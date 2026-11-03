@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -129,6 +130,23 @@ class BackendConfigTests(unittest.TestCase):
         path = directory / name
         path.write_text(json.dumps(document), encoding="utf-8")
         return path
+
+    def test_context_headroom_validation_and_capacity_states(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            for value in (-1, True, 1.5, "64", None):
+                with self.subTest(value=value), self.assertRaises(ValueError):
+                    load_backend_config(self.write(directory, backend_document("http://example.invalid", context_headroom_tokens=value)))
+            backend = load_backend_config(self.write(directory, backend_document("http://example.invalid", context_headroom_tokens=64)))
+            self.assertEqual(backend.context_headroom_tokens, 64)
+            self.assertEqual(load_backend_config(self.write(directory, backend_document("http://example.invalid"))).context_headroom_tokens, 0)
+            policy = SimpleNamespace(max_context_tokens=2048)
+            for observed, expected in ((2112, "ok"), (2048, "insufficient"), ("unknown", "unknown")):
+                with self.subTest(observed=observed):
+                    collectors = {"collectors": [{"source": "engine_info", "state": "ok", "last_value": {"option.max_model_len": observed}}]}
+                    result = GatewayApp._engine_context_capacity(policy, backend, collectors)
+                    self.assertEqual(result["state"], expected)
+                    self.assertEqual(result["reason_code"], "ENGINE_CONTEXT_CAPACITY_INSUFFICIENT" if expected == "insufficient" else None)
 
     def test_strict_config_prefix_timeouts_and_metric_parser(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

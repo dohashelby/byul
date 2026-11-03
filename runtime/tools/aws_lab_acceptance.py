@@ -239,6 +239,20 @@ def _parse_time(value: object) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def _timeline_reset(before: dict[str, Any], probe: dict[str, Any] | None, started_at: object) -> bool:
+    started = _parse_time(started_at)
+    previous = before.get("entries")
+    current = probe.get("entries") if isinstance(probe, dict) else None
+    if started is None or not isinstance(previous, list) or not previous or not isinstance(current, list) or not current:
+        return False
+    old_times = [_parse_time(row.get("from")) if isinstance(row, dict) else None for row in previous]
+    new_times = [_parse_time(row.get("from")) if isinstance(row, dict) else None for row in current]
+    if any(value is None for value in old_times + new_times):
+        return False
+    old_last = max(old_times)
+    return all(value >= started and value > old_last for value in new_times)
+
+
 def _after(value: object, since: str) -> bool:
     observed = _parse_time(value)
     boundary = _parse_time(since)
@@ -404,8 +418,8 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
                    ("restart_ok", "observed_503", "recovered_200", "cleanup_ok")),
         "AWS-16": (("stop_ok", "expired_unknown", "request_200", "cleanup_ok"),
                    ("expired_unknown", "request_200", "cleanup_ok")),
-        "AWS-17": (("pod_changed", "timeline_new_uid", "old_phase_absent"),
-                   ("pod_changed", "timeline_new_uid", "old_phase_absent")),
+        "AWS-17": (("pod_changed", "timeline_new_uid", "timeline_reset", "old_phase_absent"),
+                   ("pod_changed", "timeline_new_uid", "timeline_reset", "old_phase_absent")),
         "AWS-18": (("normal", "stream", "usage", "log_match", "context_boundary", "context_exceeded"),
                    ("normal", "stream", "usage", "context_boundary", "context_exceeded")),
         "AWS-19": (("codes", "reasons", "records", "not_delivered", "engine_log_absent", "positive_control"),
@@ -959,6 +973,7 @@ class AWSAcceptance:
             "name": metadata.get("name"),
             "uid": metadata.get("uid"),
             "container_id": engine.get("containerID") if isinstance(engine, dict) else None,
+            "started_at": ((engine.get("state") or {}).get("running") or {}).get("startedAt") if isinstance(engine, dict) else None,
             "ready": ready,
         }, result
 
@@ -1501,7 +1516,11 @@ class AWSAcceptance:
             payload["prompt"] = prompt
         boundary = self._request("POST", route, token=token, payload=payload, timeout=300)
         usage = _completion_usage(boundary)
-        boundary_ok = False if boundary.status != 200 else (usage <= output_tokens if usage is not None else None)
+        boundary_document = _json_object(boundary.body)
+        choices = boundary_document.get("choices") if boundary_document else None
+        finish_reason = choices[0].get("finish_reason") if isinstance(choices, list) and choices and isinstance(choices[0], dict) else None
+        engine_truncated = finish_reason == "length" and usage is not None and usage < output_tokens
+        boundary_ok = False if boundary.status != 200 or engine_truncated else (usage <= output_tokens if usage is not None else None)
         exceeded = self._request("POST", route, token=token,
                                  payload={**payload, "max_tokens": output_tokens + 1}, timeout=300)
         body = _json_object(exceeded.body)
@@ -1519,6 +1538,8 @@ class AWSAcceptance:
             "state": "tested", "input_tokens": input_tokens, "output_tokens": output_tokens,
             "sum": input_tokens + output_tokens, "limit": limit,
             "boundary_status": boundary.status, "boundary_usage_completion_tokens": usage,
+            "boundary_finish_reason": finish_reason, "engine_truncated": engine_truncated,
+            "boundary_result": "엔진 잘림" if engine_truncated else None,
             "exceeded_status": exceeded.status,
             "exceeded_reason": error.get("code") if isinstance(error, dict) else None,
             "exceeded_record": record,
@@ -2218,6 +2239,9 @@ class AWSAcceptance:
         }
         stopped_target: dict[str, Any] | None = None
         stopped_target_status: int | None = None
+        request_target_state: str | None = None
+        request_target_status: int | None = None
+        request_target_error: str | None = None
         stopped_valid = False
         target_recovered = False
         recovered_target: dict[str, Any] | None = None
@@ -2259,42 +2283,50 @@ class AWSAcceptance:
                 unavailable_deadline = stopped_window_started + stale + 12.0
                 while True:
                     try:
-                        _probe_response, probe_target = self._get_json("/api/target")
-                    except (OSError, URLError, TimeoutError):
+                        probe_response, probe_target = self._get_json("/api/target")
+                        request_target_status = probe_response.status
+                        request_target_error = None
+                    except (OSError, URLError, TimeoutError) as error:
                         probe_target = None
-                    probe_state = ((probe_target or {}).get("verification") or {}).get("state") if isinstance(probe_target, dict) else None
-                    if probe_state in {"unavailable", "blocked"} or self.monotonic() >= unavailable_deadline:
+                        request_target_status = None
+                        request_target_error = _safe_exception(error)
+                    request_target_state = ((probe_target or {}).get("verification") or {}).get("state") if request_target_status == 200 and isinstance(probe_target, dict) else None
+                    if request_target_state in {"unavailable", "blocked"} or self.monotonic() >= unavailable_deadline:
                         break
                     self.sleep(1.0)
-                try:
-                    stopped_response, stopped_request_id, stopped_valid = self._completion(
-                        token=self.tokens["RUNTIME_INFERENCE_TOKEN"],
-                        timeout=min(max(stale, 1.0), 30.0),
-                    )
-                    stopped_record = _record_fields(self._detail(stopped_request_id))
-                    stopped_document = _json_object(stopped_response.body)
-                    stopped_error = (
-                        stopped_document.get("error")
-                        if stopped_document and isinstance(stopped_document.get("error"), dict)
-                        else {}
-                    )
-                    stopped_request = {
-                        "http_status": stopped_response.status,
-                        "reason_code": (
-                            stopped_record.get("reason_code")
-                            if stopped_record
-                            else stopped_error.get("code")
-                        ),
-                        "error": None,
-                    }
-                    _target_response, stopped_target = self._get_json("/api/target")
-                    stopped_target_status = _target_response.status
-                except (OSError, URLError, TimeoutError) as error:
-                    stopped_request = {
-                        "http_status": None,
-                        "reason_code": None,
-                        "error": _safe_exception(error),
-                    }
+                if request_target_state == "unavailable":
+                    try:
+                        stopped_response, stopped_request_id, stopped_valid = self._completion(
+                            token=self.tokens["RUNTIME_INFERENCE_TOKEN"],
+                            timeout=min(max(stale, 1.0), 30.0),
+                        )
+                        stopped_record = _record_fields(self._detail(stopped_request_id))
+                        stopped_document = _json_object(stopped_response.body)
+                        stopped_error = (
+                            stopped_document.get("error")
+                            if stopped_document and isinstance(stopped_document.get("error"), dict)
+                            else {}
+                        )
+                        stopped_request = {
+                            "http_status": stopped_response.status,
+                            "reason_code": (
+                                stopped_record.get("reason_code")
+                                if stopped_record
+                                else stopped_error.get("code")
+                            ),
+                            "error": None,
+                        }
+                        _target_response, stopped_target = self._get_json("/api/target")
+                        stopped_target_status = _target_response.status
+                    except (OSError, URLError, TimeoutError) as error:
+                        stopped_request = {
+                            "http_status": None,
+                            "reason_code": None,
+                            "error": _safe_exception(error),
+                        }
+                else:
+                    stopped_request["error"] = ("target blocked" if request_target_state == "blocked" else
+                                                 "target 조회 실패" if request_target_error else "target unavailable 기한 초과")
         finally:
             phase_stopped = self._timeline()
             start_requested_at = _now()
@@ -2330,10 +2362,12 @@ class AWSAcceptance:
         gap_scan_ok, gap_refs = self._new_gap_refs(positions) if gaps_readable else (False, [])
         heartbeat_refs = list(heartbeat_snapshot.values())
         return {
+            **({"unknown_reason": "중단 중 /api/target 조회 실패 또는 unavailable 확인 기한 초과: " + (request_target_error or str(request_target_status))}
+               if stop.returncode == 0 and request_target_state not in {"unavailable", "blocked"} else {}),
             "stop_ok": stop.returncode == 0,
             "heartbeat_stopped_seen": heartbeat_seen,
             "collectors_unavailable": unavailable,
-            "stopped_request_200_unverified": (
+            "stopped_request_200_unverified": (False if request_target_state == "blocked" else None if request_target_state != "unavailable" else (
                 stopped_request["http_status"] == 200
                 and stopped_valid
                 and stopped_target_status == 200
@@ -2341,7 +2375,7 @@ class AWSAcceptance:
                 and isinstance(stopped_target.get("verification"), dict)
                 and stopped_target["verification"].get("state") == "unavailable"
                 and stopped_target.get("gateway_hold") is None
-            ),
+            )),
             "start_ok": bool(start and start.returncode == 0),
             "collectors_recovered": recovery_ok,
             "target_recovered": target_recovered,
@@ -2375,6 +2409,7 @@ class AWSAcceptance:
             },
             "heartbeat_stopped": heartbeat_snapshot,
             "stopped_interval_request": stopped_request,
+            "request_target_verification": {"http_status": request_target_status, "state": request_target_state, "error": request_target_error},
             "stopped_target_verification": stopped_target.get("verification") if stopped_target else None,
             "recovered_target_verification": recovered_target.get("verification") if recovered_target else None,
             "recovery_request": {
@@ -2737,7 +2772,13 @@ class AWSAcceptance:
         status = self._kubectl("rollout", "status", f"deployment/{deployment}", f"--timeout={timeout_s}s", timeout=timeout_s + 10) if restart.returncode == 0 else CommandResult(1)
         return restart.returncode == 0 and status.returncode == 0, {"restart_rc": restart.returncode, "rollout_rc": status.returncode}
 
-    def _gateway_crashed(self, window_s: float) -> tuple[bool | None, dict[str, Any]]:
+    def _gateway_pods(self) -> list[dict[str, Any]] | None:
+        result = self._kubectl("get", "pods", "-l", "app=serving-gateway", "-o", "json")
+        document = _json_object(result.stdout.encode()) if result.returncode == 0 else None
+        items = document.get("items") if isinstance(document, dict) else None
+        return [item for item in items if isinstance(item, dict) and not (item.get("metadata") or {}).get("deletionTimestamp")] if isinstance(items, list) else None
+
+    def _gateway_crashed(self, window_s: float, previous_uids: set[str]) -> tuple[bool | None, dict[str, Any]]:
         """True if the newest Gateway container exited after the restart.
 
         False only when it stayed running for the whole window; None when the
@@ -2747,12 +2788,12 @@ class AWSAcceptance:
         last: dict[str, Any] = {}
         seen = False
         while True:
-            result = self._kubectl("get", "pods", "-l", "app=serving-gateway", "-o", "json")
-            document = _json_object(result.stdout.encode()) if result.returncode == 0 else None
-            items = document.get("items") if isinstance(document, dict) else None
-            pods = [item for item in items if isinstance(item, dict) and not (item.get("metadata") or {}).get("deletionTimestamp")] if isinstance(items, list) else []
+            items = self._gateway_pods()
+            pods = [item for item in items if isinstance((item.get("metadata") or {}).get("uid"), str) and (item.get("metadata") or {}).get("uid") not in previous_uids] if items is not None else []
             if pods:
                 pod = max(pods, key=lambda item: str((item.get("metadata") or {}).get("creationTimestamp", "")))
+                metadata = pod.get("metadata") or {}
+                last.update({"pod_uid": metadata.get("uid"), "pod_name": metadata.get("name")})
                 statuses = (pod.get("status") or {}).get("containerStatuses") or []
                 status = next((item for item in statuses if isinstance(item, dict) and item.get("name") == "gateway"), None)
                 if isinstance(status, dict):
@@ -2760,8 +2801,8 @@ class AWSAcceptance:
                     state = status.get("state") or {}
                     last_state = status.get("lastState") or {}
                     waiting = (state.get("waiting") or {}).get("reason")
-                    last = {"restart_count": status.get("restartCount"), "waiting_reason": waiting,
-                            "terminated": bool(state.get("terminated") or last_state.get("terminated"))}
+                    last.update({"restart_count": status.get("restartCount"), "waiting_reason": waiting,
+                            "terminated": bool(state.get("terminated") or last_state.get("terminated"))})
                     if (isinstance(status.get("restartCount"), int) and status["restartCount"] > 0) or last["terminated"] or waiting in {"CrashLoopBackOff", "Error"}:
                         return True, last
             if self.monotonic() >= deadline:
@@ -2916,6 +2957,12 @@ class AWSAcceptance:
                 raise ValueError("bundle role empty")
             target.write_bytes(bytes([data[0] ^ 1]) + data[1:])
             evidence["same_byte_length"] = target.stat().st_size == len(data)
+            gateway_pods_before = self._gateway_pods()
+            if not gateway_pods_before or any(not (item.get("metadata") or {}).get("uid") for item in gateway_pods_before):
+                facts["unknown_reason"] = "재시작 전 Gateway Pod UID 조회 실패"
+                return facts, evidence
+            previous_uids = {(item.get("metadata") or {})["uid"] for item in gateway_pods_before}
+            evidence["gateway_pod_uids_before"] = sorted(previous_uids)
             os.symlink(bad.name, swap)
             os.replace(swap, current)
             switched = True
@@ -2923,15 +2970,16 @@ class AWSAcceptance:
             # Pod start, exit, and crash-loop, while `rollout status` can still
             # succeed. Judge by the container's exit and its log, not rollout.
             _bad_rollout, evidence["bad_restart"] = self._restart("serving-gateway", 45)
-            crashed, crash_state = self._gateway_crashed(45.0)
+            crashed, crash_state = self._gateway_crashed(45.0, previous_uids)
             evidence["bad_gateway_state"] = crash_state
             hash_error = False
-            if crashed:
+            if crashed and crash_state.get("pod_name"):
                 for extra in (("--previous",), ()):
-                    logs = self._kubectl("logs", "deployment/serving-gateway", "-c", "gateway", "--tail=100", *extra)
-                    if logs.returncode == 0 and ("SHA-256" in logs.stdout or "sha256" in logs.stdout.lower()):
-                        hash_error = True
-                        break
+                    logs = self._kubectl("logs", "pod/" + crash_state["pod_name"], "-c", "gateway", "--tail=100", *extra)
+                    if logs.returncode != 0 or not logs.stdout.strip():
+                        continue
+                    hash_error = "sha256" in logs.stdout.lower() or "SHA-256" in logs.stdout
+                    break
             facts["bad_bundle_rejected"] = (True if hash_error else None) if crashed else (False if crashed is False else None)
             evidence["hash_error_seen"] = hash_error
         except (OSError, ValueError, KeyError, StopIteration, TypeError, json.JSONDecodeError) as error:
@@ -3200,17 +3248,24 @@ class AWSAcceptance:
             self.sleep(2.0)
         probe_collector = (timeline_at_probe or {}).get("collector") or {}
         old_stale = (probe_collector.get("pod_uid") == before["uid"] and all(row.get("phase") in (None, [], ["unknown"]) for row in matched))
-        # The timeline is rewritten every few seconds, so exact written_at
-        # equality never holds. A fresh timeline written after the old Pod's
-        # last write, while the collector follows the new Pod UID, can only be
-        # the new Pod's timeline.
+        # A collector UID alone cannot prove that entries were reset. Compare
+        # every entry start with the new container start and old last entry.
         old_written = _parse_time((timeline_before.get("collector") or {}).get("written_at")) if isinstance(timeline_before, dict) else None
-        new_fresh = (probe_collector.get("pod_uid") == after["uid"] and old_written is not None
+        previous_entries = timeline_before.get("entries") or []
+        previous_starts = [_parse_time(row.get("from")) for row in previous_entries if isinstance(row, dict)]
+        old_last_start = max((item for item in previous_starts if item is not None), default=None)
+        probe_entries = (timeline_at_probe or {}).get("entries") or []
+        fresh_entries = _timeline_reset(timeline_before, timeline_at_probe, after.get("started_at"))
+        fresh_phases = {row.get("phase") for row in probe_entries if isinstance(row, dict)}
+        matched_phases = {phase for row in matched for phase in (row.get("phase") if isinstance(row.get("phase"), list) else [row.get("phase")]) if phase not in (None, "unknown")}
+        new_fresh = (probe_collector.get("pod_uid") == after["uid"] and old_written is not None and fresh_entries
+                     and matched_phases <= fresh_phases
                      and all(row.get("phase_timeline_fresh") is True
                              and (_parse_time(row.get("phase_timeline_written_at")) or old_written) > old_written
                              for row in matched))
         facts["old_phase_absent"] = (old_stale or new_fresh) if raw_uid and available and matched else None
-        evidence.update({"raw_process_pod_uid": raw_uid, "raw_event_time": raw_time, "timeline_at_probe": probe_collector, "probe_phase": [row.get("phase") for row in matched], "phase_source": "old_uid_rejected" if old_stale else "new_uid_timeline" if new_fresh else None})
+        evidence.update({"raw_process_pod_uid": raw_uid, "raw_event_time": raw_time, "timeline_at_probe": probe_collector, "probe_phase": [row.get("phase") for row in matched], "phase_source": "old_uid_rejected" if old_stale else "new_uid_timeline" if new_fresh else None,
+                         "timeline_reset": {"new_container_started_at": after.get("started_at"), "old_last_entry_start": old_last_start.isoformat() if old_last_start else None, "entries_after_new_start": fresh_entries, "matched_phases_in_new_timeline": matched_phases <= fresh_phases}})
         timeline_new = None
         for attempt in range(20):
             timeline_new = self._timeline()
@@ -3219,6 +3274,8 @@ class AWSAcceptance:
             if attempt < 19:
                 self.sleep(1.0)
         facts["timeline_new_uid"] = (timeline_new or {}).get("collector", {}).get("pod_uid") == after["uid"]
+        facts["timeline_reset"] = (_timeline_reset(timeline_before, timeline_new, after.get("started_at"))
+                                   if facts["timeline_new_uid"] and (timeline_new or {}).get("entries") else None)
         evidence["timeline_after"] = (timeline_new or {}).get("collector")
         evidence["tetragon_counts_after"] = self._tetragon_counts()
         counts_before, counts_after = evidence["tetragon_counts_before"], evidence["tetragon_counts_after"]

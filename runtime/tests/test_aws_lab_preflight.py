@@ -88,6 +88,39 @@ class PreflightTests(unittest.TestCase):
         self.assertIn(("kubectl", "--context", "byul-aws-lab", "-n", "serving-lab", "get", "tracingpoliciesnamespaced", "-o", "json"), self.runner.calls)
         self.assertEqual(checks["tracingpoliciesnamespaced"].status, "ok")
         self.assertFalse(any(word in call for call in self.runner.calls for word in ("apply", "patch", "delete", "restart", "create")))
+        self.assertNotIn("boundary_probe:chat", checks)
+
+    def test_boundary_probe_is_opt_in_and_reports_both_routes(self):
+        self.args.boundary_probe = True
+        original_run = self.runner.run
+        def run(argv, *, timeout=8):
+            if "exec" in argv:
+                self.runner.calls.append(tuple(argv))
+                state, reason = ("ok", "요청 답변 길이 생성") if argv[-1] == "chat" else ("fail", "답변 잘림")
+                return CommandResult(0, json.dumps({"state": state, "reason": reason, "completion_tokens": 2}))
+            return original_run(argv, timeout=timeout)
+        self.runner.run = run
+        def opener(request, timeout):
+            if request.full_url.endswith("/api/policy"):
+                class PolicyResponse(FakeResponse):
+                    def read(self, *args):
+                        return json.dumps({"current": {"max_context_tokens": 2048}}).encode()
+                return PolicyResponse()
+            return FakeResponse()
+        with patch("tools.aws_lab_preflight.shutil.disk_usage") as disk:
+            disk.side_effect = lambda path: SimpleNamespace(free=(70 if path == self.args.image_store else 10) * 1024**3)
+            checks = {c.name: c for c in collect(self.args, self.runner, opener=opener)}
+        self.assertEqual(checks["boundary_probe:chat"].status, "ok")
+        self.assertEqual(checks["boundary_probe:completions"].reason, "답변 잘림")
+        commands = [call for call in self.runner.calls if "exec" in call]
+        self.assertEqual(len(commands), 2)
+        self.assertTrue(all(call[-3] == "2048" and "python3" in call and "-c" in call for call in commands))
+
+    def test_boundary_probe_without_policy_limit_is_unknown_without_exec(self):
+        self.args.boundary_probe = True
+        checks = self.check()
+        self.assertEqual(checks["boundary_probe:chat"].status, "unknown")
+        self.assertFalse(any("exec" in call for call in self.runner.calls))
 
     def test_verify_failure_is_fail_and_no_raw_output(self):
         self.runner.verify_code = 1

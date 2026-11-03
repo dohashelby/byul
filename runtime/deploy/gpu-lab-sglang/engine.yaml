@@ -34,7 +34,7 @@ spec:
             - |
               exec python3 -m sglang.launch_server \
                 --model-path /models --served-model-name test-model \
-                --host 0.0.0.0 --port 8000 --context-length 2048 \
+                --host 0.0.0.0 --port 8000 --context-length 2112 \
                 --log-requests --log-requests-level 0 --log-requests-format json \
                 --enable-metrics \
                 --admin-api-key "$(cat /run/sglang-admin/admin-api-key)"

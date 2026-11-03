@@ -1,4 +1,4 @@
-"""Read-only, bounded AWS GPU lab readiness snapshot. Output contains no raw command data."""
+"""Bounded AWS GPU lab readiness snapshot; generation probes require opt-in."""
 
 from __future__ import annotations
 
@@ -116,6 +116,110 @@ def _gateway(url: str, env_file: str | None, opener: Callable) -> Check:
         return _check("gateway_policy", "unknown", "상태 조회 불가")
 
 
+BOUNDARY_CODE = r'''
+import json, sys, urllib.request, urllib.error
+limit, engine, route = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+base = 'http://127.0.0.1:8000'
+def request(path, payload):
+    req = urllib.request.Request(base + path, data=json.dumps(payload).encode(),
+                                 headers={'Content-Type': 'application/json'}, method='POST')
+    try:
+        with urllib.request.urlopen(req, timeout=300) as response:
+            return response.status, json.load(response)
+    except urllib.error.HTTPError as error:
+        return error.code, None
+def payload(text, tokens=None):
+    value = {'model': 'test-model'}
+    if route == 'chat':
+        value['messages'] = [{'role': 'user', 'content': text}]
+        if tokens is None and engine == 'vllm':
+            value['add_generation_prompt'] = True
+    else:
+        value['prompt'] = text
+    if tokens is not None:
+        value['ignore_eos'] = True
+        value['max_completion_tokens' if route == 'chat' and engine == 'sglang' else 'max_tokens'] = tokens
+    return value
+low, high, selected = 1, max(4096, limit * 4), None
+for _ in range(32):
+    if low > high:
+        break
+    middle = (low + high) // 2
+    status, data = request('/tokenize', payload(('hello ' * middle).strip()))
+    count = data.get('count') if isinstance(data, dict) else None
+    if status != 200 or type(count) is not int or count < 0:
+        break
+    if limit - 8 <= count < limit:
+        selected = middle, count
+        break
+    if count < limit - 8:
+        low = middle + 1
+    else:
+        high = middle - 1
+if selected is None:
+    print(json.dumps({'state': 'unknown', 'reason': '토큰 수를 못 찾음'}))
+    sys.exit()
+repeats, count = selected
+output = limit - count
+status, data = request('/v1/' + ('chat/completions' if route == 'chat' else 'completions'),
+                       payload(('hello ' * repeats).strip(), output))
+usage = data.get('usage') if isinstance(data, dict) else None
+completion = usage.get('completion_tokens') if isinstance(usage, dict) else None
+if 400 <= status < 500:
+    state, reason = 'fail', '경계 거부'
+elif status == 200 and type(completion) is int and completion == output:
+    state, reason = 'ok', '요청 답변 길이 생성'
+elif status == 200 and type(completion) is int and completion < output:
+    state, reason = 'fail', '답변 잘림'
+else:
+    state, reason = 'unknown', '엔진 응답 또는 usage 미확인'
+print(json.dumps({'state': state, 'reason': reason, 'http_status': status,
+                  'input_tokens': count, 'requested_completion_tokens': output,
+                  'completion_tokens': completion if type(completion) is int else None}))
+'''
+
+
+def _policy_limit(url: str, env_file: str | None, opener: Callable) -> int | None:
+    token = _token(env_file)
+    for authorization in (None, token):
+        try:
+            headers = {"Authorization": f"Bearer {authorization}"} if authorization else {}
+            with opener(Request(url.rstrip("/") + "/api/policy", headers=headers), timeout=5) as response:
+                document = json.load(response)
+                if response.status != 200 or not isinstance(document, dict):
+                    return None
+                current = document.get("current") or document.get("policy") or {}
+                value = current.get("max_context_tokens") if isinstance(current, dict) else None
+                return value if isinstance(value, int) and not isinstance(value, bool) and value > 8 else None
+        except HTTPError as error:
+            if error.code in (401, 403) and authorization is None and token:
+                continue
+            return None
+        except (URLError, OSError, ValueError, TimeoutError):
+            return None
+    return None
+
+
+def _boundary_checks(args: argparse.Namespace, runner: Runner, opener: Callable) -> list[Check]:
+    limit = _policy_limit(args.gateway_url, args.env_file, opener)
+    if limit is None:
+        return [_check("boundary_probe:" + route, "unknown", "정책 context 상한 조회 불가") for route in ("chat", "completions")]
+    base = ["kubectl", "--context", args.context, "-n", args.namespace,
+            "exec", "deployment/serving-engine", "-c", "engine", "--", "python3", "-c", BOUNDARY_CODE]
+    checks = []
+    for route in ("chat", "completions"):
+        result = runner.run(base + [str(limit), args.engine, route], timeout=600)
+        try:
+            document = json.loads(result.stdout) if result.returncode == 0 else None
+        except ValueError:
+            document = None
+        if not isinstance(document, dict) or document.get("state") not in {"ok", "fail", "unknown"}:
+            checks.append(_check("boundary_probe:" + route, "unknown", "엔진 Pod 실측 결과 없음"))
+        else:
+            checks.append(_check("boundary_probe:" + route, document["state"], document.get("reason", "결과 사유 없음")))
+    return checks
+
+
 def collect(args: argparse.Namespace, runner: Runner | None = None, *, opener: Callable = urlopen, now: datetime | None = None) -> list[Check]:
     runner = runner or Runner()
     now = now or datetime.now(timezone.utc)
@@ -205,6 +309,8 @@ def collect(args: argparse.Namespace, runner: Runner | None = None, *, opener: C
             present = {item.get("metadata", {}).get("name") for item in doc.get("items", [])}
             checks.append(_check(resource, "ok" if set(names) <= present else "fail", "필수 정책 존재" if set(names) <= present else "필수 정책 누락"))
     checks.append(_gateway(args.gateway_url, args.env_file, opener))
+    if getattr(args, "boundary_probe", False):
+        checks.extend(_boundary_checks(args, runner, opener))
     try:
         free = shutil.disk_usage(args.evidence_dir).free
         checks.append(_check("disk", "ok" if free >= 5 * 1024**3 else "fail", "여유 5 GiB 이상" if free >= 5 * 1024**3 else "여유 5 GiB 미만"))
@@ -237,6 +343,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--expect-engine-digest", help="expected declared image or Pod imageID sha256 digest")
     parser.add_argument("--env-file", help="private file with RUNTIME_VIEWER_TOKEN")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--boundary-probe", action="store_true", help="엔진 직접 생성 요청으로 정책 경계 실측")
     return parser
 
 

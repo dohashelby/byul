@@ -426,6 +426,7 @@ class ExecPolicy:
             "exception_id": None, "exception_kind": None, "exception_candidate_id": None,
             "binary_location": "other",
             "parent_attribution": "available" if parent else "unavailable",
+            "suspect_context": None,
             "image_digest": image, "rule_refs": ["SP3-EXEC"],
         }
 
@@ -459,6 +460,8 @@ class ExecPolicy:
         observed_at: str,
         pod_uid: str | None = None,
     ) -> dict[str, Any]:
+        # Tetragon supplies the execve argument. Compare it exactly: lexical
+        # normalization could turn an attacker-controlled path into an allowlisted one.
         try:
             at: datetime | None = datetime.fromisoformat(observed_at)
         except ValueError:
@@ -488,6 +491,26 @@ class ExecPolicy:
         bases = sorted({entry.basis for entry in entries})
         trusted = sorted({entry.phase for entry in entries if entry.basis in TRUSTED_BASES})
         intent = self.intent
+        constraints = dict(intent.parent_constraints)
+        if binary not in constraints:
+            parent_check = "not_constrained"
+        elif not parent:
+            parent_check = "unavailable"
+        elif parent in constraints[binary]:
+            parent_check = "matched"
+        else:
+            parent_check = "mismatch"
+        parent_allowed = parent_check in {"matched", "not_constrained"}
+        suspect_parent_context = next(
+            ((parents, phases) for executable, parents, phases in intent.suspect_parent_contexts
+             if executable == binary), None
+        )
+        suspect_context = (
+            "compile_toolchain_parent"
+            if suspect_parent_context is not None and parent in suspect_parent_context[0]
+            and bool(set(active) & set(suspect_parent_context[1]))
+            else None
+        )
         approved = set(intent.allowed_engine_binaries)
         for phase in active:
             approved |= set(intent.binaries_for(phase))
@@ -513,12 +536,25 @@ class ExecPolicy:
 
         matched = covering(trusted)
         candidate = covering(active) if matched is None else None
-        if matched is not None:
+        if not parent_allowed and not from_cache:
+            # A constrained executable never inherits an exception or phase
+            # approval through a different or missing parent.
+            verdict = "outside_allowlist"
+            matched = None
+            candidate = None
+        elif suspect_parent_context is not None:
+            # Context explains a suspect execution; it never changes its verdict.
+            verdict = "suspect_binary"
+            matched = None
+            candidate = None
+        elif matched is not None:
             verdict = "exception"
         elif from_cache:
             verdict = "exec_from_cache"
         elif binary in intent.suspect_binaries:
             verdict = "suspect_binary"
+        elif binary in intent.allowed_engine_binaries:
+            verdict = "allowed_in_phase"
         elif not active:
             verdict = "phase_unknown"
         elif candidate is not None:
@@ -549,6 +585,8 @@ class ExecPolicy:
             "exception_candidate_id": candidate.exception_id if candidate else None,
             "binary_location": "cache" if from_cache else "other",
             "parent_attribution": "available" if parent else "unavailable",
+            "parent_check": parent_check,
+            "suspect_context": suspect_context,
             "image_digest": image,
             "rule_refs": rule_refs,
         }

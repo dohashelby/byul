@@ -289,11 +289,10 @@ def collect(args: argparse.Namespace, runner: Runner | None = None, *, opener: C
     elif not exec_start:
         checks.append(_check("phase_timeline", "unknown", "수집기 ExecStart 값 없음"))
     else:
-        enabled = "--phase-timeline" in exec_start
-        expected_enabled = args.engine == "vllm"
-        checks.append(_check("phase_timeline", "ok" if enabled == expected_enabled else "fail", "단계 시간표 설정 일치" if enabled == expected_enabled else "단계 시간표 설정 불일치"))
+        enabled = "--phase-timeline" in exec_start and (args.engine == "vllm" or "--phase-engine sglang" in exec_start)
+        checks.append(_check("phase_timeline", "ok" if enabled else "fail", "단계 시간표 설정 일치" if enabled else "단계 시간표 설정 불일치"))
     obs = Path(args.observation_dir)
-    for name in ("hubble.heartbeat.json", "tetragon.heartbeat.json", "target-pods.json") + (("phase-timeline.json",) if args.engine == "vllm" else ()):
+    for name in ("hubble.heartbeat.json", "tetragon.heartbeat.json", "target-pods.json", "phase-timeline.json"):
         try:
             age = now.timestamp() - (obs / name).stat().st_mtime
             status = "ok" if -5 <= age <= 30 else "fail"

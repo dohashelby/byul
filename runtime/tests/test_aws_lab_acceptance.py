@@ -519,12 +519,50 @@ class DecisionTests(unittest.TestCase):
             checker.normal_before = {"normal_ok": True, "stream_ok": True, "cache_ok": True}
             checker.detection_started_at = "2026-11-02T10:00:00Z"
             checker._normal_control = lambda: {"normal_ok": True, "stream_ok": True, "cache_ok": True}
-            checker._tetragon_observations = lambda _since: (True, [{"kind": "process_exec", "phase": ["inferring"],
+            checker._tetragon_observations = lambda _since: (True, [{"kind": "process_exec", "pod": {"pod": "engine-current"}, "phase": ["inferring"],
                 "exec_verdict": "allowed_in_phase", "phase_timeline_fresh": True}])
             checker._collectors = lambda: (response(200, {}), {"observation_feed_tetragon": {"state": "ok"}})
             facts, _evidence = checker.aws_11()
             self.assertIsNone(facts["false_warnings_zero"])
             self.assertEqual(evaluate_case("AWS-11", facts)[0], "unknown")
+
+    def test_aws11_sglang_uses_current_phase_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "observation").mkdir()
+            checker = AWSAcceptance(arguments(Path(directory), engine="sglang"), runner=FakeRunner(), http=FakeHTTP([]))
+            checker.normal_before = {"normal_ok": True, "stream_ok": True, "cache_ok": True}
+            checker.detection_started_at = "2026-11-03T00:00:00Z"
+            checker._normal_control = lambda: {"normal_ok": True, "stream_ok": True, "cache_ok": True}
+            checker._tetragon_observations = lambda _since: (True, [{"kind": "process_exec", "pod": {"pod": "engine-current"}, "phase": ["inferring"],
+                "exec_verdict": "allowed_in_phase", "phase_timeline_fresh": True}])
+            checker._collectors = lambda: (response(200, {}), {"observation_feed_tetragon": {"state": "ok"}})
+            checker._engine_pod = lambda: ({"uid": "sglang-pod", "name": "engine-current"}, CommandResult(0))
+            checker._timeline = lambda: {"extraction": {"engine": "sglang"},
+                "collector": {"state": "running", "pod_uid": "sglang-pod", "written_at": datetime.now(timezone.utc).isoformat()}}
+            facts, _ = checker.aws_11()
+            self.assertTrue(facts["false_warnings_zero"])
+            self.assertEqual(evaluate_case("AWS-11", facts)[0], "passed")
+            checker._tetragon_observations = lambda _since: (True, [{"kind": "process_exec", "pod": {"pod": "old-engine"},
+                "phase": ["inferring"], "exec_verdict": "allowed_in_phase", "phase_timeline_fresh": True}])
+            self.assertIsNone(checker.aws_11()[0]["false_warnings_zero"])
+
+    def test_aws11_variable_paths_before_phase_do_not_count_as_false_warnings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "observation").mkdir()
+            checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(), http=FakeHTTP([]))
+            checker.normal_before = {"normal_ok": True, "stream_ok": True, "cache_ok": True}
+            checker.detection_started_at = "2026-11-03T00:00:00Z"
+            checker._normal_control = lambda: {"normal_ok": True, "stream_ok": True, "cache_ok": True}
+            rows = [{"kind": "process_exec", "binary": binary, "phase": ["unknown"],
+                     "exec_verdict": "phase_unknown"} for binary in ("/proc/self/exe", "/dev/fd/11")]
+            rows.append({"kind": "process_exec", "binary": "/usr/bin/nvidia-ctk", "phase": ["loading"],
+                         "exec_verdict": "allowed_in_phase", "phase_timeline_fresh": True})
+            checker._tetragon_observations = lambda _since: (True, rows)
+            checker._collectors = lambda: (response(200, {}), {"observation_feed_tetragon": {"state": "ok"}})
+            facts, evidence = checker.aws_11()
+            self.assertTrue(facts["false_warnings_zero"])
+            self.assertEqual(evidence["false_warning_count"], 0)
+            self.assertEqual(evidence["phase_evidence"]["unknown_exec_count"], 2)
 
     PASS_FACTS = {
         "AWS-01": dict.fromkeys(
@@ -1907,8 +1945,8 @@ class NewCaseExecutionTests(unittest.TestCase):
     def test_stage_expires_during_collector_stop_and_request_stays_200(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            checker = AWSAcceptance(arguments(root, cases=("AWS-16",), allow_collector_stop=True), runner=FakeRunner(), http=FakeHTTP([]), sleeper=lambda _s: None)
-            timeline = {"schema_version": "runtime-phase-timeline/1.0", "collector": {"state": "running", "pod_uid": "old", "written_at": datetime.now(timezone.utc).isoformat()}, "entries": [{"phase": "inferring"}]}
+            checker = AWSAcceptance(arguments(root, cases=("AWS-16",), engine="sglang", allow_collector_stop=True), runner=FakeRunner(), http=FakeHTTP([]), sleeper=lambda _s: None)
+            timeline = {"schema_version": "runtime-phase-timeline/1.0", "extraction": {"engine": "sglang"}, "collector": {"state": "running", "pod_uid": "old", "written_at": datetime.now(timezone.utc).isoformat()}, "entries": [{"phase": "inferring"}]}
             checker._timeline = lambda: timeline
             checker._engine_pod = lambda: ({"name": "engine", "uid": "old"}, CommandResult(0))
             checker._wait_tetragon = lambda *_args: (True, {"kind": "process_exec", "phase": ["unknown"]})
@@ -1924,7 +1962,7 @@ class NewCaseExecutionTests(unittest.TestCase):
             runner = FakeRunner()
             checker = AWSAcceptance(arguments(root, cases=("AWS-16",), allow_collector_stop=True), runner=runner, http=FakeHTTP([]))
             checker._engine_pod = lambda: ({"name": "engine", "uid": "current"}, CommandResult(0))
-            timeline = {"schema_version": "runtime-phase-timeline/1.0", "collector": {
+            timeline = {"schema_version": "runtime-phase-timeline/1.0", "extraction": {"engine": "vllm"}, "collector": {
                 "state": "running", "pod_uid": "current", "written_at": "2026-11-02T00:00:00Z"},
                 "entries": [{"phase": "inferring"}]}
             checker._timeline = lambda: timeline
@@ -1933,7 +1971,7 @@ class NewCaseExecutionTests(unittest.TestCase):
                 timeline["collector"].update(written_at=written_at, pod_uid=pod_uid)
                 facts, _evidence = checker.aws_16()
                 self.assertEqual(evaluate_case("AWS-16", facts)[0], "unknown")
-                self.assertFalse(runner.history)
+                self.assertFalse(any(row["argv"][:3] == ["systemctl", "--user", "stop"] for row in runner.history))
 
     def test_aws16_sglang_never_stops_collector_with_leftover_timeline(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -1951,9 +1989,26 @@ class NewCaseExecutionTests(unittest.TestCase):
                 else:
                     timeline.unlink()
                 facts, _evidence = checker.aws_16()
-                self.assertIn("단계 수집 꺼짐", facts["unknown_reason"])
+                self.assertIn(facts["unknown_reason"],
+                              {"현재 엔진 Pod의 신선한 단계 시간표 미확인", "단계 시간표 비활성 또는 읽기 실패"})
                 self.assertEqual(evaluate_case("AWS-16", facts)[0], "unknown")
-                self.assertFalse(runner.history)
+                self.assertFalse(any(row["argv"][:3] == ["systemctl", "--user", "stop"] for row in runner.history))
+
+    def test_aws16_and_aws17_reject_other_engine_timeline_before_mutation(self) -> None:
+        for engine, other in (("sglang", "vllm"), ("vllm", "sglang")):
+            for case_id in ("AWS-16", "AWS-17"):
+                with self.subTest(engine=engine, case=case_id), tempfile.TemporaryDirectory() as directory:
+                    runner = FakeRunner()
+                    checker = AWSAcceptance(arguments(Path(directory), cases=(case_id,), engine=engine,
+                        allow_collector_stop=True, allow_engine_restart=True), runner=runner, http=FakeHTTP([]))
+                    checker._engine_pod = lambda: ({"name": "engine", "uid": "current"}, CommandResult(0))
+                    checker._timeline = lambda: {"extraction": {"engine": other},
+                        "collector": {"state": "running", "pod_uid": "current",
+                                      "written_at": datetime.now(timezone.utc).isoformat()},
+                        "entries": [{"phase": "inferring"}]}
+                    facts, _evidence = checker.aws_16() if case_id == "AWS-16" else checker.aws_17()
+                    self.assertEqual(evaluate_case(case_id, facts)[0], "unknown")
+                    self.assertFalse(runner.history)
 
     def test_pod_stage_probe_uses_real_tetragon_uid_shape_and_exit_accounting(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -1966,13 +2021,13 @@ class NewCaseExecutionTests(unittest.TestCase):
                 + json.dumps({"time": event_time, "process_exit": {"process": {"pod": {"uid": "new-uid"}}}}) + "\n"
             )
             runner = FakeRunner()
-            checker = AWSAcceptance(arguments(root, cases=("AWS-17",), allow_engine_restart=True), runner=runner, http=FakeHTTP([]), sleeper=lambda _s: None)
+            checker = AWSAcceptance(arguments(root, cases=("AWS-17",), engine="sglang", allow_engine_restart=True), runner=runner, http=FakeHTTP([]), sleeper=lambda _s: None)
             pods = iter(({"name": "engine-old", "uid": "old-uid"}, {"name": "engine-new", "uid": "new-uid", "started_at": "2026-11-03T00:00:00Z"}))
             checker._engine_pod = lambda: (next(pods), CommandResult(0))
             timelines = iter((
-                {"schema_version": "runtime-phase-timeline/1.0", "collector": {"pod_uid": "old-uid", "state": "running", "written_at": datetime.now(timezone.utc).isoformat()}, "entries": [{"phase": "inferring", "from": "2026-11-02T23:59:00Z"}]},
-                {"schema_version": "runtime-phase-timeline/1.0", "collector": {"pod_uid": "new-uid", "state": "running"}, "entries": [{"phase": "ready", "from": "2026-11-03T00:00:00Z"}]},
-                {"schema_version": "runtime-phase-timeline/1.0", "collector": {"pod_uid": "new-uid", "state": "running"}, "entries": [{"phase": "ready", "from": "2026-11-03T00:00:00Z"}]},
+                {"schema_version": "runtime-phase-timeline/1.0", "extraction": {"engine": "sglang"}, "collector": {"pod_uid": "old-uid", "state": "running", "written_at": datetime.now(timezone.utc).isoformat()}, "entries": [{"phase": "inferring", "from": "2026-11-02T23:59:00Z"}]},
+                {"schema_version": "runtime-phase-timeline/1.0", "extraction": {"engine": "sglang"}, "collector": {"pod_uid": "new-uid", "state": "running"}, "entries": [{"phase": "ready", "from": "2026-11-03T00:00:00Z"}]},
+                {"schema_version": "runtime-phase-timeline/1.0", "extraction": {"engine": "sglang"}, "collector": {"pod_uid": "new-uid", "state": "running"}, "entries": [{"phase": "ready", "from": "2026-11-03T00:00:00Z"}]},
             ))
             checker._timeline = lambda: next(timelines)
             checker._tetragon_observations = lambda _since: (True, [{"kind": "process_exec", "binary": "/bin/sh", "observed_at": event_time, "pod": {"namespace": "serving-lab", "pod": "engine-new"}, "phase": ["ready"], "phase_timeline_fresh": True, "phase_timeline_written_at": (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat()}])
@@ -1991,15 +2046,17 @@ class NewCaseExecutionTests(unittest.TestCase):
             runner = FakeRunner()
             checker = AWSAcceptance(arguments(root, cases=("AWS-17",), allow_engine_restart=True), runner=runner, http=FakeHTTP([]))
             checker._engine_pod = lambda: ({"name": "engine", "uid": "current"}, CommandResult(0))
-            checker._timeline = lambda: {"schema_version": "runtime-phase-timeline/1.0",
+            timeline = {"schema_version": "runtime-phase-timeline/1.0", "extraction": {"engine": "vllm"},
                 "collector": {"state": "running", "pod_uid": "current", "written_at": "2026-11-02T00:00:00Z"},
                 "entries": [{"phase": "inferring"}]}
+            checker._timeline = lambda: timeline
             facts, _evidence = checker.aws_17()
             self.assertEqual(evaluate_case("AWS-17", facts)[0], "unknown")
             self.assertFalse(runner.history)
             checker.engine = "sglang"
+            timeline["extraction"]["engine"] = "sglang"
             facts, _evidence = checker.aws_17()
-            self.assertIn("단계 수집 꺼짐", facts["unknown_reason"])
+            self.assertIn("활성 단계 수집 미확인", facts["unknown_reason"])
             self.assertFalse(runner.history)
 
     def test_aws17_rejects_old_entry_carried_into_new_pod_timeline(self) -> None:

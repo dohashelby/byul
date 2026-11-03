@@ -1,5 +1,11 @@
 # AWS GPU lab runtime 인수 절차
 
+## 실행 부모 조건의 의미
+
+두 AWS intent의 선택적 `parent_constraints`는 Tetragon `process_exec.parent.binary`의 **관측 문자열**이 지정된 부모 중 하나일 때만 해당 실행 파일을 기존 상시·단계 허용 목록과 대조한다. 부모가 다르거나 없으면 `outside_allowlist`이며 `parent_check`에 `mismatch` 또는 `unavailable`을 남긴다. 지정되지 않은 실행 파일은 기존 판정을 유지한다. 이 두 필드는 runtime 소유 1.1 intent의 선택적 확장으로, 기존 1.1 문서를 읽는 방식은 유지하고 버전은 올리지 않았다. SGLang의 `suspect_parent_contexts`는 관측된 `nvcc`·`ninja` → `/bin/sh`를 loading/compiling 단계에서만 `suspect_context=compile_toolchain_parent`로 설명한다. 신뢰 단계를 포함해 셸의 `exec_verdict=suspect_binary` 의심 경고는 유지하며, 설명이 없는 경우 `suspect_context=null`이다. `containerd-shim` → 셸(`kubectl exec` 포함)도 계속 `suspect_binary`다. `ExecException`은 해당 실행 파일의 부모 제약을 먼저 만족한 뒤 기존의 신뢰 단계·기간·image·부모 조건을 적용하며, 이 셸 설명 설정은 예외보다 의심 판정이 우선한다.
+
+이 조건은 탐지 판정을 좁히는 관측 규칙이며 현재 Tetragon 커널 차단 규칙은 아니다. 엔진 Python이 장악되면 `ninja` 등을 통해 셸을 띄울 수 있으므로 완전 차단으로 해석하지 않는다. 시작 Python의 `containerd-shim` 부모는 정상 기동과 `kubectl exec`을 구별할 수 없어 제약하지 않았다. vLLM의 미관측 `/usr/bin/python3.12`도 부모 근거가 없어 기존 판정을 유지한다. SGLang에서 관측된 `id`·`awk`·`cat`은 기존 허용 목록에 없으므로 관측만으로 추가하지 않았고, 미관측 정규 표기 `cicc`는 허용 목록에서 제외했다. 추후 차단 단계에서는 별도 검증 후 Tetragon `matchParentBinaries`로 옮기고 parents map 비용을 확인해야 한다. 관측 쌍은 저장소 밖 2026-11-03 두 JSONL의 `engine` 컨테이너에서 추렸으며 SGLang 파일에 섞인 vLLM Pod를 분리했다. 시험 도구의 `containerd-shim` → 셸·Python은 정상 쌍에서 제외했다. 관측은 승인 자체를 뜻하지 않으며, 새 image·단계·부모 관계는 다시 확인해야 한다. 부모 정보가 빠진 정상 실행도 의도대로 `outside_allowlist`가 되므로 AWS-11의 잘못된 경고로 셀 수 있다. 11/3 증거 867건에서는 부모 누락이 0건이었다.
+
 11/4 서버 1회차는 [서버 실행순서표](서버_실행순서표.md)와 읽기 전용 [preflight 도구](../../tools/aws_lab_preflight.py)를 따른다.
 
 이 절차는 AWS 묶음 위에 runtime 배포를 올린 뒤 기존 “첫 완료 기준” 8가지와 추가 준비 사례 AWS-09~11을 확인한다. 기존 AWS-01~08 결과는 다시 판정하지 않는다. `tools/k8s_lab_check.py`는 fake engine과 시험 정책을 생성·삭제하는 kind 전용 도구이므로 이 환경에서 사용하지 않는다. AWS-12~17은 `--cases`로 명시 선택해야 하며, 배포 상태를 바꾸는 사례에는 별도 허용 플래그가 필요하다.
@@ -122,7 +128,7 @@ AWS-12의 `policy-compare-pods.yaml`·`policy-compare-cilium.yaml`은 기본 kus
 
 AWS-13은 `current`의 이전 상대 링크를 보존하고 복제한 묶음의 `gateway_policy` 파일에서 길이가 같은 1바이트만 바꾼다. Gateway 재시작에서 SHA-256 오류와 시작 거부를 확인한 뒤 반드시 이전 링크로 돌리고 다시 시작해 정상 200과 인증 거부 401 한 건을 확인한다. 이는 묶음 파일 바이트와 `bundle.json`의 SHA-256 대조이며 서명이나 승인 검증이 아니다. Gateway 호스트 마운트 경로에 쓰기 권한이 없으면 `unknown`이며 권한을 우회하지 않는다.
 
-AWS-14의 `not_before`는 실제 코드에서 Gateway 시작 시각이다. 보고서는 Gateway Pod 시작 시각과 대상 스냅샷 `collected_at`, 응답의 `TARGET_UNAVAILABLE` 및 첫 503부터 200까지의 시간을 남긴다. 10초 초과는 `failed`다. 포트포워드 재연결 사이에 503 구간을 놓치면 503→200 시간을 판정할 수 없어 `unknown`으로 두고 `reconnect_at`을 기록한다. AWS-15·16은 수집기를 `finally`에서 재개하고 collector `ok`까지 확인한다. AWS-16·17은 단계 시간표가 비활성인 SGLang 환경에서 `unknown`이며 AWS-07·08의 기존 기준에는 영향을 주지 않는다. AWS-17은 원시 Tetragon `process_exec.process.pod.uid`와 정규화 실행 관측을 대조한다. `process_exit`는 지원되지 않는 이벤트로 건너뜀 수가 증가하고 손상 수는 늘지 않아야 하며, 도구가 이 수치를 보조 근거로 기록한다. 관측 화면 표시는 사람이 확인한다.
+AWS-14의 `not_before`는 실제 코드에서 Gateway 시작 시각이다. 보고서는 Gateway Pod 시작 시각과 대상 스냅샷 `collected_at`, 응답의 `TARGET_UNAVAILABLE` 및 첫 503부터 200까지의 시간을 남긴다. 10초 초과는 `failed`다. 포트포워드 재연결 사이에 503 구간을 놓치면 503→200 시간을 판정할 수 없어 `unknown`으로 두고 `reconnect_at`을 기록한다. AWS-15·16은 수집기를 `finally`에서 재개하고 collector `ok`까지 확인한다. AWS-16·17은 SGLang에서도 신선한 단계 시간표로 판정하며 근거가 없으면 `unknown`이고 AWS-07·08의 기존 기준에는 영향을 주지 않는다. AWS-17은 원시 Tetragon `process_exec.process.pod.uid`와 정규화 실행 관측을 대조한다. `process_exit`는 지원되지 않는 이벤트로 건너뜀 수가 증가하고 손상 수는 늘지 않아야 하며, 도구가 이 수치를 보조 근거로 기록한다. 관측 화면 표시는 사람이 확인한다.
 
 AWS-09~11은 새 intent를 포함한 정책 묶음을 다시 작성하고 TG-SECRET-01 후보를 재적용한 뒤 엔진을 재시작한 환경에서만 실행한다. 파일 ConfigMap과 마운트 patch도 먼저 적용해야 한다. AWS-11을 선택할 때 AWS-09·10도 함께 선택한다. 도구는 AWS-09·10 직전에 일반 요청·stream·`/cache` 쓰기 대조를 수행하고 두 탐지 시험 뒤 같은 대조를 반복한다. 응답 시간은 참고값이며 판정에 쓰지 않는다. 탐지 시간도 기준 없이 판정하지 않는다.
 
@@ -130,7 +136,9 @@ Gateway 관측 조회는 최근 50행만 반환한다. AWS-11 구간이 이 범�
 
 ### 단계 연결 후 서버 시험 순서
 
-**1차 관찰 → 허용 목록 작성 → 2차 판정** 순서를 지킨다. 1차 관찰에서는 현재 엔진 Pod UID와 로그 시간표 상태·표지 일치 건수, 단계 경계, Tetragon 실행 경로를 수집한다. `tools/aws_lab_acceptance.py inventory --tetragon <tetragon.jsonl> --timeline <phase-timeline.json>`는 읽기 전용으로 단계·Pod·경로별 건수만 출력하고 판정에 쓰지 않는다. 시간표와 Tetragon의 Pod UID 또는 정확한 Pod 이름이 다르면 단계는 `unknown`이다. 단계 전용 실행과 반복 정상 경로의 출처를 검토한 뒤 `allowed_engine_binaries`·`phase_binaries` 변경안을 만든다. **이번 로컬 변경에는 허용 목록 확장을 넣지 않았다.** 변경안을 서버에 적용하고 2차에서 AWS-09~11을 판정한다. 시간표만 먼저 활성화하면 기존 관측 재생 기준 정상 실행 다수가 `outside_allowlist`가 될 수 있다.
+**1차 관찰 → 허용 목록 작성 → 2차 판정** 순서를 지킨다. 1차 관찰에서는 현재 엔진 Pod UID와 로그 시간표 상태·표지 일치 건수, 단계 경계, Tetragon 실행 경로를 수집한다. `tools/aws_lab_acceptance.py inventory --tetragon <tetragon.jsonl> --timeline <phase-timeline.json>`는 읽기 전용으로 단계·Pod·경로별 건수만 출력하고 판정에 쓰지 않는다. 시간표와 Tetragon의 Pod UID 또는 정확한 Pod 이름이 다르면 단계는 `unknown`이다. 단계 전용 실행과 반복 정상 경로의 출처를 검토한 뒤 `allowed_engine_binaries`·`phase_binaries` 변경안을 만든다. **11/3 관찰을 반영한 intent를 포함해 새 묶음을 작성한다.** 변경안을 서버에 적용하고 2차에서 AWS-09~11을 판정한다. 시간표만 먼저 활성화하면 기존 관측 재생 기준 정상 실행 다수가 `outside_allowlist`가 될 수 있다.
+
+`phase_binaries`는 각 단계에서 예상되는 특징적 실행 경로를 구분하는 목록이다. 로그 근거 `engine_signal`은 `TRUSTED_BASES`에 없으므로 컴파일 단계의 `nvcc` 같은 단계 전용 경로도 `allowed_in_phase`가 아닌 `phase_signal_unverified` 경고로 남는다. 이 목록만으로 AWS-11 경고가 제거되지는 않는다.
 
 현재 `phase_signals.py`는 vLLM CPU 로그 발췌의 표지를 사용한다. 저장된 GPU 관련 로그 파일 5개 중 2개에서 각각 5건이 일치했지만 GPU 전용 컴파일 경계와 전체 패턴은 서버에서 검증 전이다. 실제 단계가 잡히지 않으면 허용 목록을 추측하거나 AWS-11을 통과시키지 않는다. 시간표는 호스트 수집기의 별도 스레드가 현재 Pod 로그로 생성하고 Gateway는 읽기 전용 관측 마운트에서 읽는다. Pod가 없거나 여럿, 로그 실패·역순, 수집 중단 후 쓰기 시각 15초 만료는 단계 `unknown`이며 이것만으로 일반 요청을 막지 않는다. `engine_signal`은 신뢰 입력이 아니므로 단계 전용 예외·허용은 `phase_signal_unverified`가 될 수 있다.
 
@@ -206,6 +214,6 @@ AWS-07은 stop/start 뒤 각각 약 4초에 feed error/ok, 복구 요청 200이�
 
 `tools/aws_lab_acceptance.py --engine {vllm,sglang}`의 기본값은 `vllm`이다. `--cases`를 생략하면 기존과 같이 AWS-01~11만 선택한다. AWS-12~19는 명시 선택한다. 두 엔진에 같은 고정 chat·completions 요청 목록과 SHA-256을 기록한다. AWS-18은 각 경로의 일반·stream 응답, `[DONE]`과 잘림, `usage.completion_tokens`에 따른 답변 길이, 엔진 로그 수신을 검사한다. `usage`가 없으면 단어 수로 보완하지 않고 `unknown`이다. AWS-19는 미지원 12개 경로와 4개 필드를 일부러 보내 HTTP 코드·기록·엔진 미전달을 검사한다. 같은 구간의 정상 ID가 엔진 로그에 없으면 거부 ID 부재만으로 통과시키지 않는다. 이 새 사례는 서버에서 실제 실행한 적이 없다.
 
-SGLang 로그는 `request.received`/`request.finished` JSON의 `headers.x-request-id`로 대조한다. `--log-requests-level 0`이어도 프롬프트 관련 필드가 나오면 보고서에 필드 이름을 표시한다. 엔진 Pod의 실제 command·args·환경변수 **이름**·imageID를 기록하되 Secret 값은 기록하지 않는다. SGLang 단계 수집이 없어 AWS-11·16·17의 단계 판정은 `unknown`이다. AWS-14·15의 대상 판단은 버전 미선언과 Pod image digest 수집에 의존한다. SGLang 전환 명령과 정책 묶음 순서는 [SGLANG_전환절차.md](SGLANG_전환절차.md)를 따른다.
+SGLang 로그는 `request.received`/`request.finished` JSON의 `headers.x-request-id`로 대조한다. `--log-requests-level 0`이어도 프롬프트 관련 필드가 나오면 보고서에 필드 이름을 표시한다. 엔진 Pod의 실제 command·args·환경변수 **이름**·imageID를 기록하되 Secret 값은 기록하지 않는다. SGLang도 `--phase-timeline --phase-engine sglang`으로 단계 시간표를 수집한다. AWS-11·16·17은 현재 Pod UID의 신선한 시간표와 실행 근거로 판정하며, 근거가 없으면 `unknown`이다. 로그 근거는 v0.5.22 GPU 캐시 있는 기동이며 첫 기동 JIT 컴파일 위치는 미확인이다. `engine_signal`은 trusted 단계가 아니다. AWS-14·15의 대상 판단은 버전 미선언과 Pod image digest 수집에 의존한다. SGLang 전환 명령과 정책 묶음 순서는 [SGLANG_전환절차.md](SGLANG_전환절차.md)를 따른다.
 
 AWS-18은 엔진 Pod 안에서 `/tokenize`를 읽기 전용으로 호출해 짧은 답변 길이로 입력+답변 합이 한도와 같아지는 프롬프트를 찾는다. 그 요청의 200·usage와 1토큰 초과 요청의 `CONTEXT_LIMIT_EXCEEDED`·생성 미전달을 대조한다. 정확한 경계 프롬프트나 토큰화 결과를 못 얻으면 `unknown`이다. 토큰 계산 실패를 의도적으로 주입하는 시험은 가짜 엔진 단위 시험에서만 확인하며 실제 엔진에서는 미확인으로 남긴다. 실제 SGLang 결과가 코드 예상과 다르면 결과를 수정해 꾸미지 않고 사유를 인계한다.

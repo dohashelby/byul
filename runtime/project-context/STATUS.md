@@ -2,6 +2,12 @@
 
 최종 갱신: 2026-11-03
 
+## 2026-11-03 SGLang Claude 검수 보정 (기준 2f5f461, 미커밋)
+
+- SGLang v0.5.22 원본 파서의 CLI 우선 병합과 `prepare_server_args` 내부 인자 파싱을 확인했다. 공개 엔진 옵션은 `engine.yaml` 인자로 옮기고 Secret `config.yaml`은 관리 키만 담도록 절차를 수정했다. 기존 Secret 갱신과 이전 데이터 키 제거·복구 절차를 기록했다. 11/3 저장 Tetragon의 SGLang Pod만 대조해 관찰되지 않은 `/usr/bin/python3`, `/usr/bin/python3.12`를 SGLang intent에서 제거했다.
+- 캐시 재기동의 첫 표지 전 약 40초는 단계 미확인이고 첫 기동 JIT 경계는 로그 부재로 미확인이다. `engine_signal` 단계 전용 경로는 신뢰 단계 허용이 아니라 경고로 남는다. 새 Secret 읽기·기동과 `--config` 적용 뒤 `/proc` 인자 제거는 서버에서 확인해야 한다. 시작 로그와 `/server_info`의 관리 키 노출은 이미 관찰됐으므로 반출 전 값 검사가 필요하다. 다음은 서버 전환 뒤 AWS-09~11 재판정과 Claude 검수다.
+- `runtime/.venv/bin/python -m unittest discover -s tests`(runtime 작업 폴더에서는 `.venv/bin/python`): 642건 OK, 115건 skip. SGLang 배포 집중 시험 2건 OK, `git diff --check` 통과. 서버 배포·실제 GPU 시험은 이번 보정에서 실행하지 않았다.
+
 ## 2026-11-03 AWS GPU preflight 검수 보정 (기준 46f0309, 미커밋)
 
 - kind 재현 지적을 반영해 namespaced Tetragon 정책을 `tracingpoliciesnamespaced`로 조회하고, 빈 수집기 `ExecStart`를 `unknown`으로 판정한다. 증거 폴더 5 GiB 검사와 별도로 containerd 이미지 저장소 여유(기본 60 GiB, 경로·기준 옵션)를 확인하며 조회 불가는 `unknown`이다. 가짜 runner 회귀시험 3건을 추가했다.
@@ -330,3 +336,21 @@
 - AWS-13은 재시작 전 Gateway Pod UID를 기록하고 새 UID Pod의 종료·재시작·CrashLoop 및 그 Pod의 이전/현재 로그만 판정한다. AWS-17은 새 컨테이너 startedAt 이후 시작한 새 UID 시간표만 인정하며 이전 단계 행이 남으면 실패한다. AWS-07은 요청 직전 `/api/target`이 200·`unavailable`일 때만 중단 중 요청을 보낸다. `blocked`는 기대 200과 모순되어 실패, 조회 실패·기한 초과는 요청 없이 unknown으로 남긴다.
 - backend 선택 필드 `context_headroom_tokens`(기본 0, SGLang 예시·배포 64)를 추가했다. `/api/status.engine_context_capacity`가 기존 `/v1/models` 수집의 `max_model_len`과 정책 상한+여유를 비교해 ok/insufficient/unknown 및 경고 코드만 표시한다. 플랫폼 contracts는 수정하지 않았다. SGLang 엔진 `--context-length`는 2112다.
 - preflight `--boundary-probe`는 opt-in으로 Gateway 정책 상한을 읽고 엔진 Pod 내부의 `/tokenize`·chat/completions 경계를 직접 생성해 각 결과만 표시한다. AWS-18은 length 종료와 부족한 completion usage를 엔진 잘림으로 판정한다. 가짜 runner·회귀 시험과 `kubectl kustomize` 렌더를 확인했다. 실제 AWS 엔진 실측과 10회차 결과는 미확인이다.
+## 2026-11-03 AWS GPU 1회차 후속: SGLang 단계·허용 목록 (기준 2f5f461, 미커밋)
+
+- 근거: `docs/AWS_GPU_서버1회차_결과_20261103.md`, 외부 `sglang-observation/engine-sglang.log`의 키 없는 표지 5줄과 `tetragon-sglang.jsonl`의 `process.pod.container.name`·SGLang Pod UID 3개의 실행 경로. SGLang v0.5.22 GPU 캐시 있는 기동의 loading·compiling·inferring 표지를 추가하고 UTC `kubectl --timestamps` 우선 및 SGLang 연도 포함 로그 시각을 시험했다. 첫 기동 JIT 컴파일 위치는 미확인이고 `engine_signal`은 trusted가 아니다.
+- SGLang 시간표 수집·preflight·AWS-11/16/17 판정 경로를 켰다. vLLM/SGLang intent에 관찰 경로와 엔진 컨테이너 이름을 반영하고 셸은 suspect로 유지했다. 컨테이너 이름이 없는 이벤트도 엔진 selector가 맞으면 판정하고 귀속은 `unavailable`로 표시한다. `cicc`의 관찰된 `bin/../nvvm` 원시 문자열만 SGLang 단계 목록에 명시하고 실행 경로는 정규화 없이 정확히 비교한다. SGLang 시작은 Secret의 `config.yaml`을 `--config`로 읽도록 바꿨으며, 이전 셸 방식 복구 절차를 문서화했다.
+- 시험: 임시 설치 venv에서 `python -m unittest discover -s tests` 641건, 통과 526·skip 115·실패 0. skip은 로컬 socket 생성 제한 112건과 socket I/O 제한 3건이다. 두 intent의 `enforce render` 후보 각 10개 생성, SGLang `kubectl kustomize`와 `git diff --check` 통과. 새 fixture에는 표지 5줄만 있고 `server_args` 줄은 없다.
+- 다음 작업: 서버 이미지 안 `--config` 구현·Secret 읽기·기동·첫 기동 JIT 단계·AWS-11/16/17을 실측한다. 변경된 intent를 포함하는 새 묶음을 만들고 `bundle verify` 및 후보 규칙 검토·적용이 필요하다. intent 해시/크기는 아래 교차 검수 수정에서 다시 바뀌었다. Gateway 정책 파일·정책 승인 목록·플랫폼 승인 판본은 수정하지 않았으며 재승인은 사람이 판단한다.
+
+## 2026-11-03 교차 검수 A–D 후속 (기준 2f5f461 + 기존 미커밋 변경)
+
+- 코드·시험 대조로 A–C가 타당함을 확인했다. 두 intent의 가변 실행 경로 `/proc/self/exe`·`/dev/fd/11`을 허용 목록에서 빼고 `/usr/bin/nvidia-ctk`는 유지했다. 실행 문자열 정규화를 제거했다. SGLang에서 관찰된 `cicc`의 `bin/../nvvm` 표기만 단계 목록에 원문 그대로 명시한다. `/cache` 시작 우회 문자열은 `exec_from_cache` 경고, 다른 우회 문자열은 활성 단계에서 `outside_allowlist`다. 첫 단계 표지 전 가변 경로는 `phase_unknown`이며 AWS-11 잘못된 경고 수에 들어가지 않는 회귀시험을 추가했다.
+- Pod selector가 맞으면 컨테이너 이름 누락·형식 오류도 엔진으로 판정하고 귀속은 `unavailable`로 표시한다. 명시적으로 다른 컨테이너 이름은 제외한다. AWS-16/17은 vLLM·SGLang 모두 시간표 `extraction.engine`이 선택 엔진과 일치해야 판정한다.
+- D는 11/3 서버 관찰 문서의 위험 표와 일치한다. `--config`는 `/proc` cmdline 노출과 시작 셸만 없앤다. 시작 로그 `server_args`와 키 없는 `/server_info`의 관리 키 노출은 그대로이며, 엔진 8000 직통 차단(AWS-04)과 증거 반출 전 값 검사·가림으로 다룬다. 외부 이슈 링크는 확인하지 않아 넣지 않았다.
+- 로컬 검증: `.venv/bin/python -m unittest discover -s tests` 645건 통과(skip 115: 로컬 소켓 제약), `git diff --check` 통과. 실제 서버 적용과 AWS-11/16/17 재측정, 새 묶음 검증·정책 적용은 미확인이다. 다음은 서버에서 값 비노출 범위를 확인하고 새 intent로 시험을 재실행하는 것이다. intent SHA-256/크기: vLLM `0e347a98…`/2759바이트, SGLang `74753590…`/3430바이트. 커밋·푸시하지 않았다.
+
+## 2026-11-03 실행 부모 조건 (기준 961c455, 미커밋)
+
+- 두 AWS intent 1.1에 관측 실행 파일별 부모 제약을 추가했다. 부모 불일치·누락은 `outside_allowlist`; 제약 없는 실행 파일은 기존 판정을 유지한다. SGLang `suspect_parent_contexts`는 `nvcc`·`ninja`의 `/bin/sh`를 loading/compiling에서만 `suspect_context=compile_toolchain_parent`로 설명하며, 신뢰 단계에서도 `suspect_binary` 의심 경고를 유지한다. `containerd-shim` 셸도 의심 판정을 유지한다. 시작 Python 부모는 정상 기동과 시험용 exec를 구별할 수 없어 제약하지 않았다. SGLang의 미관측 정규 `cicc` 표기는 목록에서 제외했다. 관측 출처와 부모 누락의 AWS-11 한계는 `deploy/gpu-lab/ACCEPTANCE.md`에 기록했다.
+- 재검수 수정 후 `.venv/bin/python -m unittest discover -s tests`: 647건, 실패 0·skip 115(로컬 소켓 제약). `git diff --check` 통과. 앞선 `.venv/bin/serving-runtime enforce render`에서는 두 AWS intent 각각 후보 10개를 생성했다. 실제 서버 적용·새 image의 부모 관계·커널 차단은 미확인이다. 기존 미추적 파일은 건드리지 않았고 커밋·푸시하지 않았다.

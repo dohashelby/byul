@@ -1,0 +1,5 @@
+[2026-11-03 07:31:55] Load weight begin.
+[2026-11-03 07:31:56] Load weight end.
+[2026-11-03 07:31:57] Capture target prefill CUDA graph begin.
+[2026-11-03 07:32:04] Capture target decode CUDA graph end.
+[2026-11-03 07:32:05] The server is fired up and ready to roll!

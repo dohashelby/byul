@@ -48,6 +48,7 @@ class Workload:
     labels: dict[str, str]
     port: int | None = None
     management_port: int | None = None
+    container_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -171,6 +172,8 @@ class EnforcementIntent:
     assets: AssetsIntent | None = None
     phase_binaries: tuple[tuple[str, tuple[str, ...]], ...] = ()
     suspect_binaries: tuple[str, ...] = ()
+    parent_constraints: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    suspect_parent_contexts: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = ()
 
     def binaries_for(self, phase: str) -> tuple[str, ...]:
         return dict(self.phase_binaries).get(phase, ())
@@ -230,7 +233,7 @@ def _workload(
 ) -> Workload:
     allowed = {"labels", "port"} if engine else {"labels"}
     if engine and v11:
-        allowed = allowed | {"management_port"}
+        allowed = allowed | {"management_port", "container_name"}
     item = _object(value, path, allowed)
     labels = _labels(_required(item, "labels", path), f"{path}.labels")
     if engine:
@@ -240,7 +243,12 @@ def _workload(
             management = _port(management, f"{path}.management_port")
             if management == port:
                 raise IntentError(f"{path}.management_port must differ from port")
-        return Workload(labels, port, management)
+        container_name = item.get("container_name")
+        if container_name is not None:
+            container_name = _segment(container_name, f"{path}.container_name")
+            if _KUBERNETES_NAME.fullmatch(container_name) is None:
+                raise IntentError(f"{path}.container_name must be a Kubernetes container name")
+        return Workload(labels, port, management, container_name)
     return Workload(labels)
 
 
@@ -298,10 +306,17 @@ def _egress_list(raw: Any, path: str, *, allow_endpoint: bool) -> tuple[EgressAl
     return tuple(egress)
 
 
-def _binary_list(raw: Any, path: str) -> tuple[str, ...]:
+def _binary_list(raw: Any, path: str, *, allow_literal_parent: bool = False) -> tuple[str, ...]:
     if not isinstance(raw, list):
         raise IntentError(f"{path} must be an array")
-    values = tuple(_absolute_path(item, f"{path}[{index}]") for index, item in enumerate(raw))
+    if allow_literal_parent:
+        # Phase binaries are compared to the raw execve string, without path
+        # normalization. A literal observed spelling can be approved explicitly.
+        values = tuple(_nonempty_string(item, f"{path}[{index}]") for index, item in enumerate(raw))
+        if any(not value.startswith("/") for value in values):
+            raise IntentError(f"{path} must contain absolute paths")
+    else:
+        values = tuple(_absolute_path(item, f"{path}[{index}]") for index, item in enumerate(raw))
     if len(set(values)) != len(values):
         raise IntentError(f"{path} must not contain duplicates")
     return values
@@ -371,6 +386,8 @@ def parse_intent(document: Any) -> EnforcementIntent:
             "assets",
             "phase_binaries",
             "suspect_binaries",
+            "parent_constraints",
+            "suspect_parent_contexts",
         },
     )
     schema = _required(root, "schema", "$")
@@ -385,6 +402,8 @@ def parse_intent(document: Any) -> EnforcementIntent:
         "assets",
         "phase_binaries",
         "suspect_binaries",
+        "parent_constraints",
+        "suspect_parent_contexts",
     }
     if not v11:
         present = sorted(v11_fields & set(root))
@@ -457,6 +476,8 @@ def parse_intent(document: Any) -> EnforcementIntent:
     assets: AssetsIntent | None = None
     phase_binaries: list[tuple[str, tuple[str, ...]]] = []
     suspect: tuple[str, ...] = ()
+    parent_constraints: list[tuple[str, tuple[str, ...]]] = []
+    suspect_parent_contexts: list[tuple[str, tuple[str, ...], tuple[str, ...]]] = []
     kube_api = False
     kube_api_port = DEFAULT_KUBE_API_PORT
     if v11:
@@ -630,14 +651,40 @@ def parse_intent(document: Any) -> EnforcementIntent:
             for phase in PHASES:
                 if phase in phases_raw:
                     phase_binaries.append(
-                        (phase, _binary_list(phases_raw[phase], f"$.phase_binaries.{phase}"))
+                        (phase, _binary_list(phases_raw[phase], f"$.phase_binaries.{phase}",
+                                             allow_literal_parent=True))
                     )
+        allowed_any = set(binaries).union(*(set(items) for _, items in phase_binaries))
         if "suspect_binaries" in root:
             suspect = _binary_list(root["suspect_binaries"], "$.suspect_binaries")
-            allowed_any = set(binaries).union(*(set(items) for _, items in phase_binaries))
             overlap = sorted(allowed_any & set(suspect))
             if overlap:
                 raise IntentError(f"$.suspect_binaries overlaps allowed binaries: {', '.join(overlap)}")
+        if "parent_constraints" in root:
+            raw = _object(root["parent_constraints"], "$.parent_constraints",
+                          set(root["parent_constraints"]) if isinstance(root["parent_constraints"], dict) else set())
+            for binary, parents in raw.items():
+                if binary not in allowed_any:
+                    raise IntentError(f"$.parent_constraints key is not an allowed binary: {binary}")
+                values = _binary_list(parents, f"$.parent_constraints.{binary}")
+                if not values:
+                    raise IntentError(f"$.parent_constraints.{binary} must not be empty")
+                parent_constraints.append((binary, values))
+        if "suspect_parent_contexts" in root:
+            raw = _object(root["suspect_parent_contexts"], "$.suspect_parent_contexts",
+                          set(root["suspect_parent_contexts"]) if isinstance(root["suspect_parent_contexts"], dict) else set())
+            for binary, context_spec in raw.items():
+                if binary not in suspect:
+                    raise IntentError(f"$.suspect_parent_contexts key is not a suspect binary: {binary}")
+                path = f"$.suspect_parent_contexts.{binary}"
+                item = _object(context_spec, path, {"parents", "phases"})
+                parents = _binary_list(_required(item, "parents", path), f"{path}.parents")
+                phases = item.get("phases")
+                if (not parents or not isinstance(phases, list) or not phases
+                        or any(phase not in PHASES for phase in phases)
+                        or len(set(phases)) != len(phases)):
+                    raise IntentError(f"{path} must have nonempty unique parents and phases")
+                suspect_parent_contexts.append((binary, parents, tuple(phases)))
 
         roles: list[tuple[str, dict[str, str]]] = [
             ("$.gateway", gateway.labels),
@@ -677,6 +724,8 @@ def parse_intent(document: Any) -> EnforcementIntent:
         assets=assets,
         phase_binaries=tuple(phase_binaries),
         suspect_binaries=suspect,
+        parent_constraints=tuple(parent_constraints),
+        suspect_parent_contexts=tuple(suspect_parent_contexts),
     )
 
 

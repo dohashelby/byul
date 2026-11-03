@@ -27,9 +27,9 @@ A가 맡은 점검 13개: REQ-08, REQ-09, REQ-10, REQ-14, REQ-16, REQ-17, REQ-18
 - 3은 엔진 센서의 설치 목록만 바꿨다. 범용 관측기 `vllm_cache_callback.TARGETS`와 그 계약 시험은 그대로다.
 - 센서 소스가 바뀌었으므로 GPU에서는 `prepare-engine-callbacks` 자산을 새로 만들어야 한다. 첫 실증 자산은 `load_prepared`가 거부한다.
 
-## 1단계에서 필요한 기업 정책 값
+## 1단계 정책 값
 
-정책 초안에 넣지 않았다. 첫 실증에서 쓴 값의 기록을 찾지 못했고, 기업 기준을 임의로 채우지 않는다.
+2026-11-03 사용자 결정으로 아래 점검은 EXAMPLE 값으로 시험한다(`policy-a-draft.yaml`). 결과는 EXAMPLE 등급으로 남기고 기업 승인값으로 쓰지 않는다. SUP-03의 템플릿 SHA는 GPU에서 서빙 템플릿을 재서 넣는다.
 
 | 점검 | 정책 키 |
 |---|---|
@@ -40,7 +40,7 @@ A가 맡은 점검 13개: REQ-08, REQ-09, REQ-10, REQ-14, REQ-16, REQ-17, REQ-18
 | SUP-08 | `code_selection_fields`, `code_selection_allowed`, `rejection_codes` |
 | REQ-14·18·19·20·21, LIF-13 | 실행마다 정하는 `sensor_*_sha256` 4개만 |
 
-REQ-16 초안은 `cache_salt` 외에 `adapter_content`, `media_identity`, `model_generation`을 요구 문맥으로 둔다. 지금 배포(문자 전용 Qwen2.5-0.5B, LoRA 없음)로는 셋을 잴 수 없으므로 REQ-16은 LoRA 세대·멀티모달 세대·모델 세대 전환 사례가 생길 때까지 UNKNOWN으로 남는다. 어느 문맥을 적용 대상에서 뺄지는 기업이 정한다.
+REQ-16은 네 문맥을 모두 이번 범위에 넣는다(2026-11-03 사용자 결정). 시험 방법과 개발할 것은 `REQ-16_CONTEXTS.md`에 있다.
 
 ## 기록 규칙
 

@@ -153,23 +153,72 @@ class Lab:
         self.steps = []; self.violations = []; self.missing = []; self.mutated = False; self.normal = []
         self.cleanup_errors = []
         self.restore_model = cfg['model']
+        # Diagnostic records never participate in activation predicates.
+        self.diagnostics = []; self.diagnostic_write_errors = []; self.diagnostic_namespace = None
+        self.diagnostic_poll = None; self.diagnostic_deadline = None
+        self.diagnostic_idle_overrun = False
+
+    def diagnostic(self, event, **facts):
+        self.diagnostics.append({'poll': self.diagnostic_poll, 'event': event,
+            'recorded_monotonic': time.monotonic(), **facts})
+
+    def diagnostic_stream_metadata(self, raw):
+        return {'sha256': hashlib.sha256(raw).hexdigest(), 'bytes': len(raw)}
+
+    def write_diagnostics(self, workdir):
+        artifacts = []
+        if self.diagnostics:
+            try:
+                path = workdir / 'lab-diagnostics.json'
+                path.write_bytes(canonical_json({'diagnostic_only': True, 'metadata_only': True,
+                    'records': self.diagnostics}))
+                artifacts.append(DraftArtifact(name=path.name, path=path, collector='lab_activation/0.1.0'))
+            except (OSError, ValueError) as error:
+                self.diagnostic_write_errors.append({'reason': _diagnostic_error_kind(error)})
+        return artifacts
 
     def _kubectl(self, *args, stdin=None, cap=2 * 1024 ** 2, timeout=60):
         remaining = min(timeout, self.deadline - self.clock())
+        if self.diagnostic_deadline is not None:
+            remaining = min(remaining, self.diagnostic_deadline - self.clock())
         if remaining <= 0:
             raise TimeoutError('LAB_ACTIVATION_BUDGET_EXHAUSTED')
         context = [f"--context={self.cfg['kubectl_context']}"] if 'kubectl_context' in self.cfg else []
         options = {'input_bytes': stdin} if stdin is not None else {}
-        result = self.runner([self.binary, *context, f"--namespace={self.cfg['namespace']}", f'--request-timeout={remaining:.0f}s', *args],
-            timeout=remaining, env_extra={}, max_stdout_bytes=cap, max_stderr_bytes=4096, **options)
+        try:
+            result = self.runner([self.binary, *context, f"--namespace={self.cfg['namespace']}", f'--request-timeout={remaining:.0f}s', *args],
+                timeout=remaining, env_extra={}, max_stdout_bytes=cap, max_stderr_bytes=4096, **options)
+        except (OSError, TimeoutError, ValueError) as error:
+            if self.diagnostic_poll is not None and (args[0] == 'logs' or CLIENT in args):
+                self.diagnostic('marker-command-error' if args[0] == 'logs' else 'api-command-error', error=_diagnostic_error_kind(error),
+                    container='current' if f"--container={self.cfg['container']}" in args else 'diagnostic',
+                    previous='--previous' in args)
+            raise
+        if self.diagnostic_poll is not None and (args[0] == 'logs' or CLIENT in args):
+            self.diagnostic('marker-command' if args[0] == 'logs' else 'api-command', returncode=_diagnostic_int(result['returncode'], signed=True),
+                capture=_diagnostic_capture_metadata(result.get('capture')),
+                container='current' if f"--container={self.cfg['container']}" in args else 'diagnostic',
+                previous='--previous' in args,
+                stdout=self.diagnostic_stream_metadata(result['stdout_bytes']),
+                stderr=self.diagnostic_stream_metadata(result.get('stderr_bytes', b'')))
+        if self.diagnostic_poll is not None and args[:2] in (('get', 'pod'), ('get', 'pods'), ('get', 'namespace'), ('get', 'service')):
+            self.diagnostic('object-api-receipt', object_kind=args[1], returncode=_diagnostic_int(result['returncode'], signed=True),
+                capture=_diagnostic_capture_metadata(result.get('capture')),
+                raw_sha256=hashlib.sha256(result['stdout_bytes']).hexdigest(),
+                raw_bytes=len(result['stdout_bytes']),
+                stderr=self.diagnostic_stream_metadata(result.get('stderr_bytes', b'')))
+        if self.diagnostic_deadline is not None and not _diagnostic_capture_complete(result):
+            raise OSError('LAB_DIAGNOSTIC_CAPTURE_INCOMPLETE')
         if result['returncode'] != 0:
             raise OSError('LAB_ACTIVATION_KUBECTL_FAILED')
         return result['stdout_bytes']
 
     def verify_owned(self):
         raw = self._kubectl('get', 'namespace', self.cfg['namespace'], '-o', 'json')
-        if strict_json(raw, limit=262144).get('metadata', {}).get('labels', {}).get(OWNED_LABEL) != 'true':
+        namespace = strict_json(raw, limit=262144)
+        if namespace.get('metadata', {}).get('labels', {}).get(OWNED_LABEL) != 'true':
             raise ActivationRefused('LAB_ACTIVATION_NAMESPACE_NOT_OWNED')
+        self.diagnostic_namespace = _diagnostic_namespace_identity(namespace, self.cfg['namespace'])
 
     def _pods(self):
         raw = self._kubectl('get', 'pods', '-l', self.cfg['selector'], '-o', 'json')
@@ -349,7 +398,14 @@ class Lab:
         before = next((p for p in self._pods() if p['metadata'].get('name') == pod_name
             and p['metadata'].get('uid') == pod_uid), None)
         identity = self.engine_container_identity(before, require_ready=False) if before else None
+        if self.diagnostic_poll is not None:
+            self.diagnostic('marker-before', pod=pod_name, pod_uid=pod_uid,
+                identity=identity, snapshot=_diagnostic_pod_identity(before, self.cfg['container'], self.cfg['namespace']))
         if identity is None:
+            if self.diagnostic_poll is not None:
+                self.diagnostic('marker-unavailable', pod=pod_name, pod_uid=pod_uid,
+                    reason='INITIAL_CONTAINER_CREATING' if before is not None
+                    and self.initial_engine_container_wait(before) else 'CURRENT_ENGINE_IDENTITY_UNAVAILABLE')
             if before is not None and self.initial_engine_container_wait(before):
                 return None, None
             raise CurrentEngineMarkerChanged('CURRENT_ENGINE_IDENTITY_UNAVAILABLE')
@@ -357,6 +413,11 @@ class Lab:
             cap=8 * 1024 ** 2)
         after = next((p for p in self._pods() if p['metadata'].get('name') == pod_name
             and p['metadata'].get('uid') == pod_uid), None)
+        if self.diagnostic_poll is not None:
+            self.diagnostic('marker-after', pod=pod_name, pod_uid=pod_uid,
+                snapshot=_diagnostic_pod_identity(after, self.cfg['container'], self.cfg['namespace']),
+                identity=self.engine_container_identity(after, require_ready=False) if after else None,
+                marker_found=marker.encode() in raw)
         if after is None or self.engine_container_identity(after, require_ready=False) != identity:
             raise CurrentEngineMarkerChanged('CURRENT_ENGINE_CHANGED_DURING_LOG')
         return marker.encode() in raw, identity
@@ -606,7 +667,10 @@ def _rejected(lab, code, marker=None, *, request_model=None, require_new_faulty_
     faulty = []; faulty_uids = set(); marker_bindings = {}; diagnostic_uids = set()
     ready_uids = set(); accepted_uids = set(); referenced_uids = set(); current_container_unverified = False
     pending_container_uids = set()
+    poll = 0
     while lab.clock() < end:
+        poll += 1; lab.diagnostic_poll = poll
+        lab.diagnostic('poll-start')
         faulty = [p for p in lab._pods() if p['metadata'].get('labels', {}).get('byul.lab/generation') == 'faulty']
         if fresh_required:
             faulty = [p for p in faulty if p['metadata'].get('uid') and p['metadata']['uid'] not in prior_uids]
@@ -637,14 +701,17 @@ def _rejected(lab, code, marker=None, *, request_model=None, require_new_faulty_
                     elif lab.log_contains(pod['metadata']['name'], marker):
                         activated = True
                 except CurrentEngineMarkerChanged:
+                    lab.diagnostic('marker-unbound', pod=pod['metadata']['name'], pod_uid=uid,
+                        reason='CURRENT_ENGINE_CHANGED_OR_UNAVAILABLE')
                     current_container_unverified = True
                     try:
                         if uid not in diagnostic_uids and lab.log_contains(pod['metadata']['name'], marker):
                             diagnostic_uids.add(uid)
                     except (OSError, TimeoutError, ValueError):
                         pass
-                except (OSError, TimeoutError, ValueError):
-                    pass
+                except (OSError, TimeoutError, ValueError) as error:
+                    lab.diagnostic('marker-unavailable', pod=pod['metadata']['name'], pod_uid=uid,
+                        reason=_diagnostic_error_kind(error))
         # 로그 조회 뒤 Pod를 다시 읽는다. 조회 전 Ready는 현재 로그 세대의 승인 근거가 아니다.
         faulty = [p for p in lab._pods() if p['metadata'].get('labels', {}).get('byul.lab/generation') == 'faulty']
         if fresh_required:
@@ -665,14 +732,23 @@ def _rejected(lab, code, marker=None, *, request_model=None, require_new_faulty_
                 and marker_bindings[p['metadata']['uid']] == lab.engine_container_identity(p)}
                 if require_new_faulty_uid else current_ready_uids if activated else set())
             if accepted_uids and restore_targets is None:
+                lab.diagnostic('poll-end', reason='EXISTING_ACCEPTED_UID', accepted_uids=sorted(accepted_uids))
                 break
         try:
             row, = lab.requests([lab.chat(model=request_model or lab.cfg['model'], timeout=5)])
+            lab.diagnostic('service-request', result=_diagnostic_http_metadata(row), attribution='SERVICE_ONLY')
             if row.get('outcome') == 200:
                 seen.add(row.get('model'))
-        except (OSError, TimeoutError, ValueError):
-            pass
-        lab.wait(POLL_SECONDS)
+        except (OSError, TimeoutError, ValueError) as error:
+            lab.diagnostic('service-request-error', reason=_diagnostic_error_kind(error))
+        if require_new_faulty_uid:
+            idle_end = lab.clock() + POLL_SECONDS
+            _diagnostic_fault_pod_request(lab, faulty, end, request_model or lab.cfg['model'], idle_end=idle_end)
+            lab.wait(max(0, idle_end - lab.clock()))
+        else:
+            lab.wait(POLL_SECONDS)
+        lab.diagnostic('poll-end', reason='CONTINUE')
+    lab.diagnostic_poll = None
     lab.note('faulty-generation', became_ready=served, served_models=sorted(m for m in seen if m),
         failure_marker_seen=None if marker is None else activated,
         new_faulty_uids=sorted(faulty_uids) if fresh_required else None,
@@ -926,7 +1002,188 @@ def _deployment_lineage(lab, pod):
         return None
 
 
-def _owned_direct_pod_url(lab, pod):
+def _diagnostic_int(value, *, signed=False):
+    return value if type(value) is int and (signed or value >= 0) else None
+
+
+def _diagnostic_error_kind(error):
+    return next((kind.__name__ for kind in (TimeoutError, OSError, ValueError, KeyError, TypeError)
+        if isinstance(error, kind)), 'OTHER_ERROR')
+
+
+def _diagnostic_capture_metadata(value):
+    if type(value) is not dict:
+        return None
+    flags = {key: value.get(key) if type(value.get(key)) is bool else None
+        for key in ('bounded_at_source', 'complete', 'timed_out', 'truncated', 'pipes_closed')}
+    errors = value.get('read_errors')
+    flags['read_error_count'] = len(errors) if type(errors) is list else None
+    flags['read_errors'] = [item for item in ('stdout', 'stderr', 'stdin', 'child_reap')
+        if type(errors) is list and item in errors]
+    return flags
+
+
+def _diagnostic_capture_complete(result):
+    value = result.get('capture')
+    if type(value) is not dict or value.get('schema') != 'guard-pipe-capture/1' \
+            or any(value.get(key) is not True for key in ('bounded_at_source', 'complete', 'pipes_closed')) \
+            or any(value.get(key) is not False for key in ('timed_out', 'truncated')) \
+            or type(value.get('read_errors')) is not list or value['read_errors']:
+        return False
+    streams = value.get('streams')
+    if type(streams) is not dict or set(streams) != {'stdout', 'stderr'}:
+        return False
+    for name in ('stdout', 'stderr'):
+        row = streams[name]; raw = result.get(name + '_bytes')
+        if type(row) is not dict or type(raw) is not bytes or row.get('truncated') is not False \
+                or type(row.get('limit')) is not int or not 0 < row['limit'] <= 16 * 1024 ** 2 \
+                or type(row.get('retained_bytes')) is not int or row['retained_bytes'] != len(raw) \
+                or type(row.get('observed_bytes')) is not int or row['observed_bytes'] != len(raw) \
+                or len(raw) > row['limit'] or row.get('retained_sha256') != hashlib.sha256(raw).hexdigest():
+            return False
+    return True
+
+
+def _diagnostic_http_metadata(row):
+    outcome = row.get('outcome')
+    if not (type(outcome) is int and 100 <= outcome <= 599) and outcome not in ('error', 'timeout'):
+        outcome = 'invalid'
+    digest = row.get('sha256')
+    return {'outcome': outcome, 'sha256': digest if type(digest) is str and re.fullmatch('[0-9a-f]{64}', digest) else None,
+        'bytes': _diagnostic_int(row.get('bytes')), 'elapsed_ms': _diagnostic_int(row.get('elapsed_ms')),
+        'complete': row.get('complete') if type(row.get('complete')) is bool else None}
+
+
+def _diagnostic_namespace_identity(value, namespace):
+    if type(value) is not dict or type(value.get('metadata')) is not dict:
+        return None
+    meta = value.get('metadata', {})
+    if type(meta.get('labels')) is not dict:
+        return None
+    if meta.get('name') != namespace or type(meta.get('uid')) is not str or not meta['uid'] \
+            or meta.get('deletionTimestamp') or meta.get('labels', {}).get(OWNED_LABEL) != 'true':
+        return None
+    return {'namespace': namespace, 'namespace_uid': meta['uid']}
+
+
+def _diagnostic_pod_identity(pod, container, namespace):
+    """Strict projection only: no environment, settings, or mounted data."""
+    try:
+        meta = pod['metadata']; spec = pod['spec']; status = pod['status']
+        if any(type(value) is not dict for value in (meta, spec, status)):
+            return None
+        if type(meta.get('labels')) is not dict:
+            return None
+        if meta.get('namespace') != namespace or meta.get('deletionTimestamp') or spec.get('hostNetwork', False) is not False:
+            return None
+        values = [meta['name'], meta['uid'], spec['nodeName'], status['podIP']]
+        if any(type(value) is not str or not value for value in values):
+            return None
+        address = ipaddress.ip_address(values[3])
+        if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+            address = address.ipv4_mapped
+        if address.is_unspecified or address.is_loopback or address.is_multicast or address.is_link_local:
+            return None
+        if type(status.get('containerStatuses')) is not list or type(spec.get('containers')) is not list \
+                or any(type(row) is not dict for row in [*status['containerStatuses'], *spec['containers']]):
+            return None
+        selected = [row for row in status['containerStatuses'] if row.get('name') == container]
+        declared = [row for row in spec['containers'] if row.get('name') == container]
+        if len(selected) != 1 or len(declared) != 1:
+            return None
+        row, = selected; state = row['state']
+        if type(state) is not dict or len(state) != 1:
+            return None
+        kind, = state
+        if kind not in ('running', 'terminated') or type(state[kind]) is not dict:
+            return None
+        cid = row['containerID']; restart = row['restartCount']; started = state[kind]['startedAt']
+        if type(cid) is not str or not re.fullmatch(r'[a-z][a-z0-9+.-]*://[0-9a-f]{64}', cid) \
+                or type(restart) is not int or restart < 0 or type(started) is not str or not started:
+            return None
+        if type(row.get('ready')) is not bool:
+            return None
+        return {'namespace': namespace, 'pod': values[0], 'pod_uid': values[1], 'node': values[2],
+            'pod_ip': values[3], 'container': container, 'container_id': cid, 'restart_count': restart,
+            'state': kind, 'started_at': started, 'ready': row.get('ready') is True}
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _diagnostic_fault_pod_request(lab, pods, end, model, *, idle_end):
+    """Bounded diagnostic only; never feeds served/accepted/missing/violations."""
+    # Preserve time for the original five-second Service observation and poll.
+    remaining = min(end, lab.deadline) - lab.clock()
+    if remaining <= 5 + POLL_SECONDS:
+        lab.diagnostic('direct-request-skipped', reason='SERVICE_BUDGET_RESERVED')
+        return
+    if lab.diagnostic_idle_overrun or lab.diagnostic_namespace is None:
+        lab.diagnostic('direct-request-skipped', reason='PRIOR_DIAGNOSTIC_IDLE_OVERRUN'
+            if lab.diagnostic_idle_overrun else 'BASE_NAMESPACE_IDENTITY_UNVERIFIED')
+        return
+    lab.diagnostic_deadline = min(idle_end, lab.clock() + POLL_SECONDS, end, lab.deadline)
+    request_id = None
+    try:
+        for candidate in pods:
+            if lab.clock() >= lab.diagnostic_deadline:
+                lab.diagnostic('direct-request-skipped', reason='DIAGNOSTIC_BUDGET_EXHAUSTED')
+                break
+            if _diagnostic_pod_identity(candidate, lab.cfg['container'], lab.cfg['namespace']) is None:
+                lab.diagnostic('direct-request-unbound', reason='CANDIDATE_IDENTITY_INVALID')
+                continue
+            name = candidate['metadata']['name']; uid = candidate['metadata']['uid']
+            def snapshot(pod_name, container):
+                raw = strict_json(lab._kubectl('get', 'pod', pod_name, '-o', 'json'), limit=2 * 1024 ** 2)
+                identity = _diagnostic_pod_identity(raw, container, lab.cfg['namespace'])
+                return raw, identity if identity is not None and identity['pod'] == pod_name else None
+            def namespace_snapshot():
+                raw = strict_json(lab._kubectl('get', 'namespace', lab.cfg['namespace'], '-o', 'json'), limit=262144)
+                return _diagnostic_namespace_identity(raw, lab.cfg['namespace'])
+            namespace = namespace_snapshot()
+            before, engine = snapshot(name, lab.cfg['container'])
+            _, probe = snapshot(lab.cfg['probe_pod'], lab.cfg['probe_container'])
+            if namespace != lab.diagnostic_namespace or engine is None or probe is None or engine['pod_uid'] != uid \
+                    or before['metadata'].get('labels', {}).get('byul.lab/generation') != 'faulty' \
+                    or probe['state'] != 'running':
+                lab.diagnostic('direct-request-unbound', reason='BEFORE_IDENTITY_INVALID',
+                    namespace=namespace, engine=engine, probe=probe)
+                continue
+            url = _owned_direct_pod_url(lab, before, diagnostic=True)
+            if url is None:
+                lab.diagnostic('direct-request-unbound', reason='SERVICE_TARGET_BINDING_INVALID', engine=engine, probe=probe)
+                continue
+            timeout = min(5, lab.diagnostic_deadline - lab.clock())
+            if timeout <= 0:
+                lab.diagnostic('direct-request-skipped', reason='DIAGNOSTIC_BUDGET_EXHAUSTED')
+                break
+            request_id = 'byul-fault-diagnostic-' + uuid.uuid4().hex
+            item = lab.chat(model=model, timeout=timeout, headers={'X-Request-Id': request_id})
+            request_id = hashlib.sha256(request_id.encode()).hexdigest()
+            record = {'request_id_sha256': request_id, 'target_port': 8000, 'namespace_before': namespace,
+                'engine_before': engine, 'probe_before': probe,
+                'request_sha256': hashlib.sha256(canonical_json(item)).hexdigest(),
+                'attribution': 'POD_ADDRESS_DIAGNOSTIC_ONLY'}
+            lab.diagnostic('direct-request-start', **record)
+            row, = lab.requests([item], timeout=timeout, url=url)
+            # Keep the result even when the subsequent identity read fails.
+            lab.diagnostic('direct-request-result', request_id_sha256=request_id, result=_diagnostic_http_metadata(row))
+            _, engine_after = snapshot(name, lab.cfg['container'])
+            _, probe_after = snapshot(lab.cfg['probe_pod'], lab.cfg['probe_container'])
+            namespace_after = namespace_snapshot()
+            bound = engine == engine_after and probe == probe_after and namespace == namespace_after
+            lab.diagnostic('direct-request-binding', request_id_sha256=request_id, engine_after=engine_after,
+                probe_after=probe_after, namespace_after=namespace_after, bound=bound,
+                reason='STABLE_IDENTITIES' if bound else 'IDENTITY_CHANGED')
+    except (OSError, TimeoutError, ValueError, KeyError, TypeError, AttributeError) as error:
+        lab.diagnostic('direct-request-error', request_id_sha256=request_id, reason=_diagnostic_error_kind(error))
+    finally:
+        if lab.clock() > idle_end:
+            lab.diagnostic_idle_overrun = True
+            lab.diagnostic('direct-request-idle-overrun', reason='TRANSPORT_EXCEEDED_ORIGINAL_IDLE')
+        lab.diagnostic_deadline = None
+
+
+def _owned_direct_pod_url(lab, pod, *, diagnostic=False):
     """Resolve a Service port to this engine Pod's declared listening port."""
     try:
         selected = urlsplit(lab.cfg['service_url'])
@@ -941,6 +1198,20 @@ def _owned_direct_pod_url(lab, pod):
         service = strict_json(lab._kubectl('get', 'service', service_name, '-o', 'json'), limit=262144)
         if service['metadata'].get('namespace') != lab.cfg['namespace']:
             return None
+        if diagnostic:
+            selector_items = [item.split('=', 1) for item in lab.cfg['selector'].split(',')]
+            selector = dict(selector_items)
+            if not selector or len(selector) != len(selector_items) \
+                    or any(not key or not value or '=' in value for key, value in selector.items()) \
+                    or service['spec'].get('selector') != selector \
+                    or any(pod['metadata'].get('labels', {}).get(key) != value for key, value in selector.items()):
+                return None
+            declared_ports = service['spec']['ports']
+            if selected.port != 8000 or len(declared_ports) != 1 \
+                    or type(declared_ports[0].get('port')) is not int or declared_ports[0]['port'] != 8000 \
+                    or type(declared_ports[0].get('targetPort')) is not int or declared_ports[0]['targetPort'] != 8000 \
+                    or declared_ports[0].get('protocol', 'TCP') != 'TCP':
+                return None
         exposed = selected.port or 80
         ports = [row for row in service['spec']['ports'] if row.get('port') == exposed
             and row.get('protocol', 'TCP') == 'TCP']
@@ -1289,6 +1560,12 @@ class ActivatedExecutor:
         workdir.mkdir(parents=True, exist_ok=True)
         path = workdir / 'lab-activation.json'; path.write_bytes(canonical_json(facts))
         artifact = DraftArtifact(name=path.name, path=path, collector='lab_activation/0.1.0')
+        # Preserve the primary verdict facts before optional diagnostic writes.
+        try:
+            diagnostics = lab.write_diagnostics(workdir)
+        except Exception as error:  # noqa: BLE001 - optional diagnostics cannot erase an independent violation
+            lab.diagnostic_write_errors.append({'reason': _diagnostic_error_kind(error)})
+            diagnostics = []
         observations = {**(passive.observations if passive else {}),
             **{k: Observation(value=v, collected=True) for k, v in facts.items()}}
         complete = facts['activation_scope_complete'] or bool(facts['activation_violations'])
@@ -1297,11 +1574,12 @@ class ActivatedExecutor:
             normal_control={'attempted': bool(lab.normal), 'succeeded': bool(lab.normal) and all(lab.normal),
                 'detail': 'Parent-measured normal requests around the activated fault.'},
             challenges=[{'step': step, 'attempted': facts['activation_scope_complete']} for step in check.challenge_steps],
-            observations=observations, artifacts=[*(passive.artifacts if passive else []), artifact],
+            observations=observations, artifacts=[*(passive.artifacts if passive else []), *diagnostics, artifact],
             config={**(passive.config if passive else {}), 'lab_activation': {k: v for k, v in self.cfg.items() if k != 'kubectl_context'}},
             started_at=started, finished_at=utcnow(),
             abort_reason=None if complete else 'LAB_ACTIVATION_SCOPE_INCOMPLETE',
-            cleanup_errors=[*(passive.cleanup_errors if passive else []), *lab.cleanup_errors])
+            cleanup_errors=[*(passive.cleanup_errors if passive else []), *lab.cleanup_errors,
+                *(['LAB_ACTIVATION_DIAGNOSTIC_ARTIFACT_UNAVAILABLE'] if lab.diagnostic_write_errors else [])])
 
     def _refused(self, check, passive, reason, started):
         if passive is not None:

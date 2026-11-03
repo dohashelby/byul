@@ -54,6 +54,47 @@ for name in sorted(os.listdir(root)):
     left-=len(raw);rows.extend(json.loads(line) for line in raw.splitlines())
 print(json.dumps({"events":rows,"truncated":truncated}))
 '''
+# REQ-16 lab only: replace the active LoRA files with one declared variant, keeping the same path.
+LORA_VARIANT_COPY = r'''
+import hashlib,json,os,stat,sys
+source,active=sys.argv[1],sys.argv[2];files={}
+def read(path):
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+    try:
+        value=os.fstat(fd)
+        if not stat.S_ISREG(value.st_mode) or not 0<value.st_size<=256*1024**2:raise ValueError()
+        parts=[];left=value.st_size
+        while left:
+            chunk=os.read(fd,min(left,1<<20))
+            if not chunk:raise ValueError()
+            parts.append(chunk);left-=len(chunk)
+        return b"".join(parts)
+    finally:os.close(fd)
+os.makedirs(active,mode=0o700,exist_ok=True)
+for name in ("adapter_config.json","adapter_model.safetensors"):
+    raw=read(os.path.join(source,name));temp=os.path.join(active,"."+name+".guard-tmp")
+    fd=os.open(temp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+    try:
+        view=memoryview(raw)
+        while view:view=view[os.write(fd,view):]
+        os.fsync(fd)
+    finally:os.close(fd)
+    os.replace(temp,os.path.join(active,name));files[name]=hashlib.sha256(raw).hexdigest()
+print(json.dumps({"schema":"guard-lab-lora-copy/1","files_sha256":files},separators=(",",":")))
+'''
+
+
+def _callback_content(content):
+    """Text, or the closed REQ-16 text plus one generated PNG part."""
+    if type(content) is str:
+        return 0<len(content)<=4096
+    if type(content) is not list or len(content)!=2 or any(type(part) is not dict for part in content):
+        return False
+    text,image=content;url=(image.get("image_url") or {}).get("url") if type(image.get("image_url")) is dict else None
+    return (set(text)=={"type","text"} and text["type"]=="text" and type(text["text"]) is str and 0<len(text["text"])<=4096
+        and set(image) in ({"type","image_url"},{"type","image_url","uuid"}) and image["type"]=="image_url"
+        and set(image["image_url"])=={"url"} and type(url) is str and url.startswith("data:image/png;base64,") and len(url)<=65536
+        and ("uuid" not in image or type(image["uuid"]) is str and re.fullmatch(r"[A-Za-z0-9-]{1,64}",image["uuid"]) is not None))
 
 
 class KubernetesBindingError(RuntimeError):
@@ -183,6 +224,8 @@ class KubernetesHTTP:
         self._attempt_cases = []
         self._state_token = None
         self._state_cases = set()
+        self._callback_lab = None
+        self._callback_switches = 0
 
     def _call(self, args, *, payload=None, cap=262144, budget=None, allow_empty=False, on_document=None):
         remaining = self.deadline - self.clock()
@@ -336,6 +379,7 @@ class KubernetesHTTP:
                 raise KubernetesBindingError()
             prepared=[]
             for request in requests:
+                switch_path=None
                 if self.profile == ROUTE_AUTHENTICATION_PROFILE:
                     if len(requests)!=1:raise KubernetesBindingError()
                     self._native_route_request(request)
@@ -368,7 +412,10 @@ class KubernetesHTTP:
                 elif self.profile == ENGINE_CALLBACK_PROFILE:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
-                    self._engine_callback_request(request)
+                    if type(request) is dict and str(request.get("id","")).startswith("cbx-"):
+                        switch_path=self._engine_callback_switch_request(request)
+                    else:
+                        self._engine_callback_request(request)
                 elif type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
                     raise KubernetesBindingError()
                 ids.append(request["id"])
@@ -379,6 +426,11 @@ class KubernetesHTTP:
                 paths={"/tokenize","/v1/chat/completions"}
                 if self.profile in _CLOSE_PROFILES:
                     allowed.add("read_profile");paths.add("/v1/completions")
+                models={self.api_model}
+                if switch_path is not None:
+                    paths={switch_path};models=None
+                elif self.profile==ENGINE_CALLBACK_PROFILE and (self._callback_lab or {}).get("lora"):
+                    models.add(self._callback_lab["lora"]["name"])
                 if self.profile == ROUTE_AUTHENTICATION_PROFILE:
                     # The new closed GET/POST contract above replaces only the
                     # old POST-only path/body shape. Preserve common URL/field bounds.
@@ -390,7 +442,7 @@ class KubernetesHTTP:
                         or url.scheme!=self.endpoint.scheme or url.netloc!=self.endpoint.netloc or url.query or url.fragment
                         or url.path not in paths
                         or url.path=="/tokenize" and mode!="json"
-                        or type(value.get("body")) is not dict or value["body"].get("model")!=self.api_model):
+                        or type(value.get("body")) is not dict or models is not None and value["body"].get("model") not in models):
                     raise KubernetesBindingError()
                 value.setdefault("mode","json");prepared.append(value)
             if len(set(ids))!=len(ids):raise KubernetesBindingError()
@@ -449,8 +501,63 @@ class KubernetesHTTP:
                 or "cache_salt" in body and (type(body["cache_salt"]) is not str or not 0<len(body["cache_salt"])<=64)
                 or type(messages) is not list or not 1<=len(messages)<=8
                 or any(type(m) is not dict or set(m)!={"role","content"} or m["role"]!="user"
-                    or type(m["content"]) is not str or not 0<len(m["content"])<=4096 for m in messages)):
+                    or not _callback_content(m["content"]) for m in messages)):
             raise KubernetesBindingError()
+
+    def declare_callback_lab(self,spec):
+        """REQ-16 lab contexts: accept the declared variants only for an owned lab namespace."""
+        from guard.executors.engine_callback_projection import validate_lab_contexts
+        if self.profile!=ENGINE_CALLBACK_PROFILE or self.lab is not True or self._callback_lab is not None:
+            raise KubernetesBindingError()
+        try:value=deepcopy(validate_lab_contexts(spec))
+        except ValueError:raise KubernetesBindingError() from None
+        self._verify();engine=self.binding["engine"]
+        namespace=self._call(["get","namespace",engine["namespace"],"-o","json"])
+        metadata=namespace.get("metadata") if type(namespace) is dict else None
+        if (type(metadata) is not dict or metadata.get("name")!=engine["namespace"]
+                or metadata.get("uid")!=engine["namespace_uid"] or (metadata.get("labels") or {}).get("byul.lab/owned")!="true"):
+            raise KubernetesBindingError()
+        self._callback_lab=value
+
+    def _engine_callback_switch_request(self,request):
+        """Only the exact reload request built from the declaration may reach the engine."""
+        lab=self._callback_lab or {};body=request.get("body");endpoint=self.endpoint.scheme+"://"+self.endpoint.netloc
+        lora=lab.get("lora");weights=lab.get("weights")
+        load=lora and {"lora_name":lora["name"],"lora_path":lora["active_path"],"load_inplace":True}
+        reloads=[{"method":"reload_weights","kwargs":{"weights_path":path}} for path in (weights or {}).get("variants",{}).values()]
+        if (self.lab is not True or not re.fullmatch(r"cbx-[0-9]{1,4}",request["id"]) or request.get("headers")!={}
+                or request.get("method")!="POST" or request.get("mode")!="json"):
+            raise KubernetesBindingError()
+        if request.get("url")==endpoint+"/v1/load_lora_adapter" and load and body==load:return "/v1/load_lora_adapter"
+        if request.get("url")==endpoint+"/collective_rpc" and body in reloads:return "/collective_rpc"
+        raise KubernetesBindingError()
+
+    def engine_callback_switch(self,action,variant):
+        """Change one declared REQ-16 context in the owned lab engine and return bounded facts."""
+        lab=self._callback_lab;kind={"lora_reload":"lora","weights_reload":"weights"}.get(action)
+        if (self.profile!=ENGINE_CALLBACK_PROFILE or self.lab is not True or lab is None or kind is None
+                or lab.get(kind) is None or variant not in lab[kind]["variants"]):
+            raise KubernetesBindingError()
+        self._callback_switches+=1;endpoint=self.endpoint.scheme+"://"+self.endpoint.netloc;facts={}
+        request={"id":"cbx-%d"%self._callback_switches,"mode":"json","method":"POST","headers":{}}
+        if kind=="lora":
+            spec=lab["lora"];self._verify();engine=self.binding["engine"]
+            copied=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",
+                "--","python3","-c",LORA_VARIANT_COPY,spec["variants"][variant],spec["active_path"]],cap=4096,budget=60)
+            files=copied.get("files_sha256") if type(copied) is dict else None
+            if (type(copied) is not dict or set(copied)!={"schema","files_sha256"} or copied["schema"]!="guard-lab-lora-copy/1"
+                    or type(files) is not dict or set(files)!={"adapter_config.json","adapter_model.safetensors"}
+                    or any(type(v) is not str or not re.fullmatch(r"[0-9a-f]{64}",v) for v in files.values())):
+                raise KubernetesBindingError()
+            facts["variant_files_sha256"]=dict(files)
+            request.update(url=endpoint+"/v1/load_lora_adapter",body={"lora_name":spec["name"],"lora_path":spec["active_path"],"load_inplace":True})
+        else:
+            request.update(url=endpoint+"/collective_rpc",body={"method":"reload_weights","kwargs":{"weights_path":lab["weights"]["variants"][variant]}})
+        row,=self("kubernetes-probe",[request],120)
+        if row.get("outcome")!=200 or row.get("capture_complete") is not True:
+            raise KubernetesBindingError()
+        facts.update(engine_outcome=200,engine_response_sha256=row.get("body_sha256"))
+        return facts
 
     def engine_callback_events(self,session):
         """Bounded read of the selected session's callback rows from the engine Pod."""

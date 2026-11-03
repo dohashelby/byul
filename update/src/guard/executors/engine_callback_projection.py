@@ -6,15 +6,24 @@ never become violation=false. Elapsed time alone never decides anything.
 from __future__ import annotations
 
 from collections import deque
+import base64
 import hashlib
 import hmac
+import re
+import struct
+import zlib
 
 SCHEMA = 'byul-engine-callback-cohort/1'
 COMPUTED = 'KVCacheManager.get_computed_blocks'
-ROLES = {'REQ-14': {'normal'}, 'REQ-15': {'prime', 'control', 'probe'}, 'REQ-16': {'prime', 'control', 'probe', 'post'},
+ROLES = {'REQ-14': {'normal'}, 'REQ-15': {'prime', 'control', 'probe'}, 'REQ-16': {'prime', 'control', 'probe', 'post', 'switch'},
     'REQ-17': {'prime', 'control-present', 'control-absent', 'present', 'absent'},
     'REQ-18': {'standalone', 'restricted', 'reused'}}
 MAX_CASES = 512
+# REQ-16 lab contexts change the engine between cases: reload one LoRA in place, or reload weights.
+LAB_ACTIONS = {'lora_reload': 'lora', 'weights_reload': 'weights'}
+LAB_ROOTS = {'lora': '/guard-lora/', 'weights': '/guard-weights/'}
+_NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
+_PATH = re.compile(r'(/[A-Za-z0-9][A-Za-z0-9._-]{0,63}){2,8}')
 # 비동기 스케줄링에서는 출력이 다음 배치 뒤에 도착할 수 있다.
 PIPELINE_DEPTH = 2
 
@@ -39,13 +48,84 @@ def window(events, secret, barrier):
     return kept
 
 
+def _media(value):
+    return (type(value) is dict and 'seed' in value and set(value) <= {'seed', 'uuid'}
+        and type(value['seed']) is int and 0 <= value['seed'] < 2**31
+        and ('uuid' not in value or type(value['uuid']) is str and re.fullmatch(r'[A-Za-z0-9-]{1,64}', value['uuid'])))
+
+
+def _lab_path(value, kind):
+    return type(value) is str and _PATH.fullmatch(value) is not None and value.startswith(LAB_ROOTS[kind])
+
+
+def validate_lab_contexts(spec, cases=None):
+    """Closed REQ-16 lab declaration: one LoRA name, its active path, and owned variant paths."""
+    try:
+        if type(spec) is not dict or not spec or set(spec) - {'lora', 'weights'}:
+            raise ValueError
+        lora = spec.get('lora'); weights = spec.get('weights')
+        if lora is not None and (type(lora) is not dict or set(lora) != {'name', 'active_path', 'variants'}
+                or type(lora['name']) is not str or _NAME.fullmatch(lora['name']) is None
+                or not _lab_path(lora['active_path'], 'lora')):
+            raise ValueError
+        for kind, part in (('lora', lora), ('weights', weights)):
+            if part is None:
+                continue
+            if kind == 'weights' and (type(part) is not dict or set(part) != {'variants'}):
+                raise ValueError
+            variants = part['variants']
+            if (type(variants) is not dict or not 1 <= len(variants) <= 4
+                    or any(type(k) is not str or _NAME.fullmatch(k) is None or not _lab_path(v, kind) for k, v in variants.items())
+                    or len(set(variants.values())) != len(variants)
+                    or kind == 'lora' and lora['active_path'] in variants.values()):
+                raise ValueError
+        for case in cases or ():
+            if case['role'] == 'switch':
+                kind = LAB_ACTIONS[case['action']]
+                if spec.get(kind) is None or case['variant'] not in spec[kind]['variants']:
+                    raise ValueError
+            elif 'adapter' in case and (lora is None or case['adapter'] != lora['name']):
+                raise ValueError
+    except (KeyError, TypeError, ValueError):
+        raise ValueError('ENGINE_CALLBACK_LAB_CONTEXTS_INVALID') from None
+    return spec
+
+
+def media_png(seed):
+    """A small deterministic RGB image for one media case. Only its seed is kept in evidence."""
+    stream = hashlib.shake_256(b'byul-media:' + str(seed).encode()).digest(16 * 16 * 3)
+    rows = b''.join(b'\x00' + stream[y * 48:(y + 1) * 48] for y in range(16))
+    chunk = lambda kind, data: struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+    return (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 16, 16, 8, 2, 0, 0, 0))
+        + chunk(b'IDAT', zlib.compress(rows, 9)) + chunk(b'IEND', b''))
+
+
+def message_content(text, media):
+    if media is None:
+        return text
+    part = {'type': 'image_url', 'image_url': {'url': 'data:image/png;base64,' + base64.b64encode(media_png(media['seed'])).decode()}}
+    if 'uuid' in media:
+        part['uuid'] = media['uuid']
+    return [{'type': 'text', 'text': text}, part]
+
+
 def validate_cases(check_id, cases):
     if (type(cases) is not list or not 1 <= len(cases) <= MAX_CASES
             or len({c.get('case_id') for c in cases if type(c) is dict}) != len(cases)):
         raise ValueError('ENGINE_CALLBACK_CASES_INVALID')
     for case in cases:
+        if type(case) is dict and case.get('role') == 'switch':
+            # A switch sends no prompt. The executor runs it only against an owned lab engine.
+            if (check_id != 'REQ-16' or set(case) != {'case_id', 'role', 'action', 'variant'}
+                    or type(case['case_id']) is not str or case['action'] not in LAB_ACTIONS
+                    or type(case['variant']) is not str or _NAME.fullmatch(case['variant']) is None):
+                raise ValueError('ENGINE_CALLBACK_CASES_INVALID')
+            continue
         if (set(case) - {'case_id', 'role', 'group', 'context', 'prefix', 'prompt', 'cache_salt', 'principal', 'forged_salt',
-                'allowed_token_ids', 'max_tokens'}
+                'allowed_token_ids', 'max_tokens', 'adapter', 'media'}
+                or ('adapter' in case or 'media' in case) and check_id != 'REQ-16'
+                or 'adapter' in case and (type(case['adapter']) is not str or _NAME.fullmatch(case['adapter']) is None)
+                or 'media' in case and not _media(case['media'])
                 or case.get('role') not in ROLES[check_id] or type(case.get('prompt')) is not str
                 or not 0 < len(case['prompt']) <= 4096 or type(case['case_id']) is not str
                 or 'cache_salt' in case and (type(case['cache_salt']) is not str or not 0 < len(case['cache_salt']) <= 64)

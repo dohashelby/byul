@@ -365,10 +365,21 @@ class EngineSensorExecutor:
                 or manifest.get('environment_ref') != env.ref().model_dump(mode='json')):
             raise ValueError('ENGINE_SENSOR_CALLBACK_MANIFEST_BINDING_MISMATCH')
         cases = manifest.get('cases'); projection.validate_cases(check.id, cases)
+        lab = manifest.get('lab_contexts')
+        # 엔진 상태를 바꾸는 사례(어댑터 교체·가중치 교체)는 소유한 lab 엔진에서만 돈다.
+        if any(c['role'] == 'switch' or 'adapter' in c for c in cases) or lab is not None:
+            if target.get('lab') is not True:
+                raise ValueError('ENGINE_SENSOR_LAB_CONTEXT_REQUIRES_LAB')
+            projection.validate_lab_contexts(lab, cases)
         transport = self.transport or KubernetesHTTP(target, env, duration=duration,
             binary=self.cfg.get('kubectl_binary', 'kubectl'), profile=ENGINE_CALLBACK_PROFILE)
         endpoint = transport.endpoint.scheme + '://' + transport.endpoint.netloc + '/v1/chat/completions'
-        tags = {}; elapsed = {}; outputs = {}; trials = []; cleanup = []
+        tags = {}; elapsed = {}; outputs = {}; trials = []; cleanup = []; switches = []
+        if lab is not None:
+            try:
+                transport.declare_callback_lab(lab)
+            except (KubernetesBindingError, ValueError):
+                cleanup.append('ENGINE_SENSOR_LAB_OWNERSHIP_UNVERIFIED')
         # 같은 엔진을 다시 시험해도 이전 실행의 캐시가 교차 적중으로 보이지 않게 한다.
         nonce = uuid.uuid4().hex
         # 경계 요청: 이 요청 앞의 세션 기록은 이번 시험 근거에서 뺀다.
@@ -380,9 +391,19 @@ class EngineSensorExecutor:
                     'max_tokens': 1, 'stream': False, **({} if 'principal' in cases[0] else {'temperature': 0})}}], 30)
         except (KubernetesBindingError, ValueError):
             cleanup.append('ENGINE_SENSOR_CALLBACK_BARRIER_UNAVAILABLE')
-        for number, case in enumerate(cases):
+        for number, case in enumerate(() if 'ENGINE_SENSOR_LAB_OWNERSHIP_UNVERIFIED' in cleanup else cases):
+            if case['role'] == 'switch':
+                fact = {'case_id': case['case_id'], 'action': case['action'], 'variant': case['variant']}
+                try:
+                    switches.append({**fact, 'completed': True, **transport.engine_callback_switch(case['action'], case['variant'])})
+                except (KubernetesBindingError, ValueError):
+                    # 바꾸지 못한 문맥의 뒤 사례는 보내지 않는다. 앞선 사례의 행은 그대로 둔다.
+                    switches.append({**fact, 'completed': False})
+                    cleanup.append('ENGINE_SENSOR_LAB_SWITCH_UNAVAILABLE'); break
+                continue
             tag = tags[case['case_id']] = 'byul-cb-' + uuid.uuid4().hex
-            body = {'model': transport.api_model, 'messages': [{'role': 'user', 'content': nonce + ' ' + case['prompt']}],
+            body = {'model': case.get('adapter', transport.api_model), 'messages': [{'role': 'user',
+                    'content': projection.message_content(nonce + ' ' + case['prompt'], case.get('media'))}],
                 'max_tokens': case.get('max_tokens', 1), 'temperature': 0, 'stream': False}
             if 'allowed_token_ids' in case:
                 body['allowed_token_ids'] = case['allowed_token_ids']
@@ -450,7 +471,8 @@ class EngineSensorExecutor:
             config={'profile': PROFILES[check.id], 'target_sha256': values['sensor_target_sha256'],
                     'prepared_sha256': values['sensor_prepared_sha256'], 'manifest_sha256': values['sensor_manifest_sha256'],
                     'implementation': 'kubernetes', 'engine_started': False})
-        return self._artifact(draft, workdir, {'safe_facts': {**result, 'trials': trials, 'sensor_gaps': gaps},
+        return self._artifact(draft, workdir, {'safe_facts': {**result, 'trials': trials, 'sensor_gaps': gaps,
+                **({'lab_switches': switches} if lab is not None else {})},
             'required_branches': REQUIRED_BRANCHES[check.id]})
 
     def _auth(self, case):

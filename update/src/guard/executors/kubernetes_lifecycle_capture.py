@@ -152,7 +152,8 @@ class KubernetesLifecycleReader:
             return "context"
         if argv[2]==INVENTORY_READER and len(argv)==4 and max_bytes==65536 and argv[3]==self.session:
             return "inventory"
-        if argv[2]==SESSION_SEALER and len(argv)==4 and max_bytes==4096 and argv[3]==self.session:
+        if (argv[2]==SESSION_SEALER and len(argv)==5 and max_bytes==4096 and argv[3]==self.session
+                and argv[4]==str(self.file_read_limit)):
             return "seal"
         raise KubernetesCaptureError()
 
@@ -210,7 +211,7 @@ class KubernetesLifecycleReader:
         cleanup_before=self._parent_cleanup_failures
         try:
             result=self.exec_bounded(self.binding["engine"]["container"],
-                ["python3","-c",SESSION_SEALER,self.session],timeout=5,max_bytes=4096)
+                ["python3","-c",SESSION_SEALER,self.session,str(self.file_read_limit)],timeout=5,max_bytes=4096)
             value=strict_json(result.stdout.encode(),limit=4096)
             if (type(value) is not dict or set(value)!={"schema","session","sealed","recordings_closed","terminal_inventory_sha256"}
                     or value["schema"]!="guard-session-seal/1" or value["session"]!=self.session

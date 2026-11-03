@@ -122,9 +122,17 @@ def test_exact_native_flags_do_not_certify_backend_stop_or_trace_completion(monk
     assert projected['complete_calls'] and all(row['recording_closed'] for row in projected['samples'])
     assert any(row['flag_adapter_conflict_observed'] for row in projected['conflict_candidates'])==bool(failed)
     assert not projected['backend_collection_stopped_verified'] and not projected['trace_output_completed_verified']
+    assert projected['call_binding_failures']=={}
     capture['summary']['recording_closed']=False
     unclosed=metadata.project(packet,['0'])
     assert unclosed['complete_calls']==0 and unclosed['conflict_candidates']==[]
+    # #196: the gap code stays the same; the count names the missing condition.
+    assert 'profiler_source_process_call_binding_unavailable' in unclosed['missing']
+    assert set(unclosed['call_binding_failures'])=={'recording_not_closed'}
+    capture['summary']['recording_closed']=True;capture['process_context_verified']=False
+    unbound=metadata.project(packet,['0'])
+    assert set(unbound['call_binding_failures'])=={'physical_process_binding_unverified'}
+    assert 'required_profiler_worker_rank_unavailable' in unbound['missing']
 
 
 def test_registered_callback_code_mismatch_rejects_atomically(monkeypatch):

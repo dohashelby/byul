@@ -10,6 +10,7 @@ GPU를 켠 뒤 시험 전에 채운다. 세대(V1 센서, 기본 V2, Graph 활�
 | API 별칭 | `byul-gpu-lab` | `GET /v1/models`. 요청·target·비교에 이 별칭만 쓴다 | |
 | runner 세대 | V1 센서 세대는 `VLLM_USE_V2_MODEL_RUNNER=0`, 기본 세대는 V2, Graph 세대는 eager 끔 | Pod env와 기동 로그 | |
 | 엔진 옵션 | prefix caching 켬 | 기동 인자 | block size, `gpu_memory_utilization`, `max_model_len`(REQ-17은 1,600 이상) |
+| 스케줄링 | 기본은 async(0.31.0 자동). REQ-14 동기 세대만 `--no-async-scheduling` | 기동 로그의 async scheduling 표시 | 세대별 async 여부. 두 세대의 REQ-14 결과를 섞지 않는다 |
 | target 경로 | `topology=kubernetes-owned-direct`, `trusted_url` 호스트 = 엔진 Pod IP | target 파일과 `kubectl get pod -o wide` | Pod 이름·UID·IP |
 | Pod 설정 | `enableServiceLinks: false` | Pod spec | |
 | 실행 UID/GID | 실제 값 확인. 첫 실증 root 세대의 PLT-01 FAIL은 지우지 않는다 | Pod 안 `id` | |

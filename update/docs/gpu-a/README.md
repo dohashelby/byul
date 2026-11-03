@@ -21,6 +21,7 @@ A가 맡은 점검 13개: REQ-08, REQ-09, REQ-10, REQ-14, REQ-16, REQ-17, REQ-18
 | 1 | SHA `bb903dff…`(`gpu_model_runner.py`)만 정확한 크기 335,342바이트까지 읽는다. 다른 파일은 128 KiB 그대로 | `adapters/vllm_cache_callback.py` | REQ-14 async 출력 관측 설치(#192) |
 | 2 | 원본 바이트 SHA 확인은 호출마다 하고, SHA가 맞은 같은 바이트의 compile·digest만 재사용한다 | `adapters/vllm_cache_callback.py` | 호출당 확인 2.1ms → 0.04ms(`kv_cache_manager`), 18.8ms → 0.15ms(`gpu_model_runner`), 로컬 macOS 측정 |
 | 3 | 엔진에 설치하는 콜백 센서가 판정에 쓰이지 않는 블록 단위 함수(`BlockPool.get_cached_block`, `BlockHashToBlockMap.get_one_block`)를 감싸지 않는다 | `adapters/vllm_engine_callback_sensor.py` | REQ-17 적중 길이에 비례하던 계측 편향과 기록 예산 초과 |
+| 4 | async 출력(`AsyncGPUModelRunnerOutput`)이면 `get_output()`을 부르지 않고 그 안의 원래 출력에서 요청 ID를 읽는다(2026-11-03) | `adapters/vllm_distributed_callback.py` | GPU 기본 async 스케줄링에서 0개였던 REQ-14 출력 대조. #192 없이 진행 |
 
 - 2는 처음 후보(파일 메타데이터가 같으면 재사용)보다 엄격하게 구현했다. 파일 교체 감지는 지금처럼 바이트 SHA 비교다.
 - 3은 엔진 센서의 설치 목록만 바꿨다. 범용 관측기 `vllm_cache_callback.TARGETS`와 그 계약 시험은 그대로다.

@@ -261,6 +261,44 @@ def test_actual_worker_rpc_rank_request_and_output_object_facts_are_process_loca
     assert 'per_rank_intermediate_tensor_buffer_transport_unimplemented' in projected['missing']
 
 
+@pytest.mark.parametrize('owner', ['vllm.v1.worker.gpu_model_runner', 'example.lookalike'])
+def test_pending_async_output_ids_are_read_without_calling_get_output(tmp_path, owner):
+    """GPU 기본 async 스케줄링에서도 출력 귀속을 보되 장치 복사를 기다리지 않는다."""
+    module = source_module(distributed.MP, tmp_path, targets=distributed.TARGETS, sources=distributed.rank.SOURCE_ADDITIONS)
+    module.AsyncModelRunnerOutput = type('AsyncModelRunnerOutput', (), {})
+    module.WorkerProc.ResponseStatus = SimpleNamespace(SUCCESS='SUCCESS', FAILURE='FAILURE')
+    observer = distributed.DistributedCallbackObserver('c' * 32, context_provider=lambda: {'fixture': True})
+    for point in distributed.TARGETS[module.__name__]:
+        name, method = point.split('.'); setattr(vars(module)[name], method, observer.wrap(module, point))
+    stored = type('ModelRunnerOutput', (), {})(); stored.req_ids = [PRIVATE]
+    calls = []
+    def get_output(self):
+        calls.append(len(observer.report()['events'])); return self._model_runner_output
+    pending_type = type('AsyncGPUModelRunnerOutput', (module.AsyncModelRunnerOutput,),
+        {'__module__': owner, 'get_output': get_output})
+    pending = pending_type(); pending._model_runner_output = stored
+    scheduler = type('Scheduler', (), {})(); scheduler.num_scheduled_tokens = {PRIVATE: 4}
+    queue = []
+    worker = module.WorkerProc(); worker.rank = 1; worker.local_rank = 0
+    worker.worker = SimpleNamespace(execute_model=lambda scheduler: pending,
+        model_config=SimpleNamespace(model=PRIVATE, revision=PRIVATE))
+    worker.use_async_scheduling = True
+    worker.async_output_queue = SimpleNamespace(put=queue.append)
+    worker.worker_response_mq = SimpleNamespace(enqueue=queue.append)
+    assert worker._execute_worker_rpc(('execute_model', (scheduler,), {}, 1)) is None
+    assert calls == [] and queue == [pending]
+    events = observer.report()['events']
+    rpc = next(r for r in events if r['point'] == 'WorkerProc._execute_worker_rpc' and r['phase'] == 'CALL')
+    handled = next(r for r in events if r['point'] == 'WorkerProc.handle_output' and r['phase'] == 'CALL')
+    trusted = owner == 'vllm.v1.worker.gpu_model_runner'
+    assert handled['fields']['output_request_sha256'] == (rpc['fields']['native_request_sha256'] if trusted else None)
+    assert handled['fields']['output_ids_from_pending_async_output'] is trusted
+    worker.enqueue_output(queue.pop())
+    # vLLM 원래 경로만 get_output을 한 번 부른다.
+    assert len(calls) == 1 and queue == [('SUCCESS', stored)]
+    assert PRIVATE not in json.dumps(observer.report())
+
+
 def packet(cached=3):
     body = json.dumps({'model': 'example', 'choices': [{'text': PRIVATE}],
         'usage': {'prompt_tokens_details': {'cached_tokens': cached}, 'cache_read_input_tokens': 2}})

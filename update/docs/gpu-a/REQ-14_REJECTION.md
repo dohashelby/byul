@@ -34,13 +34,32 @@
 - 같은 크기로 내용만 바꾼 파일도 다음 호출에서 잡힌다.
 - 반복 호출에서 compile은 다시 하지 않고 원본 읽기는 호출 전후마다 한다.
 
-## #192에 남은 일
+## 출력 대조가 0개였던 이유와 #192 없이 보는 경로 (2026-11-03)
 
-- main에 이 보수가 들어간 뒤 #192를 다시 맞추고 소스 해시 목록을 새로 만든다. #192 자체 코드는 바꿀 필요가 없다. `DistributedObserver.wrap()`이 같은 `_codes()`를 지난다.
-- #192에 `wrap()`을 지나는 시험을 더한다. 지금 시험은 `_snapshot`만 본다.
+CPU 실측(opt-125m)은 출력 대조 4개, GPU G27~G29는 모두 0개였다. vLLM 0.31.0은 pooling·일부 speculative decoding·미지원 executor 같은 예외가 없으면 async 스케줄링을 기본으로 켠다(`config/vllm.py`). 그러면 worker가 `handle_output`에 넘기는 것은 `AsyncGPUModelRunnerOutput`이고, 이 객체에는 `req_ids` 속성이 없다. 기존 센서는 출력의 `req_ids`만 읽었으므로 대조할 출력이 없었다.
+
+이 객체는 만들 때 받은 `ModelRunnerOutput`을 `_model_runner_output`에 두고, `get_output()`은 장치 복사를 기다린 뒤 그 같은 객체를 돌려준다. 그래서 요청 ID는 `get_output()` 전후가 같다.
+
+| 경로 | 방법 | 상태 |
+|---|---|---|
+| 1. 동기 세대 | 엔진을 `--no-async-scheduling`으로 띄운다. 출력이 `req_ids`를 가진 `ModelRunnerOutput`으로 바로 온다 | 코드 변경 없음. 기본 설정이 아니므로 그 세대의 결과는 동기 분기로만 기록한다 |
+| 2. async 출력의 원래 출력 읽기 | 이미 설치되는 `WorkerProc.handle_output`·`enqueue_output` 지점에서, 출력이 `vllm.v1.worker.gpu_model_runner`의 `AsyncGPUModelRunnerOutput`·`AsyncGPUPoolingModelRunnerOutput`이면 `_model_runner_output.req_ids`를 읽는다. `get_output()`은 부르지 않는다. 행에 `output_ids_from_pending_async_output`을 남긴다 | `adapters/vllm_distributed_callback.py`. 새 감싸기 지점 없음, 판정 규칙 그대로 |
+| 3. `get_output` 감싸기(#192) | 335KB 파일의 메서드를 감싼다 | 경로 2가 GPU에서 되면 필요 없다 |
+
+경로 2의 계약 시험(`tests/test_cache_callback.py`):
+- 고정 소스의 `WorkerProc`가 async 출력을 queue에 넣을 때 센서는 `get_output()`을 부르지 않는다.
+- 출력 요청 ID는 같은 RPC의 예정 요청 ID와 같다.
+- vLLM 원래 경로(`enqueue_output`)만 `get_output()`을 한 번 부른다.
+- 다른 모듈의 이름만 같은 클래스는 읽지 않는다.
+
+## #192 처리
+
+- 경로 2로 GPU 1차에서 대조가 1개 이상 나오면 #192를 닫는다.
+- 0개면 #192 브랜치로 만든 자산을 후보 세대로 한 번 띄운다. 그 전에 #192는 main과의 충돌(소스 해시 목록, `MODULES` 줄)을 풀고 `wrap()`을 지나는 시험을 더해야 한다.
+- 어느 경로든 중간 tensor·TP 분기가 남아 REQ-14는 full_scope가 아니다.
 
 ## GPU에서 확인할 것
 
-1. GPU 이미지(`vllm/vllm-openai@sha256:a4a4c04…`) 안 `vllm/v1/worker/gpu_model_runner.py`의 크기 335,342와 SHA `bb903dff…`.
-2. wrap 사전 검사 통과, `get_output` 반환 뒤 `output_request_sha256` 수집, 출력 귀속 대조 1개 이상.
-3. 센서를 켠 세대와 끈 세대의 스텝 시간 차이를 기록한다.
+1. GPU 이미지(`vllm/vllm-openai@sha256:a4a4c04…`) 안 `vllm/v1/worker/gpu_model_runner.py`의 크기 335,342와 SHA `bb903dff…`, 기동 로그의 async 스케줄링 사용 여부.
+2. 기본(async) 세대에서 `handle_output` 행의 `output_ids_from_pending_async_output=true`, 출력 귀속 대조 1개 이상.
+3. `--no-async-scheduling` 세대에서 출력 귀속 대조 1개 이상. 두 세대의 결과를 섞지 않는다.

@@ -18,6 +18,8 @@ import time
 import uuid
 from urllib.parse import urlsplit
 
+import yaml
+
 from guard.models import DataOrigin, ExecStatus, canonical_json, utcnow
 from guard.models.objects import Observation
 from guard.runtime.bounded import capture_pipes, strict_json
@@ -151,7 +153,7 @@ class Lab:
         self.duration = cfg.get('max_duration_seconds', 600)
         self.deadline = self.clock() + self.duration
         self.steps = []; self.violations = []; self.missing = []; self.mutated = False; self.normal = []
-        self.cleanup_errors = []
+        self.cleanup_errors = []; self.fault_restore_failed = False
         self.restore_model = cfg['model']
         # Diagnostic records never participate in activation predicates.
         self.diagnostics = []; self.diagnostic_write_errors = []; self.diagnostic_namespace = None
@@ -160,7 +162,7 @@ class Lab:
 
     def diagnostic(self, event, **facts):
         self.diagnostics.append({'poll': self.diagnostic_poll, 'event': event,
-            'recorded_monotonic': time.monotonic(), **facts})
+            'recorded_monotonic': self.clock(), **facts})
 
     def diagnostic_stream_metadata(self, raw):
         return {'sha256': hashlib.sha256(raw).hexdigest(), 'bytes': len(raw)}
@@ -181,12 +183,13 @@ class Lab:
         remaining = min(timeout, self.deadline - self.clock())
         if self.diagnostic_deadline is not None:
             remaining = min(remaining, self.diagnostic_deadline - self.clock())
-        if remaining <= 0:
+        timeout_ns = int(remaining * 1_000_000_000)
+        if timeout_ns <= 0:
             raise TimeoutError('LAB_ACTIVATION_BUDGET_EXHAUSTED')
         context = [f"--context={self.cfg['kubectl_context']}"] if 'kubectl_context' in self.cfg else []
         options = {'input_bytes': stdin} if stdin is not None else {}
         try:
-            result = self.runner([self.binary, *context, f"--namespace={self.cfg['namespace']}", f'--request-timeout={remaining:.0f}s', *args],
+            result = self.runner([self.binary, *context, f"--namespace={self.cfg['namespace']}", f'--request-timeout={timeout_ns}ns', *args],
                 timeout=remaining, env_extra={}, max_stdout_bytes=cap, max_stderr_bytes=4096, **options)
         except (OSError, TimeoutError, ValueError) as error:
             if self.diagnostic_poll is not None and (args[0] == 'logs' or CLIENT in args):
@@ -563,6 +566,7 @@ def _replace(lab, change, *, before_model=None, after_model=None):
                 progress_path = posixpath.join(directory, 'byul-overlap-' + uuid.uuid4().hex)
         except (OSError, TimeoutError, ValueError, KeyError):
             pass
+    inflight = None; overlapping = False
     try:
         with ThreadPoolExecutor(max_workers=1) as pool:
             inflight = pool.submit(lab.requests, [lab.chat('inflight', model=before_model, max_tokens=256,
@@ -585,6 +589,7 @@ def _replace(lab, change, *, before_model=None, after_model=None):
                 lab.miss('INFLIGHT_FINISHED_BEFORE_CHANGE')
             lab.note('inflight-before-change', requested_model=before_model, first_body_seen=observed,
                 request_pending=not inflight.done())
+            overlapping = observed and not inflight.done()
             change()
             end = lab.clock() + lab.cfg['deadline_ms'] / 1000; rows = []
             while lab.clock() < end:
@@ -597,6 +602,19 @@ def _replace(lab, change, *, before_model=None, after_model=None):
                 lab.wait(POLL_SECONDS)
             first, = inflight.result()
     finally:
+        # 후속 수집 실패와 독립적으로 완료된 원 요청의 위반을 보존한다.
+        if inflight is not None and inflight.done():
+            try:
+                result, = inflight.result()
+                if result['outcome'] == 'timeout':
+                    if overlapping:
+                        lab.violate('INFLIGHT_REQUEST_HUNG_ACROSS_TRANSITION')
+                    else:
+                        lab.miss('INFLIGHT_TIMEOUT_WITHOUT_SERVER_ATTRIBUTION')
+                if len(result.get('models', [])) > 1:
+                    lab.violate('MIXED_GENERATIONS_IN_ONE_REQUEST', models=result['models'])
+            except Exception as error:  # noqa: BLE001 - 앞선 판정과 분리한다
+                lab.miss('INFLIGHT_RESULT_UNAVAILABLE:' + type(error).__name__)
         if progress_path:
             try:
                 if lab.probe_progress(progress_path, 'file') and not lab.probe_progress(progress_path, 'remove'):
@@ -605,11 +623,6 @@ def _replace(lab, change, *, before_model=None, after_model=None):
                 lab.miss('PROBE_PROGRESS_CLEANUP_FAILED')
     lab.note('inflight', requested_model=before_model, outcome=first['outcome'], complete=first['complete'],
         models=first.get('models', []), first_chunk_elapsed_ms=first.get('first_chunk_elapsed_ms'))
-    if first['outcome'] == 'timeout':
-        lab.miss('INFLIGHT_TIMEOUT_WITHOUT_SERVER_ATTRIBUTION')
-    # 한 stream 안에서 세대 별칭이 바뀌면 한 요청이 두 세대를 소비한 것이다.
-    if len(first.get('models', [])) > 1:
-        lab.violate('MIXED_GENERATIONS_IN_ONE_REQUEST', models=first['models'])
     models = {r.get('model') for r in rows if r.get('outcome') == 200}
     lab.note('during-transition', requested_model=after_model, samples=len(rows), models=sorted(m for m in models if m))
     if allowed and models - set(allowed) - {None}:
@@ -732,6 +745,7 @@ def _rejected(lab, code, marker=None, *, request_model=None, require_new_faulty_
                 and marker_bindings[p['metadata']['uid']] == lab.engine_container_identity(p)}
                 if require_new_faulty_uid else current_ready_uids if activated else set())
             if accepted_uids and restore_targets is None:
+                lab.violate(code)
                 lab.diagnostic('poll-end', reason='EXISTING_ACCEPTED_UID', accepted_uids=sorted(accepted_uids))
                 break
         try:
@@ -739,14 +753,11 @@ def _rejected(lab, code, marker=None, *, request_model=None, require_new_faulty_
             lab.diagnostic('service-request', result=_diagnostic_http_metadata(row), attribution='SERVICE_ONLY')
             if row.get('outcome') == 200:
                 seen.add(row.get('model'))
+                if allowed and row.get('model') is not None and row['model'] not in allowed:
+                    lab.violate('DISALLOWED_MODEL_SERVED_DURING_FAILED_CHANGE')
         except (OSError, TimeoutError, ValueError) as error:
             lab.diagnostic('service-request-error', reason=_diagnostic_error_kind(error))
-        if require_new_faulty_uid:
-            idle_end = lab.clock() + POLL_SECONDS
-            _diagnostic_fault_pod_request(lab, faulty, end, request_model or lab.cfg['model'], idle_end=idle_end)
-            lab.wait(max(0, idle_end - lab.clock()))
-        else:
-            lab.wait(POLL_SECONDS)
+        lab.wait(POLL_SECONDS)
         lab.diagnostic('poll-end', reason='CONTINUE')
     lab.diagnostic_poll = None
     lab.note('faulty-generation', became_ready=served, served_models=sorted(m for m in seen if m),
@@ -756,9 +767,10 @@ def _rejected(lab, code, marker=None, *, request_model=None, require_new_faulty_
         marker_uids=sorted(marker_bindings) if require_new_faulty_uid else None,
         diagnostic_marker_uids=sorted(diagnostic_uids) if require_new_faulty_uid else None,
         ready_uids=sorted(uid for uid in ready_uids if uid) if fresh_required else None)
-    if accepted_uids and restore_targets is None:
+    if accepted_uids and restore_targets is None and not any(v['code'] == code for v in lab.violations):
         lab.violate(code)
-    if allowed and seen - allowed - {None}:
+    if allowed and seen - allowed - {None} and not any(
+            v['code'] == 'DISALLOWED_MODEL_SERVED_DURING_FAILED_CHANGE' for v in lab.violations):
         lab.violate('DISALLOWED_MODEL_SERVED_DURING_FAILED_CHANGE')
     if not activated:
         lab.miss('PARTIAL_FAILURE_ACTIVATION_UNVERIFIED')
@@ -773,6 +785,14 @@ def _rejected(lab, code, marker=None, *, request_model=None, require_new_faulty_
     if require_new_faulty_uid and marker_bindings and ready_uids and not accepted_uids:
         lab.miss('FAULTY_MARKER_READY_CONTAINER_MISMATCH' if set(marker_bindings) & ready_uids
             else 'FAULTY_MARKER_READY_UID_MISMATCH')
+
+    if require_new_faulty_uid:
+        # 필수 Service/marker 관측과 판정을 끝낸 뒤 별도 남은 실행 예산으로 한 번만 진단한다.
+        diagnostic_end = min(lab.deadline, lab.clock() + 10)
+        lab.diagnostic_poll = poll
+        _diagnostic_fault_pod_request(lab, faulty[:1], diagnostic_end,
+            request_model or lab.cfg['model'], idle_end=diagnostic_end)
+        lab.diagnostic_poll = None
 
 
 def _restore_references(pod):
@@ -817,7 +837,9 @@ def _restore_material(lab, values):
         return lab.miss('RESTORE_TARGETS_NOT_APPROVED_AT_START')
     lab.normal_request('normal-before')
     _rejected(lab, 'TAMPERED_RESTORE_ACCEPTED', restore_targets=lab.cfg['tampered_objects'])
-    lab.restore(); lab.mutated = False
+    if lab.restore() is not True:
+        return lab.miss('RESTORE_NOT_CONFIRMED')
+    lab.mutated = False
     after = lab.object_digests(approved)
     if after != approved:
         lab.violate('RESTORED_MATERIAL_DIFFERS_FROM_APPROVAL')
@@ -825,6 +847,28 @@ def _restore_material(lab, values):
     lab.note('after-restore', matches_approval=after == approved, tampered_still_referenced=residual)
     if residual:
         lab.miss('TAMPERED_MATERIAL_SPEC_REFERENCE_REMAINS')
+        lab.violate('TAMPERED_MATERIAL_STILL_REFERENCED', objects=residual)
+
+
+def _bound_pod_request(lab, pod, item):
+    """직접 Pod 주소 요청과 전후 컨테이너 신원만 연결한다. Service 귀속은 주장하지 않는다."""
+    try:
+        before = lab.engine_container_identity(pod)
+        if before is None:
+            return None
+        url = _owned_direct_pod_url(lab, pod)
+        if url is None:
+            return None
+        row, = lab.requests([item], url=url)
+        current = next((p for p in lab._pods()
+            if p['metadata'].get('uid') == pod['metadata']['uid']), None)
+        if (current is None or lab.engine_container_identity(current) != before
+                or current.get('status', {}).get('podIP') != pod.get('status', {}).get('podIP')
+                or current.get('spec', {}).get('nodeName') != pod.get('spec', {}).get('nodeName')):
+            return None
+        return row
+    except (OSError, TimeoutError, ValueError, KeyError, TypeError, AttributeError):
+        return None
 
 
 def _startup_gate(lab, values):
@@ -863,6 +907,12 @@ def _startup_gate(lab, values):
         samples += 1
         if ready and row.get('outcome') != 200:
             premature += 1
+            for pod in new_pods:
+                if any(c.get('type') == 'Ready' and c.get('status') == 'True'
+                        for c in pod.get('status', {}).get('conditions', [])):
+                    direct = _bound_pod_request(lab, pod, lab.chat(model=after_model, timeout=5))
+                    if direct is not None and direct.get('outcome') != 200:
+                        lab.violate('READY_BEFORE_INFERENCE_AVAILABLE', pod_uid=pod['metadata']['uid'])
         if distinct and new_pods and not ready and row.get('outcome') == 200 and row.get('model') == after_model:
             early += 1
         if ready and row.get('outcome') == 200 and (not distinct or row.get('model') == after_model):
@@ -900,6 +950,9 @@ def _rank_faults(lab, values):
         if fault == 'communication-stall':
             continue
         _one_fault(lab, fault, lambda target: lab.signal_worker(number, target), _limit(values, key, lab), number)
+        if lab.fault_restore_failed:
+            lab.miss('SUBSEQUENT_FAULTS_BLOCKED_BY_RESTORE_FAILURE')
+            return
     # SIGSTOP is a process delay; it cannot demonstrate a distinct IPC stall.
     lab.miss('COMMUNICATION_STALL_INJECTION_UNOBSERVED')
     injected = {}
@@ -914,49 +967,60 @@ def _rank_faults(lab, values):
 
 
 def _one_fault(lab, fault, inject, limit_ms, number):
-    """긴 요청이 진행 중일 때 주입한다. 주입 전에 끝난 요청은 근거로 쓰지 않는다."""
-    lab.normal_request('normal-before-' + fault)
-    began = lab.clock()
-    target = None; stopped = None; before_release = None
+    """각 장애의 모든 종료 경로에서 복원하고 실패하면 다음 주입을 막는다."""
+    if lab.fault_restore_failed:
+        lab.miss('SUBSEQUENT_FAULTS_BLOCKED_BY_RESTORE_FAILURE')
+        return
     try:
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            running = pool.submit(lab.requests, [lab.chat('fault ' * 16, max_tokens=256, timeout=limit_ms / 1000 + 5)])
-            lab.wait(POLL_SECONDS); injected_ms = (lab.clock() - began) * 1000
-            target = lab.selected_worker()
-            inject(target)
-            if number == POSIX_SIGSTOP:
-                stopped = next((p['state'] for p in lab.census(target['pod'], target['pod_uid'])['processes']
-                    if p['pid'] == target['pid'] and p.get('start_ticks') == target['start_ticks']), None)
-            row, = running.result()
-            if number == POSIX_SIGSTOP:
-                before_release = next((p['state'] for p in lab.census(target['pod'], target['pod_uid'])['processes']
-                    if p['pid'] == target['pid'] and p.get('start_ticks') == target['start_ticks']), None)
-    except (OSError, TimeoutError, ValueError):
-        return lab.miss('FAULT_NOT_INJECTED:' + fault)
+        lab.normal_request('normal-before-' + fault)
+        began = lab.clock()
+        target = None; stopped = None; before_release = None
+        try:
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                running = pool.submit(lab.requests, [lab.chat('fault ' * 16, max_tokens=256, timeout=limit_ms / 1000 + 5)])
+                lab.wait(POLL_SECONDS); injected_ms = (lab.clock() - began) * 1000
+                target = lab.selected_worker()
+                inject(target)
+                if number == POSIX_SIGSTOP:
+                    stopped = next((p['state'] for p in lab.census(target['pod'], target['pod_uid'])['processes']
+                        if p['pid'] == target['pid'] and p.get('start_ticks') == target['start_ticks']), None)
+                row, = running.result()
+                if number == POSIX_SIGSTOP:
+                    before_release = next((p['state'] for p in lab.census(target['pod'], target['pod_uid'])['processes']
+                        if p['pid'] == target['pid'] and p.get('start_ticks') == target['start_ticks']), None)
+        except (OSError, TimeoutError, ValueError) as error:
+            lab.miss('FAULT_OBSERVATION_INTERRUPTED:' + fault + ':' + type(error).__name__)
+            return lab.miss('FAULT_NOT_INJECTED:' + fault)
+        finally:
+            if number == POSIX_SIGSTOP and target is not None:
+                try:
+                    lab.signal_worker(POSIX_SIGCONT, target)
+                except Exception as error:  # noqa: BLE001 - 계속해서 정상 세대 복원을 시도한다
+                    lab.miss('FAULT_NOT_RELEASED:' + fault + ':' + type(error).__name__)
+        lab.note('fault-' + fault, outcome=row['outcome'], elapsed_ms=row['elapsed_ms'], complete=row['complete'],
+            injected_ms=int(injected_ms), target=target, stopped_state=stopped, before_release_state=before_release)
+        if number == POSIX_SIGSTOP and stopped not in ('T', 't'):
+            lab.miss('WORKER_STOP_NOT_OBSERVED:' + fault)
+        if number == POSIX_SIGSTOP and before_release not in ('T', 't'):
+            lab.miss('WORKER_RESUMED_OR_REPLACED_BEFORE_RELEASE:' + fault)
+        if row['outcome'] == 200 and row['complete'] and row['elapsed_ms'] < injected_ms:
+            lab.miss('FAULT_AFTER_REQUEST_FINISHED:' + fault)
+        elif row['outcome'] == 'timeout' or row['elapsed_ms'] > limit_ms:
+            lab.violate('FAULT_NOT_DETECTED_BEFORE_DEADLINE', fault=fault, elapsed_ms=row['elapsed_ms'])
+        elif row['outcome'] == 200 and not row['complete']:
+            lab.violate('INCOMPLETE_WORK_REPORTED_AS_SUCCESS', fault=fault)
     finally:
-        if number == POSIX_SIGSTOP and target is not None:
-            try:
-                lab.signal_worker(POSIX_SIGCONT, target)
-            except (OSError, TimeoutError, ValueError):
-                lab.miss('FAULT_NOT_RELEASED:' + fault)
-    lab.note('fault-' + fault, outcome=row['outcome'], elapsed_ms=row['elapsed_ms'], complete=row['complete'],
-        injected_ms=int(injected_ms), target=target, stopped_state=stopped, before_release_state=before_release)
-    if number == POSIX_SIGSTOP and stopped not in ('T', 't'):
-        lab.miss('WORKER_STOP_NOT_OBSERVED:' + fault)
-    if number == POSIX_SIGSTOP and before_release not in ('T', 't'):
-        lab.miss('WORKER_RESUMED_OR_REPLACED_BEFORE_RELEASE:' + fault)
-    if row['outcome'] == 200 and row['complete'] and row['elapsed_ms'] < injected_ms:
-        lab.miss('FAULT_AFTER_REQUEST_FINISHED:' + fault)
-    elif row['outcome'] == 'timeout' or row['elapsed_ms'] > limit_ms:
-        lab.violate('FAULT_NOT_DETECTED_BEFORE_DEADLINE', fault=fault, elapsed_ms=row['elapsed_ms'])
-    elif row['outcome'] == 200 and not row['complete']:
-        lab.violate('INCOMPLETE_WORK_REPORTED_AS_SUCCESS', fault=fault)
-    try:
-        lab.restore()
-    except Exception as error:  # noqa: BLE001 - 앞 fault 판정은 복구 실패와 독립이다
-        lab.miss('FAULT_RESTORE_FAILED:' + fault + ':' + type(error).__name__)
-        lab.cleanup_errors.append('LAB_ACTIVATION_FAULT_RESTORE_FAILED:' + fault + ':' + type(error).__name__)
-
+        try:
+            if lab.restore() is not True:
+                lab.fault_restore_failed = True
+                lab.miss('FAULT_RESTORE_NOT_CONFIRMED:' + fault)
+                lab.cleanup_errors.append('LAB_ACTIVATION_FAULT_RESTORE_NOT_CONFIRMED:' + fault)
+            else:
+                lab.mutated = False
+        except Exception as error:  # noqa: BLE001 - 원 오류와 복원 오류를 각각 보존한다
+            lab.fault_restore_failed = True
+            lab.miss('FAULT_RESTORE_FAILED:' + fault + ':' + type(error).__name__)
+            lab.cleanup_errors.append('LAB_ACTIVATION_FAULT_RESTORE_FAILED:' + fault + ':' + type(error).__name__)
 
 def _disconnect(lab, values):
     lab.miss('REQUEST_SCOPED_CORE_WORKER_AND_REFERENCE_RELEASE_UNOBSERVED')
@@ -1112,7 +1176,7 @@ def _diagnostic_pod_identity(pod, container, namespace):
 
 def _diagnostic_fault_pod_request(lab, pods, end, model, *, idle_end):
     """Bounded diagnostic only; never feeds served/accepted/missing/violations."""
-    # Preserve time for the original five-second Service observation and poll.
+    # 필수 관측 종료 후 호출한다. 남은 별도 예산이 부족하면 선택 진단만 생략한다.
     remaining = min(end, lab.deadline) - lab.clock()
     if remaining <= 5 + POLL_SECONDS:
         lab.diagnostic('direct-request-skipped', reason='SERVICE_BUDGET_RESERVED')
@@ -1121,7 +1185,7 @@ def _diagnostic_fault_pod_request(lab, pods, end, model, *, idle_end):
         lab.diagnostic('direct-request-skipped', reason='PRIOR_DIAGNOSTIC_IDLE_OVERRUN'
             if lab.diagnostic_idle_overrun else 'BASE_NAMESPACE_IDENTITY_UNVERIFIED')
         return
-    lab.diagnostic_deadline = min(idle_end, lab.clock() + POLL_SECONDS, end, lab.deadline)
+    lab.diagnostic_deadline = min(idle_end, end, lab.deadline)
     request_id = None
     try:
         for candidate in pods:
@@ -1249,6 +1313,55 @@ def _owned_direct_pod_url(lab, pod, *, diagnostic=False):
         return None
 
 
+def _sensor_mount(pod, container):
+    engines = [v for v in pod['spec']['containers'] if v.get('name') == container]
+    if len(engines) != 1:
+        raise ValueError('RESTORE_ENGINE_CONTAINER_INVALID')
+    mounts = engines[0].get('volumeMounts', [])
+    callbacks = [v for v in mounts if v.get('name') in ('sensor', 'guard-callbacks')
+        and v.get('mountPath') in ('/guard-lifecycle', '/guard-lifecycle/engine-callbacks')
+        and v.get('readOnly') is True and 'subPath' not in v and 'subPathExpr' not in v]
+    if len(callbacks) != 1:
+        raise ValueError('RESTORE_SENSOR_MOUNT_INVALID')
+    selected = callbacks[0]
+    for mount in mounts:
+        path = mount.get('mountPath')
+        if type(path) is not str:
+            raise ValueError('RESTORE_VOLUME_MOUNT_PATH_INVALID')
+        if mount is selected:
+            continue
+        if path == '/guard-lifecycle/data':
+            if (mount.get('name') not in ('data', 'guard-data')
+                    or mount.get('readOnly', False) is not False
+                    or 'subPath' in mount or 'subPathExpr' in mount):
+                raise ValueError('RESTORE_DATA_MOUNT_INVALID')
+        elif path == '/' or path == '/guard-lifecycle' or path.startswith('/guard-lifecycle/'):
+            raise ValueError('RESTORE_SHADOW_MOUNT')
+    volumes = [v for v in pod['spec']['volumes'] if v.get('name') == selected['name']
+        and type(v.get('hostPath', {}).get('path')) is str]
+    if len(volumes) != 1:
+        raise ValueError('RESTORE_SENSOR_HOSTPATH_INVALID')
+    return volumes[0]['hostPath']['path'], selected['mountPath']
+
+
+def _sensor_session(lab, pod, mount):
+    # 대상 Pod에서 UID를 검증해 읽는다. 컨트롤러의 로컬 hostPath는 읽지 않는다.
+    source = """import json,os,stat,sys
+fd=os.open(sys.argv[1],os.O_RDONLY|os.O_NOFOLLOW)
+try:
+    if not stat.S_ISREG(os.fstat(fd).st_mode): raise ValueError('not regular')
+    raw=os.read(fd,65537)
+    if len(raw)>65536: raise ValueError('settings too large')
+    print(json.dumps({'session':json.loads(raw)['session']}))
+finally: os.close(fd)"""
+    result = lab._exec(source, posixpath.join(mount[1], 'settings.json'),
+        pod=pod['metadata']['name'], pod_uid=pod['metadata']['uid'])
+    session = result.get('session')
+    if type(session) is not str or re.fullmatch(r'[0-9a-f]{32}', session) is None:
+        raise ValueError('RESTORE_SENSOR_SESSION_INVALID')
+    return session
+
+
 def _restore_sensor_session(lab, old_pod, new_pod):
     """Observe the distinct prepared session mounted and loaded by the new engine."""
     try:
@@ -1265,74 +1378,58 @@ def _restore_sensor_session(lab, old_pod, new_pod):
                     row['readOnly'] = False
             return value
 
-        def sensor_mount(pod):
-            engines = [v for v in pod['spec']['containers'] if v.get('name') == lab.cfg['container']]
-            if len(engines) != 1:
-                return None
-            mounts = mount_defaults(engines[0].get('volumeMounts', []))
-            selected = [v for v in mounts if v.get('name') == 'sensor'
-                and v.get('mountPath') == '/guard-lifecycle' and v.get('readOnly') is True
-                and 'subPath' not in v and 'subPathExpr' not in v]
-            shadow = [v for v in mounts if (
-                v.get('mountPath') == '/guard-lifecycle' and v.get('name') != 'sensor'
-                or type(v.get('mountPath')) is str
-                and v['mountPath'].startswith('/guard-lifecycle/')
-                and v['mountPath'] != '/guard-lifecycle/data'
-                or v.get('mountPath') == '/guard-lifecycle/data'
-                and (v.get('name') != 'data' or v.get('readOnly') is not False))]
-            if len(selected) != 1 or shadow:
-                return None
-            volumes = [v for v in pod['spec']['volumes'] if v.get('name') == 'sensor'
-                and type(v.get('hostPath', {}).get('path')) is str]
-            return volumes[0]['hostPath']['path'] if len(volumes) == 1 else None
-
         raw = Path(lab.cfg['good_manifest']).read_bytes()
         approved = lab.cfg.get('good_manifest_sha256')
         if (type(approved) is not str or not re.fullmatch('[0-9a-f]{64}', approved)
                 or hashlib.sha256(raw).hexdigest() != approved):
-            return None
-        manifest = json.loads(raw)
+            raise ValueError('RESTORE_MANIFEST_DIGEST_UNAPPROVED')
+        manifest = yaml.safe_load(raw)
+        if type(manifest) is not dict:
+            raise ValueError('RESTORE_MANIFEST_SCHEMA_INVALID')
         if (manifest.get('kind') != 'Deployment'
                 or manifest.get('metadata', {}).get('name') != lab.cfg['deployment']
                 or manifest.get('metadata', {}).get('namespace') != lab.cfg['namespace']):
-            return None
+            raise ValueError('RESTORE_MANIFEST_TARGET_MISMATCH')
         template_meta = manifest['spec']['template']['metadata']
         labels = template_meta['labels']
         if (labels.get('guard.run') != new_pod['metadata'].get('labels', {}).get('guard.run')
                 or labels.get('byul.lab/generation') != new_pod['metadata'].get('labels', {}).get('byul.lab/generation')):
-            return None
+            raise ValueError('RESTORE_MANIFEST_LABELS_MISMATCH')
         template = manifest['spec']['template']['spec']
         desired_engine = [v for v in template['containers'] if v.get('name') == lab.cfg['container']]
         actual_engine = [v for v in new_pod['spec']['containers'] if v.get('name') == lab.cfg['container']]
         if len(desired_engine) != 1 or len(actual_engine) != 1:
-            return None
+            raise ValueError('RESTORE_ENGINE_CONTAINER_COUNT_INVALID')
         for key in ('image', 'command', 'args', 'securityContext', 'resources', 'volumeMounts'):
             if key in desired_engine[0]:
                 wanted, observed = desired_engine[0][key], actual_engine[0].get(key)
                 if key == 'volumeMounts':
                     wanted, observed = mount_defaults(wanted), mount_defaults(observed)
                     if canonical_json(wanted) != canonical_json(observed):
-                        return None
+                        raise ValueError('RESTORE_VOLUME_MOUNTS_DIFFER')
                 elif wanted != observed:
-                    return None
-        expected = sensor_mount({'spec': template})
-        old = sensor_mount(old_pod)
-        current = sensor_mount(new_pod)
+                    raise ValueError('RESTORE_ENGINE_CONFIG_DIFFERS')
+        expected = _sensor_mount({'spec': template}, lab.cfg['container'])
+        old = _sensor_mount(old_pod, lab.cfg['container'])
+        current = _sensor_mount(new_pod, lab.cfg['container'])
         if (expected is None or old is None or current is None
                 or expected == old or current != expected):
-            return None
-        local = json.loads((Path(expected) / 'settings.json').read_bytes())['session']
-        prior = json.loads((Path(old) / 'settings.json').read_bytes())['session']
-        if (not re.fullmatch(r'[0-9a-f]{32}', local)
-                or not re.fullmatch(r'[0-9a-f]{32}', prior) or local == prior):
-            return None
-        source = """import json,pathlib
-print(json.dumps({'session':json.loads(pathlib.Path('/guard-lifecycle/settings.json').read_text())['session']}))"""
-        observed = lab._exec(source, pod=new_pod['metadata']['name'],
-            pod_uid=new_pod['metadata']['uid'])
-        return local if observed.get('session') == local else None
-    except (KeyError, OSError, TimeoutError, ValueError, TypeError):
+            raise ValueError('RESTORE_SENSOR_HOSTPATH_MISMATCH')
+        prior_record = getattr(lab, '_restore_prior_session', None)
+        if prior_record is not None and prior_record[:2] == (old_pod['metadata']['uid'], old):
+            prior = prior_record[2]
+        else:
+            prior = _sensor_session(lab, old_pod, old)
+        observed = _sensor_session(lab, new_pod, current)
+        if observed == prior:
+            raise ValueError('RESTORE_SESSION_REUSED')
+        return observed
+    except (KeyError, OSError, TimeoutError, ValueError, TypeError, yaml.YAMLError) as error:
+        # 경로·세션·비밀값은 기록하지 않고 실패 단계와 오류 종류만 남긴다.
+        reason = str(error) if re.fullmatch(r'(RESTORE|LAB_ACTIVATION)_[A-Z_]+', str(error)) else type(error).__name__
+        lab.miss('RESTORE_SENSOR_SESSION_UNVERIFIED:' + reason)
         return None
+
 
 
 def _worker_cleanup(lab, values):
@@ -1344,6 +1441,13 @@ def _worker_cleanup(lab, values):
     deployment_uid = _deployment_lineage(lab, selected_pod) if selected_pod is not None else None
     if deployment_uid is None:
         return lab.miss('SELECTED_WORKER_DEPLOYMENT_UNVERIFIED')
+    if 'good_manifest' in lab.cfg:
+        try:
+            mount = _sensor_mount(selected_pod, lab.cfg['container'])
+            lab._restore_prior_session = (selected_pod['metadata']['uid'], mount,
+                _sensor_session(lab, selected_pod, mount))
+        except (KeyError, OSError, TimeoutError, ValueError, TypeError) as error:
+            lab.miss('RESTORE_PRIOR_SESSION_UNVERIFIED:' + type(error).__name__)
     before = lab.census(target['pod'], target['pod_uid'])
     lab.signal_worker(POSIX_SIGKILL, target); lab.wait(POLL_SECONDS)
     try:
@@ -1366,12 +1470,13 @@ def _worker_cleanup(lab, values):
         lab.miss('RESTORE_NATIVE_SESSION_UNVERIFIED')
         lab.rollout()
     end = lab.clock() + lab.cfg['deadline_ms'] / 1000
-    new_ready = []
+    new_ready = []; new_owned_seen = set()
     while lab.clock() < end:
         try:
-            new_ready = [p for p in lab._pods() if p['metadata'].get('uid') not in old_uids
-                and _deployment_lineage(lab, p) == deployment_uid
-                and any(c.get('type') == 'Ready' and c.get('status') == 'True'
+            owned = [p for p in lab._pods() if p['metadata'].get('uid') not in old_uids
+                and p['metadata'].get('uid') and _deployment_lineage(lab, p) == deployment_uid]
+            new_owned_seen.update(p['metadata']['uid'] for p in owned)
+            new_ready = [p for p in owned if any(c.get('type') == 'Ready' and c.get('status') == 'True'
                     for c in p.get('status', {}).get('conditions', []))]
             if new_ready:
                 break
@@ -1382,6 +1487,8 @@ def _worker_cleanup(lab, values):
         new_ready_pod_uids=sorted(p['metadata'].get('uid') for p in new_ready),
         selected_worker_death_observed=death_observed)
     if len(new_ready) != 1:
+        if not new_ready and new_owned_seen and death_observed:
+            lab.violate('NEXT_START_BLOCKED_AFTER_WORKER_FAILURE')
         lab.miss('NEXT_START_NEW_GENERATION_UNOBSERVED')
         return
     pod = new_ready[0]
@@ -1423,13 +1530,19 @@ def _retry(lab, values):
     baseline_id = f'byul-lif12-baseline-{uuid.uuid4().hex}'
     disconnected_id = f'byul-lif12-disconnect-{uuid.uuid4().hex}'
     lab.requests([lab.chat(prompt, timeout=30, headers={'X-Request-Id': baseline_id})])
-    single = lab.metric(name) - first
+    baseline_after = lab.metric(name)
     before = lab.metric(name)
+    if baseline_after is None or before is None:
+        return lab.miss('ATTEMPT_COUNTER_METRIC_UNAVAILABLE')
+    single = baseline_after - first
     lab.requests([lab.chat(prompt, max_tokens=64, stream=True, close_after_bytes=64, timeout=30,
         headers={'X-Request-Id': disconnected_id})])
     if lab.wait_idle(lab.cfg['deadline_ms']) is False:
         lab.miss('DISCONNECTED_WORK_DID_NOT_FINISH')
-    attempts = (lab.metric(name) - before) / single if single > 0 else None
+    after = lab.metric(name)
+    if after is None:
+        return lab.miss('ATTEMPT_COUNTER_METRIC_UNAVAILABLE')
+    attempts = (after - before) / single if single > 0 else None
     lab.note('disconnect-attempts', baseline_client_id=baseline_id, disconnected_client_id=disconnected_id,
         aggregate_token_ratio=attempts, client_attempts=1)
     lab.miss('REQUEST_ATTEMPT_ID_AND_TOKEN_ATTRIBUTION_UNOBSERVED')
@@ -1484,9 +1597,19 @@ def _record_state(lab, values):
     except (OSError, TimeoutError, ValueError):
         alive = None
         lab.miss('STATE_FAILED_WORKER_CENSUS_UNAVAILABLE')
+    direct = None
+    if alive == 0:
+        try:
+            pod = next((p for p in lab._pods() if p['metadata'].get('uid') == target['pod_uid']), None)
+            if pod is not None:
+                direct = _bound_pod_request(lab, pod, {'method': 'GET', 'path': '/health', 'timeout': 10})
+        except (OSError, TimeoutError, ValueError, KeyError, AttributeError):
+            pass
     lab.note('state-after-failure', health=row['outcome'], processes=alive, target=target,
-        health_worker_binding_verified=False)
-    if row['outcome'] == 200 and alive == 0:
+        health_worker_binding_verified=direct is not None)
+    if alive == 0 and direct is not None and direct.get('outcome') == 200:
+        lab.violate('HEALTH_REPORTED_AFTER_WORKERS_GONE')
+    elif row['outcome'] == 200 and alive == 0:
         lab.miss('STATE_SERVICE_HEALTH_WITHOUT_SELECTED_POD_ATTRIBUTION')
 
 
@@ -1517,18 +1640,24 @@ def run_scenario(check_id, cfg, values, *, runner=None, clock=None, wait=None):
     lab.verify_owned()
     try:
         SCENARIOS[check_id](lab, values)
-    except (OSError, TimeoutError, ValueError, KeyError) as error:
+    except Exception as error:  # noqa: BLE001 - 임의의 수집 오류도 복원을 우회하지 않는다
         lab.miss('SCENARIO_INTERRUPTED:' + type(error).__name__)
+    finally:
+        _final_restore(lab)
+    return {'activation_steps': lab.steps, 'activation_violations': lab.violations, 'activation_missing': lab.missing,
+        'activation_scope_complete': not lab.missing and bool(lab.normal) and all(lab.normal)}, lab
+
+
+def _final_restore(lab):
     if lab.mutated:
         try:
-            if lab.restore() is False:
+            if lab.restore() is not True:
                 lab.miss('FINAL_RESTORE_NOT_CONFIRMED')
                 lab.cleanup_errors.append('LAB_ACTIVATION_FINAL_RESTORE_NOT_CONFIRMED')
         except Exception as error:  # noqa: BLE001 - cleanup 실패가 앞선 위반을 지우면 안 된다
             lab.miss('FINAL_RESTORE_FAILED:' + type(error).__name__)
             lab.cleanup_errors.append('LAB_ACTIVATION_FINAL_RESTORE_FAILED:' + type(error).__name__)
-    return {'activation_steps': lab.steps, 'activation_violations': lab.violations, 'activation_missing': lab.missing,
-        'activation_scope_complete': not lab.missing and bool(lab.normal) and all(lab.normal)}, lab
+
 
 
 class ActivatedExecutor:

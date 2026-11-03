@@ -234,6 +234,7 @@ def test_request_that_ended_before_the_fault_is_not_evidence(monkeypatch):
 
 
 @pytest.mark.parametrize('modes,code', [
+    ({'residual': True}, 'TAMPERED_MATERIAL_STILL_REFERENCED'),
     ({'restore_differs': True}, 'RESTORED_MATERIAL_DIFFERS_FROM_APPROVAL'),
 ])
 def test_restore_checks_rejection_approval_and_residual_state(modes, code):
@@ -254,7 +255,10 @@ def test_restore_spec_and_ready_are_diagnostic_only(modes, missing):
     facts, _ = scenario('LIF-16', **modes)
     assert facts['activation_scope_complete'] is False
     assert missing in facts['activation_missing']
-    assert not facts['activation_violations'], facts
+    if modes.get('residual'):
+        assert {row['code'] for row in facts['activation_violations']} == {'TAMPERED_MATERIAL_STILL_REFERENCED'}
+    else:
+        assert not facts['activation_violations'], facts
     assert 'RESTORE_NONREADY_VOLUME_GATEWAY_RESIDUAL_UNOBSERVED' in facts['activation_missing']
 
 
@@ -445,7 +449,8 @@ def test_profiler_next_start_runs_normal_request_and_failure_branch_remains_miss
 
 
 def test_service_health_after_selected_workers_gone_requires_response_attribution():
-    facts, _ = scenario('OBS-02', die_on_signal=True)
+    facts, _ = scenario('OBS-02', die_on_signal=True,
+        config={'service_url': 'http://vllm.lab.svc:9000'})
     assert facts['activation_violations'] == []
     assert 'STATE_SERVICE_HEALTH_WITHOUT_SELECTED_POD_ATTRIBUTION' in facts['activation_missing']
     assert facts['activation_scope_complete'] is False

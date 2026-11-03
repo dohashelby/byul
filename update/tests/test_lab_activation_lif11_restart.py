@@ -123,9 +123,11 @@ class FakeLab:
                     sensor_mount_option=(self.sensor_mount_option
                         if self.sensor_mount_phase == ('new' if replaced else 'old') else None))]
 
-    def _exec(self, _source, *, pod, pod_uid):
-        assert pod == 'engine' and pod_uid == 'new'
-        return {'session': json.loads((self.new_sensor / 'settings.json').read_text())['session']}
+    def _exec(self, _source, *args, pod, pod_uid):
+        assert pod == 'engine' and pod_uid in ('old', 'new')
+        assert args[0] in ('/guard-lifecycle/settings.json', '/guard-lifecycle/engine-callbacks/settings.json')
+        root = self.new_sensor if pod_uid == 'new' else self.old_sensor
+        return {'session': json.loads((root / 'settings.json').read_text())['session']}
 
     def _kubectl(self, *args):
         if args[:2] == ('get', 'deployment'):

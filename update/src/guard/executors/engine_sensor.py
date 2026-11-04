@@ -35,7 +35,7 @@ PROFILES = {
 }
 # These checks read the prepared callback session instead of a lifecycle recording.
 INFORMATIONAL_GAPS = frozenset({'CACHE_CALLBACK_WEAK_OBJECT_IDENTITY_UNAVAILABLE', 'DISTRIBUTED_NON_EXECUTE_RPC_UNSUPPORTED'})
-CALLBACK_CHECKS = frozenset({'REQ-14', 'REQ-15', 'REQ-16', 'REQ-17', 'REQ-18'})
+CALLBACK_CHECKS = frozenset({'REQ-14', 'REQ-15', 'REQ-16', 'REQ-17', 'REQ-18', 'REQ-19'})
 
 
 def _callback_elapsed_ms(row):
@@ -165,7 +165,6 @@ def native_capability(check_id):
         return {'implemented': bool(ready), 'reason': None if ready else 'REVIEWED_GRAPH_NATIVE_CONTRACT_UNAVAILABLE'}
     reasons = {
         'LIF-13': 'WEIGHTS_TOOL_HAS_NO_NATIVE_AUTHORIZATION_OR_REFERENCE_ATTESTATION',
-        'REQ-19': 'ACTUAL_KERNEL_BOUNDS_AND_REFERENCE_OUTPUT_PRODUCER_UNIMPLEMENTED',
         'REQ-21': 'GPU_COMPLETION_AND_REGISTRATION_GENERATION_PRODUCER_UNIMPLEMENTED',
     }
     return {'implemented': False, 'reason': reasons[check_id]}
@@ -365,6 +364,9 @@ class EngineSensorExecutor:
                 or manifest.get('environment_ref') != env.ref().model_dump(mode='json')):
             raise ValueError('ENGINE_SENSOR_CALLBACK_MANIFEST_BINDING_MISMATCH')
         cases = manifest.get('cases'); projection.validate_cases(check.id, cases)
+        # REQ-19 대조는 엔진 안에서 GPU 동기화와 복사를 한다. 소유 lab 엔진과 명시한 준비 자산에서만 돈다.
+        if check.id == 'REQ-19' and (target.get('lab') is not True or prepared.get('lab_kernel_checks') is not True):
+            raise ValueError('ENGINE_SENSOR_KERNEL_CHECKS_REQUIRE_LAB')
         lab = manifest.get('lab_contexts')
         # 엔진 상태를 바꾸는 사례(어댑터 교체·가중치 교체)는 소유한 lab 엔진에서만 돈다.
         if any(c['role'] == 'switch' or 'adapter' in c for c in cases) or lab is not None:
@@ -452,6 +454,8 @@ class EngineSensorExecutor:
             result = projection.project_cache_context(cases, rows, values)
         elif check.id == 'REQ-18':
             result = projection.project_slot(cases, outputs, events, secret, tags)
+        elif check.id == 'REQ-19':
+            result = projection.project_kernel_bounds(cases, events, secret, tags)
         else:
             result = projection.project_cache_timing(cases, rows, elapsed, values)
         # 약한 참조가 안 되는 출력 객체, 관측 대상이 아닌 다른 RPC는 근거 공백이 아니다.

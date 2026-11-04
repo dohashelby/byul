@@ -17,7 +17,7 @@ SCHEMA = 'byul-engine-callback-cohort/1'
 COMPUTED = 'KVCacheManager.get_computed_blocks'
 ROLES = {'REQ-14': {'normal'}, 'REQ-15': {'prime', 'control', 'probe'}, 'REQ-16': {'prime', 'control', 'probe', 'post', 'switch'},
     'REQ-17': {'prime', 'control-present', 'control-absent', 'present', 'absent'},
-    'REQ-18': {'standalone', 'restricted', 'reused'}}
+    'REQ-18': {'standalone', 'restricted', 'reused'}, 'REQ-19': {'boundary'}}
 MAX_CASES = 512
 # REQ-16 lab contexts change the engine between cases: reload one LoRA in place, or reload weights.
 LAB_ACTIONS = {'lora_reload': 'lora', 'weights_reload': 'weights'}
@@ -355,3 +355,75 @@ def project_slot(cases, outputs, events, secret, tags):
     violations += [r for r in rows if r['slot_reused'] and r.get('stale_restriction_at_sampling') and r not in violations]
     return {'rows': rows, 'runner': 'v2' if v2 else 'v1', 'violation': True if violations else (None if missing else False),
         'full_scope': not missing and not violations, 'missing': missing}
+
+
+KERNEL_POINTS = ('prepare_prefill_inputs', 'prepare_pos_seq_lens')
+KERNEL_BLOCK = 1024
+
+
+def project_kernel_bounds(cases, events, secret, tags):
+    """REQ-19: 실제 입력 준비 kernel 호출의 범위·초기화·완료·독립 대조.
+
+    자리는 같은 프로세스의 V2 RequestState 행으로 요청에 잇는다. 범위 밖 주소나
+    초기화되지 않은 padding은 어느 요청의 호출이든 직접 위반이다. 출력 불일치는
+    메모리 결함의 증거로 보지 않고 미수집으로 남긴다.
+    """
+    wanted = {tag_digest(secret, tag): case_id for case_id, tag in tags.items()}
+    holder = {}; calls = {}; order = []
+    for event in events:
+        point, phase = event.get('point'), event.get('phase'); fields = event.get('fields') or {}
+        process = event.get('process_sha256')
+        if point in ('RequestState.add_request', 'RequestState.remove_request'):
+            if phase == 'RETURN' and event.get('entry_qualified_before') is True and event.get('entry_qualified_after') is True:
+                key = (process, fields.get('slot'))
+                if point == 'RequestState.add_request':
+                    holder[key] = fields.get('request_sha256')
+                else:
+                    holder.pop(key, None)
+            continue
+        if point not in KERNEL_POINTS:
+            continue
+        call = event.get('call_sha256')
+        if phase == 'CALL':
+            plan = fields.get('plan')
+            if event.get('entry_qualified_before') is True and type(plan) is dict:
+                bound = [dict(item, case_id=wanted.get(holder.get((process, item.get('slot'))))) for item in plan.get('items') or ()]
+                calls[call] = {'point': point, 'plan': plan, 'items': bound, 'terminal': None}
+                order.append(call)
+        elif call in calls and event.get('entry_qualified_after') is True:
+            calls[call]['terminal'] = {'phase': phase, **fields}
+    violations = []; missing = set(); covered = {c['case_id']: set() for c in cases}; lengths = set()
+    for call in order:
+        entry = calls[call]; terminal = entry['terminal']; point = entry['point']
+        for item in entry['items']:
+            ranges = [item.get(k) for k in ('write_range_ok', 'read_range_ok', 'lookahead_write_ok', 'lookahead_read_ok') if k in item]
+            if item.get('slot_in_range') is False or False in ranges:
+                violations.append({'point': point, 'batch': item.get('batch'), 'reason': 'access_range'})
+        if point == 'prepare_pos_seq_lens' and entry['plan'].get('padding_range_ok') is False:
+            violations.append({'point': point, 'reason': 'padding_range'})
+        if terminal is None or terminal['phase'] != 'RETURN':
+            missing.add('kernel_terminal_unobserved'); continue
+        if terminal.get('gpu_completion') is not True:
+            missing.add('gpu_completion_unobserved'); continue
+        if point == 'prepare_pos_seq_lens' and terminal.get('padding_initialized') is False:
+            violations.append({'point': point, 'reason': 'padding_not_initialized'})
+        matches = {o.get('batch'): o.get('reference_matches') for o in terminal.get('outputs') or ()}
+        for item in entry['items']:
+            if point == 'prepare_prefill_inputs' and not item.get('prefill'):
+                continue
+            result = matches.get(item.get('batch'))
+            if result is False:
+                missing.add('reference_output_mismatch')
+            if item.get('case_id') in covered and result is True and (point != 'prepare_pos_seq_lens' or terminal.get('padding_initialized') is True):
+                covered[item['case_id']].add(point)
+                if point == 'prepare_prefill_inputs' and type(item.get('query_len')) is int:
+                    lengths.add(item['query_len'])
+    if any(points != set(KERNEL_POINTS) for points in covered.values()):
+        missing.add('case_kernel_calls_unobserved')
+    if not (any(n <= KERNEL_BLOCK for n in lengths) and any(n > KERNEL_BLOCK for n in lengths)):
+        missing.add('block_boundary_not_crossed')
+    return {'calls': len(order), 'covered_cases': sorted(c for c, p in covered.items() if p == set(KERNEL_POINTS)),
+            'query_lengths': sorted(lengths), 'violations': violations,
+            'violation': True if violations else (None if missing else False),
+            'full_scope': not missing and not violations, 'missing': sorted(missing),
+            'hardware_memory_checker': False}

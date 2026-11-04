@@ -50,6 +50,32 @@ def digest_file(path):
     finally:os.close(fd)
 
 
+def prepare_runtime_layout(output,prepared):
+    """Reserve empty nested mountpoint before the sensor parent becomes RO."""
+    output=Path(output)
+    session=prepared['session']
+    if re.fullmatch('[0-9a-f]{32}',session) is None:
+        raise ValueError('PREPARATION_SESSION_INVALID')
+    if any(parent.is_symlink() for parent in (output,*output.parents)):
+        raise ValueError('PREPARATION_LAYOUT_SYMLINK')
+    flags=os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW
+    opened=[]
+    try:
+        root=os.open(output,flags);opened.append(root)
+        sensor=os.open('prepared15',flags,dir_fd=root);opened.append(sensor)
+        if any(os.fstat(fd).st_uid!=os.geteuid() or os.fstat(fd).st_mode&0o022 for fd in opened):
+            raise ValueError('PREPARATION_LAYOUT_OWNER_OR_MODE')
+        # The empty directory is not a sensor asset. The separate data hostPath
+        # is mounted over it RW, while every generated sensor byte stays RO.
+        os.mkdir('data',mode=0o700,dir_fd=sensor)
+        os.mkdir('data',mode=0o700,dir_fd=root)
+        data=os.open('data',flags,dir_fd=root);opened.append(data)
+        os.mkdir(session,mode=0o700,dir_fd=data)
+        os.mkdir('trace',mode=0o700,dir_fd=root)
+    finally:
+        for fd in reversed(opened):os.close(fd)
+
+
 def render(template,prepared,output,*,namespace,run_id,node,model,chat):
     """Only declared paths and the new native15 session replace old bindings."""
     if (re.fullmatch('[a-z0-9][a-z0-9-]{0,62}',namespace) is None
@@ -105,8 +131,7 @@ def main():
     prepared=prepare_assets(output/'prepared15',repo,profile=vllm_profiler_sensor.PROFILE)
     for name in prepared['assets']:(output/'prepared15'/name).chmod(0o600)
     if load_prepared(output/'prepared15/manifest.json')!=prepared:raise ValueError('PREPARED15_MISMATCH')
-    (output/'data'/prepared['session']).mkdir(mode=0o700,parents=True)
-    (output/'trace').mkdir(mode=0o700)
+    prepare_runtime_layout(output,prepared)
     doc=render(json.loads(args.template.read_bytes()),prepared,output,namespace=args.namespace,run_id=args.run_id,
         node=args.node,model=model,chat=args.chat_template.absolute())
     (output/'engine.json').write_bytes(canonical_json(doc))

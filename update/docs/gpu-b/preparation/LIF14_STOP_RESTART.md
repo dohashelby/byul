@@ -22,6 +22,8 @@ uv run python -m tools.lif14_stop_restart_prepare --source-commit <packet의40�
 
 생성된 준비 영수증은 source/asset/pack 결합만 뜻한다. 실제 ENV/target/POL·유효창·승인 ref·Pod UID/PID/boot/GPU 신원은 세션2가 결합한다. 기존 기업 값과 null/confirmed_by를 임의로 채우지 않는다. 새 profiler 설정은 기존 torch/ignore_frontend/TP1을 유지하고 trace mount만 `/guard-profiler-traces`로, 출력은 그 아래 `<prepared session>`으로 결합한다. 준비할 때 session trace 경로는 없어야 한다. 실제 fixture가 정상 시작 뒤 종료에서만 경로 충돌을 만나도록 정규 파일을 생성한다.
 
+준비 도구는 RO 센서 부모를 마운트하기 전에 `prepared15/data`를 빈 UID1000·0700 디렉터리로 만든다. 별도 외부 `data/<session>`과 `trace`도 UID1000·0700으로 생성하며, 센서 부모 아래에는 기록이나 trace를 쓰지 않는다. 이 빈 마운트 지점은 센서 asset이 아니며 manifest·asset bytes를 바꾸지 않는다. 기존 경로·링크·다른 소유자·그룹/전체 쓰기 허용 부모는 거부하고 기존 준비 출력을 재사용하지 않는다. 렌더링의 센서 RO/data RW 경로와 기존 기한은 그대로다. M13의 컨테이너 미기동 오류는 준비 실패이며 profiler 제품 판정으로 세지 않는다.
+
 cfg의 `owned_trace_fault=true`는 `profiler_case=prepared-stop-failure`, required ranks `["0"]`, 전용 소유 scope와 정확한 ENV/target/prepared 정책에만 허용한다. 다른 값은 기존 검증에서 거부한다. 순서는 기존 normal-before → start → normal-active → stop → next-start → normal-next → next-stop → normal-after다. marker 활성화는 정상 전 대조 뒤, 보존 복구는 첫 stop 뒤다. 복구가 확인되지 않으면 새 start를 보내지 않는다. 기존 HTTP 단계10초·설정된 전체 기한·정책600초 상한·준비/Pod/EC2 운영 기한은 유지한다.
 
 marker 복구는 `runtime/profiler_owned_trace.py`의 폐쇄된 arm/recover만 사용한다. 정확한 UID/dev/inode/marker를 검사하고 Linux `renameat2(RENAME_NOREPLACE)`로 원파일을 `<session>.fault-record`에 보존한다. 교체 파일·symlink·hardlink·기존 디렉터리·기존 보존 파일은 지우거나 덮어쓰지 않는다. 복구 오류 때 보존 marker와 진단을 반출하고 세션2의 기존 소유 namespace 정리 절차를 따른다. 기존 EC2/EBS 보존 계약을 바꾸지 않는다.

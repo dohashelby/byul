@@ -21,6 +21,7 @@ from .kubernetes_credential_exposure import KubernetesCredentialExposureExecutor
 from .input_validation import InputValidationExecutor
 from .sampling_validation import SamplingValidationExecutor
 from .kubernetes_sampling import KubernetesSamplingExecutor
+from .kubernetes_input_validation import KubernetesInputValidationExecutor
 from .response_content import ResponseContentExecutor
 from .log_analysis import LogAnalysisExecutor
 from .template_validation import TemplateValidationExecutor
@@ -95,6 +96,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "credential_exposure:real": lambda cfg: CredentialExposureExecutor(cfg.get("credential_exposure", {})),
     "credential_exposure:kubernetes": lambda cfg: KubernetesCredentialExposureExecutor(cfg.get("credential_exposure", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "input_validation:real": lambda cfg: InputValidationExecutor(cfg.get("input_validation", {})),
+    "input_validation:kubernetes": lambda cfg: KubernetesInputValidationExecutor(cfg.get("input_validation", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "sampling_validation:real": lambda cfg: SamplingValidationExecutor(cfg.get("sampling_validation", {})),
     "sampling_validation:kubernetes": lambda cfg: KubernetesSamplingExecutor(cfg.get("sampling_validation", {}), environ=cfg.get("_runtime_environ")),
     "response_content:real": lambda cfg: ResponseContentExecutor(cfg.get("response_content", {}), environ=cfg.get("_runtime_environ")),

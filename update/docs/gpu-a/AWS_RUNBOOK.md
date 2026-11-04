@@ -14,15 +14,17 @@
 3. 모델이 `/srv/serving/models/7ae5576…`에 준비돼 있습니다. 인계 03이 만듭니다.
 4. A 전용 서버입니다. B 배포와 같은 서버를 쓰지 않습니다. 한 GPU에 엔진은 하나만 띄웁니다.
 5. 서버에 byul 저장소를 받아 두고 `update/`에서 `uv sync --frozen`을 마쳤습니다. 커밋을 기록합니다.
+6. Ubuntu 24.04 AMI의 ubuntu 사용자는 `sudo -v`가 비밀번호를 요구해 인계 01이 첫 줄에서 멈춥니다(2026-11-03 실측). 스크립트를 고치지 않고 `sudo -v`만 `sudo -n true`로 넘기는 래퍼를 PATH 앞에 두고 실행했으며, 그 사실을 증거에 남겼습니다(`RESULTS-20261103.md`).
 
 ## 세대
 
 | 세대 | `--generation` | 점검 | 덧씌우는 것 |
 |---|---|---|---|
-| G-A1 | `v1-callback` | REQ-17(새 세션에서 맨 먼저), REQ-16 `cache_salt`, REQ-18(V1), REQ-14 async 경로 | 콜백 센서 마운트·`PYTHONPATH`, `VLLM_USE_V2_MODEL_RUNNER=0`, `--enable-prefix-caching` |
+| G-A1 | `v1-callback` | REQ-17(새 세션에서 맨 먼저), REQ-16 `cache_salt`, REQ-18(V1), REQ-14 async 경로 | 콜백 센서 마운트·`PYTHONPATH`, `VLLM_USE_V2_MODEL_RUNNER=0`, `--enable-prefix-caching`, `--distributed-executor-backend mp`(TP1에서도 REQ-14 워커 지점이 불리게 함) |
 | G-A2 | `v1-callback-sync` | REQ-14 동기 경로 | G-A1 + `--no-async-scheduling` |
-| G-A3 | `v2-default` | REQ-08, REQ-09, REQ-10, SUP-03, SUP-08 | 없음(라벨·`enableServiceLinks`만) |
-| G-A4 | `v1-req16-lab` | REQ-16 `adapter_content`, `model_generation` | G-A1 + `--enable-lora --max-lora-rank 8 --max-loras 1`, 런타임 LoRA 갱신·개발 모드 환경 변수, `/guard-lora`·`/guard-weights` |
+| G-A3 | `v2-default` | REQ-08, REQ-09, REQ-10, SUP-08 | 없음(라벨·`enableServiceLinks`만) |
+| G-A3 template | `v2-template` | SUP-03 | 고정 `guard-text-chat-v1.jinja` 읽기 전용 마운트와 `--chat-template` |
+| G-A4 | `v1-req16-lab` | REQ-16 `adapter_content`, `model_generation` | 센서 마운트·V1·prefix caching(MP 없음) + `--enable-lora --max-lora-rank 8 --max-loras 1`, 런타임 LoRA 갱신·개발 모드 환경 변수, `/guard-lora`·`/guard-weights` |
 
 모든 세대에 공통으로 덧씌우는 것:
 - Pod 라벨 `guard.run=<run_id>`, `byul.a/generation=<세대>`
@@ -120,10 +122,11 @@
 - 세대마다 기동 시간이 듭니다(첫 기동은 이미지·컴파일 캐시 때문에 더 깁니다). dev 단가 $1.20208/h 기준 1차 전체는 4~6시간, 약 $5~8로 봅니다. 추정이며 비용 장부(`COST_LEDGER.md`)에 실제 값을 적습니다.
 - 증거를 반출한 뒤 Stop합니다.
 
-## 이 구성으로 못 하는 것
-- **G-A3의 REQ-08·REQ-09·SUP-08:** 이 점검들이 쓰는 `input_validation` 실행기는 `real` 구현만 있고, 시험 컨테이너를 Docker로 띄웁니다. 인계 구성은 containerd만 있어 그대로는 돌지 않습니다(첫 실증은 별도 Docker 세션에서 돌렸습니다). Kubernetes 구현을 만들지, 호스트에 Docker를 따로 둘지 결정이 필요합니다. 같은 세대의 REQ-10(`sampling_validation`)과 SUP-03(`template_validation`)은 Kubernetes 구현이 있습니다. 실행 설정은 아직 입력 도구가 만들지 않습니다.
-- **REQ-16 full_scope:** 정책이 요구하는 네 문맥을 한 실행에서 모두 재야 full_scope가 됩니다. G-A4 실행은 `cache_salt`·`adapter_content`·`model_generation` 세 문맥이라, 위반이 없어도 UNKNOWN으로 남습니다. 문맥을 정책에서 빼서 채우지 않습니다.
+## 2026-11-03 후속 실행과 남은 경계
+- **G-A3:** `input_validation:kubernetes`를 구현하고 REQ-08·09·SUP-08을 실제 서버에서 실행했습니다. `python -m tools.gpu_a_run_inputs http-check --check <ID> --env <env.json> --target <target.json> --out <새 폴더>`로 REQ-08·09·10·SUP-03·08 입력을 만듭니다. SUP-03은 `v2-template` 세대를 먼저 준비합니다. select → run → judge → report는 기존 CLI 그대로입니다.
+- input validation은 선언한 한 endpoint·정상 body·유한 token 배열·정확한 추가 필드 fixture만 받습니다. 실행기 어댑터는 공백 있는 원 ID를 전송용 ID로 변환하고 응답에서 복원합니다. 고정 `stream_probe.py`와 다른 전송 프로파일의 허용 범위는 바꾸지 않았습니다.
+- **REQ-16:** Qwen2-VL-2B-Instruct를 준비한 G-A4 후속에서 `req16-full` 23사례로 네 문맥을 한 실행에서 관측했습니다. media의 공유 텍스트 접두를 위반으로 읽는 투영 한계와 실제 이미지 블록 재사용 미관측을 원자료 분석에 남겼습니다. 기존 판정은 보존합니다.
+- **큰 모델의 lab 가중치 공간:** 현재 렌더러의 `guard-weights` 상한은 4Gi입니다. 위 VL 시험 Pod는 측정 완료 39초 뒤 이 상한 초과로 Evicted됐습니다. 멀티모달 변형 재실행 전 모델 파일 합계와 변형 공간을 확인하고, 상한을 명시·검증할 렌더 입력 및 새 환경 기록을 준비해야 합니다. 0.5B용 4Gi 설정을 큰 모델에 그대로 사용하지 않습니다.
 
 - **다중 GPU:** REQ-14의 TP2 분기와 REQ-21은 L4 1장 구성에서 할 수 없습니다. 인계 묶음도 두 번째 GPU 서버를 범위에서 뺐습니다. 별도 구성 승인이 필요합니다.
-- **REQ-16 `media_identity`:** 멀티모달 모델 선정 전입니다.
-- **2단계 수집기:** REQ-19·20, LIF-13, REQ-18 V2 지점은 이 서버에서 관측 지점을 확인하며 만듭니다.
+- **2단계:** `NATIVE-20261103.md`의 실제 CUDA 구성요소·zero-copy daemon 시험을 수행했습니다. 기존 수동 증거 경로로 보존한 DECLARED 관측이며, EXAMPLE 정책과 전체 UNKNOWN을 유지합니다. 실제 서빙 경로에 묶인 자동 수집기·계보·메모리 읽기 계측은 아직 미구현입니다. 이 구성요소 시험을 자동 제품 경로 완료로 세지 않습니다.

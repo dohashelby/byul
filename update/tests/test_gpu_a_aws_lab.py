@@ -48,6 +48,9 @@ def test_overlay_keeps_the_handoff_engine_and_adds_only_a_requirements(generatio
     assert ('/guard-lora' in mounts) is (generation == 'v1-req16-lab') is record['lab_namespace_owner_label_required']
     if generation == 'v1-callback-sync':
         assert '--no-async-scheduling' in engine['args']
+    # REQ-14 세대는 워커 프로세스 지점이 불리도록 MP backend로 띄운다.
+    mp = engine['args'][engine['args'].index('--distributed-executor-backend') + 1] if '--distributed-executor-backend' in engine['args'] else None
+    assert mp == ('mp' if generation in ('v1-callback', 'v1-callback-sync') else None)
     if generation == 'v1-req16-lab':
         assert env['VLLM_ALLOW_RUNTIME_LORA_UPDATING'] == 'True' and env['VLLM_SERVER_DEV_MODE'] == '1'
 

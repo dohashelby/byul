@@ -717,3 +717,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - 2026-11-02 · LIF·OBS·REQ-12 14개는 소유 네임스페이스(`byul.lab/owned=true`)에서만 장애·재배포를 일으키는 lab 활성화로 PASS를 판정한다. 수동 관측은 증거로 남기고 PASS 관문에서 뺀다. 상태 변경은 이 표식이 있을 때만 보낸다. · 사용자 지시(GPU 전 전부 완성).
 - 2026-11-02 · 대상 밖 시스템의 사실(발급자 이벤트·전파·승인·소유자 등) 18개는 `byul-signed-record/1` HMAC 서명 기록으로만 받는다. 서명·점검·ENV·신선도가 맞지 않으면 관측을 바꾸지 않는다. · 시스템별 차이는 커넥터로 흡수.
 - 2026-11-02 · 콜백 시험은 시계 대신 경계 요청으로 이번 실행의 행을 고른다. Gateway가 ID를 다시 발급하는 경로는 직렬 시험의 마지막 사례 수로 잇는다. · 실측에서 확인.
+- 2026-11-03 · GPU 실증 인수에서 사용자가 daemon 설정과 시험 정책을 Codex가 정하도록 승인했다. 같은 고정 모델의 소유 zero_copy daemon·동일 UID 두 소비자·전체 release/종료 empty 허용·같은 공급물 fallback을 EXAMPLE로 선택했다. 기업 release 인가·전체 모델 추론·native counter 회수 승인으로 확장하지 않는다. · 사용자 “너가 임의로 정해서 하면 안돼?” 및 `docs/gpu-a/NATIVE-20261103.md`.
+- 2026-11-03 · 실제 설치된 native 구성요소의 합성 fixture GPU 시험은 원자료와 기존 manual-entry DECLARED 증거로 보존하고 전체 UNKNOWN을 유지한다. 자동 native 수집기/서빙 요청·세대·buffer 계보의 공백을 정상 component 결과로 채우지 않는다. HTTP input-validation의 전송 ID 변환은 실행기 어댑터에 두고 고정 Pod probe의 허용 ID 규칙을 넓히지 않는다. · 기존 증거 관문과 전송 경계 유지.

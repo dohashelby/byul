@@ -280,29 +280,89 @@ def project_cache_timing(cases, rows, elapsed, policy):
 
 
 def project_distributed(events, secret, tags):
-    """worker가 받은 배치와 다음에 내보낸 출력의 요청 ID를 프로세스별 순서로 대조한다."""
+    """REQ-14: worker 배치와 출력 귀속, TP rank별 실행·중간 전송·출력 rank를 대조한다.
+
+    단일 프로세스 기록은 기존대로 배치와 다음 출력의 요청 ID만 본다. 여러 rank 기록이 있으면
+    같은 요청 배치를 다른 모델·revision으로 실행한 rank, 지정 출력 rank가 아닌 rank의 요청 출력,
+    실행 구간 안의 닫힌 통신기·미등록 buffer 전송을 직접 위반으로 본다.
+    """
     wanted = {tag_digest(secret, tag) for tag in tags.values()}
     recent = {}; seen = set(); checked = 0; violations = []
+    ranks = {}; open_rpc = {}; steps = []; comm = {}
     for event in events:
-        if event.get('entry_qualified_before') is not True or event.get('phase') != 'CALL':
+        fields = event.get('fields') or {}; process = event.get('process_sha256'); point = event.get('point')
+        if event.get('entry_qualified_before') is not True:
             continue
-        fields = event.get('fields') or {}; process = event.get('process_sha256')
-        if event.get('point') == 'WorkerProc._execute_worker_rpc' and fields.get('rpc_method') == 'execute_model':
-            scheduled = fields.get('native_request_sha256')
-            if scheduled:
-                seen.update(set(scheduled) & wanted)
-                recent.setdefault(process, deque(maxlen=PIPELINE_DEPTH)).append(set(scheduled))
-        elif event.get('point') == 'WorkerProc.handle_output' and fields.get('output_request_sha256'):
+        phase = event.get('phase')
+        if point == COMM_INIT and phase == 'RETURN' and event.get('entry_qualified_after') is True:
+            comm[(process, fields.get('communicator_token'))] = {'buffer': fields.get('buffer_sha256'), 'live': fields.get('live')}
+            continue
+        if point == 'CustomAllreduce.close' and phase == 'RETURN' and (process, fields.get('communicator_token')) in comm:
+            comm[(process, fields.get('communicator_token'))]['live'] = False
+            continue
+        if point == 'CustomAllreduce.all_reduce' and process in open_rpc:
+            step = open_rpc[process]; generation = comm.get((process, fields.get('communicator_token')))
+            if phase == 'CALL':
+                if generation is None:
+                    step['transfer_unbound'] = True
+                elif generation['live'] is not True or fields.get('live') is not True:
+                    violations.append({'point': point, 'reason': 'closed_communicator_transfer'})
+                elif fields.get('buffer_sha256') != generation['buffer']:
+                    violations.append({'point': point, 'reason': 'unregistered_buffer_transfer'})
+                else:
+                    step['transfers'] += 1
+            elif phase == 'RETURN':
+                step['fences'].append(fields.get('completion_fence'))
+            continue
+        if point == 'WorkerProc._execute_worker_rpc' and fields.get('rpc_method') == 'execute_model':
+            if phase == 'CALL':
+                scheduled = fields.get('native_request_sha256')
+                if scheduled:
+                    seen.update(set(scheduled) & wanted)
+                    recent.setdefault(process, deque(maxlen=PIPELINE_DEPTH)).append(set(scheduled))
+                    if fields.get('rank') is not None:
+                        ranks.setdefault(process, fields['rank'])
+                    open_rpc[process] = {'process': process, 'rank': fields.get('rank'), 'requests': frozenset(scheduled),
+                        'model': (fields.get('configured_model_sha256'), fields.get('configured_revision_sha256')),
+                        'output_rank': fields.get('selected_output_rank'), 'transfers': 0, 'fences': [], 'transfer_unbound': False}
+            elif process in open_rpc:
+                steps.append(open_rpc.pop(process))
+            continue
+        if point == 'WorkerProc.handle_output' and phase == 'CALL' and fields.get('output_request_sha256'):
             allowed = set().union(*recent.get(process, ()))
             checked += 1
             extra = set(fields['output_request_sha256']) - allowed
             if extra:
-                violations.append({'point': event['point'], 'unscheduled_outputs': len(extra)})
+                violations.append({'point': point, 'unscheduled_outputs': len(extra)})
+            selected = {s['output_rank'] for s in steps + list(open_rpc.values()) if s['process'] == process and s['output_rank'] is not None}
+            if ranks.get(process) is not None and selected and ranks[process] not in selected and set(fields['output_request_sha256']) & wanted:
+                violations.append({'point': point, 'reason': 'unselected_rank_output'})
     complete = wanted <= seen and checked > 0
-    return {'batches_checked': checked, 'violations': violations,
-        'violation': True if violations else (False if complete else None), 'full_scope': False,
-        'missing': ['intermediate_tensor_buffer_lineage_unobserved', 'model_generation_consumption_unobserved',
-            *([] if complete else ['distributed_batches_incomplete'])]}
+    missing = []
+    if not complete:
+        missing.append('distributed_batches_incomplete')
+    tp = len(set(ranks.values())) >= 2
+    if not tp:
+        missing += ['intermediate_tensor_buffer_lineage_unobserved', 'model_generation_consumption_unobserved']
+    else:
+        by_batch = {}
+        for step in steps:
+            if step['requests'] & wanted:
+                by_batch.setdefault(step['requests'], []).append(step)
+        bound = [group for group in by_batch.values() if len({s['rank'] for s in group}) >= 2]
+        for group in bound:
+            if len({s['model'] for s in group}) != 1 or None in {m for s in group for m in s['model']}:
+                violations.append({'reason': 'rank_model_generation_mismatch'})
+        if not bound or {r for group in bound for r in group[0]['requests'] if r in wanted} < wanted:
+            missing.append('rank_batch_binding_incomplete')
+        transfers = [s for group in bound for s in group]
+        if not transfers or any(s['transfers'] == 0 or s['transfer_unbound'] for s in transfers):
+            missing.append('intermediate_tensor_buffer_lineage_unobserved')
+        if not transfers or any(not s['fences'] or any(f is not True for f in s['fences']) for s in transfers):
+            missing.append('intermediate_buffer_completion_unobserved')
+        missing.append('model_generation_consumption_unobserved')  # 설정 지문은 가중치 실제 소비의 증명이 아니다
+    return {'batches_checked': checked, 'ranks': len(set(ranks.values())), 'violations': violations,
+        'violation': True if violations else (False if complete else None), 'full_scope': False, 'missing': missing}
 
 
 def project_slot(cases, outputs, events, secret, tags):

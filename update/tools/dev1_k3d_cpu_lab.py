@@ -67,7 +67,7 @@ EXECUTORS = {'REQ-13': ('response_content', {'endpoint': '/v1/chat/completions',
 LIFECYCLE_FILES = ('guard_lifecycle_sensor.py', 'sitecustomize.py', 'settings.json', 'manifest.json')
 
 
-def render(*, run_id, engine_image, lifecycle_dir=None):
+def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None):
     """lifecycle_dir: `guard prepare-lifecycle-sensor` 출력. 주면 RUNBOOK의 계측 기동 설정을 더한다.
 
     고정 자산은 읽기 전용 /guard-lifecycle(ConfigMap), 기록은 /guard-lifecycle/data/<session>(엔진 UID 소유 0700)이다.
@@ -92,6 +92,12 @@ def render(*, run_id, engine_image, lifecycle_dir=None):
                        'volumes': [{'name': 'models', 'hostPath': {'path': '/srv/models', 'type': 'Directory'}},
                                    {'name': 'shm', 'emptyDir': {'medium': 'Memory', 'sizeLimit': '1Gi'}},
                                    {'name': 'chat-template', 'hostPath': {'path': '/srv/models/guard-chat/guard-text-chat-v1.jinja', 'type': 'File'}}]}}
+    if api_key_secret is not None:
+        # PLT-10: 엔진 API 키는 Secret 참조로만 넣는다. 인자·리터럴 환경변수에 키를 두지 않는다(대상 읽기도 valueFrom을 읽지 않는다).
+        if not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,62}', api_key_secret):
+            raise ValueError('K3D_RENDER_INPUT_INVALID')
+        engine['spec']['containers'][0]['env'].append(
+            {'name': 'VLLM_API_KEY', 'valueFrom': {'secretKeyRef': {'name': api_key_secret, 'key': 'api-key'}}})
     lifecycle = None
     if lifecycle_dir is not None:
         assets = {name: (Path(lifecycle_dir) / name).read_text(encoding='utf-8') for name in LIFECYCLE_FILES}
@@ -436,6 +442,32 @@ def record_access(base, env, *, session, root, minutes=20):
     return base, rbac_text, subjects, policy, config
 
 
+def revocation(base, env, prepared, *, event_at, root, minutes=10):
+    """PLT-10: 엔진 API 키 교체 뒤 퇴역 키의 새 접근과 대조 키의 정상 접근. EXAMPLE 정책.
+
+    lab의 교체는 엔진을 대조 키 하나로 새로 기동한 것이다(event_at = 그 엔진의 기동 시각, 선언).
+    발급자 사건을 검증할 수단이 없으므로 기한 기준은 absolute-unconditional이다. 키 원문은 환경변수 이름으로만 넘긴다.
+    """
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    values = {'revocation_environment_sha256': env.ref().sha256, 'revocation_target_sha256': sha256_hex(canonical_json(base)),
+              'revocation_prepared_sha256': sha256_hex(canonical_json(_prepared(prepared))),
+              'revocation_validity_start': now.isoformat(), 'revocation_validity_end': (now + timedelta(minutes=minutes)).isoformat(),
+              'revocation_issuer_id': 'dev1-k3d-engine-restart', 'revocation_event_id': 'plt10-static-key-rotation',
+              'revocation_event_at': event_at, 'revocation_deny_after': now.isoformat(),
+              'revocation_deadline_basis': 'absolute-unconditional', 'revocation_propagation_limit_ms': 0,
+              'revocation_max_clock_skew_ms': 1000, 'revocation_subject_label': 'retired', 'revocation_max_new_access_samples': 3}
+    root = Path(root).absolute()
+    pack = yaml.safe_load((Path(__file__).parents[1] / 'docs/gpu-a/policy-a-draft.yaml').read_text(encoding='utf-8'))['pack']
+    policy = {'data_origin': 'EXAMPLE', 'status': 'DRAFT', 'pack': pack, 'values': {'PLT-10': values},
+              'scope': {'include': ['PLT-10'], 'exclude': []}, 'exceptions': [], 'confirmed_by': None, 'confirmed_at': None}
+    config = '\n'.join([f"store = '{root / 'store'}'", '', '[adapter]', "name = 'vllm'", '', '[executors]', "credential_revocation = 'kubernetes'", '',
+                        '[credential_revocation]', f"target = '{root / 'target.json'}'", f"prepared = '{Path(prepared).absolute()}'",
+                        "kubectl_binary = 'kubectl'", 'max_duration_seconds = 120',
+                        "retired_key_env = 'DEV1_PLT10_RETIRED'", "control_key_env = 'DEV1_PLT10_CONTROL'", ''])
+    return policy, config
+
+
 def http_check(check_id, root):
     executor, settings = EXECUTORS[check_id]
     root = Path(root).absolute()
@@ -459,7 +491,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='kind', required=True)
     r = sub.add_parser('render'); r.add_argument('--run-id', required=True); r.add_argument('--engine-image', required=True)
-    r.add_argument('--lifecycle', type=Path)
+    r.add_argument('--lifecycle', type=Path); r.add_argument('--api-key-secret')
     r.add_argument('--out', type=Path, required=True)
     e = sub.add_parser('env'); e.add_argument('--render', type=Path, required=True); e.add_argument('--models', type=Path, required=True)
     e.add_argument('--out', type=Path, required=True)
@@ -482,12 +514,14 @@ def main(argv=None):
     rr.add_argument('--prepared', type=Path)
     ra = sub.add_parser('record-access'); ra.add_argument('--target', type=Path, required=True); ra.add_argument('--env', type=Path, required=True)
     ra.add_argument('--session', required=True); ra.add_argument('--out', type=Path, required=True)
+    rv = sub.add_parser('revocation'); rv.add_argument('--target', type=Path, required=True); rv.add_argument('--env', type=Path, required=True)
+    rv.add_argument('--prepared', type=Path, required=True); rv.add_argument('--event-at', required=True); rv.add_argument('--out', type=Path, required=True)
     h = sub.add_parser('http-check'); h.add_argument('--check', required=True, choices=sorted(EXECUTORS))
     h.add_argument('--target', type=Path, required=True); h.add_argument('--out', type=Path, required=True)
     args = parser.parse_args(argv)
     load = lambda path: json.loads(Path(path).read_text(encoding='utf-8'))
     if args.kind == 'render':
-        raw, record = render(run_id=args.run_id, engine_image=args.engine_image, lifecycle_dir=args.lifecycle)
+        raw, record = render(run_id=args.run_id, engine_image=args.engine_image, lifecycle_dir=args.lifecycle, api_key_secret=args.api_key_secret)
         for name, data in raw.items():
             inputs._write(args.out / name, data.decode())
         inputs._write(args.out / 'render.json', record)
@@ -543,6 +577,12 @@ def main(argv=None):
         inputs._write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True))
         inputs._write(args.out / 'guard.toml', config)
         print(json.dumps({'check': 'OBS-06', 'out': str(args.out)}))
+    elif args.kind == 'revocation':
+        policy, config = revocation(load(args.target), load_environment(args.env), args.prepared, event_at=args.event_at, root=args.out)
+        inputs._write(args.out / 'target.json', load(args.target))
+        inputs._write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True))
+        inputs._write(args.out / 'guard.toml', config)
+        print(json.dumps({'check': 'PLT-10', 'out': str(args.out)}))
     else:
         policy, config = http_check(args.check, args.out)
         inputs._write(args.out / 'target.json', load(args.target))

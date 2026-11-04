@@ -106,3 +106,15 @@ def test_lifecycle_render_follows_the_runbook_launch_and_keeps_assets_read_only(
     (tmp_path / 'manifest.json').write_text(json.dumps({'session': 'd' * 32}), encoding='utf-8')
     with pytest.raises(ValueError, match='K3D_LIFECYCLE_ASSETS_INVALID'):
         lab.render(run_id='dev1-k3d-9', engine_image=image, lifecycle_dir=tmp_path)
+
+
+def test_api_key_is_rendered_only_as_a_secret_reference():
+    import yaml
+    from tools import dev1_k3d_cpu_lab as lab
+    image = 'k3d-byul-reg:5111/vllm/vllm-openai-cpu@sha256:' + 'a' * 64
+    raw, _ = lab.render(run_id='dev1-k3d-9', engine_image=image, api_key_secret='engine-api-key-x')
+    env = yaml.safe_load(raw['engine.yaml'])['spec']['containers'][0]['env']
+    key, = (e for e in env if e['name'] == 'VLLM_API_KEY')
+    assert key == {'name': 'VLLM_API_KEY', 'valueFrom': {'secretKeyRef': {'name': 'engine-api-key-x', 'key': 'api-key'}}}
+    with pytest.raises(ValueError, match='K3D_RENDER_INPUT_INVALID'):
+        lab.render(run_id='dev1-k3d-9', engine_image=image, api_key_secret='Bad Name')

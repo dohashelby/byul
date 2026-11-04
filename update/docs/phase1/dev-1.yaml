@@ -25,11 +25,11 @@ checks:
     note: lab 대역과 k3d CPU 실측
     state: CPU_DEVELOPMENT_REMAINING
   PLT-10:
-    note: lab 대역과 k3d CPU 실측
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "k3d CPU에서 native 결합까지 COMPLETED(대조 키 수락·퇴역 키 handler 전 거부 3회, UNKNOWN: 발급자 사건 미검증). 실측은 2단계 GPU lab"
+    state: GPU_CONFIRMATION_ONLY
   PLT-11:
-    note: lab 대역과 k3d CPU 실측
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "실행 불가: 살아 있는 연결 중 철회 가능한 자격 발급자가 없다(vLLM 고정 키, runtime revocations는 정책 철회). 철회 가능한 IdP 또는 runtime 자격 철회와 사건 기록 필요"
+    state: ENTERPRISE_INPUT_WAITING
   PLT-12:
     note: lab 대역과 k3d CPU 실측
     state: CPU_DEVELOPMENT_REMAINING

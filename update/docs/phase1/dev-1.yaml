@@ -37,7 +37,7 @@ checks:
     note: "runtime Gateway 4-Pod k3d 진단: 격리 PASS, 정책 삭제 FAIL(EXAMPLE). 64개 초과 묶음 결함 수정. 실측은 2단계 GPU lab"
     state: CPU_DEVELOPMENT_REMAINING
   REQ-02:
-    note: lab 대역과 k3d CPU 실측
+    note: "runtime Gateway 요청 기록 연결과 k3d 진단 완료(기록 수집 성공, 우회 주장 0, UNKNOWN). native lifecycle 센서 준비물과 생산자 인증이 남음. 실측은 2단계 GPU lab"
     state: CPU_DEVELOPMENT_REMAINING
   REQ-03:
     note: "runtime Gateway 4-Pod k3d 진단: 관리 경로 404로 security UNKNOWN, functional FAIL. 관리 경로 계약은 runtime 담당과 합의 필요"

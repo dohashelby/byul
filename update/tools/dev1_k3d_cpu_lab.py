@@ -312,6 +312,40 @@ def egress(source_target, receiver_pod, *, receiver_pid, subject_uid, subject_ne
     return receiver_target, policy, config
 
 
+def route_record(base, env, records_text, *, session, gateway_pod, root, minutes=10):
+    """REQ-02: runtime Gateway의 실제 요청 기록을 엔진 소유 위치용 route 기록으로 옮기고 정책·설정을 만든다.
+
+    native_route 부분 수집은 엔진 안 lifecycle 센서 준비물(prepared)이 있어야 한다. k3d CPU lab에는 없으므로
+    그 부분은 실행기가 SUBCOLLECTION_UNAVAILABLE로 남긴다(2단계 GPU lab 항목).
+    """
+    from datetime import datetime, timedelta, timezone
+    from tools import dev1_runtime_records as bridge
+    if not re.fullmatch(r'[0-9a-f]{32}', session):
+        raise ValueError('K3D_ROUTE_SESSION_INVALID')
+    engine = base['kubernetes']['engine']
+    rows = bridge.final_records(records_text.splitlines(), run_id=base['kubernetes']['run_id'])
+    packet = bridge.route_packet(rows, run_id=base['kubernetes']['run_id'], environment_ref=env.ref().model_dump(mode='json'),
+                                 image=engine['image'], ingress_id=gateway_pod, upstream_id=engine['pod'])
+    data = json.dumps(packet, ensure_ascii=False, sort_keys=True).encode()
+    now = datetime.now(timezone.utc)
+    start, end = now.isoformat(), (now + timedelta(minutes=minutes)).isoformat()
+    target_sha = sha256_hex(canonical_json(base))
+    values = {'route_environment_sha256': env.ref().sha256, 'route_target_sha256': target_sha, 'route_session': session,
+              'route_file_sha256': hashlib.sha256(data).hexdigest(), 'route_validity_start': start, 'route_validity_end': end,
+              'route_native_environment_sha256': env.ref().sha256, 'route_native_target_sha256': target_sha,
+              # 준비물이 없다는 사실을 값으로 남긴다. 부분 수집은 이 값과 맞는 준비물을 찾지 못해 실패한다.
+              'route_native_prepared_sha256': hashlib.sha256(b'k3d-cpu-lab-native-route-prepared-absent').hexdigest(),
+              'route_native_validity_start': start, 'route_native_validity_end': end}
+    root = Path(root).absolute()
+    pack = yaml.safe_load((Path(__file__).parents[1] / 'docs/gpu-a/policy-a-draft.yaml').read_text(encoding='utf-8'))['pack']
+    policy = {'data_origin': 'EXAMPLE', 'status': 'DRAFT', 'pack': pack, 'values': {'REQ-02': values},
+              'scope': {'include': ['REQ-02'], 'exclude': []}, 'exceptions': [], 'confirmed_by': None, 'confirmed_at': None}
+    config = '\n'.join([f"store = '{root / 'store'}'", '', '[adapter]', "name = 'vllm'", '', '[executors]', "route_record = 'kubernetes'", '',
+                        '[route_record]', f"target = '{root / 'target.json'}'", "kubectl_binary = 'kubectl'", 'max_duration_seconds = 60',
+                        f"native_route = {{target = '{root / 'target.json'}', prepared = '{root / 'native-route-prepared-absent.json'}'}}", ''])
+    return data, policy, config, len(packet['events'])
+
+
 def http_check(check_id, root):
     executor, settings = EXECUTORS[check_id]
     root = Path(root).absolute()
@@ -351,6 +385,9 @@ def main(argv=None):
     g = sub.add_parser('egress'); g.add_argument('--target', type=Path, required=True); g.add_argument('--receiver-pod', type=Path, required=True)
     g.add_argument('--receiver-pid', type=int, required=True); g.add_argument('--subject-uid', type=int, required=True)
     g.add_argument('--subject-netns', type=int, required=True); g.add_argument('--out', type=Path, required=True)
+    rr = sub.add_parser('route-record'); rr.add_argument('--target', type=Path, required=True); rr.add_argument('--env', type=Path, required=True)
+    rr.add_argument('--records', type=Path, required=True); rr.add_argument('--session', required=True)
+    rr.add_argument('--gateway-pod', required=True); rr.add_argument('--out', type=Path, required=True)
     h = sub.add_parser('http-check'); h.add_argument('--check', required=True, choices=sorted(EXECUTORS))
     h.add_argument('--target', type=Path, required=True); h.add_argument('--out', type=Path, required=True)
     args = parser.parse_args(argv)
@@ -396,6 +433,15 @@ def main(argv=None):
         inputs._write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True))
         inputs._write(args.out / 'guard.toml', config)
         print(json.dumps({'check': 'PLT-07', 'out': str(args.out), 'pack': policy['pack']}))
+    elif args.kind == 'route-record':
+        data, policy, config, count = route_record(load(args.target), load_environment(args.env), args.records.read_text(encoding='utf-8'),
+            session=args.session, gateway_pod=args.gateway_pod, root=args.out)
+        inputs._write(args.out / 'target.json', load(args.target)); args.out.mkdir(parents=True, exist_ok=True)
+        (args.out / 'route-observations.json').write_bytes(data)
+        inputs._write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True))
+        inputs._write(args.out / 'guard.toml', config)
+        print(json.dumps({'check': 'REQ-02', 'events': count, 'file_sha256': hashlib.sha256(data).hexdigest(),
+                          'engine_path': f'/guard-route/data/{args.session}/route-observations.json'}))
     else:
         policy, config = http_check(args.check, args.out)
         inputs._write(args.out / 'target.json', load(args.target))

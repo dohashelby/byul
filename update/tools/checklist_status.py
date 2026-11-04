@@ -27,6 +27,7 @@ FIELDS = (
     "normal_case", "violation_case", "missing_case", "unsupported_case", "reuse_candidate",
     "next_experiment", "prerequisites", "team_decisions", "historical_verification",
     "historical_pack_revisions", "historical_evidence_refs", "remaining_scope",
+    "gpu_runs", "phase1_owner", "phase1_state", "phase1_note",
 )
 GROUPS = {
     "approval_workflow": "SUPPLY_APPROVAL", "supply_integrity": "SUPPLY_APPROVAL",
@@ -57,6 +58,25 @@ REUSE = {
     "approval_workflow": "기존 정책·수동 증거 경로; 실제 기업 권한 집행점은 별도",
     "cache_isolation": "REQ-15/16 수동 계약; 실제 캐시 격리 실행기로 간주하지 않음",
 }
+
+# 1단계 분담(2026-11-04 사용자 지시, DECISIONS.md): 실행기 파일 소유로 나눈다. 나머지 실행기는 GPU 담당.
+DEV1_EXECUTORS = frozenset({
+    "engine_sensor", "direct_route", "role_route", "route_record", "forwarded_identity", "stored_responses",
+    "request_binding", "response_content", "boundary_egress", "credential_revocation", "session_revocation",
+    "required_event_record", "record_access", "log_integrity",
+})
+PHASE1_FILES = {"dev-1": Path("docs/phase1/dev-1.yaml"), "gpu": Path("docs/phase1/gpu.yaml")}
+PHASE1_STATES = frozenset({
+    "DONE", "CPU_DEVELOPMENT_REMAINING", "GPU_CONFIRMATION_ONLY", "MEASUREMENT_REMAINING", "ENTERPRISE_INPUT_WAITING",
+})
+# 현행 팩(32)의 GPU 실행 공개 요약. 원 bundle이 아니며 Ref·판정만 옮긴다. 요약에 팩 Ref가 없는 기록은
+# 해당 문서가 밝힌 팩 revision을 적고(declared_pack_revision), 팩 Ref가 있으면 그 값을 읽는다.
+GPU_A_GLOB = "docs/evidence/gpu-a-*.json"  # byul-gpu-a-check-summary/1, gpu-a README 기준 PACK32
+GPU_B_GLOB = "docs/gpu-b/*.json"  # byul-independent-GPU-public-summary/1, refs에 PACK Ref
+GPU_FIRST = Path("docs/gpu-completion/20261102/GPU_RESULTS.json")  # 11-02 인계 요약 기준 PACK32 9묶음
+GPU_STATUS_ORDER = (
+    "GPU_PARTIAL_MEASURED", "GPU_PARTIAL_EXAMPLE", "GPU_COMPONENT_DECLARED_ONLY", "GPU_ATTEMPTED_NOT_COLLECTED",
+)
 
 
 def registry_keys(path: Path, variable: str) -> set[str]:
@@ -117,6 +137,111 @@ def historical_evidence(root: Path) -> dict[str, list[dict]]:
     return result
 
 
+def _ref(item: dict | None) -> str:
+    if not item:
+        return ""
+    sha = item.get("sha256") or item.get("content_sha256") or ""
+    return f"{item['id']}@{item['revision']}:{sha}"
+
+
+def _run_status(*, completed: bool, verification: str | None, manual: bool) -> str:
+    """한 GPU 실행 기록의 상태. 어떤 기록도 원 질문 전체 완료로 올리지 않는다."""
+    if not completed:
+        return "GPU_ATTEMPTED_NOT_COLLECTED"
+    if manual or verification == "DECLARED":
+        return "GPU_COMPONENT_DECLARED_ONLY"
+    if verification == "MEASURED":
+        return "GPU_PARTIAL_MEASURED"
+    return "GPU_PARTIAL_EXAMPLE"
+
+
+def gpu_runs(root: Path) -> dict[str, list[dict]]:
+    """현행 팩 GPU 실행 공개 요약을 점검별로 모은다. 형식이 다르면 조용히 건너뛰지 않고 거부한다."""
+    result: dict[str, list[dict]] = {}
+
+    def add(check_id: str, record: dict) -> None:
+        if record["pack_revision"] != 32:
+            raise ValueError(f"gpu_run_not_current_pack:{record['source']}")
+        result.setdefault(check_id, []).append(record)
+
+    for path in sorted(root.glob(GPU_A_GLOB)):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if data.get("schema") != "byul-gpu-a-check-summary/1":
+            raise ValueError(f"gpu_a_schema:{path.name}")
+        for run in data["runs"]:
+            manual = run["evidence_kind"] == "manual_native_component"
+            if run["evidence_kind"] not in {"automated", "manual_native_component"}:
+                raise ValueError(f"gpu_a_evidence_kind:{path.name}")
+            if len(run["results"]) != len(run["evidence"]):
+                raise ValueError(f"gpu_a_result_evidence_count:{path.name}")
+            for res, evd in zip(run["results"], run["evidence"], strict=True):
+                status = (evd.get("execution") or {}).get("status")
+                add(res["check_id"], {
+                    "source": path.relative_to(root).as_posix(), "run": run["run"], "pack_revision": 32,
+                    "status": _run_status(completed=status == "COMPLETED", verification=res.get("verification_level"), manual=manual),
+                    "verification_level": res.get("verification_level"), "data_origin": res.get("data_origin"),
+                    "verdicts": res["verdicts"], "result_ref": _ref(res), "evidence_ref": _ref(evd),
+                })
+    for path in sorted(root.glob(GPU_B_GLOB)):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if data.get("schema") != "byul-independent-GPU-public-summary/1":
+            raise ValueError(f"gpu_b_schema:{path.name}")
+        for run in data["runs"]:
+            refs = {r["kind"]: r for r in run["refs"]}
+            if run.get("whole_question_complete") is not False:
+                raise ValueError(f"gpu_b_whole_question_flag:{path.name}")
+            add(run["check_id"], {
+                "source": path.relative_to(root).as_posix(), "run": run["episode"],
+                "pack_revision": refs["PACK"]["revision"],
+                "status": _run_status(completed=run["EVD_status"] == "COMPLETED", verification=run.get("verification_level"), manual=False),
+                "verification_level": run.get("verification_level"), "data_origin": run["EVD_origin"],
+                "verdicts": run["verdicts"], "result_ref": _ref(refs.get("RES")), "evidence_ref": _ref(refs.get("EVD")),
+            })
+    path = root / GPU_FIRST
+    if path.exists():
+        for run in json.loads(path.read_text(encoding="utf-8")):
+            origin = run["origin"]
+            add(run["check_id"], {
+                "source": GPU_FIRST.as_posix(), "run": run["stage"], "pack_revision": 32,
+                "status": _run_status(completed=run["execution"]["status"] == "COMPLETED",
+                                      verification="MEASURED" if origin == "MEASURED" else origin, manual=False),
+                "verification_level": origin if origin == "MEASURED" else None, "data_origin": origin,
+                "verdicts": run["verdicts"], "result_ref": _ref(run["result_ref"]), "evidence_ref": _ref(run["evidence_ref"]),
+            })
+    return result
+
+
+def gpu_status(runs: list[dict]) -> str:
+    """가장 강한 실행 상태. GPU 기록이 없으면 기존 값(DEFERRED_NOT_MEASURED)을 유지한다."""
+    found = {r["status"] for r in runs}
+    return next((s for s in GPU_STATUS_ORDER if s in found), "DEFERRED_NOT_MEASURED")
+
+
+def phase1_owner(check: dict) -> str:
+    if check.get("retired"):
+        return ""
+    return "dev-1" if (check.get("executor") or "") in DEV1_EXECUTORS else "gpu"
+
+
+def load_phase1(root: Path) -> dict[str, dict]:
+    """담당별 1단계 상태 파일. 각 담당은 자기 파일만 고친다."""
+    states: dict[str, dict] = {}
+    for owner, relative in PHASE1_FILES.items():
+        path = root / relative
+        if not path.exists():
+            continue
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        if data.get("owner") != owner:
+            raise ValueError(f"phase1_owner_mismatch:{relative.as_posix()}")
+        for check_id, item in (data.get("checks") or {}).items():
+            if check_id in states:
+                raise ValueError(f"phase1_duplicate:{check_id}")
+            if item.get("state") not in PHASE1_STATES:
+                raise ValueError(f"phase1_state:{check_id}")
+            states[check_id] = {"owner": owner, "state": item["state"], "note": item.get("note", "")}
+    return states
+
+
 def _indexed(rows: list[dict], key: str, label: str) -> dict[str, dict]:
     ids = [row[key] for row in rows]
     if len(ids) != len(set(ids)):
@@ -125,12 +250,17 @@ def _indexed(rows: list[dict], key: str, label: str) -> dict[str, dict]:
 
 
 def build_rows(checks: list[dict], matrix: list[dict], *, pack_revision: int,
-               executor_keys: set[str], judge_keys: set[str], evidence: dict[str, list[dict]]) -> list[dict[str, str]]:
+               executor_keys: set[str], judge_keys: set[str], evidence: dict[str, list[dict]],
+               gpu: dict[str, list[dict]] | None = None, phase1: dict[str, dict] | None = None) -> list[dict[str, str]]:
     """원본 77행의 순서를 유지하고 구현 상태만 현재 등록에서 계산한다."""
     by_id = _indexed(checks, "id", "check")
     matrix_by_id = _indexed(matrix, "id", "matrix")
     if set(by_id) != set(matrix_by_id):
         raise ValueError("matrix_check_ids_differ")
+    gpu = gpu or {}
+    phase1 = phase1 or {}
+    if set(gpu) - set(by_id) or set(phase1) - set(by_id):
+        raise ValueError("gpu_or_phase1_unknown_check")
     rows = []
     for old in matrix:
         check_id = old["id"]
@@ -148,6 +278,11 @@ def build_rows(checks: list[dict], matrix: list[dict], *, pack_revision: int,
         policy_keys = [p["key"] for p in check.get("policy_params", [])]
         family = old["executor_kind"].split(" (")[0]
         history = evidence.get(check_id, [])
+        runs = gpu.get(check_id, [])
+        owner = phase1_owner(check)
+        plan = phase1.get(check_id)
+        if plan and plan["owner"] != owner:
+            raise ValueError(f"phase1_wrong_owner:{check_id}")
         if observation_only:
             implementation = "OBSERVATION_ONLY_NO_SECURITY_RULES"
         elif real and judging:
@@ -178,7 +313,7 @@ def build_rows(checks: list[dict], matrix: list[dict], *, pack_revision: int,
             "historical_grade": old["grade"], "grade_uncertainty": old["uncertain"],
             "experiment_group": GROUPS.get(family, "PLATFORM_CREDENTIAL_NETWORK"), "priority": priority,
             "windows_cpu_status": "HISTORICAL_LIMITED_PROFILE_ONLY" if history else "CURRENT_ENVIRONMENT_NOT_VERIFIED",
-            "current_pack_actual_status": "DEFERRED_NOT_MEASURED",
+            "current_pack_actual_status": gpu_status(runs),
             "required_observations": "; ".join(observations),
             "normal_case": check.get("normal_control") or "정상 대조의 정책·접수 조건을 먼저 확정",
             "violation_case": "; ".join(check.get("challenge_steps", [])) + " / 판정 근거: " + (check.get("fail_criteria") or "미정"),
@@ -194,6 +329,10 @@ def build_rows(checks: list[dict], matrix: list[dict], *, pack_revision: int,
             "historical_pack_revisions": ";".join(str(v) for v in sorted({h["pack"]["revision"] for h in history})),
             "historical_evidence_refs": json.dumps(history, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
             "remaining_scope": remaining,
+            "gpu_runs": json.dumps(runs, ensure_ascii=False, sort_keys=True, separators=(",", ":")) if runs else "",
+            "phase1_owner": owner,
+            "phase1_state": ("RETIRED_OUT_OF_UPDATE_SCOPE" if check.get("retired") else plan["state"] if plan else "UNSET"),
+            "phase1_note": plan["note"] if plan else "",
         })
     return rows
 
@@ -211,7 +350,7 @@ def load_rows(root: Path = ROOT) -> list[dict[str, str]]:
     return build_rows(checks, matrix, pack_revision=pack["revision"],
                       executor_keys=registry_keys(root / "src/guard/executors/registry.py", "EXECUTORS"),
                       judge_keys=registry_keys(root / "src/guard/judges/registry.py", "JUDGES"),
-                      evidence=historical_evidence(root))
+                      evidence=historical_evidence(root), gpu=gpu_runs(root), phase1=load_phase1(root))
 
 
 CONNECTED = {"REAL_EXECUTOR_AND_JUDGE_CONNECTED", "SUPPORTED_EXECUTOR_AND_JUDGE_CONNECTED"}
@@ -236,7 +375,9 @@ def render_markdown(rows: list[dict[str, str]]) -> str:
              f"현행 팩 revision {rows[0]['pack_revision'] if rows else '없음'}의 정의 {len(rows)}개, 정책 등록 {policy}점검/{paths}경로, 실행·보안 판정 규칙 연결 {real}개, 관측 전용 {observation_only}개, 나머지 미연결 {len(rows)-real-observation_only}개다. 연결 중 kubernetes 구현만 있는 점검 {kubernetes_only}개다. 연결 수는 실제 전체 분기 검증 완료 수가 아니다.", "",
              "- [분기별 전체 CSV](checklist_validation_status.csv): 현재 정의·필수 관측·정상/위반/미수집/지원 밖 계획·선행 조건·기업 결정·과거 EVD/RES를 연결한다.",
              "- `supported_implementations`는 registry에 등록된 구현을 그대로 표시한다. `real`과 `kubernetes`는 서로 대체하지 않고, 공용 `fake`와 CPU 전용 구현은 연결 수에 넣지 않는다.",
-             "- 이번 구현 묶음은 사용자 지시에 따라 실제 vLLM 실증을 보류한다. `current_pack_actual_status=DEFERRED_NOT_MEASURED`이며, 과거 기록이나 단위 시험을 현행 팩의 새 실측으로 승격하지 않는다.",
+             "- `current_pack_actual_status`는 현행 팩32의 GPU 실행 공개 요약(`docs/evidence/gpu-a-*.json`, `docs/gpu-b/*.json`, `docs/gpu-completion/20261102/GPU_RESULTS.json`)에서만 계산한다. 가장 강한 기록 하나를 표시하며 원 질문 전체 완료를 뜻하지 않는다. 기록이 없으면 `DEFERRED_NOT_MEASURED`이고, 과거 팩 기록이나 단위 시험·CPU 결과를 현행 팩 GPU 실측으로 승격하지 않는다.",
+             "- `GPU_PARTIAL_MEASURED`는 MEASURED 실행이 있음, `GPU_PARTIAL_EXAMPLE`은 실제 GPU 실행이지만 EXAMPLE 등급, `GPU_COMPONENT_DECLARED_ONLY`는 구성요소 직접 시험의 DECLARED 기록뿐, `GPU_ATTEMPTED_NOT_COLLECTED`는 중단 기록뿐이라는 뜻이다. `gpu_runs`에 실행별 정확 RES/EVD Ref와 판정을 그대로 남긴다.",
+             "- `phase1_owner`는 1단계 분담(실행기 파일 소유, `DECISIONS.md` 2026-11-04)에서 계산하고, `phase1_state`는 담당별 파일 `docs/phase1/dev-1.yaml`·`docs/phase1/gpu.yaml`에서 읽는다. 각 담당은 자기 파일만 고친다.",
              "- `historical_pack_revisions`와 EVD/RES는 구조화된 과거 CPU 선별 기록(팩17·18·19)에서만 읽는다. 팩21·22의 후속 두 이미지 결과는 원래 자동화표의 `historical_verification`·`remaining_scope`와 [실측 문서](UPDATE_VALIDATION.md)를 함께 따른다.",
              "- 이 선별 JSON은 독립 복원 가능한 원본 bundle 전체가 아니다. 추적된 EVD Ref만으로 현행 코드 재현·무결성 검증·기업 승인을 주장하지 않는다.",
              "- A/B/C는 과거 환경 가능성 분류다. Windows 지원 확정·현재 시험 완료·미지원의 비적용 판정으로 사용하지 않는다.",
@@ -244,6 +385,12 @@ def render_markdown(rows: list[dict[str, str]]) -> str:
              "- 보안 PASS·FAIL 규칙이 모두 비어 있는 관측 전용 프로파일은 실행·판정 규칙 연결 수에서 제외한다. 파일 존재·설정·API 입력 대응은 독립 worker 소비 증명이 아니며, 이런 관측만으로 보안 PASS·FAIL을 확정하지 않는다.", "",
              "| 실험 묶음 | 점검 수 |", "|---|---:|"]
     lines.extend(f"| {group} | {count} |" for group, count in sorted(groups.items()))
+    actual = Counter(r["current_pack_actual_status"] for r in rows)
+    lines += ["", "| 현행 팩 GPU 실행 상태 | 점검 수 |", "|---|---:|"]
+    lines.extend(f"| {status} | {actual[status]} |" for status in (*GPU_STATUS_ORDER, "DEFERRED_NOT_MEASURED") if actual[status])
+    owners = Counter((r["phase1_owner"] or "-", r["phase1_state"]) for r in rows)
+    lines += ["", "| 1단계 담당 | 1단계 상태 | 점검 수 |", "|---|---|---:|"]
+    lines.extend(f"| {owner} | {state} | {count} |" for (owner, state), count in sorted(owners.items()))
     lines += ["", "우선순위는 연결된 점검의 관측 공백(P1), 로컬 신규 구현(P2), 추가 인프라(P3), 기업 환경(P4)이다. 기존 점검 재실증은 실행기·정의·설정·시험 자료·환경의 변경 영향이 있을 때만 해당 범위를 수행한다. 팩 revision 변경만으로 기존 5개 전체 재실증을 요구하지 않는다. 어려운 계측 하나가 독립적인 신규 점검을 모두 막지는 않는다.", "",
               "REQ-05는 최종 모델·alias·퇴역 방침, LIF-09는 대상의 부분 실패와 외부 접수 gate, OBS-04는 실제 생성·송신 관측을 먼저 확정한다. 기존 실행기 재사용 후보가 곧 해당 점검의 지원이나 실행 완료를 뜻하지 않는다.", "",
               "실험 완료 시 현재 팩·이미지 digest·모델·정책·분기별 EVD/RES·재현 명령·원본 RPT·플랫폼 계약 검증·미검증 범위를 별도 실험 기록으로 남긴 뒤 정본에 연결한다. 본 추적 도구는 엔진·네트워크·테스트를 실행하지 않는다.", "",

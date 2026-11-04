@@ -2,6 +2,13 @@
 
 최종 갱신: 2026-11-04
 
+## 2026-11-04 SGLang 첫 기동 단계·추론 JIT 보정 (기준 8c53741, 미커밋)
+
+- 11/4 빈 캐시 첫 기동 1회에서 캡처 종료 15:57:27Z~준비 15:57:38Z 사이 셸 9건을 반영해 SGLang compiling을 준비 표지까지 유지한다. 표지 누락 시 캡처 뒤 15초(관찰 11초+여유 4초), 캡처도 없으면 `startupProbe`의 20분 상한에서 `unknown`으로 돌아간다. vLLM 표지는 그대로다. 추론의 Triton `ptxas`는 정확한 경로와 기존 Python 부모 조건에서만 허용하고 셸 의심 경고는 유지한다.
+- 로컬 전체 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 686건 중 통과 571·skip 115·실패/오류 0. `git diff --check` 통과. AWS 서버에 다시 적용·확인하지 않았다. 새 intent를 담은 정책 묶음의 `enforcement_intent` 해시·크기 재계산, 검증, 사람의 후보 규칙·승인 검토가 필요하다. 엔진 `/models`는 읽기 전용이나 엔진 루트의 `readOnlyRootFilesystem`은 설정되지 않았다.
+- 다음 서버 가동: 호스트 수집기와 Gateway 이미지를 새 `collector_state`를 읽는 같은 커밋으로 함께 갱신한다. 수집기만 갱신하면 기존 Gateway가 새 필드를 거부해 SGLang 단계와 AWS-11·16·17 판정이 `unknown`이 된다. 빈 캐시 첫 기동에서 캡처~준비 사이 셸의 compiling/부모 설명과 suspect 경고, 준비 뒤 첫 요청의 `ptxas` 경로·부모·판정, 준비 전 Service Endpoint·Gateway 요청의 엔진 미도달 여부를 확인한다. vLLM loading 단계 `ptxas`·`nvcc` 2건은 이미 허용 목록에 있는데 경고가 나온 원인이 미확인이다. 이번에는 바꾸지 않았고 다음 서버 관측 기록으로 확인한다.
+- `deploy/gpu-lab/서버3회차_확인순서.md`를 작성했다(기준 `b3fc80e`, 서버 미가동).
+
 ## 2026-11-04 AWS GPU 서버 2회차 결과 (기준 byul_runtime 5737fd3, 문서 미커밋)
 
 - 실제 서버 인수 시험에서 vLLM·SGLang 모두 AWS-01~19 최종 통과. vLLM AWS-11은 이전 gap 처리 뒤, AWS-13은 로그 재조회 뒤 통과했고 SGLang AWS-16·17·18도 판정됐다. 배포 경계 실측은 두 엔진 모두 `ok`. 상세 판정과 중간 `unknown`은 [2회차 결과](../docs/AWS_GPU_서버2회차_결과_20261104.md)에 기록했다.

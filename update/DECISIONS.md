@@ -719,3 +719,7 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - 2026-11-02 · 콜백 시험은 시계 대신 경계 요청으로 이번 실행의 행을 고른다. Gateway가 ID를 다시 발급하는 경로는 직렬 시험의 마지막 사례 수로 잇는다. · 실측에서 확인.
 - 2026-11-03 · GPU 실증 인수에서 사용자가 daemon 설정과 시험 정책을 Codex가 정하도록 승인했다. 같은 고정 모델의 소유 zero_copy daemon·동일 UID 두 소비자·전체 release/종료 empty 허용·같은 공급물 fallback을 EXAMPLE로 선택했다. 기업 release 인가·전체 모델 추론·native counter 회수 승인으로 확장하지 않는다. · 사용자 “너가 임의로 정해서 하면 안돼?” 및 `docs/gpu-a/NATIVE-20261103.md`.
 - 2026-11-03 · 실제 설치된 native 구성요소의 합성 fixture GPU 시험은 원자료와 기존 manual-entry DECLARED 증거로 보존하고 전체 UNKNOWN을 유지한다. 자동 native 수집기/서빙 요청·세대·buffer 계보의 공백을 정상 component 결과로 채우지 않는다. HTTP input-validation의 전송 ID 변환은 실행기 어댑터에 두고 고정 Pod probe의 허용 ID 규칙을 넓히지 않는다. · 기존 증거 관문과 전송 경계 유지.
+- 2026-11-04 · 1단계 2인 분담(개발 담당 26개·GPU 실증 담당 43개)은 실행기 파일 소유로 나눈다. 1단계 동안 core·models·judges·registry·cli·packs·공통 계층과 현황 도구는 개발 담당만 고치고(기존 A-1 단독 규칙을 대체), GPU 담당은 파생 DRAFT 팩으로 측정한다. `reviewed-source.json`은 나중에 머지하는 쪽이 `--write`로 재생성한다. · 사용자 지시(1단계 작업 지시서).
+- 2026-11-04 · 로컬 CPU Kubernetes는 k3d(K3s)로 둔다. AWS lab이 K3s이고 NetworkPolicy가 집행되기 때문이다. 결과의 환경은 "k3d 로컬 CPU"로 적고 AWS K3s·GPU 결과와 합치지 않는다. · 사용자 결정.
+- 2026-11-04 · 묶음 3 인수: REQ-15의 수집 완료된 위조 salt 4xx만 정상 대조에서 분리한다. 일반 요청 오류·5xx·수집 불완전 응답은 정상 대조 성공으로 만들지 않는다. 실행기 판본은 0.1.2로 구분한다. REQ-16은 명시한 `media.text_after` 사례·닫힌 전송만 추가하고 기존 media 판정·원 EVD/RES·FAIL은 유지한다. · Claude 중단 작업 인수.
+- 열린 질문(2026-11-04, REQ-16 media): 공통 텍스트 접두 적중과 실제 이미지 블록 소비를 구분하는 판정 의미의 승인·검토가 필요하다. 현행 첫 블록 키 기준을 결과에 맞춰 바꾸지 않는다. REQ-17 공식 AUC 한도·최소 표본 수는 기업 입력 대기로 남긴다.

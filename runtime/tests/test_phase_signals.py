@@ -20,6 +20,7 @@ from serving_runtime.enforcement.execpolicy import ExecPolicy, parse_timeline
 from serving_runtime.enforcement.intent import parse_intent
 from serving_runtime.enforcement.phase_signals import (
     ENGINE_PATTERN_SETS,
+    _TimelineState,
     extract_phase_timeline,
     follow_phase_timeline,
     parse_timezone,
@@ -126,17 +127,77 @@ class PhaseSignalExtractionTests(unittest.TestCase):
                                           timezone_offset="+09:00")
         self.assertEqual([(entry["phase"], entry["from"], entry["until"]) for entry in timeline["entries"]], [
             ("loading", "2026-11-03T07:31:55+09:00", "2026-11-03T07:31:56+09:00"),
-            ("compiling", "2026-11-03T07:31:57+09:00", "2026-11-03T07:32:04+09:00"),
+            ("compiling", "2026-11-03T07:31:57+09:00", "2026-11-03T07:32:05+09:00"),
             ("inferring", "2026-11-03T07:32:05+09:00", None),
         ])
         self.assertEqual(timeline["extraction"]["matched_signals"], {
             "loading_start": 1, "loading_end": 1, "compiling_start": 1,
-            "compiling_end": 1, "inferring_start": 1})
-        self.assertIn("첫 기동 JIT", timeline["extraction"]["limitations"][0])
+            "capture_end": 1, "inferring_start": 1})
+        self.assertIn("첫 기동 1회", timeline["extraction"]["limitations"][0])
         line = b"2026-11-02T22:31:55Z [2026-11-03 07:31:55] Load weight begin.\n"
         outer = extract_phase_timeline(io.BytesIO(line), engine="sglang", year=2025,
                                        timezone_offset="+09:00")
         self.assertEqual(outer["entries"][0]["from"], "2026-11-02T22:31:55+00:00")
+
+    def test_sglang_cold_start_tail_is_compiling_then_inferring_and_bounded_without_ready(self) -> None:
+        lines = (
+            b"[2026-11-03 15:54:00] Capture target prefill CUDA graph begin.\n"
+            b"[2026-11-03 15:57:27] Capture target decode CUDA graph end.\n"
+        )
+        ready = b"[2026-11-03 15:57:38] The server is fired up and ready to roll!\n"
+        intent = parse_intent(json.loads((ROOT / "deploy/gpu-lab-sglang/intent.aws-lab.json").read_text()))
+        for source, expected_end in ((lines + ready, "2026-11-03T15:57:38+00:00"),
+                                     (lines, "2026-11-03T15:57:42+00:00")):
+            with self.subTest(ready=source.endswith(ready)), tempfile.TemporaryDirectory() as directory:
+                timeline = extract_phase_timeline(io.BytesIO(source), engine="sglang", year=2026,
+                                                  timezone_offset="+00:00")
+                compiling = next(row for row in timeline["entries"] if row["phase"] == "compiling")
+                self.assertEqual(compiling["until"], expected_end)
+                path = Path(directory) / "timeline.json"
+                path.write_text(json.dumps(timeline))
+                policy = ExecPolicy(intent, timeline_path=path)
+                during = policy.classify_exec(binary="/bin/sh", parent="/usr/local/cuda/bin/nvcc",
+                    image=None, observed_at="2026-11-03T15:57:33+00:00")
+                self.assertEqual((during["phase"], during["exec_verdict"], during["suspect_context"]),
+                                 (["compiling"], "suspect_binary", "compile_toolchain_parent"))
+                after = policy.classify_exec(binary="/bin/sh", parent="/usr/local/cuda/bin/nvcc",
+                    image=None, observed_at="2026-11-03T15:57:44+00:00")
+                self.assertEqual(after["phase"], ["inferring"] if source.endswith(ready) else ["unknown"])
+                self.assertEqual(after["exec_verdict"], "suspect_binary")
+                self.assertIsNone(after["suspect_context"])
+        no_capture = extract_phase_timeline(io.BytesIO(lines.splitlines(keepends=True)[0]),
+            engine="sglang", year=2026, timezone_offset="+00:00")
+        self.assertEqual(no_capture["entries"][0]["until"], "2026-11-03T16:14:00+00:00")
+
+    def test_sglang_resume_and_reversed_capture_keep_bounded_order(self) -> None:
+        state = _TimelineState(engine="sglang", year=2026, timezone_offset="+00:00")
+        state.process_line(b"[2026-11-03 15:54:00] Capture target prefill CUDA graph begin.\n")
+        state.process_line(b"[2026-11-03 15:57:27] Capture target decode CUDA graph end.\n")
+        saved = state.snapshot(follow={})
+        self.assertEqual(saved["entries"][0]["until"], "2026-11-03T15:57:42+00:00")
+        resumed = _TimelineState(engine="sglang", year=2026, timezone_offset="+00:00",
+                                 resume_document=saved)
+        resumed.process_line(b"[2026-11-03 15:57:38] The server is fired up and ready to roll!\n")
+        self.assertEqual([(row["phase"], row["until"]) for row in resumed.snapshot()["entries"]], [
+            ("compiling", "2026-11-03T15:57:38+00:00"), ("inferring", None)])
+        reversed_log = (
+            b"[2026-11-03 15:54:00] Capture target prefill CUDA graph begin.\n"
+            b"[2026-11-03 15:57:50] The server is fired up and ready to roll!\n"
+            b"[2026-11-03 15:57:27] Capture target decode CUDA graph end.\n"
+        )
+        timeline = extract_phase_timeline(io.BytesIO(reversed_log), engine="sglang", year=2026,
+                                          timezone_offset="+00:00")
+        self.assertEqual(timeline["entries"][0]["until"], "2026-11-03T15:57:42+00:00")
+        self.assertEqual(timeline["entries"][1]["from"], "2026-11-03T15:57:50+00:00")
+        invalid_order = extract_phase_timeline(io.BytesIO(
+            b"[2026-11-03 15:54:00] Capture target prefill CUDA graph begin.\n"
+            b"[2026-11-03 15:57:27] Capture target decode CUDA graph end.\n"
+            b"[2026-11-03 15:57:26] The server is fired up and ready to roll!\n"
+        ), engine="sglang", year=2026, timezone_offset="+00:00")
+        self.assertEqual([(row["phase"], row["until"]) for row in invalid_order["entries"]], [
+            ("compiling", "2026-11-03T15:57:27+00:00")])
+        self.assertIn({"line": 3, "signal": "inferring_start", "reason": "ready_before_capture_end"},
+                      invalid_order["extraction"]["omitted_boundaries"])
 
     def test_invalid_time_inputs_fail_without_guessing(self) -> None:
         for value in ("UTC", "local", "+24:00", "+00:60"):

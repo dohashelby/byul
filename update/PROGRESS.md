@@ -1723,3 +1723,18 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 검증: 직접·입력 도구·불변식 macOS/Linux 각164 통과. macOS 전체10782 통과/18실패 원본, CSV 갱신 후 현황표13 통과, 같은18개 Linux 통과를 보존했다. Linux 전체10800 통과/19기존제외(1515.95초, 부모1517.647초). 소스 목록4644ad2f/423파일과 기존 팩32·B pin·고정 probe 유지. 실패 포함24개 Store 반출·복원·저장팩 재판정의 정확 RES Ref 일치.
 - 정리: 시험 예외 회수 후8초 timeout, probe/native Pod 삭제·엔진 scale0·GPU0MiB 확인. 원자료와13개 점검 요약은 `docs/gpu-a/RESULTS-20261103.md`와 `docs/evidence/gpu-a-*.json`. 사용자 승인 뒤 EC2 중지 요청21:47:45, 콘솔 stopped 관측21:57:10 KST. EBS 보존·자동 공인IP 해제, Claude 자동 계속 꺼짐.
 - 다음 단계/남은 것: `docs/gpu-a/NATIVE-20261103.md`의 실제 서빙 요청·세대·buffer 소비를 묶는 자동 producer/전송 계약, kernel 읽기·초기화 계측, LIF-13 기업 인가/다른 선택 모드. REQ-14 중간 tensor/REQ-21은 다중 GPU 별도 범위다.
+
+### 2026-11-04 1단계 묶음 1: 현황 정리 (개발 담당)
+- 한 일: `tools/checklist_status.py`가 현행 팩32 GPU 공개 요약 세 종류(gpu-a 13개, gpu-b 11-04, 11-02 GPU_RESULTS)를 읽어 `current_pack_actual_status`와 실행별 정확 RES/EVD Ref(`gpu_runs`)를 채운다. 1단계 분담 열(`phase1_owner`·`phase1_state`·`phase1_note`)과 담당별 상태 파일 `docs/phase1/{dev-1,gpu}.yaml`을 추가했다.
+- 결과: 69개 중 GPU_PARTIAL_MEASURED 11, GPU_PARTIAL_EXAMPLE 2(REQ-05·LIF-14), GPU_COMPONENT_DECLARED_ONLY 3(LIF-13·REQ-19·REQ-20), 나머지 DEFERRED_NOT_MEASURED. 원 질문 전체 완료 0. 11-02 PACK31 결과(OBS-03 등)는 현행 팩 기록이 아니어서 넣지 않았다. 담당 dev-1 26 / gpu 43.
+- 테스트 결과: `test_checklist_status.py`·`test_prepare_checklist_cases.py` 34 passed(macOS 3.12.13). `--check` exit0. 제품 소스·팩·manifest 변경 없음.
+- 다음 단계: 묶음 2 native 수집기.
+
+### 2026-11-04 1단계 묶음 3 Codex 인수
+- 한 일: Claude 한도 중단 시점의 REQ-15 수정·회귀 시험을 보존하고 인수했다. 수집 완료된 위조 salt 4xx만 정상 대조에서 분리하고 일반 요청 오류·5xx·불완전 수집은 성공으로 만들지 않는다. 엔진 실행기 판본은 0.1.2다. REQ-16은 선택 media.text_after와 req16-full CLI 옵션·닫힌 PNG+앞뒤 텍스트 전송을 추가했다. 기본 사례·판정 predicate 세 개의 AST는 그대로다.
+- 현황: REQ-15는 GPU_CONFIRMATION_ONLY, REQ-17은 공식 통계 정책 ENTERPRISE_INPUT_WAITING, REQ-16은 media 판정 기준 검토가 남아 CPU_DEVELOPMENT_REMAINING이다. 기존 GPU EVD/RES와 FAIL은 보존했다.
+- 검증: 구현·회귀·문서 초안을 확정한 뒤 소스 목록과 현황표를 재생성하고 직접·공통 계약·불변식 및 기본 suite를 검증한다. 현재는 결과 미기록이며 아래에 실제 결과를 추가한다.
+- 남은 것: media 판정 의미 변경 승인, 실제 Gateway/GPU 경로와 새 native 수집기의 GPU 검증. 새 AWS/GPU 기동은 하지 않는다.
+- 직접 검증: macOS Python 3.12.13에서 관련 콜백·준비 자산·Kubernetes 전송·현황표·불변식 400 passed / 기존 skip1 / 기존 제외1, pytest6.77초·부모7.203초. 일반 요청4xx·위조 요청5xx/응답 없음/불완전4xx·위조 요청만 있는 경우와 media 순서/상한/거부/manifest 결합을 검증했다. 소스 목록428파일 검증(420e4513), 팩32·원B pin 유지, 현황표 --check·diff --check 통과. 전체 기본suite·wheel은 현재 HEAD의 Linux CI에서 확인할 예정이며 아직 통과로 세지 않는다.
+- Linux 최종 검증: 코드 HEAD9547bfc·CI merge0adcd0d, run41813358952. Python3.12.3 기본 suite11147 passed / 기존skip1, pytest771.64초·부모772.913초. wheel 생성·저장소 밖 설치본 검증 통과. Docker대역2통과(36.48초/부모37.128초), platform187통과(11.08초/부모13.076초), 양OS 공용 계약·update-ci-ok 포함7개 작업 모두success. 새skip/제외/assert완화0. 코드 고정 뒤 source8파일 변경0, 근거는 외부 byul-dev1-evidence/20261104-codex-continuation/validation.json·CI로그. PR215 제목/설명에 묶음3과 최종 검증을 반영했다. 이 마지막 기록은 문서만 바꾼 것이며 제품 소스·팩·도구·시험·설정·고정 manifest는 검증 코드와 같다.
+- 2026-11-04 #215 정리: 묶음 2에서 수집기를 구현한 LIF-13·REQ-14·REQ-18·REQ-19·REQ-20을 `GPU_CONFIRMATION_ONLY`로 갱신했다. REQ-21은 엔진 재기동 lab 동작이 없어 `CPU_DEVELOPMENT_REMAINING`을 유지한다. 현황표만 재생성했고 제품 소스·팩·manifest는 변경 없음. dev-1: CPU 개발 남음 19 / GPU 확인만 6 / 기업 입력 대기 1.

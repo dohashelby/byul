@@ -6,6 +6,8 @@
 
 이 조건은 탐지 판정을 좁히는 관측 규칙이며 현재 Tetragon 커널 차단 규칙은 아니다. 엔진 Python이 장악되면 `ninja` 등을 통해 셸을 띄울 수 있으므로 완전 차단으로 해석하지 않는다. 시작 Python의 `containerd-shim` 부모는 정상 기동과 `kubectl exec`을 구별할 수 없어 제약하지 않았다. vLLM의 미관측 `/usr/bin/python3.12`도 부모 근거가 없어 기존 판정을 유지한다. SGLang에서 관측된 `id`·`awk`·`cat`은 기존 허용 목록에 없으므로 관측만으로 추가하지 않았고, 미관측 정규 표기 `cicc`는 허용 목록에서 제외했다. 추후 차단 단계에서는 별도 검증 후 Tetragon `matchParentBinaries`로 옮기고 parents map 비용을 확인해야 한다. 관측 쌍은 저장소 밖 2026-11-03 두 JSONL의 `engine` 컨테이너에서 추렸으며 SGLang 파일에 섞인 vLLM Pod를 분리했다. 시험 도구의 `containerd-shim` → 셸·Python은 정상 쌍에서 제외했다. 관측은 승인 자체를 뜻하지 않으며, 새 image·단계·부모 관계는 다시 확인해야 한다. 부모 정보가 빠진 정상 실행도 의도대로 `outside_allowlist`가 되므로 AWS-11의 잘못된 경고로 셀 수 있다. 11/3 증거 867건에서는 부모 누락이 0건이었다.
 
+11/4 빈 캐시 첫 기동 뒤 첫 요청에서 나온 Triton `ptxas`는 개발계획서의 추론 중 지연 JIT(1248줄)와 부합한다. SGLang 배포의 `/models`는 읽기 전용이지만 엔진 컨테이너의 `readOnlyRootFilesystem`은 설정되지 않아 루트 파일 시스템 보호 근거로 삼지 않는다. 추론 허용은 관측된 정확한 경로와 `/opt/sglang/bin/python3` 부모에만 한정하며 셸은 계속 의심 경고로 남긴다. 이 좁은 조건이 `id`·`awk`·`cat` 관측만으로 추가하지 않는 원칙과 다른 근거다.
+
 11/4 서버 1회차는 [서버 실행순서표](서버_실행순서표.md)와 읽기 전용 [preflight 도구](../../tools/aws_lab_preflight.py)를 따른다.
 
 이 절차는 AWS 묶음 위에 runtime 배포를 올린 뒤 기존 “첫 완료 기준” 8가지와 추가 준비 사례 AWS-09~11을 확인한다. 기존 AWS-01~08 결과는 다시 판정하지 않는다. `tools/k8s_lab_check.py`는 fake engine과 시험 정책을 생성·삭제하는 kind 전용 도구이므로 이 환경에서 사용하지 않는다. AWS-12~17은 `--cases`로 명시 선택해야 하며, 배포 상태를 바꾸는 사례에는 별도 허용 플래그가 필요하다.

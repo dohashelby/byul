@@ -23,6 +23,9 @@ OBSERVATIONS = {'profiler_control_trials': 'list', 'profiler_control_projections
     'profiler_control_missing': 'list', 'profiler_next_start_api_linked': 'bool',
     'profiler_backend_collection_stopped_verified': 'bool', 'profiler_trace_output_completed_verified': 'bool',
     'profiler_cross_process_rpc_verified': 'bool', 'profiler_scope_complete': 'bool'}
+OBSERVATIONS.update(profiler_backend_cycles='list', profiler_backend_restarts='list',
+    profiler_owned_fault_verified='bool', profiler_owned_recovery_verified='bool',
+    activation_steps='list', activation_violations='list', activation_missing='list', activation_scope_complete='bool')
 
 
 def normalize_policy(values):
@@ -63,7 +66,7 @@ def project_captures(captures, trials, *, sealed=False):
     A pre-seal capture's open-recording gap is kept apart once the sealed final
     capture of the same session no longer has it; every other gap still counts.
     """
-    conflicts = []; seen = set(); links = []; missing = []; provisional = {}
+    conflicts = []; seen = set(); links = []; missing = []; provisional = {}; cycles = {}; restarts = []
     final = next((c for c in captures if c.get('phase') == 'final' and c.get('projection') is not None), None)
     settled = sealed is True and final is not None
     for number, capture in enumerate(captures):
@@ -78,6 +81,9 @@ def project_captures(captures, trials, *, sealed=False):
                 codes = [c for c in codes if c not in deferred]
         missing.extend(codes)
         session = capture['session']
+        for cycle in data.get('backend_cycles', []):
+            key = (session, cycle['pid'], cycle['start_ticks'], cycle['generation_sha256'])
+            cycles.setdefault(key, {'capture_index': number, 'session': session, **cycle})
         for candidate in data['conflict_candidates']:
             key = (session, candidate['call_sha256'])
             if key not in seen:
@@ -110,7 +116,23 @@ def project_captures(captures, trials, *, sealed=False):
                         and end['phase'] == 'RETURN' and trial.get('outcome') == end['api_status_code'])}
         if len(matched) == 1: links.extend(matched.values())
         else: missing.append('profiler_control_api_unique_binding_unavailable:' + slot)
-    return {'api_links': links, 'flag_adapter_conflicts': conflicts, 'missing': sorted(set(missing)), 'provisional_missing': provisional}
+    values = list(cycles.values())
+    for first in values:
+        later = [row for row in values if all(row[key] == first[key] for key in (
+            'session', 'pid', 'start_ticks', 'thread_id', 'wrapper_sha256', 'rank'))
+            and row['generation_sha256'] != first['generation_sha256']
+            and row['start_event_ref'][0] == first['stop_event_ref'][0]
+            and row['start_event_ref'][1] > first['stop_event_ref'][1]]
+        if len(later) == 1 and first['worker_binding_verified'] and later[0]['worker_binding_verified']:
+            second = later[0]
+            restarts.append({'session': first['session'], 'pid': first['pid'], 'start_ticks': first['start_ticks'],
+                'rank': first['rank'], 'wrapper_sha256': first['wrapper_sha256'],
+                'first_generation_sha256': first['generation_sha256'], 'next_generation_sha256': second['generation_sha256'],
+                'next_backend_collection_verified': True, 'next_backend_stopped_verified': second['backend_collection_stopped_verified'],
+                'next_trace_output_completed_verified': second['trace_output_completed_verified'],
+                'next_trace_directory_identity': second['trace_directory_identity']})
+    return {'api_links': links, 'flag_adapter_conflicts': conflicts, 'missing': sorted(set(missing)),
+        'provisional_missing': provisional, 'backend_cycles': values, 'backend_restarts': restarts}
 
 
 class KubernetesProfilerControlExecutor:
@@ -133,7 +155,10 @@ class KubernetesProfilerControlExecutor:
         from guard.collectors.lifecycle import load_prepared
         self.validate_policy(check, policy_values); start, end = normalize_policy(policy_values)
         try:
-            if set(self.cfg) - {'target', 'prepared', 'kubectl_binary', 'max_duration_seconds'}: raise ValueError
+            if set(self.cfg) - {'target', 'prepared', 'kubectl_binary', 'max_duration_seconds', 'owned_trace_fault'}: raise ValueError
+            owned_fault = self.cfg.get('owned_trace_fault', False)
+            if type(owned_fault) is not bool or owned_fault and (
+                    policy_values['profiler_case'] != 'prepared-stop-failure' or policy_values['profiler_required_ranks'] != ['0']): raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id, env.model.revision)): raise ValueError
             with Path(self.cfg['target']).open('rb') as stream: target = strict_json(stream.read(65537), limit=65536)
             prepared = load_prepared(self.cfg['prepared']); digest = sha256_hex(canonical_json(target))
@@ -151,6 +176,7 @@ class KubernetesProfilerControlExecutor:
             duration=self.cfg.get('max_duration_seconds', 180), binary=self.cfg.get('kubectl_binary', 'kubectl'))
         started = utcnow(); reader = None; captures = []; trials = []; diagnostics = []; cleanup = []; sealed = False
         token = uuid.uuid4().hex
+        fault_ready = not owned_fault
         try:
             reader = KubernetesLifecycleReader(native_target, env, prepared, runner=self.runner,
                 duration=self.cfg.get('max_duration_seconds', 180), binary=self.cfg.get('kubectl_binary', 'kubectl'))
@@ -172,6 +198,8 @@ class KubernetesProfilerControlExecutor:
                 'attempted': False, 'normal_shape_verified': False, 'profiler_control_response_success': False,
                 'started_at': None, 'finished_at': None, 'policy_window_verified': False}
             trials.append(trial)
+            if owned_fault and not fault_ready and slot not in {'normal-before', 'normal-after'}:
+                trial['diagnostic'] = 'PROFILER_CONTROL_OWNED_FAULT_UNAVAILABLE'; continue
             if slot != 'normal-before' and slot != 'normal-after' and not trials[0].get('normal_shape_verified'):
                 trial['diagnostic'] = 'PROFILER_CONTROL_NORMAL_PRECONDITION_UNAVAILABLE'; continue
             try:
@@ -189,6 +217,22 @@ class KubernetesProfilerControlExecutor:
                 trial['policy_window_verified'] = bool(trial['started_at'] and start <= _time(trial['started_at']) <= _time(trial['finished_at']) <= end)
                 if trial['attempted'] and not trial['policy_window_verified']: diagnostics.append('PROFILER_CONTROL_POLICY_WINDOW_UNVERIFIED')
             if slot in {'stop', 'next-stop'}: capture(slot)
+            if owned_fault and slot == 'normal-before' and trial.get('normal_shape_verified'):
+                try:
+                    transport.trace_fault(prepared['session'], 'arm')
+                    fault_ready = True
+                except Exception: diagnostics.append('PROFILER_CONTROL_OWNED_FAULT_UNAVAILABLE')
+            if owned_fault and slot == 'stop' and transport.report().get('trace_fault_receipt'):
+                try: transport.trace_fault(prepared['session'], 'recover')
+                except Exception:
+                    diagnostics.append('PROFILER_CONTROL_OWNED_RECOVERY_UNAVAILABLE')
+                    # Do not start a new profiler in a still-colliding or foreign path.
+                    fault_ready = False
+        if (owned_fault and transport.report().get('trace_fault_receipt')
+                and not transport.report().get('trace_recovery_receipt')
+                and 'recover' not in transport.report().get('trace_fault_attempts', [])):
+            try: transport.trace_fault(prepared['session'], 'recover')
+            except Exception: cleanup.append('PROFILER_CONTROL_OWNED_RECOVERY_UNAVAILABLE')
         if reader is not None:
             try: sealed = reader.seal_session().get('sealed') is True
             except Exception: pass
@@ -207,23 +251,48 @@ class KubernetesProfilerControlExecutor:
         by_slot = {t['case_id']: t for t in trials}
         if any(by_slot[a]['attempted'] and not by_slot[b]['attempted'] for a, b in (('start', 'stop'), ('next-start', 'next-stop'))):
             cleanup.append('PROFILER_CONTROL_STOP_NOT_ATTEMPTED')
+        cycles = projection['backend_cycles']; restarts = projection['backend_restarts']
+        selected = [c for c in cycles if c['worker_binding_verified'] and str(c['rank']) in policy_values['profiler_required_ranks']]
+        ranks_seen = {str(c['rank']) for c in selected}
+        backend_stopped = bool(selected and ranks_seen == set(policy_values['profiler_required_ranks'])
+            and all(c['backend_collection_stopped_verified'] for c in selected))
+        # Both the active native record and exact owned-file receipt are required.
+        fault_receipt = http.get('trace_fault_receipt')
+        fault_verified = bool(fault_receipt and any(c['owned_collision_observed'] and c['stop_phase'] == 'RAISE'
+            and c['collision_sha256'] == fault_receipt['marker_sha256'] for c in selected))
+        recovery_receipt = http.get('trace_recovery_receipt')
+        fault_generations = {c['generation_sha256'] for c in selected if fault_receipt
+            and c['owned_collision_observed'] and c['collision_sha256'] == fault_receipt['marker_sha256']}
+        recovery_verified = bool(recovery_receipt and any(r['first_generation_sha256'] in fault_generations
+            and r['next_backend_collection_verified'] and r['next_backend_stopped_verified'] and r['next_trace_output_completed_verified']
+            and r['next_trace_directory_identity'] == recovery_receipt['directory_identity'] for r in restarts))
+        violations = [{'kind': 'wrapper_stopped_while_backend_collecting', 'session': c['session'],
+            'pid': c['pid'], 'start_ticks': c['start_ticks'], 'generation_sha256': c['generation_sha256'],
+            'stop_event_ref': c['stop_event_ref']} for c in cycles if c['confirmed_wrapper_backend_violation']]
+        gaps = ['control_scope_and_owner_are_operator_declarations', 'cross_process_API_RPC_worker_causality_unverified']
+        if not backend_stopped: gaps.append('independent_backend_stop_trace_and_transfer_unverified')
+        if not fault_verified and policy_values['profiler_case'] == 'prepared-stop-failure': gaps.append('prepared_fault_activation_unverified')
+        if not restarts: gaps.append('next_start_API_success_is_not_next_backend_collection')
+        if not selected: gaps.append('preexisting_backend_inactive_unverified')
         values = {'profiler_control_trials': trials, 'profiler_control_projections': [c['projection'] for c in captures],
             'profiler_control_api_links': projection['api_links'], 'profiler_control_flag_adapter_conflicts': projection['flag_adapter_conflicts'],
             'profiler_control_provisional_missing': projection['provisional_missing'],
-            'profiler_control_missing': sorted(set(projection['missing'] + diagnostics + [
-                'independent_backend_stop_trace_and_transfer_unverified', 'prepared_fault_activation_unverified',
-                'next_start_API_success_is_not_next_backend_collection', 'preexisting_backend_inactive_unverified',
-                'control_scope_and_owner_are_operator_declarations'])),
+            'profiler_control_missing': sorted(set(projection['missing'] + diagnostics + gaps)),
             'profiler_next_start_api_linked': any(r['case_id'] == 'next-start' and r['http_status_matches'] for r in projection['api_links']),
-            'profiler_backend_collection_stopped_verified': False, 'profiler_trace_output_completed_verified': False,
-            'profiler_cross_process_rpc_verified': False, 'profiler_scope_complete': False}
+            'profiler_backend_collection_stopped_verified': backend_stopped, 'profiler_trace_output_completed_verified': False,
+            'profiler_cross_process_rpc_verified': False, 'profiler_scope_complete': False,
+            'profiler_backend_cycles': cycles, 'profiler_backend_restarts': restarts,
+            'profiler_owned_fault_verified': fault_verified, 'profiler_owned_recovery_verified': recovery_verified,
+            'activation_steps': cycles, 'activation_violations': violations,
+            'activation_missing': sorted(set(projection['missing'] + diagnostics)), 'activation_scope_complete': False}
         scope_declaration = {key: policy_values[key] for key in ('profiler_control_scope', 'profiler_control_owner_ref',
             'profiler_environment_sha256', 'profiler_target_sha256', 'profiler_prepared_sha256')}
         summary = {'profile': PROFILE, 'declared_case': policy_values['profiler_case'], 'policy_values': deepcopy(policy_values),
             'trials': trials, 'captures': captures, 'transport': http, 'observations': values,
             'control_scope_declaration': scope_declaration, 'preexisting_backend_inactive_verified': False,
             'profiler_ownership_acquired_by_start_verified': False,
-            'selected_session_sealed': sealed, 'faults_injected': False, 'engine_started': False, 'whole_scope_complete': False}
+            'selected_session_sealed': sealed, 'faults_injected': bool(fault_receipt), 'fault_activation_verified': fault_verified,
+            'owned_recovery_verified': recovery_verified, 'engine_started': False, 'whole_scope_complete': False}
         artifacts = []
         try:
             path = Path(workdir) / 'profiler-control.json'; path.parent.mkdir(parents=True, exist_ok=True)
@@ -236,7 +305,7 @@ class KubernetesProfilerControlExecutor:
             normal_control={'attempted': trials[0]['attempted'], 'succeeded': all(t['normal_shape_verified'] for t in normal_slots),
                 'detail': 'Closed API normal controls only; backend collection/output/next-start remain independently unverified.'},
             challenges=[{'step': 'observe prepared profiler stop failure and next start', 'attempted': any(t['attempted'] for t in stop_attempts),
-                'observations': {'fault_activation_verified': False}}],
+                'observations': {'fault_activation_verified': fault_verified, 'owned_recovery_verified': recovery_verified}}],
             observations={k: {'value': v, 'collected': True} for k, v in values.items()}, artifacts=artifacts,
             cleanup_errors=cleanup, config={'profile': PROFILE, 'target_sha256': digest, 'prepared_sha256': sha256_hex(canonical_json(prepared)),
                 'control_scope_declaration': scope_declaration},

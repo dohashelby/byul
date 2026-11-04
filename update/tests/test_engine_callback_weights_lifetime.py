@@ -52,7 +52,9 @@ SHARED = {'send_msg': send_msg, 'recv_msg': recv_msg, 'logger': SimpleNamespace(
 
 def world(tmp_path, *, cred=True):
     daemon_module = source_module(wl.DAEMON_MODULE, tmp_path, targets=wl.TARGETS, sources=wl.SOURCES)
-    loader_module = source_module(wl.LOADER_MODULE, tmp_path, targets=wl.TARGETS, sources=wl.SOURCES)
+    # 원 load_model 코드도 흐름을 위해 클래스에 둔다. 감싸지는 않는다(실제로는 장식자 래퍼라서).
+    loader_module = source_module(wl.LOADER_MODULE, tmp_path, sources=wl.SOURCES,
+        targets={**wl.TARGETS, wl.LOADER_MODULE: ('IpcModelLoader.load_model', *wl.TARGETS[wl.LOADER_MODULE])})
     vars(daemon_module).update(SHARED, WeightCacheKey=Key, get_current_device_uuid=lambda: 'GPU-0',
         export_entries=lambda model: ({'w': 1, 'b': 2}, {}), export_model_attrs=lambda model: {})
     model_type = type('Model', (), {})
@@ -157,6 +159,11 @@ def test_release_switch_is_only_for_lif13_and_needs_a_declared_daemon_socket():
     assert projection.validate_lab_contexts(spec, CASES) == spec
     with pytest.raises(ValueError):
         projection.validate_lab_contexts({'weights_daemon': {'variants': {'target': '/tmp/x.sock'}}}, CASES)
+
+
+def test_decorated_load_model_is_not_a_target(tmp_path):
+    # 실제 vLLM의 load_model은 @instrument 장식자 래퍼라 원 코드 자격을 얻을 수 없다.
+    assert all(not p.endswith('.load_model') for p in wl.TARGETS[wl.LOADER_MODULE])
 
 
 def test_peer_reader_returns_none_without_unix_credentials():

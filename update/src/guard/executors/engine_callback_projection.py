@@ -524,8 +524,8 @@ def project_weights_lifetime(cases, outputs, events, switches):
     rows = {}; order = []
     for event in events:
         point = event.get('point')
-        if point not in (DAEMON_STATE, DAEMON_RELEASE, 'IpcModelLoader._request_state', 'IpcModelLoader._fallback_load',
-                         'IpcModelLoader.load_model') or event.get('entry_qualified_before') is not True:
+        if point not in (DAEMON_STATE, DAEMON_RELEASE, 'IpcModelLoader._request_state', 'IpcModelLoader._fallback_load') \
+                or event.get('entry_qualified_before') is not True:
             continue
         call = event.get('call_sha256')
         if event.get('phase') == 'CALL':

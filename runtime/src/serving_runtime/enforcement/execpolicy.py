@@ -307,9 +307,11 @@ def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
                 _time(item["at"], f"timeline.extraction.follow.events[{index}].at")
         collector = extraction.get("collector_state")
         if collector is not None:
-            if not isinstance(collector, dict) or set(collector) != {
+            required_collector = {
                 "run_active", "run_init_ended", "compile_seen", "inferring_seen", "health_ready_at",
-            }:
+            }
+            optional_collector = {"compile_open_from", "compile_cap_at", "capture_end_at"}
+            if not isinstance(collector, dict) or not required_collector <= set(collector) or set(collector) - required_collector - optional_collector:
                 raise IntentError("timeline.extraction.collector_state has invalid fields")
             for name in ("run_active", "run_init_ended", "compile_seen", "inferring_seen"):
                 if not isinstance(collector[name], bool):
@@ -319,6 +321,9 @@ def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
                     collector["health_ready_at"],
                     "timeline.extraction.collector_state.health_ready_at",
                 )
+            for name in optional_collector & set(collector):
+                if collector[name] is not None:
+                    _time(collector[name], f"timeline.extraction.collector_state.{name}")
         clocks = extraction.get("clock_sources")
         if clocks is not None and (
             not isinstance(clocks, dict)

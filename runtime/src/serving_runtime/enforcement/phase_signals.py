@@ -2,9 +2,10 @@
 
 The pattern table is deliberately data-oriented and lives in this module so a
 new engine/version can replace it without changing the timeline state machine.
-Only directly observed signal timestamps, or an explicitly configured health
-200 observed by the follower clock, become boundaries. An untimestamped log
-marker is reported but is not assigned a guessed time.
+Observed signal timestamps (or an explicitly configured health 200) provide
+phase transitions. SGLang's open compiling interval also has a documented
+upper bound so a missing ready marker cannot keep it active indefinitely.
+An untimestamped log marker is reported but is not assigned a guessed time.
 """
 
 from __future__ import annotations
@@ -83,23 +84,30 @@ VLLM_CPU_029 = EnginePatternSet(
 
 SGLANG_GPU_0522 = EnginePatternSet(
     engine="sglang",
-    name="sglang-gpu-0.5.22-cached-start-observed",
-    support_level="observed_gpu_cached_start_log_excerpt_first_start_jit_unverified",
+    name="sglang-gpu-0.5.22-start-observed",
+    support_level="observed_gpu_cached_start_excerpt_and_one_cold_start",
     basis="engine_signal",
     patterns=(
         _pattern("loading_start", "Load weight begin."),
         _pattern("loading_end", "Load weight end."),
         _pattern("compiling_start", "Capture target prefill CUDA graph begin."),
-        _pattern("compiling_end", "Capture target decode CUDA graph end."),
+        _pattern("capture_end", "Capture target decode CUDA graph end."),
         _pattern("inferring_start", "The server is fired up and ready to roll!"),
     ),
     limitations=(
-        "SGLang v0.5.22 GPU 캐시 있는 기동 로그 근거, 첫 기동 JIT 컴파일 위치는 미확인",
+        "SGLang v0.5.22 GPU 캐시 재기동 발췌와 GPU 빈 캐시 첫 기동 1회 관찰; 다른 image·재기동에서 재확인 필요",
         "캐시 재기동은 컨테이너 시작 07:31:15Z부터 첫 Load weight begin. 07:31:55Z까지 약 40초간 단계 없음; 07:31:23Z ptxas 등 단계 전용 실행은 phase_unknown이며 AWS-11 잘못된 경고 집계에서 제외",
-        "캐시 재기동의 07:31:58 컴파일러 실행은 07:31:57 CUDA graph 시작 뒤 compiling에 포함; 첫 기동 JIT 약 3분은 로그 부재로 경계 미확인",
+        "11/4 빈 캐시 첫 기동의 캡처 종료 뒤 준비 완료 전 11초간 nvcc·ninja 자식 셸 9건은 compiling; 준비 표지 누락 시 캡처 뒤 15초, 캡처 누락 시 시작 뒤 20분 상한",
         "engine_signal은 신뢰된 단계 근거가 아님",
     ),
 )
+
+
+# 11/4 cold start: capture end 15:57:27Z, ready 15:57:38Z (11 s).
+# Four seconds of margin bounds the unconfirmed tail. The deployment's
+# startupProbe (10 s * 120 failures) bounds a run lacking capture end.
+SGLANG_CAPTURE_GRACE = timedelta(seconds=15)
+SGLANG_STARTUP_LIMIT = timedelta(minutes=20)
 
 
 ENGINE_PATTERN_SETS: dict[str, EnginePatternSet] = {
@@ -211,6 +219,8 @@ class _TimelineState:
         self.run_init_ended = False
         self.compile_seen = False
         self.inferring_seen = False
+        self.compile_cap_at: datetime | None = None
+        self.capture_end_at: datetime | None = None
         self.health_ready_at: datetime | None = None
         self.health = {
             "configured": health_enabled,
@@ -226,8 +236,18 @@ class _TimelineState:
 
     def _resume(self, document: dict[str, Any]) -> None:
         extraction = document.get("extraction", {})
-        for item in document.get("entries", []):
+        saved = extraction.get("collector_state", {})
+        compile_open_from = saved.get("compile_open_from")
+        source_entries = document.get("entries", [])
+        compile_open_index = next((index for index in range(len(source_entries) - 1, -1, -1)
+                                   if source_entries[index].get("phase") == "compiling"
+                                   and source_entries[index].get("from") == compile_open_from
+                                   and source_entries[index].get("until") == saved.get("compile_cap_at")), None)
+        for index, item in enumerate(source_entries):
             copied = dict(item)
+            if index == compile_open_index:
+                self.open_phases["compiling"] = (datetime.fromisoformat(copied["from"]), 0, "resumed")
+                continue
             if copied.get("until") is None:
                 started = datetime.fromisoformat(copied["from"])
                 self.open_phases[copied["phase"]] = (started, 0, "resumed")
@@ -241,7 +261,6 @@ class _TimelineState:
         for name, count in extraction.get("matched_signals", {}).items():
             if name in self.matched:
                 self.matched[name] = count
-        saved = extraction.get("collector_state", {})
         self.run_active = saved.get("run_active", bool(self.open_phases))
         self.run_init_ended = saved.get("run_init_ended", False)
         self.compile_seen = saved.get(
@@ -249,6 +268,10 @@ class _TimelineState:
             any(item["phase"] == "compiling" for item in document.get("entries", [])),
         )
         self.inferring_seen = saved.get("inferring_seen", "inferring" in self.open_phases)
+        if saved.get("compile_cap_at") is not None:
+            self.compile_cap_at = datetime.fromisoformat(saved["compile_cap_at"])
+        if saved.get("capture_end_at") is not None:
+            self.capture_end_at = datetime.fromisoformat(saved["capture_end_at"])
         ready = saved.get("health_ready_at")
         if ready is not None:
             self.health_ready_at = datetime.fromisoformat(ready)
@@ -269,6 +292,8 @@ class _TimelineState:
         opened = self.open_phases.pop(phase, None)
         if opened is None:
             return False
+        if self.engine == "sglang" and phase == "compiling" and self.compile_cap_at is not None:
+            at = min(at, self.compile_cap_at)
         started, _start_line, source = opened
         if at <= started:
             reason = "health_and_log_clock_order_invalid" if source == "health_probe" else "non_positive_interval"
@@ -312,6 +337,8 @@ class _TimelineState:
         self.run_init_ended = False
         self.compile_seen = False
         self.inferring_seen = False
+        self.compile_cap_at = None
+        self.capture_end_at = None
         self.health_ready_at = None
         self.health["last_result"] = "not_ready"
         if signal != "loading_start":
@@ -367,11 +394,42 @@ class _TimelineState:
             ) and self.matched["loading_start"] == 0:
                 changed |= self.omit(self.lines_read, "loading", "loading_start_not_observed")
         elif signal == "compiling_start":
+            if self.engine == "sglang" and self.inferring_seen:
+                return self.omit(self.lines_read, signal, "out_of_order_after_ready")
             if not self.run_active:
                 changed |= self.start_run(self.lines_read, at, signal)
             self.compile_seen = True
             self.open_phases["compiling"] = (at, self.lines_read, "log_timestamp")
+            if self.engine == "sglang":
+                self.compile_cap_at = at + SGLANG_STARTUP_LIMIT
+                self.capture_end_at = None
             changed = True
+        elif signal == "capture_end":
+            opened = self.open_phases.get("compiling")
+            if self.engine == "sglang" and opened is not None and at > opened[0]:
+                self.capture_end_at = at
+                self.compile_cap_at = min(opened[0] + SGLANG_STARTUP_LIMIT, at + SGLANG_CAPTURE_GRACE)
+                if self.health_ready_at is None:
+                    self.health_ready_at = at
+                changed = True
+            elif self.engine == "sglang" and self.inferring_seen:
+                # Late log delivery may put this marker after ready. Reapply
+                # the capture cap to the already closed compiling interval.
+                inferring = self.open_phases.get("inferring")
+                compiling = next((item for item in reversed(self.entries) if item["phase"] == "compiling"), None)
+                if compiling is not None and at < datetime.fromisoformat(compiling["until"]):
+                    cap = min(datetime.fromisoformat(compiling["from"]) + SGLANG_STARTUP_LIMIT,
+                              at + SGLANG_CAPTURE_GRACE)
+                    if cap < datetime.fromisoformat(compiling["until"]):
+                        compiling["until"] = _iso(cap)
+                        changed = True
+                if inferring is not None and at >= inferring[0]:
+                    # A later capture timestamp contradicts readiness.
+                    self.open_phases.pop("inferring")
+                    changed = True
+                changed |= self.omit(self.lines_read, signal, "out_of_order_after_ready")
+            else:
+                changed |= self.omit(self.lines_read, signal, "compiling_start_not_observed_or_order_invalid")
         elif signal == "compiling_end":
             self.compile_seen = True
             if "compiling" not in self.open_phases:
@@ -390,6 +448,13 @@ class _TimelineState:
                 changed |= self.omit(self.lines_read, "compiling", "compile_markers_not_observed")
             changed = True
         elif signal == "inferring_start":
+            if self.engine == "sglang":
+                if self.capture_end_at is not None and at <= self.capture_end_at:
+                    self.compile_cap_at = self.capture_end_at
+                    changed |= self.close_phase("compiling", self.capture_end_at, self.lines_read)
+                    changed |= self.omit(self.lines_read, signal, "ready_before_capture_end")
+                    return changed
+                changed |= self.close_phase("compiling", at, self.lines_read)
             if not self.run_active:
                 changed |= self.start_run(self.lines_read, at, signal)
             self.inferring_seen = True
@@ -427,6 +492,8 @@ class _TimelineState:
                 max(1, self.lines_read), "inferring_start", "health_and_log_clock_order_invalid"
             )
         self.health["last_result"] = "healthy_boundary_recorded"
+        if self.engine == "sglang":
+            self.close_phase("compiling", checked_at, max(1, self.lines_read))
         self.inferring_seen = True
         self.open_phases["inferring"] = (
             checked_at,
@@ -438,11 +505,12 @@ class _TimelineState:
     def snapshot(self, *, follow: dict[str, Any] | None = None) -> dict[str, Any]:
         entries = [dict(item) for item in self.entries]
         for phase, (started, _line_number, _source) in self.open_phases.items():
+            until = self.compile_cap_at if self.engine == "sglang" and phase == "compiling" else None
             entries.append(
                 {
                     "phase": phase,
                     "from": _iso(started),
-                    "until": None,
+                    "until": _iso(until) if until else None,
                     "basis": self.pattern_set.basis,
                 }
             )
@@ -470,6 +538,11 @@ class _TimelineState:
                 "compile_seen": self.compile_seen,
                 "inferring_seen": self.inferring_seen,
                 "health_ready_at": _iso(self.health_ready_at) if self.health_ready_at else None,
+                **({
+                    "compile_open_from": _iso(self.open_phases["compiling"][0]) if "compiling" in self.open_phases else None,
+                    "compile_cap_at": _iso(self.compile_cap_at) if self.compile_cap_at else None,
+                    "capture_end_at": _iso(self.capture_end_at) if self.capture_end_at else None,
+                } if self.engine == "sglang" else {}),
             }
             extraction["clock_sources"] = {
                 "log_boundaries": "log_timestamp_with_explicit_year_and_timezone",

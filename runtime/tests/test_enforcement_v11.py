@@ -728,6 +728,30 @@ class AdapterIntegrationTests(unittest.TestCase):
                 self.assertEqual((kubectl_shell["exec_verdict"], kubectl_shell["suspect_context"]),
                                  ("suspect_binary", None))
 
+    def test_sglang_inferring_triton_ptxas_requires_exact_path_and_parent(self) -> None:
+        intent = load_intent(ROOT / "deploy/gpu-lab-sglang/intent.aws-lab.json")
+        ptxas = "/opt/sglang/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "timeline.json"
+            path.write_text(json.dumps({"schema_version": "runtime-phase-timeline/1.0", "entries": [
+                {"phase": "inferring", "from": "2026-11-03T15:57:38Z",
+                 "until": "2026-11-03T16:30:00Z", "basis": "declared"}]}))
+            policy = ExecPolicy(intent, timeline_path=path)
+            def check(binary: str, parent: str) -> dict:
+                return policy.classify_exec(binary=binary, parent=parent, image=None,
+                    observed_at="2026-11-03T15:59:45Z")
+            allowed = check(ptxas, "/opt/sglang/bin/python3")
+            self.assertEqual((allowed["exec_verdict"], allowed["parent_check"]),
+                             ("allowed_in_phase", "matched"))
+            wrong_parent = check(ptxas, "/bin/sh")
+            self.assertEqual((wrong_parent["exec_verdict"], wrong_parent["parent_check"]),
+                             ("outside_allowlist", "mismatch"))
+            self.assertEqual(check("/usr/local/cuda/bin/ptxas", "/opt/sglang/bin/python3")["exec_verdict"],
+                             "outside_allowlist")
+            shell = check("/bin/sh", "/usr/local/cuda/bin/nvcc")
+            self.assertEqual((shell["exec_verdict"], shell["suspect_context"]),
+                             ("suspect_binary", None))
+
     def test_aws_variable_and_traversal_exec_paths_are_not_implicitly_allowed(self) -> None:
         for intent_path, engine_binary in (("gpu-lab", "/usr/local/bin/vllm"),
                                            ("gpu-lab-sglang", "/opt/sglang/bin/python3")):

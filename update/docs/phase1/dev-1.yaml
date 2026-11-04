@@ -16,7 +16,7 @@ checks:
     note: lab 대역과 k3d CPU 실측
     state: CPU_DEVELOPMENT_REMAINING
   OBS-09:
-    note: 'Kubernetes 실행기 구현. k3d 실측은 UNKNOWN(이 이미지 digest에 검토 로그 계약 없음). 로거 SHA는 일치하며 검토 목록 추가 결정 대기'
+    note: 'Kubernetes 실행기 구현. 로컬 k3d(arm64)는 검토 로그 계약 밖이라 UNKNOWN. arm64는 검토 목록에 넣지 않고 Linux amd64 환경에서 실측'
     state: CPU_DEVELOPMENT_REMAINING
   OBS-11:
     note: 'Kubernetes 읽기 경로 구현. 수집기 중단·복구 lab 절차가 없어 실측 전'

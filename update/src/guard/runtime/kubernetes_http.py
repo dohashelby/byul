@@ -57,6 +57,17 @@ for name in sorted(os.listdir(root)):
 print(json.dumps({"events":rows,"truncated":truncated}))
 '''
 # REQ-16 lab only: replace the active LoRA files with one declared variant, keeping the same path.
+# LIF-13 lab: 소유 weights daemon socket에 원 vLLM 통신 형식으로 전체 release 한 번.
+WEIGHTS_RELEASE = r'''
+import json,socket,sys
+from vllm.model_executor.model_loader.weight_cache.protocol import send_msg,recv_msg
+s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);s.settimeout(30);s.connect(sys.argv[1])
+try:
+ send_msg(s,{"cmd":"release"});r=recv_msg(s)
+finally:
+ s.close()
+print(json.dumps({"schema":"guard-lab-weights-release/1","status":r.get("status") if isinstance(r,dict) else None}))
+'''
 LORA_VARIANT_COPY = r'''
 import hashlib,json,os,stat,sys
 source,active=sys.argv[1],sys.argv[2];files={}
@@ -597,12 +608,19 @@ class KubernetesHTTP:
 
     def engine_callback_switch(self,action,variant):
         """Change one declared REQ-16 context in the owned lab engine and return bounded facts."""
-        lab=self._callback_lab;kind={"lora_reload":"lora","weights_reload":"weights"}.get(action)
+        lab=self._callback_lab;kind={"lora_reload":"lora","weights_reload":"weights","weights_release":"weights_daemon"}.get(action)
         if (self.profile!=ENGINE_CALLBACK_PROFILE or self.lab is not True or lab is None or kind is None
                 or lab.get(kind) is None or variant not in lab[kind]["variants"]):
             raise KubernetesBindingError()
         self._callback_switches+=1;endpoint=self.endpoint.scheme+"://"+self.endpoint.netloc;facts={}
         request={"id":"cbx-%d"%self._callback_switches,"mode":"json","method":"POST","headers":{}}
+        if kind=="weights_daemon":
+            self._verify();engine=self.binding["engine"]
+            done=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",
+                "--","python3","-c",WEIGHTS_RELEASE,lab["weights_daemon"]["variants"][variant]],cap=4096,budget=60)
+            if type(done) is not dict or done!={"schema":"guard-lab-weights-release/1","status":"ok"}:
+                raise KubernetesBindingError()
+            return {"daemon_status":"ok"}
         if kind=="lora":
             spec=lab["lora"];self._verify();engine=self.binding["engine"]
             copied=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",

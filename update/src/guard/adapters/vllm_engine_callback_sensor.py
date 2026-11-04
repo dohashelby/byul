@@ -22,6 +22,7 @@ from . import vllm_cache_callback as cache
 from . import vllm_distributed_callback as distributed
 from . import vllm_kernel_bounds_callback as kernel_bounds
 from . import vllm_graph_replay_callback as graph_replay
+from . import vllm_weights_lifetime_callback as weights_lifetime
 
 PROFILE = 'vllm-engine-callback-metadata/1'
 SCHEMA = 'guard-engine-callback-events/1'
@@ -42,7 +43,7 @@ MAX_SAMPLED_SLOTS = 256
 # Block-level lookups feed no projection. Wrapping them made every cache hit
 # slower in proportion to its length and multiplied the session rows.
 CACHE_TARGETS = {'vllm.v1.core.kv_cache_manager': cache.TARGETS['vllm.v1.core.kv_cache_manager']}
-MODULES = {**CACHE_TARGETS, **distributed.TARGETS, **SLOT_TARGETS, **SLOT_V2_TARGETS, **kernel_bounds.TARGETS, **graph_replay.TARGETS}
+MODULES = {**CACHE_TARGETS, **distributed.TARGETS, **SLOT_TARGETS, **SLOT_V2_TARGETS, **kernel_bounds.TARGETS, **graph_replay.TARGETS, **weights_lifetime.TARGETS}
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
 MAX_FILE_BYTES = 16 * 1024 ** 2
@@ -188,6 +189,10 @@ class GraphObserver(_Keyed, graph_replay.GraphReplayObserver):
     pass
 
 
+class WeightsObserver(_Keyed, weights_lifetime.WeightsLifetimeObserver):
+    pass
+
+
 class Sink:
     def __init__(self, directory):
         self.path = Path(directory) / f'callbacks-{os.getpid()}.jsonl'
@@ -211,10 +216,11 @@ class EngineCallbacks:
         self.distributed = DistributedObserver(session, **options)
         self.slot = SlotObserver(session, **options)
         self.slot_v2 = SlotV2Observer(session, **options)
+        self.weights = WeightsObserver(session, **options)
         # REQ-19 kernel 대조는 GPU 동기화가 필요하다. 소유 lab 엔진에서 명시했을 때만 만든다.
         self.kernel = KernelObserver(session, **options) if kernel_checks else None
         self.graph = GraphObserver(session, kernel=self.kernel, **options) if kernel_checks else None
-        self.cache.secret = self.distributed.secret = self.slot.secret = self.slot_v2.secret = secret
+        self.cache.secret = self.distributed.secret = self.slot.secret = self.slot_v2.secret = self.weights.secret = secret
         if self.kernel is not None:
             self.kernel.secret = self.graph.secret = secret
 
@@ -232,7 +238,8 @@ class EngineCallbacks:
                 self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
                 return False
         observer = (self.cache if name in CACHE_TARGETS else self.slot if name in SLOT_TARGETS
-                    else self.slot_v2 if name in SLOT_V2_TARGETS else self.distributed)
+                    else self.slot_v2 if name in SLOT_V2_TARGETS else self.weights if name in weights_lifetime.TARGETS
+                    else self.distributed)
         try:
             changes = [(cache._function(module, point), observer.wrap(module, point)) for point in MODULES[name]]
         except Exception:
@@ -264,7 +271,7 @@ class EngineCallbacks:
 
     def flush_gaps(self):
         kernel = self.kernel.gaps | self.graph.gaps if self.kernel is not None else set()
-        for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | kernel):
+        for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | self.weights.gaps | kernel):
             self.gap(code)
 
 

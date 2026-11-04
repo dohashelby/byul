@@ -17,11 +17,14 @@ SCHEMA = 'byul-engine-callback-cohort/1'
 COMPUTED = 'KVCacheManager.get_computed_blocks'
 ROLES = {'REQ-14': {'normal'}, 'REQ-15': {'prime', 'control', 'probe'}, 'REQ-16': {'prime', 'control', 'probe', 'post', 'switch'},
     'REQ-17': {'prime', 'control-present', 'control-absent', 'present', 'absent'},
-    'REQ-18': {'standalone', 'restricted', 'reused'}, 'REQ-19': {'boundary'}, 'REQ-20': {'replay'}}
+    'REQ-18': {'standalone', 'restricted', 'reused'}, 'REQ-19': {'boundary'}, 'REQ-20': {'replay'},
+    'LIF-13': {'before', 'switch', 'after'}}
 MAX_CASES = 512
 # REQ-16 lab contexts change the engine between cases: reload one LoRA in place, or reload weights.
-LAB_ACTIONS = {'lora_reload': 'lora', 'weights_reload': 'weights'}
-LAB_ROOTS = {'lora': '/guard-lora/', 'weights': '/guard-weights/'}
+# LIF-13은 소유 weights daemon에 전체 release를 보낸다.
+LAB_ACTIONS = {'lora_reload': 'lora', 'weights_reload': 'weights', 'weights_release': 'weights_daemon'}
+LAB_ROOTS = {'lora': '/guard-lora/', 'weights': '/guard-weights/', 'weights_daemon': '/guard-weights-daemon/'}
+SWITCH_CHECKS = {'lora_reload': 'REQ-16', 'weights_reload': 'REQ-16', 'weights_release': 'LIF-13'}
 _NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
 _PATH = re.compile(r'(/[A-Za-z0-9][A-Za-z0-9._-]{0,63}){2,8}')
 # 비동기 스케줄링에서는 출력이 다음 배치 뒤에 도착할 수 있다.
@@ -61,17 +64,17 @@ def _lab_path(value, kind):
 def validate_lab_contexts(spec, cases=None):
     """Closed REQ-16 lab declaration: one LoRA name, its active path, and owned variant paths."""
     try:
-        if type(spec) is not dict or not spec or set(spec) - {'lora', 'weights'}:
+        if type(spec) is not dict or not spec or set(spec) - {'lora', 'weights', 'weights_daemon'}:
             raise ValueError
         lora = spec.get('lora'); weights = spec.get('weights')
         if lora is not None and (type(lora) is not dict or set(lora) != {'name', 'active_path', 'variants'}
                 or type(lora['name']) is not str or _NAME.fullmatch(lora['name']) is None
                 or not _lab_path(lora['active_path'], 'lora')):
             raise ValueError
-        for kind, part in (('lora', lora), ('weights', weights)):
+        for kind, part in (('lora', lora), ('weights', weights), ('weights_daemon', spec.get('weights_daemon'))):
             if part is None:
                 continue
-            if kind == 'weights' and (type(part) is not dict or set(part) != {'variants'}):
+            if kind != 'lora' and (type(part) is not dict or set(part) != {'variants'}):
                 raise ValueError
             variants = part['variants']
             if (type(variants) is not dict or not 1 <= len(variants) <= 4
@@ -116,8 +119,9 @@ def validate_cases(check_id, cases):
     for case in cases:
         if type(case) is dict and case.get('role') == 'switch':
             # A switch sends no prompt. The executor runs it only against an owned lab engine.
-            if (check_id != 'REQ-16' or set(case) != {'case_id', 'role', 'action', 'variant'}
-                    or type(case['case_id']) is not str or case['action'] not in LAB_ACTIONS
+            if (set(case) != {'case_id', 'role', 'action', 'variant'}
+                    or type(case['case_id']) is not str or case.get('action') not in LAB_ACTIONS
+                    or SWITCH_CHECKS[case['action']] != check_id
                     or type(case['variant']) is not str or _NAME.fullmatch(case['variant']) is None):
                 raise ValueError('ENGINE_CALLBACK_CASES_INVALID')
             continue
@@ -503,4 +507,77 @@ def project_graph_lifetime(cases, outputs, events, secret, tags, references=None
             missing.add('reference_output_mismatch')
     return {'replays': len(replays), 'covered_cases': sorted(covered), 'violations': violations,
             'violation': True if violations else (None if missing else False),
+            'full_scope': not missing and not violations, 'missing': sorted(missing)}
+
+
+DAEMON_STATE = 'WeightCacheDaemon._handle_get_state'
+DAEMON_RELEASE = 'WeightCacheDaemon._handle_release'
+
+
+def project_weights_lifetime(cases, outputs, events, switches):
+    """LIF-13: release 앞뒤 daemon 공급·release 주체·release 뒤 취득·fallback·기존 참조 효과.
+
+    release된 세대를 다시 공급하거나, release 뒤에도 가중치가 남아 공급되거나, fallback이 꺼진
+    loader가 디스크 fallback을 쓰면 직접 위반이다. release 주체의 허용 여부는 기업 정책이 없어
+    판단하지 않으므로 범위는 끝나지 않는다. release 뒤 답변이 달라진 것만으로는 위반이 아니다.
+    """
+    rows = {}; order = []
+    for event in events:
+        point = event.get('point')
+        if point not in (DAEMON_STATE, DAEMON_RELEASE, 'IpcModelLoader._request_state', 'IpcModelLoader._fallback_load',
+                         'IpcModelLoader.load_model') or event.get('entry_qualified_before') is not True:
+            continue
+        call = event.get('call_sha256')
+        if event.get('phase') == 'CALL':
+            rows[call] = {'point': point, 'process': event.get('process_sha256'), 'entry': event.get('fields') or {}, 'terminal': None}
+            order.append(call)
+        elif call in rows and event.get('entry_qualified_after') is True:
+            rows[call]['terminal'] = {'phase': event.get('phase'), **(event.get('fields') or {})}
+    released = None; consumers = set(); actors = []; violations = []; missing = set(); after = {'refused': 0, 'fallback': 0}
+    for call in order:
+        row = rows[call]; entry = row['entry']; terminal = row['terminal'] or {}
+        if row['point'] == DAEMON_STATE:
+            served = terminal.get('phase') == 'RETURN' and entry.get('weights_present') is True and entry.get('config_matches') is True
+            if released is None and served and entry.get('peer_pid_sha256'):
+                consumers.add(entry['peer_pid_sha256'])
+            if released is not None:
+                if served:
+                    violations.append({'reason': 'released_generation_served' if entry.get('weights_generation_token') == released
+                                       else 'weights_served_after_release'})
+                elif terminal.get('phase') == 'RETURN' and entry.get('weights_present') is False:
+                    after['refused'] += 1
+        elif row['point'] == DAEMON_RELEASE:
+            if terminal.get('phase') == 'RETURN' and terminal.get('weights_present') is False:
+                released = entry.get('weights_generation_token') or 'unknown'
+                actors.append({'peer_uid_sha256': entry.get('peer_uid_sha256'), 'peer_pid_sha256': entry.get('peer_pid_sha256')})
+            else:
+                missing.add('release_not_completed')
+        elif row['point'] == 'IpcModelLoader._fallback_load':
+            if entry.get('fallback_enabled') is False:
+                violations.append({'reason': 'fallback_used_while_disabled'})
+            elif released is not None and terminal.get('phase') == 'RETURN' and terminal.get('model_token'):
+                after['fallback'] += 1
+    if len(consumers) < 2:
+        missing.add('two_consumer_acquisition_unobserved')
+    if not actors:
+        missing.add('release_unobserved')
+    elif any(a['peer_uid_sha256'] is None for a in actors):
+        missing.add('release_actor_unobserved')
+    missing.add('release_authorization_policy_unavailable')
+    if not after['refused']:
+        missing.add('post_release_acquisition_unobserved')
+    if not after['fallback']:
+        missing.add('fallback_consumption_unobserved')
+    if not any(s.get('action') == 'weights_release' and s.get('completed') for s in switches or ()):
+        missing.add('lab_release_action_unobserved')
+    before = [outputs.get(c['case_id']) for c in cases if c['role'] == 'before']
+    later = [outputs.get(c['case_id']) for c in cases if c['role'] == 'after']
+    if not before or not later or None in before + later or len(set(before)) != 1:
+        missing.add('existing_reference_control_unavailable')
+    elif set(later) != set(before):
+        missing.add('post_release_output_changed')
+    # 주체 허용 여부는 정책이 없어 범위만 막는다. 관측한 사실의 위반 여부와는 따로 둔다.
+    core = missing - {'release_authorization_policy_unavailable'}
+    return {'consumers': len(consumers), 'release_actors': actors, 'post_release': after, 'violations': violations,
+            'violation': True if violations else (None if core else False),
             'full_scope': not missing and not violations, 'missing': sorted(missing)}

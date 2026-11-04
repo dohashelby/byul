@@ -28,16 +28,27 @@ spec:
           image: lmsysorg/sglang:v0.5.22@sha256:REPLACE_IMAGE_DIGEST_HEX
           imagePullPolicy: Never
           workingDir: /cache
-          # Secret is read at launch; its value is absent from this manifest.
-          command: [/bin/sh, -ec]
+          # Only the admin key is supplied by the Secret config.yaml.
+          command: [python3, -m, sglang.launch_server]
           args:
-            - |
-              exec python3 -m sglang.launch_server \
-                --model-path /models --served-model-name test-model \
-                --host 0.0.0.0 --port 8000 --context-length 2112 \
-                --log-requests --log-requests-level 0 --log-requests-format json \
-                --enable-metrics \
-                --admin-api-key "$(cat /run/sglang-admin/admin-api-key)"
+            - --config
+            - /run/sglang-admin/config.yaml
+            - --model-path
+            - /models
+            - --served-model-name
+            - test-model
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+            - --context-length
+            - "2112"
+            - --log-requests
+            - --log-requests-level
+            - "0"
+            - --log-requests-format
+            - json
+            - --enable-metrics
           env:
             - {name: SGLANG_RUST_SERVER, value: "0"}
             - {name: SGLANG_LOG_REQUEST_HEADERS, value: x-request-id}

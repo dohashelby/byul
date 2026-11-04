@@ -736,6 +736,145 @@ class FeedReconnectTests(unittest.TestCase):
     def gaps(self) -> list[dict]:
         return [json.loads(line) for line in self.group.gap_path.read_text(encoding="utf-8").splitlines()]
 
+    def test_restart_closes_prior_gap_only_after_successful_start(self) -> None:
+        for kind in ("hubble", "tetragon"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / f"{kind}.gaps.jsonl"
+                opened = {"schema": self.helper.GAP_SCHEMA, "event": "gap_opened", "kind": kind,
+                          "gap_id": "prior", "opened_at": "2026-11-01T11:41:50+00:00",
+                          "backfill_since": "2026-11-01T11:41:49Z", "attempts": 0}
+                self.helper._append_gap(path, opened)
+                self.group = self.helper._FeedGroup(
+                    kind, feed_path=Path(directory) / f"{kind}.jsonl",
+                    heartbeat_path=Path(directory) / f"{kind}.heartbeat.json",
+                    gap_path=path, children=self.group.children)
+                self.supervisor = self.helper._Supervisor(
+                    [self.group], context=self.helper.EXPECTED_CONTEXT,
+                    stop_requested=self.supervisor.stop_requested, clock=lambda: self.now)
+                self.start_error = OSError("connection unavailable")
+                with patch.object(self.helper, "_start", side_effect=self.fake_start):
+                    with self.assertRaises(RuntimeError):
+                        self.supervisor.start_group(self.group, since=None)
+                    self.assertEqual(len(path.read_text().splitlines()), 1)
+                    self.supervisor._open_gap(self.group, [{"name": "initial_start"}])
+                    self.start_error = None
+                    with patch.object(self.helper, "assert_safe_context"):
+                        self.supervisor.start_group(self.group, since=str(self.group.open_gap["backfill_since"]))
+                    self.assertIn("2026-11-01T11:41:49Z", " ".join(self.argv[-1]))
+                    self.assertFalse(any(row["event"] == "gap_closed" and row["gap_id"] == "prior"
+                                         for row in self.gaps()))
+                    self.supervisor._close_gap(self.group)
+                    self.supervisor.tick()
+                rows = [json.loads(line) for line in path.read_text().splitlines()]
+                prior_closed = next(row for row in rows if row["event"] == "gap_closed" and row["gap_id"] == "prior")
+                self.assertEqual(prior_closed["closed_by"], "collector_restart")
+                self.assertEqual(prior_closed["backfill"], "requested_unverified")
+                self.assertEqual(prior_closed["closed_at"], self.group.last_healthy_at.isoformat())
+                self.assertGreaterEqual(datetime.fromisoformat(prior_closed["closed_at"]),
+                                        datetime.fromisoformat(opened["opened_at"]))
+                self.assertEqual(self.group.reconnect_count, 2)
+
+    def test_restart_closes_all_prior_gaps_after_healthy_tick(self) -> None:
+        for gap_id, opened_at in (("older", "2026-11-01T11:41:40Z"),
+                                  ("newer", "2026-11-01T11:41:50Z")):
+            self.helper._append_gap(self.group.gap_path, {
+                "schema": self.helper.GAP_SCHEMA, "event": "gap_opened", "kind": "tetragon",
+                "gap_id": gap_id, "opened_at": opened_at, "backfill_since": opened_at})
+        self.supervisor = self.helper._Supervisor(
+            [self.group], context=self.helper.EXPECTED_CONTEXT,
+            stop_requested=self.supervisor.stop_requested, clock=lambda: self.now)
+        with patch.object(self.helper, "_start", side_effect=self.fake_start), patch.object(self.helper, "assert_safe_context"):
+            self.supervisor.start_group(self.group, since=None)
+            self.assertIn("--since-time=2026-11-01T11:41:39Z", self.argv[-1])
+            self.assertEqual(len(self.gaps()), 2)
+            self.supervisor.tick()
+        self.assertEqual([row["gap_id"] for row in self.gaps() if row["event"] == "gap_closed"],
+                         ["older", "newer"])
+        self.assertEqual(self.group.reconnect_count, 2)
+
+    def test_restart_with_only_closed_gaps_adds_nothing(self) -> None:
+        opened = {"schema": self.helper.GAP_SCHEMA, "kind": "tetragon", "gap_id": "done",
+                  "opened_at": "2026-11-01T11:41:50Z"}
+        self.helper._append_gap(self.group.gap_path, {**opened, "event": "gap_opened"})
+        self.helper._append_gap(self.group.gap_path, {**opened, "event": "gap_closed",
+                                                      "closed_at": "2026-11-01T11:42:00Z"})
+        before = self.group.gap_path.read_bytes()
+        self.supervisor = self.helper._Supervisor(
+            [self.group], context=self.helper.EXPECTED_CONTEXT,
+            stop_requested=self.supervisor.stop_requested, clock=lambda: self.now)
+        with patch.object(self.helper, "_start", side_effect=self.fake_start):
+            self.supervisor.start_group(self.group, since=None)
+            self.supervisor.tick()
+        self.assertEqual(self.group.gap_path.read_bytes(), before)
+        self.assertIn("--tail=0", self.argv[-1])
+
+    def test_restart_that_exits_before_healthy_tick_keeps_prior_gap_open(self) -> None:
+        self.helper._append_gap(self.group.gap_path, {
+            "schema": self.helper.GAP_SCHEMA, "event": "gap_opened", "kind": "tetragon",
+            "gap_id": "prior", "opened_at": "2026-11-01T11:41:50Z",
+            "backfill_since": "2026-11-01T11:41:49Z"})
+        self.supervisor = self.helper._Supervisor(
+            [self.group], context=self.helper.EXPECTED_CONTEXT,
+            stop_requested=self.supervisor.stop_requested, clock=lambda: self.now)
+        with patch.object(self.helper, "_start", side_effect=self.fake_start), patch.object(self.helper, "assert_safe_context"):
+            self.supervisor.start_group(self.group, since=None)
+            self.started[-1].returncode = 1
+            self.supervisor.tick()
+            self.assertEqual([row["event"] for row in self.gaps()], ["gap_opened", "gap_opened"])
+            self.now = self.group.next_attempt
+            self.supervisor.tick()
+            self.assertIn("2026-11-01T11:41:49Z", " ".join(self.argv[-1]))
+            new_gap_id = self.group.last_gap["gap_id"]
+            self.assertEqual([row["gap_id"] for row in self.gaps() if row["event"] == "gap_closed"],
+                             [new_gap_id])
+            self.supervisor.tick()
+        self.assertEqual([row["gap_id"] for row in self.gaps() if row["event"] == "gap_closed"],
+                         [new_gap_id, "prior"])
+        self.assertEqual(self.group.reconnect_count, 2)
+
+    def test_closed_before_opened_journal_is_damaged(self) -> None:
+        opened = {"schema": self.helper.GAP_SCHEMA, "kind": "tetragon", "gap_id": "bad",
+                  "opened_at": "2026-11-01T11:41:50Z"}
+        self.helper._append_gap(self.group.gap_path, {**opened, "event": "gap_opened"})
+        self.helper._append_gap(self.group.gap_path, {**opened, "event": "gap_closed",
+                                                      "closed_at": "2026-11-01T11:41:49Z"})
+        self.assertIsNone(self.helper._unclosed_gaps(self.group.gap_path, "tetragon"))
+
+    def test_damaged_prior_journal_is_not_reconciled(self) -> None:
+        self.group.gap_path.write_text('{"event": "gap_opened"}\nnot-json\n', encoding="utf-8")
+        self.supervisor = self.helper._Supervisor(
+            [self.group], context=self.helper.EXPECTED_CONTEXT,
+            stop_requested=self.supervisor.stop_requested, clock=lambda: self.now)
+        with patch.object(self.helper, "_start", side_effect=self.fake_start):
+            self.supervisor.start_group(self.group, since=None)
+        self.assertEqual(self.group.gap_path.read_text(), '{"event": "gap_opened"}\nnot-json\n')
+        self.assertIsNone(self.group.last_gap)
+
+    def test_gateway_reads_restart_closed_gap_metadata(self) -> None:
+        self.helper._append_gap(self.group.gap_path, {
+            "schema": self.helper.GAP_SCHEMA, "event": "gap_opened", "kind": "tetragon",
+            "gap_id": "prior", "opened_at": "2026-11-01T11:41:50+00:00"})
+        self.supervisor = self.helper._Supervisor(
+            [self.group], context=self.helper.EXPECTED_CONTEXT,
+            stop_requested=self.supervisor.stop_requested, clock=lambda: self.now)
+        self.group.feed_path.write_text("", encoding="utf-8")
+        feed = ObservationFeed(
+            kind="tetragon", path=self.group.feed_path, data_dir=self.root / "data",
+            data_origin="real", environment=None, run_id=None,
+            heartbeat_path=self.group.heartbeat_path)
+        with patch.object(self.helper, "_start", side_effect=self.fake_start):
+            self.supervisor.start_group(self.group, since=None)
+            self.assertEqual(len(self.gaps()), 1)
+            self.supervisor.write()
+            with self.assertRaisesRegex(OSError, "verifying"):
+                feed.collect()
+            self.supervisor.tick()
+            self.supervisor.write()
+        value, _origin = feed.collect()
+        self.assertEqual(value["writer"]["last_gap"]["backfill"], "requested_unverified")
+        self.assertEqual(value["writer"]["reconnect_count"], 1)
+        self.assertEqual(self.gaps()[-1]["closed_by"], "collector_restart")
+
     def test_exit_opens_gap_then_reconnects_with_backfill(self) -> None:
         with (
             patch.object(self.helper, "_start", side_effect=self.fake_start),

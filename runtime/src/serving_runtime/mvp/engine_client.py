@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from http.client import HTTPException
 import json
+import socket
 import time
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -12,6 +13,7 @@ from urllib.request import urlopen
 
 from .backend import BackendConfig, parse_prometheus_metrics
 from .mock_engine import _utc_now
+from .response_timeout import DeadlineWatchdog, set_response_timeout
 
 
 class TokenizeHTTPError(OSError):
@@ -21,6 +23,10 @@ class TokenizeHTTPError(OSError):
         self.endpoint = endpoint
         self.http_status = http_status
         super().__init__(f"tokenize endpoint {endpoint} returned HTTP status {http_status}")
+
+
+class RequestDeadlineExceeded(TimeoutError):
+    """The shared request deadline expired during token counting."""
 
 
 class EngineClient:
@@ -42,19 +48,73 @@ class EngineClient:
         request_id: str | None = None,
         content_type: str | None = None,
         metrics: bool = False,
+        deadline_at: float | None = None,
     ) -> tuple[int, dict[str, str], bytes]:
+        request_deadline = deadline_at
+        own_deadline = time.monotonic() + self.timeout_s
+        deadline_at = min(deadline_at, own_deadline) if deadline_at is not None else own_deadline
+        timeout_s = min(self.timeout_s, max(0.001, deadline_at - time.monotonic()))
+        if time.monotonic() >= deadline_at:
+            if request_deadline is not None and time.monotonic() >= request_deadline:
+                raise RequestDeadlineExceeded()
+            raise TimeoutError()
         if metrics:
-            connection, request_path = self.backend.metrics_connection(self.timeout_s)
+            connection, request_path = self.backend.metrics_connection(timeout_s)
         else:
-            connection, request_path = self.backend.connection(path, self.timeout_s)
+            connection, request_path = self.backend.connection(path, timeout_s)
         headers = self.backend.request_headers(
             request_id=request_id, content_type=content_type, metrics=metrics
         )
+        watchdog = DeadlineWatchdog(connection, deadline_at)
+        watchdog.start()
         try:
+            watchdog.connect()
             connection.request(method, request_path, body=body, headers=headers)
             response = connection.getresponse()
-            return response.status, dict(response.getheaders()), response.read()
+            watchdog.watch_response(response)
+            if watchdog.expired():
+                if request_deadline is not None and time.monotonic() >= request_deadline:
+                    raise RequestDeadlineExceeded()
+                raise TimeoutError()
+            chunks: list[bytes] = []
+            response_socket = getattr(connection, "sock", None) or getattr(
+                getattr(getattr(response, "fp", None), "raw", None), "_sock", None
+            )
+            while True:
+                remaining = deadline_at - time.monotonic()
+                if remaining <= 0 or watchdog.expired():
+                    if request_deadline is not None and time.monotonic() >= request_deadline:
+                        raise RequestDeadlineExceeded()
+                    raise TimeoutError()
+                response_socket = set_response_timeout(
+                    response_socket, min(self.timeout_s, remaining)
+                )
+                try:
+                    chunk = response.read1(4096)
+                except (socket.timeout, TimeoutError, OSError) as error:
+                    if watchdog.expired():
+                        if request_deadline is not None and time.monotonic() >= request_deadline:
+                            raise RequestDeadlineExceeded() from error
+                    raise
+                if watchdog.expired():
+                    if request_deadline is not None and time.monotonic() >= request_deadline:
+                        raise RequestDeadlineExceeded()
+                    raise TimeoutError()
+                if not chunk:
+                    break
+                chunks.append(chunk)
+            result = response.status, dict(response.getheaders()), b"".join(chunks)
+            if watchdog.finish():
+                if request_deadline is not None and time.monotonic() >= request_deadline:
+                    raise RequestDeadlineExceeded()
+                raise TimeoutError()
+            return result
+        except (TimeoutError, OSError, HTTPException) as error:
+            if request_deadline is not None and time.monotonic() >= request_deadline:
+                raise RequestDeadlineExceeded() from error
+            raise
         finally:
+            watchdog.cancel()
             connection.close()
 
     def count_input_tokens(
@@ -65,6 +125,7 @@ class EngineClient:
         *,
         request_kind: str = "chat",
         extra_fields: dict[str, Any] | None = None,
+        deadline_at: float | None = None,
     ) -> int:
         """Ask the backend tokenizer for the prompt length; never estimate it.
 
@@ -94,6 +155,7 @@ class EngineClient:
             body=payload,
             request_id=f"{request_id}-tokenize",
             content_type="application/json",
+            deadline_at=deadline_at,
         )
         if status != 200:
             raise TokenizeHTTPError(endpoint, status)

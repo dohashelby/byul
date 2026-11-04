@@ -73,6 +73,21 @@ def writer(path: Path, runner: Runner) -> EnginePhaseTimelineWriter:
 
 
 class EnginePhaseFeedTests(unittest.TestCase):
+    def test_sglang_writer_collects_cached_start_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runner = Runner()
+            source = (ROOT / "tests/fixtures/enforcement/sglang_gpu_0522_cached_start_excerpt.log").read_bytes()
+            runner.log = b"".join(
+                b"2026-11-02T22:31:" + f"{50 + index:02d}".encode() + b"Z " + line
+                for index, line in enumerate(source.splitlines(keepends=True))
+            )
+            path = Path(directory) / "timeline.json"
+            timeline = EnginePhaseTimelineWriter(path, SELECTOR, engine="sglang", runner=runner).collect_once()
+            self.assertEqual(timeline["extraction"]["engine"], "sglang")
+            self.assertEqual([entry["phase"] for entry in timeline["entries"]],
+                             ["loading", "compiling", "inferring"])
+            self.assertEqual(timeline["entries"][0]["from"], "2026-11-02T22:31:50+00:00")
+
     def test_collected_phase_requires_same_event_pod_uid(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "timeline.json"
@@ -84,13 +99,15 @@ class EnginePhaseFeedTests(unittest.TestCase):
                                              (None, "pod-a", "unknown")):
                 with self.subTest(uid=uid, legacy_id=legacy_id):
                     pod = {"namespace": "serving-lab", "name": "engine-1",
-                           "pod_labels": {"app": "serving-engine"}}
+                           "pod_labels": {"app": "serving-engine"},
+                           "container": {"name": "engine"}}
                     if uid is not None:
                         pod["uid"] = uid
                     if legacy_id is not None:
                         pod["pod_id"] = legacy_id
                     event = {"time": "2026-11-02T10:00:05Z", "process_exec": {
-                        "process": {"binary": "/usr/bin/uname", "pod": pod}}}
+                        "process": {"binary": "/usr/bin/uname", "pod": pod},
+                        "parent": {"binary": "/usr/bin/python3"}}}
                     result = parse_tetragon(event, data_origin="synthetic", exec_policy=policy)
                     self.assertEqual(result["phase"], [expected])
                     self.assertEqual(result["exec_verdict"], "phase_unknown" if expected == "unknown" else "outside_allowlist")
@@ -108,7 +125,7 @@ class EnginePhaseFeedTests(unittest.TestCase):
             document.pop("collector")
             path.write_text(json.dumps(document), encoding="utf-8")
             legacy = ExecPolicy(policy.intent, timeline_path=path).classify_exec(
-                binary="/usr/bin/uname", parent=None, image=None, observed_at="2026-11-02T10:00:05Z")
+                binary="/usr/bin/uname", parent="/usr/bin/python3", image=None, observed_at="2026-11-02T10:00:05Z")
             self.assertEqual(legacy["phase"], ["inferring"])
 
     def test_reverse_time_closes_open_phase_and_new_start_recovers(self) -> None:
@@ -309,13 +326,13 @@ class EnginePhaseFeedTests(unittest.TestCase):
             document = feed.collect_once()
             intent = load_intent(ROOT / "deploy/gpu-lab/intent.aws-lab.json")
             policy = ExecPolicy(intent, timeline_path=path)
-            fresh = policy.classify_exec(binary="/usr/bin/uname", parent=None, image=None,
+            fresh = policy.classify_exec(binary="/usr/bin/uname", parent="/usr/bin/python3", image=None,
                                          observed_at="2026-11-02T10:00:05Z", pod_uid="pod-a")
             self.assertEqual((fresh["phase"], fresh["exec_verdict"]), (["inferring"], "outside_allowlist"))
             document["collector"]["written_at"] = (datetime.now(timezone.utc) - timedelta(seconds=16)).isoformat()
             path.write_text(json.dumps(document), encoding="utf-8")
             stale = ExecPolicy(intent, timeline_path=path).classify_exec(
-                binary="/usr/bin/uname", parent=None, image=None,
+                binary="/usr/bin/uname", parent="/usr/bin/python3", image=None,
                 observed_at="2026-11-02T10:00:05Z")
             self.assertEqual((stale["phase"], stale["exec_verdict"], stale["phase_source_error"]),
                              (["unknown"], "phase_unknown", "stale"))

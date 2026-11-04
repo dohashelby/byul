@@ -1,6 +1,6 @@
 # 담당 A 기록 (엔진 내부와 요청 경로)
 
-A가 맡은 점검 13개: REQ-08, REQ-09, REQ-10, REQ-14, REQ-16, REQ-17, REQ-18, REQ-19, REQ-20, REQ-21, LIF-13, SUP-03, SUP-08. 시작 기준은 main `2f28942`이다. 이 폴더의 내용은 GPU 실측이 아니며, 실측 결과는 `update/docs/evidence/gpu-a-*.json`에 따로 남긴다.
+A가 맡은 점검 13개: REQ-08, REQ-09, REQ-10, REQ-14, REQ-16, REQ-17, REQ-18, REQ-19, REQ-20, REQ-21, LIF-13, SUP-03, SUP-08. 시작 기준은 main `2f28942`이다. 아래 0단계 표는 GPU 기동 전 준비 기록이다. 2026-11-03 실측과 Codex 후속은 `RESULTS-20261103.md`, 점검별 정확한 Ref와 반출 SHA는 `update/docs/evidence/gpu-a-*.json`에 남긴다.
 
 ## 0단계(GPU 켜기 전) 결과
 

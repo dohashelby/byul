@@ -167,6 +167,17 @@ class BackendConfigTests(unittest.TestCase):
             self.assertEqual(parsed["requests.running"]["samples"][0]["value"], 2.0)
             self.assertEqual(parsed["missing.metric"]["state"], "unsupported_or_absent")
 
+    def test_status_timeout_is_independent_of_relay_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            document = backend_document("http://example.invalid")
+            document["timeouts"]["status_timeout_s"] = 5
+            config = load_backend_config(self.write(Path(temporary), document), environ={})
+            self.assertEqual(config.timeouts["status_timeout_s"], 5)
+            self.assertEqual(config.timeouts["relay_timeout_s"], 0.2)
+            document["timeouts"]["status_timeout_s"] = 0
+            with self.assertRaises(ValueError):
+                load_backend_config(self.write(Path(temporary), document), environ={})
+
     def test_unknown_duplicate_and_invalid_security_options_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
@@ -284,12 +295,17 @@ class BackendConfigTests(unittest.TestCase):
         class Response:
             status = 200
 
+            def __init__(self) -> None:
+                self._read = False
+
             @staticmethod
             def getheaders() -> list[tuple[str, str]]:
                 return []
 
-            @staticmethod
-            def read() -> bytes:
+            def read1(self, _size: int) -> bytes:
+                if self._read:
+                    return b""
+                self._read = True
                 return b"metric 1\n"
 
         class Connection:

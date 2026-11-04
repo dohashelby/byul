@@ -21,15 +21,34 @@ sudo ctr -n k8s.io images pull docker.io/lmsysorg/sglang@sha256:<digest>
 sudo ctr -n k8s.io images ls | grep sglang   # 두 이름이 모두 보여야 한다
 ```
 
-서버 사본의 `deploy/gpu-lab-sglang/engine.yaml`, `deploy/gpu-lab-sglang/target.aws-lab.json`, `deploy/gpu-lab-sglang/intent.aws-lab.json`에 **같은 승인 digest**를 채운다. 호스트 `/srv/serving/cache/sglang/<digest>/<model-revision>/dev-profile-01`을 UID 2000, GID 0, mode 0700으로 만들고 `REPLACE_CACHE_PATH`를 그 절대 경로로 바꾼다. CPU·메모리 자리값은 현 dev profile로 채운다. **캐시 폴더 안의 하위 폴더도 미리 만든다.** 엔진은 `TMPDIR=/cache/tmp` 등 하위 폴더가 있다고 가정하며, 없으면 첫 커널 컴파일에서 `nvcc fatal: Could not open output file '/cache/tmp/...'`로 기동이 실패한다(11/3 서버 확인). `for d in tmp home config xdg hf inductor triton cuda pycache; do sudo install -d -o 2000 -g 0 -m 0700 <캐시경로>/$d; done`. 처음 기동(캐시가 빈 상태)에서는 커널 JIT 컴파일 때문에 `nvcc`·`ninja`가 `/bin/sh`를 여러 번 실행해 의심 실행 기록이 남는다. 캐시가 만들어진 뒤의 재시작에서는 나오지 않았다. `serving-sglang-admin` Secret은 서버의 소유자만 읽는 파일에서 만든다. 파일 값·생성 명령의 shell 기록이 증거에 들어가지 않게 한다.
+서버 사본의 `deploy/gpu-lab-sglang/engine.yaml`, `deploy/gpu-lab-sglang/target.aws-lab.json`, `deploy/gpu-lab-sglang/intent.aws-lab.json`에 **같은 승인 digest**를 채운다. 호스트 `/srv/serving/cache/sglang/<digest>/<model-revision>/dev-profile-01`을 UID 2000, GID 0, mode 0700으로 만들고 `REPLACE_CACHE_PATH`를 그 절대 경로로 바꾼다. CPU·메모리 자리값은 현 dev profile로 채운다. **캐시 폴더 안의 하위 폴더도 미리 만든다.** 엔진은 `TMPDIR=/cache/tmp` 등 하위 폴더가 있다고 가정하며, 없으면 첫 커널 컴파일에서 `nvcc fatal: Could not open output file '/cache/tmp/...'`로 기동이 실패한다(11/3 서버 확인). `for d in tmp home config xdg hf inductor triton cuda pycache; do sudo install -d -o 2000 -g 0 -m 0700 <캐시경로>/$d; done`. 처음 기동(캐시가 빈 상태)에서는 커널 JIT 컴파일 때문에 `nvcc`·`ninja`가 `/bin/sh`를 여러 번 실행해 의심 실행 기록이 남는다. 캐시가 만들어진 뒤의 재시작에서는 나오지 않았다. `serving-sglang-admin` Secret의 `config.yaml`에는 관리 키만 넣는다. 서버의 소유자만 읽는 비공개 파일로 만들고 키 값·설정 원문·생성 명령의 shell 기록을 증거에 넣지 않는다.
+
+서버의 비공개 `config.yaml`에는 `admin-api-key`의 실제 값만 YAML 문자열로 적는다. 엔진의 나머지 옵션(`--context-length 2112` 포함)은 검토 가능한 `engine.yaml`의 `args`에 둔다. 이 파일은 저장소·ConfigMap·증거 폴더 밖에 두고 소유자만 읽게 한다. 키 값은 명령 인자에 쓰지 않는다.
+
+`--config`는 `/proc` cmdline 노출과 시작 셸만 없앤다. SGLang v0.5.22는 시작 로그의 `server_args`와 키 없이 조회되는 `/server_info`에 관리 키 값을 계속 노출한다(11/3 서버 관찰). 엔진 8000 직통 차단(AWS-04)을 유지하고, 로그·증거 반출 전에는 관리 키 값이 들어 있는지 검사해 가린다.
+
+```yaml
+admin-api-key: <비공개-관리-키>
+```
 
 ```bash
-kubectl --context byul-aws-lab -n serving-lab create secret generic serving-sglang-admin --from-file=admin-api-key=<비공개-파일>
-# secret 값 출력 없이 이름·key 존재만 확인
+kubectl --context byul-aws-lab -n serving-lab create secret generic serving-sglang-admin --from-file=config.yaml=<비공개-config.yaml> --dry-run=client -o yaml | kubectl --context byul-aws-lab -n serving-lab apply -f -
+# 값 출력 없이 키 이름만 확인한다.
 kubectl --context byul-aws-lab -n serving-lab get secret serving-sglang-admin -o go-template='{{range $k,$v := .data}}{{$k}}{{"\n"}}{{end}}'
 ```
 
-이미지는 `v0.5.22@sha256:<digest>`로 고정한다. 이미지 기본 명령은 `/bin/bash`이므로 manifest의 셸이 파일 Secret을 읽고 `python3 -m sglang.launch_server`를 실행한다. `SGLANG_RUST_SERVER=0`, 8000, `--enable-metrics`, 로그 레벨 0을 유지한다. Secret의 group-read(0440)와 UID 2000/GID 0으로 읽을 수 있는지 확인한다. 이 이미지에서 UID 2000 부팅에 실패하면 실제 오류를 기록하고 권한·쓰기 경로를 조사한다. root 전환은 이 파일의 자동 절차에 넣지 않았다.
+기존 Secret에 이전 방식의 `admin-api-key` 데이터 키가 남아 있으면 `kubectl --context byul-aws-lab -n serving-lab patch secret serving-sglang-admin --type=json -p='[{"op":"remove","path":"/data/admin-api-key"}]'`로 제거하고, 위 조회에서 `config.yaml`만 남았는지 확인한다. 키 값은 출력하지 않는다.
+
+SGLang v0.5.22 태그의 `python/sglang/srt/server_args.py`는 `--config`를 등록하고 `utils/server_args_config_parser.py`에서 YAML을 읽어 CLI 옵션으로 합친다. 이미지 안의 코드와 UID 2000/GID 0의 Secret 읽기·실제 기동은 다음 서버 회차에서 확인한다. `SGLANG_RUST_SERVER=0`, 포트 8000, metrics·로그 설정을 유지한다. `--config`가 실패하면 오류 시각과 키를 가린 메시지를 보존하고 이전 셸 시작 방식으로 되돌린다. 기준점 `2f5f461`의 `runtime/deploy/gpu-lab-sglang/engine.yaml`에서 셸 시작 부분을 가져오되, 서버별 image digest·캐시·자원 값을 채운 복구 사본을 먼저 준비한다. 비공개 키 파일에서 이전 `admin-api-key` Secret을 다시 만든 뒤 아래 명령으로 복원한다.
+
+```bash
+cp <서버별-값을-채운-이전-shell-engine.yaml> deploy/gpu-lab-sglang/engine.yaml
+kubectl --context byul-aws-lab -n serving-lab create secret generic serving-sglang-admin --from-file=admin-api-key=<비공개-키-파일> --dry-run=client -o yaml | kubectl --context byul-aws-lab -n serving-lab apply -f -
+kubectl --context byul-aws-lab apply -k deploy/gpu-lab-sglang
+kubectl --context byul-aws-lab -n serving-lab rollout status deployment/serving-engine --timeout=25m
+```
+
+복구 시 Secret에 `config.yaml` 데이터 키가 남아 있으면 같은 방식으로 `/data/config.yaml`을 제거하고 `admin-api-key`만 남았는지 확인한다. 이전 방식은 `/bin/sh -ec`와 `cat`으로 키를 프로세스 인자에 넣으므로, 복귀가 성공해도 키 노출과 시작 셸 의심 경고를 알려진 제약으로 기록한다. Secret 값이나 서버 로그 원문을 반출하지 않는다.
 
 ## 2. SGLang 켜기, Gateway·대상·규칙 전환
 
@@ -41,7 +60,7 @@ cd ~/byul/runtime
 kubectl --context byul-aws-lab kustomize deploy/gpu-lab-sglang > evidence/sglang-rendered.yaml
 kubectl --context byul-aws-lab apply -k deploy/gpu-lab-sglang
 kubectl --context byul-aws-lab -n serving-lab rollout status deployment/serving-engine --timeout=25m
-# 수집기: host 사용자 service의 SGLang판은 --phase-timeline 없이 실행
+# 수집기: SGLang 단계 시간표와 엔진 종류를 켠다
 cp deploy/gpu-lab-sglang/byul-observation-feed.service ~/.config/systemd/user/byul-observation-feed.service
 systemctl --user daemon-reload && systemctl --user restart byul-observation-feed
 # intent의 engine=sglang 세대로 규칙 후보 렌더 후 검토·적용
@@ -50,7 +69,7 @@ systemctl --user daemon-reload && systemctl --user restart byul-observation-feed
 kubectl --context byul-aws-lab -n serving-lab rollout restart deployment/serving-gateway
 ```
 
-기본 `deploy/gpu-lab/kustomization.yaml`과 vLLM 파일은 변경하지 않는다. `deploy/gpu-lab-sglang/kustomization.yaml`은 Gateway backend 인자를 바꾸고 단계 시간표 인자를 제거한다. 중간 서버에는 `/metrics`, `/ready`, `/v1/models`만 `--allow-path`로 지정한다. 실제 Pod의 인자·환경변수 **이름**·imageID·실행 계정·포트·마운트·Secret 읽기 가능 여부를 조회해 증거로 남긴다(환경변수 값과 Secret 값 제외).
+기본 `deploy/gpu-lab/kustomization.yaml`과 vLLM 파일은 변경하지 않는다. `deploy/gpu-lab-sglang/kustomization.yaml`은 Gateway backend만 SGLang으로 바꾸며 단계 시간표 인자를 유지한다. 중간 서버에는 `/metrics`, `/ready`, `/v1/models`만 `--allow-path`로 지정한다. 실제 Pod의 인자·환경변수 **이름**·imageID·실행 계정·포트·마운트·Secret 읽기 가능 여부를 조회해 증거로 남긴다(환경변수 값과 Secret 값 제외).
 
 ## 3. 직접 확인과 시험
 
@@ -65,7 +84,7 @@ kubectl --context byul-aws-lab -n serving-lab exec deploy/serving-engine -c engi
 
 Pod 표준 출력 JSON 로그의 `request.received`와 `request.finished`에서 정상 chat·completions, 일반·stream의 `headers.x-request-id`를 각각 확인한다. 로그에 `text`·`input_ids`·프롬프트가 보이면 증거에 필드 이름만 적고 원문 반출을 중단한다. `/ready` 조회만으로 생성 로그가 생기지 않는지 대조한다. 관리 경로(`/update_weights_from_disk` 등)는 **GET처럼 상태를 바꾸지 않는 호출**에서 접근 불가를 확인한다. 관리 키를 넣은 변경 호출은 하지 않는다. 다른 Pod에서 8000과 관리 경로로 직접 접속할 수 없는지도 확인한다.
 
-Gateway 포워드와 토큰 파일이 준비된 시험 세션에서 다음을 vLLM과 SGLang에 같은 목록으로 실행한다. 기본 실행은 AWS-01~11이며 AWS-12~19는 `--cases`로 명시한다. AWS-07·08·12~17의 변경 사례는 각각 도구가 요구하는 `--allow-*` 옵션을 의도적으로 부여한다. SGLang AWS-11·16·17은 단계 수집이 없어 `unknown`으로 기록한다. AWS-18은 `usage.completion_tokens`가 없으면 `unknown`, stream `[DONE]` 누락은 잘림으로 기록한다. 이 사례는 Pod 내부의 `/tokenize`를 stdin으로 호출해 입력+답변 경계를 찾으며 찾지 못하면 `unknown`이다. 토큰 계산 실패의 의도적 주입은 가짜 엔진 시험만 수행한다. AWS-19는 정상 요청 ID가 같은 로그 구간에 없으면 거부 미전달을 인정하지 않는다.
+Gateway 포워드와 토큰 파일이 준비된 시험 세션에서 다음을 vLLM과 SGLang에 같은 목록으로 실행한다. 기본 실행은 AWS-01~11이며 AWS-12~19는 `--cases`로 명시한다. AWS-07·08·12~17의 변경 사례는 각각 도구가 요구하는 `--allow-*` 옵션을 의도적으로 부여한다. SGLang AWS-11·16·17도 현재 Pod UID의 신선한 단계 시간표가 있으면 판정한다. 근거가 없으면 `unknown`이다. AWS-18은 `usage.completion_tokens`가 없으면 `unknown`, stream `[DONE]` 누락은 잘림으로 기록한다. 이 사례는 Pod 내부의 `/tokenize`를 stdin으로 호출해 입력+답변 경계를 찾으며 찾지 못하면 `unknown`이다. 토큰 계산 실패의 의도적 주입은 가짜 엔진 시험만 수행한다. AWS-19는 정상 요청 ID가 같은 로그 구간에 없으면 거부 미전달을 인정하지 않는다.
 
 ```bash
 .venv/bin/python -B tools/aws_lab_acceptance.py --kube-context byul-aws-lab --engine sglang --token-env-file <비공개-토큰-파일> --cases AWS-01,AWS-02,AWS-03,AWS-18,AWS-19

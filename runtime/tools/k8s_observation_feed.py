@@ -38,7 +38,7 @@ from serving_runtime.mvp.target import (
     validate_kubernetes_name,
 )
 from serving_runtime.enforcement.phase_signals import (
-    _KUBECTL_TIME, _REQUEST_LINE, _TimelineState, VLLM_CPU_029,
+    _KUBECTL_TIME, _REQUEST_LINE, _TimelineState, ENGINE_PATTERN_SETS,
 )
 
 
@@ -105,8 +105,8 @@ def hubble_port_forward_command(
 def tetragon_command(
     *, context: str = EXPECTED_CONTEXT, since_time: str | None = None
 ) -> list[str]:
-    # First start skips old log lines; a reconnect asks for lines since the gap
-    # opened so events during the gap can be recovered (duplicates are dropped
+    # A fresh start skips old lines; a restart with an open gap asks for older
+    # lines so events during the gap can be recovered (duplicates are dropped
     # by the Gateway's event key).
     window = ["--tail=0"] if since_time is None else [f"--since-time={since_time}"]
     return [
@@ -506,6 +506,47 @@ def _append_gap(path: Path, record: dict[str, object]) -> None:
         os.fsync(output.fileno())
 
 
+def _unclosed_gaps(path: Path, kind: str) -> list[dict[str, object]] | None:
+    """Read prior gaps; an unreadable or damaged journal cannot be reconciled."""
+    def valid_time(value: object) -> bool:
+        if not isinstance(value, str):
+            return False
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).tzinfo is not None
+        except ValueError:
+            return False
+
+    try:
+        pending: dict[str, dict[str, object]] = {}
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                item = json.loads(line)
+                if not isinstance(item, dict) or item.get("schema") != GAP_SCHEMA or item.get("kind") != kind:
+                    return None
+                gap_id = item.get("gap_id")
+                if not isinstance(gap_id, str) or not gap_id:
+                    return None
+                if item.get("event") == "gap_opened":
+                    if gap_id in pending or not valid_time(item.get("opened_at")):
+                        return None
+                    pending[gap_id] = item
+                elif item.get("event") == "gap_closed":
+                    if gap_id not in pending or not valid_time(item.get("closed_at")):
+                        return None
+                    opened_at = datetime.fromisoformat(str(pending[gap_id]["opened_at"]).replace("Z", "+00:00"))
+                    closed_at = datetime.fromisoformat(str(item["closed_at"]).replace("Z", "+00:00"))
+                    if closed_at < opened_at:
+                        return None
+                    del pending[gap_id]
+                else:
+                    return None
+        return list(pending.values())
+    except FileNotFoundError:
+        return []
+    except (OSError, UnicodeError, json.JSONDecodeError, RecursionError):
+        return None
+
+
 def _strings(document: object) -> dict[str, str]:
     if not isinstance(document, dict):
         return {}
@@ -672,10 +713,13 @@ class TargetPodSnapshotWriter:
 class EnginePhaseTimelineWriter:
     """Keep one Pod's extraction state and fetch only its new timestamped logs."""
 
-    def __init__(self, path: Path, selector: KubernetesSelector, *,
+    def __init__(self, path: Path, selector: KubernetesSelector, *, engine: str = "vllm",
                  interval_s: float = 2.0, timeout_s: float = 4.0,
                  runner: Callable[..., subprocess.CompletedProcess[bytes]] = subprocess.run) -> None:
         self.path, self.selector = path, selector
+        self.engine = engine
+        self.patterns = ENGINE_PATTERN_SETS[engine].patterns
+        self.loading_start = next(item.expression for item in self.patterns if item.signal == "loading_start")
         self.interval_s, self.timeout_s, self.runner = interval_s, timeout_s, runner
         self._uid: str | None = None
         self._phase: _TimelineState | None = None
@@ -689,7 +733,7 @@ class EnginePhaseTimelineWriter:
 
     def _reset(self, uid: str | None, year: int) -> None:
         self._uid = uid
-        self._phase = _TimelineState(engine="vllm", year=year, timezone_offset="Z") if uid else None
+        self._phase = _TimelineState(engine=self.engine, year=year, timezone_offset="Z") if uid else None
         self._cursor = None
         self._boundary.clear()
         self._second_seen.clear()
@@ -752,16 +796,16 @@ class EnginePhaseTimelineWriter:
             progressed = True
             if self._order_unknown:
                 start_signal = any(pattern.signal in {"loading_start", "compiling_start", "inferring_start"}
-                                   and pattern.expression.search(line) for pattern in VLLM_CPU_029.patterns)
+                                   and pattern.expression.search(line) for pattern in self.patterns)
                 if _REQUEST_LINE.search(line) or not start_signal:
                     continue
                 self._order_unknown = False
             # A capped replay cannot establish the current run's opening
             # boundary. Wait for a new, directly observed loading start.
             if self._incomplete:
-                if limited or _REQUEST_LINE.search(line) or not VLLM_CPU_029.patterns[1].expression.search(line):
+                if limited or _REQUEST_LINE.search(line) or not self.loading_start.search(line):
                     continue
-                self._phase = _TimelineState(engine="vllm", year=year, timezone_offset="Z")
+                self._phase = _TimelineState(engine=self.engine, year=year, timezone_offset="Z")
                 self._incomplete = False
             try:
                 self._phase.process_line(raw)
@@ -905,6 +949,44 @@ class _Supervisor:
         self.context = context
         self.stop_requested = stop_requested
         self.clock = clock
+        self.prior_gaps = {group.kind: _unclosed_gaps(group.gap_path, group.kind) for group in groups}
+
+    def _prior_backfill_since(self, group: _FeedGroup, since: str | None) -> str | None:
+        pending = self.prior_gaps[group.kind]
+        if not pending:
+            return since
+        candidates = []
+        if since is not None:
+            candidates.append(datetime.fromisoformat(since.replace("Z", "+00:00")))
+        for opened in pending:
+            opened_at = datetime.fromisoformat(str(opened["opened_at"]).replace("Z", "+00:00"))
+            backfill = opened.get("backfill_since")
+            try:
+                candidate = datetime.fromisoformat(backfill.replace("Z", "+00:00")) if isinstance(backfill, str) else opened_at - BACKFILL_MARGIN
+                if candidate.tzinfo is None:
+                    candidate = opened_at - BACKFILL_MARGIN
+            except ValueError:
+                candidate = opened_at - BACKFILL_MARGIN
+            candidates.append(min(candidate, opened_at - BACKFILL_MARGIN))
+        return _rfc3339_seconds(min(candidates))
+
+    def _close_prior_gaps(self, group: _FeedGroup) -> None:
+        pending = self.prior_gaps[group.kind]
+        if pending is None or not pending:
+            return
+        assert group.last_healthy_at is not None
+        for opened in pending:
+            closed = dict(opened)
+            closed.update({
+                "event": "gap_closed",
+                "closed_at": group.last_healthy_at.isoformat(),
+                "closed_by": "collector_restart",
+                "backfill": "requested_unverified",
+            })
+            _append_gap(group.gap_path, closed)
+            group.last_gap = {key: value for key, value in closed.items() if key not in ("schema", "event", "kind")}
+            group.reconnect_count += 1
+        self.prior_gaps[group.kind] = []
 
     def _open_gap(self, group: _FeedGroup, cause: list[dict[str, object]]) -> None:
         detected = datetime.now(timezone.utc)
@@ -938,6 +1020,7 @@ class _Supervisor:
         group.reconnect_count += 1
 
     def start_group(self, group: _FeedGroup, *, since: str | None) -> None:
+        since = self._prior_backfill_since(group, since)
         started: list[_Child] = []
         try:
             if since is not None:
@@ -981,7 +1064,8 @@ class _Supervisor:
         except (OSError, subprocess.SubprocessError, RuntimeError, ValueError) as error:
             _stop_children(group)
             raise RuntimeError(f"{group.kind} start failed: {error}") from error
-        group.state = "running"
+        # A prior gap remains unavailable until the first healthy check.
+        group.state = "verifying" if self.prior_gaps[group.kind] else "running"
         group.backoff_s = BACKOFF_INITIAL_S
         group.last_healthy_at = datetime.now(timezone.utc)
 
@@ -989,7 +1073,7 @@ class _Supervisor:
         for group in self.groups:
             if self.stop_requested.is_set():
                 raise _StopRequested
-            if group.state == "running":
+            if group.state in ("running", "verifying"):
                 exited = [
                     {"name": child.name, "returncode": child.returncode()}
                     for child in group.children
@@ -1018,6 +1102,8 @@ class _Supervisor:
                     self._open_gap(group, failures)
                 else:
                     group.last_healthy_at = datetime.now(timezone.utc)
+                    self._close_prior_gaps(group)
+                    group.state = "running"
                 continue
             if group.state == "reconnecting" and self.clock() >= group.next_attempt:
                 assert group.open_gap is not None
@@ -1052,6 +1138,7 @@ def run(
     target_namespace: str = LAB_NAMESPACE,
     target_interval_s: float = DEFAULT_TARGET_INTERVAL_S,
     phase_timeline: bool = False,
+    phase_engine: str = "vllm",
 ) -> int:
     global _reader_gid
     if phase_timeline and target_selector is None:
@@ -1075,6 +1162,7 @@ def run(
             phase_writer = EnginePhaseTimelineWriter(
                 output_dir / "phase-timeline.json",
                 KubernetesSelector(context, target_namespace, target_selector, "engine"),
+                engine=phase_engine,
             )
     hubble_path = output_dir / "hubble.jsonl"
     tetragon_path = output_dir / "tetragon.jsonl"
@@ -1231,6 +1319,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--phase-timeline", action="store_true",
                         help="현재 엔진 Pod 로그에서 단계 시간표를 별도 수집")
+    parser.add_argument("--phase-engine", choices=("vllm", "sglang"), default="vllm",
+                        help="단계 시간표의 엔진 종류")
     parser.add_argument(
         "--target-namespace",
         default=LAB_NAMESPACE,
@@ -1267,6 +1357,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             target_namespace=args.target_namespace,
             target_interval_s=args.target_interval,
             phase_timeline=args.phase_timeline,
+            phase_engine=args.phase_engine,
         )
     except ReaderGroupError as error:
         # Configuration error: exit 2 so a supervisor does not restart in a loop.

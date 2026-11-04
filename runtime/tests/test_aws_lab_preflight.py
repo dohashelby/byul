@@ -128,13 +128,18 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(checks["bundle"].status, "fail")
         self.assertNotIn("secret output", json.dumps([c.reason for c in checks.values()]))
 
-    def test_sglang_timeline_is_not_required(self):
+    def test_sglang_timeline_is_required(self):
         self.args.engine = "sglang"
         self.runner.phase_enabled = False
         (self.obs / "phase-timeline.json").unlink()
         checks = self.check()
-        self.assertEqual(checks["phase_timeline"].status, "ok")
-        self.assertNotIn("observation:phase-timeline.json", checks)
+        self.assertEqual(checks["phase_timeline"].status, "fail")
+        self.assertEqual(checks["observation:phase-timeline.json"].status, "fail")
+
+    def test_sglang_timeline_enabled_with_engine_selection(self):
+        self.args.engine = "sglang"
+        self.runner.phase_output = "ExecStart=... --phase-timeline --phase-engine sglang"
+        self.assertEqual(self.check()["phase_timeline"].status, "ok")
 
     def test_empty_exec_start_is_unknown_for_sglang(self):
         self.args.engine = "sglang"

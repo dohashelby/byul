@@ -69,7 +69,7 @@ def test_env_and_target_bind_the_rendered_generation(tmp_path):
     assert 'generation=v1-callback' in env.runtime.platform and 'runner=v1' in env.runtime.platform and env.facts['prefix_cache'].value is True
     assert target['environment_ref'] == env.ref().model_dump(mode='json') and target['lab'] is False
     assert target['engine']['trusted_url'] == 'http://10.244.0.11:8000' and target['kubernetes']['run_id'] == 'a-run-1'
-    assert target['kubernetes']['probe']['pod'] == 'engine-test-probe-a-run-1' and target['model_mapping']['api_model'] == 'test-model'
+    assert target['kubernetes']['probe']['pod'] == 'engine-test-probe-a-run-1' and target['model_mapping']['served_model_name'] == 'test-model'
     assert load_environment(tmp_path / 'env.json').ref() == env.ref()
 
 

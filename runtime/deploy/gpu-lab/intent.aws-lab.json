@@ -1,25 +1,68 @@
 {
   "schema": "runtime-enforcement-intent/1.1",
   "namespace": "serving-lab",
-  "gateway": {"labels": {"app": "serving-gateway"}},
-  "engine": {"labels": {"app": "serving-engine"}, "port": 8000, "management_port": 8001},
-  "metrics_collectors": [{"labels": {"app": "serving-observer"}}],
-  "dns": {"namespace": "kube-system", "labels": {"k8s-app": "kube-dns"}, "port": 53},
+  "gateway": {
+    "labels": {
+      "app": "serving-gateway"
+    }
+  },
+  "engine": {
+    "labels": {
+      "app": "serving-engine"
+    },
+    "port": 8000,
+    "management_port": 8001,
+    "container_name": "engine"
+  },
+  "metrics_collectors": [
+    {
+      "labels": {
+        "app": "serving-observer"
+      }
+    }
+  ],
+  "dns": {
+    "namespace": "kube-system",
+    "labels": {
+      "k8s-app": "kube-dns"
+    },
+    "port": 53
+  },
   "engine_egress_allow": [],
   "acquire": {
-    "labels": {"app": "artifact-acquire"},
+    "labels": {
+      "app": "artifact-acquire"
+    },
     "egress_allow": [
-      {"endpoint": {"app": "test-receiver"}, "port": 8080, "protocol": "TCP"}
+      {
+        "endpoint": {
+          "app": "test-receiver"
+        },
+        "port": 8080,
+        "protocol": "TCP"
+      }
     ]
   },
   "test_receivers": [
-    {"name": "fixture", "labels": {"app": "test-receiver"}, "port": 8080, "allowed_from": ["acquire"]}
+    {
+      "name": "fixture",
+      "labels": {
+        "app": "test-receiver"
+      },
+      "port": 8080,
+      "allowed_from": [
+        "acquire"
+      ]
+    }
   ],
   "observer_kube_api": false,
   "protected_paths": {
     "model_dir": "/models",
     "cache_dir": "/cache",
-    "secret_paths": ["/var/run/secrets/kubernetes.io/serviceaccount", "/run/byul-probe/secret.txt"]
+    "secret_paths": [
+      "/var/run/secrets/kubernetes.io/serviceaccount",
+      "/run/byul-probe/secret.txt"
+    ]
   },
   "assets": {
     "manifest_path": "/models/.byul-model-ready.json",
@@ -35,12 +78,88 @@
     "acquire_uid": 10002,
     "probe_uid": 10003
   },
-  "allowed_engine_binaries": ["/usr/local/bin/vllm-nonroot-entrypoint.sh"],
+  "allowed_engine_binaries": [
+    "/usr/local/bin/vllm-nonroot-entrypoint.sh",
+    "/usr/bin/nvidia-ctk",
+    "/usr/local/bin/vllm"
+  ],
   "phase_binaries": {
-    "loading": ["/usr/bin/python3", "/usr/bin/python3.12"],
-    "compiling": ["/usr/bin/python3", "/usr/bin/python3.12"],
-    "inferring": ["/usr/bin/python3", "/usr/bin/python3.12"]
+    "loading": [
+      "/usr/bin/python3",
+      "/usr/bin/python3.12",
+      "/usr/bin/id",
+      "/usr/bin/awk",
+      "/usr/bin/uname",
+      "/usr/sbin/ip",
+      "/sbin/ldconfig",
+      "/sbin/ldconfig.real",
+      "/usr/local/lib/python3.12/dist-packages/triton/backends/nvidia/bin/ptxas",
+      "/usr/local/cuda/bin/ptxas",
+      "/usr/local/cuda/bin/nvcc"
+    ],
+    "compiling": [
+      "/usr/bin/python3",
+      "/usr/bin/python3.12",
+      "/sbin/ldconfig",
+      "/sbin/ldconfig.real",
+      "/usr/local/lib/python3.12/dist-packages/triton/backends/nvidia/bin/ptxas",
+      "/usr/local/cuda/bin/ptxas",
+      "/usr/local/cuda/bin/nvcc"
+    ],
+    "inferring": [
+      "/usr/bin/python3",
+      "/usr/bin/python3.12"
+    ]
   },
-  "suspect_binaries": ["/bin/sh", "/usr/bin/sh", "/bin/bash", "/usr/bin/bash", "/bin/dash", "/usr/bin/dash", "/usr/bin/curl", "/usr/bin/wget"],
-  "tetragon_mode": "monitor"
+  "suspect_binaries": [
+    "/bin/sh",
+    "/usr/bin/sh",
+    "/bin/bash",
+    "/usr/bin/bash",
+    "/bin/dash",
+    "/usr/bin/dash",
+    "/usr/bin/curl",
+    "/usr/bin/wget"
+  ],
+  "tetragon_mode": "monitor",
+  "parent_constraints": {
+    "/sbin/ldconfig": [
+      "/usr/bin/python3",
+      "/usr/local/bin/vllm"
+    ],
+    "/sbin/ldconfig.real": [
+      "/sbin/ldconfig"
+    ],
+    "/usr/bin/awk": [
+      "/usr/local/bin/vllm-nonroot-entrypoint.sh"
+    ],
+    "/usr/bin/id": [
+      "/usr/local/bin/vllm-nonroot-entrypoint.sh"
+    ],
+    "/usr/bin/nvidia-ctk": [
+      "/usr/sbin/runc"
+    ],
+    "/usr/bin/uname": [
+      "/usr/bin/python3",
+      "/usr/local/bin/vllm"
+    ],
+    "/usr/local/bin/vllm": [
+      "/usr/local/bin/vllm-nonroot-entrypoint.sh"
+    ],
+    "/usr/local/bin/vllm-nonroot-entrypoint.sh": [
+      "/usr/local/bin/containerd-shim-runc-v2"
+    ],
+    "/usr/local/cuda/bin/nvcc": [
+      "/usr/bin/python3"
+    ],
+    "/usr/local/cuda/bin/ptxas": [
+      "/usr/bin/python3"
+    ],
+    "/usr/local/lib/python3.12/dist-packages/triton/backends/nvidia/bin/ptxas": [
+      "/usr/bin/python3"
+    ],
+    "/usr/sbin/ip": [
+      "/usr/local/bin/vllm"
+    ]
+  }
 }

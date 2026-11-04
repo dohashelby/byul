@@ -1,0 +1,100 @@
+{
+  "schema": "byul-gpu-a-check-summary/1",
+  "date_kst": "2026-11-03",
+  "check_id": "REQ-19",
+  "scope": "one NVIDIA L4 on existing AWS g6.2xlarge dev instance; generations kept separate",
+  "enterprise_approval_claimed": false,
+  "judge_and_policy_rules_weakened": false,
+  "notes": [
+    "Five valid boundary fixtures called installed prefill-input and position/sequence-length Triton kernels. Output canaries and independent CPU oracle matched.",
+    "Native read bounds, uninitialized-read instrumentation, and deployed model-runner reachability remain unverified. No compute-sanitizer execution was performed."
+  ],
+  "runs": [
+    {
+      "run": "a-native-20261103-1/REQ-19",
+      "evidence_kind": "manual_native_component",
+      "official": false,
+      "bundle_path": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/native-bundles/a-native-20261103-1__REQ-19.zip",
+      "bundle_sha256": "6563feeb7ee314b5f728b04da1be7001a11ffa2efb20fbb925f27de9a8f0b66c",
+      "exact_saved_pack_rejudgment_verified": true,
+      "results": [
+        {
+          "id": "RES-01M6GNP0T402E9AHMJVV62T8SJ",
+          "revision": 1,
+          "content_sha256": "c18827fc96b5a3ab559cf48daa8aa0ac35c187d453313288b3594bc279194d7f",
+          "check_id": "REQ-19",
+          "data_origin": "EXAMPLE",
+          "verification_level": "DECLARED",
+          "verdicts": {
+            "security": "UNKNOWN",
+            "functional": "UNKNOWN",
+            "performance": "UNKNOWN"
+          },
+          "reasons": [
+            "declared by Codex / user-authorized BYUL A lab observation at 2026-11-03T12:20:58+00:00 (self-reported, not authenticated)",
+            "security: declared UNKNOWN → UNKNOWN",
+            "functional: declared UNKNOWN → UNKNOWN",
+            "performance: declared UNKNOWN → UNKNOWN"
+          ],
+          "missing_observations": [
+            "engine_sensor_violation"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "id": "EVD-01M6GNP0SSAQXH8GKGN2QNP18F",
+          "revision": 1,
+          "sha256": "73ff16b0a222fc1812bd80b17922b19ef880734dbb084a20bc972a2f45405434",
+          "data_origin": "DECLARED",
+          "execution": {
+            "status": "COMPLETED",
+            "executor": {
+              "name": "manual-entry",
+              "version": "0.5.0",
+              "config_sha256": "b0292f9bcd51bdc041a21faab587fe73a474f1dc15bb827e114faabd90caa4ec",
+              "default_judge": "declared"
+            },
+            "adapter": null,
+            "started_at": "2026-11-03T12:17:27.176522Z",
+            "finished_at": "2026-11-03T12:20:58Z",
+            "abort_reason": null,
+            "operator": {
+              "by": "Codex / user-authorized BYUL A lab observation",
+              "at": "2026-11-03T12:20:58Z"
+            },
+            "override_reason": "Automatic native source/transport contract unavailable; preserve explicitly scoped actual GPU observations as manual evidence."
+          },
+          "normal_control": {
+            "attempted": true,
+            "succeeded": true,
+            "detail": "declared: succeeded — Scoped native component control only. Original prefill-input and position/sequence-length Triton kernels: five valid boundary fixtures around block size 1024, independent CPU output oracle, canary preservation, and CUDA completion."
+          },
+          "scope_observation": {
+            "value": false,
+            "collected": true
+          }
+        }
+      ]
+    }
+  ],
+  "raw_export": {
+    "schema": "byul-gpu-a-raw-export/1",
+    "files": {
+      "byul-a-lifecycle-codex.tgz": {
+        "sha256": "45d411c9eedd818239495474a961b999dc3ae10f7714a0a18dc2320ac9a50a05",
+        "bytes": 978873
+      },
+      "byul-a-runs-codex.tgz": {
+        "sha256": "fe1606bd0ffa16ca8910b5036af2a33909f079fa19217891a092baf0fc2d60b6",
+        "bytes": 4054594
+      },
+      "privacy-scan.json": {
+        "sha256": "704d9a5f3b7c9c27c87d9b15958aa5314fbce07b89e63eea6c674a18bbe64330",
+        "bytes": 522
+      }
+    }
+  },
+  "raw_export_directory": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/raw",
+  "native_automatic_collection_implemented": false
+}

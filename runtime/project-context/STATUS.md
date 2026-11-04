@@ -1,6 +1,44 @@
 # 런타임 작업 상태
 
-최종 갱신: 2026-11-03
+최종 갱신: 2026-11-04
+
+## 2026-11-04 AWS GPU 서버 2회차 결과 (기준 byul_runtime 5737fd3, 문서 미커밋)
+
+- 실제 서버 인수 시험에서 vLLM·SGLang 모두 AWS-01~19 최종 통과. vLLM AWS-11은 이전 gap 처리 뒤, AWS-13은 로그 재조회 뒤 통과했고 SGLang AWS-16·17·18도 판정됐다. 배포 경계 실측은 두 엔진 모두 `ok`. 상세 판정과 중간 `unknown`은 [2회차 결과](../docs/AWS_GPU_서버2회차_결과_20261104.md)에 기록했다.
+- 남은 일: 서버 뒤 교차 검수 보완판 재실행과 backfill 전달 확인, 대시보드 화면 확인, SGLang 캡처 뒤 컴파일·첫 요청 Triton JIT 및 vLLM loading 컴파일의 오탐 처리. AWS-11의 경고 0건은 캐시가 있는 시험 구간의 결과다.
+
+## 2026-11-04 AWS 2회차 수집 공백·AWS-13 로그 경합 보정 (기준 byul_runtime 5737fd3, 미커밋)
+
+- Hubble·Tetragon 이전 미닫힘 gap은 가장 이른 시각부터 backfill을 요청하고 첫 정상 tick까지 관측 불가로 유지한 뒤 `collector_restart`/`requested_unverified`로 닫는다. 재단절과 손상 이력은 자동 봉합하지 않는다. 여러 gap·닫힌 이력·시간 역전 기록을 모의 시험했다.
+- AWS-13 로그 조회는 매 호출 전 남은 8초를 확인하고, 증거 첫 줄의 key·token·secret·password·credential·auth 이름과 값을 가린다. JSON의 따옴표로 감싼 키와 `--api-key`·`--admin-key` 공백 옵션도 가리며, 일반 오류 문장은 유지하는 시험을 추가했다. 해시 오류 문구가 끝내 없으면 기존처럼 unknown이다. 실제 AWS 서버 재판정은 하지 않았다.
+- `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 샌드박스 683건 실패·오류 0, skip 115 / Claude 노트북 소켓 허용 실행 683건 OK, skip 0(가리기 재수정 후 기준). `git diff --check` 확인. contracts 수정 없음, 커밋·푸시 없음. 실제 AWS 서버 재시험이 남았다.
+
+## 2026-11-03 stream 기한 결과 코드 회귀 보정 (기준 8d515ec, 미커밋)
+
+- chat·completions의 stream 본문 읽기 중 공통 감시가 연결을 닫아도 최종 결과를 `STREAM_DEADLINE` / `deadline_exceeded`로 기록한다. 엔진 응답 헤더를 받기 전 기한 초과는 8d515ec의 `ENGINE_TIMEOUT`에 맞추고, 일반 응답·토큰 계산의 `ENGINE_DEADLINE`은 유지한다. `STREAM_IDLE_TIMEOUT`, `STREAM_RELAY_ERROR`, `ENGINE_TIMEOUT`, `ENGINE_UNREACHABLE`, `CLIENT_DISCONNECTED` 분기를 기준 커밋과 grep으로 대조했다.
+- 소켓 없는 감시 종료 회귀시험을 chat·completions의 응답 시작 전후에 추가했다. `.venv/bin/python -B -m unittest discover -s tests`: 674건, 실패·오류 0, skip 115. `git diff --check` 통과. 로컬 소켓 통합 시험은 이 환경에서 건너뛰어졌으므로 Claude가 소켓 허용 노트북에서 전건 재시험해야 한다. contracts 수정 없음, 커밋·푸시 없음.
+
+## 2026-11-03 엔진 초기 수집 회귀 보정 (기준 8d515ec, 미커밋)
+
+- 엔진 health/info/metrics를 느린 작업용 `dedicated_thread`와 구분되는 엔진 그룹 한 스레드로 모았다. Gateway 시작 시 첫 수집 순회를 `status_timeout_s`(기본 5초)까지 기다린 뒤 HTTP 서비스를 시작한다. 시간이 초과되면 시작은 계속되고, 수집은 백그라운드에서 완료된다. 보안 사건·대상 Pod 일반 루프는 엔진 수집과 별도로 계속 돈다.
+- 소켓 없는 CollectorManager 시험으로 시작 직후 엔진 3종 snapshot, 지연 수집의 시작 대기 상한·후속 회복, 엔진 지연 중 보안 사건·대상 Pod 수집을 확인했다. 집중 시험 15건 통과, 전체 `.venv/bin/python -B -m unittest discover -s tests` 660건 중 실패·오류 0, skip 115. HTTP 통합 시험은 로컬 소켓 제약으로 미실행이므로 Claude가 소켓 허용 노트북에서 전건 재시험해야 한다. contracts 수정 없음, 커밋·푸시 없음.
+
+## 2026-11-03 HTTP/1.0 닫힌 응답 소켓 보정 (기준 8d515ec, 미커밋)
+
+- 일반 응답과 chat·completions stream에서 응답 소켓의 `settimeout`이 `OSError`를 내면 연결 생성 시 지정한 제한 시간으로 읽기를 계속한다. 일반 응답은 각 `read1` 직후 전체 기한을 다시 확인한다. HTTP/1.0 `will_close` 응답의 200 전달, 두 stream, 소켓 재설정 실패 후 504 기한 초과, Gateway의 chat·completions 전달을 소켓 없는 회귀시험으로 확인했다.
+- 관련 소켓 없는 집중 시험 48건 통과. 전체 `.venv/bin/python -B -m unittest discover -s tests -v`: 658건, 실패·오류 0, skip 115(로컬 소켓 제약). context·SGLang·target의 기존 소켓 없는 단위 시험은 집중 시험에 포함했다. HTTP 통합 시험은 이 환경에서 미실행이므로 소켓 허용 노트북에서 전체 재시험이 필요하다. contracts는 수정하지 않았고 커밋·푸시하지 않았다.
+
+## 2026-11-03 엔진 수집·응답 기한·completions stream 보정 (기준 8d515ec, 미커밋)
+
+- 엔진 health/info/metrics를 전용 수집 스레드로 분리하고 상태 조회의 `status_timeout_s` 기본 5초를 추론·토큰 계산·모의 receipt의 `relay_timeout_s`와 분리했다. 관측 feed·Cilium·대상 Pod는 일반 수집 루프를 유지한다. revalidation·대상 관측 콜백의 기존 잠금을 확인했다.
+- 일반 응답에 토큰 계산부터 본문 수신까지 공통 `request_deadline_s`와 64 MiB 본문 상한을 적용했다. 기한 초과는 504 `ENGINE_DEADLINE`, 과대 본문은 502 `ENGINE_BAD_RESPONSE`로 최종 기록한다. completions SSE는 이벤트 검증 후 즉시 전달하고 중간 오류·잘림·연결 끊김·기한·유휴 초과를 최종 기록한다. contracts는 수정하지 않았다.
+- 회귀시험 8건을 추가·보정했다. `.venv/bin/python -B -m unittest discover -s tests`: 655건, 실패 0·skip 115(로컬 소켓 제약). `git diff --check` 통과. 실제 GPU·서버 시험과 소켓 허용 환경의 HTTP 전건은 미확인이다. 기존 미추적 인계 문서는 건드리지 않았고 커밋·푸시하지 않았다.
+
+## 2026-11-03 SGLang Claude 검수 보정 (기준 2f5f461, 미커밋)
+
+- SGLang v0.5.22 원본 파서의 CLI 우선 병합과 `prepare_server_args` 내부 인자 파싱을 확인했다. 공개 엔진 옵션은 `engine.yaml` 인자로 옮기고 Secret `config.yaml`은 관리 키만 담도록 절차를 수정했다. 기존 Secret 갱신과 이전 데이터 키 제거·복구 절차를 기록했다. 11/3 저장 Tetragon의 SGLang Pod만 대조해 관찰되지 않은 `/usr/bin/python3`, `/usr/bin/python3.12`를 SGLang intent에서 제거했다.
+- 캐시 재기동의 첫 표지 전 약 40초는 단계 미확인이고 첫 기동 JIT 경계는 로그 부재로 미확인이다. `engine_signal` 단계 전용 경로는 신뢰 단계 허용이 아니라 경고로 남는다. 새 Secret 읽기·기동과 `--config` 적용 뒤 `/proc` 인자 제거는 서버에서 확인해야 한다. 시작 로그와 `/server_info`의 관리 키 노출은 이미 관찰됐으므로 반출 전 값 검사가 필요하다. 다음은 서버 전환 뒤 AWS-09~11 재판정과 Claude 검수다.
+- `runtime/.venv/bin/python -m unittest discover -s tests`(runtime 작업 폴더에서는 `.venv/bin/python`): 642건 OK, 115건 skip. SGLang 배포 집중 시험 2건 OK, `git diff --check` 통과. 서버 배포·실제 GPU 시험은 이번 보정에서 실행하지 않았다.
 
 ## 2026-11-03 AWS GPU preflight 검수 보정 (기준 46f0309, 미커밋)
 
@@ -330,3 +368,32 @@
 - AWS-13은 재시작 전 Gateway Pod UID를 기록하고 새 UID Pod의 종료·재시작·CrashLoop 및 그 Pod의 이전/현재 로그만 판정한다. AWS-17은 새 컨테이너 startedAt 이후 시작한 새 UID 시간표만 인정하며 이전 단계 행이 남으면 실패한다. AWS-07은 요청 직전 `/api/target`이 200·`unavailable`일 때만 중단 중 요청을 보낸다. `blocked`는 기대 200과 모순되어 실패, 조회 실패·기한 초과는 요청 없이 unknown으로 남긴다.
 - backend 선택 필드 `context_headroom_tokens`(기본 0, SGLang 예시·배포 64)를 추가했다. `/api/status.engine_context_capacity`가 기존 `/v1/models` 수집의 `max_model_len`과 정책 상한+여유를 비교해 ok/insufficient/unknown 및 경고 코드만 표시한다. 플랫폼 contracts는 수정하지 않았다. SGLang 엔진 `--context-length`는 2112다.
 - preflight `--boundary-probe`는 opt-in으로 Gateway 정책 상한을 읽고 엔진 Pod 내부의 `/tokenize`·chat/completions 경계를 직접 생성해 각 결과만 표시한다. AWS-18은 length 종료와 부족한 completion usage를 엔진 잘림으로 판정한다. 가짜 runner·회귀 시험과 `kubectl kustomize` 렌더를 확인했다. 실제 AWS 엔진 실측과 10회차 결과는 미확인이다.
+## 2026-11-03 AWS GPU 1회차 후속: SGLang 단계·허용 목록 (기준 2f5f461, 미커밋)
+
+- 근거: `docs/AWS_GPU_서버1회차_결과_20261103.md`, 외부 `sglang-observation/engine-sglang.log`의 키 없는 표지 5줄과 `tetragon-sglang.jsonl`의 `process.pod.container.name`·SGLang Pod UID 3개의 실행 경로. SGLang v0.5.22 GPU 캐시 있는 기동의 loading·compiling·inferring 표지를 추가하고 UTC `kubectl --timestamps` 우선 및 SGLang 연도 포함 로그 시각을 시험했다. 첫 기동 JIT 컴파일 위치는 미확인이고 `engine_signal`은 trusted가 아니다.
+- SGLang 시간표 수집·preflight·AWS-11/16/17 판정 경로를 켰다. vLLM/SGLang intent에 관찰 경로와 엔진 컨테이너 이름을 반영하고 셸은 suspect로 유지했다. 컨테이너 이름이 없는 이벤트도 엔진 selector가 맞으면 판정하고 귀속은 `unavailable`로 표시한다. `cicc`의 관찰된 `bin/../nvvm` 원시 문자열만 SGLang 단계 목록에 명시하고 실행 경로는 정규화 없이 정확히 비교한다. SGLang 시작은 Secret의 `config.yaml`을 `--config`로 읽도록 바꿨으며, 이전 셸 방식 복구 절차를 문서화했다.
+- 시험: 임시 설치 venv에서 `python -m unittest discover -s tests` 641건, 통과 526·skip 115·실패 0. skip은 로컬 socket 생성 제한 112건과 socket I/O 제한 3건이다. 두 intent의 `enforce render` 후보 각 10개 생성, SGLang `kubectl kustomize`와 `git diff --check` 통과. 새 fixture에는 표지 5줄만 있고 `server_args` 줄은 없다.
+- 다음 작업: 서버 이미지 안 `--config` 구현·Secret 읽기·기동·첫 기동 JIT 단계·AWS-11/16/17을 실측한다. 변경된 intent를 포함하는 새 묶음을 만들고 `bundle verify` 및 후보 규칙 검토·적용이 필요하다. intent 해시/크기는 아래 교차 검수 수정에서 다시 바뀌었다. Gateway 정책 파일·정책 승인 목록·플랫폼 승인 판본은 수정하지 않았으며 재승인은 사람이 판단한다.
+
+## 2026-11-03 교차 검수 A–D 후속 (기준 2f5f461 + 기존 미커밋 변경)
+
+- 코드·시험 대조로 A–C가 타당함을 확인했다. 두 intent의 가변 실행 경로 `/proc/self/exe`·`/dev/fd/11`을 허용 목록에서 빼고 `/usr/bin/nvidia-ctk`는 유지했다. 실행 문자열 정규화를 제거했다. SGLang에서 관찰된 `cicc`의 `bin/../nvvm` 표기만 단계 목록에 원문 그대로 명시한다. `/cache` 시작 우회 문자열은 `exec_from_cache` 경고, 다른 우회 문자열은 활성 단계에서 `outside_allowlist`다. 첫 단계 표지 전 가변 경로는 `phase_unknown`이며 AWS-11 잘못된 경고 수에 들어가지 않는 회귀시험을 추가했다.
+- Pod selector가 맞으면 컨테이너 이름 누락·형식 오류도 엔진으로 판정하고 귀속은 `unavailable`로 표시한다. 명시적으로 다른 컨테이너 이름은 제외한다. AWS-16/17은 vLLM·SGLang 모두 시간표 `extraction.engine`이 선택 엔진과 일치해야 판정한다.
+- D는 11/3 서버 관찰 문서의 위험 표와 일치한다. `--config`는 `/proc` cmdline 노출과 시작 셸만 없앤다. 시작 로그 `server_args`와 키 없는 `/server_info`의 관리 키 노출은 그대로이며, 엔진 8000 직통 차단(AWS-04)과 증거 반출 전 값 검사·가림으로 다룬다. 외부 이슈 링크는 확인하지 않아 넣지 않았다.
+- 로컬 검증: `.venv/bin/python -m unittest discover -s tests` 645건 통과(skip 115: 로컬 소켓 제약), `git diff --check` 통과. 실제 서버 적용과 AWS-11/16/17 재측정, 새 묶음 검증·정책 적용은 미확인이다. 다음은 서버에서 값 비노출 범위를 확인하고 새 intent로 시험을 재실행하는 것이다. intent SHA-256/크기: vLLM `0e347a98…`/2759바이트, SGLang `74753590…`/3430바이트. 커밋·푸시하지 않았다.
+
+## 2026-11-03 실행 부모 조건 (기준 961c455, 미커밋)
+
+- 두 AWS intent 1.1에 관측 실행 파일별 부모 제약을 추가했다. 부모 불일치·누락은 `outside_allowlist`; 제약 없는 실행 파일은 기존 판정을 유지한다. SGLang `suspect_parent_contexts`는 `nvcc`·`ninja`의 `/bin/sh`를 loading/compiling에서만 `suspect_context=compile_toolchain_parent`로 설명하며, 신뢰 단계에서도 `suspect_binary` 의심 경고를 유지한다. `containerd-shim` 셸도 의심 판정을 유지한다. 시작 Python 부모는 정상 기동과 시험용 exec를 구별할 수 없어 제약하지 않았다. SGLang의 미관측 정규 `cicc` 표기는 목록에서 제외했다. 관측 출처와 부모 누락의 AWS-11 한계는 `deploy/gpu-lab/ACCEPTANCE.md`에 기록했다.
+- 재검수 수정 후 `.venv/bin/python -m unittest discover -s tests`: 647건, 실패 0·skip 115(로컬 소켓 제약). `git diff --check` 통과. 앞선 `.venv/bin/serving-runtime enforce render`에서는 두 AWS intent 각각 후보 10개를 생성했다. 실제 서버 적용·새 image의 부모 관계·커널 차단은 미확인이다. 기존 미추적 파일은 건드리지 않았고 커밋·푸시하지 않았다.
+
+## 2026-11-03 엔진 응답 소켓 timeout 검수 후속 (기준 8d515ec, 미커밋)
+
+- `engine_client.request`의 응답 읽기에서 닫힌 HTTP/1.0 소켓의 `settimeout` 오류를 허용하고 매 `read1` 뒤 기한을 확인한다. `relay`와 공통 `response_timeout` 도우미를 사용한다. 저장소의 `settimeout` 검색과 이번 diff 대조에서 새 호출은 이 두 경로뿐이며, 기존 `relay` 보호 처리를 공통 도우미로 이동했다. contracts는 수정하지 않았다.
+- 소켓 없는 새 회귀시험은 닫힌 소켓의 정상 본문 및 공유/자체 기한 초과를 확인한다. `.venv/bin/python -B -m unittest tests.test_mvp_engine_client_deadlines tests.test_mvp_relay_deadlines`: 12건 통과. `.venv/bin/python -B -m unittest discover -s tests`: 662건, 실패·오류 0, skip 115(이 환경의 소켓 제약). `git diff --check` 통과. Claude의 노트북 소켓 허용 환경 전체 재시험과 실제 엔진 상태 확인은 남았다. 커밋·푸시하지 않았다.
+
+## 2026-11-03 교차 검수 기한·AWS stream 판정 후속 (기준 8d515ec, 미커밋)
+
+- 연결 수립은 기한 내 별도 작업으로 대기하고, 공통 감시가 요청 전송·헤더·본문 중 기한에 소켓을 끊는다. 연결이 늦게 끝나도 닫는다. relay 일반·chat/completions stream·토큰 계산에 적용했으며, 공유 기한 뒤 토큰 계산 timeout/OSError는 504 `ENGINE_DEADLINE`과 클라이언트 연결 닫기로 분류한다. 공유 기한 전 실패는 503을 유지한다.
+- AWS-01·18 stream 성공은 `[DONE]`과 Gateway 최종 기록의 ALLOWED/completed/오류 없음 여부를 함께 확인하며, 기록 누락은 unknown이다. GPU-LAB README의 엔진 수집 스레드 설명을 실제 순차 처리와 지연 한계에 맞췄다. contracts는 수정하지 않았다.
+- 소켓 없는 회귀시험을 추가해 헤더 분할 전송·본문 대기 중 기한 종료, 연결 수립 지연, 정상 감시 취소, 토큰 기한 오류, `[DONE]` 뒤 최종 실패를 확인했다. `.venv/bin/python -B -m unittest discover -s tests`: 672건, 실패·오류 0, skip 115(로컬 소켓 제약). Claude 노트북에서 전체 재시험과 실제 엔진 확인이 남았다. 커밋·푸시하지 않았다.

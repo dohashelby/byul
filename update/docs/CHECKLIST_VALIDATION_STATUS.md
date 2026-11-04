@@ -36,8 +36,9 @@
 | 1단계 담당 | 1단계 상태 | 점검 수 |
 |---|---|---:|
 | - | RETIRED_OUT_OF_UPDATE_SCOPE | 8 |
-| dev-1 | CPU_DEVELOPMENT_REMAINING | 24 |
+| dev-1 | CPU_DEVELOPMENT_REMAINING | 23 |
 | dev-1 | ENTERPRISE_INPUT_WAITING | 1 |
+| dev-1 | GPU_CONFIRMATION_ONLY | 1 |
 | dev-1 | NOT_APPLICABLE_IN_TARGET | 1 |
 | gpu | MEASUREMENT_REMAINING | 43 |
 

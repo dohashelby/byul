@@ -64,7 +64,15 @@ EXECUTORS = {'REQ-13': ('response_content', {'endpoint': '/v1/chat/completions',
                                        'roles': {'general': 'DEV1_TOKEN_GENERAL', 'admin': 'DEV1_TOKEN_ADMIN'}})}
 
 
-def render(*, run_id, engine_image):
+LIFECYCLE_FILES = ('guard_lifecycle_sensor.py', 'sitecustomize.py', 'settings.json', 'manifest.json')
+
+
+def render(*, run_id, engine_image, lifecycle_dir=None):
+    """lifecycle_dir: `guard prepare-lifecycle-sensor` 출력. 주면 RUNBOOK의 계측 기동 설정을 더한다.
+
+    고정 자산은 읽기 전용 /guard-lifecycle(ConfigMap), 기록은 /guard-lifecycle/data/<session>(엔진 UID 소유 0700)이다.
+    준비물 하나가 세션 하나이므로 세션을 봉인하는 점검마다 엔진을 새로 띄운다.
+    """
     if not _RUN.fullmatch(run_id or '') or not _IMAGE.fullmatch(engine_image or ''):
         raise ValueError('K3D_RENDER_INPUT_INVALID')
     labels = {'guard.run': run_id, 'byul.a/generation': GENERATION}
@@ -84,6 +92,26 @@ def render(*, run_id, engine_image):
                        'volumes': [{'name': 'models', 'hostPath': {'path': '/srv/models', 'type': 'Directory'}},
                                    {'name': 'shm', 'emptyDir': {'medium': 'Memory', 'sizeLimit': '1Gi'}},
                                    {'name': 'chat-template', 'hostPath': {'path': '/srv/models/guard-chat/guard-text-chat-v1.jinja', 'type': 'File'}}]}}
+    lifecycle = None
+    if lifecycle_dir is not None:
+        assets = {name: (Path(lifecycle_dir) / name).read_text(encoding='utf-8') for name in LIFECYCLE_FILES}
+        session = json.loads(assets['settings.json'])['session']
+        if not re.fullmatch(r'[0-9a-f]{32}', session) or json.loads(assets['manifest.json'])['session'] != session:
+            raise ValueError('K3D_LIFECYCLE_ASSETS_INVALID')
+        lifecycle = {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': f'guard-lifecycle-{run_id}'[:63], 'namespace': NAMESPACE,
+                     'labels': labels}, 'data': assets}
+        spec, container = engine['spec'], engine['spec']['containers'][0]
+        container['args'] = [*ARGS, '--middleware', 'guard_lifecycle_sensor.Middleware']
+        container['env'] += [{'name': 'PYTHONPATH', 'value': '/guard-lifecycle'},
+                             {'name': 'GUARD_LIFECYCLE_CONFIG', 'value': '/guard-lifecycle/settings.json'}]
+        container['volumeMounts'] += [{'name': 'lifecycle-assets', 'mountPath': '/guard-lifecycle', 'readOnly': True},
+                                      {'name': 'lifecycle-data', 'mountPath': '/guard-lifecycle/data'}]
+        spec['volumes'] += [{'name': 'lifecycle-assets', 'configMap': {'name': lifecycle['metadata']['name']}},
+                            {'name': 'lifecycle-data', 'emptyDir': {'sizeLimit': '64Mi'}}]
+        # 엔진은 이미지 기본 사용자(root)로 돈다. 같은 UID의 0700 세션 폴더를 엔진보다 먼저 만든다.
+        spec['initContainers'] = [{'name': 'lifecycle-session', 'image': engine_image, 'imagePullPolicy': 'IfNotPresent',
+                                   'command': ['sh', '-c', f'mkdir -m 0700 /guard-lifecycle/data/{session}'],
+                                   'volumeMounts': [{'name': 'lifecycle-data', 'mountPath': '/guard-lifecycle/data'}]}]
     probe = {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {'name': f'engine-test-probe-{run_id}'[:63], 'namespace': NAMESPACE,
              'labels': {'app': 'engine-test-probe', **labels}},
              'spec': {'enableServiceLinks': False, 'automountServiceAccountToken': False, 'restartPolicy': 'Never',
@@ -104,10 +132,12 @@ def render(*, run_id, engine_image):
                                          'resources': {'requests': {'cpu': '50m', 'memory': '64Mi'}, 'limits': {'cpu': '500m', 'memory': '256Mi'}},
                                          'volumeMounts': [{'name': 'observations', 'mountPath': '/guard-observations'}]}],
                          'volumes': [{'name': 'observations', 'emptyDir': {'sizeLimit': '16Mi'}}]}}
-    docs = {'namespace.yaml': namespace, 'engine.yaml': engine, 'probe.yaml': probe, 'receiver.yaml': receiver}
+    docs = {'namespace.yaml': namespace, 'engine.yaml': engine, 'probe.yaml': probe, 'receiver.yaml': receiver,
+            **({'lifecycle.yaml': lifecycle} if lifecycle else {})}
     raw = {name: yaml.safe_dump(value, sort_keys=False).encode() for name, value in docs.items()}
     record = {'schema': SCHEMA, 'generation': GENERATION, 'profile': 'cpu', 'run_id': run_id, 'engine_image': engine_image,
-              'model_id': MODEL_ID, 'model_revision': MODEL_REVISION, 'served_model_name': SERVED, 'args': ARGS,
+              'model_id': MODEL_ID, 'model_revision': MODEL_REVISION, 'served_model_name': SERVED,
+              'args': engine['spec']['containers'][0]['args'], 'lifecycle_session': lifecycle and json.loads(lifecycle['data']['settings.json'])['session'],
               'enforce_eager': True, 'lab_namespace_owner_label_required': True,
               'outputs_sha256': {'engine.yaml': hashlib.sha256(raw['engine.yaml']).hexdigest(),
                                  **{n: hashlib.sha256(b).hexdigest() for n, b in raw.items() if n != 'engine.yaml'}}}
@@ -312,11 +342,16 @@ def egress(source_target, receiver_pod, *, receiver_pid, subject_uid, subject_ne
     return receiver_target, policy, config
 
 
-def route_record(base, env, records_text, *, session, gateway_pod, root, minutes=10):
+def _prepared(path):
+    from guard.collectors.lifecycle import load_prepared
+    return load_prepared(path)
+
+
+def route_record(base, env, records_text, *, session, gateway_pod, root, prepared=None, minutes=10):
     """REQ-02: runtime Gateway의 실제 요청 기록을 엔진 소유 위치용 route 기록으로 옮기고 정책·설정을 만든다.
 
-    native_route 부분 수집은 엔진 안 lifecycle 센서 준비물(prepared)이 있어야 한다. k3d CPU lab에는 없으므로
-    그 부분은 실행기가 SUBCOLLECTION_UNAVAILABLE로 남긴다(2단계 GPU lab 항목).
+    native_route 부분 수집은 엔진 안 lifecycle 센서 준비물(prepared manifest)이 있어야 한다. 주지 않으면
+    준비물이 없다는 값을 두고, 실행기가 그 부분을 SUBCOLLECTION_UNAVAILABLE로 남긴다.
     """
     from datetime import datetime, timedelta, timezone
     from tools import dev1_runtime_records as bridge
@@ -333,8 +368,9 @@ def route_record(base, env, records_text, *, session, gateway_pod, root, minutes
     values = {'route_environment_sha256': env.ref().sha256, 'route_target_sha256': target_sha, 'route_session': session,
               'route_file_sha256': hashlib.sha256(data).hexdigest(), 'route_validity_start': start, 'route_validity_end': end,
               'route_native_environment_sha256': env.ref().sha256, 'route_native_target_sha256': target_sha,
-              # 준비물이 없다는 사실을 값으로 남긴다. 부분 수집은 이 값과 맞는 준비물을 찾지 못해 실패한다.
-              'route_native_prepared_sha256': hashlib.sha256(b'k3d-cpu-lab-native-route-prepared-absent').hexdigest(),
+              # 준비물이 없으면 그 사실을 값으로 남긴다. 부분 수집은 이 값과 맞는 준비물을 찾지 못해 실패한다.
+              'route_native_prepared_sha256': (sha256_hex(canonical_json(_prepared(prepared))) if prepared
+                                               else hashlib.sha256(b'k3d-cpu-lab-native-route-prepared-absent').hexdigest()),
               'route_native_validity_start': start, 'route_native_validity_end': end}
     root = Path(root).absolute()
     pack = yaml.safe_load((Path(__file__).parents[1] / 'docs/gpu-a/policy-a-draft.yaml').read_text(encoding='utf-8'))['pack']
@@ -342,7 +378,7 @@ def route_record(base, env, records_text, *, session, gateway_pod, root, minutes
               'scope': {'include': ['REQ-02'], 'exclude': []}, 'exceptions': [], 'confirmed_by': None, 'confirmed_at': None}
     config = '\n'.join([f"store = '{root / 'store'}'", '', '[adapter]', "name = 'vllm'", '', '[executors]', "route_record = 'kubernetes'", '',
                         '[route_record]', f"target = '{root / 'target.json'}'", "kubectl_binary = 'kubectl'", 'max_duration_seconds = 60',
-                        f"native_route = {{target = '{root / 'target.json'}', prepared = '{root / 'native-route-prepared-absent.json'}'}}", ''])
+                        f"native_route = {{target = '{root / 'target.json'}', prepared = '{Path(prepared).absolute() if prepared else root / 'native-route-prepared-absent.json'}', max_duration_seconds = 120}}", ''])
     return data, policy, config, len(packet['events'])
 
 
@@ -423,6 +459,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='kind', required=True)
     r = sub.add_parser('render'); r.add_argument('--run-id', required=True); r.add_argument('--engine-image', required=True)
+    r.add_argument('--lifecycle', type=Path)
     r.add_argument('--out', type=Path, required=True)
     e = sub.add_parser('env'); e.add_argument('--render', type=Path, required=True); e.add_argument('--models', type=Path, required=True)
     e.add_argument('--out', type=Path, required=True)
@@ -442,6 +479,7 @@ def main(argv=None):
     rr = sub.add_parser('route-record'); rr.add_argument('--target', type=Path, required=True); rr.add_argument('--env', type=Path, required=True)
     rr.add_argument('--records', type=Path, required=True); rr.add_argument('--session', required=True)
     rr.add_argument('--gateway-pod', required=True); rr.add_argument('--out', type=Path, required=True)
+    rr.add_argument('--prepared', type=Path)
     ra = sub.add_parser('record-access'); ra.add_argument('--target', type=Path, required=True); ra.add_argument('--env', type=Path, required=True)
     ra.add_argument('--session', required=True); ra.add_argument('--out', type=Path, required=True)
     h = sub.add_parser('http-check'); h.add_argument('--check', required=True, choices=sorted(EXECUTORS))
@@ -449,7 +487,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     load = lambda path: json.loads(Path(path).read_text(encoding='utf-8'))
     if args.kind == 'render':
-        raw, record = render(run_id=args.run_id, engine_image=args.engine_image)
+        raw, record = render(run_id=args.run_id, engine_image=args.engine_image, lifecycle_dir=args.lifecycle)
         for name, data in raw.items():
             inputs._write(args.out / name, data.decode())
         inputs._write(args.out / 'render.json', record)
@@ -491,7 +529,7 @@ def main(argv=None):
         print(json.dumps({'check': 'PLT-07', 'out': str(args.out), 'pack': policy['pack']}))
     elif args.kind == 'route-record':
         data, policy, config, count = route_record(load(args.target), load_environment(args.env), args.records.read_text(encoding='utf-8'),
-            session=args.session, gateway_pod=args.gateway_pod, root=args.out)
+            session=args.session, gateway_pod=args.gateway_pod, root=args.out, prepared=args.prepared)
         inputs._write(args.out / 'target.json', load(args.target)); args.out.mkdir(parents=True, exist_ok=True)
         (args.out / 'route-observations.json').write_bytes(data)
         inputs._write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True))

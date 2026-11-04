@@ -79,3 +79,30 @@ def test_record_access_grants_logs_of_the_engine_pod_only_and_leaves_the_copy_in
     assert {s['username'] for s in subjects['subjects']} == {lab.READER_USER, lab.NO_READER_USER}
     with pytest.raises(ValueError, match='K3D_RECORD_SESSION_INVALID'):
         lab.record_access(base, env, session='x', root=tmp_path)
+
+
+def test_lifecycle_render_follows_the_runbook_launch_and_keeps_assets_read_only(tmp_path):
+    import json
+    import yaml
+    from tools import dev1_k3d_cpu_lab as lab
+    session = 'c' * 32
+    for name in lab.LIFECYCLE_FILES:
+        (tmp_path / name).write_text('x', encoding='utf-8')
+    (tmp_path / 'settings.json').write_text(json.dumps({'session': session}), encoding='utf-8')
+    (tmp_path / 'manifest.json').write_text(json.dumps({'session': session}), encoding='utf-8')
+    image = 'k3d-byul-reg:5111/vllm/vllm-openai-cpu@sha256:' + 'a' * 64
+    raw, record = lab.render(run_id='dev1-k3d-9', engine_image=image, lifecycle_dir=tmp_path)
+    pod = yaml.safe_load(raw['engine.yaml']); engine = pod['spec']['containers'][0]
+    assert engine['args'][-2:] == ['--middleware', 'guard_lifecycle_sensor.Middleware'] and record['lifecycle_session'] == session
+    env = {e['name']: e['value'] for e in engine['env']}
+    assert env['PYTHONPATH'] == '/guard-lifecycle' and env['GUARD_LIFECYCLE_CONFIG'] == '/guard-lifecycle/settings.json'
+    mounts = {m['mountPath']: m for m in engine['volumeMounts']}
+    assert mounts['/guard-lifecycle']['readOnly'] is True and '/guard-lifecycle/data' in mounts
+    init, = pod['spec']['initContainers']
+    assert init['command'][-1] == f'mkdir -m 0700 /guard-lifecycle/data/{session}'
+    assert set(yaml.safe_load(raw['lifecycle.yaml'])['data']) == set(lab.LIFECYCLE_FILES)
+    plain, _ = lab.render(run_id='dev1-k3d-9', engine_image=image)
+    assert 'lifecycle.yaml' not in plain and '--middleware' not in yaml.safe_load(plain['engine.yaml'])['spec']['containers'][0]['args']
+    (tmp_path / 'manifest.json').write_text(json.dumps({'session': 'd' * 32}), encoding='utf-8')
+    with pytest.raises(ValueError, match='K3D_LIFECYCLE_ASSETS_INVALID'):
+        lab.render(run_id='dev1-k3d-9', engine_image=image, lifecycle_dir=tmp_path)

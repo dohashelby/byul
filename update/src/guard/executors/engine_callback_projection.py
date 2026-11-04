@@ -52,8 +52,9 @@ def window(events, secret, barrier):
 
 
 def _media(value):
-    return (type(value) is dict and 'seed' in value and set(value) <= {'seed', 'uuid'}
+    return (type(value) is dict and 'seed' in value and set(value) <= {'seed', 'uuid', 'text_after'}
         and type(value['seed']) is int and 0 <= value['seed'] < 2**31
+        and ('text_after' not in value or type(value['text_after']) is str and 0 < len(value['text_after']) <= 4096)
         and ('uuid' not in value or type(value['uuid']) is str and re.fullmatch(r'[A-Za-z0-9-]{1,64}', value['uuid'])))
 
 
@@ -109,7 +110,8 @@ def message_content(text, media):
     part = {'type': 'image_url', 'image_url': {'url': 'data:image/png;base64,' + base64.b64encode(media_png(media['seed'])).decode()}}
     if 'uuid' in media:
         part['uuid'] = media['uuid']
-    return [{'type': 'text', 'text': text}, part]
+    return [{'type': 'text', 'text': text}, part, *(
+        [{'type': 'text', 'text': media['text_after']}] if 'text_after' in media else [])]
 
 
 def validate_cases(check_id, cases):
@@ -132,6 +134,8 @@ def validate_cases(check_id, cases):
                 or 'media' in case and not _media(case['media'])
                 or case.get('role') not in ROLES[check_id] or type(case.get('prompt')) is not str
                 or not 0 < len(case['prompt']) <= 4096 or type(case['case_id']) is not str
+                # The executor prepends a 32-character nonce and one space. Keep the existing 4096 text limit.
+                or 'media' in case and 'text_after' in case['media'] and len(case['prompt']) + len(case['media']['text_after']) > 4096 - 33
                 or 'cache_salt' in case and (type(case['cache_salt']) is not str or not 0 < len(case['cache_salt']) <= 64)
                 or type(case.get('max_tokens', 1)) is not int or not 1 <= case.get('max_tokens', 1) <= 8
                 or 'allowed_token_ids' in case and (type(case['allowed_token_ids']) is not list or not case['allowed_token_ids'])):

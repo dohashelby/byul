@@ -40,7 +40,9 @@ def _context(context, prefix, prompt, roles, **extra):
         **(probe if role == 'probe' else extra)} for role in roles]
 
 
-def cases(preset):
+def cases(preset, *, media_text_after=None):
+    if media_text_after is not None and (preset != 'req16-full' or type(media_text_after) is not str or not media_text_after):
+        raise ValueError('RUN_INPUTS_MEDIA_TEXT_AFTER_REQUIRES_REQ16_FULL')
     if preset == 'req14-normal':
         return [{'case_id': f'n{i}', 'role': 'normal', 'prompt': f'normal {i} {TEXT}'} for i in range(4)]
     if preset == 'req18-slot':
@@ -53,10 +55,11 @@ def cases(preset):
     if preset == 'req16-salt':
         return salt
     # 같은 문장에 이미지만 바꾼 probe. uuid를 같게 둔 묶음은 요청의 uuid가 캐시 식별자로 쓰이는지 따로 본다.
+    suffix = {'text_after': media_text_after} if media_text_after is not None else {}
     media = [*_context('media_identity', 'm', 'media ' + TEXT, ('prime', 'control', 'probe', 'post'),
-            media={'seed': 1}, probe={'media': {'seed': 2}}),
+            media={'seed': 1, **suffix}, probe={'media': {'seed': 2, **suffix}}),
         *_context('media_identity', 'u', 'uuid ' + TEXT, ('prime', 'control', 'probe', 'post'),
-            media={'seed': 1, 'uuid': 'byul-media-1'}, probe={'media': {'seed': 2, 'uuid': 'byul-media-1'}})]
+            media={'seed': 1, 'uuid': 'byul-media-1', **suffix}, probe={'media': {'seed': 2, 'uuid': 'byul-media-1', **suffix}})]
     if preset in ('req16-lab', 'req16-full'):
         if preset == 'req16-full':
             salt = [*salt, *media]
@@ -222,7 +225,8 @@ def main(argv=None):
     t.add_argument('--out', type=Path, required=True)
     c = sub.add_parser('check'); c.add_argument('--check', required=True); c.add_argument('--env', type=Path, required=True)
     c.add_argument('--target', type=Path, required=True); c.add_argument('--prepared', type=Path, required=True)
-    c.add_argument('--cases', required=True, help='req14-normal, req16-salt, req16-lab, req18-slot 또는 REQ-17 사례 생성기 출력 파일')
+    c.add_argument('--cases', required=True, help='req14-normal, req16-salt, req16-lab, req16-full, req18-slot 또는 REQ-17 사례 생성기 출력 파일')
+    c.add_argument('--media-text-after', help='req16-full 전용: 이미지 뒤 텍스트. 생략하면 기존 사례 그대로')
     c.add_argument('--policy-draft', type=Path, default=Path('docs/gpu-a/policy-a-draft.yaml'))
     c.add_argument('--out', type=Path, required=True)
     h = sub.add_parser('http-check'); h.add_argument('--check', required=True); h.add_argument('--env', type=Path, required=True)
@@ -230,6 +234,8 @@ def main(argv=None):
     h.add_argument('--policy-draft', type=Path, default=Path('docs/gpu-a/policy-a-draft.yaml'))
     h.add_argument('--out', type=Path, required=True)
     args = parser.parse_args(argv)
+    if args.kind == 'check' and args.media_text_after is not None and (args.check != 'REQ-16' or args.cases != 'req16-full'):
+        parser.error('--media-text-after requires --check REQ-16 --cases req16-full')
     load = lambda path: json.loads(Path(path).read_text(encoding='utf-8'))
     if args.kind == 'env':
         env = environment(load(args.render), model_id=args.model_id, gpu_model=args.gpu_model, driver=args.driver,
@@ -250,7 +256,8 @@ def main(argv=None):
         _write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True)); _write(args.out / 'guard.toml', config)
         print(json.dumps({'schema': SCHEMA, 'check': args.check, 'executor': HTTP_CHECKS[args.check][0]}))
     else:
-        case_list = load(args.cases)['cases'] if Path(args.cases).is_file() else cases(args.cases)
+        case_list = (cases(args.cases, media_text_after=args.media_text_after) if args.media_text_after is not None
+            else load(args.cases)['cases'] if Path(args.cases).is_file() else cases(args.cases))
         manifest, policy, config = check_inputs(args.check, load_environment(args.env), load(args.target), args.prepared, case_list,
             yaml.safe_load(args.policy_draft.read_text(encoding='utf-8')), root=args.out)
         _write(args.out / 'target.json', load(args.target)); _write(args.out / 'manifest.json', manifest)

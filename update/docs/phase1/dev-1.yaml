@@ -58,14 +58,14 @@ checks:
     note: 중간 tensor/buffer 계보 설계와 TP2 실행 묶음
     state: CPU_DEVELOPMENT_REMAINING
   REQ-15:
-    note: cache_salt Gateway 대역
-    state: CPU_DEVELOPMENT_REMAINING
+    note: 기존 인증 Gateway 경로를 재사용. 수집 완료된 위조 salt 4xx만 정상 대조에서 분리. 실제 Gateway·엔진 경로 재실증 필요
+    state: GPU_CONFIRMATION_ONLY
   REQ-16:
-    note: LoRA·멀티모달·모델 세대 문맥 사례
+    note: 네 문맥 사례와 이미지 뒤 텍스트 옵션 준비. 기존 LoRA·모델 세대 FAIL 보존. 공통 텍스트 적중과 이미지 블록 소비를 구분할 media 판정 기준 검토 필요
     state: CPU_DEVELOPMENT_REMAINING
   REQ-17:
-    note: 통계 설계(방향·워밍업·순서·표본·오버헤드 대조)
-    state: CPU_DEVELOPMENT_REMAINING
+    note: 통계 설계·2026-11-03 GPU 표본과 오버헤드 대조 보존. 공식 AUC 한도·최소 표본 수의 기업 정책 입력 대기
+    state: ENTERPRISE_INPUT_WAITING
   REQ-18:
     note: V2 RequestState/Sampler와 서빙 요청·세대 소비를 묶는 producer
     state: CPU_DEVELOPMENT_REMAINING

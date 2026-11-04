@@ -1729,3 +1729,10 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 결과: 69개 중 GPU_PARTIAL_MEASURED 11, GPU_PARTIAL_EXAMPLE 2(REQ-05·LIF-14), GPU_COMPONENT_DECLARED_ONLY 3(LIF-13·REQ-19·REQ-20), 나머지 DEFERRED_NOT_MEASURED. 원 질문 전체 완료 0. 11-02 PACK31 결과(OBS-03 등)는 현행 팩 기록이 아니어서 넣지 않았다. 담당 dev-1 26 / gpu 43.
 - 테스트 결과: `test_checklist_status.py`·`test_prepare_checklist_cases.py` 34 passed(macOS 3.12.13). `--check` exit0. 제품 소스·팩·manifest 변경 없음.
 - 다음 단계: 묶음 2 native 수집기.
+
+### 2026-11-04 1단계 묶음 3 Codex 인수
+- 한 일: Claude 한도 중단 시점의 REQ-15 수정·회귀 시험을 보존하고 인수했다. 수집 완료된 위조 salt 4xx만 정상 대조에서 분리하고 일반 요청 오류·5xx·불완전 수집은 성공으로 만들지 않는다. 엔진 실행기 판본은 0.1.2다. REQ-16은 선택 media.text_after와 req16-full CLI 옵션·닫힌 PNG+앞뒤 텍스트 전송을 추가했다. 기본 사례·판정 predicate 세 개의 AST는 그대로다.
+- 현황: REQ-15는 GPU_CONFIRMATION_ONLY, REQ-17은 공식 통계 정책 ENTERPRISE_INPUT_WAITING, REQ-16은 media 판정 기준 검토가 남아 CPU_DEVELOPMENT_REMAINING이다. 기존 GPU EVD/RES와 FAIL은 보존했다.
+- 검증: 구현·회귀·문서 초안을 확정한 뒤 소스 목록과 현황표를 재생성하고 직접·공통 계약·불변식 및 기본 suite를 검증한다. 현재는 결과 미기록이며 아래에 실제 결과를 추가한다.
+- 남은 것: media 판정 의미 변경 승인, 실제 Gateway/GPU 경로와 새 native 수집기의 GPU 검증. 새 AWS/GPU 기동은 하지 않는다.
+- 직접 검증: macOS Python 3.12.13에서 관련 콜백·준비 자산·Kubernetes 전송·현황표·불변식 400 passed / 기존 skip1 / 기존 제외1, pytest6.77초·부모7.203초. 일반 요청4xx·위조 요청5xx/응답 없음/불완전4xx·위조 요청만 있는 경우와 media 순서/상한/거부/manifest 결합을 검증했다. 소스 목록428파일 검증(420e4513), 팩32·원B pin 유지, 현황표 --check·diff --check 통과. 전체 기본suite·wheel은 현재 HEAD의 Linux CI에서 확인할 예정이며 아직 통과로 세지 않는다.

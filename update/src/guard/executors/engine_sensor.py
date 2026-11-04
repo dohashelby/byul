@@ -177,7 +177,7 @@ def slot_observations(record):
 class EngineSensorExecutor:
     """A single executor name; source CPU is never substituted for Kubernetes."""
     name = 'engine_sensor'
-    version = '0.1.1'
+    version = '0.1.2'
 
     def __init__(self, cfg, *, implementation='kubernetes', expected_target_sha256=None):
         self.cfg = deepcopy(cfg)
@@ -398,7 +398,8 @@ class EngineSensorExecutor:
                 cleanup.append('ENGINE_SENSOR_CALLBACK_REQUEST_UNAVAILABLE')
                 break
             good = row.get('outcome') == 200 and row.get('capture_complete') is True
-            trials.append({'case_id': case['case_id'], 'role': case['role'], 'outcome': row.get('outcome'), 'normal_shape': good})
+            trials.append({'case_id': case['case_id'], 'role': case['role'], 'outcome': row.get('outcome'),
+                'capture_complete': row.get('capture_complete') is True, 'normal_shape': good})
             if good:
                 outputs[case['case_id']] = _answer(row.get('body'))
             latency = _callback_elapsed_ms(row)
@@ -416,7 +417,7 @@ class EngineSensorExecutor:
         gateway = any('principal' in case for case in cases)
         served = [c for c in cases if outputs.get(c['case_id']) is not None or c['case_id'] in elapsed]
         # Gateway가 4xx로 막은 위조 요청은 엔진에 닿지 않는다.
-        rejected = {t['case_id'] for t in trials if type(t['outcome']) is int and 400 <= t['outcome'] < 500}
+        rejected = {t['case_id'] for t in trials if t['capture_complete'] and type(t['outcome']) is int and 400 <= t['outcome'] < 500}
         rows = projection.sequence_rows(events, served) if gateway else projection.computed_rows(events, secret, tags)
         if check.id == 'REQ-14':
             result = projection.project_distributed(events, secret, tags)
@@ -442,10 +443,13 @@ class EngineSensorExecutor:
         collected = result['violation'] is not None
         finished = collected and not cleanup
         origin = DataOrigin(transport.process_observation_origin)
+        # Gateway가 위조 salt를 4xx로 거부한 것은 도전의 기대 결과다. 정상 대조에서는 뺀다.
+        forged = {c['case_id'] for c in cases if 'forged_salt' in c}
+        normal_trials = [t for t in trials if not (gateway and t['case_id'] in forged and t['case_id'] in rejected)]
         # INV-02: 끝나지 않은 실행은 MEASURED가 될 수 없다.
         draft = EvidenceDraft(status=ExecStatus.COMPLETED if finished else ExecStatus.ABORTED,
             data_origin=origin if finished or origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED,
-            normal_control={'attempted': bool(trials), 'succeeded': bool(trials) and all(t['normal_shape'] for t in trials)},
+            normal_control={'attempted': bool(normal_trials), 'succeeded': bool(normal_trials) and all(t['normal_shape'] for t in normal_trials)},
             observations={'engine_sensor_violation': {'value': result['violation'], 'collected': collected},
                           'engine_sensor_full_scope': {'value': result['full_scope'] and not gaps and not cleanup, 'collected': True}},
             challenges=[{'step': step, 'attempted': True} for step in check.challenge_steps],

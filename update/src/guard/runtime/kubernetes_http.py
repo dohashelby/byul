@@ -98,12 +98,17 @@ print(json.dumps({"schema":"guard-lab-lora-copy/1","files_sha256":files},separat
 
 
 def _callback_content(content):
-    """Text, or the closed REQ-16 text plus one generated PNG part."""
+    """Text, or REQ-16 text plus one generated PNG and optional bounded trailing text."""
     if type(content) is str:
         return 0<len(content)<=4096
-    if type(content) is not list or len(content)!=2 or any(type(part) is not dict for part in content):
+    if type(content) is not list or len(content) not in (2,3) or any(type(part) is not dict for part in content):
         return False
-    text,image=content;url=(image.get("image_url") or {}).get("url") if type(image.get("image_url")) is dict else None
+    if len(content)==3:
+        tail=content[2]
+        if (set(tail)!={"type","text"} or tail["type"]!="text" or type(tail["text"]) is not str or not 0<len(tail["text"])<=4096
+                or type(content[0].get("text")) is not str or len(content[0]["text"])+len(tail["text"])>4096):
+            return False
+    text,image=content[:2];url=(image.get("image_url") or {}).get("url") if type(image.get("image_url")) is dict else None
     return (set(text)=={"type","text"} and text["type"]=="text" and type(text["text"]) is str and 0<len(text["text"])<=4096
         and set(image) in ({"type","image_url"},{"type","image_url","uuid"}) and image["type"]=="image_url"
         and set(image["image_url"])=={"url"} and type(url) is str and url.startswith("data:image/png;base64,") and len(url)<=65536

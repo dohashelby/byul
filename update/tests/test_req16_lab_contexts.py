@@ -62,6 +62,48 @@ def test_media_content_is_a_reproducible_png_part():
     assert not _callback_content(bad) and not _callback_content([parts[0]])
 
 
+def test_media_can_have_text_after_the_same_generated_image():
+    media = {'seed': 9, 'uuid': 'same-id', 'text_after': ' '.join('after' for _ in range(100))}
+    projection.validate_cases('REQ-16', [{'case_id': 'm', 'role': 'probe', 'prompt': 'before', 'media': media}])
+    parts = projection.message_content('before', media)
+    assert parts[:2] == projection.message_content('before', {'seed': 9, 'uuid': 'same-id'})
+    assert parts[2] == {'type': 'text', 'text': media['text_after']} and _callback_content(parts)
+    world = LabWorld(); http = transport(world)
+    assert http('kubernetes-probe', chat('fixture-model', parts), 5)[0]['outcome'] == 200
+    assert world.posts[-1]['body']['messages'][0]['content'] == parts
+
+
+@pytest.mark.parametrize('tail', [None, '', 2, 'x' * 4097, {'url': 'https://example.invalid/x'}])
+def test_invalid_media_trailing_text_is_rejected_in_the_manifest(tail):
+    with pytest.raises(ValueError, match='ENGINE_CALLBACK_CASES_INVALID'):
+        projection.validate_cases('REQ-16', [{'case_id': 'm', 'role': 'probe', 'prompt': 'before',
+            'media': {'seed': 1, 'text_after': tail}}])
+
+
+def test_media_text_limit_includes_the_nonce_and_trailing_text():
+    case = {'case_id': 'm', 'role': 'probe', 'prompt': 'b', 'media': {'seed': 1, 'text_after': 'x' * (4096 - 34)}}
+    projection.validate_cases('REQ-16', [case])
+    assert _callback_content(projection.message_content('n' * 32 + ' b', case['media']))
+    case['media']['text_after'] += 'x'
+    with pytest.raises(ValueError, match='ENGINE_CALLBACK_CASES_INVALID'):
+        projection.validate_cases('REQ-16', [case])
+
+
+@pytest.mark.parametrize('damage', ['image', 'extra-field', 'empty', 'oversize', 'four-parts', 'remote-image'])
+def test_transport_does_not_open_arbitrary_multimodal_content(damage):
+    parts = projection.message_content('before', {'seed': 1, 'text_after': 'after'})
+    if damage == 'image': parts[2] = deepcopy(parts[1])
+    elif damage == 'extra-field': parts[2]['url'] = 'https://example.invalid/x'
+    elif damage == 'empty': parts[2]['text'] = ''
+    elif damage == 'oversize': parts[2]['text'] = 'x' * 4096
+    elif damage == 'four-parts': parts.append({'type': 'text', 'text': 'another'})
+    else: parts[1]['image_url']['url'] = 'https://example.invalid/x.png'
+    world = LabWorld(); http = transport(world)
+    with pytest.raises(KubernetesBindingError):
+        http('kubernetes-probe', chat('fixture-model', parts), 5)
+    assert not world.posts
+
+
 class LabWorld(BindingWorld):
     """Owned-namespace label, the fixed copy program and the reload POST; nothing else."""
     def __init__(self, *, owned=True):

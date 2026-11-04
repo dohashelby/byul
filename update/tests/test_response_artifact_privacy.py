@@ -71,7 +71,7 @@ def test_original_response_policy_uses_complete_transient_data_without_saving_it
         "UNKNOWN" if mode in {"ignored","completion"} else "PASS")
     assert res.verdicts.security.value==expected
     assert evd.normal_control.succeeded is (mode not in {"leak-late","exception"})
-    assert evd.execution.executor.version=="0.2.0" and evd.data_origin.value=="EXAMPLE"
+    assert evd.execution.executor.version=="0.2.1" and evd.data_origin.value=="EXAMPLE"  # 0.2.1: API 별칭으로 모델 비교
     data=payload(store,evd)
     assert data["artifact_profile"]==content.ARTIFACT_PROFILE and len(data["samples"])==len(sent)
     first=data["samples"][0]

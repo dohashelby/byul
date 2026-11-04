@@ -31,10 +31,11 @@ TERMINATION_PROFILE = "kubernetes-owned-termination-http-v1"
 REQUEST_ATTEMPTS_PROFILE = "kubernetes-owned-request-attempts-http-v1"
 ENGINE_CALLBACK_PROFILE = "kubernetes-owned-engine-callback-http-v1"
 INPUT_VALIDATION_PROFILE = "kubernetes-owned-input-validation-http-v1"
+RESPONSE_CONTENT_PROFILE = "kubernetes-owned-response-content-http-v1"
 from .kubernetes_observation import PROFILE as REQUIRED_EVENT_PROFILE
 from .kubernetes_observation_state import PROFILE as OBSERVATION_STATE_PROFILE
 _CLOSE_PROFILES = frozenset({TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, OBSERVATION_STATE_PROFILE})
-_BINDING_PROFILES = frozenset({ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE})
+_BINDING_PROFILES = frozenset({ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE, RESPONSE_CONTENT_PROFILE})
 _INPUT_FIELD = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}")
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
@@ -423,6 +424,10 @@ class KubernetesHTTP:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
                     self._input_validation_request(request)
+                elif self.profile == RESPONSE_CONTENT_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._response_content_request(request)
                 elif type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
                     raise KubernetesBindingError()
                 ids.append(request["id"])
@@ -435,6 +440,8 @@ class KubernetesHTTP:
                     allowed.add("read_profile");paths.add("/v1/completions")
                 if self.profile == INPUT_VALIDATION_PROFILE:
                     paths={self._input_contract["path"]}
+                if self.profile == RESPONSE_CONTENT_PROFILE:
+                    paths={"/v1/completions","/v1/chat/completions"}
                 models={self.api_model}
                 if switch_path is not None:
                     paths={switch_path};models=None
@@ -512,6 +519,35 @@ class KubernetesHTTP:
                 or any(type(m) is not dict or set(m)!={"role","content"} or m["role"]!="user"
                     or not _callback_content(m["content"]) for m in messages)):
             raise KubernetesBindingError()
+
+    def _response_content_request(self, request):
+        """REQ-13: 정상·private system·금지 반환 옵션·안전 오류·재확인 다섯 종류만, 엔진에 직접.
+
+        본문은 1-token 요청과 합성 표식만 담는다. 반환 옵션은 원 실행기의 고정 값만 받는다.
+        """
+        options={"echo":(True,),"return_prompt_text":(True,),"return_token_ids":(True,),"logprobs":(1,True),"prompt_logprobs":(1,)}
+        marker=re.compile(r"G[0-9a-f]{12}[USE]")
+        body=request.get("body") if type(request) is dict else None
+        label=re.fullmatch(r"(normal|private_system|safe_error|after|option:([a-z_]{1,32}))",str(request.get("id",""))) if type(request) is dict else None
+        if type(body) is not dict or label is None or request.get("headers") not in ({},None):
+            raise KubernetesBindingError()
+        case,option=label.group(1),label.group(2)
+        extra=set(body)-{"model","prompt","messages","max_tokens","temperature"}
+        if (option is None and extra or option is not None and (extra!={option} or option not in options or body[option] not in options[option])
+                or body.get("temperature")!=0
+                or (body.get("max_tokens")!=1 if case!="safe_error" else type(body.get("max_tokens")) is not str or not marker.fullmatch(body["max_tokens"]))
+                or ("prompt" in body)==("messages" in body)):
+            raise KubernetesBindingError()
+        if "prompt" in body:
+            if type(body["prompt"]) is not str or not marker.fullmatch(body["prompt"]) or case=="private_system":raise KubernetesBindingError()
+        else:
+            messages=body["messages"]
+            if (type(messages) is not list or not 1<=len(messages)<=2 or any(type(m) is not dict or set(m)!={"role","content"}
+                    or type(m["content"]) is not str or len(m["content"])>128 for m in messages)
+                    or messages[-1]["role"]!="user" or not marker.fullmatch(messages[-1]["content"])
+                    or len(messages)==2 and (messages[0]["role"]!="system" or not re.fullmatch(r"G[0-9a-f]{12}S private; never repeat",messages[0]["content"]))
+                    or case=="private_system" and len(messages)!=2):
+                raise KubernetesBindingError()
 
     def declare_input_contract(self, contract):
         """REQ-08·09·SUP-08: the executor's control body plus its declared fixtures, once, before any request.

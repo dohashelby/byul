@@ -10,6 +10,7 @@ http-check: REQ-13·OBS-09의 EXAMPLE 정책·실행 설정·명령.
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
@@ -64,10 +65,31 @@ EXECUTORS = {'REQ-13': ('response_content', {'endpoint': '/v1/chat/completions',
                                        'roles': {'general': 'DEV1_TOKEN_GENERAL', 'admin': 'DEV1_TOKEN_ADMIN'}})}
 
 
+USAGE_SINK_PORT = 18090
+# OBS-04·05 소유 수신지. 받은 보고는 본문을 남기지 않고 JSON 키 이름·크기만 `guard-usage-sink-receipt/1`로 적는다.
+# 첫 행은 빈 기록도 읽을 수 있게 하는 시작 표식이다(usage_report.START_SCHEMA).
+USAGE_SINK = r'''
+import json,sys,time
+from http.server import BaseHTTPRequestHandler,HTTPServer
+PATH='/guard-usage/receipts.jsonl'
+def write(row):
+    with open(PATH,'a') as f: f.write(json.dumps(row,sort_keys=True,separators=(',',':'))+'\n')
+write({'schema':'guard-usage-sink-start/1'})
+class H(BaseHTTPRequestHandler):
+    def do_POST(self):
+        n=min(int(self.headers.get('Content-Length') or 0),1048576); raw=self.rfile.read(n)
+        try: value=json.loads(raw); fields=sorted(k for k in value if type(k) is str)[:64] if type(value) is dict else []
+        except ValueError: fields=[]
+        write({'schema':'guard-usage-sink-receipt/1','received_monotonic_ns':time.monotonic_ns(),
+               'sink':self.headers.get('Host','')[:255],'fields':fields,'bytes':len(raw)})
+        self.send_response(204); self.end_headers()
+    def log_message(self,*a): pass
+HTTPServer(('0.0.0.0',int(sys.argv[1])),H).serve_forever()
+'''
 LIFECYCLE_FILES = ('guard_lifecycle_sensor.py', 'sitecustomize.py', 'settings.json', 'manifest.json')
 
 
-def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None):
+def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usage=None):
     """lifecycle_dir: `guard prepare-lifecycle-sensor` 출력. 주면 RUNBOOK의 계측 기동 설정을 더한다.
 
     고정 자산은 읽기 전용 /guard-lifecycle(ConfigMap), 기록은 /guard-lifecycle/data/<session>(엔진 UID 소유 0700)이다.
@@ -92,6 +114,14 @@ def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None):
                        'volumes': [{'name': 'models', 'hostPath': {'path': '/srv/models', 'type': 'Directory'}},
                                    {'name': 'shm', 'emptyDir': {'medium': 'Memory', 'sizeLimit': '1Gi'}},
                                    {'name': 'chat-template', 'hostPath': {'path': '/srv/models/guard-chat/guard-text-chat-v1.jinja', 'type': 'File'}}]}}
+    if usage is not None:
+        # OBS-04(forbidden)·OBS-05(allowed): 보고 목적지를 같은 run의 소유 수신 Service로 바꾼다. 금지면 두 끄기 설정도 넣는다.
+        if usage not in {'forbidden', 'allowed'}:
+            raise ValueError('K3D_RENDER_INPUT_INVALID')
+        settings = {'VLLM_USAGE_STATS_SERVER': f'http://usage-sink-{run_id}.{NAMESPACE}.svc:{USAGE_SINK_PORT}/report'}
+        if usage == 'forbidden':
+            settings.update(VLLM_NO_USAGE_STATS='1', DO_NOT_TRACK='1')
+        engine['spec']['containers'][0]['env'] += [{'name': k, 'value': v} for k, v in settings.items()]
     if api_key_secret is not None:
         # PLT-10: 엔진 API 키는 Secret 참조로만 넣는다. 인자·리터럴 환경변수에 키를 두지 않는다(대상 읽기도 valueFrom을 읽지 않는다).
         if not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,62}', api_key_secret):
@@ -138,7 +168,20 @@ def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None):
                                          'resources': {'requests': {'cpu': '50m', 'memory': '64Mi'}, 'limits': {'cpu': '500m', 'memory': '256Mi'}},
                                          'volumeMounts': [{'name': 'observations', 'mountPath': '/guard-observations'}]}],
                          'volumes': [{'name': 'observations', 'emptyDir': {'sizeLimit': '16Mi'}}]}}
+    sink = {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {'name': f'usage-sink-{run_id}'[:63], 'namespace': NAMESPACE,
+            'labels': {'app': 'usage-sink', **labels}},
+            'spec': {'enableServiceLinks': False, 'automountServiceAccountToken': False, 'restartPolicy': 'Never',
+                     'securityContext': {'runAsUser': 2000, 'runAsGroup': 2000, 'runAsNonRoot': True},
+                     'containers': [{'name': 'sink', 'image': engine_image, 'imagePullPolicy': 'IfNotPresent',
+                                     'command': ['python3', '-u', '-c', USAGE_SINK], 'args': [str(USAGE_SINK_PORT)],
+                                     'securityContext': {'allowPrivilegeEscalation': False, 'capabilities': {'drop': ['ALL']}},
+                                     'resources': {'requests': {'cpu': '50m', 'memory': '64Mi'}, 'limits': {'cpu': '500m', 'memory': '256Mi'}},
+                                     'volumeMounts': [{'name': 'usage', 'mountPath': '/guard-usage'}]}],
+                     'volumes': [{'name': 'usage', 'emptyDir': {'sizeLimit': '16Mi'}}]}}
+    sink_service = {'apiVersion': 'v1', 'kind': 'Service', 'metadata': {'name': f'usage-sink-{run_id}'[:63], 'namespace': NAMESPACE, 'labels': labels},
+                    'spec': {'selector': {'app': 'usage-sink', **labels}, 'ports': [{'port': USAGE_SINK_PORT, 'targetPort': USAGE_SINK_PORT}]}}
     docs = {'namespace.yaml': namespace, 'engine.yaml': engine, 'probe.yaml': probe, 'receiver.yaml': receiver,
+            'usage-sink.yaml': sink, 'usage-sink-service.yaml': sink_service,
             **({'lifecycle.yaml': lifecycle} if lifecycle else {})}
     raw = {name: yaml.safe_dump(value, sort_keys=False).encode() for name, value in docs.items()}
     record = {'schema': SCHEMA, 'generation': GENERATION, 'profile': 'cpu', 'run_id': run_id, 'engine_image': engine_image,
@@ -186,7 +229,7 @@ def _sha_json(value):
     return raw, hashlib.sha256(raw).hexdigest()
 
 
-def gateway_lab(*, run_id, gateway_image, tokens):
+def gateway_lab(*, run_id, gateway_image, tokens, chat_temperature=False):
     """4Pod 구성의 Gateway·바깥 probe·엔진 Service·엔진 격리 정책과 runtime 설정(비밀 원문 없음).
 
     tokens: 주체 이름 → 원문 토큰. 설정에는 SHA-256만 들어간다. 원문은 호출자가 저장소 밖에 0600으로 둔다.
@@ -195,10 +238,15 @@ def gateway_lab(*, run_id, gateway_image, tokens):
         raise ValueError('K3D_GATEWAY_INPUT_INVALID')
     labels = {'guard.run': run_id, 'byul.a/generation': GENERATION}
     target_id = f'{NAMESPACE}-{run_id}'
-    policy_raw, policy_sha = _sha_json({'schema_version': 'runtime-mvp/1.1', 'policy_id': 'dev1-k3d-gateway', 'policy_version': '1',
+    # extra_fields는 runtime 정책 스키마 1.2부터 받는다(runtime mvp/policy.py _V12_FIELDS).
+    policy_schema = 'runtime-mvp/1.2' if chat_temperature else 'runtime-mvp/1.1'
+    policy_raw, policy_sha = _sha_json({'schema_version': policy_schema,
+        'policy_id': 'dev1-k3d-gateway', 'policy_version': '1',
         'target_id': target_id, 'allowed_models': [SERVED], 'output_default_tokens': 8, 'output_max_tokens': 16,
         'max_body_bytes': 65536, 'max_context_tokens': 512, 'valid_from': '2026-01-01T00:00:00+00:00',
-        'valid_until': '2027-12-31T23:59:59+00:00', 'approval_ref': 'DEV1-K3D-EXAMPLE'})
+        'valid_until': '2027-12-31T23:59:59+00:00', 'approval_ref': 'DEV1-K3D-EXAMPLE',
+        # REQ-13 Gateway 대상: 원 실행기의 고정 요청은 temperature 0을 보낸다. EXAMPLE 정책으로 chat의 0만 허용한다.
+        **({'extra_fields': {'temperature': {'mode': 'validate', 'type': 'number', 'min': 0, 'max': 0}}} if chat_temperature else {})})
     approvals_raw, approvals_sha = _sha_json({'schema_version': 'runtime-policy-approvals/1.0', 'entries': [{'policy_id': 'dev1-k3d-gateway',
         'policy_version': '1', 'sha256': policy_sha, 'approval_ref': 'DEV1-K3D-EXAMPLE', 'approved_at': '2026-11-04T00:00:00+00:00',
         'valid_until': '2027-12-31T23:59:59+00:00'}]})
@@ -208,7 +256,7 @@ def gateway_lab(*, run_id, gateway_image, tokens):
         'created_at': '2026-11-04T00:00:00+00:00', 'policy_ref': {'policy_id': 'dev1-k3d-gateway', 'policy_version': '1', 'sha256': policy_sha},
         'target_ref': target_id, 'approval': {'approved_by': 'dev1-lab-owner-EXAMPLE', 'approved_at': '2026-11-04T00:00:00+00:00',
         'approval_ref': 'DEV1-K3D-EXAMPLE'}, 'validity': {'valid_from': '2026-01-01T00:00:00+00:00', 'valid_until': '2027-12-31T23:59:59+00:00'},
-        'files': [{'role': 'gateway_policy', 'path': 'runtime-policy.json', 'schema_version': 'runtime-mvp/1.1', 'sha256': policy_sha, 'bytes': len(policy_raw)},
+        'files': [{'role': 'gateway_policy', 'path': 'runtime-policy.json', 'schema_version': policy_schema, 'sha256': policy_sha, 'bytes': len(policy_raw)},
                   {'role': 'policy_approvals', 'path': 'policy-approvals.json', 'schema_version': 'runtime-policy-approvals/1.0', 'sha256': approvals_sha, 'bytes': len(approvals_raw)},
                   {'role': 'target', 'path': 'target.json', 'schema_version': 'runtime-target/1.0', 'sha256': target_sha, 'bytes': len(target_raw)}]})
     engine_service = f'serving-engine-{run_id}'[:63]
@@ -468,12 +516,51 @@ def revocation(base, env, prepared, *, event_at, root, minutes=10):
     return policy, config
 
 
-def http_check(check_id, root):
+def usage_inputs(base, env, sink_pod, *, check, root, minutes=20):
+    """OBS-04(금지)·OBS-05(허용): 소유 수신 Pod target·EXAMPLE 정책·실행 설정. 엔진은 같은 run의 usage 설정으로 새로 기동한 것이다."""
+    from datetime import datetime, timedelta, timezone
+    from guard.runtime.kubernetes_binding import validate_container_binding
+    if check not in {'OBS-04', 'OBS-05'}:
+        raise ValueError('K3D_USAGE_CHECK_INVALID')
+    meta, spec, status = sink_pod['metadata'], sink_pod['spec'], sink_pod['status']
+    state, = (c for c in status['containerStatuses'] if c['name'] == 'sink')
+    image, = (c['image'] for c in spec['containers'] if c['name'] == 'sink')
+    binding = {'namespace': meta['namespace'], 'namespace_uid': base['kubernetes']['engine']['namespace_uid'],
+               'pod': meta['name'], 'pod_uid': meta['uid'], 'container': 'sink', 'container_id': state['containerID'],
+               'image': image, 'image_id': state['imageID'], 'restart_count': state['restartCount'], 'node': spec['nodeName'],
+               'pod_ip': status['podIP'], 'started_at': state['state']['running']['startedAt']}
+    validate_container_binding(binding)
+    sink_target = {'schema': 'guard-kubernetes-lifecycle-target/1', 'run_id': base['kubernetes']['run_id'],
+                   'environment_ref': base['environment_ref'], 'lab': True,
+                   'kubernetes': {'context': base['kubernetes']['context'], 'engine': binding}}
+    values = {'usage_allowed': check == 'OBS-05', 'usage_report_paths': ['/root/.config/vllm/usage_stats.json'],
+              'usage_settings_fresh_process': True}
+    if check == 'OBS-05':
+        # EXAMPLE 허용 범위: 소유 수신지 하나만. 허용 필드는 기업이 정한다. 비워 두면 어떤 필드든 범위 밖으로 남는다.
+        values.update(allowed_usage_fields=[], allowed_usage_sinks=[f"usage-sink-{base['kubernetes']['run_id']}.{NAMESPACE}.svc:{USAGE_SINK_PORT}"])
+    root = Path(root).absolute()
+    pack = yaml.safe_load((Path(__file__).parents[1] / 'docs/gpu-a/policy-a-draft.yaml').read_text(encoding='utf-8'))['pack']
+    policy = {'data_origin': 'EXAMPLE', 'status': 'DRAFT', 'pack': pack, 'values': {check: values},
+              'scope': {'include': [check], 'exclude': []}, 'exceptions': [], 'confirmed_by': None, 'confirmed_at': None}
+    config = '\n'.join([f"store = '{root / 'store'}'", '', '[adapter]', "name = 'vllm'", '', '[executors]', "boundary_egress = 'kubernetes'", '',
+                        '[boundary_egress]', f"target = '{root / 'target.json'}'", f"sink_target = '{root / 'sink-target.json'}'",
+                        "kubectl_binary = 'kubectl'", 'max_duration_seconds = 120', 'usage_wait_seconds = 5', ''])
+    return sink_target, policy, config
+
+
+def http_check(check_id, root, route_target=None):
+    """route_target: REQ-13 Gateway 대상. 4-Pod 경로 target과 허용 주체 토큰 환경변수 이름을 실행 설정에 더한다."""
     executor, settings = EXECUTORS[check_id]
     root = Path(root).absolute()
+    values = deepcopy(VALUES[check_id])
+    if route_target is not None:
+        if check_id != 'REQ-13':
+            raise ValueError('K3D_ROUTE_TARGET_UNSUPPORTED')
+        values['required_targets'] = ['engine', 'gateway']
+        settings = {**settings, 'route_target': str(Path(route_target).absolute()), 'allowed_key_env': 'DEV1_TOKEN_GENERAL'}
     # 팩 Ref는 기존 GPU 실측 정책 초안과 같은 PACK-BASELINE@32를 쓴다.
     pack = yaml.safe_load((Path(__file__).parents[1] / 'docs/gpu-a/policy-a-draft.yaml').read_text(encoding='utf-8'))['pack']
-    policy = {'data_origin': 'EXAMPLE', 'status': 'DRAFT', 'pack': pack, 'values': {check_id: VALUES[check_id]},
+    policy = {'data_origin': 'EXAMPLE', 'status': 'DRAFT', 'pack': pack, 'values': {check_id: values},
               'scope': {'include': [check_id], 'exclude': []}, 'exceptions': [], 'confirmed_by': None, 'confirmed_at': None}
     lines = [f"store = '{root / 'store'}'", '', '[adapter]', "name = 'vllm'", '', '[executors]', f"{executor} = 'kubernetes'",
              '', f'[{executor}]', f"target = '{root / 'target.json'}'", "kubectl_binary = 'kubectl'"]
@@ -491,7 +578,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='kind', required=True)
     r = sub.add_parser('render'); r.add_argument('--run-id', required=True); r.add_argument('--engine-image', required=True)
-    r.add_argument('--lifecycle', type=Path); r.add_argument('--api-key-secret')
+    r.add_argument('--lifecycle', type=Path); r.add_argument('--api-key-secret'); r.add_argument('--usage', choices=['forbidden', 'allowed'])
     r.add_argument('--out', type=Path, required=True)
     e = sub.add_parser('env'); e.add_argument('--render', type=Path, required=True); e.add_argument('--models', type=Path, required=True)
     e.add_argument('--out', type=Path, required=True)
@@ -500,7 +587,7 @@ def main(argv=None):
         t.add_argument('--' + name, type=Path, required=True)
     t.add_argument('--context', default='k3d-byul-cpu'); t.add_argument('--out', type=Path, required=True)
     w = sub.add_parser('gateway'); w.add_argument('--run-id', required=True); w.add_argument('--gateway-image', required=True)
-    w.add_argument('--out', type=Path, required=True)
+    w.add_argument('--out', type=Path, required=True); w.add_argument('--chat-temperature', action='store_true')
     rt = sub.add_parser('route-target'); rt.add_argument('--target', type=Path, required=True)
     for name in ('gateway-pod', 'external-pod', 'namespace'):
         rt.add_argument('--' + name, type=Path, required=True)
@@ -516,12 +603,16 @@ def main(argv=None):
     ra.add_argument('--session', required=True); ra.add_argument('--out', type=Path, required=True)
     rv = sub.add_parser('revocation'); rv.add_argument('--target', type=Path, required=True); rv.add_argument('--env', type=Path, required=True)
     rv.add_argument('--prepared', type=Path, required=True); rv.add_argument('--event-at', required=True); rv.add_argument('--out', type=Path, required=True)
+    us = sub.add_parser('usage'); us.add_argument('--check', required=True, choices=['OBS-04', 'OBS-05'])
+    us.add_argument('--target', type=Path, required=True); us.add_argument('--env', type=Path, required=True)
+    us.add_argument('--sink-pod', type=Path, required=True); us.add_argument('--out', type=Path, required=True)
     h = sub.add_parser('http-check'); h.add_argument('--check', required=True, choices=sorted(EXECUTORS))
     h.add_argument('--target', type=Path, required=True); h.add_argument('--out', type=Path, required=True)
+    h.add_argument('--route-target', type=Path)
     args = parser.parse_args(argv)
     load = lambda path: json.loads(Path(path).read_text(encoding='utf-8'))
     if args.kind == 'render':
-        raw, record = render(run_id=args.run_id, engine_image=args.engine_image, lifecycle_dir=args.lifecycle, api_key_secret=args.api_key_secret)
+        raw, record = render(run_id=args.run_id, engine_image=args.engine_image, lifecycle_dir=args.lifecycle, api_key_secret=args.api_key_secret, usage=args.usage)
         for name, data in raw.items():
             inputs._write(args.out / name, data.decode())
         inputs._write(args.out / 'render.json', record)
@@ -547,7 +638,7 @@ def main(argv=None):
         fd = os.open(secret_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, 'w') as stream:
             stream.write(''.join(f'DEV1_TOKEN_{name.upper()}={value}\n' for name, value in tokens.items()))
-        for name, data in gateway_lab(run_id=args.run_id, gateway_image=args.gateway_image, tokens=tokens).items():
+        for name, data in gateway_lab(run_id=args.run_id, gateway_image=args.gateway_image, tokens=tokens, chat_temperature=args.chat_temperature).items():
             inputs._write(args.out / name, data.decode())
         print(json.dumps({'gateway': str(args.out), 'tokens_file': str(secret_file), 'principals': sorted(PRINCIPALS)}))
     elif args.kind == 'route-target':
@@ -583,8 +674,14 @@ def main(argv=None):
         inputs._write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True))
         inputs._write(args.out / 'guard.toml', config)
         print(json.dumps({'check': 'PLT-10', 'out': str(args.out)}))
+    elif args.kind == 'usage':
+        sink_target, policy, config = usage_inputs(load(args.target), load_environment(args.env), load(args.sink_pod), check=args.check, root=args.out)
+        inputs._write(args.out / 'target.json', load(args.target)); inputs._write(args.out / 'sink-target.json', sink_target)
+        inputs._write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True))
+        inputs._write(args.out / 'guard.toml', config)
+        print(json.dumps({'check': args.check, 'out': str(args.out)}))
     else:
-        policy, config = http_check(args.check, args.out)
+        policy, config = http_check(args.check, args.out, route_target=args.route_target)
         inputs._write(args.out / 'target.json', load(args.target))
         inputs._write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True))
         inputs._write(args.out / 'guard.toml', config)

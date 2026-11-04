@@ -4,26 +4,26 @@ checks:
     note: daemon 세대·release 주체·후속 공급을 인증 경계에 연결하는 수집기
     state: CPU_DEVELOPMENT_REMAINING
   OBS-01:
-    note: lab 대역과 k3d CPU 실측
+    note: "실행기가 엔진에 직접 요청하고 엔진 쪽 감사 기록을 읽는 설계라 BYUL 구성(감사 기록은 runtime Gateway)과 맞지 않는다. Gateway 경로 수집 프로필(응답 X-Request-ID 상관)이 필요해 팩 개정이 따른다. 1단계 중 팩 개정은 GPU 담당 기준을 바꾸므로 1단계 뒤로 미룸"
     state: CPU_DEVELOPMENT_REMAINING
   OBS-04:
-    note: lab 대역과 k3d CPU 실측
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "Kubernetes 구현 추가, k3d CPU 진단 PASS/PASS(EXAMPLE, 집계 제외). 수신 센서 양성 대조와 GPU 이미지 실측은 2단계"
+    state: GPU_CONFIRMATION_ONLY
   OBS-05:
-    note: lab 대역과 k3d CPU 실측
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "Kubernetes 구현은 OBS-04와 같다. usage 허용 CPU 엔진이 warm-up에서 두 번 멈춰 측정 못 함(원인 미확인). 허용 필드·목적지는 기업 결정. 2단계 GPU 이미지에서 실행"
+    state: GPU_CONFIRMATION_ONLY
   OBS-06:
     note: "k3d RBAC 두 신원 진단 완료(허용 읽기 성공, 무권한 거부, UNKNOWN). 기업 로그 사본 목록과 거부 확정 감사 기록이 필요"
     state: ENTERPRISE_INPUT_WAITING
   OBS-09:
-    note: 'Kubernetes 실행기 구현. 로컬 k3d(arm64)는 검토 로그 계약 밖이라 UNKNOWN. arm64는 검토 목록에 넣지 않고 Linux amd64 환경에서 실측'
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "Kubernetes 실행기 구현과 k3d 진단. arm64는 검토 로그 계약 밖이라 UNKNOWN(사용자 결정으로 목록에 넣지 않음). 2단계에 GPU 이미지 로거·포매터 SHA 대조 후 계약에 더하고 실행"
+    state: GPU_CONFIRMATION_ONLY
   OBS-11:
-    note: 'Kubernetes 읽기 경로 구현. 수집기 중단·복구 lab 절차가 없어 실측 전'
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "Kubernetes 읽기 경로 구현(시험). 수집 상태 기록의 생산자가 없다. 기업 수집 파이프라인 또는 runtime observation feed(heartbeat·공백 표식) 연결과 수집기 중단·복구 절차가 필요"
+    state: ENTERPRISE_INPUT_WAITING
   PLT-07:
-    note: lab 대역과 k3d CPU 실측
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "k3d 진단: 송신 제한 없음 FAIL 검출, 차단 시 UNKNOWN(차단과 다른 실패를 구분 못 함, 설계대로). 차단 확인에는 정책 집행 기록(예: Hubble flow)이 필요. 2단계 GPU lab 실행"
+    state: GPU_CONFIRMATION_ONLY
   PLT-10:
     note: "k3d CPU에서 native 결합까지 COMPLETED(대조 키 수락·퇴역 키 handler 전 거부 3회, UNKNOWN: 발급자 사건 미검증). 실측은 2단계 GPU lab"
     state: GPU_CONFIRMATION_ONLY
@@ -31,29 +31,29 @@ checks:
     note: "실행 불가: 살아 있는 연결 중 철회 가능한 자격 발급자가 없다(vLLM 고정 키, runtime revocations는 정책 철회). 철회 가능한 IdP 또는 runtime 자격 철회와 사건 기록 필요"
     state: ENTERPRISE_INPUT_WAITING
   PLT-12:
-    note: lab 대역과 k3d CPU 실측
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "폐기 자격 사본 목록(비밀 저장소·환경변수·파일·백업)과 그 기록 생산자는 기업 자격 관리의 사실이라 lab에서 만들지 않는다. 기업 입력 대기"
+    state: ENTERPRISE_INPUT_WAITING
   REQ-01:
-    note: "runtime Gateway 4-Pod k3d 진단: 격리 PASS, 정책 삭제 FAIL(EXAMPLE). 64개 초과 묶음 결함 수정. 실측은 2단계 GPU lab"
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "runtime Gateway 4-Pod k3d 진단: 격리 PASS, 정책 삭제 FAIL(EXAMPLE, 집계 제외). 64개 초과 묶음 결함 수정. 실측은 2단계 GPU lab"
+    state: GPU_CONFIRMATION_ONLY
   REQ-02:
     note: "runtime Gateway 기록 + native 센서 복합 수집이 k3d CPU에서 COMPLETED(UNKNOWN: 생산자 미인증, 인가 미검증). 남은 것은 생산자 인증(runtime 합의)과 GPU 이미지 SHA 대조 후 2단계 실행"
     state: GPU_CONFIRMATION_ONLY
   REQ-03:
-    note: "runtime Gateway 4-Pod k3d 진단: 관리 경로 404로 security UNKNOWN, functional FAIL. 관리 경로 계약은 runtime 담당과 합의 필요"
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "runtime Gateway 4-Pod k3d 진단: 관리 경로(관리자 /metrics 포함) 404로 security UNKNOWN, functional FAIL. 관리 역할·관리 경로 정의가 필요(runtime 담당·기업)"
+    state: ENTERPRISE_INPUT_WAITING
   REQ-04:
-    note: lab 대역과 k3d CPU 실측
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "runtime Gateway는 엔진 요청 header를 새로 만든다(Content-Type·X-Request-ID·엔진 키만, 소스 backend.request_headers). 클라이언트 신원 header를 넘기지 않고 엔진은 신원으로 인가하지 않는다. 적용 조건(전달 신원을 인가에 사용) 불성립 후보로, 적용 제외 여부는 사용자 결정 대기"
+    state: ENTERPRISE_INPUT_WAITING
   REQ-06:
     note: "사용자 결정(2026-11-04): 대상 구성에서 적용 제외. runtime Gateway가 저장 Responses를 제공하지 않음(/v1/responses 생성·조회 404). Gateway가 이 경로를 열면 다시 적용"
     state: NOT_APPLICABLE_IN_TARGET
   REQ-11:
-    note: lab 대역과 k3d CPU 실측
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "Kubernetes 경로 k3d 진단: arm64 CPU 이미지는 고정 소비 소스 계약·관리 템플릿 신원 밖이라 요청 0(UNKNOWN). 검토된 Linux amd64 GPU 이미지에서 2단계 실행"
+    state: GPU_CONFIRMATION_ONLY
   REQ-13:
-    note: 'Kubernetes 실행기 구현과 k3d CPU 실측 완료(security FAIL - 금지 반환 옵션 수용, EXAMPLE). Gateway 대상 Kubernetes 바인딩 개발 남음'
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "엔진·Gateway 두 대상 Kubernetes 경로 k3d 진단 완료(엔진은 금지 옵션 수용 FAIL, Gateway는 3개 모두 400 거부; EXAMPLE, 집계 제외). 허용 응답·오류 필드 목록은 기업 결정. 실측은 2단계 GPU lab"
+    state: GPU_CONFIRMATION_ONLY
   REQ-14:
     note: 중간 tensor/buffer 계보 설계와 TP2 실행 묶음
     state: CPU_DEVELOPMENT_REMAINING

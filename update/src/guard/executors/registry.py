@@ -50,6 +50,7 @@ from .kubernetes_profiler_observation import KubernetesProfilerObservationExecut
 from .kubernetes_observation_identity import KubernetesObservationIdentityExecutor
 from .kubernetes_ipc_product import KubernetesIPCProductExecutor
 from .kubernetes_egress_product import KubernetesEgressProductExecutor
+from .kubernetes_usage_report import kubernetes_boundary_egress
 from .kubernetes_native_route import KubernetesNativeRouteExecutor
 from .kubernetes_model_authorization import KubernetesModelAuthorizationExecutor
 from .kubernetes_request_termination import KubernetesRequestTerminationExecutor
@@ -68,7 +69,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "engine_sensor:source-cpu": lambda cfg: EngineSensorExecutor(cfg.get("engine_sensor", {}), implementation="source-cpu"),
     "lifecycle_transition:kubernetes": lambda cfg: LifecycleTransitionExecutor(cfg.get("lifecycle_transition", {}), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "profiler_observation:source-cpu": lambda cfg: KubernetesProfilerObservationExecutor(cfg.get("profiler_observation", {}), implementation="source-cpu"),
-    "boundary_egress:kubernetes": lambda cfg: KubernetesEgressProductExecutor(cfg.get("boundary_egress", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "boundary_egress:kubernetes": lambda cfg: kubernetes_boundary_egress(cfg.get("boundary_egress", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "native_route:kubernetes": lambda cfg: KubernetesNativeRouteExecutor(cfg.get("native_route", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "unix_ipc:kubernetes": lambda cfg: KubernetesIPCProductExecutor(cfg.get("unix_ipc", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "observation_identity:kubernetes": lambda cfg: KubernetesObservationIdentityExecutor(cfg.get("observation_identity", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),

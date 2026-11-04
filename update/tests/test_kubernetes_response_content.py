@@ -117,3 +117,29 @@ def test_executor_is_registered_and_rejects_unknown_settings(tmp_path):
     executor = module.KubernetesResponseContentExecutor({'target': str(tmp_path / 'target.json'), 'shell': 'x'}, runner=_no_kubectl)
     with pytest.raises(ValueError, match='KUBERNETES_RESPONSE_CONTENT_CONFIGURATION_INVALID'):
         executor.run(baseline_pack().checks['REQ-13'], load_environment(tmp_path / 'env.json'), VALUES, object(), tmp_path / 'w')
+
+
+def test_gateway_leg_goes_to_the_route_transport_and_the_engine_leg_drops_only_the_caller_key():
+    from guard.executors.kubernetes_response_content import _Legs
+    from guard.runtime.kubernetes_routes import EXTERNAL
+    calls = []
+    def engine(network, requests, timeout):
+        calls.append(('engine', network, requests)); return [{'id': r['id'], 'outcome': 200} for r in requests]
+    def gateway(network, requests, timeout):
+        calls.append(('gateway', network, requests)); return [{'id': r['id'], 'outcome': 200} for r in requests]
+    legs = _Legs(engine, gateway)
+    request = {'id': 'normal', 'method': 'POST', 'url': 'u', 'headers': {'Authorization': 'Bearer caller'}, 'body': {'model': 'm'}}
+    legs('kubernetes-probe', [request], 5); legs(EXTERNAL, [request], 5)
+    (_, _, sent_engine), (_, _, sent_gateway) = calls[0], calls[1]
+    assert sent_engine[0]['headers'] == {} and sent_engine[0]['body'] == request['body']
+    assert sent_gateway[0]['headers'] == {'Authorization': 'Bearer caller'}
+
+
+def test_route_target_and_key_env_must_be_given_together(tmp_path):
+    from guard.executors.kubernetes_response_content import KubernetesResponseContentExecutor
+    from guard.models import load_pack
+    from pathlib import Path
+    check = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks['REQ-13']
+    for cfg in ({'target': 'x', 'route_target': 'y'}, {'target': 'x', 'allowed_key_env': 'K'}):
+        with pytest.raises(ValueError, match='KUBERNETES_RESPONSE_CONTENT_CONFIGURATION_INVALID'):
+            KubernetesResponseContentExecutor(cfg).validate_configuration(check)

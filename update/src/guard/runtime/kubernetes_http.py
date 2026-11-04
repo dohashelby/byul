@@ -33,10 +33,11 @@ ENGINE_CALLBACK_PROFILE = "kubernetes-owned-engine-callback-http-v1"
 INPUT_VALIDATION_PROFILE = "kubernetes-owned-input-validation-http-v1"
 RESPONSE_CONTENT_PROFILE = "kubernetes-owned-response-content-http-v1"
 LOG_INTEGRITY_PROFILE = "kubernetes-owned-log-integrity-http-v1"
+USAGE_CONTROL_PROFILE = "kubernetes-owned-usage-control-http-v1"
 from .kubernetes_observation import PROFILE as REQUIRED_EVENT_PROFILE
 from .kubernetes_observation_state import PROFILE as OBSERVATION_STATE_PROFILE
 _CLOSE_PROFILES = frozenset({TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, OBSERVATION_STATE_PROFILE})
-_BINDING_PROFILES = frozenset({ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE, RESPONSE_CONTENT_PROFILE, LOG_INTEGRITY_PROFILE})
+_BINDING_PROFILES = frozenset({ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE, RESPONSE_CONTENT_PROFILE, LOG_INTEGRITY_PROFILE, USAGE_CONTROL_PROFILE})
 _INPUT_FIELD = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}")
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
@@ -449,6 +450,10 @@ class KubernetesHTTP:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
                     self._log_integrity_request(request)
+                elif self.profile == USAGE_CONTROL_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._usage_control_request(request)
                 elif type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
                     raise KubernetesBindingError()
                 ids.append(request["id"])
@@ -463,7 +468,7 @@ class KubernetesHTTP:
                     paths={self._input_contract["path"]}
                 if self.profile == RESPONSE_CONTENT_PROFILE:
                     paths={"/v1/completions","/v1/chat/completions"}
-                if self.profile == LOG_INTEGRITY_PROFILE:
+                if self.profile in {LOG_INTEGRITY_PROFILE, USAGE_CONTROL_PROFILE}:
                     paths={"/v1/completions"}
                 models={self.api_model}
                 if switch_path is not None:
@@ -571,6 +576,15 @@ class KubernetesHTTP:
                     or len(messages)==2 and (messages[0]["role"]!="system" or not re.fullmatch(r"G[0-9a-f]{12}S private; never repeat",messages[0]["content"]))
                     or case=="private_system" and len(messages)!=2):
                 raise KubernetesBindingError()
+
+    def _usage_control_request(self, request):
+        """OBS-04·05: 보고 전후 사이의 정상 추론 1회. 원 실행기의 기능 대조 요청 하나만 받는다."""
+        body=request.get("body") if type(request) is dict else None
+        # 고정 stream probe 식별자 규칙에 공백이 없어 원 기능 대조 식별자 대신 이 이름으로만 받는다(실행기가 되돌린다).
+        if (type(request) is not dict or request.get("id")!="usage-control" or request.get("method")!="POST"
+                or request.get("headers") not in ({},None) or type(body) is not dict
+                or set(body)!={"model","prompt","max_tokens"} or body["prompt"]!="ping" or body["max_tokens"]!=1):
+            raise KubernetesBindingError()
 
     def _log_integrity_request(self, request):
         """OBS-09: 원 실행기의 고정 1-token completion과 정해진 일곱 body request_id만."""

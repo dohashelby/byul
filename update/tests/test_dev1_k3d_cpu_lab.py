@@ -118,3 +118,19 @@ def test_api_key_is_rendered_only_as_a_secret_reference():
     assert key == {'name': 'VLLM_API_KEY', 'valueFrom': {'secretKeyRef': {'name': 'engine-api-key-x', 'key': 'api-key'}}}
     with pytest.raises(ValueError, match='K3D_RENDER_INPUT_INVALID'):
         lab.render(run_id='dev1-k3d-9', engine_image=image, api_key_secret='Bad Name')
+
+
+def test_gateway_chat_temperature_uses_policy_schema_1_2_and_allows_only_zero():
+    import json
+    import yaml
+    from tools import dev1_k3d_cpu_lab as lab
+    tokens = {name: f'EXAMPLE-raw-token-{name}-0123456789' for name in lab.PRINCIPALS}
+    image = 'k3d-byul-reg:5111/serving-gateway@sha256:' + 'a' * 64
+    config = yaml.safe_load(lab.gateway_lab(run_id='dev1-k3d-9', gateway_image=image, tokens=tokens, chat_temperature=True)['gateway-config.yaml'])
+    policy, bundle = json.loads(config['data']['runtime-policy.json']), json.loads(config['data']['bundle.json'])
+    assert policy['schema_version'] == 'runtime-mvp/1.2'
+    assert policy['extra_fields'] == {'temperature': {'mode': 'validate', 'type': 'number', 'min': 0, 'max': 0}}
+    entry, = (f for f in bundle['files'] if f['path'] == 'runtime-policy.json')
+    assert entry['schema_version'] == 'runtime-mvp/1.2'
+    plain = yaml.safe_load(lab.gateway_lab(run_id='dev1-k3d-9', gateway_image=image, tokens=tokens)['gateway-config.yaml'])
+    assert json.loads(plain['data']['runtime-policy.json'])['schema_version'] == 'runtime-mvp/1.1'

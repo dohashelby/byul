@@ -1,6 +1,6 @@
 # Tetragon 선택적 차단 설계안
 
-상태: **설계 제안, 미구현·미적용**. 이 문서의 `enforce`는 앞으로 검증할 정책 모드이며 실제 엔진에서 차단됐다는 뜻이 아니다. 현재 intent의 `tetragon_mode`는 `monitor|enforce_probe`이고, 렌더러는 `enforce_probe`일 때만 정확한 시험 경로 쓰기에 `TG-DENY-01`의 `Post`+`Override(argError: -1)`을 낸다. 나머지 `TG-SECRET-01`·`TG-ASSET-01`·`TG-CACHE-01`은 `Post` 감시다. 근거: `runtime/src/serving_runtime/enforcement/intent.py:465-472`, `runtime/src/serving_runtime/enforcement/tetragon.py:22-25,74-109`. 로컬 kind L-05 외의 차단 효과는 미확인이고, 그 시험도 업그레이드 직후 불일치 원인이 남았다. 근거: `runtime/docs/상세_안내.md:570-582`, `runtime/docs/지원_미지원_목록.md:40`.
+상태: **제한적 구현·단위 시험, 클러스터 미적용·미검증**. 이 문서의 `enforce`는 앞으로 검증할 정책 모드이며 실제 엔진에서 차단됐다는 뜻이 아니다. 현재 intent의 `tetragon_mode`는 `monitor|enforce_probe`이고 `enforce_probe`는 시험 경로 쓰기 `TG-DENY-01`만 제어한다. 선택 필드 `tetragon_rule_modes`에서 `TG-SECRET-01: enforce`를 지정하면 정확한 보호 파일 읽기에 `Post`+`Override(argError: -1)`을 낸다. 그 외 운영 파일 규칙은 `Post` 감시다. 근거: `runtime/src/serving_runtime/enforcement/intent.py:465-472`, `runtime/src/serving_runtime/enforcement/tetragon.py:22-25,74-109`. 로컬 kind L-05 외의 차단 효과는 미확인이고, 그 시험도 업그레이드 직후 불일치 원인이 남았다. 근거: `runtime/docs/상세_안내.md:570-582`, `runtime/docs/지원_미지원_목록.md:40`.
 
 ## 1. 후보와 우선순위
 
@@ -66,9 +66,17 @@ Tetragon 훅은 커널 호출을 보며 `loading`·`compiling`·`inferring`은 �
 - **보호 경로 사용:** 엔진이 진짜 비밀 파일을 읽는 경우 Override가 정상 동작을 깨뜨릴 수 있다. 가짜 파일 AWS-10은 이를 배제하지 못한다. 파일 경로 접두·링크·복합 mask·다른 API의 우회나 중복 이벤트도 시험 전까지 **미확인**. 근거: `runtime/deploy/gpu-lab/ACCEPTANCE.md:167`, `runtime/src/serving_runtime/enforcement/tetragon.py:53-63`.
 - **관측과 집행의 차이:** Tetragon 이벤트 `Override`는 시도 근거다. 차단이 확인되려면 읽기 호출 결과와 같은 대상의 대조가 필요하다. 수집 중단·gap이 있으면 사건 부재를 허용/차단 증거로 쓰지 않는다. 근거: `contracts/README.md:87-99`, `runtime/docs/AWS_GPU_서버3회차_결과_20261104.md:40-44`.
 
+## 구현 상태 (2026-11-05)
+
+- intent 1.1의 선택 필드 `tetragon_rule_modes`를 구현했다. `TG-SECRET-01`만 `enforce` 가능하며 `TG-ASSET-01`·`TG-ASSET-02`·`TG-CACHE-01`은 명시적 `monitor`만 가능하다. `TG-DENY-01`은 이 필드에서 거부하며 기존 `tetragon_mode=enforce_probe`만 제어한다. `enforce_probe`가 `TG-SECRET-01`의 차단을 암시하지 않고 두 설정은 함께 쓸 수 있다. 필드를 생략하면 기존 렌더 결과·CLI 출력이 그대로다.
+- `TG-SECRET-01: enforce`에는 비어 있지 않은 정확한 파일 경로만 받는다. 첫 적용의 보수적 형식 기준으로 끝에 `/`가 붙은 경로, 확장자가 없는 디렉터리형 경로, 다른 보호 경로의 상위 경로를 거부한다. 컨테이너 안 파일 유형을 로컬 intent 검증에서 확인할 수 없으므로, 확장자가 있는 디렉터리나 링크의 실제 유형은 kind에서 확인해야 한다. 확장자가 없는 파일은 이 첫 적용에서 사용할 수 없다.
+- 렌더러는 파일 경로에 `Equal`, read mask `4`, `Post`와 `Override(argError: -1)`을 낸다. `-1`은 `-EPERM`이며 기존 L-05 `TG-DENY-01`의 측정값과 바로 대조할 수 있어서 `-EACCES(-13)` 대신 선택했다. 실제 사용자 공간 errno와 차단 효과는 아직 미검증이다. `enforce render`는 선택적 운영 차단이 있을 때 `차단 규칙 1개(미검증)`처럼 표시한다.
+- 이벤트 어댑터의 기존 `KPROBE_ACTION_OVERRIDE` → `action_mode=enforce` 분류와 `rule_id` 보존을 시험했다. 이는 차단 **시도** 기록이고 성공 증명은 아니다. 로컬 kind 도구에 `--secret-enforce-check` L-05b를 준비해 monitor→enforce→monitor, errno·원시 이벤트·Pod UID·정상 요청 200을 대조한다. 실제 kind·AWS 시험은 하지 않았다.
+
 ## 다음 구현 단계
 
-1. runtime intent 로더·검증에 선택적 규칙별 모드를 추가하고 기존 1.0/1.1·`enforce_probe` 호환 시험을 작성한다. **미구현**.
-2. `TG-SECRET-01`의 제한된 `Override` 렌더링과 정확 경로·mask·커널 조건 시험을 추가한다. **미구현**.
-3. L-05 확장과 AWS-10 변형의 도구·되돌리기·증거 판정을 구현해 kind에서 먼저 실행한다. **미구현**.
+
+1. runtime intent 로더·검증에 선택적 규칙별 모드를 추가하고 기존 1.0/1.1·`enforce_probe` 호환 시험을 작성한다. **구현·단위 시험 완료**.
+2. `TG-SECRET-01`의 제한된 `Override` 렌더링과 정확 경로·mask 시험을 추가했다. **구현·단위 시험 완료; 커널 조건 실측 미확인**.
+3. L-05b 로컬 kind opt-in 도구·되돌리기·증거 판정을 준비했다. **kind 미실행; AWS-10 변형은 후속 범위**.
 4. platform과 개별 사건의 `차단` 표시·계약 변경 필요성을 합의하고, 우선은 검증 시험 결과에만 `차단 확인`을 표시한다. **합의 필요/미구현**.

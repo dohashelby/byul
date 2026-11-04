@@ -479,9 +479,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         except (OSError, ValueError, IntentError) as error:
             print(f"통제 후보 생성 실패: {error}", file=sys.stderr)
             return 1
+        blocked_rules = sum(mode == "enforce" for _, mode in intent.tetragon_rule_modes)
+        blocked_summary = f", 차단 규칙 {blocked_rules}개(미검증)" if blocked_rules else ""
         print(
             f"{len(written)}개 생성: Cilium 1.20.3 / Tetragon 1.7.1 문법 기준 후보, "
-            "클러스터 미적용·미검증"
+            f"클러스터 미적용·미검증{blocked_summary}"
         )
         return 0
     if args.command == "enforce" and args.enforce_command == "ingest":

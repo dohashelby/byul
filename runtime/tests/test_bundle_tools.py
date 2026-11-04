@@ -61,6 +61,19 @@ class BundleToolsTest(unittest.TestCase):
         bundle = verify_policy_bundle(self.out / engine)
         return bundle, lab
 
+    def test_build_bundle_with_enforced_secret_intent(self):
+        self._build("vllm")
+        intent_path = self.root / "vllm-intent.json"
+        intent = json.loads(intent_path.read_text())
+        intent["protected_paths"]["secret_paths"] = ["/var/run/secrets/serving/probe-secret.txt"]
+        intent["tetragon_rule_modes"] = {"TG-SECRET-01": "enforce"}
+        intent_path.write_text(json.dumps(intent))
+        bundle = build_bundle(str(self.policy_path), self.digest, str(self.server_path),
+                              str(intent_path), str(self.out), "enforce-secret")
+        self.assertEqual(bundle.bundle_id, "enforce-secret")
+        self.assertEqual(verify_policy_bundle(self.out / "enforce-secret").bundle_id,
+                         "enforce-secret")
+
     def test_golden_both_engines_and_rejects_draft_or_hash(self):
         for engine in ("vllm", "sglang"):
             bundle, lab = self._build(engine)

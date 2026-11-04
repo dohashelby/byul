@@ -8,9 +8,11 @@ from pathlib import Path
 
 import pytest
 
+import json
+
 from tools.checklist_status import (
-    CSV_PATH, MD_PATH, ROOT, build_rows, historical_evidence, load_rows,
-    main, registry_keys, render_csv, render_markdown,
+    CSV_PATH, MD_PATH, ROOT, build_rows, gpu_runs, gpu_status, historical_evidence, load_phase1, load_rows,
+    main, phase1_owner, registry_keys, render_csv, render_markdown,
 )
 
 
@@ -157,3 +159,75 @@ def test_fake_and_cpu_only_implementations_do_not_count_as_connected():
     row, = build_rows(checks, matrix, **kwargs)
     assert row["supported_implementations"] == "reference-cpu"
     assert row["implementation"] == "PARTIALLY_CONNECTED"
+
+
+def _gpu_record(status, **extra):
+    return {"source": "s", "run": "r", "pack_revision": 32, "status": status, "verification_level": None,
+            "data_origin": None, "verdicts": {"security": "UNKNOWN"}, "result_ref": "", "evidence_ref": "", **extra}
+
+
+def test_gpu_status_takes_strongest_record_and_never_claims_whole_question():
+    assert gpu_status([]) == "DEFERRED_NOT_MEASURED"
+    assert gpu_status([_gpu_record("GPU_ATTEMPTED_NOT_COLLECTED")]) == "GPU_ATTEMPTED_NOT_COLLECTED"
+    assert gpu_status([_gpu_record("GPU_ATTEMPTED_NOT_COLLECTED"), _gpu_record("GPU_COMPONENT_DECLARED_ONLY")]) == "GPU_COMPONENT_DECLARED_ONLY"
+    assert gpu_status([_gpu_record("GPU_PARTIAL_EXAMPLE"), _gpu_record("GPU_PARTIAL_MEASURED")]) == "GPU_PARTIAL_MEASURED"
+    checks, matrix, kwargs = _inputs()
+    kwargs["gpu"] = {"REQ-01": [_gpu_record("GPU_PARTIAL_MEASURED", verdicts={"security": "FAIL"})]}
+    row, = build_rows(checks, matrix, **kwargs)
+    assert row["current_pack_actual_status"] == "GPU_PARTIAL_MEASURED"
+    assert json.loads(row["gpu_runs"])[0]["verdicts"] == {"security": "FAIL"}
+    kwargs["gpu"] = {"REQ-99": [_gpu_record("GPU_PARTIAL_MEASURED")]}
+    with pytest.raises(ValueError, match="gpu_or_phase1_unknown_check"):
+        build_rows(checks, matrix, **kwargs)
+
+
+def test_real_gpu_summaries_keep_exact_refs_and_separate_declared_components():
+    runs = gpu_runs(ROOT)
+    assert {r["pack_revision"] for rows in runs.values() for r in rows} == {32}
+    assert all(r["result_ref"].startswith("RES-") for rows in runs.values() for r in rows)
+    assert gpu_status(runs["LIF-13"]) == "GPU_COMPONENT_DECLARED_ONLY"
+    assert gpu_status(runs["PLT-01"]) == "GPU_PARTIAL_MEASURED"
+    assert gpu_status(runs["REQ-05"]) == "GPU_PARTIAL_EXAMPLE"
+    assert "OBS-03" not in runs  # 11-02 PACK31 결과는 현행 팩 기록이 아니다.
+    first = [r for r in runs["REQ-17"] if r["source"].endswith("GPU_RESULTS.json")]
+    assert first and {r["status"] for r in first} == {"GPU_ATTEMPTED_NOT_COLLECTED"}
+
+
+def test_gpu_summary_from_other_pack_or_unknown_schema_is_rejected(tmp_path):
+    (tmp_path / "docs/gpu-b").mkdir(parents=True)
+    run = {"episode": "M1", "check_id": "PLT-01", "EVD_status": "COMPLETED", "EVD_origin": "MEASURED",
+           "verification_level": "MEASURED", "verdicts": {}, "whole_question_complete": False,
+           "refs": [{"kind": "PACK", "id": "PACK-BASELINE", "revision": 31, "sha256": "x"}]}
+    path = tmp_path / "docs/gpu-b/x.json"
+    path.write_text(json.dumps({"schema": "byul-independent-GPU-public-summary/1", "runs": [run]}), encoding="utf-8")
+    with pytest.raises(ValueError, match="gpu_run_not_current_pack"):
+        gpu_runs(tmp_path)
+    run["refs"][0]["revision"] = 32
+    run["whole_question_complete"] = True
+    path.write_text(json.dumps({"schema": "byul-independent-GPU-public-summary/1", "runs": [run]}), encoding="utf-8")
+    with pytest.raises(ValueError, match="gpu_b_whole_question_flag"):
+        gpu_runs(tmp_path)
+    path.write_text(json.dumps({"schema": "other", "runs": []}), encoding="utf-8")
+    with pytest.raises(ValueError, match="gpu_b_schema"):
+        gpu_runs(tmp_path)
+
+
+def test_phase1_owner_follows_executor_files_and_state_files_are_owner_scoped(tmp_path):
+    assert phase1_owner({"executor": "engine_sensor"}) == "dev-1"
+    assert phase1_owner({"executor": "supply_boot"}) == "gpu"
+    assert phase1_owner({"executor": None, "retired": True}) == ""
+    rows = load_rows()
+    owners = {r["check_id"]: r["phase1_owner"] for r in rows}
+    assert sum(v == "dev-1" for v in owners.values()) == 26 and sum(v == "gpu" for v in owners.values()) == 43
+    assert all(r["phase1_state"] != "UNSET" for r in rows)
+    (tmp_path / "docs/phase1").mkdir(parents=True)
+    (tmp_path / "docs/phase1/dev-1.yaml").write_text("owner: gpu\nchecks: {}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="phase1_owner_mismatch"):
+        load_phase1(tmp_path)
+    (tmp_path / "docs/phase1/dev-1.yaml").write_text("owner: dev-1\nchecks: {REQ-01: {state: PASS}}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="phase1_state"):
+        load_phase1(tmp_path)
+    checks, matrix, kwargs = _inputs()
+    kwargs["phase1"] = {"REQ-01": {"owner": "gpu", "state": "DONE", "note": ""}}
+    with pytest.raises(ValueError, match="phase1_wrong_owner"):
+        build_rows(checks, matrix, **kwargs)

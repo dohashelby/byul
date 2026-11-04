@@ -346,6 +346,60 @@ def route_record(base, env, records_text, *, session, gateway_pod, root, minutes
     return data, policy, config, len(packet['events'])
 
 
+READER_USER, READER_GROUP = 'dev1-log-reader', 'dev1-log-readers'
+NO_READER_USER, NO_READER_GROUP = 'dev1-no-reader', 'dev1-no-readers'
+
+
+def lifecycle_target(base):
+    """엔진 Pod만 고르는 수집 target(`guard-kubernetes-lifecycle-target/1`). 같은 run·Pod 바인딩을 그대로 쓴다."""
+    return {'schema': 'guard-kubernetes-lifecycle-target/1', 'run_id': base['kubernetes']['run_id'],
+            'environment_ref': base['environment_ref'], 'lab': True,
+            'kubernetes': {'context': base['kubernetes']['context'], 'engine': base['kubernetes']['engine']}}
+
+
+def record_access(base, env, *, session, root, minutes=20):
+    """OBS-06: 엔진 Pod 로그를 읽을 수 있는 신원 하나와 없는 신원 하나(RBAC)와 주체 계획·정책·설정.
+
+    두 신원은 kubectl 가장(--as)으로 쓴다. 사본 목록(로그 sink·백업·회전 파일 등)은 기업 기록 체계의 사실이라
+    lab에서 만들지 않는다. 실행기는 그 부분을 RECORD_ACCESS_INVENTORY_UNAVAILABLE로 남긴다.
+    """
+    from datetime import datetime, timedelta, timezone
+    if not re.fullmatch(r'[0-9a-f]{32}', session):
+        raise ValueError('K3D_RECORD_SESSION_INVALID')
+    engine = base['kubernetes']['engine']
+    base = lifecycle_target(base)
+    rbac = [{'apiVersion': 'rbac.authorization.k8s.io/v1', 'kind': 'Role',
+             'metadata': {'name': 'dev1-engine-log-reader', 'namespace': engine['namespace']},
+             'rules': [{'apiGroups': [''], 'resources': ['pods'], 'resourceNames': [engine['pod']], 'verbs': ['get']},
+                       {'apiGroups': [''], 'resources': ['pods/log'], 'resourceNames': [engine['pod']], 'verbs': ['get']}]},
+            {'apiVersion': 'rbac.authorization.k8s.io/v1', 'kind': 'RoleBinding',
+             'metadata': {'name': 'dev1-engine-log-reader', 'namespace': engine['namespace']},
+             'roleRef': {'apiGroup': 'rbac.authorization.k8s.io', 'kind': 'Role', 'name': 'dev1-engine-log-reader'},
+             'subjects': [{'apiGroup': 'rbac.authorization.k8s.io', 'kind': 'User', 'name': READER_USER}]}]
+    rbac_text = yaml.safe_dump_all(rbac, sort_keys=False)
+    # 조회 권한 정책의 출처는 위 RBAC 매니페스트다. 기업 승인 정책이 아니므로 EXAMPLE 식별자를 쓴다.
+    access_ref = {'kind': 'POL', 'id': 'POL-DEV1-K3D-RECORD-ACCESS-EXAMPLE', 'revision': 1,
+                  'sha256': hashlib.sha256(rbac_text.encode()).hexdigest()}
+    target_sha = sha256_hex(canonical_json(base))
+    subjects = {'schema': 'guard-record-access-subjects/1', 'environment_ref': env.ref().model_dump(mode='json'),
+                'target_sha256': target_sha, 'policy_ref': access_ref,
+                'subjects': [{'role': 'authorized_reader', 'username': READER_USER, 'groups': [READER_GROUP, 'system:authenticated']},
+                             {'role': 'unauthorized_reader', 'username': NO_READER_USER, 'groups': [NO_READER_GROUP, 'system:authenticated']}]}
+    now = datetime.now(timezone.utc)
+    values = {'record_environment_sha256': env.ref().sha256, 'record_target_sha256': target_sha,
+              'record_subject_plan_sha256': sha256_hex(canonical_json(subjects)), 'record_inventory_session': session,
+              'record_inventory_source_sha256': hashlib.sha256(b'k3d-cpu-lab-record-copy-inventory-absent').hexdigest(),
+              'record_validity_start': now.isoformat(), 'record_validity_end': (now + timedelta(minutes=minutes)).isoformat()}
+    root = Path(root).absolute()
+    pack = yaml.safe_load((Path(__file__).parents[1] / 'docs/gpu-a/policy-a-draft.yaml').read_text(encoding='utf-8'))['pack']
+    policy = {'data_origin': 'EXAMPLE', 'status': 'DRAFT', 'pack': pack, 'values': {'OBS-06': values},
+              'scope': {'include': ['OBS-06'], 'exclude': []}, 'exceptions': [], 'confirmed_by': None, 'confirmed_at': None}
+    config = '\n'.join([f"store = '{root / 'store'}'", '', '[adapter]', "name = 'vllm'", '', '[executors]', "record_access = 'kubernetes'", '',
+                        '[record_access]', f"target = '{root / 'target.json'}'", f"subjects = '{root / 'subjects.json'}'",
+                        "kubectl_binary = 'kubectl'", 'max_duration_seconds = 120', ''])
+    return base, rbac_text, subjects, policy, config
+
+
 def http_check(check_id, root):
     executor, settings = EXECUTORS[check_id]
     root = Path(root).absolute()
@@ -388,6 +442,8 @@ def main(argv=None):
     rr = sub.add_parser('route-record'); rr.add_argument('--target', type=Path, required=True); rr.add_argument('--env', type=Path, required=True)
     rr.add_argument('--records', type=Path, required=True); rr.add_argument('--session', required=True)
     rr.add_argument('--gateway-pod', required=True); rr.add_argument('--out', type=Path, required=True)
+    ra = sub.add_parser('record-access'); ra.add_argument('--target', type=Path, required=True); ra.add_argument('--env', type=Path, required=True)
+    ra.add_argument('--session', required=True); ra.add_argument('--out', type=Path, required=True)
     h = sub.add_parser('http-check'); h.add_argument('--check', required=True, choices=sorted(EXECUTORS))
     h.add_argument('--target', type=Path, required=True); h.add_argument('--out', type=Path, required=True)
     args = parser.parse_args(argv)
@@ -442,6 +498,13 @@ def main(argv=None):
         inputs._write(args.out / 'guard.toml', config)
         print(json.dumps({'check': 'REQ-02', 'events': count, 'file_sha256': hashlib.sha256(data).hexdigest(),
                           'engine_path': f'/guard-route/data/{args.session}/route-observations.json'}))
+    elif args.kind == 'record-access':
+        selected, rbac, subjects, policy, config = record_access(load(args.target), load_environment(args.env), session=args.session, root=args.out)
+        inputs._write(args.out / 'target.json', selected); inputs._write(args.out / 'rbac.yaml', rbac)
+        inputs._write(args.out / 'subjects.json', subjects)
+        inputs._write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True))
+        inputs._write(args.out / 'guard.toml', config)
+        print(json.dumps({'check': 'OBS-06', 'out': str(args.out)}))
     else:
         policy, config = http_check(args.check, args.out)
         inputs._write(args.out / 'target.json', load(args.target))

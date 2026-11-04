@@ -57,3 +57,25 @@ def test_gateway_lab_keeps_raw_tokens_out_and_isolates_the_engine_port():
                 {'gateway_image': image, 'tokens': {'general': 'x'}}):
         with pytest.raises(ValueError, match='K3D_GATEWAY_INPUT_INVALID'):
             lab.gateway_lab(run_id='dev1-k3d-9', **bad)
+
+
+def test_record_access_grants_logs_of_the_engine_pod_only_and_leaves_the_copy_inventory_to_the_enterprise(tmp_path):
+    import yaml
+    from guard.models import canonical_json, sha256_hex
+    from tools import dev1_k3d_cpu_lab as lab
+    from tests.builders import environment
+    env = environment()
+    engine = {'namespace': 'byul-cpu-lab', 'pod': 'serving-engine-x'}
+    base = {'environment_ref': env.ref().model_dump(mode='json'),
+            'kubernetes': {'run_id': 'dev1-k3d-9', 'context': 'k3d-byul-cpu', 'engine': engine}}
+    selected, rbac, subjects, policy, config = lab.record_access(base, env, session='a' * 32, root=tmp_path)
+    assert selected['schema'] == 'guard-kubernetes-lifecycle-target/1' and set(selected['kubernetes']) == {'context', 'engine'}
+    role, binding = yaml.safe_load_all(rbac)
+    assert all(rule['resourceNames'] == ['serving-engine-x'] and rule['verbs'] == ['get'] for rule in role['rules'])
+    assert [s['name'] for s in binding['subjects']] == [lab.READER_USER]
+    values = policy['values']['OBS-06']
+    assert values['record_subject_plan_sha256'] == sha256_hex(canonical_json(subjects))
+    assert values['record_target_sha256'] == sha256_hex(canonical_json(selected)) and policy['confirmed_by'] is None
+    assert {s['username'] for s in subjects['subjects']} == {lab.READER_USER, lab.NO_READER_USER}
+    with pytest.raises(ValueError, match='K3D_RECORD_SESSION_INVALID'):
+        lab.record_access(base, env, session='x', root=tmp_path)

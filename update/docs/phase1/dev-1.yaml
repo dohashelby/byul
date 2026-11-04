@@ -13,8 +13,8 @@ checks:
     note: lab 대역과 k3d CPU 실측
     state: CPU_DEVELOPMENT_REMAINING
   OBS-06:
-    note: lab 대역과 k3d CPU 실측
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "k3d RBAC 두 신원 진단 완료(허용 읽기 성공, 무권한 거부, UNKNOWN). 기업 로그 사본 목록과 거부 확정 감사 기록이 필요"
+    state: ENTERPRISE_INPUT_WAITING
   OBS-09:
     note: 'Kubernetes 실행기 구현. 로컬 k3d(arm64)는 검토 로그 계약 밖이라 UNKNOWN. arm64는 검토 목록에 넣지 않고 Linux amd64 환경에서 실측'
     state: CPU_DEVELOPMENT_REMAINING

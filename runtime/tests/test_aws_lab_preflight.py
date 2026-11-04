@@ -90,6 +90,14 @@ class PreflightTests(unittest.TestCase):
         self.assertFalse(any(word in call for call in self.runner.calls for word in ("apply", "patch", "delete", "restart", "create")))
         self.assertNotIn("boundary_probe:chat", checks)
 
+    def test_override_check_is_opt_in_and_never_claims_kernel_support(self):
+        self.assertNotIn("kprobe_override", self.check())
+        self.args.override_check = True
+        checks = self.check()
+        self.assertEqual(checks["kprobe_override"].status, "unknown")
+        self.assertIn("CONFIG_BPF_KPROBE_OVERRIDE", checks["kprobe_override"].reason)
+        self.assertFalse(any("exec" in call or "debug" in call for call in self.runner.calls))
+
     def test_boundary_probe_is_opt_in_and_reports_both_routes(self):
         self.args.boundary_probe = True
         original_run = self.runner.run

@@ -62,6 +62,21 @@ describe("사건 로그", () => {
     expect(row.querySelector("td[title='serving-lab/serving-gateway-1']")).toBeTruthy();
   });
 
+  it("보호 파일 Override의 판정 열에 차단 표지와 원본 행위를 표시한다", async () => {
+    const sample = EVENTS.find((e) => e.source === "tetragon")!;
+    const blocked: RuntimeEvent = {
+      ...sample, event_id: "override-file", outcome: "enforce_attempted",
+      native: { ...sample.native, record: { ...sample.native.record, action_raw: "KPROBE_ACTION_OVERRIDE" } as unknown as RuntimeEvent["native"]["record"] },
+      observation: { ...sample.observation!, kind: "file_access", path: "/tmp/fake-secret", rule_id: "TG-SECRET-01", action_mode: "enforce", exec_verdict: null },
+    };
+    mockApi({ "/api/runtime/events": { items: [blocked], invalid: [], source: SOURCE, truncated: false } });
+    renderAt("/runtime/observe/tetragon", "/runtime/observe/:sub", <RuntimeObservePage />);
+    const tableRow = (await screen.findByText("/tmp/fake-secret")).closest("tr")!;
+    expect(within(tableRow).getByText("차단")).toBeTruthy();
+    expect(tableRow.textContent).toContain("차단 (Override)");
+    expect(tableRow.textContent).toContain("TG-SECRET-01");
+  });
+
   it("Hubble 사건(DROPPED 포함)은 거부 확인으로 표시되지 않는다", async () => {
     mockApi({
       "/api/runtime/events": { items: EVENTS, invalid: [], source: SOURCE, truncated: false },

@@ -1,6 +1,6 @@
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { RuntimeRequestDetail, RuntimeStatus } from "../src/api/types";
+import type { RuntimeEvent, RuntimeRequestDetail, RuntimeStatus } from "../src/api/types";
 import { RequestDrawer } from "../src/pages/runtime/RequestDrawer";
 import { RuntimeOverviewPage } from "../src/pages/runtime/RuntimeOverviewPage";
 import { RuntimeTargetPage } from "../src/pages/runtime/RuntimeTargetPage";
@@ -12,6 +12,8 @@ const STATUS = Object.values(
 const DETAIL = Object.values(
   import.meta.glob("../../../contracts/examples/runtime-request-detail.json", { eager: true, import: "default" }),
 )[0] as RuntimeRequestDetail;
+const EVENT_RAW = Object.values(import.meta.glob("../../../contracts/examples/runtime-events.jsonl", { eager: true, query: "?raw", import: "default" }))[0] as string;
+const TETRAGON = EVENT_RAW.split("\n").filter(Boolean).map((line) => JSON.parse(line) as RuntimeEvent).find((event) => event.source === "tetragon")!;
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -72,6 +74,21 @@ describe("사용자별 캐시 분리 표시", () => {
 
     const label = await screen.findByText("캐시 분리");
     expect(label.parentElement?.textContent).toContain(expected);
+  });
+});
+
+describe("기간별 Tetragon 통제 방식", () => {
+  it.each([[true, true], [false, false]] as const)("선택 기간 안 Override=%s이면 보조 표시=%s", async (recent, expected) => {
+    const at = recent ? new Date().toISOString() : "2020-01-01T00:00:00Z";
+    const blocked: RuntimeEvent = {
+      ...TETRAGON, event_id: "override", recorded_at: at, occurred_at: at,
+      native: { ...TETRAGON.native, record: { ...TETRAGON.native.record, action_raw: "KPROBE_ACTION_OVERRIDE" } as unknown as RuntimeEvent["native"]["record"] },
+      observation: { ...TETRAGON.observation!, kind: "file_access", action_mode: "enforce" },
+    };
+    mockApi({ ...overviewRoutes(clone(STATUS)), "/api/runtime/events": { items: [blocked], invalid: [], source: SOURCE, truncated: false } });
+    renderAt("/runtime/overview?period=24h", "/runtime/overview", <RuntimeOverviewPage />);
+    expect(await screen.findByText("런타임 탐지 (Tetragon) · 탐지")).toBeTruthy();
+    expect(Boolean(screen.queryByText("탐지 · 일부 규칙 차단"))).toBe(expected);
   });
 });
 

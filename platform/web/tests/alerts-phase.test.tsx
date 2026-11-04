@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { AlertsPage } from "../src/pages/runtime/AlertsPage";
 import { PhaseTimelinePage } from "../src/pages/runtime/PhaseTimelinePage";
 import { groupAlerts } from "../src/lib/alerts";
+import { isTetragonOverride } from "../src/lib/tetragon";
 import { alertSeverity, GATEWAY_REASON, PHASE, EXEC_VERDICT } from "../src/lib/labels";
 import type { RuntimeEvent } from "../src/api/types";
 import { SOURCE, mockApi, renderAt } from "./helpers";
@@ -11,6 +12,14 @@ import { SOURCE, mockApi, renderAt } from "./helpers";
 const raw = Object.values(import.meta.glob("../../../contracts/examples/runtime-events.jsonl", { eager: true, query: "?raw", import: "default" }))[0] as string;
 const events = raw.split("\n").filter(Boolean).map((line) => JSON.parse(line)) as RuntimeEvent[];
 const sample = events.find((e) => e.source === "tetragon")!;
+
+function secret(id: string, override: boolean): RuntimeEvent {
+  return {
+    ...sample, event_id: id, source: "tetragon", outcome: override ? "enforce_attempted" : "detected",
+    native: { ...sample.native, record: { ...sample.native.record, action_raw: override ? "KPROBE_ACTION_OVERRIDE" : "KPROBE_ACTION_POST" } as unknown as RuntimeEvent["native"]["record"] },
+    observation: { ...sample.observation!, kind: "file_access", rule_id: "TG-SECRET-01", path: "/tmp/fake-secret", exec_verdict: null, action_mode: override ? "enforce" : "monitor", phases: [] },
+  };
+}
 
 function flagged(id: string, verdict: string): RuntimeEvent {
   return { ...sample, event_id: id, occurred_at: "2026-11-04T10:00:00Z", observation: { ...sample.observation!, kind: "process_exec", binary: "/bin/sh", exec_verdict: verdict, phases: ["compiling"] } };
@@ -37,6 +46,23 @@ describe("알림 심각도와 묶음", () => {
     expect(groups[0].severity).toBe("높음");
     expect(groups[0].items).toHaveLength(2);
     expect(groups[1].severity).toBe("중간");
+  });
+  it("보호 파일 Override만 차단으로 보고 같은 규칙의 탐지와 별도 묶음으로 표시한다", () => {
+    const detected = secret("detected", false);
+    const blocked = secret("blocked", true);
+    expect(isTetragonOverride(blocked)).toBe(true);
+    expect(isTetragonOverride({ ...blocked, native: detected.native })).toBe(false);
+    const groups = groupAlerts([detected, blocked]);
+    expect(groups).toHaveLength(2);
+    expect(groups.map((group) => group.severity)).toEqual(["높음", "높음"]);
+    expect(groups.find((group) => group.items[0].event_id === "blocked")?.title).toContain("차단됨");
+    expect(groups.find((group) => group.items[0].event_id === "detected")?.title).not.toContain("차단됨");
+  });
+  it("차단 알림 행에 별도 표지를 표시한다", async () => {
+    mockApi({ "/api/runtime/events": { items: [secret("blocked", true)], invalid: [], source: SOURCE, truncated: false } });
+    renderAt("/runtime/alerts", "/runtime/alerts", <AlertsPage />);
+    expect(await screen.findByText(/차단됨 · Override/)).toBeTruthy();
+    expect(screen.getAllByText("차단")).toHaveLength(2);
   });
   it("알림 페이지에 건수와 자세히 연결을 보여준다", async () => {
     mockApi({ "/api/runtime/events": { items: [flagged("a", "suspect_binary"), flagged("b", "suspect_binary")], invalid: [], source: SOURCE, truncated: false } });

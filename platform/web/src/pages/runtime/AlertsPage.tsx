@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
 import { useRuntimeEvents } from "../../api/hooks";
-import { OriginBadge } from "../../components/Badges";
+import { Badge, OriginBadge } from "../../components/Badges";
 import { PageHead, Query, StateView } from "../../components/Misc";
 import { groupAlerts } from "../../lib/alerts";
+import { isTetragonOverride } from "../../lib/tetragon";
 import { formatTime } from "./parts";
 
 const color: Record<string, string> = { 높음: "var(--error)", 중간: "var(--warn)", 낮음: "var(--warn)", 정보: "var(--accent)", "미분류": "var(--muted)" };
@@ -16,9 +17,9 @@ export function AlertsPage() {
       return <>
         <p className="small muted">동일 판정·실행 파일 또는 규칙·엔진 실행 단계별 집계입니다. 탐지는 차단 근거와 구분됩니다.</p>
         {groups.length ? groups.map((g) => <details key={g.key} className="card" style={{ padding: 16, marginBottom: 8 }}>
-          <summary><strong style={{ color: color[g.severity] }}>{g.severity}</strong> · {g.title} · {g.items.length}건 <span className="small muted">{formatTime(g.first)} ~ {formatTime(g.last)}</span></summary>
+          <summary><strong style={{ color: color[g.severity] }}>{g.severity}</strong> · {isTetragonOverride(g.items[0]) && <><Badge tone="caution" title="Override 차단 시도 기록">차단</Badge> · </>}{g.title} · {g.items.length}건 <span className="small muted">{formatTime(g.first)} ~ {formatTime(g.last)}</span></summary>
           <ul>{g.items.map((e) => <li key={e.event_id}>
-            {formatTime(e.occurred_at)} · {e.source === "tetragon" ? "프로세스·파일 탐지" : "네트워크 관측"} · <OriginBadge origin={e.data_origin} detail={e.origin_detail} /> · <Link to={`/runtime/events?sel=${encodeURIComponent(e.event_id)}`}>자세히</Link>
+            {formatTime(e.occurred_at)} · {isTetragonOverride(e) ? <Badge tone="caution" title="Override 차단 시도 기록">차단</Badge> : e.source === "tetragon" ? "프로세스·파일 탐지" : "네트워크 관측"} · <OriginBadge origin={e.data_origin} detail={e.origin_detail} /> · <Link to={`/runtime/events?sel=${encodeURIComponent(e.event_id)}`}>자세히</Link>
           </li>)}</ul>
         </details>) : <StateView kind="empty" detail="관측 이벤트 미수집 상태입니다. 수집 상태를 확인하세요." />}
       </>;

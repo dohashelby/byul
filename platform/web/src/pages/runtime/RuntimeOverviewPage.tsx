@@ -9,6 +9,7 @@ import { ChartCard, Donut, HBars, REQUEST_SERIES, TimeBars, TimeLine, type Reque
 import { Value } from "../../components/Value";
 import { APPROVAL_DETAIL, ENGINE_NAME } from "../../lib/labels";
 import { bucketize, inRange } from "../../lib/time";
+import { isTetragonOverride } from "../../lib/tetragon";
 import { carry, useGlobalFilters } from "../../lib/url";
 import p from "../pages.module.css";
 import { ControlModeBadges, ObservationChip, formatTime, observationState, rt } from "./parts";
@@ -304,7 +305,7 @@ export function RuntimeOverviewPage() {
               )}
 
               <h2 className={ui.blockTitle}>구성요소 상태</h2>
-              <ControlModeBadges />
+              <ControlModeBadges hasTetragonOverride={observations.some((e) => inRange(e.recorded_at, range) && isTetragonOverride(e))} />
               <div className={rt.cardGrid3}>
                 <article className="card card-pad stack" style={{ gap: 10 }}>
                   <h3 className="row" style={{ gap: 8 }}>

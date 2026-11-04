@@ -97,12 +97,13 @@ export function ObservationChip({ label, state }: { label: string; state: [strin
   return <span className={`${r.chip} ${cls}`}>{`${label} 관측 · ${state[0]}`}</span>;
 }
 
-export function ControlModeBadges() {
+export function ControlModeBadges({ hasTetragonOverride = false }: { hasTetragonOverride?: boolean }) {
   return (
     <div className="row wrap" style={{ gap: 8 }} aria-label="구성요소 통제 방식">
       <Badge tone="accent" title="엔진 전달 전 요청 정책 평가">요청 통제 (Gateway) · 차단</Badge>
       <Badge tone="accent" title="엔진의 네트워크 통신에 적용하는 정책">네트워크 정책 (Cilium) · 차단</Badge>
       <Badge tone="warn" title="프로세스 실행·파일 접근 감지">런타임 탐지 (Tetragon) · 탐지</Badge>
+      {hasTetragonOverride && <Badge tone="caution" title="선택 기간의 Override 차단 시도 기록">탐지 · 일부 규칙 차단</Badge>}
       <Badge tone="neutral" title="네트워크 흐름 관측">네트워크 관측 (Hubble) · 관측</Badge>
     </div>
   );

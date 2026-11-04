@@ -1,6 +1,8 @@
 from copy import deepcopy
 import asyncio
 from pathlib import Path
+import sys
+import types
 import pytest
 from guard.adapters import vllm_profiler_sensor as sensor,vllm_profiler_metadata as metadata
 from guard.models import load_pack
@@ -52,3 +54,17 @@ def test_new_nested_payload_rejects_private_extra_field(monkeypatch):
         if r['event']=='PROFILER' and r['payload']['point']=='TorchProfilerWrapper._stop' and r['payload']['phase']=='RETURN')
     row['trace_after']['private_path']='/PRIVATE'
     with pytest.raises(ValueError,match='PROFILER_SAMPLE_INVALID'):metadata.validate_sample(row)
+
+
+def test_fresh_source_compilation_matches_runtime_and_rejects_changed_function():
+    from guard.adapters import vllm_lifecycle_sensor as original_base
+    modules=[]
+    for name,path in (('base',Path(original_base.__file__)),('profiler',Path(sensor.__file__))):
+        module=types.ModuleType('_fresh_'+name);module.__file__=str(path)
+        exec(compile(path.read_bytes(),str(path),'exec',dont_inherit=True,optimize=0),module.__dict__)
+        modules.append(module)
+    base,fresh=modules;runtime='cpython-'+'.'.join(map(str,sys.version_info[:3]))
+    assert fresh.code_contract(base)==fresh.RUNTIME_CODE_CONTRACTS[runtime]
+    fresh.configure(base)
+    fresh.ProfilerObservation.profiler_backend=lambda *a:None
+    with pytest.raises(ValueError,match='PROFILER_OBSERVER_CODE_UNAVAILABLE'):fresh.configure(base)

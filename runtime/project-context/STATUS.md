@@ -2,6 +2,10 @@
 
 최종 갱신: 2026-11-04
 
+## 2026-11-04 AWS GPU 서버 3회차 결과 (기준 b3fc80e, Claude 실행)
+
+- 20:21~20:54 KST 가동. 범위는 `deploy/gpu-lab/서버3회차_확인순서.md` 1~7번이고, 실행한 사례는 모두 최종 통과했다. vLLM AWS-09·10·11·13, SGLang AWS-09·10·11·13·16·17, 복귀 AWS-01·02다. 확인한 것: gap backfill 실제 전달 1건, SGLang 빈 캐시 첫 기동의 compiling이 준비 표지까지 유지, 셸 suspect 유지, 추론 `ptxas` 허용, Ready 전 요청 15건 Gateway 503·엔진 도달 0건, `ptxas` 파일·상위 폴더 UID 2000 쓰기 불가. vLLM 오경고 2건은 이전 묶음이 적용돼 있던 구간에서 난 것으로 보는 것이 유력하다. 묶음 ID 미기록으로 직접 확인은 못 했다. 결과는 `docs/AWS_GPU_서버3회차_결과_20261104.md`, 증거는 `~/.local/state/serving-runtime/aws-lab/evidence-20261104-run3.tgz`. 승인은 runtime 담당 자기 승인(LAB)이다.
+
 ## 2026-11-04 SGLang 첫 기동 단계·추론 JIT 보정 (기준 8c53741, 미커밋)
 
 - 11/4 빈 캐시 첫 기동 1회에서 캡처 종료 15:57:27Z~준비 15:57:38Z 사이 셸 9건을 반영해 SGLang compiling을 준비 표지까지 유지한다. 표지 누락 시 캡처 뒤 15초(관찰 11초+여유 4초), 캡처도 없으면 `startupProbe`의 20분 상한에서 `unknown`으로 돌아간다. vLLM 표지는 그대로다. 추론의 Triton `ptxas`는 정확한 경로와 기존 Python 부모 조건에서만 허용하고 셸 의심 경고는 유지한다.

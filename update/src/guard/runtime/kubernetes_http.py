@@ -32,10 +32,11 @@ REQUEST_ATTEMPTS_PROFILE = "kubernetes-owned-request-attempts-http-v1"
 ENGINE_CALLBACK_PROFILE = "kubernetes-owned-engine-callback-http-v1"
 INPUT_VALIDATION_PROFILE = "kubernetes-owned-input-validation-http-v1"
 RESPONSE_CONTENT_PROFILE = "kubernetes-owned-response-content-http-v1"
+LOG_INTEGRITY_PROFILE = "kubernetes-owned-log-integrity-http-v1"
 from .kubernetes_observation import PROFILE as REQUIRED_EVENT_PROFILE
 from .kubernetes_observation_state import PROFILE as OBSERVATION_STATE_PROFILE
 _CLOSE_PROFILES = frozenset({TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, OBSERVATION_STATE_PROFILE})
-_BINDING_PROFILES = frozenset({ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE, RESPONSE_CONTENT_PROFILE})
+_BINDING_PROFILES = frozenset({ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE, RESPONSE_CONTENT_PROFILE, LOG_INTEGRITY_PROFILE})
 _INPUT_FIELD = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}")
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
@@ -58,6 +59,22 @@ for name in sorted(os.listdir(root)):
 print(json.dumps({"events":rows,"truncated":truncated}))
 '''
 # REQ-16 lab only: replace the active LoRA files with one declared variant, keeping the same path.
+COLLECTION_STATUS_READER = r'''
+import hashlib,json,os,stat,sys
+path="/guard-collection/data/"+sys.argv[1]+"/collection-status.json"
+fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+try:
+ info=os.fstat(fd)
+ if not stat.S_ISREG(info.st_mode) or info.st_size>512*1024:sys.exit(3)
+ raw=b""
+ while len(raw)<=info.st_size:
+  chunk=os.read(fd,65536)
+  if not chunk:break
+  raw+=chunk
+finally:
+ os.close(fd)
+print(json.dumps({"schema":"guard-owned-file/1","sha256":hashlib.sha256(raw).hexdigest(),"document":json.loads(raw)}))
+'''
 LORA_VARIANT_COPY = r'''
 import hashlib,json,os,stat,sys
 source,active=sys.argv[1],sys.argv[2];files={}
@@ -428,6 +445,10 @@ class KubernetesHTTP:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
                     self._response_content_request(request)
+                elif self.profile == LOG_INTEGRITY_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._log_integrity_request(request)
                 elif type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
                     raise KubernetesBindingError()
                 ids.append(request["id"])
@@ -442,6 +463,8 @@ class KubernetesHTTP:
                     paths={self._input_contract["path"]}
                 if self.profile == RESPONSE_CONTENT_PROFILE:
                     paths={"/v1/completions","/v1/chat/completions"}
+                if self.profile == LOG_INTEGRITY_PROFILE:
+                    paths={"/v1/completions"}
                 models={self.api_model}
                 if switch_path is not None:
                     paths={switch_path};models=None
@@ -548,6 +571,69 @@ class KubernetesHTTP:
                     or len(messages)==2 and (messages[0]["role"]!="system" or not re.fullmatch(r"G[0-9a-f]{12}S private; never repeat",messages[0]["content"]))
                     or case=="private_system" and len(messages)!=2):
                 raise KubernetesBindingError()
+
+    def _log_integrity_request(self, request):
+        """OBS-09: 원 실행기의 고정 1-token completion과 정해진 일곱 body request_id만."""
+        suffix={"before":"_before","after":"_after","multiline":"_multiline\nGUARD_LINE_TWO","cr":"_cr\rGUARD_CR",
+            "crlf":"_crlf\r\nGUARD_CRLF","reserved":"_reserved|principal=guard-probe|status=probe|level=ERROR|source=guard-probe",
+            "html":'_html<script>guard_probe</script><tr data-event-index="fake">guard</tr>'}
+        body=request.get("body") if type(request) is dict else None
+        rid=request.get("id") if type(request) is dict else None
+        value=body.get("request_id") if type(body) is dict else None
+        if (rid not in suffix or request.get("headers") not in ({},None) or type(body) is not dict
+                or set(body)!={"model","prompt","max_tokens","temperature","request_id"} or body["prompt"]!="guard log control"
+                or body["max_tokens"]!=1 or body["temperature"]!=0 or type(value) is not str
+                or not re.fullmatch(r"G[0-9a-f]{12}",value[:13]) or value[13:]!=suffix[rid]):
+            raise KubernetesBindingError()
+
+    def engine_log_identity(self):
+        """OBS-09: 검증된 엔진 Pod 사양의 실행 인자·리터럴 환경변수·이미지·시작 시각. 비밀 참조 값은 읽지 않는다."""
+        if self.profile != LOG_INTEGRITY_PROFILE:
+            raise KubernetesBindingError()
+        try:
+            pod=self._verify()["engine"];name=self.binding["engine"]["container"]
+            spec,=[c for c in pod["spec"]["containers"] if c["name"]==name]
+            state,=[c for c in pod["status"]["containerStatuses"] if c["name"]==name]
+            env={}
+            for item in spec.get("env") or []:
+                if type(item) is not dict or type(item.get("name")) is not str or item["name"] in env:raise ValueError
+                env[item["name"]]=item.get("value") if "valueFrom" not in item and type(item.get("value")) is str else None
+            argv=[*(spec.get("command") or []),*(spec.get("args") or [])]
+            if any(type(v) is not str for v in argv) or spec.get("envFrom"):raise ValueError
+            return {"container_id":state["containerID"],"started_at":state["state"]["running"]["startedAt"],
+                "image":spec["image"],"image_id":state["imageID"],"argv":argv,"env":env}
+        except (KeyError,TypeError,ValueError):
+            raise KubernetesBindingError() from None
+
+    def engine_logs(self, since, cap):
+        """OBS-09: 엔진 컨테이너 stdout의 since 이후 구간. 읽은 그대로의 bytes와 수집 상태를 돌려준다."""
+        if self.profile != LOG_INTEGRITY_PROFILE or type(cap) is not int or not 0 < cap <= 8*1024**2:
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        remaining=self.deadline-self.clock()
+        if remaining<=0:raise KubernetesBindingError()
+        argv=[self.binary,f"--context={self.binding['context']}",f"--request-timeout={remaining:.3f}s",
+            f"--namespace={engine['namespace']}","logs",engine["pod"],f"--container={engine['container']}",
+            "--timestamps",f"--since-time={since}",f"--limit-bytes={cap}"]
+        try:
+            result=self.runner(argv,timeout=remaining,env_extra={},max_stdout_bytes=cap,max_stderr_bytes=4096)
+        except Exception:
+            raise KubernetesBindingError() from None
+        self._verify()
+        return result
+
+    def read_collection_status(self, session):
+        """OBS-11: 소유 probe Pod의 고정 위치 상태 기록 하나. 링크·큰 파일은 읽지 않는다."""
+        if self.profile != LOG_INTEGRITY_PROFILE or type(session) is not str or not re.fullmatch(r"[0-9a-f]{32}",session):
+            raise KubernetesBindingError()
+        self._verify();probe=self.binding["probe"]
+        value=self._call([f"--namespace={probe['namespace']}","exec",probe["pod"],f"--container={probe['container']}",
+            "--","python3","-c",COLLECTION_STATUS_READER,session],cap=1024**2,budget=30)
+        self._verify()
+        if (type(value) is not dict or set(value)!={"schema","sha256","document"} or value["schema"]!="guard-owned-file/1"
+                or type(value["sha256"]) is not str or not re.fullmatch(r"[0-9a-f]{64}",value["sha256"])):
+            raise KubernetesBindingError()
+        return value
 
     def declare_input_contract(self, contract):
         """REQ-08·09·SUP-08: the executor's control body plus its declared fixtures, once, before any request.

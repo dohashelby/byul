@@ -30,6 +30,7 @@ from .kubernetes_template_supply import KubernetesTemplateSupplyExecutor
 from .request_binding import RequestBindingExecutor
 from .kubernetes_request_binding import KubernetesRequestBindingExecutor
 from .log_integrity import LogIntegrityExecutor
+from .kubernetes_log_integrity import KubernetesLogIntegrityExecutor
 from .unix_ipc import UnixIPCExecutor
 from .usage_report import BoundaryEgressDispatch
 from .api_transport import APITransportExecutor
@@ -109,6 +110,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "request_binding:real": lambda cfg: RequestBindingExecutor(cfg.get("request_binding", {}), environ=cfg.get("_runtime_environ")),
     "request_binding:kubernetes": lambda cfg: KubernetesRequestBindingExecutor(cfg.get("request_binding", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "log_integrity:real": lambda cfg: LogIntegrityExecutor(cfg.get("log_integrity", {}), environ=cfg.get("_runtime_environ")),
+    "log_integrity:kubernetes": lambda cfg: KubernetesLogIntegrityExecutor(cfg.get("log_integrity", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "unix_ipc:real": lambda cfg: UnixIPCExecutor(cfg.get("unix_ipc", {}), environ=cfg.get("_runtime_environ")),
     "boundary_egress:real": lambda cfg: BoundaryEgressDispatch(cfg.get("boundary_egress", {})),
     "api_transport:real": lambda cfg: APITransportExecutor(cfg.get("api_transport", {})),

@@ -153,3 +153,16 @@ def test_executor_is_registered_and_rejects_unknown_settings(tmp_path):
     executor = module.KubernetesLogIntegrityExecutor({'target': str(tmp_path / 'x.json'), 'docker_binary': 'docker'})
     with pytest.raises(ValueError, match='KUBERNETES_LOG_INTEGRITY_CONFIGURATION_INVALID'):
         executor.run(check(), environment(), VALUES, VllmAdapter(), tmp_path / 'w')
+
+
+def test_pod_env_without_value_is_the_empty_string_and_secret_refs_stay_unread():
+    from types import SimpleNamespace
+    pod = {'spec': {'containers': [{'name': 'engine', 'image': IMAGE, 'command': ['vllm', 'serve'], 'args': ['/m'],
+                    'env': [{'name': 'VLLM_LOGGING_PREFIX'}, {'name': 'VLLM_LOGGING_LEVEL', 'value': 'INFO'},
+                            {'name': 'API_KEY', 'valueFrom': {'secretKeyRef': {'name': 's', 'key': 'k'}}}]}]},
+           'status': {'containerStatuses': [{'name': 'engine', 'containerID': 'c', 'imageID': 'i',
+                      'state': {'running': {'startedAt': 't'}}}]}}
+    stub = SimpleNamespace(profile='kubernetes-owned-log-integrity-http-v1', binding={'engine': {'container': 'engine'}},
+                           _verify=lambda: {'engine': pod})
+    identity = KubernetesHTTP.engine_log_identity(stub)
+    assert identity['env'] == {'VLLM_LOGGING_PREFIX': '', 'VLLM_LOGGING_LEVEL': 'INFO', 'API_KEY': None}

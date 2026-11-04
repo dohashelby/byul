@@ -597,7 +597,9 @@ class KubernetesHTTP:
             env={}
             for item in spec.get("env") or []:
                 if type(item) is not dict or type(item.get("name")) is not str or item["name"] in env:raise ValueError
-                env[item["name"]]=item.get("value") if "valueFrom" not in item and type(item.get("value")) is str else None
+                # Kubernetes는 빈 값을 "value" 없이 저장한다. 비밀 참조(valueFrom)만 읽지 않는다(k3d 실측에서 확인).
+                value=item.get("value","")
+                env[item["name"]]=value if "valueFrom" not in item and type(value) is str else None
             argv=[*(spec.get("command") or []),*(spec.get("args") or [])]
             if any(type(v) is not str for v in argv) or spec.get("envFrom"):raise ValueError
             return {"container_id":state["containerID"],"started_at":state["state"]["running"]["startedAt"],

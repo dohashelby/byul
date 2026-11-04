@@ -12,8 +12,8 @@ def test_exact_user_assignment_and_manual_exclusions():
     result = tool.inspect(baseline_pack())
     assert result['assigned'] == 23 and result['excluded_manual_paths_preserved']
     assert all(not row['whole_check_experiment_complete'] and not row['gpu_measured'] for row in result['checks'])
-    assert {row['check_id'] for row in result['checks'] if row['unimplemented_reason']} == {
-        'LIF-13','REQ-19','REQ-20','REQ-21'}
+    # LIF-13·REQ-19·REQ-20은 콜백 수집기로 구현됐다(GPU 미실측). 남은 미구현은 REQ-21이다.
+    assert {row['check_id'] for row in result['checks'] if row['unimplemented_reason']} == {'REQ-21'}
 
 
 def test_fake_factory_does_not_count_as_support(monkeypatch):

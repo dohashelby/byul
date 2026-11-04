@@ -1,0 +1,374 @@
+{
+  "schema": "byul-independent-GPU-public-summary/1",
+  "measured_source": "3bba3c73a6bee1966b784cd90a9690e3e9d2512a",
+  "measured_source_tree": "74ef2f1ee8e003f4bdb9c94205762b592b9acb07",
+  "reviewed_source_manifest_sha256": "cffa0fe6ffe96b198ca3159238b8114098248ff5eb934f5ff432da8897c75d67",
+  "publication_base": "ebd74518c445d6b3daa721b8c07547220d481b1d",
+  "related_code_PR": 206,
+  "public_summary_is_not_raw_evidence_bundle": true,
+  "environment": {
+    "GPU": "NVIDIA L4",
+    "physical_GPU_count": 1,
+    "TP": 1,
+    "PP": 1,
+    "nodes": 1,
+    "engine": "vLLM0.31.0",
+    "image": "vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+    "model": "Qwen/Qwen2.5-0.5B-Instruct",
+    "model_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "model_inventory_sha256": "b52d654ef0bf6bf214e055f791b4e492206b9bd1380cb93d75bc4a092638245e",
+    "controller_Python": "3.12.3",
+    "desktop_rejudge_Python": "3.12.14"
+  },
+  "runs": [
+    {
+      "episode": "M05",
+      "check_id": "PLT-01",
+      "EVD_status": "COMPLETED",
+      "EVD_origin": "MEASURED",
+      "RES_origin": "DECLARED",
+      "verification_level": "MEASURED",
+      "verdicts": {
+        "security": "FAIL",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "normal_control_succeeded": true,
+      "refs": [
+        {
+          "kind": "ENV",
+          "id": "ENV-01M6GY5TG7HC3RCBCBRSEHNSZC",
+          "revision": 1,
+          "sha256": "e08f04f035af7f3289a591ab5cc13882e895776305836def67f6b109a52d08dc"
+        },
+        {
+          "kind": "POL",
+          "id": "POL-01M6GY5TKKQM81SSA8QY42PWCT",
+          "revision": 1,
+          "sha256": "ce7b7adaa1f49ef5dbf33196748eeb7ba39de45aad46aaf80c2af0348a73c824"
+        },
+        {
+          "kind": "PACK",
+          "id": "PACK-BASELINE",
+          "revision": 32,
+          "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+        },
+        {
+          "kind": "PLAN",
+          "id": "PLAN-01M6GY5TQEMJ6P78CW953NY4WF",
+          "revision": 1,
+          "sha256": "0f8db6f44cf4972f0b1e1eff9707c28d044e1f9b513cc4a03103be50d836e826"
+        },
+        {
+          "kind": "RPT",
+          "id": "RPT-01M6GY5Y1X7T6817QCSTK553DV",
+          "revision": 1,
+          "sha256": "07eb867f5b50dbba41c7610c7b1b48701d816a802841c23b4904e8231708a124"
+        },
+        {
+          "kind": "EVD",
+          "id": "EVD-01M6GY5TQY5Z670W17EDJF4E3G",
+          "revision": 1,
+          "sha256": "48bb1e8740b17408eda1e51c9315d2df4cd4eb1e6cce6eb59ab004173222ab2a"
+        },
+        {
+          "kind": "RES",
+          "id": "RES-01M6GY5Y1H3M0PN48R15AX18JP",
+          "revision": 1,
+          "sha256": "b78e523073d30446b9d18cd7f4fbf446cacbd951423e645cab64aa6cd8a0b49f"
+        }
+      ],
+      "original_archive_sha256": "2e9f6ed0decd9eff701cea32cc61091b4e05778945395506bd898571066c5b77",
+      "raw_members_verified": 440,
+      "saved_pack_rejudge": true,
+      "whole_question_complete": false
+    },
+    {
+      "episode": "M05",
+      "check_id": "PLT-04",
+      "EVD_status": "COMPLETED",
+      "EVD_origin": "MEASURED",
+      "RES_origin": "DECLARED",
+      "verification_level": "MEASURED",
+      "verdicts": {
+        "security": "FAIL",
+        "functional": "PASS",
+        "performance": "UNKNOWN"
+      },
+      "normal_control_succeeded": true,
+      "refs": [
+        {
+          "kind": "ENV",
+          "id": "ENV-01M6GY5TG7HC3RCBCBRSEHNSZC",
+          "revision": 1,
+          "sha256": "e08f04f035af7f3289a591ab5cc13882e895776305836def67f6b109a52d08dc"
+        },
+        {
+          "kind": "POL",
+          "id": "POL-01M6GY5YHGBB1SS7QCMZT3ACJ8",
+          "revision": 1,
+          "sha256": "573a6348eb9bba8e7fedc2c336f2039b5906e832d3ccea93edfb7d0fcd3800e5"
+        },
+        {
+          "kind": "PACK",
+          "id": "PACK-BASELINE",
+          "revision": 32,
+          "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+        },
+        {
+          "kind": "PLAN",
+          "id": "PLAN-01M6GY5YMX3BBT3Y58HB5TSA9H",
+          "revision": 1,
+          "sha256": "5b2a1dc7e9789136296056856dee098d51711a78d47015d688c1c787881fbc70"
+        },
+        {
+          "kind": "RPT",
+          "id": "RPT-01M6GY6053F4WPBEVD7FTWET4P",
+          "revision": 1,
+          "sha256": "1bd10a422a7eaad862daf029b0df5e2623b8556e1c6fad4be7f0204ba37cc2ea"
+        },
+        {
+          "kind": "EVD",
+          "id": "EVD-01M6GY5YNBK9P3WC27M2WP9RHB",
+          "revision": 1,
+          "sha256": "9dd993aaeb6cb4e32d0abb96fc7ea8834408c09ab3e821e185c455efe7ff5943"
+        },
+        {
+          "kind": "RES",
+          "id": "RES-01M6GY604PAFETB34SGX4WV8YZ",
+          "revision": 1,
+          "sha256": "ccd559edbbb2f4f0cbca504ef52ce3fd0d75f6cc9a3422cf13ab46a091b7ab90"
+        }
+      ],
+      "original_archive_sha256": "2e9f6ed0decd9eff701cea32cc61091b4e05778945395506bd898571066c5b77",
+      "raw_members_verified": 440,
+      "saved_pack_rejudge": true,
+      "whole_question_complete": false
+    },
+    {
+      "episode": "M06",
+      "check_id": "REQ-05",
+      "EVD_status": "COMPLETED",
+      "EVD_origin": "EXAMPLE",
+      "verdicts": {
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "security": "UNKNOWN"
+      },
+      "normal_control_succeeded": true,
+      "refs": [
+        {
+          "id": "PACK-BASELINE",
+          "kind": "PACK",
+          "revision": 32,
+          "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+        },
+        {
+          "kind": "ENV",
+          "id": "ENV-01M6JC2YN9QBKSWQYVFX0EP0WC",
+          "revision": 1,
+          "sha256": "ae638b57d2754cbc9efcb76a83db38ea486fd7e5feccc86763554e5c5dbf20ae"
+        },
+        {
+          "kind": "POL",
+          "id": "POL-01M6JC30GMT5KW4GEYK4SXKW0K",
+          "revision": 1,
+          "sha256": "d1887c0c17bb35b34185f849ccc3e5ea059a3d20583dd9feb577c91da97bdbbb"
+        },
+        {
+          "kind": "PLAN",
+          "id": "PLAN-01M6JC30MFY8VKXCJR1V7VMKH0",
+          "revision": 1,
+          "sha256": "82d85b0c56d7688a05e780f2a563472ad886440627e157f954e67e0d7d931b4e"
+        },
+        {
+          "kind": "RPT",
+          "id": "RPT-01M6JC3E9J5BC77HF90J42ZEMZ",
+          "revision": 1,
+          "sha256": "5937d26485982e45cf07fa0dc2b0b759dc1230a760ab8c28f5794e59bc15248f"
+        },
+        {
+          "kind": "EVD",
+          "id": "EVD-01M6JC30MYNKWK1VBTPSX45S4S",
+          "revision": 1,
+          "sha256": "de06ad3d4fa461d66d2dec8d23a90fabe41f13759f47fbf13b2fbbcf5ea3aa3d"
+        },
+        {
+          "kind": "RES",
+          "id": "RES-01M6JC3E97KXBXAHFW534DZDSD",
+          "revision": 1,
+          "sha256": "df4590aefb16a46c520b60dc7166c02ab9eb998ee30e686f45484e6b9fdf6e48"
+        }
+      ],
+      "original_archive_sha256": "a0edfb067a527485212a088bbdd8bf243d51b56543ce5597caa2d10eb6e7acc4",
+      "raw_members_verified": 425,
+      "desktop_exact_refs_restored": true,
+      "saved_pack_rejudge_same_RES_ref": true,
+      "new_MEASURED_count": 0,
+      "whole_question_complete": false,
+      "HTTP_outcomes": [
+        200,
+        401,
+        200
+      ],
+      "final_model_principal_and_request_native_link_verified": false,
+      "retirement_branch_selected": false
+    },
+    {
+      "episode": "M07",
+      "check_id": "LIF-14",
+      "EVD_status": "COMPLETED",
+      "EVD_origin": "EXAMPLE",
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "normal_control_succeeded": true,
+      "refs": [
+        {
+          "kind": "PACK",
+          "id": "PACK-BASELINE",
+          "revision": 32,
+          "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+        },
+        {
+          "kind": "EVD",
+          "id": "EVD-01M6JCMR644KNCZCVC6FC2FCER",
+          "revision": 1,
+          "sha256": "2d8638c48b00627799947964ea60c84326cc6f89fd536122c304e324d4f59c8b"
+        },
+        {
+          "kind": "RES",
+          "id": "RES-01M6JCNZ8F1C707RTX27QB5HSW",
+          "revision": 1,
+          "sha256": "7a5c044d787adb24566d8f91709ee8a2cadc2c32d160f46e322f8401f2aa4831"
+        },
+        {
+          "kind": "RPT",
+          "id": "RPT-01M6JCP0CJ7M3VZMJ7MA1A3X93",
+          "revision": 1,
+          "sha256": "b874c792471100f3f622c3260a2cb9e79f242d30b40789d4581ba2f98958ab78"
+        },
+        {
+          "kind": "ENV",
+          "id": "ENV-01M6JCMJFPFPYQ2RS5ZVA4B0C1",
+          "revision": 1,
+          "sha256": "b9917b7d8f3feae7958f430dce8d6eb2cc3cc53f356aca11797e5136a96ecdf6"
+        },
+        {
+          "kind": "POL",
+          "id": "POL-01M6JCMN3RS3K1T23V96W9GH7X",
+          "revision": 1,
+          "sha256": "45b425f9ef62df2d71068599e4a21e1e524de35d66081314d43f763f2b86906d"
+        },
+        {
+          "kind": "PLAN",
+          "id": "PLAN-01M6JCMQ3AM7WE4SQXE10R7J5M",
+          "revision": 1,
+          "sha256": "ec7d327eade7487600882ce1ab3d8afeda8ff560360b7301c4deaf6d9c2583a3"
+        }
+      ],
+      "original_archive_sha256": "eac3d04cd398eab0b07fee5883c809c8655201fbdd00007f5c0e2cf037af35d9",
+      "raw_members_verified": 480,
+      "desktop_exact_refs_restored": true,
+      "saved_pack_rejudge_same_RES_ref": true,
+      "new_MEASURED_count": 0,
+      "whole_question_complete": false,
+      "normal_trials": [
+        {
+          "case_id": "normal-before",
+          "outcome": 200,
+          "normal_shape_verified": true,
+          "profiler_control_response_success": false
+        },
+        {
+          "case_id": "start",
+          "outcome": 200,
+          "normal_shape_verified": false,
+          "profiler_control_response_success": true
+        },
+        {
+          "case_id": "normal-active",
+          "outcome": 200,
+          "normal_shape_verified": true,
+          "profiler_control_response_success": false
+        },
+        {
+          "case_id": "stop",
+          "outcome": 200,
+          "normal_shape_verified": false,
+          "profiler_control_response_success": true
+        },
+        {
+          "case_id": "next-start",
+          "outcome": 200,
+          "normal_shape_verified": false,
+          "profiler_control_response_success": true
+        },
+        {
+          "case_id": "normal-next",
+          "outcome": 200,
+          "normal_shape_verified": true,
+          "profiler_control_response_success": false
+        },
+        {
+          "case_id": "next-stop",
+          "outcome": 200,
+          "normal_shape_verified": false,
+          "profiler_control_response_success": true
+        },
+        {
+          "case_id": "normal-after",
+          "outcome": 200,
+          "normal_shape_verified": true,
+          "profiler_control_response_success": false
+        }
+      ],
+      "native_API_links": 4,
+      "native_API_links_all_HTTP_matches": true,
+      "trace_files": [
+        {
+          "ordinal": 1,
+          "bytes": 68709,
+          "sha256": "7522a69baad778cb8866f4c41aec9fbdce259f245ca4f6e7f8c60c33eecd177c",
+          "CUDA_kernel_events": 258,
+          "device_names": [
+            "NVIDIA L4"
+          ]
+        },
+        {
+          "ordinal": 2,
+          "bytes": 69675,
+          "sha256": "0bc93a1ec08317bad6f1ed639e89f7e96a6537d75ce2418d0c0bb1a8edd4910b",
+          "CUDA_kernel_events": 258,
+          "device_names": [
+            "NVIDIA L4"
+          ]
+        }
+      ],
+      "backend_stop_output_completion_and_cross_process_RPC_verified": false,
+      "all_canonical9_CLI_terminal": true,
+      "activation_input_supplied": false
+    }
+  ],
+  "final_resource_observation_UTC": "2026-11-04T04:38:33.254200+00:00",
+  "final_resources": {
+    "EC2_stopped_count": 3,
+    "public_IPv4_count": 0,
+    "active_SSM_commands": 0,
+    "EBS_GiB_preserved": 440,
+    "same_instance_profile_and_security_groups": true,
+    "force_stop_or_delete_used": false
+  },
+  "cost": {
+    "asof_UTC": "2026-11-04T04:38:33.254200+00:00",
+    "cumulative_conservative_estimate_USD": 38.32304661594877,
+    "remaining_after_minimum_5_USD_reserve": 56.67695338405123,
+    "billing_confirmed": false,
+    "CE_results_are_account_wide_Estimated_not_task_bill": true,
+    "retained_EBS_estimated_USD_per_hour": 0.055748
+  },
+  "whole_questions_completed": 0,
+  "new_GPU_or_followup_scope_after_user_closeout": false
+}

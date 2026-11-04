@@ -40,6 +40,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         "verify", help="정책 묶음의 구조·파일·유효성을 확인"
     )
     bundle_verify_parser.add_argument("--bundle-dir", required=True, metavar="DIR")
+    bundle_build_parser = bundle_commands.add_parser("build", help="CONFIRMED 플랫폼 정책에서 묶음 생성")
+    bundle_build_parser.add_argument("--policy", required=True, metavar="FILE")
+    bundle_build_parser.add_argument("--policy-sha256", required=True, metavar="SHA256")
+    bundle_build_parser.add_argument("--server-values", required=True, metavar="FILE")
+    bundle_build_parser.add_argument("--intent", required=True, metavar="FILE")
+    bundle_build_parser.add_argument("--output-parent", required=True, metavar="DIR")
+    bundle_build_parser.add_argument("--bundle-id", required=True)
+    bundle_apply_parser = bundle_commands.add_parser("apply", help="서버 묶음 배치·재시작·상태 확인")
+    bundle_apply_parser.add_argument("--bundle-dir", required=True, metavar="DIR")
+    bundle_apply_parser.add_argument("--bundle-root", required=True, metavar="DIR")
+    bundle_apply_parser.add_argument("--context", required=True)
+    bundle_apply_parser.add_argument("--namespace", required=True)
+    bundle_apply_parser.add_argument("--kubeconfig", metavar="FILE", help="모든 kubectl 호출에 명시할 kubeconfig")
+    bundle_apply_parser.add_argument("--status-url", required=True, help="Gateway 내부 포트를 담은 로컬 URL; 새 임시 port-forward를 엽니다")
+    bundle_apply_parser.add_argument("--token-env-file", metavar="FILE", help="RUNTIME_VIEWER_TOKEN을 읽을 env 파일(조회가 비보호면 생략 가능)")
+    bundle_apply_parser.add_argument("--dry-run", action="store_true")
     mvp_parser = commands.add_parser("mvp", help="로컬 Gateway와 선택한 backend 실행")
     mvp_parser.add_argument("--policy", metavar="PATH")
     mvp_parser.add_argument(
@@ -303,6 +319,33 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"정책 묶음 검증 성공: {bundle.bundle_id}")
         print(f"bundle.json SHA-256: {bundle.sha256}")
         print(f"파일 수: {len(bundle.files)}")
+        return 0
+    if args.command == "bundle" and args.bundle_command == "build":
+        from .bundle_tools import build_bundle
+
+        try:
+            bundle = build_bundle(args.policy, args.policy_sha256, args.server_values,
+                                  args.intent, args.output_parent, args.bundle_id)
+        except (OSError, ValueError) as error:
+            print(f"정책 묶음 생성 실패: {error}", file=sys.stderr)
+            return 1
+        print(f"정책 묶음 생성·검증 성공: {bundle.bundle_id}; 파일 {len(bundle.files)}개")
+        print(f"policy_ref.sha256: {bundle.policy_ref['sha256']}; bundle.json SHA-256: {bundle.sha256}")
+        print("승인 목록은 플랫폼 승인 기록의 자기 신고 사본이며 승인 검증이 아닙니다.")
+        return 0
+    if args.command == "bundle" and args.bundle_command == "apply":
+        from .bundle_tools import apply_bundle
+
+        try:
+            result = apply_bundle(args.bundle_dir, args.bundle_root, args.context,
+                                  args.namespace, args.status_url, args.token_env_file,
+                                  kubeconfig=args.kubeconfig,
+                                  dry_run=args.dry_run)
+        except (OSError, ValueError, RuntimeError) as error:
+            print(f"정책 묶음 적용 실패: {error}", file=sys.stderr)
+            return 1
+        print(f"묶음 {'적용 계획' if result['dry_run'] else '적용·상태 확인'} 성공: "
+              f"{result['previous']} -> {result['bundle_id']}")
         return 0
     if args.command == "mvp":
         from .mvp.app import run

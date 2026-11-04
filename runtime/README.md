@@ -6,6 +6,16 @@
 - 언어: Python 3.12, 표준 라이브러리만 사용(`dependencies = []`).
 - 상세 설명·옵션·한계는 [`docs/상세_안내.md`](docs/상세_안내.md), 인수 담당 실행 순서는 [`docs/인계_안내.md`](docs/인계_안내.md)에 있습니다.
 
+정책 묶음 명령(`cd runtime`에서 실행):
+
+```text
+.venv/bin/python -B -m serving_runtime bundle build --policy POLICY.json --policy-sha256 SHA256 --server-values SERVER.json --intent INTENT.json --output-parent DIR --bundle-id ID
+.venv/bin/python -B -m serving_runtime bundle verify --bundle-dir DIR/ID
+sudo -E env KUBECONFIG="$HOME/.kube/config" PATH="$PATH" .venv/bin/python -B -m serving_runtime bundle apply --bundle-dir DIR/ID --bundle-root ROOT --context CONTEXT --namespace NAMESPACE --kubeconfig "$HOME/.kube/config" --status-url http://127.0.0.1:8080 --token-env-file "$HOME/runtime-acceptance.env" [--dry-run]
+```
+
+입력 형식·거부 규칙은 [`docs/정책묶음_변환규칙.md`](docs/정책묶음_변환규칙.md), 서버 적용과 수동 대체 절차는 [`deploy/gpu-lab/정책_수동적용_절차.md`](deploy/gpu-lab/정책_수동적용_절차.md)에 있습니다. apply는 rollout 뒤 새 임시 port-forward를 열고 viewer 토큰이 필요한 경우에만 사용합니다. 조회 불가이면 새 링크를 유지하며 수동 확인을 요구합니다. 생성 승인 목록은 자기 신고 사본이며 승인 검증이 아닙니다. 새 명령은 로컬 가짜 환경에서만 시험했습니다.
+
 ```text
 클라이언트 → Gateway (인증·정책·context 상한 판정, 요청 ID 발급)
                 │  허용만 중계

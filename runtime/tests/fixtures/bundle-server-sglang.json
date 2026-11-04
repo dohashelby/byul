@@ -1,0 +1,23 @@
+{
+  "schema_version": "runtime-bundle-server-values/1.0",
+  "gateway_schema_version": "runtime-mvp/1.1",
+  "target": {
+    "schema_version": "runtime-target/1.0",
+    "target_id": "serving-engine-aws-lab",
+    "engine": {
+      "kind": "sglang",
+      "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "model": {
+      "id": "test-model"
+    },
+    "kubernetes": {
+      "context": "byul-aws-lab",
+      "namespace": "serving-lab",
+      "selector": {
+        "app": "serving-engine"
+      },
+      "container": "engine"
+    }
+  }
+}

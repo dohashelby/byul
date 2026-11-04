@@ -1,6 +1,15 @@
 # 런타임 작업 상태
 
-최종 갱신: 2026-11-04
+최종 갱신: 2026-11-05
+
+## 2026-11-05 플랫폼 정책 묶음 build/apply와 후보 목록 (기준 e6985d7, 미커밋)
+
+- 검수 지적 반영: apply의 `/api/status` 조회 토큰을 서버 env 관례인 `RUNTIME_VIEWER_TOKEN`으로 맞추고, 비보호 200 응답은 토큰 없이 처리한다. rollout 뒤 새 임시 port-forward를 열어 최대 30초 재시도한다. 실제 값 불일치·rollout 실패는 이전 링크 복원·재시작, 연결·인증 등 조회 불가는 새 링크를 유지하고 수동 확인을 요구한다. `--kubeconfig`를 모든 kubectl 호출에 전달하며 sudo 실행 예시를 갱신했다. 실제 서버 재실행은 아직 없다.
+- 검수 반영 후 전체 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 694건, 실패·오류 0, skip 115. `git diff --check` 통과.
+- `bundle build`가 CONFIRMED `byul-policy/0.1` 원본과 독립 확인 정규 해시·서버 값·intent를 받아 새 ID 묶음을 생성하고 기존 verifier로 확인한다. `bundle apply`는 root:10000 권한으로 서버 루트에 배치·재검증, 상대 `current` 링크 교체, Gateway 재시작·`/api/status` 승인 `verified` 확인, 실패 시 링크 복원·재시작을 수행한다. `--dry-run` 제공. 변환·거부 규칙과 수동 대체 절차는 `docs/정책묶음_변환규칙.md`, `deploy/gpu-lab/정책_수동적용_절차.md`에 기록했다. 승인 목록은 자기 신고 사본이며 검증된 플랫폼 승인이 아니다.
+- LAB `platform-approval.aws-lab.json`은 원본 전체가 아닌 요약본이라 원본 해시 `b37fa34…`를 재검산할 수 없다. 합성 EXAMPLE 정책 정규 해시 `e6ff3f32…`와 시험 서버 값으로 vLLM·SGLang 묶음을 만들었고 둘 다 `bundle verify` 통과, Gateway 정책 파일은 기존 LAB 바이트와 동일(`472a7cca…`). intent·digest 자리값은 시험 사본에서만 채웠다. 실제 원본·서버 권한·kubectl·HTTP·AWS 적용은 미확인이다.
+- `docs/후보상태_기능목록.md`에 F6 지표, SP1 캐시, F4 SGLang drift, F7 승인 검증기, 관리 listener와 3회차의 제한된 SGLang 빈 캐시 관찰을 기록했다. `docs/지원_미지원_목록.md`의 backfill 전달 1건과 PR #216 빈 캐시 기동 1회 확인을 3회차 §3·§4 근거로 갱신했다. 다음은 플랫폼 원본 판본·실제 서버 값으로 생성 검증, 배치 권한과 되돌리기 실습, 실제 엔진의 후보 값 대조다.
+- 로컬 전체 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 692건, 실패·오류 0, skip 115(소켓/환경 제한). `git diff --check` 통과. AWS 서버에는 접속·적용하지 않았고 커밋·push하지 않았다.
 
 ## 2026-11-04 AWS GPU 서버 3회차 결과 (기준 b3fc80e, Claude 실행)
 

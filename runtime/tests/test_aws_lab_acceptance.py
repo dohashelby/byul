@@ -491,7 +491,9 @@ class DecisionTests(unittest.TestCase):
             with gap.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps({"event": "gap_closed", "kind": "tetragon", "gap_id": "gap-1",
                                          "opened_at": "2026-11-02T10:00:01Z",
-                                         "closed_at": "2026-11-02T10:00:03Z"}) + "\n")
+                                         "closed_at": "2026-11-02T10:00:03Z",
+                                         "closed_by": "collector_restart", "backfill": "not_requested"}) + "\n")
+            self.assertFalse(checker._tetragon_gaps_clear("2026-11-02T10:00:02Z"))
             self.assertTrue(checker._tetragon_gaps_clear("2026-11-02T10:00:04Z"))
 
     def test_aws11_unavailable_tetragon_collector_is_unknown(self) -> None:
@@ -2217,6 +2219,123 @@ class NewCaseExecutionTests(unittest.TestCase):
                 self.assertTrue(log_calls and all("pod/gateway-new" in call for call in log_calls))
                 self.assertEqual((bundles / "current").readlink(), Path("previous"))
                 self.assertEqual(sorted(path.name for path in bundles.iterdir()), ["current", "previous"])
+
+    def test_bad_bundle_retries_previous_and_current_logs_with_diagnostics(self) -> None:
+        class LogRunner(FakeRunner):
+            def __init__(self, logs):
+                super().__init__()
+                self.logs = list(logs)
+
+            def run(self, argv, *, timeout=30):
+                if "logs" in argv:
+                    self.history.append({"argv": list(argv)})
+                    return self.logs.pop(0)
+                return super().run(argv, timeout=timeout)
+
+        scenarios = (
+            ([CommandResult(0, "starting\n"), CommandResult(0, "still starting\n"),
+              CommandResult(1, "", "container waiting"), CommandResult(0, "MVP 실행 실패: runtime-policy.json: SHA-256이 bundle.json과 다릅니다\n")], True, 4, "hash_error"),
+            ([CommandResult(1, "") if index % 2 else CommandResult(0, "token=" + INFERENCE + "\n")
+              for index in range(8)], None, 8, "known_token"),
+            ([CommandResult(0, line + "\n") for line in (
+                "RUNTIME_ADMIN_KEY=fake-admin-key OPENAI_API_KEY: fake-openai-key",
+                "MiXeD_CrEdEnTiAl=FakeCredential custom_AUTH: FakeAuth",
+                "service_secret=FakeSecret user_password: FakePassword",
+                "api.token=FakeToken Bearer FakeBearer",
+            )] + [CommandResult(1, "") for _ in range(4)], None, 8, "assignments"),
+            ([CommandResult(0, line + "\n") for line in (
+                '{"api_key": "sk-json-double"}',
+                "{'api_key': 'sk-json-single'}",
+                '"RUNTIME_ADMIN_KEY":"sk-runtime-json"',
+                "--api-key sk-cli-api --admin-key 'sk-cli-admin'",
+                "RUNTIME_ADMIN_KEY=sk-existing-equals OPENAI_API_KEY: sk-existing-colon",
+                "x-api-key: sk-existing-header Authorization: Bearer sk-existing-bearer",
+                "gateway startup failed: policy file unavailable",
+                "container waiting",
+            )], None, 8, "quoted_and_options"),
+        )
+        for log_results, expected, expected_reads, scenario_name in scenarios:
+            with self.subTest(scenario=scenario_name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                bundles = root / "bundles"
+                previous = bundles / "previous"
+                previous.mkdir(parents=True)
+                (previous / "policy.json").write_bytes(b"{}")
+                (previous / "bundle.json").write_text(json.dumps({"files": [{"role": "gateway_policy", "path": "policy.json"}]}))
+                (bundles / "current").symlink_to("previous")
+                runner = LogRunner(log_results)
+                clock = FakeClock()
+                checker = AWSAcceptance(arguments(root, cases=("AWS-13",), allow_bundle_switch=True,
+                                                  bundle_root=str(bundles)), runner=runner,
+                                        http=FakeHTTP([]), sleeper=clock.sleep, monotonic=clock.monotonic)
+                checker._gateway_pods = lambda: [{"metadata": {"uid": "old"}}]
+                checker._gateway_crashed = lambda _window, _uids: (True, {"pod_name": "gateway-new"})
+                checker._restart = lambda _deployment, _timeout=90: (False, {})
+                facts, evidence = checker.aws_13()
+                self.assertIs(facts["bad_bundle_rejected"], expected)
+                reads = evidence["bad_gateway_log_reads"]
+                self.assertEqual(len(reads), expected_reads)
+                self.assertEqual([row["source"] for row in reads], ["previous", "current"] * (expected_reads // 2))
+                self.assertTrue(all("returncode" in row and "stdout_length" in row and
+                                    "stderr_length" in row and len(row["first_line_prefix"]) <= 120 for row in reads))
+                if expected:
+                    self.assertEqual(reads[2]["first_line_prefix"], "container waiting")
+                    self.assertEqual(reads[3]["first_line_prefix"],
+                                     "MVP 실행 실패: runtime-policy.json: SHA-256이 bundle.json과 다릅니다")
+                self.assertNotIn(INFERENCE, json.dumps(reads))
+                for secret in ("fake-admin-key", "fake-openai-key", "FakeCredential", "FakeAuth",
+                               "FakeSecret", "FakePassword", "FakeToken", "FakeBearer",
+                               "sk-json-double", "sk-json-single", "sk-runtime-json", "sk-cli-api",
+                               "sk-cli-admin", "sk-existing-equals", "sk-existing-colon",
+                               "sk-existing-header", "sk-existing-bearer"):
+                    self.assertNotIn(secret, json.dumps(reads))
+                if scenario_name == "quoted_and_options":
+                    self.assertEqual(reads[0]["first_line_prefix"], '{"api_key": [REDACTED]}')
+                    self.assertEqual(reads[1]["first_line_prefix"], "{'api_key': [REDACTED]}")
+                    self.assertEqual(reads[2]["first_line_prefix"], '"RUNTIME_ADMIN_KEY":[REDACTED]')
+                    self.assertEqual(reads[3]["first_line_prefix"],
+                                     "--api-key [REDACTED] --admin-key [REDACTED]")
+                    self.assertEqual(reads[6]["first_line_prefix"],
+                                     "gateway startup failed: policy file unavailable")
+                self.assertEqual((bundles / "current").readlink(), Path("previous"))
+
+    def test_bad_bundle_log_reads_stop_at_eight_second_deadline(self) -> None:
+        class TimedLogRunner(FakeRunner):
+            def __init__(self, clock):
+                super().__init__()
+                self.clock = clock
+                self.timeouts = []
+
+            def run(self, argv, *, timeout=30):
+                if "logs" in argv:
+                    self.timeouts.append(timeout)
+                    self.clock.value += timeout
+                    return CommandResult(1, "", "still waiting")
+                return super().run(argv, timeout=timeout)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bundles = root / "bundles"
+            previous = bundles / "previous"
+            previous.mkdir(parents=True)
+            (previous / "policy.json").write_bytes(b"{}")
+            (previous / "bundle.json").write_text(json.dumps({
+                "files": [{"role": "gateway_policy", "path": "policy.json"}]}))
+            (bundles / "current").symlink_to("previous")
+            clock = FakeClock()
+            runner = TimedLogRunner(clock)
+            checker = AWSAcceptance(arguments(root, cases=("AWS-13",), allow_bundle_switch=True,
+                                              bundle_root=str(bundles)), runner=runner,
+                                    http=FakeHTTP([]), sleeper=clock.sleep, monotonic=clock.monotonic)
+            checker._gateway_pods = lambda: [{"metadata": {"uid": "old"}}]
+            checker._gateway_crashed = lambda _window, _uids: (True, {"pod_name": "gateway-new"})
+            checker._restart = lambda _deployment, _timeout=90: (False, {})
+            facts, evidence = checker.aws_13()
+            self.assertIsNone(facts["bad_bundle_rejected"])
+            self.assertEqual(len(evidence["bad_gateway_log_reads"]), 2)
+            self.assertEqual(runner.timeouts, [3.0, 3.0])
+            self.assertLessEqual(clock.value, 8.0)
+            self.assertEqual((bundles / "current").readlink(), Path("previous"))
 
 
 if __name__ == "__main__":

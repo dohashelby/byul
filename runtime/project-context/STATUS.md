@@ -1,6 +1,17 @@
 # 런타임 작업 상태
 
-최종 갱신: 2026-11-03
+최종 갱신: 2026-11-04
+
+## 2026-11-04 AWS GPU 서버 2회차 결과 (기준 byul_runtime 5737fd3, 문서 미커밋)
+
+- 실제 서버 인수 시험에서 vLLM·SGLang 모두 AWS-01~19 최종 통과. vLLM AWS-11은 이전 gap 처리 뒤, AWS-13은 로그 재조회 뒤 통과했고 SGLang AWS-16·17·18도 판정됐다. 배포 경계 실측은 두 엔진 모두 `ok`. 상세 판정과 중간 `unknown`은 [2회차 결과](../docs/AWS_GPU_서버2회차_결과_20261104.md)에 기록했다.
+- 남은 일: 서버 뒤 교차 검수 보완판 재실행과 backfill 전달 확인, 대시보드 화면 확인, SGLang 캡처 뒤 컴파일·첫 요청 Triton JIT 및 vLLM loading 컴파일의 오탐 처리. AWS-11의 경고 0건은 캐시가 있는 시험 구간의 결과다.
+
+## 2026-11-04 AWS 2회차 수집 공백·AWS-13 로그 경합 보정 (기준 byul_runtime 5737fd3, 미커밋)
+
+- Hubble·Tetragon 이전 미닫힘 gap은 가장 이른 시각부터 backfill을 요청하고 첫 정상 tick까지 관측 불가로 유지한 뒤 `collector_restart`/`requested_unverified`로 닫는다. 재단절과 손상 이력은 자동 봉합하지 않는다. 여러 gap·닫힌 이력·시간 역전 기록을 모의 시험했다.
+- AWS-13 로그 조회는 매 호출 전 남은 8초를 확인하고, 증거 첫 줄의 key·token·secret·password·credential·auth 이름과 값을 가린다. JSON의 따옴표로 감싼 키와 `--api-key`·`--admin-key` 공백 옵션도 가리며, 일반 오류 문장은 유지하는 시험을 추가했다. 해시 오류 문구가 끝내 없으면 기존처럼 unknown이다. 실제 AWS 서버 재판정은 하지 않았다.
+- `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 샌드박스 683건 실패·오류 0, skip 115 / Claude 노트북 소켓 허용 실행 683건 OK, skip 0(가리기 재수정 후 기준). `git diff --check` 확인. contracts 수정 없음, 커밋·푸시 없음. 실제 AWS 서버 재시험이 남았다.
 
 ## 2026-11-03 stream 기한 결과 코드 회귀 보정 (기준 8d515ec, 미커밋)
 

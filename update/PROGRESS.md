@@ -1723,3 +1723,9 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 검증: 직접·입력 도구·불변식 macOS/Linux 각164 통과. macOS 전체10782 통과/18실패 원본, CSV 갱신 후 현황표13 통과, 같은18개 Linux 통과를 보존했다. Linux 전체10800 통과/19기존제외(1515.95초, 부모1517.647초). 소스 목록4644ad2f/423파일과 기존 팩32·B pin·고정 probe 유지. 실패 포함24개 Store 반출·복원·저장팩 재판정의 정확 RES Ref 일치.
 - 정리: 시험 예외 회수 후8초 timeout, probe/native Pod 삭제·엔진 scale0·GPU0MiB 확인. 원자료와13개 점검 요약은 `docs/gpu-a/RESULTS-20261103.md`와 `docs/evidence/gpu-a-*.json`. 사용자 승인 뒤 EC2 중지 요청21:47:45, 콘솔 stopped 관측21:57:10 KST. EBS 보존·자동 공인IP 해제, Claude 자동 계속 꺼짐.
 - 다음 단계/남은 것: `docs/gpu-a/NATIVE-20261103.md`의 실제 서빙 요청·세대·buffer 소비를 묶는 자동 producer/전송 계약, kernel 읽기·초기화 계측, LIF-13 기업 인가/다른 선택 모드. REQ-14 중간 tensor/REQ-21은 다중 GPU 별도 범위다.
+
+### 2026-11-04 1단계 묶음 1: 현황 정리 (개발 담당)
+- 한 일: `tools/checklist_status.py`가 현행 팩32 GPU 공개 요약 세 종류(gpu-a 13개, gpu-b 11-04, 11-02 GPU_RESULTS)를 읽어 `current_pack_actual_status`와 실행별 정확 RES/EVD Ref(`gpu_runs`)를 채운다. 1단계 분담 열(`phase1_owner`·`phase1_state`·`phase1_note`)과 담당별 상태 파일 `docs/phase1/{dev-1,gpu}.yaml`을 추가했다.
+- 결과: 69개 중 GPU_PARTIAL_MEASURED 11, GPU_PARTIAL_EXAMPLE 2(REQ-05·LIF-14), GPU_COMPONENT_DECLARED_ONLY 3(LIF-13·REQ-19·REQ-20), 나머지 DEFERRED_NOT_MEASURED. 원 질문 전체 완료 0. 11-02 PACK31 결과(OBS-03 등)는 현행 팩 기록이 아니어서 넣지 않았다. 담당 dev-1 26 / gpu 43.
+- 테스트 결과: `test_checklist_status.py`·`test_prepare_checklist_cases.py` 34 passed(macOS 3.12.13). `--check` exit0. 제품 소스·팩·manifest 변경 없음.
+- 다음 단계: 묶음 2 native 수집기.

@@ -1,0 +1,81 @@
+# 1단계 개발 담당 상태. 이 담당만 고친다. 상태 값은 tools/checklist_status.py PHASE1_STATES.
+checks:
+  LIF-13:
+    note: daemon 세대·release 주체·후속 공급을 인증 경계에 연결하는 수집기
+    state: CPU_DEVELOPMENT_REMAINING
+  OBS-01:
+    note: lab 대역과 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  OBS-04:
+    note: lab 대역과 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  OBS-05:
+    note: lab 대역과 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  OBS-06:
+    note: lab 대역과 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  OBS-09:
+    note: Kubernetes 실행기 구현 후 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  OBS-11:
+    note: Kubernetes 실행기 구현 후 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  PLT-07:
+    note: lab 대역과 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  PLT-10:
+    note: lab 대역과 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  PLT-11:
+    note: lab 대역과 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  PLT-12:
+    note: lab 대역과 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  REQ-01:
+    note: lab 대역과 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  REQ-02:
+    note: lab 대역과 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  REQ-03:
+    note: lab 대역과 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  REQ-04:
+    note: lab 대역과 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  REQ-06:
+    note: lab 대역과 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  REQ-11:
+    note: lab 대역과 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  REQ-13:
+    note: Kubernetes 실행기 구현 후 k3d CPU 실측
+    state: CPU_DEVELOPMENT_REMAINING
+  REQ-14:
+    note: 중간 tensor/buffer 계보 설계와 TP2 실행 묶음
+    state: CPU_DEVELOPMENT_REMAINING
+  REQ-15:
+    note: cache_salt Gateway 대역
+    state: CPU_DEVELOPMENT_REMAINING
+  REQ-16:
+    note: LoRA·멀티모달·모델 세대 문맥 사례
+    state: CPU_DEVELOPMENT_REMAINING
+  REQ-17:
+    note: 통계 설계(방향·워밍업·순서·표본·오버헤드 대조)
+    state: CPU_DEVELOPMENT_REMAINING
+  REQ-18:
+    note: V2 RequestState/Sampler와 서빙 요청·세대 소비를 묶는 producer
+    state: CPU_DEVELOPMENT_REMAINING
+  REQ-19:
+    note: 선정 서빙 kernel 도달·범위·초기화 계측 producer
+    state: CPU_DEVELOPMENT_REMAINING
+  REQ-20:
+    note: 실제 graph key·입력 갱신·출력 소비·buffer 계보
+    state: CPU_DEVELOPMENT_REMAINING
+  REQ-21:
+    note: 등록·해제 관측 코드와 TP2 실행 묶음
+    state: CPU_DEVELOPMENT_REMAINING
+owner: dev-1

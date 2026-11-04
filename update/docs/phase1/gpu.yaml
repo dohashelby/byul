@@ -1,0 +1,132 @@
+# 1단계 GPU 실증 담당 상태. 이 담당만 고친다. 상태 값은 tools/checklist_status.py PHASE1_STATES.
+checks:
+  LIF-01:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  LIF-02:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  LIF-03:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  LIF-04:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  LIF-05:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  LIF-06:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  LIF-07:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  LIF-08:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  LIF-09:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  LIF-10:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  LIF-11:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  LIF-12:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  LIF-14:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  LIF-16:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  OBS-02:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  OBS-03:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  PLT-01:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  PLT-02:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  PLT-03:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  PLT-04:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  PLT-05:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  PLT-06:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  PLT-08:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  PLT-09:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  REQ-05:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  REQ-07:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  REQ-08:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  REQ-09:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  REQ-10:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  REQ-12:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  SUP-03:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  SUP-04:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  SUP-05:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  SUP-06:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  SUP-07:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  SUP-08:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  SUP-09:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  SUP-10:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  SUP-11:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  SUP-12:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  SUP-13:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  SUP-15:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+  SUP-16:
+    note: 기존 실행기로 GPU/CPU 실측
+    state: MEASUREMENT_REMAINING
+owner: gpu

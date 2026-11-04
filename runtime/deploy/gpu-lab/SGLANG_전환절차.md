@@ -54,6 +54,14 @@ kubectl --context byul-aws-lab -n serving-lab rollout status deployment/serving-
 
 정책 묶음은 [정책_수동적용_절차.md](정책_수동적용_절차.md)의 승인 판본 → 변환 → 해시·크기 대조 → 검증 → 상대 링크 교체 → Gateway 재시작 순서를 따른다. SGLang도 vLLM과 같은 플랫폼 승인 판본 `aws-lab-policy-001`(승인 번호 `aws-lab-policy-001-v2`, 시험용 자기 신고 승인)의 **같은 정책 파일**을 쓴다. 엔진별 target·intent는 실제 digest와 서버 값으로 새 묶음에 넣고 `bundle verify`를 먼저 실행한다. `target.engine.version`은 생략한다. `image_digest`를 고정하고 Pod 스냅샷의 imageID와 비교한다.
 
+11/4 관찰을 반영한 SGLang intent는 추론 단계의 정확한 Triton `ptxas` 경로 하나를 `/opt/sglang/bin/python3` 부모 조건으로 추가한다. 서버에는 아직 재확인하지 않았다. 다음 빈 캐시 첫 기동에서 캡처 종료(15:57:27Z) 뒤 준비 완료(15:57:38Z) 전 셸 9건의 compiling·`compile_toolchain_parent` 설명과 계속되는 `suspect_binary` 경고, 준비 뒤 첫 요청의 `ptxas` 4건 경로·부모·허용 판정, 다른 셸 경고를 다시 대조한다. 준비 표지가 없으면 캡처 뒤 15초(관찰 간격 11초와 여유 4초)까지만 compiling이며, 캡처도 없으면 startupProbe 상한 20분까지만 열린다. 이후 단계는 `unknown`이다.
+
+호스트 수집기와 Gateway 이미지는 새 `collector_state` 형식을 읽는 **같은 커밋**으로 함께 갱신한다. 수집기만 갱신하면 기존 Gateway가 `compile_open_from`·`compile_cap_at`·`capture_end_at`을 거부해 SGLang 단계가 모두 `unknown`이 되고 AWS-11·16·17도 `unknown`이 예상된다.
+
+intent 바이트가 바뀌므로 서버별 `enforcement_intent` 파일을 새 묶음에 넣고 `bundle.json`의 해당 `files[]` 항목 `sha256`·`bytes`를 다시 계산한다. 새 묶음 ID로 로컬·서버 `bundle verify`를 수행하고 사람이 승인 판본·후보 규칙을 검토한 뒤 `current` 상대 링크와 Gateway를 전환한다. Gateway 정책 파일 바이트가 그대로면 `policy-approvals.aws-lab.json`의 `entries[]` 중 `policy_id=aws-lab-policy-001`, `policy_version=1`, `approval_ref=aws-lab-policy-001-v2`인 정책 해시 항목을 바꿀 이유는 없다. 정책 파일을 바꾸는 경우 그 승인 항목의 ID·판본·참조·해시를 사람이 다시 대조한다. 승인 기록은 자동으로 갱신하지 않는다.
+
+`engine.yaml`은 `/ready` startup/readiness probe를 사용하고 Gateway backend는 `serving-engine` Service로 연결한다. Gateway 대상 대조는 Pod 실행·digest와 모델 정보는 확인하지만 컨테이너 `ready`를 직접 admission 조건으로 검사하지 않는다. 따라서 준비 전 엔진 미도달은 Service의 Ready Endpoint 제외 동작에 의존하며, Endpoint 반영 지연·직통 접속까지 이 코드만으로 배제하지 못한다. 다음 서버 회차에서 준비 전 Gateway 요청의 503 또는 연결 실패와 엔진 요청 로그 부재, Service Endpoint 상태를 함께 기록한다.
+
 ```bash
 cd ~/byul/runtime
 .venv/bin/python -B -m serving_runtime bundle verify --bundle-dir <새-bundle-폴더>

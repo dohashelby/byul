@@ -409,3 +409,11 @@
 - 연결 수립은 기한 내 별도 작업으로 대기하고, 공통 감시가 요청 전송·헤더·본문 중 기한에 소켓을 끊는다. 연결이 늦게 끝나도 닫는다. relay 일반·chat/completions stream·토큰 계산에 적용했으며, 공유 기한 뒤 토큰 계산 timeout/OSError는 504 `ENGINE_DEADLINE`과 클라이언트 연결 닫기로 분류한다. 공유 기한 전 실패는 503을 유지한다.
 - AWS-01·18 stream 성공은 `[DONE]`과 Gateway 최종 기록의 ALLOWED/completed/오류 없음 여부를 함께 확인하며, 기록 누락은 unknown이다. GPU-LAB README의 엔진 수집 스레드 설명을 실제 순차 처리와 지연 한계에 맞췄다. contracts는 수정하지 않았다.
 - 소켓 없는 회귀시험을 추가해 헤더 분할 전송·본문 대기 중 기한 종료, 연결 수립 지연, 정상 감시 취소, 토큰 기한 오류, `[DONE]` 뒤 최종 실패를 확인했다. `.venv/bin/python -B -m unittest discover -s tests`: 672건, 실패·오류 0, skip 115(로컬 소켓 제약). Claude 노트북에서 전체 재시험과 실제 엔진 확인이 남았다. 커밋·푸시하지 않았다.
+
+## 2026-11-04 플랫폼 단계 시간표 조회 (기준 byul_runtime 작업 트리, 미커밋)
+
+- 근거: Gateway에 기존 ExecPolicy 시간표 파일의 읽기 전용 `/api/phase-timeline` 투영을 추가했다. 수집 상태·15초 freshness·단계/근거/추출 수준만 내보내며 Pod 이름·UID는 제외한다. 파일 누락의 로컬 시연은 `RUNTIME_DEMO=1`일 때 합성임을 표시한다. `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 688건 통과, skip 115건(로컬 소켓 제약). 실제 관측 mount·인증을 건 GPU 환경의 응답은 미확인이다.
+
+## 2026-11-04 사용자 화면 검수 후속 (기준 9fc5056 + 미커밋 변경)
+
+- 근거: 예시 시간표는 기존 합성 Tetragon 관측 시각의 처음·끝에 맞춰 생성해 단계와 실행 점이 겹치며, 실제 시간표 파일 조회 분기는 그대로다. 로컬 전체 unittest 689건 통과(skip 115: 소켓 제약)와 단위시험으로 시간 포함·합성 표지를 확인했다. 실제 GPU 관측 mount와 화면에서의 점 배치는 미확인이다.

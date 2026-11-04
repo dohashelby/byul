@@ -33,7 +33,7 @@ export function RuntimeTargetPage() {
   const reval = useRevalidation();
   return (
     <div className="page">
-      <PageHead title="대상·구성" />
+      <PageHead title="대상 엔진" />
       <Query q={q}>
         {(res) => {
           if (!res.item) return <StateView kind="invalid" detail={res.invalid?.errors.join(" / ")} />;
@@ -115,7 +115,7 @@ export function RuntimeTargetPage() {
                     })}
                   </tbody>
                 </table>
-                {items.length === 0 && <p className={rt.empty}>열린 재검증 요청이 없습니다.</p>}
+                {items.length === 0 && <p className={rt.empty}>재검증 요청 없음. 변경 사항과 수집 상태를 확인하세요.</p>}
               </TableCard>
             </>
           );

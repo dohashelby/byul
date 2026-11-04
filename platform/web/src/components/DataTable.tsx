@@ -144,7 +144,7 @@ export function DataTable<T>({
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={shown.length || 1}>{empty ?? <span className="muted">항목이 없습니다</span>}</td>
+                <td colSpan={shown.length || 1}>{empty ?? <span className="muted">항목 없음</span>}</td>
               </tr>
             ) : (
               visible.map((row) => {

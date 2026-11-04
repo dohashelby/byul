@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 import threading
@@ -35,6 +36,7 @@ from .http_handler import (
 from .lab_report import LabReportSource
 from .mock_engine import MockEngine, _utc_now
 from .observation_feed import ObservationFeed
+from .phase_timeline import read_phase_timeline
 from serving_runtime.enforcement.execpolicy import ExecPolicy
 
 from .approval import (
@@ -731,6 +733,14 @@ class GatewayApp:
                 request_header_timeout_s=self.config.request_header_timeout_s,
                 request_body_timeout_s=self.config.request_body_timeout_s,
                 target_status=self.target_status,
+                phase_timeline=lambda: read_phase_timeline(
+                    self.config.observation_timeline_path,
+                    demo=os.environ.get("RUNTIME_DEMO") == "1",
+                    observed_times=(
+                        item.get("observed_at")
+                        for item in self._observations.query({"source": "tetragon", "data_origin": "synthetic"})["observations"]
+                    ) if os.environ.get("RUNTIME_DEMO") == "1" else (),
+                ),
                 authorize_read=lambda header: self.auth_state.authorize_read(header),
                 record_rejected=self._route_rejections.record,
             )

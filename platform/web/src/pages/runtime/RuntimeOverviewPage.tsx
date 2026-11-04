@@ -11,7 +11,7 @@ import { APPROVAL_DETAIL, ENGINE_NAME } from "../../lib/labels";
 import { bucketize, inRange } from "../../lib/time";
 import { carry, useGlobalFilters } from "../../lib/url";
 import p from "../pages.module.css";
-import { ObservationChip, formatTime, observationState, rt } from "./parts";
+import { ControlModeBadges, ObservationChip, formatTime, observationState, rt } from "./parts";
 
 type Row = [string, ReactNode, { problem?: boolean; mono?: boolean; title?: string }?];
 
@@ -42,7 +42,7 @@ export function ScopeChips({ status, observeEnv }: { status: RuntimeStatus; obse
         <span className={rt.scopeValue}>{observeEnv ?? "미연결"}</span>
       </span>
       <span className={ui.badge} style={external && !status.backend.healthy ? { color: "var(--error)", background: "var(--error-soft)" } : undefined}>
-        {external ? `외부 ${name} 모드 · ${status.backend.healthy ? "연결됨" : "연결 안 됨"} · 정식 GPU 시험(S3B) 전` : "모의 엔진"}
+        {external ? `외부 ${name} 모드 · ${status.backend.healthy ? "연결 정상" : "연결 장애"} · GPU 검증 시험(S3B) 이전` : "모의 엔진"}
       </span>
     </div>
   );
@@ -100,22 +100,22 @@ export function RuntimeOverviewPage() {
           const policyRows: Row[] = [
             ["정책", pol.policy_ref?.policy_id],
             ["판본", pol.policy_ref?.policy_version],
-            ["프로필", pol.test_only ? `${pol.profile} (시험 전용)` : pol.profile || "default", { problem: pol.test_only }],
+            ["설정 유형", pol.test_only ? `${pol.profile} (시험 전용)` : pol.profile || "default", { problem: pol.test_only }],
             ["대상", s.target.target_id],
             ["SHA-256", pol.policy_ref ? `${pol.policy_ref.sha256.slice(0, 12)}…` : null, { mono: true, title: pol.policy_ref?.sha256 }],
-            ["로딩", formatTime(pol.loaded_at)],
-            ["로딩 검증", pol.load_valid ? "유효" : "무효 — 추론 요청은 503", { problem: !pol.load_valid }],
+            ["적재", formatTime(pol.loaded_at)],
+            ["적재 검증", pol.load_valid ? "유효" : "무효 — 추론 요청은 503", { problem: !pol.load_valid }],
             ["승인 확인", APPROVAL_DETAIL[pol.approval_state] ?? pol.approval_state, { problem: !["not_configured", "verified"].includes(pol.approval_state) }],
             ["Gateway 활성", pol.gateway_active ? "활성" : "비활성 — 추론 요청은 503", { problem: !pol.gateway_active }],
             [
               "사용자별 캐시 분리",
               pol.cache_isolation.mode === "off"
-                ? "꺼짐(사용자 간 prefix cache 공유)"
+                ? "비활성 (사용자 간 prefix cache 공유)"
                 : pol.cache_isolation.mode === "per_principal"
                   ? pol.cache_isolation.ready
-                    ? "켜짐"
+                    ? "활성"
                     : `준비 불가(${pol.cache_isolation.unavailable_reason_code ?? "unknown"})`
-                  : "모름",
+                  : "미확인",
               { problem: pol.cache_isolation.mode === "per_principal" && !pol.cache_isolation.ready },
             ],
             ...(!pol.load_valid ? ([["사유", `${pol.error_code ?? ""} ${pol.error_message ?? ""}`.trim(), { problem: true }]] as Row[]) : []),
@@ -134,7 +134,7 @@ export function RuntimeOverviewPage() {
             ["연결", eng.healthy ? "정상" : "응답 없음", { problem: !eng.healthy }],
             ["점검", formatTime(eng.checked_at)],
             ["동시 요청", `${s.concurrency.in_flight ?? "–"} / ${s.concurrency.limit ?? "–"}`],
-            ["클라이언트 연결", `${s.connections.active ?? "–"} / ${s.connections.limit ?? "–"} · 거절 ${s.connections.rejected ?? 0}`],
+            ["요청자 연결", `${s.connections.active ?? "–"} / ${s.connections.limit ?? "–"} · 거절 ${s.connections.rejected ?? 0}`],
             ["요청 읽기 timeout", `헤더 ${s.connections.request_header_timeout_s ?? "–"}초 · 본문 ${s.connections.request_body_timeout_s ?? "–"}초`],
             [
               "수신 기록",
@@ -292,18 +292,19 @@ export function RuntimeOverviewPage() {
 
               {pol.test_only && (
                 <WarningBox>
-                  시험 전용 프로필({pol.profile}): 검사하지 않고 엔진에 전달하는 필드 {pol.passthrough_fields.length}개
+                  시험 전용 설정 유형({pol.profile}): 검사하지 않고 엔진에 전달하는 필드 {pol.passthrough_fields.length}개
                   {pol.passthrough_fields.length ? ` (${pol.passthrough_fields.join(", ")})` : ""} · 검사 후 전달 <Value v={pol.validate_count} />개 · 허용 n 최대 {pol.max_n ?? 1}. 승인된 운영 정책이
                   아닙니다.
                 </WarningBox>
               )}
               {s.revalidation.open_count > 0 && (
                 <WarningBox>
-                  열린 재검증 요청 {s.revalidation.open_count}건 · 현재 근거 {s.revalidation.current_condition_count}건 — 자동 승인·해제되지 않습니다.
+                  재검증 요청 {s.revalidation.open_count}건 · 현재 근거 {s.revalidation.current_condition_count}건 · 자동 승인·해제 대상 제외
                 </WarningBox>
               )}
 
               <h2 className={ui.blockTitle}>구성요소 상태</h2>
+              <ControlModeBadges />
               <div className={rt.cardGrid3}>
                 <article className="card card-pad stack" style={{ gap: 10 }}>
                   <h3 className="row" style={{ gap: 8 }}>
@@ -328,7 +329,7 @@ export function RuntimeOverviewPage() {
                 </article>
               </div>
 
-              <div className={rt.chipRow} aria-label="관측 연결 상태">
+              <div className={rt.chipRow} aria-label="수집 상태">
                 <ObservationChip label="네트워크" state={observationState(origins.network_flow, col.observation_feed_hubble)} />
                 <ObservationChip label="프로세스" state={observationState(origins.process_exec, col.observation_feed_tetragon)} />
                 <ObservationChip label="파일" state={observationState(origins.file_access, col.observation_feed_tetragon)} />

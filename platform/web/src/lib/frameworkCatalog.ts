@@ -118,14 +118,14 @@ export const ENV_CONDITIONS: EnvCondition[] = [
   {
     key: "supply",
     no: 4,
-    title: "모델·공급물·로딩",
+    title: "모델·공급 자산·적재",
     runtime: "runtime이 모델 ID와 승인 자산 목록 대비 디스크 파일 해시를 수집합니다.",
     baseChecks: ["SUP-001", "SUP-002", "SUP-003", "SUP-004", "SUP-005", "SUP-014", "REQ-009", "PLT-003", "LIF-005", "LIF-015", "OBS-001"],
     otherChecks: "분기 13 · 선정 구현 2 · 조건부 7",
     fields: [
       { key: "model_source", label: "모델 공급원", kind: "choice", options: [c("local_bundle", "내부 반입 묶음"), c("hf_hub", "Hugging Face Hub"), c("object_storage", "객체 저장소(S3·GCS 등)"), c("registry", "내부 모델 레지스트리")] },
       { key: "acquisition", label: "가져오는 시점", kind: "choice", options: [c("baked_image", "이미지에 포함"), c("mounted", "볼륨 마운트"), c("download_at_start", "기동 시 내려받기")] },
-      { key: "loader", label: "가중치 loader", kind: "choice", options: [c("safetensors", "safetensors 지정"), c("auto", "자동 선택(auto)"), c("pytorch", "PyTorch .bin·.pt"), c("gguf", "GGUF"), c("remote_streamer", "원격 streaming loader"), c("other", "기타")] },
+      { key: "loader", label: "가중치 loader", kind: "choice", options: [c("safetensors", "safetensors 지정"), c("auto", "자동 선택(auto)"), c("pytorch", "PyTorch .bin·.pt"), c("gguf", "GGUF"), c("remote_streamer", "원격 연속 전송 loader"), c("other", "기타")] },
       { key: "weight_formats", label: "가중치 형식", kind: "multi", options: [c("safetensors", "safetensors"), c("pt_bin", "PyTorch .bin·.pt"), c("gguf", "GGUF"), c("other", "기타")] },
       { key: "quantization", label: "양자화", kind: "choice", options: [c("none", "없음"), c("fp8", "FP8"), c("awq", "AWQ"), c("gptq", "GPTQ"), c("bitsandbytes", "bitsandbytes"), c("other", "기타")] },
       { key: "extra_files", label: "함께 쓰는 공급물", kind: "multi", options: [c("tokenizer", "별도 tokenizer"), c("chat_template", "chat template 파일"), c("generation_config", "generation config"), c("lora", "LoRA adapter")] },
@@ -137,7 +137,7 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     key: "features",
     no: 5,
     title: "요청·활성 기능",
-    elsewhere: "byul runtime Gateway는 /v1/chat/completions·/v1/completions만 열고 기본으로 model·messages(문자열)·prompt(문자열)·max_tokens·stream·n만 넘깁니다. chat 요청은 정책의 추가 허용 필드만큼 더 넘길 수 있습니다. 객체 필드는 열 수 없어 스트리밍(항상 열림)·구조화 출력·tools·embedding·token ID·미디어·Responses·batch는 묻지 않습니다.",
+    elsewhere: "byul runtime Gateway는 /v1/chat/completions·/v1/completions만 열고 기본으로 model·messages(문자열)·prompt(문자열)·max_tokens·stream·n만 넘깁니다. chat 요청은 정책의 추가 허용 필드만큼 더 넘길 수 있습니다. 객체 필드는 열 수 없어 연속 응답(항상 적용)·구조화 출력·tools·embedding·token ID·미디어·Responses·batch는 묻지 않습니다.",
     baseChecks: ["SUP-003", "REQ-009", "LIF-005", "LIF-010"],
     otherChecks: "분기 15 · 조건부 11 · 선정 구현 3",
     fields: [
@@ -168,7 +168,7 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     no: 7,
     title: "호스트·자격·외부 접근",
     elsewhere: "비밀값 원문은 받지 않습니다.",
-    runtime: "runtime이 Cilium·Hubble·Tetragon으로 송신 차단과 파일·실행 이벤트를 관측합니다(로컬 kind 확인).",
+    runtime: "runtime이 Cilium·Hubble·Tetragon으로 송신 차단과 파일·실행 이벤트를 관측합니다(개발 환경 kind에서 확인).",
     baseChecks: ["SUP-004", "SUP-005", "REQ-001", "PLT-001", "PLT-002", "PLT-003", "PLT-006", "PLT-010", "PLT-012", "LIF-015", "OBS-004", "OBS-010", "OBS-011"],
     otherChecks: "분기 7 · 선정 구현 1 · 조건부 7",
     fields: [
@@ -178,7 +178,7 @@ export const ENV_CONDITIONS: EnvCondition[] = [
       { key: "run_as_root", label: "엔진을 root로 실행", kind: "tri", yes: "예", no: "아니오" },
       { key: "model_mount_readonly", label: "모델 경로 읽기 전용 마운트", kind: "tri", yes: "예", no: "아니오" },
       { key: "credential_delivery", label: "자격 전달 방식", kind: "multi", options: [c("env_var", "환경변수"), c("mounted_file", "파일 마운트"), c("workload_identity", "workload identity"), c("secret_manager", "비밀 관리자"), c("none", "자격 없음")] },
-      { key: "egress_control", label: "외부 송신 제한", kind: "choice", options: [c("none", "없음"), c("network_policy", "네트워크 정책"), c("proxy_allowlist", "프록시 허용 목록"), c("firewall", "방화벽")] },
+      { key: "egress_control", label: "외부 송신 제한", kind: "choice", options: [c("none", "없음"), c("network_policy", "네트워크 정책"), c("proxy_allowlist", "중계 서버 허용 목록"), c("firewall", "방화벽")] },
       { key: "tls", label: "API 구간 TLS", kind: "choice", options: [c("none", "없음"), c("to_gateway", "Gateway까지"), c("end_to_end", "엔진까지")] },
     ],
   },
@@ -189,7 +189,7 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     baseChecks: [],
     otherChecks: "분기 3(SUP-006·012, REQ-005) · 조건부 1(LIF-013)",
     fields: [
-      { key: "delivery", label: "가중치 공급 방식", kind: "choice", options: [c("local_file", "로컬 파일"), c("shared_daemon", "공유 daemon"), c("remote_streaming", "원격 streaming")] },
+      { key: "delivery", label: "가중치 공급 방식", kind: "choice", options: [c("local_file", "장치 내 파일"), c("shared_daemon", "공유 상주 프로세스"), c("remote_streaming", "원격 연속 전송")] },
       { key: "fallback", label: "다른 공급원으로 fallback", kind: "tri", yes: "있음", no: "없음", required: { key: "delivery", is: ["shared_daemon", "remote_streaming", null] } },
       { key: "zero_copy", label: "copy·zero-copy 공유 참조", kind: "tri", yes: "사용", no: "사용 안 함", required: true, when: { key: "delivery", is: ["shared_daemon", "remote_streaming"] } },
     ],
@@ -232,8 +232,8 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     baseChecks: ["PLT-012", "OBS-001", "OBS-004", "OBS-010", "OBS-011"],
     otherChecks: "분기 8 · 조건부 7",
     fields: [
-      { key: "log_sinks", label: "로그·지표 목적지", kind: "multi", options: [c("stdout", "표준 출력"), c("file", "로컬 파일"), c("loki", "Loki"), c("elasticsearch", "Elasticsearch"), c("cloud_logging", "클라우드 로깅"), c("otel_collector", "OTel collector")] },
-      { key: "body_logging", label: "요청·응답 본문 기록", kind: "choice", options: [c("none", "기록 안 함"), c("metadata", "메타데이터만"), c("full", "본문까지")] },
+      { key: "log_sinks", label: "로그·지표 목적지", kind: "multi", options: [c("stdout", "표준 출력"), c("file", "장치 내 파일"), c("loki", "Loki"), c("elasticsearch", "Elasticsearch"), c("cloud_logging", "클라우드 기록 서비스"), c("otel_collector", "OTel collector")] },
+      { key: "body_logging", label: "요청·응답 본문 기록", kind: "choice", options: [c("none", "기록 안 함"), c("metadata", "요청 부가 정보만"), c("full", "본문까지")] },
       { key: "usage_stats", label: "엔진 사용 통계 보고", kind: "tri", yes: "켜짐", no: "꺼짐" },
       { key: "tracing", label: "OTLP trace 송신", kind: "tri", yes: "켜짐", no: "꺼짐" },
       { key: "diagnostics", label: "진단 dump·profiler", kind: "tri", yes: "사용", no: "사용 안 함" },
@@ -509,7 +509,7 @@ export const SECURITY_FUNCTIONS: SecurityFunction[] = [
       },
       {
         id: "4.4",
-        title: "실행 상태·버퍼 수명",
+        title: "실행 상태·임시 저장 수명",
         checks: ["REQ-018", "REQ-020", "REQ-021", "LIF-013"],
         fields: [{ key: "force_kill", label: "강제 종료", kind: "choice", options: [c("after_deadline", "기한 후 허용"), c("never", "쓰지 않음")] }],
         numbers: [n("request_end", "요청 종결 기한", ["초"], ["취소 시점부터"]), n("process_end", "rank·프로세스 종료 기한", ["초"], ["종료 요청부터"]), n("ref_release", "참조 회수 기한", ["초"], ["요청 종결부터"])],
@@ -535,7 +535,7 @@ export const SECURITY_FUNCTIONS: SecurityFunction[] = [
         title: "수집 정보 최소화",
         checks: ["OBS-003"],
         fields: [
-          { key: "body_logging", label: "본문 기록", kind: "choice", options: [c("forbidden", "금지"), c("metadata", "메타데이터만"), c("approved_sampling", "승인 시 표본")] },
+          { key: "body_logging", label: "본문 기록", kind: "choice", options: [c("forbidden", "금지"), c("metadata", "요청 부가 정보만"), c("approved_sampling", "승인 시 표본")] },
           { key: "allowed_log_fields", label: "로그 허용 필드", kind: "list", placeholder: "request_id" },
           { key: "forbidden_log_fields", label: "로그 금지 필드", kind: "list", placeholder: "prompt" },
           { key: "diagnostics", label: "진단 dump·profiler", kind: "choice", options: [c("forbidden", "금지"), c("approved", "승인 시 허용")] },
@@ -616,7 +616,7 @@ export const SECURITY_FUNCTIONS: SecurityFunction[] = [
           n("queue_length", "대기열 한도", ["요청"], ["전체"], true),
           n("request_timeout", "요청 처리 시간 한도", ["초"], ["요청별"], true),
           n("gpu_memory", "GPU 메모리 한도", ["GiB", "%"], ["엔진별"], true),
-          n("stream_buffer", "연결별 스트림 버퍼 상한", ["MiB"], ["연결별"], true),
+          n("stream_buffer", "연결별 연속 응답 임시 저장 한도", ["MiB"], ["연결별"], true),
         ],
       },
       {

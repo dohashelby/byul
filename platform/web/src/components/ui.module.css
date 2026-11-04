@@ -133,6 +133,18 @@ button.metric:hover {
   color: var(--muted);
   font-size: 13px;
 }
+.chartTotals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 18px;
+  margin: 0 0 14px;
+}
+.chartTotal {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
 .metricBody {
   display: flex;
   flex-wrap: wrap;

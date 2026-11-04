@@ -10,6 +10,7 @@ from fastapi.responses import Response
 
 from ..models import (
     LabReportResponse,
+    PhaseTimelineResponse,
     RequestDetail,
     RequestList,
     RequestSummary,
@@ -112,3 +113,8 @@ def lab_report(state: AppState = Depends(get_state)) -> dict[str, Any]:
     doc = state.runtime.lab_report()
     bad = invalid_one(state.contracts, "runtime-lab-report", doc)
     return {"item": None if bad else doc, "invalid": bad, "source": state.source("runtime")}
+
+
+@router.get("/phase-timeline", response_model=PhaseTimelineResponse)
+def phase_timeline(state: AppState = Depends(get_state)) -> dict[str, Any]:
+    return {**state.runtime.phase_timeline(), "source": state.source("runtime")}

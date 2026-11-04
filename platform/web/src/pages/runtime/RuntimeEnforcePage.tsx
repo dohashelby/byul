@@ -22,19 +22,19 @@ export function RuntimeEnforcePage() {
   const report = lab?.report;
   return (
     <div className="page">
-      <PageHead title="통제 적용" />
-      <p className="notice">정책이 설정됐다는 것과 실제 차단이 확인됐다는 것은 다릅니다. 실제 결과는 lab 시험 결과로 확인합니다.</p>
+      <PageHead title={sub === "lab" ? "검증 시험 (Lab)" : "네트워크 정책 (Cilium)"} />
+      <p className="notice">정책 설정과 실제 차단 여부는 별도로 확인합니다. 실제 결과는 검증 시험 (Lab) 결과에서 확인합니다.</p>
       <Subtabs
         tabs={[
-          { to: "/runtime/enforce/cilium", label: "Cilium 정책 적용 상태", count: problems?.ciliumCount, badge: problems?.cilium, active: sub === "cilium" },
-          { to: "/runtime/enforce/lab", label: "kind lab 시험 결과", count: problems?.labCount, badge: problems?.lab, active: sub === "lab" },
+          { to: "/runtime/enforce/cilium", label: "네트워크 정책 (Cilium)", count: problems?.ciliumCount, badge: problems?.cilium, active: sub === "cilium" },
+          { to: "/runtime/enforce/lab", label: "검증 시험 (Lab)", count: problems?.labCount, badge: problems?.lab, active: sub === "lab" },
         ]}
       />
       {sub === "cilium" && (
         <TableCard
           title={
             <>
-              Cilium 정책 적용 상태{" "}
+              네트워크 정책 (Cilium){" "}
               <span className="muted small">
                 {collector
                   ? `${collector.state} · 마지막 조회 ${formatTime(collector.last_attempt_at)} · 최근 성공 ${formatTime(collector.last_success_at)}${collector.last_error ? ` · ${collector.last_error}` : ""}`
@@ -48,7 +48,7 @@ export function RuntimeEnforcePage() {
               <Badge tone={blocked ? "accent" : "error"}>
                 {blocked
                   ? `저장된 실제 차단 근거 있음 (${l02?.status === "passed" ? "L-02 통과" : ""}${l02?.status === "passed" && realDrops ? " · " : ""}${realDrops ? `Hubble DROPPED ${realDrops}건` : ""})`
-                  : "실제 차단 확인 안 됨"}
+                  : "차단 근거 미확인"}
               </Badge>
             </div>
           }
@@ -86,7 +86,7 @@ export function RuntimeEnforcePage() {
         <TableCard
           title={
             <>
-              kind lab 시험 결과{" "}
+              검증 시험 (Lab) 결과{" "}
               <span className="muted small">{lab?.state === "ok" && report ? `${report.overall} · ${report.run_id}` : `${lab?.state ?? "–"}${lab?.error ? ` · ${lab.error}` : ""}`}</span>
             </>
           }

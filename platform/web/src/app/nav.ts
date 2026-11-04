@@ -1,4 +1,4 @@
-export type NavItem = { path: string; label: string; badge?: string; match?: string };
+export type NavItem = { path: string; label: string; badge?: string; match?: string; description?: string };
 export type NavGroup = { title: string; items: NavItem[] };
 export type AreaKey = "input" | "update" | "runtime";
 export type Area = { key: AreaKey; title: string; short: string; home: string; groups: NavGroup[] };
@@ -41,29 +41,30 @@ export const AREAS: Area[] = [
       {
         title: "요청 통제",
         items: [
-          { path: "/runtime/overview", label: "현황", badge: "overview" },
-          { path: "/dashboard", label: "대시보드" },
+          { path: "/runtime/overview", label: "현황", badge: "overview", description: "요청 판정과 관측 사건을 통합 조회" },
           { path: "/runtime/requests", label: "요청", badge: "requests" },
-          { path: "/runtime/policy", label: "정책·기준", badge: "policy" },
-          { path: "/runtime/target", label: "대상·구성", badge: "target" },
+          { path: "/runtime/policy", label: "적용 정책", badge: "policy", description: "Gateway가 요청에 적용하는 정책" },
+          { path: "/runtime/target", label: "대상 엔진", badge: "target", description: "등록·검증된 추론 엔진" },
           // 재검증 요청은 runtime이 운영 중 변화(자산·구성 drift·정책 내용)를 보고 연다.
-          { path: "/runtime/revalidation", label: "재검증 요청", badge: "revalidation" },
+          { path: "/runtime/revalidation", label: "재검증 요청", badge: "revalidation", description: "자산·구성 변경으로 다시 확인할 항목" },
         ],
       },
       {
         title: "관측",
         items: [
-          { path: "/runtime/observe/collectors", label: "수집원", badge: "observe" },
-          { path: "/runtime/observe/hubble", label: "Hubble" },
-          { path: "/runtime/observe/tetragon", label: "Tetragon", badge: "tetragonFlagged" },
+          { path: "/runtime/observe/collectors", label: "수집 상태", badge: "observe", description: "관측 수집기의 연결·지연·오류 상태" },
+          { path: "/runtime/observe/hubble", label: "네트워크 흐름 (Hubble)", description: "네트워크 통신 결과와 차단 기록" },
+          { path: "/runtime/observe/tetragon", label: "프로세스·파일 이벤트 (Tetragon)", badge: "tetragonFlagged", description: "엔진 내부 실행과 파일 접근 기록" },
+          { path: "/runtime/observe/phases", label: "엔진 실행 단계", description: "모델 적재·컴파일·추론 시간 구간" },
+          { path: "/runtime/alerts", label: "탐지 알림", description: "판정·대상·단계별 탐지 이벤트 집계" },
           { path: "/runtime/events", label: "사건 로그" },
         ],
       },
       {
         title: "통제 적용",
         items: [
-          { path: "/runtime/enforce/cilium", label: "Cilium", badge: "cilium" },
-          { path: "/runtime/enforce/lab", label: "lab 시험", badge: "lab" },
+          { path: "/runtime/enforce/cilium", label: "네트워크 정책 (Cilium)", badge: "cilium", description: "통신 차단 정책과 적용 상태" },
+          { path: "/runtime/enforce/lab", label: "검증 시험 (Lab)", badge: "lab", description: "실제 차단·허용 결과 확인" },
         ],
       },
       { title: "설정", items: [{ path: "/runtime/settings", label: "설정·인증" }] },
@@ -76,6 +77,7 @@ const hit = (pathname: string, path: string) => pathname === path || pathname.st
 
 /** 주소가 속한 영역. 두 영역에 걸친 화면(증거 목록)은 직전에 있던 영역을 따른다. */
 export function areaFor(pathname: string, last: AreaKey | null): AreaKey {
+  if (pathname === "/dashboard") return "runtime";
   const owners = AREAS.filter((a) => a.groups.some((g) => g.items.some((i) => hit(pathname, i.path))));
   if (owners.length === 1) return owners[0].key;
   if (last && owners.some((a) => a.key === last)) return last;
@@ -83,6 +85,7 @@ export function areaFor(pathname: string, last: AreaKey | null): AreaKey {
 }
 
 export function titleFor(pathname: string): string {
+  if (pathname === "/dashboard") return "현황";
   for (const a of AREAS) for (const g of a.groups) for (const i of g.items) if (hit(pathname, i.path)) return i.label;
   return "byul";
 }

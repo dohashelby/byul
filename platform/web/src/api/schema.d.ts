@@ -160,6 +160,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runtime/phase-timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phase Timeline */
+        get: operations["phase_timeline_api_runtime_phase_timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/update/results": {
         parameters: {
             query?: never;
@@ -523,6 +540,48 @@ export interface components {
             /** Open Revalidation */
             open_revalidation: number | null;
             revalidation_error?: components["schemas"]["ErrorBody"] | null;
+        };
+        /** PhaseCollector */
+        PhaseCollector: {
+            /** State */
+            state: string;
+            /** Written At */
+            written_at: string | null;
+            /** Fresh */
+            fresh: boolean;
+        };
+        /** PhaseEntry */
+        PhaseEntry: {
+            /** Phase */
+            phase: string;
+            /** From */
+            from: string;
+            /** Until */
+            until: string | null;
+            /** Basis */
+            basis: string;
+        };
+        /** PhaseExtraction */
+        PhaseExtraction: {
+            /** Engine */
+            engine: string | null;
+            /** Support Level */
+            support_level: string | null;
+            /** Limitations */
+            limitations: string[];
+        };
+        /** PhaseTimelineResponse */
+        PhaseTimelineResponse: {
+            /** Entries */
+            entries: components["schemas"]["PhaseEntry"][];
+            collector: components["schemas"]["PhaseCollector"];
+            extraction: components["schemas"]["PhaseExtraction"];
+            /**
+             * Data Origin
+             * @enum {string}
+             */
+            data_origin: "real" | "synthetic";
+            source: components["schemas"]["SourceInfo"];
         };
         /** PolicyConfirm */
         PolicyConfirm: {
@@ -2215,6 +2274,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LabReportResponse"];
+                };
+            };
+        };
+    };
+    phase_timeline_api_runtime_phase_timeline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhaseTimelineResponse"];
                 };
             };
         };

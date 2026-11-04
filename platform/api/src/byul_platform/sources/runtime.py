@@ -975,6 +975,7 @@ class RuntimeSource(Protocol):
     def lab_report(self) -> Any: ...
     def revalidation(self) -> list[Any]: ...
     def ping(self) -> str: ...
+    def phase_timeline(self) -> dict[str, Any]: ...
 
 
 def summary_from_events(events: Iterable[dict[str, Any]]) -> Summary:
@@ -1052,6 +1053,28 @@ class ExampleRuntimeSource:
 
     def ping(self) -> str:
         return "example"
+
+    def phase_timeline(self) -> dict[str, Any]:
+        from datetime import datetime, timedelta, timezone
+
+        now = datetime.now(timezone.utc)
+        records = self._events() if (self.dir / "runtime-events.jsonl").is_file() else []
+        observed = [datetime.fromisoformat(event["occurred_at"]).astimezone(timezone.utc)
+                    for event in records if isinstance(event, dict) and event.get("source") == "tetragon"
+                    and event.get("data_origin") == "EXAMPLE" and isinstance(event.get("occurred_at"), str)]
+        first = min(observed) if observed else now
+        last = max(observed) if observed else now
+        at = lambda base, minutes: (base + timedelta(minutes=minutes)).isoformat()
+        return {
+            "entries": [
+                {"phase": "loading", "from": at(first, -10), "until": at(first, -6), "basis": "engine_signal"},
+                {"phase": "compiling", "from": at(first, -6), "until": at(first, -2), "basis": "engine_signal"},
+                {"phase": "inferring", "from": at(first, -2), "until": at(last, 2), "basis": "engine_signal"},
+            ],
+            "collector": {"state": "example", "written_at": now.isoformat(), "fresh": True},
+            "extraction": {"engine": "sglang", "support_level": "example", "limitations": ["합성 시간표이며 실제 엔진 기록이 아닙니다."]},
+            "data_origin": "synthetic",
+        }
 
 
 class RuntimeClient:
@@ -1235,6 +1258,9 @@ class LiveRuntimeSource:
             observations=self._get("/api/observations"),
             baseline=self._get("/api/baseline"),
         )
+
+    def phase_timeline(self) -> dict[str, Any]:
+        return self._get("/api/phase-timeline")
 
     def lab_report(self) -> Any:
         return lab_report_doc(self._get("/api/lab-report"))

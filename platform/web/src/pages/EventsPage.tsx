@@ -19,7 +19,6 @@ const FACETS = [
   { key: "source", title: "출처", get: (e: RuntimeEvent) => e.source, table: SOURCE },
   { key: "category", title: "분류", get: (e: RuntimeEvent) => e.category, table: CATEGORY },
   { key: "outcome", title: "결과", get: (e: RuntimeEvent) => e.outcome, table: Object.fromEntries(Object.entries(OUTCOME).map(([k, v]) => [k, v.label])) },
-  { key: "rule", title: "규칙", get: (e: RuntimeEvent) => e.rule_ref, table: {} as Record<string, string> },
 ] as const;
 
 function target(e: RuntimeEvent): string | null {
@@ -50,9 +49,9 @@ const columns: Column<RuntimeEvent>[] = [
   { id: "source", header: "출처", cell: (e) => label(SOURCE, e.source), sort: (e) => e.source },
   { id: "category", header: "분류", cell: (e) => label(CATEGORY, e.category), sort: (e) => e.category },
   { id: "outcome", header: "결과", cell: (e) => <OutcomeBadge outcome={e.outcome} />, sort: (e) => e.outcome },
-  { id: "rule_ref", header: "규칙", cell: (e) => <Value v={e.rule_ref} mono />, sort: (e) => e.rule_ref },
+  { id: "rule_ref", header: "규칙", cell: (e) => <Value v={e.rule_ref} mono />, sort: (e) => e.rule_ref, hidden: true },
   { id: "phase", header: "단계", cell: (e) => <Value v={e.phase ? label(PHASE, e.phase) : null} />, sort: (e) => e.phase },
-  { id: "target", header: "대상", cell: (e) => <Value v={target(e)} mono />, sort: (e) => target(e) },
+  { id: "target", header: "대상", cell: (e) => <Value v={target(e)} mono />, sort: (e) => target(e), hidden: true },
   { id: "data_origin", header: "자료 등급", cell: (e) => <OriginBadge origin={e.data_origin} detail={e.origin_detail} />, sort: (e) => e.data_origin },
   { id: "recorded_at", header: "기록 시각", cell: (e) => <Time iso={e.recorded_at} />, sort: (e) => e.recorded_at, hidden: true },
 ];
@@ -138,7 +137,7 @@ export function EventsPage() {
                 initialSort={{ id: "occurred_at", dir: "desc" }}
                 storageKey="events"
                 pageSizes={[50, 100, 200]}
-                empty={<StateView kind="empty" />}
+                empty={<StateView kind="empty" detail="선택 기간의 관측 이벤트 미수집. 수집 상태와 기간을 확인하세요." />}
               />
               {selected &&
                 (current ? (

@@ -21,7 +21,7 @@ export function LandingPage() {
         </span>
         <ThemeToggle />
       </header>
-      {meta.data?.example_mode && <Banner kind="example">예시 데이터 — 일부 출처가 예시 자료를 읽고 있습니다. 공식 판정 근거가 될 수 없습니다.</Banner>}
+      {meta.data?.example_mode && <Banner kind="example">예시 데이터 · 일부 수집원은 합성 자료를 사용합니다 · 공식 판정 근거 제외</Banner>}
       <main className={s.main}>
         <nav className={s.grid} aria-label="영역">
           {AREAS.map((a) => (

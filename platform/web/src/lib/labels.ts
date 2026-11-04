@@ -28,7 +28,7 @@ export const REQUEST_OUTCOME_LABEL: Record<string, string> = {
   invalid: "입력 오류",
   engine_rejected: "엔진 거부",
   error: "오류",
-  unknown: "미완료",
+  unknown: "판정 미기록",
 };
 
 export const VERDICT: Record<string, Entry> = {
@@ -45,13 +45,13 @@ export const DATA_ORIGIN: Record<string, Entry> = {
 };
 
 export const SOURCE: Record<string, string> = {
-  gateway: "Gateway",
-  management_listener: "관리 리스너",
-  hubble: "Hubble",
-  tetragon: "Tetragon",
+  gateway: "요청 통제 (Gateway)",
+  management_listener: "관리 요청 수신기",
+  hubble: "네트워크 흐름 (Hubble)",
+  tetragon: "프로세스·파일 이벤트 (Tetragon)",
   policy_state: "정책 상태",
   target_monitor: "대상 감시",
-  collector: "수집기",
+  collector: "관측 기록 수집",
 };
 
 export const CATEGORY: Record<string, string> = {
@@ -65,11 +65,11 @@ export const CATEGORY: Record<string, string> = {
 };
 
 export const PHASE: Record<string, string> = {
-  loading: "로딩",
+  loading: "모델 적재",
   compiling: "컴파일",
   inferring: "추론",
   maintenance: "유지보수",
-  unknown: "미확인",
+  unknown: "단계 미확인",
 };
 
 export const COLLECTOR_STATE: Record<string, Entry> = {
@@ -139,7 +139,7 @@ export const SIDE: Record<string, string> = { single: "단일", baseline: "기�
 export const MODE: Record<string, string> = { audit: "감사", update: "업데이트" };
 
 export const AREA: Record<string, string> = {
-  SUP: "공급물",
+  SUP: "공급 자산 (모델·이미지)",
   REQ: "요청·상태",
   PLT: "실행 기반",
   LIF: "배포·변경",
@@ -160,7 +160,7 @@ export const DOC_STATUS: Record<string, Entry> = {
 export const TRIGGER: Record<string, string> = {
   asset_changed: "자산 변경",
   policy_content_changed: "정책 내용 변경",
-  config_drift: "구성 변경",
+  config_drift: "승인 구성 불일치 (drift)",
 };
 
 export const REVAL_EVENT: Record<string, string> = {
@@ -187,8 +187,8 @@ export const SOURCE_MODE: Record<string, string> = { example: "예시", live: "�
 
 export const CONNECTION: Record<string, Entry> = {
   example: { label: "예시 데이터", tone: "warn" },
-  connected: { label: "연결됨", tone: "accent" },
-  disconnected: { label: "끊김", tone: "error" },
+  connected: { label: "연결", tone: "accent" },
+  disconnected: { label: "연결 단절", tone: "error" },
   unauthorized: { label: "인증 거부", tone: "error" },
 };
 
@@ -254,16 +254,16 @@ export const REQUEST_RESULT: Record<string, Entry> = {
   invalid: { label: "입력 오류", tone: "accent" },
   engine_rejected: { label: "엔진 거부", tone: "accent" },
   error: { label: "처리 오류", tone: "error" },
-  unknown: { label: "미완료", tone: "muted" },
+  unknown: { label: "판정 미기록", tone: "muted" },
 };
 
 export const APPROVAL_DETAIL: Record<string, string> = {
   not_configured: "미설정",
-  verified: "확인됨",
-  unverified: "목록에서 확인 못함 — 추론 요청은 503",
-  rejected: "불일치·만료 — 추론 요청은 503",
-  error: "확인 오류 — 추론 요청은 503",
-  last_verified: "목록 확인 불가 — 마지막 확인 승인 유지",
+  verified: "승인 확인",
+  unverified: "승인 목록 미확인 (추론 요청 503)",
+  rejected: "승인 불일치·만료 (추론 요청 503)",
+  error: "승인 확인 오류 (추론 요청 503)",
+  last_verified: "승인 목록 조회 불가 (마지막 확인 승인 유지)",
 };
 
 export const VALIDITY_ITEM: Record<string, string> = { period: "기간", revocation: "철회", approval: "승인 확인" };
@@ -271,21 +271,100 @@ export const VALIDITY_RESULT: Record<string, string> = { not_configured: "미설
 
 export const RT_TRIGGER: Record<string, string> = {
   asset_changed: "자산 변경",
-  config_drift: "구성 drift",
+  config_drift: "승인 구성 불일치 (drift)",
   policy_content_changed: "정책 내용 변경",
 };
 
 export const EXEC_VERDICT: Record<string, string> = {
-  allowed_in_phase: "단계 허용",
+  allowed_in_phase: "단계별 허용",
   exception: "승인 예외",
-  outside_allowlist: "목록 밖",
+  outside_allowlist: "허용 목록 외 실행",
   suspect_binary: "의심 실행",
-  exec_from_cache: "캐시에서 실행",
-  phase_unknown: "단계 불명",
-  phase_signal_unverified: "엔진 신호만 근거 — 확인 필요",
+  exec_from_cache: "캐시 경로 실행",
+  phase_unknown: "단계 미확인",
+  phase_signal_unverified: "단계 근거 미검증 (엔진 로그)",
 };
 
-export const CACHE_GENERATION: Record<string, string> = { current: "현재 캐시 세대", other: "다른 캐시 세대", outside: "캐시 밖" };
+export const PARENT_CHECK: Record<string, string> = {
+  matched: "부모 프로세스 일치",
+  not_constrained: "부모 프로세스 제약 없음",
+  unavailable: "부모 프로세스 정보 미확인",
+  mismatch: "부모 프로세스 불일치",
+};
+
+export const PARENT_ATTRIBUTION: Record<string, string> = {
+  available: "부모 프로세스 정보 확인",
+  unavailable: "부모 프로세스 정보 미확인",
+};
+
+export const SUSPECT_CONTEXT: Record<string, string> = {
+  compile_toolchain_parent: "컴파일 도구 하위 실행",
+};
+
+// Gateway의 요청 판정 코드. 전달 전 종료는 request_flow.finish_without_relay에서 attempted=false로 기록한다.
+export const GATEWAY_REASON: Record<string, string> = {
+  REQUEST_ALLOWED: "정책 검사 통과",
+  POLICY_UNAVAILABLE: "적용 정책 부재 (엔진 미전달)",
+  POLICY_NOT_YET_VALID: "정책 유효기간 시작 전 (엔진 미전달)",
+  POLICY_EXPIRED: "정책 만료 (엔진 미전달)",
+  POLICY_REVOCATION_UNKNOWN: "정책 철회 상태 미확인 (엔진 미전달)",
+  POLICY_REVOKED: "정책 철회 (엔진 미전달)",
+  POLICY_APPROVAL_UNVERIFIED: "정책 승인 미확인 (엔진 미전달)",
+  POLICY_APPROVAL_REJECTED: "정책 승인 거부 (엔진 미전달)",
+  POLICY_APPROVAL_ERROR: "정책 승인 확인 오류 (엔진 미전달)",
+  TARGET_UNAVAILABLE: "대상 엔진 조회 불가 (엔진 미전달)",
+  TARGET_MISMATCH: "등록 대상 불일치 (엔진 미전달)",
+  TARGET_UNVERIFIED: "대상 미확인 (엔진 미전달)",
+  AUTH_UNAVAILABLE: "인증 설정 사용 불가 (엔진 미전달)",
+  AUTH_REQUIRED: "인증 정보 누락 (엔진 미전달)",
+  AUTH_INVALID: "인증 실패 (엔진 미전달)",
+  ROLE_NOT_ALLOWED: "역할 권한 부족 (엔진 미전달)",
+  PRINCIPAL_MODEL_NOT_ALLOWED: "요청 주체 모델 권한 부족 (엔진 미전달)",
+  CACHE_ISOLATION_UNAVAILABLE: "사용자별 캐시 격리 불가 (엔진 미전달)",
+  BACKEND_CREDENTIAL_MISSING: "엔진 인증 정보 누락 (엔진 미전달)",
+  BACKEND_CREDENTIAL_INVALID: "엔진 인증 정보 형식 오류 (엔진 미전달)",
+  BACKEND_MODEL_UNMAPPED: "엔진 모델 매핑 누락 (엔진 미전달)",
+  UNSUPPORTED_TRANSFER_ENCODING: "전송 인코딩 미지원 (엔진 미전달)",
+  INVALID_CONTENT_LENGTH: "요청 본문 길이 오류 (엔진 미전달)",
+  BODY_TOO_LARGE: "요청 본문 크기 초과 (엔진 미전달)",
+  UNSUPPORTED_MEDIA_TYPE: "JSON 외 미디어 유형 (엔진 미전달)",
+  MALFORMED_JSON: "JSON 구문 오류 (엔진 미전달)",
+  DUPLICATE_KEY: "JSON 키 중복 (엔진 미전달)",
+  INVALID_REQUEST: "요청 형식 오류 (엔진 미전달)",
+  UNSUPPORTED_ALIAS: "토큰 필드 별칭 미지원 (엔진 미전달)",
+  UNSUPPORTED_FIELD: "요청 필드 미지원 (엔진 미전달)",
+  INVALID_MODEL: "모델 식별자 오류 (엔진 미전달)",
+  INVALID_MESSAGES: "메시지 형식 오류 (엔진 미전달)",
+  INVALID_PROMPT_TYPE: "프롬프트 유형 오류 (엔진 미전달)",
+  INVALID_MAX_TOKENS: "출력 토큰 수 형식 오류 (엔진 미전달)",
+  INVALID_STREAM: "연속 응답 설정 오류 (엔진 미전달)",
+  N_UNSUPPORTED: "생성 개수 허용 범위 외 (엔진 미전달)",
+  INVALID_EXTRA_FIELD: "추가 필드 정책 위반 (엔진 미전달)",
+  MODEL_NOT_ALLOWED: "정책 외 모델 (엔진 미전달)",
+  MAX_TOKENS_EXCEEDED: "출력 토큰 한도 초과 (엔진 미전달)",
+  CONTEXT_LIMIT_EXCEEDED: "입력·출력 토큰 합계 한도 초과 (엔진 미전달)",
+  CONTEXT_CHECK_UNAVAILABLE: "입력 토큰 수 확인 불가 (엔진 미전달)",
+  CONCURRENCY_LIMIT: "동시 요청 한도 도달 (엔진 미전달)",
+  STORE_UNAVAILABLE: "요청 로그 저장 불가 (엔진 미전달)",
+  REQUEST_BODY_TIMEOUT: "요청 본문 수신 시간 초과 (엔진 미전달)",
+  REQUEST_HEADER_TIMEOUT: "요청 헤더 수신 시간 초과 (엔진 미전달)",
+  CONNECTION_IO_TIMEOUT: "연결 입출력 시간 초과",
+  CONNECTION_LIMIT: "연결 한도 도달 (엔진 미전달)",
+  ENGINE_DEADLINE: "엔진 처리 기한 초과",
+  ENGINE_TIMEOUT: "엔진 응답 시간 초과",
+  ENGINE_UNREACHABLE: "엔진 연결 불가",
+  ENGINE_BAD_RESPONSE: "엔진 응답 형식 오류",
+  ENGINE_AUTHORIZATION_FAILED: "엔진 인증 실패",
+  ENGINE_CAPACITY_REJECTED: "엔진 용량 부족 거부",
+  ENGINE_REJECTED_REQUEST: "엔진 요청 거부",
+  STREAM_DEADLINE: "연속 응답 처리 기한 초과",
+  STREAM_IDLE_TIMEOUT: "연속 응답 유휴 시간 초과",
+  STREAM_TRUNCATED: "엔진 연속 응답 중단",
+  STREAM_RELAY_ERROR: "연속 응답 전달 오류",
+  CLIENT_DISCONNECTED: "요청자 연결 중단",
+};
+
+export const CACHE_GENERATION: Record<string, string> = { current: "현재 캐시 세대", other: "타 캐시 세대", outside: "캐시 범위 외" };
 
 export const TIMELINE_PHASE: Record<string, string> = {
   started: "전달 전 시작 기록",
@@ -330,3 +409,24 @@ export function label(table: Record<string, string>, value: string | null | unde
   if (value == null) return "–";
   return table[value] ?? value;
 }
+
+export type AlertSeverity = "높음" | "중간" | "낮음" | "정보" | "미분류";
+export const EXEC_SEVERITY: Record<string, AlertSeverity> = {
+  suspect_binary: "높음",
+  exec_from_cache: "높음",
+  outside_allowlist: "중간",
+  phase_unknown: "낮음",
+  phase_signal_unverified: "낮음",
+  allowed_in_phase: "정보",
+  exception: "정보",
+};
+
+export function alertSeverity(verdict: string | null | undefined, rule: string | null | undefined, source: string): AlertSeverity {
+  if (source === "hubble" && verdict?.toLowerCase() === "dropped") return "정보";
+  if (rule && /(?:^TG-SECRET-|SECRET)/i.test(rule)) return "높음";
+  return verdict ? EXEC_SEVERITY[verdict] ?? "미분류" : "미분류";
+}
+
+export const SEVERITY_ORDER: Record<AlertSeverity, number> = {
+  높음: 0, 중간: 1, 낮음: 2, 정보: 3, "미분류": 4,
+};

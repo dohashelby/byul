@@ -50,7 +50,7 @@ function Checks({ value, options, onChange }: { value: unknown; options: Choice[
         모름
       </label>
       {list.filter((v) => !options.some((o) => o.value === v)).map((v) => (
-        <span key={v} className={p.outside} title="카탈로그 목록 밖의 값(이전 판본)">
+        <span key={v} className={p.outside} title="등록 목록 외 값(이전 판본)">
           {v}
         </span>
       ))}

@@ -34,10 +34,10 @@ function overviewRoutes(status: RuntimeStatus) {
 
 describe("사용자별 캐시 분리 표시", () => {
   it.each([
-    [{ mode: "off", ready: true, unavailable_reason_code: null }, "꺼짐(사용자 간 prefix cache 공유)", false],
-    [{ mode: "per_principal", ready: true, unavailable_reason_code: null }, "켜짐", false],
+    [{ mode: "off", ready: true, unavailable_reason_code: null }, "비활성 (사용자 간 prefix cache 공유)", false],
+    [{ mode: "per_principal", ready: true, unavailable_reason_code: null }, "활성", false],
     [{ mode: "per_principal", ready: false, unavailable_reason_code: "CACHE_ISOLATION_KEY_MISSING" }, "준비 불가(CACHE_ISOLATION_KEY_MISSING)", true],
-    [{ mode: null, ready: false, unavailable_reason_code: null }, "모름", false],
+    [{ mode: null, ready: false, unavailable_reason_code: null }, "미확인", false],
   ] as const)("현황 정책 상태 %#를 표시한다", async (cacheIsolation, expected, problem) => {
     const status = clone(STATUS);
     status.policy.cache_isolation = cacheIsolation;

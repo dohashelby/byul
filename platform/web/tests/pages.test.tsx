@@ -45,6 +45,7 @@ describe("사건 로그", () => {
     const sample = EVENTS.find((e) => e.source === "tetragon")!;
     const suspect: RuntimeEvent = {
       ...sample, event_id: "sha:" + "d".repeat(64), outcome: "detected",
+      native: { ...sample.native, record: { ...sample.native.record, parent_check: "matched", parent_attribution: "available", suspect_context: "compile_toolchain_parent" } as unknown as RuntimeEvent["native"]["record"] },
       observation: { ...sample.observation!, kind: "process_exec", binary: "/bin/sh",
         pod_namespace: "serving-lab", pod_name: "serving-gateway-1",
         exec_verdict: "suspect_binary", phases: ["unknown"], allowed_binary: null },
@@ -53,6 +54,10 @@ describe("사건 로그", () => {
     renderAt("/runtime/observe/tetragon", "/runtime/observe/:sub", <RuntimeObservePage />);
     const row = (await screen.findByText("/bin/sh")).closest("tr")!;
     expect(row.textContent).toContain("의심 실행");
+    expect(row.textContent).toContain("부모 프로세스 일치");
+    expect(row.textContent).toContain("컴파일 도구 하위 실행");
+    expect(row.textContent).toContain("단계 미확인");
+    expect(within(row).getByText("부모 프로세스 일치 · 부모 프로세스 정보 확인 · 컴파일 도구 하위 실행")).toBeTruthy();
     expect(row.className).toContain("rowFlagged");
     expect(row.querySelector("td[title='serving-lab/serving-gateway-1']")).toBeTruthy();
   });
@@ -65,10 +70,10 @@ describe("사건 로그", () => {
     });
     renderAt("/runtime/events", "/runtime/events", <EventsPage />);
     const table = await screen.findByRole("table");
-    const hubbleRow = within(table).getByText("Hubble").closest("tr")!;
+    const hubbleRow = within(table).getByText("네트워크 흐름 (Hubble)").closest("tr")!;
     expect(hubbleRow.textContent).toContain("관측");
     expect(hubbleRow.textContent).not.toContain("거부 확인");
-    const tetragonRow = within(table).getByText("Tetragon").closest("tr")!;
+    const tetragonRow = within(table).getByText("프로세스·파일 이벤트 (Tetragon)").closest("tr")!;
     expect(tetragonRow.textContent).toContain("탐지");
     expect(tetragonRow.textContent).not.toMatch(/거부 확인|차단/);
   });
@@ -112,7 +117,7 @@ describe("사건 로그", () => {
       ),
     );
     renderAt("/runtime/events", "/runtime/events", <EventsPage />);
-    expect(await screen.findByText("runtime 연결 끊김")).toBeTruthy();
+    expect(await screen.findByText("런타임 연결 단절")).toBeTruthy();
   });
 });
 
@@ -129,7 +134,8 @@ describe("요청 내역", () => {
     const cellOf = (name: string) => cells[headers.indexOf(name)].textContent;
     expect(cellOf("max_tokens")).toBe("–");
     expect(cellOf("모델")).toBe("–");
-    expect(cellOf("사유")).toBe("UNSUPPORTED_MEDIA_TYPE");
+    expect(cellOf("사유")).toBe("JSON 외 미디어 유형 (엔진 미전달)");
+    expect(cellOf("엔진전달")).toBe("미전달");
     expect(cellOf("결과")).toBe("입력 오류");
     expect(cellOf("환경·실행")).toBe("환경 미기록실행 미기록");
     // 지연시간·토큰 수·비용 열은 없다
@@ -148,7 +154,7 @@ describe("요청 내역", () => {
     expect(calls.every((c) => c.url.startsWith("/api/"))).toBe(true);
   });
 
-  it("필터: 검색·결과·스트림", () => {
+  it("필터: 검색·결과·연속 응답", () => {
     const rows = [row({ request_id: "b".repeat(32), model: "test-model", outcome: "allowed", stream: true }), row({})];
     expect(filterRequests(rows, { q: "TEST" })).toHaveLength(1);
     expect(filterRequests(rows, { outcome: "invalid" })).toHaveLength(1);

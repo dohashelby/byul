@@ -33,6 +33,7 @@ export function ChartCard({
   active,
   onTab,
   total,
+  totals,
   note,
   children,
   footer,
@@ -42,6 +43,7 @@ export function ChartCard({
   active?: string;
   onTab?: (id: string) => void;
   total?: ReactNode;
+  totals?: { value: ReactNode; label: string }[];
   note?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
@@ -64,6 +66,10 @@ export function ChartCard({
           {note && <span className={s.bigCaption}>{note}</span>}
         </p>
       )}
+      {totals && <div className={s.chartTotals}>
+        {totals.map((item) => <span key={item.label} className={s.chartTotal}><strong className={s.metricValue}>{item.value}</strong><span className={s.bigCaption}>{item.label}</span></span>)}
+        {note && <span className={s.bigCaption}>{note}</span>}
+      </div>}
       {children}
       {footer}
     </article>
@@ -111,7 +117,7 @@ function EmptyChart({ height }: { height: number }) {
       : PERIODS.find((p) => p.key === period)?.label;
   return (
     <div className={s.empty} style={{ height, display: "flex", flexDirection: "column", justifyContent: "center", gap: 8, padding: 0 }}>
-      <span>{period === "all" ? "기록이 없습니다" : `선택한 기간(${range})에 기록이 없습니다`}</span>
+      <span>{period === "all" ? "기록 없음" : `선택 기간(${range}) 기록 없음`}</span>
       {period !== "all" && (
         <span>
           <button type="button" className="btn btn-small" onClick={() => patch({ period: null, from: null, to: null })}>
@@ -288,7 +294,7 @@ export const REQUEST_SERIES = [
   { key: "invalid", label: "입력 오류", color: "var(--viz-invalid)" },
   { key: "engine_rejected", label: "엔진 거부", color: "var(--viz-engine-rejected)" },
   { key: "error", label: "처리 오류", color: "var(--viz-error)" },
-  { key: "unknown", label: "미완료", color: "var(--viz-unknown)" },
+  { key: "unknown", label: "판정 미기록", color: "var(--viz-unknown)" },
 ] as const;
 
 export type RequestKey = (typeof REQUEST_SERIES)[number]["key"];

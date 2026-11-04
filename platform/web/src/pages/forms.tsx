@@ -42,7 +42,7 @@ const FACT_HINT: Record<string, string> = {
   gateway: "엔진 앞에 Gateway를 두는가",
   prefix_cache: "엔진의 prefix cache를 켰는가",
   prefix_cache_or_shared_cache: "prefix cache 또는 그 밖의 공유 cache를 하나라도 쓰는가 (묶음 전체)",
-  shared_or_remote_weights: "공유 daemon·원격 streaming으로 가중치를 받는가",
+  shared_or_remote_weights: "공유 상주 프로세스·원격 연속 전송으로 가중치를 받는가",
   dynamic_import: "설정·요청으로 Python 모듈을 동적으로 불러오는가",
   alternate_sources_or_formats_or_derived_cache: "대체 공급원·다른 형식·파생 캐시 중 하나라도 쓰는가 (묶음 전체)",
   remote_acquisition_or_retry: "모델을 원격에서 받거나 취득을 재시도하는가 (묶음 전체)",
@@ -372,14 +372,14 @@ export function EnvironmentForm(props: FormProps<EnvironmentDoc>) {
   return (
     <div className="stack">
       <nav className={p.toc} aria-label="입력 구역">
-        <a href="#env-basic">기본·프로필</a>
+        <a href="#env-basic">기본·설정 유형</a>
         <a href="#env-conditions">
           12개 환경 조건 <Progress done={condDone[0]} total={condDone[1]} />
         </a>
       </nav>
 
       <section id="env-basic" className="card card-pad stack">
-        <h2>기본 정보·프로필</h2>
+        <h2>기본 정보·설정 유형</h2>
         <div className="small muted">
           판본 번호와 생성 시각은 저장할 때 서버가 정합니다. <span className={p.req}>표시</span>는 필수 입력입니다.
         </div>
@@ -867,7 +867,7 @@ function GatewayFields({ req, ctx }: { req: string; ctx: FormCtx }) {
         <NumberField ctx={ctx} path="/runtime/gateway/output_default_tokens" label="기본 출력 토큰" />
         <NumberField ctx={ctx} path="/runtime/gateway/output_max_tokens" label="최대 출력 토큰" required />
         <NumberField ctx={ctx} path="/runtime/gateway/max_body_bytes" label="최대 본문 바이트" />
-        <NumberField ctx={ctx} path="/runtime/gateway/max_context_tokens" label="최대 context 토큰 (입력+출력)" nullable />
+        <NumberField ctx={ctx} path="/runtime/gateway/max_context_tokens" label="최대 문맥 토큰 (입력+출력)" nullable />
         <NumberField ctx={ctx} path="/runtime/gateway/max_n" label="max_n (선택)" optional />
       </div>
       <ExtraFieldsEditor ctx={ctx} />

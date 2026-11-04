@@ -9,7 +9,7 @@ export function RuntimePolicyPage() {
   const q = useRuntimeStatus();
   return (
     <div className="page">
-      <PageHead title="정책·기준 상태" />
+      <PageHead title="적용 정책" />
       <p className="notice">이 화면의 정책은 Gateway가 추론 요청을 허용·거부하는 규칙입니다. Cilium·Tetragon 정책은 「통제 적용」에서 따로 봅니다.</p>
       <Query q={q}>
         {(res) => {

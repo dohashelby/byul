@@ -7,7 +7,7 @@ import { JsonView } from "../../components/JsonView";
 import { Query, StateView } from "../../components/Misc";
 import { OriginBadge, EnumBadge } from "../../components/Badges";
 import { Short, Time } from "../../components/Value";
-import { AUTH_RESULT, CONTEXT_RESULT, EXTRA_FIELD_MODE, REQUEST_RESULT, TIMELINE_PHASE, label } from "../../lib/labels";
+import { AUTH_RESULT, CONTEXT_RESULT, EXTRA_FIELD_MODE, GATEWAY_REASON, REQUEST_RESULT, TIMELINE_PHASE, label } from "../../lib/labels";
 import { ScopeBadges, formatTime, rt } from "./parts";
 
 type Row = [string, ReactNode, { mono?: boolean; problem?: boolean }?];
@@ -51,8 +51,9 @@ function Overview({ d }: { d: RuntimeRequestDetail }) {
           ["HTTP", d.decision.http_status],
           ["HTTP 시작 상태", d.http_start_status],
           ["최종 결과", d.final_outcome, { mono: true }],
-          ["스트림", d.stream === true ? "예" : d.stream === false ? "아니요" : null],
-          ["사유 코드", d.decision.reason_code, { mono: true }],
+          ["연속 응답", d.stream === true ? "예" : d.stream === false ? "아니요" : null],
+          ["사유", label(GATEWAY_REASON, d.decision.reason_code)],
+          ["원본 코드", <span className="small mono muted">{d.decision.reason_code ?? "–"}</span>],
           ["설명", d.decision.message],
           ["적용 규칙", d.decision.rule_id, { mono: true }],
           ["엔진 HTTP", d.decision.engine_http_status],
@@ -62,14 +63,14 @@ function Overview({ d }: { d: RuntimeRequestDetail }) {
           ["캐시 분리", d.request.cache_isolation.applied === true ? "적용" : d.request.cache_isolation.applied === false ? "미적용" : "모름"],
           ["추가 필드", d.request.extra_fields.length ? d.request.extra_fields.map((x) => `${x.name}(${label(EXTRA_FIELD_MODE, x.mode)})`).join(", ") : null],
           ["요청 주체", authText(d)],
-          ["context 검사", ctx ? `${label(CONTEXT_RESULT, ctx.result)} · 입력 ${ctx.input_tokens ?? "–"}토큰 / 한도 ${ctx.limit ?? "–"}` : "설정 안 됨"],
+          ["문맥 길이 검사", ctx ? `${label(CONTEXT_RESULT, ctx.result)} · 입력 ${ctx.input_tokens ?? "–"}토큰 / 한도 ${ctx.limit ?? "–"}` : "미설정"],
         ]}
       />
       <h4 className={rt.h4}>적용 정책</h4>
       <Kv
         rows={[
           ["정책", `${d.policy.policy_id ?? "–"} · 판본 ${d.policy.policy_version ?? "–"}`],
-          ["프로필", d.policy.profile === "zeroday-lab" ? "zeroday-lab (시험 전용)" : d.policy.profile, { problem: d.policy.profile === "zeroday-lab" }],
+          ["설정 유형", d.policy.profile === "zeroday-lab" ? "zeroday-lab (시험 전용)" : d.policy.profile, { problem: d.policy.profile === "zeroday-lab" }],
           ["SHA-256", d.policy.sha256, { mono: true }],
         ]}
       />

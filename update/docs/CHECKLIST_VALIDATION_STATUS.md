@@ -36,7 +36,8 @@
 | 1단계 담당 | 1단계 상태 | 점검 수 |
 |---|---|---:|
 | - | RETIRED_OUT_OF_UPDATE_SCOPE | 8 |
-| dev-1 | CPU_DEVELOPMENT_REMAINING | 26 |
+| dev-1 | CPU_DEVELOPMENT_REMAINING | 25 |
+| dev-1 | NOT_APPLICABLE_IN_TARGET | 1 |
 | gpu | MEASUREMENT_REMAINING | 43 |
 
 우선순위는 연결된 점검의 관측 공백(P1), 로컬 신규 구현(P2), 추가 인프라(P3), 기업 환경(P4)이다. 기존 점검 재실증은 실행기·정의·설정·시험 자료·환경의 변경 영향이 있을 때만 해당 범위를 수행한다. 팩 revision 변경만으로 기존 5개 전체 재실증을 요구하지 않는다. 어려운 계측 하나가 독립적인 신규 점검을 모두 막지는 않는다.

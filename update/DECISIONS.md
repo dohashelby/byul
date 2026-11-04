@@ -723,3 +723,4 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - 2026-11-04 · 로컬 CPU Kubernetes는 k3d(K3s)로 둔다. AWS lab이 K3s이고 NetworkPolicy가 집행되기 때문이다. 결과의 환경은 "k3d 로컬 CPU"로 적고 AWS K3s·GPU 결과와 합치지 않는다. · 사용자 결정.
 - 2026-11-04 · 대상 플랫폼은 기업 서버의 Linux amd64다. 로컬 k3d(arm64, macOS)는 Kubernetes 경로 개발·진단용이며 arm64 이미지를 OBS-09 검토 로그 계약 목록에 넣지 않는다. 검토 이미지 고정이 필요한 점검의 실측은 Linux amd64 환경에서 한다. · 사용자 결정.
 - 2026-11-04 · 개발 담당 점검(GPU 필요 9개·불필요 17개)의 실측은 별도 AWS CPU 인스턴스를 쓰지 않고 2단계 GPU lab에서 GPU 서빙 이미지로 한 번에 한다. CPU 이미지 결과는 GPU 이미지로 옮길 수 없어 다시 측정해야 하기 때문이다. 1단계 묶음 5는 lab 대역 매니페스트·실행 설정 준비와 로컬 k3d 경로 진단으로 바꾸며 판정을 실측으로 세지 않는다. OBS-09는 GPU 이미지의 로거·포매터 SHA를 확인한 뒤 검토 로그 계약에 더하는 절차가 필요하다. · 사용자 결정.
+- 2026-11-04 · REQ-06(저장 결과 객체 권한, 조건부)은 대상 구성에서 적용 제외로 둔다. BYUL runtime Gateway가 `/v1/responses` 생성·조회를 열지 않아(k3d lab 404, runtime AWS-19 거부 경로) 저장 결과 객체가 없다. 1단계 상태 값 `NOT_APPLICABLE_IN_TARGET`을 더하며 이는 PASS가 아니다. Gateway가 이 경로를 열면 다시 적용한다. · 사용자 결정.

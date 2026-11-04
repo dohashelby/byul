@@ -46,8 +46,8 @@ checks:
     note: lab 대역과 k3d CPU 실측
     state: CPU_DEVELOPMENT_REMAINING
   REQ-06:
-    note: "사용자 결정(2026-11-04): 적용 제외. runtime Gateway가 저장 Responses를 제공하지 않음(/v1/responses 404). 적용 제외 상태 값은 PHASE1_STATES에 아직 없어 상태는 그대로 둠"
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "사용자 결정(2026-11-04): 대상 구성에서 적용 제외. runtime Gateway가 저장 Responses를 제공하지 않음(/v1/responses 생성·조회 404). Gateway가 이 경로를 열면 다시 적용"
+    state: NOT_APPLICABLE_IN_TARGET
   REQ-11:
     note: lab 대역과 k3d CPU 실측
     state: CPU_DEVELOPMENT_REMAINING

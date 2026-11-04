@@ -11,12 +11,25 @@ import subprocess
 from guard.adapters import vllm_profiler_sensor
 from guard.collectors.lifecycle import prepare_assets,load_prepared
 from guard.models import canonical_json
+from guard.update_validation import reserve_output
 from tools.verify_req10_consumption import verify
 from tools.build_kubernetes_profiler_control_pack import derive
 
 TEMPLATE_SHA='787d4d447d807146d7c2f445e6f25248b721f20df2ec5a631dda16cfeab37ae7'
 MODEL_MANIFEST_SHA='31bcec24aac23f235ee23292934bd20f1acf0abb2c10068820684052218fd7c5'
 CHAT_SHA='e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e'
+
+
+def reserve_preparation_output(output,*,protected):
+    candidate=Path(output).expanduser().absolute()
+    canonical=candidate.resolve()
+    if any((parent/'.git').exists() for parent in (canonical,*canonical.parents)):
+        raise ValueError('PREPARATION_OUTPUT_IN_GIT_WORKSPACE')
+    # Existing helper rejects links before resolving '..' and checks both
+    # directions against every source/model/input path before making a directory.
+    result=reserve_output(candidate,protected=protected)
+    result.chmod(0o700)
+    return result
 
 
 def digest_file(path):
@@ -88,10 +101,7 @@ def main():
         path=model/row['path']
         if not path.resolve(strict=True).is_relative_to(model) or digest_file(path)!=(row['bytes'],row['sha256']):
             raise ValueError('REVIEWED_MODEL_CHANGED')
-    output=args.output.absolute()
-    if output.exists() or output.is_symlink() or output.is_relative_to(repo) or any(p.is_symlink() for p in output.parents):
-        raise ValueError('FRESH_EXTERNAL_OUTPUT_REQUIRED')
-    output.mkdir(mode=0o700,parents=True)
+    output=reserve_preparation_output(args.output,protected=[repo,model,args.model_manifest,args.chat_template,args.template])
     prepared=prepare_assets(output/'prepared15',repo,profile=vllm_profiler_sensor.PROFILE)
     for name in prepared['assets']:(output/'prepared15'/name).chmod(0o600)
     if load_prepared(output/'prepared15/manifest.json')!=prepared:raise ValueError('PREPARED15_MISMATCH')

@@ -49,11 +49,19 @@ VALUES = {
                'client_request_id_trust': 'untrusted_correlation'},
     # 실행기가 지원하는 유일한 조합(request_binding.SUPPORTED_POLICY). 기업 결정값이 아니다.
     'REQ-11': {'result_binding': 'originating_connection', 'client_request_id_trust': 'untrusted_correlation'},
+    # EXAMPLE: 엔진 직통의 허용 주체는 runtime Gateway의 일반 주체 하나(REQ-01 기능 대조의 역할 이름은 allowed). 기업 목록이 아니다.
+    'REQ-01': {'allowed_callers': ['allowed']},
+    # EXAMPLE: 일반 주체에게 추론 경로만 허용한다. 관리·진단 경로는 관리자 역할만.
+    'REQ-03': {'general_allowed_kinds': ['inference']},
 }
 EXECUTORS = {'REQ-13': ('response_content', {'endpoint': '/v1/chat/completions', 'request_timeout': 30}),
              'OBS-09': ('log_integrity', {'request_timeout': 30, 'max_duration_seconds': 300}),
              'REQ-11': ('request_binding', {'endpoint': '/v1/chat/completions', 'tokenize_endpoint': '/tokenize',
-                                            'request_timeout': 30, 'max_duration_seconds': 300})}
+                                            'request_timeout': 30, 'max_duration_seconds': 300}),
+             'REQ-01': ('direct_route', {'request_timeout': 10, 'max_duration_seconds': 300,
+                                         'roles': {'allowed': 'DEV1_TOKEN_GENERAL'}}),
+             'REQ-03': ('role_route', {'request_timeout': 10, 'max_duration_seconds': 300, 'admin_role': 'admin',
+                                       'roles': {'general': 'DEV1_TOKEN_GENERAL', 'admin': 'DEV1_TOKEN_ADMIN'}})}
 
 
 def render(*, run_id, engine_image):
@@ -104,6 +112,135 @@ def render(*, run_id, engine_image):
               'outputs_sha256': {'engine.yaml': hashlib.sha256(raw['engine.yaml']).hexdigest(),
                                  **{n: hashlib.sha256(b).hexdigest() for n, b in raw.items() if n != 'engine.yaml'}}}
     return raw, record
+
+
+GATEWAY_PORT = 8080
+GATEWAY_LOOPBACK_PORT = 8081
+# runtime Gateway는 설계상 127.0.0.1에만 바인딩한다(runtime deploy/gpu-lab README의 미결 노출 방식).
+# lab에서는 같은 Pod의 중계 컨테이너가 0.0.0.0:8080을 127.0.0.1:8081로 넘긴다. runtime 코드는 바꾸지 않는다.
+RELAY = r"""
+import socket,threading
+def pipe(a,b):
+    try:
+        while True:
+            d=a.recv(65536)
+            if not d: break
+            b.sendall(d)
+    except OSError: pass
+    finally:
+        for s in (a,b):
+            try: s.shutdown(socket.SHUT_RDWR)
+            except OSError: pass
+            s.close()
+def serve(c):
+    try: u=socket.create_connection(("127.0.0.1",%d),timeout=10)
+    except OSError: c.close(); return
+    u.settimeout(None)
+    threading.Thread(target=pipe,args=(c,u),daemon=True).start(); pipe(u,c)
+l=socket.socket(); l.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); l.bind(("0.0.0.0",%d)); l.listen(64)
+while True:
+    c,_=l.accept(); threading.Thread(target=serve,args=(c,),daemon=True).start()
+"""
+# runtime Gateway(BYUL runtime 제품)를 lab Gateway로 쓴다. 역할은 REQ-03(general/admin)과 REQ-06(A/B) 시험용이다.
+PRINCIPALS = {'general': ['inference'], 'admin': ['inference', 'admin'], 'A': ['inference'], 'B': ['inference']}
+
+
+def _sha_json(value):
+    raw = (json.dumps(value, ensure_ascii=False, indent=2) + '\n').encode()
+    return raw, hashlib.sha256(raw).hexdigest()
+
+
+def gateway_lab(*, run_id, gateway_image, tokens):
+    """4Pod 구성의 Gateway·바깥 probe·엔진 Service·엔진 격리 정책과 runtime 설정(비밀 원문 없음).
+
+    tokens: 주체 이름 → 원문 토큰. 설정에는 SHA-256만 들어간다. 원문은 호출자가 저장소 밖에 0600으로 둔다.
+    """
+    if not _IMAGE.fullmatch(gateway_image or '') or set(tokens) != set(PRINCIPALS):
+        raise ValueError('K3D_GATEWAY_INPUT_INVALID')
+    labels = {'guard.run': run_id, 'byul.a/generation': GENERATION}
+    target_id = f'{NAMESPACE}-{run_id}'
+    policy_raw, policy_sha = _sha_json({'schema_version': 'runtime-mvp/1.1', 'policy_id': 'dev1-k3d-gateway', 'policy_version': '1',
+        'target_id': target_id, 'allowed_models': [SERVED], 'output_default_tokens': 8, 'output_max_tokens': 16,
+        'max_body_bytes': 65536, 'max_context_tokens': 512, 'valid_from': '2026-01-01T00:00:00+00:00',
+        'valid_until': '2027-12-31T23:59:59+00:00', 'approval_ref': 'DEV1-K3D-EXAMPLE'})
+    approvals_raw, approvals_sha = _sha_json({'schema_version': 'runtime-policy-approvals/1.0', 'entries': [{'policy_id': 'dev1-k3d-gateway',
+        'policy_version': '1', 'sha256': policy_sha, 'approval_ref': 'DEV1-K3D-EXAMPLE', 'approved_at': '2026-11-04T00:00:00+00:00',
+        'valid_until': '2027-12-31T23:59:59+00:00'}]})
+    target_raw, target_sha = _sha_json({'schema_version': 'runtime-target/1.0', 'target_id': target_id, 'target_ref': 'DEV1-K3D-' + run_id,
+        'engine': {'kind': 'vllm', 'version': '0.31.0'}, 'model': {'id': SERVED}, 'baseline_ref': None})
+    bundle_raw, _ = _sha_json({'schema_version': 'byul-policy-bundle/0.1', 'bundle_id': 'bundle-dev1-k3d-' + run_id,
+        'created_at': '2026-11-04T00:00:00+00:00', 'policy_ref': {'policy_id': 'dev1-k3d-gateway', 'policy_version': '1', 'sha256': policy_sha},
+        'target_ref': target_id, 'approval': {'approved_by': 'dev1-lab-owner-EXAMPLE', 'approved_at': '2026-11-04T00:00:00+00:00',
+        'approval_ref': 'DEV1-K3D-EXAMPLE'}, 'validity': {'valid_from': '2026-01-01T00:00:00+00:00', 'valid_until': '2027-12-31T23:59:59+00:00'},
+        'files': [{'role': 'gateway_policy', 'path': 'runtime-policy.json', 'schema_version': 'runtime-mvp/1.1', 'sha256': policy_sha, 'bytes': len(policy_raw)},
+                  {'role': 'policy_approvals', 'path': 'policy-approvals.json', 'schema_version': 'runtime-policy-approvals/1.0', 'sha256': approvals_sha, 'bytes': len(approvals_raw)},
+                  {'role': 'target', 'path': 'target.json', 'schema_version': 'runtime-target/1.0', 'sha256': target_sha, 'bytes': len(target_raw)}]})
+    engine_service = f'serving-engine-{run_id}'[:63]
+    backend = {'schema_version': 'runtime-backend/1.0', 'kind': 'vllm', 'base_url': f'http://{engine_service}.{NAMESPACE}.svc.cluster.local:8000',
+               'model_map': {SERVED: SERVED}, 'health_path': '/health', 'models_path': '/v1/models', 'version_path': '/version',
+               'metrics_url': f'http://{engine_service}.{NAMESPACE}.svc.cluster.local:8000/metrics',
+               'timeouts': {'relay_timeout_s': 60, 'status_timeout_s': 5, 'stream_idle_timeout_s': 30, 'request_deadline_s': 120}}
+    auth = {'schema_version': 'runtime-auth/1.0', 'auth_ref': 'DEV1-K3D-AUTH-EXAMPLE',
+            'principals': [{'principal_id': 'dev1-' + name.lower(), 'roles': roles, 'allowed_models': [SERVED],
+                            'token_sha256': hashlib.sha256(tokens[name].encode('ascii')).hexdigest()} for name, roles in PRINCIPALS.items()],
+            'route_roles': {'POST /v1/chat/completions': ['inference'], 'POST /v1/completions': ['inference'], 'GET /api/*': ['admin']}}
+    config = {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': f'gateway-config-{run_id}'[:63], 'namespace': NAMESPACE, 'labels': labels},
+              'data': {'backend.json': json.dumps(backend, indent=2) + '\n', 'auth.json': json.dumps(auth, indent=2) + '\n',
+                       'bundle.json': bundle_raw.decode(), 'runtime-policy.json': policy_raw.decode(),
+                       'policy-approvals.json': approvals_raw.decode(), 'target.json': target_raw.decode()}}
+    files = {'backend.json': 'backend.json', 'auth.json': 'auth.json'}
+    bundle_items = ['bundle.json', 'runtime-policy.json', 'policy-approvals.json', 'target.json']
+    gateway = {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {'name': f'serving-gateway-{run_id}'[:63], 'namespace': NAMESPACE,
+               'labels': {'app': 'serving-gateway', **labels}},
+               'spec': {'enableServiceLinks': False, 'automountServiceAccountToken': False, 'restartPolicy': 'Never',
+                        'securityContext': {'runAsUser': 10000, 'runAsGroup': 10000, 'runAsNonRoot': True, 'seccompProfile': {'type': 'RuntimeDefault'}},
+                        'containers': [{'name': 'gateway', 'image': gateway_image, 'imagePullPolicy': 'IfNotPresent',
+                            'args': ['mvp', '--backend', 'vllm', '--backend-config', '/etc/serving/backend/backend.json',
+                                     '--policy-bundle', '/etc/serving/bundle', '--auth-config', '/etc/serving/auth/auth.json',
+                                     '--gateway-port', str(GATEWAY_LOOPBACK_PORT), '--data-dir', '/srv/serving/runtime/data',
+                                     '--environment', 'dev1-k3d', '--run-id', run_id],
+                            'securityContext': {'allowPrivilegeEscalation': False, 'readOnlyRootFilesystem': True, 'capabilities': {'drop': ['ALL']}},
+                            'resources': {'requests': {'cpu': '100m', 'memory': '128Mi'}, 'limits': {'cpu': '1', 'memory': '512Mi'}},
+                            'volumeMounts': [{'name': 'config', 'mountPath': '/etc/serving/backend/backend.json', 'subPath': 'backend.json', 'readOnly': True},
+                                             {'name': 'config', 'mountPath': '/etc/serving/auth/auth.json', 'subPath': 'auth.json', 'readOnly': True},
+                                             *({'name': 'config', 'mountPath': f'/etc/serving/bundle/{n}', 'subPath': n, 'readOnly': True} for n in bundle_items),
+                                             {'name': 'data', 'mountPath': '/srv/serving/runtime/data'}, {'name': 'tmp', 'mountPath': '/tmp'}]},
+                                       {'name': 'relay', 'image': gateway_image, 'imagePullPolicy': 'IfNotPresent',
+                                        'command': ['python3', '-u', '-c', RELAY % (GATEWAY_LOOPBACK_PORT, GATEWAY_PORT)],
+                                        'ports': [{'containerPort': GATEWAY_PORT}],
+                                        'securityContext': {'allowPrivilegeEscalation': False, 'readOnlyRootFilesystem': True, 'capabilities': {'drop': ['ALL']}},
+                                        'resources': {'requests': {'cpu': '20m', 'memory': '32Mi'}, 'limits': {'cpu': '500m', 'memory': '128Mi'}}}],
+                        'volumes': [{'name': 'config', 'configMap': {'name': config['metadata']['name']}},
+                                    {'name': 'data', 'emptyDir': {'sizeLimit': '256Mi'}}, {'name': 'tmp', 'emptyDir': {'sizeLimit': '64Mi'}}]}}
+    external = {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {'name': f'external-test-probe-{run_id}'[:63], 'namespace': NAMESPACE,
+                'labels': {'app': 'external-test-probe', **labels}},
+                'spec': {'enableServiceLinks': False, 'automountServiceAccountToken': False, 'restartPolicy': 'Never',
+                         'securityContext': {'runAsUser': 2000, 'runAsGroup': 0, 'runAsNonRoot': True},
+                         'containers': [{'name': 'probe', 'image': gateway_image, 'imagePullPolicy': 'IfNotPresent', 'command': ['sleep', 'infinity'],
+                                         'securityContext': {'allowPrivilegeEscalation': False, 'capabilities': {'drop': ['ALL']}},
+                                         'resources': {'requests': {'cpu': '50m', 'memory': '64Mi'}, 'limits': {'cpu': '500m', 'memory': '256Mi'}}}]}}
+    service = {'apiVersion': 'v1', 'kind': 'Service', 'metadata': {'name': engine_service, 'namespace': NAMESPACE, 'labels': labels},
+               'spec': {'selector': {'app': 'serving-engine', 'guard.run': run_id}, 'ports': [{'port': 8000, 'targetPort': 8000}]}}
+    # REQ-01: 엔진은 Gateway와 안쪽 probe에서만 받는다. 바깥 probe의 직통 접근은 막는다.
+    isolate = {'apiVersion': 'networking.k8s.io/v1', 'kind': 'NetworkPolicy', 'metadata': {'name': f'engine-ingress-{run_id}'[:63], 'namespace': NAMESPACE},
+               'spec': {'podSelector': {'matchLabels': {'app': 'serving-engine', 'guard.run': run_id}}, 'policyTypes': ['Ingress'],
+                        'ingress': [{'from': [{'podSelector': {'matchLabels': {'app': name, 'guard.run': run_id}}} for name in ('serving-gateway', 'engine-test-probe')],
+                                     'ports': [{'port': 8000}]}]}}
+    docs = {'gateway-config.yaml': config, 'gateway.yaml': gateway, 'external-probe.yaml': external, 'engine-service.yaml': service,
+            'engine-ingress.yaml': isolate}
+    return {name: yaml.safe_dump(value, sort_keys=False).encode() for name, value in docs.items()}
+
+
+def route_target(base, gateway_pod, external_pod, namespace):
+    """REQ-01·03·06 4Pod target: 기존 target에 Gateway·바깥 probe 바인딩과 직통 대상만 더한다."""
+    from guard.runtime.kubernetes_routes import EXTERNAL
+    value = json.loads(json.dumps(base))
+    value['kubernetes_routes'] = {'gateway': inputs._binding(gateway_pod, namespace, 'gateway', 'serving-gateway'),
+                                  'external_probe': inputs._binding(external_pod, namespace, 'probe', 'external-test-probe')}
+    value['gateway'] = {'url': f"http://{value['kubernetes_routes']['gateway']['pod_ip']}:{GATEWAY_PORT}"}
+    value['origins'] = {'trusted': {'network': 'kubernetes-probe'}, 'external': {'network': EXTERNAL}}
+    value['direct_targets'] = [{'origin': 'external', 'url': value['engine']['trusted_url']}]
+    return value
 
 
 def inventory(root):
@@ -184,7 +321,13 @@ def http_check(check_id, root):
               'scope': {'include': [check_id], 'exclude': []}, 'exceptions': [], 'confirmed_by': None, 'confirmed_at': None}
     lines = [f"store = '{root / 'store'}'", '', '[adapter]', "name = 'vllm'", '', '[executors]', f"{executor} = 'kubernetes'",
              '', f'[{executor}]', f"target = '{root / 'target.json'}'", "kubectl_binary = 'kubectl'"]
-    lines += [f"{k} = '{v}'" if type(v) is str else f'{k} = {v}' for k, v in settings.items()]
+    def toml(value):
+        if type(value) is str:
+            return f"'{value}'"
+        if type(value) is dict:
+            return '{' + ', '.join(f'{k} = {toml(v)}' for k, v in value.items()) + '}'
+        return str(value)
+    lines += [f'{k} = {toml(v)}' for k, v in settings.items()]
     return policy, '\n'.join([*lines, ''])
 
 
@@ -199,6 +342,12 @@ def main(argv=None):
     for name in ('namespace', 'engine-pod', 'probe-pod'):
         t.add_argument('--' + name, type=Path, required=True)
     t.add_argument('--context', default='k3d-byul-cpu'); t.add_argument('--out', type=Path, required=True)
+    w = sub.add_parser('gateway'); w.add_argument('--run-id', required=True); w.add_argument('--gateway-image', required=True)
+    w.add_argument('--out', type=Path, required=True)
+    rt = sub.add_parser('route-target'); rt.add_argument('--target', type=Path, required=True)
+    for name in ('gateway-pod', 'external-pod', 'namespace'):
+        rt.add_argument('--' + name, type=Path, required=True)
+    rt.add_argument('--out', type=Path, required=True)
     g = sub.add_parser('egress'); g.add_argument('--target', type=Path, required=True); g.add_argument('--receiver-pod', type=Path, required=True)
     g.add_argument('--receiver-pid', type=int, required=True); g.add_argument('--subject-uid', type=int, required=True)
     g.add_argument('--subject-netns', type=int, required=True); g.add_argument('--out', type=Path, required=True)
@@ -223,6 +372,21 @@ def main(argv=None):
     elif args.kind == 'target':
         value = target(load_environment(args.env), load(args.render), load(args.namespace), load(args.engine_pod),
                        load(args.probe_pod), context=args.context)
+        inputs._write(args.out, value)
+        print(json.dumps({'target': str(args.out), 'sha256': sha256_hex(canonical_json(value))}))
+    elif args.kind == 'gateway':
+        import os, secrets
+        tokens = {name: secrets.token_urlsafe(32) for name in PRINCIPALS}
+        args.out.mkdir(parents=True, exist_ok=True)
+        secret_file = args.out / 'tokens.env'
+        fd = os.open(secret_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w') as stream:
+            stream.write(''.join(f'DEV1_TOKEN_{name.upper()}={value}\n' for name, value in tokens.items()))
+        for name, data in gateway_lab(run_id=args.run_id, gateway_image=args.gateway_image, tokens=tokens).items():
+            inputs._write(args.out / name, data.decode())
+        print(json.dumps({'gateway': str(args.out), 'tokens_file': str(secret_file), 'principals': sorted(PRINCIPALS)}))
+    elif args.kind == 'route-target':
+        value = route_target(load(args.target), load(args.gateway_pod), load(args.external_pod), load(args.namespace))
         inputs._write(args.out, value)
         print(json.dumps({'target': str(args.out), 'sha256': sha256_hex(canonical_json(value))}))
     elif args.kind == 'egress':

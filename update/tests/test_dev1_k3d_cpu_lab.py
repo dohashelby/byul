@@ -37,3 +37,23 @@ def test_inventory_ignores_the_download_cache_and_env_is_cpu(tmp_path):
     _, record = lab.render(run_id='dev1-k3d-9', engine_image=IMAGE)
     env = lab.environment(record, digest)
     assert env.runtime.gpu_count == 0 and env.model.inventory_sha256 == digest and env.hash_ok()
+
+
+def test_gateway_lab_keeps_raw_tokens_out_and_isolates_the_engine_port():
+    import yaml
+    from tools import dev1_k3d_cpu_lab as lab
+    tokens = {name: f'EXAMPLE-raw-token-{name}-0123456789' for name in lab.PRINCIPALS}
+    image = 'k3d-byul-reg:5111/serving-gateway@sha256:' + 'a' * 64
+    out = lab.gateway_lab(run_id='dev1-k3d-9', gateway_image=image, tokens=tokens)
+    blob = b''.join(out.values()).decode()
+    assert all(raw not in blob for raw in tokens.values())
+    pod = yaml.safe_load(out['gateway.yaml'])
+    names = [c['name'] for c in pod['spec']['containers']]
+    assert len(names) == 2 and pod['spec']['containers'][0]['image'] == image
+    policy = yaml.safe_load(out['engine-ingress.yaml'])
+    rule, = policy['spec']['ingress']
+    assert [p['port'] for p in rule['ports']] == [8000] and len(rule['from']) == 2
+    for bad in ({'gateway_image': 'serving-gateway:latest', 'tokens': tokens},
+                {'gateway_image': image, 'tokens': {'general': 'x'}}):
+        with pytest.raises(ValueError, match='K3D_GATEWAY_INPUT_INVALID'):
+            lab.gateway_lab(run_id='dev1-k3d-9', **bad)

@@ -28,6 +28,7 @@ NAMESPACE = 'byul-cpu-lab'
 MODEL_ID = 'facebook/opt-125m'
 MODEL_REVISION = '27dcfa74d334bc871f3234de431e71c6eeba5dd6'
 SERVED = 'byul-cpu-lab'
+RECEIVER_PORT = 18080
 # 11-02 CPU 실측과 같은 작은 모델 설정. OBS-09가 요구하는 요청 로그 설정을 함께 둔다.
 ARGS = ['/models/opt-125m', '--served-model-name', SERVED, '--max-model-len', '512', '--max-num-seqs', '2',
         '--dtype', 'float32', '--block-size', '32', '--enable-log-requests', '--max-log-len', '512',
@@ -83,7 +84,19 @@ def render(*, run_id, engine_image):
                                       'command': ['sleep', 'infinity'],
                                       'securityContext': {'allowPrivilegeEscalation': False, 'capabilities': {'drop': ['ALL']}},
                                       'resources': {'requests': {'cpu': '100m', 'memory': '256Mi'}, 'limits': {'cpu': '1', 'memory': '1Gi'}}}]}}
-    docs = {'namespace.yaml': namespace, 'engine.yaml': engine, 'probe.yaml': probe}
+    # PLT-07: 원본 수신기를 Pod 명령으로 그대로 실행한다(A1_KUBERNETES_EGRESS_COMMON). 뜬 뒤 120초만 받으므로 측정 직전에 적용한다.
+    receiver_source = (Path(__file__).parents[1] / 'src/guard/executors/egress_receiver.py').read_text(encoding='utf-8')
+    receiver = {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {'name': f'egress-receiver-{run_id}'[:63], 'namespace': NAMESPACE,
+                'labels': {'app': 'egress-receiver', **labels}},
+                'spec': {'enableServiceLinks': False, 'automountServiceAccountToken': False, 'restartPolicy': 'Never',
+                         'securityContext': {'runAsUser': 2000, 'runAsGroup': 2000, 'runAsNonRoot': True},
+                         'containers': [{'name': 'receiver', 'image': engine_image, 'imagePullPolicy': 'IfNotPresent',
+                                         'command': ['python3', '-u', '-c', receiver_source], 'args': [str(RECEIVER_PORT)],
+                                         'securityContext': {'allowPrivilegeEscalation': False, 'capabilities': {'drop': ['ALL']}},
+                                         'resources': {'requests': {'cpu': '50m', 'memory': '64Mi'}, 'limits': {'cpu': '500m', 'memory': '256Mi'}},
+                                         'volumeMounts': [{'name': 'observations', 'mountPath': '/guard-observations'}]}],
+                         'volumes': [{'name': 'observations', 'emptyDir': {'sizeLimit': '16Mi'}}]}}
+    docs = {'namespace.yaml': namespace, 'engine.yaml': engine, 'probe.yaml': probe, 'receiver.yaml': receiver}
     raw = {name: yaml.safe_dump(value, sort_keys=False).encode() for name, value in docs.items()}
     record = {'schema': SCHEMA, 'generation': GENERATION, 'profile': 'cpu', 'run_id': run_id, 'engine_image': engine_image,
               'model_id': MODEL_ID, 'model_revision': MODEL_REVISION, 'served_model_name': SERVED, 'args': ARGS,
@@ -126,6 +139,42 @@ def target(env, record, namespace, engine_pod, probe_pod, *, context):
     return value
 
 
+def egress(source_target, receiver_pod, *, receiver_pid, subject_uid, subject_netns, root, minutes=20):
+    """PLT-07 수신기 target·EXAMPLE 정책·DRAFT 팩·실행 설정. 대상 사실(PID·UID·netns)은 측정 직전 실제 Pod에서 읽어 넘긴다."""
+    from datetime import datetime, timedelta, timezone
+    from guard.runtime.kubernetes_binding import validate_container_binding
+    from tools import build_kubernetes_boundary_egress_pack as pack_tool
+    meta, spec, status = receiver_pod['metadata'], receiver_pod['spec'], receiver_pod['status']
+    state, = (c for c in status['containerStatuses'] if c['name'] == 'receiver')
+    image, = (c['image'] for c in spec['containers'] if c['name'] == 'receiver')
+    binding = {'namespace': meta['namespace'], 'namespace_uid': source_target['kubernetes']['engine']['namespace_uid'],
+               'pod': meta['name'], 'pod_uid': meta['uid'], 'container': 'receiver', 'container_id': state['containerID'],
+               'image': image, 'image_id': state['imageID'], 'restart_count': state['restartCount'], 'node': spec['nodeName'],
+               'pod_ip': status['podIP'], 'started_at': state['state']['running']['startedAt']}
+    validate_container_binding(binding)
+    receiver_target = {'schema': 'guard-kubernetes-egress-receiver-target/1', 'environment_ref': source_target['environment_ref'],
+                       'source_target_sha256': sha256_hex(canonical_json(source_target)), 'run_id': source_target['kubernetes']['run_id'],
+                       'lab': True, 'context': source_target['kubernetes']['context'], 'receiver': binding, 'receiver_pid': receiver_pid}
+    now = datetime.now(timezone.utc)
+    values = {'subject_scope': 'all_processes_in_container_uid_netns',
+              'subject_container_id': source_target['kubernetes']['engine']['container_id'], 'subject_uid': subject_uid,
+              'subject_net_namespace_inode': subject_netns, 'forbidden_receiver_container_id': binding['container_id'],
+              'forbidden_receiver_ip': binding['pod_ip'], 'forbidden_receiver_port': RECEIVER_PORT, 'forbidden_protocol': 'tcp',
+              'forbidden_operation': 'tcp_connect', 'validity_start': now.isoformat(), 'validity_end': (now + timedelta(minutes=minutes)).isoformat(),
+              'source_target_sha256': receiver_target['source_target_sha256'], 'receiver_target_sha256': sha256_hex(canonical_json(receiver_target))}
+    root = Path(root).absolute()
+    pack_tool.derive(Path(__file__).parents[1] / 'reference/pack-seeds/PACK-BASELINE-31', root / 'pack')
+    pack_ref = yaml.safe_load((root / 'pack' / 'pack.yaml').read_text(encoding='utf-8'))
+    policy = {'data_origin': 'EXAMPLE', 'status': 'DRAFT', 'pack': {'id': pack_ref['pack_id'], 'revision': pack_ref['revision']},
+              'values': {'PLT-07': values}, 'scope': {'include': ['PLT-07'], 'exclude': []}, 'exceptions': [],
+              'confirmed_by': None, 'confirmed_at': None}
+    config = '\n'.join([f"store = '{root / 'store'}'", '', '[adapter]', "name = 'vllm'", '', '[executors]', "boundary_egress = 'kubernetes'", '',
+                        '[boundary_egress]', f"target = '{root / 'target.json'}'", f"receiver_target = '{root / 'receiver-target.json'}'",
+                        f'actor_spec = {{uid={subject_uid},gid={subject_uid},groups=[{subject_uid}]}}', 'connect_timeout = 1',
+                        'total_timeout = 10', 'max_duration_seconds = 60', ''])
+    return receiver_target, policy, config
+
+
 def http_check(check_id, root):
     executor, settings = EXECUTORS[check_id]
     root = Path(root).absolute()
@@ -150,6 +199,9 @@ def main(argv=None):
     for name in ('namespace', 'engine-pod', 'probe-pod'):
         t.add_argument('--' + name, type=Path, required=True)
     t.add_argument('--context', default='k3d-byul-cpu'); t.add_argument('--out', type=Path, required=True)
+    g = sub.add_parser('egress'); g.add_argument('--target', type=Path, required=True); g.add_argument('--receiver-pod', type=Path, required=True)
+    g.add_argument('--receiver-pid', type=int, required=True); g.add_argument('--subject-uid', type=int, required=True)
+    g.add_argument('--subject-netns', type=int, required=True); g.add_argument('--out', type=Path, required=True)
     h = sub.add_parser('http-check'); h.add_argument('--check', required=True, choices=sorted(EXECUTORS))
     h.add_argument('--target', type=Path, required=True); h.add_argument('--out', type=Path, required=True)
     args = parser.parse_args(argv)
@@ -173,6 +225,13 @@ def main(argv=None):
                        load(args.probe_pod), context=args.context)
         inputs._write(args.out, value)
         print(json.dumps({'target': str(args.out), 'sha256': sha256_hex(canonical_json(value))}))
+    elif args.kind == 'egress':
+        receiver_target, policy, config = egress(load(args.target), load(args.receiver_pod), receiver_pid=args.receiver_pid,
+            subject_uid=args.subject_uid, subject_netns=args.subject_netns, root=args.out)
+        inputs._write(args.out / 'target.json', load(args.target)); inputs._write(args.out / 'receiver-target.json', receiver_target)
+        inputs._write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True))
+        inputs._write(args.out / 'guard.toml', config)
+        print(json.dumps({'check': 'PLT-07', 'out': str(args.out), 'pack': policy['pack']}))
     else:
         policy, config = http_check(args.check, args.out)
         inputs._write(args.out / 'target.json', load(args.target))

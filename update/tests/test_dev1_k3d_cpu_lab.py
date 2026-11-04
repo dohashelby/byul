@@ -134,3 +134,25 @@ def test_gateway_chat_temperature_uses_policy_schema_1_2_and_allows_only_zero():
     assert entry['schema_version'] == 'runtime-mvp/1.2'
     plain = yaml.safe_load(lab.gateway_lab(run_id='dev1-k3d-9', gateway_image=image, tokens=tokens)['gateway-config.yaml'])
     assert json.loads(plain['data']['runtime-policy.json'])['schema_version'] == 'runtime-mvp/1.1'
+
+
+def test_gpu_profile_adds_one_gpu_and_keeps_names_apart_from_the_cpu_diagnosis(monkeypatch):
+    import yaml
+    from tools import dev1_k3d_cpu_lab as lab
+    for name in ('NAMESPACE', 'GENERATION', 'SERVED', 'SCHEMA'):
+        monkeypatch.setattr(lab, name, getattr(lab, name))
+    monkeypatch.setattr(lab, 'ARGS', list(lab.ARGS))
+    lab.use_gpu_profile()
+    image = 'registry.example/vllm/vllm-openai@sha256:' + 'a' * 64
+    raw, record = lab.render(run_id='dev1-gpu-1', engine_image=image, gpu={'model': 'NVIDIA L4', 'runtime_class': 'nvidia'})
+    pod = yaml.safe_load(raw['engine.yaml']); engine = pod['spec']['containers'][0]
+    assert pod['metadata']['namespace'] == 'byul-dev1-gpu-lab' and pod['spec']['runtimeClassName'] == 'nvidia'
+    assert engine['resources']['limits']['nvidia.com/gpu'] == '1' and engine['args'][-2:] == ['--gpu-memory-utilization', '0.5']
+    assert 'VLLM_CPU_KVCACHE_SPACE' not in {e['name'] for e in engine['env']}
+    assert record['profile'] == 'gpu' and record['served_model_name'] == 'byul-dev1-lab'
+    assert engine['args'][engine['args'].index('--served-model-name') + 1] == 'byul-dev1-lab'
+    record = {**record, 'model_id': 'facebook/opt-125m', 'model_revision': 'r', 'outputs_sha256': record['outputs_sha256']}
+    env = lab.environment(record, 'b' * 64)
+    assert env.data_origin.value == 'DECLARED' and env.runtime.gpu_count == 1 and env.runtime.gpu_model == 'NVIDIA L4'
+    with pytest.raises(ValueError, match='K3D_RENDER_INPUT_INVALID'):
+        lab.render(run_id='dev1-gpu-1', engine_image=image, gpu={'model': ''})

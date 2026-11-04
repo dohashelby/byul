@@ -86,10 +86,17 @@ class H(BaseHTTPRequestHandler):
     def log_message(self,*a): pass
 HTTPServer(('0.0.0.0',int(sys.argv[1])),H).serve_forever()
 '''
+def use_gpu_profile():
+    """2단계 GPU lab 이름. CPU 진단 기록과 섞이지 않게 이름공간·세대 표식·API 별칭을 바꾼다."""
+    global NAMESPACE, GENERATION, SERVED, SCHEMA
+    NAMESPACE, GENERATION, SERVED, SCHEMA = 'byul-dev1-gpu-lab', 'gpu-l4', 'byul-dev1-lab', 'byul-dev1-gpu-render/1'
+    ARGS[ARGS.index('--served-model-name') + 1] = SERVED
+
+
 LIFECYCLE_FILES = ('guard_lifecycle_sensor.py', 'sitecustomize.py', 'settings.json', 'manifest.json')
 
 
-def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usage=None):
+def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usage=None, gpu=None):
     """lifecycle_dir: `guard prepare-lifecycle-sensor` 출력. 주면 RUNBOOK의 계측 기동 설정을 더한다.
 
     고정 자산은 읽기 전용 /guard-lifecycle(ConfigMap), 기록은 /guard-lifecycle/data/<session>(엔진 UID 소유 0700)이다.
@@ -103,7 +110,7 @@ def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usa
               'labels': {'app': 'serving-engine', **labels}},
               'spec': {'enableServiceLinks': False, 'automountServiceAccountToken': False, 'restartPolicy': 'Never',
                        'containers': [{'name': 'engine', 'image': engine_image, 'imagePullPolicy': 'IfNotPresent', 'args': ARGS,
-                                       'env': [{'name': k, 'value': v} for k, v in {**LOG_ENV, 'VLLM_CPU_KVCACHE_SPACE': '1'}.items()],
+                                       'env': [{'name': k, 'value': v} for k, v in ({**LOG_ENV} if gpu else {**LOG_ENV, 'VLLM_CPU_KVCACHE_SPACE': '1'}).items()],
                                        'ports': [{'containerPort': 8000}],
                                        'readinessProbe': {'httpGet': {'path': '/health', 'port': 8000}, 'periodSeconds': 5},
                                        'resources': {'requests': {'cpu': '2', 'memory': '2Gi'}, 'limits': {'cpu': '4', 'memory': '4Gi'}},
@@ -114,6 +121,17 @@ def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usa
                        'volumes': [{'name': 'models', 'hostPath': {'path': '/srv/models', 'type': 'Directory'}},
                                    {'name': 'shm', 'emptyDir': {'medium': 'Memory', 'sizeLimit': '1Gi'}},
                                    {'name': 'chat-template', 'hostPath': {'path': '/srv/models/guard-chat/guard-text-chat-v1.jinja', 'type': 'File'}}]}}
+    if gpu is not None:
+        # 2단계 GPU lab(Linux amd64 K3s, NVIDIA device plugin). 같은 모델·인자에 GPU 1장과 메모리 비율만 더한다.
+        if (type(gpu) is not dict or set(gpu) - {'model', 'driver', 'runtime_class'} or type(gpu.get('model')) is not str
+                or not gpu['model'] or gpu.get('runtime_class') is not None and not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,62}', gpu['runtime_class'])):
+            raise ValueError('K3D_RENDER_INPUT_INVALID')
+        container = engine['spec']['containers'][0]
+        container['args'] = [*container['args'], '--gpu-memory-utilization', '0.5']
+        container['resources'] = {'requests': {'cpu': '2', 'memory': '8Gi', 'nvidia.com/gpu': '1'},
+                                  'limits': {'cpu': '4', 'memory': '16Gi', 'nvidia.com/gpu': '1'}}
+        if gpu.get('runtime_class'):
+            engine['spec']['runtimeClassName'] = gpu['runtime_class']
     if usage is not None:
         # OBS-04(forbidden)·OBS-05(allowed): 보고 목적지를 같은 run의 소유 수신 Service로 바꾼다. 금지면 두 끄기 설정도 넣는다.
         if usage not in {'forbidden', 'allowed'}:
@@ -184,7 +202,7 @@ def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usa
             'usage-sink.yaml': sink, 'usage-sink-service.yaml': sink_service,
             **({'lifecycle.yaml': lifecycle} if lifecycle else {})}
     raw = {name: yaml.safe_dump(value, sort_keys=False).encode() for name, value in docs.items()}
-    record = {'schema': SCHEMA, 'generation': GENERATION, 'profile': 'cpu', 'run_id': run_id, 'engine_image': engine_image,
+    record = {'schema': SCHEMA, 'generation': GENERATION, 'profile': 'gpu' if gpu else 'cpu', 'gpu': gpu, 'run_id': run_id, 'engine_image': engine_image,
               'model_id': MODEL_ID, 'model_revision': MODEL_REVISION, 'served_model_name': SERVED,
               'args': engine['spec']['containers'][0]['args'], 'lifecycle_session': lifecycle and json.loads(lifecycle['data']['settings.json'])['session'],
               'enforce_eager': True, 'lab_namespace_owner_label_required': True,
@@ -340,12 +358,16 @@ def inventory(root):
 
 
 def environment(record, inventory_sha256):
-    platform = ('CPU, arm64, k3d local Docker Desktop macOS; ' + '; '.join(f'{k}={v}' for k, v in (
+    gpu = record.get('gpu')
+    head = 'GPU, Linux amd64, K3s GPU lab; ' if gpu else 'CPU, arm64, k3d local Docker Desktop macOS; '
+    platform = (head + '; '.join(f'{k}={v}' for k, v in (
         ('generation', record['generation']), ('run', record['run_id']), ('render_engine_sha256', record['outputs_sha256']['engine.yaml']))))
-    return Environment(id=new_id('ENV'), data_origin=DataOrigin.EXAMPLE,
+    # GPU 이름·드라이버는 운영자가 넘긴 값이라 DECLARED다. 측정값으로 올리지 않는다.
+    return Environment(id=new_id('ENV'), data_origin=DataOrigin.DECLARED if gpu else DataOrigin.EXAMPLE,
         engine={'name': 'vllm', 'version': '0.31.0', 'image_digest': record['engine_image']},
         adapter={'name': 'vllm', 'version': VllmAdapter().version},
-        runtime={'nodes': 1, 'tp_groups': 1, 'gpu_count': 0, 'gpu_model': None, 'driver': None, 'platform': platform},
+        runtime={'nodes': 1, 'tp_groups': 1, 'gpu_count': 1 if gpu else 0, 'gpu_model': gpu and gpu['model'],
+                 'driver': gpu and gpu.get('driver'), 'platform': platform},
         model={'id': record['model_id'], 'revision': record['model_revision'], 'inventory_sha256': inventory_sha256}).seal()
 
 
@@ -576,8 +598,11 @@ def http_check(check_id, root, route_target=None):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--profile', choices=['cpu', 'gpu'], default='cpu',
+                        help='gpu: 2단계 GPU lab. 이름공간·세대·별칭을 바꾼다. 같은 run의 모든 하위 명령에 같은 값을 준다.')
     sub = parser.add_subparsers(dest='kind', required=True)
     r = sub.add_parser('render'); r.add_argument('--run-id', required=True); r.add_argument('--engine-image', required=True)
+    r.add_argument('--gpu-model'); r.add_argument('--gpu-driver'); r.add_argument('--runtime-class')
     r.add_argument('--lifecycle', type=Path); r.add_argument('--api-key-secret'); r.add_argument('--usage', choices=['forbidden', 'allowed'])
     r.add_argument('--out', type=Path, required=True)
     e = sub.add_parser('env'); e.add_argument('--render', type=Path, required=True); e.add_argument('--models', type=Path, required=True)
@@ -610,9 +635,13 @@ def main(argv=None):
     h.add_argument('--target', type=Path, required=True); h.add_argument('--out', type=Path, required=True)
     h.add_argument('--route-target', type=Path)
     args = parser.parse_args(argv)
+    if args.profile == 'gpu':
+        use_gpu_profile()
     load = lambda path: json.loads(Path(path).read_text(encoding='utf-8'))
     if args.kind == 'render':
-        raw, record = render(run_id=args.run_id, engine_image=args.engine_image, lifecycle_dir=args.lifecycle, api_key_secret=args.api_key_secret, usage=args.usage)
+        raw, record = render(run_id=args.run_id, engine_image=args.engine_image, lifecycle_dir=args.lifecycle, api_key_secret=args.api_key_secret, usage=args.usage,
+            gpu=({k: v for k, v in (('model', args.gpu_model), ('driver', args.gpu_driver), ('runtime_class', args.runtime_class)) if v}
+                 if args.profile == 'gpu' else None))
         for name, data in raw.items():
             inputs._write(args.out / name, data.decode())
         inputs._write(args.out / 'render.json', record)

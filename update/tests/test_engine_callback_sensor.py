@@ -402,3 +402,77 @@ def test_window_drops_earlier_runs_and_processes_without_the_barrier():
     new = {**computed(TAGS['b'], 16), 'process_sha256': 'p1'}
     gone = {**computed(TAGS['c'], 16), 'process_sha256': 'p0'}
     assert projection.window([old, gone, mark, new], SECRET, barrier) == [mark, new]
+
+
+GATEWAY_CASES = [c for first, second in (('A', 'B'), ('B', 'A')) for c in (
+    {'case_id': f'{first}-prime', 'role': 'prime', 'group': first, 'prefix': first, 'prompt': 'p' + first, 'principal': first},
+    {'case_id': f'{first}-control', 'role': 'control', 'group': first, 'prefix': first, 'prompt': 'p' + first, 'principal': first},
+    {'case_id': f'{second}-forged-{first}', 'role': 'probe', 'group': second, 'prefix': 'f' + first, 'prompt': 'f',
+     'principal': second, 'forged_salt': 'salt-' + first},
+    {'case_id': f'{second}-probe-{first}', 'role': 'probe', 'group': second, 'prefix': first, 'prompt': 'p' + first, 'principal': second})]
+
+
+class GatewayTransport(Transport):
+    """runtime Gateway 대역: 토큰으로 주체를 정해 salt를 붙이고 위조 salt는 403으로 막는다. 요청 ID는 새로 준다."""
+    def __init__(self, secret, tokens, *, outcomes=None):
+        super().__init__(secret, tokens)
+        self.outcomes = outcomes or {}
+
+    def __call__(self, network, requests, timeout):
+        request, = requests
+        principal = {'Bearer tok-a': 'A', 'Bearer tok-b': 'B'}[request['headers']['Authorization']]
+        if request['id'] in self.outcomes:
+            return [self.outcomes[request['id']]]
+        if 'cache_salt' in request['body']:
+            return [{'outcome': 403, 'capture_complete': True}]
+        self.count += 1
+        tokens = 16 if request['id'] != 'cb-9999' and self.count % 3 == 0 else 0
+        self.events.append({'point': projection.COMPUTED, 'phase': 'RETURN', 'entry_qualified_before': True,
+            'entry_qualified_after': True, 'fields': {'request_sha256': 'gw-%d' % self.count, 'num_computed_tokens': tokens,
+                'request_block_hashes_sha256': ['h' + request['body']['messages'][0]['content'][-2:]], 'request_cache_salt_sha256': 'salt-' + principal}})
+        return [{'outcome': 200, 'capture_complete': True, 'elapsed_ms': 5, 'body': '{}'}]
+
+
+def run_gateway(tmp_path, monkeypatch, *, outcomes=None, cases=GATEWAY_CASES):
+    monkeypatch.setenv('BYUL_TOKEN_A', 'tok-a'); monkeypatch.setenv('BYUL_TOKEN_B', 'tok-b')
+    env = Environment(id='ENV-CALLBACK-EXAMPLE', data_origin=DataOrigin.EXAMPLE, engine={'name': 'vllm', 'version': '0.31.0'}).seal()
+    prepared = engine_callbacks.prepare_assets(tmp_path / 'assets')
+    target = {'kubernetes': {}, 'lab': True}
+    manifest = {'schema': projection.SCHEMA, 'session': prepared['session'], 'target_sha256': sha256_hex(canonical_json(target)),
+        'environment_ref': env.ref().model_dump(mode='json'), 'cases': cases}
+    (tmp_path / 'target.json').write_bytes(canonical_json(target)); (tmp_path / 'manifest.json').write_bytes(canonical_json(manifest))
+    executor = engine_sensor.EngineSensorExecutor({'target': str(tmp_path / 'target.json'), 'prepared': str(tmp_path / 'assets/manifest.json'),
+        'manifest': str(tmp_path / 'manifest.json'), 'principal_token_env': {'A': 'BYUL_TOKEN_A', 'B': 'BYUL_TOKEN_B'}}, implementation='kubernetes')
+    executor.transport = GatewayTransport(engine_callbacks.load_secret(tmp_path / 'assets'), [], outcomes=outcomes)
+    values = {'sensor_environment_sha256': env.ref().sha256, 'sensor_target_sha256': sha256_hex(canonical_json(target)),
+        'sensor_prepared_sha256': sha256_hex(canonical_json(prepared)), 'sensor_manifest_sha256': sha256_hex(canonical_json(manifest)),
+        **GROUP_POLICY, 'public_prefix_sharing_allowed': False, 'cache_identity_policy_ref': 'EXAMPLE'}
+    check = baseline_pack().checks['REQ-15'].model_copy(deep=True)
+    check.executor = 'engine_sensor'; check.collection_profile = engine_sensor.PROFILES['REQ-15']
+    draft = executor.run(check, env, values, None, tmp_path / 'work')
+    facts = json.loads(draft.artifacts[0].path.read_text())['safe_facts']
+    return draft, facts
+
+
+def test_gateway_rejecting_forged_salt_is_not_a_failed_normal_control(tmp_path, monkeypatch):
+    draft, facts = run_gateway(tmp_path, monkeypatch)
+    assert draft.normal_control.attempted is True and draft.normal_control.succeeded is True
+    assert draft.observations['engine_sensor_violation'].value is False
+    assert draft.observations['engine_sensor_full_scope'].value is True
+    assert len(facts['trials']) == len(GATEWAY_CASES)
+    assert [t['outcome'] for t in facts['trials'] if 'forged' in t['case_id']] == [403, 403]
+
+
+@pytest.mark.parametrize('case_id,outcome,capture_complete', [
+    ('cb-1', 403, True), ('cb-2', 500, True), ('cb-2', None, False), ('cb-2', 403, False)])
+def test_failed_normal_or_unverified_forged_response_still_fails_the_control(tmp_path, monkeypatch, case_id, outcome, capture_complete):
+    draft, facts = run_gateway(tmp_path, monkeypatch, outcomes={case_id: {'outcome': outcome, 'capture_complete': capture_complete}})
+    assert draft.normal_control.attempted is True and draft.normal_control.succeeded is False
+    assert draft.observations['engine_sensor_full_scope'].value is False
+    assert any(t['outcome'] == outcome and t['capture_complete'] is capture_complete for t in facts['trials'])
+
+
+def test_rejected_challenges_alone_are_not_a_normal_control(tmp_path, monkeypatch):
+    draft, _ = run_gateway(tmp_path, monkeypatch, cases=[c for c in GATEWAY_CASES if 'forged_salt' in c])
+    assert draft.normal_control.attempted is False and draft.normal_control.succeeded is False
+    assert draft.observations['engine_sensor_full_scope'].value is False

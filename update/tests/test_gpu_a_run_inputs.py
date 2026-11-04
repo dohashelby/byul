@@ -54,10 +54,13 @@ def build(tmp_path, generation):
     return pods, record
 
 
-def check(tmp_path, check_id, preset, name):
-    inputs.main(['check', '--check', check_id, '--env', str(tmp_path / 'env.json'), '--target', str(tmp_path / 'target.json'),
+def check(tmp_path, check_id, preset, name, *, media_text_after=None):
+    argv = ['check', '--check', check_id, '--env', str(tmp_path / 'env.json'), '--target', str(tmp_path / 'target.json'),
         '--prepared', str(tmp_path / 'prepared'), '--cases', preset, '--policy-draft', str(UPDATE / 'docs/gpu-a/policy-a-draft.yaml'),
-        '--out', str(tmp_path / name)])
+        '--out', str(tmp_path / name)]
+    if media_text_after is not None:
+        argv += ['--media-text-after', media_text_after]
+    inputs.main(argv)
     return tmp_path / name
 
 
@@ -88,7 +91,8 @@ def test_target_refuses_pods_from_another_run_or_role(tmp_path, damage):
 
 
 @pytest.mark.parametrize('check_id,preset,generation', [('REQ-14', 'req14-normal', 'v1-callback'),
-    ('REQ-16', 'req16-salt', 'v1-callback'), ('REQ-16', 'req16-lab', 'v1-req16-lab'), ('REQ-18', 'req18-slot', 'v1-callback'),
+    ('REQ-16', 'req16-salt', 'v1-callback'), ('REQ-16', 'req16-lab', 'v1-req16-lab'),
+    ('REQ-16', 'req16-full', 'v1-req16-lab'), ('REQ-18', 'req18-slot', 'v1-callback'),
     ('REQ-17', 'cohort', 'v1-callback')])
 def test_check_inputs_pass_the_executor_binding_and_selection(tmp_path, check_id, preset, generation):
     build(tmp_path, generation)
@@ -102,7 +106,7 @@ def test_check_inputs_pass_the_executor_binding_and_selection(tmp_path, check_id
     values = policy['values'][check_id]
     assert policy['status'] == 'DRAFT' and policy['confirmed_by'] is None and policy['scope']['include'] == [check_id]
     assert policy['data_origin'] == 'DECLARED' and values['sensor_manifest_sha256'] == sha256_hex(canonical_json(manifest))
-    assert ('lab_contexts' in manifest) is (preset == 'req16-lab')
+    assert ('lab_contexts' in manifest) is (preset in ('req16-lab', 'req16-full'))
     if check_id == 'REQ-16':
         assert values['required_cache_contexts'] == ['cache_salt', 'adapter_content', 'media_identity', 'model_generation']
     if check_id == 'REQ-17':
@@ -127,3 +131,36 @@ def test_lab_cases_need_the_lab_generation_target(tmp_path):
     build(tmp_path, 'v1-callback')
     with pytest.raises(ValueError, match='RUN_INPUTS_LAB_CASES_NEED_LAB_TARGET'):
         check(tmp_path, 'REQ-16', 'req16-lab', 'run-lab')
+
+
+def test_trailing_media_text_is_bound_to_the_manifest_and_sent_after_the_image(tmp_path):
+    build(tmp_path, 'v1-req16-lab')
+    suffix = ' '.join(f'after{i}' for i in range(64))
+    original = check(tmp_path, 'REQ-16', 'req16-full', 'run-original')
+    out = check(tmp_path, 'REQ-16', 'req16-full', 'run-after', media_text_after=suffix)
+    manifest = json.loads((out / 'manifest.json').read_text())
+    policy = yaml.safe_load((out / 'policy.yaml').read_text())
+    original_policy = yaml.safe_load((original / 'policy.yaml').read_text())
+    assert len(manifest['cases']) == 23
+    media_cases = [c for c in manifest['cases'] if 'media' in c]
+    assert len(media_cases) == 8 and all(c['media']['text_after'] == suffix for c in media_cases)
+    assert policy['values']['REQ-16']['sensor_manifest_sha256'] == sha256_hex(canonical_json(manifest))
+    assert policy['values']['REQ-16']['sensor_manifest_sha256'] != original_policy['values']['REQ-16']['sensor_manifest_sha256']
+    assert all('text_after' not in c.get('media', {}) for c in json.loads((original / 'manifest.json').read_text())['cases'])
+    executor = engine_sensor.EngineSensorExecutor({'target': str(out / 'target.json'),
+        'prepared': str(tmp_path / 'prepared/manifest.json'), 'manifest': str(out / 'manifest.json')})
+    executor.transport = CohortTransport(engine_callbacks.load_secret(tmp_path / 'prepared'), [0] * 20)
+    check_def = baseline_pack().checks['REQ-16'].model_copy(deep=True)
+    check_def.executor = 'engine_sensor'; check_def.collection_profile = engine_sensor.PROFILES['REQ-16']
+    draft = executor.run(check_def, load_environment(tmp_path / 'env.json'), policy['values']['REQ-16'], None, tmp_path / 'work-after')
+    parts = [b['messages'][0]['content'] for b in executor.transport.bodies if isinstance(b['messages'][0]['content'], list)]
+    assert len(parts) == 8 and all(p[2] == {'type': 'text', 'text': suffix} for p in parts)
+    assert draft.data_origin.value == 'EXAMPLE' and draft.observations['engine_sensor_full_scope'].value is False
+    assert suffix not in draft.artifacts[0].path.read_text()
+
+
+@pytest.mark.parametrize('check_id,preset', [('REQ-16', 'req16-salt'), ('REQ-17', 'req16-full'), ('REQ-16', 'custom.json')])
+def test_trailing_media_option_is_not_silently_ignored(tmp_path, check_id, preset):
+    with pytest.raises(SystemExit) as error:
+        check(tmp_path, check_id, preset, 'unused', media_text_after='after')
+    assert error.value.code == 2 and not (tmp_path / 'unused').exists()

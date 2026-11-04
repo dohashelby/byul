@@ -273,3 +273,27 @@ def test_serial_socket_timeouts_return_complete_batch_without_a_second_sum_timeo
         assert transport.report()['collection_gap'] is False
     finally:
         server.shutdown();thread.join();server.server_close()
+
+
+def test_batches_over_sixty_four_are_split_in_order_with_binding_checked_per_chunk():
+    # 실측: 엔진 직접 경로가 열리면 REQ-01 열거가 한 번에 79개를 보낸다. 원 Docker 전송에는 크기 제한이 없다.
+    env,t=inputs();world=World(t,mode='violation')
+    transport=KubernetesRoutesHTTP(t,env,runner=world.runner)
+    url=t['engine']['trusted_url']
+    requests=[{'id':f'r{i}','method':'GET','url':url+'/health'} for i in range(79)]
+    rows=transport(EXTERNAL,requests,1)
+    assert [r['id'] for r in rows]==[r['id'] for r in requests]
+    assert [len(p) for p in world.packets]==[64,15]
+    assert 'probe_unavailable' not in {r['outcome'] for r in rows}
+    report=transport.report()
+    assert report['collection_gap'] is False and [len(r['request_ids']) for r in report['requests']]==[64,15]
+
+
+def test_split_batch_with_repeated_ids_is_unavailable_before_any_dispatch():
+    env,t=inputs();world=World(t)
+    transport=KubernetesRoutesHTTP(t,env,runner=world.runner)
+    url=t['engine']['trusted_url']
+    requests=[{'id':'same' if i in (0,70) else f'r{i}','method':'GET','url':url+'/health'} for i in range(79)]
+    rows=transport(EXTERNAL,requests,1)
+    assert {r['outcome'] for r in rows}=={'probe_unavailable'} and world.packets==[]
+    assert transport.report()['collection_gap'] is True

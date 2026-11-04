@@ -405,7 +405,7 @@
   "update/src/guard/runtime/kubernetes_rank_failure.py": "394a0403b37d5bc58cce56277f03a41f781d27e16e1caebce15fa81cd4576efd",
   "update/src/guard/runtime/kubernetes_recovery_http.py": "0279ae6c3eb6ab1542b29565b3bc5336a929ed51dd471f4de083d704a165fc68",
   "update/src/guard/runtime/kubernetes_resource_recovery.py": "3e9d45d7fe60cf73ec85b56757b062323acc6435eb84b59103cb96877093e4ce",
-  "update/src/guard/runtime/kubernetes_routes.py": "51de9d3981f005731fae6e35e1cae230d4d54a920f307c45e5fc4b3efce35335",
+  "update/src/guard/runtime/kubernetes_routes.py": "19044ae78b6f599fc4d22e2d8e823e476cddb211f36784c3412e952feaec24f0",
   "update/src/guard/runtime/kubernetes_session_revocation.py": "24cee35fbb824e66c285444a6e41645de8bf6b6fb60c8fe09c4514f05764570c",
   "update/src/guard/runtime/kubernetes_startup_binding.py": "a63c81627e579129c64f2831f56ddc7cb1dfbb9b27cd98110541c10e21050db7",
   "update/src/guard/runtime/kubernetes_stored_response_scope.py": "8dc6c01ef4c3fd249d2533472ded507d9b9280f87ad1e0287a57bb0aac925721",

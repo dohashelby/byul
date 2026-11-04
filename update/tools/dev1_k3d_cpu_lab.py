@@ -46,9 +46,13 @@ VALUES = {
                'required_targets': ['engine']},
     'OBS-09': {'collector_profile': 'guard-vllm-native-info-v1', 'required_trusted_fields': ['process', 'level', 'source'],
                'client_request_id_trust': 'untrusted_correlation'},
+    # 실행기가 지원하는 유일한 조합(request_binding.SUPPORTED_POLICY). 기업 결정값이 아니다.
+    'REQ-11': {'result_binding': 'originating_connection', 'client_request_id_trust': 'untrusted_correlation'},
 }
 EXECUTORS = {'REQ-13': ('response_content', {'endpoint': '/v1/chat/completions', 'request_timeout': 30}),
-             'OBS-09': ('log_integrity', {'request_timeout': 30, 'max_duration_seconds': 300})}
+             'OBS-09': ('log_integrity', {'request_timeout': 30, 'max_duration_seconds': 300}),
+             'REQ-11': ('request_binding', {'endpoint': '/v1/chat/completions', 'tokenize_endpoint': '/tokenize',
+                                            'request_timeout': 30, 'max_duration_seconds': 300})}
 
 
 def render(*, run_id, engine_image):

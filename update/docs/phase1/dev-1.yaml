@@ -46,7 +46,7 @@ checks:
     note: lab 대역과 k3d CPU 실측
     state: CPU_DEVELOPMENT_REMAINING
   REQ-06:
-    note: lab 대역과 k3d CPU 실측
+    note: "runtime Gateway가 /v1/responses에 404(설계상 거부). Gateway 경로로 실행 불가. 적용 제외 또는 엔진 직접 경로는 사용자 결정 대기"
     state: CPU_DEVELOPMENT_REMAINING
   REQ-11:
     note: lab 대역과 k3d CPU 실측

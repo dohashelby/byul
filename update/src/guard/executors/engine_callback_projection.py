@@ -303,13 +303,31 @@ def project_distributed(events, secret, tags):
 
 def project_slot(cases, outputs, events, secret, tags):
     """A가 쓴 자리를 B가 다시 받았을 때 B의 출력이 단독 실행과 같아야 한다."""
-    slots = {}
+    slots = {}; v2_slot = {}; v2_restricted = {}; sampled = {}
     for event in events:
         fields = event.get('fields') or {}
-        if (event.get('point') == 'InputBatch.add_request' and event.get('phase') == 'RETURN'
-                and event.get('entry_qualified_before') is True and event.get('entry_qualified_after') is True):
+        point, phase = event.get('point'), event.get('phase')
+        if event.get('entry_qualified_before') is not True:
+            continue
+        if point == 'Sampler.__call__' and phase == 'CALL':
+            # 진입 시점 상태다. sampler가 받은 그대로 남는다.
+            for item in fields.get('sampled') or ():
+                if type(item) is dict and item.get('request_sha256'):
+                    sampled.setdefault(item['request_sha256'], []).append(item)
+            continue
+        if phase != 'RETURN' or event.get('entry_qualified_after') is not True:
+            continue
+        if point == 'InputBatch.add_request':
             slots[fields.get('request_sha256')] = {'slot': fields.get('slot'), 'restricted': fields.get('restricted')}
+        elif point == 'RequestState.add_request':
+            v2_slot[fields.get('request_sha256')] = fields.get('slot')
+        elif point == 'Sampler.add_request':
+            v2_restricted[(fields.get('request_sha256'), fields.get('slot'))] = fields.get('restricted')
+    v2 = bool(v2_slot)
+    for request, number in v2_slot.items():
+        slots.setdefault(request, {'slot': number, 'restricted': v2_restricted.get((request, number))})
     slot_of = lambda case: slots.get(tag_digest(secret, tags[case['case_id']]), {})
+    stale = lambda item: (type(item.get('allowed_token_count')) is int and item['allowed_token_count'] > 0) or item.get('logit_bias_in_use') is True
     alone = [outputs.get(c['case_id']) for c in cases if c['role'] == 'standalone']
     missing = []
     if len(alone) < 2 or None in alone or len(set(alone)) != 1:
@@ -321,11 +339,19 @@ def project_slot(cases, outputs, events, secret, tags):
         previous = next((c for c in reversed(cases[:index]) if c['role'] == 'restricted'), None)
         former = slot_of(previous) if previous else {}
         same = former.get('slot') is not None and former.get('slot') == slot_of(case).get('slot') and former.get('restricted') is True
-        rows.append({'slot_reused': same, 'output_matches_standalone': bool(alone) and outputs.get(case['case_id']) == alone[0]})
+        row = {'slot_reused': same, 'output_matches_standalone': bool(alone) and outputs.get(case['case_id']) == alone[0]}
+        if v2:
+            states = [i for i in sampled.get(tag_digest(secret, tags[case['case_id']]), ()) if i.get('slot') == slot_of(case).get('slot')]
+            row.update(sampler_state_observed=bool(states), stale_restriction_at_sampling=any(stale(i) for i in states))
+        rows.append(row)
     if not rows or not all(r['slot_reused'] for r in rows):
         missing.append('slot_reuse_not_observed')
+    if v2 and not all(r.get('sampler_state_observed') for r in rows):
+        missing.append('sampler_state_not_observed')
     violations = [r for r in rows if r['slot_reused'] and not r['output_matches_standalone']]
     if 'standalone_control_not_deterministic' in missing:
         violations = []
-    return {'rows': rows, 'violation': True if violations else (None if missing else False),
+    # sampler가 받은 상태에 앞 요청의 제한이 남아 있으면 출력 비교와 무관한 직접 위반이다.
+    violations += [r for r in rows if r['slot_reused'] and r.get('stale_restriction_at_sampling') and r not in violations]
+    return {'rows': rows, 'runner': 'v2' if v2 else 'v1', 'violation': True if violations else (None if missing else False),
         'full_scope': not missing and not violations, 'missing': missing}

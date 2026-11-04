@@ -71,9 +71,9 @@ PHASE1_STATES = frozenset({
 })
 # 현행 팩(32)의 GPU 실행 공개 요약. 원 bundle이 아니며 Ref·판정만 옮긴다. 요약에 팩 Ref가 없는 기록은
 # 해당 문서가 밝힌 팩 revision을 적고(declared_pack_revision), 팩 Ref가 있으면 그 값을 읽는다.
-GPU_A_GLOB = "docs/evidence/gpu-a-*.json"  # byul-gpu-a-check-summary/1, docs/gpu-a/README.md: PACK32
+GPU_A_GLOB = "docs/evidence/gpu-a-*.json"  # byul-gpu-a-check-summary/1, gpu-a README 기준 PACK32
 GPU_B_GLOB = "docs/gpu-b/*.json"  # byul-independent-GPU-public-summary/1, refs에 PACK Ref
-GPU_FIRST = Path("docs/gpu-completion/20261102/GPU_RESULTS.json")  # GPU_HANDOFF_SUMMARY.md: PACK32 9묶음
+GPU_FIRST = Path("docs/gpu-completion/20261102/GPU_RESULTS.json")  # 11-02 인계 요약 기준 PACK32 9묶음
 GPU_STATUS_ORDER = (
     "GPU_PARTIAL_MEASURED", "GPU_PARTIAL_EXAMPLE", "GPU_COMPONENT_DECLARED_ONLY", "GPU_ATTEMPTED_NOT_COLLECTED",
 )

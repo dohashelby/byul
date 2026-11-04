@@ -1,8 +1,8 @@
 # 1단계 개발 담당 상태. 이 담당만 고친다. 상태 값은 tools/checklist_status.py PHASE1_STATES.
 checks:
   LIF-13:
-    note: daemon 세대·release 주체·후속 공급을 인증 경계에 연결하는 수집기
-    state: CPU_DEVELOPMENT_REMAINING
+    note: daemon·IPC loader 콜백 수집기 구현(9e2c01e·4f2da6a). release 주체 허용 여부는 기업 정책 대기. GPU에서 daemon 자산 배치·release 뒤 새 소비자 세대로 실측 필요
+    state: GPU_CONFIRMATION_ONLY
   OBS-01:
     note: lab 대역과 k3d CPU 실측
     state: CPU_DEVELOPMENT_REMAINING
@@ -55,8 +55,8 @@ checks:
     note: Kubernetes 실행기 구현 후 k3d CPU 실측
     state: CPU_DEVELOPMENT_REMAINING
   REQ-14:
-    note: 중간 tensor/buffer 계보 설계와 TP2 실행 묶음
-    state: CPU_DEVELOPMENT_REMAINING
+    note: TP rank별 실행·중간 all_reduce 전송·출력 rank 대조 구현(39d4208). GPU 2장 eager TP2 실측 필요. 가중치 실제 소비는 미관측으로 남음
+    state: GPU_CONFIRMATION_ONLY
   REQ-15:
     note: 기존 인증 Gateway 경로를 재사용. 수집 완료된 위조 salt 4xx만 정상 대조에서 분리. 실제 Gateway·엔진 경로 재실증 필요
     state: GPU_CONFIRMATION_ONLY
@@ -67,15 +67,15 @@ checks:
     note: 통계 설계·2026-11-03 GPU 표본과 오버헤드 대조 보존. 공식 AUC 한도·최소 표본 수의 기업 정책 입력 대기
     state: ENTERPRISE_INPUT_WAITING
   REQ-18:
-    note: V2 RequestState/Sampler와 서빙 요청·세대 소비를 묶는 producer
-    state: CPU_DEVELOPMENT_REMAINING
+    note: V2 자리 재사용·sampler 진입 상태 수집기 구현(b85ffe4). V2 GPU 세대 실측 필요
+    state: GPU_CONFIRMATION_ONLY
   REQ-19:
-    note: 선정 서빙 kernel 도달·범위·초기화 계측 producer
-    state: CPU_DEVELOPMENT_REMAINING
+    note: 입력 준비 kernel 범위·padding·완료·대조 수집기 구현(f73d819). --lab-kernel-checks 자산으로 GPU 실측 필요
+    state: GPU_CONFIRMATION_ONLY
   REQ-20:
-    note: 실제 graph key·입력 갱신·출력 소비·buffer 계보
-    state: CPU_DEVELOPMENT_REMAINING
+    note: FULL graph replay·sample 소비 수집기 구현(1ec307e). GPU 실측과 graph off 대조 세대 답변 해시 필요
+    state: GPU_CONFIRMATION_ONLY
   REQ-21:
-    note: 등록·해제 관측 코드와 TP2 실행 묶음
+    note: 통신기 세대 수집기 구현(a1034c2). 엔진 재기동 lab 동작(바인딩 재설정)이 없어 개발 남음. 이후 GPU 2장 TP2 실측
     state: CPU_DEVELOPMENT_REMAINING
 owner: dev-1

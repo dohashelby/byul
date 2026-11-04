@@ -17,7 +17,7 @@ SCHEMA = 'byul-engine-callback-cohort/1'
 COMPUTED = 'KVCacheManager.get_computed_blocks'
 ROLES = {'REQ-14': {'normal'}, 'REQ-15': {'prime', 'control', 'probe'}, 'REQ-16': {'prime', 'control', 'probe', 'post', 'switch'},
     'REQ-17': {'prime', 'control-present', 'control-absent', 'present', 'absent'},
-    'REQ-18': {'standalone', 'restricted', 'reused'}, 'REQ-19': {'boundary'}}
+    'REQ-18': {'standalone', 'restricted', 'reused'}, 'REQ-19': {'boundary'}, 'REQ-20': {'replay'}}
 MAX_CASES = 512
 # REQ-16 lab contexts change the engine between cases: reload one LoRA in place, or reload weights.
 LAB_ACTIONS = {'lora_reload': 'lora', 'weights_reload': 'weights'}
@@ -427,3 +427,80 @@ def project_kernel_bounds(cases, events, secret, tags):
             'violation': True if violations else (None if missing else False),
             'full_scope': not missing and not violations, 'missing': sorted(missing),
             'hardware_memory_checker': False}
+
+
+REPLAY = 'ModelCudaGraphManager.run_fullgraph'
+SAMPLE = 'GPUModelRunner.sample'
+_SHA = re.compile('[0-9a-f]{64}')
+
+
+def validate_reference_outputs(cases, references):
+    """REQ-20 독립 대조: graph를 끈 엔진 세대에서 같은 사례의 답변 해시. 없으면 None."""
+    if references is None:
+        return None
+    ids = {c['case_id'] for c in cases if c.get('role') == 'replay'}
+    if (type(references) is not dict or not references or set(references) - ids
+            or any(type(v) is not str or _SHA.fullmatch(v) is None for v in references.values())):
+        raise ValueError('ENGINE_CALLBACK_REFERENCE_OUTPUTS_INVALID')
+    return references
+
+
+def project_graph_lifetime(cases, outputs, events, secret, tags, references=None):
+    """REQ-20: FULL graph replay와 그 출력의 소비를 요청 단위로 잇는다.
+
+    앞 replay 출력이 소비되기 전에 새 replay가 시작되거나, 소비 시점에 출력 값이 바뀌었거나,
+    replay 직전 위치 입력이 이번 step 값이 아니면 직접 위반이다. HTTP 답변이 graph를 끈
+    대조 세대와 다른 것만으로는 위반으로 보지 않는다.
+    """
+    wanted = {tag_digest(secret, tag): case_id for case_id, tag in tags.items()}
+    replays = {}; samples = []
+    for event in events:
+        point = event.get('point'); fields = event.get('fields') or {}
+        if point not in (REPLAY, SAMPLE) or event.get('entry_qualified_before') is not True:
+            continue
+        call = event.get('call_sha256')
+        if point == REPLAY:
+            if event.get('phase') == 'CALL':
+                replays[call] = {'entry': fields, 'terminal': None}
+            elif call in replays and event.get('entry_qualified_after') is True:
+                replays[call]['terminal'] = {'phase': event.get('phase'), **fields}
+        elif event.get('phase') == 'CALL':
+            samples.append(fields)
+    violations = []; missing = set()
+    for call, replay in replays.items():
+        entry = replay['entry']
+        if entry.get('pending_unconsumed') is True:
+            violations.append({'reason': 'replay_before_output_consumed'})
+        if entry.get('input_refresh') is False:
+            violations.append({'reason': 'stale_graph_input'})
+        if entry.get('input_refresh') is None:
+            missing.add('graph_input_refresh_unobserved')
+        if entry.get('captured') is not True or (entry.get('desc') or {}).get('cg_mode') != 'FULL':
+            missing.add('graph_key_unverified')
+        terminal = replay['terminal']
+        if terminal is None or terminal['phase'] != 'RETURN' or terminal.get('gpu_completion') is not True:
+            missing.add('graph_completion_unobserved')
+    covered = set()
+    for sample in samples:
+        if sample.get('graph_output') is not True:
+            continue
+        if sample.get('output_intact') is False:
+            violations.append({'reason': 'graph_output_changed_before_consumption'})
+        if sample.get('output_intact') is True:
+            covered |= {wanted[r] for r in sample.get('native_request_sha256') or () if r in wanted}
+    replay_cases = [c['case_id'] for c in cases if c.get('role') == 'replay']
+    if not replays:
+        missing.add('graph_replay_unobserved')
+    if set(replay_cases) - covered:
+        missing.add('case_graph_consumption_unobserved')
+    if references is None:
+        missing.add('independent_output_control_unavailable')
+    else:
+        compared = {c: outputs.get(c) == references[c] for c in references}
+        if set(replay_cases) - set(references):
+            missing.add('independent_output_control_unavailable')
+        if not all(compared.values()):
+            missing.add('reference_output_mismatch')
+    return {'replays': len(replays), 'covered_cases': sorted(covered), 'violations': violations,
+            'violation': True if violations else (None if missing else False),
+            'full_scope': not missing and not violations, 'missing': sorted(missing)}

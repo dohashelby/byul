@@ -35,7 +35,7 @@ PROFILES = {
 }
 # These checks read the prepared callback session instead of a lifecycle recording.
 INFORMATIONAL_GAPS = frozenset({'CACHE_CALLBACK_WEAK_OBJECT_IDENTITY_UNAVAILABLE', 'DISTRIBUTED_NON_EXECUTE_RPC_UNSUPPORTED'})
-CALLBACK_CHECKS = frozenset({'REQ-14', 'REQ-15', 'REQ-16', 'REQ-17', 'REQ-18', 'REQ-19'})
+CALLBACK_CHECKS = frozenset({'REQ-14', 'REQ-15', 'REQ-16', 'REQ-17', 'REQ-18', 'REQ-19', 'REQ-20'})
 
 
 def _callback_elapsed_ms(row):
@@ -158,11 +158,6 @@ def native_capability(check_id):
                  and _sha(slot.CALLBACK_CODE_SHA256)
                  and type(getattr(kubernetes_http, 'SLOT_MASK_PROFILE', None)) is str)
         return {'implemented': bool(ready), 'reason': None if ready else 'REVIEWED_SLOT_NATIVE_CONTRACT_UNAVAILABLE'}
-    if check_id == 'REQ-20':
-        from tools import b_req20_graph as graph
-        # _capability performs additional exact module/code/profile checks at run.
-        ready = type(graph.NATIVE_CONTRACT) is dict and bool(graph.NATIVE_CONTRACT)
-        return {'implemented': bool(ready), 'reason': None if ready else 'REVIEWED_GRAPH_NATIVE_CONTRACT_UNAVAILABLE'}
     reasons = {
         'LIF-13': 'WEIGHTS_TOOL_HAS_NO_NATIVE_AUTHORIZATION_OR_REFERENCE_ATTESTATION',
         'REQ-21': 'GPU_COMPLETION_AND_REGISTRATION_GENERATION_PRODUCER_UNIMPLEMENTED',
@@ -320,25 +315,6 @@ class EngineSensorExecutor:
             scope = False
             cleanup = (result or {}).get('cleanup_errors', [])
             normal = (result or {}).get('standalone_unrestricted_source_path_observed')
-        elif check.id == 'REQ-20':
-            from tools import b_req20_graph as graph
-            from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
-            validate_target(graph._capture_target(env, target), env)
-            transport = KubernetesHTTP(target, env, duration=duration, binary=self.cfg.get('kubectl_binary', 'kubectl'), profile=REQUEST_BINDING_PROFILE)
-            graph._bodies(manifest, transport)
-            if (manifest.get('schema') != 'byul-req20-cohort/1' or manifest.get('environment_ref') != env.ref().model_dump(mode='json')
-                    or manifest.get('target_sha256') != values['sensor_target_sha256'] or manifest.get('session') != prepared['session']
-                    or manifest.get('run_id') != target['kubernetes']['run_id']
-                    or manifest.get('model_inventory_sha256') != env.model.inventory_sha256
-                    or manifest.get('declared_graph_mode') not in graph.MODES - {'NONE'}):
-                raise ValueError('ENGINE_SENSOR_GRAPH_MANIFEST_BINDING_MISMATCH')
-            if not graph._capability(prepared):
-                raise EngineSensorNotImplemented('REVIEWED_GRAPH_NATIVE_CONTRACT_UNAVAILABLE')
-            raw = graph._capture_kubernetes(env, target, prepared, manifest, duration=duration, binary=self.cfg.get('kubectl_binary', 'kubectl'))
-            result = graph.project(raw, env, target, prepared, manifest)
-            # Version changes and incomplete GPU query facts remain candidates.
-            observed, violation, scope, normal = False, None, False, None
-            cleanup = [] if result['cleanup']['complete'] else ['ENGINE_SENSOR_GRAPH_CLEANUP_UNVERIFIED']
         else:
             raise EngineSensorNotImplemented(native_capability(check.id)['reason'])
         draft = EvidenceDraft(status=ExecStatus.ABORTED,
@@ -365,8 +341,9 @@ class EngineSensorExecutor:
             raise ValueError('ENGINE_SENSOR_CALLBACK_MANIFEST_BINDING_MISMATCH')
         cases = manifest.get('cases'); projection.validate_cases(check.id, cases)
         # REQ-19 대조는 엔진 안에서 GPU 동기화와 복사를 한다. 소유 lab 엔진과 명시한 준비 자산에서만 돈다.
-        if check.id == 'REQ-19' and (target.get('lab') is not True or prepared.get('lab_kernel_checks') is not True):
+        if check.id in ('REQ-19', 'REQ-20') and (target.get('lab') is not True or prepared.get('lab_kernel_checks') is not True):
             raise ValueError('ENGINE_SENSOR_KERNEL_CHECKS_REQUIRE_LAB')
+        references = projection.validate_reference_outputs(cases, manifest.get('reference_outputs')) if check.id == 'REQ-20' else None
         lab = manifest.get('lab_contexts')
         # 엔진 상태를 바꾸는 사례(어댑터 교체·가중치 교체)는 소유한 lab 엔진에서만 돈다.
         if any(c['role'] == 'switch' or 'adapter' in c for c in cases) or lab is not None:
@@ -456,6 +433,8 @@ class EngineSensorExecutor:
             result = projection.project_slot(cases, outputs, events, secret, tags)
         elif check.id == 'REQ-19':
             result = projection.project_kernel_bounds(cases, events, secret, tags)
+        elif check.id == 'REQ-20':
+            result = projection.project_graph_lifetime(cases, outputs, events, secret, tags, references)
         else:
             result = projection.project_cache_timing(cases, rows, elapsed, values)
         # 약한 참조가 안 되는 출력 객체, 관측 대상이 아닌 다른 RPC는 근거 공백이 아니다.

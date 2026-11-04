@@ -16,6 +16,7 @@ import hashlib
 import hmac
 import os
 import types
+import weakref
 
 from . import vllm_cache_callback as cache
 
@@ -73,6 +74,7 @@ class KernelBoundsObserver(cache.CacheCallbackObserver):
     sources = SOURCES
     schema = SCHEMA
     profile = 'source-bound-kernel-bounds-callback-candidate-v1'
+    last_positions = None
 
     def digest(self, values):
         return hmac.new(self.secret, repr(values).encode(), hashlib.sha256).hexdigest() if values is not None else None
@@ -169,7 +171,24 @@ class KernelBoundsObserver(cache.CacheCallbackObserver):
                            'reference_matches': None if written is None or lens is None else written == expected and lens[item['batch']] == done + end - start,
                            'output_sha256': self.digest(written)})
         padding = None if lens is None or not plan['padding_range_ok'] else all(v == 0 for v in lens[len(plan['items']):])
+        self._remember_positions(positions, plan, result)
         return result, padding
+
+    def _remember_positions(self, positions, plan, result):
+        """REQ-20이 graph replay 직전 위치 buffer가 이번 step 값인지 대조할 수 있게 남긴다."""
+        self.last_positions = None
+        items = plan['items']
+        if not items or not all(i.get('write_range_ok') for i in items) or not all(r['reference_matches'] for r in result):
+            return
+        refs = sorted(i['reference'] for i in items)
+        if refs[0][0] != 0 or any(a[1] != b[0] for a, b in zip(refs, refs[1:])):
+            return
+        expected = [p for start, end, done in refs for p in range(done, done + end - start)]
+        try:
+            self.last_positions = {'tensor': weakref.ref(positions), 'length': refs[-1][1],
+                                   'expected_sha256': hmac.new(self.secret, repr(expected).encode(), hashlib.sha256).hexdigest()}
+        except TypeError:
+            self.last_positions = None
 
     # ------------------------------------------------------------- 감싸기
     def wrap(self, module, point):

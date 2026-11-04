@@ -197,3 +197,28 @@ def test_transport_sends_one_release_only_to_the_declared_daemon_socket():
     refused = ReleaseWorld('error'); http = transport(refused); http.declare_callback_lab(spec)
     with pytest.raises(KubernetesBindingError):
         http.engine_callback_switch('weights_release', 'target')
+
+
+def test_daemon_and_consumer_rows_from_separate_processes_are_not_mixed(tmp_path):
+    # daemon과 소비자는 실제로 다른 프로세스다. 호출 번호가 겹쳐도 행이 서로 덮이면 안 된다.
+    daemon_module = source_module(wl.DAEMON_MODULE, tmp_path, targets=wl.TARGETS, sources=wl.SOURCES)
+    loader_module = source_module(wl.LOADER_MODULE, tmp_path, sources=wl.SOURCES,
+        targets={**wl.TARGETS, wl.LOADER_MODULE: ('IpcModelLoader.load_model', *wl.TARGETS[wl.LOADER_MODULE])})
+    rows = []
+    daemon_side = sensor.EngineCallbacks('a' * 32, SECRET, rows.append, context_provider=lambda: {'process': 'daemon'})
+    consumer_side = sensor.EngineCallbacks('a' * 32, SECRET, rows.append, context_provider=lambda: {'process': 'consumer'})
+    daemon_side.weights.peer_reader = staticmethod(lambda conn: conn.cred)
+    assert daemon_side.instrument(daemon_module) and consumer_side.instrument(loader_module)
+    model_type = type('Model', (), {})
+    vars(daemon_module).update(SHARED, WeightCacheKey=Key, get_current_device_uuid=lambda: 'GPU-0',
+        export_entries=lambda model: ({'w': 1}, {}), export_model_attrs=lambda model: {})
+    vars(loader_module).update(SHARED, WeightCacheUnavailableError=Unavailable, CacheConfigMismatchError=Mismatch,
+        UnsupportedQuantForIPCError=Unsupported, check_ipc_platform_support=lambda: None,
+        WeightCacheState=lambda **kw: SimpleNamespace(**kw),
+        DefaultModelLoader=lambda config: SimpleNamespace(load_model=lambda **kw: model_type()))
+    daemon = daemon_module.WeightCacheDaemon(); vars(daemon).update(model=model_type(), cache_config=Key(), role='target', global_rank=0)
+    w = SimpleNamespace(daemon=daemon, loader_cls=loader_module.IpcModelLoader, model_type=model_type)
+    consumer(w, 101); consumer(w, 102); release(w); consumer(w, 103)
+    result = projection.project_weights_lifetime(CASES, SAME, rows, SWITCHES)
+    assert len({r['process_sha256'] for r in rows}) == 2
+    assert result['consumers'] == 2 and result['post_release'] == {'refused': 1, 'fallback': 1} and result['violation'] is False

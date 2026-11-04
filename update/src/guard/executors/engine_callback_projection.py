@@ -18,7 +18,7 @@ COMPUTED = 'KVCacheManager.get_computed_blocks'
 ROLES = {'REQ-14': {'normal'}, 'REQ-15': {'prime', 'control', 'probe'}, 'REQ-16': {'prime', 'control', 'probe', 'post', 'switch'},
     'REQ-17': {'prime', 'control-present', 'control-absent', 'present', 'absent'},
     'REQ-18': {'standalone', 'restricted', 'reused'}, 'REQ-19': {'boundary'}, 'REQ-20': {'replay'},
-    'LIF-13': {'before', 'switch', 'after'}}
+    'LIF-13': {'before', 'switch', 'after'}, 'REQ-21': {'before', 'after'}}
 MAX_CASES = 512
 # REQ-16 lab contexts change the engine between cases: reload one LoRA in place, or reload weights.
 # LIF-13은 소유 weights daemon에 전체 release를 보낸다.
@@ -387,7 +387,7 @@ def project_kernel_bounds(cases, events, secret, tags):
             continue
         if point not in KERNEL_POINTS:
             continue
-        call = event.get('call_sha256')
+        call = (event.get('process_sha256'), event.get('call_sha256'))  # 호출 번호는 프로세스마다 따로 센다
         if phase == 'CALL':
             plan = fields.get('plan')
             if event.get('entry_qualified_before') is True and type(plan) is dict:
@@ -462,7 +462,7 @@ def project_graph_lifetime(cases, outputs, events, secret, tags, references=None
         point = event.get('point'); fields = event.get('fields') or {}
         if point not in (REPLAY, SAMPLE) or event.get('entry_qualified_before') is not True:
             continue
-        call = event.get('call_sha256')
+        call = (event.get('process_sha256'), event.get('call_sha256'))  # 호출 번호는 프로세스마다 따로 센다
         if point == REPLAY:
             if event.get('phase') == 'CALL':
                 replays[call] = {'entry': fields, 'terminal': None}
@@ -527,7 +527,7 @@ def project_weights_lifetime(cases, outputs, events, switches):
         if point not in (DAEMON_STATE, DAEMON_RELEASE, 'IpcModelLoader._request_state', 'IpcModelLoader._fallback_load') \
                 or event.get('entry_qualified_before') is not True:
             continue
-        call = event.get('call_sha256')
+        call = (event.get('process_sha256'), event.get('call_sha256'))  # 호출 번호는 프로세스마다 따로 센다
         if event.get('phase') == 'CALL':
             rows[call] = {'point': point, 'process': event.get('process_sha256'), 'entry': event.get('fields') or {}, 'terminal': None}
             order.append(call)
@@ -580,4 +580,78 @@ def project_weights_lifetime(cases, outputs, events, switches):
     core = missing - {'release_authorization_policy_unavailable'}
     return {'consumers': len(consumers), 'release_actors': actors, 'post_release': after, 'violations': violations,
             'violation': True if violations else (None if core else False),
+            'full_scope': not missing and not violations, 'missing': sorted(missing)}
+
+
+COMM_INIT = 'CustomAllreduce.__init__'
+COMM_POINTS = (COMM_INIT, 'CustomAllreduce.register_graph_buffers', 'CustomAllreduce.all_reduce', 'CustomAllreduce.close')
+
+
+def project_comm_buffer(cases, outputs, events):
+    """REQ-21: 통신기 세대별 등록·사용·완료·해제와 재기동 뒤 재등록·정상 회복.
+
+    닫힌 통신기의 사용, 그 세대에 등록되지 않은 buffer의 사용, 닫힌 통신기의 graph buffer
+    등록은 직접 위반이다. 주소가 세대 사이에 다시 나오는 것은 정상 재사용일 수 있어 보지 않는다.
+    재기동 뒤 답변이 달라진 것만으로는 위반이 아니다.
+    """
+    calls = {}; order = []
+    for event in events:
+        if event.get('point') not in COMM_POINTS or event.get('entry_qualified_before') is not True:
+            continue
+        call = (event.get('process_sha256'), event.get('call_sha256'))  # 호출 번호는 프로세스마다 따로 센다
+        if event.get('phase') == 'CALL':
+            calls[call] = {'point': event['point'], 'process': event.get('process_sha256'), 'entry': event.get('fields') or {}, 'terminal': None}
+            order.append(call)
+        elif call in calls and event.get('entry_qualified_after') is True:
+            calls[call]['terminal'] = {'phase': event.get('phase'), **(event.get('fields') or {})}
+    generations = {}; violations = []; missing = set(); fences = []
+    for call in order:
+        row = calls[call]; entry = row['entry']; terminal = row['terminal'] or {}
+        if row['point'] == COMM_INIT:
+            if terminal.get('phase') == 'RETURN' and terminal.get('communicator_token'):
+                # 객체 token은 프로세스마다 따로 세므로 프로세스와 함께 세대를 구분한다.
+                generations[(row['process'], terminal['communicator_token'])] = {'process': row['process'], 'rank': terminal.get('rank'),
+                    'world_size': terminal.get('world_size'), 'buffer': terminal.get('buffer_sha256'),
+                    'live': terminal.get('live'), 'used': False, 'closed': False, 'order': len(generations)}
+            continue
+        generation = generations.get((row['process'], entry.get('communicator_token')))
+        if generation is None:
+            missing.add('communicator_registration_unobserved'); continue
+        if row['point'] == 'CustomAllreduce.close':
+            if terminal.get('phase') == 'RETURN' and terminal.get('live') is False:
+                generation['closed'] = True
+            elif generation['live']:
+                missing.add('communicator_release_unverified')
+            continue
+        if generation['closed'] or entry.get('live') is False and generation['live']:
+            violations.append({'reason': 'closed_communicator_used' if row['point'].endswith('all_reduce') else 'closed_communicator_registered'})
+            continue
+        if row['point'] == 'CustomAllreduce.all_reduce' and generation['live']:
+            if entry.get('buffer_sha256') != generation['buffer']:
+                violations.append({'reason': 'unregistered_buffer_used'})
+            else:
+                generation['used'] = True
+            fences.append(terminal.get('completion_fence'))
+    live = [g for g in generations.values() if g['live']]
+    if not live or not any((g['world_size'] or 0) >= 2 for g in live):
+        missing.add('tensor_parallel_communicator_inactive')
+    if not any(g['used'] for g in live):
+        missing.add('buffer_consumption_unobserved')
+    if not fences or any(f is not True for f in fences):
+        missing.add('completion_fence_unobserved')
+    closed = [g for g in live if g['closed']]
+    if not closed:
+        missing.add('release_generation_unobserved')
+    # 재기동: 닫힌 세대 뒤에 다른 프로세스의 새 세대가 등록·사용돼야 한다.
+    if not any(g['used'] and g['process'] not in {c['process'] for c in closed} and g['order'] > min(c['order'] for c in closed)
+               for g in live) if closed else True:
+        missing.add('restart_and_reregistration_unobserved')
+    before = [outputs.get(c['case_id']) for c in cases if c['role'] == 'before']
+    after = [outputs.get(c['case_id']) for c in cases if c['role'] == 'after']
+    if not before or not after or None in before + after:
+        missing.add('normal_recovered_control_unavailable')
+    elif set(after) != set(before):
+        missing.add('post_restart_output_changed')
+    return {'generations': len(generations), 'violations': violations,
+            'violation': True if violations else (None if missing else False),
             'full_scope': not missing and not violations, 'missing': sorted(missing)}

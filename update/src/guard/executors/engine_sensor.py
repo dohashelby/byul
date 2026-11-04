@@ -35,7 +35,7 @@ PROFILES = {
 }
 # These checks read the prepared callback session instead of a lifecycle recording.
 INFORMATIONAL_GAPS = frozenset({'CACHE_CALLBACK_WEAK_OBJECT_IDENTITY_UNAVAILABLE', 'DISTRIBUTED_NON_EXECUTE_RPC_UNSUPPORTED'})
-CALLBACK_CHECKS = frozenset({'LIF-13', 'REQ-14', 'REQ-15', 'REQ-16', 'REQ-17', 'REQ-18', 'REQ-19', 'REQ-20'})
+CALLBACK_CHECKS = frozenset({'LIF-13', 'REQ-14', 'REQ-15', 'REQ-16', 'REQ-17', 'REQ-18', 'REQ-19', 'REQ-20', 'REQ-21'})
 
 
 def _callback_elapsed_ms(row):
@@ -158,10 +158,7 @@ def native_capability(check_id):
                  and _sha(slot.CALLBACK_CODE_SHA256)
                  and type(getattr(kubernetes_http, 'SLOT_MASK_PROFILE', None)) is str)
         return {'implemented': bool(ready), 'reason': None if ready else 'REVIEWED_SLOT_NATIVE_CONTRACT_UNAVAILABLE'}
-    reasons = {
-        'REQ-21': 'GPU_COMPLETION_AND_REGISTRATION_GENERATION_PRODUCER_UNIMPLEMENTED',
-    }
-    return {'implemented': False, 'reason': reasons[check_id]}
+    return {'implemented': False, 'reason': 'ENGINE_SENSOR_NATIVE_PRODUCER_UNIMPLEMENTED'}
 
 
 def slot_observations(record):
@@ -436,6 +433,8 @@ class EngineSensorExecutor:
             result = projection.project_graph_lifetime(cases, outputs, events, secret, tags, references)
         elif check.id == 'LIF-13':
             result = projection.project_weights_lifetime(cases, outputs, events, switches)
+        elif check.id == 'REQ-21':
+            result = projection.project_comm_buffer(cases, outputs, events)
         else:
             result = projection.project_cache_timing(cases, rows, elapsed, values)
         # 약한 참조가 안 되는 출력 객체, 관측 대상이 아닌 다른 RPC는 근거 공백이 아니다.

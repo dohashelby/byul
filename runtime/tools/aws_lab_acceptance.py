@@ -3012,12 +3012,38 @@ class AWSAcceptance:
             evidence["bad_gateway_state"] = crash_state
             hash_error = False
             if crashed and crash_state.get("pod_name"):
-                for extra in (("--previous",), ()):
-                    logs = self._kubectl("logs", "pod/" + crash_state["pod_name"], "-c", "gateway", "--tail=100", *extra)
-                    if logs.returncode != 0 or not logs.stdout.strip():
-                        continue
-                    hash_error = "sha256" in logs.stdout.lower() or "SHA-256" in logs.stdout
-                    break
+                reads: list[dict[str, Any]] = []
+                deadline = self.monotonic() + 8.0
+                for attempt in range(4):
+                    for extra in (("--previous",), ()):
+                        remaining = deadline - self.monotonic()
+                        if reads and remaining <= 0:
+                            break
+                        logs = self._kubectl("logs", "pod/" + crash_state["pod_name"], "-c", "gateway", "--tail=100", *extra,
+                                             timeout=min(3.0, max(remaining, 0.0)))
+                        first_line_source = "stdout" if logs.stdout else "stderr"
+                        first_line_text = logs.stdout if logs.stdout else logs.stderr
+                        first_line = first_line_text.splitlines()[0] if first_line_text else ""
+                        first_line = _redact(first_line, (*self.tokens.values(), self.wrong_token))
+                        first_line = re.sub(
+                            r'''(?i)(?<![\w.-])(["']?[a-z_][\w.-]*(?:key|token|secret|password|credential|auth)[\w.-]*["']?\s*[:=]\s*)(?:Bearer\s+\S+|"[^"]*"|'[^']*'|[^\s,;}\]]+)''',
+                            r"\1[REDACTED]", first_line)
+                        first_line = re.sub(
+                            r'''(?i)(?<![\w.-])(--[a-z0-9_.-]*key[a-z0-9_.-]*\s+)(?:"[^"]*"|'[^']*'|\S+)''',
+                            r"\1[REDACTED]", first_line)
+                        first_line = re.sub(r"(?i)\b(bearer|token|secret|password|credential|auth)\s+\S+", r"\1 [REDACTED]", first_line)
+                        first_line = first_line[:120]
+                        reads.append({"attempt": attempt + 1, "source": "previous" if extra else "current",
+                                      "returncode": logs.returncode, "stdout_length": len(logs.stdout),
+                                      "stderr_length": len(logs.stderr), "first_line_source": first_line_source,
+                                      "first_line_prefix": first_line})
+                        if logs.returncode == 0 and ("sha256" in logs.stdout.lower() or "SHA-256" in logs.stdout):
+                            hash_error = True
+                            break
+                    if hash_error or attempt == 3 or self.monotonic() >= deadline:
+                        break
+                    self.sleep(min(2.0, max(0.0, deadline - self.monotonic())))
+                evidence["bad_gateway_log_reads"] = reads
             facts["bad_bundle_rejected"] = (True if hash_error else None) if crashed else (False if crashed is False else None)
             evidence["hash_error_seen"] = hash_error
         except (OSError, ValueError, KeyError, StopIteration, TypeError, json.JSONDecodeError) as error:

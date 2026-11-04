@@ -29,18 +29,20 @@ def _inspection_matches(row, owner):
             "started_at": row["State"].get("StartedAt"), "image": row["Config"].get("Image")} == owner
 
 
-def parse_environment_names(text, returncode):
+def parse_environment_names(text, returncode, *, subjects=None):
     """Keep names from identified records; only a complete scan proves absence.
 
     A malformed/duplicate PID or misplaced marker cannot borrow another
     process's completion marker. Values and unrelated text are never returned.
     Names observed before a later collection failure remain positive facts.
+    Optional subjects.read_complete means a valid complete PID record, not
+    merely a later success marker. Invalid framing stays invalid for that PID.
     This parser does not establish worker attribution or PID/start stability.
     """
     if type(text) is not str:
         return [], False
     names, pids = set(), set()
-    current, closed = False, False
+    current, closed, subject, record_valid = False, False, None, False
     complete = type(returncode) is int and returncode == 0
     for line in text.splitlines():
         if line.startswith("PID") and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", line):
@@ -49,11 +51,16 @@ def parse_environment_names(text, returncode):
             match = re.fullmatch(r"PID ([1-9][0-9]{0,9})", line)
             pid = int(match[1]) if match else None
             current = pid is not None and pid <= 2147483647 and pid not in pids
+            record_valid = current
             closed = False
             if current:
                 pids.add(pid)
+                subject = {"pid": pid, "environment_names": [], "read_complete": False}
+                if subjects is not None:
+                    subjects.append(subject)
             else:
                 complete = False
+                subject = None
             continue
         if not line:
             continue  # The fixed producer emits a blank line for an empty environment.
@@ -62,13 +69,20 @@ def parse_environment_names(text, returncode):
         elif line in {"GUARD_READ_OK", "GUARD_READ_ERROR"}:
             if closed or line == "GUARD_READ_ERROR":
                 complete = False
+                record_valid = False
+            subject["read_complete"] = line == "GUARD_READ_OK" and not closed and record_valid
             closed = True
         elif closed:
             complete = False
+            record_valid = False
+            subject["read_complete"] = False
         elif re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", line):
             names.add(line)
+            subject["environment_names"] = sorted(set(subject["environment_names"]) | {line})
         else:
             complete = False
+            record_valid = False
+            subject["read_complete"] = False
     complete = complete and bool(pids) and current and closed
     return sorted(names), complete
 
@@ -93,9 +107,17 @@ def collect_kubernetes_credential_exposure(ctx):
     }
     functional, normal = kubernetes_process_control(ctx)
     observations.update(functional)
+    from .kubernetes_gpu_process_observations import collect as collect_passive_gpu_process
+    passive = collect_passive_gpu_process(record, ctx.cprobe)
+    try:
+        transport_report = ctx.cprobe.report()
+    except Exception:
+        transport_report = {"diagnostic_codes": ["KUBERNETES_TRANSPORT_REPORT_UNAVAILABLE"]}
     summary = {"profile": "kubernetes-credential-metadata-consumer-v1", "process_observation": record,
+        "passive_gpu_process_observation": passive,
         "container_environment_names_observed": names, "worker_subject_verified": False,
-        "candidate_access_verified": False, "kubernetes": ctx.cprobe.report(),
+        "worker_inventory_complete": False, "provider_scope_verified": False,
+        "candidate_access_verified": False, "kubernetes": transport_report,
         "candidate_request": "missing" if selected is None else "explicit_empty" if not selected else "explicit_paths",
         "fixture": {"process_profile": record["profile"], "program_sha256": record["program_sha256"],
                     "candidate_paths": selected,
@@ -103,6 +125,7 @@ def collect_kubernetes_credential_exposure(ctx):
         "limitations": ["Container-reported environment names are not source-bound worker environment names.",
             "Candidate lstat absence/mode does not establish a worker's namespace, effective access or credential use.",
             "Pod volumeMount declarations are not observed process mounts or actual credential access.",
+            "An open read-capable credential FD is a positive process fact, not model-worker identity or provider use.",
             "An explicit empty candidate list tests no path; whole-worker credential coverage is unverified."]}
     packet = record.get("packet")
     challenges = [{"step": step, "attempted": (bool(normal.get("attempted")) if index == 2 else
@@ -189,13 +212,13 @@ class CredentialExposureExecutor(ContainerConfigExecutor):
             path == destination or path.startswith(destination.rstrip("/") + "/")
             or destination.startswith(path.rstrip("/") + "/") for destination in destinations))
 
-        names, complete = [], False
+        names, complete, subjects = [], False, []
         try:
             check_owner()
             raw = docker.exec(source_container, ["sh", "-c", ENV_CMD], timeout=30)
             check_owner()
             intervals["environment"] = True
-            names, complete = parse_environment_names(raw.stdout, raw.returncode)
+            names, complete = parse_environment_names(raw.stdout, raw.returncode, subjects=subjects)
             if not complete:
                 errors.append("PROCESS_ENVIRONMENT_INCOMPLETE")
         except _SourceUnverified:
@@ -270,8 +293,14 @@ class CredentialExposureExecutor(ContainerConfigExecutor):
             errors.append("FUNCTIONAL_PROBE_UNAVAILABLE")
         normal["attempted"] = functional_attempted
         mount_fact_collected = mounts_collected or bool(violations)
+        # The legacy Docker reader scans container PIDs, without identifying
+        # GPU workers or binding their generations. Positive names retain the
+        # existing subject-level policy meaning; absence/full coverage does not.
+        gpu_worker_scope_unverified = bool(ctx.env.runtime.gpu_count)
+        if gpu_worker_scope_unverified:
+            errors.append("GPU_WORKER_CREDENTIAL_SCOPE_UNVERIFIED")
         obs = {
-            "process_scan_complete": {"value": complete, "collected": True},
+            "process_scan_complete": {"value": complete and not gpu_worker_scope_unverified, "collected": True},
             "worker_env_names": {"value": names if complete or names else None,
                                  "collected": complete or bool(names)},
             # A valid forbidden row proves overlap even in a partial list.
@@ -288,6 +317,10 @@ class CredentialExposureExecutor(ContainerConfigExecutor):
         }
         return obs, normal, [{"step": step, "attempted": True} for step in ctx.check.challenge_steps], {
             "credential_names": names, "mount_destinations": destinations, "scan_complete": complete,
+            "observed_environment_subjects": subjects,
+            "worker_subject_verified": False, "worker_inventory_complete": False,
+            "provider_scope_verified": False,
+            "gpu_worker_scope_unverified": gpu_worker_scope_unverified,
             "forbidden_mount_violations": violations if mount_fact_collected else None,
             "candidate_request": "missing" if paths is None else "explicit_empty" if not paths else "explicit_paths",
             "candidate_configured": requested,

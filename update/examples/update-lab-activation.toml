@@ -17,13 +17,20 @@ selector = "app=vllm"
 container = "engine"
 probe_pod = "byul-probe"
 probe_container = "probe"
+probe_progress_directory = "/guard-lifecycle/probe-progress"  # LIF-05/06 첫 stream body 표식용 사전 준비된 probe 전용 디렉터리
 service_url = "http://vllm.byul-lab.svc:8000"
 model = "EXAMPLE-served-model"
 deployment = "vllm"
 process_pattern = "VLLM::Worker"
+# TP 다중 worker라면 아래 중 실제 선정 executor에서 확인한 식별 조합을 넣는다.
+# worker_pod = "vllm-rank-1"  # Ready Pod가 여러 개면 대상 Pod 지정
+# worker_pid = 12345
+# worker_start_ticks = 123456789  # /proc/PID/stat starttime. PID 재사용·세대 교체 방지
+# worker_rank = 1
+# worker_rank_regex = "rank=(\\d+)"  # 명령/comm 첫 캡처 그룹. 실제 형식 확인 필요
 deadline_ms = 90000                 # 운영자가 정한다. 기본값 없음
 burst_requests = 4                  # LIF-03
-allowed_models = ["EXAMPLE-served-model"]
+allowed_models = ["EXAMPLE-served-model", "EXAMPLE-served-model-v2"]
 faulty_manifest = "lab/faulty.yaml" # LIF-06·LIF-09·LIF-16. 세대 레이블 byul.lab/generation=faulty
 good_manifest = "lab/good.yaml"
 update_manifest = "lab/update.yaml"

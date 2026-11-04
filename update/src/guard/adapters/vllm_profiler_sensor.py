@@ -29,7 +29,7 @@ MAX_BYTES=2*1024**2
 CODE_FILENAME='guard/adapters/vllm_profiler_sensor.py'
 LEGACY_RUNTIME_CODE_CONTRACTS={'cpython-3.12.15': '40ce580a64fec147cc1fa5ecc33d8eafae24d61a0753d3b06aa7d61d58701628', 'cpython-3.12.14':'40ce580a64fec147cc1fa5ecc33d8eafae24d61a0753d3b06aa7d61d58701628','cpython-3.12.3':'423b896038c2ab86cf4b718d4be0ff71c6f22ce7102e7d58c97ccb68589308de'}
 RUNTIME_CODE_CONTRACTS={'cpython-3.12.3':'6c47eb56e6ff474eda9c5b40231559fef440fd7934e8f8d0d1568d4d49272f59',
- 'cpython-3.12.14':'6c47eb56e6ff474eda9c5b40231559fef440fd7934e8f8d0d1568d4d49272f59'}
+ 'cpython-3.12.14':'f21bb6cf60090a6f75110deb50162c42735b9a94dcdd0304873bce5d13022485'}
 _BASE=None
 _CALL=contextvars.ContextVar('guard_profiler_call',default=None)
 

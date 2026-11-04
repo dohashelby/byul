@@ -4,11 +4,12 @@ VLLM wrapper flags and adapter returns never certify Torch/backend collection,
 trace callbacks, output transfer, cross-process RPC or the next normal start.
 """
 from __future__ import annotations
-import contextvars,functools,hashlib,inspect,os,stat,sys,threading,time,types,weakref
+import contextvars,functools,gzip,hashlib,inspect,json,os,re,stat,sys,threading,time,types,weakref
 
 PROFILE='vllm-native-lifecycle-metadata/15'
 SCHEMA='guard-native-lifecycle-events/15'
-EVENT_SCHEMA='guard-native-profiler/1'
+EVENT_SCHEMA='guard-native-profiler/2'
+LEGACY_EVENT_SCHEMA='guard-native-profiler/1'
 COMMIT='db9527a46873454610df6dbedf79a36d6bf1a7f6'
 BASE8_SHA256='2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd'
 WRAPPER='vllm.profiler.wrapper'
@@ -26,7 +27,9 @@ POINTS=frozenset(POINT_SOURCES)
 MAX_ROWS=2048
 MAX_BYTES=2*1024**2
 CODE_FILENAME='guard/adapters/vllm_profiler_sensor.py'
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.15': '40ce580a64fec147cc1fa5ecc33d8eafae24d61a0753d3b06aa7d61d58701628', 'cpython-3.12.14':'40ce580a64fec147cc1fa5ecc33d8eafae24d61a0753d3b06aa7d61d58701628','cpython-3.12.3':'423b896038c2ab86cf4b718d4be0ff71c6f22ce7102e7d58c97ccb68589308de'}
+LEGACY_RUNTIME_CODE_CONTRACTS={'cpython-3.12.15': '40ce580a64fec147cc1fa5ecc33d8eafae24d61a0753d3b06aa7d61d58701628', 'cpython-3.12.14':'40ce580a64fec147cc1fa5ecc33d8eafae24d61a0753d3b06aa7d61d58701628','cpython-3.12.3':'423b896038c2ab86cf4b718d4be0ff71c6f22ce7102e7d58c97ccb68589308de'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.3':'6c47eb56e6ff474eda9c5b40231559fef440fd7934e8f8d0d1568d4d49272f59',
+ 'cpython-3.12.14':'6c47eb56e6ff474eda9c5b40231559fef440fd7934e8f8d0d1568d4d49272f59'}
 _BASE=None
 _CALL=contextvars.ContextVar('guard_profiler_call',default=None)
 
@@ -40,6 +43,72 @@ def attrs(value):
 def uint(value):return value if type(value) is int and 0<=value<2**63 else None
 def flag(value):return value if type(value) is bool else None
 def sha(value):return hashlib.sha256(value).hexdigest()
+
+
+def file_identity(info):
+    return [info.st_dev,info.st_ino,info.st_uid,info.st_mode,info.st_size,info.st_mtime_ns,info.st_ctime_ns]
+
+
+def trace_inventory(owner,session):
+    """Bounded, stable, local output only. Never return trace text or filenames."""
+    result={'status':'unavailable','directory_identity':None,'collision_sha256':None,'files':[]}
+    expected='/guard-profiler-traces/'+session
+    path=attrs(attrs(owner).get('profiler_config')).get('torch_profiler_dir')
+    if path!=expected:return result
+    root='/guard-profiler-traces'
+    try:
+        rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+        try:
+            parent=os.fstat(rootfd)
+            if parent.st_uid!=os.geteuid() or parent.st_mode&0o022:return result
+            entry=os.stat(session,dir_fd=rootfd,follow_symlinks=False)
+            if entry.st_uid!=os.geteuid():return result
+            if stat.S_ISREG(entry.st_mode):
+                fd=os.open(session,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=rootfd)
+                try:
+                    info=os.fstat(fd)
+                    if info.st_nlink!=1 or info.st_size>128:return result
+                    raw=os.read(fd,129)
+                    if file_identity(info)!=file_identity(os.fstat(fd)) or file_identity(info)!=file_identity(os.stat(session,dir_fd=rootfd,follow_symlinks=False)):return result
+                    marker=('guard-owned-profiler-stop-fault/1:'+session+'\n').encode()
+                    if raw==marker:result.update(status='owned-collision',collision_sha256=sha(raw))
+                    return result
+                finally:os.close(fd)
+            folder=os.open(session,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=rootfd)
+            try:
+                before=os.fstat(folder)
+                if before.st_mode&0o022 or file_identity(before)!=file_identity(entry):return result
+                names=os.listdir(folder)
+                if len(names)>16:return result
+                files=[];left=8*1024**2
+                for name in sorted(names):
+                    kind='trace' if name.endswith(('.pt.trace.json','.pt.trace.json.gz')) else 'table' if re.fullmatch(r'profiler_out_[0-9]+\.txt',name) else None
+                    if kind is None:return result
+                    fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=folder)
+                    try:
+                        info=os.fstat(fd)
+                        if not stat.S_ISREG(info.st_mode) or info.st_nlink!=1 or info.st_uid!=os.geteuid() or not 0<info.st_size<=left:return result
+                        with os.fdopen(fd,'rb',closefd=False) as stream:raw=stream.read(left+1)
+                        if len(raw)!=info.st_size or file_identity(info)!=file_identity(os.fstat(fd)) or file_identity(info)!=file_identity(os.stat(name,dir_fd=folder,follow_symlinks=False)):return result
+                        events=None
+                        if kind=='trace':
+                            if name.endswith('.gz'):
+                                import io
+                                with gzip.GzipFile(fileobj=io.BytesIO(raw)) as stream:decoded=stream.read(16*1024**2+1)
+                            else:decoded=raw
+                            if len(decoded)>16*1024**2:return result
+                            value=json.loads(decoded)
+                            if type(value) is not dict or type(value.get('traceEvents')) is not list or not value['traceEvents']:return result
+                            events=len(value['traceEvents'])
+                        files.append({'name_sha256':sha(name.encode()),'kind':kind,'sha256':sha(raw),'bytes':len(raw),'identity':file_identity(info),'trace_events':events})
+                        left-=len(raw)
+                    finally:os.close(fd)
+                if file_identity(before)!=file_identity(os.fstat(folder)) or file_identity(before)!=file_identity(os.stat(session,dir_fd=rootfd,follow_symlinks=False)):return result
+                result.update(status='directory',directory_identity=file_identity(before)[:4],files=files)
+                return result
+            finally:os.close(folder)
+        finally:os.close(rootfd)
+    except Exception:return result
 
 
 def checked_codes(module,base):
@@ -78,9 +147,26 @@ def route_targets(module,point,original):
 
 
 class ProfilerObservation:
+    def profiler_backend(self,owner):
+        result={'value':None,'collected':False,'backend_sha256':None,'thread_id':None}
+        if type(owner).__module__!=WRAPPER or type(owner).__name__!='TorchProfilerWrapper':return result
+        torch=sys.modules.get('torch');data=attrs(owner);backend=data.get('profiler')
+        try:
+            # The independent probe is Torch's C builtin, never a wrapper flag,
+            # Python replacement, EXAMPLE backend or HTTP response.
+            probe=torch.autograd._profiler_enabled
+            if (not inspect.isbuiltin(probe) or probe is not torch._C._autograd._profiler_enabled
+                    or probe.__module__!='torch._C._autograd'):return result
+            value=probe()
+            if type(value) is not bool:return result
+            result.update(value=value,collected=True,thread_id=threading.get_native_id())
+            if type(backend) is torch.profiler.profile:result['backend_sha256']=self.profiler_nonce(backend)
+        except Exception:pass
+        return result
+
     def profiler_nonce(self,owner=None):
         if self.profiler_pid!=os.getpid():
-            self.profiler_pid=os.getpid();self.profiler_lock=threading.RLock();self.profiler_serial=0;self.profiler_objects=weakref.WeakKeyDictionary()
+            self.profiler_pid=os.getpid();self.profiler_lock=threading.RLock();self.profiler_serial=0;self.profiler_objects=weakref.WeakKeyDictionary();self.profiler_generations={}
         with self.profiler_lock:
             if owner is not None:
                 existing=self.profiler_objects.get(owner)
@@ -115,14 +201,27 @@ class ProfilerObservation:
         parent=_CALL.get();parent=parent if type(parent) is dict and parent.get('pid')==os.getpid() and parent.get('closed') is False else None
         context=self.route_context() or {};is_start=None
         if point=='Worker.profile':is_start=flag(args[1] if len(args)>1 else kwargs.get('is_start',True))
+        backend=self.profiler_backend(owner) if point in {'TorchProfilerWrapper._start','TorchProfilerWrapper._stop'} else None
         return {'point':point,'call_sha256':self.profiler_nonce(),'parent_call_sha256':parent['call_sha256'] if parent else None,
             'owner_sha256':self.profiler_nonce(owner) if owner is not None else None,'owner':owner,'state_before':state,
             'asgi_request_sha256':context.get('request'),'asgi_invocation_sha256':context.get('invocation'),
-            'registered_handler_observed':registered,'is_start':is_start,'pid':os.getpid(),'closed':False}
+            'registered_handler_observed':registered,'is_start':is_start,'pid':os.getpid(),'closed':False,
+            'backend_before':backend,'trace_before':trace_inventory(owner,self.config['session']) if backend is not None else None}
 
     def profiler_emit(self,binding,phase,result,kind,started,finished):
         try:
             point=binding['point'];module=POINT_SOURCES[point];status=attrs(result).get('status_code') if phase=='RETURN' and point in API_POINTS else None
+            before=binding['backend_before'];after=self.profiler_backend(binding['owner']) if phase!='CALL' and before is not None else None
+            generation=None;qualified=False
+            if before is not None:
+                key=(binding['state_before']['wrapper_sha256'],before['thread_id'])
+                with self.profiler_lock:
+                    if point=='TorchProfilerWrapper._start' and phase=='RETURN' and before['collected'] and before['value'] is False and after['collected'] and after['value'] is True and after['backend_sha256'] is not None and before['thread_id']==after['thread_id']:
+                        self.profiler_generations[key]={'generation':self.profiler_nonce(),'backend':after['backend_sha256'],'thread':after['thread_id']}
+                    lease=self.profiler_generations.get(key)
+                    if lease is not None and ((point.endswith('._start') and phase=='RETURN' and after['backend_sha256']==lease['backend']) or (point.endswith('._stop') and before['collected'] and before['value'] is True and before['backend_sha256']==lease['backend'])):
+                        generation=lease['generation']
+                        qualified=bool(after is not None and after['collected'] and after['thread_id']==lease['thread'] and after['backend_sha256']==lease['backend'])
             self.emit('PROFILER',{'schema':EVENT_SCHEMA,'point':point,'phase':phase,'source_module':module,'source_sha256':SOURCE_ADDITIONS[module],
                 'source_verified':self.modules.get(module,{}).get('source_sha256')==SOURCE_ADDITIONS[module],
                 'observer_runtime':self.profiler_runtime,'observer_code_sha256':self.profiler_code,
@@ -130,7 +229,9 @@ class ProfilerObservation:
                 'state_after':self.profiler_state(binding['owner']) if phase!='CALL' else None,
                 'api_status_code':status if type(status) is int and 100<=status<=599 else None,'exception_kind':kind,
                 'operation_started_ns':started,'operation_finished_ns':finished,
-                'backend_collection_stopped_verified':False,'trace_output_completed_verified':False,'cross_process_rpc_verified':False,'producer_authenticated':False})
+                'backend_collection_stopped_verified':False,'trace_output_completed_verified':False,'cross_process_rpc_verified':False,'producer_authenticated':False,
+                'backend_before':before,'backend_after':after,'backend_generation_sha256':generation,'backend_probe_qualified':qualified,
+                'trace_before':binding['trace_before'],'trace_after':trace_inventory(binding['owner'],self.config['session']) if phase!='CALL' and before is not None else None})
         except BaseException:self.disabled_pid=os.getpid()
 
     def profiler_wrap(self,point,original,expected,registered=False):
@@ -174,7 +275,7 @@ def relative_code(code):
 
 
 def code_contract(base):
-    functions=(attrs,uint,flag,sha,checked_codes,route_targets,ProfilerObservation.profiler_nonce,ProfilerObservation.profiler_state,
+    functions=(attrs,uint,flag,sha,file_identity,trace_inventory,checked_codes,route_targets,ProfilerObservation.profiler_backend,ProfilerObservation.profiler_nonce,ProfilerObservation.profiler_state,
         ProfilerObservation.profiler_begin,ProfilerObservation.profiler_emit,ProfilerObservation.profiler_wrap,configure)
     return sha(''.join(base.code_digest(relative_code(fn.__code__)) for fn in functions).encode())
 
@@ -188,7 +289,7 @@ def configure(base):
     class ProfilerObserver(ProfilerObservation,base.Observer):
         def __init__(self,*args,**kwargs):
             super().__init__(*args,**kwargs);self.profiler_base=base;self.profiler_runtime=runtime;self.profiler_code=expected
-            self.profiler_pid=os.getpid();self.profiler_lock=threading.RLock();self.profiler_serial=0;self.profiler_objects=weakref.WeakKeyDictionary()
+            self.profiler_pid=os.getpid();self.profiler_lock=threading.RLock();self.profiler_serial=0;self.profiler_objects=weakref.WeakKeyDictionary();self.profiler_generations={}
         def instrument(self,module):
             name=module.__name__
             if name not in SOURCE_ADDITIONS:return super().instrument(module)

@@ -1,14 +1,16 @@
 """Closed profiler start/stop requests against one explicitly owned Pod binding.
 
-Reuses the existing bounded HTTP program and target verifier. No engine lifecycle,
-fault injection, dynamic routes, credentials, body previews or backend-state claim.
+Reuses bounded HTTP and target verification, plus the opt-in owned trace fixture.
+No engine lifecycle, dynamic routes, credentials, body previews or backend-state claim.
 """
 from copy import deepcopy
+from pathlib import Path
 import re
 
 from guard.models import canonical_json, sha256_hex
 from .bounded import strict_json
 from .kubernetes_http import KubernetesHTTP, KubernetesBindingError, REQUEST_BINDING_PROFILE
+from . import profiler_owned_trace as trace_fixture
 
 PROFILE = 'kubernetes-owned-profiler-control-http-v1'
 SLOTS = ('normal-before', 'start', 'normal-active', 'stop', 'next-start', 'normal-next', 'next-stop', 'normal-after')
@@ -22,9 +24,49 @@ class KubernetesProfilerControlHTTP(KubernetesHTTP):
             raise KubernetesBindingError()
         super().__init__(target, env, profile=REQUEST_BINDING_PROFILE, **kwargs)
         self._last_slot = -1; self._control_token = None
+        self._trace_receipt = None; self._trace_recovery = None; self._trace_session = None
+        self._trace_attempts = []
 
     def __call__(self, *args, **kwargs):
         raise KubernetesBindingError()
+
+    def trace_fault(self, session, action):
+        """Existing dedicated lab only; one arm and one exact-marker recovery."""
+        if type(session) is not str or re.fullmatch('[0-9a-f]{32}', session) is None:
+            raise KubernetesBindingError()
+        with self.lock:
+            if (action not in {'arm', 'recover'} or action in self._trace_attempts
+                    or action == 'arm' and self._last_slot != SLOTS.index('normal-before')
+                    or action == 'recover' and (self._trace_receipt is None or self._trace_session != session
+                        or self._last_slot < SLOTS.index('start') or self._last_slot >= SLOTS.index('next-start'))):
+                raise KubernetesBindingError()
+            self._trace_attempts.append(action)
+            self._trace_session = session
+        def retain(value):
+            if (type(value) is not dict or value.get('schema') != trace_fixture.SCHEMA
+                    or value.get('session') != session or value.get('action') != action
+                    or value.get('marker_sha256') != sha256_hex(trace_fixture.marker(session))):
+                raise ValueError()
+            if action == 'arm':
+                if value.get('fault_activation_verified') is not True or value.get('recovery_verified') is not False:
+                    raise ValueError()
+                self._trace_receipt = deepcopy(value)
+            else:
+                if (value.get('recovery_verified') is not True or value.get('original_marker_retained') is not True
+                        or value.get('marker_identity') != self._trace_receipt['marker_identity']):
+                    raise ValueError()
+                self._trace_recovery = deepcopy(value)
+        self._verify()
+        budget = min(10, self.deadline - self.clock())
+        if budget <= 0: raise KubernetesBindingError()
+        engine = self.binding['engine']
+        source = Path(trace_fixture.__file__).read_text(encoding='utf-8')
+        result = self._call(['--namespace=' + engine['namespace'], 'exec', '-i', engine['pod'],
+            '--container=' + engine['container'], '--', 'python3', '-c', source, session, action],
+            payload=canonical_json(self._trace_receipt) if action == 'recover' else b'',
+            cap=4096, budget=budget, on_document=retain)
+        self._verify()
+        return deepcopy(result)
 
     def perform(self, slot, request_id):
         # Fixed sequence permits omission after a failed normal precondition but
@@ -88,5 +130,7 @@ class KubernetesProfilerControlHTTP(KubernetesHTTP):
         result = super().report()
         # Parent assumes generic request IDs; this closed profile has safe slot IDs.
         result.update(profile=PROFILE, requests=deepcopy(self.rows), engine_started=False,
-            fault_injection_implemented=False, actual_backend_state_verified=False)
+            fault_injection_implemented=True, actual_backend_state_verified=False,
+            trace_fault_receipt=deepcopy(self._trace_receipt), trace_recovery_receipt=deepcopy(self._trace_recovery),
+            trace_fault_attempts=list(self._trace_attempts))
         return result

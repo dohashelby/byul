@@ -16,10 +16,10 @@ checks:
     note: lab 대역과 k3d CPU 실측
     state: CPU_DEVELOPMENT_REMAINING
   OBS-09:
-    note: Kubernetes 실행기 구현·k3d 실측 UNKNOWN(이 이미지 digest에 검토 로그 계약 없음). 로거 SHA는 일치 — 검토 목록 추가 결정 대기
+    note: 'Kubernetes 실행기 구현. k3d 실측은 UNKNOWN(이 이미지 digest에 검토 로그 계약 없음). 로거 SHA는 일치하며 검토 목록 추가 결정 대기'
     state: CPU_DEVELOPMENT_REMAINING
   OBS-11:
-    note: Kubernetes 읽기 경로 구현. 수집기 중단·복구 lab 절차가 없어 실측 전
+    note: 'Kubernetes 읽기 경로 구현. 수집기 중단·복구 lab 절차가 없어 실측 전'
     state: CPU_DEVELOPMENT_REMAINING
   PLT-07:
     note: lab 대역과 k3d CPU 실측
@@ -52,7 +52,7 @@ checks:
     note: lab 대역과 k3d CPU 실측
     state: CPU_DEVELOPMENT_REMAINING
   REQ-13:
-    note: Kubernetes 실행기 구현·k3d CPU 실측(FAIL: 금지 반환 옵션 수용, EXAMPLE). Gateway 대상 Kubernetes 바인딩 개발 남음
+    note: 'Kubernetes 실행기 구현과 k3d CPU 실측 완료(security FAIL - 금지 반환 옵션 수용, EXAMPLE). Gateway 대상 Kubernetes 바인딩 개발 남음'
     state: CPU_DEVELOPMENT_REMAINING
   REQ-14:
     note: 중간 tensor/buffer 계보 설계와 TP2 실행 묶음

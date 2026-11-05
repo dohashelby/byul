@@ -43,8 +43,8 @@ checks:
     note: "runtime Gateway 4-Pod k3d 진단: 관리 경로(관리자 /metrics 포함) 404로 security UNKNOWN, functional FAIL. 관리 역할·관리 경로 정의가 필요(runtime 담당·기업)"
     state: ENTERPRISE_INPUT_WAITING
   REQ-04:
-    note: "runtime Gateway는 엔진 요청 header를 새로 만든다(Content-Type·X-Request-ID·엔진 키만, 소스 backend.request_headers). 클라이언트 신원 header를 넘기지 않고 엔진은 신원으로 인가하지 않는다. 적용 조건(전달 신원을 인가에 사용) 불성립 후보로, 적용 제외 여부는 사용자 결정 대기"
-    state: ENTERPRISE_INPUT_WAITING
+    note: "사용자 결정(2026-11-05): 대상 구성에서 적용 제외. runtime Gateway는 엔진 요청 header를 새로 만들어(Content-Type·X-Request-ID·엔진 키만) 클라이언트 신원 header를 넘기지 않고, 엔진은 전달 신원으로 인가하지 않는다. Gateway가 신원을 전달해 인가에 쓰면 다시 적용"
+    state: NOT_APPLICABLE_IN_TARGET
   REQ-06:
     note: "사용자 결정(2026-11-04): 대상 구성에서 적용 제외. runtime Gateway가 저장 Responses를 제공하지 않음(/v1/responses 생성·조회 404). Gateway가 이 경로를 열면 다시 적용"
     state: NOT_APPLICABLE_IN_TARGET

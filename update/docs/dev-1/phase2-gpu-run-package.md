@@ -46,7 +46,7 @@
 | 점검 | 이유 | 필요한 것 |
 |---|---|---|
 | REQ-06 | 적용 제외(사용자 결정). runtime Gateway가 `/v1/responses`를 열지 않음 | Gateway가 열면 다시 적용 |
-| REQ-04 | runtime Gateway가 신원 header를 넘기지 않음. 적용 제외 후보 | 사용자 결정 |
+| REQ-04 | 적용 제외(사용자 결정 2026-11-05). runtime Gateway가 신원 header를 넘기지 않음 | Gateway가 신원을 전달해 인가에 쓰면 다시 적용 |
 | OBS-01 | 실행기는 엔진 직접 경로, BYUL 감사 기록은 Gateway | Gateway 경로 수집 프로필(팩 개정, 1단계 뒤) |
 | PLT-11, PLT-12, OBS-11, OBS-06 사본 목록, REQ-03 관리 경로, REQ-17 한도 | 기업·runtime 입력 | `docs/phase1/dev-1.yaml` 메모의 입력 |
 | REQ-16 | media 판정 기준(텍스트 적중과 이미지 블록 재사용 구분) 미정 | 사용자 결정 |

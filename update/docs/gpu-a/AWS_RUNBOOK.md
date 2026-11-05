@@ -25,6 +25,9 @@
 | G-A3 | `v2-default` | REQ-08, REQ-09, REQ-10, SUP-08 | 없음(라벨·`enableServiceLinks`만) |
 | G-A3 template | `v2-template` | SUP-03 | 고정 `guard-text-chat-v1.jinja` 읽기 전용 마운트와 `--chat-template` |
 | G-A4 | `v1-req16-lab` | REQ-16 `adapter_content`, `model_generation` | 센서 마운트·V1·prefix caching(MP 없음) + `--enable-lora --max-lora-rank 8 --max-loras 1`, 런타임 LoRA 갱신·개발 모드 환경 변수, `/guard-lora`·`/guard-weights` |
+| P2 V2 관측 | `v2-producers` | REQ-08·09·10 runner 소비 생산자 | 센서 마운트·`PYTHONPATH`, `VLLM_USE_V2_MODEL_RUNNER=1`, prefix caching. 준비 자산에 `--runner-consumption`; 같은 sample 지점을 쓰는 `--lab-kernel-checks`는 함께 켜지 않음 |
+
+PLT-01·04 process-device-provider는 소유 Pod 바인딩을 확인한 뒤 노드 root 관측(`--node-view sudo`)과 같은 컨테이너의 장치 열기 시험을 합친다. CPU k3d 확인만 마쳤으며 GPU 결합·지원 등록은 아직 미완료다. 기존 인스턴스 `i-04f510eaa76c2bc89` 재시작 전에는 현재 상태·시간당 비용·기존 SSH 보안 그룹의 사용자 IP를 다시 확인한다. A 18개 실측의 최신 실행 묶음은 `docs/dev-1/phase2-gpu-run-package.md`의 G1~G6 범위를 함께 따른다.
 
 모든 세대에 공통으로 덧씌우는 것:
 - Pod 라벨 `guard.run=<run_id>`, `byul.a/generation=<세대>`

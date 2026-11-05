@@ -3,7 +3,7 @@
 개발 담당 A의 P2 중 REQ-08·09·10을 위한 V1 경로다. `vllm_consumption_callback.py`가
 API `InputProcessor`의 입력·옵션 검증, worker `_update_states`의 새 요청 도착,
 `_sample` 진입 시 InputBatch의 CPU 배열을 관측한다. GPU kernel 내부 소비를 증명하지 않는다.
-SUP-03·08의 추가 모듈·선택 옵션 소비와 V2 runner는 별도 후속 범위다.
+SUP-03·08의 추가 모듈·선택 옵션 소비는 별도 후속 범위다. V2 경로의 CPU 준비는 마지막 절에 기록한다.
 
 - `guard prepare-engine-callbacks --runner-consumption`으로만 켠다. 기존 기본 관측 설정은 그대로다.
 - vLLM 0.31.0의 검토된 소스·함수 코드가 일치해야 설치한다.
@@ -128,4 +128,15 @@ InputBatch에 남아 있는 마스크를 적용된 허용 목록으로 읽어 �
   - 세션 -2에서는 다른 형식의 요청 태그 때문에 API 행과 runner 행이 이어지지 않았다. 센서가 `byul-cb-<32 hex>` 태그만 지문으로 쓰는 설계를 GPU에서 다시 확인한 결과다.
 - SUP-03 supply-reads: 공급 파일 5개(경로는 지문만 남김. 크기 659·7,305·7,031,645·242 bytes와 가중치 988,097,824 bytes)를 audit hook과 inotify 모두에서 관측했다. 수집 전후 `/models` 마운트가 엔진 Pod 전용이라 `inotify_pod_exclusive`다. 가중치 988 MB는 해시 한도(64 MiB) 초과로 `SUPPLY_FILE_NOT_HASHED`다.
 - runner-consumption과 supply-reads 생산자는 같은 날 `SUPPORTED_PRODUCERS`에 등록했다(V1 runner 경로 기준). 남은 gap은 등록 뒤에도 그대로 남는다.
+
+## V2 runner CPU 준비(2026-11-05)
+
+- `adapters/vllm_consumption_v2_callback.py`는 vLLM 0.31.0 V2 `GPUModelRunner.add_requests`·`sample`의 고정 소스 SHA와 함수 코드를 확인해 감싼다. API 관측은 기존 V1 InputProcessor 관측기를 재사용한다.
+- `SamplingStates`·logits processor의 CPU 배열을 `input_batch.idx_mapping_np` 자리로 읽어 온도·top_p·top_k·logprobs·허용 token/금지어/logit bias 개수를 남긴다. GPU kernel 내부 소비나 token ID 목록의 동일성을 증명하지 않는다.
+- V2의 `LogitBiasState.num_logit_bias` 개수도 기록하지만, 공통 계약의 V1 한계 gap은 그대로 유지한다. 비교 의미 변경은 B 합의 과제 Q2다(`phase2-contract-questions.md`).
+- `collectors/runner_consumption_v2_producer.py`는 V2 행을 공통 runner-consumption 형식으로 변환한다. V1 runner 행이 섞이면 버리고 진단을 남긴다. 생산자 신원은 V1과 다른 이름·소스 SHA이며 GPU 확인 전에는 등록하지 않는다.
+- 기존 `--runner-consumption` 설정으로 V2 모듈을 관측한다. 준비 자산에 새 모듈을 포함하고 Kubernetes 읽기 필터도 V2 schema를 받는다. `--lab-kernel-checks`는 같은 sample 지점을 쓰므로 그 세션에서는 V2 소비 관측을 설치하지 않고 gap을 남긴다.
+- GPU 확인용 `v2-producers` 세대는 V2 runner를 명시한다. 시험은 실제 고정 V2 model_runner.py 함수와 CPU 대역 상태 배열로 수행하며, GPU 엔진 기동 시험과 구분한다. 비정상 sampler 개수(NaN·무한대·비정수·범위 초과)는 null로 남기고 다른 관측은 보존한다.
+- 남은 일: 고정 이미지의 실제 V2 GPU 경로에서 API→runner→sampler 결합·읽기 종료를 확인한 뒤 지원 등록 검토. SUP-08 멀티모달 소비와 A 담당 GPU 실측은 별도 미완료다.
+- 최종 CPU 검증은 P1과 묶어 직접·공통 계약·불변식 289 통과/기존 1 제외(pytest 1.46초, 부모 1.634초)다. wheel 빌드와 체크아웃 밖 격리 설치 검증을 통과했고, 설치본에서 새 모듈 4개 import·콜백 자산 21개 해시·V2 관측기 bytes 일치를 확인했다. 제품 소스는 검증 동안 불변이다. 전체 기본 suite는 이 소스의 Linux CI로 확인한다. 원자료는 `byul-dev1-evidence/20261105-codex-takeover/`에 둔다.
 - V2 runner 경로는 아직 관측하지 않았다.

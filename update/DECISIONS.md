@@ -295,6 +295,9 @@
 - 2026-10-19 · 모델: `Execution.operator{by,at}`·`override_reason`, `ExecutorInfo.default_judge`, `CheckRow.evidence_source`·`replaced`, `Report.evidence_counts` — 모두 비어 있으면 직렬화에서 빠짐(기존 해시 유지). 사람이 입력한 증거(operator 있음)는 모델이 MEASURED를 거부.
 
 ## 열린 질문
+### dev-1 2단계 생산자 (2026-11-05)
+- P2-Q1 — 긴 요청이 #196 계약 사건 상한 4,096에 닿는다(요청 14개 세션에서 request-attempt 2,383행, 1,300 토큰 KV 압박 세션은 초과로 거부). 단계 요약 행(schema `/2`)·기록 분할·요청 선택 중 무엇으로 할지 B 소비자와 합의가 필요하다. 잠정: 요청 선택으로 상한 안에서 시험, 계약은 그대로. 상세는 `docs/dev-1/phase2-contract-questions.md`.
+- P2-Q2 — V2 runner는 sampler 단계 logit bias 개수를 읽을 수 있는데, 계약은 V1 한계 때문에 이 gap을 고정으로 붙인다. 관측이 있을 때 비교로 바꿀지 B 확인이 필요하다. 잠정: 계약 그대로.
 ### U1 (2026-10-25 개정, 변경 유형별 시험 선정)
 - ~~U1-Q1 — 패치 릴리스도 전체 시험할 것인가?~~ → 2026-10-25 사용자 결정: 패치 릴리스는 필요한 점검만 골라 시험한다(아래 "U1 개정 2").
 - U1-Q2 — 엔진 릴리스에서 실험이 닿지 않은 변경 진입점을 판정에 반영할 것인가(그 점검 PASS → UNKNOWN)? 판정 규칙 변경이다. 잠정: 보고서 표시와 수동 시험 대상 등록만.

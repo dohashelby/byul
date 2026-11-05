@@ -40,7 +40,8 @@ def test_overlay_keeps_the_handoff_engine_and_adds_only_a_requirements(generatio
     env = {e['name']: e['value'] for e in engine['env']}
     mounts = {m['mountPath']: m for m in engine['volumeMounts']}
     if lab.GENERATIONS[generation]['sensor']:
-        assert env['PYTHONPATH'] == lab.CALLBACKS and env['VLLM_USE_V2_MODEL_RUNNER'] == '0'
+        # 센서 세대는 V1 runner 고정이다. P2 V2 runner 확인 세대만 V2를 명시한다.
+        assert env['PYTHONPATH'] == lab.CALLBACKS and env['VLLM_USE_V2_MODEL_RUNNER'] == ('1' if generation == 'v2-producers' else '0')
         assert mounts[lab.CALLBACKS]['readOnly'] is True and not mounts[lab.DATA].get('readOnly')
         assert record['host_directories']['lifecycle_data'] == '/srv/byul-a/a-run-1/lifecycle-data'
     else:

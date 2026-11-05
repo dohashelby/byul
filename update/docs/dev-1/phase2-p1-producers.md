@@ -6,7 +6,7 @@
 |---|---|---|
 | request-attempt | LIF-03·10·12 | CPU k3d·GPU 확인, 등록(2026-11-05). 선점(retry)·KV 한도 경로는 GPU KV 압박 분기에서 확인 |
 | generation-transition | LIF-05·06·07·09 | CPU k3d 생산 확인(2026-11-05). GPU 확인, 등록(2026-11-05). rank·graph 준비 행은 아직 없음 |
-| process-device-provider | PLT-01·04 | 남음 |
+| process-device-provider | PLT-01·04 | 구현·CPU k3d 확인. GPU 확인·지원 등록은 남음(아래 절) |
 | rank-fault | LIF-08 | 남음(TP2) |
 | failed-group-resources | LIF-11 | 남음(TP2) |
 | health-worker-causal | OBS-02 | CPU k3d 생산 확인(2026-11-05). GPU 확인, 등록(2026-11-05). vLLM 안에 health와 worker 사이 공유 인과 키가 없음(진단으로 남아 complete 아님) |
@@ -128,3 +128,14 @@
   - `SUPPORTED_PRODUCERS` 등록: 여섯 생산자(request-attempt·generation-transition·health-worker-causal·profiler-control·runner-consumption·supply-reads)를 세션 -3 기록의 생산자 SHA와 같은 현재 소스 SHA로 등록했다. `tests/test_gpu_common_inputs.py`가 등록 값과 현재 소스 SHA의 일치를 확인한다.
   - process-device-provider, rank-fault·failed-group-resources(TP2 필요).
   - 긴 요청은 단계마다 사건이 쌓여 계약 상한 4,096에 닿는다. 단계 사건 요약 방식은 계약 소비자와 합의할 과제다.
+
+## process-device-provider CPU 준비(2026-11-05)
+
+- `collectors/process_device_observer.py`는 노드 PID 이름공간의 `/proc`에서 소유 Pod UID와 container ID가 함께 있는 cgroup만 고른다. NSpid 사슬·시작 ticks·실효 UID·cgroup 해시·열린 장치 fd·자격 환경 변수 이름·마운트 사용을 읽는다. 읽기 전후 프로세스 신원과 cgroup이 같아야 행을 쓴다.
+- NVML host PID와 NSpid 첫 값을 연결해 `gpu_process`를 만든다. 엔진 컨테이너 안 장치 열기 시험은 ioctl 없이 O_RDWR로 열고 바로 닫는다. 같은 실효 UID의 결과만 해당 프로세스에 적용하며, 이미 열린 fd는 별도 근거로 보존한다.
+- 환경 변수·마운트 읽기 실패나 잘림은 `unknown`과 진단으로 남긴다. 자격 후보 32개 또는 장치 64개 상한을 넘기면 누락을 숨기지 않는다. Secret 값·파일 본문은 저장하지 않으며 자격 세대는 미관측(null)이다.
+- `collectors/process_device_producer.py`에서 #196 형식으로 변환한다. 관측기와 변환을 별도 모듈로 두어 기존 등록 생산자 여섯 종의 소스 SHA는 유지한다.
+- 수집: `tools.gpu_a_producers_collect --node-view sudo`(GPU 호스트) 또는 `--node-view pod:<namespace>/<name> --node-dev-root /host/dev`(k3d 노드 관측 Pod). 제품용 노드 관측 주체의 배포는 별도 범위다.
+- CPU 원자료 `byul-dev1-evidence/k3d-run19/`: 기존 run18 엔진의 컨테이너 프로세스 4개(namespace PID 1·75·76·113)를 골랐다. CPU 노드라 NVML·GPU device가 없어 필수 행은 비었고 `source_ended=false`다. lab 관측 Pod는 수집 뒤 삭제했다. 이 원자료는 Claude 작성 시점 소스의 결과이며 후속 보수 후 최종 소스와 구분한다.
+- GPU 확인·지원 등록 전이다. CPU 관측이나 합성 장치 데이터로 PLT-01·04 완료 또는 PASS를 주장하지 않는다. 사건 상한·V2 logit bias 계약 과제는 `phase2-contract-questions.md`에 기록했다.
+- 인계 후 최종 소스 검증: 직접·공통 계약·불변식 289 통과/기존 1 제외(pytest 1.46초, 부모 1.634초). 최종 소스로 같은 run18 엔진을 다시 읽어 namespace PID 1·75·76·113과 NVML/GPU 미관측 gap을 재확인했다. 임시 `byul-codex-node-view` 네임스페이스는 삭제 확인했고 기존 engine/probe는 유지했다. 원자료는 `byul-dev1-evidence/20261105-codex-takeover/process-device-final.json`이며 이 생산자 SHA는 `442ea49b…93451`이다.

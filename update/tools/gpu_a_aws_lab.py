@@ -55,6 +55,9 @@ GENERATIONS = {
         'args': ['--enable-prefix-caching', '--profiler-config', PROFILER_CONFIG, '--max-model-len', '512',
                  '--num-gpu-blocks-override', '40'],
         'env': {'VLLM_USE_V2_MODEL_RUNNER': '0', 'VLLM_SERVER_DEV_MODE': '1'}},
+    # P2 runner-consumption의 V2 runner 경로 확인. 센서는 같은 준비 자산(--runner-consumption)으로 API 행과 V2 runner 행을 함께 남긴다.
+    # V2 runner를 명시한다(0.31.0 기본값과 같다). lab kernel 대조는 같은 sample 지점을 감싸므로 이 세대에서 켜지 않는다.
+    'v2-producers': {'sensor': True, 'args': ['--enable-prefix-caching'], 'env': {'VLLM_USE_V2_MODEL_RUNNER': '1'}},
     # REQ-16 lab 문맥. 소유 lab 네임스페이스에서만 띄운다.
     'v1-req16-lab': {'sensor': True, 'lab': True,
         'args': ['--enable-prefix-caching', '--enable-lora', '--max-lora-rank', '8', '--max-loras', '1'],

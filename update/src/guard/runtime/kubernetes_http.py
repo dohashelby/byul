@@ -64,7 +64,7 @@ print(json.dumps({"events":rows,"truncated":truncated}))
 ATTEMPT_EVENTS_READER = r'''
 import json,os,re,sys
 root="/guard-lifecycle/data/"+sys.argv[1];out=[];left=14*1024**2;truncated=False
-wanted=(b'"schema":"guard-vllm-attempt-callback/1"',b'"schema":"guard-vllm-transition-callback/1"',b'"schema":"guard-vllm-health-callback/1"',b'"schema":"guard-vllm-profiler-callback/1"',b'"schema":"guard-vllm-consumption-callback/1"',b'"schema":"guard-vllm-supply-read-callback/1"',b'"phase":"GAP"')
+wanted=(b'"schema":"guard-vllm-attempt-callback/1"',b'"schema":"guard-vllm-transition-callback/1"',b'"schema":"guard-vllm-health-callback/1"',b'"schema":"guard-vllm-profiler-callback/1"',b'"schema":"guard-vllm-consumption-callback/1"',b'"schema":"guard-vllm-consumption-v2-callback/1"',b'"schema":"guard-vllm-supply-read-callback/1"',b'"phase":"GAP"')
 for name in sorted(os.listdir(root)):
     found=re.fullmatch(r"callbacks-([1-9][0-9]*)\.jsonl",name)
     if found is None:continue
@@ -972,6 +972,31 @@ class KubernetesHTTP:
                        or type(p["events"]) is not list for p in processes)):
             raise KubernetesBindingError()
         return value
+
+    def engine_pod_document(self):
+        """PLT-01·04: 소유 엔진 Pod 명세(자격 공급 후보를 고르는 데 쓴다). 바인딩을 앞뒤로 확인한다. Secret은 읽지 않는다."""
+        if self.profile!=ENGINE_CALLBACK_PROFILE:
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        pod=self._call([f"--namespace={engine['namespace']}","get","pod",engine["pod"],"-o","json"])
+        self._verify()
+        if type(pod) is not dict or pod.get("metadata",{}).get("uid")!=engine["pod_uid"]:
+            raise KubernetesBindingError()
+        return pod
+
+    def engine_device_open_test(self):
+        """PLT-01·04: 엔진 컨테이너 안에서 보이는 GPU device node를 O_RDWR로 열었다 닫는다(ioctl 없음)."""
+        from guard.collectors.process_device_observer import DEVICE_OPEN_TEST, DEVICE_PATTERN, decode_open
+        if self.profile!=ENGINE_CALLBACK_PROFILE:
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        value=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],
+            f"--container={engine['container']}","--","python3","-I","-S","-c",DEVICE_OPEN_TEST,DEVICE_PATTERN],cap=65536,budget=60)
+        self._verify()
+        try:
+            return decode_open(value)
+        except ValueError:
+            raise KubernetesBindingError() from None
 
     def _state_request(self,request,timeout):
         from .kubernetes_observation_state import validate_request

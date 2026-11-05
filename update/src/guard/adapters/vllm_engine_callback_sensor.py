@@ -29,6 +29,7 @@ from . import vllm_transition_callback as transition
 from . import vllm_health_callback as health
 from . import vllm_profiler_callback as profiler
 from . import vllm_consumption_callback as consumption
+from . import vllm_consumption_v2_callback as consumption_v2
 from . import vllm_supply_read_callback as supply_read
 
 PROFILE = 'vllm-engine-callback-metadata/1'
@@ -64,9 +65,12 @@ for _name, _points in profiler.TARGETS.items():
 # P2 runner 최종 소비: settings의 runner_consumption이 참일 때만 감싼다.
 for _name, _points in consumption.TARGETS.items():
     MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
+# 같은 설정의 V2 runner 경로: V2 runner 모듈이 불릴 때만 감싼다(lab kernel 대조 세션은 graph replay가 같은 지점을 쓴다).
+for _name, _points in consumption_v2.TARGETS.items():
+    MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
 # 선택 관측(이름, 대상): 같은 모듈에 여러 개가 있을 수 있어 지점별로 관측기를 고른다.
 OPTIONAL = (('attempt', attempt.TARGETS), ('transition', transition.TARGETS), ('health', health.TARGETS), ('profiler', profiler.TARGETS),
-            ('consumption', consumption.TARGETS))
+            ('consumption', consumption.TARGETS), ('consumption_v2', consumption_v2.TARGETS))
 OPTIONAL_MODULES = frozenset(name for _, targets in OPTIONAL for name in targets)
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
@@ -241,6 +245,10 @@ class ConsumptionObserver(_Keyed, consumption.ConsumptionObserver):
     pass
 
 
+class ConsumptionV2Observer(_Keyed, consumption_v2.ConsumptionV2Observer):
+    pass
+
+
 class Sink:
     def __init__(self, directory):
         self.path = Path(directory) / f'callbacks-{os.getpid()}.jsonl'
@@ -290,13 +298,19 @@ class EngineCallbacks:
         self.consumption = ConsumptionObserver(session, **options) if runner_consumption else None
         if self.consumption is not None:
             self.consumption.secret = secret
+        self.consumption_v2 = ConsumptionV2Observer(session, **options) if runner_consumption else None
+        if self.consumption_v2 is not None:
+            self.consumption_v2.secret = secret
 
     def instrument(self, module):
         """Validate every point of a module before changing any of them."""
         name = vars(module).get('__name__')
         if name in kernel_bounds.TARGETS or name in graph_replay.TARGETS:
             if self.kernel is None:
-                return False
+                # kernel 대조를 끈 세션: V2 runner 모듈에서는 켜진 선택 관측(P2 V2 소비)만 감쌀 수 있다.
+                return self._instrument_optional(module, name) if name in OPTIONAL_MODULES else False
+            if name in OPTIONAL_MODULES and getattr(self, 'consumption_v2', None) is not None:
+                self.gap('CONSUMPTION_V2_SKIPPED_KERNEL_CHECKS', name)
             try:
                 if name in kernel_bounds.TARGETS:
                     return kernel_bounds.instrument(module, self.kernel)
@@ -363,7 +377,7 @@ class EngineCallbacks:
 
     def flush_gaps(self):
         kernel = self.kernel.gaps | self.graph.gaps if self.kernel is not None else set()
-        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption, getattr(self, 'supply', None), getattr(self, 'supply_watch', None)) if o is not None))
+        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption, getattr(self, 'consumption_v2', None), getattr(self, 'supply', None), getattr(self, 'supply_watch', None)) if o is not None))
         for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | self.weights.gaps | self.comm.gaps | kernel | extra):
             self.gap(code)
 

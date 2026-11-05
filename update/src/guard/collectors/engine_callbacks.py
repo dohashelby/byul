@@ -10,7 +10,7 @@ from guard.adapters import vllm_engine_callback_sensor as sensor
 
 SCHEMA = 'guard-engine-callback-assets/1'
 PACKAGE = 'guard_engine_callbacks'
-MODULES = ('vllm_attempt_callback', 'vllm_consumption_callback', 'vllm_supply_read_callback', 'vllm_health_callback', 'vllm_profiler_callback', 'vllm_profiler_sensor', 'vllm_transition_callback', 'vllm_cache_callback', 'vllm_comm_buffer_callback', 'vllm_distributed_callback', 'vllm_engine_callback_sensor', 'vllm_graph_replay_callback', 'vllm_kernel_bounds_callback',
+MODULES = ('vllm_attempt_callback', 'vllm_consumption_callback', 'vllm_consumption_v2_callback', 'vllm_supply_read_callback', 'vllm_health_callback', 'vllm_profiler_callback', 'vllm_profiler_sensor', 'vllm_transition_callback', 'vllm_cache_callback', 'vllm_comm_buffer_callback', 'vllm_distributed_callback', 'vllm_engine_callback_sensor', 'vllm_graph_replay_callback', 'vllm_kernel_bounds_callback',
     'vllm_lifecycle_sensor', 'vllm_rank_failure_sensor', 'vllm_weights_lifetime_callback', 'vllm_worker_generation_contract',
     'vllm_worker_startup_contract')
 SITECUSTOMIZE = (f'from {PACKAGE} import vllm_engine_callback_sensor\n'

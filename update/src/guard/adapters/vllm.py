@@ -492,7 +492,9 @@ class VllmAdapter:
                     {"path": "vllm/entrypoints/openai/chat_completion/protocol.py", "sha256": "4bdc71f668e4820d8ae5bae2a153fed0296b430cd6353ace8c0c27cfb982ebc1", "lines": "391-400,416-423,446-452"}])}
 
     def native_log_contract(self, image_digest: str, engine_version: str) -> dict | None:
-        if image_digest != CHAT_REVIEWED_IMAGE or engine_version != "0.31.0":
+        # 2026-11-05 L4에서 linux/amd64 manifest(a4a4)와 logger/formatter/request_logger 소스3개를 대조했다.
+        # 부모 index(c1c9)와 config(c76d)는 이 계약의 이미지 신원으로 받지 않는다.
+        if image_digest not in (CHAT_REVIEWED_IMAGE, REQUEST_BINDING_GPU_IMAGE) or engine_version != "0.31.0":
             return None
         return fixed_native_log_profile("request-info-v1")
 

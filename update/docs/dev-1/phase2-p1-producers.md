@@ -6,7 +6,7 @@
 |---|---|---|
 | request-attempt | LIF-03·10·12 | CPU k3d·GPU 확인, 등록(2026-11-05). 선점(retry)·KV 한도 경로는 GPU KV 압박 분기에서 확인 |
 | generation-transition | LIF-05·06·07·09 | CPU k3d 생산 확인(2026-11-05). GPU 확인, 등록(2026-11-05). rank·graph 준비 행은 아직 없음 |
-| process-device-provider | PLT-01·04 | 구현·CPU k3d 확인. GPU 확인·지원 등록은 남음(아래 절) |
+| process-device-provider | PLT-01·04 | CPU k3d·GPU 확인, 소스 SHA 등록(2026-11-05). 자격 공급 전체 판정과 구분 |
 | rank-fault | LIF-08 | 남음(TP2) |
 | failed-group-resources | LIF-11 | 남음(TP2) |
 | health-worker-causal | OBS-02 | CPU k3d 생산 확인(2026-11-05). GPU 확인, 등록(2026-11-05). vLLM 안에 health와 worker 사이 공유 인과 키가 없음(진단으로 남아 complete 아님) |
@@ -139,3 +139,10 @@
 - CPU 원자료 `byul-dev1-evidence/k3d-run19/`: 기존 run18 엔진의 컨테이너 프로세스 4개(namespace PID 1·75·76·113)를 골랐다. CPU 노드라 NVML·GPU device가 없어 필수 행은 비었고 `source_ended=false`다. lab 관측 Pod는 수집 뒤 삭제했다. 이 원자료는 Claude 작성 시점 소스의 결과이며 후속 보수 후 최종 소스와 구분한다.
 - GPU 확인·지원 등록 전이다. CPU 관측이나 합성 장치 데이터로 PLT-01·04 완료 또는 PASS를 주장하지 않는다. 사건 상한·V2 logit bias 계약 과제는 `phase2-contract-questions.md`에 기록했다.
 - 인계 후 최종 소스 검증: 직접·공통 계약·불변식 289 통과/기존 1 제외(pytest 1.46초, 부모 1.634초). 최종 소스로 같은 run18 엔진을 다시 읽어 namespace PID 1·75·76·113과 NVML/GPU 미관측 gap을 재확인했다. 임시 `byul-codex-node-view` 네임스페이스는 삭제 확인했고 기존 engine/probe는 유지했다. 원자료는 `byul-dev1-evidence/20261105-codex-takeover/process-device-final.json`이며 이 생산자 SHA는 `442ea49b…93451`이다.
+
+## process-device-provider GPU 확인(2026-11-05)
+
+- 기존 서울 L4 인스턴스를 사용자 승인 EC2 $8 상한으로 21:11:44 KST에 재시작했다. 6시간 자동 중지 예약을 확인했다. 소스는 CI 7개가 통과한 `25cb08f`를 별도 경로에 배치했다.
+- 세션 `a-p2v2-20261105-1`, vLLM 0.31.0 이미지 `c1c9f6fd…`, V2 runner다. `producers-2.json`에서 소유 컨테이너 프로세스3개, GPU process1행, device_access24행을 확인했다. NVML host PID 4393은 같은 프로세스의 NSpid `[4393, 78]`로 결합됐다. `source_ended=true`, 진단0, 위반 후보0이다.
+- 수집 당시 유일한 gap은 미등록이었다. 원자료를 반출하고 현재 생산자 소스 SHA `442ea49bbc88e7497cda42b359de6ad2fb938d7819f6bcfbb868684406793451`와 같음을 확인한 뒤 지원 목록에 더했다. 자격 후보는0개인 이 Pod의 사실이며 기업 전체 자격 사본/권한 PASS를 뜻하지 않는다.
+- 노드 원 출력·장치 열기 출력·원 콜백·ENV/target/prepared·HTTP 대조와 파일 해시는 외부 `20261105-codex-takeover/gpu-v2/a-p2v2-20261105-1/`에 보존했다. 원 콜백 묶음 SHA256은 `955fea421bd2cbe77de745ccb1eb8a89509bd070c399ece9aa0383d03b8eed1a`다.

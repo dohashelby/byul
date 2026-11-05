@@ -98,8 +98,11 @@ def test_every_kind_names_its_consumers_and_required_events():
 
 
 def test_registered_producers_are_exactly_the_gpu_confirmed_current_sources():
-    """등록 목록은 GPU 확인한 여섯 생산자뿐이고, 값은 지금 소스의 생산자 SHA와 같아야 한다(소스가 바뀌면 다시 확인)."""
+    """등록한 여덟 생산자 값은 GPU 확인한 현재 소스 SHA와 같아야 한다(변경 시 다시 확인)."""
+    from guard.collectors.process_device_producer import device_producer
+    from guard.collectors.runner_consumption_v2_producer import producer as v2_producer
     from guard.collectors import gpu_input_producers as producers
     current = [f() for f in (producers.attempt_producer, producers.transition_producer, producers.health_producer,
                              producers.profiler_producer, producers.consumption_producer, producers.supply_producer)]
+    current.extend([device_producer(), v2_producer()])
     assert contract.SUPPORTED_PRODUCERS == {(p['name'], p['version']): p['source_sha256'] for p in current}

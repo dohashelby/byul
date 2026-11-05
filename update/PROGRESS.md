@@ -5,6 +5,8 @@
 - 전체 CI 첫 실행(3979a2c): 11,287 통과/9실패/기존skip1(pytest585.26초/부모586.347초). 9개 모두 새 관측 파일·변경 소스가 release/reviewed-source.json에 반영되지 않아 source gate가 거부한 경우다. 고정 전체 범위 445파일의 해시 목록만 갱신했으며 gate·B 원본·판정·제품 bytes는 유지했다. 관련 gate/제품/신규 생산자/불변식 253 통과·기존1제외(pytest14.97초/부모15.118초), 새 manifest f56ee035…630fdc를 확인했다. 원 실패 로그를 보존하고 수정 커밋 CI로 전체를 재확인한다.
 - 수정25cb08f CI 7개 성공: 기본11,296통과/기존skip1(pytest419.82초/부모420.457초), wheel/격리설치·공용계약·플랫폼·Docker 통과. 사용자 EC2 상한$8 승인 뒤21:11:44 기존 L4 재시작·6시간 자동 중지 예약을 확인했다. 새 생산자용 고정25cb08f를 별도 서버 경로에 배치했고 실제0.31.0 이미지의 InputProcessor/V1·V2 runner 3개 소스 pin이 일치한다.
 - 후속 A 실측 준비: GPU lifecycle 추가 시 메모리 비율 유지·실제 eager 인자/기록 정합성을 보수했다. 렌더/입력/불변식170통과·기존1제외(pytest1.59초/부모1.758초)다. 런처 보수는 새 생산자 GPU 확인과 구분해 반영하고 실제 A 실측 전 해당 소스의 CI를 확인한다.
+- GPU 후속: a-p2v2-20261105-1에서 PDP25행(소유process3/GPU process1/device24), V2 소비45행(API 검증13/거부2/runner15/sampler15)을 source_ended=true·진단0·위반후보0으로 반출했다. 정상7/거부2 HTTP 대조 일치, 등록 뒤 PDP 계약 complete=true·V2는 기존 logit bias gap 유지다. 실제 SHA가 일치하는 두 생산자를 더해 총8종 등록했다. 원 first logprobs 형식400과 보정 대조를 모두 보존한다.
+- 이미지 경계: 노드 OCI 원문 hash로 c1c9(index)→a4a4(linux/amd64 manifest)→c76d(config)를 대조했다. 직접 index 허용의 관련1실패/475통과 원본을 보존하고 해당 허용을 제거했다. 기존 index/config/다른 버전 거부는 유지하며 정확 a4a4의 로그 소스3개 검토 뒤 OBS09 계약만 추가했다. 고정 목록 갱신 후 직접/계약/이미지/소스gate/불변식476통과·기존1제외(pytest6.69초/부모6.833초). 새 생산자 Pod/시험 예외 정리·회수 뒤 health timeout·GPU0MiB를 확인했다. 다음은 A 단일 GPU 실행 묶음이다.
 - 다음 단계: 고정 소스 검증·문서/체크포인트·PR 갱신 후 준비된 단일 GPU 세션을 비용 확인에 따라 진행한다. 신규 생산자 두 종의 GPU 확인·등록과 A 18개 GPU 실측은 미완료다.
 - 막힌 것: TP2 별도 비용/구성, SUP-08 멀티모달, 사건 상한 4,096과 V2 logit bias 계약 의미 변경은 기존 합의 경계를 유지한다. CPU·대역을 GPU MEASURED 또는 전체 PASS로 올리지 않는다.
 

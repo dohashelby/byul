@@ -140,4 +140,12 @@ InputBatch에 남아 있는 마스크를 적용된 허용 목록으로 읽어 �
 - 남은 일: 고정 이미지의 실제 V2 GPU 경로에서 API→runner→sampler 결합·읽기 종료를 확인한 뒤 지원 등록 검토. SUP-08 멀티모달 소비와 A 담당 GPU 실측은 별도 미완료다.
 - 최종 CPU 검증은 P1과 묶어 직접·공통 계약·불변식 289 통과/기존 1 제외(pytest 1.46초, 부모 1.634초)다. wheel 빌드와 체크아웃 밖 격리 설치 검증을 통과했고, 설치본에서 새 모듈 4개 import·콜백 자산 21개 해시·V2 관측기 bytes 일치를 확인했다. 제품 소스는 검증 동안 불변이다. 전체 기본 suite는 이 소스의 Linux CI로 확인한다. 원자료는 `byul-dev1-evidence/20261105-codex-takeover/`에 둔다.
 - 첫 전체 CI `3979a2c`는 11,287 통과·9실패·기존 skip1(pytest 585.26초, 부모 586.347초)였고, 실패 9개는 공통 소스 고정 목록에 새 4파일/변경 3파일이 반영되지 않은 동일 원인이다. 검토한 실제 소스의 해시 목록(`release/reviewed-source.json`)을 445파일로 갱신했으며 SHA는 `f56ee035749d900537926262d7c37db3e9547e451f5815b48e312977ff630fdc`다. gate 코드·원 B pin·범위·변조 거부·제품 bytes는 그대로다. 해당 gate/제품·신규 생산자·불변식 253 통과/기존1제외(pytest 14.97초, 부모 15.118초)를 확인했고 수정 커밋에서 전체 CI를 재실행한다. 실패 원본은 `ci-failure.log`에 보존했다.
+
+## V2 runner GPU 확인(2026-11-05)
+
+- `25cb08f`의 전체 CI는 11,296 통과/기존 skip1(pytest 419.82초, 부모 420.457초), 총7개 job 성공이었다. 별도 경로에 배치한 이 소스와 실제 이미지 `c1c9f6fd…`의 InputProcessor·V1/V2 runner 소스3개의 SHA가 모두 일치했다.
+- 세션 `a-p2v2-20261105-1`: 정상7개(일반·sampling·logprobs·중복 허용 ID·bad words·logit bias·제한 뒤 무제한) HTTP200, 잘못된 token/음수 온도2개 HTTP400 대조가 일치했다. 첫 시도의 logprobs를 bool 대신 정수로 보낸 HTTP400은 원 `traffic.json`에 보존했고, 올바른 `logprobs=true, top_logprobs=2`로 재대조한 결과가 `traffic-2.json`이다.
+- 누적 계약 기록은 API 검증13·API 거부2·runner 도착15·sampler 적용15, 총45행이다. API 검증과 결합되지 않은 runner 행도 버리지 않았다. `source_ended=true`, 진단0, 위반 후보0이다. V1 생산자는 V2 runner 행을 쓰지 않아 의도대로 미완료로 남고 두 경로를 합치지 않는다.
+- 원자료 반출 뒤 생산자 SHA `041353842e9c8a12e50ca6515cc21ba9b09fa389a8bee3842926b565c6eb8c66`를 지원 목록에 등록했다. V2 sampler logit bias 개수는 실제로 관측됐지만 공통 계약 Q2 gap은 그대로다. 등록은 전체 REQ-08·09·10 PASS가 아니다. SUP-08 멀티모달 소비는 별도 미완료다.
+- 최근 GPU 이미지의 소비 소스3개와 logger/formatter/request_logger3개도 기존 검토 SHA와 모두 일치했다. 노드 OCI 원문에서 `c1c9f6fd…`는 부모 index, Linux amd64 manifest는 기존 검토 `a4a4c043…`, config는 `c76d0e22…`임을 확인했다. REQ-11의 index/config 거부를 유지하고, 정확 amd64 manifest의 0.31.0 조합만 OBS-09 로그 소스 계약에 더했다. 원 증거는 `20261105-codex-takeover/current-image-contract-sources.json`, `vllm-index-c1c9.json`, `vllm-linux-amd64-manifest.json` 및 `gpu-v2/`에 있다. 첫 시험의 index 직접 허용 실패도 보존하고 해당 허용 코드는 반영하지 않았다.
 - V2 runner 경로는 아직 관측하지 않았다.

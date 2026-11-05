@@ -9,6 +9,7 @@ from guard.adapters import vllm_consumption_callback as v1
 from guard.adapters import vllm_consumption_v2_callback as v2
 from guard.adapters import vllm_engine_callback_sensor as sensor
 from guard.collectors import runner_consumption_v2_producer as producer
+from guard.collectors import gpu_common_inputs as contract
 from tests.test_cache_callback import source_module
 
 SECRET = bytes(range(32))
@@ -17,6 +18,12 @@ ENV = {'kind': 'ENV', 'id': 'ENV-EXAMPLE', 'revision': 1, 'sha256': 'a' * 64}
 SCOPE = {'environment_ref': ENV, 'target_sha256': 'b' * 64, 'prepared_sha256': 'c' * 64, 'session': 'd' * 32}
 POD = {'pod_uid': '10000000-0000-0000-0000-000000000001', 'container_id': 'containerd://' + 'e' * 64, 'restart_count': 0}
 VOCAB = 1000
+
+
+@pytest.fixture(autouse=True)
+def unregistered_synthetic_producer(monkeypatch):
+    # GPU 확인 뒤에도 미등록 합성 기록의 source gate 거부 시험은 유지한다.
+    monkeypatch.delitem(contract.SUPPORTED_PRODUCERS, (producer.NAME, producer.VERSION), raising=False)
 
 
 def arr(size, fill=0):

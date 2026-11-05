@@ -2,7 +2,7 @@
 
 GPU 실증 담당이 #196에서 요청한 공통 입력의 형식을 공통 계층에 정했다. 코드는 `src/guard/collectors/gpu_common_inputs.py`, 시험은 `tests/test_gpu_common_inputs.py`다.
 
-이 계약은 **생산자가 아니다**. 1단계에는 GPU가 없어 실제 생산자를 만들지 않았다. 지원 생산자 목록(`SUPPORTED_PRODUCERS`)은 비어 있다. 그래서 형식이 맞는 기록이 와도 `supported=False`, `complete=False`이고, 소비자는 그 기록으로 PASS를 만들 수 없다.
+이 계약은 **생산자가 아니다**. 1단계에는 GPU가 없어 지원 생산자 목록(`SUPPORTED_PRODUCERS`)이 비어 있었다. 2단계에는 실제 GPU 확인과 현재 소스 SHA 대조를 마친 여덟 생산자 이름·판본만 등록했다. 목록에 없는 생산자나 소스가 다른 기록은 형식이 맞아도 `supported=False`, `complete=False`이며 소비자는 그 기록으로 PASS를 만들 수 없다. 등록된 생산자의 진단·누락 gap도 그대로 적용한다.
 
 ## 공통 봉투 `guard-gpu-common-input/1`
 

@@ -26,7 +26,8 @@ _SESSION = re.compile(r"[0-9a-f]{32}")
 MAX_EVENTS = 4096
 
 # (생산자 이름, 판본) -> 소스 SHA-256(관측기 소스 + 변환 소스, `gpu_input_producers.*_producer()`).
-# 2단계 GPU 확인(2026-11-05, AWS g6.2xlarge L4, vLLM 0.31.0 V1 runner, 세션 a-p1-20261105-3·-5)에서
+# 2단계 GPU 확인(2026-11-05, AWS g6.2xlarge L4, vLLM 0.31.0, 세션 a-p1-20261105-3·-5와
+# process-device-provider/V2 runner의 a-p2v2-20261105-1)에서
 # 기록이 계약 형식을 통과하고 원 기록 끝까지 읽힌 생산자만 둔다. 소스가 바뀌면 SHA가 달라져 자동으로 미지원이 된다.
 # 등록은 생산자 지원일 뿐이다. 각 기록의 진단·누락 gap은 그대로 남고, 판정 PASS를 뜻하지 않는다.
 SUPPORTED_PRODUCERS: dict[tuple[str, str], str] = {
@@ -36,6 +37,8 @@ SUPPORTED_PRODUCERS: dict[tuple[str, str], str] = {
     ("guard-engine-callback-profiler-control", "1"): "4da009ecc296f50357d1b559b9fce545ab7ae3a10f4544e0e248c7147ba00764",
     ("guard-engine-callback-runner-consumption", "1"): "5c9778f43e58465fd961ea223d966ca54b1320eb55267ce35a0a955eb1aa5095",
     ("guard-engine-callback-supply-reads", "1"): "533ec8c173222136a5d2ab61f66d30e8a82719753e8740f477a5f3cb7a6e5126",
+    ("guard-node-process-device-provider", "1"): "442ea49bbc88e7497cda42b359de6ad2fb938d7819f6bcfbb868684406793451",
+    ("guard-engine-callback-runner-consumption-v2", "1"): "041353842e9c8a12e50ca6515cc21ba9b09fa389a8bee3842926b565c6eb8c66",
 }
 
 _BINDING = ("pod_uid", "container_id", "restart_count", "worker_pid", "start_ticks", "rank")

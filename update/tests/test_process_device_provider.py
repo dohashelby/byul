@@ -101,6 +101,13 @@ OPENED = {'schema': observer.OPEN_SCHEMA, 'uid_effective': 2000,
 CANDIDATES = observer.provider_candidates(pod_spec(), 'engine')
 
 
+@pytest.fixture(autouse=True)
+def unregistered_synthetic_producer(monkeypatch):
+    # 실제 GPU 확인 뒤 등록된 소스와 별개로 미지원 기록의 거부 경계를 계속 시험한다.
+    monkeypatch.delitem(contract.SUPPORTED_PRODUCERS,
+                        (producers.DEVICE_PRODUCER_NAME, producers.DEVICE_PRODUCER_VERSION), raising=False)
+
+
 def record(value, opened=OPENED, **kwargs):
     return producers.process_device_record(value, opened, CANDIDATES, pod=POD, container='engine', **SCOPE, **kwargs)
 

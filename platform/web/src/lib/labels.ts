@@ -47,7 +47,7 @@ export const DATA_ORIGIN: Record<string, Entry> = {
 export const SOURCE: Record<string, string> = {
   gateway: "요청 통제 (Gateway)",
   management_listener: "관리 요청 수신기",
-  hubble: "네트워크 흐름 (Hubble)",
+  hubble: "네트워크 이벤트 (Hubble)",
   tetragon: "프로세스·파일 이벤트 (Tetragon)",
   policy_state: "정책 상태",
   target_monitor: "대상 감시",
@@ -337,7 +337,7 @@ export const GATEWAY_REASON: Record<string, string> = {
   INVALID_MESSAGES: "메시지 형식 오류 (엔진 미전달)",
   INVALID_PROMPT_TYPE: "프롬프트 유형 오류 (엔진 미전달)",
   INVALID_MAX_TOKENS: "출력 토큰 수 형식 오류 (엔진 미전달)",
-  INVALID_STREAM: "연속 응답 설정 오류 (엔진 미전달)",
+  INVALID_STREAM: "스트리밍 설정 오류 (엔진 미전달)",
   N_UNSUPPORTED: "생성 개수 허용 범위 외 (엔진 미전달)",
   INVALID_EXTRA_FIELD: "추가 필드 정책 위반 (엔진 미전달)",
   MODEL_NOT_ALLOWED: "정책 외 모델 (엔진 미전달)",
@@ -357,11 +357,11 @@ export const GATEWAY_REASON: Record<string, string> = {
   ENGINE_AUTHORIZATION_FAILED: "엔진 인증 실패",
   ENGINE_CAPACITY_REJECTED: "엔진 용량 부족 거부",
   ENGINE_REJECTED_REQUEST: "엔진 요청 거부",
-  STREAM_DEADLINE: "연속 응답 처리 기한 초과",
-  STREAM_IDLE_TIMEOUT: "연속 응답 유휴 시간 초과",
-  STREAM_TRUNCATED: "엔진 연속 응답 중단",
-  STREAM_RELAY_ERROR: "연속 응답 전달 오류",
-  CLIENT_DISCONNECTED: "요청자 연결 중단",
+  STREAM_DEADLINE: "스트리밍 처리 기한 초과",
+  STREAM_IDLE_TIMEOUT: "스트리밍 유휴 시간 초과",
+  STREAM_TRUNCATED: "엔진 스트리밍 중단",
+  STREAM_RELAY_ERROR: "스트리밍 전달 오류",
+  CLIENT_DISCONNECTED: "클라이언트 연결 중단",
 };
 
 export const CACHE_GENERATION: Record<string, string> = { current: "현재 캐시 세대", other: "타 캐시 세대", outside: "캐시 범위 외" };

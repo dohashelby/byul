@@ -65,7 +65,7 @@ function columns(sessionId: string | null | undefined): Column<RequestRow>[] {
     { id: "reason_code", header: "사유", cell: (r) => label(GATEWAY_REASON, r.reason_code), sort: (r) => r.reason_code },
     { id: "delivery_attempted", header: "엔진 전달", cell: (r) => r.delivery_attempted === true ? "전달" : r.delivery_attempted === false ? "미전달" : "–", sort: (r) => r.delivery_attempted },
     // platform 추가 열(기본 숨김)
-    { id: "http_status", header: "요청자 HTTP 상태", cell: (r) => <Value v={r.http_status} />, sort: (r) => r.http_status, hidden: true },
+    { id: "http_status", header: "클라이언트 HTTP 상태", cell: (r) => <Value v={r.http_status} />, sort: (r) => r.http_status, hidden: true },
     { id: "engine_http_status", header: "엔진 HTTP", cell: (r) => <Value v={r.engine_http_status} />, sort: (r) => r.engine_http_status, hidden: true },
     { id: "backend_kind", header: "백엔드", cell: (r) => <Value v={r.backend_kind} />, sort: (r) => r.backend_kind, hidden: true },
     { id: "data_origin", header: "자료 등급", cell: (r) => <OriginBadge origin={r.data_origin} detail={r.origin_detail} />, sort: (r) => r.data_origin, hidden: true },
@@ -141,7 +141,7 @@ export function RequestsPage() {
               />
               <FilterSelect label="모델" value={filters.model} onChange={(v) => patch({ model: v })} options={opt(uniq(all.map((r) => r.model)))} />
               <FilterSelect label="사유" value={filters.reason} onChange={(v) => patch({ reason: v })} options={opt(uniq(all.map((r) => r.reason_code)), GATEWAY_REASON)} />
-              <FilterSelect label="연속 응답" value={filters.stream} onChange={(v) => patch({ stream: v })} options={[{ value: "true", label: "예" }, { value: "false", label: "아니오" }]} />
+              <FilterSelect label="스트리밍" value={filters.stream} onChange={(v) => patch({ stream: v })} options={[{ value: "true", label: "예" }, { value: "false", label: "아니오" }]} />
               <FilterSelect label="run_id" value={filters.run} onChange={(v) => patch({ run: v })} options={opt(uniq(all.map((r) => r.run_id)))} />
               <button className="btn btn-small" type="button" onClick={saveCurrent}>
                 필터 저장

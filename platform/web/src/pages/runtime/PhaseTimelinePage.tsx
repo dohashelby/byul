@@ -88,7 +88,7 @@ export function PhaseTimelinePage() {
     <PageHead title="엔진 실행 단계" />
     <Subtabs tabs={[
       { to: "/runtime/observe/collectors", label: "수집 상태", active: false },
-      { to: "/runtime/observe/hubble", label: "네트워크 흐름 (Hubble)", active: false },
+      { to: "/runtime/observe/hubble", label: "네트워크 이벤트 (Hubble)", active: false },
       { to: "/runtime/observe/tetragon", label: "프로세스·파일 이벤트 (Tetragon)", active: false },
       { to: "/runtime/observe/phases", label: "엔진 실행 단계", active: true },
     ]} />

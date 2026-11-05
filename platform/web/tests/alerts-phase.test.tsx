@@ -1,4 +1,6 @@
-import { screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { isValidElement } from "react";
 import { describe, expect, it } from "vitest";
 import { AlertsPage } from "../src/pages/runtime/AlertsPage";
@@ -89,6 +91,25 @@ describe("엔진 단계", () => {
 });
 
 describe("통합 개요", () => {
+  it("요청 통제·네트워크 차단 카드가 차단 내역의 해당 구역으로 이동한다", async () => {
+    const { DashboardPage } = await import("../src/pages/DashboardPage");
+    mockApi({
+      "/api/overview": { status: null, requests: null, latest_verification: null, open_revalidation: 0 },
+      "/api/runtime/requests": { items: [], invalid: [], source: SOURCE, truncated: false },
+      "/api/runtime/events": { items: [], invalid: [], source: SOURCE, truncated: false },
+    });
+    function Destination() { const location = useLocation(); return <span>{location.pathname}{location.search}</span>; }
+    for (const [button, section] of [["차단 내역의 엔진 미전달 요청 보기", "requests"], ["차단 내역의 네트워크 차단 보기", "network"]]) {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/runtime/overview"]}><Routes>
+        <Route path="/runtime/overview" element={<DashboardPage />} />
+        <Route path="/runtime/blocked" element={<Destination />} />
+      </Routes></MemoryRouter></QueryClientProvider>);
+      fireEvent.click(await screen.findByRole("button", { name: button }));
+      expect(await screen.findByText(`/runtime/blocked?section=${section}`)).toBeTruthy();
+      cleanup();
+    }
+  });
   it("두 주소가 같은 화면을 가리키고 Gateway 사건을 관측 건수에 다시 더하지 않는다", async () => {
     const { routes } = await import("../src/app/App");
     const children = routes[1].children!;
@@ -111,12 +132,15 @@ describe("통합 개요", () => {
       "/api/runtime/events": { items: [...gatewayEvents, ...observations], invalid: [], source: SOURCE, truncated: false },
     });
     renderAt("/dashboard", "/dashboard", <DashboardPage />);
-    const chart = (await screen.findByText("시간별 요청·관측 이벤트")).closest("article")!;
-    expect(Array.from(chart.querySelectorAll("strong")).map((node) => node.textContent)).toEqual(["56", "5"]);
-    expect(chart.textContent).toContain("56요청");
-    expect(chart.textContent).toContain("5관측 이벤트");
+    const chart = (await screen.findByText("시간대별 추이")).closest("article")!;
+    expect(chart.textContent).toContain("요청 56건");
+    expect(chart.textContent).toContain("관측 이벤트 5건");
+    expect(screen.getByRole("heading", { name: "통제·관측 현황" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "구성 비율" })).toBeTruthy();
     expect(screen.queryByText("117")).toBeNull();
     expect(screen.getByText("검토 대상 탐지 알림 1묶음")).toBeTruthy();
-    expect(screen.getByText("거부·오류 사유").parentElement?.textContent).toContain("1");
+    const reasons = screen.getByText("거부·오류 사유").closest("article")!;
+    expect(reasons.querySelector("ol li strong")?.textContent).toBe("1");
+    expect(reasons.querySelector(".bigNumber")).toBeNull();
   });
 });

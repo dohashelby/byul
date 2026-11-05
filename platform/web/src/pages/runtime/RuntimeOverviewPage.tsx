@@ -101,7 +101,7 @@ export function RuntimeOverviewPage() {
           const policyRows: Row[] = [
             ["정책", pol.policy_ref?.policy_id],
             ["판본", pol.policy_ref?.policy_version],
-            ["설정 유형", pol.test_only ? `${pol.profile} (시험 전용)` : pol.profile || "default", { problem: pol.test_only }],
+            ["프로필", pol.test_only ? `${pol.profile} (시험 전용)` : pol.profile || "default", { problem: pol.test_only }],
             ["대상", s.target.target_id],
             ["SHA-256", pol.policy_ref ? `${pol.policy_ref.sha256.slice(0, 12)}…` : null, { mono: true, title: pol.policy_ref?.sha256 }],
             ["적재", formatTime(pol.loaded_at)],
@@ -135,7 +135,7 @@ export function RuntimeOverviewPage() {
             ["연결", eng.healthy ? "정상" : "응답 없음", { problem: !eng.healthy }],
             ["점검", formatTime(eng.checked_at)],
             ["동시 요청", `${s.concurrency.in_flight ?? "–"} / ${s.concurrency.limit ?? "–"}`],
-            ["요청자 연결", `${s.connections.active ?? "–"} / ${s.connections.limit ?? "–"} · 거절 ${s.connections.rejected ?? 0}`],
+            ["클라이언트 연결", `${s.connections.active ?? "–"} / ${s.connections.limit ?? "–"} · 거절 ${s.connections.rejected ?? 0}`],
             ["요청 읽기 timeout", `헤더 ${s.connections.request_header_timeout_s ?? "–"}초 · 본문 ${s.connections.request_body_timeout_s ?? "–"}초`],
             [
               "수신 기록",
@@ -293,7 +293,7 @@ export function RuntimeOverviewPage() {
 
               {pol.test_only && (
                 <WarningBox>
-                  시험 전용 설정 유형({pol.profile}): 검사하지 않고 엔진에 전달하는 필드 {pol.passthrough_fields.length}개
+                  시험 전용 프로필({pol.profile}): 검사하지 않고 엔진에 전달하는 필드 {pol.passthrough_fields.length}개
                   {pol.passthrough_fields.length ? ` (${pol.passthrough_fields.join(", ")})` : ""} · 검사 후 전달 <Value v={pol.validate_count} />개 · 허용 n 최대 {pol.max_n ?? 1}. 승인된 운영 정책이
                   아닙니다.
                 </WarningBox>

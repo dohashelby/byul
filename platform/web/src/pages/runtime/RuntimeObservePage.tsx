@@ -37,7 +37,7 @@ function CollectorSummary({ c }: { c: Collector }) {
         : null;
       lines.push([
         <>
-          네트워크 흐름 (Hubble) 손실 누적 <Value v={d.lost_events_total} /> · 원인별 <Value v={bySource} /> · 최근 손실 <Value v={d.last_lost_at ? formatTime(d.last_lost_at) : null} />
+          네트워크 이벤트 (Hubble) 손실 누적 <Value v={d.lost_events_total} /> · 원인별 <Value v={bySource} /> · 최근 손실 <Value v={d.last_lost_at ? formatTime(d.last_lost_at) : null} />
           {d.lost_events_total === 0 ? " (처리한 줄에서 손실 기록 미관측; 무손실 확인 아님)" : ""}
         </>,
         d.loss_detected === true,
@@ -133,10 +133,10 @@ export function RuntimeObservePage() {
   const item = status.data?.item;
   return (
     <div className="page">
-      <PageHead title={sub === "hubble" ? "네트워크 흐름 (Hubble)" : sub === "tetragon" ? "프로세스·파일 이벤트 (Tetragon)" : "수집 상태"}>
+      <PageHead title={sub === "hubble" ? "네트워크 이벤트 (Hubble)" : sub === "tetragon" ? "프로세스·파일 이벤트 (Tetragon)" : "수집 상태"}>
         {item && (
           <span className="row small muted" style={{ gap: 12 }}>
-            <span>네트워크 흐름 {item.observations.by_source.hubble ?? 0}건 · 프로세스·파일 이벤트 {item.observations.by_source.tetragon ?? 0}건</span>
+            <span>네트워크 이벤트 {item.observations.by_source.hubble ?? 0}건 · 프로세스·파일 이벤트 {item.observations.by_source.tetragon ?? 0}건</span>
             <span>손상 줄 {item.observations.corrupt_lines}</span>
           </span>
         )}
@@ -145,7 +145,7 @@ export function RuntimeObservePage() {
       <Subtabs
         tabs={[
           { to: "/runtime/observe/collectors", label: "수집 상태", badge: problems?.observe, title: problems?.collectorProblems.join(" · "), active: sub === "collectors" },
-          { to: "/runtime/observe/hubble", label: "네트워크 흐름 (Hubble)", count: hubble.length, active: sub === "hubble" },
+          { to: "/runtime/observe/hubble", label: "네트워크 이벤트 (Hubble)", count: hubble.length, active: sub === "hubble" },
           { to: "/runtime/observe/tetragon", label: "프로세스·파일 이벤트 (Tetragon)", count: tetragon.length, badge: problems?.tetragonFlagged, title: problems?.tetragonFlagged ? `허용 목록 외 실행·의심·확인 필요 실행 ${problems.tetragonFlagged}건` : undefined, active: sub === "tetragon" },
           { to: "/runtime/observe/phases", label: "엔진 실행 단계", active: sub === "phases" },
         ]}
@@ -184,7 +184,7 @@ export function RuntimeObservePage() {
         </Query>
       )}
       {sub === "hubble" && (
-        <TableCard title="네트워크 흐름 (Hubble)">
+        <TableCard title="네트워크 이벤트 (Hubble)">
           <table className={rt.statusTable}>
             <thead>
               <tr><th>시각</th><th>환경·실행</th><th>출발</th><th>도착</th><th>판정</th><th>출처</th></tr>
@@ -205,7 +205,7 @@ export function RuntimeObservePage() {
               })}
             </tbody>
           </table>
-          {hubble.length === 0 && <p className={rt.empty}>네트워크 흐름 이벤트 미수집. 수집 상태와 기간을 확인하세요.</p>}
+          {hubble.length === 0 && <p className={rt.empty}>네트워크 이벤트 미수집. 수집 상태와 기간을 확인하세요.</p>}
           <p className="notice" style={{ padding: "8px 16px 12px" }}>Hubble DROPPED는 관측이며, 출발·목적지·정책 귀속과 수신 대조 전에는 거부 확인이 아닙니다.</p>
         </TableCard>
       )}

@@ -4,6 +4,7 @@ import { SOURCE, mockApi, renderAt } from "./helpers";
 import { EventsPage } from "../src/pages/EventsPage";
 import { RuntimeObservePage } from "../src/pages/runtime/RuntimeObservePage";
 import { RequestsPage, filterRequests } from "../src/pages/RequestsPage";
+import { BlockedPage, blockedRows } from "../src/pages/BlockedPage";
 import type { RequestRow, RuntimeEvent } from "../src/api/types";
 
 const raw = Object.values(
@@ -110,7 +111,7 @@ describe("사건 로그", () => {
     });
     renderAt("/runtime/events", "/runtime/events", <EventsPage />);
     const table = await screen.findByRole("table");
-    const hubbleRow = within(table).getByText("네트워크 흐름 (Hubble)").closest("tr")!;
+    const hubbleRow = within(table).getByText("네트워크 이벤트 (Hubble)").closest("tr")!;
     expect(hubbleRow.textContent).toContain("관측");
     expect(hubbleRow.textContent).not.toContain("거부 확인");
     const tetragonRow = within(table).getByText("프로세스·파일 이벤트 (Tetragon)").closest("tr")!;
@@ -194,11 +195,58 @@ describe("요청 내역", () => {
     expect(calls.every((c) => c.url.startsWith("/api/"))).toBe(true);
   });
 
-  it("필터: 검색·결과·연속 응답", () => {
+  it("필터: 검색·결과·스트리밍", () => {
     const rows = [row({ request_id: "b".repeat(32), model: "test-model", outcome: "allowed", stream: true }), row({})];
     expect(filterRequests(rows, { q: "TEST" })).toHaveLength(1);
     expect(filterRequests(rows, { outcome: "invalid" })).toHaveLength(1);
     expect(filterRequests(rows, { stream: "true" })[0].model).toBe("test-model");
     expect(filterRequests(rows, {})).toHaveLength(2);
+  });
+});
+
+describe("차단 내역", () => {
+  const hubble = EVENTS.find((e) => e.source === "hubble")!;
+  const tetragon = EVENTS.find((e) => e.source === "tetragon")!;
+  const dropped: RuntimeEvent = { ...hubble, event_id: "drop-1", observation: { ...hubble.observation!, verdict: "DROPPED" } };
+  const override: RuntimeEvent = {
+    ...tetragon, event_id: "file-override", outcome: "enforce_attempted", origin_detail: "synthetic",
+    native: { ...tetragon.native, record: { ...tetragon.native.record, action_raw: "KPROBE_ACTION_OVERRIDE" } as unknown as RuntimeEvent["native"]["record"] },
+    observation: { ...tetragon.observation!, kind: "file_access", path: "/tmp/secret", action_mode: "enforce", rule_id: "TG-1" },
+  };
+
+  it("미전달 요청·DROPPED·파일 Override만 담고 탐지는 제외한다", () => {
+    const rows = blockedRows(
+      [row({}), row({ request_id: "b".repeat(32), outcome: "denied", delivery_attempted: true }), row({ request_id: "c".repeat(32), outcome: "allowed", delivery_attempted: false })],
+      [dropped, { ...hubble, event_id: "allow-1", observation: { ...hubble.observation!, verdict: "FORWARDED" } }, override, { ...override, event_id: "detected-1", outcome: "detected", native: tetragon.native }],
+    );
+    expect(rows.requests).toHaveLength(1);
+    expect(rows.network).toHaveLength(1);
+    expect(rows.files).toHaveLength(1);
+  });
+
+  it("세 구역의 건수·요청 상세 링크·합성 표지를 표시한다", async () => {
+    mockApi({
+      "/api/runtime/requests": { items: [row({})], invalid: [], source: SOURCE, truncated: false },
+      "/api/runtime/events": { items: [dropped, override], invalid: [], source: SOURCE, truncated: false },
+      "/api/environments": EMPTY_LIST,
+    });
+    renderAt("/runtime/blocked?section=requests", "/runtime/blocked", <BlockedPage />);
+    const requestSection = await screen.findByRole("region", { name: "엔진에 전달되지 않은 요청" });
+    expect(requestSection.textContent).toContain("1건");
+    expect(within(requestSection).getByRole("link", { name: "a".repeat(32) }).getAttribute("href")).toContain(`sel=${"a".repeat(32)}`);
+    expect(screen.getByRole("region", { name: "네트워크 차단" }).textContent).toContain("1건");
+    expect(screen.getByRole("region", { name: "파일 차단 시도" }).textContent).toContain("예시 자료");
+  });
+
+  it("빈 구역마다 이유를 표시한다", async () => {
+    mockApi({
+      "/api/runtime/requests": { items: [], invalid: [], source: SOURCE, truncated: false },
+      "/api/runtime/events": { items: [], invalid: [], source: SOURCE, truncated: false },
+      "/api/environments": EMPTY_LIST,
+    });
+    renderAt("/runtime/blocked", "/runtime/blocked", <BlockedPage />);
+    expect(await screen.findByText(/엔진 미전달 거부·입력 오류·처리 오류 요청이 없습니다/)).toBeTruthy();
+    expect(screen.getByText(/Hubble DROPPED 기록이 없습니다/)).toBeTruthy();
+    expect(screen.getByText(/Tetragon Override 파일 차단 시도 기록이 없습니다/)).toBeTruthy();
   });
 });

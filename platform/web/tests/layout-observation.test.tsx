@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { useRuntimeStatus } from "../src/api/hooks";
 import type { Collector, RuntimeStatus } from "../src/api/types";
@@ -14,15 +14,29 @@ function StatusReady() {
   return useRuntimeStatus().data?.item ? <span>상태 조회 완료</span> : null;
 }
 
-function renderLayout(status: RuntimeStatus) {
+function renderLayout(status: RuntimeStatus, path = "/runtime/overview") {
   mockApi({
     "/api/meta": { example_mode: true, sources: [{ name: "runtime", mode: "example" }], runtime_connection: "example", contracts_version: "test" },
     "/api/runtime/status": { item: status, invalid: null, source: SOURCE },
   });
-  renderAt("/runtime/overview", "/runtime/overview", <><Layout /><StatusReady /></>);
+  renderAt(path, path, <><Layout /><StatusReady /></>);
 }
 
 describe("관측 연결 경고", () => {
+  it("Runtime과 Update 사이드바의 세 단계 제목을 표시한다", async () => {
+    const status = structuredClone(STATUS);
+    renderLayout(status);
+    await screen.findByText("상태 조회 완료");
+    expect(screen.getByText("Runtime · 운영 통제")).toBeTruthy();
+    expect(screen.getByText("요청 통제")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "차단 내역" })).toBeTruthy();
+    cleanup();
+    renderLayout(status, "/update/results");
+    await screen.findByText("상태 조회 완료");
+    expect(screen.getByText("Update · 격리 검증")).toBeTruthy();
+    expect(screen.getByText("검증")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "검증 결과" })).toBeTruthy();
+  });
   it("수집원이 없는 합성 자료 시연에서는 관측 불가 경고를 띄우지 않는다", async () => {
     const status = structuredClone(STATUS);
     status.collectors = [];

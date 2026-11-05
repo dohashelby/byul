@@ -43,6 +43,7 @@ export const AREAS: Area[] = [
         items: [
           { path: "/runtime/overview", label: "현황", badge: "overview", description: "요청 판정과 관측 사건을 통합 조회" },
           { path: "/runtime/requests", label: "요청", badge: "requests" },
+          { path: "/runtime/blocked", label: "차단 내역", description: "엔진 미전달 요청·네트워크 차단·파일 차단 시도" },
           { path: "/runtime/policy", label: "적용 정책", badge: "policy", description: "Gateway가 요청에 적용하는 정책" },
           { path: "/runtime/target", label: "대상 엔진", badge: "target", description: "등록·검증된 추론 엔진" },
           // 재검증 요청은 runtime이 운영 중 변화(자산·구성 drift·정책 내용)를 보고 연다.
@@ -53,7 +54,7 @@ export const AREAS: Area[] = [
         title: "관측",
         items: [
           { path: "/runtime/observe/collectors", label: "수집 상태", badge: "observe", description: "관측 수집기의 연결·지연·오류 상태" },
-          { path: "/runtime/observe/hubble", label: "네트워크 흐름 (Hubble)", description: "네트워크 통신 결과와 차단 기록" },
+          { path: "/runtime/observe/hubble", label: "네트워크 이벤트 (Hubble)", description: "네트워크 통신 결과와 차단 기록" },
           { path: "/runtime/observe/tetragon", label: "프로세스·파일 이벤트 (Tetragon)", badge: "tetragonFlagged", description: "엔진 내부 실행과 파일 접근 기록" },
           { path: "/runtime/observe/phases", label: "엔진 실행 단계", description: "모델 적재·컴파일·추론 시간 구간" },
           { path: "/runtime/alerts", label: "탐지 알림", description: "판정·대상·단계별 탐지 이벤트 집계" },

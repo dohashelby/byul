@@ -6,6 +6,7 @@ import { EventsPage } from "../pages/EventsPage";
 import { EvidencePage } from "../pages/EvidencePage";
 import { LandingPage } from "../pages/LandingPage";
 import { RequestsPage } from "../pages/RequestsPage";
+import { BlockedPage } from "../pages/BlockedPage";
 import { ResultsPage } from "../pages/ResultsPage";
 import { RevalidationPage } from "../pages/RevalidationPage";
 import { RuntimeEnforcePage } from "../pages/runtime/RuntimeEnforcePage";
@@ -36,6 +37,7 @@ export const routes: RouteObject[] = [
       { path: "runtime/alerts", element: <AlertsPage /> },
       { path: "runtime/observe/phases", element: <PhaseTimelinePage /> },
       { path: "runtime/requests", element: <RequestsPage /> },
+      { path: "runtime/blocked", element: <BlockedPage /> },
       { path: "runtime/policy", element: <RuntimePolicyPage /> },
       { path: "runtime/target", element: <RuntimeTargetPage /> },
       { path: "runtime/observe", element: <Navigate to="/runtime/observe/collectors" replace /> },

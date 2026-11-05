@@ -51,7 +51,7 @@ function Overview({ d }: { d: RuntimeRequestDetail }) {
           ["HTTP", d.decision.http_status],
           ["HTTP 시작 상태", d.http_start_status],
           ["최종 결과", d.final_outcome, { mono: true }],
-          ["연속 응답", d.stream === true ? "예" : d.stream === false ? "아니요" : null],
+          ["스트리밍", d.stream === true ? "예" : d.stream === false ? "아니요" : null],
           ["사유", label(GATEWAY_REASON, d.decision.reason_code)],
           ["원본 코드", <span className="small mono muted">{d.decision.reason_code ?? "–"}</span>],
           ["설명", d.decision.message],
@@ -63,14 +63,14 @@ function Overview({ d }: { d: RuntimeRequestDetail }) {
           ["캐시 분리", d.request.cache_isolation.applied === true ? "적용" : d.request.cache_isolation.applied === false ? "미적용" : "모름"],
           ["추가 필드", d.request.extra_fields.length ? d.request.extra_fields.map((x) => `${x.name}(${label(EXTRA_FIELD_MODE, x.mode)})`).join(", ") : null],
           ["요청 주체", authText(d)],
-          ["문맥 길이 검사", ctx ? `${label(CONTEXT_RESULT, ctx.result)} · 입력 ${ctx.input_tokens ?? "–"}토큰 / 한도 ${ctx.limit ?? "–"}` : "미설정"],
+          ["컨텍스트 길이 검사", ctx ? `${label(CONTEXT_RESULT, ctx.result)} · 입력 ${ctx.input_tokens ?? "–"}토큰 / 한도 ${ctx.limit ?? "–"}` : "미설정"],
         ]}
       />
       <h4 className={rt.h4}>적용 정책</h4>
       <Kv
         rows={[
           ["정책", `${d.policy.policy_id ?? "–"} · 판본 ${d.policy.policy_version ?? "–"}`],
-          ["설정 유형", d.policy.profile === "zeroday-lab" ? "zeroday-lab (시험 전용)" : d.policy.profile, { problem: d.policy.profile === "zeroday-lab" }],
+          ["프로필", d.policy.profile === "zeroday-lab" ? "zeroday-lab (시험 전용)" : d.policy.profile, { problem: d.policy.profile === "zeroday-lab" }],
           ["SHA-256", d.policy.sha256, { mono: true }],
         ]}
       />

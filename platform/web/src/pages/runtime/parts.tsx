@@ -104,7 +104,7 @@ export function ControlModeBadges({ hasTetragonOverride = false }: { hasTetragon
       <Badge tone="accent" title="엔진의 네트워크 통신에 적용하는 정책">네트워크 정책 (Cilium) · 차단</Badge>
       <Badge tone="warn" title="프로세스 실행·파일 접근 감지">런타임 탐지 (Tetragon) · 탐지</Badge>
       {hasTetragonOverride && <Badge tone="caution" title="선택 기간의 Override 차단 시도 기록">탐지 · 일부 규칙 차단</Badge>}
-      <Badge tone="neutral" title="네트워크 흐름 관측">네트워크 관측 (Hubble) · 관측</Badge>
+      <Badge tone="neutral" title="네트워크 이벤트 관측">네트워크 관측 (Hubble) · 관측</Badge>
     </div>
   );
 }

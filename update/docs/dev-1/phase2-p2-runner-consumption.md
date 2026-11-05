@@ -119,3 +119,13 @@ InputBatch에 남아 있는 마스크를 적용된 허용 목록으로 읽어 �
   - Pod 목록 읽기 한도를 공용 pipe 한도(16 MiB)로 맞췄다.
   - 기록 읽기·해시 수집 프로그램을 `python3 -I -S`로 돌린다. 그전에는 엔진 PYTHONPATH의 센서를 수집 프로그램이 불러와, 자기 파일 열기가 공급 읽기로 기록됐다(callbacks-263·275·287, `SUPPLY_PROCESS_START_UNAVAILABLE`).
 - 남은 gap: `SUPPLY_FILE_NOT_HASHED`는 가중치(250 MB, 64 MiB 한도 초과)다. 가중치 bytes 대조는 native weight 읽기(SUP-06·16) 쪽 근거를 쓴다.
+
+## GPU 확인(2026-11-05, AWS g6.2xlarge L4)
+
+- 세대 `v1-producers`(V1 runner), 세션 `a-p1-20261105-3`. 생산자 P1과 같은 엔진·요청에서 함께 수집했다(`phase2-p1-producers.md` GPU 절).
+- runner-consumption: 요청 14개 모두 `api_validated`·`runner_received`·`sampler_applied`로 이어졌고 `source_ended` 참이다.
+  - 남은 gap: `GPU_INPUT_CONSUMPTION_FIELD_UNOBSERVED:sampler_applied:logit_bias`. logit bias는 V1 InputBatch의 CPU 배열에 요청별 값으로 남지 않아 sampler 단계에서 읽지 못한다(한계, 판정을 완화하지 않음).
+  - 세션 -2에서는 다른 형식의 요청 태그 때문에 API 행과 runner 행이 이어지지 않았다. 센서가 `byul-cb-<32 hex>` 태그만 지문으로 쓰는 설계를 GPU에서 다시 확인한 결과다.
+- SUP-03 supply-reads: 공급 파일 5개(경로는 지문만 남김. 크기 659·7,305·7,031,645·242 bytes와 가중치 988,097,824 bytes)를 audit hook과 inotify 모두에서 관측했다. 수집 전후 `/models` 마운트가 엔진 Pod 전용이라 `inotify_pod_exclusive`다. 가중치 988 MB는 해시 한도(64 MiB) 초과로 `SUPPLY_FILE_NOT_HASHED`다.
+- runner-consumption과 supply-reads 생산자는 같은 날 `SUPPORTED_PRODUCERS`에 등록했다(V1 runner 경로 기준). 남은 gap은 등록 뒤에도 그대로 남는다.
+- V2 runner 경로는 아직 관측하지 않았다.

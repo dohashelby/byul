@@ -1,16 +1,16 @@
 # 2단계 P1: #196 공통 입력 생산자 (개발 담당)
 
-계약은 `docs/dev-1/gpu-common-inputs-196.md`, 분담은 2단계 작업 지시서를 따른다. 생산자는 엔진 안 관측과 계약 기록 변환을 합친 것이다. 지원 생산자 목록(`SUPPORTED_PRODUCERS`) 등록은 GPU 확인 뒤에 한다. 그 전까지 기록은 형식이 맞아도 complete가 아니다.
+계약은 `docs/dev-1/gpu-common-inputs-196.md`, 분담은 2단계 작업 지시서를 따른다. 생산자는 엔진 안 관측과 계약 기록 변환을 합친 것이다. 지원 생산자 목록(`SUPPORTED_PRODUCERS`)에는 GPU 확인(2026-11-05)을 마친 생산자의 소스 SHA만 등록했다. 등록은 생산자 지원일 뿐 판정 PASS가 아니며, 각 기록의 진단·누락 gap은 그대로 남는다. 생산자 소스(관측기·`gpu_input_producers.py`)가 바뀌면 SHA가 달라져 다시 미지원이 된다.
 
 | 종류 | 소비 점검(B) | 상태 |
 |---|---|---|
-| request-attempt | LIF-03·10·12 | CPU k3d 생산 확인(2026-11-05). GPU 확인·등록 남음 |
-| generation-transition | LIF-05·06·07·09 | CPU k3d 생산 확인(2026-11-05). rank·backend·graph 준비 행은 아직 없음. GPU 확인·등록 남음 |
+| request-attempt | LIF-03·10·12 | CPU k3d·GPU 확인, 등록(2026-11-05). 선점(retry)·KV 한도 경로는 GPU KV 압박 분기에서 확인 |
+| generation-transition | LIF-05·06·07·09 | CPU k3d 생산 확인(2026-11-05). GPU 확인, 등록(2026-11-05). rank·graph 준비 행은 아직 없음 |
 | process-device-provider | PLT-01·04 | 남음 |
 | rank-fault | LIF-08 | 남음(TP2) |
 | failed-group-resources | LIF-11 | 남음(TP2) |
-| health-worker-causal | OBS-02 | CPU k3d 생산 확인(2026-11-05). vLLM 안에 health와 worker 사이 공유 인과 키가 없음(진단으로 기록). GPU 확인·등록 남음 |
-| profiler-control | LIF-14·OBS-03 | CPU k3d 생산 확인(2026-11-05). 세 프로세스를 잇는 공유 키 없음(진단으로 기록). GPU 확인·등록 남음 |
+| health-worker-causal | OBS-02 | CPU k3d 생산 확인(2026-11-05). GPU 확인, 등록(2026-11-05). vLLM 안에 health와 worker 사이 공유 인과 키가 없음(진단으로 남아 complete 아님) |
+| profiler-control | LIF-14·OBS-03 | CPU k3d 생산 확인(2026-11-05). GPU 확인, 등록(2026-11-05). 세 프로세스를 잇는 공유 키 없음(진단으로 남아 complete 아님) |
 
 ## request-attempt
 
@@ -60,7 +60,7 @@
 - 남은 것:
   - rank·모델·backend·graph 준비 완료 행(LIF-07). worker 기동 관측이 필요하다.
   - 실제 서비스 gate(API health와 접수의 결합). health-worker-causal과 함께 만든다.
-  - GPU 확인과 등록.
+  - GPU 확인과 등록: 2026-11-05 완료(아래 GPU 절).
 
 ## health-worker-causal
 
@@ -102,4 +102,29 @@
 - 남은 것:
   - backend 실제 수집 상태와 trace callback(LIF-14). torch profiler 안쪽 관측이 필요하다.
   - 프로세스별 출력 파일 구분. 출력 폴더를 프로세스별로 나누거나 trace 이름의 rank 접미어를 쓴다.
-  - GPU 확인과 등록.
+  - GPU 확인과 등록: 2026-11-05 완료(아래 GPU 절).
+
+## GPU 확인(2026-11-05, AWS g6.2xlarge L4, 인계 01~03 재실행 뒤)
+
+- 구성: 세대 `v1-producers`(V1 runner·prefix caching·개발 경로·torch profiler, MP backend 없음)와 KV 압박 분기 `v1-producers-kv`(max_model_len 512·KV 블록 40). 준비 자산은 다섯 선택 관측과 SUP-03(`--supply-root /models --supply-watch`)을 함께 켰다.
+- 요청: `tools/gpu_a_producers_traffic.py`(시험 Pod 안, 표준 라이브러리), 수집: `tools/gpu_a_producers_collect.py`(소유 Pod 바인딩 확인 → 한 번 읽기 → 종류별 계약 기록과 `validate()` 결과).
+- 원자료: `byul-dev1-evidence/gpu-20261105/byul-a/a-p1-20261105-{1..5}`(묶음 SHA256 `8bb4682d…e95d`). 모두 lab 관측이며 MEASURED 판정이 아니다.
+
+| 세션 | 내용 | 결과 |
+|---|---|---|
+| -1 | MP backend 포함 첫 시도 | REQ-14 분산 관측 행이 프로세스 파일 16 MiB를 먼저 채워 모든 기록이 잘림(`*_READ_TRUNCATED`). 세대에서 MP를 빼고 읽기 한도를 14 MiB(pipe 16 MiB)로 올림 |
+| -2 | 같은 요청, 태그 `byul-gp-…` | runner-consumption만 API 행과 runner 행이 이어지지 않음. 센서는 요청 ID 안의 `byul-cb-<32 hex>`만 지문으로 쓰고, 그 밖의 ID는 vLLM이 붙이는 무작위 접미사까지 지문에 들어간다. 요청 태그 형식을 고침 |
+| -3 | 전체 요청 21단계 모두 HTTP 200 | 여섯 기록 모두 `source_ended` 참 |
+| -4 | KV 압박 첫 시도(2048·160블록·1,300토큰) | 계약 사건 상한 4,096 초과(`GPU_INPUT_EVENTS_INVALID`)와 파일 16 MiB 도달. 계약 상한은 그대로 두고 분기를 줄임 |
+| -5 | KV 압박(400토큰 동시 두 개) | `retry` 1(선점), `limit_enforced` 117 |
+
+- 세션 -3 기록(계약 gap은 미등록 `GPU_INPUT_PRODUCER_UNSUPPORTED` 외 아래만):
+  - request-attempt: 요청 14개, 사건 2,383. 13개 finished, 스트림 끊김 1개 abort, 14개 모두 KV 반환.
+  - generation-transition: 사건 826. 진행 중 요청 하나가 `/collective_rpc reload_weights` 진입 때 in_flight였고 `mixed_generation_consumption` 후보가 나왔다(CPU run 11과 같은 모양). `model_loaded`·`backend_ready`·`service_gate` 행이 함께 나왔다.
+  - health-worker-causal: 사건 620. `HEALTH_WORKER_CAUSAL_LINK_ABSENT_IN_ENGINE` 진단(설계대로).
+  - profiler-control: 사건 12. API·EngineCore·worker 사슬(`api_call`·`rpc`·`worker_control`·`backend_state`·`output_complete`). `PROFILER_CAUSAL_ID_ABSENT_IN_ENGINE` 진단(설계대로).
+- 세션 -5: profiler를 쓰지 않아 profiler-control 기록은 바인딩 0개로 계약이 형식 오류로 거부했다. 수집 도구가 이를 결과(`contract_error`)로 남긴다. generation-transition은 전환을 일으키지 않아 필수 사건이 없다.
+- 남은 것:
+  - `SUPPORTED_PRODUCERS` 등록: 여섯 생산자(request-attempt·generation-transition·health-worker-causal·profiler-control·runner-consumption·supply-reads)를 세션 -3 기록의 생산자 SHA와 같은 현재 소스 SHA로 등록했다. `tests/test_gpu_common_inputs.py`가 등록 값과 현재 소스 SHA의 일치를 확인한다.
+  - process-device-provider, rank-fault·failed-group-resources(TP2 필요).
+  - 긴 요청은 단계마다 사건이 쌓여 계약 상한 4,096에 닿는다. 단계 사건 요약 방식은 계약 소비자와 합의할 과제다.

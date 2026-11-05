@@ -63,7 +63,7 @@ print(json.dumps({"events":rows,"truncated":truncated}))
 # #196 request-attempt(P1): 프로세스별 콜백 기록과 그 프로세스의 시작 ticks. 살아 있지 않은 프로세스는 ticks가 None이다.
 ATTEMPT_EVENTS_READER = r'''
 import json,os,re,sys
-root="/guard-lifecycle/data/"+sys.argv[1];out=[];left=6*1024**2;truncated=False
+root="/guard-lifecycle/data/"+sys.argv[1];out=[];left=14*1024**2;truncated=False
 wanted=(b'"schema":"guard-vllm-attempt-callback/1"',b'"schema":"guard-vllm-transition-callback/1"',b'"schema":"guard-vllm-health-callback/1"',b'"schema":"guard-vllm-profiler-callback/1"',b'"schema":"guard-vllm-consumption-callback/1"',b'"schema":"guard-vllm-supply-read-callback/1"',b'"phase":"GAP"')
 for name in sorted(os.listdir(root)):
     found=re.fullmatch(r"callbacks-([1-9][0-9]*)\.jsonl",name)
@@ -963,7 +963,7 @@ class KubernetesHTTP:
             raise KubernetesBindingError()
         self._verify();engine=self.binding["engine"]
         value=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],
-            f"--container={engine['container']}","--","python3","-I","-S","-c",ATTEMPT_EVENTS_READER,session],cap=8*1024**2,budget=30)
+            f"--container={engine['container']}","--","python3","-I","-S","-c",ATTEMPT_EVENTS_READER,session],cap=16*1024**2,budget=60)  # 고른 행 14 MiB + JSON 여유, 공용 pipe 한도
         self._verify()
         processes=value.get("processes") if type(value) is dict else None
         if (type(processes) is not list or type(value.get("truncated")) is not bool

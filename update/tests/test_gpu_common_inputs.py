@@ -32,7 +32,7 @@ COMPLETE = [row(0, 'admitted'), row(1, 'finished'), row(2, 'gpu_fence'), row(3, 
 def test_well_formed_record_from_an_unregistered_producer_is_never_complete(monkeypatch):
     result = contract.validate(record(COMPLETE), kind='request-attempt', **SCOPE)
     assert result['supported'] is False and result['complete'] is False and result['producer_authenticated'] is False
-    assert result['gaps'] == ['GPU_INPUT_PRODUCER_UNSUPPORTED'] and contract.SUPPORTED_PRODUCERS == {}
+    assert result['gaps'] == ['GPU_INPUT_PRODUCER_UNSUPPORTED'] and ('guard-gpu-attempt', '1') not in contract.SUPPORTED_PRODUCERS
     monkeypatch.setitem(contract.SUPPORTED_PRODUCERS, ('guard-gpu-attempt', '1'), 'e' * 64)
     assert contract.validate(record(COMPLETE), kind='request-attempt', **SCOPE)['complete'] is True
     monkeypatch.setitem(contract.SUPPORTED_PRODUCERS, ('guard-gpu-attempt', '1'), 'f' * 64)
@@ -95,3 +95,11 @@ def test_every_kind_names_its_consumers_and_required_events():
     assert consumers == {'LIF-03', 'LIF-05', 'LIF-06', 'LIF-07', 'LIF-08', 'LIF-09', 'LIF-10', 'LIF-11', 'LIF-12',
                          'LIF-14', 'PLT-01', 'PLT-04', 'OBS-02', 'OBS-03', 'REQ-08', 'REQ-09', 'REQ-10', 'SUP-03'}
     assert all(set(spec['complete_requires']) <= set(spec['events']) for spec in contract.KINDS.values())
+
+
+def test_registered_producers_are_exactly_the_gpu_confirmed_current_sources():
+    """등록 목록은 GPU 확인한 여섯 생산자뿐이고, 값은 지금 소스의 생산자 SHA와 같아야 한다(소스가 바뀌면 다시 확인)."""
+    from guard.collectors import gpu_input_producers as producers
+    current = [f() for f in (producers.attempt_producer, producers.transition_producer, producers.health_producer,
+                             producers.profiler_producer, producers.consumption_producer, producers.supply_producer)]
+    assert contract.SUPPORTED_PRODUCERS == {(p['name'], p['version']): p['source_sha256'] for p in current}

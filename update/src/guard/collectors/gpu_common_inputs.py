@@ -10,7 +10,7 @@ GPU 실증 담당의 소비자(LIF-03·05·06·07·08·09·10·11·12·14, PLT-0
 
 판정에 쓰는 원칙(#196 본문):
 - 지원 생산자 목록(`SUPPORTED_PRODUCERS`)에 없는 생산자의 기록은 형식이 맞아도 `supported=False`다. 소비자는 그 기록으로
-  PASS를 만들지 않는다. 1단계에는 생산자가 없으므로 목록이 비어 있다. 2단계에서 GPU 생산자를 만들 때 판본·소스 SHA를 더한다.
+  PASS를 만들지 않는다. 1단계에는 목록이 비어 있었고, 2단계 GPU 확인을 마친 생산자의 판본·소스 SHA만 더한다.
 - 누락·지원 불일치(`gaps`)와 실제 위반 후보(`violation_candidates`)를 따로 둔다. 후속 수집·정리 오류는 앞선 위반 후보를 지우지 않는다.
 - 생산자 인증은 언제나 False다. 같은 시간대라는 이유만으로 다른 세대·세션의 행을 합치지 않는다.
 - 비밀 원문은 받지 않는다. 문자열 값은 닫힌 식별자 형식이거나 SHA-256이다.
@@ -25,8 +25,18 @@ _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}")
 _SESSION = re.compile(r"[0-9a-f]{32}")
 MAX_EVENTS = 4096
 
-# (생산자 이름, 판본) -> 소스 SHA-256. 1단계에는 구현된 생산자가 없다.
-SUPPORTED_PRODUCERS: dict[tuple[str, str], str] = {}
+# (생산자 이름, 판본) -> 소스 SHA-256(관측기 소스 + 변환 소스, `gpu_input_producers.*_producer()`).
+# 2단계 GPU 확인(2026-11-05, AWS g6.2xlarge L4, vLLM 0.31.0 V1 runner, 세션 a-p1-20261105-3·-5)에서
+# 기록이 계약 형식을 통과하고 원 기록 끝까지 읽힌 생산자만 둔다. 소스가 바뀌면 SHA가 달라져 자동으로 미지원이 된다.
+# 등록은 생산자 지원일 뿐이다. 각 기록의 진단·누락 gap은 그대로 남고, 판정 PASS를 뜻하지 않는다.
+SUPPORTED_PRODUCERS: dict[tuple[str, str], str] = {
+    ("guard-engine-callback-request-attempt", "1"): "7927d551395f09945211ae83ad1135d8edf74a41a8306f0e6072ca0727e70610",
+    ("guard-engine-callback-generation-transition", "1"): "64437f216798ebf1f85e62b9856b623d4b69570517e44c933be8017e42fb64da",
+    ("guard-engine-callback-health-worker", "1"): "0cf549269305cecbfcb5c6ee9de609bf6c70cbb5f1993f53aa59c30e4873dd34",
+    ("guard-engine-callback-profiler-control", "1"): "4da009ecc296f50357d1b559b9fce545ab7ae3a10f4544e0e248c7147ba00764",
+    ("guard-engine-callback-runner-consumption", "1"): "5c9778f43e58465fd961ea223d966ca54b1320eb55267ce35a0a955eb1aa5095",
+    ("guard-engine-callback-supply-reads", "1"): "533ec8c173222136a5d2ab61f66d30e8a82719753e8740f477a5f3cb7a6e5126",
+}
 
 _BINDING = ("pod_uid", "container_id", "restart_count", "worker_pid", "start_ticks", "rank")
 

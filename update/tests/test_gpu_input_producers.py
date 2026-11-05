@@ -56,6 +56,7 @@ def lifecycle(request=R1, *, preempt=False, abort=False):
 
 
 def test_complete_lifecycle_becomes_a_valid_record_that_stays_unsupported_until_registration(monkeypatch):
+    monkeypatch.setattr(contract, 'SUPPORTED_PRODUCERS', {})  # 등록 전 상태: 형식이 맞아도 complete가 아니다
     record, result = producers.request_attempt_record([{'pid': 74, 'start_ticks': 1000, 'events': lifecycle()}], pod=POD, **SCOPE)
     assert [e['event'] for e in record['events']] == ['admitted', 'queued', 'budget', 'dequeued', 'kv_owned', 'gpu_fence', 'finished', 'kv_released']
     assert record['bindings'] == [{**{k: POD[k] for k in ('pod_uid', 'restart_count')}, 'container_id': 'e' * 64,
@@ -133,7 +134,8 @@ def test_reload_during_a_live_request_shows_in_flight_mixed_consumption_and_the_
     assert kinds == [('consumed', 'weights-0'), ('in_flight', 'weights-0'), ('model_loaded', 'weights-1'), ('service_gate', 'service-0'),
                      ('consumed', 'weights-1'), ('consumed', 'weights-1'), ('accepted', 'service-0')]
     assert result['violation_candidates'] == [{'request_sha256': R1, 'component': 'weights', 'reason': 'mixed_generation_consumption'}]
-    assert record['completeness']['source_ended'] is True and result['gaps'] == ['GPU_INPUT_PRODUCER_UNSUPPORTED']
+    # 등록된 생산자(GPU 확인 2026-11-05)라 지원 gap이 없다. 위반 후보는 그대로다.
+    assert record['completeness']['source_ended'] is True and result['supported'] is True and result['gaps'] == []
 
 
 def test_failed_transition_then_recovery_and_paused_gate():
@@ -222,7 +224,8 @@ def test_profiler_chain_across_three_processes_with_output_and_next_collection()
         ('api_call', 'start'), ('backend_state', 'started'), ('worker_control', 'start'), ('rpc', 'start'), ('api_call', 'stop'),
         ('backend_state', 'stopped'), ('output_complete', 'files'), ('worker_control', 'stop'), ('rpc', 'stop'), ('next_collection', 'started')]
     assert record['completeness']['source_ended'] is True and len(record['bindings']) == 3
-    assert set(result['gaps']) == {'GPU_INPUT_PRODUCER_UNSUPPORTED', 'GPU_INPUT_PRODUCER_DIAGNOSTIC:PROFILER_CAUSAL_ID_ABSENT_IN_ENGINE'}
+    # 등록 뒤에도 공유 인과 키 부재 진단은 남아 complete가 아니다.
+    assert set(result['gaps']) == {'GPU_INPUT_PRODUCER_DIAGNOSTIC:PROFILER_CAUSAL_ID_ABSENT_IN_ENGINE'} and result['complete'] is False
 
 
 def test_profiler_stop_failure_and_missing_output_stay_visible():
@@ -271,7 +274,7 @@ def test_api_runner_and_sampler_values_match_and_complete_the_record():
                                                           {'pid': 112, 'start_ticks': 2, 'events': worker}], pod=POD, **SCOPE)
     assert [e['event'] for e in record['events']] == ['api_validated', 'runner_received', 'sampler_applied']
     assert record['completeness']['source_ended'] is True and result['violation_candidates'] == []
-    assert result['gaps'] == ['GPU_INPUT_PRODUCER_UNSUPPORTED']
+    assert result['gaps'] == [] and result['supported'] is True and result['producer_authenticated'] is False
 
 
 def test_restriction_lost_before_sampler_and_rejected_input_consumed_are_candidates():

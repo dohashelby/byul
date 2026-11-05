@@ -51,6 +51,9 @@ def test_overlay_keeps_the_handoff_engine_and_adds_only_a_requirements(generatio
     # REQ-14 세대는 워커 프로세스 지점이 불리도록 MP backend로 띄운다.
     mp = engine['args'][engine['args'].index('--distributed-executor-backend') + 1] if '--distributed-executor-backend' in engine['args'] else None
     assert mp == ('mp' if generation in ('v1-callback', 'v1-callback-sync') else None)
+    assert (lab.PROFILES_DIR in mounts) is generation.startswith('v1-producers')
+    if generation.startswith('v1-producers'):
+        assert env['VLLM_SERVER_DEV_MODE'] == '1' and json.loads(engine['args'][engine['args'].index('--profiler-config') + 1])['torch_profiler_dir'] == lab.PROFILES_DIR
     if generation == 'v1-req16-lab':
         assert env['VLLM_ALLOW_RUNTIME_LORA_UPDATING'] == 'True' and env['VLLM_SERVER_DEV_MODE'] == '1'
 

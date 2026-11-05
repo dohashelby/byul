@@ -92,6 +92,7 @@ def test_duplicate_allowed_ids_and_unbounded_logprobs_are_not_misreported():
 
 
 def test_real_producer_record_is_consumable_but_unregistered_until_gpu_review(monkeypatch):
+    monkeypatch.setattr(contract, 'SUPPORTED_PRODUCERS', {})  # 등록 전 상태를 따로 확인한다
     record, result = produce(worker_rows())
     assert result['gaps'] == ['GPU_INPUT_PRODUCER_UNSUPPORTED'] and result['complete'] is False
     register(monkeypatch, record)

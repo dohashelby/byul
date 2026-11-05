@@ -56,7 +56,7 @@ def runtime_files(tmp_path, launch):
     file = tmp_path / "inspect.json"
     file.write_text(json.dumps([inspect]))
     networkfile = tmp_path / "network.json"
-    networkfile.write_text(json.dumps([{"Id": "f" * 64, "Name": launch["network"], "Labels": {"guard.run": inputs()["run_id"]},
+    networkfile.write_text(json.dumps([{"Id": "f" * 64, "Name": launch["network"], "Internal": True, "Labels": {"guard.run": inputs()["run_id"]},
         "Containers": {inspect["Id"]: {"Name": launch["container"]}}}]))
     return envfile, file, networkfile, env, inspect
 
@@ -88,6 +88,7 @@ def test_rendered_argv_is_closed_nonroot_readonly_and_never_invokes_docker(tmp_p
     assert argv[argv.index("--user") + 1] == "1000:1000"
     assert argv[argv.index("--mount") + 1].endswith(",dst=/models,readonly")
     assert "--privileged" not in argv and "--pid" not in argv
+    assert prep.document(output / "network.argv.json") == ["docker", "network", "create", "--internal", "--label", "guard.run=" + inputs()["run_id"], receipt["network"]]
     assert argv[argv.index("--distributed-executor-backend") + 1] == "mp"
     assert receipt["declared_configuration_only"] and not receipt["engine_or_GPU_started"]
 
@@ -176,6 +177,34 @@ def test_network_owner_and_later_environment_replacement_are_rejected(tmp_path):
     envfile.write_bytes(canonical_json(env.model_dump(mode="json")))
     with pytest.raises(ValueError, match="ENVIRONMENT_REPLACED"):
         prep.verify_generation(tmp_path / "bound", file)
+
+
+def test_external_network_cannot_replace_original_internal_environment(tmp_path):
+    _, rendered_path, launch = rendered(tmp_path)
+    envfile, file, networkfile, _, _ = runtime_files(tmp_path, launch)
+    network = json.loads(networkfile.read_bytes());network[0]["Internal"] = False
+    networkfile.write_text(json.dumps(network))
+    with pytest.raises(ValueError, match="NETWORK_BINDING_INVALID"):
+        prep.bind(rendered_path, envfile, file, networkfile, tmp_path / "bad")
+    assert not (tmp_path / "bad").exists()
+
+
+@pytest.mark.parametrize("helper", ["update/tools/lif14_stop_restart_prepare.py", "update/tools/verify_req10_consumption.py",
+    "update/tools/build_kubernetes_profiler_control_pack.py", "update/tests/builders.py"])
+def test_dirty_imported_preparation_helpers_are_rejected_by_actual_git(tmp_path, monkeypatch, helper):
+    repo = tmp_path / "fixed-source"
+    repo.mkdir()
+    for name in prep.PREPARATION_SOURCES:
+        target = repo / name;target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT.parent / name).read_bytes())
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=CPU contract", "-c", "user.email=cpu@example.invalid", "commit", "-qm", "fixed helper sources"], check=True)
+    commit = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+    target = repo / helper;target.write_bytes(target.read_bytes() + b"\n# uncommitted helper change\n")
+    monkeypatch.setattr(prep, "verify", lambda *_: pytest.fail("dirty helper must fail before source-manifest verifier"))
+    with pytest.raises(subprocess.CalledProcessError):
+        prep.source_context(repo, commit, "0" * 64)
 
 
 def test_case_variant_of_same_uuid_cannot_be_two_tp_devices():

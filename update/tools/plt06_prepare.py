@@ -22,6 +22,11 @@ from tools.verify_req10_consumption import verify
 RECIPE = Path(__file__).parent / "fixtures/plt06_environment.json"
 ASSETS = {"environment.recipe.json", "policy.draft.json", "process-map.py", "runtime-inputs.json"}
 INPUTS = {"run_id", "uid", "gid", "gpu_devices", "tp", "model_root", "served_model_name", "host_port"}
+PREPARATION_SOURCES = (
+    "update/tools/plt06_prepare.py", "update/tools/fixtures/plt06_environment.json",
+    "update/tools/lif14_stop_restart_prepare.py", "update/tools/verify_req10_consumption.py",
+    "update/tools/build_kubernetes_profiler_control_pack.py", "update/tests/builders.py",
+)
 
 
 def read_bytes(path, limit=262144):
@@ -69,9 +74,9 @@ def source_context(repo, commit, manifest_sha):
     actual = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
     if actual != commit:
         raise ValueError("PLT06_FIXED_SOURCE_MISMATCH")
-    paths = ["update/src", "update/release", "update/tools/plt06_prepare.py", "update/tools/fixtures/plt06_environment.json"]
+    paths = ["update/src", "update/release", *PREPARATION_SOURCES]
     subprocess.run(["git", "-C", str(repo), "diff", "--exit-code", "HEAD", "--", *paths], check=True)
-    subprocess.run(["git", "-C", str(repo), "ls-files", "--error-unmatch", *paths[2:]], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["git", "-C", str(repo), "ls-files", "--error-unmatch", *PREPARATION_SOURCES], check=True, stdout=subprocess.DEVNULL)
     if sha(read_bytes(repo / "update/release/reviewed-source.json")) != manifest_sha:
         raise ValueError("PLT06_FIXED_MANIFEST_MISMATCH")
     verify(repo)
@@ -166,7 +171,7 @@ def render(prepared, values, output):
             "-e", "VLLM_USE_V1=1", "-e", "VLLM_ENABLE_V1_MULTIPROCESSING=1", "--entrypoint", "python3", recipe["image"], *args]
     out = reserve(output, prepared)
     files = {"launch.argv.json": write(out / "launch.argv.json", argv),
-             "network.argv.json": write(out / "network.argv.json", ["docker", "network", "create", "--label", "guard.run=" + values["run_id"], network]),
+             "network.argv.json": write(out / "network.argv.json", ["docker", "network", "create", "--internal", "--label", "guard.run=" + values["run_id"], network]),
              "operator-inputs.json": write(out / "operator-inputs.json", values)}
     receipt = {"schema": "plt06-render/1", "preparation": str(Path(prepared).absolute()), "preparation_sha256": sha(read_bytes(Path(prepared) / "preparation.json")),
                "source_commit": original["source_commit"], "container": container, "network": network,
@@ -225,7 +230,7 @@ def bind(rendered, environment, inspection, network_inspection, output):
     if type(network) is list and len(network) == 1:
         network = network[0]
     try:
-        if (network["Name"] != launch["network"] or network["Id"] != identity["network_id"]
+        if (network["Name"] != launch["network"] or network["Id"] != identity["network_id"] or network["Internal"] is not True
                 or network["Labels"]["guard.run"] != inputs["run_id"]
                 or network["Containers"][identity["container_id"]]["Name"] != launch["container"]):
             raise ValueError

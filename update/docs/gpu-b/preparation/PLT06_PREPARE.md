@@ -4,6 +4,8 @@
 
 ## 산출물과 계약
 
+고정 소스 검사는 준비 도구·recipe뿐 아니라 실제 import하는 출력 예약·manifest 검증·파생팩 helper와 검증 helper가 사용하는 builders도 포함한다. 이 파일의 미커밋 변경을 실제 Git diff로 거부하며 정본 manifest나 기존 승인값을 바꾸지 않는다.
+
 `prepare`는 고정 HEAD·clean 제품/준비 소스·정본 source manifest·원 PACK-BASELINE 무결성을 확인한 뒤 새 외부 0700 출력에 다음을 생성한다.
 
 - `environment.recipe.json`: GB35의 기존 고정 a4 이미지·Python probe 이미지·mp backend·512/2/eager 설정과 자원 제한을 재사용하는 Docker 환경 recipe.
@@ -29,6 +31,8 @@ uv run python -m tools.plt06_prepare render --prepared <준비경로> --bindings
 생성 `network.argv.json`·`launch.argv.json`은 shell 문자열이 아닌 인자 배열이다. 원 `guard.run` 소유 라벨·전용 이름·이미지 pull-never·모델 RO mount·cap-drop/no-new-privileges·자원 한도와 loopback publish를 유지한다. GPU device CSV의 쉼표 인용은 Docker 인자 parser에 전달할 literal double quote이며 shell escaping이 아니다([Docker GPU 문서](https://docs.docker.com/engine/containers/gpu/)). `render.json`은 선언 설정일 뿐 실제 engine/GPU 기동 증거가 아니다.
 
 실제 Docker·NVIDIA runtime·캐시 이미지·원 모델 inventory와 fresh run/network/container 부재 확인, argv 적용과 실패 정리는 세션2의 기존 소유 운영 절차다. 이미 있는 다른 세대/소유자의 이름·라벨을 재사용하지 않는다. 도구는 새 원격 실행 계층이나 자동 cleanup을 만들지 않는다.
+
+원 GB35의 `docker network create --internal`을 유지하고, 제공된 실제 network inspect에서도 `Internal=true`를 요구한다. TP2는 한 Docker 호스트의 실제 GPU 두 UUID를 지정하는 형식이며 두 노드 TP 구성을 준비한 것이 아니다.
 
 ## 실제 입력 결합과 세대 비교
 

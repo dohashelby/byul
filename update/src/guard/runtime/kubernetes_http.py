@@ -64,15 +64,17 @@ print(json.dumps({"events":rows,"truncated":truncated}))
 ATTEMPT_EVENTS_READER = r'''
 import json,os,re,sys
 root="/guard-lifecycle/data/"+sys.argv[1];out=[];left=6*1024**2;truncated=False
+wanted=(b'"schema":"guard-vllm-attempt-callback/1"',b'"schema":"guard-vllm-transition-callback/1"',b'"phase":"GAP"')
 for name in sorted(os.listdir(root)):
     found=re.fullmatch(r"callbacks-([1-9][0-9]*)\.jsonl",name)
     if found is None:continue
-    pid=int(found.group(1))
-    with os.fdopen(os.open(os.path.join(root,name),os.O_RDONLY|os.O_NOFOLLOW),"rb") as stream:raw=stream.read(left+1)
-    if len(raw)>left:raw=raw[:left];truncated=True
-    raw=raw.rpartition(b"\n")[0];left-=len(raw)
-    rows=[json.loads(line) for line in raw.splitlines()]
-    rows=[r for r in rows if r.get("schema")=="guard-vllm-attempt-callback/1" or r.get("phase")=="GAP"]
+    pid=int(found.group(1));rows=[]
+    # 다른 관측기 행은 읽기 한도에 세지 않는다. 고른 행만 한도까지 담는다(파일 자체는 센서가 16 MiB로 막는다).
+    with os.fdopen(os.open(os.path.join(root,name),os.O_RDONLY|os.O_NOFOLLOW),"rb") as stream:
+        for line in stream:
+            if not line.endswith(b"\n") or not any(w in line for w in wanted):continue
+            if len(line)>left:truncated=True;break
+            left-=len(line);rows.append(json.loads(line))
     try:
         stat=open("/proc/%d/stat"%pid).read();ticks=int(stat.rsplit(")",1)[1].split()[19])
     except (OSError,ValueError,IndexError):ticks=None

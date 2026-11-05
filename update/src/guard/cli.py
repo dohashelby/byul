@@ -491,10 +491,11 @@ def prepare_model_read_scope(env: Path = typer.Option(...,"--env"),target: Path 
 def prepare_engine_callbacks(output: Path = typer.Option(..., "--output", help="새 준비 자산 폴더"),
     lab_faults: bool = typer.Option(False, "--lab-faults", help="소유 실험 환경의 LIF-08 예외 주입을 켠다"),
     lab_kernel_checks: bool = typer.Option(False, "--lab-kernel-checks", help="소유 실험 환경의 REQ-19 kernel 범위·REQ-20 graph replay 대조(GPU 동기화)를 켠다"),
-    request_attempts: bool = typer.Option(False, "--request-attempts", help="#196 request-attempt 관측(scheduler·KV 매 단계)을 켠다")):
+    request_attempts: bool = typer.Option(False, "--request-attempts", help="#196 request-attempt 관측(scheduler·KV 매 단계)을 켠다"),
+    generation_transitions: bool = typer.Option(False, "--generation-transitions", help="#196 generation-transition 관측(EngineCore 전환 진입점). --request-attempts와 함께 쓴다")):
     """REQ-14~17 콜백 센서 자산을 만든다. 엔진을 시작하지 않는다."""
     from guard.collectors.engine_callbacks import prepare_assets
-    typer.echo(json.dumps(prepare_assets(output, lab_faults=lab_faults, lab_kernel_checks=lab_kernel_checks, request_attempts=request_attempts), ensure_ascii=False))
+    typer.echo(json.dumps(prepare_assets(output, lab_faults=lab_faults, lab_kernel_checks=lab_kernel_checks, request_attempts=request_attempts, generation_transitions=generation_transitions), ensure_ascii=False))
 
 
 @app.command("prepare-lifecycle-sensor")

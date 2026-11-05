@@ -123,3 +123,126 @@ def request_attempt_record(processes, *, pod, environment_ref, target_sha256, pr
                                'diagnostic_codes': [c for c in codes if contract._ID.fullmatch(c)]}}
     return record, contract.validate(record, kind='request-attempt', environment_ref=environment_ref,
                                      target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)
+
+
+# ---------------------------------------------------------------------------
+# generation-transition (LIF-05·06·07·09)
+# ---------------------------------------------------------------------------
+from guard.adapters import vllm_transition_callback as transition_callback
+
+TRANSITION_PRODUCER_NAME = 'guard-engine-callback-generation-transition'
+TRANSITION_PRODUCER_VERSION = '1'
+_COMPONENT = {'EngineCore.collective_rpc': 'weights', 'EngineCore.add_lora': 'adapter', 'EngineCore.remove_lora': 'adapter',
+              'EngineCore.reset_prefix_cache': 'cache'}
+_GATE_CLOSE = {'EngineCore.pause_scheduler', 'EngineCoreProc.pause_scheduler', 'EngineCore.sleep'}
+_GATE_OPEN = {'EngineCore.resume_scheduler', 'EngineCore.wake_up'}
+
+
+def transition_producer():
+    digest = hashlib.sha256()
+    for path in (Path(transition_callback.__file__), Path(attempt_callback.__file__), Path(__file__)):
+        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
+    return {'name': TRANSITION_PRODUCER_NAME, 'version': TRANSITION_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
+
+
+def _transition_qualified(row):
+    return (row.get('schema') == transition_callback.SCHEMA and row.get('entry_qualified_before') is True
+            and row.get('phase') in ('CALL', 'RETURN', 'RAISE') and (row['phase'] == 'CALL' or row.get('entry_qualified_after') is True))
+
+
+def generation_transition_events(processes, *, requests=None):
+    """전환 진입점 행과 request-attempt 단계 행을 시간 순서로 맞춰 계약 행을 만든다.
+
+    - 세대 이름은 구성요소별 성공 전환 횟수다(`weights-0` → 전환 성공 뒤 `weights-1`).
+    - 전환 진입 시 scheduler의 요청은 in_flight, 단계 배정은 그 시점 세대의 consumed다.
+    - 접수 차단(pause·sleep) 중이 아니면 전환 성공 직후 service_gate open, 차단이면 재개 때 open이다.
+    - 전환 실패(RAISE)는 failure, 같은 구성요소의 다음 성공 전환은 recovery다.
+    """
+    events, bindings, codes, rows = [], [], set(), []
+    for process in processes:
+        if process['start_ticks'] is None:
+            if any(_qualified(r) or _transition_qualified(r) for r in process['events']):
+                codes.add('TRANSITION_PROCESS_START_UNAVAILABLE')
+            continue
+        index = None
+        for row in process['events']:
+            if row.get('phase') == 'GAP':
+                codes.add(row.get('code') if type(row.get('code')) is str else 'TRANSITION_PRODUCER_GAP'); continue
+            if not (_qualified(row) or _transition_qualified(row)):
+                continue
+            if index is None:
+                index = len(bindings); bindings.append({'pid': process['pid'], 'start_ticks': process['start_ticks']})
+            stamp = row.get('operation_started_ns') if row['phase'] == 'CALL' else row.get('operation_finished_ns')
+            rows.append((stamp or 0, len(rows), index, row))
+    if not rows:
+        return [], bindings, sorted(codes)
+    origin = min(r[0] for r in rows)
+    generation = {'weights': 0, 'adapter': 0, 'cache': 0, 'service': 0}; changed = set(); failed = set()
+    gate_open = True; seen_admit = set(); waiting_gate = set()
+    def keep(request):
+        return request is None or requests is None or request in requests
+    def add(event, binding, at_ms, component, request=None, state=None, error=None):
+        if keep(request):
+            events.append({'seq': len(events), 'event': event, 'binding': binding, 'at_ms': at_ms, 'request_sha256': request,
+                           'generation': f'{component}-{generation[component]}', 'component': component, 'state': state,
+                           'error_sha256': error, 'alias_sha256': None})
+    for stamp, _, binding, row in sorted(rows):
+        at_ms = max(0, (stamp - origin) // 1_000_000); fields = row.get('fields') or {}; point = row['point']; phase = row['phase']
+        if row.get('schema') == transition_callback.SCHEMA:
+            component = _COMPONENT.get(point)
+            if point == 'EngineCore.collective_rpc' and fields.get('rpc_transition') is not True:
+                continue
+            if phase == 'CALL':
+                kind = component or 'service'
+                for request in fields.get('in_flight_request_sha256') or []:
+                    add('in_flight', binding, at_ms, kind, request)
+                if point in _GATE_CLOSE:
+                    gate_open = False; add('drain', binding, at_ms, 'service', state=fields.get('mode') or 'closed')
+            elif phase == 'RAISE':
+                if component:
+                    failed.add(component); add('failure', binding, at_ms, component, state='raised')
+            elif point in _GATE_OPEN:
+                gate_open = True; generation['service'] += 1
+                add('routing', binding, at_ms, 'service', state='resumed'); add('service_gate', binding, at_ms, 'service', state='open')
+            elif component and (fields.get('result') is not False):
+                generation[component] += 1; changed.add(component)
+                add('model_loaded' if component in ('weights', 'adapter') else 'backend_ready', binding, at_ms, component, state='committed')
+                if component in failed:
+                    failed.discard(component); add('recovery', binding, at_ms, component, state='committed')
+                if gate_open:
+                    add('service_gate', binding, at_ms, 'service', state='open')
+            continue
+        if point == 'Scheduler.add_request' and phase == 'RETURN':
+            request = fields.get('request_sha256')
+            if request:
+                seen_admit.add(request)
+                if any(e['event'] == 'service_gate' for e in events):
+                    waiting_gate.add(request)
+        elif point == 'Scheduler.schedule' and phase == 'RETURN':
+            for item in fields.get('scheduled') or []:
+                request = item.get('request_sha256')
+                if not request:
+                    continue
+                for component in ['weights', *sorted(changed - {'weights'})]:
+                    add('consumed', binding, at_ms, component, request, state='scheduled')
+                if request in waiting_gate:
+                    waiting_gate.discard(request); add('accepted', binding, at_ms, 'service', request, state='scheduled')
+    return events, bindings, sorted(codes)
+
+
+def generation_transition_record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False, requests=None):
+    events, processes_used, codes = generation_transition_events(processes, requests=requests)
+    if truncated:
+        codes = sorted(set(codes) | {'TRANSITION_READ_TRUNCATED'})
+    bindings = [{'pod_uid': pod['pod_uid'], 'container_id': pod['container_id'].removeprefix('containerd://')[:128],
+                 'restart_count': pod['restart_count'], 'worker_pid': p['pid'], 'start_ticks': p['start_ticks'], 'rank': 0}
+                for p in processes_used]
+    transitions = [e for e in events if e['event'] in ('model_loaded', 'backend_ready', 'failure')]
+    closed = bool(transitions) and any(e['event'] == 'service_gate' and e['at_ms'] >= transitions[-1]['at_ms'] for e in events)
+    record = {'schema': contract.SCHEMA, 'kind': 'generation-transition', 'producer': transition_producer(),
+              'environment_ref': environment_ref, 'target_sha256': target_sha256, 'prepared_sha256': prepared_sha256,
+              'session': session, 'bindings': bindings, 'events': events,
+              'completeness': {'source_ended': closed and not truncated, 'dropped': 0,
+                               'diagnostic_codes': [c for c in codes if contract._ID.fullmatch(c)]}}
+    return record, contract.validate(record, kind='generation-transition', environment_ref=environment_ref,
+                                     target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)

@@ -97,3 +97,73 @@ def test_producer_identity_binds_both_source_files():
     first = producers.attempt_producer()
     assert first['name'] == 'guard-engine-callback-request-attempt' and len(first['source_sha256']) == 64
     assert first == producers.attempt_producer()
+
+
+from guard.adapters import vllm_transition_callback as transition
+
+
+def trow(ns, point, phase, **fields):
+    return {'schema': transition.SCHEMA, 'point': point, 'phase': phase, 'entry_qualified_before': True,
+            'entry_qualified_after': True, 'operation_started_ns': ns, 'operation_finished_ns': ns, 'fields': fields}
+
+
+def sched(ns, *requests):
+    return row(ns, 'Scheduler.schedule', 'RETURN', budget_tokens=512, scheduled=[{'request_sha256': r, 'tokens': 1} for r in requests])
+
+
+def test_transition_observer_keeps_only_names_and_in_flight_fingerprints():
+    obs = transition.TransitionObserver.__new__(transition.TransitionObserver)
+    obs.gaps = set(); obs.fingerprint = lambda v: ('f' + str(v)).ljust(64, '0')[:64] if v is not None else None
+    core = SimpleNamespace(scheduler=SimpleNamespace(requests={'req-1': object()}))
+    entry = obs._snapshot('EngineCore.collective_rpc', (core, 'reload_weights'), {'kwargs': {'weights_path': '/secret/path'}})
+    assert entry['rpc_transition'] is True and len(entry['in_flight_request_sha256']) == 1 and '/secret/path' not in str(entry)
+    other = obs._snapshot('EngineCore.collective_rpc', (core, 'get_kv_cache_spec'), {})
+    assert other['rpc_transition'] is False and 'in_flight_request_sha256' not in other
+    lora = obs._snapshot('EngineCore.add_lora', (core, SimpleNamespace(lora_name='tenant-a', lora_path='/x')), {}, True, True)
+    assert lora['result'] is True and '/x' not in str(lora)
+
+
+def test_reload_during_a_live_request_shows_in_flight_mixed_consumption_and_the_gate():
+    rows = [row(1_000_000, 'Scheduler.add_request', 'RETURN', request_sha256=R1), sched(2_000_000, R1),
+            trow(3_000_000, 'EngineCore.collective_rpc', 'CALL', rpc_transition=True, in_flight_request_sha256=[R1]),
+            trow(4_000_000, 'EngineCore.collective_rpc', 'RETURN', rpc_transition=True, result=None),
+            sched(5_000_000, R1), row(6_000_000, 'Scheduler.add_request', 'RETURN', request_sha256=R2), sched(7_000_000, R2)]
+    record, result = producers.generation_transition_record([{'pid': 74, 'start_ticks': 1000, 'events': rows}], pod=POD, **SCOPE)
+    kinds = [(e['event'], e['generation']) for e in record['events']]
+    assert kinds == [('consumed', 'weights-0'), ('in_flight', 'weights-0'), ('model_loaded', 'weights-1'), ('service_gate', 'service-0'),
+                     ('consumed', 'weights-1'), ('consumed', 'weights-1'), ('accepted', 'service-0')]
+    assert result['violation_candidates'] == [{'request_sha256': R1, 'component': 'weights', 'reason': 'mixed_generation_consumption'}]
+    assert record['completeness']['source_ended'] is True and result['gaps'] == ['GPU_INPUT_PRODUCER_UNSUPPORTED']
+
+
+def test_failed_transition_then_recovery_and_paused_gate():
+    rows = [sched(1_000_000, R1),
+            trow(2_000_000, 'EngineCore.pause_scheduler', 'CALL', mode='wait', in_flight_request_sha256=[R1]),
+            trow(3_000_000, 'EngineCore.collective_rpc', 'CALL', rpc_transition=True, in_flight_request_sha256=[]),
+            trow(3_500_000, 'EngineCore.collective_rpc', 'RAISE', rpc_transition=True),
+            trow(4_000_000, 'EngineCore.collective_rpc', 'CALL', rpc_transition=True, in_flight_request_sha256=[]),
+            trow(4_500_000, 'EngineCore.collective_rpc', 'RETURN', rpc_transition=True, result=None),
+            trow(5_000_000, 'EngineCore.resume_scheduler', 'RETURN')]
+    events, _, _ = producers.generation_transition_events([{'pid': 74, 'start_ticks': 1000, 'events': rows}])
+    names = [e['event'] for e in events]
+    assert names == ['consumed', 'in_flight', 'drain', 'failure', 'model_loaded', 'recovery', 'routing', 'service_gate']
+    assert next(e for e in events if e['event'] == 'drain')['state'] == 'wait'
+    ignored = [trow(1, 'EngineCore.collective_rpc', 'CALL', rpc_transition=False), trow(2, 'EngineCore.collective_rpc', 'RETURN', rpc_transition=False)]
+    assert producers.generation_transition_events([{'pid': 74, 'start_ticks': 1000, 'events': ignored}])[0] == []
+
+
+def test_attempt_reader_keeps_only_attempt_transition_and_gap_rows_within_its_budget(tmp_path):
+    import json, os, subprocess, sys
+    from guard.runtime.kubernetes_http import ATTEMPT_EVENTS_READER
+    session = 'a' * 32; root = tmp_path / session; root.mkdir()
+    compact = lambda v: json.dumps(v, sort_keys=True, separators=(',', ':'))  # 센서 Sink와 같은 형식
+    noise = compact({'schema': 'guard-vllm-cache-callback/1', 'pad': 'x' * 4000})
+    keep = compact({'schema': attempt.SCHEMA, 'phase': 'RETURN'}); gap = compact({'phase': 'GAP', 'code': 'X'})
+    (root / f'callbacks-{os.getpid()}.jsonl').write_text('\n'.join([noise] * 2000 + [keep, gap, keep]) + '\n' + keep)
+    (root / 'other.jsonl').write_text(keep + '\n')
+    source = ATTEMPT_EVENTS_READER.replace('"/guard-lifecycle/data/"', repr(str(tmp_path) + '/'))
+    done = subprocess.run([sys.executable, '-c', source, session], capture_output=True, text=True, check=True)
+    value = json.loads(done.stdout)
+    process, = value['processes']
+    assert value['truncated'] is False and process['pid'] == os.getpid() and type(process['start_ticks']) in (int, type(None))
+    assert [r.get('phase') for r in process['events']] == ['RETURN', 'GAP', 'RETURN']  # 끝 줄바꿈 없는 마지막 행은 쓰는 중이라 뺀다

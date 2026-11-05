@@ -5,7 +5,7 @@
 | 종류 | 소비 점검(B) | 상태 |
 |---|---|---|
 | request-attempt | LIF-03·10·12 | CPU k3d 생산 확인(2026-11-05). GPU 확인·등록 남음 |
-| generation-transition | LIF-05·06·07·09 | 남음 |
+| generation-transition | LIF-05·06·07·09 | CPU k3d 생산 확인(2026-11-05). rank·backend·graph 준비 행은 아직 없음. GPU 확인·등록 남음 |
 | process-device-provider | PLT-01·04 | 남음 |
 | rank-fault | LIF-08 | 남음(TP2) |
 | failed-group-resources | LIF-11 | 남음(TP2) |
@@ -40,3 +40,24 @@
   - 계약 검증 결과 gap은 `GPU_INPUT_PRODUCER_UNSUPPORTED` 하나(미등록)다. 위반 후보는 0이다.
   - 첫 기동에서는 scheduler 설치가 `ENGINE_CALLBACK_INSTALL_UNAVAILABLE`로 거부됐다(소스 크기 한도). 원 자산은 `k3d-run10/callbacks-attempt1-assets`에 있다.
 - 남은 것: GPU 이미지에서 같은 확인을 하고 등록한다. 선점 경로(retry)와 KV 한도 경로(limit_enforced)는 CPU 단일 요청 규모에서 나오지 않았으므로, GPU에서 동시 요청과 작은 KV로 따로 만든다.
+
+## generation-transition
+
+- 관측(`adapters/vllm_transition_callback.py`): vLLM 0.31.0 EngineCore의 세대 전환 진입점을 원 소스 해시로 고정해 감싼다.
+  - 대상: `collective_rpc`(메서드가 `reload_weights`일 때만 전환), `add_lora`·`remove_lora`, `reset_prefix_cache`, `pause_scheduler`·`resume_scheduler`·`sleep`·`wake_up`, `set_weight_version`
+  - 진입 시 scheduler가 가진 요청을 지문으로 남긴다.
+  - 선택 기능 `--generation-transitions`이고, request-attempt 기록과 함께 써야 한다.
+- 변환:
+  - 세대 이름은 구성요소별 성공 전환 횟수다(`weights-0` → `weights-1`).
+  - 단계 배정 시점의 세대가 `consumed`다. 전환 진입 시 요청은 `in_flight`다.
+  - 접수 차단 중이 아니면 전환 성공 직후 `service_gate` open이다. 차단 중이면 재개 때 open이다.
+  - 실패(RAISE)는 `failure`, 다음 성공은 `recovery`다.
+- k3d CPU 확인(run 11, `byul-dev1-evidence/k3d-run11/generation-transition-record.json`, dev 경로를 켠 lab 엔진):
+  - 200토큰 요청 A가 진행 중일 때 `/collective_rpc reload_weights`를 보냈다. A는 전환 진입 때 in_flight였다. 이전 세대 24단계, 새 세대 176단계를 소비했고, 계약의 `mixed_generation_consumption` 후보가 나왔다. CPU vLLM은 진행 중 요청을 비우지 않고 새 가중치로 이어서 디코딩한다. 같은 가중치 파일을 다시 읽었으므로 답변 차이는 이 실험으로 판단하지 않는다.
+  - `/reset_prefix_cache` 뒤 요청 B는 gate 이후 접수(`accepted`)됐고, `weights-1`·`cache-1`을 소비했다.
+  - 계약 검증 gap은 미등록 하나다. 사건은 214개다.
+- 읽기 수정: 처음에는 worker 프로세스의 다른 관측기 행(4.4 MB)이 읽기 한도를 먼저 써서 EngineCore 행이 잘렸다. 지금은 고른 행(attempt·transition·GAP)만 한도에 센다.
+- 남은 것:
+  - rank·모델·backend·graph 준비 완료 행(LIF-07). worker 기동 관측이 필요하다.
+  - 실제 서비스 gate(API health와 접수의 결합). health-worker-causal과 함께 만든다.
+  - GPU 확인과 등록.

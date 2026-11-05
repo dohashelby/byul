@@ -97,7 +97,7 @@ LIFECYCLE_FILES = ('guard_lifecycle_sensor.py', 'sitecustomize.py', 'settings.js
 
 
 def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usage=None, gpu=None, restart_always=False,
-           engine_callbacks=None):
+           engine_callbacks=None, dev_endpoints=False):
     """lifecycle_dir: `guard prepare-lifecycle-sensor` 출력. 주면 RUNBOOK의 계측 기동 설정을 더한다.
 
     고정 자산은 읽기 전용 /guard-lifecycle(ConfigMap), 기록은 /guard-lifecycle/data/<session>(엔진 UID 소유 0700)이다.
@@ -132,6 +132,9 @@ def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usa
                                       {'name': 'callback-data', 'mountPath': '/guard-lifecycle/data'}]
         engine['spec']['volumes'] += [{'name': 'guard-callbacks', 'hostPath': {'path': '/srv/models/' + engine_callbacks, 'type': 'Directory'}},
                                       {'name': 'callback-data', 'emptyDir': {'sizeLimit': '128Mi'}}]
+    if dev_endpoints:
+        # lab 전용: vLLM 개발 경로(/collective_rpc·/reset_prefix_cache·/pause·/resume·/sleep). 세대 전환을 직접 일으킬 때만 켠다.
+        engine['spec']['containers'][0]['env'].append({'name': 'VLLM_SERVER_DEV_MODE', 'value': '1'})
     if restart_always:
         # REQ-21 lab 재기동: 같은 Pod에서 엔진 컨테이너만 다시 뜨게 한다(engine_restart 동작의 전제).
         engine['spec']['restartPolicy'] = 'Always'
@@ -650,7 +653,7 @@ def main(argv=None):
                         help='gpu: 2단계 GPU lab. 이름공간·세대·별칭을 바꾼다. 같은 run의 모든 하위 명령에 같은 값을 준다.')
     sub = parser.add_subparsers(dest='kind', required=True)
     r = sub.add_parser('render'); r.add_argument('--run-id', required=True); r.add_argument('--engine-image', required=True)
-    r.add_argument('--restart-always', action='store_true'); r.add_argument('--engine-callbacks'); r.add_argument('--gpu-model'); r.add_argument('--gpu-driver'); r.add_argument('--runtime-class')
+    r.add_argument('--restart-always', action='store_true'); r.add_argument('--engine-callbacks'); r.add_argument('--dev-endpoints', action='store_true'); r.add_argument('--gpu-model'); r.add_argument('--gpu-driver'); r.add_argument('--runtime-class')
     r.add_argument('--lifecycle', type=Path); r.add_argument('--api-key-secret'); r.add_argument('--usage', choices=['forbidden', 'allowed'])
     r.add_argument('--out', type=Path, required=True)
     e = sub.add_parser('env'); e.add_argument('--render', type=Path, required=True); e.add_argument('--models', type=Path, required=True)
@@ -689,7 +692,7 @@ def main(argv=None):
         use_gpu_profile()
     load = lambda path: json.loads(Path(path).read_text(encoding='utf-8'))
     if args.kind == 'render':
-        raw, record = render(run_id=args.run_id, engine_image=args.engine_image, lifecycle_dir=args.lifecycle, api_key_secret=args.api_key_secret, usage=args.usage, restart_always=args.restart_always, engine_callbacks=args.engine_callbacks,
+        raw, record = render(run_id=args.run_id, engine_image=args.engine_image, lifecycle_dir=args.lifecycle, api_key_secret=args.api_key_secret, usage=args.usage, restart_always=args.restart_always, engine_callbacks=args.engine_callbacks, dev_endpoints=args.dev_endpoints,
             gpu=({k: v for k, v in (('model', args.gpu_model), ('driver', args.gpu_driver), ('runtime_class', args.runtime_class)) if v}
                  if args.profile == 'gpu' else None))
         for name, data in raw.items():

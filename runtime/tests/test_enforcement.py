@@ -363,6 +363,38 @@ class EventAdapterTests(unittest.TestCase):
 
 
 class EnforcementCliTests(unittest.TestCase):
+    def test_synthetic_override_ingest_records_block_attempts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = io.StringIO()
+            with redirect_stdout(output), redirect_stderr(io.StringIO()):
+                status = main([
+                    "enforce", "ingest", "--kind", "tetragon",
+                    "--input", str(FIXTURE_DIR / "tetragon_override.synthetic.jsonl"),
+                    "--origin", "synthetic", "--data-dir", temporary,
+                    "--environment", "kind-runtime-lab",
+                    "--intent", str(ROOT / "deploy/lab/intent.lab-v1.1.json"),
+                ])
+            self.assertEqual(status, 0)
+            self.assertIn("저장 4건 · 거부 0건", output.getvalue())
+            records, corrupt = JsonlStore(Path(temporary) / "observations.jsonl").read_all()
+            self.assertEqual(corrupt, [])
+            self.assertEqual(len(records), 4)
+            for item in records:
+                self.assertEqual(item["source"], "tetragon")
+                self.assertEqual(item["kind"], "file_access")
+                self.assertEqual(item["data_origin"], "synthetic")
+                self.assertEqual(item["environment"], "kind-runtime-lab")
+                self.assertEqual(item["rule_id"], "TG-SECRET-01")
+                self.assertEqual(item["policy_name"], "runtime-tg-secret-01")
+                self.assertEqual(item["pod"], {"namespace": "serving-lab", "pod": "serving-engine-def"})
+                self.assertEqual(item["path"], "/run/byul-probe/secret.txt")
+                self.assertEqual(item["access"], "read")
+            self.assertEqual(
+                [(item["action_raw"], item["action_mode"]) for item in records],
+                [("KPROBE_ACTION_OVERRIDE", "enforce")] * 3
+                + [("KPROBE_ACTION_POST", "monitor")],
+            )
+
     def test_render_and_ingest(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

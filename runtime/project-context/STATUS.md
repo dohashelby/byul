@@ -431,3 +431,8 @@
 - 2026-11-05 Tetragon 선택적 차단 설계안 `docs/Tetragon_차단_설계.md` 작성: 보호 파일 읽기 Override를 1순위로 제안하고 intent·묶음·계약·화면·되돌리기·kind/AWS 시험과 미확인 위험을 정리했다. 구현·적용·실측은 하지 않았으며 계약 변경은 intent 1.1 선택 필드 범위에서는 불필요, 개별 사건 차단 판정 확장은 합의 필요다.
 - 2026-11-05 Tetragon `TG-SECRET-01` 선택적 읽기 차단 후보와 intent 1.1 검증·단위 시험, L-05b kind opt-in 도구를 구현했다(기준 a9e487d, 미커밋); 전체 unittest 701건 통과(skip 115), `git diff --check` 통과, 실제 kind/AWS 차단·errno·복원은 미확인이고 Claude 검수 전이다.
 - 2026-11-05 4회차 준비(기준 4432c0f, 미커밋): platform 웹 Override 차단 표지·알림 분리·기간별 개요 보조 표시, runtime AWS-20(승인 enforce 선적용·monitor 자동 복원), preflight 커널 수동 확인, 두 엔진 지표 이름 도구·확인순서를 추가했다. 웹 타입 검사·71건 및 runtime 708건(skip 115) 통과, `git diff --check` 통과; AWS 실측·커널 지원·지표·화면 실자료는 미확인이다.
+
+## 2026-11-05 노트북 데모용 Tetragon Override 합성 관측 (기준 51f802e, 미커밋)
+
+- `RUNTIME_DEMO=1` 실행에 한해 TG-SECRET-01 가짜 파일 읽기 Override 3건·Post 1건을 `--origin synthetic`으로 수집한다. 기존 관측 폴더에도 한 번 추가하고 데이터 폴더의 표지 파일로 재수집을 막는다. 실제 서버 관측·판정 코드는 변경하지 않았다.
+- CLI 수집 후 정규화 필드와 웹의 합성·예시 및 차단 시도 표지를 시험했다. `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 713건 통과(skip 115). `platform/web` 타입 검사·72건 시험, `git diff --check`, 셸 구문 검사 통과. 노트북 UI 수동 확인 및 실제 차단 결과는 미확인이다.

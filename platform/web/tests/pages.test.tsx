@@ -77,6 +77,31 @@ describe("사건 로그", () => {
     expect(tableRow.textContent).toContain("TG-SECRET-01");
   });
 
+  it("합성 보호 파일 Override를 예시 자료로 표시하면서 차단 표지를 유지한다", async () => {
+    const sample = EVENTS.find((e) => e.source === "tetragon")!;
+    const blocked: RuntimeEvent = {
+      ...sample, event_id: "synthetic-secret-override", outcome: "enforce_attempted",
+      data_origin: "EXAMPLE", origin_detail: "synthetic",
+      native: { ...sample.native, record: { ...sample.native.record, action_raw: "KPROBE_ACTION_OVERRIDE" } as unknown as RuntimeEvent["native"]["record"] },
+      observation: { ...sample.observation!, kind: "file_access", path: "/run/byul-probe/secret.txt", access: "read", rule_id: "TG-SECRET-01", action_mode: "enforce", exec_verdict: null },
+    };
+    mockApi({
+      "/api/runtime/events": { items: [blocked], invalid: [], source: SOURCE, truncated: false },
+      "/api/environments": EMPTY_LIST,
+      "/api/update/results": { items: [], invalid: [], source: SOURCE },
+    });
+    const view = renderAt("/runtime/observe/tetragon", "/runtime/observe/:sub", <RuntimeObservePage />);
+    const tableRow = (await screen.findByText("/run/byul-probe/secret.txt")).closest("tr")!;
+    expect(within(tableRow).getByText("합성")).toBeTruthy();
+    expect(within(tableRow).getByText("차단")).toBeTruthy();
+    expect(tableRow.textContent).toContain("차단 (Override)");
+    expect(tableRow.textContent).toContain("TG-SECRET-01 · 차단 시도 기록(enforce)");
+    view.unmount();
+    renderAt("/runtime/events", "/runtime/events", <EventsPage />);
+    const eventRow = within(await screen.findByRole("table")).getByText("프로세스·파일 이벤트 (Tetragon)").closest("tr")!;
+    expect(within(eventRow).getByText("예시").title).toBe("EXAMPLE (synthetic)");
+  });
+
   it("Hubble 사건(DROPPED 포함)은 거부 확인으로 표시되지 않는다", async () => {
     mockApi({
       "/api/runtime/events": { items: EVENTS, invalid: [], source: SOURCE, truncated: false },

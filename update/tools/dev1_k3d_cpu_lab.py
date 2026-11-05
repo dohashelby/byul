@@ -18,7 +18,7 @@ import re
 
 import yaml
 
-from guard.adapters.vllm import CHAT_TEMPLATE_CONTAINER_PATH, VllmAdapter
+from guard.adapters.vllm import CHAT_TEMPLATE_CONTAINER_PATH, CHAT_TEMPLATE_PROFILE, CHAT_TEMPLATE_SHA256, VllmAdapter
 from guard.collectors.file import load_environment
 from guard.models import DataOrigin, Environment, canonical_json, new_id, sha256_hex
 from tools import gpu_a_run_inputs as inputs
@@ -389,7 +389,7 @@ def inventory(root):
 
 def environment(record, inventory_sha256):
     gpu = record.get('gpu')
-    head = 'GPU, Linux amd64, K3s GPU lab; ' if gpu else 'CPU, arm64, k3d local Docker Desktop macOS; '
+    head = 'GPU, Linux amd64, Kubernetes GPU lab; ' if gpu else 'CPU, arm64, k3d local Docker Desktop macOS; '
     platform = (head + '; '.join(f'{k}={v}' for k, v in (
         ('generation', record['generation']), ('run', record['run_id']), ('render_engine_sha256', record['outputs_sha256']['engine.yaml']))))
     # GPU 이름·드라이버는 운영자가 넘긴 값이라 DECLARED다. 측정값으로 올리지 않는다.
@@ -406,8 +406,15 @@ def target(env, record, namespace, engine_pod, probe_pod, *, context):
     container, = (c for c in engine_pod['spec']['containers'] if c['name'] == 'engine')
     value['engine']['command'] = ['vllm', 'serve']
     value['observed_version'] = env.engine.version
+    # 이 lab은 AWS 인계의 /models snapshot 대신 /srv/models 아래 opt-125m 하위 폴더를 마운트한다.
+    value['model_mapping'].update(host_snapshot='/srv/models/opt-125m', container_mount='/models/opt-125m')
     # OBS-09: 실제 Pod 인자와 검토된 로그 계약. 검토되지 않은 이미지면 계약은 None이고 실행기가 공백으로 남긴다.
-    value['comparison_config'] = {'launch': {'argv': list(container['args']),
+    args = list(container['args'])
+    value['comparison_config'] = {'launch': {'argv': args,
+        'profile': 'gpu-bounded-v1' if record.get('profile') == 'gpu' else 'cpu-bounded-v1',
+        'max_model_len': int(args[args.index('--max-model-len') + 1]),
+        'chat_template': {'profile': CHAT_TEMPLATE_PROFILE, 'version': '1', 'sha256': CHAT_TEMPLATE_SHA256,
+            'container_path': CHAT_TEMPLATE_CONTAINER_PATH, 'content_format': 'string', 'request_overrides': False},
         'log_profile': VllmAdapter().native_log_contract(env.engine.image_digest, env.engine.version)}}
     return value
 

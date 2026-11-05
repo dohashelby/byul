@@ -7,6 +7,7 @@
 - 후속 A 실측 준비: GPU lifecycle 추가 시 메모리 비율 유지·실제 eager 인자/기록 정합성을 보수했다. 렌더/입력/불변식170통과·기존1제외(pytest1.59초/부모1.758초)다. 런처 보수는 새 생산자 GPU 확인과 구분해 반영하고 실제 A 실측 전 해당 소스의 CI를 확인한다.
 - GPU 후속: a-p2v2-20261105-1에서 PDP25행(소유process3/GPU process1/device24), V2 소비45행(API 검증13/거부2/runner15/sampler15)을 source_ended=true·진단0·위반후보0으로 반출했다. 정상7/거부2 HTTP 대조 일치, 등록 뒤 PDP 계약 complete=true·V2는 기존 logit bias gap 유지다. 실제 SHA가 일치하는 두 생산자를 더해 총8종 등록했다. 원 first logprobs 형식400과 보정 대조를 모두 보존한다.
 - 이미지 경계: 노드 OCI 원문 hash로 c1c9(index)→a4a4(linux/amd64 manifest)→c76d(config)를 대조했다. 직접 index 허용의 관련1실패/475통과 원본을 보존하고 해당 허용을 제거했다. 기존 index/config/다른 버전 거부는 유지하며 정확 a4a4의 로그 소스3개 검토 뒤 OBS09 계약만 추가했다. 고정 목록 갱신 후 직접/계약/이미지/소스gate/불변식476통과·기존1제외(pytest6.69초/부모6.833초). 새 생산자 Pod/시험 예외 정리·회수 뒤 health timeout·GPU0MiB를 확인했다. 다음은 A 단일 GPU 실행 묶음이다.
+- A 실행 입력: dev1 target에 누락된 고정 chat template/bounded launch/max_model_len과 실제 OPT 하위 모델 경로를 채웠다. 소비자·원본 판정/파일 신원 검사는 그대로이며 GPU 플랫폼 표기는 실제 Kubernetes에 맞췄다. 입력/REQ11·로그/Kubernetes·불변식218통과·기존1제외(pytest5.03초/부모5.203초). G1 엔진·Gateway·양쪽 probe는 준비됐고 확정 입력으로 점검을 진행한다.
 - 다음 단계: 고정 소스 검증·문서/체크포인트·PR 갱신 후 준비된 단일 GPU 세션을 비용 확인에 따라 진행한다. 신규 생산자 두 종의 GPU 확인·등록과 A 18개 GPU 실측은 미완료다.
 - 막힌 것: TP2 별도 비용/구성, SUP-08 멀티모달, 사건 상한 4,096과 V2 logit bias 계약 의미 변경은 기존 합의 경계를 유지한다. CPU·대역을 GPU MEASURED 또는 전체 PASS로 올리지 않는다.
 

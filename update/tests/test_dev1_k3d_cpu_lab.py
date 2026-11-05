@@ -178,3 +178,24 @@ def test_graph_declaration_cannot_claim_eager_when_the_launch_option_is_absent(m
     raw, record = lab.render(run_id='dev1-gpu-3', engine_image=IMAGE, gpu={'model': 'NVIDIA L4'})
     assert '--enforce-eager' not in yaml.safe_load(raw['engine.yaml'])['spec']['containers'][0]['args']
     assert record['enforce_eager'] is False
+def test_gpu_target_declares_the_actual_opt_subdirectory_and_managed_template(tmp_path):
+    import json
+    from tests.test_gpu_a_run_inputs import deployed
+    from guard.adapters.vllm import VllmAdapter
+    pods, _ = deployed(tmp_path, 'v1-callback')
+    image = pods['engine']['spec']['containers'][0]['image']
+    raw, record = lab.render(run_id='a-run-1', engine_image=image, gpu={'model': 'EXAMPLE-L4'})
+    rendered = yaml.safe_load(raw['engine.yaml'])
+    pods['engine']['spec']['containers'][0]['args'] = rendered['spec']['containers'][0]['args']
+    for pod in pods.values():
+        pod['metadata']['labels']['byul.a/generation'] = record['generation']
+    env = lab.environment(record, 'b' * 64)
+    value = lab.target(env, record, json.loads((tmp_path / 'namespace.json').read_text()),
+                       pods['engine'], pods['probe'], context='EXAMPLE-context')
+    launch = value['comparison_config']['launch']
+    assert launch['profile'] == 'gpu-bounded-v1' and launch['max_model_len'] == 512
+    assert VllmAdapter().supports_template_profile(launch['chat_template'])
+    assert launch['log_profile'] is None  # EXAMPLE digest는 새로 지원하지 않는다.
+    assert value['model_mapping']['host_snapshot'] == '/srv/models/opt-125m'
+    assert value['model_mapping']['container_mount'] == '/models/opt-125m'
+    assert value['environment_ref'] == env.ref().model_dump(mode='json') and env.hash_ok()

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Pagination, usePagination } from "./Pagination";
 import s from "./ui.module.css";
 
 export type Column<T> = {
@@ -17,7 +18,7 @@ type Props<T> = {
   onRowClick?: (row: T) => void;
   selectedKey?: string | null;
   initialSort?: { id: string; dir: "asc" | "desc" };
-  pageSizes?: number[];
+  pageParam?: string;
   storageKey?: string;
   empty?: ReactNode;
   toolbar?: ReactNode;
@@ -41,7 +42,7 @@ export function DataTable<T>({
   onRowClick,
   selectedKey,
   initialSort,
-  pageSizes = [25, 50, 100],
+  pageParam = "page",
   storageKey,
   empty,
   toolbar,
@@ -50,8 +51,6 @@ export function DataTable<T>({
   const [hidden, setHidden] = useState<string[]>(() =>
     readHidden(storageKey, columns.filter((c) => c.hidden).map((c) => c.id)),
   );
-  const [pageSize, setPageSize] = useState(pageSizes[0]);
-  const [page, setPage] = useState(0);
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -89,14 +88,14 @@ export function DataTable<T>({
     });
   }, [rows, sort, columns]);
 
-  const pages = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const current = Math.min(page, pages - 1);
-  const visible = sorted.slice(current * pageSize, current * pageSize + pageSize);
+  const pagination = usePagination(sorted.length, pageParam);
+  const visible = sorted.slice(pagination.start, pagination.end);
   const shown = columns.filter((c) => !hidden.includes(c.id));
 
   const toggleSort = (c: Column<T>) => {
     if (!c.sort) return;
     setSort((prev) => (prev?.id === c.id ? { id: c.id, dir: prev.dir === "asc" ? "desc" : "asc" } : { id: c.id, dir: "desc" }));
+    pagination.setPage(1);
   };
 
   return (
@@ -167,32 +166,7 @@ export function DataTable<T>({
           </tbody>
         </table>
       </div>
-      <div className={s.tableFoot}>
-        <span>
-          {sorted.length}건 중 {sorted.length === 0 ? 0 : current * pageSize + 1}–{Math.min((current + 1) * pageSize, sorted.length)}
-        </span>
-        <div className="row">
-          <label className="row small">
-            페이지 크기
-            <select className="select" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}>
-              {pageSizes.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button className="btn btn-small" type="button" disabled={current === 0} onClick={() => setPage(current - 1)}>
-            이전
-          </button>
-          <span>
-            {current + 1} / {pages}
-          </span>
-          <button className="btn btn-small" type="button" disabled={current >= pages - 1} onClick={() => setPage(current + 1)}>
-            다음
-          </button>
-        </div>
-      </div>
+      <Pagination state={pagination} />
     </div>
   );
 }

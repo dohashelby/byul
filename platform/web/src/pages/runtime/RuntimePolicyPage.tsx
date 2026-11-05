@@ -2,11 +2,14 @@
 import { useRuntimeStatus } from "../../api/hooks";
 import { Badge } from "../../components/Badges";
 import { PageHead, Query, StateView } from "../../components/Misc";
+import { Pagination, usePagination } from "../../components/Pagination";
 import { VALIDITY_ITEM, VALIDITY_RESULT, label } from "../../lib/labels";
 import { TableCard, formatTime, rt } from "./parts";
 
 export function RuntimePolicyPage() {
   const q = useRuntimeStatus();
+  const validityPagination = usePagination(q.data?.item?.policy.validity_items.length ?? 0, "page_validity");
+  const historyPagination = usePagination(q.data?.item?.policy.history.length ?? 0);
   return (
     <div className="page">
       <PageHead title="적용 정책" />
@@ -38,7 +41,7 @@ export function RuntimePolicyPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {pol.validity_items.map((v) => (
+                    {pol.validity_items.slice(validityPagination.start, validityPagination.end).map((v) => (
                       <tr key={v.item}>
                         <td>{label(VALIDITY_ITEM, v.item)}</td>
                         <td>{v.state ?? "–"}</td>
@@ -47,6 +50,7 @@ export function RuntimePolicyPage() {
                     ))}
                   </tbody>
                 </table>
+                <Pagination state={validityPagination} />
               </TableCard>
               <TableCard title={<>정책 이력 <span className="muted small">{store.state === "ok" ? "저장 정상" : `저장 오류: ${store.last_error ?? "확인 불가"}`}</span></>}>
                 <table className={rt.statusTable}>
@@ -62,7 +66,7 @@ export function RuntimePolicyPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {pol.history.map((h, i) => (
+                    {pol.history.slice(historyPagination.start, historyPagination.end).map((h, i) => (
                       <tr key={i} className={h.same_version_content_changed ? rt.rowChanged : undefined}>
                         <td>{formatTime(h.at)}</td>
                         <td>{h.event}</td>
@@ -77,6 +81,7 @@ export function RuntimePolicyPage() {
                     ))}
                   </tbody>
                 </table>
+                <Pagination state={historyPagination} />
                 {pol.history.length === 0 && <p className={rt.empty}>정책 이력이 없습니다.</p>}
               </TableCard>
             </>

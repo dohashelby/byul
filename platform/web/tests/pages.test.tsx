@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { SOURCE, mockApi, renderAt } from "./helpers";
 import { EventsPage } from "../src/pages/EventsPage";
@@ -42,6 +42,16 @@ const row = (over: Partial<RequestRow>): RequestRow => ({
 const EMPTY_LIST = { items: [], source: { name: "store", mode: "example", detail: null } };
 
 describe("사건 로그", () => {
+  it("네트워크 이벤트 표를 25행씩 표시하고 나머지를 다음 페이지에 둔다", async () => {
+    const hubble = EVENTS.find((e) => e.source === "hubble")!;
+    const items = Array.from({ length: 27 }, (_, index) => ({ ...hubble, event_id: `network-${index}` }));
+    mockApi({ "/api/runtime/events": { items, invalid: [], source: SOURCE, truncated: false } });
+    renderAt("/runtime/observe/hubble?page=2", "/runtime/observe/:sub", <RuntimeObservePage />);
+    const nav = await screen.findByRole("navigation", { name: "페이지 이동" });
+    expect(nav.textContent).toContain("26–27 / 27");
+    expect(screen.getByRole("table").querySelectorAll("tbody tr")).toHaveLength(2);
+  });
+
   it("Gateway Pod의 의심 실행을 Tetragon 탐지 행으로 표시한다", async () => {
     const sample = EVENTS.find((e) => e.source === "tetragon")!;
     const suspect: RuntimeEvent = {
@@ -234,7 +244,16 @@ describe("차단 내역", () => {
     const requestSection = await screen.findByRole("region", { name: "엔진에 전달되지 않은 요청" });
     expect(requestSection.textContent).toContain("1건");
     expect(within(requestSection).getByRole("link", { name: "a".repeat(32) }).getAttribute("href")).toContain(`sel=${"a".repeat(32)}`);
+    const networkTab = screen.getByRole("tab", { name: "네트워크 차단 1건" });
+    const filesTab = screen.getByRole("tab", { name: "파일 차단 시도 1건" });
+    expect(screen.queryByRole("navigation", { name: "페이지 이동" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "네트워크 차단" })).toBeNull();
+    fireEvent.click(networkTab);
+    expect(networkTab.getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("region", { name: "네트워크 차단" }).textContent).toContain("1건");
+    expect(screen.queryByRole("region", { name: "엔진에 전달되지 않은 요청" })).toBeNull();
+    fireEvent.click(filesTab);
+    expect(filesTab.getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("region", { name: "파일 차단 시도" }).textContent).toContain("예시 자료");
   });
 
@@ -246,7 +265,28 @@ describe("차단 내역", () => {
     });
     renderAt("/runtime/blocked", "/runtime/blocked", <BlockedPage />);
     expect(await screen.findByText(/엔진 미전달 거부·입력 오류·처리 오류 요청이 없습니다/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "네트워크 차단 0건" }));
     expect(screen.getByText(/Hubble DROPPED 기록이 없습니다/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "파일 차단 시도 0건" }));
     expect(screen.getByText(/Tetragon Override 파일 차단 시도 기록이 없습니다/)).toBeTruthy();
+  });
+
+  it("구역 쿼리·해시로 탭을 선택하고 탭마다 25행씩 페이지를 전환한다", async () => {
+    const requests = Array.from({ length: 27 }, (_, index) => row({ request_id: String(index).padStart(32, "0") }));
+    mockApi({
+      "/api/runtime/requests": { items: requests, invalid: [], source: SOURCE, truncated: false },
+      "/api/runtime/events": { items: [dropped, override], invalid: [], source: SOURCE, truncated: false },
+    });
+    const view = renderAt("/runtime/blocked?section=requests&page=2", "/runtime/blocked", <BlockedPage />);
+    const section = await screen.findByRole("region", { name: "엔진에 전달되지 않은 요청" });
+    expect(within(section).getAllByRole("row")).toHaveLength(3);
+    expect(within(section).getByText("26–27 / 27")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "네트워크 차단 1건" }));
+    expect(screen.getByRole("region", { name: "네트워크 차단" })).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "페이지 이동" })).toBeNull();
+    view.unmount();
+    renderAt("/runtime/blocked#blocked-files", "/runtime/blocked", <BlockedPage />);
+    expect((await screen.findByRole("tab", { name: "파일 차단 시도 1건" })).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("region", { name: "파일 차단 시도" })).toBeTruthy();
   });
 });

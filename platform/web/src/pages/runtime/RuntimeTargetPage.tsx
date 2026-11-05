@@ -3,6 +3,7 @@ import { useRevalidation, useRuntimeStatus } from "../../api/hooks";
 import type { CompareTable } from "../../api/types";
 import { Badge } from "../../components/Badges";
 import { PageHead, Query, StateView, WarningBox } from "../../components/Misc";
+import { Pagination, usePagination, type PaginationState } from "../../components/Pagination";
 import { AnyValue } from "../../components/Value";
 import { RT_TRIGGER, label } from "../../lib/labels";
 import { StateBadge, TableCard, formatTime, rt } from "./parts";
@@ -11,10 +12,10 @@ function evidenceSummary(fields: { field: string; expected: unknown; observed: u
   return fields.map((f) => `${f.field}: ${f.expected ?? "–"} → ${f.observed ?? "–"}`).join(" · ") || "–";
 }
 
-function CompareRows({ table, withTime }: { table: CompareTable; withTime: boolean }) {
+function CompareRows({ table, withTime, pagination }: { table: CompareTable; withTime: boolean; pagination: PaginationState }) {
   return (
     <tbody>
-      {table.rows.map((row) => (
+      {table.rows.slice(pagination.start, pagination.end).map((row) => (
         <tr key={row.field}>
           <td className="mono">{row.field}</td>
           <td><AnyValue v={row.expected} /></td>
@@ -31,6 +32,9 @@ function CompareRows({ table, withTime }: { table: CompareTable; withTime: boole
 export function RuntimeTargetPage() {
   const q = useRuntimeStatus();
   const reval = useRevalidation();
+  const targetPagination = usePagination(q.data?.item?.comparisons.target.rows.length ?? 0, "page_target");
+  const baselinePagination = usePagination(q.data?.item?.comparisons.baseline.rows.length ?? 0, "page_baseline");
+  const revalidationPagination = usePagination(reval.data?.items.length ?? 0);
   return (
     <div className="page">
       <PageHead title="대상 엔진" />
@@ -72,8 +76,9 @@ export function RuntimeTargetPage() {
                   <thead>
                     <tr><th>필드</th><th>등록값</th><th>현재</th><th>출처</th><th>상태</th></tr>
                   </thead>
-                  <CompareRows table={s.comparisons.target} withTime={false} />
+                  <CompareRows table={s.comparisons.target} withTime={false} pagination={targetPagination} />
                 </table>
+                <Pagination state={targetPagination} />
                 {s.comparisons.target.rows.length === 0 && <p className={rt.empty}>대상 비교 행이 없습니다.</p>}
                 <p className="notice" style={{ padding: "8px 16px 12px" }}>{instance}</p>
               </TableCard>
@@ -82,8 +87,9 @@ export function RuntimeTargetPage() {
                   <thead>
                     <tr><th>필드</th><th>기준</th><th>현재</th><th>출처</th><th>관측 시각</th><th>상태</th></tr>
                   </thead>
-                  <CompareRows table={s.comparisons.baseline} withTime />
+                  <CompareRows table={s.comparisons.baseline} withTime pagination={baselinePagination} />
                 </table>
+                <Pagination state={baselinePagination} />
                 {s.comparisons.baseline.rows.length === 0 && (
                   <p className={rt.empty}>{s.comparisons.baseline.state === "not_configured" ? "기준(baseline)이 설정되지 않았습니다." : "기준 비교 행이 없습니다."}</p>
                 )}
@@ -100,7 +106,7 @@ export function RuntimeTargetPage() {
                     <tr><th>트리거</th><th>근거 요약</th><th>열린 시각</th><th>현재 근거</th><th>출처</th></tr>
                   </thead>
                   <tbody>
-                    {items.map((x) => {
+                    {items.slice(revalidationPagination.start, revalidationPagination.end).map((x) => {
                       const cond = x.event === "superseded" ? "다른 근거로 대체됨, 해소 아님" : x.event === "condition_cleared" ? "해소됨" : "있음";
                       const tone = x.event === "superseded" ? "muted" : x.current_evidence_present ? "error" : "accent";
                       return (
@@ -115,6 +121,7 @@ export function RuntimeTargetPage() {
                     })}
                   </tbody>
                 </table>
+                <Pagination state={revalidationPagination} />
                 {items.length === 0 && <p className={rt.empty}>재검증 요청 없음. 변경 사항과 수집 상태를 확인하세요.</p>}
               </TableCard>
             </>

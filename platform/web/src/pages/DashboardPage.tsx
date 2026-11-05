@@ -61,16 +61,27 @@ export function DashboardPage() {
       </section>
       {status && <details className="card" style={{ padding: 16 }}><summary>요청 통제 정책 자세히</summary><KeyValue items={[["Gateway 활성", status.policy.gateway_active ? "활성" : "비활성"], ["사용자별 캐시 분리", <span style={status.policy.cache_isolation.mode === "per_principal" && !status.policy.cache_isolation.ready ? { color: "var(--error)" } : undefined}>{status.policy.cache_isolation.mode === "off" ? "비활성 (사용자 간 prefix cache 공유)" : status.policy.cache_isolation.mode === "per_principal" ? status.policy.cache_isolation.ready ? "활성" : `준비 불가(${status.policy.cache_isolation.unavailable_reason_code ?? "unknown"})` : "미확인"}</span>]]} /></details>}
       <div className={`${p.chartRow} ${p.dashboardChartRow}`}>
-        <ChartCard title="시간대별 추이" tabs={[{ id: "total", label: "전체" }, { id: "results", label: "결과별" }]} active={requestMode} onTab={setRequestMode}>
-          <div className={`stack ${p.dashboardChartStack}`}>
-            <div className={p.chartSubhead}><h3>요청</h3><span className="small muted">요청 {reqRows.length}건</span></div>
+        <div className={p.chartSide}>
+          <ChartCard
+            title="시간별 요청"
+            tabs={[
+              { id: "total", label: "전체" },
+              { id: "results", label: "결과별" },
+            ]}
+            active={requestMode}
+            onTab={setRequestMode}
+            total={reqRows.length}
+            note="최근 요청"
+          >
             {requestMode === "total"
               ? <TimeLine buckets={reqDayChart.buckets} size={reqDayChart.size} keys={REQUEST_SERIES.map((x) => x.key)} onSelectRange={openRequests} />
               : <TimeBars buckets={reqChart.buckets} size={reqChart.size} series={[...REQUEST_SERIES]} onSelectRange={openRequests} />}
-            <div className={p.chartSubhead}><h3>관측 이벤트</h3><span className="small muted">관측 이벤트 {observationRows.length}건</span></div>
+          </ChartCard>
+          <ChartCard title="시간별 관측 이벤트">
+            <div className={p.chartSubhead}><span className="small muted">관측 이벤트 {observationRows.length}건</span></div>
             <TimeBars<EventKey> buckets={evChart.buckets} size={evChart.size} series={[...EVENT_SERIES]} onSelectRange={(from, to) => go("/runtime/events", { period: "custom", from: new Date(from).toISOString(), to: new Date(to).toISOString() })} />
-          </div>
-        </ChartCard>
+          </ChartCard>
+        </div>
         <div className={p.chartSide}>
           <ChartCard title="구성 비율" note="선택한 기간의 요청 결과" total={reqRows.length}>
             <Donut items={REQUEST_SERIES.map((series) => ({ ...series, value: resultCounts.get(series.key) ?? 0 }))} />

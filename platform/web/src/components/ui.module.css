@@ -281,6 +281,9 @@ button.metric:hover {
   font-size: 12px;
   flex-wrap: wrap;
 }
+.pageButtons, .pageNumber { display: inline-flex; align-items: center; gap: 4px; }
+.pageButtons { flex-wrap: wrap; }
+.pageButtons button[aria-current="page"] { border-color: var(--accent); color: var(--accent-ink); }
 .colMenu {
   position: relative;
 }

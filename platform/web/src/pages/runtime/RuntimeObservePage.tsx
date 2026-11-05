@@ -4,6 +4,7 @@ import { useParams as useRouteParams } from "react-router-dom";
 import { useRuntimeEvents, useRuntimeStatus } from "../../api/hooks";
 import type { Collector, RuntimeEvent } from "../../api/types";
 import { Badge } from "../../components/Badges";
+import { Pagination, usePagination } from "../../components/Pagination";
 import { PageHead, Query, StateView } from "../../components/Misc";
 import { Value } from "../../components/Value";
 import { CACHE_GENERATION, EXEC_VERDICT, METRIC_STATE, PARENT_ATTRIBUTION, PARENT_CHECK, PHASE, SUSPECT_CONTEXT, label } from "../../lib/labels";
@@ -126,11 +127,12 @@ export function RuntimeObservePage() {
   const events = useRuntimeEvents();
   const problems = useRuntimeProblems();
   const observations = (events.data?.items ?? []).filter((e) => e.observation);
-  // runtime처럼 Hubble은 DROPPED를 먼저(최대 25) 보여준다.
+  // Hubble은 DROPPED를 먼저 보여준다.
   const hubbleAll = observations.filter((e) => e.source === "hubble");
-  const hubble = [...hubbleAll.filter((e) => e.observation!.verdict?.toLowerCase() === "dropped").slice(0, 25), ...hubbleAll.filter((e) => e.observation!.verdict?.toLowerCase() !== "dropped")];
+  const hubble = [...hubbleAll.filter((e) => e.observation!.verdict?.toLowerCase() === "dropped"), ...hubbleAll.filter((e) => e.observation!.verdict?.toLowerCase() !== "dropped")];
   const tetragon = observations.filter((e) => e.source === "tetragon");
   const item = status.data?.item;
+  const pagination = usePagination(sub === "hubble" ? hubble.length : sub === "tetragon" ? tetragon.length : item?.collectors.length ?? 0);
   return (
     <div className="page">
       <PageHead title={sub === "hubble" ? "네트워크 이벤트 (Hubble)" : sub === "tetragon" ? "프로세스·파일 이벤트 (Tetragon)" : "수집 상태"}>
@@ -162,7 +164,7 @@ export function RuntimeObservePage() {
                     <tr><th>관측 연결</th><th>상태</th><th>최근 성공</th><th>오류</th><th>출처</th></tr>
                   </thead>
                   <tbody>
-                    {res.item.collectors.map((c) => (
+                    {res.item.collectors.slice(pagination.start, pagination.end).map((c) => (
                       <tr key={c.source}>
                         <td>
                           <span className="mono">{c.source}</span>
@@ -178,6 +180,7 @@ export function RuntimeObservePage() {
                     ))}
                   </tbody>
                 </table>
+                <Pagination state={pagination} />
               </TableCard>
             )
           }
@@ -190,7 +193,7 @@ export function RuntimeObservePage() {
               <tr><th>시각</th><th>환경·실행</th><th>출발</th><th>도착</th><th>판정</th><th>출처</th></tr>
             </thead>
             <tbody>
-              {hubble.map((e) => {
+              {hubble.slice(pagination.start, pagination.end).map((e) => {
                 const o = e.observation!;
                 return (
                   <tr key={e.event_id} className={o.verdict?.toLowerCase() === "dropped" ? rt.rowDropped : undefined}>
@@ -205,6 +208,7 @@ export function RuntimeObservePage() {
               })}
             </tbody>
           </table>
+          <Pagination state={pagination} />
           {hubble.length === 0 && <p className={rt.empty}>네트워크 이벤트 미수집. 수집 상태와 기간을 확인하세요.</p>}
           <p className="notice" style={{ padding: "8px 16px 12px" }}>Hubble DROPPED는 관측이며, 출발·목적지·정책 귀속과 수신 대조 전에는 거부 확인이 아닙니다.</p>
         </TableCard>
@@ -216,7 +220,7 @@ export function RuntimeObservePage() {
               <tr><th>시각</th><th>환경·실행</th><th>종류</th><th>실행 파일·경로</th><th>판정</th><th>단계</th><th>부모 확인</th><th>규칙·행위</th><th>출처</th></tr>
             </thead>
             <tbody>
-              {tetragon.map((e) => {
+              {tetragon.slice(pagination.start, pagination.end).map((e) => {
                 const o = e.observation!;
                 const flagged = o.kind === "process_exec" && (o.exec_verdict ? FLAGGED.includes(o.exec_verdict) : o.allowed_binary === false);
                 const { kind, attr } = tetragonKind(e);
@@ -238,6 +242,7 @@ export function RuntimeObservePage() {
               })}
             </tbody>
           </table>
+          <Pagination state={pagination} />
           {tetragon.length === 0 && <p className={rt.empty}>프로세스·파일 이벤트 미수집. 수집 상태와 기간을 확인하세요.</p>}
           <p className="notice" style={{ padding: "8px 16px 12px" }}>
             프로세스·파일 이벤트 (Tetragon)의 Override는 차단 시도 기록입니다. 실제 EPERM 결과는 「검증 시험 (Lab)」의 L-05 결과에서 확인합니다.

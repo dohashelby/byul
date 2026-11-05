@@ -136,7 +136,6 @@ export function EventsPage() {
                 selectedKey={selected}
                 initialSort={{ id: "occurred_at", dir: "desc" }}
                 storageKey="events"
-                pageSizes={[50, 100, 200]}
                 empty={<StateView kind="empty" detail="선택 기간의 관측 이벤트 미수집. 수집 상태와 기간을 확인하세요." />}
               />
               {selected &&

@@ -4,6 +4,7 @@ import { useLabReport, useRuntimeStatus } from "../../api/hooks";
 import { Badge } from "../../components/Badges";
 import { KeyValue } from "../../components/DetailPanel";
 import { PageHead } from "../../components/Misc";
+import { Pagination, usePagination } from "../../components/Pagination";
 import { useRuntimeProblems } from "./problems";
 import { StateBadge, Subtabs, TableCard, formatTime, rt } from "./parts";
 
@@ -20,6 +21,7 @@ export function RuntimeEnforcePage() {
   const realDrops = status?.observations.real_hubble_dropped ?? 0;
   const blocked = l02?.status === "passed" || realDrops > 0;
   const report = lab?.report;
+  const pagination = usePagination(sub === "lab" ? report?.cases.length ?? 0 : policies.length);
   return (
     <div className="page">
       <PageHead title={sub === "lab" ? "검증 시험 (Lab)" : "네트워크 정책 (Cilium)"} />
@@ -58,7 +60,7 @@ export function RuntimeEnforcePage() {
               <tr><th>정책</th><th>객체 상태</th><th>조건</th></tr>
             </thead>
             <tbody>
-              {policies.map((pol) => (
+              {policies.slice(pagination.start, pagination.end).map((pol) => (
                 <tr key={pol.name}>
                   <td className="mono">{pol.name}</td>
                   <td title={pol.last_updated ?? ""}>
@@ -75,6 +77,7 @@ export function RuntimeEnforcePage() {
               ))}
             </tbody>
           </table>
+          <Pagination state={pagination} />
           {policies.length === 0 && (
             <p className={rt.empty}>
               {collector ? (collector.last_error ? `정책 조회 실패: ${collector.last_error}` : "CiliumNetworkPolicy 객체가 없습니다.") : "Cilium 정책 상태 수집원이 설정되지 않았습니다."}
@@ -113,7 +116,7 @@ export function RuntimeEnforcePage() {
               <tr><th>시험</th><th>상태</th><th>요약·증거</th></tr>
             </thead>
             <tbody>
-              {(report?.cases ?? []).map((c) => (
+              {(report?.cases ?? []).slice(pagination.start, pagination.end).map((c) => (
                 <tr key={c.id}>
                   <td className="mono">{`${c.id} · ${c.title}`}</td>
                   <td><StateBadge value={c.status} /></td>
@@ -126,6 +129,7 @@ export function RuntimeEnforcePage() {
               ))}
             </tbody>
           </table>
+          <Pagination state={pagination} />
           {!report && (
             <p className={rt.empty}>
               {lab?.state === "not_configured"

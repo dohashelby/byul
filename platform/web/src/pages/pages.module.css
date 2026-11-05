@@ -14,14 +14,6 @@
 .dashboardChartRow {
   align-items: stretch;
 }
-.dashboardChartRow > article {
-  display: flex;
-  flex-direction: column;
-}
-.dashboardChartStack {
-  flex: 1;
-  justify-content: space-evenly;
-}
 .dashboardChartRow .chartSide > article:last-child {
   flex: 1;
 }
@@ -526,7 +518,6 @@
   align-items: baseline;
   gap: 8px;
 }
-.chartSubhead h3 { margin: 0; }
 .reasonList {
   margin: 0;
   padding: 0;
@@ -581,8 +572,8 @@
   text-align: right;
 }
 .reasonCount strong { color: var(--accent-ink); font-size: 15px; }
+.blockedTabs { flex-wrap: wrap; }
 .blockedSection { scroll-margin-top: 64px; }
-.blockedSelected { border-color: var(--accent); }
 .blockedSection h2 { margin: 0 0 12px; font-size: 16px; }
 .blockedCount { color: var(--accent-ink); font-size: 13px; }
 .blockedTable { width: 100%; border-collapse: collapse; font-size: 13px; }

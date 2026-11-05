@@ -250,7 +250,6 @@ function History({ kind, id }: { kind: DocKind; id: string }) {
         rows={items}
         rowKey={(r) => String(r.revision)}
         initialSort={{ id: "revision", dir: "desc" }}
-        pageSizes={[10, 25]}
       />
       {items.length < 2 ? (
         <span className="small muted">판본이 하나뿐이라 비교할 것이 없습니다.</span>
@@ -296,6 +295,7 @@ function History({ kind, id }: { kind: DocKind; id: string }) {
                   ]}
                   rows={d.entries}
                   rowKey={(e) => e.path}
+                  pageParam="page_diff"
                   empty={<span className="muted">차이가 없습니다</span>}
                 />
               )}

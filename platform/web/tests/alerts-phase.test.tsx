@@ -72,6 +72,17 @@ describe("알림 심각도와 묶음", () => {
     expect(await screen.findByText(/동일 판정·실행 파일/)).toBeTruthy();
     expect(screen.getByText(/셸 실행 — 의심 실행/)).toBeTruthy();
   });
+  it("탐지 알림 묶음 목록을 URL 페이지에서 25개씩 보여준다", async () => {
+    const items = Array.from({ length: 27 }, (_, index) => {
+      const event = flagged(`group-${index}`, "suspect_binary");
+      return { ...event, observation: { ...event.observation!, binary: `/bin/tool-${index}` } };
+    });
+    mockApi({ "/api/runtime/events": { items, invalid: [], source: SOURCE, truncated: false } });
+    renderAt("/runtime/alerts?page=2", "/runtime/alerts", <AlertsPage />);
+    const nav = await screen.findByRole("navigation", { name: "페이지 이동" });
+    expect(nav.textContent).toContain("26–27 / 27");
+    expect(screen.getAllByText(/프로세스·파일 탐지/)).toHaveLength(2);
+  });
 });
 
 describe("엔진 단계", () => {
@@ -136,9 +147,12 @@ describe("통합 개요", () => {
       "/api/runtime/events": { items: [...gatewayEvents, ...observations], invalid: [], source: SOURCE, truncated: false },
     });
     renderAt("/dashboard", "/dashboard", <DashboardPage />);
-    const chart = (await screen.findByText("시간대별 추이")).closest("article")!;
-    expect(chart.textContent).toContain("요청 56건");
-    expect(chart.textContent).toContain("관측 이벤트 5건");
+    const chart = (await screen.findByRole("heading", { name: "시간별 요청" })).closest("article")!;
+    const eventChart = screen.getByRole("heading", { name: "시간별 관측 이벤트" }).closest("article")!;
+    expect(screen.queryByRole("heading", { name: "시간대별 추이" })).toBeNull();
+    expect(chart.querySelector(".bigNumber")?.textContent).toBe("56최근 요청");
+    expect(eventChart.textContent).toContain("관측 이벤트 5건");
+    expect(eventChart.textContent).toContain("기타(관측·허용 등)");
     const totalTab = within(chart).getByRole("tab", { name: "전체" });
     const resultsTab = within(chart).getByRole("tab", { name: "결과별" });
     expect(totalTab.getAttribute("aria-selected")).toBe("true");
@@ -146,14 +160,16 @@ describe("통합 개요", () => {
     fireEvent.click(resultsTab);
     expect(resultsTab.getAttribute("aria-selected")).toBe("true");
     expect(chart.textContent).toContain("판정 미기록");
-    expect(chart.textContent).toContain("관측 이벤트 5건");
+    expect(eventChart.textContent).toContain("관측 이벤트 5건");
     fireEvent.click(totalTab);
     expect(totalTab.getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("heading", { name: "통제·관측 현황" })).toBeTruthy();
-    const chartRow = chart.parentElement!;
+    const chartRow = chart.parentElement!.parentElement!;
     expect(chartRow.children).toHaveLength(2);
     expect(chartRow.className).toContain("dashboardChartRow");
-    expect(chart.querySelector(".dashboardChartStack")).toBeTruthy();
+    const left = chartRow.children[0];
+    expect(Array.from(left.children, (card) => card.querySelector("h3")?.textContent)).toEqual(["시간별 요청", "시간별 관측 이벤트"]);
+    expect(eventChart.querySelector(".bigNumber")).toBeNull();
     const side = chartRow.children[1];
     expect(Array.from(side.children, (card) => card.querySelector("h3")?.textContent)).toEqual(["구성 비율", "거부·오류 사유"]);
     expect(screen.getAllByRole("heading", { name: "구성 비율" })).toHaveLength(1);

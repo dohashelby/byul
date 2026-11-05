@@ -11,6 +11,20 @@
   gap: 12px;
   min-width: 0;
 }
+.dashboardChartRow {
+  align-items: stretch;
+}
+.dashboardChartRow > article {
+  display: flex;
+  flex-direction: column;
+}
+.dashboardChartStack {
+  flex: 1;
+  justify-content: space-evenly;
+}
+.dashboardChartRow .chartSide > article:last-child {
+  flex: 1;
+}
 .three {
   display: grid;
   grid-template-columns: 200px minmax(0, 1fr) 440px;

@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useOverview, useRequests, useRuntimeEvents } from "../api/hooks";
 import { OriginBadge, VerdictBadge } from "../components/Badges";
 import { KeyValue } from "../components/DetailPanel";
 import { MetricCard, Query, StateView, ui } from "../components/Misc";
-import { ChartCard, Donut, EVENT_SERIES, REQUEST_SERIES, TimeBars, eventKey, type EventKey, type RequestKey } from "../components/StackedBars";
+import { ChartCard, Donut, EVENT_SERIES, REQUEST_SERIES, TimeBars, TimeLine, eventKey, type EventKey, type RequestKey } from "../components/StackedBars";
 import { AREA, GATEWAY_REASON } from "../lib/labels";
 import { matchesTarget, useEnvTarget } from "../lib/filters";
 import { bucketize, inRange } from "../lib/time";
@@ -12,6 +12,7 @@ import { carry, useGlobalFilters } from "../lib/url";
 import p from "./pages.module.css";
 
 const AREAS = ["SUP", "REQ", "PLT", "LIF", "OBS"] as const;
+const DAY = 24 * 60 * 60 * 1000;
 
 export function DashboardPage() {
   const overview = useOverview();
@@ -21,6 +22,7 @@ export function DashboardPage() {
   const { env, targetRef } = useEnvTarget();
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const [requestMode, setRequestMode] = useState("total");
   const go = (path: string, extra: Record<string, string> = {}) => navigate(`${path}${carry(params, extra)}`);
   const reqRows = useMemo(() => (requests.data?.items ?? []).filter((r) => inRange(r.recorded_at, range) && matchesTarget(r.target_ref, env, targetRef)), [requests.data, range, env, targetRef]);
   const evRows = useMemo(() => (events.data?.items ?? []).filter((e) => inRange(e.recorded_at, range) && matchesTarget(e.target_ref, env, targetRef)), [events.data, range, env, targetRef]);
@@ -32,7 +34,9 @@ export function DashboardPage() {
   const processDetected = evRows.some((e) => e.source === "tetragon" && e.observation?.kind === "process_exec" && e.outcome === "detected");
   const fileDetected = evRows.some((e) => e.source === "tetragon" && e.observation?.kind === "file_access" && e.outcome === "detected");
   const reqChart = bucketize(reqRows, (r) => r.recorded_at, (r) => r.outcome as RequestKey, REQUEST_SERIES.map((x) => x.key), range);
+  const reqDayChart = bucketize(reqRows, (r) => r.recorded_at, (r) => r.outcome as RequestKey, REQUEST_SERIES.map((x) => x.key), range, DAY);
   const evChart = bucketize(observationRows, (e) => e.recorded_at, (e) => eventKey(e.outcome), EVENT_SERIES.map((x) => x.key), range);
+  const openRequests = (from: number, to: number) => go("/runtime/requests", { period: "custom", from: new Date(from).toISOString(), to: new Date(to).toISOString() });
   const reasons = new Map<string, number>();
   for (const r of reqRows) if (["denied", "invalid", "engine_rejected", "error"].includes(r.outcome) && r.reason_code) reasons.set(r.reason_code, (reasons.get(r.reason_code) ?? 0) + 1);
   const topReasons = [...reasons.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -56,13 +60,20 @@ export function DashboardPage() {
         </div>
       </section>
       {status && <details className="card" style={{ padding: 16 }}><summary>요청 통제 정책 자세히</summary><KeyValue items={[["Gateway 활성", status.policy.gateway_active ? "활성" : "비활성"], ["사용자별 캐시 분리", <span style={status.policy.cache_isolation.mode === "per_principal" && !status.policy.cache_isolation.ready ? { color: "var(--error)" } : undefined}>{status.policy.cache_isolation.mode === "off" ? "비활성 (사용자 간 prefix cache 공유)" : status.policy.cache_isolation.mode === "per_principal" ? status.policy.cache_isolation.ready ? "활성" : `준비 불가(${status.policy.cache_isolation.unavailable_reason_code ?? "unknown"})` : "미확인"}</span>]]} /></details>}
-      <div className={p.chartRow}>
-        <ChartCard title="시간대별 추이">
-          <div className="stack"><div className={p.chartSubhead}><h3>요청</h3><span className="small muted">요청 {reqRows.length}건</span></div><TimeBars buckets={reqChart.buckets} size={reqChart.size} series={[...REQUEST_SERIES]} onSelectRange={(from, to) => go("/runtime/requests", { period: "custom", from: new Date(from).toISOString(), to: new Date(to).toISOString() })} /><div className={p.chartSubhead}><h3>관측 이벤트</h3><span className="small muted">관측 이벤트 {observationRows.length}건</span></div><TimeBars<EventKey> buckets={evChart.buckets} size={evChart.size} series={[...EVENT_SERIES]} onSelectRange={(from, to) => go("/runtime/events", { period: "custom", from: new Date(from).toISOString(), to: new Date(to).toISOString() })} /></div>
+      <div className={`${p.chartRow} ${p.dashboardChartRow}`}>
+        <ChartCard title="시간대별 추이" tabs={[{ id: "total", label: "전체" }, { id: "results", label: "결과별" }]} active={requestMode} onTab={setRequestMode}>
+          <div className={`stack ${p.dashboardChartStack}`}>
+            <div className={p.chartSubhead}><h3>요청</h3><span className="small muted">요청 {reqRows.length}건</span></div>
+            {requestMode === "total"
+              ? <TimeLine buckets={reqDayChart.buckets} size={reqDayChart.size} keys={REQUEST_SERIES.map((x) => x.key)} onSelectRange={openRequests} />
+              : <TimeBars buckets={reqChart.buckets} size={reqChart.size} series={[...REQUEST_SERIES]} onSelectRange={openRequests} />}
+            <div className={p.chartSubhead}><h3>관측 이벤트</h3><span className="small muted">관측 이벤트 {observationRows.length}건</span></div>
+            <TimeBars<EventKey> buckets={evChart.buckets} size={evChart.size} series={[...EVENT_SERIES]} onSelectRange={(from, to) => go("/runtime/events", { period: "custom", from: new Date(from).toISOString(), to: new Date(to).toISOString() })} />
+          </div>
         </ChartCard>
         <div className={p.chartSide}>
           <ChartCard title="구성 비율" note="선택한 기간의 요청 결과" total={reqRows.length}>
-            <Donut compact items={REQUEST_SERIES.map((series) => ({ ...series, value: resultCounts.get(series.key) ?? 0 }))} />
+            <Donut items={REQUEST_SERIES.map((series) => ({ ...series, value: resultCounts.get(series.key) ?? 0 }))} />
           </ChartCard>
           <ChartCard title="거부·오류 사유" footer={<p className="small muted">최근 요청 중 거부·오류 상위 5개 사유</p>}>
             {topReasons.length ? <ol className={p.reasonList}>{topReasons.map(([reason, count], index) => {

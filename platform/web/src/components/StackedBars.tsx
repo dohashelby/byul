@@ -211,13 +211,16 @@ export function TimeBars<K extends string>({
 }
 
 /** 시간대별 합계 선(면 채움). serving-runtime "시간별 요청 · 전체" 탭과 같은 모양. */
-export function TimeLine<K extends string>({ buckets, size, keys, height = 240 }: { buckets: Bucket<K>[]; size: number; keys: readonly K[]; height?: number }) {
+export function TimeLine<K extends string>({ buckets, size, keys, height = 240, onSelectRange }: { buckets: Bucket<K>[]; size: number; keys: readonly K[]; height?: number; onSelectRange?: (from: number, to: number) => void }) {
   const data = buckets.map((b) => ({ start: b.start, label: b.label, total: keys.reduce((a, k) => a + (b[k] as number), 0) }));
   if (data.every((d) => d.total === 0)) return empty(height);
   return (
     <div className={s.chartBox} style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+        <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }} onClick={(e: ChartEvent) => {
+          const start = e?.activePayload?.[0]?.payload?.start ?? buckets.find((b) => b.label === e?.activeLabel)?.start;
+          if (start !== undefined) onSelectRange?.(start, start + size);
+        }}>
           <CartesianGrid vertical={false} stroke="var(--grid)" />
           <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={{ stroke: "var(--grid)" }} minTickGap={24} />
           <YAxis allowDecimals={false} tick={AXIS} tickLine={false} axisLine={false} />

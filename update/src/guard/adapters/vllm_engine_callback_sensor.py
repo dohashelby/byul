@@ -24,6 +24,7 @@ from . import vllm_kernel_bounds_callback as kernel_bounds
 from . import vllm_graph_replay_callback as graph_replay
 from . import vllm_weights_lifetime_callback as weights_lifetime
 from . import vllm_comm_buffer_callback as comm_buffer
+from . import vllm_attempt_callback as attempt
 
 PROFILE = 'vllm-engine-callback-metadata/1'
 SCHEMA = 'guard-engine-callback-events/1'
@@ -45,6 +46,9 @@ MAX_SAMPLED_SLOTS = 256
 # slower in proportion to its length and multiplied the session rows.
 CACHE_TARGETS = {'vllm.v1.core.kv_cache_manager': cache.TARGETS['vllm.v1.core.kv_cache_manager']}
 MODULES = {**CACHE_TARGETS, **distributed.TARGETS, **SLOT_TARGETS, **SLOT_V2_TARGETS, **kernel_bounds.TARGETS, **graph_replay.TARGETS, **weights_lifetime.TARGETS, **comm_buffer.TARGETS}
+# #196 request-attempt(P1): settings의 request_attempts가 참일 때만 감싼다. KV 모듈은 cache 관측과 같은 모듈이라 지점별로 관측기를 고른다.
+MODULES = {**MODULES, attempt.SCHEDULER: attempt.TARGETS[attempt.SCHEDULER],
+           attempt.KV: MODULES.get(attempt.KV, ()) + attempt.TARGETS[attempt.KV]}
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
 MAX_FILE_BYTES = 16 * 1024 ** 2
@@ -198,6 +202,10 @@ class CommObserver(_Keyed, comm_buffer.CommBufferObserver):
     pass
 
 
+class AttemptObserver(_Keyed, attempt.AttemptObserver):
+    pass
+
+
 class Sink:
     def __init__(self, directory):
         self.path = Path(directory) / f'callbacks-{os.getpid()}.jsonl'
@@ -214,7 +222,8 @@ class Sink:
 
 
 class EngineCallbacks:
-    def __init__(self, session, secret, sink, *, context_provider=None, clock=None, fault_file=None, kernel_checks=False):
+    def __init__(self, session, secret, sink, *, context_provider=None, clock=None, fault_file=None, kernel_checks=False,
+                 request_attempts=False):
         self.sink = sink; self.fault_file = fault_file
         options = {'sink': sink, 'context_provider': context_provider, 'clock': clock}
         self.cache = CacheObserver(session, **options)
@@ -229,6 +238,10 @@ class EngineCallbacks:
         self.cache.secret = self.distributed.secret = self.slot.secret = self.slot_v2.secret = self.weights.secret = self.comm.secret = secret
         if self.kernel is not None:
             self.kernel.secret = self.graph.secret = secret
+        # 매 단계 scheduler를 감싸므로 명시한 세션에서만 만든다(다른 점검의 시간 측정에 부담을 주지 않게).
+        self.attempt = AttemptObserver(session, **options) if request_attempts else None
+        if self.attempt is not None:
+            self.attempt.secret = secret
 
     def instrument(self, module):
         """Validate every point of a module before changing any of them."""
@@ -243,6 +256,8 @@ class EngineCallbacks:
             except Exception:
                 self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
                 return False
+        if name in attempt.TARGETS:
+            return self._instrument_attempt(module, name)
         observer = (self.cache if name in CACHE_TARGETS else self.slot if name in SLOT_TARGETS
                     else self.slot_v2 if name in SLOT_V2_TARGETS else self.weights if name in weights_lifetime.TARGETS
                     else self.comm if name in comm_buffer.TARGETS
@@ -255,6 +270,24 @@ class EngineCallbacks:
         for (owner, method, _), wrapped in changes:
             setattr(owner, method, self._fault(wrapped) if method == FAULT_POINT and self.fault_file else wrapped)
         return True
+
+    def _instrument_attempt(self, module, name):
+        """scheduler·KV 모듈: 지점마다 관측기를 고른다. attempt 관측이 꺼져 있으면 원래 관측만 한다."""
+        plan = []
+        for point in MODULES[name]:
+            if point in attempt.TARGETS[name]:
+                if self.attempt is not None:
+                    plan.append((self.attempt, point))
+            elif name in CACHE_TARGETS and point in CACHE_TARGETS[name]:
+                plan.append((self.cache, point))
+        try:
+            changes = [(cache._function(module, point), observer.wrap(module, point)) for observer, point in plan]
+        except Exception:
+            self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
+            return False
+        for (owner, method, _), wrapped in changes:
+            setattr(owner, method, wrapped)
+        return bool(changes)
 
     def _fault(self, wrapped):
         """Lab only: raise once in the worker when the parent placed the fault file."""
@@ -278,7 +311,8 @@ class EngineCallbacks:
 
     def flush_gaps(self):
         kernel = self.kernel.gaps | self.graph.gaps if self.kernel is not None else set()
-        for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | self.weights.gaps | self.comm.gaps | kernel):
+        extra = self.attempt.gaps if self.attempt is not None else set()
+        for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | self.weights.gaps | self.comm.gaps | kernel | extra):
             self.gap(code)
 
 
@@ -320,7 +354,8 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
         callbacks = EngineCallbacks(settings['session'], bytes.fromhex(settings['secret']), Sink(directory),
             context_provider=context_provider,
             fault_file=str(directory / FAULT_FILE) if settings.get('lab_faults') is True else None,
-            kernel_checks=settings.get('lab_kernel_checks') is True)
+            kernel_checks=settings.get('lab_kernel_checks') is True,
+            request_attempts=settings.get('request_attempts') is True)
         sys.meta_path.insert(0, Finder(callbacks))
         atexit.register(callbacks.flush_gaps)
         return True

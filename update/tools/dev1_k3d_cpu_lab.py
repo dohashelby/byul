@@ -96,7 +96,8 @@ def use_gpu_profile():
 LIFECYCLE_FILES = ('guard_lifecycle_sensor.py', 'sitecustomize.py', 'settings.json', 'manifest.json')
 
 
-def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usage=None, gpu=None, restart_always=False):
+def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usage=None, gpu=None, restart_always=False,
+           engine_callbacks=None):
     """lifecycle_dir: `guard prepare-lifecycle-sensor` 출력. 주면 RUNBOOK의 계측 기동 설정을 더한다.
 
     고정 자산은 읽기 전용 /guard-lifecycle(ConfigMap), 기록은 /guard-lifecycle/data/<session>(엔진 UID 소유 0700)이다.
@@ -121,6 +122,16 @@ def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usa
                        'volumes': [{'name': 'models', 'hostPath': {'path': '/srv/models', 'type': 'Directory'}},
                                    {'name': 'shm', 'emptyDir': {'medium': 'Memory', 'sizeLimit': '1Gi'}},
                                    {'name': 'chat-template', 'hostPath': {'path': '/srv/models/guard-chat/guard-text-chat-v1.jinja', 'type': 'File'}}]}}
+    if engine_callbacks is not None:
+        # 엔진 콜백 센서(`guard prepare-engine-callbacks`). 노드에 마운트된 모델 폴더 아래 자산을 읽기 전용으로 쓴다(AWS lab의 hostPath 방식과 같다).
+        if lifecycle_dir is not None or not re.fullmatch(r'guard-callbacks-[a-z0-9-]{1,40}', engine_callbacks):
+            raise ValueError('K3D_RENDER_INPUT_INVALID')
+        container = engine['spec']['containers'][0]
+        container['env'].append({'name': 'PYTHONPATH', 'value': '/guard-lifecycle/engine-callbacks'})
+        container['volumeMounts'] += [{'name': 'guard-callbacks', 'mountPath': '/guard-lifecycle/engine-callbacks', 'readOnly': True},
+                                      {'name': 'callback-data', 'mountPath': '/guard-lifecycle/data'}]
+        engine['spec']['volumes'] += [{'name': 'guard-callbacks', 'hostPath': {'path': '/srv/models/' + engine_callbacks, 'type': 'Directory'}},
+                                      {'name': 'callback-data', 'emptyDir': {'sizeLimit': '128Mi'}}]
     if restart_always:
         # REQ-21 lab 재기동: 같은 Pod에서 엔진 컨테이너만 다시 뜨게 한다(engine_restart 동작의 전제).
         engine['spec']['restartPolicy'] = 'Always'
@@ -639,7 +650,7 @@ def main(argv=None):
                         help='gpu: 2단계 GPU lab. 이름공간·세대·별칭을 바꾼다. 같은 run의 모든 하위 명령에 같은 값을 준다.')
     sub = parser.add_subparsers(dest='kind', required=True)
     r = sub.add_parser('render'); r.add_argument('--run-id', required=True); r.add_argument('--engine-image', required=True)
-    r.add_argument('--restart-always', action='store_true'); r.add_argument('--gpu-model'); r.add_argument('--gpu-driver'); r.add_argument('--runtime-class')
+    r.add_argument('--restart-always', action='store_true'); r.add_argument('--engine-callbacks'); r.add_argument('--gpu-model'); r.add_argument('--gpu-driver'); r.add_argument('--runtime-class')
     r.add_argument('--lifecycle', type=Path); r.add_argument('--api-key-secret'); r.add_argument('--usage', choices=['forbidden', 'allowed'])
     r.add_argument('--out', type=Path, required=True)
     e = sub.add_parser('env'); e.add_argument('--render', type=Path, required=True); e.add_argument('--models', type=Path, required=True)
@@ -678,7 +689,7 @@ def main(argv=None):
         use_gpu_profile()
     load = lambda path: json.loads(Path(path).read_text(encoding='utf-8'))
     if args.kind == 'render':
-        raw, record = render(run_id=args.run_id, engine_image=args.engine_image, lifecycle_dir=args.lifecycle, api_key_secret=args.api_key_secret, usage=args.usage, restart_always=args.restart_always,
+        raw, record = render(run_id=args.run_id, engine_image=args.engine_image, lifecycle_dir=args.lifecycle, api_key_secret=args.api_key_secret, usage=args.usage, restart_always=args.restart_always, engine_callbacks=args.engine_callbacks,
             gpu=({k: v for k, v in (('model', args.gpu_model), ('driver', args.gpu_driver), ('runtime_class', args.runtime_class)) if v}
                  if args.profile == 'gpu' else None))
         for name, data in raw.items():

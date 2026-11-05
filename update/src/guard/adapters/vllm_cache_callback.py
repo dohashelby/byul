@@ -37,7 +37,9 @@ MAX_OBJECTS = 256
 MAX_BLOCKS = 256
 # Pinned sources above the default 128 KiB read bound, by SHA-256 and exact reviewed
 # size (vLLM 0.31.0 image). A file of any other size or content is still refused.
-SOURCE_BYTES = {'bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a': 335342}
+SOURCE_BYTES = {'bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a': 335342,
+                # vllm.v1.core.sched.scheduler (#196 request-attempt P1)
+                'f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a': 159016}
 _ACTIVE = contextvars.ContextVar('guard_cache_callback_active', default=None)
 # Digests of bytes that already matched their pin. The bytes are re-read and
 # re-hashed on every call; only the compile of identical bytes is reused.

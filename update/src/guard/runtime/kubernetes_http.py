@@ -60,6 +60,25 @@ for name in sorted(os.listdir(root)):
     left-=len(raw);rows.extend(json.loads(line) for line in raw.splitlines())
 print(json.dumps({"events":rows,"truncated":truncated}))
 '''
+# #196 request-attempt(P1): 프로세스별 콜백 기록과 그 프로세스의 시작 ticks. 살아 있지 않은 프로세스는 ticks가 None이다.
+ATTEMPT_EVENTS_READER = r'''
+import json,os,re,sys
+root="/guard-lifecycle/data/"+sys.argv[1];out=[];left=6*1024**2;truncated=False
+for name in sorted(os.listdir(root)):
+    found=re.fullmatch(r"callbacks-([1-9][0-9]*)\.jsonl",name)
+    if found is None:continue
+    pid=int(found.group(1))
+    with os.fdopen(os.open(os.path.join(root,name),os.O_RDONLY|os.O_NOFOLLOW),"rb") as stream:raw=stream.read(left+1)
+    if len(raw)>left:raw=raw[:left];truncated=True
+    raw=raw.rpartition(b"\n")[0];left-=len(raw)
+    rows=[json.loads(line) for line in raw.splitlines()]
+    rows=[r for r in rows if r.get("schema")=="guard-vllm-attempt-callback/1" or r.get("phase")=="GAP"]
+    try:
+        stat=open("/proc/%d/stat"%pid).read();ticks=int(stat.rsplit(")",1)[1].split()[19])
+    except (OSError,ValueError,IndexError):ticks=None
+    out.append({"pid":pid,"start_ticks":ticks,"events":rows})
+print(json.dumps({"processes":out,"truncated":truncated}))
+'''
 # REQ-16 lab only: replace the active LoRA files with one declared variant, keeping the same path.
 COLLECTION_STATUS_READER = r'''
 import hashlib,json,os,stat,sys
@@ -872,6 +891,22 @@ class KubernetesHTTP:
             f"--container={engine['container']}","--","python3","-c",ENGINE_CALLBACK_READER,session],cap=8*1024**2,budget=30)
         self._verify()
         if type(value) is not dict or type(value.get("events")) is not list or type(value.get("truncated")) is not bool:
+            raise KubernetesBindingError()
+        return value
+
+    def engine_attempt_events(self,session):
+        """#196 request-attempt: 선택 세션의 attempt 콜백 행을 프로세스별로 읽는다(시작 ticks 포함)."""
+        if self.profile!=ENGINE_CALLBACK_PROFILE or not re.fullmatch(r"[0-9a-f]{32}",session):
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        value=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],
+            f"--container={engine['container']}","--","python3","-c",ATTEMPT_EVENTS_READER,session],cap=8*1024**2,budget=30)
+        self._verify()
+        processes=value.get("processes") if type(value) is dict else None
+        if (type(processes) is not list or type(value.get("truncated")) is not bool
+                or any(type(p) is not dict or set(p)!={"pid","start_ticks","events"} or type(p["pid"]) is not int or p["pid"]<1
+                       or p["start_ticks"] is not None and (type(p["start_ticks"]) is not int or p["start_ticks"]<0)
+                       or type(p["events"]) is not list for p in processes)):
             raise KubernetesBindingError()
         return value
 

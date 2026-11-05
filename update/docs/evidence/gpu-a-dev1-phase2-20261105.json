@@ -1,0 +1,2361 @@
+{
+ "schema": "byul-gpu-a-check-summary/1",
+ "date": "2026-11-05",
+ "scope": "A/dev-1 approved single-L4 phase2; synthetic EXAMPLE/DRAFT lab, not enterprise certification",
+ "whole_question_complete": false,
+ "canonical_pack": "PACK-BASELINE@32",
+ "counts": {
+  "workflows": 25,
+  "canonical_pack_workflows": 20,
+  "derived_draft_pack_workflows": 5,
+  "unique_checks": 17,
+  "restored_saved_pack_rejudge_equal": 25
+ },
+ "evidence_archive_sha256": "504c08a31d88e34fcd990493576f7d982c0b81ff7b2e23127467d5e4fbd9062c",
+ "files_verified_after_export": 5429,
+ "runs": [
+  {
+   "run": "dev1-gpu-g1-20261105/OBS-06",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "f8814f5e5fde2b2ad842619336d40f6e00d29519ddf8ee291cf3ee4468135e42",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NVWY429EBHRFAH029938S1",
+     "revision": 1,
+     "sha256": "2028d95f16b2ca01c83a25a60f6d20d2b26e14544e891fb0a9de8335670c824d"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NWPP689E4ET43D6X7FE8EQ",
+     "revision": 1,
+     "sha256": "9f76d5a440b2719f5c8ff809795db0fc17f24e6f385fb7a575a9fda5a91def70"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NWPP9SSEAPNVRHE5966TT7",
+     "revision": 1,
+     "sha256": "a58443191a0203dccbe05f108102b2f192946c71ab33a74bef3b681f9f73abd3"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWPPQASXHQZTW385K1KZSE",
+     "revision": 1,
+     "sha256": "18a220f2b46676065336f093649ba420f6da7ee46eee6920597ef02cc37cf83d"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWPRGYVBEV0308TK08VN1Y",
+     "revision": 1,
+     "sha256": "2bdea3a4a61338ccd11d86fd041d2e2d81c2ba17e7a52be0b7e6dab433de0bf6"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NWPRYF1C04MV25SNMNXF4N",
+     "revision": 1,
+     "sha256": "2248473aa0d2c8a3d1376dd022285894b02c4b128a644b7c0db85511fd21509b"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWPRGYVBEV0308TK08VN1Y",
+     "revision": 1,
+     "sha256": "2bdea3a4a61338ccd11d86fd041d2e2d81c2ba17e7a52be0b7e6dab433de0bf6",
+     "check_id": "OBS-06",
+     "data_origin": "EXAMPLE",
+     "verification_level": null,
+     "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWPPQASXHQZTW385K1KZSE",
+     "revision": 1,
+     "sha256": "18a220f2b46676065336f093649ba420f6da7ee46eee6920597ef02cc37cf83d",
+     "check_id": "OBS-06",
+     "data_origin": "DECLARED",
+     "execution": {
+      "status": "ABORTED",
+      "executor": {
+       "name": "record_access",
+       "version": "0.1.0",
+       "config_sha256": "63c537c88a85ba23510dd70d571967c3b47d6cc381cab748370e31beaa1a4b67"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T12:59:53Z",
+      "finished_at": "2026-11-05T12:59:54Z",
+      "abort_reason": "RECORD_ACCESS_INVENTORY_UNAVAILABLE"
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g1-20261105/OBS-09",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "17f7c568df6cc210b4f644036261693f36a2dae5db5e012812e57eda16449eb6",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NVWY429EBHRFAH029938S1",
+     "revision": 1,
+     "sha256": "2028d95f16b2ca01c83a25a60f6d20d2b26e14544e891fb0a9de8335670c824d"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NW23EQ8EG1YCPTPN1CDCBM",
+     "revision": 1,
+     "sha256": "5bd5c6617598dd3cc739a168f8a503d66134522e7963f295fe3821e4a18293c2"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NW23J7RBF4JSQCK280B18A",
+     "revision": 1,
+     "sha256": "8bda77fdb992b426a435e64483cc9e01833599bc6bb17ba4743b9f33fa949a92"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NW23ZZTENBGJAD7Q9H9QFV",
+     "revision": 1,
+     "sha256": "5202bfe6fcd30d71d0841995cac732eb9d08279a490ae6d64b50402fbdb4009b"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NW2896E59KM64C3NGZC5XJ",
+     "revision": 1,
+     "sha256": "0fd01bead31ae677b8aab6b09d02dd8125bc75489d61e9e4fcbb7023806398ee"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NW28PMFF5QM06SVDF557S4",
+     "revision": 1,
+     "sha256": "db9cc5fe1fc70cf3ffb38c4555e1e3eaee08ac0ed90019e004b883b4a2dd0dd3"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NW2896E59KM64C3NGZC5XJ",
+     "revision": 1,
+     "sha256": "0fd01bead31ae677b8aab6b09d02dd8125bc75489d61e9e4fcbb7023806398ee",
+     "check_id": "OBS-09",
+     "data_origin": "EXAMPLE",
+     "verification_level": null,
+     "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NW23ZZTENBGJAD7Q9H9QFV",
+     "revision": 1,
+     "sha256": "5202bfe6fcd30d71d0841995cac732eb9d08279a490ae6d64b50402fbdb4009b",
+     "check_id": "OBS-09",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "ABORTED",
+      "executor": {
+       "name": "log_integrity",
+       "version": "0.3.1+k8s.1",
+       "config_sha256": "c6e8d069af94db752a0034f184090bd88663b40f126bcea1982779a56295a178"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T12:48:38Z",
+      "finished_at": "2026-11-05T12:48:42Z",
+      "abort_reason": "ARTIFACT_CAPTURE_INCOMPLETE"
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g1-20261105/REQ-01-closed",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "2dfe1fe3df82dcd111c2c9ccd69016700587ffa9dfdb2eab91383acf6db78fca",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NVWY429EBHRFAH029938S1",
+     "revision": 1,
+     "sha256": "2028d95f16b2ca01c83a25a60f6d20d2b26e14544e891fb0a9de8335670c824d"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NVZYEVK8J6GE7EXQGX19V8",
+     "revision": 1,
+     "sha256": "38c2841fbe5ec330079eff8424934c26d79813be6d0b72f32af3d8c255c13bad"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NVZYJGCX5PY4G86RB20578",
+     "revision": 1,
+     "sha256": "9ccc180d63f01b07a22e8b96f4b28995f6ed9068443656c7098e4b2290219702"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NVZZ037R35FJ3833MJVKN2",
+     "revision": 1,
+     "sha256": "cc56c37b710b8f0d50b924b725c7e00a53ed590591de8223e5b28e2223f22b7b"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NW16NYZ9SM5ZYAZNQ4AH70",
+     "revision": 1,
+     "sha256": "cf0bc85149a8687972eee16d69c1ca1ea5193191a6810de082d3f5024ef2f844"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NW173FJT27SPVF9H3X8XPY",
+     "revision": 1,
+     "sha256": "dc3d8ec29a70b41bfeaa3b7259b814683ca644d289ed1a87b3fac0b38dbb93c6"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NW16NYZ9SM5ZYAZNQ4AH70",
+     "revision": 1,
+     "sha256": "cf0bc85149a8687972eee16d69c1ca1ea5193191a6810de082d3f5024ef2f844",
+     "check_id": "REQ-01",
+     "data_origin": "EXAMPLE",
+     "verification_level": null,
+     "verdicts": {
+      "security": "PASS",
+      "functional": "PASS",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NVZZ037R35FJ3833MJVKN2",
+     "revision": 1,
+     "sha256": "cc56c37b710b8f0d50b924b725c7e00a53ed590591de8223e5b28e2223f22b7b",
+     "check_id": "REQ-01",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "direct_route",
+       "version": "0.6.0",
+       "config_sha256": "c59ef14b8bb1137eaa9f43ab497ea82600baa59c4b14b05ce6de51302f20dd1c"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T12:47:28Z",
+      "finished_at": "2026-11-05T12:48:08Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g1-20261105/REQ-01-open",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "4589dbd192c9829c7dfb00662a595928315b41d54c504a705ba7959703b6114d",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NVWY429EBHRFAH029938S1",
+     "revision": 1,
+     "sha256": "2028d95f16b2ca01c83a25a60f6d20d2b26e14544e891fb0a9de8335670c824d"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NWMZ6BR3QVQZZE9GKP1XR7",
+     "revision": 1,
+     "sha256": "9a879d0a35e5e8cd9a253e7957c20f3b5b602eb98b6a3e3003c4fda9de9d5d86"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NWMZ9V055V1GSA58MA7HBE",
+     "revision": 1,
+     "sha256": "117b1250f428ead73ffaaeddf5124431557c84d5660e700880c4f8f6f457fef5"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWMZQHFTC6NRJ9R4RYWGE0",
+     "revision": 1,
+     "sha256": "8e7873cc0e309d72db0e4be1a514db3863fa8bbfc7fea9edab14087d59b2ad55"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWN9BY9CVP5S3825M7Q62W",
+     "revision": 1,
+     "sha256": "5ce77a455b2b9d994758505c637078027aea4ce5216679e0ad0bcc9bda01b1e9"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NWN9SEDVBDPZ0ASK2BT4NB",
+     "revision": 1,
+     "sha256": "887f4fe9615e64b705b534da3c50e16d98d8a62820afb3139e6331adcb9fd55e"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWN9BY9CVP5S3825M7Q62W",
+     "revision": 1,
+     "sha256": "5ce77a455b2b9d994758505c637078027aea4ce5216679e0ad0bcc9bda01b1e9",
+     "check_id": "REQ-01",
+     "data_origin": "EXAMPLE",
+     "verification_level": null,
+     "verdicts": {
+      "security": "FAIL",
+      "functional": "PASS",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWMZQHFTC6NRJ9R4RYWGE0",
+     "revision": 1,
+     "sha256": "8e7873cc0e309d72db0e4be1a514db3863fa8bbfc7fea9edab14087d59b2ad55",
+     "check_id": "REQ-01",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "direct_route",
+       "version": "0.6.0",
+       "config_sha256": "c59ef14b8bb1137eaa9f43ab497ea82600baa59c4b14b05ce6de51302f20dd1c"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T12:58:57Z",
+      "finished_at": "2026-11-05T12:59:06Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g1-20261105/REQ-01-reclosed",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "253595ec11e65ffaf16f34a78b7bac616924b6c1fb77ce660cdc9fdee4af3002",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NVWY429EBHRFAH029938S1",
+     "revision": 1,
+     "sha256": "2028d95f16b2ca01c83a25a60f6d20d2b26e14544e891fb0a9de8335670c824d"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NWNCMRMKT40ACMSMNCQ411",
+     "revision": 1,
+     "sha256": "97af105a2aae5873efb60c6128b24321bbb909371f8db2cd58ae4f0e163875a1"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NWNCRBBGHEE1FN6D28B82N",
+     "revision": 1,
+     "sha256": "703777ffb74841cfb3a9972f93fe12658186f58fb4edabb2a3bcd6fc6b7326c6"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWND5ZK4Z0XACKE3H0ZHKM",
+     "revision": 1,
+     "sha256": "4a367e1b3aaa0c8268484d741355c91544f457df0effcef90335921214319dbf"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWPJY2EYDZT30XEPYJSWCW",
+     "revision": 1,
+     "sha256": "26e9c69c0f6c1019d2ea4e816f9d45b681c44c5a32ddcac722a7e3de6ed6f790"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NWPKBGEBDPP8GDVYDFSJWN",
+     "revision": 1,
+     "sha256": "00b9a4bf6603b6d8f89982f3ab9fc5c106d5cb8fbf7a456046a3a804a4ec6c3e"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWPJY2EYDZT30XEPYJSWCW",
+     "revision": 1,
+     "sha256": "26e9c69c0f6c1019d2ea4e816f9d45b681c44c5a32ddcac722a7e3de6ed6f790",
+     "check_id": "REQ-01",
+     "data_origin": "EXAMPLE",
+     "verification_level": null,
+     "verdicts": {
+      "security": "PASS",
+      "functional": "PASS",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWND5ZK4Z0XACKE3H0ZHKM",
+     "revision": 1,
+     "sha256": "4a367e1b3aaa0c8268484d741355c91544f457df0effcef90335921214319dbf",
+     "check_id": "REQ-01",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "direct_route",
+       "version": "0.6.0",
+       "config_sha256": "c59ef14b8bb1137eaa9f43ab497ea82600baa59c4b14b05ce6de51302f20dd1c"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T12:59:10Z",
+      "finished_at": "2026-11-05T12:59:49Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g1-20261105/REQ-03",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "b90ccb3582a4679b777a21195b3b5addc67fb3312dceb7fb10adbf30cab7ddd9",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NVWY429EBHRFAH029938S1",
+     "revision": 1,
+     "sha256": "2028d95f16b2ca01c83a25a60f6d20d2b26e14544e891fb0a9de8335670c824d"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NW19VJK9XYZPJWHAW3C0NJ",
+     "revision": 1,
+     "sha256": "869276dda0a9376dba403c2b79bdec9ce69ec33d742729bb634f6e129d438f87"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NW19Z5JR6234SQY0SXX2XK",
+     "revision": 1,
+     "sha256": "b5593b9136e3b69d2cd6acc322cb55c68970daaaab3e650c20e7fae9df459fca"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NW1ACQ7W1XCBWRJYA4XBGM",
+     "revision": 1,
+     "sha256": "5ffbaccb5afd2a1ea8405f0067897e05357ae6b1461f1b7c5122e6f3ecf05f8d"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NW1GTEN028FGNSF2BKQNGJ",
+     "revision": 1,
+     "sha256": "21f68281f015f7b6b8fc493abebf763cec4ab8726d79d7eac57a491882c72087"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NW1H7WCFZMS2Q5QFNDJG1B",
+     "revision": 1,
+     "sha256": "c38f87e12692daedc0260635dc73679ed2b75e3ad6b123aa7fc9ec9ab1547e2b"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NW1GTEN028FGNSF2BKQNGJ",
+     "revision": 1,
+     "sha256": "21f68281f015f7b6b8fc493abebf763cec4ab8726d79d7eac57a491882c72087",
+     "check_id": "REQ-03",
+     "data_origin": "EXAMPLE",
+     "verification_level": null,
+     "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "FAIL",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NW1ACQ7W1XCBWRJYA4XBGM",
+     "revision": 1,
+     "sha256": "5ffbaccb5afd2a1ea8405f0067897e05357ae6b1461f1b7c5122e6f3ecf05f8d",
+     "check_id": "REQ-03",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "role_route",
+       "version": "0.4.0",
+       "config_sha256": "a3dd0de86fb21dcc1a2a5003eef013a4415ecf98c3de47980d7017278f71cce4"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T12:48:12Z",
+      "finished_at": "2026-11-05T12:48:18Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g1-20261105/REQ-11",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "1168eb49de32f37d0acbe72103f7a2aba2bdd186bad9cc952722836398b6ce99",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NVWY429EBHRFAH029938S1",
+     "revision": 1,
+     "sha256": "2028d95f16b2ca01c83a25a60f6d20d2b26e14544e891fb0a9de8335670c824d"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NW2BEQ4MQN8SNHGRV8XSZP",
+     "revision": 1,
+     "sha256": "6367625ebb844f102d7511d7a8b54b29ce75bc0bf51b2c0752b0e3be5b0ca912"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NW2BJ623EPPAY49T21C5X0",
+     "revision": 1,
+     "sha256": "7d31e6a2003f32ec8e373936230d781f3bb5b99a294f5675ea61ce63cde6fca4"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NW2BZT6F4ESY3T441XAGKA",
+     "revision": 1,
+     "sha256": "65ddd58ac725b79699aa0c7a732954e390435ac525ad4fe3ba023c0b67bca099"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NW2CJEH6243MA93D0MBFX5",
+     "revision": 1,
+     "sha256": "2995ef73cd9cd1fd811b86149f442d27cae5fb764a58475a20f7b02802a144be"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NW2CZXEBV4FCNBJ5599CAF",
+     "revision": 1,
+     "sha256": "59e05b258c5d75b7b8603530cdcedba38e868f7710f7ee9d65d2ace7f8ed691d"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NW2CJEH6243MA93D0MBFX5",
+     "revision": 1,
+     "sha256": "2995ef73cd9cd1fd811b86149f442d27cae5fb764a58475a20f7b02802a144be",
+     "check_id": "REQ-11",
+     "data_origin": "EXAMPLE",
+     "verification_level": "EXAMPLE",
+     "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NW2BZT6F4ESY3T441XAGKA",
+     "revision": 1,
+     "sha256": "65ddd58ac725b79699aa0c7a732954e390435ac525ad4fe3ba023c0b67bca099",
+     "check_id": "REQ-11",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "request_binding",
+       "version": "0.1.5",
+       "config_sha256": "0724cf3519af0d9205e4193384ab63500fb682bf8fafddfed77cd338ab333e53"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T12:48:47Z",
+      "finished_at": "2026-11-05T12:48:47Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g1-20261105/REQ-13-both",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "62af1cca52ac9de42a5757c37877a06506f22fac6fe9acbfa4d7e9ed70428246",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NVWY429EBHRFAH029938S1",
+     "revision": 1,
+     "sha256": "2028d95f16b2ca01c83a25a60f6d20d2b26e14544e891fb0a9de8335670c824d"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NW1KZFJ0V1PZX51F3M7CK7",
+     "revision": 1,
+     "sha256": "cd0fafe86b6f83a93089e29f6028412ebe453dcb4420cacbae0d4f78a012200f"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NW1M2ZQV0K90S1VNFCVZMT",
+     "revision": 1,
+     "sha256": "010001afb5474f78bde2f3ef21006512f1f3b301ac7b1e8ad79c0f5325b99fd3"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NW1MGS7FCFF20WPZ7TY2N7",
+     "revision": 1,
+     "sha256": "602f9fe61dcece47fd10c4d2f1e53719f2af47b23575aabad48f2df2062875da"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NW209BJ6QTTY64KKH0NFHC",
+     "revision": 1,
+     "sha256": "f2b6ad4809519738b503c4315fa32b6555dc44aadde5402da8eb79fee2a72398"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NW20PSB9VH9GKRNSP3PR2F",
+     "revision": 1,
+     "sha256": "aa10c85fb0fa63fbce17e79d4c0c57395d15017d63c2e334cb377df5abcff80e"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NW209BJ6QTTY64KKH0NFHC",
+     "revision": 1,
+     "sha256": "f2b6ad4809519738b503c4315fa32b6555dc44aadde5402da8eb79fee2a72398",
+     "check_id": "REQ-13",
+     "data_origin": "EXAMPLE",
+     "verification_level": "EXAMPLE",
+     "verdicts": {
+      "security": "FAIL",
+      "functional": "PASS",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NW1MGS7FCFF20WPZ7TY2N7",
+     "revision": 1,
+     "sha256": "602f9fe61dcece47fd10c4d2f1e53719f2af47b23575aabad48f2df2062875da",
+     "check_id": "REQ-13",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "response_content",
+       "version": "0.2.1+k8s.1",
+       "config_sha256": "cd77b68a9b86c61655ae73baa974d76bc9c72c46a3769ffd430fbbdbefc109d2"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T12:48:23Z",
+      "finished_at": "2026-11-05T12:48:34Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g13-20261105/LIF-13",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "8f744ea4ab2178fdabdfcd279ce4f99a8616c86df462b1f9aafe251e108a6138",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NZXY2YBWW21VGFQTD7ERCZ",
+     "revision": 1,
+     "sha256": "a8c4e5d3eee8ce4ee8ae56de0d10572e4f65261c2d8b3ec1508d26c54416e092"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NZYSDRY2WG45E2106KGAWA",
+     "revision": 1,
+     "sha256": "b5228780f1b65b5248f84a50ba2595371977f0a28cd451a63e94a75be559c21d"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NZYSHCGWMX8NY81YB0CF4C",
+     "revision": 1,
+     "sha256": "f5fcb29ed899703c15643c4918184c4ca05f6422f79f4164f799f1b397d87891"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NZYSZ157FF4T54P1P8GR4J",
+     "revision": 1,
+     "sha256": "e4c71e1988194c3cc8da80d094f59f0bd0973041340f0fc61b4f940e94b7aa3c"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NZZ5F15XWHZSVA84N7TMEF",
+     "revision": 1,
+     "sha256": "fe4277d294047cde00c4d464c96d4878452e78f85f5ab9f1ba72efa2949fe57a"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NZZ5WEZEMQJVT11DPGJ9XH",
+     "revision": 1,
+     "sha256": "9b0f197301028d09d0fc4b1259eb00c83802c722896175ca4b8a75b8a0c8f2d2"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NZZ5F15XWHZSVA84N7TMEF",
+     "revision": 1,
+     "sha256": "fe4277d294047cde00c4d464c96d4878452e78f85f5ab9f1ba72efa2949fe57a",
+     "check_id": "LIF-13",
+     "data_origin": "EXAMPLE",
+     "verification_level": null,
+     "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NZYSZ157FF4T54P1P8GR4J",
+     "revision": 1,
+     "sha256": "e4c71e1988194c3cc8da80d094f59f0bd0973041340f0fc61b4f940e94b7aa3c",
+     "check_id": "LIF-13",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "ABORTED",
+      "executor": {
+       "name": "engine_sensor",
+       "version": "0.1.3",
+       "config_sha256": "7af6a7976d6fe4a59fad257a0b59be9b8ae80cde4900c3bb4daa6f7f0c33ac84"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T13:56:44Z",
+      "finished_at": "2026-11-05T13:56:55Z",
+      "abort_reason": "ENGINE_SENSOR_CALLBACK_SCOPE_INCOMPLETE"
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g15-20261105/REQ-15",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "5d6636ae8c51eeacd9a7172f38f45624c45fe5893a3378fa4f2b1944dea5c7e4",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6P08343FMX3Y4AX16RD6F0Q",
+     "revision": 1,
+     "sha256": "2fa7c1807b49b26a08cccda0f89014116cccca5deeaaa19f4024d2d11fe5379f"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6P0MTTG5CZ640CXHHEA3DHC",
+     "revision": 1,
+     "sha256": "7190646d8495ae1817abe82754f8d47dd74eda8a7e9e8cdf1ff730a26bd9b5ce"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6P0MTY36SNBEJVDST4SE5VE",
+     "revision": 1,
+     "sha256": "0158d4386ac53ac78e7f5cda24d8234cb4fc3c98d27fa3522fac3bbd7518cdf5"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6P0MVBTY3G3B7C9ZBKN7SQQ",
+     "revision": 1,
+     "sha256": "105d8b695a99ac3bd8d254c4f871c796a269845e6b2faf18171c5b28df07af6d"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6P0N7J8211H6PA4V0KWC7QQ",
+     "revision": 1,
+     "sha256": "af83e182fabdaafe78d1fe30a57b643e424cd19ce31286e43862c553fbdafd31"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6P0N7ZW37JKQRQ9PM6BGJWY",
+     "revision": 1,
+     "sha256": "47f77639961d0c557c623b1594286522f54b91fdd679f3ceace25261b63e9076"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6P0N7J8211H6PA4V0KWC7QQ",
+     "revision": 1,
+     "sha256": "af83e182fabdaafe78d1fe30a57b643e424cd19ce31286e43862c553fbdafd31",
+     "check_id": "REQ-15",
+     "data_origin": "EXAMPLE",
+     "verification_level": "EXAMPLE",
+     "verdicts": {
+      "security": "PASS",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6P0MVBTY3G3B7C9ZBKN7SQQ",
+     "revision": 1,
+     "sha256": "105d8b695a99ac3bd8d254c4f871c796a269845e6b2faf18171c5b28df07af6d",
+     "check_id": "REQ-15",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "engine_sensor",
+       "version": "0.1.4",
+       "config_sha256": "6f41f9b327c4d98cb3a68c4eabd3d246f478076bf4c70ff3e1da58a5be62403c"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T14:08:46Z",
+      "finished_at": "2026-11-05T14:08:59Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g18-20261105/REQ-18",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "90f6e6efd4fec263fc667cff617079588d98e803d5b718f4ccc51cb1b7b807e4",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NXCW6Q1V1D3QSSS7606MRT",
+     "revision": 1,
+     "sha256": "cd12176b2b42df4521e0354a363ab96ac01968fb7d12450aa7af2f9a2c269e07"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NXCWRY8FY860JC36MW30HB",
+     "revision": 1,
+     "sha256": "8d2f1b0fc65d6a6b47d6d6ca8b8d10a647ceeec70b64029acd16507bb8db76bd"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NXCWWK2ZAJ6V82VAGE06SJ",
+     "revision": 1,
+     "sha256": "1dbf9cdcfc4f14ac302869a7efe73b04458682ddf61c57bf4399ae593c75cb1f"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NXCXA9YEDWFKAYP05XEHWZ",
+     "revision": 1,
+     "sha256": "583cfe3721eadab5f2d9ec09576ec1c7e6151fb8f8e14538708f445cd3ee7b1a"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NXD273D0E7PP8866EMSVWV",
+     "revision": 1,
+     "sha256": "67319fdb13010c294d71a3bbd0e47f2a420b1595cbc4998e63bf71001e8400cd"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NXD2ME48NES83KTNS5BF5E",
+     "revision": 1,
+     "sha256": "49045ae05a2f27f40120c991ce05e9c5b892c50dced7a7d105e87b7f1f329027"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NXD273D0E7PP8866EMSVWV",
+     "revision": 1,
+     "sha256": "67319fdb13010c294d71a3bbd0e47f2a420b1595cbc4998e63bf71001e8400cd",
+     "check_id": "REQ-18",
+     "data_origin": "EXAMPLE",
+     "verification_level": "EXAMPLE",
+     "verdicts": {
+      "security": "PASS",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NXCXA9YEDWFKAYP05XEHWZ",
+     "revision": 1,
+     "sha256": "583cfe3721eadab5f2d9ec09576ec1c7e6151fb8f8e14538708f445cd3ee7b1a",
+     "check_id": "REQ-18",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "engine_sensor",
+       "version": "0.1.2",
+       "config_sha256": "0ba259414ad233f166245f0c97c0e0dbda521bc27a8949d3dd49084a16909044"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T13:12:01Z",
+      "finished_at": "2026-11-05T13:12:05Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g19-20261105/REQ-19",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "865fd9846017027f012867c6ff4664518e6aaca4eb1882adb7cd39b4712189ca",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NXFT71FHVGSHDH60RDZZSM",
+     "revision": 1,
+     "sha256": "77c33393a507ae0e4c438fa482b98b70995b0e6df4e91203f76a8bb8c3c5a320"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NXFTS6VMF2PSQ332P4QW9P",
+     "revision": 1,
+     "sha256": "bb100826056b28d8a086c6d7f30b601435920aa8ba9f791cf30ac6e57893f6b6"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NXFTWTAPS93SVXHC0WNC0Z",
+     "revision": 1,
+     "sha256": "1184d182dfad40bd766298d4e29a3b03cb574f9555fff40c235a7c005f67b7e3"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NXFVADKGXGBWZY97W3XR0Q",
+     "revision": 1,
+     "sha256": "a5f98f1cce7c2e452b84156f1347e60750fa3a31795d8fcb4ef4b36f0545abea"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NXG01XA93EFS9Y5KE9SMEH",
+     "revision": 1,
+     "sha256": "335d6022e6564a078064321f729614798e9875b53e22f62291ce11f2157b076e"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NXG0FCMPZN3YT9FPRS3DK0",
+     "revision": 1,
+     "sha256": "79ad575201c0f628588faa24b061bf31fcfcad6508496c3d990854e6003d059b"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NXG01XA93EFS9Y5KE9SMEH",
+     "revision": 1,
+     "sha256": "335d6022e6564a078064321f729614798e9875b53e22f62291ce11f2157b076e",
+     "check_id": "REQ-19",
+     "data_origin": "EXAMPLE",
+     "verification_level": null,
+     "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NXFVADKGXGBWZY97W3XR0Q",
+     "revision": 1,
+     "sha256": "a5f98f1cce7c2e452b84156f1347e60750fa3a31795d8fcb4ef4b36f0545abea",
+     "check_id": "REQ-19",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "ABORTED",
+      "executor": {
+       "name": "engine_sensor",
+       "version": "0.1.2",
+       "config_sha256": "bae8cf58ef6c0ad50aa466286e197e0d78831ea166eb74c8b44624946199d27b"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T13:13:37Z",
+      "finished_at": "2026-11-05T13:13:41Z",
+      "abort_reason": "ENGINE_SENSOR_CALLBACK_SCOPE_INCOMPLETE"
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g19-20261105/REQ-19-cold",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "f413d266b965a0410862adc97441b1842a02af6bf99440373a13bf01ecbcd4fc",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NXFT71FHVGSHDH60RDZZSM",
+     "revision": 1,
+     "sha256": "77c33393a507ae0e4c438fa482b98b70995b0e6df4e91203f76a8bb8c3c5a320"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NZM54PJFQHG5ZZATRX6FN8",
+     "revision": 1,
+     "sha256": "5615e238d2c381db7a4177a1bfa19e84706299309114c93bf72f35d66b4b9939"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NZM588RZ4RSCMP5P6HVB1N",
+     "revision": 1,
+     "sha256": "f4ad3097ebc901f37ddf510aa443558642cab87cfb13a5b0afd82a85cb829ebb"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NZM5P0D7T22QA31ZX551FG",
+     "revision": 1,
+     "sha256": "0f459b7cfa0ddad3282bf00906ce40e6ab75e58bc515d5bfdf42ea6b575c4574"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NZM90Z9F6RF6615DE2FGBM",
+     "revision": 1,
+     "sha256": "2ef8f29b0434a2a704fdf55f67795cd2fafa5217d19facdcc8078b2f795353d6"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NZM9EDE4WYMTFXFJ6Y04X6",
+     "revision": 1,
+     "sha256": "638e530398ad2adb2cd14d92fa43ba1cbf6f93599543c43a69bea276f4a737c2"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NZM90Z9F6RF6615DE2FGBM",
+     "revision": 1,
+     "sha256": "2ef8f29b0434a2a704fdf55f67795cd2fafa5217d19facdcc8078b2f795353d6",
+     "check_id": "REQ-19",
+     "data_origin": "EXAMPLE",
+     "verification_level": "EXAMPLE",
+     "verdicts": {
+      "security": "PASS",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NZM5P0D7T22QA31ZX551FG",
+     "revision": 1,
+     "sha256": "0f459b7cfa0ddad3282bf00906ce40e6ab75e58bc515d5bfdf42ea6b575c4574",
+     "check_id": "REQ-19",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "engine_sensor",
+       "version": "0.1.3",
+       "config_sha256": "3d6479ff830c97f90e7a00af39d8a13639c365245139df57ca2f2c481c871f88"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T13:50:56Z",
+      "finished_at": "2026-11-05T13:50:59Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g2-20261105/REQ-02",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "843a616c82ce61b9a60f9e3177b1f6d9cfd8aac54c1359546ea99ecb95c75b6f",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NX2H9AQPEH655EQMGZXGWA",
+     "revision": 1,
+     "sha256": "f73c9fe597f0f2a9b9b1fd04e8d575d6a2cb445cf51db46e4d7d9429b0c19867"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NX3ERNGGRN640F96Y4M6WK",
+     "revision": 1,
+     "sha256": "1937bd6231dbf4143ec5c46c4cb8956e32662b3e61f35857ac87dc173a4204c8"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NX3EW5H2DBHHXW6G69VK0H",
+     "revision": 1,
+     "sha256": "79de79ae656d34ef272353dcfacf296e72e2e403af6b99f5fc00e222383f570f"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NX3F9PF5FDQPD2QK5ZD51F",
+     "revision": 1,
+     "sha256": "8caf068504cdc879d12d89616e3f4024eaea6556349ff6aa396390740f9c5eb2"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NX3P3MTS9EBT4EP3VD2X0F",
+     "revision": 1,
+     "sha256": "4a1877ff16ba7b8f51f02a649a32008cbf63f90294d8e1167cee099da8fb811e"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NX3PHHRKMGFMKQEYARQGP6",
+     "revision": 1,
+     "sha256": "6befe83f7d9cb1066cc1e6b54c9c212c20c3fc49fdb3b7d5d87f80dd585c6d6a"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NX3P3MTS9EBT4EP3VD2X0F",
+     "revision": 1,
+     "sha256": "4a1877ff16ba7b8f51f02a649a32008cbf63f90294d8e1167cee099da8fb811e",
+     "check_id": "REQ-02",
+     "data_origin": "EXAMPLE",
+     "verification_level": "EXAMPLE",
+     "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NX3F9PF5FDQPD2QK5ZD51F",
+     "revision": 1,
+     "sha256": "8caf068504cdc879d12d89616e3f4024eaea6556349ff6aa396390740f9c5eb2",
+     "check_id": "REQ-02",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "route_record",
+       "version": "0.2.0",
+       "config_sha256": "0faeb823965cca2b71f854d7f287a7af108f894b7ef8275c0bc309c7d63305d0"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T13:06:51Z",
+      "finished_at": "2026-11-05T13:06:58Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g20off-20261105/REQ-20",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "8b43f865c13077e05e50dfd04b843825b101ab3253307fa86ecbb743e09a7765",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NZQ0NJHM1GZ8SHSMCFDQ64",
+     "revision": 1,
+     "sha256": "4f39cd0e8509ff3abd7a07d4d906c6f131c137fb7f375148eab818bfb8a5e3fb"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NZQ3RC9Z7Y0XRZ4HWRH42C",
+     "revision": 1,
+     "sha256": "adaab835f0e4e9bcffc21d01ddf306972cc5a8ea677c70f7b3daf732ebd83430"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NZQ3VYMZQGMSYN1M1ST132",
+     "revision": 1,
+     "sha256": "b76a89e9938649c86a7dfff4190255017f825978dad71974b186e716790a9af4"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NZQ49FKJT2ZNNY9SHSMG6H",
+     "revision": 1,
+     "sha256": "54dbe0e3ddfda971d3ed04fd385f7c47ea388df889c1bb183b0bac4bda63c618"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NZQ7N2N4H7EF7DHP1D2WC0",
+     "revision": 1,
+     "sha256": "2e04e042f5e5740d429c74e595b2a7fce3c32cb3dd466370e9dec9bce8e69bfc"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NZQ82M7T1HWWYTE0H42128",
+     "revision": 1,
+     "sha256": "b644ee337a2970bf0988d9986ab95c9377f2c2fdfc6d85d8f195fd155c8befef"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NZQ7N2N4H7EF7DHP1D2WC0",
+     "revision": 1,
+     "sha256": "2e04e042f5e5740d429c74e595b2a7fce3c32cb3dd466370e9dec9bce8e69bfc",
+     "check_id": "REQ-20",
+     "data_origin": "EXAMPLE",
+     "verification_level": null,
+     "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NZQ49FKJT2ZNNY9SHSMG6H",
+     "revision": 1,
+     "sha256": "54dbe0e3ddfda971d3ed04fd385f7c47ea388df889c1bb183b0bac4bda63c618",
+     "check_id": "REQ-20",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "ABORTED",
+      "executor": {
+       "name": "engine_sensor",
+       "version": "0.1.3",
+       "config_sha256": "8879397114626ce3dcedfecb97b6b9f46432fe56de68d2152a07a6d441c2d983"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T13:52:33Z",
+      "finished_at": "2026-11-05T13:52:36Z",
+      "abort_reason": "ENGINE_SENSOR_CALLBACK_SCOPE_INCOMPLETE"
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g20on-20261105/REQ-20",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "3f5f626827f57a5b8894b6aed3a2c29d34d91aed3f525d38555f1bd743c4aeea",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NZT9GYSBTFKRK32KEJ4XT6",
+     "revision": 1,
+     "sha256": "367358bff70b12603700cec680a352b1af90f2ee4bb4c5b314beda21746dcffb"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NZTA3AF8JXV7X7KDBP50BV",
+     "revision": 1,
+     "sha256": "da89adce649a672ab2291f89e2ceb159ff8ff42819935527cf7cf22a77e95b63"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NZTA6XDBQPZZ2THQSEJWWM",
+     "revision": 1,
+     "sha256": "e640bd0a0e4a79bd7ccdec160585e8266bc108ea28de193d8b020cacece4f5d8"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NZTAMG4RD9Q35AH6DQDX2D",
+     "revision": 1,
+     "sha256": "757c7495d62dbb72b43ed2ad71e60863973f6e600497e933496b25d2db429cd9"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NZTDXN0P9VXFYB758YWTKM",
+     "revision": 1,
+     "sha256": "f49e87fb13c9b30618c61f26a3906c827229b509117609c2c4f238ee2606caf3"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NZTEB46DG2QDQRGJCH825D",
+     "revision": 1,
+     "sha256": "8ca7c20c12f9e6dd558c54e1e9067d5c074dd81efb991c403df9e40b55055da7"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NZTDXN0P9VXFYB758YWTKM",
+     "revision": 1,
+     "sha256": "f49e87fb13c9b30618c61f26a3906c827229b509117609c2c4f238ee2606caf3",
+     "check_id": "REQ-20",
+     "data_origin": "EXAMPLE",
+     "verification_level": "EXAMPLE",
+     "verdicts": {
+      "security": "PASS",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NZTAMG4RD9Q35AH6DQDX2D",
+     "revision": 1,
+     "sha256": "757c7495d62dbb72b43ed2ad71e60863973f6e600497e933496b25d2db429cd9",
+     "check_id": "REQ-20",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "engine_sensor",
+       "version": "0.1.3",
+       "config_sha256": "967d2f3ec098d6317dbc2bebbbda3afc4c96ba3c9f98cb927ea8456ef9787105"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T13:54:17Z",
+      "finished_at": "2026-11-05T13:54:20Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g3-20261105/PLT-10",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "6531a691299136ba6674765909fa20d779dbe52eb836ef058529315cfa7ffc80",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NX6F637DPPVPYKW47T2K6J",
+     "revision": 1,
+     "sha256": "7802f634d0c2d7f232c8cfa31d142e06faf4855c05a6ade8fe22a4e68a5f974a"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NX6FX1MYSFCRGDVHN04E44",
+     "revision": 1,
+     "sha256": "7a41276371e6bb3129d40138802056affcb374a2bd93f5feaf4f6c78017b77b4"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NX6G0RVH1XZYDXRRPJSX14",
+     "revision": 1,
+     "sha256": "7b74c14fd5817ab14aefb2e42af7b6056e5ba9aa64388a7cc63c088b839c2d46"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NX6GEKT4F7Z9J4D2MTBK0A",
+     "revision": 1,
+     "sha256": "52433787a811841cdbf3e31bc6393e4a71041aff5a3c6e6cbe67b8365bdf0224"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NX6QT1PPW2YWXM8DPXM239",
+     "revision": 1,
+     "sha256": "0baaa1e61358de43fd6ce9c15d980d9e2eca3f37bf70308c6968fc7a955c4d18"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NX6R7Q6040CSVM54WBYBYV",
+     "revision": 1,
+     "sha256": "ea14412103586ef2f29d24a0067c04527bd8ab29e4f0830984cb4285b862e283"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NX6QT1PPW2YWXM8DPXM239",
+     "revision": 1,
+     "sha256": "0baaa1e61358de43fd6ce9c15d980d9e2eca3f37bf70308c6968fc7a955c4d18",
+     "check_id": "PLT-10",
+     "data_origin": "EXAMPLE",
+     "verification_level": "EXAMPLE",
+     "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NX6GEKT4F7Z9J4D2MTBK0A",
+     "revision": 1,
+     "sha256": "52433787a811841cdbf3e31bc6393e4a71041aff5a3c6e6cbe67b8365bdf0224",
+     "check_id": "PLT-10",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "credential_revocation",
+       "version": "0.1.0",
+       "config_sha256": "0d65048ac69d22087f6e490482f6efc7c32e71773fe98ac988fd260353b1268e"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T13:08:31Z",
+      "finished_at": "2026-11-05T13:08:38Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g4-20261105/OBS-04",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "eb1be8841ffa3a633917cd4a9da5b77077ed94baa58b5dba32d93bc133969228",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NWVAC47JS7G0GG5ARCYT94",
+     "revision": 1,
+     "sha256": "a063f6ba2c88c21d7cb29ca9a4f593ab607e7bab24a8f62c53af4acf93b832a8"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NWVAZXNNNY99W5D99H28X6",
+     "revision": 1,
+     "sha256": "2fa729425fef32dd4dd8222077176d679942728fe7fc9462f6551a0ecad3147e"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NWVB3F8Y4CBJG2MRJA3T1V",
+     "revision": 1,
+     "sha256": "fc63a557313296688fdc89911c2516f594a5f54803a293ee8989291a4f855a32"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWVBGZ99PTZNEKHSEWR41A",
+     "revision": 1,
+     "sha256": "6bd90d3bf4f4c409bfbc3a7cd78158dee6667214005b32cb9d8dc8c162aa132c"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWVKF2KH9EX77C3M1BQ45M",
+     "revision": 1,
+     "sha256": "3b6a621904e9b72685abe939a23da855f6db90c955a9658ce44bf7ed85c746bd"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NWVKWFKZSWXHAYDP8VRY62",
+     "revision": 1,
+     "sha256": "bbef1fc4c727d9578baa64fb924518d4184d0905219087e16bf279476131a9b2"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWVKF2KH9EX77C3M1BQ45M",
+     "revision": 1,
+     "sha256": "3b6a621904e9b72685abe939a23da855f6db90c955a9658ce44bf7ed85c746bd",
+     "check_id": "OBS-04",
+     "data_origin": "EXAMPLE",
+     "verification_level": "EXAMPLE",
+     "verdicts": {
+      "security": "PASS",
+      "functional": "PASS",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWVBGZ99PTZNEKHSEWR41A",
+     "revision": 1,
+     "sha256": "6bd90d3bf4f4c409bfbc3a7cd78158dee6667214005b32cb9d8dc8c162aa132c",
+     "check_id": "OBS-04",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "boundary_egress",
+       "version": "0.1.0+k8s.1",
+       "config_sha256": "e5719fb5071a81fd911e0275de811fdd15cfba03892ae0dff2b1e2f8d1c107a2"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T13:02:25Z",
+      "finished_at": "2026-11-05T13:02:33Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g4-20261105/REQ-11",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "e8a7112ffe908dc0733f343f53eede96a004a9de3b14e1105f3fbb792337c97f",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NWVAC47JS7G0GG5ARCYT94",
+     "revision": 1,
+     "sha256": "a063f6ba2c88c21d7cb29ca9a4f593ab607e7bab24a8f62c53af4acf93b832a8"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NWVPM1GJ782PEZZWP29FN3",
+     "revision": 1,
+     "sha256": "c7c05c8d57b2c7d725663d31b0578b3ae2425c8719b90aa8be7a11652cf336cf"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NWVPQ5J15E92B1BVD9PR6R",
+     "revision": 1,
+     "sha256": "0642235f865bdb86d1a7e6929dc064b385736960f4d5a6b6f1fde6ab8ba0c987"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWVQ4QPHS6SHYC5GKAKZ4G",
+     "revision": 1,
+     "sha256": "54aee5eb57d01e35076813f1cee8190aa153fd00c4138003f33db107b6e198c6"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWW1HMRJKD7KRX35J47BD1",
+     "revision": 1,
+     "sha256": "89eb81aeca9b3947106bf7773d29f4dd25244ec53c24ad9d44a6682f609ae4c1"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NWW1Z5583X0DEWV8GBMGPR",
+     "revision": 1,
+     "sha256": "10bb4126cfe098edbaeef46ea9550eb2982817c9309d549447138b6280c213fa"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWW1HMRJKD7KRX35J47BD1",
+     "revision": 1,
+     "sha256": "89eb81aeca9b3947106bf7773d29f4dd25244ec53c24ad9d44a6682f609ae4c1",
+     "check_id": "REQ-11",
+     "data_origin": "EXAMPLE",
+     "verification_level": "EXAMPLE",
+     "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "PASS",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWVQ4QPHS6SHYC5GKAKZ4G",
+     "revision": 1,
+     "sha256": "54aee5eb57d01e35076813f1cee8190aa153fd00c4138003f33db107b6e198c6",
+     "check_id": "REQ-11",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "request_binding",
+       "version": "0.1.5",
+       "config_sha256": "0724cf3519af0d9205e4193384ab63500fb682bf8fafddfed77cd338ab333e53"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T13:02:37Z",
+      "finished_at": "2026-11-05T13:02:47Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g5-20261105/OBS-05",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 32,
+    "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "626c5882e978c5889e8db630683ff0469afa7c2a905ad9f6fd34876f6b3c8279",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NWYSWAA7ZC9MG8AVHM8A7X",
+     "revision": 1,
+     "sha256": "51dbb27b63de865b0f297baa1dde9540d9cc0dbfbeb90088317fd72d5ab3eb03"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NWYTGAN86Z1YQSR4JZ9GSA",
+     "revision": 1,
+     "sha256": "7b8dfb2c098b28c74839d967064caee8e809f56a672c92e88080853ddf85d140"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NWYTKXXR1F8EVSENB2CV4A",
+     "revision": 1,
+     "sha256": "63eaf79d0b8ea6febb765b94581635b7dc5b260c180272f0219380f0e81fa6a3"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWYV1FHPSJN924ES3ZMMSS",
+     "revision": 1,
+     "sha256": "19785357be5adc547cb1ec2e93fd23b37c951a4ca6a991357b8d0f23b46c5e2d"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWZ30QZQW7MTSA4YH6M07A",
+     "revision": 1,
+     "sha256": "ee587b0300e6940d7dc7591aeae689befad78205eaf3a63e17bed5d9dfcc053c"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NWZ3ED5PD4HFR3VWGCT71P",
+     "revision": 1,
+     "sha256": "a49c6805be72ace99d5e8789ec8af50c405ca1103565809963b79f491adec86a"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWZ30QZQW7MTSA4YH6M07A",
+     "revision": 1,
+     "sha256": "ee587b0300e6940d7dc7591aeae689befad78205eaf3a63e17bed5d9dfcc053c",
+     "check_id": "OBS-05",
+     "data_origin": "EXAMPLE",
+     "verification_level": "EXAMPLE",
+     "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "PASS",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWYV1FHPSJN924ES3ZMMSS",
+     "revision": 1,
+     "sha256": "19785357be5adc547cb1ec2e93fd23b37c951a4ca6a991357b8d0f23b46c5e2d",
+     "check_id": "OBS-05",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "boundary_egress",
+       "version": "0.1.0+k8s.1",
+       "config_sha256": "391ea61a7422e8122d15e39a70f6646ca654bcc4aa6c02cfc8eb340a50a87991"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T13:04:20Z",
+      "finished_at": "2026-11-05T13:04:27Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  }
+ ],
+ "derived_pack_runs": [
+  {
+   "run": "dev1-gpu-g1-20261105/OBS-01",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-DEV1-GATEWAY-OBS01",
+    "revision": 1,
+    "sha256": "810d4e79edf5aba0c27d37cbfed7bf8a94a0abe6ab1b9547f1c1e5d213a63eb8"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "04de665132bb604c439f3bd12b13a015b28db3fc16e0f89a0bc9a9f8f6a1f224",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NVWY429EBHRFAH029938S1",
+     "revision": 1,
+     "sha256": "2028d95f16b2ca01c83a25a60f6d20d2b26e14544e891fb0a9de8335670c824d"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NWPW288KP3N80V7CH2DW39",
+     "revision": 1,
+     "sha256": "acecd54c3750274204ecc16724bdc96a05a62bc7cb1b25fbc3219134e830404c"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NWPW5SX9F4KYD5HZTY3365",
+     "revision": 1,
+     "sha256": "7945a682fe58f858f8b4e9870a832e28ef1ce3c524a4fad6d6b55832ac446e6e"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWPWKC44AKX2WWPPAZ5TE5",
+     "revision": 1,
+     "sha256": "29959cebf07da07770806dd19a4cc5e869bb5ba7b96ffd04bba59b5d1f4f966a"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWQ1E3D0067E7HA31T0VN1",
+     "revision": 1,
+     "sha256": "57fcb185d7d87ca1232be85aa983743c47e7d9f4d1c3148c71b87b249f211e31"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NWQ1WZS7RAJ8F08730RP1J",
+     "revision": 1,
+     "sha256": "069847c3199904daa500671a73a4d944b94665248946915975b0d40524f9189a"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWQ1E3D0067E7HA31T0VN1",
+     "revision": 1,
+     "sha256": "57fcb185d7d87ca1232be85aa983743c47e7d9f4d1c3148c71b87b249f211e31",
+     "check_id": "OBS-01",
+     "data_origin": "EXAMPLE",
+     "verification_level": null,
+     "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWPWKC44AKX2WWPPAZ5TE5",
+     "revision": 1,
+     "sha256": "29959cebf07da07770806dd19a4cc5e869bb5ba7b96ffd04bba59b5d1f4f966a",
+     "check_id": "OBS-01",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "ABORTED",
+      "executor": {
+       "name": "required_event_record",
+       "version": "0.2.0",
+       "config_sha256": "a398d83bd88c58765d4b41454be8408a73737f9cd3c83237507f5b0a9632c158"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T12:59:59Z",
+      "finished_at": "2026-11-05T13:00:03Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g1-20261105/PLT-07-denied",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-KUBERNETES-BOUNDARY-EGRESS",
+    "revision": 1,
+    "sha256": "9b7078f73e9a9cc3a35f8da30ab18e49e9b50390ee94a125ec32300f4f198047"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "332719b8e7759aed2c8511fa765522241d2e6cbc3d053be4aa39bb52a039fca4",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NVWY429EBHRFAH029938S1",
+     "revision": 1,
+     "sha256": "2028d95f16b2ca01c83a25a60f6d20d2b26e14544e891fb0a9de8335670c824d"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NWQB8J8HAQWPK0ZY0F4V78",
+     "revision": 1,
+     "sha256": "381fec3c07b753463feb87d0e7fca401ba2793b7927918ad6b176a4938739711"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NWQBBDTVXGCY94QB9QC2VA",
+     "revision": 1,
+     "sha256": "4ff57b394a0491898cad0814d8b4166ad5b67904e1cb2bfcc2092058caae6ec0"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWQBRATJ3Q8CT008R5VQBJ",
+     "revision": 1,
+     "sha256": "f17fdea182f6ff157966c95c383158b7556606857bccc73bd5eccf49f6584e9c"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWQEF169PEPV9HPADQKKNJ",
+     "revision": 1,
+     "sha256": "11542a982c7a5a5793ae5e35e9c6852cc8e71ac18ff4f91c4865bc37b3887893"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NWQEVQR3Y6HF1QG1P0G8SE",
+     "revision": 1,
+     "sha256": "736c17ffef4175dd08aa643ebeb8a4a5e83bd1ff4e919d09a7e9922620b0fe7d"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWQEF169PEPV9HPADQKKNJ",
+     "revision": 1,
+     "sha256": "11542a982c7a5a5793ae5e35e9c6852cc8e71ac18ff4f91c4865bc37b3887893",
+     "check_id": "PLT-07",
+     "data_origin": "EXAMPLE",
+     "verification_level": null,
+     "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWQBRATJ3Q8CT008R5VQBJ",
+     "revision": 1,
+     "sha256": "f17fdea182f6ff157966c95c383158b7556606857bccc73bd5eccf49f6584e9c",
+     "check_id": "PLT-07",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "ABORTED",
+      "executor": {
+       "name": "boundary_egress",
+       "version": "0.1.0",
+       "config_sha256": "7df25900b9a591ea1816a07a6c4b75f0fb83a4a8c424fb5d2c536e128979aa39"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T13:00:14Z",
+      "finished_at": "2026-11-05T13:00:17Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g1-20261105/PLT-07-open",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-KUBERNETES-BOUNDARY-EGRESS",
+    "revision": 1,
+    "sha256": "9b7078f73e9a9cc3a35f8da30ab18e49e9b50390ee94a125ec32300f4f198047"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "f68d1a26444389a4d8befc99ad3fb48efccec390856c1e68c26cb9bb2535bd19",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6NVWY429EBHRFAH029938S1",
+     "revision": 1,
+     "sha256": "2028d95f16b2ca01c83a25a60f6d20d2b26e14544e891fb0a9de8335670c824d"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6NWQ5R8872JQ0S01JYCKWTB",
+     "revision": 1,
+     "sha256": "17c0acc8233a43db81b9a0272138b24a84968880aeb362d392c126d7afdb3e2f"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6NWQ5V3A8WSKJ57KM9KDP3W",
+     "revision": 1,
+     "sha256": "e98c1ac09f119fe16dd3183cfb0f6976db47dbfcafd82474bb545e529968fd8f"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWQ6839T5JZ068751EQ422",
+     "revision": 1,
+     "sha256": "1b388ba4b56f75e61cfdd861aafc1589579012ddfd2812a6abfb58b22d1ed0ed"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWQ7Z61SGQJMD5JM366E4Z",
+     "revision": 1,
+     "sha256": "6913db0509107bd2372a13543f72943b28ea371003a1bf51d341566ae26610e9"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6NWQ8BNAXBQ65RMNW77HCPV",
+     "revision": 1,
+     "sha256": "62cf95a6b95ee6060c53063dc2f4e23b6bc4507d3c138ecef43e797512251fcc"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6NWQ7Z61SGQJMD5JM366E4Z",
+     "revision": 1,
+     "sha256": "6913db0509107bd2372a13543f72943b28ea371003a1bf51d341566ae26610e9",
+     "check_id": "PLT-07",
+     "data_origin": "EXAMPLE",
+     "verification_level": "EXAMPLE",
+     "verdicts": {
+      "security": "FAIL",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6NWQ6839T5JZ068751EQ422",
+     "revision": 1,
+     "sha256": "1b388ba4b56f75e61cfdd861aafc1589579012ddfd2812a6abfb58b22d1ed0ed",
+     "check_id": "PLT-07",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "COMPLETED",
+      "executor": {
+       "name": "boundary_egress",
+       "version": "0.1.0",
+       "config_sha256": "0e19ea2169d6f0985fb668da2fead209bd2537fb87456dd703932ec9a3bfdfef"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T13:00:09Z",
+      "finished_at": "2026-11-05T13:00:10Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g15-20261105/OBS-01-fresh",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-DEV1-GATEWAY-OBS01",
+    "revision": 1,
+    "sha256": "810d4e79edf5aba0c27d37cbfed7bf8a94a0abe6ab1b9547f1c1e5d213a63eb8"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "356ac4f749739bccc91349bbe12b9ff18a5b0a6a5f51a13d5dd76d81c762796c",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6P08343FMX3Y4AX16RD6F0Q",
+     "revision": 1,
+     "sha256": "2fa7c1807b49b26a08cccda0f89014116cccca5deeaaa19f4024d2d11fe5379f"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6P08756NBN10PF8WGZSXQ04",
+     "revision": 1,
+     "sha256": "b9f0fce2ca2d769c4c2717be1f857c4eb4aff59518dd75857bfa6ea4c0b8a6cb"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6P0878QMQYRGNVX8BARWY61",
+     "revision": 1,
+     "sha256": "4d6fa992809dd26e81634db1c565697e4aa88504cfc45830f12f7dc3337cad77"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6P087PEM58B6ZBEZAZ1AMMQ",
+     "revision": 1,
+     "sha256": "55ced60c29a95cff50e167dc114407d6e4f396bc37fcb47559aa12659218a9e3"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6P08DETMFRN59DTWPTVHDYV",
+     "revision": 1,
+     "sha256": "8fd140d5b7f10bfb21c1d2bd80ec50e46dd8c47e8ba052d9d94c53904c8315cf"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6P08DWAAR0GRR0DRMXZPZNN",
+     "revision": 1,
+     "sha256": "fb9844c997d064119cf91c6ba26d8007423ca99f7550bcffcf64890cc2127982"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6P08DETMFRN59DTWPTVHDYV",
+     "revision": 1,
+     "sha256": "8fd140d5b7f10bfb21c1d2bd80ec50e46dd8c47e8ba052d9d94c53904c8315cf",
+     "check_id": "OBS-01",
+     "data_origin": "EXAMPLE",
+     "verification_level": null,
+     "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6P087PEM58B6ZBEZAZ1AMMQ",
+     "revision": 1,
+     "sha256": "55ced60c29a95cff50e167dc114407d6e4f396bc37fcb47559aa12659218a9e3",
+     "check_id": "OBS-01",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "ABORTED",
+      "executor": {
+       "name": "required_event_record",
+       "version": "0.2.0",
+       "config_sha256": "4f90622cc83dfef262a77b5debd9de25524aeee68498ed9bbbdf84701f2c74b6"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T14:01:53Z",
+      "finished_at": "2026-11-05T14:01:59Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g15-20261105/OBS-01-stable",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-DEV1-GATEWAY-OBS01",
+    "revision": 1,
+    "sha256": "810d4e79edf5aba0c27d37cbfed7bf8a94a0abe6ab1b9547f1c1e5d213a63eb8"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "549c3707e04c6ca16d7fe720361d683c0bc76ab1b2a4c8a6427973dea0a76a78",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6P08343FMX3Y4AX16RD6F0Q",
+     "revision": 1,
+     "sha256": "2fa7c1807b49b26a08cccda0f89014116cccca5deeaaa19f4024d2d11fe5379f"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6P0M6Q2DHAFS789NVA7PDF6",
+     "revision": 1,
+     "sha256": "87040d6160ba64b60b6932cde36c457be16f067742217cf549a9c294cfbb096e"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6P0M6TMGVYX2YPNS28PAGWA",
+     "revision": 1,
+     "sha256": "144c44fb577df23b7a28b4a9cbed3ddd0d23ab0d4152710618bb29049ec4cd82"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6P0M785EH3QZ4156Z257RBP",
+     "revision": 1,
+     "sha256": "9f097d823d3b2daac920455766e980f1e62bcc2cb3a54d2da5e4430b2f3b22a2"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6P0MC1SBJRV9X9Q5HNXTFEA",
+     "revision": 1,
+     "sha256": "97fe7b8a03b8d26ba37c99113d63e22b11d8f2fc0dafc8cfe65d42815c99c16a"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6P0MCF12ZNTTF4RB6Y5CSXQ",
+     "revision": 1,
+     "sha256": "c66c28352a8076fca65ed34aae54d5fbc0f9a0e90efa8608edce9df5f6bedee7"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6P0MC1SBJRV9X9Q5HNXTFEA",
+     "revision": 1,
+     "sha256": "97fe7b8a03b8d26ba37c99113d63e22b11d8f2fc0dafc8cfe65d42815c99c16a",
+     "check_id": "OBS-01",
+     "data_origin": "EXAMPLE",
+     "verification_level": null,
+     "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6P0M785EH3QZ4156Z257RBP",
+     "revision": 1,
+     "sha256": "9f097d823d3b2daac920455766e980f1e62bcc2cb3a54d2da5e4430b2f3b22a2",
+     "check_id": "OBS-01",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "status": "ABORTED",
+      "executor": {
+       "name": "required_event_record",
+       "version": "0.2.0",
+       "config_sha256": "4f90622cc83dfef262a77b5debd9de25524aeee68498ed9bbbdf84701f2c74b6"
+      },
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "started_at": "2026-11-05T14:08:26Z",
+      "finished_at": "2026-11-05T14:08:30Z",
+      "abort_reason": null
+     }
+    }
+   ]
+  }
+ ],
+ "excluded_scopes": {
+  "REQ-14": "TP2 additional GPU approval not provided",
+  "REQ-21": "TP2 additional GPU approval not provided",
+  "REQ-16": "multimodal model selection/download approval not provided"
+ },
+ "code_validation": {
+  "head": "6207638998839d64ab1f9ee6d9a1d46c9e2e89e6",
+  "run": 42040646656,
+  "jobs": 7,
+  "conclusion": "success",
+  "default_passed": 11312,
+  "existing_skipped": 1,
+  "pytest_seconds": 468.88,
+  "parent_seconds": 469.629,
+  "wheel_build": true,
+  "outside_checkout_install_verify": true
+ },
+ "producer_validation_summary": "docs/evidence/dev1-p1-v2-gpu-20261105.json",
+ "resource_cleanup": {
+  "instance_type": "g6.2xlarge",
+  "region": "ap-northeast-2",
+  "gpu_count": 1,
+  "state_verified": "stopped",
+  "started_at": "2026-11-05T12:11:44+00:00",
+  "stop_requested_at": "2026-11-05T14:15:00+00:00",
+  "stopped_observed_at": "2026-11-05T14:24:14+00:00",
+  "hourly_usd": 1.20208,
+  "ec2_estimate_usd_range": [
+   2.4696,
+   2.6546
+  ],
+  "ec2_user_cap_usd": 8,
+  "actual_bill_verified": false,
+  "preserved_EBS_billed_separately": true,
+  "automatic_public_ip_released": true,
+  "owned_namespace_removed": true,
+  "original_serving_replicas": 0,
+  "gpu_memory_after_cleanup_mib": 0,
+  "temporary_auth_env_files_deleted": 5,
+  "proof": "gpu-stopped.png"
+ }
+}

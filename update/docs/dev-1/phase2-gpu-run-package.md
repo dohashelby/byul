@@ -1,12 +1,14 @@
 # 개발 담당 26개 2단계 GPU 실행 묶음 (묶음 7, 2026-11-05)
 
+2026-11-05 실행 기록: `gpu-20261105.md`와 `../evidence/gpu-a-dev1-phase2-20261105.json`. 승인된 단일 L4 실측·진단 17개/증거 왕복25건을 완료했다. 미승인 TP2·멀티모달과 기업 입력은 남는다. 아래 표는 최초 실행 계획이며 실제 세대별 argv·이미지·Ref·실패는 증거가 우선한다.
+
 사용자 결정(DECISIONS 2026-11-04)에 따라 개발 담당 점검은 2단계 GPU lab에서 GPU 서빙 이미지로 한 번에 실측한다. 이 문서는 그 실행 묶음이다. 1단계의 k3d CPU 결과는 경로 진단이며 실측 수에 넣지 않는다.
 
 ## 1. 전제
 
 | 항목 | 값 | 확인 방법 |
 |---|---|---|
-| 환경 | AWS L4 단일 GPU, Linux amd64, K3s, NVIDIA device plugin | `kubectl get node -o jsonpath='{..allocatable.nvidia\.com/gpu}'` = 1 |
+| 환경 | AWS L4 단일 GPU, Linux amd64, Kubernetes(kubeadm), NVIDIA device plugin | `kubectl get node -o jsonpath='{..allocatable.nvidia\.com/gpu}'` = 1 |
 | 엔진 이미지 | `vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b` (0.31.0, linux/amd64; `docs/gpu-a/ENVIRONMENT.md`) | Pod `imageID` |
 | Gateway 이미지 | runtime `deploy/gateway/Dockerfile` 빌드. 1단계 k3d에서 쓴 `serving-gateway@sha256:5e79946d…`는 arm64라 다시 빌드한다 | 레지스트리 digest |
 | 모델 | `facebook/opt-125m@27dcfa74…`와 guard chat template(1단계와 같음) | `env` 하위 명령의 inventory |

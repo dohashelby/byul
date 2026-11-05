@@ -1,3 +1,11 @@
+## 2026-11-05 — A 개발 담당 GPU 인수 실측 마감
+
+- 한 일: 사용자 승인 EC2 최대 $8 범위에서 기존 서울 L4 한 장을 재시작해 신규 process-device-provider·V2 runner-consumption 생산자 2종을 GPU 증거로 등록했다(원6종 SHA 유지). A 17개 항목의 실측·진단과 25개 증거 왕복을 마쳤다. 정본 PACK32 20건과 파생 DRAFT5건을 구분하고 원 FAIL·UNKNOWN·첫 실패를 보존했다.
+- 보수: 실제 Pod command·템플릿·모델 mount 입력, lifecycle eager/GPU 메모리 인자 유지, REQ-20 동일 입력 비교 nonce, REQ-15 실제 Gateway/엔진/주체 연결을 고쳤다. 전체 source gate446파일·원 B pin·PACK32·판정 기준을 유지한다.
+- 검증: 코드6207638 CI42040646656 기본11312통과/기존제외1(pytest468.88초·부모469.629초), wheel·저장소 밖 설치·Docker stub·양 OS 계약·platform 포함7작업 success. 직접 Gateway/인접128통과·기존1제외(7.42초·부모7.580초), source gate8통과(0.74초·부모0.878초). 새 skip·assert 완화0.
+- 증거: 5429파일 반출 SHA 검증, 25건 원 Ref·저장 팩 재판정 일치. archive504c08a3…fbd9062c. 세부 결과는 docs/dev-1/gpu-20261105.md와 docs/evidence/gpu-a-dev1-phase2-20261105.json. 상태 표의 DONE은 lab 단계 완료이며 기업·전체 질문 PASS가 아니다.
+- 남음: LIF-13 daemon 행의 정본 세션 결합, REQ-11 출력 소유권 독립 증명, OBS-09 복수행 경계, OBS-05 양성 보고·기업/runtime 기록 인증 입력. TP2(REQ-14/21)·멀티모달(REQ-16)은 이번 승인 밖이다. 시험 namespace/임시 인증 자료 정리·서빙0·GPU0MiB 확인, EC2 stopped·자동 공인IP 해제까지 확인했다(23:15:00 중지 요청/23:24:14 관측). EC2 추정$2.47~$2.65, 상한$8 이내·EBS 별도; COST_LEDGER에 기록했다.
+
 ## 2026-11-05 — A 개발 담당 process-device-provider·P2 V2 CPU 준비 인계
 
 - 한 일: Claude의 사용량 한도 중단 상태와 미커밋 14파일을 컴퓨터 유즈로 확인·백업했다. PLT-01·04 노드 관측/계약 변환, P2 V2 runner 관측/변환, 준비 자산·전송·수집 도구 연결과 계약 과제를 이어받았다. 읽기 실패/잘림의 unknown 보존·장치 시험 UID 일치·cgroup 재확인·후보 상한의 명시 오류·비정상 V2 개수 처리를 보수했다.

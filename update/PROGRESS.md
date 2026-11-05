@@ -1,3 +1,11 @@
+## 2026-11-06 — LIF-13 가중치 수명 행 세대 결합(CPU 개발)
+
+- 한 일: 11-05 GPU LIF-13 ABORTED 원인을 원 콜백 행으로 확인했다(daemon은 경계 요청을 받지 않고 소비자는 기동 때 취득 → `window()`가 가중치 행 전부 제외, 소비자0·release 미관측). 가중치 수명 행을 현재 컨테이너 세대(같은 노드 monotonic)로 결합하고 경계 전 release·이전 컨테이너 행을 제외했다. 소비자 기동·release 뒤 재취득을 정본 실행 lab 동작 `weights_consumer_start`로 넣고 실행이 띄운 소비자만 정리한다. LIF-13만 실행 상한 900초. 원 EVD/RES는 바꾸지 않았다. 상세 `docs/dev-1/lif13-generation-scope.md`.
+- 테스트 결과: LIF-13 직접 16 통과. 콜백·lab·생산자·불변식 399 통과·기존1 제외(pytest2.65초). Kubernetes 전송·gate 인접 1,763 통과·44 실패(Linux x86_64 전용 profiler 조건·macOS 경로; 변경 전 HEAD에서도 같은 44개). 검토 소스 manifest `01301f69…744e`. 최종 전체는 Linux CI로 확인한다.
+- 진단 재투영(증거 아님): 11-05 원 행 전체에 새 투영을 적용하면 소비자2·거절1·fallback1·위반 없음, 남은 것은 release 기업 인가뿐. release 뒤 행은 실행 뒤 수작업이라 정본 GPU 재실측이 필요하다.
+- 다음 단계: OBS-09 사건 경계·REQ-11 출력 소유권 CPU 개발 → LIF-13 포함 단일 GPU 재실측(비용 확인).
+- 막힌 것: release 주체 기업 인가 정책 입력 없음(범위 미완 유지).
+
 ## 2026-11-05 — A 개발 담당 GPU 인수 실측 마감
 
 - 한 일: 사용자 승인 EC2 최대 $8 범위에서 기존 서울 L4 한 장을 재시작해 신규 process-device-provider·V2 runner-consumption 생산자 2종을 GPU 증거로 등록했다(원6종 SHA 유지). A 17개 항목의 실측·진단과 25개 증거 왕복을 마쳤다. 정본 PACK32 20건과 파생 DRAFT5건을 구분하고 원 FAIL·UNKNOWN·첫 실패를 보존했다.

@@ -1,10 +1,10 @@
 # 개발 담당 상태. DONE은 이 lab 단계 완료이며 보안 PASS/전체 질문 인증이 아니다.
 checks:
   LIF-13:
-    note: '2026-11-05: GPU daemon·zero_copy 서빙 소비자2·release 전후 기존 참조 추론·새 소비자 fallback200
-      확인. 정본 collector barrier가 daemon 행을 제외해 UNKNOWN; 세션 결합 보수와 release 기업 인가 필요.
-      docs/dev-1/gpu-20261105.md'
-    state: CPU_DEVELOPMENT_REMAINING
+    note: '2026-11-06: 가중치 수명 행을 경계 요청 대신 현재 컨테이너 세대(같은 노드 monotonic)로 결합하고 경계 전 release는
+      이번 실행에서 제외. 소비자 기동·release 뒤 재취득을 정본 실행의 lab 동작(weights_consumer_start)으로 넣음. 11-05 원자료
+      진단 재투영은 소비자2·거절1·fallback1(사후 수작업 행 포함). 정본 GPU 재실측과 release 기업 인가 필요. docs/dev-1/lif13-generation-scope.md'
+    state: GPU_CONFIRMATION_ONLY
   OBS-01:
     note: '2026-11-05: GPU 파생 DRAFT팩 Gateway 파일 소유/bytes·허용/거부/후속 기록 수집. 봉인·생산자 인증·독립
       사건 증명 부족 UNKNOWN. 초기 읽기 실패와 Ref 보존; 정본팩 집계 제외. docs/dev-1/gpu-20261105.md'

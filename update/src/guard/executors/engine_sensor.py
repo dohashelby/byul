@@ -293,7 +293,8 @@ class EngineSensorExecutor:
                 or self.expected_target is not None and values['sensor_target_sha256'] != self.expected_target):
             raise ValueError('ENGINE_SENSOR_NATIVE_BINDING_MISMATCH')
         duration = self.cfg.get('max_duration_seconds', 180)
-        if type(duration) not in (int, float) or not 0 < duration <= 300:
+        # LIF-13 lab은 실행 안에서 소비자 엔진을 두 번 기동한다(release 전 취득, release 뒤 거절·fallback). 그 점검만 900초까지.
+        if type(duration) not in (int, float) or not 0 < duration <= (900 if check.id == 'LIF-13' else 300):
             raise ValueError('ENGINE_SENSOR_DURATION_INVALID')
         began = utcnow()
         if check.id in CALLBACK_CHECKS:
@@ -432,14 +433,25 @@ class EngineSensorExecutor:
             latency = _callback_elapsed_ms(row)
             if good and latency is not None:
                 elapsed[case['case_id']] = latency
+        weights_scope = None
         try:
             read = transport.engine_callback_events(prepared['session'])
-            events = read['events'] if any('principal' in case for case in cases) else projection.window(
-                read['events'], engine_callbacks.load_secret(self.cfg['prepared']), barrier)
+            if check.id == 'LIF-13':
+                # daemon·소비자 엔진 행은 경계 요청이 아니라 현재 컨테이너 세대로 고른다.
+                events, weights_scope = projection.weights_window(read['events'], engine_callbacks.load_secret(self.cfg['prepared']),
+                                                                  barrier, read.get('container_start_monotonic_ns'))
+            else:
+                events = read['events'] if any('principal' in case for case in cases) else projection.window(
+                    read['events'], engine_callbacks.load_secret(self.cfg['prepared']), barrier)
             if read['truncated']:
                 cleanup.append('ENGINE_SENSOR_CALLBACK_EVENTS_TRUNCATED')
         except KubernetesBindingError:
             events = []; cleanup.append('ENGINE_SENSOR_CALLBACK_EVENTS_UNAVAILABLE')
+        if check.id == 'LIF-13' and lab is not None:
+            try:
+                transport.stop_lab_consumers()
+            except (KubernetesBindingError, ValueError):
+                cleanup.append('ENGINE_SENSOR_LAB_CONSUMER_CLEANUP_UNVERIFIED')
         secret = engine_callbacks.load_secret(self.cfg['prepared'])
         gateway = any('principal' in case for case in cases)
         served = [c for c in cases if outputs.get(c['case_id']) is not None or c['case_id'] in elapsed]
@@ -460,7 +472,7 @@ class EngineSensorExecutor:
         elif check.id == 'REQ-20':
             result = projection.project_graph_lifetime(cases, outputs, events, secret, tags, references)
         elif check.id == 'LIF-13':
-            result = projection.project_weights_lifetime(cases, outputs, events, switches)
+            result = projection.project_weights_lifetime(cases, outputs, events, switches, weights_scope)
         elif check.id == 'REQ-21':
             result = projection.project_comm_buffer(cases, outputs, events)
         else:

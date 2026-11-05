@@ -58,7 +58,14 @@ for name in sorted(os.listdir(root)):
     if len(raw)>left:raw=raw[:left];truncated=True
     raw=raw.rpartition(b"\n")[0]
     left-=len(raw);rows.extend(json.loads(line) for line in raw.splitlines())
-print(json.dumps({"events":rows,"truncated":truncated}))
+# LIF-13: 이 컨테이너 PID 1의 시작을 콜백 행과 같은 monotonic 시계로 환산한다(이전 컨테이너 세대의 행을 가르는 기준).
+try:
+    import time
+    stat=open("/proc/1/stat").read();ticks=int(stat.rsplit(")",1)[1].split()[19])
+    offset=time.clock_gettime_ns(time.CLOCK_BOOTTIME)-time.monotonic_ns()
+    start=ticks*1000000000//os.sysconf("SC_CLK_TCK")-offset
+except (OSError,ValueError,IndexError,AttributeError):start=None
+print(json.dumps({"events":rows,"truncated":truncated,"container_start_monotonic_ns":start}))
 '''
 # #196 request-attempt(P1): 프로세스별 콜백 기록과 그 프로세스의 시작 ticks. 살아 있지 않은 프로세스는 ticks가 None이다.
 ATTEMPT_EVENTS_READER = r'''
@@ -133,6 +140,46 @@ try:
 finally:
  s.close()
 print(json.dumps({"schema":"guard-lab-weights-release/1","status":r.get("status") if isinstance(r,dict) else None}))
+'''
+# LIF-13 lab: 엔진(PID 1)과 같은 인자로 같은 컨테이너에 소비자 엔진 하나를 더 띄운다(포트만 다름).
+# 같은 --load-format ipc_cache 설정이라 daemon에서 가중치를 취득하고, release 뒤에는 거절 뒤 디스크 fallback으로 뜬다.
+# 준비(/health 200)까지만 기다린다. 소비자 정리는 WEIGHTS_CONSUMERS_STOP이 한다.
+WEIGHTS_CONSUMER_START = r'''
+import json,os,subprocess,sys,time,urllib.request
+port=int(sys.argv[1]);argv=open("/proc/1/cmdline","rb").read().split(b"\0")[:-1];argv=[a.decode() for a in argv]
+if len(argv)<3 or os.path.basename(argv[0])!="vllm" or argv[1]!="serve" or "--port" in argv or not 8001<=port<=8009:
+    print(json.dumps({"schema":"guard-lab-weights-consumer/1","status":"unsupported"}));sys.exit(0)
+log=open("/tmp/guard-lab-consumer-%d.log"%port,"wb")
+p=subprocess.Popen(argv+["--port",str(port)],stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+ticks=int(open("/proc/%d/stat"%p.pid).read().rsplit(")",1)[1].split()[19])
+status="timeout"
+for _ in range(240):
+    if p.poll() is not None:status="exited";break
+    try:
+        if urllib.request.urlopen("http://127.0.0.1:%d/health"%port,timeout=2).status==200:status="ok";break
+    except OSError:pass
+    time.sleep(1)
+print(json.dumps({"schema":"guard-lab-weights-consumer/1","status":status,"pid":p.pid,"start_ticks":ticks}))
+'''
+WEIGHTS_CONSUMERS_STOP = r'''
+import json,os,signal,sys,time
+left=[]
+for item in json.loads(sys.argv[1]):
+    try:
+        ticks=int(open("/proc/%d/stat"%item["pid"]).read().rsplit(")",1)[1].split()[19])
+    except (OSError,ValueError,IndexError):continue
+    if ticks!=item["start_ticks"]:continue
+    os.killpg(item["pid"],signal.SIGTERM);left.append(item)
+for _ in range(60):
+    alive=[]
+    for item in left:
+        try:
+            if int(open("/proc/%d/stat"%item["pid"]).read().rsplit(")",1)[1].split()[19])==item["start_ticks"]:alive.append(item)
+        except (OSError,ValueError,IndexError):pass
+    left=alive
+    if not left:break
+    time.sleep(1)
+print(json.dumps({"schema":"guard-lab-weights-consumers-stop/1","status":"ok" if not left else "alive"}))
 '''
 # REQ-21 lab: 소유 엔진 컨테이너의 PID 1에 SIGTERM 한 번. Pod는 restartPolicy Always여야 같은 Pod에서 새 컨테이너가 뜬다.
 ENGINE_RESTART = r'''
@@ -837,7 +884,7 @@ class KubernetesHTTP:
 
     def engine_callback_switch(self,action,variant):
         """Change one declared REQ-16 context in the owned lab engine and return bounded facts."""
-        lab=self._callback_lab;kind={"lora_reload":"lora","weights_reload":"weights","weights_release":"weights_daemon","engine_restart":"engine_restart"}.get(action)
+        lab=self._callback_lab;kind={"lora_reload":"lora","weights_reload":"weights","weights_release":"weights_daemon","weights_consumer_start":"weights_daemon","engine_restart":"engine_restart"}.get(action)
         if (self.profile!=ENGINE_CALLBACK_PROFILE or self.lab is not True or lab is None or kind is None
                 or lab.get(kind) is None or variant not in lab[kind]["variants"]):
             raise KubernetesBindingError()
@@ -845,6 +892,18 @@ class KubernetesHTTP:
         request={"id":"cbx-%d"%self._callback_switches,"mode":"json","method":"POST","headers":{}}
         if kind=="engine_restart":
             return self._engine_restart()
+        if action=="weights_consumer_start":
+            self._verify();engine=self.binding["engine"];started=getattr(self,"_lab_consumers",[])
+            port=8001+len(started)
+            done=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",
+                "--","python3","-I","-S","-c",WEIGHTS_CONSUMER_START,str(port)],cap=4096,budget=300)
+            self._verify()
+            if (type(done) is dict and done.get("schema")=="guard-lab-weights-consumer/1" and type(done.get("pid")) is int
+                    and type(done.get("start_ticks")) is int):
+                self._lab_consumers=started+[{"pid":done["pid"],"start_ticks":done["start_ticks"]}]
+            if type(done) is not dict or done.get("status")!="ok":
+                raise KubernetesBindingError()
+            return {"consumer_status":"ok","consumer_port":port}
         if kind=="weights_daemon":
             self._verify();engine=self.binding["engine"]
             done=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",
@@ -870,6 +929,19 @@ class KubernetesHTTP:
             raise KubernetesBindingError()
         facts.update(engine_outcome=200,engine_response_sha256=row.get("body_sha256"))
         return facts
+
+    def stop_lab_consumers(self):
+        """LIF-13 lab: 이 실행이 띄운 소비자 엔진을 시작 ticks가 같을 때만 끝낸다. 띄운 것이 없으면 아무것도 하지 않는다."""
+        started=getattr(self,"_lab_consumers",[])
+        if not started:
+            return True
+        self._verify();engine=self.binding["engine"]
+        done=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",
+            "--","python3","-I","-S","-c",WEIGHTS_CONSUMERS_STOP,json.dumps(started)],cap=4096,budget=90)
+        if type(done) is not dict or done!={"schema":"guard-lab-weights-consumers-stop/1","status":"ok"}:
+            raise KubernetesBindingError()
+        self._lab_consumers=[]
+        return True
 
     def _engine_restart(self):
         """REQ-21 lab: 같은 Pod의 엔진 컨테이너를 한 번 다시 시작하고, 확인된 새 세대로만 바인딩을 옮긴다.

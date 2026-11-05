@@ -22,9 +22,11 @@ ROLES = {'REQ-14': {'normal'}, 'REQ-15': {'prime', 'control', 'probe'}, 'REQ-16'
 MAX_CASES = 512
 # REQ-16 lab contexts change the engine between cases: reload one LoRA in place, or reload weights.
 # LIF-13은 소유 weights daemon에 전체 release를 보낸다.
-LAB_ACTIONS = {'lora_reload': 'lora', 'weights_reload': 'weights', 'weights_release': 'weights_daemon', 'engine_restart': 'engine_restart'}
+LAB_ACTIONS = {'lora_reload': 'lora', 'weights_reload': 'weights', 'weights_release': 'weights_daemon',
+               'weights_consumer_start': 'weights_daemon', 'engine_restart': 'engine_restart'}
 LAB_ROOTS = {'lora': '/guard-lora/', 'weights': '/guard-weights/', 'weights_daemon': '/guard-weights-daemon/'}
-SWITCH_CHECKS = {'lora_reload': 'REQ-16', 'weights_reload': 'REQ-16', 'weights_release': 'LIF-13', 'engine_restart': 'REQ-21'}
+SWITCH_CHECKS = {'lora_reload': 'REQ-16', 'weights_reload': 'REQ-16', 'weights_release': 'LIF-13',
+                 'weights_consumer_start': 'LIF-13', 'engine_restart': 'REQ-21'}
 # REQ-21: 같은 Pod 안에서 엔진 컨테이너만 한 번 다시 시작한다. 경로가 없는 동작이라 값이 고정이다.
 ENGINE_RESTART_SPEC = {'variants': {'once': 'container'}}
 _NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
@@ -606,9 +608,43 @@ def project_graph_lifetime(cases, outputs, events, secret, tags, references=None
 
 DAEMON_STATE = 'WeightCacheDaemon._handle_get_state'
 DAEMON_RELEASE = 'WeightCacheDaemon._handle_release'
+WEIGHTS_POINTS = (DAEMON_STATE, DAEMON_RELEASE, 'IpcModelLoader._request_state', 'IpcModelLoader._fallback_load')
 
 
-def project_weights_lifetime(cases, outputs, events, switches):
+def _started(event):
+    value = event.get('operation_started_ns')
+    return value if type(value) is int and value >= 0 else None
+
+
+def weights_window(events, secret, barrier, container_start_ns):
+    """LIF-13: 가중치 수명 행은 경계 요청이 아니라 엔진 컨테이너 세대 범위로 고른다.
+
+    daemon과 소비자 엔진은 HTTP 경계 요청을 받지 않거나(daemon) 경계 요청 전에 기동 때 가중치를 취득한다.
+    그래서 `window()`로는 이번 세대의 취득·release 행을 모두 잃는다(2026-11-05 GPU, 소비자 0·release 미관측).
+    - 다른 관측 행은 `window()` 그대로다.
+    - 가중치 수명 지점 행은 이 세션 전체에서 고르되, 현재 컨테이너 시작(같은 노드 monotonic 시계) 전의 행은 버린다.
+    - 경계 요청이 엔진에서 처음 보인 시각(anchor)을 함께 돌려준다. 그 전에 release가 있었다면 이번 실행의
+      release가 아니므로 투영이 범위 미완으로 남긴다. 시각 비교는 같은 노드 프로세스들 사이에서만 한다.
+    """
+    kept = [e for e in window(events, secret, barrier) if e.get('point') not in WEIGHTS_POINTS]
+    marker = tag_digest(secret, barrier)
+    stamps = [_started(e) for e in events
+              if marker in ((e.get('fields') or {}).get('request_sha256'), *((e.get('fields') or {}).get('native_request_sha256') or ()))]
+    anchor = min((t for t in stamps if t is not None), default=None)
+    rows, stale = [], 0
+    for event in events:
+        if event.get('point') not in WEIGHTS_POINTS:
+            continue
+        started = _started(event)
+        if type(container_start_ns) is not int or started is None or started < container_start_ns:
+            stale += 1; continue
+        rows.append(event)
+    scope = {'anchor_ns': anchor, 'container_start_known': type(container_start_ns) is int,
+             'rows_outside_container': stale}
+    return kept + rows, scope
+
+
+def project_weights_lifetime(cases, outputs, events, switches, scope=None):
     """LIF-13: release 앞뒤 daemon 공급·release 주체·release 뒤 취득·fallback·기존 참조 효과.
 
     release된 세대를 다시 공급하거나, release 뒤에도 가중치가 남아 공급되거나, fallback이 꺼진
@@ -616,14 +652,19 @@ def project_weights_lifetime(cases, outputs, events, switches):
     판단하지 않으므로 범위는 끝나지 않는다. release 뒤 답변이 달라진 것만으로는 위반이 아니다.
     """
     rows = {}; order = []
-    for event in events:
+    # daemon·소비자는 서로 다른 프로세스다. 같은 노드 monotonic 시작 시각으로 순서를 정한다.
+    # 끝 행은 그 호출의 시작 시각을 그대로 가지므로 같은 시각이면 CALL을 먼저 둔다(그다음 원래 순서).
+    timed = sorted(enumerate(events), key=lambda item: (_started(item[1]) if _started(item[1]) is not None else -1,
+                                                        item[1].get('phase') != 'CALL', item[0]))
+    anchor = (scope or {}).get('anchor_ns')
+    for _, event in timed:
         point = event.get('point')
-        if point not in (DAEMON_STATE, DAEMON_RELEASE, 'IpcModelLoader._request_state', 'IpcModelLoader._fallback_load') \
-                or event.get('entry_qualified_before') is not True:
+        if point not in WEIGHTS_POINTS or event.get('entry_qualified_before') is not True:
             continue
         call = (event.get('process_sha256'), event.get('call_sha256'))  # 호출 번호는 프로세스마다 따로 센다
         if event.get('phase') == 'CALL':
-            rows[call] = {'point': point, 'process': event.get('process_sha256'), 'entry': event.get('fields') or {}, 'terminal': None}
+            rows[call] = {'point': point, 'process': event.get('process_sha256'), 'entry': event.get('fields') or {}, 'terminal': None,
+                          'started': _started(event)}
             order.append(call)
         elif call in rows and event.get('entry_qualified_after') is True:
             rows[call]['terminal'] = {'phase': event.get('phase'), **(event.get('fields') or {})}
@@ -641,6 +682,9 @@ def project_weights_lifetime(cases, outputs, events, switches):
                 elif terminal.get('phase') == 'RETURN' and entry.get('weights_present') is False:
                     after['refused'] += 1
         elif row['point'] == DAEMON_RELEASE:
+            if scope is not None and (anchor is None or row['started'] is None or row['started'] < anchor):
+                # 경계 요청 전의 release는 이번 실행의 lab release가 아니다(같은 세대를 다시 시험한 경우 등).
+                missing.add('release_before_run'); continue
             if terminal.get('phase') == 'RETURN' and terminal.get('weights_present') is False:
                 released = entry.get('weights_generation_token') or 'unknown'
                 actors.append({'peer_uid_sha256': entry.get('peer_uid_sha256'), 'peer_pid_sha256': entry.get('peer_pid_sha256')})
@@ -664,6 +708,11 @@ def project_weights_lifetime(cases, outputs, events, switches):
         missing.add('fallback_consumption_unobserved')
     if not any(s.get('action') == 'weights_release' and s.get('completed') for s in switches or ()):
         missing.add('lab_release_action_unobserved')
+    if scope is not None:
+        if scope.get('anchor_ns') is None:
+            missing.add('run_anchor_unobserved')
+        if scope.get('container_start_known') is not True:
+            missing.add('container_generation_unverified')
     before = [outputs.get(c['case_id']) for c in cases if c['role'] == 'before']
     later = [outputs.get(c['case_id']) for c in cases if c['role'] == 'after']
     if not before or not later or None in before + later or len(set(before)) != 1:
@@ -673,6 +722,7 @@ def project_weights_lifetime(cases, outputs, events, switches):
     # 주체 허용 여부는 정책이 없어 범위만 막는다. 관측한 사실의 위반 여부와는 따로 둔다.
     core = missing - {'release_authorization_policy_unavailable'}
     return {'consumers': len(consumers), 'release_actors': actors, 'post_release': after, 'violations': violations,
+            **({'scope': dict(scope)} if scope is not None else {}),
             'violation': True if violations else (None if core else False),
             'full_scope': not missing and not violations, 'missing': sorted(missing)}
 

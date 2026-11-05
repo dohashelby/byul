@@ -222,3 +222,113 @@ def test_daemon_and_consumer_rows_from_separate_processes_are_not_mixed(tmp_path
     result = projection.project_weights_lifetime(CASES, SAME, rows, SWITCHES)
     assert len({r['process_sha256'] for r in rows}) == 2
     assert result['consumers'] == 2 and result['post_release'] == {'refused': 1, 'fallback': 1} and result['violation'] is False
+
+
+# ---------------------------------------------------------------------------
+# 2026-11-06: 세대 범위 결합. GPU(2026-11-05)에서 daemon은 경계 요청을 받지 않고, 소비자는 기동 때(경계 요청 전) 취득해
+# window()가 모든 가중치 행을 버렸다(소비자 0·release 미관측, ENGINE_SENSOR_CALLBACK_SCOPE_INCOMPLETE).
+# ---------------------------------------------------------------------------
+BARRIER = 'byul-cb-' + 'f' * 32
+CONSUMER_CASES = [{'case_id': 'b1', 'role': 'before', 'prompt': 'x'},
+                  {'case_id': 'c1', 'role': 'switch', 'action': 'weights_consumer_start', 'variant': 'target'},
+                  {'case_id': 'r', 'role': 'switch', 'action': 'weights_release', 'variant': 'target'},
+                  {'case_id': 'c2', 'role': 'switch', 'action': 'weights_consumer_start', 'variant': 'target'},
+                  {'case_id': 'a1', 'role': 'after', 'prompt': 'x'}]
+
+
+def barrier_row(at_ns):
+    """엔진 프로세스가 경계 요청을 처음 본 행(캐시 관측). 표식은 경계 태그의 keyed 지문이다."""
+    return {'schema': 'guard-vllm-cache-callback/1', 'point': 'KVCacheManager.get_computed_blocks', 'phase': 'CALL',
+            'process_sha256': 'engine', 'call_sha256': 'barrier', 'operation_started_ns': at_ns, 'entry_qualified_before': True,
+            'fields': {'request_sha256': projection.tag_digest(SECRET, BARRIER)}}
+
+
+def timed(w):
+    """행의 시작 시각(같은 노드 monotonic)으로 기동 취득 두 번 → release → 재취득 사이에 경계 요청을 둔다."""
+    starts = sorted({r['operation_started_ns'] for r in w.rows if r.get('point') == projection.DAEMON_RELEASE})
+    return starts[0] - 1, min(r['operation_started_ns'] for r in w.rows) - 10
+
+
+def test_daemon_and_startup_acquisitions_join_the_run_by_container_generation(tmp_path):
+    w = scenario(tmp_path)
+    anchor, container = timed(w)
+    events = [barrier_row(anchor), *reversed(w.rows)]  # 읽기 순서(파일 이름 순)와 무관하게 시각으로 정렬한다.
+    old = projection.project_weights_lifetime(CASES, SAME, projection.window(events, SECRET, BARRIER), SWITCHES)
+    assert old['consumers'] == 0 and 'release_unobserved' in old['missing']  # 원 GPU 실패와 같은 모양
+    kept, scope = projection.weights_window(events, SECRET, BARRIER, container)
+    assert scope == {'anchor_ns': anchor, 'container_start_known': True, 'rows_outside_container': 0}
+    result = projection.project_weights_lifetime(CASES, SAME, kept, SWITCHES, scope)
+    assert result['consumers'] == 2 and result['post_release'] == {'refused': 1, 'fallback': 1}
+    assert result['violation'] is False and result['missing'] == ['release_authorization_policy_unavailable']
+
+
+def test_rows_from_an_earlier_container_and_a_release_before_the_run_are_not_this_run(tmp_path):
+    w = scenario(tmp_path)
+    anchor, container = timed(w)
+    stale = {'schema': wl.SCHEMA, 'point': projection.DAEMON_RELEASE, 'phase': 'CALL', 'process_sha256': 'old-daemon',
+             'call_sha256': 'x', 'operation_started_ns': container - 5, 'entry_qualified_before': True, 'fields': {}}
+    kept, scope = projection.weights_window([stale, barrier_row(anchor), *w.rows], SECRET, BARRIER, container)
+    assert scope['rows_outside_container'] == 1 and stale not in kept
+    # 같은 세대를 다시 시험한 경우: 이번 경계 요청이 release 뒤에 있으면 그 release는 이번 실행의 것이 아니다.
+    late = max(r['operation_started_ns'] for r in w.rows) + 1
+    kept, scope = projection.weights_window([barrier_row(late), *w.rows], SECRET, BARRIER, container)
+    result = projection.project_weights_lifetime(CASES, SAME, kept, SWITCHES, scope)
+    assert 'release_before_run' in result['missing'] and result['violation'] is None
+
+
+def test_unknown_container_start_or_missing_anchor_keeps_the_scope_open(tmp_path):
+    w = scenario(tmp_path)
+    anchor, _ = timed(w)
+    kept, scope = projection.weights_window([barrier_row(anchor), *w.rows], SECRET, BARRIER, None)
+    result = projection.project_weights_lifetime(CASES, SAME, kept, SWITCHES, scope)
+    assert scope['container_start_known'] is False and result['consumers'] == 0
+    assert {'container_generation_unverified', 'release_unobserved'} <= set(result['missing']) and result['violation'] is None
+    kept, scope = projection.weights_window(list(w.rows), SECRET, BARRIER, timed(w)[1])
+    result = projection.project_weights_lifetime(CASES, SAME, kept, SWITCHES, scope)
+    assert 'run_anchor_unobserved' in result['missing'] and result['violation'] is None
+
+
+def test_consumer_start_switch_is_lif13_only_and_bound_to_the_declared_daemon():
+    projection.validate_cases('LIF-13', CONSUMER_CASES)
+    with pytest.raises(ValueError):
+        projection.validate_cases('REQ-21', CONSUMER_CASES)
+    spec = {'weights_daemon': {'variants': {'target': '/guard-weights-daemon/target.sock'}}}
+    assert projection.validate_lab_contexts(spec, CONSUMER_CASES) == spec
+
+
+def test_transport_starts_numbered_consumers_and_stops_only_the_ones_it_started():
+    import json
+    from guard.runtime.kubernetes_http import WEIGHTS_CONSUMER_START, WEIGHTS_CONSUMERS_STOP, KubernetesBindingError
+    from tests.test_req16_lab_contexts import LabWorld, transport
+
+    class ConsumerWorld(LabWorld):
+        def __init__(self, status='ok'):
+            super().__init__(); self.ports = []; self.stops = []; self.status = status
+        def runner(self, argv, **kwargs):
+            if 'exec' in argv and WEIGHTS_CONSUMER_START in argv:
+                self.ports.append(argv[-1])
+                value = {'schema': 'guard-lab-weights-consumer/1', 'status': self.status, 'pid': 400 + len(self.ports), 'start_ticks': 9}
+                return {'returncode': 0, 'stdout_bytes': json.dumps(value).encode(), 'stderr_bytes': b'', 'capture': {'complete': True}}
+            if 'exec' in argv and WEIGHTS_CONSUMERS_STOP in argv:
+                self.stops.append(json.loads(argv[-1]))
+                value = {'schema': 'guard-lab-weights-consumers-stop/1', 'status': 'ok'}
+                return {'returncode': 0, 'stdout_bytes': json.dumps(value).encode(), 'stderr_bytes': b'', 'capture': {'complete': True}}
+            return super().runner(argv, **kwargs)
+
+    spec = {'weights_daemon': {'variants': {'target': '/guard-weights-daemon/target.sock'}}}
+    world = ConsumerWorld(); http = transport(world)
+    assert http.stop_lab_consumers() is True and world.stops == []  # 띄운 것이 없으면 아무것도 하지 않는다
+    with pytest.raises(KubernetesBindingError):
+        http.engine_callback_switch('weights_consumer_start', 'target')  # 선언 전
+    http.declare_callback_lab(spec)
+    assert http.engine_callback_switch('weights_consumer_start', 'target') == {'consumer_status': 'ok', 'consumer_port': 8001}
+    assert http.engine_callback_switch('weights_consumer_start', 'target')['consumer_port'] == 8002
+    assert world.ports == ['8001', '8002'] and not world.posts
+    assert http.stop_lab_consumers() is True
+    assert world.stops == [[{'pid': 401, 'start_ticks': 9}, {'pid': 402, 'start_ticks': 9}]]
+    # 준비되지 않은 소비자도 정리 대상에 남기고, 동작은 실패로 돌려준다.
+    slow = ConsumerWorld('timeout'); http = transport(slow); http.declare_callback_lab(spec)
+    with pytest.raises(KubernetesBindingError):
+        http.engine_callback_switch('weights_consumer_start', 'target')
+    http.stop_lab_consumers()
+    assert slow.stops == [[{'pid': 401, 'start_ticks': 9}]]

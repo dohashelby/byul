@@ -18,13 +18,15 @@ COMPUTED = 'KVCacheManager.get_computed_blocks'
 ROLES = {'REQ-14': {'normal'}, 'REQ-15': {'prime', 'control', 'probe'}, 'REQ-16': {'prime', 'control', 'probe', 'post', 'switch'},
     'REQ-17': {'prime', 'control-present', 'control-absent', 'present', 'absent'},
     'REQ-18': {'standalone', 'restricted', 'reused'}, 'REQ-19': {'boundary'}, 'REQ-20': {'replay'},
-    'LIF-13': {'before', 'switch', 'after'}, 'REQ-21': {'before', 'after'}}
+    'LIF-13': {'before', 'switch', 'after'}, 'REQ-21': {'before', 'switch', 'after'}}
 MAX_CASES = 512
 # REQ-16 lab contexts change the engine between cases: reload one LoRA in place, or reload weights.
 # LIF-13은 소유 weights daemon에 전체 release를 보낸다.
-LAB_ACTIONS = {'lora_reload': 'lora', 'weights_reload': 'weights', 'weights_release': 'weights_daemon'}
+LAB_ACTIONS = {'lora_reload': 'lora', 'weights_reload': 'weights', 'weights_release': 'weights_daemon', 'engine_restart': 'engine_restart'}
 LAB_ROOTS = {'lora': '/guard-lora/', 'weights': '/guard-weights/', 'weights_daemon': '/guard-weights-daemon/'}
-SWITCH_CHECKS = {'lora_reload': 'REQ-16', 'weights_reload': 'REQ-16', 'weights_release': 'LIF-13'}
+SWITCH_CHECKS = {'lora_reload': 'REQ-16', 'weights_reload': 'REQ-16', 'weights_release': 'LIF-13', 'engine_restart': 'REQ-21'}
+# REQ-21: 같은 Pod 안에서 엔진 컨테이너만 한 번 다시 시작한다. 경로가 없는 동작이라 값이 고정이다.
+ENGINE_RESTART_SPEC = {'variants': {'once': 'container'}}
 _NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
 _PATH = re.compile(r'(/[A-Za-z0-9][A-Za-z0-9._-]{0,63}){2,8}')
 # 비동기 스케줄링에서는 출력이 다음 배치 뒤에 도착할 수 있다.
@@ -65,7 +67,9 @@ def _lab_path(value, kind):
 def validate_lab_contexts(spec, cases=None):
     """Closed REQ-16 lab declaration: one LoRA name, its active path, and owned variant paths."""
     try:
-        if type(spec) is not dict or not spec or set(spec) - {'lora', 'weights', 'weights_daemon'}:
+        if type(spec) is not dict or not spec or set(spec) - {'lora', 'weights', 'weights_daemon', 'engine_restart'}:
+            raise ValueError
+        if 'engine_restart' in spec and spec['engine_restart'] != ENGINE_RESTART_SPEC:
             raise ValueError
         lora = spec.get('lora'); weights = spec.get('weights')
         if lora is not None and (type(lora) is not dict or set(lora) != {'name', 'active_path', 'variants'}

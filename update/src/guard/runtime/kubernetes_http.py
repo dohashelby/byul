@@ -87,6 +87,12 @@ finally:
  s.close()
 print(json.dumps({"schema":"guard-lab-weights-release/1","status":r.get("status") if isinstance(r,dict) else None}))
 '''
+# REQ-21 lab: 소유 엔진 컨테이너의 PID 1에 SIGTERM 한 번. Pod는 restartPolicy Always여야 같은 Pod에서 새 컨테이너가 뜬다.
+ENGINE_RESTART = r'''
+import json,os,signal
+print(json.dumps({"schema":"guard-lab-engine-restart/1","signal":"SIGTERM"}),flush=True)
+os.kill(1,signal.SIGTERM)
+'''
 LORA_VARIANT_COPY = r'''
 import hashlib,json,os,stat,sys
 source,active=sys.argv[1],sys.argv[2];files={}
@@ -751,12 +757,14 @@ class KubernetesHTTP:
 
     def engine_callback_switch(self,action,variant):
         """Change one declared REQ-16 context in the owned lab engine and return bounded facts."""
-        lab=self._callback_lab;kind={"lora_reload":"lora","weights_reload":"weights","weights_release":"weights_daemon"}.get(action)
+        lab=self._callback_lab;kind={"lora_reload":"lora","weights_reload":"weights","weights_release":"weights_daemon","engine_restart":"engine_restart"}.get(action)
         if (self.profile!=ENGINE_CALLBACK_PROFILE or self.lab is not True or lab is None or kind is None
                 or lab.get(kind) is None or variant not in lab[kind]["variants"]):
             raise KubernetesBindingError()
         self._callback_switches+=1;endpoint=self.endpoint.scheme+"://"+self.endpoint.netloc;facts={}
         request={"id":"cbx-%d"%self._callback_switches,"mode":"json","method":"POST","headers":{}}
+        if kind=="engine_restart":
+            return self._engine_restart()
         if kind=="weights_daemon":
             self._verify();engine=self.binding["engine"]
             done=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",
@@ -782,6 +790,44 @@ class KubernetesHTTP:
             raise KubernetesBindingError()
         facts.update(engine_outcome=200,engine_response_sha256=row.get("body_sha256"))
         return facts
+
+    def _engine_restart(self):
+        """REQ-21 lab: 같은 Pod의 엔진 컨테이너를 한 번 다시 시작하고, 확인된 새 세대로만 바인딩을 옮긴다.
+
+        Pod·이름공간·노드·IP·이미지·이미지 ID는 그대로여야 한다. 바뀌어도 되는 것은 container ID·restart 횟수·시작 시각뿐이고
+        restart 횟수는 정확히 하나 늘어야 한다. 새 컨테이너가 준비되지 않거나 다른 값이 바뀌면 실패다(바인딩은 그대로 둔다).
+        """
+        import time
+        self._verify();engine=deepcopy(self.binding["engine"])
+        pod=self._call([f"--namespace={engine['namespace']}","get","pod",engine["pod"],"-o","json"])
+        if type(pod) is not dict or (pod.get("spec") or {}).get("restartPolicy")!="Always":
+            raise KubernetesBindingError()
+        try:
+            self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",
+                "--","python3","-c",ENGINE_RESTART],cap=4096,budget=20)
+        except KubernetesBindingError:
+            pass  # 신호와 함께 exec 연결이 끊길 수 있다. 성공 여부는 아래의 새 세대 관측으로만 정한다.
+        namespace=self._call(["get","namespace",engine["namespace"],"-o","json"])
+        deadline=min(self.deadline,self.clock()+300)
+        while self.clock()<deadline:
+            pod=self._call([f"--namespace={engine['namespace']}","get","pod",engine["pod"],"-o","json"])
+            state=next((x for x in (pod.get("status") or {}).get("containerStatuses",[]) if x.get("name")==engine["container"]),{})
+            running=(state.get("state") or {}).get("running") or {}
+            if (state.get("restartCount")==engine["restart_count"]+1 and state.get("ready") is True and running.get("startedAt")
+                    and state.get("containerID")!=engine["container_id"]):
+                moved={**engine,"container_id":state["containerID"],"restart_count":state["restartCount"],"started_at":running["startedAt"]}
+                try:
+                    validate_container_binding(moved)
+                    verify_owned_pod(pod,namespace["metadata"],moved,self.binding["run_id"])
+                except (KeyError,TypeError,ValueError):
+                    raise KubernetesBindingError() from None
+                self.binding["engine"]=moved;self._verify()
+                return {"restart_count_before":engine["restart_count"],"restart_count_after":moved["restart_count"],
+                        "container_generation_changed":True,"pod_uid_unchanged":True}
+            if state.get("restartCount",engine["restart_count"])>engine["restart_count"]+1:
+                raise KubernetesBindingError()
+            time.sleep(2)
+        raise KubernetesBindingError()
 
     def engine_callback_events(self,session):
         """Bounded read of the selected session's callback rows from the engine Pod."""

@@ -35,7 +35,7 @@
 | G4 usage 금지 | `--usage forbidden` | OBS-04 | `usage --check OBS-04` |
 | G5 usage 허용 | `--usage allowed` | OBS-05(1단계 CPU에서는 warm-up 정지. GPU에서 재현되면 엔진 문제로 기록) | `usage --check OBS-05` |
 | G6~ engine_sensor | PR #215 인계 | REQ-18(V2), REQ-19(`--lab-kernel-checks`), REQ-20(graph 켬·끔 두 세대), LIF-13(daemon 자산), REQ-15(Gateway salt) | `tools/gpu_a_run_inputs.py check-inputs`, `tools/b_req18*`·`b_req20*`·`b_lif13*` |
-| TP2 (새 승인 필요) | 2장 eager | REQ-14, REQ-21 | PR #215 인계 |
+| TP2 (새 승인 필요) | 2장 eager, REQ-21은 `--restart-always` | REQ-14, REQ-21(사례: before → switch engine_restart → after) | PR #215 인계 |
 
 순서: G1 → G4 → G5 → G2 → G3 → G6~. 앞 묶음은 센서가 없어 세션 봉인 문제가 없다.
 

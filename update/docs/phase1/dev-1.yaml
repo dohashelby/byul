@@ -76,6 +76,6 @@ checks:
     note: FULL graph replay·sample 소비 수집기 구현(1ec307e). GPU 실측과 graph off 대조 세대 답변 해시 필요
     state: GPU_CONFIRMATION_ONLY
   REQ-21:
-    note: 통신기 세대 수집기 구현(a1034c2). 엔진 재기동 lab 동작(바인딩 재설정)이 없어 개발 남음. 이후 GPU 2장 TP2 실측
-    state: CPU_DEVELOPMENT_REMAINING
+    note: "통신기 세대 수집기(a1034c2)와 lab 재기동 동작(같은 Pod 엔진 컨테이너 재시작, 확인된 새 세대로만 바인딩 이동) 구현, k3d에서 재기동 확인. 판정은 GPU 2장 TP2 실측 필요(새 승인)"
+    state: GPU_CONFIRMATION_ONLY
 owner: dev-1

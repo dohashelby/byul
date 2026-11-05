@@ -47,7 +47,7 @@
 |---|---|---|
 | REQ-06 | 적용 제외(사용자 결정). runtime Gateway가 `/v1/responses`를 열지 않음 | Gateway가 열면 다시 적용 |
 | REQ-04 | 적용 제외(사용자 결정 2026-11-05). runtime Gateway가 신원 header를 넘기지 않음 | Gateway가 신원을 전달해 인가에 쓰면 다시 적용 |
-| OBS-01 | 실행기는 엔진 직접 경로, BYUL 감사 기록은 Gateway | Gateway 경로 수집 프로필(팩 개정, 1단계 뒤) |
+| OBS-01 | (실행함) G1에서 파생 DRAFT 팩 `PACK-DEV1-GATEWAY-OBS01@1`과 `obs01` 하위 명령으로 실행 | 정본 팩 개정은 현황 정리에서 |
 | PLT-11, PLT-12, OBS-11, OBS-06 사본 목록, REQ-03 관리 경로, REQ-17 한도 | 기업·runtime 입력 | `docs/phase1/dev-1.yaml` 메모의 입력 |
 | REQ-16 | 판정 기준 확정(2026-11-05). 멀티모달 모델 선정·내려받기 승인 대기 | 승인 뒤 G6에 추가 |
 

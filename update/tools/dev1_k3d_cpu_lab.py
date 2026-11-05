@@ -242,7 +242,8 @@ while True:
     c,_=l.accept(); threading.Thread(target=serve,args=(c,),daemon=True).start()
 """
 # runtime Gateway(BYUL runtime 제품)를 lab Gateway로 쓴다. 역할은 REQ-03(general/admin)과 REQ-06(A/B) 시험용이다.
-PRINCIPALS = {'general': ['inference'], 'admin': ['inference', 'admin'], 'A': ['inference'], 'B': ['inference']}
+# observer: 인증은 되지만 추론 역할이 없는 주체. OBS-01 Gateway 경로의 거부 시도(누가 거부됐는지 기록에 남는다)에 쓴다.
+PRINCIPALS = {'general': ['inference'], 'admin': ['inference', 'admin'], 'A': ['inference'], 'B': ['inference'], 'observer': ['observer']}
 
 
 def _sha_json(value):
@@ -573,6 +574,39 @@ def usage_inputs(base, env, sink_pod, *, check, root, minutes=20):
     return sink_target, policy, config
 
 
+def obs01_inputs(route_target, env, gateway_config, *, session, root, minutes=10):
+    """OBS-01 Gateway 경로: 파생 DRAFT 팩(PACK32의 OBS-01 수집 프로필만 교체)·EXAMPLE 정책·실행 설정."""
+    from datetime import datetime, timedelta, timezone
+    from guard.executors.kubernetes_gateway_observation import principal_sha256
+    from tools import build_dev1_gateway_obs01_pack as pack_tool
+    if not re.fullmatch(r'[0-9a-f]{32}', session):
+        raise ValueError('K3D_OBS01_SESSION_INVALID')
+    data = yaml.safe_load(gateway_config)['data']
+    policy_sha = hashlib.sha256(data['runtime-policy.json'].encode()).hexdigest()
+    gateway_target = json.loads(data['target.json'])['target_id']
+    root = Path(root).absolute()
+    result = pack_tool.derive(root / 'pack')
+    now = datetime.now(timezone.utc)
+    values = {'observation_environment_sha256': env.ref().sha256, 'observation_target_sha256': sha256_hex(canonical_json(route_target)),
+              'observation_validity_start': now.isoformat(), 'observation_validity_end': (now + timedelta(minutes=minutes)).isoformat(),
+              'observation_max_delay_ms': 5000, 'observation_required_events': ['ACCESS_ALLOWED', 'ACCESS_DENIED'],
+              'observation_required_fields': ['actor_sha256', 'target_sha256', 'run_sha256', 'policy_sha256', 'request_sha256', 'result_sha256'],
+              'observation_session': session,
+              'observation_expected_source_sha256': hashlib.sha256(route_target['kubernetes_routes']['gateway']['image'].encode()).hexdigest(),
+              # EXAMPLE: Gateway에 실제로 적재된 정책 bytes의 SHA. 기업 승인 정책이 아니다.
+              'observation_event_policy_sha256': policy_sha,
+              'observation_allowed_actor_sha256': principal_sha256('dev1-general'),
+              'observation_denied_actor_sha256': principal_sha256('dev1-observer'),
+              'observation_gateway_target_id': gateway_target}
+    policy = {'data_origin': 'EXAMPLE', 'status': 'DRAFT', 'pack': {'id': result['pack_ref']['id'], 'revision': result['pack_ref']['revision']},
+              'values': {'OBS-01': values}, 'scope': {'include': ['OBS-01'], 'exclude': []}, 'exceptions': [],
+              'confirmed_by': None, 'confirmed_at': None}
+    config = '\n'.join([f"store = '{root / 'store'}'", '', '[adapter]', "name = 'vllm'", '', '[executors]', "required_event_record = 'kubernetes'", '',
+                        '[required_event_record]', f"target = '{root / 'target.json'}'", "kubectl_binary = 'kubectl'", 'max_duration_seconds = 120',
+                        "roles = {allowed = 'DEV1_TOKEN_GENERAL', denied = 'DEV1_TOKEN_OBSERVER'}", ''])
+    return policy, config, result
+
+
 def http_check(check_id, root, route_target=None):
     """route_target: REQ-13 Gateway 대상. 4-Pod 경로 target과 허용 주체 토큰 환경변수 이름을 실행 설정에 더한다."""
     executor, settings = EXECUTORS[check_id]
@@ -634,6 +668,8 @@ def main(argv=None):
     us = sub.add_parser('usage'); us.add_argument('--check', required=True, choices=['OBS-04', 'OBS-05'])
     us.add_argument('--target', type=Path, required=True); us.add_argument('--env', type=Path, required=True)
     us.add_argument('--sink-pod', type=Path, required=True); us.add_argument('--out', type=Path, required=True)
+    ob = sub.add_parser('obs01'); ob.add_argument('--route-target', type=Path, required=True); ob.add_argument('--env', type=Path, required=True)
+    ob.add_argument('--gateway-config', type=Path, required=True); ob.add_argument('--session', required=True); ob.add_argument('--out', type=Path, required=True)
     h = sub.add_parser('http-check'); h.add_argument('--check', required=True, choices=sorted(EXECUTORS))
     h.add_argument('--target', type=Path, required=True); h.add_argument('--out', type=Path, required=True)
     h.add_argument('--route-target', type=Path)
@@ -712,6 +748,13 @@ def main(argv=None):
         inputs._write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True))
         inputs._write(args.out / 'guard.toml', config)
         print(json.dumps({'check': args.check, 'out': str(args.out)}))
+    elif args.kind == 'obs01':
+        policy, config, result = obs01_inputs(load(args.route_target), load_environment(args.env), args.gateway_config.read_text(encoding='utf-8'),
+                                              session=args.session, root=args.out)
+        inputs._write(args.out / 'target.json', load(args.route_target))
+        inputs._write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True))
+        inputs._write(args.out / 'guard.toml', config)
+        print(json.dumps({'check': 'OBS-01', 'out': str(args.out), 'pack': result['pack_ref']}))
     else:
         policy, config = http_check(args.check, args.out, route_target=args.route_target)
         inputs._write(args.out / 'target.json', load(args.target))

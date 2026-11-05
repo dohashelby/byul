@@ -40,11 +40,19 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
             from . import credential_copy_contract as copy_contract
             if getattr(check,'collection_profile',None)!=copy_contract.PROFILE:raise ValueError('COPY_PROFILE_UNSUPPORTED')
             copy_contract.normalize_policy(values);return
+        from . import kubernetes_gateway_observation as gateway
+        if check.id=='OBS-01' and getattr(check,'collection_profile',None)==gateway.PROFILE:
+            gateway.normalize_policy(values);return
         if check.id!='OBS-01' or getattr(check,'collection_profile',None)!=PROFILE:raise ValueError('OBSERVATION_PROFILE_UNSUPPORTED')
         normalize_policy(values)
 
     def run(self,check,env,policy_values,adapter,workdir):
         self.validate_policy(check,policy_values)
+        from . import kubernetes_gateway_observation as gateway
+        if getattr(check,'collection_profile',None)==gateway.PROFILE:
+            # BYUL 구성: 감사 기록 생산자가 runtime Gateway인 OBS-01 경로(파생 DRAFT 팩에서만 선택된다).
+            return gateway.KubernetesGatewayRequiredEventExecutor(self.cfg,runner=self.runner,environ=self._environ,
+                expected_target_sha256=self.expected_target).run(check,env,policy_values,adapter,workdir)
         if check.id=='PLT-12':
             from .kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor
             if set(self.cfg)-{'target','roles','copy_inventory','kubectl_binary','max_duration_seconds'}:

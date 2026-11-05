@@ -34,10 +34,11 @@ INPUT_VALIDATION_PROFILE = "kubernetes-owned-input-validation-http-v1"
 RESPONSE_CONTENT_PROFILE = "kubernetes-owned-response-content-http-v1"
 LOG_INTEGRITY_PROFILE = "kubernetes-owned-log-integrity-http-v1"
 USAGE_CONTROL_PROFILE = "kubernetes-owned-usage-control-http-v1"
+GATEWAY_EVENT_PROFILE = "kubernetes-owned-gateway-event-http-v1"
 from .kubernetes_observation import PROFILE as REQUIRED_EVENT_PROFILE
 from .kubernetes_observation_state import PROFILE as OBSERVATION_STATE_PROFILE
 _CLOSE_PROFILES = frozenset({TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, OBSERVATION_STATE_PROFILE})
-_BINDING_PROFILES = frozenset({ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE, RESPONSE_CONTENT_PROFILE, LOG_INTEGRITY_PROFILE, USAGE_CONTROL_PROFILE})
+_BINDING_PROFILES = frozenset({ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE, RESPONSE_CONTENT_PROFILE, LOG_INTEGRITY_PROFILE, USAGE_CONTROL_PROFILE, GATEWAY_EVENT_PROFILE})
 _INPUT_FIELD = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}")
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
@@ -270,6 +271,7 @@ class KubernetesHTTP:
         self._callback_lab = None
         self._callback_switches = 0
         self._input_contract = None
+        self._gateway_netloc = None
 
     def _call(self, args, *, payload=None, cap=262144, budget=None, allow_empty=False, on_document=None):
         remaining = self.deadline - self.clock()
@@ -476,6 +478,10 @@ class KubernetesHTTP:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
                     self._usage_control_request(request)
+                elif self.profile == GATEWAY_EVENT_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._gateway_event_request(request)
                 elif type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
                     raise KubernetesBindingError()
                 ids.append(request["id"])
@@ -492,6 +498,9 @@ class KubernetesHTTP:
                     paths={"/v1/completions","/v1/chat/completions"}
                 if self.profile in {LOG_INTEGRITY_PROFILE, USAGE_CONTROL_PROFILE}:
                     paths={"/v1/completions"}
+                target_netloc=self.endpoint.netloc
+                if self.profile == GATEWAY_EVENT_PROFILE:
+                    paths={"/v1/chat/completions"};target_netloc=self._gateway_netloc
                 models={self.api_model}
                 if switch_path is not None:
                     paths={switch_path};models=None
@@ -505,7 +514,7 @@ class KubernetesHTTP:
                             or url.username is not None or url.password is not None):raise KubernetesBindingError()
                 elif self.profile != OBSERVATION_STATE_PROFILE and (set(value)-allowed
                         or value.get("method")!="POST" or mode not in {"json","sse"}
-                        or url.scheme!=self.endpoint.scheme or url.netloc!=self.endpoint.netloc or url.query or url.fragment
+                        or url.scheme!=self.endpoint.scheme or url.netloc!=target_netloc or url.query or url.fragment
                         or url.path not in paths
                         or url.path=="/tokenize" and mode!="json"
                         or type(value.get("body")) is not dict or models is not None and value["body"].get("model") not in models):
@@ -538,7 +547,12 @@ class KubernetesHTTP:
                     raise KubernetesBindingError()
                 if row.get("body") is not None and (type(row["body"]) is not str or len(row["body"].encode("utf-8"))>128*1024):
                     raise KubernetesBindingError()
-                results.append({key:row[key] for key in keys if key in row})
+                kept={key:row[key] for key in keys if key in row}
+                if self.profile == GATEWAY_EVENT_PROFILE:
+                    # OBS-01 Gateway 경로: Gateway가 발급한 요청 ID만 넘긴다. 다른 응답 header는 넘기지 않는다.
+                    rid=(row.get("response_headers") or {}).get("x-request-id")
+                    kept["gateway_request_id"]=rid if type(rid) is str and re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}",rid) else None
+                results.append(kept)
             with self.lock:
                 self.rows.extend({"id":row["id"],"binding_verified_before_after":True,"outcome":row["outcome"],
                     "capture_complete":row.get("capture_complete") is True,
@@ -598,6 +612,26 @@ class KubernetesHTTP:
                     or len(messages)==2 and (messages[0]["role"]!="system" or not re.fullmatch(r"G[0-9a-f]{12}S private; never repeat",messages[0]["content"]))
                     or case=="private_system" and len(messages)!=2):
                 raise KubernetesBindingError()
+
+    def declare_gateway(self, url):
+        """OBS-01 Gateway 경로: 4-Pod 바인딩으로 검증한 Gateway 주소 하나만 받는다(같은 scheme, 경로 없음)."""
+        value=urlsplit(url) if type(url) is str else None
+        if (self.profile!=GATEWAY_EVENT_PROFILE or self._gateway_netloc is not None or value is None
+                or value.scheme!=self.endpoint.scheme or not value.port or value.path or value.query or value.fragment
+                or value.username is not None or value.password is not None or value.netloc==self.endpoint.netloc):
+            raise KubernetesBindingError()
+        self._gateway_netloc=value.netloc
+
+    def _gateway_event_request(self, request):
+        """OBS-01 Gateway 경로: 정해진 세 시도와 1-token chat 하나만. 자격은 Authorization 하나만."""
+        body=request.get("body") if type(request) is dict else None
+        headers=request.get("headers") if type(request) is dict else None
+        if (self._gateway_netloc is None or request.get("id") not in {"obs01-before","obs01-denied","obs01-after"}
+                or request.get("method")!="POST" or type(headers) is not dict or set(headers)!={"Authorization"}
+                or type(headers["Authorization"]) is not str or re.fullmatch(r"Bearer [!-~]{8,512}",headers["Authorization"]) is None
+                or type(body) is not dict or set(body)!={"model","messages","max_tokens","stream"}
+                or body["messages"]!=[{"role":"user","content":"hello"}] or body["max_tokens"]!=1 or body["stream"] is not False):
+            raise KubernetesBindingError()
 
     def _usage_control_request(self, request):
         """OBS-04·05: 보고 전후 사이의 정상 추론 1회. 원 실행기의 기능 대조 요청 하나만 받는다."""

@@ -27,6 +27,7 @@ from . import vllm_comm_buffer_callback as comm_buffer
 from . import vllm_attempt_callback as attempt
 from . import vllm_transition_callback as transition
 from . import vllm_health_callback as health
+from . import vllm_profiler_callback as profiler
 
 PROFILE = 'vllm-engine-callback-metadata/1'
 SCHEMA = 'guard-engine-callback-events/1'
@@ -55,6 +56,12 @@ MODULES = {**MODULES, attempt.SCHEDULER: attempt.TARGETS[attempt.SCHEDULER],
 MODULES = {**MODULES, transition.CORE: transition.TARGETS[transition.CORE]}
 # #196 health-worker-causal(P1): settings의 health_causal이 참일 때만 감싼다(request_attempts와 함께 쓴다).
 MODULES = {**MODULES, health.ASYNC_LLM: health.TARGETS[health.ASYNC_LLM]}
+# #196 profiler-control(P1): settings의 profiler_control이 참일 때만 감싼다. 같은 모듈의 다른 선택 관측과 지점별로 나눈다.
+for _name, _points in profiler.TARGETS.items():
+    MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
+# 선택 관측(이름, 대상): 같은 모듈에 여러 개가 있을 수 있어 지점별로 관측기를 고른다.
+OPTIONAL = (('attempt', attempt.TARGETS), ('transition', transition.TARGETS), ('health', health.TARGETS), ('profiler', profiler.TARGETS))
+OPTIONAL_MODULES = frozenset(name for _, targets in OPTIONAL for name in targets)
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
 MAX_FILE_BYTES = 16 * 1024 ** 2
@@ -220,6 +227,10 @@ class HealthObserver(_Keyed, health.HealthObserver):
     pass
 
 
+class ProfilerObserver(_Keyed, profiler.ProfilerObserver):
+    pass
+
+
 class Sink:
     def __init__(self, directory):
         self.path = Path(directory) / f'callbacks-{os.getpid()}.jsonl'
@@ -237,7 +248,7 @@ class Sink:
 
 class EngineCallbacks:
     def __init__(self, session, secret, sink, *, context_provider=None, clock=None, fault_file=None, kernel_checks=False,
-                 request_attempts=False, generation_transitions=False, health_causal=False):
+                 request_attempts=False, generation_transitions=False, health_causal=False, profiler_control=False):
         self.sink = sink; self.fault_file = fault_file
         options = {'sink': sink, 'context_provider': context_provider, 'clock': clock}
         self.cache = CacheObserver(session, **options)
@@ -262,6 +273,9 @@ class EngineCallbacks:
         self.health = HealthObserver(session, **options) if health_causal else None
         if self.health is not None:
             self.health.secret = secret
+        self.profiler = ProfilerObserver(session, **options) if profiler_control else None
+        if self.profiler is not None:
+            self.profiler.secret = secret
 
     def instrument(self, module):
         """Validate every point of a module before changing any of them."""
@@ -276,20 +290,8 @@ class EngineCallbacks:
             except Exception:
                 self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
                 return False
-        if name in attempt.TARGETS:
-            return self._instrument_attempt(module, name)
-        if name in transition.TARGETS or name in health.TARGETS:
-            observer, targets = (self.transition, transition.TARGETS) if name in transition.TARGETS else (self.health, health.TARGETS)
-            if observer is None:
-                return False
-            try:
-                changes = [(cache._function(module, point), observer.wrap(module, point)) for point in targets[name]]
-            except Exception:
-                self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
-                return False
-            for (owner, method, _), wrapped in changes:
-                setattr(owner, method, wrapped)
-            return True
+        if name in OPTIONAL_MODULES:
+            return self._instrument_optional(module, name)
         observer = (self.cache if name in CACHE_TARGETS else self.slot if name in SLOT_TARGETS
                     else self.slot_v2 if name in SLOT_V2_TARGETS else self.weights if name in weights_lifetime.TARGETS
                     else self.comm if name in comm_buffer.TARGETS
@@ -303,15 +305,19 @@ class EngineCallbacks:
             setattr(owner, method, self._fault(wrapped) if method == FAULT_POINT and self.fault_file else wrapped)
         return True
 
-    def _instrument_attempt(self, module, name):
-        """scheduler·KV 모듈: 지점마다 관측기를 고른다. attempt 관측이 꺼져 있으면 원래 관측만 한다."""
+    def _instrument_optional(self, module, name):
+        """선택 관측이 있는 모듈: 지점마다 켜진 관측기를 고른다. 꺼진 관측기의 지점은 건드리지 않는다."""
         plan = []
         for point in MODULES[name]:
-            if point in attempt.TARGETS[name]:
-                if self.attempt is not None:
-                    plan.append((self.attempt, point))
-            elif name in CACHE_TARGETS and point in CACHE_TARGETS[name]:
-                plan.append((self.cache, point))
+            chosen = None
+            for attribute, targets in OPTIONAL:
+                if point in targets.get(name, ()):
+                    chosen = getattr(self, attribute)
+                    break
+            if chosen is None and name in CACHE_TARGETS and point in CACHE_TARGETS[name]:
+                chosen = self.cache
+            if chosen is not None:
+                plan.append((chosen, point))
         try:
             changes = [(cache._function(module, point), observer.wrap(module, point)) for observer, point in plan]
         except Exception:
@@ -343,7 +349,7 @@ class EngineCallbacks:
 
     def flush_gaps(self):
         kernel = self.kernel.gaps | self.graph.gaps if self.kernel is not None else set()
-        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health) if o is not None))
+        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler) if o is not None))
         for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | self.weights.gaps | self.comm.gaps | kernel | extra):
             self.gap(code)
 
@@ -389,7 +395,8 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
             kernel_checks=settings.get('lab_kernel_checks') is True,
             request_attempts=settings.get('request_attempts') is True,
             generation_transitions=settings.get('generation_transitions') is True,
-            health_causal=settings.get('health_causal') is True)
+            health_causal=settings.get('health_causal') is True,
+            profiler_control=settings.get('profiler_control') is True)
         sys.meta_path.insert(0, Finder(callbacks))
         atexit.register(callbacks.flush_gaps)
         return True

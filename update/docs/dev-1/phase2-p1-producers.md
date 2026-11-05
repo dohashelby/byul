@@ -10,7 +10,7 @@
 | rank-fault | LIF-08 | 남음(TP2) |
 | failed-group-resources | LIF-11 | 남음(TP2) |
 | health-worker-causal | OBS-02 | CPU k3d 생산 확인(2026-11-05). vLLM 안에 health와 worker 사이 공유 인과 키가 없음(진단으로 기록). GPU 확인·등록 남음 |
-| profiler-control | LIF-14·OBS-03 | 남음 |
+| profiler-control | LIF-14·OBS-03 | CPU k3d 생산 확인(2026-11-05). 세 프로세스를 잇는 공유 키 없음(진단으로 기록). GPU 확인·등록 남음 |
 
 ## request-attempt
 
@@ -80,3 +80,26 @@
   - EngineCore(PID 74)의 `worker_state` output 3건, `request_accepted` 1건이 나왔다.
   - 계약 gap은 미등록과 공유 인과 키 부재 진단이다.
 - 의미: OBS-02(API health와 실제 worker 상태의 인과)는 vLLM 0.31 기본 health 경로로는 확인할 수 없다. 인과를 보려면 worker 왕복이 있는 health(예: runtime의 별도 준비 확인)가 필요하다. runtime 담당과 합의할 항목에 더한다.
+
+## profiler-control
+
+- 관측(`adapters/vllm_profiler_callback.py`): vLLM 0.31.0의 다음 지점을 원 소스 해시로 고정해 감싼다.
+  - API `AsyncLLM.start_profile`·`stop_profile`
+  - EngineCore `EngineCore.profile`
+  - worker `Worker.profile`, `TorchProfilerWrapper._start`·`_stop`
+  - gpu_worker·wrapper 해시는 native/15 profiler 센서가 검토한 값과 같다.
+  - `_stop` 반환 뒤 출력 폴더의 파일 이름 지문과 크기만 남긴다. 내용은 읽지 않는다.
+  - 선택 기능 `--profiler-control`이다.
+- 센서 설치 정리: 같은 모듈(async_llm, core)에 선택 관측이 여럿 겹친다. 그래서 선택 관측의 설치를 지점별로 관측기를 고르는 한 함수로 합쳤다(`_instrument_optional`).
+- 변환:
+  - 사건: `api_call`, `rpc`, `worker_control`, `backend_state`, `stop_failed`, `output_complete`(파일 목록 지문·파일 수), `next_collection`
+  - causal 지문은 행마다 고유하다. API → EngineCore → worker로는 `is_start`와 접두어만 가고 요청 ID가 없다. 이를 `PROFILER_CAUSAL_ID_ABSENT_IN_ENGINE` 진단으로 남긴다.
+- k3d CPU 확인(run 13, `byul-dev1-evidence/k3d-run13/profiler-control-record.json`):
+  - 시작·중지를 두 번 했다. API(PID 1)·EngineCore(PID 74)·worker(PID 112)에서 사건 24개가 나왔다.
+  - 두 번 모두 시작 → 중지 → 출력 완료 → 다음 수집 순서였다.
+  - API 서버도 자기 torch profiler를 돌려 같은 출력 폴더에 쓴다. 그래서 파일 목록만으로는 어느 프로세스의 파일인지 가를 수 없다(한계).
+  - 처음 두 번은 중지 때 엔진이 OOMKilled됐다(4 GiB·6 GiB 한도, 센서를 끈 대조에서도 같음). vLLM 기본 설정(with_stack·gzip·device time 표)의 CPU lab 메모리 사용 때문이다. lab에서는 그 세 옵션을 끄고 6 GiB로 실행했다. 로그는 `k3d-run13/engine-attempt{1,2}-oom.log`에 있다.
+- 남은 것:
+  - backend 실제 수집 상태와 trace callback(LIF-14). torch profiler 안쪽 관측이 필요하다.
+  - 프로세스별 출력 파일 구분. 출력 폴더를 프로세스별로 나누거나 trace 이름의 rank 접미어를 쓴다.
+  - GPU 확인과 등록.

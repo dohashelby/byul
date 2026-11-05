@@ -97,7 +97,7 @@ LIFECYCLE_FILES = ('guard_lifecycle_sensor.py', 'sitecustomize.py', 'settings.js
 
 
 def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usage=None, gpu=None, restart_always=False,
-           engine_callbacks=None, dev_endpoints=False):
+           engine_callbacks=None, dev_endpoints=False, profiler=False):
     """lifecycle_dir: `guard prepare-lifecycle-sensor` 출력. 주면 RUNBOOK의 계측 기동 설정을 더한다.
 
     고정 자산은 읽기 전용 /guard-lifecycle(ConfigMap), 기록은 /guard-lifecycle/data/<session>(엔진 UID 소유 0700)이다.
@@ -132,6 +132,16 @@ def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usa
                                       {'name': 'callback-data', 'mountPath': '/guard-lifecycle/data'}]
         engine['spec']['volumes'] += [{'name': 'guard-callbacks', 'hostPath': {'path': '/srv/models/' + engine_callbacks, 'type': 'Directory'}},
                                       {'name': 'callback-data', 'emptyDir': {'sizeLimit': '128Mi'}}]
+    if profiler:
+        # profiler-control(P1) lab: torch profiler를 켜고 출력은 엔진 Pod의 빈 폴더(/guard-profiles)에 둔다.
+        container = engine['spec']['containers'][0]
+        container['args'] = [*container['args'], '--profiler-config', json.dumps({'profiler': 'torch', 'torch_profiler_dir': '/guard-profiles',
+            # 기본값(with_stack·gzip·device time 표)으로는 CPU lab에서 중지 때 메모리 초과였다(run 13, 센서 없이도 같음).
+            'torch_profiler_with_stack': False, 'torch_profiler_use_gzip': False, 'torch_profiler_dump_cuda_time_total': False})]
+        container['volumeMounts'].append({'name': 'profiles', 'mountPath': '/guard-profiles'})
+        engine['spec']['volumes'].append({'name': 'profiles', 'emptyDir': {'sizeLimit': '512Mi'}})
+        # 4 GiB 한도에서는 중지 때 trace 내보내기가 OOMKilled됐다(run 13 첫 시도).
+        container['resources']['limits']['memory'] = '6Gi'
     if dev_endpoints:
         # lab 전용: vLLM 개발 경로(/collective_rpc·/reset_prefix_cache·/pause·/resume·/sleep). 세대 전환을 직접 일으킬 때만 켠다.
         engine['spec']['containers'][0]['env'].append({'name': 'VLLM_SERVER_DEV_MODE', 'value': '1'})
@@ -653,7 +663,7 @@ def main(argv=None):
                         help='gpu: 2단계 GPU lab. 이름공간·세대·별칭을 바꾼다. 같은 run의 모든 하위 명령에 같은 값을 준다.')
     sub = parser.add_subparsers(dest='kind', required=True)
     r = sub.add_parser('render'); r.add_argument('--run-id', required=True); r.add_argument('--engine-image', required=True)
-    r.add_argument('--restart-always', action='store_true'); r.add_argument('--engine-callbacks'); r.add_argument('--dev-endpoints', action='store_true'); r.add_argument('--gpu-model'); r.add_argument('--gpu-driver'); r.add_argument('--runtime-class')
+    r.add_argument('--restart-always', action='store_true'); r.add_argument('--engine-callbacks'); r.add_argument('--dev-endpoints', action='store_true'); r.add_argument('--profiler', action='store_true'); r.add_argument('--gpu-model'); r.add_argument('--gpu-driver'); r.add_argument('--runtime-class')
     r.add_argument('--lifecycle', type=Path); r.add_argument('--api-key-secret'); r.add_argument('--usage', choices=['forbidden', 'allowed'])
     r.add_argument('--out', type=Path, required=True)
     e = sub.add_parser('env'); e.add_argument('--render', type=Path, required=True); e.add_argument('--models', type=Path, required=True)
@@ -692,7 +702,7 @@ def main(argv=None):
         use_gpu_profile()
     load = lambda path: json.loads(Path(path).read_text(encoding='utf-8'))
     if args.kind == 'render':
-        raw, record = render(run_id=args.run_id, engine_image=args.engine_image, lifecycle_dir=args.lifecycle, api_key_secret=args.api_key_secret, usage=args.usage, restart_always=args.restart_always, engine_callbacks=args.engine_callbacks, dev_endpoints=args.dev_endpoints,
+        raw, record = render(run_id=args.run_id, engine_image=args.engine_image, lifecycle_dir=args.lifecycle, api_key_secret=args.api_key_secret, usage=args.usage, restart_always=args.restart_always, engine_callbacks=args.engine_callbacks, dev_endpoints=args.dev_endpoints, profiler=args.profiler,
             gpu=({k: v for k, v in (('model', args.gpu_model), ('driver', args.gpu_driver), ('runtime_class', args.runtime_class)) if v}
                  if args.profile == 'gpu' else None))
         for name, data in raw.items():

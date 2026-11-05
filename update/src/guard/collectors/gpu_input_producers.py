@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 
 from guard.adapters import vllm_attempt_callback as attempt_callback
@@ -329,4 +330,102 @@ def health_worker_record(processes, *, pod, environment_ref, target_sha256, prep
                                and any(e['event'] == 'worker_state' for e in events), 'dropped': 0,
                                'diagnostic_codes': [c for c in codes if contract._ID.fullmatch(c)]}}
     return record, contract.validate(record, kind='health-worker-causal', environment_ref=environment_ref,
+                                     target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)
+
+
+# ---------------------------------------------------------------------------
+# profiler-control (LIF-14·OBS-03)
+# ---------------------------------------------------------------------------
+from guard.adapters import vllm_profiler_callback as profiler_callback
+
+PROFILER_PRODUCER_NAME = 'guard-engine-callback-profiler-control'
+PROFILER_PRODUCER_VERSION = '1'
+
+
+def profiler_producer():
+    digest = hashlib.sha256()
+    for path in (Path(profiler_callback.__file__), Path(__file__)):
+        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
+    return {'name': PROFILER_PRODUCER_NAME, 'version': PROFILER_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
+
+
+def profiler_control_events(processes):
+    """API·EngineCore·worker의 profiler 제어 행을 계약 행으로 옮긴다.
+
+    - api_call: API 진입, rpc: EngineCore 반환, worker_control: worker 반환, backend_state: torch profiler 시작·중지 반환
+    - stop_failed: 중지 쪽 예외(worker·backend)
+    - output_complete: 중지 반환 뒤 출력 폴더의 파일 목록(이름 지문·크기). artifact 지문은 그 목록의 해시, 파일 세대는 파일 수다.
+    - next_collection: 출력 완료 뒤 다시 시작된 backend
+    - causal 지문은 행마다 고유하다. 세 프로세스를 잇는 키가 vLLM에 없어서다.
+    """
+    events, bindings, codes, rows = [], [], set(), []
+    for process in processes:
+        relevant = [r for r in process['events'] if r.get('schema') == profiler_callback.SCHEMA]
+        if process['start_ticks'] is None:
+            if relevant:
+                codes.add('PROFILER_PROCESS_START_UNAVAILABLE')
+            continue
+        index = None
+        for row in process['events']:
+            if row.get('phase') == 'GAP':
+                codes.add(row.get('code') if type(row.get('code')) is str else 'PROFILER_PRODUCER_GAP'); continue
+            if row.get('schema') != profiler_callback.SCHEMA or row.get('entry_qualified_before') is not True:
+                continue
+            if row['phase'] != 'CALL' and row.get('entry_qualified_after') is not True:
+                continue
+            if index is None:
+                index = len(bindings); bindings.append({'pid': process['pid'], 'start_ticks': process['start_ticks']})
+            stamp = row.get('operation_started_ns') if row['phase'] == 'CALL' else row.get('operation_finished_ns')
+            rows.append((stamp or 0, len(rows), index, row))
+    if not rows:
+        return [], bindings, sorted(codes)
+    origin = min(r[0] for r in rows); completed = False
+    for stamp, number, binding, row in sorted(rows):
+        at_ms = max(0, (stamp - origin) // 1_000_000); fields = row.get('fields') or {}; point = row['point']; phase = row['phase']
+        causal = hashlib.sha256(('%s:%s:%d' % (row.get('process_sha256'), row.get('call_sha256'), number)).encode()).hexdigest()
+        start = fields.get('is_start')
+        state = 'start' if start is True else 'stop' if start is False else None
+        def add(event, state=state, artifact=None, generation=None):
+            events.append({'seq': len(events), 'event': event, 'binding': binding, 'at_ms': at_ms, 'causal_sha256': causal,
+                           'artifact_sha256': artifact, 'file_generation': generation, 'state': state})
+        if point.startswith('AsyncLLM.') and phase == 'CALL':
+            add('api_call')
+        elif point == 'EngineCore.profile' and phase == 'RETURN':
+            add('rpc')
+        elif point == 'EngineCore.profile' and phase == 'RAISE':
+            add('rpc', state='raised')
+        elif point == 'Worker.profile' and phase == 'RETURN':
+            add('worker_control')
+        elif point == 'Worker.profile' and phase == 'RAISE':
+            add('stop_failed' if start is False else 'worker_control', state='raised')
+        elif point == 'TorchProfilerWrapper._start' and phase == 'RETURN':
+            add('next_collection' if completed else 'backend_state', state='started')
+        elif point == 'TorchProfilerWrapper._stop' and phase == 'RAISE':
+            add('stop_failed', state='raised')
+        elif point == 'TorchProfilerWrapper._stop' and phase == 'RETURN':
+            add('backend_state', state='stopped')
+            files = fields.get('output_files')
+            if type(files) is list and files:
+                completed = True
+                add('output_complete', state='files', artifact=hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest(),
+                    generation='files-%d' % len(files))
+            else:
+                codes.add('PROFILER_OUTPUT_UNOBSERVED')
+    return events, bindings, sorted(codes)
+
+
+def profiler_control_record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False):
+    events, processes_used, codes = profiler_control_events(processes)
+    codes = set(codes) | {'PROFILER_CAUSAL_ID_ABSENT_IN_ENGINE'} | ({'PROFILER_READ_TRUNCATED'} if truncated else set())
+    bindings = [{'pod_uid': pod['pod_uid'], 'container_id': pod['container_id'].removeprefix('containerd://')[:128],
+                 'restart_count': pod['restart_count'], 'worker_pid': p['pid'], 'start_ticks': p['start_ticks'], 'rank': 0}
+                for p in processes_used]
+    stops = [e for e in events if e['event'] == 'api_call' and e['state'] == 'stop']
+    closed = bool(stops) and any(e['event'] == 'output_complete' and e['at_ms'] >= stops[-1]['at_ms'] for e in events)
+    record = {'schema': contract.SCHEMA, 'kind': 'profiler-control', 'producer': profiler_producer(),
+              'environment_ref': environment_ref, 'target_sha256': target_sha256, 'prepared_sha256': prepared_sha256,
+              'session': session, 'bindings': bindings, 'events': events,
+              'completeness': {'source_ended': closed and not truncated, 'dropped': 0,
+                               'diagnostic_codes': sorted(c for c in codes if contract._ID.fullmatch(c))}}
+    return record, contract.validate(record, kind='profiler-control', environment_ref=environment_ref,
                                      target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)

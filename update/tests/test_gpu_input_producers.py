@@ -199,3 +199,34 @@ def test_health_and_worker_rows_keep_separate_generations_and_no_shared_causal_k
     assert 'GPU_INPUT_PRODUCER_DIAGNOSTIC:HEALTH_WORKER_CAUSAL_LINK_ABSENT_IN_ENGINE' in result['gaps']
     dead = producers.health_worker_events([{'pid': 90, 'start_ticks': 5, 'events': [hrow(1, 'CALL', engine_dead=True, output_handler_running=True)]}])[0]
     assert dead[0]['state'] == 'unhealthy'
+
+
+from guard.adapters import vllm_profiler_callback as profcb
+
+
+def prow(ns, point, phase, **fields):
+    return {'schema': profcb.SCHEMA, 'point': point, 'phase': phase, 'entry_qualified_before': True, 'entry_qualified_after': True,
+            'operation_started_ns': ns, 'operation_finished_ns': ns, 'fields': fields, 'process_sha256': 'p' * 64, 'call_sha256': str(ns)}
+
+
+def test_profiler_chain_across_three_processes_with_output_and_next_collection():
+    api = [prow(1_000_000, 'AsyncLLM.start_profile', 'CALL', is_start=True), prow(9_000_000, 'AsyncLLM.stop_profile', 'CALL', is_start=False)]
+    core = [prow(2_000_000, 'EngineCore.profile', 'RETURN', is_start=True), prow(10_000_000, 'EngineCore.profile', 'RETURN', is_start=False)]
+    worker = [prow(1_500_000, 'TorchProfilerWrapper._start', 'RETURN', is_start=True), prow(1_800_000, 'Worker.profile', 'RETURN', is_start=True, rank=0),
+              prow(9_500_000, 'TorchProfilerWrapper._stop', 'RETURN', is_start=False, output_files=[{'name_sha256': 'n' * 64, 'bytes': 10}]),
+              prow(9_800_000, 'Worker.profile', 'RETURN', is_start=False, rank=0),
+              prow(11_000_000, 'TorchProfilerWrapper._start', 'RETURN', is_start=True)]
+    record, result = producers.profiler_control_record([{'pid': 1, 'start_ticks': 1, 'events': api}, {'pid': 74, 'start_ticks': 2, 'events': core},
+                                                        {'pid': 111, 'start_ticks': 3, 'events': worker}], pod=POD, **SCOPE)
+    assert [(e['event'], e['state']) for e in record['events']] == [
+        ('api_call', 'start'), ('backend_state', 'started'), ('worker_control', 'start'), ('rpc', 'start'), ('api_call', 'stop'),
+        ('backend_state', 'stopped'), ('output_complete', 'files'), ('worker_control', 'stop'), ('rpc', 'stop'), ('next_collection', 'started')]
+    assert record['completeness']['source_ended'] is True and len(record['bindings']) == 3
+    assert set(result['gaps']) == {'GPU_INPUT_PRODUCER_UNSUPPORTED', 'GPU_INPUT_PRODUCER_DIAGNOSTIC:PROFILER_CAUSAL_ID_ABSENT_IN_ENGINE'}
+
+
+def test_profiler_stop_failure_and_missing_output_stay_visible():
+    worker = [prow(1, 'TorchProfilerWrapper._stop', 'RAISE', is_start=False), prow(2, 'Worker.profile', 'RAISE', is_start=False),
+              prow(3, 'TorchProfilerWrapper._stop', 'RETURN', is_start=False, output_files=[])]
+    events, _, codes = producers.profiler_control_events([{'pid': 111, 'start_ticks': 3, 'events': worker}])
+    assert [e['event'] for e in events] == ['stop_failed', 'stop_failed', 'backend_state'] and codes == ['PROFILER_OUTPUT_UNOBSERVED']

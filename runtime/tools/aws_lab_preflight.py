@@ -308,6 +308,14 @@ def collect(args: argparse.Namespace, runner: Runner | None = None, *, opener: C
             present = {item.get("metadata", {}).get("name") for item in doc.get("items", [])}
             checks.append(_check(resource, "ok" if set(names) <= present else "fail", "필수 정책 존재" if set(names) <= present else "필수 정책 누락"))
     checks.append(_gateway(args.gateway_url, args.env_file, opener))
+    if getattr(args, "override_check", False):
+        checks.append(_check(
+            "kprobe_override", "unknown",
+            "노드 커널 지원 미확인; 수동: Tetragon Pod에서 `tetra probe config`, 노드에서 "
+            "`zgrep CONFIG_BPF_KPROBE_OVERRIDE /proc/config.gz` 또는 "
+            "`grep CONFIG_BPF_KPROBE_OVERRIDE /boot/config-$(uname -r)`; "
+            "security_file_permission 오류 주입 지원·정책 load 상태·실제 EPERM 별도 확인",
+        ))
     if getattr(args, "boundary_probe", False):
         checks.extend(_boundary_checks(args, runner, opener))
     try:
@@ -343,6 +351,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--env-file", help="private file with RUNTIME_VIEWER_TOKEN")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--boundary-probe", action="store_true", help="엔진 직접 생성 요청으로 정책 경계 실측")
+    parser.add_argument("--override-check", action="store_true", help="kprobe Override 수동 확인 명령과 미확인 상태 표시")
     return parser
 
 

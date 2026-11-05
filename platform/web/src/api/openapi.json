@@ -233,6 +233,27 @@
         }
       }
     },
+    "/api/runtime/phase-timeline": {
+      "get": {
+        "tags": [
+          "runtime"
+        ],
+        "summary": "Phase Timeline",
+        "operationId": "phase_timeline_api_runtime_phase_timeline_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhaseTimelineResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/update/results": {
       "get": {
         "tags": [
@@ -1326,6 +1347,148 @@
           "open_revalidation"
         ],
         "title": "Overview"
+      },
+      "PhaseCollector": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "written_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Written At"
+          },
+          "fresh": {
+            "type": "boolean",
+            "title": "Fresh"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "written_at",
+          "fresh"
+        ],
+        "title": "PhaseCollector"
+      },
+      "PhaseEntry": {
+        "properties": {
+          "phase": {
+            "type": "string",
+            "title": "Phase"
+          },
+          "from": {
+            "type": "string",
+            "title": "From"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phase",
+          "from",
+          "until",
+          "basis"
+        ],
+        "title": "PhaseEntry"
+      },
+      "PhaseExtraction": {
+        "properties": {
+          "engine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine"
+          },
+          "support_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Support Level"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "engine",
+          "support_level",
+          "limitations"
+        ],
+        "title": "PhaseExtraction"
+      },
+      "PhaseTimelineResponse": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/PhaseEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "collector": {
+            "$ref": "#/components/schemas/PhaseCollector"
+          },
+          "extraction": {
+            "$ref": "#/components/schemas/PhaseExtraction"
+          },
+          "data_origin": {
+            "type": "string",
+            "enum": [
+              "real",
+              "synthetic"
+            ],
+            "title": "Data Origin"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entries",
+          "collector",
+          "extraction",
+          "data_origin",
+          "source"
+        ],
+        "title": "PhaseTimelineResponse"
       },
       "PolicyConfirm": {
         "properties": {

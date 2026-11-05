@@ -1,6 +1,17 @@
 # 런타임 작업 상태
 
-최종 갱신: 2026-11-04
+최종 갱신: 2026-11-05
+
+- 2026-11-05 AWS `bundle apply` 4회에서 이전 Pod port-forward로 자동 조회 불가였고 새 수동 포워드의 ID·`verified` 일치를 확인했다. 연결 실패 시 포워드 재개설(기본 90초), `--existing` 재검증·복귀, dry-run sudo 안내를 수정했다. 로컬 전체 시험 712건 통과(skip 115), `git diff --check` 통과; 수정판의 AWS 재적용·Pod 종료 구간 자동 확인은 미검증이다.
+
+## 2026-11-05 플랫폼 정책 묶음 build/apply와 후보 목록 (기준 e6985d7, 미커밋)
+
+- 검수 지적 반영: apply의 `/api/status` 조회 토큰을 서버 env 관례인 `RUNTIME_VIEWER_TOKEN`으로 맞추고, 비보호 200 응답은 토큰 없이 처리한다. rollout 뒤 새 임시 port-forward를 열어 최대 30초 재시도한다. 실제 값 불일치·rollout 실패는 이전 링크 복원·재시작, 연결·인증 등 조회 불가는 새 링크를 유지하고 수동 확인을 요구한다. `--kubeconfig`를 모든 kubectl 호출에 전달하며 sudo 실행 예시를 갱신했다. 실제 서버 재실행은 아직 없다.
+- 검수 반영 후 전체 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 694건, 실패·오류 0, skip 115. `git diff --check` 통과.
+- `bundle build`가 CONFIRMED `byul-policy/0.1` 원본과 독립 확인 정규 해시·서버 값·intent를 받아 새 ID 묶음을 생성하고 기존 verifier로 확인한다. `bundle apply`는 root:10000 권한으로 서버 루트에 배치·재검증, 상대 `current` 링크 교체, Gateway 재시작·`/api/status` 승인 `verified` 확인, 실패 시 링크 복원·재시작을 수행한다. `--dry-run` 제공. 변환·거부 규칙과 수동 대체 절차는 `docs/정책묶음_변환규칙.md`, `deploy/gpu-lab/정책_수동적용_절차.md`에 기록했다. 승인 목록은 자기 신고 사본이며 검증된 플랫폼 승인이 아니다.
+- LAB `platform-approval.aws-lab.json`은 원본 전체가 아닌 요약본이라 원본 해시 `b37fa34…`를 재검산할 수 없다. 합성 EXAMPLE 정책 정규 해시 `e6ff3f32…`와 시험 서버 값으로 vLLM·SGLang 묶음을 만들었고 둘 다 `bundle verify` 통과, Gateway 정책 파일은 기존 LAB 바이트와 동일(`472a7cca…`). intent·digest 자리값은 시험 사본에서만 채웠다. 실제 원본·서버 권한·kubectl·HTTP·AWS 적용은 미확인이다.
+- `docs/후보상태_기능목록.md`에 F6 지표, SP1 캐시, F4 SGLang drift, F7 승인 검증기, 관리 listener와 3회차의 제한된 SGLang 빈 캐시 관찰을 기록했다. `docs/지원_미지원_목록.md`의 backfill 전달 1건과 PR #216 빈 캐시 기동 1회 확인을 3회차 §3·§4 근거로 갱신했다. 다음은 플랫폼 원본 판본·실제 서버 값으로 생성 검증, 배치 권한과 되돌리기 실습, 실제 엔진의 후보 값 대조다.
+- 로컬 전체 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 692건, 실패·오류 0, skip 115(소켓/환경 제한). `git diff --check` 통과. AWS 서버에는 접속·적용하지 않았고 커밋·push하지 않았다.
 
 ## 2026-11-04 AWS GPU 서버 3회차 결과 (기준 b3fc80e, Claude 실행)
 
@@ -409,3 +420,19 @@
 - 연결 수립은 기한 내 별도 작업으로 대기하고, 공통 감시가 요청 전송·헤더·본문 중 기한에 소켓을 끊는다. 연결이 늦게 끝나도 닫는다. relay 일반·chat/completions stream·토큰 계산에 적용했으며, 공유 기한 뒤 토큰 계산 timeout/OSError는 504 `ENGINE_DEADLINE`과 클라이언트 연결 닫기로 분류한다. 공유 기한 전 실패는 503을 유지한다.
 - AWS-01·18 stream 성공은 `[DONE]`과 Gateway 최종 기록의 ALLOWED/completed/오류 없음 여부를 함께 확인하며, 기록 누락은 unknown이다. GPU-LAB README의 엔진 수집 스레드 설명을 실제 순차 처리와 지연 한계에 맞췄다. contracts는 수정하지 않았다.
 - 소켓 없는 회귀시험을 추가해 헤더 분할 전송·본문 대기 중 기한 종료, 연결 수립 지연, 정상 감시 취소, 토큰 기한 오류, `[DONE]` 뒤 최종 실패를 확인했다. `.venv/bin/python -B -m unittest discover -s tests`: 672건, 실패·오류 0, skip 115(로컬 소켓 제약). Claude 노트북에서 전체 재시험과 실제 엔진 확인이 남았다. 커밋·푸시하지 않았다.
+
+## 2026-11-04 플랫폼 단계 시간표 조회 (기준 byul_runtime 작업 트리, 미커밋)
+
+- 근거: Gateway에 기존 ExecPolicy 시간표 파일의 읽기 전용 `/api/phase-timeline` 투영을 추가했다. 수집 상태·15초 freshness·단계/근거/추출 수준만 내보내며 Pod 이름·UID는 제외한다. 파일 누락의 로컬 시연은 `RUNTIME_DEMO=1`일 때 합성임을 표시한다. `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 688건 통과, skip 115건(로컬 소켓 제약). 실제 관측 mount·인증을 건 GPU 환경의 응답은 미확인이다.
+
+## 2026-11-04 사용자 화면 검수 후속 (기준 9fc5056 + 미커밋 변경)
+
+- 근거: 예시 시간표는 기존 합성 Tetragon 관측 시각의 처음·끝에 맞춰 생성해 단계와 실행 점이 겹치며, 실제 시간표 파일 조회 분기는 그대로다. 로컬 전체 unittest 689건 통과(skip 115: 소켓 제약)와 단위시험으로 시간 포함·합성 표지를 확인했다. 실제 GPU 관측 mount와 화면에서의 점 배치는 미확인이다.
+- 2026-11-05 Tetragon 선택적 차단 설계안 `docs/Tetragon_차단_설계.md` 작성: 보호 파일 읽기 Override를 1순위로 제안하고 intent·묶음·계약·화면·되돌리기·kind/AWS 시험과 미확인 위험을 정리했다. 구현·적용·실측은 하지 않았으며 계약 변경은 intent 1.1 선택 필드 범위에서는 불필요, 개별 사건 차단 판정 확장은 합의 필요다.
+- 2026-11-05 Tetragon `TG-SECRET-01` 선택적 읽기 차단 후보와 intent 1.1 검증·단위 시험, L-05b kind opt-in 도구를 구현했다(기준 a9e487d, 미커밋); 전체 unittest 701건 통과(skip 115), `git diff --check` 통과, 실제 kind/AWS 차단·errno·복원은 미확인이고 Claude 검수 전이다.
+- 2026-11-05 4회차 준비(기준 4432c0f, 미커밋): platform 웹 Override 차단 표지·알림 분리·기간별 개요 보조 표시, runtime AWS-20(승인 enforce 선적용·monitor 자동 복원), preflight 커널 수동 확인, 두 엔진 지표 이름 도구·확인순서를 추가했다. 웹 타입 검사·71건 및 runtime 708건(skip 115) 통과, `git diff --check` 통과; AWS 실측·커널 지원·지표·화면 실자료는 미확인이다.
+
+## 2026-11-05 노트북 데모용 Tetragon Override 합성 관측 (기준 51f802e, 미커밋)
+
+- `RUNTIME_DEMO=1` 실행에 한해 TG-SECRET-01 가짜 파일 읽기 Override 3건·Post 1건을 `--origin synthetic`으로 수집한다. 기존 관측 폴더에도 한 번 추가하고 데이터 폴더의 표지 파일로 재수집을 막는다. 실제 서버 관측·판정 코드는 변경하지 않았다.
+- CLI 수집 후 정규화 필드와 웹의 합성·예시 및 차단 시도 표지를 시험했다. `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 713건 통과(skip 115). `platform/web` 타입 검사·72건 시험, `git diff --check`, 셸 구문 검사 통과. 노트북 UI 수동 확인 및 실제 차단 결과는 미확인이다.

@@ -100,6 +100,16 @@ describe("기간과 묶기", () => {
     expect(untimed).toBe(1);
     expect(buckets.reduce((a, b) => a + b.allowed + b.denied, 0)).toBe(2);
   });
+
+  it("전체 요청 그래프는 날짜 단위로 묶고 빈 날짜도 표시한다", () => {
+    const items = [
+      { t: "2026-10-25T01:00:00Z", k: "allowed" as const },
+      { t: "2026-10-27T01:00:00Z", k: "allowed" as const },
+    ];
+    const { buckets, size } = bucketize(items, (x) => x.t, (x) => x.k, ["allowed"] as const, resolveRange("all", null, null), 24 * 60 * 60 * 1000);
+    expect(size).toBe(24 * 60 * 60 * 1000);
+    expect(buckets.map((b) => b.allowed)).toEqual([1, 0, 1]);
+  });
 });
 
 describe("환경 사실 경고", () => {

@@ -50,6 +50,7 @@ export function bucketize<T, K extends string>(
   keyOf: (item: T) => K,
   keys: readonly K[],
   range: Range,
+  fixedSize?: number,
 ): { buckets: Bucket<K>[]; size: number; untimed: number } {
   const times: { t: number; k: K }[] = [];
   let untimed = 0;
@@ -67,7 +68,7 @@ export function bucketize<T, K extends string>(
   // 기간을 "전체"로 두면 자료가 있는 구간만 그린다(serving-runtime과 같음). 정한 기간이면 지금까지.
   const dataMax = times.length ? Math.max(...times.map((x) => x.t)) : Date.now();
   const max = range.to ?? (range.from == null ? dataMax : Math.max(Date.now(), dataMax));
-  const size = bucketSize(Math.max(max - min, 60_000));
+  const size = fixedSize ?? bucketSize(Math.max(max - min, 60_000));
   const first = Math.floor(min / size) * size;
   const count = Math.min(Math.floor((max - first) / size) + 1, 500);
   const buckets: Bucket<K>[] = [];

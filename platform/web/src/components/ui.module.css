@@ -133,6 +133,18 @@ button.metric:hover {
   color: var(--muted);
   font-size: 13px;
 }
+.chartTotals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 18px;
+  margin: 0 0 14px;
+}
+.chartTotal {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
 .metricBody {
   display: flex;
   flex-wrap: wrap;
@@ -269,6 +281,9 @@ button.metric:hover {
   font-size: 12px;
   flex-wrap: wrap;
 }
+.pageButtons, .pageNumber { display: inline-flex; align-items: center; gap: 4px; }
+.pageButtons { flex-wrap: wrap; }
+.pageButtons button[aria-current="page"] { border-color: var(--accent); color: var(--accent-ink); }
 .colMenu {
   position: relative;
 }
@@ -636,6 +651,25 @@ button.metric:hover {
   position: relative;
   height: 240px;
 }
+.donutCompact {
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.donutLegend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  min-width: 0;
+}
+.donutLegendItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.donutLegendItem > span:first-child { flex: none; margin-right: 0; }
 
 /* 섹션 머리 (serving-runtime .section-head) */
 .sectionHead {

@@ -139,9 +139,9 @@ describe("environment form: one question per value", () => {
     pick("로컬 파일");
     // update는 source가 없는 사실을 모름으로 보므로 화면 입력에도 source를 남긴다.
     expect(doc.facts?.shared_or_remote_weights).toMatchObject({ value: false, origin: "DECLARED", source: "byul platform 환경 입력 (가중치 공급 방식 답)" });
-    pick("공유 daemon");
+    pick("공유 데몬(daemon)");
     expect(doc.facts?.shared_or_remote_weights).toMatchObject({ value: true });
-    pick("공유 daemon");
+    pick("공유 데몬(daemon)");
     expect(doc.facts?.shared_or_remote_weights).toBeUndefined();
     // 조건 답으로 정해지는 사실과 전제로 정해진 사실은 따로 묻지 않는다.
     expect(screen.queryByRole("radiogroup", { name: "공유·원격 가중치" })).toBeNull();

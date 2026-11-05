@@ -18,10 +18,10 @@ import time
 from typing import Any, BinaryIO, Callable, Sequence
 
 from serving_runtime.enforcement.cilium import (
-    render_manifests as render_cilium_manifests,
+    render_manifests as render_cilium_manifests, write_manifests,
 )
 from serving_runtime.enforcement.events import transform_lines
-from serving_runtime.enforcement.intent import load_intent
+from serving_runtime.enforcement.intent import load_intent, parse_intent
 from serving_runtime.enforcement.tetragon import (
     render_manifests as render_tetragon_manifests,
 )
@@ -54,6 +54,7 @@ CASE_TITLES = {
 # Opt-in cases (--task-checks). They create and always delete their own Pods
 # and policies, so they do not depend on --cleanup.
 TASK_CASE_TITLES = {
+    "L-05b": "TG-SECRET-01 가짜 파일 읽기 monitor→enforce→monitor",
     "L-07": "SP4 작업별 통신(acquire 허용·engine 거부)",
     "L-08": "SP1 공급물 읽기 전용 mount·비root 계정",
 }
@@ -164,6 +165,17 @@ except OSError as error:
     raise SystemExit(9)
 print("WRITE_SUCCEEDED")
 """
+SECRET_READ_ERRNO_SCRIPT = """\
+import errno, json
+from pathlib import Path
+try:
+    Path("/opt/serving/secret/read-probe.txt").read_bytes()
+except OSError as error:
+    print(json.dumps({"errno": error.errno, "name": errno.errorcode.get(error.errno)}))
+    raise SystemExit(13 if error.errno == errno.EPERM else 9)
+print(json.dumps({"read": "ok"}))
+"""
+SECRET_PROBE_PATH = "/opt/serving/secret/read-probe.txt"
 TCP_CONNECT_SCRIPT = """\
 import json, socket, sys
 try:
@@ -491,6 +503,35 @@ def matches_tetragon_file_observation(
     )
 
 
+def evaluate_l05b_phase(
+    raw_lines: Sequence[str], *, since: str, pod_uid: str, namespace: str, action: str
+) -> bool:
+    """Require a raw event with the exact rule, file, read mask, action and Pod UID."""
+
+    start = _parse_observed_at(since)
+    for line in raw_lines:
+        try:
+            root = json.loads(line)
+            event = root["process_kprobe"]
+            process = event["process"]
+            pod = process["pod"]
+            args = event["args"]
+            observed = _parse_observed_at(root.get("time"))
+            if (
+                start is not None and observed is not None and observed >= start
+                and event.get("policy_name") == "runtime-tg-secret-01"
+                and event.get("action", "").upper() == action
+                and pod.get("uid") == pod_uid
+                and pod.get("namespace") == namespace
+                and any(arg.get("file_arg", {}).get("path") == SECRET_PROBE_PATH for arg in args)
+                and any(str(arg.get("int_arg")) == "4" for arg in args)
+            ):
+                return True
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            continue
+    return False
+
+
 def matches_tetragon_exec_observation(
     item: dict[str, Any],
     *,
@@ -613,6 +654,7 @@ class LabChecker:
         cleanup: bool,
         tetragon_wait: float = DEFAULT_TETRAGON_WAIT,
         task_checks: bool = False,
+        secret_enforce_check: bool = False,
         allow_non_kind_context: bool = False,
         runner: SubprocessRunner | None = None,
         repo_root: Path | None = None,
@@ -639,12 +681,18 @@ class LabChecker:
         self.data_dir = self.state_dir / "data" / self.run_id
         self.observations_path = self.data_dir / "observations.jsonl"
         self.task_checks = task_checks
+        self.secret_enforce_check = secret_enforce_check
         self.intent_v11 = self.repo_root / "deploy/lab/intent.lab-v1.1.json"
         self.task_pods = self.repo_root / "deploy/lab/task-check-pods.yaml"
         self.rendered_v11_dir = self.state_dir / "rendered-v1.1"
         titles = dict(CASE_TITLES)
-        if task_checks:
+        if task_checks or secret_enforce_check:
             titles.update(TASK_CASE_TITLES)
+        if not task_checks:
+            for case_id in ("L-07", "L-08"):
+                titles.pop(case_id, None)
+        if not secret_enforce_check:
+            titles.pop("L-05b", None)
         self.cases = {case_id: _new_case(case_id, titles) for case_id in titles}
         self.pods: dict[str, str] = {}
         self.applied: list[Path] = []
@@ -1440,6 +1488,109 @@ class LabChecker:
                 evidence,
             )
 
+    def _l05b(self, case: dict[str, Any]) -> None:
+        """Opt-in local trial; restore monitoring even when a step fails."""
+
+        source = json.loads(self.intent_v11.read_text(encoding="utf-8"))
+        source["protected_paths"]["secret_paths"] = [SECRET_PROBE_PATH]
+        monitor = parse_intent(source)
+        source["tetragon_rule_modes"] = {"TG-SECRET-01": "enforce"}
+        enforce = parse_intent(source)
+        monitor_dir = self.state_dir / "l05b-monitor"
+        enforce_dir = self.state_dir / "l05b-enforce"
+        monitor_path = monitor_dir / "tetragon-tg-secret-01.json"
+        enforce_path = enforce_dir / "tetragon-tg-secret-01.json"
+        write_manifests(render_tetragon_manifests(monitor), monitor_dir)
+        write_manifests(render_tetragon_manifests(enforce), enforce_dir)
+        uid_result = self._kubectl(
+            case, "get", "pod", self.pods["engine"], "-o", "jsonpath={.metadata.uid}"
+        )
+        pod_uid = uid_result.stdout.strip() if uid_result.returncode == 0 else ""
+        if not pod_uid:
+            self._set(case, "unknown", "엔진 Pod UID를 확인하지 못함")
+            return
+
+        steps: list[dict[str, Any]] = []
+        evidence: list[Path] = [monitor_path, enforce_path]
+        restored = False
+
+        def replace(path: Path) -> None:
+            deleted = self._kubectl(
+                case, "delete", "tracingpolicynamespaced", "runtime-tg-secret-01",
+                "--ignore-not-found=true", "--wait=true", "--timeout=60s", timeout=70,
+            )
+            if deleted.returncode != 0 or self._apply(case, path).returncode != 0:
+                raise RuntimeError(f"TG-SECRET-01 정책 교체 실패: {path}")
+            self.sleep(3)
+
+        try:
+            for label, path, action in (
+                ("monitor", monitor_path, "KPROBE_ACTION_POST"),
+                ("enforce", enforce_path, "KPROBE_ACTION_OVERRIDE"),
+                ("restored", monitor_path, "KPROBE_ACTION_POST"),
+            ):
+                replace(path)
+                if label == "restored":
+                    restored = True
+                since = utc_now()
+                read = self._exec(
+                    case, self.pods["engine"], "python", "-c", SECRET_READ_ERRNO_SCRIPT
+                )
+                normal = self._gateway_request(case) if label == "enforce" else None
+                raw_path = self.raw_dir / f"l05b-{label}.jsonl"
+                try:
+                    _observations, wait = self._collect_tetragon_logs(
+                        case, path=raw_path, since=since,
+                        expected_events=lambda items: {"rule_action": any(
+                            item.get("rule_id") == "TG-SECRET-01"
+                            and item.get("path") == SECRET_PROBE_PATH
+                            and item.get("action_raw", "").upper() == action
+                            for item in items
+                        )},
+                    )
+                except RuntimeError:
+                    self._set(case, "unknown", f"{label} 구간 Tetragon 로그 수집 불가", evidence)
+                    break
+                evidence.append(raw_path)
+                event_found = evaluate_l05b_phase(
+                    raw_path.read_text(encoding="utf-8").splitlines(),
+                    since=since, pod_uid=pod_uid, namespace=self.namespace, action=action,
+                )
+                try:
+                    outcome = parse_last_json(read.stdout)
+                except ValueError:
+                    outcome = {}
+                read_ok = read.returncode == 0 and outcome.get("read") == "ok"
+                denied = read.returncode == 13 and outcome.get("errno") == 1 and outcome.get("name") == "EPERM"
+                steps.append({
+                    "phase": label, "read_returncode": read.returncode,
+                    "read_result": outcome, "event_matched": event_found,
+                    "tetragon_wait": wait,
+                    "normal_request_200": self._is_http_200(normal) if normal is not None else None,
+                })
+                if label == "enforce" and not self._is_http_200(normal):
+                    self._set(case, "failed", "차단 구간의 정상 Gateway 요청이 HTTP 200이 아님", evidence)
+                    break
+                if (label == "enforce" and read_ok) or (label != "enforce" and denied):
+                    self._set(case, "failed", f"{label} 구간에서 반대 읽기 결과가 관측됨", evidence)
+                    break
+                if outcome.get("errno") is not None and not denied:
+                    self._set(case, "failed", f"{label} 구간에서 예상과 다른 읽기 errno가 관측됨", evidence)
+                    break
+                if not (denied if label == "enforce" else read_ok) or not event_found:
+                    self._set(case, "unknown", f"{label} 구간의 errno/읽기 또는 동일 Pod UID 원시 이벤트가 부족함", evidence)
+                    break
+            else:
+                self._set(case, "passed", "가짜 파일 monitor→EPERM Override→monitor와 정상 요청 200 대조", evidence)
+        finally:
+            if not restored:
+                try:
+                    replace(monitor_path)
+                    case["rollback"] = "monitor 복원 적용"
+                except Exception as error:
+                    self._set(case, "failed", f"monitor 복원 실패: {sanitize_text(str(error))}", evidence)
+            case["steps"] = steps
+
     def _tracingpolicy_nenforce(
         self, case: dict[str, Any], policy_name: str
     ) -> int | None:
@@ -1610,7 +1761,7 @@ class LabChecker:
         try:
             self._start_task_pods(start)
         except Exception as error:  # report both cases, then clean up
-            for case_id in TASK_CASE_TITLES:
+            for case_id in ("L-07", "L-08"):
                 self._set(self.cases[case_id], "failed", sanitize_text(str(error)))
             if not self._delete_task_pods(start):
                 self._mark_task_cleanup_failure()
@@ -1630,7 +1781,7 @@ class LabChecker:
                 self._mark_task_cleanup_failure()
 
     def _mark_task_cleanup_failure(self) -> None:
-        for case_id in TASK_CASE_TITLES:
+        for case_id in ("L-07", "L-08"):
             case = self.cases[case_id]
             case["status"] = "failed"
             case["summary"] = f"{case['summary']} · 시험 Pod 정리 실패"
@@ -1713,7 +1864,13 @@ class LabChecker:
                 self._task_cases(cilium_ok)
             else:
                 for case_id in TASK_CASE_TITLES:
-                    self._set(self.cases[case_id], "not_run", "L-01 기준선 실패로 생략")
+                    if case_id in self.cases and case_id in {"L-07", "L-08"}:
+                        self._set(self.cases[case_id], "not_run", "L-01 기준선 실패로 생략")
+        if self.secret_enforce_check:
+            if baseline_ok:
+                self._run_case("L-05b", self._l05b)
+            else:
+                self._set(self.cases["L-05b"], "not_run", "L-01 기준선 실패로 생략")
         self._run_case("L-06", self._l06)
         statuses = [item["status"] for item in self.cases.values()]
         overall = calculate_overall(statuses)
@@ -1878,6 +2035,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="L-07(SP4 작업별 통신)·L-08(SP1 읽기 전용 공급물)을 추가 실행. 시험 Pod·정책은 매번 삭제",
     )
+    parser.add_argument(
+        "--secret-enforce-check",
+        action="store_true",
+        help="L-05b 가짜 보호 파일 monitor→enforce→monitor 시험을 추가 실행",
+    )
     return parser
 
 
@@ -1890,6 +2052,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         cleanup=args.cleanup,
         tetragon_wait=args.tetragon_wait,
         task_checks=args.task_checks,
+        secret_enforce_check=args.secret_enforce_check,
         allow_non_kind_context=args.allow_non_kind_context,
     )
     if args.kube_context != EXPECTED_CONTEXT and args.allow_non_kind_context:

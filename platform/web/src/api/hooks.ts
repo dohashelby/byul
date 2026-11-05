@@ -19,6 +19,7 @@ import type {
   LabReportResponse,
   RuntimeEventList,
   RuntimeStatusResponse,
+  PhaseTimelineResponse,
   VerificationDetail,
   VerificationList,
 } from "./types";
@@ -47,6 +48,8 @@ export const useRequestSummary = () =>
   useQuery({ queryKey: ["runtime", "summary"], queryFn: () => getJson<RequestSummary>("/api/runtime/summary"), ...live });
 export const useRuntimeStatus = () =>
   useQuery({ queryKey: ["runtime", "status"], queryFn: () => getJson<RuntimeStatusResponse>("/api/runtime/status"), ...live });
+export const usePhaseTimeline = () =>
+  useQuery({ queryKey: ["runtime", "phase-timeline"], queryFn: () => getJson<PhaseTimelineResponse>("/api/runtime/phase-timeline"), ...live });
 export const useResults = () =>
   useQuery({ queryKey: ["update", "results"], queryFn: () => getJson<VerificationList>("/api/update/results") });
 export const useResult = (id: string | null) =>

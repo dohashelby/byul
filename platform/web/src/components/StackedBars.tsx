@@ -33,6 +33,7 @@ export function ChartCard({
   active,
   onTab,
   total,
+  totals,
   note,
   children,
   footer,
@@ -42,6 +43,7 @@ export function ChartCard({
   active?: string;
   onTab?: (id: string) => void;
   total?: ReactNode;
+  totals?: { value: ReactNode; label: string }[];
   note?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
@@ -64,6 +66,10 @@ export function ChartCard({
           {note && <span className={s.bigCaption}>{note}</span>}
         </p>
       )}
+      {totals && <div className={s.chartTotals}>
+        {totals.map((item) => <span key={item.label} className={s.chartTotal}><strong className={s.metricValue}>{item.value}</strong><span className={s.bigCaption}>{item.label}</span></span>)}
+        {note && <span className={s.bigCaption}>{note}</span>}
+      </div>}
       {children}
       {footer}
     </article>
@@ -111,7 +117,7 @@ function EmptyChart({ height }: { height: number }) {
       : PERIODS.find((p) => p.key === period)?.label;
   return (
     <div className={s.empty} style={{ height, display: "flex", flexDirection: "column", justifyContent: "center", gap: 8, padding: 0 }}>
-      <span>{period === "all" ? "기록이 없습니다" : `선택한 기간(${range})에 기록이 없습니다`}</span>
+      <span>{period === "all" ? "기록 없음" : `선택 기간(${range}) 기록 없음`}</span>
       {period !== "all" && (
         <span>
           <button type="button" className="btn btn-small" onClick={() => patch({ period: null, from: null, to: null })}>
@@ -205,13 +211,16 @@ export function TimeBars<K extends string>({
 }
 
 /** 시간대별 합계 선(면 채움). serving-runtime "시간별 요청 · 전체" 탭과 같은 모양. */
-export function TimeLine<K extends string>({ buckets, size, keys, height = 240 }: { buckets: Bucket<K>[]; size: number; keys: readonly K[]; height?: number }) {
+export function TimeLine<K extends string>({ buckets, size, keys, height = 240, onSelectRange }: { buckets: Bucket<K>[]; size: number; keys: readonly K[]; height?: number; onSelectRange?: (from: number, to: number) => void }) {
   const data = buckets.map((b) => ({ start: b.start, label: b.label, total: keys.reduce((a, k) => a + (b[k] as number), 0) }));
   if (data.every((d) => d.total === 0)) return empty(height);
   return (
     <div className={s.chartBox} style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+        <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }} onClick={(e: ChartEvent) => {
+          const start = e?.activePayload?.[0]?.payload?.start ?? buckets.find((b) => b.label === e?.activeLabel)?.start;
+          if (start !== undefined) onSelectRange?.(start, start + size);
+        }}>
           <CartesianGrid vertical={false} stroke="var(--grid)" />
           <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={{ stroke: "var(--grid)" }} minTickGap={24} />
           <YAxis allowDecimals={false} tick={AXIS} tickLine={false} axisLine={false} />
@@ -223,12 +232,12 @@ export function TimeLine<K extends string>({ buckets, size, keys, height = 240 }
   );
 }
 
-/** 구성 비율 도넛 (cutout 68%, 오른쪽 범례). */
-export function Donut({ items, height = 240 }: { items: { key: string; label: string; value: number; color: string }[]; height?: number }) {
-  if (items.every((i) => i.value === 0)) return empty(height);
+/** 구성 비율 도넛 (cutout 68%). 좁은 카드에서는 범례를 아래에 둔다. */
+export function Donut({ items, height = 240, compact = false }: { items: { key: string; label: string; value: number; color: string }[]; height?: number; compact?: boolean }) {
+  if (items.every((i) => i.value === 0)) return empty(compact ? 128 : height);
   return (
-    <div className="row" style={{ height, alignItems: "center" }}>
-      <div className={s.chartBox} style={{ height, flex: 1, minWidth: 0 }}>
+    <div className={`row ${compact ? s.donutCompact : ""}`} style={{ height: compact ? undefined : height, alignItems: "center" }}>
+      <div className={s.chartBox} style={{ height: compact ? 128 : height, flex: compact ? "none" : 1, width: compact ? "100%" : undefined, minWidth: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie data={items} dataKey="value" nameKey="label" innerRadius="68%" outerRadius="100%" startAngle={90} endAngle={-270} stroke="var(--surface)" strokeWidth={2} isAnimationActive={false}>
@@ -249,12 +258,12 @@ export function Donut({ items, height = 240 }: { items: { key: string; label: st
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <div className="stack" style={{ gap: 6, flex: "none" }}>
+      <div className={`stack ${compact ? s.donutLegend : ""}`} style={{ gap: 6, flex: "none" }}>
         {items.map((i) => (
-          <span key={i.key} className="small muted nowrap">
-            <span className={s.legendSwatch} style={{ background: i.color, width: 22 }} />
+          <span key={i.key} className={`small muted ${compact ? s.donutLegendItem : "nowrap"}`}>
+            <span className={s.legendSwatch} style={{ background: i.color, width: compact ? 10 : 22 }} />
             {i.label}
-            <span style={{ marginLeft: 8, color: "var(--text-2)" }}>{i.value}</span>
+            <span style={{ marginLeft: compact ? "auto" : 8, color: "var(--text-2)" }}>{i.value}</span>
           </span>
         ))}
       </div>
@@ -288,7 +297,7 @@ export const REQUEST_SERIES = [
   { key: "invalid", label: "입력 오류", color: "var(--viz-invalid)" },
   { key: "engine_rejected", label: "엔진 거부", color: "var(--viz-engine-rejected)" },
   { key: "error", label: "처리 오류", color: "var(--viz-error)" },
-  { key: "unknown", label: "미완료", color: "var(--viz-unknown)" },
+  { key: "unknown", label: "판정 미기록", color: "var(--viz-unknown)" },
 ] as const;
 
 export type RequestKey = (typeof REQUEST_SERIES)[number]["key"];

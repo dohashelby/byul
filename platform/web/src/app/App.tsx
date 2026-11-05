@@ -6,11 +6,13 @@ import { EventsPage } from "../pages/EventsPage";
 import { EvidencePage } from "../pages/EvidencePage";
 import { LandingPage } from "../pages/LandingPage";
 import { RequestsPage } from "../pages/RequestsPage";
+import { BlockedPage } from "../pages/BlockedPage";
 import { ResultsPage } from "../pages/ResultsPage";
 import { RevalidationPage } from "../pages/RevalidationPage";
 import { RuntimeEnforcePage } from "../pages/runtime/RuntimeEnforcePage";
 import { RuntimeObservePage } from "../pages/runtime/RuntimeObservePage";
-import { RuntimeOverviewPage } from "../pages/runtime/RuntimeOverviewPage";
+import { AlertsPage } from "../pages/runtime/AlertsPage";
+import { PhaseTimelinePage } from "../pages/runtime/PhaseTimelinePage";
 import { RuntimePolicyPage } from "../pages/runtime/RuntimePolicyPage";
 import { RuntimeSettingsPage } from "../pages/runtime/RuntimeSettingsPage";
 import { RuntimeTargetPage } from "../pages/runtime/RuntimeTargetPage";
@@ -31,8 +33,11 @@ export const routes: RouteObject[] = [
       { path: "policies/new", element: <PolicyEditorPage key="new" /> },
       { path: "policies/:id", element: <PolicyEditorPage /> },
       { path: "update/results", element: <ResultsPage /> },
-      { path: "runtime/overview", element: <RuntimeOverviewPage /> },
+      { path: "runtime/overview", element: <DashboardPage /> },
+      { path: "runtime/alerts", element: <AlertsPage /> },
+      { path: "runtime/observe/phases", element: <PhaseTimelinePage /> },
       { path: "runtime/requests", element: <RequestsPage /> },
+      { path: "runtime/blocked", element: <BlockedPage /> },
       { path: "runtime/policy", element: <RuntimePolicyPage /> },
       { path: "runtime/target", element: <RuntimeTargetPage /> },
       { path: "runtime/observe", element: <Navigate to="/runtime/observe/collectors" replace /> },

@@ -30,6 +30,7 @@ export type RequestDetail = S["RequestDetail"];
 export type RequestSummary = S["RequestSummary"];
 export type RuntimeEventList = S["RuntimeEventList"];
 export type RuntimeStatusResponse = S["RuntimeStatusResponse"];
+export type PhaseTimelineResponse = S["PhaseTimelineResponse"];
 export type RuntimeLabReport = S["RuntimeLabReport"];
 export type RuntimeRequestDetail = S["RuntimeRequestDetail"];
 export type LabReportResponse = S["LabReportResponse"];

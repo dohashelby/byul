@@ -42,6 +42,21 @@ if [ "${RUNTIME_DEMO:-0}" = "1" ] && [ ! -f "$RUNTIME_DATA_DIR/observations.json
       --origin synthetic --data-dir "$RUNTIME_DATA_DIR" --environment kind-runtime-lab --intent deploy/lab/intent.lab-v1.1.json) || true
 fi
 
+if [ "${RUNTIME_DEMO:-0}" = "1" ]; then
+  # 기존 관측 폴더에도 시연용 Override를 한 번만 보탠다. 성공 후에만 표지를 남긴다.
+  mkdir -p "$RUNTIME_DATA_DIR"
+  DEMO_OVERRIDE_MARKER="$RUNTIME_DATA_DIR/.tetragon-override-synthetic-v1.ingested"
+  if [ ! -f "$DEMO_OVERRIDE_MARKER" ]; then
+    echo "합성 Tetragon Override 관측 자료 넣기"
+    if (cd "$ROOT/runtime" && "${RT[@]}" enforce ingest --kind tetragon \
+      --input tests/fixtures/enforcement/tetragon_override.synthetic.jsonl \
+      --origin synthetic --data-dir "$RUNTIME_DATA_DIR" --environment kind-runtime-lab \
+      --intent deploy/lab/intent.lab-v1.1.json); then
+      touch "$DEMO_OVERRIDE_MARKER"
+    fi
+  fi
+fi
+
 cleanup() { [ -n "${RUNTIME_PID:-}" ] && kill "$RUNTIME_PID" 2>/dev/null || true; }
 trap cleanup EXIT INT TERM
 

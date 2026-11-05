@@ -4,6 +4,7 @@ import { useLabReport, useRuntimeStatus } from "../../api/hooks";
 import { Badge } from "../../components/Badges";
 import { KeyValue } from "../../components/DetailPanel";
 import { PageHead } from "../../components/Misc";
+import { Pagination, usePagination } from "../../components/Pagination";
 import { useRuntimeProblems } from "./problems";
 import { StateBadge, Subtabs, TableCard, formatTime, rt } from "./parts";
 
@@ -20,21 +21,22 @@ export function RuntimeEnforcePage() {
   const realDrops = status?.observations.real_hubble_dropped ?? 0;
   const blocked = l02?.status === "passed" || realDrops > 0;
   const report = lab?.report;
+  const pagination = usePagination(sub === "lab" ? report?.cases.length ?? 0 : policies.length);
   return (
     <div className="page">
-      <PageHead title="통제 적용" />
-      <p className="notice">정책이 설정됐다는 것과 실제 차단이 확인됐다는 것은 다릅니다. 실제 결과는 lab 시험 결과로 확인합니다.</p>
+      <PageHead title={sub === "lab" ? "검증 시험 (Lab)" : "네트워크 정책 (Cilium)"} />
+      <p className="notice">정책 설정과 실제 차단 여부는 별도로 확인합니다. 실제 결과는 검증 시험 (Lab) 결과에서 확인합니다.</p>
       <Subtabs
         tabs={[
-          { to: "/runtime/enforce/cilium", label: "Cilium 정책 적용 상태", count: problems?.ciliumCount, badge: problems?.cilium, active: sub === "cilium" },
-          { to: "/runtime/enforce/lab", label: "kind lab 시험 결과", count: problems?.labCount, badge: problems?.lab, active: sub === "lab" },
+          { to: "/runtime/enforce/cilium", label: "네트워크 정책 (Cilium)", count: problems?.ciliumCount, badge: problems?.cilium, active: sub === "cilium" },
+          { to: "/runtime/enforce/lab", label: "검증 시험 (Lab)", count: problems?.labCount, badge: problems?.lab, active: sub === "lab" },
         ]}
       />
       {sub === "cilium" && (
         <TableCard
           title={
             <>
-              Cilium 정책 적용 상태{" "}
+              네트워크 정책 (Cilium){" "}
               <span className="muted small">
                 {collector
                   ? `${collector.state} · 마지막 조회 ${formatTime(collector.last_attempt_at)} · 최근 성공 ${formatTime(collector.last_success_at)}${collector.last_error ? ` · ${collector.last_error}` : ""}`
@@ -48,7 +50,7 @@ export function RuntimeEnforcePage() {
               <Badge tone={blocked ? "accent" : "error"}>
                 {blocked
                   ? `저장된 실제 차단 근거 있음 (${l02?.status === "passed" ? "L-02 통과" : ""}${l02?.status === "passed" && realDrops ? " · " : ""}${realDrops ? `Hubble DROPPED ${realDrops}건` : ""})`
-                  : "실제 차단 확인 안 됨"}
+                  : "차단 근거 미확인"}
               </Badge>
             </div>
           }
@@ -58,7 +60,7 @@ export function RuntimeEnforcePage() {
               <tr><th>정책</th><th>객체 상태</th><th>조건</th></tr>
             </thead>
             <tbody>
-              {policies.map((pol) => (
+              {policies.slice(pagination.start, pagination.end).map((pol) => (
                 <tr key={pol.name}>
                   <td className="mono">{pol.name}</td>
                   <td title={pol.last_updated ?? ""}>
@@ -75,6 +77,7 @@ export function RuntimeEnforcePage() {
               ))}
             </tbody>
           </table>
+          <Pagination state={pagination} />
           {policies.length === 0 && (
             <p className={rt.empty}>
               {collector ? (collector.last_error ? `정책 조회 실패: ${collector.last_error}` : "CiliumNetworkPolicy 객체가 없습니다.") : "Cilium 정책 상태 수집원이 설정되지 않았습니다."}
@@ -86,7 +89,7 @@ export function RuntimeEnforcePage() {
         <TableCard
           title={
             <>
-              kind lab 시험 결과{" "}
+              검증 시험 (Lab) 결과{" "}
               <span className="muted small">{lab?.state === "ok" && report ? `${report.overall} · ${report.run_id}` : `${lab?.state ?? "–"}${lab?.error ? ` · ${lab.error}` : ""}`}</span>
             </>
           }
@@ -113,7 +116,7 @@ export function RuntimeEnforcePage() {
               <tr><th>시험</th><th>상태</th><th>요약·증거</th></tr>
             </thead>
             <tbody>
-              {(report?.cases ?? []).map((c) => (
+              {(report?.cases ?? []).slice(pagination.start, pagination.end).map((c) => (
                 <tr key={c.id}>
                   <td className="mono">{`${c.id} · ${c.title}`}</td>
                   <td><StateBadge value={c.status} /></td>
@@ -126,6 +129,7 @@ export function RuntimeEnforcePage() {
               ))}
             </tbody>
           </table>
+          <Pagination state={pagination} />
           {!report && (
             <p className={rt.empty}>
               {lab?.state === "not_configured"

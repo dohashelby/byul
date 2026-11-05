@@ -14,6 +14,7 @@ SCHEMA = "runtime-enforcement-intent/1.0"
 SCHEMA_V11 = "runtime-enforcement-intent/1.1"
 DEFAULT_KUBE_API_PORT = 6443
 SCHEMAS = frozenset({SCHEMA, SCHEMA_V11})
+TETRAGON_RULE_MODES = frozenset({"TG-SECRET-01", "TG-ASSET-01", "TG-ASSET-02", "TG-CACHE-01"})
 PHASES = ("loading", "compiling", "inferring")
 _SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _KUBERNETES_NAME = re.compile(r"[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?")
@@ -174,6 +175,10 @@ class EnforcementIntent:
     suspect_binaries: tuple[str, ...] = ()
     parent_constraints: tuple[tuple[str, tuple[str, ...]], ...] = ()
     suspect_parent_contexts: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = ()
+    tetragon_rule_modes: tuple[tuple[str, str], ...] = ()
+
+    def tetragon_rule_mode(self, rule_id: str) -> str:
+        return dict(self.tetragon_rule_modes).get(rule_id, "monitor")
 
     def binaries_for(self, phase: str) -> tuple[str, ...]:
         return dict(self.phase_binaries).get(phase, ())
@@ -388,6 +393,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
             "suspect_binaries",
             "parent_constraints",
             "suspect_parent_contexts",
+            "tetragon_rule_modes",
         },
     )
     schema = _required(root, "schema", "$")
@@ -404,6 +410,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
         "suspect_binaries",
         "parent_constraints",
         "suspect_parent_contexts",
+        "tetragon_rule_modes",
     }
     if not v11:
         present = sorted(v11_fields & set(root))
@@ -470,6 +477,28 @@ def parse_intent(document: Any) -> EnforcementIntent:
         probe = _absolute_path(probe, "$.probe_path")
     if mode == "enforce_probe" and probe is None:
         raise IntentError("$.probe_path is required in enforce_probe mode")
+
+    rule_modes: list[tuple[str, str]] = []
+    if "tetragon_rule_modes" in root:
+        raw_modes = _object(root["tetragon_rule_modes"], "$.tetragon_rule_modes", set(TETRAGON_RULE_MODES))
+        for rule_id, rule_mode in raw_modes.items():
+            if rule_mode not in ("monitor", "enforce"):
+                raise IntentError(f"$.tetragon_rule_modes.{rule_id} must be monitor or enforce")
+            if rule_mode == "enforce" and rule_id != "TG-SECRET-01":
+                raise IntentError(f"$.tetragon_rule_modes.{rule_id} cannot enforce yet")
+            rule_modes.append((rule_id, rule_mode))
+    if dict(rule_modes).get("TG-SECRET-01") == "enforce":
+        secrets = protected.secret_paths
+        if not secrets:
+            raise IntentError("TG-SECRET-01 enforce requires secret_paths with exact files")
+        for path in secrets:
+            # The intent describes container paths, so local stat() cannot prove
+            # their type. Require an explicit file-like leaf for the first rollout.
+            # A directory/prefix such as /opt/serving/secret is not eligible.
+            if path.endswith("/") or not Path(path).suffix or any(
+                other != path and Path(other).is_relative_to(path) for other in secrets
+            ):
+                raise IntentError("TG-SECRET-01 enforce requires exact file paths in secret_paths")
 
     acquire: AcquireIntent | None = None
     receivers: list[TestReceiver] = []
@@ -726,6 +755,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
         suspect_binaries=suspect,
         parent_constraints=tuple(parent_constraints),
         suspect_parent_contexts=tuple(suspect_parent_contexts),
+        tetragon_rule_modes=tuple(rule_modes),
     )
 
 

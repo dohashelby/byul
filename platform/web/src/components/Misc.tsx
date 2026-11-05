@@ -102,12 +102,12 @@ export function Banner({ kind, children }: { kind: "example" | "unofficial"; chi
 export function StateView({ kind, detail }: { kind: "empty" | "disconnected" | "unauthorized" | "invalid" | "not_found" | "error" | "loading"; detail?: ReactNode }) {
   const text: Record<typeof kind, [string, string]> = {
     loading: ["불러오는 중", ""],
-    empty: ["데이터가 없습니다", "선택한 기간·필터에 맞는 항목이 없습니다."],
-    disconnected: ["runtime 연결 끊김", "runtime 조회 API에 연결하지 못했습니다. RUNTIME_BASE_URL과 runtime 실행 상태를 확인하세요."],
-    unauthorized: ["runtime 인증 거부", "runtime이 조회 토큰을 거부했습니다. RUNTIME_VIEWER_TOKEN을 확인하세요."],
-    invalid: ["형식 오류", "받은 자료가 계약 스키마 검증을 통과하지 못했습니다."],
-    not_found: ["찾을 수 없음", "해당 항목이 없습니다."],
-    error: ["오류", "플랫폼 API 요청이 실패했습니다."],
+    empty: ["데이터 없음", "선택 기간·필터에 해당하는 항목이 없습니다."],
+    disconnected: ["런타임 연결 단절", "런타임 조회 API 연결 상태와 RUNTIME_BASE_URL을 확인하세요."],
+    unauthorized: ["런타임 인증 거부", "조회 토큰이 거부됐습니다. RUNTIME_VIEWER_TOKEN을 확인하세요."],
+    invalid: ["형식 오류", "수신 자료의 계약 스키마 검증 실패. 원본을 확인하세요."],
+    not_found: ["항목 미발견", "해당 항목의 조회 결과가 없습니다."],
+    error: ["API 오류", "플랫폼 API 요청 실패. 연결 상태를 확인하세요."],
   };
   const [title, body] = text[kind];
   const isError = kind !== "empty" && kind !== "loading";

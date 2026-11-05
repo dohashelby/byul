@@ -21,8 +21,14 @@ def _policy(
 ) -> dict[str, Any]:
     actions: list[dict[str, Any]] = [{"action": "Post"}]
     if override:
+        # Reuse TG-DENY-01's -EPERM: L-05 already measures this errno, so the
+        # first read-denial trial can compare the same kernel override behavior.
         actions.append({"action": "Override", "argError": -1})
-    description = "kernel override support and effect unverified; probe path only" if override else "monitor only"
+    description = (
+        ("kernel override support and effect unverified; probe path only"
+         if rule_id == "TG-DENY-01" else "kernel override support and effect unverified; exact files only")
+        if override else "monitor only"
+    )
     return {
         "apiVersion": "cilium.io/v1alpha1",
         "kind": "TracingPolicyNamespaced",
@@ -94,8 +100,11 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
             intent, "TG-ASSET-02", [assets.tokenizer_dir], 2
         )
     if paths.secret_paths:
+        secret_enforce = intent.tetragon_rule_mode("TG-SECRET-01") == "enforce"
         manifests["tetragon-tg-secret-01.json"] = _policy(
-            intent, "TG-SECRET-01", list(paths.secret_paths), 4
+            intent, "TG-SECRET-01", list(paths.secret_paths), 4,
+            exact_path=secret_enforce,
+            override=secret_enforce,
         )
     if intent.tetragon_mode == "enforce_probe":
         manifests["tetragon-tg-deny-01.json"] = _policy(

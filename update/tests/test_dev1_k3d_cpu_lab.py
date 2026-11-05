@@ -147,6 +147,7 @@ def test_gpu_profile_adds_one_gpu_and_keeps_names_apart_from_the_cpu_diagnosis(m
     raw, record = lab.render(run_id='dev1-gpu-1', engine_image=image, gpu={'model': 'NVIDIA L4', 'runtime_class': 'nvidia'})
     pod = yaml.safe_load(raw['engine.yaml']); engine = pod['spec']['containers'][0]
     assert pod['metadata']['namespace'] == 'byul-dev1-gpu-lab' and pod['spec']['runtimeClassName'] == 'nvidia'
+    assert engine['command'] == ['vllm', 'serve']
     assert engine['resources']['limits']['nvidia.com/gpu'] == '1' and engine['args'][-2:] == ['--gpu-memory-utilization', '0.5']
     assert 'VLLM_CPU_KVCACHE_SPACE' not in {e['name'] for e in engine['env']}
     assert record['profile'] == 'gpu' and record['served_model_name'] == 'byul-dev1-lab'

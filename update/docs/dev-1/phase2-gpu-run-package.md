@@ -75,3 +75,4 @@
 - lifecycle 센서를 붙일 때 이미 더한 GPU 메모리 비율 등 기동 옵션을 유지한다. 이전 구현은 기본 ARGS로 다시 덮어써 GPU의 `--gpu-memory-utilization 0.5`가 빠졌다.
 - 렌더·입력·불변식 묶음 170 통과/기존1제외(pytest 1.59초, 부모 1.758초). 새 GPU 실측에는 실제 이미지 digest·소스 pin·최종 렌더 bytes를 다시 묶는다. 최근 보존된 GPU 생산자 세대는 `c1c9f6fd…`이며 위 계획서의 `a4a4c043…`와 같은 이미지로 간주하지 않는다.
 - 입력 target의 관리 템플릿 신원·bounded launch profile·실제 max_model_len과 opt-125m 하위 폴더 매핑을 명시했다. AWS Qwen 경로(`/srv/serving/models/<revision>`→`/models`)를 이 lab의 실제 경로(`/srv/models/opt-125m`→`/models/opt-125m`)로 재사용하지 않는다. 독립 executor의 실제 파일 bytes/읽기 전용 mount/소스 계약 검사는 그대로다. GPU 플랫폼 표기는 Kubernetes로 하고 실제 kubeadm 노드와 구분되지 않는 K3s 단정을 제거했다.
+- G1 첫 REQ-11은 Pod에 명시한 command가 없어 관리 템플릿 신원 검사를 시작하지 못했다. 렌더 Pod에도 target과 같은 `command: [vllm, serve]`를 명시한다. 판정·전송 검사는 유지하며 첫 UNKNOWN 증거도 보존한다. 새 세대로 재측정한다. 관련 입력·렌더 시험 29 통과(pytest 1.27초, 부모 1.439초).

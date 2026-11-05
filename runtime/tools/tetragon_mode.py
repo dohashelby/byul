@@ -20,6 +20,15 @@ def _tetra(context: str, tetragon_namespace: str, *args: str) -> list[str]:
     return _kubectl(context, tetragon_namespace) + ["exec", "daemonset/tetragon", "-c", "tetragon", "--", "tetra", *args]
 
 
+def _try_run(run: Callable[[list[str]], Any], command: list[str]) -> Any | None:
+    try:
+        return run(command)
+    except (OSError, subprocess.TimeoutExpired):
+        # A timed-out set-mode may already have changed the kernel policy.
+        # Treat the result as unknown and continue to verification/rollback.
+        return None
+
+
 def parse_policy_row(output: str, name: str, namespace: str) -> dict[str, str] | None:
     lines = [line.split() for line in output.splitlines() if line.strip()]
     if not lines:
@@ -40,8 +49,8 @@ def parse_policy_row(output: str, name: str, namespace: str) -> dict[str, str] |
 
 def _read_policy(run: Callable[[list[str]], Any], context: str, tetragon_namespace: str,
                  policy_name: str, policy_namespace: str) -> dict[str, str] | None:
-    result = run(_tetra(context, tetragon_namespace, "tracingpolicy", "list"))
-    if result.returncode:
+    result = _try_run(run, _tetra(context, tetragon_namespace, "tracingpolicy", "list"))
+    if result is None or result.returncode:
         return None
     return parse_policy_row(result.stdout, policy_name, policy_namespace)
 
@@ -58,14 +67,14 @@ def switch_mode(context: str, policy_namespace: str, policy_name: str, target_mo
         return {"ok": True, "reason": "already in target mode", "before": before, "after": before}
     command = _tetra(context, tetragon_namespace, "tp", "set-mode", "--namespace", policy_namespace,
                      policy_name, target_mode)
-    changed = run(command)
+    changed = _try_run(run, command)
     after = _read_policy(run, context, tetragon_namespace, policy_name, policy_namespace)
-    if changed.returncode == 0 and after is not None and after["id"] == before["id"] and after["state"] == "enabled" and after["mode"] == target_mode:
+    if changed is not None and changed.returncode == 0 and after is not None and after["id"] == before["id"] and after["state"] == "enabled" and after["mode"] == target_mode:
         return {"ok": True, "reason": "mode verified", "before": before, "after": after}
-    rollback = run(_tetra(context, tetragon_namespace, "tp", "set-mode", "--namespace", policy_namespace,
-                          policy_name, before["mode"]))
+    rollback = _try_run(run, _tetra(context, tetragon_namespace, "tp", "set-mode", "--namespace", policy_namespace,
+                                   policy_name, before["mode"]))
     restored = _read_policy(run, context, tetragon_namespace, policy_name, policy_namespace)
-    rollback_ok = (rollback.returncode == 0 and restored is not None and restored["id"] == before["id"]
+    rollback_ok = (rollback is not None and rollback.returncode == 0 and restored is not None and restored["id"] == before["id"]
                    and restored["state"] == "enabled" and restored["mode"] == before["mode"])
     return {"ok": False, "reason": "mode switch failed; rollback verified" if rollback_ok else "mode switch and rollback unverified",
             "before": before, "after": after, "rollback": restored, "rollback_ok": rollback_ok}
@@ -82,11 +91,13 @@ def replace_after_load(context: str, policy_namespace: str, old_name: str, new_m
     old = _read_policy(run, context, tetragon_namespace, old_name, policy_namespace)
     if old is None or old["state"] != "enabled":
         return {"ok": False, "reason": "old policy not enabled"}
-    applied = run(_kubectl(context, policy_namespace) + ["apply", "-f", str(new_manifest)])
+    applied = _try_run(run, _kubectl(context, policy_namespace) + ["apply", "-f", str(new_manifest)])
     new = _read_policy(run, context, tetragon_namespace, new_name, policy_namespace)
-    if applied.returncode or new is None or new["state"] != "enabled":
-        run(_kubectl(context, policy_namespace) + ["delete", "tracingpolicynamespaced", new_name, "--ignore-not-found=true"])
-        return {"ok": False, "reason": "new policy load failed; old policy kept", "old": old, "new": new}
-    deleted = run(_kubectl(context, policy_namespace) + ["delete", "tracingpolicynamespaced", old_name])
-    return {"ok": deleted.returncode == 0, "reason": "new policy enabled before old removal" if deleted.returncode == 0 else "old removal failed; both policies may be active",
+    if applied is None or applied.returncode or new is None or new["state"] != "enabled":
+        cleanup = _try_run(run, _kubectl(context, policy_namespace) + ["delete", "tracingpolicynamespaced", new_name, "--ignore-not-found=true"])
+        return {"ok": False, "reason": "new policy load failed; old policy kept", "old": old, "new": new,
+                "cleanup_ok": cleanup is not None and cleanup.returncode == 0}
+    deleted = _try_run(run, _kubectl(context, policy_namespace) + ["delete", "tracingpolicynamespaced", old_name])
+    deleted_ok = deleted is not None and deleted.returncode == 0
+    return {"ok": deleted_ok, "reason": "new policy enabled before old removal" if deleted_ok else "old removal failed; both policies may be active",
             "old": old, "new": new}

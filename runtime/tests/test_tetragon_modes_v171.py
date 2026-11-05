@@ -1,6 +1,7 @@
 import copy
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -116,6 +117,38 @@ class ModeTests(unittest.TestCase):
         self.assertFalse(outcome["ok"])
         self.assertTrue(outcome["rollback_ok"])
         self.assertEqual([command[-1] for command in changes], ["enforce", "monitor"])
+
+    def test_timeout_after_switch_still_attempts_and_verifies_rollback(self):
+        for rollback_fails in (False, True):
+            with self.subTest(rollback_fails=rollback_fails):
+                mode = "monitor"
+                changes = []
+                def run(command):
+                    nonlocal mode
+                    if command[-2:] == ["tracingpolicy", "list"]:
+                        return Result(output=table(mode=mode))
+                    changes.append(command[-1])
+                    if command[-1] == "enforce":
+                        mode = "enforce"
+                        raise subprocess.TimeoutExpired(command, 70)
+                    if rollback_fails:
+                        raise OSError("kubectl unavailable")
+                    mode = "monitor"
+                    return Result()
+                outcome = switch_mode("ctx", "serving-lab", "runtime-tg-secret-01", "enforce", run=run)
+                self.assertFalse(outcome["ok"])
+                self.assertEqual(outcome["rollback_ok"], not rollback_fails)
+                self.assertEqual(changes, ["enforce", "monitor"])
+
+    def test_current_state_timeout_prevents_mode_mutation(self):
+        calls = []
+        def run(command):
+            calls.append(command)
+            raise subprocess.TimeoutExpired(command, 70)
+        outcome = switch_mode("ctx", "serving-lab", "runtime-tg-secret-01", "enforce", run=run)
+        self.assertFalse(outcome["ok"])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][-2:], ["tracingpolicy", "list"])
 
     def test_replacement_loads_new_before_removing_old(self):
         with tempfile.TemporaryDirectory() as temp:

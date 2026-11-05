@@ -285,3 +285,35 @@ def test_restriction_lost_before_sampler_and_rejected_input_consumed_are_candida
     _, result = producers.runner_consumption_record([{'pid': 1, 'start_ticks': 1, 'events': api_rows(reject=True)},
                                                      {'pid': 112, 'start_ticks': 2, 'events': consumed}], pod=POD, **SCOPE)
     assert {c['reason'] for c in result['violation_candidates']} == {'rejected_input_consumed'}
+
+
+from guard.adapters import vllm_supply_read_callback as supply
+
+
+def test_audit_hook_records_only_declared_roots_once_with_access_kind(tmp_path):
+    root = tmp_path / 'models'; root.mkdir(); (root / 'config.json').write_text('{}')
+    rows = []
+    observer = supply.SupplyReadObserver([str(root)], sink=rows.append, process_sha256='p' * 64, clock=lambda: 5)
+    observer.hook('open', (str(root / 'config.json'), 'r', 0))
+    observer.hook('open', (str(root / 'config.json'), 'r', 0))
+    observer.hook('open', (str(root / 'new.bin'), 'wb', 0))
+    observer.hook('open', (str(tmp_path / 'outside.txt'), 'r', 0))
+    observer.hook('os.listdir', (str(root),))
+    assert [(r['relative'], r['write']) for r in rows] == [('config.json', False), ('new.bin', True)]
+    assert rows[0]['size'] == 2 and rows[0]['regular'] is True and observer.seen[(0, 'config.json', False)] == 2
+
+
+def test_supply_record_matches_opens_to_hashes_and_flags_writes_and_changes():
+    opened = [{'schema': supply.SCHEMA, 'phase': 'OPEN', 'root': 0, 'relative': 'config.json', 'write': False, 'regular': True, 'size': 2, 'opened_ns': 1},
+              {'schema': supply.SCHEMA, 'phase': 'OPEN', 'root': 0, 'relative': 'tokenizer.json', 'write': True, 'regular': True, 'size': 5, 'opened_ns': 2}]
+    processes = [{'pid': 1, 'start_ticks': 1, 'events': opened}]
+    assert producers.supply_open_files(processes) == [{'root': 0, 'relative': 'config.json'}, {'root': 0, 'relative': 'tokenizer.json'}]
+    hashes = [{'root': 0, 'relative': 'config.json', 'sha256': 'a' * 64, 'size': 2, 'state': 'hashed'},
+              {'root': 0, 'relative': 'tokenizer.json', 'sha256': 'b' * 64, 'size': 9, 'state': 'hashed'}]
+    record, result = producers.supply_read_record(processes, hashes, pod=POD, **SCOPE)
+    assert record['completeness']['source_ended'] is True
+    assert record['events'][0]['path_sha256'] == producers.path_sha256('config.json')
+    assert {c['reason'] for c in result['violation_candidates']} == {'supply_file_written', 'supply_file_changed_after_open'}
+    assert 'GPU_INPUT_PRODUCER_DIAGNOSTIC:SUPPLY_NATIVE_READS_UNOBSERVED' in result['gaps']
+    _, partial = producers.supply_read_record(processes, hashes[:1], pod=POD, **SCOPE)
+    assert 'GPU_INPUT_SOURCE_INCOMPLETE' in partial['gaps']

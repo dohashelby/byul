@@ -93,5 +93,5 @@ def test_closed_format_rejects_unbound_or_open_records(damage):
 def test_every_kind_names_its_consumers_and_required_events():
     consumers = {c for spec in contract.KINDS.values() for c in spec['checks']}
     assert consumers == {'LIF-03', 'LIF-05', 'LIF-06', 'LIF-07', 'LIF-08', 'LIF-09', 'LIF-10', 'LIF-11', 'LIF-12',
-                         'LIF-14', 'PLT-01', 'PLT-04', 'OBS-02', 'OBS-03', 'REQ-08', 'REQ-09', 'REQ-10'}
+                         'LIF-14', 'PLT-01', 'PLT-04', 'OBS-02', 'OBS-03', 'REQ-08', 'REQ-09', 'REQ-10', 'SUP-03'}
     assert all(set(spec['complete_requires']) <= set(spec['events']) for spec in contract.KINDS.values())

@@ -495,10 +495,12 @@ def prepare_engine_callbacks(output: Path = typer.Option(..., "--output", help="
     generation_transitions: bool = typer.Option(False, "--generation-transitions", help="#196 generation-transition 관측(EngineCore 전환 진입점). --request-attempts와 함께 쓴다"),
     health_causal: bool = typer.Option(False, "--health-causal", help="#196 health-worker-causal 관측(API health 판단). --request-attempts와 함께 쓴다"),
     profiler_control: bool = typer.Option(False, "--profiler-control", help="#196 profiler-control 관측(API·EngineCore·worker profiler 사슬)"),
-    runner_consumption: bool = typer.Option(False, "--runner-consumption", help="P2 runner 최종 소비 관측(API 검증·runner 도착·sampler 적용, V1 runner)")):
+    runner_consumption: bool = typer.Option(False, "--runner-consumption", help="P2 runner 최종 소비 관측(API 검증·runner 도착·sampler 적용, V1 runner)"),
+    supply_root: list[str] = typer.Option([], "--supply-root", help="SUP-03 공급 파일 읽기 관측의 루트(엔진 컨테이너 안 절대 경로). 여러 번 줄 수 있다")):
     """REQ-14~17 콜백 센서 자산을 만든다. 엔진을 시작하지 않는다."""
     from guard.collectors.engine_callbacks import prepare_assets
-    typer.echo(json.dumps(prepare_assets(output, lab_faults=lab_faults, lab_kernel_checks=lab_kernel_checks, request_attempts=request_attempts, generation_transitions=generation_transitions, health_causal=health_causal, profiler_control=profiler_control, runner_consumption=runner_consumption), ensure_ascii=False))
+    typer.echo(json.dumps(prepare_assets(output, lab_faults=lab_faults, lab_kernel_checks=lab_kernel_checks, request_attempts=request_attempts, generation_transitions=generation_transitions, health_causal=health_causal, profiler_control=profiler_control, runner_consumption=runner_consumption,
+                                         supply_roots=supply_root or None), ensure_ascii=False))
 
 
 @app.command("prepare-lifecycle-sensor")

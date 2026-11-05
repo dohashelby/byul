@@ -552,3 +552,92 @@ def runner_consumption_record(processes, *, pod, environment_ref, target_sha256,
                                'diagnostic_codes': [c for c in codes if contract._ID.fullmatch(c)]}}
     return record, contract.validate(record, kind='runner-consumption', environment_ref=environment_ref,
                                      target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)
+
+
+# ---------------------------------------------------------------------------
+# supply-reads (P2: SUP-03)
+# ---------------------------------------------------------------------------
+from guard.adapters import vllm_supply_read_callback as supply_callback
+
+SUPPLY_PRODUCER_NAME = 'guard-engine-callback-supply-reads'
+SUPPLY_PRODUCER_VERSION = '1'
+
+
+def supply_producer():
+    digest = hashlib.sha256()
+    for path in (Path(supply_callback.__file__), Path(__file__)):
+        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
+    return {'name': SUPPLY_PRODUCER_NAME, 'version': SUPPLY_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
+
+
+def path_sha256(relative):
+    """승인 목록과 같은 방식으로 대조할 수 있게 상대 경로의 평문 SHA-256을 쓴다."""
+    return hashlib.sha256(relative.encode('utf-8')).hexdigest()
+
+
+def supply_open_files(processes):
+    """해시를 계산할 고유 파일 목록(루트 번호·상대 경로)."""
+    seen = []
+    for process in processes:
+        for row in process['events']:
+            if row.get('schema') == supply_callback.SCHEMA and row.get('phase') == 'OPEN':
+                key = {'root': row['root'], 'relative': row['relative']}
+                if key not in seen:
+                    seen.append(key)
+    return seen
+
+
+def supply_read_events(processes, hashes):
+    events, bindings, codes, rows = [], [], set(), []
+    for process in processes:
+        mine = [r for r in process['events'] if r.get('schema') == supply_callback.SCHEMA and r.get('phase') == 'OPEN']
+        codes |= {r.get('code') for r in process['events'] if r.get('phase') == 'GAP' and type(r.get('code')) is str and r['code'].startswith('SUPPLY_')}
+        if not mine:
+            continue
+        if process['start_ticks'] is None:
+            codes.add('SUPPLY_PROCESS_START_UNAVAILABLE'); continue
+        index = len(bindings); bindings.append({'pid': process['pid'], 'start_ticks': process['start_ticks']})
+        rows += [(r.get('opened_ns') or 0, len(rows), index, r) for r in mine]
+    if not rows:
+        return [], bindings, sorted(codes)
+    origin = min(r[0] for r in rows); last = 0
+    for stamp, _, binding, row in sorted(rows):
+        at_ms = max(0, (stamp - origin) // 1_000_000); last = max(last, at_ms)
+        if type(row.get('relative')) is not str or type(row.get('root')) is not int:
+            codes.add('SUPPLY_ROW_INVALID'); continue
+        events.append({'seq': len(events), 'event': 'file_opened', 'binding': binding, 'at_ms': at_ms, 'root': row['root'],
+                       'path_sha256': path_sha256(row['relative']), 'access': 'write' if row.get('write') else 'read',
+                       'size': row.get('size') if type(row.get('size')) is int else None, 'bytes_sha256': None,
+                       'state': 'regular' if row.get('regular') else 'not_regular' if row.get('regular') is False else None})
+    for item in hashes:
+        events.append({'seq': len(events), 'event': 'file_hashed', 'binding': 0, 'at_ms': last, 'root': item['root'],
+                       'path_sha256': path_sha256(item['relative']), 'access': 'read',
+                       'size': item.get('size') if type(item.get('size')) is int else None,
+                       'bytes_sha256': item.get('sha256'), 'state': item.get('state')})
+        if item.get('state') != 'hashed':
+            codes.add('SUPPLY_FILE_NOT_HASHED')
+    return events, bindings, sorted(codes)
+
+
+def supply_read_record(processes, hashes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False):
+    """기록된 연 파일마다 해시 행이 있어야 닫힌다. 너무 큰 파일(가중치 등)은 해시하지 않고 상태로 남긴다.
+
+    native 코드의 읽기는 보이지 않으므로 `SUPPLY_NATIVE_READS_UNOBSERVED` 진단이 항상 붙는다. 그래서 등록 뒤에도
+    이 기록만으로 SUP-03의 공급 범위 완료를 만들 수 없다. native 읽기 관측(fanotify·/proc fd 등)이 더해져야 한다.
+    """
+    events, processes_used, codes = supply_read_events(processes, hashes)
+    # Python audit hook은 native 코드(Rust tokenizers, C++ 로더 등)의 파일 읽기를 보지 못한다(k3d run 17: vocab.json·merges.txt).
+    # 그래서 이 기록만으로는 실제 소비 전체가 아니라는 진단을 항상 남긴다.
+    codes = sorted(set(codes) | {'SUPPLY_NATIVE_READS_UNOBSERVED'} | ({'SUPPLY_READ_TRUNCATED'} if truncated else set()))
+    bindings = [{'pod_uid': pod['pod_uid'], 'container_id': pod['container_id'].removeprefix('containerd://')[:128],
+                 'restart_count': pod['restart_count'], 'worker_pid': p['pid'], 'start_ticks': p['start_ticks'], 'rank': 0}
+                for p in processes_used]
+    opened = {(e['root'], e['path_sha256']) for e in events if e['event'] == 'file_opened'}
+    covered = {(e['root'], e['path_sha256']) for e in events if e['event'] == 'file_hashed'}
+    record = {'schema': contract.SCHEMA, 'kind': 'supply-reads', 'producer': supply_producer(),
+              'environment_ref': environment_ref, 'target_sha256': target_sha256, 'prepared_sha256': prepared_sha256,
+              'session': session, 'bindings': bindings, 'events': events,
+              'completeness': {'source_ended': bool(opened) and opened <= covered and not truncated, 'dropped': 0,
+                               'diagnostic_codes': [c for c in codes if contract._ID.fullmatch(c)]}}
+    return record, contract.validate(record, kind='supply-reads', environment_ref=environment_ref,
+                                     target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)

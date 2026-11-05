@@ -86,6 +86,15 @@ KINDS = {
                    "logprobs": "opt_int", "allowed_tokens": "opt_int", "bad_words": "opt_int", "logit_bias": "opt_int"},
         "complete_requires": ("api_validated", "runner_received", "sampler_applied"),
     },
+    # P2 SUP-03(개발 담당 2단계): 선언한 공급 루트 아래에서 실제로 연 파일과 수집 시점 bytes 해시.
+    # 경로는 승인 목록과 대조하도록 상대 경로의 평문 SHA-256(path_sha256)으로 남긴다.
+    "supply-reads": {
+        "checks": ("SUP-03",),
+        "events": ("file_opened", "file_hashed"),
+        "fields": {"at_ms": "ms", "root": "int", "path_sha256": "sha", "access": "enum:read|write", "size": "opt_int",
+                   "bytes_sha256": "opt_sha", "state": "opt_id"},
+        "complete_requires": ("file_opened", "file_hashed"),
+    },
     "profiler-control": {
         "checks": ("LIF-14", "OBS-03"),
         "events": ("api_call", "rpc", "worker_control", "backend_state", "stop_failed", "trace_callback", "output_complete",
@@ -209,6 +218,16 @@ def violation_candidates(kind, events):
         released = {r["resource_sha256"] for r in events if r["event"] == "released"}
         out += [{"resource_sha256": item, "reason": "resource_remaining_after_failure"}
                 for item in sorted((before & after) - released)]
+    elif kind == "supply-reads":
+        hashed = {(r["root"], r["path_sha256"]): r for r in events if r["event"] == "file_hashed"}
+        for row in events:
+            if row["event"] != "file_opened":
+                continue
+            if row["access"] == "write":
+                out.append({"seq": row["seq"], "path_sha256": row["path_sha256"], "reason": "supply_file_written"})
+            later = hashed.get((row["root"], row["path_sha256"]))
+            if later is not None and row["size"] is not None and later["size"] is not None and row["size"] != later["size"]:
+                out.append({"seq": row["seq"], "path_sha256": row["path_sha256"], "reason": "supply_file_changed_after_open"})
     elif kind == "runner-consumption":
         out += _consumption_candidates(events)
     elif kind == "rank-fault":

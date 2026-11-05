@@ -64,7 +64,7 @@ print(json.dumps({"events":rows,"truncated":truncated}))
 ATTEMPT_EVENTS_READER = r'''
 import json,os,re,sys
 root="/guard-lifecycle/data/"+sys.argv[1];out=[];left=6*1024**2;truncated=False
-wanted=(b'"schema":"guard-vllm-attempt-callback/1"',b'"schema":"guard-vllm-transition-callback/1"',b'"schema":"guard-vllm-health-callback/1"',b'"schema":"guard-vllm-profiler-callback/1"',b'"schema":"guard-vllm-consumption-callback/1"',b'"phase":"GAP"')
+wanted=(b'"schema":"guard-vllm-attempt-callback/1"',b'"schema":"guard-vllm-transition-callback/1"',b'"schema":"guard-vllm-health-callback/1"',b'"schema":"guard-vllm-profiler-callback/1"',b'"schema":"guard-vllm-consumption-callback/1"',b'"schema":"guard-vllm-supply-read-callback/1"',b'"phase":"GAP"')
 for name in sorted(os.listdir(root)):
     found=re.fullmatch(r"callbacks-([1-9][0-9]*)\.jsonl",name)
     if found is None:continue
@@ -80,6 +80,31 @@ for name in sorted(os.listdir(root)):
     except (OSError,ValueError,IndexError):ticks=None
     out.append({"pid":pid,"start_ticks":ticks,"events":rows})
 print(json.dumps({"processes":out,"truncated":truncated}))
+'''
+# SUP-03(P2): 기록된 공급 파일의 현재 bytes SHA-256. 루트 밖·링크·특수 파일·한도 초과는 해시하지 않는다.
+SUPPLY_HASH_READER = r'''
+import hashlib,json,os,stat,sys
+request=json.loads(sys.stdin.read());limit=64*1024**2;out=[]
+for item in request["files"][:2048]:
+    root=os.path.normpath(request["roots"][item["root"]]);rel=item["relative"]
+    path=root if rel=="." else os.path.normpath(os.path.join(root,rel))
+    row={"root":item["root"],"relative":rel,"sha256":None,"size":None,"mtime_ns":None,"state":"unavailable"}
+    if path!=root and not path.startswith(root.rstrip("/")+"/"):row["state"]="outside_root";out.append(row);continue
+    try:
+        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        try:
+            info=os.fstat(fd);row.update(size=info.st_size,mtime_ns=info.st_mtime_ns)
+            if not stat.S_ISREG(info.st_mode):row["state"]="not_regular"
+            elif info.st_size>limit:row["state"]="too_large"
+            else:
+                digest=hashlib.sha256()
+                with os.fdopen(os.dup(fd),"rb") as stream:
+                    for chunk in iter(lambda:stream.read(1<<20),b""):digest.update(chunk)
+                row.update(sha256=digest.hexdigest(),state="hashed")
+        finally:os.close(fd)
+    except OSError:pass
+    out.append(row)
+print(json.dumps({"files":out}))
 '''
 # REQ-16 lab only: replace the active LoRA files with one declared variant, keeping the same path.
 COLLECTION_STATUS_READER = r'''
@@ -895,6 +920,21 @@ class KubernetesHTTP:
         if type(value) is not dict or type(value.get("events")) is not list or type(value.get("truncated")) is not bool:
             raise KubernetesBindingError()
         return value
+
+    def engine_supply_hashes(self,roots,files):
+        """SUP-03: 기록된 공급 파일의 현재 bytes 해시를 엔진 컨테이너 안에서 계산한다."""
+        if (self.profile!=ENGINE_CALLBACK_PROFILE or type(roots) is not list or not 1<=len(roots)<=8 or type(files) is not list
+                or len(files)>2048 or any(type(f) is not dict or set(f)!={"root","relative"} for f in files)):
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        payload=json.dumps({"roots":roots,"files":files}).encode()
+        value=self._call([f"--namespace={engine['namespace']}","exec","-i",engine["pod"],
+            f"--container={engine['container']}","--","python3","-c",SUPPLY_HASH_READER],payload=payload,cap=4*1024**2,budget=120)
+        self._verify()
+        rows=value.get("files") if type(value) is dict else None
+        if type(rows) is not list or len(rows)!=len(files):
+            raise KubernetesBindingError()
+        return rows
 
     def engine_attempt_events(self,session):
         """#196 request-attempt: 선택 세션의 attempt 콜백 행을 프로세스별로 읽는다(시작 ticks 포함)."""

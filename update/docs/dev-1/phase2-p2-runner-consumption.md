@@ -54,3 +54,21 @@ InputBatch에 남아 있는 마스크를 적용된 허용 목록으로 읽어 �
 
 공개 요약은 `docs/evidence/dev1-p2-runner-cpu-20261105.json`, 원자료는 저장소 밖 `byul-dev1-evidence/k3d-run{14,15,16}/`와
 `20261105-codex-handoff/`에 있다. 최종 전체 suite는 해당 소스의 Linux CI로 별도 확인한다.
+
+## SUP-03 공급 파일 읽기 (2026-11-05)
+
+- 관측(`adapters/vllm_supply_read_callback.py`): 함수를 감싸지 않고 Python audit hook(`sys.addaudithook`)의 `open` 사건만 읽는다. 원 코드와 열기 동작은 바꾸지 않는다.
+  - 선언한 공급 루트(`guard prepare-engine-callbacks --supply-root <경로>`, 여러 번 가능) 아래 경로만 남긴다.
+  - 프로세스마다 (상대 경로, 읽기/쓰기) 처음 한 번, 열 때의 크기·수정 시각을 남긴다.
+  - 내용 해시는 수집 시점에 엔진 컨테이너 안에서 따로 계산한다(`engine_supply_hashes`, 64 MiB 초과는 `too_large`).
+- 계약 종류 `supply-reads`(소비 SUP-03):
+  - 경로는 승인 목록과 대조할 수 있게 상대 경로의 평문 SHA-256으로 남긴다.
+  - 위반 후보: 공급 루트 안 쓰기(`supply_file_written`), 연 뒤 크기 변경(`supply_file_changed_after_open`).
+- k3d CPU 확인(run 17, `byul-dev1-evidence/k3d-run17/supply-reads-record.json`, chat 요청 1개):
+  - API 서버: `config.json`·`tokenizer_config.json`·`special_tokens_map.json`·`generation_config.json`, chat template 파일
+  - EngineCore: `config.json`·`tokenizer_config.json`·`special_tokens_map.json`
+  - worker: `pytorch_model.bin`
+  - 해시는 가중치(250 MB, `too_large`)를 뺀 다섯 개를 계산했고 쓰기는 0이다. 호스트 원본 SHA와 같다(config.json `54162c9c…`, tokenizer_config.json `d1e4185b…`).
+- 한계(중요): 같은 실행에서 tokenizer가 쓴 `vocab.json`·`merges.txt`는 보이지 않았다. Rust `tokenizers` 같은 native 코드는 Python `open`을 거치지 않기 때문이다.
+  - 그래서 기록에 `SUPPLY_NATIVE_READS_UNOBSERVED` 진단을 항상 붙인다. 이 기록만으로는 공급 범위 완료가 되지 않는다.
+  - native 읽기 관측(fanotify, 또는 프로세스별 열린 fd 목록 대조)이 더해져야 SUP-03을 닫을 수 있다. 2단계 후속 항목이다.

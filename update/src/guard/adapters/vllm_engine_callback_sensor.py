@@ -29,6 +29,7 @@ from . import vllm_transition_callback as transition
 from . import vllm_health_callback as health
 from . import vllm_profiler_callback as profiler
 from . import vllm_consumption_callback as consumption
+from . import vllm_supply_read_callback as supply_read
 
 PROFILE = 'vllm-engine-callback-metadata/1'
 SCHEMA = 'guard-engine-callback-events/1'
@@ -362,7 +363,7 @@ class EngineCallbacks:
 
     def flush_gaps(self):
         kernel = self.kernel.gaps | self.graph.gaps if self.kernel is not None else set()
-        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption) if o is not None))
+        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption, getattr(self, 'supply', None)) if o is not None))
         for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | self.weights.gaps | self.comm.gaps | kernel | extra):
             self.gap(code)
 
@@ -412,6 +413,11 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
             profiler_control=settings.get('profiler_control') is True,
             runner_consumption=settings.get('runner_consumption') is True)
         sys.meta_path.insert(0, Finder(callbacks))
+        if settings.get('supply_roots'):
+            # SUP-03(P2): 선언한 공급 루트 아래에서 실제로 연 파일. audit hook은 원 코드를 바꾸지 않는다.
+            callbacks.supply = supply_read.SupplyReadObserver(settings['supply_roots'], sink=callbacks.sink,
+                                                              process_sha256=callbacks.cache.process_sha256)
+            sys.addaudithook(callbacks.supply.hook)
         atexit.register(callbacks.flush_gaps)
         return True
     except Exception:

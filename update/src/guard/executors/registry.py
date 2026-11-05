@@ -23,12 +23,14 @@ from .sampling_validation import SamplingValidationExecutor
 from .kubernetes_sampling import KubernetesSamplingExecutor
 from .kubernetes_input_validation import KubernetesInputValidationExecutor
 from .response_content import ResponseContentExecutor
+from .kubernetes_response_content import KubernetesResponseContentExecutor
 from .log_analysis import LogAnalysisExecutor
 from .template_validation import TemplateValidationExecutor
 from .kubernetes_template_supply import KubernetesTemplateSupplyExecutor
 from .request_binding import RequestBindingExecutor
 from .kubernetes_request_binding import KubernetesRequestBindingExecutor
 from .log_integrity import LogIntegrityExecutor
+from .kubernetes_log_integrity import KubernetesLogIntegrityExecutor
 from .unix_ipc import UnixIPCExecutor
 from .usage_report import BoundaryEgressDispatch
 from .api_transport import APITransportExecutor
@@ -48,6 +50,7 @@ from .kubernetes_profiler_observation import KubernetesProfilerObservationExecut
 from .kubernetes_observation_identity import KubernetesObservationIdentityExecutor
 from .kubernetes_ipc_product import KubernetesIPCProductExecutor
 from .kubernetes_egress_product import KubernetesEgressProductExecutor
+from .kubernetes_usage_report import kubernetes_boundary_egress
 from .kubernetes_native_route import KubernetesNativeRouteExecutor
 from .kubernetes_model_authorization import KubernetesModelAuthorizationExecutor
 from .kubernetes_request_termination import KubernetesRequestTerminationExecutor
@@ -66,7 +69,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "engine_sensor:source-cpu": lambda cfg: EngineSensorExecutor(cfg.get("engine_sensor", {}), implementation="source-cpu"),
     "lifecycle_transition:kubernetes": lambda cfg: LifecycleTransitionExecutor(cfg.get("lifecycle_transition", {}), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "profiler_observation:source-cpu": lambda cfg: KubernetesProfilerObservationExecutor(cfg.get("profiler_observation", {}), implementation="source-cpu"),
-    "boundary_egress:kubernetes": lambda cfg: KubernetesEgressProductExecutor(cfg.get("boundary_egress", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "boundary_egress:kubernetes": lambda cfg: kubernetes_boundary_egress(cfg.get("boundary_egress", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "native_route:kubernetes": lambda cfg: KubernetesNativeRouteExecutor(cfg.get("native_route", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "unix_ipc:kubernetes": lambda cfg: KubernetesIPCProductExecutor(cfg.get("unix_ipc", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "observation_identity:kubernetes": lambda cfg: KubernetesObservationIdentityExecutor(cfg.get("observation_identity", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
@@ -100,6 +103,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "sampling_validation:real": lambda cfg: SamplingValidationExecutor(cfg.get("sampling_validation", {})),
     "sampling_validation:kubernetes": lambda cfg: KubernetesSamplingExecutor(cfg.get("sampling_validation", {}), environ=cfg.get("_runtime_environ")),
     "response_content:real": lambda cfg: ResponseContentExecutor(cfg.get("response_content", {}), environ=cfg.get("_runtime_environ")),
+    "response_content:kubernetes": lambda cfg: KubernetesResponseContentExecutor(cfg.get("response_content", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "log_analysis:real": lambda cfg: LogAnalysisExecutor(cfg.get("log_analysis", {}), environ=cfg.get("_runtime_environ")),
     "template_validation:real": lambda cfg: TemplateValidationExecutor(cfg.get("template_validation", {}), environ=cfg.get("_runtime_environ")),
     "template_validation:kubernetes": lambda cfg: KubernetesTemplateSupplyExecutor(cfg.get("template_validation", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
@@ -107,6 +111,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "request_binding:real": lambda cfg: RequestBindingExecutor(cfg.get("request_binding", {}), environ=cfg.get("_runtime_environ")),
     "request_binding:kubernetes": lambda cfg: KubernetesRequestBindingExecutor(cfg.get("request_binding", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "log_integrity:real": lambda cfg: LogIntegrityExecutor(cfg.get("log_integrity", {}), environ=cfg.get("_runtime_environ")),
+    "log_integrity:kubernetes": lambda cfg: KubernetesLogIntegrityExecutor(cfg.get("log_integrity", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "unix_ipc:real": lambda cfg: UnixIPCExecutor(cfg.get("unix_ipc", {}), environ=cfg.get("_runtime_environ")),
     "boundary_egress:real": lambda cfg: BoundaryEgressDispatch(cfg.get("boundary_egress", {})),
     "api_transport:real": lambda cfg: APITransportExecutor(cfg.get("api_transport", {})),

@@ -68,6 +68,8 @@ DEV1_EXECUTORS = frozenset({
 PHASE1_FILES = {"dev-1": Path("docs/phase1/dev-1.yaml"), "gpu": Path("docs/phase1/gpu.yaml")}
 PHASE1_STATES = frozenset({
     "DONE", "CPU_DEVELOPMENT_REMAINING", "GPU_CONFIRMATION_ONLY", "MEASUREMENT_REMAINING", "ENTERPRISE_INPUT_WAITING",
+    # 사용자 결정으로 대상 구성(BYUL runtime Gateway)에서 적용 조건이 성립하지 않는 조건부 점검. 판정 PASS가 아니다.
+    "NOT_APPLICABLE_IN_TARGET",
 })
 # 현행 팩(32)의 GPU 실행 공개 요약. 원 bundle이 아니며 Ref·판정만 옮긴다. 요약에 팩 Ref가 없는 기록은
 # 해당 문서가 밝힌 팩 revision을 적고(declared_pack_revision), 팩 Ref가 있으면 그 값을 읽는다.

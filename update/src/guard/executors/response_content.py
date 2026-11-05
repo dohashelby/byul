@@ -22,7 +22,7 @@ ENDPOINTS = {"/v1/completions", "/v1/chat/completions"}
 
 class ResponseContentExecutor(HttpCheckExecutor):
     name = "response_content"
-    version = "0.2.0"
+    version = "0.2.1"
     requires_roles = False
     requires_route_scope = False
 
@@ -55,7 +55,8 @@ class ResponseContentExecutor(HttpCheckExecutor):
         targets = values["required_targets"]
 
         def body(*, private=False):
-            base = {"model": ctx.env.model.id, "max_tokens": 1, "temperature": 0}
+            # 저장소 ID가 아니라 검증된 API 별칭으로 요청·응답을 비교한다.
+            base = {"model": ctx.api_model, "max_tokens": 1, "temperature": 0}
             if private_supported:
                 messages = [{"role": "user", "content": marks["caller_input"]}]
                 if private:
@@ -85,7 +86,7 @@ class ResponseContentExecutor(HttpCheckExecutor):
             rejected_option = option and type(status) is int and status in {400, 413, 422}
             if not expected_status and not rejected_option:
                 gaps.append(f"{label}: expected {'safe 4xx' if error else '200'} response, got {status}")
-            if status == 200 and not error and control_state(result, ctx.env.model.id, endpoint) != "pass":
+            if status == 200 and not error and control_state(result, ctx.api_model, endpoint) != "pass":
                 gaps.append(f"{label}: normal inference response shape/model/usage not confirmed")
             if value is not None and type(status) is int:
                 is_error = status >= 400
@@ -134,7 +135,7 @@ class ResponseContentExecutor(HttpCheckExecutor):
                 gaps.append("gateway: target URL unavailable")
                 continue
             normal = inspect(target, "normal", body())
-            controls[f"{target}:before"] = control_state(normal, ctx.env.model.id, endpoint)
+            controls[f"{target}:before"] = control_state(normal, ctx.api_model, endpoint)
             if controls[f"{target}:before"] != "pass":
                 gaps.append(f"{target}: normal control did not succeed; challenges not sent")
                 continue
@@ -153,7 +154,7 @@ class ResponseContentExecutor(HttpCheckExecutor):
             error_body["max_tokens"] = marks["error_input"]
             inspect(target, "safe_error", error_body, error=True, private=private_supported)
             after = inspect(target, "after", body())
-            controls[f"{target}:after"] = control_state(after, ctx.env.model.id, endpoint)
+            controls[f"{target}:after"] = control_state(after, ctx.api_model, endpoint)
         planned = [f"{target}:{label}" for target in targets for label in ("before", "after")]
         complete = not gaps and private_supported and len(controls) == len(planned)
         obs = {

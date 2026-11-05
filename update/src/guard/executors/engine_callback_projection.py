@@ -18,13 +18,15 @@ COMPUTED = 'KVCacheManager.get_computed_blocks'
 ROLES = {'REQ-14': {'normal'}, 'REQ-15': {'prime', 'control', 'probe'}, 'REQ-16': {'prime', 'control', 'probe', 'post', 'switch'},
     'REQ-17': {'prime', 'control-present', 'control-absent', 'present', 'absent'},
     'REQ-18': {'standalone', 'restricted', 'reused'}, 'REQ-19': {'boundary'}, 'REQ-20': {'replay'},
-    'LIF-13': {'before', 'switch', 'after'}, 'REQ-21': {'before', 'after'}}
+    'LIF-13': {'before', 'switch', 'after'}, 'REQ-21': {'before', 'switch', 'after'}}
 MAX_CASES = 512
 # REQ-16 lab contexts change the engine between cases: reload one LoRA in place, or reload weights.
 # LIF-13은 소유 weights daemon에 전체 release를 보낸다.
-LAB_ACTIONS = {'lora_reload': 'lora', 'weights_reload': 'weights', 'weights_release': 'weights_daemon'}
+LAB_ACTIONS = {'lora_reload': 'lora', 'weights_reload': 'weights', 'weights_release': 'weights_daemon', 'engine_restart': 'engine_restart'}
 LAB_ROOTS = {'lora': '/guard-lora/', 'weights': '/guard-weights/', 'weights_daemon': '/guard-weights-daemon/'}
-SWITCH_CHECKS = {'lora_reload': 'REQ-16', 'weights_reload': 'REQ-16', 'weights_release': 'LIF-13'}
+SWITCH_CHECKS = {'lora_reload': 'REQ-16', 'weights_reload': 'REQ-16', 'weights_release': 'LIF-13', 'engine_restart': 'REQ-21'}
+# REQ-21: 같은 Pod 안에서 엔진 컨테이너만 한 번 다시 시작한다. 경로가 없는 동작이라 값이 고정이다.
+ENGINE_RESTART_SPEC = {'variants': {'once': 'container'}}
 _NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
 _PATH = re.compile(r'(/[A-Za-z0-9][A-Za-z0-9._-]{0,63}){2,8}')
 # 비동기 스케줄링에서는 출력이 다음 배치 뒤에 도착할 수 있다.
@@ -65,7 +67,9 @@ def _lab_path(value, kind):
 def validate_lab_contexts(spec, cases=None):
     """Closed REQ-16 lab declaration: one LoRA name, its active path, and owned variant paths."""
     try:
-        if type(spec) is not dict or not spec or set(spec) - {'lora', 'weights', 'weights_daemon'}:
+        if type(spec) is not dict or not spec or set(spec) - {'lora', 'weights', 'weights_daemon', 'engine_restart'}:
+            raise ValueError
+        if 'engine_restart' in spec and spec['engine_restart'] != ENGINE_RESTART_SPEC:
             raise ValueError
         lora = spec.get('lora'); weights = spec.get('weights')
         if lora is not None and (type(lora) is not dict or set(lora) != {'name', 'active_path', 'variants'}
@@ -154,7 +158,8 @@ def computed_rows(events, secret, tags):
         case_id = cases.get(fields.get('request_sha256'))
         if case_id is not None and type(fields.get('num_computed_tokens')) is int:
             rows.setdefault(case_id, []).append({'tokens': fields['num_computed_tokens'],
-                'hashes': fields.get('request_block_hashes_sha256'), 'salt': fields.get('request_cache_salt_sha256')})
+                'hashes': fields.get('request_block_hashes_sha256'), 'salt': fields.get('request_cache_salt_sha256'),
+                'media': fields.get('request_media_ranges')})
     return rows
 
 
@@ -166,7 +171,8 @@ def sequence_rows(events, cases):
         if (event.get('point') == COMPUTED and event.get('phase') == 'RETURN' and event.get('entry_qualified_before') is True
                 and event.get('entry_qualified_after') is True and type(fields.get('num_computed_tokens')) is int):
             ordered.setdefault(fields.get('request_sha256'), []).append({'tokens': fields['num_computed_tokens'],
-                'hashes': fields.get('request_block_hashes_sha256'), 'salt': fields.get('request_cache_salt_sha256')})
+                'hashes': fields.get('request_block_hashes_sha256'), 'salt': fields.get('request_cache_salt_sha256'),
+                'media': fields.get('request_media_ranges')})
     # 경계 요청 ID도 Gateway가 바꾸므로, 직렬로 보낸 마지막 사례 수만큼을 이번 시험으로 본다.
     if len(ordered) < len(cases):
         return {}
@@ -230,7 +236,25 @@ def project_cache_group(cases, rows, policy, identity=None):
         'full_scope': not missing and not violated, 'missing': missing}
 
 
+def _media_reach(rows, case):
+    """캐시 적중 토큰이 요청의 첫 이미지 토큰 위치를 넘었는가. 위치 기록이 없으면 None."""
+    found = rows.get(case['case_id'])
+    if not found:
+        return None
+    ranges = [r['media'] for r in found if r.get('media')]
+    if not ranges or any(r.get('media') is None for r in found):
+        return None
+    start = min(item['offset'] for item in ranges[0])
+    return max(r['tokens'] for r in found) > start
+
+
 def project_cache_context(cases, rows, policy):
+    """REQ-16. 문맥만 바꾼 probe의 같은 첫 블록 키 적중을 위반으로 본다.
+
+    이미지 문맥(사용자 결정 2026-11-05)은 이미지 토큰을 담은 블록까지 적중했을 때만 위반이다. 앞의 공통 텍스트 블록만
+    적중한 것은 정상 공유다. 판정 근거는 엔진 기록의 이미지 토큰 위치(`mm_position.offset`)와 적중 토큰 수다.
+    같은 이미지를 다시 보낸 대조가 이미지 블록까지 적중해야 측정력이 있다고 본다.
+    """
     required = set(policy['required_cache_contexts'])
     results = []
     for probe in (c for c in cases if c['role'] == 'probe'):
@@ -238,11 +262,17 @@ def project_cache_context(cases, rows, policy):
         if prime is None or control is None:
             continue
         same_key = _first_hash(rows, prime) is not None and _first_hash(rows, prime) == _first_hash(rows, probe)
+        if 'media' in probe:
+            control_hit, changed_hit = _media_reach(rows, control), _media_reach(rows, probe)
+            results.append({'context': probe.get('context'), 'control_hit': control_hit, 'changed_hit': changed_hit,
+                'same_key': same_key, 'basis': 'media_block_reach', 'text_prefix_hit': _hit(rows, probe)})
+            continue
         results.append({'context': probe.get('context'), 'control_hit': _hit(rows, control),
             'changed_hit': _hit(rows, probe), 'same_key': same_key})
     measured = {r['context'] for r in results if r['control_hit'] is True and r['changed_hit'] is not None}
-    violations = [r for r in results if r['changed_hit'] is True and r['control_hit'] is True and r['same_key']
-        and r['context'] in required]
+    # 이미지 문맥은 이미지 블록 도달 자체가 근거다. 첫 블록은 공통 텍스트라 same_key를 따로 요구하지 않는다.
+    violations = [r for r in results if r['changed_hit'] is True and r['control_hit'] is True
+        and (r['same_key'] or r.get('basis') == 'media_block_reach') and r['context'] in required]
     posts = [_hit(rows, c) for c in cases if c['role'] == 'post']
     complete = required <= measured and bool(posts) and all(v is True for v in posts)
     missing = [] if complete else ['required_cache_context_cases_incomplete']

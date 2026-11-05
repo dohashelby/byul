@@ -31,10 +31,14 @@ TERMINATION_PROFILE = "kubernetes-owned-termination-http-v1"
 REQUEST_ATTEMPTS_PROFILE = "kubernetes-owned-request-attempts-http-v1"
 ENGINE_CALLBACK_PROFILE = "kubernetes-owned-engine-callback-http-v1"
 INPUT_VALIDATION_PROFILE = "kubernetes-owned-input-validation-http-v1"
+RESPONSE_CONTENT_PROFILE = "kubernetes-owned-response-content-http-v1"
+LOG_INTEGRITY_PROFILE = "kubernetes-owned-log-integrity-http-v1"
+USAGE_CONTROL_PROFILE = "kubernetes-owned-usage-control-http-v1"
+GATEWAY_EVENT_PROFILE = "kubernetes-owned-gateway-event-http-v1"
 from .kubernetes_observation import PROFILE as REQUIRED_EVENT_PROFILE
 from .kubernetes_observation_state import PROFILE as OBSERVATION_STATE_PROFILE
 _CLOSE_PROFILES = frozenset({TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, OBSERVATION_STATE_PROFILE})
-_BINDING_PROFILES = frozenset({ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE})
+_BINDING_PROFILES = frozenset({ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE, RESPONSE_CONTENT_PROFILE, LOG_INTEGRITY_PROFILE, USAGE_CONTROL_PROFILE, GATEWAY_EVENT_PROFILE})
 _INPUT_FIELD = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}")
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
@@ -57,6 +61,22 @@ for name in sorted(os.listdir(root)):
 print(json.dumps({"events":rows,"truncated":truncated}))
 '''
 # REQ-16 lab only: replace the active LoRA files with one declared variant, keeping the same path.
+COLLECTION_STATUS_READER = r'''
+import hashlib,json,os,stat,sys
+path="/guard-collection/data/"+sys.argv[1]+"/collection-status.json"
+fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+try:
+ info=os.fstat(fd)
+ if not stat.S_ISREG(info.st_mode) or info.st_size>512*1024:sys.exit(3)
+ raw=b""
+ while len(raw)<=info.st_size:
+  chunk=os.read(fd,65536)
+  if not chunk:break
+  raw+=chunk
+finally:
+ os.close(fd)
+print(json.dumps({"schema":"guard-owned-file/1","sha256":hashlib.sha256(raw).hexdigest(),"document":json.loads(raw)}))
+'''
 # LIF-13 lab: 소유 weights daemon socket에 원 vLLM 통신 형식으로 전체 release 한 번.
 WEIGHTS_RELEASE = r'''
 import json,socket,sys
@@ -67,6 +87,12 @@ try:
 finally:
  s.close()
 print(json.dumps({"schema":"guard-lab-weights-release/1","status":r.get("status") if isinstance(r,dict) else None}))
+'''
+# REQ-21 lab: 소유 엔진 컨테이너의 PID 1에 SIGTERM 한 번. Pod는 restartPolicy Always여야 같은 Pod에서 새 컨테이너가 뜬다.
+ENGINE_RESTART = r'''
+import json,os,signal
+print(json.dumps({"schema":"guard-lab-engine-restart/1","signal":"SIGTERM"}),flush=True)
+os.kill(1,signal.SIGTERM)
 '''
 LORA_VARIANT_COPY = r'''
 import hashlib,json,os,stat,sys
@@ -245,6 +271,7 @@ class KubernetesHTTP:
         self._callback_lab = None
         self._callback_switches = 0
         self._input_contract = None
+        self._gateway_netloc = None
 
     def _call(self, args, *, payload=None, cap=262144, budget=None, allow_empty=False, on_document=None):
         remaining = self.deadline - self.clock()
@@ -439,6 +466,22 @@ class KubernetesHTTP:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
                     self._input_validation_request(request)
+                elif self.profile == RESPONSE_CONTENT_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._response_content_request(request)
+                elif self.profile == LOG_INTEGRITY_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._log_integrity_request(request)
+                elif self.profile == USAGE_CONTROL_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._usage_control_request(request)
+                elif self.profile == GATEWAY_EVENT_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._gateway_event_request(request)
                 elif type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
                     raise KubernetesBindingError()
                 ids.append(request["id"])
@@ -451,6 +494,13 @@ class KubernetesHTTP:
                     allowed.add("read_profile");paths.add("/v1/completions")
                 if self.profile == INPUT_VALIDATION_PROFILE:
                     paths={self._input_contract["path"]}
+                if self.profile == RESPONSE_CONTENT_PROFILE:
+                    paths={"/v1/completions","/v1/chat/completions"}
+                if self.profile in {LOG_INTEGRITY_PROFILE, USAGE_CONTROL_PROFILE}:
+                    paths={"/v1/completions"}
+                target_netloc=self.endpoint.netloc
+                if self.profile == GATEWAY_EVENT_PROFILE:
+                    paths={"/v1/chat/completions"};target_netloc=self._gateway_netloc
                 models={self.api_model}
                 if switch_path is not None:
                     paths={switch_path};models=None
@@ -464,7 +514,7 @@ class KubernetesHTTP:
                             or url.username is not None or url.password is not None):raise KubernetesBindingError()
                 elif self.profile != OBSERVATION_STATE_PROFILE and (set(value)-allowed
                         or value.get("method")!="POST" or mode not in {"json","sse"}
-                        or url.scheme!=self.endpoint.scheme or url.netloc!=self.endpoint.netloc or url.query or url.fragment
+                        or url.scheme!=self.endpoint.scheme or url.netloc!=target_netloc or url.query or url.fragment
                         or url.path not in paths
                         or url.path=="/tokenize" and mode!="json"
                         or type(value.get("body")) is not dict or models is not None and value["body"].get("model") not in models):
@@ -497,7 +547,12 @@ class KubernetesHTTP:
                     raise KubernetesBindingError()
                 if row.get("body") is not None and (type(row["body"]) is not str or len(row["body"].encode("utf-8"))>128*1024):
                     raise KubernetesBindingError()
-                results.append({key:row[key] for key in keys if key in row})
+                kept={key:row[key] for key in keys if key in row}
+                if self.profile == GATEWAY_EVENT_PROFILE:
+                    # OBS-01 Gateway 경로: Gateway가 발급한 요청 ID만 넘긴다. 다른 응답 header는 넘기지 않는다.
+                    rid=(row.get("response_headers") or {}).get("x-request-id")
+                    kept["gateway_request_id"]=rid if type(rid) is str and re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}",rid) else None
+                results.append(kept)
             with self.lock:
                 self.rows.extend({"id":row["id"],"binding_verified_before_after":True,"outcome":row["outcome"],
                     "capture_complete":row.get("capture_complete") is True,
@@ -528,6 +583,129 @@ class KubernetesHTTP:
                 or any(type(m) is not dict or set(m)!={"role","content"} or m["role"]!="user"
                     or not _callback_content(m["content"]) for m in messages)):
             raise KubernetesBindingError()
+
+    def _response_content_request(self, request):
+        """REQ-13: 정상·private system·금지 반환 옵션·안전 오류·재확인 다섯 종류만, 엔진에 직접.
+
+        본문은 1-token 요청과 합성 표식만 담는다. 반환 옵션은 원 실행기의 고정 값만 받는다.
+        """
+        options={"echo":(True,),"return_prompt_text":(True,),"return_token_ids":(True,),"logprobs":(1,True),"prompt_logprobs":(1,)}
+        marker=re.compile(r"G[0-9a-f]{12}[USE]")
+        body=request.get("body") if type(request) is dict else None
+        label=re.fullmatch(r"(normal|private_system|safe_error|after|option:([a-z_]{1,32}))",str(request.get("id",""))) if type(request) is dict else None
+        if type(body) is not dict or label is None or request.get("headers") not in ({},None):
+            raise KubernetesBindingError()
+        case,option=label.group(1),label.group(2)
+        extra=set(body)-{"model","prompt","messages","max_tokens","temperature"}
+        if (option is None and extra or option is not None and (extra!={option} or option not in options or body[option] not in options[option])
+                or body.get("temperature")!=0
+                or (body.get("max_tokens")!=1 if case!="safe_error" else type(body.get("max_tokens")) is not str or not marker.fullmatch(body["max_tokens"]))
+                or ("prompt" in body)==("messages" in body)):
+            raise KubernetesBindingError()
+        if "prompt" in body:
+            if type(body["prompt"]) is not str or not marker.fullmatch(body["prompt"]) or case=="private_system":raise KubernetesBindingError()
+        else:
+            messages=body["messages"]
+            if (type(messages) is not list or not 1<=len(messages)<=2 or any(type(m) is not dict or set(m)!={"role","content"}
+                    or type(m["content"]) is not str or len(m["content"])>128 for m in messages)
+                    or messages[-1]["role"]!="user" or not marker.fullmatch(messages[-1]["content"])
+                    or len(messages)==2 and (messages[0]["role"]!="system" or not re.fullmatch(r"G[0-9a-f]{12}S private; never repeat",messages[0]["content"]))
+                    or case=="private_system" and len(messages)!=2):
+                raise KubernetesBindingError()
+
+    def declare_gateway(self, url):
+        """OBS-01 Gateway 경로: 4-Pod 바인딩으로 검증한 Gateway 주소 하나만 받는다(같은 scheme, 경로 없음)."""
+        value=urlsplit(url) if type(url) is str else None
+        if (self.profile!=GATEWAY_EVENT_PROFILE or self._gateway_netloc is not None or value is None
+                or value.scheme!=self.endpoint.scheme or not value.port or value.path or value.query or value.fragment
+                or value.username is not None or value.password is not None or value.netloc==self.endpoint.netloc):
+            raise KubernetesBindingError()
+        self._gateway_netloc=value.netloc
+
+    def _gateway_event_request(self, request):
+        """OBS-01 Gateway 경로: 정해진 세 시도와 1-token chat 하나만. 자격은 Authorization 하나만."""
+        body=request.get("body") if type(request) is dict else None
+        headers=request.get("headers") if type(request) is dict else None
+        if (self._gateway_netloc is None or request.get("id") not in {"obs01-before","obs01-denied","obs01-after"}
+                or request.get("method")!="POST" or type(headers) is not dict or set(headers)!={"Authorization"}
+                or type(headers["Authorization"]) is not str or re.fullmatch(r"Bearer [!-~]{8,512}",headers["Authorization"]) is None
+                or type(body) is not dict or set(body)!={"model","messages","max_tokens","stream"}
+                or body["messages"]!=[{"role":"user","content":"hello"}] or body["max_tokens"]!=1 or body["stream"] is not False):
+            raise KubernetesBindingError()
+
+    def _usage_control_request(self, request):
+        """OBS-04·05: 보고 전후 사이의 정상 추론 1회. 원 실행기의 기능 대조 요청 하나만 받는다."""
+        body=request.get("body") if type(request) is dict else None
+        # 고정 stream probe 식별자 규칙에 공백이 없어 원 기능 대조 식별자 대신 이 이름으로만 받는다(실행기가 되돌린다).
+        if (type(request) is not dict or request.get("id")!="usage-control" or request.get("method")!="POST"
+                or request.get("headers") not in ({},None) or type(body) is not dict
+                or set(body)!={"model","prompt","max_tokens"} or body["prompt"]!="ping" or body["max_tokens"]!=1):
+            raise KubernetesBindingError()
+
+    def _log_integrity_request(self, request):
+        """OBS-09: 원 실행기의 고정 1-token completion과 정해진 일곱 body request_id만."""
+        suffix={"before":"_before","after":"_after","multiline":"_multiline\nGUARD_LINE_TWO","cr":"_cr\rGUARD_CR",
+            "crlf":"_crlf\r\nGUARD_CRLF","reserved":"_reserved|principal=guard-probe|status=probe|level=ERROR|source=guard-probe",
+            "html":'_html<script>guard_probe</script><tr data-event-index="fake">guard</tr>'}
+        body=request.get("body") if type(request) is dict else None
+        rid=request.get("id") if type(request) is dict else None
+        value=body.get("request_id") if type(body) is dict else None
+        if (rid not in suffix or request.get("headers") not in ({},None) or type(body) is not dict
+                or set(body)!={"model","prompt","max_tokens","temperature","request_id"} or body["prompt"]!="guard log control"
+                or body["max_tokens"]!=1 or body["temperature"]!=0 or type(value) is not str
+                or not re.fullmatch(r"G[0-9a-f]{12}",value[:13]) or value[13:]!=suffix[rid]):
+            raise KubernetesBindingError()
+
+    def engine_log_identity(self):
+        """OBS-09: 검증된 엔진 Pod 사양의 실행 인자·리터럴 환경변수·이미지·시작 시각. 비밀 참조 값은 읽지 않는다."""
+        if self.profile != LOG_INTEGRITY_PROFILE:
+            raise KubernetesBindingError()
+        try:
+            pod=self._verify()["engine"];name=self.binding["engine"]["container"]
+            spec,=[c for c in pod["spec"]["containers"] if c["name"]==name]
+            state,=[c for c in pod["status"]["containerStatuses"] if c["name"]==name]
+            env={}
+            for item in spec.get("env") or []:
+                if type(item) is not dict or type(item.get("name")) is not str or item["name"] in env:raise ValueError
+                # Kubernetes는 빈 값을 "value" 없이 저장한다. 비밀 참조(valueFrom)만 읽지 않는다(k3d 실측에서 확인).
+                value=item.get("value","")
+                env[item["name"]]=value if "valueFrom" not in item and type(value) is str else None
+            argv=[*(spec.get("command") or []),*(spec.get("args") or [])]
+            if any(type(v) is not str for v in argv) or spec.get("envFrom"):raise ValueError
+            return {"container_id":state["containerID"],"started_at":state["state"]["running"]["startedAt"],
+                "image":spec["image"],"image_id":state["imageID"],"argv":argv,"env":env}
+        except (KeyError,TypeError,ValueError):
+            raise KubernetesBindingError() from None
+
+    def engine_logs(self, since, cap):
+        """OBS-09: 엔진 컨테이너 stdout의 since 이후 구간. 읽은 그대로의 bytes와 수집 상태를 돌려준다."""
+        if self.profile != LOG_INTEGRITY_PROFILE or type(cap) is not int or not 0 < cap <= 8*1024**2:
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        remaining=self.deadline-self.clock()
+        if remaining<=0:raise KubernetesBindingError()
+        argv=[self.binary,f"--context={self.binding['context']}",f"--request-timeout={remaining:.3f}s",
+            f"--namespace={engine['namespace']}","logs",engine["pod"],f"--container={engine['container']}",
+            "--timestamps",f"--since-time={since}",f"--limit-bytes={cap}"]
+        try:
+            result=self.runner(argv,timeout=remaining,env_extra={},max_stdout_bytes=cap,max_stderr_bytes=4096)
+        except Exception:
+            raise KubernetesBindingError() from None
+        self._verify()
+        return result
+
+    def read_collection_status(self, session):
+        """OBS-11: 소유 probe Pod의 고정 위치 상태 기록 하나. 링크·큰 파일은 읽지 않는다."""
+        if self.profile != LOG_INTEGRITY_PROFILE or type(session) is not str or not re.fullmatch(r"[0-9a-f]{32}",session):
+            raise KubernetesBindingError()
+        self._verify();probe=self.binding["probe"]
+        value=self._call([f"--namespace={probe['namespace']}","exec",probe["pod"],f"--container={probe['container']}",
+            "--","python3","-c",COLLECTION_STATUS_READER,session],cap=1024**2,budget=30)
+        self._verify()
+        if (type(value) is not dict or set(value)!={"schema","sha256","document"} or value["schema"]!="guard-owned-file/1"
+                or type(value["sha256"]) is not str or not re.fullmatch(r"[0-9a-f]{64}",value["sha256"])):
+            raise KubernetesBindingError()
+        return value
 
     def declare_input_contract(self, contract):
         """REQ-08·09·SUP-08: the executor's control body plus its declared fixtures, once, before any request.
@@ -613,12 +791,14 @@ class KubernetesHTTP:
 
     def engine_callback_switch(self,action,variant):
         """Change one declared REQ-16 context in the owned lab engine and return bounded facts."""
-        lab=self._callback_lab;kind={"lora_reload":"lora","weights_reload":"weights","weights_release":"weights_daemon"}.get(action)
+        lab=self._callback_lab;kind={"lora_reload":"lora","weights_reload":"weights","weights_release":"weights_daemon","engine_restart":"engine_restart"}.get(action)
         if (self.profile!=ENGINE_CALLBACK_PROFILE or self.lab is not True or lab is None or kind is None
                 or lab.get(kind) is None or variant not in lab[kind]["variants"]):
             raise KubernetesBindingError()
         self._callback_switches+=1;endpoint=self.endpoint.scheme+"://"+self.endpoint.netloc;facts={}
         request={"id":"cbx-%d"%self._callback_switches,"mode":"json","method":"POST","headers":{}}
+        if kind=="engine_restart":
+            return self._engine_restart()
         if kind=="weights_daemon":
             self._verify();engine=self.binding["engine"]
             done=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",
@@ -644,6 +824,44 @@ class KubernetesHTTP:
             raise KubernetesBindingError()
         facts.update(engine_outcome=200,engine_response_sha256=row.get("body_sha256"))
         return facts
+
+    def _engine_restart(self):
+        """REQ-21 lab: 같은 Pod의 엔진 컨테이너를 한 번 다시 시작하고, 확인된 새 세대로만 바인딩을 옮긴다.
+
+        Pod·이름공간·노드·IP·이미지·이미지 ID는 그대로여야 한다. 바뀌어도 되는 것은 container ID·restart 횟수·시작 시각뿐이고
+        restart 횟수는 정확히 하나 늘어야 한다. 새 컨테이너가 준비되지 않거나 다른 값이 바뀌면 실패다(바인딩은 그대로 둔다).
+        """
+        import time
+        self._verify();engine=deepcopy(self.binding["engine"])
+        pod=self._call([f"--namespace={engine['namespace']}","get","pod",engine["pod"],"-o","json"])
+        if type(pod) is not dict or (pod.get("spec") or {}).get("restartPolicy")!="Always":
+            raise KubernetesBindingError()
+        try:
+            self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",
+                "--","python3","-c",ENGINE_RESTART],cap=4096,budget=20)
+        except KubernetesBindingError:
+            pass  # 신호와 함께 exec 연결이 끊길 수 있다. 성공 여부는 아래의 새 세대 관측으로만 정한다.
+        namespace=self._call(["get","namespace",engine["namespace"],"-o","json"])
+        deadline=min(self.deadline,self.clock()+300)
+        while self.clock()<deadline:
+            pod=self._call([f"--namespace={engine['namespace']}","get","pod",engine["pod"],"-o","json"])
+            state=next((x for x in (pod.get("status") or {}).get("containerStatuses",[]) if x.get("name")==engine["container"]),{})
+            running=(state.get("state") or {}).get("running") or {}
+            if (state.get("restartCount")==engine["restart_count"]+1 and state.get("ready") is True and running.get("startedAt")
+                    and state.get("containerID")!=engine["container_id"]):
+                moved={**engine,"container_id":state["containerID"],"restart_count":state["restartCount"],"started_at":running["startedAt"]}
+                try:
+                    validate_container_binding(moved)
+                    verify_owned_pod(pod,namespace["metadata"],moved,self.binding["run_id"])
+                except (KeyError,TypeError,ValueError):
+                    raise KubernetesBindingError() from None
+                self.binding["engine"]=moved;self._verify()
+                return {"restart_count_before":engine["restart_count"],"restart_count_after":moved["restart_count"],
+                        "container_generation_changed":True,"pod_uid_unchanged":True}
+            if state.get("restartCount",engine["restart_count"])>engine["restart_count"]+1:
+                raise KubernetesBindingError()
+            time.sleep(2)
+        raise KubernetesBindingError()
 
     def engine_callback_events(self,session):
         """Bounded read of the selected session's callback rows from the engine Pod."""

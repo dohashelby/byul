@@ -44,7 +44,7 @@ def _pinned_image(value):
 
 class LogIntegrityExecutor(HttpCheckExecutor):
     name = "log_integrity"
-    version = "0.3.0"
+    version = "0.3.1"
     requires_roles = False
     requires_route_scope = False
 
@@ -220,7 +220,8 @@ class LogIntegrityExecutor(HttpCheckExecutor):
                 if label in {"before", "after"}:
                     controls[label] = "no_response"
                 continue
-            body = {"model": ctx.env.model.id, "prompt": "guard log control", "max_tokens": 1,
+            # 검증된 API 별칭으로 요청·응답을 비교한다(저장소 ID가 아니다).
+            body = {"model": ctx.api_model, "prompt": "guard log control", "max_tokens": 1,
                     "temperature": 0, "request_id": request_id}
             request = content_request(ctx, "engine", label, "/v1/completions", body)
             # A header ID would override the JSON-body ID in the reviewed engine.
@@ -240,7 +241,7 @@ class LogIntegrityExecutor(HttpCheckExecutor):
             safe_outcome = outcome if (type(outcome) is int and 100 <= outcome <= 599 or type(outcome) is str and outcome in {"refused", "timeout", "unreachable", "dns_error", "error", "probe_error"}) else "probe_error"
             ctx.record("trusted", "log-integrity", label, "allowed",
                 {**log_metadata({**response, "outcome": safe_outcome}), "method": request["method"]})
-            state = control_state(response, ctx.env.model.id, "/v1/completions")
+            state = control_state(response, ctx.api_model, "/v1/completions")
             value, error = json_body(response)
             response_id = value.get("id") if not error else None
             response_matches = bool(state == "pass" and response_id == "cmpl-" + request_id)

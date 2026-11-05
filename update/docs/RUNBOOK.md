@@ -53,7 +53,7 @@ guard prepare-lifecycle-sensor --output C:\guard-data\lifecycle-assets-new
 `/guard-lifecycle`에 두고, 설정의 `/guard-lifecycle/data/<session>`만 해당 engine UID 소유
 0700의 새 쓰기 공간으로 제공한다. `PYTHONPATH=/guard-lifecycle`과
 `GUARD_LIFECYCLE_CONFIG=/guard-lifecycle/settings.json`, native `--middleware
-guard_lifecycle_sensor:Middleware`가 필요한 새 계측 기동 설정이다. 이 설정은 기존 causal
+guard_lifecycle_sensor.Middleware`(vLLM 0.31은 `모듈.객체` 형식만 받는다)가 필요한 새 계측 기동 설정이다. 이 설정은 기존 causal
 프로파일/ENV/fixture와 구분한다. 예전 증거에 소급하거나 기존 요청/스트림 측정을 바꾸지 않는다.
 이 문서는 로컬 Docker/엔진 기동이나 새 image/model 취득 승인이 아니다.
 

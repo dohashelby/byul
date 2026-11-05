@@ -83,6 +83,25 @@ class KubernetesRoutesHTTP:
             verify_owned_pod(pod, ns['metadata'], b, self.binding['run_id'])
 
     def __call__(self, network, requests, timeout):
+        # 원 Docker 전송은 묶음 크기 제한이 없다. REQ-01 경로 열거는 열린 배치에서
+        # 64개를 넘으므로(실측 79개) 순서를 지켜 64개씩 나눠 보낸다. 각 조각은 앞뒤
+        # 바인딩 검증을 따로 거치고, 한 조각이 실패하면 나머지는 probe_unavailable이다.
+        if type(requests) is list and len(requests) > 64:
+            labels = [r.get('id') if type(r) is dict else None for r in requests]
+            if len(set(map(repr, labels))) != len(labels):
+                self.failed = True
+                self.rows.append({'request_ids': [], 'binding_verified_before_after': False,
+                                  'diagnostic': 'KUBERNETES_ROUTE_BINDING_UNAVAILABLE'})
+                return [{'id': r.get('id') if type(r) is dict else None,
+                         'method': r.get('method') if type(r) is dict else None,
+                         'outcome': 'probe_unavailable'} for r in requests]
+            out = []
+            for start in range(0, len(requests), 64):
+                out.extend(self._dispatch(network, requests[start:start+64], timeout))
+            return out
+        return self._dispatch(network, requests, timeout)
+
+    def _dispatch(self, network, requests, timeout):
         ids = []
         try:
             if (self.failed or network not in {'kubernetes-probe', EXTERNAL}

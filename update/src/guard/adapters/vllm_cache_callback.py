@@ -148,6 +148,21 @@ class CacheCallbackObserver:
             self.gaps.add('CACHE_CALLBACK_BLOCK_SHAPE_UNAVAILABLE'); return None
         return [self._block(value) for value in values]
 
+    def _media(self, features):
+        """REQ-16: 요청의 멀티모달 항목별 토큰 위치(offset·length)와 식별자 지문. 원 데이터·식별자 원문은 남기지 않는다."""
+        if features is None or type(features) in (list, tuple) and not features:
+            return []
+        if type(features) not in (list, tuple) or len(features) > 16:
+            self.gaps.add('CACHE_CALLBACK_MEDIA_SHAPE_UNAVAILABLE'); return None
+        out = []
+        for feature in features:
+            fields = base.attrs(feature); position = base.attrs(fields.get('mm_position'))
+            offset, length = _uint(position.get('offset')), _uint(position.get('length'))
+            if offset is None or length is None or not length:
+                self.gaps.add('CACHE_CALLBACK_MEDIA_SHAPE_UNAVAILABLE'); return None
+            out.append({'offset': offset, 'length': length, 'identifier_sha256': self.fingerprint(fields.get('identifier'))})
+        return out
+
     def _snapshot(self, point, args, kwargs, result=None, returned=False):
         receiver = args[0] if args else None
         active = _ACTIVE.get()
@@ -161,6 +176,7 @@ class CacheCallbackObserver:
                 request_cache_salt_sha256=self.fingerprint(fields.get('cache_salt')),
                 request_lora_name_sha256=self.fingerprint(base.attrs(fields.get('lora_request')).get('lora_name')),
                 request_block_hashes_sha256=[self.fingerprint(v) for v in hashes] if type(hashes) in (list, tuple) and len(hashes) <= MAX_BLOCKS else None,
+                request_media_ranges=self._media(fields.get('mm_features')),
                 block_pool_token=self.token(base.attrs(receiver).get('block_pool')))
             if returned:
                 if type(result) is tuple and len(result) == 3:

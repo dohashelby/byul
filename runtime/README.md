@@ -11,10 +11,13 @@
 ```text
 .venv/bin/python -B -m serving_runtime bundle build --policy POLICY.json --policy-sha256 SHA256 --server-values SERVER.json --intent INTENT.json --output-parent DIR --bundle-id ID
 .venv/bin/python -B -m serving_runtime bundle verify --bundle-dir DIR/ID
-sudo -E env KUBECONFIG="$HOME/.kube/config" PATH="$PATH" .venv/bin/python -B -m serving_runtime bundle apply --bundle-dir DIR/ID --bundle-root ROOT --context CONTEXT --namespace NAMESPACE --kubeconfig "$HOME/.kube/config" --status-url http://127.0.0.1:8080 --token-env-file "$HOME/runtime-acceptance.env" [--dry-run]
+sudo -E env KUBECONFIG="$HOME/.kube/config" PATH="$PATH" .venv/bin/python -B -m serving_runtime bundle apply --bundle-dir DIR/ID --bundle-root ROOT --context CONTEXT --namespace NAMESPACE --kubeconfig "$HOME/.kube/config" --status-url http://127.0.0.1:8080 --token-env-file "$HOME/runtime-acceptance.env" --dry-run
+sudo -E env KUBECONFIG="$HOME/.kube/config" PATH="$PATH" .venv/bin/python -B -m serving_runtime bundle apply --bundle-dir DIR/ID --bundle-root ROOT --context CONTEXT --namespace NAMESPACE --kubeconfig "$HOME/.kube/config" --status-url http://127.0.0.1:8080 --token-env-file "$HOME/runtime-acceptance.env"
+sudo -E env KUBECONFIG="$HOME/.kube/config" PATH="$PATH" .venv/bin/python -B -m serving_runtime bundle apply --existing ID --bundle-root ROOT --context CONTEXT --namespace NAMESPACE --kubeconfig "$HOME/.kube/config" --status-url http://127.0.0.1:8080 --token-env-file "$HOME/runtime-acceptance.env" --dry-run
+sudo -E env KUBECONFIG="$HOME/.kube/config" PATH="$PATH" .venv/bin/python -B -m serving_runtime bundle apply --existing ID --bundle-root ROOT --context CONTEXT --namespace NAMESPACE --kubeconfig "$HOME/.kube/config" --status-url http://127.0.0.1:8080 --token-env-file "$HOME/runtime-acceptance.env"
 ```
 
-입력 형식·거부 규칙은 [`docs/정책묶음_변환규칙.md`](docs/정책묶음_변환규칙.md), 서버 적용과 수동 대체 절차는 [`deploy/gpu-lab/정책_수동적용_절차.md`](deploy/gpu-lab/정책_수동적용_절차.md)에 있습니다. apply는 rollout 뒤 새 임시 port-forward를 열고 viewer 토큰이 필요한 경우에만 사용합니다. 조회 불가이면 새 링크를 유지하며 수동 확인을 요구합니다. 생성 승인 목록은 자기 신고 사본이며 승인 검증이 아닙니다. 새 명령은 로컬 가짜 환경에서만 시험했습니다.
+입력 형식·거부 규칙은 [`docs/정책묶음_변환규칙.md`](docs/정책묶음_변환규칙.md), 서버 적용과 수동 대체 절차는 [`deploy/gpu-lab/정책_수동적용_절차.md`](deploy/gpu-lab/정책_수동적용_절차.md)에 있습니다. `--dry-run`도 묶음 루트의 읽기 권한이 필요해 sudo로 실행합니다. `--existing ID`는 루트에 배치된 묶음을 재검증하고 복사 없이 전환합니다. apply는 rollout 뒤 연결 실패마다 새 임시 port-forward를 열고 viewer 토큰이 필요한 경우에만 사용합니다. 조회 불가이면 새 링크를 유지하며 수동 확인을 요구합니다. 생성 승인 목록은 자기 신고 사본이며 승인 검증이 아닙니다. 새 전환 경로는 로컬 가짜 환경에서만 시험했습니다.
 
 Tetragon 보호 파일 읽기의 선택적 차단은 intent 1.1에서만 명시합니다. 예시의 경로는 가짜 파일이며 실제 적용 전 Pod 안의 파일 유형과 정상 사용 여부를 확인해야 합니다.
 

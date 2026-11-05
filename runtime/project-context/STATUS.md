@@ -2,6 +2,8 @@
 
 최종 갱신: 2026-11-05
 
+- 2026-11-05 AWS `bundle apply` 4회에서 이전 Pod port-forward로 자동 조회 불가였고 새 수동 포워드의 ID·`verified` 일치를 확인했다. 연결 실패 시 포워드 재개설(기본 90초), `--existing` 재검증·복귀, dry-run sudo 안내를 수정했다. 로컬 전체 시험 712건 통과(skip 115), `git diff --check` 통과; 수정판의 AWS 재적용·Pod 종료 구간 자동 확인은 미검증이다.
+
 ## 2026-11-05 플랫폼 정책 묶음 build/apply와 후보 목록 (기준 e6985d7, 미커밋)
 
 - 검수 지적 반영: apply의 `/api/status` 조회 토큰을 서버 env 관례인 `RUNTIME_VIEWER_TOKEN`으로 맞추고, 비보호 200 응답은 토큰 없이 처리한다. rollout 뒤 새 임시 port-forward를 열어 최대 30초 재시도한다. 실제 값 불일치·rollout 실패는 이전 링크 복원·재시작, 연결·인증 등 조회 불가는 새 링크를 유지하고 수동 확인을 요구한다. `--kubeconfig`를 모든 kubectl 호출에 전달하며 sudo 실행 예시를 갱신했다. 실제 서버 재실행은 아직 없다.

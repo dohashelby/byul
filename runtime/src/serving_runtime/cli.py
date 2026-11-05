@@ -48,7 +48,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     bundle_build_parser.add_argument("--output-parent", required=True, metavar="DIR")
     bundle_build_parser.add_argument("--bundle-id", required=True)
     bundle_apply_parser = bundle_commands.add_parser("apply", help="서버 묶음 배치·재시작·상태 확인")
-    bundle_apply_parser.add_argument("--bundle-dir", required=True, metavar="DIR")
+    bundle_apply_source = bundle_apply_parser.add_mutually_exclusive_group(required=True)
+    bundle_apply_source.add_argument("--bundle-dir", metavar="DIR")
+    bundle_apply_source.add_argument("--existing", metavar="ID", help="루트에 이미 배치된 묶음으로 전환")
     bundle_apply_parser.add_argument("--bundle-root", required=True, metavar="DIR")
     bundle_apply_parser.add_argument("--context", required=True)
     bundle_apply_parser.add_argument("--namespace", required=True)
@@ -340,7 +342,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = apply_bundle(args.bundle_dir, args.bundle_root, args.context,
                                   args.namespace, args.status_url, args.token_env_file,
                                   kubeconfig=args.kubeconfig,
-                                  dry_run=args.dry_run)
+                                  dry_run=args.dry_run, existing=args.existing)
         except (OSError, ValueError, RuntimeError) as error:
             print(f"정책 묶음 적용 실패: {error}", file=sys.stderr)
             return 1

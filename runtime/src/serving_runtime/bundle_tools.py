@@ -11,6 +11,7 @@ import ctypes
 from pathlib import Path
 import re
 import selectors
+import stat
 import subprocess
 import tempfile
 import time
@@ -277,86 +278,110 @@ def _token(path: str | None) -> str | None:
 
 def _checked_status(context: str, namespace: str, kubeconfig: str | None,
                     remote_port: int, token: str | None, bundle_id: str,
-                    *, timeout: float = 30) -> None:
+                    *, timeout: float = 90) -> None:
+    # Recreate 배치에서 이전 Pod 종료 유예(보통 최대 30초)와 새 Pod 연결 시간을 함께 둔다.
     deadline = time.monotonic() + timeout
     last_error = ""
     while True:
         try:
             with _port_forward(context, namespace, kubeconfig, remote_port) as url:
-                while True:
-                    try:
-                        status = _status(url, token)
-                    except (URLError, TimeoutError, OSError, ValueError, StatusUnavailable) as error:
-                        last_error = str(error) if isinstance(error, StatusUnavailable) else type(error).__name__
-                        if time.monotonic() >= deadline:
-                            break
-                        time.sleep(min(0.5, max(0, deadline - time.monotonic())))
-                        continue
-                    bundle_status = status.get("policy_bundle")
-                    policy_status = status.get("policy")
-                    if not isinstance(bundle_status, dict) or not isinstance(policy_status, dict) or not isinstance(policy_status.get("approval"), dict):
-                        raise StatusUnavailable("/api/status 묶음·승인 필드가 없어 확인할 수 없습니다")
-                    actual_id = bundle_status.get("bundle_id")
-                    approval = policy_status["approval"]
-                    if actual_id is None or approval.get("state") is None:
-                        raise StatusUnavailable("/api/status 묶음·승인 값이 없어 확인할 수 없습니다")
-                    if actual_id != bundle_id or approval.get("state") != "verified":
-                        raise StatusMismatch(f"/api/status 불일치: bundle_id={actual_id!r}, approval.state={approval.get('state')!r}")
-                    return
-        except (StatusUnavailable, OSError) as error:
-            last_error = str(error)
+                # 연결 실패 후에는 오래된 Pod에 붙은 포워드를 닫고 새로 연다.
+                status = _status(url, token)
+            bundle_status = status.get("policy_bundle")
+            policy_status = status.get("policy")
+            if not isinstance(bundle_status, dict) or not isinstance(policy_status, dict) or not isinstance(policy_status.get("approval"), dict):
+                raise StatusUnavailable("/api/status 묶음·승인 필드가 없어 확인할 수 없습니다")
+            actual_id = bundle_status.get("bundle_id")
+            approval = policy_status["approval"]
+            if actual_id is None or approval.get("state") is None:
+                raise StatusUnavailable("/api/status 묶음·승인 값이 없어 확인할 수 없습니다")
+            if actual_id != bundle_id or approval.get("state") != "verified":
+                raise StatusMismatch(f"/api/status 불일치: bundle_id={actual_id!r}, approval.state={approval.get('state')!r}")
+            return
+        except (URLError, TimeoutError, OSError, ValueError, StatusUnavailable) as error:
+            last_error = str(error) if isinstance(error, StatusUnavailable) else type(error).__name__
         if time.monotonic() >= deadline:
             raise StatusUnavailable(f"/api/status 조회 불가({last_error}); 새 링크 유지·수동 확인 필요")
         time.sleep(min(0.5, max(0, deadline - time.monotonic())))
 
 
-def apply_bundle(bundle_dir: str, bundle_root: str, context: str, namespace: str,
+def _check_deployed_permissions(directory: Path) -> None:
+    # 기존 묶음은 복사·chmod 없이 그대로 재사용하므로 Gateway 읽기 권한을 엄격히 확인한다.
+    for path in [directory, *directory.rglob("*")]:
+        info = path.lstat()
+        expected_mode = 0o750 if stat.S_ISDIR(info.st_mode) else 0o640
+        if (not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode))
+                or info.st_uid != 0 or info.st_gid != 10000
+                or stat.S_IMODE(info.st_mode) != expected_mode):
+            raise ValueError(f"기존 묶음 소유권·권한 불일치(root:10000, 폴더 0750, 파일 0640): {path}")
+
+
+def apply_bundle(bundle_dir: str | None, bundle_root: str, context: str, namespace: str,
                  status_url: str, token_env_file: str | None, *, kubeconfig: str | None = None,
-                 dry_run: bool = False) -> dict:
+                 dry_run: bool = False, existing: str | None = None) -> dict:
     parsed_url = urlparse(status_url)
     if parsed_url.scheme != "http" or parsed_url.hostname not in {"127.0.0.1", "localhost"} or not parsed_url.port or parsed_url.path not in {"", "/"} or parsed_url.query or parsed_url.fragment:
         raise ValueError("--status-url은 로컬 http://127.0.0.1:PORT 형식이어야 합니다")
     if kubeconfig is not None and not Path(kubeconfig).is_file():
         raise ValueError("--kubeconfig 파일이 없습니다")
-    source = verify_policy_bundle(bundle_dir)
+    if (bundle_dir is None) == (existing is None):
+        raise ValueError("--bundle-dir 또는 --existing 중 하나만 지정해야 합니다")
     root = Path(bundle_root)
     current = root / "current"
-    if not current.is_symlink():
-        raise ValueError("current 상대 심볼릭 링크가 필요합니다")
-    previous = os.readlink(current)
-    if not _ID.fullmatch(previous) or not (root / previous).is_dir():
-        raise ValueError("이전 current 대상이 안전한 묶음 폴더가 아닙니다")
-    verify_policy_bundle(root / previous)
-    if (root / source.bundle_id).exists() or (root / source.bundle_id).is_symlink():
-        raise FileExistsError("적용 대상 bundle_id가 이미 존재합니다")
-    if (root / "current.next").exists() or (root / "current.next").is_symlink():
-        raise FileExistsError("current.next가 이미 있습니다")
-    if (root / "current.rollback").exists() or (root / "current.rollback").is_symlink():
-        raise FileExistsError("current.rollback이 이미 있습니다")
+    if root.is_dir() and not os.access(root, os.R_OK | os.X_OK):
+        raise PermissionError("묶음 루트 조회 권한이 없습니다: --dry-run도 sudo로 실행해야 합니다")
+    try:
+        if existing is not None:
+            if not _ID.fullmatch(existing):
+                raise ValueError("--existing bundle_id 형식이 잘못되었습니다")
+            destination = root / existing
+            if destination.is_symlink() or not destination.is_dir():
+                raise ValueError("--existing 대상은 루트의 실제 묶음 폴더여야 합니다")
+            source = verify_policy_bundle(destination)
+            if source.bundle_id != existing:
+                raise ValueError("--existing ID와 bundle.json의 bundle_id가 다릅니다")
+            _check_deployed_permissions(destination)
+        else:
+            source = verify_policy_bundle(bundle_dir)
+        if not current.is_symlink():
+            raise ValueError("current 상대 심볼릭 링크가 필요합니다")
+        previous = os.readlink(current)
+        if not _ID.fullmatch(previous) or not (root / previous).is_dir():
+            raise ValueError("이전 current 대상이 안전한 묶음 폴더가 아닙니다")
+        verify_policy_bundle(root / previous)
+        if existing is None and ((root / source.bundle_id).exists() or (root / source.bundle_id).is_symlink()):
+            raise FileExistsError("적용 대상 bundle_id가 이미 존재합니다")
+        if (root / "current.next").exists() or (root / "current.next").is_symlink():
+            raise FileExistsError("current.next가 이미 있습니다")
+        if (root / "current.rollback").exists() or (root / "current.rollback").is_symlink():
+            raise FileExistsError("current.rollback이 이미 있습니다")
+    except PermissionError as error:
+        raise PermissionError("묶음 루트 조회 권한이 없습니다: --dry-run도 sudo로 실행해야 합니다") from error
     if dry_run:
         return {"bundle_id": source.bundle_id, "previous": previous, "dry_run": True}
     token = _token(token_env_file)
-    with tempfile.TemporaryDirectory(prefix=".bundle-apply-", dir=root) as temporary:
-        staging = Path(temporary)
-        try:
-            for item in source.files:
-                dest = staging / item.relative_path
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                dest.write_bytes(item.content)
-            manifest_raw = (Path(bundle_dir) / "bundle.json").read_bytes()
-            if _sha(manifest_raw) != source.sha256:
-                raise ValueError("원본 bundle.json이 검증 뒤 변경되었습니다")
-            (staging / "bundle.json").write_bytes(manifest_raw)
-            for folder in [staging, *(p for p in staging.rglob("*") if p.is_dir())]:
-                os.chown(folder, 0, 10000)
-                folder.chmod(0o750)
-            for file in (p for p in staging.rglob("*") if p.is_file()):
-                os.chown(file, 0, 10000)
-                file.chmod(0o640)
-        except PermissionError as error:
-            raise PermissionError("root:10000 소유권·권한 설정 실패: sudo로 실행해야 합니다") from error
-        _rename_new(staging, root / source.bundle_id)
-    verify_policy_bundle(root / source.bundle_id)
+    if existing is None:
+        with tempfile.TemporaryDirectory(prefix=".bundle-apply-", dir=root) as temporary:
+            staging = Path(temporary)
+            try:
+                for item in source.files:
+                    dest = staging / item.relative_path
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    dest.write_bytes(item.content)
+                manifest_raw = (Path(bundle_dir) / "bundle.json").read_bytes()
+                if _sha(manifest_raw) != source.sha256:
+                    raise ValueError("원본 bundle.json이 검증 뒤 변경되었습니다")
+                (staging / "bundle.json").write_bytes(manifest_raw)
+                for folder in [staging, *(p for p in staging.rglob("*") if p.is_dir())]:
+                    os.chown(folder, 0, 10000)
+                    folder.chmod(0o750)
+                for file in (p for p in staging.rglob("*") if p.is_file()):
+                    os.chown(file, 0, 10000)
+                    file.chmod(0o640)
+            except PermissionError as error:
+                raise PermissionError("root:10000 소유권·권한 설정 실패: sudo로 실행해야 합니다") from error
+            _rename_new(staging, root / source.bundle_id)
+        verify_policy_bundle(root / source.bundle_id)
     switched = False
     try:
         os.symlink(source.bundle_id, root / "current.next")

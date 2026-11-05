@@ -11,7 +11,8 @@ from unittest.mock import patch
 from urllib.error import HTTPError, URLError
 
 from serving_runtime.bundle_tools import (build_bundle, apply_bundle, _canonical,
-                                          _checked_status, _status, StatusMismatch,
+                                          _checked_status, _check_deployed_permissions,
+                                          _status, StatusMismatch,
                                           StatusUnavailable)
 from serving_runtime.cli import main
 from serving_runtime.mvp.policy_bundle import verify_policy_bundle
@@ -208,6 +209,103 @@ class BundleToolsTest(unittest.TestCase):
              patch("serving_runtime.bundle_tools._status", side_effect=URLError("disconnected")):
             with self.assertRaisesRegex(StatusUnavailable, "조회 불가.*URLError"):
                 _checked_status("ctx", "ns", None, 8080, None, "new", timeout=0)
+
+    def test_status_reopens_failed_fake_kubectl_port_forward(self):
+        kubectl = self.root / "kubectl"
+        kubectl.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$FAKE_KUBECTL_LOG"\n'
+                           'if [ "$(wc -l < "$FAKE_KUBECTL_LOG")" -eq 1 ]; then\n'
+                           '  printf "old Pod gone\\n"\n  exit 1\nfi\n'
+                           'printf "Forwarding from 127.0.0.1:9090 -> 8080\\n"\n'
+                           'exec sleep 60\n')
+        kubectl.chmod(0o755)
+        log = self.root / "kubectl.log"
+        status = {"policy_bundle": {"bundle_id": "new"},
+                  "policy": {"approval": {"state": "verified"}}}
+        with patch.dict(os.environ, {"PATH": str(self.root) + os.pathsep + os.environ["PATH"],
+                                     "FAKE_KUBECTL_LOG": str(log)}), \
+             patch("serving_runtime.bundle_tools._status", return_value=status) as lookup, \
+             patch("serving_runtime.bundle_tools.time.sleep"):
+            _checked_status("ctx", "ns", None, 8080, None, "new", timeout=5)
+        self.assertEqual(len(log.read_text().splitlines()), 2)
+        lookup.assert_called_once()
+        self.assertTrue(all("port-forward deployment/serving-gateway" in line
+                            for line in log.read_text().splitlines()))
+
+    def test_existing_switch_dry_run_permissions_and_rollback(self):
+        self._build("vllm")
+        root = self.root / "server"
+        root.mkdir()
+        for name in ("previous", "vllm"):
+            target = root / name
+            target.mkdir()
+            for item in (self.out / "vllm").iterdir():
+                (target / item.name).write_bytes(item.read_bytes())
+            if name == "previous":
+                manifest = json.loads((target / "bundle.json").read_text())
+                manifest["bundle_id"] = name
+                (target / "bundle.json").write_text(json.dumps(manifest))
+        (root / "current").symlink_to("previous")
+        args = (None, str(root), "ctx", "ns", "http://127.0.0.1:8080", None)
+        with self.assertRaisesRegex(ValueError, "소유권·권한"):
+            apply_bundle(*args, existing="vllm", dry_run=True)
+        with patch("serving_runtime.bundle_tools._check_deployed_permissions") as permissions:
+            result = apply_bundle(*args, existing="vllm", dry_run=True)
+            self.assertEqual(result["bundle_id"], "vllm")
+            with redirect_stdout(io.StringIO()):
+                code = main(["bundle", "apply", "--existing", "vllm", "--bundle-root", str(root),
+                             "--context", "ctx", "--namespace", "ns",
+                             "--status-url", "http://127.0.0.1:8080", "--dry-run"])
+            self.assertEqual(code, 0)
+            with self.assertRaises(FileExistsError):
+                apply_bundle(str(self.out / "vllm"), *args[1:], dry_run=True)
+            with patch("serving_runtime.bundle_tools.tempfile.TemporaryDirectory",
+                       side_effect=AssertionError("복사 경로에 들어감")), \
+                 patch("serving_runtime.bundle_tools._run") as rollout, \
+                 patch("serving_runtime.bundle_tools._checked_status",
+                       side_effect=StatusMismatch("wrong")):
+                with self.assertRaisesRegex(RuntimeError, "이전 링크 복원"):
+                    apply_bundle(*args, existing="vllm")
+            self.assertEqual(os.readlink(root / "current"), "previous")
+            self.assertEqual(rollout.call_count, 4)
+            with patch("serving_runtime.bundle_tools._run") as rollout, \
+                 patch("serving_runtime.bundle_tools._checked_status") as checked:
+                result = apply_bundle(*args, existing="vllm")
+            self.assertEqual(os.readlink(root / "current"), "vllm")
+            self.assertEqual(rollout.call_count, 2)
+            checked.assert_called_once()
+            self.assertFalse(result["dry_run"])
+        self.assertGreaterEqual(permissions.call_count, 3)
+
+    def test_dry_run_root_permission_error_mentions_sudo(self):
+        self._build("vllm")
+        root = self.root / "server"
+        root.mkdir()
+        root.chmod(0o000)
+        try:
+            with self.assertRaisesRegex(PermissionError, "--dry-run도 sudo"):
+                apply_bundle(str(self.out / "vllm"), str(root), "ctx", "ns",
+                             "http://127.0.0.1:8080", None, dry_run=True)
+        finally:
+            root.chmod(0o700)
+
+    def test_existing_permissions_require_exact_owner_and_modes(self):
+        directory = self.root / "deployed"
+        directory.mkdir(mode=0o750)
+        file = directory / "bundle.json"
+        file.write_text("{}")
+        file.chmod(0o640)
+        original_lstat = Path.lstat
+
+        def root_owned(path):
+            values = list(original_lstat(path))
+            values[4:6] = [0, 10000]
+            return os.stat_result(values)
+
+        with patch("serving_runtime.bundle_tools.Path.lstat", root_owned):
+            _check_deployed_permissions(directory)
+            file.chmod(0o600)
+            with self.assertRaisesRegex(ValueError, "소유권·권한"):
+                _check_deployed_permissions(directory)
 
     def test_gateway_12_requires_explicit_server_cache_value(self):
         self._build("vllm")

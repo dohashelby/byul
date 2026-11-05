@@ -33,6 +33,8 @@ RECEIVER_PORT = 18080
 # 11-02 CPU 실측과 같은 작은 모델 설정. OBS-09가 요구하는 요청 로그 설정을 함께 둔다.
 ARGS = ['/models/opt-125m', '--served-model-name', SERVED, '--max-model-len', '512', '--max-num-seqs', '2',
         '--dtype', 'float32', '--block-size', '32', '--enable-log-requests', '--max-log-len', '512',
+        # CPU 진단의 eager 선언을 GPU 프로필에서도 실제 기동 인자로 지킨다. graph 대조는 별도 세대다.
+        '--enforce-eager',
         # opt-125m에는 chat template이 없다. SUP-03에서 검토한 guard 고정 템플릿을 그대로 붙인다(run 2에서 chat 400 확인).
         '--chat-template', CHAT_TEMPLATE_CONTAINER_PATH]
 LOG_ENV = {'VLLM_CONFIGURE_LOGGING': '1', 'VLLM_LOGGING_LEVEL': 'INFO', 'VLLM_LOGGING_COLOR': '0',
@@ -182,7 +184,7 @@ def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usa
         lifecycle = {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': f'guard-lifecycle-{run_id}'[:63], 'namespace': NAMESPACE,
                      'labels': labels}, 'data': assets}
         spec, container = engine['spec'], engine['spec']['containers'][0]
-        container['args'] = [*ARGS, '--middleware', 'guard_lifecycle_sensor.Middleware']
+        container['args'] = [*container['args'], '--middleware', 'guard_lifecycle_sensor.Middleware']
         container['env'] += [{'name': 'PYTHONPATH', 'value': '/guard-lifecycle'},
                              {'name': 'GUARD_LIFECYCLE_CONFIG', 'value': '/guard-lifecycle/settings.json'}]
         container['volumeMounts'] += [{'name': 'lifecycle-assets', 'mountPath': '/guard-lifecycle', 'readOnly': True},
@@ -232,7 +234,7 @@ def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usa
     record = {'schema': SCHEMA, 'generation': GENERATION, 'profile': 'gpu' if gpu else 'cpu', 'gpu': gpu, 'run_id': run_id, 'engine_image': engine_image,
               'model_id': MODEL_ID, 'model_revision': MODEL_REVISION, 'served_model_name': SERVED,
               'args': engine['spec']['containers'][0]['args'], 'lifecycle_session': lifecycle and json.loads(lifecycle['data']['settings.json'])['session'],
-              'enforce_eager': True, 'lab_namespace_owner_label_required': True,
+              'enforce_eager': '--enforce-eager' in engine['spec']['containers'][0]['args'], 'lab_namespace_owner_label_required': True,
               'outputs_sha256': {'engine.yaml': hashlib.sha256(raw['engine.yaml']).hexdigest(),
                                  **{n: hashlib.sha256(b).hexdigest() for n, b in raw.items() if n != 'engine.yaml'}}}
     return raw, record

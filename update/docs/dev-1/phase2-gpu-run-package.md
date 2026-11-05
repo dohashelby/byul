@@ -68,3 +68,9 @@
 - Gateway 정책 1.2 스키마와 bundle 항목 스키마 일치(REQ-13 Gateway).
 - usage 정상 대조 식별자 별칭(OBS-04·05).
 - #196 공통 입력 계약(`docs/dev-1/gpu-common-inputs-196.md`). 생산자는 2단계에 만든다.
+
+## GPU 실행 준비 보수(2026-11-05)
+
+- `dev1_k3d_cpu_lab`의 eager 선언을 실제 `--enforce-eager` 인자로 고정하고 렌더 기록은 실제 인자를 따른다. 과거 CPU 원자료는 바꾸지 않는다. REQ-20 graph on/off 대조는 별도 세대다.
+- lifecycle 센서를 붙일 때 이미 더한 GPU 메모리 비율 등 기동 옵션을 유지한다. 이전 구현은 기본 ARGS로 다시 덮어써 GPU의 `--gpu-memory-utilization 0.5`가 빠졌다.
+- 렌더·입력·불변식 묶음 170 통과/기존1제외(pytest 1.59초, 부모 1.758초). 새 GPU 실측에는 실제 이미지 digest·소스 pin·최종 렌더 bytes를 다시 묶는다. 최근 보존된 GPU 생산자 세대는 `c1c9f6fd…`이며 위 계획서의 `a4a4c043…`와 같은 이미지로 간주하지 않는다.

@@ -97,3 +97,25 @@ InputBatch에 남아 있는 마스크를 적용된 허용 목록으로 읽어 �
 - 남은 진단: `SUPPLY_NATIVE_READ_PROCESS_UNATTRIBUTED`.
   - inotify는 연 프로세스를 알려 주지 않는다. 같은 노드의 다른 Pod가 같은 hostPath 파일을 열어도 섞일 수 있다.
   - 그래서 이 기록만으로는 complete가 되지 않는다. 모델 폴더의 Pod 전용 마운트 확인이나 Tetragon 같은 독립 귀속 근거가 더해져야 닫힌다.
+
+### 마운트 전용성 확인 (2026-11-05)
+
+- 방향(사용자 결정): inotify 사건의 프로세스 귀속 대신, 공급 루트 볼륨이 소유 엔진 Pod 전용인지 Kubernetes API로 확인한다. 전용이면 그 사건을 이 Pod의 읽기로 좁힌다. SUP-03은 Pod 안의 프로세스 구분이 필요 없다.
+- 구현(`runtime/kubernetes_mount_scope.py`, `KubernetesHTTP.supply_mount_exclusivity`): 엔진 Pod와 클러스터 전체 Pod 목록을 읽어 루트마다 판단한다.
+  - hostPath: 같은 노드에서 겹치는 호스트 경로(상위·하위 포함)를 마운트한 다른 Pod가 없어야 한다.
+  - PVC: 같은 namespace에 같은 claim을 쓰는 다른 Pod가 없어야 한다.
+  - emptyDir·configMap·secret·projected·downwardAPI: Pod 안 사본이라 같은 Pod의 다른 컨테이너만 본다.
+  - 모든 경우 같은 Pod의 다른 컨테이너가 같은 볼륨을 마운트하면 공유다. 끝난 Pod는 세지 않는다.
+  - 그 밖의 볼륨 종류와 마운트를 못 찾은 루트는 확인 불가다.
+- 기록:
+  - 수집 전후 두 번 모두 모든 루트가 전용이면 `file_observed`가 `inotify_pod_exclusive`가 되고 귀속 진단이 빠진다.
+  - 공유면 `SUPPLY_MOUNT_SHARED`, 확인 불가나 미실행이면 `SUPPLY_MOUNT_EXCLUSIVITY_UNVERIFIED`와 `SUPPLY_NATIVE_READ_PROCESS_UNATTRIBUTED`가 붙는다.
+  - 결과에는 원 경로·Pod 이름 대신 종류와 개수만 남긴다.
+- 범위 밖: 노드의 Kubernetes 밖 프로세스(호스트 데몬 등)는 API로 보이지 않는다. GPU lab에서는 노드가 lab 전용인지 운영 기록으로 따로 확인한다.
+- k3d CPU 확인(run 18):
+  - 엔진만 있을 때: 전후 모두 두 루트가 `exclusive_host_path`였고 귀속 진단이 없다. 원자료는 `supply-reads-exclusive-final.json`이다.
+  - 같은 노드에 `/srv/models`를 마운트한 Pod를 하나 더 띄웠을 때: 두 루트 모두 `shared_host_path`(공유 Pod 1)였고 `SUPPLY_MOUNT_SHARED`가 붙었다. 원자료는 `supply-reads-shared.json`이다.
+- 함께 고친 결함:
+  - Pod 목록 읽기 한도를 공용 pipe 한도(16 MiB)로 맞췄다.
+  - 기록 읽기·해시 수집 프로그램을 `python3 -I -S`로 돌린다. 그전에는 엔진 PYTHONPATH의 센서를 수집 프로그램이 불러와, 자기 파일 열기가 공급 읽기로 기록됐다(callbacks-263·275·287, `SUPPLY_PROCESS_START_UNAVAILABLE`).
+- 남은 gap: `SUPPLY_FILE_NOT_HASHED`는 가중치(250 MB, 64 MiB 한도 초과)다. 가중치 bytes 대조는 native weight 읽기(SUP-06·16) 쪽 근거를 쓴다.

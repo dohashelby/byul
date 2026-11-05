@@ -626,18 +626,47 @@ def supply_read_events(processes, hashes):
     return events, bindings, sorted(codes)
 
 
-def supply_read_record(processes, hashes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False):
+def mount_scope_codes(before, after):
+    """수집 전후 두 번의 마운트 전용성 확인을 진단 코드로 바꾼다. 두 번 모두 모든 루트가 전용이어야 빈 목록이다."""
+    if before is None or after is None:
+        return ['SUPPLY_MOUNT_EXCLUSIVITY_UNVERIFIED']
+    rows = list(before) + list(after)
+    if not rows or len(before) != len(after):
+        return ['SUPPLY_MOUNT_EXCLUSIVITY_UNVERIFIED']
+    codes = set()
+    for row in rows:
+        if row.get('exclusive') is True:
+            continue
+        codes.add('SUPPLY_MOUNT_SHARED' if str(row.get('reason', '')).startswith('shared') else 'SUPPLY_MOUNT_EXCLUSIVITY_UNVERIFIED')
+    return sorted(codes)
+
+
+def supply_read_record(processes, hashes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False,
+                       mount_before=None, mount_after=None):
     """기록된 연 파일마다 해시 행이 있어야 닫힌다. 너무 큰 파일(가중치 등)은 해시하지 않고 상태로 남긴다.
 
     - inotify 감시가 없으면 native 읽기를 못 보므로 `SUPPLY_NATIVE_READS_UNOBSERVED` 진단이 붙는다.
     - inotify 감시가 있으면 native 읽기 파일은 보이지만 연 프로세스를 모른다. 같은 노드의 다른 Pod 읽기도 섞일 수 있다.
-      그래서 `SUPPLY_NATIVE_READ_PROCESS_UNATTRIBUTED` 진단이 붙는다. Tetragon 같은 독립 귀속 근거가 더해져야 닫힌다.
+      수집 전후 마운트 전용성 확인(`supply_mount_exclusivity`)이 두 번 모두 전용이면 이 Pod의 읽기로 좁히고 진단을 붙이지 않는다.
+      확인이 없거나 공유면 `SUPPLY_NATIVE_READ_PROCESS_UNATTRIBUTED`와 그 이유 코드가 붙는다.
+      노드의 Kubernetes 밖 프로세스는 API로 보이지 않아 이 확인 범위 밖이다.
     """
     events, processes_used, codes = supply_read_events(processes, hashes)
     # Python audit hook은 native 코드(Rust tokenizers, C++ 로더 등)의 파일 읽기를 보지 못한다(k3d run 17: vocab.json·merges.txt).
     # 그래서 이 기록만으로는 실제 소비 전체가 아니라는 진단을 항상 남긴다.
     watched = 'SUPPLY_INOTIFY_OBSERVED' in codes
-    codes = (set(codes) - {'SUPPLY_INOTIFY_OBSERVED'}) | {'SUPPLY_NATIVE_READ_PROCESS_UNATTRIBUTED' if watched else 'SUPPLY_NATIVE_READS_UNOBSERVED'}
+    codes = set(codes) - {'SUPPLY_INOTIFY_OBSERVED'}
+    if not watched:
+        codes.add('SUPPLY_NATIVE_READS_UNOBSERVED')
+    else:
+        # 공급 루트 볼륨이 전후 모두 이 엔진 Pod 전용이면 inotify 사건을 이 Pod의 읽기로 좁힌다(Pod 안 프로세스 구분은 SUP-03에 필요 없다).
+        scope = mount_scope_codes(mount_before, mount_after)
+        if scope:
+            codes |= {'SUPPLY_NATIVE_READ_PROCESS_UNATTRIBUTED', *scope}
+        else:
+            for event in events:
+                if event['event'] == 'file_observed':
+                    event['state'] = 'inotify_pod_exclusive'
     codes = sorted(codes | ({'SUPPLY_READ_TRUNCATED'} if truncated else set()))
     bindings = [{'pod_uid': pod['pod_uid'], 'container_id': pod['container_id'].removeprefix('containerd://')[:128],
                  'restart_count': pod['restart_count'], 'worker_pid': p['pid'], 'start_ticks': p['start_ticks'], 'rank': 0}

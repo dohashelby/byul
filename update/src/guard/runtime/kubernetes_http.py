@@ -921,15 +921,36 @@ class KubernetesHTTP:
             raise KubernetesBindingError()
         return value
 
+    def supply_mount_exclusivity(self,roots):
+        """SUP-03: 공급 루트 볼륨이 이 엔진 Pod 전용인지. 엔진 Pod와 클러스터의 Pod 목록을 읽어 판단한다."""
+        from .kubernetes_mount_scope import exclusivity
+        if self.profile!=ENGINE_CALLBACK_PROFILE or type(roots) is not list or not 1<=len(roots)<=8:
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        pod=self._call([f"--namespace={engine['namespace']}","get","pod",engine["pod"],"-o","json"])
+        listed=self._call(["get","pods","--all-namespaces","-o","json"],cap=16*1024**2,budget=60)  # 공용 pipe 한도(16 MiB)
+        self._verify()
+        if (type(pod) is not dict or pod.get("metadata",{}).get("uid")!=engine["pod_uid"]
+                or type(listed) is not dict or type(listed.get("items")) is not list):
+            raise KubernetesBindingError()
+        try:
+            return exclusivity(pod,listed["items"],engine["container"],roots)
+        except (KeyError,TypeError,ValueError):
+            raise KubernetesBindingError() from None
+
     def engine_supply_hashes(self,roots,files):
-        """SUP-03: 기록된 공급 파일의 현재 bytes 해시를 엔진 컨테이너 안에서 계산한다."""
+        """SUP-03: 기록된 공급 파일의 현재 bytes 해시를 엔진 컨테이너 안에서 계산한다.
+
+        수집 프로그램은 `python3 -I -S`로 돈다. 엔진의 PYTHONPATH sitecustomize(센서)를 불러오면
+        수집 프로그램 자신의 파일 열기가 공급 읽기로 기록된다(k3d run 18에서 확인).
+        """
         if (self.profile!=ENGINE_CALLBACK_PROFILE or type(roots) is not list or not 1<=len(roots)<=8 or type(files) is not list
                 or len(files)>2048 or any(type(f) is not dict or set(f)!={"root","relative"} for f in files)):
             raise KubernetesBindingError()
         self._verify();engine=self.binding["engine"]
         payload=json.dumps({"roots":roots,"files":files}).encode()
         value=self._call([f"--namespace={engine['namespace']}","exec","-i",engine["pod"],
-            f"--container={engine['container']}","--","python3","-c",SUPPLY_HASH_READER],payload=payload,cap=4*1024**2,budget=120)
+            f"--container={engine['container']}","--","python3","-I","-S","-c",SUPPLY_HASH_READER],payload=payload,cap=4*1024**2,budget=120)
         self._verify()
         rows=value.get("files") if type(value) is dict else None
         if type(rows) is not list or len(rows)!=len(files):
@@ -942,7 +963,7 @@ class KubernetesHTTP:
             raise KubernetesBindingError()
         self._verify();engine=self.binding["engine"]
         value=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],
-            f"--container={engine['container']}","--","python3","-c",ATTEMPT_EVENTS_READER,session],cap=8*1024**2,budget=30)
+            f"--container={engine['container']}","--","python3","-I","-S","-c",ATTEMPT_EVENTS_READER,session],cap=8*1024**2,budget=30)
         self._verify()
         processes=value.get("processes") if type(value) is dict else None
         if (type(processes) is not list or type(value.get("truncated")) is not bool

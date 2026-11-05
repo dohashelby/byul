@@ -1,3 +1,10 @@
+## 2026-11-05 — A 개발 담당 Claude 인계·P2 V1 runner 소비
+
+- 한 일: Claude 화면과 GitHub main `925ca62`를 컴퓨터 유즈로 대조하고, `codex/dev1-p1-producers`의 미커밋 9파일을 원본 보존 후 이어받았다. REQ-08·09·10 API 검증→runner 도착→sampler CPU 메타데이터 관측과 공통 계약 변환을 연결했다. 필드 접근 실패·누락 top-k의 0 대체·이전 허용 마스크 오독을 고쳤고, 요청별 단계/누락·후속 값 변경·거부 입력 소비 후보를 보존한다.
+- 테스트 결과: 직접·계약·불변식 225 통과/기존1제외(0.89초·부모1.088초), 인접120통과/기존 P1 pin 기대 목록1실패 원본 보존 뒤 해당 cache 전체51통과(1.44초·부모1.840초). k3d CPU run16은 정상4/거부2 HTTP 대조, 계약 사건13/위반후보0/미등록 gap이다. wheel 설치 CLI·자산 bytes 일치, 고정 manifest439파일/PACK32 유지. GPU MEASURED 신규0이며 기본 전체는 수정 HEAD Linux CI로 확인한다.
+- 다음 단계: Linux CI와 인계 문서·checkpoint를 마감한다. P1 process-device-provider·TP2 종류, P2 SUP-03/08·V2 및 GPU 확인/생산자 등록·B 소비 연결은 남아 있다.
+- 막힌 것: AWS·새 인스턴스·TP2·멀티모달 모델의 기존 승인 경계는 유지한다. 수집기의 CPU 확인을 GPU 실측이나 전체 질문 완료로 올리지 않는다. 원자료·실패와 상세는 `docs/dev-1/phase2-p2-runner-consumption.md` 및 `docs/evidence/dev1-p2-runner-cpu-20261105.json`에 있다. 검증에 쓴 A 소유 engine/probe Pod만 정리하고 공용 cluster는 중단하지 않았다.
+
 ## 2026-10-30 — A-1 LIF08 선정 mp rank 실패 관측 제품 묶음
 
 - 한 일: PR123 확정683e48d를 보존하고 선정 mp의 worker 예외 응답·collective RPC/Future 결과·사망 monitor·core 실패 표식을 분리한 명시 native13/parser와 닫힌 six-probe·LIF08 전용 소비·DRAFT팩/registry를 초안으로 연결했다. 예외/사망/지연/통신정지 네 조건과 원팩 정상/output rank 기준·다른76정의·native8~12·A2/B 원본을 유지한다. callback·RPC·worker 상태를 바꾸거나 실제 장애를 주입하지 않는다.

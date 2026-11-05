@@ -28,6 +28,7 @@ from . import vllm_attempt_callback as attempt
 from . import vllm_transition_callback as transition
 from . import vllm_health_callback as health
 from . import vllm_profiler_callback as profiler
+from . import vllm_consumption_callback as consumption
 
 PROFILE = 'vllm-engine-callback-metadata/1'
 SCHEMA = 'guard-engine-callback-events/1'
@@ -59,8 +60,12 @@ MODULES = {**MODULES, health.ASYNC_LLM: health.TARGETS[health.ASYNC_LLM]}
 # #196 profiler-control(P1): settings의 profiler_control이 참일 때만 감싼다. 같은 모듈의 다른 선택 관측과 지점별로 나눈다.
 for _name, _points in profiler.TARGETS.items():
     MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
+# P2 runner 최종 소비: settings의 runner_consumption이 참일 때만 감싼다.
+for _name, _points in consumption.TARGETS.items():
+    MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
 # 선택 관측(이름, 대상): 같은 모듈에 여러 개가 있을 수 있어 지점별로 관측기를 고른다.
-OPTIONAL = (('attempt', attempt.TARGETS), ('transition', transition.TARGETS), ('health', health.TARGETS), ('profiler', profiler.TARGETS))
+OPTIONAL = (('attempt', attempt.TARGETS), ('transition', transition.TARGETS), ('health', health.TARGETS), ('profiler', profiler.TARGETS),
+            ('consumption', consumption.TARGETS))
 OPTIONAL_MODULES = frozenset(name for _, targets in OPTIONAL for name in targets)
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
@@ -231,6 +236,10 @@ class ProfilerObserver(_Keyed, profiler.ProfilerObserver):
     pass
 
 
+class ConsumptionObserver(_Keyed, consumption.ConsumptionObserver):
+    pass
+
+
 class Sink:
     def __init__(self, directory):
         self.path = Path(directory) / f'callbacks-{os.getpid()}.jsonl'
@@ -248,7 +257,8 @@ class Sink:
 
 class EngineCallbacks:
     def __init__(self, session, secret, sink, *, context_provider=None, clock=None, fault_file=None, kernel_checks=False,
-                 request_attempts=False, generation_transitions=False, health_causal=False, profiler_control=False):
+                 request_attempts=False, generation_transitions=False, health_causal=False, profiler_control=False,
+                 runner_consumption=False):
         self.sink = sink; self.fault_file = fault_file
         options = {'sink': sink, 'context_provider': context_provider, 'clock': clock}
         self.cache = CacheObserver(session, **options)
@@ -276,6 +286,9 @@ class EngineCallbacks:
         self.profiler = ProfilerObserver(session, **options) if profiler_control else None
         if self.profiler is not None:
             self.profiler.secret = secret
+        self.consumption = ConsumptionObserver(session, **options) if runner_consumption else None
+        if self.consumption is not None:
+            self.consumption.secret = secret
 
     def instrument(self, module):
         """Validate every point of a module before changing any of them."""
@@ -349,7 +362,7 @@ class EngineCallbacks:
 
     def flush_gaps(self):
         kernel = self.kernel.gaps | self.graph.gaps if self.kernel is not None else set()
-        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler) if o is not None))
+        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption) if o is not None))
         for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | self.weights.gaps | self.comm.gaps | kernel | extra):
             self.gap(code)
 
@@ -396,7 +409,8 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
             request_attempts=settings.get('request_attempts') is True,
             generation_transitions=settings.get('generation_transitions') is True,
             health_causal=settings.get('health_causal') is True,
-            profiler_control=settings.get('profiler_control') is True)
+            profiler_control=settings.get('profiler_control') is True,
+            runner_consumption=settings.get('runner_consumption') is True)
         sys.meta_path.insert(0, Finder(callbacks))
         atexit.register(callbacks.flush_gaps)
         return True

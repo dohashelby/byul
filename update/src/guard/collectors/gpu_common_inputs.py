@@ -77,6 +77,15 @@ KINDS = {
         "fields": {"at_ms": "ms", "generation": "id", "causal_sha256": "sha", "state": "id"},
         "complete_requires": ("api_health", "worker_state"),
     },
+    # P2(개발 담당 2단계): API가 받은 입력·옵션이 runner와 sampler까지 같은 값으로 갔는가. V1 runner 경로.
+    "runner-consumption": {
+        "checks": ("REQ-08", "REQ-09", "REQ-10"),
+        "events": ("api_validated", "api_rejected", "runner_received", "sampler_applied"),
+        "fields": {"request_sha256": "sha", "at_ms": "ms", "stage": "opt_id", "prompt_tokens": "opt_int", "max_token_id": "opt_int",
+                   "temperature_milli": "opt_int", "top_p_milli": "opt_int", "top_k": "opt_int", "max_tokens": "opt_int",
+                   "logprobs": "opt_int", "allowed_tokens": "opt_int", "bad_words": "opt_int", "logit_bias": "opt_int"},
+        "complete_requires": ("api_validated", "runner_received", "sampler_applied"),
+    },
     "profiler-control": {
         "checks": ("LIF-14", "OBS-03"),
         "events": ("api_call", "rpc", "worker_control", "backend_state", "stop_failed", "trace_callback", "output_complete",
@@ -167,6 +176,8 @@ def validate(record, *, kind, environment_ref, target_sha256, prepared_sha256, s
         gaps.append("GPU_INPUT_SOURCE_INCOMPLETE")
     gaps += [f"GPU_INPUT_REQUIRED_EVENT_MISSING:{name}" for name in spec["complete_requires"] if name not in seen]
     gaps += [f"GPU_INPUT_PRODUCER_DIAGNOSTIC:{code}" for code in completeness["diagnostic_codes"]]
+    if kind == 'runner-consumption':
+        gaps += _consumption_gaps(events)
     return {"kind": kind, "checks": list(spec["checks"]), "supported": supported, "producer_authenticated": False,
             "complete": supported and not gaps, "gaps": gaps, "generations": len(generations), "events": len(events),
             "violation_candidates": violation_candidates(kind, events)}
@@ -198,6 +209,55 @@ def violation_candidates(kind, events):
         released = {r["resource_sha256"] for r in events if r["event"] == "released"}
         out += [{"resource_sha256": item, "reason": "resource_remaining_after_failure"}
                 for item in sorted((before & after) - released)]
+    elif kind == "runner-consumption":
+        out += _consumption_candidates(events)
     elif kind == "rank-fault":
         out += [{"seq": r["seq"], "reason": "fault_ack_missing"} for r in events if r["event"] == "fault_applied" and not r["ack"]]
+    return out
+
+
+_COMPARED = ("temperature_milli", "top_p_milli", "top_k", "logprobs", "allowed_tokens")
+
+
+def _consumption_gaps(events):
+    gaps = set()
+    for request in {r['request_sha256'] for r in events if r['event'] == 'api_validated'}:
+        rows = [r for r in events if r['request_sha256'] == request]
+        api = next(r for r in rows if r['event'] == 'api_validated')
+        if api['logit_bias']:
+            gaps.add('GPU_INPUT_CONSUMPTION_FIELD_UNOBSERVED:sampler_applied:logit_bias')
+        for stage in ('runner_received', 'sampler_applied'):
+            stage_rows = [r for r in rows if r['event'] == stage]
+            if not stage_rows:
+                gaps.add(f'GPU_INPUT_CONSUMPTION_STAGE_MISSING:{stage}')
+            fields = _COMPARED + ('bad_words',) + (('max_tokens', 'prompt_tokens', 'max_token_id', 'logit_bias')
+                                                   if stage == 'runner_received' else ())
+            for field in fields:
+                if api[field] is None or any(r[field] is None for r in stage_rows):
+                    gaps.add(f'GPU_INPUT_CONSUMPTION_FIELD_UNOBSERVED:{stage}:{field}')
+    return sorted(gaps)
+
+
+def _consumption_candidates(events):
+    """API에서 받은 값과 runner·sampler 값의 차이. bad_words는 단어와 토큰 변형 수가 달라 있음/없음만 본다."""
+    out = []
+    by = {}
+    for row in events:
+        by.setdefault(row["request_sha256"], []).append(row)
+    for request, rows in sorted(by.items()):
+        api = next((r for r in rows if r["event"] == "api_validated"), None)
+        if any(r["event"] == "api_rejected" for r in rows) and any(r["event"] in ("runner_received", "sampler_applied") for r in rows):
+            out.append({"request_sha256": request, "reason": "rejected_input_consumed"})
+        if api is None:
+            continue
+        for row in rows:
+            if row["event"] not in ("runner_received", "sampler_applied"):
+                continue
+            fields = _COMPARED + (("max_tokens", "prompt_tokens", "max_token_id") if row["event"] == "runner_received" else ())
+            changed = sorted(f for f in fields if api[f] is not None and row[f] is not None and api[f] != row[f])
+            if api["bad_words"] is not None and row["bad_words"] is not None and bool(api["bad_words"]) != bool(row["bad_words"]):
+                changed.append("bad_words")
+            if changed:
+                out.append({"request_sha256": request, "seq": row["seq"], "stage": row["event"], "fields": changed,
+                            "reason": "value_changed_before_consumption"})
     return out

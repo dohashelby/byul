@@ -429,3 +429,126 @@ def profiler_control_record(processes, *, pod, environment_ref, target_sha256, p
                                'diagnostic_codes': sorted(c for c in codes if contract._ID.fullmatch(c))}}
     return record, contract.validate(record, kind='profiler-control', environment_ref=environment_ref,
                                      target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)
+
+
+# ---------------------------------------------------------------------------
+# runner-consumption (P2: REQ-08·09·10)
+# ---------------------------------------------------------------------------
+from guard.adapters import vllm_consumption_callback as consumption_callback
+
+CONSUMPTION_PRODUCER_NAME = 'guard-engine-callback-runner-consumption'
+CONSUMPTION_PRODUCER_VERSION = '1'
+_CONSUMPTION_FIELDS = ('prompt_tokens', 'max_token_id') + consumption_callback.FIELDS
+
+
+def consumption_producer():
+    digest = hashlib.sha256()
+    for path in (Path(consumption_callback.__file__), Path(__file__)):
+        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
+    return {'name': CONSUMPTION_PRODUCER_NAME, 'version': CONSUMPTION_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
+
+
+def runner_consumption_events(processes, *, requests=None):
+    """API 검증(API 서버)·runner 도착·sampler 적용(worker) 행을 계약 행으로 옮긴다.
+
+    - api_validated / api_rejected: `process_inputs` 안의 `_validate_model_input`·`_validate_params` 결과. 예외면 거부다.
+    - runner_received: `_update_states`의 새 요청(요청마다 한 번)
+    - sampler_applied: `_sample` 진입 때 batch의 요청별 값. 처음 값과 이후 달라진 값을 남긴다.
+    """
+    events, bindings, codes, rows = [], [], set(), []
+    for process in processes:
+        relevant = [r for r in process['events'] if r.get('schema') == consumption_callback.SCHEMA]
+        if process['start_ticks'] is None:
+            if relevant:
+                codes.add('CONSUMPTION_PROCESS_START_UNAVAILABLE')
+            continue
+        index = None
+        for row in process['events']:
+            if row.get('phase') == 'GAP':
+                codes.add(row.get('code') if type(row.get('code')) is str else 'CONSUMPTION_PRODUCER_GAP'); continue
+            if row.get('schema') != consumption_callback.SCHEMA or row.get('entry_qualified_before') is not True:
+                continue
+            if row['phase'] != 'CALL' and row.get('entry_qualified_after') is not True:
+                continue
+            if index is None:
+                index = len(bindings); bindings.append({'pid': process['pid'], 'start_ticks': process['start_ticks']})
+            stamp = row.get('operation_started_ns') if row['phase'] == 'CALL' else row.get('operation_finished_ns')
+            rows.append((stamp or 0, len(rows), index, row))
+    if not rows:
+        return [], bindings, sorted(codes)
+    origin = min(r[0] for r in rows)
+    pending = {}; applied = {}; received = set()
+    def keep(request):
+        return request is not None and (requests is None or request in requests)
+    def add(event, binding, at_ms, request, stage=None, **values):
+        if keep(request):
+            row = {'seq': len(events), 'event': event, 'request_sha256': request, 'binding': binding, 'at_ms': at_ms, 'stage': stage}
+            row.update({name: values.get(name) for name in _CONSUMPTION_FIELDS})
+            events.append(row)
+    calls = {}
+    for stamp, _, binding, row in sorted(rows):
+        at_ms = max(0, (stamp - origin) // 1_000_000); fields = row.get('fields') or {}; point = row['point']; phase = row['phase']
+        call = (binding, row.get('process_sha256'), row.get('call_sha256'))
+        if phase == 'CALL':
+            calls[call] = fields
+        entry = calls.get(call, fields)
+        if point == 'InputProcessor._validate_model_input' and phase in ('RETURN', 'RAISE'):
+            request = entry.get('request_sha256')
+            state = pending.setdefault(request, {'binding': binding, 'values': {}, 'rejected': None})
+            state['values'].update(prompt_tokens=entry.get('prompt_tokens'), max_token_id=entry.get('max_token_id'))
+            if phase == 'RAISE':
+                state['rejected'] = 'model_input'
+        elif point == 'InputProcessor._validate_params' and phase in ('RETURN', 'RAISE'):
+            request = entry.get('request_sha256')
+            state = pending.setdefault(request, {'binding': binding, 'values': {}, 'rejected': None})
+            state['values'].update(entry.get('params') or {})
+            if phase == 'RAISE':
+                state['rejected'] = 'params'
+        elif point == 'InputProcessor.process_inputs' and phase in ('RETURN', 'RAISE'):
+            request = entry.get('request_sha256'); state = pending.pop(request, None)
+            if state is None:
+                if phase == 'RAISE':
+                    add('api_rejected', binding, at_ms, request, stage='process_inputs')
+                continue
+            rejected = state['rejected'] or ('process_inputs' if phase == 'RAISE' else None)
+            add('api_rejected' if rejected else 'api_validated', state['binding'], at_ms, request, stage=rejected or 'validated',
+                **state['values'])
+        elif point == 'GPUModelRunner._update_states' and phase == 'CALL':
+            for item in fields.get('received') or []:
+                request = item.get('request_sha256')
+                if request in received:
+                    continue
+                received.add(request)
+                add('runner_received', binding, at_ms, request, stage='new_request', prompt_tokens=item.get('prompt_tokens'),
+                    max_token_id=item.get('max_token_id'), **(item.get('params') or {}))
+        elif point == 'GPUModelRunner._sample' and phase == 'CALL':
+            for item in fields.get('applied') or []:
+                request = item.get('request_sha256')
+                values = {k: v for k, v in item.items() if k != 'request_sha256'}
+                if request in applied and applied[request] == values:
+                    continue
+                stage = 'sample_changed' if request in applied else 'first_sample'
+                applied[request] = values
+                add('sampler_applied', binding, at_ms, request, stage=stage, **values)
+    if requests is not None and set(requests) - {e['request_sha256'] for e in events}:
+        codes.add('CONSUMPTION_SELECTED_REQUEST_UNOBSERVED')
+    return events, bindings, sorted(codes)
+
+
+def runner_consumption_record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False, requests=None):
+    events, processes_used, codes = runner_consumption_events(processes, requests=requests)
+    if truncated:
+        codes = sorted(set(codes) | {'CONSUMPTION_READ_TRUNCATED'})
+    bindings = [{'pod_uid': pod['pod_uid'], 'container_id': pod['container_id'].removeprefix('containerd://')[:128],
+                 'restart_count': pod['restart_count'], 'worker_pid': p['pid'], 'start_ticks': p['start_ticks'], 'rank': 0}
+                for p in processes_used]
+    validated = {e['request_sha256'] for e in events if e['event'] == 'api_validated'}
+    closed = bool(validated) and all(all(any(e['request_sha256'] == r and e['event'] == stage for e in events)
+                                       for stage in ('runner_received', 'sampler_applied')) for r in validated)
+    record = {'schema': contract.SCHEMA, 'kind': 'runner-consumption', 'producer': consumption_producer(),
+              'environment_ref': environment_ref, 'target_sha256': target_sha256, 'prepared_sha256': prepared_sha256,
+              'session': session, 'bindings': bindings, 'events': events,
+              'completeness': {'source_ended': closed and not truncated, 'dropped': 0,
+                               'diagnostic_codes': [c for c in codes if contract._ID.fullmatch(c)]}}
+    return record, contract.validate(record, kind='runner-consumption', environment_ref=environment_ref,
+                                     target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)

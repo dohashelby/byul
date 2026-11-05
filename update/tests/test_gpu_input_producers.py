@@ -230,3 +230,58 @@ def test_profiler_stop_failure_and_missing_output_stay_visible():
               prow(3, 'TorchProfilerWrapper._stop', 'RETURN', is_start=False, output_files=[])]
     events, _, codes = producers.profiler_control_events([{'pid': 111, 'start_ticks': 3, 'events': worker}])
     assert [e['event'] for e in events] == ['stop_failed', 'stop_failed', 'backend_state'] and codes == ['PROFILER_OUTPUT_UNOBSERVED']
+
+
+from guard.adapters import vllm_consumption_callback as cons
+
+
+def crow(ns, point, phase, call='1', **fields):
+    return {'schema': cons.SCHEMA, 'point': point, 'phase': phase, 'entry_qualified_before': True, 'entry_qualified_after': True,
+            'operation_started_ns': ns, 'operation_finished_ns': ns, 'fields': fields, 'process_sha256': 'p' * 64, 'call_sha256': call}
+
+
+PARAMS = {'temperature_milli': 0, 'top_p_milli': 1000, 'top_k': 0, 'max_tokens': 4, 'logprobs': 0, 'allowed_tokens': 3, 'bad_words': 1, 'logit_bias': 0}
+
+
+def api_rows(request=R1, *, reject=False):
+    return [crow(1, 'InputProcessor.process_inputs', 'CALL', call='a', request_sha256=request),
+            crow(2, 'InputProcessor._validate_params', 'CALL', call='b', request_sha256=request, params=PARAMS),
+            crow(3, 'InputProcessor._validate_params', 'RAISE' if reject else 'RETURN', call='b'),
+            crow(4, 'InputProcessor._validate_model_input', 'CALL', call='c', request_sha256=request, prompt_tokens=5, max_token_id=99),
+            crow(5, 'InputProcessor._validate_model_input', 'RETURN', call='c'),
+            crow(6, 'InputProcessor.process_inputs', 'RAISE' if reject else 'RETURN', call='a')]
+
+
+def test_consumption_observer_reads_counts_not_strings():
+    params = SimpleNamespace(temperature=0.7, top_p=0.9, top_k=-1, max_tokens=8, logprobs=None, allowed_token_ids=[1, 2],
+                             bad_words=['secret-word'], logit_bias={5: 1.0})
+    summary = cons.params_summary(params)
+    assert summary == {'temperature_milli': 700, 'top_p_milli': 900, 'top_k': 0, 'max_tokens': 8, 'logprobs': 0,
+                       'allowed_tokens': 2, 'bad_words': 1, 'logit_bias': 1}
+    assert 'secret-word' not in str(summary)
+
+
+def test_api_runner_and_sampler_values_match_and_complete_the_record():
+    worker = [crow(10, 'GPUModelRunner._update_states', 'CALL', received=[{'request_sha256': R1, 'prompt_tokens': 5, 'max_token_id': 99, 'params': PARAMS}]),
+              crow(11, 'GPUModelRunner._sample', 'CALL', applied=[{'request_sha256': R1, 'temperature_milli': 0, 'top_p_milli': 1000, 'top_k': 0,
+                                                                    'logprobs': 0, 'allowed_tokens': 3, 'bad_words': 2}]),
+              crow(12, 'GPUModelRunner._sample', 'CALL', applied=[{'request_sha256': R1, 'temperature_milli': 0, 'top_p_milli': 1000, 'top_k': 0,
+                                                                    'logprobs': 0, 'allowed_tokens': 3, 'bad_words': 2}])]
+    record, result = producers.runner_consumption_record([{'pid': 1, 'start_ticks': 1, 'events': api_rows()},
+                                                          {'pid': 112, 'start_ticks': 2, 'events': worker}], pod=POD, **SCOPE)
+    assert [e['event'] for e in record['events']] == ['api_validated', 'runner_received', 'sampler_applied']
+    assert record['completeness']['source_ended'] is True and result['violation_candidates'] == []
+    assert result['gaps'] == ['GPU_INPUT_PRODUCER_UNSUPPORTED']
+
+
+def test_restriction_lost_before_sampler_and_rejected_input_consumed_are_candidates():
+    lost = [crow(10, 'GPUModelRunner._sample', 'CALL', applied=[{'request_sha256': R1, 'temperature_milli': 0, 'top_p_milli': 1000, 'top_k': 0,
+                                                                  'logprobs': 0, 'allowed_tokens': 0, 'bad_words': 0}])]
+    _, result = producers.runner_consumption_record([{'pid': 1, 'start_ticks': 1, 'events': api_rows()},
+                                                     {'pid': 112, 'start_ticks': 2, 'events': lost}], pod=POD, **SCOPE)
+    candidate, = result['violation_candidates']
+    assert candidate['stage'] == 'sampler_applied' and candidate['fields'] == ['allowed_tokens', 'bad_words']
+    consumed = [crow(10, 'GPUModelRunner._update_states', 'CALL', received=[{'request_sha256': R1, 'prompt_tokens': 5, 'max_token_id': 99, 'params': PARAMS}])]
+    _, result = producers.runner_consumption_record([{'pid': 1, 'start_ticks': 1, 'events': api_rows(reject=True)},
+                                                     {'pid': 112, 'start_ticks': 2, 'events': consumed}], pod=POD, **SCOPE)
+    assert {c['reason'] for c in result['violation_candidates']} == {'rejected_input_consumed'}

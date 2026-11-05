@@ -169,7 +169,10 @@ def test_verified_bytes_are_compiled_once_and_still_read_every_call(world, monke
 
 
 def test_large_pinned_source_needs_its_exact_reviewed_size(tmp_path, monkeypatch):
-    assert callback.SOURCE_BYTES == {callback.base.SOURCE_SHA['vllm.v1.worker.gpu_model_runner']: 335342}
+    assert callback.SOURCE_BYTES == {
+        callback.base.SOURCE_SHA['vllm.v1.worker.gpu_model_runner']: 335342,
+        callback.base.SOURCE_SHA['vllm.v1.core.sched.scheduler']: 159016,
+    }
     raw = b'class Big:\n    def run(self):\n        return 7\n' + b'#' * 200000 + b'\n'
     path = tmp_path / 'big.py'; path.write_bytes(raw)
     module = ModuleType('example.big'); module.__file__ = str(path)

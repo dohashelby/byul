@@ -94,7 +94,7 @@ a.brand:hover {
 }
 .areaTitle + .group {
   margin-top: 0;
-  padding-top: 0;
+  padding-top: 8px;
   border-top: 0;
 }
 .groupTitle {
@@ -295,6 +295,9 @@ a.brand:hover {
     padding-top: 0;
     border-top: 0;
     align-items: center;
+  }
+  .areaTitle + .group {
+    padding-top: 0;
   }
   .groupTitle {
     display: inline;

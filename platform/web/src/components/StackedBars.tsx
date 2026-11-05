@@ -229,12 +229,12 @@ export function TimeLine<K extends string>({ buckets, size, keys, height = 240 }
   );
 }
 
-/** 구성 비율 도넛 (cutout 68%, 오른쪽 범례). */
-export function Donut({ items, height = 240 }: { items: { key: string; label: string; value: number; color: string }[]; height?: number }) {
-  if (items.every((i) => i.value === 0)) return empty(height);
+/** 구성 비율 도넛 (cutout 68%). 좁은 카드에서는 범례를 아래에 둔다. */
+export function Donut({ items, height = 240, compact = false }: { items: { key: string; label: string; value: number; color: string }[]; height?: number; compact?: boolean }) {
+  if (items.every((i) => i.value === 0)) return empty(compact ? 128 : height);
   return (
-    <div className="row" style={{ height, alignItems: "center" }}>
-      <div className={s.chartBox} style={{ height, flex: 1, minWidth: 0 }}>
+    <div className={`row ${compact ? s.donutCompact : ""}`} style={{ height: compact ? undefined : height, alignItems: "center" }}>
+      <div className={s.chartBox} style={{ height: compact ? 128 : height, flex: compact ? "none" : 1, width: compact ? "100%" : undefined, minWidth: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie data={items} dataKey="value" nameKey="label" innerRadius="68%" outerRadius="100%" startAngle={90} endAngle={-270} stroke="var(--surface)" strokeWidth={2} isAnimationActive={false}>
@@ -255,12 +255,12 @@ export function Donut({ items, height = 240 }: { items: { key: string; label: st
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <div className="stack" style={{ gap: 6, flex: "none" }}>
+      <div className={`stack ${compact ? s.donutLegend : ""}`} style={{ gap: 6, flex: "none" }}>
         {items.map((i) => (
-          <span key={i.key} className="small muted nowrap">
-            <span className={s.legendSwatch} style={{ background: i.color, width: 22 }} />
+          <span key={i.key} className={`small muted ${compact ? s.donutLegendItem : "nowrap"}`}>
+            <span className={s.legendSwatch} style={{ background: i.color, width: compact ? 10 : 22 }} />
             {i.label}
-            <span style={{ marginLeft: 8, color: "var(--text-2)" }}>{i.value}</span>
+            <span style={{ marginLeft: compact ? "auto" : 8, color: "var(--text-2)" }}>{i.value}</span>
           </span>
         ))}
       </div>

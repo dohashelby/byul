@@ -5,7 +5,6 @@ import { OriginBadge, VerdictBadge } from "../components/Badges";
 import { KeyValue } from "../components/DetailPanel";
 import { MetricCard, Query, StateView, ui } from "../components/Misc";
 import { ChartCard, Donut, EVENT_SERIES, REQUEST_SERIES, TimeBars, eventKey, type EventKey, type RequestKey } from "../components/StackedBars";
-import { groupAlerts } from "../lib/alerts";
 import { AREA, GATEWAY_REASON } from "../lib/labels";
 import { matchesTarget, useEnvTarget } from "../lib/filters";
 import { bucketize, inRange } from "../lib/time";
@@ -26,8 +25,6 @@ export function DashboardPage() {
   const reqRows = useMemo(() => (requests.data?.items ?? []).filter((r) => inRange(r.recorded_at, range) && matchesTarget(r.target_ref, env, targetRef)), [requests.data, range, env, targetRef]);
   const evRows = useMemo(() => (events.data?.items ?? []).filter((e) => inRange(e.recorded_at, range) && matchesTarget(e.target_ref, env, targetRef)), [events.data, range, env, targetRef]);
   const observationRows = evRows.filter((e) => e.source === "hubble" || e.source === "tetragon");
-  const alerts = groupAlerts(observationRows);
-  const attention = alerts.filter((g) => g.severity === "높음" || g.severity === "중간");
   const blockedRequests = reqRows.filter((r) => r.delivery_attempted === false && ["denied", "invalid", "error"].includes(r.outcome)).length;
   const dropped = evRows.filter((e) => e.source === "hubble" && e.observation?.verdict?.toLowerCase() === "dropped").length;
   const process = evRows.filter((e) => e.source === "tetragon" && e.observation?.kind === "process_exec").length;
@@ -63,15 +60,23 @@ export function DashboardPage() {
         <ChartCard title="시간대별 추이">
           <div className="stack"><div className={p.chartSubhead}><h3>요청</h3><span className="small muted">요청 {reqRows.length}건</span></div><TimeBars buckets={reqChart.buckets} size={reqChart.size} series={[...REQUEST_SERIES]} onSelectRange={(from, to) => go("/runtime/requests", { period: "custom", from: new Date(from).toISOString(), to: new Date(to).toISOString() })} /><div className={p.chartSubhead}><h3>관측 이벤트</h3><span className="small muted">관측 이벤트 {observationRows.length}건</span></div><TimeBars<EventKey> buckets={evChart.buckets} size={evChart.size} series={[...EVENT_SERIES]} onSelectRange={(from, to) => go("/runtime/events", { period: "custom", from: new Date(from).toISOString(), to: new Date(to).toISOString() })} /></div>
         </ChartCard>
-        <ChartCard title="거부·오류 사유" footer={<p className="small muted">최근 요청 중 거부·오류 상위 5개 사유</p>}>
-          {topReasons.length ? <ol className={p.reasonList}>{topReasons.map(([reason, count]) => <li key={reason}><button type="button" onClick={() => go("/runtime/requests", { reason })}><span>{GATEWAY_REASON[reason] ?? "사유 확인 필요"}</span><span className={p.reasonCount}><strong>{count}</strong>건</span></button></li>)}</ol> : <p className="small muted">거부·오류 사유가 없습니다. 요청 내역에서 전체 결과를 확인하세요.</p>}
-        </ChartCard>
+        <div className={p.chartSide}>
+          <ChartCard title="구성 비율" note="선택한 기간의 요청 결과" total={reqRows.length}>
+            <Donut compact items={REQUEST_SERIES.map((series) => ({ ...series, value: resultCounts.get(series.key) ?? 0 }))} />
+          </ChartCard>
+          <ChartCard title="거부·오류 사유" footer={<p className="small muted">최근 요청 중 거부·오류 상위 5개 사유</p>}>
+            {topReasons.length ? <ol className={p.reasonList}>{topReasons.map(([reason, count], index) => {
+              const label = GATEWAY_REASON[reason] ?? "사유 확인 필요";
+              const undelivered = label.endsWith(" (엔진 미전달)");
+              return <li key={reason}><button type="button" onClick={() => go("/runtime/requests", { reason })}>
+                <span className={`${p.reasonRank} ${index === 0 ? p.reasonRankFirst : ""}`} aria-hidden="true">{index + 1}</span>
+                <span className={p.reasonLabel}>{undelivered ? label.slice(0, -" (엔진 미전달)".length) : label}{undelivered && <small className={p.reasonTag}>엔진 미전달</small>}</span>
+                <span className={p.reasonCount}><strong>{count}</strong>건</span>
+              </button></li>;
+            })}</ol> : <p className="small muted">거부·오류 사유가 없습니다. 요청 내역에서 전체 결과를 확인하세요.</p>}
+          </ChartCard>
+        </div>
       </div>
-      <ChartCard title="구성 비율" note="선택한 기간의 요청 결과" total={reqRows.length}>
-        <Donut items={REQUEST_SERIES.map((series) => ({ ...series, value: resultCounts.get(series.key) ?? 0 }))} />
-      </ChartCard>
-      <h2 className={ui.blockTitle}>검토 대상 탐지 알림 {attention.length}묶음</h2>
-      {attention.length ? <ol>{attention.slice(0, 5).map((g) => <li key={g.key}><button type="button" onClick={() => go("/runtime/alerts")}>{g.severity} · {g.title} · {g.items.length}건</button></li>)}</ol> : <p className="small muted">높음·중간 심각도 알림 없음. <button type="button" onClick={() => go("/runtime/alerts")}>탐지 알림 전체 보기</button></p>}
       <h2 className={ui.blockTitle}>최신 업데이트 검증</h2>
       <div className={ui.cardGrid}>
         <MetricCard title="최신 검증 결과" dot={verification ? "ok" : "none"} onClick={() => go("/update/results")} label="업데이트 검증 결과 보기">{verification ? <div className="stack">{AREAS.map((a) => <div key={a}>{AREA[a]} <VerdictBadge verdict={verification.summary.by_area[a]?.security ?? null} /></div>)}<OriginBadge origin={verification.data_origin} /></div> : <span className="muted">검증 결과가 없습니다. 검증 결과에서 새 보고서를 확인하세요.</span>}</MetricCard>

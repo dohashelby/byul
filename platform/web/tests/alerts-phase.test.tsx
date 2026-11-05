@@ -120,7 +120,11 @@ describe("통합 개요", () => {
     const at = new Date().toISOString();
     const gateway = events.find((event) => event.source === "gateway")!;
     const hubble = events.find((event) => event.source === "hubble")!;
-    const requests = Array.from({ length: 56 }, (_, index) => ({ recorded_at: at, outcome: index === 0 ? "denied" : "allowed", target_ref: null, reason_code: index === 0 ? "MODEL_NOT_ALLOWED" : null }));
+    const reasonCodes = ["MODEL_NOT_ALLOWED", "AUTH_REQUIRED", "POLICY_EXPIRED", "INVALID_REQUEST", "TARGET_MISMATCH"];
+    const requests = [
+      ...reasonCodes.flatMap((reasonCode, index) => Array.from({ length: 5 - index }, () => ({ recorded_at: at, outcome: "denied", target_ref: null, reason_code: reasonCode }))),
+      ...Array.from({ length: 41 }, () => ({ recorded_at: at, outcome: "allowed", target_ref: null, reason_code: null })),
+    ];
     const gatewayEvents = Array.from({ length: 56 }, (_, index) => ({ ...gateway, event_id: `gateway-${index}`, recorded_at: at, occurred_at: at }));
     const observations = [
       ...Array.from({ length: 3 }, (_, index) => ({ ...flagged(`tetragon-${index}`, "suspect_binary"), recorded_at: at, occurred_at: at })),
@@ -136,11 +140,39 @@ describe("통합 개요", () => {
     expect(chart.textContent).toContain("요청 56건");
     expect(chart.textContent).toContain("관측 이벤트 5건");
     expect(screen.getByRole("heading", { name: "통제·관측 현황" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "구성 비율" })).toBeTruthy();
+    const chartRow = chart.parentElement!;
+    expect(chartRow.children).toHaveLength(2);
+    const side = chartRow.children[1];
+    expect(Array.from(side.children, (card) => card.querySelector("h3")?.textContent)).toEqual(["구성 비율", "거부·오류 사유"]);
+    expect(screen.getAllByRole("heading", { name: "구성 비율" })).toHaveLength(1);
+    expect(chartRow.nextElementSibling?.textContent).not.toContain("구성 비율");
     expect(screen.queryByText("117")).toBeNull();
-    expect(screen.getByText("검토 대상 탐지 알림 1묶음")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: /검토 대상 탐지 알림/ })).toBeNull();
     const reasons = screen.getByText("거부·오류 사유").closest("article")!;
-    expect(reasons.querySelector("ol li strong")?.textContent).toBe("1");
+    const ranked = Array.from(reasons.querySelectorAll("ol li"));
+    expect(ranked).toHaveLength(5);
+    expect(ranked.map((item) => item.querySelector("button > span:first-child")?.textContent)).toEqual(["1", "2", "3", "4", "5"]);
+    expect(ranked[0].querySelector("button > span:first-child")?.className).toContain("reasonRankFirst");
+    expect(ranked.slice(1).every((item) => !item.querySelector("button > span:first-child")?.className.includes("reasonRankFirst"))).toBe(true);
+    expect(ranked[0].querySelector("small")?.textContent).toBe("엔진 미전달");
+    expect(ranked[0].querySelector("button > span:nth-child(2)")?.textContent).toBe("정책 외 모델엔진 미전달");
+    expect(ranked.map((item) => item.querySelector("button > span:last-child strong")?.textContent)).toEqual(["5", "4", "3", "2", "1"]);
     expect(reasons.querySelector(".bigNumber")).toBeNull();
+  });
+  it("거부·오류 사유를 누르면 요청 내역의 사유 필터로 이동한다", async () => {
+    const { DashboardPage } = await import("../src/pages/DashboardPage");
+    mockApi({
+      "/api/overview": { status: null, requests: null, latest_verification: null, open_revalidation: 0 },
+      "/api/runtime/requests": { items: [{ recorded_at: new Date().toISOString(), outcome: "denied", target_ref: null, reason_code: "MODEL_NOT_ALLOWED" }], invalid: [], source: SOURCE, truncated: false },
+      "/api/runtime/events": { items: [], invalid: [], source: SOURCE, truncated: false },
+    });
+    function Destination() { const location = useLocation(); return <span>{location.pathname}{location.search}</span>; }
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/runtime/overview"]}><Routes>
+      <Route path="/runtime/overview" element={<DashboardPage />} />
+      <Route path="/runtime/requests" element={<Destination />} />
+    </Routes></MemoryRouter></QueryClientProvider>);
+    fireEvent.click(await screen.findByRole("button", { name: /정책 외 모델.*엔진 미전달.*1건/ }));
+    expect(await screen.findByText("/runtime/requests?reason=MODEL_NOT_ALLOWED")).toBeTruthy();
   });
 });

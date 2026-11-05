@@ -177,7 +177,7 @@ def slot_observations(record):
 class EngineSensorExecutor:
     """A single executor name; source CPU is never substituted for Kubernetes."""
     name = 'engine_sensor'
-    version = '0.1.3'
+    version = '0.1.4'
 
     def __init__(self, cfg, *, implementation='kubernetes', expected_target_sha256=None):
         self.cfg = deepcopy(cfg)
@@ -278,7 +278,7 @@ class EngineSensorExecutor:
         from guard.collectors import engine_callbacks
         from guard.runtime.bounded import strict_json
         from guard.executors.kubernetes_lifecycle_capture import validate_target
-        if (set(self.cfg) - {'target', 'prepared', 'manifest', 'max_duration_seconds', 'kubectl_binary', 'principal_token_env'}
+        if (set(self.cfg) - {'target', 'prepared', 'manifest', 'max_duration_seconds', 'kubectl_binary', 'principal_token_env', 'gateway_target'}
                 or not {'target', 'prepared', 'manifest'} <= set(self.cfg)
                 or not env.hash_ok() or env.engine.name != 'vllm' or env.engine.version != '0.31.0'):
             raise ValueError('ENGINE_SENSOR_NATIVE_CONFIGURATION_INVALID')
@@ -355,8 +355,27 @@ class EngineSensorExecutor:
             if target.get('lab') is not True:
                 raise ValueError('ENGINE_SENSOR_LAB_CONTEXT_REQUIRES_LAB')
             projection.validate_lab_contexts(lab, cases)
-        transport = self.transport or KubernetesHTTP(target, env, duration=duration,
-            binary=self.cfg.get('kubectl_binary', 'kubectl'), profile=ENGINE_CALLBACK_PROFILE)
+        transport = self.transport
+        if transport is None and any('principal' in case for case in cases):
+            # A Bearer header on a direct unauthenticated engine is not a
+            # principal binding. Join the independently pinned Gateway target.
+            from guard.runtime.bounded import strict_json
+            from guard.runtime.kubernetes_callback_gateway import KubernetesCallbackGatewayHTTP
+            try:
+                if check.id != 'REQ-15':
+                    raise ValueError
+                gateway_target = strict_json(Path(self.cfg['gateway_target']).read_bytes(), limit=65536)
+                if manifest.get('gateway_target_sha256') != sha256_hex(canonical_json(gateway_target)):
+                    raise ValueError
+            except (KeyError, OSError, ValueError, TypeError):
+                raise ValueError('ENGINE_SENSOR_GATEWAY_TARGET_BINDING_REQUIRED') from None
+            transport = KubernetesCallbackGatewayHTTP(target, gateway_target, env, duration=duration,
+                binary=self.cfg.get('kubectl_binary', 'kubectl'))
+        elif 'gateway_target' in self.cfg and check.id != 'REQ-15':
+            raise ValueError('ENGINE_SENSOR_GATEWAY_TARGET_UNSUPPORTED')
+        if transport is None:
+            transport = KubernetesHTTP(target, env, duration=duration,
+                binary=self.cfg.get('kubectl_binary', 'kubectl'), profile=ENGINE_CALLBACK_PROFILE)
         endpoint = transport.endpoint.scheme + '://' + transport.endpoint.netloc + '/v1/chat/completions'
         tags = {}; elapsed = {}; outputs = {}; trials = []; cleanup = []; switches = []
         if lab is not None:

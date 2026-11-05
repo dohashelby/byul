@@ -82,4 +82,3 @@ LIF-04의 실제 M10 transport_kind=unsupported는 위 7종과 별개의 ASGI/so
 ## 검증
 
 `uv run python -m tools.checklist_status`와 `uv run python -m tools.checklist_status --check`를 수행했다. 상태 집합·43개 소유 ID·개발 26개 bytes 불변·생성 CSV의 GPU 담당 상태/note만 변경됨을 확인했다. 정본 PACK32/manifest/제품 소스 변경은 없다. 문서 변경이므로 전체 suite·wheel·기존 GPU 시험을 반복하지 않았다. Linux CI 전체 통과를 새로 주장하지 않는다.
-

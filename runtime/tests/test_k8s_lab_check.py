@@ -1093,6 +1093,25 @@ class TaskCheckTests(unittest.TestCase):
         self.assertTrue(build_parser().parse_args(["--state-dir", "x", "--task-checks"]).task_checks)
         self.assertFalse(build_parser().parse_args(["--state-dir", "x"]).task_checks)
 
+    def test_l05c_partial_apply_removes_disposable_resources(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            checker = LabChecker(context="kind-runtime-lab", namespace="serving-lab",
+                                 state_dir=Path(directory), cleanup=False,
+                                 sigkill_probe_check=True, runner=FakeRunner())
+            self.assertIn("L-05c", checker.cases)
+            calls: list[tuple[str, ...]] = []
+
+            def kubectl(_case, *args, **_kwargs):
+                calls.append(args)
+                return ProcessResult(tuple(args), 1 if args[0] == "apply" else 0, "", "")
+
+            with patch.object(checker, "_kubectl", side_effect=kubectl):
+                checker._l05c(checker.cases["L-05c"])
+            self.assertEqual(checker.cases["L-05c"]["status"], "unknown")
+            self.assertEqual([call[1] for call in calls if call[0] == "delete"],
+                             ["tracingpolicynamespaced", "pod", "configmap"])
+        self.assertTrue(build_parser().parse_args(["--state-dir", "x", "--sigkill-probe-check"]).sigkill_probe_check)
+
     def test_task_cases_pass_and_always_clean_up(self) -> None:
         runner = TaskCheckRunner(connect=self.good_connect(), supply=self.good_supply())
         with tempfile.TemporaryDirectory() as directory:

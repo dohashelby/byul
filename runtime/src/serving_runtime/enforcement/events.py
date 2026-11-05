@@ -341,7 +341,7 @@ def parse_tetragon(
 
     binary, pod = _process(event, "$.process_kprobe", require_binary=False)
     function_name = _string(event.get("function_name"), "$.process_kprobe.function_name")
-    if function_name != "security_file_permission":
+    if function_name not in {"security_file_permission", "fd_install", "sys_openat", "__x64_sys_openat", "__arm64_sys_openat"}:
         raise UnsupportedTetragonEvent(f"unsupported kprobe function: {function_name}")
     policy_name = _string(event.get("policy_name"), "$.process_kprobe.policy_name")
     match = _RULE_ID.search(policy_name)
@@ -357,6 +357,8 @@ def parse_tetragon(
         file_arg = arg.get("file_arg")
         if isinstance(file_arg, dict) and isinstance(file_arg.get("path"), str):
             file_path = file_arg["path"]
+        if function_name.endswith("sys_openat") and isinstance(arg.get("string_arg"), str):
+            file_path = arg["string_arg"].rstrip("\x00")
         if "int_arg" in arg:
             value = arg["int_arg"]
             try:
@@ -365,12 +367,13 @@ def parse_tetragon(
                 raise EventError("int_arg is not an integer") from error
     if not file_path:
         raise EventError("process_kprobe has no file_arg.path")
-    if mask is None:
+    if mask is None and function_name == "security_file_permission":
         raise EventError("process_kprobe has no int_arg")
-    access = "write" if mask & 2 else "read" if mask & 4 else "other"
+    access = ("write" if mask & 2 else "read" if mask & 4 else "other") if function_name == "security_file_permission" else "open"
     action = _string(event.get("action"), "$.process_kprobe.action")
     action_mode = {
         "KPROBE_ACTION_OVERRIDE": "enforce",
+        "KPROBE_ACTION_SIGKILL": "enforce",
         "KPROBE_ACTION_POST": "monitor",
     }.get(action.upper(), "unknown")
     normalized = _base(

@@ -429,13 +429,14 @@ export function EnvironmentForm(props: FormProps<EnvironmentDoc>) {
 }
 
 /** 조건 카드 안에 그리는 계약 필드(target·deployment). 다른 구역에서 다시 묻지 않는다. */
-function ContractFields({ cond, ctx, doc, values, update }: { cond: string; ctx: FormCtx; doc: EnvironmentDoc; values: Values; update: (next: Values) => void }) {
+function ContractFields({ cond, ctx, doc }: { cond: string; ctx: FormCtx; doc: EnvironmentDoc }) {
   switch (cond) {
     case "engine": {
       const name = doc.target.engine.name;
       return (
         <div className={p.formGrid}>
           <SelectField ctx={ctx} path="/target/engine/name" label="엔진" options={Object.entries(ENGINE_NAME).map(([value, label]) => ({ value, label }))} required />
+          <SelectField ctx={ctx} path="/target/engine/runtime_kind" label="런타임 엔진 종류" options={["vllm", "sglang", "mock"].map((value) => ({ value, label: value }))} />
           <TextField ctx={ctx} path="/target/engine/version" label="버전" nullable required suggestions={ENGINE_VERSIONS[name]} placeholder="목록에서 고르거나 입력 (모르면 비워 둠)" />
           <TextField ctx={ctx} path="/target/engine/image_digest" label="이미지 digest" nullable required placeholder="sha256:… (모르면 비워 둠)" />
           <TextField ctx={ctx} path="/target/engine/source_commit" label="소스 커밋" nullable placeholder="7~40자리 hex (모르면 비워 둠)" />
@@ -481,16 +482,14 @@ function ContractFields({ cond, ctx, doc, values, update }: { cond: string; ctx:
             <div className={p.formGrid}>
               {deployment.kind === "kubernetes" && <TextField ctx={ctx} path="/deployment/kubernetes_context" label="Kubernetes context" nullable />}
               {deployment.kind === "kubernetes" && <TextField ctx={ctx} path="/deployment/namespace" label="namespace" nullable />}
-              {deployment.kind === "kubernetes" && (
-                <label className={p.field}>
-                  엔진 컨테이너
-                  <input className="input" value={typeof values.k8s_container === "string" ? values.k8s_container : ""} placeholder="engine" onChange={(e) => update(putKey(values, "k8s_container", e.target.value || undefined))} />
-                </label>
-              )}
+              {deployment.kind === "kubernetes" && <TextField ctx={ctx} path="/deployment/engine_container" label="엔진 컨테이너" nullable />}
+              <SelectField ctx={ctx} path="/deployment/gateway_schema_version" label="Gateway 정책 스키마" options={["runtime-mvp/1.1", "runtime-mvp/1.2"].map((value) => ({ value, label: value }))} />
+              <SelectField ctx={ctx} path="/deployment/gateway_cache_isolation" label="Gateway cache isolation (1.2)" options={["off", "per_principal"].map((value) => ({ value, label: value }))} />
               <NumberField ctx={ctx} path="/deployment/engine_port" label="엔진 포트" nullable />
               <NumberField ctx={ctx} path="/deployment/management_port" label="관리 포트" nullable />
               <LabelsField ctx={ctx} path="/deployment/gateway_labels" label="Gateway labels" />
               <LabelsField ctx={ctx} path="/deployment/engine_labels" label="엔진 labels" />
+              <JsonField ctx={ctx} path="/deployment/enforcement_intent" label="환경 집행 intent (정책에 없을 때)" rows={8} hint="runtime-enforcement-intent/1.1 원본 JSON. 모르면 비워 둡니다." />
             </div>
           )}
         </div>
@@ -757,7 +756,7 @@ function ConditionCard({ cond, done, total, edit }: { cond: EnvCondition; done: 
             {cond.runtime && <div>byul runtime: {cond.runtime}</div>}
           </Note>
         )}
-        <ContractFields cond={cond.key} ctx={ctx} doc={doc} values={values} update={update} />
+        <ContractFields cond={cond.key} ctx={ctx} doc={doc} />
         <div className={p.qGrid}>
           {cond.fields
             .filter((f) => visible(f, values, others))

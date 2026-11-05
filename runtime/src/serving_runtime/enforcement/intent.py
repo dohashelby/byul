@@ -149,6 +149,7 @@ class ProtectedPaths:
     model_dir: str
     cache_dir: str
     secret_paths: tuple[str, ...]
+    enforce_exact_files: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -176,6 +177,8 @@ class EnforcementIntent:
     parent_constraints: tuple[tuple[str, tuple[str, ...]], ...] = ()
     suspect_parent_contexts: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = ()
     tetragon_rule_modes: tuple[tuple[str, str], ...] = ()
+    tetragon_enforce_method: str | None = None
+    tetragon_openat_symbol: str | None = None
 
     def tetragon_rule_mode(self, rule_id: str) -> str:
         return dict(self.tetragon_rule_modes).get(rule_id, "monitor")
@@ -394,6 +397,8 @@ def parse_intent(document: Any) -> EnforcementIntent:
             "parent_constraints",
             "suspect_parent_contexts",
             "tetragon_rule_modes",
+            "tetragon_enforce_method",
+            "tetragon_openat_symbol",
         },
     )
     schema = _required(root, "schema", "$")
@@ -411,6 +416,8 @@ def parse_intent(document: Any) -> EnforcementIntent:
         "parent_constraints",
         "suspect_parent_contexts",
         "tetragon_rule_modes",
+        "tetragon_enforce_method",
+        "tetragon_openat_symbol",
     }
     if not v11:
         present = sorted(v11_fields & set(root))
@@ -442,7 +449,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
     protected_raw = _object(
         _required(root, "protected_paths", "$"),
         "$.protected_paths",
-        {"model_dir", "cache_dir", "secret_paths"},
+        {"model_dir", "cache_dir", "secret_paths", "enforce_exact_files"},
     )
     raw_secrets = _required(protected_raw, "secret_paths", "$.protected_paths")
     if not isinstance(raw_secrets, list):
@@ -460,7 +467,19 @@ def parse_intent(document: Any) -> EnforcementIntent:
             _absolute_path(item, f"$.protected_paths.secret_paths[{index}]")
             for index, item in enumerate(raw_secrets)
         ),
+        tuple(
+            _absolute_path(item, f"$.protected_paths.enforce_exact_files[{index}]")
+            for index, item in enumerate(protected_raw.get("enforce_exact_files", []))
+        ) if isinstance(protected_raw.get("enforce_exact_files", []), list) else (),
     )
+    if "enforce_exact_files" in protected_raw and not isinstance(protected_raw["enforce_exact_files"], list):
+        raise IntentError("$.protected_paths.enforce_exact_files must be an array")
+    if not v11 and "enforce_exact_files" in protected_raw:
+        raise IntentError("$.protected_paths.enforce_exact_files requires schema 1.1")
+    if len(set(protected.enforce_exact_files)) != len(protected.enforce_exact_files):
+        raise IntentError("$.protected_paths.enforce_exact_files contains duplicates")
+    if set(protected.enforce_exact_files) - set(protected.secret_paths):
+        raise IntentError("enforce_exact_files must be listed in secret_paths")
 
     raw_binaries = _required(root, "allowed_engine_binaries", "$")
     if not isinstance(raw_binaries, list):
@@ -488,17 +507,26 @@ def parse_intent(document: Any) -> EnforcementIntent:
                 raise IntentError(f"$.tetragon_rule_modes.{rule_id} cannot enforce yet")
             rule_modes.append((rule_id, rule_mode))
     if dict(rule_modes).get("TG-SECRET-01") == "enforce":
-        secrets = protected.secret_paths
+        method = root.get("tetragon_enforce_method")
+        if method is not None and method not in {"override_lsm", "sigkill_fd_install", "override_syscall"}:
+            raise IntentError("$.tetragon_enforce_method is unsupported")
+        secrets = protected.enforce_exact_files if method is not None else protected.secret_paths
         if not secrets:
-            raise IntentError("TG-SECRET-01 enforce requires secret_paths with exact files")
+            raise IntentError("TG-SECRET-01 enforce requires enforce_exact_files")
         for path in secrets:
-            # The intent describes container paths, so local stat() cannot prove
-            # their type. Require an explicit file-like leaf for the first rollout.
-            # A directory/prefix such as /opt/serving/secret is not eligible.
-            if path.endswith("/") or not Path(path).suffix or any(
+            # Legacy path-only intents retain their old extension check. New
+            # methods require an explicit file declaration, including token files.
+            if path.endswith("/") or (method is None and not Path(path).suffix) or any(
                 other != path and Path(other).is_relative_to(path) for other in secrets
             ):
-                raise IntentError("TG-SECRET-01 enforce requires exact file paths in secret_paths")
+                raise IntentError("TG-SECRET-01 enforce requires exact files, not directories or prefixes")
+        symbol = root.get("tetragon_openat_symbol")
+        if method == "override_syscall" and (not isinstance(symbol, str) or not re.fullmatch(r"(?:__x64_|__arm64_)?sys_openat", symbol)):
+            raise IntentError("$.tetragon_openat_symbol must name a checked openat symbol")
+        if method != "override_syscall" and symbol is not None:
+            raise IntentError("$.tetragon_openat_symbol requires override_syscall")
+    elif "tetragon_enforce_method" in root or "tetragon_openat_symbol" in root:
+        raise IntentError("tetragon method requires TG-SECRET-01 enforce")
 
     acquire: AcquireIntent | None = None
     receivers: list[TestReceiver] = []
@@ -756,6 +784,8 @@ def parse_intent(document: Any) -> EnforcementIntent:
         parent_constraints=tuple(parent_constraints),
         suspect_parent_contexts=tuple(suspect_parent_contexts),
         tetragon_rule_modes=tuple(rule_modes),
+        tetragon_enforce_method=root.get("tetragon_enforce_method"),
+        tetragon_openat_symbol=root.get("tetragon_openat_symbol"),
     )
 
 

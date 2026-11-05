@@ -57,14 +57,14 @@ describe("알림 심각도와 묶음", () => {
     const groups = groupAlerts([detected, blocked]);
     expect(groups).toHaveLength(2);
     expect(groups.map((group) => group.severity)).toEqual(["높음", "높음"]);
-    expect(groups.find((group) => group.items[0].event_id === "blocked")?.title).toContain("차단됨");
+    expect(groups.find((group) => group.items[0].event_id === "blocked")?.title).toContain("차단 시도");
     expect(groups.find((group) => group.items[0].event_id === "detected")?.title).not.toContain("차단됨");
   });
   it("차단 알림 행에 별도 표지를 표시한다", async () => {
     mockApi({ "/api/runtime/events": { items: [secret("blocked", true)], invalid: [], source: SOURCE, truncated: false } });
     renderAt("/runtime/alerts", "/runtime/alerts", <AlertsPage />);
-    expect(await screen.findByText(/차단됨 · Override/)).toBeTruthy();
-    expect(screen.getAllByText("차단")).toHaveLength(2);
+    expect(await screen.findByText(/차단 시도 · Override/)).toBeTruthy();
+    expect(screen.getAllByText("차단 시도")).toHaveLength(2);
   });
   it("알림 페이지에 건수와 자세히 연결을 보여준다", async () => {
     mockApi({ "/api/runtime/events": { items: [flagged("a", "suspect_binary"), flagged("b", "suspect_binary")], invalid: [], source: SOURCE, truncated: false } });

@@ -70,6 +70,10 @@ update ── run-context (격리 시험에서 runtime 통제를 켤 때) ┘   
 
 ## 변환 규칙
 
+### 환경 판본에서 정책 묶음 내보내기
+
+환경 `target.engine.runtime_kind`는 runtime target의 `engine.kind`로, `target.engine.image_digest`와 `target.model.id`는 그대로 옮긴다. Kubernetes `deployment`의 context·namespace·engine_labels·engine_container는 runtime target의 Kubernetes 등록으로 옮긴다. `deployment.gateway_schema_version`과 1.2의 `gateway_cache_isolation`은 서버 값으로 쓴다. 정책 `runtime.enforcement.intent`가 없으면 `deployment.enforcement_intent` 원본을 쓴다. 이 칸은 선택 입력이며, 묶음을 내보낼 때 필요한 칸이 비어 있으면 목록으로 거부한다. 실제 서버 값의 진위는 별도 확인한다.
+
 ### runtime Gateway 판정 → `outcome`
 
 | `decision.result` | 조건 | `outcome` | `enforcer` |

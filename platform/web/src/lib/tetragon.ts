@@ -7,3 +7,12 @@ export function isTetragonOverride(event: RuntimeEvent): boolean {
   return event.observation.action_mode === "enforce"
     && (record.action_raw === "KPROBE_ACTION_OVERRIDE" || record.action === "KPROBE_ACTION_OVERRIDE");
 }
+
+export function isTetragonSigkill(event: RuntimeEvent): boolean {
+  if (event.source !== "tetragon" || event.observation?.kind !== "file_access") return false;
+  const record = event.native.record as Record<string, unknown>;
+  return event.observation.action_mode === "enforce"
+    && (record.action_raw === "KPROBE_ACTION_SIGKILL" || record.action === "KPROBE_ACTION_SIGKILL");
+}
+
+export const isTetragonBlockAttempt = (event: RuntimeEvent): boolean => isTetragonOverride(event) || isTetragonSigkill(event);

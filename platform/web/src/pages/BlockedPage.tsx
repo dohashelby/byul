@@ -9,7 +9,7 @@ import { Time } from "../components/Value";
 import { matchesTarget, useEnvTarget } from "../lib/filters";
 import { GATEWAY_REASON } from "../lib/labels";
 import { inRange } from "../lib/time";
-import { isTetragonOverride } from "../lib/tetragon";
+import { isTetragonBlockAttempt, isTetragonSigkill } from "../lib/tetragon";
 import { carry, useGlobalFilters, useParams } from "../lib/url";
 import ui from "../components/ui.module.css";
 import p from "./pages.module.css";
@@ -19,7 +19,7 @@ export function blockedRows(requests: RequestRow[], events: RuntimeEvent[]) {
   return {
     requests: requests.filter((r) => r.delivery_attempted === false && ["denied", "invalid", "error"].includes(r.outcome)),
     network: events.filter((e) => e.source === "hubble" && e.observation?.verdict?.toLowerCase() === "dropped"),
-    files: events.filter(isTetragonOverride),
+    files: events.filter(isTetragonBlockAttempt),
   };
 }
 
@@ -62,12 +62,12 @@ export function BlockedPage() {
       <p className="small muted">Hubble의 DROPPED 관측 기록입니다. 정책 귀속·수신 대조 전에는 통제 결과로 확정하지 않습니다.</p>
     </section>}
     {active === "files" && <section id="blocked-files" className={sectionClass} aria-label="파일 차단 시도">
-      <h2>파일 차단 시도 (Tetragon Override) <span className={p.blockedCount}>{rows.files.length}건</span></h2>
+      <h2>파일 차단 시도 (Tetragon Override·Sigkill) <span className={p.blockedCount}>{rows.files.length}건</span></h2>
       {rows.files.length ? <table className={p.blockedTable}><thead><tr><th>시각</th><th>파일 경로</th><th>규칙·행위</th><th>자료</th></tr></thead><tbody>
-        {rows.files.slice(pagination.start, pagination.end).map((e) => <tr key={e.event_id}><td><Time iso={e.occurred_at ?? e.recorded_at} /></td><td><Link className="mono" to={eventLink(e)}>{e.observation?.path ?? "경로 미기록"}</Link></td><td>{e.observation?.rule_id ?? "규칙 미기록"} · Override</td><td><OriginBadge origin={e.data_origin} detail={e.origin_detail} />{e.origin_detail === "synthetic" && <span className="small muted"> 예시 자료</span>}</td></tr>)}
-      </tbody></table> : <p className="small muted">선택한 기간·환경에 Tetragon Override 파일 차단 시도 기록이 없습니다. 탐지 이벤트는 포함하지 않습니다.</p>}
+        {rows.files.slice(pagination.start, pagination.end).map((e) => <tr key={e.event_id}><td><Time iso={e.occurred_at ?? e.recorded_at} /></td><td><Link className="mono" to={eventLink(e)}>{e.observation?.path ?? "경로 미기록"}</Link></td><td>{e.observation?.rule_id ?? "규칙 미기록"} · {isTetragonSigkill(e) ? "Sigkill · 프로세스 종료" : "Override"}</td><td><OriginBadge origin={e.data_origin} detail={e.origin_detail} />{e.origin_detail === "synthetic" && <span className="small muted"> 예시 자료</span>}</td></tr>)}
+      </tbody></table> : <p className="small muted">선택한 기간·환경에 Tetragon 파일 차단 시도 기록이 없습니다. 탐지 이벤트는 포함하지 않습니다.</p>}
       <Pagination state={pagination} />
-      <p className="small muted">Override는 차단 시도 기록입니다. 실제 EPERM 결과는 검증 시험 (Lab)에서 확인합니다.</p>
+      <p className="small muted">원시 행위는 차단 시도 기록입니다. Sigkill은 프로세스를 종료하며 실제 거부·서빙 영향은 별도 시험으로 확인합니다.</p>
     </section>}
   </>}</Query>}</Query></div>;
 }

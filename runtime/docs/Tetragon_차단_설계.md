@@ -1,8 +1,10 @@
 # Tetragon 선택적 차단 설계안
 
-상태: **제한적 구현·단위 시험, 클러스터 미적용·미검증**. 이 문서의 `enforce`는 앞으로 검증할 정책 모드이며 실제 엔진에서 차단됐다는 뜻이 아니다. 현재 intent의 `tetragon_mode`는 `monitor|enforce_probe`이고 `enforce_probe`는 시험 경로 쓰기 `TG-DENY-01`만 제어한다. 선택 필드 `tetragon_rule_modes`에서 `TG-SECRET-01: enforce`를 지정하면 정확한 보호 파일 읽기에 `Post`+`Override(argError: -1)`을 낸다. 그 외 운영 파일 규칙은 `Post` 감시다. 근거: `runtime/src/serving_runtime/enforcement/intent.py:465-472`, `runtime/src/serving_runtime/enforcement/tetragon.py:22-25,74-109`. 로컬 kind L-05 외의 차단 효과는 미확인이고, 그 시험도 업그레이드 직후 불일치 원인이 남았다. 근거: `runtime/docs/상세_안내.md:570-582`, `runtime/docs/지원_미지원_목록.md:40`.
+상태: **방식별 후보·전환 도구·단위 시험 구현, 새 후보의 kind/AWS 차단 효과 미검증**. `tetragon_rule_modes`의 `TG-SECRET-01: enforce`와 `tetragon_enforce_method`를 함께 지정하면 아래 방식별 후보를 monitor 모드로 렌더한다. `tetragon_mode=enforce_probe`는 기존 시험 쓰기 규칙 `TG-DENY-01`만 제어한다. 이 문서의 이전 4회차 제안 중 정책 delete→apply와 확장자로 파일을 추정하는 절차는 아래 **구현 상태**와 5회차 확인순서로 대체한다.
 
 ## 1. 후보와 우선순위
+
+1~7절은 4회차 전 설계·시험 제안을 보존한 기록이다. 현재 구현과 5회차 절차는 아래 **구현 상태**와 [5회차 확인순서](../deploy/gpu-lab/서버5회차_확인순서.md)를 우선한다.
 
 Tetragon 훅은 커널 호출을 보며 `loading`·`compiling`·`inferring`은 별도 엔진 로그에서 만든 시간표다. 따라서 단계별 허용 목록을 커널 차단 선택자로 그대로 옮길 수 없다는 설계 판단이다. 근거: `runtime/src/serving_runtime/enforcement/tetragon.py:39-68`, `runtime/deploy/gpu-lab/ACCEPTANCE.md:141-145`; **추정/미확인:** 특정 단계와 커널 사건의 안전한 동기화 방식.
 
@@ -68,15 +70,14 @@ Tetragon 훅은 커널 호출을 보며 `loading`·`compiling`·`inferring`은 �
 
 ## 구현 상태 (2026-11-05)
 
-- intent 1.1의 선택 필드 `tetragon_rule_modes`를 구현했다. `TG-SECRET-01`만 `enforce` 가능하며 `TG-ASSET-01`·`TG-ASSET-02`·`TG-CACHE-01`은 명시적 `monitor`만 가능하다. `TG-DENY-01`은 이 필드에서 거부하며 기존 `tetragon_mode=enforce_probe`만 제어한다. `enforce_probe`가 `TG-SECRET-01`의 차단을 암시하지 않고 두 설정은 함께 쓸 수 있다. 필드를 생략하면 기존 렌더 결과·CLI 출력이 그대로다.
-- `TG-SECRET-01: enforce`에는 비어 있지 않은 정확한 파일 경로만 받는다. 첫 적용의 보수적 형식 기준으로 끝에 `/`가 붙은 경로, 확장자가 없는 디렉터리형 경로, 다른 보호 경로의 상위 경로를 거부한다. 컨테이너 안 파일 유형을 로컬 intent 검증에서 확인할 수 없으므로, 확장자가 있는 디렉터리나 링크의 실제 유형은 kind에서 확인해야 한다. 확장자가 없는 파일은 이 첫 적용에서 사용할 수 없다.
-- 렌더러는 파일 경로에 `Equal`, read mask `4`, `Post`와 `Override(argError: -1)`을 낸다. `-1`은 `-EPERM`이며 기존 L-05 `TG-DENY-01`의 측정값과 바로 대조할 수 있어서 `-EACCES(-13)` 대신 선택했다. 실제 사용자 공간 errno와 차단 효과는 아직 미검증이다. `enforce render`는 선택적 운영 차단이 있을 때 `차단 규칙 1개(미검증)`처럼 표시한다.
-- 이벤트 어댑터의 기존 `KPROBE_ACTION_OVERRIDE` → `action_mode=enforce` 분류와 `rule_id` 보존을 시험했다. 이는 차단 **시도** 기록이고 성공 증명은 아니다. 로컬 kind 도구에 `--secret-enforce-check` L-05b를 준비해 monitor→enforce→monitor, errno·원시 이벤트·Pod UID·정상 요청 200을 대조한다. 실제 kind·AWS 시험은 하지 않았다.
+- intent 1.1에 `protected_paths.enforce_exact_files`를 추가했다. 명시한 파일은 확장자가 없어도 받으며 상위 디렉터리·접두 경로는 거부한다. 새 방식 지정에는 이 목록이 필수다. 이전 intent는 그대로 읽고 렌더한다. 컨테이너 안 파일 유형과 링크 대상은 로컬 검증만으로 증명할 수 없다.
+- `tetragon_enforce_method` 선택값은 `override_lsm`(`security_file_permission`, Override -EPERM + Sigkill), `sigkill_fd_install`(`fd_install`, Sigkill), `override_syscall`(`sys_openat`, Override -EPERM + Sigkill)이다. 모두 엔진 Pod selector의 `TracingPolicyNamespaced` 후보이며 `spec.options.policy-mode=monitor`로 시작한다. Tetragon **1.7.1**의 정책 모드는 `monitor`·`enforce` 두 가지다. `monitor_only`는 이 버전의 전환값으로 쓰지 않는다. [1.7.1 정책 모드 문서](https://github.com/cilium/tetragon/blob/v1.7.1/docs/content/en/docs/concepts/tracing-policy/mode.md), [selectors 문서](https://github.com/cilium/tetragon/blob/v1.7.1/docs/content/en/docs/concepts/tracing-policy/selectors.md).
+- `override_syscall`은 경로 문자열을 대조하므로 상대 경로·심볼릭 링크·경합 우회 한계가 있다. Sigkill은 엔진 프로세스 종료를 일으킬 수 있다. 엔진 종료가 실제로 일어나면 Gateway 대상 확인 실패와 요청 503(엔진 미전달), Kubernetes 재시작 및 복구를 별도로 확인해야 한다. Sigkill 이벤트 하나만으로 파일 동작이 막혔다고 판정하지 않는다. [1.7.1 enforcement 문서](https://github.com/cilium/tetragon/blob/v1.7.1/docs/content/en/docs/concepts/enforcement/_index.md).
+- `runtime/tools/tetragon_mode.py`는 `tetra tp set-mode --namespace` 뒤 STATE·MODE·정책 ID를 확인하고 실패하면 원래 모드로 돌려 확인한다. 규칙 교체는 새 이름으로 적용·enabled 확인 뒤 이전 규칙을 삭제한다. L-05b와 AWS-20은 같은 정책 모드 전환을 사용한다. L-05c는 `--sigkill-probe-check`로 분리한 시험용 Pod에서 실행한다. `aws_lab_preflight.py --override-check`는 커널 설정·LSM·오류 주입 심볼·`tetra probe` 근거로 방식별 가능/불가/확인 필요를 출력한다.
+- AWS-20은 방식별 errno 또는 종료 코드와 같은 Pod UID 원시 이벤트, 정상 요청 또는 엔진 대상 503·복구, monitor 복귀를 판정한다. Override+Sigkill을 함께 쓸 때 사용자 공간 errno가 실제로 관측될지는 미확인이다. 현재 `kubectl exec` 읽기 probe는 엔진의 주 프로세스가 아니므로 엔진 대상 503·재시작의 증거가 될 수 없다. 5회차에서는 별도 엔진 주 프로세스 시험 절차를 마련하기 전 해당 항목을 통과로 기록하지 않는다.
 
-## 다음 구현 단계
+## 다음 확인
 
-
-1. runtime intent 로더·검증에 선택적 규칙별 모드를 추가하고 기존 1.0/1.1·`enforce_probe` 호환 시험을 작성한다. **구현·단위 시험 완료**.
-2. `TG-SECRET-01`의 제한된 `Override` 렌더링과 정확 경로·mask 시험을 추가했다. **구현·단위 시험 완료; 커널 조건 실측 미확인**.
-3. L-05b 로컬 kind opt-in 도구·되돌리기·증거 판정을 준비했다. **kind 미실행; AWS-10 변형은 후속 범위**.
-4. platform과 개별 사건의 `차단` 표시·계약 변경 필요성을 합의하고, 우선은 검증 시험 결과에만 `차단 확인`을 표시한다. **합의 필요/미구현**.
+1. 로컬 kind L-05b/L-05c에서 정책 load·MODE·동일 ID·원시 이벤트·파일 결과를 실측한다. WSL 커널에서 load 불가면 지원 불가 근거를 남기고 단위 시험 결과와 구분한다.
+2. 5회차 서버에서는 사전 점검 뒤 시험용 Pod부터 방식별 후보를 확인한다. 엔진 주 프로세스 대상 시험은 별도 opt-in이며 Gateway 503·재시작·복구 증거가 있어야 한다.
+3. 화면의 Override/Sigkill 표지는 **차단 시도**다. 실제 차단 판정은 파일 결과와 수집 상태를 함께 확인한다.

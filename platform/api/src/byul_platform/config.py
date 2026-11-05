@@ -32,6 +32,8 @@ class Settings:
     update_reports_dir: Path | None = None
     platform_data_dir: Path | None = None
     evidence_index_paths: tuple[Path, ...] = ()
+    bundle_runtime_dir: Path = REPO_ROOT / "runtime"
+    bundle_runtime_python: Path | None = None
     host: str = "127.0.0.1"
     port: int = 8700
 
@@ -51,6 +53,8 @@ class Settings:
             update_reports_dir=_path("UPDATE_REPORTS_DIR"),
             platform_data_dir=_path("PLATFORM_DATA_DIR"),
             evidence_index_paths=tuple(_paths("EVIDENCE_INDEX_PATHS")),
+            bundle_runtime_dir=_path("BYUL_BUNDLE_RUNTIME_DIR") or REPO_ROOT / "runtime",
+            bundle_runtime_python=_path("BYUL_BUNDLE_RUNTIME_PYTHON"),
             host=os.environ.get("BYUL_PLATFORM_HOST", "127.0.0.1").strip() or "127.0.0.1",
             port=int(os.environ.get("BYUL_PLATFORM_PORT", "8700")),
         )

@@ -130,6 +130,8 @@ class RuleModeTests(unittest.TestCase):
             )
             checker.pods = {"engine": "engine-pod", "gateway": "gateway-pod"}
             applied: list[str] = []
+            mode = "monitor"
+            calls: list[tuple[str, ...]] = []
             reads = iter([
                 ProcessResult(("read",), 0, '{"read":"ok"}\n', ""),
                 ProcessResult(("read",), 13, '{"errno":1,"name":"EPERM"}\n', ""),
@@ -137,6 +139,14 @@ class RuleModeTests(unittest.TestCase):
             ])
 
             def kubectl(_case, *args, **_kwargs):
+                nonlocal mode
+                calls.append(args)
+                if args[:2] == ("exec", "daemonset/tetragon") and args[-2:] == ("tracingpolicy", "list"):
+                    output = ("ID NAME STATE FILTERID NAMESPACE SENSORS KERNELMEMORY MODE\n"
+                              f"7 runtime-tg-secret-01-l05b enabled 1 serving-lab generic_kprobe 1MB {mode}\n")
+                    return ProcessResult(("kubectl", *args), 0, output, "")
+                if "set-mode" in args:
+                    mode = args[-1]
                 return ProcessResult(("kubectl", *args), 0,
                                      "pod-1" if args[:2] == ("get", "pod") else "", "")
 
@@ -149,7 +159,7 @@ class RuleModeTests(unittest.TestCase):
                           else "KPROBE_ACTION_POST")
                 raw = {"time": "2099-01-01T00:00:00Z", "process_kprobe": {
                     "process": {"pod": {"uid": "pod-1", "namespace": "serving-lab"}},
-                    "policy_name": "runtime-tg-secret-01", "action": action,
+                    "policy_name": "runtime-tg-secret-01-l05b", "action": action,
                     "args": [{"file_arg": {"path": SECRET_PROBE_PATH}}, {"int_arg": 4}],
                 }}
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -169,8 +179,9 @@ class RuleModeTests(unittest.TestCase):
                              ["monitor", "enforce", "restored"])
             self.assertTrue(all(step["event_matched"] for step in case["steps"]))
             self.assertTrue(case["steps"][1]["normal_request_200"])
-            self.assertEqual([Path(path).parent.name for path in applied],
-                             ["l05b-monitor", "l05b-enforce", "l05b-monitor"])
+            self.assertEqual([Path(path).parent.name for path in applied], ["l05b-trial"])
+            self.assertEqual({step["policy_id"] for step in case["steps"]}, {"7"})
+            self.assertFalse(any("delete" in call for call in calls[:next(i for i, call in enumerate(calls) if "set-mode" in call)]))
 
 
 if __name__ == "__main__":

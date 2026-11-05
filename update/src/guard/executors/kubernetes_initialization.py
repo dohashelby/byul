@@ -124,6 +124,7 @@ class KubernetesInitializationExecutor(HttpCheckExecutor):
         ctx._init_cleanup=list(http['cleanup_errors'])
         if read_report and read_report.get('parent_cleanup_unverified'):ctx._init_cleanup.append('INITIALIZATION_PARENT_CLEANUP_UNVERIFIED')
         ctx._init_gap=bool(diagnostics or http['collection_gap'] or ctx._init_cleanup)
+        ctx._init_diagnostic_codes=tuple(diagnostics)
         summary={'profile':ctx.check.collection_profile,'declared_phase':ctx.policy_values['init_phase'],
             'declared_scenario_sha256':ctx.policy_values['init_scenario_sha256'],'trials':trials,'native':packet,'projection':projection,
             'transport':http,'reader':read_report,'worker_startup':worker,'sealed_selected_session':sealed,'diagnostic_codes':diagnostics,
@@ -142,5 +143,9 @@ class KubernetesInitializationExecutor(HttpCheckExecutor):
 
     def _finish(self,ctx):
         draft=super()._finish(ctx);draft.data_origin=DataOrigin.EXAMPLE
-        if ctx._init_gap:draft.status=ExecStatus.ABORTED
+        if ctx._init_gap:
+            draft.status=ExecStatus.ABORTED
+            if draft.abort_reason is None:
+                codes=sorted(set(tuple(getattr(ctx,'_init_diagnostic_codes',()))+tuple(ctx._init_cleanup)))
+                draft.abort_reason='; '.join(codes) or 'INITIALIZATION_COLLECTION_INCOMPLETE'
         draft.cleanup_errors.extend(ctx._init_cleanup);return draft

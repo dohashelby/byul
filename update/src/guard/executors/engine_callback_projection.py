@@ -17,11 +17,14 @@ SCHEMA = 'byul-engine-callback-cohort/1'
 COMPUTED = 'KVCacheManager.get_computed_blocks'
 ROLES = {'REQ-14': {'normal'}, 'REQ-15': {'prime', 'control', 'probe'}, 'REQ-16': {'prime', 'control', 'probe', 'post', 'switch'},
     'REQ-17': {'prime', 'control-present', 'control-absent', 'present', 'absent'},
-    'REQ-18': {'standalone', 'restricted', 'reused'}}
+    'REQ-18': {'standalone', 'restricted', 'reused'}, 'REQ-19': {'boundary'}, 'REQ-20': {'replay'},
+    'LIF-13': {'before', 'switch', 'after'}, 'REQ-21': {'before', 'after'}}
 MAX_CASES = 512
 # REQ-16 lab contexts change the engine between cases: reload one LoRA in place, or reload weights.
-LAB_ACTIONS = {'lora_reload': 'lora', 'weights_reload': 'weights'}
-LAB_ROOTS = {'lora': '/guard-lora/', 'weights': '/guard-weights/'}
+# LIF-13은 소유 weights daemon에 전체 release를 보낸다.
+LAB_ACTIONS = {'lora_reload': 'lora', 'weights_reload': 'weights', 'weights_release': 'weights_daemon'}
+LAB_ROOTS = {'lora': '/guard-lora/', 'weights': '/guard-weights/', 'weights_daemon': '/guard-weights-daemon/'}
+SWITCH_CHECKS = {'lora_reload': 'REQ-16', 'weights_reload': 'REQ-16', 'weights_release': 'LIF-13'}
 _NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
 _PATH = re.compile(r'(/[A-Za-z0-9][A-Za-z0-9._-]{0,63}){2,8}')
 # 비동기 스케줄링에서는 출력이 다음 배치 뒤에 도착할 수 있다.
@@ -49,8 +52,9 @@ def window(events, secret, barrier):
 
 
 def _media(value):
-    return (type(value) is dict and 'seed' in value and set(value) <= {'seed', 'uuid'}
+    return (type(value) is dict and 'seed' in value and set(value) <= {'seed', 'uuid', 'text_after'}
         and type(value['seed']) is int and 0 <= value['seed'] < 2**31
+        and ('text_after' not in value or type(value['text_after']) is str and 0 < len(value['text_after']) <= 4096)
         and ('uuid' not in value or type(value['uuid']) is str and re.fullmatch(r'[A-Za-z0-9-]{1,64}', value['uuid'])))
 
 
@@ -61,17 +65,17 @@ def _lab_path(value, kind):
 def validate_lab_contexts(spec, cases=None):
     """Closed REQ-16 lab declaration: one LoRA name, its active path, and owned variant paths."""
     try:
-        if type(spec) is not dict or not spec or set(spec) - {'lora', 'weights'}:
+        if type(spec) is not dict or not spec or set(spec) - {'lora', 'weights', 'weights_daemon'}:
             raise ValueError
         lora = spec.get('lora'); weights = spec.get('weights')
         if lora is not None and (type(lora) is not dict or set(lora) != {'name', 'active_path', 'variants'}
                 or type(lora['name']) is not str or _NAME.fullmatch(lora['name']) is None
                 or not _lab_path(lora['active_path'], 'lora')):
             raise ValueError
-        for kind, part in (('lora', lora), ('weights', weights)):
+        for kind, part in (('lora', lora), ('weights', weights), ('weights_daemon', spec.get('weights_daemon'))):
             if part is None:
                 continue
-            if kind == 'weights' and (type(part) is not dict or set(part) != {'variants'}):
+            if kind != 'lora' and (type(part) is not dict or set(part) != {'variants'}):
                 raise ValueError
             variants = part['variants']
             if (type(variants) is not dict or not 1 <= len(variants) <= 4
@@ -106,7 +110,8 @@ def message_content(text, media):
     part = {'type': 'image_url', 'image_url': {'url': 'data:image/png;base64,' + base64.b64encode(media_png(media['seed'])).decode()}}
     if 'uuid' in media:
         part['uuid'] = media['uuid']
-    return [{'type': 'text', 'text': text}, part]
+    return [{'type': 'text', 'text': text}, part, *(
+        [{'type': 'text', 'text': media['text_after']}] if 'text_after' in media else [])]
 
 
 def validate_cases(check_id, cases):
@@ -116,8 +121,9 @@ def validate_cases(check_id, cases):
     for case in cases:
         if type(case) is dict and case.get('role') == 'switch':
             # A switch sends no prompt. The executor runs it only against an owned lab engine.
-            if (check_id != 'REQ-16' or set(case) != {'case_id', 'role', 'action', 'variant'}
-                    or type(case['case_id']) is not str or case['action'] not in LAB_ACTIONS
+            if (set(case) != {'case_id', 'role', 'action', 'variant'}
+                    or type(case['case_id']) is not str or case.get('action') not in LAB_ACTIONS
+                    or SWITCH_CHECKS[case['action']] != check_id
                     or type(case['variant']) is not str or _NAME.fullmatch(case['variant']) is None):
                 raise ValueError('ENGINE_CALLBACK_CASES_INVALID')
             continue
@@ -128,6 +134,8 @@ def validate_cases(check_id, cases):
                 or 'media' in case and not _media(case['media'])
                 or case.get('role') not in ROLES[check_id] or type(case.get('prompt')) is not str
                 or not 0 < len(case['prompt']) <= 4096 or type(case['case_id']) is not str
+                # The executor prepends a 32-character nonce and one space. Keep the existing 4096 text limit.
+                or 'media' in case and 'text_after' in case['media'] and len(case['prompt']) + len(case['media']['text_after']) > 4096 - 33
                 or 'cache_salt' in case and (type(case['cache_salt']) is not str or not 0 < len(case['cache_salt']) <= 64)
                 or type(case.get('max_tokens', 1)) is not int or not 1 <= case.get('max_tokens', 1) <= 8
                 or 'allowed_token_ids' in case and (type(case['allowed_token_ids']) is not list or not case['allowed_token_ids'])):
@@ -276,40 +284,118 @@ def project_cache_timing(cases, rows, elapsed, policy):
 
 
 def project_distributed(events, secret, tags):
-    """worker가 받은 배치와 다음에 내보낸 출력의 요청 ID를 프로세스별 순서로 대조한다."""
+    """REQ-14: worker 배치와 출력 귀속, TP rank별 실행·중간 전송·출력 rank를 대조한다.
+
+    단일 프로세스 기록은 기존대로 배치와 다음 출력의 요청 ID만 본다. 여러 rank 기록이 있으면
+    같은 요청 배치를 다른 모델·revision으로 실행한 rank, 지정 출력 rank가 아닌 rank의 요청 출력,
+    실행 구간 안의 닫힌 통신기·미등록 buffer 전송을 직접 위반으로 본다.
+    """
     wanted = {tag_digest(secret, tag) for tag in tags.values()}
     recent = {}; seen = set(); checked = 0; violations = []
+    ranks = {}; open_rpc = {}; steps = []; comm = {}
     for event in events:
-        if event.get('entry_qualified_before') is not True or event.get('phase') != 'CALL':
+        fields = event.get('fields') or {}; process = event.get('process_sha256'); point = event.get('point')
+        if event.get('entry_qualified_before') is not True:
             continue
-        fields = event.get('fields') or {}; process = event.get('process_sha256')
-        if event.get('point') == 'WorkerProc._execute_worker_rpc' and fields.get('rpc_method') == 'execute_model':
-            scheduled = fields.get('native_request_sha256')
-            if scheduled:
-                seen.update(set(scheduled) & wanted)
-                recent.setdefault(process, deque(maxlen=PIPELINE_DEPTH)).append(set(scheduled))
-        elif event.get('point') == 'WorkerProc.handle_output' and fields.get('output_request_sha256'):
+        phase = event.get('phase')
+        if point == COMM_INIT and phase == 'RETURN' and event.get('entry_qualified_after') is True:
+            comm[(process, fields.get('communicator_token'))] = {'buffer': fields.get('buffer_sha256'), 'live': fields.get('live')}
+            continue
+        if point == 'CustomAllreduce.close' and phase == 'RETURN' and (process, fields.get('communicator_token')) in comm:
+            comm[(process, fields.get('communicator_token'))]['live'] = False
+            continue
+        if point == 'CustomAllreduce.all_reduce' and process in open_rpc:
+            step = open_rpc[process]; generation = comm.get((process, fields.get('communicator_token')))
+            if phase == 'CALL':
+                if generation is None:
+                    step['transfer_unbound'] = True
+                elif generation['live'] is not True or fields.get('live') is not True:
+                    violations.append({'point': point, 'reason': 'closed_communicator_transfer'})
+                elif fields.get('buffer_sha256') != generation['buffer']:
+                    violations.append({'point': point, 'reason': 'unregistered_buffer_transfer'})
+                else:
+                    step['transfers'] += 1
+            elif phase == 'RETURN':
+                step['fences'].append(fields.get('completion_fence'))
+            continue
+        if point == 'WorkerProc._execute_worker_rpc' and fields.get('rpc_method') == 'execute_model':
+            if phase == 'CALL':
+                scheduled = fields.get('native_request_sha256')
+                if scheduled:
+                    seen.update(set(scheduled) & wanted)
+                    recent.setdefault(process, deque(maxlen=PIPELINE_DEPTH)).append(set(scheduled))
+                    if fields.get('rank') is not None:
+                        ranks.setdefault(process, fields['rank'])
+                    open_rpc[process] = {'process': process, 'rank': fields.get('rank'), 'requests': frozenset(scheduled),
+                        'model': (fields.get('configured_model_sha256'), fields.get('configured_revision_sha256')),
+                        'output_rank': fields.get('selected_output_rank'), 'transfers': 0, 'fences': [], 'transfer_unbound': False}
+            elif process in open_rpc:
+                steps.append(open_rpc.pop(process))
+            continue
+        if point == 'WorkerProc.handle_output' and phase == 'CALL' and fields.get('output_request_sha256'):
             allowed = set().union(*recent.get(process, ()))
             checked += 1
             extra = set(fields['output_request_sha256']) - allowed
             if extra:
-                violations.append({'point': event['point'], 'unscheduled_outputs': len(extra)})
+                violations.append({'point': point, 'unscheduled_outputs': len(extra)})
+            selected = {s['output_rank'] for s in steps + list(open_rpc.values()) if s['process'] == process and s['output_rank'] is not None}
+            if ranks.get(process) is not None and selected and ranks[process] not in selected and set(fields['output_request_sha256']) & wanted:
+                violations.append({'point': point, 'reason': 'unselected_rank_output'})
     complete = wanted <= seen and checked > 0
-    return {'batches_checked': checked, 'violations': violations,
-        'violation': True if violations else (False if complete else None), 'full_scope': False,
-        'missing': ['intermediate_tensor_buffer_lineage_unobserved', 'model_generation_consumption_unobserved',
-            *([] if complete else ['distributed_batches_incomplete'])]}
+    missing = []
+    if not complete:
+        missing.append('distributed_batches_incomplete')
+    tp = len(set(ranks.values())) >= 2
+    if not tp:
+        missing += ['intermediate_tensor_buffer_lineage_unobserved', 'model_generation_consumption_unobserved']
+    else:
+        by_batch = {}
+        for step in steps:
+            if step['requests'] & wanted:
+                by_batch.setdefault(step['requests'], []).append(step)
+        bound = [group for group in by_batch.values() if len({s['rank'] for s in group}) >= 2]
+        for group in bound:
+            if len({s['model'] for s in group}) != 1 or None in {m for s in group for m in s['model']}:
+                violations.append({'reason': 'rank_model_generation_mismatch'})
+        if not bound or {r for group in bound for r in group[0]['requests'] if r in wanted} < wanted:
+            missing.append('rank_batch_binding_incomplete')
+        transfers = [s for group in bound for s in group]
+        if not transfers or any(s['transfers'] == 0 or s['transfer_unbound'] for s in transfers):
+            missing.append('intermediate_tensor_buffer_lineage_unobserved')
+        if not transfers or any(not s['fences'] or any(f is not True for f in s['fences']) for s in transfers):
+            missing.append('intermediate_buffer_completion_unobserved')
+        missing.append('model_generation_consumption_unobserved')  # 설정 지문은 가중치 실제 소비의 증명이 아니다
+    return {'batches_checked': checked, 'ranks': len(set(ranks.values())), 'violations': violations,
+        'violation': True if violations else (False if complete else None), 'full_scope': False, 'missing': missing}
 
 
 def project_slot(cases, outputs, events, secret, tags):
     """A가 쓴 자리를 B가 다시 받았을 때 B의 출력이 단독 실행과 같아야 한다."""
-    slots = {}
+    slots = {}; v2_slot = {}; v2_restricted = {}; sampled = {}
     for event in events:
         fields = event.get('fields') or {}
-        if (event.get('point') == 'InputBatch.add_request' and event.get('phase') == 'RETURN'
-                and event.get('entry_qualified_before') is True and event.get('entry_qualified_after') is True):
+        point, phase = event.get('point'), event.get('phase')
+        if event.get('entry_qualified_before') is not True:
+            continue
+        if point == 'Sampler.__call__' and phase == 'CALL':
+            # 진입 시점 상태다. sampler가 받은 그대로 남는다.
+            for item in fields.get('sampled') or ():
+                if type(item) is dict and item.get('request_sha256'):
+                    sampled.setdefault(item['request_sha256'], []).append(item)
+            continue
+        if phase != 'RETURN' or event.get('entry_qualified_after') is not True:
+            continue
+        if point == 'InputBatch.add_request':
             slots[fields.get('request_sha256')] = {'slot': fields.get('slot'), 'restricted': fields.get('restricted')}
+        elif point == 'RequestState.add_request':
+            v2_slot[fields.get('request_sha256')] = fields.get('slot')
+        elif point == 'Sampler.add_request':
+            v2_restricted[(fields.get('request_sha256'), fields.get('slot'))] = fields.get('restricted')
+    v2 = bool(v2_slot)
+    for request, number in v2_slot.items():
+        slots.setdefault(request, {'slot': number, 'restricted': v2_restricted.get((request, number))})
     slot_of = lambda case: slots.get(tag_digest(secret, tags[case['case_id']]), {})
+    stale = lambda item: (type(item.get('allowed_token_count')) is int and item['allowed_token_count'] > 0) or item.get('logit_bias_in_use') is True
     alone = [outputs.get(c['case_id']) for c in cases if c['role'] == 'standalone']
     missing = []
     if len(alone) < 2 or None in alone or len(set(alone)) != 1:
@@ -321,11 +407,315 @@ def project_slot(cases, outputs, events, secret, tags):
         previous = next((c for c in reversed(cases[:index]) if c['role'] == 'restricted'), None)
         former = slot_of(previous) if previous else {}
         same = former.get('slot') is not None and former.get('slot') == slot_of(case).get('slot') and former.get('restricted') is True
-        rows.append({'slot_reused': same, 'output_matches_standalone': bool(alone) and outputs.get(case['case_id']) == alone[0]})
+        row = {'slot_reused': same, 'output_matches_standalone': bool(alone) and outputs.get(case['case_id']) == alone[0]}
+        if v2:
+            states = [i for i in sampled.get(tag_digest(secret, tags[case['case_id']]), ()) if i.get('slot') == slot_of(case).get('slot')]
+            row.update(sampler_state_observed=bool(states), stale_restriction_at_sampling=any(stale(i) for i in states))
+        rows.append(row)
     if not rows or not all(r['slot_reused'] for r in rows):
         missing.append('slot_reuse_not_observed')
+    if v2 and not all(r.get('sampler_state_observed') for r in rows):
+        missing.append('sampler_state_not_observed')
     violations = [r for r in rows if r['slot_reused'] and not r['output_matches_standalone']]
     if 'standalone_control_not_deterministic' in missing:
         violations = []
-    return {'rows': rows, 'violation': True if violations else (None if missing else False),
+    # sampler가 받은 상태에 앞 요청의 제한이 남아 있으면 출력 비교와 무관한 직접 위반이다.
+    violations += [r for r in rows if r['slot_reused'] and r.get('stale_restriction_at_sampling') and r not in violations]
+    return {'rows': rows, 'runner': 'v2' if v2 else 'v1', 'violation': True if violations else (None if missing else False),
         'full_scope': not missing and not violations, 'missing': missing}
+
+
+KERNEL_POINTS = ('prepare_prefill_inputs', 'prepare_pos_seq_lens')
+KERNEL_BLOCK = 1024
+
+
+def project_kernel_bounds(cases, events, secret, tags):
+    """REQ-19: 실제 입력 준비 kernel 호출의 범위·초기화·완료·독립 대조.
+
+    자리는 같은 프로세스의 V2 RequestState 행으로 요청에 잇는다. 범위 밖 주소나
+    초기화되지 않은 padding은 어느 요청의 호출이든 직접 위반이다. 출력 불일치는
+    메모리 결함의 증거로 보지 않고 미수집으로 남긴다.
+    """
+    wanted = {tag_digest(secret, tag): case_id for case_id, tag in tags.items()}
+    holder = {}; calls = {}; order = []
+    for event in events:
+        point, phase = event.get('point'), event.get('phase'); fields = event.get('fields') or {}
+        process = event.get('process_sha256')
+        if point in ('RequestState.add_request', 'RequestState.remove_request'):
+            if phase == 'RETURN' and event.get('entry_qualified_before') is True and event.get('entry_qualified_after') is True:
+                key = (process, fields.get('slot'))
+                if point == 'RequestState.add_request':
+                    holder[key] = fields.get('request_sha256')
+                else:
+                    holder.pop(key, None)
+            continue
+        if point not in KERNEL_POINTS:
+            continue
+        call = (event.get('process_sha256'), event.get('call_sha256'))  # 호출 번호는 프로세스마다 따로 센다
+        if phase == 'CALL':
+            plan = fields.get('plan')
+            if event.get('entry_qualified_before') is True and type(plan) is dict:
+                bound = [dict(item, case_id=wanted.get(holder.get((process, item.get('slot'))))) for item in plan.get('items') or ()]
+                calls[call] = {'point': point, 'plan': plan, 'items': bound, 'terminal': None}
+                order.append(call)
+        elif call in calls and event.get('entry_qualified_after') is True:
+            calls[call]['terminal'] = {'phase': phase, **fields}
+    violations = []; missing = set(); covered = {c['case_id']: set() for c in cases}; lengths = set()
+    for call in order:
+        entry = calls[call]; terminal = entry['terminal']; point = entry['point']
+        for item in entry['items']:
+            ranges = [item.get(k) for k in ('write_range_ok', 'read_range_ok', 'lookahead_write_ok', 'lookahead_read_ok') if k in item]
+            if item.get('slot_in_range') is False or False in ranges:
+                violations.append({'point': point, 'batch': item.get('batch'), 'reason': 'access_range'})
+        if point == 'prepare_pos_seq_lens' and entry['plan'].get('padding_range_ok') is False:
+            violations.append({'point': point, 'reason': 'padding_range'})
+        if terminal is None or terminal['phase'] != 'RETURN':
+            missing.add('kernel_terminal_unobserved'); continue
+        if terminal.get('gpu_completion') is not True:
+            missing.add('gpu_completion_unobserved'); continue
+        if point == 'prepare_pos_seq_lens' and terminal.get('padding_initialized') is False:
+            violations.append({'point': point, 'reason': 'padding_not_initialized'})
+        matches = {o.get('batch'): o.get('reference_matches') for o in terminal.get('outputs') or ()}
+        for item in entry['items']:
+            if point == 'prepare_prefill_inputs' and not item.get('prefill'):
+                continue
+            result = matches.get(item.get('batch'))
+            if result is False:
+                missing.add('reference_output_mismatch')
+            if item.get('case_id') in covered and result is True and (point != 'prepare_pos_seq_lens' or terminal.get('padding_initialized') is True):
+                covered[item['case_id']].add(point)
+                if point == 'prepare_prefill_inputs' and type(item.get('query_len')) is int:
+                    lengths.add(item['query_len'])
+    if any(points != set(KERNEL_POINTS) for points in covered.values()):
+        missing.add('case_kernel_calls_unobserved')
+    if not (any(n <= KERNEL_BLOCK for n in lengths) and any(n > KERNEL_BLOCK for n in lengths)):
+        missing.add('block_boundary_not_crossed')
+    return {'calls': len(order), 'covered_cases': sorted(c for c, p in covered.items() if p == set(KERNEL_POINTS)),
+            'query_lengths': sorted(lengths), 'violations': violations,
+            'violation': True if violations else (None if missing else False),
+            'full_scope': not missing and not violations, 'missing': sorted(missing),
+            'hardware_memory_checker': False}
+
+
+REPLAY = 'ModelCudaGraphManager.run_fullgraph'
+SAMPLE = 'GPUModelRunner.sample'
+_SHA = re.compile('[0-9a-f]{64}')
+
+
+def validate_reference_outputs(cases, references):
+    """REQ-20 독립 대조: graph를 끈 엔진 세대에서 같은 사례의 답변 해시. 없으면 None."""
+    if references is None:
+        return None
+    ids = {c['case_id'] for c in cases if c.get('role') == 'replay'}
+    if (type(references) is not dict or not references or set(references) - ids
+            or any(type(v) is not str or _SHA.fullmatch(v) is None for v in references.values())):
+        raise ValueError('ENGINE_CALLBACK_REFERENCE_OUTPUTS_INVALID')
+    return references
+
+
+def project_graph_lifetime(cases, outputs, events, secret, tags, references=None):
+    """REQ-20: FULL graph replay와 그 출력의 소비를 요청 단위로 잇는다.
+
+    앞 replay 출력이 소비되기 전에 새 replay가 시작되거나, 소비 시점에 출력 값이 바뀌었거나,
+    replay 직전 위치 입력이 이번 step 값이 아니면 직접 위반이다. HTTP 답변이 graph를 끈
+    대조 세대와 다른 것만으로는 위반으로 보지 않는다.
+    """
+    wanted = {tag_digest(secret, tag): case_id for case_id, tag in tags.items()}
+    replays = {}; samples = []
+    for event in events:
+        point = event.get('point'); fields = event.get('fields') or {}
+        if point not in (REPLAY, SAMPLE) or event.get('entry_qualified_before') is not True:
+            continue
+        call = (event.get('process_sha256'), event.get('call_sha256'))  # 호출 번호는 프로세스마다 따로 센다
+        if point == REPLAY:
+            if event.get('phase') == 'CALL':
+                replays[call] = {'entry': fields, 'terminal': None}
+            elif call in replays and event.get('entry_qualified_after') is True:
+                replays[call]['terminal'] = {'phase': event.get('phase'), **fields}
+        elif event.get('phase') == 'CALL':
+            samples.append(fields)
+    violations = []; missing = set()
+    for call, replay in replays.items():
+        entry = replay['entry']
+        if entry.get('pending_unconsumed') is True:
+            violations.append({'reason': 'replay_before_output_consumed'})
+        if entry.get('input_refresh') is False:
+            violations.append({'reason': 'stale_graph_input'})
+        if entry.get('input_refresh') is None:
+            missing.add('graph_input_refresh_unobserved')
+        if entry.get('captured') is not True or (entry.get('desc') or {}).get('cg_mode') != 'FULL':
+            missing.add('graph_key_unverified')
+        terminal = replay['terminal']
+        if terminal is None or terminal['phase'] != 'RETURN' or terminal.get('gpu_completion') is not True:
+            missing.add('graph_completion_unobserved')
+    covered = set()
+    for sample in samples:
+        if sample.get('graph_output') is not True:
+            continue
+        if sample.get('output_intact') is False:
+            violations.append({'reason': 'graph_output_changed_before_consumption'})
+        if sample.get('output_intact') is True:
+            covered |= {wanted[r] for r in sample.get('native_request_sha256') or () if r in wanted}
+    replay_cases = [c['case_id'] for c in cases if c.get('role') == 'replay']
+    if not replays:
+        missing.add('graph_replay_unobserved')
+    if set(replay_cases) - covered:
+        missing.add('case_graph_consumption_unobserved')
+    if references is None:
+        missing.add('independent_output_control_unavailable')
+    else:
+        compared = {c: outputs.get(c) == references[c] for c in references}
+        if set(replay_cases) - set(references):
+            missing.add('independent_output_control_unavailable')
+        if not all(compared.values()):
+            missing.add('reference_output_mismatch')
+    return {'replays': len(replays), 'covered_cases': sorted(covered), 'violations': violations,
+            'violation': True if violations else (None if missing else False),
+            'full_scope': not missing and not violations, 'missing': sorted(missing)}
+
+
+DAEMON_STATE = 'WeightCacheDaemon._handle_get_state'
+DAEMON_RELEASE = 'WeightCacheDaemon._handle_release'
+
+
+def project_weights_lifetime(cases, outputs, events, switches):
+    """LIF-13: release 앞뒤 daemon 공급·release 주체·release 뒤 취득·fallback·기존 참조 효과.
+
+    release된 세대를 다시 공급하거나, release 뒤에도 가중치가 남아 공급되거나, fallback이 꺼진
+    loader가 디스크 fallback을 쓰면 직접 위반이다. release 주체의 허용 여부는 기업 정책이 없어
+    판단하지 않으므로 범위는 끝나지 않는다. release 뒤 답변이 달라진 것만으로는 위반이 아니다.
+    """
+    rows = {}; order = []
+    for event in events:
+        point = event.get('point')
+        if point not in (DAEMON_STATE, DAEMON_RELEASE, 'IpcModelLoader._request_state', 'IpcModelLoader._fallback_load') \
+                or event.get('entry_qualified_before') is not True:
+            continue
+        call = (event.get('process_sha256'), event.get('call_sha256'))  # 호출 번호는 프로세스마다 따로 센다
+        if event.get('phase') == 'CALL':
+            rows[call] = {'point': point, 'process': event.get('process_sha256'), 'entry': event.get('fields') or {}, 'terminal': None}
+            order.append(call)
+        elif call in rows and event.get('entry_qualified_after') is True:
+            rows[call]['terminal'] = {'phase': event.get('phase'), **(event.get('fields') or {})}
+    released = None; consumers = set(); actors = []; violations = []; missing = set(); after = {'refused': 0, 'fallback': 0}
+    for call in order:
+        row = rows[call]; entry = row['entry']; terminal = row['terminal'] or {}
+        if row['point'] == DAEMON_STATE:
+            served = terminal.get('phase') == 'RETURN' and entry.get('weights_present') is True and entry.get('config_matches') is True
+            if released is None and served and entry.get('peer_pid_sha256'):
+                consumers.add(entry['peer_pid_sha256'])
+            if released is not None:
+                if served:
+                    violations.append({'reason': 'released_generation_served' if entry.get('weights_generation_token') == released
+                                       else 'weights_served_after_release'})
+                elif terminal.get('phase') == 'RETURN' and entry.get('weights_present') is False:
+                    after['refused'] += 1
+        elif row['point'] == DAEMON_RELEASE:
+            if terminal.get('phase') == 'RETURN' and terminal.get('weights_present') is False:
+                released = entry.get('weights_generation_token') or 'unknown'
+                actors.append({'peer_uid_sha256': entry.get('peer_uid_sha256'), 'peer_pid_sha256': entry.get('peer_pid_sha256')})
+            else:
+                missing.add('release_not_completed')
+        elif row['point'] == 'IpcModelLoader._fallback_load':
+            if entry.get('fallback_enabled') is False:
+                violations.append({'reason': 'fallback_used_while_disabled'})
+            elif released is not None and terminal.get('phase') == 'RETURN' and terminal.get('model_token'):
+                after['fallback'] += 1
+    if len(consumers) < 2:
+        missing.add('two_consumer_acquisition_unobserved')
+    if not actors:
+        missing.add('release_unobserved')
+    elif any(a['peer_uid_sha256'] is None for a in actors):
+        missing.add('release_actor_unobserved')
+    missing.add('release_authorization_policy_unavailable')
+    if not after['refused']:
+        missing.add('post_release_acquisition_unobserved')
+    if not after['fallback']:
+        missing.add('fallback_consumption_unobserved')
+    if not any(s.get('action') == 'weights_release' and s.get('completed') for s in switches or ()):
+        missing.add('lab_release_action_unobserved')
+    before = [outputs.get(c['case_id']) for c in cases if c['role'] == 'before']
+    later = [outputs.get(c['case_id']) for c in cases if c['role'] == 'after']
+    if not before or not later or None in before + later or len(set(before)) != 1:
+        missing.add('existing_reference_control_unavailable')
+    elif set(later) != set(before):
+        missing.add('post_release_output_changed')
+    # 주체 허용 여부는 정책이 없어 범위만 막는다. 관측한 사실의 위반 여부와는 따로 둔다.
+    core = missing - {'release_authorization_policy_unavailable'}
+    return {'consumers': len(consumers), 'release_actors': actors, 'post_release': after, 'violations': violations,
+            'violation': True if violations else (None if core else False),
+            'full_scope': not missing and not violations, 'missing': sorted(missing)}
+
+
+COMM_INIT = 'CustomAllreduce.__init__'
+COMM_POINTS = (COMM_INIT, 'CustomAllreduce.register_graph_buffers', 'CustomAllreduce.all_reduce', 'CustomAllreduce.close')
+
+
+def project_comm_buffer(cases, outputs, events):
+    """REQ-21: 통신기 세대별 등록·사용·완료·해제와 재기동 뒤 재등록·정상 회복.
+
+    닫힌 통신기의 사용, 그 세대에 등록되지 않은 buffer의 사용, 닫힌 통신기의 graph buffer
+    등록은 직접 위반이다. 주소가 세대 사이에 다시 나오는 것은 정상 재사용일 수 있어 보지 않는다.
+    재기동 뒤 답변이 달라진 것만으로는 위반이 아니다.
+    """
+    calls = {}; order = []
+    for event in events:
+        if event.get('point') not in COMM_POINTS or event.get('entry_qualified_before') is not True:
+            continue
+        call = (event.get('process_sha256'), event.get('call_sha256'))  # 호출 번호는 프로세스마다 따로 센다
+        if event.get('phase') == 'CALL':
+            calls[call] = {'point': event['point'], 'process': event.get('process_sha256'), 'entry': event.get('fields') or {}, 'terminal': None}
+            order.append(call)
+        elif call in calls and event.get('entry_qualified_after') is True:
+            calls[call]['terminal'] = {'phase': event.get('phase'), **(event.get('fields') or {})}
+    generations = {}; violations = []; missing = set(); fences = []
+    for call in order:
+        row = calls[call]; entry = row['entry']; terminal = row['terminal'] or {}
+        if row['point'] == COMM_INIT:
+            if terminal.get('phase') == 'RETURN' and terminal.get('communicator_token'):
+                # 객체 token은 프로세스마다 따로 세므로 프로세스와 함께 세대를 구분한다.
+                generations[(row['process'], terminal['communicator_token'])] = {'process': row['process'], 'rank': terminal.get('rank'),
+                    'world_size': terminal.get('world_size'), 'buffer': terminal.get('buffer_sha256'),
+                    'live': terminal.get('live'), 'used': False, 'closed': False, 'order': len(generations)}
+            continue
+        generation = generations.get((row['process'], entry.get('communicator_token')))
+        if generation is None:
+            missing.add('communicator_registration_unobserved'); continue
+        if row['point'] == 'CustomAllreduce.close':
+            if terminal.get('phase') == 'RETURN' and terminal.get('live') is False:
+                generation['closed'] = True
+            elif generation['live']:
+                missing.add('communicator_release_unverified')
+            continue
+        if generation['closed'] or entry.get('live') is False and generation['live']:
+            violations.append({'reason': 'closed_communicator_used' if row['point'].endswith('all_reduce') else 'closed_communicator_registered'})
+            continue
+        if row['point'] == 'CustomAllreduce.all_reduce' and generation['live']:
+            if entry.get('buffer_sha256') != generation['buffer']:
+                violations.append({'reason': 'unregistered_buffer_used'})
+            else:
+                generation['used'] = True
+            fences.append(terminal.get('completion_fence'))
+    live = [g for g in generations.values() if g['live']]
+    if not live or not any((g['world_size'] or 0) >= 2 for g in live):
+        missing.add('tensor_parallel_communicator_inactive')
+    if not any(g['used'] for g in live):
+        missing.add('buffer_consumption_unobserved')
+    if not fences or any(f is not True for f in fences):
+        missing.add('completion_fence_unobserved')
+    closed = [g for g in live if g['closed']]
+    if not closed:
+        missing.add('release_generation_unobserved')
+    # 재기동: 닫힌 세대 뒤에 다른 프로세스의 새 세대가 등록·사용돼야 한다.
+    if not any(g['used'] and g['process'] not in {c['process'] for c in closed} and g['order'] > min(c['order'] for c in closed)
+               for g in live) if closed else True:
+        missing.add('restart_and_reregistration_unobserved')
+    before = [outputs.get(c['case_id']) for c in cases if c['role'] == 'before']
+    after = [outputs.get(c['case_id']) for c in cases if c['role'] == 'after']
+    if not before or not after or None in before + after:
+        missing.add('normal_recovered_control_unavailable')
+    elif set(after) != set(before):
+        missing.add('post_restart_output_changed')
+    return {'generations': len(generations), 'violations': violations,
+            'violation': True if violations else (None if missing else False),
+            'full_scope': not missing and not violations, 'missing': sorted(missing)}

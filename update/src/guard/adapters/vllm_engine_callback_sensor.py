@@ -20,6 +20,10 @@ import threading
 
 from . import vllm_cache_callback as cache
 from . import vllm_distributed_callback as distributed
+from . import vllm_kernel_bounds_callback as kernel_bounds
+from . import vllm_graph_replay_callback as graph_replay
+from . import vllm_weights_lifetime_callback as weights_lifetime
+from . import vllm_comm_buffer_callback as comm_buffer
 
 PROFILE = 'vllm-engine-callback-metadata/1'
 SCHEMA = 'guard-engine-callback-events/1'
@@ -28,10 +32,19 @@ DATA_ROOT = '/guard-lifecycle/data'
 SLOT_MODULE = 'vllm.v1.worker.gpu_input_batch'
 SLOT_TARGETS = {SLOT_MODULE: ('InputBatch.add_request', 'InputBatch.remove_request')}
 SLOT_SOURCE = {SLOT_MODULE: 'e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d'}
+# V2 model runner (vLLM 0.31.0 기본 GPU runner). 자리 배정·회수와 sampler가 실제로
+# 받은 요청별 상태를 CPU 쪽 배열에서만 읽는다. GPU tensor를 읽거나 동기화하지 않는다.
+SLOT_V2_STATES = 'vllm.v1.worker.gpu.states'
+SLOT_V2_SAMPLER = 'vllm.v1.worker.gpu.sample.sampler'
+SLOT_V2_TARGETS = {SLOT_V2_STATES: ('RequestState.add_request', 'RequestState.remove_request'),
+                   SLOT_V2_SAMPLER: ('Sampler.add_request', 'Sampler.__call__')}
+SLOT_V2_SOURCE = {SLOT_V2_STATES: '8c899b8ef63d95f450876d3f01e56772f9534938a95383a46659fddf85573fa3',
+                  SLOT_V2_SAMPLER: 'ddbcdab46010bf38a5fab9b9b6a2deed2ec5e883ebfe81e83f6d22f41e546771'}
+MAX_SAMPLED_SLOTS = 256
 # Block-level lookups feed no projection. Wrapping them made every cache hit
 # slower in proportion to its length and multiplied the session rows.
 CACHE_TARGETS = {'vllm.v1.core.kv_cache_manager': cache.TARGETS['vllm.v1.core.kv_cache_manager']}
-MODULES = {**CACHE_TARGETS, **distributed.TARGETS, **SLOT_TARGETS}
+MODULES = {**CACHE_TARGETS, **distributed.TARGETS, **SLOT_TARGETS, **SLOT_V2_TARGETS, **kernel_bounds.TARGETS, **graph_replay.TARGETS, **weights_lifetime.TARGETS, **comm_buffer.TARGETS}
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
 MAX_FILE_BYTES = 16 * 1024 ** 2
@@ -84,6 +97,107 @@ class SlotObserver(_Keyed, cache.CacheCallbackObserver):
         return row
 
 
+def _slot_index(value):
+    """numpy 정수도 받되 bool·음수·거대값은 버린다."""
+    try:
+        if isinstance(value, bool):
+            return None
+        index = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return index if 0 <= index < 2**31 and index == value else None
+
+
+def _array_at(array, index):
+    try:
+        return array[index]
+    except Exception:
+        return None
+
+
+class SlotV2Observer(_Keyed, cache.CacheCallbackObserver):
+    """V2 runner의 자리 배정과 sampler가 실제로 쓴 자리별 제한 상태.
+
+    값(허용 token 목록·logit)은 남기지 않고 개수·플래그만 남긴다. 상태는 sampler가
+    호출되는 순간의 CPU 원본 배열이며, GPU kernel이 그 값을 소비했다는 증명은 아니다.
+    """
+    targets = SLOT_V2_TARGETS
+    sources = SLOT_V2_SOURCE
+    schema = 'guard-vllm-slot-v2-callback/1'
+    profile = 'source-bound-slot-v2-callback-candidate-v1'
+
+    def _request_at(self, states, slot):
+        mapping = cache.base.attrs(states).get('index_to_req_id')
+        return self.fingerprint(mapping.get(slot)) if type(mapping) is dict else None
+
+    def _slot_state(self, sampler, slot):
+        """Sampler의 logit-bias 상태에서 이 자리의 허용 token 개수와 사용 여부."""
+        fields = cache.base.attrs(sampler)
+        bias = next((p for p in (fields.get('logits_processors') or ()) if hasattr(p, 'num_allowed_token_ids')), None)
+        allowed = _array_at(getattr(getattr(bias, 'num_allowed_token_ids', None), 'np', None), slot)
+        used = _array_at(getattr(bias, 'use_logit_bias', None), slot)
+        needs = _array_at(fields.get('needs_logits_processing'), slot)
+        return {'allowed_token_count': _slot_index(allowed) if allowed is not None else None,
+                'logit_bias_in_use': bool(used) if used is not None else None,
+                'needs_logits_processing': bool(needs) if needs is not None else None}
+
+    def _snapshot(self, point, args, kwargs, result=None, returned=False):
+        receiver = args[0] if args else None
+        if point == 'RequestState.add_request':
+            req_id = args[1] if len(args) > 1 else kwargs.get('req_id')
+            row = {'request_sha256': self.fingerprint(req_id)}
+            if returned:
+                mapping = cache.base.attrs(receiver).get('req_id_to_index')
+                row['slot'] = _slot_index(mapping.get(req_id)) if type(mapping) is dict else None
+            return row
+        if point == 'RequestState.remove_request':
+            req_id = args[1] if len(args) > 1 else kwargs.get('req_id')
+            row = {'request_sha256': self.fingerprint(req_id)}
+            if returned:
+                row['slot'] = _slot_index(result)
+            return row
+        states = cache.base.attrs(receiver).get('req_states')
+        if point == 'Sampler.add_request':
+            slot = _slot_index(args[1] if len(args) > 1 else kwargs.get('req_idx'))
+            params = args[2] if len(args) > 2 else kwargs.get('sampling_params')
+            allowed = cache.base.attrs(params).get('allowed_token_ids')
+            row = {'slot': slot, 'request_sha256': self._request_at(states, slot),
+                   'restricted': type(allowed) is list and bool(allowed)}
+            if returned and slot is not None:
+                row.update(self._slot_state(receiver, slot))
+            return row
+        # Sampler.__call__: 진입 시점의 batch 자리와 그 자리의 상태만 읽는다.
+        if returned:
+            return {}
+        batch = args[2] if len(args) > 2 else kwargs.get('input_batch')
+        mapping = cache.base.attrs(batch).get('idx_mapping_np')
+        try:
+            slots = [_slot_index(v) for v in list(mapping)] if mapping is not None and len(mapping) <= MAX_SAMPLED_SLOTS else None
+        except Exception:
+            slots = None
+        if slots is None or None in slots:
+            self.gaps.add('SLOT_V2_SAMPLED_SLOTS_UNAVAILABLE')
+            return {'sampled': None}
+        return {'sampled': [{'slot': s, 'request_sha256': self._request_at(states, s), **self._slot_state(receiver, s)}
+                            for s in slots]}
+
+
+class KernelObserver(_Keyed, kernel_bounds.KernelBoundsObserver):
+    pass
+
+
+class GraphObserver(_Keyed, graph_replay.GraphReplayObserver):
+    pass
+
+
+class WeightsObserver(_Keyed, weights_lifetime.WeightsLifetimeObserver):
+    pass
+
+
+class CommObserver(_Keyed, comm_buffer.CommBufferObserver):
+    pass
+
+
 class Sink:
     def __init__(self, directory):
         self.path = Path(directory) / f'callbacks-{os.getpid()}.jsonl'
@@ -100,18 +214,39 @@ class Sink:
 
 
 class EngineCallbacks:
-    def __init__(self, session, secret, sink, *, context_provider=None, clock=None, fault_file=None):
+    def __init__(self, session, secret, sink, *, context_provider=None, clock=None, fault_file=None, kernel_checks=False):
         self.sink = sink; self.fault_file = fault_file
         options = {'sink': sink, 'context_provider': context_provider, 'clock': clock}
         self.cache = CacheObserver(session, **options)
         self.distributed = DistributedObserver(session, **options)
         self.slot = SlotObserver(session, **options)
-        self.cache.secret = self.distributed.secret = self.slot.secret = secret
+        self.slot_v2 = SlotV2Observer(session, **options)
+        self.weights = WeightsObserver(session, **options)
+        self.comm = CommObserver(session, fence=kernel_checks, **options)
+        # REQ-19 kernel 대조는 GPU 동기화가 필요하다. 소유 lab 엔진에서 명시했을 때만 만든다.
+        self.kernel = KernelObserver(session, **options) if kernel_checks else None
+        self.graph = GraphObserver(session, kernel=self.kernel, **options) if kernel_checks else None
+        self.cache.secret = self.distributed.secret = self.slot.secret = self.slot_v2.secret = self.weights.secret = self.comm.secret = secret
+        if self.kernel is not None:
+            self.kernel.secret = self.graph.secret = secret
 
     def instrument(self, module):
         """Validate every point of a module before changing any of them."""
         name = vars(module).get('__name__')
-        observer = self.cache if name in CACHE_TARGETS else self.slot if name in SLOT_TARGETS else self.distributed
+        if name in kernel_bounds.TARGETS or name in graph_replay.TARGETS:
+            if self.kernel is None:
+                return False
+            try:
+                if name in kernel_bounds.TARGETS:
+                    return kernel_bounds.instrument(module, self.kernel)
+                return graph_replay.instrument(module, self.graph)
+            except Exception:
+                self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
+                return False
+        observer = (self.cache if name in CACHE_TARGETS else self.slot if name in SLOT_TARGETS
+                    else self.slot_v2 if name in SLOT_V2_TARGETS else self.weights if name in weights_lifetime.TARGETS
+                    else self.comm if name in comm_buffer.TARGETS
+                    else self.distributed)
         try:
             changes = [(cache._function(module, point), observer.wrap(module, point)) for point in MODULES[name]]
         except Exception:
@@ -142,7 +277,8 @@ class EngineCallbacks:
             pass
 
     def flush_gaps(self):
-        for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps):
+        kernel = self.kernel.gaps | self.graph.gaps if self.kernel is not None else set()
+        for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | self.weights.gaps | self.comm.gaps | kernel):
             self.gap(code)
 
 
@@ -183,7 +319,8 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         callbacks = EngineCallbacks(settings['session'], bytes.fromhex(settings['secret']), Sink(directory),
             context_provider=context_provider,
-            fault_file=str(directory / FAULT_FILE) if settings.get('lab_faults') is True else None)
+            fault_file=str(directory / FAULT_FILE) if settings.get('lab_faults') is True else None,
+            kernel_checks=settings.get('lab_kernel_checks') is True)
         sys.meta_path.insert(0, Finder(callbacks))
         atexit.register(callbacks.flush_gaps)
         return True

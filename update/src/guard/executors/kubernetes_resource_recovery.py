@@ -78,12 +78,23 @@ class KubernetesResourceRecoveryExecutor(HttpCheckExecutor):
                         prepared=ctx._recovery_prepared,owner_identity=reader.owner_identity,read_file=reader.read_file,image_check=reader.image_check)
                     if not packet.get('recorded_files_covered'):diagnostics.append('RESOURCE_RECOVERY_NATIVE_COVERAGE_UNAVAILABLE')
                 except Exception:diagnostics.append('RESOURCE_RECOVERY_CAPTURE_UNAVAILABLE')
-        projection=project(censuses,ctx._recovery_selection,ctx.policy_values);http=ctx.cprobe.report();read_report=reader.report() if reader else None
+        projection=project(censuses,ctx._recovery_selection,ctx.policy_values)
+        try:http=ctx.cprobe.report()
+        except Exception:
+            diagnostics.append('RESOURCE_RECOVERY_HTTP_REPORT_UNAVAILABLE')
+            http={'collection_gap':True,'cleanup_errors':['RESOURCE_RECOVERY_HTTP_REPORT_UNAVAILABLE']}
+        read_report=None
+        if reader is not None:
+            try:read_report=reader.report()
+            except Exception:
+                diagnostics.append('RESOURCE_RECOVERY_READER_REPORT_UNAVAILABLE')
+                read_report={'collection_gap':True,'parent_cleanup_unverified':True}
         if any(not row.get('collected') or not row.get('owner_binding_verified') or not row.get('clock_window_verified') for row in censuses) or len(censuses)!=2:
             diagnostics.append('RESOURCE_RECOVERY_CENSUS_BINDING_UNAVAILABLE')
         ctx._recovery_cleanup=list(http['cleanup_errors'])
         if read_report and read_report.get('parent_cleanup_unverified'):ctx._recovery_cleanup.append('RESOURCE_RECOVERY_PARENT_CLEANUP_UNVERIFIED')
         ctx._recovery_gap=bool(diagnostics or http['collection_gap'] or ctx._recovery_cleanup)
+        ctx._recovery_diagnostic_codes=tuple(diagnostics)
         summary={'profile':PROFILE,'declared_branch':ctx.policy_values['recovery_branch'],'declared_phase':ctx.policy_values['recovery_phase'],
             'declared_scenario_sha256':ctx.policy_values['recovery_scenario_sha256'],'trials':trials,'censuses':censuses,'native':packet,
             'projection':projection,'transport':http,'reader':read_report,'sealed_selected_session':sealed,'diagnostic_codes':diagnostics,
@@ -97,5 +108,9 @@ class KubernetesResourceRecoveryExecutor(HttpCheckExecutor):
 
     def _finish(self,ctx):
         draft=super()._finish(ctx);draft.data_origin=DataOrigin.EXAMPLE
-        if ctx._recovery_gap:draft.status=ExecStatus.ABORTED
+        if ctx._recovery_gap:
+            draft.status=ExecStatus.ABORTED
+            if draft.abort_reason is None:
+                codes=sorted(set(tuple(getattr(ctx,'_recovery_diagnostic_codes',()))+tuple(ctx._recovery_cleanup)))
+                draft.abort_reason='; '.join(codes) or 'RESOURCE_RECOVERY_COLLECTION_INCOMPLETE'
         draft.cleanup_errors.extend(ctx._recovery_cleanup);return draft

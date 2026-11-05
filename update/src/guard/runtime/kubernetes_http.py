@@ -76,6 +76,17 @@ finally:
  os.close(fd)
 print(json.dumps({"schema":"guard-owned-file/1","sha256":hashlib.sha256(raw).hexdigest(),"document":json.loads(raw)}))
 '''
+# LIF-13 lab: 소유 weights daemon socket에 원 vLLM 통신 형식으로 전체 release 한 번.
+WEIGHTS_RELEASE = r'''
+import json,socket,sys
+from vllm.model_executor.model_loader.weight_cache.protocol import send_msg,recv_msg
+s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);s.settimeout(30);s.connect(sys.argv[1])
+try:
+ send_msg(s,{"cmd":"release"});r=recv_msg(s)
+finally:
+ s.close()
+print(json.dumps({"schema":"guard-lab-weights-release/1","status":r.get("status") if isinstance(r,dict) else None}))
+'''
 LORA_VARIANT_COPY = r'''
 import hashlib,json,os,stat,sys
 source,active=sys.argv[1],sys.argv[2];files={}
@@ -106,12 +117,17 @@ print(json.dumps({"schema":"guard-lab-lora-copy/1","files_sha256":files},separat
 
 
 def _callback_content(content):
-    """Text, or the closed REQ-16 text plus one generated PNG part."""
+    """Text, or REQ-16 text plus one generated PNG and optional bounded trailing text."""
     if type(content) is str:
         return 0<len(content)<=4096
-    if type(content) is not list or len(content)!=2 or any(type(part) is not dict for part in content):
+    if type(content) is not list or len(content) not in (2,3) or any(type(part) is not dict for part in content):
         return False
-    text,image=content;url=(image.get("image_url") or {}).get("url") if type(image.get("image_url")) is dict else None
+    if len(content)==3:
+        tail=content[2]
+        if (set(tail)!={"type","text"} or tail["type"]!="text" or type(tail["text"]) is not str or not 0<len(tail["text"])<=4096
+                or type(content[0].get("text")) is not str or len(content[0]["text"])+len(tail["text"])>4096):
+            return False
+    text,image=content[:2];url=(image.get("image_url") or {}).get("url") if type(image.get("image_url")) is dict else None
     return (set(text)=={"type","text"} and text["type"]=="text" and type(text["text"]) is str and 0<len(text["text"])<=4096
         and set(image) in ({"type","image_url"},{"type","image_url","uuid"}) and image["type"]=="image_url"
         and set(image["image_url"])=={"url"} and type(url) is str and url.startswith("data:image/png;base64,") and len(url)<=65536
@@ -735,12 +751,19 @@ class KubernetesHTTP:
 
     def engine_callback_switch(self,action,variant):
         """Change one declared REQ-16 context in the owned lab engine and return bounded facts."""
-        lab=self._callback_lab;kind={"lora_reload":"lora","weights_reload":"weights"}.get(action)
+        lab=self._callback_lab;kind={"lora_reload":"lora","weights_reload":"weights","weights_release":"weights_daemon"}.get(action)
         if (self.profile!=ENGINE_CALLBACK_PROFILE or self.lab is not True or lab is None or kind is None
                 or lab.get(kind) is None or variant not in lab[kind]["variants"]):
             raise KubernetesBindingError()
         self._callback_switches+=1;endpoint=self.endpoint.scheme+"://"+self.endpoint.netloc;facts={}
         request={"id":"cbx-%d"%self._callback_switches,"mode":"json","method":"POST","headers":{}}
+        if kind=="weights_daemon":
+            self._verify();engine=self.binding["engine"]
+            done=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",
+                "--","python3","-c",WEIGHTS_RELEASE,lab["weights_daemon"]["variants"][variant]],cap=4096,budget=60)
+            if type(done) is not dict or done!={"schema":"guard-lab-weights-release/1","status":"ok"}:
+                raise KubernetesBindingError()
+            return {"daemon_status":"ok"}
         if kind=="lora":
             spec=lab["lora"];self._verify();engine=self.binding["engine"]
             copied=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",

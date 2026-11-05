@@ -96,7 +96,17 @@ class KubernetesStreamBufferExecutor(HttpCheckExecutor):
                     if not packet.get('recorded_files_covered'):diagnostics.append('STREAM_BUFFER_NATIVE_COVERAGE_UNAVAILABLE')
                     if budget_profile:rss_samples.extend(reader.sample_packet(packet,'after'))
                 except Exception:diagnostics.append('STREAM_BUFFER_CAPTURE_UNAVAILABLE')
-        projection=metadata.project(packet,trials,ctx.policy_values);http=ctx.cprobe.report();read_report=reader.report() if reader else None
+        projection=metadata.project(packet,trials,ctx.policy_values)
+        try:http=ctx.cprobe.report()
+        except Exception:
+            diagnostics.append('STREAM_BUFFER_HTTP_REPORT_UNAVAILABLE')
+            http={'collection_gap':True,'cleanup_errors':['STREAM_BUFFER_HTTP_REPORT_UNAVAILABLE']}
+        read_report=None
+        if reader is not None:
+            try:read_report=reader.report()
+            except Exception:
+                diagnostics.append('STREAM_BUFFER_READER_REPORT_UNAVAILABLE')
+                read_report={'collection_gap':True,'parent_cleanup_unverified':True}
         summary={'profile':ctx.check.collection_profile,'trials':trials,'native':packet,'projection':projection,'transport':http,'reader':read_report,
             'sealed_selected_session':sealed,'diagnostic_codes':diagnostics,'fixture':{'profile':PROFILE},'whole_scope_complete':False,
             'server_memory_is_client_read_timing':False,'worker_gpu_release_verified':False}
@@ -109,6 +119,7 @@ class KubernetesStreamBufferExecutor(HttpCheckExecutor):
             if any(not row['process_context_verified'] or not row['owner_binding_verified'] for row in rss_samples):
                 diagnostics.append('BUDGET_RSS_SAMPLING_INCOMPLETE')
         ctx._buffer_gap=bool(diagnostics or http['collection_gap'] or ctx._buffer_cleanup)
+        ctx._buffer_diagnostic_codes=tuple(diagnostics)
         data={'buffer_http_trials':trials,'buffer_native_samples':projection['samples'],'buffer_cases':projection['cases'],
             'buffer_missing':projection['missing'],'buffer_conflict_candidates':projection['conflict_candidates'],
             'buffer_producer_authenticated':False,'buffer_inventory_complete':False,'buffer_release_verified':False,'buffer_scope_complete':False}
@@ -130,5 +141,9 @@ class KubernetesStreamBufferExecutor(HttpCheckExecutor):
 
     def _finish(self,ctx):
         draft=super()._finish(ctx);draft.data_origin=DataOrigin.EXAMPLE
-        if ctx._buffer_gap:draft.status=ExecStatus.ABORTED
+        if ctx._buffer_gap:
+            draft.status=ExecStatus.ABORTED
+            if draft.abort_reason is None:
+                codes=sorted(set(tuple(getattr(ctx,'_buffer_diagnostic_codes',()))+tuple(ctx._buffer_cleanup)))
+                draft.abort_reason='; '.join(codes) or 'STREAM_BUFFER_COLLECTION_INCOMPLETE'
         draft.cleanup_errors.extend(ctx._buffer_cleanup);return draft

@@ -105,8 +105,12 @@ class KubernetesSupplyBootExecutor:
                 result["native"] = contract.native_consumption(native_model_file_reads.analyze(captured, prepared))
             except Exception:
                 row["diagnostic_codes"].append("SUPPLY_BOOT_NATIVE_UNAVAILABLE")
-        report = reader.report()
-        if report.get("parent_cleanup_unverified"):
+        try:
+            report = reader.report()
+            if report.get("parent_cleanup_unverified"):
+                result["cleanup"] = "SUPPLY_BOOT_PARENT_CLEANUP_UNVERIFIED"
+        except Exception:
+            row["diagnostic_codes"].append("SUPPLY_BOOT_READER_REPORT_UNAVAILABLE")
             result["cleanup"] = "SUPPLY_BOOT_PARENT_CLEANUP_UNVERIFIED"
         return result
 
@@ -167,8 +171,10 @@ class KubernetesSupplyBootExecutor:
                     "supply_boot_normal_verified": normal_ok, "supply_boot_change_applied": bool(change and change["applied"]),
                     "supply_boot_record_authenticated": False, "supply_boot_native_consumption": native_rows}
         record_seen = any(part["packet"] is not None for part in collected.values())
+        native_seen = any(part["native"] is not None for part in collected.values())
         observations = {key: {"value": value, "collected": record_seen or key in ("supply_boot_sessions", "supply_boot_missing",
-                              "supply_boot_complete", "supply_boot_record_authenticated")}
+                              "supply_boot_complete", "supply_boot_record_authenticated") or (native_seen and key in (
+                              "supply_boot_violations", "supply_boot_native_consumption"))}
                         for key, value in observed.items()}
         observations["supply_boot_change"]["collected"] = change is not None
         for item in observations.values():

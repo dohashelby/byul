@@ -1,0 +1,1073 @@
+{
+  "schema": "byul-gpu-b-phase1-status-audit/1",
+  "as_of": "2026-11-05T05:20:03.035793+00:00",
+  "baseline_commit": "c826fcc5d0d8303c2afc98b4550253a58907f480",
+  "owner": "gpu",
+  "owner_count": 43,
+  "all_notes_updated": 43,
+  "state_values_changed": 39,
+  "state_counts": {
+    "CPU_DEVELOPMENT_REMAINING": 36,
+    "DONE": 2,
+    "ENTERPRISE_INPUT_WAITING": 1,
+    "MEASUREMENT_REMAINING": 4
+  },
+  "new_GPU_executions": 0,
+  "new_GPU_MEASURED_results": 0,
+  "whole_question_complete_claimed": false,
+  "phase1_all_complete": false,
+  "checks": {
+    "LIF-01": {
+      "note": "docs/gpu-b/supply-preparation.md: 단계별 시간·CPU/GPU·임시 자원 및 중단/정리 boot-record 생산자 없음. 미실측 UNKNOWN.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "LIF-02": {
+      "note": "docs/gpu-b/supply-preparation.md 및 packs/PACK-BASELINE/checks/LIF-02.yaml: 장애 저장소·재시도 주체/중첩 계층·누적 bytes 생산자와 정상/도전 준비가 없음. 미실측 UNKNOWN.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "LIF-03": {
+      "note": "#196 생산자 대기(request-attempt); docs/gpu-b/lifecycle-development.md: 요청·단계별 예산, KV/GPU 비용·한도 집행 미확인 UNKNOWN. SUPPORTED_PRODUCERS 비어 있음, validate() 소비자 미연결. 기존 직접 관측·독립 FAIL·정확 Ref는 유지.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "LIF-04": {
+      "note": "M10 LIF04-stream/v2, reviews/S2-M10-VERIFY-01-result-v1.md: COMPLETED/EXAMPLE·세 축 UNKNOWN. native12 80행 transport_kind=unsupported; socket/drain/backpressure·GPU 회수 공통 관측 수정 필요.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "LIF-05": {
+      "note": "#196 생산자 대기(generation-transition); docs/gpu-b/lifecycle-development.md: 진행 요청과 worker·weights·cache 세대 연결 미확인 UNKNOWN. SUPPORTED_PRODUCERS 비어 있음, validate() 소비자 미연결. 기존 직접 관측·독립 FAIL·정확 Ref는 유지.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "LIF-06": {
+      "note": "#196 생산자 대기(generation-transition); docs/gpu-b/lifecycle-development.md: 부분 교체·혼합 소비와 동일 faulty 세대 외부 접수 미확인 UNKNOWN. SUPPORTED_PRODUCERS 비어 있음, validate() 소비자 미연결. 기존 직접 관측·독립 FAIL·정확 Ref는 유지.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "LIF-07": {
+      "note": "#196 생산자 대기(generation-transition); docs/gpu-b/lif07-normal-preparation.md: rank·모델·backend 준비와 실제 service gate 미확인 UNKNOWN. SUPPORTED_PRODUCERS 비어 있음, validate() 소비자 미연결. 기존 직접 관측·독립 FAIL·정확 Ref는 유지. M09 LIF07-normal/v1 ABORTED/EXAMPLE·RES level null. native22와 native15 혼용 금지.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "LIF-08": {
+      "note": "#196 생산자 대기(rank-fault); docs/gpu-b/lifecycle-development.md: 주입/해제 ack·선택 rank·탐지·복구 미확인 UNKNOWN. SUPPORTED_PRODUCERS 비어 있음, validate() 소비자 미연결. 기존 직접 관측·독립 FAIL·정확 Ref는 유지.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "LIF-09": {
+      "note": "#196 생산자 대기(generation-transition); docs/gpu-b/lifecycle-development.md: 부분 초기화 실패와 해당 세대 접수·차단 미확인 UNKNOWN. SUPPORTED_PRODUCERS 비어 있음, validate() 소비자 미연결. 기존 직접 관측·독립 FAIL·정확 Ref는 유지.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "LIF-10": {
+      "note": "#196 생산자 대기(request-attempt); docs/gpu-b/lifecycle-development.md: cancel/close/timeout의 Core·worker·참조·GPU 회수 미확인 UNKNOWN. SUPPORTED_PRODUCERS 비어 있음, validate() 소비자 미연결. 기존 직접 관측·독립 FAIL·정확 Ref는 유지. M11 COMPLETED/EXAMPLE·세 축 UNKNOWN, gpu_transfers 0·7scope 미검증.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "LIF-11": {
+      "note": "#196 생산자 대기(failed-group-resources); docs/gpu-b/lifecycle-development.md: 실패 그룹별 PID/IPC/SHM/NCCL/device 전후·반환 미확인 UNKNOWN. SUPPORTED_PRODUCERS 비어 있음, validate() 소비자 미연결. 기존 직접 관측·독립 FAIL·정확 Ref는 유지.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "LIF-12": {
+      "note": "#196 생산자 대기(request-attempt); docs/gpu-b/lifecycle-development.md: 새 attempt 자동 retry와 비용·KV·GPU 중복 소비 미확인 UNKNOWN. SUPPORTED_PRODUCERS 비어 있음, validate() 소비자 미연결. 기존 직접 관측·독립 FAIL·정확 Ref는 유지.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "LIF-14": {
+      "note": "#196 생산자 대기(profiler-control); docs/gpu-b/20261104-independent-measurements.md: backend stop/실패·worker RPC·출력 완료·다음 수집 미확인 UNKNOWN. SUPPORTED_PRODUCERS 비어 있음, validate() 소비자 미연결. 기존 직접 관측·독립 FAIL·정확 Ref는 유지. M07 EVD-01M6JCMR644KNCZCVC6FC2FCER@1 / RES-01M6JCNZ8F1C707RTX27QB5HSW@1, EXAMPLE·세 축 UNKNOWN. M17/v5.3 새 archive SHA42a89cc6, source4e의 materialize Git 소유권 조회 실패(128/상위1), trial/store 결과 없음. 최종 control/stopped 별도.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "LIF-16": {
+      "note": "docs/gpu-b/lif16-scope-correction.md: CPU 계약은 참조·해시의 독립 FAIL 보존. 변조 복원물 실제 소비·외부 gate 및 격리 정상/도전 준비 미구현; 미실측 UNKNOWN.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "OBS-02": {
+      "note": "#196 생산자 대기(health-worker-causal); docs/dev-1/gpu-common-inputs-196.md: API health와 같은 worker 세대 상태·접수 인과 미확인 UNKNOWN. SUPPORTED_PRODUCERS 비어 있음, validate() 소비자 미연결. 기존 직접 관측·독립 FAIL·정확 Ref는 유지.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "OBS-03": {
+      "note": "#196 생산자 대기(profiler-control); docs/dev-1/gpu-common-inputs-196.md: profiler 제어·trace/debug 필드와 실제 worker 수집 인과 미확인 UNKNOWN. SUPPORTED_PRODUCERS 비어 있음, validate() 소비자 미연결. 기존 직접 관측·독립 FAIL·정확 Ref는 유지.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "PLT-01": {
+      "note": "#196 생산자 대기(process-device-provider); docs/gpu-b/platform-development.md: GPU worker·NVML·namespace·실제 장치 접근 미확인 UNKNOWN. SUPPORTED_PRODUCERS 비어 있음, validate() 소비자 미연결. 기존 직접 관측·독립 FAIL·정확 Ref는 유지. M05 EVD-01M6GY5TQY5Z670W17EDJF4E3G@1 / RES-01M6GY5Y1H3M0PN48R15AX18JP@1, MEASURED 보안 FAIL.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "PLT-02": {
+      "note": "M02 준비 실패, docs/gpu-b/20261104-independent-measurements.md: listener/accepted 소유 모호성. 실행에 쓸 고정 소스의 owner·공통 pin 연결 검증 필요; SHM/TCP/명령 소비 미확인 UNKNOWN.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "PLT-03": {
+      "note": "docs/gpu-b/supply-preparation.md 및 packs/PACK-BASELINE/checks/PLT-03.yaml: 저장소 허용/비허용 객체·동일 주체·독립 감사 생산자와 격리 준비 없음. 신고 기록만으로 PASS 불가; 미실측 UNKNOWN.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "PLT-04": {
+      "note": "#196 생산자 대기(process-device-provider); docs/gpu-b/platform-development.md: 동일 worker의 자격 접근·provider 전달·갱신 미확인 UNKNOWN. SUPPORTED_PRODUCERS 비어 있음, validate() 소비자 미연결. 기존 직접 관측·독립 FAIL·정확 Ref는 유지. M05 EVD-01M6GY5YNBK9P3WC27M2WP9RHB@1 / RES-01M6GY604PAFETB34SGX4WV8YZ@1, MEASURED 보안 FAIL.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "PLT-05": {
+      "note": "docs/gpu-b/supply-preparation.md 및 packs/PACK-BASELINE/checks/PLT-05.yaml: 선정 SDK provider chain·만료/누락 자격의 실제 취득/신원 생산자와 준비 필요. 미실측 UNKNOWN; 자격 원문 수집 금지.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "PLT-06": {
+      "note": "GB35PLT06 RES-01M6G1PT8NS7F4EZKTJ39PG533@1, 기존 RUN_SUMMARY.json: EXAMPLE 보안 FAIL 보존. docs/gpu-b/platform-development.md 및 reviews/PLT06-next-v1-dependencies.md: worker 송신/reader/소비·명령 효과 생산자 없음; 새 준비 변경 검토 별도.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "PLT-08": {
+      "note": "GB23PLT08 RES-01M6EMV94Y6E57Y2WDYFTH5A2R@1, 기존 RUN_SUMMARY.json: 평문 독립 FAIL 보존. 실제 호출 앱·Gateway/TLS·인증서/허용 구간과 상대 정책 입력 필요; direct API 결과를 전체 경로로 확대하지 않음.",
+      "state": "ENTERPRISE_INPUT_WAITING"
+    },
+    "PLT-09": {
+      "note": "PLT09-cpu/v1, reviews/PLT09-cpu-v1.md: CPU TLS/평문/평문+연결불가 3사례 EXAMPLE·복원/저장팩 재판정·정리 검증. 평문 FAIL 보존; 실제 sender SDK·sink 수신은 생산자 부재 UNKNOWN. GPU MEASURED 아님.",
+      "state": "DONE"
+    },
+    "REQ-05": {
+      "note": "M06, EVD-01M6JC30MYNKWK1VBTPSX45S4S@1 / RES-01M6JC3E97KXBXAHFW534DZDSD@1, docs/gpu-b/20261104-independent-measurements.md: 실제 L4 200/401/200·EXAMPLE·세 축 UNKNOWN. 최종 모델/주체/adapter·퇴역 revision 생산자·연결 필요.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "REQ-07": {
+      "note": "packs/PACK-BASELINE/checks/REQ-07.yaml 및 기존 docs/checklist_validation_status.csv: 고정 CPU text-chat/output1 소비 대조 범위만 지원. GPU 이미지/임의 template·override·processor·fallback·멀티모달 미확인 UNKNOWN; GPU용 고정 준비 없음.",
+      "state": "MEASUREMENT_REMAINING"
+    },
+    "REQ-08": {
+      "note": "docs/evidence/gpu-a-REQ-08-20261103.json: GPU EVD MEASURED·RES level MEASURED/data_origin EXAMPLE 및 원 판정/정확 Ref 보존. 추가 필드·수용 옵션의 실제 runner/모듈 소비 생산자 미연결; 전체 분기 UNKNOWN.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "REQ-09": {
+      "note": "docs/evidence/gpu-a-REQ-09-20261103.json: GPU EVD MEASURED·RES level MEASURED/data_origin EXAMPLE·기능 PASS/보안 UNKNOWN 보존. 수용된 추가 입력/모듈의 실제 소비·실행 생산자 미연결.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "REQ-10": {
+      "note": "docs/evidence/gpu-a-REQ-10-20261103.json: GPU EVD MEASURED·RES level MEASURED/data_origin EXAMPLE·기능 PASS/보안 UNKNOWN 보존. runner_consumption_verified=false; 동일 API 경계 반복으로 해소되지 않으며 실제 sampler 소비 연결 필요.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "REQ-12": {
+      "note": "M12 termination-attempts/v1, reviews/S2-M12-VERIFY-01-result-v1.md: COMPLETED/EXAMPLE·세 축 UNKNOWN. 5요청/80 output행·6 link이나 client_receipt_verified=false; 늦은 전달/자동 retry 생산자 미연결.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "SUP-03": {
+      "note": "docs/evidence/gpu-a-SUP-03-20261103.json 및 docs/gpu-b/supply-preparation.md: GPU EVD MEASURED·RES level MEASURED/data_origin EXAMPLE·세 축 UNKNOWN 보존. readonly template/API projection만 관측; config/tokenizer/하위 공급물·독립 loader/worker 소비 생산자 미연결.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "SUP-04": {
+      "note": "SUP04-cpu/v1, reviews/SUP04-cpu-v1.md: 실제 container_config factory의 CPU 2사례 EXAMPLE·정확 Ref/저장팩 재판정·정리 검증. 빈 승인 목록 보안 FAIL·HTTP501 기능 FAIL 보존; package/native/entrypoint/mount·배포 gate는 미계측 UNKNOWN. GPU MEASURED 아님.",
+      "state": "DONE"
+    },
+    "SUP-05": {
+      "note": "docs/gpu-b/preparation/SUPPLY_NATIVE_FAILURE_PRESERVATION.md: native17 producer→consumer→factory CPU 70계약 재사용(EXAMPLE). 실제 정상/변경 boot 두 세대·고정 target/prepared/read scope 패킷 미완료; GPU 미실측 UNKNOWN.",
+      "state": "MEASUREMENT_REMAINING"
+    },
+    "SUP-06": {
+      "note": "docs/gpu-b/supply-preparation.md: native17 read bytes/rank 후보 소비만 구현. 실제 shard/tensor 적재·필수 tensor·publisher/payload 생산자 없음; TP2 새 비용 승인 및 정상/누락 패킷 필요. 미실측 UNKNOWN.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "SUP-07": {
+      "note": "docs/gpu-b/supply-preparation.md: GPU compile cache 생성자/writer·실제 reader·검증 지점 boot-record 생산자와 격리 변조/복구 준비 없음. 미실측 UNKNOWN.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "SUP-08": {
+      "note": "docs/evidence/gpu-a-SUP-08-20261103.json 및 docs/gpu-b/supply-preparation.md: GPU EVD MEASURED·RES level MEASURED/data_origin EXAMPLE 보존. 기존 텍스트 경로 부분 거부와 멀티모달 실제 override 선택/import·허용 판본 대조를 구분; 후속 생산자/모델 미확정.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "SUP-09": {
+      "note": "docs/gpu-b/supply-preparation.md 및 packs/PACK-BASELINE/checks/SUP-09.yaml: 무해 custom module CPU 표식 소비 계약만 구현. 실제 GPU auto_map/loader import boot-record 생산자·정상/금지 기동 준비 없음; UNKNOWN.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "SUP-10": {
+      "note": "docs/gpu-b/supply-preparation.md: CPU plugin 단계 행은 GPU worker hook 실측이 아님. general/endpoint/logits/io 실제 producer·파생 이미지·격리 정상/금지 세대 준비 필요; UNKNOWN.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "SUP-11": {
+      "note": "docs/gpu-b/supply-preparation.md: CPU 12행 형식은 실제 GPU 지원 모드 목록이 아님. 지원 Python 모드별 import/constructor 생산자·분리 세대 준비 필요; 미실측 UNKNOWN.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "SUP-12": {
+      "note": "docs/gpu-b/supply-preparation.md 및 packs/PACK-BASELINE/checks/SUP-12.yaml: 무해 손상/불허 reader fixture 소비만 구현. 실제 fallback·파일/통신 부수 동작 boot-record 생산자·정상/도전 준비 없음; UNKNOWN.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "SUP-13": {
+      "note": "기존 prep-stage1/out/stage1/sup13-component-preflight.json: pinned source/index modified로 기동 전 거부. packs/PACK-BASELINE/checks/SUP-13.yaml의 고정 CPU __class__ 프로파일만 지원; 올바른 고정 준비 재생성/실측 필요, GPU 지원·전체 sandbox UNKNOWN.",
+      "state": "MEASUREMENT_REMAINING"
+    },
+    "SUP-15": {
+      "note": "docs/gpu-b/supply-preparation.md: GPU cache key/lookup·실제 재사용/재생성·호환성 검증 boot-record 생산자 없음. 동일/관련 변경/무관 변경 세대 준비 필요; 미실측 UNKNOWN.",
+      "state": "CPU_DEVELOPMENT_REMAINING"
+    },
+    "SUP-16": {
+      "note": "docs/gpu-b/supply-preparation.md: native17 실제 read bytes CPU 계약 재사용. 정상/부분 파일의 서로 다른 실제 target/prepared·종결 기록 두 세대 패킷 필요; 다운로드/변환/compile 완료 표시·최종 소비 미실측 UNKNOWN.",
+      "state": "MEASUREMENT_REMAINING"
+    }
+  },
+  "common_contract": {
+    "path": "src/guard/collectors/gpu_common_inputs.py",
+    "sha256": "60d6bce3e0e562b3a26346e8ec25d12a233243dd2eba2252347bce2b55a9906e",
+    "supported_producers_count": 0,
+    "product_consumer_callers": [],
+    "confirmed_field_change_requests": []
+  },
+  "reused_evidence": [
+    {
+      "check_id": "SUP-03",
+      "source": "docs/evidence/gpu-a-SUP-03-20261103.json",
+      "source_sha256": "ea3a67c0518ed776d00bae6533e711ee016eaef12124bc5c0e9041eadce40c98",
+      "run": "a-g3-20261103-2/SUP-03",
+      "bundle_sha256": "261aed5fd7d400fbfbdf7a8d856433145a6998c42c476e150c6a8a4d653d37ac",
+      "evidence_ref": {
+        "id": "EVD-01M6GJSNSGM0THQBJAPB26KSJC",
+        "revision": 1,
+        "sha256": "67da448d50926df8616afbb1706db6f3c46124c023e2153119fa33bfacb6aef3"
+      },
+      "EVD_data_origin": "MEASURED",
+      "execution_status": "COMPLETED",
+      "result_ref": {
+        "id": "RES-01M6GJSR2MSNN155GSSVRWZ4SS",
+        "revision": 1,
+        "content_sha256": "3ab43641d6d2ba13978720bbf6f7c17bfa63adb649300c2a9fe63fa229ddb2c8"
+      },
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": "MEASURED",
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "official": false
+    },
+    {
+      "check_id": "SUP-08",
+      "source": "docs/evidence/gpu-a-SUP-08-20261103.json",
+      "source_sha256": "870f35827208ea3e5a999af6000feefafbe8888c35337ccb9c3e6ecdb9777c6d",
+      "run": "a-g3-20261103-3/SUP-08",
+      "bundle_sha256": "47ec5b89d18bae8441e6fc2dbd562a6d12eefb55acd70295a42db8b7ff7803f7",
+      "evidence_ref": {
+        "id": "EVD-01M6GKBEGGWK72K6E9MRCRM3Y7",
+        "revision": 1,
+        "sha256": "67b9aa59c34741b0e3411e7ff28b49e9de7b10ee3f92094a07706541a12ca9e1"
+      },
+      "EVD_data_origin": "MEASURED",
+      "execution_status": "COMPLETED",
+      "result_ref": {
+        "id": "RES-01M6GKBF8FD8KASAJX94EFEBH2",
+        "revision": 1,
+        "content_sha256": "1cb29ae8419b6b9618ec67e96e634c964201544ab243e898745fb48f6f7f69eb"
+      },
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": "MEASURED",
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "official": false
+    },
+    {
+      "check_id": "SUP-08",
+      "source": "docs/evidence/gpu-a-SUP-08-20261103.json",
+      "source_sha256": "870f35827208ea3e5a999af6000feefafbe8888c35337ccb9c3e6ecdb9777c6d",
+      "run": "a-g3-20261103-3/SUP-08-codex-idfix-1",
+      "bundle_sha256": "843ca15f264e6a0e5f00b61fd512d6d205ba60b02c2834dcb1c28c4f28f1cd5f",
+      "evidence_ref": {
+        "id": "EVD-01M6GKY927Z01VA3C4XZNRB1D5",
+        "revision": 1,
+        "sha256": "2374509afec1679f562270ffcde80fdf2770a531201bcdd1e775479495ffd23d"
+      },
+      "EVD_data_origin": "MEASURED",
+      "execution_status": "COMPLETED",
+      "result_ref": {
+        "id": "RES-01M6GKYAY8AJNR8YD12022FJFQ",
+        "revision": 1,
+        "content_sha256": "c4e572b80fd60712db513164fe24bcf80c0f0e166104be7bf073243279dee505"
+      },
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": "MEASURED",
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "PASS",
+        "performance": "UNKNOWN"
+      },
+      "official": false
+    },
+    {
+      "check_id": "SUP-08",
+      "source": "docs/evidence/gpu-a-SUP-08-20261103.json",
+      "source_sha256": "870f35827208ea3e5a999af6000feefafbe8888c35337ccb9c3e6ecdb9777c6d",
+      "run": "a-g3-20261103-3/SUP-08-try1-id",
+      "bundle_sha256": "6fde7c324af1c38e4ff7fd6884415dd02ec7a17fb70f3388d2778dc7dedcfa7b",
+      "evidence_ref": {
+        "id": "EVD-01M6GK9VX0XQP2GZYV69CE74A6",
+        "revision": 1,
+        "sha256": "148076f8502d21c7b6960e14f8059d4f046e715c728055578c2524ab37053131"
+      },
+      "EVD_data_origin": "MEASURED",
+      "execution_status": "COMPLETED",
+      "result_ref": {
+        "id": "RES-01M6GK9WBDG2VE4E3RD2C8YJ8Z",
+        "revision": 1,
+        "content_sha256": "c3a2081215d20dd526c600dc4ce6cfcfaa2e28f43bc4c1f69665e144b4de15f8"
+      },
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": "MEASURED",
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "official": false
+    },
+    {
+      "check_id": "REQ-08",
+      "source": "docs/evidence/gpu-a-REQ-08-20261103.json",
+      "source_sha256": "6a90c3c138755f85e7af0d03508647e7bf3421831e7cfbc6fbeaef81858a1e4c",
+      "run": "a-g3-20261103-3/REQ-08",
+      "bundle_sha256": "bca83311c229d7f60d22c908661012f6208804593af053de29f6cdeb19df4ac4",
+      "evidence_ref": {
+        "id": "EVD-01M6GKBC1977FZ9PRCTXGGTN19",
+        "revision": 1,
+        "sha256": "354295f5f336083336684c13794248e9ecdf85b19d66354479a9fb5aeb48edfc"
+      },
+      "EVD_data_origin": "MEASURED",
+      "execution_status": "COMPLETED",
+      "result_ref": {
+        "id": "RES-01M6GKBCSQS9SFDQBJCEDYW6QH",
+        "revision": 1,
+        "content_sha256": "1a5e5d925fe7c5131081d0653818b785ca35a3226785a27200596e3f76dee1b5"
+      },
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": "MEASURED",
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "official": false
+    },
+    {
+      "check_id": "REQ-08",
+      "source": "docs/evidence/gpu-a-REQ-08-20261103.json",
+      "source_sha256": "6a90c3c138755f85e7af0d03508647e7bf3421831e7cfbc6fbeaef81858a1e4c",
+      "run": "a-g3-20261103-3/REQ-08-codex-idfix-1",
+      "bundle_sha256": "8ce424d49303f6fe26ecc2db3243b3ffceabd65914a98b60e404f389d9ba4bf5",
+      "evidence_ref": {
+        "id": "EVD-01M6GKY5J9QN84XWDEMPV4XRRD",
+        "revision": 1,
+        "sha256": "f5bc20871766844b2ec2b0791322fccef4d3f4d82ede461135a583e73231290d"
+      },
+      "EVD_data_origin": "MEASURED",
+      "execution_status": "COMPLETED",
+      "result_ref": {
+        "id": "RES-01M6GKY7DQNDZ71XHPA2384FK4",
+        "revision": 1,
+        "content_sha256": "6957136db43ee3e3c12ded9b1e9730f391f4e78e975ef623e6c5919dd494e25f"
+      },
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": "MEASURED",
+      "verdicts": {
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN"
+      },
+      "official": false
+    },
+    {
+      "check_id": "REQ-08",
+      "source": "docs/evidence/gpu-a-REQ-08-20261103.json",
+      "source_sha256": "6a90c3c138755f85e7af0d03508647e7bf3421831e7cfbc6fbeaef81858a1e4c",
+      "run": "a-g3-20261103-3/REQ-08-try1-id",
+      "bundle_sha256": "5428e1f2aa4b866dabce0a66a1533d4a8122f9f826cc351e9f8ba308d69f96d4",
+      "evidence_ref": {
+        "id": "EVD-01M6GK9SRZKS1BGJNMEAM7DPTX",
+        "revision": 1,
+        "sha256": "287ab62582987ad915a6aae790a8b944f4af0bb85c326a0d9ae2efb5c0465f42"
+      },
+      "EVD_data_origin": "MEASURED",
+      "execution_status": "COMPLETED",
+      "result_ref": {
+        "id": "RES-01M6GK9T72S0HMYJXR2AK4YWX3",
+        "revision": 1,
+        "content_sha256": "580988210c96d0ce19aff100b3c7f49d5a4fe0adf3ebc2a84ccc00420cc53810"
+      },
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": "MEASURED",
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "official": false
+    },
+    {
+      "check_id": "REQ-09",
+      "source": "docs/evidence/gpu-a-REQ-09-20261103.json",
+      "source_sha256": "b1ff0680847d005b6fefa932570010d6ad5a3d9a22ca4316f55cb1d2ec2e121b",
+      "run": "a-g3-20261103-3/REQ-09",
+      "bundle_sha256": "27cf6af6e4edd4c26713ec5a19848dcbb5c7d1972876d76cb6d0c2ff2053397e",
+      "evidence_ref": {
+        "id": "EVD-01M6GKB9HD2KRP5R93RG5JS8A9",
+        "revision": 1,
+        "sha256": "9d8b3bb3b04ddb35742d4570a06d3b39fa225b30479d797a414fb39f09ecc0d8"
+      },
+      "EVD_data_origin": "MEASURED",
+      "execution_status": "COMPLETED",
+      "result_ref": {
+        "id": "RES-01M6GKBAA00VY7AXX8ERAPSN6M",
+        "revision": 1,
+        "content_sha256": "6d1d4a5b19a2220068726a8cd113f8e3829aa2f59ddbba3a55f51bbc4d9b6136"
+      },
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": "MEASURED",
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "official": false
+    },
+    {
+      "check_id": "REQ-09",
+      "source": "docs/evidence/gpu-a-REQ-09-20261103.json",
+      "source_sha256": "b1ff0680847d005b6fefa932570010d6ad5a3d9a22ca4316f55cb1d2ec2e121b",
+      "run": "a-g3-20261103-3/REQ-09-codex-idfix-1",
+      "bundle_sha256": "4bc946843f5bf809004faae80ae1f9c272edf320fdda7e4cbb84c347f56455bf",
+      "evidence_ref": {
+        "id": "EVD-01M6GKY14053DEBJTS0K08NPY1",
+        "revision": 1,
+        "sha256": "ce01f21a2034e15b9bb9f5122627bbdf646933b4535393cbb64c30cf0dc7b043"
+      },
+      "EVD_data_origin": "MEASURED",
+      "execution_status": "COMPLETED",
+      "result_ref": {
+        "id": "RES-01M6GKY3YAQYH1AMGQBR10CSPH",
+        "revision": 1,
+        "content_sha256": "a4164101089726e49842f29b922db8ec8980257a61ea4bf6e0c131dfdc3e73fd"
+      },
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": "MEASURED",
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "PASS",
+        "performance": "UNKNOWN"
+      },
+      "official": false
+    },
+    {
+      "check_id": "REQ-09",
+      "source": "docs/evidence/gpu-a-REQ-09-20261103.json",
+      "source_sha256": "b1ff0680847d005b6fefa932570010d6ad5a3d9a22ca4316f55cb1d2ec2e121b",
+      "run": "a-g3-20261103-3/REQ-09-try1-id",
+      "bundle_sha256": "13c3c8d2a927aead0cdc9b79553a77d05c6731a7d1df97bf0530a5a4b100343a",
+      "evidence_ref": {
+        "id": "EVD-01M6GK9QKYMT578W8VYHN32JZ2",
+        "revision": 1,
+        "sha256": "0058c71597a6cc104af62de196aafffd831bf962c43dde7fce670d59131231c8"
+      },
+      "EVD_data_origin": "MEASURED",
+      "execution_status": "COMPLETED",
+      "result_ref": {
+        "id": "RES-01M6GK9R2F3P0WQ3NGSH1V9J7R",
+        "revision": 1,
+        "content_sha256": "50bdf5959a3227b0be89c7001ae39954c3396e7599c4acebf276eb7f746a39a8"
+      },
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": "MEASURED",
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "official": false
+    },
+    {
+      "check_id": "REQ-10",
+      "source": "docs/evidence/gpu-a-REQ-10-20261103.json",
+      "source_sha256": "635469bb7ca0a359afeea4b0a296c178b25d51e3f35a451dd0a1cb9cc70f2507",
+      "run": "a-g3-20261103-1/REQ-10",
+      "bundle_sha256": "6921d8d73bfd153fb1380192d45924d44b90dee199fa5661787ebf40a6106771",
+      "evidence_ref": {
+        "id": "EVD-01M6GHZDX2WKCSRFDDABAT8K0S",
+        "revision": 1,
+        "sha256": "b9f6cf874dc88ad8c8a155461354c4b0f7b7a933e9e0818434d79f401dff6a46"
+      },
+      "EVD_data_origin": "MEASURED",
+      "execution_status": "COMPLETED",
+      "result_ref": {
+        "id": "RES-01M6GHZMW5SFBBVB6HZRBY86XK",
+        "revision": 1,
+        "content_sha256": "08688e4263216af9b273cca9d2efeeb29c966a96cdf1576d53a44d87d9feaa7d"
+      },
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": "MEASURED",
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "PASS",
+        "performance": "UNKNOWN"
+      },
+      "official": false
+    },
+    {
+      "check_id": "REQ-10",
+      "source": "docs/evidence/gpu-a-REQ-10-20261103.json",
+      "source_sha256": "635469bb7ca0a359afeea4b0a296c178b25d51e3f35a451dd0a1cb9cc70f2507",
+      "run": "a-g3-20261103-1/REQ-10-try1-mapping",
+      "bundle_sha256": "4011df67509b9820ff1523ab4b8aeaba86316f1510010907cdd880cd1777a07e",
+      "evidence_ref": {
+        "id": "EVD-01M6GHW29P9J3XZNDR3ZH1X7GB",
+        "revision": 1,
+        "sha256": "636eae5f29b49ed35198a9faf15eaa65de8df206bb22560d84a1e4b505aa71e7"
+      },
+      "EVD_data_origin": "EXAMPLE",
+      "execution_status": "ABORTED",
+      "result_ref": {
+        "id": "RES-01M6GHW2QJCZS6Q4WASEZFZDW1",
+        "revision": 1,
+        "content_sha256": "c5ae389c970567fe74b4577e65bd683628c7de01643ee397cf4f483217bc9fbd"
+      },
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": null,
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "official": false
+    },
+    {
+      "check_id": "PLT-01",
+      "source": "docs/gpu-b/20261104-independent-measurements.json",
+      "source_sha256": "ea05540d9373c0db119dc654d7da3430bcec994ab1d45b49ada9f93ec7788a09",
+      "run": "M05",
+      "refs": [
+        {
+          "kind": "ENV",
+          "id": "ENV-01M6GY5TG7HC3RCBCBRSEHNSZC",
+          "revision": 1,
+          "sha256": "e08f04f035af7f3289a591ab5cc13882e895776305836def67f6b109a52d08dc"
+        },
+        {
+          "kind": "POL",
+          "id": "POL-01M6GY5TKKQM81SSA8QY42PWCT",
+          "revision": 1,
+          "sha256": "ce7b7adaa1f49ef5dbf33196748eeb7ba39de45aad46aaf80c2af0348a73c824"
+        },
+        {
+          "kind": "PACK",
+          "id": "PACK-BASELINE",
+          "revision": 32,
+          "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+        },
+        {
+          "kind": "PLAN",
+          "id": "PLAN-01M6GY5TQEMJ6P78CW953NY4WF",
+          "revision": 1,
+          "sha256": "0f8db6f44cf4972f0b1e1eff9707c28d044e1f9b513cc4a03103be50d836e826"
+        },
+        {
+          "kind": "RPT",
+          "id": "RPT-01M6GY5Y1X7T6817QCSTK553DV",
+          "revision": 1,
+          "sha256": "07eb867f5b50dbba41c7610c7b1b48701d816a802841c23b4904e8231708a124"
+        },
+        {
+          "kind": "EVD",
+          "id": "EVD-01M6GY5TQY5Z670W17EDJF4E3G",
+          "revision": 1,
+          "sha256": "48bb1e8740b17408eda1e51c9315d2df4cd4eb1e6cce6eb59ab004173222ab2a"
+        },
+        {
+          "kind": "RES",
+          "id": "RES-01M6GY5Y1H3M0PN48R15AX18JP",
+          "revision": 1,
+          "sha256": "b78e523073d30446b9d18cd7f4fbf446cacbd951423e645cab64aa6cd8a0b49f"
+        }
+      ],
+      "EVD_data_origin": "MEASURED",
+      "verification_level": "MEASURED",
+      "verdicts": {
+        "security": "FAIL",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "whole_question_complete": false,
+      "RES_data_origin": "DECLARED",
+      "official": false,
+      "level_origin_provenance": "guard-output/gpu-stage1-3sessions/reviews/M05-M08-existing-v1.md",
+      "source_commit": "3bba3c73a6bee1966b784cd90a9690e3e9d2512a",
+      "archive_sha256": "2e9f6ed0decd9eff701cea32cc61091b4e05778945395506bd898571066c5b77"
+    },
+    {
+      "check_id": "PLT-04",
+      "source": "docs/gpu-b/20261104-independent-measurements.json",
+      "source_sha256": "ea05540d9373c0db119dc654d7da3430bcec994ab1d45b49ada9f93ec7788a09",
+      "run": "M05",
+      "refs": [
+        {
+          "kind": "ENV",
+          "id": "ENV-01M6GY5TG7HC3RCBCBRSEHNSZC",
+          "revision": 1,
+          "sha256": "e08f04f035af7f3289a591ab5cc13882e895776305836def67f6b109a52d08dc"
+        },
+        {
+          "kind": "POL",
+          "id": "POL-01M6GY5YHGBB1SS7QCMZT3ACJ8",
+          "revision": 1,
+          "sha256": "573a6348eb9bba8e7fedc2c336f2039b5906e832d3ccea93edfb7d0fcd3800e5"
+        },
+        {
+          "kind": "PACK",
+          "id": "PACK-BASELINE",
+          "revision": 32,
+          "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+        },
+        {
+          "kind": "PLAN",
+          "id": "PLAN-01M6GY5YMX3BBT3Y58HB5TSA9H",
+          "revision": 1,
+          "sha256": "5b2a1dc7e9789136296056856dee098d51711a78d47015d688c1c787881fbc70"
+        },
+        {
+          "kind": "RPT",
+          "id": "RPT-01M6GY6053F4WPBEVD7FTWET4P",
+          "revision": 1,
+          "sha256": "1bd10a422a7eaad862daf029b0df5e2623b8556e1c6fad4be7f0204ba37cc2ea"
+        },
+        {
+          "kind": "EVD",
+          "id": "EVD-01M6GY5YNBK9P3WC27M2WP9RHB",
+          "revision": 1,
+          "sha256": "9dd993aaeb6cb4e32d0abb96fc7ea8834408c09ab3e821e185c455efe7ff5943"
+        },
+        {
+          "kind": "RES",
+          "id": "RES-01M6GY604PAFETB34SGX4WV8YZ",
+          "revision": 1,
+          "sha256": "ccd559edbbb2f4f0cbca504ef52ce3fd0d75f6cc9a3422cf13ab46a091b7ab90"
+        }
+      ],
+      "EVD_data_origin": "MEASURED",
+      "verification_level": "MEASURED",
+      "verdicts": {
+        "security": "FAIL",
+        "functional": "PASS",
+        "performance": "UNKNOWN"
+      },
+      "whole_question_complete": false,
+      "RES_data_origin": "DECLARED",
+      "official": false,
+      "level_origin_provenance": "guard-output/gpu-stage1-3sessions/reviews/M05-M08-existing-v1.md",
+      "source_commit": "3bba3c73a6bee1966b784cd90a9690e3e9d2512a",
+      "archive_sha256": "2e9f6ed0decd9eff701cea32cc61091b4e05778945395506bd898571066c5b77"
+    },
+    {
+      "check_id": "REQ-05",
+      "source": "docs/gpu-b/20261104-independent-measurements.json",
+      "source_sha256": "ea05540d9373c0db119dc654d7da3430bcec994ab1d45b49ada9f93ec7788a09",
+      "run": "M06",
+      "refs": [
+        {
+          "id": "PACK-BASELINE",
+          "kind": "PACK",
+          "revision": 32,
+          "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+        },
+        {
+          "kind": "ENV",
+          "id": "ENV-01M6JC2YN9QBKSWQYVFX0EP0WC",
+          "revision": 1,
+          "sha256": "ae638b57d2754cbc9efcb76a83db38ea486fd7e5feccc86763554e5c5dbf20ae"
+        },
+        {
+          "kind": "POL",
+          "id": "POL-01M6JC30GMT5KW4GEYK4SXKW0K",
+          "revision": 1,
+          "sha256": "d1887c0c17bb35b34185f849ccc3e5ea059a3d20583dd9feb577c91da97bdbbb"
+        },
+        {
+          "kind": "PLAN",
+          "id": "PLAN-01M6JC30MFY8VKXCJR1V7VMKH0",
+          "revision": 1,
+          "sha256": "82d85b0c56d7688a05e780f2a563472ad886440627e157f954e67e0d7d931b4e"
+        },
+        {
+          "kind": "RPT",
+          "id": "RPT-01M6JC3E9J5BC77HF90J42ZEMZ",
+          "revision": 1,
+          "sha256": "5937d26485982e45cf07fa0dc2b0b759dc1230a760ab8c28f5794e59bc15248f"
+        },
+        {
+          "kind": "EVD",
+          "id": "EVD-01M6JC30MYNKWK1VBTPSX45S4S",
+          "revision": 1,
+          "sha256": "de06ad3d4fa461d66d2dec8d23a90fabe41f13759f47fbf13b2fbbcf5ea3aa3d"
+        },
+        {
+          "kind": "RES",
+          "id": "RES-01M6JC3E97KXBXAHFW534DZDSD",
+          "revision": 1,
+          "sha256": "df4590aefb16a46c520b60dc7166c02ab9eb998ee30e686f45484e6b9fdf6e48"
+        }
+      ],
+      "EVD_data_origin": "EXAMPLE",
+      "verification_level": "EXAMPLE",
+      "verdicts": {
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "security": "UNKNOWN"
+      },
+      "whole_question_complete": false,
+      "RES_data_origin": "EXAMPLE",
+      "official": false,
+      "level_origin_provenance": "guard-output/gpu-stage1-3sessions/reviews/M06M07-existing-v1.md",
+      "source_commit": "3bba3c73a6bee1966b784cd90a9690e3e9d2512a",
+      "archive_sha256": "a0edfb067a527485212a088bbdd8bf243d51b56543ce5597caa2d10eb6e7acc4"
+    },
+    {
+      "check_id": "LIF-14",
+      "source": "docs/gpu-b/20261104-independent-measurements.json",
+      "source_sha256": "ea05540d9373c0db119dc654d7da3430bcec994ab1d45b49ada9f93ec7788a09",
+      "run": "M07",
+      "refs": [
+        {
+          "kind": "PACK",
+          "id": "PACK-BASELINE",
+          "revision": 32,
+          "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+        },
+        {
+          "kind": "EVD",
+          "id": "EVD-01M6JCMR644KNCZCVC6FC2FCER",
+          "revision": 1,
+          "sha256": "2d8638c48b00627799947964ea60c84326cc6f89fd536122c304e324d4f59c8b"
+        },
+        {
+          "kind": "RES",
+          "id": "RES-01M6JCNZ8F1C707RTX27QB5HSW",
+          "revision": 1,
+          "sha256": "7a5c044d787adb24566d8f91709ee8a2cadc2c32d160f46e322f8401f2aa4831"
+        },
+        {
+          "kind": "RPT",
+          "id": "RPT-01M6JCP0CJ7M3VZMJ7MA1A3X93",
+          "revision": 1,
+          "sha256": "b874c792471100f3f622c3260a2cb9e79f242d30b40789d4581ba2f98958ab78"
+        },
+        {
+          "kind": "ENV",
+          "id": "ENV-01M6JCMJFPFPYQ2RS5ZVA4B0C1",
+          "revision": 1,
+          "sha256": "b9917b7d8f3feae7958f430dce8d6eb2cc3cc53f356aca11797e5136a96ecdf6"
+        },
+        {
+          "kind": "POL",
+          "id": "POL-01M6JCMN3RS3K1T23V96W9GH7X",
+          "revision": 1,
+          "sha256": "45b425f9ef62df2d71068599e4a21e1e524de35d66081314d43f763f2b86906d"
+        },
+        {
+          "kind": "PLAN",
+          "id": "PLAN-01M6JCMQ3AM7WE4SQXE10R7J5M",
+          "revision": 1,
+          "sha256": "ec7d327eade7487600882ce1ab3d8afeda8ff560360b7301c4deaf6d9c2583a3"
+        }
+      ],
+      "EVD_data_origin": "EXAMPLE",
+      "verification_level": "EXAMPLE",
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "whole_question_complete": false,
+      "RES_data_origin": "EXAMPLE",
+      "official": false,
+      "level_origin_provenance": "guard-output/gpu-stage1-3sessions/reviews/M06M07-existing-v1.md",
+      "source_commit": "3bba3c73a6bee1966b784cd90a9690e3e9d2512a",
+      "archive_sha256": "eac3d04cd398eab0b07fee5883c809c8655201fbdd00007f5c0e2cf037af35d9"
+    },
+    {
+      "check_id": "LIF-07",
+      "source": "worktrees/byul-gpu-b-verify-stage1-20261104/out/M09-result-v1/verification.json",
+      "source_sha256": "9031b01547fb1860ee913dfeaf43ba1a5e6a923bd33922bebd4f115cd3768b64",
+      "run": "M09",
+      "source_commit": "3bba3c73a6bee1966b784cd90a9690e3e9d2512a",
+      "packet_version": "v1",
+      "archive_sha256": "c6a032964fe7e5d28b7c4ec3f67f9753403c837caa1e939d127965a5b32bd9f8",
+      "exact_Refs_restored": [
+        {
+          "kind": "ENV",
+          "id": "ENV-01M6JKWSA70JDS3N3WGHWFM3A5",
+          "revision": 1,
+          "sha256": "b36084b814d3fdde5efc41d1e617b132d1a1b51a09b030af2d2e7ce0a10c32db"
+        },
+        {
+          "kind": "POL",
+          "id": "POL-01M6JM4YWJ48TKE5QN2BF44E5V",
+          "revision": 1,
+          "sha256": "92d685d2a898cb179ab5eea7681833edc9b6a1c33a7045482e3704675bad7d5d"
+        },
+        {
+          "kind": "PLAN",
+          "id": "PLAN-01M6JM51RBXGXESDXBM0NDZN3Z",
+          "revision": 1,
+          "sha256": "6c62cf28bde477ced47c5dca311a033864b27d3e48d7a4efa10d313af054fbe7"
+        },
+        {
+          "kind": "EVD",
+          "id": "EVD-01M6JM52TTPXZTC0X82H0J5G40",
+          "revision": 1,
+          "sha256": "fbf50210865403b09f02c80acff0bd48bca31ee0fc29dfaa3e7717207c015184"
+        },
+        {
+          "kind": "RES",
+          "id": "RES-01M6JM5GHFRKR1JDMRDJ5ET8GX",
+          "revision": 1,
+          "sha256": "444ddfc01c01b7deb25724afd87c08ee87673a5d46819e552c5b2399d06a16fd"
+        },
+        {
+          "kind": "RPT",
+          "id": "RPT-01M6JM5HNCTWZG2Y4630NC2124",
+          "revision": 1,
+          "sha256": "1d51b165eb736f67b1fc28fe1e5cc4044c664ebf1f54e87fb68754139838f230"
+        }
+      ],
+      "EVD_data_origin": "EXAMPLE",
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": null,
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "execution_status": "ABORTED",
+      "official": false,
+      "unchanged_verification_reused": true
+    },
+    {
+      "check_id": "LIF-04",
+      "source": "worktrees/byul-gpu-b-verify-stage1-20261104/out/M10-result-v1/verification.json",
+      "source_sha256": "c80d5d920f9f860ce32c593d7b8fedd67b3e5d177b8a4c95c17f42a2f58c50d7",
+      "run": "M10",
+      "source_commit": "3bba3c73a6bee1966b784cd90a9690e3e9d2512a",
+      "packet_version": "v2",
+      "archive_sha256": "86b15553187da5992d4ec4ace6cbb895ec4ff10a1aadd8d2cb6a9bf4eac30a6c",
+      "exact_Refs_restored": [
+        {
+          "kind": "ENV",
+          "id": "ENV-01M6JRAVCDJ11VVV7A0C9T3K49",
+          "revision": 1,
+          "sha256": "77cb8585ae4b56dad780f5d44da0d30472d54edfc8b0fee7218fbf1010648c04"
+        },
+        {
+          "kind": "POL",
+          "id": "POL-01M6JRB1P83SGCCF4202RAXSBN",
+          "revision": 1,
+          "sha256": "f221fe2ea8390a66f75086208e074775efee0eccc0cdd943f4967af5d8ba8274"
+        },
+        {
+          "kind": "PLAN",
+          "id": "PLAN-01M6JRB4EA2KBNZN2WYR3ATKYR",
+          "revision": 1,
+          "sha256": "fe30a76d72ec5e5be21f63b8cf3bcb01590b42f1ac6b50759e0cfbcf09b09a12"
+        },
+        {
+          "kind": "EVD",
+          "id": "EVD-01M6JRB5HNYNF25DH36ZS52GWP",
+          "revision": 1,
+          "sha256": "e8173bc702e9aca63ccf8b8280d3b9617e43c7a2329554b70627e5a33b2ff749"
+        },
+        {
+          "kind": "RES",
+          "id": "RES-01M6JRBQN6W8P3QWXXFF0CPT5Y",
+          "revision": 1,
+          "sha256": "61ab3fc8ccdbdef945e305cf323c13d221591dcb4d4afda7552ae246a41e014c"
+        },
+        {
+          "kind": "RPT",
+          "id": "RPT-01M6JRBRQPYF89QWMNQNBVDNEE",
+          "revision": 1,
+          "sha256": "975848cd1c14bdc5e1152beb0166e4d8b159213d53c7e3e336db793eb215e1d7"
+        }
+      ],
+      "EVD_data_origin": "EXAMPLE",
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": "EXAMPLE",
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "execution_status": "COMPLETED",
+      "official": false,
+      "unchanged_verification_reused": true
+    },
+    {
+      "check_id": "LIF-10",
+      "source": "worktrees/byul-gpu-b-verify-stage1-20261104/out/M11-result-v1/verification.json",
+      "source_sha256": "0829f1064bb762815bddc6e47c1ba14b4ad36f38c11a74423b79bcb6949b0831",
+      "run": "M11",
+      "source_commit": "3bba3c73a6bee1966b784cd90a9690e3e9d2512a",
+      "packet_version": "v1",
+      "archive_sha256": "74adc74a855ccc75ecdc3a9c1467b327415321a9c0d28618c54f86f91760915d",
+      "exact_Refs_restored": [
+        {
+          "kind": "ENV",
+          "id": "ENV-01M6JTRQZJAWWCE6J1JN97PSW0",
+          "revision": 1,
+          "sha256": "d8028f82cbcb57d357c3a180b0d95be23e98fe94619e92f7166ecd31e7139e78"
+        },
+        {
+          "kind": "POL",
+          "id": "POL-01M6JTRXZQSRP37N91S354C7PW",
+          "revision": 1,
+          "sha256": "ad316151fbfdd6c37900efd2775764747efa6c08fe1c2fba80a7bc12aa7d5260"
+        },
+        {
+          "kind": "PLAN",
+          "id": "PLAN-01M6JTS0PYSTX6M96JE3XXRGAZ",
+          "revision": 1,
+          "sha256": "725ad5b20c8e845429ce35245221b45f1fe6ce27e5a8c3f1775f9759154886b4"
+        },
+        {
+          "kind": "EVD",
+          "id": "EVD-01M6JTS1TQP6WSFRGFZ3RJ55KN",
+          "revision": 1,
+          "sha256": "c4567687e70c7d5bbd7ff4bbcb90a8fbb6bfd0591873b22f123d4686bfd9d585"
+        },
+        {
+          "kind": "RES",
+          "id": "RES-01M6JTSG6CP2FAYZPDVQB1JKK7",
+          "revision": 1,
+          "sha256": "13e71bb9b96e9a24201fd8089925928b079676e0999d8f893e6621224c01f0d7"
+        },
+        {
+          "kind": "RPT",
+          "id": "RPT-01M6JTSH8Y9Q5GFN5CVP43S8A6",
+          "revision": 1,
+          "sha256": "fbf2f75e3a6f5570055b5b58dd4eb9e900c61a5da560af2d694f20ee15d604b1"
+        }
+      ],
+      "EVD_data_origin": "EXAMPLE",
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": "EXAMPLE",
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "execution_status": "COMPLETED",
+      "official": false,
+      "unchanged_verification_reused": true
+    },
+    {
+      "check_id": "REQ-12",
+      "source": "worktrees/byul-gpu-b-verify-stage1-20261104/out/M12-result-v1/verification.json",
+      "source_sha256": "92023987ba58d109a27c2c362817fe7d57e330c5720b241d95caf42255dcd855",
+      "run": "M12",
+      "source_commit": "3bba3c73a6bee1966b784cd90a9690e3e9d2512a",
+      "packet_version": "v1",
+      "archive_sha256": "003ef3fc299109e360e3f58f97dec5b85ab667bcddcf611ab654bd37bfcad7b8",
+      "exact_Refs_restored": [
+        {
+          "kind": "ENV",
+          "id": "ENV-01M6JV74QEFM8092FEXWKZ8E5P",
+          "revision": 1,
+          "sha256": "7b62ad1e6c78d92cf7721008475733bc0f80f47b5a2b8fde5751603c7dccb43c"
+        },
+        {
+          "kind": "POL",
+          "id": "POL-01M6JV7A4K8KPF58HAAX53JFVE",
+          "revision": 1,
+          "sha256": "b128b838c942672317e0e28db289c594cdb49997c0cff329f1e591bef881d426"
+        },
+        {
+          "kind": "PLAN",
+          "id": "PLAN-01M6JV7CW17S4AA6S84DZ67G7W",
+          "revision": 1,
+          "sha256": "3a26bbe3d55989086b4d8373ead4477af71f67e4cd1b7113ee59b2eb281b7edf"
+        },
+        {
+          "kind": "EVD",
+          "id": "EVD-01M6JV7DY3DCG3QVMMSC4ZVYQ1",
+          "revision": 1,
+          "sha256": "8f961b5144729b53e6a6eb805d7c7d9a82d6649ff8321aab7609c02f516bd307"
+        },
+        {
+          "kind": "RES",
+          "id": "RES-01M6JV7YC4N65D5S3JJM3QV6VW",
+          "revision": 1,
+          "sha256": "6574cdf5b8664bdc4942203b3c27ce3d6c4af63d8335d1e07ba768cf6b05649c"
+        },
+        {
+          "kind": "RPT",
+          "id": "RPT-01M6JV7ZETJ3BMBFDB6PBZQ16D",
+          "revision": 1,
+          "sha256": "e694772b767d78a6cb6f6a1254ecc021efc0d8c592ba23872809d957fb3ec1e1"
+        }
+      ],
+      "EVD_data_origin": "EXAMPLE",
+      "RES_data_origin": "EXAMPLE",
+      "verification_level": "EXAMPLE",
+      "verdicts": {
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN"
+      },
+      "execution_status": "COMPLETED",
+      "official": false,
+      "unchanged_verification_reused": true
+    }
+  ],
+  "verification": {
+    "phase1_states_valid": true,
+    "exact_owner_IDs_match": true,
+    "developer_26_state_bytes_unchanged": true,
+    "generated_csv_only_gpu_state_notes_changed": true,
+    "changed_csv_rows": 43,
+    "archive_full_checks_repeated": false,
+    "raw_source_pack_manifest_changed": false
+  },
+  "cost_basis": {
+    "source": "worktrees/byul-gpu-b-validation-20261102/out/gpu-b/cost-ledger.json",
+    "as_of": "2026-11-05T04:59:44.027188+00:00",
+    "current_balance_or_resource_state_claimed": false,
+    "single_GPU_including_preserved_storage_USD_per_hour": 1.050348,
+    "two_GPU_including_preserved_storage_USD_per_hour": 2.044948,
+    "next_single_bundle_hours_assumption": [
+      1,
+      2
+    ],
+    "existing_bundle_worst_cost_USD": 5.62,
+    "whole_43_total_estimate": null,
+    "reason": "producer implementation/registration and fixed packet/recovery counts are not known"
+  },
+  "new_status_input": {
+    "schema": "byul-gpu-b-status-input-check/1",
+    "at": "2026-11-05T05:22:45.149035+00:00",
+    "bundle_id": "LIF14-stop-restart",
+    "packet_version": "v5.3/operator-v2-probe-uid",
+    "run": "M17",
+    "source_commit": "4e4da648dd9ff5aee9fef47c859410434c214f5e",
+    "packet": "guard-output/gpu-stage1-3sessions/prepare/LIF14-stop-restart/v5.3/packet.md",
+    "archive": "guard-output/gpu-stage1-3sessions/runs/LIF14-stop-restart-v5.3/M17/GB1017-original-evidence.zip",
+    "archive_sha256": "42a89cc6175113838a30dd408e6b32f6f617a09842104e22635f01255c079ff6",
+    "archive_bytes": 553814,
+    "ZIP_CRC_members_verified": 231,
+    "manifest_members_bytes_SHA_verified": 230,
+    "manifest_sha256": "171ab7e45210e7e811a71b179bc76817225396fa2a2548bc12ae386e77048fc4",
+    "external_transport_receipt_sha256": "92144809954e16a7c085347233880d39796b57a4105de0735697f818cb44562c",
+    "failure": {
+      "phase": "001-materialize-live-profiler-inputs",
+      "outer_returncode": 1,
+      "inner_git_returncode": 128,
+      "reason": "Git dubious ownership detected at materialize source HEAD lookup",
+      "source_location": "M17-materialize-inputs.py:10 (original traceback)",
+      "stderr_member": "controller/product/001-materialize-live-profiler-inputs.stderr",
+      "stderr_sha256": "012f5a9d06c6cf43c8bab6d1dc1aa8341cb74177aa48e696599a681c02416964",
+      "started_at": "2026-11-05T05:09:49.298792+00:00",
+      "ended_at": "2026-11-05T05:09:49.393499+00:00",
+      "child_reaped": true,
+      "group_terminal": true
+    },
+    "scope": "Archive integrity and original failure boundary for phase1 status only; no full runtime/generation/control closeout review",
+    "trial_store_or_pipeline_result_present_in_archive": false,
+    "exact_Ref_restore_saved_pack_rejudge": "not applicable to absent product store/result in this archive",
+    "product_verdict_assigned": false,
+    "new_GPU_MEASURED_results": 0,
+    "current_AWS_state_claimed": false,
+    "final_control_stopped_receipts_reviewed": false
+  },
+  "local_CPU_execution_dependency": {
+    "docker_daemon_available": false,
+    "observed_error": "Docker Desktop Linux engine named pipe was not found; no Docker settings or services changed"
+  }
+}

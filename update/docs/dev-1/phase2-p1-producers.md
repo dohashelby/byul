@@ -9,7 +9,7 @@
 | process-device-provider | PLT-01·04 | 남음 |
 | rank-fault | LIF-08 | 남음(TP2) |
 | failed-group-resources | LIF-11 | 남음(TP2) |
-| health-worker-causal | OBS-02 | 남음 |
+| health-worker-causal | OBS-02 | CPU k3d 생산 확인(2026-11-05). vLLM 안에 health와 worker 사이 공유 인과 키가 없음(진단으로 기록). GPU 확인·등록 남음 |
 | profiler-control | LIF-14·OBS-03 | 남음 |
 
 ## request-attempt
@@ -61,3 +61,22 @@
   - rank·모델·backend·graph 준비 완료 행(LIF-07). worker 기동 관측이 필요하다.
   - 실제 서비스 gate(API health와 접수의 결합). health-worker-causal과 함께 만든다.
   - GPU 확인과 등록.
+
+## health-worker-causal
+
+- 관측(`adapters/vllm_health_callback.py`): vLLM 0.31.0 `AsyncLLM.check_health`(API 서버 프로세스)를 원 소스 해시로 고정해 감싼다.
+  - 이 함수는 worker에 묻지 않는다. 클라이언트 쪽 표식(`engine_core.resources.engine_dead`)과 출력 처리 task가 살아 있는지만 본다.
+  - 관측은 그 두 값을 판단 시점에 그대로 남긴다.
+  - coroutine 함수라 반환 시점은 coroutine 생성 시점이다. 판단 값은 진입 시점 표식으로 정해지므로 진입 행을 근거로 쓴다.
+  - 선택 기능 `--health-causal`이고, request-attempt와 함께 쓴다.
+- 변환:
+  - `api_health`: healthy / unhealthy / unknown
+  - `worker_state`: EngineCore `update_from_output` 반환(output) 또는 예외(raised)
+  - `request_accepted`: EngineCore 접수
+  - 세대는 프로세스(PID·시작 ticks)다.
+  - causal 지문은 행마다 고유하다. vLLM 안에는 health와 worker 상태를 잇는 공유 키가 없기 때문이다. 이 사실을 `HEALTH_WORKER_CAUSAL_LINK_ABSENT_IN_ENGINE` 진단으로 기록에 남긴다. 소비자는 시간 근접으로 둘을 합치지 않는다(#196 OBS-02 거부 조건).
+- k3d CPU 확인(run 12, `byul-dev1-evidence/k3d-run12/health-worker-record.json`):
+  - API 서버(PID 1)의 `api_health` healthy 5건이 나왔다. 명시 호출 4건과 kubelet 준비 검사가 함께 잡혔다.
+  - EngineCore(PID 74)의 `worker_state` output 3건, `request_accepted` 1건이 나왔다.
+  - 계약 gap은 미등록과 공유 인과 키 부재 진단이다.
+- 의미: OBS-02(API health와 실제 worker 상태의 인과)는 vLLM 0.31 기본 health 경로로는 확인할 수 없다. 인과를 보려면 worker 왕복이 있는 health(예: runtime의 별도 준비 확인)가 필요하다. runtime 담당과 합의할 항목에 더한다.

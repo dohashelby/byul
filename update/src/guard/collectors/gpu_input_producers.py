@@ -246,3 +246,87 @@ def generation_transition_record(processes, *, pod, environment_ref, target_sha2
                                'diagnostic_codes': [c for c in codes if contract._ID.fullmatch(c)]}}
     return record, contract.validate(record, kind='generation-transition', environment_ref=environment_ref,
                                      target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)
+
+
+# ---------------------------------------------------------------------------
+# health-worker-causal (OBS-02)
+# ---------------------------------------------------------------------------
+from guard.adapters import vllm_health_callback as health_callback
+
+HEALTH_PRODUCER_NAME = 'guard-engine-callback-health-worker'
+HEALTH_PRODUCER_VERSION = '1'
+
+
+def health_producer():
+    digest = hashlib.sha256()
+    for path in (Path(health_callback.__file__), Path(attempt_callback.__file__), Path(__file__)):
+        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
+    return {'name': HEALTH_PRODUCER_NAME, 'version': HEALTH_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
+
+
+def health_worker_events(processes):
+    """API health 판단(API 서버 프로세스)과 worker 단계 상태(EngineCore)를 각자의 세대로 남긴다.
+
+    - api_health: health 진입 시 표식. 둘 다 정상(engine_dead=False, 출력 처리 task 실행 중)이면 healthy, 아니면 unhealthy/unknown.
+    - worker_state: `update_from_output` 반환(output) 또는 예외(raised). 단계 출력이 host에 도착했다는 뜻이다.
+    - request_accepted: EngineCore 접수(`add_request` 반환).
+    - 세대는 프로세스(PID·시작 ticks)다. causal 지문은 행마다 고유하다. vLLM health는 worker 왕복이 없어 공유 인과 키가 없다.
+    """
+    events, bindings, codes, rows = [], [], set(), []
+    for process in processes:
+        relevant = [r for r in process['events'] if r.get('schema') in (health_callback.SCHEMA, attempt_callback.SCHEMA)]
+        if process['start_ticks'] is None:
+            if relevant:
+                codes.add('HEALTH_PROCESS_START_UNAVAILABLE')
+            continue
+        index = None
+        for row in process['events']:
+            if row.get('phase') == 'GAP':
+                codes.add(row.get('code') if type(row.get('code')) is str else 'HEALTH_PRODUCER_GAP'); continue
+            if row.get('entry_qualified_before') is not True or row.get('schema') not in (health_callback.SCHEMA, attempt_callback.SCHEMA):
+                continue
+            if row['phase'] != 'CALL' and row.get('entry_qualified_after') is not True:
+                continue
+            if index is None:
+                index = len(bindings); bindings.append({'pid': process['pid'], 'start_ticks': process['start_ticks']})
+            stamp = row.get('operation_started_ns') if row['phase'] == 'CALL' else row.get('operation_finished_ns')
+            rows.append((stamp or 0, len(rows), index, row))
+    if not rows:
+        return [], bindings, sorted(codes)
+    origin = min(r[0] for r in rows)
+    for stamp, number, binding, row in sorted(rows):
+        at_ms = max(0, (stamp - origin) // 1_000_000); fields = row.get('fields') or {}; point = row['point']; phase = row['phase']
+        generation = 'process-%d-%d' % (bindings[binding]['pid'], bindings[binding]['start_ticks'])
+        causal = hashlib.sha256(('%s:%s:%d' % (row.get('process_sha256'), row.get('call_sha256'), number)).encode()).hexdigest()
+        if point == 'AsyncLLM.check_health' and phase == 'CALL':
+            dead, running = fields.get('engine_dead'), fields.get('output_handler_running')
+            state = 'healthy' if dead is False and running is True else 'unhealthy' if dead is True or running is False else 'unknown'
+            event = 'api_health'
+        elif point == 'Scheduler.update_from_output' and phase in ('RETURN', 'RAISE'):
+            event, state = 'worker_state', 'output' if phase == 'RETURN' else 'raised'
+        elif point == 'Scheduler.add_request' and phase == 'RETURN':
+            event, state = 'request_accepted', 'admitted'
+        else:
+            continue
+        events.append({'seq': len(events), 'event': event, 'binding': binding, 'at_ms': at_ms, 'generation': generation,
+                       'causal_sha256': causal, 'state': state})
+    return events, bindings, sorted(codes)
+
+
+def health_worker_record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False):
+    events, processes_used, codes = health_worker_events(processes)
+    if truncated:
+        codes = sorted(set(codes) | {'HEALTH_READ_TRUNCATED'})
+    bindings = [{'pod_uid': pod['pod_uid'], 'container_id': pod['container_id'].removeprefix('containerd://')[:128],
+                 'restart_count': pod['restart_count'], 'worker_pid': p['pid'], 'start_ticks': p['start_ticks'], 'rank': 0}
+                for p in processes_used]
+    # 공유 인과 키가 없으므로 생산자 진단으로 남긴다. 소비자는 시간 근접으로 health와 worker 상태를 합치지 않는다.
+    codes = sorted(set(codes) | {'HEALTH_WORKER_CAUSAL_LINK_ABSENT_IN_ENGINE'})
+    record = {'schema': contract.SCHEMA, 'kind': 'health-worker-causal', 'producer': health_producer(),
+              'environment_ref': environment_ref, 'target_sha256': target_sha256, 'prepared_sha256': prepared_sha256,
+              'session': session, 'bindings': bindings, 'events': events,
+              'completeness': {'source_ended': not truncated and any(e['event'] == 'api_health' for e in events)
+                               and any(e['event'] == 'worker_state' for e in events), 'dropped': 0,
+                               'diagnostic_codes': [c for c in codes if contract._ID.fullmatch(c)]}}
+    return record, contract.validate(record, kind='health-worker-causal', environment_ref=environment_ref,
+                                     target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)

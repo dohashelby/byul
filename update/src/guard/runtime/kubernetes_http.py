@@ -64,7 +64,7 @@ print(json.dumps({"events":rows,"truncated":truncated}))
 ATTEMPT_EVENTS_READER = r'''
 import json,os,re,sys
 root="/guard-lifecycle/data/"+sys.argv[1];out=[];left=6*1024**2;truncated=False
-wanted=(b'"schema":"guard-vllm-attempt-callback/1"',b'"schema":"guard-vllm-transition-callback/1"',b'"phase":"GAP"')
+wanted=(b'"schema":"guard-vllm-attempt-callback/1"',b'"schema":"guard-vllm-transition-callback/1"',b'"schema":"guard-vllm-health-callback/1"',b'"phase":"GAP"')
 for name in sorted(os.listdir(root)):
     found=re.fullmatch(r"callbacks-([1-9][0-9]*)\.jsonl",name)
     if found is None:continue

@@ -167,3 +167,35 @@ def test_attempt_reader_keeps_only_attempt_transition_and_gap_rows_within_its_bu
     process, = value['processes']
     assert value['truncated'] is False and process['pid'] == os.getpid() and type(process['start_ticks']) in (int, type(None))
     assert [r.get('phase') for r in process['events']] == ['RETURN', 'GAP', 'RETURN']  # 끝 줄바꿈 없는 마지막 행은 쓰는 중이라 뺀다
+
+
+from guard.adapters import vllm_health_callback as health
+
+
+def hrow(ns, phase, **fields):
+    return {'schema': health.SCHEMA, 'point': 'AsyncLLM.check_health', 'phase': phase, 'entry_qualified_before': True,
+            'entry_qualified_after': True, 'operation_started_ns': ns, 'operation_finished_ns': ns, 'fields': fields,
+            'process_sha256': 'p' * 64, 'call_sha256': 'c' * 64}
+
+
+def test_health_observer_reads_only_the_client_flags():
+    obs = health.HealthObserver.__new__(health.HealthObserver); obs.gaps = set()
+    task = SimpleNamespace(done=lambda: False)
+    llm = SimpleNamespace(engine_core=SimpleNamespace(resources=SimpleNamespace(engine_dead=False)), output_handler=task)
+    assert obs._snapshot('AsyncLLM.check_health', (llm,), {}) == {'engine_dead': False, 'output_handler_running': True}
+    assert obs._snapshot('AsyncLLM.check_health', (llm,), {}, None, True) == {}
+
+
+def test_health_and_worker_rows_keep_separate_generations_and_no_shared_causal_key():
+    api = [hrow(1_000_000, 'CALL', engine_dead=False, output_handler_running=True), hrow(1_000_100, 'RETURN')]
+    core = [row(2_000_000, 'Scheduler.add_request', 'RETURN', request_sha256=R1),
+            row(3_000_000, 'Scheduler.update_from_output', 'RETURN', output_request_sha256=[R1])]
+    record, result = producers.health_worker_record([{'pid': 90, 'start_ticks': 5, 'events': api},
+                                                     {'pid': 74, 'start_ticks': 1000, 'events': core}], pod=POD, **SCOPE)
+    events = record['events']
+    assert [(e['event'], e['state']) for e in events] == [('api_health', 'healthy'), ('request_accepted', 'admitted'), ('worker_state', 'output')]
+    assert events[0]['generation'] == 'process-90-5' and events[2]['generation'] == 'process-74-1000'
+    assert len({e['causal_sha256'] for e in events}) == 3
+    assert 'GPU_INPUT_PRODUCER_DIAGNOSTIC:HEALTH_WORKER_CAUSAL_LINK_ABSENT_IN_ENGINE' in result['gaps']
+    dead = producers.health_worker_events([{'pid': 90, 'start_ticks': 5, 'events': [hrow(1, 'CALL', engine_dead=True, output_handler_running=True)]}])[0]
+    assert dead[0]['state'] == 'unhealthy'

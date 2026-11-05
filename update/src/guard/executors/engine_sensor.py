@@ -177,7 +177,7 @@ def slot_observations(record):
 class EngineSensorExecutor:
     """A single executor name; source CPU is never substituted for Kubernetes."""
     name = 'engine_sensor'
-    version = '0.1.2'
+    version = '0.1.3'
 
     def __init__(self, cfg, *, implementation='kubernetes', expected_target_sha256=None):
         self.cfg = deepcopy(cfg)
@@ -336,6 +336,15 @@ class EngineSensorExecutor:
                 or manifest.get('environment_ref') != env.ref().model_dump(mode='json')):
             raise ValueError('ENGINE_SENSOR_CALLBACK_MANIFEST_BINDING_MISMATCH')
         cases = manifest.get('cases'); projection.validate_cases(check.id, cases)
+        # Independent graph-on/off controls must send identical input bytes.
+        # The optional comparison nonce is part of the policy-bound manifest;
+        # other checks keep fresh cache-isolating nonces for every run.
+        nonce = manifest.get('comparison_nonce')
+        if 'comparison_nonce' in manifest and (check.id != 'REQ-20' or target.get('lab') is not True
+                or type(nonce) is not str or re.fullmatch('[0-9a-f]{32}', nonce) is None):
+            raise ValueError('ENGINE_SENSOR_COMPARISON_NONCE_INVALID')
+        if nonce is None:
+            nonce = uuid.uuid4().hex
         # REQ-19 대조는 엔진 안에서 GPU 동기화와 복사를 한다. 소유 lab 엔진과 명시한 준비 자산에서만 돈다.
         if check.id in ('REQ-19', 'REQ-20') and (target.get('lab') is not True or prepared.get('lab_kernel_checks') is not True):
             raise ValueError('ENGINE_SENSOR_KERNEL_CHECKS_REQUIRE_LAB')
@@ -356,7 +365,6 @@ class EngineSensorExecutor:
             except (KubernetesBindingError, ValueError):
                 cleanup.append('ENGINE_SENSOR_LAB_OWNERSHIP_UNVERIFIED')
         # 같은 엔진을 다시 시험해도 이전 실행의 캐시가 교차 적중으로 보이지 않게 한다.
-        nonce = uuid.uuid4().hex
         # 경계 요청: 이 요청 앞의 세션 기록은 이번 시험 근거에서 뺀다.
         barrier = 'byul-cb-' + uuid.uuid4().hex
         try:
@@ -459,6 +467,7 @@ class EngineSensorExecutor:
                     'prepared_sha256': values['sensor_prepared_sha256'], 'manifest_sha256': values['sensor_manifest_sha256'],
                     'implementation': 'kubernetes', 'engine_started': False})
         return self._artifact(draft, workdir, {'safe_facts': {**result, 'trials': trials, 'sensor_gaps': gaps,
+                **({'comparison_nonce_sha256': sha256_hex(nonce.encode())} if 'comparison_nonce' in manifest else {}),
                 **({'lab_switches': switches} if lab is not None else {})},
             'required_branches': REQUIRED_BRANCHES[check.id]})
 

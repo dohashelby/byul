@@ -83,9 +83,24 @@ describe("사건 로그", () => {
     mockApi({ "/api/runtime/events": { items: [blocked], invalid: [], source: SOURCE, truncated: false } });
     renderAt("/runtime/observe/tetragon", "/runtime/observe/:sub", <RuntimeObservePage />);
     const tableRow = (await screen.findByText("/tmp/fake-secret")).closest("tr")!;
-    expect(within(tableRow).getByText("차단")).toBeTruthy();
+    expect(within(tableRow).getByText("차단 시도")).toBeTruthy();
     expect(tableRow.textContent).toContain("차단 (Override)");
     expect(tableRow.textContent).toContain("TG-SECRET-01");
+  });
+
+  it("보호 파일 Sigkill을 차단 시도와 프로세스 종료로 표시한다", async () => {
+    const sample = EVENTS.find((e) => e.source === "tetragon")!;
+    const killed: RuntimeEvent = {
+      ...sample, event_id: "sigkill-file", outcome: "enforce_attempted",
+      native: { ...sample.native, record: { ...sample.native.record, action_raw: "KPROBE_ACTION_SIGKILL" } as unknown as RuntimeEvent["native"]["record"] },
+      observation: { ...sample.observation!, kind: "file_access", path: "/tmp/probe-token", rule_id: "TG-SECRET-01", action_mode: "enforce", exec_verdict: null },
+    };
+    expect(blockedRows([], [killed]).files).toHaveLength(1);
+    mockApi({ "/api/runtime/events": { items: [killed], invalid: [], source: SOURCE, truncated: false } });
+    renderAt("/runtime/observe/tetragon", "/runtime/observe/:sub", <RuntimeObservePage />);
+    const tableRow = (await screen.findByText("/tmp/probe-token")).closest("tr")!;
+    expect(tableRow.textContent).toContain("차단 시도");
+    expect(tableRow.textContent).toContain("Sigkill · 프로세스 종료");
   });
 
   it("합성 보호 파일 Override를 예시 자료로 표시하면서 차단 표지를 유지한다", async () => {
@@ -104,7 +119,7 @@ describe("사건 로그", () => {
     const view = renderAt("/runtime/observe/tetragon", "/runtime/observe/:sub", <RuntimeObservePage />);
     const tableRow = (await screen.findByText("/run/byul-probe/secret.txt")).closest("tr")!;
     expect(within(tableRow).getByText("합성")).toBeTruthy();
-    expect(within(tableRow).getByText("차단")).toBeTruthy();
+    expect(within(tableRow).getByText("차단 시도")).toBeTruthy();
     expect(tableRow.textContent).toContain("차단 (Override)");
     expect(tableRow.textContent).toContain("TG-SECRET-01 · 차단 시도 기록(enforce)");
     view.unmount();
@@ -268,7 +283,7 @@ describe("차단 내역", () => {
     fireEvent.click(screen.getByRole("tab", { name: "네트워크 차단 0건" }));
     expect(screen.getByText(/Hubble DROPPED 기록이 없습니다/)).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "파일 차단 시도 0건" }));
-    expect(screen.getByText(/Tetragon Override 파일 차단 시도 기록이 없습니다/)).toBeTruthy();
+    expect(screen.getByText(/Tetragon 파일 차단 시도 기록이 없습니다/)).toBeTruthy();
   });
 
   it("구역 쿼리·해시로 탭을 선택하고 탭마다 25행씩 페이지를 전환한다", async () => {

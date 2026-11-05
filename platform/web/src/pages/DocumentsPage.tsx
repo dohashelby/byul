@@ -20,6 +20,7 @@ import { AnyValue, Short, Time, Value } from "../components/Value";
 import { DOC_STATUS } from "../lib/labels";
 import { EnvironmentForm, PolicyForm, factWarnings, newEnvironment, newPolicy, nextPolicyVersion } from "./forms";
 import p from "./pages.module.css";
+import { BundleExport } from "./BundleExport";
 
 const TITLE: Record<DocKind, string> = { environments: "환경", policies: "정책" };
 
@@ -170,6 +171,7 @@ export function PolicyEditorPage() {
         <ConfirmPolicy id={id} revision={latest} stored={current.data.document} edited={doc} onConfirmed={(d) => setDoc({ ...d, status: "DRAFT" })} />
       )}
       {!isNew && id && <History kind="policies" id={id} />}
+      {!isNew && id && <BundleExport policyId={id} revisions={revs.data?.items ?? []} />}
     </div>
   );
 }

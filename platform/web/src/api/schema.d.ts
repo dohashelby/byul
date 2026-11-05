@@ -386,6 +386,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/policies/{doc_id}/revisions/{revision}/bundle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export Bundle */
+        post: operations["export_bundle_api_policies__doc_id__revisions__revision__bundle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/evidence": {
         parameters: {
             query?: never;
@@ -415,6 +432,24 @@ export interface components {
             security: string | null;
             /** Inventory Complete */
             inventory_complete: boolean | null;
+        };
+        /** BundleExportRequest */
+        BundleExportRequest: {
+            /** Environment Id */
+            environment_id: string;
+            /** Environment Revision */
+            environment_revision: number;
+            /**
+             * Requested By Role
+             * @enum {string}
+             */
+            requested_by_role: "runtime_operator" | "policy_operator";
+            /** Server Values Override */
+            server_values_override?: {
+                [key: string]: unknown;
+            } | null;
+            /** Bundle Id */
+            bundle_id?: string | null;
         };
         /** DiffEntry */
         DiffEntry: {
@@ -1063,6 +1098,8 @@ export interface components {
                 target_ref: components["schemas"]["Common_local_id"];
                 engine: {
                     name: string;
+                    /** @enum {unknown} */
+                    runtime_kind?: "mock" | "vllm" | "sglang";
                     version: string | null;
                     image_digest: string | null;
                     source_commit: string | null;
@@ -1088,6 +1125,13 @@ export interface components {
                 kind: "kubernetes" | "docker" | "host";
                 kubernetes_context?: string | null;
                 namespace?: string | null;
+                engine_container?: string | null;
+                /** @enum {unknown} */
+                gateway_schema_version?: "runtime-mvp/1.1" | "runtime-mvp/1.2";
+                /** @enum {unknown} */
+                gateway_cache_isolation?: "off" | "per_principal";
+                /** @description 정책에 intent가 없을 때 쓰는 runtime-enforcement-intent/1.1 원본. runtime이 내부 필드를 검증한다. */
+                enforcement_intent?: Record<string, never> | null;
                 gateway_labels?: components["schemas"]["Environment_labels"];
                 engine_labels?: components["schemas"]["Environment_labels"];
                 engine_port?: number | null;
@@ -2713,6 +2757,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SaveRejected"];
+                };
+            };
+        };
+    };
+    export_bundle_api_policies__doc_id__revisions__revision__bundle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+                revision: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BundleExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

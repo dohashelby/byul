@@ -842,6 +842,65 @@
         }
       }
     },
+    "/api/policies/{doc_id}/revisions/{revision}/bundle": {
+      "post": {
+        "tags": [
+          "policies"
+        ],
+        "summary": "Export Bundle",
+        "operationId": "export_bundle_api_policies__doc_id__revisions__revision__bundle_post",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc Id"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Revision"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BundleExportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/evidence": {
       "get": {
         "tags": [
@@ -902,6 +961,57 @@
           "inventory_complete"
         ],
         "title": "AxisRow"
+      },
+      "BundleExportRequest": {
+        "properties": {
+          "environment_id": {
+            "type": "string",
+            "title": "Environment Id"
+          },
+          "environment_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Environment Revision"
+          },
+          "requested_by_role": {
+            "type": "string",
+            "enum": [
+              "runtime_operator",
+              "policy_operator"
+            ],
+            "title": "Requested By Role"
+          },
+          "server_values_override": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Values Override"
+          },
+          "bundle_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bundle Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "environment_id",
+          "environment_revision",
+          "requested_by_role"
+        ],
+        "title": "BundleExportRequest"
       },
       "DiffEntry": {
         "properties": {
@@ -3278,6 +3388,13 @@
                     "minLength": 1,
                     "maxLength": 64
                   },
+                  "runtime_kind": {
+                    "enum": [
+                      "mock",
+                      "vllm",
+                      "sglang"
+                    ]
+                  },
                   "version": {
                     "type": [
                       "string",
@@ -3404,6 +3521,32 @@
                   "namespace": {
                     "type": [
                       "string",
+                      "null"
+                    ]
+                  },
+                  "engine_container": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1
+                  },
+                  "gateway_schema_version": {
+                    "enum": [
+                      "runtime-mvp/1.1",
+                      "runtime-mvp/1.2"
+                    ]
+                  },
+                  "gateway_cache_isolation": {
+                    "enum": [
+                      "off",
+                      "per_principal"
+                    ]
+                  },
+                  "enforcement_intent": {
+                    "description": "정책에 intent가 없을 때 쓰는 runtime-enforcement-intent/1.1 원본. runtime이 내부 필드를 검증한다.",
+                    "type": [
+                      "object",
                       "null"
                     ]
                   },

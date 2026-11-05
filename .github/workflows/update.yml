@@ -165,7 +165,8 @@ jobs:
       - run: uv sync --frozen
       - name: Verify platform contracts and read-only RPT projection
         run: |
-          uv run --frozen --with-editable ../../update python - <<'PY'
+          # Bundle export tests invoke the installed runtime CLI, including its package metadata.
+          uv run --frozen --with-editable ../../update --with-editable ../../runtime python - <<'PY'
           import os
           import subprocess
           import sys

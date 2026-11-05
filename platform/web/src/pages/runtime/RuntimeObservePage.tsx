@@ -8,7 +8,7 @@ import { Pagination, usePagination } from "../../components/Pagination";
 import { PageHead, Query, StateView } from "../../components/Misc";
 import { Value } from "../../components/Value";
 import { CACHE_GENERATION, EXEC_VERDICT, METRIC_STATE, PARENT_ATTRIBUTION, PARENT_CHECK, PHASE, SUSPECT_CONTEXT, label } from "../../lib/labels";
-import { isTetragonOverride } from "../../lib/tetragon";
+import { isTetragonBlockAttempt, isTetragonSigkill } from "../../lib/tetragon";
 import { useRuntimeProblems } from "./problems";
 import { ObservationOriginBadge, ScopeBadges, StateBadge, Subtabs, TableCard, formatTime, rt } from "./parts";
 
@@ -224,7 +224,7 @@ export function RuntimeObservePage() {
                 const o = e.observation!;
                 const flagged = o.kind === "process_exec" && (o.exec_verdict ? FLAGGED.includes(o.exec_verdict) : o.allowed_binary === false);
                 const { kind, attr } = tetragonKind(e);
-                const blocked = isTetragonOverride(e);
+                const blocked = isTetragonBlockAttempt(e);
                 const mode = o.action_mode === "enforce" ? "차단 시도 기록(enforce)" : o.action_mode === "monitor" ? "감시만(monitor)" : "알 수 없음";
                 return (
                   <tr key={e.event_id} className={flagged ? rt.rowFlagged : undefined}>
@@ -232,7 +232,7 @@ export function RuntimeObservePage() {
                     <td><ScopeBadges environment={e.scope.environment} runId={e.scope.run_id} /></td>
                     <td>{kind}</td>
                     <td className="mono" title={attr || pod(o.pod_namespace, o.pod_name)}>{o.path ?? o.binary ?? "–"}</td>
-                    <td>{blocked ? <><Badge tone="caution" title="Override 차단 시도 기록; 실제 거부 결과는 Lab 시험에서 확인">차단</Badge> 차단 (Override)</> : o.exec_verdict ? `${label(EXEC_VERDICT, o.exec_verdict)}${o.exec_verdict === "exception" && o.exception_id ? ` · ${o.exception_id}` : ""}` : "–"}</td>
+                    <td>{blocked ? <><Badge tone="caution" title="원시 차단 시도 기록; 실제 결과는 Lab 시험에서 확인">차단 시도</Badge> {isTetragonSigkill(e) ? "Sigkill · 프로세스 종료" : "차단 (Override)"}</> : o.exec_verdict ? `${label(EXEC_VERDICT, o.exec_verdict)}${o.exec_verdict === "exception" && o.exception_id ? ` · ${o.exception_id}` : ""}` : "–"}</td>
                     <td>{o.phases.length ? o.phases.map((phase) => label(PHASE, phase)).join(" + ") : "–"}</td>
                     <td>{parentInfo(e)}</td>
                     <td className="mono" title={o.action_raw ?? "원본 action 미기록"}>{`${o.rule_id ?? "–"} · ${mode}`}</td>

@@ -2,6 +2,10 @@
 
 최종 갱신: 2026-11-05
 
+- 2026-11-05 입력→런타임 연결: 사용자가 환경 계약의 필요한 선택 필드 추가를 승인했다. CONFIRMED 정책·환경 판본의 해시를 확인하고 runtime CLI로 묶음을 만들어 다운로드·감사 기록하는 API와 정책 화면 버튼을 구현했다. DRAFT→승인→내보내기→verify→임시 Gateway `bundle_id`/`gateway_active`/`verified`까지 자동 시험으로 확인했다. 서버 적용은 사람 작업이며 실서버 재적용은 미확인이다.
+- 2026-11-05 Tetragon 차단: 명시적 정확 파일 목록과 세 방식(`override_lsm`, `sigkill_fd_install`, `override_syscall`)의 1.7.1 monitor 후보, 동일 ID MODE 전환·rollback·신규 이름 선로드 교체, 사전 능력 판별, L-05b/L-05c·AWS-20 방식별 판정, 화면 Sigkill “차단 시도” 표지를 구현했다. 4회차 값에서는 `override_lsm` 불가로 분류한다. 모든 신규 후보에 Sigkill이 들어가므로 엔진 대상 AWS-20에는 별도 opt-in을 요구한다. 실제 kind/AWS load·차단 효과와 엔진 주 프로세스 종료→503→재시작은 미확인이다. 5회차 확인순서 초안을 추가했으며 서버는 켜지 않았다.
+- 검증: runtime `unittest discover -s tests` 723건 중 115건 skip·실패 0, web `npm run typecheck && npm test` 88건 통과. PR 준비에서 API 시험의 로컬 runtime 가상환경 의존을 제거하고 CI와 같은 `uv run --frozen --with-editable ../../update --with-editable ../../runtime python -m pytest -q` 깨끗한 Git 사본 194건 통과, CI 경로 분기 시험 10건 통과, 공용 계약 schemas 13·examples 11 오류 0, `git diff --check` 통과. 기준 `925ca62`, 사용자 요청으로 PR·머지 진행. 남은 개발은 차단 판정·엔진 주 프로세스 시험 보완, 현재 정책 MODE·점검 결과·시험 근거의 대시보드 연결, 이후 인증된 서버 적용 연결이다. kind와 AWS 실측은 아직 하지 않았다.
+
 - 2026-11-05 AWS `bundle apply` 4회에서 이전 Pod port-forward로 자동 조회 불가였고 새 수동 포워드의 ID·`verified` 일치를 확인했다. 연결 실패 시 포워드 재개설(기본 90초), `--existing` 재검증·복귀, dry-run sudo 안내를 수정했다. 로컬 전체 시험 712건 통과(skip 115), `git diff --check` 통과; 수정판의 AWS 재적용·Pod 종료 구간 자동 확인은 미검증이다.
 
 ## 2026-11-05 플랫폼 정책 묶음 build/apply와 후보 목록 (기준 e6985d7, 미커밋)

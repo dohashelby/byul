@@ -580,7 +580,7 @@ def supply_open_files(processes):
     seen = []
     for process in processes:
         for row in process['events']:
-            if row.get('schema') == supply_callback.SCHEMA and row.get('phase') == 'OPEN':
+            if row.get('schema') == supply_callback.SCHEMA and row.get('phase') in ('OPEN', 'INOTIFY'):
                 key = {'root': row['root'], 'relative': row['relative']}
                 if key not in seen:
                     seen.append(key)
@@ -590,7 +590,7 @@ def supply_open_files(processes):
 def supply_read_events(processes, hashes):
     events, bindings, codes, rows = [], [], set(), []
     for process in processes:
-        mine = [r for r in process['events'] if r.get('schema') == supply_callback.SCHEMA and r.get('phase') == 'OPEN']
+        mine = [r for r in process['events'] if r.get('schema') == supply_callback.SCHEMA and r.get('phase') in ('OPEN', 'INOTIFY')]
         codes |= {r.get('code') for r in process['events'] if r.get('phase') == 'GAP' and type(r.get('code')) is str and r['code'].startswith('SUPPLY_')}
         if not mine:
             continue
@@ -605,6 +605,13 @@ def supply_read_events(processes, hashes):
         at_ms = max(0, (stamp - origin) // 1_000_000); last = max(last, at_ms)
         if type(row.get('relative')) is not str or type(row.get('root')) is not int:
             codes.add('SUPPLY_ROW_INVALID'); continue
+        if row['phase'] == 'INOTIFY':
+            # inotify 행: 연 프로세스를 모른다. binding은 감시한 프로세스이며 귀속 근거가 아니다.
+            codes.add('SUPPLY_INOTIFY_OBSERVED')
+            events.append({'seq': len(events), 'event': 'file_observed', 'binding': binding, 'at_ms': at_ms, 'root': row['root'],
+                           'path_sha256': path_sha256(row['relative']), 'access': 'read', 'size': None, 'bytes_sha256': None,
+                           'state': 'inotify_unattributed'})
+            continue
         events.append({'seq': len(events), 'event': 'file_opened', 'binding': binding, 'at_ms': at_ms, 'root': row['root'],
                        'path_sha256': path_sha256(row['relative']), 'access': 'write' if row.get('write') else 'read',
                        'size': row.get('size') if type(row.get('size')) is int else None, 'bytes_sha256': None,
@@ -622,17 +629,20 @@ def supply_read_events(processes, hashes):
 def supply_read_record(processes, hashes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False):
     """기록된 연 파일마다 해시 행이 있어야 닫힌다. 너무 큰 파일(가중치 등)은 해시하지 않고 상태로 남긴다.
 
-    native 코드의 읽기는 보이지 않으므로 `SUPPLY_NATIVE_READS_UNOBSERVED` 진단이 항상 붙는다. 그래서 등록 뒤에도
-    이 기록만으로 SUP-03의 공급 범위 완료를 만들 수 없다. native 읽기 관측(fanotify·/proc fd 등)이 더해져야 한다.
+    - inotify 감시가 없으면 native 읽기를 못 보므로 `SUPPLY_NATIVE_READS_UNOBSERVED` 진단이 붙는다.
+    - inotify 감시가 있으면 native 읽기 파일은 보이지만 연 프로세스를 모른다. 같은 노드의 다른 Pod 읽기도 섞일 수 있다.
+      그래서 `SUPPLY_NATIVE_READ_PROCESS_UNATTRIBUTED` 진단이 붙는다. Tetragon 같은 독립 귀속 근거가 더해져야 닫힌다.
     """
     events, processes_used, codes = supply_read_events(processes, hashes)
     # Python audit hook은 native 코드(Rust tokenizers, C++ 로더 등)의 파일 읽기를 보지 못한다(k3d run 17: vocab.json·merges.txt).
     # 그래서 이 기록만으로는 실제 소비 전체가 아니라는 진단을 항상 남긴다.
-    codes = sorted(set(codes) | {'SUPPLY_NATIVE_READS_UNOBSERVED'} | ({'SUPPLY_READ_TRUNCATED'} if truncated else set()))
+    watched = 'SUPPLY_INOTIFY_OBSERVED' in codes
+    codes = (set(codes) - {'SUPPLY_INOTIFY_OBSERVED'}) | {'SUPPLY_NATIVE_READ_PROCESS_UNATTRIBUTED' if watched else 'SUPPLY_NATIVE_READS_UNOBSERVED'}
+    codes = sorted(codes | ({'SUPPLY_READ_TRUNCATED'} if truncated else set()))
     bindings = [{'pod_uid': pod['pod_uid'], 'container_id': pod['container_id'].removeprefix('containerd://')[:128],
                  'restart_count': pod['restart_count'], 'worker_pid': p['pid'], 'start_ticks': p['start_ticks'], 'rank': 0}
                 for p in processes_used]
-    opened = {(e['root'], e['path_sha256']) for e in events if e['event'] == 'file_opened'}
+    opened = {(e['root'], e['path_sha256']) for e in events if e['event'] in ('file_opened', 'file_observed')}
     covered = {(e['root'], e['path_sha256']) for e in events if e['event'] == 'file_hashed'}
     record = {'schema': contract.SCHEMA, 'kind': 'supply-reads', 'producer': supply_producer(),
               'environment_ref': environment_ref, 'target_sha256': target_sha256, 'prepared_sha256': prepared_sha256,

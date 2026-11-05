@@ -72,3 +72,28 @@ InputBatch에 남아 있는 마스크를 적용된 허용 목록으로 읽어 �
 - 한계(중요): 같은 실행에서 tokenizer가 쓴 `vocab.json`·`merges.txt`는 보이지 않았다. Rust `tokenizers` 같은 native 코드는 Python `open`을 거치지 않기 때문이다.
   - 그래서 기록에 `SUPPLY_NATIVE_READS_UNOBSERVED` 진단을 항상 붙인다. 이 기록만으로는 공급 범위 완료가 되지 않는다.
   - native 읽기 관측(fanotify, 또는 프로세스별 열린 fd 목록 대조)이 더해져야 SUP-03을 닫을 수 있다. 2단계 후속 항목이다.
+
+### native 읽기: inotify (2026-11-05)
+
+- 검토한 후보:
+  - fanotify: `CAP_SYS_ADMIN` 필요 → 제외
+  - LD_PRELOAD: 공유 라이브러리 빌드와 로딩 변경, 직접 syscall 누락 → 제외
+  - ptrace/strace: `CAP_SYS_PTRACE`, 엔진 교란 → 제외
+  - `/proc/<pid>/fd` 폴링: 짧은 열기 누락 → 제외
+  - inotify: 특권 없음 → 채택
+  - runtime Tetragon 파일 열기 정책: 프로세스 귀속이 되는 독립 근거 → GPU lab에서 runtime 담당과 합의해 더할 후보
+- 실험(run 17 엔진 컨테이너, 같은 tokenizer 로딩):
+  - Python audit hook은 `config.json`·`tokenizer_config.json`·`special_tokens_map.json`만 봤다.
+  - inotify는 여기에 더해 `vocab.json`·`merges.txt`를 봤다. Rust `tokenizers`가 native로 여는 파일이다.
+- 구현(`SupplyWatcher`, `guard prepare-engine-callbacks --supply-root … --supply-watch`):
+  - ctypes만으로 inotify를 쓴다.
+  - Pod 안에서 세션 폴더 잠금 파일을 먼저 만든 프로세스 하나만 지킨다.
+  - 폴더 루트는 하위 폴더까지 지킨다. 파일 루트는 파일 자체를 지킨다. 파일 하나를 bind mount하면 부모 폴더 감시로는 사건이 오지 않았다(run 18 첫 시도, 원자료는 `k3d-run18/*-attempt1*`).
+  - 큐 넘침은 `SUPPLY_INOTIFY_OVERFLOW` gap이다.
+  - 행은 계약의 `file_observed`(state `inotify_unattributed`)다.
+- k3d CPU 확인(run 18, `byul-dev1-evidence/k3d-run18/supply-reads-record.json`):
+  - inotify가 `vocab.json`·`merges.txt`를 포함해 모델 폴더의 모든 사용 파일과 chat template을 봤다.
+  - 해시는 가중치(`too_large`)를 뺀 7개다. 위반 후보는 0이다.
+- 남은 진단: `SUPPLY_NATIVE_READ_PROCESS_UNATTRIBUTED`.
+  - inotify는 연 프로세스를 알려 주지 않는다. 같은 노드의 다른 Pod가 같은 hostPath 파일을 열어도 섞일 수 있다.
+  - 그래서 이 기록만으로는 complete가 되지 않는다. 모델 폴더의 Pod 전용 마운트 확인이나 Tetragon 같은 독립 귀속 근거가 더해져야 닫힌다.

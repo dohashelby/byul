@@ -363,7 +363,7 @@ class EngineCallbacks:
 
     def flush_gaps(self):
         kernel = self.kernel.gaps | self.graph.gaps if self.kernel is not None else set()
-        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption, getattr(self, 'supply', None)) if o is not None))
+        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption, getattr(self, 'supply', None), getattr(self, 'supply_watch', None)) if o is not None))
         for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | self.weights.gaps | self.comm.gaps | kernel | extra):
             self.gap(code)
 
@@ -418,6 +418,16 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
             callbacks.supply = supply_read.SupplyReadObserver(settings['supply_roots'], sink=callbacks.sink,
                                                               process_sha256=callbacks.cache.process_sha256)
             sys.addaudithook(callbacks.supply.hook)
+            if settings.get('supply_watch') is True:
+                # native 읽기(inotify): Pod 안에서 잠금 파일을 먼저 만든 프로세스 하나만 지킨다.
+                try:
+                    lock = os.open(directory / 'supply-watch.lock', os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                    os.write(lock, str(os.getpid()).encode()); os.close(lock)
+                    callbacks.supply_watch = supply_read.SupplyWatcher(settings['supply_roots'], sink=callbacks.sink,
+                                                                       process_sha256=callbacks.cache.process_sha256)
+                    callbacks.supply_watch.start()
+                except FileExistsError:
+                    pass
         atexit.register(callbacks.flush_gaps)
         return True
     except Exception:

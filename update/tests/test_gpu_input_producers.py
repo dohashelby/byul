@@ -317,3 +317,34 @@ def test_supply_record_matches_opens_to_hashes_and_flags_writes_and_changes():
     assert 'GPU_INPUT_PRODUCER_DIAGNOSTIC:SUPPLY_NATIVE_READS_UNOBSERVED' in result['gaps']
     _, partial = producers.supply_read_record(processes, hashes[:1], pod=POD, **SCOPE)
     assert 'GPU_INPUT_SOURCE_INCOMPLETE' in partial['gaps']
+
+
+def test_inotify_events_become_unattributed_rows_once_and_overflow_is_a_gap(tmp_path):
+    import struct
+    root = tmp_path / 'models'; (root / 'sub').mkdir(parents=True)
+    rows = []
+    watcher = supply.SupplyWatcher([str(root)], sink=rows.append, process_sha256='p' * 64, clock=lambda: 7)
+    watcher.watches = {1: (0, '', None), 2: (0, 'sub/', None), 3: (0, '', '.')}
+    def event(wd, mask, name):
+        raw = name.encode() + b'\0' * (16 - len(name) % 16)
+        return struct.pack('iIII', wd, mask, 0, len(raw)) + raw
+    watcher.handle(event(1, supply.IN_OPEN, 'vocab.json') + event(1, supply.IN_ACCESS, 'vocab.json')
+                   + event(2, supply.IN_OPEN, 'merges.txt') + event(1, supply.IN_OPEN | supply.IN_ISDIR, 'sub')
+                   + event(-1, supply.IN_Q_OVERFLOW, '') + struct.pack('iIII', 3, supply.IN_OPEN, 0, 0))
+    observed = [r for r in rows if r['phase'] == 'INOTIFY']
+    assert [r['relative'] for r in observed] == ['vocab.json', 'sub/merges.txt', '.'] and observed[0]['process_attributed'] is False
+    assert [r['code'] for r in rows if r['phase'] == 'GAP'] == ['SUPPLY_INOTIFY_OVERFLOW'] and 'SUPPLY_INOTIFY_OVERFLOW' in watcher.gaps
+
+
+def test_inotify_rows_join_the_record_and_replace_the_unobserved_diagnostic():
+    rows = [{'schema': supply.SCHEMA, 'phase': 'OPEN', 'root': 0, 'relative': 'config.json', 'write': False, 'regular': True, 'size': 2, 'opened_ns': 1},
+            {'schema': supply.SCHEMA, 'phase': 'INOTIFY', 'root': 0, 'relative': 'vocab.json', 'opened_ns': 2, 'process_attributed': False}]
+    processes = [{'pid': 1, 'start_ticks': 1, 'events': rows}]
+    files = producers.supply_open_files(processes)
+    assert {'root': 0, 'relative': 'vocab.json'} in files
+    hashes = [{**f, 'sha256': 'a' * 64, 'size': 1, 'state': 'hashed'} for f in files]
+    record, result = producers.supply_read_record(processes, hashes, pod=POD, **SCOPE)
+    assert [e['event'] for e in record['events']] == ['file_opened', 'file_observed', 'file_hashed', 'file_hashed']
+    assert record['completeness']['source_ended'] is True
+    assert 'GPU_INPUT_PRODUCER_DIAGNOSTIC:SUPPLY_NATIVE_READ_PROCESS_UNATTRIBUTED' in result['gaps']
+    assert not any('UNOBSERVED' in g for g in result['gaps'])

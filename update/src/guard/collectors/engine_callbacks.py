@@ -26,10 +26,12 @@ def _sources():
 
 
 def prepare_assets(output, *, lab_faults=False, lab_kernel_checks=False, request_attempts=False, generation_transitions=False,
-                   health_causal=False, profiler_control=False, runner_consumption=False, supply_roots=None):
+                   health_causal=False, profiler_control=False, runner_consumption=False, supply_roots=None, supply_watch=False):
     if supply_roots is not None:
         from guard.adapters.vllm_supply_read_callback import normalize_roots
         supply_roots = normalize_roots(supply_roots)
+    if supply_watch and not supply_roots:
+        raise ValueError('ENGINE_CALLBACK_SUPPLY_WATCH_REQUIRES_ROOTS')
     if (generation_transitions or health_causal) and not request_attempts:
         # 요청별 세대 소비는 request-attempt 단계 기록과 맞춰야 나온다.
         raise ValueError('ENGINE_CALLBACK_TRANSITIONS_REQUIRE_ATTEMPTS')
@@ -44,11 +46,12 @@ def prepare_assets(output, *, lab_faults=False, lab_kernel_checks=False, request
         # #196 request-attempt 관측(P1). 켜면 매 단계 scheduler를 감싼다.
         'request_attempts': request_attempts is True, 'generation_transitions': generation_transitions is True,
         'health_causal': health_causal is True, 'profiler_control': profiler_control is True,
-        'runner_consumption': runner_consumption is True, 'supply_roots': supply_roots}), encoding='utf-8')
+        'runner_consumption': runner_consumption is True, 'supply_roots': supply_roots,
+        'supply_watch': supply_watch is True}), encoding='utf-8')
     manifest = {'schema': SCHEMA, 'profile': sensor.PROFILE, 'session': session, 'engine_started': False, 'lab_faults': lab_faults, 'lab_kernel_checks': lab_kernel_checks,
         'request_attempts': request_attempts is True, 'generation_transitions': generation_transitions is True,
         'health_causal': health_causal is True, 'profiler_control': profiler_control is True,
-        'runner_consumption': runner_consumption is True, 'supply_roots': supply_roots, 'assets': {name: hashlib.sha256(data).hexdigest() for name, data in sorted(values.items())}}
+        'runner_consumption': runner_consumption is True, 'supply_roots': supply_roots, 'supply_watch': supply_watch is True, 'assets': {name: hashlib.sha256(data).hexdigest() for name, data in sorted(values.items())}}
     (output / 'manifest.json').write_text(json.dumps(manifest, sort_keys=True), encoding='utf-8')
     return manifest
 

@@ -89,3 +89,101 @@ class SupplyReadObserver:
                 pass
         finally:
             self.local.busy = False
+
+
+# ---------------------------------------------------------------------------
+# native 읽기: inotify (특권 없음, ctypes만 사용)
+# ---------------------------------------------------------------------------
+IN_ACCESS, IN_OPEN, IN_Q_OVERFLOW, IN_ISDIR, IN_NONBLOCK = 0x001, 0x020, 0x4000, 0x40000000, 0o4000
+_EVENT = 16
+MAX_WATCHES = 512
+
+
+class SupplyWatcher:
+    """선언 공급 루트를 inotify로 지켜 native 코드(Rust tokenizers 등)가 연 파일까지 남긴다.
+
+    - Pod 안에서 하나만 돈다(세션 폴더의 잠금 파일을 먼저 만든 프로세스). 여러 프로세스가 같은 사건을 겹쳐 남기지 않는다.
+    - 폴더 루트는 하위 폴더까지 지킨다. 파일 루트는 그 파일 자체를 지킨다(bind mount된 파일은 부모 폴더 감시로 보이지 않는다).
+    - inotify는 연 프로세스를 알려 주지 않는다. 같은 노드의 다른 Pod가 같은 파일을 열어도 섞인다.
+      그래서 이 행은 프로세스 귀속이 없다는 표시와 함께 쓴다(소비자는 Tetragon 등 독립 근거로 귀속을 보완한다).
+    - 큐가 넘치면(IN_Q_OVERFLOW) 놓친 사건이 있다는 gap을 남긴다.
+    """
+
+    def __init__(self, roots, *, sink, process_sha256, clock=None, libc=None):
+        self.roots = normalize_roots(roots); self.sink = sink; self.process_sha256 = process_sha256
+        self.clock = clock or time.monotonic_ns; self.seen = set(); self.watches = {}; self.gaps = set()
+        self.libc = libc
+        self.fd = None
+
+    def _libc(self):
+        if self.libc is None:
+            import ctypes
+            self.libc = ctypes.CDLL('libc.so.6', use_errno=True)
+        return self.libc
+
+    def _watch(self, directory, root_index, prefix, only=None):
+        if len(self.watches) >= MAX_WATCHES:
+            self.gaps.add('SUPPLY_INOTIFY_WATCH_LIMIT'); return
+        wd = self._libc().inotify_add_watch(self.fd, directory.encode(), IN_OPEN | IN_ACCESS)
+        if wd < 0:
+            self.gaps.add('SUPPLY_INOTIFY_WATCH_UNAVAILABLE'); return
+        self.watches[wd] = (root_index, prefix, only)
+
+    def start(self):
+        try:
+            self.fd = self._libc().inotify_init1(IN_NONBLOCK)
+            if self.fd < 0:
+                raise OSError
+            for index, root in enumerate(self.roots):
+                if os.path.isdir(root):
+                    for current, dirs, _ in os.walk(root):
+                        dirs.sort()
+                        relative = os.path.relpath(current, root)
+                        self._watch(current, index, '' if relative == '.' else relative + '/')
+                elif os.path.isfile(root):
+                    # 파일 하나를 bind mount한 경우 부모 폴더 감시로는 사건이 오지 않는다(k3d run 18). 파일 자체를 지킨다.
+                    self._watch(root, index, '', only='.')
+            threading.Thread(target=self._run, name='guard-supply-watch', daemon=True).start()
+            return True
+        except BaseException:
+            self.gaps.add('SUPPLY_INOTIFY_UNAVAILABLE'); return False
+
+    def handle(self, data):
+        """inotify 사건 bytes를 행으로 옮긴다(시험에서 직접 부른다)."""
+        import struct
+        offset = 0
+        while offset + _EVENT <= len(data):
+            wd, mask, _, length = struct.unpack_from('iIII', data, offset)
+            name = data[offset + _EVENT:offset + _EVENT + length].split(b'\0', 1)[0].decode('utf-8', 'replace')
+            offset += _EVENT + length
+            if mask & IN_Q_OVERFLOW:
+                self.gaps.add('SUPPLY_INOTIFY_OVERFLOW')
+                self.sink({'schema': SCHEMA, 'phase': 'GAP', 'code': 'SUPPLY_INOTIFY_OVERFLOW', 'process_sha256': self.process_sha256})
+                continue
+            watch = self.watches.get(wd)
+            if watch is None or mask & IN_ISDIR:
+                continue
+            root_index, prefix, only = watch
+            if only == '.':
+                relative = '.'  # 파일 자체 감시: 사건에 이름이 없다
+            elif not name:
+                continue
+            else:
+                relative = prefix + name
+            key = (root_index, relative)
+            if key in self.seen:
+                continue
+            self.seen.add(key)
+            self.sink({'schema': SCHEMA, 'phase': 'INOTIFY', 'process_sha256': self.process_sha256, 'root': root_index,
+                       'relative': relative, 'write': False, 'regular': True, 'size': None, 'mtime_ns': None,
+                       'opened_ns': self.clock(), 'process_attributed': False})
+
+    def _run(self):
+        import select
+        while True:
+            try:
+                ready, _, _ = select.select([self.fd], [], [], 1.0)
+                if ready:
+                    self.handle(os.read(self.fd, 65536))
+            except BaseException:
+                self.gaps.add('SUPPLY_INOTIFY_READ_UNAVAILABLE'); return

@@ -90,7 +90,8 @@ KINDS = {
     # 경로는 승인 목록과 대조하도록 상대 경로의 평문 SHA-256(path_sha256)으로 남긴다.
     "supply-reads": {
         "checks": ("SUP-03",),
-        "events": ("file_opened", "file_hashed"),
+        # file_observed: inotify로 본 파일. 연 프로세스를 모른다(state inotify_unattributed).
+        "events": ("file_opened", "file_observed", "file_hashed"),
         "fields": {"at_ms": "ms", "root": "int", "path_sha256": "sha", "access": "enum:read|write", "size": "opt_int",
                    "bytes_sha256": "opt_sha", "state": "opt_id"},
         "complete_requires": ("file_opened", "file_hashed"),

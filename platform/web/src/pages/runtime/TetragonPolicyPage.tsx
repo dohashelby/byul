@@ -1,3 +1,4 @@
+import { ModeRequests } from "../RuntimeOperations";
 import { useTetragonStatus } from "../../api/hooks";
 import type { TetragonVerification } from "../../api/types";
 import { Badge, OriginBadge } from "../../components/Badges";
@@ -41,6 +42,7 @@ export function TetragonPolicyPage() {
       { to: "/runtime/enforce/tetragon", label: "파일·프로세스 정책 (Tetragon)", active: true },
       { to: "/runtime/enforce/lab", label: "검증 시험 (Lab)", active: false },
     ]} />
+    <ModeRequests />
     <Query q={query}>{(data) => {
       const state = data.item;
       const current = state.fresh && state.state === "ok";

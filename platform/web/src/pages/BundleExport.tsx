@@ -1,3 +1,4 @@
+import { BundleApplyRequest } from "./RuntimeOperations";
 import { useEffect, useState } from "react";
 import { useDocList, useDocRevisions, useEnvironmentRevision, usePolicyRevision } from "../api/hooks";
 import type { RevisionMeta } from "../api/types";
@@ -99,6 +100,7 @@ export function BundleExport({ policyId, revisions }: { policyId: string; revisi
 
   return <section className="card card-pad stack">
     <h2>정책 묶음 내보내기</h2>
+    <BundleApplyRequest policyId={policyId} revision={policyRevision} environmentId={envId} environmentRevision={envRevision} confirmed={confirmed} override={override} />
     <span className="small muted">CONFIRMED 판본과 환경 판본을 선택합니다. 받은 파일은 서버에서 직접 적용합니다.</span>
     <div className="row wrap">
       <label className="small">정책 판본 <select className="select" aria-label="묶음 정책 판본" value={policyRevision ?? ""} onChange={(e) => setPolicyRevision(Number(e.target.value))}>

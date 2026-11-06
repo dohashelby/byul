@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -276,6 +276,23 @@ def _token(path: str | None) -> str | None:
     return matches[0] if matches else None
 
 
+def _gateway_status(context: str, namespace: str, kubeconfig: str | None,
+                    remote_port: int, token: str | None, *,
+                    status_url: str | None = None, timeout: float = 90) -> dict:
+    """Read this deployment through a fresh forward; a local URL is opt-in."""
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            connection = (nullcontext(status_url) if status_url is not None else
+                          _port_forward(context, namespace, kubeconfig, remote_port))
+            with connection as url:
+                return _status(url, token)
+        except (URLError, TimeoutError, OSError, ValueError, StatusUnavailable) as error:
+            if time.monotonic() >= deadline:
+                raise StatusUnavailable(type(error).__name__) from None
+        time.sleep(min(0.5, max(0, deadline - time.monotonic())))
+
+
 def _checked_status(context: str, namespace: str, kubeconfig: str | None,
                     remote_port: int, token: str | None, bundle_id: str,
                     *, timeout: float = 90) -> None:
@@ -284,9 +301,7 @@ def _checked_status(context: str, namespace: str, kubeconfig: str | None,
     last_error = ""
     while True:
         try:
-            with _port_forward(context, namespace, kubeconfig, remote_port) as url:
-                # 연결 실패 후에는 오래된 Pod에 붙은 포워드를 닫고 새로 연다.
-                status = _status(url, token)
+            status = _gateway_status(context, namespace, kubeconfig, remote_port, token, timeout=0)
             bundle_status = status.get("policy_bundle")
             policy_status = status.get("policy")
             if not isinstance(bundle_status, dict) or not isinstance(policy_status, dict) or not isinstance(policy_status.get("approval"), dict):

@@ -1,0 +1,7 @@
+# Install with visudo only after replacing the fixed context/namespace/paths.
+# Requires sudo >= 1.9.10 argument regex support. No other Python invocation,
+# kubectl, shell, arbitrary bundle-root, context, namespace or config is allowed.
+# /opt/byul/runtime and its Python environment must be root-owned, not writable
+# by runtime-agent. Keep the exact argument order used by the agent.
+Cmnd_Alias BYUL_BUNDLE_APPLY = /opt/byul/runtime/.venv/bin/python ^-B -m serving_runtime bundle apply --bundle-root /srv/serving/bundles --context lab-context --namespace serving --status-url http\://127\.0\.0\.1\:8080 (--existing [A-Za-z0-9][A-Za-z0-9_.-]*|--bundle-dir /tmp/runtime-agent-[A-Za-z0-9_-]+/[A-Za-z0-9][A-Za-z0-9_.-]*) --kubeconfig /etc/serving-runtime/kubeconfig --token-env-file /etc/serving-runtime/viewer.env --operation-result$
+runtime-agent ALL=(root) NOPASSWD: BYUL_BUNDLE_APPLY

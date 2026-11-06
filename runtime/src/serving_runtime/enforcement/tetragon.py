@@ -163,7 +163,7 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
             intent, "TG-ASSET-02", [assets.tokenizer_dir], 2
         )
     if paths.secret_paths:
-        secret_enforce = intent.tetragon_rule_mode("TG-SECRET-01") == "enforce"
+        secret_enforce = "enforce" in intent.allowed_modes("TG-SECRET-01")
         if secret_enforce and intent.tetragon_enforce_method:
             manifests["tetragon-tg-secret-01.json"] = _secret_enforcement_policy(intent)
         else:

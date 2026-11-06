@@ -1,6 +1,7 @@
 // Internal protocol candidate; credentials are managed by operationSession.
 export type Expected = { bundle_id: string; approval: "verified"; policy_id?: string | null; mode?: string | null; spec_sha256?: string | null };
 export type Readiness = { name: string; method: string | null; expected: Expected; checks: Record<string, boolean>; evidence_sha256: string[];
+  monitor_windows?: { node: string; since: string; until: string; continuous: boolean; event_count: number; reviewed_event_count: number; false_positive_count: number }[];
   capability_basis?: "static" | "live_trial" | null;
   capability_reason?: "static_unavailable" | "evidence_required" | "capability_missing" | null };
 export type Actor = { id: string; role: "viewer" | "runtime_operator" | "approver" | "agent" };

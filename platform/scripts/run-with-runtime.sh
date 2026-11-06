@@ -16,6 +16,10 @@
 #   RUNTIME_TETRAGON_NAMESPACE          기본 serving-lab
 #   RUNTIME_TETRAGON_STREAM_POLICIES    gRPC로 수집할 정책 이름, 쉼표 구분
 #   RUNTIME_TETRAGON_BASELINE           사전에 확인한 정책 spec·모드 기대값 파일
+#   RUNTIME_TETRAGON_MONITOR_WINDOW=1   Gateway 실제 관측으로 모니터 창 생성(opt-in)
+#   RUNTIME_TETRAGON_MONITOR_POLICIES   대상 정책, 쉼표 구분(기본 runtime-tg-secret-01)
+#   RUNTIME_TETRAGON_MONITOR_REVIEWS    사람이 작성한 이벤트별 검토 JSON(선택)
+#   RUNTIME_TETRAGON_MONITOR_OUTPUT     에이전트 --review-file 출력(기본 data-dir/tetragon-monitor-windows.json)
 #
 # runtime은 byul/runtime의 코드를 그대로 쓴다(uv 임시 환경에 편집 모드로 설치, runtime/ 폴더에는 파일을 만들지 않음).
 # platform은 runtime 조회 API(GET /api/*)만 읽는다.
@@ -65,6 +69,7 @@ if [ "${RUNTIME_DEMO:-0}" = "1" ]; then
 fi
 
 cleanup() {
+  [ -n "${TETRAGON_MONITOR_PID:-}" ] && kill "$TETRAGON_MONITOR_PID" 2>/dev/null || true
   [ -n "${TETRAGON_IDENTITY_PID:-}" ] && kill "$TETRAGON_IDENTITY_PID" 2>/dev/null || true
   [ -n "${TETRAGON_STREAM_PID:-}" ] && kill "$TETRAGON_STREAM_PID" 2>/dev/null || true
   [ -n "${TETRAGON_PID:-}" ] && kill "$TETRAGON_PID" 2>/dev/null || true
@@ -123,6 +128,19 @@ if [ "${RUNTIME_TETRAGON_STATE:-0}" = "1" ]; then
     --output "$RUNTIME_DATA_DIR/tetragon-state.json" \
     --evidence-dir "${TETRAGON_EVIDENCE_DIR:-$STATE_HOME/tetragon-evidence}" "${RECOVERY_ARGS[@]}" --watch) &
   TETRAGON_PID=$!
+fi
+
+if [ "${RUNTIME_TETRAGON_MONITOR_WINDOW:-0}" = "1" ]; then
+  MONITOR_ARGS=()
+  IFS=',' read -r -a MONITOR_POLICIES <<< "${RUNTIME_TETRAGON_MONITOR_POLICIES:-runtime-tg-secret-01}"
+  for policy in "${MONITOR_POLICIES[@]}"; do MONITOR_ARGS+=(--policy "$policy"); done
+  [ -n "${RUNTIME_TETRAGON_MONITOR_REVIEWS:-}" ] && MONITOR_ARGS+=(--reviews "$RUNTIME_TETRAGON_MONITOR_REVIEWS")
+  (cd "$ROOT/runtime" && uv run -q --no-project --python 3.12 --with-editable . python -B -m tools.tetragon_monitor_window \
+    --context "${RUNTIME_KUBE_CONTEXT:-kind-runtime-lab}" --namespace "${RUNTIME_TETRAGON_NAMESPACE:-serving-lab}" \
+    "${MONITOR_ARGS[@]}" --status "$RUNTIME_DATA_DIR/tetragon-state.json" \
+    --observations "$RUNTIME_DATA_DIR/observations.jsonl" \
+    --output "${RUNTIME_TETRAGON_MONITOR_OUTPUT:-$RUNTIME_DATA_DIR/tetragon-monitor-windows.json}" --watch) &
+  TETRAGON_MONITOR_PID=$!
 fi
 
 if [ "${RUNTIME_DEMO:-0}" = "1" ]; then

@@ -54,6 +54,22 @@ it("근거가 없으면 차단 버튼을 비활성화한다", async () => {
   expect(screen.getByText(/미충족 · 방식·spec 해시·커널/)).toBeTruthy();
 });
 
+it.each(["정책", "운영"])("%s 화면에 모니터 창 시작·건수·미검토·오탐을 표시한다", async (page) => {
+  const result = data();
+  const row = result.agents[0].policies[0];
+  row.checks.monitor_period = false;
+  row.monitor_windows = [{ node: "node-01", since: "2026-11-06T00:00:00Z", until: "2026-11-06T00:00:10Z",
+    continuous: true, event_count: 3, reviewed_event_count: 2, false_positive_count: 1 }];
+  mockApi({ "/api/runtime/operations": result });
+  renderAt("/runtime/operations", "/runtime/operations", page === "정책" ? <ModeRequests /> : <RuntimeOperationsPage />);
+  enterToken();
+  if (page === "정책") fireEvent.click(screen.getByText("전환 조건 조회"));
+  expect(await screen.findByText(/node-01 · 창 시작/)).toBeTruthy();
+  expect(screen.getByText(/이벤트 3건 · 검토 2\/3건 · 오탐 1건 · 미검토 있음/)).toBeTruthy();
+  expect(screen.getByText(/미충족 · 모니터 기간/)).toBeTruthy();
+  if (page === "정책") expect((screen.getByRole("button", { name: "차단으로 전환" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
 it.each([
   ["static", null, true, true, "확인: 사전 점검으로 확인"],
   ["static", null, true, false, "확인: 사전 점검으로 확인"],

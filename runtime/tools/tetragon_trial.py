@@ -1,4 +1,4 @@
-"""Opt-in isolated kind trials; read denial and main-process death are distinct results."""
+"""Opt-in isolated trials; read denial and main-process death are distinct results."""
 from __future__ import annotations
 
 import argparse
@@ -69,13 +69,70 @@ def atomic_json(path, value):
     temporary.replace(path)
 
 
+class KindDockerAccess:
+    def __init__(self, runner):
+        self.run=runner
+
+    def validate(self, node):
+        pass
+
+    def inspect(self, node, cid):
+        return self.run(["docker","exec",node,"crictl","inspect",cid])
+
+    def sample(self, node, pid):
+        # Preserve the original kind command byte for byte.
+        return self.run(["docker","exec",node,"sh","-c",
+                        f"cat /proc/{pid}/stat && readlink /proc/{pid}/ns/pid && "
+                        f"grep '^NSpid:' /proc/{pid}/status && getconf CLK_TCK"])
+
+    def kernel(self, node):
+        return self.run(["docker","exec",node,"uname","-r"])
+
+
+class LocalSudoAccess:
+    """Only fixed executables/arguments; never pass CRI output to a shell."""
+    def __init__(self, runner):
+        self.run=runner
+
+    def validate(self, node):
+        result=self.run(["sudo","-n","uname","-n"])
+        if result.returncode or not node or result.stdout.strip()!=node:
+            raise RuntimeError("local host does not match probe Pod node or cannot be verified")
+
+    def inspect(self, node, cid):
+        return self.run(["sudo","-n","crictl","inspect",cid])
+
+    def sample(self, node, pid):
+        lines=[]
+        for command in (["cat",f"/proc/{pid}/stat"], ["readlink",f"/proc/{pid}/ns/pid"],
+                        ["grep","^NSpid:",f"/proc/{pid}/status"], ["getconf","CLK_TCK"]):
+            result=self.run(["sudo","-n",*command])
+            if result.returncode:
+                return subprocess.CompletedProcess([],result.returncode,"","")
+            lines.append(result.stdout.rstrip("\n"))
+        return subprocess.CompletedProcess([],0,"\n".join(lines)+"\n","")
+
+    def kernel(self, node):
+        self.validate(node)
+        return self.run(["sudo","-n","uname","-r"])
+
+
 class KindTrial:
-    def __init__(self, output: Path, method: str, *, image="serving-runtime-lab:dev", override_only=False):
+    # Historical name retained for callers of the kind-only tool.
+    def __init__(self, output: Path, method: str, *, image="serving-runtime-lab:dev", override_only=False,
+                 context="kind-runtime-lab", node_access="kind-docker", image_pull_policy="IfNotPresent", runner=None):
+        if node_access not in {"kind-docker","local-sudo"}:
+            raise ValueError("unknown node access method")
+        if image_pull_policy not in {"IfNotPresent","Never"}:
+            raise ValueError("unsupported image pull policy")
+        self.run=runner or run
+        self.node_access=(KindDockerAccess if node_access=="kind-docker" else LocalSudoAccess)(self.run)
         self.output=output
         self.method=method
         self.image=image
+        self.image_pull_policy=image_pull_policy
         self.override_only=override_only
-        self.context="kind-runtime-lab"
+        self.context=context
         self.namespace="byul-proof-"+uuid4().hex[:10]
         self.policy="runtime-tg-secret-01-"+self.namespace
         self.pod="probe"
@@ -92,7 +149,7 @@ class KindTrial:
         self.stream_error=None
 
     def kube(self,*args,namespace=None,timeout=30):
-        return run(["kubectl","--context",self.context,"-n",namespace or self.namespace,*args],timeout=timeout)
+        return self.run(["kubectl","--context",self.context,"-n",namespace or self.namespace,*args],timeout=timeout)
 
     def document(self,*args):
         result=self.kube(*args)
@@ -103,7 +160,7 @@ class KindTrial:
         atomic_json(path,value)
         result=self.kube("create" if create else "apply","-f",str(path))
         if result.returncode:
-            raise RuntimeError(result.stderr[:1000])
+            raise RuntimeError("trial resource could not be applied")
 
     def state(self):
         result=self.kube("exec","daemonset/tetragon","-c","tetragon","--","tetra","tp","list","-o","json",namespace="kube-system")
@@ -112,7 +169,7 @@ class KindTrial:
         return next((p for p in json.loads(result.stdout).get("policies",[]) if p.get("name")==self.policy and p.get("namespace")==self.namespace),None)
 
     def mode(self,target):
-        result=switch_mode(self.context,self.namespace,self.policy,target,run=run,history_path=self.history)
+        result=switch_mode(self.context,self.namespace,self.policy,target,run=self.run,history_path=self.history)
         self.report["steps"].append({"at":now(),"target_mode":target,**result})
         return result
 
@@ -131,7 +188,7 @@ class KindTrial:
         result=self.kube("get","pods","-l","app.kubernetes.io/name=tetragon","-o","json",namespace="kube-system")
         pods=json.loads(result.stdout).get("items",[]) if result.returncode==0 else []
         if len(pods)!=1:
-            raise RuntimeError("isolated kind trial requires exactly one Tetragon agent")
+            raise RuntimeError("isolated trial requires exactly one Tetragon agent")
         statuses=pods[0].get("status",{}).get("containerStatuses",[])
         agent=next((s for s in statuses if s.get("name")=="tetragon"),{})
         if not agent.get("ready"):
@@ -141,20 +198,21 @@ class KindTrial:
     def task_identity(self, pod, node):
         """Read only CRI's exact container init; never infer identity from a PID alone."""
         import re
+        if pod.get("spec",{}).get("nodeName")!=node:
+            raise RuntimeError("probe Pod node changed during trial")
+        self.node_access.validate(node)
         statuses=pod.get("status",{}).get("containerStatuses",[])
         container=next(s for s in statuses if s.get("name")=="probe")
         cid=container["containerID"].removeprefix("containerd://")
         if not re.fullmatch(r"[a-f0-9]{64}",cid):
             raise RuntimeError("unexpected CRI container identity")
-        inspected=run(["docker","exec",node,"crictl","inspect",cid])
+        inspected=self.node_access.inspect(node,cid)
         if inspected.returncode:
             raise RuntimeError("cannot inspect disposable container init")
         init_pid=json.loads(inspected.stdout)["info"]["pid"]
         if type(init_pid) is not int or init_pid <= 0:
             raise RuntimeError("invalid CRI init PID")
-        sample=run(["docker","exec",node,"sh","-c",
-                    f"cat /proc/{init_pid}/stat && readlink /proc/{init_pid}/ns/pid && "
-                    f"grep '^NSpid:' /proc/{init_pid}/status && getconf CLK_TCK"])
+        sample=self.node_access.sample(node,init_pid)
         if sample.returncode:
             raise RuntimeError("cannot bind disposable container init to procfs")
         stat,pidns,nspid,hz=sample.stdout.splitlines()
@@ -185,8 +243,8 @@ class KindTrial:
             self.apply("pod",{"apiVersion":"v1","kind":"Pod","metadata":{"name":self.pod,"namespace":self.namespace,"labels":{"app":"byul-tetragon-proof"}},
                 "spec":{"restartPolicy":"Always","terminationGracePeriodSeconds":1,"automountServiceAccountToken":False,"securityContext":{"runAsUser":10001,"runAsGroup":10001,"fsGroup":10001},
                     "volumes":[{"name":"file","emptyDir":{}}],
-                    "initContainers":[{"name":"prepare-fake-file","image":self.image,"imagePullPolicy":"IfNotPresent","command":["python","-c","from pathlib import Path; Path('/run/byul-probe/secret.txt').write_text('FAKE-PROBE-ONLY')"],"volumeMounts":[{"name":"file","mountPath":"/run/byul-probe"}]}],
-                    "containers":[{"name":"probe","image":self.image,"imagePullPolicy":"IfNotPresent","command":["python","-u","-c",SERVER],"volumeMounts":[{"name":"file","mountPath":"/run/byul-probe","readOnly":True}]}]}})
+                    "initContainers":[{"name":"prepare-fake-file","image":self.image,"imagePullPolicy":self.image_pull_policy,"command":["python","-c","from pathlib import Path; Path('/run/byul-probe/secret.txt').write_text('FAKE-PROBE-ONLY')"],"volumeMounts":[{"name":"file","mountPath":"/run/byul-probe"}]}],
+                    "containers":[{"name":"probe","image":self.image,"imagePullPolicy":self.image_pull_policy,"command":["python","-u","-c",SERVER],"volumeMounts":[{"name":"file","mountPath":"/run/byul-probe","readOnly":True}]}]}})
             ready=self.kube("wait","pod/"+self.pod,"--for=condition=Ready","--timeout=60s",timeout=65)
             if ready.returncode or not self.wait_read():
                 raise RuntimeError("disposable main-process probe did not become ready")
@@ -197,8 +255,10 @@ class KindTrial:
             self.report["node"]=node
             identity=self.task_identity(pod_doc,node)
             self.report["task_identity"]=identity
-            kernel=run(["docker","exec",node,"uname","-r"])
+            kernel=self.node_access.kernel(node)
             self.report["kernel"]=kernel.stdout.strip() if kernel.returncode==0 else None
+            if not self.report["kernel"]:
+                raise RuntimeError("cannot read trial node kernel")
             source=json.loads((ROOT/"deploy/lab/intent.lab-v1.1.json").read_text())
             source["namespace"]=self.namespace
             source["engine"]["labels"]={"app":"byul-tetragon-proof"}
@@ -368,14 +428,20 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output",type=Path,required=True)
     parser.add_argument("--methods",nargs="+",choices=METHODS,default=METHODS)
-    parser.add_argument("--allow-isolated-kind-trials",action="store_true",required=True)
+    parser.add_argument("--node-access",choices=("kind-docker","local-sudo"),default="kind-docker")
+    parser.add_argument("--context",default="kind-runtime-lab")
+    parser.add_argument("--image",default="serving-runtime-lab:dev",help="Python을 포함한 시험용 이미지")
+    parser.add_argument("--image-pull-policy",choices=("IfNotPresent","Never"),default="IfNotPresent")
+    parser.add_argument("--allow-isolated-trials","--allow-isolated-kind-trials",dest="allow_isolated_trials",action="store_true",required=True)
     parser.add_argument("--override-only-diagnostic",action="store_true",help="시험 전용으로 Sigkill을 제거해 Override의 errno를 분리 측정")
     args=parser.parse_args()
     exit_code=0
     for method in args.methods:
         if args.override_only_diagnostic and method=="sigkill_fd_install":
             parser.error("Override diagnostic requires an Override method")
-        report=KindTrial(args.output,method,override_only=args.override_only_diagnostic).execute()
+        report=KindTrial(args.output,method,override_only=args.override_only_diagnostic,
+                         node_access=args.node_access,context=args.context,image=args.image,
+                         image_pull_policy=args.image_pull_policy).execute()
         print(json.dumps({"id":report["id"],"method":method,"verification":report["verification"],"load_state":(report.get("load") or {}).get("state"),"error":report.get("error")},ensure_ascii=False),flush=True)
         if report["verification"]["status"]!="passed": exit_code=2
         if report["facts"].get("agent_changed"): break

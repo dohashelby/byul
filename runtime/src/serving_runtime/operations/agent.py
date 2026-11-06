@@ -224,10 +224,15 @@ class Agent:
             if not self.config.review_file:
                 return {}
             path = Path(self.config.review_file)
-            info = path.stat()
-            if path.is_symlink() or not stat.S_ISREG(info.st_mode) or info.st_mode & 0o022 or info.st_uid not in {0, os.getuid()} or info.st_size > 2 * 1024 * 1024:
-                return {}
-            raw = path.read_bytes()
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            with os.fdopen(fd, "rb") as source:
+                info = os.fstat(source.fileno())
+                if (not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o600
+                        or info.st_uid not in {0, os.getuid()} or info.st_size > 2 * 1024 * 1024):
+                    return {}
+                raw = source.read(2 * 1024 * 1024 + 1)
+                if len(raw) > 2 * 1024 * 1024:
+                    return {}
             value = json.loads(raw)
             value["file_sha256"] = hashlib.sha256(raw).hexdigest()
             return value
@@ -237,8 +242,9 @@ class Agent:
     def readiness(self, current, intent):
         snapshot = self.snapshot()
         rows = []
+        review = self.review()
         for name in sorted({p["name"] for p in snapshot.get("policies", []) if p.get("namespace") == self.config.namespace}):
-            ready = evaluate(snapshot, name, intent, self.review(), self.monitor_seconds)
+            ready = evaluate(snapshot, name, intent, review, self.monitor_seconds)
             if ready["expected"] and all(ready["expected"].values()):
                 if len({p.get("node") for p in snapshot.get("policies", []) if p.get("name") == name}) != 1:
                     ready["checks"]["policy"] = False

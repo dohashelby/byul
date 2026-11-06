@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import ui from "../components/ui.module.css";
 import styles from "./RuntimeOperations.module.css";
-import { CHECK_LABELS, enforceReady, operationApi, type Actor, type Operation, type AgentState, type Operations } from "../api/operations";
+import { CHECK_LABELS, enforceReady, operationApi, type Actor, type Operation, type AgentState, type Operations, type Readiness } from "../api/operations";
 
 import { useOperationToken } from "../api/operationSession";
 
@@ -53,6 +53,20 @@ export function BundleApplyRequest({ policyId, revision, environmentId, environm
   </div>;
 }
 
+function MonitorWindows({ row }: { row: Readiness }) {
+  if (!row.monitor_windows?.length) return <p>모니터 창 없음 · 관측·상태 갱신 필요</p>;
+  return <div>{row.monitor_windows.map((window, index) => <p key={`${window.node}-${index}`}>
+    {window.node} · 창 시작 {timeLabel(window.since)} · 마지막 확인 {timeLabel(window.until)} · {window.continuous ? "연속 관측" : "관측 공백"}
+    {` · 이벤트 ${window.event_count}건 · 검토 ${window.reviewed_event_count}/${window.event_count}건 · 오탐 ${window.false_positive_count}건`}
+    {window.reviewed_event_count < window.event_count ? " · 미검토 있음" : " · 미검토 없음"}
+  </p>)}</div>;
+}
+
+function PolicyChecks({ row }: { row: Readiness }) {
+  return <ul>{Object.entries(CHECK_LABELS).map(([key, label]) => <li key={key}>{row.checks[key] ? "충족" : "미충족"} · {label}
+    {key === "monitor_period" && <MonitorWindows row={row} />}</li>)}</ul>;
+}
+
 export function ModeRequests() {
   const [token, setToken] = useOperationToken();
   const [data, setData] = useState<Operations | null>(null);
@@ -82,7 +96,7 @@ export function ModeRequests() {
     <label>확인 입력: ENGINE_RESTART <input aria-label="Sigkill 확인 입력" className="input" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
     {data?.agents.map(agent => <div key={agent.server} className="stack"><strong>{agent.server} · 마지막 조회 {agent.last_poll_at ?? "미확인"}</strong>
       {agent.policies.map(row => <div key={row.name} className="notice"><strong>{row.name} · {row.expected.mode}</strong>
-        <ul>{Object.entries(CHECK_LABELS).map(([key, label]) => <li key={key}>{row.checks[key] ? "충족" : "미충족"} · {label}</li>)}</ul>
+        <PolicyChecks row={row} />
         {row.checks.capability && row.capability_basis && <p>확인: {row.capability_basis === "live_trial" ? "실측 시험으로 확인" : "사전 점검으로 확인"}</p>}
         {!row.checks.capability && row.capability_reason && <p>{CAPABILITY_REASONS[row.capability_reason]}</p>}
         {!enforceReady(agent, row) && <p>차단 전환 조건 미충족 또는 상태 갱신 필요</p>}
@@ -243,7 +257,9 @@ export function RuntimeOperationsPage() {
       {detail.state === "unknown" && <p className="notice">서버 상태를 수동 확인하세요. 자동으로 다시 실행하지 않습니다.</p>}
     </section>}
     <section className="card card-pad stack"><h2>에이전트 서버 상태</h2>
-      {data?.agents.map(a => <div key={a.server}><strong>{a.server}</strong> · 에이전트 마지막 조회 {timeLabel(a.last_poll_at)} · 상태 보고 {timeLabel(a.at)} · 현재 적용 묶음 {a.current?.bundle_id ?? "미확인"}</div>)}
+      {data?.agents.map(a => <div key={a.server}><strong>{a.server}</strong> · 에이전트 마지막 조회 {timeLabel(a.last_poll_at)} · 상태 보고 {timeLabel(a.at)} · 현재 적용 묶음 {a.current?.bundle_id ?? "미확인"}
+        {a.policies.map(row => <div key={row.name}><strong>{row.name}</strong><PolicyChecks row={row} /></div>)}
+      </div>)}
       {data?.agents.length === 0 && <p>등록된 에이전트가 없습니다.</p>}
     </section>
     {data?.actor?.role === "runtime_operator" && <button className="btn" onClick={openSwitch}>이전 묶음으로 되돌리기</button>}

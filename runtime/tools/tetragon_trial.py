@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import json
 import hashlib
 from pathlib import Path
+import re
 import subprocess
 import time
 from uuid import uuid4
@@ -91,13 +92,26 @@ class KindDockerAccess:
 
 class LocalSudoAccess:
     """Only fixed executables/arguments; never pass CRI output to a shell."""
-    def __init__(self, runner):
+    def __init__(self, runner, context):
         self.run=runner
+        self.context=context
 
     def validate(self, node):
-        result=self.run(["sudo","-n","uname","-n"])
-        if result.returncode or not node or result.stdout.strip()!=node:
-            raise RuntimeError("local host does not match probe Pod node or cannot be verified")
+        message="local host machine ID does not match probe Pod node or cannot be verified"
+        if not node:
+            raise RuntimeError(message)
+        try:
+            remote=self.run(["kubectl","--context",self.context,"get","node",node,
+                             "-o","jsonpath={.status.nodeInfo.machineID}"],timeout=30)
+            local=self.run(["sudo","-n","cat","/etc/machine-id"])
+        except OSError:
+            raise RuntimeError(message) from None
+        if remote.returncode or local.returncode:
+            raise RuntimeError(message)
+        remote_id,local_id=remote.stdout.strip(),local.stdout.strip()
+        if (not re.fullmatch(r"[a-f0-9]{32}",remote_id)
+            or not re.fullmatch(r"[a-f0-9]{32}",local_id) or remote_id!=local_id):
+            raise RuntimeError(message)
 
     def inspect(self, node, cid):
         return self.run(["sudo","-n","crictl","inspect",cid])
@@ -126,7 +140,8 @@ class KindTrial:
         if image_pull_policy not in {"IfNotPresent","Never"}:
             raise ValueError("unsupported image pull policy")
         self.run=runner or run
-        self.node_access=(KindDockerAccess if node_access=="kind-docker" else LocalSudoAccess)(self.run)
+        self.node_access=(KindDockerAccess(self.run) if node_access=="kind-docker"
+                          else LocalSudoAccess(self.run,context))
         self.output=output
         self.method=method
         self.image=image

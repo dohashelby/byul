@@ -21,6 +21,7 @@ from serving_runtime.operations.safety import evaluate
 
 AT = '2026-11-06T01:00:00+00:00'
 CID = 'a' * 64
+MACHINE_ID = '0123456789abcdef0123456789abcdef'
 STAT = '42 (python) ' + ' '.join(['S'] + ['0'] * 18 + ['1000']) + '\n'
 SAMPLE = STAT + 'pid:[123]\nNSpid:\t42\t1\n100\n'
 
@@ -32,9 +33,11 @@ def result(value='', code=0):
 
 class FakeRunner:
     """Unexpected commands fail immediately; no subprocess or cluster is used."""
-    def __init__(self, node='aws-node', fail=None, local_node=None):
+    def __init__(self, node='aws-node', fail=None, local_node=None,
+                 machine_id=MACHINE_ID, local_machine_id=MACHINE_ID):
         self.node, self.fail = node, fail
         self.local_node = local_node or node
+        self.machine_id, self.local_machine_id = machine_id, local_machine_id
         self.calls, self.manifests = [], {}
         self.mode, self.stream, self.policy, self.namespace = 'monitor', None, None, None
 
@@ -50,6 +53,7 @@ class FakeRunner:
             if self.fail and self.fail in command: return result(code=1)
             args = command[2:] if command[0] == 'sudo' else command[3:]
             if args == ['uname', '-n']: return result(self.local_node + '\n')
+            if args == ['cat', '/etc/machine-id']: return result(self.local_machine_id)
             if args == ['uname', '-r']: return result('test-kernel\n')
             if args == ['crictl', 'inspect', CID]: return result({'info': {'pid': 42}})
             if args[:2] == ['sh', '-c']: return result(SAMPLE)
@@ -59,6 +63,8 @@ class FakeRunner:
             if args == ['getconf', 'CLK_TCK']: return result('100\n')
             raise AssertionError(command)
         if command[0] != 'kubectl': raise AssertionError(command)
+        if command[3:] == ['get', 'node', self.node, '-o', 'jsonpath={.status.nodeInfo.machineID}']:
+            return result(self.machine_id, code=int(self.fail == 'machineID'))
         args = command[5:]
         if args[:1] in (['apply'], ['create']):
             value = json.loads(Path(args[2]).read_text())
@@ -124,24 +130,68 @@ class TrialTests(unittest.TestCase):
         self.assertEqual(identity, {'pod_uid': 'pod-uid', 'namespace': trial.namespace, 'container_id': CID,
             'node_pid': 42, 'ns_pid': 1, 'pidns': 123, 'start_ticks': 1000, 'clock_ticks': 100})
         self.assertEqual(kernel.stdout.strip(), 'test-kernel')
+        binding = [
+            ['kubectl', '--context', 'kind-runtime-lab', 'get', 'node', runner.node,
+             '-o', 'jsonpath={.status.nodeInfo.machineID}'],
+            ['sudo', '-n', 'cat', '/etc/machine-id']]
         self.assertEqual(runner.calls, [
-            ['sudo', '-n', 'uname', '-n'], ['sudo', '-n', 'crictl', 'inspect', CID],
+            *binding, ['sudo', '-n', 'crictl', 'inspect', CID],
             ['sudo', '-n', 'cat', '/proc/42/stat'], ['sudo', '-n', 'readlink', '/proc/42/ns/pid'],
             ['sudo', '-n', 'grep', '^NSpid:', '/proc/42/status'], ['sudo', '-n', 'getconf', 'CLK_TCK'],
-            ['sudo', '-n', 'uname', '-n'], ['sudo', '-n', 'uname', '-r']])
+            *binding, ['sudo', '-n', 'uname', '-r']])
 
-    def test_local_node_mismatch_refused_before_cri(self):
-        runner = FakeRunner(local_node='different-node')
+    def test_local_machine_id_mismatch_refused_before_cri(self):
+        runner = FakeRunner(local_machine_id='f' * 32)
         trial = KindTrial(Path('/unused'), 'sigkill_fd_install', node_access='local-sudo', runner=runner)
         with self.assertRaisesRegex(RuntimeError, 'does not match'):
             trial.task_identity(runner.pod(), runner.node)
-        self.assertEqual(runner.calls, [['sudo', '-n', 'uname', '-n']])
+        self.assertEqual(len(runner.calls), 2)
+        self.assertFalse(any('inspect' in cmd for cmd in runner.calls))
         with self.assertRaisesRegex(RuntimeError, 'node changed'):
             trial.task_identity(runner.pod(), 'other-node')
-        self.assertEqual(len(runner.calls), 1)
+        self.assertEqual(len(runner.calls), 2)
+
+    def test_different_hostname_with_matching_machine_id_passes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runner = FakeRunner(node='byul-gpu-01', local_node='ip-10-77-1-29',
+                                machine_id=' \n' + MACHINE_ID + '\t', local_machine_id=MACHINE_ID + '\n')
+            _, report = execute_fake(Path(directory), runner, node_access='local-sudo', context='byul-aws-lab')
+            self.assertEqual(report['verification']['status'], 'passed', report)
+            self.assertNotIn(['sudo', '-n', 'uname', '-n'], runner.calls)
+            self.assertIn(['kubectl', '--context', 'byul-aws-lab', 'get', 'node', runner.node,
+                           '-o', 'jsonpath={.status.nodeInfo.machineID}'], runner.calls)
+
+    def test_invalid_or_unreadable_machine_id_refused_without_values(self):
+        for side in ('machine_id', 'local_machine_id'):
+            for value in ('', 'a' * 31, 'a' * 33, MACHINE_ID.upper(), 'g' * 32, 'PRIVATE'):
+                with self.subTest(side=side, value=value):
+                    runner = FakeRunner(**{side: value})
+                    trial = KindTrial(Path('/unused'), 'sigkill_fd_install', node_access='local-sudo', runner=runner)
+                    with self.assertRaises(RuntimeError) as raised:
+                        trial.task_identity(runner.pod(), runner.node)
+                    self.assertNotIn(MACHINE_ID, str(raised.exception))
+                    if value: self.assertNotIn(value, str(raised.exception))
+                    self.assertFalse(any('inspect' in cmd for cmd in runner.calls))
+        for failure in ('machineID', '/etc/machine-id'):
+            runner = FakeRunner(fail=failure)
+            trial = KindTrial(Path('/unused'), 'sigkill_fd_install', node_access='local-sudo', runner=runner)
+            with self.subTest(failure=failure), self.assertRaises(RuntimeError):
+                trial.task_identity(runner.pod(), runner.node)
+            self.assertFalse(any('inspect' in cmd for cmd in runner.calls))
+
+    def test_machine_id_read_oserror_does_not_leak(self):
+        for executable in ('kubectl', 'sudo'):
+            runner = FakeRunner()
+            def fake(command, **kwargs):
+                if command[0] == executable: raise OSError('PRIVATE')
+                return runner(command, **kwargs)
+            trial = KindTrial(Path('/unused'), 'sigkill_fd_install', node_access='local-sudo', runner=fake)
+            with self.subTest(executable=executable), self.assertRaises(RuntimeError) as raised:
+                trial.task_identity(runner.pod(), runner.node)
+            self.assertNotIn('PRIVATE', str(raised.exception))
 
     def test_local_sudo_failures_never_pass_and_cleanup_runs(self):
-        for failure in ('-n', 'inspect', 'cat', 'readlink', 'grep', 'getconf', '-r'):
+        for failure in ('machineID', '/etc/machine-id', '-n', 'inspect', 'cat', 'readlink', 'grep', 'getconf', '-r'):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:
                 runner = FakeRunner(fail=failure)
                 trial, report = execute_fake(Path(directory), runner, node_access='local-sudo', context='byul-aws-lab')
@@ -152,9 +202,9 @@ class TrialTests(unittest.TestCase):
                 self.assertTrue((Path(directory) / (trial.namespace + '.verification.json')).exists())
                 self.assertNotIn('TracingPolicyNamespaced', runner.manifests)
 
-    def test_local_node_mismatch_report_is_incomplete_and_cleaned(self):
+    def test_local_machine_id_mismatch_report_is_incomplete_and_cleaned(self):
         with tempfile.TemporaryDirectory() as directory:
-            runner = FakeRunner(local_node='different-node')
+            runner = FakeRunner(local_machine_id='f' * 32)
             _, report = execute_fake(Path(directory), runner, node_access='local-sudo')
             self.assertEqual(report['verification']['status'], 'unknown')
             self.assertTrue(report['facts']['cleanup_ok'])

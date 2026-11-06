@@ -140,6 +140,16 @@ worker 기록은 END=BOUND_REACHED로 끝났고 loader iterator 종료·operatio
 
 Docker 대상을 동등한 제품 경로에 연결하려면 명시적으로 지원하는 owned-Docker native-scope entry의 반환 또는 실제 운영 담당의 Kubernetes runtime/신원 입력이 필요하다. 원 실패 참조는 `guard-output/gpu-stage1-3sessions/prepare/new5-SUP05-first-product/v1/compatible-input-v1/public-scope-failure-v1.json`, SHA256 `1366d9bd7cd1499732d358259c7e22b508ed58f026e66e640b57fea4bcd9ee15`다. 게시 담당의 정적 경계 검토는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup05-public-scope-boundary-review-v1.json`, SHA256 `6557801fb87cea83a8d03e3d6b7919c69182b5070f7bb2af6f70a643ee972b9d`다. 새 모델 전체 패킷·실제 실행 성공을 이 검토로 인정하지 않는다.
 
+## SUP-03 전용 target 결합 — 오프라인 준비 정적 검토
+
+기존 A target 도구는 A 전용 라벨·이름·모델 경로를 가정하므로 B의 실제 배포 값을 그대로 연결할 전용 결합기를 별도 준비했다. 공통 파일은 수정하지 않고 기존 `_binding`·`verify_owned_pod`·model_mapping·Kubernetes request-binding 생성자·원 SUP-03 `_target`을 재사용한다. 게시 담당은 고정 파일15개의 bytes/SHA와 AST, CPU7개 통과/실제 격리 CLI 종료0 기록 및 원 consumer 경로를 정적으로 대조했다. 새 시험·Kubernetes·모델·GPU 실행은0회다.
+
+결합 입력은 실제 sealed ENV, 같은 실제 namespace와 서로 다른 engine/probe Pod의 원 JSON, model_mapping, 배포할 고정 template bytes 및 실제 context/run/container/port/version이다. 과거 SUP-16 engine 내부 준비 컨테이너를 별도 probe로 바꾸거나 미래 UID·PID·IP·시각을 만들지 않는다. 명시한 command/args의 template 경로·readonly 파일 mount·model 길이·별칭·port를 기존 소비 계약과 대조한다. 기존 고정 template은 원 단일 user text 대조에 사용하는 형식이며 실제 chat 성공이나 instruction 모델 지원을 미리 주장하지 않는다.
+
+초기 EXAMPLE 계약에서 정확한 기존 예외 타입을 잘못 기대한 오류는 보존하고 기대 타입만 정정했다. 제품 결합 동작·보호 조건·기한을 완화하지 않았다. 실제 입력 미제공·GPU_READY=false, runtime_owner_currently_verified=false, template_file_in_container_read=false, independent_worker_consumption_verified=false를 유지한다. serializer는 source-root 자체의 commit 권한이나 현재 runtime을 인증하지 않으므로 S2가 source/자산 pin과 실제 배포·조회 시각·소유권·모델/template mount·반출 조건을 별도 고정해야 한다. 제품 실행기는 원 template snapshot 검증을 다시 수행한다.
+
+[검토용 전용 결합 코드](implementation-snapshots/sup03_cold_target_binding.py.txt)의 원 bytes SHA256은 `9de45928324bbf91e093cc27530f51835b1a83882a16031149e2dea124e8ff82`다. 준비 freeze 참조는 `worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup03-cold-target-binding-v1/freeze.json`, SHA256 `eb2ca8560f68029d32127260149c2f4c26f94143b1aac4b60266fb6afdfa103c`, 게시 담당 정적 검토 참조는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-cold-binding-static-review-v1.json`, SHA256 `757ab9bca7dbe2bd6482a45ebdbd2f2af6bdb4a41aac96ade3d3c81eb55f1298`다. 이 정적 준비 인계 범위에서 새 차단 결함은 발견하지 않았으며 실제 운영 패킷 승인이나 제품 완료를 뜻하지 않는다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

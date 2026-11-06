@@ -162,6 +162,16 @@ Docker 대상을 동등한 제품 경로에 연결하려면 명시적으로 지�
 
 최종 인계 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/req08-registry-delta-20261106-v1/actual-final-handoff-v1.json`, SHA256 `ca16d5dc651292caf963a433e0a8cc07c26ab401edac4a873495c75de79d3c91`이다. 원 검토 SHA256 `38f35cdcab2a941eb71aa203cad35bec4d9d003c4afad1c274290169756bd3a0`와 같은 디렉터리의 `actual-source-correlation-followup-v1.json` SHA256 `2356e51727e13374ee4f5bf88f210c11da6ad31df6ed835233a16007acbfb171`를 함께 따른다. 검토자는 실제 caller/모델/컨테이너 시험을 반복하지 않았다.
 
+## SUP-05 H32 새 입력 — 정상 역할 1회 전 변경 검토 완료
+
+2026-11-06 23:12:54 KST 세션6이 별도 새 H32 입력 패킷의 필수 변경 검토를 완료했다. 새96개 자료의 bytes/SHA, 실제 safetensors23개 tensor 형상·값·A/B 한 좌표 차이, 원 config에서 hidden_size4→32만 바뀐 사실, 실제 생성/소유 정리와 manifest→ENV/model/revision→scope/target/session→native17 준비→고정 argv 연결을 대조했다. 기존 worker/관측기·source6·원 기한·독립 wait·정리 검증은 재사용했다. 원 head4 실패를 수정하거나 새 모델을 같은 실행 세대로 재태깅하지 않았다.
+
+당시 freeze/validate-only 도구 기록은 재실행 없이 원 세션 기록의 정확한 두 항목만 추출해 연결했다. compound 명령의22:52:11.570~22:52:17.415 KST·종료0·실제 stdout과 source import origin을 확인했고, 개별 하위 명령의 시작/종료·exit를 따로 계측하지 않은 한계는 유지했다. class-only/입력 검증을 실제 제품 factory 실행으로 표시하지 않는다.
+
+이 정확 패킷의 차단 결함·필수 추가 입력은0이다. 기존 승인 범위의 CPU normal1회만, 실행 직전 자원·다른 모델0을 확인한 뒤 진행하도록 인계했다. 원90초/85초 진단·독립 wait30초·2CPU/4GiB·UID/GID·원 tmpfs/네트워크/읽기 전용 보호를 유지한다. 중간 자료 대조나 검토 완료만으로 실제 요청/native 성공을 인정하지 않으며 challenge/recovery 자동 확대·자동 retry는0이다. public scope의 Docker 거부와 독립 CPU 준비·제품 연결의 구분도 유지한다.
+
+최종 변경 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup05-h32-input-delta-20261106-v1/input-delta-review-v1.json`, SHA256 `17f30a84f8eb10680f23003a6928df360e7b9ed4297c5484f63eb3a79ef565aa`다. 사전 검토 당시 새 H32의 실제 요청·native 봉인·제품 Ref는 미관측이며, 실제 결과는 별도 검증한다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

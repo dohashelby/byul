@@ -132,6 +132,14 @@ worker 기록은 END=BOUND_REACHED로 끝났고 loader iterator 종료·operatio
 
 이번 정확GB09의 전체 회수·무결성·진단 의미·운영 마감은 확인됐다. 원 실험의 제품 factory·EVD/RES/RPT는 미생성이며 SUP-16 제품 증거 보완과 43ID의25/18 분류는 유지한다. 다음 archive는 새 producer 명령·계획 basename·실제 생성 receipt에 맞춘 별도 binding이 필요하며 GB09 전용 결합을 그대로 사용하지 않는다.
 
+## SUP-05 새 입력 준비 — public scope의 지원 대상 경계
+
+새 호환 입력 준비에서 공개 `model_read_scope.build_scope`가 owned-Docker CPU target을 `KUBERNETES_CAPTURE_TARGET_INVALID`로 거부했다. 2026-11-06 22:52:12 KST의 첫 실패와 부분 준비 산출물은 보존했다. 게시 담당은 원 실패 receipt SHA와 고정 source3b3의 `model_read_scope.py`→Kubernetes capture의 `validate_target`→`kubernetes_binding.py` 연결을 대조했다. 이 공개 entry는 manifest를 읽기 전에 Kubernetes target 계약을 검사하므로 Docker 입력을 이 경로의 제품 연결 성공으로 처리할 수 없다.
+
+공통 validator 수정이나 가짜 Kubernetes 신원 필드를 추가하지 않는다. 기존 native sensor `validate_scope`→`prepare_assets/load_prepared`로 이어지는 전용 CPU 준비는 별도 범위로 계속할 수 있지만 공개 build_scope·제품 factory·제품 Ref 완료를 대신하지 않는다. 새 정확 패킷 검토 전의 추가 엔진 실측은 보류하고 REQ-08 결과 검증은 독립 진행한다. 이 경계의 동일 실패는 반복하지 않는다.
+
+Docker 대상을 동등한 제품 경로에 연결하려면 명시적으로 지원하는 owned-Docker native-scope entry의 반환 또는 실제 운영 담당의 Kubernetes runtime/신원 입력이 필요하다. 원 실패 참조는 `guard-output/gpu-stage1-3sessions/prepare/new5-SUP05-first-product/v1/compatible-input-v1/public-scope-failure-v1.json`, SHA256 `1366d9bd7cd1499732d358259c7e22b508ed58f026e66e640b57fea4bcd9ee15`다. 게시 담당의 정적 경계 검토는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup05-public-scope-boundary-review-v1.json`, SHA256 `6557801fb87cea83a8d03e3d6b7919c69182b5070f7bb2af6f70a643ee972b9d`다. 새 모델 전체 패킷·실제 실행 성공을 이 검토로 인정하지 않는다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

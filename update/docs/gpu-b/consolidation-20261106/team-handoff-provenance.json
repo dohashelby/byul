@@ -26,5 +26,25 @@
   "new_tests_or_raw_verification_by_publisher": false,
   "local_raw_not_published": true,
   "historical_snapshot": true,
-  "subsequent_verified_results": "FOLLOWUP_RESULTS.md"
+  "subsequent_verified_results": "FOLLOWUP_RESULTS.md",
+  "subsequent_GB09_recovery_closeout": {
+    "S6_recorded_at_KST": "2026-11-06T22:44:45.841431+09:00",
+    "review": {
+      "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/transport-v3-actual-20261106/current-control-final-review-v1.json",
+      "sha256": "28fa75d0d332d6808b7c666ae2d4d2c47079587727e03785cb9647b85318382d"
+    },
+    "operator_final_link": {
+      "project_relative_path": "worktrees/byul-gpu-b-run-lif14-labels-20261105/out/SUP16-live-normal-v1-operator-20261105/transport-target-repair-v3/10-required-transport-GB09-recovery-final-link-v1.json",
+      "sha256": "f024ce04d4722e5d65e54f61154bd06fa12fc0b77065ffba1284a8362b8f3bb3"
+    },
+    "whole_original_GB09_recovered": true,
+    "original_semantics_review_sha256": "8f2177abebff1351f92346634171f95c6dfe842c5a5adb71190c3d2c121243bf",
+    "operating_jobs_at_final_link": 0,
+    "operating_closeout_remaining_required_inputs": 0,
+    "whole_SUP16_product_complete": false,
+    "cost_as_of_KST": "2026-11-06T22:24:57.406829+09:00",
+    "estimated_USD": 53.08166739362498,
+    "billing_confirmed": false,
+    "retained_storage_cost_continues": true
+  }
 }

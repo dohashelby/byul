@@ -120,6 +120,18 @@ worker 기록은 END=BOUND_REACHED로 끝났고 loader iterator 종료·operatio
 
 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/req08-registry-delta-20261106-v1/registry-diagnostic-review-v5.json`, SHA256 `51bf547289e6195fa166f6a506ad77e9acf83627dc83c1394c6fa1a27b7e5301`이다. 이 사전 검토를 REQ-08 제품 준비 성공이나 과거 child 종료값의 복구로 사용하지 않는다.
 
+## GB09 회수 운영 마감 — 정지·비용·최종 증거 연결 검증 완료
+
+2026-11-06 22:44:45 KST 세션6이 새 control archive의 CRC2,412개·payload2,411개와 원 파일 결합, 원 runtime·원 stop 감시 실패, 후속 실제 정지·비용 산술을 검증했다. 새 반출은 성공했지만 원 collect의 종료1·정상 stop1회·180초 감시 실패·원 final 부재는 유지한다. 정상 stop 재요청·Force·타이머 초기화는0회다.
+
+22:22~22:23 KST의 각 조회에서는 대상 stopping/IP 있음·활성 SSM0·EIP0·보존 EBS440GiB였고, 이후22:24:55.647~22:24:57.407 KST EC2 조회에서 소유3대 stopped·공인IP0을 확인했다. 정확한 물리 정지 전이 시각은 미확정이고 이후 미래 상태를 이 조회로 보증하지 않는다. 비용은 보수적으로 기동 intent22:04:44.190부터 후속 정지 관측 끝까지 연산/IP를 계산해 닫았다.
+
+장부의22:24:57.407 KST 기준 누적 추정은 `$53.08166739362498`, 예비비$5를 제외한 잔여는 `$41.91833260637502`다. 실청구 확인값은 아니다. 보존 EBS 비용은 계속되므로 이 금액을 이후 시각의 현재 비용으로 복사하지 않는다. 운영 담당의 최종 연결 시점에 실행 중 작업은0건이며 새기동·추가정지·자동화 재생성은 하지 않았다.
+
+세션6 최종 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/transport-v3-actual-20261106/current-control-final-review-v1.json`, SHA256 `28fa75d0d332d6808b7c666ae2d4d2c47079587727e03785cb9647b85318382d`다. 세션2의 최종 결합 참조는 `worktrees/byul-gpu-b-run-lif14-labels-20261105/out/SUP16-live-normal-v1-operator-20261105/transport-target-repair-v3/10-required-transport-GB09-recovery-final-link-v1.json`, SHA256 `f024ce04d4722e5d65e54f61154bd06fa12fc0b77065ffba1284a8362b8f3bb3`다. 기존 ZIP 무결성5d5124b6와 게시 담당 의미 검토8f2177ab를 재사용해 연결했으며 이번 회수·운영 마감의 추가 필수 입력은0이다.
+
+이번 정확GB09의 전체 회수·무결성·진단 의미·운영 마감은 확인됐다. 원 실험의 제품 factory·EVD/RES/RPT는 미생성이며 SUP-16 제품 증거 보완과 43ID의25/18 분류는 유지한다. 다음 archive는 새 producer 명령·계획 basename·실제 생성 receipt에 맞춘 별도 binding이 필요하며 GB09 전용 결합을 그대로 사용하지 않는다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

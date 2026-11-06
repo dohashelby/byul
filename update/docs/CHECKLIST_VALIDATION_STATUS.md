@@ -6,7 +6,7 @@
 
 - [분기별 전체 CSV](checklist_validation_status.csv): 현재 정의·필수 관측·정상/위반/미수집/지원 밖 계획·선행 조건·기업 결정·과거 EVD/RES를 연결한다.
 - `supported_implementations`는 registry에 등록된 구현을 그대로 표시한다. `real`과 `kubernetes`는 서로 대체하지 않고, 공용 `fake`와 CPU 전용 구현은 연결 수에 넣지 않는다.
-- `current_pack_actual_status`는 현행 팩32의 GPU 실행 공개 요약(`docs/evidence/gpu-a-*.json`, `docs/gpu-b/*.json`, `docs/gpu-completion/20261102/GPU_RESULTS.json`)에서만 계산한다. 가장 강한 기록 하나를 표시하며 원 질문 전체 완료를 뜻하지 않는다. 기록이 없으면 `DEFERRED_NOT_MEASURED`이고, 과거 팩 기록이나 단위 시험·CPU 결과를 현행 팩 GPU 실측으로 승격하지 않는다.
+- `current_pack_actual_status`는 현행 팩의 GPU 실행 공개 요약(`docs/evidence/gpu-a-*.json`, `docs/gpu-b/*.json`, `docs/gpu-completion/20261102/GPU_RESULTS.json`)에서만 계산한다. 가장 강한 기록 하나를 표시하며 원 질문 전체 완료를 뜻하지 않는다. 팩32 기록은 정의가 바뀌지 않은 점검에서만 현행 기록으로 세고, 정의가 바뀐 REQ-11의 팩32 기록은 `gpu_runs`에 이력(`current_definition=false`)으로만 남긴다. 기록이 없으면 `DEFERRED_NOT_MEASURED`이고, 과거 팩 기록이나 단위 시험·CPU 결과를 현행 팩 GPU 실측으로 승격하지 않는다.
 - `GPU_PARTIAL_MEASURED`는 MEASURED 실행이 있음, `GPU_PARTIAL_EXAMPLE`은 실제 GPU 실행이지만 EXAMPLE 등급, `GPU_COMPONENT_DECLARED_ONLY`는 구성요소 직접 시험의 DECLARED 기록뿐, `GPU_ATTEMPTED_NOT_COLLECTED`는 중단 기록뿐이라는 뜻이다. `gpu_runs`에 실행별 정확 RES/EVD Ref와 판정을 그대로 남긴다.
 - `phase1_owner`는 1단계 분담(실행기 파일 소유, `DECISIONS.md` 2026-11-04)에서 계산하고, `phase1_state`는 담당별 파일 `docs/phase1/dev-1.yaml`·`docs/phase1/gpu.yaml`에서 읽는다. 각 담당은 자기 파일만 고친다.
 - `historical_pack_revisions`와 EVD/RES는 구조화된 과거 CPU 선별 기록(팩17·18·19)에서만 읽는다. 팩21·22의 후속 두 이미지 결과는 원래 자동화표의 `historical_verification`·`remaining_scope`와 [실측 문서](UPDATE_VALIDATION.md)를 함께 따른다.
@@ -29,9 +29,9 @@
 | 현행 팩 GPU 실행 상태 | 점검 수 |
 |---|---:|
 | GPU_PARTIAL_MEASURED | 11 |
-| GPU_PARTIAL_EXAMPLE | 13 |
+| GPU_PARTIAL_EXAMPLE | 14 |
 | GPU_COMPONENT_DECLARED_ONLY | 1 |
-| GPU_ATTEMPTED_NOT_COLLECTED | 2 |
+| GPU_ATTEMPTED_NOT_COLLECTED | 1 |
 | DEFERRED_NOT_MEASURED | 50 |
 
 | 1단계 담당 | 1단계 상태 | 점검 수 |

@@ -1,3 +1,10 @@
+## 2026-11-06 — GPU 2장 전 마무리: 현황표 팩33 연결·플랫폼 이슈
+
+- 한 일: 11-06 L4 공개 실측 요약 `docs/evidence/gpu-a-dev1-phase2-20261106.json`(4실행, 팩33 Ref·정확 EVD/RES)을 만들고, 현황표 도구가 팩33 기록을 읽게 했다. 팩32 기록은 정의가 같은 76개 점검에서만 현행으로 세고, 정의가 바뀐 REQ-11의 팩32 기록은 이력(`current_definition=false`)으로 남긴다. REQ-11·OBS-09 현행 GPU 상태 GPU_PARTIAL_EXAMPLE. OBS-05 정책 입력(허용 필드·목적지 주소, 화면→정책 값 변환)은 플랫폼 이슈 dohashelby/byul#226으로 올렸다.
+- 테스트 결과: 현황표 17 통과, 생성물 재생성.
+- 다음 단계: 17b6bde CI·EC2 stopped 최종 확인. 그 뒤 남은 개발 담당 일은 TP2(REQ-14·21, GPU 2장 승인)·멀티모달(REQ-16 승인)과 기업 입력 대기다.
+- 막힌 것: 기업 입력(12개+OBS-05+LIF-13 인가), B 합의 P2-Q1·Q2, GPU 담당 #196 생산자.
+
 ## 2026-11-06 — 단일 L4 재측정(REQ-11·OBS-09·LIF-13)
 
 - 한 일: 사용자 승인 상한 $4로 기존 L4를 14:27 시작·15:14 중지 요청. 47e7fff(CI 성공) 소스로 REQ-11 팩33 COMPLETED 보안/기능 PASS(EXAMPLE), LIF-13 정본 실행 안 소비자·release·fallback 모든 분기 관측·위반 없음(release 기업 인가 부재로 UNKNOWN). OBS-09 첫 실행은 attach 정렬·7사례 경계 보존에도 투영 재생이 CRI image ID를 거부해 ABORTED → `native_projection.py`만 고친 수정본(파일 해시 고정)으로 재측정 COMPLETED 보안/기능 PASS(EXAMPLE). 소비자 정리 미확인은 좀비를 살아 있다고 센 정리 스크립트 결함으로 고쳤다. 원 EVD/RES 모두 보존. 상세 `docs/dev-1/gpu-20261106.md`.

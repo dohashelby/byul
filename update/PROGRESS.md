@@ -1,3 +1,10 @@
+## 2026-11-06 — TP2 준비(REQ-14·REQ-21)
+
+- 한 일: 사용자 결정으로 2장 구성을 g6.12xlarge(L4 4장 중 2장)로 정하고 G and VT vCPU 할당량 8→48을 요청했다(승인 대기). 기존 인스턴스 15:51 stopped 확인·비용 장부 마감. TP2 하네스(`a-tp2.py`: 노드 GPU·P2P 기록, REQ-14 TP2, REQ-21 TP2 재기동)를 만들고 11-05 GPU 입력으로 REQ-14·REQ-21 입력 생성·select를 통과시켰다. REQ-21도 실행 안에서 엔진을 재기동하므로 실행기·입력 도구의 900초 상한에 넣었다. 계획 `docs/dev-1/tp2-run-plan.md`.
+- 테스트 결과: 입력·콜백·lab 125 통과, REQ-14·21 관련 91 통과(한 코어). 검토 소스 manifest 갱신.
+- 다음 단계: 할당량 승인 → 비용 상한 승인 → TP2 실측.
+- 막힌 것: AWS 할당량 승인. L4 PCIe P2P가 없으면 REQ-21 통신기가 꺼져 UNKNOWN일 수 있다.
+
 ## 2026-11-06 — GPU 2장 전 마무리: 현황표 팩33 연결·플랫폼 이슈
 
 - 한 일: 11-06 L4 공개 실측 요약 `docs/evidence/gpu-a-dev1-phase2-20261106.json`(4실행, 팩33 Ref·정확 EVD/RES)을 만들고, 현황표 도구가 팩33 기록을 읽게 했다. 팩32 기록은 정의가 같은 76개 점검에서만 현행으로 세고, 정의가 바뀐 REQ-11의 팩32 기록은 이력(`current_definition=false`)으로 남긴다. REQ-11·OBS-09 현행 GPU 상태 GPU_PARTIAL_EXAMPLE. OBS-05 정책 입력(허용 필드·목적지 주소, 화면→정책 값 변환)은 플랫폼 이슈 dohashelby/byul#226으로 올렸다.

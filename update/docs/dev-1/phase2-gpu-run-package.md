@@ -37,7 +37,7 @@
 | G4 usage 금지 | `--usage forbidden` | OBS-04 | `usage --check OBS-04` |
 | G5 usage 허용 | `--usage allowed` | OBS-05(1단계 CPU에서는 warm-up 정지. GPU에서 재현되면 엔진 문제로 기록) | `usage --check OBS-05` |
 | G6~ engine_sensor | PR #215 인계 | REQ-18(V2), REQ-19(`--lab-kernel-checks`), REQ-20(graph 켬·끔 두 세대), LIF-13(daemon 자산, 2026-11-06부터 소비자 lab 동작 사례: `lif13-generation-scope.md`), REQ-15(Gateway salt) | `tools/gpu_a_run_inputs.py check-inputs`, `tools/b_req18*`·`b_req20*`·`b_lif13*` |
-| TP2 (새 승인 필요) | 2장 eager, REQ-21은 `--restart-always` | REQ-14, REQ-21(사례: before → switch engine_restart → after) | PR #215 인계 |
+| TP2 (할당량 승인·비용 승인 필요) | g6.12xlarge에서 2장 eager, REQ-21은 `restartPolicy: Always` | REQ-14, REQ-21(사례: before → switch engine_restart → after) | `tp2-run-plan.md`, 하네스 `a-tp2.py` |
 
 순서: G1 → G4 → G5 → G2 → G3 → G6~. 앞 묶음은 센서가 없어 세션 봉인 문제가 없다.
 
@@ -58,7 +58,7 @@
 | 구성 | 단가 근거 | 시간 | 추정 |
 |---|---|---|---|
 | g6.2xlarge(L4 1장) On-Demand | $1.20208/h(`docs/gpu-a/COST_LEDGER.md`, 현행 청구 단가 미확인) | 준비 30분 + G1~G5 각 15분 + G6~ 60분 ≈ 2시간 45분 | 약 $3.3 (EBS 제외) |
-| TP2(L4 2장 이상) | 단가 미확인 | 1시간 | 새 승인 때 제시 |
+| TP2(g6.12xlarge, L4 4장 중 2장) | $5.65823/h(콘솔 표시, 2026-11-06) | 1.5~2시간 | 약 $8.5~$11 (EBS 제외, 실행 전 상한 승인) |
 
 1단계 작업 지시서 기준 GPU 잔여 예산은 $56.68이다. 보존 EBS 비용(약 $0.056/h)은 별도다.
 

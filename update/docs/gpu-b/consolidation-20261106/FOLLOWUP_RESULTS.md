@@ -75,6 +75,31 @@
 
 고정 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/transport-v3-actual-20261106/recovered-GB09-archive-integrity-v1.json`, SHA256 `5d5124b68eda36b0b34d987aecb9531dc6309d2ce53d6dfb7b813c51bb4e8943`다. 원 ZIP과 계정·인프라 식별자는 게시하지 않는다. 한 파일의 회수 성공을 모든 전송 장애 해결이나 SUP-16 제품 성공으로 확대하지 않으며 25개 한정 마감 제안·18개 제품 증거 필요 분류는 유지한다.
 
+## LIF-11·SUP-03 준비 — 고정 코드의 정적 인계 검토
+
+검토 대기를 줄이기 위해 게시 담당이 세션1의 두 고정 패킷을 정적으로 검토했다. source `3b3ff137b31b830403ccce1997dabf26319bac4f`, freeze 2개와 그 고정 파일25개의 bytes/SHA, Python AST, 원 CPU argv·종료0·로그 및 실제 consumer/factory 호출 경로를 대조했다. 새 시험·원 archive CRC·Ref 복원은 실행하지 않았다. 이 준비 코드의 정적 인계 범위에서 새 차단 결함은 발견하지 않았으며, 실제 운영 입력·신원·자원·기한·반출 패킷의 사전 검토를 대신하지 않는다.
+
+| 항목 | 확인한 준비 범위 | 한계와 남은 입력 |
+| --- | --- | --- |
+| LIF-11 | 원 prepare_assets→load_prepared→입력 결합→등록 factory의 validate_policy. 원 EXAMPLE 오프라인 계약8개 통과 기록 재사용. 입력 hash·분기/profile·유효창·model mapping 대조 및 기존 출력 덮어쓰기 거부 | 실제 선정 worker/rank/PID/FD·ENV/target·정책/시나리오·장애/복구 입력 미제공. 실제 trigger·전역 자원 회수·후속 launch lineage 공통 출력도 필요 |
+| SUP-03 | 실제 core/Store 인터페이스의 선정→EVD/RES/RPT→반출→복원·동일 as-of/저장 팩 재판정에 대한 EXAMPLE CPU 계약4개와 산출물 보존1개 통과 기록 재사용. adapter=vllm 보완과 원 실패 보존 확인 | CPU transport와 verify_source는 mock. 실제 source/runtime 소유권·ENV/target·반출 입력은 미검증. fixed template identity/정책 소속/API projection 범위이며 worker 소비·전체 공급 범위는 미확인 |
+
+두 항목 모두 `GPU_READY=false`다. SUP-03의 EXAMPLE 결과는 functional/performance/security 모두 UNKNOWN, official=false, template_consumer_verified=false, supply_scope_complete=false다. 원 allowlist의 명시 빈 목록은 LAB DRAFT 입력이며 기업 승인이나 실제 비허용 파일 소비 FAIL로 바꾸지 않는다. native17의 weight 관측을 config/tokenizer/template 소비로 확대하지 않는다.
+
+[선정 입력 준비 코드 참조](implementation-snapshots/lif11_selected_input_prepare.py.txt) SHA256 `92cf446ab47ed4da6700a9a70d0d48aee9cd42049eda68da1caa2faa315a0bb2`, [고정 template 제품 경로 코드 참조](implementation-snapshots/sup03_fixed_template_product.py.txt) SHA256 `bb92196f6a5f5d8edbe7ff448c366ea68d9ce08fdc0e2f9b68122f449a9520ed`는 원 bytes와 동일하다. 설치된 운영 코드나 source commit에 포함된 새 기능이라는 뜻은 아니다.
+
+원 freeze의 프로젝트 상대 경로는 `worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/lif11-selected-input-prep-v1/freeze.json` SHA256 `f5870a4431d267283f04cb3bb229d79c8e2e34cae263aab39b0c72b94e9496e4`, 같은 out의 `sup03-fixed-template-product-v1/freeze.json` SHA256 `384fbab8df616bce1831b280a128aedfdf2789fed9472cdcee1954fdff221682`다. SUP-03 v2는 verify_source의 UID/GID·mode 검사에 대한 문구만 정정했고 코드/시험은 재사용했다. 게시 담당 검토 참조는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/s1-fixed-preparation-static-review-v1.json`, SHA256 `4a42ecdb992c293d085a7bc016949b2a3cc3312f93ca42eded1ddebbbe48dcac`다.
+
+## SUP-05 실제 CPU 정상 역할 1회 — 실패·원자료·정리 검증 완료
+
+2026-11-06 22:33:24 KST 세션6이 승인된 CPU normal1회의 새57참조·실제 명령/실행 신원·원 예외·native 기록·입력 전후와 소유 정리 근거를 검증했다. 원 image·source·worker·모델과90초·2CPU/4GiB 조건을 유지했다. Engine 생성은58.089초에 반환하고 요청은58.102초에 제출됐으나 `engine.step`에서 `Unsupported CPU attention configuration: head_dim=4 isa=1 kv_cache_idx=0`로 실패했다. host/worker 종료값은1이며 역할과 정리는72.541초였다. 원90초 timeout과 다른 실패이고, 이전 timeout의 단일 원인이 해결됐다고 단정하지 않는다.
+
+native 원문694행의 seq·prev SHA·정규 bytes·단조시각과 실행 신원을 확인했다. 1,206,057 bytes의 원문과 부분 mirror SHA가 같으며 A파일3,288 bytes의 실제 FD 읽기 반환은 관측됐다. 그러나 worker 배정·승인 파일 결합·tensor 적용은 미확인이다. END=PROCESS_EXIT는 정상 SEALED를 뜻하지 않는다. 정상 봉인·완전 수집·native admission은 성립하지 않았고 제품 EVD/RES/RPT는 생성되지 않았다. 복원할 새 제품 Ref나 저장 팩 재판정 대상도 없다.
+
+작업 A파일의 hash 복구·engine 참조 소멸·관측 FD 정리 및 소유 컨테이너 제거/부재와 오류0을 확인했다. 이를 모든 내부 runtime 전역 자원의 회수 보증으로 확대하지 않는다. 정상 준비 실패에 따라 challenge·recovery·같은 입력 재시도는0회다. 별도 호환 입력 준비가 이 실패를 성공으로 바꾸지 않으며 CPU 진단을 GPU MEASURED/제품 PASS로 집계하지 않는다.
+
+최종 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup05-preservation-delta-20261106-v1/actual-normal-final-verification-v1.json`, SHA256 `a1da5a5b4c7dc9f14229224da99e017a1df09d49aadf134109099c40f4d13430`다. 이 고정 실패·정리 검증의 추가 필수 입력은 없으며 제품 검증 재개에는 설치판과 호환되는 별도 고정 모델 입력이 필요하다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

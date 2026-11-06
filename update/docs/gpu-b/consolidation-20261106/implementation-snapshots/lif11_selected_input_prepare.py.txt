@@ -1,0 +1,122 @@
+"""LIF-11 offline input binding. Never creates identities or operates Kubernetes."""
+from pathlib import Path
+import argparse
+import hashlib
+import json
+import sys
+
+
+def prepare(*, environment, target, prepared, selection, values, pack, output):
+    from guard.collectors.file import load_environment
+    from guard.collectors.lifecycle import load_prepared
+    from guard.adapters import resource_recovery_probe as probe
+    from guard.adapters import vllm_rank_failure_sensor as rank
+    from guard.adapters import vllm_initialization_sensor as initialization
+    from guard.executors.resource_recovery_contract import (
+        PROFILE, normalize_policy, validate_selected_policy,
+    )
+    from guard.executors.registry import resolve_executor
+    from guard.models import canonical_json, sha256_hex, load_pack, utcnow
+    from guard.runtime.bounded import strict_json
+    from guard.runtime.kubernetes_recovery_http import KubernetesRecoveryHTTP
+
+    def read(path, limit=65536):
+        with Path(path).open('rb') as stream:
+            return strict_json(stream.read(limit + 1), limit=limit)
+
+    env = load_environment(Path(environment))
+    tgt = read(target)
+    assets = load_prepared(prepared)  # Actual producer manifest and all asset bytes.
+    selected = read(selection, probe.MAX_INPUT)
+    policy = read(values)
+    start, end, _ = normalize_policy(policy)
+    validate_selected_policy(selected, policy)
+    if not start <= utcnow() <= end:
+        raise ValueError('RESOURCE_RECOVERY_POLICY_WINDOW_NOT_CURRENT')
+    expected = {
+        'recovery_environment_sha256': env.ref().sha256,
+        'recovery_target_sha256': sha256_hex(canonical_json(tgt)),
+        'recovery_prepared_sha256': sha256_hex(canonical_json(assets)),
+        'recovery_selection_sha256': sha256_hex(canonical_json(selected)),
+    }
+    if any(policy[key] != value for key, value in expected.items()):
+        raise ValueError('RESOURCE_RECOVERY_SUPPLIED_BINDING_MISMATCH')
+    profile = rank.PROFILE if policy['recovery_branch'] == 'runtime-failure' else initialization.PROFILE
+    if assets['profile'] != profile:
+        raise ValueError('RESOURCE_RECOVERY_BRANCH_ASSET_MISMATCH')
+    if (tgt.get('environment_ref') != env.ref().model_dump(mode='json')
+            or not env.model.id or not env.model.revision
+            or not probe.fingerprint(env.model.inventory_sha256)):
+        raise ValueError('RESOURCE_RECOVERY_MODEL_ENVIRONMENT_REQUIRED')
+    selected_pack = load_pack(Path(pack))
+    check = selected_pack.checks['LIF-11']
+    if check.executor != 'resource_recovery' or check.collection_profile != PROFILE:
+        raise ValueError('RESOURCE_RECOVERY_SELECTED_PACK_PROFILE_MISMATCH')
+
+    def forbidden_runtime(*args, **kwargs):
+        raise AssertionError('OFFLINE_PREPARATION_MUST_NOT_EXECUTE')
+
+    # This existing constructor validates model mapping and fixed Kubernetes input
+    # without dispatching. The real runtime repeats owner/clock checks at execution.
+    KubernetesRecoveryHTTP(tgt, env, runner=forbidden_runtime)
+    cfg = {'target': str(Path(target).resolve()), 'prepared': str(Path(prepared).resolve()),
+           'selection': str(Path(selection).resolve()), 'max_duration_seconds': 120}
+    factory = resolve_executor('resource_recovery', 'kubernetes')
+    if factory is None:
+        raise ValueError('RESOURCE_RECOVERY_REGISTERED_FACTORY_UNAVAILABLE')
+    executor = factory({'resource_recovery': cfg})
+    executor.validate_policy(check, policy)
+
+    # Values and approvals stay caller-supplied: no generated deadline, scenario
+    # approval, owner, rank, PID, FD, native row, or automatic hash approval.
+    supplied = {name: {'path': str(Path(path).resolve()),
+                      'bytes_sha256': hashlib.sha256(Path(path).read_bytes()).hexdigest()}
+                for name, path in {'environment': environment, 'target': target,
+                                  'prepared': prepared, 'selection': selection,
+                                  'values': values}.items()}
+    receipt = {
+        'check_id': 'LIF-11', 'branch': policy['recovery_branch'],
+        'phase': policy['recovery_phase'], 'collection_profile': PROFILE,
+        'environment_ref': env.ref().model_dump(mode='json'),
+        'pack_ref': selected_pack.ref().model_dump(mode='json'),
+        'supplied_inputs': supplied, 'executor_config': cfg,
+        'factory_class': type(executor).__name__,
+        'state': 'OFFLINE_INPUTS_BOUND_NOT_EXECUTED',
+        'runtime_owner_clock_or_failure_verified': False,
+        'product_objects_created': False, 'GPU_READY': False,
+        'scope': 'selected owner/resource census; not global reclaim or next-launch recovery',
+    }
+    folder = Path(output)
+    folder.mkdir(mode=0o700)  # Refuse existing output, including failed old versions.
+    toml = '[executors]\nresource_recovery="kubernetes"\n[adapter]\nname="vllm"\n[resource_recovery]\n'
+    toml += ''.join(f'{key}={json.dumps(value)}\n' for key, value in cfg.items())
+    for name, raw in [('guard.toml', toml.encode()),
+                      ('policy-values.json', canonical_json(policy)),
+                      ('receipt.json', canonical_json(receipt))]:
+        with (folder / name).open('xb') as stream:
+            stream.write(raw)
+        (folder / name).chmod(0o600)
+    return receipt
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for key in ('source-root', 'environment', 'target', 'prepared', 'selection', 'values', 'pack', 'output'):
+        parser.add_argument('--' + key, type=Path, required=True)
+    args = vars(parser.parse_args())
+    root = args.pop('source_root').resolve()
+    sys.path.insert(0, str(root / 'update' / 'src'))
+    import guard
+    if Path(guard.__file__).resolve().parent != root / 'update' / 'src' / 'guard':
+        raise ValueError('RESOURCE_RECOVERY_WRONG_GUARD_SOURCE')
+    try:
+        result = prepare(**args)
+    except (ValueError, OSError, KeyError) as error:
+        print(json.dumps({'error_type': type(error).__name__, 'diagnostic': str(error)}), file=sys.stderr)
+        return 2
+    print(json.dumps(result))
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

@@ -23,6 +23,19 @@ function renderLayout(status: RuntimeStatus, path = "/runtime/overview") {
 }
 
 describe("관측 연결 경고", () => {
+  it("실제 runtime과 예시 증거가 섞이면 예시 경고의 대상을 구분한다", async () => {
+    const status = structuredClone(STATUS);
+    status.collectors = [];
+    mockApi({
+      "/api/meta": { example_mode: true, sources: [{ name: "runtime", mode: "live" }, { name: "evidence", mode: "example" }], runtime_connection: "connected", contracts_version: "test" },
+      "/api/runtime/status": { item: status, invalid: null, source: { ...SOURCE, mode: "live" } },
+    });
+    renderAt("/runtime/enforce/tetragon", "/runtime/enforce/tetragon", <><Layout /><StatusReady /></>);
+    await screen.findByText("상태 조회 완료");
+    expect(screen.getByText("일부 예시 포함")).toBeTruthy();
+    expect(screen.getByText("예시 자료 · evidence · 해당 자료는 공식 판정 근거 제외")).toBeTruthy();
+    expect(screen.queryByText(/^예시 데이터 ·/)).toBeNull();
+  });
   it("Runtime과 Update 사이드바의 세 단계 제목을 표시한다", async () => {
     const status = structuredClone(STATUS);
     renderLayout(status);

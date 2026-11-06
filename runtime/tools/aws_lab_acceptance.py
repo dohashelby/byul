@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 from ipaddress import ip_address
 import json
+import shlex
 import math
 import os
 from pathlib import Path
@@ -318,7 +319,7 @@ def _aws20_method(document: object, *, namespace: str) -> str | None:
 
 
 def _aws20_raw_action(path: Path, *, since: str, pod_uid: str, namespace: str,
-                      action: str, method: str) -> bool:
+                      action: str, method: str, probe_tag: str | None = None) -> bool:
     try:
         with path.open("r", encoding="utf-8") as handle:
             for line in handle:
@@ -326,11 +327,13 @@ def _aws20_raw_action(path: Path, *, since: str, pod_uid: str, namespace: str,
                     root = json.loads(line)
                     event = root.get("process_kprobe") or {}
                     pod = (event.get("process") or {}).get("pod") or {}
+                    arguments = (event.get("process") or {}).get("arguments", "")
                     args = event.get("args") or []
                     if (_after(root.get("time"), since)
                         and event.get("policy_name") == "runtime-tg-secret-01"
                         and event.get("action") == action
                         and pod.get("uid") == pod_uid and pod.get("namespace") == namespace
+                        and (probe_tag is None or probe_tag in shlex.split(arguments))
                         and any(isinstance(arg, dict) and ((arg.get("file_arg") or {}).get("path") == _SECRET_PROBE_PATH
                                                            or str(arg.get("string_arg", "")).rstrip("\x00") == _SECRET_PROBE_PATH) for arg in args)
                         and (method != "override_lsm" or any(isinstance(arg, dict) and str(arg.get("int_arg")) == "4" for arg in args))):
@@ -439,13 +442,13 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
         if method not in {"override_lsm", "override_syscall", "sigkill_fd_install"}:
             return "unknown", "차단 방식을 확인하지 못함"
         if method == "sigkill_fd_install":
-            required = ["enforce_active", "exit_sigkill", "raw_sigkill", "cleanup_ok", "restore_read_ok"]
+            required = ["enforce_active", "monitor_read_ok", "exit_sigkill", "raw_sigkill", "cleanup_ok", "restore_read_ok"]
             if facts.get("engine_target") is True:
                 required += ["gateway_503", "recovered_200", "engine_restarted"]
             else:
                 required += ["normal_200"]
         else:
-            required = ["enforce_active", "read_eperm", "raw_override", "normal_200", "cleanup_ok", "restore_read_ok"]
+            required = ["enforce_active", "monitor_read_ok", "read_eperm", "raw_override", "normal_200", "cleanup_ok", "restore_read_ok"]
         if any(facts.get(name) is False for name in required):
             return "failed", "차단·정상 요청 또는 monitor 복귀 결과 불일치"
         missing = [name for name in required if facts.get(name) is not True]
@@ -2806,7 +2809,8 @@ class AWSAcceptance:
             return {"unknown_reason": "Ready 대상 Pod UID를 확인하지 못함"}, {}
         current_result = self._kubectl("get", "tracingpolicynamespaced", "runtime-tg-secret-01", "-o", "json")
         current = _json_object(current_result.stdout.encode()) if current_result.returncode == 0 else None
-        if (_aws20_method(current, namespace=self.namespace) != method or current["spec"] != monitor["spec"]):
+        from serving_runtime.enforcement.tetragon import comparable_spec
+        if (_aws20_method(current, namespace=self.namespace) != method or comparable_spec(current["spec"]) != comparable_spec(monitor["spec"])):
             return {"unknown_reason": "적용 규칙과 검토한 monitor manifest 불일치"}, {}
         labels = (pod_doc or {}).get("metadata", {}).get("labels", {})
         selector = current["spec"]["podSelector"]["matchLabels"]
@@ -2816,13 +2820,20 @@ class AWSAcceptance:
 
         def run_mode(command: list[str]) -> CommandResult:
             return self.runner.run(command, timeout=70)
-        enabled = switch_mode(self.context, self.namespace, "runtime-tg-secret-01", "enforce", run=run_mode)
+        probe_tag = "byul-read-probe-" + uuid4().hex
+        monitor_read = self._kubectl("exec", "pod/" + pod["name"], "-c", container, "--",
+                                     "python3", "-c", PROBE_READ_ERRNO_CODE, _SECRET_PROBE_PATH,
+                                     probe_tag + "-monitor", timeout=15)
+        if monitor_read.returncode != 0 or _json_object(monitor_read.stdout.encode()) != {"read": "ok"}:
+            return {"unknown_reason": "monitor 구간의 가짜 파일 읽기 대조 실패; 정책 모드 유지"}, {}
+        enabled = switch_mode(self.context, self.namespace, "runtime-tg-secret-01", "enforce", run=run_mode, history_path=self.evidence_dir / "transitions.jsonl")
         if not enabled["ok"] or enabled["before"]["mode"] != "monitor":
             if enabled["ok"] and enabled["before"]["mode"] != "monitor":
-                switch_mode(self.context, self.namespace, "runtime-tg-secret-01", "monitor", run=run_mode)
+                switch_mode(self.context, self.namespace, "runtime-tg-secret-01", "monitor", run=run_mode, history_path=self.evidence_dir / "transitions.jsonl")
             return {"unknown_reason": "정책 monitor→enforce 모드 전환 또는 동일 ID 확인 실패"}, {"mode_switch": enabled}
 
         facts: dict[str, Any] = {"enforce_method": method, "engine_target": engine_target,
+                                  "monitor_read_ok": True,
                                   "enforce_active": True, "read_eperm": None, "raw_override": None,
                                   "exit_sigkill": None, "raw_sigkill": None,
                                   "normal_200": None, "gateway_503": None, "engine_restarted": None,
@@ -2830,40 +2841,48 @@ class AWSAcceptance:
         evidence: dict[str, Any] = {"engine_pod_uid": pod["uid"], "rule_id": "TG-SECRET-01",
                                     "path": _SECRET_PROBE_PATH, "reviewed_manifest_sha256": hashlib.sha256(monitor_path.read_bytes()).hexdigest(),
                                     "enforce_method": method, "policy_id": enabled["after"]["id"]}
+        evidence["probe_scope"] = "kubectl_exec_process"
         try:
             started = _now()
             read = self._kubectl("exec", "pod/" + pod["name"], "-c", container, "--",
-                                 "python3", "-c", PROBE_READ_ERRNO_CODE, _SECRET_PROBE_PATH, timeout=15)
+                                 "python3", "-c", PROBE_READ_ERRNO_CODE, _SECRET_PROBE_PATH, probe_tag, timeout=15)
             result = _json_object(read.stdout.encode())
-            if method == "sigkill_fd_install":
-                facts["exit_sigkill"] = read.returncode in {137, -9}
-            else:
-                facts["read_eperm"] = read.returncode == 13 and result == {"errno": 1, "name": "EPERM"}
+            facts["exit_sigkill"] = (True if read.returncode in {137, -9}
+                                     else False if read.returncode in {0, 13} and result else None)
+            if method != "sigkill_fd_install":
+                facts["read_eperm"] = (True if read.returncode == 13 and result == {"errno": 1, "name": "EPERM"}
+                                       else False if read.returncode == 0 and result == {"read": "ok"} else None)
             evidence["read_returncode"] = read.returncode
             action = "KPROBE_ACTION_SIGKILL" if method == "sigkill_fd_install" else "KPROBE_ACTION_OVERRIDE"
             for attempt in range(8):
                 if _aws20_raw_action(self.observation_dir / "tetragon.jsonl", since=started,
-                                     pod_uid=pod["uid"], namespace=self.namespace, action=action, method=method):
+                                     pod_uid=pod["uid"], namespace=self.namespace, action=action, method=method,
+                                     probe_tag=probe_tag):
                     facts["raw_sigkill" if method == "sigkill_fd_install" else "raw_override"] = True
                     break
                 if attempt < 7:
                     self.sleep(2.0)
             key = "raw_sigkill" if method == "sigkill_fd_install" else "raw_override"
             facts[key] = facts[key] or None
+            if method != "sigkill_fd_install":
+                facts["raw_sigkill"] = _aws20_raw_action(self.observation_dir / "tetragon.jsonl", since=started,
+                    pod_uid=pod["uid"], namespace=self.namespace, action="KPROBE_ACTION_SIGKILL", method=method,
+                    probe_tag=probe_tag) or None
             response, request_id, valid = self._completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"])
             record = _record_fields(self._detail(request_id))
             facts["normal_200"] = (response.status == 200 and valid and record is not None
                                    and record["result"] == "ALLOWED" and record["delivery"]["attempted"] is True)
-            if method == "sigkill_fd_install" and engine_target:
-                facts["gateway_503"] = response.status == 503 and record is not None and record["delivery"]["attempted"] is False
+            if engine_target:
+                evidence["engine_lifecycle_note"] = "exec 시험 프로세스의 종료는 엔진 주 프로세스 종료·503·재시작 근거가 아님"
             evidence["normal_request_id"] = request_id
             evidence["normal_http_status"] = response.status
             evidence["collector_clear"] = self._tetragon_collector_ok() and self._tetragon_gaps_clear(started)
             if not evidence["collector_clear"]:
                 facts[key] = None
+                facts["raw_sigkill"] = None
         finally:
             try:
-                restored = switch_mode(self.context, self.namespace, "runtime-tg-secret-01", "monitor", run=run_mode)
+                restored = switch_mode(self.context, self.namespace, "runtime-tg-secret-01", "monitor", run=run_mode, history_path=self.evidence_dir / "transitions.jsonl")
                 facts["cleanup_ok"] = (restored["ok"] and restored["after"]["id"] == enabled["after"]["id"])
                 evidence["mode_restore"] = restored
                 if facts["cleanup_ok"]:
@@ -2871,17 +2890,20 @@ class AWSAcceptance:
                     read_after = self._kubectl("exec", "pod/" + pod["name"], "-c", container, "--",
                                                "python3", "-c", PROBE_READ_ERRNO_CODE, _SECRET_PROBE_PATH, timeout=15)
                     after = _json_object(read_after.stdout.encode())
-                    facts["restore_read_ok"] = read_after.returncode == 0 and after == {"read": "ok"}
+                    facts["restore_read_ok"] = (True if read_after.returncode == 0 and after == {"read": "ok"}
+                                                else False if after and "errno" in after else None)
                     evidence["restore_read_returncode"] = read_after.returncode
-                    if method == "sigkill_fd_install" and engine_target:
-                        recovered, recovered_id, recovered_valid = self._completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"])
-                        facts["recovered_200"] = recovered.status == 200 and recovered_valid
-                        current_pod, _ = self._engine_pod()
-                        facts["engine_restarted"] = bool(current_pod and current_pod.get("uid") != pod["uid"])
-                        evidence["recovered_request_id"] = recovered_id
             except Exception as error:
                 facts["cleanup_ok"] = False
                 evidence["restore_error"] = _safe_exception(error)
+        from serving_runtime.enforcement.verification import assess_effects
+        evidence["verified_effects"] = assess_effects(method, {
+            "enforce_active": facts["enforce_active"], "event_bound": bool(facts.get("raw_override") or facts.get("raw_sigkill")),
+            "collector_complete": evidence.get("collector_clear"), "override_event": facts.get("raw_override"),
+            "sigkill_event": facts.get("raw_sigkill"), "read_denied": facts.get("read_eperm"),
+            "process_terminated": facts.get("exit_sigkill"), "monitor_read_ok": facts["monitor_read_ok"],
+            "restore_read_ok": facts["restore_read_ok"], "same_policy_id": facts["cleanup_ok"], "cleanup_ok": facts["cleanup_ok"],
+        })
         return facts, evidence
 
     def _normal_control(self) -> dict[str, Any]:

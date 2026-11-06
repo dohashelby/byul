@@ -115,6 +115,7 @@ class HandlerDependencies:
     request_body_timeout_s: float
     target_status: Callable[[], dict[str, Any]] = lambda: {"registration": {"state": "not_configured"}}
     phase_timeline: Callable[[], dict[str, Any]] = lambda: {"entries": [], "collector": {"state": "missing", "written_at": None, "fresh": False}}
+    tetragon_status: Callable[[], dict[str, Any]] = lambda: {"state": "not_configured"}
     authorize_read: Callable[[str | None], tuple[int, str, str] | None] = lambda _header: None
     record_rejected: Callable[[str, str, str, int, str], None] = lambda *_args: None
 
@@ -358,6 +359,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/lab-report",
                 "/api/target",
                 "/api/phase-timeline",
+                "/api/tetragon-status",
                 "/v1/chat/completions",
                 "/v1/completions",
             }
@@ -499,6 +501,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/phase-timeline":
             self._send_json(200, self.dependencies.phase_timeline())
+            return
+        if path == "/api/tetragon-status":
+            self._send_json(200, self.dependencies.tetragon_status())
             return
         if path == "/api/summary":
             self._send_json(200, self.dependencies.queries.summary())

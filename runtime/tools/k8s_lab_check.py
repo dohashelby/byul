@@ -1540,7 +1540,7 @@ class LabChecker:
                 ("enforce", "enforce", "KPROBE_ACTION_OVERRIDE"),
                 ("restored", "monitor", "KPROBE_ACTION_POST"),
             ):
-                switched = switch_mode(self.context, self.namespace, policy_name, mode, run=run_mode)
+                switched = switch_mode(self.context, self.namespace, policy_name, mode, run=run_mode, history_path=self.state_dir / "transitions.jsonl")
                 if not switched["ok"]:
                     self._set(case, "failed" if switched.get("rollback_ok") is False else "unknown",
                               f"{label} 정책 모드 전환·되돌림 미확인", evidence)
@@ -1605,7 +1605,7 @@ class LabChecker:
         finally:
             if not restored:
                 try:
-                    recovery = switch_mode(self.context, self.namespace, policy_name, "monitor", run=run_mode)
+                    recovery = switch_mode(self.context, self.namespace, policy_name, "monitor", run=run_mode, history_path=self.state_dir / "transitions.jsonl")
                     case["rollback"] = "동일 정책 monitor 복귀" if recovery["ok"] else "monitor 복귀 미확인"
                     if not recovery["ok"]:
                         self._set(case, "failed", "monitor 복귀 실패", evidence)
@@ -1671,7 +1671,7 @@ class LabChecker:
             if ready.returncode or not pod_uid:
                 self._set(case, "unknown", "L-05c 시험용 Pod 준비 또는 UID 확인 실패", evidence)
                 return
-            enabled = switch_mode(self.context, self.namespace, policy_name, "enforce", run=run_mode)
+            enabled = switch_mode(self.context, self.namespace, policy_name, "enforce", run=run_mode, history_path=self.state_dir / "transitions.jsonl")
             if not enabled["ok"]:
                 self._set(case, "unknown", "L-05c enforce 전환 실패", evidence)
                 return
@@ -1690,7 +1690,7 @@ class LabChecker:
                                                action="KPROBE_ACTION_SIGKILL", policy_name=policy_name, mask=None)
             except (RuntimeError, OSError):
                 matched = False
-            restored = switch_mode(self.context, self.namespace, policy_name, "monitor", run=run_mode)
+            restored = switch_mode(self.context, self.namespace, policy_name, "monitor", run=run_mode, history_path=self.state_dir / "transitions.jsonl")
             if not restored["ok"]:
                 self._set(case, "failed", "L-05c monitor 복귀 실패", evidence)
                 return
@@ -1708,7 +1708,7 @@ class LabChecker:
                 self._set(case, "passed", "시험용 Pod Sigkill 종료·원시 이벤트·동일 정책 monitor 복귀 확인", evidence)
         finally:
             if created:
-                recovery = switch_mode(self.context, self.namespace, policy_name, "monitor", run=run_mode)
+                recovery = switch_mode(self.context, self.namespace, policy_name, "monitor", run=run_mode, history_path=self.state_dir / "transitions.jsonl")
                 if not recovery["ok"]:
                     self._set(case, "failed", "L-05c 정리 중 monitor 복귀 실패", evidence)
             cleanup_failed = []

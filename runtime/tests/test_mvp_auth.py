@@ -334,7 +334,7 @@ class ReadApiAuthTests(AuthHttpBase):
         status, inference_headers, _ = self.post(chat(), INFERENCE_TOKEN)
         self.assertEqual(status, 200)
         request_id = inference_headers["X-Request-ID"]
-        paths = ["/api/status", "/api/requests", f"/api/requests/{request_id}", f"/api/requests/{request_id}/evidence", "/api/observations", "/api/target", "/api/phase-timeline"]
+        paths = ["/api/status", "/api/requests", f"/api/requests/{request_id}", f"/api/requests/{request_id}/evidence", "/api/observations", "/api/target", "/api/phase-timeline", "/api/tetragon-status"]
         for path in paths:
             with self.subTest(path=path):
                 code, headers, body = self.get(path)

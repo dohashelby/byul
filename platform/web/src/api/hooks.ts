@@ -17,6 +17,7 @@ import type {
   RevisionDiff,
   RevisionList,
   LabReportResponse,
+  TetragonStatusResponse,
   RuntimeEventList,
   RuntimeStatusResponse,
   PhaseTimelineResponse,
@@ -38,6 +39,8 @@ export const useRequests = () =>
   useQuery({ queryKey: ["runtime", "requests"], queryFn: () => getJson<RequestList>("/api/runtime/requests"), ...live });
 export const useLabReport = () =>
   useQuery({ queryKey: ["runtime", "lab-report"], queryFn: () => getJson<LabReportResponse>("/api/runtime/lab-report"), ...live });
+export const useTetragonStatus = () =>
+  useQuery({ queryKey: ["runtime", "tetragon-status"], queryFn: () => getJson<TetragonStatusResponse>("/api/runtime/tetragon-status"), ...live });
 export const useRequestDetail = (id: string | null) =>
   useQuery({
     queryKey: ["runtime", "request", id],

@@ -10,6 +10,7 @@ import { BlockedPage } from "../pages/BlockedPage";
 import { ResultsPage } from "../pages/ResultsPage";
 import { RevalidationPage } from "../pages/RevalidationPage";
 import { RuntimeEnforcePage } from "../pages/runtime/RuntimeEnforcePage";
+import { TetragonPolicyPage } from "../pages/runtime/TetragonPolicyPage";
 import { RuntimeObservePage } from "../pages/runtime/RuntimeObservePage";
 import { AlertsPage } from "../pages/runtime/AlertsPage";
 import { PhaseTimelinePage } from "../pages/runtime/PhaseTimelinePage";
@@ -43,6 +44,7 @@ export const routes: RouteObject[] = [
       { path: "runtime/observe", element: <Navigate to="/runtime/observe/collectors" replace /> },
       { path: "runtime/observe/:sub", element: <RuntimeObservePage /> },
       { path: "runtime/enforce", element: <Navigate to="/runtime/enforce/cilium" replace /> },
+      { path: "runtime/enforce/tetragon", element: <TetragonPolicyPage /> },
       { path: "runtime/enforce/:sub", element: <RuntimeEnforcePage /> },
       { path: "runtime/events", element: <EventsPage /> },
       { path: "runtime/settings", element: <RuntimeSettingsPage /> },

@@ -29,11 +29,16 @@ def classify_capabilities(*, kernel: str | None, config: str | None, lsm: str | 
     lsm_names = [name.strip() for name in lsm.split(",") if name.strip()] if lsm is not None else None
     override_probe = _probe_flag(probe, "override_return")
     lsm_probe = _probe_flag(probe, "lsm")
+    fmodret_probe = _probe_flag(probe, "fmodret")
     symbols = set(re.findall(r"\b(?:security_file_permission|(?:__x64_|__arm64_)?sys_openat)\b", injection_list)) if injection_list is not None else None
     supported: list[str] = []
     unavailable: list[str] = []
     unknown: list[str] = []
-    if override_config is False or override_probe is False or (symbols is not None and "security_file_permission" not in symbols):
+    if fmodret_probe is True and (override_probe is False or (symbols is not None and "security_file_permission" not in symbols)):
+        # security_* hooks can use the fmodret path. A missing kprobe Override
+        # feature alone is not proof that this policy cannot load.
+        unknown.append("override_lsm")
+    elif override_config is False or override_probe is False or (symbols is not None and "security_file_permission" not in symbols):
         unavailable.append("override_lsm")
     elif override_config is True and override_probe is True and symbols is not None and "security_file_permission" in symbols:
         supported.append("override_lsm")
@@ -53,6 +58,7 @@ def classify_capabilities(*, kernel: str | None, config: str | None, lsm: str | 
             "lsm": lsm_names, "apparmor": None if lsm_names is None else "apparmor" in lsm_names,
             "bpf_lsm": None if lsm_names is None else "bpf" in lsm_names,
             "tetragon_override_return": override_probe, "tetragon_lsm": lsm_probe,
+            "tetragon_fmodret": fmodret_probe,
             "error_injection_list_readable": injection_list is not None,
             "error_injection_symbols": openat + (["security_file_permission"] if symbols and "security_file_permission" in symbols else []),
             "available": supported, "unavailable": unavailable, "unknown": unknown,

@@ -93,6 +93,11 @@ class MethodTests(unittest.TestCase):
 
 
 class ModeTests(unittest.TestCase):
+    def test_real_v171_table_memory_unit_does_not_shift_mode(self):
+        output = ("ID NAME STATE FILTERID NAMESPACE SENSORS KERNELMEMORY MODE NPOST NENFORCE NMONITOR\n"
+                  "13 runtime-tg-secret-01 enabled 13 serving-lab generic_kprobe 2.00 MB monitor 0 0 0\n")
+        self.assertEqual(parse_policy_row(output, "runtime-tg-secret-01", "serving-lab")["mode"], "monitor")
+
     def test_parse_and_switch_without_delete(self):
         self.assertEqual(parse_policy_row(table(), "runtime-tg-secret-01", "serving-lab")["mode"], "monitor")
         calls = []

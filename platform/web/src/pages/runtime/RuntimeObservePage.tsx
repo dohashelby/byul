@@ -232,7 +232,7 @@ export function RuntimeObservePage() {
                     <td><ScopeBadges environment={e.scope.environment} runId={e.scope.run_id} /></td>
                     <td>{kind}</td>
                     <td className="mono" title={attr || pod(o.pod_namespace, o.pod_name)}>{o.path ?? o.binary ?? "–"}</td>
-                    <td>{blocked ? <><Badge tone="caution" title="원시 차단 시도 기록; 실제 결과는 Lab 시험에서 확인">차단 시도</Badge> {isTetragonSigkill(e) ? "Sigkill · 프로세스 종료" : "차단 (Override)"}</> : o.exec_verdict ? `${label(EXEC_VERDICT, o.exec_verdict)}${o.exec_verdict === "exception" && o.exception_id ? ` · ${o.exception_id}` : ""}` : "–"}</td>
+                    <td>{blocked ? <><Badge tone="caution" title="원시 차단 시도 기록; 실제 결과는 Lab 시험에서 확인">차단 시도</Badge> {isTetragonSigkill(e) ? "Sigkill · 프로세스 종료 규칙" : "Override · 오류 반환 규칙"}</> : o.exec_verdict ? `${label(EXEC_VERDICT, o.exec_verdict)}${o.exec_verdict === "exception" && o.exception_id ? ` · ${o.exception_id}` : ""}` : "–"}</td>
                     <td>{o.phases.length ? o.phases.map((phase) => label(PHASE, phase)).join(" + ") : "–"}</td>
                     <td>{parentInfo(e)}</td>
                     <td className="mono" title={o.action_raw ?? "원본 action 미기록"}>{`${o.rule_id ?? "–"} · ${mode}`}</td>

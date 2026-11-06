@@ -254,6 +254,27 @@
         }
       }
     },
+    "/api/runtime/tetragon-status": {
+      "get": {
+        "tags": [
+          "runtime"
+        ],
+        "summary": "Tetragon Status",
+        "operationId": "tetragon_status_api_runtime_tetragon_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TetragonStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/update/results": {
       "get": {
         "tags": [
@@ -3007,6 +3028,1374 @@
         ],
         "title": "SourceInfo",
         "description": "이 응답의 자료를 어디서 읽었는지. example이면 화면에 '예시 데이터' 띠를 띄운다."
+      },
+      "TetragonAction": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "argError": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Argerror"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "TetragonAction"
+      },
+      "TetragonAgent": {
+        "properties": {
+          "node": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node"
+          },
+          "restart_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restart Count"
+          },
+          "last_exit_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Exit At"
+          },
+          "last_exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Exit Code"
+          },
+          "last_exit_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Exit Reason"
+          },
+          "last_exit_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Exit Summary"
+          }
+        },
+        "type": "object",
+        "title": "TetragonAgent"
+      },
+      "TetragonAgentSample": {
+        "properties": {
+          "pod_uid": {
+            "type": "string",
+            "title": "Pod Uid"
+          },
+          "restart_count": {
+            "type": "integer",
+            "title": "Restart Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pod_uid",
+          "restart_count"
+        ],
+        "title": "TetragonAgentSample"
+      },
+      "TetragonCapability": {
+        "properties": {
+          "node": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node"
+          },
+          "checked_at": {
+            "type": "string",
+            "title": "Checked At"
+          },
+          "kernel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kernel"
+          },
+          "apparmor": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apparmor"
+          },
+          "available": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available"
+          },
+          "unavailable": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unavailable"
+          },
+          "unknown": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown"
+          },
+          "recommended": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended"
+          },
+          "tetragon_override_return": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tetragon Override Return"
+          },
+          "tetragon_lsm": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tetragon Lsm"
+          },
+          "tetragon_fmodret": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tetragon Fmodret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "checked_at"
+        ],
+        "title": "TetragonCapability"
+      },
+      "TetragonEffects": {
+        "properties": {
+          "expected_effect": {
+            "type": "string",
+            "enum": [
+              "file_read_denial",
+              "process_termination"
+            ],
+            "title": "Expected Effect"
+          },
+          "file_read_denial": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "failed",
+              "unknown"
+            ],
+            "title": "File Read Denial"
+          },
+          "file_denial_basis": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "userspace_errno",
+                  "kernel_permission_return"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Denial Basis"
+          },
+          "process_termination": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "failed",
+              "unknown"
+            ],
+            "title": "Process Termination"
+          },
+          "service_recovery": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "failed",
+              "unknown"
+            ],
+            "title": "Service Recovery"
+          },
+          "monitor_restored": {
+            "type": "boolean",
+            "title": "Monitor Restored"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "failed",
+              "unknown",
+              "unsupported"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_effect",
+          "file_read_denial",
+          "process_termination",
+          "service_recovery",
+          "monitor_restored",
+          "status"
+        ],
+        "title": "TetragonEffects"
+      },
+      "TetragonKernelTask": {
+        "properties": {
+          "pid": {
+            "type": "integer",
+            "title": "Pid"
+          },
+          "start_ns": {
+            "type": "string",
+            "title": "Start Ns"
+          },
+          "pidns": {
+            "type": "integer",
+            "title": "Pidns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pid",
+          "start_ns",
+          "pidns"
+        ],
+        "title": "TetragonKernelTask"
+      },
+      "TetragonLoad": {
+        "properties": {
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "title": "TetragonLoad"
+      },
+      "TetragonModeState": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "mode",
+          "state"
+        ],
+        "title": "TetragonModeState"
+      },
+      "TetragonPolicy": {
+        "properties": {
+          "node": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "namespace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Namespace"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "monitor",
+              "enforce",
+              "monitor_only",
+              "unknown"
+            ],
+            "title": "Mode"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "load_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Load Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "id",
+          "state",
+          "mode"
+        ],
+        "title": "TetragonPolicy"
+      },
+      "TetragonProbeEvent": {
+        "properties": {
+          "time": {
+            "type": "string",
+            "title": "Time"
+          },
+          "policy": {
+            "type": "string",
+            "title": "Policy"
+          },
+          "pod_uid": {
+            "type": "string",
+            "title": "Pod Uid"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "access_mask": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Access Mask"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "exec_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exec Id"
+          },
+          "ns_pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ns Pid"
+          },
+          "function": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Function"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "return_value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Value"
+          },
+          "identity_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "kernel_task",
+                  "tetragon_process_cache"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Source"
+          },
+          "kernel_task": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonKernelTask"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "time",
+          "policy",
+          "pod_uid"
+        ],
+        "title": "TetragonProbeEvent"
+      },
+      "TetragonReadResult": {
+        "properties": {
+          "read": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "denied"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read"
+          },
+          "errno": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errno"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "transport_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transport Error"
+          }
+        },
+        "type": "object",
+        "title": "TetragonReadResult"
+      },
+      "TetragonSnapshot": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "runtime-tetragon-state/1.0",
+            "title": "Schema Version"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "stale",
+              "error",
+              "not_configured"
+            ],
+            "title": "State"
+          },
+          "fresh": {
+            "type": "boolean",
+            "title": "Fresh"
+          },
+          "generated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated At"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/TetragonPolicy"
+            },
+            "type": "array",
+            "title": "Policies"
+          },
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/TetragonCapability"
+            },
+            "type": "array",
+            "title": "Capabilities"
+          },
+          "transitions": {
+            "items": {
+              "$ref": "#/components/schemas/TetragonTransition"
+            },
+            "type": "array",
+            "title": "Transitions"
+          },
+          "verifications": {
+            "items": {
+              "$ref": "#/components/schemas/TetragonVerification"
+            },
+            "type": "array",
+            "title": "Verifications"
+          },
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/TetragonAgent"
+            },
+            "type": "array",
+            "title": "Agents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schema_version",
+          "state",
+          "fresh"
+        ],
+        "title": "TetragonSnapshot"
+      },
+      "TetragonStatusResponse": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/TetragonSnapshot"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "source"
+        ],
+        "title": "TetragonStatusResponse"
+      },
+      "TetragonTaskIdentity": {
+        "properties": {
+          "pod_uid": {
+            "type": "string",
+            "title": "Pod Uid"
+          },
+          "namespace": {
+            "type": "string",
+            "title": "Namespace"
+          },
+          "container_id": {
+            "type": "string",
+            "title": "Container Id"
+          },
+          "node_pid": {
+            "type": "integer",
+            "title": "Node Pid"
+          },
+          "ns_pid": {
+            "type": "integer",
+            "title": "Ns Pid"
+          },
+          "pidns": {
+            "type": "integer",
+            "title": "Pidns"
+          },
+          "start_ticks": {
+            "type": "integer",
+            "title": "Start Ticks"
+          },
+          "clock_ticks": {
+            "type": "integer",
+            "title": "Clock Ticks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pod_uid",
+          "namespace",
+          "container_id",
+          "node_pid",
+          "ns_pid",
+          "pidns",
+          "start_ticks",
+          "clock_ticks"
+        ],
+        "title": "TetragonTaskIdentity"
+      },
+      "TetragonTermination": {
+        "properties": {
+          "exitCode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exitcode"
+          },
+          "signal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishedat"
+          }
+        },
+        "type": "object",
+        "title": "TetragonTermination"
+      },
+      "TetragonTransition": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "context": {
+            "type": "string",
+            "title": "Context"
+          },
+          "namespace": {
+            "type": "string",
+            "title": "Namespace"
+          },
+          "policy": {
+            "type": "string",
+            "title": "Policy"
+          },
+          "requested_mode": {
+            "type": "string",
+            "title": "Requested Mode"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonModeState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonModeState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rollback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonModeState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rollback_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rollback Ok"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "context",
+          "namespace",
+          "policy",
+          "requested_mode",
+          "ok",
+          "reason"
+        ],
+        "title": "TetragonTransition"
+      },
+      "TetragonTrialStep": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "target_mode": {
+            "type": "string",
+            "title": "Target Mode"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonModeState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonModeState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rollback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonModeState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rollback_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rollback Ok"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "target_mode",
+          "ok",
+          "reason"
+        ],
+        "title": "TetragonTrialStep"
+      },
+      "TetragonVerification": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "context": {
+            "type": "string",
+            "title": "Context"
+          },
+          "node": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node"
+          },
+          "kernel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kernel"
+          },
+          "namespace": {
+            "type": "string",
+            "title": "Namespace"
+          },
+          "policy": {
+            "type": "string",
+            "title": "Policy"
+          },
+          "probe_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe Path"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "variant": {
+            "type": "string",
+            "enum": [
+              "combined",
+              "override_only_diagnostic"
+            ],
+            "title": "Variant",
+            "default": "combined"
+          },
+          "data_origin": {
+            "type": "string",
+            "enum": [
+              "real",
+              "synthetic"
+            ],
+            "title": "Data Origin"
+          },
+          "started_at": {
+            "type": "string",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "type": "string",
+            "title": "Finished At"
+          },
+          "pod_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pod Uid"
+          },
+          "main_pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Pid"
+          },
+          "task_identity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonTaskIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "identity_probe_data": {
+            "items": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Identity Probe Data"
+          },
+          "policy_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Id"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/TetragonEffects"
+          },
+          "facts": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Facts"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/TetragonProbeEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "monitor_events": {
+            "items": {
+              "$ref": "#/components/schemas/TetragonProbeEvent"
+            },
+            "type": "array",
+            "title": "Monitor Events"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/TetragonTrialStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "policy_actions": {
+            "items": {
+              "$ref": "#/components/schemas/TetragonAction"
+            },
+            "type": "array",
+            "title": "Policy Actions"
+          },
+          "policy_spec_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Spec Sha256"
+          },
+          "manifest_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest Sha256"
+          },
+          "raw_event_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Event Sha256"
+          },
+          "source_report_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Report Sha256"
+          },
+          "reassessed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reassessed At"
+          },
+          "reassessment_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reassessment Note"
+          },
+          "read_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonReadResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "monitor_read_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonReadResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "restore_read_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonReadResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agent_before": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonAgentSample"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agent_after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonAgentSample"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "termination": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonTermination"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "load": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonLoad"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "context",
+          "namespace",
+          "policy",
+          "method",
+          "data_origin",
+          "started_at",
+          "finished_at",
+          "verification"
+        ],
+        "title": "TetragonVerification"
       },
       "ValidationError": {
         "properties": {

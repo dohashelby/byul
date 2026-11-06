@@ -3,11 +3,30 @@
 from __future__ import annotations
 
 from typing import Any
+import copy
 
 from .intent import EnforcementIntent
 
 
 _STATUS = "candidate-cluster-unapplied-unverified"
+
+
+def comparable_spec(spec: dict[str, Any]) -> dict[str, Any]:
+    """Ignore only observed 1.7.1 CRD defaults on kprobe argument definitions."""
+    result = copy.deepcopy(spec)
+    for probe in result.get("kprobes", []):
+        if probe.get("return") is False:
+            probe.pop("return")
+        arguments = list(probe.get("args", [])) + list(probe.get("data", []))
+        if isinstance(probe.get("returnArg"), dict):
+            arguments.append(probe["returnArg"])
+        for argument in arguments:
+            for key in ("maxData", "returnCopy"):
+                if argument.get(key) is False:
+                    argument.pop(key)
+            if argument.get("resolve") == "":
+                argument.pop("resolve")
+    return result
 
 
 def _policy(

@@ -53,6 +53,7 @@ class MVPConfig:
     retention_enforce: bool = False
     retention_hold_path: str | None = None
     lab_report_path: str | None = None
+    tetragon_state_path: str | None = None
     observation_feeds: tuple[tuple[str, str], ...] = ()
     observation_heartbeats: tuple[tuple[str, str], ...] = ()
     observation_origin: str = "real"
@@ -113,6 +114,7 @@ class MVPConfig:
             "manifest_path",
             "asset_manifest_path",
             "lab_report_path",
+            "tetragon_state_path",
             "observation_intent_path",
             "auth_config_path",
             "target_path",

@@ -172,6 +172,33 @@ Docker 대상을 동등한 제품 경로에 연결하려면 명시적으로 지�
 
 최종 변경 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup05-h32-input-delta-20261106-v1/input-delta-review-v1.json`, SHA256 `17f30a84f8eb10680f23003a6928df360e7b9ed4297c5484f63eb3a79ef565aa`다. 사전 검토 당시 새 H32의 실제 요청·native 봉인·제품 Ref는 미관측이며, 실제 결과는 별도 검증한다.
 
+## SUP-03 운영 입력 준비 — 정상 imageID 표기 거부 수정 검토
+
+세션2의 새 배포 후보·읽기 전용 원 API 수집기 cold-v1을 게시 담당이 정적으로 검토했다. 고정 파일7개의 bytes/SHA와 shipped template의 실제 binaryData/SHA를 확인하고, engine/probe·고정 template/모델 mount의 호환성은 세션1의 고정 검토를 재사용했다. 후보의 UID/IP/판본/현재 모델 상태를 실제 관측값으로 채우지 않았으며 운영 전체 패킷은 아직 준비 중이다.
+
+수집기가 정상 Kubernetes imageID를 거부하는 F1을 실행 전에 발견했다. 기존 원GB09 API 기록은 동일한 고정 이미지 digest를 `docker.io/vllm/...@sha256:...`로 반환하지만 v1은 짧은 저장소 표기와 bare digest만 허용했다. 새 v2는 같은 저장소·고정 digest의 정확한 세 표기만 허용하고 원 raw imageID를 변환하지 않는다. 다른 저장소/digest·태그만 있는 값·접미사·비문자열은 거부한다. 원 v1과 smoke/freeze는 보존했다.
+
+게시 담당은 새 함수와 호출1곳 외 AST 동일, 새 collector/시험/CPU 기록 SHA 및 좁은 계약11개 결과를 대조했다. 기존 CPU·archive CRC·실제 Kubernetes/AWS/모델을 재실행하지 않았다. F1은 이 cold 변경 범위에서 해소됐으며 source/정책·기한·소유권 조건을 완화하지 않았다.
+
+수정 freeze 참조는 `worktrees/byul-gpu-b-run-lif14-labels-20261105/out/SUP16-live-normal-v1-operator-20261105/SUP03-fixed-template-operator-prep-v2/freeze.json`, SHA256 `3ae34a0cbd7ddfd133a72de393ff08d630c81f168c8c3d233c4aceae99ba1c40`다. 게시 담당 최종 정적 검토는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-s2-cold-static-review-v2.json`, SHA256 `06b78c3054d43c2155942ddb28f3450ac4103678602a287d524dccc4195e5443`다. 별도 installer/controller·실제 신원/소유권·새 archive 명령/receipt 결합·현재 자원/예산/보호/정리의 전체 운영 검토는 남아 있으며 GPU_READY=false를 유지한다.
+
+## SUP-05 H32 실제 정상 역할 1회 — 요청 성공·증거 채택 실패 검증 완료
+
+2026-11-06 23:30:16 KST 세션6이 새 H32 normal1회의65개 고유 자료를 검증했다. 원 핵심34개 검증을 재사용하고 추가31개를 처음 대조했으며 native688행의 해시 사슬을 반복 검증하지 않았다. 실제 공개 요청은2×32 출력으로 완료됐고 native END=SEALED·worker 종료0·원 primary=null·소유 정리 오류0이었다. 역할과 정리는71.740초로 원90초 안에 끝났다. 원 head4의 CPU attention 미지원 실패와 별도 새 입력/실행이며 과거 결과를 바꾸지 않는다.
+
+그러나 host는 `NATIVE17_READ_RETURN_NOT_ADMITTED`로 종료1이었다. 실제 FD가 A파일28,696 bytes를 읽어 반환한 hash는 선언 기준과 같지만, READ_RETURN [recording0, seq29]의 root_load/model_object가 null이다. 첫 후속 weight root는seq125에 생겼으므로 원 consumer는 이 읽기를 `loader_root_unavailable`·unjoined1·rows=[]로 남겼다. 요청 성공·봉인을 증거 채택이나 유효 정상 전체 성공으로 해석하지 않는다. UNKNOWN·미확인 사유7개와 승인 권한/worker 배정/tensor·decoder/전체 범위 미확인을 보존한다. challenge·recovery·같은 입력 재시도는0회다.
+
+실제 capture의 data_origin은EXAMPLE이다. verification_level·official·policy_status 필드가 없는 원 자료에 값을 채우지 않았다. 준비 ENV Ref는 존재하지만 제품 EVD/RES/RPT·제품 Store Ref는 생성되지 않아 복원·저장 팩 재판정 대상은 없다. 운영 outcome의 null을 저장된 RES 판정으로 읽지 않는다. 원 실행의 핀 검사·S5의 사후 핀 관측·세션6의23:30 KST 별도 관측을 구분하며 동시적인 전체 파일 전후 receipt가 있었다고 주장하지 않는다.
+
+현재 실제 읽기 시점의 loader/model causal root를 제공할 공통 관측 지원이 필요하다. 해당 root를 뒤의 이벤트에서 수작업으로 소급 연결하거나 consumer 조건·판정·assert·팩을 완화하지 않는다. 반환 담당 범위는 기존 공통 센서/관측 소비 계약 소유자이며 개별 담당자/세션은 미확정이다. 반환물이 오기 전에는 이 동일 실험을 반복하지 않는다.
+
+| 재개에 필요한 반환 | 현재 source의 연결 지점 | 보존할 검증 범위 |
+| --- | --- | --- |
+| 실제 읽기 시점에 같은 loader/model의 causal identity를 제공하는 지원 producer/profile | `update/src/guard/adapters/vllm_weight_iteration_sensor.py`의 활성 parent STEP/root 생성, `vllm_file_read_sensor.py`의 해당 시점 root 기록 | 실제 producer→FILE_READ→원 consumer 결합과 동일 source/모델/세대. 후속 root를 소급 사용하지 않음 |
+| 원 consumer가 요구하는 동등한 연결과 새 고정 지원 버전·영향 근거 | `update/src/guard/collectors/native_model_file_reads.py`의 model_candidate 조회와 unjoined 처리 | 기존 rows=[]/UNKNOWN·독립 실패 보존. root 지원만으로 승인·worker/rank·tensor/전체 scope를 true로 바꾸지 않음 |
+
+최종 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup05-h32-actual-20261106-v1/actual-final-verification-v1.json`, SHA256 `f58abf71730ec1e7aae9bdfe3981787498610ae702a02753a8f873206b864a64`다. 실제 의존성은 같은 디렉터리의 `actual-admission-dependency-v1.json`, SHA256 `e485e85a80760ac9fcfd666aec2d971436a2731b101813c88c8ed755105375a0`다. 이번65개 인계 자료의 필수 검증은 완료했으며 SUP-05 제품 경로 보완과25개 한정 마감 제안/18개 제품 증거 필요 분류는 유지한다. 최종 인계 목록은 같은 디렉터리의 `actual-final-handoff-v1.json`, SHA256 `0687ce88ded92d5bc97fb575f8141692219dfe9a8e751d1cdd7e3de9e83d32b5`다. 별도 사후 핀 자료38개는 원65개와 시각을 구분해 연결했으며 원 시점의 동시 관측으로 소급하지 않았다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

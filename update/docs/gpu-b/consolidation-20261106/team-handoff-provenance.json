@@ -57,5 +57,27 @@
     "diagnostic_required_verification_remaining": 0,
     "whole_REQ08_product_complete": false,
     "product_Refs_created": false
+  },
+  "subsequent_SUP05_H32_normal": {
+    "S6_recorded_at_KST": "2026-11-06T23:30:16.456498+09:00",
+    "review_project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup05-h32-actual-20261106-v1/actual-final-verification-v1.json",
+    "review_sha256": "f58abf71730ec1e7aae9bdfe3981787498610ae702a02753a8f873206b864a64",
+    "dependency_review_sha256": "e485e85a80760ac9fcfd666aec2d971436a2731b101813c88c8ed755105375a0",
+    "actual_new_H32_normal_runs": 1,
+    "verified_raw_references": 65,
+    "public_request_finished": true,
+    "pooling_shape": [
+      2,
+      32
+    ],
+    "native_END": "SEALED",
+    "host_exit": 1,
+    "worker_exit": 0,
+    "admitted_native_rows": 0,
+    "admission_failure": "loader_root_unavailable",
+    "product_EVD_RES_RPT_created": false,
+    "whole_SUP05_product_complete": false,
+    "challenge_recovery_retry": 0,
+    "final_handoff_sha256": "0687ce88ded92d5bc97fb575f8141692219dfe9a8e751d1cdd7e3de9e83d32b5"
   }
 }

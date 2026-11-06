@@ -31,6 +31,24 @@
 
 세션6 고정 검토의 프로젝트 상대 경로는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/transport-terminal-index-delta-20261106-v1/component-review-v1.json`, SHA256 `3055918cef1d1c6cdf250fa9136c9a65b1309ee144c5f8c81fbd82f6de557082`다. 기존 CHUNK12000·GET4/PUT1·전송900초·정지180초·2시간 보호 조건을 변경하지 않았다.
 
-## 후속 반환의 검증 기준
+## 10ID의 지원·반환물 인계
+
+세션1이 LIF-11·SUP-03·PLT-02·LIF-06·SUP-09·SUP-10·SUP-11·REQ-09·REQ-10·SUP-06을 분기별로 ①기존 지원으로 전용 준비 가능 ②공통 담당의 정확한 지원 반환 필요 ③실제 모델·정책·topology 입력 필요로 구분했다. [DEPENDENCY_RETURNS.md](DEPENDENCY_RETURNS.md)에 파일·함수, 필요한 실제 출력, 기존 consumer 영향과 검증 입력을 연결한다. 항목 전체를 일괄 공통 대기로 분류하지 않는다.
+
+게시 담당은 고정 원문 SHA와 10고유ID 및 공개 범위를 대조했다. 이는 반환 계약 분석의 인계이며 새 코드 검토·실제 모델 실행·제품 완료의 판정은 아니다. LIF-11과 SUP-03 새 준비 패킷의 CPU 결과는 해당 검토가 반환된 범위에서 별도 반영한다. 실제 입력 미결합 상태를 실행 가능으로 올리지 않는다.
+
+원 인계 프로젝트 상대 경로는 `guard-output/gpu-stage1-3sessions/prepare/S1-followup-product-connections/v1/dependency-returns.md`, SHA256 `7382f6cb16ead5437aa6538cdc455639b5250aa26308e0b5ebce6e5670180ad7`이다. 새 원본·공통 지원 반환·실제 환경 입력이 없는 분기의 동일 시험은 반복하지 않는다.
+
+## 추가 결과의 확인 기준
+
+## 전송 전용 실행본 결합 — 사전 검토 완료
+
+세션6이 `S6-EXACT-GB09-TRANSPORT-V3-OPERATING-BINDING-20261106-01 / fixed-operating-binding-v1`을 검토했다. 기존 컴포넌트 검토를 재사용하고, 실제 배치6파일의 신원·권한·SHA와 원 import명에 새 bytes가 연결된 사실, 현재 actor에 맞춘 invoker·보조도구, 시각별 자원 조회와 비용·기한 연결을 확인했다. 이 고정 결합 범위의 차단 결함과 추가 필수 입력은 없다.
+
+기존 driver/helper와 archive 신원, 불확실한 수락의 후속 실행 차단, 전송900초·정지180초·2시간 보호 조건은 유지했다. 선정 범위는 원GB09의 정확한 읽기·회수이며 새 모델·worker 실험이 아니다. 사전 검토 자체로 실제 기동·전체 회수·전송 장애 해결·새 제품 결과를 인정하지 않는다. 실제 실행 결과는 별도 원자료 검증에서 연결한다.
+
+고정 검토의 프로젝트 상대 경로는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/transport-v3-operating-binding-20261106-v1/operating-binding-review-v1.json`, SHA256 `90a68d4abdd416afebb34c37235550d63a63d2aca5673a470fd45e99c8b99146`이다. 검토 시각은 2026-11-06 22:03 KST이며 이후 현재 자원·미래 성공을 보증하지 않는다.
+
+## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

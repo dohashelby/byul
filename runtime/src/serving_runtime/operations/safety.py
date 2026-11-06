@@ -11,6 +11,11 @@ CHECKS = ("policy", "evidence", "capability", "monitor_period", "collection", "a
 SHA = re.compile(r"^[0-9a-f]{64}$")
 
 
+def is_mode_switch_target(policy: dict) -> bool:
+    return (policy.get("mode") in {"monitor", "enforce"}
+            and policy.get("method") in {"override_lsm", "sigkill_fd_install", "override_syscall"})
+
+
 def recent(stamp, seconds, now=None):
     try:
         value = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
@@ -34,8 +39,7 @@ def evaluate(snapshot: dict, name: str, intent, review: dict, monitor_seconds: i
         first = rows[0]
         method = first.get("method")
         expected = {"policy_id": first.get("id"), "mode": first.get("mode"), "spec_sha256": first.get("spec_sha256")}
-        checks["policy"] = all(p.get("state") == "enabled" and p.get("mode") in {"monitor", "enforce"}
-                               and p.get("method") in {"override_lsm", "sigkill_fd_install", "override_syscall"}
+        checks["policy"] = all(p.get("state") == "enabled" and is_mode_switch_target(p)
                                and p.get("method") == method and p.get("spec_sha256") == first.get("spec_sha256")
                                and p.get("id") == first.get("id") for p in rows)
         # All observed nodes must pass. Missing capabilities or proof fail closed.

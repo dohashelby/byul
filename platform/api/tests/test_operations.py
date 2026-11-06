@@ -249,6 +249,31 @@ def test_monitor_window_agent_projection_and_validation(ops):
     assert ops.post(BASE + "/agent-state", headers=auth("agent-01"), json=payload).status_code == 422
 
 
+def test_runtime_readiness_mixed_monitor_only_snapshot_validates_platform_models():
+    from types import SimpleNamespace
+    from unittest.mock import Mock, patch
+    from serving_runtime.operations.agent import Agent, Config
+    from byul_platform.routes.operations import Heartbeat, PolicyReadiness
+
+    agent = Agent(Mock(), Config("server-01", "/unused", "aws-lab", "serving-lab"))
+    intent = SimpleNamespace(namespace="serving-lab", allowed_modes=lambda _: ("monitor", "enforce"))
+    current = {"bundle_id": "old", "approval": "verified"}
+    secret = {"name": "runtime-tg-secret-01", "namespace": "serving-lab", "node": "node-01",
+              "id": "7", "state": "enabled", "mode": "monitor", "method": "sigkill_fd_install",
+              "spec_sha256": "a" * 64}
+    snapshot = {"policies": [secret] + [
+        {**secret, "name": f"runtime-tg-{rule}-01", "id": str(index),
+         "mode": "monitor_only", "method": "monitor"}
+        for index, rule in enumerate(("cache", "asset"), start=8)]}
+    with patch.object(agent, "snapshot", return_value=snapshot):
+        rows = agent.readiness(current, intent)
+
+    assert [row["name"] for row in rows] == [secret["name"]]
+    assert PolicyReadiness.model_validate(rows[0]).expected.mode == "monitor"
+    heartbeat = Heartbeat.model_validate({"server": "server-01", "current": current, "policies": rows})
+    assert [row.name for row in heartbeat.policies] == [secret["name"]]
+
+
 def test_two_party_approval_and_lab_self_approval(ops):
     expected = ready(ops)
     item = enforce(ops, expected).json()

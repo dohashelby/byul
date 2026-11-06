@@ -1,9 +1,11 @@
 from copy import deepcopy
 import asyncio
 from pathlib import Path
+import shutil
 import sys
 import types
 import pytest
+import yaml
 from guard.adapters import vllm_profiler_sensor as sensor,vllm_profiler_metadata as metadata
 from guard.models import load_pack
 from tests.builders import baseline_pack
@@ -21,6 +23,19 @@ def test_DRAFT_keeps_other76_bytes_and_original_question_judge_contract(tmp_path
         if file.is_file() and file.name!='pack.yaml' and file.relative_to(seed.path).as_posix()!='checks/LIF-14.yaml':
             assert file.read_bytes()==(output/file.relative_to(seed.path)).read_bytes()
     assert pack.manifest.review.status=='DRAFT'
+
+
+def test_future_baseline_is_rejected_before_any_derived_output(tmp_path):
+    source=Path(__file__).resolve().parents[1]/'packs/PACK-BASELINE'
+    seed=tmp_path/'future-seed';shutil.copytree(source,seed)
+    manifest=yaml.safe_load((seed/'pack.yaml').read_bytes())
+    manifest['revision']=34
+    (seed/'pack.yaml').write_text(yaml.safe_dump(manifest,allow_unicode=True),encoding='utf-8')
+    assert load_pack(seed).ref().revision==34
+    output=tmp_path/'derived'
+    with pytest.raises(ValueError,match='PROFILER_CONTROL_SEED_UNSUPPORTED'):
+        derive(seed,output)
+    assert not output.exists()
 
 
 def test_observer_function_replacement_rejected_without_approving_new_hash(monkeypatch):

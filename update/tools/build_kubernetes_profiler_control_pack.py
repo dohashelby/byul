@@ -9,12 +9,19 @@ from guard.models import load_pack,sha256_hex
 from guard.models.checkdef import build_pack
 
 SEED_SHA='1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd'
+# Integration main has baseline33; its LIF14 question/judge is unchanged.
+# Keep exact historical32 support and reject any other revision/content pair.
+SUPPORTED_SEEDS=frozenset({
+    (32,SEED_SHA),
+    (33,'74219b48b241775e4c4fa153a950b2a94029147f512c731f055e91cf945cd5b6'),
+})
 
 
 def derive(seed,output):
     seed,output=Path(seed),Path(output)
     original=load_pack(seed)
-    if original.ref().sha256!=SEED_SHA or original.ref().revision!=32 or original.ref().id!='PACK-BASELINE':
+    ref=original.ref()
+    if ref.id!='PACK-BASELINE' or (ref.revision,ref.sha256) not in SUPPORTED_SEEDS:
         raise ValueError('PROFILER_CONTROL_SEED_UNSUPPORTED')
     if output.exists() or output.is_symlink():raise ValueError('FRESH_DRAFT_OUTPUT_REQUIRED')
     manifest=yaml.safe_load((seed/'pack.yaml').read_bytes())

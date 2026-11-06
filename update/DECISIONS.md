@@ -736,3 +736,4 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - 2026-11-05 · 실측은 EXAMPLE/DRAFT 정책 범위이며 PASS를 기업 승인·원 질문 전체 완료로 확대하지 않는다. 정본 PACK32와 OBS-01/PLT-07 파생 DRAFT 결과를 구분한다. LIF-13 실제 서빙 소비자/daemon 추가 관측은 원 UNKNOWN EVD/RES를 대체하지 않는다.
 - 2026-11-06 · OBS-09 Kubernetes 경로는 CRI가 LF 앞 CR을 지우므로 `kubectl attach --quiet` stdout 바이트를 CRI 줄과 끝 CR 하나 차이·유일 연속 위치로 맞춘 경우에만 쓴다. 못 맞추면 UNKNOWN이며 파서·판정·정책은 그대로다. · [CRI 경계](docs/dev-1/obs09-cri-boundary.md).
 - 열린 질문(2026-11-06, OBS-09): CRI 로그를 줄 단위로 읽는 기업 수집기는 입력 LF를 진짜 접두사를 가진 별도 사건으로 볼 수 있다. 기업 수집 경로를 OBS-09 대상에 넣을지 기업 수집기 입력과 함께 정한다.
+- 2026-11-06 · 사용자 결정: REQ-11 생성 출력 귀속 오라클은 요청별 배타 allowed_token_ids(exclusive-allowed-token-ids-v1)로 하고, 판정 정의를 rev7·PACK-BASELINE@33으로 올려 보안 PASS 규칙을 둔다. 과거 팩·EVD/RES는 소급 변경하지 않는다. GPU 정책 초안과 OBS-01 파생 팩 seed도 33으로 옮긴다. · [출력 오라클](docs/dev-1/req11-output-oracle.md).

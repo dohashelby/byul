@@ -135,7 +135,7 @@ def test_dynamic_exception_type_and_message_are_not_evidence(tmp_path):
 
 def test_fixture_fingerprint_matches_the_pinned_pre_projection_contract(tmp_path):
     draft, _ = req.run(tmp_path, PrivateWorld())
-    assert draft.comparability.fixture_sha256 == "6f22d621745e1b4a9f703327a75987edcb24f1b74d66b3a293c42118cbba5f63"
+    assert draft.comparability.fixture_sha256 == "fa982731739e3129f1d1f3b418ada46e41bf642bccabf018d87c5ec414490a10"
 
 
 def test_product_saved_evidence_and_report_replay_preserve_refs(tmp_path, monkeypatch):
@@ -166,7 +166,7 @@ def test_product_saved_evidence_and_report_replay_preserve_refs(tmp_path, monkey
     (evd,) = run_plan(store,pack,plan,RunConfig(executors={"request_binding":"privacy-sim"},adapter="vllm"))
     (result,) = judge_plan(store,pack,plan,as_of=T0)
     assert result.verdicts.security == Verdict.FAIL and evd.data_origin.value == "EXAMPLE"
-    assert evd.execution.executor.version == "0.3.5"
+    assert evd.execution.executor.version == "0.4.0"
     for artifact in evd.artifacts:
         text = (store.root / artifact.path).read_text(encoding="utf-8")
         assert PRIVATE_INPUT not in text and PRIVATE_OUTPUT not in text

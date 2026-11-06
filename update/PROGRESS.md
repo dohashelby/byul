@@ -1,3 +1,10 @@
+## 2026-11-06 — REQ-11 생성 출력 귀속 오라클·판정 rev7(CPU 개발)
+
+- 한 일: 사용자 결정으로 요청별 배타 allowed_token_ids 오라클(exclusive-allowed-token-ids-v1)을 넣었다. 각 연결 출력 token이 모두 자기 배타 집합이면 출력 귀속 확인, 다른 쪽 배타 token은 타 요청 출력 반환 FAIL, 제약 미준수·불완전은 UNKNOWN. REQ-11 rev7·PACK-BASELINE@33(74219b48…cd5b6)에 보안 PASS 규칙과 `output_binding_cases_verified`를 더했다. 실행기 0.4.0/Kubernetes 0.2.0. GPU 정책 초안·OBS-01 파생 팩 seed를 33으로(파생 @2) 옮겼다. 과거 팩·EVD/RES는 그대로다. 상세 `docs/dev-1/req11-output-oracle.md`.
+- 테스트 결과: REQ-11·Kubernetes·GPU 입력·산출물 비공개 183 통과. 실행기 판본·비교 지문 고정값은 의도한 변경으로 갱신(실행마다 바뀌는 허용 집합 해시는 fixture 밖으로). 남은 실패는 Linux x86_64 전용 출력 센서 조건이다. 로컬 전체 시험은 CPU 점유로 사용자 요청에 따라 중단했고 전체 확인은 Linux CI에 맡긴다.
+- 다음 단계: CI 확인 → LIF-13·OBS-09·REQ-11 포함 단일 GPU 재실측(비용 확인).
+- 막힌 것: 실제 vLLM 0.31.0의 chat allowed_token_ids 준수는 GPU 실측으로만 확인된다.
+
 ## 2026-11-06 — OBS-09 Kubernetes 로그 사건 경계(CPU 개발)
 
 - 한 일: 11-05 GPU OBS-09 UNKNOWN(multiline·crlf 정확 사건 0)의 원인을 k3d에서 확인했다. CRI 로그 계층이 LF 앞 CR 하나를 지워 vLLM formatter의 연속 표식이 사라진다. 시험 동안 `kubectl attach --quiet`로 받은 stdout 바이트를 CRI 줄과 유일 위치로 맞춰 CRI 시각+원 바이트로 잇고, 못 맞추면 UNKNOWN으로 둔다. 파서·판정·정책·원 EVD/RES는 바꾸지 않았다. 판본 0.3.1+k8s.2. 상세 `docs/dev-1/obs09-cri-boundary.md`.

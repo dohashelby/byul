@@ -86,6 +86,11 @@ class World:
             rid = "chatcmpl-" + request.get("headers", {}).get("X-Request-Id", body.get("request_id", "EXAMPLE-" + label))
             consumed = requests[1 - index]["body"] if len(requests) == 2 and label == self.changes.get("foreign") else body
             ids, text = self.tokens(consumed), rendered_text(consumed["messages"][0]["content"])
+            out = [55]  # 기본 대역은 출력 제약을 따르지 않는다(출력 귀속 UNKNOWN)
+            if self.changes.get("honor_allowed") and consumed.get("allowed_token_ids"):
+                out = [consumed["allowed_token_ids"][0]]
+            if label == self.changes.get("output_swap") and len(requests) == 2:
+                out = [requests[1 - index]["body"]["allowed_token_ids"][0]]
             usage = {"prompt_tokens": len(ids), "completion_tokens": 1, "total_tokens": len(ids) + 1}
             mode = request["mode"]
             common = {"id": rid, "model": "fixture-model",
@@ -93,7 +98,7 @@ class World:
             if mode == "json":
                 value = {**common, "prompt_token_ids": ids, "prompt_text": text, "choices": [{"index": 0,
                     "message": {"role": "assistant", "content": "EXAMPLE-generated-without-input-marker"},
-                    "token_ids": [55], "finish_reason": "length"}], "usage": usage}
+                    "token_ids": out, "finish_reason": "length"}], "usage": usage}
                 if label == self.changes.get("missing_consumer"):
                     value.pop("prompt_token_ids")
                     value.pop("prompt_text")
@@ -105,7 +110,7 @@ class World:
                 first = {**common, "prompt_token_ids": ids, "prompt_text": text,
                          "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""}, "finish_reason": None}]}
                 last = {**common, "choices": [{"index": 0, "delta": {"content": "EXAMPLE"},
-                            "token_ids": [55], "finish_reason": "length"}]}
+                            "token_ids": out, "finish_reason": "length"}]}
                 if label == self.changes.get("stream_id_change"):
                     last["id"] = "chatcmpl-EXAMPLE-other-request"
                 frames = [json.dumps(first), json.dumps(last), json.dumps({**common, "choices": [], "usage": usage}), "[DONE]"]
@@ -266,3 +271,39 @@ def test_invalid_policy_shapes_are_rejected_before_any_probe(tmp_path, key, valu
     with pytest.raises(ValueError):
         run(tmp_path, world, values={**VALUES, key: value})
     assert not world.calls and world.inspections == 0
+
+
+def test_exclusive_allowed_tokens_attribute_generated_output_and_pass(tmp_path):
+    draft, world = run(tmp_path, World(honor_allowed=True))
+    generated = [call["body"] for call in world.calls if call["id"] != "tokenize-A" and call["id"] != "tokenize-B"]
+    assert all(body["allowed_token_ids"] for body in generated)
+    a, b = (set(next(c["body"]["allowed_token_ids"] for c in world.calls if c["id"] == f"json-generated-{s}")) for s in "AB")
+    assert a and b and not a & b
+    assert draft.observations["output_binding_verified"].value is True
+    assert draft.observations["output_binding_cases_verified"].value == list(CASES)
+    assert draft.observations["output_binding_gap"].value == "none"
+    assert judge(draft).verdicts == {"security": Verdict.PASS, "functional": Verdict.PASS, "performance": Verdict.UNKNOWN}
+    assert summary(draft)["verification_scope"]["output_oracle"] == "exclusive-allowed-token-ids-v1"
+
+
+@pytest.mark.parametrize("label", ["json-generated-A", "sse-collision_body-B"])
+def test_output_from_the_other_requests_constraint_is_fail(tmp_path, label):
+    """입력 projection은 모두 맞고 출력만 바뀐 반례: 이전 판정에서는 잡지 못한 경우다."""
+    draft, _ = run(tmp_path, World(honor_allowed=True, output_swap=label))
+    assert draft.observations["input_projection_verified"].value is False or draft.observations["security_violations"].value
+    assert any("other connection's exclusive constraint" in v for v in draft.observations["security_violations"].value)
+    assert judge(draft).verdicts["security"] == Verdict.FAIL
+
+
+def test_unenforced_output_constraint_stays_unknown(tmp_path):
+    draft, _ = run(tmp_path)  # 대역 출력이 어느 배타 집합에도 없다
+    assert draft.observations["input_projection_verified"].value is True
+    assert draft.observations["output_binding_verified"].value is False
+    assert "originating request's exclusive constraint" in draft.observations["output_binding_gap"].value
+    assert judge(draft).verdicts["security"] == Verdict.UNKNOWN
+
+
+def test_self_declared_output_binding_cannot_pass_without_the_other_rules(tmp_path):
+    draft, _ = run(tmp_path, World(honor_allowed=True, incomplete="sse-generated-A"))
+    assert draft.observations["output_binding_verified"].value is False
+    assert judge(draft).verdicts["security"] != Verdict.PASS

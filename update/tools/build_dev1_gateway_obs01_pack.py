@@ -1,4 +1,7 @@
-"""PACK32에서 OBS-01만 BYUL Gateway 경로 수집 프로필로 바꾼 파생 DRAFT 팩(개발 담당, 1단계).
+"""정본 팩에서 OBS-01만 BYUL Gateway 경로 수집 프로필로 바꾼 파생 DRAFT 팩(개발 담당).
+
+2026-11-06: 정본이 PACK-BASELINE@33(REQ-11 rev7)으로 올라 seed를 33으로, 파생 revision을 2로 바꿨다.
+11-05 GPU 실행의 파생 팩 @1(seed 32)과 그 결과는 그대로 남는다.
 
 1단계 동안 PACK-BASELINE은 바꾸지 않는다(GPU 담당 측정 기준 유지). 판정 규칙·관측 이름·다른 76개 정의는 그대로다.
 바뀌는 것은 OBS-01의 수집 프로필, 정책 키 하나(`observation_gateway_target_id`), revision, 한계 문장뿐이다.
@@ -18,8 +21,9 @@ from guard.models.checkdef import build_pack
 from guard.executors.kubernetes_gateway_observation import PROFILE
 
 PACK_ID = 'PACK-DEV1-GATEWAY-OBS01'
-SEED_REF = {'kind': 'PACK', 'id': 'PACK-BASELINE', 'revision': 32,
-            'sha256': '1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd'}
+SEED_REF = {'kind': 'PACK', 'id': 'PACK-BASELINE', 'revision': 33,
+            'sha256': '74219b48b241775e4c4fa153a950b2a94029147f512c731f055e91cf945cd5b6'}
+DERIVED_REVISION = 2
 LIMITATIONS = [
     'BYUL 구성: 감사 기록 생산자는 runtime Gateway다. 시도는 Gateway로 보내고, Gateway가 응답 X-Request-ID로 돌려준 요청 ID로 Gateway 기록과 대조한다.',
     'Gateway 기록은 끝 표식이 없는 추가 전용 파일이라 source_ended=false로 남고 실행은 ABORTED다. 생산자 봉인·인증은 runtime 합의 항목이다.',
@@ -36,7 +40,7 @@ def derive(output, seed=None):
     manifest = yaml.safe_load(raw.pop('pack.yaml').decode('utf-8'))
     original = build_pack(manifest, raw)
     if original.ref().model_dump(mode='json') != SEED_REF or len(original.checks) != 77:
-        raise ValueError('REVIEWED_PACK32_REQUIRED')
+        raise ValueError('REVIEWED_SEED_PACK_REQUIRED')
     check = yaml.safe_load(raw['checks/OBS-01.yaml'].decode('utf-8'))
     check.update(revision=check['revision'] + 1, collection_profile=PROFILE,
                  policy_params=deepcopy(check['policy_params']) + [{'key': 'observation_gateway_target_id', 'type': 'str', 'required': True}],
@@ -44,7 +48,7 @@ def derive(output, seed=None):
     changed = dict(raw)
     changed['checks/OBS-01.yaml'] = yaml.safe_dump(check, allow_unicode=True, sort_keys=False).encode('utf-8')
     new = deepcopy(manifest)
-    new.update(pack_id=PACK_ID, revision=1, review={'status': 'DRAFT', 'reviewer': None, 'reviewed_at': None},
+    new.update(pack_id=PACK_ID, revision=DERIVED_REVISION, review={'status': 'DRAFT', 'reviewer': None, 'reviewed_at': None},
                files_sha256=[{'path': n, 'sha256': sha256_hex(v)} for n, v in sorted(changed.items())])
     result = build_pack(new, changed)
     if list(result.checks) != list(original.checks):

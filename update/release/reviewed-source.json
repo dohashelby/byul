@@ -51,7 +51,7 @@
   "update/packs/PACK-BASELINE/checks/REQ-08.yaml": "2e6702b7e3603ebe43e35dd637201deb9075c16f59d68a5a9736c2da90460be1",
   "update/packs/PACK-BASELINE/checks/REQ-09.yaml": "07acac86bf990aa4485ce9ebc19f1d8b852dfcdf340119b7ec21500a472ab972",
   "update/packs/PACK-BASELINE/checks/REQ-10.yaml": "d069d3f8c263376228bac02bec57bf9b4cfebd261ffe6f80c24f449b4c6363a0",
-  "update/packs/PACK-BASELINE/checks/REQ-11.yaml": "53c5f4a231c98e6aa3942a60d60d69789edeff9bf2043b670af02433b7c37b64",
+  "update/packs/PACK-BASELINE/checks/REQ-11.yaml": "0625269d603b66508e2d6dc5f6c7b51eedb80f6e1c5a53e17ff78dc71e2a94ce",
   "update/packs/PACK-BASELINE/checks/REQ-12.yaml": "b3e6ad5fcdb1502f8fa33afcc0ce144daf1673cc1010870cb02f3c24696fcfed",
   "update/packs/PACK-BASELINE/checks/REQ-13.yaml": "4a7643439ef1211e82edd97840f8a6c2ea855fed294f96e51e2625459c151eef",
   "update/packs/PACK-BASELINE/checks/REQ-14.yaml": "04410b19c6f1e14653cae9ab1de200bb9eacb4d98b454c3ca8133040f55fc88c",
@@ -79,7 +79,7 @@
   "update/packs/PACK-BASELINE/checks/SUP-15.yaml": "529d3ece91c35d2d229dfb173af489688e8cd87b4042e8cb72c215683819dd27",
   "update/packs/PACK-BASELINE/checks/SUP-16.yaml": "482996c0386654117bf45d613e7f8f032027a306e3e4dabf14e484f5884a8621",
   "update/packs/PACK-BASELINE/id_map.yaml": "b0f611ac95a33a2ed32cf39f0be72d1316a016bc0b9156eb1e0a1239dd901e3b",
-  "update/packs/PACK-BASELINE/pack.yaml": "c37d318cd46bcf59c5ac098ce6511c331bebdd3f882f576369efa681b2bd242d",
+  "update/packs/PACK-BASELINE/pack.yaml": "154cd52d6f038539e87d42074edbbdb63e5d198c4db22f64d0290975382500ba",
   "update/pyproject.toml": "bfda17103fe0ea4486754de7052fc35020c19e477b8af4e149509e1b8f877e54",
   "update/reference/framework/01_프레임워크와_위협통제연결.md": "ac4c00edf3b7066480285f3a244de4f700847bac66b872f5d765916a037ec785",
   "update/reference/framework/02_환경별_적용기준.md": "253362d1d6fed107cec55109e4a1a1ba1815e6606d842b300ce4beb46891bad5",
@@ -286,7 +286,7 @@
   "update/src/guard/executors/kubernetes_record_access.py": "cfa39dc1082c3028452fab06e5254caf60b0c8634f799d6abcbb259558f35347",
   "update/src/guard/executors/kubernetes_record_access_product.py": "3c68415091ec1ffb680c6ae4ecfb465b7de19b7f4b510177ee1a77f09a18f4f7",
   "update/src/guard/executors/kubernetes_request_attempts.py": "3560fd9924f7ecb8125acfdb9bad527cd81af058731417c130e11c974c14def4",
-  "update/src/guard/executors/kubernetes_request_binding.py": "f3c229d593a99cda7654926c72658ee89b3ca796bf64aa3fa1e8cb8457b8b403",
+  "update/src/guard/executors/kubernetes_request_binding.py": "0cfca4f2940b8f653fdd8909ee1d02d32ea09e5132977ff476478997644927d8",
   "update/src/guard/executors/kubernetes_request_termination.py": "82d9bc9d09b02c8284f4c6535c6718267b549832070d304fa854af2186cb58d6",
   "update/src/guard/executors/kubernetes_resource_recovery.py": "8af4c0ee398605908727ec4930bc6760d44084e9e961fa78d8275f4cac588807",
   "update/src/guard/executors/kubernetes_response_content.py": "6bd8d012598f2530460ccded8a77731b7dd3fbb5dd3e2e9c1ff9ffb8cba87f47",
@@ -333,7 +333,7 @@
   "update/src/guard/executors/record_attestation.py": "1144567dcda382c4156ab69e988c02cf1868f83eea4fba245cd62cf5f5778a9d",
   "update/src/guard/executors/record_transport.py": "c48fb2e18bc8a030ca766a62b6fee5f448cfeecfb93dcbcfbc0d8b5a4586bf2d",
   "update/src/guard/executors/registry.py": "bffe8d4513bfb7b3b3d3d04dece7b2377f9f4d537b86438d4d5a9581bdd38a12",
-  "update/src/guard/executors/request_binding.py": "38eacd67bf5e3c41a6e13a04116f2372a1f22b818f1742b1ee17ea9956ec2ff3",
+  "update/src/guard/executors/request_binding.py": "1fa7bd277eb295eb2ff0933cd8d9e9c021f37ac6d9005dc155fa728a306ef249",
   "update/src/guard/executors/request_field_probe.py": "5da63e555cdff1ec15144b384323b1e4ab5e9dc533ec85902e61faadfaa2dee8",
   "update/src/guard/executors/resource_recovery_contract.py": "cd183b31f4c7cf63f3769a247315eb254c76e99364ffe697ea3f43ca863d2949",
   "update/src/guard/executors/response_content.py": "b76d0275158bb1f846c3c10b6a9d80cdda322314b7029c3afdde790bca3c622a",
@@ -450,8 +450,8 @@
  "pack_ref": {
   "id": "PACK-BASELINE",
   "kind": "PACK",
-  "revision": 32,
-  "sha256": "1c4c723001eb3fcccb43e79c63e944663601e4d8b2939a84bff59730a8a3b8bd"
+  "revision": 33,
+  "sha256": "74219b48b241775e4c4fa153a950b2a94029147f512c731f055e91cf945cd5b6"
  },
  "paths": [
   "update/src/guard",

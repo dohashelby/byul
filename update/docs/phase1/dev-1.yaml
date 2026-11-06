@@ -66,9 +66,10 @@ checks:
       않음(/v1/responses 생성·조회 404). Gateway가 이 경로를 열면 다시 적용'
     state: NOT_APPLICABLE_IN_TARGET
   REQ-11:
-    note: '2026-11-05: GPU JSON/SSE8사례 입력 투영·연결·템플릿 신원 검증/기능 PASS. 생성 출력 소유권 독립 증명
-      없어 보안 UNKNOWN. 첫 command 실패 보존. docs/dev-1/gpu-20261105.md'
-    state: MEASUREMENT_REMAINING
+    note: '2026-11-06: 생성 출력 귀속 오라클(요청별 배타 allowed_token_ids)과 판정 정의 rev7·PACK-BASELINE@33(보안
+      PASS 규칙) 추가. 11-05 GPU는 입력 투영·연결 검증/기능 PASS·보안 UNKNOWN(rev6) 그대로. 팩33 GPU 재실측 필요.
+      docs/dev-1/req11-output-oracle.md'
+    state: GPU_CONFIRMATION_ONLY
   REQ-13:
     note: '2026-11-05: GPU 엔진 금지 반환 옵션 수용 FAIL·Gateway3옵션400 거부·기능 PASS·증거 왕복. 허용
       응답/오류 필드 기업 입력 대기. docs/dev-1/gpu-20261105.md'

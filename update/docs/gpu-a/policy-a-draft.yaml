@@ -6,7 +6,7 @@ data_origin: EXAMPLE
 status: DRAFT
 pack:
   id: PACK-BASELINE
-  revision: 32
+  revision: 33  # 2026-11-06 REQ-11 rev7. 11-05 실행 기록은 당시 32를 썼다.
 values:
   REQ-08:
     reused_token_field: prompt_token_ids

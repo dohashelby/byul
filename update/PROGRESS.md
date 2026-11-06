@@ -1,3 +1,10 @@
+## 2026-11-06 — 단일 L4 재측정(REQ-11·OBS-09·LIF-13)
+
+- 한 일: 사용자 승인 상한 $4로 기존 L4를 14:27 시작·15:14 중지 요청. 47e7fff(CI 성공) 소스로 REQ-11 팩33 COMPLETED 보안/기능 PASS(EXAMPLE), LIF-13 정본 실행 안 소비자·release·fallback 모든 분기 관측·위반 없음(release 기업 인가 부재로 UNKNOWN). OBS-09 첫 실행은 attach 정렬·7사례 경계 보존에도 투영 재생이 CRI image ID를 거부해 ABORTED → `native_projection.py`만 고친 수정본(파일 해시 고정)으로 재측정 COMPLETED 보안/기능 PASS(EXAMPLE). 소비자 정리 미확인은 좀비를 살아 있다고 센 정리 스크립트 결함으로 고쳤다. 원 EVD/RES 모두 보존. 상세 `docs/dev-1/gpu-20261106.md`.
+- 테스트 결과: OBS-09 로그 관련 222 통과, 콜백·lab 108 통과(한 코어). 반출 묶음 서버·로컬 SHA 일치 `e51b7a10…b9d`, REQ-11·OBS-09 반출·복원·재판정 일치. 검토 소스 manifest 갱신.
+- 다음 단계: 수정 2건 커밋·CI, 공개 실측 요약(docs/evidence)과 현황표의 팩33 GPU 기록 연결.
+- 막힌 것: LIF-13 release 인가·OBS-09 기업 수집기 범위는 기업 입력.
+
 ## 2026-11-06 — GPU 재측정 준비 중 LIF-13 실행 경로 보수
 
 - 한 일: GPU 실행 전 점검에서 두 결함을 찾아 고쳤다. (1) Kubernetes 콜백 전송의 300초 상한이 LIF-13 900초를 거부 → 소유 lab 콜백 전송만 900초, 입력 도구도 LIF-13에 900초. (2) 소비자 기동이 PID 1 `vllm serve`만 인정 → 실제 콘솔 스크립트 형태 `python /…/vllm serve`도 인정(k3d 엔진 PID 1에서 판별 확인, 소비자는 띄우지 않음).

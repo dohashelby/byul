@@ -165,20 +165,18 @@ print(json.dumps({"schema":"guard-lab-weights-consumer/1","status":status,"pid":
 '''
 WEIGHTS_CONSUMERS_STOP = r'''
 import json,os,signal,sys,time
+def live(item):
+    # 시작 ticks가 같고 좀비(Z)·소멸(X)이 아닐 때만 살아 있다. 엔진 PID 1이 소비자를 거두지 않아 좀비가 남는다(GPU 11-06 실측).
+    try:
+        rest=open("/proc/%d/stat"%item["pid"]).read().rsplit(")",1)[1].split()
+    except (OSError,ValueError,IndexError):return False
+    return int(rest[19])==item["start_ticks"] and rest[0] not in ("Z","X")
 left=[]
 for item in json.loads(sys.argv[1]):
-    try:
-        ticks=int(open("/proc/%d/stat"%item["pid"]).read().rsplit(")",1)[1].split()[19])
-    except (OSError,ValueError,IndexError):continue
-    if ticks!=item["start_ticks"]:continue
+    if not live(item):continue
     os.killpg(item["pid"],signal.SIGTERM);left.append(item)
 for _ in range(60):
-    alive=[]
-    for item in left:
-        try:
-            if int(open("/proc/%d/stat"%item["pid"]).read().rsplit(")",1)[1].split()[19])==item["start_ticks"]:alive.append(item)
-        except (OSError,ValueError,IndexError):pass
-    left=alive
+    left=[item for item in left if live(item)]
     if not left:break
     time.sleep(1)
 print(json.dumps({"schema":"guard-lab-weights-consumers-stop/1","status":"ok" if not left else "alive"}))

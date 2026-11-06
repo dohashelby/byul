@@ -390,3 +390,25 @@ def test_consumer_start_reads_the_console_script_form_of_pid1(cmdline, supported
         assert result['status'] == 'ok' and started == [[a.decode() for a in cmdline] + ['--port', '8001']]
     else:
         assert result['status'] == 'unsupported' and not started
+
+
+@pytest.mark.parametrize('state,expected', [('Z', 'ok'), ('X', 'ok'), ('S', 'alive')])
+def test_consumer_stop_counts_a_zombie_as_stopped(state, expected, capsys, monkeypatch):
+    """GPU 11-06: 소비자는 종료됐지만 엔진 PID 1이 거두지 않아 좀비로 남아 정리 미확인이 됐다."""
+    import io, json as _json, builtins
+    from guard.runtime import kubernetes_http as http
+    killed = []
+    def fake_open(path, mode='r'):
+        return io.StringIO('77 (python3) ' + state + ' ' + ' '.join(['0'] * 18) + ' 555 0')
+    fake_os = type('O', (), {'killpg': staticmethod(lambda pid, sig: killed.append(pid))})
+    real_import = builtins.__import__
+    def fake_import(name, *args, **kwargs):
+        if name == 'os': return fake_os
+        if name == 'time': return type('T', (), {'sleep': staticmethod(lambda s: None)})
+        return real_import(name, *args, **kwargs)
+    monkeypatch.setattr('sys.argv', ['x', _json.dumps([{'pid': 77, 'start_ticks': 555}])])
+    monkeypatch.setattr('signal.SIGTERM', 15, raising=False)
+    exec(compile(http.WEIGHTS_CONSUMERS_STOP, 'stop', 'exec'),
+         {'__name__': '__main__', '__builtins__': {**builtins.__dict__, '__import__': fake_import, 'open': fake_open}})
+    assert _json.loads(capsys.readouterr().out)['status'] == expected
+    assert killed == ([] if state in 'ZX' else [77])

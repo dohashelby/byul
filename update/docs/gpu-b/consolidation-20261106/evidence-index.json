@@ -100,6 +100,12 @@
       "sha256": "6b93999c2f12fa1619f6162df0f3e3fe6968e86f4dbb8efdea12cdf4668a2494",
       "bytes": 13683,
       "scope": "all16 local implementation candidates and previous main inclusion checks"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-run-lif14-labels-20261105/out/SUP16-live-normal-v1-operator-20261105/native17-ordering-writer-normal-operator-v1/poststop-native17-ordering-writer-v1-owned-instances.stdout",
+      "sha256": "58ee8c89cd611ffd401d75cd24e69f270ca6078f08e95869bf9bb82a36af094f",
+      "bytes": 23237,
+      "scope": "poststop original completed19:34:59KST; all3stopped/publicIP0; independent of original stop180 exit1"
     }
   ],
   "code_snapshots": [
@@ -1244,7 +1250,17 @@
   },
   "latest_changes": {
     "SUP-16": "Previous actual L4/TP1 load/KV/HTTP200 and FD read candidate verified. Follow-up observe Success/0; export selected old GB07 while current archive is GB09 and timed out at original900s. Supervisor blocked on uncertain final SSM acceptance, no normal stop submitted. Model/namespace cleanup confirmed; instance stopped/cost/GB09 export unconfirmed. Preserve in place, no new boot or trial implied.",
-    "SUP-05": "Public Engine normal CPU attempt: original90 timeout and wait30 timeout, owned remove/absence confirmed. Worker final/request output/native journal/seal not collected; no retry or product Ref."
+    "SUP-05": "Public Engine normal CPU attempt: original90 timeout and wait30 timeout, owned remove/absence confirmed. Worker final/request output/native journal/seal not collected; no retry or product Ref.",
+    "SUP-16_closeout": {
+      "poststop_query_output_completed_KST": "2026-11-06T19:34:59.1355916+09:00",
+      "owned_instance_count": 3,
+      "all_stopped": true,
+      "public_IP_count": 0,
+      "original_stop180_result": "STOPPED_NOT_YET_OBSERVED/exit1",
+      "final_cost_closeout_verified": false,
+      "GB09_full_export_verified": false,
+      "new_boot_or_experiment": false
+    }
   },
   "raw_archives_databases_credentials_or_host_identifiers_published": false
 }

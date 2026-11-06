@@ -7,7 +7,7 @@
 | 세션 | 확정된 작업 | 남은 작업 |
 | --- | --- | --- |
 | 1 — 실행 묶음 만들기 | SUP-16 native17 writer의 LF 포함 해시 계약 수정, 실제 journal 양성·잘린 LF·다른 session 거부 CPU 3/3 및 세션3 검토 완료. SUP-15 cold compile·출력 1회 검증 완료 | SUP-16 실제 writer·제품 연결 확인. SUP-15 warm 45초 alive 원인과 나머지 분기 미완료 |
-| 2 — GPU 실측 운영 | 권한·호출 이름·설치 payload 연결 오류 수정. 이전 L4/TP1 모델 적재·KV cache·HTTP 200 및 실제 파일 읽기 후보 확인. AWS 콘솔 계정·리전·당시 중지 상태 확인 | 후속 관측 Success/0 뒤 반출이 새 GB09 대신 옛 GB07을 선택했고 원900초에 timeout. 감독은 마지막 SSM 접수 불확실성에서 후속/stop을 보류. 모델·namespace 정리는 완료됐지만 현재 인스턴스 정지·비용 마감과 GB09 반출은 미확정 |
+| 2 — GPU 실측 운영 | 권한·호출 이름·설치 payload 연결 오류 수정. 이전 L4/TP1 적재·HTTP200 확인. 후속 실행의 모델·namespace 정리, 정상stop1회 수락 뒤 19:34:59 KST 완료 원조회에서 소유3대 stopped·공인IP0 확인 | 새 GB09 대신 옛 GB07 선택·원900초 반출 timeout·감독 불확실성 차단은 보존. 원stop180은 기한 내 미확인/exit1이며 후속3대 중지를 별도 관측으로 연결. 최종 비용 마감·GB09 전체 반출/원문 검증은 미확정 |
 | 3 — 기존 결과 검증 | 이전 GPU 부분관측·원자료·실행 신원·정리·최종 정지 검증, 새 writer와 운영 연결 변경분 검토 완료 | 후속 실행 archive·native·writer·factory·Ref·정리 검증. 명령 exit0만으로 제품 성공으로 올리지 않음 |
 | 4 — 과거6/43ID 대조 | 기존43 index·최신 delta·외부 반환물·과거 원본 미확인 범위 인계 완료 | 새 결과가 도착한 ID의 추가분만 연결. 원자료 재검색·불변 재검 반복 없음 |
 | 5 — SUP-05 CPU 준비·실행 | 공개 LLMEngine caller·고정 입력·원90초·실패 전달 구현, create 응답 불명 시 소유 CID 복구/정리 보완. 실제 실패·정리·검증 인계까지 현재 건 마감 | 정상1회 원90초 ready 미도달·wait30 초과. 요청 출력·worker final·native journal/seal 미수집. 새 구현·시험·재시도는 착수하지 않음 |
@@ -34,4 +34,4 @@
 
 검증 결과는 [VALIDATION.md](VALIDATION.md), 다음 작업과 완료 조건은 [NEXT_PLAN.md](NEXT_PLAN.md)를 따른다. 원자료와 정확한 검토 source SHA는 evidence index에 연결한다.
 
-현재 건 마감과 PR 취합을 우선한다. 위 표의 이전 중지 관측을 현재 실행의 최종 정지로 사용하지 않는다. GB09 미반출·원 전송 timeout·정상 stop 미확정은 한계로 보존한다. 다음 계획은 검토용 재개안이며 새 GPU 기동·archive-only 재기동·신규 묶음·구현·재시험을 자동 지시하지 않는다.
+현재 건 마감과 PR 취합을 우선한다. 이번 중지는 새 후속 조회 원본에서 확인했으며, 원stop180 실패를 성공으로 바꾸지 않는다. GB09 미반출·원 전송 timeout·비용 마감 미확정은 한계로 보존한다. 다음 계획은 검토용 재개안이며 새 GPU 기동·archive-only 재기동·신규 묶음·구현·재시험을 자동 지시하지 않는다.

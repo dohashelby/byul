@@ -1,6 +1,6 @@
 {
   "kind": "derived-review-index-not-central-status",
-  "recorded_at_KST": "2026-11-06T19:16:56.333925+09:00",
+  "recorded_at_KST": "2026-11-06T19:24:41.575672+09:00",
   "integration_base": "e5a8ba7589be09fa472c35276e190b117426a0ae",
   "actual_product_source": "3b3ff137b31b830403ccce1997dabf26319bac4f",
   "scope_count": 43,
@@ -1243,7 +1243,7 @@
     }
   },
   "latest_changes": {
-    "SUP-16": "Previous actual L4/TP1 load/KV/HTTP200 and FD read candidate verified. Follow-up observe Success/0; export selected old GB07 while current archive is GB09. Exact archive-only recovery and writer/factory/Refs/cleanup verification pending; never use old bytes as new evidence.",
+    "SUP-16": "Previous actual L4/TP1 load/KV/HTTP200 and FD read candidate verified. Follow-up observe Success/0; export selected old GB07 while current archive is GB09 and timed out at original900s. Supervisor blocked on uncertain final SSM acceptance, no normal stop submitted. Model/namespace cleanup confirmed; instance stopped/cost/GB09 export unconfirmed. Preserve in place, no new boot or trial implied.",
     "SUP-05": "Public Engine normal CPU attempt: original90 timeout and wait30 timeout, owned remove/absence confirmed. Worker final/request output/native journal/seal not collected; no retry or product Ref."
   },
   "raw_archives_databases_credentials_or_host_identifiers_published": false

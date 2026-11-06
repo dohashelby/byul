@@ -16,6 +16,7 @@ class TetragonPolicy(BaseModel):
     mode: Literal["monitor", "enforce", "monitor_only", "unknown"]
     method: str | None = None
     load_error: str | None = None
+    spec_sha256: str | None = None
 
 class TetragonCapability(BaseModel):
     node: str | None = None
@@ -173,11 +174,48 @@ class TetragonVerification(BaseModel):
 
 class TetragonAgent(BaseModel):
     node: str | None = None
+    pod_uid: str | None = None
     restart_count: int | None = None
     last_exit_at: str | None = None
     last_exit_code: int | None = None
     last_exit_reason: str | None = None
     last_exit_summary: str | None = None
+
+class TetragonRecoveryGap(BaseModel):
+    opened_at: str
+    last_verified_at: str | None = None
+    reason: str
+    closed_at: str | None = None
+    recovery: str | None = None
+    backfill: str | None = None
+
+class TetragonMonitoring(BaseModel):
+    state: Literal["healthy", "recovering", "not_configured", "error", "stale"]
+    reasons: list[str] = Field(default_factory=list)
+    generated_at: str | None = None
+    policies_verified: bool = False
+    writer_verified: bool = False
+    identities_verified: bool = False
+    events_verified: bool = False
+    verified_at: str | None = None
+    verification_since: str | None = None
+    controls_verified_since: str | None = None
+    event_verified_at: dict[str, str] = Field(default_factory=dict)
+    open_gap: TetragonRecoveryGap | None = None
+    history: list[TetragonRecoveryGap] = Field(default_factory=list)
+
+class TetragonOperationsCheck(BaseModel):
+    id: str
+    context: str
+    namespace: str
+    data_origin: Literal["real", "synthetic"]
+    started_at: str
+    finished_at: str
+    restart_requested: bool
+    status: Literal["passed", "failed"]
+    facts: dict[str, bool | None] = Field(default_factory=dict)
+    artifact_sha256: dict[str, str] = Field(default_factory=dict)
+    error: str | None = None
 
 class TetragonSnapshot(BaseModel):
     schema_version: Literal["runtime-tetragon-state/1.0"]
@@ -191,6 +229,8 @@ class TetragonSnapshot(BaseModel):
     transitions: list[TetragonTransition] = Field(default_factory=list)
     verifications: list[TetragonVerification] = Field(default_factory=list)
     agents: list[TetragonAgent] = Field(default_factory=list)
+    monitoring: TetragonMonitoring | None = None
+    operation_checks: list[TetragonOperationsCheck] = Field(default_factory=list)
 
 class TetragonStatusResponse(BaseModel):
     item: TetragonSnapshot

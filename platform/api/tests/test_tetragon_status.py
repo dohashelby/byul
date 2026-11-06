@@ -27,6 +27,9 @@ def test_live_projection_keeps_effects_separate_and_only_reads(tmp_path):
     effects={'expected_effect':'process_termination','file_read_denial':'unknown','process_termination':'confirmed',
              'service_recovery':'confirmed','monitor_restored':True,'status':'passed'}
     snapshot={'schema_version':'runtime-tetragon-state/1.0','state':'ok','fresh':True,'context':'kind-runtime-lab',
+              'monitoring':{'state':'recovering','reasons':['waiting_for_attributed_event'],
+                            'policies_verified':True,'writer_verified':True,'identities_verified':True,'events_verified':False,
+                            'open_gap':{'opened_at':'2026-11-06T00:00:00Z','reason':'agent_epoch_changed'}},
               'verifications':[{'id':'probe','context':'kind-runtime-lab','namespace':'trial','policy':'trial',
                 'method':'sigkill_fd_install','data_origin':'real','started_at':'2026-11-06T00:00:00Z',
                 'finished_at':'2026-11-06T00:00:03Z','verification':effects,
@@ -50,6 +53,10 @@ def test_live_projection_keeps_effects_separate_and_only_reads(tmp_path):
         assert proof['task_identity']['pidns']==456
         assert proof['events'][0]['identity_source']=='kernel_task'
         assert proof['events'][0]['kernel_task']['start_ns']=='10005000000'
+        monitoring=response.json()['item']['monitoring']
+        assert monitoring['state']=='recovering'
+        assert monitoring['events_verified'] is False
+        assert monitoring['open_gap']['reason']=='agent_epoch_changed'
         assert calls==[('GET','/api/tetragon-status')]
         assert client.post('/api/runtime/tetragon-status').status_code==405
     runtime.close()

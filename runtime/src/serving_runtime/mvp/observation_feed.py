@@ -44,8 +44,12 @@ class ObservationFeed:
         heartbeat_path: str | Path | None = None,
         heartbeat_stale_after_s: float = 15.0,
         exec_policy: Any = None,
+        identity_path: str | Path | None = None,
+        kube_context: str = "kind-runtime-lab",
     ) -> None:
         self.exec_policy = exec_policy
+        self.identity_path = identity_path
+        self.kube_context = kube_context
         if kind not in {"hubble", "tetragon"}:
             raise ValueError("observation feed kind must be hubble or tetragon")
         self.kind = kind
@@ -273,6 +277,8 @@ class ObservationFeed:
             or document.get("kind") != self.kind
         ):
             raise ValueError("observation writer heartbeat schema or kind is invalid")
+        if document.get("kube_context") not in (None, self.kube_context):
+            raise ValueError("observation writer belongs to a different Kubernetes context")
         feed_path = document.get("feed_path")
         if (
             not isinstance(feed_path, str)
@@ -467,8 +473,30 @@ class ObservationFeed:
             "redaction_loss_detected": redaction_loss_detected,
         }
 
+    def _save_health_receipt(self, item):
+        path = self.state_path.parent / "tetragon-health-receipts.json"
+        nodes = {}
+        try:
+            document = json.loads(path.read_text())
+            if document.get("context") == self.kube_context and isinstance(document.get("nodes"), dict):
+                nodes = document["nodes"]
+        except (OSError, ValueError, TypeError, AttributeError):
+            pass
+        node = item["identity"]["node"]
+        if node not in nodes or nodes[node].get("observed_at", "") <= item["observed_at"]:
+            nodes[node] = item
+        temporary = path.with_name(path.name+".next")
+        temporary.write_text(json.dumps({"schema_version":"runtime-tetragon-health-receipts/1.0",
+            "context":self.kube_context,"nodes":nodes}, ensure_ascii=False)+"\n")
+        temporary.chmod(0o600)
+        temporary.replace(path)
+
     def collect(self) -> tuple[dict[str, Any], str]:
         heartbeat, writer_started_at = self._read_heartbeat()
+        identity_index = None
+        if self.kind == "tetragon" and self.identity_path is not None:
+            from serving_runtime.enforcement.attribution import read_identities
+            identity_index = read_identities(self.identity_path, context=self.kube_context)
         writer_loss_changed = self._update_writer_loss(heartbeat)
         mode = "append"
         with self.path.open("rb") as source:
@@ -548,6 +576,7 @@ class ObservationFeed:
                 environment=self.environment,
                 run_id=self.run_id,
                 exec_policy=self.exec_policy,
+                identity_index=identity_index,
             )
             if line_rejected:
                 rejected.append(
@@ -603,7 +632,10 @@ class ObservationFeed:
                 self._remember(event_key)
                 continue
             item["event_key"] = event_key
-            self.store.append(item)
+            if item.get("observation_purpose") == "health_check":
+                self._save_health_receipt(item)
+            else:
+                self.store.append(item)
             self._remember(event_key)
             accepted_count += 1
 

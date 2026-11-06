@@ -3066,6 +3066,17 @@
             ],
             "title": "Node"
           },
+          "pod_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pod Uid"
+          },
           "restart_count": {
             "anyOf": [
               {
@@ -3417,6 +3428,209 @@
         ],
         "title": "TetragonModeState"
       },
+      "TetragonMonitoring": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "recovering",
+              "not_configured",
+              "error",
+              "stale"
+            ],
+            "title": "State"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "generated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated At"
+          },
+          "policies_verified": {
+            "type": "boolean",
+            "title": "Policies Verified",
+            "default": false
+          },
+          "writer_verified": {
+            "type": "boolean",
+            "title": "Writer Verified",
+            "default": false
+          },
+          "identities_verified": {
+            "type": "boolean",
+            "title": "Identities Verified",
+            "default": false
+          },
+          "events_verified": {
+            "type": "boolean",
+            "title": "Events Verified",
+            "default": false
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          },
+          "verification_since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification Since"
+          },
+          "controls_verified_since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Controls Verified Since"
+          },
+          "event_verified_at": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Event Verified At"
+          },
+          "open_gap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonRecoveryGap"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/TetragonRecoveryGap"
+            },
+            "type": "array",
+            "title": "History"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "TetragonMonitoring"
+      },
+      "TetragonOperationsCheck": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "context": {
+            "type": "string",
+            "title": "Context"
+          },
+          "namespace": {
+            "type": "string",
+            "title": "Namespace"
+          },
+          "data_origin": {
+            "type": "string",
+            "enum": [
+              "real",
+              "synthetic"
+            ],
+            "title": "Data Origin"
+          },
+          "started_at": {
+            "type": "string",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "type": "string",
+            "title": "Finished At"
+          },
+          "restart_requested": {
+            "type": "boolean",
+            "title": "Restart Requested"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "facts": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Facts"
+          },
+          "artifact_sha256": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Artifact Sha256"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "context",
+          "namespace",
+          "data_origin",
+          "started_at",
+          "finished_at",
+          "restart_requested",
+          "status"
+        ],
+        "title": "TetragonOperationsCheck"
+      },
       "TetragonPolicy": {
         "properties": {
           "node": {
@@ -3484,6 +3698,17 @@
               }
             ],
             "title": "Load Error"
+          },
+          "spec_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spec Sha256"
           }
         },
         "type": "object",
@@ -3685,6 +3910,68 @@
         "type": "object",
         "title": "TetragonReadResult"
       },
+      "TetragonRecoveryGap": {
+        "properties": {
+          "opened_at": {
+            "type": "string",
+            "title": "Opened At"
+          },
+          "last_verified_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Verified At"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "recovery": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery"
+          },
+          "backfill": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backfill"
+          }
+        },
+        "type": "object",
+        "required": [
+          "opened_at",
+          "reason"
+        ],
+        "title": "TetragonRecoveryGap"
+      },
       "TetragonSnapshot": {
         "properties": {
           "schema_version": {
@@ -3773,6 +4060,23 @@
             },
             "type": "array",
             "title": "Agents"
+          },
+          "monitoring": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TetragonMonitoring"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operation_checks": {
+            "items": {
+              "$ref": "#/components/schemas/TetragonOperationsCheck"
+            },
+            "type": "array",
+            "title": "Operation Checks"
           }
         },
         "type": "object",

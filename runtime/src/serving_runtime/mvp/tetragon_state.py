@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 from serving_runtime.enforcement.verification import reassess_record
+from serving_runtime.enforcement.recovery import reassess_operations
 
 SCHEMA = "runtime-tetragon-state/1.0"
 
@@ -16,6 +17,8 @@ def read_tetragon_state(path: str | Path, *, context: str | None = None,
               "state": "not_configured", "fresh": False, "error": None,
               "policies": [], "capabilities": [], "transitions": [], "verifications": []}
     result["agents"] = []
+    result["monitoring"] = {"state":"not_configured","reasons":["recovery_check_not_configured"]}
+    result["operation_checks"] = []
     try:
         target=Path(path)
         if not target.exists():
@@ -39,8 +42,16 @@ def read_tetragon_state(path: str | Path, *, context: str | None = None,
         if not isinstance(value.get("agents", []), list):
             raise ValueError("invalid Tetragon agent status")
         result["agents"] = value.get("agents", [])
+        if not isinstance(value.get("operation_checks",[]),list):
+            raise ValueError("invalid Tetragon operations checks")
+        result["operation_checks"] = [reassess_operations(r) for r in value.get("operation_checks",[]) if isinstance(r,dict)]
+        if not isinstance(value.get("monitoring",{}),dict):
+            raise ValueError("invalid Tetragon recovery status")
+        result["monitoring"] = value.get("monitoring", result["monitoring"])
         result["fresh"]=-5<=age<=stale_after_s and value.get("state")=="ok"
         result["state"]="stale" if age>stale_after_s or age < -5 else value.get("state","error")
+        if not result["fresh"]:
+            result["monitoring"] = {**result["monitoring"],"state":"stale"}
         result["error"]=value.get("error")
     except (OSError,ValueError,KeyError,TypeError,AttributeError,RecursionError):
         result.update(state="error",error="Tetragon state could not be validated")

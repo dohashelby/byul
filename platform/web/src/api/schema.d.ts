@@ -1016,6 +1016,8 @@ export interface components {
         TetragonAgent: {
             /** Node */
             node?: string | null;
+            /** Pod Uid */
+            pod_uid?: string | null;
             /** Restart Count */
             restart_count?: number | null;
             /** Last Exit At */
@@ -1118,6 +1120,86 @@ export interface components {
             /** State */
             state: string;
         };
+        /** TetragonMonitoring */
+        TetragonMonitoring: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "healthy" | "recovering" | "not_configured" | "error" | "stale";
+            /** Reasons */
+            reasons?: string[];
+            /** Generated At */
+            generated_at?: string | null;
+            /**
+             * Policies Verified
+             * @default false
+             */
+            policies_verified: boolean;
+            /**
+             * Writer Verified
+             * @default false
+             */
+            writer_verified: boolean;
+            /**
+             * Identities Verified
+             * @default false
+             */
+            identities_verified: boolean;
+            /**
+             * Events Verified
+             * @default false
+             */
+            events_verified: boolean;
+            /** Verified At */
+            verified_at?: string | null;
+            /** Verification Since */
+            verification_since?: string | null;
+            /** Controls Verified Since */
+            controls_verified_since?: string | null;
+            /** Event Verified At */
+            event_verified_at?: {
+                [key: string]: string;
+            };
+            open_gap?: components["schemas"]["TetragonRecoveryGap"] | null;
+            /** History */
+            history?: components["schemas"]["TetragonRecoveryGap"][];
+        };
+        /** TetragonOperationsCheck */
+        TetragonOperationsCheck: {
+            /** Id */
+            id: string;
+            /** Context */
+            context: string;
+            /** Namespace */
+            namespace: string;
+            /**
+             * Data Origin
+             * @enum {string}
+             */
+            data_origin: "real" | "synthetic";
+            /** Started At */
+            started_at: string;
+            /** Finished At */
+            finished_at: string;
+            /** Restart Requested */
+            restart_requested: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "passed" | "failed";
+            /** Facts */
+            facts?: {
+                [key: string]: boolean | null;
+            };
+            /** Artifact Sha256 */
+            artifact_sha256?: {
+                [key: string]: string;
+            };
+            /** Error */
+            error?: string | null;
+        };
         /** TetragonPolicy */
         TetragonPolicy: {
             /** Node */
@@ -1139,6 +1221,8 @@ export interface components {
             method?: string | null;
             /** Load Error */
             load_error?: string | null;
+            /** Spec Sha256 */
+            spec_sha256?: string | null;
         };
         /** TetragonProbeEvent */
         TetragonProbeEvent: {
@@ -1179,6 +1263,21 @@ export interface components {
             /** Transport Error */
             transport_error?: string | null;
         };
+        /** TetragonRecoveryGap */
+        TetragonRecoveryGap: {
+            /** Opened At */
+            opened_at: string;
+            /** Last Verified At */
+            last_verified_at?: string | null;
+            /** Reason */
+            reason: string;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Recovery */
+            recovery?: string | null;
+            /** Backfill */
+            backfill?: string | null;
+        };
         /** TetragonSnapshot */
         TetragonSnapshot: {
             /**
@@ -1209,6 +1308,9 @@ export interface components {
             verifications?: components["schemas"]["TetragonVerification"][];
             /** Agents */
             agents?: components["schemas"]["TetragonAgent"][];
+            monitoring?: components["schemas"]["TetragonMonitoring"] | null;
+            /** Operation Checks */
+            operation_checks?: components["schemas"]["TetragonOperationsCheck"][];
         };
         /** TetragonStatusResponse */
         TetragonStatusResponse: {

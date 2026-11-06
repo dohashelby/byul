@@ -12,6 +12,15 @@ const METHODS: Record<string, string> = {
   sigkill_fd_install: "프로세스 강제 종료",
 };
 const MODES: Record<string, string> = { monitor: "감시", enforce: "차단", monitor_only: "감시 전용", unknown: "미확인" };
+const RECOVERY_REASONS: Record<string, string> = {
+  agent_epoch_changed: "에이전트 교체·재시작 감지", agent_or_policy_query_unavailable: "에이전트·정책 조회 대기",
+  agent_epoch_first_observed: "초기 에이전트 확인 후 새 관측 대기",
+  expected_policy_state_mismatch: "기대 정책·모드 불일치", event_writer_unavailable: "이벤트 수집기 중단·지연",
+  process_identity_source_unavailable: "프로세스 대상 확인 자료 미확인", waiting_for_attributed_event: "복구 이후 대상이 확인된 새 이벤트 대기",
+  normalized_observations_unavailable: "정규화 이벤트 조회 불가", expected_policies_unavailable: "기대 정책 파일 미설정",
+  recovery_check_not_configured: "운영 복구 확인 미설정", recovery_evidence_unavailable: "복구 근거 확인 불가",
+  recovery_observer_stale: "복구 확인 수집기의 갱신 공백 감지",
+};
 const effect = (value: string) => value === "confirmed" ? "확인" : value === "failed" ? "실패" : "미확인";
 
 function downloadEvidence(report: TetragonVerification) {
@@ -39,6 +48,7 @@ export function TetragonPolicyPage() {
       const capabilities = state.capabilities ?? [];
       const transitions = state.transitions ?? [];
       const verifications = state.verifications ?? [];
+      const monitoring = state.monitoring;
       return <>
         <p className="notice">정책 모드는 서버에서 조회한 값입니다. 실제 차단 효과는 아래 시험 결과에서 파일 읽기 거부와 프로세스 종료를 각각 확인합니다.</p>
         <div className="row wrap">
@@ -46,6 +56,26 @@ export function TetragonPolicyPage() {
           <span>환경 {state.context ?? "미확인"} · 마지막 수집 {formatTime(state.generated_at)}</span>
         </div>
         {state.error && <p role="alert" className="notice">{state.error}</p>}
+        <TableCard title="운영 감시 중단·복구 확인">
+          <div className={rt.pad}>
+            <Badge tone={current && monitoring?.state === "healthy" ? "accent" : "caution"}>
+              {!current ? "복구 상태 수집 미확인" : monitoring?.state === "healthy" ? "복구 조건 확인됨" : monitoring?.state === "recovering" ? "중단·복구 확인 중" : "운영 복구 확인 미설정·오류"}
+            </Badge>
+            <p>마지막 확인 {formatTime(monitoring?.verified_at)} · 기대 정책 {monitoring?.policies_verified ? "확인" : "미확인"} · 수집기 {monitoring?.writer_verified ? "확인" : "미확인"} · 대상 식별 {monitoring?.identities_verified ? "확인" : "미확인"} · 복구 후 새 이벤트 {monitoring?.events_verified ? "확인" : "미확인"}</p>
+            {(monitoring?.reasons ?? []).map((reason) => <div key={reason}>{RECOVERY_REASONS[reason] ?? "복구 근거 확인 중"}</div>)}
+            {monitoring?.open_gap && <p role="alert">중단·미확인 구간: 이전 정상 확인 {formatTime(monitoring.open_gap.last_verified_at)} · 감지 {formatTime(monitoring.open_gap.opened_at)}</p>}
+            <p className="small muted">정책·수집기·대상 확인과 새 실제 이벤트를 함께 확인합니다. 복구 확인은 중단 구간의 이벤트가 모두 복원됐다는 뜻이 아닙니다.</p>
+            {(monitoring?.history ?? []).slice().reverse().map((gap, i) => <div className="small" key={`${gap.opened_at}/${i}`}>{formatTime(gap.opened_at)} ~ {formatTime(gap.closed_at)} · 복구 확인 · 구간 이벤트 완전성 미확인</div>)}
+          </div>
+        </TableCard>
+        {(state.operation_checks ?? []).length > 0 && <TableCard title="운영 대상 확인·재시작 복구 실측">
+          <div className={rt.pad}>{(state.operation_checks ?? []).map((check) => <div key={check.id} className="notice">
+            {formatTime(check.finished_at)} · {check.namespace} · {check.status === "passed" ? "시험 통과" : "시험 미통과"}
+            <div>주 프로세스 {check.facts?.main_process_identified ? "확인" : "미확인"} · 자식 프로세스 {check.facts?.child_process_identified ? "확인" : "미확인"} · 두 Pod 구분 {check.facts?.distinct_pods_identified ? "확인" : "미확인"}{check.facts?.threaded_child_identified && " · 스레드의 파일 접근 확인"}</div>
+            <div>{check.restart_requested ? <>중단 감지 {check.facts?.gap_detected ? "확인" : "미확인"} · 복구 후 새 이벤트 {check.facts?.recovery_verified ? "확인" : "미확인"}</> : "에이전트 재시작 시험 안 함"}</div>
+            <span className="small muted">시험 대상·기록된 구간의 실측이며 중단 구간 이벤트의 완전한 복원을 뜻하지 않습니다.</span>
+          </div>)}</div>
+        </TableCard>}
         {(state.agents ?? []).filter((a) => a.last_exit_summary).map((a) => <p className="notice" key={a.node}>에이전트 종료 이력: {a.node} · {formatTime(a.last_exit_at)} · {a.last_exit_summary} · 재시작 {a.restart_count ?? "미확인"}회</p>)}
         {!current && policies.length > 0 && <p role="alert" className="notice">수집이 지연되거나 실패했습니다. 아래 모드는 마지막 관측값이며 현재 모드로 확정하지 않습니다.</p>}
         <TableCard title={current ? "현재 정책 모드" : "마지막 관측 정책 모드"}>

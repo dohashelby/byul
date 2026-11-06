@@ -6,6 +6,7 @@ from typing import Any
 import copy
 
 from .intent import EnforcementIntent
+from .attribution import KERNEL_DATA
 
 
 _STATUS = "candidate-cluster-unapplied-unverified"
@@ -180,4 +181,9 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
             exact_path=True,
             override=True,
         )
+    if intent.tetragon_kernel_identity:
+        for manifest in manifests.values():
+            for probe in manifest["spec"]["kprobes"]:
+                probe["data"] = copy.deepcopy(KERNEL_DATA)
+            manifest["metadata"]["annotations"]["serving-runtime.local/kernel-identity"] = "v2"
     return manifests

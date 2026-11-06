@@ -12,6 +12,10 @@
 #   RUNTIME_TETRAGON_STATE=1  명시한 context의 Tetragon 상태를 읽기 전용으로 수집
 #   RUNTIME_KUBE_CONTEXT     기본 kind-runtime-lab
 #   TETRAGON_EVIDENCE_DIR    Tetragon 시험·모드 전환 기록 폴더
+#   RUNTIME_TETRAGON_IDENTITY_SELECTOR  대상 Pod selector(설정하면 식별 자료 수집)
+#   RUNTIME_TETRAGON_NAMESPACE          기본 serving-lab
+#   RUNTIME_TETRAGON_STREAM_POLICIES    gRPC로 수집할 정책 이름, 쉼표 구분
+#   RUNTIME_TETRAGON_BASELINE           사전에 확인한 정책 spec·모드 기대값 파일
 #
 # runtime은 byul/runtime의 코드를 그대로 쓴다(uv 임시 환경에 편집 모드로 설치, runtime/ 폴더에는 파일을 만들지 않음).
 # platform은 runtime 조회 API(GET /api/*)만 읽는다.
@@ -61,6 +65,8 @@ if [ "${RUNTIME_DEMO:-0}" = "1" ]; then
 fi
 
 cleanup() {
+  [ -n "${TETRAGON_IDENTITY_PID:-}" ] && kill "$TETRAGON_IDENTITY_PID" 2>/dev/null || true
+  [ -n "${TETRAGON_STREAM_PID:-}" ] && kill "$TETRAGON_STREAM_PID" 2>/dev/null || true
   [ -n "${TETRAGON_PID:-}" ] && kill "$TETRAGON_PID" 2>/dev/null || true
   [ -n "${RUNTIME_PID:-}" ] && kill "$RUNTIME_PID" 2>/dev/null || true
 }
@@ -70,6 +76,16 @@ EXTRA=()
 [ -n "${RUNTIME_LAB_REPORT:-}" ] && EXTRA+=(--lab-report "$RUNTIME_LAB_REPORT")
 [ "${RUNTIME_CILIUM:-0}" = "1" ] && EXTRA+=(--cilium-policy-status)
 EXTRA+=(--kube-context "${RUNTIME_KUBE_CONTEXT:-kind-runtime-lab}")
+TETRAGON_FEED_DIR="${RUNTIME_TETRAGON_FEED_DIR:-$STATE_HOME/tetragon-live}"
+if [ -n "${RUNTIME_TETRAGON_IDENTITY_SELECTOR:-}" ]; then
+  RUNTIME_TETRAGON_IDENTITIES="${RUNTIME_TETRAGON_IDENTITIES:-$RUNTIME_DATA_DIR/tetragon-identities.json}"
+fi
+[ -n "${RUNTIME_TETRAGON_IDENTITIES:-}" ] && EXTRA+=(--tetragon-identities "$RUNTIME_TETRAGON_IDENTITIES")
+if [ -n "${RUNTIME_TETRAGON_STREAM_POLICIES:-}" ]; then
+  EXTRA+=(--observation-feed "tetragon=$TETRAGON_FEED_DIR/tetragon.jsonl"
+    --observation-heartbeat "tetragon=$TETRAGON_FEED_DIR/tetragon.heartbeat.json"
+    --observation-origin real --observation-environment "${RUNTIME_KUBE_CONTEXT:-kind-runtime-lab}")
+fi
 echo "runtime Gateway: http://127.0.0.1:$RUNTIME_PORT (기록: $RUNTIME_DATA_DIR${RUNTIME_LAB_REPORT:+ · lab 보고서: $RUNTIME_LAB_REPORT})"
 (cd "$ROOT/runtime" && "${RT[@]}" mvp \
   --gateway-port "$RUNTIME_PORT" --engine-port "$ENGINE_PORT" --data-dir "$RUNTIME_DATA_DIR" ${EXTRA[@]+"${EXTRA[@]}"}) &
@@ -80,11 +96,32 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 
+if [ -n "${RUNTIME_TETRAGON_IDENTITY_SELECTOR:-}" ]; then
+  (cd "$ROOT/runtime" && uv run -q --no-project --python 3.12 --with-editable . python -B -m tools.tetragon_identities \
+    --context "${RUNTIME_KUBE_CONTEXT:-kind-runtime-lab}" --namespace "${RUNTIME_TETRAGON_NAMESPACE:-serving-lab}" \
+    --selector "$RUNTIME_TETRAGON_IDENTITY_SELECTOR" --output "$RUNTIME_TETRAGON_IDENTITIES" --watch) &
+  TETRAGON_IDENTITY_PID=$!
+fi
+if [ -n "${RUNTIME_TETRAGON_STREAM_POLICIES:-}" ]; then
+  STREAM_ARGS=()
+  IFS=',' read -r -a STREAM_POLICIES <<< "$RUNTIME_TETRAGON_STREAM_POLICIES"
+  for policy in "${STREAM_POLICIES[@]}"; do STREAM_ARGS+=(--policy "$policy"); done
+  (cd "$ROOT/runtime" && uv run -q --no-project --python 3.12 --with-editable . python -B -m tools.tetragon_stream \
+    --context "${RUNTIME_KUBE_CONTEXT:-kind-runtime-lab}" --namespace "${RUNTIME_TETRAGON_NAMESPACE:-serving-lab}" \
+    "${STREAM_ARGS[@]}" --output "$TETRAGON_FEED_DIR") &
+  TETRAGON_STREAM_PID=$!
+fi
 if [ "${RUNTIME_TETRAGON_STATE:-0}" = "1" ]; then
+  RECOVERY_ARGS=()
+  if [ -n "${RUNTIME_TETRAGON_BASELINE:-}" ]; then
+    RECOVERY_ARGS+=(--expected-policies "$RUNTIME_TETRAGON_BASELINE"
+      --identities "${RUNTIME_TETRAGON_IDENTITIES:?복구 확인에는 대상 식별 자료가 필요합니다}"
+      --feed-heartbeat "$TETRAGON_FEED_DIR/tetragon.heartbeat.json" --observations "$RUNTIME_DATA_DIR/observations.jsonl")
+  fi
   (cd "$ROOT/runtime" && uv run -q --no-project --python 3.12 --with-editable . python -B -m tools.tetragon_status \
     --context "${RUNTIME_KUBE_CONTEXT:-kind-runtime-lab}" \
     --output "$RUNTIME_DATA_DIR/tetragon-state.json" \
-    --evidence-dir "${TETRAGON_EVIDENCE_DIR:-$STATE_HOME/tetragon-evidence}" --watch) &
+    --evidence-dir "${TETRAGON_EVIDENCE_DIR:-$STATE_HOME/tetragon-evidence}" "${RECOVERY_ARGS[@]}" --watch) &
   TETRAGON_PID=$!
 fi
 

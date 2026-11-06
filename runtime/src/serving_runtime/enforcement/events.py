@@ -248,7 +248,15 @@ def parse_tetragon(
     environment: str | None = None,
     run_id: str | None = None,
     exec_policy: Any = None,
+    identity_index: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    identity = None
+    if identity_index is not None:
+        from .attribution import bind_event
+        try:
+            document, identity = bind_event(_object(document, "$"), identity_index)
+        except (TypeError, AttributeError, KeyError, ValueError):
+            identity = {"state":"unavailable","source":None,"reason":"identity_evidence_invalid"}
     root = _object(document, "$")
     observed_at = _event_time(root)
     event_names = [name for name in root if name.startswith("process_")]
@@ -260,7 +268,7 @@ def parse_tetragon(
         raise UnsupportedTetragonEvent(f"unsupported Tetragon event: {event_name}")
     if event_name == "process_exec":
         raw_process = event.get("process")
-        if not isinstance(raw_process, dict) and exec_policy is not None:
+        if not isinstance(raw_process, dict) and (exec_policy is not None or identity_index is not None):
             normalized = _base(observed_at, "tetragon", "process_exec", data_origin,
                                environment=environment, run_id=run_id)
             normalized.update({"binary": None, "process_attribution": "unavailable",
@@ -268,11 +276,13 @@ def parse_tetragon(
                                "container_attribution": "unavailable", "path": None,
                                "access": None, "rule_id": "TG-EXEC-01", "action": "observed",
                                "action_raw": "observed", "action_mode": "monitor", "allowed_binary": None})
-            normalized.update(exec_policy.classify_exec(
-                binary="", parent=None, image=None, observed_at=observed_at, pod_uid=None))
+            if exec_policy is not None:
+                normalized.update(exec_policy.classify_exec(
+                    binary="", parent=None, image=None, observed_at=observed_at, pod_uid=None))
+            if identity is not None:
+                normalized["identity"] = identity
             return normalized
-        binary, pod = _process(event, "$.process_exec", require_binary=True)
-        assert binary is not None
+        binary, pod = _process(event, "$.process_exec", require_binary=identity_index is None)
         normalized = _base(
             observed_at,
             "tetragon",
@@ -285,7 +295,7 @@ def parse_tetragon(
         normalized.update(
             {
                 "binary": binary,
-                "process_attribution": "available",
+                "process_attribution": "available" if binary is not None else "unavailable",
                 "pod": pod,
                 "pod_attribution": "available" if pod is not None else "unavailable",
                 "container_attribution": (
@@ -302,7 +312,7 @@ def parse_tetragon(
                 "action_mode": "monitor",
                 "allowed_binary": (
                     binary in allowlist
-                    if allowlist and (exec_policy is None or _matches_engine(event, exec_policy.intent))
+                    if binary is not None and allowlist and (exec_policy is None or _matches_engine(event, exec_policy.intent))
                     else None
                 ),
             }
@@ -318,7 +328,7 @@ def parse_tetragon(
             )
             normalized.update(
                 exec_policy.classify_exec(
-                    binary=binary,
+                    binary=binary or "",
                     parent=parent_binary,
                     image=_image_digest(event.get("process")),
                     observed_at=observed_at,
@@ -337,6 +347,8 @@ def parse_tetragon(
                 binary, parent=parent_binary if isinstance(parent_binary, str) and parent_binary else None,
                 image=_image_digest(event.get("process")),
             ))
+        if identity is not None:
+            normalized["identity"] = identity
         return normalized
 
     binary, pod = _process(event, "$.process_kprobe", require_binary=False)
@@ -403,6 +415,12 @@ def parse_tetragon(
     )
     if exec_policy is not None and normalized["rule_id"] == "TG-CACHE-01":
         normalized.update(exec_policy.classify_cache_write(file_path))
+    if identity is not None:
+        normalized["identity"] = identity
+    if (normalized["rule_id"] == "TG-HEALTH-01" and file_path == "/run/byul-runtime-sentinel/read.txt"
+        and identity is not None and identity.get("state") == "confirmed"
+        and identity.get("container_name") == "sentinel" and action.upper() == "KPROBE_ACTION_POST"):
+        normalized["observation_purpose"] = "health_check"
     return normalized
 
 
@@ -437,6 +455,7 @@ def transform_lines_with_loss(
     environment: str | None = None,
     run_id: str | None = None,
     exec_policy: Any = None,
+    identity_index: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Transform lines while retaining only line numbers and safe error reasons."""
 
@@ -469,6 +488,7 @@ def transform_lines_with_loss(
                     environment=environment,
                     run_id=run_id,
                     exec_policy=exec_policy,
+                    identity_index=identity_index,
                 )
         except UnsupportedTetragonEvent:
             continue

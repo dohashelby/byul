@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -9,6 +10,8 @@ import time
 
 from tools.tetragon_capability import classify_capabilities
 from tools.tetragon_trial import atomic_json, run
+from serving_runtime.enforcement.tetragon import comparable_spec
+from serving_runtime.enforcement.recovery import RecoveryTracker
 
 SCHEMA="runtime-tetragon-state/1.0"
 
@@ -27,11 +30,12 @@ def method_from_spec(policy):
 
 
 class StatusCollector:
-    def __init__(self,context,output,evidence_dir,*,runner=run):
+    def __init__(self,context,output,evidence_dir,*,runner=run,recovery=None):
         self.context=context
         self.output=Path(output)
         self.evidence=Path(evidence_dir)
         self.run=runner
+        self.recovery=recovery
         self.capabilities=[]
         self.capabilities_at=0.0
         self.spec_fingerprint=None
@@ -48,6 +52,7 @@ class StatusCollector:
         result={"schema_version":SCHEMA,"generated_at":datetime.now(timezone.utc).isoformat(),"context":self.context,
                 "state":"ok","error":None,"policies":[],"capabilities":[],"transitions":[],"verifications":[]}
         result["agents"]=[]
+        result["operation_checks"]=[]
         try:
             pods=self.kube("get","pods","-l","app.kubernetes.io/name=tetragon","-o","json")
             if pods.returncode:
@@ -61,6 +66,9 @@ class StatusCollector:
             spec_docs=json.loads(specs.stdout).get("items",[])
             fingerprint=sorted((p.get("metadata",{}).get("namespace",""),p.get("metadata",{}).get("name",""),
                                 p.get("metadata",{}).get("resourceVersion","")) for p in spec_docs)
+            fingerprint += sorted(("agent", p.get("metadata",{}).get("uid",""),
+                str(next((s.get("restartCount") for s in p.get("status",{}).get("containerStatuses",[])
+                          if s.get("name")=="tetragon"),None))) for p in pod_docs)
             if fingerprint != self.spec_fingerprint:
                 self.spec_fingerprint=fingerprint
                 self.spec_changed_at=time.monotonic()
@@ -68,6 +76,9 @@ class StatusCollector:
                 raise ValueError("정책 변경 감지: 로드 안정화 대기 중")
             methods={(p.get("metadata",{}).get("namespace"),p.get("metadata",{}).get("name")):method_from_spec(p)
                      for p in spec_docs}
+            hashes={(p.get("metadata",{}).get("namespace"),p.get("metadata",{}).get("name")):
+                hashlib.sha256(json.dumps(comparable_spec(p.get("spec",{})),sort_keys=True,separators=(",",":")).encode()).hexdigest()
+                for p in spec_docs}
             refresh=not self.capabilities or time.monotonic()-self.capabilities_at>60
             capabilities=[]
             for pod in pod_docs:
@@ -81,6 +92,7 @@ class StatusCollector:
                 summary=("정책 조회 경로 내부 오류 (TotalMemlock/ListTracingPolicies)"
                          if "TotalMemlock" in message and "ListTracingPolicies" in message else None)
                 result["agents"].append({"node":node,"restart_count":agent.get("restartCount"),
+                    "pod_uid":pod["metadata"].get("uid"),
                     "last_exit_at":ended.get("finishedAt"),"last_exit_code":ended.get("exitCode"),
                     "last_exit_reason":ended.get("reason"),"last_exit_summary":summary})
                 raw=self.node_read(name,"tetra","tp","list","-o","json")
@@ -92,6 +104,7 @@ class StatusCollector:
                         "id":str(policy.get("id")),"state":policy.get("state","").removeprefix("TP_STATE_").lower(),
                         "mode":mode if mode in {"monitor","enforce","monitor_only"} else "unknown",
                         "method":methods.get((policy.get("namespace"),policy.get("name"))),
+                        "spec_sha256":hashes.get((policy.get("namespace"),policy.get("name"))),
                         "load_error":str(policy.get("error", ""))[:500] or None})
                 if refresh:
                     kernel=(self.node_read(name,"uname","-r") or "").strip() or None
@@ -125,8 +138,19 @@ class StatusCollector:
                 if record.get("context")==self.context and record.get("schema_version")=="runtime-tetragon-verification/1.0":
                     result["verifications"].append(record)
             result["verifications"].sort(key=lambda item: str(item.get("finished_at", "")), reverse=True)
+            for path in sorted(self.evidence.glob("*.operations.json"),key=lambda p:p.stat().st_mtime,reverse=True)[:10]:
+                record=json.loads(path.read_text())
+                if record.get("context")==self.context and record.get("schema_version")=="runtime-tetragon-operations-check/1.0":
+                    result["operation_checks"].append(record)
         except (OSError,ValueError,TypeError,AttributeError,RecursionError):
             result.update(state="error",error="Tetragon trial evidence could not be read")
+        if self.recovery is not None:
+            try:
+                result["monitoring"] = self.recovery.update(result)
+            except (OSError,ValueError,TypeError,AttributeError,KeyError):
+                result["monitoring"] = {"state":"error","reasons":["recovery_evidence_unavailable"]}
+        else:
+            result["monitoring"] = {"state":"not_configured","reasons":["recovery_check_not_configured"]}
         atomic_json(self.output,result)
         return result
 
@@ -138,15 +162,34 @@ def main():
     parser.add_argument("--evidence-dir",type=Path,required=True)
     parser.add_argument("--watch",action="store_true")
     parser.add_argument("--interval",type=float,default=5)
+    parser.add_argument("--capture-baseline",type=Path,help="현재 정책 spec·모드를 기대값 파일로 저장; 원격 변경 없음")
+    parser.add_argument("--expected-policies",type=Path)
+    parser.add_argument("--identities",type=Path)
+    parser.add_argument("--feed-heartbeat",type=Path)
+    parser.add_argument("--observations",type=Path)
     args=parser.parse_args()
     if args.interval<1: parser.error("interval must be at least one second")
-    collector=StatusCollector(args.context,args.output,args.evidence_dir)
+    checks=[args.expected_policies,args.identities,args.feed_heartbeat,args.observations]
+    if any(checks) and not all(checks):
+        parser.error("recovery checks require expected-policies, identities, feed-heartbeat and observations")
+    if args.capture_baseline and args.watch:
+        parser.error("baseline capture is a one-shot read")
+    recovery=(RecoveryTracker(args.context,args.output.with_name(args.output.name+".recovery.json"),
+        baseline_path=args.expected_policies,identities_path=args.identities,
+        heartbeat_path=args.feed_heartbeat,observations_path=args.observations) if all(checks) else None)
+    collector=StatusCollector(args.context,args.output,args.evidence_dir,recovery=recovery)
     while True:
         result=collector.collect()
         if not args.watch and result.get("error")=="정책 변경 감지: 로드 안정화 대기 중":
             time.sleep(3.1)
             result=collector.collect()
         print(json.dumps({"state":result["state"],"policies":len(result["policies"]),"verifications":len(result["verifications"])}),flush=True)
+        if args.capture_baseline:
+            if result["state"]!="ok" or not result["policies"]:
+                return 1
+            atomic_json(args.capture_baseline,{"schema_version":"runtime-tetragon-baseline/1.0",
+                "context":args.context,"captured_at":result["generated_at"],
+                "policies":[{k:p.get(k) for k in ("node","namespace","name","mode","spec_sha256")} for p in result["policies"]]})
         if not args.watch: break
         time.sleep(args.interval)
     return 0 if result["state"]=="ok" else 1

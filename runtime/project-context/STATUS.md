@@ -2,6 +2,8 @@
 
 최종 갱신: 2026-11-06
 
+- 최신 작업: 운영 Tetragon 이벤트의 Pod·컨테이너·프로세스 귀속과 감시 중단·복구 확인을 구현했다. 두 Pod/주·자식·스레드 접근과 에이전트 실제 교체·살아 있는 수집기의 전달 중단을 로컬 kind에서 확인했다. 개발 화면은 실제 8개 정책과 복구 조건/공백 이력을 조회한다. 기준 `82804c1`, 사용자 요청으로 이번 변경을 로컬 커밋한다. 상세·검증 범위는 아래 최신 기록 및 `docs/Tetragon_운영귀속_복구_20261106.md`.
+
 - 현재 후속 결과: 시험 수집의 Pod 귀속 누락을 커널 task·CRI 대조로 보완한 뒤 Sigkill·LSM Override+Sigkill 각각 새 namespace 3회 연속 통과, Override 단독 EPERM 진단 통과, syscall 미지원 재확인. 실제 MODE·기능 조건·전환 기록·근거 다운로드 화면 연결. runtime 742건(skip 0)·API 197건·web 92건 및 타입 검사 통과. 사용자 요청은 로컬 커밋까지만이며 AWS/GPU 적용·PR·푸시·머지는 범위 밖이다. 일반 운영 이벤트의 WSL 귀속 제약과 Tetragon 에이전트 버그는 남는다. 상세는 아래 2026-11-06 후속 검증 기록.
 - 2026-11-06 사용자 요청으로 정책 묶음 내보내기·Tetragon 후보 PR #224를 main에 머지했다(`1a03e6c`, GitHub 필수 검사 7개 성공). `byul_runtime`도 같은 커밋으로 동기화했다. 준비 중 CI의 runtime 패키지 메타데이터 누락과 모드 전환 시간 초과 뒤 rollback 누락 경로를 수정했다. 소켓 허용 환경의 runtime 전체 725건 전부 통과(skip 0), 깨끗한 Git 사본 API 194건, web 88건·타입 검사, CI 경로 분기 10건과 공용 계약 검사 통과. 실제 kind·AWS 신규 후보 차단 효과는 아직 미검증이다.
 - 후속 작업 순서: (1) 파일 읽기 거부·프로세스 종료의 판정과 시험 보완, (2) 로컬 kind에서 시험용 Pod의 후보별 동작·복귀 실측, (3) 실제 정책 MODE·선택 방식·지원 점검·전환/복귀 결과·시험 근거를 대시보드에 연결, (4) AWS 시험용 Pod부터 두 엔진·서빙 복구 검증, (5) 인증된 서버 제어 경로로 화면 모드 전환과 묶음 자동 적용 연결. 후속 기능 구현과 서버 가동은 이번 PR 머지 작업에서 하지 않았다.
@@ -465,3 +467,16 @@
 - Chromium에서 실제 개발 화면의 정책 4개·시험 결과 표·커널 task 식별 설명을 확인했다. LSM 성공 행의 근거 JSON을 실제 다운로드해 file_read_denial=confirmed·identity_source=kernel_task·CRI init PID 1을 대조했다. 페이지 오류 0. 개발 서비스 재연결 후 최신 실제 수집 상태를 확인했고 스크린샷/다운로드는 `/tmp/byul-tetragon-dashboard-*-reviewed.png`, `/tmp/byul-tetragon-reviewed-download.json`에 보존했다.
 - 후속 검수에서 uint64 나노초를 문자열로 보존해 브라우저의 긴 uptime 정밀도 손실을 막았다. 상단 예시 경고는 실제 runtime까지 예시로 오해하지 않도록 예시 source에 한정했다. web 최종 타입 검사·92건(`--maxWorkers=1`) 통과. 동시 실행에서는 기존 웹 환경 폼 5초 timeout, 기존 runtime 관리 listener 50ms 한도 시험의 504/502 경합이 각각 1회 있었고 시간 한도를 완화하지 않고 재확인했다.
 - 최종 순차 runtime 전체 재시험 742건 통과(skip 0, 140.208초); 관리 listener 실패 사례와 변경 기능 17건도 별도 통과했다. API 최종 전체 197건, web 최종 92건·타입 검사, 계약 13개 스키마/11개 예시 오류 0, 셸 구문 검사·diff 검사 통과. 원래 에이전트 spec·기준 정책 spec 일치, 잔여 시험 namespace 0, live 상태 fresh/ok·정책 4개·보고서 16개를 확인했다.
+
+## 2026-11-06 운영 귀속·감시 중단/복구 보완 (기준 82804c1, 로컬 커밋)
+
+- intent 1.1 선택 필드 `tetragon_kernel_identity`와 일반 운영 `enforcement/attribution.py`·`tools/tetragon_identities.py`를 추가했다. 적용 정책의 커널 tgid·group_leader.start_boottime·PID namespace와 정확한 CRI 컨테이너/Pod UID·procfs 시작 tick을 대조한다. 일반 ObservationFeed에 연결했고 같은 tick의 중복 후보·충돌·만료·너무 빠른 종료는 미확인으로 남긴다. 인자/환경 변수/파일 내용은 수집하지 않는다. 기존 trial 전용 귀속 코드와 구분한다.
+- 새 `enforcement/recovery.py`·`tools/tetragon_stream.py`는 에이전트 UID/restarts/준비 상태와 스트림을 감독하고, 저장한 정책 spec·모드 기대값/수집기/식별 자료/복구 이후 새 실제 이벤트를 모두 요구한다. 살아 있는 writer의 이벤트 전달 중단도 감지한다. 기대값 자동 갱신·누락 정책 무조건 재적용·무공백/완전한 backfill 보장은 하지 않는다. 중복 종료 신호와 원격 자기 세션 정리도 보완했으며 최신 서비스 정상 재시작 1.63초를 확인했다.
+- API/대시보드에 복구 조건 네 가지·공백 이력·운영 실측, 일반 이벤트의 Pod UID/컨테이너/커널·컨테이너 PID를 연결했다. 개발 스크립트가 생산자들을 명시 설정으로 함께 실행한다. 자가점검 DaemonSet은 가짜 파일만 읽고 노드당 receipt 한 건을 별도 저장해 보안 사건 수를 늘리지 않는다. 화면에서 서버 자동 적용/모드 변경 실행은 후속 범위로 유지했다.
+- 실측 `byul-proof-4296fa7ca9`: 서로 다른 두 Pod의 주/자식 구분·에이전트 실제 교체·공백 감지·정책/새 이벤트 복구·원래 정책 보존·정리 통과. `byul-proof-265c9552ed`: group_leader 기반 스레드 접근까지 통과(재시작 시험은 이 실행에 포함하지 않음). 영구 보고서/원본/해시는 `~/.local/state/serving-runtime/tetragon-evidence/operations-artifacts/`에 있다. 개발 연결 전체의 에이전트 교체와 수집 child SIGSTOP→감지→SIGCONT 복구도 통과했고 `/tmp/byul-tetragon-live-agent-recovery.json`, `/tmp/byul-tetragon-silent-stall-check.json`에 기록했다.
+- 현재 로컬 kind에는 기존 네 정책을 유지하고 별도 Post 정책 `runtime-tg-{asset,cache,secret}-01-identity-v2`·`runtime-tg-health-01-sentinel-v2`만 더했다. v1 추가 정책은 v2 새 이벤트 확인 후 제거했다. 실제 GPU 엔진/AWS/다중 노드 시험은 하지 않았다.
+- 새 파일: attribution/recovery, identities/stream/operations_check 도구, runtime 시험 세 개, lab sentinel JSON, 운영 보완 문서. 수정: runtime intent/렌더/CLI/Gateway/feed/status, platform 상태 모델/생성 타입/관측·정책 화면/개발 실행 스크립트. contracts/update 구현과 기존 미추적 인계·작업지시·체크리스트 문서는 변경하지 않았다.
+- 검증: API 전체 197건 통과. runtime 전체 766건 통과 뒤 추가 시험을 더했고, 767건 실행의 기존 정책 만료 시각 시험 1회 경합은 해당 사례 포함 25건 재시험 통과로 확인했다(시간 한도 수정 없음). 최신 runtime 전체 및 웹 타입/전체 시험은 마무리 실행 로그 `/tmp/byul-ops-runtime-final-verified.log`, `/tmp/byul-ops-web-verified.log`에 기록한다. 최종 결과는 아래에 덧붙인다.
+- 사용자 요청으로 작업을 마무리하고 로컬 커밋한다. 푸시/PR은 하지 않는다. Claude 대화형 독립 검수와 최신 변경의 브라우저 시각 검수는 별도다. AWS 서버는 켜지 않았다.
+
+- 최종 마무리 검증: runtime 전체 768건 통과(skip 0, `/tmp/byul-ops-runtime-final-verified.log`), web 타입 검사·93건 통과, API 전체 197건 통과, 계약 스키마 13개/예시 11개 오류 0, 셸 구문·`git diff --check` 통과. 잔여 `byul-proof-*` namespace 0, 실제 개발 상태 `ok/healthy`·정책 8개·운영 실측 보고서 2개를 확인했다.

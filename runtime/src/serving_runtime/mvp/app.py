@@ -272,6 +272,7 @@ class GatewayApp:
                 heartbeat_path=observation_heartbeats.get(kind),
                 heartbeat_stale_after_s=config.collector_stale_after_s,
                 exec_policy=self._exec_policy,
+                identity_path=config.tetragon_identities_path,
             )
             self._observation_feeds.append(feed)
             collectors.append(
@@ -307,6 +308,8 @@ class GatewayApp:
             )
         kube_context = config.kube_context or registered_context or DEFAULT_KUBE_CONTEXT
         self._tetragon_context = kube_context
+        for feed in self._observation_feeds:
+            feed.kube_context = kube_context
         self._cilium_policy_collector: CiliumPolicyCollector | None = None
         if config.cilium_policy_status:
             self._cilium_policy_collector = CiliumPolicyCollector(

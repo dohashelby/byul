@@ -179,6 +179,7 @@ class EnforcementIntent:
     tetragon_rule_modes: tuple[tuple[str, str], ...] = ()
     tetragon_enforce_method: str | None = None
     tetragon_openat_symbol: str | None = None
+    tetragon_kernel_identity: bool = False
 
     def tetragon_rule_mode(self, rule_id: str) -> str:
         return dict(self.tetragon_rule_modes).get(rule_id, "monitor")
@@ -399,6 +400,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
             "tetragon_rule_modes",
             "tetragon_enforce_method",
             "tetragon_openat_symbol",
+            "tetragon_kernel_identity",
         },
     )
     schema = _required(root, "schema", "$")
@@ -418,12 +420,15 @@ def parse_intent(document: Any) -> EnforcementIntent:
         "tetragon_rule_modes",
         "tetragon_enforce_method",
         "tetragon_openat_symbol",
+        "tetragon_kernel_identity",
     }
     if not v11:
         present = sorted(v11_fields & set(root))
         if present:
             raise IntentError(f"$ has unknown fields: {', '.join(present)}")
     namespace = _nonempty_string(_required(root, "namespace", "$"), "$.namespace")
+    if type(root.get("tetragon_kernel_identity", False)) is not bool:
+        raise IntentError("$.tetragon_kernel_identity must be boolean")
     gateway = _workload(_required(root, "gateway", "$"), "$.gateway")
     engine = _workload(_required(root, "engine", "$"), "$.engine", engine=True, v11=v11)
 
@@ -786,6 +791,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
         tetragon_rule_modes=tuple(rule_modes),
         tetragon_enforce_method=root.get("tetragon_enforce_method"),
         tetragon_openat_symbol=root.get("tetragon_openat_symbol"),
+        tetragon_kernel_identity=root.get("tetragon_kernel_identity", False),
     )
 
 

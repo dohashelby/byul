@@ -28,6 +28,17 @@ it("수집 지연이면 마지막 모드를 현재 상태로 확정하지 않는
   expect(screen.queryByText("현재 정책 모드")).toBeNull();
 });
 
+it("정책 조회가 정상이어도 복구 후 이벤트를 기다리면 감시 복구로 표시하지 않는다", async () => {
+  const item={...state(),monitoring:{state:"recovering",reasons:["waiting_for_attributed_event"],
+    policies_verified:true,writer_verified:true,identities_verified:true,events_verified:false,
+    open_gap:{opened_at:"2026-11-06T00:00:00Z",last_verified_at:null,reason:"agent_epoch_changed"},history:[]}};
+  mockApi({"/api/runtime/tetragon-status":{item,source:SOURCE}});
+  renderAt("/runtime/enforce/tetragon","/runtime/enforce/tetragon",<TetragonPolicyPage />);
+  expect(await screen.findByText("중단·복구 확인 중")).toBeTruthy();
+  expect(screen.getByText("복구 이후 대상이 확인된 새 이벤트 대기")).toBeTruthy();
+  expect(screen.queryByText("복구 조건 확인됨")).toBeNull();
+});
+
 it("종료 확인과 파일 읽기 거부 미확인을 다른 칸에 표시한다", async () => {
   const item = state();
   item.verifications = [{ id: "proof", context: "kind-runtime-lab", namespace: "trial", policy: "trial-policy", method: "sigkill_fd_install", data_origin: "real",

@@ -67,6 +67,14 @@
 
 세션6 고정 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup05-preservation-delta-20261106-v1/preservation-review-v2.json`, SHA256 `1bb68051b16902db5ec90e068bc2d4aeb41aae2d4b3ebfa50f50a7d4ca8351ed`다. 해당 고정 변경의 실행 전 차단 결함·추가 필수 입력은 없으며, 실제 정상 역할 실행과 원자료·정리 결과는 별도 검증한다.
 
+## GB09 원본 전체 회수 — 무결성 검증 완료
+
+2026-11-06 22:21:25 KST 세션6 검증에서, 새 전송v3로 반출한 정확한 원GB09 ZIP 2,203,771 bytes의 SHA256 `7ee9e4128cf5c2ff1e32feb23603a0ea10ee35b6c88fb0717370b32c60437673`를 확인했다. ZIP CRC674개·payload673개의 bytes/SHA·고유 manifest 집합·원 archive 생성 명령과 반출 receipt 결합·Linux 다운로드와 Windows 사본 일치가 확인됐다. 이는 이전 v2의 미반출·timeout 기록 이후 새로 확인한 전체 회수 성공이다. 과거 partial·timeout·정지 감시 실패 기록은 보존한다.
+
+원 manifest 생성 시각은 같은 날18:58:25 KST다. 원 실험 source는 `3b3ff137b31b830403ccce1997dabf26319bac4f`이며 후속 회수용 부팅을 원 실험 부팅으로 바꾸지 않았다. manifest의 `normal_diagnostic_only=true`, `actual_product_Refs_created=false`, `whole_question_complete=false`를 유지한다. 이 무결성 검토만으로 writer/native 의미·정상 대조·factory→EVD→RES→RPT·정확 Ref 복원·저장 팩 재판정을 확인한 것은 아니다. 내부 의미 검토와 새 회수 건의 정지·자원·비용 마감 검증은 별도 반환을 기다린다.
+
+고정 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/transport-v3-actual-20261106/recovered-GB09-archive-integrity-v1.json`, SHA256 `5d5124b68eda36b0b34d987aecb9531dc6309d2ce53d6dfb7b813c51bb4e8943`다. 원 ZIP과 계정·인프라 식별자는 게시하지 않는다. 한 파일의 회수 성공을 모든 전송 장애 해결이나 SUP-16 제품 성공으로 확대하지 않으며 25개 한정 마감 제안·18개 제품 증거 필요 분류는 유지한다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

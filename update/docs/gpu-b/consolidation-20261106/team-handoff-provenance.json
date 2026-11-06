@@ -24,5 +24,7 @@
   "GB09_whole_archive_recovered": false,
   "whole43_complete": false,
   "new_tests_or_raw_verification_by_publisher": false,
-  "local_raw_not_published": true
+  "local_raw_not_published": true,
+  "historical_snapshot": true,
+  "subsequent_verified_results": "FOLLOWUP_RESULTS.md"
 }

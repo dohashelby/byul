@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Navigate, RouterProvider, createBrowserRouter, createMemoryRouter, type RouteObject } from "react-router-dom";
+import { RuntimeOperationsPage } from "../pages/RuntimeOperations";
 import { DashboardPage } from "../pages/DashboardPage";
 import { DocListPage, EnvironmentEditorPage, PolicyEditorPage } from "../pages/DocumentsPage";
 import { EventsPage } from "../pages/EventsPage";
@@ -37,6 +38,7 @@ export const routes: RouteObject[] = [
       { path: "runtime/overview", element: <DashboardPage /> },
       { path: "runtime/alerts", element: <AlertsPage /> },
       { path: "runtime/observe/phases", element: <PhaseTimelinePage /> },
+      { path: "runtime/operations", element: <RuntimeOperationsPage /> },
       { path: "runtime/requests", element: <RequestsPage /> },
       { path: "runtime/blocked", element: <BlockedPage /> },
       { path: "runtime/policy", element: <RuntimePolicyPage /> },

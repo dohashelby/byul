@@ -32,6 +32,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--version", action="version", version=f"%(prog)s {version('serving-runtime')}"
     )
     commands = parser.add_subparsers(dest="command")
+    from .operations.agent import add_arguments
+
+    agent_parser = commands.add_parser("agent", help="플랫폼 운영 요청 조회·검증·실행")
+    add_arguments(agent_parser)
     file_parser = commands.add_parser("file-info", help="파일 크기와 SHA-256 확인")
     file_parser.add_argument("path", type=Path, help="확인할 일반 파일 경로")
     bundle_parser = commands.add_parser("bundle", help="LAB 정책 묶음 확인")
@@ -58,6 +62,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     bundle_apply_parser.add_argument("--status-url", required=True, help="Gateway 내부 포트를 담은 로컬 URL; 새 임시 port-forward를 엽니다")
     bundle_apply_parser.add_argument("--token-env-file", metavar="FILE", help="RUNTIME_VIEWER_TOKEN을 읽을 env 파일(조회가 비보호면 생략 가능)")
     bundle_apply_parser.add_argument("--dry-run", action="store_true")
+    bundle_apply_parser.add_argument("--operation-result", action="store_true", help="에이전트용 제한된 JSON 결과")
     mvp_parser = commands.add_parser("mvp", help="로컬 Gateway와 선택한 backend 실행")
     mvp_parser.add_argument("--policy", metavar="PATH")
     mvp_parser.add_argument(
@@ -302,6 +307,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--resume", action="store_true", help="기존 timeline 상태와 입력 위치에서 이어가기"
     )
     args = parser.parse_args(argv)
+    if args.command == "agent":
+        from .operations.agent import main as agent_main
+        return agent_main(args)
     if args.command == "file-info":
         try:
             info = inspect_file(args.path)
@@ -346,8 +354,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                                   kubeconfig=args.kubeconfig,
                                   dry_run=args.dry_run, existing=args.existing)
         except (OSError, ValueError, RuntimeError) as error:
-            print(f"정책 묶음 적용 실패: {error}", file=sys.stderr)
+            if args.operation_result:
+                restored = "이전 링크 복원 및 재시작 완료" in str(error)
+                print(json.dumps({"state": "rolled_back" if restored else "unknown",
+                                  "code": "ROLLED_BACK" if restored else "STATUS_UNKNOWN"}))
+            else:
+                print(f"정책 묶음 적용 실패: {error}", file=sys.stderr)
             return 1
+        if args.operation_result:
+            print(json.dumps({"state": "succeeded", "code": "OK"}))
+            return 0
         print(f"묶음 {'적용 계획' if result['dry_run'] else '적용·상태 확인'} 성공: "
               f"{result['previous']} -> {result['bundle_id']}")
         return 0
@@ -485,7 +501,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         except (OSError, ValueError, IntentError) as error:
             print(f"통제 후보 생성 실패: {error}", file=sys.stderr)
             return 1
-        blocked_rules = sum(mode == "enforce" for _, mode in intent.tetragon_rule_modes)
+        blocked_rules = len({rule for rule, mode in intent.tetragon_rule_modes if mode == "enforce"}
+                            | {rule for rule, modes in intent.tetragon_allowed_modes if "enforce" in modes})
         blocked_summary = f", 차단 규칙 {blocked_rules}개(미검증)" if blocked_rules else ""
         print(
             f"{len(written)}개 생성: Cilium 1.20.3 / Tetragon 1.7.1 문법 기준 후보, "

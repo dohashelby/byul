@@ -177,12 +177,18 @@ class EnforcementIntent:
     parent_constraints: tuple[tuple[str, tuple[str, ...]], ...] = ()
     suspect_parent_contexts: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = ()
     tetragon_rule_modes: tuple[tuple[str, str], ...] = ()
+    tetragon_allowed_modes: tuple[tuple[str, tuple[str, ...]], ...] = ()
     tetragon_enforce_method: str | None = None
     tetragon_openat_symbol: str | None = None
     tetragon_kernel_identity: bool = False
 
     def tetragon_rule_mode(self, rule_id: str) -> str:
         return dict(self.tetragon_rule_modes).get(rule_id, "monitor")
+
+    def allowed_modes(self, rule_id: str) -> tuple[str, ...]:
+        # Legacy modes express candidate capability, never current server MODE.
+        legacy = ("monitor", "enforce") if self.tetragon_rule_mode(rule_id) == "enforce" else ("monitor",)
+        return dict(self.tetragon_allowed_modes).get(rule_id, legacy)
 
     def binaries_for(self, phase: str) -> tuple[str, ...]:
         return dict(self.phase_binaries).get(phase, ())
@@ -398,6 +404,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
             "parent_constraints",
             "suspect_parent_contexts",
             "tetragon_rule_modes",
+            "tetragon_allowed_modes",
             "tetragon_enforce_method",
             "tetragon_openat_symbol",
             "tetragon_kernel_identity",
@@ -418,6 +425,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
         "parent_constraints",
         "suspect_parent_contexts",
         "tetragon_rule_modes",
+        "tetragon_allowed_modes",
         "tetragon_enforce_method",
         "tetragon_openat_symbol",
         "tetragon_kernel_identity",
@@ -511,7 +519,22 @@ def parse_intent(document: Any) -> EnforcementIntent:
             if rule_mode == "enforce" and rule_id != "TG-SECRET-01":
                 raise IntentError(f"$.tetragon_rule_modes.{rule_id} cannot enforce yet")
             rule_modes.append((rule_id, rule_mode))
-    if dict(rule_modes).get("TG-SECRET-01") == "enforce":
+    allowed_modes = []
+    if "tetragon_allowed_modes" in root:
+        for rule_id, modes in _object(root["tetragon_allowed_modes"], "$.tetragon_allowed_modes", set(TETRAGON_RULE_MODES)).items():
+            if (not isinstance(modes, list) or not modes or any(m not in ("monitor", "enforce") for m in modes)
+                    or len(set(modes)) != len(modes) or "monitor" not in modes):
+                raise IntentError("allowed modes require unique monitor/enforce values including monitor")
+            if "enforce" in modes and rule_id != "TG-SECRET-01":
+                raise IntentError("only TG-SECRET-01 supports enforce")
+            if rule_id in dict(rule_modes) and ((dict(rule_modes)[rule_id] == "enforce") != ("enforce" in modes)):
+                raise IntentError("tetragon_rule_modes conflicts with tetragon_allowed_modes")
+            allowed_modes.append((rule_id, tuple(modes)))
+    secret_capable = ("enforce" in dict(allowed_modes).get("TG-SECRET-01", ())
+                      or dict(rule_modes).get("TG-SECRET-01") == "enforce")
+    if "enforce" in dict(allowed_modes).get("TG-SECRET-01", ()) and not root.get("tetragon_enforce_method"):
+        raise IntentError("new allowed enforce mode requires an explicit enforcement method")
+    if secret_capable:
         method = root.get("tetragon_enforce_method")
         if method is not None and method not in {"override_lsm", "sigkill_fd_install", "override_syscall"}:
             raise IntentError("$.tetragon_enforce_method is unsupported")
@@ -789,6 +812,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
         parent_constraints=tuple(parent_constraints),
         suspect_parent_contexts=tuple(suspect_parent_contexts),
         tetragon_rule_modes=tuple(rule_modes),
+        tetragon_allowed_modes=tuple(allowed_modes),
         tetragon_enforce_method=root.get("tetragon_enforce_method"),
         tetragon_openat_symbol=root.get("tetragon_openat_symbol"),
         tetragon_kernel_identity=root.get("tetragon_kernel_identity", False),

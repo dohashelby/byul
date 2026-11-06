@@ -64,6 +64,7 @@ export const AREAS: Area[] = [
       {
         title: "통제 적용",
         items: [
+          { path: "/runtime/operations", label: "운영 요청", description: "정책 묶음·모드 전환의 승인·실행 기록" },
           { path: "/runtime/enforce/cilium", label: "네트워크 정책 (Cilium)", badge: "cilium", description: "통신 차단 정책과 적용 상태" },
           { path: "/runtime/enforce/tetragon", label: "파일·프로세스 정책 (Tetragon)", description: "실제 정책 모드·서버 점검·전환 결과·시험 근거" },
           { path: "/runtime/enforce/lab", label: "검증 시험 (Lab)", badge: "lab", description: "실제 차단·허용 결과 확인" },

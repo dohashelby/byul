@@ -34,6 +34,10 @@ class Settings:
     evidence_index_paths: tuple[Path, ...] = ()
     bundle_runtime_dir: Path = REPO_ROOT / "runtime"
     bundle_runtime_python: Path | None = None
+    operation_tokens: tuple[dict, ...] = field(default=(), repr=False)
+    operation_lab_self_approval: bool = False
+    operation_lease_seconds: int = 600
+    operation_monitor_seconds: int = 86400
     host: str = "127.0.0.1"
     port: int = 8700
 
@@ -44,7 +48,12 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> Settings:
+        from .operations import load_tokens
+
         return cls(
+            operation_tokens=load_tokens(os.environ.get("BYUL_OPERATION_TOKENS", "[]")),
+            operation_lab_self_approval=os.environ.get("BYUL_OPERATION_LAB_SELF_APPROVAL") == "1",
+            operation_monitor_seconds=int(os.environ.get("BYUL_OPERATION_MONITOR_SECONDS", "86400")),
             contracts_dir=_path("BYUL_CONTRACTS_DIR") or DEFAULT_CONTRACTS_DIR,
             examples_override=_path("BYUL_EXAMPLES_DIR"),
             web_dist=_path("BYUL_WEB_DIST") or DEFAULT_WEB_DIST,

@@ -100,6 +100,26 @@ native 원문694행의 seq·prev SHA·정규 bytes·단조시각과 실행 신�
 
 최종 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup05-preservation-delta-20261106-v1/actual-normal-final-verification-v1.json`, SHA256 `a1da5a5b4c7dc9f14229224da99e017a1df09d49aadf134109099c40f4d13430`다. 이 고정 실패·정리 검증의 추가 필수 입력은 없으며 제품 검증 재개에는 설치판과 호환되는 별도 고정 모델 입력이 필요하다.
 
+## GB09 원실험 내부 의미 — 정상 응답과 제품 증거의 구분
+
+게시 담당이 회수한 원GB09 내부의 실행 의미를 별도로 검토했다. 세션6의 전체 ZIP 무결성 검토는 재사용했고 CRC·전체 member SHA 검증을 반복하지 않았다. 원 source27개 pin의 expected=actual, 제품 source3b3와 sensor public commit db9527의 구분, native3파일 총1,210행의 정규 bytes·seq·prev SHA·단조시각·START session/sensor/settings 결합을 확인했다. 새로운 모델·worker 실행은0회다.
+
+정상 API 응답은200·입력6/출력1 token으로 원 controller 응답과 일치하고 전후 같은 Pod 신원이 확인됐다. native의 OPEN/READ_RETURN/CLOSE 기록과 원 analyzer 후보1건을 대조했다. 250,500,968 bytes의 실제 FD 읽기 반환 hash는 선언된 EXAMPLE 기준값과 일치했다. GPU host process와 namespace PID/startticks도 연결되지만, 이 상관관계가 consumer 계약의 worker/rank 배정·승인 기준 권한·producer 인증·tensor/backend 적용 완료를 입증하지는 않는다.
+
+worker 기록은 END=BOUND_REACHED로 끝났고 loader iterator 종료·operation 완결·decoder 완료·전체 inventory·적용 범위는 미확인이다. API 측 END=SEALED 및 정상 응답을 worker 전체 소비 완료로 해석하지 않는다. 원 analyzer의 security=UNKNOWN과 missing8개를 보존한다. 파일 읽기 FD 반환 증거와 `source_bound_eager_fd_read_unavailable` 등 더 강한 producer/consumer 보증이 남은 상태를 함께 인계한다.
+
+원 진단 결과는 product_factory_executed=false·formal_product_metadata_generated=false·whole_question_complete=false다. archive 안에 제품 Store 경로가 없고 원 실행도 제품 증거 객체를 생성하지 않았으므로 새 EVD/RES/RPT의 정확 Ref 복원·저장 팩 재판정을 수행하지 않았다. 빈 대상을 완료 처리하거나 임의 객체를 만들지 않는다. 원 실험의 정상 UID/RV 삭제·NotFound·잔존 GPU process0 기록도 확인했으며 후속 회수용 부팅의 정지/비용 마감과 구분한다.
+
+의미 검토 참조는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/recovered-GB09-semantic-review-v1.json`, SHA256 `8f2177abebff1351f92346634171f95c6dfe842c5a5adb71190c3d2c121243bf`다. 이로써 이번 회수 자료의 진단 의미와 한계는 확인했지만 SUP-16 제품 검증은 남는다. 재개에는 정상/변경/복구의 실제 factory 경로와 worker/rank·승인 기준 권한·실제 소비/적용의 지원 입력이 필요하다.
+
+## REQ-08 registry 진단 — 실제 실행 전 오류 보완 검토
+
+진단용 monitor thread의 시작 실패가 이미 생성된 원 Popen 객체의 반환을 가리고 미시작 thread join에서 추가 오류를 내는 결함을 세션6이 발견했다. 이전 고정본의 실행을 보류하고 원 child 제어는 유지한 채 진단 오류를 독립 누적하고 시작된 monitor만 join하도록 좁게 수정했다. 원 오류 주입·차단 기록은 보존한다.
+
+세션6은 v5의 독립 stdlib child 오류 주입에서 원 Popen 반환·binary stdout/stderr·child 종료0·독립 진단 오류·미시작 join0·원 binding 및 소유 FD 회수를 확인했다. 기존 CPU5+finalizer4 및 세션5의 새4개 계약은 재사용했고 전체 suite·실제 모델·GPU를 검토자가 실행하지 않았다. local Docker endpoint 검사와 원 caller·registry pin·PIPE/원 예외·90초·85초 진단·2CPU/4GiB·정리 계약을 유지했다. 이 고정 delta의 차단 결함·필수 검토 잔여는0이며 실제 진단 결과는 별도로 검증한다.
+
+검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/req08-registry-delta-20261106-v1/registry-diagnostic-review-v5.json`, SHA256 `51bf547289e6195fa166f6a506ad77e9acf83627dc83c1394c6fa1a27b7e5301`이다. 이 사전 검토를 REQ-08 제품 준비 성공이나 과거 child 종료값의 복구로 사용하지 않는다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

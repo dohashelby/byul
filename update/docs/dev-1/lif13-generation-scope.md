@@ -25,6 +25,11 @@
    `/health` 200까지만 기다리며, 실행이 끝나면 이 실행이 띄운 소비자만 시작 ticks를 확인해 끝낸다(실패하면 `ENGINE_SENSOR_LAB_CONSUMER_CLEANUP_UNVERIFIED`).
    소비자 기동 두 번이 들어가므로 LIF-13만 실행 상한을 900초까지 받는다(다른 점검은 300초 그대로).
 
+## GPU 준비 중 보수 (2026-11-06)
+
+- Kubernetes 콜백 전송이 실행 상한을 300초로 막아 LIF-13의 900초가 전송 생성에서 거부되던 불일치를 고쳤다. 900초는 소유 lab 콜백 전송(`lab: true`)에서만 받는다. `gpu_a_run_inputs`도 LIF-13 설정에 900초를 쓴다.
+- 소비자 기동 스크립트가 PID 1을 `vllm serve …`로만 받던 것을 고쳤다. 콘솔 스크립트는 shebang 때문에 `/opt/venv/bin/python /opt/venv/bin/vllm serve …`로 보인다(k3d 실측). 두 형태만 받고 다른 명령은 그대로 거부한다.
+
 ## GPU 재실측 사례
 
 ```json

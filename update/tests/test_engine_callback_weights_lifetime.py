@@ -332,3 +332,61 @@ def test_transport_starts_numbered_consumers_and_stops_only_the_ones_it_started(
         http.engine_callback_switch('weights_consumer_start', 'target')
     http.stop_lab_consumers()
     assert slow.stops == [[{'pid': 401, 'start_ticks': 9}]]
+
+
+def test_transport_accepts_the_lif13_duration_only_for_an_owned_lab_callback_target():
+    """실행기가 LIF-13에 900초를 주면 전송도 받아야 한다(11-06 GPU 준비 중 발견한 불일치)."""
+    from tests.test_req16_lab_contexts import LabWorld
+    from tests.test_kubernetes_request_binding import World as BindingWorld, env as binding_env, target as binding_target
+    from guard.runtime.kubernetes_http import ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, KubernetesBindingError, KubernetesHTTP
+    lab = LabWorld()
+    KubernetesHTTP(lab.target, binding_env(), duration=900, runner=lab.runner, profile=ENGINE_CALLBACK_PROFILE)
+    with pytest.raises(KubernetesBindingError):
+        KubernetesHTTP(lab.target, binding_env(), duration=901, runner=lab.runner, profile=ENGINE_CALLBACK_PROFILE)
+    value = binding_target(); value['lab'] = False
+    plain = BindingWorld(value)
+    with pytest.raises(KubernetesBindingError):
+        KubernetesHTTP(plain.target, binding_env(), duration=900, runner=plain.runner, profile=ENGINE_CALLBACK_PROFILE)
+    with pytest.raises(KubernetesBindingError):
+        KubernetesHTTP(lab.target, binding_env(), duration=900, runner=lab.runner, profile=REQUEST_BINDING_PROFILE)
+
+
+@pytest.mark.parametrize('cmdline,supported', [
+    ([b'/opt/venv/bin/python', b'/opt/venv/bin/vllm', b'serve', b'/models/opt-125m'], True),  # k3d 실측 형태
+    ([b'vllm', b'serve', b'/models/opt-125m'], True),
+    ([b'/opt/venv/bin/python', b'-c', b'serve', b'x'], False),
+    ([b'/opt/venv/bin/python', b'/opt/venv/bin/vllm', b'bench', b'x'], False),
+    ([b'vllm', b'serve', b'/m', b'--port', b'8000'], False)])
+def test_consumer_start_reads_the_console_script_form_of_pid1(cmdline, supported, capsys):
+    import io, json as _json, sys as _sys, types
+    from guard.runtime import kubernetes_http as http
+    started = []
+    class Child:
+        pid = 4242
+        def poll(self): return None
+    fake_subprocess = types.SimpleNamespace(DEVNULL=-3, STDOUT=-2, Popen=lambda argv, **kw: started.append(argv) or Child())
+    def fake_open(path, mode='r'):
+        if path == '/proc/1/cmdline': return io.BytesIO(b'\0'.join(cmdline) + b'\0')
+        if path.startswith('/proc/4242/stat'): return io.StringIO('4242 (python) S ' + ' '.join(['0'] * 17) + ' 777 0')
+        return io.BytesIO()
+    class Resp: status = 200
+    fake_urllib = types.SimpleNamespace(request=types.SimpleNamespace(urlopen=lambda *a, **k: Resp()))
+    import builtins
+    real_import = builtins.__import__
+    def fake_import(name, *args, **kwargs):
+        if name == 'subprocess': return fake_subprocess
+        if name.startswith('urllib'): return fake_urllib
+        return real_import(name, *args, **kwargs)
+    scope = {'__name__': '__main__', '__builtins__': {**builtins.__dict__, '__import__': fake_import, 'open': fake_open}}
+    argv = _sys.argv
+    try:
+        _sys.argv = ['x', '8001']
+        with pytest.raises(SystemExit) if not supported else __import__('contextlib').nullcontext():
+            exec(compile(http.WEIGHTS_CONSUMER_START, 'consumer', 'exec'), scope)
+    finally:
+        _sys.argv = argv
+    result = _json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    if supported:
+        assert result['status'] == 'ok' and started == [[a.decode() for a in cmdline] + ['--port', '8001']]
+    else:
+        assert result['status'] == 'unsupported' and not started

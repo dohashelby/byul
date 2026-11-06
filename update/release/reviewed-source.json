@@ -412,7 +412,7 @@
   "update/src/guard/runtime/kubernetes_forwarded_identity.py": "1d9f998734b01747f949d15cd0bc6af82465ceb67846782cbfa4b0df6fb8d2a4",
   "update/src/guard/runtime/kubernetes_forwarded_identity_http.py": "e786beae10e8590d68d5df3bc25161f0e69f984fb15eebf09ad42c91e8c4b331",
   "update/src/guard/runtime/kubernetes_functional.py": "a86596182c063b7cbda5fac2325401ebb69a0cf5f388fe75c210ed65a565f263",
-  "update/src/guard/runtime/kubernetes_http.py": "042591fda4c1024a09d7a1643963a9f90f19b8d62eade70ba9f4142ade596cb3",
+  "update/src/guard/runtime/kubernetes_http.py": "c48037f8888a410e0d4aee013ba44984f180ddc29d4944127364b5ef41167e49",
   "update/src/guard/runtime/kubernetes_initialization.py": "284fb44a281bf96099f35f17694b22fd3c2caea7a8c2250d8183615b48850565",
   "update/src/guard/runtime/kubernetes_ipc.py": "7b45d1a5564cfabf0b315778598d911bee16dc9e8ace849f81ce971b8fb84f4e",
   "update/src/guard/runtime/kubernetes_ipc_actor.py": "5fe44e3599199324021f9691d9d048f75ead4ef340f8f24eebd190501cfaf4ea",

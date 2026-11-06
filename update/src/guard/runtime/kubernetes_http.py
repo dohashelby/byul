@@ -147,7 +147,9 @@ print(json.dumps({"schema":"guard-lab-weights-release/1","status":r.get("status"
 WEIGHTS_CONSUMER_START = r'''
 import json,os,subprocess,sys,time,urllib.request
 port=int(sys.argv[1]);argv=open("/proc/1/cmdline","rb").read().split(b"\0")[:-1];argv=[a.decode() for a in argv]
-if len(argv)<3 or os.path.basename(argv[0])!="vllm" or argv[1]!="serve" or "--port" in argv or not 8001<=port<=8009:
+# 콘솔 스크립트는 shebang 때문에 PID 1이 "python /…/vllm serve …"로 보인다(k3d 실측 2026-11-06). 두 형태만 받는다.
+at=1 if len(argv)>=3 and os.path.basename(argv[0])=="vllm" else 2 if len(argv)>=4 and os.path.basename(argv[0]).startswith("python") and os.path.basename(argv[1])=="vllm" else None
+if at is None or argv[at]!="serve" or "--port" in argv or not 8001<=port<=8009:
     print(json.dumps({"schema":"guard-lab-weights-consumer/1","status":"unsupported"}));sys.exit(0)
 log=open("/tmp/guard-lab-consumer-%d.log"%port,"wb")
 p=subprocess.Popen(argv+["--port",str(port)],stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
@@ -382,7 +384,9 @@ class KubernetesHTTP:
         self.binding, self.endpoint = _validate(target, env)
         self.target_sha256=sha256_hex(canonical_json(target))
         self.environment_ref=(deepcopy(target["environment_ref"]) if profile in _BINDING_PROFILES else None)
-        if (type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= 300
+        # LIF-13 lab은 실행 안에서 소비자 엔진을 두 번 기동한다. 그 실행기 상한(900초)은 소유 lab 콜백 전송에서만 받는다.
+        limit = 900 if profile == ENGINE_CALLBACK_PROFILE and target.get("lab") is True else 300
+        if (type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= limit
                 or type(binary) is not str or not binary.strip()):
             raise KubernetesBindingError()
         self.clock = clock or time.monotonic

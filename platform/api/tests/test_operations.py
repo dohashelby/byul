@@ -216,6 +216,7 @@ def test_runtime_capability_projection_controls_enforce(ops, classification, pro
                 "monitoring": {"state": "healthy", **dict.fromkeys(
                     ("policies_verified", "writer_verified", "identities_verified", "events_verified"), True)}}
     window = {"policy": policy["name"], "node": "node-01", "method": policy["method"], "kernel": "test-kernel",
+              "namespace": "serving", "policy_id": policy["id"], "mode": "monitor",
               "spec_sha256": "a" * 64, "since": (at - timedelta(days=1)).isoformat(), "until": at.isoformat(),
               "continuous": True, "event_count": 0, "false_positive_count": 0, "events_sha256": "b" * 64}
     row = evaluate(snapshot, policy["name"], SimpleNamespace(namespace="serving", allowed_modes=lambda _: ("monitor", "enforce")),
@@ -230,6 +231,22 @@ def test_runtime_capability_projection_controls_enforce(ops, classification, pro
     assert projected["capability_basis"] == basis
     assert projected["capability_reason"] == reason
     assert enforce(ops, row["expected"]).status_code == (201 if all(row["checks"].values()) else 409)
+
+
+def test_monitor_window_agent_projection_and_validation(ops):
+    expected = ready(ops)
+    row = ops.get(BASE, headers=auth("viewer-01")).json()["agents"][0]["policies"][0]
+    at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    window = {"node": "node-01", "since": at, "until": at, "continuous": True,
+              "event_count": 2, "reviewed_event_count": 1, "false_positive_count": 0}
+    row.update(monitor_windows=[window], checks={**row["checks"], "monitor_period": False})
+    payload = {"server": "server-01", "policies": [row]}
+    assert ops.post(BASE + "/agent-state", headers=auth("agent-01"), json=payload).status_code == 200
+    result = ops.get(BASE, headers=auth("viewer-01")).json()["agents"][0]["policies"][0]
+    assert result["monitor_windows"] == [window]
+    assert enforce(ops, expected).status_code == 409
+    window["event_count"] = -1
+    assert ops.post(BASE + "/agent-state", headers=auth("agent-01"), json=payload).status_code == 422
 
 
 def test_two_party_approval_and_lab_self_approval(ops):

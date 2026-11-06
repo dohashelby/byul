@@ -29,6 +29,7 @@ def evaluate(snapshot: dict, name: str, intent, review: dict, monitor_seconds: i
     method = None
     capability_basis = None
     capability_reason = "capability_missing"
+    monitor_windows = []
     if rows:
         first = rows[0]
         method = first.get("method")
@@ -75,6 +76,8 @@ def evaluate(snapshot: dict, name: str, intent, review: dict, monitor_seconds: i
             # and is explicitly tied to the current rule/spec/kernel. A changed
             # control, open gap, stale count, or incomplete human review rejects it.
             periods = [r for r in review.get("windows", []) if r.get("policy") == name
+                       and r.get("namespace") == intent.namespace and r.get("policy_id") == policy.get("id")
+                       and r.get("mode") == "monitor" and policy.get("mode") == "monitor"
                        and r.get("node") == policy.get("node") and r.get("spec_sha256") == policy.get("spec_sha256")
                        and r.get("method") == method and r.get("kernel") == cap.get("kernel")]
             valid_period = False
@@ -83,10 +86,18 @@ def evaluate(snapshot: dict, name: str, intent, review: dict, monitor_seconds: i
                     start = datetime.fromisoformat(r["since"].replace("Z", "+00:00"))
                     end = datetime.fromisoformat(r["until"].replace("Z", "+00:00"))
                     count, reviewed = r["event_count"], r.get("reviewed_event_count", 0)
+                    false_positives = r.get("false_positive_count")
+                    if (start.tzinfo is not None and end.tzinfo is not None and start <= end <= now
+                            and type(count) is int and count >= 0 and type(reviewed) is int and 0 <= reviewed <= count
+                            and type(false_positives) is int and 0 <= false_positives <= reviewed
+                            and type(r.get("continuous")) is bool):
+                        monitor_windows.append({"node": policy["node"], "since": r["since"], "until": r["until"],
+                            "continuous": r["continuous"], "event_count": count, "reviewed_event_count": reviewed,
+                            "false_positive_count": false_positives})
                     valid_period = (start.tzinfo is not None and end.tzinfo is not None and start <= end <= now
                                     and (end - start).total_seconds() >= max(0, monitor_seconds)
                                     and recent(r["until"], 30, now) and r.get("continuous") is True
-                                    and type(count) is int and count >= 0 and r.get("false_positive_count") == 0
+                                    and type(count) is int and count >= 0 and type(false_positives) is int and false_positives == 0
                                     and (count == 0 or (type(reviewed) is int and reviewed == count
                                          and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", r.get("reviewer_token_id", ""))))
                                     and bool(SHA.fullmatch(r.get("events_sha256", ""))))
@@ -117,5 +128,6 @@ def evaluate(snapshot: dict, name: str, intent, review: dict, monitor_seconds: i
                             and all(monitoring.get(k) is True for k in
                                     ("policies_verified", "writer_verified", "identities_verified", "events_verified")))
     return {"name": name, "method": method, "expected": expected, "checks": checks,
+            "monitor_windows": monitor_windows[:128],
             "capability_basis": capability_basis, "capability_reason": capability_reason,
             "evidence_sha256": sorted(set(evidence))[:64]}

@@ -87,6 +87,16 @@ class Result(Closed):
     dry_run: bool = False
 
 
+class MonitorWindow(Closed):
+    node: str = Field(min_length=1, max_length=253)
+    since: datetime
+    until: datetime
+    continuous: bool
+    event_count: int = Field(ge=0, strict=True)
+    reviewed_event_count: int = Field(ge=0, strict=True)
+    false_positive_count: int = Field(ge=0, strict=True)
+
+
 class PolicyReadiness(Closed):
     name: Identifier
     method: Identifier | None = None
@@ -94,6 +104,7 @@ class PolicyReadiness(Closed):
     checks: dict[Literal["policy", "evidence", "capability", "monitor_period", "collection", "allowed_mode"], bool]
     capability_basis: Literal["static", "live_trial"] | None = None
     capability_reason: Literal["static_unavailable", "evidence_required", "capability_missing"] | None = None
+    monitor_windows: list[MonitorWindow] = Field(default_factory=list, max_length=128)
     evidence_sha256: list[Digest] = Field(default_factory=list, max_length=64)
 
 

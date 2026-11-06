@@ -288,6 +288,7 @@ class SafetyTest(unittest.TestCase):
             "verifications": [{"data_origin": "real", "node": "node-01", "method": "override_lsm", "policy_spec_sha256": "a" * 64, "kernel": "test-kernel", "verification": {"status": "passed"}, "source_report_sha256": "c" * 64}],
             "monitoring": {"state": "healthy", **dict.fromkeys(("policies_verified", "writer_verified", "identities_verified", "events_verified"), True)}}
         self.window = {"policy": self.name, "node": "node-01", "method": "override_lsm", "spec_sha256": "a" * 64, "kernel": "test-kernel", "since": (self.time - timedelta(days=1)).isoformat(), "until": self.time.isoformat(), "continuous": True, "event_count": 0, "false_positive_count": 0, "events_sha256": "b" * 64}
+        self.window.update(namespace=self.intent.namespace, policy_id="7", mode="monitor")
 
     def evaluate(self):
         return evaluate(self.snapshot, self.name, self.intent, {"windows": [self.window]}, 86400, now=self.time)

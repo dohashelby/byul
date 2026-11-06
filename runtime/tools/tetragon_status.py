@@ -134,8 +134,10 @@ class StatusCollector:
                         continue
             result["transitions"] = sorted(result["transitions"],key=lambda item:item.get("at", ""))[-100:]
             for path in sorted(self.evidence.glob("*.verification.json"),key=lambda p:p.stat().st_mtime,reverse=True)[:30]:
-                record=json.loads(path.read_text())
+                raw=path.read_bytes()
+                record=json.loads(raw)
                 if record.get("context")==self.context and record.get("schema_version")=="runtime-tetragon-verification/1.0":
+                    record["source_report_sha256"]=hashlib.sha256(raw).hexdigest()
                     result["verifications"].append(record)
             result["verifications"].sort(key=lambda item: str(item.get("finished_at", "")), reverse=True)
             for path in sorted(self.evidence.glob("*.operations.json"),key=lambda p:p.stat().st_mtime,reverse=True)[:10]:

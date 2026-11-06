@@ -4,8 +4,12 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import stat
+import subprocess
+import sys
 import tempfile
+import textwrap
 import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
@@ -187,6 +191,73 @@ class BundleToolsTest(unittest.TestCase):
                              "http://127.0.0.1:8080", None)
         self.assertEqual(os.readlink(root / "current"), "vllm")
         self.assertEqual(kubectl.call_count, 2)
+
+    def test_apply_subprocess_keeps_kubectl_output_off_result_stdout(self):
+        self._build("vllm")
+        kubectl = self.root / "kubectl"
+        kubectl.write_text(
+            '#!/bin/sh\n'
+            'case "$*" in\n'
+            '  *restart*) printf "deployment.apps/serving-gateway restarted\\n";;\n'
+            '  *status*) printf "Waiting for deployment serving-gateway...\\n"\n'
+            '            printf "deployment serving-gateway successfully rolled out\\n";;\n'
+            '  *) exit 2;;\n'
+            'esac\n'
+            'printf "kubectl diagnostic\\n" >&2\n'
+        )
+        kubectl.chmod(0o755)
+        # Run the real CLI/apply/_run in a child so inherited file descriptors are
+        # captured too; redirect_stdout alone cannot detect this regression.
+        script = textwrap.dedent("""\
+            import sys
+            from unittest.mock import patch
+            from serving_runtime.bundle_tools import StatusMismatch, StatusUnavailable
+            from serving_runtime.cli import main
+
+            error = {"rollback": StatusMismatch("wrong bundle"),
+                     "unknown": StatusUnavailable("status unavailable")}.get(sys.argv[1])
+            with patch("serving_runtime.bundle_tools.os.chown"), \\
+                 patch("serving_runtime.bundle_tools._checked_status", side_effect=error):
+                sys.exit(main(sys.argv[2:]))
+            """)
+        cases = [
+            ("success", True, 0, {"state": "succeeded", "code": "OK"}, 1),
+            ("rollback", True, 1, {"state": "rolled_back", "code": "ROLLED_BACK"}, 2),
+            ("unknown", True, 1, {"state": "unknown", "code": "STATUS_UNKNOWN"}, 1),
+            ("success", False, 0, None, 1),
+        ]
+        for index, (scenario, machine, returncode, outcome, rollouts) in enumerate(cases):
+            with self.subTest(scenario=scenario, operation_result=machine):
+                root = self.root / f"server-{index}"
+                old = root / "previous"
+                shutil.copytree(self.out / "vllm", old)
+                manifest = json.loads((old / "bundle.json").read_text())
+                manifest["bundle_id"] = "previous"
+                (old / "bundle.json").write_text(json.dumps(manifest))
+                (root / "current").symlink_to("previous")
+                command = [sys.executable, "-B", "-c", script, scenario,
+                           "bundle", "apply", "--bundle-dir", str(self.out / "vllm"),
+                           "--bundle-root", str(root), "--context", "test", "--namespace", "test",
+                           "--status-url", "http://127.0.0.1:9999"]
+                if machine:
+                    command.append("--operation-result")
+                result = subprocess.run(
+                    command, capture_output=True, text=True, timeout=10, check=False,
+                    env={**os.environ, "PATH": str(self.root) + os.pathsep + os.environ["PATH"]},
+                )
+                self.assertEqual(result.returncode, returncode, result.stderr)
+                if machine:
+                    self.assertEqual(json.loads(result.stdout), outcome)
+                    self.assertEqual(len(result.stdout.splitlines()), 1)
+                else:
+                    self.assertEqual(result.stdout, "묶음 적용·상태 확인 성공: previous -> vllm\n")
+                for message in ("deployment.apps/serving-gateway restarted",
+                                "Waiting for deployment serving-gateway...",
+                                "deployment serving-gateway successfully rolled out"):
+                    self.assertEqual(result.stderr.count(message), rollouts)
+                self.assertEqual(result.stderr.count("kubectl diagnostic"), rollouts * 2)
+                self.assertEqual(os.readlink(root / "current"),
+                                 "previous" if scenario == "rollback" else "vllm")
 
     def test_status_retry_and_unprotected_lookup(self):
         status = {"policy_bundle": {"bundle_id": "new"},

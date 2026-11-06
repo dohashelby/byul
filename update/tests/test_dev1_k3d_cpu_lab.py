@@ -147,6 +147,7 @@ def test_gpu_profile_adds_one_gpu_and_keeps_names_apart_from_the_cpu_diagnosis(m
     raw, record = lab.render(run_id='dev1-gpu-1', engine_image=image, gpu={'model': 'NVIDIA L4', 'runtime_class': 'nvidia'})
     pod = yaml.safe_load(raw['engine.yaml']); engine = pod['spec']['containers'][0]
     assert pod['metadata']['namespace'] == 'byul-dev1-gpu-lab' and pod['spec']['runtimeClassName'] == 'nvidia'
+    assert engine['command'] == ['vllm', 'serve']
     assert engine['resources']['limits']['nvidia.com/gpu'] == '1' and engine['args'][-2:] == ['--gpu-memory-utilization', '0.5']
     assert 'VLLM_CPU_KVCACHE_SPACE' not in {e['name'] for e in engine['env']}
     assert record['profile'] == 'gpu' and record['served_model_name'] == 'byul-dev1-lab'
@@ -156,3 +157,46 @@ def test_gpu_profile_adds_one_gpu_and_keeps_names_apart_from_the_cpu_diagnosis(m
     assert env.data_origin.value == 'DECLARED' and env.runtime.gpu_count == 1 and env.runtime.gpu_model == 'NVIDIA L4'
     with pytest.raises(ValueError, match='K3D_RENDER_INPUT_INVALID'):
         lab.render(run_id='dev1-gpu-1', engine_image=image, gpu={'model': ''})
+
+
+def test_gpu_lifecycle_keeps_the_memory_budget_and_records_the_actual_eager_option(tmp_path):
+    import json
+    session = 'c' * 32
+    for name in lab.LIFECYCLE_FILES:
+        (tmp_path / name).write_text('x', encoding='utf-8')
+    for name in ('settings.json', 'manifest.json'):
+        (tmp_path / name).write_text(json.dumps({'session': session}), encoding='utf-8')
+    raw, record = lab.render(run_id='dev1-gpu-2', engine_image=IMAGE, lifecycle_dir=tmp_path, gpu={'model': 'NVIDIA L4'})
+    args = yaml.safe_load(raw['engine.yaml'])['spec']['containers'][0]['args']
+    assert args[args.index('--gpu-memory-utilization') + 1] == '0.5'
+    assert '--enforce-eager' in args and record['enforce_eager'] is True
+    assert args[-2:] == ['--middleware', 'guard_lifecycle_sensor.Middleware']
+    assert record['args'] == args
+
+
+def test_graph_declaration_cannot_claim_eager_when_the_launch_option_is_absent(monkeypatch):
+    monkeypatch.setattr(lab, 'ARGS', [arg for arg in lab.ARGS if arg != '--enforce-eager'])
+    raw, record = lab.render(run_id='dev1-gpu-3', engine_image=IMAGE, gpu={'model': 'NVIDIA L4'})
+    assert '--enforce-eager' not in yaml.safe_load(raw['engine.yaml'])['spec']['containers'][0]['args']
+    assert record['enforce_eager'] is False
+def test_gpu_target_declares_the_actual_opt_subdirectory_and_managed_template(tmp_path):
+    import json
+    from tests.test_gpu_a_run_inputs import deployed
+    from guard.adapters.vllm import VllmAdapter
+    pods, _ = deployed(tmp_path, 'v1-callback')
+    image = pods['engine']['spec']['containers'][0]['image']
+    raw, record = lab.render(run_id='a-run-1', engine_image=image, gpu={'model': 'EXAMPLE-L4'})
+    rendered = yaml.safe_load(raw['engine.yaml'])
+    pods['engine']['spec']['containers'][0]['args'] = rendered['spec']['containers'][0]['args']
+    for pod in pods.values():
+        pod['metadata']['labels']['byul.a/generation'] = record['generation']
+    env = lab.environment(record, 'b' * 64)
+    value = lab.target(env, record, json.loads((tmp_path / 'namespace.json').read_text()),
+                       pods['engine'], pods['probe'], context='EXAMPLE-context')
+    launch = value['comparison_config']['launch']
+    assert launch['profile'] == 'gpu-bounded-v1' and launch['max_model_len'] == 512
+    assert VllmAdapter().supports_template_profile(launch['chat_template'])
+    assert launch['log_profile'] is None  # EXAMPLE digest는 새로 지원하지 않는다.
+    assert value['model_mapping']['host_snapshot'] == '/srv/models/opt-125m'
+    assert value['model_mapping']['container_mount'] == '/models/opt-125m'
+    assert value['environment_ref'] == env.ref().model_dump(mode='json') and env.hash_ok()

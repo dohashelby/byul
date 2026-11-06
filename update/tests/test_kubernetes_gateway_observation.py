@@ -65,13 +65,14 @@ def test_transport_accepts_only_the_three_gateway_trials_with_one_credential_hea
     assert GATEWAY_EVENT_PROFILE == 'kubernetes-owned-gateway-event-http-v1'
 
 
-def test_derived_pack_changes_only_obs01_and_keeps_pack32_untouched(tmp_path):
+def test_derived_pack_changes_only_obs01_and_keeps_the_seed_pack_untouched(tmp_path):
     from pathlib import Path
     from guard.models import load_pack
     from tools import build_dev1_gateway_obs01_pack as tool
     result = tool.derive(tmp_path / 'pack')
     derived, original = load_pack(tmp_path / 'pack'), load_pack(Path(tool.__file__).parents[1] / 'packs/PACK-BASELINE')
     assert original.ref().model_dump(mode='json') == tool.SEED_REF and result['pack_ref']['id'] == 'PACK-DEV1-GATEWAY-OBS01'
+    assert result['pack_ref']['revision'] == tool.DERIVED_REVISION == 2
     assert derived.checks['OBS-01'].collection_profile == module.PROFILE
     assert {cid for cid in original.checks if original.checks[cid] != derived.checks[cid]} == {'OBS-01'}
     with pytest.raises(ValueError, match='NEW_EXTERNAL_PACK_DIRECTORY_REQUIRED'):

@@ -10,7 +10,7 @@ GPU 실증 담당의 소비자(LIF-03·05·06·07·08·09·10·11·12·14, PLT-0
 
 판정에 쓰는 원칙(#196 본문):
 - 지원 생산자 목록(`SUPPORTED_PRODUCERS`)에 없는 생산자의 기록은 형식이 맞아도 `supported=False`다. 소비자는 그 기록으로
-  PASS를 만들지 않는다. 1단계에는 생산자가 없으므로 목록이 비어 있다. 2단계에서 GPU 생산자를 만들 때 판본·소스 SHA를 더한다.
+  PASS를 만들지 않는다. 1단계에는 목록이 비어 있었고, 2단계 GPU 확인을 마친 생산자의 판본·소스 SHA만 더한다.
 - 누락·지원 불일치(`gaps`)와 실제 위반 후보(`violation_candidates`)를 따로 둔다. 후속 수집·정리 오류는 앞선 위반 후보를 지우지 않는다.
 - 생산자 인증은 언제나 False다. 같은 시간대라는 이유만으로 다른 세대·세션의 행을 합치지 않는다.
 - 비밀 원문은 받지 않는다. 문자열 값은 닫힌 식별자 형식이거나 SHA-256이다.
@@ -25,8 +25,21 @@ _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}")
 _SESSION = re.compile(r"[0-9a-f]{32}")
 MAX_EVENTS = 4096
 
-# (생산자 이름, 판본) -> 소스 SHA-256. 1단계에는 구현된 생산자가 없다.
-SUPPORTED_PRODUCERS: dict[tuple[str, str], str] = {}
+# (생산자 이름, 판본) -> 소스 SHA-256(관측기 소스 + 변환 소스, `gpu_input_producers.*_producer()`).
+# 2단계 GPU 확인(2026-11-05, AWS g6.2xlarge L4, vLLM 0.31.0, 세션 a-p1-20261105-3·-5와
+# process-device-provider/V2 runner의 a-p2v2-20261105-1)에서
+# 기록이 계약 형식을 통과하고 원 기록 끝까지 읽힌 생산자만 둔다. 소스가 바뀌면 SHA가 달라져 자동으로 미지원이 된다.
+# 등록은 생산자 지원일 뿐이다. 각 기록의 진단·누락 gap은 그대로 남고, 판정 PASS를 뜻하지 않는다.
+SUPPORTED_PRODUCERS: dict[tuple[str, str], str] = {
+    ("guard-engine-callback-request-attempt", "1"): "7927d551395f09945211ae83ad1135d8edf74a41a8306f0e6072ca0727e70610",
+    ("guard-engine-callback-generation-transition", "1"): "64437f216798ebf1f85e62b9856b623d4b69570517e44c933be8017e42fb64da",
+    ("guard-engine-callback-health-worker", "1"): "0cf549269305cecbfcb5c6ee9de609bf6c70cbb5f1993f53aa59c30e4873dd34",
+    ("guard-engine-callback-profiler-control", "1"): "4da009ecc296f50357d1b559b9fce545ab7ae3a10f4544e0e248c7147ba00764",
+    ("guard-engine-callback-runner-consumption", "1"): "5c9778f43e58465fd961ea223d966ca54b1320eb55267ce35a0a955eb1aa5095",
+    ("guard-engine-callback-supply-reads", "1"): "533ec8c173222136a5d2ab61f66d30e8a82719753e8740f477a5f3cb7a6e5126",
+    ("guard-node-process-device-provider", "1"): "442ea49bbc88e7497cda42b359de6ad2fb938d7819f6bcfbb868684406793451",
+    ("guard-engine-callback-runner-consumption-v2", "1"): "041353842e9c8a12e50ca6515cc21ba9b09fa389a8bee3842926b565c6eb8c66",
+}
 
 _BINDING = ("pod_uid", "container_id", "restart_count", "worker_pid", "start_ticks", "rank")
 
@@ -76,6 +89,25 @@ KINDS = {
         "events": ("api_health", "api_record", "worker_state", "request_accepted"),
         "fields": {"at_ms": "ms", "generation": "id", "causal_sha256": "sha", "state": "id"},
         "complete_requires": ("api_health", "worker_state"),
+    },
+    # P2(개발 담당 2단계): API가 받은 입력·옵션이 runner와 sampler까지 같은 값으로 갔는가. V1 runner 경로.
+    "runner-consumption": {
+        "checks": ("REQ-08", "REQ-09", "REQ-10"),
+        "events": ("api_validated", "api_rejected", "runner_received", "sampler_applied"),
+        "fields": {"request_sha256": "sha", "at_ms": "ms", "stage": "opt_id", "prompt_tokens": "opt_int", "max_token_id": "opt_int",
+                   "temperature_milli": "opt_int", "top_p_milli": "opt_int", "top_k": "opt_int", "max_tokens": "opt_int",
+                   "logprobs": "opt_int", "allowed_tokens": "opt_int", "bad_words": "opt_int", "logit_bias": "opt_int"},
+        "complete_requires": ("api_validated", "runner_received", "sampler_applied"),
+    },
+    # P2 SUP-03(개발 담당 2단계): 선언한 공급 루트 아래에서 실제로 연 파일과 수집 시점 bytes 해시.
+    # 경로는 승인 목록과 대조하도록 상대 경로의 평문 SHA-256(path_sha256)으로 남긴다.
+    "supply-reads": {
+        "checks": ("SUP-03",),
+        # file_observed: inotify로 본 파일. 연 프로세스를 모른다(state inotify_unattributed).
+        "events": ("file_opened", "file_observed", "file_hashed"),
+        "fields": {"at_ms": "ms", "root": "int", "path_sha256": "sha", "access": "enum:read|write", "size": "opt_int",
+                   "bytes_sha256": "opt_sha", "state": "opt_id"},
+        "complete_requires": ("file_opened", "file_hashed"),
     },
     "profiler-control": {
         "checks": ("LIF-14", "OBS-03"),
@@ -167,6 +199,8 @@ def validate(record, *, kind, environment_ref, target_sha256, prepared_sha256, s
         gaps.append("GPU_INPUT_SOURCE_INCOMPLETE")
     gaps += [f"GPU_INPUT_REQUIRED_EVENT_MISSING:{name}" for name in spec["complete_requires"] if name not in seen]
     gaps += [f"GPU_INPUT_PRODUCER_DIAGNOSTIC:{code}" for code in completeness["diagnostic_codes"]]
+    if kind == 'runner-consumption':
+        gaps += _consumption_gaps(events)
     return {"kind": kind, "checks": list(spec["checks"]), "supported": supported, "producer_authenticated": False,
             "complete": supported and not gaps, "gaps": gaps, "generations": len(generations), "events": len(events),
             "violation_candidates": violation_candidates(kind, events)}
@@ -198,6 +232,65 @@ def violation_candidates(kind, events):
         released = {r["resource_sha256"] for r in events if r["event"] == "released"}
         out += [{"resource_sha256": item, "reason": "resource_remaining_after_failure"}
                 for item in sorted((before & after) - released)]
+    elif kind == "supply-reads":
+        hashed = {(r["root"], r["path_sha256"]): r for r in events if r["event"] == "file_hashed"}
+        for row in events:
+            if row["event"] != "file_opened":
+                continue
+            if row["access"] == "write":
+                out.append({"seq": row["seq"], "path_sha256": row["path_sha256"], "reason": "supply_file_written"})
+            later = hashed.get((row["root"], row["path_sha256"]))
+            if later is not None and row["size"] is not None and later["size"] is not None and row["size"] != later["size"]:
+                out.append({"seq": row["seq"], "path_sha256": row["path_sha256"], "reason": "supply_file_changed_after_open"})
+    elif kind == "runner-consumption":
+        out += _consumption_candidates(events)
     elif kind == "rank-fault":
         out += [{"seq": r["seq"], "reason": "fault_ack_missing"} for r in events if r["event"] == "fault_applied" and not r["ack"]]
+    return out
+
+
+_COMPARED = ("temperature_milli", "top_p_milli", "top_k", "logprobs", "allowed_tokens")
+
+
+def _consumption_gaps(events):
+    gaps = set()
+    for request in {r['request_sha256'] for r in events if r['event'] == 'api_validated'}:
+        rows = [r for r in events if r['request_sha256'] == request]
+        api = next(r for r in rows if r['event'] == 'api_validated')
+        if api['logit_bias']:
+            gaps.add('GPU_INPUT_CONSUMPTION_FIELD_UNOBSERVED:sampler_applied:logit_bias')
+        for stage in ('runner_received', 'sampler_applied'):
+            stage_rows = [r for r in rows if r['event'] == stage]
+            if not stage_rows:
+                gaps.add(f'GPU_INPUT_CONSUMPTION_STAGE_MISSING:{stage}')
+            fields = _COMPARED + ('bad_words',) + (('max_tokens', 'prompt_tokens', 'max_token_id', 'logit_bias')
+                                                   if stage == 'runner_received' else ())
+            for field in fields:
+                if api[field] is None or any(r[field] is None for r in stage_rows):
+                    gaps.add(f'GPU_INPUT_CONSUMPTION_FIELD_UNOBSERVED:{stage}:{field}')
+    return sorted(gaps)
+
+
+def _consumption_candidates(events):
+    """API에서 받은 값과 runner·sampler 값의 차이. bad_words는 단어와 토큰 변형 수가 달라 있음/없음만 본다."""
+    out = []
+    by = {}
+    for row in events:
+        by.setdefault(row["request_sha256"], []).append(row)
+    for request, rows in sorted(by.items()):
+        api = next((r for r in rows if r["event"] == "api_validated"), None)
+        if any(r["event"] == "api_rejected" for r in rows) and any(r["event"] in ("runner_received", "sampler_applied") for r in rows):
+            out.append({"request_sha256": request, "reason": "rejected_input_consumed"})
+        if api is None:
+            continue
+        for row in rows:
+            if row["event"] not in ("runner_received", "sampler_applied"):
+                continue
+            fields = _COMPARED + (("max_tokens", "prompt_tokens", "max_token_id") if row["event"] == "runner_received" else ())
+            changed = sorted(f for f in fields if api[f] is not None and row[f] is not None and api[f] != row[f])
+            if api["bad_words"] is not None and row["bad_words"] is not None and bool(api["bad_words"]) != bool(row["bad_words"]):
+                changed.append("bad_words")
+            if changed:
+                out.append({"request_sha256": request, "seq": row["seq"], "stage": row["event"], "fields": changed,
+                            "reason": "value_changed_before_consumption"})
     return out

@@ -109,5 +109,15 @@ def test_cpu_contract_and_other_gpu_gates_are_unchanged():
     assert "launch_profile" not in cpu
     assert gpu["sources"] == cpu["sources"]
     assert gpu["launch_profile"] == "gpu-bounded-v1"
-    assert adapter.native_log_contract(REQUEST_BINDING_GPU_IMAGE, "0.31.0") is None
+    # 실제 L4에서 정확 amd64 manifest와 로그 소스3개를 검토한 뒤 이 한 조합만 더했다.
+    assert adapter.native_log_contract(REQUEST_BINDING_GPU_IMAGE, "0.31.0") == adapter.native_log_contract(CHAT_REVIEWED_IMAGE, "0.31.0")
     assert adapter.native_log_contract(REQUEST_BINDING_GPU_032_IMAGE, "0.32.0") is None
+def test_reviewed_gpu_log_contract_keeps_index_config_and_other_versions_unsupported():
+    adapter = VllmAdapter()
+    assert adapter.native_log_contract(REQUEST_BINDING_GPU_IMAGE, '0.31.0') == adapter.native_log_contract(CHAT_REVIEWED_IMAGE, '0.31.0')
+    for image, version in (
+            ('vllm/vllm-openai@sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3', '0.31.0'),
+            ('vllm/vllm-openai@sha256:c76d0e2225a4b1cb1e2109ace39639f55e714abd1a7a427acc8b0bbd7f6a83b3', '0.31.0'),
+            (REQUEST_BINDING_GPU_IMAGE, '0.32.0')):
+        assert adapter.request_binding_contract(image, version) is None
+        assert adapter.native_log_contract(image, version) is None

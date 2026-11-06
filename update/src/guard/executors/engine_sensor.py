@@ -177,7 +177,7 @@ def slot_observations(record):
 class EngineSensorExecutor:
     """A single executor name; source CPU is never substituted for Kubernetes."""
     name = 'engine_sensor'
-    version = '0.1.2'
+    version = '0.1.4'
 
     def __init__(self, cfg, *, implementation='kubernetes', expected_target_sha256=None):
         self.cfg = deepcopy(cfg)
@@ -278,7 +278,7 @@ class EngineSensorExecutor:
         from guard.collectors import engine_callbacks
         from guard.runtime.bounded import strict_json
         from guard.executors.kubernetes_lifecycle_capture import validate_target
-        if (set(self.cfg) - {'target', 'prepared', 'manifest', 'max_duration_seconds', 'kubectl_binary', 'principal_token_env'}
+        if (set(self.cfg) - {'target', 'prepared', 'manifest', 'max_duration_seconds', 'kubectl_binary', 'principal_token_env', 'gateway_target'}
                 or not {'target', 'prepared', 'manifest'} <= set(self.cfg)
                 or not env.hash_ok() or env.engine.name != 'vllm' or env.engine.version != '0.31.0'):
             raise ValueError('ENGINE_SENSOR_NATIVE_CONFIGURATION_INVALID')
@@ -293,7 +293,8 @@ class EngineSensorExecutor:
                 or self.expected_target is not None and values['sensor_target_sha256'] != self.expected_target):
             raise ValueError('ENGINE_SENSOR_NATIVE_BINDING_MISMATCH')
         duration = self.cfg.get('max_duration_seconds', 180)
-        if type(duration) not in (int, float) or not 0 < duration <= 300:
+        # LIF-13 lab은 실행 안에서 소비자 엔진을 두 번 기동한다(release 전 취득, release 뒤 거절·fallback). 그 점검만 900초까지.
+        if type(duration) not in (int, float) or not 0 < duration <= (900 if check.id == 'LIF-13' else 300):
             raise ValueError('ENGINE_SENSOR_DURATION_INVALID')
         began = utcnow()
         if check.id in CALLBACK_CHECKS:
@@ -336,6 +337,15 @@ class EngineSensorExecutor:
                 or manifest.get('environment_ref') != env.ref().model_dump(mode='json')):
             raise ValueError('ENGINE_SENSOR_CALLBACK_MANIFEST_BINDING_MISMATCH')
         cases = manifest.get('cases'); projection.validate_cases(check.id, cases)
+        # Independent graph-on/off controls must send identical input bytes.
+        # The optional comparison nonce is part of the policy-bound manifest;
+        # other checks keep fresh cache-isolating nonces for every run.
+        nonce = manifest.get('comparison_nonce')
+        if 'comparison_nonce' in manifest and (check.id != 'REQ-20' or target.get('lab') is not True
+                or type(nonce) is not str or re.fullmatch('[0-9a-f]{32}', nonce) is None):
+            raise ValueError('ENGINE_SENSOR_COMPARISON_NONCE_INVALID')
+        if nonce is None:
+            nonce = uuid.uuid4().hex
         # REQ-19 대조는 엔진 안에서 GPU 동기화와 복사를 한다. 소유 lab 엔진과 명시한 준비 자산에서만 돈다.
         if check.id in ('REQ-19', 'REQ-20') and (target.get('lab') is not True or prepared.get('lab_kernel_checks') is not True):
             raise ValueError('ENGINE_SENSOR_KERNEL_CHECKS_REQUIRE_LAB')
@@ -346,8 +356,27 @@ class EngineSensorExecutor:
             if target.get('lab') is not True:
                 raise ValueError('ENGINE_SENSOR_LAB_CONTEXT_REQUIRES_LAB')
             projection.validate_lab_contexts(lab, cases)
-        transport = self.transport or KubernetesHTTP(target, env, duration=duration,
-            binary=self.cfg.get('kubectl_binary', 'kubectl'), profile=ENGINE_CALLBACK_PROFILE)
+        transport = self.transport
+        if transport is None and any('principal' in case for case in cases):
+            # A Bearer header on a direct unauthenticated engine is not a
+            # principal binding. Join the independently pinned Gateway target.
+            from guard.runtime.bounded import strict_json
+            from guard.runtime.kubernetes_callback_gateway import KubernetesCallbackGatewayHTTP
+            try:
+                if check.id != 'REQ-15':
+                    raise ValueError
+                gateway_target = strict_json(Path(self.cfg['gateway_target']).read_bytes(), limit=65536)
+                if manifest.get('gateway_target_sha256') != sha256_hex(canonical_json(gateway_target)):
+                    raise ValueError
+            except (KeyError, OSError, ValueError, TypeError):
+                raise ValueError('ENGINE_SENSOR_GATEWAY_TARGET_BINDING_REQUIRED') from None
+            transport = KubernetesCallbackGatewayHTTP(target, gateway_target, env, duration=duration,
+                binary=self.cfg.get('kubectl_binary', 'kubectl'))
+        elif 'gateway_target' in self.cfg and check.id != 'REQ-15':
+            raise ValueError('ENGINE_SENSOR_GATEWAY_TARGET_UNSUPPORTED')
+        if transport is None:
+            transport = KubernetesHTTP(target, env, duration=duration,
+                binary=self.cfg.get('kubectl_binary', 'kubectl'), profile=ENGINE_CALLBACK_PROFILE)
         endpoint = transport.endpoint.scheme + '://' + transport.endpoint.netloc + '/v1/chat/completions'
         tags = {}; elapsed = {}; outputs = {}; trials = []; cleanup = []; switches = []
         if lab is not None:
@@ -356,7 +385,6 @@ class EngineSensorExecutor:
             except (KubernetesBindingError, ValueError):
                 cleanup.append('ENGINE_SENSOR_LAB_OWNERSHIP_UNVERIFIED')
         # 같은 엔진을 다시 시험해도 이전 실행의 캐시가 교차 적중으로 보이지 않게 한다.
-        nonce = uuid.uuid4().hex
         # 경계 요청: 이 요청 앞의 세션 기록은 이번 시험 근거에서 뺀다.
         barrier = 'byul-cb-' + uuid.uuid4().hex
         try:
@@ -405,14 +433,25 @@ class EngineSensorExecutor:
             latency = _callback_elapsed_ms(row)
             if good and latency is not None:
                 elapsed[case['case_id']] = latency
+        weights_scope = None
         try:
             read = transport.engine_callback_events(prepared['session'])
-            events = read['events'] if any('principal' in case for case in cases) else projection.window(
-                read['events'], engine_callbacks.load_secret(self.cfg['prepared']), barrier)
+            if check.id == 'LIF-13':
+                # daemon·소비자 엔진 행은 경계 요청이 아니라 현재 컨테이너 세대로 고른다.
+                events, weights_scope = projection.weights_window(read['events'], engine_callbacks.load_secret(self.cfg['prepared']),
+                                                                  barrier, read.get('container_start_monotonic_ns'))
+            else:
+                events = read['events'] if any('principal' in case for case in cases) else projection.window(
+                    read['events'], engine_callbacks.load_secret(self.cfg['prepared']), barrier)
             if read['truncated']:
                 cleanup.append('ENGINE_SENSOR_CALLBACK_EVENTS_TRUNCATED')
         except KubernetesBindingError:
             events = []; cleanup.append('ENGINE_SENSOR_CALLBACK_EVENTS_UNAVAILABLE')
+        if check.id == 'LIF-13' and lab is not None:
+            try:
+                transport.stop_lab_consumers()
+            except (KubernetesBindingError, ValueError):
+                cleanup.append('ENGINE_SENSOR_LAB_CONSUMER_CLEANUP_UNVERIFIED')
         secret = engine_callbacks.load_secret(self.cfg['prepared'])
         gateway = any('principal' in case for case in cases)
         served = [c for c in cases if outputs.get(c['case_id']) is not None or c['case_id'] in elapsed]
@@ -433,7 +472,7 @@ class EngineSensorExecutor:
         elif check.id == 'REQ-20':
             result = projection.project_graph_lifetime(cases, outputs, events, secret, tags, references)
         elif check.id == 'LIF-13':
-            result = projection.project_weights_lifetime(cases, outputs, events, switches)
+            result = projection.project_weights_lifetime(cases, outputs, events, switches, weights_scope)
         elif check.id == 'REQ-21':
             result = projection.project_comm_buffer(cases, outputs, events)
         else:
@@ -459,6 +498,7 @@ class EngineSensorExecutor:
                     'prepared_sha256': values['sensor_prepared_sha256'], 'manifest_sha256': values['sensor_manifest_sha256'],
                     'implementation': 'kubernetes', 'engine_started': False})
         return self._artifact(draft, workdir, {'safe_facts': {**result, 'trials': trials, 'sensor_gaps': gaps,
+                **({'comparison_nonce_sha256': sha256_hex(nonce.encode())} if 'comparison_nonce' in manifest else {}),
                 **({'lab_switches': switches} if lab is not None else {})},
             'required_branches': REQUIRED_BRANCHES[check.id]})
 

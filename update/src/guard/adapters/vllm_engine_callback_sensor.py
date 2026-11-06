@@ -24,6 +24,13 @@ from . import vllm_kernel_bounds_callback as kernel_bounds
 from . import vllm_graph_replay_callback as graph_replay
 from . import vllm_weights_lifetime_callback as weights_lifetime
 from . import vllm_comm_buffer_callback as comm_buffer
+from . import vllm_attempt_callback as attempt
+from . import vllm_transition_callback as transition
+from . import vllm_health_callback as health
+from . import vllm_profiler_callback as profiler
+from . import vllm_consumption_callback as consumption
+from . import vllm_consumption_v2_callback as consumption_v2
+from . import vllm_supply_read_callback as supply_read
 
 PROFILE = 'vllm-engine-callback-metadata/1'
 SCHEMA = 'guard-engine-callback-events/1'
@@ -45,6 +52,26 @@ MAX_SAMPLED_SLOTS = 256
 # slower in proportion to its length and multiplied the session rows.
 CACHE_TARGETS = {'vllm.v1.core.kv_cache_manager': cache.TARGETS['vllm.v1.core.kv_cache_manager']}
 MODULES = {**CACHE_TARGETS, **distributed.TARGETS, **SLOT_TARGETS, **SLOT_V2_TARGETS, **kernel_bounds.TARGETS, **graph_replay.TARGETS, **weights_lifetime.TARGETS, **comm_buffer.TARGETS}
+# #196 request-attempt(P1): settings의 request_attempts가 참일 때만 감싼다. KV 모듈은 cache 관측과 같은 모듈이라 지점별로 관측기를 고른다.
+MODULES = {**MODULES, attempt.SCHEDULER: attempt.TARGETS[attempt.SCHEDULER],
+           attempt.KV: MODULES.get(attempt.KV, ()) + attempt.TARGETS[attempt.KV]}
+# #196 generation-transition(P1): settings의 generation_transitions가 참일 때만 감싼다(request_attempts와 함께 쓴다).
+MODULES = {**MODULES, transition.CORE: transition.TARGETS[transition.CORE]}
+# #196 health-worker-causal(P1): settings의 health_causal이 참일 때만 감싼다(request_attempts와 함께 쓴다).
+MODULES = {**MODULES, health.ASYNC_LLM: health.TARGETS[health.ASYNC_LLM]}
+# #196 profiler-control(P1): settings의 profiler_control이 참일 때만 감싼다. 같은 모듈의 다른 선택 관측과 지점별로 나눈다.
+for _name, _points in profiler.TARGETS.items():
+    MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
+# P2 runner 최종 소비: settings의 runner_consumption이 참일 때만 감싼다.
+for _name, _points in consumption.TARGETS.items():
+    MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
+# 같은 설정의 V2 runner 경로: V2 runner 모듈이 불릴 때만 감싼다(lab kernel 대조 세션은 graph replay가 같은 지점을 쓴다).
+for _name, _points in consumption_v2.TARGETS.items():
+    MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
+# 선택 관측(이름, 대상): 같은 모듈에 여러 개가 있을 수 있어 지점별로 관측기를 고른다.
+OPTIONAL = (('attempt', attempt.TARGETS), ('transition', transition.TARGETS), ('health', health.TARGETS), ('profiler', profiler.TARGETS),
+            ('consumption', consumption.TARGETS), ('consumption_v2', consumption_v2.TARGETS))
+OPTIONAL_MODULES = frozenset(name for _, targets in OPTIONAL for name in targets)
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
 MAX_FILE_BYTES = 16 * 1024 ** 2
@@ -198,6 +225,30 @@ class CommObserver(_Keyed, comm_buffer.CommBufferObserver):
     pass
 
 
+class AttemptObserver(_Keyed, attempt.AttemptObserver):
+    pass
+
+
+class TransitionObserver(_Keyed, transition.TransitionObserver):
+    pass
+
+
+class HealthObserver(_Keyed, health.HealthObserver):
+    pass
+
+
+class ProfilerObserver(_Keyed, profiler.ProfilerObserver):
+    pass
+
+
+class ConsumptionObserver(_Keyed, consumption.ConsumptionObserver):
+    pass
+
+
+class ConsumptionV2Observer(_Keyed, consumption_v2.ConsumptionV2Observer):
+    pass
+
+
 class Sink:
     def __init__(self, directory):
         self.path = Path(directory) / f'callbacks-{os.getpid()}.jsonl'
@@ -214,7 +265,9 @@ class Sink:
 
 
 class EngineCallbacks:
-    def __init__(self, session, secret, sink, *, context_provider=None, clock=None, fault_file=None, kernel_checks=False):
+    def __init__(self, session, secret, sink, *, context_provider=None, clock=None, fault_file=None, kernel_checks=False,
+                 request_attempts=False, generation_transitions=False, health_causal=False, profiler_control=False,
+                 runner_consumption=False):
         self.sink = sink; self.fault_file = fault_file
         options = {'sink': sink, 'context_provider': context_provider, 'clock': clock}
         self.cache = CacheObserver(session, **options)
@@ -229,13 +282,35 @@ class EngineCallbacks:
         self.cache.secret = self.distributed.secret = self.slot.secret = self.slot_v2.secret = self.weights.secret = self.comm.secret = secret
         if self.kernel is not None:
             self.kernel.secret = self.graph.secret = secret
+        # 매 단계 scheduler를 감싸므로 명시한 세션에서만 만든다(다른 점검의 시간 측정에 부담을 주지 않게).
+        self.attempt = AttemptObserver(session, **options) if request_attempts else None
+        if self.attempt is not None:
+            self.attempt.secret = secret
+        self.transition = TransitionObserver(session, **options) if generation_transitions else None
+        if self.transition is not None:
+            self.transition.secret = secret
+        self.health = HealthObserver(session, **options) if health_causal else None
+        if self.health is not None:
+            self.health.secret = secret
+        self.profiler = ProfilerObserver(session, **options) if profiler_control else None
+        if self.profiler is not None:
+            self.profiler.secret = secret
+        self.consumption = ConsumptionObserver(session, **options) if runner_consumption else None
+        if self.consumption is not None:
+            self.consumption.secret = secret
+        self.consumption_v2 = ConsumptionV2Observer(session, **options) if runner_consumption else None
+        if self.consumption_v2 is not None:
+            self.consumption_v2.secret = secret
 
     def instrument(self, module):
         """Validate every point of a module before changing any of them."""
         name = vars(module).get('__name__')
         if name in kernel_bounds.TARGETS or name in graph_replay.TARGETS:
             if self.kernel is None:
-                return False
+                # kernel 대조를 끈 세션: V2 runner 모듈에서는 켜진 선택 관측(P2 V2 소비)만 감쌀 수 있다.
+                return self._instrument_optional(module, name) if name in OPTIONAL_MODULES else False
+            if name in OPTIONAL_MODULES and getattr(self, 'consumption_v2', None) is not None:
+                self.gap('CONSUMPTION_V2_SKIPPED_KERNEL_CHECKS', name)
             try:
                 if name in kernel_bounds.TARGETS:
                     return kernel_bounds.instrument(module, self.kernel)
@@ -243,6 +318,8 @@ class EngineCallbacks:
             except Exception:
                 self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
                 return False
+        if name in OPTIONAL_MODULES:
+            return self._instrument_optional(module, name)
         observer = (self.cache if name in CACHE_TARGETS else self.slot if name in SLOT_TARGETS
                     else self.slot_v2 if name in SLOT_V2_TARGETS else self.weights if name in weights_lifetime.TARGETS
                     else self.comm if name in comm_buffer.TARGETS
@@ -255,6 +332,28 @@ class EngineCallbacks:
         for (owner, method, _), wrapped in changes:
             setattr(owner, method, self._fault(wrapped) if method == FAULT_POINT and self.fault_file else wrapped)
         return True
+
+    def _instrument_optional(self, module, name):
+        """선택 관측이 있는 모듈: 지점마다 켜진 관측기를 고른다. 꺼진 관측기의 지점은 건드리지 않는다."""
+        plan = []
+        for point in MODULES[name]:
+            chosen = None
+            for attribute, targets in OPTIONAL:
+                if point in targets.get(name, ()):
+                    chosen = getattr(self, attribute)
+                    break
+            if chosen is None and name in CACHE_TARGETS and point in CACHE_TARGETS[name]:
+                chosen = self.cache
+            if chosen is not None:
+                plan.append((chosen, point))
+        try:
+            changes = [(cache._function(module, point), observer.wrap(module, point)) for observer, point in plan]
+        except Exception:
+            self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
+            return False
+        for (owner, method, _), wrapped in changes:
+            setattr(owner, method, wrapped)
+        return bool(changes)
 
     def _fault(self, wrapped):
         """Lab only: raise once in the worker when the parent placed the fault file."""
@@ -278,7 +377,8 @@ class EngineCallbacks:
 
     def flush_gaps(self):
         kernel = self.kernel.gaps | self.graph.gaps if self.kernel is not None else set()
-        for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | self.weights.gaps | self.comm.gaps | kernel):
+        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption, getattr(self, 'consumption_v2', None), getattr(self, 'supply', None), getattr(self, 'supply_watch', None)) if o is not None))
+        for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | self.weights.gaps | self.comm.gaps | kernel | extra):
             self.gap(code)
 
 
@@ -320,8 +420,28 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
         callbacks = EngineCallbacks(settings['session'], bytes.fromhex(settings['secret']), Sink(directory),
             context_provider=context_provider,
             fault_file=str(directory / FAULT_FILE) if settings.get('lab_faults') is True else None,
-            kernel_checks=settings.get('lab_kernel_checks') is True)
+            kernel_checks=settings.get('lab_kernel_checks') is True,
+            request_attempts=settings.get('request_attempts') is True,
+            generation_transitions=settings.get('generation_transitions') is True,
+            health_causal=settings.get('health_causal') is True,
+            profiler_control=settings.get('profiler_control') is True,
+            runner_consumption=settings.get('runner_consumption') is True)
         sys.meta_path.insert(0, Finder(callbacks))
+        if settings.get('supply_roots'):
+            # SUP-03(P2): 선언한 공급 루트 아래에서 실제로 연 파일. audit hook은 원 코드를 바꾸지 않는다.
+            callbacks.supply = supply_read.SupplyReadObserver(settings['supply_roots'], sink=callbacks.sink,
+                                                              process_sha256=callbacks.cache.process_sha256)
+            sys.addaudithook(callbacks.supply.hook)
+            if settings.get('supply_watch') is True:
+                # native 읽기(inotify): Pod 안에서 잠금 파일을 먼저 만든 프로세스 하나만 지킨다.
+                try:
+                    lock = os.open(directory / 'supply-watch.lock', os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                    os.write(lock, str(os.getpid()).encode()); os.close(lock)
+                    callbacks.supply_watch = supply_read.SupplyWatcher(settings['supply_roots'], sink=callbacks.sink,
+                                                                       process_sha256=callbacks.cache.process_sha256)
+                    callbacks.supply_watch.start()
+                except FileExistsError:
+                    pass
         atexit.register(callbacks.flush_gaps)
         return True
     except Exception:

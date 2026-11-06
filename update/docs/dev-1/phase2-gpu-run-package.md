@@ -1,12 +1,14 @@
 # 개발 담당 26개 2단계 GPU 실행 묶음 (묶음 7, 2026-11-05)
 
+2026-11-05 실행 기록: `gpu-20261105.md`와 `../evidence/gpu-a-dev1-phase2-20261105.json`. 승인된 단일 L4 실측·진단 17개/증거 왕복25건을 완료했다. 미승인 TP2·멀티모달과 기업 입력은 남는다. 아래 표는 최초 실행 계획이며 실제 세대별 argv·이미지·Ref·실패는 증거가 우선한다.
+
 사용자 결정(DECISIONS 2026-11-04)에 따라 개발 담당 점검은 2단계 GPU lab에서 GPU 서빙 이미지로 한 번에 실측한다. 이 문서는 그 실행 묶음이다. 1단계의 k3d CPU 결과는 경로 진단이며 실측 수에 넣지 않는다.
 
 ## 1. 전제
 
 | 항목 | 값 | 확인 방법 |
 |---|---|---|
-| 환경 | AWS L4 단일 GPU, Linux amd64, K3s, NVIDIA device plugin | `kubectl get node -o jsonpath='{..allocatable.nvidia\.com/gpu}'` = 1 |
+| 환경 | AWS L4 단일 GPU, Linux amd64, Kubernetes(kubeadm), NVIDIA device plugin | `kubectl get node -o jsonpath='{..allocatable.nvidia\.com/gpu}'` = 1 |
 | 엔진 이미지 | `vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b` (0.31.0, linux/amd64; `docs/gpu-a/ENVIRONMENT.md`) | Pod `imageID` |
 | Gateway 이미지 | runtime `deploy/gateway/Dockerfile` 빌드. 1단계 k3d에서 쓴 `serving-gateway@sha256:5e79946d…`는 arm64라 다시 빌드한다 | 레지스트리 digest |
 | 모델 | `facebook/opt-125m@27dcfa74…`와 guard chat template(1단계와 같음) | `env` 하위 명령의 inventory |
@@ -29,12 +31,12 @@
 
 | 기동 | render 옵션 | 점검 | 하위 명령(1단계와 같음) |
 |---|---|---|---|
-| G1 기본 + Gateway 4-Pod | 없음, `gateway --chat-temperature` | REQ-01(격리, 이어서 `engine-ingress` 삭제로 열림), REQ-03, REQ-11, REQ-13(엔진+Gateway), OBS-09(2번 통과 시), OBS-06, PLT-07(수신기 기동 직후) | `http-check`, `route-target`, `record-access`, `egress` |
+| G1 기본 + Gateway 4-Pod | 없음, `gateway --chat-temperature` | REQ-01(격리, 이어서 `engine-ingress` 삭제로 열림), REQ-03, REQ-11(팩33 출력 오라클 — `req11-output-oracle.md`), REQ-13(엔진+Gateway), OBS-09(2번 통과 시, `pods/attach` 필요 — `obs09-cri-boundary.md`), OBS-06, PLT-07(수신기 기동 직후) | `http-check`, `route-target`, `record-access`, `egress` |
 | G2 센서 + Gateway | `--lifecycle` | REQ-02(Gateway 기록 + native 복합) | `route-record --prepared` |
 | G3 센서 + API 키 | `--lifecycle --api-key-secret` | PLT-10 | `revocation` |
 | G4 usage 금지 | `--usage forbidden` | OBS-04 | `usage --check OBS-04` |
 | G5 usage 허용 | `--usage allowed` | OBS-05(1단계 CPU에서는 warm-up 정지. GPU에서 재현되면 엔진 문제로 기록) | `usage --check OBS-05` |
-| G6~ engine_sensor | PR #215 인계 | REQ-18(V2), REQ-19(`--lab-kernel-checks`), REQ-20(graph 켬·끔 두 세대), LIF-13(daemon 자산), REQ-15(Gateway salt) | `tools/gpu_a_run_inputs.py check-inputs`, `tools/b_req18*`·`b_req20*`·`b_lif13*` |
+| G6~ engine_sensor | PR #215 인계 | REQ-18(V2), REQ-19(`--lab-kernel-checks`), REQ-20(graph 켬·끔 두 세대), LIF-13(daemon 자산, 2026-11-06부터 소비자 lab 동작 사례: `lif13-generation-scope.md`), REQ-15(Gateway salt) | `tools/gpu_a_run_inputs.py check-inputs`, `tools/b_req18*`·`b_req20*`·`b_lif13*` |
 | TP2 (새 승인 필요) | 2장 eager, REQ-21은 `--restart-always` | REQ-14, REQ-21(사례: before → switch engine_restart → after) | PR #215 인계 |
 
 순서: G1 → G4 → G5 → G2 → G3 → G6~. 앞 묶음은 센서가 없어 세션 봉인 문제가 없다.
@@ -68,3 +70,13 @@
 - Gateway 정책 1.2 스키마와 bundle 항목 스키마 일치(REQ-13 Gateway).
 - usage 정상 대조 식별자 별칭(OBS-04·05).
 - #196 공통 입력 계약(`docs/dev-1/gpu-common-inputs-196.md`). 생산자는 2단계에 만든다.
+
+## GPU 실행 준비 보수(2026-11-05)
+
+- `dev1_k3d_cpu_lab`의 eager 선언을 실제 `--enforce-eager` 인자로 고정하고 렌더 기록은 실제 인자를 따른다. 과거 CPU 원자료는 바꾸지 않는다. REQ-20 graph on/off 대조는 별도 세대다.
+- lifecycle 센서를 붙일 때 이미 더한 GPU 메모리 비율 등 기동 옵션을 유지한다. 이전 구현은 기본 ARGS로 다시 덮어써 GPU의 `--gpu-memory-utilization 0.5`가 빠졌다.
+- 렌더·입력·불변식 묶음 170 통과/기존1제외(pytest 1.59초, 부모 1.758초). 새 GPU 실측에는 실제 이미지 digest·소스 pin·최종 렌더 bytes를 다시 묶는다. 최근 보존된 GPU 생산자 세대는 `c1c9f6fd…`이며 위 계획서의 `a4a4c043…`와 같은 이미지로 간주하지 않는다.
+- 입력 target의 관리 템플릿 신원·bounded launch profile·실제 max_model_len과 opt-125m 하위 폴더 매핑을 명시했다. AWS Qwen 경로(`/srv/serving/models/<revision>`→`/models`)를 이 lab의 실제 경로(`/srv/models/opt-125m`→`/models/opt-125m`)로 재사용하지 않는다. 독립 executor의 실제 파일 bytes/읽기 전용 mount/소스 계약 검사는 그대로다. GPU 플랫폼 표기는 Kubernetes로 하고 실제 kubeadm 노드와 구분되지 않는 K3s 단정을 제거했다.
+- G1 첫 REQ-11은 Pod에 명시한 command가 없어 관리 템플릿 신원 검사를 시작하지 못했다. 렌더 Pod에도 target과 같은 `command: [vllm, serve]`를 명시한다. 판정·전송 검사는 유지하며 첫 UNKNOWN 증거도 보존한다. 새 세대로 재측정한다. 관련 입력·렌더 시험 29 통과(pytest 1.27초, 부모 1.439초).
+- REQ-20 graph 켬/끔 대조는 같은 입력 bytes가 필요하다. 원 실행기가 세대마다 새 nonce를 붙여 입력을 바꾸므로, 소유 lab의 REQ-20 manifest에만 32자리 소문자 hex `comparison_nonce`를 선택 선언한다(실행기 0.1.3). 동일 값을 두 세대에 쓰고 사례·manifest의 정책 해시를 다시 묶으며, 요청 ID와 세션은 계속 새로 발급한다. 다른 점검·잘못된 nonce는 거부하고 기존 기본값은 실행별 무작위다. safe_facts에는 nonce의 SHA만 남긴다. 판정·센서·B 파일·PACK32는 유지한다. 관련 시험 92 통과/기존1제외(pytest 2.72초, 부모 2.879초); 전체 source manifest도 같은 445개 범위로 갱신한다.
+- REQ-15의 인증 Gateway 연결은 이전까지 시험 대역만 연결돼 있었다. 실제 실행기 0.1.4는 `gateway_target` 파일과 manifest의 `gateway_target_sha256`을 요구하고, 엔진·probe·model 매핑이 원 target과 같은 세대인지 대조한다. HTTP는 선택 Gateway로만 보내고 매 요청 앞뒤에 Gateway와 엔진 세대를 함께 검증한다. 콜백 파일은 원 엔진에서 읽는다. 직접 엔진에 Bearer header만 붙인 것을 인증 신원으로 간주하지 않는다. 신원/생산자 진위는 계속 미인증이고 기업 승인값을 만들지 않는다. 새 모듈을 포함해 같은 전체 디렉터리 범위를 446개 파일로 갱신하며 B 기본 pin과 PACK32는 유지한다. 초기 관련 회귀 126 통과/기존1제외(pytest 7.27초, 부모 7.410초).

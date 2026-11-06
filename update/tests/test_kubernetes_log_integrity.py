@@ -5,6 +5,8 @@ kubectl은 부르지 않는다. 엔진 응답과 vLLM 원 형식 로그 줄은 �
 """
 from copy import deepcopy
 import json
+import re
+import sys
 
 import pytest
 
@@ -23,13 +25,49 @@ from tests.test_log_integrity import IMAGE, VALUES, World, check, judge, target
 DIGEST = IMAGE.rsplit('@', 1)[1]
 
 
+@pytest.fixture(autouse=True)
+def no_settle(monkeypatch):
+    monkeypatch.setattr(module, 'ATTACH_SETTLE_SECONDS', 0)
+
+
+def cri(text):
+    """containerd CRI 로그 계층: 줄마다 LF 앞 CR 하나를 지운다(k3d 실측 2026-11-06)."""
+    return text.replace('\r\n', '\n')
+
+
+class Stream:
+    def __init__(self, world, mode):
+        self.world, self.mode = world, mode
+
+    def stop(self):
+        text = re.sub(r'(?m)^\S+Z ', '', ''.join(self.world.lines))  # attach에는 시각이 없다
+        if self.mode == 'extra':
+            text = 'startup line\n' + text + 'idle line\n'
+        if self.mode == 'missing':
+            text = text.split('\n', 2)[-1]
+        complete = self.mode != 'incomplete'
+        return {'returncode': 0 if complete else -1, 'stdout_bytes': text.encode(), 'stderr_bytes': b'',
+                'capture': {'complete': complete}}
+
+
 class Transport:
-    """Kubernetes 전송 대역. 요청 검증은 실제 KubernetesHTTP 검증기를 쓴다."""
+    """Kubernetes 전송 대역. 요청 검증은 실제 KubernetesHTTP 검증기를 쓴다.
+
+    kubectl logs는 실제 CRI처럼 LF 앞 CR 하나가 지워진 줄을, attach는 원 바이트를 준다.
+    """
     api_model = 'fixture-model'
     injected = True
 
-    def __init__(self, world, *, identity=None, status=None):
+    def __init__(self, world, *, identity=None, status=None, attach='exact'):
         self.world = world; self.identity = identity or {}; self.status = status; self.validated = []
+        self.attach = attach; self.attached = 0
+
+    def engine_attach(self, cap):
+        assert cap == module.MAX_CAPTURE_BYTES
+        if self.attach is None:
+            raise KubernetesBindingError()
+        self.attached += 1
+        return Stream(self.world, self.attach)
 
     def __call__(self, network, requests, timeout):
         assert network == 'kubernetes-probe'
@@ -49,7 +87,7 @@ class Transport:
     def engine_logs(self, since, cap):
         until = '2099-01-01T00:00:00+00:00'
         result = self.world.logs_window('EXAMPLE-log-engine', since=since, until=until, timeout=5)
-        return {'stdout_bytes': result.stdout.encode(), 'stderr_bytes': b'', 'returncode': result.returncode,
+        return {'stdout_bytes': cri(result.stdout).encode(), 'stderr_bytes': b'', 'returncode': result.returncode,
                 'capture': {'complete': True}}
 
     def read_collection_status(self, session):
@@ -61,11 +99,11 @@ class Transport:
         return {'cleanup_errors': []}
 
 
-def run(tmp_path, monkeypatch, *, changes=None, identity=None, definition=None, values=None, status=None):
+def run(tmp_path, monkeypatch, *, changes=None, identity=None, definition=None, values=None, status=None, attach='exact'):
     world = World(**(changes or {}))
     data = target(); data['kubernetes'] = {'run_id': 'EXAMPLE-log-run'}
     path = tmp_path / 'target.json'; path.write_text(json.dumps(data), encoding='utf-8')
-    fake = Transport(world, identity=identity, status=status)
+    fake = Transport(world, identity=identity, status=status, attach=attach)
     monkeypatch.setattr(module, 'KubernetesHTTP', lambda *a, **k: fake)
     executor = module.KubernetesLogIntegrityExecutor({'target': str(path), 'request_timeout': 1})
     env = environment(engine={'name': 'vllm', 'version': '0.31.0', 'image_digest': IMAGE}, model={'id': 'fixture-model'})
@@ -101,6 +139,10 @@ def test_lines_after_the_window_end_are_dropped(tmp_path, monkeypatch):
             text = '2026-11-04T00:00:01.123456789Z a\rkept\n2026-11-04T00:00:09Z b\n'
             return {'stdout_bytes': text.encode(), 'returncode': 0, 'capture': {'complete': True}}
     ctx = type('Ctx', (), {'cprobe': Late(fake.world)})()
+    class Raw:
+        def stop(self):
+            return {'returncode': 0, 'stdout_bytes': b'a\rkept\nb\n', 'stderr_bytes': b'', 'capture': {'complete': True}}
+    record._attach = Raw()
     read = record._read(ctx, '2026-11-04T00:00:00Z', '2026-11-04T00:00:05+00:00', float('inf'))
     assert read['text'] == '2026-11-04T00:00:01.123456789Z a\rkept\n' and read['source_complete'] is True
     class Unstamped(Late):
@@ -166,3 +208,74 @@ def test_pod_env_without_value_is_the_empty_string_and_secret_refs_stay_unread()
                            _verify=lambda: {'engine': pod})
     identity = KubernetesHTTP.engine_log_identity(stub)
     assert identity['env'] == {'VLLM_LOGGING_PREFIX': '', 'VLLM_LOGGING_LEVEL': 'INFO', 'API_KEY': None}
+
+
+def test_cri_alone_loses_the_native_continuation_and_stays_unknown(tmp_path, monkeypatch):
+    """11-05 GPU 실행의 모양: attach가 없으면 CRI 줄만으로는 multiline·crlf 경계를 확인할 수 없다."""
+    draft, fake, _ = run(tmp_path, monkeypatch, attach=None)
+    gaps = draft.observations['log_coverage_gaps'].value
+    assert any(g.startswith('multiline:') for g in gaps) and any(g.startswith('crlf:') for g in gaps)
+    assert draft.observations['log_trials_reached'].value == ['before', 'cr', 'reserved', 'html', 'after']
+    assert draft.observations['log_security_violations'].value == []
+    assert judge(draft).verdicts['security'] == Verdict.UNKNOWN
+
+
+def test_attach_bytes_restore_the_cr_removed_by_cri(tmp_path, monkeypatch):
+    draft, fake, _ = run(tmp_path, monkeypatch, attach='extra')
+    assert fake.attached == 1
+    assert draft.observations['log_trials_reached'].value == ['before', 'multiline', 'cr', 'crlf', 'reserved', 'html', 'after']
+    assert judge(draft).verdicts['security'] == Verdict.PASS
+
+
+@pytest.mark.parametrize('mode', ['missing', 'incomplete'])
+def test_attach_that_does_not_cover_the_window_is_not_used(tmp_path, monkeypatch, mode):
+    draft, _, _ = run(tmp_path, monkeypatch, attach=mode)
+    assert draft.observations['log_collection_complete'].value is False
+    assert judge(draft).verdicts['security'] != Verdict.PASS
+
+
+def test_alignment_requires_one_contiguous_exact_run():
+    lines = ['2026-11-06T00:00:01Z A1\n', '2026-11-06T00:00:01Z A2\n']
+    merged, diag = module.align_attach(lines, b'x\nA1\r\nA2\ny\n')
+    assert merged == '2026-11-06T00:00:01Z A1\r\n2026-11-06T00:00:01Z A2\n' and diag['cr_restored_lines'] == 1
+    assert module.align_attach(lines, b'A1\r\nA2\nA1\nA2\n')[0] is None  # 두 위치
+    assert module.align_attach(lines, b'A1\r\r\nA2\n')[0] is None        # CR 둘은 CRI 줄 A1\r과 같아야 한다
+    assert module.align_attach(lines, b'A1\r\nA2')[0] is None              # 끝나지 않은 줄
+    assert module.align_attach(lines, b'A1\nX\nA2\n')[0] is None           # 끊긴 연속
+    assert module.align_attach([], b'A1\n')[0] is None
+
+
+def test_attach_stream_stops_only_its_child_and_reports_bytes():
+    from guard.runtime.kubernetes_http import AttachStream
+    import time
+    code = "import sys,time;sys.stdout.buffer.write(b'A1\\r\\nA2\\n');sys.stdout.flush();time.sleep(30)"
+    stream = AttachStream([sys.executable, '-c', code], cap=1024, timeout=20)
+    time.sleep(1.0)
+    result = stream.stop()
+    assert result['stdout_bytes'] == b'A1\r\nA2\n' and result['returncode'] == 0 and result['capture']['complete'] is True
+    early = AttachStream([sys.executable, '-c', 'print(1)'], cap=1024, timeout=20)
+    time.sleep(1.0)
+    assert early.stop()['capture']['complete'] is False  # 스스로 끝난 attach는 연결 끊김이다
+    small = AttachStream([sys.executable, '-c', code], cap=2, timeout=20)
+    time.sleep(1.0)
+    assert small.stop()['capture']['truncated'] is True
+
+
+def test_transport_attach_is_log_profile_only_and_quiet():
+    from types import SimpleNamespace
+    from guard.runtime import kubernetes_http as http
+    seen = {}
+    class Fake:
+        def __init__(self, argv, **kwargs):
+            seen['argv'] = argv; self.stdout = self.stderr = __import__('io').BytesIO(b'')
+        def poll(self): return 0
+        def kill(self): pass
+        def wait(self, timeout=None): return 0
+        returncode = 0
+    stub = SimpleNamespace(profile=http.LOG_INTEGRITY_PROFILE, binary='kubectl', deadline=100, clock=lambda: 0,
+                           binding={'context': 'c', 'engine': {'namespace': 'n', 'pod': 'p', 'container': 'engine'}},
+                           _verify=lambda: None)
+    http.KubernetesHTTP.engine_attach(stub, 1024, popen=Fake).stop()
+    assert seen['argv'][-4:] == ['attach', 'p', '--container=engine', '--quiet'] and '-i' not in seen['argv']
+    with pytest.raises(KubernetesBindingError):
+        http.KubernetesHTTP.engine_attach(SimpleNamespace(**{**vars(stub), 'profile': http.PROFILE}), 1024, popen=Fake)

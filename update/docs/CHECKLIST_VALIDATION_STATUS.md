@@ -2,7 +2,7 @@
 
 이 문서와 CSV는 `tools/checklist_status.py`의 생성물이다. 수정할 정본은 팩·registry·기존 자동화표·명시된 선별 실험 기록이다.
 
-현행 팩 revision 32의 정의 77개, 정책 등록 74점검/498경로, 실행·보안 판정 규칙 연결 68개, 관측 전용 1개, 나머지 미연결 8개다. 연결 중 kubernetes 구현만 있는 점검 45개다. 연결 수는 실제 전체 분기 검증 완료 수가 아니다.
+현행 팩 revision 33의 정의 77개, 정책 등록 74점검/498경로, 실행·보안 판정 규칙 연결 68개, 관측 전용 1개, 나머지 미연결 8개다. 연결 중 kubernetes 구현만 있는 점검 45개다. 연결 수는 실제 전체 분기 검증 완료 수가 아니다.
 
 - [분기별 전체 CSV](checklist_validation_status.csv): 현재 정의·필수 관측·정상/위반/미수집/지원 밖 계획·선행 조건·기업 결정·과거 EVD/RES를 연결한다.
 - `supported_implementations`는 registry에 등록된 구현을 그대로 표시한다. `real`과 `kubernetes`는 서로 대체하지 않고, 공용 `fake`와 CPU 전용 구현은 연결 수에 넣지 않는다.
@@ -29,15 +29,18 @@
 | 현행 팩 GPU 실행 상태 | 점검 수 |
 |---|---:|
 | GPU_PARTIAL_MEASURED | 11 |
-| GPU_PARTIAL_EXAMPLE | 2 |
-| GPU_COMPONENT_DECLARED_ONLY | 3 |
-| DEFERRED_NOT_MEASURED | 61 |
+| GPU_PARTIAL_EXAMPLE | 13 |
+| GPU_COMPONENT_DECLARED_ONLY | 1 |
+| GPU_ATTEMPTED_NOT_COLLECTED | 2 |
+| DEFERRED_NOT_MEASURED | 50 |
 
 | 1단계 담당 | 1단계 상태 | 점검 수 |
 |---|---|---:|
 | - | RETIRED_OUT_OF_UPDATE_SCOPE | 8 |
-| dev-1 | ENTERPRISE_INPUT_WAITING | 6 |
-| dev-1 | GPU_CONFIRMATION_ONLY | 18 |
+| dev-1 | DONE | 6 |
+| dev-1 | ENTERPRISE_INPUT_WAITING | 11 |
+| dev-1 | GPU_CONFIRMATION_ONLY | 6 |
+| dev-1 | MEASUREMENT_REMAINING | 1 |
 | dev-1 | NOT_APPLICABLE_IN_TARGET | 2 |
 | gpu | CPU_DEVELOPMENT_REMAINING | 36 |
 | gpu | DONE | 2 |

@@ -18,7 +18,7 @@ import re
 
 import yaml
 
-from guard.adapters.vllm import CHAT_TEMPLATE_CONTAINER_PATH, VllmAdapter
+from guard.adapters.vllm import CHAT_TEMPLATE_CONTAINER_PATH, CHAT_TEMPLATE_PROFILE, CHAT_TEMPLATE_SHA256, VllmAdapter
 from guard.collectors.file import load_environment
 from guard.models import DataOrigin, Environment, canonical_json, new_id, sha256_hex
 from tools import gpu_a_run_inputs as inputs
@@ -33,6 +33,8 @@ RECEIVER_PORT = 18080
 # 11-02 CPU 실측과 같은 작은 모델 설정. OBS-09가 요구하는 요청 로그 설정을 함께 둔다.
 ARGS = ['/models/opt-125m', '--served-model-name', SERVED, '--max-model-len', '512', '--max-num-seqs', '2',
         '--dtype', 'float32', '--block-size', '32', '--enable-log-requests', '--max-log-len', '512',
+        # CPU 진단의 eager 선언을 GPU 프로필에서도 실제 기동 인자로 지킨다. graph 대조는 별도 세대다.
+        '--enforce-eager',
         # opt-125m에는 chat template이 없다. SUP-03에서 검토한 guard 고정 템플릿을 그대로 붙인다(run 2에서 chat 400 확인).
         '--chat-template', CHAT_TEMPLATE_CONTAINER_PATH]
 LOG_ENV = {'VLLM_CONFIGURE_LOGGING': '1', 'VLLM_LOGGING_LEVEL': 'INFO', 'VLLM_LOGGING_COLOR': '0',
@@ -96,7 +98,8 @@ def use_gpu_profile():
 LIFECYCLE_FILES = ('guard_lifecycle_sensor.py', 'sitecustomize.py', 'settings.json', 'manifest.json')
 
 
-def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usage=None, gpu=None, restart_always=False):
+def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usage=None, gpu=None, restart_always=False,
+           engine_callbacks=None, dev_endpoints=False, profiler=False):
     """lifecycle_dir: `guard prepare-lifecycle-sensor` 출력. 주면 RUNBOOK의 계측 기동 설정을 더한다.
 
     고정 자산은 읽기 전용 /guard-lifecycle(ConfigMap), 기록은 /guard-lifecycle/data/<session>(엔진 UID 소유 0700)이다.
@@ -109,7 +112,8 @@ def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usa
     engine = {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {'name': f'serving-engine-{run_id}'[:63], 'namespace': NAMESPACE,
               'labels': {'app': 'serving-engine', **labels}},
               'spec': {'enableServiceLinks': False, 'automountServiceAccountToken': False, 'restartPolicy': 'Never',
-                       'containers': [{'name': 'engine', 'image': engine_image, 'imagePullPolicy': 'IfNotPresent', 'args': ARGS,
+                       'containers': [{'name': 'engine', 'image': engine_image, 'imagePullPolicy': 'IfNotPresent',
+                                       'command': ['vllm', 'serve'], 'args': ARGS,
                                        'env': [{'name': k, 'value': v} for k, v in ({**LOG_ENV} if gpu else {**LOG_ENV, 'VLLM_CPU_KVCACHE_SPACE': '1'}).items()],
                                        'ports': [{'containerPort': 8000}],
                                        'readinessProbe': {'httpGet': {'path': '/health', 'port': 8000}, 'periodSeconds': 5},
@@ -121,6 +125,29 @@ def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usa
                        'volumes': [{'name': 'models', 'hostPath': {'path': '/srv/models', 'type': 'Directory'}},
                                    {'name': 'shm', 'emptyDir': {'medium': 'Memory', 'sizeLimit': '1Gi'}},
                                    {'name': 'chat-template', 'hostPath': {'path': '/srv/models/guard-chat/guard-text-chat-v1.jinja', 'type': 'File'}}]}}
+    if engine_callbacks is not None:
+        # 엔진 콜백 센서(`guard prepare-engine-callbacks`). 노드에 마운트된 모델 폴더 아래 자산을 읽기 전용으로 쓴다(AWS lab의 hostPath 방식과 같다).
+        if lifecycle_dir is not None or not re.fullmatch(r'guard-callbacks-[a-z0-9-]{1,40}', engine_callbacks):
+            raise ValueError('K3D_RENDER_INPUT_INVALID')
+        container = engine['spec']['containers'][0]
+        container['env'].append({'name': 'PYTHONPATH', 'value': '/guard-lifecycle/engine-callbacks'})
+        container['volumeMounts'] += [{'name': 'guard-callbacks', 'mountPath': '/guard-lifecycle/engine-callbacks', 'readOnly': True},
+                                      {'name': 'callback-data', 'mountPath': '/guard-lifecycle/data'}]
+        engine['spec']['volumes'] += [{'name': 'guard-callbacks', 'hostPath': {'path': '/srv/models/' + engine_callbacks, 'type': 'Directory'}},
+                                      {'name': 'callback-data', 'emptyDir': {'sizeLimit': '128Mi'}}]
+    if profiler:
+        # profiler-control(P1) lab: torch profiler를 켜고 출력은 엔진 Pod의 빈 폴더(/guard-profiles)에 둔다.
+        container = engine['spec']['containers'][0]
+        container['args'] = [*container['args'], '--profiler-config', json.dumps({'profiler': 'torch', 'torch_profiler_dir': '/guard-profiles',
+            # 기본값(with_stack·gzip·device time 표)으로는 CPU lab에서 중지 때 메모리 초과였다(run 13, 센서 없이도 같음).
+            'torch_profiler_with_stack': False, 'torch_profiler_use_gzip': False, 'torch_profiler_dump_cuda_time_total': False})]
+        container['volumeMounts'].append({'name': 'profiles', 'mountPath': '/guard-profiles'})
+        engine['spec']['volumes'].append({'name': 'profiles', 'emptyDir': {'sizeLimit': '512Mi'}})
+        # 4 GiB 한도에서는 중지 때 trace 내보내기가 OOMKilled됐다(run 13 첫 시도).
+        container['resources']['limits']['memory'] = '6Gi'
+    if dev_endpoints:
+        # lab 전용: vLLM 개발 경로(/collective_rpc·/reset_prefix_cache·/pause·/resume·/sleep). 세대 전환을 직접 일으킬 때만 켠다.
+        engine['spec']['containers'][0]['env'].append({'name': 'VLLM_SERVER_DEV_MODE', 'value': '1'})
     if restart_always:
         # REQ-21 lab 재기동: 같은 Pod에서 엔진 컨테이너만 다시 뜨게 한다(engine_restart 동작의 전제).
         engine['spec']['restartPolicy'] = 'Always'
@@ -158,7 +185,7 @@ def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usa
         lifecycle = {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': f'guard-lifecycle-{run_id}'[:63], 'namespace': NAMESPACE,
                      'labels': labels}, 'data': assets}
         spec, container = engine['spec'], engine['spec']['containers'][0]
-        container['args'] = [*ARGS, '--middleware', 'guard_lifecycle_sensor.Middleware']
+        container['args'] = [*container['args'], '--middleware', 'guard_lifecycle_sensor.Middleware']
         container['env'] += [{'name': 'PYTHONPATH', 'value': '/guard-lifecycle'},
                              {'name': 'GUARD_LIFECYCLE_CONFIG', 'value': '/guard-lifecycle/settings.json'}]
         container['volumeMounts'] += [{'name': 'lifecycle-assets', 'mountPath': '/guard-lifecycle', 'readOnly': True},
@@ -208,7 +235,7 @@ def render(*, run_id, engine_image, lifecycle_dir=None, api_key_secret=None, usa
     record = {'schema': SCHEMA, 'generation': GENERATION, 'profile': 'gpu' if gpu else 'cpu', 'gpu': gpu, 'run_id': run_id, 'engine_image': engine_image,
               'model_id': MODEL_ID, 'model_revision': MODEL_REVISION, 'served_model_name': SERVED,
               'args': engine['spec']['containers'][0]['args'], 'lifecycle_session': lifecycle and json.loads(lifecycle['data']['settings.json'])['session'],
-              'enforce_eager': True, 'lab_namespace_owner_label_required': True,
+              'enforce_eager': '--enforce-eager' in engine['spec']['containers'][0]['args'], 'lab_namespace_owner_label_required': True,
               'outputs_sha256': {'engine.yaml': hashlib.sha256(raw['engine.yaml']).hexdigest(),
                                  **{n: hashlib.sha256(b).hexdigest() for n, b in raw.items() if n != 'engine.yaml'}}}
     return raw, record
@@ -363,7 +390,7 @@ def inventory(root):
 
 def environment(record, inventory_sha256):
     gpu = record.get('gpu')
-    head = 'GPU, Linux amd64, K3s GPU lab; ' if gpu else 'CPU, arm64, k3d local Docker Desktop macOS; '
+    head = 'GPU, Linux amd64, Kubernetes GPU lab; ' if gpu else 'CPU, arm64, k3d local Docker Desktop macOS; '
     platform = (head + '; '.join(f'{k}={v}' for k, v in (
         ('generation', record['generation']), ('run', record['run_id']), ('render_engine_sha256', record['outputs_sha256']['engine.yaml']))))
     # GPU 이름·드라이버는 운영자가 넘긴 값이라 DECLARED다. 측정값으로 올리지 않는다.
@@ -380,8 +407,15 @@ def target(env, record, namespace, engine_pod, probe_pod, *, context):
     container, = (c for c in engine_pod['spec']['containers'] if c['name'] == 'engine')
     value['engine']['command'] = ['vllm', 'serve']
     value['observed_version'] = env.engine.version
+    # 이 lab은 AWS 인계의 /models snapshot 대신 /srv/models 아래 opt-125m 하위 폴더를 마운트한다.
+    value['model_mapping'].update(host_snapshot='/srv/models/opt-125m', container_mount='/models/opt-125m')
     # OBS-09: 실제 Pod 인자와 검토된 로그 계약. 검토되지 않은 이미지면 계약은 None이고 실행기가 공백으로 남긴다.
-    value['comparison_config'] = {'launch': {'argv': list(container['args']),
+    args = list(container['args'])
+    value['comparison_config'] = {'launch': {'argv': args,
+        'profile': 'gpu-bounded-v1' if record.get('profile') == 'gpu' else 'cpu-bounded-v1',
+        'max_model_len': int(args[args.index('--max-model-len') + 1]),
+        'chat_template': {'profile': CHAT_TEMPLATE_PROFILE, 'version': '1', 'sha256': CHAT_TEMPLATE_SHA256,
+            'container_path': CHAT_TEMPLATE_CONTAINER_PATH, 'content_format': 'string', 'request_overrides': False},
         'log_profile': VllmAdapter().native_log_contract(env.engine.image_digest, env.engine.version)}}
     return value
 
@@ -639,7 +673,7 @@ def main(argv=None):
                         help='gpu: 2단계 GPU lab. 이름공간·세대·별칭을 바꾼다. 같은 run의 모든 하위 명령에 같은 값을 준다.')
     sub = parser.add_subparsers(dest='kind', required=True)
     r = sub.add_parser('render'); r.add_argument('--run-id', required=True); r.add_argument('--engine-image', required=True)
-    r.add_argument('--restart-always', action='store_true'); r.add_argument('--gpu-model'); r.add_argument('--gpu-driver'); r.add_argument('--runtime-class')
+    r.add_argument('--restart-always', action='store_true'); r.add_argument('--engine-callbacks'); r.add_argument('--dev-endpoints', action='store_true'); r.add_argument('--profiler', action='store_true'); r.add_argument('--gpu-model'); r.add_argument('--gpu-driver'); r.add_argument('--runtime-class')
     r.add_argument('--lifecycle', type=Path); r.add_argument('--api-key-secret'); r.add_argument('--usage', choices=['forbidden', 'allowed'])
     r.add_argument('--out', type=Path, required=True)
     e = sub.add_parser('env'); e.add_argument('--render', type=Path, required=True); e.add_argument('--models', type=Path, required=True)
@@ -678,7 +712,7 @@ def main(argv=None):
         use_gpu_profile()
     load = lambda path: json.loads(Path(path).read_text(encoding='utf-8'))
     if args.kind == 'render':
-        raw, record = render(run_id=args.run_id, engine_image=args.engine_image, lifecycle_dir=args.lifecycle, api_key_secret=args.api_key_secret, usage=args.usage, restart_always=args.restart_always,
+        raw, record = render(run_id=args.run_id, engine_image=args.engine_image, lifecycle_dir=args.lifecycle, api_key_secret=args.api_key_secret, usage=args.usage, restart_always=args.restart_always, engine_callbacks=args.engine_callbacks, dev_endpoints=args.dev_endpoints, profiler=args.profiler,
             gpu=({k: v for k, v in (('model', args.gpu_model), ('driver', args.gpu_driver), ('runtime_class', args.runtime_class)) if v}
                  if args.profile == 'gpu' else None))
         for name, data in raw.items():

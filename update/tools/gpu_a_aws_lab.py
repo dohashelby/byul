@@ -26,6 +26,10 @@ MP = ('--distributed-executor-backend', 'mp')
 # guard 어댑터의 고정 SUP-03 템플릿(adapters/assets/chat). 호스트 사본은 실행 전에 같은 바이트로 둔다.
 CHAT_TEMPLATE_PATH = '/guard-assets/chat/guard-text-chat-v1.jinja'
 CHAT_TEMPLATE_SHA256 = 'e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e'
+PROFILES_DIR = '/guard-profiles'
+# k3d run 13과 같은 설정: with_stack·gzip·device time 표를 끈다(중지 때 trace 내보내기 메모리).
+PROFILER_CONFIG = json.dumps({'profiler': 'torch', 'torch_profiler_dir': PROFILES_DIR, 'torch_profiler_with_stack': False,
+    'torch_profiler_use_gzip': False, 'torch_profiler_dump_cuda_time_total': False}, sort_keys=True)
 GENERATIONS = {
     # 콜백 센서는 V1 고정 소스 지점을 감싼다. REQ-14·16·17·18. TP1의 기본 executor는 워커를 따로 띄우지 않아
     # REQ-14가 감싸는 MultiprocExecutor·WorkerProc 지점이 불리지 않는다. 첫 실증과 같은 MP backend로 띄운다.
@@ -37,6 +41,23 @@ GENERATIONS = {
     'v2-default': {'sensor': False, 'args': [], 'env': {}},
     # SUP-03. guard 고정 템플릿 파일을 읽기 전용으로 마운트하고 --chat-template으로 고른다.
     'v2-template': {'sensor': False, 'template': True, 'args': ['--chat-template', CHAT_TEMPLATE_PATH], 'env': {}},
+    # 2단계 P1·P2 생산자 GPU 확인. 콜백 센서의 선택 관측(prepare-engine-callbacks 플래그)을 한 엔진에서 함께 켠다.
+    # 세대 전환을 직접 일으키는 개발 경로와 torch profiler를 켠다. 시험 예외로만 닿는 lab 엔진이다.
+    'v1-producers': {'sensor': True, 'profiles': True,
+        # MP backend를 쓰지 않는다: REQ-14 분산 관측(MultiprocExecutor·WorkerProc)이 프로세스마다 16 MiB 기록 한도를
+        # 먼저 채워 생산자 행이 잘렸다(a-p1-20261105-1). TP1 기본 executor에서는 그 지점이 불리지 않는다.
+        'args': ['--enable-prefix-caching', '--profiler-config', PROFILER_CONFIG],
+        'env': {'VLLM_USE_V2_MODEL_RUNNER': '0', 'VLLM_SERVER_DEV_MODE': '1'}},
+    # 같은 생산자 확인의 KV 압박 분기: KV 블록을 줄여 동시 요청 두 개가 선점(retry)·한도 집행 경로를 지나게 한다.
+    # max_model_len 512·블록 40개(16토큰 기준 640토큰): 400토큰 요청 하나는 담고 두 개는 함께 못 담는다.
+    # 처음 시도(2048·160블록·1,300토큰, a-p1-20261105-4)는 계약 사건 상한 4,096과 센서 파일 16 MiB를 넘었다.
+    'v1-producers-kv': {'sensor': True, 'profiles': True,
+        'args': ['--enable-prefix-caching', '--profiler-config', PROFILER_CONFIG, '--max-model-len', '512',
+                 '--num-gpu-blocks-override', '40'],
+        'env': {'VLLM_USE_V2_MODEL_RUNNER': '0', 'VLLM_SERVER_DEV_MODE': '1'}},
+    # P2 runner-consumption의 V2 runner 경로 확인. 센서는 같은 준비 자산(--runner-consumption)으로 API 행과 V2 runner 행을 함께 남긴다.
+    # V2 runner를 명시한다(0.31.0 기본값과 같다). lab kernel 대조는 같은 sample 지점을 감싸므로 이 세대에서 켜지 않는다.
+    'v2-producers': {'sensor': True, 'args': ['--enable-prefix-caching'], 'env': {'VLLM_USE_V2_MODEL_RUNNER': '1'}},
     # REQ-16 lab 문맥. 소유 lab 네임스페이스에서만 띄운다.
     'v1-req16-lab': {'sensor': True, 'lab': True,
         'args': ['--enable-prefix-caching', '--enable-lora', '--max-lora-rank', '8', '--max-loras', '1'],
@@ -98,6 +119,9 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
         engine['volumeMounts'].append({'name': 'guard-chat-template', 'mountPath': CHAT_TEMPLATE_PATH, 'readOnly': True})
         pod['spec']['volumes'].append({'name': 'guard-chat-template',
             'hostPath': {'path': run_root + '/guard-text-chat-v1.jinja', 'type': 'File'}})
+    if spec.get('profiles'):
+        engine['volumeMounts'].append({'name': 'guard-profiles', 'mountPath': PROFILES_DIR})
+        pod['spec']['volumes'].append({'name': 'guard-profiles', 'emptyDir': {'sizeLimit': '1Gi'}})
     if spec.get('lab'):
         engine['volumeMounts'] +=[{'name': 'guard-lora', 'mountPath': '/guard-lora'},
             {'name': 'guard-weights', 'mountPath': '/guard-weights'}]

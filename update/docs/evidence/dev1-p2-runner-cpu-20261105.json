@@ -1,0 +1,197 @@
+{
+  "schema": "byul-dev1-p2-cpu-validation/1",
+  "date": "2026-11-05",
+  "role": "dev-1 / A",
+  "data_origin": "EXAMPLE",
+  "scope": "vLLM 0.31.0 V1 runner CPU k3d; REQ-08/09/10 metadata producer only",
+  "gpu_measured_runs": 0,
+  "producer_registered": false,
+  "full_question_completion_claimed": false,
+  "source": {
+    "base_main": "925ca62d61547acc447b77fc35f2271e70e75788",
+    "inherited_head": "e94829af6630449ec3ab8fcc7c9e6ef1ca0ad0ac",
+    "reviewed_source_sha256": "54189f232f5e0a3795d061ec155a1e2b0df702b16f9b1ccd02b5de7725cc63c4",
+    "frozen_v2_files_unchanged": true,
+    "test_only_followup": "tests/test_cache_callback.py exact scheduler pin expectation"
+  },
+  "tests": {
+    "python": "3.12.13",
+    "direct": {
+      "command": [
+        "uv",
+        "run",
+        "--locked",
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_gpu_common_inputs.py",
+        "tests/test_gpu_input_producers.py",
+        "tests/test_runner_consumption.py",
+        "tests/test_engine_callback_sensor.py",
+        "tests/test_dev1_k3d_cpu_lab.py",
+        "tests/invariants"
+      ],
+      "returncode": 0,
+      "parent_seconds": 1.0881248749792576,
+      "passed": 225,
+      "deselected": 1,
+      "pytest_seconds": 0.89
+    },
+    "adjacent_original": {
+      "command": [
+        "uv",
+        "run",
+        "--locked",
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_engine_callback_comm_buffer.py",
+        "tests/test_engine_callback_distributed_tp.py",
+        "tests/test_engine_callback_graph_replay.py",
+        "tests/test_engine_callback_kernel_bounds.py",
+        "tests/test_engine_callback_restart_lab.py",
+        "tests/test_engine_callback_slot_v2.py",
+        "tests/test_engine_callback_timing_transport.py",
+        "tests/test_engine_callback_weights_lifetime.py",
+        "tests/test_cache_callback.py"
+      ],
+      "returncode": 1,
+      "parent_seconds": 3.7926957081072032,
+      "passed": 120,
+      "failed": 1,
+      "pytest_seconds": 3.45
+    },
+    "cache_pin_correction": {
+      "command": [
+        "uv",
+        "run",
+        "--locked",
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_cache_callback.py"
+      ],
+      "returncode": 0,
+      "parent_seconds": 1.8398461248725653,
+      "test_sha256": "c808a04c2e0d179b075a3c6f865fba028a4e8ee9a04c871308a31bd0a9068d75",
+      "passed": 51,
+      "pytest_seconds": 1.44
+    }
+  },
+  "k3d_runs": [
+    {
+      "run": "14 inherited",
+      "record_sha256": "1b74d8c39004a8a5360a87983372ece9d88d32e1c50a4dd37ff2dff9fc7c7a17",
+      "raw_recovered_sha256": "0d103b59ebf82995a0b82f26fc88b80c89736eaf4cb37e20c163dfc710b85b11",
+      "finding": "Fields indexing failed; sampler temperature/top_p null and unknown top_k incorrectly defaulted to zero",
+      "original_preserved": true
+    },
+    {
+      "run": "15",
+      "record_sha256": "74e484a4a02b532d0145ede90ec397ea23635ee8d0123cf757830d142cf75b29",
+      "events": 13,
+      "candidate_reasons": [
+        "value_changed_before_consumption"
+      ],
+      "finding": "retained allowed-token mask was counted for an unrestricted subsequent request",
+      "original_preserved": true
+    },
+    {
+      "run": "16",
+      "record_sha256": "0d44114290c8f3e2cc34e17acb874c8b45f0afa0759326c07a487e18f2399b37",
+      "raw_sha256": "cfb5417601c2075e8930e1419b0624983ea7f499f1e1ca700ab4c25b1bbc3a83",
+      "events": 13,
+      "event_counts": {
+        "api_validated": 4,
+        "runner_received": 4,
+        "sampler_applied": 4,
+        "api_rejected": 1
+      },
+      "requests": [
+        {
+          "case": "control",
+          "response": {
+            "status": 200,
+            "bytes": 576
+          }
+        },
+        {
+          "case": "restricted",
+          "response": {
+            "status": 200,
+            "bytes": 1063
+          }
+        },
+        {
+          "case": "unlimited_top_k",
+          "response": {
+            "status": 200,
+            "bytes": 571
+          }
+        },
+        {
+          "case": "duplicate_allowed_ids",
+          "response": {
+            "status": 200,
+            "bytes": 578
+          }
+        },
+        {
+          "case": "invalid_token_ids",
+          "response": {
+            "status": 400,
+            "bytes": 109
+          }
+        },
+        {
+          "case": "invalid_temperature",
+          "response": {
+            "status": 400,
+            "bytes": 161
+          }
+        }
+      ],
+      "validation": {
+        "kind": "runner-consumption",
+        "checks": [
+          "REQ-08",
+          "REQ-09",
+          "REQ-10"
+        ],
+        "supported": false,
+        "producer_authenticated": false,
+        "complete": false,
+        "gaps": [
+          "GPU_INPUT_PRODUCER_UNSUPPORTED"
+        ],
+        "generations": 2,
+        "events": 13,
+        "violation_candidates": []
+      },
+      "scope_note": "invalid temperature is rejected before InputProcessor and has no callback event"
+    }
+  ],
+  "wheel": {
+    "wheel_sha256": "d2ecec1dc21120ccd5c7e6ebab0d91e16e2b1ce67d554591b78c79f2b91b353b",
+    "installed_module_sha256": "fd25cd72f8ac800afb5b3aba83f624f6c6e533420ae5b8e546f8b4bedfe1cdbf",
+    "outside_checkout": true,
+    "runner_consumption_enabled": true,
+    "sensor_started": false
+  },
+  "remaining": [
+    "GPU confirmation and registration",
+    "SUP-03/08 downstream module consumption",
+    "V2 runner path",
+    "all-vocabulary logprobs normalization",
+    "logit-bias sampler observation",
+    "B executor consumption wiring"
+  ],
+  "cleanup": {
+    "engine_and_probe_pods": "absent; A-owned CPU lab namespace has no Pods",
+    "aws_accessed": false,
+    "shared_cluster_stopped": false
+  }
+}

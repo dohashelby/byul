@@ -476,3 +476,54 @@ def test_rejected_challenges_alone_are_not_a_normal_control(tmp_path, monkeypatc
     draft, _ = run_gateway(tmp_path, monkeypatch, cases=[c for c in GATEWAY_CASES if 'forged_salt' in c])
     assert draft.normal_control.attempted is False and draft.normal_control.succeeded is False
     assert draft.observations['engine_sensor_full_scope'].value is False
+
+
+def graph_control_requests(root, nonce_marker=... , check_id='REQ-20'):
+    env = Environment(id='ENV-GRAPH-CONTROL', data_origin=DataOrigin.EXAMPLE,
+        engine={'name': 'vllm', 'version': '0.31.0'}).seal()
+    prepared = engine_callbacks.prepare_assets(root / 'assets', lab_kernel_checks=True)
+    target = {'kubernetes': {}, 'lab': True}
+    role = 'replay' if check_id == 'REQ-20' else 'standalone'
+    manifest = {'schema': projection.SCHEMA, 'session': prepared['session'],
+        'target_sha256': sha256_hex(canonical_json(target)), 'environment_ref': env.ref().model_dump(mode='json'),
+        'cases': [{'case_id': 'control', 'role': role, 'prompt': 'same input', 'max_tokens': 2}]}
+    if nonce_marker is not ...:
+        manifest['comparison_nonce'] = nonce_marker
+    (root / 'target.json').write_bytes(canonical_json(target)); (root / 'manifest.json').write_bytes(canonical_json(manifest))
+    executor = engine_sensor.EngineSensorExecutor({'target': str(root / 'target.json'),
+        'prepared': str(root / 'assets/manifest.json'), 'manifest': str(root / 'manifest.json')})
+    requests = []
+    class RecordingTransport:
+        endpoint = SimpleNamespace(scheme='http', netloc='owned-engine:8000')
+        api_model = 'same-model'; process_observation_origin = 'EXAMPLE'
+        def __call__(self, network, batch, timeout):
+            requests.extend(batch)
+            return [{'outcome': 200, 'capture_complete': True,
+                     'body': json.dumps({'choices': [{'message': {'content': 'answer'}}]})}]
+        def engine_callback_events(self, session):
+            return {'events': [], 'truncated': False}
+    executor.transport = RecordingTransport()
+    values = {'sensor_environment_sha256': env.ref().sha256,
+        'sensor_target_sha256': sha256_hex(canonical_json(target)),
+        'sensor_prepared_sha256': sha256_hex(canonical_json(prepared)),
+        'sensor_manifest_sha256': sha256_hex(canonical_json(manifest))}
+    check = baseline_pack().checks[check_id].model_copy(deep=True)
+    check.executor = 'engine_sensor'; check.collection_profile = engine_sensor.PROFILES[check_id]
+    draft = executor.run(check, env, values, None, root / 'work')
+    assert draft.observations['engine_sensor_full_scope'].value is False
+    return requests
+
+
+def test_graph_controls_repeat_the_same_input_without_reusing_request_ids(tmp_path):
+    first = graph_control_requests(tmp_path / 'off', 'a' * 32)
+    second = graph_control_requests(tmp_path / 'on', 'a' * 32)
+    assert first[-1]['body'] == second[-1]['body']
+    assert first[-1]['headers']['X-Request-Id'] != second[-1]['headers']['X-Request-Id']
+    fresh = graph_control_requests(tmp_path / 'fresh')
+    assert fresh[-1]['body']['messages'] != first[-1]['body']['messages']
+
+
+@pytest.mark.parametrize('nonce,check_id', [(None, 'REQ-20'), ('short', 'REQ-20'), ('A' * 32, 'REQ-20'), ('a' * 32, 'REQ-18')])
+def test_comparison_nonce_rejects_invalid_values_and_other_checks(tmp_path, nonce, check_id):
+    with pytest.raises(ValueError, match='ENGINE_SENSOR_COMPARISON_NONCE_INVALID'):
+        graph_control_requests(tmp_path, nonce, check_id)

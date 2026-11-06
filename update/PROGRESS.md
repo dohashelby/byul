@@ -1,3 +1,68 @@
+## 2026-11-06 — GPU 재측정 준비 중 LIF-13 실행 경로 보수
+
+- 한 일: GPU 실행 전 점검에서 두 결함을 찾아 고쳤다. (1) Kubernetes 콜백 전송의 300초 상한이 LIF-13 900초를 거부 → 소유 lab 콜백 전송만 900초, 입력 도구도 LIF-13에 900초. (2) 소비자 기동이 PID 1 `vllm serve`만 인정 → 실제 콘솔 스크립트 형태 `python /…/vllm serve`도 인정(k3d 엔진 PID 1에서 판별 확인, 소비자는 띄우지 않음).
+- 테스트 결과: 콜백·lab·입력·Kubernetes 요청/로그·pin 236 통과(pytest8.07초, 한 코어). 검토 소스 manifest `fe6fdad6…93c4`.
+- 다음 단계: 커밋·CI → 단일 L4 GPU 재측정(상한 $4 승인).
+- 막힌 것: EC2 시작·SSH 보안 그룹 갱신은 사용자 콘솔 작업이 필요하다.
+
+## 2026-11-06 — 기업·runtime 입력 요청 목록
+
+- 한 일: 기업 입력 대기 점검(REQ-02·03·13·17, PLT-07·10·11·12, OBS-01·06·11)과 OBS-05·OBS-09·LIF-13·PLT-08의 요청 값을 점검 정의 기준으로 정리했다. 실행 도구가 채우는 해시·세션·유효 기간 키는 제외했다. `docs/dev-1/enterprise-input-requests.md`.
+- 테스트 결과: 문서만 추가(제품 동작 변경 없음).
+- 다음 단계: 목록 전달(사용자 판단) → 단일 L4 GPU 재측정 비용 보고.
+- 막힌 것: 없음.
+
+## 2026-11-06 — REQ-11 생성 출력 귀속 오라클·판정 rev7(CPU 개발)
+
+- 한 일: 사용자 결정으로 요청별 배타 allowed_token_ids 오라클(exclusive-allowed-token-ids-v1)을 넣었다. 각 연결 출력 token이 모두 자기 배타 집합이면 출력 귀속 확인, 다른 쪽 배타 token은 타 요청 출력 반환 FAIL, 제약 미준수·불완전은 UNKNOWN. REQ-11 rev7·PACK-BASELINE@33(74219b48…cd5b6)에 보안 PASS 규칙과 `output_binding_cases_verified`를 더했다. 실행기 0.4.0/Kubernetes 0.2.0. GPU 정책 초안·OBS-01 파생 팩 seed를 33으로(파생 @2) 옮겼다. 과거 팩·EVD/RES는 그대로다. 상세 `docs/dev-1/req11-output-oracle.md`.
+- 테스트 결과: REQ-11·Kubernetes·GPU 입력·산출물 비공개 183 통과. 실행기 판본·비교 지문 고정값은 의도한 변경으로 갱신(실행마다 바뀌는 허용 집합 해시는 fixture 밖으로). 남은 실패는 Linux x86_64 전용 출력 센서 조건이다. 로컬 전체 시험은 CPU 점유로 사용자 요청에 따라 중단했고 전체 확인은 Linux CI에 맡긴다. CI(ffa7663) 24실패/11,305통과/기존skip1(pytest566.55초): 모두 examples 정책 5개가 팩32를 가리킨 탓이다(직전 팩 개정 7c2715e와 같은 처리로 33으로 맞춤). 실패6파일 39통과·examples 사용 시험 316통과.
+- 다음 단계: CI 확인 → LIF-13·OBS-09·REQ-11 포함 단일 GPU 재실측(비용 확인).
+- 막힌 것: 실제 vLLM 0.31.0의 chat allowed_token_ids 준수는 GPU 실측으로만 확인된다.
+
+## 2026-11-06 — OBS-09 Kubernetes 로그 사건 경계(CPU 개발)
+
+- 한 일: 11-05 GPU OBS-09 UNKNOWN(multiline·crlf 정확 사건 0)의 원인을 k3d에서 확인했다. CRI 로그 계층이 LF 앞 CR 하나를 지워 vLLM formatter의 연속 표식이 사라진다. 시험 동안 `kubectl attach --quiet`로 받은 stdout 바이트를 CRI 줄과 유일 위치로 맞춰 CRI 시각+원 바이트로 잇고, 못 맞추면 UNKNOWN으로 둔다. 파서·판정·정책·원 EVD/RES는 바꾸지 않았다. 판본 0.3.1+k8s.2. 상세 `docs/dev-1/obs09-cri-boundary.md`.
+- 테스트 결과: Kubernetes 로그 직접 18 통과, 로그 관련 201 통과(pytest8.79초). Kubernetes·콜백 인접 시험의 35 실패는 profiler·process의 기존 환경 실패(Linux x86_64 전용·macOS 경로)다. 검토 소스 pin 시험 153 통과·1건은 저장소 안 임시 폴더 문제(밖에서 통과). 검토 소스 manifest `716917d9…c6c0`. 최종 전체는 Linux CI로 확인한다.
+- 진단(증거 아님): k3d 실제 vLLM에서 CRI만 사건12·multiline0·crlf0, 정렬 뒤 사건10·다섯 사례 정확1. 원자료 `byul-dev1-evidence/20261106-obs09-cri-diagnostic/`.
+- 다음 단계: REQ-11 출력 소유권 CPU 개발 → LIF-13·OBS-09 포함 단일 GPU 재실측(비용 확인, `pods/attach` 권한).
+- 막힌 것: CRI 줄 단위 기업 수집기의 별도 사건 해석은 기업 수집기 입력과 함께 정할 열린 질문이다.
+
+## 2026-11-06 — LIF-13 가중치 수명 행 세대 결합(CPU 개발)
+
+- 한 일: 11-05 GPU LIF-13 ABORTED 원인을 원 콜백 행으로 확인했다(daemon은 경계 요청을 받지 않고 소비자는 기동 때 취득 → `window()`가 가중치 행 전부 제외, 소비자0·release 미관측). 가중치 수명 행을 현재 컨테이너 세대(같은 노드 monotonic)로 결합하고 경계 전 release·이전 컨테이너 행을 제외했다. 소비자 기동·release 뒤 재취득을 정본 실행 lab 동작 `weights_consumer_start`로 넣고 실행이 띄운 소비자만 정리한다. LIF-13만 실행 상한 900초. 원 EVD/RES는 바꾸지 않았다. 상세 `docs/dev-1/lif13-generation-scope.md`.
+- 테스트 결과: LIF-13 직접 16 통과. 콜백·lab·생산자·불변식 399 통과·기존1 제외(pytest2.65초). Kubernetes 전송·gate 인접 1,763 통과·44 실패(Linux x86_64 전용 profiler 조건·macOS 경로; 변경 전 HEAD에서도 같은 44개). 검토 소스 manifest `01301f69…744e`. 최종 전체는 Linux CI로 확인한다.
+- 진단 재투영(증거 아님): 11-05 원 행 전체에 새 투영을 적용하면 소비자2·거절1·fallback1·위반 없음, 남은 것은 release 기업 인가뿐. release 뒤 행은 실행 뒤 수작업이라 정본 GPU 재실측이 필요하다.
+- 다음 단계: OBS-09 사건 경계·REQ-11 출력 소유권 CPU 개발 → LIF-13 포함 단일 GPU 재실측(비용 확인).
+- 막힌 것: release 주체 기업 인가 정책 입력 없음(범위 미완 유지).
+
+## 2026-11-05 — A 개발 담당 GPU 인수 실측 마감
+
+- 한 일: 사용자 승인 EC2 최대 $8 범위에서 기존 서울 L4 한 장을 재시작해 신규 process-device-provider·V2 runner-consumption 생산자 2종을 GPU 증거로 등록했다(원6종 SHA 유지). A 17개 항목의 실측·진단과 25개 증거 왕복을 마쳤다. 정본 PACK32 20건과 파생 DRAFT5건을 구분하고 원 FAIL·UNKNOWN·첫 실패를 보존했다.
+- 보수: 실제 Pod command·템플릿·모델 mount 입력, lifecycle eager/GPU 메모리 인자 유지, REQ-20 동일 입력 비교 nonce, REQ-15 실제 Gateway/엔진/주체 연결을 고쳤다. 전체 source gate446파일·원 B pin·PACK32·판정 기준을 유지한다.
+- 검증: 코드6207638 CI42040646656 기본11312통과/기존제외1(pytest468.88초·부모469.629초), wheel·저장소 밖 설치·Docker stub·양 OS 계약·platform 포함7작업 success. 직접 Gateway/인접128통과·기존1제외(7.42초·부모7.580초), source gate8통과(0.74초·부모0.878초). 새 skip·assert 완화0.
+- 증거: 5429파일 반출 SHA 검증, 25건 원 Ref·저장 팩 재판정 일치. archive504c08a3…fbd9062c. 세부 결과는 docs/dev-1/gpu-20261105.md와 docs/evidence/gpu-a-dev1-phase2-20261105.json. 상태 표의 DONE은 lab 단계 완료이며 기업·전체 질문 PASS가 아니다.
+- 남음: LIF-13 daemon 행의 정본 세션 결합, REQ-11 출력 소유권 독립 증명, OBS-09 복수행 경계, OBS-05 양성 보고·기업/runtime 기록 인증 입력. TP2(REQ-14/21)·멀티모달(REQ-16)은 이번 승인 밖이다. 시험 namespace/임시 인증 자료 정리·서빙0·GPU0MiB 확인, EC2 stopped·자동 공인IP 해제까지 확인했다(23:15:00 중지 요청/23:24:14 관측). EC2 추정$2.47~$2.65, 상한$8 이내·EBS 별도; COST_LEDGER에 기록했다.
+
+## 2026-11-05 — A 개발 담당 process-device-provider·P2 V2 CPU 준비 인계
+
+- 한 일: Claude의 사용량 한도 중단 상태와 미커밋 14파일을 컴퓨터 유즈로 확인·백업했다. PLT-01·04 노드 관측/계약 변환, P2 V2 runner 관측/변환, 준비 자산·전송·수집 도구 연결과 계약 과제를 이어받았다. 읽기 실패/잘림의 unknown 보존·장치 시험 UID 일치·cgroup 재확인·후보 상한의 명시 오류·비정상 V2 개수 처리를 보수했다.
+- 테스트 결과: 기존 HEAD eced2ea의 Linux CI 7개 성공 확인. 최종 소스 직접/계약/불변식 289 통과·기존1제외(pytest1.46초/부모1.634초), wheel/격리설치 검증·설치 모듈4개/콜백자산21개 bytes 일치. 최종 CPU 실수집에서 기존 엔진 PID4개와 NVML/GPU 미관측 gap을 재확인하고 임시 노드 관측 namespace 삭제 확인. 최종 기본 전체는 새 커밋 Linux CI에서 확인한다.
+- 전체 CI 첫 실행(3979a2c): 11,287 통과/9실패/기존skip1(pytest585.26초/부모586.347초). 9개 모두 새 관측 파일·변경 소스가 release/reviewed-source.json에 반영되지 않아 source gate가 거부한 경우다. 고정 전체 범위 445파일의 해시 목록만 갱신했으며 gate·B 원본·판정·제품 bytes는 유지했다. 관련 gate/제품/신규 생산자/불변식 253 통과·기존1제외(pytest14.97초/부모15.118초), 새 manifest f56ee035…630fdc를 확인했다. 원 실패 로그를 보존하고 수정 커밋 CI로 전체를 재확인한다.
+- 수정25cb08f CI 7개 성공: 기본11,296통과/기존skip1(pytest419.82초/부모420.457초), wheel/격리설치·공용계약·플랫폼·Docker 통과. 사용자 EC2 상한$8 승인 뒤21:11:44 기존 L4 재시작·6시간 자동 중지 예약을 확인했다. 새 생산자용 고정25cb08f를 별도 서버 경로에 배치했고 실제0.31.0 이미지의 InputProcessor/V1·V2 runner 3개 소스 pin이 일치한다.
+- 후속 A 실측 준비: GPU lifecycle 추가 시 메모리 비율 유지·실제 eager 인자/기록 정합성을 보수했다. 렌더/입력/불변식170통과·기존1제외(pytest1.59초/부모1.758초)다. 런처 보수는 새 생산자 GPU 확인과 구분해 반영하고 실제 A 실측 전 해당 소스의 CI를 확인한다.
+- GPU 후속: a-p2v2-20261105-1에서 PDP25행(소유process3/GPU process1/device24), V2 소비45행(API 검증13/거부2/runner15/sampler15)을 source_ended=true·진단0·위반후보0으로 반출했다. 정상7/거부2 HTTP 대조 일치, 등록 뒤 PDP 계약 complete=true·V2는 기존 logit bias gap 유지다. 실제 SHA가 일치하는 두 생산자를 더해 총8종 등록했다. 원 first logprobs 형식400과 보정 대조를 모두 보존한다.
+- 이미지 경계: 노드 OCI 원문 hash로 c1c9(index)→a4a4(linux/amd64 manifest)→c76d(config)를 대조했다. 직접 index 허용의 관련1실패/475통과 원본을 보존하고 해당 허용을 제거했다. 기존 index/config/다른 버전 거부는 유지하며 정확 a4a4의 로그 소스3개 검토 뒤 OBS09 계약만 추가했다. 고정 목록 갱신 후 직접/계약/이미지/소스gate/불변식476통과·기존1제외(pytest6.69초/부모6.833초). 새 생산자 Pod/시험 예외 정리·회수 뒤 health timeout·GPU0MiB를 확인했다. 다음은 A 단일 GPU 실행 묶음이다.
+- A 실행 입력: dev1 target에 누락된 고정 chat template/bounded launch/max_model_len과 실제 OPT 하위 모델 경로를 채웠다. 소비자·원본 판정/파일 신원 검사는 그대로이며 GPU 플랫폼 표기는 실제 Kubernetes에 맞췄다. 입력/REQ11·로그/Kubernetes·불변식218통과·기존1제외(pytest5.03초/부모5.203초). G1 엔진·Gateway·양쪽 probe는 준비됐고 확정 입력으로 점검을 진행한다.
+- 다음 단계: 고정 소스 검증·문서/체크포인트·PR 갱신 후 준비된 단일 GPU 세션을 비용 확인에 따라 진행한다. 신규 생산자 두 종의 GPU 확인·등록과 A 18개 GPU 실측은 미완료다.
+- 막힌 것: TP2 별도 비용/구성, SUP-08 멀티모달, 사건 상한 4,096과 V2 logit bias 계약 의미 변경은 기존 합의 경계를 유지한다. CPU·대역을 GPU MEASURED 또는 전체 PASS로 올리지 않는다.
+
+## 2026-11-05 — A 개발 담당 Claude 인계·P2 V1 runner 소비
+
+- 한 일: Claude 화면과 GitHub main `925ca62`를 컴퓨터 유즈로 대조하고, `codex/dev1-p1-producers`의 미커밋 9파일을 원본 보존 후 이어받았다. REQ-08·09·10 API 검증→runner 도착→sampler CPU 메타데이터 관측과 공통 계약 변환을 연결했다. 필드 접근 실패·누락 top-k의 0 대체·이전 허용 마스크 오독을 고쳤고, 요청별 단계/누락·후속 값 변경·거부 입력 소비 후보를 보존한다.
+- 테스트 결과: 직접·계약·불변식 225 통과/기존1제외(0.89초·부모1.088초), 인접120통과/기존 P1 pin 기대 목록1실패 원본 보존 뒤 해당 cache 전체51통과(1.44초·부모1.840초). k3d CPU run16은 정상4/거부2 HTTP 대조, 계약 사건13/위반후보0/미등록 gap이다. wheel 설치 CLI·자산 bytes 일치, 고정 manifest439파일/PACK32 유지. GPU MEASURED 신규0이며 기본 전체는 수정 HEAD Linux CI로 확인한다.
+- 다음 단계: Linux CI와 인계 문서·checkpoint를 마감한다. P1 process-device-provider·TP2 종류, P2 SUP-03/08·V2 및 GPU 확인/생산자 등록·B 소비 연결은 남아 있다.
+- 막힌 것: AWS·새 인스턴스·TP2·멀티모달 모델의 기존 승인 경계는 유지한다. 수집기의 CPU 확인을 GPU 실측이나 전체 질문 완료로 올리지 않는다. 원자료·실패와 상세는 `docs/dev-1/phase2-p2-runner-consumption.md` 및 `docs/evidence/dev1-p2-runner-cpu-20261105.json`에 있다. 검증에 쓴 A 소유 engine/probe Pod만 정리하고 공용 cluster는 중단하지 않았다.
+
 ## 2026-10-30 — A-1 LIF08 선정 mp rank 실패 관측 제품 묶음
 
 - 한 일: PR123 확정683e48d를 보존하고 선정 mp의 worker 예외 응답·collective RPC/Future 결과·사망 monitor·core 실패 표식을 분리한 명시 native13/parser와 닫힌 six-probe·LIF08 전용 소비·DRAFT팩/registry를 초안으로 연결했다. 예외/사망/지연/통신정지 네 조건과 원팩 정상/output rank 기준·다른76정의·native8~12·A2/B 원본을 유지한다. callback·RPC·worker 상태를 바꾸거나 실제 장애를 주입하지 않는다.

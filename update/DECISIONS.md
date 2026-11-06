@@ -295,6 +295,9 @@
 - 2026-10-19 · 모델: `Execution.operator{by,at}`·`override_reason`, `ExecutorInfo.default_judge`, `CheckRow.evidence_source`·`replaced`, `Report.evidence_counts` — 모두 비어 있으면 직렬화에서 빠짐(기존 해시 유지). 사람이 입력한 증거(operator 있음)는 모델이 MEASURED를 거부.
 
 ## 열린 질문
+### dev-1 2단계 생산자 (2026-11-05)
+- P2-Q1 — 긴 요청이 #196 계약 사건 상한 4,096에 닿는다(요청 14개 세션에서 request-attempt 2,383행, 1,300 토큰 KV 압박 세션은 초과로 거부). 단계 요약 행(schema `/2`)·기록 분할·요청 선택 중 무엇으로 할지 B 소비자와 합의가 필요하다. 잠정: 요청 선택으로 상한 안에서 시험, 계약은 그대로. 상세는 `docs/dev-1/phase2-contract-questions.md`.
+- P2-Q2 — V2 runner는 sampler 단계 logit bias 개수를 읽을 수 있는데, 계약은 V1 한계 때문에 이 gap을 고정으로 붙인다. 관측이 있을 때 비교로 바꿀지 B 확인이 필요하다. 잠정: 계약 그대로.
 ### U1 (2026-10-25 개정, 변경 유형별 시험 선정)
 - ~~U1-Q1 — 패치 릴리스도 전체 시험할 것인가?~~ → 2026-10-25 사용자 결정: 패치 릴리스는 필요한 점검만 골라 시험한다(아래 "U1 개정 2").
 - U1-Q2 — 엔진 릴리스에서 실험이 닿지 않은 변경 진입점을 판정에 반영할 것인가(그 점검 PASS → UNKNOWN)? 판정 규칙 변경이다. 잠정: 보고서 표시와 수동 시험 대상 등록만.
@@ -728,3 +731,9 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - 2026-11-05 · REQ-16 이미지 문맥(`media_identity`)은 이미지 토큰을 담은 블록까지 캐시 적중했을 때만 위반으로 본다. 앞의 공통 텍스트 블록만 적중한 것은 정상 공유다. 근거는 엔진 기록의 이미지 토큰 위치(`Request.mm_features[].mm_position.offset`)와 적중 토큰 수(`num_computed_tokens`)이며, 같은 이미지를 다시 보낸 대조가 이미지 블록까지 적중해야 측정력이 있다. 위치 기록이 없으면 미측정이다. 다른 문맥(salt·adapter·모델 세대)의 같은 첫 블록 키 규칙은 그대로다. 2026-11-04 열린 질문을 닫는다. · 사용자 결정.
 - 2026-11-04 · 묶음 3 인수: REQ-15의 수집 완료된 위조 salt 4xx만 정상 대조에서 분리한다. 일반 요청 오류·5xx·수집 불완전 응답은 정상 대조 성공으로 만들지 않는다. 실행기 판본은 0.1.2로 구분한다. REQ-16은 명시한 `media.text_after` 사례·닫힌 전송만 추가하고 기존 media 판정·원 EVD/RES·FAIL은 유지한다. · Claude 중단 작업 인수.
 - 열린 질문(2026-11-04, REQ-16 media): 공통 텍스트 접두 적중과 실제 이미지 블록 소비를 구분하는 판정 의미의 승인·검토가 필요하다. 현행 첫 블록 키 기준을 결과에 맞춰 바꾸지 않는다. REQ-17 공식 AUC 한도·최소 표본 수는 기업 입력 대기로 남긴다.
+
+- 2026-11-05 · 사용자 승인: 기존 서울 g6.2xlarge L4 한 장에서 신규 생산자2종과 A 단일 GPU 실측을 진행하며 EC2 상한 $8, 보존 EBS 별도. 시작 전 CI 성공·증거 반출·최종 stopped 확인을 요구했다. TP2 추가 GPU와 멀티모달 모델 선정/다운로드는 이 승인에 포함하지 않는다.
+- 2026-11-05 · 실측은 EXAMPLE/DRAFT 정책 범위이며 PASS를 기업 승인·원 질문 전체 완료로 확대하지 않는다. 정본 PACK32와 OBS-01/PLT-07 파생 DRAFT 결과를 구분한다. LIF-13 실제 서빙 소비자/daemon 추가 관측은 원 UNKNOWN EVD/RES를 대체하지 않는다.
+- 2026-11-06 · OBS-09 Kubernetes 경로는 CRI가 LF 앞 CR을 지우므로 `kubectl attach --quiet` stdout 바이트를 CRI 줄과 끝 CR 하나 차이·유일 연속 위치로 맞춘 경우에만 쓴다. 못 맞추면 UNKNOWN이며 파서·판정·정책은 그대로다. · [CRI 경계](docs/dev-1/obs09-cri-boundary.md).
+- 열린 질문(2026-11-06, OBS-09): CRI 로그를 줄 단위로 읽는 기업 수집기는 입력 LF를 진짜 접두사를 가진 별도 사건으로 볼 수 있다. 기업 수집 경로를 OBS-09 대상에 넣을지 기업 수집기 입력과 함께 정한다.
+- 2026-11-06 · 사용자 결정: REQ-11 생성 출력 귀속 오라클은 요청별 배타 allowed_token_ids(exclusive-allowed-token-ids-v1)로 하고, 판정 정의를 rev7·PACK-BASELINE@33으로 올려 보안 PASS 규칙을 둔다. 과거 팩·EVD/RES는 소급 변경하지 않는다. GPU 정책 초안과 OBS-01 파생 팩 seed도 33으로 옮긴다. · [출력 오라클](docs/dev-1/req11-output-oracle.md).

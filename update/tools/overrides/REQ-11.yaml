@@ -20,6 +20,7 @@ required_observations:
   - { key: input_projection_verified, type: bool }
   - { key: output_binding_verified, type: bool }
   - { key: output_binding_gap, type: str }
+  - { key: output_binding_cases_verified, type: "list[str]" }
   - { key: connection_overlap_verified, type: bool }
   - { key: tested_result_binding, type: str }
   - { key: tested_client_request_id_trust, type: str }
@@ -36,11 +37,24 @@ judge:
   params:
     fail_when_any:
       - { obs: security_violations, op: nonempty }
-    # No independent output-binding oracle is available in this collector.
-    # Empty security pass rules deliberately withhold PASS, including for a
-    # manual declaration claiming output_binding_verified=true. Input-projection
-    # subproperties remain observations; independent violations still FAIL.
-    pass_when_all: []
+    # rev7: the exclusive allowed-token oracle attributes generated output.
+    # PASS needs the supported profile, every input-projection case, every
+    # output-attribution case, both controls and complete collection.
+    # Independent violations (foreign prompt/output, stream ID change) FAIL first.
+    pass_when_all:
+      - { obs: profile_supported, op: eq, value: true }
+      - { obs: source_contract_verified, op: eq, value: true }
+      - { obs: template_identity_verified, op: eq, value: true }
+      - { obs: tested_result_binding, op: eq, value_policy: result_binding }
+      - { obs: tested_client_request_id_trust, op: eq, value_policy: client_request_id_trust }
+      - { obs: cases_planned, op: eq, value: ["json:generated", "json:distinct_body", "json:collision_body", "json:collision_header", "sse:generated", "sse:distinct_body", "sse:collision_body", "sse:collision_header"] }
+      - { obs: cases_verified, op: superset_of, value_obs: cases_planned }
+      - { obs: input_projection_verified, op: eq, value: true }
+      - { obs: connection_overlap_verified, op: eq, value: true }
+      - { obs: output_binding_verified, op: eq, value: true }
+      - { obs: output_binding_cases_verified, op: superset_of, value_obs: cases_planned }
+      - { obs: collection_complete, op: eq, value: true }
+      - { obs: normal_controls, op: eq, value: true }
     axes:
       functional:
         pass_when_all:
@@ -57,8 +71,9 @@ functional_probes:
     expect: [200]
     via: engine
 limitations:
-  - "REQ-11 rev3: 입력 projection·연결·응답 형식의 제한된 하위 성질을 수집한다. 생성 출력 자체의 귀속은 미검증이므로 보안 PASS를 보류한다. 독립 위반이 없으면 보안 UNKNOWN, 확인된 타 연결 소비 입력·스트림 ID 변경은 FAIL이다. 기능 축은 정상 대조로 따로 판정하며 성능은 UNKNOWN이다."
-  - "input_projection_verified·기존 connection_binding_verified·cases_verified는 소비 입력 projection과 연결/응답 형식의 하위 검증이다. output_binding_verified=false이며 collection_complete=true도 생성 출력 귀속의 입증을 뜻하지 않는다. 수동 PASS와 자기 신고 output_binding_verified=true도 이 정의의 보안 PASS 상한을 바꾸지 못한다."
+  - "REQ-11 rev7: 생성 출력 귀속을 요청별 배타 허용 token 오라클(exclusive-allowed-token-ids-v1)로 확인한다. 두 요청에 각자의 독립 tokenize 결과에만 있는 token을 allowed_token_ids로 주고, 각 연결의 출력 token이 모두 자기 집합 안이면 귀속 확인, 다른 연결의 배타 집합 token이 있으면 타 요청 출력 반환으로 FAIL이다. 엔진이 제약을 지키지 않았거나 응답이 불완전하면 UNKNOWN이다. rev3~6의 결과는 당시 규칙(보안 PASS 보류)으로 남는다."
+  - "input_projection_verified·connection_binding_verified·cases_verified는 소비 입력 projection과 연결/응답 형식의 하위 검증이다. 보안 PASS는 이와 함께 output_binding_verified=true와 8개 사례 모두의 output_binding_cases_verified가 필요하다. 생성 문장·usage 개수·클라이언트 ID는 오라클이 아니다."
+  - "출력 귀속 오라클은 엔진 sampler가 각 요청의 allowed_token_ids를 지킨다는 데 기댄다. 두 요청이 모두 제약을 벗어나 같은 방식으로 바뀐 출력(제약과 출력이 함께 교환)은 입력 projection 대조가 별도로 잡는다. 출력 내용의 품질·의미는 확인하지 않는다."
   - request-connection-binding-v1은 고정 CPU text-chat profile에서 직접 엔진에 연결하는 두 합성 클라이언트의 일반 JSON·SSE 소비 입력 projection·연결·응답 형식만 확인한다. result_binding=originating_connection과 client_request_id_trust=untrusted_correlation은 기업의 원래 공유·신원 정책을 대체하지 않는 명시적 하위 정책이다. 다른 유효 정책값은 지원하지 않아 UNKNOWN으로 남긴다.
   - 고정 이미지의 소비 측 prompt_token_ids·prompt_text 출처를 확인하고 독립 /tokenize 결과와 고정 template 렌더를 각 연결에서 정확히 대조한다. HTTP 200·usage 개수·클라이언트가 보낸 ID·모델의 임의 생성 문장이나 표식 우연 일치만으로 PASS하지 않는다.
   - 서버 생성 ID·서로 다른 body ID·같은 body ID·같은 X-Request-Id와 다른 body ID의 네 경우를 일반·SSE에서 시험한다. 클라이언트가 제어하는 API ID의 충돌 자체는 FAIL이 아니다. 다른 연결의 정확한 소비 입력 반환·한 스트림 안 ID 변경은 확인된 독립 위반으로 보존한다. 종료 이후 data·중복 종료만으로는 타 요청으로 잘못 귀속됐다고 단정하지 않고 UNKNOWN으로 남긴다.

@@ -24,6 +24,9 @@ from .response_projection import capture_metadata, log_metadata
 
 
 PROFILE = "request-connection-binding-v1"
+# 생성 출력 귀속 오라클: 두 요청에 서로 겹치지 않는 allowed_token_ids를 준다. 정상 엔진의 출력은
+# 자기 요청의 제약 집합 안에서만 나온다. 다른 연결의 배타 집합 token은 타 요청 출력의 반환이다.
+OUTPUT_ORACLE = "exclusive-allowed-token-ids-v1"
 ARTIFACT_PROFILE = "request-binding-response-projection/1"
 ID_CASES = ("generated", "distinct_body", "collision_body", "collision_header")
 CASES = tuple(f"{mode}:{case}" for mode in ("json", "sse") for case in ID_CASES)
@@ -63,7 +66,7 @@ def _response_object(response):
 def _analysis_projection(value):
     """Storage only: keep the complete analyzer result transient and unchanged."""
     result = {key: value[key] for key in ("verified", "gaps", "violations", "output_tokens",
-                                         "finish_signals", "terminal_signals") if key in value}
+                                         "finish_signals", "terminal_signals", "output_bound", "output_gap") if key in value}
     for key in ("api_ids", "consumer_ids", "consumer_texts"):
         if key in value:
             result[key + "_sha256"] = sha256_hex(canonical_json(value[key]))
@@ -80,6 +83,20 @@ def _timing_projection(value):
         result[key] = item if (type(item) in (int, float) and 0 <= item <= 86_400_000
                                and math.isfinite(item)) else None
     return result
+
+
+def output_binding(output_ids, *, own, other):
+    """출력 token이 모두 자기 배타 집합 안이면 귀속 확인, 다른 쪽 배타 집합 token이 있으면 위반."""
+    if not own or not other or set(own) & set(other):
+        return {"bound": False, "gap": "exclusive per-request output constraints are unavailable", "violation": None}
+    foreign = [token for token in output_ids if token in set(other)]
+    if foreign:
+        return {"bound": False, "gap": None,
+                "violation": "generated token IDs from the other connection's exclusive constraint were returned"}
+    if output_ids and all(token in set(own) for token in output_ids):
+        return {"bound": True, "gap": None, "violation": None}
+    return {"bound": False, "gap": "generated token IDs are not all within the originating request's exclusive constraint",
+            "violation": None}
 
 
 def analyze_response(response, *, expected, foreign, model, max_output, api_id=None, mode="json"):
@@ -226,7 +243,17 @@ def analyze_response(response, *, expected, foreign, model, max_output, api_id=N
             or usage.get("completion_tokens") != len(output_ids)
             or usage.get("total_tokens") != len(expected["tokens"]) + len(output_ids)):
         gaps.append("consumer/output token counts and complete usage do not correspond")
+    # 생성 출력 귀속은 입력 projection 검증(verified)과 따로 둔다. 확인된 타 연결 출력만 위반에 더한다.
+    bound = None
+    if "allowed" in expected or "allowed" in foreign:
+        bound = output_binding(output_ids, own=expected.get("allowed"), other=foreign.get("allowed"))
+        if bound["violation"]:
+            violations.append(bound["violation"])
+    output_bound = bool(bound and bound["bound"] and not gaps and not violations)
+    output_gap = None if output_bound else (bound or {}).get("gap") or (
+        "generated output attribution needs a complete response" if bound else "no output oracle was requested")
     return {"verified": not gaps and not violations, "gaps": sorted(set(gaps)),
+            "output_bound": output_bound, "output_gap": output_gap,
             "violations": sorted(set(violations)), "api_ids": sorted(set(response_ids)),
             "consumer_ids": consumer_ids, "consumer_texts": consumer_texts,
             "output_tokens": len(output_ids), "finish_signals": finish_count, "terminal_signals": done_count}
@@ -234,7 +261,7 @@ def analyze_response(response, *, expected, foreign, model, max_output, api_id=N
 
 class RequestBindingExecutor(HttpCheckExecutor):
     name = "request_binding"
-    version = "0.3.5"
+    version = "0.4.0"
     requires_roles = False
     requires_route_scope = False
     _uses_docker_identity = True
@@ -284,6 +311,7 @@ class RequestBindingExecutor(HttpCheckExecutor):
         started = time.monotonic()
         deadline = started + settings["max_duration_seconds"]
         gaps, violations, samples, cases_attempted, cases_verified = [], [], [], [], []
+        output_gaps, output_cases, output_controls = [], [], {}
         pair_observations, controls = [], {}
         sent = 0
         policy_supported = all(ctx.policy_values[key] == value for key, value in SUPPORTED_POLICY.items())
@@ -371,12 +399,20 @@ class RequestBindingExecutor(HttpCheckExecutor):
                           and expected["A"].get("tokens") != expected["B"].get("tokens"))
         if not fixtures_ready:
             gaps.append("two distinct independently tokenized text fixtures were not obtained")
+        else:
+            # 각 요청의 독립 tokenize 결과에만 있는 token이 그 요청의 배타 출력 제약이다.
+            for side, other in (("A", "B"), ("B", "A")):
+                expected[side]["allowed"] = sorted(set(expected[side]["tokens"]) - set(expected[other]["tokens"]))
+            if not expected["A"]["allowed"] or not expected["B"]["allowed"]:
+                output_gaps.append("exclusive per-request output constraints could not be derived from the fixtures")
 
         def inference(side, label, mode, case="generated", *, delay=0):
             body = {"model": model, "messages": [{"role": "user", "content": texts[side]}],
                     "max_tokens": settings["max_output_tokens"], "temperature": 0,
                     "return_token_ids": True, "return_prompt_text": True,
                     "add_generation_prompt": True, "add_special_tokens": False, "stream": mode == "sse"}
+            if expected[side].get("allowed"):
+                body["allowed_token_ids"] = list(expected[side]["allowed"])
             rid = None
             if case == "distinct_body":
                 rid = f"guard-{nonce}-{side}"
@@ -402,12 +438,16 @@ class RequestBindingExecutor(HttpCheckExecutor):
                                       api_id=api_id, mode=mode)
             violations.extend(f"{response.get('id')}: {reason}" for reason in result["violations"])
             gaps.extend(f"{response.get('id')}: {reason}" for reason in result["gaps"])
+            if not result.get("output_bound"):
+                output_gaps.append(f"{response.get('id')}: {result.get('output_gap')}")
             return result
 
         if fixtures_ready:
             request, rid = inference("A", "before", "json")
             results = send([request], stream=True)
-            controls["before"] = "pass" if results and analyze(results[0], "A", "json", rid)["verified"] else "no_response"
+            first = analyze(results[0], "A", "json", rid) if results else {}
+            controls["before"] = "pass" if first.get("verified") else "no_response"
+            output_controls["before"] = bool(first.get("output_bound"))
             for case_key in CASES:
                 mode, case = case_key.split(":")
                 pending = [inference(side, f"{mode}-{case}-{side}", mode, case,
@@ -430,12 +470,16 @@ class RequestBindingExecutor(HttpCheckExecutor):
                 verified = bool(len(analyses) == 2 and all(item["verified"] for item in analyses) and overlap and connections)
                 if verified:
                     cases_verified.append(case_key)
+                    if all(item.get("output_bound") for item in analyses):
+                        output_cases.append(case_key)
                 pair_observations.append({"case": case_key, "overlap": overlap, "distinct_connections": connections,
                     "verified": verified, "responses": [_analysis_projection(item) for item in analyses],
                     "timings": [_timing_projection(result) for result in results]})
             request, rid = inference("A", "after", "json")
             results = send([request], stream=True)
-            controls["after"] = "pass" if results and analyze(results[0], "A", "json", rid)["verified"] else "no_response"
+            last = analyze(results[0], "A", "json", rid) if results else {}
+            controls["after"] = "pass" if last.get("verified") else "no_response"
+            output_controls["after"] = bool(last.get("output_bound"))
         controls = {label: controls.get(label, "no_response") for label in ("before", "after")}
         normal_ok = all(state == "pass" for state in controls.values())
         after = self._template_snapshot(ctx, identity, argv, deadline) if identity_verified else None
@@ -444,18 +488,23 @@ class RequestBindingExecutor(HttpCheckExecutor):
             gaps.append("owned engine and fixed template identity were not stable across collection")
         complete = bool(profile_supported and identity_verified and not gaps and not violations
                         and cases_verified == list(CASES) and normal_ok)
-        # This verifies returned consumer-input projections and response framing,
-        # not which request produced the generated content/token IDs. In
-        # particular, an output-only swap can preserve every checked projection.
+        # Input projection alone cannot attribute generated content: an
+        # output-only swap preserves every checked projection. The exclusive
+        # allowed-token oracle attributes output only when every case and both
+        # controls stayed inside their own disjoint constraint.
         input_projection_verified = complete
-        output_binding_gap = ("Generated output attribution is not independently verified: "
-            "matching prompt projections, API IDs and token counts are insufficient.")
+        output_verified = bool(complete and output_cases == list(CASES)
+                               and all(output_controls.get(label) for label in ("before", "after")))
+        output_binding_gap = ("none" if output_verified else
+            "Generated output attribution is not independently verified: " + "; ".join(sorted(set(output_gaps)))
+            if output_gaps else "Generated output attribution is not independently verified: incomplete collection.")
         obs_values = {"profile_supported": profile_supported, "source_contract_verified": source_verified,
             "template_identity_verified": identity_verified,
             "connection_binding_verified": cases_verified == list(CASES),  # legacy case-coverage observation
             "input_projection_verified": input_projection_verified,
-            "output_binding_verified": False,
+            "output_binding_verified": output_verified,
             "output_binding_gap": output_binding_gap,
+            "output_binding_cases_verified": output_cases,
             "connection_overlap_verified": len(pair_observations) == len(CASES) and all(item["overlap"] for item in pair_observations),
             "tested_result_binding": ctx.policy_values["result_binding"],
             "tested_client_request_id_trust": ctx.policy_values["client_request_id_trust"],
@@ -467,20 +516,27 @@ class RequestBindingExecutor(HttpCheckExecutor):
         summary = {"profile": PROFILE, "artifact_profile": ARTIFACT_PROFILE,
             "requests_sent": sent, "settings": settings,
             "verification_scope": {"input_projection_verified": input_projection_verified,
-                "output_binding_verified": False, "output_binding_gap": output_binding_gap,
+                "output_binding_verified": output_verified, "output_binding_gap": output_binding_gap,
+                "output_oracle": OUTPUT_ORACLE,
                 "cases_verified_meaning": "input projection, connection overlap and response framing only",
-                "collection_complete_meaning": "bounded collector protocol complete; not generated-output ownership proof"},
+                "collection_complete_meaning": "bounded collector protocol complete; generated-output ownership is output_binding_verified"},
             "source_contract": contract, "gaps": sorted(set(gaps)), "violations": sorted(set(violations)),
             "template_identity_before": before, "template_identity_after": after,
             "pairs": pair_observations,
             "fixtures": {side: {key + "_sha256": sha256_hex(canonical_json(value)) for key, value in fixture.items()}
                          for side, fixture in expected.items()},
             "fixture": {"profile": PROFILE, "settings": settings, "case_order": list(CASES),
-                        "body_shape": {"user": "per-run synthetic A/B text", "output": settings["max_output_tokens"]}},
+                        "body_shape": {"user": "per-run synthetic A/B text", "output": settings["max_output_tokens"],
+                                       "allowed_token_ids": "tokens only in that side's independent tokenization"},
+                        "output_oracle": OUTPUT_ORACLE},
+            # 실행마다 nonce가 달라 비교 조건(fixture)에 넣지 않는다.
+            "allowed_token_ids_sha256": {side: sha256_hex(canonical_json(fixture.get("allowed")))
+                                         for side, fixture in expected.items()},
             "elapsed_seconds": time.monotonic() - started,
             "limitations": ["HTTP request/collection intervals overlap; worker-side simultaneous execution is not proved.",
                 output_binding_gap,
-                "connection_binding_verified and cases_verified describe input-projection subproperties only; CheckDef rev3 withholds security PASS.",
+                "Output attribution relies on the engine enforcing each request's disjoint allowed_token_ids; an unenforced constraint is a gap, not proof.",
+                "connection_binding_verified and cases_verified describe input-projection subproperties only.",
                 "Caller-controlled API IDs may intentionally collide; a collision alone is not a foreign-result finding.",
                 "Only the pinned CPU text fixture and two synthetic direct-engine connections are covered.",
                 "Enterprise principals, gateway authorization, child IDs, randomization modes, cancellation, retries and stored results remain untested.",

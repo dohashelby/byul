@@ -10,7 +10,7 @@ from guard.adapters import vllm_engine_callback_sensor as sensor
 
 SCHEMA = 'guard-engine-callback-assets/1'
 PACKAGE = 'guard_engine_callbacks'
-MODULES = ('vllm_cache_callback', 'vllm_comm_buffer_callback', 'vllm_distributed_callback', 'vllm_engine_callback_sensor', 'vllm_graph_replay_callback', 'vllm_kernel_bounds_callback',
+MODULES = ('vllm_attempt_callback', 'vllm_consumption_callback', 'vllm_consumption_v2_callback', 'vllm_supply_read_callback', 'vllm_health_callback', 'vllm_profiler_callback', 'vllm_profiler_sensor', 'vllm_transition_callback', 'vllm_cache_callback', 'vllm_comm_buffer_callback', 'vllm_distributed_callback', 'vllm_engine_callback_sensor', 'vllm_graph_replay_callback', 'vllm_kernel_bounds_callback',
     'vllm_lifecycle_sensor', 'vllm_rank_failure_sensor', 'vllm_weights_lifetime_callback', 'vllm_worker_generation_contract',
     'vllm_worker_startup_contract')
 SITECUSTOMIZE = (f'from {PACKAGE} import vllm_engine_callback_sensor\n'
@@ -25,7 +25,16 @@ def _sources():
     return values
 
 
-def prepare_assets(output, *, lab_faults=False, lab_kernel_checks=False):
+def prepare_assets(output, *, lab_faults=False, lab_kernel_checks=False, request_attempts=False, generation_transitions=False,
+                   health_causal=False, profiler_control=False, runner_consumption=False, supply_roots=None, supply_watch=False):
+    if supply_roots is not None:
+        from guard.adapters.vllm_supply_read_callback import normalize_roots
+        supply_roots = normalize_roots(supply_roots)
+    if supply_watch and not supply_roots:
+        raise ValueError('ENGINE_CALLBACK_SUPPLY_WATCH_REQUIRES_ROOTS')
+    if (generation_transitions or health_causal) and not request_attempts:
+        # 요청별 세대 소비는 request-attempt 단계 기록과 맞춰야 나온다.
+        raise ValueError('ENGINE_CALLBACK_TRANSITIONS_REQUIRE_ATTEMPTS')
     output = Path(output).absolute()
     if output.exists():
         raise ValueError('ENGINE_CALLBACK_OUTPUT_EXISTS')
@@ -33,9 +42,16 @@ def prepare_assets(output, *, lab_faults=False, lab_kernel_checks=False):
     values = _sources(); session = secrets.token_hex(16)
     for name, data in values.items():
         (output / name).write_bytes(data)
-    (output / 'settings.json').write_text(json.dumps({'session': session, 'secret': secrets.token_hex(32), 'lab_faults': lab_faults, 'lab_kernel_checks': lab_kernel_checks}), encoding='utf-8')
+    (output / 'settings.json').write_text(json.dumps({'session': session, 'secret': secrets.token_hex(32), 'lab_faults': lab_faults, 'lab_kernel_checks': lab_kernel_checks,
+        # #196 request-attempt 관측(P1). 켜면 매 단계 scheduler를 감싼다.
+        'request_attempts': request_attempts is True, 'generation_transitions': generation_transitions is True,
+        'health_causal': health_causal is True, 'profiler_control': profiler_control is True,
+        'runner_consumption': runner_consumption is True, 'supply_roots': supply_roots,
+        'supply_watch': supply_watch is True}), encoding='utf-8')
     manifest = {'schema': SCHEMA, 'profile': sensor.PROFILE, 'session': session, 'engine_started': False, 'lab_faults': lab_faults, 'lab_kernel_checks': lab_kernel_checks,
-        'assets': {name: hashlib.sha256(data).hexdigest() for name, data in sorted(values.items())}}
+        'request_attempts': request_attempts is True, 'generation_transitions': generation_transitions is True,
+        'health_causal': health_causal is True, 'profiler_control': profiler_control is True,
+        'runner_consumption': runner_consumption is True, 'supply_roots': supply_roots, 'supply_watch': supply_watch is True, 'assets': {name: hashlib.sha256(data).hexdigest() for name, data in sorted(values.items())}}
     (output / 'manifest.json').write_text(json.dumps(manifest, sort_keys=True), encoding='utf-8')
     return manifest
 

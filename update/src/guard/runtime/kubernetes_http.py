@@ -58,7 +58,60 @@ for name in sorted(os.listdir(root)):
     if len(raw)>left:raw=raw[:left];truncated=True
     raw=raw.rpartition(b"\n")[0]
     left-=len(raw);rows.extend(json.loads(line) for line in raw.splitlines())
-print(json.dumps({"events":rows,"truncated":truncated}))
+# LIF-13: 이 컨테이너 PID 1의 시작을 콜백 행과 같은 monotonic 시계로 환산한다(이전 컨테이너 세대의 행을 가르는 기준).
+try:
+    import time
+    stat=open("/proc/1/stat").read();ticks=int(stat.rsplit(")",1)[1].split()[19])
+    offset=time.clock_gettime_ns(time.CLOCK_BOOTTIME)-time.monotonic_ns()
+    start=ticks*1000000000//os.sysconf("SC_CLK_TCK")-offset
+except (OSError,ValueError,IndexError,AttributeError):start=None
+print(json.dumps({"events":rows,"truncated":truncated,"container_start_monotonic_ns":start}))
+'''
+# #196 request-attempt(P1): 프로세스별 콜백 기록과 그 프로세스의 시작 ticks. 살아 있지 않은 프로세스는 ticks가 None이다.
+ATTEMPT_EVENTS_READER = r'''
+import json,os,re,sys
+root="/guard-lifecycle/data/"+sys.argv[1];out=[];left=14*1024**2;truncated=False
+wanted=(b'"schema":"guard-vllm-attempt-callback/1"',b'"schema":"guard-vllm-transition-callback/1"',b'"schema":"guard-vllm-health-callback/1"',b'"schema":"guard-vllm-profiler-callback/1"',b'"schema":"guard-vllm-consumption-callback/1"',b'"schema":"guard-vllm-consumption-v2-callback/1"',b'"schema":"guard-vllm-supply-read-callback/1"',b'"phase":"GAP"')
+for name in sorted(os.listdir(root)):
+    found=re.fullmatch(r"callbacks-([1-9][0-9]*)\.jsonl",name)
+    if found is None:continue
+    pid=int(found.group(1));rows=[]
+    # 다른 관측기 행은 읽기 한도에 세지 않는다. 고른 행만 한도까지 담는다(파일 자체는 센서가 16 MiB로 막는다).
+    with os.fdopen(os.open(os.path.join(root,name),os.O_RDONLY|os.O_NOFOLLOW),"rb") as stream:
+        for line in stream:
+            if not line.endswith(b"\n") or not any(w in line for w in wanted):continue
+            if len(line)>left:truncated=True;break
+            left-=len(line);rows.append(json.loads(line))
+    try:
+        stat=open("/proc/%d/stat"%pid).read();ticks=int(stat.rsplit(")",1)[1].split()[19])
+    except (OSError,ValueError,IndexError):ticks=None
+    out.append({"pid":pid,"start_ticks":ticks,"events":rows})
+print(json.dumps({"processes":out,"truncated":truncated}))
+'''
+# SUP-03(P2): 기록된 공급 파일의 현재 bytes SHA-256. 루트 밖·링크·특수 파일·한도 초과는 해시하지 않는다.
+SUPPLY_HASH_READER = r'''
+import hashlib,json,os,stat,sys
+request=json.loads(sys.stdin.read());limit=64*1024**2;out=[]
+for item in request["files"][:2048]:
+    root=os.path.normpath(request["roots"][item["root"]]);rel=item["relative"]
+    path=root if rel=="." else os.path.normpath(os.path.join(root,rel))
+    row={"root":item["root"],"relative":rel,"sha256":None,"size":None,"mtime_ns":None,"state":"unavailable"}
+    if path!=root and not path.startswith(root.rstrip("/")+"/"):row["state"]="outside_root";out.append(row);continue
+    try:
+        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        try:
+            info=os.fstat(fd);row.update(size=info.st_size,mtime_ns=info.st_mtime_ns)
+            if not stat.S_ISREG(info.st_mode):row["state"]="not_regular"
+            elif info.st_size>limit:row["state"]="too_large"
+            else:
+                digest=hashlib.sha256()
+                with os.fdopen(os.dup(fd),"rb") as stream:
+                    for chunk in iter(lambda:stream.read(1<<20),b""):digest.update(chunk)
+                row.update(sha256=digest.hexdigest(),state="hashed")
+        finally:os.close(fd)
+    except OSError:pass
+    out.append(row)
+print(json.dumps({"files":out}))
 '''
 # REQ-16 lab only: replace the active LoRA files with one declared variant, keeping the same path.
 COLLECTION_STATUS_READER = r'''
@@ -87,6 +140,48 @@ try:
 finally:
  s.close()
 print(json.dumps({"schema":"guard-lab-weights-release/1","status":r.get("status") if isinstance(r,dict) else None}))
+'''
+# LIF-13 lab: 엔진(PID 1)과 같은 인자로 같은 컨테이너에 소비자 엔진 하나를 더 띄운다(포트만 다름).
+# 같은 --load-format ipc_cache 설정이라 daemon에서 가중치를 취득하고, release 뒤에는 거절 뒤 디스크 fallback으로 뜬다.
+# 준비(/health 200)까지만 기다린다. 소비자 정리는 WEIGHTS_CONSUMERS_STOP이 한다.
+WEIGHTS_CONSUMER_START = r'''
+import json,os,subprocess,sys,time,urllib.request
+port=int(sys.argv[1]);argv=open("/proc/1/cmdline","rb").read().split(b"\0")[:-1];argv=[a.decode() for a in argv]
+# 콘솔 스크립트는 shebang 때문에 PID 1이 "python /…/vllm serve …"로 보인다(k3d 실측 2026-11-06). 두 형태만 받는다.
+at=1 if len(argv)>=3 and os.path.basename(argv[0])=="vllm" else 2 if len(argv)>=4 and os.path.basename(argv[0]).startswith("python") and os.path.basename(argv[1])=="vllm" else None
+if at is None or argv[at]!="serve" or "--port" in argv or not 8001<=port<=8009:
+    print(json.dumps({"schema":"guard-lab-weights-consumer/1","status":"unsupported"}));sys.exit(0)
+log=open("/tmp/guard-lab-consumer-%d.log"%port,"wb")
+p=subprocess.Popen(argv+["--port",str(port)],stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+ticks=int(open("/proc/%d/stat"%p.pid).read().rsplit(")",1)[1].split()[19])
+status="timeout"
+for _ in range(240):
+    if p.poll() is not None:status="exited";break
+    try:
+        if urllib.request.urlopen("http://127.0.0.1:%d/health"%port,timeout=2).status==200:status="ok";break
+    except OSError:pass
+    time.sleep(1)
+print(json.dumps({"schema":"guard-lab-weights-consumer/1","status":status,"pid":p.pid,"start_ticks":ticks}))
+'''
+WEIGHTS_CONSUMERS_STOP = r'''
+import json,os,signal,sys,time
+left=[]
+for item in json.loads(sys.argv[1]):
+    try:
+        ticks=int(open("/proc/%d/stat"%item["pid"]).read().rsplit(")",1)[1].split()[19])
+    except (OSError,ValueError,IndexError):continue
+    if ticks!=item["start_ticks"]:continue
+    os.killpg(item["pid"],signal.SIGTERM);left.append(item)
+for _ in range(60):
+    alive=[]
+    for item in left:
+        try:
+            if int(open("/proc/%d/stat"%item["pid"]).read().rsplit(")",1)[1].split()[19])==item["start_ticks"]:alive.append(item)
+        except (OSError,ValueError,IndexError):pass
+    left=alive
+    if not left:break
+    time.sleep(1)
+print(json.dumps({"schema":"guard-lab-weights-consumers-stop/1","status":"ok" if not left else "alive"}))
 '''
 # REQ-21 lab: 소유 엔진 컨테이너의 PID 1에 SIGTERM 한 번. Pod는 restartPolicy Always여야 같은 Pod에서 새 컨테이너가 뜬다.
 ENGINE_RESTART = r'''
@@ -173,6 +268,87 @@ def _validate(target, env):
         raise KubernetesBindingError() from None
 
 
+class AttachStream:
+    """한 kubectl attach 자식의 stdout·stderr를 상한까지 담는다. stop()이 그 자식만 끝낸다.
+
+    timeout이 지나면 자식을 끝내고 timed_out으로 남긴다. 상한을 넘으면 truncated다.
+    """
+    def __init__(self, argv, *, cap, timeout, popen=None):
+        import subprocess
+        if type(cap) is not int or not 0 < cap <= 8*1024**2 or type(timeout) not in (int, float) or not 0 < timeout:
+            raise ValueError
+        self.cap, self.timeout, self.started = cap, timeout, time.monotonic()
+        self.child = (popen or subprocess.Popen)(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                                 stderr=subprocess.PIPE, bufsize=0)
+        self.data = {"stdout": bytearray(), "stderr": bytearray()}
+        self.limits = {"stdout": cap, "stderr": 4096}
+        self.overflow = {"stdout": False, "stderr": False}
+        self.errors, self.timed_out, self.result = [], False, None
+        self.threads = [threading.Thread(target=self._consume, args=(name, pipe), daemon=True)
+                        for name, pipe in (("stdout", self.child.stdout), ("stderr", self.child.stderr))]
+        for thread in self.threads:
+            thread.start()
+        self.timer = threading.Timer(timeout, self._expire)
+        self.timer.daemon = True
+        self.timer.start()
+
+    def _consume(self, name, pipe):
+        try:
+            while True:
+                chunk = pipe.read(4096)
+                if not chunk:
+                    break
+                room = self.limits[name] - len(self.data[name])
+                self.data[name].extend(chunk[:room])
+                if len(chunk) > room:
+                    self.overflow[name] = True
+                    break
+        except (OSError, ValueError):
+            self.errors.append(name)
+
+    def _expire(self):
+        self.timed_out = True
+        self._kill()
+
+    def _kill(self):
+        try:
+            if self.child.poll() is None:
+                self.child.kill()
+        except OSError:
+            self.errors.append("kill")
+
+    def stop(self):
+        """자식을 끝내고 결과를 돌려준다. 이미 스스로 끝났다면(연결 끊김) returncode가 그대로 남는다."""
+        if self.result is not None:
+            return self.result
+        self.timer.cancel()
+        ended_early = self.child.poll() is not None
+        self._kill()
+        try:
+            self.child.wait(timeout=1)
+        except Exception:
+            self.errors.append("child_reap")
+        for thread in self.threads:
+            thread.join(timeout=0.25)
+        closed = not any(thread.is_alive() for thread in self.threads)
+        for pipe in (self.child.stdout, self.child.stderr):
+            try:
+                pipe.close()
+            except OSError:
+                pass
+        raw = {name: bytes(value) for name, value in self.data.items()}
+        complete = (not ended_early and not self.timed_out and closed and not self.errors
+                    and not any(self.overflow.values()))
+        self.result = {"returncode": 0 if complete else (self.child.returncode if ended_early else -1),
+                       "stdout_bytes": raw["stdout"], "stderr_bytes": raw["stderr"],
+                       "capture": {"schema": "guard-attach-capture/1", "ended_before_stop": ended_early,
+                                   "timed_out": self.timed_out, "truncated": any(self.overflow.values()),
+                                   "pipes_closed": closed, "read_errors": sorted(set(self.errors)), "complete": complete,
+                                   "stdout_sha256": sha256_hex(raw["stdout"]), "stdout_bytes": len(raw["stdout"]),
+                                   "hash_scope": "kubectl attach stdout bytes before UTF-8 decoding; not node log-file bytes"}}
+        return self.result
+
+
 class KubernetesHTTP:
     def __init__(self, target, env, *, duration, binary="kubectl", runner=None, profile=PROFILE, clock=None):
         if profile not in {PROFILE, *_BINDING_PROFILES}:
@@ -208,7 +384,9 @@ class KubernetesHTTP:
         self.binding, self.endpoint = _validate(target, env)
         self.target_sha256=sha256_hex(canonical_json(target))
         self.environment_ref=(deepcopy(target["environment_ref"]) if profile in _BINDING_PROFILES else None)
-        if (type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= 300
+        # LIF-13 lab은 실행 안에서 소비자 엔진을 두 번 기동한다. 그 실행기 상한(900초)은 소유 lab 콜백 전송에서만 받는다.
+        limit = 900 if profile == ENGINE_CALLBACK_PROFILE and target.get("lab") is True else 300
+        if (type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= limit
                 or type(binary) is not str or not binary.strip()):
             raise KubernetesBindingError()
         self.clock = clock or time.monotonic
@@ -694,6 +872,24 @@ class KubernetesHTTP:
         self._verify()
         return result
 
+    def engine_attach(self, cap, *, popen=None):
+        """OBS-09: 엔진 컨테이너 stdout 원 바이트를 실시간으로 받는다(stdin·tty 없음, --quiet).
+
+        CRI 로그(`kubectl logs`)는 줄마다 끝 CR 하나를 지워 native formatter의 연속 표식을 잃는다.
+        attach 스트림은 그 처리 전 바이트다. 시작한 kubectl 자식 하나만 멈춘다.
+        """
+        if self.profile != LOG_INTEGRITY_PROFILE or type(cap) is not int or not 0 < cap <= 8*1024**2:
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        remaining=self.deadline-self.clock()
+        if remaining<=0:raise KubernetesBindingError()
+        argv=[self.binary,f"--context={self.binding['context']}",f"--request-timeout={remaining:.3f}s",
+            f"--namespace={engine['namespace']}","attach",engine["pod"],f"--container={engine['container']}","--quiet"]
+        try:
+            return AttachStream(argv,cap=cap,timeout=remaining,popen=popen)
+        except Exception:
+            raise KubernetesBindingError() from None
+
     def read_collection_status(self, session):
         """OBS-11: 소유 probe Pod의 고정 위치 상태 기록 하나. 링크·큰 파일은 읽지 않는다."""
         if self.profile != LOG_INTEGRITY_PROFILE or type(session) is not str or not re.fullmatch(r"[0-9a-f]{32}",session):
@@ -791,7 +987,7 @@ class KubernetesHTTP:
 
     def engine_callback_switch(self,action,variant):
         """Change one declared REQ-16 context in the owned lab engine and return bounded facts."""
-        lab=self._callback_lab;kind={"lora_reload":"lora","weights_reload":"weights","weights_release":"weights_daemon","engine_restart":"engine_restart"}.get(action)
+        lab=self._callback_lab;kind={"lora_reload":"lora","weights_reload":"weights","weights_release":"weights_daemon","weights_consumer_start":"weights_daemon","engine_restart":"engine_restart"}.get(action)
         if (self.profile!=ENGINE_CALLBACK_PROFILE or self.lab is not True or lab is None or kind is None
                 or lab.get(kind) is None or variant not in lab[kind]["variants"]):
             raise KubernetesBindingError()
@@ -799,6 +995,18 @@ class KubernetesHTTP:
         request={"id":"cbx-%d"%self._callback_switches,"mode":"json","method":"POST","headers":{}}
         if kind=="engine_restart":
             return self._engine_restart()
+        if action=="weights_consumer_start":
+            self._verify();engine=self.binding["engine"];started=getattr(self,"_lab_consumers",[])
+            port=8001+len(started)
+            done=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",
+                "--","python3","-I","-S","-c",WEIGHTS_CONSUMER_START,str(port)],cap=4096,budget=300)
+            self._verify()
+            if (type(done) is dict and done.get("schema")=="guard-lab-weights-consumer/1" and type(done.get("pid")) is int
+                    and type(done.get("start_ticks")) is int):
+                self._lab_consumers=started+[{"pid":done["pid"],"start_ticks":done["start_ticks"]}]
+            if type(done) is not dict or done.get("status")!="ok":
+                raise KubernetesBindingError()
+            return {"consumer_status":"ok","consumer_port":port}
         if kind=="weights_daemon":
             self._verify();engine=self.binding["engine"]
             done=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",
@@ -824,6 +1032,19 @@ class KubernetesHTTP:
             raise KubernetesBindingError()
         facts.update(engine_outcome=200,engine_response_sha256=row.get("body_sha256"))
         return facts
+
+    def stop_lab_consumers(self):
+        """LIF-13 lab: 이 실행이 띄운 소비자 엔진을 시작 ticks가 같을 때만 끝낸다. 띄운 것이 없으면 아무것도 하지 않는다."""
+        started=getattr(self,"_lab_consumers",[])
+        if not started:
+            return True
+        self._verify();engine=self.binding["engine"]
+        done=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",
+            "--","python3","-I","-S","-c",WEIGHTS_CONSUMERS_STOP,json.dumps(started)],cap=4096,budget=90)
+        if type(done) is not dict or done!={"schema":"guard-lab-weights-consumers-stop/1","status":"ok"}:
+            raise KubernetesBindingError()
+        self._lab_consumers=[]
+        return True
 
     def _engine_restart(self):
         """REQ-21 lab: 같은 Pod의 엔진 컨테이너를 한 번 다시 시작하고, 확인된 새 세대로만 바인딩을 옮긴다.
@@ -874,6 +1095,83 @@ class KubernetesHTTP:
         if type(value) is not dict or type(value.get("events")) is not list or type(value.get("truncated")) is not bool:
             raise KubernetesBindingError()
         return value
+
+    def supply_mount_exclusivity(self,roots):
+        """SUP-03: 공급 루트 볼륨이 이 엔진 Pod 전용인지. 엔진 Pod와 클러스터의 Pod 목록을 읽어 판단한다."""
+        from .kubernetes_mount_scope import exclusivity
+        if self.profile!=ENGINE_CALLBACK_PROFILE or type(roots) is not list or not 1<=len(roots)<=8:
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        pod=self._call([f"--namespace={engine['namespace']}","get","pod",engine["pod"],"-o","json"])
+        listed=self._call(["get","pods","--all-namespaces","-o","json"],cap=16*1024**2,budget=60)  # 공용 pipe 한도(16 MiB)
+        self._verify()
+        if (type(pod) is not dict or pod.get("metadata",{}).get("uid")!=engine["pod_uid"]
+                or type(listed) is not dict or type(listed.get("items")) is not list):
+            raise KubernetesBindingError()
+        try:
+            return exclusivity(pod,listed["items"],engine["container"],roots)
+        except (KeyError,TypeError,ValueError):
+            raise KubernetesBindingError() from None
+
+    def engine_supply_hashes(self,roots,files):
+        """SUP-03: 기록된 공급 파일의 현재 bytes 해시를 엔진 컨테이너 안에서 계산한다.
+
+        수집 프로그램은 `python3 -I -S`로 돈다. 엔진의 PYTHONPATH sitecustomize(센서)를 불러오면
+        수집 프로그램 자신의 파일 열기가 공급 읽기로 기록된다(k3d run 18에서 확인).
+        """
+        if (self.profile!=ENGINE_CALLBACK_PROFILE or type(roots) is not list or not 1<=len(roots)<=8 or type(files) is not list
+                or len(files)>2048 or any(type(f) is not dict or set(f)!={"root","relative"} for f in files)):
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        payload=json.dumps({"roots":roots,"files":files}).encode()
+        value=self._call([f"--namespace={engine['namespace']}","exec","-i",engine["pod"],
+            f"--container={engine['container']}","--","python3","-I","-S","-c",SUPPLY_HASH_READER],payload=payload,cap=4*1024**2,budget=120)
+        self._verify()
+        rows=value.get("files") if type(value) is dict else None
+        if type(rows) is not list or len(rows)!=len(files):
+            raise KubernetesBindingError()
+        return rows
+
+    def engine_attempt_events(self,session):
+        """#196 request-attempt: 선택 세션의 attempt 콜백 행을 프로세스별로 읽는다(시작 ticks 포함)."""
+        if self.profile!=ENGINE_CALLBACK_PROFILE or not re.fullmatch(r"[0-9a-f]{32}",session):
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        value=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],
+            f"--container={engine['container']}","--","python3","-I","-S","-c",ATTEMPT_EVENTS_READER,session],cap=16*1024**2,budget=60)  # 고른 행 14 MiB + JSON 여유, 공용 pipe 한도
+        self._verify()
+        processes=value.get("processes") if type(value) is dict else None
+        if (type(processes) is not list or type(value.get("truncated")) is not bool
+                or any(type(p) is not dict or set(p)!={"pid","start_ticks","events"} or type(p["pid"]) is not int or p["pid"]<1
+                       or p["start_ticks"] is not None and (type(p["start_ticks"]) is not int or p["start_ticks"]<0)
+                       or type(p["events"]) is not list for p in processes)):
+            raise KubernetesBindingError()
+        return value
+
+    def engine_pod_document(self):
+        """PLT-01·04: 소유 엔진 Pod 명세(자격 공급 후보를 고르는 데 쓴다). 바인딩을 앞뒤로 확인한다. Secret은 읽지 않는다."""
+        if self.profile!=ENGINE_CALLBACK_PROFILE:
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        pod=self._call([f"--namespace={engine['namespace']}","get","pod",engine["pod"],"-o","json"])
+        self._verify()
+        if type(pod) is not dict or pod.get("metadata",{}).get("uid")!=engine["pod_uid"]:
+            raise KubernetesBindingError()
+        return pod
+
+    def engine_device_open_test(self):
+        """PLT-01·04: 엔진 컨테이너 안에서 보이는 GPU device node를 O_RDWR로 열었다 닫는다(ioctl 없음)."""
+        from guard.collectors.process_device_observer import DEVICE_OPEN_TEST, DEVICE_PATTERN, decode_open
+        if self.profile!=ENGINE_CALLBACK_PROFILE:
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        value=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],
+            f"--container={engine['container']}","--","python3","-I","-S","-c",DEVICE_OPEN_TEST,DEVICE_PATTERN],cap=65536,budget=60)
+        self._verify()
+        try:
+            return decode_open(value)
+        except ValueError:
+            raise KubernetesBindingError() from None
 
     def _state_request(self,request,timeout):
         from .kubernetes_observation_state import validate_request

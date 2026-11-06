@@ -27,3 +27,14 @@ GPU를 켠 뒤 시험 전에 채운다. 세대(`AWS_RUNBOOK.md`의 G-A1~G-A4)마
 | 세대 이름 | runner | Graph | Pod UID | 시작(KST) | 종료(KST) | 쓴 점검 |
 |---|---|---|---|---|---|---|
 | | | | | | | |
+## 2026-11-05 노드 OCI 신원 대조
+
+최근 생산자 세션 `a-p2v2-20261105-1`은 `images.lock`의 index 참조 `c1c9f6fd…`로 기동했고 CRI imageID도 index를 보고했다. 노드 content store의 원문과 SHA를 따로 확인했다.
+
+| 종류 | SHA256 시작 | 확인 |
+|---|---|---|
+| 부모 multi-platform index | c1c9f6fd… | arm64와 amd64 항목을 포함한다 |
+| Linux amd64 manifest | a4a4c043… | 기존 REQ-11 검토 manifest와 같다. 후속 A 실행은 이 정확 digest로 기동한다 |
+| image config | c76d0e22… | manifest와 구분하며 계약의 image digest로 쓰지 않는다 |
+
+실제 설치 소비 소스3개와 logger/formatter/request_logger3개의 SHA도 검토 값과 일치했다. REQ-11의 index/config 거부는 그대로이며, OBS-09 로그 계약은 검토한 정확 amd64 manifest만 추가했다. 과거 ENV/target/원자료의 index 표기는 수정하지 않는다. 외부 원문과 hash는 `byul-dev1-evidence/20261105-codex-takeover/vllm-{index-c1c9,linux-amd64-manifest}.json`에 있다.

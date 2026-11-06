@@ -1,0 +1,127 @@
+{
+  "schema": "byul-dev1-gpu-producer-confirmation/1",
+  "date": "2026-11-05",
+  "session": "a-p2v2-20261105-1",
+  "platform": "AWS g6.2xlarge L4 linux/amd64",
+  "code_head_measured": "25cb08f",
+  "producer_count_registered": 8,
+  "producer_results": {
+    "process-device-provider": {
+      "producer": {
+        "name": "guard-node-process-device-provider",
+        "source_sha256": "442ea49bbc88e7497cda42b359de6ad2fb938d7819f6bcfbb868684406793451",
+        "version": "1"
+      },
+      "events": 25,
+      "bindings": 3,
+      "source_ended": true,
+      "validation_after_registration": {
+        "kind": "process-device-provider",
+        "checks": [
+          "PLT-01",
+          "PLT-04"
+        ],
+        "supported": true,
+        "producer_authenticated": false,
+        "complete": true,
+        "gaps": [],
+        "generations": 3,
+        "events": 25,
+        "violation_candidates": []
+      }
+    },
+    "runner-consumption-v2": {
+      "producer": {
+        "name": "guard-engine-callback-runner-consumption-v2",
+        "source_sha256": "041353842e9c8a12e50ca6515cc21ba9b09fa389a8bee3842926b565c6eb8c66",
+        "version": "1"
+      },
+      "events": 45,
+      "bindings": 2,
+      "source_ended": true,
+      "validation_after_registration": {
+        "kind": "runner-consumption",
+        "checks": [
+          "REQ-08",
+          "REQ-09",
+          "REQ-10"
+        ],
+        "supported": true,
+        "producer_authenticated": false,
+        "complete": false,
+        "gaps": [
+          "GPU_INPUT_CONSUMPTION_FIELD_UNOBSERVED:sampler_applied:logit_bias"
+        ],
+        "generations": 2,
+        "events": 45,
+        "violation_candidates": []
+      }
+    }
+  },
+  "http_controls": {
+    "normal_200": 7,
+    "rejected_400": 2,
+    "matched": true,
+    "first_logprobs_type_error_preserved": true
+  },
+  "callback_archive_sha256": "955fea421bd2cbe77de745ccb1eb8a89509bd070c399ece9aa0383d03b8eed1a",
+  "source_contract_checks": {
+    "all_equal": true,
+    "image": "docker.io/vllm/vllm-openai@sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3",
+    "rows": [
+      {
+        "actual": "e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02",
+        "bytes": 7357,
+        "equal": true,
+        "expected": "e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02",
+        "path": "vllm/entrypoints/serve/engine/serving.py"
+      },
+      {
+        "actual": "532dadea845c77a5a79011027b9989987c3e32467614e993f439f29c924de002",
+        "bytes": 57487,
+        "equal": true,
+        "expected": "532dadea845c77a5a79011027b9989987c3e32467614e993f439f29c924de002",
+        "path": "vllm/entrypoints/openai/chat_completion/serving.py"
+      },
+      {
+        "actual": "4bdc71f668e4820d8ae5bae2a153fed0296b430cd6353ace8c0c27cfb982ebc1",
+        "bytes": 47050,
+        "equal": true,
+        "expected": "4bdc71f668e4820d8ae5bae2a153fed0296b430cd6353ace8c0c27cfb982ebc1",
+        "path": "vllm/entrypoints/openai/chat_completion/protocol.py"
+      },
+      {
+        "actual": "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010",
+        "bytes": 14971,
+        "equal": true,
+        "expected": "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010",
+        "path": "vllm/logger.py"
+      },
+      {
+        "actual": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5",
+        "bytes": 4964,
+        "equal": true,
+        "expected": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5",
+        "path": "vllm/logging_utils/formatter.py"
+      },
+      {
+        "actual": "e7839742189c6f336f7d9fa3355cd78ccb1b1d63a8a24361b8b13a7f7cd0e83d",
+        "bytes": 3980,
+        "equal": true,
+        "expected": "e7839742189c6f336f7d9fa3355cd78ccb1b1d63a8a24361b8b13a7f7cd0e83d",
+        "path": "vllm/entrypoints/serve/utils/request_logger.py"
+      }
+    ],
+    "version": "0.31.0"
+  },
+  "whole_check_pass_claimed": false,
+  "source_authentication_claimed": false,
+  "v2_logit_bias_gap_preserved": true,
+  "cleanup": {
+    "probe_removed": true,
+    "test_access_withdrawal_health_timeout": true,
+    "engine_scaled_to_zero": true,
+    "gpu_memory_after_generation_mib": 0,
+    "ec2_still_running_for_A_measurements": true
+  }
+}

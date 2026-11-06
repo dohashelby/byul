@@ -1,0 +1,49 @@
+"""One local CPU observation only, after S2 case selection and S3 review.
+
+Execution requires an explicit local receipt matching this frozen version.
+This is the requested selection/review contract, not a new human approval gate.
+"""
+from pathlib import Path
+import argparse,hashlib,json,subprocess,uuid
+HERE=Path(__file__).resolve().parent;W=HERE.parents[1]
+SHA=lambda p:hashlib.sha256(Path(p).read_bytes()).hexdigest()
+
+def main():
+    p=argparse.ArgumentParser();p.add_argument('--selection-and-review',type=Path,required=True);a=p.parse_args()
+    f=json.loads((HERE/'freeze.json').read_bytes());admission=json.loads(a.selection_and_review.read_bytes())
+    if admission['freeze_SHA']!=SHA(HERE/'freeze.json') or admission['selected_case']!='cold-baseline-one-observed':
+        raise ValueError('SUP15_SINGLE_FIXED_CASE_NOT_SELECTED')
+    if not admission['S2_selection_message_ref'] or not admission['S3_review_path'] or SHA(admission['S3_review_path'])!=admission['S3_review_SHA']:
+        raise ValueError('SUP15_SINGLE_REVIEW_NOT_BOUND')
+    for name,row in f['host_pins'].items():
+        if SHA(row['path'])!=row['SHA256']:raise ValueError('SUP15_SINGLE_HOST_ASSET_CHANGED:'+name)
+    if subprocess.check_output(['git','-C',str(W),'rev-parse','HEAD'],text=True).strip()!=f['source']:raise ValueError('SUP15_SINGLE_SOURCE_CHANGED')
+    subprocess.run(['git','-C',str(W),'diff','--exit-code','HEAD'],check=True)
+    if SHA(W/'update/release/reviewed-source.json')!=f['manifest_SHA']:raise ValueError('SUP15_SINGLE_MANIFEST_CHANGED')
+    helper=Path(f['capture_helper']['path']);h={'__name__':'_sup15_single_capture','__file__':str(helper)}
+    if SHA(helper)!=f['capture_helper']['SHA256']:raise ValueError('SUP15_SINGLE_CAPTURE_HELPER_CHANGED')
+    exec(compile(helper.read_bytes(),str(helper),'exec'),h)
+    # This directory is the one-run reservation. No automatic retry or delete.
+    data=HERE/'actual';data.mkdir();rows=[];call=h['make_call'](HERE,rows);run='sup15-single-'+uuid.uuid4().hex
+    cid=None;primary=None;cleanup=None;workload_exit=None
+    try:
+        argv=['docker','create','--pull','never','--label','guard.run='+run,'--network','none','--user','1000:1000',
+            '--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--memory','4g','--cpus','2','--pids-limit','256',
+            '--tmpfs','/tmp:rw,exec,nosuid,size=512m,mode=1777','--tmpfs','/guard-cache:rw,exec,nosuid,size=512m,mode=1777','-e','HOME=/tmp']
+        for name,row in f['runtime_host_paths'].items():argv+=['--mount',f'type=bind,src={row},dst=/assets/{name},readonly']
+        argv+=['--mount',f'type=bind,src={HERE/"freeze.json"},dst=/assets/freeze.json,readonly',
+               '--mount',f'type=bind,src={data},dst=/evidence','--entrypoint','python3',f['image'],'-I','-B','/assets/single_case.py']
+        cid=call('single-create',argv).decode().strip()
+        try:call('single-run',['docker','start','--attach',cid],timeout=150)
+        except RuntimeError:
+            if rows[-1]['label']!='single-run' or rows[-1]['exit']!=1 or not (data/'single-case-result.json').is_file():raise
+        workload_exit=rows[-1]['exit'];call('single-state',['docker','inspect',cid])
+    except BaseException as exc:primary=h['diagnostic']('SUP15-single-actual-CPU',exc)
+    finally:
+        if cid:cleanup=h['finish_role'](cid,run,'single',call)
+        with (HERE/'execution-receipt.json').open('x',encoding='utf8') as stream:json.dump({'CID':cid,'run':run,'commands':rows,
+            'primary':primary,'cleanup':cleanup,'workload_exit':workload_exit,'freeze_SHA':SHA(HERE/'freeze.json'),
+            'actual_workload_error_not_success':workload_exit not in (None,0)},stream,indent=2)
+    print(json.dumps({'primary':primary,'cleanup':cleanup,'actual_workload_exit':workload_exit}))
+    return 1 if primary or not cleanup or cleanup['errors'] or not cleanup['owned_cleanup_verified'] or workload_exit!=0 else 0
+if __name__=='__main__':raise SystemExit(main())

@@ -1,0 +1,36 @@
+"""Only new consumer contracts on original producer output, never native replay."""
+from pathlib import Path
+import hashlib,importlib.util,json,unittest,zipfile
+
+HERE=Path(__file__).resolve().parent
+SHA=lambda raw:hashlib.sha256(raw).hexdigest()
+
+class OrderingDelta(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.f=json.loads((HERE/'freeze.json').read_bytes())
+        for row in cls.f['source_pins'].values():
+            if SHA(Path(row['path']).read_bytes())!=row['SHA256']:raise ValueError('SUP16_DELTA_SOURCE_CHANGED')
+        with zipfile.ZipFile(cls.f['actual_archive']) as z:
+            cls.raw=z.read(cls.f['journal_member']);binding_raw=z.read(cls.f['binding_member'])
+        if SHA(cls.raw)!=cls.f['journal_SHA'] or SHA(binding_raw)!=cls.f['binding_SHA']:
+            raise ValueError('SUP16_DELTA_ACTUAL_INPUT_CHANGED')
+        cls.binding=json.loads(binding_raw)
+        spec=importlib.util.spec_from_file_location('_new_sup16_writer',HERE/'write_normal_boot.py')
+        cls.module=importlib.util.module_from_spec(spec);spec.loader.exec_module(cls.module)
+    def test_actual_native17_producer_bytes_LF_ordering(self):
+        self.assertIs(self.module.native17_ordering_from_raw(self.raw,self.binding),True)
+        self.assertEqual(json.loads(self.raw.splitlines()[-1])['payload']['reason'],'BOUND_REACHED')
+        self.assertEqual(SHA(self.raw),self.f['journal_SHA'])
+    def test_missing_final_LF_rejected_in_memory(self):
+        with self.assertRaisesRegex(ValueError,'SUP16_NATIVE_ORDERING_RECORD_INVALID'):
+            self.module.native17_ordering_from_raw(self.raw[:-1],self.binding)
+        self.assertEqual(SHA(self.raw),self.f['journal_SHA'])
+    def test_different_session_rejected_in_memory(self):
+        changed={**self.binding,'session':'0'*32}
+        self.assertNotEqual(changed['session'],self.binding['session'])
+        with self.assertRaisesRegex(ValueError,'SUP16_NATIVE_ORDERING_HEADER_INVALID'):
+            self.module.native17_ordering_from_raw(self.raw,changed)
+        self.assertEqual(SHA(self.raw),self.f['journal_SHA'])
+
+if __name__=='__main__':unittest.main(verbosity=2)

@@ -46,5 +46,16 @@
     "estimated_USD": 53.08166739362498,
     "billing_confirmed": false,
     "retained_storage_cost_continues": true
+  },
+  "subsequent_REQ08_diagnostic": {
+    "S6_recorded_at_KST": "2026-11-06T22:58:21.724986+09:00",
+    "review_project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/req08-registry-delta-20261106-v1/actual-final-handoff-v1.json",
+    "review_sha256": "ca16d5dc651292caf963a433e0a8cc07c26ab401edac4a873495c75de79d3c91",
+    "source_correlation_followup_sha256": "2356e51727e13374ee4f5bf88f210c11da6ad31df6ed835233a16007acbfb171",
+    "actual_CPU_diagnostic_runs": 1,
+    "verified_new_raw_files": 53,
+    "diagnostic_required_verification_remaining": 0,
+    "whole_REQ08_product_complete": false,
+    "product_Refs_created": false
   }
 }

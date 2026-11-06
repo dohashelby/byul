@@ -150,6 +150,18 @@ Docker 대상을 동등한 제품 경로에 연결하려면 명시적으로 지�
 
 [검토용 전용 결합 코드](implementation-snapshots/sup03_cold_target_binding.py.txt)의 원 bytes SHA256은 `9de45928324bbf91e093cc27530f51835b1a83882a16031149e2dea124e8ff82`다. 준비 freeze 참조는 `worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup03-cold-target-binding-v1/freeze.json`, SHA256 `eb2ca8560f68029d32127260149c2f4c26f94143b1aac4b60266fb6afdfa103c`, 게시 담당 정적 검토 참조는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-cold-binding-static-review-v1.json`, SHA256 `757ab9bca7dbe2bd6482a45ebdbd2f2af6bdb4a41aac96ade3d3c81eb55f1298`다. 이 정적 준비 인계 범위에서 새 차단 결함은 발견하지 않았으며 실제 운영 패킷 승인이나 제품 완료를 뜻하지 않는다.
 
+## REQ-08 실제 진단 1회 — registry child·입력 처리·정리 검증 완료
+
+2026-11-06 22:58:21 KST 세션6이 실제 CPU 진단1회의 새53개 원자료와 producer→registry child→consumer 연결, source·원 읽기 전용 입력8개·종료·소유 정리를 검증해 인계했다. 원 caller는40.324초였고 host/container 종료0·OOM=false·정리 오류0이었다. 실제 ModelConfig·renderer·InputProcessor를 사용했고 원 registry 자식1개의 정확 argv·PID/startticks·표준 pipe3개·진행 중 상태와 실제 communicate 종료0을 확인했다. stdout0 bytes·stderr257 bytes의 전체 반환 hash를 보존했으며 진행 중 returncode=null을 최종 종료값으로 쓰지 않았다.
+
+정상 대조6건은 반환됐고 입력 metadata가 유지됐다. 새 타입5건 중 fractional 목록은 renderer/InputProcessor 반환까지 type·length·canonical SHA가 같았다. numeric-string·mixed-int-string·nested-list는 InputProcessor에서, scalar-int는 renderer에서 원 TypeError를 냈다. 이 결과를 타입 안전 PASS·정책상 허용/거부·보안 판정이나 제품 완료로 바꾸지 않는다. TypedDict mapping 생성만으로 입력 유효성이 검증된다는 주장도 하지 않는다.
+
+검증기의 통합 source assertion에 조건식 오류가 있어 후속 검토에서 spec/invocation/result/operation/outcome의 실제5개 source 필드를 명시적으로 다시 대조했다. 모두 원 source `3b3ff137b31b830403ccce1997dabf26319bac4f`와 일치했고 기존 PID/UID 개별 검증도 유지했다. 이 정정은 검증기 문제이며 원 자료·원 판정을 수정하지 않았다.
+
+이 고정 진단의 추가 필수 검증은0이다. 범위는 LAB_DRAFT·CPU_COMPONENT_NOT_FORMAL_PRODUCT_METADATA이며 serving API·최종 모델/worker·샘플러·GPU·제품 factory는 검증하지 않았다. 제품 EVD/RES/RPT와 복원·저장 팩 재판정 대상은 없으며 과거90초 timeout 원인·과거 child 종료값을 소급 확정하지 않는다. 25개 한정 마감 제안/18개 제품 증거 필요 분류는 유지한다.
+
+최종 인계 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/req08-registry-delta-20261106-v1/actual-final-handoff-v1.json`, SHA256 `ca16d5dc651292caf963a433e0a8cc07c26ab401edac4a873495c75de79d3c91`이다. 원 검토 SHA256 `38f35cdcab2a941eb71aa203cad35bec4d9d003c4afad1c274290169756bd3a0`와 같은 디렉터리의 `actual-source-correlation-followup-v1.json` SHA256 `2356e51727e13374ee4f5bf88f210c11da6ad31df6ed835233a16007acbfb171`를 함께 따른다. 검토자는 실제 caller/모델/컨테이너 시험을 반복하지 않았다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

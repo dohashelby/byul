@@ -1,3 +1,11 @@
+## 2026-11-06 — OBS-09 Kubernetes 로그 사건 경계(CPU 개발)
+
+- 한 일: 11-05 GPU OBS-09 UNKNOWN(multiline·crlf 정확 사건 0)의 원인을 k3d에서 확인했다. CRI 로그 계층이 LF 앞 CR 하나를 지워 vLLM formatter의 연속 표식이 사라진다. 시험 동안 `kubectl attach --quiet`로 받은 stdout 바이트를 CRI 줄과 유일 위치로 맞춰 CRI 시각+원 바이트로 잇고, 못 맞추면 UNKNOWN으로 둔다. 파서·판정·정책·원 EVD/RES는 바꾸지 않았다. 판본 0.3.1+k8s.2. 상세 `docs/dev-1/obs09-cri-boundary.md`.
+- 테스트 결과: Kubernetes 로그 직접 18 통과, 로그 관련 201 통과(pytest8.79초). Kubernetes·콜백 인접 시험의 35 실패는 profiler·process의 기존 환경 실패(Linux x86_64 전용·macOS 경로)다. 검토 소스 pin 시험 153 통과·1건은 저장소 안 임시 폴더 문제(밖에서 통과). 검토 소스 manifest `716917d9…c6c0`. 최종 전체는 Linux CI로 확인한다.
+- 진단(증거 아님): k3d 실제 vLLM에서 CRI만 사건12·multiline0·crlf0, 정렬 뒤 사건10·다섯 사례 정확1. 원자료 `byul-dev1-evidence/20261106-obs09-cri-diagnostic/`.
+- 다음 단계: REQ-11 출력 소유권 CPU 개발 → LIF-13·OBS-09 포함 단일 GPU 재실측(비용 확인, `pods/attach` 권한).
+- 막힌 것: CRI 줄 단위 기업 수집기의 별도 사건 해석은 기업 수집기 입력과 함께 정할 열린 질문이다.
+
 ## 2026-11-06 — LIF-13 가중치 수명 행 세대 결합(CPU 개발)
 
 - 한 일: 11-05 GPU LIF-13 ABORTED 원인을 원 콜백 행으로 확인했다(daemon은 경계 요청을 받지 않고 소비자는 기동 때 취득 → `window()`가 가중치 행 전부 제외, 소비자0·release 미관측). 가중치 수명 행을 현재 컨테이너 세대(같은 노드 monotonic)로 결합하고 경계 전 release·이전 컨테이너 행을 제외했다. 소비자 기동·release 뒤 재취득을 정본 실행 lab 동작 `weights_consumer_start`로 넣고 실행이 띄운 소비자만 정리한다. LIF-13만 실행 상한 900초. 원 EVD/RES는 바꾸지 않았다. 상세 `docs/dev-1/lif13-generation-scope.md`.

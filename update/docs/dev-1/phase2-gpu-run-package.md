@@ -31,7 +31,7 @@
 
 | 기동 | render 옵션 | 점검 | 하위 명령(1단계와 같음) |
 |---|---|---|---|
-| G1 기본 + Gateway 4-Pod | 없음, `gateway --chat-temperature` | REQ-01(격리, 이어서 `engine-ingress` 삭제로 열림), REQ-03, REQ-11, REQ-13(엔진+Gateway), OBS-09(2번 통과 시), OBS-06, PLT-07(수신기 기동 직후) | `http-check`, `route-target`, `record-access`, `egress` |
+| G1 기본 + Gateway 4-Pod | 없음, `gateway --chat-temperature` | REQ-01(격리, 이어서 `engine-ingress` 삭제로 열림), REQ-03, REQ-11, REQ-13(엔진+Gateway), OBS-09(2번 통과 시, `pods/attach` 필요 — `obs09-cri-boundary.md`), OBS-06, PLT-07(수신기 기동 직후) | `http-check`, `route-target`, `record-access`, `egress` |
 | G2 센서 + Gateway | `--lifecycle` | REQ-02(Gateway 기록 + native 복합) | `route-record --prepared` |
 | G3 센서 + API 키 | `--lifecycle --api-key-secret` | PLT-10 | `revocation` |
 | G4 usage 금지 | `--usage forbidden` | OBS-04 | `usage --check OBS-04` |

@@ -734,3 +734,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 
 - 2026-11-05 · 사용자 승인: 기존 서울 g6.2xlarge L4 한 장에서 신규 생산자2종과 A 단일 GPU 실측을 진행하며 EC2 상한 $8, 보존 EBS 별도. 시작 전 CI 성공·증거 반출·최종 stopped 확인을 요구했다. TP2 추가 GPU와 멀티모달 모델 선정/다운로드는 이 승인에 포함하지 않는다.
 - 2026-11-05 · 실측은 EXAMPLE/DRAFT 정책 범위이며 PASS를 기업 승인·원 질문 전체 완료로 확대하지 않는다. 정본 PACK32와 OBS-01/PLT-07 파생 DRAFT 결과를 구분한다. LIF-13 실제 서빙 소비자/daemon 추가 관측은 원 UNKNOWN EVD/RES를 대체하지 않는다.
+- 2026-11-06 · OBS-09 Kubernetes 경로는 CRI가 LF 앞 CR을 지우므로 `kubectl attach --quiet` stdout 바이트를 CRI 줄과 끝 CR 하나 차이·유일 연속 위치로 맞춘 경우에만 쓴다. 못 맞추면 UNKNOWN이며 파서·판정·정책은 그대로다. · [CRI 경계](docs/dev-1/obs09-cri-boundary.md).
+- 열린 질문(2026-11-06, OBS-09): CRI 로그를 줄 단위로 읽는 기업 수집기는 입력 LF를 진짜 접두사를 가진 별도 사건으로 볼 수 있다. 기업 수집 경로를 OBS-09 대상에 넣을지 기업 수집기 입력과 함께 정한다.

@@ -21,9 +21,10 @@ checks:
       docs/dev-1/gpu-20261105.md'
     state: ENTERPRISE_INPUT_WAITING
   OBS-09:
-    note: '2026-11-05: GPU 로거/포매터 pin·신원·7요청200 확인. multiline/CRLF 정확 사건 경계 미수집으로
-      UNKNOWN. docs/dev-1/gpu-20261105.md'
-    state: MEASUREMENT_REMAINING
+    note: '2026-11-06: 11-05 GPU UNKNOWN 원인은 CRI 로그가 LF 앞 CR(native 연속 표식)을 지운 것(k3d 실측). 시험 동안
+      kubectl attach 원 stdout 바이트를 CRI 줄과 정확히 한 곳에서 맞춰 쓰고, 못 맞추면 UNKNOWN. k3d 진단에서 다섯 사례
+      정확 사건 복원. GPU 재실측 필요. docs/dev-1/obs09-cri-boundary.md'
+    state: GPU_CONFIRMATION_ONLY
   OBS-11:
     note: Kubernetes 읽기 경로 구현(시험). 수집 상태 기록의 생산자가 없다. 기업 수집 파이프라인 또는 runtime observation
       feed(heartbeat·공백 표식) 연결과 수집기 중단·복구 절차가 필요

@@ -266,6 +266,87 @@ def _validate(target, env):
         raise KubernetesBindingError() from None
 
 
+class AttachStream:
+    """한 kubectl attach 자식의 stdout·stderr를 상한까지 담는다. stop()이 그 자식만 끝낸다.
+
+    timeout이 지나면 자식을 끝내고 timed_out으로 남긴다. 상한을 넘으면 truncated다.
+    """
+    def __init__(self, argv, *, cap, timeout, popen=None):
+        import subprocess
+        if type(cap) is not int or not 0 < cap <= 8*1024**2 or type(timeout) not in (int, float) or not 0 < timeout:
+            raise ValueError
+        self.cap, self.timeout, self.started = cap, timeout, time.monotonic()
+        self.child = (popen or subprocess.Popen)(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                                 stderr=subprocess.PIPE, bufsize=0)
+        self.data = {"stdout": bytearray(), "stderr": bytearray()}
+        self.limits = {"stdout": cap, "stderr": 4096}
+        self.overflow = {"stdout": False, "stderr": False}
+        self.errors, self.timed_out, self.result = [], False, None
+        self.threads = [threading.Thread(target=self._consume, args=(name, pipe), daemon=True)
+                        for name, pipe in (("stdout", self.child.stdout), ("stderr", self.child.stderr))]
+        for thread in self.threads:
+            thread.start()
+        self.timer = threading.Timer(timeout, self._expire)
+        self.timer.daemon = True
+        self.timer.start()
+
+    def _consume(self, name, pipe):
+        try:
+            while True:
+                chunk = pipe.read(4096)
+                if not chunk:
+                    break
+                room = self.limits[name] - len(self.data[name])
+                self.data[name].extend(chunk[:room])
+                if len(chunk) > room:
+                    self.overflow[name] = True
+                    break
+        except (OSError, ValueError):
+            self.errors.append(name)
+
+    def _expire(self):
+        self.timed_out = True
+        self._kill()
+
+    def _kill(self):
+        try:
+            if self.child.poll() is None:
+                self.child.kill()
+        except OSError:
+            self.errors.append("kill")
+
+    def stop(self):
+        """자식을 끝내고 결과를 돌려준다. 이미 스스로 끝났다면(연결 끊김) returncode가 그대로 남는다."""
+        if self.result is not None:
+            return self.result
+        self.timer.cancel()
+        ended_early = self.child.poll() is not None
+        self._kill()
+        try:
+            self.child.wait(timeout=1)
+        except Exception:
+            self.errors.append("child_reap")
+        for thread in self.threads:
+            thread.join(timeout=0.25)
+        closed = not any(thread.is_alive() for thread in self.threads)
+        for pipe in (self.child.stdout, self.child.stderr):
+            try:
+                pipe.close()
+            except OSError:
+                pass
+        raw = {name: bytes(value) for name, value in self.data.items()}
+        complete = (not ended_early and not self.timed_out and closed and not self.errors
+                    and not any(self.overflow.values()))
+        self.result = {"returncode": 0 if complete else (self.child.returncode if ended_early else -1),
+                       "stdout_bytes": raw["stdout"], "stderr_bytes": raw["stderr"],
+                       "capture": {"schema": "guard-attach-capture/1", "ended_before_stop": ended_early,
+                                   "timed_out": self.timed_out, "truncated": any(self.overflow.values()),
+                                   "pipes_closed": closed, "read_errors": sorted(set(self.errors)), "complete": complete,
+                                   "stdout_sha256": sha256_hex(raw["stdout"]), "stdout_bytes": len(raw["stdout"]),
+                                   "hash_scope": "kubectl attach stdout bytes before UTF-8 decoding; not node log-file bytes"}}
+        return self.result
+
+
 class KubernetesHTTP:
     def __init__(self, target, env, *, duration, binary="kubectl", runner=None, profile=PROFILE, clock=None):
         if profile not in {PROFILE, *_BINDING_PROFILES}:
@@ -786,6 +867,24 @@ class KubernetesHTTP:
             raise KubernetesBindingError() from None
         self._verify()
         return result
+
+    def engine_attach(self, cap, *, popen=None):
+        """OBS-09: 엔진 컨테이너 stdout 원 바이트를 실시간으로 받는다(stdin·tty 없음, --quiet).
+
+        CRI 로그(`kubectl logs`)는 줄마다 끝 CR 하나를 지워 native formatter의 연속 표식을 잃는다.
+        attach 스트림은 그 처리 전 바이트다. 시작한 kubectl 자식 하나만 멈춘다.
+        """
+        if self.profile != LOG_INTEGRITY_PROFILE or type(cap) is not int or not 0 < cap <= 8*1024**2:
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        remaining=self.deadline-self.clock()
+        if remaining<=0:raise KubernetesBindingError()
+        argv=[self.binary,f"--context={self.binding['context']}",f"--request-timeout={remaining:.3f}s",
+            f"--namespace={engine['namespace']}","attach",engine["pod"],f"--container={engine['container']}","--quiet"]
+        try:
+            return AttachStream(argv,cap=cap,timeout=remaining,popen=popen)
+        except Exception:
+            raise KubernetesBindingError() from None
 
     def read_collection_status(self, session):
         """OBS-11: 소유 probe Pod의 고정 위치 상태 기록 하나. 링크·큰 파일은 읽지 않는다."""

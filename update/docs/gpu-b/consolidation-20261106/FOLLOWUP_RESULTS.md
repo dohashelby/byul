@@ -49,6 +49,24 @@
 
 고정 검토의 프로젝트 상대 경로는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/transport-v3-operating-binding-20261106-v1/operating-binding-review-v1.json`, SHA256 `90a68d4abdd416afebb34c37235550d63a63d2aca5673a470fd45e99c8b99146`이다. 검토 시각은 2026-11-06 22:03 KST이며 이후 현재 자원·미래 성공을 보증하지 않는다.
 
+## 기동 후 PID 신원 검사 — 최소 변경 검토 완료
+
+기동 수락과 원 시작 프로세스의 정상 종료 뒤, 읽기 도구의 PID 숫자 존재 검사가 AWS 조회 전에 중단됐다. 원 실패는 보존하고, 원 actor의 positive terminal과 정확한 실행 argv를 결합해 동일 actor·부재·다른 프로세스를 구분하도록 좁게 보완했다. collect-only 경로는 새 start를 허용하지 않으며 기존 freeze·배타 실행·불확실성 차단·기한을 유지한다.
+
+세션6은 22:12 KST에 해당 변경을 검토해 차단 결함과 필수 추가 입력이 없음을 반환했다. 22:10:51 KST까지의 후속 조회에서 running·SSM Online·활성 명령0이 확인된 근거를 연결했으며 이후 현재 상태의 보증으로 사용하지 않는다. 같은 기동을 재사용하며 원 프로세스 starttick 미수집 값을 새 값으로 채우지 않았다.
+
+검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/transport-v3-poststart-identity-20261106-v2/identity-review-v2.json`, SHA256 `af91a731fe397c786168bde63d7ae79b6aa65563a85ff59417dcd40fee0d944b`다. 검토 자체는 회수 성공이나 새 제품 판정이 아니다.
+
+## SUP-05 관측 보존 — F1 수정 검토 완료
+
+첫 관측기 고정본에서 보조 스레드의 FD 닫기 오류가 상위 close 결과·worker 종료 오류에 전달되지 않는 결함이 발견돼 실제 모델 실행을 보류했다. 수정v2는 각 FD 오류를 누적하고 다른 FD 정리를 계속하며, 상태가 불명확한 FD 번호는 다시 닫지 않는다. 기존 worker 소비자에 errors·FD_release_verified·unconfirmed_FD_releases를 반환한다. 원 v1 차단·재현 기록은 보존한다.
+
+세션5의 새 FD 오류 계약5개와 세션6의 수정v2 독립 pipe 오류 주입에서 오류 반환·다른 FD 정리·재close 없음이 확인됐다. 기존12·9·11 계약과 원 v1 검증은 재실행하지 않았다. worker/native/image/model·90초·2CPU/4GiB·정상 준비 선행 조건·정리 계약은 유지했다. 이 결과는 stdlib 관측기 검증이며 실제 모델 준비 성공이나 제품 결과가 아니다.
+
+관측기 전체 bytes SHA256은 `44cf7c6cc7a37aa697748690a1e68e6fcbe83e927d469c35c3fb27914273c05b`다. [검토용 FD 정리 메서드 발췌](implementation-snapshots/sup05_observer_release_method.py.txt)는 원 메서드 AST 동일성을 확인한 참조이며 독립 실행기·운영 설치 완료를 뜻하지 않는다.
+
+세션6 고정 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup05-preservation-delta-20261106-v1/preservation-review-v2.json`, SHA256 `1bb68051b16902db5ec90e068bc2d4aeb41aae2d4b3ebfa50f50a7d4ca8351ed`다. 해당 고정 변경의 실행 전 차단 결함·추가 필수 입력은 없으며, 실제 정상 역할 실행과 원자료·정리 결과는 별도 검증한다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

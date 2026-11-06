@@ -1,0 +1,28 @@
+{
+  "recorded_at_KST": "2026-11-06T21:29:54.656444+09:00",
+  "kind": "team_handoff_reference_only",
+  "sources": [
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-history-6-20261106/out/limited-closeout-43-handoff-v1/43-limited-closeout-handoff-v1.json",
+      "bytes": 271792,
+      "sha256": "7682268eaa91cfd2413f89b39c0854ecfe7daa16950d749a072bbfeae91c8417"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup16-gb09-closeout-takeover-v1/current-cleanup-final-review-v1.json",
+      "bytes": 394274,
+      "sha256": "2aadfbf699b3c52b9a69d116335c48a7ac52fd354e53aba35a87de3674265912"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-run-lif14-labels-20261105/out/SUP16-live-normal-v1-operator-20261105/transport-target-repair-v2/11-required-current-cleanup-verification-link-v1.json",
+      "bytes": 4539,
+      "sha256": "a92193c89181eed2ead1afdb180072972a87ffb3a4e76e209f1f3acbfbf7304b"
+    }
+  ],
+  "scoped_closeout_proposal_IDs": 25,
+  "product_evidence_incomplete_IDs": 18,
+  "current_operating_jobs": 0,
+  "GB09_whole_archive_recovered": false,
+  "whole43_complete": false,
+  "new_tests_or_raw_verification_by_publisher": false,
+  "local_raw_not_published": true
+}

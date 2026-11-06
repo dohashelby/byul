@@ -1,3 +1,10 @@
+## 2026-11-06 — 기업·runtime 입력 요청 목록
+
+- 한 일: 기업 입력 대기 점검(REQ-02·03·13·17, PLT-07·10·11·12, OBS-01·06·11)과 OBS-05·OBS-09·LIF-13·PLT-08의 요청 값을 점검 정의 기준으로 정리했다. 실행 도구가 채우는 해시·세션·유효 기간 키는 제외했다. `docs/dev-1/enterprise-input-requests.md`.
+- 테스트 결과: 문서만 추가(제품 동작 변경 없음).
+- 다음 단계: 목록 전달(사용자 판단) → 단일 L4 GPU 재측정 비용 보고.
+- 막힌 것: 없음.
+
 ## 2026-11-06 — REQ-11 생성 출력 귀속 오라클·판정 rev7(CPU 개발)
 
 - 한 일: 사용자 결정으로 요청별 배타 allowed_token_ids 오라클(exclusive-allowed-token-ids-v1)을 넣었다. 각 연결 출력 token이 모두 자기 배타 집합이면 출력 귀속 확인, 다른 쪽 배타 token은 타 요청 출력 반환 FAIL, 제약 미준수·불완전은 UNKNOWN. REQ-11 rev7·PACK-BASELINE@33(74219b48…cd5b6)에 보안 PASS 규칙과 `output_binding_cases_verified`를 더했다. 실행기 0.4.0/Kubernetes 0.2.0. GPU 정책 초안·OBS-01 파생 팩 seed를 33으로(파생 @2) 옮겼다. 과거 팩·EVD/RES는 그대로다. 상세 `docs/dev-1/req11-output-oracle.md`.

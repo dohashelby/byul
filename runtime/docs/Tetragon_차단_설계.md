@@ -1,6 +1,8 @@
 # Tetragon 선택적 차단 설계안
 
-상태: **방식별 후보·전환 도구·단위 시험 구현, 새 후보의 kind/AWS 차단 효과 미검증**. `tetragon_rule_modes`의 `TG-SECRET-01: enforce`와 `tetragon_enforce_method`를 함께 지정하면 아래 방식별 후보를 monitor 모드로 렌더한다. `tetragon_mode=enforce_probe`는 기존 시험 쓰기 규칙 `TG-DENY-01`만 제어한다. 이 문서의 이전 4회차 제안 중 정책 delete→apply와 확장자로 파일을 추정하는 절차는 아래 **구현 상태**와 5회차 확인순서로 대체한다.
+상태: **로컬 kind의 가짜 파일·시험용 Pod 실측과 대시보드 조회 연결, AWS·실제 GPU 엔진 미검증**. `tetragon_rule_modes`의 `TG-SECRET-01: enforce`와 `tetragon_enforce_method`를 함께 지정하면 아래 방식별 후보를 monitor 모드로 렌더한다. `tetragon_mode=enforce_probe`는 기존 시험 쓰기 규칙 `TG-DENY-01`만 제어한다. 이 문서의 이전 4회차 제안 중 정책 delete→apply와 확장자로 파일을 추정하는 절차는 아래 **구현 상태**와 5회차 확인순서로 대체한다.
+
+최신 실측·독립 판정·대시보드 연결 근거는 [2026-11-06 로컬 검증 결과](Tetragon_로컬검증_20261106.md)를 우선한다.
 
 ## 1. 후보와 우선순위
 
@@ -81,3 +83,10 @@ Tetragon 훅은 커널 호출을 보며 `loading`·`compiling`·`inferring`은 �
 1. 로컬 kind L-05b/L-05c에서 정책 load·MODE·동일 ID·원시 이벤트·파일 결과를 실측한다. WSL 커널에서 load 불가면 지원 불가 근거를 남기고 단위 시험 결과와 구분한다.
 2. 5회차 서버에서는 사전 점검 뒤 시험용 Pod부터 방식별 후보를 확인한다. 엔진 주 프로세스 대상 시험은 별도 opt-in이며 Gateway 503·재시작·복구 증거가 있어야 한다.
 3. 화면의 Override/Sigkill 표지는 **차단 시도**다. 실제 차단 판정은 파일 결과와 수집 상태를 함께 확인한다.
+
+## 2026-11-06 후속 구현·실측
+
+- 파일 읽기 거부·프로세스 종료·시험 서비스 복구를 독립 판정하며 저장된 성공 표지를 근거와 다시 대조한다. 같은 PID·Pod UID·파일·정책·차단 모드 시간 구간이 필수다.
+- kind 가짜 파일에서 LSM Override+Sigkill의 read 권한 검사 -EPERM과 주 프로세스 종료·복구, Override 단독 진단의 사용자 공간 EPERM, fd_install의 종료·복구를 확인했다. syscall 후보는 실제 load_error다. 이 결과를 GPU 엔진에 일반화하지 않는다.
+- 정책 상태·노드 기능·전환/rollback·시험 근거의 읽기 전용 대시보드를 추가했다. 상태가 오래되면 현재 모드로 표시하지 않는다.
+- 실측 중 Tetragon 1.7.1 정책 조회 경로 내부 오류와 에이전트 재시작을 관측했다. 정책 변경 직후 안정화 대기, 에이전트 교체 시 시험 근거 무효화를 추가했으나 해당 버전의 무공백 보장을 주장하지 않는다. 자세한 원본·시각·해시는 위 로컬 검증 문서를 참조한다.

@@ -238,7 +238,9 @@ function Pagebar() {
         </label>
         {meta.data && (
           <span className={`${l.chip}`} style={{ padding: "0 8px", color: meta.data.example_mode ? "var(--warn)" : "var(--text-2)" }}>
-            {meta.data.example_mode ? "예시 데이터" : "실제 연결"}
+            {meta.data.example_mode
+              ? meta.data.sources.some((s) => s.mode !== "example") ? "일부 예시 포함" : "예시 데이터"
+              : "실제 연결"}
           </span>
         )}
       </div>
@@ -291,7 +293,7 @@ export function Layout() {
         <Pagebar />
         {meta.data?.example_mode && (
           <Banner kind="example">
-            예시 데이터 · {meta.data.sources.filter((x) => x.mode === "example").map((x) => x.name).join(", ")} · 공식 판정 근거 제외
+            {meta.data.sources.some((s) => s.mode !== "example") ? "예시 자료" : "예시 데이터"} · {meta.data.sources.filter((x) => x.mode === "example").map((x) => x.name).join(", ")} · 해당 자료는 공식 판정 근거 제외
           </Banner>
         )}
         {unavailable.length > 0 && (

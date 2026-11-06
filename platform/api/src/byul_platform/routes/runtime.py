@@ -18,6 +18,8 @@ from ..models import (
     RuntimeStatusResponse,
 )
 from ..sources.runtime import RuntimeNotFound, request_row
+from ..tetragon_models import TetragonSnapshot, TetragonStatusResponse
+from pydantic import ValidationError
 from ..state import AppState, get_state, invalid_one, partition
 from .evidence import evidence_for_refs
 
@@ -118,3 +120,13 @@ def lab_report(state: AppState = Depends(get_state)) -> dict[str, Any]:
 @router.get("/phase-timeline", response_model=PhaseTimelineResponse)
 def phase_timeline(state: AppState = Depends(get_state)) -> dict[str, Any]:
     return {**state.runtime.phase_timeline(), "source": state.source("runtime")}
+
+
+@router.get("/tetragon-status", response_model=TetragonStatusResponse)
+def tetragon_status(state: AppState = Depends(get_state)) -> dict[str, Any]:
+    try:
+        item = TetragonSnapshot.model_validate(state.runtime.tetragon_status())
+    except ValidationError:
+        item = TetragonSnapshot(schema_version="runtime-tetragon-state/1.0", state="error", fresh=False,
+                                error="Tetragon 상태 자료의 형식을 확인할 수 없습니다")
+    return {"item": item, "source": state.source("runtime")}

@@ -22,7 +22,7 @@ export function groupAlerts(events: RuntimeEvent[]): AlertGroup[] {
     const record = event.native.record as Record<string, unknown>;
     const context = record.suspect_context === "compile_toolchain_parent" ? "컴파일 도구 하위 실행" : explanation;
     const action = o.binary?.endsWith("/sh") ? "셸 실행" : kind;
-    const title = `${action} — ${blocked ? (isTetragonSigkill(event) ? "차단 시도 · Sigkill · 프로세스 종료" : "차단 시도 · Override") : context} · ${PHASE[phase] ?? phase}`;
+    const title = `${action} — ${blocked ? (isTetragonSigkill(event) ? "차단 시도 · Sigkill · 프로세스 종료 규칙" : "차단 시도 · Override") : context} · ${PHASE[phase] ?? phase}`;
     const at = event.occurred_at ?? event.recorded_at;
     const group = groups.get(key);
     if (group) {

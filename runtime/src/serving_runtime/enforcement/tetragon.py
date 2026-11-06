@@ -3,11 +3,31 @@
 from __future__ import annotations
 
 from typing import Any
+import copy
 
 from .intent import EnforcementIntent
+from .attribution import KERNEL_DATA
 
 
 _STATUS = "candidate-cluster-unapplied-unverified"
+
+
+def comparable_spec(spec: dict[str, Any]) -> dict[str, Any]:
+    """Ignore only observed 1.7.1 CRD defaults on kprobe argument definitions."""
+    result = copy.deepcopy(spec)
+    for probe in result.get("kprobes", []):
+        if probe.get("return") is False:
+            probe.pop("return")
+        arguments = list(probe.get("args", [])) + list(probe.get("data", []))
+        if isinstance(probe.get("returnArg"), dict):
+            arguments.append(probe["returnArg"])
+        for argument in arguments:
+            for key in ("maxData", "returnCopy"):
+                if argument.get(key) is False:
+                    argument.pop(key)
+            if argument.get("resolve") == "":
+                argument.pop("resolve")
+    return result
 
 
 def _policy(
@@ -161,4 +181,9 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
             exact_path=True,
             override=True,
         )
+    if intent.tetragon_kernel_identity:
+        for manifest in manifests.values():
+            for probe in manifest["spec"]["kprobes"]:
+                probe["data"] = copy.deepcopy(KERNEL_DATA)
+            manifest["metadata"]["annotations"]["serving-runtime.local/kernel-identity"] = "v2"
     return manifests

@@ -84,7 +84,7 @@ describe("사건 로그", () => {
     renderAt("/runtime/observe/tetragon", "/runtime/observe/:sub", <RuntimeObservePage />);
     const tableRow = (await screen.findByText("/tmp/fake-secret")).closest("tr")!;
     expect(within(tableRow).getByText("차단 시도")).toBeTruthy();
-    expect(tableRow.textContent).toContain("차단 (Override)");
+    expect(tableRow.textContent).toContain("Override · 오류 반환 규칙");
     expect(tableRow.textContent).toContain("TG-SECRET-01");
   });
 
@@ -120,7 +120,7 @@ describe("사건 로그", () => {
     const tableRow = (await screen.findByText("/run/byul-probe/secret.txt")).closest("tr")!;
     expect(within(tableRow).getByText("합성")).toBeTruthy();
     expect(within(tableRow).getByText("차단 시도")).toBeTruthy();
-    expect(tableRow.textContent).toContain("차단 (Override)");
+    expect(tableRow.textContent).toContain("Override · 오류 반환 규칙");
     expect(tableRow.textContent).toContain("TG-SECRET-01 · 차단 시도 기록(enforce)");
     view.unmount();
     renderAt("/runtime/events", "/runtime/events", <EventsPage />);

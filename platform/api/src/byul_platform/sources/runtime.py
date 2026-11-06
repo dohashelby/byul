@@ -976,6 +976,7 @@ class RuntimeSource(Protocol):
     def revalidation(self) -> list[Any]: ...
     def ping(self) -> str: ...
     def phase_timeline(self) -> dict[str, Any]: ...
+    def tetragon_status(self) -> dict[str, Any]: ...
 
 
 def summary_from_events(events: Iterable[dict[str, Any]]) -> Summary:
@@ -1039,6 +1040,9 @@ class ExampleRuntimeSource:
 
     def status(self) -> Any:
         return self._json("runtime-status.json")
+
+    def tetragon_status(self) -> dict[str, Any]:
+        return {"schema_version": "runtime-tetragon-state/1.0", "state": "not_configured", "fresh": False}
 
     def lab_report(self) -> Any:
         doc = self._json("runtime-lab-report.json")
@@ -1261,6 +1265,13 @@ class LiveRuntimeSource:
 
     def phase_timeline(self) -> dict[str, Any]:
         return self._get("/api/phase-timeline")
+
+    def tetragon_status(self) -> dict[str, Any]:
+        try:
+            return self._get("/api/tetragon-status")
+        except RuntimeNotFound:
+            return {"schema_version": "runtime-tetragon-state/1.0", "state": "not_configured", "fresh": False,
+                    "error": "연결된 Gateway가 Tetragon 상태 조회를 지원하지 않습니다"}
 
     def lab_report(self) -> Any:
         return lab_report_doc(self._get("/api/lab-report"))

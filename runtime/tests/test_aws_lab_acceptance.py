@@ -663,7 +663,7 @@ class DecisionTests(unittest.TestCase):
         "AWS-18": dict.fromkeys(("normal", "stream", "usage", "log_match", "context_boundary", "context_exceeded"), True),
         "AWS-19": dict.fromkeys(("codes", "reasons", "records", "not_delivered", "engine_log_absent", "positive_control"), True),
         "AWS-20": {"enforce_method": "override_lsm", **dict.fromkeys(
-            ("enforce_active", "read_eperm", "raw_override", "normal_200", "cleanup_ok", "restore_read_ok"), True
+            ("enforce_active", "monitor_read_ok", "read_eperm", "raw_override", "normal_200", "cleanup_ok", "restore_read_ok"), True
         )},
     }
 

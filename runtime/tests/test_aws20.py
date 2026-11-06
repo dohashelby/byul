@@ -75,12 +75,12 @@ class AWS20Tests(unittest.TestCase):
                                                 namespace="serving-lab", action="KPROBE_ACTION_SIGKILL", method="sigkill_fd_install"))
 
     def test_method_specific_verdicts_and_opt_in(self):
-        override = dict.fromkeys(("enforce_active", "read_eperm", "raw_override", "normal_200", "cleanup_ok", "restore_read_ok"), True)
+        override = dict.fromkeys(("enforce_active", "monitor_read_ok", "read_eperm", "raw_override", "normal_200", "cleanup_ok", "restore_read_ok"), True)
         override["enforce_method"] = "override_lsm"
         self.assertEqual(evaluate_case("AWS-20", override)[0], "passed")
         self.assertEqual(evaluate_case("AWS-20", {**override, "raw_override": None})[0], "unknown")
         self.assertEqual(evaluate_case("AWS-20", {**override, "cleanup_ok": False})[0], "failed")
-        sigkill = dict.fromkeys(("enforce_active", "exit_sigkill", "raw_sigkill", "normal_200", "cleanup_ok", "restore_read_ok"), True)
+        sigkill = dict.fromkeys(("enforce_active", "monitor_read_ok", "exit_sigkill", "raw_sigkill", "normal_200", "cleanup_ok", "restore_read_ok"), True)
         sigkill.update(enforce_method="sigkill_fd_install", engine_target=False)
         self.assertEqual(evaluate_case("AWS-20", sigkill)[0], "passed")
         self.assertEqual(evaluate_case("AWS-20", {**sigkill, "raw_sigkill": None})[0], "unknown")

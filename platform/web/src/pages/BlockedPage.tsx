@@ -64,10 +64,11 @@ export function BlockedPage() {
     {active === "files" && <section id="blocked-files" className={sectionClass} aria-label="파일 차단 시도">
       <h2>파일 차단 시도 (Tetragon Override·Sigkill) <span className={p.blockedCount}>{rows.files.length}건</span></h2>
       {rows.files.length ? <table className={p.blockedTable}><thead><tr><th>시각</th><th>파일 경로</th><th>규칙·행위</th><th>자료</th></tr></thead><tbody>
-        {rows.files.slice(pagination.start, pagination.end).map((e) => <tr key={e.event_id}><td><Time iso={e.occurred_at ?? e.recorded_at} /></td><td><Link className="mono" to={eventLink(e)}>{e.observation?.path ?? "경로 미기록"}</Link></td><td>{e.observation?.rule_id ?? "규칙 미기록"} · {isTetragonSigkill(e) ? "Sigkill · 프로세스 종료" : "Override"}</td><td><OriginBadge origin={e.data_origin} detail={e.origin_detail} />{e.origin_detail === "synthetic" && <span className="small muted"> 예시 자료</span>}</td></tr>)}
+        {rows.files.slice(pagination.start, pagination.end).map((e) => <tr key={e.event_id}><td><Time iso={e.occurred_at ?? e.recorded_at} /></td><td><Link className="mono" to={eventLink(e)}>{e.observation?.path ?? "경로 미기록"}</Link></td><td>{e.observation?.rule_id ?? "규칙 미기록"} · {isTetragonSigkill(e) ? "Sigkill · 프로세스 종료 규칙" : "Override"}</td><td><OriginBadge origin={e.data_origin} detail={e.origin_detail} />{e.origin_detail === "synthetic" && <span className="small muted"> 예시 자료</span>}</td></tr>)}
       </tbody></table> : <p className="small muted">선택한 기간·환경에 Tetragon 파일 차단 시도 기록이 없습니다. 탐지 이벤트는 포함하지 않습니다.</p>}
       <Pagination state={pagination} />
-      <p className="small muted">원시 행위는 차단 시도 기록입니다. Sigkill은 프로세스를 종료하며 실제 거부·서빙 영향은 별도 시험으로 확인합니다.</p>
+      <p className="small muted">원시 행위는 차단 시도 기록입니다. Sigkill 종료 규칙의 이벤트입니다. 실제 읽기 거부·프로세스 종료는 정책 시험 근거에서 확인합니다.</p>
+      <Link to="/runtime/enforce/tetragon">현재 정책 모드·시험 근거 확인</Link>
     </section>}
   </>}</Query>}</Query></div>;
 }

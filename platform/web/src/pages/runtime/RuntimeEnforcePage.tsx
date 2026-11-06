@@ -29,6 +29,7 @@ export function RuntimeEnforcePage() {
       <Subtabs
         tabs={[
           { to: "/runtime/enforce/cilium", label: "네트워크 정책 (Cilium)", count: problems?.ciliumCount, badge: problems?.cilium, active: sub === "cilium" },
+          { to: "/runtime/enforce/tetragon", label: "파일·프로세스 정책 (Tetragon)", active: false },
           { to: "/runtime/enforce/lab", label: "검증 시험 (Lab)", count: problems?.labCount, badge: problems?.lab, active: sub === "lab" },
         ]}
       />

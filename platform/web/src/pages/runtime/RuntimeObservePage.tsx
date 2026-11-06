@@ -15,6 +15,16 @@ import { ObservationOriginBadge, ScopeBadges, StateBadge, Subtabs, TableCard, fo
 const FLAGGED = ["outside_allowlist", "suspect_binary", "exec_from_cache", "phase_unknown", "phase_signal_unverified"];
 const gib = (bytes: number | null) => `${((bytes ?? 0) / 1024 ** 3).toFixed(2)}GiB`;
 
+function OperatingIdentity({ event }: { event: RuntimeEvent }) {
+  const raw = event.native.record.identity;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const identity = raw as Record<string, unknown>;
+  return <div className="small muted">
+    {identity.state === "confirmed" ? "대상 확인" : identity.state === "conflict" ? "대상 정보 충돌" : identity.state === "ambiguous" ? "대상 후보 중복" : "대상 미확인"}
+    {identity.state === "confirmed" && <><br />{pod(event.observation?.pod_namespace ?? null, event.observation?.pod_name ?? null)}<br />커널 PID {String(identity.pid ?? "미확인")}{typeof identity.ns_pid === "number" && ` · 컨테이너 PID ${identity.ns_pid}`} · {String(identity.container_name ?? "미확인")}<br /><span style={{overflowWrap:"anywhere"}}>Pod UID {String(identity.pod_uid ?? "미확인")}</span></>}
+  </div>;
+}
+
 function CollectorSummary({ c }: { c: Collector }) {
   const d = c.detail;
   if (!d) return null;
@@ -53,7 +63,7 @@ function CollectorSummary({ c }: { c: Collector }) {
     ]);
     if (d.writer.last_gap)
       lines.push([
-        `재연결 ${d.writer.reconnect_count ?? 0}회 · 최근 연결 단절 구간 ${formatTime(d.writer.last_gap.opened_at)} ~ ${formatTime(d.writer.last_gap.closed_at)} · 구간 이벤트 복구 요청(완전성 미확인)`,
+        `재연결 ${d.writer.reconnect_count ?? 0}회 · 최근 연결 단절 구간 ${formatTime(d.writer.last_gap.opened_at)} ~ ${formatTime(d.writer.last_gap.closed_at)} · 구간 이벤트 복원 완전성 미확인`,
         true,
       ]);
   }
@@ -231,8 +241,8 @@ export function RuntimeObservePage() {
                     <td>{formatTime(e.occurred_at)}</td>
                     <td><ScopeBadges environment={e.scope.environment} runId={e.scope.run_id} /></td>
                     <td>{kind}</td>
-                    <td className="mono" title={attr || pod(o.pod_namespace, o.pod_name)}>{o.path ?? o.binary ?? "–"}</td>
-                    <td>{blocked ? <><Badge tone="caution" title="원시 차단 시도 기록; 실제 결과는 Lab 시험에서 확인">차단 시도</Badge> {isTetragonSigkill(e) ? "Sigkill · 프로세스 종료" : "차단 (Override)"}</> : o.exec_verdict ? `${label(EXEC_VERDICT, o.exec_verdict)}${o.exec_verdict === "exception" && o.exception_id ? ` · ${o.exception_id}` : ""}` : "–"}</td>
+                    <td className="mono" title={attr || pod(o.pod_namespace, o.pod_name)}>{o.path ?? o.binary ?? "–"}<OperatingIdentity event={e} /></td>
+                    <td>{blocked ? <><Badge tone="caution" title="원시 차단 시도 기록; 실제 결과는 Lab 시험에서 확인">차단 시도</Badge> {isTetragonSigkill(e) ? "Sigkill · 프로세스 종료 규칙" : "Override · 오류 반환 규칙"}</> : o.exec_verdict ? `${label(EXEC_VERDICT, o.exec_verdict)}${o.exec_verdict === "exception" && o.exception_id ? ` · ${o.exception_id}` : ""}` : "–"}</td>
                     <td>{o.phases.length ? o.phases.map((phase) => label(PHASE, phase)).join(" + ") : "–"}</td>
                     <td>{parentInfo(e)}</td>
                     <td className="mono" title={o.action_raw ?? "원본 action 미기록"}>{`${o.rule_id ?? "–"} · ${mode}`}</td>

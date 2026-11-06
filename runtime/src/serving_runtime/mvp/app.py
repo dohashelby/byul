@@ -34,6 +34,7 @@ from .http_handler import (
     create_handler,
 )
 from .lab_report import LabReportSource
+from .tetragon_state import read_tetragon_state
 from .mock_engine import MockEngine, _utc_now
 from .observation_feed import ObservationFeed
 from .phase_timeline import read_phase_timeline
@@ -271,6 +272,7 @@ class GatewayApp:
                 heartbeat_path=observation_heartbeats.get(kind),
                 heartbeat_stale_after_s=config.collector_stale_after_s,
                 exec_policy=self._exec_policy,
+                identity_path=config.tetragon_identities_path,
             )
             self._observation_feeds.append(feed)
             collectors.append(
@@ -305,6 +307,9 @@ class GatewayApp:
                 f"kubernetes.context {registered_context!r}와 다릅니다"
             )
         kube_context = config.kube_context or registered_context or DEFAULT_KUBE_CONTEXT
+        self._tetragon_context = kube_context
+        for feed in self._observation_feeds:
+            feed.kube_context = kube_context
         self._cilium_policy_collector: CiliumPolicyCollector | None = None
         if config.cilium_policy_status:
             self._cilium_policy_collector = CiliumPolicyCollector(
@@ -729,6 +734,10 @@ class GatewayApp:
                 receipt_lookup=self._engine_client.receipt_lookup,
                 observation_session_id=self.observation_session_id,
                 lab_report=self._lab_report.read,
+                tetragon_status=lambda: read_tetragon_state(
+                    self.config.tetragon_state_path or Path(self.config.data_dir) / "tetragon-state.json",
+                    context=self._tetragon_context,
+                ),
                 record_transport_error=self._request_flow.record_without_relay,
                 request_header_timeout_s=self.config.request_header_timeout_s,
                 request_body_timeout_s=self.config.request_body_timeout_s,

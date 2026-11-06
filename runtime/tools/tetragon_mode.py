@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
+import os
 from pathlib import Path
 import subprocess
 from typing import Callable, Any
@@ -42,6 +44,12 @@ def parse_policy_row(output: str, name: str, namespace: str) -> dict[str, str] |
         if len(row) <= max(index.values()):
             continue
         values = {column.lower(): row[pos] for column, pos in index.items()}
+        # 1.7.1 prints memory as e.g. "2.00 MB", adding a token before MODE.
+        # Never treat the unit as a policy mode.
+        modes = [token for token in row[index["MODE"]:] if token in {"monitor", "enforce", "monitor_only"}]
+        if len(modes) != 1:
+            continue
+        values["mode"] = modes[0]
         if values["name"] == name and values["namespace"] == namespace:
             return values
     return None
@@ -55,7 +63,7 @@ def _read_policy(run: Callable[[list[str]], Any], context: str, tetragon_namespa
     return parse_policy_row(result.stdout, policy_name, policy_namespace)
 
 
-def switch_mode(context: str, policy_namespace: str, policy_name: str, target_mode: str,
+def _switch_mode(context: str, policy_namespace: str, policy_name: str, target_mode: str,
                 *, tetragon_namespace: str = "kube-system", run: Callable[[list[str]], Any] = _run) -> dict:
     """Switch an already loaded policy and verify both success and rollback."""
     if target_mode not in {"monitor", "enforce"}:
@@ -78,6 +86,28 @@ def switch_mode(context: str, policy_namespace: str, policy_name: str, target_mo
                    and restored["state"] == "enabled" and restored["mode"] == before["mode"])
     return {"ok": False, "reason": "mode switch failed; rollback verified" if rollback_ok else "mode switch and rollback unverified",
             "before": before, "after": after, "rollback": restored, "rollback_ok": rollback_ok}
+
+
+def switch_mode(context: str, policy_namespace: str, policy_name: str, target_mode: str,
+                *, tetragon_namespace: str = "kube-system", run: Callable[[list[str]], Any] = _run,
+                history_path: str | Path | None = None) -> dict:
+    result = _switch_mode(context, policy_namespace, policy_name, target_mode,
+                          tetragon_namespace=tetragon_namespace, run=run)
+    record = {"at": datetime.now(timezone.utc).isoformat(), "context": context,
+              "namespace": policy_namespace, "policy": policy_name, "requested_mode": target_mode,
+              **result}
+    if history_path is not None:
+        path = Path(history_path)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(path, os.O_CREAT | os.O_APPEND | os.O_WRONLY, 0o600)
+            with os.fdopen(fd, "a", encoding="utf-8") as output:
+                output.write(json.dumps(record, ensure_ascii=False) + "\n")
+                output.flush()
+                os.fsync(output.fileno())
+        except OSError:
+            result["history_error"] = "transition history could not be persisted"
+    return result
 
 
 def replace_after_load(context: str, policy_namespace: str, old_name: str, new_manifest: str | Path,

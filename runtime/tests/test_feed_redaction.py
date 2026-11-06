@@ -20,6 +20,13 @@ FIXTURE = ROOT / "tests" / "fixtures" / "enforcement" / "tetragon_events.synthet
 
 
 class RedactTetragonLineTests(unittest.TestCase):
+    def test_environment_variables_are_removed_from_every_actor(self) -> None:
+        private={"arguments":"example-private-args","environment_variables":[{"key":"EXAMPLE","value":"example-private-env"}]}
+        raw={"process_exec":{"process":{"binary":"/bin/a",**private},"parent":dict(private),"ancestors":[dict(private)]}}
+        cleaned=feed.redact_tetragon_line(json.dumps(raw).encode())
+        self.assertNotIn(b"example-private",cleaned)
+        self.assertIn(b"/bin/a",cleaned)
+
     def test_arguments_are_removed_and_other_fields_kept(self) -> None:
         for raw in FIXTURE.read_bytes().splitlines(keepends=True):
             cleaned = feed.redact_tetragon_line(raw)

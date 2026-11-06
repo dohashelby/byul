@@ -199,6 +199,18 @@ Docker 대상을 동등한 제품 경로에 연결하려면 명시적으로 지�
 
 최종 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup05-h32-actual-20261106-v1/actual-final-verification-v1.json`, SHA256 `f58abf71730ec1e7aae9bdfe3981787498610ae702a02753a8f873206b864a64`다. 실제 의존성은 같은 디렉터리의 `actual-admission-dependency-v1.json`, SHA256 `e485e85a80760ac9fcfd666aec2d971436a2731b101813c88c8ed755105375a0`다. 이번65개 인계 자료의 필수 검증은 완료했으며 SUP-05 제품 경로 보완과25개 한정 마감 제안/18개 제품 증거 필요 분류는 유지한다. 최종 인계 목록은 같은 디렉터리의 `actual-final-handoff-v1.json`, SHA256 `0687ce88ded92d5bc97fb575f8141692219dfe9a8e751d1cdd7e3de9e83d32b5`다. 별도 사후 핀 자료38개는 원65개와 시각을 구분해 연결했으며 원 시점의 동시 관측으로 소급하지 않았다.
 
+## SUP-03 source 검사 actor 연결 — 전용 driver 정적 검토 완료
+
+제품 검사를 root 운영자와 직접 kubectl로 실행하고 원 source Git 두 호출만 기존 검증된 소유자 helper로 연결하는 전용 driver를 고정했다. 원 driver·helper·공통 src·manifest·권한·venv·kubeconfig는 변경하지 않았다. Git 소유자 확인을 위한 기존 sudo와 채택하지 않은 kubectl sudo-wrapper는 다른 경로다. root 검사 actor가 기업 검사 권한·POL authority·official 승인이라는 뜻은 아니다.
+
+게시 담당은 고정10개 파일의 bytes/SHA·원 helper 함수·새 CPU8개/CLI help 종료0 기록을 대조했다. 전체 module AST에서 helper 로딩/검증 호출·필요 import·CLI 인자2개 외 변경이 없고 제품 수집·Store·정확 Ref·반출/복원·동일 as-of 저장 팩 재판정·예외 보존 본문이 같은 사실을 독립 확인했다. CPU 근거는 owner/Git/verify 효과를 EXAMPLE로 격리했으며 실제 root/sudo 권한·현재 source owner 전환 성공을 입증하지 않는다. 기존 CPU4+보존1·모델·archive·전체 suite는 반복하지 않았다.
+
+새 로더는 기존 helper의 정확한 고정SHA만 허용하고 일반 파일·lstat/open FD identity·지원 OS의 O_NOFOLLOW·읽기 상한·bytes SHA를 확인해 그때 읽은 동일 bytes를 compile/exec한다. 원 source guard를 monkeypatch하거나 path를 다시 읽어 실행하지 않으며 새 해시를 자동 승인하지 않는다. 원 helper는 repo/.git owner·ubuntu UID1000을 확인하고 원 Git argv2와 manifest/verify_req10/import/팩 검사를 유지한다.
+
+[검토용 helper 결합 발췌](implementation-snapshots/sup03_source_owner_helper_binding.py.txt) SHA256 `59df2a8c3494065ff313c954f70dec53b03f3f3eee55eff55b2d06dc75a25f76`는 해당 고정 상수/함수3개의 AST를 원 코드와 대조한 참조다. 독립 실행기나 설치 완료를 뜻하지 않는다. 원 driver 전체 SHA256은 `f88549218e27788ab524d9a8527ed17f5faf9c05f844007d07360d5bad568150`, 원 helper는 `fb12dbe8d82d6bc027b613a477d6e1a432fa4693c46c6f1380cb38cecdf79fc9`다.
+
+준비 freeze 참조는 `worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup03-root-actor-product-v1/freeze.json`, SHA256 `9ab359a22a5b4b8bb8711a34e50b6eb2b2a7d2c4cc0d73ec9868073d3fde9b31`, 게시 담당 정적 검토는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-root-actor-static-review-v1.json`, SHA256 `a93afcfe1788fd888ae2019394bb8693e78adf4b7ecc95133d8ca2f01bca60f0`다. 이 정적 변경 범위의 새 차단 결함은 발견하지 않았다. 실제 root 검사/engine·probe UID1000·root700 결과/user700 입력·원 감독/기한·정리·현재 자원/비용·새 archive producer/receipt 결합은 S2 전체 운영 패킷의 별도 검토 대상이며 GPU_READY=false다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

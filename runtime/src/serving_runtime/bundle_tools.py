@@ -13,6 +13,7 @@ import re
 import selectors
 import stat
 import subprocess
+import sys
 import tempfile
 import time
 from urllib.error import HTTPError, URLError
@@ -189,7 +190,8 @@ def build_bundle(policy_path: str, policy_sha256: str, server_values_path: str,
 
 
 def _run(command: list[str]) -> None:
-    subprocess.run(command, check=True)
+    # Keep kubectl progress visible without contaminating --operation-result JSON.
+    subprocess.run(command, check=True, stdout=sys.stderr)
 
 
 class StatusUnavailable(RuntimeError):

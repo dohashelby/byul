@@ -79,5 +79,25 @@
     "whole_SUP05_product_complete": false,
     "challenge_recovery_retry": 0,
     "final_handoff_sha256": "0687ce88ded92d5bc97fb575f8141692219dfe9a8e751d1cdd7e3de9e83d32b5"
+  },
+  "latest_cleanup_only_user_scope": {
+    "recorded_at_KST": "2026-11-07T00:57:11.831617+09:00",
+    "user_reply": "현재 건 정리까지만 진행",
+    "proof_project_relative_path": "worktrees/byul-gpu-b-run-lif14-labels-20261105/out/SUP16-live-normal-v1-operator-20261105/current-case-cleanup-only-user-reply-20261107-v1/cleanup-only-resolution-v1.json",
+    "proof_sha256": "7131df6788ab5632e6880ff2853b3155a67fbeb4327bc3912d0998efa70ab6ab",
+    "local_observation_at_KST": "2026-11-07T00:56:42.247248+09:00",
+    "current_jobs": [],
+    "matching_operator_python_count": 0,
+    "SUP03_private_runtime_present": false,
+    "SUP03_final_operating_freeze_or_start_intent_present": false,
+    "current_case_required_verification_remaining": 0,
+    "SUP03_followup_execution": "stopped_by_new_user_scope",
+    "drafts_and_evidence_preserved": true,
+    "new_AWS_query_or_mutation": false,
+    "last_AWS_observation_at_KST": "2026-11-06T22:24:57.406829+09:00",
+    "historical_cost_estimate_USD": 53.08166739362498,
+    "billing_confirmed": false,
+    "retained_EBS_storage_cost_continues": true,
+    "whole43_complete": false
   }
 }

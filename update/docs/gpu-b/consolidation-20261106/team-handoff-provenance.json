@@ -168,8 +168,22 @@
     "selected_guest_freeze_sha256": "a35443bb242307819a6106371fcd116b46d545847b9fd1034c4bd2dce346ce49",
     "selected_client_freeze_sha256": "1576803af21f53710d75cafe1ef61e729624dc76785b3fd45ab1123090b4c2eb",
     "F1_and_G1_resolved_in_selected_code": true,
-    "whole_operating_join_review_pending": true,
+    "whole_operating_join_review_pending": false,
     "actual_new_GPU_execution_verified": false,
     "whole43_counts_changed": false
+  },
+  "SUP03_whole_operating_join_review": {
+    "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-whole-operating-20261107-v1/operating-join-review-v1.json",
+    "sha256": "3cf1f0757b62e824f80e69ca393283e0a7cc5903cfe481a6be7ddafa22d7475e",
+    "required_review_remaining_before_start": 0,
+    "new_concrete_defects": 0,
+    "observed_at_KST": "2026-11-07T19:50:30.231007+09:00",
+    "estimated_USD": 54.2761120275903,
+    "next_worst_plus_estimate_USD": 59.8961120275903,
+    "first_start_window_until_KST": "2026-11-07T20:20:30.231007+09:00",
+    "actual_start_verified_by_this_review": false,
+    "guest_preflight_before_deployment": true,
+    "whole43_counts_changed": false,
+    "root_cost_path_review_sha256": "25d8182cd56019c7bae5ff8c42570362df060108cd2d10e60ebb007b68326d65"
   }
 }

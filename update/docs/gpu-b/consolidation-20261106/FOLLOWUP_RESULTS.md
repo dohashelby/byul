@@ -266,6 +266,20 @@ S2가 사용자가 지정한 브라우저 CloudShell에서 읽기 전용7종 관
 
 남은 순서는 최종 패킷·실제 CloudShell 배치/전송·기동 직전 자원·비용·원 감독/정리의 전체 결합 검토, 승인 범위 단일 기동, 모델 배포 전 실제 guest 양성 preflight, 선정 제품 분기1회, 결과 반출·필요 Ref 복원/재판정·정리/정지·비용·실제 결과 검증이다. 꺼진 guest의 proof를 사전에 만들거나 별도 사람/root 수신 ACK를 추가하지 않는다. 준비 검토만으로25개 한정 마감 제안/18개 제품 증거 필요 분류를 바꾸지 않는다.
 
+## 2026-11-07 기동 전 전체 운영 결합 검토 완료
+
+세션6이 고정 source·guest v2/client v3와 실제 CloudShell 배치, UI 전송/다운로드, 새 자원·비용 원자료, 단일 runtime 발행·호출, 원 감독·기한·정리·archive producer 결합을105개 항목으로 확인했다. 기동 전 검토 범위의 구체 결함·추가 필수 입력은0이다. 기존 코드·CPU·source ZIP·GB09 검증은 재사용했다.
+
+새 원자료는 19:50:30 KST 완료의 읽기 전용7종 관측이다. 소유3대 stopped·공인IP0·활성 명령0을 확인했다. 누적 추정은 `$54.2761120275903`, 예비$5 제외 잔여 `$40.7238879724097`, 다음 건 최악$5.62와 정리 포함 합계 `$59.8961120275903`로$95 미만이다. 실청구 미확정·보존 저장소 비용 지속을 유지하며, 호출별 비동시 관측을 한 시각의 원자적 snapshot으로 바꾸지 않는다.
+
+긴 로컬 경로에서 whole ZIP/ASCII 전송 실패를 보존한 뒤 짧은 전용 경로로 새 ZIP89,115 bytes의 UI 업로드·CloudShell 배치에 성공했다. 경로 길이가 단일 원인이었다고 확정하지 않는다. 실제 배치12파일의 bytes/SHA·actor·권한과 새 원자료 ZIP14,061 bytes/18member의 최초 CRC·원 CLI producer→소비값·UI 반출 일치를 검증했다. 준비 전송의 성공은 향후 제품 archive 회수 성공을 대신하지 않는다.
+
+S2는 제안 원본의 `not_ready=false`와 해당 고정 리뷰 참조만 변경해 최초 runtime packet을 배타적으로 발행하고 실제 새 SHA를 원 단일 호출에 사용한다. 최초 start 허용 창은 **20:20:30.231007 KST까지**이며 연장하지 않는다. 창 안에서 시작한 뒤에는 원 개별 실행 기한을 따른다. 단일 기동 후 실제 source/owner·system Python/root/실행 flags·boot/node/GPU/model·원 timer의 양성 preflight가 모델 배포의 선행 조건이다. 실패는 원 오류·가능한 증거·원 정리/단일 stop180과 불확실성 차단으로 연결한다. 별도 사람/root ACK를 추가하지 않는다.
+
+비용 영수증 경로 변경은 게시 담당이 원 코드와 좁게 병행 검토했다. `T`와 `PRIVATE` 상수2개 외 전체 module AST가 같으며 단가·산술·시작 intent부터의 보수 계산·실제 중지 관측 후 close·원 backup/배타 receipt/원자 장부 교체는 그대로다. 실제 원 start/terminal/정확 packet의 동일 bytes 로컬 사본과 중지 receipt를 소비해야 하며, 이미 기록한 prestart를 재실행하지 않는다. 이번 정적 검토에서 updater나 AWS/장부 쓰기는 실행하지 않았다.
+
+전체 운영 리뷰 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-whole-operating-20261107-v1/operating-join-review-v1.json`, SHA256 `3cf1f0757b62e824f80e69ca393283e0a7cc5903cfe481a6be7ddafa22d7475e`다. 비용 경로 리뷰는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-browser-cost-bookend-static-review-v1.json`, SHA256 `25d8182cd56019c7bae5ff8c42570362df060108cd2d10e60ebb007b68326d65`다. 이 기록만으로 실제 start/SSM/worker·EVD/RES/RPT·최종 정리 성공을 선언하지 않으며43ID 분류는 유지한다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

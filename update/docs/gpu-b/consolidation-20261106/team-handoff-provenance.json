@@ -130,7 +130,8 @@
     "remaining_after_5_reserve_USD": 40.75243412172523,
     "billing_confirmed": false,
     "retained_storage_cost_continues": true,
-    "summary_review_sha256": "f953aace3608ebb8dc2dbfdebfc0fca846961ec7fe0d2e8e8a173c1a58fec004"
+    "summary_review_sha256": "f953aace3608ebb8dc2dbfdebfc0fca846961ec7fe0d2e8e8a173c1a58fec004",
+    "superseded_by": "SUP03_R1_final_actual_and_R2_preparation"
   },
   "SUP03_browser_guest_preparation_reviews": {
     "reviews": {
@@ -205,7 +206,7 @@
     "start_accepted_verified": true,
     "whole_prestart_zero_defects_conclusion_corrected": true,
     "original_execution_retried": false,
-    "actual_stderr_control_and_stop_review_pending": true,
+    "actual_stderr_control_and_stop_review_pending": false,
     "whole43_counts_changed": false,
     "root_cost_open_review_sha256": "dfc225eccf6318814acf6023e39ba2007532815ab8051f5ac5fdc6c992ee9ec6"
   },
@@ -218,6 +219,42 @@
     "compute_IP_interval_closed": true,
     "EBS_continues": true,
     "billing_confirmed": false,
-    "S6_original_control_scope_review_pending": true
-  }
+    "S6_original_control_scope_review_pending": false
+  },
+  "SUP03_R1_final_actual_and_R2_preparation": {
+    "reviews": {
+      "control-integrity-review-v1.json": {
+        "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-browser-actual-20261107-v1/control-integrity-review-v1.json",
+        "sha256": "44bc5ede27c22fdd88537c573e5613775b58ab4b8d2cb6129ab475bdc807e90a"
+      },
+      "control-runtime-review-v1.json": {
+        "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-browser-actual-20261107-v1/control-runtime-review-v1.json",
+        "sha256": "1f9c7af739549a0e3125f472d71da945b9b3cdfa9409d29d2a6d010a9d7603dd"
+      },
+      "r1-final-actual-handoff-v1.json": {
+        "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-browser-actual-20261107-v1/r1-final-actual-handoff-v1.json",
+        "sha256": "8d5fa2d7717f30e804e9904e9c33948c1d22496e8dbf42be9b5adf0384fdf2b2"
+      }
+    },
+    "R1_required_closeout_verification_remaining": 0,
+    "execute_exit": 1,
+    "normal_stop_count": 1,
+    "original_stop180_failed": true,
+    "supervisor_final_present": false,
+    "guest_installer_product_preflight_model_NS_factory_reached": false,
+    "product_EVD_RES_RPT_Refs_created": false,
+    "restore_rejudge_target_exists": false,
+    "actual_stopped_observation_at_KST": "2026-11-07T20:30:45.417836+09:00",
+    "owned_instances_stopped": 3,
+    "public_IPs": 0,
+    "estimated_USD": 54.57090061145566,
+    "remaining_after_reserve_USD": 40.42909938854434,
+    "compute_IP_interval_closed": true,
+    "EBS_continues": true,
+    "billing_confirmed": false,
+    "next": "S1 ZIP installer input + S2 matching ZIP producer/caller; CPU preparation only until new fixed coupling/resources/budget/protection",
+    "new_GPU_experiment_completed_successfully": false,
+    "whole43_counts_changed": false
+  },
+  "current_work_reference": "SUP03_R1_final_actual_and_R2_preparation"
 }

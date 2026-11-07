@@ -304,6 +304,26 @@ S2는 원 execute 종료1과 같은 전송 오류를 보고했고 원 감독의 
 
 비용 close 검토 참조는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-browser-cost-close-actual-review-v1.json`, SHA256 `fefe069ba6bdc5ee4f29b2a4e356b224c3375a7c6a5667cf4c1a6eff1ab73ff4`다. 원 장부·영수증·단가·정책을 수정하지 않았고 제품 성공·재실행·실청구 확인을 뜻하지 않는다.
 
+## 2026-11-07 SUP-03 R1 실제 실패·정지·비용 구간 최종 인계
+
+세션6의 R1 최종 필수 검증이 완료됐으며 이번 운영 마감 범위의 추가 필수 입력은0이다. 실제 control ZIP485,650 bytes의 최초422 outer CRC·421 payload bytes/SHA·UI 원본/사본 일치, 실제 runtime/source12파일·기존 startup7 재사용, adapter의 원 request→stdout/stderr SHA→receipt→소비값과 실행 신원을 확인했다. 기존 CPU·GB09·nested archive·과거 Ref 검증은 반복하지 않았다.
+
+원 start·health 제출·정상 stop은 각각1회 수락됐고 불확실성 기록·자동 재시도는0이다. health는 종료0으로 물리 L4·원 timer·유지된 bootstrap source `3bba3c73a6bee1966b784cd90a9690e3e9d2512a` 범위를 확인했다. 선택 제품 source `3b3ff137b31b830403ccce1997dabf26319bac4f`의 guest preflight와는 다른 범위다. payload helper는 JSON 확장자 오류로 종료1이었고 installer·제품 source 사전 검증·모델·namespace·factory에 도달하지 않았다. 새 제품 EVD/RES/RPT·Store Ref가 없어 복원·저장 팩 재판정 대상도 없다. 해당 미도달을 제품 PASS/공식 GPU MEASURED로 채우지 않는다.
+
+원 execute는 종료1·child 회수/group 종료·cleanup 오류 목록[]였지만 원 정상 stop180 감시는 실패했고 감독 final 파일은 없다. 이후20:29 KST full7은 대상 stopping/IP1·SSM0/EIP0·EBS440GiB를 기록했다. 그다음 **20:30:44.662938~20:30:45.417661 KST EC2-only 원조회**와20:30:45.417836 집계에서 소유3대 stopped·공인IP0을 확인했다. 집계만 사용하지 않고 새 반출 ZIP2,728 bytes의 원 stdout/stderr2개를 최초 CRC/bytes/SHA·UI 원본과 대조해 producer→집계 값의 일치를 검증했다. 정확 off 시각은 미확인이고 원stop180 실패를 후속 stopped로 소급 성공 처리하지 않는다.
+
+비용은 게시 담당의 open/close 검토를 재사용해20:30:45 KST 추정 `$54.57090061145566`, 예비$5 제외 잔여 `$40.42909938854434`, compute/IP 구간 닫힘과 EBS 비용 지속을 연결했다. 실청구 확인값은 아니다. 원 API wrapper intent와 실제 CLI 수락 시각도 구분해 정정했다. 실행·정지 관측과 비용 계산을 한 건의 의미로 합치지 않는다.
+
+| 필수 검증 | 프로젝트 상대 참조 | SHA256 |
+| --- | --- | --- |
+| 실제 control 최초 무결성 | `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-browser-actual-20261107-v1/control-integrity-review-v1.json` | `44bc5ede27c22fdd88537c573e5613775b58ab4b8d2cb6129ab475bdc807e90a` |
+| 원 실행·실패·원 정지 범위 | 같은 디렉터리 `control-runtime-review-v1.json` | `1f9c7af739549a0e3125f472d71da945b9b3cdfa9409d29d2a6d010a9d7603dd` |
+| 후속 실제 stopped와 R1 최종 인계 | 같은 디렉터리 `r1-final-actual-handoff-v1.json` | `8d5fa2d7717f30e804e9904e9c33948c1d22496e8dbf42be9b5adf0384fdf2b2` |
+
+게시 담당은 위 고정 리뷰의 bytes/SHA·최종 범위와 비용 영수증 산술을 대조했고 같은 원 archive를 다시 검증하지 않았다. 사전 검토 누락2b83과 원리뷰3cf1/0ad706·원 실패/원자료를 보존한다. 이번 마감은 실패한 선정 실행의 결과·정리·후속 정지·비용 구간 검증 완료다. 25개 한정 마감 제안/18개 제품 증거 추가 필요와 전체 분기 완료 미확정은 유지한다.
+
+다음 준비는 S1의 실제 단일member ZIP→기존 JSON 검증 installer 계약과 S2의 동일 ZIP producer/put/호출 최소 변경으로 나눴다. 원 helper 허용 제한·제품 source/venv/모델·판정·기한을 바꾸지 않는다. 새 고정 delta 검토와 당시 자원·예산·보호 조건이 준비되기 전에는 새 GPU/SSM을 실행하지 않으며 원 R1의 기한·실패를 재설정하지 않는다. 이번 배정은 새 실행 성공이나 ZIP 변경 검토 완료를 뜻하지 않는다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

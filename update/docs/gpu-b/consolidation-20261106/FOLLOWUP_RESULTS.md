@@ -247,6 +247,25 @@ S2가 사용자가 지정한 브라우저 CloudShell에서 읽기 전용7종 관
 
 관측 참조는 `worktrees/byul-gpu-b-run-lif14-labels-20261105/out/SUP16-live-normal-v1-operator-20261105/SUP03-fixed-template-operating-packet-v1/observations/browser-current-resources-v1.json`, SHA256 `458ec938955fa6931c892b791d0bb9043fd36eb0e77e5b2405bd1565efa98fc5`다. 게시 담당 요약 대조는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/browser-current-resources-summary-20261107-v1.json`, SHA256 `f953aace3608ebb8dc2dbfdebfc0fca846961ec7fe0d2e8e8a173c1a58fec004`다. 계정·인스턴스·볼륨·인증 식별자나 원 AWS JSON은 게시하지 않는다.
 
+## 2026-11-07 브라우저 제어·게스트 준비 코드 검토
+
+세션1은 guest installer/controller·고정 입력을, 세션2는 브라우저 CloudShell 제어·전송을 병행 준비했다. 세션6은 기존 검토·CPU·원 archive를 재사용하고 새 변경과 결합만 검토했다. 호출/검토를 기다리며 GPU를 켜두지 않았고 공통 제품 source·정책·판정·기한·권한은 변경하지 않았다.
+
+브라우저 client의 초기 exporter가 과거 private 경로의 기록을 새 공유 경로와 혼용할 수 있는 F1을 발견했다. client v2는 정확한 현재 private origin·actor·권한·자체 bytes·최종 packet·동일 driver/terminal의 결합을 읽기 전에 확인하도록 수정했고 세션6 검토를 통과했다. 원 정수 실패 exit의 관측·반출을 허용하되 원 실패를 성공으로 바꾸지 않는다. 소형 실제 UI 전송/회수와 읽기 전용 결과 ZIP 검증은 제어 경로 근거이며 제품 archive 성공을 대신하지 않는다.
+
+게스트 결합 검토에서는 system Python의 사전 관측에 사용한 `-I -S -B`와 실제 정리 호출의 `-I -B`가 다른 G1을 발견했다. guest v2는 실제 flags와 원 양성 proof의 정확한 정수값을 기록·대조하고, client v3는 정리3단계와 정확 archive 명령을 `-I -S -B`로 일치시켰다. 제품3단계는 기존 retained Python/옵션을 유지했다. 고정 guest v2/client v3 조합에서 G1이 해소됐으며 새 코드 변경 범위의 구체 차단 결함·필수 검증 잔여는0이다. 이는 전체 운영 준비나 실제 guest 성공 판정은 아니다.
+
+새 설치·workflow CPU18개와 flags 변경 CPU5개 기록을 검토했다. 모의 API·격리된 자체 임시 경로·실제 로컬 Python 시작 옵션의 근거이며 실제 AWS/Kubernetes/모델 관측으로 세지 않는다. flags 양성 시험은 시험 runtime 경계에서 중단했고 `-S` 없는 호출의 거부를 확인했다. 원18개·기존 CPU/모델/GB09·archive를 반복 실행하지 않았다.
+
+| 최종 선정 준비 | 고정 SHA256 | 세션6 최종 검토 SHA256 |
+| --- | --- | --- |
+| guest v2 freeze | `a35443bb242307819a6106371fcd116b46d545847b9fd1034c4bd2dce346ce49` | `c5a51fc960b35e3847e0661509dad15c21143f54be5f3b324258f15d58f208ef` |
+| browser client v3 freeze | `1576803af21f53710d75cafe1ef61e729624dc76785b3fd45ab1123090b4c2eb` | `0ad706aa93dd711c1911f9637c4f42fa00684ced7dbf41ea2dd2adac02a72c9e` |
+
+원 F1·G1·v1/v2 검토는 보존한다. 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-browser-client-20261107-v1/client-review-v2.json`(SHA256 `97f07b4a4aaf9d757ff051dcfd7fb614c311aa1afbd0f3721fd667114d89d18b`), 같은 디렉터리의 `client-review-v3.json`, 그리고 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-guest-workflow-20261107-v1/guest-review-v2.json`이다. 게시 담당은 고정 검토 파일의 bytes/SHA와 결과 범위를 대조했으며 동일 시험을 다시 실행하지 않았다.
+
+남은 순서는 최종 패킷·실제 CloudShell 배치/전송·기동 직전 자원·비용·원 감독/정리의 전체 결합 검토, 승인 범위 단일 기동, 모델 배포 전 실제 guest 양성 preflight, 선정 제품 분기1회, 결과 반출·필요 Ref 복원/재판정·정리/정지·비용·실제 결과 검증이다. 꺼진 guest의 proof를 사전에 만들거나 별도 사람/root 수신 ACK를 추가하지 않는다. 준비 검토만으로25개 한정 마감 제안/18개 제품 증거 필요 분류를 바꾸지 않는다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

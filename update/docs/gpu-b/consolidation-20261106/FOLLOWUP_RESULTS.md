@@ -398,6 +398,18 @@ root는 원 open-after와 정확히 같은 close-before 장부부터 새 비용 
 
 과거 pending·review·원 health/실패 자료는 수정하지 않고 새 최종 연결로 검증 대기를 해소했다. 게시 담당은 고정 리뷰 bytes/SHA와 비용 산술을 대조했으며 원 archive/CPU/모델/GB09/Ref를 반복 실행하지 않았다. 원R1·R2와 새R3 source/출력세대 변경을 구분하고, 현재 R3 health는 정확 CID/control·원 positive preflight의 실제 근거를 사용한다. 고정 archive의 bootstrap-health는 legacyR1 부록으로 보존한다. R3 실제 stage·fresh 자원/예산·최종 운영 결합은 별도 필수 검토이며 새 제품 성공이나43ID 분류 변경을 이 마감으로 인정하지 않는다.
 
+## 2026-11-07 SUP-03 R3 기동 전 실제 운영 결합 검토 완료
+
+세션6이 새 R3 actual stage/source13pins·actor/권한·원자원 관측·최종 proposal와 원 invoker/보호의 필수 결합을 확인했다. 새16원본 ZIP의 최초 CRC/bytes/SHA·실제 UI 원본과 각 CLI producer→full7 집계의 값을 확인했고 관측 시각을 구분했다. 고정 candidate에서 비용3필드와 명시 근거만 갱신한 proposal은13pins를 유지한다. 기존 source44항목·S1 경로 대조·legacy health 출처 한계·R2 최종 검증을 재사용했으며 기동 전 구체 차단 결함·추가 필수 입력은0이다.
+
+root는 R2 after-close와 정확히 같은 R3 before-prestart 장부에서 **133.031821초 EBS$0.0020600716547522226만 추가**되는 새 산술을 검증했다.21:15:15.546041 KST 시점 추정은 `$54.8753179756252`, 예비$5 제외 잔여 `$40.1246820243748`, 다음 최악/정리$5.62 포함 `$60.4953179756252`로$95 미만이다. compute/IP 구간은 아직 닫힌 상태이며 EBS는 계속되고 실청구는 미확정이다. 이 비용 검토 참조는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-r3-prestart-cost-review-v1.json`, SHA256 `f39eb6bb28b253204fcf751a0a4564887745183faf2df8d73de2a44ad1c331c9`다.
+
+S2는 최초 runtime freeze의 `not_ready=false`와 이 고정 리뷰 참조 두 필드만 변경하고 나머지 proposal을 정확히 유지한다. 원 UTF-8/LF bytes 정책을 보존하며 입력 원본을 텍스트로 재인코딩하지 않는다. 새 파일의 exclusive 생성·0600/단일 link·실제 bytes/SHA를 기록한 뒤 그 actual packet SHA로 원 단일 start/execute를 연결한다. 최초 start 창은 **21:45:15.546041 KST까지**이며 원2h/transfer900/stop180·stop1·불확실성 차단은 유지한다. 별도 사람/root 수신 ACK를 추가하지 않는다.
+
+고정 archive의 `bootstrap-health/`는 legacyR1 부록이고 현재 R3 CID/control 및 원 양성 guest preflight의 실제 boot/source 근거와 분리한다. 이 optional 부록을 현재 증거로 소급하거나 새 일반 gate로 만들지 않는다. 실제 R3 fresh health 출력·boot/L4/timer·guest source/owner/system Python·root/no-site·installer/model/worker/Ref 성공은 단일 기동 이후의 실제 자료로 확인해야 하며 이 기동 전 리뷰에서 충족했다고 가정하지 않는다.
+
+최종 운영 리뷰 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-health-generation-delta-20261107-v1/r3-whole-operating-review-v1.json`, SHA256 `c01cf5d1e83079eab3d7e73c64208c291c236661739bfa540580271f4971738d`다. root는 고정 리뷰 bytes/SHA·결론과 비용 산술을 대조했으며 원CPU/source/archive/모델/GB09/Ref를 반복 실행하지 않았다. R1/R2 실패·원 정지 감시 실패·후속 실제 중지/비용 마감은 별도 이력으로 유지하고43ID 분류를 올리지 않는다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

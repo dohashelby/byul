@@ -184,6 +184,40 @@
     "actual_start_verified_by_this_review": false,
     "guest_preflight_before_deployment": true,
     "whole43_counts_changed": false,
-    "root_cost_path_review_sha256": "25d8182cd56019c7bae5ff8c42570362df060108cd2d10e60ebb007b68326d65"
+    "root_cost_path_review_sha256": "25d8182cd56019c7bae5ff8c42570362df060108cd2d10e60ebb007b68326d65",
+    "subsequent_missed_transfer_contract_finding": {
+      "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-browser-actual-20261107-v1/payload-transfer-contract-review-omission-v1.json",
+      "sha256": "2b83e44518685bffbfd27fe86c1fb1cdf85c455da04a305b5d508d52142d6e91"
+    }
+  },
+  "SUP03_actual_startup_and_transfer_failure": {
+    "reviews": {
+      "startup-actual-review-v1.json": {
+        "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-browser-actual-20261107-v1/startup-actual-review-v1.json",
+        "sha256": "48d48c0d0f4e4690bb6aed58ae5e6995cf0ac9052e69ace654e323d4052b2c52"
+      },
+      "payload-transfer-contract-review-omission-v1.json": {
+        "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-browser-actual-20261107-v1/payload-transfer-contract-review-omission-v1.json",
+        "sha256": "2b83e44518685bffbfd27fe86c1fb1cdf85c455da04a305b5d508d52142d6e91"
+      }
+    },
+    "actual_runtime_packet_sha256": "3819025ba775ad651e9ff64afd12aa88386f31a505e5644db33f4df5594c54b6",
+    "start_accepted_verified": true,
+    "whole_prestart_zero_defects_conclusion_corrected": true,
+    "original_execution_retried": false,
+    "actual_stderr_control_and_stop_review_pending": true,
+    "whole43_counts_changed": false,
+    "root_cost_open_review_sha256": "dfc225eccf6318814acf6023e39ba2007532815ab8051f5ac5fdc6c992ee9ec6"
+  },
+  "SUP03_actual_cost_close": {
+    "root_review_project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-browser-cost-close-actual-review-v1.json",
+    "sha256": "fefe069ba6bdc5ee4f29b2a4e356b224c3375a7c6a5667cf4c1a6eff1ab73ff4",
+    "observation_at_KST": "2026-11-07T20:30:45.417836+09:00",
+    "estimated_USD": 54.57090061145566,
+    "remaining_after_reserve_USD": 40.42909938854434,
+    "compute_IP_interval_closed": true,
+    "EBS_continues": true,
+    "billing_confirmed": false,
+    "S6_original_control_scope_review_pending": true
   }
 }

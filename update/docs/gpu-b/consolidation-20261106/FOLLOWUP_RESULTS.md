@@ -268,6 +268,8 @@ S2가 사용자가 지정한 브라우저 CloudShell에서 읽기 전용7종 관
 
 ## 2026-11-07 기동 전 전체 운영 결합 검토 완료
 
+> **후속 정정:** 아래의 기동 전 차단 결함0 결론은 실제 실행 후 발견한 JSON 전송 계약 누락으로 정정한다. 원 검토는 당시 기록으로 보존하며, 아래 실제 startup·후속 오류 기록을 함께 확인한다.
+
 세션6이 고정 source·guest v2/client v3와 실제 CloudShell 배치, UI 전송/다운로드, 새 자원·비용 원자료, 단일 runtime 발행·호출, 원 감독·기한·정리·archive producer 결합을105개 항목으로 확인했다. 기동 전 검토 범위의 구체 결함·추가 필수 입력은0이다. 기존 코드·CPU·source ZIP·GB09 검증은 재사용했다.
 
 새 원자료는 19:50:30 KST 완료의 읽기 전용7종 관측이다. 소유3대 stopped·공인IP0·활성 명령0을 확인했다. 누적 추정은 `$54.2761120275903`, 예비$5 제외 잔여 `$40.7238879724097`, 다음 건 최악$5.62와 정리 포함 합계 `$59.8961120275903`로$95 미만이다. 실청구 미확정·보존 저장소 비용 지속을 유지하며, 호출별 비동시 관측을 한 시각의 원자적 snapshot으로 바꾸지 않는다.
@@ -279,6 +281,28 @@ S2는 제안 원본의 `not_ready=false`와 해당 고정 리뷰 참조만 변�
 비용 영수증 경로 변경은 게시 담당이 원 코드와 좁게 병행 검토했다. `T`와 `PRIVATE` 상수2개 외 전체 module AST가 같으며 단가·산술·시작 intent부터의 보수 계산·실제 중지 관측 후 close·원 backup/배타 receipt/원자 장부 교체는 그대로다. 실제 원 start/terminal/정확 packet의 동일 bytes 로컬 사본과 중지 receipt를 소비해야 하며, 이미 기록한 prestart를 재실행하지 않는다. 이번 정적 검토에서 updater나 AWS/장부 쓰기는 실행하지 않았다.
 
 전체 운영 리뷰 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-whole-operating-20261107-v1/operating-join-review-v1.json`, SHA256 `3cf1f0757b62e824f80e69ca393283e0a7cc5903cfe481a6be7ddafa22d7475e`다. 비용 경로 리뷰는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-browser-cost-bookend-static-review-v1.json`, SHA256 `25d8182cd56019c7bae5ff8c42570362df060108cd2d10e60ebb007b68326d65`다. 이 기록만으로 실제 start/SSM/worker·EVD/RES/RPT·최종 정리 성공을 선언하지 않으며43ID 분류는 유지한다.
+
+## 2026-11-07 실제 startup 검증과 준비 전송 결함 후속 정정
+
+세션6이 startup 원ZIP10,130 bytes의7member 최초 CRC/bytes/SHA와 실제 UI 다운로드·로컬 사본 일치, runtime packet의 원 제안 대비 허용된 두 필드 변경, 단일 기동 수락·시작 감독 종료0·실제 execute 부모/자식·health 명령의 신원을 확인했다. 최종 packet SHA256은 `3819025ba775ad651e9ff64afd12aa88386f31a505e5644db33f4df5594c54b6`다. 원 start intent는20:15:13 KST, 시작 감독 종료는20:16:09, execute 제출은20:20:05이며 최초 기동 창 안의 start와 후속 execute를 구분한다.
+
+그러나 고정 driver가 `operator-payload.json`을 helper의 put에 전달하는 반면, 해당 고정 helper는 `.py`·`.zip`·`.tar.gz`·`.whl`만 허용한다. JSON 이름은 remote init 이전의 파일명 검사에서 거부되므로 installer·guest preflight·prepare/observe로 연결될 수 없는 구체 결함이다. 최초 전체 결합 검토에서 이 caller→전송기 계약을 연결해 확인하지 못했다. 원 리뷰와 실제 실패를 삭제하거나 소급 성공으로 바꾸지 않고 후속 정정으로 연결한다. 이미 검토한 F1/G1 수정의 범위와 이번 누락은 구분한다.
+
+S2는 원 execute 종료1과 같은 전송 오류를 보고했고 원 감독의 단일 정상 stop 요청을 확인 중이다. 이 startup 검토 시점에는 실행 stderr와 최종 control·실제 중지 원자료가 아직 별도 검증 중이므로 제품/전체 정리 성공을 선언하지 않는다. health 제출·기동 수락·장비 상태 확인을 제품 EVD/RES/RPT/Store·모델 실측 완료로 올리지 않는다. 새 기동·같은 실행 반복·원 기한 연장은 하지 않는다.
+
+비용 open은 게시 담당이 원 intent·정확 packet·원 before/after 장부와 receipt의 SHA 및 산술을 대조했다. 19:50:30부터20:15:13 KST까지 저장소 추정$0.02297373488084889가 더해져 intent 시점 추정은 `$54.29908576247115`이며 그때부터 compute/IP를 보수적으로 열었다. 실제 중지 관측 전에는 이 값을 최종 비용으로 읽지 않는다. 실청구 미확정·EBS 지속·최종 close 검증 대기를 유지한다.
+
+실제 startup 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-browser-actual-20261107-v1/startup-actual-review-v1.json`, SHA256 `48d48c0d0f4e4690bb6aed58ae5e6995cf0ac9052e69ace654e323d4052b2c52`다. 같은 디렉터리의 `payload-transfer-contract-review-omission-v1.json`, SHA256 `2b83e44518685bffbfd27fe86c1fb1cdf85c455da04a305b5d508d52142d6e91`은 사전 검토 누락과 후속 수정 담당·입력 계약을 기록한다. 비용 open 검토는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-browser-cost-open-actual-review-v1.json`, SHA256 `dfc225eccf6318814acf6023e39ba2007532815ab8051f5ac5fdc6c992ee9ec6`다. 원ZIP/코드/CPU/GB09는 반복 검증하지 않았다. 25개 한정 마감 제안/18개 제품 증거 필요 분류는 유지한다.
+
+## 2026-11-07 비용 close 산술 검증 — 원 정지 실패와 후속 중지 구분
+
+게시 담당이 새 before/after 장부·cost-close receipt·정확한 후속 EC2-only JSON의 SHA 연결과 산술을 확인했다. 원 start intent20:15:13.789979부터 후속 중지 관측20:30:45.417836 KST까지931.627857초를 보수적으로 계산했다. 해당 기간 compute$0.25609414646866663·IP$0.0012939275791666665·EBS$0.014426774936676667을 더한 추정은 `$54.57090061145566`, 예비$5 제외 잔여는 `$40.42909938854434`다. compute/IP 구간은 닫혔고 보존 EBS 비용은 계속된다. 실청구값은 아니다.
+
+후속 EC2-only 사본에는 소유3대 stopped·공인IP0이 기록됐지만 정확 off 전환 시각은 미확인이다. 이전 full7의 stopping/IP1과 원stop180 감시 실패를 후속 중지로 덮지 않는다. 전체 CLI/control/UI 원자료 진위와 원 실행 범위는 세션6의 후속 검증 대상이며 게시 담당은 같은 ZIP CRC를 반복하지 않았다.
+
+원 API wrapper의 `at`는 실제 CLI 수락 시각과 다르다. 비용 시작은 원 intent의 보수 anchor를 유지하며, start 실제 CLI는20:16:07~20:16:09 KST, stop 실제 CLI는20:23:38~20:23:39 KST다. 원 wrapper 시각을 실제 API 완료 시각으로 소급하지 않는다. 정확한 mutation intent/result·stdout/receipt 시각은 세션6 원control 검증에 연결한다.
+
+비용 close 검토 참조는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-browser-cost-close-actual-review-v1.json`, SHA256 `fefe069ba6bdc5ee4f29b2a4e356b224c3375a7c6a5667cf4c1a6eff1ab73ff4`다. 원 장부·영수증·단가·정책을 수정하지 않았고 제품 성공·재실행·실청구 확인을 뜻하지 않는다.
 
 ## 반환 결과의 추가 원칙
 

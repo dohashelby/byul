@@ -336,6 +336,14 @@ S2는 원 execute 종료1과 같은 전송 오류를 보고했고 원 감독의 
 
 새 R2 prestart 비용 산술은 게시 담당이 원R1 after-close와 정확히 같은 before 장부에서 검증했다. 20:44:40.863450 KST까지835.445614초의 EBS 추정$0.012937339469242224만 더해 `$54.5838379509249`, 예비$5 제외 잔여 `$40.4161620490751`, 다음 최악/정리$5.62 포함 `$60.2038379509249`로$95 미만이다. compute/IP 구간은 아직 닫힌 상태이며 EBS는 계속된다. 새 최초 기동 허용 창은21:14:40.863450 KST까지1800초다. 비용 검토 참조는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-r2-prestart-cost-review-v1.json`, SHA256 `8cdaf9de1e74d40fabc4089ef6ad41f2b646429e664610df94e4f9ca4e54f1ca`다. 새 실제 배치/원조회 producer·최종 패킷의 운영 결합은 세션6 별도 검토이며 이 산술은 새 기동/제품 성공을 뜻하지 않는다.
 
+## 2026-11-07 SUP-03 R2 기동 전 전체 운영 결합 검토 완료
+
+세션6이 새 R2 source/CPU 검토9589를 재사용하고 실제 배치·자원·전송·최종 운영 결합을 검토했다. 새 source13파일의 bytes/SHA·actor·700/600 권한·단일 link, UI 업로드/반출, 원자료 ZIP16member 최초 CRC·stream SHA와 full7의 실제 CLI producer→집계 값·각 관측 시각을 확인했다. 최종 proposal은 원 candidate의 비용3필드와 명시 근거만 갱신하고13개 pin을 유지했다. 원 invoker·중복 방지·종료/불확실성·정리·개별 기한과 예산 조건도 결합했다. 이 기동 전 검토 범위의 구체 차단 결함·추가 필수 입력은0이다.
+
+S2는 최초 runtime freeze 발행 시 `not_ready=false`와 이 고정 리뷰 참조의 두 필드만 바꾸고 나머지 proposal을 정확히 유지한다. 새 파일의 exclusive 생성·실제 bytes/SHA를 기록한 뒤 그 actual packet SHA로 원 start/execute를 각각1회 연결한다. 별도 사람/root 수신 ACK를 추가하지 않는다. 최초 start 창은 **21:14:40.863450 KST까지**, 예산100/예비5·최악5.62·원2h/transfer900/stop180·정상 stop1 조건을 유지한다. 실제 installer·제품 source/owner/system Python·root/no-site·model/node/worker/Ref는 단일 기동 후 원 preflight/실제 결과로 확인해야 하며 이 검토만으로 성공을 선언하지 않는다.
+
+stage/resource 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-payload-zip-delta-20261107-v1/r2-stage-resource-review-v1.json`, SHA256 `67ecc69f03550df34136077249a4d29c24f1364fdba43aebcf10fe70da314d10`이다. 같은 디렉터리의 `r2-whole-operating-review-v1.json`, SHA256 `cba621697159fd9683fee4754ff15c80b006521472d7e649b5a3415e73e4c2a8`이 최종 기동 전 운영 결합 검토다. root prestart 비용8cdaf9를 재사용하며 실청구 미확정·EBS 비용 지속을 유지한다. 검증기 오검사 정정 중 새 source ZIP을 한 차례 재계산한 범위는 원 리뷰에 명시했다. 기존 CPU/모델/GB09/Ref를 반복하지 않았고 R1의 실패·stop180 실패·후속 실제 중지·최종8d5fa2와 분리한다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

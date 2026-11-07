@@ -379,6 +379,25 @@ S2는 원 R2 health의 `FRESH_OUTPUT_REQUIRED`·종료1/빈stdout·upload 전 �
 
 root의 범위 결정은 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-r3-legacy-health-archive-scope-v1.json`, SHA256 `930da496ab37912cb3238cf960966ac16382d5a4663c05b958f872af8d9a2c3c`다. 새 source freeze는 `7f6123cf875b37b3988434c2099c6ed2a27aaa45e4330546cdd2431561146ef5`다. 게시 담당은 위 고정 기록의 bytes/SHA·범위를 대조했고 같은 CPU/archive·실제 AWS/모델은 재실행하지 않았다. 25개 한정 마감 제안/18개 제품 증거 추가 필요 분류는 유지한다.
 
+## 2026-11-07 SUP-03 R2 실제 실패·후속 중지·비용 구간 최종 인계
+
+세션6이 R2 최종 필수 검증을 완료했으며 이번 운영 마감 범위의 추가 필수 입력은0이다. 새 control506,373 bytes의415 outer CRC·414 payload bytes/SHA·UI 원본 일치와 원 startup6/source13 재사용, actual packet962d/원 actor·request→receipt→stdout/stderr SHA·소비값을 확인했다. 원 start/send/stop 각1회 수락·불확실성 기록0과 실제 poststart running/SSM Online/각 활성 명령0의 연결도 검증했다. wrapper intent anchor와 실제 CLI 수락 시각은 구분했다.
+
+원 health는 고정83f 코드와 정확한 현재 CID로 종료1·빈stdout·`FRESH_OUTPUT_REQUIRED` 원stderr를 남겼다. 원R1 health출력이 이미 생성돼 R2에서 다시 fresh로 사용할 수 없다는 사전검토 누락725867을 직접 원문으로 연결했다. upload·ZIP 실제 전송·installer·제품 source preflight·모델·namespace·factory·제품 EVD/RES/RPT/Store Ref에 도달하지 않았고 복원·저장 팩 재판정 대상도 없다. 실행 준비 실패를 모델/source 제품 FAIL 또는 전체 실증 완료로 확대하지 않는다.
+
+원 execute1710은 종료1·group 종료·cleanup 오류 목록[]이며, 원 정상 stop1 수락 이후180초 감시는 실패했고 감독 final 파일은 없다. 앞선21:11:06 KST full7의 대상 stopping/IP1·각 SSM0/EIP0·EBS440GiB와 후속 중지를 분리했다. **21:13:01.753925~21:13:02.514007 KST EC2-only 원조회**,21:13:02.514220 집계에서 소유3대 stopped·공인IP0을 확인했다. 새 반출 ZIP5,798 bytes의 집계+원 stdout/stderr3개를 최초 CRC/bytes/SHA·실제 UI 원본과 비교하고 raw stdout→dfc365 집계·원 packet/terminal의 일치를 확인했다. 정확 off 시각은 미확인이고 원stop180 실패를 소급 성공으로 바꾸지 않는다.
+
+root는 원 open-after와 정확히 같은 close-before 장부부터 새 비용 산술과 원 영수증 SHA 연결을 검증했다. 원 intent20:57:10.324190부터 후속 중지 관측21:13:02.514220 KST까지952.19003초의 compute$0.2617464593577778·IP$0.001322486152777778·EBS$0.014745191609011114를 더해 **추정$54.87325790397045·예비$5 제외 잔여$40.12674209602955**다. compute/IP 구간은 닫혔고 보존 EBS 비용은 계속된다. 실청구값이 아니며 S6는 root 산술을 재사용했다.
+
+| 필수 검증 | 프로젝트 상대 참조 | SHA256 |
+| --- | --- | --- |
+| control 최초 무결성 | `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r2-actual-20261107-v1/r2-control-integrity-review-v1.json` | `a732286b1760ffb7375469594651ccc2d3c778b3f07ecc5812bb9deb7ebcac3d` |
+| 원 실행·health 실패·stop 범위 | 같은 디렉터리 `r2-control-runtime-review-v1.json` | `d9ef424d1e093dc4572f2ff868233ef6c28e3aff25c6324d0e7407046206d122` |
+| 실제 후속 중지·R2 최종 인계 | 같은 디렉터리 `r2-final-actual-handoff-v1.json` | `e32c8affae8887a4f99646f8c27f850ffc4ca0637fe1f5591905ff89d1a05aa8` |
+| 비용 close 산술 | `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-r2-cost-close-actual-review-v1.json` | `75f5be25883a6a4a97e7e13c04eaf95ba97de8b130b523b2a5ae94be6e68bcae` |
+
+과거 pending·review·원 health/실패 자료는 수정하지 않고 새 최종 연결로 검증 대기를 해소했다. 게시 담당은 고정 리뷰 bytes/SHA와 비용 산술을 대조했으며 원 archive/CPU/모델/GB09/Ref를 반복 실행하지 않았다. 원R1·R2와 새R3 source/출력세대 변경을 구분하고, 현재 R3 health는 정확 CID/control·원 positive preflight의 실제 근거를 사용한다. 고정 archive의 bootstrap-health는 legacyR1 부록으로 보존한다. R3 실제 stage·fresh 자원/예산·최종 운영 결합은 별도 필수 검토이며 새 제품 성공이나43ID 분류 변경을 이 마감으로 인정하지 않는다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

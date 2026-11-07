@@ -256,7 +256,7 @@
     "new_GPU_experiment_completed_successfully": false,
     "whole43_counts_changed": false
   },
-  "current_work_reference": "SUP03_R2_prestart_whole_operating_review",
+  "current_work_reference": "SUP03_R2_actual_startup",
   "SUP03_R2_payload_ZIP_delta_review": {
     "review_project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-payload-zip-delta-20261107-v1/payload-zip-source-delta-review-v1.json",
     "review_sha256": "9589a039e4b0c77bf987062a1a83560fa6989c55a94c1e87fd73dc2ff1912396",
@@ -300,6 +300,38 @@
     "actual_runtime_publication_start_product_success_claimed": false,
     "source_candidate_preserved_not_ready": true,
     "extra_ACK_gate": false,
+    "whole43_counts_changed": false
+  },
+  "SUP03_R2_actual_startup": {
+    "reviews": {
+      "r2-local-finalization-review-v1.json": {
+        "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-payload-zip-delta-20261107-v1/r2-local-finalization-review-v1.json",
+        "sha256": "6b9b7eb8645a6fc75708691a6049423738d28008baeb4422950b2597a74bbc02"
+      },
+      "r2-publisher-constants-review-v1.json": {
+        "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-payload-zip-delta-20261107-v1/r2-publisher-constants-review-v1.json",
+        "sha256": "356f8e59bee29628ced7008434af140fa57d8df82b3332a9fff5d27d3ece616b"
+      },
+      "r2-publication-input-bytes-review-v1.json": {
+        "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-payload-zip-delta-20261107-v1/r2-publication-input-bytes-review-v1.json",
+        "sha256": "b382c0c3ee95bc06a9e8e126c76dd7f1bb70e4e76db0f6ada66a56ed7796a2d4"
+      },
+      "r2-startup-actual-review-v1.json": {
+        "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r2-actual-20261107-v1/r2-startup-actual-review-v1.json",
+        "sha256": "984f2696e22bb930a783ec5ac289671afb6a6900079318fc3c5f184eb31940cb"
+      }
+    },
+    "actual_runtime_packet_sha256": "962decb2ddb8e9ee13c34973574e0bd67d02e43d8e3ea5472a356fba05bfdfca",
+    "publication_at_KST": "2026-11-07T20:56:35.624131+09:00",
+    "original_intent_at_KST": "2026-11-07T20:57:10.324190+09:00",
+    "start_terminal_at_KST": "2026-11-07T20:58:05.897011+09:00",
+    "start_accepted": true,
+    "start_terminal_exit": 0,
+    "root_cost_open_review_sha256": "1ec0285931ccd738cac432a502128e13e8cf0ee16adbbd99cdbd07f1a1e88bdf",
+    "cost_estimate_at_intent_USD": 54.59544376685088,
+    "compute_IP_interval_open": true,
+    "actual_guest_product_final_stop_verified_by_this_review": false,
+    "billing_confirmed": false,
     "whole43_counts_changed": false
   }
 }

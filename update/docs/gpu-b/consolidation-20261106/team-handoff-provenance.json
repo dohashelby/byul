@@ -99,5 +99,37 @@
     "billing_confirmed": false,
     "retained_EBS_storage_cost_continues": true,
     "whole43_complete": false
+  },
+  "latest_resume_user_scope": {
+    "recorded_at_KST": "2026-11-07T19:12:20.120928+09:00",
+    "proof_project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/user-resume-sup03-20261107-v1.json",
+    "proof_sha256": "d7dfcb9602abca00bff19d0b1be2f0c371ed35262a5a3bd3383811c0a5e04647",
+    "next_item": "SUP-03 fixed-template branch",
+    "state": "resumed_preparation_and_fresh_state_check",
+    "new_GPU_execution_confirmed": false,
+    "old_evidence_retest": false,
+    "prior_cleanup_scope_preserved": true,
+    "whole43_complete": false,
+    "operating_transport": "existing AWS browser console requested by user in S2; new control/transfer coupling review pending",
+    "parallel_preparation_roles": {
+      "S1": "guest installer/workflow preparation only",
+      "S2": "browser console/CloudShell client, live AWS/resource/cost, external start/stop and artifact transport",
+      "S6": "new fixed guest code and new operating/transport coupling review; reuse completed evidence"
+    }
+  },
+  "current_scope_reference": "latest_resume_user_scope",
+  "latest_browser_resource_observation": {
+    "AWS_observed_at_KST": "2026-11-07T19:19:46.826086+09:00",
+    "owned_instances_stopped": 3,
+    "public_IPs": 0,
+    "active_SSM_commands": 0,
+    "EIPs": 0,
+    "gp3_GiB": 440,
+    "new_AWS_mutations": 0,
+    "estimated_USD": 54.24756587827477,
+    "remaining_after_5_reserve_USD": 40.75243412172523,
+    "billing_confirmed": false,
+    "retained_storage_cost_continues": true,
+    "summary_review_sha256": "f953aace3608ebb8dc2dbfdebfc0fca846961ec7fe0d2e8e8a173c1a58fec004"
   }
 }

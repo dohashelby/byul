@@ -1,0 +1,126 @@
+"""SUP-03 target assembly from supplied API objects, with no runtime dispatch."""
+from copy import deepcopy
+from pathlib import Path
+from types import SimpleNamespace
+import argparse
+import hashlib
+import json
+import sys
+
+
+def build_target(*, env, namespace, engine_pod, probe_pod, mapping, template_bytes,
+                 context, run_id, engine_container, probe_container, engine_port,
+                 observed_version):
+    from guard.adapters.vllm import VllmAdapter, fixed_chat_template, CHAT_TEMPLATE_PROFILE
+    from guard.collectors.model_mapping import validate_model_mapping
+    from guard.executors.template_supply_approval import _target
+    from guard.runtime.kubernetes_binding import verify_owned_pod
+    from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
+    from guard.models import canonical_json, sha256_hex
+    from tools.gpu_a_run_inputs import _binding
+
+    if (namespace.get('kind') != 'Namespace' or namespace['metadata'].get('deletionTimestamp')
+            or any(p.get('kind') != 'Pod' or p['metadata']['namespace'] != namespace['metadata']['name']
+                   for p in (engine_pod, probe_pod))):
+        raise ValueError('SUP03_NAMESPACE_API_OBJECT_MISMATCH')
+    # Reuse the existing binding projection; A-only role/generation labels and
+    # /srv/serving path conventions are not part of B's existing HTTP contract.
+    engine = _binding(engine_pod, namespace, engine_container)
+    probe = _binding(probe_pod, namespace, probe_container)
+    for pod, bound in ((engine_pod, engine), (probe_pod, probe)):
+        verify_owned_pod(pod, namespace['metadata'], bound, run_id)
+    mapping = validate_model_mapping(env, mapping)
+    if env.engine.name != 'vllm' or observed_version != env.engine.version or observed_version != '0.31.0':
+        raise ValueError('SUP03_OBSERVED_VERSION_MISMATCH')
+    if type(engine_port) is not int or not 1 <= engine_port <= 65535:
+        raise ValueError('SUP03_ENGINE_PORT_INVALID')
+    _, identity = fixed_chat_template(CHAT_TEMPLATE_PROFILE)
+    if type(template_bytes) is not bytes or hashlib.sha256(template_bytes).hexdigest() != identity['sha256']:
+        raise ValueError('SUP03_SUPPLIED_TEMPLATE_BYTES_UNSUPPORTED')
+    container, = (c for c in engine_pod['spec']['containers'] if c['name'] == engine_container)
+    argv, command = container.get('args'), container.get('command')
+    if (type(argv) is not list or type(command) is not list or not command
+            or any(type(a) is not str or not a for a in command + argv)
+            or any(argv.count(flag) != 1 for flag in ('--chat-template', '--max-model-len'))):
+        raise ValueError('SUP03_EXPLICIT_TEMPLATE_LAUNCH_REQUIRED')
+    try:
+        selected_path = argv[argv.index('--chat-template') + 1]
+        model_len = int(argv[argv.index('--max-model-len') + 1])
+    except (IndexError, ValueError):
+        raise ValueError('SUP03_TEMPLATE_LAUNCH_ARGUMENT_INVALID') from None
+    if selected_path != identity['container_path'] or not any(
+            m.get('mountPath') == selected_path and m.get('readOnly') is True
+            for m in container.get('volumeMounts', [])):
+        raise ValueError('SUP03_EXACT_READONLY_TEMPLATE_MOUNT_REQUIRED')
+    if '--port' in argv:
+        index = argv.index('--port') + 1
+        if argv.count('--port') != 1 or index >= len(argv) or argv[index] != str(engine_port):
+            raise ValueError('SUP03_SUPPLIED_PORT_MISMATCH')
+    target = {
+        'schema': 'guard-kubernetes-request-binding-target/1', 'lab': True,
+        'topology': 'kubernetes-owned-direct', 'engine_kind': 'vllm',
+        'origins': {'trusted': {'network': 'kubernetes-probe'}},
+        'engine': {'trusted_url': f"http://{engine['pod_ip']}:{engine_port}",
+                   'image_digest': env.engine.image_digest, 'command': deepcopy(command)},
+        'kubernetes': {'context': context, 'run_id': run_id, 'engine': engine, 'probe': probe},
+        'environment_ref': env.ref().model_dump(mode='json'), 'model_mapping': mapping,
+        'observed_version': observed_version,
+        'comparison_config': {'launch': {'argv': deepcopy(argv), 'chat_template': identity, 'max_model_len': model_len}},
+    }
+
+    def no_runtime(*a, **kw):
+        raise AssertionError('SUP03_COLD_BINDER_NO_RUNTIME')
+
+    transport = KubernetesHTTP(target, env, duration=30, runner=no_runtime, profile=REQUEST_BINDING_PROFILE)
+    ctx = SimpleNamespace(target=target, env=env, cprobe=transport,
+                          adapter=VllmAdapter(), api_model=transport.api_model)
+    if _target(ctx, kubernetes=True) is None:
+        raise ValueError('SUP03_EXISTING_CONSUMER_TARGET_REJECTED')
+    return target, {'target_sha256': sha256_hex(canonical_json(target)),
+                    'state': 'SUPPLIED_API_OBJECTS_BOUND_NOT_RUNTIME_VERIFIED',
+                    'runtime_owner_currently_verified': False, 'template_file_in_container_read': False,
+                    'independent_worker_consumption_verified': False, 'GPU_READY': False}
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    for key in ('source-root', 'environment', 'namespace', 'engine-pod', 'probe-pod', 'model-mapping', 'template-file', 'output'):
+        p.add_argument('--' + key, type=Path, required=True)
+    for key in ('context', 'run-id', 'engine-container', 'probe-container', 'observed-version'):
+        p.add_argument('--' + key, required=True)
+    p.add_argument('--engine-port', type=int, required=True)
+    a = p.parse_args()
+    root = a.source_root.resolve()
+    sys.path[:0] = [str(root / 'update' / 'src'), str(root / 'update')]
+    from guard.collectors.file import load_environment
+    from guard.runtime.bounded import strict_json
+    from guard.models import canonical_json
+    from guard.update_validation import reserve_output
+
+    def read(path):
+        with path.open('rb') as stream:
+            return strict_json(stream.read(2 * 1024**2 + 1), limit=2 * 1024**2)
+
+    paths = {key: getattr(a, key) for key in ('environment', 'namespace', 'engine_pod', 'probe_pod', 'model_mapping', 'template_file')}
+    with a.template_file.open('rb') as stream:
+        template_bytes = stream.read(8193)
+    target, receipt = build_target(env=load_environment(a.environment), namespace=read(a.namespace),
+        engine_pod=read(a.engine_pod), probe_pod=read(a.probe_pod), mapping=read(a.model_mapping),
+        template_bytes=template_bytes, context=a.context, run_id=a.run_id,
+        engine_container=a.engine_container, probe_container=a.probe_container,
+        engine_port=a.engine_port, observed_version=a.observed_version)
+    receipt['supplied_input_sha256'] = {k: hashlib.sha256(v.read_bytes()).hexdigest() for k, v in paths.items()}
+    folder = reserve_output(a.output, protected=[root, *paths.values()])
+    with (folder / 'target.json').open('xb') as stream:
+        stream.write(canonical_json(target))
+    text = '[executors]\ntemplate_validation="kubernetes"\n[adapter]\nname="vllm"\n[template_validation]\n'
+    text += 'target=' + json.dumps(str((folder / 'target.json').resolve())) + '\n'
+    with (folder / 'guard.toml').open('x', encoding='utf-8') as stream:
+        stream.write(text)
+    with (folder / 'receipt.json').open('xb') as stream:
+        stream.write(canonical_json(receipt))
+    print(json.dumps(receipt))
+
+
+if __name__ == '__main__':
+    main()

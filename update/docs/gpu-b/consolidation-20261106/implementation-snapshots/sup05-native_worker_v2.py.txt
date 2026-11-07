@@ -1,0 +1,181 @@
+"""공개 Engine caller 준비본. 명시 배정 전 모델 실행 금지. native 행 생성 없음."""
+from pathlib import Path
+import argparse
+import contextlib
+import faulthandler
+import gc
+import hashlib
+import json
+import os
+import shutil
+import sys
+import time
+import traceback
+import types
+import weakref
+
+sha=lambda p:hashlib.sha256(Path(p).read_bytes()).hexdigest()
+
+
+def main():
+    a=argparse.ArgumentParser();a.add_argument('--scenario',choices=['normal','challenge','recovery'],required=True)
+    args=a.parse_args();os.umask(0o077)
+    out=Path('/evidence');spec=json.loads(Path('/spec.json').read_bytes())
+    role=spec['roles'][args.scenario];began=time.monotonic();engine=None;native=None
+    r=dict(scenario=args.scenario,role=role['role'],PID=os.getpid(),uid=os.getuid(),gid=os.getgid(),groups=os.getgroups(),
+           python=sys.version,executable=sys.executable,isolated=sys.flags.isolated,no_site=sys.flags.no_site,
+           primary=None,shutdown_errors=[],call_counts={},engine_constructor_returned=False,
+           request_submitted=False,pooling_request_finished=False,disk_restored=False,product_factory_executed=False,
+           spec_SHA=sha('/spec.json'),source_tool_SHA=sha(__file__),native_session=role['session'],target_sha256=role['target_sha256'],
+           api='public vllm.LLMEngine',public_shutdown_present=None,internal_shutdown_verified=False)
+    model=Path('/work/model')
+    def save(name):
+        r['elapsed_seconds']=time.monotonic()-began
+        with (out/name).open('w') as stream:json.dump(r,stream,indent=2);stream.flush();os.fsync(stream.fileno())
+    try:
+        if os.getuid()!=1000 or os.getgid()!=1000:raise ValueError('REAL_UID_GID_MISMATCH')
+        if sha(__file__)!=spec['worker_tool_SHA']:raise ValueError('FIXED_WORKER_SOURCE_CHANGED')
+        for filename,expected in spec['input_pins'].items():
+            if sha(Path('/input')/filename)!=expected:raise ValueError('IMMUTABLE_MODEL_INPUT_CHANGED')
+        caller_root=Path('/opt/venv/lib/python3.12/site-packages/vllm')
+        for filename,expected in spec['caller_source_pins'].items():
+            if sha(caller_root/filename)!=expected:raise ValueError('FIXED_CALLER_SOURCE_CHANGED:'+filename)
+        r['caller_source_pins_verified_before_import']=True
+        model.mkdir(mode=0o700)
+        for filename in ('config.json','model.safetensors'):
+            shutil.copyfile(Path('/input/baseline')/filename,model/filename)
+        r['approved_before']=sha(model/'model.safetensors')
+        if r['approved_before']!=spec['input_pins']['baseline/model.safetensors']:raise ValueError('BASELINE_MISMATCH')
+        native_root=Path('/guard-lifecycle');(native_root/'data').mkdir(mode=0o700)
+        (native_root/'data'/role['session']).mkdir(mode=0o700)
+        for filename,info in role['assets'].items():
+            source=Path('/native')/filename
+            if sha(source)!=info['sha256']:raise ValueError('NATIVE_ASSET_CHANGED')
+            shutil.copyfile(source,native_root/filename);os.chmod(native_root/filename,0o600)
+        raw=(native_root/'guard_lifecycle_sensor.py').read_bytes()
+        native=types.ModuleType('guard_lifecycle_sensor');native.__file__=str(native_root/'guard_lifecycle_sensor.py')
+        exec(compile(raw,native.__file__,'exec'),native.__dict__)
+        sys.modules[native.__name__]=native
+        if native.install('/guard-lifecycle/settings.json') is not True:raise ValueError('NATIVE17_INSTALL_REJECTED')
+        r['native_installed_before_loader']=True
+        if args.scenario=='challenge':
+            shutil.copyfile('/input/challenge/model.safetensors',model/'replacement.tmp')
+            os.replace(model/'replacement.tmp',model/'model.safetensors')
+        r['selected_before_loader']=sha(model/'model.safetensors')
+        r['replacement_applied']=args.scenario=='challenge' and r['selected_before_loader']!=r['approved_before']
+        if args.scenario=='challenge' and not r['replacement_applied']:raise ValueError('NO_ACTUAL_REPLACEMENT')
+        watched={'cpu_worker.py','cpu_model_runner.py','default_loader.py','base_loader.py','weight_utils.py','bert.py','utils.py'}
+        def profile(frame,event,arg):
+            if event=='call' and Path(frame.f_code.co_filename).name in watched and '/vllm/' in frame.f_code.co_filename:
+                key=frame.f_code.co_qualname
+                if key not in r['call_counts'] and len(r['call_counts'])>=256:return
+                r['call_counts'][key]=r['call_counts'].get(key,0)+1
+        faulthandler.dump_traceback_later(85,repeat=False,file=sys.stderr)
+        sys.setprofile(profile)
+        save('before-worker.json')
+        with contextlib.redirect_stdout(sys.stderr):
+            from vllm import EngineArgs,LLMEngine,PoolingParams
+            from vllm.inputs import tokens_input
+            import vllm
+            r['vllm_public_version']=vllm.__version__
+            r['import_origins']={name:str(Path(sys.modules[obj.__module__].__file__).resolve())
+                for name,obj in [('EngineArgs',EngineArgs),('LLMEngine',LLMEngine),('PoolingParams',PoolingParams),('tokens_input',tokens_input)]}
+            r['vllm_origin']=str(Path(vllm.__file__).resolve())
+            engine_args=EngineArgs(model=str(model),runner='pooling',convert='auto',tokenizer=None,tokenizer_mode='auto',
+                skip_tokenizer_init=True,trust_remote_code=False,dtype='float32',gpu_memory_utilization=0.92,
+                cpu_offload_gb=0,offload_group_size=0,offload_num_in_group=1,offload_prefetch_step=1,offload_params=set(),
+                enable_return_routed_experts=False,return_sampling_mask=False,
+                max_model_len=8,max_num_seqs=1,max_num_batched_tokens=8,enforce_eager=True,
+                enable_chunked_prefill=False,enable_prefix_caching=False,tensor_parallel_size=1,
+                load_format='safetensors',safetensors_load_strategy='eager',kv_cache_memory_bytes=67108864,
+                disable_log_stats=True,disable_custom_all_reduce=True,seed=0)
+            r['effective_caller_parameters']={name:getattr(engine_args,name) for name in (
+                'model','runner','convert','tokenizer','tokenizer_mode','skip_tokenizer_init','trust_remote_code','dtype',
+                'gpu_memory_utilization','cpu_offload_gb','offload_group_size','offload_num_in_group','offload_prefetch_step',
+                'enable_return_routed_experts','return_sampling_mask','max_model_len','max_num_seqs','max_num_batched_tokens',
+                'enforce_eager','enable_chunked_prefill','enable_prefix_caching','tensor_parallel_size','load_format',
+                'safetensors_load_strategy','kv_cache_memory_bytes','disable_log_stats','disable_custom_all_reduce','seed')}
+            r['effective_caller_parameters']['offload_params']=sorted(engine_args.offload_params)
+            engine=LLMEngine.from_engine_args(engine_args,enable_multiprocessing=False)
+            r['engine_constructor_returned']=True
+            prompt=tokens_input([1,2]);params=PoolingParams()
+            if prompt.get('type')!='token' or prompt.get('prompt_token_ids')!=[1,2]:raise ValueError('PUBLIC_TOKEN_INPUT_CONTRACT_CHANGED')
+            r['public_input_factory_output']=prompt;r['initial_pooling_task']=params.task
+            request_id='s5-sup05-'+args.scenario
+            r['internal_request_id']=engine.add_request(request_id,prompt,params)
+            r['request_submitted']=True;r['library_selected_pooling_task']=params.task
+            r['pooling_outputs']=[]
+            while engine.has_unfinished_requests():
+                if time.monotonic()-began>=90:raise TimeoutError('ORIGINAL_WORKER_CPU90_EXPIRED')
+                for value in engine.step():
+                    if value.request_id!=request_id:raise ValueError('PUBLIC_ENGINE_REQUEST_ID_MISMATCH')
+                    data=value.outputs.data
+                    r['pooling_outputs'].append(dict(request_id=value.request_id,finished=value.finished,
+                        output_class=type(value).__name__,shape=list(data.shape),data=data.tolist()))
+            r['pooling_request_finished']=any(x['finished'] for x in r['pooling_outputs'])
+            if not r['pooling_request_finished']:raise ValueError('PUBLIC_POOLING_REQUEST_NOT_FINISHED')
+        sys.setprofile(None)
+        if not any('load_model' in key and count for key,count in r['call_counts'].items()):
+            raise ValueError('ACTUAL_MODEL_LOAD_CALL_NOT_OBSERVED')
+        native._BASE.seal()
+        writer=native._BASE._OBSERVER.writer
+        if writer is None:raise ValueError('ACTUAL_NATIVE_WRITER_UNAVAILABLE')
+        while not writer.closed:
+            if time.monotonic()-began>=90:raise TimeoutError('ORIGINAL_WORKER_CPU90_EXPIRED_DURING_SEAL')
+            time.sleep(.01)
+        journals=list((Path('/guard-lifecycle/data')/role['session']).glob('pid-'+str(os.getpid())+'-*.jsonl'))
+        if len(journals)!=1:raise ValueError('ACTUAL_NATIVE_RECORDING_IDENTITY_UNAVAILABLE')
+        with journals[0].open('rb') as stream:
+            stream.seek(max(0,journals[0].stat().st_size-16384));last=json.loads(stream.read().splitlines()[-1])
+        if last.get('event')!='END' or last.get('payload',{}).get('reason')!='SEALED':raise ValueError('ACTUAL_NATIVE_SEAL_END_UNCONFIRMED')
+        r['native_end_reason']='SEALED'
+        r['native_sealed']=True
+        faulthandler.cancel_dump_traceback_later()
+        record=dict(schema='guard-supply-boot-record/1',profile='supply-boot-substitution-v1',role=role['role'],
+            environment_ref=spec['environment_ref'],target_sha256=role['target_sha256'],source_sha256=sha(__file__),
+            change=dict(kind='owned-CPU-approved-to-replaced-safetensors',applied=r['replacement_applied'],denied=False,
+                actor_sha256=sha(__file__),sensor_started_before_consumption=True),rows=[])
+        directory=Path('/guard-supply-boot/data')/role['session'];directory.mkdir(parents=True,mode=0o700)
+        with (directory/'boot-record.json').open('x') as stream:json.dump(record,stream,separators=(',',':'))
+        (out/'boot-record.json').write_text(json.dumps(record,indent=2))
+        save('ready.json')
+        end=time.monotonic()+360
+        while not (out/'finish').exists():
+            if time.monotonic()>=end:raise TimeoutError('OWNED_CAPTURE_HOLD_EXPIRED')
+            time.sleep(.05)
+    except BaseException:
+        r['primary']=traceback.format_exc();sys.setprofile(None);faulthandler.cancel_dump_traceback_later()
+        save('failed.json')
+    finally:
+        if model.exists():
+            try:
+                shutil.copyfile('/input/baseline/model.safetensors',model/'model.safetensors')
+                r['restored_disk_sha256']=sha(model/'model.safetensors')
+                r['disk_restored']=r['restored_disk_sha256']==spec['input_pins']['baseline/model.safetensors']
+            except BaseException:r['shutdown_errors'].append(traceback.format_exc())
+        if native is not None and getattr(native,'_BASE',None) is not None:
+            try:native._BASE._OBSERVER.close()
+            except BaseException:r['shutdown_errors'].append(traceback.format_exc())
+        if engine is not None:
+            original_hook=sys.unraisablehook
+            def record_unraisable(event):
+                try:r['shutdown_errors'].append(''.join(traceback.format_exception(event.exc_type,event.exc_value,event.exc_traceback)))
+                finally:original_hook(event)
+            try:
+                sys.unraisablehook=record_unraisable
+                shutdown=getattr(engine,'shutdown',None);r['public_shutdown_present']=callable(shutdown)
+                if callable(shutdown):shutdown()
+                ref=weakref.ref(engine);del engine;gc.collect()
+                r['engine_reference_alive_after_gc']=ref() is not None
+                r['engine_reference_released']=True
+            except BaseException:r['shutdown_errors'].append(traceback.format_exc())
+            finally:sys.unraisablehook=original_hook
+        journals=Path('/guard-lifecycle/data')/role['session']
+        if journals.is_dir():
+            try:shutil.copytree(journals,out/'native-raw')
+            except BaseException:r['shutdown_errors'].append(traceback.format_exc())
+        save('result.json')
+    return int(r['primary'] is not None or bool(r['shutdown_errors']))
+
+
+if __name__=='__main__':raise SystemExit(main())

@@ -1,0 +1,41 @@
+"""Read actual original SUP15 records through the unchanged CPU consumer.
+
+Registry construction and projection contract only: no Kubernetes collection,
+no injected owner authenticity, no evidence import or fabricated product Ref.
+"""
+from pathlib import Path
+import json
+from guard.runtime.bounded import strict_json
+from guard.executors import registry,supply_boot_contract as contract
+from guard.executors.owned_capture import MAX_BYTES
+from guard.models import load_pack,utcnow
+
+def consume(*, source_root, environment, values, inputs, output):
+    factory=registry.build_executor('supply_boot','kubernetes',{'supply_boot':{}})
+    check=load_pack(source_root/'update/packs/PACK-BASELINE').checks['SUP-15']
+    collected={};issues=[]
+    for role in contract.ROLES:
+        row={'role':role,'collected':False,'sealed':False,'record_sha256':None,'owner_binding_verified':False,
+             'native_files_covered':False,'diagnostic_codes':['CPU_REPLAY_NO_KUBERNETES_OWNER_PROVENANCE']}
+        part={'row':row,'packet':None,'native':None,'evaluated':None}
+        try:
+            item=inputs[role]
+            with Path(item['record']).open('rb') as stream:raw=stream.read(MAX_BYTES+1)
+            binding=json.loads(Path(item['binding']).read_bytes())
+            packet=contract.validate_record(strict_json(raw,limit=MAX_BYTES),check_id='SUP-15',role=role,
+                environment_ref=binding['environment_ref'],target_sha256=binding['target_sha256'],source_sha256=binding['source_sha256'])
+            # Both roles must belong to the retained ENV; no future ENV is made.
+            if binding['environment_ref']!=environment.ref().model_dump(mode='json'):raise ValueError('SUP15_REPLAY_ENV_CHANGED')
+            part.update(packet=packet,evaluated=contract.evaluate_record('SUP-15',packet,values))
+            row['collected']=True
+        except (OSError,KeyError,TypeError,ValueError) as exc:
+            row['diagnostic_codes'].append('SUPPLY_BOOT_RECORD_UNAVAILABLE')
+            issues.append({'role':role,'type':type(exc).__name__,'message':str(exc)})
+        collected[role]=part
+    draft=factory._draft(check,environment,values,output,utcnow(),collected)
+    return {'actual_factory_class':type(factory).__name__,'collection_run_invoked':False,
+            'policy_window_or_enterprise_approval_validated':False,
+            'consumer_validation_and_factory_projection_invoked':True,'issues':issues,
+            'status':draft.status.value,'normal_control':draft.normal_control.model_dump(mode='json'),
+            'observations':{k:v.model_dump(mode='json') for k,v in draft.observations.items()},
+            'GPU_product_Refs_or_authenticated_owner':False}

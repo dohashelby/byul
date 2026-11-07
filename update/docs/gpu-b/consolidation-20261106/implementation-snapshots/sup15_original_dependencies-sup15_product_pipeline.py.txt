@@ -1,0 +1,67 @@
+"""SUP15 only: existing registered Kubernetes collector to stored-pack rejudge.
+
+No deployment, writer, source approval or input-record import. The real factory
+reads its two owned Pods. Session2 runs this after runtime inputs are bound.
+"""
+from pathlib import Path
+from datetime import datetime
+import argparse,hashlib,json,sys,tomllib
+from guard.collectors.file import load_environment,load_policy
+from guard.core.select import select
+from guard.core.run import run_plan,RunConfig
+from guard.core.judge import judge_plan
+from guard.core.report import build_report
+from guard.models import load_pack,Ref,utcnow
+from guard.store import Store
+from guard.store.packs import put_pack,get_pack
+from guard.store.bundle import verify_complete,export_bundle,restore_bundle
+from guard.update_validation import reserve_output
+
+def run(a):
+    if hashlib.sha256(Path(__file__).read_bytes()).hexdigest()!=a.tool_sha256:raise ValueError('SUP15_PIPELINE_BYTES_CHANGED')
+    sys.path.insert(0,str(a.source_root/'update'))
+    from tools.gpu_b_sup04_realmodel import verify_source
+    verify_source(a.source_root,a.source_commit,a.manifest_sha256)
+    # Explicit source pack path for selection AND execution/judgment. There is
+    # no default packs/<external name> lookup, nor rewriting of saved pack refs.
+    pack=load_pack(a.pack);env=load_environment(a.environment);pol=load_policy(a.policy,pack)
+    cfg=tomllib.loads(a.config.read_text(encoding='utf8'))
+    if (pol.status.value!='DRAFT' or pol.data_origin.value!='EXAMPLE' or pol.scope.include!=['SUP-15']
+            or cfg.get('executors')!={'supply_boot':'kubernetes'}):raise ValueError('SUP15_EXPLICIT_LAB_KUBERNETES_SCOPE_REQUIRED')
+    output=reserve_output(a.output,protected=[a.source_root,a.pack,a.environment,a.policy,a.config])
+    record={'request':'S2-SUP15-CACHE-REUSE-PREP-20261105-01','source':a.source_commit,'started_at':utcnow().isoformat(),
+        'GPU_count':0,'AWS_actions':0,'deployment_or_cleanup_performed':False,'whole_question_complete':False}
+    try:
+        store=Store(output/'store');pack_ref=put_pack(store,pack.path);store.put_many([env,pol]);plan=select(pack,[env],pol);store.put(plan)
+        evd,=run_plan(store,pack,plan,RunConfig(adapter=None,executors=cfg['executors'],raw=cfg))
+        asof=utcnow();res,=judge_plan(store,pack,plan,asof);report=build_report(store,pack,plan,asof);store.put(report)
+        record.update(as_of=asof.isoformat(),PACK=pack_ref.model_dump(mode='json'),
+            refs={k:v.ref().model_dump(mode='json') for k,v in [('ENV',env),('POL',pol),('PLAN',plan),('EVD',evd),('RES',res),('RPT',report)]},
+            execution=evd.execution.model_dump(mode='json'),observations={k:v.model_dump(mode='json') for k,v in evd.observations.items()},
+            normal=evd.normal_control.model_dump(mode='json'),verdicts=res.verdicts.model_dump(mode='json'),official=report.official,data_origin=evd.data_origin.value)
+        verify_complete(store);bundle=output/'evidence.zip';export_bundle(store.root,bundle);restore_bundle(bundle,output/'restored')
+        restored=Store(output/'restored');verify_complete(restored)
+        for ref in record['refs'].values():restored.resolve(Ref.model_validate(ref))
+        again,=judge_plan(restored,get_pack(restored,pack_ref),restored.resolve(plan.ref()),datetime.fromisoformat(record['as_of']))
+        if again.ref().model_dump(mode='json')!=record['refs']['RES']:raise ValueError('SUP15_STORED_PACK_REJUDGMENT_CHANGED')
+        record.update(bundle_sha256=hashlib.sha256(bundle.read_bytes()).hexdigest(),exact_refs_restored_and_rejudged=True)
+        if (evd.normal_control.succeeded is not True or evd.observations['supply_boot_change_applied'].value is not True
+                or evd.observations['supply_boot_record_authenticated'].value is not False):
+            raise ValueError('SUP15_DIRECT_NORMAL_AND_CHALLENGE_CONTRACT_NOT_REACHED')
+    except BaseException as error:
+        record.update(error_type=type(error).__name__,error_message=str(error)[:1500]);raise
+    finally:
+        record['finished_at']=utcnow().isoformat()
+        try:
+            with (output/'result.json').open('x',encoding='utf8') as stream:json.dump(record,stream,indent=2)
+        except OSError:
+            if 'error_type' not in record:raise
+    return record
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__)
+    for key in ('source-root','pack','environment','policy','config','output'):p.add_argument('--'+key,type=Path,required=True)
+    for key in ('source-commit','manifest-sha256','tool-sha256'):p.add_argument('--'+key,required=True)
+    print(json.dumps(run(p.parse_args()),indent=2))
+
+if __name__=='__main__':main()

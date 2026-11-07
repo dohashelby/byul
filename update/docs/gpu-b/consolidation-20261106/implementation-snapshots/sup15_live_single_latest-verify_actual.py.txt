@@ -1,0 +1,56 @@
+"""Read the one new raw run; never launch another child or model."""
+from pathlib import Path
+import hashlib,json,sys
+from guard.executors import supply_boot_contract as contract
+
+HERE=Path(__file__).resolve().parent
+SHA=lambda p:hashlib.sha256(Path(p).read_bytes()).hexdigest()
+LOAD=lambda p:json.loads(Path(p).read_bytes())
+
+def main():
+    f=LOAD(HERE/'freeze.json');receipt=LOAD(HERE/'execution-receipt.json');r=LOAD(HERE/'actual/single-case-result.json')
+    checks=[]
+    def require(name,condition):
+        checks.append({'name':name,'satisfied':bool(condition)})
+        if not condition:raise ValueError('SUP15_SINGLE_EVIDENCE_INCONSISTENT:'+name)
+    require('fixed_runtime_and_host_assets',all(SHA(v['path'])==v['SHA256'] for v in f['host_pins'].values()))
+    require('parent_transport_and_owned_cleanup',receipt['primary'] is None and receipt['cleanup']['owned_cleanup_verified'] and not receipt['cleanup']['errors'])
+    require('one_actual_original_child_cold_only',r['child_launch_attempts']==r['model_child_invocations']==1 and r['case']=='baseline' and r['warm_same_case'] is False)
+    require('fresh_actual_cache_own_uid',r['uid']==1000 and r['cache_at_start_empty'] and r['cache_birth']['uid']==1000 and r['cache_birth']['mode']==0o700)
+    require('own_cache_and_group_cleanup',r['cleanup_error'] is None and r['cache_root_left'] is False and r['own_process_group_absent'])
+    term=r['termination'];diag=r['diagnostic'];budget=diag['absolute_budget']
+    require('original_wait_and_single_absolute150',term['PID']==diag['binding']['PID'] and budget['absolute_deadline']==r['absolute_deadline'] and budget['nominal_limit']==90 and 0<budget['effective_wait_seconds']<=90 and budget['original_total_seconds']==150 and not budget['deadline_reset'])
+    phases=[json.loads(line) for line in (HERE/'actual/baseline-diagnostics/phases.jsonl').read_bytes().splitlines()]
+    binding=diag['binding']
+    require('actual_PID_start_PG_phase_binding',bool(phases) and all(all(row[k]==binding[k] for k in ['PID','PPID','PGID','SID','start_ticks','nonce','target_SHA']) for row in phases) and binding['PGID']==binding['SID']==binding['PID'])
+    require('actual_before_original_main_observed','before_original_main' in {row['stage'] for row in phases})
+    require('observer_stopped_with_samples',diag['observer_thread_stopped'] and diag['samples']>0)
+    fact=r.get('original_report');compile_observed=bool(fact and fact.get('actual_torch_compile') and fact.get('actual_PyCodeCache_module_loaded'))
+    if fact is not None:
+        require('original_report_not_replaced',SHA(HERE/'actual/baseline.json')==r['original_report_SHA'] and fact==LOAD(HERE/'actual/baseline.json') and fact['PID']==term['PID'])
+        if fact.get('error_type') is None:
+            require('actual_compile_output_and_module_bytes',compile_observed and fact['output']==fact['expected']==list(range(1,17)) and fact['file_sha256']==r['actual_cached_code_SHA']==SHA(HERE/'actual/baseline-actual-code.py'))
+    if r['wait_returncode']==0:
+        require('wait0_is_real_success_not_report_only',not term['timed_out'] and term['wait_returncode']==term['final_observed_returncode']==0 and compile_observed and fact.get('error_type') is None)
+    else:
+        require('nonzero_or_timeout_not_success',receipt['workload_exit']!=0 and (term['timed_out'] or term.get('wait_returncode')!=0))
+    # Evaluate only fresh baseline-derived rows. This is an evaluator boundary,
+    # not a validated boot record, policy judgment, factory run or product Ref.
+    rows=r.get('existing_project_rows')
+    evaluator=None
+    if rows is not None:
+        violations,missing=contract.evaluate_record('SUP-15',{'rows':rows},{})
+        require('baseline_transition_scope_stays_missing',rows==[] and violations==[] and missing==['relevant_change_not_attempted'])
+        evaluator={'source':'fresh original project_rows baseline output','violations':violations,'missing':missing,
+                   'closed_record_validation_and_product_judgment_invoked':False}
+    stack=HERE/'actual/baseline-diagnostics/before-deadline-stack.log'
+    summary={'checks':checks,'actual_compile_observed':compile_observed,'wait_returncode':r['wait_returncode'],
+        'actual_workload_exit':receipt['workload_exit'],'elapsed_seconds':r['elapsed_seconds'],
+        'phase_stages':[row['stage'] for row in phases],'samples':diag['samples'],'observer_errors':diag['observer_errors'],
+        'stack_bytes':stack.stat().st_size,'stack_scope':'Python timer; may be empty for exit before85 or unavailable due GIL/scheduling',
+        'consumer_evaluator_boundary':evaluator,'full_model_loop_five_cases_run':False,'warm45_reproduced':False,
+        'warm45_root_cause_resolved':False,'K8s_factory_run_product_Refs_or_GPU':False,'whole_question_complete':False,
+        'formal_verification_level_data_origin_official':'not issued; raw CPU component result only'}
+    with (HERE/'actual-evidence-verification.json').open('x',encoding='utf8') as stream:json.dump(summary,stream,indent=2)
+    print(json.dumps({'checks':len(checks),'actual_compile_observed':compile_observed,'wait_returncode':r['wait_returncode'],'elapsed_seconds':r['elapsed_seconds']}))
+if __name__=='__main__':main()

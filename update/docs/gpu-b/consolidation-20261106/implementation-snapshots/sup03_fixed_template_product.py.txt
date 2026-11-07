@@ -1,0 +1,119 @@
+"""SUP-03 fixed-template observation through existing product/store interfaces.
+
+No preparation, deployment, automatic approval, or independent consumption claim.
+"""
+from pathlib import Path
+from datetime import datetime
+import argparse
+import hashlib
+import json
+import sys
+import tomllib
+
+
+def run(args):
+    from guard.collectors.file import load_environment, load_policy
+    from guard.core.select import select
+    from guard.core.run import run_plan, RunConfig
+    from guard.core.judge import judge_plan
+    from guard.core.report import build_report
+    from guard.models import load_pack, Ref, utcnow
+    from guard.store import Store
+    from guard.store.packs import put_pack, get_pack
+    from guard.store.bundle import verify_complete, export_bundle, restore_bundle
+    from guard.update_validation import reserve_output
+    from guard.executors.registry import resolve_executor
+    from tools.gpu_b_sup04_realmodel import verify_source
+
+    if hashlib.sha256(Path(__file__).read_bytes()).hexdigest() != args.tool_sha256:
+        raise ValueError('SUP03_PIPELINE_BYTES_CHANGED')
+    verify_source(args.source_root, args.source_commit, args.manifest_sha256)
+    pack = load_pack(args.pack)
+    env = load_environment(args.environment)
+    policy = load_policy(args.policy, pack)
+    cfg = tomllib.loads(args.config.read_text(encoding='utf-8'))
+    if (policy.status.value != 'DRAFT' or policy.data_origin.value != 'EXAMPLE'
+            or policy.scope.include != ['SUP-03'] or policy.scope.exclude
+            or cfg.get('executors') != {'template_validation': 'kubernetes'}
+            or cfg.get('adapter', {}).get('name') != 'vllm'
+            or pack.checks['SUP-03'].collection_profile != 'fixed-template-supply-v1'):
+        raise ValueError('SUP03_EXPLICIT_LAB_FIXED_TEMPLATE_SCOPE_REQUIRED')
+    factory = resolve_executor('template_validation', 'kubernetes')
+    if factory is None:
+        raise ValueError('SUP03_REGISTERED_IMPLEMENTATION_UNAVAILABLE')
+    factory(cfg).validate_policy(pack.checks['SUP-03'], policy.values['SUP-03'])
+    output = reserve_output(args.output, protected=[args.source_root, args.pack,
+                             args.environment, args.policy, args.config])
+    record = {'check_id': 'SUP-03', 'source_commit': args.source_commit,
+              'started_at': utcnow().isoformat(),
+              'scope': 'managed template identity, explicit policy membership, API input projection',
+              'independent_worker_consumption_verified': False,
+              'fresh_boot_supply_challenge_executed': False,
+              'whole_question_complete': False, 'deployment_or_AWS_actions': False}
+    primary = None
+    try:
+        store = Store(output / 'store')
+        pack_ref = put_pack(store, pack.path)
+        store.put_many([env, policy])
+        plan = select(pack, [env], policy)
+        store.put(plan)
+        evd, = run_plan(store, pack, plan, RunConfig(adapter=cfg['adapter']['name'], executors=cfg['executors'], raw=cfg))
+        asof = utcnow()
+        res, = judge_plan(store, pack, plan, asof)
+        report = build_report(store, pack, plan, asof)
+        store.put(report)
+        record.update(as_of=asof.isoformat(), PACK=pack_ref.model_dump(mode='json'),
+            refs={key: value.ref().model_dump(mode='json') for key, value in
+                  [('ENV', env), ('POL', policy), ('PLAN', plan), ('EVD', evd), ('RES', res), ('RPT', report)]},
+            execution=evd.execution.model_dump(mode='json'),
+            observations={key: value.model_dump(mode='json') for key, value in evd.observations.items()},
+            normal=evd.normal_control.model_dump(mode='json'),
+            verdicts=res.verdicts.model_dump(mode='json'), official=report.official,
+            data_origin=evd.data_origin.value)
+        verify_complete(store)
+        bundle = output / 'evidence.zip'
+        export_bundle(store.root, bundle)
+        restore_bundle(bundle, output / 'restored')
+        restored = Store(output / 'restored')
+        verify_complete(restored)
+        for ref in record['refs'].values():
+            restored.resolve(Ref.model_validate(ref))
+        again, = judge_plan(restored, get_pack(restored, pack_ref), restored.resolve(plan.ref()),
+                            datetime.fromisoformat(record['as_of']))
+        if again.ref().model_dump(mode='json') != record['refs']['RES']:
+            raise ValueError('SUP03_STORED_PACK_REJUDGMENT_CHANGED')
+        record.update(bundle_sha256=hashlib.sha256(bundle.read_bytes()).hexdigest(),
+                      exact_refs_restored_and_rejudged=True)
+    except BaseException as error:
+        primary = error
+        record.update(error_type=type(error).__name__, error_message=str(error)[:1500])
+        raise
+    finally:
+        record['finished_at'] = utcnow().isoformat()
+        try:
+            with (output / 'result.json').open('x', encoding='utf-8') as stream:
+                json.dump(record, stream, ensure_ascii=False, indent=2)
+        except OSError as secondary:
+            if primary is None:
+                raise
+            primary.add_note('SUP03 result preservation failed: ' + type(secondary).__name__)
+    return record
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for key in ('source-root', 'pack', 'environment', 'policy', 'config', 'output'):
+        parser.add_argument('--' + key, type=Path, required=True)
+    for key in ('source-commit', 'manifest-sha256', 'tool-sha256'):
+        parser.add_argument('--' + key, required=True)
+    args = parser.parse_args()
+    root = args.source_root.resolve()
+    sys.path[:0] = [str(root / 'update' / 'src'), str(root / 'update')]
+    import guard
+    if Path(guard.__file__).resolve().parent != root / 'update' / 'src' / 'guard':
+        raise ValueError('SUP03_WRONG_GUARD_SOURCE')
+    print(json.dumps(run(args), ensure_ascii=False))
+
+
+if __name__ == '__main__':
+    main()

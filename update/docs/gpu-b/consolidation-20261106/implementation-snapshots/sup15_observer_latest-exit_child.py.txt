@@ -1,0 +1,61 @@
+"""SUP15-only diagnostic bootstrap; original handlers and exit code preserved."""
+from pathlib import Path
+import argparse,atexit,hashlib,json,os,runpy,sys,threading,time,traceback
+
+SHA=lambda p:hashlib.sha256(Path(p).read_bytes()).hexdigest()
+
+def main():
+    p=argparse.ArgumentParser();p.add_argument('--config',type=Path,required=True);p.add_argument('--config-sha',required=True);a=p.parse_args()
+    if SHA(a.config)!=a.config_sha:raise ValueError('SUP15_EXIT_CONFIG_CHANGED')
+    f=json.loads(a.config.read_bytes());target=Path(f['target'])
+    if SHA(__file__)!=f['bootstrap_SHA'] or SHA(target)!=f['target_SHA']:raise ValueError('SUP15_EXIT_SOURCE_CHANGED')
+    if os.getuid()!=1000 or sys.flags.optimize or sys.version_info[:2]!=(3,12):raise ValueError('SUP15_EXIT_RUNTIME_CHANGED')
+    stat=Path('/proc/self/stat').read_text().rsplit(')',1)[1].split()
+    binding={'schema':'sup15-exit-diagnostic/1','nonce':f['nonce'],'PID':os.getpid(),'PPID':os.getppid(),'uid':os.getuid(),
+             'start_ticks':int(stat[19]),'PGID':os.getpgid(0),'SID':os.getsid(0),'target_SHA':f['target_SHA']}
+    fd=os.open(f['journal'],os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_APPEND|os.O_NOFOLLOW,0o600)
+    failed=[]
+    def note(stage,**fields):
+        try:
+            raw=(json.dumps({**binding,'stage':stage,'monotonic_ns':time.monotonic_ns(),**fields},separators=(',',':'))+'\n').encode()
+            if len(raw)>4096:raise ValueError('SUP15_EXIT_PHASE_BOUND')
+            while raw:raw=raw[os.write(fd,raw):]
+            os.fsync(fd)
+        except BaseException as exc:
+            failed.append(type(exc).__name__)
+            try:os.write(2,('SUP15_EXIT_DIAGNOSTIC_WRITE_ERROR '+type(exc).__name__+'\n').encode())
+            except OSError:pass
+    # Keep these fds through interpreter finalization. Never cancel an original callback.
+    stack_fd=os.open(f['stack'],os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+    def dump_python_stacks():
+        # A Python thread holds valid frame references. It needs the GIL and may
+        # be delayed by a GIL-holding native call; absence is not proof of exit.
+        note('python_stack_collection_enter')
+        try:
+            with os.fdopen(os.dup(stack_fd),'w',encoding='utf8') as stream:
+                stream.write(json.dumps({'monotonic_ns':time.monotonic_ns(),'PID':os.getpid(),'scope':'Python frames; requires observer thread scheduling/GIL'})+'\n')
+                frames=sys._current_frames()
+                for thread_id,frame in frames.items():
+                    stream.write('PYTHON_THREAD '+str(thread_id)+'\n');traceback.print_stack(frame,file=stream)
+                stream.flush();os.fsync(stream.fileno())
+            note('python_stack_collection_return')
+        except BaseException as exc:note('python_stack_collection_error',error_type=type(exc).__name__)
+    timer=threading.Timer(f['stack_after_seconds'],dump_python_stacks);timer.daemon=True;timer.start()
+    def early():note('early_registered_atexit_enter');note('early_registered_atexit_return')
+    def late():note('late_registered_atexit_enter');note('late_registered_atexit_return')
+    atexit.register(early)
+    note('observer_boot')
+    sys.argv=[str(target),*f['target_args']]
+    note('before_original_main')
+    try:
+        runpy.run_path(str(target),run_name='__main__')
+    except BaseException as exc:
+        fields={'original_exception_type':type(exc).__name__}
+        if isinstance(exc,SystemExit):fields['original_exit_code']=exc.code if type(exc.code) in (int,type(None)) else 'noninteger-code'
+        note('original_main_exception',**fields)
+        raise
+    finally:
+        note('original_main_finally',diagnostic_errors=list(failed))
+        atexit.register(late)
+
+if __name__=='__main__':main()

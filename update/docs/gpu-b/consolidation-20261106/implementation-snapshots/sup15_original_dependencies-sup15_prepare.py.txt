@@ -1,0 +1,172 @@
+"""SUP15-only offline Kubernetes inputs. Never deploys or queries a cluster."""
+from pathlib import Path
+from datetime import datetime
+import argparse
+import hashlib
+import json
+import re
+import sys
+
+from guard.collectors.file import load_environment
+from guard.collectors.lifecycle import prepare_assets, load_prepared
+from guard.executors import registry
+from guard.executors.supply_boot_contract import normalize_policy
+from guard.models import Environment, Policy, canonical_json, load_pack, new_id
+from guard.runtime.kubernetes_binding import validate_capture_target, project_owned_snapshot
+from guard.update_validation import reserve_output
+
+IMAGE = "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b"
+ROLES = ("normal", "challenge")
+SHA = lambda path: hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def write(path, value):
+    with path.open("xb") as stream:stream.write(canonical_json(value))
+
+
+def prepare(args):
+    output = reserve_output(args.output, protected=[args.source_root, args.producer, args.lab_policy])
+    assets = {}
+    for role in ROLES:
+        manifest = prepare_assets(output/role, args.source_root)
+        assets[role] = {"manifest":str(output/role/"manifest.json"),"session":manifest["session"]}
+    environment = Environment(id=new_id("ENV"), data_origin="EXAMPLE",
+        engine={"name":"CPU-Inductor-cache-component","version":"torch2.13.0+cpu","image_digest":IMAGE},
+        runtime={"gpu_count":0,"platform":"LAB CPU actual Torch compile-generated module/UID writer/cold loader; no vLLM worker/GPU"}).seal()
+    write(output/"ENV.sdk.example.json", environment.model_dump(mode="json"))
+    record = {"schema":"byul-sup15-preparation/1","source":args.source_commit,
+        "manifest_sha256":args.manifest_sha256,"producer":str(args.producer),"producer_sha256":SHA(args.producer),
+        "lab_policy":str(args.lab_policy),
+        "binding_writer":str('C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-gpu-b-prep-recovery-errors-20261104\\out\\lif02-fetch-v1\\write_runtime_binding.py'),
+        "binding_writer_sha256":SHA('C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-gpu-b-prep-recovery-errors-20261104\\out\\lif02-fetch-v1\\write_runtime_binding.py'),
+        "lab_policy_sha256":SHA(args.lab_policy),"environment":str(output/"ENV.sdk.example.json"),"roles":assets,
+        "engine_or_cluster_started":False,"base_prepared_use":"existing session/asset validation only; native vLLM recording is not claimed"}
+    write(output/"preparation.json", record)
+    return record
+
+
+def load_preparation(path):
+    root=path.resolve(strict=True);record=json.loads((root/"preparation.json").read_text(encoding="utf8"))
+    for key in ("producer","lab_policy","binding_writer"):
+        if SHA(record[key])!=record[key+"_sha256"]:raise ValueError("SUP15_PREPARED_ASSET_CHANGED:"+key)
+    for role in ROLES:
+        prepared=load_prepared(record["roles"][role]["manifest"])
+        if prepared["session"]!=record["roles"][role]["session"]:raise ValueError("SUP15_PREPARED_SESSION_CHANGED")
+    return record
+
+
+def render(args):
+    record=load_preparation(args.assets)
+    if any(re.fullmatch(r"sup15-[a-z0-9][a-z0-9-]{0,38}",v) is None for v in (args.namespace,args.run_id)):
+        raise ValueError("SUP15_EXPLICIT_OWNED_NAMES_REQUIRED")
+    output=reserve_output(args.output,protected=[args.source_root,args.assets,Path(record["producer"])])
+    labels={"guard.run":args.run_id};items=[{"apiVersion":"v1","kind":"Namespace","metadata":{"name":args.namespace,"labels":labels}}]
+    for role in ROLES:
+        name="sup15-"+role;session=record["roles"][role]["session"]
+        items.append({"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":name+"-assets","namespace":args.namespace,"labels":labels},
+            "data":{"producer.py":Path(record["producer"]).read_bytes().decode("utf8"),"lab-policy.json":Path(record["lab_policy"]).read_bytes().decode("utf8"),
+                    "bind.py":Path(record["binding_writer"]).read_bytes().decode("utf8")}})
+        mounts=[{"name":"assets","mountPath":"/guard-assets","readOnly":True},
+            {"name":"control","mountPath":"/guard-supply-boot/control"},
+            {"name":"records","mountPath":"/guard-supply-boot/data"},
+            {"name":"cache","mountPath":"/guard-cache"},{"name":"temp","mountPath":"/tmp"}]
+        security={"allowPrivilegeEscalation":False,"readOnlyRootFilesystem":True,"capabilities":{"drop":["ALL"]}}
+        compiler={"name":"downloader","image":IMAGE,"imagePullPolicy":"Never",
+            "command":["python3","-I","-B","/guard-assets/producer.py","--binding","/guard-supply-boot/control/binding.json",
+                "--wait-binding-seconds","90","--cache","/guard-cache","--output","/guard-supply-boot/data/"+session,
+                "--source-sha256",record["producer_sha256"],"--hold-for-capture","360"],
+            "env":[{"name":"HOME","value":"/tmp"}],"securityContext":security,
+            "resources":{"requests":{"cpu":"1","memory":"1Gi"},"limits":{"cpu":"2","memory":"4Gi"}},"volumeMounts":mounts}
+        items.append({"apiVersion":"v1","kind":"Pod","metadata":{"name":name,"namespace":args.namespace,"labels":labels},
+            "spec":{"restartPolicy":"Never","automountServiceAccountToken":False,"activeDeadlineSeconds":600,"nodeName":args.node_name,
+                "securityContext":{"runAsUser":1000,"runAsGroup":1000,"fsGroup":1000,"runAsNonRoot":True},
+                "containers":[compiler],"volumes":[{"name":"assets","configMap":{"name":name+"-assets","defaultMode":292}},
+                    {"name":"control","emptyDir":{}},{"name":"records","emptyDir":{}},{"name":"cache","emptyDir":{"sizeLimit":"512Mi"}},
+                    {"name":"temp","emptyDir":{"sizeLimit":"512Mi"}}]}})
+    write(output/"environment.json",{"apiVersion":"v1","kind":"List","items":items})
+    write(output/"render.json",{"assets":str(args.assets),"namespace":args.namespace,"run_id":args.run_id,
+        "CPU_Inductor_no_vLLM_worker_GPU":True,"future_runtime_identity_not_filled":True})
+    return {"environment":str(output/"environment.json"),"deployed":False}
+
+
+def bind(args):
+    record=load_preparation(args.assets);rendered=json.loads((args.render/"render.json").read_text(encoding="utf8"))
+    env=load_environment(record["environment"]);namespace=json.loads(args.namespace_json.read_text(encoding="utf8"))
+    if namespace["metadata"]["name"]!=rendered["namespace"] or namespace["metadata"].get("labels",{}).get("guard.run")!=rendered["run_id"]:
+        raise ValueError("SUP15_OWNED_NAMESPACE_MISMATCH")
+    output=reserve_output(args.output,protected=[args.source_root,args.assets,args.render,args.namespace_json,args.normal_pod_json,args.challenge_pod_json])
+    values={"supply_environment_sha256":env.ref().sha256,"supply_record_source_sha256":record["producer_sha256"],
+        "supply_validity_start":args.validity_start,"supply_validity_end":args.validity_end,
+        **json.loads(Path(record["lab_policy"]).read_text(encoding="utf8"))["values"]}
+    config={}
+    for role,filename in (("normal",args.normal_pod_json),("challenge",args.challenge_pod_json)):
+        pod=json.loads(filename.read_text(encoding="utf8"));meta=pod["metadata"];status=pod["status"]
+        state,=[s for s in status["containerStatuses"] if s["name"]=="downloader"]
+        selected,=[s for s in pod["spec"]["containers"] if s["name"]=="downloader"]
+        planned=json.loads((args.render/"environment.json").read_text(encoding="utf8"))["items"]
+        expected,=[p for p in planned if p["kind"]=="Pod" and p["metadata"]["name"]=="sup15-"+role]
+        expected_container,=[c for c in expected["spec"]["containers"] if c["name"]=="downloader"]
+        if pod["spec"].get("securityContext")!=expected["spec"]["securityContext"]:raise ValueError("SUP15_ACTUAL_UID_PREPARATION_MISMATCH")
+        if any(selected.get(key)!=expected_container[key] for key in
+               ("image","command","env","volumeMounts","securityContext","resources","imagePullPolicy")):
+            raise ValueError("SUP15_ACTUAL_CONTAINER_PREPARATION_MISMATCH")
+        if any(v not in pod["spec"]["volumes"] for v in expected["spec"]["volumes"]):
+            raise ValueError("SUP15_ACTUAL_MOUNT_PREPARATION_MISMATCH")
+        binding={"namespace":rendered["namespace"],"namespace_uid":namespace["metadata"]["uid"],
+            "pod":meta["name"],"pod_uid":meta["uid"],"container":"downloader","container_id":state["containerID"],
+            "image":selected["image"],"image_id":state["imageID"],"restart_count":state["restartCount"],
+            "node":pod["spec"]["nodeName"],"pod_ip":status["podIP"],"started_at":state["state"]["running"]["startedAt"]}
+        if meta["name"]!="sup15-"+role:raise ValueError("SUP15_ROLE_POD_MISMATCH")
+        target={"schema":"guard-kubernetes-lifecycle-target/1","run_id":rendered["run_id"],"environment_ref":env.ref().model_dump(mode="json"),
+            "lab":True,"kubernetes":{"context":args.context,"engine":binding}}
+        validate_capture_target(target,env)
+        project_owned_snapshot(pod,namespace,binding,rendered["run_id"],require_ready=False)
+        digest=hashlib.sha256(canonical_json(target)).hexdigest()
+        prepared=load_prepared(record["roles"][role]["manifest"])
+        write(output/(role+".target.json"),target)
+        write(output/(role+".binding.json"),{"role":role,"session":prepared["session"],"environment_ref":env.ref().model_dump(mode="json"),
+            "target_sha256":digest,"source_sha256":record["producer_sha256"]})
+        values["supply_"+role+"_target_sha256"]=digest
+        values["supply_"+role+"_prepared_sha256"]=hashlib.sha256(canonical_json(prepared)).hexdigest()
+        config[role]={"target":str(output/(role+".target.json")),"prepared":record["roles"][role]["manifest"]}
+    normalize_policy("SUP-15",values)
+    pack=load_pack(args.source_root/"update/packs/PACK-BASELINE")
+    factory=registry.build_executor("supply_boot","kubernetes",{"supply_boot":config})
+    factory.validate_policy(pack.checks["SUP-15"],values)
+    policy=Policy(id=new_id("POL"),data_origin="EXAMPLE",status="DRAFT",pack=pack.ref(),scope={"include":["SUP-15"]},values={"SUP-15":values}).seal()
+    write(output/"POL.lab.draft.json",policy.model_dump(mode="json"))
+    text='[executors]\nsupply_boot = "kubernetes"\n[supply_boot]\nmax_duration_seconds = 120\n'
+    text+='kubectl_binary = '+json.dumps(args.kubectl_binary)+'\n'
+    for role in ROLES:
+        text+='\n[supply_boot.'+role+']\n'
+        text+='target = '+json.dumps(config[role]["target"])+ '\n'
+        text+='prepared = '+json.dumps(config[role]["prepared"])+ '\n'
+    with (output/"config.toml").open("x",encoding="utf8") as stream:stream.write(text)
+    return {"ENV":record["environment"],"POL":str(output/"POL.lab.draft.json"),"config":str(output/"config.toml"),
+        "actual_factory_class":type(factory).__name__,"Kubernetes_or_AWS_commands_run":False}
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    for key in ("source-root","output"):
+        parser.add_argument("--"+key,type=Path,required=True)
+    for key in ("source-commit","manifest-sha256","tool-sha256"):
+        parser.add_argument("--"+key,required=True)
+    sub=parser.add_subparsers(dest="action",required=True)
+    prep=sub.add_parser("prepare")
+    for key in ("producer","lab-policy"):prep.add_argument("--"+key,type=Path,required=True)
+    draw=sub.add_parser("render");draw.add_argument("--assets",type=Path,required=True)
+    draw.add_argument("--namespace",required=True);draw.add_argument("--run-id",required=True)
+    draw.add_argument("--node-name",required=True)
+    bound=sub.add_parser("bind")
+    for key in ("assets","render","namespace-json","normal-pod-json","challenge-pod-json"):bound.add_argument("--"+key,type=Path,required=True)
+    for key in ("context","validity-start","validity-end"):bound.add_argument("--"+key,required=True)
+    bound.add_argument("--kubectl-binary",required=True)
+    args=parser.parse_args()
+    if SHA(__file__)!=args.tool_sha256:raise ValueError("SUP15_FIXED_PREPARATION_TOOL_CHANGED")
+    sys.path.insert(0,str(args.source_root/"update"))
+    from tools.gpu_b_sup04_realmodel import verify_source
+    verify_source(args.source_root,args.source_commit,args.manifest_sha256)
+    print(json.dumps({"prepare":prepare,"render":render,"bind":bind}[args.action](args),indent=2))
+
+if __name__=="__main__":main()

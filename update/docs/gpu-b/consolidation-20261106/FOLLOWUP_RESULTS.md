@@ -338,6 +338,8 @@ S2는 원 execute 종료1과 같은 전송 오류를 보고했고 원 감독의 
 
 ## 2026-11-07 SUP-03 R2 기동 전 전체 운영 결합 검토 완료
 
+> **후속 정정:** 이 기동 전 차단 결함0 결론은 아래 health 세대 경로 재사용 누락으로 정정한다. 원 검토와 당시 바이트/연결 확인은 보존한다.
+
 세션6이 새 R2 source/CPU 검토9589를 재사용하고 실제 배치·자원·전송·최종 운영 결합을 검토했다. 새 source13파일의 bytes/SHA·actor·700/600 권한·단일 link, UI 업로드/반출, 원자료 ZIP16member 최초 CRC·stream SHA와 full7의 실제 CLI producer→집계 값·각 관측 시각을 확인했다. 최종 proposal은 원 candidate의 비용3필드와 명시 근거만 갱신하고13개 pin을 유지했다. 원 invoker·중복 방지·종료/불확실성·정리·개별 기한과 예산 조건도 결합했다. 이 기동 전 검토 범위의 구체 차단 결함·추가 필수 입력은0이다.
 
 S2는 최초 runtime freeze 발행 시 `not_ready=false`와 이 고정 리뷰 참조의 두 필드만 바꾸고 나머지 proposal을 정확히 유지한다. 새 파일의 exclusive 생성·실제 bytes/SHA를 기록한 뒤 그 actual packet SHA로 원 start/execute를 각각1회 연결한다. 별도 사람/root 수신 ACK를 추가하지 않는다. 최초 start 창은 **21:14:40.863450 KST까지**, 예산100/예비5·최악5.62·원2h/transfer900/stop180·정상 stop1 조건을 유지한다. 실제 installer·제품 source/owner/system Python·root/no-site·model/node/worker/Ref는 단일 기동 후 원 preflight/실제 결과로 확인해야 하며 이 검토만으로 성공을 선언하지 않는다.
@@ -355,6 +357,27 @@ stage/resource 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/r
 실제 startup 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r2-actual-20261107-v1/r2-startup-actual-review-v1.json`, SHA256 `984f2696e22bb930a783ec5ac289671afb6a6900079318fc3c5f184eb31940cb`다. 비용 open 검토는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-r2-cost-open-actual-review-v1.json`, SHA256 `1ec0285931ccd738cac432a502128e13e8cf0ee16adbbd99cdbd07f1a1e88bdf`다. 로컬 최종화/발행 상수/입력 원바이트 검토는 [참조 목록](team-handoff-provenance.json)에 연결했다. 게시 담당은 고정 검토 bytes/SHA·결론과 비용 산술만 대조했고 같은 원 archive/CPU/모델/GB09를 재실행하지 않았다.
 
 이 검토는 실제 poststart·execute/health·guest installer·제품 source/worker·EVD/RES/RPT·Store Ref·복원/재판정·최종 정리 성공을 아직 확인한 결과가 아니다. 이후 새 실제 자료가 도착한 범위만 검증한다. R1의 실패·원 정지 감시 실패·후속 중지/비용과 R2를 구분하며43ID 분류를 올리지 않는다.
+
+## 2026-11-07 R2 health 세대 경로 누락 정정과 R3 최소 변경 검토
+
+세션6이 R1/R2 health 코드의 동일 bytes·출력 경로와 기존 R1 실제 health 성공 기록을 대조했다. 고정 health는 R1에서 생성한 동일 출력root를 R2에서도 사용하고, 원 `fresh_path`는 기존 경로를 새 mkdir 전에 거부한다. 최초 R2 운영 검토에서 CloudShell의 새 private 경로와 source 동일성은 확인했으나 guest에 남는 health 출력의 세대 충돌을 놓쳤다. 원 cba62169/9589 검토·JSON 전송 수정과 과거 출력은 보존하고 이 누락을 후속 정정했다.
+
+S2는 원 R2 health의 `FRESH_OUTPUT_REQUIRED`·종료1/빈stdout·upload 전 미도달, 원 execute 종료1·정상 stop1 수락·원180초 감시 실패를 보고했다. 이 정정 시점에는 원control/실제 후속 중지의 독립 검증과 비용 close가 별도 진행 중이다. 모델/source 제품 FAIL 또는 ZIP 실제 전송·installer·제품 preflight 성공으로 확대하지 않는다. 원 기동/실행은 반복하지 않고 원 정리부터 마감한다.
+
+새 R3 source는 health 출력 literal1개와 그 새pin을 고정했다. 해당 literal을 원값으로 돌리면 원 health bytes와 같고 원 guard/기한/소스/모델 계약은 유지한다. 나머지12파일은7개 byte동일·5개 CloudShell r2→r3 경로 상수 변경이며 모든 파일이 같은 SHA라고 표시하지 않았다. 세션6이44항목으로 새 source delta를 확인했고 해당 변경 범위의 구체 결함·추가 필수 입력은0이다. 원 ZIP/installer·guest/config/payload·기존 CPU16·모델·GB09/Ref는 재실행하지 않았다. 실제 새 guest 출력 경로의 부재·성공은 추정하지 않고 원 guard로 단일 기동 후 확인할 범위로 남긴다. 새 candidate는 NOT_READY이고 실제 stage·fresh 자원/비용·최종 운영 결합은 남아 있다.
+
+세션1은 exclusive 출력의 producer·도달 단계7개 경계를 읽기 전용 대조했다. R1/R2 installer 미도달만으로 나머지 원격 경로가 현재 없다고 확정하지 않았다. 추가 원격 충돌 확정/존재 조회는0이며 source/config/권한을 수정하지 않았다. 같은 R1 health 경로의 추가 소비는 고정 controller.archive()의1곳뿐임을 확인했다.
+
+고정 archive의 `bootstrap-health/`는 기존 R1 부록으로 명시해 보존하고 현재 R3 health·boot/source의 긍정 근거로 쓰지 않는다. 현재 health는 해당 실행의 정확 CID/control·원 request/response/stdout/stderr/terminal에 별도로 연결하며, 제품·정리의 현재 boot/source는 원 양성 guest preflight의 실제 자료를 사용한다. 이 부록 때문에 guest/config/payload를 다시 수정하거나 과거 자료를 현재 세대로 바꾸지 않는다. 현재 세대 부록을 필수로 요구하는 구체 소비 계약 없이 새 일반 gate를 추가하지 않는다.
+
+| 확인 범위 | 프로젝트 상대 참조 | SHA256 |
+| --- | --- | --- |
+| R2 사전 검토 누락 | `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r2-actual-20261107-v1/r2-health-generation-review-omission-v1.json` | `725867563e7f4875a03a092fc46768381f56ebce9f3ec997947c7fa47e7aa8c1` |
+| R3 source 변경 | `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-health-generation-delta-20261107-v1/r3-health-literal-source-review-v1.json` | `634c0cc0330b1346e9c01b9f6957504b0142cd1aa412b84312cbce92e8a0b0a8` |
+| 경로 producer/도달 단계 대조 | `worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup03-exclusive-path-static-v1/path-review.json` | `ecf6a7ebb9cd2297e719b6d8100a74f5ee750624ec5f51c81fa9bf0f3fd06472` |
+| legacy health 출처 한계 | 위 R3 검토 디렉터리의 `r3-archive-health-origin-limitation-v1.json` | `ed515821b5844d020b3415bc4a54b909db1b74b7f1fb1d2f31749a5f860c8d3b` |
+
+root의 범위 결정은 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-r3-legacy-health-archive-scope-v1.json`, SHA256 `930da496ab37912cb3238cf960966ac16382d5a4663c05b958f872af8d9a2c3c`다. 새 source freeze는 `7f6123cf875b37b3988434c2099c6ed2a27aaa45e4330546cdd2431561146ef5`다. 게시 담당은 위 고정 기록의 bytes/SHA·범위를 대조했고 같은 CPU/archive·실제 AWS/모델은 재실행하지 않았다. 25개 한정 마감 제안/18개 제품 증거 추가 필요 분류는 유지한다.
 
 ## 반환 결과의 추가 원칙
 

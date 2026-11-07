@@ -256,7 +256,7 @@
     "new_GPU_experiment_completed_successfully": false,
     "whole43_counts_changed": false
   },
-  "current_work_reference": "SUP03_R2_actual_startup",
+  "current_work_reference": "SUP03_R2_health_failure_and_R3_source_delta",
   "SUP03_R2_payload_ZIP_delta_review": {
     "review_project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-payload-zip-delta-20261107-v1/payload-zip-source-delta-review-v1.json",
     "review_sha256": "9589a039e4b0c77bf987062a1a83560fa6989c55a94c1e87fd73dc2ff1912396",
@@ -300,7 +300,8 @@
     "actual_runtime_publication_start_product_success_claimed": false,
     "source_candidate_preserved_not_ready": true,
     "extra_ACK_gate": false,
-    "whole43_counts_changed": false
+    "whole43_counts_changed": false,
+    "subsequent_missed_health_generation_review_sha256": "725867563e7f4875a03a092fc46768381f56ebce9f3ec997947c7fa47e7aa8c1"
   },
   "SUP03_R2_actual_startup": {
     "reviews": {
@@ -332,6 +333,21 @@
     "compute_IP_interval_open": true,
     "actual_guest_product_final_stop_verified_by_this_review": false,
     "billing_confirmed": false,
+    "whole43_counts_changed": false
+  },
+  "SUP03_R2_health_failure_and_R3_source_delta": {
+    "R2_static_omission_review_sha256": "725867563e7f4875a03a092fc46768381f56ebce9f3ec997947c7fa47e7aa8c1",
+    "S2_reported_R2_health_failure": "FRESH_OUTPUT_REQUIRED before upload",
+    "R2_original_control_actual_stop_cost_close_review_pending": true,
+    "R3_source_review_sha256": "634c0cc0330b1346e9c01b9f6957504b0142cd1aa412b84312cbce92e8a0b0a8",
+    "S1_path_review_sha256": "ecf6a7ebb9cd2297e719b6d8100a74f5ee750624ec5f51c81fa9bf0f3fd06472",
+    "R3_legacy_scope_review_sha256": "ed515821b5844d020b3415bc4a54b909db1b74b7f1fb1d2f31749a5f860c8d3b",
+    "root_scope_decision_sha256": "930da496ab37912cb3238cf960966ac16382d5a4663c05b958f872af8d9a2c3c",
+    "R3_source_freeze_sha256": "7f6123cf875b37b3988434c2099c6ed2a27aaa45e4330546cdd2431561146ef5",
+    "source_delta_required_remaining": 0,
+    "R3_actual_stage_resource_operating_join_complete": false,
+    "current_R3_health_evidence": "exact current CID/control; archive bootstrap-health is legacy R1 only",
+    "actual_guest_output_absence_or_product_success_claimed": false,
     "whole43_counts_changed": false
   }
 }

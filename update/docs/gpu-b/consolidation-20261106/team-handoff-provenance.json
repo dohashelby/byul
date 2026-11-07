@@ -256,5 +256,30 @@
     "new_GPU_experiment_completed_successfully": false,
     "whole43_counts_changed": false
   },
-  "current_work_reference": "SUP03_R1_final_actual_and_R2_preparation"
+  "current_work_reference": "SUP03_R2_payload_ZIP_delta_review",
+  "SUP03_R2_payload_ZIP_delta_review": {
+    "review_project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-payload-zip-delta-20261107-v1/payload-zip-source-delta-review-v1.json",
+    "review_sha256": "9589a039e4b0c77bf987062a1a83560fa6989c55a94c1e87fd73dc2ff1912396",
+    "source_freeze_sha256": "35dccb3c0483b91c1429fea7f5a18e70b8d3fbca4b3ecfd871bdd617cf6eb320",
+    "payload_ZIP_sha256": "1896c4f89c88c4d78f43397b3dbf42b898cb838ba504d7d188f8e00a4949b694",
+    "original_JSON_sha256": "6dd28b792eb5f7c8bae12687d0c0a4ca5279ac31b7da81e5445a1a12fe796f7a",
+    "installer_sha256": "2aae2679df0f8cefb0c8a45c6899616559519a198ff03a870a5a9c3a90d8bf73",
+    "local_new_CPU_passes": 16,
+    "source_CPU_component_required_remaining": 0,
+    "whole_operating_remaining": [
+      "새 r2 private에 실제 source13file 배치·UID/mode/nlink/bytesSHA와 UI전송 근거",
+      "새 actual full7/원 예산 및 원1800 start 창을 넣은 최종 운영 proposal와 원 invoker/종료·불확실수락 방지 결합"
+    ],
+    "actual_new_remote_installer_model_product_success_observed": false,
+    "whole43_counts_changed": false,
+    "prestart_cost_review": {
+      "root_review_sha256": "8cdaf9de1e74d40fabc4089ef6ad41f2b646429e664610df94e4f9ca4e54f1ca",
+      "asof_KST": "2026-11-07T20:44:40.863450+09:00",
+      "estimated_USD": 54.5838379509249,
+      "remaining_after_reserve_USD": 40.4161620490751,
+      "estimate_plus_worst_cleanup_USD": 60.2038379509249,
+      "window_until_KST": "2026-11-07T21:14:40.863450+09:00",
+      "billing_confirmed": false
+    }
+  }
 }

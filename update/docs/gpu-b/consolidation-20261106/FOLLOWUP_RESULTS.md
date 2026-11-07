@@ -324,6 +324,18 @@ S2는 원 execute 종료1과 같은 전송 오류를 보고했고 원 감독의 
 
 다음 준비는 S1의 실제 단일member ZIP→기존 JSON 검증 installer 계약과 S2의 동일 ZIP producer/put/호출 최소 변경으로 나눴다. 원 helper 허용 제한·제품 source/venv/모델·판정·기한을 바꾸지 않는다. 새 고정 delta 검토와 당시 자원·예산·보호 조건이 준비되기 전에는 새 GPU/SSM을 실행하지 않으며 원 R1의 기한·실패를 재설정하지 않는다. 이번 배정은 새 실행 성공이나 ZIP 변경 검토 완료를 뜻하지 않는다.
 
+## 2026-11-07 SUP-03 R2 ZIP 입력·호출 변경 검토 완료
+
+세션6이 새 R2 source/CPU 변경을105개 항목으로 검토했다. 실제 ZIP47,079 bytes에는 원 `operator-payload.json`137,721 bytes가 정확히 한 member로 들어 있으며 원 JSON SHA256 `6dd28b792eb5f7c8bae12687d0c0a4ca5279ac31b7da81e5445a1a12fe796f7a`를 유지한다. 새 입력 경계는 ZIP을 제한해 읽고 기존 JSON 검증/decoder로 넘긴다. 기존 installer의 JSON/설치 본문과 helper 확장자 제한·제품 source/venv/모델·기한은 그대로다.
+
+고정 실제 ZIP producer→새 ingress→원 decoder11자산 연결, helper가 허용하는 실제 파일명, caller의 명시 ZIP/ZIP SHA·installer source SHA·stdin0 계약을 확인했다. 새 입력/오류 처리 CPU16개 통과 기록은 로컬 WSL의 자체 임시 경로 경계 시험이며 원격 installer·worker·모델 성공을 뜻하지 않는다. 원 selected venv의 `-I -B`/inline 실행 계약을 유지하고 최초 전달의 system Python 명령 예시는 후속 정정했다. cleanup/preflight의 기존 별도 system Python/no-site 계약과 혼용하지 않는다.
+
+이 고정 변경 범위의 구체 결함·필수 추가 입력은0이며 원 JSON 전송 거부 원인은 로컬·정적/CPU 범위에서 해소됐다. 기존 guest/client·R1 최종 결과·CPU/모델/GB09/Ref·전체 suite는 반복하지 않았다. 새 candidate는 NOT_READY를 유지한다. 다음 필수 작업은 새 R2 actual source13파일 배치·actor/권한/bytes·UI 근거와 새 full7/원 예산·최초1800초 창·proposal/invoker의 전체 운영 결합이다. 새 원격 전송/installer·제품 성공을 이 코드 검토로 인정하지 않는다.
+
+검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-payload-zip-delta-20261107-v1/payload-zip-source-delta-review-v1.json`, SHA256 `9589a039e4b0c77bf987062a1a83560fa6989c55a94c1e87fd73dc2ff1912396`다. 새 source freeze SHA256은 `35dccb3c0483b91c1429fea7f5a18e70b8d3fbca4b3ecfd871bdd617cf6eb320`, source ZIP은 `0311a27b03179d61c371787f1659ad9c9da5710fdce0ab29c7ee82ce308d3799`다. S1 installer SHA256은 `2aae2679df0f8cefb0c8a45c6899616559519a198ff03a870a5a9c3a90d8bf73`이며 CPU16과 실제 producer→consumer의 범위를 구분했다. 게시 담당은 고정 검토 bytes/SHA·결론을 대조했으며 같은 시험·archive를 다시 실행하지 않았다. R1 원실패와 최종 인계8d5fa2,43ID 분류는 유지한다.
+
+새 R2 prestart 비용 산술은 게시 담당이 원R1 after-close와 정확히 같은 before 장부에서 검증했다. 20:44:40.863450 KST까지835.445614초의 EBS 추정$0.012937339469242224만 더해 `$54.5838379509249`, 예비$5 제외 잔여 `$40.4161620490751`, 다음 최악/정리$5.62 포함 `$60.2038379509249`로$95 미만이다. compute/IP 구간은 아직 닫힌 상태이며 EBS는 계속된다. 새 최초 기동 허용 창은21:14:40.863450 KST까지1800초다. 비용 검토 참조는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-r2-prestart-cost-review-v1.json`, SHA256 `8cdaf9de1e74d40fabc4089ef6ad41f2b646429e664610df94e4f9ca4e54f1ca`다. 새 실제 배치/원조회 producer·최종 패킷의 운영 결합은 세션6 별도 검토이며 이 산술은 새 기동/제품 성공을 뜻하지 않는다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

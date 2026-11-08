@@ -35,6 +35,8 @@ AWS 공통 GPU 시험환경 설치 묶음(`aws-handoff-20261026`, 이하 "AWS �
 
 ## BPF LSM 서버 준비와 파일 거부 방식
 
+호스트 계정·권한·에이전트/수집기 systemd 설치는 [노드 설치기](../install/README.md)로 묶었다. 무변경 `--dry-run`, 명시적 BPF LSM 설정, 최초 baseline 캡처와 되돌리기 절차를 제공한다. 아래 사용자 수집기·Gateway·sentinel 배치는 별도로 준비한다.
+
 Tetragon 1.7.1의 `lsm_file_open`은 BPF LSM 활성화가 필요하다. 다음은 서버 관리자가 유지보수 시간에 수행하는 호스트 부팅 설정이며, 이 문서 작성 작업에서는 실행하지 않았다.
 
 1. `uname -r`, `/boot/config-$(uname -r)`의 `CONFIG_BPF_LSM=y`, `cat /sys/kernel/security/lsm`을 확인한다. 현재 목록의 순서를 보존하고 `bpf`가 없을 때만 끝에 추가한다. 기존 GRUB의 `lsm=` 설정이 있다면 중복 인자가 생기지 않게 기존 설정을 통합한다.

@@ -170,7 +170,7 @@ class IdentityCollector:
         except (OSError, ValueError, KeyError, TypeError, AttributeError, StopIteration):
             result.update(state="error", error="scoped process identities could not be verified", records=[], policies=[])
         result["generated_at"] = datetime.now(timezone.utc).isoformat()
-        atomic_json(self.output, result)
+        atomic_json(self.output, result, mode=0o640)
         return result
 
 

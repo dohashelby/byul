@@ -1,5 +1,9 @@
 # 통합 검증 — 2026-11-06
 
+## 2026-11-08 B3 후속
+
+[B3 검증 근거](b3-validation-20261108.json)는 실제 CPU API·과거 journal 재생·EXAMPLE factory/저장/판정/보고/복원 계약·소유 정리와 원 실패를 구분한다. API/model/원archive·불변suite를 재실행하지 않고 고정 소스·원자료·기존 정확 Ref를 재사용했다. source manifest는 추가1/갱신2만 반영했고 원 B gate의 거부 경계도 함께 확인했다. 선행 CI수정 d1d91329의14성공과 B3 head의 원격 재검사는 별개다.
+
 ## 2026-11-08 B1·B2 소비자와 B4 준비 추가 검증
 
 이번 신규 코드의 CPU fixture·원 factory/저장/판정/보고·복원/재판정·미등록/독립 FAIL 보존 범위는 [B12_B4_INTEGRATION.md](B12_B4_INTEGRATION.md), 실행별 원 실패와 수정·고정 SHA·검토는 [b12-b4-validation-20261108.json](b12-b4-validation-20261108.json)을 따른다. 이전 시험 횟수를 새 실적으로 합산하지 않는다. GPU·모델·Docker 기동과 다운로드는 하지 않았다.

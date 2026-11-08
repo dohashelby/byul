@@ -100,7 +100,15 @@
   "original_B_default_pin_changed": false,
   "A_HTTP_capability_pin_changed": false,
   "runtime_hash_approval": false,
-  "remote_CI_after_fix": "새 head 게시 후 확인",
+  "remote_CI_after_fix": {
+    "head": "d1d91329a4c1063256c4bfa2776391db68f38742",
+    "success": 14,
+    "failed": 0,
+    "unfinished": 0,
+    "receipt_project_relative": "worktrees/byul-b12-s2-plan-20261108/out/ci-pr232-d1d91329-20261108-v1/final-success-receipt-v1.json",
+    "file_sha256": "683078fa0437352e3e6149c715999d6b0059c7aa8c85d730bde6c5ea4827326a",
+    "B3_head_included": false
+  },
   "token_AST_proof": {
     "template_file_sha256": "4e7df5927b86b3eb6f6a2369a9fe5b9a78ff03bd30abb8d097a87f952f7e8419",
     "old_file_sha256": "0f96a26959180ed783160ec7b3d5a13e0c0e5d5f4d913ffe257f4b84926efe27",
@@ -157,6 +165,10 @@
       "project_relative_path": "worktrees/byul-b12-review-20261108/out/reviews/ci-metadata-review-20261108-v1/ci-manifest-helper-fixture-review-v1.json",
       "file_sha256": "cb01b345ea575e24204fadfbed5f77947699d6104da53c3483b8d5669faea46e"
     },
-    "generator_order_delta": "root 직접 회귀21통과; 집중 검토 후속 별도"
+    "generator_order_delta": {
+      "project_relative_path": "worktrees/byul-b12-review-20261108/out/reviews/ci-metadata-review-20261108-v1/ci-metadata-and-order-independent-review-v2.json",
+      "file_sha256": "2087a6226d4d24b6f0aa03a0205efeac4e9bb4712bcc2103dbda50593fbb9fe9",
+      "result": "고정 d1d91329 범위 미해결 구체결함0"
+    }
   }
 }

@@ -1,0 +1,221 @@
+{
+  "schema": "guard-b3-followup-validation/1",
+  "base": "aa3c6ac8f9b7e4a70f8ea76f6f35b89a3b40737c",
+  "source_commits": {
+    "S1": "67ca111f07e9946321095100b79936d6e57d02f7",
+    "S5": "59adb851d184c9a6ceb376a040ccde1fa61af4ce"
+  },
+  "integration_source_snapshot": "ff61f1e6c330cb760e6c2dacd5ecee85c4ce303b",
+  "source_files": [
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_supply_boot.py",
+      "bytes": 15085,
+      "file_sha256": "329b6b2de57bfe2a3155d54aaa4b31257605c30eb7385ac75f140d0de32af126"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/supply_boot_artifacts.py",
+      "bytes": 1557,
+      "file_sha256": "26b95bfb2a8ce0e5408e78c7c291086f19f0c15c447ee067ebfc8e877b6120aa"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/supply_boot_contract.py",
+      "bytes": 13395,
+      "file_sha256": "23d0c7befe31de52888131b64459d37e3f277480031d7e741902525a33aff697"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/tests/fixtures/b3_supply_retained_cpu_records.json",
+      "bytes": 41777,
+      "file_sha256": "f91db3313c9ecc2631383fe797329efd82cdc8b295daf11abd3c1a9c459e5f73"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/tests/test_b3_supply_records.py",
+      "bytes": 9914,
+      "file_sha256": "3fa9a7d37a38d7e60aaabd0687dbc6c5f47ab875eb079762121987889915b37d"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/tools/b3_supply_cpu.py",
+      "bytes": 18748,
+      "file_sha256": "d46fb0ea027ff28badda2e858f0949dd52bbc2d0f78528239bcb2583f23bf439"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/tools/gpu_b_sup16_pair_writer.py",
+      "bytes": 6896,
+      "file_sha256": "ed9616091017c486cba9bb8e1b804969e6f1944c5fdbbd4b6c7408fa009bb519"
+    }
+  ],
+  "scope": {
+    "new_GPU_AWS_SSM_starts": 0,
+    "new_model_worker_runs": 0,
+    "input_origin": "synthetic/historical replay",
+    "data_origin": "EXAMPLE",
+    "official": false,
+    "current_native_owner_verified": false,
+    "GPU_packet_ready": false
+  },
+  "actual_CPU_components": [
+    {
+      "checks": [
+        "SUP-05"
+      ],
+      "API": "C safe_open/get_slice",
+      "assertions": 5,
+      "API_seconds": 2.0000489
+    },
+    {
+      "checks": [
+        "SUP-07",
+        "SUP-12"
+      ],
+      "API": "source0.31 np_cache_weights_iterator; installed0.29 metadata distinct",
+      "cases": [
+        "generate",
+        "reuse",
+        "truncated-header rejection",
+        "restore"
+      ],
+      "assertions": 7
+    },
+    {
+      "checks": [
+        "SUP-13"
+      ],
+      "API": "HF/Jinja normal/syntax-error/normal and B policy entry",
+      "assertions": 5
+    },
+    {
+      "checks": [
+        "SUP-16"
+      ],
+      "API": "pinned2485 normal filesystem writer",
+      "calls": 3,
+      "journal_origin": "historical GB09 replay"
+    },
+    {
+      "checks": [
+        "SUP-16"
+      ],
+      "API": "pinned new pair filesystem writer",
+      "legacy_reproduction": "chain-invalid",
+      "new_role_calls": 2,
+      "same_producer_bytes": true,
+      "native_ordering_claim": "CPU pair false; historical normal true separate"
+    }
+  ],
+  "contract_only": {
+    "S1_new_direct": 9,
+    "S1_role_IO_replay": 10,
+    "S1_related": 13,
+    "path": "registered factory/run→EVD→original judge→RES→RPT→other DB→stored-pack rejudge",
+    "actual_Kubernetes_capture": false,
+    "EVD_status": "ABORTED",
+    "security": "UNKNOWN",
+    "verification_level": null,
+    "official": false,
+    "whole_question_complete": false,
+    "original_errors_preserved": true
+  },
+  "evidence": {
+    "S1_source_results": {
+      "project_relative_path": "worktrees/byul-b3-supply-consumption-20261108/out/b3-frozen-handoff-v1/source-and-validation.json",
+      "bytes": 4104,
+      "file_sha256": "66b3f8b4200b89418557ef53d030c1b4206a1b3e8b9bdc3bae789c189ebb89bc"
+    },
+    "S1_related_exact_command": {
+      "project_relative_path": "worktrees/byul-b3-supply-consumption-20261108/update/out/b3-related-command-supplement-v1/exact-command.json",
+      "bytes": 3848,
+      "file_sha256": "7eac3f3944c006e5c92f378bf9e9a5def30f42f4e8ccc3af481a4a2bd2f3d57c"
+    },
+    "S5_original_index": {
+      "project_relative_path": "worktrees/byul-b3-s5-cpu-20261108/out/b3-s5-final-v1/receipt.json",
+      "bytes": 11056,
+      "file_sha256": "f79bec27f5f76137f0b9c300ca5acb4a7b5c54c86a31088c122dc812a5d305a6"
+    },
+    "S5_v3_actual_receipt": {
+      "project_relative_path": "worktrees/byul-b3-s5-cpu-20261108/out/b3-s5-cpu-v3/run/receipt.json",
+      "bytes": 21299,
+      "file_sha256": "1de51a69a65b18f6b8f2a43e926c12ef3aea5ffc1ecbeda5308651b761e42315"
+    },
+    "S5_final_packet_closure": {
+      "project_relative_path": "worktrees/byul-b3-s5-cpu-20261108/out/b3-s5-final-v2/receipt.json",
+      "bytes": 2026,
+      "file_sha256": "b83e1a48ba6b35a3be16c5303f3ffdbec1983ec697334b0856d6bf5572439cb6"
+    }
+  },
+  "preparation_failures_preserved": {
+    "S5_v1": "180-second import incomplete; original termination identity limited",
+    "S5_v2": "120-second HF metadata/stat deadline; no renderer reached",
+    "S5_v3": "native LinuxFS environment selection; source/API functions unchanged, only not-reached APIs executed",
+    "S1_replay_first": "10 test-call failures from asof/as_of typo; only test calls corrected"
+  },
+  "reviews": {
+    "S1": {
+      "project_relative_path": "worktrees/byul-b12-review-20261108/out/reviews/b3-s1-records-review-20261108-v1/b3-s1-records-and-pair-independent-review-v1.json",
+      "bytes": 51148,
+      "file_sha256": "b08f7552542cd7b906e6fee1ef76a0fc172ecbacf0fcb94e2d3a15013c8c6b35"
+    },
+    "S5": {
+      "project_relative_path": "worktrees/byul-b12-review-20261108/out/reviews/b3-s5-cpu-review-20261108-v1/b3-s5-cpu-independent-review-v1.json",
+      "bytes": 41866,
+      "file_sha256": "8da4a98170663d7ccb1d1f6b353b5396fd34731939cc57f4d1f006f19f7cd4d9"
+    },
+    "CI_fix": {
+      "project_relative_path": "worktrees/byul-b12-review-20261108/out/reviews/ci-metadata-review-20261108-v1/ci-metadata-and-order-independent-review-v2.json",
+      "bytes": 15430,
+      "file_sha256": "2087a6226d4d24b6f0aa03a0205efeac4e9bb4712bcc2103dbda50593fbb9fe9"
+    }
+  },
+  "manifest_delta": {
+    "added": [
+      "update/src/guard/executors/supply_boot_artifacts.py"
+    ],
+    "changed": [
+      "update/src/guard/executors/kubernetes_supply_boot.py",
+      "update/src/guard/executors/supply_boot_contract.py"
+    ],
+    "removed": [],
+    "scope_and_pack_unchanged": true,
+    "manifest_sha256": "e2fc6ad21e006553be639edfb988713a1303a711a1c17b3a02a00028a5287c23",
+    "files": 465
+  },
+  "manifest_gate": {
+    "log": {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/b3-manifest-gate.txt",
+      "bytes": 100,
+      "file_sha256": "e1675ddfe2d5fcfefa94e3799a057f405f38be0ca7f0b594f49f1dc5efccb065"
+    },
+    "result": "1 passed in 2.31s",
+    "original_B_default_still_rejects": true
+  },
+  "CI": {
+    "fixed_head_d1": {
+      "project_relative_path": "worktrees/byul-b12-s2-plan-20261108/out/ci-pr232-d1d91329-20261108-v1/final-success-receipt-v1.json",
+      "bytes": 8304,
+      "file_sha256": "683078fa0437352e3e6149c715999d6b0059c7aa8c85d730bde6c5ea4827326a"
+    },
+    "fixed_head_all_checks_success": 14,
+    "this_B3_head_result": "게시 후 별도 확인; d1 성공을 복사하지 않음"
+  },
+  "status": {
+    "assigned_IDs": 43,
+    "states_unchanged": true,
+    "B3_note_updates": [
+      "SUP-05",
+      "SUP-07",
+      "SUP-12",
+      "SUP-13",
+      "SUP-15",
+      "SUP-16"
+    ],
+    "lab_done": 2,
+    "lab_remaining": 41,
+    "limited": 25,
+    "product_evidence_needed": 18,
+    "previous_actual_local_snapshot_IDs": 14
+  },
+  "remaining": [
+    "승인 inventory/pre-read·실제 worker/rank·현재 native ownership",
+    "실제 cache writer/검증 전 집행·전체 reader/OS부수 동작과 정책",
+    "제품 endpoint/공급 template 귀속·양 role target/prepared/유효 정책",
+    "A1~A4·등록 생산자 및 GPU/TP2 실측 입력"
+  ]
+}

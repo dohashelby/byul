@@ -1,3 +1,10 @@
+## 2026-11-08 — B3 공급물 후속 고정·통합
+
+- 한 일: SUP05 C mapping, SUP07/12 원0.31 npcache, SUP13 HF/Jinja의 신규 CPU API를 실제 관측했다. SUP15 strict bool/SHA와 SUP15/16 원 record·보고행·저장 오류 보존을 보완하고, SUP16 pair를 고정2485 helper에 연결했다. 새 모델/worker/GPU/AWS 기동은 없다.
+- 검증: 실제 C5·np7·HF/B정책5 assertion, 원기록 직접9·EXAMPLE role 재생10·관련13을 확인했다. 실제 normal writer3 및 legacy pair실패→새pair2의 source/FD/기존bytes·정리/소비를 검증했다. 원180/120 준비실패와 실행판본·조회시각 한계는 보존했다. 두 묶음 고정 검토의 잔여 구체결함0, 새 manifest는 추가1/갱신2·삭제0만 반영하고 원source gate1통과를 확인했다.
+- 다음 단계: B3_CPU_FOLLOWUP_20261108.md 및 b3-validation-20261108.json으로 실제 API·historical 재생·제품 계약 시험·남은 실제 연결을 인계하고 PR232의 최종B3 head CI를 확인한다. 선행 CI수정 d1d91329는 두 이벤트14/14성공이다.
+- 남은 것: 실제 승인/pre-read/worker·native owner, cache 집행/reader전체효과, endpoint·양role target/prepared/정책, A1~A4·등록/TP2 입력. 현재 지원된 CPU 묶음에서 독립적으로 가능한 구현·관측·오류보존은 마쳤고, 같은실패/기존모델/불변suite는 반복하지 않는다. 43state·원FAIL/UNKNOWN/Ref와 lab2/41·한정25/18·이전로컬14 스냅샷은 유지한다.
+
 ## 2026-11-08 — PR232 CI 정합성과 B3/B5 후속
 
 - 한 일: aa3c6ac8의 양쪽 CI 원40실패를 source gate9·REQ13 helper pin30·상태생성물1로 분리했다. 기존 생성기로 검토된 source manifest와 상태 CSV를 갱신하고, AST가 같은 token helper의 정확 pin만 adapter/원 tool에서 함께 갱신했다. B5 impact·정책 검토 의견도 추가했다.

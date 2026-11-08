@@ -106,13 +106,13 @@ checks:
     note: "SUP04-cpu/v1, reviews/SUP04-cpu-v1.md: 실제 container_config factory의 CPU 2사례 EXAMPLE·정확 Ref/저장팩 재판정·정리 검증. 빈 승인 목록 보안 FAIL·HTTP501 기능 FAIL 보존; package/native/entrypoint/mount·배포 gate는 미계측 UNKNOWN. GPU MEASURED 아님."
     state: DONE
   SUP-05:
-    note: "docs/gpu-b/b12-readiness-20261108.md 기준. actual_ref=docs/gpu-b/consolidation-20261106/local-actual-validation-20261108.json#/rows/4: actual_local_component·synthetic/EXAMPLE·official=false의 한정 추가 관측; 과거 원본 복구/전체 질문 PASS/GPU MEASURED 아님. 기존 관측·한계(당시 메모): docs/gpu-b/preparation/SUPPLY_NATIVE_FAILURE_PRESERVATION.md: native17 producer→consumer→factory CPU 70계약 재사용(EXAMPLE). 실제 정상/변경 boot 두 세대·고정 target/prepared/read scope 패킷 미완료; GPU 미실측 UNKNOWN."
+    note: "B3 추가(2026-11-08): C safe_open/get_slice 실제 mmap·inode·입력 불변·FD 수명 관측5assert 성공. synthetic/EXAMPLE·official=false. docs/gpu-b/consolidation-20261106/B3_CPU_FOLLOWUP_20261108.md 참조. 기존 상태/관측: docs/gpu-b/b12-readiness-20261108.md 기준. actual_ref=docs/gpu-b/consolidation-20261106/local-actual-validation-20261108.json#/rows/4: actual_local_component·synthetic/EXAMPLE·official=false의 한정 추가 관측; 과거 원본 복구/전체 질문 PASS/GPU MEASURED 아님. 기존 관측·한계(당시 메모): docs/gpu-b/preparation/SUPPLY_NATIVE_FAILURE_PRESERVATION.md: native17 producer→consumer→factory CPU 70계약 재사용(EXAMPLE). 실제 정상/변경 boot 두 세대·고정 target/prepared/read scope 패킷 미완료; GPU 미실측 UNKNOWN."
     state: MEASUREMENT_REMAINING
   SUP-06:
     note: "docs/gpu-b/b12-readiness-20261108.md 기준. B2 반환 수신: docs/dev-1/sup06-worker-shard.md; gpu_common_inputs worker-shard-load /1; guard-engine-callback-worker-shard-load@1 미등록. 실제 CPU 1-rank 3사례. tests/test_worker_shard.py에 shard_rows→기존 _worker_shard 직접 fixture 호출 있음. supply_boot_contract._worker_shard fixture 연결 있음; 공급 boot 실제 수집 경로 결합은 대기. TP2·필수 roster·GPU memory 소비 별도. 미등록 supported/complete=false. actual_ref=docs/gpu-b/consolidation-20261106/local-actual-validation-20261108.json#/rows/5: actual_local_component·synthetic/EXAMPLE·official=false의 한정 추가 관측; 과거 원본 복구/전체 질문 PASS/GPU MEASURED 아님. 기존 관측·한계(당시 메모): docs/gpu-b/supply-preparation.md: native17 read bytes/rank 후보 소비만 구현. 실제 shard/tensor 적재·필수 tensor·publisher/payload 생산자 없음; TP2 새 비용 승인 및 정상/누락 패킷 필요. 미실측 UNKNOWN."
     state: CPU_DEVELOPMENT_REMAINING
   SUP-07:
-    note: "docs/gpu-b/supply-preparation.md: GPU compile cache 생성자/writer·실제 reader·검증 지점 boot-record 생산자와 격리 변조/복구 준비 없음. 미실측 UNKNOWN."
+    note: "B3 추가(2026-11-08): 원0.31 npcache 실제 생성·재사용·손상 거부·복구 관측; writer 권한·검증 전 집행은 미확인. synthetic/EXAMPLE·official=false. docs/gpu-b/consolidation-20261106/B3_CPU_FOLLOWUP_20261108.md 참조. 기존 상태/관측: docs/gpu-b/supply-preparation.md: GPU compile cache 생성자/writer·실제 reader·검증 지점 boot-record 생산자와 격리 변조/복구 준비 없음. 미실측 UNKNOWN."
     state: CPU_DEVELOPMENT_REMAINING
   SUP-08:
     note: "docs/gpu-b/b12-readiness-20261108.md 기준. actual_ref=docs/gpu-b/consolidation-20261106/local-actual-validation-20261108.json#/rows/6: actual_local_component·synthetic/EXAMPLE·official=false의 한정 추가 관측; 과거 원본 복구/전체 질문 PASS/GPU MEASURED 아님. 기존 관측·한계(당시 메모): docs/evidence/gpu-a-SUP-08-20261103.json 및 docs/gpu-b/supply-preparation.md: GPU EVD MEASURED·RES level MEASURED/data_origin EXAMPLE 보존. 기존 텍스트 경로 부분 거부와 멀티모달 실제 override 선택/import·허용 판본 대조를 구분; 후속 생산자/모델 미확정."
@@ -127,15 +127,15 @@ checks:
     note: "docs/gpu-b/b12-readiness-20261108.md 기준. B2 반환 수신: docs/dev-1/sup09-model-entry.md; guard-model-entry/1 별도 계약; 공통 GPU 등록표 대상 아님. 실제 transformers model-entry 6행. -OO 정상 대조 실패로 complete=false 유지. supply_boot_contract._dynamic는 기존 v1 유지; 새 contract 분기 연결 대기. vLLM engine boot/worker forward 아님. -OO 지원 범위/정상 대조 공백 유지. actual_ref=docs/gpu-b/consolidation-20261106/local-actual-validation-20261108.json#/rows/9: actual_local_component·synthetic/EXAMPLE·official=false의 한정 추가 관측; 과거 원본 복구/전체 질문 PASS/GPU MEASURED 아님. 기존 관측·한계(당시 메모): docs/gpu-b/supply-preparation.md: CPU 12행 형식은 실제 GPU 지원 모드 목록이 아님. 지원 Python 모드별 import/constructor 생산자·분리 세대 준비 필요; 미실측 UNKNOWN."
     state: CPU_DEVELOPMENT_REMAINING
   SUP-12:
-    note: "docs/gpu-b/supply-preparation.md 및 packs/PACK-BASELINE/checks/SUP-12.yaml: 무해 손상/불허 reader fixture 소비만 구현. 실제 fallback·파일/통신 부수 동작 boot-record 생산자·정상/도전 준비 없음; UNKNOWN."
+    note: "B3 추가(2026-11-08): 원0.31 npcache의 np.load 도달과 원예외·복구 관측; 승인 reader/전체 부수 동작·fallback은 미확인. synthetic/EXAMPLE·official=false. docs/gpu-b/consolidation-20261106/B3_CPU_FOLLOWUP_20261108.md 참조. 기존 상태/관측: docs/gpu-b/supply-preparation.md 및 packs/PACK-BASELINE/checks/SUP-12.yaml: 무해 손상/불허 reader fixture 소비만 구현. 실제 fallback·파일/통신 부수 동작 boot-record 생산자·정상/도전 준비 없음; UNKNOWN."
     state: CPU_DEVELOPMENT_REMAINING
   SUP-13:
-    note: "기존 prep-stage1/out/stage1/sup13-component-preflight.json: pinned source/index modified로 기동 전 거부. packs/PACK-BASELINE/checks/SUP-13.yaml의 고정 CPU __class__ 프로파일만 지원; 올바른 고정 준비 재생성/실측 필요, GPU 지원·전체 sandbox UNKNOWN."
+    note: "B3 추가(2026-11-08): 실제 HF/Jinja 구문 오류 후 정상 복구와 기존 B 정책 진입 관측; 제품 endpoint/worker/sandbox 전체는 미확인. synthetic/EXAMPLE·official=false. docs/gpu-b/consolidation-20261106/B3_CPU_FOLLOWUP_20261108.md 참조. 기존 상태/관측: 기존 prep-stage1/out/stage1/sup13-component-preflight.json: pinned source/index modified로 기동 전 거부. packs/PACK-BASELINE/checks/SUP-13.yaml의 고정 CPU __class__ 프로파일만 지원; 올바른 고정 준비 재생성/실측 필요, GPU 지원·전체 sandbox UNKNOWN."
     state: MEASUREMENT_REMAINING
   SUP-15:
-    note: "docs/gpu-b/supply-preparation.md: GPU cache key/lookup·실제 재사용/재생성·호환성 검증 boot-record 생산자 없음. 동일/관련 변경/무관 변경 세대 준비 필요; 미실측 UNKNOWN."
+    note: "B3 추가(2026-11-08): strict bool/pathSHA·원 CPU record/session 보존 및 저장 오류의 독립 사실 보존 계약 검증. synthetic/EXAMPLE·official=false. docs/gpu-b/consolidation-20261106/B3_CPU_FOLLOWUP_20261108.md 참조. 기존 상태/관측: docs/gpu-b/supply-preparation.md: GPU cache key/lookup·실제 재사용/재생성·호환성 검증 boot-record 생산자 없음. 동일/관련 변경/무관 변경 세대 준비 필요; 미실측 UNKNOWN."
     state: CPU_DEVELOPMENT_REMAINING
   SUP-16:
-    note: "docs/gpu-b/b12-readiness-20261108.md 기준. actual_ref=docs/gpu-b/consolidation-20261106/local-actual-validation-20261108.json#/rows/10: actual_local_component·synthetic/EXAMPLE·official=false의 한정 추가 관측; 과거 원본 복구/전체 질문 PASS/GPU MEASURED 아님. 기존 관측·한계(당시 메모): docs/gpu-b/supply-preparation.md: native17 실제 read bytes CPU 계약 재사용. 정상/부분 파일의 서로 다른 실제 target/prepared·종결 기록 두 세대 패킷 필요; 다운로드/변환/compile 완료 표시·최종 소비 미실측 UNKNOWN."
+    note: "B3 추가(2026-11-08): 원 record 보존·실제 CPU 단일/쌍 writer filesystem/API 연결 검증; historical journal 재생·현재 native owner/worker 미확인. synthetic/EXAMPLE·official=false. docs/gpu-b/consolidation-20261106/B3_CPU_FOLLOWUP_20261108.md 참조. 기존 상태/관측: docs/gpu-b/b12-readiness-20261108.md 기준. actual_ref=docs/gpu-b/consolidation-20261106/local-actual-validation-20261108.json#/rows/10: actual_local_component·synthetic/EXAMPLE·official=false의 한정 추가 관측; 과거 원본 복구/전체 질문 PASS/GPU MEASURED 아님. 기존 관측·한계(당시 메모): docs/gpu-b/supply-preparation.md: native17 실제 read bytes CPU 계약 재사용. 정상/부분 파일의 서로 다른 실제 target/prepared·종결 기록 두 세대 패킷 필요; 다운로드/변환/compile 완료 표시·최종 소비 미실측 UNKNOWN."
     state: MEASUREMENT_REMAINING
 owner: gpu

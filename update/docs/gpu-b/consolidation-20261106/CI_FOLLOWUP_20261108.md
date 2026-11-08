@@ -32,3 +32,5 @@
 - B5의 [impact·확정 정책 검토 의견](../B5_REVIEW_OPINION_20261108.md)을 추가했다. 77ID와 33/38/6은 일치한다. 기존 EXAMPLE 정책의 REQ-17 75/24는 사용자 확정55/200 반영본이 아니며 A5가 실제 typed 값/반환을 제공해야 한다. impact null·DRAFT·CONFIRMED/REVIEWED/official은 임의 변경하지 않았다.
 
 이번 작업에서 GPU/AWS/SSM 기동은 0이다. CPU 결과·임시 입력·소스 해시 갱신을 실제 GPU 검증·기업 승인·43개 전체 완료로 집계하지 않는다.
+
+수정 head `d1d91329a4c1063256c4bfa2776391db68f38742`의 원격 재검사는 push run42463120479·pull_request run42463124207 각각7/7, 합14/14성공으로 종료됐다. 뒤의 [B3 후속](B3_CPU_FOLLOWUP_20261108.md)은 새 소스 head의 CI로 다시 확인하며 이 성공을 복사하지 않는다.

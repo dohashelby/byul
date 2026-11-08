@@ -1,4 +1,4 @@
-"""Read-only, secret-minimized Kubernetes lab report view."""
+"""Read-only, secret-minimized kind/AWS lab report view."""
 
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ from .mock_engine import _utc_now
 
 
 REPORT_SCHEMA = "serving-runtime-k8s-lab-report/1.0"
+AWS_REPORT_SCHEMA = "serving-runtime-aws-lab-report/1.0"
+AWS_CASE_IDS = tuple(f"AWS-{index:02d}" for index in range(1, 21))
 CASE_IDS = tuple(f"L-{index:02d}" for index in range(1, 7))
 # Present only when the checker ran with --task-checks (SP4/SP1).
 OPTIONAL_CASE_IDS = ("L-07", "L-08")
@@ -79,8 +81,10 @@ class LabReportSource:
 
     @staticmethod
     def _validate(document: Any) -> dict[str, Any]:
-        if not isinstance(document, dict) or document.get("schema") != REPORT_SCHEMA:
+        if not isinstance(document, dict) or document.get("schema") not in (REPORT_SCHEMA, AWS_REPORT_SCHEMA):
             raise ValueError("unsupported lab report schema")
+        aws = document["schema"] == AWS_REPORT_SCHEMA
+        allowed_ids = AWS_CASE_IDS if aws else CASE_IDS + OPTIONAL_CASE_IDS
         for name in ("run_id", "started_at", "finished_at", "context", "namespace", "overall"):
             if not isinstance(document.get(name), str) or not document[name]:
                 raise ValueError(f"lab report {name} must be a non-empty string")
@@ -93,13 +97,15 @@ class LabReportSource:
             if not isinstance(raw_case, dict):
                 raise ValueError("lab report case must be an object")
             case_id = raw_case.get("id")
-            if case_id not in CASE_IDS + OPTIONAL_CASE_IDS or case_id in seen:
-                raise ValueError("lab report case IDs must be unique L-01 through L-08")
+            if case_id not in allowed_ids or case_id in seen:
+                raise ValueError("lab report case IDs must be unique and match its schema")
             seen.add(case_id)
             status = raw_case.get("status")
             title = raw_case.get("title")
             summary = raw_case.get("summary")
             evidence = raw_case.get("evidence")
+            if aws and status not in ("passed", "failed", "not_run", "unknown"):
+                raise ValueError("invalid AWS lab case status")
             if (
                 not isinstance(status, str)
                 or not isinstance(title, str)
@@ -123,11 +129,13 @@ class LabReportSource:
                     else None,
                 }
             )
-        if not set(CASE_IDS) <= seen:
+        if aws and not seen:
+            raise ValueError("AWS lab report must contain selected cases")
+        if not aws and not set(CASE_IDS) <= seen:
             raise ValueError("lab report must contain L-01 through L-06")
         cases.sort(key=lambda item: item["id"])
         return {
-            "schema": REPORT_SCHEMA,
+            "schema": document["schema"],
             "run_id": document["run_id"],
             "started_at": document["started_at"],
             "finished_at": document["finished_at"],

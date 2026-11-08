@@ -1543,6 +1543,115 @@ class EvidenceTests(unittest.TestCase):
             "result": result, "reason": reason, "facts": facts, "evidence": evidence,
         }
 
+    def test_public_report_preserves_real_run_and_excludes_raw_details(self):
+        from serving_runtime.mvp.lab_report import LabReportSource, AWS_REPORT_SCHEMA
+        from tools import verification_material
+        import os
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            public = root / "public"
+            public.mkdir(mode=0o2750)
+            public.chmod(0o2750)
+            checker = AWSAcceptance(arguments(root, cases=("AWS-06",), public_report_dir=public), runner=FakeRunner(), http=FakeHTTP([]))
+            checker.run_started_at = "2020-01-01T00:00:00Z"
+            checker.cases.append(self._case("AWS-06", {"raw": "private-command-output"}))
+            link = os.link
+            def observed_link(source, target):
+                self.assertEqual(LabReportSource(public).read()["state"], "missing")
+                self.assertEqual(stat.S_IMODE(Path(source).stat().st_mode), 0o640)
+                return link(source, target)
+            with patch.object(verification_material.os, "link", side_effect=observed_link):
+                private, markdown = checker.write_report()
+            raw = json.loads(private.read_text())
+            result = LabReportSource(public).read()
+            self.assertEqual(result["state"], "ok")
+            view = result["report"]
+            self.assertEqual(view["schema"], AWS_REPORT_SCHEMA)
+            for key in ("run_id", "started_at", "namespace", "overall"):
+                self.assertEqual(view[key], raw[key])
+            self.assertEqual(view["context"], raw["kube_context"])
+            self.assertEqual(view["finished_at"], raw["ended_at"])
+            self.assertEqual([c["id"] for c in view["cases"]], ["AWS-06"])
+            self.assertIn("private-command-output", private.read_text())
+            published = Path(result["path"])
+            for secret in (INFERENCE, VIEWER, "private-command-output", "gateway_url", "observation_dir", "facts", "commands"):
+                self.assertNotIn(secret, published.read_text())
+            self.assertEqual(stat.S_IMODE(published.stat().st_mode), 0o640)
+            self.assertEqual(published.stat().st_gid, public.stat().st_gid)
+            self.assertEqual(stat.S_IMODE(public.stat().st_mode), 0o2750)
+            for path in (private, markdown):
+                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+            self.assertEqual(list(public.glob(".verification-*")), [])
+
+    def test_public_report_preserves_all_result_states_and_schema_case_families(self):
+        from tools.aws_lab_acceptance import publish_report
+        from serving_runtime.mvp.lab_report import LabReportSource, REPORT_SCHEMA
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            report = {"run_id": "aws-acceptance-20200101T000000Z-1", "started_at": "2020-01-01T00:00:00Z",
+                      "ended_at": "2020-01-01T00:01:00Z", "kube_context": "private-192.0.2.99", "namespace": "serving-lab", "engine": "vllm",
+                      "cases": [{"case_id": f"AWS-{i:02d}", "result": result, "reason": INFERENCE}
+                                for i, result in enumerate(("passed", "failed", "unknown", "not_run"), 1)]}
+            path = publish_report(report, root, (INFERENCE,))
+            value = LabReportSource(root).read()["report"]
+            self.assertEqual(value["overall"], "failed")
+            self.assertEqual([c["status"] for c in value["cases"]], ["passed", "failed", "unknown", "not_run"])
+            self.assertTrue(value["context"].startswith("environment-"))
+            self.assertNotIn("192.0.2.99", path.read_text())
+            for malformed in (dict(value, schema=REPORT_SCHEMA), dict(value, cases=value["cases"] * 2), dict(value, cases=[]), dict(value, schema=[])):
+                with self.assertRaises(ValueError):
+                    LabReportSource._validate(malformed)
+            invalid_status = dict(value, cases=[dict(value["cases"][0], status=[])])
+            with self.assertRaises(ValueError):
+                LabReportSource._validate(invalid_status)
+            value["cases"][0]["id"] = "L-01"
+            with self.assertRaises(ValueError):
+                LabReportSource._validate(value)
+
+    def test_run_publication_keeps_failure_and_unknown_exit_codes(self):
+        from serving_runtime.mvp.lab_report import LabReportSource
+        for status, expected in (("failed", 1), ("unknown", 3), ("not_run", 3), ("passed", 0)):
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                public = root / "public"
+                public.mkdir(mode=0o2750)
+                args = arguments(root, cases=("AWS-06",), public_report_dir=public)
+                checker = AWSAcceptance(args, runner=FakeRunner(), http=FakeHTTP([]))
+                case = self._case("AWS-06", {})
+                case["result"] = status
+                with patch.object(checker, "_run_case", side_effect=lambda *args: checker.cases.append(case)), redirect_stdout(io.StringIO()):
+                    self.assertEqual(checker.run(), expected)
+                self.assertEqual(LabReportSource(public).read()["report"]["cases"][0]["status"], status)
+
+    def test_publication_refuses_unsafe_destination_and_keeps_private_evidence_on_failure(self):
+        from tools.aws_lab_acceptance import ConfigurationError
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            checker = AWSAcceptance(arguments(root, cases=("AWS-06",), public_report_dir=root / "missing"), runner=FakeRunner(), http=FakeHTTP([]))
+            checker.cases.append(self._case("AWS-06", {}))
+            with self.assertRaisesRegex(ConfigurationError, "PUBLIC_REPORT_WRITE_FAILED"):
+                checker.write_report()
+            self.assertTrue((checker.evidence_dir / "report.json").is_file())
+            self.assertTrue((checker.evidence_dir / "report.md").is_file())
+            public = root / "public"
+            public.mkdir(mode=0o2750)
+            checker.args.public_report_dir = public
+            checker.write_report()
+            path = next(public.glob("*.json"))
+            before = path.read_bytes()
+            with self.assertRaisesRegex(ConfigurationError, "PUBLIC_REPORT_WRITE_FAILED"):
+                checker.write_report()
+            self.assertEqual(path.read_bytes(), before)
+            link = root / "link"
+            link.symlink_to(public, target_is_directory=True)
+            checker.args.public_report_dir = link
+            with self.assertRaisesRegex(ConfigurationError, "PUBLIC_REPORT_WRITE_FAILED"):
+                checker.write_report()
+            public.chmod(0o2770)
+            checker.args.public_report_dir = public
+            with self.assertRaisesRegex(ConfigurationError, "PUBLIC_REPORT_WRITE_FAILED"):
+                checker.write_report()
+
     def test_markdown_uses_korean_sections_and_only_selected_case_notes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             checker = AWSAcceptance(arguments(Path(temporary), cases=("AWS-06",)), runner=FakeRunner(), http=FakeHTTP([]))

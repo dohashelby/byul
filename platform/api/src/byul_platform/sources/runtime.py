@@ -667,7 +667,8 @@ def runtime_status(
             "approval_checked_at": _str_or_none(approval.get("checked_at")),
             "approval_reason_code": _str_or_none(approval.get("reason_code")),
             "validity_items": [
-                {"item": str(v.get("item")), "state": _str_or_none(v.get("state")), "result": _str_or_none(v.get("result"))}
+                {"item": str(v.get("item")), "state": _str_or_none(v.get("state")),
+                 "result": _str_or_none(v.get("error_code") if v.get("item") == "revocation" and v.get("error_code") else v.get("result"))}
                 for v in _l(policy.get("validity")) if isinstance(v, dict)
             ],
             "history": [
@@ -763,6 +764,10 @@ def comparisons(baseline: dict[str, Any], target: dict[str, Any]) -> dict[str, A
     base_meta = _d(baseline.get("baseline"))
     reg = _d(target.get("registration"))
     notes_base = [baseline["model_id_limit"]] if isinstance(baseline.get("model_id_limit"), str) else []
+    for name, meta in (("기준", base_meta), ("현재 선언", _d(baseline.get("manifest")))):
+        if meta.get("error_code"):
+            detail = "승인본 없음 — 미설정/미승인" if str(meta["error_code"]).endswith("_NOT_FOUND") else "읽기/검증 오류"
+            notes_base.append(f"{name}: {detail} ({meta['error_code']})")
     notes_target = [x for x in _l(target.get("limits")) if isinstance(x, str)]
     return {
         "baseline": {"state": _str_or_none(base_meta.get("state")), "rows": _comparison_rows(_l(baseline.get("rows"))), "notes": notes_base},

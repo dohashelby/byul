@@ -1,0 +1,222 @@
+"""공개 Engine 준비본. --execute는 S2 별도 정확 1회 배정 뒤에만 사용한다."""
+from pathlib import Path
+import argparse
+import hashlib
+import importlib.util
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+import traceback
+
+import guard
+from guard.collectors.file import load_environment
+from guard.collectors.lifecycle import load_prepared,collect_session
+from guard.collectors.native_model_file_reads import analyze
+from guard.executors.supply_boot_contract import native_consumption,validate_record,evaluate_record
+from guard.executors.registry import build_executor
+from guard.runtime.docker import Docker
+
+H=Path(__file__).resolve().parent;W=H.parents[2];INPUTS=H.parent/'inputs'
+sha=lambda p:hashlib.sha256(Path(p).read_bytes()).hexdigest()
+helper=W/'out/new5-PLT04-worker-path-boundary-component-v3/run_cpu.py'
+assert sha(helper)=='dd7ef63509e34b57421bf612a56f3d86dd4ab59b2e480882d38292459f6f002b'
+sp=importlib.util.spec_from_file_location('own_verified_cleanup',helper)
+cleanup_module=importlib.util.module_from_spec(sp);sp.loader.exec_module(cleanup_module)
+
+
+class BudgetDocker(Docker):
+    # Preserve the original subprocess_runner and source-bounded pipe capture.
+    def __init__(self,run_id,deadline):super().__init__(run_id);self.deadline=deadline
+    def remaining(self,timeout):
+        value=self.deadline-time.monotonic()
+        if value<=0:raise TimeoutError('ORIGINAL_CPU90_EXPIRED')
+        return min(timeout,value)
+    def _docker(self,args,*,timeout,**kwargs):return super()._docker(args,timeout=self.remaining(timeout),**kwargs)
+    def _bounded_read(self,args,*,timeout,max_bytes):return super()._bounded_read(args,timeout=self.remaining(timeout),max_bytes=max_bytes)
+
+
+def create_argv(spec,scenario,output):
+    role=spec['roles'][scenario];native_root=Path(role['prepared']).parent
+    argv=['docker','create','--pull','never','--name',role['target']['engine']['container'],
+        '--label','guard.run='+spec['run_id'],'--network','none','--user','1000:1000','--read-only',
+        '--cap-drop','ALL','--security-opt','no-new-privileges','--memory','4g','--memory-swap','4g',
+        '--cpus','2','--pids-limit','256','--shm-size','512m',
+        '--tmpfs','/tmp:rw,exec,nosuid,size=256m,mode=1777',
+        '--tmpfs','/work:rw,exec,nosuid,size=64m,mode=700,uid=1000,gid=1000',
+        '--tmpfs','/guard-lifecycle:rw,noexec,nosuid,size=8m,mode=700,uid=1000,gid=1000',
+        '--tmpfs','/guard-supply-boot:rw,noexec,nosuid,size=4m,mode=700,uid=1000,gid=1000']
+    for source,target,ro in [(H/'native_worker_v2.py','/native_worker.py',True),(H/'spec-v2.json','/spec.json',True),
+            (INPUTS,'/input',True),(native_root,'/native',True),(output,'/evidence',False)]:
+        argv+=['--mount',f'type=bind,src={source},dst={target}'+(',readonly' if ro else '')]
+    environment=dict(HOME='/tmp',HF_HOME='/tmp/hf',HF_MODULES_CACHE='/tmp/modules',HF_HUB_OFFLINE='1',
+        TRANSFORMERS_OFFLINE='1',VLLM_TARGET_DEVICE='cpu',CUDA_VISIBLE_DEVICES='',VLLM_PLUGINS='',
+        VLLM_CACHE_ROOT='/tmp/vllm',VLLM_ENABLE_V1_MULTIPROCESSING='0',
+        OMP_NUM_THREADS='2',MKL_NUM_THREADS='2',OPENBLAS_NUM_THREADS='2',TOKENIZERS_PARALLELISM='false')
+    for k,v in environment.items():argv+=['-e',k+'='+v]
+    return argv+['--entrypoint','python3',spec['image'],'-I','-B','/native_worker.py','--scenario',scenario]
+
+
+def recover_created_container(spec,role,call):
+    """Create 응답 불명일 때 현재 고정 name의 소유권만 읽는다. 삭제는 helper 담당."""
+    result=dict(queried_run=spec['run_id'],queried_name=role['target']['engine']['container'],
+        run_label_CIDs=None,identity=None,errors=[],owned_cid=None,absence_claim=False)
+    try:
+        raw=call('create-recovery-label',['docker','ps','--all','--no-trunc','--filter','label=guard.run='+spec['run_id'],'--format','{{.ID}}'])
+        ids=raw.decode('ascii').split()
+        if len(ids)>3 or any(re.fullmatch('[0-9a-f]{64}',x) is None for x in ids):raise ValueError('RUN_LABEL_RESULT_INVALID')
+        result['run_label_CIDs']=ids
+    except BaseException:result['errors'].append(dict(stage='run_label_lookup',traceback=traceback.format_exc()))
+    template='{"Id":{{json .Id}},"Name":{{json .Name}},"Run":{{json (index .Config.Labels "guard.run")}},"Image":{{json .Config.Image}},"Running":{{json .State.Running}},"Status":{{json .State.Status}}}'
+    try:
+        raw=call('create-recovery-name',['docker','inspect','--type','container','--format',template,result['queried_name']])
+        row=json.loads(raw);result['identity']=row
+        if (type(row) is not dict or re.fullmatch('[0-9a-f]{64}',str(row.get('Id',''))) is None
+                or row.get('Name')!='/'+result['queried_name'] or row.get('Run')!=spec['run_id'] or row.get('Image')!=spec['image']):
+            raise ValueError('RECOVERED_CONTAINER_OWNERSHIP_MISMATCH')
+        if result['run_label_CIDs'] is not None and row['Id'] not in result['run_label_CIDs']:
+            result['errors'].append(dict(stage='lookup_snapshot_changed',detail='name snapshot differs from earlier label census'))
+        result['owned_cid']=row['Id']
+    except BaseException:result['errors'].append(dict(stage='fixed_name_lookup_or_owner',traceback=traceback.format_exc()))
+    # Empty/failed discovery never proves an asynchronous create cannot finish later.
+    return result
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    mode=parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument('--validate-only',action='store_true');mode.add_argument('--execute',action='store_true')
+    parser.add_argument('--scenario',choices=['normal','challenge','recovery'],default='normal')
+    args=parser.parse_args()
+    spec=json.loads((H/'spec-v2.json').read_bytes());freeze=json.loads((H/'code-freeze-v3.json').read_bytes())
+    if sha(H/'spec-v2.json')!=freeze['spec_SHA']:raise ValueError('FIXED_SPEC_CHANGED')
+    if Path(guard.__file__).resolve()!=W/'update/src/guard/__init__.py':raise ValueError('HOST_IMPORT_ORIGIN_CHANGED')
+    for n,s in freeze['tools'].items():
+        if sha(H/n)!=s:raise ValueError('FIXED_PREPARATION_CODE_CHANGED:'+n)
+    for n,s in spec['input_pins'].items():
+        if sha(INPUTS/n)!=s:raise ValueError('IMMUTABLE_INPUT_CHANGED')
+    if subprocess.check_output(['git','-C',str(W),'rev-parse','HEAD'],text=True).strip()!=spec['source']:raise ValueError('SOURCE_CHANGED')
+    for n,s in freeze['product_inputs'].items():
+        if sha(W/'update'/n)!=s:raise ValueError('PRODUCT_INPUT_CHANGED:'+n)
+    for scenario,expected in freeze['prepared_manifest_SHA'].items():
+        if sha(spec['roles'][scenario]['prepared'])!=expected:raise ValueError('PREPARED_MANIFEST_CHANGED:'+scenario)
+        load_prepared(Path(spec['roles'][scenario]['prepared']))
+    if sha(H/'caller-source/metadata.json')!=spec['caller_source_metadata_SHA']:raise ValueError('CALLER_SOURCE_RECEIPT_CHANGED')
+    if sha(H/'fixed-create-argv-v3.json')!=freeze['fixed_create_argv_SHA']:raise ValueError('FIXED_CREATE_ARGV_RECEIPT_CHANGED')
+    planned=json.loads((H/'fixed-create-argv-v3.json').read_bytes())
+    for scenario in spec['roles']:
+        if create_argv(spec,scenario,H/('actual-v3-'+scenario))!=planned[scenario]:raise ValueError('ACTUAL_CREATE_ARGV_DIFFERS_FROM_FIXED:'+scenario)
+    env=load_environment(H/'ENV.owned-CPU.json')
+    if env.ref().model_dump(mode='json')!=spec['environment_ref']:raise ValueError('FIXED_ENV_REF_CHANGED')
+    factory=type(build_executor('supply_boot','kubernetes',{'supply_boot':{}})).__name__
+    if args.validate_only:
+        print(json.dumps(dict(preparation_inputs_validated=True,model_or_Docker_executed=False,product_factory_run=False,
+            factory_class_only=factory,spec_SHA=sha(H/'spec-v2.json'),origin=guard.__file__)))
+        return 0
+    endpoint=json.loads(subprocess.check_output(['docker','context','inspect','--format','{{json .Endpoints.docker.Host}}'],text=True))
+    allowed={'unix:///var/run/docker.sock','npipe:////./pipe/dockerDesktopLinuxEngine'}
+    if endpoint not in allowed or os.environ.get('DOCKER_HOST',endpoint) not in allowed:raise ValueError('LOCAL_DOCKER_REQUIRED')
+    result=dict(request=spec['request'],source=spec['source'],origin=guard.__file__,python=sys.version,
+        spec_SHA=sha(H/'spec-v2.json'),roles={},primary=None,product_factory_run=False,new_product_Refs=[],
+        original_component_or_GPU_executed=False)
+    result['factory_class']=factory
+    # Exactly one explicitly selected role. No automatic follow-up or retry.
+    for scenario in (args.scenario,):
+        if (H/('probe-result-v3-'+scenario+'.json')).exists():raise ValueError('NEW_VERSION_REQUIRED_ROLE_RESULT_EXISTS')
+        role=spec['roles'][scenario];output=H/('actual-v3-'+scenario);output.mkdir()
+        cid=None;create_attempted=False;start_attempted=False;commands=[];r=dict(primary=None,cleanup=None,terminal_errors=[]);result['roles'][scenario]=r
+        start=time.perf_counter();deadline=time.monotonic()+90;client=BudgetDocker(spec['run_id'],deadline)
+        def call(label,argv):
+            timeout=min(30,deadline-time.monotonic()) if label in {'create','start','running-inspect'} else 30
+            if label.startswith('create-recovery-'):timeout=5
+            if timeout<=0:raise TimeoutError('ORIGINAL_CPU90_EXPIRED:'+label)
+            try:p=subprocess.run(argv,capture_output=True,timeout=timeout)
+            except subprocess.TimeoutExpired as error:
+                (output/(label+'.stdout')).write_bytes(error.stdout or b'')
+                (output/(label+'.stderr')).write_bytes(error.stderr or b'')
+                commands.append(dict(label=label,argv=argv,timeout=True,timeout_seconds=timeout,exception=traceback.format_exc()));raise
+            (output/(label+'.stdout')).write_bytes(p.stdout);(output/(label+'.stderr')).write_bytes(p.stderr)
+            commands.append(dict(label=label,argv=argv,exit=p.returncode,timeout_seconds=timeout))
+            if p.returncode:raise subprocess.CalledProcessError(p.returncode,argv,p.stdout,p.stderr)
+            return p.stdout
+        try:
+            argv=create_argv(spec,scenario,output)
+            create_attempted=True
+            returned=call('create',argv).decode().strip()
+            if re.fullmatch('[0-9a-f]{64}',returned) is None:raise ValueError('CREATE_CID_RESPONSE_INVALID')
+            cid=returned;r['CID']=cid
+            start_attempted=True;call('start',['docker','start',cid])
+            while not (output/'ready.json').exists():
+                if (output/'failed.json').exists():raise RuntimeError('ACTUAL_WORKER_FAILED_SEE_ORIGINAL_RAW')
+                if time.monotonic()>=deadline:raise TimeoutError('ORIGINAL_CPU90_EXPIRED')
+                time.sleep(.1)
+            before=json.loads(call('running-inspect',['docker','inspect',cid]))[0]
+            if before['Config']['Labels'].get('guard.run')!=spec['run_id'] or not before['State']['Running']:
+                raise ValueError('ACTUAL_OWNED_WORKER_NOT_RUNNING')
+            prepared=load_prepared(Path(role['prepared']))
+            capture=collect_session(client,env,role['target'],role['target']['engine']['container'],spec['image'],prepared)
+            (output/'capture.json').write_text(json.dumps(capture,indent=2))
+            raw=analyze(capture,prepared);consumed=native_consumption(raw)
+            (output/'native-analysis.json').write_text(json.dumps(raw,indent=2))
+            (output/'native-consumption.json').write_text(json.dumps(consumed,indent=2))
+            record=json.loads((output/'boot-record.json').read_bytes())
+            validate_record(record,check_id='SUP-05',role=role['role'],environment_ref=env.ref().model_dump(mode='json'),
+                target_sha256=role['target_sha256'],source_sha256=spec['worker_tool_SHA'])
+            r.update(native=consumed,boot_record_validated=True,record_evaluation=evaluate_record('SUP-05',record,{}))
+            if not consumed['rows']:raise ValueError('NATIVE17_READ_RETURN_NOT_ADMITTED')
+            if scenario!='challenge' and (consumed['unread_declared_paths'] or not all(x['matches_approved'] for x in consumed['rows'])):
+                raise ValueError('NATIVE17_NORMAL_APPROVED_BYTES_NOT_OBSERVED')
+            if scenario=='challenge' and not any(x['mismatch'] for x in consumed['rows']):
+                raise ValueError('NATIVE17_CHALLENGE_BYTE_MISMATCH_NOT_OBSERVED')
+        except BaseException:r['primary']=traceback.format_exc();result['primary']=r['primary']
+        finally:
+            r['create_attempted']=create_attempted;r['start_attempted']=start_attempted
+            if cid is None and create_attempted:
+                r['create_reconciliation']=recover_created_container(spec,role,call)
+                cid=r['create_reconciliation']['owned_cid']
+                if cid:r['CID']=cid;r['CID_recovered_after_create_failure']=True
+                else:r['cleanup']=dict(owned_cleanup_verified=False,errors=['CREATE_OUTCOME_UNRESOLVED_NO_OWNED_CID'],
+                    discovery=r['create_reconciliation'])
+            if cid and start_attempted:
+                try:(output/'finish').touch()
+                except OSError:r['finish_signal_error']=traceback.format_exc()
+                try:
+                    raw_exit=call('wait',['docker','wait',cid]);r['worker_exit_stdout']=raw_exit.decode('utf8','replace')
+                    r['worker_exit_code']=int(raw_exit.decode('ascii').strip())
+                    if r['worker_exit_code']!=0:r['terminal_errors'].append('ACTUAL_WORKER_NONZERO_EXIT')
+                except BaseException:r['wait_error']=traceback.format_exc();r['terminal_errors'].append('ACTUAL_WORKER_EXIT_UNCONFIRMED')
+                try:
+                    final=json.loads((output/'result.json').read_bytes());r['worker_final']=final
+                    if final.get('scenario')!=scenario or final.get('role')!=role['role']:
+                        r['terminal_errors'].append('ACTUAL_WORKER_SCENARIO_MISMATCH')
+                    if (final.get('spec_SHA')!=sha(H/'spec-v2.json') or final.get('source_tool_SHA')!=spec['worker_tool_SHA']
+                            or final.get('native_session')!=role['session'] or final.get('target_sha256')!=role['target_sha256']):
+                        r['terminal_errors'].append('ACTUAL_WORKER_FINAL_IDENTITY_MISMATCH')
+                    if final.get('primary') is not None:r['terminal_errors'].append('ACTUAL_WORKER_PRIMARY_EXCEPTION')
+                    if final.get('shutdown_errors')!=[]:r['terminal_errors'].append('ACTUAL_WORKER_SHUTDOWN_FAILED_OR_UNCONFIRMED')
+                    if (final.get('disk_restored') is not True or final.get('restored_disk_sha256')!=spec['input_pins']['baseline/model.safetensors']):
+                        r['terminal_errors'].append('ACTUAL_DISK_RESTORE_FAILED_OR_UNCONFIRMED')
+                    if final.get('engine_constructor_returned') is not True or final.get('pooling_request_finished') is not True:
+                        r['terminal_errors'].append('ACTUAL_PUBLIC_ENGINE_REQUEST_NOT_CONFIRMED')
+                    if final.get('native_sealed') is not True or final.get('native_end_reason')!='SEALED':
+                        r['terminal_errors'].append('ACTUAL_NATIVE_SEAL_NOT_CONFIRMED')
+                except BaseException:r['worker_final_read_error']=traceback.format_exc();r['terminal_errors'].append('ACTUAL_WORKER_FINAL_RESULT_UNAVAILABLE')
+            if cid:
+                if not start_attempted:
+                    r['worker_not_started_by_this_driver']=True
+                    r['terminal_errors'].append('WORKER_NOT_STARTED_CREATE_RESULT_FAILED')
+                r['cleanup']=cleanup_module.cleanup_owned(cid,spec['run_id'],call)
+                if r.get('create_reconciliation',{}).get('errors'):
+                    r['cleanup']['errors'].append(dict(stage='create_reconciliation',errors=r['create_reconciliation']['errors']))
+            r['seconds']=time.perf_counter()-start;r['commands']=commands
+            (output/'invocation.json').write_text(json.dumps(r,indent=2))
+            with (H/('probe-result-v3-'+scenario+'.json')).open('x') as stream:json.dump(result,stream,indent=2)
+        if r['primary'] or r['terminal_errors'] or not r['cleanup'] or r['cleanup']['errors'] or not r['cleanup']['owned_cleanup_verified']:
+            break
+    print(json.dumps(dict(primary=result['primary'],attempted_scenarios=list(result['roles']),terminal_errors={k:v['terminal_errors'] for k,v in result['roles'].items()},product_factory_run=False)))
+    return int(result['primary'] is not None or any(r['terminal_errors'] or not (r.get('cleanup') or {}).get('owned_cleanup_verified') or (r.get('cleanup') or {}).get('errors') for r in result['roles'].values()))
+
+
+if __name__=='__main__':raise SystemExit(main())

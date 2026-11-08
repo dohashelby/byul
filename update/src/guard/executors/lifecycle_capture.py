@@ -150,9 +150,9 @@ def parse_recording(raw, prepared):
             "executor","future","worker","core","execute_model","PENDING","RUNNING","FINISHED","CANCELLED","CANCELLED_AND_NOTIFIED",
             "none","value","timeout","exception","base-exception","negative","zero","positive"}
     if is_profiler:
-        keys=keys|profiler_metadata.FIELDS|profiler_metadata.STATE_FIELDS
+        keys=keys|profiler_metadata.FIELDS|profiler_metadata.STATE_FIELDS|profiler_metadata.CAPTURE_KEYS
         words=words|{'PROFILER',profiler_sensor.EVENT_SCHEMA,*profiler_sensor.POINTS,*profiler_sensor.SOURCE_ADDITIONS,
-            *profiler_sensor.RUNTIME_CODE_CONTRACTS,'worker','torch-wrapper','torch','cuda','proton','other','exception','base-exception'}
+            *profiler_sensor.RUNTIME_CODE_CONTRACTS,*profiler_metadata.CAPTURE_WORDS,'worker','torch-wrapper','torch','cuda','proton','other','exception','base-exception'}
     if is_init:
         keys=keys|init_metadata.FIELDS|{'rank'}
         words=words|{'INITIALIZATION',init_sensor.EVENT_SCHEMA,*init_sensor.POINTS,*init_sensor.SOURCE_ADDITIONS,
@@ -394,7 +394,9 @@ def parse_recording(raw, prepared):
             if payload['source_module'] not in ready:raise ValueError('PROFILER_SOURCE_MODULE_UNAVAILABLE')
             if profiler_runtime is not None and payload['observer_runtime']!=profiler_runtime:raise ValueError('PROFILER_OBSERVER_RUNTIME_MISMATCH')
             profiler_runtime=payload['observer_runtime'];profiler_events+=1
-            identity={k:payload[k] for k in ('point','parent_call_sha256','owner_sha256','asgi_request_sha256','asgi_invocation_sha256','registered_handler_observed','is_start','state_before')}
+            identity={k:payload[k] for k in ('schema','point','parent_call_sha256','owner_sha256','asgi_request_sha256','asgi_invocation_sha256','registered_handler_observed','is_start','state_before')}
+            if payload['schema']==profiler_sensor.EVENT_SCHEMA:
+                identity.update({key:payload[key] for key in ('backend_before','trace_before')})
             call=profiler_calls.setdefault(payload['call_sha256'],{'identity':identity,'calls':0,'ends':0})
             if call['identity']!=identity:raise ValueError('PROFILER_CALL_BINDING_MISMATCH')
             call['calls']+=payload['phase']=='CALL';call['ends']+=payload['phase'] in {'RETURN','RAISE'}

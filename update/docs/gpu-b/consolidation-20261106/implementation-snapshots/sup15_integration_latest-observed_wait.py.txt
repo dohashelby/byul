@@ -1,0 +1,54 @@
+"""SUP15-only bridge to the fixed observer and the original bounded child wait."""
+import math,time,traceback
+
+
+def remaining_limit(deadline, nominal, *, clock=time.monotonic):
+    if not math.isfinite(deadline) or not 0 < nominal <= 90:
+        raise ValueError('SUP15_ABSOLUTE_BUDGET_INVALID')
+    remaining=deadline-clock()
+    if remaining <= 0:
+        raise TimeoutError('SUP15_ABSOLUTE_150_DEADLINE_REACHED_BEFORE_CHILD')
+    return min(nominal,remaining)
+
+
+def observe_with_deadline(*, original, observer, argv, env, output, stem,
+                          nominal, deadline, bootstrap, allowed_source_SHA):
+    """No new deadline: charge observer setup to the caller's existing budget.
+
+    Preserve the real wait result or its original exception even if subsequent
+    observer summary collection fails. No observer error is a successful child.
+    """
+    outcome={};began=time.monotonic()
+    limit=remaining_limit(deadline,nominal)
+    def wait(wrapped,child_env,directory,name,prepared_limit):
+        effective=remaining_limit(deadline,prepared_limit)
+        outcome.update(wait_started_monotonic=time.monotonic(),effective_wait_seconds=effective,
+                       nominal_limit=nominal,absolute_deadline=deadline)
+        try:
+            result=original.bounded_child(wrapped,child_env,directory,name,effective)
+        except BaseException as exc:
+            outcome['primary']=(exc,exc.__traceback__)
+            raise
+        outcome['result']=result
+        return result
+    try:
+        rc,termination,summary=observer.observe_one(original_wait=wait,argv=argv,env=env,
+            output=output,stem=stem,limit=limit,bootstrap=bootstrap,
+            allowed_source_SHA=allowed_source_SHA)
+    except BaseException as exc:
+        followup={'type':type(exc).__name__,'traceback':traceback.format_exc()}
+        if 'primary' in outcome:
+            primary,tb=outcome['primary']
+            # Diagnostic failure must not replace the original exception.
+            try:primary.add_note('SUP15 observer follow-up: '+followup['type'])
+            except AttributeError:pass
+            raise primary.with_traceback(tb)
+        if 'result' not in outcome:
+            raise
+        rc,termination=outcome['result']
+        summary={'original_wait_return':rc,'original_termination':termination,
+                 'observer_followup_error':followup,'observer_summary_unavailable':True}
+    public={k:v for k,v in outcome.items() if k not in ('primary','result')}
+    summary['absolute_budget']={**public,'bridge_started_monotonic':began,
+                                'original_total_seconds':150,'deadline_reset':False}
+    return rc,termination,summary

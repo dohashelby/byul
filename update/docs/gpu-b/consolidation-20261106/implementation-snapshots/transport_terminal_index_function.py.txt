@@ -1,0 +1,31 @@
+def unresolved_mutations(include_inflight=True):
+    root();rows=[]
+    # One call-local directory snapshot; no cross-call terminal cache.
+    terminal_index={}
+    if include_inflight:
+        for marker in OUT.glob("command-*.terminal-observation.json"):
+            match=re.fullmatch(r"command-([a-f0-9-]{36})-[\s\S]*\.terminal-observation\.json",marker.name)
+            if match:terminal_index.setdefault(match.group(1),[]).append(marker)
+    for p in sorted(OUT.glob('*.mutation-intent.json')):
+        tag=p.name[:-len('.mutation-intent.json')];intent=read(p);rp=OUT/(tag+'.mutation-result.json');resolution=OUT/(tag+'.positive-resolution.json')
+        if resolution.exists():
+            r=read(resolution)
+            if r.get('intent_sha256')==digest(p.read_bytes()) and r.get('actual_terminal_positive_correlation_verified') is True:continue
+        if not rp.exists():
+            if include_inflight:rows.append({'tag':tag,'state':'CLI_ACTOR_INFLIGHT_OR_DIED_BEFORE_RESULT','intent':str(p)})
+            continue
+        result=read(rp)
+        if result['outcome']!='ACCEPTED':rows.append({'tag':tag,'state':'ACCEPTANCE_UNCERTAIN','intent':str(p),'result':str(rp)});continue
+        if include_inflight and intent['operation']=='send_command':
+            cid=result['CommandId']
+            if re.fullmatch(r'[a-f0-9-]{36}',cid):
+                observed=False
+                for marker in terminal_index.get(cid,[]):
+                    try:marker.lstat()
+                    except FileNotFoundError:continue
+                    observed=True;break
+            else:
+                # Preserve original glob semantics for noncanonical old input.
+                observed=bool(list(OUT.glob('command-'+cid+'-*.terminal-observation.json')))
+            if not observed:rows.append({'tag':tag,'state':'ACCEPTED_COMMAND_NOT_YET_OBSERVED_TERMINAL','CommandId':cid,'intent':str(p)})
+    return rows

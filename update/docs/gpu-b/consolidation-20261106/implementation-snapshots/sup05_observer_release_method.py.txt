@@ -1,0 +1,25 @@
+def _release(self):
+        # A failed close has uncertain descriptor state. Never retry that
+        # numeric FD; record it and continue with every other owned descriptor.
+        failures = []
+        def release(fd, label):
+            if fd is None:
+                return
+            try:
+                os.close(fd)
+            except BaseException:
+                detail = label + ': ' + traceback.format_exc()
+                self.errors.append(detail)
+                failures.append(label)
+        for name, e in self.entries.items():
+            for key in ('src', 'dst'):
+                fd = e[key]
+                e[key] = None
+                release(fd, name + ':' + key)
+        for name in ('source_fd', 'output_fd'):
+            fd = getattr(self, name)
+            setattr(self, name, None)
+            release(fd, name)
+        self.status['errors'] = list(self.errors)
+        self.status['FD_release_verified'] = not failures
+        self.status['unconfirmed_FD_releases'] = failures

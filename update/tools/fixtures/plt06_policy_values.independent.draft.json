@@ -1,0 +1,4 @@
+{
+  "worker_isolation_requirement": "independent-uid",
+  "worker_trust_group_markers": ["EngineCor", "Worker"]
+}

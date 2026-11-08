@@ -1,0 +1,10 @@
+{
+  "schema": "plt06-docker-recipe/1",
+  "backend": "real",
+  "image": "vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+  "probe_image": "python@sha256:673719e071ecf27434fd2635bbd8d00f49f4fdd81f243143438a42ced8bedf60",
+  "resources": {"cpus": "4", "memory": "8g", "shm": "512m", "pids": "512"},
+  "application_argv": ["-m", "vllm.entrypoints.openai.api_server", "--model", "/models", "--served-model-name", "{served_model_name}", "--host", "0.0.0.0", "--port", "8000", "--tensor-parallel-size", "{tp}", "--pipeline-parallel-size", "1", "--distributed-executor-backend", "mp", "--gpu-memory-utilization", "0.3", "--max-model-len", "512", "--max-num-seqs", "2", "--enforce-eager"],
+  "basis": "Existing GB35 PLT06 Docker fixture; no profiler/native15 asset or new worker identity producer is installed by this recipe.",
+  "limits": ["Engine UID config applies to the shared execution group, not authenticated per-role UID isolation.", "Device selections are operator inputs, not verified physical GPU inventory.", "Admitted-worker sender/reader/effect collection remains unimplemented in the current product."]
+}

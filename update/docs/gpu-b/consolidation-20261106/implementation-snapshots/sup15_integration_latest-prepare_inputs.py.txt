@@ -1,0 +1,55 @@
+"""Offline SUP15 integration asset/render adapter; never operates Kubernetes."""
+from pathlib import Path
+import argparse,hashlib,importlib.util,json,subprocess,sys
+
+HERE=Path(__file__).resolve().parent
+SHA=lambda p:hashlib.sha256(Path(p).read_bytes()).hexdigest()
+
+def original(path):
+    spec=importlib.util.spec_from_file_location('_sup15_fixed_preparation',path)
+    m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
+
+def verify(root):
+    f=json.loads((HERE/'freeze.json').read_bytes())
+    for name,row in f['files'].items():
+        if SHA(row['path'])!=row['SHA256']:raise ValueError('SUP15_PREP_SOURCE_CHANGED:'+name)
+    if subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip()!=f['source']:raise ValueError('SUP15_FIXED_HEAD_CHANGED')
+    if SHA(root/'update/release/reviewed-source.json')!=f['manifest_SHA']:raise ValueError('SUP15_FIXED_MANIFEST_CHANGED')
+    import guard
+    if not Path(guard.__file__).resolve().is_relative_to(root/'update/src'):raise ValueError('SUP15_ACTUAL_IMPORT_ORIGIN_CHANGED')
+    return f,original(Path(f['files']['original_prepare']['path']))
+
+def render(a):
+    f,old=verify(a.source_root)
+    assets=a.output/'assets';drawing=a.output/'render'
+    a.output.mkdir(mode=0o700,exist_ok=False)
+    from types import SimpleNamespace
+    old.prepare(SimpleNamespace(output=assets,source_root=a.source_root,source_commit=f['source'],
+        manifest_sha256=f['manifest_SHA'],producer=HERE/'producer.py',lab_policy=Path(f['files']['LAB_policy']['path'])))
+    old.render(SimpleNamespace(assets=assets,source_root=a.source_root,namespace=a.namespace,run_id=a.run_id,
+        output=drawing,node_name=a.node_name))
+    manifest=json.loads((HERE/'integration-manifest.json').read_bytes())
+    environment=json.loads((drawing/'environment.json').read_bytes())
+    for item in environment['items']:
+        if item['kind']=='ConfigMap':
+            for name in manifest['runtime_files']:
+                item['data'][name]=(HERE/name).read_bytes().decode('utf8')
+            item['data']['integration-manifest.json']=(HERE/'integration-manifest.json').read_text(encoding='utf8')
+        elif item['kind']=='Pod':
+            container,=item['spec']['containers']
+            container['command']+=['--assets-manifest','/guard-assets/integration-manifest.json']
+    # This is a new unpublished render; fixed previous packets are untouched.
+    with (drawing/'environment.json').open('w',encoding='utf8') as stream:json.dump(environment,stream,indent=2)
+    from guard.models import canonical_json
+    record={'schema':'sup15-observed-render/1','source':f['source'],'render_SHA':SHA(drawing/'environment.json'),
+        'integration_manifest_SHA':SHA(HERE/'integration-manifest.json'),'files':manifest['runtime_files'],
+        'base_preparation':str(assets),'new_runtime_identity_created':False}
+    with (a.output/'observed-render.json').open('xb') as stream:stream.write(canonical_json(record))
+    return record
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--source-root',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
+    for key in ['namespace','run-id','node-name']:p.add_argument('--'+key,required=True)
+    print(json.dumps(render(p.parse_args()),indent=2))
+if __name__=='__main__':main()

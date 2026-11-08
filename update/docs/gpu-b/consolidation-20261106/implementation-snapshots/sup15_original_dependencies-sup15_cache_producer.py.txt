@@ -1,0 +1,144 @@
+"""SUP15 actual CPU Inductor compatibility cases. No stale-cache forced fault."""
+import argparse,contextlib,hashlib,json,os,shutil,subprocess,sys,time,traceback
+from pathlib import Path
+CODECACHE_SHA='1de34a274c58a2b826a6c46829e94f1df5b24a3d83841a6c4ff8a691a50d8c59'
+RELOAD_SHA='824244b91623128e299df93db614e1f046b9ddee2f0ca8a84c6e7707bbacf5c2'
+def digest(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+def save(p,v):
+    with Path(p).open('x',encoding='utf8') as f:json.dump(v,f,sort_keys=True,indent=2)
+
+def child(a):
+    result={'uid':os.geteuid(),'PID':os.getpid(),'delta':a.delta,'LAB_logging_label':a.logging_label,'error_type':None};rc=0
+    try:
+        if os.geteuid()!=1000:raise ValueError('SUP15_ACTUAL_UID_INVALID')
+        with contextlib.redirect_stdout(sys.stderr):
+            import torch
+            import torch._inductor.codecache as cc
+            import torch._inductor.runtime.compile_tasks as ct
+            from torch._dynamo.utils import counters
+            if torch.__version__!='2.13.0+cpu' or digest(cc.__file__)!=CODECACHE_SHA or digest(ct.__file__)!=RELOAD_SHA:
+                raise ValueError('SUP15_ACTUAL_LIBRARY_SOURCE_UNSUPPORTED')
+            delta=a.delta
+            def compute(t):return t+delta
+            x=torch.arange(16,dtype=torch.float32)
+            actual=torch.compile(compute,backend='inductor',fullgraph=True)(x)
+            torch.testing.assert_close(actual,x+delta)
+            modules=[m for m in cc.PyCodeCache.modules if callable(getattr(m,'call',None)) and Path(m.__file__).is_relative_to(a.cache)]
+            if len(modules)!=1:raise ValueError('SUP15_ACTUAL_CACHE_MODULE_AMBIGUOUS')
+            m,=modules;p=Path(m.__file__);s=p.stat()
+            result.update(actual_torch_compile=True,actual_PyCodeCache_module_loaded=True,cache_key=m.key,cache_path=str(p),
+                file_sha256=digest(p),file_inode=s.st_ino,file_mtime_ns=s.st_mtime_ns,owner_uid=s.st_uid,
+                output=actual.tolist(),expected=(x+delta).tolist(),torch_version=torch.__version__,
+                library_source_sha256=CODECACHE_SHA,reload_source_sha256=RELOAD_SHA,
+                actual_inductor_counters={str(k):v for k,v in counters['inductor'].items() if type(v) in (int,float)})
+    except BaseException as e:result['error_type']=type(e).__name__;traceback.print_exc(file=sys.stderr);rc=1
+    finally:save(a.report,result)
+    print(json.dumps(result));return rc
+
+def project_rows(cases):
+    """Only directly observed original library lookup + actual compiled output."""
+    rows=[];base=cases.get('baseline')
+    if not base:return rows
+    for name,prior in [('same',base),('irrelevant',cases.get('same')),('relevant',cases.get('irrelevant')),('after',cases.get('relevant'))]:
+        c=cases.get(name)
+        if not c or not prior or c.get('error_type'):continue
+        old_same=(c['cache_key']==prior['cache_key'] and c['file_sha256']==prior['file_sha256'])
+        hit=c['actual_inductor_counters'].get('fxgraph_cache_hit',0)>0
+        # The real hit counter and the original compiled code consumption both
+        # are required. File presence by itself never means cache reuse.
+        reused=old_same and hit and c['actual_PyCodeCache_module_loaded']
+        relevant=c['delta']!=prior['delta']
+        numerical=c['output']==c['expected']
+        rows.append({'path_sha256':hashlib.sha256(c['cache_path'].encode()).hexdigest(),
+            'relevant_change':relevant,'reused':reused,'compatibility_verified':numerical})
+    return rows
+
+def bounded_child(argv,env,output,stem,limit):
+    # File logs separate the immediate process lifetime from inherited pipe EOF.
+    # A successful JSON/report never substitutes for an actual wait return.
+    import signal
+    stdout=output/(stem+'.stdout');stderr=output/(stem+'.stderr')
+    with stdout.open('xb') as out,stderr.open('xb') as err:
+        proc=subprocess.Popen(argv,env=env,stdout=out,stderr=err,start_new_session=(os.name=='posix'))
+        diag={'PID':proc.pid,'wait_contract':'immediate-child-with-file-logs','timed_out':False}
+        try:
+            rc=proc.wait(timeout=limit)
+            diag['wait_returncode']=rc
+        except subprocess.TimeoutExpired:
+            rc=None;diag['timed_out']=True;diag['poll_before_cleanup']=proc.poll()
+            for name in ('status','wchan'):
+                try:diag['proc_'+name]=(Path('/proc')/str(proc.pid)/name).read_text()[:4096]
+                except OSError:pass
+        finally:
+            if os.name=='posix':
+                try:os.killpg(proc.pid,signal.SIGTERM)
+                except ProcessLookupError:pass
+            elif proc.poll() is None:proc.terminate()
+            if proc.poll() is None:
+                try:proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    if os.name=='posix':
+                        try:os.killpg(proc.pid,signal.SIGKILL)
+                        except ProcessLookupError:pass
+                    else:proc.kill()
+                    proc.wait(timeout=5)
+            diag['final_observed_returncode']=proc.returncode
+    save(output/(stem+'.termination.json'),diag)
+    return rc,diag
+
+def publish(output,packet,capture):
+    save(output/'boot-record.json',packet)
+    try:save(output/'capture.json',capture)
+    except OSError as e:return {'boot_record_preserved':True,'auxiliary_error_type':type(e).__name__}
+    return {'captured':True}
+
+def run(a):
+    if digest(__file__)!=a.source_sha256 or os.geteuid()!=1000:raise ValueError('SUP15_SOURCE_OR_UID_MISMATCH')
+    if not 0<=a.hold_for_capture<=360 or not 0<=a.wait_binding_seconds<=90:raise ValueError('SUP15_WAIT_BOUND_INVALID')
+    until=time.monotonic()+a.wait_binding_seconds
+    while not a.binding.exists() and time.monotonic()<until:time.sleep(.1)
+    b=json.loads(a.binding.read_text())
+    if set(b)!={'role','session','environment_ref','target_sha256','source_sha256'} or b['role'] not in ('normal','challenge') or b['source_sha256']!=a.source_sha256:
+        raise ValueError('SUP15_ACTUAL_BINDING_INVALID')
+    a.output.mkdir(mode=0o700,parents=True,exist_ok=False);root=a.cache/b['session'];root.mkdir(mode=0o700,exist_ok=False)
+    cases={};receipts=[];errors=[];cleanup_error=None;started=time.monotonic();deadline=started+150
+    env=dict(os.environ,TORCHINDUCTOR_CACHE_DIR=str(root),TORCHINDUCTOR_COMPILE_THREADS='1',OMP_NUM_THREADS='2',MKL_NUM_THREADS='2')
+    try:
+        for name,delta,label in [('baseline',1,'normal'),('same',1,'normal'),('irrelevant',1,'diagnostic-label-only'),('relevant',2,'normal'),('after',2,'normal')]:
+            argv=[sys.executable,'-I','-B',__file__,'--child','--cache',str(root),'--report',str(a.output/(name+'.json')),'--delta',str(delta),'--logging-label',label]
+            before=time.monotonic();limit=min(90 if name=='baseline' else 45,max(.01,deadline-before));rc=None
+            rc,termination=bounded_child(argv,env,a.output,name,limit)
+            if termination['timed_out']:errors.append(name+':parent_deadline')
+            receipts.append({'case':name,'argv':argv,'returncode':rc,'deadline_seconds':limit,'parent_wall_ms':int((time.monotonic()-before)*1000)})
+            report=a.output/(name+'.json')
+            if report.exists():
+                fact=json.loads(report.read_text());cases[name]=fact
+                if 'cache_path' in fact:(a.output/(name+'-actual-code.py')).write_bytes(Path(fact['cache_path']).read_bytes())
+            if rc!=0:errors.append(name+':actual_compile_failed_or_timed_out');break
+    except BaseException as e:errors.append(type(e).__name__+':'+str(e)[:400]);traceback.print_exc(file=sys.stderr)
+    finally:
+        rows=project_rows(cases)
+        try:
+            if root.is_symlink() or root.parent!=a.cache or root.name!=b['session']:raise ValueError('SUP15_CLEANUP_OWNER_CHANGED')
+            shutil.rmtree(root)
+        except BaseException as e:cleanup_error=type(e).__name__
+        packet={'schema':'guard-supply-boot-record/1','profile':'supply-boot-cache-reuse-v1','role':b['role'],'environment_ref':b['environment_ref'],
+            'target_sha256':b['target_sha256'],'source_sha256':a.source_sha256,
+            'change':{'kind':'LAB-math-constant1-to2-and-logging-only-control','applied':any(r['relevant_change'] for r in rows),'denied':False,
+                'actor_sha256':a.source_sha256,'sensor_started_before_consumption':True},'rows':rows}
+        summary={'role':b['role'],'uid':os.geteuid(),'session':b['session'],'actual_cases':cases,'child_invocations':receipts,'errors':errors,
+            'cleanup_error_type':cleanup_error,'cache_root_left':root.exists(),'actual_seconds':time.monotonic()-started,
+            'producer_authenticated':False,'GPU_or_vLLM_worker_execution':False,
+            'scope':'Actual CPU Inductor compiler/FxGraphCache counters/cold-process PyCodeCache module and output. Relevant numerical constant and unrelated LAB log-label. Not every cache/model/compiler option or worker/GPU.'}
+        print(json.dumps(publish(a.output,packet,summary)),flush=True)
+    if a.hold_for_capture:time.sleep(a.hold_for_capture)
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--child',action='store_true')
+    for k in ('binding','output','cache','report'):p.add_argument('--'+k,type=Path)
+    p.add_argument('--delta',type=int,choices=(1,2));p.add_argument('--logging-label',choices=('normal','diagnostic-label-only'))
+    p.add_argument('--source-sha256');p.add_argument('--hold-for-capture',type=int,default=0);p.add_argument('--wait-binding-seconds',type=int,default=0)
+    a=p.parse_args()
+    if a.child:raise SystemExit(child(a))
+    run(a)
+if __name__=='__main__':main()

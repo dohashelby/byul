@@ -1,0 +1,418 @@
+{
+  "format": "gpu18-prototype-validation/1",
+  "scope": "EXAMPLE mock integration only",
+  "data_origin": "EXAMPLE",
+  "policy_status": "DRAFT",
+  "official": false,
+  "as_of": "2026-11-08T05:29:12+00:00",
+  "check_count": 18,
+  "scenario_count": 54,
+  "source_pack": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 33,
+    "sha256": "74219b48b241775e4c4fa153a950b2a94029147f512c731f055e91cf945cd5b6"
+  },
+  "prototype_pack": {
+    "kind": "PACK",
+    "id": "PACK-GPU18-PROTOTYPE",
+    "revision": 1,
+    "sha256": "39f3b2e7d23f80b66d02b889d618273dfefc3da6734cb4b2bca55f5d7d750073"
+  },
+  "judge_override_ids": [
+    "REQ-10",
+    "SUP-03",
+    "PLT-02"
+  ],
+  "bundle_verified": true,
+  "restored_rejudge_stable": true,
+  "gpu_started": false,
+  "real_integration_completed": false,
+  "summary_sha256": "9e6d3495b9a1a7ff189f90c599d52ba391574fd388c2772963072f06a61d0772",
+  "bundle_sha256": "6c67f96cf0274bc5208a9788ae083252ba8efa40b5053c2a0d1475fb3bd9e315",
+  "bundle_files": 155,
+  "implementation_files_sha256": {
+    "__init__.py": "fa18248d111b26cd5a0a70cfb94dd70ca30dd0afc489cde9f934003acae0062f",
+    "__main__.py": "5cf07149ac47b0a0471ec9eecdf437f6ad2d24a70b7f8a0fc49c20593bef7169",
+    "common_cases.py": "2629411efd29513698b571988e26444052a1ed9bd587eb87f700d42985a65f6e",
+    "cpu_cases.py": "2f950a02bebc12203493ce2e5baf463c330cebc58291ed49db60f2f21fdf64fb",
+    "history_cases.py": "8a8ad02e43d2f21e6415ebb4ea7440d35a6706a5467b807399e0971839c04c69",
+    "native_case.py": "4a4f14eaa2c010e204f51e391b931604dc7e48d119fad08bc98226402af71c2a",
+    "runner.py": "331b3d133ed4a2cb71ef2428a2db8264e04fa4071322aa2909c55d27a5cc0183"
+  },
+  "rows": [
+    {
+      "check_id": "REQ-08",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "선정 endpoint/필드/허용 주체·문맥과 권한 있는 실제 정책, 고정 ENV/source/image/model/argv, 요청·attempt→renderer/InputProcessor→worker/model 최종 소비값 또는 사전 제거·거부의 실제 기록이 필요하다. 허용 재사용 입력의 타입·vocab·길이·신원 검사는 별도 실제 연동 대상이다. 기존 CPU registry 진단은 재사용하되 과거 timeout 원인 해결이나 제품 소비 증거로 소급하지 않는다."
+    },
+    {
+      "check_id": "REQ-09",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "실제 vocab/모델·허용 endpoint/token-array 정책, 원인별 거부 및 consumer 소비/피해 직접 계측·동시/후속 정상 대조와 정확 request/worker Ref 필요."
+    },
+    {
+      "check_id": "REQ-10",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "UNKNOWN",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "실제 runner/worker의 sampling 최종 소비·V2 활성 및 옵션별 거부 경계, 동시/후속 정상 요청·backend/rank 결합 필요. 기본 팩 FAIL 규칙 부재는 유지."
+    },
+    {
+      "check_id": "SUP-03",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "UNKNOWN",
+        "violation": "UNKNOWN",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "승인된 config/tokenizer/template·secondary source 전체 inventory와 독립 worker의 파일 bytes 선택·실제 소비·request 결합 및 승인 제외 challenge 필요. 기본 PACK33은 관측 전용이며 이 모형의 PASS/FAIL 규칙은 모의 DRAFT 팩에만 적용."
+    },
+    {
+      "check_id": "SUP-05",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "실제 eager FD read 이전에 활성·기록되는 loader/model causal-root 공통 producer/profile, 고정 source/method/runtime/manifest 및 strict consumer 계약이 필요하다. 기존 seq29 읽기와 후속 seq125 root를 소급 결합하지 않는다. 공식 owned-Docker scope 지원 또는 실제 Kubernetes ENV/target·UID/GID·mount/subPath·PID/start/FD 귀속, 권한 있는 승인 inventory/정책, worker/rank 배정·tensor/decoder 소비와 정상/변경/정리 원자료를 각각 반환해야 한다. 이 모형은 파일 race/symlink/mount/실제 센서 인증·제품 factory를 실행하거나 증명하지 않는다."
+    },
+    {
+      "check_id": "SUP-06",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "실제 모델/양자화별 필수 tensor·rank/shard 배정과 load 반환/후처리, 공유 weights 사용 시 publisher/model/generation/layout/payload 실제 소비 producer 필요."
+    },
+    {
+      "check_id": "SUP-08",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "보고된 Mac ZIP3/tgz2의 실물·manifest/receipt/실행source·Store/전체Ref는 미확인. 실제 지원 요청필드·허용정책·진짜 model/code commit·Hub/cache provenance·최종 module/import/worker 소비 직접 생산자가 필요하다. 문자열 선택 토큰은 실제 import 증거가 아니다."
+    },
+    {
+      "check_id": "SUP-09",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "실제 loader trust 설정·고정 공급물 코드 bytes/판본·선택/거부/소비 경계와 서명된 원세대 record 및 양 세션 ENV/target/prepared 필요. 모형은 코드를 실행하지 않음."
+    },
+    {
+      "check_id": "SUP-10",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "실제 선택한 plugin 집합·autoload 설정·entry point와 호출/미호출 producer 기록, 기동 session/정상 대조·정책 결합 필요. 모형은 plugin을 import/실행하지 않음."
+    },
+    {
+      "check_id": "SUP-11",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "설치 Python 시작 옵션·환경/탐색 경로·실제 loader/module 소비 producer와 정상/변경 세션 원자료 필요. 모형의 isolated 상태는 실제 interpreter 시험이 아님."
+    },
+    {
+      "check_id": "SUP-16",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "실제 download/conversion/compile producer의 source·toolchain/ABI·설정 신원, 완료 표식/원자적 공개 계약, 중단 지점의 원 bytes·manifest·정확 SHA와 회수 receipt, 각 normal/challenge worker·boot/session 신원 및 native FILE_READ 소비 원자료가 필요하다. 이를 실제 ENV/target/prepared/POL 유효창과 기존 supply_boot producer→consumer에 결합해야 한다. 이 모형은 메모리 상태만 실행하며 실제 빌드/회수/인증/worker admission을 검증하지 않는다. 기존 GB09/GB11·FAIL/UNKNOWN·GPU 실증 및 비용 장부는 변경하지 않는다."
+    },
+    {
+      "check_id": "PLT-02",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "UNKNOWN",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "실제 IPC 종류·namespace·inode/owner/peer 주체와 허용/비허용 프로세스의 연결·읽기/쓰기·명령 소비·정상 TP 요청 증거 필요. 모형은 실제 OS 권한 시험이 아님."
+    },
+    {
+      "check_id": "LIF-06",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "선정 live/LoRA/rolling producer의 실제 부분 로딩·storage 참조·fallback, 진행 요청별 weights/cache/replica 세대·복구 정상 대조와 고정 전이 정책 필요."
+    },
+    {
+      "check_id": "LIF-08",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "과거 CPU 원 archive/argv/launcher/receipt/Store·정확Ref는 미확인. 실제 executor/topology/rank별 신원·fault 발생→감지→상위 통지·요청 결과·복구 생산자, 채택 기한과 별도 TP2 승인/환경이 필요하다. 이 모형은 GPU/TP 실측이 아니다."
+    },
+    {
+      "check_id": "LIF-11",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "선정 backend/TP rank의 실패 전후 PID/start·socket/SHM 소유 inventory, 정책 기한 안 실제 회수, 같은 환경 재기동·정상 요청, ENV/target/prepared/Ref 필요."
+    },
+    {
+      "check_id": "LIF-12",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "과거 원 archive/명령/receipt/Store·정확Ref는 미확인. 실제 자동 retry 주체·조건·원/새 attempt·잔존 작업·중복/누적 비용·정책 한도·종결 직접 기록이 필요하다. LIF10/REQ12 지원으로 LIF12 지원을 가정하지 않는다."
+    },
+    {
+      "check_id": "LIF-16",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "과거 원 archive/명령/receipt/Store·정확Ref는 미확인. 실제 백업/설정/자격참조/volume/Gateway의 승인 대상·파일 소비·검증/접수 gate·분리 세대·잔존 참조·기한 내 복구가 필요하다. 선택 snapshot/CRIU/GPU 경로는 이 기본 메모리 모형에 포함되지 않는다."
+    },
+    {
+      "check_id": "OBS-02",
+      "prototype": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "source_pack_example": {
+        "normal": "PASS",
+        "violation": "FAIL",
+        "missing": "UNKNOWN"
+      },
+      "real_integration_required": "과거 CPU 원 archive/명령/receipt/Store·정확Ref는 미확인. 동일 실행 세대의 API/로그 의미와 worker/작업/backend 독립 상태·시각·인과·실제 수집 종료가 필요하다. 실제 profiler 활성 경로와 다음 시작은 별도 원기록으로 대조해야 한다."
+    }
+  ],
+  "runs": [
+    {
+      "scenario": "normal",
+      "plan_ref": {
+        "kind": "PLAN",
+        "id": "PLAN-01M6WT3MD8M55YQCT6WWEXGN1H",
+        "revision": 1,
+        "sha256": "16a99bad8bbc98f469fba10e24dda40e91a9ca3422d0012a60fd51cadcd4d2a2"
+      },
+      "report_ref": {
+        "kind": "RPT",
+        "id": "RPT-01M6WT3MWN9D9W5S3E715YXB3K",
+        "revision": 1,
+        "sha256": "292c5db7ea6eda425cc3e4b35004a22542d77496d4feee09af8e7cfbf524eb04"
+      }
+    },
+    {
+      "scenario": "violation",
+      "plan_ref": {
+        "kind": "PLAN",
+        "id": "PLAN-01M6WT3NQE905041Q936MAN2FC",
+        "revision": 1,
+        "sha256": "07e403d64282400870603980114028d787c8136cd89ecf5838225d0ce35e445a"
+      },
+      "report_ref": {
+        "kind": "RPT",
+        "id": "RPT-01M6WT3P6NTCDC7WGV2QC648FY",
+        "revision": 1,
+        "sha256": "ae6b976b83910ef2fbf45ed1b08e1152742eca44e799a937eb9cc086ee392e4f"
+      }
+    },
+    {
+      "scenario": "missing",
+      "plan_ref": {
+        "kind": "PLAN",
+        "id": "PLAN-01M6WT3PVKAJ0GWY003TGMZ60W",
+        "revision": 1,
+        "sha256": "1e784e2b41331124b04d21b2d1fd8076e5519c3449d9a4e7719104b460745454"
+      },
+      "report_ref": {
+        "kind": "RPT",
+        "id": "RPT-01M6WT3QBFTB7HJ31EN67E2W9Z",
+        "revision": 1,
+        "sha256": "1a2bd9c100e0f6c2c7e55ca4972e63a816e33f4ab9dc3b828b0f181c98dbd38d"
+      }
+    }
+  ],
+  "source_pack_runs": [
+    {
+      "scenario": "normal",
+      "plan_ref": {
+        "kind": "PLAN",
+        "id": "PLAN-01M6WT3N51JN11Y7QCAND3Z7R2",
+        "revision": 1,
+        "sha256": "6e5999b56461e01acd0a7e2717d429fedabf9f3b45299de99f2a920178ae83a5"
+      },
+      "report_ref": {
+        "kind": "RPT",
+        "id": "RPT-01M6WT3NP3YT2PGQ2KCQZ4ZN3P",
+        "revision": 1,
+        "sha256": "54116388d0675898844cc0273a68dbb06563c2fabbd1e4135e876252ad930a39"
+      }
+    },
+    {
+      "scenario": "violation",
+      "plan_ref": {
+        "kind": "PLAN",
+        "id": "PLAN-01M6WT3P91V6TWAQRVDHXCDC64",
+        "revision": 1,
+        "sha256": "734a8356f409b7535160ef02eee2a55bbb64b998bf4d767b5d37ac60cd72d5df"
+      },
+      "report_ref": {
+        "kind": "RPT",
+        "id": "RPT-01M6WT3PT9V1F28RBMTP6DA29A",
+        "revision": 1,
+        "sha256": "6928ae1e675cff74dee05266e57cd50295d1659ed6298e2d104905e269f775e7"
+      }
+    },
+    {
+      "scenario": "missing",
+      "plan_ref": {
+        "kind": "PLAN",
+        "id": "PLAN-01M6WT3QEFQ5E8PAR9VXEDCXS1",
+        "revision": 1,
+        "sha256": "55c5d7ac0886b8c3f71910d995ea36112b7f787b71d28523328b7225335718d0"
+      },
+      "report_ref": {
+        "kind": "RPT",
+        "id": "RPT-01M6WT3QZ94ZNJP6AC223HE3NG",
+        "revision": 1,
+        "sha256": "780663f7d673055697c0e566c83d5f6c4c9450006236f44e30d593622d1c0536"
+      }
+    }
+  ],
+  "tests": {
+    "independent_review": {
+      "passed": 14,
+      "pytest_seconds": 25.13,
+      "external_process_or_network_attempts": 0,
+      "test_commit": "cd79c422ef63100ad944b0b129283c773d2c5bef",
+      "test_file_sha256": "c3b57dcb355d5d7ad9b06c02252783ac96114f2e36432d36ab01267e1a8c9283",
+      "review_sha256": "f633b10fda48d644771e898ee6549096f86f219cb210bc52e988f8de6ef8d4fc",
+      "unresolved_material_defects": 0
+    },
+    "existing_regression": {
+      "passed": 38,
+      "pytest_seconds": 43.31,
+      "paths": [
+        "tests/test_cli.py",
+        "tests/test_evidence_bundle.py",
+        "tests/invariants/test_inv_02.py",
+        "tests/invariants/test_inv_11.py"
+      ]
+    }
+  },
+  "module_commits": {
+    "common_cases.py": "f4f6a94e2ab0b08db47a6c66176eb96f508d511c",
+    "cpu_cases.py": "a9529b75e35fc2d87036d004c1ad302d825176f1",
+    "history_cases.py": "dbb4f00e308f8129b52ff629320ba69664d1ffba",
+    "native_case.py": "2fed8b388b7221f4c7af92aeab67e5eedb0d987e"
+  }
+}

@@ -1,5 +1,14 @@
 # 통합 검증 — 2026-11-06
 
+## 2026-11-08 추가: GPU18 모의 연동
+
+- 전용 `guard.gpu18_prototype`에서 18개×정상/위반/누락54사례를 실행했다. 모의 계약은 PASS18/FAIL18/UNKNOWN18, 원팩 대조는 정상 PASS16/UNKNOWN2·위반 FAIL16/UNKNOWN2·누락 UNKNOWN18이다.
+- 6개 PLAN에서 EVD108·RES108·RPT6을 생성했다. 실제 내용 주소 Store·팩 snapshot·bundle155파일을 반출/복원하고, 고정 `as_of`로 정확 Result Ref와 보고서의 동등성을 확인했다. 모두 EXAMPLE·DRAFT 정책·비공식이며 GPU 추가 기동0이다.
+- 독립 테스트14개 통과(25.13초): 저장 객체/Ref·출처·모의 사건·원팩 대조·독립 FAIL·복원/재판정·변조3종 거부·기존 출력 보존·예외 시 registry 복원·CLI. 프로세스·네트워크 차단기의 시도0이다.
+- 기존 회귀38개 통과(43.31초): `tests/test_cli.py tests/test_evidence_bundle.py tests/invariants/test_inv_02.py tests/invariants/test_inv_11.py`. 추가 엔진·모델·Docker·전체 suite 실행은 없다.
+- 최초 통합에서 directory 팩과 stored 팩의 안내 문구 차이를 발견했다. 최초 보고서부터 저장 팩으로 생성하도록 수정해 동일 경로로 대조했다. 한계 문구 제거·판정 완화·공통 코드 수정은 없다.
+- [실행·실제 연동 인계](GPU18_PROTOTYPE.md), [정확 Ref·SHA 기록](gpu18-prototype-validation-20261108.json). 기존 실증25/18은 유지한다.
+
 ## 현재 통합 소스
 
 - main `e5a8ba7589be09fa472c35276e190b117426a0ae` 위에 기존 미반영7개 commit을 적용했다. 원 commit 순서는 `97cf8cfc`, `3a115bd6`, `ee44d8dd`, `4e4da648`, `678a20d8`, `58ee6dff`, `3b3ff137`이다.

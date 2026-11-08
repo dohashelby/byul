@@ -1,6 +1,8 @@
 # GPU43 1단계 통합 현황 — 2026-11-06
 
-> **최신 상태(2026-11-08): SUP-03 R3 원실행·GB11·Ref 미생성·소유정리·현재 중지/비용 구간의 필수 검증 완료.** 실제 tool source3b3·root/no-site·L4/TP1 모델 적재는 확인됐지만 원90초 준비 기한 초과로 factory/ENV sealing·제품 EVD/RES/RPT/Store Ref에는 도달하지 못했다. 늦은 Ready를 원성공으로 바꾸지 않는다.13:23 KST 후속 원조회에서 소유3대 stopped/IP0·SSM0을 검증했고 compute/IP 장부 구간은 닫혔다. 비용$71.5797은 관측 공백을 보수 포함한 상계로 실제16h 가동/확정청구가 아니며 EBS는 계속된다. 외부 입력 대기는6열로 인계하고 새실험은 추가하지 않는다. 후속은 Draft PR #232, 기존PR228은병합됐다. [시각별 결과](FOLLOWUP_RESULTS.md)를 따른다.
+> **추가 구현(2026-11-08): 잔여18개 모의 연동 1차 버전.** GPU 추가 기동 없이 정상·위반·누락54개와 원팩 대조54개를 생성하고, 실제 Store 반출·복원·저장 팩 재판정·보고서 동등성을 확인했다. 모두 EXAMPLE/DRAFT/official=false다. 기존 실증25/18과 원래 FAIL/UNKNOWN은 유지한다. [실행 방법·실제 연동 인계](GPU18_PROTOTYPE.md)와 [검증 결과](gpu18-prototype-validation-20261108.json)를 따른다.
+
+> **이전 실측 마감 상태(2026-11-08): SUP-03 R3 원실행·GB11·Ref 미생성·소유정리·현재 중지/비용 구간의 필수 검증 완료.** 실제 tool source3b3·root/no-site·L4/TP1 모델 적재는 확인됐지만 원90초 준비 기한 초과로 factory/ENV sealing·제품 EVD/RES/RPT/Store Ref에는 도달하지 못했다. 늦은 Ready를 원성공으로 바꾸지 않는다.13:23 KST 후속 원조회에서 소유3대 stopped/IP0·SSM0을 검증했고 compute/IP 장부 구간은 닫혔다. 비용$71.5797은 관측 공백을 보수 포함한 상계로 실제16h 가동/확정청구가 아니며 EBS는 계속된다. 외부 입력 대기는6열로 인계하고 새실험은 추가하지 않는다. 후속은 Draft PR #232, 기존PR228은병합됐다. [시각별 결과](FOLLOWUP_RESULTS.md)를 따른다.
 
 팀원 인계와 1단계 종료 기준의 해석은 [TEAM_HANDOFF.md](TEAM_HANDOFF.md)를 먼저 확인한다. 기존 “42개 마감 가능”은 잠정 행정 해석이며 제품 증거 절차 완료 수로 사용하지 않는다. 아래 통합 시점의 관측과 후속 마감 자료의 시점을 구분한다.
 

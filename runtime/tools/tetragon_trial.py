@@ -5,6 +5,7 @@ import argparse
 from datetime import datetime, timezone
 import json
 import hashlib
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -62,11 +63,15 @@ def run(command, *, timeout=30):
         return subprocess.CompletedProcess(command,124,"","command timed out")
 
 
-def atomic_json(path, value):
+def atomic_json(path, value, mode=0o644):
     path=Path(path)
     path.parent.mkdir(parents=True,exist_ok=True)
     temporary=path.with_name(path.name+".next")
-    temporary.write_text(json.dumps(value,ensure_ascii=False,indent=2)+"\n")
+    temporary.unlink(missing_ok=True)
+    fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+    with os.fdopen(fd,"w",encoding="utf-8") as target:
+        os.fchmod(target.fileno(),mode)
+        target.write(json.dumps(value,ensure_ascii=False,indent=2)+"\n")
     temporary.replace(path)
 
 

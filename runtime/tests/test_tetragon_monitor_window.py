@@ -3,13 +3,14 @@ from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import json
+import os
 from pathlib import Path
 import stat
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from tools.tetragon_monitor_window import MonitorWindowGenerator, atomic_json, digest
+from tools.tetragon_monitor_window import MonitorWindowGenerator, atomic_json, digest, main, read_bytes
 from serving_runtime.operations.agent import Agent, Config
 from serving_runtime.operations.safety import evaluate
 from serving_runtime.enforcement.intent import parse_intent
@@ -274,6 +275,43 @@ class MonitorWindowTests(unittest.TestCase):
         atomic_json(self.output, {"windows": []})
         self.assertEqual(target.read_bytes(), before)
         self.assertFalse(self.output.is_symlink())
+
+    def test_explicit_owner_trust_preserves_default_and_write_restrictions(self):
+        real_fstat = os.fstat
+
+        def gateway_owner(fd):
+            info = list(real_fstat(fd))
+            info[4] = 10000
+            return os.stat_result(info)
+
+        with patch("tools.tetragon_monitor_window.os.getuid", return_value=10001), \
+             patch("tools.tetragon_monitor_window.os.fstat", side_effect=gateway_owner):
+            for owners in ((), (10002,)):
+                with self.assertRaises(ValueError):
+                    read_bytes(self.events, 1024, trusted_owner_uids=owners)
+            self.assertEqual(read_bytes(self.events, 1024, trusted_owner_uids=(10002, 10000))[0], b"")
+            self.assertEqual(self.collect()["state"], "unavailable")
+            self.generator.trusted_owner_uids = frozenset({10000})
+            self.assertEqual(self.collect()["state"], "ok")
+            for mode in (0o664, 0o646):
+                self.events.chmod(mode)
+                self.assertEqual(self.collect()["state"], "unavailable")
+            self.events.chmod(0o644)
+            target = self.root/"renamed.jsonl"
+            self.events.rename(target)
+            self.events.symlink_to(target)
+            self.assertEqual(self.collect()["state"], "unavailable")
+
+    def test_cli_passes_repeated_explicit_trusted_owner_uids(self):
+        generator = Mock(output=self.output)
+        generator.collect.return_value = {"state": "ok"}
+        args = ["monitor", "--context", "test", "--namespace", self.intent.namespace,
+                "--policy", self.name, "--status", str(self.status), "--observations", str(self.events),
+                "--output", str(self.output), "--trusted-owner-uid", "10000", "--trusted-owner-uid", "10002"]
+        with patch("sys.argv", args), \
+             patch("tools.tetragon_monitor_window.MonitorWindowGenerator", return_value=generator) as constructor:
+            self.assertEqual(main(), 0)
+        self.assertEqual(constructor.call_args.kwargs["trusted_owner_uids"], [10000, 10002])
 
 
 if __name__ == "__main__":

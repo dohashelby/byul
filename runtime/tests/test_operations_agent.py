@@ -44,6 +44,46 @@ class AgentTest(unittest.TestCase):
         self.before = {"bundle_id": "old", "approval": "verified", "policy_id": None, "mode": None, "spec_sha256": None}
         self.intent = parse_intent(intent_document())
 
+    def test_readiness_excludes_policies_without_switchable_mode_or_method(self):
+        self.agent = Agent(self.client, replace(self.agent.config, namespace=self.intent.namespace))
+        policy = {"name": "runtime-tg-secret-01", "namespace": self.agent.config.namespace,
+                  "node": "node-01", "state": "enabled", "mode": "monitor", "id": "7",
+                  "method": "sigkill_fd_install", "spec_sha256": "a" * 64}
+        for mode, method in (("monitor_only", "monitor"), ("monitor_only", "sigkill_fd_install"),
+                             ("monitor", "monitor"), ("unknown", "override_lsm")):
+            with self.subTest(mode=mode, method=method):
+                snapshot = {"policies": [
+                    {**policy, "name": f"runtime-tg-{rule}-01", "mode": mode, "method": method}
+                    for rule in ("cache", "asset")] + [policy]}
+                with patch.object(self.agent, "snapshot", return_value=snapshot):
+                    rows = self.agent.readiness(self.before, self.intent)
+                self.assertEqual([row["name"] for row in rows], [policy["name"]])
+                self.assertEqual(rows[0]["expected"], {**self.before, "policy_id": "7",
+                                                     "mode": "monitor", "spec_sha256": "a" * 64})
+
+    def test_readiness_keeps_switchable_policies_with_failed_safety_checks(self):
+        self.agent = Agent(self.client, replace(self.agent.config, namespace=self.intent.namespace))
+        for mode in ("monitor", "enforce"):
+            for method in ("override_lsm", "sigkill_fd_install", "override_syscall"):
+                with self.subTest(mode=mode, method=method):
+                    policy = {"name": "runtime-tg-secret-01", "namespace": self.agent.config.namespace,
+                              "node": "node-01", "state": "disabled", "mode": mode, "id": "7",
+                              "method": method, "spec_sha256": "a" * 64}
+                    with patch.object(self.agent, "snapshot", return_value={"policies": [policy]}):
+                        rows = self.agent.readiness(self.before, self.intent)
+                    self.assertEqual(len(rows), 1)
+                    self.assertFalse(rows[0]["checks"]["policy"])
+                    self.assertFalse(rows[0]["checks"]["collection"])
+
+    def test_readiness_excludes_policy_if_any_node_is_not_switchable(self):
+        self.agent = Agent(self.client, replace(self.agent.config, namespace=self.intent.namespace))
+        policy = {"name": "runtime-tg-secret-01", "namespace": self.agent.config.namespace,
+                  "node": "node-01", "state": "enabled", "mode": "monitor", "id": "7",
+                  "method": "sigkill_fd_install", "spec_sha256": "a" * 64}
+        snapshot = {"policies": [policy, {**policy, "node": "node-02", "mode": "monitor_only"}]}
+        with patch.object(self.agent, "snapshot", return_value=snapshot):
+            self.assertEqual(self.agent.readiness(self.before, self.intent), [])
+
     def test_state_changed_and_target_and_lease(self):
         op = operation()
         self.assertEqual(self.agent.validate(op, self.before, self.intent), self.before)

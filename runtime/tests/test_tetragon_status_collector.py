@@ -1,15 +1,69 @@
 import json
+import os
 from pathlib import Path
 import tempfile
 import time
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
+from tools import tetragon_status
 from tools.tetragon_status import StatusCollector
+from serving_runtime.enforcement.recovery import RecoveryTracker
 from serving_runtime.mvp.tetragon_state import read_tetragon_state
 
 
 class CollectorTests(unittest.TestCase):
+    def test_state_and_recovery_permissions_under_umask_with_stale_next(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / 'state.json'
+            recovery_path = root / 'state.json.recovery.json'
+            for path in (output, recovery_path):
+                temporary = path.with_name(path.name + '.next')
+                temporary.write_text('{}')
+                temporary.chmod(0o664)
+            recovery = RecoveryTracker('kind-test', recovery_path,
+                baseline_path=root / 'missing-baseline', identities_path=root / 'identities',
+                heartbeat_path=root / 'heartbeat', observations_path=root / 'observations')
+            collector = StatusCollector('kind-test', output, root / 'evidence', recovery=recovery,
+                runner=lambda command: SimpleNamespace(returncode=1, stdout=''))
+            previous = os.umask(0o002)
+            try:
+                snapshot = collector.collect()
+            finally:
+                os.umask(previous)
+            self.assertEqual(snapshot['monitoring']['state'], 'not_configured')
+            for path, mode in ((output, 0o644), (recovery_path, 0o600)):
+                self.assertEqual(path.stat().st_mode & 0o777, mode)
+                self.assertEqual(path.stat().st_mode & 0o022, 0)
+                self.assertEqual(json.loads(path.read_text())['context'], 'kind-test')
+                self.assertFalse(path.with_name(path.name + '.next').exists())
+
+    def test_baseline_permissions_under_umask_with_stale_next(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            baseline = root / 'baseline.json'
+            temporary = baseline.with_name(baseline.name + '.next')
+            temporary.write_text('{}')
+            temporary.chmod(0o664)
+            snapshot = {'state': 'ok', 'generated_at': '2026-11-08T00:00:00+00:00',
+                'policies': [{'name': 'policy', 'node': 'node', 'namespace': 'test',
+                    'mode': 'monitor_only', 'spec_sha256': 'a' * 64}], 'verifications': []}
+            argv = ['tetragon_status', '--context', 'kind-test', '--output', str(root / 'state.json'),
+                '--evidence-dir', str(root / 'evidence'), '--capture-baseline', str(baseline)]
+            previous = os.umask(0o002)
+            try:
+                with patch('sys.argv', argv), patch.object(StatusCollector, 'collect', return_value=snapshot), \
+                     patch('builtins.print'):
+                    self.assertEqual(tetragon_status.main(), 0)
+            finally:
+                os.umask(previous)
+            self.assertEqual(baseline.stat().st_mode & 0o777, 0o644)
+            self.assertEqual(baseline.stat().st_mode & 0o022, 0)
+            self.assertEqual(json.loads(baseline.read_text())['policies'], snapshot['policies'])
+            self.assertFalse(temporary.exists())
+
     def test_queries_real_node_scope_and_never_changes_policy(self):
         calls=[]
         def run(command):

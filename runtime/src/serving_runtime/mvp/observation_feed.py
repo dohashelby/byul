@@ -488,7 +488,7 @@ class ObservationFeed:
         temporary = path.with_name(path.name+".next")
         temporary.write_text(json.dumps({"schema_version":"runtime-tetragon-health-receipts/1.0",
             "context":self.kube_context,"nodes":nodes}, ensure_ascii=False)+"\n")
-        temporary.chmod(0o600)
+        temporary.chmod(0o640)
         temporary.replace(path)
 
     def collect(self) -> tuple[dict[str, Any], str]:

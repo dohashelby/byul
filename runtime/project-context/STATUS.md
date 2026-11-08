@@ -1,6 +1,16 @@
 # 런타임 작업 상태
 
-최종 갱신: 2026-11-06
+최종 갱신: 2026-11-08
+
+- 2026-11-08 AWS 6회차 umask 보정(기준 `byul_runtime` `f27dbb8`, 미커밋): `tools.tetragon_trial.atomic_json`에 선택 `mode`(기본 0644)를 추가했다. 오래된 `.next`를 unlink한 뒤 O_CREAT|O_EXCL로 새로 만들고 fchmod로 권한을 정해 원자 교체한다. `tetragon_status`의 상태·baseline은 0644를 명시하며 recovery의 기존 0600은 유지했다. GPU lab README에 runtime-agent의 Ubuntu umask 002 주의와 명시 권한을 기록했다.
+- 근거: umask 002·077, 선택 mode, 오래된 0664 `.next` 및 상태·baseline·recovery 권한 회귀시험 4건 추가. 관련 25건 통과. runtime에서 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 전체 837건 중 721 통과·115 skip·기존 `test_gateway_serves_snapshot_without_kubernetes_mutation` 소켓 생성 PermissionError 1건. 로그 `/tmp/byul-aws6-permissions-unittest.log`. `git diff --check` 통과.
+- 미확인·다음: 실제 AWS의 sudo/runtime-agent 수집과 안전 조건 재판정은 미실행이며 Claude 대화형 검수 후 현장 확인이 필요하다. 새 파일 없음. 기존 미추적 AWS 6회차 결과·인계 문서는 보존했다. contracts/update 수정, 8700·5173 프로세스 조작, 커밋·push 없음.
+
+- 2026-11-06 AWS 5회차 후속 보정(기준 `byul_runtime` `6dcd376`, 미커밋): 식별 수집기가 argv0·PATH로 찾은 실행 경로를 대상 프로세스 루트에서 해석하고 exe와 device/inode가 같을 때만 증명과 함께 기록한다. Gateway는 실제 binary 또는 증명된 별칭만 수용한다. sentinel receipt는 0640, monitor window는 반복 가능한 `--trusted-owner-uid`로 명시 UID만 추가 신뢰하며 기존 소유자 기본값·그룹/기타 쓰기 거부를 유지했다. Gateway 식별 인자, 그룹 10010·0640 출력을 위한 setgid 폴더/UMask와 새 `host/byul-tetragon-identities.service`, AWS sentinel·Post 전용 v2 정책 및 kustomization 연결을 추가했다. README에 runtime-agent의 그룹 10000 읽기, crictl·`/etc/crictl.yaml`, 플랫폼/에이전트 감시 기간(LAB 60·운영 기본 86400, max)을 기록했다.
+- 근거: 관련 34건 통과(신규 8건: 가짜 procfs에서 실제 셸 실행·별칭 증명/거부·UID 신뢰/쓰기 권한 회귀 등), GPU lab/SGLang 로컬 kustomize 렌더·서비스 `systemd-analyze verify`·`git diff --check` 통과. 지정 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests` 전체 833건: 717 통과·115 skip·기존 `test_gateway_serves_snapshot_without_kubernetes_mutation` 소켓 생성 PermissionError 1건. 로그 `/tmp/byul-aws5-runtime-unittest.log`.
+- 미확인·다음: kind 조회는 API 소켓 `Operation not permitted`로 실패했다. sentinel 정책은 기존 로컬 후보를 복사했고 comparable spec SHA-256 `1b09636c9e787bab5363e9c024f92fc615957ccb9853b3c07f0145373333b25e`가 기존 로컬 baseline과 일치하나 현재 live 정책과 직접 대조하지 못했다. Claude 검수 후 소켓 허용 환경의 전체 시험·정책 읽기 대조와 AWS 수집기/Gateway 재배포 시 실제 별칭·그룹 읽기·sentinel 새 receipt·정상 복구를 확인해야 한다. 상대 argv0 경로·상대 PATH 항목과 증명 불가 경로는 별칭으로 채택하지 않는다. AWS 접속/적용, kind 변경, 지정 포트 프로세스 조작, contracts/update 수정, 커밋·push 없음. 기존 platform/web 3개 변경·미추적 `aws-gpu-lab-인계.md`는 보존했으며 Claude 대화형 검수를 기다린다.
+
+- 2026-11-06 AWS agent-state 422 보정: safety의 기존 monitor/enforce·override_lsm/sigkill_fd_install/override_syscall 조건을 공통 함수로 사용하고 readiness에서 전환 불가 정책을 제외했다. secret-01과 monitor_only cache/asset 혼합 스냅샷·모드/방식별 제외·안전 조건 실패 정책 유지·노드별 혼합 회귀시험 및 실제 readiness 출력의 platform PolicyReadiness/Heartbeat 검증 시험을 추가했다. platform 제품 코드·agent-state 스키마는 유지했다. 에이전트 시험 32건 통과(`/tmp/byul-readiness-agent-tests.log`). runtime 지정 전체 825건: 709 통과·115 skip·기존 소켓 PermissionError 1건(`/tmp/byul-readiness-runtime-tests.log`). API 지정 uv 명령은 기본 캐시 읽기 전용 오류로 시작 실패(`/tmp/byul-readiness-api-prescribed.log`); 기존 문서의 `/tmp` 캐시·offline·epoll 20ms 보조 설정으로 tests/test_operations.py 39 통과·1 skip(`/tmp/byul-readiness-api-tests.log`), 신규 모델 검증 별도 1건 통과. 정책 하나의 유효하지 않은 값으로 보고 전체가 거부되는 API 구조는 남으며 AWS 현장 재검증은 미실행이다. 기준 byul_runtime 0c827bd, 새 파일 없음, 기존 platform/web·미추적 문서 보존, contracts/update 수정·8700/5173/8080 프로세스 조작·커밋·push 없음. 다음은 Claude 검수와 AWS 에이전트 재보고 확인이다.
 
 - 2026-11-06 AWS 묶음 적용 결과에 kubectl 출력이 섞여 `STATUS_UNKNOWN`이 되는 원인을 수정했다. `bundle_tools._run`의 자식 stdout을 부모 stderr로 보내며 CLI 성공/오류 분기의 JSON 한 줄 출력과 `operations/agent.py`의 전체 stdout 엄격 파싱은 유지했다. 실제 CLI·apply·가짜 kubectl 서브프로세스로 성공/복원/조회 불가의 단일 JSON, 일반 CLI 성공 문구, stderr 진행/진단 출력과 링크 상태를 확인하는 회귀시험 1건(4개 경우)을 추가했다. runtime에서 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest tests.test_bundle_tools tests.test_operations_agent`: 40건 통과. 지정 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 822건 중 706 통과·115 skip·기존 `test_gateway_serves_snapshot_without_kubernetes_mutation` 소켓 PermissionError 1건, 로그 `/tmp/byul-bundle-operation-result-tests.log`. 실제 AWS/sudo 재검증은 미실행이다. 기준 `byul_runtime` `93558a6`, 새 파일 없음, 기존 platform/web 3개 변경·미추적 인계 문서 보존, contracts/update 수정·8700/5173/8080 프로세스 조작·커밋·push 없음. 다음은 Claude 검수와 AWS 현장 확인이다.
 
@@ -518,3 +528,19 @@
 - 내부 형식: agent-state의 선택 bundles(묶음 ID·SHA-256, 최대 256), 목록 actor와 미조회 등록 서버, claimed_at/running_at을 추가했다. 에이전트 상태 조회의 타 서버 정보도 제외한다. contracts/update는 수정하지 않았다. root 0600 토큰·kind 4역할 build 명령·대상 일치·노드 볼륨 준비와 에이전트 탈취 시 임의 root 적용 위험은 `docs/원격운영_사용과검증.md` §5/8/9/10 및 설계 위험 절에 기록했다.
 - 검증: runtime 지정 전체 792건(676 통과·115 skip·기존 소켓 PermissionError 1), 에이전트/묶음 34건 전부 통과. web 최종 타입 검사·전체 109건 통과. API 지정 uv는 읽기 전용 기본 캐시 lock 생성 실패. /tmp 캐시·offline·기존 epoll 20ms 보조 설정 전체는 216 통과·1 skip·기존 소켓 PermissionError 1; 운영 API/실제 export→agent→apply→Gateway 객체 통합은 20 통과·실제 HTTP 변형 1 skip. 오류를 제품/시험 수정으로 우회하지 않았다. 소켓 허용 환경 전체 통과와 kind 재확인은 남았다.
 - 로그: `/tmp/byul-remote-ab-runtime-all.log`, `-runtime-targeted.log`, `-web-final.log`, `-api-prescribed.log`, `-api-all.log`, `-api-targeted.log`(공통 접두사 `/tmp/byul-remote-ab`). 이번 추가 파일은 web의 `api/operationSession.ts`, `pages/RuntimeOperations.module.css`; 기존 미추적 agent/API/화면/시험과 인계/계약 후보 문서를 보완했다. `git diff --check` 통과, HEAD b712bd5·byul_runtime 유지, 기존 미커밋/미추적 작업 보존. 커밋·push·PR 없음. kind·실서버·GPU·sudo/서비스 설치·브라우저 시각 검수는 미실행이며 Claude 대화형 검수에 인계한다.
+
+## 2026-11-06 AWS GPU 5회차 (Claude 실행, 기준 0c827bd + 6dcd376)
+
+- 근거: [5회차 결과](../docs/AWS_GPU_서버5회차_결과_20261106.md), 증거 `~/.local/state/serving-runtime/aws-lab/evidence-20261106-run5.tgz`(SHA-256 `2f73bfa1…`).
+- 실서버 통과: 에이전트 실제 설치(systemd·sudoers), 묶음 원격 적용 42초·되돌리기 39초·STATE_CHANGED 거부, AWS 커널 Sigkill 실측, 안전 조건 6개 충족 후 대시보드 경로 Sigkill 전환 10초·exit 137·monitor 복귀 4초, vLLM·SGLang 엔진 컨테이너 내 Sigkill(읽은 프로세스만 종료, 엔진 생존).
+- 서버 임시 우회 5건(식별 인자·sentinel·실행 경로 별칭·생존 기록 권한·모니터 입력 소유자)은 이후 코드·배포 정의로 수정했으나 서버 미검증.
+- 미확인·다음: 플랫폼 새 내보내기 묶음(`bundle.apply`)의 AWS 적용 1회, 위 수정의 우회 없는 서버 확인, 엔진 본체 직접 읽기 시 503·복구 시간.
+- 화면 검수(노트북): 운영 요청 증거 해시 축약·한국어 24시간 시각·에이전트 판단 시점 구분·Tetragon 전환 카드 정리. web 134건 통과.
+- 최종 시험: runtime 833건 통과, platform API 237건 통과, web 타입 검사·134건 통과, `git diff --check` 통과.
+
+## 2026-11-08 AWS GPU 6회차 (Claude 실행, 기준 f27dbb8)
+
+- 근거: [6회차 결과](../docs/AWS_GPU_서버6회차_결과_20261108.md), 증거 `~/.local/state/serving-runtime/aws-lab/evidence-20261108-run6.tgz`(SHA-256 `af4de3fb…`).
+- 실서버 통과: 플랫폼 새 내보내기 묶음 `bundle.apply` 49초(정책 r4·환경 r2), 5회차 임시 우회 없이 복구 4조건 healthy·모니터 기록 ok(`--trusted-owner-uid 10000`)·실행 경로 별칭, 안전 조건 6개 충족 후 Sigkill 전환 15초·exit 137·monitor 복귀 16초.
+- 새 문제: runtime-agent의 pam_umask 002로 상태 파일 0664 → 명시 권한 쓰기로 수정(서버 재확인은 다음 회차).
+- 미확인: 엔진 본체 직접 읽기 시 503·복구 시간(선택).

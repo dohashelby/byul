@@ -26,7 +26,7 @@ from ..enforcement.intent import load_intent, TETRAGON_RULE_MODES
 from ..enforcement.tetragon import comparable_spec
 from ..mvp.policy_bundle import verify_policy_bundle
 from ..mvp.tetragon_state import read_tetragon_state
-from .safety import evaluate, recent
+from .safety import evaluate, is_mode_switch_target, recent
 
 ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 REQUIRED_ROLES = {"gateway_policy", "policy_approvals", "target", "enforcement_intent"}
@@ -244,6 +244,10 @@ class Agent:
         rows = []
         review = self.review()
         for name in sorted({p["name"] for p in snapshot.get("policies", []) if p.get("namespace") == self.config.namespace}):
+            policies = [p for p in snapshot.get("policies", [])
+                        if p.get("name") == name and p.get("namespace") == self.config.namespace]
+            if not all(is_mode_switch_target(p) for p in policies):
+                continue
             ready = evaluate(snapshot, name, intent, review, self.monitor_seconds)
             if ready["expected"] and all(ready["expected"].values()):
                 if len({p.get("node") for p in snapshot.get("policies", []) if p.get("name") == name}) != 1:

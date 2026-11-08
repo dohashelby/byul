@@ -5,6 +5,7 @@ import styles from "./RuntimeOperations.module.css";
 import { CHECK_LABELS, enforceReady, operationApi, type Actor, type Operation, type AgentState, type Operations, type Readiness } from "../api/operations";
 
 import { useOperationToken } from "../api/operationSession";
+import { formatLocal } from "../lib/time";
 
 const ROLE_LABELS: Record<string, string> = { viewer: "조회자", runtime_operator: "운영 요청자", approver: "승인자", agent: "에이전트" };
 const CAPABILITY_REASONS = {
@@ -13,10 +14,10 @@ const CAPABILITY_REASONS = {
   capability_missing: "미확인: 차단 능력 정보 또는 커널 정보 없음",
 };
 
-export function OperationCredentials({ token, setToken, actor }: { token: string; setToken: (v: string) => void; actor?: Actor }) {
+export function OperationCredentials({ token, setToken, actor, unknownRoleLabel = "현재 역할: 조회 후 확인" }: { token: string; setToken: (v: string) => void; actor?: Actor; unknownRoleLabel?: string }) {
   const [draft, setDraft] = useState("");
   return <div className="row wrap">
-    {token ? <><span>운영 토큰 저장됨 · 현재 역할: {actor ? `${ROLE_LABELS[actor.role]} (${actor.role}) · ${actor.id}` : "조회 후 확인"}</span>
+    {token ? <><span>운영 토큰 저장됨 · {actor ? `현재 역할: ${ROLE_LABELS[actor.role]} (${actor.role}) · ${actor.id}` : unknownRoleLabel}</span>
       <button className="btn" type="button" onClick={() => { setToken(""); setDraft(""); }}>토큰 지우기</button></> : <>
       <label className="small">운영 토큰 <input className="input" type="password" autoComplete="off" value={draft} onChange={e => setDraft(e.target.value)} /></label>
       <button className="btn" type="button" disabled={!draft.trim()} onClick={() => { setToken(draft.trim()); setDraft(""); }}>토큰 저장</button>
@@ -54,27 +55,33 @@ export function BundleApplyRequest({ policyId, revision, environmentId, environm
 }
 
 function MonitorWindows({ row }: { row: Readiness }) {
-  if (!row.monitor_windows?.length) return <p>모니터 창 없음 · 관측·상태 갱신 필요</p>;
+  if (!row.monitor_windows?.length) return <p>현재 모니터 창 없음 · 관측·상태 갱신 필요</p>;
   return <div>{row.monitor_windows.map((window, index) => <p key={`${window.node}-${index}`}>
-    {window.node} · 창 시작 {timeLabel(window.since)} · 마지막 확인 {timeLabel(window.until)} · {window.continuous ? "연속 관측" : "관측 공백"}
+    현재 모니터 창 · {window.node} · 창 시작 {timeLabel(window.since)} · 마지막 확인 {timeLabel(window.until)} · {window.continuous ? "연속 관측" : "관측 공백"}
     {` · 이벤트 ${window.event_count}건 · 검토 ${window.reviewed_event_count}/${window.event_count}건 · 오탐 ${window.false_positive_count}건`}
     {window.reviewed_event_count < window.event_count ? " · 미검토 있음" : " · 미검토 없음"}
   </p>)}</div>;
 }
 
-function PolicyChecks({ row }: { row: Readiness }) {
-  return <ul>{Object.entries(CHECK_LABELS).map(([key, label]) => <li key={key}>{row.checks[key] ? "충족" : "미충족"} · {label}
-    {key === "monitor_period" && <MonitorWindows row={row} />}</li>)}</ul>;
+function PolicyChecks({ row, reportedAt }: { row: Readiness; reportedAt?: string }) {
+  const reported = timeLabel(reportedAt);
+  return <div>
+    <p title={reported}>에이전트 판단(보고 시각 {reported === "미확인" ? reported : reported.slice(-8)} 기준)</p>
+    <ul>{Object.entries(CHECK_LABELS).map(([key, label]) => <li key={key}>{row.checks[key] ? "충족" : "미충족"} · {label}</li>)}</ul>
+    <MonitorWindows row={row} />
+  </div>;
 }
 
 export function ModeRequests() {
   const [token, setToken] = useOperationToken();
   const [data, setData] = useState<Operations | null>(null);
   const [confirmation, setConfirmation] = useState("");
+  const [selection, setSelection] = useState<{ server: string; name: string; mode: string } | null>(null);
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
-  useEffect(() => { setData(null); setConfirmation(""); setMessage(""); }, [token]);
+  useEffect(() => { setData(null); setSelection(null); setConfirmation(""); setMessage(""); }, [token]);
   async function load() {
+    setSelection(null); setConfirmation("");
     try { setData(await operationApi<Operations>(token)); setMessage(""); }
     catch (e) { setMessage(e instanceof Error ? e.message : "조회 실패"); }
   }
@@ -86,23 +93,32 @@ export function ModeRequests() {
       const item = await operationApi<{id: string}>(token, "", { kind: "tetragon.mode", server: agent.server,
         expected: row.expected, policy_name: name, mode, confirmation: mode === "enforce" ? "ENGINE_RESTART" : undefined });
       setMessage(`전환 요청 등록: ${item.id}`);
+      setSelection(null);
       setConfirmation("");
     } catch (e) { setMessage(e instanceof Error ? e.message : "요청 실패"); }
     finally { setPending(false); }
   }
   return <section className="card card-pad stack"><h2>정책 모드 전환 요청</h2>
-    <div className="row wrap"><OperationCredentials token={token} setToken={setToken} actor={data?.actor} /><button className="btn" disabled={!token} onClick={load}>전환 조건 조회</button></div>
-    <p>Sigkill 계열: 엔진 종료 → Gateway 503 → 재시작</p>
-    <label>확인 입력: ENGINE_RESTART <input aria-label="Sigkill 확인 입력" className="input" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
-    {data?.agents.map(agent => <div key={agent.server} className="stack"><strong>{agent.server} · 마지막 조회 {agent.last_poll_at ?? "미확인"}</strong>
-      {agent.policies.map(row => <div key={row.name} className="notice"><strong>{row.name} · {row.expected.mode}</strong>
-        <PolicyChecks row={row} />
+    <div className="row wrap"><OperationCredentials token={token} setToken={setToken} actor={data?.actor} unknownRoleLabel="역할 미확인(전환 조건 조회 시 확인)" /><button className="btn" disabled={!token} onClick={load}>전환 조건 조회</button></div>
+    {data?.agents.map(agent => <div key={agent.server} className="stack"><strong>{agent.server} · 마지막 조회 {timeLabel(agent.last_poll_at)}</strong>
+      {agent.policies.map(row => {
+        const mode = selection?.server === agent.server && selection.name === row.name ? selection.mode : "";
+        const needsConfirmation = mode === "enforce" && ["sigkill_fd_install", "override_lsm", "override_syscall"].includes(row.method ?? "");
+        return <div key={row.name} className="notice"><strong>{row.name} · {row.expected.mode}</strong>
+        <PolicyChecks row={row} reportedAt={agent.at} />
         {row.checks.capability && row.capability_basis && <p>확인: {row.capability_basis === "live_trial" ? "실측 시험으로 확인" : "사전 점검으로 확인"}</p>}
         {!row.checks.capability && row.capability_reason && <p>{CAPABILITY_REASONS[row.capability_reason]}</p>}
         {!enforceReady(agent, row) && <p>차단 전환 조건 미충족 또는 상태 갱신 필요</p>}
-        <button className="btn" disabled={pending || !token || !enforceReady(agent, row) || confirmation !== "ENGINE_RESTART"} onClick={() => request(agent, row.name, "enforce")}>차단으로 전환</button>{" "}
-        <button className="btn" disabled={pending || !token} onClick={() => request(agent, row.name, "monitor")}>탐지로 전환</button>
-      </div>)}
+        <label>전환 모드 <select className="input" aria-label={`${agent.server} · ${row.name} 전환 모드`} value={mode} disabled={pending} onChange={e => {
+          setSelection({ server: agent.server, name: row.name, mode: e.target.value }); setConfirmation("");
+        }}><option value="">전환 요청 선택</option><option value="enforce">enforce (차단)</option><option value="monitor">monitor (탐지)</option></select></label>
+        {needsConfirmation && <>
+          <p>Sigkill 계열: 엔진 종료 → Gateway 503 → 재시작</p>
+          <label>확인 입력: ENGINE_RESTART <input aria-label="Sigkill 확인 입력" className="input" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
+        </>}
+        <button className="btn" disabled={pending || !token || !mode || (mode === "enforce" && !enforceReady(agent, row)) || (needsConfirmation && confirmation !== "ENGINE_RESTART")}
+          onClick={() => request(agent, row.name, mode)}>{mode === "enforce" ? "차단으로 전환" : mode === "monitor" ? "탐지로 전환" : "전환 요청"}</button>
+      </div>; })}
     </div>)}
     {message && <p role="status">{message}</p>}<Link to="/runtime/operations">운영 요청 목록</Link>
   </section>;
@@ -122,7 +138,17 @@ const REASON_LABELS: Record<string, string> = {
 function timeLabel(value?: string) {
   if (!value) return "미확인";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "미확인" : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? "미확인" : formatLocal(value);
+}
+function evidenceHashes(hashes: string[] = []) {
+  return hashes.filter(hash => !/^0{64}$/.test(hash));
+}
+function EvidenceSummary({ hashes }: { hashes?: string[] }) {
+  const evidence = evidenceHashes(hashes);
+  if (!evidence.length) return <>없음</>;
+  return <span className={`mono ${styles.evidence}`} title={evidence.join("\n")}>
+    {evidence[0].slice(0, 12)}…{evidence.length > 1 && ` 외 ${evidence.length - 1}개`}
+  </span>;
 }
 function stateLabel(op: Operation) {
   return STATE_LABELS[op.state] ?? op.state;
@@ -237,7 +263,7 @@ export function RuntimeOperationsPage() {
           <td>요청: {op.requested_by}<div>승인: {op.approvals.map(a => `${a.token_id}${a.self_approval ? " (자기 승인)" : ""}`).join(", ") || (op.approval_required ? "승인 대기" : "별도 승인 없음")}</div></td>
           <td>요청: {timeLabel(op.created_at)}<div>결과: {timeLabel(op.result?.finished_at)}</div></td>
           <td><ResultSummary op={op} /></td>
-          <td>{op.result?.evidence_sha256.length ? op.result.evidence_sha256.map(hash => <div className="mono" key={hash} style={{ overflowWrap: "anywhere", maxWidth: 220 }}>{hash}</div>) : "없음"}</td>
+          <td><EvidenceSummary hashes={op.result?.evidence_sha256} /></td>
           <td>{op.state === "requested" && (data.actor?.role === "approver" || (data.lab_self_approval && data.actor?.id === op.requested_by)) &&
             <button className="btn" disabled={pending || !approvalAllowed(op, data)} title={!approvalAllowed(op, data) ? "자기 요청은 승인할 수 없습니다" : undefined}
               onClick={e => { e.stopPropagation(); void approve(op.id); }}>승인</button>}</td>
@@ -253,12 +279,13 @@ export function RuntimeOperationsPage() {
       <p>실행 전 현재 적용 묶음: {detail.result?.before?.bundle_id ?? "미확인"} · 실행 후 현재 적용 묶음: {detail.result?.after?.bundle_id ?? "미확인"}</p>
       <div>결과: <ResultSummary op={detail} /></div>
       {detail.result?.steps.map((s, i) => <div key={i}>{STEP_LABELS[s.stage] ?? s.stage}: {STEP_STATES[s.state] ?? s.state}</div>)}
-      {detail.result?.evidence_sha256.map(hash => <div className="mono" key={hash} style={{ overflowWrap: "anywhere" }}>증거 SHA-256: {hash}</div>)}
+      {evidenceHashes(detail.result?.evidence_sha256).map(hash => <div className="mono" key={hash} style={{ overflowWrap: "anywhere" }}>증거 SHA-256: {hash}</div>)}
+      {!evidenceHashes(detail.result?.evidence_sha256).length && <p>증거 SHA-256: 없음</p>}
       {detail.state === "unknown" && <p className="notice">서버 상태를 수동 확인하세요. 자동으로 다시 실행하지 않습니다.</p>}
     </section>}
     <section className="card card-pad stack"><h2>에이전트 서버 상태</h2>
       {data?.agents.map(a => <div key={a.server}><strong>{a.server}</strong> · 에이전트 마지막 조회 {timeLabel(a.last_poll_at)} · 상태 보고 {timeLabel(a.at)} · 현재 적용 묶음 {a.current?.bundle_id ?? "미확인"}
-        {a.policies.map(row => <div key={row.name}><strong>{row.name}</strong><PolicyChecks row={row} /></div>)}
+        {a.policies.map(row => <div key={row.name}><strong>{row.name}</strong><PolicyChecks row={row} reportedAt={a.at} /></div>)}
       </div>)}
       {data?.agents.length === 0 && <p>등록된 에이전트가 없습니다.</p>}
     </section>

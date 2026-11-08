@@ -4,7 +4,7 @@
 
 - 기존 모의 결과와 별도로 새 실제 로컬 관측14ID를 확보했다. LIF-08·12·16, OBS-02에는 이번 새 실제 실행이 없다. 전체 제품 질문 완료 수와 구분한다.
 - 원0.31 renderer/InputProcessor 새6사례(수용3·표준거부3), SamplingParams 정상/범위 거부, SUP08의 trust-MM 옵션 함수6사례를 실제로 호출했다. renderer4사례/processor5사례로 실제 도달 범위를 구분한다.
-- 별도 설치 vLLM0.29 CPU에서 새 극소형 모델로 정상2요청·각2출력토큰을 확인했다. 원0.31 엔진/GPU 성공으로 승격하지 않는다. 실제 engine init57.308초·실효CPU KV cache1GiB·Worker정상종료뒤내부Core강제종료·부모종료후동일PID/start부재를 원자료대로 기록했다.
+- 별도 설치 vLLM0.29 CPU에서 새 극소형 모델로 정상2요청·각2출력토큰을 확인했다. 원0.31 엔진/GPU 성공으로 승격하지 않는다. LLM 호출 직전→Ready 표기57.308초(후속 설정/proc 수집 포함)·실효CPU KV cache1GiB·Worker정상종료뒤내부Core강제종료·부모종료후동일PID/start부재를 원자료대로 기록했다.
 - S1 host11component기록 중10completed·PLT02 metadataassert1불충족/exit1을 유지했다. 별도 자기 소유 user/PID/mount namespace의 같은probe4조건은 충족했다. hostUID1000과 namespaceUID0 매핑을 구분하고 host권한/정책을 바꾸지 않았다.
 - SUP16은 새파일의 정상2·거부2/자식4실행·16assert 확인이다. 고정writer API/parser 범위이며 전체writer·native worker·제품factory 검증과 구분한다.
 - 신규7도구의 Python3.12 구문·CLI help 및 engine OOV 라벨만 고친 AST 동등성을 확인했다. 실제API 입력 사례가 직접 기능 검증이며 기존 모의/52tests·heavy모델/전체suite를 새 성과로 반복 집계하지 않는다.

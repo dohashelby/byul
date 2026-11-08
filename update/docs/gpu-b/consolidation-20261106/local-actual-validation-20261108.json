@@ -105,11 +105,12 @@
       "negative SamplingParams.temperature",
       "out-of-vocabulary token 42"
     ],
-    "actual_LLM_init_seconds": 57.30823308302206,
     "effective_CPU_KV_cache_bytes": 1073741824,
     "worker_shutdown": "graceful worker followed by internal EngineCore force kill; not all-graceful",
     "post_parent_exit": "same parent/tracker/core/worker PID+start identities absent; owned short tmp absent",
-    "original_031_profile_pass_claimed": false
+    "original_031_profile_pass_claimed": false,
+    "before_LLM_call_to_ready_marker_seconds": 57.30823308302206,
+    "timing_scope": "before_actual_cpu_engine to actual_cpu_engine_ready markers; includes post-constructor config/proc collection; not pure constructor time or comparable to past GPU deadline"
   },
   "ipc_scope": {
     "host_probe_metadata_complete": false,
@@ -1810,6 +1811,12 @@
     },
     "unresolved_material_defects_in_published_scopes": 0,
     "preserved_host_ipc_assertion_failure_count": 1,
-    "root_publication_consistency": "14 IDs, 4 without new execution, 37 scoped records, source hashes and EXAMPLE flags checked"
+    "root_publication_consistency": "14 IDs, 4 without new execution, 37 scoped records, source hashes and EXAMPLE flags checked",
+    "consolidated_review": {
+      "sha256": "4808fa6d5ce9c8927d1260872ad3dc139fc9259aa3b7db3ffbfa11b3c8f3debc",
+      "reviewed_head": "3d37527d1833fb93635b41824abf747e5f95989a",
+      "reviewed_public_json_sha256": "af0bed90c2e0478680418fdd2de20c26c2de5f08518298a47f41ac200859a77c",
+      "followup_change": "Timing scope wording only and this review reference; execution records unchanged"
+    }
   }
 }

@@ -20,7 +20,7 @@
 
 원0.31의6사례는 수용3·표준 거부3이다. 정상 텍스트·직접 token-array는 renderer→InputProcessor, 길이17토큰의 거부는 renderer, 두 embedding 사례는 InputProcessor 직접 호출에서 관측했다. 원 case명 `new_reused_tokens`의 입력은 `prompt_token_ids:[8,9,10]`이며 kv/reused 요청 필드의 정책 검사가 아니다. 이벤트는 호출 위치를 확인하는 근거로 쓰고, 성공/거부는 실제 반환과 원 예외로 구분한다.
 
-CPU 엔진은 실제 LLM 초기화 구간57.308초를 관측했다. CPU 로그의 실효 KV cache는1GiB이며 요청한16MiB 값과 구분한다. worker의 정상 종료 뒤 엔진 내부 관리자가 EngineCore를 강제 종료한 로그를 보존했다. 부모 종료 후 같은 PID/start의 부모·tracker·Core·worker 모두 부재, 자기 소유 임시 경로 제거를 확인했으며 전체가 graceful이었다고 쓰지 않는다.
+CPU 엔진은 LLM 호출 직전→Ready 표기 구간57.308초(생성자 반환 후 설정·프로세스 정보 수집 포함)를 관측했다. CPU 로그의 실효 KV cache는1GiB이며 요청한16MiB 값과 구분한다. worker의 정상 종료 뒤 엔진 내부 관리자가 EngineCore를 강제 종료한 로그를 보존했다. 부모 종료 후 같은 PID/start의 부모·tracker·Core·worker 모두 부재, 자기 소유 임시 경로 제거를 확인했으며 전체가 graceful이었다고 쓰지 않는다.
 
 첫 CPU 엔진 시도의 긴 ZMQ 소켓 경로 오류, 첫 공급물 수집의 BatchEncoding 직렬화 오류와 host IPC 메타데이터 실패는 별도 원자료로 보존했다. 엔진 코드·원 검사·권한·기한을 완화하지 않았다. 원 receipt의 `unsupported_prompt_container`는 실제 OOV 토큰42의 거부였으며, 공개 도구의 향후 라벨만 `oov_prompt_token`으로 바로잡았다. 이 문자열 외 호출·입력·검사·정리 AST는 동일하다.
 

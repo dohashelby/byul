@@ -13,6 +13,7 @@ def test_all_contract_examples_pass_schema(contracts):
         "run-context.json": "run-context",
         "verification-result.json": "verification-result",
         "runtime-status.json": "runtime-status",
+        "runtime-lab-report.json": "runtime-lab-report",
         "revalidation-request.json": "revalidation-request",
         "evidence-index.json": "evidence-index",
     }
@@ -96,6 +97,11 @@ def test_openapi_uses_contract_schemas(example_client):
     for name in ("RuntimeEvent", "RuntimeStatus", "VerificationResult", "Environment", "Policy", "EvidenceItem", "Common_policy_ref"):
         assert name in schemas
     assert schemas["RuntimeEventList"]["properties"]["items"]["items"] == {"$ref": "#/components/schemas/RuntimeEvent"}
+    assert schemas["LabReportResponse"]["properties"]["item"]["anyOf"] == [
+        {"$ref": "#/components/schemas/RuntimeLabReport"}, {"type": "null"},
+    ]
+    assert "RuntimeLabReportView" not in schemas
+    assert "runtime-lab-report-view" not in example_client.app.state.byul.contracts.schemas
     assert "x-contract" not in str(doc)
 
 

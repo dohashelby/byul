@@ -30,7 +30,7 @@ update ── run-context (격리 시험에서 runtime 통제를 켤 때) ┘   
 | `verification-result` | update → platform | 검증 결과·보고서 화면 자료 (0.2) | guard RPT의 투영. 0.2부터 삭제된 update HTML 보고서가 보여주던 RPT 필드를 모두 담는다 |
 | `runtime-event` | runtime → platform | 사건 한 줄(JSONL) | `runtime-mvp-record/1.0`, `runtime-observation/1.0` 등을 `native`에 감쌈 |
 | `runtime-status` | runtime → platform | 상태 스냅샷 (0.2) | `/api/status`·`/policy`·`/collectors`·`/target`·`/baseline`·`/summary`·`/revalidation`·`/observations`의 합성 |
-| `runtime-lab-report` | runtime → platform | kind lab 시험 결과 (0.1, 신규) | `/api/lab-report` |
+| `runtime-lab-report` | runtime → platform | 저장된 kind·AWS lab 실행 회차 (0.1) | `/api/lab-report` |
 | `runtime-request-detail` | runtime → platform | 요청 상세 (0.1, 신규) | `/api/requests/{id}` |
 | `revalidation-request` | runtime → platform → update | 재검증 요청 | `runtime-revalidation-request/1.0` |
 | `evidence-index` | update, runtime → platform | 증거 파일 목록 | §5.4 `evidence/index.json` |
@@ -139,6 +139,10 @@ Hubble `DROPPED`는 출발·목적지·정책 귀속과 수신 대조 전에는 
 7. **보고서 표시 규칙의 소유:** 대표 상태·종합 판정·비공식 사유의 표시 규칙은 update HTML 보고서에서 platform으로 옮겨 왔다. 이 값들을 update가 RPT에 직접 넣을지 정해야 한다.
 
 ## 변경 이력
+
+### 사용자 승인(2026-11-08) · Lab 보고서 AWS 사례 ID 허용
+
+승인 범위는 Lab 보고서 사례 계약이다. `runtime-lab-report` 0.1과 DRAFT 상태를 유지하며 사례 ID를 kind `L-01`~`L-08` 및 AWS `AWS-01`~`AWS-20`으로 명시했다. 선택 `report.schema`는 `serving-runtime-k8s-lab-report/1.0`·`serving-runtime-aws-lab-report/1.0`을 허용한다. 기존 kind 문서는 schema 필드 없이도 유효하므로 실제 kind 생산자와 하위 호환된다. 종전 정규식이 허용하던 범위 밖 L ID(`L-00`, `L-09`~`L-99`)는 이제 거부한다. 저장된 실행 회차는 현재 통제 상태의 증명이 아니다. 소비자인 platform은 공용 계약을 직접 검증하며 별도 조회용 파생 스키마를 제거했다. update 계약과 나머지 runtime 계약은 변경하지 않았다.
 
 ### runtime 결정(2026-10-26) · Hubble 수집 손실 상태
 

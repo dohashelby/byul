@@ -202,8 +202,15 @@ def test_unreachable_runtime_returns_503_with_code(tmp_path, monkeypatch):
         assert client.get("/api/meta").json()["runtime_connection"] == "disconnected"
 
 
-@pytest.mark.parametrize("case_id,valid", [("AWS-01", True), ("AWS-20", True), ("AWS-21", False)])
-def test_aws_lab_report_view_preserves_ids_and_run(live_client, fake, case_id, valid):
+@pytest.mark.parametrize("case_id,valid", [
+    *[(f"AWS-{i:02d}", True) for i in range(1, 21)],
+    *[(f"L-{i:02d}", True) for i in range(1, 9)],
+    *[(case_id, False) for case_id in (
+        "AWS-00", "AWS-21", "AWS-1", "AWS-001", "aws-01", "AWS-01\n", "xAWS-01",
+        "L-00", "L-09", "L-99", "L-1",
+    )],
+])
+def test_lab_report_contract_preserves_ids_and_run(live_client, fake, case_id, valid):
     report = {"run_id": "aws-acceptance-20200101T000000Z-1", "context": "byul-aws-lab", "namespace": "serving-lab",
               "started_at": "2020-01-01T00:00:00Z", "finished_at": "2020-01-01T00:01:00Z", "overall": "unknown",
               "cases": [{"id": case_id, "title": "AWS 시험", "status": "unknown", "summary": "미확인", "evidence": [], "limitation": None, "note": "해당 회차 선택 사례"}]}
@@ -212,7 +219,23 @@ def test_aws_lab_report_view_preserves_ids_and_run(live_client, fake, case_id, v
     if valid:
         assert body["invalid"] is None
         assert body["item"]["report"] == report
-        # Shared kind contract is unchanged; this extension is an API view.
-        assert live_client.app.state.byul.contracts.errors("runtime-lab-report", body["item"])
+        assert live_client.app.state.byul.contracts.errors("runtime-lab-report", body["item"]) == []
     else:
         assert body["item"] is None and body["invalid"]
+
+
+@pytest.mark.parametrize("report_schema,valid", [
+    ("serving-runtime-k8s-lab-report/1.0", True),
+    ("serving-runtime-aws-lab-report/1.0", True),
+    ("serving-runtime-aws-lab-report/2.0", False),
+    (None, False),
+    (1, False),
+])
+def test_lab_report_optional_schema(contracts, report_schema, valid):
+    from conftest import EXAMPLES
+
+    document = load_json(EXAMPLES / "runtime-lab-report.json")
+    document["report"]["schema"] = report_schema
+    if report_schema == "serving-runtime-aws-lab-report/1.0":
+        document["report"]["cases"][0]["id"] = "AWS-01"
+    assert contracts.is_valid("runtime-lab-report", document) == valid

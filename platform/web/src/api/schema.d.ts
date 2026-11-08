@@ -420,6 +420,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runtime/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Operations */
+        get: operations["list_operations_api_runtime_operations_get"];
+        put?: never;
+        /** Request Operation */
+        post: operations["request_operation_api_runtime_operations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runtime/operations/agent-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Heartbeat */
+        post: operations["heartbeat_api_runtime_operations_agent_state_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runtime/operations/{op_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve */
+        post: operations["approve_api_runtime_operations__op_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runtime/operations/{op_id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Claim */
+        post: operations["claim_api_runtime_operations__op_id__claim_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runtime/operations/{op_id}/bundle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download */
+        get: operations["download_api_runtime_operations__op_id__bundle_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runtime/operations/{op_id}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Result */
+        post: operations["result_api_runtime_operations__op_id__result_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/evidence": {
         parameters: {
             query?: never;
@@ -441,6 +544,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AvailableBundle */
+        AvailableBundle: {
+            /** Bundle Id */
+            bundle_id: string;
+            /** Sha256 */
+            sha256: string;
+        };
         /** AxisRow */
         AxisRow: {
             /** Name */
@@ -468,6 +578,8 @@ export interface components {
             /** Bundle Id */
             bundle_id?: string | null;
         };
+        /** Claim */
+        Claim: Record<string, never>;
         /** DiffEntry */
         DiffEntry: {
             /** Path */
@@ -518,6 +630,23 @@ export interface components {
             invalid: components["schemas"]["InvalidItem"][];
             source: components["schemas"]["SourceInfo"];
         };
+        /** Expected */
+        Expected: {
+            /** Bundle Id */
+            bundle_id: string;
+            /**
+             * Approval
+             * @default verified
+             * @constant
+             */
+            approval: "verified";
+            /** Policy Id */
+            policy_id?: string | null;
+            /** Mode */
+            mode?: ("monitor" | "enforce") | null;
+            /** Spec Sha256 */
+            spec_sha256?: string | null;
+        };
         /** FieldIssue */
         FieldIssue: {
             /** Path */
@@ -529,6 +658,16 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** Heartbeat */
+        Heartbeat: {
+            /** Server */
+            server: string;
+            /** Policies */
+            policies?: components["schemas"]["PolicyReadiness"][];
+            current?: components["schemas"]["StateSummary"] | null;
+            /** Bundles */
+            bundles?: components["schemas"]["AvailableBundle"][];
         };
         /**
          * InvalidItem
@@ -545,7 +684,7 @@ export interface components {
         /** LabReportResponse */
         LabReportResponse: {
             /** Item */
-            item: components["schemas"]["RuntimeLabReportView"] | null;
+            item: components["schemas"]["RuntimeLabReport"] | null;
             invalid?: components["schemas"]["InvalidItem"] | null;
             source: components["schemas"]["SourceInfo"];
         };
@@ -574,12 +713,68 @@ export interface components {
              */
             runtime_connection: "example" | "connected" | "disconnected" | "unauthorized";
         };
+        /** MonitorWindow */
+        MonitorWindow: {
+            /** Node */
+            node: string;
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /**
+             * Until
+             * Format: date-time
+             */
+            until: string;
+            /** Continuous */
+            continuous: boolean;
+            /** Event Count */
+            event_count: number;
+            /** Reviewed Event Count */
+            reviewed_event_count: number;
+            /** False Positive Count */
+            false_positive_count: number;
+        };
         /** NotSelectedRow */
         NotSelectedRow: {
             /** Check Id */
             check_id: string | null;
             /** Reason */
             reason: string | null;
+        };
+        /** OperationRequest */
+        OperationRequest: {
+            /** Server */
+            server: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "bundle.apply" | "bundle.switch" | "tetragon.mode";
+            expected: components["schemas"]["Expected"];
+            /** Policy Id */
+            policy_id?: string | null;
+            /** Policy Revision */
+            policy_revision?: number | null;
+            /** Environment Id */
+            environment_id?: string | null;
+            /** Environment Revision */
+            environment_revision?: number | null;
+            /** Bundle Id */
+            bundle_id?: string | null;
+            /** Server Values Override */
+            server_values_override?: {
+                [key: string]: unknown;
+            } | null;
+            /** Policy Name */
+            policy_name?: string | null;
+            /** Mode */
+            mode?: ("monitor" | "enforce") | null;
+            /** Confirmation */
+            confirmation?: "ENGINE_RESTART" | null;
+            /** Requested By Role */
+            requested_by_role?: string | null;
         };
         /** Overview */
         Overview: {
@@ -641,6 +836,28 @@ export interface components {
             revision: number;
             /** Approved By */
             approved_by: string;
+        };
+        /** PolicyReadiness */
+        PolicyReadiness: {
+            /** Name */
+            name: string;
+            /** Method */
+            method?: string | null;
+            /** Contains Sigkill */
+            contains_sigkill?: boolean | null;
+            expected: components["schemas"]["Expected"];
+            /** Checks */
+            checks: {
+                [key: string]: boolean;
+            };
+            /** Capability Basis */
+            capability_basis?: ("static" | "live_trial") | null;
+            /** Capability Reason */
+            capability_reason?: ("static_unavailable" | "evidence_required" | "capability_missing") | null;
+            /** Monitor Windows */
+            monitor_windows?: components["schemas"]["MonitorWindow"][];
+            /** Evidence Sha256 */
+            evidence_sha256?: string[];
         };
         /** PolicyRevision */
         PolicyRevision: {
@@ -915,6 +1132,41 @@ export interface components {
             generated_at: string | null;
             source: components["schemas"]["SourceInfo"];
         };
+        /** Result */
+        Result: {
+            /** Lease Id */
+            lease_id: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "running" | "checked" | "succeeded" | "failed" | "rolled_back" | "unknown";
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "OK" | "DRY_RUN" | "STATE_CHANGED" | "VALIDATION_FAILED" | "HASH_MISMATCH" | "APPROVAL_REQUIRED" | "TARGET_MISMATCH" | "SAFETY_REJECTED" | "EXECUTION_FAILED" | "ROLLED_BACK" | "STATUS_UNKNOWN" | "LEASE_EXPIRED";
+            /** Reason Code */
+            reason_code?: ("BUNDLE_ROLES_MISSING" | "BUNDLE_INVALID" | "CURRENT_LINK_INVALID" | "STATUS_UNREACHABLE" | "STATUS_MISMATCH") | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Finished At */
+            finished_at?: string | null;
+            before?: components["schemas"]["StateSummary"] | null;
+            after?: components["schemas"]["StateSummary"] | null;
+            /** Steps */
+            steps?: components["schemas"]["Step"][];
+            /** Evidence Sha256 */
+            evidence_sha256?: string[];
+            /**
+             * Dry Run
+             * @default false
+             */
+            dry_run: boolean;
+        };
         /** RevalidationList */
         RevalidationList: {
             /** Items */
@@ -1004,6 +1256,35 @@ export interface components {
             mode: "example" | "live" | "file";
             /** Detail */
             detail?: string | null;
+        };
+        /** StateSummary */
+        StateSummary: {
+            /** Bundle Id */
+            bundle_id: string;
+            /**
+             * Approval
+             * @enum {string}
+             */
+            approval: "verified" | "unknown";
+            /** Policy Id */
+            policy_id?: string | null;
+            /** Mode */
+            mode?: ("monitor" | "enforce" | "monitor_only" | "unknown") | null;
+            /** Spec Sha256 */
+            spec_sha256?: string | null;
+        };
+        /** Step */
+        Step: {
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "validation" | "link" | "restart" | "status" | "set-mode" | "rollback";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "passed" | "failed" | "unknown" | "skipped";
         };
         /** TetragonAction */
         TetragonAction: {
@@ -1985,7 +2266,7 @@ export interface components {
         } & (unknown & unknown);
         /**
          * 통제 적용 시험 결과 (runtime → platform)
-         * @description runtime /api/lab-report(kind lab L-01~L-08 시험 보고서, runtime 형식 serving-runtime-k8s-lab-report/1.0)를 옮긴 것. 정책이 설정됐다는 것과 실제 차단이 확인됐다는 것은 다르며, 실제 결과는 이 시험 결과로 본다. 로컬 kind·가짜 backend 결과는 정식 환경 검증이 아니다.
+         * @description runtime /api/lab-report에서 옮긴 저장된 kind L-01~L-08·AWS-01~AWS-20 실행 회차이며 현재 통제 상태의 증명이 아님. 원본 형식은 serving-runtime-k8s-lab-report/1.0 또는 serving-runtime-aws-lab-report/1.0이다. 정책 설정과 실제 차단 확인은 다르며, 로컬 kind·가짜 backend 결과는 정식 환경 검증이 아니다.
          */
         RuntimeLabReport: {
             /** @constant */
@@ -2000,6 +2281,11 @@ export interface components {
             path: string | null;
             error: string | null;
             report: null | {
+                /**
+                 * @description 선택 원본 보고서 형식. 기존 플랫폼 변환 문서에는 없을 수 있다.
+                 * @enum {unknown}
+                 */
+                schema?: "serving-runtime-k8s-lab-report/1.0" | "serving-runtime-aws-lab-report/1.0";
                 run_id: string;
                 context: string;
                 namespace: string;
@@ -2586,41 +2872,6 @@ export interface components {
             data_origin: components["schemas"]["Common_data_origin"];
             /** @description 이 증거를 쓴 객체·사건. guard EVD 참조나 runtime event_id. */
             refs?: string[];
-        };
-        /**
-         * Lab 실행 결과 조회 (kind·AWS)
-         * @description 저장된 kind L-01~L-08 또는 AWS-01~AWS-20 실행 회차. 현재 통제 상태의 증명이 아니다.
-         */
-        RuntimeLabReportView: {
-            /** @constant */
-            schema_version: "byul-runtime-lab-report/0.1";
-            generated_at: components["schemas"]["Common_timestamp"];
-            /**
-             * @description not_configured=Gateway에 --lab-report 없음, missing=파일 없음, error=읽기·형식 오류, ok=읽음.
-             * @enum {unknown}
-             */
-            state: "not_configured" | "missing" | "error" | "ok";
-            configured_path: string | null;
-            path: string | null;
-            error: string | null;
-            report: null | {
-                run_id: string;
-                context: string;
-                namespace: string;
-                started_at: string | null;
-                finished_at: string | null;
-                overall: string;
-                cases: {
-                    id: string;
-                    title: string;
-                    /** @description runtime 시험 상태(passed, failed, not_run, blocked_by_environment 등). */
-                    status: string;
-                    summary: string;
-                    evidence: string[];
-                    limitation: string | null;
-                    note: string | null;
-                }[];
-            };
         };
     };
     responses: never;
@@ -3305,6 +3556,249 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["BundleExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_operations_api_runtime_operations_get: {
+        parameters: {
+            query?: {
+                server?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_operation_api_runtime_operations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    heartbeat_api_runtime_operations_agent_state_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Heartbeat"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_api_runtime_operations__op_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                op_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claim_api_runtime_operations__op_id__claim_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                op_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Claim"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_api_runtime_operations__op_id__bundle_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                op_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    result_api_runtime_operations__op_id__result_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                op_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Result"];
             };
         };
         responses: {

@@ -9,7 +9,8 @@
 
 ## 순서
 
-1. 할당량 승인 확인 → 비용 상한 승인(예상 1.5~2시간, 약 $8.5~$11, EBS 별도).
+1. 할당량 승인 확인. 비용 상한은 사용자 승인(2026-11-08): **A+B 한 세션 EC2 $20**(EBS 별도). A만이면 1.5~2시간·약 $8.5~$11. 범위·조건은 `user-decisions-20261108.md` 1·2절
+   (REQ-16 Qwen2-VL-2B-Instruct를 EC2 안에서 내려받아 같은 세션에서 실행, B 분기 입력이 세션 전에 없으면 A 범위만).
 2. 콘솔: 인스턴스 유형 변경(g6.2xlarge → g6.12xlarge) → 시작 → SSH 원본 확인.
 3. 서버: 커밋 소스 묶음 배치(SHA 대조), 하네스 `harness-tp2.tgz` 배치, `uv sync --frozen`.
 4. `BYUL_RUN_DATE=<날짜> python a-tp2.py facts`: GPU 수·`nvidia-smi topo -m`·P2P 읽기·노드 allocatable을 기록한다. device plugin이 4장을 보고하는지 확인한다.

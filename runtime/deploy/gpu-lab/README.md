@@ -77,6 +77,8 @@ UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`
 
    운영 수집기(`runtime-agent`)가 Gateway 정규화 기록을 읽을 때는 해당 계정을 그룹 10000에 넣고 `/srv/serving/runtime/data`를 그룹 10000·0750으로 준비한다(수집기가 없으면 기존 0700 유지). Gateway의 `observations.jsonl`은 0644, `tetragon-health-receipts.json`은 0640이다. 기존 0600 receipt는 새 Gateway가 다음 sentinel receipt를 기록하면 0640으로 교체된다. monitor window 수집에는 `--trusted-owner-uid 10000`을 명시한다. 추가 UID는 반복 지정할 수 있고, 생략하면 root·자기 UID만 신뢰하며 그룹/기타 쓰기 가능한 입력은 계속 거부한다.
 
+   `runtime-agent`로 수집기를 실행할 때 Ubuntu의 `umask 002`에 주의한다. `tools.tetragon_status` 코드는 상태 파일·baseline을 명시 권한 0644, recovery를 0600으로 써서 그룹/기타 쓰기를 허용하지 않는다.
+
    호스트의 CRI 확인에는 `crictl`도 필요하다(kubeadm 설치에 포함되지 않음). 클러스터 Kubernetes 버전에 맞는 `cri-tools` 버전을 별도로 설치하고, containerd 환경의 `/etc/crictl.yaml`을 아래처럼 준비한다. 설치 후 `sudo crictl info`로 연결을 확인한다.
    ```yaml
    runtime-endpoint: unix:///run/containerd/containerd.sock

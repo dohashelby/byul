@@ -153,7 +153,7 @@ class StatusCollector:
                 result["monitoring"] = {"state":"error","reasons":["recovery_evidence_unavailable"]}
         else:
             result["monitoring"] = {"state":"not_configured","reasons":["recovery_check_not_configured"]}
-        atomic_json(self.output,result)
+        atomic_json(self.output,result,mode=0o644)
         return result
 
 
@@ -191,7 +191,7 @@ def main():
                 return 1
             atomic_json(args.capture_baseline,{"schema_version":"runtime-tetragon-baseline/1.0",
                 "context":args.context,"captured_at":result["generated_at"],
-                "policies":[{k:p.get(k) for k in ("node","namespace","name","mode","spec_sha256")} for p in result["policies"]]})
+                "policies":[{k:p.get(k) for k in ("node","namespace","name","mode","spec_sha256")} for p in result["policies"]]},mode=0o644)
         if not args.watch: break
         time.sleep(args.interval)
     return 0 if result["state"]=="ok" else 1

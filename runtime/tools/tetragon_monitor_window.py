@@ -156,7 +156,7 @@ class MonitorWindowGenerator:
                 if (policy.get("mode") != "monitor" or policy.get("state") != "enabled"
                         or not node or not policy.get("id") or len(caps) != 1 or not caps[0].get("kernel")
                         or not SHA.fullmatch(policy.get("spec_sha256", ""))
-                        or policy.get("method") not in {"override_lsm", "sigkill_fd_install", "override_syscall"}):
+                        or policy.get("method") not in {"lsm_file_open", "override_lsm", "sigkill_fd_install", "override_syscall"}):
                     continue
                 binding = {"policy": policy["name"], "namespace": self.namespace, "node": node,
                            "policy_id": policy["id"], "spec_sha256": policy["spec_sha256"],

@@ -1,0 +1,26 @@
+[Unit]
+Description=Serving Runtime Tetragon monitor window generator
+After=serving-runtime-tetragon-status.service
+Wants=serving-runtime-tetragon-status.service
+
+[Service]
+Type=simple
+User=runtime-agent
+Group=runtime-agent
+# Gateway data group 10000 and serving-observe group 10010 (read only).
+SupplementaryGroups=10000 10010
+UMask=0022
+Environment=KUBECONFIG=/etc/serving-runtime/kubeconfig
+WorkingDirectory=/opt/byul/runtime
+# Replace lab-context/serving and paths at installation.
+ExecStart=/opt/byul/runtime/.venv/bin/python -B -m tools.tetragon_monitor_window --context lab-context --namespace serving --trusted-owner-uid 10000 --policy runtime-tg-secret-01 --status /var/lib/serving-runtime/tetragon-state.json --observations /srv/serving/runtime/data/observations.jsonl --output /var/lib/serving-runtime/monitor-review.json --watch
+Restart=on-failure
+RestartSec=10
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/serving-runtime
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

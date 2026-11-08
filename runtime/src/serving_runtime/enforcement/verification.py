@@ -50,7 +50,10 @@ def match_probe_events(lines: list[str], *, policy: str, namespace: str, pod_uid
     for line in lines:
         try:
             raw = json.loads(line)
-            event = raw.get("process_kprobe") or {}
+            names = [name for name in ("process_kprobe", "process_lsm") if name in raw]
+            if len(names) != 1:
+                continue
+            event = raw[names[0]]
             process = event.get("process") or {}
             pod = process.get("pod") or {}
             at = _time(raw.get("time"))
@@ -102,7 +105,7 @@ def assess_effects(method: str, facts: dict[str, Any]) -> dict[str, Any]:
     """Require direct errno or a matching kernel permission return; death is separate."""
     bound = (facts.get("event_bound") is True and facts.get("collector_complete") is True
              and facts.get("enforce_active") is True)
-    userspace_denied = (method in {"override_lsm", "override_syscall"}
+    userspace_denied = (method in {"lsm_file_open", "override_lsm", "override_syscall"}
                         and facts.get("read_denied") is True and facts.get("override_event") is True)
     kernel_denied = (method == "override_lsm" and facts.get("kernel_read_denied") is True
                      and facts.get("override_configured") is True)
@@ -156,6 +159,12 @@ def reassess_record(record: dict[str, Any]) -> dict[str, Any]:
     restore_times = [at for s in restores if (at := _time(s.get("at"))) is not None
                      and enabled_at is not None and at >= enabled_at]
     restored_at = min(restore_times) if restore_times else end
+    functions = {
+        "lsm_file_open": {"file_open"},
+        "override_syscall": {"sys_openat", "__x64_sys_openat", "__arm64_sys_openat"},
+        "override_lsm": {"security_file_permission"},
+        "sigkill_fd_install": {"fd_install"},
+    }.get(record.get("method"), set())
     events = []
     for event in record.get("events") or []:
         at = _time(event.get("time"))
@@ -169,6 +178,7 @@ def reassess_record(record: dict[str, Any]) -> dict[str, Any]:
         if (start and end and at and enabled_at and restored_at
             and start <= enabled_at <= at <= restored_at <= end
             and task_valid and event.get("policy") == record.get("policy")
+            and event.get("function") in functions
             and event.get("pod_uid") == record.get("pod_uid")
             and record.get("probe_path") is not None and event.get("path") == record["probe_path"]
             and (not facts.get("main_process") or (isinstance(record.get("main_pid"),int)
@@ -177,12 +187,20 @@ def reassess_record(record: dict[str, Any]) -> dict[str, Any]:
     facts["event_bound"] = bool(events)
     facts["override_event"] = any(e.get("action") == "KPROBE_ACTION_OVERRIDE" for e in events)
     facts["sigkill_event"] = any(e.get("action") == "KPROBE_ACTION_SIGKILL" for e in events)
-    facts["override_configured"] = any(a.get("action") == "Override" and a.get("argError") == -1
-                                       for a in record.get("policy_actions") or [])
+    # Accept permission errors only; a policy load or action alone is no proof
+    # of an actual denial. LSM events in 1.7.1 do not expose a return value.
+    errors = {a.get("argError") for a in record.get("policy_actions") or []
+              if a.get("action") == "Override" and type(a.get("argError")) is int
+              and a["argError"] in (-1, -13)}
+    facts["override_configured"] = bool(errors)
     facts["kernel_read_denied"] = any(e.get("function") == "security_file_permission"
-                                      and e.get("access_mask") == 4 and e.get("return_value") == -1 for e in events)
+                                      and e.get("access_mask") == 4 and e.get("return_value") in errors for e in events)
     read = record.get("read_result") or {}
-    facts["read_denied"] = (read.get("read") == "denied" and read.get("errno") == 1
+    expected_errnos = {-error for error in errors}
+    if record.get("method") == "lsm_file_open" and errors:
+        expected_errnos.add(1)  # 1.7.1 BPF LSM observed EPERM even with argError=-13.
+    facts["read_denied"] = (read.get("read") == "denied" and type(read.get("errno")) is int
+                            and read["errno"] in expected_errnos
                             and facts["override_configured"])
     facts["read_succeeded"] = read.get("read") == "ok"
     terminated = record.get("termination") or {}

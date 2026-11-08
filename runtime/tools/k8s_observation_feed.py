@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import threading
@@ -240,8 +241,13 @@ _reader_gid: int | None = None
 def _share(path: Path, *, directory: bool = False) -> None:
     if _reader_gid is None:
         return
+    mode = 0o640
+    if directory:
+        # Keep group inheritance for the identity collector across restarts.
+        # Capture setgid before chown, which may clear special mode bits.
+        mode = 0o750 | (path.stat(follow_symlinks=False).st_mode & stat.S_ISGID)
     os.chown(path, -1, _reader_gid, follow_symlinks=False)
-    os.chmod(path, 0o750 if directory else 0o640)
+    os.chmod(path, mode)
 
 
 def _share_fd(descriptor: int) -> None:

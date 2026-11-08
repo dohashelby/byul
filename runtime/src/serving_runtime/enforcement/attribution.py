@@ -89,7 +89,7 @@ def kernel_task(event: dict) -> dict | None:
 
 def bind_event(root: dict, index: dict | None) -> tuple[dict, dict]:
     """Do not invent attribution from a policy name, path or PID alone."""
-    names = [name for name in ("process_kprobe", "process_exec") if isinstance(root.get(name), dict)]
+    names = [name for name in ("process_kprobe", "process_exec", "process_lsm") if isinstance(root.get(name), dict)]
     result = {"state": "unavailable", "source": None, "reason": "identity_snapshot_unavailable"}
     if len(names) != 1 or not index or index.get("state") != "ok":
         return root, result
@@ -125,7 +125,7 @@ def bind_event(root: dict, index: dict | None) -> tuple[dict, dict]:
             # Process IDs in a nested node need not be kernel-global IDs.
             # A native exec_id + binary + container ID still identifies the
             # native actor; only fill its workload, never a guessed host PID.
-            if (names[0] == "process_exec" and type(process.get("pid")) is int
+            if (names[0] in {"process_exec", "process_lsm"} and type(process.get("pid")) is int
                 and process["pid"] > 0 and process.get("exec_id") and process.get("binary")):
                 by_container = {r.get("container_id"): r for r in rows
                                 if str(r.get("container_id", "")).startswith(cid)}

@@ -156,6 +156,20 @@ class ReaderGroupSharingTests(unittest.TestCase):
         feed._write_json_atomic(heartbeat, {"state": "reconnecting"})
         self.assertEqual(self.mode(heartbeat), 0o640)
 
+    def test_reader_group_preserves_directory_setgid_and_child_group(self) -> None:
+        gid = os.getgid()
+        feed._reader_gid = gid
+        for mode in (0o2750, 0o2777):
+            with self.subTest(mode=oct(mode)):
+                os.chmod(self.directory, mode)
+                feed._share(self.directory, directory=True)
+                self.assertEqual(self.mode(self.directory), 0o2750)
+                self.assertEqual(self.directory.stat().st_gid, gid)
+                child = self.directory / f"identity-{mode}.json"
+                child.touch(mode=0o640)
+                self.assertEqual(child.stat().st_gid, gid)
+                self.assertEqual(self.mode(child) & 0o022, 0)
+
     def test_group_not_held_fails_clearly_with_exit_2(self) -> None:
         held = {os.getegid(), *os.getgroups()}
         missing = next(gid for gid in range(60000, 65000) if gid not in held)

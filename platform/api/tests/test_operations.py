@@ -67,6 +67,17 @@ def test_listing_identity_agent_inventory_and_scope(ops):
     assert [a["server"] for a in scoped["agents"]] == ["server-01"]
 
 
+@pytest.mark.parametrize("seconds,self_approval", [(86400, False), (60, True)])
+def test_listing_exposes_platform_settings_for_lab_warning(ops, seconds, self_approval):
+    state = ops.app.state.byul
+    state.settings = replace(state.settings, operation_monitor_seconds=seconds,
+                             operation_lab_self_approval=self_approval)
+    response = ops.get(BASE, headers=auth("viewer-01"))
+    assert response.status_code == 200
+    assert response.json()["monitor_seconds"] == seconds
+    assert response.json()["lab_self_approval"] is self_approval
+
+
 def test_auth_denial_and_body_role_forgery(ops):
     payload = {"kind": "bundle.switch", "server": "server-01", "expected": {"bundle_id": "old"}, "bundle_id": "new", "requested_by_role": "runtime_operator"}
     assert ops.post(BASE, json=payload).status_code == 401
@@ -249,6 +260,31 @@ def test_monitor_window_agent_projection_and_validation(ops):
     assert ops.post(BASE + "/agent-state", headers=auth("agent-01"), json=payload).status_code == 422
 
 
+def test_runtime_readiness_mixed_monitor_only_snapshot_validates_platform_models():
+    from types import SimpleNamespace
+    from unittest.mock import Mock, patch
+    from serving_runtime.operations.agent import Agent, Config
+    from byul_platform.routes.operations import Heartbeat, PolicyReadiness
+
+    agent = Agent(Mock(), Config("server-01", "/unused", "aws-lab", "serving-lab"))
+    intent = SimpleNamespace(namespace="serving-lab", allowed_modes=lambda _: ("monitor", "enforce"))
+    current = {"bundle_id": "old", "approval": "verified"}
+    secret = {"name": "runtime-tg-secret-01", "namespace": "serving-lab", "node": "node-01",
+              "id": "7", "state": "enabled", "mode": "monitor", "method": "sigkill_fd_install",
+              "spec_sha256": "a" * 64}
+    snapshot = {"policies": [secret] + [
+        {**secret, "name": f"runtime-tg-{rule}-01", "id": str(index),
+         "mode": "monitor_only", "method": "monitor"}
+        for index, rule in enumerate(("cache", "asset"), start=8)]}
+    with patch.object(agent, "snapshot", return_value=snapshot):
+        rows = agent.readiness(current, intent)
+
+    assert [row["name"] for row in rows] == [secret["name"]]
+    assert PolicyReadiness.model_validate(rows[0]).expected.mode == "monitor"
+    heartbeat = Heartbeat.model_validate({"server": "server-01", "current": current, "policies": rows})
+    assert [row.name for row in heartbeat.policies] == [secret["name"]]
+
+
 def test_two_party_approval_and_lab_self_approval(ops):
     expected = ready(ops)
     item = enforce(ops, expected).json()
@@ -406,3 +442,20 @@ def test_platform_agent_apply_temporary_gateway_verified(ops, tmp_path, monkeypa
     finally:
         if gateway:
             gateway.stop()
+
+
+@pytest.mark.parametrize('method,contains_sigkill,expected_status', [
+    ('lsm_file_open', False, 201), ('override_syscall', False, 201),
+    ('override_syscall', True, 409), ('override_syscall', None, 409),
+    ('override_lsm', True, 409), ('sigkill_fd_install', True, 409),
+])
+def test_confirmation_follows_actual_sigkill_actions(ops, method, contains_sigkill, expected_status):
+    expected = ready(ops)
+    row = ops.get(BASE, headers=auth('viewer-01')).json()['agents'][0]['policies'][0]
+    row.update(method=method, contains_sigkill=contains_sigkill)
+    assert ops.post(BASE + '/agent-state', headers=auth('agent-01'),
+                    json={'server': 'server-01', 'policies': [row]}).status_code == 200
+    response = request(ops, kind='tetragon.mode', policy_name=row['name'], mode='enforce', expected=expected)
+    assert response.status_code == expected_status
+    if expected_status == 409:
+        assert response.json()['detail']['code'] == 'CONFIRMATION_REQUIRED'

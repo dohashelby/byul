@@ -76,6 +76,10 @@ PHASE1_STATES = frozenset({
 GPU_A_GLOB = "docs/evidence/gpu-a-*.json"  # byul-gpu-a-check-summary/1, gpu-a README 기준 PACK32
 GPU_B_GLOB = "docs/gpu-b/*.json"  # byul-independent-GPU-public-summary/1, refs에 PACK Ref
 GPU_FIRST = Path("docs/gpu-completion/20261102/GPU_RESULTS.json")  # 11-02 인계 요약 기준 PACK32 9묶음
+CURRENT_PACK_REVISION = 33
+# 팩33은 REQ-11 정의만 바꿨다(rev6→7, 2026-11-06 사용자 결정). 팩32의 다른 76개 정의는 그대로라
+# 그 GPU 기록은 현행 정의의 기록이다. REQ-11의 팩32 기록은 이전 정의 이력으로 남기고 상태 계산에서 뺀다.
+CHANGED_SINCE_PACK32 = frozenset({"REQ-11"})
 GPU_STATUS_ORDER = (
     "GPU_PARTIAL_MEASURED", "GPU_PARTIAL_EXAMPLE", "GPU_COMPONENT_DECLARED_ONLY", "GPU_ATTEMPTED_NOT_COLLECTED",
 )
@@ -162,7 +166,12 @@ def gpu_runs(root: Path) -> dict[str, list[dict]]:
     result: dict[str, list[dict]] = {}
 
     def add(check_id: str, record: dict) -> None:
-        if record["pack_revision"] != 32:
+        revision = record["pack_revision"]
+        if revision == CURRENT_PACK_REVISION:
+            record["current_definition"] = True
+        elif revision == 32:
+            record["current_definition"] = check_id not in CHANGED_SINCE_PACK32
+        else:
             raise ValueError(f"gpu_run_not_current_pack:{record['source']}")
         result.setdefault(check_id, []).append(record)
 
@@ -179,7 +188,8 @@ def gpu_runs(root: Path) -> dict[str, list[dict]]:
             for res, evd in zip(run["results"], run["evidence"], strict=True):
                 status = (evd.get("execution") or {}).get("status")
                 add(res["check_id"], {
-                    "source": path.relative_to(root).as_posix(), "run": run["run"], "pack_revision": 32,
+                    "source": path.relative_to(root).as_posix(), "run": run["run"],
+                    "pack_revision": (run.get("pack_ref") or {}).get("revision", 32),
                     "status": _run_status(completed=status == "COMPLETED", verification=res.get("verification_level"), manual=manual),
                     "verification_level": res.get("verification_level"), "data_origin": res.get("data_origin"),
                     "verdicts": res["verdicts"], "result_ref": _ref(res), "evidence_ref": _ref(evd),
@@ -215,7 +225,7 @@ def gpu_runs(root: Path) -> dict[str, list[dict]]:
 
 def gpu_status(runs: list[dict]) -> str:
     """가장 강한 실행 상태. GPU 기록이 없으면 기존 값(DEFERRED_NOT_MEASURED)을 유지한다."""
-    found = {r["status"] for r in runs}
+    found = {r["status"] for r in runs if r.get("current_definition", True)}
     return next((s for s in GPU_STATUS_ORDER if s in found), "DEFERRED_NOT_MEASURED")
 
 
@@ -377,7 +387,7 @@ def render_markdown(rows: list[dict[str, str]]) -> str:
              f"현행 팩 revision {rows[0]['pack_revision'] if rows else '없음'}의 정의 {len(rows)}개, 정책 등록 {policy}점검/{paths}경로, 실행·보안 판정 규칙 연결 {real}개, 관측 전용 {observation_only}개, 나머지 미연결 {len(rows)-real-observation_only}개다. 연결 중 kubernetes 구현만 있는 점검 {kubernetes_only}개다. 연결 수는 실제 전체 분기 검증 완료 수가 아니다.", "",
              "- [분기별 전체 CSV](checklist_validation_status.csv): 현재 정의·필수 관측·정상/위반/미수집/지원 밖 계획·선행 조건·기업 결정·과거 EVD/RES를 연결한다.",
              "- `supported_implementations`는 registry에 등록된 구현을 그대로 표시한다. `real`과 `kubernetes`는 서로 대체하지 않고, 공용 `fake`와 CPU 전용 구현은 연결 수에 넣지 않는다.",
-             "- `current_pack_actual_status`는 현행 팩32의 GPU 실행 공개 요약(`docs/evidence/gpu-a-*.json`, `docs/gpu-b/*.json`, `docs/gpu-completion/20261102/GPU_RESULTS.json`)에서만 계산한다. 가장 강한 기록 하나를 표시하며 원 질문 전체 완료를 뜻하지 않는다. 기록이 없으면 `DEFERRED_NOT_MEASURED`이고, 과거 팩 기록이나 단위 시험·CPU 결과를 현행 팩 GPU 실측으로 승격하지 않는다.",
+             "- `current_pack_actual_status`는 현행 팩의 GPU 실행 공개 요약(`docs/evidence/gpu-a-*.json`, `docs/gpu-b/*.json`, `docs/gpu-completion/20261102/GPU_RESULTS.json`)에서만 계산한다. 가장 강한 기록 하나를 표시하며 원 질문 전체 완료를 뜻하지 않는다. 팩32 기록은 정의가 바뀌지 않은 점검에서만 현행 기록으로 세고, 정의가 바뀐 REQ-11의 팩32 기록은 `gpu_runs`에 이력(`current_definition=false`)으로만 남긴다. 기록이 없으면 `DEFERRED_NOT_MEASURED`이고, 과거 팩 기록이나 단위 시험·CPU 결과를 현행 팩 GPU 실측으로 승격하지 않는다.",
              "- `GPU_PARTIAL_MEASURED`는 MEASURED 실행이 있음, `GPU_PARTIAL_EXAMPLE`은 실제 GPU 실행이지만 EXAMPLE 등급, `GPU_COMPONENT_DECLARED_ONLY`는 구성요소 직접 시험의 DECLARED 기록뿐, `GPU_ATTEMPTED_NOT_COLLECTED`는 중단 기록뿐이라는 뜻이다. `gpu_runs`에 실행별 정확 RES/EVD Ref와 판정을 그대로 남긴다.",
              "- `phase1_owner`는 1단계 분담(실행기 파일 소유, `DECISIONS.md` 2026-11-04)에서 계산하고, `phase1_state`는 담당별 파일 `docs/phase1/dev-1.yaml`·`docs/phase1/gpu.yaml`에서 읽는다. 각 담당은 자기 파일만 고친다.",
              "- `historical_pack_revisions`와 EVD/RES는 구조화된 과거 CPU 선별 기록(팩17·18·19)에서만 읽는다. 팩21·22의 후속 두 이미지 결과는 원래 자동화표의 `historical_verification`·`remaining_scope`와 [실측 문서](UPDATE_VALIDATION.md)를 함께 따른다.",

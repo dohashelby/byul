@@ -9,7 +9,8 @@ const METHODS: Record<string, string> = {
   monitor: "감시 규칙",
   override_only: "오류 반환 규칙 (Override)",
   override_lsm: "파일 접근 거부 + 프로세스 종료",
-  override_syscall: "파일 열기 거부 + 프로세스 종료",
+  override_syscall: "파일 열기 거부 (openat)",
+  lsm_file_open: "파일 열기만 거부, 프로세스 유지 (BPF LSM)",
   sigkill_fd_install: "프로세스 강제 종료",
 };
 const MODES: Record<string, string> = { monitor: "감시", enforce: "차단", monitor_only: "감시 전용", unknown: "미확인" };

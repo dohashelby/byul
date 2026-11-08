@@ -1,0 +1,409 @@
+{
+ "schema": "byul-gpu-a-check-summary/1",
+ "date": "2026-11-06",
+ "scope": "A/dev-1 approved single-L4 re-measurement (cap $4); synthetic EXAMPLE/DRAFT lab, not enterprise certification",
+ "whole_question_complete": false,
+ "canonical_pack": "PACK-BASELINE@33",
+ "counts": {
+  "workflows": 4,
+  "canonical_pack_workflows": 4,
+  "unique_checks": 3,
+  "restored_saved_pack_rejudge_equal": 3
+ },
+ "evidence_archive_sha256": "e51b7a104de2570d3a6d5985a1791a9db694a7c5756928a44380c967e4b2eb9d",
+ "source": {
+  "head": "47e7fff",
+  "package_sha256": "1403484f47700263fcbc43fba67aef907b79e2b5af68177c671093895b49ca77",
+  "obs09_rerun_override": {
+   "file": "src/guard/executors/native_projection.py",
+   "sha256": "ae179981a51c1cea4fe7ac14484bfedd7ae0e12861a93a9f3d4d2de34f880992",
+   "committed_in": "17b6bde"
+  }
+ },
+ "runs": [
+  {
+   "run": "dev1-gpu-g1r-20261106/REQ-11",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "id": "PACK-BASELINE",
+    "kind": "PACK",
+    "revision": 33,
+    "sha256": "74219b48b241775e4c4fa153a950b2a94029147f512c731f055e91cf945cd5b6"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "c9e6f5ef588f10ac22049735a0c6167ed8dbac1c6faea07df88bf107f8ad533a",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6QNHQPYZNX6MQTRPY4W4STD",
+     "revision": 1,
+     "sha256": "61b74d21b0e22f05a5863713ff158ecdaf62770e77726fb66e67fc2e0d8f7fbb"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6QNHRRPJW8TX5W1EVY4GZF4",
+     "revision": 1,
+     "sha256": "5af7a746ab5333b81ce0f0071d84a3a3d44ab5389509e76ff9b08aee9754a880"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6QNHRWGDYQSDY5NV91FGKCN",
+     "revision": 1,
+     "sha256": "1babdf6deb911072f5e23d9bd4ea490e0ca16a9294f2fae0e77f62ffbe551e70"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6QNHSABA3FZE93TTZJ2E1DJ",
+     "revision": 1,
+     "sha256": "27ac95aaaf5a95634a57b3b620201da6ebe359dada669886edd4a063a44347fd"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6QNJ4T8GGEA8CANT6X7K5FX",
+     "revision": 1,
+     "sha256": "d913b86fcc896e0c2abafb24a78ebed67b3f9b294398ba5a7243a1d86b460336"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6QNJ57R7BASJXYXEEAJZWV2",
+     "revision": 1,
+     "sha256": "96275fde2bdcac9a024a986b9b92c706e1ddf7abb03b5a756f97495c7cfcb211"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6QNJ4T8GGEA8CANT6X7K5FX",
+     "revision": 1,
+     "sha256": "d913b86fcc896e0c2abafb24a78ebed67b3f9b294398ba5a7243a1d86b460336",
+     "check_id": "REQ-11",
+     "data_origin": "EXAMPLE",
+     "verification_level": "EXAMPLE",
+     "verdicts": {
+      "functional": "PASS",
+      "performance": "UNKNOWN",
+      "security": "PASS"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6QNHSABA3FZE93TTZJ2E1DJ",
+     "revision": 1,
+     "sha256": "27ac95aaaf5a95634a57b3b620201da6ebe359dada669886edd4a063a44347fd",
+     "check_id": "REQ-11",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "abort_reason": null,
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "executor": {
+       "config_sha256": "0724cf3519af0d9205e4193384ab63500fb682bf8fafddfed77cd338ab333e53",
+       "name": "request_binding",
+       "version": "0.2.0"
+      },
+      "finished_at": "2026-11-06T05:33:32Z",
+      "started_at": "2026-11-06T05:33:21Z",
+      "status": "COMPLETED"
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g1r-20261106/OBS-09",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "id": "PACK-BASELINE",
+    "kind": "PACK",
+    "revision": 33,
+    "sha256": "74219b48b241775e4c4fa153a950b2a94029147f512c731f055e91cf945cd5b6"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "f7fabc870a4adc7cbfdcad793d9fe5ad2d51394ae6674259cb9641c85994a559",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6QNHQPYZNX6MQTRPY4W4STD",
+     "revision": 1,
+     "sha256": "61b74d21b0e22f05a5863713ff158ecdaf62770e77726fb66e67fc2e0d8f7fbb"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6QNJ80B66GHWJ6J3XM9P39D",
+     "revision": 1,
+     "sha256": "71516dc555d883399753ca17b178ccea41d673221cb39959b1341b0fa504547f"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6QNJ83YSZRTM2RCE85Z2VRK",
+     "revision": 1,
+     "sha256": "8f15d2f8835ecb4f1fe586513f88bf1ef4ef2f515360028fd5a49723f18c76d6"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6QNJ8HJ35V2MA99E3NEYEES",
+     "revision": 1,
+     "sha256": "48dd470dbc441aaf9647bda844d95e6e70cd1053f25df839b3641bd4b2f461e5"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6QNJDYGJGWS2BYY9D647DYC",
+     "revision": 1,
+     "sha256": "4936ce55877563c2adf80e4c39635635389305f527a54fc6d2aaa80d75c85cd7"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6QNJEBWY9JQ46V6493187Y1",
+     "revision": 1,
+     "sha256": "3a482756e9197143ec8429f671cd8fabcc5873e80edd462a43414d82b0050bd2"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6QNJDYGJGWS2BYY9D647DYC",
+     "revision": 1,
+     "sha256": "4936ce55877563c2adf80e4c39635635389305f527a54fc6d2aaa80d75c85cd7",
+     "check_id": "OBS-09",
+     "data_origin": "EXAMPLE",
+     "verification_level": null,
+     "verdicts": {
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN",
+      "security": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6QNJ8HJ35V2MA99E3NEYEES",
+     "revision": 1,
+     "sha256": "48dd470dbc441aaf9647bda844d95e6e70cd1053f25df839b3641bd4b2f461e5",
+     "check_id": "OBS-09",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "abort_reason": "ARTIFACT_CAPTURE_INCOMPLETE",
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "executor": {
+       "config_sha256": "c6e8d069af94db752a0034f184090bd88663b40f126bcea1982779a56295a178",
+       "name": "log_integrity",
+       "version": "0.3.1+k8s.2"
+      },
+      "finished_at": "2026-11-06T05:33:41Z",
+      "started_at": "2026-11-06T05:33:36Z",
+      "status": "ABORTED"
+     }
+    }
+   ]
+  },
+  {
+   "run": "dev1-gpu-g13r-20261106/LIF-13",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "id": "PACK-BASELINE",
+    "kind": "PACK",
+    "revision": 33,
+    "sha256": "74219b48b241775e4c4fa153a950b2a94029147f512c731f055e91cf945cd5b6"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": null,
+   "bundle_sha256": null,
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6QQF0F3A7D2ZDQTYT0STV87",
+     "revision": 1,
+     "sha256": "45ad87c907cd1d708d027dcd160755eb0239627b2216923f21118acbeb3db050"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6QQF14VC6J5QJG7H9F4V8VX",
+     "revision": 1,
+     "sha256": "6b81fac80e5d303bd50d6ac5b22d37656a21eb3392b91b1a95ed181735d60d99"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6QQF18J3H3E3793CC4ADV4T",
+     "revision": 1,
+     "sha256": "3c044bc6727e0eed77757d02a4f98ec6a94cfc9614e0b622f1a39062f9d15b2a"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6QQF1P1ESKWG1Y6GD4X2W0Z",
+     "revision": 1,
+     "sha256": "5f28c3bb25cfc576c582cdb056d325bc49f6550bd8ff39ca267916389e779c44"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6QQWQ63BYED48Y10NK1GHKJ",
+     "revision": 1,
+     "sha256": "dec3819783b19c12d280c53198c5851d28656d5d79c43d3c06671e83cbba3d42"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6QQWQ63BYED48Y10NK1GHKJ",
+     "revision": 1,
+     "sha256": "dec3819783b19c12d280c53198c5851d28656d5d79c43d3c06671e83cbba3d42",
+     "check_id": "LIF-13",
+     "data_origin": "EXAMPLE",
+     "verification_level": null,
+     "verdicts": {
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN",
+      "security": "UNKNOWN"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6QQF1P1ESKWG1Y6GD4X2W0Z",
+     "revision": 1,
+     "sha256": "5f28c3bb25cfc576c582cdb056d325bc49f6550bd8ff39ca267916389e779c44",
+     "check_id": "LIF-13",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "abort_reason": "ENGINE_SENSOR_CALLBACK_SCOPE_INCOMPLETE",
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "cleanup_errors": [
+       "ENGINE_SENSOR_LAB_CONSUMER_CLEANUP_UNVERIFIED"
+      ],
+      "executor": {
+       "config_sha256": "880fc5f14f2256f2f7be98a97909aaad3402bf770fecad5c9b2b1fe717d8769f",
+       "name": "engine_sensor",
+       "version": "0.1.4"
+      },
+      "finished_at": "2026-11-06T06:08:51Z",
+      "started_at": "2026-11-06T06:06:48Z",
+      "status": "ABORTED"
+     }
+    }
+   ],
+   "note": "Server run CLI stopped on consumer-cleanup verification; RES produced locally from the exported store copy. No server saved-pack rejudge."
+  },
+  {
+   "run": "dev1-gpu-g1o-20261106/OBS-09",
+   "evidence_kind": "automated",
+   "pack_ref": {
+    "id": "PACK-BASELINE",
+    "kind": "PACK",
+    "revision": 33,
+    "sha256": "74219b48b241775e4c4fa153a950b2a94029147f512c731f055e91cf945cd5b6"
+   },
+   "whole_question_complete": false,
+   "saved_pack_rejudge_equal": true,
+   "bundle_sha256": "97e3c7936ca2afd1ba0330efa6a6b7af98bcd3ed2f2c3e8e5cbf8c99317f3744",
+   "exact_refs": [
+    {
+     "kind": "ENV",
+     "id": "ENV-01M6QQR09GHWVMT0K0EXFEZJ8J",
+     "revision": 1,
+     "sha256": "a7fbf80b3459fceae205c85a30a24d43f4ee533e9d4b7af357878ebe1f1ca540"
+    },
+    {
+     "kind": "POL",
+     "id": "POL-01M6QQR1ABWPVFWFMMZQRFHHB0",
+     "revision": 1,
+     "sha256": "417da81ebea689f8b92b97df59c656b0c97ceaf36b2e829d852310aa83f6255b"
+    },
+    {
+     "kind": "PLAN",
+     "id": "PLAN-01M6QQR1DYJ7RSFAGXTRJGVJS0",
+     "revision": 1,
+     "sha256": "d081ea8bb044f69016be1f54db279bcc3929003b5176cbe61513efde49e27e82"
+    },
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6QQR1VPMV8S5MYQ3JZKFZJX",
+     "revision": 1,
+     "sha256": "c84c10cdd89b231c55e53b438e13b7a0755209e92aeba1728b2076ae66843601"
+    },
+    {
+     "kind": "RES",
+     "id": "RES-01M6QQR87XMS291PVVABDSSPYW",
+     "revision": 1,
+     "sha256": "b82d7a5583e14367a2fef4ea11b97413991a4aaa1e617724bd90fba27148a33c"
+    },
+    {
+     "kind": "RPT",
+     "id": "RPT-01M6QQR8NHCCBG12P2F2XSHNPC",
+     "revision": 1,
+     "sha256": "761b311f1ee20951a802776141263a042c5f33b4a007e14737cf70c2dfd049f4"
+    }
+   ],
+   "results": [
+    {
+     "kind": "RES",
+     "id": "RES-01M6QQR87XMS291PVVABDSSPYW",
+     "revision": 1,
+     "sha256": "b82d7a5583e14367a2fef4ea11b97413991a4aaa1e617724bd90fba27148a33c",
+     "check_id": "OBS-09",
+     "data_origin": "EXAMPLE",
+     "verification_level": "EXAMPLE",
+     "verdicts": {
+      "functional": "PASS",
+      "performance": "UNKNOWN",
+      "security": "PASS"
+     }
+    }
+   ],
+   "evidence": [
+    {
+     "kind": "EVD",
+     "id": "EVD-01M6QQR1VPMV8S5MYQ3JZKFZJX",
+     "revision": 1,
+     "sha256": "c84c10cdd89b231c55e53b438e13b7a0755209e92aeba1728b2076ae66843601",
+     "check_id": "OBS-09",
+     "data_origin": "EXAMPLE",
+     "execution": {
+      "abort_reason": null,
+      "adapter": {
+       "name": "vllm",
+       "version": "0.4.2"
+      },
+      "executor": {
+       "config_sha256": "c6e8d069af94db752a0034f184090bd88663b40f126bcea1982779a56295a178",
+       "name": "log_integrity",
+       "version": "0.3.1+k8s.2"
+      },
+      "finished_at": "2026-11-06T06:11:49Z",
+      "started_at": "2026-11-06T06:11:43Z",
+      "status": "COMPLETED"
+     }
+    }
+   ]
+  }
+ ],
+ "derived_pack_runs": [],
+ "excluded_scopes": {
+  "REQ-14": "TP2 additional GPU approval not provided",
+  "REQ-21": "TP2 additional GPU approval not provided",
+  "REQ-16": "multimodal model selection/download approval not provided"
+ },
+ "resource_cleanup": {
+  "instance_type": "g6.2xlarge",
+  "region": "ap-northeast-2",
+  "gpu_count": 1,
+  "started_at": "2026-11-06T05:27:22+00:00",
+  "stop_requested_at": "2026-11-06T06:14:02+00:00",
+  "state_verified": "stopping",
+  "hourly_usd": 1.20208,
+  "ec2_estimate_usd": 0.94,
+  "owned_namespace_deleted": true,
+  "gpu_memory_after_mib": 0
+ }
+}

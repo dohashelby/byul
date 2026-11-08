@@ -1,0 +1,388 @@
+{
+ "codes": [],
+ "processes": [
+  {
+   "net_ns": 4026533651,
+   "pid": 1,
+   "rank": null,
+   "role": "api_server",
+   "sockets": [
+    {
+     "fd": 21,
+     "inode": 1283158
+    },
+    {
+     "fd": 22,
+     "inode": 1283159
+    },
+    {
+     "fd": 23,
+     "inode": 1283160
+    },
+    {
+     "fd": 33,
+     "inode": 1283181
+    },
+    {
+     "fd": 35,
+     "inode": 1283182
+    },
+    {
+     "fd": 46,
+     "inode": 1285305
+    },
+    {
+     "fd": 48,
+     "inode": 1284248
+    }
+   ],
+   "stable": true,
+   "start_ticks": 4261463,
+   "title_sha256": "5e9e782492abe76986abb217df66c682dff1e2775c232b6da186fa0872ab67b7",
+   "uid_effective": 0
+  },
+  {
+   "net_ns": 4026533651,
+   "pid": 75,
+   "rank": null,
+   "role": "utility",
+   "sockets": [],
+   "stable": true,
+   "start_ticks": 4262735,
+   "title_sha256": "5e9e782492abe76986abb217df66c682dff1e2775c232b6da186fa0872ab67b7",
+   "uid_effective": 0
+  },
+  {
+   "net_ns": 4026533651,
+   "pid": 76,
+   "rank": null,
+   "role": "engine_core",
+   "sockets": [
+    {
+     "fd": 30,
+     "inode": 1283213
+    },
+    {
+     "fd": 32,
+     "inode": 1283214
+    },
+    {
+     "fd": 34,
+     "inode": 1280387
+    },
+    {
+     "fd": 35,
+     "inode": 1280388
+    },
+    {
+     "fd": 49,
+     "inode": 1276839
+    },
+    {
+     "fd": 51,
+     "inode": 1276840
+    },
+    {
+     "fd": 62,
+     "inode": 1281456
+    },
+    {
+     "fd": 67,
+     "inode": 1287229
+    }
+   ],
+   "stable": true,
+   "start_ticks": 4262735,
+   "title_sha256": "dabe928c71023079bfed72a2b9a91986f864262f7ced20d55a6482897cc6c056",
+   "uid_effective": 0
+  },
+  {
+   "net_ns": 4026533651,
+   "pid": 113,
+   "rank": null,
+   "role": "worker",
+   "sockets": [
+    {
+     "fd": 18,
+     "inode": 1283324
+    },
+    {
+     "fd": 22,
+     "inode": 1283330
+    },
+    {
+     "fd": 28,
+     "inode": 1283336
+    },
+    {
+     "fd": 30,
+     "inode": 1283342
+    },
+    {
+     "fd": 39,
+     "inode": 1283348
+    },
+    {
+     "fd": 41,
+     "inode": 1283354
+    },
+    {
+     "fd": 48,
+     "inode": 1283360
+    },
+    {
+     "fd": 50,
+     "inode": 1283366
+    },
+    {
+     "fd": 56,
+     "inode": 1283372
+    },
+    {
+     "fd": 58,
+     "inode": 1283378
+    },
+    {
+     "fd": 64,
+     "inode": 1283384
+    },
+    {
+     "fd": 66,
+     "inode": 1283390
+    },
+    {
+     "fd": 72,
+     "inode": 1283396
+    },
+    {
+     "fd": 96,
+     "inode": 1283399
+    },
+    {
+     "fd": 97,
+     "inode": 1283400
+    },
+    {
+     "fd": 104,
+     "inode": 1283401
+    },
+    {
+     "fd": 106,
+     "inode": 1283402
+    },
+    {
+     "fd": 107,
+     "inode": 1283403
+    },
+    {
+     "fd": 108,
+     "inode": 1283404
+    }
+   ],
+   "stable": true,
+   "start_ticks": 4263049,
+   "title_sha256": "5b311ed25a4703fea443f8efcf3eb2fd8d510ac653f57cf681fab67b1c3af8df",
+   "uid_effective": 0
+  }
+ ],
+ "schema": "guard-ipc-ownership/1",
+ "sock_diag_complete": true,
+ "unix": {
+  "1276839": {
+   "abstract": false,
+   "path_sha256": null,
+   "peer": 1283403,
+   "state": 1,
+   "type": 1,
+   "vfs": null
+  },
+  "1276840": {
+   "abstract": false,
+   "path_sha256": null,
+   "peer": 1283404,
+   "state": 1,
+   "type": 1,
+   "vfs": null
+  },
+  "1280387": {
+   "abstract": false,
+   "path_sha256": "3bda2836ed66162305f5a48dd12ad5dfe44ba85a20a53400dc77812e2e41b0f6",
+   "peer": 1283399,
+   "state": 1,
+   "type": 1,
+   "vfs": [
+    494832,
+    161
+   ]
+  },
+  "1280388": {
+   "abstract": false,
+   "path_sha256": "eb421e5e7af51ecfe09407a268955b2c1fdddf3e179f20846f8e1b26f6192bba",
+   "peer": 1283400,
+   "state": 1,
+   "type": 1,
+   "vfs": [
+    494833,
+    161
+   ]
+  },
+  "1281456": {
+   "abstract": false,
+   "path_sha256": null,
+   "peer": 1285305,
+   "state": 1,
+   "type": 1,
+   "vfs": null
+  },
+  "1283158": {
+   "abstract": false,
+   "path_sha256": null,
+   "peer": 1283159,
+   "state": 1,
+   "type": 1,
+   "vfs": null
+  },
+  "1283159": {
+   "abstract": false,
+   "path_sha256": null,
+   "peer": 1283158,
+   "state": 1,
+   "type": 1,
+   "vfs": null
+  },
+  "1283181": {
+   "abstract": false,
+   "path_sha256": "a52b488aed3bfecb7cf1113518f97a4933e830f74c07e68f951366f0f5c6702e",
+   "peer": null,
+   "state": 10,
+   "type": 1,
+   "vfs": [
+    494821,
+    161
+   ]
+  },
+  "1283182": {
+   "abstract": false,
+   "path_sha256": "c5d4efcd85fa26488cedb710a5484cc8e808ea7ad37d879b25986a3f21080e0d",
+   "peer": null,
+   "state": 10,
+   "type": 1,
+   "vfs": [
+    494822,
+    161
+   ]
+  },
+  "1283213": {
+   "abstract": false,
+   "path_sha256": "3bda2836ed66162305f5a48dd12ad5dfe44ba85a20a53400dc77812e2e41b0f6",
+   "peer": null,
+   "state": 10,
+   "type": 1,
+   "vfs": [
+    494832,
+    161
+   ]
+  },
+  "1283214": {
+   "abstract": false,
+   "path_sha256": "eb421e5e7af51ecfe09407a268955b2c1fdddf3e179f20846f8e1b26f6192bba",
+   "peer": null,
+   "state": 10,
+   "type": 1,
+   "vfs": [
+    494833,
+    161
+   ]
+  },
+  "1283399": {
+   "abstract": false,
+   "path_sha256": null,
+   "peer": 1280387,
+   "state": 1,
+   "type": 1,
+   "vfs": null
+  },
+  "1283400": {
+   "abstract": false,
+   "path_sha256": null,
+   "peer": 1280388,
+   "state": 1,
+   "type": 1,
+   "vfs": null
+  },
+  "1283401": {
+   "abstract": false,
+   "path_sha256": "02bef1da0eef24ceda7e78bda6baec7252181866a1199d43ba862394591f15b1",
+   "peer": null,
+   "state": 10,
+   "type": 1,
+   "vfs": [
+    495567,
+    161
+   ]
+  },
+  "1283402": {
+   "abstract": false,
+   "path_sha256": "c003cfa68f0069fcc562752e1c4d058431eaa8778d4340e2438850e95750c6c2",
+   "peer": null,
+   "state": 10,
+   "type": 1,
+   "vfs": [
+    495568,
+    161
+   ]
+  },
+  "1283403": {
+   "abstract": false,
+   "path_sha256": "02bef1da0eef24ceda7e78bda6baec7252181866a1199d43ba862394591f15b1",
+   "peer": 1276839,
+   "state": 1,
+   "type": 1,
+   "vfs": [
+    495567,
+    161
+   ]
+  },
+  "1283404": {
+   "abstract": false,
+   "path_sha256": "c003cfa68f0069fcc562752e1c4d058431eaa8778d4340e2438850e95750c6c2",
+   "peer": 1276840,
+   "state": 1,
+   "type": 1,
+   "vfs": [
+    495568,
+    161
+   ]
+  },
+  "1284248": {
+   "abstract": false,
+   "path_sha256": "a52b488aed3bfecb7cf1113518f97a4933e830f74c07e68f951366f0f5c6702e",
+   "peer": 1287229,
+   "state": 1,
+   "type": 1,
+   "vfs": [
+    494821,
+    161
+   ]
+  },
+  "1285305": {
+   "abstract": false,
+   "path_sha256": "c5d4efcd85fa26488cedb710a5484cc8e808ea7ad37d879b25986a3f21080e0d",
+   "peer": 1281456,
+   "state": 1,
+   "type": 1,
+   "vfs": [
+    494822,
+    161
+   ]
+  },
+  "1287229": {
+   "abstract": false,
+   "path_sha256": null,
+   "peer": 1284248,
+   "state": 1,
+   "type": 1,
+   "vfs": null
+  }
+ }
+}

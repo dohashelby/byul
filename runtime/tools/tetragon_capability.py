@@ -34,6 +34,12 @@ def classify_capabilities(*, kernel: str | None, config: str | None, lsm: str | 
     supported: list[str] = []
     unavailable: list[str] = []
     unknown: list[str] = []
+    if (lsm_names is not None and "bpf" in lsm_names) or lsm_probe is True:
+        supported.append("lsm_file_open")
+    elif lsm_probe is False or (lsm_names is not None and "bpf" not in lsm_names):
+        unavailable.append("lsm_file_open")
+    else:
+        unknown.append("lsm_file_open")
     if fmodret_probe is True and (override_probe is False or (symbols is not None and "security_file_permission" not in symbols)):
         # security_* hooks can use the fmodret path. A missing kprobe Override
         # feature alone is not proof that this policy cannot load.
@@ -53,7 +59,7 @@ def classify_capabilities(*, kernel: str | None, config: str | None, lsm: str | 
         unknown.append("override_syscall")
     # fd_install requires a live load trial. The host inspection alone cannot prove it.
     unknown.append("sigkill_fd_install")
-    recommended = next((method for method in ("override_lsm", "override_syscall", "sigkill_fd_install") if method in supported), None)
+    recommended = next((method for method in ("lsm_file_open", "override_syscall", "sigkill_fd_install") if method in supported), None)
     return {"kernel": kernel, "config_bpf_kprobe_override": override_config, "config_bpf_lsm": bpf_lsm_config,
             "lsm": lsm_names, "apparmor": None if lsm_names is None else "apparmor" in lsm_names,
             "bpf_lsm": None if lsm_names is None else "bpf" in lsm_names,

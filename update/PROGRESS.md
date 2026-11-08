@@ -5,6 +5,64 @@
 - 다음 단계: PR232의 LOCAL_ACTUAL_VALIDATION.md와 local-actual-validation-20261108.json에서 항목별 실제 범위·원source/설치버전·GPU분기·공통producer/정책 반환물을 확인한다. 모의18/18과 제품 증거 필요18개 분류는 별도 유지한다.
 - 남은 것: LIF08/12/16·OBS02 새실행없음, 0.31최종worker·TP2/GPUrank/native소비·실제retry/restore/state producer·기업 승인/과거원본. 독립적으로 가능한 이번 CPU 묶음을 마친 뒤 추가GPU를 기동하지 않는다.
 
+## 2026-11-08 — SUP-06 worker shard 공통 입력(B 의존 반환 5)
+
+- 한 일: 엔진 콜백 센서에 선택 관측 `worker_shards`(기본 꺼짐)를 더하고 `DefaultModelLoader._prepare_weights`·`track_weights_loading`, `WorkerProc.monitor_death_pipe`(READY 직전)를 원 소스 해시로 감쌌다. 공통 입력 종류 `worker-shard-load`와 생산자 `guard-engine-callback-worker-shard-load`(미등록)를 만들고 기존 `supply_boot_contract._worker_shard` 입력 행으로 투영한다. 상세 `docs/dev-1/sup06-worker-shard.md`.
+- 테스트 결과: 새 시험 9 통과. k3d 임시 생산자 Pod 실제 3사례: 단일 파일·shard 2개+index는 배정=필수·적재 완료·READY, shard 하나 삭제는 배정 단계 예외·READY 없음. 위반 후보 없음.
+- 다음 단계: B 의존 반환 3·4·8, TP2에서 rank 2개 확인 뒤 등록.
+- 막힌 것: AWS 할당량 승인.
+
+## 2026-11-08 — SUP-10 plugin runner 지원 계약(B 의존 반환 2)
+
+- 한 일: v1(10사례)을 그대로 두고 `guard-plugin-runner/1` 계약과 실제 생산자·수집 도구를 만들었다. IO processor를 실제 `VllmConfig`·renderer·`get_io_processor`로 선택해 생성자 ModelConfig·요청·출력 효과를 결합하고, 허용 목록 차단·미설정 시 비승인 등록 함수 호출(사실)을 구분한다. 상세 `docs/dev-1/sup10-plugin-runner.md`.
+- 테스트 결과: 새 시험 19 통과. 실제 4사례 complete·위반 없음.
+- 사고: 처음 서빙 엔진 컨테이너 안에서 생산자를 돌려 메모리 상한을 넘겨 k3d lab 엔진 Pod `serving-engine-dev1-k3d-18`이 OOM 종료(Failed)됐다. 별도 생산자 Pod로 측정한 뒤 지웠다. 사용자 확인 뒤 같은 Pod 명세로 다시 띄워 Ready·정상 요청 200을 확인했다(새 Pod IP 10.42.0.77, 이전 target의 Pod 바인딩은 새로 만들어야 한다).
+- 다음 단계: B 의존 반환 3~5·8, TP2(할당량 대기).
+- 막힌 것: AWS 할당량 승인.
+
+## 2026-11-08 — SUP-09·11 model-entry 지원 계약(B 의존 반환 1)
+
+- 한 일: v1(12사례 import·constructor)을 그대로 두고 `guard-model-entry/1` 계약(실제 선택 모델 클래스 source·trust·모드·import/constructor/forward·정상 대조)과 실제 생산자(컨테이너 안 RUNNER, 무해 사용자 모델)·수집 도구를 만들었다. 로컬에 transformers가 없어 k3d vLLM CPU 이미지 안에서 실제 생산자를 돌렸다(의존성 추가 없음). 상세 `docs/dev-1/sup09-model-entry.md`.
+- 테스트 결과: 새 시험 16 통과. 실제 행: trust=False 3모드 거부·코드 0, trust=True 3모드 선택·forward. -OO 내장 GPT2 정상 대조 실패로 complete=false(보존). 공급 boot 기존 7개 로컬 실패는 HEAD에서도 같음.
+- 다음 단계: B 의존 반환 2~5·8, TP2(할당량 대기).
+- 막힌 것: -OO 지원 범위는 라이브러리 담당 결정. AWS 할당량 승인.
+
+## 2026-11-08 — LIF-11 복구 계보 공통 입력(B 의존 반환 7)
+
+- 한 일: `failed-group-resources` 생산자(관측기·생산자·전송 메서드·계보 요약)를 만들고 계약에 `failure_trigger`·`normal_inference` 행을 더했다. 실패 전·후 소유 그룹의 프로세스·unix socket·/dev/shm·장치 fd inventory로 반환·잔존·다음 세대·정상 추론을 잇는다. GPU 메모리 반환은 공백으로 남긴다. 미등록. 상세 `docs/dev-1/lif11-recovery-lineage.md`.
+- 테스트 결과: 새 시험 16, 직접·계약 47 통과. 계약 의존 묶음에서 `test_a1_resource_recovery*` 29개 실패는 변경 없는 HEAD 임시 트리에서도 같아 로컬 환경 문제로 보며 Linux CI로 확인한다.
+- 참고: 작업 중 사용자가 작업 트리·증거 폴더를 `Desktop/Buyl/`로 옮겼다. 이 작업 트리의 git 연결을 `git worktree repair`로 새 경로에 맞췄다(다른 이동 트리 4개는 그대로 prunable 상태). venv 실행 파일이 옛 경로를 가리켜 `uv run python -m pytest`로 돌렸다.
+- 다음 단계: B 의존 반환 1~5·8, TP2(할당량 대기)에서 ipc-ownership·failed-group-resources 생산자 GPU 확인.
+- 막힌 것: AWS 할당량 승인.
+
+## 2026-11-08 — PLT-02 실제 IPC 소유 공통 입력(B 의존 반환 6)
+
+- 한 일: origin/main을 합치고 새 PR dohashelby/byul#231을 올렸다. CI가 Ubuntu 26.04 러너에서 Python 3.12.3을 찾지 못해 update-default를 ubuntu-24.04로 고정했다(main도 같은 원인). B 의존 반환 6번으로 `ipc-ownership` 계약 종류·컨테이너 안 관측기(/proc+sock_diag)·생산자·전송 메서드·요약을 만들었다. 생산자는 GPU 확인 전이라 미등록이다. 상세 `docs/dev-1/plt02-ipc-ownership.md`.
+- 테스트 결과: 새 시험 17, 계약 의존 168 통과(한 코어). k3d 실제 vLLM에서 4프로세스·unix 20개·연결 방향 3종·미해결 0.
+- 다음 단계: B 의존 반환 1~5·7·8, TP2(할당량 대기), 생산자 GPU 확인·등록.
+- 막힌 것: AWS 할당량 승인.
+
+## 2026-11-06 — TP2 준비(REQ-14·REQ-21)
+
+- 한 일: 사용자 결정으로 2장 구성을 g6.12xlarge(L4 4장 중 2장)로 정하고 G and VT vCPU 할당량 8→48을 요청했다(승인 대기). 기존 인스턴스 15:51 stopped 확인·비용 장부 마감. TP2 하네스(`a-tp2.py`: 노드 GPU·P2P 기록, REQ-14 TP2, REQ-21 TP2 재기동)를 만들고 11-05 GPU 입력으로 REQ-14·REQ-21 입력 생성·select를 통과시켰다. REQ-21도 실행 안에서 엔진을 재기동하므로 실행기·입력 도구의 900초 상한에 넣었다. 계획 `docs/dev-1/tp2-run-plan.md`.
+- 테스트 결과: 입력·콜백·lab 125 통과, REQ-14·21 관련 91 통과(한 코어). 검토 소스 manifest 갱신.
+- 다음 단계: 할당량 승인 → 비용 상한 승인 → TP2 실측.
+- 막힌 것: AWS 할당량 승인. L4 PCIe P2P가 없으면 REQ-21 통신기가 꺼져 UNKNOWN일 수 있다.
+
+## 2026-11-06 — GPU 2장 전 마무리: 현황표 팩33 연결·플랫폼 이슈
+
+- 한 일: 11-06 L4 공개 실측 요약 `docs/evidence/gpu-a-dev1-phase2-20261106.json`(4실행, 팩33 Ref·정확 EVD/RES)을 만들고, 현황표 도구가 팩33 기록을 읽게 했다. 팩32 기록은 정의가 같은 76개 점검에서만 현행으로 세고, 정의가 바뀐 REQ-11의 팩32 기록은 이력(`current_definition=false`)으로 남긴다. REQ-11·OBS-09 현행 GPU 상태 GPU_PARTIAL_EXAMPLE. OBS-05 정책 입력(허용 필드·목적지 주소, 화면→정책 값 변환)은 플랫폼 이슈 dohashelby/byul#226으로 올렸다.
+- 테스트 결과: 현황표 17 통과, 생성물 재생성.
+- 다음 단계: 17b6bde CI·EC2 stopped 최종 확인. 그 뒤 남은 개발 담당 일은 TP2(REQ-14·21, GPU 2장 승인)·멀티모달(REQ-16 승인)과 기업 입력 대기다.
+- 막힌 것: 기업 입력(12개+OBS-05+LIF-13 인가), B 합의 P2-Q1·Q2, GPU 담당 #196 생산자.
+
+## 2026-11-06 — 단일 L4 재측정(REQ-11·OBS-09·LIF-13)
+
+- 한 일: 사용자 승인 상한 $4로 기존 L4를 14:27 시작·15:14 중지 요청. 47e7fff(CI 성공) 소스로 REQ-11 팩33 COMPLETED 보안/기능 PASS(EXAMPLE), LIF-13 정본 실행 안 소비자·release·fallback 모든 분기 관측·위반 없음(release 기업 인가 부재로 UNKNOWN). OBS-09 첫 실행은 attach 정렬·7사례 경계 보존에도 투영 재생이 CRI image ID를 거부해 ABORTED → `native_projection.py`만 고친 수정본(파일 해시 고정)으로 재측정 COMPLETED 보안/기능 PASS(EXAMPLE). 소비자 정리 미확인은 좀비를 살아 있다고 센 정리 스크립트 결함으로 고쳤다. 원 EVD/RES 모두 보존. 상세 `docs/dev-1/gpu-20261106.md`.
+- 테스트 결과: OBS-09 로그 관련 222 통과, 콜백·lab 108 통과(한 코어). 반출 묶음 서버·로컬 SHA 일치 `e51b7a10…b9d`, REQ-11·OBS-09 반출·복원·재판정 일치. 검토 소스 manifest 갱신.
+- 다음 단계: 수정 2건 커밋·CI, 공개 실측 요약(docs/evidence)과 현황표의 팩33 GPU 기록 연결.
+- 막힌 것: LIF-13 release 인가·OBS-09 기업 수집기 범위는 기업 입력.
+
 ## 2026-11-06 — GPU 재측정 준비 중 LIF-13 실행 경로 보수
 
 - 한 일: GPU 실행 전 점검에서 두 결함을 찾아 고쳤다. (1) Kubernetes 콜백 전송의 300초 상한이 LIF-13 900초를 거부 → 소유 lab 콜백 전송만 900초, 입력 도구도 LIF-13에 900초. (2) 소비자 기동이 PID 1 `vllm serve`만 인정 → 실제 콘솔 스크립트 형태 `python /…/vllm serve`도 인정(k3d 엔진 PID 1에서 판별 확인, 소비자는 띄우지 않음).

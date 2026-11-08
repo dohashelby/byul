@@ -74,6 +74,24 @@ class AWS20Tests(unittest.TestCase):
             self.assertFalse(_aws20_raw_action(path, since="2026-11-05T00:00:00Z", pod_uid="other",
                                                 namespace="serving-lab", action="KPROBE_ACTION_SIGKILL", method="sigkill_fd_install"))
 
+    def test_file_open_and_override_only_syscall_candidates(self):
+        from tests.test_tetragon_file_open import policy as rendered
+        for method in ('lsm_file_open', 'override_syscall'):
+            candidate = rendered(method)
+            candidate['metadata']['namespace'] = 'serving-lab'
+            probes = candidate['spec'].get('lsmhooks', candidate['spec'].get('kprobes'))
+            probes[0]['selectors'][0]['matchArgs'][0]['values'] = [PATH + ('\x00' if method == 'override_syscall' else '')]
+            self.assertEqual(_aws20_method(candidate, namespace='serving-lab'), method)
+        raw = {'time': '2026-11-08T00:01:00Z', 'process_lsm': {
+            'function_name': 'file_open', 'policy_name': 'runtime-tg-secret-01',
+            'action': 'KPROBE_ACTION_OVERRIDE', 'process': {'pod': {'namespace': 'serving-lab', 'uid': 'uid'}},
+            'args': [{'file_arg': {'path': PATH}}]}}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'events.jsonl'
+            path.write_text(json.dumps(raw) + '\n')
+            self.assertTrue(_aws20_raw_action(path, since='2026-11-08T00:00:00Z', pod_uid='uid',
+                namespace='serving-lab', action='KPROBE_ACTION_OVERRIDE', method='lsm_file_open'))
+
     def test_method_specific_verdicts_and_opt_in(self):
         override = dict.fromkeys(("enforce_active", "monitor_read_ok", "read_eperm", "raw_override", "normal_200", "cleanup_ok", "restore_read_ok"), True)
         override["enforce_method"] = "override_lsm"

@@ -1,4 +1,4 @@
-"""Read scoped Kubernetes/container procfs identity metadata; never command arguments."""
+"""Read scoped procfs identities and inode-verified argv0 paths, never arguments."""
 from __future__ import annotations
 
 import argparse
@@ -13,11 +13,40 @@ from serving_runtime.enforcement.tetragon import comparable_spec
 from tools.tetragon_trial import atomic_json, run
 
 # The process list is restricted by Kubernetes container IDs before any exe
-# metadata is read. Re-read start time, cgroup and exe to fence exit/exec races.
+# metadata is read. Only argv0 and PATH are used locally to verify an alias;
+# neither arguments nor environment values are returned in the snapshot.
+# Re-read start time, cgroup, exe and file identity to fence exit/exec races.
 PROC_SCAN = r'''
 root=/procRoot
 allowed="$*"
 hz=$(getconf CLK_TCK) || exit 3
+# Resolve symlinks inside the target's root, including absolute symlink targets.
+# Never execute a binary from that root or evaluate argv0/PATH as shell code.
+resolve_path() {
+  pending=$1; resolved=; links=0; parts=0
+  while [ -n "$pending" ]; do
+    parts=$((parts+1)); [ "$parts" -le 256 ] || return 1
+    part=${pending%%/*}
+    case "$pending" in */*) pending=${pending#*/};; *) pending=;; esac
+    case "$part" in ''|.) continue;; ..) resolved=${resolved%/*}; continue;; esac
+    if target=$(readlink "$dir/root$resolved/$part" 2>/dev/null); then
+      links=$((links+1)); [ "$links" -le 40 ] || return 1
+      case "$target" in /*) resolved=;; esac
+      pending=$target${pending:+/$pending}
+    else
+      resolved=$resolved/$part
+    fi
+  done
+  printf '%s' "${resolved:-/}"
+}
+verify_alias() {
+  case "$1" in /*) ;; *) return 1;; esac
+  case "$1" in *[!a-zA-Z0-9_./+-]*) return 1;; esac
+  resolved_path=$(resolve_path "$1") || return 1
+  candidate_id=$(stat -L -c '%d:%i' "$dir/root$resolved_path" 2>/dev/null) || return 1
+  [ "$candidate_id" = "$file_id" ] || return 1
+  alias=$1
+}
 count=0
 for dir in "$root"/[0-9]*; do
   [ -r "$dir/cgroup" ] && [ -r "$dir/stat" ] || continue
@@ -37,6 +66,20 @@ for dir in "$root"/[0-9]*; do
   ticks=$1
   ns=$(readlink "$dir/ns/pid" 2>/dev/null) || continue
   exe=$(readlink "$dir/exe" 2>/dev/null) || continue
+  file_id=$(stat -L -c '%d:%i' "$dir/exe" 2>/dev/null) || continue
+  alias=
+  argv0=$(awk 'BEGIN { RS="\0" } NR==1 { printf "%s", $0; exit }' "$dir/cmdline" 2>/dev/null)
+  case "$argv0" in
+    /*) verify_alias "$argv0" || :;;
+    */*|'') :;;
+    *)
+      search_path=$(awk 'BEGIN { RS="\0" } /^PATH=/ { printf "%s", substr($0,6); exit }' "$dir/environ" 2>/dev/null)
+      while [ -n "$search_path" ]; do
+        entry=${search_path%%:*}
+        case "$search_path" in *:*) search_path=${search_path#*:};; *) search_path=;; esac
+        case "$entry" in /*) verify_alias "$entry/$argv0" && break;; esac
+      done;;
+  esac
   npid=
   while IFS= read -r line; do
     case "$line" in NSpid:*) set -- $line; for item do npid=$item; done;; esac
@@ -47,7 +90,12 @@ for dir in "$root"/[0-9]*; do
   [ "$ticks" = "$1" ] || continue
   [ "$cg" = "$(cat "$dir/cgroup" 2>/dev/null)" ] || continue
   [ "$exe" = "$(readlink "$dir/exe" 2>/dev/null)" ] || continue
-  printf '%s\000%s\000%s\000%s\000%s\000%s\000%s\000' "$matched" "${dir##*/}" "$ns" "$ticks" "$npid" "$exe" "$hz"
+  [ "$file_id" = "$(stat -L -c '%d:%i' "$dir/exe" 2>/dev/null)" ] || continue
+  if [ -n "$alias" ]; then
+    sampled_alias=$alias; alias=
+    verify_alias "$sampled_alias" || :
+  fi
+  printf '%s\000%s\000%s\000%s\000%s\000%s\000%s\000%s\000%s\000' "$matched" "${dir##*/}" "$ns" "$ticks" "$npid" "$exe" "$hz" "$file_id" "$alias"
   count=$((count+1)); [ "$count" -lt 10000 ] || exit 4
 done
 '''
@@ -102,15 +150,17 @@ class IdentityCollector:
                 if len(raw) > 2 * 1024 * 1024:
                     raise ValueError("identity process snapshot exceeds limit")
                 fields = raw.split("\0")
-                if fields[-1] != "" or (len(fields)-1) % 7:
+                if fields[-1] != "" or (len(fields)-1) % 9:
                     raise ValueError("identity process snapshot is incomplete")
-                for i in range(0, len(fields)-1, 7):
-                    cid, pid, ns, ticks, npid, binary, hz = fields[i:i+7]
-                    if cid not in containers or not re.fullmatch(r"pid:\[\d+\]", ns) or not binary.startswith("/"):
+                for i in range(0, len(fields)-1, 9):
+                    cid, pid, ns, ticks, npid, binary, hz, file_id, alias = fields[i:i+9]
+                    if (cid not in containers or not re.fullmatch(r"pid:\[\d+\]", ns) or not binary.startswith("/")
+                        or not re.fullmatch(r"\d+:\d+", file_id) or (alias and not alias.startswith("/"))):
                         raise ValueError("invalid identity process sample")
                     row = {**containers[cid], "node_pid": int(pid), "pidns": int(ns[5:-1]),
                            "start_ticks": int(ticks), "clock_ticks": int(hz), "ns_pid": int(npid),
-                           "binary": binary, "stable": True}
+                           "binary": binary, "binary_file_id": file_id,
+                           "binary_aliases": [{"path": alias, "file_id": file_id}] if alias else [], "stable": True}
                     result["records"].append(row)
             for policy in policies:
                 probes = comparable_spec(policy["spec"]).get("kprobes", [])

@@ -5,6 +5,7 @@ import argparse
 from datetime import datetime, timezone
 import json
 import hashlib
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -18,7 +19,7 @@ from tools.tetragon_mode import switch_mode
 
 ROOT = Path(__file__).resolve().parents[1]
 PROBE_PATH = "/run/byul-probe/secret.txt"
-METHODS = ("override_lsm", "override_syscall", "sigkill_fd_install")
+METHODS = ("lsm_file_open", "override_syscall", "sigkill_fd_install", "override_lsm")
 SERVER = r'''
 import errno,json,os
 from http.server import BaseHTTPRequestHandler,HTTPServer
@@ -62,11 +63,15 @@ def run(command, *, timeout=30):
         return subprocess.CompletedProcess(command,124,"","command timed out")
 
 
-def atomic_json(path, value):
+def atomic_json(path, value, mode=0o644):
     path=Path(path)
     path.parent.mkdir(parents=True,exist_ok=True)
     temporary=path.with_name(path.name+".next")
-    temporary.write_text(json.dumps(value,ensure_ascii=False,indent=2)+"\n")
+    temporary.unlink(missing_ok=True)
+    fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+    with os.fdopen(fd,"w",encoding="utf-8") as target:
+        os.fchmod(target.fileno(),mode)
+        target.write(json.dumps(value,ensure_ascii=False,indent=2)+"\n")
     temporary.replace(path)
 
 
@@ -269,7 +274,10 @@ class KindTrial:
             node=pod_doc["spec"]["nodeName"]
             self.report["node"]=node
             identity=self.task_identity(pod_doc,node)
-            self.report["task_identity"]=identity
+            # LSM 1.7.1 cannot carry proof data; require native Pod UID + PID.
+            event_identity=None if self.method=="lsm_file_open" else identity
+            if event_identity is not None:
+                self.report["task_identity"]=identity
             kernel=self.node_access.kernel(node)
             self.report["kernel"]=kernel.stdout.strip() if kernel.returncode==0 else None
             if not self.report["kernel"]:
@@ -286,12 +294,14 @@ class KindTrial:
             policy["metadata"]["name"]=self.policy
             # Proof-only metadata reads; the candidate's hooks, selectors and
             # enforcement actions remain identical to the rendered policy.
-            policy["spec"]["kprobes"][0]["data"]=KERNEL_IDENTITY_DATA
-            self.report["identity_probe_data"]=KERNEL_IDENTITY_DATA
+            probe=policy["spec"].get("lsmhooks",policy["spec"].get("kprobes"))[0]
+            if event_identity is not None:
+                probe["data"]=KERNEL_IDENTITY_DATA
+                self.report["identity_probe_data"]=KERNEL_IDENTITY_DATA
             if self.override_only:
                 if self.method=="sigkill_fd_install":
                     raise ValueError("Override diagnostic requires an Override method")
-                for selector in policy["spec"]["kprobes"][0]["selectors"]:
+                for selector in probe["selectors"]:
                     selector["matchActions"]=[a for a in selector["matchActions"] if a["action"]!="Sigkill"]
                 policy["metadata"]["annotations"]["serving-runtime.local/trial-variant"]="override-only-diagnostic"
             self.apply("policy",policy)
@@ -299,7 +309,7 @@ class KindTrial:
             atomic_json(self.output/self.namespace/"installed-spec.json",installed.get("spec",{}))
             if comparable_spec(installed.get("spec", {})) != comparable_spec(policy["spec"]):
                 raise RuntimeError("loaded policy spec differs from reviewed candidate")
-            self.report["policy_actions"]=policy["spec"]["kprobes"][0]["selectors"][0]["matchActions"]
+            self.report["policy_actions"]=probe["selectors"][0]["matchActions"]
             self.report["policy_spec_sha256"]=hashlib.sha256(json.dumps(comparable_spec(installed["spec"]),sort_keys=True,separators=(",",":")).encode()).hexdigest()
             # 1.7.1 ListTracingPolicies can race with sensor loading. Let the
             # controller settle before querying; still fence agent restarts.
@@ -336,7 +346,7 @@ class KindTrial:
                 if self.stream.poll() is not None:
                     raise RuntimeError("probe event stream ended before mode switch")
                 monitor_events=match_probe_events(raw_path.read_text().splitlines(),policy=self.policy,
-                    namespace=self.namespace,pod_uid=uid,path=PROBE_PATH,since=monitor_started,main_process=True,task_identity=identity)
+                    namespace=self.namespace,pod_uid=uid,path=PROBE_PATH,since=monitor_started,main_process=True,pid=identity["node_pid"] if event_identity is None else None,task_identity=event_identity)
                 pids={e["pid"] for e in monitor_events if isinstance(e.get("pid"),int)}
                 if len(pids)==1:
                     main_pid=pids.pop()
@@ -379,7 +389,7 @@ class KindTrial:
             events=[]
             for _ in range(8):
                 raw_lines=raw_path.read_text().splitlines()
-                events=match_probe_events(raw_lines,policy=self.policy,namespace=self.namespace,pod_uid=uid,path=PROBE_PATH,since=started,until=until,main_process=True,pid=main_pid,task_identity=identity)
+                events=match_probe_events(raw_lines,policy=self.policy,namespace=self.namespace,pod_uid=uid,path=PROBE_PATH,since=started,until=until,main_process=True,pid=main_pid,task_identity=event_identity)
                 if events: break
                 time.sleep(1)
             self.report["events"]=events

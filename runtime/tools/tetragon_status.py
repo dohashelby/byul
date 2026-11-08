@@ -17,6 +17,11 @@ SCHEMA="runtime-tetragon-state/1.0"
 
 
 def method_from_spec(policy):
+    hooks=policy.get("spec",{}).get("lsmhooks",[])
+    if hooks:
+        if policy.get("spec",{}).get("kprobes") or len(hooks)!=1: return None
+        actions={a.get("action") for s in hooks[0].get("selectors",[]) for a in s.get("matchActions",[])}
+        return "lsm_file_open" if hooks[0].get("hook")=="file_open" and "Override" in actions and "Sigkill" not in actions else None
     probes=policy.get("spec",{}).get("kprobes",[])
     if len(probes)!=1: return None
     probe=probes[0]
@@ -25,7 +30,7 @@ def method_from_spec(policy):
     if probe.get("call")=="fd_install" and "Sigkill" in actions: return "sigkill_fd_install"
     if probe.get("call")=="security_file_permission" and "Override" in actions:
         return "override_lsm" if "Sigkill" in actions else "override_only"
-    if probe.get("call")=="sys_openat" and {"Override","Sigkill"}<=actions: return "override_syscall"
+    if probe.get("call")=="sys_openat" and "Override" in actions: return "override_syscall"
     return None
 
 
@@ -76,6 +81,9 @@ class StatusCollector:
                 raise ValueError("정책 변경 감지: 로드 안정화 대기 중")
             methods={(p.get("metadata",{}).get("namespace"),p.get("metadata",{}).get("name")):method_from_spec(p)
                      for p in spec_docs}
+            sigkills={(p.get("metadata",{}).get("namespace"),p.get("metadata",{}).get("name")):
+                any(a.get("action")=="Sigkill" for probe in p.get("spec",{}).get("kprobes",[]) + p.get("spec",{}).get("lsmhooks",[])
+                    for s in probe.get("selectors",[]) for a in s.get("matchActions",[]) + s.get("matchReturnActions",[])) for p in spec_docs}
             hashes={(p.get("metadata",{}).get("namespace"),p.get("metadata",{}).get("name")):
                 hashlib.sha256(json.dumps(comparable_spec(p.get("spec",{})),sort_keys=True,separators=(",",":")).encode()).hexdigest()
                 for p in spec_docs}
@@ -104,6 +112,7 @@ class StatusCollector:
                         "id":str(policy.get("id")),"state":policy.get("state","").removeprefix("TP_STATE_").lower(),
                         "mode":mode if mode in {"monitor","enforce","monitor_only"} else "unknown",
                         "method":methods.get((policy.get("namespace"),policy.get("name"))),
+                        "contains_sigkill":sigkills.get((policy.get("namespace"),policy.get("name"))),
                         "spec_sha256":hashes.get((policy.get("namespace"),policy.get("name"))),
                         "load_error":str(policy.get("error", ""))[:500] or None})
                 if refresh:
@@ -153,7 +162,7 @@ class StatusCollector:
                 result["monitoring"] = {"state":"error","reasons":["recovery_evidence_unavailable"]}
         else:
             result["monitoring"] = {"state":"not_configured","reasons":["recovery_check_not_configured"]}
-        atomic_json(self.output,result)
+        atomic_json(self.output,result,mode=0o644)
         return result
 
 
@@ -191,7 +200,7 @@ def main():
                 return 1
             atomic_json(args.capture_baseline,{"schema_version":"runtime-tetragon-baseline/1.0",
                 "context":args.context,"captured_at":result["generated_at"],
-                "policies":[{k:p.get(k) for k in ("node","namespace","name","mode","spec_sha256")} for p in result["policies"]]})
+                "policies":[{k:p.get(k) for k in ("node","namespace","name","mode","spec_sha256")} for p in result["policies"]]},mode=0o644)
         if not args.watch: break
         time.sleep(args.interval)
     return 0 if result["state"]=="ok" else 1

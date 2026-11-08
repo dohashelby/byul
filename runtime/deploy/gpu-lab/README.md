@@ -26,10 +26,40 @@ AWS 공통 GPU 시험환경 설치 묶음(`aws-handoff-20261026`, 이하 "AWS �
 | `intent.aws-lab.json` | AWS 값으로 만든 통제 의도(엔진 UID 2000, `/models`, 포트 8000/8001) |
 | `target.aws-lab.json` | 정책 묶음의 `target` 역할에 넣을 대상 등록 예시. image digest를 실제 값으로 교체해야 함 |
 | `host/byul-observation-feed.service` | AWS 호스트에서 수집기를 계속 돌리는 systemd 사용자 서비스 |
+| `host/byul-tetragon-identities.service` | 엔진·proof·sentinel의 procfs 식별 자료를 수집하는 systemd 사용자 서비스 |
+| `tetragon-sentinel.json`·`tetragon-sentinel-policy.json` | Gateway 이미지의 Python 3.12로 가짜 파일을 읽는 노드별 sentinel과 Post 전용 TG-HEALTH-01 정책 |
 | [`ACCEPTANCE.md`](ACCEPTANCE.md) | AWS 첫 완료 기준 8개 사례의 실행·증거·비용 절약 절차 |
 | `policy.aws-lab.json` | 정책 묶음의 gateway policy 역할에 넣을 LAB 시험 정책(아래 "LAB 시험값") |
 | `policy-approvals.aws-lab.json` | 위 정책의 LAB 승인 목록(SHA-256 대조). runtime 자체 기록이며 정식 승인 아님 |
 | `perf-plan.aws-lab.json` | B0/B1/B2 성능 비교 계획(`tools/perf_compare.py`) |
+
+## BPF LSM 서버 준비와 파일 거부 방식
+
+Tetragon 1.7.1의 `lsm_file_open`은 BPF LSM 활성화가 필요하다. 다음은 서버 관리자가 유지보수 시간에 수행하는 호스트 부팅 설정이며, 이 문서 작성 작업에서는 실행하지 않았다.
+
+1. `uname -r`, `/boot/config-$(uname -r)`의 `CONFIG_BPF_LSM=y`, `cat /sys/kernel/security/lsm`을 확인한다. 현재 목록의 순서를 보존하고 `bpf`가 없을 때만 끝에 추가한다. 기존 GRUB의 `lsm=` 설정이 있다면 중복 인자가 생기지 않게 기존 설정을 통합한다.
+2. `/etc/default/grub.d/99-byul-bpf-lsm.cfg`에 다음을 기록한다. `<현재 목록>`은 바로 확인한 쉼표 구분 목록으로 바꾸며, 이미 `bpf`가 있으면 다시 추가하지 않는다.
+
+   ```bash
+   GRUB_CMDLINE_LINUX="$GRUB_CMDLINE_LINUX lsm=<현재 목록>,bpf"
+   ```
+
+3. `sudo update-grub` 실행 후 `sudo reboot`한다. 재접속 뒤 `/proc/cmdline`, `/sys/kernel/security/lsm`의 `bpf`, Tetragon의 `tetra probe` 출력 `lsm: true`를 확인한다. 설정 파일만 작성된 상태를 활성화로 판정하지 않는다.
+
+방식 추천 순서는 `lsm_file_open` → `override_syscall` → `sigkill_fd_install`이다. 추천은 intent나 기존 묶음을 자동 변경하지 않는다. 사전 조건이 확인된 후보만 추천하며, `fd_install`은 정적 점검만으로 지원을 확정하지 않는다. 실제 정책 로드·파일 거부·monitor 복귀 증거와 운영 안전 조건은 계속 필요하다.
+
+| 방식 | 동작과 한계 |
+| --- | --- |
+| `lsm_file_open` | `lsmhooks.file_open`의 정확한 파일 경로 + Post·Override(-13). 파일 열기만 거부, 프로세스 유지. 기존에 열린 descriptor는 보호하지 않는다. 7회차에서 상대 경로도 거부됐으나 모든 별칭·파일시스템을 보장한 것은 아니다. |
+| `override_syscall` | openat 경로 문자열 + Post·Override(-13). 파일 열기만 거부, 프로세스 유지. 상대 경로·symlink·TOCTOU·openat2·io_uring 등 우회 한계가 있어 포괄적인 파일 보호로 간주하지 않는다. args 2개 + 식별 data 3개로 최대 5개를 지킨다. |
+| `sigkill_fd_install` | 해당 프로세스를 종료한다. 엔진 본체 접근이면 엔진 종료·Gateway 503·재시작 위험이 있다. 파일 읽기 거부 증거와 프로세스 종료 증거를 구분한다. |
+| 기존 `override_lsm` | security_file_permission kprobe + Override·Sigkill. 새 BPF LSM 방식과 다르며 기존 intent 호환용이다. AWS 7회차에서 security_* error injection 부재로 사용할 수 없었다. |
+
+`lsm_file_open`의 `data`는 [1.7.1 LsmHookSpec](https://github.com/cilium/tetragon/blob/v1.7.1/pkg/k8s/apis/cilium.io/v1alpha1/types.go#L401-L419)에 필드가 없어 생략한다. `process_lsm`에도 반환값·data가 없으므로 커널 반환값만으로 `kernel_read_denied`를 만들지 않는다. native 프로세스·Pod UID·정책·정확한 경로·시간창과 userspace EPERM/EACCES 증거가 필요하며 귀속이 부족하면 `unknown`을 유지한다. trial은 CRI init PID와 native 이벤트 PID도 대조한다.
+
+openat Equal 값 끝의 `\u0000`은 기존 코드가 명시적으로 붙인 종결자다. [1.7.1 writeMatchStrings](https://github.com/cilium/tetragon/blob/v1.7.1/pkg/selectors/kernel.go#L701-L707)는 string 타입에 trimNulSuffix를 켜고, [ArgStringSelectorValue](https://github.com/cilium/tetragon/blob/v1.7.1/pkg/selectors/selectors.go#L353-L359)는 끝 NUL을 제거한다. 따라서 string Equal 비교에는 필수가 아니며 실측에서 매치된 것과도 일치한다. 기존 생성값의 호환성을 위해 유지한다. 제거 대조 실험은 미실행이며, 파일 객체 경로를 쓰는 LSM 값에는 붙이지 않는다.
+
+새 정책은 monitor로 로드한다. 기존 syscall+Sigkill 묶음은 바꾸지 않으며 수집한 실제 action의 `contains_sigkill`에 따라 화면·API·에이전트가 `ENGINE_RESTART` 확인을 요구한다. 이전 상태 자료에 이 정보가 없으면 기존 Sigkill 계열 방식의 확인을 보수적으로 유지한다. 상세 실측은 [7회차 결과](../../docs/AWS_GPU_서버7회차_결과_20261108.md)를 참조한다.
 
 ## Gateway 시간 제한과 수집
 
@@ -67,14 +97,41 @@ UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`
 1. **호스트 폴더·그룹 준비** (관리자)
    ```bash
    sudo groupadd -g 10010 serving-observe && sudo usermod -aG serving-observe ubuntu   # 재로그인
-   sudo install -d -o ubuntu -g 10010 -m 0750 /srv/serving/observation
+   sudo install -d -o ubuntu -g 10010 -m 2750 /srv/serving/observation
    sudo install -d -o 10000 -g 10000 -m 0700 /srv/serving/runtime/data
    sudo install -d -o root -g 10000 -m 0750 /srv/serving/bundles
    ```
    `/srv/serving/runtime`이 없으면 먼저 만든다. `usermod` 뒤에는 이미 떠 있는 systemd 사용자 매니저가 예전 그룹 목록을 유지하므로(다른 SSH·tmux 세션이나 linger가 있으면 재로그인만으로 부족) `sudo systemctl restart user@$(id -u ubuntu)` 후 `systemd-run --user --wait --pipe id -G`에 10010이 보이는지 확인한다. 그룹이 없으면 수집기는 명확한 오류와 함께 종료 코드 2로 멈춘다(재시작 반복 없음).
 
+   운영 수집기(`runtime-agent`)가 Gateway 정규화 기록을 읽을 때는 해당 계정을 그룹 10000에 넣고 `/srv/serving/runtime/data`를 그룹 10000·0750으로 준비한다(수집기가 없으면 기존 0700 유지). Gateway의 `observations.jsonl`은 0644, `tetragon-health-receipts.json`은 0640이다. 기존 0600 receipt는 새 Gateway가 다음 sentinel receipt를 기록하면 0640으로 교체된다. monitor window 수집에는 `--trusted-owner-uid 10000`을 명시한다. 추가 UID는 반복 지정할 수 있고, 생략하면 root·자기 UID만 신뢰하며 그룹/기타 쓰기 가능한 입력은 계속 거부한다.
+
+   `runtime-agent`로 수집기를 실행할 때 Ubuntu의 `umask 002`에 주의한다. `tools.tetragon_status` 코드는 상태 파일·baseline을 명시 권한 0644, recovery를 0600으로 써서 그룹/기타 쓰기를 허용하지 않는다.
+
+   지속 운영용 상태·모니터 수집기 systemd 예시는 `deploy/agent/`에 있다. baseline 최초 캡처·그룹/폴더 권한·설치 검증, HTTPS/사설 CA 연결, 운영 토큰 발급·회전과 LAB 전용 값은 [원격운영 사용과 검증 §14~15](../../docs/원격운영_사용과검증.md#14-운영-배치-수집기https토큰)를 따른다.
+
+   호스트의 CRI 확인에는 `crictl`도 필요하다(kubeadm 설치에 포함되지 않음). 클러스터 Kubernetes 버전에 맞는 `cri-tools` 버전을 별도로 설치하고, containerd 환경의 `/etc/crictl.yaml`을 아래처럼 준비한다. 설치 후 `sudo crictl info`로 연결을 확인한다.
+   ```yaml
+   runtime-endpoint: unix:///run/containerd/containerd.sock
+   image-endpoint: unix:///run/containerd/containerd.sock
+   timeout: 10
+   debug: false
+   ```
+
    첫 버전의 정책 묶음은 사람이 [`정책_수동적용_절차.md`](정책_수동적용_절차.md)에 따라 `/srv/serving/bundles/<bundle_id>/`에 쓰고 `current`가 그 폴더를 가리키게 한다(`runtime/docs/결정기록_정책묶음_수신.md`). Gateway 컨테이너에는 이 폴더가 `/etc/serving/bundles`로 보이므로 **`current`는 상대 링크**(`ln -sfn <bundle_id> current`)여야 한다. 절대 링크(`/srv/serving/bundles/<id>`)는 컨테이너 안에서 풀리지 않아 Gateway가 시작하지 않는다. 묶음 폴더와 파일은 Gateway(UID 10000)가 읽을 수 있어야 한다(예: 그룹 10000, 폴더 0750·파일 0640). 묶음은 03 완료 뒤 서버의 `images.lock`에 기록된 엔진 digest를 확인하고 서버 사본에서 만든다. 묶음의 gateway policy는 `allowed_models`에 `test-model`을, `enforcement_intent` 역할에 `intent.aws-lab.json`(값을 채운 것)을 넣는다. 이 역할의 항목 이름은 `schema_version`이지만 intent 본문은 `schema`를 쓴다. `target` 역할에는 `target.aws-lab.json`의 `REPLACE_IMAGE_DIGEST_HEX`를 실제 엔진 image digest hex로 바꾸고 넣는다. gateway policy의 `target_id`, bundle의 `target_ref`, target 등록의 `target_id`는 모두 `serving-engine-aws-lab`로 맞춘다. 대상 등록의 Kubernetes 값은 context `byul-aws-lab`, namespace `serving-lab`, selector `app=serving-engine`, container `engine`이어야 한다. vLLM 판본은 등록 schema가 허용하므로 이 환경의 `0.31.0`을 선언한다.
 2. **수집기 실행** — byul 저장소를 `~/byul`에 두고 `host/byul-observation-feed.service`의 주석대로 설치한다. `--kube-context byul-aws-lab --reader-group 10010 --target-selector app=serving-engine --target-interval 5 --phase-timeline`으로 돌며, Tetragon 프로세스 인자를 지운 뒤 기록한다. Hubble/Tetragon 상태는 `/srv/serving/observation/*.heartbeat.json`, 대상 Pod는 `/srv/serving/observation/target-pods.json`, 현재 엔진 Pod 로그의 단계는 `/srv/serving/observation/phase-timeline.json`에 원자 교체로 기록한다. Pod 조회 실패나 4초의 kubectl 제한 초과 때 이전 items를 재사용하지 않고 `state: error`로 바꾼다. 단계 수집 스레드는 별개이며 호스트 kubectl에는 기존 `get pods` 외에 해당 namespace의 `get pods/log` 권한이 필요하다. Gateway에는 kubectl 권한을 추가하지 않는다.
+
+   식별 수집기도 같은 호스트 사용자로 설치한다. `/srv/serving/observation`의 setgid(2750)와 서비스 `UMask=0027`로 매번 교체되는 `tetragon-identities.json`을 그룹 10010·0640으로 만든다. 관측 수집기는 시작할 때 기존 폴더의 setgid를 보존한다. 이전 버전이 0750으로 바꾼 폴더는 두 수집기를 멈추고 1번의 `install -d` 명령으로 2750·그룹 10010을 복구한 뒤 다시 시작한다. 재시작 후 `stat -c '%a %g %n' /srv/serving/observation`으로 `2750 10010`을 확인한다. 기존 파일·`.next`가 있다면 수집기를 멈춘 상태에서 그룹 10010·0640인지 먼저 확인·수정한다.
+   ```bash
+   cp deploy/gpu-lab/host/byul-tetragon-identities.service ~/.config/systemd/user/
+   systemctl --user daemon-reload
+   systemctl --user enable --now byul-tetragon-identities
+   stat -c '%a %g %n' /srv/serving/observation/tetragon-identities.json
+   ```
+   selector는 `app in (serving-engine,byul-tetragon-proof,byul-tetragon-sentinel)`이다. 호스트 계정에는 serving-lab Pod·namespaced 정책 조회, kube-system Tetragon Pod 조회·exec 권한이 필요하다. Gateway는 보조 그룹 10010으로 `--tetragon-identities /srv/serving/observation/tetragon-identities.json`을 읽는다. SGLang도 같은 식별 서비스를 사용한다.
+
+   AWS sentinel은 아래 Gateway 이미지와 같은 태그를 사용하며 `imagePullPolicy: Never`, command `/usr/local/bin/python3.12`로 실행한다. 정책은 기존 로컬 후보 `~/.local/state/serving-runtime/tetragon-monitoring/runtime-tg-health-01-sentinel-v2.json`에서 복사했다. 이번 수정 환경에서는 kind API 소켓 접근이 거부되어 현재 live 정책과의 직접 대조는 미확인이다. `TG-HEALTH-01`의 가짜 파일 읽기·Post 전용 범위를 검토한 뒤 배포한다. Tetragon CRD가 먼저 설치되어 있어야 하며 정책은 `runtime-tg-health-01-sentinel-v2`라는 별도 이름을 사용한다. 운영 스트림을 `tools.tetragon_stream`으로 수집한다면 이 정책 이름도 `--policy`에 포함하고, 기대 정책 baseline은 사람이 검토해 갱신한다. 정책 설치만으로 감시 정상이나 복구 완료로 판정하지 않는다.
+
+   플랫폼의 `BYUL_OPERATION_MONITOR_SECONDS`는 운영 기본 86400초다. LAB에서만 플랫폼 환경에 `BYUL_OPERATION_MONITOR_SECONDS=60`을 주고 에이전트에도 `--monitor-seconds 60`을 지정한다. 에이전트는 자체 최소 기간과 플랫폼 기간 중 큰 값을 사용하므로 한쪽만 줄이면 60초 창으로 통과하지 않는다.
 
    대상 스냅샷의 타이밍은 **writer 간격 + kubectl timeout + Gateway poll 간격 < Gateway stale window**여야 한다. Gateway 기본값은 poll 5초 / stale 15초이고, 이 서비스는 writer 5초 / kubectl timeout 4초이므로 최악 age는 14초로 15초보다 작다. CLI는 이 기본 조합을 지키기 위해 `--target-interval`의 5초 초과 값을 거부한다. Gateway 재시작 뒤에는 시작 전에 쓴 파일을 인정하지 않아 Pod 준비 완료 후에도 새 쓰기·읽기까지 최대 약 10초(조회 시간 추가 가능) `TARGET_UNAVAILABLE` 503이 날 수 있다.
 3. **Gateway 이미지 넣기** — 레지스트리가 없으므로 노드의 containerd에 직접 넣는다.

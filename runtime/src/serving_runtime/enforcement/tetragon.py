@@ -15,7 +15,7 @@ _STATUS = "candidate-cluster-unapplied-unverified"
 def comparable_spec(spec: dict[str, Any]) -> dict[str, Any]:
     """Ignore only observed 1.7.1 CRD defaults on kprobe argument definitions."""
     result = copy.deepcopy(spec)
-    for probe in result.get("kprobes", []):
+    for probe in result.get("kprobes", []) + result.get("lsmhooks", []):
         if probe.get("return") is False:
             probe.pop("return")
         arguments = list(probe.get("args", [])) + list(probe.get("data", []))
@@ -101,7 +101,16 @@ def _secret_enforcement_policy(intent: EnforcementIntent) -> dict[str, Any]:
     """New explicit methods start in monitor mode with their action loaded."""
     method = intent.tetragon_enforce_method
     exact = list(intent.protected_paths.enforce_exact_files)
-    if method == "override_lsm":
+    if method == "lsm_file_open":
+        manifest = _policy(intent, "TG-SECRET-01", exact, 4, exact_path=True)
+        del manifest["spec"]["kprobes"]
+        manifest["spec"]["lsmhooks"] = [{
+            "hook": "file_open", "args": [{"index": 0, "type": "file"}],
+            "selectors": [{"matchArgs": [{"index": 0, "operator": "Equal", "values": exact}],
+                           "matchActions": [{"action": "Post"}, {"action": "Override", "argError": -13}]}],
+        }]
+        limit = "BPF LSM file_open; exact files; denies opens, process survives; existing descriptors unaffected"
+    elif method == "override_lsm":
         manifest = _policy(intent, "TG-SECRET-01", exact, 4, exact_path=True, override=True)
         probe = manifest["spec"]["kprobes"][0]
         probe["selectors"][0]["matchActions"].append({"action": "Sigkill"})
@@ -120,21 +129,23 @@ def _secret_enforcement_policy(intent: EnforcementIntent) -> dict[str, Any]:
         manifest["spec"]["kprobes"] = [{
             # Tetragon 1.7.1 resolves the architecture prefix for syscall:true.
             "call": "sys_openat", "syscall": True,
-            "args": [{"index": 0, "type": "int"}, {"index": 1, "type": "string"},
-                     {"index": 2, "type": "int"}],
+            # Two args + three identity data entries fit the 1.7.1 limit of five.
+            "args": [{"index": 0, "type": "int"}, {"index": 1, "type": "string"}],
             "selectors": [{"matchArgs": [{"index": 1, "operator": "Equal",
+                                          # Keep the legacy terminator for manifest compatibility.
+                                          # Tetragon 1.7.1 trims trailing NULs for string Equal.
                                           "values": [path + "\u0000" for path in exact]}],
-                           "matchActions": [{"action": "Post"}, {"action": "Override", "argError": -1},
-                                            {"action": "Sigkill"}]}],
+                           "matchActions": [{"action": "Post"}, {"action": "Override", "argError": -13}]}],
         }]
         manifest["metadata"]["annotations"]["serving-runtime.local/openat-symbol"] = intent.tetragon_openat_symbol
-        limit = "path string only; relative paths, symlinks and TOCTOU can bypass; process terminates"
+        limit = "openat path string only; relative paths, symlinks, TOCTOU, openat2 and io_uring can bypass; process survives"
     else:
         raise ValueError("unknown TG-SECRET-01 enforcement method")
     manifest["spec"]["options"] = [{"name": "policy-mode", "value": "monitor"}]
     manifest["metadata"]["annotations"]["serving-runtime.local/enforce-method"] = method
     manifest["metadata"]["annotations"]["serving-runtime.local/limit"] = limit
     manifest["metadata"]["annotations"]["serving-runtime.local/serving-impact"] = (
+        "file open denied only; process survives" if method in {"lsm_file_open", "override_syscall"} else
         "engine process termination -> Gateway target check fails -> 503 without engine delivery -> Kubernetes restart"
     )
     return manifest
@@ -183,7 +194,12 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
         )
     if intent.tetragon_kernel_identity:
         for manifest in manifests.values():
-            for probe in manifest["spec"]["kprobes"]:
+            # LsmHookSpec in 1.7.1 has no data field. Never claim kernel identity
+            # for that policy; native workload attribution is still required.
+            if "lsmhooks" in manifest["spec"]:
+                manifest["metadata"]["annotations"]["serving-runtime.local/identity-limit"] = "Tetragon 1.7.1 LsmHookSpec has no data field; native attribution required"
+                continue
+            for probe in manifest["spec"].get("kprobes", []):
                 probe["data"] = copy.deepcopy(KERNEL_DATA)
             manifest["metadata"]["annotations"]["serving-runtime.local/kernel-identity"] = "v2"
     return manifests

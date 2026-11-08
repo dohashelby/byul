@@ -8,6 +8,8 @@ import unittest
 
 import yaml
 
+from serving_runtime.enforcement.attribution import KERNEL_DATA
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -36,6 +38,22 @@ class SGLangDeploymentTests(unittest.TestCase):
         gateway = next(document for document in documents if document.get("kind") == "Deployment"
                        and document.get("metadata", {}).get("name") == "serving-gateway")
         self.assertIn("--observation-timeline", gateway["spec"]["template"]["spec"]["containers"][0]["args"])
+        args = gateway["spec"]["template"]["spec"]["containers"][0]["args"]
+        self.assertEqual(args[args.index("--tetragon-identities") + 1],
+                         "/srv/serving/observation/tetragon-identities.json")
+        sentinel = next(document for document in documents if document.get("kind") == "DaemonSet"
+                        and document["metadata"]["name"] == "byul-tetragon-sentinel")
+        pod = sentinel["spec"]["template"]["spec"]
+        for container in pod["initContainers"] + pod["containers"]:
+            self.assertEqual(container["image"], "serving-gateway:REPLACE_GATEWAY_TAG")
+            self.assertEqual(container["imagePullPolicy"], "Never")
+            self.assertEqual(container["command"][0], "/usr/local/bin/python3.12")
+        policy = next(document for document in documents if document.get("kind") == "TracingPolicyNamespaced"
+                      and document["metadata"]["name"] == "runtime-tg-health-01-sentinel-v2")
+        self.assertEqual(policy["spec"]["podSelector"]["matchLabels"], {"app": "byul-tetragon-sentinel"})
+        probe, = policy["spec"]["kprobes"]
+        self.assertEqual(probe["data"], KERNEL_DATA)
+        self.assertEqual(probe["selectors"][0]["matchActions"], [{"action": "Post"}])
 
     def test_sglang_intent_uses_observed_python_binary(self) -> None:
         intent = json.loads((ROOT / "deploy/gpu-lab-sglang/intent.aws-lab.json").read_text(encoding="utf-8"))

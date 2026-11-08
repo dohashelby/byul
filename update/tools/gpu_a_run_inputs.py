@@ -169,8 +169,8 @@ def check_inputs(check_id, env, target_value, prepared_dir, case_list, draft, *,
     config = '\n'.join([f"store = '{root / 'store'}'", '', '[adapter]', "name = 'vllm'", '', '[executors]', "engine_sensor = 'kubernetes'",
         '', '[engine_sensor]', f"target = '{root / 'target.json'}'", f"prepared = '{Path(prepared_dir).absolute() / 'manifest.json'}'",
         f"manifest = '{root / 'manifest.json'}'",
-        # LIF-13은 실행 안에서 소비자 엔진을 두 번 기동한다(실행기·lab 전송 상한 900초).
-        f"max_duration_seconds = {900 if check_id == 'LIF-13' else 300}", ''])
+        # LIF-13(소비자 엔진 두 번 기동)·REQ-21(TP2 엔진 재기동)은 실행 안에서 엔진을 띄운다(실행기·lab 전송 상한 900초).
+        f"max_duration_seconds = {900 if check_id in ('LIF-13', 'REQ-21') else 300}", ''])
     return manifest, policy, config
 
 

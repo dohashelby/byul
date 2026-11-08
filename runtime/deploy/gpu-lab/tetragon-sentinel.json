@@ -1,0 +1,97 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "DaemonSet",
+  "metadata": {
+    "name": "byul-tetragon-sentinel",
+    "namespace": "serving-lab",
+    "labels": {
+      "serving-runtime.local/purpose": "monitoring-sentinel"
+    }
+  },
+  "spec": {
+    "selector": {
+      "matchLabels": {
+        "app": "byul-tetragon-sentinel"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "byul-tetragon-sentinel"
+        }
+      },
+      "spec": {
+        "automountServiceAccountToken": false,
+        "terminationGracePeriodSeconds": 1,
+        "securityContext": {
+          "runAsUser": 10001,
+          "runAsGroup": 10001,
+          "fsGroup": 10001
+        },
+        "volumes": [
+          {
+            "name": "fake-file",
+            "emptyDir": {}
+          }
+        ],
+        "initContainers": [
+          {
+            "name": "fake-file",
+            "image": "serving-gateway:REPLACE_GATEWAY_TAG",
+            "imagePullPolicy": "Never",
+            "command": [
+              "/usr/local/bin/python3.12",
+              "-c",
+              "from pathlib import Path; Path('/run/byul-runtime-sentinel/read.txt').write_text('FAKE-HEALTH-CHECK')"
+            ],
+            "volumeMounts": [
+              {
+                "name": "fake-file",
+                "mountPath": "/run/byul-runtime-sentinel"
+              }
+            ]
+          }
+        ],
+        "containers": [
+          {
+            "name": "sentinel",
+            "image": "serving-gateway:REPLACE_GATEWAY_TAG",
+            "imagePullPolicy": "Never",
+            "command": [
+              "/usr/local/bin/python3.12",
+              "-u",
+              "-c",
+              "import time\nwhile True:\n with open('/run/byul-runtime-sentinel/read.txt','rb') as f: f.read(1)\n time.sleep(5)"
+            ],
+            "securityContext": {
+              "allowPrivilegeEscalation": false,
+              "readOnlyRootFilesystem": true,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              }
+            },
+            "resources": {
+              "requests": {
+                "cpu": "5m",
+                "memory": "16Mi"
+              },
+              "limits": {
+                "cpu": "100m",
+                "memory": "64Mi"
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "fake-file",
+                "mountPath": "/run/byul-runtime-sentinel",
+                "readOnly": true
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

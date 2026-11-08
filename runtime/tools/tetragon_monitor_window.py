@@ -33,12 +33,12 @@ def digest(value):
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
-def read_bytes(path, limit):
+def read_bytes(path, limit, *, trusted_owner_uids=()):
     # O_NOFOLLOW and fstat bind the checks to the opened file, including a rename race.
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     with os.fdopen(fd, "rb") as source:
         info = os.fstat(source.fileno())
-        if (not stat.S_ISREG(info.st_mode) or info.st_uid not in {0, os.getuid()}
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid not in {0, os.getuid(), *trusted_owner_uids}
                 or info.st_mode & 0o022 or info.st_size > limit):
             raise ValueError("untrusted or oversized input")
         raw = source.read(limit + 1)
@@ -47,8 +47,8 @@ def read_bytes(path, limit):
         return raw, (info.st_dev, info.st_ino)
 
 
-def read_object(path):
-    value = json.loads(read_bytes(path, 2 * 1024 * 1024)[0])
+def read_object(path, *, trusted_owner_uids=()):
+    value = json.loads(read_bytes(path, 2 * 1024 * 1024, trusted_owner_uids=trusted_owner_uids)[0])
     if not isinstance(value, dict):
         raise ValueError("expected an object")
     return value
@@ -75,12 +75,12 @@ def atomic_json(path, value):
             os.unlink(temporary)
 
 
-def human_reviews(path):
+def human_reviews(path, *, trusted_owner_uids=()):
     """A missing/invalid review never supplies approvals, even a valid subset."""
     if path is None:
         return {}, None
     try:
-        value = read_object(path)
+        value = read_object(path, trusted_owner_uids=trusted_owner_uids)
         reviewer = value.get("reviewer_token_id")
         if not isinstance(reviewer, str) or not TOKEN.fullmatch(reviewer):
             raise ValueError("invalid reviewer")
@@ -101,10 +101,11 @@ def human_reviews(path):
 
 class MonitorWindowGenerator:
     def __init__(self, *, context, namespace, policies, status, observations, output,
-                 reviews=None, catalog=None):
+                 reviews=None, catalog=None, trusted_owner_uids=()):
         self.context, self.namespace, self.policies = context, namespace, set(policies)
         self.status, self.observations = Path(status), Path(observations)
         self.output, self.reviews = Path(output), reviews
+        self.trusted_owner_uids = frozenset(trusted_owner_uids)
         self.catalog = Path(catalog) if catalog else self.output.with_name(self.output.name + ".events.json")
         self.windows = {}
         self.last_at = None
@@ -116,7 +117,7 @@ class MonitorWindowGenerator:
                   "context": self.context, "windows": [], "state": "unavailable"}
         catalog = []
         try:
-            snapshot = read_object(self.status)
+            snapshot = read_object(self.status, trusted_owner_uids=self.trusted_owner_uids)
             monitoring = snapshot.get("monitoring") or {}
             if (snapshot.get("schema_version") != "runtime-tetragon-state/1.0"
                     or snapshot.get("context") != self.context or snapshot.get("state") != "ok"
@@ -125,7 +126,7 @@ class MonitorWindowGenerator:
                     or not all(monitoring.get(k) is True for k in HEALTH_CHECKS)):
                 raise ValueError("status unavailable")
             end = timestamp(snapshot["generated_at"])
-            raw, inode = read_bytes(self.observations, 64 * 1024 * 1024)
+            raw, inode = read_bytes(self.observations, 64 * 1024 * 1024, trusted_owner_uids=self.trusted_owner_uids)
             # A retention rewrite, truncate or replacement cannot prove completeness.
             source_changed = self.source is not None and (
                 inode != self.source[0] or len(raw) < self.source[1]
@@ -140,7 +141,7 @@ class MonitorWindowGenerator:
             if any(not isinstance(event, dict) or event.get("schema") != "runtime-observation/1.0"
                    or timestamp(event.get("observed_at")) is None for event in events):
                 raise ValueError("invalid observation record")
-            reviews, reviewer = human_reviews(self.reviews)
+            reviews, reviewer = human_reviews(self.reviews, trusted_owner_uids=self.trusted_owner_uids)
             active = {}
             seen = set()
             for policy in snapshot["policies"]:
@@ -155,7 +156,7 @@ class MonitorWindowGenerator:
                 if (policy.get("mode") != "monitor" or policy.get("state") != "enabled"
                         or not node or not policy.get("id") or len(caps) != 1 or not caps[0].get("kernel")
                         or not SHA.fullmatch(policy.get("spec_sha256", ""))
-                        or policy.get("method") not in {"override_lsm", "sigkill_fd_install", "override_syscall"}):
+                        or policy.get("method") not in {"lsm_file_open", "override_lsm", "sigkill_fd_install", "override_syscall"}):
                     continue
                 binding = {"policy": policy["name"], "namespace": self.namespace, "node": node,
                            "policy_id": policy["id"], "spec_sha256": policy["spec_sha256"],
@@ -221,9 +222,13 @@ def main():
     parser.add_argument("--policy", action="append", required=True)
     parser.add_argument("--reviews", help="Human-authored event verdicts; never generated automatically")
     parser.add_argument("--catalog", help="Review catalog (default: OUTPUT.events.json)")
+    parser.add_argument("--trusted-owner-uid", type=int, action="append", default=[],
+                        help="Additionally trust this input file owner UID (repeatable; no group/other writes)")
     parser.add_argument("--watch", action="store_true")
     parser.add_argument("--interval", type=float, default=5)
     args = parser.parse_args()
+    if any(uid < 0 for uid in args.trusted_owner_uid):
+        parser.error("trusted owner UIDs must be nonnegative")
     if not 1 <= args.interval <= 20:
         parser.error("interval must be between 1 and 20 seconds")
     paths = [Path(p).resolve() for p in (args.status, args.observations, args.output,
@@ -231,7 +236,8 @@ def main():
     if len(paths) != len(set(paths)):
         parser.error("input and output paths must be distinct")
     generator = MonitorWindowGenerator(context=args.context, namespace=args.namespace, policies=args.policy,
-        status=args.status, observations=args.observations, output=args.output, reviews=args.reviews, catalog=args.catalog)
+        status=args.status, observations=args.observations, output=args.output, reviews=args.reviews, catalog=args.catalog,
+        trusted_owner_uids=args.trusted_owner_uid)
     generator.output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     fd = os.open(str(generator.output) + ".lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, "w") as lock:

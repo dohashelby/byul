@@ -3,6 +3,7 @@ from copy import deepcopy
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -119,6 +120,41 @@ def execute_fake(root, runner, module=trial_module, **kwargs):
         trial = module.KindTrial(root, 'sigkill_fd_install', **kwargs)
         report = trial.execute()
     return trial, report
+
+
+class AtomicJsonTests(unittest.TestCase):
+    def test_permissions_are_explicit_under_umask(self):
+        for mask in (0o002, 0o077):
+            for mode in (None, 0o600, 0o640):
+                with self.subTest(umask=mask, mode=mode), tempfile.TemporaryDirectory() as directory:
+                    output = Path(directory) / 'nested' / 'output.json'
+                    previous = os.umask(mask)
+                    try:
+                        kwargs = {} if mode is None else {'mode': mode}
+                        trial_module.atomic_json(output, {'value': '한글'}, **kwargs)
+                    finally:
+                        os.umask(previous)
+                    self.assertEqual(output.stat().st_mode & 0o777, 0o644 if mode is None else mode)
+                    self.assertEqual(output.stat().st_mode & 0o022, 0)
+                    self.assertEqual(json.loads(output.read_text()), {'value': '한글'})
+
+    def test_stale_next_is_recreated_without_preserving_permissions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'output.json'
+            temporary = output.with_name(output.name + '.next')
+            temporary.write_text('old')
+            temporary.chmod(0o664)
+            witness = Path(directory) / 'old-inode'
+            os.link(temporary, witness)
+            previous = os.umask(0o002)
+            try:
+                trial_module.atomic_json(output, {'new': True})
+            finally:
+                os.umask(previous)
+            self.assertEqual(output.stat().st_mode & 0o777, 0o644)
+            self.assertEqual(json.loads(output.read_text()), {'new': True})
+            self.assertEqual(witness.read_text(), 'old')
+            self.assertFalse(temporary.exists())
 
 
 class TrialTests(unittest.TestCase):

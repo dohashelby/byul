@@ -60,7 +60,7 @@ class MethodTests(unittest.TestCase):
                 policy = render_manifests(parse_intent(intent))["tetragon-tg-secret-01.json"]
                 actions = policy["spec"]["kprobes"][0]["selectors"][0]["matchActions"]
                 self.assertEqual([action["action"] for action in actions],
-                                 ["Sigkill"] if method == "sigkill_fd_install" else ["Post", "Override", "Sigkill"])
+                                 ["Sigkill"] if method == "sigkill_fd_install" else ["Post", "Override"] if method == "override_syscall" else ["Post", "Override", "Sigkill"])
                 self.assertEqual(policy["metadata"]["annotations"]["serving-runtime.local/enforce-method"], method)
                 if method == "override_syscall":
                     self.assertIn("relative paths", policy["metadata"]["annotations"]["serving-runtime.local/limit"])

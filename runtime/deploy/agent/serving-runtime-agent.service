@@ -1,7 +1,7 @@
 [Unit]
 Description=Serving Runtime pull agent (validation only by default)
-After=network-online.target
-Wants=network-online.target
+After=network-online.target serving-runtime-tetragon-status.service serving-runtime-monitor-window.service
+Wants=network-online.target serving-runtime-tetragon-status.service serving-runtime-monitor-window.service
 
 [Service]
 Type=simple
@@ -14,6 +14,8 @@ RuntimeDirectoryMode=0700
 UMask=0077
 EnvironmentFile=/etc/serving-runtime/agent.env
 # agent.env contains configuration only; the bearer token stays in a 0600 file.
+# Replace context/namespace/paths at installation; defaults are for production.
+# For a private CA, append --ca-file /etc/serving-runtime/platform-ca.pem.
 ExecStart=/opt/byul/runtime/.venv/bin/python -B -m serving_runtime agent --platform-url ${PLATFORM_URL} --agent-token-file /etc/serving-runtime/agent.token --server server-01 --bundle-root /srv/serving/bundles --context lab-context --namespace serving --kubeconfig /etc/serving-runtime/kubeconfig --token-env-file /etc/serving-runtime/viewer.env --state-file /var/lib/serving-runtime/tetragon-state.json --review-file /var/lib/serving-runtime/monitor-review.json --history-file /var/lib/serving-runtime/remote-transitions.jsonl --tools-dir /opt/byul/runtime/tools --lock-file /run/serving-runtime-agent/lock --sudo-bundle-apply --dry-run
 Restart=on-failure
 RestartSec=10

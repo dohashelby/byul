@@ -62,6 +62,8 @@ spec:
             - hubble=/srv/serving/observation/hubble.jsonl
             - --observation-feed
             - tetragon=/srv/serving/observation/tetragon.jsonl
+            - --tetragon-identities
+            - /srv/serving/observation/tetragon-identities.json
             - --observation-heartbeat
             - hubble=/srv/serving/observation/hubble.heartbeat.json
             - --observation-heartbeat

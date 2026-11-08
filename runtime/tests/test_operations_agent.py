@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import io
 import json
+import ssl
 from pathlib import Path
 import tarfile
 import tempfile
@@ -11,6 +12,7 @@ import unittest
 from unittest.mock import Mock, patch
 from contextlib import nullcontext
 from urllib.error import URLError
+from urllib.request import HTTPSHandler
 
 from serving_runtime.operations.agent import Agent, Config, PlatformClient, Rejected, locked, now
 from serving_runtime.operations.safety import evaluate
@@ -43,6 +45,46 @@ class AgentTest(unittest.TestCase):
         self.agent = Agent(self.client, Config("server-01", "/unused", "test", "test"))
         self.before = {"bundle_id": "old", "approval": "verified", "policy_id": None, "mode": None, "spec_sha256": None}
         self.intent = parse_intent(intent_document())
+
+    def test_readiness_excludes_policies_without_switchable_mode_or_method(self):
+        self.agent = Agent(self.client, replace(self.agent.config, namespace=self.intent.namespace))
+        policy = {"name": "runtime-tg-secret-01", "namespace": self.agent.config.namespace,
+                  "node": "node-01", "state": "enabled", "mode": "monitor", "id": "7",
+                  "method": "sigkill_fd_install", "spec_sha256": "a" * 64}
+        for mode, method in (("monitor_only", "monitor"), ("monitor_only", "sigkill_fd_install"),
+                             ("monitor", "monitor"), ("unknown", "override_lsm")):
+            with self.subTest(mode=mode, method=method):
+                snapshot = {"policies": [
+                    {**policy, "name": f"runtime-tg-{rule}-01", "mode": mode, "method": method}
+                    for rule in ("cache", "asset")] + [policy]}
+                with patch.object(self.agent, "snapshot", return_value=snapshot):
+                    rows = self.agent.readiness(self.before, self.intent)
+                self.assertEqual([row["name"] for row in rows], [policy["name"]])
+                self.assertEqual(rows[0]["expected"], {**self.before, "policy_id": "7",
+                                                     "mode": "monitor", "spec_sha256": "a" * 64})
+
+    def test_readiness_keeps_switchable_policies_with_failed_safety_checks(self):
+        self.agent = Agent(self.client, replace(self.agent.config, namespace=self.intent.namespace))
+        for mode in ("monitor", "enforce"):
+            for method in ("lsm_file_open", "override_lsm", "sigkill_fd_install", "override_syscall"):
+                with self.subTest(mode=mode, method=method):
+                    policy = {"name": "runtime-tg-secret-01", "namespace": self.agent.config.namespace,
+                              "node": "node-01", "state": "disabled", "mode": mode, "id": "7",
+                              "method": method, "spec_sha256": "a" * 64}
+                    with patch.object(self.agent, "snapshot", return_value={"policies": [policy]}):
+                        rows = self.agent.readiness(self.before, self.intent)
+                    self.assertEqual(len(rows), 1)
+                    self.assertFalse(rows[0]["checks"]["policy"])
+                    self.assertFalse(rows[0]["checks"]["collection"])
+
+    def test_readiness_excludes_policy_if_any_node_is_not_switchable(self):
+        self.agent = Agent(self.client, replace(self.agent.config, namespace=self.intent.namespace))
+        policy = {"name": "runtime-tg-secret-01", "namespace": self.agent.config.namespace,
+                  "node": "node-01", "state": "enabled", "mode": "monitor", "id": "7",
+                  "method": "sigkill_fd_install", "spec_sha256": "a" * 64}
+        snapshot = {"policies": [policy, {**policy, "node": "node-02", "mode": "monitor_only"}]}
+        with patch.object(self.agent, "snapshot", return_value=snapshot):
+            self.assertEqual(self.agent.readiness(self.before, self.intent), [])
 
     def test_state_changed_and_target_and_lease(self):
         op = operation()
@@ -130,6 +172,68 @@ class AgentTest(unittest.TestCase):
             self.assertNotIn("test-only-token", repr(client))
             with self.assertRaises(ValueError):
                 PlatformClient("http://platform.invalid", str(path))
+
+    def test_enforce_confirmation_uses_actual_policy_actions(self):
+        state = {**self.before, "policy_id": "7", "mode": "monitor", "spec_sha256": "a" * 64}
+        op = operation()
+        op.update(kind="tetragon.mode", expected=state, approval_required=True,
+                  approvals=[{"token_id": "approver-01", "role": "approver"}])
+        op['payload'] = {'policy_name': 'runtime-tg-secret-01', 'mode': 'enforce'}
+        ready = {'checks': {'all': True}, 'expected': {k: state[k] for k in ('policy_id', 'mode', 'spec_sha256')}}
+        for method, contains in (('lsm_file_open', False), ('override_syscall', False), ('override_syscall', True)):
+            with self.subTest(method=method, contains=contains), \
+                 patch.object(self.agent, 'mode_state', return_value=state), \
+                 patch.object(self.agent, 'live_safety', return_value={}), \
+                 patch('serving_runtime.operations.agent.evaluate', return_value={**ready, 'method': method, 'contains_sigkill': contains}):
+                if contains:
+                    with self.assertRaisesRegex(Rejected, 'SAFETY_REJECTED'):
+                        self.agent.validate(op, self.before, self.intent)
+                else:
+                    self.assertEqual(self.agent.validate(op, self.before, self.intent), state)
+
+    def test_platform_ca_replaces_default_roots_and_keeps_verification(self):
+        ca = Path(__file__).parent / "fixtures" / "platform-test-ca.pem"
+        with tempfile.TemporaryDirectory() as tmp:
+            token = Path(tmp) / "token"
+            token.write_text("test-only-token")
+            token.chmod(0o600)
+            # A supplied CA must not also load the system trust store.
+            with patch.object(ssl.SSLContext, "load_default_certs") as defaults:
+                client = PlatformClient("https://platform.invalid", str(token), str(ca))
+                defaults.assert_not_called()
+            context = next(h._context for h in client.opener.handlers if isinstance(h, HTTPSHandler))
+            self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
+            self.assertTrue(context.check_hostname)
+            self.assertEqual(context.cert_store_stats()["x509_ca"], 1)
+            self.assertEqual(context.get_ca_certs()[0]["subject"], ((("commonName", "byul-test-only-ca"),),))
+            with patch.object(ssl.SSLContext, "load_default_certs") as defaults:
+                PlatformClient("https://platform.invalid", str(token))
+                defaults.assert_called_once_with(ssl.Purpose.SERVER_AUTH)
+            with self.assertRaises(OSError):
+                PlatformClient("https://platform.invalid", str(token), str(Path(tmp) / "missing-ca"))
+            with self.assertRaises(ValueError):
+                PlatformClient("https://platform.invalid", str(token), "")
+            invalid = Path(tmp) / "invalid-ca"
+            invalid.write_text("not a certificate")
+            with self.assertRaises(ssl.SSLError):
+                PlatformClient("https://platform.invalid", str(token), str(invalid))
+
+    def test_agent_ca_cli_failure_is_sanitized_and_never_polls(self):
+        from serving_runtime.cli import main
+        with tempfile.TemporaryDirectory() as tmp:
+            token = Path(tmp) / "token"
+            token.write_text("test-only-token")
+            token.chmod(0o600)
+            out, err = io.StringIO(), io.StringIO()
+            with patch("sys.stdout", out), patch("sys.stderr", err), patch.object(Agent, "once") as poll:
+                code = main(["agent", "--platform-url", "https://platform.invalid",
+                    "--agent-token-file", str(token), "--ca-file", str(Path(tmp) / "missing-ca"),
+                    "--server", "server-01", "--bundle-root", tmp, "--context", "test",
+                    "--namespace", "test", "--lock-file", str(Path(tmp) / "lock"), "--once"])
+            self.assertEqual(code, 1)
+            self.assertEqual(out.getvalue(), "")
+            self.assertEqual(err.getvalue(), "agent: configuration or lock unavailable\n")
+            poll.assert_not_called()
 
     def test_lock_excludes_second_agent(self):
         with tempfile.TemporaryDirectory() as tmp, locked(Path(tmp) / "lock"):

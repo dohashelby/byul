@@ -14,3 +14,7 @@
 .operations td:nth-child(4) { min-width: 140px; }
 .operations td:nth-child(5) { min-width: 170px; }
 .operations td:nth-child(6) { min-width: 180px; }
+
+.evidence {
+  white-space: nowrap;
+}

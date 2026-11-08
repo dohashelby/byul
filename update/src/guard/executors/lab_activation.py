@@ -1870,9 +1870,9 @@ class ActivatedExecutor:
             facts['activation_scope_complete'] = False
         from .lifecycle_common_input_consumption import merge_activation_inputs
         facts = merge_activation_inputs(facts, passive)
-        workdir.mkdir(parents=True, exist_ok=True)
         artifact = None; primary_artifact_gap = False
         try:
+            workdir.mkdir(parents=True, exist_ok=True)
             path = workdir / 'lab-activation.json'; path.write_bytes(canonical_json(facts))
             artifact = DraftArtifact(name=path.name, path=path, collector='lab_activation/0.1.0')
         except OSError:

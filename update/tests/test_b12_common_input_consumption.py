@@ -179,7 +179,7 @@ def test_existing_factories_preserve_optional_input_and_native_cfg(tmp_path, nam
     assert executor.name == name and executor.b_common_inputs == descriptor and 'common_inputs' not in executor.cfg
 
 
-@pytest.mark.parametrize('primary_artifact_error', [False, True])
+@pytest.mark.parametrize('primary_artifact_error', [False, True, 'mkdir'])
 def test_activation_preserves_both_independent_fails_and_example_ceiling(tmp_path, monkeypatch, primary_artifact_error):
     env, target, prepared, _, _, descriptor = inputs(tmp_path/'input')
     check = load_pack(ROOT/'packs/PACK-BASELINE').checks['LIF-10']
@@ -188,12 +188,18 @@ def test_activation_preserves_both_independent_fails_and_example_ceiling(tmp_pat
               'activation_missing':[], 'activation_scope_complete':True}
     lab = SimpleNamespace(normal=[True], cleanup_errors=[], diagnostic_write_errors=[], write_diagnostics=lambda _: [])
     monkeypatch.setattr(lab_activation, 'run_scenario', lambda *a, **kw: (deepcopy(active), lab))
-    if primary_artifact_error:
+    if primary_artifact_error is True:
         original = Path.write_bytes
         def write(path, data):
             if path.name == 'lab-activation.json':raise OSError('EXAMPLE-primary-artifact-error')
             return original(path,data)
         monkeypatch.setattr(Path,'write_bytes',write)
+    elif primary_artifact_error == 'mkdir':
+        original = Path.mkdir
+        def mkdir(path,*a,**kw):
+            if path == tmp_path/'active':raise OSError('EXAMPLE-primary-directory-error')
+            return original(path,*a,**kw)
+        monkeypatch.setattr(Path,'mkdir',mkdir)
     child = SimpleNamespace(run=lambda *a, **kw: passive)
     executor = lab_activation.ActivatedExecutor(child, {}, runner=None)
     result = executor.run(check, env, {}, None, tmp_path/'active')
@@ -208,7 +214,8 @@ def test_activation_preserves_both_independent_fails_and_example_ceiling(tmp_pat
         assert result.artifacts == passive.artifacts
 
 
-def test_without_common_inputs_primary_artifact_error_keeps_original_exception_boundary(tmp_path, monkeypatch):
+@pytest.mark.parametrize('primary_stage', ['write','mkdir'])
+def test_without_common_inputs_primary_artifact_error_keeps_original_exception_boundary(tmp_path, monkeypatch, primary_stage):
     active={'activation_steps':[], 'activation_violations':[{'code':'ACTIVE_INDEPENDENT_FAIL'}],
             'activation_missing':[], 'activation_scope_complete':False}
     monkeypatch.setattr(lab_activation,'run_scenario',lambda *a,**kw:(active,None))
@@ -217,6 +224,12 @@ def test_without_common_inputs_primary_artifact_error_keeps_original_exception_b
         if path.name=='lab-activation.json':raise OSError('EXAMPLE-primary-artifact-error')
         return original(path,data)
     monkeypatch.setattr(Path,'write_bytes',write)
+    if primary_stage == 'mkdir':
+        original_mkdir=Path.mkdir
+        def mkdir(path,*a,**kw):
+            if path == tmp_path:raise OSError('EXAMPLE-primary-artifact-error')
+            return original_mkdir(path,*a,**kw)
+        monkeypatch.setattr(Path,'mkdir',mkdir)
     check=load_pack(ROOT/'packs/PACK-BASELINE').checks['LIF-10']
     with pytest.raises(OSError, match='EXAMPLE-primary-artifact-error'):
         lab_activation.ActivatedExecutor(SimpleNamespace(run=lambda *a:draft()),{}).run(check,None,{},None,tmp_path)
@@ -285,7 +298,8 @@ def test_lif10_actual_producer_to_current_pack_normalized_evidence_and_rejudge(t
     assert result.verdicts.security.value=='UNKNOWN' and not evd.observations['activation_scope_complete'].value
 
 
-def test_primary_artifact_error_keeps_original_judge_fail_remaining_artifacts_report_and_restored_refs(tmp_path, group, native_target, monkeypatch):
+@pytest.mark.parametrize('primary_stage', ['write','mkdir'])
+def test_primary_artifact_error_keeps_original_judge_fail_remaining_artifacts_report_and_restored_refs(tmp_path, group, native_target, monkeypatch, primary_stage):
     from tests.test_a1_kubernetes_request_termination_product import inputs as native_inputs
     from guard.runtime import kubernetes_http as http
     world, values, _, _ = native_inputs(tmp_path,group,native_target,'normal')
@@ -302,7 +316,17 @@ def test_primary_artifact_error_keeps_original_judge_fail_remaining_artifacts_re
     def write(path,data):
         if path.name=='lab-activation.json':raise OSError('EXAMPLE-primary-artifact-error')
         return original(path,data)
-    monkeypatch.setattr(Path,'write_bytes',write)
+    if primary_stage == 'write':
+        monkeypatch.setattr(Path,'write_bytes',write)
+    else:
+        original_mkdir=Path.mkdir
+        def mkdir(path,*a,**kw):
+            # Let the passive child create its own work/artifacts first. Fail
+            # the primary collector's subsequent preparation of that parent.
+            if path.name=='single' and path.parent.name=='LIF-10' and path.is_dir():
+                raise OSError('EXAMPLE-primary-directory-error')
+            return original_mkdir(path,*a,**kw)
+        monkeypatch.setattr(Path,'mkdir',mkdir)
     store, evd, result=pipeline(tmp_path/'product',load_pack(ROOT/'packs/PACK-BASELINE'),group.env,'LIF-10',values,
         {'target':str(target),'prepared':str(group.manifest_path),'common_inputs':descriptor},activation={'namespace':'EXAMPLE'})
     assert evd.execution.status == ExecStatus.ABORTED

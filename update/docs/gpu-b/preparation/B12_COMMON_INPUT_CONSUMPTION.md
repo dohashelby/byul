@@ -92,3 +92,7 @@ list JSON의 `.get` 오류는 전용 소비자에서 형식을 확인하도록 �
 현재 PACK의 원 judge FAIL·보고·별도 DB 복원·저장팩 재판정과 미실패 artifact 저장을 직접 시험한다.
 원 21파일 회귀는 651통과/2실패이며 두 실패는 저장소 내부 basetemp가 기존 lifecycle 출력 gate에 거부된 것이다.
 같은 `bb4cf60d`에서 해당 두 case만 저장소 밖 새 temp로 실행해 2통과를 확인했다. 원 gate와 실패 로그를 보존하며 전체 21파일을 반복하지 않는다.
+
+S6 후속 지적으로 `69362aef`의 primary 디렉터리 mkdir가 try 밖인 잔여 조건을 확인하고 단일 CPU 실패로 재현했다.
+그 mkdir 한 줄을 같은 guard 안으로 옮겼다. 새 mkdir 사례는 양쪽 FAIL/출처 보존, 무입력 원 예외, 원 judge·남은 artifact·RPT·복원 Ref만 직접 검증한다.
+기존 192개와 원 21파일은 반복하지 않으며 당시 file-write 오류 경계 검증 결과로 보존한다.

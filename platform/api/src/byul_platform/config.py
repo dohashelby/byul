@@ -32,6 +32,12 @@ class Settings:
     update_reports_dir: Path | None = None
     platform_data_dir: Path | None = None
     evidence_index_paths: tuple[Path, ...] = ()
+    bundle_runtime_dir: Path = REPO_ROOT / "runtime"
+    bundle_runtime_python: Path | None = None
+    operation_tokens: tuple[dict, ...] = field(default=(), repr=False)
+    operation_lab_self_approval: bool = False
+    operation_lease_seconds: int = 600
+    operation_monitor_seconds: int = 86400
     host: str = "127.0.0.1"
     port: int = 8700
 
@@ -42,7 +48,12 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> Settings:
+        from .operations import load_tokens
+
         return cls(
+            operation_tokens=load_tokens(os.environ.get("BYUL_OPERATION_TOKENS", "[]")),
+            operation_lab_self_approval=os.environ.get("BYUL_OPERATION_LAB_SELF_APPROVAL") == "1",
+            operation_monitor_seconds=int(os.environ.get("BYUL_OPERATION_MONITOR_SECONDS", "86400")),
             contracts_dir=_path("BYUL_CONTRACTS_DIR") or DEFAULT_CONTRACTS_DIR,
             examples_override=_path("BYUL_EXAMPLES_DIR"),
             web_dist=_path("BYUL_WEB_DIST") or DEFAULT_WEB_DIST,
@@ -51,6 +62,8 @@ class Settings:
             update_reports_dir=_path("UPDATE_REPORTS_DIR"),
             platform_data_dir=_path("PLATFORM_DATA_DIR"),
             evidence_index_paths=tuple(_paths("EVIDENCE_INDEX_PATHS")),
+            bundle_runtime_dir=_path("BYUL_BUNDLE_RUNTIME_DIR") or REPO_ROOT / "runtime",
+            bundle_runtime_python=_path("BYUL_BUNDLE_RUNTIME_PYTHON"),
             host=os.environ.get("BYUL_PLATFORM_HOST", "127.0.0.1").strip() or "127.0.0.1",
             port=int(os.environ.get("BYUL_PLATFORM_PORT", "8700")),
         )

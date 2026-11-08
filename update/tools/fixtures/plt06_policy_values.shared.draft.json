@@ -1,0 +1,4 @@
+{
+  "worker_isolation_requirement": "shared-trust-group",
+  "worker_trust_group_markers": ["EngineCor", "Worker"]
+}

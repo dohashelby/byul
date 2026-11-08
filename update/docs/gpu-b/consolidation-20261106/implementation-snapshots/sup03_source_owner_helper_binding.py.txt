@@ -1,0 +1,27 @@
+SOURCE_OWNER_HELPER_SHA256 = 'fb12dbe8d82d6bc027b613a477d6e1a432fa4693c46c6f1380cb38cecdf79fc9'
+
+def load_source_owner_helper(path, expected_sha256):
+    """Execute only the existing pinned helper bytes, never re-read by path."""
+    if expected_sha256 != SOURCE_OWNER_HELPER_SHA256:
+        raise ValueError('SUP03_SOURCE_OWNER_HELPER_PIN_UNSUPPORTED')
+    path = Path(path)
+    before = path.lstat()
+    if not stat.S_ISREG(before.st_mode):
+        raise ValueError('SUP03_SOURCE_OWNER_HELPER_REGULAR_FILE_REQUIRED')
+    fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_BINARY', 0))
+    with os.fdopen(fd, 'rb') as stream:
+        opened = os.fstat(stream.fileno())
+        if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+            raise ValueError('SUP03_SOURCE_OWNER_HELPER_REPLACED')
+        raw = stream.read(65537)
+    if len(raw) > 65536 or hashlib.sha256(raw).hexdigest() != expected_sha256:
+        raise ValueError('SUP03_SOURCE_OWNER_HELPER_BYTES_CHANGED')
+    namespace = {'__name__': '_sup03_pinned_source_owner_helper', '__file__': str(path)}
+    exec(compile(raw, str(path), 'exec'), namespace)
+    return namespace['verify_source_owned']
+
+def verify_source_for_actor(args):
+    verify = load_source_owner_helper(args.source_owner_helper, args.source_owner_helper_sha256)
+    # The unchanged helper verifies who may run exactly the two original Git
+    # commands; no root fallback, safe.directory, chmod, or approval synthesis.
+    return verify(args.source_root, args.source_commit, args.manifest_sha256)

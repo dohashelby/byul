@@ -4,14 +4,26 @@ import { useParams as useRouteParams } from "react-router-dom";
 import { useRuntimeEvents, useRuntimeStatus } from "../../api/hooks";
 import type { Collector, RuntimeEvent } from "../../api/types";
 import { Badge } from "../../components/Badges";
+import { Pagination, usePagination } from "../../components/Pagination";
 import { PageHead, Query, StateView } from "../../components/Misc";
 import { Value } from "../../components/Value";
-import { CACHE_GENERATION, EXEC_VERDICT, METRIC_STATE } from "../../lib/labels";
+import { CACHE_GENERATION, EXEC_VERDICT, METRIC_STATE, PARENT_ATTRIBUTION, PARENT_CHECK, PHASE, SUSPECT_CONTEXT, label } from "../../lib/labels";
+import { isTetragonBlockAttempt, isTetragonSigkill } from "../../lib/tetragon";
 import { useRuntimeProblems } from "./problems";
 import { ObservationOriginBadge, ScopeBadges, StateBadge, Subtabs, TableCard, formatTime, rt } from "./parts";
 
 const FLAGGED = ["outside_allowlist", "suspect_binary", "exec_from_cache", "phase_unknown", "phase_signal_unverified"];
 const gib = (bytes: number | null) => `${((bytes ?? 0) / 1024 ** 3).toFixed(2)}GiB`;
+
+function OperatingIdentity({ event }: { event: RuntimeEvent }) {
+  const raw = event.native.record.identity;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const identity = raw as Record<string, unknown>;
+  return <div className="small muted">
+    {identity.state === "confirmed" ? "대상 확인" : identity.state === "conflict" ? "대상 정보 충돌" : identity.state === "ambiguous" ? "대상 후보 중복" : "대상 미확인"}
+    {identity.state === "confirmed" && <><br />{pod(event.observation?.pod_namespace ?? null, event.observation?.pod_name ?? null)}<br />커널 PID {String(identity.pid ?? "미확인")}{typeof identity.ns_pid === "number" && ` · 컨테이너 PID ${identity.ns_pid}`} · {String(identity.container_name ?? "미확인")}<br /><span style={{overflowWrap:"anywhere"}}>Pod UID {String(identity.pod_uid ?? "미확인")}</span></>}
+  </div>;
+}
 
 function CollectorSummary({ c }: { c: Collector }) {
   const d = c.detail;
@@ -36,8 +48,8 @@ function CollectorSummary({ c }: { c: Collector }) {
         : null;
       lines.push([
         <>
-          Hubble 손실 누적 <Value v={d.lost_events_total} /> · source별 <Value v={bySource} /> · 최근 손실 <Value v={d.last_lost_at ? formatTime(d.last_lost_at) : null} />
-          {d.lost_events_total === 0 ? " (처리한 줄에서 loss 레코드 미관측; 무손실 확인 아님)" : ""}
+          네트워크 이벤트 (Hubble) 손실 누적 <Value v={d.lost_events_total} /> · 원인별 <Value v={bySource} /> · 최근 손실 <Value v={d.last_lost_at ? formatTime(d.last_lost_at) : null} />
+          {d.lost_events_total === 0 ? " (처리한 줄에서 손실 기록 미관측; 무손실 확인 아님)" : ""}
         </>,
         d.loss_detected === true,
       ]);
@@ -45,13 +57,13 @@ function CollectorSummary({ c }: { c: Collector }) {
     if (d.rejected_details.length) lines.push([d.rejected_details.map((x) => `#${x.line}: ${x.reason}`).join(" · "), true]);
     lines.push([
       d.writer.configured
-        ? `writer ${d.writer.state} · heartbeat ${formatTime(d.writer.updated_at)}${d.idle ? " · 새 이벤트 없음" : ""}`
-        : "writer heartbeat 미설정 · 이벤트가 없으면 생존 여부를 확인할 수 없음",
+        ? `수집기 ${d.writer.state} · 생존 신호 ${formatTime(d.writer.updated_at)}${d.idle ? " · 신규 이벤트 없음" : ""}`
+        : "수집기 생존 신호 미설정 · 수집기 상태 확인 불가",
       !d.writer.configured,
     ]);
     if (d.writer.last_gap)
       lines.push([
-        `재연결 ${d.writer.reconnect_count ?? 0}회 · 최근 끊긴 구간 ${formatTime(d.writer.last_gap.opened_at)} ~ ${formatTime(d.writer.last_gap.closed_at)} · 그 사이 이벤트 복구 요청함(완전성 미확인)`,
+        `재연결 ${d.writer.reconnect_count ?? 0}회 · 최근 연결 단절 구간 ${formatTime(d.writer.last_gap.opened_at)} ~ ${formatTime(d.writer.last_gap.closed_at)} · 구간 이벤트 복원 완전성 미확인`,
         true,
       ]);
   }
@@ -98,15 +110,25 @@ function pod(ns: string | null, name: string | null) {
 function tetragonKind(e: RuntimeEvent) {
   const o = e.observation!;
   let kind = o.kind === "process_exec" ? "프로세스" : `파일 ${o.access ?? "other"}`;
-  if (o.exec_verdict) {
-    const verdict = o.exec_verdict === "exception" ? `승인 예외 ${o.exception_id ?? ""}`.trim() : (EXEC_VERDICT[o.exec_verdict] ?? o.exec_verdict);
-    kind += ` · ${o.phases.join("+")} · ${verdict}`;
-  }
   if (o.cache_generation) kind += ` · ${CACHE_GENERATION[o.cache_generation] ?? o.cache_generation}`;
   const attr = [];
   if (o.pod_attribution === "unavailable") attr.push("pod 미확인");
   if (o.process_attribution === "unavailable" || (o.kind === "file_access" && !o.binary)) attr.push("프로세스 미확인");
   return { kind: attr.length ? `${kind} · ${attr.join(" · ")}` : kind, attr: attr.join(" · ") };
+}
+
+// 계약 observation에는 부모 필드가 없지만 native.record에는 runtime 정규화 원본이 보존된다.
+function parentInfo(e: RuntimeEvent) {
+  const record: Record<string, unknown> = e.native.record;
+  const field = (key: string) => typeof record[key] === "string" ? record[key] as string : null;
+  const check = field("parent_check");
+  const attribution = field("parent_attribution");
+  const context = field("suspect_context");
+  return [
+    check ? label(PARENT_CHECK, check) : null,
+    attribution && (check !== "unavailable" || attribution !== "unavailable") ? label(PARENT_ATTRIBUTION, attribution) : null,
+    context ? label(SUSPECT_CONTEXT, context) : null,
+  ].filter(Boolean).join(" · ") || "–";
 }
 
 export function RuntimeObservePage() {
@@ -115,17 +137,18 @@ export function RuntimeObservePage() {
   const events = useRuntimeEvents();
   const problems = useRuntimeProblems();
   const observations = (events.data?.items ?? []).filter((e) => e.observation);
-  // runtime처럼 Hubble은 DROPPED를 먼저(최대 25) 보여준다.
+  // Hubble은 DROPPED를 먼저 보여준다.
   const hubbleAll = observations.filter((e) => e.source === "hubble");
-  const hubble = [...hubbleAll.filter((e) => e.observation!.verdict?.toLowerCase() === "dropped").slice(0, 25), ...hubbleAll.filter((e) => e.observation!.verdict?.toLowerCase() !== "dropped")];
+  const hubble = [...hubbleAll.filter((e) => e.observation!.verdict?.toLowerCase() === "dropped"), ...hubbleAll.filter((e) => e.observation!.verdict?.toLowerCase() !== "dropped")];
   const tetragon = observations.filter((e) => e.source === "tetragon");
   const item = status.data?.item;
+  const pagination = usePagination(sub === "hubble" ? hubble.length : sub === "tetragon" ? tetragon.length : item?.collectors.length ?? 0);
   return (
     <div className="page">
-      <PageHead title="통신·행위 관측">
+      <PageHead title={sub === "hubble" ? "네트워크 이벤트 (Hubble)" : sub === "tetragon" ? "프로세스·파일 이벤트 (Tetragon)" : "수집 상태"}>
         {item && (
           <span className="row small muted" style={{ gap: 12 }}>
-            <span>Hubble {item.observations.by_source.hubble ?? 0}건 · Tetragon {item.observations.by_source.tetragon ?? 0}건</span>
+            <span>네트워크 이벤트 {item.observations.by_source.hubble ?? 0}건 · 프로세스·파일 이벤트 {item.observations.by_source.tetragon ?? 0}건</span>
             <span>손상 줄 {item.observations.corrupt_lines}</span>
           </span>
         )}
@@ -133,9 +156,10 @@ export function RuntimeObservePage() {
       <p className="notice">관측 자료의 환경(예: kind lab)은 행마다 표시됩니다. 요청 화면의 엔진과 다른 환경일 수 있습니다.</p>
       <Subtabs
         tabs={[
-          { to: "/runtime/observe/collectors", label: "수집원", badge: problems?.observe, title: problems?.collectorProblems.join(" · "), active: sub === "collectors" },
-          { to: "/runtime/observe/hubble", label: "Hubble 통신", count: hubble.length, active: sub === "hubble" },
-          { to: "/runtime/observe/tetragon", label: "Tetragon 프로세스·파일", count: tetragon.length, badge: problems?.tetragonFlagged, title: problems?.tetragonFlagged ? `목록 밖·의심·확인 필요 실행 ${problems.tetragonFlagged}건` : undefined, active: sub === "tetragon" },
+          { to: "/runtime/observe/collectors", label: "수집 상태", badge: problems?.observe, title: problems?.collectorProblems.join(" · "), active: sub === "collectors" },
+          { to: "/runtime/observe/hubble", label: "네트워크 이벤트 (Hubble)", count: hubble.length, active: sub === "hubble" },
+          { to: "/runtime/observe/tetragon", label: "프로세스·파일 이벤트 (Tetragon)", count: tetragon.length, badge: problems?.tetragonFlagged, title: problems?.tetragonFlagged ? `허용 목록 외 실행·의심·확인 필요 실행 ${problems.tetragonFlagged}건` : undefined, active: sub === "tetragon" },
+          { to: "/runtime/observe/phases", label: "엔진 실행 단계", active: sub === "phases" },
         ]}
       />
       {sub === "collectors" && (
@@ -144,13 +168,13 @@ export function RuntimeObservePage() {
             !res.item ? (
               <StateView kind="invalid" />
             ) : (
-              <TableCard title="수집원">
+              <TableCard title="수집 상태">
                 <table className={rt.statusTable}>
                   <thead>
-                    <tr><th>수집원</th><th>상태</th><th>최근 성공</th><th>오류</th><th>출처</th></tr>
+                    <tr><th>관측 연결</th><th>상태</th><th>최근 성공</th><th>오류</th><th>출처</th></tr>
                   </thead>
                   <tbody>
-                    {res.item.collectors.map((c) => (
+                    {res.item.collectors.slice(pagination.start, pagination.end).map((c) => (
                       <tr key={c.source}>
                         <td>
                           <span className="mono">{c.source}</span>
@@ -166,19 +190,20 @@ export function RuntimeObservePage() {
                     ))}
                   </tbody>
                 </table>
+                <Pagination state={pagination} />
               </TableCard>
             )
           }
         </Query>
       )}
       {sub === "hubble" && (
-        <TableCard title="Hubble 통신">
+        <TableCard title="네트워크 이벤트 (Hubble)">
           <table className={rt.statusTable}>
             <thead>
               <tr><th>시각</th><th>환경·실행</th><th>출발</th><th>도착</th><th>판정</th><th>출처</th></tr>
             </thead>
             <tbody>
-              {hubble.map((e) => {
+              {hubble.slice(pagination.start, pagination.end).map((e) => {
                 const o = e.observation!;
                 return (
                   <tr key={e.event_id} className={o.verdict?.toLowerCase() === "dropped" ? rt.rowDropped : undefined}>
@@ -193,28 +218,33 @@ export function RuntimeObservePage() {
               })}
             </tbody>
           </table>
-          {hubble.length === 0 && <p className={rt.empty}>아직 Hubble 관측이 없습니다.</p>}
+          <Pagination state={pagination} />
+          {hubble.length === 0 && <p className={rt.empty}>네트워크 이벤트 미수집. 수집 상태와 기간을 확인하세요.</p>}
           <p className="notice" style={{ padding: "8px 16px 12px" }}>Hubble DROPPED는 관측이며, 출발·목적지·정책 귀속과 수신 대조 전에는 거부 확인이 아닙니다.</p>
         </TableCard>
       )}
       {sub === "tetragon" && (
-        <TableCard title="Tetragon 프로세스·파일">
+        <TableCard title="프로세스·파일 이벤트 (Tetragon)">
           <table className={rt.statusTable}>
             <thead>
-              <tr><th>시각</th><th>환경·실행</th><th>종류</th><th>실행 파일·경로</th><th>규칙·행위</th><th>출처</th></tr>
+              <tr><th>시각</th><th>환경·실행</th><th>종류</th><th>실행 파일·경로</th><th>판정</th><th>단계</th><th>부모 확인</th><th>규칙·행위</th><th>출처</th></tr>
             </thead>
             <tbody>
-              {tetragon.map((e) => {
+              {tetragon.slice(pagination.start, pagination.end).map((e) => {
                 const o = e.observation!;
                 const flagged = o.kind === "process_exec" && (o.exec_verdict ? FLAGGED.includes(o.exec_verdict) : o.allowed_binary === false);
                 const { kind, attr } = tetragonKind(e);
+                const blocked = isTetragonBlockAttempt(e);
                 const mode = o.action_mode === "enforce" ? "차단 시도 기록(enforce)" : o.action_mode === "monitor" ? "감시만(monitor)" : "알 수 없음";
                 return (
                   <tr key={e.event_id} className={flagged ? rt.rowFlagged : undefined}>
                     <td>{formatTime(e.occurred_at)}</td>
                     <td><ScopeBadges environment={e.scope.environment} runId={e.scope.run_id} /></td>
                     <td>{kind}</td>
-                    <td className="mono" title={attr || pod(o.pod_namespace, o.pod_name)}>{o.path ?? o.binary ?? "–"}</td>
+                    <td className="mono" title={attr || pod(o.pod_namespace, o.pod_name)}>{o.path ?? o.binary ?? "–"}<OperatingIdentity event={e} /></td>
+                    <td>{blocked ? <><Badge tone="caution" title="원시 차단 시도 기록; 실제 결과는 Lab 시험에서 확인">차단 시도</Badge> {isTetragonSigkill(e) ? "Sigkill · 프로세스 종료 규칙" : "Override · 오류 반환 규칙"}</> : o.exec_verdict ? `${label(EXEC_VERDICT, o.exec_verdict)}${o.exec_verdict === "exception" && o.exception_id ? ` · ${o.exception_id}` : ""}` : "–"}</td>
+                    <td>{o.phases.length ? o.phases.map((phase) => label(PHASE, phase)).join(" + ") : "–"}</td>
+                    <td>{parentInfo(e)}</td>
                     <td className="mono" title={o.action_raw ?? "원본 action 미기록"}>{`${o.rule_id ?? "–"} · ${mode}`}</td>
                     <td><ObservationOriginBadge origin={e.origin_detail} /></td>
                   </tr>
@@ -222,9 +252,10 @@ export function RuntimeObservePage() {
               })}
             </tbody>
           </table>
-          {tetragon.length === 0 && <p className={rt.empty}>아직 Tetragon 관측이 없습니다.</p>}
+          <Pagination state={pagination} />
+          {tetragon.length === 0 && <p className={rt.empty}>프로세스·파일 이벤트 미수집. 수집 상태와 기간을 확인하세요.</p>}
           <p className="notice" style={{ padding: "8px 16px 12px" }}>
-            Tetragon Override는 차단 시도가 기록됐다는 뜻입니다. 실제 EPERM 결과는 「통제 적용」의 lab L-05 결과로 따로 확인합니다.
+            프로세스·파일 이벤트 (Tetragon)의 Override는 차단 시도 기록입니다. 실제 EPERM 결과는 「검증 시험 (Lab)」의 L-05 결과에서 확인합니다.
           </p>
         </TableCard>
       )}

@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useSearchParams } from "react-route
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { useDocList, useMeta, useRevalidation, useRuntimeStatus } from "../api/hooks";
 import { useRuntimeProblems, type RuntimeProblems } from "../pages/runtime/problems";
+import { observationState } from "../pages/runtime/parts";
 import { Banner, Dot } from "../components/Misc";
 import { SOURCE_MODE, label } from "../lib/labels";
 import { PERIODS, fromLocalInput, toLocalInput, type PeriodKey } from "../lib/time";
@@ -96,7 +97,7 @@ function Sidebar() {
   const openReval = reval.data?.items.filter((r) => r.status === "open").length ?? 0;
   const problems = useRuntimeProblems();
   const conn = meta.data?.runtime_connection ?? (meta.isError ? "disconnected" : null);
-  const connText: Record<string, string> = { connected: "연결됨", disconnected: "연결 끊김", unauthorized: "인증 거부", example: "예시 데이터" };
+  const connText: Record<string, string> = { connected: "연결 정상", disconnected: "연결 단절", unauthorized: "인증 거부", example: "예시 데이터" };
   const badgeOf = (key: string | undefined): number => {
     if (!key) return 0;
     if (key === "revalidation") return openReval;
@@ -130,7 +131,7 @@ function Sidebar() {
           <div key={g.title} className={l.group}>
             <span className={l.groupTitle}>{g.title}</span>
             {g.items.map((i) => (
-              <NavLink key={i.path} to={`${i.path}${keep}`} className={({ isActive }) => `${l.link} ${isActive ? l.active : ""}`}>
+              <NavLink key={i.path} to={`${i.path}${keep}`} title={i.description} className={({ isActive }) => `${l.link} ${isActive ? l.active : ""}`}>
                 <span className={l.navLabel}>{i.label}</span>
                 {badgeOf(i.badge) ? (
                   <span className={`${l.navBadge} ${errorBadges.has(i.badge ?? "") ? l.navBadgeError : ""}`}>{badgeOf(i.badge)}</span>
@@ -237,7 +238,9 @@ function Pagebar() {
         </label>
         {meta.data && (
           <span className={`${l.chip}`} style={{ padding: "0 8px", color: meta.data.example_mode ? "var(--warn)" : "var(--text-2)" }}>
-            {meta.data.example_mode ? "예시 데이터" : "실제 연결"}
+            {meta.data.example_mode
+              ? meta.data.sources.some((s) => s.mode !== "example") ? "일부 예시 포함" : "예시 데이터"
+              : "실제 연결"}
           </span>
         )}
       </div>
@@ -265,13 +268,24 @@ function useRuntimeStale(): string | null {
   const q = useRuntimeStatus();
   if (!q.isError) return null;
   const last = q.dataUpdatedAt ? new Date(q.dataUpdatedAt) : null;
-  const since = last ? `마지막 성공 ${pad2(last.getHours())}시 ${pad2(last.getMinutes())}분 ${pad2(last.getSeconds())}초 기준 데이터` : "아직 받은 데이터 없음";
-  return `runtime 연결 끊김 — ${since}`;
+  const since = last ? `마지막 수집 ${pad2(last.getHours())}시 ${pad2(last.getMinutes())}분 ${pad2(last.getSeconds())}초` : "수신 기록 없음";
+  return `런타임 연결 단절 · ${since}`;
 }
 
 export function Layout() {
   const meta = useMeta();
   const stale = useRuntimeStale();
+  const { pathname } = useLocation();
+  const status = useRuntimeStatus().data?.item;
+  const unavailable = (pathname.startsWith("/runtime/") || pathname === "/dashboard") && status
+    ? ([
+        ["Hubble", "observation_feed_hubble", "network_flow"],
+        ["Tetragon", "observation_feed_tetragon", "process_exec"],
+      ] as const).filter(([, source, kind]) => {
+        const collector = status.collectors.find((c) => c.source === source);
+        return collector !== undefined && (collector.state !== "ok" || observationState(status.observations.origins_by_kind[kind], collector)[1] === "off");
+      }).map(([name]) => name)
+    : [];
   return (
     <div className={l.shell}>
       <Sidebar />
@@ -279,9 +293,11 @@ export function Layout() {
         <Pagebar />
         {meta.data?.example_mode && (
           <Banner kind="example">
-            예시 데이터 — {meta.data.sources.filter((x) => x.mode === "example").map((x) => x.name).join(", ")} 출처가 예시 자료를 읽고 있습니다. 공식 판정 근거가 될 수
-            없습니다.
+            {meta.data.sources.some((s) => s.mode !== "example") ? "예시 자료" : "예시 데이터"} · {meta.data.sources.filter((x) => x.mode === "example").map((x) => x.name).join(", ")} · 해당 자료는 공식 판정 근거 제외
           </Banner>
+        )}
+        {unavailable.length > 0 && (
+          <Banner kind="unofficial">관측 불가: 해당 구간 이벤트 누락 가능 ({unavailable.join(", ")})</Banner>
         )}
         {stale && <Banner kind="unofficial">{stale}</Banner>}
         <main style={stale ? { opacity: 0.5, transition: "opacity 0.2s" } : undefined}>

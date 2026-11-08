@@ -3,11 +3,31 @@
 from __future__ import annotations
 
 from typing import Any
+import copy
 
 from .intent import EnforcementIntent
+from .attribution import KERNEL_DATA
 
 
 _STATUS = "candidate-cluster-unapplied-unverified"
+
+
+def comparable_spec(spec: dict[str, Any]) -> dict[str, Any]:
+    """Ignore only observed 1.7.1 CRD defaults on kprobe argument definitions."""
+    result = copy.deepcopy(spec)
+    for probe in result.get("kprobes", []):
+        if probe.get("return") is False:
+            probe.pop("return")
+        arguments = list(probe.get("args", [])) + list(probe.get("data", []))
+        if isinstance(probe.get("returnArg"), dict):
+            arguments.append(probe["returnArg"])
+        for argument in arguments:
+            for key in ("maxData", "returnCopy"):
+                if argument.get(key) is False:
+                    argument.pop(key)
+            if argument.get("resolve") == "":
+                argument.pop("resolve")
+    return result
 
 
 def _policy(
@@ -21,8 +41,14 @@ def _policy(
 ) -> dict[str, Any]:
     actions: list[dict[str, Any]] = [{"action": "Post"}]
     if override:
+        # Reuse TG-DENY-01's -EPERM: L-05 already measures this errno, so the
+        # first read-denial trial can compare the same kernel override behavior.
         actions.append({"action": "Override", "argError": -1})
-    description = "kernel override support and effect unverified; probe path only" if override else "monitor only"
+    description = (
+        ("kernel override support and effect unverified; probe path only"
+         if rule_id == "TG-DENY-01" else "kernel override support and effect unverified; exact files only")
+        if override else "monitor only"
+    )
     return {
         "apiVersion": "cilium.io/v1alpha1",
         "kind": "TracingPolicyNamespaced",
@@ -71,6 +97,49 @@ def _policy(
     }
 
 
+def _secret_enforcement_policy(intent: EnforcementIntent) -> dict[str, Any]:
+    """New explicit methods start in monitor mode with their action loaded."""
+    method = intent.tetragon_enforce_method
+    exact = list(intent.protected_paths.enforce_exact_files)
+    if method == "override_lsm":
+        manifest = _policy(intent, "TG-SECRET-01", exact, 4, exact_path=True, override=True)
+        probe = manifest["spec"]["kprobes"][0]
+        probe["selectors"][0]["matchActions"].append({"action": "Sigkill"})
+        limit = "Override + Sigkill; requires injectable security_file_permission; process terminates"
+    elif method == "sigkill_fd_install":
+        manifest = _policy(intent, "TG-SECRET-01", exact, 4, exact_path=True)
+        manifest["spec"]["kprobes"] = [{
+            "call": "fd_install", "syscall": False,
+            "args": [{"index": 0, "type": "int"}, {"index": 1, "type": "file"}],
+            "selectors": [{"matchArgs": [{"index": 1, "operator": "Equal", "values": exact}],
+                           "matchActions": [{"action": "Sigkill"}]}],
+        }]
+        limit = "Sigkill at fd_install; process terminates; operation prevention not guaranteed"
+    elif method == "override_syscall":
+        manifest = _policy(intent, "TG-SECRET-01", exact, 4, exact_path=True)
+        manifest["spec"]["kprobes"] = [{
+            # Tetragon 1.7.1 resolves the architecture prefix for syscall:true.
+            "call": "sys_openat", "syscall": True,
+            "args": [{"index": 0, "type": "int"}, {"index": 1, "type": "string"},
+                     {"index": 2, "type": "int"}],
+            "selectors": [{"matchArgs": [{"index": 1, "operator": "Equal",
+                                          "values": [path + "\u0000" for path in exact]}],
+                           "matchActions": [{"action": "Post"}, {"action": "Override", "argError": -1},
+                                            {"action": "Sigkill"}]}],
+        }]
+        manifest["metadata"]["annotations"]["serving-runtime.local/openat-symbol"] = intent.tetragon_openat_symbol
+        limit = "path string only; relative paths, symlinks and TOCTOU can bypass; process terminates"
+    else:
+        raise ValueError("unknown TG-SECRET-01 enforcement method")
+    manifest["spec"]["options"] = [{"name": "policy-mode", "value": "monitor"}]
+    manifest["metadata"]["annotations"]["serving-runtime.local/enforce-method"] = method
+    manifest["metadata"]["annotations"]["serving-runtime.local/limit"] = limit
+    manifest["metadata"]["annotations"]["serving-runtime.local/serving-impact"] = (
+        "engine process termination -> Gateway target check fails -> 503 without engine delivery -> Kubernetes restart"
+    )
+    return manifest
+
+
 def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
     """Render file policies; TG-EXEC-01 is intentionally adapter-only."""
 
@@ -94,9 +163,15 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
             intent, "TG-ASSET-02", [assets.tokenizer_dir], 2
         )
     if paths.secret_paths:
-        manifests["tetragon-tg-secret-01.json"] = _policy(
-            intent, "TG-SECRET-01", list(paths.secret_paths), 4
-        )
+        secret_enforce = "enforce" in intent.allowed_modes("TG-SECRET-01")
+        if secret_enforce and intent.tetragon_enforce_method:
+            manifests["tetragon-tg-secret-01.json"] = _secret_enforcement_policy(intent)
+        else:
+            manifests["tetragon-tg-secret-01.json"] = _policy(
+                intent, "TG-SECRET-01", list(paths.secret_paths), 4,
+                exact_path=secret_enforce,
+                override=secret_enforce,
+            )
     if intent.tetragon_mode == "enforce_probe":
         manifests["tetragon-tg-deny-01.json"] = _policy(
             intent,
@@ -106,4 +181,9 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
             exact_path=True,
             override=True,
         )
+    if intent.tetragon_kernel_identity:
+        for manifest in manifests.values():
+            for probe in manifest["spec"]["kprobes"]:
+                probe["data"] = copy.deepcopy(KERNEL_DATA)
+            manifest["metadata"]["annotations"]["serving-runtime.local/kernel-identity"] = "v2"
     return manifests

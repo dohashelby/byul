@@ -6,6 +6,39 @@
 - 언어: Python 3.12, 표준 라이브러리만 사용(`dependencies = []`).
 - 상세 설명·옵션·한계는 [`docs/상세_안내.md`](docs/상세_안내.md), 인수 담당 실행 순서는 [`docs/인계_안내.md`](docs/인계_안내.md)에 있습니다.
 
+정책 묶음 명령(`cd runtime`에서 실행):
+
+```text
+.venv/bin/python -B -m serving_runtime bundle build --policy POLICY.json --policy-sha256 SHA256 --server-values SERVER.json --intent INTENT.json --output-parent DIR --bundle-id ID
+.venv/bin/python -B -m serving_runtime bundle verify --bundle-dir DIR/ID
+sudo -E env KUBECONFIG="$HOME/.kube/config" PATH="$PATH" .venv/bin/python -B -m serving_runtime bundle apply --bundle-dir DIR/ID --bundle-root ROOT --context CONTEXT --namespace NAMESPACE --kubeconfig "$HOME/.kube/config" --status-url http://127.0.0.1:8080 --token-env-file "$HOME/runtime-acceptance.env" --dry-run
+sudo -E env KUBECONFIG="$HOME/.kube/config" PATH="$PATH" .venv/bin/python -B -m serving_runtime bundle apply --bundle-dir DIR/ID --bundle-root ROOT --context CONTEXT --namespace NAMESPACE --kubeconfig "$HOME/.kube/config" --status-url http://127.0.0.1:8080 --token-env-file "$HOME/runtime-acceptance.env"
+sudo -E env KUBECONFIG="$HOME/.kube/config" PATH="$PATH" .venv/bin/python -B -m serving_runtime bundle apply --existing ID --bundle-root ROOT --context CONTEXT --namespace NAMESPACE --kubeconfig "$HOME/.kube/config" --status-url http://127.0.0.1:8080 --token-env-file "$HOME/runtime-acceptance.env" --dry-run
+sudo -E env KUBECONFIG="$HOME/.kube/config" PATH="$PATH" .venv/bin/python -B -m serving_runtime bundle apply --existing ID --bundle-root ROOT --context CONTEXT --namespace NAMESPACE --kubeconfig "$HOME/.kube/config" --status-url http://127.0.0.1:8080 --token-env-file "$HOME/runtime-acceptance.env"
+```
+
+입력 형식·거부 규칙은 [`docs/정책묶음_변환규칙.md`](docs/정책묶음_변환규칙.md), 서버 적용과 수동 대체 절차는 [`deploy/gpu-lab/정책_수동적용_절차.md`](deploy/gpu-lab/정책_수동적용_절차.md)에 있습니다. `--dry-run`도 묶음 루트의 읽기 권한이 필요해 sudo로 실행합니다. `--existing ID`는 루트에 배치된 묶음을 재검증하고 복사 없이 전환합니다. apply는 rollout 뒤 연결 실패마다 새 임시 port-forward를 열고 viewer 토큰이 필요한 경우에만 사용합니다. 조회 불가이면 새 링크를 유지하며 수동 확인을 요구합니다. 생성 승인 목록은 자기 신고 사본이며 승인 검증이 아닙니다. 새 전환 경로는 로컬 가짜 환경에서만 시험했습니다.
+
+Tetragon 보호 파일 읽기의 선택적 차단은 intent 1.1에서만 명시합니다. 예시의 경로는 가짜 파일이며 실제 적용 전 Pod 안의 파일 유형과 정상 사용 여부를 확인해야 합니다.
+
+```json
+{
+  "tetragon_mode": "monitor",
+  "protected_paths": {"secret_paths": ["/opt/serving/secret/read-probe.txt"]},
+  "tetragon_rule_modes": {"TG-SECRET-01": "enforce"}
+}
+```
+
+위 조각을 기존 1.1 intent의 해당 필드에 넣고 `.venv/bin/python -B -m serving_runtime enforce render --intent INTENT.json --out OUT_DIR`로 후보를 확인합니다. 출력 요약의 `차단 규칙 1개(미검증)`은 실제 차단 확인이 아닙니다. `tetragon_mode=enforce_probe`는 별도의 `TG-DENY-01` 시험 쓰기만 제어합니다. 새 intent는 기존 묶음에 수동 교체하지 않고 승인 원본과 일치시킨 뒤 `bundle build`·`bundle verify`를 다시 실행합니다. 첫 차단의 `argError`는 기존 L-05와 대조할 `-EPERM(-1)`입니다. 자세한 제약과 되돌리기는 [`docs/Tetragon_차단_설계.md`](docs/Tetragon_차단_설계.md)에 있습니다.
+
+로컬 kind에서 가짜 파일 monitor→enforce→monitor를 시험할 때만 다음 opt-in 명령을 실행합니다. 이 작업에서는 실제 kind를 실행하지 않았습니다.
+
+```bash
+.venv/bin/python -B tools/k8s_lab_check.py --kube-context kind-runtime-lab --namespace serving-lab --state-dir ~/.local/state/serving-runtime/k8s-lab --secret-enforce-check
+```
+
+L-05b는 마지막에 monitor 정책을 다시 적용하고 같은 파일 읽기 성공·`Post`를 확인합니다. 전체 lab 정책도 정리하려면 `--cleanup`을 추가합니다. 보고서의 L-05b 단계별 errno, 같은 Pod UID·경로·read mask·규칙 ID의 원시 `Post`/`Override` 이벤트, 차단 구간 정상 요청 200을 대조합니다. 이벤트나 errno가 빠지면 확인 불가, 예상과 다른 차단 또는 정상 요청 실패는 실패입니다.
+
 ```text
 클라이언트 → Gateway (인증·정책·context 상한 판정, 요청 ID 발급)
                 │  허용만 중계

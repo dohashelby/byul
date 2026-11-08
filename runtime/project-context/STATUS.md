@@ -1,6 +1,46 @@
 # 런타임 작업 상태
 
-최종 갱신: 2026-11-04
+최종 갱신: 2026-11-06
+
+- 2026-11-06 AWS 묶음 적용 결과에 kubectl 출력이 섞여 `STATUS_UNKNOWN`이 되는 원인을 수정했다. `bundle_tools._run`의 자식 stdout을 부모 stderr로 보내며 CLI 성공/오류 분기의 JSON 한 줄 출력과 `operations/agent.py`의 전체 stdout 엄격 파싱은 유지했다. 실제 CLI·apply·가짜 kubectl 서브프로세스로 성공/복원/조회 불가의 단일 JSON, 일반 CLI 성공 문구, stderr 진행/진단 출력과 링크 상태를 확인하는 회귀시험 1건(4개 경우)을 추가했다. runtime에서 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest tests.test_bundle_tools tests.test_operations_agent`: 40건 통과. 지정 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 822건 중 706 통과·115 skip·기존 `test_gateway_serves_snapshot_without_kubernetes_mutation` 소켓 PermissionError 1건, 로그 `/tmp/byul-bundle-operation-result-tests.log`. 실제 AWS/sudo 재검증은 미실행이다. 기준 `byul_runtime` `93558a6`, 새 파일 없음, 기존 platform/web 3개 변경·미추적 인계 문서 보존, contracts/update 수정·8700/5173/8080 프로세스 조작·커밋·push 없음. 다음은 Claude 검수와 AWS 현장 확인이다.
+
+- 2026-11-06 `tetragon_trial` local-sudo의 호스트명 검증을 노드 `.status.nodeInfo.machineID`와 `sudo -n cat /etc/machine-id` 비교로 교체했다. 앞뒤 공백 제거 후 32자리 소문자 hex가 정확히 같아야 통과하며 조회 실패·형식 오류·불일치는 값을 노출하지 않는 RuntimeError로 거부한다. 호스트명 불일치 허용·양쪽 조회 실패/형식 오류 회귀시험과 서버 순서표 7번을 갱신했다. runtime에서 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest tests.test_tetragon_trial`: 11건 통과(kind 기존 명령·산출물/보고서 바이트 동일 포함). `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 821건 중 705 통과·115 skip·기존 `test_gateway_serves_snapshot_without_kubernetes_mutation` 소켓 PermissionError 1건, 로그 `/tmp/byul-machine-id-tests.log`. 실제 AWS/sudo 실측은 미실행이다. 기준 byul_runtime ff92d6d, 새 파일 없음, 기존 platform/web 3개 변경과 미추적 인계 문서 보존, contracts/update 수정·지정 포트 프로세스 종료/재시작·커밋·push 없음. 다음은 Claude 검수와 AWS 현장 확인이다.
+- 2026-11-06 `tetragon_trial`에 기본 kind-docker 유지·local-sudo(호스트 uname -n과 Pod nodeName 일치 필수), context/image/pull-policy와 일반화 허용 플래그(구 이름 호환)를 추가했다. `tetragon_status`는 같은 context의 원본 보고서 바이트 해시를 붙여 safety evidence에 연결한다. 가짜 runner 신규 8건·관련 52건 통과, kind 기본 산출물/보고서는 e5a8ba7과 바이트 동일 확인. 지정 전체 818건(702 통과·115 skip·기존 소켓 PermissionError 1), `git diff --check` 통과, 로그 `/tmp/byul-tetragon-trial-tests.log`. B-7 AWS 명령·evidence-dir 연결을 기록했다. 실제 클러스터/sudo/AWS 실측은 미실행이며 단일 노드·호스트명 일치·sudo 권한·Python 이미지 준비가 필요하다. 기준 byul_runtime e5a8ba7, 기존 미커밋 변경 보존·runtime 안 5개 파일만 변경(새 tests/test_tetragon_trial.py 포함), contracts/update 수정·커밋·push 없음.
+- 2026-11-06 모니터 기록 생성기 구현: 새 `tools/tetragon_monitor_window.py`는 Gateway의 real/confirmed 관측 저장소와 fresh/healthy Tetragon 상태를 읽어 정책·namespace·node별 windows 및 사람 검토용 이벤트 catalog를 0600 임시 파일→rename으로 갱신한다. 기본 `--watch` 5초, 정책 ID/spec/method/kernel·agent epoch·공백/복구/모드 이력·저장소 교체 시 새 창이며 과거/재기동 기간은 소급하지 않는다. 별도 사람 검토 파일의 verdict/검토자 ID만 집계한다. 에이전트 `--review-file` 직접 연결, 열린 fd 기준 root/실행 UID·0600 검사, namespace/ID/monitor 모드 대조, agent-state→API→운영/Tetragon 화면의 창 시작·건수·검토/오탐 표시, 개발 스크립트 opt-in을 추가했다. 설계 §6.1·사용 §11~12에 사용법·검토 절차·제약을 기록했다. 기준 `byul_runtime` HEAD `e5a8ba7` (= main, PR #227 머지됨), 커밋·push 없음, contracts/update 수정 없음. 작업 중 감지된 별도 GPU 확인순서 문서 변경과 기존 미추적 인계 파일은 보존한다.
+- 2026-11-06 kind 실측(사용자 전달 Claude 기록, 분·초 시각 미제공): 6개 안전 조건 통과(`capability_basis=live_trial`) → operator 요청 requested → 자기 승인 HTTP 403 → 별도 approver 승인 → `agent --execute` set-mode monitor→enforce 통과(9초) → 시험용 Pod 보호 파일 읽기 exit 137(Sigkill) → monitor 복귀 요청 즉시 approved → 실행 후 monitor·읽기 정상. 근거 없는 요청은 플랫폼 요청 단계 SAFETY_REJECTED. 당시 임시 스크립트가 windows를 3초마다 만들었으며 새 생성기의 실측은 아니다. 이번 세션의 kind/GPU/실서버 재실행은 없고, 새 생성기 연결 후 kind 전체 경로 확인은 남아 있다.
+- 생성기 검증: runtime 지정 전체 810건(694 통과·115 skip·기존 `test_gateway_serves_snapshot_without_kubernetes_mutation` 소켓 생성 PermissionError 1), 관련 42건 전부 통과(새 시험 13건). web 타입 검사·117건 통과. API 지정 uv 명령은 기본 캐시 읽기 전용으로 시작 실패; `/tmp` 캐시·offline만으로는 TestClient 진행 중단, 기존 문서 §7의 selector 보조 설정을 추가해 전체 234 통과·1 skip·기존 `test_saved_confirmed_export_starts_temporary_gateway` 소켓 생성 PermissionError 1, 관련 운영 API 38 통과·소켓 통합 1 skip. 새 API 시험의 UTC 표기 문자열 비교는 수정 후 통과했다. `bash -n`·`git diff --check` 통과. 로그 `/tmp/byul-monitor-*`, 상세 명령·제약은 사용 문서 §13. 관측 64 MiB/상태·검토 2 MiB 제한, 재기동 시 새 창, 사람 검토의 로컬 신뢰·대용량 증분 처리 미지원은 남는다.
+
+- 2026-11-06 원격 enforce의 capability 판정 1건을 보정했다. `available`은 static, `unknown`은 evidence 검사와 같은 동일 노드·커널·방식·정책 spec의 real combined passed 근거로 live_trial 통과, `unavailable`은 근거가 있어도 우선 거부한다. 준비 결과의 basis/거부 사유를 API가 보존하고 화면에 표시하며, API·웹은 같은 6개 체크를 요구한다. 판정표·불일치·kind 상태 파일 구조 회귀시험과 설계 §6/사용/계약후보 문서를 갱신했다. 기준 `byul_runtime` HEAD `b712bd5` 위 기존 미커밋 운영 구현 보존, 이번 새 파일·contracts/update 변경·커밋·push 없음. 실제 kind/AWS 전환은 미실행이다.
+- 이번 검증: runtime 지정 전체 797건(통과 681·skip 115·기존 소켓 생성 PermissionError 1), 관련 `tests.test_operations_agent` 29건 통과. web 타입 검사 통과; 기본 병렬 시험 시간 초과·화면 대기 실패 11건 뒤 `npm test -- --maxWorkers=1` 전체 115건 통과. API 지정 uv 명령은 기본 캐시 읽기 전용으로 시작 실패; 기존 문서의 `/tmp` 캐시·오프라인·selector 보조 설정으로 전체 233건 통과·skip 1·기존 소켓 생성 PermissionError 1, 관련 `tests/test_operations.py` 37건 통과·소켓 통합 1건 skip. 로그 `/tmp/byul-capability-*.log`. `git diff --check` 통과.
+
+- 2026-11-06 dry-run 검증 통과를 `checked/DRY_RUN`('실행 없이 확인 완료')으로 종결하도록 에이전트·플랫폼 결과 모델/검증·화면 상태 필터/진행 표시·운영 문서 2개를 수정했다. 검증 실패는 `failed`와 해당 사유를 유지하며 종결 요청의 재승인·재임대·실행 보고 거부를 회귀시험으로 확인했다. 기준 `byul_runtime` HEAD `b712bd5` 위 기존 미커밋 운영 구현 보존, 새 파일·contracts/update 변경·커밋·push 없음.
+- 이번 검증: runtime `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests` 793건 중 소켓 권한 오류 1·skip 115, 관련 `tests.test_operations_agent` 25건 통과. web 타입 검사 통과; 기본 `npm test` 시간 초과 4건 뒤 `npm test -- --maxWorkers=1` 전체 110건 통과. API 지정 uv 명령은 기본 캐시 읽기 전용으로 시작 실패; 기존 문서의 `/tmp` 캐시·오프라인·selector 보조 설정으로 `tests/test_operations.py` 30건 통과·소켓 통합 1건 skip. 로그 `/tmp/byul-checked-*.log`. `git diff --check` 통과. 실제 kind/서버 재검증은 미실행이다.
+
+- 최신 작업: 운영 Tetragon 이벤트의 Pod·컨테이너·프로세스 귀속과 감시 중단·복구 확인을 구현했다. 두 Pod/주·자식·스레드 접근과 에이전트 실제 교체·살아 있는 수집기의 전달 중단을 로컬 kind에서 확인했다. 개발 화면은 실제 8개 정책과 복구 조건/공백 이력을 조회한다. 기준 `82804c1`, 사용자 요청으로 이번 변경을 로컬 커밋한다. 상세·검증 범위는 아래 최신 기록 및 `docs/Tetragon_운영귀속_복구_20261106.md`.
+
+- 현재 후속 결과: 시험 수집의 Pod 귀속 누락을 커널 task·CRI 대조로 보완한 뒤 Sigkill·LSM Override+Sigkill 각각 새 namespace 3회 연속 통과, Override 단독 EPERM 진단 통과, syscall 미지원 재확인. 실제 MODE·기능 조건·전환 기록·근거 다운로드 화면 연결. runtime 742건(skip 0)·API 197건·web 92건 및 타입 검사 통과. 사용자 요청은 로컬 커밋까지만이며 AWS/GPU 적용·PR·푸시·머지는 범위 밖이다. 일반 운영 이벤트의 WSL 귀속 제약과 Tetragon 에이전트 버그는 남는다. 상세는 아래 2026-11-06 후속 검증 기록.
+
+- 2026-11-06 사용자 요청으로 정책 묶음 내보내기·Tetragon 후보 PR #224를 main에 머지했다(`1a03e6c`, GitHub 필수 검사 7개 성공). `byul_runtime`도 같은 커밋으로 동기화했다. 준비 중 CI의 runtime 패키지 메타데이터 누락과 모드 전환 시간 초과 뒤 rollback 누락 경로를 수정했다. 소켓 허용 환경의 runtime 전체 725건 전부 통과(skip 0), 깨끗한 Git 사본 API 194건, web 88건·타입 검사, CI 경로 분기 10건과 공용 계약 검사 통과. 실제 kind·AWS 신규 후보 차단 효과는 아직 미검증이다.
+- 후속 작업 순서: (1) 파일 읽기 거부·프로세스 종료의 판정과 시험 보완, (2) 로컬 kind에서 시험용 Pod의 후보별 동작·복귀 실측, (3) 실제 정책 MODE·선택 방식·지원 점검·전환/복귀 결과·시험 근거를 대시보드에 연결, (4) AWS 시험용 Pod부터 두 엔진·서빙 복구 검증, (5) 인증된 서버 제어 경로로 화면 모드 전환과 묶음 자동 적용 연결. 후속 기능 구현과 서버 가동은 이번 PR 머지 작업에서 하지 않았다.
+
+- 2026-11-05 체크리스트 MD에 AWS-01~20 대응표와 37개 행별 `기존 AWS 실증으로 충족한 범위` 칸을 추가했다. 직통 제한·context 경계·input_ids 안전 거부·Gateway 준비 경계·선정 송신 제한 등 기존 통과를 인정하고, 잔여 요구와 변경 영향 회귀만 다음 작업으로 구분했다. 기존 시험 절차/구현/미확인 칸은 보존했다. 새 시험은 실행하지 않았다.
+- 2026-11-05 입력→런타임 연결: 사용자가 환경 계약의 필요한 선택 필드 추가를 승인했다. CONFIRMED 정책·환경 판본의 해시를 확인하고 runtime CLI로 묶음을 만들어 다운로드·감사 기록하는 API와 정책 화면 버튼을 구현했다. DRAFT→승인→내보내기→verify→임시 Gateway `bundle_id`/`gateway_active`/`verified`까지 자동 시험으로 확인했다. 서버 적용은 사람 작업이며 실서버 재적용은 미확인이다.
+- 2026-11-05 Tetragon 차단: 명시적 정확 파일 목록과 세 방식(`override_lsm`, `sigkill_fd_install`, `override_syscall`)의 1.7.1 monitor 후보, 동일 ID MODE 전환·rollback·신규 이름 선로드 교체, 사전 능력 판별, L-05b/L-05c·AWS-20 방식별 판정, 화면 Sigkill “차단 시도” 표지를 구현했다. 4회차 값에서는 `override_lsm` 불가로 분류한다. 모든 신규 후보에 Sigkill이 들어가므로 엔진 대상 AWS-20에는 별도 opt-in을 요구한다. 실제 kind/AWS load·차단 효과와 엔진 주 프로세스 종료→503→재시작은 미확인이다. 5회차 확인순서 초안을 추가했으며 서버는 켜지 않았다.
+- 검증: runtime `unittest discover -s tests` 723건 중 115건 skip·실패 0, web `npm run typecheck && npm test` 88건 통과. PR 준비에서 API 시험의 로컬 runtime 가상환경 의존을 제거하고 CI와 같은 `uv run --frozen --with-editable ../../update --with-editable ../../runtime python -m pytest -q` 깨끗한 Git 사본 194건 통과, CI 경로 분기 시험 10건 통과, 공용 계약 schemas 13·examples 11 오류 0, `git diff --check` 통과. 기준 `925ca62`, 사용자 요청으로 PR·머지 진행. 남은 개발은 차단 판정·엔진 주 프로세스 시험 보완, 현재 정책 MODE·점검 결과·시험 근거의 대시보드 연결, 이후 인증된 서버 적용 연결이다. kind와 AWS 실측은 아직 하지 않았다.
+
+- 2026-11-05 체크리스트 37개 MD를 카테고리별 표에서 착수 순서 01~37의 단일 표로 바꿨다. HTML 질문 원문을 왼쪽에 그대로 넣고 행마다 로컬 시험·개발·GPU/운영/다중 worker 단계와 바로 할 일을 표시했다. 기존 시험 절차·구현/기존 증거·미개발/미확인/다음 작업 칸은 유지했다. 새 기능 구현·시험 실행은 하지 않았다.
+- 2026-11-05 체크리스트 37개 문서의 시험 완료선에 사용자 지적을 반영했다. 로컬 시험은 사전검증이며, 실제 vLLM·SGLang 지원 주장은 현재 코드·묶음·엔진 판본의 GPU 통합 증거가 필요하다. GPU 자체와 무관한 인증/보존 등은 실제 배포 통합·운영 저장소에서 확인하고, 다중 worker 항목은 별도 환경이 필요함을 구분했다. 새 시험은 실행하지 않았다.
+- 2026-11-05 사용자 제공 HTML의 `봐야 하는` 37개를 `docs/런타임_체크리스트37_시험_현황_우선순위.md`로 옮겨 시험 절차·합격 기준·기존 구현/시험 증거·미확인·개발 순서를 대응시켰다(P0 19, P1 17, P2 1). 원본 37개 ID 대조와 `git diff --check`를 확인했다. 이번 작업에서 신규 시험 실행·기능 구현·커밋·push는 하지 않았다. 기존 작업 트리 변경은 보존했다.
+- 2026-11-05 AWS `bundle apply` 4회에서 이전 Pod port-forward로 자동 조회 불가였고 새 수동 포워드의 ID·`verified` 일치를 확인했다. 연결 실패 시 포워드 재개설(기본 90초), `--existing` 재검증·복귀, dry-run sudo 안내를 수정했다. 로컬 전체 시험 712건 통과(skip 115), `git diff --check` 통과; 수정판의 AWS 재적용·Pod 종료 구간 자동 확인은 미검증이다.
+
+## 2026-11-05 플랫폼 정책 묶음 build/apply와 후보 목록 (기준 e6985d7, 미커밋)
+
+- 검수 지적 반영: apply의 `/api/status` 조회 토큰을 서버 env 관례인 `RUNTIME_VIEWER_TOKEN`으로 맞추고, 비보호 200 응답은 토큰 없이 처리한다. rollout 뒤 새 임시 port-forward를 열어 최대 30초 재시도한다. 실제 값 불일치·rollout 실패는 이전 링크 복원·재시작, 연결·인증 등 조회 불가는 새 링크를 유지하고 수동 확인을 요구한다. `--kubeconfig`를 모든 kubectl 호출에 전달하며 sudo 실행 예시를 갱신했다. 실제 서버 재실행은 아직 없다.
+- 검수 반영 후 전체 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 694건, 실패·오류 0, skip 115. `git diff --check` 통과.
+- `bundle build`가 CONFIRMED `byul-policy/0.1` 원본과 독립 확인 정규 해시·서버 값·intent를 받아 새 ID 묶음을 생성하고 기존 verifier로 확인한다. `bundle apply`는 root:10000 권한으로 서버 루트에 배치·재검증, 상대 `current` 링크 교체, Gateway 재시작·`/api/status` 승인 `verified` 확인, 실패 시 링크 복원·재시작을 수행한다. `--dry-run` 제공. 변환·거부 규칙과 수동 대체 절차는 `docs/정책묶음_변환규칙.md`, `deploy/gpu-lab/정책_수동적용_절차.md`에 기록했다. 승인 목록은 자기 신고 사본이며 검증된 플랫폼 승인이 아니다.
+- LAB `platform-approval.aws-lab.json`은 원본 전체가 아닌 요약본이라 원본 해시 `b37fa34…`를 재검산할 수 없다. 합성 EXAMPLE 정책 정규 해시 `e6ff3f32…`와 시험 서버 값으로 vLLM·SGLang 묶음을 만들었고 둘 다 `bundle verify` 통과, Gateway 정책 파일은 기존 LAB 바이트와 동일(`472a7cca…`). intent·digest 자리값은 시험 사본에서만 채웠다. 실제 원본·서버 권한·kubectl·HTTP·AWS 적용은 미확인이다.
+- `docs/후보상태_기능목록.md`에 F6 지표, SP1 캐시, F4 SGLang drift, F7 승인 검증기, 관리 listener와 3회차의 제한된 SGLang 빈 캐시 관찰을 기록했다. `docs/지원_미지원_목록.md`의 backfill 전달 1건과 PR #216 빈 캐시 기동 1회 확인을 3회차 §3·§4 근거로 갱신했다. 다음은 플랫폼 원본 판본·실제 서버 값으로 생성 검증, 배치 권한과 되돌리기 실습, 실제 엔진의 후보 값 대조다.
+- 로컬 전체 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 692건, 실패·오류 0, skip 115(소켓/환경 제한). `git diff --check` 통과. AWS 서버에는 접속·적용하지 않았고 커밋·push하지 않았다.
 
 ## 2026-11-04 AWS GPU 서버 3회차 결과 (기준 b3fc80e, Claude 실행)
 
@@ -409,3 +449,72 @@
 - 연결 수립은 기한 내 별도 작업으로 대기하고, 공통 감시가 요청 전송·헤더·본문 중 기한에 소켓을 끊는다. 연결이 늦게 끝나도 닫는다. relay 일반·chat/completions stream·토큰 계산에 적용했으며, 공유 기한 뒤 토큰 계산 timeout/OSError는 504 `ENGINE_DEADLINE`과 클라이언트 연결 닫기로 분류한다. 공유 기한 전 실패는 503을 유지한다.
 - AWS-01·18 stream 성공은 `[DONE]`과 Gateway 최종 기록의 ALLOWED/completed/오류 없음 여부를 함께 확인하며, 기록 누락은 unknown이다. GPU-LAB README의 엔진 수집 스레드 설명을 실제 순차 처리와 지연 한계에 맞췄다. contracts는 수정하지 않았다.
 - 소켓 없는 회귀시험을 추가해 헤더 분할 전송·본문 대기 중 기한 종료, 연결 수립 지연, 정상 감시 취소, 토큰 기한 오류, `[DONE]` 뒤 최종 실패를 확인했다. `.venv/bin/python -B -m unittest discover -s tests`: 672건, 실패·오류 0, skip 115(로컬 소켓 제약). Claude 노트북에서 전체 재시험과 실제 엔진 확인이 남았다. 커밋·푸시하지 않았다.
+
+## 2026-11-04 플랫폼 단계 시간표 조회 (기준 byul_runtime 작업 트리, 미커밋)
+
+- 근거: Gateway에 기존 ExecPolicy 시간표 파일의 읽기 전용 `/api/phase-timeline` 투영을 추가했다. 수집 상태·15초 freshness·단계/근거/추출 수준만 내보내며 Pod 이름·UID는 제외한다. 파일 누락의 로컬 시연은 `RUNTIME_DEMO=1`일 때 합성임을 표시한다. `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 688건 통과, skip 115건(로컬 소켓 제약). 실제 관측 mount·인증을 건 GPU 환경의 응답은 미확인이다.
+
+## 2026-11-04 사용자 화면 검수 후속 (기준 9fc5056 + 미커밋 변경)
+
+- 근거: 예시 시간표는 기존 합성 Tetragon 관측 시각의 처음·끝에 맞춰 생성해 단계와 실행 점이 겹치며, 실제 시간표 파일 조회 분기는 그대로다. 로컬 전체 unittest 689건 통과(skip 115: 소켓 제약)와 단위시험으로 시간 포함·합성 표지를 확인했다. 실제 GPU 관측 mount와 화면에서의 점 배치는 미확인이다.
+- 2026-11-05 Tetragon 선택적 차단 설계안 `docs/Tetragon_차단_설계.md` 작성: 보호 파일 읽기 Override를 1순위로 제안하고 intent·묶음·계약·화면·되돌리기·kind/AWS 시험과 미확인 위험을 정리했다. 구현·적용·실측은 하지 않았으며 계약 변경은 intent 1.1 선택 필드 범위에서는 불필요, 개별 사건 차단 판정 확장은 합의 필요다.
+- 2026-11-05 Tetragon `TG-SECRET-01` 선택적 읽기 차단 후보와 intent 1.1 검증·단위 시험, L-05b kind opt-in 도구를 구현했다(기준 a9e487d, 미커밋); 전체 unittest 701건 통과(skip 115), `git diff --check` 통과, 실제 kind/AWS 차단·errno·복원은 미확인이고 Claude 검수 전이다.
+- 2026-11-05 4회차 준비(기준 4432c0f, 미커밋): platform 웹 Override 차단 표지·알림 분리·기간별 개요 보조 표시, runtime AWS-20(승인 enforce 선적용·monitor 자동 복원), preflight 커널 수동 확인, 두 엔진 지표 이름 도구·확인순서를 추가했다. 웹 타입 검사·71건 및 runtime 708건(skip 115) 통과, `git diff --check` 통과; AWS 실측·커널 지원·지표·화면 실자료는 미확인이다.
+
+## 2026-11-05 노트북 데모용 Tetragon Override 합성 관측 (기준 51f802e, 미커밋)
+
+- `RUNTIME_DEMO=1` 실행에 한해 TG-SECRET-01 가짜 파일 읽기 Override 3건·Post 1건을 `--origin synthetic`으로 수집한다. 기존 관측 폴더에도 한 번 추가하고 데이터 폴더의 표지 파일로 재수집을 막는다. 실제 서버 관측·판정 코드는 변경하지 않았다.
+- CLI 수집 후 정규화 필드와 웹의 합성·예시 및 차단 시도 표지를 시험했다. `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 713건 통과(skip 115). `platform/web` 타입 검사·72건 시험, `git diff --check`, 셸 구문 검사 통과. 노트북 UI 수동 확인 및 실제 차단 결과는 미확인이다.
+
+## 2026-11-06 차단 근거 판정·kind 실측·대시보드 연결 (기준 1a03e6c, 미커밋)
+
+- 앞선 입력→runtime 묶음 연결·Tetragon 후보 구현은 PR #224로 머지됐다. 이번 변경은 파일 읽기 거부/주 프로세스 종료/서비스 복구를 분리 판정하고, 같은 정책·Pod·PID·가짜 경로·차단 시간·실제 Override 설정을 대조한다. 저장된 성공 표지도 Gateway에서 다시 판정한다.
+- 새 `tools/tetragon_trial.py`로 독립 kind namespace의 HTTP 주 프로세스(PID 1)를 시험했다. 앞선 실측은 fd_install 종료137·재시작 복구, LSM의 read 권한 검사 -EPERM 및 종료·복구, Override 단독 EPERM을 확인했다. syscall은 실제 helper 미지원 load_error다. **최종 코드 재실행은 감시 읽기의 이벤트 연결 실패로 차단 성공을 재현하지 못했다.** 앞선 성공과 최신 미확인을 함께 보존하며 반복 재현/수집 안정성 확인이 남았다.
+- 실측 중 Tetragon 1.7.1의 TotalMemlock/ListTracingPolicies 내부 오류로 에이전트 exit2·자동 재시작을 관측했다. 안정화 대기·에이전트 변경 감지·조회 실패 처리를 추가했지만 에이전트 버그 수정이나 감시 무공백 보장은 아니다. 최종 재실행 전후 restartCount 4 동일, 시험 namespace 정리 및 개발 수집기 재개 확인.
+- 새 `tools/tetragon_status.py`는 노드에서 실제 모드·로드 상태·정책ID·기능 조건을 읽는다. Gateway `/api/tetragon-status` → platform `/api/runtime/tetragon-status` → `/runtime/enforce/tetragon` 화면에 전환/되돌림·실측 근거·에이전트 종료 이력을 제공한다. 개발 서비스에 연결해 fresh 실제 응답과 화면 HTTP200을 확인했다. 화면은 조회만 지원한다.
+- 상세 근거: `docs/Tetragon_로컬검증_20261106.md`. 실제 보고서·원본·manifest·이벤트는 `~/.local/state/serving-runtime/tetragon-evidence/`에 보존한다. 이번 작업에서 AWS/GPU 실제 시험·원격 자동 적용은 하지 않았다.
+- 시험: runtime 전체 741건 통과(skip 0), API 전체 197건 통과, web 타입 검사·91건 통과. 셸 구문 검사 통과. 기준 PR #224 머지 `1a03e6c`; 이번 변경 커밋·푸시하지 않았고 Claude 대화형 검수 및 브라우저 시각 검수 전이다. 기존 미추적 문서와 체크리스트 기록은 보존했다.
+
+## 2026-11-06 귀속 누락 보완·반복 실측·로컬 커밋 (기준 1a03e6c)
+
+- 고유 정책을 namespace 필터 없이 수집해 원시 이벤트의 process.flags=unknown·Pod 귀속 누락을 확인했다. procfs/PID namespace 불일치 경고도 확인했지만 에이전트 내부 원인을 단정하지 않는다. 임시 호스트 procfs mount·DaemonSet 경로 보정은 해결하지 못해 원복했고 계획된 에이전트 교체 2회 및 공백은 실측 성공 범위에서 제외했다.
+- 시험 정책에만 current_task의 tgid·start_boottime·PID namespace 데이터를 추가했다. 파일·mask·훅·집행 action은 유지한다. Kubernetes/CRI가 식별한 정확한 컨테이너 init의 PID 1·namespace inode·시작 tick과 대조하고 차단 전 identity를 다시 확인한다. 독립 namespace의 고유 정책·같은 kernel PID·정책 ID·시간 구간을 요구하며 Gateway도 같은 근거로 재판정한다. 원시 Pod 필드와 독립 식별 결과는 identity_source로 구분한다. 일반 운영 process-cache 귀속 문제의 수정은 아니다.
+- 새 실측: Sigkill 3/3(종료137·재시작/HTTP복구·monitor 복귀/읽기 성공; 파일 읽기 거부는 미확인), LSM Override+Sigkill 3/3(read 권한 검사 -EPERM 및 같은 종료/복구), Override 단독 1/1(사용자 공간 EPERM·Override·monitor 복귀), syscall 1회 load_error 미지원. 각 성공 실행의 전후 에이전트 UID·restartCount 0 동일. 근거는 `/tmp/byul-tetragon-repaired-*`와 `~/.local/state/serving-runtime/tetragon-evidence/`에 보존하며 이전 실패 기록도 유지한다.
+- 새 파일: `enforcement/verification.py`, `mvp/tetragon_state.py`, `tools/tetragon_trial.py`, `tools/tetragon_status.py`, runtime 시험 2개, platform Tetragon 모델/API 시험/화면/화면 시험 및 `docs/Tetragon_로컬검증_20261106.md`. 기존 mode·AWS/kind 인수 도구와 Gateway 읽기 API·개발 연결·웹 타입을 수정했다. contracts·update 구현은 변경하지 않았다.
+- 전체 검증: `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests` 742건 통과(skip 0); API의 runtime/update editable 설치 경로 전체 pytest 197건 통과 및 새 귀속 필드 투영 3건 재확인; web 타입 검사·91건 통과. 기존 Starlette deprecation/jsdom navigation/ResourceWarning은 있었고 실패는 없다. AWS/GPU·실제 엔진 503/복구·운영 수집 무공백은 미검증이다.
+- 사용자 요청대로 로컬 커밋만 진행한다. 기존 미추적 인계·체크리스트·작업지시 문서와 외부 STATUS 기록은 커밋 대상에서 제외한다. Codex 자체 코드·시험 검수 후 Claude의 대화형 독립 검수는 별도다.
+- Chromium에서 실제 개발 화면의 정책 4개·시험 결과 표·커널 task 식별 설명을 확인했다. LSM 성공 행의 근거 JSON을 실제 다운로드해 file_read_denial=confirmed·identity_source=kernel_task·CRI init PID 1을 대조했다. 페이지 오류 0. 개발 서비스 재연결 후 최신 실제 수집 상태를 확인했고 스크린샷/다운로드는 `/tmp/byul-tetragon-dashboard-*-reviewed.png`, `/tmp/byul-tetragon-reviewed-download.json`에 보존했다.
+- 후속 검수에서 uint64 나노초를 문자열로 보존해 브라우저의 긴 uptime 정밀도 손실을 막았다. 상단 예시 경고는 실제 runtime까지 예시로 오해하지 않도록 예시 source에 한정했다. web 최종 타입 검사·92건(`--maxWorkers=1`) 통과. 동시 실행에서는 기존 웹 환경 폼 5초 timeout, 기존 runtime 관리 listener 50ms 한도 시험의 504/502 경합이 각각 1회 있었고 시간 한도를 완화하지 않고 재확인했다.
+- 최종 순차 runtime 전체 재시험 742건 통과(skip 0, 140.208초); 관리 listener 실패 사례와 변경 기능 17건도 별도 통과했다. API 최종 전체 197건, web 최종 92건·타입 검사, 계약 13개 스키마/11개 예시 오류 0, 셸 구문 검사·diff 검사 통과. 원래 에이전트 spec·기준 정책 spec 일치, 잔여 시험 namespace 0, live 상태 fresh/ok·정책 4개·보고서 16개를 확인했다.
+
+
+## 2026-11-06 운영 귀속·감시 중단/복구 보완 (기준 82804c1, 로컬 커밋)
+
+- intent 1.1 선택 필드 `tetragon_kernel_identity`와 일반 운영 `enforcement/attribution.py`·`tools/tetragon_identities.py`를 추가했다. 적용 정책의 커널 tgid·group_leader.start_boottime·PID namespace와 정확한 CRI 컨테이너/Pod UID·procfs 시작 tick을 대조한다. 일반 ObservationFeed에 연결했고 같은 tick의 중복 후보·충돌·만료·너무 빠른 종료는 미확인으로 남긴다. 인자/환경 변수/파일 내용은 수집하지 않는다. 기존 trial 전용 귀속 코드와 구분한다.
+- 새 `enforcement/recovery.py`·`tools/tetragon_stream.py`는 에이전트 UID/restarts/준비 상태와 스트림을 감독하고, 저장한 정책 spec·모드 기대값/수집기/식별 자료/복구 이후 새 실제 이벤트를 모두 요구한다. 살아 있는 writer의 이벤트 전달 중단도 감지한다. 기대값 자동 갱신·누락 정책 무조건 재적용·무공백/완전한 backfill 보장은 하지 않는다. 중복 종료 신호와 원격 자기 세션 정리도 보완했으며 최신 서비스 정상 재시작 1.63초를 확인했다.
+- API/대시보드에 복구 조건 네 가지·공백 이력·운영 실측, 일반 이벤트의 Pod UID/컨테이너/커널·컨테이너 PID를 연결했다. 개발 스크립트가 생산자들을 명시 설정으로 함께 실행한다. 자가점검 DaemonSet은 가짜 파일만 읽고 노드당 receipt 한 건을 별도 저장해 보안 사건 수를 늘리지 않는다. 화면에서 서버 자동 적용/모드 변경 실행은 후속 범위로 유지했다.
+- 실측 `byul-proof-4296fa7ca9`: 서로 다른 두 Pod의 주/자식 구분·에이전트 실제 교체·공백 감지·정책/새 이벤트 복구·원래 정책 보존·정리 통과. `byul-proof-265c9552ed`: group_leader 기반 스레드 접근까지 통과(재시작 시험은 이 실행에 포함하지 않음). 영구 보고서/원본/해시는 `~/.local/state/serving-runtime/tetragon-evidence/operations-artifacts/`에 있다. 개발 연결 전체의 에이전트 교체와 수집 child SIGSTOP→감지→SIGCONT 복구도 통과했고 `/tmp/byul-tetragon-live-agent-recovery.json`, `/tmp/byul-tetragon-silent-stall-check.json`에 기록했다.
+- 현재 로컬 kind에는 기존 네 정책을 유지하고 별도 Post 정책 `runtime-tg-{asset,cache,secret}-01-identity-v2`·`runtime-tg-health-01-sentinel-v2`만 더했다. v1 추가 정책은 v2 새 이벤트 확인 후 제거했다. 실제 GPU 엔진/AWS/다중 노드 시험은 하지 않았다.
+- 새 파일: attribution/recovery, identities/stream/operations_check 도구, runtime 시험 세 개, lab sentinel JSON, 운영 보완 문서. 수정: runtime intent/렌더/CLI/Gateway/feed/status, platform 상태 모델/생성 타입/관측·정책 화면/개발 실행 스크립트. contracts/update 구현과 기존 미추적 인계·작업지시·체크리스트 문서는 변경하지 않았다.
+- 검증: API 전체 197건 통과. runtime 전체 766건 통과 뒤 추가 시험을 더했고, 767건 실행의 기존 정책 만료 시각 시험 1회 경합은 해당 사례 포함 25건 재시험 통과로 확인했다(시간 한도 수정 없음). 최신 runtime 전체 및 웹 타입/전체 시험은 마무리 실행 로그 `/tmp/byul-ops-runtime-final-verified.log`, `/tmp/byul-ops-web-verified.log`에 기록한다. 최종 결과는 아래에 덧붙인다.
+- 사용자 요청으로 작업을 마무리하고 로컬 커밋한다. 푸시/PR은 하지 않는다. Claude 대화형 독립 검수와 최신 변경의 브라우저 시각 검수는 별도다. AWS 서버는 켜지 않았다.
+
+- 최종 마무리 검증: runtime 전체 768건 통과(skip 0, `/tmp/byul-ops-runtime-final-verified.log`), web 타입 검사·93건 통과, API 전체 197건 통과, 계약 스키마 13개/예시 11개 오류 0, 셸 구문·`git diff --check` 통과. 잔여 `byul-proof-*` namespace 0, 실제 개발 상태 `ok/healthy`·정책 8개·운영 실측 보고서 2개를 확인했다.
+
+## 2026-11-06 원격 적용·모드 전환 구현 (기준 b712bd5, 미커밋)
+
+- 사용자 채택 D1~D7과 `docs/설계_원격적용_모드전환.md`에 따라 platform/api의 토큰 해시·역할·서버 제한, 추가 전용 감사 저장소, 운영 요청/승인/임대/다운로드/결과·agent-state API를 추가했다. 새 묶음·enforce는 2인 승인, LAB 자기 승인 명시 기록·양쪽 opt-in, bundle.switch/monitor는 즉시 대상이다. 요청 본문 역할은 무시한다. 기존 조회·내보내기·판정 동작과 contracts/update는 변경하지 않았다.
+- runtime pull 에이전트는 파일 잠금·10초 조회·기본 dry-run·명시 execute, 묶음/승인/대상/기대 상태·해시 재검사, apply_bundle/기존 묶음 복귀와 tetragon_mode 전환·되돌림, 제한된 결과 보고를 수행한다. 임대 만료는 unknown·재실행 금지, 기대 상태 불일치는 failed STATE_CHANGED다. systemd·bundle apply만의 sudoers 예시를 제공했고 설치하지 않았다. 특권 결과 JSON과 이전 Gateway 재확인을 분리했다.
+- intent 1.1의 규칙별 `tetragon_allowed_modes`를 추가했다. 기존 tetragon_rule_modes는 후보 능력 선언으로 호환하며 충돌을 거부한다. 새 enforce 허용은 명시 방식과 monitor 초기 렌더가 필요하다. 필드 미사용 렌더 바이트 호환 시험 통과. 현재 실제 MODE는 서버 조회/기록으로 관리한다.
+- §6 조건은 같은 방식/spec/커널의 실제 재판정 근거·기존 available 능력·설정 모니터 기간/오탐 0 또는 전부 검토·수집 복구 4조건·enabled/허용 모드를 요구한다. 서버별 준비 조건을 화면/플랫폼에서 확인하고 실행 직전 live 커널·기능·정책·기대 상태와 다시 대조한다. 기존 unknown 능력은 승격하지 않는다. 모니터 구간 집계·검토는 신뢰 가능한 로컬 근거 파일로 제공해야 하며 자동 생산은 이번 구현에 없다. 기존 단일 daemon set-mode 제약으로 원격 enforce는 단일 노드만 허용한다.
+- 화면에 정책 판본 [적용 요청], 운영 요청 목록/승인/단계/결과/증거 해시/에이전트 마지막 조회, Tetragon 체크리스트/차단·탐지 요청/Sigkill ENGINE_RESTART 입력을 추가했다. 토큰은 화면 메모리에만 보관한다. API/명령 예, 권한·승인 표, 안전장치 근거, 설치 예시, kind 명령·기대 증거와 변경 파일은 `docs/원격운영_사용과검증.md`. 공용 계약 후보는 사용자 지정 `docs/계약후보_operations.md`에만 두었다.
+- 검증: runtime 전체 785건(669 통과·115 skip·기존 소켓 시험 PermissionError 1), 변경·묶음·모드 회귀 44건 전부 통과. web 최종 타입 검사·기본 npm test 98건 통과(첫 기존 환경 폼 timeout 1회 후 재확인, 단일 worker 98건도 통과). API 전체는 기본 uv 캐시 쓰기/DNS 제한을 확인한 뒤 캐시를 /tmp로 복사하고 offline+임시 epoll 20ms 시험 보조 설정에서 209 통과·기존 소켓 시험 PermissionError 1·HTTP 통합 skip 1. 새 API/로컬 통합은 13 통과·HTTP 변형 skip 1, 실제 export→승인→agent→실제 apply→Gateway 객체의 verified 확인. 전체 지정 명령의 완전 통과는 이 샌드박스에서 확인하지 못했다.
+- 로그: `/tmp/byul-remote-runtime-final.log`, `/tmp/byul-remote-runtime-targeted.log`, `/tmp/byul-remote-web-final.log`, `/tmp/byul-remote-api-final.log`, `/tmp/byul-remote-api-operations-final.log`. sudoers `visudo -cf` parsed OK, `git diff --check` 통과. 원래 미추적 문서/STATUS 기록 보존, HEAD b712bd5 유지, 커밋·push·머지 없음. 실서버·GPU·kind·실제 HTTP Gateway·sudo 실행/서비스 설치·브라우저 수동 검수는 미실행이다. Claude의 소켓 허용 전체 시험·kind 실행·독립 검수가 필요하다.
+
+## 2026-11-06 kind 지적 A·운영 화면 B 보완 (기준 b712bd5, 미커밋)
+
+- A: 에이전트의 기본 상태 조회를 context/namespace/kubeconfig의 deployment/serving-gateway에 매번 새 port-forward를 여는 공통 재시도 경로로 수정했다. 고정 8080의 다른 Gateway를 읽지 않으며 --status-url은 명시 local 조회에만 쓴다. apply_bundle의 기존 새 포워드/되돌림 동작을 유지했다. 4역할 요구를 유지하고, Result의 선택 reason_code(BUNDLE_ROLES_MISSING/BUNDLE_INVALID/CURRENT_LINK_INVALID/STATUS_UNREACHABLE/STATUS_MISMATCH)로 비밀·경로 없이 실패를 구분한다. 기존 결과 코드·오래된 Result 본문을 유지한다.
+- B: 운영 목록 우선·상태 필터·한국어 단계·요청/승인 역할 ID·시각·결과/세부 사유/증거 해시·행 상세·등록 서버별 마지막 조회를 구현했다. 토큰은 sessionStorage(실패 시 메모리)에 세션 유지하고 저장 후 입력에서 지우며 현재 역할/토큰 지우기를 표시한다. 정책 적용/모드 전환도 같은 토큰을 공유한다. 되돌리기는 버튼으로 열고 agent-state의 서버/current와 검증된 같은 대상 4역할 묶음 목록에서 선택하며 직접 입력은 고급에 뒀다. 새 상태 보고를 반영하고 정상 화면은 최근 30초 보고를 요구한다. 승인자/자기 요청/LAB 역할 처리를 API와 맞췄다.
+- 내부 형식: agent-state의 선택 bundles(묶음 ID·SHA-256, 최대 256), 목록 actor와 미조회 등록 서버, claimed_at/running_at을 추가했다. 에이전트 상태 조회의 타 서버 정보도 제외한다. contracts/update는 수정하지 않았다. root 0600 토큰·kind 4역할 build 명령·대상 일치·노드 볼륨 준비와 에이전트 탈취 시 임의 root 적용 위험은 `docs/원격운영_사용과검증.md` §5/8/9/10 및 설계 위험 절에 기록했다.
+- 검증: runtime 지정 전체 792건(676 통과·115 skip·기존 소켓 PermissionError 1), 에이전트/묶음 34건 전부 통과. web 최종 타입 검사·전체 109건 통과. API 지정 uv는 읽기 전용 기본 캐시 lock 생성 실패. /tmp 캐시·offline·기존 epoll 20ms 보조 설정 전체는 216 통과·1 skip·기존 소켓 PermissionError 1; 운영 API/실제 export→agent→apply→Gateway 객체 통합은 20 통과·실제 HTTP 변형 1 skip. 오류를 제품/시험 수정으로 우회하지 않았다. 소켓 허용 환경 전체 통과와 kind 재확인은 남았다.
+- 로그: `/tmp/byul-remote-ab-runtime-all.log`, `-runtime-targeted.log`, `-web-final.log`, `-api-prescribed.log`, `-api-all.log`, `-api-targeted.log`(공통 접두사 `/tmp/byul-remote-ab`). 이번 추가 파일은 web의 `api/operationSession.ts`, `pages/RuntimeOperations.module.css`; 기존 미추적 agent/API/화면/시험과 인계/계약 후보 문서를 보완했다. `git diff --check` 통과, HEAD b712bd5·byul_runtime 유지, 기존 미커밋/미추적 작업 보존. 커밋·push·PR 없음. kind·실서버·GPU·sudo/서비스 설치·브라우저 시각 검수는 미실행이며 Claude 대화형 검수에 인계한다.

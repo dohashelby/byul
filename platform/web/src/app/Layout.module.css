@@ -61,10 +61,11 @@ a.brand:hover {
 }
 .areaTitle {
   display: block;
-  padding: 4px 8px 0;
+  padding: 10px 8px 12px;
+  border-bottom: 1px solid var(--border);
   color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
 }
 .brandName {
   font-size: 14px;
@@ -87,19 +88,27 @@ a.brand:hover {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  margin-top: 12px;
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.areaTitle + .group {
+  margin-top: 0;
+  padding-top: 8px;
+  border-top: 0;
 }
 .groupTitle {
-  padding: 0 8px 4px;
-  color: var(--muted);
-  font-size: 12px;
+  padding: 0 8px 5px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
 }
 .link {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 6px 8px;
+  padding: 6px 8px 6px 20px;
   border: 0;
   border-radius: var(--radius);
   background: none;
@@ -120,6 +129,7 @@ a.brand:hover {
 .navLabel {
   flex: 1;
   min-width: 0;
+  font-size: 12px;
 }
 .navBadge {
   min-width: 18px;
@@ -273,20 +283,31 @@ a.brand:hover {
   }
   .nav {
     display: flex;
-    gap: 4px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
     overflow-x: auto;
     padding: 6px 8px;
   }
   .group {
     flex-direction: row;
     margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+    align-items: center;
+  }
+  .areaTitle + .group {
+    padding-top: 0;
   }
   .groupTitle {
-    display: none;
+    display: inline;
+    padding: 0 6px;
+    white-space: nowrap;
   }
   .link {
     width: auto;
     white-space: nowrap;
+    padding-left: 8px;
   }
   .footer {
     display: flex;

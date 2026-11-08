@@ -1,0 +1,1266 @@
+{
+  "kind": "derived-review-index-not-central-status",
+  "recorded_at_KST": "2026-11-06T19:24:41.575672+09:00",
+  "integration_base": "e5a8ba7589be09fa472c35276e190b117426a0ae",
+  "actual_product_source": "3b3ff137b31b830403ccce1997dabf26319bac4f",
+  "scope_count": 43,
+  "counts_as_of": "2026-11-06T16:40:04+09:00",
+  "counts_are_not_completion": {
+    "GPU_assigned": 33,
+    "CPU_assigned": 10,
+    "mixed_direct_evidence": 38,
+    "history_report_only": 5,
+    "product_path_partial_or_aborted": 25,
+    "other_component_or_preparation": 13
+  },
+  "whole_original_question_completed_IDs": 0,
+  "applied_branches_enumeration_complete": false,
+  "total_applied_branches": null,
+  "sources": [
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-history-6-20261106/out/historical6-primary-and43-gap-v1/43-existing-reference-index-v1.json",
+      "sha256": "7f8a36cfb7b89f57dde14a380160e35d2f1db4515a4ec9f0485d5949c234defc",
+      "bytes": 61731,
+      "scope": "기존43ID pointer index; not current READY"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-history-6-20261106/out/PR-and-next-plan-reference-handoff-v1/PR-plan-reference-handoff-v1.json",
+      "sha256": "8e53b46a2aa2626fcd17a0d293cd9da28f1f1f32d7cf7c1080eea3b9e5af34ff",
+      "bytes": 10088,
+      "scope": "S4 handoff and versioned deltas"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-history-6-20261106/out/latest-counts-sup15-sup05-manifest-v1/current-counts-delta-v1.json",
+      "sha256": "d61488ad5baf04dc4119661e1cd3f92af61a5ccdfebd9759ce2a7dee1f9cc27e",
+      "bytes": 23212,
+      "scope": "counts as of 16:40 KST; not completion"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-history-6-20261106/out/SUP16-actual-GPU-native-partial-followup-v1/SUP16-native-partial-followup-v1.json",
+      "sha256": "1bc0be34428d68a872d3272208bd5e5fc83852e8ebc23897b470f6e2a2fe5237",
+      "bytes": 7731,
+      "scope": "SUP16 previous actual partial GPU; native UNKNOWN/missing8; no product Ref"
+    },
+    {
+      "project_relative_path": "guard-output/gpu-stage1-3sessions/prepare/SUP16-native17-ordering-writer-delta/v1/packet.md",
+      "sha256": "8fa11a64847b1cb5898558868e983b2c702a073fa4d259af1fd00e8d67dade05",
+      "bytes": 6081,
+      "scope": "S1 fixed LF writer CPU3; later S3 review reused"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup16-native17-ordering-writer-delta-v1/CPU-contract-invocation.json",
+      "sha256": "351673356a4636260a8d0536499cc5329a37f871c5360aa5789f424a005e44ed",
+      "bytes": 685,
+      "scope": "CPU3 invocation; not remote writer"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-next-packet-20261106/out/new5-SUP05-first-product-v1/public-engine-cpu-delta-v1/code-freeze-v3.json",
+      "sha256": "e0d42db1a09192f7b6b6cda0730d0741f4edd16f94396e2853a1677a0645e17c",
+      "bytes": 6664,
+      "scope": "SUP05 final source freeze; no actual success implied"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-next-packet-20261106/out/new5-SUP05-first-product-v1/public-engine-cpu-delta-v1/probe-result-v3-normal.json",
+      "sha256": "d8139e161f3f8958a077efa0f5b585e21fd9baf6b6e5f6c77378a2b96ecc06bd",
+      "bytes": 11708,
+      "scope": "SUP05 exactly one CPU normal role timed out; missing final/native remain unknown"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/new5-SUP05-first-product/public-engine-cpu-delta-v1/code-v3-delta-review-v1.json",
+      "sha256": "ec01faaca67723fc7fe7f6880277fe8d75d36a97a86bdb0ce9ab188c629ce546",
+      "bytes": 9389,
+      "scope": "create recovery mocks11; not engine execution"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/new5-SUP05-first-product/public-engine-cpu-delta-v1/packet-index-v2-review-v1.json",
+      "sha256": "190e88fcf80617c4e459c09e4efd66bc21068dc3aac2682a337b96990aba6fdd",
+      "bytes": 25164,
+      "scope": "packet2/index59 final reference review"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/new5-SUP05-first-product/public-engine-cpu-delta-v1/actual-normal-once-v1/essential-observation-v1.json",
+      "sha256": "1e761eb7233d353295ddf7e48f6181024806005ddf053cd40dced7f5559384ed",
+      "bytes": 6445,
+      "scope": "actual normal CPU preparation failure and owned cleanup, independently verified"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/new5-SUP05-first-product/public-engine-cpu-delta-v1/actual-normal-once-v1/actual-index-review-v1.json",
+      "sha256": "ebf0f96c12fdda591535dbfbd91261aab5406b8ff0a9d43666084c29f4de97e1",
+      "bytes": 24715,
+      "scope": "actual CPU final reference validation; missing outputs remain unknown"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/native17-ordering-writer-normal-actual-v1/S3-PR-integration-handoff-20261106-v3.json",
+      "sha256": "cc72c454a14738f0ea247635f38195353a1fb914da7265f85415af2a0cfe42c1",
+      "bytes": 2509,
+      "scope": "new actual export generation mismatch; no GB07→GB09 evidence promotion"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/session1-pr-inventory-20261106-v1/code-and-remote-inventory.json",
+      "sha256": "6b93999c2f12fa1619f6162df0f3e3fe6968e86f4dbb8efdea12cdf4668a2494",
+      "bytes": 13683,
+      "scope": "all16 local implementation candidates and previous main inclusion checks"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-run-lif14-labels-20261105/out/SUP16-live-normal-v1-operator-20261105/native17-ordering-writer-normal-operator-v1/poststop-native17-ordering-writer-v1-owned-instances.stdout",
+      "sha256": "58ee8c89cd611ffd401d75cd24e69f270ca6078f08e95869bf9bb82a36af094f",
+      "bytes": 23237,
+      "scope": "poststop original completed19:34:59KST; all3stopped/publicIP0; independent of original stop180 exit1"
+    }
+  ],
+  "code_snapshots": [
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup16-native17-ordering-writer-delta-v1/write_normal_boot.py",
+      "sha256": "2485ba44ce8398f833477b79a04c86624cc254316b566f399a4bc9b5f085e4bd",
+      "bytes": 7644,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup16-write_normal_boot.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-next-packet-20261106/out/new5-SUP05-first-product-v1/public-engine-cpu-delta-v1/run_cpu_v3.py",
+      "sha256": "caa9c5a2646e4f32f8190fb9f977b89dacc9a9c33a76c96c99f119cbe7f20ff3",
+      "bytes": 16817,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup05-run_cpu_v3.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-next-packet-20261106/out/new5-SUP05-first-product-v1/public-engine-cpu-delta-v1/native_worker_v2.py",
+      "sha256": "393d5de61b1c4e28f2e49b35b12b2b95737bb14793b79ae1bbd0d8ffe9e91bd1",
+      "bytes": 12360,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup05-native_worker_v2.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup16-native17-ordering-writer-delta-v1/test_ordering_delta.py",
+      "sha256": "965e37acc81d309ba2e33bac1675d12718325a0cdc0ac8e38dbcc2626813bc7a",
+      "bytes": 2151,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup16_ordering_latest-test_ordering_delta.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-exit-observability-prep-v2/exit_observer.py",
+      "sha256": "23b6ce65ae944fca949d94f800c2b891eaab2ad8f73a8a6bd19553ceb87c5810",
+      "bytes": 6921,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup15_observer_latest-exit_observer.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-exit-observability-prep-v2/exit_child.py",
+      "sha256": "dca31dd09fc1cbba9515136b8a558fa625bcd6208be2c22e9a883adf3f856032",
+      "bytes": 3760,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup15_observer_latest-exit_child.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-exit-integration-v3/observed_wait.py",
+      "sha256": "0747d52e748ae6f0506b9d6327f5c99ffc95f023e145eaddf10aba8f81815717",
+      "bytes": 2680,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup15_integration_latest-observed_wait.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-exit-integration-v3/producer.py",
+      "sha256": "91c9f28dec00d874ab21b7fcfd98e1d36cac6abb4af336a3df9936c00489d02e",
+      "bytes": 5809,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup15_integration_latest-producer.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-exit-integration-v3/prepare_inputs.py",
+      "sha256": "339041c98628a4fbf3e1f71494b0d48a0fd308ba34468be51e01b0afa9985293",
+      "bytes": 3353,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup15_integration_latest-prepare_inputs.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-exit-integration-v3/consume_output.py",
+      "sha256": "545cdff7586a48b1c7c5e3722efecacc8258609d4398613ff3f4ed9d27c482d8",
+      "bytes": 2681,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup15_integration_latest-consume_output.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-live-loop-cpu-prep-v1/single_case.py",
+      "sha256": "0e773fd8c8abd4134a2b33065d72bc15e34fd7221c74e75cc0dc47ab69b2d4d1",
+      "bytes": 5263,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup15_live_single_latest-single_case.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-live-loop-cpu-prep-v1/run_once.py",
+      "sha256": "ddf6629bcd5e4fddbbae375035edb5c3c9d3b55ceca3e572631fe1bbce3a2c35",
+      "bytes": 3974,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup15_live_single_latest-run_once.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-live-loop-cpu-prep-v1/verify_actual.py",
+      "sha256": "026a84add9dc1bdcf9435aef1185764d44af61643a8096226bb237e701211468",
+      "bytes": 5225,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup15_live_single_latest-verify_actual.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-cache-v2/sup15_cache_producer.py",
+      "sha256": "89083d7ec986eee7c6427312dc98bf58feda7d7f8fa1129e8ef7d973cdd14d98",
+      "bytes": 9676,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup15_original_dependencies-sup15_cache_producer.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-cache-v2/sup15_prepare.py",
+      "sha256": "e972ff7d5c727972ee7daa09b65abd9f32e39258384779d49cadb58b5e205adb",
+      "bytes": 12550,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup15_original_dependencies-sup15_prepare.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-cache-v2/sup15_product_pipeline.py",
+      "sha256": "a282ea28a22626b3575032f13450c6187b81a120d8212e75a4ac2271ca9a52a9",
+      "bytes": 4676,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/sup15_original_dependencies-sup15_product_pipeline.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/lif06-layerwise-component-v1/component.py",
+      "sha256": "5a37e3906b9c2f572aec3b267d56831323b3f568546451e7184f7b2429da3fd6",
+      "bytes": 6309,
+      "repository_snapshot": "update/docs/gpu-b/consolidation-20261106/implementation-snapshots/lif06_component-component.py.txt",
+      "role": "reviewed fixed-run code reference; not portable production tool"
+    }
+  ],
+  "session1_all16_candidate_refs": [
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup16-native17-ordering-writer-delta-v1/write_normal_boot.py",
+      "sha256": "2485ba44ce8398f833477b79a04c86624cc254316b566f399a4bc9b5f085e4bd",
+      "bytes": 7644,
+      "group": "SUP16_ordering_latest",
+      "publication": "fixed-code-reference"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup16-native17-ordering-writer-delta-v1/test_ordering_delta.py",
+      "sha256": "965e37acc81d309ba2e33bac1675d12718325a0cdc0ac8e38dbcc2626813bc7a",
+      "bytes": 2151,
+      "group": "SUP16_ordering_latest",
+      "publication": "fixed-code-reference"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup16-native17-ordering-writer-delta-v1/environment.template.json",
+      "sha256": "1b84465cb9714b189877a8d4a7f65f304309a3201a0dbfe24c198e08459fd3a2",
+      "bytes": 35662,
+      "group": "SUP16_ordering_latest",
+      "publication": "local-only configuration or host-coupled reference"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-exit-observability-prep-v2/exit_observer.py",
+      "sha256": "23b6ce65ae944fca949d94f800c2b891eaab2ad8f73a8a6bd19553ceb87c5810",
+      "bytes": 6921,
+      "group": "SUP15_observer_latest",
+      "publication": "fixed-code-reference"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-exit-observability-prep-v2/exit_child.py",
+      "sha256": "dca31dd09fc1cbba9515136b8a558fa625bcd6208be2c22e9a883adf3f856032",
+      "bytes": 3760,
+      "group": "SUP15_observer_latest",
+      "publication": "fixed-code-reference"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-exit-integration-v3/observed_wait.py",
+      "sha256": "0747d52e748ae6f0506b9d6327f5c99ffc95f023e145eaddf10aba8f81815717",
+      "bytes": 2680,
+      "group": "SUP15_integration_latest",
+      "publication": "fixed-code-reference"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-exit-integration-v3/producer.py",
+      "sha256": "91c9f28dec00d874ab21b7fcfd98e1d36cac6abb4af336a3df9936c00489d02e",
+      "bytes": 5809,
+      "group": "SUP15_integration_latest",
+      "publication": "fixed-code-reference"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-exit-integration-v3/prepare_inputs.py",
+      "sha256": "339041c98628a4fbf3e1f71494b0d48a0fd308ba34468be51e01b0afa9985293",
+      "bytes": 3353,
+      "group": "SUP15_integration_latest",
+      "publication": "fixed-code-reference"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-exit-integration-v3/consume_output.py",
+      "sha256": "545cdff7586a48b1c7c5e3722efecacc8258609d4398613ff3f4ed9d27c482d8",
+      "bytes": 2681,
+      "group": "SUP15_integration_latest",
+      "publication": "fixed-code-reference"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-live-loop-cpu-prep-v1/single_case.py",
+      "sha256": "0e773fd8c8abd4134a2b33065d72bc15e34fd7221c74e75cc0dc47ab69b2d4d1",
+      "bytes": 5263,
+      "group": "SUP15_live_single_latest",
+      "publication": "fixed-code-reference"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-live-loop-cpu-prep-v1/run_once.py",
+      "sha256": "ddf6629bcd5e4fddbbae375035edb5c3c9d3b55ceca3e572631fe1bbce3a2c35",
+      "bytes": 3974,
+      "group": "SUP15_live_single_latest",
+      "publication": "fixed-code-reference"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-live-loop-cpu-prep-v1/verify_actual.py",
+      "sha256": "026a84add9dc1bdcf9435aef1185764d44af61643a8096226bb237e701211468",
+      "bytes": 5225,
+      "group": "SUP15_live_single_latest",
+      "publication": "fixed-code-reference"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-cache-v2/sup15_cache_producer.py",
+      "sha256": "89083d7ec986eee7c6427312dc98bf58feda7d7f8fa1129e8ef7d973cdd14d98",
+      "bytes": 9676,
+      "group": "SUP15_original_dependencies",
+      "publication": "fixed-code-reference"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-cache-v2/sup15_prepare.py",
+      "sha256": "e972ff7d5c727972ee7daa09b65abd9f32e39258384779d49cadb58b5e205adb",
+      "bytes": 12550,
+      "group": "SUP15_original_dependencies",
+      "publication": "fixed-code-reference"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/sup15-cache-v2/sup15_product_pipeline.py",
+      "sha256": "a282ea28a22626b3575032f13450c6187b81a120d8212e75a4ac2271ca9a52a9",
+      "bytes": 4676,
+      "group": "SUP15_original_dependencies",
+      "publication": "fixed-code-reference"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-prep-recovery-errors-20261104/out/lif06-layerwise-component-v1/component.py",
+      "sha256": "5a37e3906b9c2f572aec3b267d56831323b3f568546451e7184f7b2429da3fd6",
+      "bytes": 6309,
+      "group": "LIF06_component",
+      "publication": "fixed-code-reference"
+    }
+  ],
+  "rows": {
+    "LIF-01": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/LIF-01"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v8-LIF01-runtime-delta.json",
+        "bytes": 10742,
+        "sha256": "32e89c7306915af0490bc1fc2df9c937a3bc3c804c46761286253940184c5aa5",
+        "json_pointer": "/rows/LIF-01"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/LIF-01"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "LIF-02": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/LIF-02"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v5-runtime-delta.json",
+        "bytes": 76678,
+        "sha256": "7a4ece5db65a43cb3ec70f2efeb8ef74171bcd704ace9411fade8b8bac485fa5",
+        "json_pointer": "/rows/LIF-02"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/LIF-02"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "LIF-03": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/LIF-03"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v1.json",
+        "bytes": 289271,
+        "sha256": "ac154a52e1cd3f2924d54438dec5fc8ad4f635d744b308e96026cc4d2e701614",
+        "json_pointer": "/rows/LIF-03"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/LIF-03"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "LIF-04": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/LIF-04"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v1.json",
+        "bytes": 289271,
+        "sha256": "ac154a52e1cd3f2924d54438dec5fc8ad4f635d744b308e96026cc4d2e701614",
+        "json_pointer": "/rows/LIF-04"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/LIF-04"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "LIF-05": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/LIF-05"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v1.json",
+        "bytes": 289271,
+        "sha256": "ac154a52e1cd3f2924d54438dec5fc8ad4f635d744b308e96026cc4d2e701614",
+        "json_pointer": "/rows/LIF-05"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/LIF-05"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "LIF-06": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/LIF-06"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v24-LIF06-layerwise-CPU-component-delta.json",
+        "bytes": 5710,
+        "sha256": "2c90d207e3e779ac360665d13131e6f023de21e902005126ec1e023833d674b7",
+        "json_pointer": "/rows/LIF-06"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/LIF-06"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "LIF-07": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/LIF-07"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v1.json",
+        "bytes": 289271,
+        "sha256": "ac154a52e1cd3f2924d54438dec5fc8ad4f635d744b308e96026cc4d2e701614",
+        "json_pointer": "/rows/LIF-07"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/LIF-07"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "LIF-08": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/LIF-08"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v3-cpu9-delta.json",
+        "bytes": 61366,
+        "sha256": "82d0ce87895fd0aecdc2eb226e43828110dc6d01da85c93f9e5adffb08f43467",
+        "json_pointer": "/rows/LIF-08"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/LIF-08"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "LIF-09": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/LIF-09"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v1.json",
+        "bytes": 289271,
+        "sha256": "ac154a52e1cd3f2924d54438dec5fc8ad4f635d744b308e96026cc4d2e701614",
+        "json_pointer": "/rows/LIF-09"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/LIF-09"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "LIF-10": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/LIF-10"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v1.json",
+        "bytes": 289271,
+        "sha256": "ac154a52e1cd3f2924d54438dec5fc8ad4f635d744b308e96026cc4d2e701614",
+        "json_pointer": "/rows/LIF-10"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/LIF-10"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "LIF-11": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/LIF-11"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v1.json",
+        "bytes": 289271,
+        "sha256": "ac154a52e1cd3f2924d54438dec5fc8ad4f635d744b308e96026cc4d2e701614",
+        "json_pointer": "/rows/LIF-11"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/LIF-11"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "LIF-12": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/LIF-12"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v3-cpu9-delta.json",
+        "bytes": 61366,
+        "sha256": "82d0ce87895fd0aecdc2eb226e43828110dc6d01da85c93f9e5adffb08f43467",
+        "json_pointer": "/rows/LIF-12"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/LIF-12"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "LIF-14": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/LIF-14"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v5-runtime-delta.json",
+        "bytes": 76678,
+        "sha256": "7a4ece5db65a43cb3ec70f2efeb8ef74171bcd704ace9411fade8b8bac485fa5",
+        "json_pointer": "/rows/LIF-14"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/LIF-14"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "LIF-16": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/LIF-16"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v3-cpu9-delta.json",
+        "bytes": 61366,
+        "sha256": "82d0ce87895fd0aecdc2eb226e43828110dc6d01da85c93f9e5adffb08f43467",
+        "json_pointer": "/rows/LIF-16"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/LIF-16"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "OBS-02": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/OBS-02"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v3-cpu9-delta.json",
+        "bytes": 61366,
+        "sha256": "82d0ce87895fd0aecdc2eb226e43828110dc6d01da85c93f9e5adffb08f43467",
+        "json_pointer": "/rows/OBS-02"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/OBS-02"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "OBS-03": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/OBS-03"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v17-OBS03-native-component-delta.json",
+        "bytes": 4630,
+        "sha256": "1f5963bc43a5041287d42e0a85a0c327598512e9ff074363f44cf9a1b245651c",
+        "json_pointer": "/rows/OBS-03"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/OBS-03"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "PLT-01": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/PLT-01"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v1.json",
+        "bytes": 289271,
+        "sha256": "ac154a52e1cd3f2924d54438dec5fc8ad4f635d744b308e96026cc4d2e701614",
+        "json_pointer": "/rows/PLT-01"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/PLT-01"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "PLT-02": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/PLT-02"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v21-PLT02-SUP16-delta.json",
+        "bytes": 8730,
+        "sha256": "2569c36b0eabf7c5df5b9a1817b430d05a7d042d9d3ac0080c673e70c72c6b9b",
+        "json_pointer": "/rows/PLT-02"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/PLT-02"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "PLT-03": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/PLT-03"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v5-runtime-delta.json",
+        "bytes": 76678,
+        "sha256": "7a4ece5db65a43cb3ec70f2efeb8ef74171bcd704ace9411fade8b8bac485fa5",
+        "json_pointer": "/rows/PLT-03"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/PLT-03"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "PLT-04": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/PLT-04"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v1.json",
+        "bytes": 289271,
+        "sha256": "ac154a52e1cd3f2924d54438dec5fc8ad4f635d744b308e96026cc4d2e701614",
+        "json_pointer": "/rows/PLT-04"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/PLT-04"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "PLT-05": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/PLT-05"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v5-runtime-delta.json",
+        "bytes": 76678,
+        "sha256": "7a4ece5db65a43cb3ec70f2efeb8ef74171bcd704ace9411fade8b8bac485fa5",
+        "json_pointer": "/rows/PLT-05"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/PLT-05"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "PLT-06": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/PLT-06"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v2-delta.json",
+        "bytes": 18862,
+        "sha256": "2578fd9a2e77fd0ba2be4f334592298d8f8977fb94f872dcdb936516a4e29876",
+        "json_pointer": "/rows/PLT-06"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/PLT-06"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "PLT-08": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/PLT-08"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v1.json",
+        "bytes": 289271,
+        "sha256": "ac154a52e1cd3f2924d54438dec5fc8ad4f635d744b308e96026cc4d2e701614",
+        "json_pointer": "/rows/PLT-08"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/PLT-08"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "PLT-09": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/PLT-09"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v18-REQ09-shape-PLT09-SDK-delta.json",
+        "bytes": 7842,
+        "sha256": "536d447006f4b0f72ef8252ef001417e77895f9c1c31ee4b01622846429b3690",
+        "json_pointer": "/rows/PLT-09"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/PLT-09"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "REQ-05": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/REQ-05"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v1.json",
+        "bytes": 289271,
+        "sha256": "ac154a52e1cd3f2924d54438dec5fc8ad4f635d744b308e96026cc4d2e701614",
+        "json_pointer": "/rows/REQ-05"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/REQ-05"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "REQ-07": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/REQ-07"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v2-delta.json",
+        "bytes": 18862,
+        "sha256": "2578fd9a2e77fd0ba2be4f334592298d8f8977fb94f872dcdb936516a4e29876",
+        "json_pointer": "/rows/REQ-07"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/REQ-07"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "REQ-08": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/REQ-08"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v15-REQ08-preparation-delta.json",
+        "bytes": 6222,
+        "sha256": "04ac404f4937d56806e9b7a76367788189aca2ef8a38911bd2f1cd333ded05ee",
+        "json_pointer": "/rows/REQ-08"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/REQ-08"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "REQ-09": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/REQ-09"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v18-REQ09-shape-PLT09-SDK-delta.json",
+        "bytes": 7842,
+        "sha256": "536d447006f4b0f72ef8252ef001417e77895f9c1c31ee4b01622846429b3690",
+        "json_pointer": "/rows/REQ-09"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/REQ-09"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "REQ-10": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/REQ-10"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v20-REQ10-SUP12-delta.json",
+        "bytes": 6533,
+        "sha256": "8ed4ef41d874e40cfa1c564721828e6306faed4b400422d5a2267da2248cef1b",
+        "json_pointer": "/rows/REQ-10"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/REQ-10"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "REQ-12": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/REQ-12"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v1.json",
+        "bytes": 289271,
+        "sha256": "ac154a52e1cd3f2924d54438dec5fc8ad4f635d744b308e96026cc4d2e701614",
+        "json_pointer": "/rows/REQ-12"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/REQ-12"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "SUP-03": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/SUP-03"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v19-SUP03-tokenizer-aux-delta.json",
+        "bytes": 5052,
+        "sha256": "89707bdb033d03fc999d051e7a25c87e66271bf31a6a569eefedae5d178f560d",
+        "json_pointer": "/rows/SUP-03"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/SUP-03"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "SUP-04": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/SUP-04"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v4-runtime-delta.json",
+        "bytes": 58740,
+        "sha256": "6754ca760fcb24a60a0d7c181d909f17612d6497e25d77264921f44b3037526a",
+        "json_pointer": "/rows/SUP-04"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/SUP-04"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "SUP-05": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/SUP-05"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v13-component-worker-delta.json",
+        "bytes": 18568,
+        "sha256": "b08e78a1095f0b41784fb1a5026d74e91d273416c94c3f339f2c0d8aab94e117",
+        "json_pointer": "/rows/SUP-05"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/SUP-05"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "SUP-06": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/SUP-06"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v13-component-worker-delta.json",
+        "bytes": 18568,
+        "sha256": "b08e78a1095f0b41784fb1a5026d74e91d273416c94c3f339f2c0d8aab94e117",
+        "json_pointer": "/rows/SUP-06"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/SUP-06"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "SUP-07": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/SUP-07"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v9-SUP07-SUP15-delta.json",
+        "bytes": 11918,
+        "sha256": "a7556ccd85b8a9efd3681b3b6773ee48c635100a3eb15d87bd82b33c43afecc8",
+        "json_pointer": "/rows/SUP-07"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/SUP-07"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "SUP-08": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/SUP-08"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v1.json",
+        "bytes": 289271,
+        "sha256": "ac154a52e1cd3f2924d54438dec5fc8ad4f635d744b308e96026cc4d2e701614",
+        "json_pointer": "/rows/SUP-08"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/SUP-08"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "SUP-09": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/SUP-09"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v12-SUP09-component-SUP12v3-delta.json",
+        "bytes": 9711,
+        "sha256": "da71968d88bf4945bb97f59904534304022799293d7a71e8b21ccbdb8f5359ae",
+        "json_pointer": "/rows/SUP-09"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/SUP-09"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "SUP-10": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/SUP-10"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v13-component-worker-delta.json",
+        "bytes": 18568,
+        "sha256": "b08e78a1095f0b41784fb1a5026d74e91d273416c94c3f339f2c0d8aab94e117",
+        "json_pointer": "/rows/SUP-10"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/SUP-10"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "SUP-11": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/SUP-11"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v14-SUP11-modes-delta.json",
+        "bytes": 5686,
+        "sha256": "08cc8e73ed2e069831a9da29e3ac1d78f0b2a3e4ce4903048acf24b8310205a9",
+        "json_pointer": "/rows/SUP-11"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/SUP-11"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "SUP-12": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/SUP-12"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v20-REQ10-SUP12-delta.json",
+        "bytes": 6533,
+        "sha256": "8ed4ef41d874e40cfa1c564721828e6306faed4b400422d5a2267da2248cef1b",
+        "json_pointer": "/rows/SUP-12"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/SUP-12"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "SUP-13": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/SUP-13"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v4-runtime-delta.json",
+        "bytes": 58740,
+        "sha256": "6754ca760fcb24a60a0d7c181d909f17612d6497e25d77264921f44b3037526a",
+        "json_pointer": "/rows/SUP-13"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/SUP-13"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "SUP-15": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/SUP-15"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v23-M20v8-SUP15-observer-delta.json",
+        "bytes": 4203,
+        "sha256": "7bdfe60f8e5f7b290ddfec3564dc54a122c116c6f15fb0d497c305e047ce4c82",
+        "json_pointer": "/rows/SUP-15"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/SUP-15"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    },
+    "SUP-16": {
+      "기존_원질문_분기_담당_입력_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-applied-branch-crosscheck-v6-r2.json",
+        "bytes": 640628,
+        "sha256": "496ad14d61ddda7aeaa0b576bebe69fd824921b61a6d19ad3f0c9b4bbc97a358",
+        "json_pointer": "/rows/SUP-16"
+      },
+      "후속_관측_참조": {
+        "path": "worktrees/byul-gpu-b-verify-stage1-20261104/out/GPU43-evidence-review-20261105/43-id-evidence-crosscheck-v23-M20v8-SUP15-observer-delta.json",
+        "bytes": 4203,
+        "sha256": "7bdfe60f8e5f7b290ddfec3564dc54a122c116c6f15fb0d497c305e047ce4c82",
+        "json_pointer": "/rows/SUP-16"
+      },
+      "기존_준비표_참조": {
+        "path": "guard-output/gpu-stage1-3sessions/prepare/branch-readiness.json",
+        "bytes": 119856,
+        "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
+        "json_pointer": "/checks/SUP-16"
+      },
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+    }
+  },
+  "latest_changes": {
+    "SUP-16": "Previous actual L4/TP1 load/KV/HTTP200 and FD read candidate verified. Follow-up observe Success/0; export selected old GB07 while current archive is GB09 and timed out at original900s. Supervisor blocked on uncertain final SSM acceptance, no normal stop submitted. Model/namespace cleanup confirmed; instance stopped/cost/GB09 export unconfirmed. Preserve in place, no new boot or trial implied.",
+    "SUP-05": "Public Engine normal CPU attempt: original90 timeout and wait30 timeout, owned remove/absence confirmed. Worker final/request output/native journal/seal not collected; no retry or product Ref.",
+    "SUP-16_closeout": {
+      "poststop_query_output_completed_KST": "2026-11-06T19:34:59.1355916+09:00",
+      "owned_instance_count": 3,
+      "all_stopped": true,
+      "public_IP_count": 0,
+      "original_stop180_result": "STOPPED_NOT_YET_OBSERVED/exit1",
+      "final_cost_closeout_verified": false,
+      "GB09_full_export_verified": false,
+      "new_boot_or_experiment": false
+    }
+  },
+  "raw_archives_databases_credentials_or_host_identifiers_published": false
+}

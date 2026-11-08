@@ -1,16 +1,20 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Navigate, RouterProvider, createBrowserRouter, createMemoryRouter, type RouteObject } from "react-router-dom";
+import { RuntimeOperationsPage } from "../pages/RuntimeOperations";
 import { DashboardPage } from "../pages/DashboardPage";
 import { DocListPage, EnvironmentEditorPage, PolicyEditorPage } from "../pages/DocumentsPage";
 import { EventsPage } from "../pages/EventsPage";
 import { EvidencePage } from "../pages/EvidencePage";
 import { LandingPage } from "../pages/LandingPage";
 import { RequestsPage } from "../pages/RequestsPage";
+import { BlockedPage } from "../pages/BlockedPage";
 import { ResultsPage } from "../pages/ResultsPage";
 import { RevalidationPage } from "../pages/RevalidationPage";
 import { RuntimeEnforcePage } from "../pages/runtime/RuntimeEnforcePage";
+import { TetragonPolicyPage } from "../pages/runtime/TetragonPolicyPage";
 import { RuntimeObservePage } from "../pages/runtime/RuntimeObservePage";
-import { RuntimeOverviewPage } from "../pages/runtime/RuntimeOverviewPage";
+import { AlertsPage } from "../pages/runtime/AlertsPage";
+import { PhaseTimelinePage } from "../pages/runtime/PhaseTimelinePage";
 import { RuntimePolicyPage } from "../pages/runtime/RuntimePolicyPage";
 import { RuntimeSettingsPage } from "../pages/runtime/RuntimeSettingsPage";
 import { RuntimeTargetPage } from "../pages/runtime/RuntimeTargetPage";
@@ -31,13 +35,18 @@ export const routes: RouteObject[] = [
       { path: "policies/new", element: <PolicyEditorPage key="new" /> },
       { path: "policies/:id", element: <PolicyEditorPage /> },
       { path: "update/results", element: <ResultsPage /> },
-      { path: "runtime/overview", element: <RuntimeOverviewPage /> },
+      { path: "runtime/overview", element: <DashboardPage /> },
+      { path: "runtime/alerts", element: <AlertsPage /> },
+      { path: "runtime/observe/phases", element: <PhaseTimelinePage /> },
+      { path: "runtime/operations", element: <RuntimeOperationsPage /> },
       { path: "runtime/requests", element: <RequestsPage /> },
+      { path: "runtime/blocked", element: <BlockedPage /> },
       { path: "runtime/policy", element: <RuntimePolicyPage /> },
       { path: "runtime/target", element: <RuntimeTargetPage /> },
       { path: "runtime/observe", element: <Navigate to="/runtime/observe/collectors" replace /> },
       { path: "runtime/observe/:sub", element: <RuntimeObservePage /> },
       { path: "runtime/enforce", element: <Navigate to="/runtime/enforce/cilium" replace /> },
+      { path: "runtime/enforce/tetragon", element: <TetragonPolicyPage /> },
       { path: "runtime/enforce/:sub", element: <RuntimeEnforcePage /> },
       { path: "runtime/events", element: <EventsPage /> },
       { path: "runtime/settings", element: <RuntimeSettingsPage /> },

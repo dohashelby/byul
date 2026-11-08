@@ -1,9 +1,10 @@
 // update 격리 검증 보고서 화면. 삭제된 update HTML 보고서(guard/report/html.py)의 내용을 모두 옮겼고,
 // 모양은 runtime에서 가져온 platform 디자인을 따른다. 판정·집계 값은 서버가 RPT에서 꺼낸 그대로 쓴다.
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { ReportCheck, ReportMark, ReportSide, ReportView as Report } from "../api/types";
 import { Badge, EnumBadge, OriginBadge, VerdictBadge } from "../components/Badges";
 import { DataTable, type Column } from "../components/DataTable";
+import { Pagination, usePagination } from "../components/Pagination";
 import { DetailPanel, KeyValue } from "../components/DetailPanel";
 import { JsonView } from "../components/JsonView";
 import { Banner, Dot, MetricCard, ui } from "../components/Misc";
@@ -119,10 +120,10 @@ function FindingCard({ c, update, onOpen }: { c: ReportCheck; update: boolean; o
   );
 }
 
-function FindingGroup({ title, note, ids, byId, update, onOpen }: { title: string; note?: string; ids: string[]; byId: Map<string, ReportCheck>; update: boolean; onOpen: (id: string) => void }) {
-  const [all, setAll] = useState(false);
+function FindingGroup({ title, note, ids, byId, update, onOpen, pageParam }: { title: string; note?: string; ids: string[]; byId: Map<string, ReportCheck>; update: boolean; onOpen: (id: string) => void; pageParam: string }) {
+  const pagination = usePagination(ids.length, pageParam);
   if (ids.length === 0) return null;
-  const shown = all ? ids : ids.slice(0, 6);
+  const shown = ids.slice(pagination.start, pagination.end);
   return (
     <section className={p.section}>
       <h3 className="row" style={{ gap: 8 }}>
@@ -134,11 +135,7 @@ function FindingGroup({ title, note, ids, byId, update, onOpen }: { title: strin
           return c ? <FindingCard key={id} c={c} update={update} onOpen={() => onOpen(id)} /> : null;
         })}
       </div>
-      {ids.length > 6 && (
-        <button type="button" className="btn btn-small" style={{ alignSelf: "flex-start" }} onClick={() => setAll(!all)}>
-          {all ? "접기" : `나머지 ${ids.length - 6}건 더 보기`}
-        </button>
-      )}
+      <Pagination state={pagination} />
     </section>
   );
 }
@@ -401,9 +398,9 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
         <p className="notice">미충족·미확인 항목 없음</p>
       ) : (
         <>
-          <FindingGroup title="후퇴" note="(기준 충족 → 후보 미충족)" ids={report.focus.regressed} byId={byId} update={update} onOpen={onSelect} />
-          <FindingGroup title="미충족" ids={report.focus.fail} byId={byId} update={update} onOpen={onSelect} />
-          <FindingGroup title="미확인" note="(근거 부족, 충족으로 집계하지 않음)" ids={report.focus.unknown} byId={byId} update={update} onOpen={onSelect} />
+          <FindingGroup title="후퇴" note="(기준 충족 → 후보 미충족)" ids={report.focus.regressed} byId={byId} update={update} onOpen={onSelect} pageParam="page_regressed" />
+          <FindingGroup title="미충족" ids={report.focus.fail} byId={byId} update={update} onOpen={onSelect} pageParam="page_failed" />
+          <FindingGroup title="미확인" note="(근거 부족, 충족으로 집계하지 않음)" ids={report.focus.unknown} byId={byId} update={update} onOpen={onSelect} pageParam="page_unknown" />
         </>
       )}
 
@@ -416,7 +413,7 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
         ]}
         rows={report.by_purpose}
         rowKey={(r) => r.name}
-        pageSizes={[10, 25, 50]}
+        pageParam="page_purpose"
       />
 
       <article className="card card-pad stack">
@@ -437,7 +434,6 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
         selectedKey={selected}
         initialSort={{ id: "check_id", dir: "asc" }}
         storageKey={`report-${report.mode}`}
-        pageSizes={[25, 50, 100]}
       />
 
       <div className={p.grid2}>
@@ -485,7 +481,7 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
             ]}
             rows={report.inputs_manifest}
             rowKey={(r) => `${r.kind}:${r.id}:${r.revision}`}
-            pageSizes={[10, 50, 200]}
+            pageParam="page_manifest"
           />
         </div>
       </details>

@@ -1,0 +1,83 @@
+"""Real native layerwise CPU contracts; no worker or live admission claim."""
+from pathlib import Path
+import contextlib,hashlib,importlib.metadata,json,os,sys,time,traceback
+SHA=lambda p:hashlib.sha256(Path(p).read_bytes()).hexdigest()
+
+def main():
+    f=json.loads(Path('/input/freeze.json').read_bytes());out=Path('/evidence');start=time.monotonic()
+    r={'uid':os.getuid(),'PID':os.getpid(),'freeze_SHA':SHA('/input/freeze.json'),'cases':[],'primary':None,
+       'worker_request_KV_GPU_product_Refs':False,'whole_question_complete':False}
+    active=None
+    def save(stage):
+        r['stage']=stage;r['elapsed_seconds']=time.monotonic()-start
+        with (out/'result.partial.json').open('w') as stream:json.dump(r,stream,indent=2);stream.flush();os.fsync(stream.fileno())
+    try:
+        root=Path(importlib.metadata.distribution('vllm').locate_file('vllm'))
+        r['source_before']={p:SHA(root/p) for p in f['source_pins']}
+        if r['source_before']!=f['source_pins'] or SHA(__file__)!=f['child_SHA'] or os.getuid()!=1000:raise ValueError('FIXED_SOURCE_OR_UID_CHANGED')
+        r['metadata_before']={n:SHA(Path('/model')/n) for n in f['metadata_pins']}
+        if r['metadata_before']!=f['metadata_pins']:raise ValueError('FIXED_METADATA_CHANGED')
+        save('before-native-imports')
+        with contextlib.redirect_stdout(sys.stderr):
+            import torch
+            from vllm.config import ModelConfig
+            from vllm.model_executor.model_loader.reload import layerwise as native
+            if torch.__version__!='2.13.0+cpu' or torch.get_default_device().type!='cpu':raise ValueError('CPU_TORCH_UNSUPPORTED')
+            config=ModelConfig(model='/model',tokenizer='/model',dtype='float32',max_model_len=128,trust_remote_code=False)
+        r['model_config']={'class':type(config).__module__+'.'+type(config).__name__,'vocab':config.get_vocab_size(),'weights_loaded':False}
+        save('genuine-config-and-native-imported')
+        watched={str(root/p):p for p in f['source_pins']}
+        def profile(frame,event,arg):
+            if active is not None and event in ('call','return') and frame.f_code.co_filename in watched and len(active['calls'])<3000:
+                active['calls'].append({'event':event,'file':watched[frame.f_code.co_filename],'function':frame.f_code.co_qualname})
+        def snap(t):
+            return {'object_id':id(t),'device':str(t.device),'shape':list(t.shape),'storage_ptr':None if t.is_meta else t.untyped_storage().data_ptr(),
+                    'values':None if t.is_meta else t.detach().flatten().tolist()}
+        def layer(bias=False):
+            x=torch.nn.Linear(2,2,bias=bias)
+            with torch.no_grad():
+                x.weight.copy_(torch.tensor([[1.,2.],[3.,4.]]))
+                if bias:x.bias.copy_(torch.tensor([5.,6.]))
+            return x
+        for name in ['untouched-fallback','partial-layer-finalize','later-shape-error']:
+            row={'name':name,'calls':[]};r['cases'].append(row);active=row;sys.setprofile(profile)
+            try:
+                model=torch.nn.Sequential(layer(),layer()) if name=='later-shape-error' else layer(name=='partial-layer-finalize')
+                modules=[model[0],model[1]] if name=='later-shape-error' else [model]
+                held=[m.weight for m in modules];before=[snap(t) for t in held];row['before']=before
+                if name=='partial-layer-finalize':row['bias_before']=snap(model.bias)
+                native.record_metadata_for_reloading(model);native.initialize_layerwise_reload(model)
+                row['after_initialize']=[snap(m.weight) for m in modules]
+                if name!='untouched-fallback':
+                    weight=modules[0].weight;weight.weight_loader(weight,torch.tensor([[10.,20.],[30.,40.]]))
+                    row['held_after_first_load']=[snap(t) for t in held]
+                    info=native.get_layerwise_info(modules[0]);row['first_load_progress']={'loaded':info.load_numel,'total':info.load_numel_total}
+                if name=='later-shape-error':
+                    try:
+                        weight=modules[1].weight;weight.weight_loader(weight,torch.tensor([7.,8.,9.]))
+                    except Exception as exc:row['actual_loader_error']={'type':type(exc).__name__,'traceback':traceback.format_exc()}
+                    row['before_finalize_held']=[snap(t) for t in held]
+                native.finalize_layerwise_reload(model,config)
+                row['after_finalize']=[snap(m.weight) for m in modules];row['held_after_finalize']=[snap(t) for t in held]
+                row['original_objects_restored']=[m.weight is h for m,h in zip(modules,held)]
+                row['loading_closed']=[not native.get_layerwise_info(m).can_load() for m in model.modules()]
+                if name=='partial-layer-finalize':row['bias_after']=snap(model.bias)
+                # Actual retained-storage consumption; no A->B->A restore cycle.
+                with torch.no_grad():
+                    value=torch.tensor([[1.,2.]])
+                    row['model_output']=model(value).tolist()
+                    reference=value
+                    for i,t in enumerate(held):reference=torch.nn.functional.linear(reference,t,model.bias if name=='partial-layer-finalize' else None)
+                    row['retained_storage_output']=reference.tolist()
+                row['outcome']='native-boundary-returned'
+            except Exception as exc:row['outcome']='native-boundary-error';row['error']={'type':type(exc).__name__,'traceback':traceback.format_exc()}
+            finally:sys.setprofile(None);active=None;save(name)
+        r['source_after']={p:SHA(root/p) for p in f['source_pins']};r['metadata_after']={n:SHA(Path('/model')/n) for n in f['metadata_pins']}
+        save('component-collected')
+    except BaseException as exc:r['primary']={'type':type(exc).__name__,'traceback':traceback.format_exc()};save('preparation-error')
+    finally:
+        sys.setprofile(None)
+        with (out/'result.json').open('x') as stream:json.dump(r,stream,indent=2)
+    print(json.dumps({'primary':r['primary'],'cases':len(r['cases']),'seconds':r['elapsed_seconds']}))
+    return 1 if r['primary'] or any(x['outcome']!='native-boundary-returned' for x in r['cases']) else 0
+if __name__=='__main__':raise SystemExit(main())

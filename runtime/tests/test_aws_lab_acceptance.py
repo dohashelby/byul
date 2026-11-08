@@ -662,6 +662,9 @@ class DecisionTests(unittest.TestCase):
         "AWS-17": dict.fromkeys(("pod_changed", "timeline_new_uid", "timeline_reset", "old_phase_absent"), True),
         "AWS-18": dict.fromkeys(("normal", "stream", "usage", "log_match", "context_boundary", "context_exceeded"), True),
         "AWS-19": dict.fromkeys(("codes", "reasons", "records", "not_delivered", "engine_log_absent", "positive_control"), True),
+        "AWS-20": {"enforce_method": "override_lsm", **dict.fromkeys(
+            ("enforce_active", "monitor_read_ok", "read_eperm", "raw_override", "normal_200", "cleanup_ok", "restore_read_ok"), True
+        )},
     }
 
     def test_every_case_passes_only_with_all_required_facts(self) -> None:
@@ -690,6 +693,7 @@ class DecisionTests(unittest.TestCase):
             "AWS-17": "pod_changed",
             "AWS-18": "usage",
             "AWS-19": "codes",
+            "AWS-20": "read_eperm",
         }
         for case_id, key in decisive.items():
             with self.subTest(case_id=case_id):

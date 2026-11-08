@@ -160,6 +160,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runtime/phase-timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phase Timeline */
+        get: operations["phase_timeline_api_runtime_phase_timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runtime/tetragon-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tetragon Status */
+        get: operations["tetragon_status_api_runtime_tetragon_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/update/results": {
         parameters: {
             query?: never;
@@ -369,6 +403,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/policies/{doc_id}/revisions/{revision}/bundle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export Bundle */
+        post: operations["export_bundle_api_policies__doc_id__revisions__revision__bundle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/evidence": {
         parameters: {
             query?: never;
@@ -398,6 +449,24 @@ export interface components {
             security: string | null;
             /** Inventory Complete */
             inventory_complete: boolean | null;
+        };
+        /** BundleExportRequest */
+        BundleExportRequest: {
+            /** Environment Id */
+            environment_id: string;
+            /** Environment Revision */
+            environment_revision: number;
+            /**
+             * Requested By Role
+             * @enum {string}
+             */
+            requested_by_role: "runtime_operator" | "policy_operator";
+            /** Server Values Override */
+            server_values_override?: {
+                [key: string]: unknown;
+            } | null;
+            /** Bundle Id */
+            bundle_id?: string | null;
         };
         /** DiffEntry */
         DiffEntry: {
@@ -523,6 +592,48 @@ export interface components {
             /** Open Revalidation */
             open_revalidation: number | null;
             revalidation_error?: components["schemas"]["ErrorBody"] | null;
+        };
+        /** PhaseCollector */
+        PhaseCollector: {
+            /** State */
+            state: string;
+            /** Written At */
+            written_at: string | null;
+            /** Fresh */
+            fresh: boolean;
+        };
+        /** PhaseEntry */
+        PhaseEntry: {
+            /** Phase */
+            phase: string;
+            /** From */
+            from: string;
+            /** Until */
+            until: string | null;
+            /** Basis */
+            basis: string;
+        };
+        /** PhaseExtraction */
+        PhaseExtraction: {
+            /** Engine */
+            engine: string | null;
+            /** Support Level */
+            support_level: string | null;
+            /** Limitations */
+            limitations: string[];
+        };
+        /** PhaseTimelineResponse */
+        PhaseTimelineResponse: {
+            /** Entries */
+            entries: components["schemas"]["PhaseEntry"][];
+            collector: components["schemas"]["PhaseCollector"];
+            extraction: components["schemas"]["PhaseExtraction"];
+            /**
+             * Data Origin
+             * @enum {string}
+             */
+            data_origin: "real" | "synthetic";
+            source: components["schemas"]["SourceInfo"];
         };
         /** PolicyConfirm */
         PolicyConfirm: {
@@ -894,6 +1005,465 @@ export interface components {
             /** Detail */
             detail?: string | null;
         };
+        /** TetragonAction */
+        TetragonAction: {
+            /** Action */
+            action: string;
+            /** Argerror */
+            argError?: number | null;
+        };
+        /** TetragonAgent */
+        TetragonAgent: {
+            /** Node */
+            node?: string | null;
+            /** Pod Uid */
+            pod_uid?: string | null;
+            /** Restart Count */
+            restart_count?: number | null;
+            /** Last Exit At */
+            last_exit_at?: string | null;
+            /** Last Exit Code */
+            last_exit_code?: number | null;
+            /** Last Exit Reason */
+            last_exit_reason?: string | null;
+            /** Last Exit Summary */
+            last_exit_summary?: string | null;
+        };
+        /** TetragonAgentSample */
+        TetragonAgentSample: {
+            /** Pod Uid */
+            pod_uid: string;
+            /** Restart Count */
+            restart_count: number;
+        };
+        /** TetragonCapability */
+        TetragonCapability: {
+            /** Node */
+            node?: string | null;
+            /** Checked At */
+            checked_at: string;
+            /** Kernel */
+            kernel?: string | null;
+            /** Apparmor */
+            apparmor?: boolean | null;
+            /** Available */
+            available?: string[];
+            /** Unavailable */
+            unavailable?: string[];
+            /** Unknown */
+            unknown?: string[];
+            /** Recommended */
+            recommended?: string | null;
+            /** Tetragon Override Return */
+            tetragon_override_return?: boolean | null;
+            /** Tetragon Lsm */
+            tetragon_lsm?: boolean | null;
+            /** Tetragon Fmodret */
+            tetragon_fmodret?: boolean | null;
+        };
+        /** TetragonEffects */
+        TetragonEffects: {
+            /**
+             * Expected Effect
+             * @enum {string}
+             */
+            expected_effect: "file_read_denial" | "process_termination";
+            /**
+             * File Read Denial
+             * @enum {string}
+             */
+            file_read_denial: "confirmed" | "failed" | "unknown";
+            /** File Denial Basis */
+            file_denial_basis?: ("userspace_errno" | "kernel_permission_return") | null;
+            /**
+             * Process Termination
+             * @enum {string}
+             */
+            process_termination: "confirmed" | "failed" | "unknown";
+            /**
+             * Service Recovery
+             * @enum {string}
+             */
+            service_recovery: "confirmed" | "failed" | "unknown";
+            /** Monitor Restored */
+            monitor_restored: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "passed" | "failed" | "unknown" | "unsupported";
+        };
+        /** TetragonKernelTask */
+        TetragonKernelTask: {
+            /** Pid */
+            pid: number;
+            /** Start Ns */
+            start_ns: string;
+            /** Pidns */
+            pidns: number;
+        };
+        /** TetragonLoad */
+        TetragonLoad: {
+            /** State */
+            state?: string | null;
+            /** Id */
+            id?: string | null;
+            /** Error */
+            error?: string | null;
+        };
+        /** TetragonModeState */
+        TetragonModeState: {
+            /** Id */
+            id: string;
+            /** Mode */
+            mode: string;
+            /** State */
+            state: string;
+        };
+        /** TetragonMonitoring */
+        TetragonMonitoring: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "healthy" | "recovering" | "not_configured" | "error" | "stale";
+            /** Reasons */
+            reasons?: string[];
+            /** Generated At */
+            generated_at?: string | null;
+            /**
+             * Policies Verified
+             * @default false
+             */
+            policies_verified: boolean;
+            /**
+             * Writer Verified
+             * @default false
+             */
+            writer_verified: boolean;
+            /**
+             * Identities Verified
+             * @default false
+             */
+            identities_verified: boolean;
+            /**
+             * Events Verified
+             * @default false
+             */
+            events_verified: boolean;
+            /** Verified At */
+            verified_at?: string | null;
+            /** Verification Since */
+            verification_since?: string | null;
+            /** Controls Verified Since */
+            controls_verified_since?: string | null;
+            /** Event Verified At */
+            event_verified_at?: {
+                [key: string]: string;
+            };
+            open_gap?: components["schemas"]["TetragonRecoveryGap"] | null;
+            /** History */
+            history?: components["schemas"]["TetragonRecoveryGap"][];
+        };
+        /** TetragonOperationsCheck */
+        TetragonOperationsCheck: {
+            /** Id */
+            id: string;
+            /** Context */
+            context: string;
+            /** Namespace */
+            namespace: string;
+            /**
+             * Data Origin
+             * @enum {string}
+             */
+            data_origin: "real" | "synthetic";
+            /** Started At */
+            started_at: string;
+            /** Finished At */
+            finished_at: string;
+            /** Restart Requested */
+            restart_requested: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "passed" | "failed";
+            /** Facts */
+            facts?: {
+                [key: string]: boolean | null;
+            };
+            /** Artifact Sha256 */
+            artifact_sha256?: {
+                [key: string]: string;
+            };
+            /** Error */
+            error?: string | null;
+        };
+        /** TetragonPolicy */
+        TetragonPolicy: {
+            /** Node */
+            node?: string | null;
+            /** Name */
+            name: string;
+            /** Namespace */
+            namespace?: string | null;
+            /** Id */
+            id: string;
+            /** State */
+            state: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "monitor" | "enforce" | "monitor_only" | "unknown";
+            /** Method */
+            method?: string | null;
+            /** Load Error */
+            load_error?: string | null;
+            /** Spec Sha256 */
+            spec_sha256?: string | null;
+        };
+        /** TetragonProbeEvent */
+        TetragonProbeEvent: {
+            /** Time */
+            time: string;
+            /** Policy */
+            policy: string;
+            /** Pod Uid */
+            pod_uid: string;
+            /** Path */
+            path?: string | null;
+            /** Access Mask */
+            access_mask?: number | null;
+            /** Pid */
+            pid?: number | null;
+            /** Exec Id */
+            exec_id?: string | null;
+            /** Ns Pid */
+            ns_pid?: number | null;
+            /** Function */
+            function?: string | null;
+            /** Action */
+            action?: string | null;
+            /** Return Value */
+            return_value?: number | null;
+            /** Identity Source */
+            identity_source?: ("kernel_task" | "tetragon_process_cache") | null;
+            kernel_task?: components["schemas"]["TetragonKernelTask"] | null;
+        };
+        /** TetragonReadResult */
+        TetragonReadResult: {
+            /** Read */
+            read?: ("ok" | "denied") | null;
+            /** Errno */
+            errno?: number | null;
+            /** Pid */
+            pid?: number | null;
+            /** Transport Error */
+            transport_error?: string | null;
+        };
+        /** TetragonRecoveryGap */
+        TetragonRecoveryGap: {
+            /** Opened At */
+            opened_at: string;
+            /** Last Verified At */
+            last_verified_at?: string | null;
+            /** Reason */
+            reason: string;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Recovery */
+            recovery?: string | null;
+            /** Backfill */
+            backfill?: string | null;
+        };
+        /** TetragonSnapshot */
+        TetragonSnapshot: {
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "runtime-tetragon-state/1.0";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ok" | "stale" | "error" | "not_configured";
+            /** Fresh */
+            fresh: boolean;
+            /** Generated At */
+            generated_at?: string | null;
+            /** Context */
+            context?: string | null;
+            /** Error */
+            error?: string | null;
+            /** Policies */
+            policies?: components["schemas"]["TetragonPolicy"][];
+            /** Capabilities */
+            capabilities?: components["schemas"]["TetragonCapability"][];
+            /** Transitions */
+            transitions?: components["schemas"]["TetragonTransition"][];
+            /** Verifications */
+            verifications?: components["schemas"]["TetragonVerification"][];
+            /** Agents */
+            agents?: components["schemas"]["TetragonAgent"][];
+            monitoring?: components["schemas"]["TetragonMonitoring"] | null;
+            /** Operation Checks */
+            operation_checks?: components["schemas"]["TetragonOperationsCheck"][];
+        };
+        /** TetragonStatusResponse */
+        TetragonStatusResponse: {
+            item: components["schemas"]["TetragonSnapshot"];
+            source: components["schemas"]["SourceInfo"];
+        };
+        /** TetragonTaskIdentity */
+        TetragonTaskIdentity: {
+            /** Pod Uid */
+            pod_uid: string;
+            /** Namespace */
+            namespace: string;
+            /** Container Id */
+            container_id: string;
+            /** Node Pid */
+            node_pid: number;
+            /** Ns Pid */
+            ns_pid: number;
+            /** Pidns */
+            pidns: number;
+            /** Start Ticks */
+            start_ticks: number;
+            /** Clock Ticks */
+            clock_ticks: number;
+        };
+        /** TetragonTermination */
+        TetragonTermination: {
+            /** Exitcode */
+            exitCode?: number | null;
+            /** Signal */
+            signal?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /** Finishedat */
+            finishedAt?: string | null;
+        };
+        /** TetragonTransition */
+        TetragonTransition: {
+            /** At */
+            at: string;
+            /** Context */
+            context: string;
+            /** Namespace */
+            namespace: string;
+            /** Policy */
+            policy: string;
+            /** Requested Mode */
+            requested_mode: string;
+            /** Ok */
+            ok: boolean;
+            /** Reason */
+            reason: string;
+            before?: components["schemas"]["TetragonModeState"] | null;
+            after?: components["schemas"]["TetragonModeState"] | null;
+            rollback?: components["schemas"]["TetragonModeState"] | null;
+            /** Rollback Ok */
+            rollback_ok?: boolean | null;
+        };
+        /** TetragonTrialStep */
+        TetragonTrialStep: {
+            /** At */
+            at: string;
+            /** Target Mode */
+            target_mode: string;
+            /** Ok */
+            ok: boolean;
+            /** Reason */
+            reason: string;
+            before?: components["schemas"]["TetragonModeState"] | null;
+            after?: components["schemas"]["TetragonModeState"] | null;
+            rollback?: components["schemas"]["TetragonModeState"] | null;
+            /** Rollback Ok */
+            rollback_ok?: boolean | null;
+        };
+        /** TetragonVerification */
+        TetragonVerification: {
+            /** Id */
+            id: string;
+            /** Context */
+            context: string;
+            /** Node */
+            node?: string | null;
+            /** Kernel */
+            kernel?: string | null;
+            /** Namespace */
+            namespace: string;
+            /** Policy */
+            policy: string;
+            /** Probe Path */
+            probe_path?: string | null;
+            /** Method */
+            method: string;
+            /**
+             * Variant
+             * @default combined
+             * @enum {string}
+             */
+            variant: "combined" | "override_only_diagnostic";
+            /**
+             * Data Origin
+             * @enum {string}
+             */
+            data_origin: "real" | "synthetic";
+            /** Started At */
+            started_at: string;
+            /** Finished At */
+            finished_at: string;
+            /** Pod Uid */
+            pod_uid?: string | null;
+            /** Main Pid */
+            main_pid?: number | null;
+            task_identity?: components["schemas"]["TetragonTaskIdentity"] | null;
+            /** Identity Probe Data */
+            identity_probe_data?: {
+                [key: string]: number | string;
+            }[];
+            /** Policy Id */
+            policy_id?: string | null;
+            verification: components["schemas"]["TetragonEffects"];
+            /** Facts */
+            facts?: {
+                [key: string]: boolean | null;
+            };
+            /** Events */
+            events?: components["schemas"]["TetragonProbeEvent"][];
+            /** Monitor Events */
+            monitor_events?: components["schemas"]["TetragonProbeEvent"][];
+            /** Steps */
+            steps?: components["schemas"]["TetragonTrialStep"][];
+            /** Policy Actions */
+            policy_actions?: components["schemas"]["TetragonAction"][];
+            /** Policy Spec Sha256 */
+            policy_spec_sha256?: string | null;
+            /** Manifest Sha256 */
+            manifest_sha256?: string | null;
+            /** Raw Event Sha256 */
+            raw_event_sha256?: string | null;
+            /** Source Report Sha256 */
+            source_report_sha256?: string | null;
+            /** Reassessed At */
+            reassessed_at?: string | null;
+            /** Reassessment Note */
+            reassessment_note?: string | null;
+            read_result?: components["schemas"]["TetragonReadResult"] | null;
+            monitor_read_result?: components["schemas"]["TetragonReadResult"] | null;
+            restore_read_result?: components["schemas"]["TetragonReadResult"] | null;
+            agent_before?: components["schemas"]["TetragonAgentSample"] | null;
+            agent_after?: components["schemas"]["TetragonAgentSample"] | null;
+            termination?: components["schemas"]["TetragonTermination"] | null;
+            load?: components["schemas"]["TetragonLoad"] | null;
+            /** Error */
+            error?: string | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -1004,6 +1574,8 @@ export interface components {
                 target_ref: components["schemas"]["Common_local_id"];
                 engine: {
                     name: string;
+                    /** @enum {unknown} */
+                    runtime_kind?: "mock" | "vllm" | "sglang";
                     version: string | null;
                     image_digest: string | null;
                     source_commit: string | null;
@@ -1029,6 +1601,13 @@ export interface components {
                 kind: "kubernetes" | "docker" | "host";
                 kubernetes_context?: string | null;
                 namespace?: string | null;
+                engine_container?: string | null;
+                /** @enum {unknown} */
+                gateway_schema_version?: "runtime-mvp/1.1" | "runtime-mvp/1.2";
+                /** @enum {unknown} */
+                gateway_cache_isolation?: "off" | "per_principal";
+                /** @description 정책에 intent가 없을 때 쓰는 runtime-enforcement-intent/1.1 원본. runtime이 내부 필드를 검증한다. */
+                enforcement_intent?: Record<string, never> | null;
                 gateway_labels?: components["schemas"]["Environment_labels"];
                 engine_labels?: components["schemas"]["Environment_labels"];
                 engine_port?: number | null;
@@ -2219,6 +2798,46 @@ export interface operations {
             };
         };
     };
+    phase_timeline_api_runtime_phase_timeline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhaseTimelineResponse"];
+                };
+            };
+        };
+    };
+    tetragon_status_api_runtime_tetragon_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TetragonStatusResponse"];
+                };
+            };
+        };
+    };
     results_api_update_results_get: {
         parameters: {
             query?: never;
@@ -2634,6 +3253,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SaveRejected"];
+                };
+            };
+        };
+    };
+    export_bundle_api_policies__doc_id__revisions__revision__bundle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+                revision: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BundleExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

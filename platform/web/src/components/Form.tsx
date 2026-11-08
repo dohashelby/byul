@@ -129,7 +129,7 @@ export function TextField({
 export function NumberField({ ctx, path, label, nullable, optional, required }: { ctx: FormCtx; path: string; label: string; nullable?: boolean; optional?: boolean; required?: boolean }) {
   const v = getIn(ctx.doc, path);
   return (
-    <Field label={label} ctx={ctx} path={path} hint={required ? undefined : nullable ? "모르면 비워 둠 (null)" : optional ? "비우면 필드 없음" : undefined} required={required}>
+    <Field label={label} ctx={ctx} path={path} hint={required ? undefined : nullable ? "미확인 시 비움 (null)" : optional ? "공란 시 필드 생략" : undefined} required={required}>
       <input
         className={`input ${bad(ctx, path)}`}
         aria-required={required}

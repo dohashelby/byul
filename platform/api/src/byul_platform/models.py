@@ -135,6 +135,33 @@ class LabReportResponse(BaseModel):
     source: SourceInfo
 
 
+class PhaseEntry(BaseModel):
+    phase: str
+    from_: str = Field(alias="from")
+    until: str | None
+    basis: str
+
+
+class PhaseCollector(BaseModel):
+    state: str
+    written_at: str | None
+    fresh: bool
+
+
+class PhaseExtraction(BaseModel):
+    engine: str | None
+    support_level: str | None
+    limitations: list[str]
+
+
+class PhaseTimelineResponse(BaseModel):
+    entries: list[PhaseEntry]
+    collector: PhaseCollector
+    extraction: PhaseExtraction
+    data_origin: Literal["real", "synthetic"]
+    source: SourceInfo
+
+
 class RevalidationList(BaseModel):
     items: list[RevalidationRequestDoc]
     invalid: list[InvalidItem]

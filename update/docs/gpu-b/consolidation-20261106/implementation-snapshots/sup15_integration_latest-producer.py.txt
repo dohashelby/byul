@@ -1,0 +1,78 @@
+"""SUP15 dedicated observed run; original child/rows/wait/cleanup are reused.
+
+This entry is prepared only. The model/compile run is not a CPU contract test.
+"""
+from pathlib import Path
+import argparse,hashlib,importlib.util,json,os,shutil,sys,time,traceback
+
+SHA=lambda p:hashlib.sha256(Path(p).read_bytes()).hexdigest()
+def module(name,path):
+    spec=importlib.util.spec_from_file_location(name,path)
+    value=importlib.util.module_from_spec(spec);spec.loader.exec_module(value);return value
+
+def dependencies(manifest):
+    f=json.loads(manifest.read_bytes());root=manifest.parent
+    if f['source']!='3b3ff137b31b830403ccce1997dabf26319bac4f':raise ValueError('SUP15_INTEGRATION_SOURCE_CHANGED')
+    for name,digest in f['runtime_files'].items():
+        if SHA(root/name)!=digest:raise ValueError('SUP15_INTEGRATION_ASSET_CHANGED:'+name)
+    return f,module('_sup15_original',root/'original_sup15.py'),module('_sup15_observer',root/'exit_observer.py'),module('_sup15_budget',root/'observed_wait.py')
+
+def run(a):
+    f,original,observer,bridge=dependencies(a.assets_manifest)
+    if SHA(__file__)!=a.source_sha256 or os.geteuid()!=1000:raise ValueError('SUP15_SOURCE_OR_UID_MISMATCH')
+    if not 0<=a.hold_for_capture<=360 or not 0<=a.wait_binding_seconds<=90:raise ValueError('SUP15_WAIT_BOUND_INVALID')
+    until=time.monotonic()+a.wait_binding_seconds
+    while not a.binding.exists() and time.monotonic()<until:time.sleep(.1)
+    b=json.loads(a.binding.read_bytes())
+    if set(b)!={'role','session','environment_ref','target_sha256','source_sha256'} or b['role'] not in ('normal','challenge') or b['source_sha256']!=a.source_sha256:
+        raise ValueError('SUP15_ACTUAL_BINDING_INVALID')
+    a.output.mkdir(mode=0o700,parents=True,exist_ok=False)
+    root=a.cache/b['session'];root.mkdir(mode=0o700,exist_ok=False)
+    started=time.monotonic();deadline=started+150
+    cases={};receipts=[];errors=[];cleanup_error=None
+    env=dict(os.environ,TORCHINDUCTOR_CACHE_DIR=str(root),TORCHINDUCTOR_COMPILE_THREADS='1',OMP_NUM_THREADS='2',MKL_NUM_THREADS='2')
+    assets=a.assets_manifest.parent
+    try:
+        for name,delta,label in [('baseline',1,'normal'),('same',1,'normal'),('irrelevant',1,'diagnostic-label-only'),('relevant',2,'normal'),('after',2,'normal')]:
+            argv=[sys.executable,'-I','-B',str(assets/'original_sup15.py'),'--child','--cache',str(root),'--report',str(a.output/(name+'.json')),'--delta',str(delta),'--logging-label',label]
+            before=time.monotonic();nominal=90 if name=='baseline' else 45
+            rc,termination,diagnostics=bridge.observe_with_deadline(original=original,observer=observer,argv=argv,env=env,
+                output=a.output,stem=name,nominal=nominal,deadline=deadline,bootstrap=assets/'exit_child.py',
+                allowed_source_SHA={f['runtime_files']['original_sup15.py']})
+            receipts.append({'case':name,'argv':argv,'returncode':rc,'nominal_limit':nominal,'termination':termination,
+                             'parent_wall_ms':int((time.monotonic()-before)*1000),'diagnostics':diagnostics})
+            if diagnostics.get('observer_errors') or diagnostics.get('observer_followup_error'):
+                errors.append(name+':observer_diagnostics_unavailable')
+            if termination['timed_out']:errors.append(name+':parent_deadline')
+            report=a.output/(name+'.json')
+            if report.exists():
+                fact=json.loads(report.read_bytes());cases[name]=fact
+                if 'cache_path' in fact:(a.output/(name+'-actual-code.py')).write_bytes(Path(fact['cache_path']).read_bytes())
+            if rc!=0:errors.append(name+':actual_compile_failed_or_timed_out');break
+            if diagnostics.get('observer_thread_stopped') is False:
+                errors.append(name+':observer_thread_not_stopped');break
+    except BaseException as exc:
+        errors.append(type(exc).__name__+':'+str(exc)[:400]);traceback.print_exc(file=sys.stderr)
+    finally:
+        rows=original.project_rows(cases)
+        try:
+            if root.is_symlink() or root.parent!=a.cache or root.name!=b['session']:raise ValueError('SUP15_CLEANUP_OWNER_CHANGED')
+            shutil.rmtree(root)
+        except BaseException as exc:cleanup_error=type(exc).__name__
+        packet={'schema':'guard-supply-boot-record/1','profile':'supply-boot-cache-reuse-v1','role':b['role'],
+            'environment_ref':b['environment_ref'],'target_sha256':b['target_sha256'],'source_sha256':a.source_sha256,
+            'change':{'kind':'LAB-math-constant1-to2-and-logging-only-control','applied':any(r['relevant_change'] for r in rows),
+                      'denied':False,'actor_sha256':a.source_sha256,'sensor_started_before_consumption':True},'rows':rows}
+        summary={'role':b['role'],'uid':os.geteuid(),'session':b['session'],'actual_cases':cases,'child_invocations':receipts,'errors':errors,
+                 'cleanup_error_type':cleanup_error,'cache_root_left':root.exists(),'actual_seconds':time.monotonic()-started,
+                 'absolute_deadline_monotonic':deadline,'original_total_seconds':150,'producer_authenticated':False,
+                 'GPU_or_vLLM_worker_execution':False,'scope':'Observed CPU Inductor component only; no worker or enterprise authentication'}
+        print(json.dumps(original.publish(a.output,packet,summary)),flush=True)
+    if a.hold_for_capture:time.sleep(a.hold_for_capture)
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__)
+    for key in ['binding','output','cache','assets-manifest']:p.add_argument('--'+key,type=Path,required=True)
+    p.add_argument('--source-sha256',required=True);p.add_argument('--hold-for-capture',type=int,default=0)
+    p.add_argument('--wait-binding-seconds',type=int,default=0);run(p.parse_args())
+if __name__=='__main__':main()

@@ -32,6 +32,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--version", action="version", version=f"%(prog)s {version('serving-runtime')}"
     )
     commands = parser.add_subparsers(dest="command")
+    from .operations.agent import add_arguments
+
+    agent_parser = commands.add_parser("agent", help="플랫폼 운영 요청 조회·검증·실행")
+    add_arguments(agent_parser)
     file_parser = commands.add_parser("file-info", help="파일 크기와 SHA-256 확인")
     file_parser.add_argument("path", type=Path, help="확인할 일반 파일 경로")
     bundle_parser = commands.add_parser("bundle", help="LAB 정책 묶음 확인")
@@ -40,6 +44,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         "verify", help="정책 묶음의 구조·파일·유효성을 확인"
     )
     bundle_verify_parser.add_argument("--bundle-dir", required=True, metavar="DIR")
+    bundle_build_parser = bundle_commands.add_parser("build", help="CONFIRMED 플랫폼 정책에서 묶음 생성")
+    bundle_build_parser.add_argument("--policy", required=True, metavar="FILE")
+    bundle_build_parser.add_argument("--policy-sha256", required=True, metavar="SHA256")
+    bundle_build_parser.add_argument("--server-values", required=True, metavar="FILE")
+    bundle_build_parser.add_argument("--intent", required=True, metavar="FILE")
+    bundle_build_parser.add_argument("--output-parent", required=True, metavar="DIR")
+    bundle_build_parser.add_argument("--bundle-id", required=True)
+    bundle_apply_parser = bundle_commands.add_parser("apply", help="서버 묶음 배치·재시작·상태 확인")
+    bundle_apply_source = bundle_apply_parser.add_mutually_exclusive_group(required=True)
+    bundle_apply_source.add_argument("--bundle-dir", metavar="DIR")
+    bundle_apply_source.add_argument("--existing", metavar="ID", help="루트에 이미 배치된 묶음으로 전환")
+    bundle_apply_parser.add_argument("--bundle-root", required=True, metavar="DIR")
+    bundle_apply_parser.add_argument("--context", required=True)
+    bundle_apply_parser.add_argument("--namespace", required=True)
+    bundle_apply_parser.add_argument("--kubeconfig", metavar="FILE", help="모든 kubectl 호출에 명시할 kubeconfig")
+    bundle_apply_parser.add_argument("--status-url", required=True, help="Gateway 내부 포트를 담은 로컬 URL; 새 임시 port-forward를 엽니다")
+    bundle_apply_parser.add_argument("--token-env-file", metavar="FILE", help="RUNTIME_VIEWER_TOKEN을 읽을 env 파일(조회가 비보호면 생략 가능)")
+    bundle_apply_parser.add_argument("--dry-run", action="store_true")
+    bundle_apply_parser.add_argument("--operation-result", action="store_true", help="에이전트용 제한된 JSON 결과")
     mvp_parser = commands.add_parser("mvp", help="로컬 Gateway와 선택한 backend 실행")
     mvp_parser.add_argument("--policy", metavar="PATH")
     mvp_parser.add_argument(
@@ -131,6 +154,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     mvp_parser.add_argument("--retention-hold", metavar="PATH", help="삭제하지 않을 실행·요청 ID 목록")
     mvp_parser.add_argument("--lab-report", metavar="PATH")
+    mvp_parser.add_argument("--tetragon-state", metavar="PATH", help="호스트에서 수집한 Tetragon 정책·시험 상태 JSON")
+    mvp_parser.add_argument("--tetragon-identities", metavar="PATH", help="노드에서 확인한 Tetragon 프로세스·컨테이너 식별 자료")
     mvp_parser.add_argument(
         "--observation-feed",
         action="append",
@@ -282,6 +307,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--resume", action="store_true", help="기존 timeline 상태와 입력 위치에서 이어가기"
     )
     args = parser.parse_args(argv)
+    if args.command == "agent":
+        from .operations.agent import main as agent_main
+        return agent_main(args)
     if args.command == "file-info":
         try:
             info = inspect_file(args.path)
@@ -303,6 +331,41 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"정책 묶음 검증 성공: {bundle.bundle_id}")
         print(f"bundle.json SHA-256: {bundle.sha256}")
         print(f"파일 수: {len(bundle.files)}")
+        return 0
+    if args.command == "bundle" and args.bundle_command == "build":
+        from .bundle_tools import build_bundle
+
+        try:
+            bundle = build_bundle(args.policy, args.policy_sha256, args.server_values,
+                                  args.intent, args.output_parent, args.bundle_id)
+        except (OSError, ValueError) as error:
+            print(f"정책 묶음 생성 실패: {error}", file=sys.stderr)
+            return 1
+        print(f"정책 묶음 생성·검증 성공: {bundle.bundle_id}; 파일 {len(bundle.files)}개")
+        print(f"policy_ref.sha256: {bundle.policy_ref['sha256']}; bundle.json SHA-256: {bundle.sha256}")
+        print("승인 목록은 플랫폼 승인 기록의 자기 신고 사본이며 승인 검증이 아닙니다.")
+        return 0
+    if args.command == "bundle" and args.bundle_command == "apply":
+        from .bundle_tools import apply_bundle
+
+        try:
+            result = apply_bundle(args.bundle_dir, args.bundle_root, args.context,
+                                  args.namespace, args.status_url, args.token_env_file,
+                                  kubeconfig=args.kubeconfig,
+                                  dry_run=args.dry_run, existing=args.existing)
+        except (OSError, ValueError, RuntimeError) as error:
+            if args.operation_result:
+                restored = "이전 링크 복원 및 재시작 완료" in str(error)
+                print(json.dumps({"state": "rolled_back" if restored else "unknown",
+                                  "code": "ROLLED_BACK" if restored else "STATUS_UNKNOWN"}))
+            else:
+                print(f"정책 묶음 적용 실패: {error}", file=sys.stderr)
+            return 1
+        if args.operation_result:
+            print(json.dumps({"state": "succeeded", "code": "OK"}))
+            return 0
+        print(f"묶음 {'적용 계획' if result['dry_run'] else '적용·상태 확인'} 성공: "
+              f"{result['previous']} -> {result['bundle_id']}")
         return 0
     if args.command == "mvp":
         from .mvp.app import run
@@ -357,6 +420,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "environment": args.environment,
                 "run_id": args.run_id,
                 "lab_report_path": args.lab_report,
+                "tetragon_state_path": args.tetragon_state,
+                "tetragon_identities_path": args.tetragon_identities,
                 "observation_feeds": tuple(args.observation_feed),
                 "observation_heartbeats": tuple(args.observation_heartbeat),
                 "observation_origin": args.observation_origin,
@@ -436,9 +501,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         except (OSError, ValueError, IntentError) as error:
             print(f"통제 후보 생성 실패: {error}", file=sys.stderr)
             return 1
+        blocked_rules = len({rule for rule, mode in intent.tetragon_rule_modes if mode == "enforce"}
+                            | {rule for rule, modes in intent.tetragon_allowed_modes if "enforce" in modes})
+        blocked_summary = f", 차단 규칙 {blocked_rules}개(미검증)" if blocked_rules else ""
         print(
             f"{len(written)}개 생성: Cilium 1.20.3 / Tetragon 1.7.1 문법 기준 후보, "
-            "클러스터 미적용·미검증"
+            f"클러스터 미적용·미검증{blocked_summary}"
         )
         return 0
     if args.command == "enforce" and args.enforce_command == "ingest":

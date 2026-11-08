@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import type { ReactNode } from "react";
 import type { Collector } from "../../api/types";
 import { Badge } from "../../components/Badges";
-import { stateTone } from "../../lib/labels";
+import { COLLECTOR_STATE, stateTone } from "../../lib/labels";
 import { formatLocal } from "../../lib/time";
 import { carry } from "../../lib/url";
 import r from "./runtime.module.css";
@@ -74,27 +74,39 @@ export function observationState(origins: Record<string, number> | undefined, co
   const detail = collector?.detail && collector.detail.kind === "observation_feed" ? collector.detail : null;
   const writer = detail?.writer;
   if (collector && collector.state !== "ok") {
-    if (writer && writer.configured === false) return [`관측 불가 (writer heartbeat 미설정 · ${collector.state})`, "off"];
-    if ((collector.last_error ?? "").includes("heartbeat") || (collector.last_error ?? "").includes("writer")) return ["관측 불가 (writer heartbeat 오류)", "off"];
-    return [`관측 불가 (${collector.state})`, "off"];
+    if (writer && writer.configured === false) return [`관측 불가 · 수집기 생존 신호 미설정 · ${COLLECTOR_STATE[collector.state]?.label ?? "상태 미확인"}`, "off"];
+    if ((collector.last_error ?? "").includes("heartbeat") || (collector.last_error ?? "").includes("writer")) return ["관측 불가 · 수집기 생존 신호 오류", "off"];
+    return [`관측 불가 · ${COLLECTOR_STATE[collector.state]?.label ?? "상태 미확인"}`, "off"];
   }
   if (detail) {
     if (detail.loss_detected === true) return ["실시간 수집 · Hubble 손실 감지", "synthetic"];
     if (detail.rejected > 0 && detail.out_of_window === detail.rejected && writer?.configured) return ["수집 정상 · 실행 전 이벤트 제외", "real"];
-    if (detail.rejected > 0 && detail.accepted === 0) return ["관측 불가 (손상 줄)", "off"];
+    if (detail.rejected > 0 && detail.accepted === 0) return ["관측 불가 · 손상 기록", "off"];
     if (detail.rejected > 0) return ["실시간 수집 · 일부 제외", "synthetic"];
-    if (collector?.state === "ok" && writer?.configured && detail.idle) return ["수집 정상 · 새 이벤트 없음", "real"];
-    if (collector?.state === "ok" && writer?.configured) return ["실제 수집(실시간)", "real"];
+    if (collector?.state === "ok" && writer?.configured && detail.idle) return ["수집 정상 · 신규 이벤트 없음", "real"];
+    if (collector?.state === "ok" && writer?.configured) return ["실시간 수집", "real"];
   }
-  if (collector?.state === "ok") return ["실시간 기록 · writer 생존 미확인", "off"];
-  if ((origins?.real ?? 0) > 0) return ["실제 기록 · 실시간 미연결", "off"];
+  if (collector?.state === "ok") return ["실시간 수집 · 수집기 생존 신호 미확인", "off"];
+  if ((origins?.real ?? 0) > 0) return ["실제 기록 · 실시간 수집 단절", "off"];
   if ((origins?.synthetic ?? 0) > 0) return ["합성 데이터", "synthetic"];
-  return ["미연결", "off"];
+  return ["수집원 미연결", "off"];
 }
 
 export function ObservationChip({ label, state }: { label: string; state: [string, "off" | "synthetic" | "real"] }) {
   const cls = state[1] === "off" ? r.chipOff : state[1] === "synthetic" ? r.chipSynthetic : r.chipReal;
   return <span className={`${r.chip} ${cls}`}>{`${label} 관측 · ${state[0]}`}</span>;
+}
+
+export function ControlModeBadges({ hasTetragonOverride = false }: { hasTetragonOverride?: boolean }) {
+  return (
+    <div className="row wrap" style={{ gap: 8 }} aria-label="구성요소 통제 방식">
+      <Badge tone="accent" title="엔진 전달 전 요청 정책 평가">요청 통제 (Gateway) · 차단</Badge>
+      <Badge tone="accent" title="엔진의 네트워크 통신에 적용하는 정책">네트워크 정책 (Cilium) · 차단</Badge>
+      <Badge tone="warn" title="프로세스 실행·파일 접근 감지">런타임 탐지 (Tetragon) · 탐지</Badge>
+      {hasTetragonOverride && <Badge tone="caution" title="선택 기간의 Override 차단 시도 기록">탐지 · 일부 규칙 차단</Badge>}
+      <Badge tone="neutral" title="네트워크 이벤트 관측">네트워크 관측 (Hubble) · 관측</Badge>
+    </div>
+  );
 }
 
 export { r as rt };

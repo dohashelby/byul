@@ -16,6 +16,11 @@ from typing import Callable, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+try:
+    from tools.tetragon_capability import collect_capabilities
+except ModuleNotFoundError:  # direct ``python tools/aws_lab_preflight.py``
+    from tetragon_capability import collect_capabilities
+
 
 @dataclass(frozen=True)
 class CommandResult:
@@ -308,6 +313,30 @@ def collect(args: argparse.Namespace, runner: Runner | None = None, *, opener: C
             present = {item.get("metadata", {}).get("name") for item in doc.get("items", [])}
             checks.append(_check(resource, "ok" if set(names) <= present else "fail", "필수 정책 존재" if set(names) <= present else "필수 정책 누락"))
     checks.append(_gateway(args.gateway_url, args.env_file, opener))
+    if getattr(args, "override_check", False):
+        capability = collect_capabilities(runner, args.context)
+        checks.append(_check("kernel", "ok" if capability["kernel"] else "unknown",
+                             capability["kernel"] or "커널 버전 조회 실패"))
+        for name, key in (("CONFIG_BPF_KPROBE_OVERRIDE", "config_bpf_kprobe_override"),
+                          ("CONFIG_BPF_LSM", "config_bpf_lsm"),
+                          ("tetra_override_return", "tetragon_override_return"),
+                          ("tetra_lsm", "tetragon_lsm")):
+            value = capability[key]
+            checks.append(_check(name, "ok" if value is True else "fail" if value is False else "unknown",
+                                 "true" if value is True else "false" if value is False else "조회 불가"))
+        checks.append(_check("kernel_lsm", "ok" if capability["lsm"] is not None else "unknown",
+                             ", ".join(capability["lsm"]) if capability["lsm"] is not None else "LSM 목록 조회 불가"))
+        checks.append(_check("error_injection_symbols", "ok" if capability["error_injection_symbols"] else "fail" if capability["error_injection_list_readable"] else "unknown",
+                             ", ".join(capability["error_injection_symbols"]) or "오류 주입 목록의 대상 심볼 미확인"))
+        recommendation = capability["recommended"]
+        checks.append(_check("tetragon_enforcement", "ok" if recommendation else "unknown",
+                             "권장 방식 " + recommendation if recommendation else "차단 방식 근거 부족; 시험용 Pod 로드 확인 필요"))
+        checks.append(_check("tetragon_enforcement_methods", "ok" if capability["available"] else "unknown",
+                             "가능: " + ", ".join(capability["available"])
+                             + "; 불가: " + ", ".join(capability["unavailable"])
+                             + "; 확인 필요: " + ", ".join(capability["unknown"])))
+        checks.append(_check("apparmor", "ok" if capability["apparmor"] is True else "unknown",
+                             "LSM에 AppArmor 있음" if capability["apparmor"] is True else "LSM AppArmor 활성 확인 필요"))
     if getattr(args, "boundary_probe", False):
         checks.extend(_boundary_checks(args, runner, opener))
     try:
@@ -343,6 +372,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--env-file", help="private file with RUNTIME_VIEWER_TOKEN")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--boundary-probe", action="store_true", help="엔진 직접 생성 요청으로 정책 경계 실측")
+    parser.add_argument("--override-check", action="store_true", help="kprobe Override 수동 확인 명령과 미확인 상태 표시")
     return parser
 
 

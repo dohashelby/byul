@@ -27,6 +27,7 @@
           "required": ["name", "version", "image_digest", "source_commit"],
           "properties": {
             "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "runtime_kind": { "enum": ["mock", "vllm", "sglang"] },
             "version": { "type": ["string", "null"] },
             "image_digest": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
             "source_commit": { "type": ["string", "null"], "pattern": "^[0-9a-f]{7,40}$" }
@@ -71,6 +72,10 @@
             "kind": { "enum": ["kubernetes", "docker", "host"] },
             "kubernetes_context": { "type": ["string", "null"] },
             "namespace": { "type": ["string", "null"] },
+            "engine_container": { "type": ["string", "null"], "minLength": 1 },
+            "gateway_schema_version": { "enum": ["runtime-mvp/1.1", "runtime-mvp/1.2"] },
+            "gateway_cache_isolation": { "enum": ["off", "per_principal"] },
+            "enforcement_intent": { "description": "정책에 intent가 없을 때 쓰는 runtime-enforcement-intent/1.1 원본. runtime이 내부 필드를 검증한다.", "type": ["object", "null"] },
             "gateway_labels": { "$ref": "#/$defs/labels" },
             "engine_labels": { "$ref": "#/$defs/labels" },
             "engine_port": { "type": ["integer", "null"], "minimum": 1, "maximum": 65535 },

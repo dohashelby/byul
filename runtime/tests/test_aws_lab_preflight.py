@@ -32,6 +32,8 @@ class FakeRunner:
             if "show" in argv:
                 return CommandResult(0, self.phase_output if self.phase_output is not None else "ExecStart=... " + ("--phase-timeline" if self.phase_enabled else ""))
             return CommandResult(0, "active\n")
+        if argv[0] in {"uname", "cat", "zcat"} or ("exec" in argv and "tetra" in argv):
+            return CommandResult(124)
         if "nodes" in argv:
             return CommandResult(0, json.dumps({"items": [{"status": {"conditions": [{"type": "Ready", "status": "True"}], "allocatable": {"nvidia.com/gpu": "1"}}}]}))
         if "app=serving-engine" in argv:
@@ -89,6 +91,14 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(checks["tracingpoliciesnamespaced"].status, "ok")
         self.assertFalse(any(word in call for call in self.runner.calls for word in ("apply", "patch", "delete", "restart", "create")))
         self.assertNotIn("boundary_probe:chat", checks)
+
+    def test_override_check_is_opt_in_and_never_claims_kernel_support(self):
+        self.assertNotIn("tetragon_enforcement", self.check())
+        self.args.override_check = True
+        checks = self.check()
+        self.assertEqual(checks["tetragon_enforcement"].status, "unknown")
+        self.assertIn("확인 필요", checks["tetragon_enforcement_methods"].reason)
+        self.assertTrue(any("tetra" in call for call in self.runner.calls))
 
     def test_boundary_probe_is_opt_in_and_reports_both_routes(self):
         self.args.boundary_probe = True

@@ -1,0 +1,68 @@
+"""Exactly one original SUP15 cold baseline with reviewed exit observation.
+
+No warmup, same-case sequence, cache reconstruction, worker or product record.
+"""
+from pathlib import Path
+import hashlib,importlib.util,json,os,shutil,sys,time,traceback,uuid
+
+SHA=lambda p:hashlib.sha256(Path(p).read_bytes()).hexdigest()
+def module(name,path):
+    s=importlib.util.spec_from_file_location(name,path);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
+
+def main():
+    out=Path('/evidence');assets=Path('/assets');f=json.loads((assets/'freeze.json').read_bytes())
+    r={'scope':'one genuine original SUP15 cold baseline + exit observation; not old warm same/45alive reproduction',
+       'case':'baseline','warm_same_case':False,'model_child_invocations':0,'product_GPU_or_worker_claimed':False,
+       'primary':None,'cleanup_error':None,'uid':os.getuid(),'PID':os.getpid(),'child_launch_attempts':0};cache=None;birth=None
+    try:
+        if os.getuid()!=1000 or sys.flags.optimize:raise ValueError('SUP15_SINGLE_RUNTIME_INVALID')
+        for name,digest in f['runtime_pins'].items():
+            if SHA(assets/name)!=digest:raise ValueError('SUP15_SINGLE_ASSET_CHANGED:'+name)
+        original=module('_original_sup15',assets/'original_sup15.py')
+        observer=module('_reviewed_sup15_observer',assets/'exit_observer.py')
+        bridge=module('_reviewed_sup15_bridge',assets/'observed_wait.py')
+        session=uuid.uuid4().hex;parent=Path('/guard-cache')
+        if parent.is_symlink() or not parent.is_dir():raise ValueError('SUP15_SINGLE_CACHE_PARENT_INVALID')
+        cache=parent/session;cache.mkdir(mode=0o700);s=cache.lstat();birth=(s.st_dev,s.st_ino,s.st_uid)
+        r['own_runtime_session']=session;r['cache_at_start_empty']=not any(cache.iterdir())
+        r['cache_birth']={'dev':s.st_dev,'ino':s.st_ino,'uid':s.st_uid,'gid':s.st_gid,'mode':s.st_mode&0o7777}
+        env=dict(os.environ,TORCHINDUCTOR_CACHE_DIR=str(cache),TORCHINDUCTOR_COMPILE_THREADS='1',OMP_NUM_THREADS='2',MKL_NUM_THREADS='2')
+        report=out/'baseline.json';argv=[sys.executable,'-I','-B',str(assets/'original_sup15.py'),'--child',
+            '--cache',str(cache),'--report',str(report),'--delta','1','--logging-label','normal']
+        started=time.monotonic();deadline=started+150;r['absolute_deadline']=deadline;r['started_monotonic']=started
+        r['original_argv']=argv;r['original_child_source_SHA']=f['runtime_pins']['original_sup15.py']
+        r['original_environment_settings']={k:env[k] for k in ['TORCHINDUCTOR_CACHE_DIR','TORCHINDUCTOR_COMPILE_THREADS','OMP_NUM_THREADS','MKL_NUM_THREADS','HOME']}
+        r['child_launch_attempts']=1;r['model_child_invocations']=None
+        rc,termination,diagnostic=bridge.observe_with_deadline(original=original,observer=observer,argv=argv,env=env,
+            output=out,stem='baseline',nominal=90,deadline=deadline,bootstrap=assets/'exit_child.py',
+            allowed_source_SHA={f['runtime_pins']['original_sup15.py']})
+        r.update(wait_returncode=rc,termination=termination,diagnostic=diagnostic,elapsed_seconds=time.monotonic()-started,
+                 model_child_invocations=1 if termination.get('PID') else None)
+        try:os.killpg(termination['PID'],0);r['own_process_group_absent']=False
+        except ProcessLookupError:r['own_process_group_absent']=True
+        if report.exists():
+            fact=json.loads(report.read_bytes());r['original_report']=fact;r['original_report_SHA']=SHA(report)
+            if fact.get('cache_path'):
+                p=Path(fact['cache_path'])
+                if not p.is_relative_to(cache) or p.is_symlink():raise ValueError('SUP15_SINGLE_CODE_PATH_INVALID')
+                r['actual_cached_code_SHA']=SHA(p)
+                (out/'baseline-actual-code.py').write_bytes(p.read_bytes())
+            # One baseline has no prior/new transition pair. Keep missing scope;
+            # never synthesize same/challenge rows from a successful output.
+            r['existing_project_rows']=original.project_rows({'baseline':fact})
+        else:r['original_report_missing']=True
+    except BaseException as exc:
+        r['primary']={'type':type(exc).__name__,'traceback':traceback.format_exc()};traceback.print_exc(file=sys.stderr)
+    finally:
+        if cache is not None:
+            try:
+                s=cache.lstat()
+                if cache.is_symlink() or cache.parent!=Path('/guard-cache') or (s.st_dev,s.st_ino,s.st_uid)!=birth:
+                    raise ValueError('SUP15_SINGLE_CLEANUP_IDENTITY_CHANGED')
+                shutil.rmtree(cache);r['cache_root_left']=cache.exists()
+            except BaseException as exc:r['cleanup_error']={'type':type(exc).__name__,'traceback':traceback.format_exc()}
+        with (out/'single-case-result.json').open('x',encoding='utf8') as stream:json.dump(r,stream,indent=2)
+    print(json.dumps({'primary':r['primary'],'wait_returncode':r.get('wait_returncode'),'invocations':r['model_child_invocations'],
+                      'cleanup_error':r['cleanup_error'],'warm_same_reproduced':False}))
+    return 1 if r['primary'] or r['cleanup_error'] or r.get('wait_returncode')!=0 or r.get('cache_root_left') or not r.get('own_process_group_absent') else 0
+if __name__=='__main__':raise SystemExit(main())

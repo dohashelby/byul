@@ -170,12 +170,14 @@ def redact_tetragon_line(line: bytes) -> bytes | None:
         for key in _TETRAGON_PROCESS_KEYS:
             process = event.get(key)
             if isinstance(process, dict):
-                process.pop("arguments", None)
+                for private in ("arguments","environment_variables","environment","env","envs"):
+                    process.pop(private, None)
         ancestors = event.get("ancestors")
         if isinstance(ancestors, list):
             for ancestor in ancestors:
                 if isinstance(ancestor, dict):
-                    ancestor.pop("arguments", None)
+                    for private in ("arguments","environment_variables","environment","env","envs"):
+                        ancestor.pop(private, None)
     return (json.dumps(document, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
 
 
@@ -449,12 +451,16 @@ class _FeedGroup:
         heartbeat_path: Path,
         gap_path: Path,
         children: list[_Child],
+        health_check: Callable[[], list[dict[str, object]]] | None = None,
+        supports_backfill: bool = True,
     ) -> None:
         self.kind = kind
         self.feed_path = feed_path
         self.heartbeat_path = heartbeat_path
         self.gap_path = gap_path
         self.children = children
+        self.health_check = health_check
+        self.supports_backfill = supports_backfill
         # The writer start time stays fixed so backfilled events remain in window.
         self.started_at = _utc_now()
         self.state = "starting"
@@ -981,7 +987,7 @@ class _Supervisor:
                 "event": "gap_closed",
                 "closed_at": group.last_healthy_at.isoformat(),
                 "closed_by": "collector_restart",
-                "backfill": "requested_unverified",
+                "backfill": "requested_unverified" if group.supports_backfill else "not_available",
             })
             _append_gap(group.gap_path, closed)
             group.last_gap = {key: value for key, value in closed.items() if key not in ("schema", "event", "kind")}
@@ -1013,7 +1019,7 @@ class _Supervisor:
         closed["closed_at"] = _utc_now()
         # Backfill was requested; whether every event came back is not knowable
         # (logs may have rotated or the pod may have restarted).
-        closed["backfill"] = "requested_unverified"
+        closed["backfill"] = "requested_unverified" if group.supports_backfill else "not_available"
         _append_gap(group.gap_path, {"schema": GAP_SCHEMA, "event": "gap_closed", "kind": group.kind, **closed})
         group.last_gap = closed
         group.open_gap = None
@@ -1097,6 +1103,11 @@ class _Supervisor:
                             }
                         )
                 failures = exited + dead_pumps
+                if group.health_check is not None:
+                    try:
+                        failures += group.health_check()
+                    except Exception:
+                        failures.append({"name":"source_health","error":"HealthCheckFailed"})
                 if failures:
                     _stop_children(group)
                     self._open_gap(group, failures)
@@ -1123,7 +1134,7 @@ class _Supervisor:
             write_heartbeats(
                 {group.kind: (group.heartbeat_path, group.feed_path, group.started_at, group.processes())},
                 state=state,
-                extra={group.kind: group.heartbeat_extra()},
+                extra={group.kind: {**group.heartbeat_extra(), "kube_context": self.context}},
             )
 
 

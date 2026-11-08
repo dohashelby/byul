@@ -17,8 +17,10 @@ import type {
   RevisionDiff,
   RevisionList,
   LabReportResponse,
+  TetragonStatusResponse,
   RuntimeEventList,
   RuntimeStatusResponse,
+  PhaseTimelineResponse,
   VerificationDetail,
   VerificationList,
 } from "./types";
@@ -37,6 +39,8 @@ export const useRequests = () =>
   useQuery({ queryKey: ["runtime", "requests"], queryFn: () => getJson<RequestList>("/api/runtime/requests"), ...live });
 export const useLabReport = () =>
   useQuery({ queryKey: ["runtime", "lab-report"], queryFn: () => getJson<LabReportResponse>("/api/runtime/lab-report"), ...live });
+export const useTetragonStatus = () =>
+  useQuery({ queryKey: ["runtime", "tetragon-status"], queryFn: () => getJson<TetragonStatusResponse>("/api/runtime/tetragon-status"), ...live });
 export const useRequestDetail = (id: string | null) =>
   useQuery({
     queryKey: ["runtime", "request", id],
@@ -47,6 +51,8 @@ export const useRequestSummary = () =>
   useQuery({ queryKey: ["runtime", "summary"], queryFn: () => getJson<RequestSummary>("/api/runtime/summary"), ...live });
 export const useRuntimeStatus = () =>
   useQuery({ queryKey: ["runtime", "status"], queryFn: () => getJson<RuntimeStatusResponse>("/api/runtime/status"), ...live });
+export const usePhaseTimeline = () =>
+  useQuery({ queryKey: ["runtime", "phase-timeline"], queryFn: () => getJson<PhaseTimelineResponse>("/api/runtime/phase-timeline"), ...live });
 export const useResults = () =>
   useQuery({ queryKey: ["update", "results"], queryFn: () => getJson<VerificationList>("/api/update/results") });
 export const useResult = (id: string | null) =>

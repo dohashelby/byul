@@ -1,3 +1,10 @@
+## 2026-11-08 — B4 TP2 입력 준비
+
+- 한 일: A 공통 반환물을 고정 통합한 `37c284d9`를 기준으로 B 전용 `tools/b12_tp2_inputs.py`를 구현했다. LIF-08·LIF-11·SUP-06의 기존 PACK33 정책·profile, 파일 포인터·정상/실패/복구·시간 선언과 미충족 담당을 별도 계획 파일로 반환한다. `docs/dev-1/tp2-run-plan.md`는 기존 A 본문을 보존하고 B 절만 추가했다.
+- 검증: 고정 생성기의 직접 영향 시험 13개 통과(루트 6.15초), 독립 검토 13개 통과(7.10초, 별도 실적으로 합산하지 않음). 실제 준비 CLI 출력의 파일/manifest SHA를 대조했다. 잘못된 입력·기존 출력 덮어쓰기·실행 옵션을 거부하며 외부 명령 호출은 없다.
+- 다음 단계: S1/S5의 B1·B2 소비자 고정 변경을 통합하고 원 factory→EVD→저장 팩 판정→RPT 경로를 확인해 PR232에 함께 인계한다.
+- 남은 것: rank-fault 생산자 신원, IPC/실패 그룹/worker-shard 지원 등록·TP2 원자료, A6 실제 하네스·ENV/POL/target/prepared·제어 입력. 준비 문서의 시간/단가는 가정이며 실제 실행·비용 충족·권한을 부여하지 않는다. 이번 B4 AWS/GPU 작업은 0이다.
+
 ## 2026-11-08 — GPU18 임시 입력의 실제 로컬 연결
 
 - 한 일: 기존 모의18개와 별도로 실제CPU/소스/guard·OS컴포넌트 관측14ID를 수집했다. 원0.31 renderer/InputProcessor·SamplingParams·SUP08 사전옵션 함수, 별도0.29 CPU엔진 정상2요청, 공급물·파일/FD·Python모드·pipe·소유UDS/namespace·SUP16고정API를 사용했다. GPU/AWS/다운로드0, 공통core/models/store/judges/packs/registry·기존prototype·원FAIL/UNKNOWN 변경0.

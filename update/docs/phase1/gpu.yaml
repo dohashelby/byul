@@ -1,3 +1,5 @@
+# 후속 B1/B2 소비자 코드·CPU 검증/B4 준비: docs/gpu-b/consolidation-20261106/B12_B4_INTEGRATION.md
+# 아래 note의 기준37c284d9 연결 대기는 수신 시점 스냅샷이다. 새 코드로 state/원 판정/실측 완료 수를 자동 변경하지 않는다.
 # 2026-11-08 B1/B2/B4 수신/연결 대조 기준: 37c284d91286dbcf2483f8fa654d2e50f32f9d38
 # 새 지시서 lab_done=2(SUP-04,PLT-09)/remaining=41; 기존 limited=25/product_evidence_needed=18과 다른 축.
 # actual_local=14는 local-actual-validation-20261108.json의 한정 컴포넌트 관측이며 lab DONE/실증 전체 완료 수가 아니다.

@@ -1,3 +1,10 @@
+## 2026-11-08 — B1·B2 기존 소비자 연결
+
+- 한 일: 고정 A /1 반환을 기존 B 소비자의 선택 입력으로 연결했다. lifecycle/OBS/PLT는 선언 필드·artifact에 원 기록·scope·gap을 보존하고, 요청·공급물은 runner V1/V2·supply-reads·IPC/group/shard/model-entry/plugin 계약을 소비한다. 원 기본 팩·등록 SHA·core/models/store/judges/registry·A 생산자는 수정하지 않았다.
+- 검증: 신규 lifecycle 53통과, 요청/공급물28통과 및 직접 delta, 원 등록 factory→run_plan→저장 원 팩→judge_plan→RPT 3분기 통과. 기존21파일651통과/2저장소내 출력거부를 보존하고 같은소스의 외부temp 정정2통과를 연결했다. 검토에서 REQ09 세대/PID 귀속 오류를 수정해 직접5통과, activation artifact 쓰기 오류의 독립FAIL 소실을 좁게 수정해 직접분+기존lab3파일192통과를 확인했다. 후속 mkdir 1줄을 같은 guard로 옮겨 직접3통과도 확인했다. 실행별 수치이며 중복을 완료 ID로 합산하지 않는다.
+- 다음 단계: PR232의 B12_B4_INTEGRATION.md 및 b12-b4-validation-20261108.json에서 코드·원 실패/수정·검토 SHA·담당별 실제 반환물을 확인한다. 실제 GPU 기동 없이 가능한 이번 소비 경로와 B4 준비를 구분한다.
+- 남은 것: REQ12/OBS02 복합profiler 대상 선언, 기본 PLT02 profile, LIF11 기능 축·PLT/OBS named관측, 미커밋 A1~A4, rank-fault 신원·IPC/group/shard 지원 등록·TP2 원자료/A6 runtime 입력. 이전 lab2/41·한정25/18·로컬14ID 상태와 원FAIL/UNKNOWN은 유지한다.
+
 ## 2026-11-08 — B4 TP2 입력 준비
 
 - 한 일: A 공통 반환물을 고정 통합한 `37c284d9`를 기준으로 B 전용 `tools/b12_tp2_inputs.py`를 구현했다. LIF-08·LIF-11·SUP-06의 기존 PACK33 정책·profile, 파일 포인터·정상/실패/복구·시간 선언과 미충족 담당을 별도 계획 파일로 반환한다. `docs/dev-1/tp2-run-plan.md`는 기존 A 본문을 보존하고 B 절만 추가했다.

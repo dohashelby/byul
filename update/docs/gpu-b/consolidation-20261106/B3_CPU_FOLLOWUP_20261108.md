@@ -31,9 +31,17 @@ SUP-15의 boolean 세 필드와 path SHA를 닫힌 타입으로 검사한다. �
 - [S1 소비·기록기 상세](../preparation/B3_SUP15_SUP16_RECORDS.md): 원 CPU context·record·오류·Ref, 단일/쌍 writer와 helper 인계.
 - [S5 API·준비 실패/복구 상세](../../b-work/B3_S5_CPU_20261108.md): v1~v3 실제 API·판본·원 오류·정리 한계.
 - [B3 고정 근거](b3-validation-20261108.json): 코드·실행별 원 자료·독립 검토·manifest delta의 정확한 SHA.
-- [CI 수정](CI_FOLLOWUP_20261108.md): d1d91329는 두 이벤트14/14 성공했다. B3 통합 head의 CI 결과는 그 뒤 별도 확인한다.
+- [CI 수정](CI_FOLLOWUP_20261108.md): d1d91329와 B3 통합 c1ae7bcd는 각각 두 이벤트14/14 성공했다. 아래 저장 오류 후속 head의 CI는 별도로 확인한다.
 - [B5 검토 의견](../B5_REVIEW_OPINION_20261108.md): impact·확정 정책을 검토했으며 상태를 임의 변경하지 않았다.
 
 남은 실제 연결은 승인 inventory·pre-read/소비 인과, cache writer/검증 전 집행, reader 부수 동작/정책·실제 endpoint, 정상/실패 양 role의 지원 target/prepared·native owner·소유권/유효 정책이다. 이 반환물 없이 CPU 기록을 K8s target으로 바꾸거나 미관측 행을 채우지 않는다. 기존150초 및90/45초 종료 계약, 원 FAIL/UNKNOWN·출처·Ref는 유지한다.
 
 기존 lab DONE2/잔여41·한정25/제품 증거18·이전 실제 로컬14ID는 당시 기준으로 유지하고 이번 B3 추가 근거를 별도로 연결한다. API assertion·재생 계약·완료 ID를 서로 합산하지 않는다. EXAMPLE·historical replay·CPU 관측을 MEASURED나 official로 올리지 않는다.
+
+## 독립 작업 점검에서 발견한 저장 오류 후속
+
+c1ae7bcd 이후 남은 분기를 점검하며 SUP15/16 외의 boot summary 저장 오류가 Draft 반환 전에 전파되는 결함을 확인했다. 원 factory/run→EVD/judge 대표3개에서 mkdir/write 오류의 FAIL→UNKNOWN 손실과 collision의 시험 파일 덮어쓰기·COMPLETED를 재현했다. 기존 persist를 전체13 boot 프로파일의 저장 경계에서 재사용해 원 violations·normal·source/role·진단/cleanup을 보존하고 저장 gap은 ABORTED·complete=false로 남긴다. SUP15/16의 raw record/session 조건과 helper 실행 로직·수집·투영·정책·팩은 유지한다.
+
+새 직접21개, 기존 진단/cleanup 추가1개, 다른 공통 profile 대표6개의 고유28개가 통과했다. 앞선 통과 사례·모델·archive는 반복하지 않았다. 원 실패와 명령·수집/부모 시간·JUnit은 [S5 기존 인계 문서](../../b-work/B12_S5_CONSUMERS_20261108.md)와 [고정 근거의 boot_artifact_IO_followup](b3-validation-20261108.json)에 연결한다. 실제 transport는 CPU role-I/O fixture이며 현재 Kubernetes/worker·등록 생산자 실증이 아니다. 원43 state·FAIL/UNKNOWN·Ref와 실제 연동 잔여는 유지한다.
+
+세션6은 고정 코드·함수 AST, 3실패/고유28통과의 원 JUnit/argv/freeze, 원/수정 Store6개의 EVD/RES12객체 해시, manifest465개 중 정확2해시 변경을 읽기 전용으로 대조했다. 범위내 미해결 구체 결함은 없었고 시험·API·모델·복원 재실행은0이다. 이 후속 head의 원격 CI는 게시 후 확인한다.

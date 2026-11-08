@@ -1,3 +1,9 @@
+## 2026-11-08 — boot 저장 오류의 독립 FAIL 보존
+
+- 한 일: CONTINUATION 독립 점검에서 SUP15/16 외 공통 boot 저장 오류의 위반 소실과 기존 시험 파일 덮어쓰기를 발견했다. 기존 persist를 전체13 profile에 재사용해 원 관측·normal·출처·진단을 보존하고 저장 gap/ABORTED·complete=false를 유지한다. 수집·정책·팩·SUP15/16 raw/session·helper 실행 로직은 그대로다.
+- 검증: 원 대표3실패를 보존하고 새 직접21+진단/cleanup1+다른profile6의 고유28개를 확인했다. 원 모델/통과 suite 반복·GPU/AWS/SSM 추가기동0. manifest465개 중 정확2파일 해시만 변경했고 원Bdefault거부를 포함한 source gate1통과를 확인했다.
+- 다음 단계: 고정 source·원/수정 증거·Store 객체12개·manifest2해시의 독립 검토를 완료했다(범위내 미해결 구체결함0). PR232에 반영하고 해당 최종 head CI를 확인한다. 선행 B3 c1ae7bcd는14/14 성공이며 다음 head에 복사하지 않는다. 현재 입력으로 가능한 구체 추가 결함은 이 저장 경계까지 점검했고, 실제 worker/승인·A계약/등록·TP2·과거원자료 대기는 해당 분기로 남긴다.
+
 ## 2026-11-08 — B3 공급물 후속 고정·통합
 
 - 한 일: SUP05 C mapping, SUP07/12 원0.31 npcache, SUP13 HF/Jinja의 신규 CPU API를 실제 관측했다. SUP15 strict bool/SHA와 SUP15/16 원 record·보고행·저장 오류 보존을 보완하고, SUP16 pair를 고정2485 helper에 연결했다. 새 모델/worker/GPU/AWS 기동은 없다.

@@ -193,7 +193,23 @@
       "file_sha256": "683078fa0437352e3e6149c715999d6b0059c7aa8c85d730bde6c5ea4827326a"
     },
     "fixed_head_all_checks_success": 14,
-    "this_B3_head_result": "게시 후 별도 확인; d1 성공을 복사하지 않음"
+    "this_B3_head_result": "c1ae is14/14 success; subsequent boot I/O head is verified separately after publication",
+    "B3_c1ae": {
+      "head": "c1ae7bcdcc683a7fdd79e9105642657a6487db1e",
+      "checks_passed": 14,
+      "failed": 0,
+      "unfinished": 0,
+      "runs": [
+        42465666804,
+        42465672032
+      ],
+      "receipt": {
+        "project_relative_path": "worktrees/byul-b12-s2-plan-20261108/out/ci-pr232-c1ae7bcd-20261108-v1/final-success-receipt-v1.json",
+        "bytes": 8488,
+        "file_sha256": "6d46acb6db2eb9545a391d85c41f8a9cba2dde63ee53081d5ee65c749adcd0bf"
+      },
+      "boot_IO_followup_included": false
+    }
   },
   "status": {
     "assigned_IDs": 43,
@@ -217,5 +233,177 @@
     "실제 cache writer/검증 전 집행·전체 reader/OS부수 동작과 정책",
     "제품 endpoint/공급 template 귀속·양 role target/prepared/유효 정책",
     "A1~A4·등록 생산자 및 GPU/TP2 실측 입력"
-  ]
+  ],
+  "boot_artifact_IO_followup": {
+    "base": "c1ae7bcdcc683a7fdd79e9105642657a6487db1e",
+    "source_commits": [
+      "2575fc4974f3449f2ad73fa2d38ffe1d94674334",
+      "ab82500e3395ad5a0cdb858bd078872a5bae5760"
+    ],
+    "root_integrated_code": "d30cfb81",
+    "scope": "existing persist reused for all13 boot profiles; SUP15/16 raw/session conditions and helper function AST unchanged",
+    "source_files": [
+      {
+        "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_supply_boot.py",
+        "bytes": 14625,
+        "file_sha256": "a845602875402b4f6868752161389af081357114ff64cf2f64120d655c898486"
+      },
+      {
+        "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/supply_boot_artifacts.py",
+        "bytes": 1584,
+        "file_sha256": "e623c79657510c2ddba09896002417b5ae0d7ba909758590896d764dcbe058cd"
+      },
+      {
+        "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/tests/test_b2_boot_evidence_persistence.py",
+        "bytes": 11973,
+        "file_sha256": "a054b708a7b508818cdb7fb5eff805d9cba2fed40f6bb174a994e2ec4cabee0c"
+      }
+    ],
+    "original_failures": 3,
+    "new_unique_passed": 28,
+    "stages": [
+      {
+        "scope": "baseline-v1",
+        "test_count": 3,
+        "failures": 3,
+        "receipt": {
+          "project_relative_path": "worktrees/byul-b2-s5-boot-artifacts-20261108/out/b2-boot-evidence-baseline-v1/receipt.json",
+          "bytes": 1816,
+          "file_sha256": "8ca73f159785cc92cdd7fbd6c535980d32873c9b9f060e3a8e03b7df97f403f0"
+        },
+        "junit": {
+          "project_relative_path": "worktrees/byul-b2-s5-boot-artifacts-20261108/out/b2-boot-evidence-baseline-v1/pytest.xml",
+          "bytes": 7882,
+          "file_sha256": "e99a93581fc1319e47c130846aa28ad86318f61b1071bc07088fba1a68c70714"
+        },
+        "source_freeze": {
+          "project_relative_path": "worktrees/byul-b2-s5-boot-artifacts-20261108/out/b2-boot-evidence-baseline-v1/source-freeze.json",
+          "bytes": 929,
+          "file_sha256": "b06d78113ac82882f2b0b2d911e15994ad86953db0025678de11333d80d6cee5"
+        },
+        "argv_and_wall_clock": "receipt contains exact original values; stdout and JUnit durations kept distinct"
+      },
+      {
+        "scope": "fixed-v1",
+        "test_count": 21,
+        "failures": 0,
+        "receipt": {
+          "project_relative_path": "worktrees/byul-b2-s5-boot-artifacts-20261108/out/b2-boot-evidence-fixed-v1/receipt.json",
+          "bytes": 1831,
+          "file_sha256": "34044bb8e2d236afb592b485b254c0dd92cac426cd4ea5721a978882ba255124"
+        },
+        "junit": {
+          "project_relative_path": "worktrees/byul-b2-s5-boot-artifacts-20261108/out/b2-boot-evidence-fixed-v1/pytest.xml",
+          "bytes": 3465,
+          "file_sha256": "04f263157fae84e9b54a6ab10b6b054191cb7e72dfc090303bc2c9cf1b3fecdb"
+        },
+        "source_freeze": {
+          "project_relative_path": "worktrees/byul-b2-s5-boot-artifacts-20261108/out/b2-boot-evidence-fixed-v1/source-freeze.json",
+          "bytes": 1074,
+          "file_sha256": "a466679059e20443ed30a76dfbc0d6a47da46179176d3ff08281adc052086b76"
+        },
+        "argv_and_wall_clock": "receipt contains exact original values; stdout and JUnit durations kept distinct"
+      },
+      {
+        "scope": "fixed-v2",
+        "test_count": 1,
+        "failures": 0,
+        "receipt": {
+          "project_relative_path": "worktrees/byul-b2-s5-boot-artifacts-20261108/out/b2-boot-evidence-fixed-v2/receipt.json",
+          "bytes": 1884,
+          "file_sha256": "5776b3505fff3695324f3a428fbc75ae857fec3b89b40d92eb3f8885aa2729de"
+        },
+        "junit": {
+          "project_relative_path": "worktrees/byul-b2-s5-boot-artifacts-20261108/out/b2-boot-evidence-fixed-v2/pytest.xml",
+          "bytes": 401,
+          "file_sha256": "212b033e1e552c844d5da2911c77aa31f02cf8326bb61acf9c0bca4344f7c8a1"
+        },
+        "source_freeze": {
+          "project_relative_path": "worktrees/byul-b2-s5-boot-artifacts-20261108/out/b2-boot-evidence-fixed-v2/source-freeze.json",
+          "bytes": 1104,
+          "file_sha256": "7f30e9f18743b857593d5aad9a06a1faefed9199342d9317b7ffa61681f8737b"
+        },
+        "argv_and_wall_clock": "receipt contains exact original values; stdout and JUnit durations kept distinct"
+      },
+      {
+        "scope": "shared-v1",
+        "test_count": 6,
+        "failures": 0,
+        "receipt": {
+          "project_relative_path": "worktrees/byul-b2-s5-boot-artifacts-20261108/out/b2-boot-evidence-shared-v1/receipt.json",
+          "bytes": 1963,
+          "file_sha256": "5ab323673e8781d52a46b57af0b82f5ea1c9d1a06cb3f98171f949e28ceabc58"
+        },
+        "junit": {
+          "project_relative_path": "worktrees/byul-b2-s5-boot-artifacts-20261108/out/b2-boot-evidence-shared-v1/pytest.xml",
+          "bytes": 1197,
+          "file_sha256": "19d0ff6fc8c5ddbddcb0fe195a52c1c871da8cf92d88cc69b9c8dc65a6eedb0b"
+        },
+        "source_freeze": {
+          "project_relative_path": "worktrees/byul-b2-s5-boot-artifacts-20261108/out/b2-boot-evidence-shared-v1/source-freeze.json",
+          "bytes": 1186,
+          "file_sha256": "10ce142a79669431ad598c8e075ff558617f19f5b00e836343c9cdfe999c4aa2"
+        },
+        "argv_and_wall_clock": "receipt contains exact original values; stdout and JUnit durations kept distinct"
+      }
+    ],
+    "execution_scope": "CPU role-I/O fixture and registered run/Store/judge; no real K8s/worker/GPU/producer certification",
+    "properties": [
+      "independent violations/normal/source/role preserved on mkdir/write error",
+      "existing collision bytes preserved via exclusive create",
+      "artifact error→ABORTED/completefalse; clean observations remainUNKNOWN",
+      "existing diagnostics/cleanup preserved"
+    ],
+    "manifest_delta": {
+      "before_sha256": "e2fc6ad21e006553be639edfb988713a1303a711a1c17b3a02a00028a5287c23",
+      "after_sha256": "cb1828a8799752511c6c4817bfba1aedf89c79b274a46562f45d992e32045705",
+      "file_count": 465,
+      "added": [],
+      "removed": [],
+      "changed": {
+        "update/src/guard/executors/kubernetes_supply_boot.py": {
+          "before": "329b6b2de57bfe2a3155d54aaa4b31257605c30eb7385ac75f140d0de32af126",
+          "after": "a845602875402b4f6868752161389af081357114ff64cf2f64120d655c898486"
+        },
+        "update/src/guard/executors/supply_boot_artifacts.py": {
+          "before": "26b95bfb2a8ce0e5408e78c7c291086f19f0c15c447ee067ebfc8e877b6120aa",
+          "after": "e623c79657510c2ddba09896002417b5ae0d7ba909758590896d764dcbe058cd"
+        }
+      },
+      "other_metadata_unchanged": true
+    },
+    "manifest_gate": {
+      "result": "1passed2.31s",
+      "original_B_default_still_rejects": true,
+      "raw": {
+        "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/boot-io-manifest-gate.txt",
+        "bytes": 724,
+        "file_sha256": "535c355f48a0a7225c8e07d9322f17e63512bbc8f8e669ddf68de09e14e55d21"
+      }
+    },
+    "CI_final_head": "post-publication confirmation required; prior head success not reused",
+    "GPU_AWS_SSM_new_start": 0,
+    "states_changed": false,
+    "final_execution_index": {
+      "project_relative_path": "worktrees/byul-b2-s5-boot-artifacts-20261108/out/b2-boot-evidence-handoff-v1/receipt.json",
+      "bytes": 24094,
+      "file_sha256": "a32ad8d4573c87bb914b8c4fd553c5a05a677539d616b6fde721f016a5c419ea"
+    },
+    "owned_jobs_remaining": 0,
+    "independent_review": {
+      "reviewer_existing_thread": "01a1af2c-e5d2-7083-bbab-9d8e1758f1b2",
+      "turn": "01a1ba7c-6ce4-7f13-a20f-92a0c633f206",
+      "source_code": "02122bfbe58bd1c8c24dd98230cec398ae74452f",
+      "final_doc_only_amend": "ab82500e3395ad5a0cdb858bd078872a5bae5760",
+      "conclusion": "범위내 미해결 구체결함0",
+      "method": [
+        "exactsource and helper/collection/projection/run/policy AST",
+        "original3failure and final28unique pass JUnit/argv/freeze",
+        "6readonly Stores and12 EVD/RES content hashes",
+        "root465entry manifest exact2hash changes, no additions/removals or metadata change"
+      ],
+      "test_API_model_restore_repeated": 0,
+      "verification_level_null_preserved": true
+    }
+  }
 }

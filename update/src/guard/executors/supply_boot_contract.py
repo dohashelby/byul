@@ -89,6 +89,11 @@ def validate_record(packet, *, check_id, role, environment_ref, target_sha256, s
     fields = _ROWS.get(check_id)
     if fields is not None and any(type(row) is not dict or set(row) != fields for row in packet["rows"]):
         raise ValueError("SUPPLY_BOOT_RECORD_INVALID")
+    if check_id == 'SUP-15' and any(
+            any(type(row[key]) is not bool for key in ('relevant_change', 'reused', 'compatibility_verified'))
+            or type(row['path_sha256']) is not str or _SHA.fullmatch(row['path_sha256']) is None
+            for row in packet['rows']):
+        raise ValueError('SUPPLY_BOOT_RECORD_INVALID')
     return packet
 
 

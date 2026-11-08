@@ -1,0 +1,435 @@
+{
+  "schema": "byul-b3-retained-cpu-records/1",
+  "original_source_commit": "3b3ff137b31b830403ccce1997dabf26319bac4f",
+  "data_origin": "EXAMPLE",
+  "new_component_model_execution": false,
+  "worker_verified": false,
+  "cases": {
+    "SUP-15": {
+      "environment_utf8": "{\"adapter\":null,\"content_sha256\":\"d5c89568af0726336ef8081c7fb084020a2901b8ebd91c7a21df310d6475ccdc\",\"created_at\":\"2026-11-05T10:04:04Z\",\"data_origin\":\"EXAMPLE\",\"engine\":{\"image_digest\":\"vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b\",\"name\":\"CPU-Inductor-cache-component\",\"source_commit\":null,\"version\":\"torch2.13.0+cpu\"},\"facts\":{},\"id\":\"ENV-01M6NJMS2AS294M8WH0Y73MZEB\",\"kind\":\"ENV\",\"model\":{\"id\":null,\"inventory_sha256\":null,\"revision\":null},\"refs\":[],\"revision\":1,\"runtime\":{\"driver\":null,\"gpu_count\":0,\"gpu_model\":null,\"nodes\":1,\"platform\":\"Actual local Docker Torch compiler and new-process loader; no vLLM worker/Kubernetes\",\"tp_groups\":1}}",
+      "environment_sha256": "f41e89941a1dd418f4990c475885845b4e0f5c53958f46cea47bd95ff1c189f5",
+      "roles": {
+        "normal": {
+          "original_record_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-gpu-b-prep-recovery-errors-20261104\\out\\sup15-cache-v2\\actual-v1-normal\\data\\11fb0c72f82d43c2abc00a061ee8476f\\boot-record.json",
+          "record_utf8": "{\n  \"change\": {\n    \"actor_sha256\": \"89083d7ec986eee7c6427312dc98bf58feda7d7f8fa1129e8ef7d973cdd14d98\",\n    \"applied\": true,\n    \"denied\": false,\n    \"kind\": \"LAB-math-constant1-to2-and-logging-only-control\",\n    \"sensor_started_before_consumption\": true\n  },\n  \"environment_ref\": {\n    \"id\": \"ENV-01M6NJMS2AS294M8WH0Y73MZEB\",\n    \"kind\": \"ENV\",\n    \"revision\": 1,\n    \"sha256\": \"d5c89568af0726336ef8081c7fb084020a2901b8ebd91c7a21df310d6475ccdc\"\n  },\n  \"profile\": \"supply-boot-cache-reuse-v1\",\n  \"role\": \"normal\",\n  \"rows\": [\n    {\n      \"compatibility_verified\": true,\n      \"path_sha256\": \"e9e3c0064fbdd87f4970c7f0d333fa8845bcdf9a82e8da90ca5df99b88a7ab20\",\n      \"relevant_change\": false,\n      \"reused\": true\n    },\n    {\n      \"compatibility_verified\": true,\n      \"path_sha256\": \"e9e3c0064fbdd87f4970c7f0d333fa8845bcdf9a82e8da90ca5df99b88a7ab20\",\n      \"relevant_change\": false,\n      \"reused\": true\n    },\n    {\n      \"compatibility_verified\": true,\n      \"path_sha256\": \"f9387e95fe47369a5952b20dfc79ed70e52b7c58810140e2c00a4d9bfe68cb5a\",\n      \"relevant_change\": true,\n      \"reused\": false\n    },\n    {\n      \"compatibility_verified\": true,\n      \"path_sha256\": \"f9387e95fe47369a5952b20dfc79ed70e52b7c58810140e2c00a4d9bfe68cb5a\",\n      \"relevant_change\": false,\n      \"reused\": true\n    }\n  ],\n  \"schema\": \"guard-supply-boot-record/1\",\n  \"source_sha256\": \"89083d7ec986eee7c6427312dc98bf58feda7d7f8fa1129e8ef7d973cdd14d98\",\n  \"target_sha256\": \"60c71a89f9ece9582712323aa0f7dde4d74087dd2dbebd550bf0fd23d34f5472\"\n}",
+          "record_sha256": "a84f516c46aa01ff4a5aff8681c07e29fcad9802d24f96558ecce38a76a33b77",
+          "binding": {
+            "environment_ref": {
+              "id": "ENV-01M6NJMS2AS294M8WH0Y73MZEB",
+              "kind": "ENV",
+              "revision": 1,
+              "sha256": "d5c89568af0726336ef8081c7fb084020a2901b8ebd91c7a21df310d6475ccdc"
+            },
+            "role": "normal",
+            "session": "11fb0c72f82d43c2abc00a061ee8476f",
+            "source_sha256": "89083d7ec986eee7c6427312dc98bf58feda7d7f8fa1129e8ef7d973cdd14d98",
+            "target_sha256": "60c71a89f9ece9582712323aa0f7dde4d74087dd2dbebd550bf0fd23d34f5472"
+          },
+          "target": {
+            "created_container_id": "9597e64161e9ec8a13b5b2f965ddebf96438902cc8a15c4257e9e54a41616e9f",
+            "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+            "role": "normal",
+            "run_id": "sup15-cpu-v1-normal-564303d0",
+            "scope": "actual CPU Docker Inductor component only; not Kubernetes target"
+          },
+          "prepared": {
+            "assets": {
+              "guard_lifecycle_sensor.py": {
+                "bytes": 56479,
+                "sha256": "2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd"
+              },
+              "settings.json": {
+                "bytes": 258,
+                "sha256": "42401e2b4a0af1f958caea554ed9e09ac5b8381527195059a0a30a5743a690e0"
+              },
+              "sitecustomize.py": {
+                "bytes": 574,
+                "sha256": "0fad8ca363d29ee791ed3fcad2292f1e89c24e62871e6788749225c8b340df4d"
+              }
+            },
+            "engine_started": false,
+            "image_contents_verified": false,
+            "product_connected": false,
+            "profile": "vllm-native-lifecycle-metadata/8",
+            "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+            "schema": "guard-lifecycle-assets/1",
+            "session": "b11b269358494c1e9d4a850437d21a50",
+            "source_sha256": {
+              "vllm.entrypoints.generate.base.serving": "9bffd4141b12973b37c08b19d603f2694c42d6fb41f9d1569c349445dc7d00b2",
+              "vllm.entrypoints.openai.completion.api_router": "b93b00298a74a62a3f2d8da1c0a9380a2be5823f5ab7ab99a2c911906280d769",
+              "vllm.entrypoints.openai.completion.serving": "aac889978efb034b95ab81ec59695d83ba7c879ab48cd5be2448c980f109a3bd",
+              "vllm.entrypoints.openai.models.api_router": "58d7bf90b7dd2a896441d3085b8a4467c12412120f21fe53d838109b7b85f48b",
+              "vllm.entrypoints.openai.models.serving": "39ecebf92abec7931b4c953e0d9743320dbd93532a8e3488307398c29dba2553",
+              "vllm.entrypoints.serve.engine.serving": "e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02",
+              "vllm.entrypoints.serve.middleware.authenticate": "ceb576aa3c053a5bcf145cfbe3f81def0f7213480c4aa1531fc4c00e32955225",
+              "vllm.entrypoints.serve.utils.api_utils": "ffb5e08c2b6cf6d0402c6ba31d0d05e53eb7e9e8c13b29700e84a4bfada420ba",
+              "vllm.model_executor.model_loader.base_loader": "5291c330c4ed5634a9ea1d535364c26162b60251aa2af03fd409b88c34d836e2",
+              "vllm.model_executor.model_loader.default_loader": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+              "vllm.model_executor.model_loader.weight_utils": "7d2573931b9684147b17018c1f6de318eea1c105556ffea03154201a72418afd",
+              "vllm.v1.core.block_pool": "05c73052934a9d4664ccd5df562ce71011278d9a511932da102ef2efff00e934",
+              "vllm.v1.core.kv_cache_coordinator": "6a1e00227b981a7bb6108a42db0e446c716f789274f40c63eb9a6ce4d699ddcb",
+              "vllm.v1.core.kv_cache_manager": "bd9bf46a2101f9368d4941867415a239d18d95e0b956f82f885ce25e10e69f3b",
+              "vllm.v1.core.sched.output": "972e0bc8e7af1f4262ac73f660f6b8f798ba780f86c031a9c8a7f10cbfaad3a8",
+              "vllm.v1.core.sched.scheduler": "f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a",
+              "vllm.v1.core.single_type_kv_cache_manager": "3a3cb20bd6aa1e0ad46471fc9e5e01ee5797ab4bb759e00ef5fb309d2830db13",
+              "vllm.v1.engine.async_llm": "ff933ed78aa3195782cf1c6d18c53897adfa5bf920421bd2bcc330f2adc84d1e",
+              "vllm.v1.engine.core": "f116962c35d9d312b20b0b76c34a8cdaa6d3f1d31f2036db4e123957d2d1555b",
+              "vllm.v1.engine.core_client": "24eecc78e8fc4849d4eac948c7586ee349ebfd503d07e80f05ec6c859da06fdd",
+              "vllm.v1.engine.input_processor": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
+              "vllm.v1.engine.output_processor": "c72d0149e18d6da71d53e23b6550d09310af6917523fef6e282b0907d36b8d54",
+              "vllm.v1.request": "dd7c30bf8b0894dc123a739c299c0133566f8cc075b081e45905f1c29506e69d",
+              "vllm.v1.worker.cpu_model_runner": "69cd626ddbc3b1693e026fda99018201d8c9f4dd559540970e8ff265b7a97093",
+              "vllm.v1.worker.gpu_input_batch": "e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d",
+              "vllm.v1.worker.gpu_model_runner": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a"
+            }
+          },
+          "noncode_assets": {
+            "settings.json": "{\n  \"control_path\": \"/guard-lifecycle/data/b11b269358494c1e9d4a850437d21a50/SEALED\",\n  \"output_dir\": \"/guard-lifecycle/data/b11b269358494c1e9d4a850437d21a50\",\n  \"schema\": \"guard-native-lifecycle-settings/1\",\n  \"session\": \"b11b269358494c1e9d4a850437d21a50\"\n}\n",
+            "sitecustomize.py": "import hashlib,pathlib,sys,types\ndef _guard_lifecycle_start():\n    try:\n        path=pathlib.Path('/guard-lifecycle/guard_lifecycle_sensor.py')\n        raw=path.read_bytes()\n        if hashlib.sha256(raw).hexdigest()!='2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd': return\n        module=types.ModuleType('guard_lifecycle_sensor')\n        module.__file__=str(path)\n        exec(compile(raw,str(path),'exec'),module.__dict__)\n        sys.modules[module.__name__]=module\n        module.install()\n    except Exception:\n        pass\n_guard_lifecycle_start()\n"
+          },
+          "new_native_or_worker_collection": false
+        },
+        "challenge": {
+          "original_record_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-gpu-b-prep-recovery-errors-20261104\\out\\sup15-cache-v2\\actual-v1-challenge\\data\\f33a5533a988422db3f61e775ae11d2e\\boot-record.json",
+          "record_utf8": "{\n  \"change\": {\n    \"actor_sha256\": \"89083d7ec986eee7c6427312dc98bf58feda7d7f8fa1129e8ef7d973cdd14d98\",\n    \"applied\": true,\n    \"denied\": false,\n    \"kind\": \"LAB-math-constant1-to2-and-logging-only-control\",\n    \"sensor_started_before_consumption\": true\n  },\n  \"environment_ref\": {\n    \"id\": \"ENV-01M6NJMS2AS294M8WH0Y73MZEB\",\n    \"kind\": \"ENV\",\n    \"revision\": 1,\n    \"sha256\": \"d5c89568af0726336ef8081c7fb084020a2901b8ebd91c7a21df310d6475ccdc\"\n  },\n  \"profile\": \"supply-boot-cache-reuse-v1\",\n  \"role\": \"challenge\",\n  \"rows\": [\n    {\n      \"compatibility_verified\": true,\n      \"path_sha256\": \"92639facd73be108e830acfa2b605cf5bb2ab0e8b2793cafc0c7bdbc921efcd1\",\n      \"relevant_change\": false,\n      \"reused\": true\n    },\n    {\n      \"compatibility_verified\": true,\n      \"path_sha256\": \"92639facd73be108e830acfa2b605cf5bb2ab0e8b2793cafc0c7bdbc921efcd1\",\n      \"relevant_change\": false,\n      \"reused\": true\n    },\n    {\n      \"compatibility_verified\": true,\n      \"path_sha256\": \"d141bad674f6832f84b131fbb2d4a586afeff42f0a60f7b4c28e12f5ae83b9b5\",\n      \"relevant_change\": true,\n      \"reused\": false\n    },\n    {\n      \"compatibility_verified\": true,\n      \"path_sha256\": \"d141bad674f6832f84b131fbb2d4a586afeff42f0a60f7b4c28e12f5ae83b9b5\",\n      \"relevant_change\": false,\n      \"reused\": true\n    }\n  ],\n  \"schema\": \"guard-supply-boot-record/1\",\n  \"source_sha256\": \"89083d7ec986eee7c6427312dc98bf58feda7d7f8fa1129e8ef7d973cdd14d98\",\n  \"target_sha256\": \"3770b2e7eea9a6dcb5079649de6e53f00ba9a0ad7c612e0e2f97928084abe81c\"\n}",
+          "record_sha256": "9ab0adb25d4d0d77e4b41079aff2c56a6bc53992359defacc1411e4995af7267",
+          "binding": {
+            "environment_ref": {
+              "id": "ENV-01M6NJMS2AS294M8WH0Y73MZEB",
+              "kind": "ENV",
+              "revision": 1,
+              "sha256": "d5c89568af0726336ef8081c7fb084020a2901b8ebd91c7a21df310d6475ccdc"
+            },
+            "role": "challenge",
+            "session": "f33a5533a988422db3f61e775ae11d2e",
+            "source_sha256": "89083d7ec986eee7c6427312dc98bf58feda7d7f8fa1129e8ef7d973cdd14d98",
+            "target_sha256": "3770b2e7eea9a6dcb5079649de6e53f00ba9a0ad7c612e0e2f97928084abe81c"
+          },
+          "target": {
+            "created_container_id": "5aa8e723ff02174f00ea584d2116e5be8c26d4f9011806703d44806eded0172c",
+            "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+            "role": "challenge",
+            "run_id": "sup15-cpu-v1-challenge-663b863e",
+            "scope": "actual CPU Docker Inductor component only; not Kubernetes target"
+          },
+          "prepared": {
+            "assets": {
+              "guard_lifecycle_sensor.py": {
+                "bytes": 56479,
+                "sha256": "2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd"
+              },
+              "settings.json": {
+                "bytes": 258,
+                "sha256": "564b7e5da17403f848ee209d928c61642c7777daff9260295a880884cbff1dab"
+              },
+              "sitecustomize.py": {
+                "bytes": 574,
+                "sha256": "0fad8ca363d29ee791ed3fcad2292f1e89c24e62871e6788749225c8b340df4d"
+              }
+            },
+            "engine_started": false,
+            "image_contents_verified": false,
+            "product_connected": false,
+            "profile": "vllm-native-lifecycle-metadata/8",
+            "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+            "schema": "guard-lifecycle-assets/1",
+            "session": "3a4c7092a45e4891a8202e6514d29f6e",
+            "source_sha256": {
+              "vllm.entrypoints.generate.base.serving": "9bffd4141b12973b37c08b19d603f2694c42d6fb41f9d1569c349445dc7d00b2",
+              "vllm.entrypoints.openai.completion.api_router": "b93b00298a74a62a3f2d8da1c0a9380a2be5823f5ab7ab99a2c911906280d769",
+              "vllm.entrypoints.openai.completion.serving": "aac889978efb034b95ab81ec59695d83ba7c879ab48cd5be2448c980f109a3bd",
+              "vllm.entrypoints.openai.models.api_router": "58d7bf90b7dd2a896441d3085b8a4467c12412120f21fe53d838109b7b85f48b",
+              "vllm.entrypoints.openai.models.serving": "39ecebf92abec7931b4c953e0d9743320dbd93532a8e3488307398c29dba2553",
+              "vllm.entrypoints.serve.engine.serving": "e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02",
+              "vllm.entrypoints.serve.middleware.authenticate": "ceb576aa3c053a5bcf145cfbe3f81def0f7213480c4aa1531fc4c00e32955225",
+              "vllm.entrypoints.serve.utils.api_utils": "ffb5e08c2b6cf6d0402c6ba31d0d05e53eb7e9e8c13b29700e84a4bfada420ba",
+              "vllm.model_executor.model_loader.base_loader": "5291c330c4ed5634a9ea1d535364c26162b60251aa2af03fd409b88c34d836e2",
+              "vllm.model_executor.model_loader.default_loader": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+              "vllm.model_executor.model_loader.weight_utils": "7d2573931b9684147b17018c1f6de318eea1c105556ffea03154201a72418afd",
+              "vllm.v1.core.block_pool": "05c73052934a9d4664ccd5df562ce71011278d9a511932da102ef2efff00e934",
+              "vllm.v1.core.kv_cache_coordinator": "6a1e00227b981a7bb6108a42db0e446c716f789274f40c63eb9a6ce4d699ddcb",
+              "vllm.v1.core.kv_cache_manager": "bd9bf46a2101f9368d4941867415a239d18d95e0b956f82f885ce25e10e69f3b",
+              "vllm.v1.core.sched.output": "972e0bc8e7af1f4262ac73f660f6b8f798ba780f86c031a9c8a7f10cbfaad3a8",
+              "vllm.v1.core.sched.scheduler": "f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a",
+              "vllm.v1.core.single_type_kv_cache_manager": "3a3cb20bd6aa1e0ad46471fc9e5e01ee5797ab4bb759e00ef5fb309d2830db13",
+              "vllm.v1.engine.async_llm": "ff933ed78aa3195782cf1c6d18c53897adfa5bf920421bd2bcc330f2adc84d1e",
+              "vllm.v1.engine.core": "f116962c35d9d312b20b0b76c34a8cdaa6d3f1d31f2036db4e123957d2d1555b",
+              "vllm.v1.engine.core_client": "24eecc78e8fc4849d4eac948c7586ee349ebfd503d07e80f05ec6c859da06fdd",
+              "vllm.v1.engine.input_processor": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
+              "vllm.v1.engine.output_processor": "c72d0149e18d6da71d53e23b6550d09310af6917523fef6e282b0907d36b8d54",
+              "vllm.v1.request": "dd7c30bf8b0894dc123a739c299c0133566f8cc075b081e45905f1c29506e69d",
+              "vllm.v1.worker.cpu_model_runner": "69cd626ddbc3b1693e026fda99018201d8c9f4dd559540970e8ff265b7a97093",
+              "vllm.v1.worker.gpu_input_batch": "e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d",
+              "vllm.v1.worker.gpu_model_runner": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a"
+            }
+          },
+          "noncode_assets": {
+            "settings.json": "{\n  \"control_path\": \"/guard-lifecycle/data/3a4c7092a45e4891a8202e6514d29f6e/SEALED\",\n  \"output_dir\": \"/guard-lifecycle/data/3a4c7092a45e4891a8202e6514d29f6e\",\n  \"schema\": \"guard-native-lifecycle-settings/1\",\n  \"session\": \"3a4c7092a45e4891a8202e6514d29f6e\"\n}\n",
+            "sitecustomize.py": "import hashlib,pathlib,sys,types\ndef _guard_lifecycle_start():\n    try:\n        path=pathlib.Path('/guard-lifecycle/guard_lifecycle_sensor.py')\n        raw=path.read_bytes()\n        if hashlib.sha256(raw).hexdigest()!='2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd': return\n        module=types.ModuleType('guard_lifecycle_sensor')\n        module.__file__=str(path)\n        exec(compile(raw,str(path),'exec'),module.__dict__)\n        sys.modules[module.__name__]=module\n        module.install()\n    except Exception:\n        pass\n_guard_lifecycle_start()\n"
+          },
+          "new_native_or_worker_collection": false
+        }
+      }
+    },
+    "SUP-16": {
+      "environment_utf8": "{\"adapter\":null,\"content_sha256\":\"cb9eb05eb08e131d13eade86c5dfe9ba9e7807a856b1c242e22217516f20e847\",\"created_at\":\"2026-11-05T08:33:53Z\",\"data_origin\":\"EXAMPLE\",\"engine\":{\"image_digest\":\"vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b\",\"name\":\"vllm\",\"source_commit\":null,\"version\":\"0.31.0+cpu\"},\"facts\":{},\"id\":\"ENV-01M6NDFNAC7VZ547BD1YDH6FEH\",\"kind\":\"ENV\",\"model\":{\"id\":\"OPT-125m-derived-safetensors-CPU-component\",\"inventory_sha256\":\"a5e923321861e7f885c0b83a15b321d799189c7f80ff9dffb80abd820aa7d59c\",\"revision\":\"27dcfa74d334bc871f3234de431e71c6eeba5dd6\"},\"refs\":[],\"revision\":1,\"runtime\":{\"driver\":null,\"gpu_count\":0,\"gpu_model\":null,\"nodes\":1,\"platform\":\"Actual local standalone HF SDK plus vLLM eager iterator. No serving worker/model-loader root.\",\"tp_groups\":1}}",
+      "environment_sha256": "726b3ca660e12cc74d4b9ded47aea2151cfd82e67351a9bf391fc2473076e6f0",
+      "roles": {
+        "normal": {
+          "original_record_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-gpu-b-prep-recovery-errors-20261104\\out\\sup16-partial-v1\\actual-v4-normal\\evidence\\capture\\boot-record.json",
+          "record_utf8": "{\n  \"change\": {\n    \"actor_sha256\": \"dfea8c3d57c17559e85271567819ebeb362bcd27e54ca32708123e0ea7b1897b\",\n    \"applied\": false,\n    \"denied\": false,\n    \"kind\": \"actual-SDK-partial-body-and-explicit-LAB-promotion\",\n    \"sensor_started_before_consumption\": true\n  },\n  \"environment_ref\": {\n    \"id\": \"ENV-01M6NDFNAC7VZ547BD1YDH6FEH\",\n    \"kind\": \"ENV\",\n    \"revision\": 1,\n    \"sha256\": \"cb9eb05eb08e131d13eade86c5dfe9ba9e7807a856b1c242e22217516f20e847\"\n  },\n  \"profile\": \"supply-boot-partial-artifact-v1\",\n  \"role\": \"normal\",\n  \"rows\": [\n    {\n      \"error_type\": null,\n      \"file_bytes\": 250500968,\n      \"file_sha256\": \"077edec6c7a19ddbcbee084d4763a63b72293cee16837cdfcd4b95f7b9f51251\",\n      \"label\": \"complete-read\",\n      \"reader_returned_any_tensor\": true,\n      \"yield_count\": 196\n    }\n  ],\n  \"schema\": \"guard-supply-boot-record/1\",\n  \"source_sha256\": \"dfea8c3d57c17559e85271567819ebeb362bcd27e54ca32708123e0ea7b1897b\",\n  \"target_sha256\": \"f1977f8b2770d9d10d55ca3daf47ce920c0033ffc76d742374679f60ff7c7e4b\"\n}",
+          "record_sha256": "9a121f86c6a10c3fd508dedc6352e27ddf0d32fc71c137b2ef276480805c8843",
+          "binding": {
+            "environment_ref": {
+              "id": "ENV-01M6NDFNAC7VZ547BD1YDH6FEH",
+              "kind": "ENV",
+              "revision": 1,
+              "sha256": "cb9eb05eb08e131d13eade86c5dfe9ba9e7807a856b1c242e22217516f20e847"
+            },
+            "role": "normal",
+            "session": "c9d9d0f5d34d46e68fbb4e346e605da7",
+            "source_sha256": "dfea8c3d57c17559e85271567819ebeb362bcd27e54ca32708123e0ea7b1897b",
+            "target_sha256": "f1977f8b2770d9d10d55ca3daf47ce920c0033ffc76d742374679f60ff7c7e4b"
+          },
+          "target": {
+            "actual_component_container_id": "495b53ced9e66dcdc94121506751883a8a6f116750aa096b0039cd0673854121",
+            "engine": {
+              "container": "guard-sup16-normal-b44545676e",
+              "image_digest": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b"
+            },
+            "environment_ref": {
+              "id": "ENV-01M6NDFNAC7VZ547BD1YDH6FEH",
+              "kind": "ENV",
+              "revision": 1,
+              "sha256": "cb9eb05eb08e131d13eade86c5dfe9ba9e7807a856b1c242e22217516f20e847"
+            },
+            "lab": true,
+            "run_id": "sup16-normal-c2cf9f798f",
+            "scope": "Actual CPU component only; not Kubernetes/serving target"
+          },
+          "prepared": {
+            "assets": {
+              "guard_lifecycle_base.py": {
+                "bytes": 56479,
+                "sha256": "2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd"
+              },
+              "guard_lifecycle_sensor.py": {
+                "bytes": 15718,
+                "sha256": "e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d"
+              },
+              "guard_weight_iteration.py": {
+                "bytes": 18435,
+                "sha256": "6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648"
+              },
+              "model-read-scope.json": {
+                "bytes": 1201,
+                "sha256": "bb88db4d6a7d716d2b96ed57868ea6379232fb9e59123935da422ab52ade2894"
+              },
+              "settings.json": {
+                "bytes": 258,
+                "sha256": "7f48eba40801e869f640aa4ca3aa3bb7f560c0b85177ee77a07420865631f20e"
+              },
+              "sitecustomize.py": {
+                "bytes": 574,
+                "sha256": "692ead848047ab20eab7b0976de121d36c361f69968fc6064eeee5b9f6297c63"
+              }
+            },
+            "engine_started": false,
+            "image_contents_verified": false,
+            "model_read_scope": {
+              "data_origin": "EXAMPLE",
+              "environment_ref": {
+                "id": "ENV-01M6NDFNAC7VZ547BD1YDH6FEH",
+                "kind": "ENV",
+                "revision": 1,
+                "sha256": "cb9eb05eb08e131d13eade86c5dfe9ba9e7807a856b1c242e22217516f20e847"
+              },
+              "files": [
+                {
+                  "bytes": 250500968,
+                  "normalized_path_sha256": "3d728183be6b3279699b60724beaa692a78809d6b98a930ce3954951b17a56e9",
+                  "reference_sha256": "077edec6c7a19ddbcbee084d4763a63b72293cee16837cdfcd4b95f7b9f51251"
+                }
+              ],
+              "hash_model_bytes": true,
+              "inventory_sha256": "a5e923321861e7f885c0b83a15b321d799189c7f80ff9dffb80abd820aa7d59c",
+              "manifest_bytes_sha256": "a5e923321861e7f885c0b83a15b321d799189c7f80ff9dffb80abd820aa7d59c",
+              "max_hash_bytes": 2147483648,
+              "model_sha256": "f74b4e578bae72d8913502c399a06fcbfbcb9e5369e33af01a29541e7bd17e7c",
+              "nonsecret_model_weights": true,
+              "revision_sha256": "2a4cc6751be85eaaad8b75766af0d440f5b91bc9892fd54e9db02ff991494918",
+              "target_sha256": "f1977f8b2770d9d10d55ca3daf47ce920c0033ffc76d742374679f60ff7c7e4b"
+            },
+            "product_connected": false,
+            "profile": "vllm-native-lifecycle-metadata/17",
+            "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+            "schema": "guard-lifecycle-assets/1",
+            "session": "c9d9d0f5d34d46e68fbb4e346e605da7",
+            "source_sha256": {
+              "vllm.entrypoints.generate.base.serving": "9bffd4141b12973b37c08b19d603f2694c42d6fb41f9d1569c349445dc7d00b2",
+              "vllm.entrypoints.openai.completion.api_router": "b93b00298a74a62a3f2d8da1c0a9380a2be5823f5ab7ab99a2c911906280d769",
+              "vllm.entrypoints.openai.completion.serving": "aac889978efb034b95ab81ec59695d83ba7c879ab48cd5be2448c980f109a3bd",
+              "vllm.entrypoints.openai.models.api_router": "58d7bf90b7dd2a896441d3085b8a4467c12412120f21fe53d838109b7b85f48b",
+              "vllm.entrypoints.openai.models.serving": "39ecebf92abec7931b4c953e0d9743320dbd93532a8e3488307398c29dba2553",
+              "vllm.entrypoints.serve.engine.serving": "e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02",
+              "vllm.entrypoints.serve.middleware.authenticate": "ceb576aa3c053a5bcf145cfbe3f81def0f7213480c4aa1531fc4c00e32955225",
+              "vllm.entrypoints.serve.utils.api_utils": "ffb5e08c2b6cf6d0402c6ba31d0d05e53eb7e9e8c13b29700e84a4bfada420ba",
+              "vllm.model_executor.model_loader.base_loader": "5291c330c4ed5634a9ea1d535364c26162b60251aa2af03fd409b88c34d836e2",
+              "vllm.model_executor.model_loader.default_loader": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+              "vllm.model_executor.model_loader.weight_utils": "7d2573931b9684147b17018c1f6de318eea1c105556ffea03154201a72418afd",
+              "vllm.model_executor.models.utils": "7171b6347b3cbab213df299fa317094ac6c9b2b397daf6a2ec93ff3a152b0e75",
+              "vllm.v1.core.block_pool": "05c73052934a9d4664ccd5df562ce71011278d9a511932da102ef2efff00e934",
+              "vllm.v1.core.kv_cache_coordinator": "6a1e00227b981a7bb6108a42db0e446c716f789274f40c63eb9a6ce4d699ddcb",
+              "vllm.v1.core.kv_cache_manager": "bd9bf46a2101f9368d4941867415a239d18d95e0b956f82f885ce25e10e69f3b",
+              "vllm.v1.core.sched.output": "972e0bc8e7af1f4262ac73f660f6b8f798ba780f86c031a9c8a7f10cbfaad3a8",
+              "vllm.v1.core.sched.scheduler": "f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a",
+              "vllm.v1.core.single_type_kv_cache_manager": "3a3cb20bd6aa1e0ad46471fc9e5e01ee5797ab4bb759e00ef5fb309d2830db13",
+              "vllm.v1.engine.async_llm": "ff933ed78aa3195782cf1c6d18c53897adfa5bf920421bd2bcc330f2adc84d1e",
+              "vllm.v1.engine.core": "f116962c35d9d312b20b0b76c34a8cdaa6d3f1d31f2036db4e123957d2d1555b",
+              "vllm.v1.engine.core_client": "24eecc78e8fc4849d4eac948c7586ee349ebfd503d07e80f05ec6c859da06fdd",
+              "vllm.v1.engine.input_processor": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
+              "vllm.v1.engine.output_processor": "c72d0149e18d6da71d53e23b6550d09310af6917523fef6e282b0907d36b8d54",
+              "vllm.v1.request": "dd7c30bf8b0894dc123a739c299c0133566f8cc075b081e45905f1c29506e69d",
+              "vllm.v1.worker.cpu_model_runner": "69cd626ddbc3b1693e026fda99018201d8c9f4dd559540970e8ff265b7a97093",
+              "vllm.v1.worker.gpu_input_batch": "e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d",
+              "vllm.v1.worker.gpu_model_runner": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a"
+            }
+          },
+          "noncode_assets": {
+            "model-read-scope.json": "{\n  \"data_origin\": \"EXAMPLE\",\n  \"environment_ref\": {\n    \"id\": \"ENV-01M6NDFNAC7VZ547BD1YDH6FEH\",\n    \"kind\": \"ENV\",\n    \"revision\": 1,\n    \"sha256\": \"cb9eb05eb08e131d13eade86c5dfe9ba9e7807a856b1c242e22217516f20e847\"\n  },\n  \"files\": [\n    {\n      \"bytes\": 250500968,\n      \"normalized_path_sha256\": \"3d728183be6b3279699b60724beaa692a78809d6b98a930ce3954951b17a56e9\",\n      \"reference_sha256\": \"077edec6c7a19ddbcbee084d4763a63b72293cee16837cdfcd4b95f7b9f51251\"\n    }\n  ],\n  \"hash_model_bytes\": true,\n  \"input_scope_sha256\": \"92d683dddc88066ff7e8ccf3a407ab8b0ba7b79b057e0e820a49892ba8cc1615\",\n  \"inventory_sha256\": \"a5e923321861e7f885c0b83a15b321d799189c7f80ff9dffb80abd820aa7d59c\",\n  \"manifest_bytes_sha256\": \"a5e923321861e7f885c0b83a15b321d799189c7f80ff9dffb80abd820aa7d59c\",\n  \"max_hash_bytes\": 2147483648,\n  \"model_sha256\": \"f74b4e578bae72d8913502c399a06fcbfbcb9e5369e33af01a29541e7bd17e7c\",\n  \"nonsecret_model_weights\": true,\n  \"revision_sha256\": \"2a4cc6751be85eaaad8b75766af0d440f5b91bc9892fd54e9db02ff991494918\",\n  \"schema\": \"guard-native-model-read-scope/1\",\n  \"session\": \"c9d9d0f5d34d46e68fbb4e346e605da7\",\n  \"target_sha256\": \"f1977f8b2770d9d10d55ca3daf47ce920c0033ffc76d742374679f60ff7c7e4b\"\n}\n",
+            "settings.json": "{\n  \"control_path\": \"/guard-lifecycle/data/c9d9d0f5d34d46e68fbb4e346e605da7/SEALED\",\n  \"output_dir\": \"/guard-lifecycle/data/c9d9d0f5d34d46e68fbb4e346e605da7\",\n  \"schema\": \"guard-native-lifecycle-settings/1\",\n  \"session\": \"c9d9d0f5d34d46e68fbb4e346e605da7\"\n}\n",
+            "sitecustomize.py": "import hashlib,pathlib,sys,types\ndef _guard_lifecycle_start():\n    try:\n        path=pathlib.Path('/guard-lifecycle/guard_lifecycle_sensor.py')\n        raw=path.read_bytes()\n        if hashlib.sha256(raw).hexdigest()!='e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d': return\n        module=types.ModuleType('guard_lifecycle_sensor')\n        module.__file__=str(path)\n        exec(compile(raw,str(path),'exec'),module.__dict__)\n        sys.modules[module.__name__]=module\n        module.install()\n    except Exception:\n        pass\n_guard_lifecycle_start()\n"
+          },
+          "new_native_or_worker_collection": false
+        },
+        "challenge": {
+          "original_record_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-gpu-b-prep-recovery-errors-20261104\\out\\sup16-partial-v1\\actual-v4-challenge\\evidence\\capture\\boot-record.json",
+          "record_utf8": "{\n  \"change\": {\n    \"actor_sha256\": \"dfea8c3d57c17559e85271567819ebeb362bcd27e54ca32708123e0ea7b1897b\",\n    \"applied\": true,\n    \"denied\": false,\n    \"kind\": \"actual-SDK-partial-body-and-explicit-LAB-promotion\",\n    \"sensor_started_before_consumption\": true\n  },\n  \"environment_ref\": {\n    \"id\": \"ENV-01M6NDFNAC7VZ547BD1YDH6FEH\",\n    \"kind\": \"ENV\",\n    \"revision\": 1,\n    \"sha256\": \"cb9eb05eb08e131d13eade86c5dfe9ba9e7807a856b1c242e22217516f20e847\"\n  },\n  \"profile\": \"supply-boot-partial-artifact-v1\",\n  \"role\": \"challenge\",\n  \"rows\": [\n    {\n      \"error_type\": \"SafetensorError\",\n      \"file_bytes\": 10485760,\n      \"file_sha256\": \"d72424507d4abf34517c53c61c31946db15f60de13eb6d0ec106c04b9c052af9\",\n      \"label\": \"partial-promoted-read\",\n      \"reader_returned_any_tensor\": false,\n      \"yield_count\": 0\n    },\n    {\n      \"error_type\": null,\n      \"file_bytes\": 250500968,\n      \"file_sha256\": \"077edec6c7a19ddbcbee084d4763a63b72293cee16837cdfcd4b95f7b9f51251\",\n      \"label\": \"SDK-restart-recovered-read\",\n      \"reader_returned_any_tensor\": true,\n      \"yield_count\": 196\n    }\n  ],\n  \"schema\": \"guard-supply-boot-record/1\",\n  \"source_sha256\": \"dfea8c3d57c17559e85271567819ebeb362bcd27e54ca32708123e0ea7b1897b\",\n  \"target_sha256\": \"8734278c908282d117ae68bccc5476d8d792a12cc3f8defc472d690bb70c5ea6\"\n}",
+          "record_sha256": "169673228cbc9ed0fd3bbd2712454c94fe2c033cbb455b36261ed1a5a49b8a88",
+          "binding": {
+            "environment_ref": {
+              "id": "ENV-01M6NDFNAC7VZ547BD1YDH6FEH",
+              "kind": "ENV",
+              "revision": 1,
+              "sha256": "cb9eb05eb08e131d13eade86c5dfe9ba9e7807a856b1c242e22217516f20e847"
+            },
+            "role": "challenge",
+            "session": "3f6aa796553c4d3ebafa4a5ecc5a8c54",
+            "source_sha256": "dfea8c3d57c17559e85271567819ebeb362bcd27e54ca32708123e0ea7b1897b",
+            "target_sha256": "8734278c908282d117ae68bccc5476d8d792a12cc3f8defc472d690bb70c5ea6"
+          },
+          "target": {
+            "actual_component_container_id": "e09eedd881b18dd3be11a1d8ad8d07ef1627d9dd92065a6c37135bc94f17f8d9",
+            "engine": {
+              "container": "guard-sup16-challenge-bec71187f7",
+              "image_digest": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b"
+            },
+            "environment_ref": {
+              "id": "ENV-01M6NDFNAC7VZ547BD1YDH6FEH",
+              "kind": "ENV",
+              "revision": 1,
+              "sha256": "cb9eb05eb08e131d13eade86c5dfe9ba9e7807a856b1c242e22217516f20e847"
+            },
+            "lab": true,
+            "run_id": "sup16-challenge-a0d2bcbdff",
+            "scope": "Actual CPU component only; not Kubernetes/serving target"
+          },
+          "prepared": {
+            "assets": {
+              "guard_lifecycle_base.py": {
+                "bytes": 56479,
+                "sha256": "2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd"
+              },
+              "guard_lifecycle_sensor.py": {
+                "bytes": 15718,
+                "sha256": "e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d"
+              },
+              "guard_weight_iteration.py": {
+                "bytes": 18435,
+                "sha256": "6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648"
+              },
+              "model-read-scope.json": {
+                "bytes": 1201,
+                "sha256": "6983918435be01aafc289b8287e16ae216980a5a61e265ca1608adb0bc2d8ca6"
+              },
+              "settings.json": {
+                "bytes": 258,
+                "sha256": "5771d4d539a435a9c2e55d13e824341ad2396b2b0fc1fd53a3dea4c69e45d65b"
+              },
+              "sitecustomize.py": {
+                "bytes": 574,
+                "sha256": "692ead848047ab20eab7b0976de121d36c361f69968fc6064eeee5b9f6297c63"
+              }
+            },
+            "engine_started": false,
+            "image_contents_verified": false,
+            "model_read_scope": {
+              "data_origin": "EXAMPLE",
+              "environment_ref": {
+                "id": "ENV-01M6NDFNAC7VZ547BD1YDH6FEH",
+                "kind": "ENV",
+                "revision": 1,
+                "sha256": "cb9eb05eb08e131d13eade86c5dfe9ba9e7807a856b1c242e22217516f20e847"
+              },
+              "files": [
+                {
+                  "bytes": 250500968,
+                  "normalized_path_sha256": "3d728183be6b3279699b60724beaa692a78809d6b98a930ce3954951b17a56e9",
+                  "reference_sha256": "077edec6c7a19ddbcbee084d4763a63b72293cee16837cdfcd4b95f7b9f51251"
+                }
+              ],
+              "hash_model_bytes": true,
+              "inventory_sha256": "a5e923321861e7f885c0b83a15b321d799189c7f80ff9dffb80abd820aa7d59c",
+              "manifest_bytes_sha256": "a5e923321861e7f885c0b83a15b321d799189c7f80ff9dffb80abd820aa7d59c",
+              "max_hash_bytes": 2147483648,
+              "model_sha256": "f74b4e578bae72d8913502c399a06fcbfbcb9e5369e33af01a29541e7bd17e7c",
+              "nonsecret_model_weights": true,
+              "revision_sha256": "2a4cc6751be85eaaad8b75766af0d440f5b91bc9892fd54e9db02ff991494918",
+              "target_sha256": "8734278c908282d117ae68bccc5476d8d792a12cc3f8defc472d690bb70c5ea6"
+            },
+            "product_connected": false,
+            "profile": "vllm-native-lifecycle-metadata/17",
+            "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+            "schema": "guard-lifecycle-assets/1",
+            "session": "3f6aa796553c4d3ebafa4a5ecc5a8c54",
+            "source_sha256": {
+              "vllm.entrypoints.generate.base.serving": "9bffd4141b12973b37c08b19d603f2694c42d6fb41f9d1569c349445dc7d00b2",
+              "vllm.entrypoints.openai.completion.api_router": "b93b00298a74a62a3f2d8da1c0a9380a2be5823f5ab7ab99a2c911906280d769",
+              "vllm.entrypoints.openai.completion.serving": "aac889978efb034b95ab81ec59695d83ba7c879ab48cd5be2448c980f109a3bd",
+              "vllm.entrypoints.openai.models.api_router": "58d7bf90b7dd2a896441d3085b8a4467c12412120f21fe53d838109b7b85f48b",
+              "vllm.entrypoints.openai.models.serving": "39ecebf92abec7931b4c953e0d9743320dbd93532a8e3488307398c29dba2553",
+              "vllm.entrypoints.serve.engine.serving": "e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02",
+              "vllm.entrypoints.serve.middleware.authenticate": "ceb576aa3c053a5bcf145cfbe3f81def0f7213480c4aa1531fc4c00e32955225",
+              "vllm.entrypoints.serve.utils.api_utils": "ffb5e08c2b6cf6d0402c6ba31d0d05e53eb7e9e8c13b29700e84a4bfada420ba",
+              "vllm.model_executor.model_loader.base_loader": "5291c330c4ed5634a9ea1d535364c26162b60251aa2af03fd409b88c34d836e2",
+              "vllm.model_executor.model_loader.default_loader": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+              "vllm.model_executor.model_loader.weight_utils": "7d2573931b9684147b17018c1f6de318eea1c105556ffea03154201a72418afd",
+              "vllm.model_executor.models.utils": "7171b6347b3cbab213df299fa317094ac6c9b2b397daf6a2ec93ff3a152b0e75",
+              "vllm.v1.core.block_pool": "05c73052934a9d4664ccd5df562ce71011278d9a511932da102ef2efff00e934",
+              "vllm.v1.core.kv_cache_coordinator": "6a1e00227b981a7bb6108a42db0e446c716f789274f40c63eb9a6ce4d699ddcb",
+              "vllm.v1.core.kv_cache_manager": "bd9bf46a2101f9368d4941867415a239d18d95e0b956f82f885ce25e10e69f3b",
+              "vllm.v1.core.sched.output": "972e0bc8e7af1f4262ac73f660f6b8f798ba780f86c031a9c8a7f10cbfaad3a8",
+              "vllm.v1.core.sched.scheduler": "f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a",
+              "vllm.v1.core.single_type_kv_cache_manager": "3a3cb20bd6aa1e0ad46471fc9e5e01ee5797ab4bb759e00ef5fb309d2830db13",
+              "vllm.v1.engine.async_llm": "ff933ed78aa3195782cf1c6d18c53897adfa5bf920421bd2bcc330f2adc84d1e",
+              "vllm.v1.engine.core": "f116962c35d9d312b20b0b76c34a8cdaa6d3f1d31f2036db4e123957d2d1555b",
+              "vllm.v1.engine.core_client": "24eecc78e8fc4849d4eac948c7586ee349ebfd503d07e80f05ec6c859da06fdd",
+              "vllm.v1.engine.input_processor": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
+              "vllm.v1.engine.output_processor": "c72d0149e18d6da71d53e23b6550d09310af6917523fef6e282b0907d36b8d54",
+              "vllm.v1.request": "dd7c30bf8b0894dc123a739c299c0133566f8cc075b081e45905f1c29506e69d",
+              "vllm.v1.worker.cpu_model_runner": "69cd626ddbc3b1693e026fda99018201d8c9f4dd559540970e8ff265b7a97093",
+              "vllm.v1.worker.gpu_input_batch": "e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d",
+              "vllm.v1.worker.gpu_model_runner": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a"
+            }
+          },
+          "noncode_assets": {
+            "model-read-scope.json": "{\n  \"data_origin\": \"EXAMPLE\",\n  \"environment_ref\": {\n    \"id\": \"ENV-01M6NDFNAC7VZ547BD1YDH6FEH\",\n    \"kind\": \"ENV\",\n    \"revision\": 1,\n    \"sha256\": \"cb9eb05eb08e131d13eade86c5dfe9ba9e7807a856b1c242e22217516f20e847\"\n  },\n  \"files\": [\n    {\n      \"bytes\": 250500968,\n      \"normalized_path_sha256\": \"3d728183be6b3279699b60724beaa692a78809d6b98a930ce3954951b17a56e9\",\n      \"reference_sha256\": \"077edec6c7a19ddbcbee084d4763a63b72293cee16837cdfcd4b95f7b9f51251\"\n    }\n  ],\n  \"hash_model_bytes\": true,\n  \"input_scope_sha256\": \"47aaecf50dd02089027b87e6079c32a5e3a7a89ef60277f2ba117b3be7a2210b\",\n  \"inventory_sha256\": \"a5e923321861e7f885c0b83a15b321d799189c7f80ff9dffb80abd820aa7d59c\",\n  \"manifest_bytes_sha256\": \"a5e923321861e7f885c0b83a15b321d799189c7f80ff9dffb80abd820aa7d59c\",\n  \"max_hash_bytes\": 2147483648,\n  \"model_sha256\": \"f74b4e578bae72d8913502c399a06fcbfbcb9e5369e33af01a29541e7bd17e7c\",\n  \"nonsecret_model_weights\": true,\n  \"revision_sha256\": \"2a4cc6751be85eaaad8b75766af0d440f5b91bc9892fd54e9db02ff991494918\",\n  \"schema\": \"guard-native-model-read-scope/1\",\n  \"session\": \"3f6aa796553c4d3ebafa4a5ecc5a8c54\",\n  \"target_sha256\": \"8734278c908282d117ae68bccc5476d8d792a12cc3f8defc472d690bb70c5ea6\"\n}\n",
+            "settings.json": "{\n  \"control_path\": \"/guard-lifecycle/data/3f6aa796553c4d3ebafa4a5ecc5a8c54/SEALED\",\n  \"output_dir\": \"/guard-lifecycle/data/3f6aa796553c4d3ebafa4a5ecc5a8c54\",\n  \"schema\": \"guard-native-lifecycle-settings/1\",\n  \"session\": \"3f6aa796553c4d3ebafa4a5ecc5a8c54\"\n}\n",
+            "sitecustomize.py": "import hashlib,pathlib,sys,types\ndef _guard_lifecycle_start():\n    try:\n        path=pathlib.Path('/guard-lifecycle/guard_lifecycle_sensor.py')\n        raw=path.read_bytes()\n        if hashlib.sha256(raw).hexdigest()!='e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d': return\n        module=types.ModuleType('guard_lifecycle_sensor')\n        module.__file__=str(path)\n        exec(compile(raw,str(path),'exec'),module.__dict__)\n        sys.modules[module.__name__]=module\n        module.install()\n    except Exception:\n        pass\n_guard_lifecycle_start()\n"
+          },
+          "new_native_or_worker_collection": false
+        }
+      }
+    }
+  }
+}

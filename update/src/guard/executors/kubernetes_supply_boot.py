@@ -108,6 +108,8 @@ class KubernetesSupplyBootExecutor:
             row.update(collected=True, record_sha256=provenance["capture_sha256"],
                        owner_binding_verified=provenance["owner_binding_verified"])
             result["packet"] = packet
+            if check.id in {'SUP-15', 'SUP-16'}:
+                result['record_bytes'] = raw
             result["evaluated"] = contract.evaluate_record(check.id, packet, values)
         except Exception:
             row["diagnostic_codes"].append("SUPPLY_BOOT_RECORD_UNAVAILABLE")
@@ -184,7 +186,10 @@ class KubernetesSupplyBootExecutor:
 
     def _draft(self, check, env, values, workdir, started, collected):
         violations, missing, native_rows, normal_ok, complete, change = self._project(check, collected)
-        sessions = [part["row"] for part in collected.values()]
+        b3 = check.id in {'SUP-15', 'SUP-16'}
+        sessions = [{**part['row'], **({'reported_boot_record': part['packet'],
+                    'reported_record_is_native_worker_verification': False}
+                    if b3 and part['packet'] is not None else {})} for part in collected.values()]
         cleanup = sorted({part["cleanup"] for part in collected.values() if part.get("cleanup")})
         observed = {"supply_boot_sessions": sessions, "supply_boot_change": change, "supply_boot_violations": violations,
                     "supply_boot_missing": missing, "supply_boot_complete": complete and not missing,
@@ -203,11 +208,21 @@ class KubernetesSupplyBootExecutor:
         workdir = Path(workdir)
         summary = {"profile": check.collection_profile, "sessions": sessions, "violations": violations, "missing": missing,
                    "native": native_rows, "producer_authenticated": False, "engine_started": False}
-        workdir.mkdir(parents=True, exist_ok=True)
-        artifact = workdir / "supply_boot_summary.json"
-        artifact.write_text(json.dumps(summary, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+        artifact_errors = []
+        if b3:
+            from .supply_boot_artifacts import persist
+            artifacts, artifact_errors = persist(workdir, summary, collected, f'{self.name}/{self.version}')
+            if artifact_errors:
+                cleanup = sorted(set(cleanup + artifact_errors))
+                observations['supply_boot_complete'] = {'value': False, 'collected': True}
+                observations['supply_boot_missing'] = {'value': sorted(set(missing + artifact_errors)), 'collected': True}
+        else:
+            workdir.mkdir(parents=True, exist_ok=True)
+            artifact = workdir / "supply_boot_summary.json"
+            artifact.write_text(json.dumps(summary, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+            artifacts = [DraftArtifact(name="supply_boot_summary.json", path=artifact, collector=f"{self.name}/{self.version}")]
         gap = bool(any(row["diagnostic_codes"] for row in sessions) or cleanup)
-        codes = sorted({code for row in sessions for code in row["diagnostic_codes"]})
+        codes = sorted({code for row in sessions for code in row["diagnostic_codes"]} | set(artifact_errors))
         normal = {"attempted": any(row["collected"] for row in sessions[:1]), "succeeded": normal_ok if collected["normal"]["row"]["collected"] else None,
                   "detail": "승인 공급물로 준비된 기동 세션"}
         input_examples = any("worker_shard_input" in self.cfg.get(role, {}) for role in contract.ROLES)
@@ -215,7 +230,7 @@ class KubernetesSupplyBootExecutor:
             status=ExecStatus.ABORTED if gap else ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE
             if input_examples or self.runner is not None or env.data_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED,
             normal_control=normal, challenges=[{"step": step, "attempted": bool(change and change["applied"])} for step in check.challenge_steps],
-            observations=observations, artifacts=[DraftArtifact(name="supply_boot_summary.json", path=artifact, collector=f"{self.name}/{self.version}")],
+            observations=observations, artifacts=artifacts,
             comparability={"fixture_sha256": sha256_hex(canonical_json({"profile": check.collection_profile})),
                            "model_inventory_sha256": env.model.inventory_sha256, "gpu": env.runtime.gpu_model,
                            "driver": env.runtime.driver, "cpu": env.runtime.cpu},

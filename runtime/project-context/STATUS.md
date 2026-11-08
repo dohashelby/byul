@@ -1,6 +1,10 @@
 # 런타임 작업 상태
 
-최종 갱신: 2026-11-06
+최종 갱신: 2026-11-08
+
+- 2026-11-08 AWS 6회차 umask 보정(기준 `byul_runtime` `f27dbb8`, 미커밋): `tools.tetragon_trial.atomic_json`에 선택 `mode`(기본 0644)를 추가했다. 오래된 `.next`를 unlink한 뒤 O_CREAT|O_EXCL로 새로 만들고 fchmod로 권한을 정해 원자 교체한다. `tetragon_status`의 상태·baseline은 0644를 명시하며 recovery의 기존 0600은 유지했다. GPU lab README에 runtime-agent의 Ubuntu umask 002 주의와 명시 권한을 기록했다.
+- 근거: umask 002·077, 선택 mode, 오래된 0664 `.next` 및 상태·baseline·recovery 권한 회귀시험 4건 추가. 관련 25건 통과. runtime에서 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 전체 837건 중 721 통과·115 skip·기존 `test_gateway_serves_snapshot_without_kubernetes_mutation` 소켓 생성 PermissionError 1건. 로그 `/tmp/byul-aws6-permissions-unittest.log`. `git diff --check` 통과.
+- 미확인·다음: 실제 AWS의 sudo/runtime-agent 수집과 안전 조건 재판정은 미실행이며 Claude 대화형 검수 후 현장 확인이 필요하다. 새 파일 없음. 기존 미추적 AWS 6회차 결과·인계 문서는 보존했다. contracts/update 수정, 8700·5173 프로세스 조작, 커밋·push 없음.
 
 - 2026-11-06 AWS 5회차 후속 보정(기준 `byul_runtime` `6dcd376`, 미커밋): 식별 수집기가 argv0·PATH로 찾은 실행 경로를 대상 프로세스 루트에서 해석하고 exe와 device/inode가 같을 때만 증명과 함께 기록한다. Gateway는 실제 binary 또는 증명된 별칭만 수용한다. sentinel receipt는 0640, monitor window는 반복 가능한 `--trusted-owner-uid`로 명시 UID만 추가 신뢰하며 기존 소유자 기본값·그룹/기타 쓰기 거부를 유지했다. Gateway 식별 인자, 그룹 10010·0640 출력을 위한 setgid 폴더/UMask와 새 `host/byul-tetragon-identities.service`, AWS sentinel·Post 전용 v2 정책 및 kustomization 연결을 추가했다. README에 runtime-agent의 그룹 10000 읽기, crictl·`/etc/crictl.yaml`, 플랫폼/에이전트 감시 기간(LAB 60·운영 기본 86400, max)을 기록했다.
 - 근거: 관련 34건 통과(신규 8건: 가짜 procfs에서 실제 셸 실행·별칭 증명/거부·UID 신뢰/쓰기 권한 회귀 등), GPU lab/SGLang 로컬 kustomize 렌더·서비스 `systemd-analyze verify`·`git diff --check` 통과. 지정 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests` 전체 833건: 717 통과·115 skip·기존 `test_gateway_serves_snapshot_without_kubernetes_mutation` 소켓 생성 PermissionError 1건. 로그 `/tmp/byul-aws5-runtime-unittest.log`.
@@ -533,3 +537,10 @@
 - 미확인·다음: 플랫폼 새 내보내기 묶음(`bundle.apply`)의 AWS 적용 1회, 위 수정의 우회 없는 서버 확인, 엔진 본체 직접 읽기 시 503·복구 시간.
 - 화면 검수(노트북): 운영 요청 증거 해시 축약·한국어 24시간 시각·에이전트 판단 시점 구분·Tetragon 전환 카드 정리. web 134건 통과.
 - 최종 시험: runtime 833건 통과, platform API 237건 통과, web 타입 검사·134건 통과, `git diff --check` 통과.
+
+## 2026-11-08 AWS GPU 6회차 (Claude 실행, 기준 f27dbb8)
+
+- 근거: [6회차 결과](../docs/AWS_GPU_서버6회차_결과_20261108.md), 증거 `~/.local/state/serving-runtime/aws-lab/evidence-20261108-run6.tgz`(SHA-256 `af4de3fb…`).
+- 실서버 통과: 플랫폼 새 내보내기 묶음 `bundle.apply` 49초(정책 r4·환경 r2), 5회차 임시 우회 없이 복구 4조건 healthy·모니터 기록 ok(`--trusted-owner-uid 10000`)·실행 경로 별칭, 안전 조건 6개 충족 후 Sigkill 전환 15초·exit 137·monitor 복귀 16초.
+- 새 문제: runtime-agent의 pam_umask 002로 상태 파일 0664 → 명시 권한 쓰기로 수정(서버 재확인은 다음 회차).
+- 미확인: 엔진 본체 직접 읽기 시 503·복구 시간(선택).

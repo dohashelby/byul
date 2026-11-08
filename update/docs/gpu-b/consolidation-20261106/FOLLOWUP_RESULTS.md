@@ -410,6 +410,18 @@ S2는 최초 runtime freeze의 `not_ready=false`와 이 고정 리뷰 참조 두
 
 최종 운영 리뷰 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-health-generation-delta-20261107-v1/r3-whole-operating-review-v1.json`, SHA256 `c01cf5d1e83079eab3d7e73c64208c291c236661739bfa540580271f4971738d`다. root는 고정 리뷰 bytes/SHA·결론과 비용 산술을 대조했으며 원CPU/source/archive/모델/GB09/Ref를 반복 실행하지 않았다. R1/R2 실패·원 정지 감시 실패·후속 실제 중지/비용 마감은 별도 이력으로 유지하고43ID 분류를 올리지 않는다.
 
+## 2026-11-07 SUP-03 R3 실제 패킷 발행·시작 감독 검증
+
+세션6이 R3 startup ZIP2,531 bytes의 원6member를 최초 CRC/bytes/SHA·실제 UI 원본·원 로컬 사본과 대조했다. 실제 runtime packet8,187 bytes/SHA256 `cbca7ea784b3a7d02342e2fabefc7691b382054f5cab1cc0c59137fc5c85d255`는 검토한 두 필드 최종화와 같았다. 실제 발행21:28:54.050930 KST의 actor·0600/단일 link·원 리뷰c01 결합, 원 exclusive start 부모/driver·argv·같은 packet·고정 driver b40ca의 연결을 확인했다. 소유 대상 stopped→pending 수락 응답과21:30:30.042035 KST 시작 감독 종료0·child 회수/group 종료·cleanup 오류 목록[]를 확인했다. 부모 proc의 존재를 active로 세지 않았고 원 최초start 창 안의 단일 제출이다.
+
+그 전 로컬 발행 입력 검토는 원proposal7871B/b87a에서 허용된 두 필드만 바뀌고13pins/나머지값·원 UTF-8/LF bytes가 유지됐음을 확인했다. publisher는 원 코드의7개 메타데이터 상수 외 전체 AST가 같고, 새3member 입력 ZIP의 원 short-input bytes/SHA가 같았다. 실제 원격 발행 이전의 로컬 검토와 actual startup6 검증을 구분한다. 로컬 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-health-generation-delta-20261107-v1/r3-local-publication-input-review-v1.json`, SHA256 `a0211165bedb801031584922e7b8763e8047e1015e04b19a1bbf4ccb2542858d`다.
+
+root는 원 R3 prestart-after 장부와 동일한 before-open부터 새 비용 산술·원 intent/실제 packet·receipt SHA를 확인했다. 원 intent **21:29:36.590233 KST**까지861.044192초 EBS 추정$0.013333747671004446만 추가돼 해당 시각 추정은 `$54.888651723296206`, 예비$5 제외 잔여 `$40.111348276703794`다. 그 intent부터 compute/IP 비용 구간을 보수적으로 열었다. wrapper의 intent anchor를 실제 API CLI 수락 시각으로 바꾸지 않고 후속 control에서 분리 확인한다. 실제 중지 관측 전에는 구간을 닫지 않으며 실청구 미확정·EBS 비용은 지속된다.
+
+실제 startup 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/r3-startup-actual-review-v1.json`, SHA256 `6245b8d4c37cb2147a3bf967c0a5a9ec8f5c1d2ce8e71a32241b9639430d8ab7`다. 비용 open 검토는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-r3-cost-open-actual-review-v1.json`, SHA256 `784f1e202cf87fa424dfe9969627eb5f8aff6026e7ffb58795c03983d50325b7`다. 게시 담당은 고정 리뷰 bytes/SHA·결론과 비용 산술을 대조했고 같은 원 archive/CPU/모델/GB09/Ref는 재실행하지 않았다.
+
+S2가 보고한21:33:11 KST poststart 양성값과21:35:08 KST execute 제출은 원raw/control 사본 도착 후 독립 검증할 범위다. 이 startup 검토만으로 현재 physical L4·fresh health·installer·guest 제품 source/system Python·모델/worker·제품 EVD/RES/RPT/Store Ref·복원/재판정·최종 정리 성공을 인정하지 않는다. legacyR1 archive부록을 현재 R3 health/boot 근거로 사용하지 않고 정확 현재 CID/control·원 양성 preflight를 별도로 연결한다. R1/R2의 실패·후속 마감과43ID 분류는 보존한다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

@@ -256,7 +256,7 @@
     "new_GPU_experiment_completed_successfully": false,
     "whole43_counts_changed": false
   },
-  "current_work_reference": "SUP03_R3_prestart_whole_operating_review",
+  "current_work_reference": "SUP03_R3_actual_startup",
   "SUP03_R2_payload_ZIP_delta_review": {
     "review_project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-payload-zip-delta-20261107-v1/payload-zip-source-delta-review-v1.json",
     "review_sha256": "9589a039e4b0c77bf987062a1a83560fa6989c55a94c1e87fd73dc2ff1912396",
@@ -388,6 +388,23 @@
     "legacy_R1_archive_health_not_current_R3_evidence": true,
     "actual_new_runtime_publication_start_product_success_claimed": false,
     "extra_ACK_gate": false,
+    "whole43_counts_changed": false
+  },
+  "SUP03_R3_actual_startup": {
+    "review_project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/r3-startup-actual-review-v1.json",
+    "review_sha256": "6245b8d4c37cb2147a3bf967c0a5a9ec8f5c1d2ce8e71a32241b9639430d8ab7",
+    "local_input_review_sha256": "a0211165bedb801031584922e7b8763e8047e1015e04b19a1bbf4ccb2542858d",
+    "runtime_packet_sha256": "cbca7ea784b3a7d02342e2fabefc7691b382054f5cab1cc0c59137fc5c85d255",
+    "actual_publication_at_KST": "2026-11-07T21:28:54.050930+09:00",
+    "original_intent_at_KST": "2026-11-07T21:29:36.590233+09:00",
+    "start_terminal_at_KST": "2026-11-07T21:30:30.042035+09:00",
+    "start_accepted": true,
+    "start_terminal_exit": 0,
+    "root_cost_open_review_sha256": "784f1e202cf87fa424dfe9969627eb5f8aff6026e7ffb58795c03983d50325b7",
+    "cost_estimate_at_intent_USD": 54.888651723296206,
+    "compute_IP_interval_open": true,
+    "actual_current_health_guest_product_final_stop_verified_by_this_review": false,
+    "billing_confirmed": false,
     "whole43_counts_changed": false
   }
 }

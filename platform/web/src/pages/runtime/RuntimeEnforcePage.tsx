@@ -101,6 +101,7 @@ export function RuntimeEnforcePage() {
                   ? [
                       ["실행", <span className="mono">{report.run_id}</span>],
                       ["환경", `${report.context} · ${report.namespace}`],
+                      ["시작", formatTime(report.started_at)],
                       ["완료", formatTime(report.finished_at)],
                       ["전체", <StateBadge value={report.overall} />],
                     ]
@@ -112,6 +113,7 @@ export function RuntimeEnforcePage() {
             />
           }
         >
+          {report && <p className="notice">저장된 회차의 시험 결과입니다. 실행 시각·환경을 확인하세요. 현재 정책의 차단 상태를 보장하지 않습니다.</p>}
           <table className={rt.statusTable}>
             <thead>
               <tr><th>시험</th><th>상태</th><th>요약·증거</th></tr>

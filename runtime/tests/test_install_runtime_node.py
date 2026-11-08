@@ -118,6 +118,9 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         self.assertIn(r"--context cluster\.test --namespace serving-test", sudoers)
         self.assertIn("--operation-result$", sudoers)
         self.assertIn("--trusted-owner-uid 10000", result["serving-runtime-monitor-window.service"].decode())
+        status = result["serving-runtime-tetragon-status.service"].decode()
+        self.assertIn("--public-output /srv/serving/observation/tetragon-status/tetragon-state.json", status)
+        self.assertIn("ReadWritePaths=/var/lib/serving-runtime /srv/serving/observation/tetragon-status", status)
         config["PLATFORM_CA_FILE"] = "/private/ca.pem"
         execute = installer.render(config, execute=True)["serving-runtime-agent.service"].decode()
         self.assertIn("--execute", execute)
@@ -363,6 +366,8 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         self.assertTrue(baseline.exists())
         self.assertIn("runtime-agent", calls[0])
         self.assertTrue(any("umask 022" in str(v) for v in calls[0]))
+        self.assertEqual(calls[0][calls[0].index("--public-output") + 1],
+                         installer.OBSERVATION / "tetragon-status/tetragon-state.json")
         self.assertFalse((self.root / "baseline.capture.json").exists())
 
     def test_failed_capture_never_installs_a_baseline(self):
@@ -533,6 +538,8 @@ class InstallRuntimeNodeTests(unittest.TestCase):
                       ["systemctl", "start", unit])]
         self.assertEqual(events[events.index("baseline-verified"):], expected)
         mocks["summary"].assert_called_once()
+        mocks["directory"].assert_any_call(installer.OBSERVATION / "tetragon-status", 999, 10010, 0o2750)
+        mocks["directory"].assert_any_call(installer.OBSERVATION / "lab-reports", 1000, 10010, 0o2750)
 
 
 if __name__ == "__main__":

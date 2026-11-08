@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,6 +15,7 @@ from uuid import uuid4
 
 from serving_runtime.enforcement.events import ObservationQuery
 from serving_runtime.enforcement.intent import load_intent
+from serving_runtime.enforcement.tetragon import comparable_spec, render_manifests
 
 from .assets import check as check_assets, load_manifest as load_asset_manifest
 from .backend import BackendConfig, load_backend_config
@@ -98,8 +101,22 @@ class GatewayApp:
                 )
         allowed_binaries: tuple[str, ...] = ()
         self._exec_policy: ExecPolicy | None = None
+        self._expected_tetragon_policies = None
         if config.observation_intent_path is not None:
             intent = load_intent(config.observation_intent_path)
+            bundle = self._policy_bundle or {}
+            ref = bundle.get("policy_ref", {})
+            policy = policy_state.policy
+            if (policy_state.ok and policy is not None
+                    and ref == {"policy_id": policy.policy_id, "policy_version": policy.policy_version,
+                                "sha256": policy_state.sha256}
+                    and any(f.get("role") == "enforcement_intent" and f.get("applied") is True
+                            for f in bundle.get("files", []))):
+                self._expected_tetragon_policies = {
+                    (m["metadata"]["namespace"], m["metadata"]["name"]): hashlib.sha256(
+                        json.dumps(comparable_spec(m["spec"]), sort_keys=True, separators=(",", ":")).encode()
+                    ).hexdigest() for m in render_manifests(intent).values()
+                }
             allowed_binaries = intent.allowed_engine_binaries
             if intent.schema != "runtime-enforcement-intent/1.0":
                 self._exec_policy = ExecPolicy(
@@ -500,12 +517,20 @@ class GatewayApp:
             **self._target_inputs(),
         )
 
+    def tetragon_status(self) -> dict[str, Any]:
+        return read_tetragon_state(
+            self.config.tetragon_state_path or Path(self.config.data_dir) / "tetragon-state.json",
+            context=self._tetragon_context,
+        )
+
     def policy_status(self) -> dict[str, Any]:
         policy = self.policy_state.policy
         validity = evaluate_policy(
             self.policy_state,
             self.revocation_state,
             approval=self._approval_result(),
+            tetragon_state=self.tetragon_status(),
+            expected_tetragon_policies=self._expected_tetragon_policies,
         )
         history = self._policy_history.latest(50)
         history_storage = self._policy_history.status()
@@ -551,7 +576,7 @@ class GatewayApp:
                 "production signature verification",
                 "approval service integration",
                 "hot reload",
-                "external enforcement confirmation",
+                "actual external blocking confirmation (separate trial evidence required)",
             ],
         }
 
@@ -734,10 +759,7 @@ class GatewayApp:
                 receipt_lookup=self._engine_client.receipt_lookup,
                 observation_session_id=self.observation_session_id,
                 lab_report=self._lab_report.read,
-                tetragon_status=lambda: read_tetragon_state(
-                    self.config.tetragon_state_path or Path(self.config.data_dir) / "tetragon-state.json",
-                    context=self._tetragon_context,
-                ),
+                tetragon_status=self.tetragon_status,
                 record_transport_error=self._request_flow.record_without_relay,
                 request_header_timeout_s=self.config.request_header_timeout_s,
                 request_body_timeout_s=self.config.request_body_timeout_s,

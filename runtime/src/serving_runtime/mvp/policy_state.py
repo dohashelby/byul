@@ -154,6 +154,8 @@ def evaluate_policy(
     *,
     approval: ApprovalResult | None = None,
     now: datetime | None = None,
+    tetragon_state: dict[str, Any] | None = None,
+    expected_tetragon_policies: dict[tuple[str, str], str] | None = None,
 ) -> dict[str, Any]:
     """Evaluate the immutable startup snapshot for one new request."""
 
@@ -232,7 +234,7 @@ def evaluate_policy(
     return {
         "loaded": loaded,
         "gateway_active": loaded and reason_code is None,
-        "external_enforcement": "not_connected",
+        "external_enforcement": external_enforcement(tetragon_state, expected_tetragon_policies),
         "evaluated_at": evaluated_at.isoformat(),
         "reason_code": reason_code,
         "reason_message": reason_message,
@@ -264,6 +266,37 @@ def evaluate_policy(
         ],
         "approval": approval_status,
     }
+
+
+def external_enforcement(snapshot, expected):
+    """Report Tetragon's loaded mode, never a claim about an actual denied read.
+
+    ``expected`` must come from the immutable intent of the current verified
+    Gateway bundle. Every sampled agent must have every expected policy.
+    """
+    if not snapshot or snapshot.get("state") == "not_configured":
+        return "not_connected"
+    if snapshot.get("state") == "error":
+        return "error"
+    if snapshot.get("state") != "ok" or snapshot.get("fresh") is not True or not expected:
+        return "unknown"
+    agents = snapshot.get("agents", [])
+    nodes = {agent.get("node") for agent in agents if isinstance(agent, dict)}
+    if not nodes or None in nodes or len(nodes) != len(agents):
+        return "unknown"
+    modes = set()
+    for node in nodes:
+        for (namespace, name), digest in expected.items():
+            matches = [p for p in snapshot.get("policies", []) if isinstance(p, dict)
+                       and (p.get("node"), p.get("namespace"), p.get("name")) == (node, namespace, name)]
+            if len(matches) != 1:
+                return "unknown"
+            policy = matches[0]
+            if (policy.get("state") != "enabled" or policy.get("spec_sha256") != digest
+                    or policy.get("load_error") or policy.get("mode") not in {"monitor", "monitor_only", "enforce"}):
+                return "unknown"
+            modes.add(policy["mode"])
+    return next(iter(modes)) if len(modes) == 1 else "mixed"
 
 
 class PolicyHistory:

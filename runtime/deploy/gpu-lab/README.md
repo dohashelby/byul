@@ -94,6 +94,44 @@ openat Equal 값 끝의 `\u0000`은 기존 코드가 명시적으로 붙인 종�
 
 UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`runtime/docs/결정기록_엔진UID.md`). Gateway 10000·observer 10004·공유 그룹 10010은 겹치지 않게 고른 프로젝트 선택값이다.
 
+## 대시보드 상태와 Lab 보고서 연결
+
+Gateway는 기존 `/srv/serving/observation` readOnly mount에서 `--tetragon-state /srv/serving/observation/tetragon-status/tetragon-state.json`과 `--lab-report /srv/serving/observation/lab-reports`를 읽는다. SGLang 배포도 이 Gateway 정의를 상속한다. [호스트 설치기](../install/README.md)가 하위 폴더 소유자·관측 그룹·2750을 준비한다. 설치기를 쓰지 않으면 관리자가 다음을 준비한다(상위 관측 폴더와 그룹은 아래 1번대로 준비).
+
+```bash
+sudo install -d -o runtime-agent -g 10010 -m 2750 /srv/serving/observation/tetragon-status
+sudo install -d -o ubuntu -g 10010 -m 2750 /srv/serving/observation/lab-reports
+```
+
+상태 서비스는 원본을 유지하고 `--public-output` 사본을 5초마다 0640으로 원자 교체한다. 노드·에이전트·컨테이너 식별값은 사본 내 별칭이며 임의 필드·오류 원문·명령 출력은 제외한다. 공유 폴더 전체를 쓰기 가능하게 만들지 않는다. 서비스의 쓰기 허용 경로는 상태 전용 하위 폴더다. 설치 후 서비스 재시작과 새 Gateway 이미지/매니페스트 반영이 모두 필요하다.
+
+`external_enforcement`는 **Tetragon의 실제 로드 모드**다. 현재 Gateway 시작 시 검증한 묶음의 적용 intent를 렌더해 이름·namespace·spec SHA-256을 계산하고, 같은 context의 최신 상태에서 모든 에이전트의 기대 정책이 ENABLED인지 대조한다. 원격 set-mode는 spec을 바꾸지 않으므로 초기 monitor 선언과 현재 모드를 구분한다. 초기 기대값은 시작 시 고정하고 디스크 파일을 다시 읽어 바꾸지 않는다.
+
+| 값 | 의미 |
+| --- | --- |
+| `not_connected` | 상태 자료 없음 |
+| `error` | 파일 읽기·형식/context 검증 오류 또는 수집기 오류 |
+| `unknown` | 20초 초과/미래 5초 초과, 묶음 대조 불가, 노드/정책 누락·중복, spec 불일치, ENABLED·모드 미확인 |
+| `monitor` / `monitor_only` / `enforce` | 모든 기대 정책·노드가 대조되고 같은 실제 모드 |
+| `mixed` | 모든 기대 정책·노드가 대조되지만 실제 모드가 섞임; 정책별 화면에서 확인 |
+
+이 값은 실제 차단 실측이나 감시 무공백을 뜻하지 않는다. 파일 읽기 거부·프로세스 종료는 별도의 시험 근거로, 감시 복구는 기존 heartbeat/식별/새 이벤트의 4조건으로 확인한다. Cilium 상태는 이 집계에 포함하지 않는다. 현재 AWS Gateway에는 Cilium 상태 수집기가 없으며 Kubernetes 권한을 추가하지 않는다.
+
+Lab 보고서는 **서버 운영자가 유지보수 때 실제 checker를 실행한 결과만** 게시한다. 이 checker는 조회 전용이 아니다. `serving-lab`의 관리 대상 Cilium/Tetragon 정책을 실행 전에 삭제하고 시험 정책을 적용하며 `--cleanup`이면 시험 후 삭제한다. 현재 묶음·기대 baseline·정책 spec/mode를 호스트 전용 위치에 백업하고 복원 절차를 준비한 유지보수에서만 실행한다. `deploy/lab` 시험 workload/경로/모델 전제가 AWS 엔진·시험 Pod와 맞는지 먼저 확인한다. 전제가 맞지 않아 failed/not_run이어도 그대로 보고하며 성공 보고서를 만들지 않는다. 임의 namespace 변경만으로 격리할 수 있는 도구는 아니다.
+
+```bash
+# 서버의 runtime/에서, 관측 폴더 소유 사용자로 실행한다. 이번 코드 작업에서는 실행하지 않았다.
+umask 027
+.venv/bin/python -B -m tools.k8s_lab_check \
+  --context byul-aws-lab --allow-non-kind-context --namespace serving-lab \
+  --state-dir "$HOME/.local/state/serving-runtime/k8s-lab" --cleanup \
+  --public-report-dir /srv/serving/observation/lab-reports
+```
+
+원본 JSON/Markdown·명령 근거는 `--state-dir`에 기존 0600으로 남고, 공개 폴더에는 명령 출력을 제외한 최소 JSON만 0640 원자 교체로 쓴다. 보고서의 run_id·시작/완료 시각·context·namespace는 바꾸지 않는다. 실행 후 관리 정책을 원래 검증된 묶음과 모드로 복원하고 status/복구 4조건을 재확인한다. `--secret-enforce-check`·`--sigkill-probe-check`의 별도 사례는 기존 Gateway 보고서 스키마가 지원하지 않아 이 게시 절차에 추가하지 않는다.
+
+Gateway는 디렉터리의 최신 JSON(mtime, 동률이면 파일명)을 선택한다. 과거 보고서를 복사해 이번 결과로 삼지 말고 화면의 실행 시각·환경을 확인한다. 아직 JSON이 없으면 `missing`으로 표시하며 배포 때 예시를 채우지 않는다. 서버에서는 `stat`으로 상위/하위 폴더 2750·관측 GID와 두 공개 JSON의 0640·GID를 확인하고, Gateway UID 10000/보조 그룹 10010으로 읽기 성공·쓰기 거부, `/api/runtime/tetragon-status`의 fresh/오류·실제 모드 및 `/api/runtime/lab-report`의 missing→실행 결과·시각을 대조한다. 이번 수정에서는 AWS 접속·서버 실행을 하지 않았다.
+
 ## 순서 (AWS 묶음 01→02→03 성공 뒤)
 
 1. **호스트 폴더·그룹 준비** (관리자)

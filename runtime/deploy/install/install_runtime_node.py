@@ -481,7 +481,9 @@ def capture_baseline(config, capture):
              "/bin/sh", "-c", 'umask 022; cd /opt/byul/runtime || exit; exec "$@"', "byul-baseline",
              DEST / ".venv/bin/python", "-B", "-m", "tools.tetragon_status",
              "--context", config["CONTEXT"], "--evidence-dir", STATE / "evidence",
-             "--output", STATE / "tetragon-state.json", "--capture-baseline", candidate])
+             "--output", STATE / "tetragon-state.json",
+             "--public-output", OBSERVATION / "tetragon-status/tetragon-state.json",
+             "--capture-baseline", candidate])
         # Reject enforce/unknown policies before atomically accepting the candidate.
         validate_baseline(candidate, config)
         # link fails if a concurrent writer has created BASELINE; never overwrite it.
@@ -549,6 +551,11 @@ def install(config, args, artifacts, grub):
             directory(STATE / "evidence", account.pw_uid, account.pw_gid, 0o750)
             directory(Path("/srv/serving/bundles"), 0, int(config["GATEWAY_DATA_GID"]), 0o2750)
             directory(OBSERVATION, pwd.getpwnam(config["OBSERVATION_USER"]).pw_uid,
+                      int(config["OBSERVE_GID"]), 0o2750)
+            # Give the status writer its own directory; the shared parent stays go-w.
+            directory(OBSERVATION / "tetragon-status", account.pw_uid,
+                      int(config["OBSERVE_GID"]), 0o2750)
+            directory(OBSERVATION / "lab-reports", pwd.getpwnam(config["OBSERVATION_USER"]).pw_uid,
                       int(config["OBSERVE_GID"]), 0o2750)
             # The Gateway UID is 10000, independently of its configured data GID.
             directory(DATA, 10000, int(config["GATEWAY_DATA_GID"]), 0o750)

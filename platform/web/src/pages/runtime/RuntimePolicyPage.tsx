@@ -6,6 +6,16 @@ import { Pagination, usePagination } from "../../components/Pagination";
 import { VALIDITY_ITEM, VALIDITY_RESULT, label } from "../../lib/labels";
 import { TableCard, formatTime, rt } from "./parts";
 
+const EXTERNAL_ENFORCEMENT: Record<string, string> = {
+  not_connected: "미연결",
+  error: "상태 읽기 오류",
+  unknown: "현재 상태 미확인",
+  enforce: "집행 모드 (차단 실측과 별도)",
+  monitor: "감시 모드",
+  monitor_only: "감시 전용 모드",
+  mixed: "혼합 모드 (정책별 확인)",
+};
+
 export function RuntimePolicyPage() {
   const q = useRuntimeStatus();
   const validityPagination = usePagination(q.data?.item?.policy.validity_items.length ?? 0, "page_validity");
@@ -21,7 +31,8 @@ export function RuntimePolicyPage() {
           const badges: [string, boolean, string][] = [
             ["읽기", pol.loaded, pol.loaded ? "성공" : "실패"],
             ["Gateway 활성", pol.gateway_active, pol.gateway_active ? "활성" : "비활성"],
-            ["외부 집행", false, pol.external_enforcement === "not_connected" ? "미연결" : pol.external_enforcement],
+            ["외부 집행 (Tetragon)", ["enforce", "monitor", "monitor_only", "mixed"].includes(pol.external_enforcement),
+              EXTERNAL_ENFORCEMENT[pol.external_enforcement] ?? "현재 상태 미확인"],
           ];
           const store = pol.history_store;
           return (

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 import re
 from pathlib import Path
 
@@ -80,6 +81,26 @@ def test_runtime_client_sends_only_get(live_client, fake):
     assert all(p.startswith("/api/") for _, p, _ in fake.calls)
     assert not any("/v1/" in p for _, p, _ in fake.calls)
     assert {auth for _, _, auth in fake.calls} == {f"Bearer {TOKEN}"}
+
+
+@pytest.mark.parametrize("value", ["not_connected", "error", "unknown", "monitor", "monitor_only", "enforce", "mixed"])
+def test_external_enforcement_modes_pass_through_contract(live_client, fake, value):
+    fake.endpoints = deepcopy(fake.endpoints)
+    fake.endpoints["status"]["policy"]["external_enforcement"] = value
+    response = live_client.get("/api/runtime/status")
+    assert response.status_code == 200
+    assert response.json()["item"]["policy"]["external_enforcement"] == value
+
+
+def test_configured_empty_lab_directory_stays_missing(live_client, fake):
+    fake.endpoints = deepcopy(fake.endpoints)
+    fake.endpoints["lab-report"] = {"state": "missing", "report": None,
+        "configured_path": "/srv/serving/observation/lab-reports", "path": None,
+        "generated_at": "2026-11-08T00:00:00Z", "error": "lab report directory has no JSON reports"}
+    response = live_client.get("/api/runtime/lab-report")
+    assert response.status_code == 200
+    assert response.json()["item"]["state"] == "missing"
+    assert response.json()["item"]["report"] is None
 
 
 @pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])

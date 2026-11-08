@@ -183,5 +183,41 @@ class VerificationMaterialTests(unittest.TestCase):
         self.assertNotIn("/verification/candidates", gateway)
 
 
+    def test_declaration_input_diagnostics_are_bounded(self):
+        source = self.root / "private-token-path"
+        argv = ["declaration", "--kind", "baseline", "--environment-candidate", str(source), "--out", str(self.candidates / "new.json")]
+        for code, raw in (("NOT_FOUND", None), ("INVALID_JSON", b'{"private-token":'),
+                          ("INVALID_JSON", b'{"x":1,"x":2}'), ("INVALID_JSON", bytes([255])),
+                          ("INVALID_INPUT", b'{}')):
+            if raw is not None:
+                source.write_bytes(raw)
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                self.assertEqual(material.main(argv), 1)
+            self.assertEqual(stderr.getvalue().strip(), f"VERIFICATION_MATERIAL_FAILED: {code}:environment_candidate")
+        stderr = io.StringIO()
+        with patch.object(Path, "read_bytes", side_effect=PermissionError("private-token-path")), redirect_stderr(stderr):
+            self.assertEqual(material.main(argv), 1)
+        self.assertEqual(stderr.getvalue().strip(), "VERIFICATION_MATERIAL_FAILED: PERMISSION_DENIED:environment_candidate")
+
+    def test_bad_arguments_do_not_echo_values(self):
+        stderr = io.StringIO()
+        with redirect_stderr(stderr):
+            self.assertEqual(material.main(["private-token"]), 1)
+        self.assertEqual(stderr.getvalue().strip(), "VERIFICATION_MATERIAL_FAILED: INVALID_INPUT:arguments")
+
+    def test_output_diagnostics_and_existing_file_preservation(self):
+        path = self.candidates / "revocations.json"
+        argv = ["revocations", "--out", str(path)]
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(material.main(argv), 0)
+        previous = path.read_bytes()
+        stderr = io.StringIO()
+        with redirect_stderr(stderr):
+            self.assertEqual(material.main(argv), 1)
+        self.assertEqual(stderr.getvalue().strip(), "VERIFICATION_MATERIAL_FAILED: ALREADY_EXISTS:out")
+        self.assertEqual(path.read_bytes(), previous)
+
+
 if __name__ == "__main__":
     unittest.main()

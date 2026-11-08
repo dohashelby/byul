@@ -113,7 +113,7 @@ def status(state: AppState = Depends(get_state)) -> dict[str, Any]:
 @router.get("/lab-report", response_model=LabReportResponse)
 def lab_report(state: AppState = Depends(get_state)) -> dict[str, Any]:
     doc = state.runtime.lab_report()
-    bad = invalid_one(state.contracts, "runtime-lab-report", doc)
+    bad = invalid_one(state.contracts, "runtime-lab-report-view", doc)
     return {"item": None if bad else doc, "invalid": bad, "source": state.source("runtime")}
 
 

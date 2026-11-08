@@ -1,7 +1,6 @@
 """Offline candidate generation and explicit human publication; never auto-approve."""
 from __future__ import annotations
 
-import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -16,6 +15,11 @@ from serving_runtime.mvp.collectors import load_declaration
 from serving_runtime.mvp.policy import _object_without_duplicates, _reject_json_constant
 from serving_runtime.mvp.policy_state import load_revocations
 
+try:
+    from tools.candidate_errors import CandidateError, CandidateArgumentParser, operation
+except ModuleNotFoundError:
+    from candidate_errors import CandidateError, CandidateArgumentParser, operation
+
 SCHEMA = "runtime-verification-candidate/1.0"
 FILENAMES = {"assets": "asset-manifest.json", "baseline": "baseline.json",
              "manifest": "manifest.json", "revocations": "revocations.json"}
@@ -29,10 +33,18 @@ def encode(document):
     return (json.dumps(document, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode()
 
 
-def read_json(path):
-    return json.loads(Path(path).read_text(encoding="utf-8"),
-                      object_pairs_hook=_object_without_duplicates,
-                      parse_constant=_reject_json_constant)
+def decode_json(raw, label):
+    try:
+        return json.loads(raw.decode("utf-8"), object_pairs_hook=_object_without_duplicates,
+                          parse_constant=_reject_json_constant)
+    except (ValueError, UnicodeError, RecursionError):
+        raise CandidateError("INVALID_JSON", label) from None
+
+
+def read_json(path, label="input"):
+    with operation(label):
+        raw = Path(path).read_bytes()
+    return decode_json(raw, label)
 
 
 def plain_path(path):
@@ -117,13 +129,13 @@ def validate_document(kind, document):
 
 
 def approve(path, approved_dir, expected_sha256, reviewer, reason, *, replace=False):
-    path = plain_path(path)
-    raw = path.read_bytes()
+    with operation("candidate"):
+        path = plain_path(path)
+        raw = path.read_bytes()
     digest = hashlib.sha256(raw).hexdigest()
     if digest != expected_sha256 or not reviewer.strip() or not reason.strip():
         raise ValueError("REVIEW_HASH_OR_ATTESTATION_MISSING")
-    value = json.loads(raw, object_pairs_hook=_object_without_duplicates,
-                       parse_constant=_reject_json_constant)
+    value = decode_json(raw, "candidate")
     if not isinstance(value, dict) or value.get("schema_version") != SCHEMA or value.get("state") != "candidate":
         raise ValueError("NOT_A_CANDIDATE")
     kind, document = value["kind"], value["document"]
@@ -149,7 +161,7 @@ def approve(path, approved_dir, expected_sha256, reviewer, reason, *, replace=Fa
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = CandidateArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     assets = commands.add_parser("assets")
     assets.add_argument("--root", required=True)
@@ -173,28 +185,36 @@ def build_parser():
 
 
 def main(argv=None):
-    args = build_parser().parse_args(argv)
     try:
+        args = build_parser().parse_args(argv)
         if args.command == "approve":
-            digest = approve(args.candidate, args.approved_dir, args.expect_sha256,
-                             args.reviewer, args.reason, replace=args.replace)
+            with operation("approval"):
+                digest = approve(args.candidate, args.approved_dir, args.expect_sha256,
+                                 args.reviewer, args.reason, replace=args.replace)
             print("APPROVED candidate_sha256=" + digest + "; Gateway 재시작 필요(기준/선언/폐기 목록)")
             return 0
         if args.command == "assets":
-            value = assets_candidate(args.root, args.gateway_root)
+            with operation("root"):
+                value = assets_candidate(args.root, args.gateway_root)
         elif args.command == "declaration":
-            value = declaration_candidate(read_json(args.environment_candidate), args.kind)
+            with operation("environment_candidate"):
+                value = declaration_candidate(read_json(args.environment_candidate, "environment_candidate"), args.kind)
         else:
-            document = read_json(args.source) if args.source else {
+            document = read_json(args.source, "source") if args.source else {
                 "schema_version": "runtime-mvp-revocations/1.0", "revoked": []}
             value = candidate("revocations", document)
-        validate_document(value["kind"], value["document"])
-        raw = encode(value)
-        atomic_write(args.out, raw)
+        with operation("document"):
+            validate_document(value["kind"], value["document"])
+            raw = encode(value)
+        with operation("out"):
+            atomic_write(args.out, raw)
         print("CANDIDATE_ONLY sha256=" + hashlib.sha256(raw).hexdigest())
         return 0
-    except (OSError, ValueError, KeyError, TypeError):
-        print("VERIFICATION_MATERIAL_FAILED: 입력·권한·형식을 확인하세요(상세 값 비노출).", file=sys.stderr)
+    except CandidateError as error:
+        print(f"VERIFICATION_MATERIAL_FAILED: {error}", file=sys.stderr)
+        return 1
+    except (OSError, ValueError, KeyError, TypeError, RecursionError):
+        print("VERIFICATION_MATERIAL_FAILED: INVALID_INPUT:arguments", file=sys.stderr)
         return 1
 
 

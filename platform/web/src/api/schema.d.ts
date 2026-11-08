@@ -545,7 +545,7 @@ export interface components {
         /** LabReportResponse */
         LabReportResponse: {
             /** Item */
-            item: components["schemas"]["RuntimeLabReport"] | null;
+            item: components["schemas"]["RuntimeLabReportView"] | null;
             invalid?: components["schemas"]["InvalidItem"] | null;
             source: components["schemas"]["SourceInfo"];
         };
@@ -2586,6 +2586,41 @@ export interface components {
             data_origin: components["schemas"]["Common_data_origin"];
             /** @description 이 증거를 쓴 객체·사건. guard EVD 참조나 runtime event_id. */
             refs?: string[];
+        };
+        /**
+         * Lab 실행 결과 조회 (kind·AWS)
+         * @description 저장된 kind L-01~L-08 또는 AWS-01~AWS-20 실행 회차. 현재 통제 상태의 증명이 아니다.
+         */
+        RuntimeLabReportView: {
+            /** @constant */
+            schema_version: "byul-runtime-lab-report/0.1";
+            generated_at: components["schemas"]["Common_timestamp"];
+            /**
+             * @description not_configured=Gateway에 --lab-report 없음, missing=파일 없음, error=읽기·형식 오류, ok=읽음.
+             * @enum {unknown}
+             */
+            state: "not_configured" | "missing" | "error" | "ok";
+            configured_path: string | null;
+            path: string | null;
+            error: string | null;
+            report: null | {
+                run_id: string;
+                context: string;
+                namespace: string;
+                started_at: string | null;
+                finished_at: string | null;
+                overall: string;
+                cases: {
+                    id: string;
+                    title: string;
+                    /** @description runtime 시험 상태(passed, failed, not_run, blocked_by_environment 등). */
+                    status: string;
+                    summary: string;
+                    evidence: string[];
+                    limitation: string | null;
+                    note: string | null;
+                }[];
+            };
         };
     };
     responses: never;

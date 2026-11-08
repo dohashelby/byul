@@ -28,6 +28,7 @@ COMPONENT_NAMES = {
     "runtime-event": "RuntimeEvent",
     "runtime-status": "RuntimeStatus",
     "runtime-lab-report": "RuntimeLabReport",
+    "runtime-lab-report-view": "RuntimeLabReportView",
     "runtime-request-detail": "RuntimeRequestDetail",
     "revalidation-request": "RevalidationRequest",
     "evidence-index": "EvidenceIndex",
@@ -63,6 +64,15 @@ class Contracts:
         }
         if not self.schemas:
             raise FileNotFoundError(f"계약 스키마가 없습니다: {schema_dir}")
+        # Platform read view extends case IDs without changing the shared
+        # kind-only contract. The original validator remains available intact.
+        lab_view = copy.deepcopy(self.schemas["runtime-lab-report"])
+        lab_view["$id"] = "https://contracts.byul.invalid/0.1/runtime-lab-report-view.schema.json"
+        lab_view["title"] = "Lab 실행 결과 조회 (kind·AWS)"
+        lab_view["description"] = "저장된 kind L-01~L-08 또는 AWS-01~AWS-20 실행 회차. 현재 통제 상태의 증명이 아니다."
+        case_id = lab_view["properties"]["report"]["oneOf"][1]["properties"]["cases"]["items"]["properties"]["id"]
+        case_id["pattern"] = r"^(?:L-[0-9]{2}|AWS-(?:0[1-9]|1[0-9]|20))$"
+        self.schemas["runtime-lab-report-view"] = lab_view
         registry = Registry().with_resources(
             (s["$id"], Resource.from_contents(s)) for s in self.schemas.values()
         )

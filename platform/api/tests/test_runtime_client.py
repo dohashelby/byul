@@ -200,3 +200,19 @@ def test_unreachable_runtime_returns_503_with_code(tmp_path, monkeypatch):
         o = client.get("/api/overview").json()
         assert o["requests"] is None and o["requests_error"]["code"] == "RUNTIME_UNREACHABLE"
         assert client.get("/api/meta").json()["runtime_connection"] == "disconnected"
+
+
+@pytest.mark.parametrize("case_id,valid", [("AWS-01", True), ("AWS-20", True), ("AWS-21", False)])
+def test_aws_lab_report_view_preserves_ids_and_run(live_client, fake, case_id, valid):
+    report = {"run_id": "aws-acceptance-20200101T000000Z-1", "context": "byul-aws-lab", "namespace": "serving-lab",
+              "started_at": "2020-01-01T00:00:00Z", "finished_at": "2020-01-01T00:01:00Z", "overall": "unknown",
+              "cases": [{"id": case_id, "title": "AWS 시험", "status": "unknown", "summary": "미확인", "evidence": [], "limitation": None, "note": "해당 회차 선택 사례"}]}
+    fake.endpoints = {**fake.endpoints, "lab-report": {"state": "ok", "report": report, "generated_at": "2020-01-01T00:01:01Z"}}
+    body = live_client.get("/api/runtime/lab-report").json()
+    if valid:
+        assert body["invalid"] is None
+        assert body["item"]["report"] == report
+        # Shared kind contract is unchanged; this extension is an API view.
+        assert live_client.app.state.byul.contracts.errors("runtime-lab-report", body["item"])
+    else:
+        assert body["item"] is None and body["invalid"]

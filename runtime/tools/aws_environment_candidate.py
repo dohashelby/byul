@@ -6,7 +6,6 @@ contract values. The partial environment needs human completion before import.
 """
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -18,10 +17,12 @@ from serving_runtime.mvp.policy import load_policy
 from serving_runtime.mvp.target import load_target, summarize_pods
 try:
     from tools.aws_lab_preflight import Runner
-    from tools.verification_material import atomic_write, encode, now
+    from tools.verification_material import atomic_write, encode, now, read_json
+    from tools.candidate_errors import CandidateError, CandidateArgumentParser, operation
 except ModuleNotFoundError:
     from aws_lab_preflight import Runner
-    from verification_material import atomic_write, encode, now
+    from verification_material import atomic_write, encode, now, read_json
+    from candidate_errors import CandidateError, CandidateArgumentParser, operation
 
 SCHEMA = "runtime-environment-candidate/1.0"
 VERSION = re.compile(r"(?<![\w.])v?(\d+\.\d+\.\d+[A-Za-z0-9.+_-]*)")
@@ -41,12 +42,12 @@ print(json.dumps(out))
 def _json(runner, command):
     result = runner.run(command, timeout=8)
     if result.returncode:
-        return {}, "조회 실패 또는 시간 초과"
+        return {}, "KUBECTL_FAILED:kubectl (조회 실패 또는 시간 초과)"
     try:
         value = json.loads(result.stdout)
-        return (value, "") if isinstance(value, dict) else ({}, "JSON 객체 아님")
-    except (ValueError, TypeError):
-        return {}, "JSON 해석 실패"
+        return (value, "") if isinstance(value, dict) else ({}, "INVALID_JSON:kubectl (JSON 객체 아님)")
+    except (ValueError, TypeError, RecursionError):
+        return {}, "INVALID_JSON:kubectl (JSON 해석 실패)"
 
 
 def _single_running(document, container, node=None):
@@ -79,9 +80,16 @@ def _arg(args, name):
 
 def collect(args, runner=None):
     runner = runner or Runner()
+    read_json(args.target_registration, "target_registration")
     target = load_target(args.target_registration)
     if target.state != "ok" or target.kubernetes is None or target.engine_kind not in {"vllm", "sglang"}:
-        raise ValueError("VALID_TARGET_REGISTRATION_REQUIRED")
+        raise CandidateError("INVALID_INPUT", "target_registration")
+    policy_raw = None
+    if args.gateway_policy:
+        policy_raw = read_json(args.gateway_policy, "gateway_policy")
+        policy = load_policy(args.gateway_policy)
+        if not policy.ok:
+            raise CandidateError("INVALID_INPUT", "gateway_policy")
     kube = target.kubernetes
     observations, unconfirmed = {}, {}
     environment = {"schema_version": "byul-environment/0.1",
@@ -140,19 +148,21 @@ def collect(args, runner=None):
     volume = next((v for v in pod.get("spec", {}).get("volumes", []) if v.get("name") == mount.get("name")), {})
     root = volume.get("hostPath", {}).get("path", "")
     inventory = ""
+    model_error = ""
     if root and not (mount.get("subPath") or mount.get("subPathExpr")):
         try:
-            snap = snapshot(root)
-            _, links, _, errors = _walk(Path(root))
-            if links or errors:
-                raise ValueError("INCOMPLETE_TREE")
+            with operation("model_root"):
+                snap = snapshot(root)
+                _, links, _, errors = _walk(Path(root))
+                if links or errors:
+                    raise ValueError("INCOMPLETE_TREE")
             # Same all-scope file-list contract as update's model_inventory.py.
             files = [{"path": f["path"], "bytes": f["size"], "sha256": f["sha256"]} for f in snap["files"]]
             inventory = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
-        except (OSError, ValueError):
-            pass
+        except CandidateError as error:
+            model_error = str(error) + " "
     record("/target/model/inventory_sha256", inventory, "live /models hostPath; all-scope files hashed on host",
-           "호스트 snapshot 해시를 완전하게 읽지 못함(권한·링크·배치 확인)", destination=model)
+           model_error + "호스트 snapshot 해시를 완전하게 읽지 못함(권한·링크·배치 확인)", destination=model)
     # A directory named like a revision is only a mount generation, not provenance.
     record("/target/model/revision", "", "live /models hostPath", "폴더명을 모델 출처 revision으로 승인하지 않음")
     record("/target/model/tokenizer_revision", "", "live /models hostPath", "토크나이저 출처 revision은 사람의 근거 확인 필요")
@@ -178,10 +188,11 @@ def collect(args, runner=None):
                 # A partial response cannot establish the number of visible GPUs.
                 gpu_rows.clear()
                 break
+    gpu_error = "KUBECTL_FAILED:kubectl (조회 실패 또는 시간 초과)" if gpu_result and gpu_result.returncode else "가시 GPU/드라이버 미확인"
     unique = set(gpu_rows)
-    record("/target/runtime/gpu_model", gpu_rows[0][0] if len(unique) == 1 else "", "engine nvidia-smi", destination=runtime)
-    record("/target/runtime/driver", gpu_rows[0][1] if len(unique) == 1 else "", "engine nvidia-smi", destination=runtime)
-    record("/target/runtime/gpu_count", len(gpu_rows) if gpu_rows else "", "engine nvidia-smi visible devices", destination=runtime)
+    record("/target/runtime/gpu_model", gpu_rows[0][0] if len(unique) == 1 else "", "engine nvidia-smi", gpu_error, destination=runtime)
+    record("/target/runtime/driver", gpu_rows[0][1] if len(unique) == 1 else "", "engine nvidia-smi", gpu_error, destination=runtime)
+    record("/target/runtime/gpu_count", len(gpu_rows) if gpu_rows else "", "engine nvidia-smi visible devices", gpu_error, destination=runtime)
 
     for name, selector, container, binary in (("tetragon", "app.kubernetes.io/name=tetragon", "tetragon", "tetra"),
                                                ("cilium", "k8s-app=cilium", "cilium-agent", "cilium-dbg")):
@@ -193,6 +204,8 @@ def collect(args, runner=None):
             result = runner.run(base + ["-n", "kube-system", "exec", agent_name, "-c", container, "--", binary, "version"], timeout=8)
             if result.returncode == 0:
                 version = _safe_version(result.stdout)
+            else:
+                error = "KUBECTL_FAILED:kubectl (조회 실패 또는 시간 초과)"
         record(name + "_version", version, "engine node agent executable version",
                error or "같은 노드의 단일 Ready 에이전트 판본 조회 실패")
 
@@ -206,9 +219,8 @@ def collect(args, runner=None):
                 fields[dest + "." + name] = source[name]
 
     if args.gateway_policy:
-        policy = load_policy(args.gateway_policy)
         if policy.ok:
-            raw = json.loads(Path(args.gateway_policy).read_text())
+            raw = policy_raw
             environment["deployment"]["gateway_schema_version"] = raw["schema_version"]
             # v1.2 requires the explicit cache-isolation mode for export.
             if raw["schema_version"] == "runtime-mvp/1.2":
@@ -229,7 +241,7 @@ def collect(args, runner=None):
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = CandidateArgumentParser(description=__doc__)
     parser.add_argument("--target-registration", required=True, help="installed bundle target.json, with real context/selector")
     parser.add_argument("--environment-id", required=True)
     parser.add_argument("--revision", type=int, required=True)
@@ -239,18 +251,25 @@ def build_parser():
 
 
 def main(argv=None):
-    args = build_parser().parse_args(argv)
     try:
+        args = build_parser().parse_args(argv)
         if args.revision < 1 or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", args.environment_id):
-            raise ValueError("INVALID_ENVIRONMENT_ID_OR_REVISION")
+            raise CandidateError("INVALID_INPUT", "environment_id_or_revision")
         value = collect(args)
         raw = encode(value)
-        atomic_write(args.out, raw)
+        with operation("out"):
+            atomic_write(args.out, raw)
         print("ENVIRONMENT_CANDIDATE_ONLY sha256=" + hashlib.sha256(raw).hexdigest())
+        for code in sorted({item["reason"].split(" ", 1)[0] for item in value["unconfirmed"].values()
+                            if item["reason"].startswith(("KUBECTL_FAILED:", "INVALID_JSON:", "PERMISSION_DENIED:", "NOT_FOUND:", "IO_ERROR:", "INVALID_INPUT:"))}):
+            print("ENVIRONMENT_CANDIDATE_UNCONFIRMED: " + code, file=sys.stderr)
         print("미승인·미확인=" + str(len(value["unconfirmed"])) + "; 플랫폼 등록 전 계약 검증 필요")
         return 0
-    except (OSError, ValueError, TypeError, KeyError):
-        print("ENVIRONMENT_CANDIDATE_FAILED: 입력·권한·형식을 확인하세요(상세 값 비노출).", file=sys.stderr)
+    except CandidateError as error:
+        print(f"ENVIRONMENT_CANDIDATE_FAILED: {error}", file=sys.stderr)
+        return 1
+    except (OSError, ValueError, TypeError, KeyError, RecursionError):
+        print("ENVIRONMENT_CANDIDATE_FAILED: INVALID_INPUT:arguments", file=sys.stderr)
         return 1
 
 

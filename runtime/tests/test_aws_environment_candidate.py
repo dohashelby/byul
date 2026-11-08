@@ -147,5 +147,57 @@ class EnvironmentCandidateTests(unittest.TestCase):
         self.assertNotIn("source_commit", environment["target"]["engine"])
 
 
+    def test_cli_bounded_input_diagnostics(self):
+        from contextlib import redirect_stderr
+        import io
+        base = ["--environment-id", "lab", "--revision", "1", "--out", str(self.root / "out.json")]
+        for label, option in (("target_registration", "--target-registration"), ("gateway_policy", "--gateway-policy")):
+            for code, error in (("PERMISSION_DENIED", PermissionError("private-token-path")),
+                                ("NOT_FOUND", FileNotFoundError("private-token-path"))):
+                stderr = io.StringIO()
+                argv = base + ["--target-registration", str(self.target)]
+                if option == "--gateway-policy":
+                    argv += [option, "private-token-path"]
+                original = Path.read_bytes
+                failed_path = self.target if label == "target_registration" else Path("private-token-path")
+                def read(path):
+                    if path == failed_path:
+                        raise error
+                    return original(path)
+                with patch.object(Path, "read_bytes", autospec=True, side_effect=read), redirect_stderr(stderr):
+                    self.assertEqual(tool.main(argv), 1)
+                self.assertEqual(stderr.getvalue().strip(), f"ENVIRONMENT_CANDIDATE_FAILED: {code}:{label}")
+        self.target.write_text('{"private-token":')
+        stderr = io.StringIO()
+        with redirect_stderr(stderr):
+            self.assertEqual(tool.main(base + ["--target-registration", str(self.target)]), 1)
+        self.assertEqual(stderr.getvalue().strip(), "ENVIRONMENT_CANDIDATE_FAILED: INVALID_JSON:target_registration")
+
+    def test_cli_argument_and_gateway_json_errors_do_not_echo_values(self):
+        from contextlib import redirect_stderr
+        import io
+        for argv in (["--revision", "private-token"], ["--private-token"],
+                     ["--target-registration", str(self.target), "--gateway-policy", str(self.root / "bad.json"),
+                      "--environment-id", "lab", "--revision", "1", "--out", str(self.root / "out.json")]):
+            (self.root / "bad.json").write_text('{"private-token":')
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                self.assertEqual(tool.main(argv), 1)
+            self.assertNotIn("private-token", stderr.getvalue())
+            self.assertIn("INVALID_JSON:gateway_policy" if "--gateway-policy" in argv else "INVALID_INPUT:arguments", stderr.getvalue())
+
+    def test_cli_kubectl_failure_retains_partial_candidate_and_reports_code(self):
+        from contextlib import redirect_stderr, redirect_stdout
+        import io
+        self.runner.fail = True
+        stderr = io.StringIO()
+        with patch.object(tool, "Runner", return_value=self.runner), redirect_stderr(stderr), redirect_stdout(io.StringIO()):
+            result = tool.main(["--target-registration", str(self.target), "--environment-id", "lab", "--revision", "1",
+                                "--out", str(self.root / "partial.json")])
+        self.assertEqual(result, 0)
+        self.assertEqual(stderr.getvalue().strip(), "ENVIRONMENT_CANDIDATE_UNCONFIRMED: KUBECTL_FAILED:kubectl")
+        self.assertFalse(json.loads((self.root / "partial.json").read_text())["import_ready"])
+
+
 if __name__ == "__main__":
     unittest.main()

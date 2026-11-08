@@ -61,3 +61,19 @@ it.each([
   renderAt("/runtime/policy", "/runtime/policy", <RuntimePolicyPage />);
   expect(await screen.findByText(text)).toBeTruthy();
 });
+
+
+it("AWS Lab 사례 ID와 미확인 판정을 해당 회차 환경·시각과 함께 표시한다", async () => {
+  mockApi({ "/api/runtime/lab-report": { item: { state: "ok", report: {
+    run_id: "aws-acceptance-20200101T000000Z-1", context: "byul-aws-lab", namespace: "serving-lab",
+    started_at: "2020-01-01T00:00:00Z", finished_at: "2020-01-01T00:01:00Z", overall: "unknown",
+    cases: [{ id: "AWS-20", title: "보호 파일 읽기 차단", status: "unknown", summary: "근거 부족·미확인", evidence: [],
+      limitation: null, note: "AWS · vllm · 선택 사례의 해당 회차 결과만 표시" }],
+  } }, source: SOURCE } });
+  renderAt("/runtime/enforce/lab", "/runtime/enforce/:sub", <RuntimeEnforcePage />);
+  expect(await screen.findByText("AWS-20 · 보호 파일 읽기 차단")).toBeTruthy();
+  expect(screen.getByText("byul-aws-lab · serving-lab")).toBeTruthy();
+  expect(screen.getByText("근거 부족·미확인")).toBeTruthy();
+  expect(screen.getAllByText(/2020/).length).toBeGreaterThanOrEqual(2);
+  expect(screen.getByText(/현재 정책의 차단 상태를 보장하지 않습니다/)).toBeTruthy();
+});

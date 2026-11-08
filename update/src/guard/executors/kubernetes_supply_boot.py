@@ -209,7 +209,7 @@ class KubernetesSupplyBootExecutor:
         summary = {"profile": check.collection_profile, "sessions": sessions, "violations": violations, "missing": missing,
                    "native": native_rows, "producer_authenticated": False, "engine_started": False}
         artifact_errors = []
-        if b3:
+        if b3 or check.id in {'SUP-05', 'SUP-06', 'SUP-09', 'SUP-10', 'SUP-11'}:
             from .supply_boot_artifacts import persist
             artifacts, artifact_errors = persist(workdir, summary, collected, f'{self.name}/{self.version}')
             if artifact_errors:

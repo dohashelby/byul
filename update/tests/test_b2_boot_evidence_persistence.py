@@ -13,7 +13,7 @@ from guard.store import Store
 from guard.store.packs import put_pack
 from tests.builders import dummy_ref, environment, policy
 from tests.test_dynamic_code_cpu import row as model_row
-from tests.test_supply_boot_record_access import PACK, SOURCE, base_values, native, part, read_row
+from tests.test_supply_boot_record_access import PACK, SOURCE, VALUES, RECORD_CASES, base_values, native, part, read_row
 
 CHECKS = ("SUP-05", "SUP-06", "SUP-09", "SUP-10", "SUP-11")
 FAULTS = ("mkdir", "write", "collision")
@@ -32,6 +32,15 @@ def rows(cid, violation):
     if cid == "SUP-11":
         return [model_row(), model_row(mode="O", events=[{"phase": "import"}] if violation else [],
                                        outcome="accepted" if violation else "rejected_at_trust_gate")]
+    for check_id, bad, good, _ in RECORD_CASES:
+        if check_id == cid:
+            return [deepcopy(bad if violation else good)]
+    if cid == "LIF-02":
+        return [{"attempt": 0, "at_ms": 0, "bytes": 99 if violation else 1,
+                 "outcome": "failed" if violation else "complete", "temporary_left": False}]
+    if cid == "PLT-05":
+        return [{"case": "expired", "identity_sha256": "other" if violation else "i",
+                 "source": "cache" if violation else "approved", "outcome": "fetched" if violation else "denied"}]
     return []
 
 
@@ -170,3 +179,24 @@ def test_existing_role_diagnostic_and_cleanup_survive_storage_error(tmp_path, mo
     assert diagnostic in draft.abort_reason and cleanup in draft.cleanup_errors
     assert draft.observations["supply_boot_violations"].value
     assert values["supply_record_source_sha256"] == SOURCE
+
+
+@pytest.mark.parametrize("cid,fault", [("SUP-07", "mkdir"), ("SUP-12", "write"), ("LIF-01", "collision"),
+                                       ("LIF-02", "write"), ("PLT-03", "mkdir"), ("PLT-05", "collision")])
+def test_other_boot_profiles_share_the_same_persistence_guard(tmp_path, monkeypatch, cid, fault):
+    env = environment()
+    extra = {key: VALUES[key] for key in contract.EXTRA_POLICY.get(cid, {})}
+    values = base_values(env, cid, extra)
+    parts = collected(env, cid, values)
+    executor = registry.build_executor("supply_boot", "kubernetes", {"supply_boot": {"normal": {}, "challenge": {}}})
+    expected, _, _, normal, _, _ = executor._project(PACK.checks[cid], parts)
+    assert expected
+    original = storage_fault(monkeypatch, tmp_path / "evidence", fault)
+    draft = executor._draft(PACK.checks[cid], env, values, tmp_path / "evidence", utcnow(), parts)
+    assert_preserved(draft, parts, normal, fault)
+    assert draft.observations["supply_boot_violations"].value == expected
+    evd = Evidence(id="EVD-BOOT-OTHER-IO", data_origin=draft.data_origin, plan=dummy_ref("PLAN"), environment=env.ref(),
+        check_id=cid, side="single", execution={"status": draft.status}, **_normalize(PACK.checks[cid], draft)).seal()
+    assert judge_evidence(PACK.checks[cid], evd, policy(PACK.ref(), values={cid: values}), utcnow()).verdicts.security.value == "FAIL"
+    if fault != "write":
+        assert original.read_bytes() == ORIGINAL

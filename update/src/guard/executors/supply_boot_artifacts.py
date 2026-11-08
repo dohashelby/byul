@@ -1,4 +1,4 @@
-"""SUP15/16 evidence persistence only; no collection, verdict or new executor."""
+"""supply_boot 전체 프로파일의 증거 저장. 수집·판정·실행기는 추가하지 않는다."""
 from pathlib import Path
 import json
 

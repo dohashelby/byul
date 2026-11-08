@@ -5,12 +5,11 @@
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
-from .base import DraftArtifact, EvidenceDraft
+from .base import EvidenceDraft
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
 from .lifecycle_session import capture_session
 from .owned_capture import _FILE_READER, MAX_BYTES
@@ -208,19 +207,12 @@ class KubernetesSupplyBootExecutor:
         workdir = Path(workdir)
         summary = {"profile": check.collection_profile, "sessions": sessions, "violations": violations, "missing": missing,
                    "native": native_rows, "producer_authenticated": False, "engine_started": False}
-        artifact_errors = []
-        if b3 or check.id in {'SUP-05', 'SUP-06', 'SUP-09', 'SUP-10', 'SUP-11'}:
-            from .supply_boot_artifacts import persist
-            artifacts, artifact_errors = persist(workdir, summary, collected, f'{self.name}/{self.version}')
-            if artifact_errors:
-                cleanup = sorted(set(cleanup + artifact_errors))
-                observations['supply_boot_complete'] = {'value': False, 'collected': True}
-                observations['supply_boot_missing'] = {'value': sorted(set(missing + artifact_errors)), 'collected': True}
-        else:
-            workdir.mkdir(parents=True, exist_ok=True)
-            artifact = workdir / "supply_boot_summary.json"
-            artifact.write_text(json.dumps(summary, ensure_ascii=False, sort_keys=True), encoding="utf-8")
-            artifacts = [DraftArtifact(name="supply_boot_summary.json", path=artifact, collector=f"{self.name}/{self.version}")]
+        from .supply_boot_artifacts import persist
+        artifacts, artifact_errors = persist(workdir, summary, collected, f'{self.name}/{self.version}')
+        if artifact_errors:
+            cleanup = sorted(set(cleanup + artifact_errors))
+            observations['supply_boot_complete'] = {'value': False, 'collected': True}
+            observations['supply_boot_missing'] = {'value': sorted(set(missing + artifact_errors)), 'collected': True}
         gap = bool(any(row["diagnostic_codes"] for row in sessions) or cleanup)
         codes = sorted({code for row in sessions for code in row["diagnostic_codes"]} | set(artifact_errors))
         normal = {"attempted": any(row["collected"] for row in sessions[:1]), "succeeded": normal_ok if collected["normal"]["row"]["collected"] else None,

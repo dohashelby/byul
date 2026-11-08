@@ -1,0 +1,21 @@
+# Install alongside byul-observation-feed.service as the ubuntu user.
+# Requires the same kubectl context and group 10010 in the user manager.
+# The setgid output directory keeps atomic replacements readable by Gateway.
+# Do not share this output path with another identity collector.
+[Unit]
+Description=byul scoped Tetragon process identities (context byul-aws-lab)
+
+[Service]
+Type=simple
+WorkingDirectory=%h/byul/runtime
+Environment=PYTHONPATH=%h/byul/runtime/src
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+UMask=0027
+ExecStartPre=/usr/bin/test -g /srv/serving/observation
+ExecStartPre=/usr/bin/test -w /srv/serving/observation
+ExecStart=/usr/bin/python3 -B -m tools.tetragon_identities --context byul-aws-lab --namespace serving-lab --selector "app in (serving-engine,byul-tetragon-proof,byul-tetragon-sentinel)" --output /srv/serving/observation/tetragon-identities.json --watch
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=default.target

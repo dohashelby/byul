@@ -1,0 +1,101 @@
+{
+  "apiVersion": "cilium.io/v1alpha1",
+  "kind": "TracingPolicyNamespaced",
+  "metadata": {
+    "name": "runtime-tg-health-01-sentinel-v2",
+    "namespace": "serving-lab",
+    "annotations": {
+      "serving-runtime.local/kernel-identity": "v2",
+      "serving-runtime.local/limit": "monitor only",
+      "serving-runtime.local/owner": "byul-monitoring",
+      "serving-runtime.local/rule-id": "TG-HEALTH-01",
+      "serving-runtime.local/status": "candidate-cluster-unapplied-unverified",
+      "serving-runtime.local/syntax-target": "Tetragon 1.7.1"
+    }
+  },
+  "spec": {
+    "kprobes": [
+      {
+        "args": [
+          {
+            "index": 0,
+            "maxData": false,
+            "resolve": "",
+            "returnCopy": false,
+            "type": "file"
+          },
+          {
+            "index": 1,
+            "maxData": false,
+            "resolve": "",
+            "returnCopy": false,
+            "type": "int"
+          }
+        ],
+        "call": "security_file_permission",
+        "data": [
+          {
+            "index": 0,
+            "type": "int",
+            "source": "current_task",
+            "resolve": "tgid",
+            "label": "runtime_pid"
+          },
+          {
+            "index": 1,
+            "type": "uint64",
+            "source": "current_task",
+            "resolve": "group_leader.start_boottime",
+            "label": "runtime_start_ns"
+          },
+          {
+            "index": 2,
+            "type": "uint32",
+            "source": "current_task",
+            "resolve": "nsproxy.pid_ns_for_children.ns.inum",
+            "label": "runtime_pidns"
+          }
+        ],
+        "return": true,
+        "returnArg": {
+          "index": 0,
+          "maxData": false,
+          "resolve": "",
+          "returnCopy": false,
+          "type": "int"
+        },
+        "selectors": [
+          {
+            "matchActions": [
+              {
+                "action": "Post"
+              }
+            ],
+            "matchArgs": [
+              {
+                "index": 0,
+                "operator": "Prefix",
+                "values": [
+                  "/run/byul-runtime-sentinel/read.txt"
+                ]
+              },
+              {
+                "index": 1,
+                "operator": "Equal",
+                "values": [
+                  "4"
+                ]
+              }
+            ]
+          }
+        ],
+        "syscall": false
+      }
+    ],
+    "podSelector": {
+      "matchLabels": {
+        "app": "byul-tetragon-sentinel"
+      }
+    }
+  }
+}

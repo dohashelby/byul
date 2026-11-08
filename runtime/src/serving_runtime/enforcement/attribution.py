@@ -24,6 +24,21 @@ def timestamp(value):
         return None
 
 
+def verified_binary_paths(row):
+    """Aliases are collector attestations tied to the sampled exe device/inode."""
+    paths = [row.get("binary")]
+    file_id = row.get("binary_file_id")
+    aliases = row.get("binary_aliases", [])
+    if (not isinstance(file_id, str) or not re.fullmatch(r"\d+:\d+", file_id)
+        or not isinstance(aliases, list)):
+        return paths
+    for alias in aliases:
+        if (isinstance(alias, dict) and alias.get("file_id") == file_id
+            and isinstance(alias.get("path"), str) and alias["path"].startswith("/")):
+            paths.append(alias["path"])
+    return paths
+
+
 def read_identities(path: str | Path, *, context: str, now=None) -> dict:
     unavailable = {"state": "error", "records": [], "policies": [], "context": context}
     try:
@@ -46,6 +61,9 @@ def read_identities(path: str | Path, *, context: str, now=None) -> dict:
                 or row.get("stable") is not True or not isinstance(row.get("labels",{}),dict)
                 or any(type(row.get(key)) is not int or row[key] <= 0
                        for key in ("node_pid","ns_pid","pidns","start_ticks","clock_ticks"))):
+                return unavailable
+            aliases = row.get("binary_aliases", [])
+            if (not isinstance(aliases, list) or len(verified_binary_paths(row)) != len(aliases) + 1):
                 return unavailable
         if any(not isinstance(p, dict) or not isinstance(p.get("selector", {}), dict) for p in value["policies"]):
             return unavailable
@@ -124,7 +142,7 @@ def bind_event(root: dict, index: dict | None) -> tuple[dict, dict]:
     raw_container = pod.get("container") or {}
     if not isinstance(raw_container, dict) or raw_container.get("name") not in (None, "", row.get("container_name")):
         conflict = "native_container_conflict"
-    if task and process.get("binary") not in (None, "", row.get("binary")):
+    if task and process.get("binary") not in (None, "", *verified_binary_paths(row)):
         conflict = "native_binary_conflict"
     if conflict:
         cleared = copy.deepcopy(root)

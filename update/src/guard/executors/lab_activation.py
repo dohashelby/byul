@@ -1871,8 +1871,16 @@ class ActivatedExecutor:
         from .lifecycle_common_input_consumption import merge_activation_inputs
         facts = merge_activation_inputs(facts, passive)
         workdir.mkdir(parents=True, exist_ok=True)
-        path = workdir / 'lab-activation.json'; path.write_bytes(canonical_json(facts))
-        artifact = DraftArtifact(name=path.name, path=path, collector='lab_activation/0.1.0')
+        artifact = None; primary_artifact_gap = False
+        try:
+            path = workdir / 'lab-activation.json'; path.write_bytes(canonical_json(facts))
+            artifact = DraftArtifact(name=path.name, path=path, collector='lab_activation/0.1.0')
+        except OSError:
+            if passive is None or 'b_common_inputs' not in passive.config:
+                raise  # Preserve the original path when no B common input was consumed.
+            primary_artifact_gap = True
+            facts['activation_missing'].append('LAB_ACTIVATION_COMMON_INPUT_ARTIFACT_UNAVAILABLE')
+            facts['activation_scope_complete'] = False
         # Preserve the primary verdict facts before optional diagnostic writes.
         try:
             diagnostics = lab.write_diagnostics(workdir)
@@ -1881,7 +1889,7 @@ class ActivatedExecutor:
             diagnostics = []
         observations = {**(passive.observations if passive else {}),
             **{k: Observation(value=v, collected=True) for k, v in facts.items()}}
-        complete = facts['activation_scope_complete'] or bool(facts['activation_violations'])
+        complete = not primary_artifact_gap and (facts['activation_scope_complete'] or bool(facts['activation_violations']))
         origin = DataOrigin.EXAMPLE if self.runner is not None else DataOrigin.MEASURED if complete else DataOrigin.DECLARED
         if passive is not None and 'b_common_inputs' in passive.config:
             # Registration does not authenticate an external record. Preserve
@@ -1892,11 +1900,12 @@ class ActivatedExecutor:
             normal_control={'attempted': bool(lab.normal), 'succeeded': bool(lab.normal) and all(lab.normal),
                 'detail': 'Parent-measured normal requests around the activated fault.'},
             challenges=[{'step': step, 'attempted': facts['activation_scope_complete']} for step in check.challenge_steps],
-            observations=observations, artifacts=[*(passive.artifacts if passive else []), *diagnostics, artifact],
+            observations=observations, artifacts=[*(passive.artifacts if passive else []), *diagnostics, *([artifact] if artifact else [])],
             config={**(passive.config if passive else {}), 'lab_activation': {k: v for k, v in self.cfg.items() if k != 'kubectl_context'}},
             started_at=started, finished_at=utcnow(),
-            abort_reason=None if complete else 'LAB_ACTIVATION_SCOPE_INCOMPLETE',
+            abort_reason=None if complete else 'LAB_ACTIVATION_COMMON_INPUT_ARTIFACT_UNAVAILABLE' if primary_artifact_gap else 'LAB_ACTIVATION_SCOPE_INCOMPLETE',
             cleanup_errors=[*(passive.cleanup_errors if passive else []), *lab.cleanup_errors,
+                *(['LAB_ACTIVATION_COMMON_INPUT_ARTIFACT_UNAVAILABLE'] if primary_artifact_gap else []),
                 *(['LAB_ACTIVATION_DIAGNOSTIC_ARTIFACT_UNAVAILABLE'] if lab.diagnostic_write_errors else [])])
 
     def _refused(self, check, passive, reason, started):

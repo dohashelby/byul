@@ -179,7 +179,8 @@ def test_existing_factories_preserve_optional_input_and_native_cfg(tmp_path, nam
     assert executor.name == name and executor.b_common_inputs == descriptor and 'common_inputs' not in executor.cfg
 
 
-def test_activation_preserves_both_independent_fails_and_example_ceiling(tmp_path, monkeypatch):
+@pytest.mark.parametrize('primary_artifact_error', [False, True])
+def test_activation_preserves_both_independent_fails_and_example_ceiling(tmp_path, monkeypatch, primary_artifact_error):
     env, target, prepared, _, _, descriptor = inputs(tmp_path/'input')
     check = load_pack(ROOT/'packs/PACK-BASELINE').checks['LIF-10']
     passive = attach_inputs(draft(), check, env, target, descriptor, tmp_path/'passive', prepared=prepared, owner=POD)
@@ -187,6 +188,12 @@ def test_activation_preserves_both_independent_fails_and_example_ceiling(tmp_pat
               'activation_missing':[], 'activation_scope_complete':True}
     lab = SimpleNamespace(normal=[True], cleanup_errors=[], diagnostic_write_errors=[], write_diagnostics=lambda _: [])
     monkeypatch.setattr(lab_activation, 'run_scenario', lambda *a, **kw: (deepcopy(active), lab))
+    if primary_artifact_error:
+        original = Path.write_bytes
+        def write(path, data):
+            if path.name == 'lab-activation.json':raise OSError('EXAMPLE-primary-artifact-error')
+            return original(path,data)
+        monkeypatch.setattr(Path,'write_bytes',write)
     child = SimpleNamespace(run=lambda *a, **kw: passive)
     executor = lab_activation.ActivatedExecutor(child, {}, runner=None)
     result = executor.run(check, env, {}, None, tmp_path/'active')
@@ -195,15 +202,34 @@ def test_activation_preserves_both_independent_fails_and_example_ceiling(tmp_pat
     assert not result.observations['activation_scope_complete'].value
     assert result.observations['activation_steps'].value[-1]['records']
     assert merge_activation_inputs(active, None) is active
+    if primary_artifact_error:
+        assert result.status == ExecStatus.ABORTED
+        assert result.abort_reason == 'LAB_ACTIVATION_COMMON_INPUT_ARTIFACT_UNAVAILABLE'
+        assert result.artifacts == passive.artifacts
 
 
-def pipeline(folder, pack, env, check_id, values, cfg):
+def test_without_common_inputs_primary_artifact_error_keeps_original_exception_boundary(tmp_path, monkeypatch):
+    active={'activation_steps':[], 'activation_violations':[{'code':'ACTIVE_INDEPENDENT_FAIL'}],
+            'activation_missing':[], 'activation_scope_complete':False}
+    monkeypatch.setattr(lab_activation,'run_scenario',lambda *a,**kw:(active,None))
+    original=Path.write_bytes
+    def write(path,data):
+        if path.name=='lab-activation.json':raise OSError('EXAMPLE-primary-artifact-error')
+        return original(path,data)
+    monkeypatch.setattr(Path,'write_bytes',write)
+    check=load_pack(ROOT/'packs/PACK-BASELINE').checks['LIF-10']
+    with pytest.raises(OSError, match='EXAMPLE-primary-artifact-error'):
+        lab_activation.ActivatedExecutor(SimpleNamespace(run=lambda *a:draft()),{}).run(check,None,{},None,tmp_path)
+
+
+def pipeline(folder, pack, env, check_id, values, cfg, *, activation=None):
     pol = policy(pack.ref(), scope={'include':[check_id]}, values={check_id:values})
     store = Store(folder/'store'); put_pack(store, pack.path); store.put_many([env,pol])
     plan = select(pack,[env],pol); store.put(plan)
     check = pack.checks[check_id]
     assert next(item for item in plan.items if item.check_id == check_id).selected
-    evd, = run_plan(store,pack,plan,RunConfig(executors={check.executor:'kubernetes'},adapter='vllm',raw={check.executor:cfg}))
+    evd, = run_plan(store,pack,plan,RunConfig(executors={check.executor:'kubernetes'},adapter='vllm',
+        raw={check.executor:cfg, **({'lab_activation':activation} if activation is not None else {})}))
     now = utcnow(); result, = judge_plan(store,pack,plan,as_of=now)
     report = build_report(store,pack,plan,as_of=now); store.put(report)
     export_bundle(store.root,folder/'bundle.zip'); restore_bundle(folder/'bundle.zip',folder/'restored')
@@ -257,6 +283,34 @@ def test_lif10_actual_producer_to_current_pack_normalized_evidence_and_rejudge(t
     assert report['records'][0]['kind']=='request-attempt' and report['records'][0]['validation']['supported']
     assert report['native_observations']['termination_attempts']['collected']
     assert result.verdicts.security.value=='UNKNOWN' and not evd.observations['activation_scope_complete'].value
+
+
+def test_primary_artifact_error_keeps_original_judge_fail_remaining_artifacts_report_and_restored_refs(tmp_path, group, native_target, monkeypatch):
+    from tests.test_a1_kubernetes_request_termination_product import inputs as native_inputs
+    from guard.runtime import kubernetes_http as http
+    world, values, _, _ = native_inputs(tmp_path,group,native_target,'normal')
+    target=tmp_path/'target.json';target.write_bytes(canonical_json(world.target))
+    *_, descriptor=inputs(tmp_path/'common',env=group.env,target=world.target,prepared=group.prepared,
+                            pod=world.target['kubernetes']['engine'])
+    monkeypatch.setattr(http,'capture_pipes',world.runner)
+    monkeypatch.setattr('guard.executors.kubernetes_lifecycle_capture.capture_pipes',world.runner)
+    active={'activation_steps':[{'step':'EXAMPLE-active'}], 'activation_violations':[{'code':'EXAMPLE_CONFIRMED_ACTIVE_FAIL'}],
+            'activation_missing':[], 'activation_scope_complete':False}
+    lab=SimpleNamespace(normal=[True], cleanup_errors=[], diagnostic_write_errors=[], write_diagnostics=lambda _:[])
+    monkeypatch.setattr(lab_activation,'run_scenario',lambda *a,**kw:(deepcopy(active),lab))
+    original=Path.write_bytes
+    def write(path,data):
+        if path.name=='lab-activation.json':raise OSError('EXAMPLE-primary-artifact-error')
+        return original(path,data)
+    monkeypatch.setattr(Path,'write_bytes',write)
+    store, evd, result=pipeline(tmp_path/'product',load_pack(ROOT/'packs/PACK-BASELINE'),group.env,'LIF-10',values,
+        {'target':str(target),'prepared':str(group.manifest_path),'common_inputs':descriptor},activation={'namespace':'EXAMPLE'})
+    assert evd.execution.status == ExecStatus.ABORTED
+    assert result.verdicts.security.value == 'FAIL'
+    assert evd.observations['activation_violations'].value == [{'code':'EXAMPLE_CONFIRMED_ACTIVE_FAIL'}]
+    names={a.name for a in evd.artifacts}
+    assert {'b-common-inputs.json','probe_log.jsonl'} <= names and 'lab-activation.json' not in names
+    assert 'LAB_ACTIVATION_COMMON_INPUT_ARTIFACT_UNAVAILABLE' in evd.execution.cleanup_errors
 
 
 @pytest.mark.parametrize('mode', ['released-descriptors','retained','retained-http-failure'])

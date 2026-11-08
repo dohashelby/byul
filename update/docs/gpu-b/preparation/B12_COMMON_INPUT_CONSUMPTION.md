@@ -83,3 +83,12 @@ list JSON의 `.get` 오류는 전용 소비자에서 형식을 확인하도록 �
 나머지 3개는 기본 PLT-02 profile 불일치를 숨기지 않고 위 경계대로 시험을 분리했다.
 최종 소스 SHA·실행 argv·pytest 시간·부모 wall time·exact Ref는 같은 worktree `out/` 및 `update/out/b12-*`의 고정 인계로 참조한다.
 같은 버전의 유효 검증을 반복하지 않는다. GPU·실제 생산자 인증·정책 승인·전체 질문 완료를 주장하지 않는다.
+
+### 후속 artifact 오류 수정
+
+`bb4cf60d`의 전용 단일 CPU 재현에서 primary `lab-activation.json` 쓰기 OSError가 병합된 원 위반을 밖으로 전파해 소실시키는 경계를 확인했다.
+후속 수정은 common input을 실제 소비한 passive draft가 있을 때만 이 오류를 진단·ABORTED로 남기고 양쪽 원 위반과 나머지 artifact를 보존한다.
+입력이 없는 원 경로의 예외 경계는 유지한다. 이 변경은 원 후보를 위반으로 바꾸지 않는다.
+현재 PACK의 원 judge FAIL·보고·별도 DB 복원·저장팩 재판정과 미실패 artifact 저장을 직접 시험한다.
+원 21파일 회귀는 651통과/2실패이며 두 실패는 저장소 내부 basetemp가 기존 lifecycle 출력 gate에 거부된 것이다.
+같은 `bb4cf60d`에서 해당 두 case만 저장소 밖 새 temp로 실행해 2통과를 확인했다. 원 gate와 실패 로그를 보존하며 전체 21파일을 반복하지 않는다.

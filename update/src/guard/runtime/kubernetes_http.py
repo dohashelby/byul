@@ -1157,6 +1157,25 @@ class KubernetesHTTP:
             raise KubernetesBindingError()
         return pod
 
+    def engine_ipc_ownership(self):
+        """PLT-02 공통 입력: 엔진 컨테이너 안 unix socket의 실제 소유·상대(읽기 전용). 관측 앞뒤로 소유 Pod 바인딩을 확인한다.
+
+        (관측, 바인딩 Pod 신원, 앞뒤 바인딩 동일 여부)를 돌려준다. 관측 형식이 맞지 않으면 실패다.
+        """
+        from guard.collectors.ipc_ownership_observer import OBSERVER, decode
+        if self.profile not in {REQUEST_BINDING_PROFILE, ENGINE_CALLBACK_PROFILE}:
+            raise KubernetesBindingError()
+        self._verify();engine=deepcopy(self.binding["engine"])
+        value=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],
+            f"--container={engine['container']}","--","python3","-I","-S","-c",OBSERVER],cap=4*1024**2,budget=60)
+        self._verify()
+        try:
+            observed=decode(value)
+        except ValueError:
+            raise KubernetesBindingError() from None
+        pod={"pod_uid":engine["pod_uid"],"container_id":engine["container_id"],"restart_count":engine["restart_count"]}
+        return observed,pod,self.binding["engine"]==engine
+
     def engine_device_open_test(self):
         """PLT-01·04: 엔진 컨테이너 안에서 보이는 GPU device node를 O_RDWR로 열었다 닫는다(ioctl 없음)."""
         from guard.collectors.process_device_observer import DEVICE_OPEN_TEST, DEVICE_PATTERN, decode_open

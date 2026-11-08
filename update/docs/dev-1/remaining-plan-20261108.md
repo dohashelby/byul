@@ -43,8 +43,8 @@ B 인계가 "개발26 공통"으로 남긴 것 중 A가 할 일이다. 등록을
 | runner-consumption(V1·V2)·supply-reads | REQ-08·09·10, SUP 계열 | 등록됨 → B 소비자 연결 |
 | **rank-fault 생산자** | LIF-08 | 미등록. TP2 필요 → A의 TP2 세션에서 함께 GPU 확인 |
 | **failed-group-resources 생산자** | LIF-11 | 미등록. TP2 필요 → 같은 세션 |
-| **IPC 소유·sender/reader 공통 관측** | PLT-02·06 | 미구현(listener/accepted 소유 구분) |
-| **공식 model-entry/consumer 지원** | SUP-09 | 미구현 |
+| **IPC 소유 공통 관측** | PLT-02 | 2026-11-08 반환(`plt02-ipc-ownership.md`, 미등록·GPU 확인 대기). PLT-06 메시지 소비는 별도 |
+| B 의존 반환 1~5·7·8 | SUP-09·11, SUP-10, LIF-06, SUP-03, SUP-06, LIF-11, REQ-09·10 | 미착수. 대상 함수·검증 방법은 `gpu-b/consolidation-20261106/DEPENDENCY_RETURNS.md` |
 | 계약 합의 P2-Q1(사건 상한)·P2-Q2(V2 logit bias) | #196 소비 전반 | B 답변 대기 |
 
 ### 2-4. 정리 작업

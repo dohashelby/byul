@@ -109,6 +109,17 @@ KINDS = {
                    "bytes_sha256": "opt_sha", "state": "opt_id"},
         "complete_requires": ("file_opened", "file_hashed"),
     },
+    # PLT-02(개발 담당, B 의존 반환 6): 엔진 컨테이너 안 실제 vLLM 프로세스의 unix socket 소유·상태·상대.
+    # 경로는 SHA-256(path_sha256), 경로 파일의 (dev, ino)는 파일 신원(path_file_sha256)으로 따로 두며 socket 커널 inode와 섞지 않는다.
+    # peer_binding은 상대 socket을 가진 이 기록의 바인딩(프로세스) 번호이고, 컨테이너 안에서 찾지 못하면 None이다.
+    "ipc-ownership": {
+        "checks": ("PLT-02",),
+        "events": ("process", "unix_socket"),
+        "fields": {"role": "enum:api_server|engine_core|worker|utility|other", "uid": "opt_int", "net_ns": "opt_int",
+                   "socket_inode": "opt_int", "fd": "opt_int", "state": "enum:none|listen|accepted|connected|unconnected",
+                   "path_sha256": "opt_sha", "path_file_sha256": "opt_sha", "peer_socket_inode": "opt_int", "peer_binding": "opt_int"},
+        "complete_requires": ("process", "unix_socket"),
+    },
     "profiler-control": {
         "checks": ("LIF-14", "OBS-03"),
         "events": ("api_call", "rpc", "worker_control", "backend_state", "stop_failed", "trace_callback", "output_complete",
@@ -244,6 +255,15 @@ def violation_candidates(kind, events):
                 out.append({"seq": row["seq"], "path_sha256": row["path_sha256"], "reason": "supply_file_changed_after_open"})
     elif kind == "runner-consumption":
         out += _consumption_candidates(events)
+    elif kind == "ipc-ownership":
+        roles = {r["binding"]: r["role"] for r in events if r["event"] == "process"}
+        for row in events:
+            if row["event"] != "unix_socket":
+                continue
+            if row["state"] == "listen" and roles.get(row["binding"]) in ("utility", "other"):
+                out.append({"seq": row["seq"], "reason": "listener_owned_outside_serving_roles"})
+            if row["state"] in ("accepted", "connected") and row["peer_binding"] is None:
+                out.append({"seq": row["seq"], "reason": "peer_outside_container_roster"})
     elif kind == "rank-fault":
         out += [{"seq": r["seq"], "reason": "fault_ack_missing"} for r in events if r["event"] == "fault_applied" and not r["ack"]]
     return out

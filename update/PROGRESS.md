@@ -1,3 +1,10 @@
+## 2026-11-08 — PLT-02 실제 IPC 소유 공통 입력(B 의존 반환 6)
+
+- 한 일: origin/main을 합치고 새 PR dohashelby/byul#231을 올렸다. CI가 Ubuntu 26.04 러너에서 Python 3.12.3을 찾지 못해 update-default를 ubuntu-24.04로 고정했다(main도 같은 원인). B 의존 반환 6번으로 `ipc-ownership` 계약 종류·컨테이너 안 관측기(/proc+sock_diag)·생산자·전송 메서드·요약을 만들었다. 생산자는 GPU 확인 전이라 미등록이다. 상세 `docs/dev-1/plt02-ipc-ownership.md`.
+- 테스트 결과: 새 시험 17, 계약 의존 168 통과(한 코어). k3d 실제 vLLM에서 4프로세스·unix 20개·연결 방향 3종·미해결 0.
+- 다음 단계: B 의존 반환 1~5·7·8, TP2(할당량 대기), 생산자 GPU 확인·등록.
+- 막힌 것: AWS 할당량 승인.
+
 ## 2026-11-06 — TP2 준비(REQ-14·REQ-21)
 
 - 한 일: 사용자 결정으로 2장 구성을 g6.12xlarge(L4 4장 중 2장)로 정하고 G and VT vCPU 할당량 8→48을 요청했다(승인 대기). 기존 인스턴스 15:51 stopped 확인·비용 장부 마감. TP2 하네스(`a-tp2.py`: 노드 GPU·P2P 기록, REQ-14 TP2, REQ-21 TP2 재기동)를 만들고 11-05 GPU 입력으로 REQ-14·REQ-21 입력 생성·select를 통과시켰다. REQ-21도 실행 안에서 엔진을 재기동하므로 실행기·입력 도구의 900초 상한에 넣었다. 계획 `docs/dev-1/tp2-run-plan.md`.

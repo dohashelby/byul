@@ -38,6 +38,22 @@ def sample():
 
 
 class AttributionTests(unittest.TestCase):
+    def test_lsm_without_data_requires_native_actor_and_unique_cri_container(self):
+        raw, index = sample()
+        event = raw.pop('process_kprobe')
+        raw['process_lsm'] = event
+        event.update(function_name='file_open', args=[{'file_arg': {'path': '/run/probe/file'}}])
+        event.pop('data')
+        self.assertEqual(parse_tetragon(raw, data_origin='synthetic', identity_index=index)['identity']['state'], 'unavailable')
+        event['process'].update(exec_id='native-exec', binary='/usr/bin/python3', docker=CID[:16])
+        result = parse_tetragon(raw, data_origin='synthetic', identity_index=index)
+        self.assertEqual(result['identity']['state'], 'confirmed')
+        self.assertEqual(result['identity']['source'], 'native_exec_cri_container')
+        self.assertEqual(result['pod'], {'namespace': 'serving', 'pod': 'engine'})
+        self.assertNotIn('data', raw['process_lsm'])
+        event['process']['pod'] = {'namespace': 'other', 'uid': 'other'}
+        self.assertEqual(parse_tetragon(raw, data_origin='synthetic', identity_index=index)['identity']['state'], 'conflict')
+
     def test_child_process_binding_survives_missing_native_cache_without_inventing_exec_id(self):
         raw, index = sample()
         observation = parse_tetragon(raw, data_origin="real", identity_index=index)

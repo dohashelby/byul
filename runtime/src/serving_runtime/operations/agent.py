@@ -27,7 +27,7 @@ from ..enforcement.intent import load_intent, TETRAGON_RULE_MODES
 from ..enforcement.tetragon import comparable_spec
 from ..mvp.policy_bundle import verify_policy_bundle
 from ..mvp.tetragon_state import read_tetragon_state
-from .safety import evaluate, is_mode_switch_target, recent
+from .safety import evaluate, is_mode_switch_target, recent, requires_restart_confirmation
 
 ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 REQUIRED_ROLES = {"gateway_policy", "policy_approvals", "target", "enforcement_intent"}
@@ -346,7 +346,7 @@ class Agent:
             if mode == "enforce":
                 ready = evaluate(self.live_safety(name), name, intent, self.review(), self.monitor_seconds)
                 if (not all(ready["checks"].values()) or ready["expected"] != {k: before[k] for k in ("policy_id", "mode", "spec_sha256")}
-                        or payload.get("confirmation") != "ENGINE_RESTART"):
+                        or (requires_restart_confirmation(ready) and payload.get("confirmation") != "ENGINE_RESTART")):
                     reject("SAFETY_REJECTED")
         expected = {k: v for k, v in op.get("expected", {}).items() if v is not None}
         if not expected or any(before.get(k) != v for k, v in expected.items()):

@@ -264,7 +264,7 @@ def parse_tetragon(
         raise EventError("event must contain exactly one process_* Tetragon event")
     event_name = event_names[0]
     event = _object(root[event_name], f"$.{event_name}")
-    if event_name not in {"process_exec", "process_kprobe"}:
+    if event_name not in {"process_exec", "process_kprobe", "process_lsm"}:
         raise UnsupportedTetragonEvent(f"unsupported Tetragon event: {event_name}")
     if event_name == "process_exec":
         raw_process = event.get("process")
@@ -353,7 +353,7 @@ def parse_tetragon(
 
     binary, pod = _process(event, "$.process_kprobe", require_binary=False)
     function_name = _string(event.get("function_name"), "$.process_kprobe.function_name")
-    if function_name not in {"security_file_permission", "fd_install", "sys_openat", "__x64_sys_openat", "__arm64_sys_openat"}:
+    if (event_name == "process_lsm" and function_name != "file_open") or (event_name == "process_kprobe" and function_name not in {"security_file_permission", "fd_install", "sys_openat", "__x64_sys_openat", "__arm64_sys_openat"}):
         raise UnsupportedTetragonEvent(f"unsupported kprobe function: {function_name}")
     policy_name = _string(event.get("policy_name"), "$.process_kprobe.policy_name")
     match = _RULE_ID.search(policy_name)

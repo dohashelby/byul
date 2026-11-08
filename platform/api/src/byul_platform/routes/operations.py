@@ -100,6 +100,7 @@ class MonitorWindow(Closed):
 class PolicyReadiness(Closed):
     name: Identifier
     method: Identifier | None = None
+    contains_sigkill: bool | None = Field(default=None, strict=True)
     expected: Expected
     checks: dict[Literal["policy", "evidence", "capability", "monitor_period", "collection", "allowed_mode"], bool]
     capability_basis: Literal["static", "live_trial"] | None = None
@@ -175,7 +176,10 @@ def _check_ready(heartbeats, body):
         deny("SAFETY_REJECTED")
     if ready["expected"] != body.expected.model_dump(mode="json"):
         deny("STATE_CHANGED")
-    if ready["method"] in {"sigkill_fd_install", "override_lsm", "override_syscall"} and body.confirmation != "ENGINE_RESTART":
+    contains_sigkill = ready.get("contains_sigkill")
+    if contains_sigkill is None:
+        contains_sigkill = ready["method"] in {"sigkill_fd_install", "override_lsm", "override_syscall"}
+    if contains_sigkill and body.confirmation != "ENGINE_RESTART":
         deny("CONFIRMATION_REQUIRED")
 
 

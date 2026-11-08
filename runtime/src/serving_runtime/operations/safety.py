@@ -11,9 +11,16 @@ CHECKS = ("policy", "evidence", "capability", "monitor_period", "collection", "a
 SHA = re.compile(r"^[0-9a-f]{64}$")
 
 
+def requires_restart_confirmation(policy: dict) -> bool:
+    # Older snapshots have no action flag; retain their conservative behavior.
+    if type(policy.get("contains_sigkill")) is bool:
+        return policy["contains_sigkill"]
+    return policy.get("method") in {"override_lsm", "sigkill_fd_install", "override_syscall"}
+
+
 def is_mode_switch_target(policy: dict) -> bool:
     return (policy.get("mode") in {"monitor", "enforce"}
-            and policy.get("method") in {"override_lsm", "sigkill_fd_install", "override_syscall"})
+            and policy.get("method") in {"lsm_file_open", "override_lsm", "sigkill_fd_install", "override_syscall"})
 
 
 def recent(stamp, seconds, now=None):
@@ -132,6 +139,7 @@ def evaluate(snapshot: dict, name: str, intent, review: dict, monitor_seconds: i
                             and all(monitoring.get(k) is True for k in
                                     ("policies_verified", "writer_verified", "identities_verified", "events_verified")))
     return {"name": name, "method": method, "expected": expected, "checks": checks,
+            "contains_sigkill": any(requires_restart_confirmation(p) for p in rows),
             "monitor_windows": monitor_windows[:128],
             "capability_basis": capability_basis, "capability_reason": capability_reason,
             "evidence_sha256": sorted(set(evidence))[:64]}

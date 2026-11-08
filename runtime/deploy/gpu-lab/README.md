@@ -33,6 +33,34 @@ AWS 공통 GPU 시험환경 설치 묶음(`aws-handoff-20261026`, 이하 "AWS �
 | `policy-approvals.aws-lab.json` | 위 정책의 LAB 승인 목록(SHA-256 대조). runtime 자체 기록이며 정식 승인 아님 |
 | `perf-plan.aws-lab.json` | B0/B1/B2 성능 비교 계획(`tools/perf_compare.py`) |
 
+## BPF LSM 서버 준비와 파일 거부 방식
+
+Tetragon 1.7.1의 `lsm_file_open`은 BPF LSM 활성화가 필요하다. 다음은 서버 관리자가 유지보수 시간에 수행하는 호스트 부팅 설정이며, 이 문서 작성 작업에서는 실행하지 않았다.
+
+1. `uname -r`, `/boot/config-$(uname -r)`의 `CONFIG_BPF_LSM=y`, `cat /sys/kernel/security/lsm`을 확인한다. 현재 목록의 순서를 보존하고 `bpf`가 없을 때만 끝에 추가한다. 기존 GRUB의 `lsm=` 설정이 있다면 중복 인자가 생기지 않게 기존 설정을 통합한다.
+2. `/etc/default/grub.d/99-byul-bpf-lsm.cfg`에 다음을 기록한다. `<현재 목록>`은 바로 확인한 쉼표 구분 목록으로 바꾸며, 이미 `bpf`가 있으면 다시 추가하지 않는다.
+
+   ```bash
+   GRUB_CMDLINE_LINUX="$GRUB_CMDLINE_LINUX lsm=<현재 목록>,bpf"
+   ```
+
+3. `sudo update-grub` 실행 후 `sudo reboot`한다. 재접속 뒤 `/proc/cmdline`, `/sys/kernel/security/lsm`의 `bpf`, Tetragon의 `tetra probe` 출력 `lsm: true`를 확인한다. 설정 파일만 작성된 상태를 활성화로 판정하지 않는다.
+
+방식 추천 순서는 `lsm_file_open` → `override_syscall` → `sigkill_fd_install`이다. 추천은 intent나 기존 묶음을 자동 변경하지 않는다. 사전 조건이 확인된 후보만 추천하며, `fd_install`은 정적 점검만으로 지원을 확정하지 않는다. 실제 정책 로드·파일 거부·monitor 복귀 증거와 운영 안전 조건은 계속 필요하다.
+
+| 방식 | 동작과 한계 |
+| --- | --- |
+| `lsm_file_open` | `lsmhooks.file_open`의 정확한 파일 경로 + Post·Override(-13). 파일 열기만 거부, 프로세스 유지. 기존에 열린 descriptor는 보호하지 않는다. 7회차에서 상대 경로도 거부됐으나 모든 별칭·파일시스템을 보장한 것은 아니다. |
+| `override_syscall` | openat 경로 문자열 + Post·Override(-13). 파일 열기만 거부, 프로세스 유지. 상대 경로·symlink·TOCTOU·openat2·io_uring 등 우회 한계가 있어 포괄적인 파일 보호로 간주하지 않는다. args 2개 + 식별 data 3개로 최대 5개를 지킨다. |
+| `sigkill_fd_install` | 해당 프로세스를 종료한다. 엔진 본체 접근이면 엔진 종료·Gateway 503·재시작 위험이 있다. 파일 읽기 거부 증거와 프로세스 종료 증거를 구분한다. |
+| 기존 `override_lsm` | security_file_permission kprobe + Override·Sigkill. 새 BPF LSM 방식과 다르며 기존 intent 호환용이다. AWS 7회차에서 security_* error injection 부재로 사용할 수 없었다. |
+
+`lsm_file_open`의 `data`는 [1.7.1 LsmHookSpec](https://github.com/cilium/tetragon/blob/v1.7.1/pkg/k8s/apis/cilium.io/v1alpha1/types.go#L401-L419)에 필드가 없어 생략한다. `process_lsm`에도 반환값·data가 없으므로 커널 반환값만으로 `kernel_read_denied`를 만들지 않는다. native 프로세스·Pod UID·정책·정확한 경로·시간창과 userspace EPERM/EACCES 증거가 필요하며 귀속이 부족하면 `unknown`을 유지한다. trial은 CRI init PID와 native 이벤트 PID도 대조한다.
+
+openat Equal 값 끝의 `\u0000`은 기존 코드가 명시적으로 붙인 종결자다. [1.7.1 writeMatchStrings](https://github.com/cilium/tetragon/blob/v1.7.1/pkg/selectors/kernel.go#L701-L707)는 string 타입에 trimNulSuffix를 켜고, [ArgStringSelectorValue](https://github.com/cilium/tetragon/blob/v1.7.1/pkg/selectors/selectors.go#L353-L359)는 끝 NUL을 제거한다. 따라서 string Equal 비교에는 필수가 아니며 실측에서 매치된 것과도 일치한다. 기존 생성값의 호환성을 위해 유지한다. 제거 대조 실험은 미실행이며, 파일 객체 경로를 쓰는 LSM 값에는 붙이지 않는다.
+
+새 정책은 monitor로 로드한다. 기존 syscall+Sigkill 묶음은 바꾸지 않으며 수집한 실제 action의 `contains_sigkill`에 따라 화면·API·에이전트가 `ENGINE_RESTART` 확인을 요구한다. 이전 상태 자료에 이 정보가 없으면 기존 Sigkill 계열 방식의 확인을 보수적으로 유지한다. 상세 실측은 [7회차 결과](../../docs/AWS_GPU_서버7회차_결과_20261108.md)를 참조한다.
+
 ## Gateway 시간 제한과 수집
 
 `backend-config.yaml`의 `timeouts.status_timeout_s`는 엔진 health·models/version·metrics 조회와 상태 API health 확인에 쓰며 기본값은 5초다. 각 엔진 조회는 이 값으로 제한된다. 추론 및 토큰 계산·모의 receipt 조회는 `relay_timeout_s`(이 배포 예시 60초)를 계속 사용한다. 엔진 health·info·metrics는 엔진 전용 스레드 하나에서 순차 수집하고, Hubble/Tetragon 관측·Cilium·대상 Pod 수집은 별도 일반 수집 루프에서 진행한다. 한 엔진 조회가 지연되면 같은 그룹의 다음 조회와 기준선 재검증도 늦어질 수 있다. 상태 API의 수집원별 표시 형식은 같다.

@@ -66,7 +66,7 @@ class AgentTest(unittest.TestCase):
     def test_readiness_keeps_switchable_policies_with_failed_safety_checks(self):
         self.agent = Agent(self.client, replace(self.agent.config, namespace=self.intent.namespace))
         for mode in ("monitor", "enforce"):
-            for method in ("override_lsm", "sigkill_fd_install", "override_syscall"):
+            for method in ("lsm_file_open", "override_lsm", "sigkill_fd_install", "override_syscall"):
                 with self.subTest(mode=mode, method=method):
                     policy = {"name": "runtime-tg-secret-01", "namespace": self.agent.config.namespace,
                               "node": "node-01", "state": "disabled", "mode": mode, "id": "7",
@@ -172,6 +172,24 @@ class AgentTest(unittest.TestCase):
             self.assertNotIn("test-only-token", repr(client))
             with self.assertRaises(ValueError):
                 PlatformClient("http://platform.invalid", str(path))
+
+    def test_enforce_confirmation_uses_actual_policy_actions(self):
+        state = {**self.before, "policy_id": "7", "mode": "monitor", "spec_sha256": "a" * 64}
+        op = operation()
+        op.update(kind="tetragon.mode", expected=state, approval_required=True,
+                  approvals=[{"token_id": "approver-01", "role": "approver"}])
+        op['payload'] = {'policy_name': 'runtime-tg-secret-01', 'mode': 'enforce'}
+        ready = {'checks': {'all': True}, 'expected': {k: state[k] for k in ('policy_id', 'mode', 'spec_sha256')}}
+        for method, contains in (('lsm_file_open', False), ('override_syscall', False), ('override_syscall', True)):
+            with self.subTest(method=method, contains=contains), \
+                 patch.object(self.agent, 'mode_state', return_value=state), \
+                 patch.object(self.agent, 'live_safety', return_value={}), \
+                 patch('serving_runtime.operations.agent.evaluate', return_value={**ready, 'method': method, 'contains_sigkill': contains}):
+                if contains:
+                    with self.assertRaisesRegex(Rejected, 'SAFETY_REJECTED'):
+                        self.agent.validate(op, self.before, self.intent)
+                else:
+                    self.assertEqual(self.agent.validate(op, self.before, self.intent), state)
 
     def test_platform_ca_replaces_default_roots_and_keeps_verification(self):
         ca = Path(__file__).parent / "fixtures" / "platform-test-ca.pem"

@@ -551,3 +551,14 @@
 - 실서버 통과: 플랫폼 새 내보내기 묶음 `bundle.apply` 49초(정책 r4·환경 r2), 5회차 임시 우회 없이 복구 4조건 healthy·모니터 기록 ok(`--trusted-owner-uid 10000`)·실행 경로 별칭, 안전 조건 6개 충족 후 Sigkill 전환 15초·exit 137·monitor 복귀 16초.
 - 새 문제: runtime-agent의 pam_umask 002로 상태 파일 0664 → 명시 권한 쓰기로 수정(서버 재확인은 다음 회차).
 - 미확인: 엔진 본체 직접 읽기 시 503·복구 시간(선택).
+
+## 2026-11-08 AWS 7회차 반영 (Codex 구현, Claude 검수 대기)
+
+- 기준 `byul_runtime` / `62a844338c0ea1d1ceb9d4c03b32120e510228d8`, 미커밋·push 없음. 기존 미추적 인계 문서 보존. `contracts/`, `update/`, AWS·kind, 127.0.0.1:8700·5173 변경 없음.
+- `lsm_file_open`을 intent→lsmhooks(Post·Override -13, monitor 초기 로드)→process_lsm 정규화·native 귀속→verification→capability·trial·운영 안전 조건·화면에 연결. 1.7.1 LsmHookSpec/ProcessLsm에는 data·return이 없어 KERNEL_DATA와 커널 반환값 판정을 생략하고 귀속된 이벤트+직접 errno를 요구한다. 근거 부족은 unknown 유지.
+- syscall은 args 2개+data 3개, Post·Override(-13), Sigkill 제거. 추천은 LSM > syscall > fd_install이며 기존 intent·묶음은 자동 변경하지 않는다. 실제 action에서 수집한 내부 선택 필드 contains_sigkill로 화면·API·agent 확인을 맞추고, 이전 자료는 보수적으로 기존 ENGINE_RESTART 확인 유지. 공용 계약 수정 없음. AWS 인수 도구도 새 형식·EACCES에 맞춤.
+- NUL 확인: upstream 1.7.1의 string Equal 파서가 끝 NUL을 제거하므로 필수 아님. 기존 생성값 호환성을 위해 유지. 우회 한계·BPF LSM 부팅 준비는 `deploy/gpu-lab/README.md`, 실측 근거·SHA-256·검수 한계는 새 [7회차 결과](../docs/AWS_GPU_서버7회차_결과_20261108.md). 새 시험 파일 `tests/test_tetragon_file_open.py`.
+- runtime 지정 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: **848건 중 732 통과·115 skip·기존 AF_INET 소켓 생성 PermissionError 1**. 관련 8개 시험 모듈/클래스 101건 전부 통과. 로그 `/tmp/byul-run7-runtime-final.log`, `/tmp/byul-run7-targeted-final.log`.
+- API `.venv/bin/python -B -m pytest`: yaml·guard 미설치로 수집 오류 2건. 로컬 update/src·기존 yaml·runtime 경로를 PYTHONPATH로 연결한 재실행은 TestClient 대기에서 중단. `/tmp` 전용 epoll 20ms 보조 플러그인으로 전체 재실행: **257 통과·1 skip·기존 AF_INET PermissionError 1 실패**. 저장소 시험/제품에 소켓 우회 수정 없음. 최종 명령: `PYTHONPATH=/home/bobgy/bobproject/byul/update/src:/home/bobgy/bobproject/byul/runtime/src:/home/bobgy/bobproject/byul/runtime:/tmp/byul-run7-deps .venv/bin/python -B -m pytest -p byul_test_poll`. 로그 `/tmp/byul-run7-api.log`, `/tmp/byul-run7-api-final.log`; 보조 파일 `/tmp/byul-run7-deps/byul_test_poll.py`.
+- web `npm run typecheck` 통과. `npm test` 첫 전체 143 통과, 재실행에서 기존 framework·pagination 시간 초과 2건 발생. `npm test -- --maxWorkers=1` 최종 전체 **143 통과**. 로그 `/tmp/byul-run7-tsc-final.log`, `/tmp/byul-run7-web-final.log`, `/tmp/byul-run7-web-serial.log`. `git diff --check` 통과.
+- 남은 확인: 소켓 허용 환경에서 보조 설정 없는 runtime/API 전체 통과, 새 생성 정책의 AWS trial·native 귀속·대시보드 운영 전환 실측, Claude 직접 코드·문서 검수. 수동 AWS 증거를 자동 trial 성공 보고서로 만들지 않았다.

@@ -442,3 +442,20 @@ def test_platform_agent_apply_temporary_gateway_verified(ops, tmp_path, monkeypa
     finally:
         if gateway:
             gateway.stop()
+
+
+@pytest.mark.parametrize('method,contains_sigkill,expected_status', [
+    ('lsm_file_open', False, 201), ('override_syscall', False, 201),
+    ('override_syscall', True, 409), ('override_syscall', None, 409),
+    ('override_lsm', True, 409), ('sigkill_fd_install', True, 409),
+])
+def test_confirmation_follows_actual_sigkill_actions(ops, method, contains_sigkill, expected_status):
+    expected = ready(ops)
+    row = ops.get(BASE, headers=auth('viewer-01')).json()['agents'][0]['policies'][0]
+    row.update(method=method, contains_sigkill=contains_sigkill)
+    assert ops.post(BASE + '/agent-state', headers=auth('agent-01'),
+                    json={'server': 'server-01', 'policies': [row]}).status_code == 200
+    response = request(ops, kind='tetragon.mode', policy_name=row['name'], mode='enforce', expected=expected)
+    assert response.status_code == expected_status
+    if expected_status == 409:
+        assert response.json()['detail']['code'] == 'CONFIRMATION_REQUIRED'

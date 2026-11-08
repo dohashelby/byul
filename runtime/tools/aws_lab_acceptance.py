@@ -145,7 +145,7 @@ PROBE_READ_ERRNO_CODE = (
     "import errno,json,pathlib,sys\n"
     "try: pathlib.Path(sys.argv[1]).read_bytes()\n"
     "except OSError as error:\n"
-    " print(json.dumps({'errno':error.errno,'name':errno.errorcode.get(error.errno)})); sys.exit(13 if error.errno==errno.EPERM else 9)\n"
+    " print(json.dumps({'errno':error.errno,'name':errno.errorcode.get(error.errno)})); sys.exit(13 if error.errno in (errno.EPERM,errno.EACCES) else 9)\n"
     "print(json.dumps({'read':'ok'}))"
 )
 ROUTE_RECORD_PROBE_CODE = (
@@ -289,8 +289,10 @@ def _aws20_method(document: object, *, namespace: str) -> str | None:
         return None
     annotations = metadata.get("annotations") or {}
     method = annotations.get("serving-runtime.local/enforce-method") if isinstance(annotations, dict) else None
-    probes = spec.get("kprobes")
-    if method not in {"override_lsm", "sigkill_fd_install", "override_syscall"} or not isinstance(probes, list) or len(probes) != 1:
+    probes = spec.get("lsmhooks") if method == "lsm_file_open" else spec.get("kprobes")
+    if (method == "lsm_file_open" and spec.get("kprobes")) or (method != "lsm_file_open" and spec.get("lsmhooks")):
+        return None
+    if method not in {"lsm_file_open", "override_lsm", "sigkill_fd_install", "override_syscall"} or not isinstance(probes, list) or len(probes) != 1:
         return None
     probe = probes[0]
     selectors = probe.get("selectors") if isinstance(probe, dict) else None
@@ -300,11 +302,14 @@ def _aws20_method(document: object, *, namespace: str) -> str | None:
     actions = selector.get("matchActions") if isinstance(selector, dict) else None
     expected = ([{"action": "Sigkill"}] if method == "sigkill_fd_install" else
                 [{"action": "Post"}, {"action": "Override", "argError": -1}, {"action": "Sigkill"}])
-    if actions != expected:
+    override_only = [{"action": "Post"}, {"action": "Override", "argError": -13}]
+    if actions != expected and not (method in {"lsm_file_open", "override_syscall"} and actions == override_only):
         return None
-    call = probe.get("call")
+    if method == "lsm_file_open" and actions != override_only:
+        return None
+    call = probe.get("hook") if method == "lsm_file_open" else probe.get("call")
     if call != {"override_lsm": "security_file_permission", "sigkill_fd_install": "fd_install",
-                "override_syscall": "sys_openat"}[method]:
+                "override_syscall": "sys_openat", "lsm_file_open": "file_open"}[method]:
         return None
     args = selector.get("matchArgs")
     if not isinstance(args, list) or not args:
@@ -314,6 +319,9 @@ def _aws20_method(document: object, *, namespace: str) -> str | None:
     if not isinstance(file_arg, dict) or file_arg.get("operator") != "Equal" or file_arg.get("values") != [path]:
         return None
     if method == "override_lsm" and (len(args) != 2 or args[1] != {"index": 1, "operator": "Equal", "values": ["4"]}):
+        return None
+    if method == "lsm_file_open" and (len(args) != 1 or file_arg.get("index") != 0
+                                      or probe.get("args") != [{"index": 0, "type": "file"}]):
         return None
     return method
 
@@ -325,7 +333,7 @@ def _aws20_raw_action(path: Path, *, since: str, pod_uid: str, namespace: str,
             for line in handle:
                 try:
                     root = json.loads(line)
-                    event = root.get("process_kprobe") or {}
+                    event = root.get("process_lsm" if method == "lsm_file_open" else "process_kprobe") or {}
                     pod = (event.get("process") or {}).get("pod") or {}
                     arguments = (event.get("process") or {}).get("arguments", "")
                     args = event.get("args") or []
@@ -439,7 +447,7 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
         return "unknown", str(facts["unknown_reason"])
     if case_id == "AWS-20":
         method = facts.get("enforce_method")
-        if method not in {"override_lsm", "override_syscall", "sigkill_fd_install"}:
+        if method not in {"lsm_file_open", "override_lsm", "override_syscall", "sigkill_fd_install"}:
             return "unknown", "차단 방식을 확인하지 못함"
         if method == "sigkill_fd_install":
             required = ["enforce_active", "monitor_read_ok", "exit_sigkill", "raw_sigkill", "cleanup_ok", "restore_read_ok"]
@@ -455,7 +463,7 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
         if missing:
             return "unknown", "판정 근거 부족: " + ", ".join(missing)
         return "passed", ("Sigkill 종료·동일 Pod UID 이벤트·monitor 복귀 확인" if method == "sigkill_fd_install"
-                          else "가짜 파일 EPERM·동일 Pod UID Override·정상 200·monitor 복귀 확인")
+                          else "가짜 파일 EPERM/EACCES·동일 Pod UID Override·정상 200·monitor 복귀 확인")
     if case_id == "AWS-05" and facts.get("receiver_control_connected") is False:
         return "unknown", "대조 실패: receiver에 닿지 않음"
 
@@ -2792,8 +2800,11 @@ class AWSAcceptance:
             return {"unknown_reason": "검토한 1.7.1 monitor-mode manifest의 방식·가짜 경로 불일치"}, {}
         probe_name = getattr(self.args, "aws20_probe_pod", None)
         engine_target = not bool(probe_name)
-        if engine_target and not getattr(self.args, "allow_engine_sigkill", False):
-            return {"not_run_reason": "모든 신규 후보가 Sigkill을 포함하므로 --aws20-probe-pod 우선; 엔진 대상은 --allow-engine-sigkill 필요"}, {}
+        probes = monitor["spec"].get("kprobes", []) + monitor["spec"].get("lsmhooks", [])
+        contains_sigkill = any(a.get("action") == "Sigkill" for p in probes
+                              for s in p.get("selectors", []) for a in s.get("matchActions", []))
+        if engine_target and contains_sigkill and not getattr(self.args, "allow_engine_sigkill", False):
+            return {"not_run_reason": "Sigkill 포함 정책은 --aws20-probe-pod 우선; 엔진 대상은 --allow-engine-sigkill 필요"}, {}
         if probe_name:
             pod_result = self._kubectl("get", "pod", probe_name, "-o", "json")
             pod_doc = _json_object(pod_result.stdout.encode()) if pod_result.returncode == 0 else None
@@ -2850,7 +2861,8 @@ class AWSAcceptance:
             facts["exit_sigkill"] = (True if read.returncode in {137, -9}
                                      else False if read.returncode in {0, 13} and result else None)
             if method != "sigkill_fd_install":
-                facts["read_eperm"] = (True if read.returncode == 13 and result == {"errno": 1, "name": "EPERM"}
+                # Keep the legacy fact key for stored AWS-20 reports.
+                facts["read_eperm"] = (True if read.returncode == 13 and result in ({"errno": 1, "name": "EPERM"}, {"errno": 13, "name": "EACCES"})
                                        else False if read.returncode == 0 and result == {"read": "ok"} else None)
             evidence["read_returncode"] = read.returncode
             action = "KPROBE_ACTION_SIGKILL" if method == "sigkill_fd_install" else "KPROBE_ACTION_OVERRIDE"

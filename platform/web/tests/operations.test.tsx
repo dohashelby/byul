@@ -85,7 +85,7 @@ it("근거가 없으면 차단 버튼을 비활성화한다", async () => {
   expect(screen.getByText(/미충족 · 방식·spec 해시·커널/)).toBeTruthy();
 });
 
-it.each(["sigkill_fd_install", "override_lsm", "override_syscall", "override_only", "monitor", null])("%s 방식의 enforce 요청 선택에 따라 Sigkill 안내를 표시한다", async method => {
+it.each(["lsm_file_open", "sigkill_fd_install", "override_lsm", "override_syscall", "override_only", "monitor", null])("%s 방식의 enforce 요청 선택에 따라 Sigkill 안내를 표시한다", async method => {
   const result = data();
   result.agents[0].policies[0].method = method;
   const needsConfirmation = ["sigkill_fd_install", "override_lsm", "override_syscall"].includes(method ?? "");
@@ -458,4 +458,21 @@ it("오래된 상태 보고에서는 기본 되돌리기를 막고 고급 입력
   await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === "POST")).toBe(true));
   const call = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === "POST")!;
   expect(JSON.parse(call[1]!.body as string).bundle_id).toBe("manual-previous");
+});
+
+
+it.each([false, true, null])("openat의 실제 Sigkill 포함 여부 %s로 확인을 요구한다", async containsSigkill => {
+  const result = data();
+  const row = result.agents[0].policies[0];
+  row.method = "override_syscall";
+  row.contains_sigkill = containsSigkill;
+  const needsConfirmation = containsSigkill !== false;
+  mockApi({ "/api/runtime/operations": result });
+  renderAt("/runtime/enforce/tetragon", "/runtime/enforce/tetragon", <ModeRequests />);
+  enterToken();
+  fireEvent.click(screen.getByText("전환 조건 조회"));
+  await chooseMode("enforce");
+  expect(!!screen.queryByLabelText("Sigkill 확인 입력")).toBe(needsConfirmation);
+  expect((screen.getByRole("button", { name: "차단으로 전환" }) as HTMLButtonElement).disabled).toBe(needsConfirmation);
+  if (!needsConfirmation) expect(screen.getByText("파일 열기만 거부, 프로세스 유지")).toBeTruthy();
 });

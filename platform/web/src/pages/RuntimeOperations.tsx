@@ -111,7 +111,8 @@ export function ModeRequests() {
     {data?.agents.map(agent => <div key={agent.server} className="stack"><strong>{agent.server} · 마지막 조회 {timeLabel(agent.last_poll_at)}</strong>
       {agent.policies.map(row => {
         const mode = selection?.server === agent.server && selection.name === row.name ? selection.mode : "";
-        const needsConfirmation = mode === "enforce" && ["sigkill_fd_install", "override_lsm", "override_syscall"].includes(row.method ?? "");
+        const containsSigkill = row.contains_sigkill ?? ["sigkill_fd_install", "override_lsm", "override_syscall"].includes(row.method ?? "");
+        const needsConfirmation = mode === "enforce" && containsSigkill;
         return <div key={row.name} className="notice"><strong>{row.name} · {row.expected.mode}</strong>
         <PolicyChecks row={row} reportedAt={agent.at} />
         {row.checks.capability && row.capability_basis && <p>확인: {row.capability_basis === "live_trial" ? "실측 시험으로 확인" : "사전 점검으로 확인"}</p>}
@@ -120,6 +121,7 @@ export function ModeRequests() {
         <label>전환 모드 <select className="input" aria-label={`${agent.server} · ${row.name} 전환 모드`} value={mode} disabled={pending} onChange={e => {
           setSelection({ server: agent.server, name: row.name, mode: e.target.value }); setConfirmation("");
         }}><option value="">전환 요청 선택</option><option value="enforce">enforce (차단)</option><option value="monitor">monitor (탐지)</option></select></label>
+        {["lsm_file_open", "override_syscall"].includes(row.method ?? "") && !containsSigkill && <p>파일 열기만 거부, 프로세스 유지</p>}
         {needsConfirmation && <>
           <p>Sigkill 계열: 엔진 종료 → Gateway 503 → 재시작</p>
           <label>확인 입력: ENGINE_RESTART <input aria-label="Sigkill 확인 입력" className="input" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>

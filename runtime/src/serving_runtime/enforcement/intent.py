@@ -536,7 +536,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
         raise IntentError("new allowed enforce mode requires an explicit enforcement method")
     if secret_capable:
         method = root.get("tetragon_enforce_method")
-        if method is not None and method not in {"override_lsm", "sigkill_fd_install", "override_syscall"}:
+        if method is not None and method not in {"lsm_file_open", "override_lsm", "sigkill_fd_install", "override_syscall"}:
             raise IntentError("$.tetragon_enforce_method is unsupported")
         secrets = protected.enforce_exact_files if method is not None else protected.secret_paths
         if not secrets:

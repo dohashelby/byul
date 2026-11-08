@@ -256,7 +256,7 @@
     "new_GPU_experiment_completed_successfully": false,
     "whole43_counts_changed": false
   },
-  "current_work_reference": "SUP03_R3_recovery_20261108",
+  "current_work_reference": "SUP03_R3_final_required_closeout",
   "SUP03_R2_payload_ZIP_delta_review": {
     "review_project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-payload-zip-delta-20261107-v1/payload-zip-source-delta-review-v1.json",
     "review_sha256": "9589a039e4b0c77bf987062a1a83560fa6989c55a94c1e87fd73dc2ff1912396",
@@ -419,7 +419,7 @@
     "S6_gap_review_sha256": "b00cffe66711b31e6b2c98a4d6546bb58e963bf1bb48ff65163d0fa8623e1004",
     "S2_reported_current_observation_at_KST": "2026-11-08T13:23:03.972569+09:00",
     "S2_reported_owned_three_stopped_publicIP0": true,
-    "S6_current_raw_GB11_control_Ref_final_scope_review_pending": true,
+    "S6_current_raw_GB11_control_Ref_final_scope_review_pending": false,
     "root_cost_close_review_sha256": "7355473d815423b543c69fe2e3d7796f01ec8aa7b8f9face2f7759aebba8fd31",
     "estimated_conservative_upper_bound_USD": 71.57966828492202,
     "remaining_after_reserve_USD": 23.420331715077978,
@@ -439,7 +439,7 @@
     "first_CRC_members": 200,
     "payload_SHA_members": 199,
     "installed_asset_pins_equal_original_payload": 11,
-    "semantic_producer_Ref_cleanup_current_stop_review_pending": true,
+    "semantic_producer_Ref_cleanup_current_stop_review_pending": false,
     "whole_question_complete": false,
     "whole43_counts_changed": false
   },
@@ -469,5 +469,41 @@
     "branch_rows": 22,
     "scope": "기존 후속17+SUP16 제품 인계; 완료 개수/새실험수 아님",
     "whole43_reclassification_or_new_test": false
+  },
+  "SUP03_R3_final_required_closeout": {
+    "reviews": {
+      "GB11-runtime-content-review-v1.json": {
+        "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/GB11-runtime-content-review-v1.json",
+        "sha256": "14d2e1bd980a802829f6a56c88afc8285c5fa9061b5ea890c040b247ce01a73b"
+      },
+      "r3-control-integrity-review-v1.json": {
+        "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/r3-control-integrity-review-v1.json",
+        "sha256": "7ca7f651b2db279b7ecb34e1a20bb73da4b04924da11c39805969a4f703d1f6b"
+      },
+      "r3-control-runtime-review-v1.json": {
+        "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/r3-control-runtime-review-v1.json",
+        "sha256": "30184c76eaadac0243b9abac76dbbf516e5fd70fdc89d470b74057b2e975ce8f"
+      }
+    },
+    "S2_final_link_project_relative_path": "worktrees/byul-gpu-b-run-lif14-labels-20261105/out/SUP16-live-normal-v1-operator-20261105/SUP03-fixed-template-operating-packet-v1/browser-console-v5/whole-packet-v3/required-r3-final-actual-verification-link-v1.json",
+    "S2_final_link_sha256": "95fbd6262b98930d3d2fc8d101084c26aed536fd51411cb284047a80690f57c9",
+    "root_cost_close_sha256": "7355473d815423b543c69fe2e3d7796f01ec8aa7b8f9face2f7759aebba8fd31",
+    "required_closeout_verification_remaining": 0,
+    "original_readiness_timeout_retained": true,
+    "later_Ready_not_retroactive_success": true,
+    "actual_L4_TP1_preparation_UID_cleanup_verified": true,
+    "product_factory_ENV_sealing_EVD_RES_RPT_Store_Refs_created": false,
+    "restore_rejudge_target_exists": false,
+    "input_POL_EXAMPLE_DRAFT_PACK_BASELINE32_preserved": true,
+    "current_observed_at_KST": "2026-11-08T13:23:03.972569+09:00",
+    "owned_three_stopped_publicIP0": true,
+    "active_SSM0": true,
+    "compute_IP_interval_closed": true,
+    "EBS_continues": true,
+    "estimated_conservative_upper_bound_USD": 71.57966828492202,
+    "remaining_after_reserve_USD": 23.420331715077978,
+    "actual_billing_or_16h_running_not_claimed": true,
+    "new_R4_test_or_deadline_reset": false,
+    "classification_25_limited_proposal_18_product_evidence_unchanged": true
   }
 }

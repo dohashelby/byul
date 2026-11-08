@@ -1,6 +1,6 @@
 # GPU 담당 43개 — 1단계 마감 검토와 팀 인계
 
-> **최신 상태(2026-11-08): 기존 R3 실행의 원자료 회수·실제 중지·비용 마감 검증 재개.** 운영 연결 오류 뒤 S2가 원탭을 복구했고13:23:03 KST 새조회에서 소유3대 stopped·공인IP0을 보고했다. 원R3는 health/install/preflight/prepare 성공 뒤 observe의 engine-ready 대기에서 실패했으며 새GB11/control 내용은 독립 검증 중이다. R3 startup까지의 독립 검증과 이후 S2 보고를 구분하고 현재 제품/Refs 성공을 선언하지 않는다. 원2h·900·180·원실패와 legacyR1/currentR3 구분을 유지하고 새실험·기한reset은 하지 않는다. PR #228은6574에서 병합돼 후속자료는 별도 Draft PR로 연결한다. [시각별 결과](FOLLOWUP_RESULTS.md)를 따른다.
+> **최신 상태(2026-11-08): SUP-03 R3 원실행·GB11·Ref 미생성·소유정리·현재 중지/비용 구간의 필수 검증 완료.** 실제 tool source3b3·root/no-site·L4/TP1 모델 적재는 확인됐지만 원90초 준비 기한 초과로 factory/ENV sealing·제품 EVD/RES/RPT/Store Ref에는 도달하지 못했다. 늦은 Ready를 원성공으로 바꾸지 않는다.13:23 KST 후속 원조회에서 소유3대 stopped/IP0·SSM0을 검증했고 compute/IP 장부 구간은 닫혔다. 비용$71.5797은 관측 공백을 보수 포함한 상계로 실제16h 가동/확정청구가 아니며 EBS는 계속된다. 외부 입력 대기는6열로 인계하고 새실험은 추가하지 않는다. 후속은 Draft PR #232, 기존PR228은병합됐다. [시각별 결과](FOLLOWUP_RESULTS.md)를 따른다.
 
 이 문서는 1단계 작업지시서 기준의 마감 제안과 실제 관측 결과를 함께 검토하기 위한 인계다. 제품 성공, 모든 적용 분기의 실측 완료, 기업 승인과 구분한다. 정확한 원자료 참조는 [기존 색인](evidence-index.json)을 재사용한다.
 

@@ -10,6 +10,9 @@ function enterToken(value = "test-only") {
   fireEvent.change(screen.getByLabelText("운영 토큰"), { target: { value } });
   fireEvent.click(screen.getByRole("button", { name: "토큰 저장" }));
 }
+async function chooseMode(mode: string, policy = "runtime-tg-secret-01", server = "server-01") {
+  fireEvent.change(await screen.findByRole("combobox", { name: `${server} · ${policy} 전환 모드` }), { target: { value: mode } });
+}
 function data(): Operations {
   return { actor: { id: "approver-01", role: "approver" }, items: [{ id: "op-01", server: "server-01", kind: "bundle.apply", state: "requested", requested_by: "operator-01", created_at: new Date().toISOString(), approval_required: true, approvals: [] }],
     agents: [{ server: "server-01", at: new Date().toISOString(), last_poll_at: new Date().toISOString(), current: { bundle_id: "old", approval: "verified" }, bundles: [{ bundle_id: "old", sha256: "b".repeat(64) }, { bundle_id: "previous", sha256: "c".repeat(64) }], policies: [{ name: "runtime-tg-secret-01", method: "override_lsm", expected: { bundle_id: "old", approval: "verified", policy_id: "7", mode: "monitor", spec_sha256: "a".repeat(64) }, checks: Object.fromEntries(Object.keys(CHECK_LABELS).map(k => [k, true])), evidence_sha256: [] }] }],
@@ -28,10 +31,18 @@ it("차단은 Sigkill 확인 입력을 요구하고 탐지 복귀는 조건과 �
   mockApi({ "/api/runtime/operations": data() });
   renderAt("/runtime/enforce/tetragon", "/runtime/enforce/tetragon", <ModeRequests />);
   enterToken();
+  expect(screen.getByText(/역할 미확인\(전환 조건 조회 시 확인\)/)).toBeTruthy();
+  expect(screen.queryByText(/현재 역할: 조회 후 확인/)).toBeNull();
+  expect(screen.queryByText(/Sigkill 계열/)).toBeNull();
+  expect(screen.queryByLabelText("Sigkill 확인 입력")).toBeNull();
   fireEvent.click(screen.getByText("전환 조건 조회"));
+  await screen.findByRole("combobox", { name: /전환 모드/ });
+  expect(screen.queryByText(/Sigkill 계열/)).toBeNull();
+  expect(screen.queryByLabelText("Sigkill 확인 입력")).toBeNull();
+  expect(screen.getByText(/현재 역할: 승인자/)).toBeTruthy();
+  await chooseMode("enforce");
   const enforce = await screen.findByRole("button", { name: "차단으로 전환" });
   expect((enforce as HTMLButtonElement).disabled).toBe(true);
-  expect((screen.getByRole("button", { name: "탐지로 전환" }) as HTMLButtonElement).disabled).toBe(false);
   fireEvent.change(screen.getByLabelText("Sigkill 확인 입력"), { target: { value: "ENGINE_RESTART" } });
   expect((enforce as HTMLButtonElement).disabled).toBe(false);
   expect(screen.getByText(/엔진 종료 → Gateway 503 → 재시작/)).toBeTruthy();
@@ -48,10 +59,93 @@ it("근거가 없으면 차단 버튼을 비활성화한다", async () => {
   mockApi({ "/api/runtime/operations": result });
   renderAt("/runtime/enforce/tetragon", "/runtime/enforce/tetragon", <ModeRequests />);
   enterToken();
-  fireEvent.change(screen.getByLabelText("Sigkill 확인 입력"), { target: { value: "ENGINE_RESTART" } });
   fireEvent.click(screen.getByText("전환 조건 조회"));
+  await chooseMode("enforce");
+  fireEvent.change(screen.getByLabelText("Sigkill 확인 입력"), { target: { value: "ENGINE_RESTART" } });
   expect((await screen.findByRole("button", { name: "차단으로 전환" }) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.getByText(/미충족 · 방식·spec 해시·커널/)).toBeTruthy();
+});
+
+it.each(["sigkill_fd_install", "override_lsm", "override_syscall", "override_only", "monitor", null])("%s 방식의 enforce 요청 선택에 따라 Sigkill 안내를 표시한다", async method => {
+  const result = data();
+  result.agents[0].policies[0].method = method;
+  const needsConfirmation = ["sigkill_fd_install", "override_lsm", "override_syscall"].includes(method ?? "");
+  mockApi({ "/api/runtime/operations": result });
+  renderAt("/runtime/enforce/tetragon", "/runtime/enforce/tetragon", <ModeRequests />);
+  enterToken();
+  fireEvent.click(screen.getByText("전환 조건 조회"));
+  await chooseMode("enforce");
+  expect(!!screen.queryByText(/Sigkill 계열/)).toBe(needsConfirmation);
+  expect(!!screen.queryByLabelText("Sigkill 확인 입력")).toBe(needsConfirmation);
+  expect((screen.getByRole("button", { name: "차단으로 전환" }) as HTMLButtonElement).disabled).toBe(needsConfirmation);
+  if (needsConfirmation) fireEvent.change(screen.getByLabelText("Sigkill 확인 입력"), { target: { value: "ENGINE_RESTART" } });
+  await chooseMode("monitor");
+  expect(screen.queryByText(/Sigkill 계열/)).toBeNull();
+  expect(screen.queryByLabelText("Sigkill 확인 입력")).toBeNull();
+  expect((screen.getByRole("button", { name: "탐지로 전환" }) as HTMLButtonElement).disabled).toBe(false);
+  await chooseMode("enforce");
+  if (needsConfirmation) expect((screen.getByLabelText("Sigkill 확인 입력") as HTMLInputElement).value).toBe("");
+  await chooseMode("");
+  expect(screen.queryByLabelText("Sigkill 확인 입력")).toBeNull();
+  expect((screen.getByRole("button", { name: "전환 요청" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+it("다른 정책 선택이나 전환 조건 재조회 시 Sigkill 확인 입력을 초기화한다", async () => {
+  const result = data();
+  result.agents[0].policies.push({ ...result.agents[0].policies[0], name: "policy-02" });
+  mockApi({ "/api/runtime/operations": result });
+  renderAt("/runtime/enforce/tetragon", "/runtime/enforce/tetragon", <ModeRequests />);
+  enterToken();
+  fireEvent.click(screen.getByText("전환 조건 조회"));
+  await chooseMode("enforce");
+  fireEvent.change(screen.getByLabelText("Sigkill 확인 입력"), { target: { value: "ENGINE_RESTART" } });
+  await chooseMode("enforce", "policy-02");
+  expect((screen.getByLabelText("Sigkill 확인 입력") as HTMLInputElement).value).toBe("");
+  expect((screen.getByRole("button", { name: "차단으로 전환" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText("Sigkill 확인 입력"), { target: { value: "ENGINE_RESTART" } });
+  fireEvent.click(screen.getByText("전환 조건 조회"));
+  await waitFor(() => expect(screen.queryByLabelText("Sigkill 확인 입력")).toBeNull());
+  expect(screen.queryByText(/Sigkill 계열/)).toBeNull();
+});
+
+it("monitor 요청은 안전 조건 미충족이어도 Sigkill 확인 없이 기존 요청 형식으로 전송한다", async () => {
+  const result = data();
+  result.agents[0].policies[0].checks.evidence = false;
+  mockApi({ "/api/runtime/operations": result });
+  renderAt("/runtime/enforce/tetragon", "/runtime/enforce/tetragon", <ModeRequests />);
+  enterToken();
+  fireEvent.click(screen.getByText("전환 조건 조회"));
+  await chooseMode("monitor");
+  fireEvent.click(screen.getByRole("button", { name: "탐지로 전환" }));
+  await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === "POST")).toBe(true));
+  const call = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === "POST")!;
+  expect(JSON.parse(call[1]!.body as string)).toEqual({ kind: "tetragon.mode", server: "server-01",
+    expected: result.agents[0].policies[0].expected, policy_name: "runtime-tg-secret-01", mode: "monitor" });
+});
+
+it.each(["정책", "운영"])("%s 화면은 보고 시각 기준 판단과 현재 모니터 창을 분리한다", async page => {
+  const result = data();
+  result.agents[0].at = "2026-11-06T17:29:24";
+  result.agents[0].last_poll_at = "2026-11-06T18:30:25";
+  mockApi({ "/api/runtime/operations": result });
+  renderAt("/runtime/operations", "/runtime/operations", page === "정책" ? <ModeRequests /> : <RuntimeOperationsPage />);
+  enterToken();
+  if (page === "정책") fireEvent.click(screen.getByText("전환 조건 조회"));
+  const judgment = await screen.findByText("에이전트 판단(보고 시각 17:29:24 기준)");
+  expect(judgment.title).toBe("2026-11-06 17:29:24");
+  const checks = judgment.parentElement!;
+  expect(within(checks).getByText(/충족 · 모니터 기간/).closest("ul")).toBeTruthy();
+  expect(within(checks).getByText("현재 모니터 창 없음 · 관측·상태 갱신 필요").closest("ul")).toBeNull();
+  expect(screen.queryByText(/에이전트 판단\(보고 시각 18:30:25/)).toBeNull();
+});
+
+it.each([undefined, "invalid"])("보고 시각 %s는 현재 시각이나 마지막 조회 시각으로 대체하지 않는다", async at => {
+  const result = data();
+  result.agents[0].at = at;
+  mockApi({ "/api/runtime/operations": result });
+  renderAt("/runtime/operations", "/runtime/operations", <RuntimeOperationsPage />);
+  enterToken();
+  expect(await screen.findByText("에이전트 판단(보고 시각 미확인 기준)")).toBeTruthy();
 });
 
 it.each(["정책", "운영"])("%s 화면에 모니터 창 시작·건수·미검토·오탐을 표시한다", async (page) => {
@@ -65,9 +159,13 @@ it.each(["정책", "운영"])("%s 화면에 모니터 창 시작·건수·미검
   enterToken();
   if (page === "정책") fireEvent.click(screen.getByText("전환 조건 조회"));
   expect(await screen.findByText(/node-01 · 창 시작/)).toBeTruthy();
+  expect(screen.getByText(/현재 모니터 창 · node-01/)).toBeTruthy();
   expect(screen.getByText(/이벤트 3건 · 검토 2\/3건 · 오탐 1건 · 미검토 있음/)).toBeTruthy();
   expect(screen.getByText(/미충족 · 모니터 기간/)).toBeTruthy();
-  if (page === "정책") expect((screen.getByRole("button", { name: "차단으로 전환" }) as HTMLButtonElement).disabled).toBe(true);
+  if (page === "정책") {
+    await chooseMode("enforce");
+    expect((screen.getByRole("button", { name: "차단으로 전환" }) as HTMLButtonElement).disabled).toBe(true);
+  }
 });
 
 it.each([
@@ -89,8 +187,9 @@ it.each([
   mockApi({ "/api/runtime/operations": result });
   renderAt("/runtime/enforce/tetragon", "/runtime/enforce/tetragon", <ModeRequests />);
   enterToken();
-  fireEvent.change(screen.getByLabelText("Sigkill 확인 입력"), { target: { value: "ENGINE_RESTART" } });
   fireEvent.click(screen.getByText("전환 조건 조회"));
+  await chooseMode("enforce");
+  fireEvent.change(screen.getByLabelText("Sigkill 확인 입력"), { target: { value: "ENGINE_RESTART" } });
   expect(await screen.findByText(label)).toBeTruthy();
   expect((screen.getByRole("button", { name: "차단으로 전환" }) as HTMLButtonElement).disabled).toBe(!(capability && evidence));
 });
@@ -103,6 +202,53 @@ it("요청 목록에 승인과 에이전트 조회 시각을 표시한다", asyn
   expect(await screen.findByRole("button", { name: "새 묶음 적용 · server-01" })).toBeTruthy();
   expect(screen.getByText(/에이전트 마지막 조회/)).toBeTruthy();
   expect(screen.getByRole("button", { name: "승인" })).toBeTruthy();
+});
+
+it.each([
+  [[], "없음", null],
+  [["0".repeat(64)], "없음", null],
+  [["a".repeat(64)], `${"a".repeat(12)}…`, "a".repeat(64)],
+  [["0".repeat(64), "a".repeat(64), "b".repeat(64), "c".repeat(64)], `${"a".repeat(12)}… 외 2개`, ["a".repeat(64), "b".repeat(64), "c".repeat(64)].join("\n")],
+] as const)("증거 해시 %j를 요약하고 실제 증거만 전체 값으로 제공한다", async (hashes, label, title) => {
+  const result = data();
+  result.items[0].result = { code: "OK", dry_run: false, evidence_sha256: [...hashes], steps: [] };
+  mockApi({ "/api/runtime/operations": result });
+  renderAt("/runtime/operations", "/runtime/operations", <RuntimeOperationsPage />);
+  enterToken();
+  const row = (await screen.findByRole("button", { name: "새 묶음 적용 · server-01" })).closest("tr")!;
+  const cell = within(row).getAllByRole("cell")[5];
+  expect(cell.textContent).toBe(label);
+  if (title) expect(within(cell).getByText(label).getAttribute("title")).toBe(title);
+  expect(within(cell).queryByText("0".repeat(64))).toBeNull();
+  fireEvent.click(row);
+  const detail = screen.getByRole("region", { name: "운영 요청 상세" });
+  for (const hash of hashes.filter(hash => hash !== "0".repeat(64))) expect(within(detail).getByText(`증거 SHA-256: ${hash}`)).toBeTruthy();
+  expect(within(detail).queryByText(`증거 SHA-256: ${"0".repeat(64)}`)).toBeNull();
+  if (!title) expect(within(detail).getByText("증거 SHA-256: 없음")).toBeTruthy();
+});
+
+it("운영 요청 목록·상세와 에이전트 시각을 공용 24시간 형식으로 표시한다", async () => {
+  const result = data();
+  const op = result.items[0];
+  op.created_at = "2026-11-06T17:29:24";
+  op.claimed_at = "2026-11-06T17:30:25";
+  op.running_at = "2026-11-06T17:31:26";
+  op.approvals = [{ token_id: "approver-02", at: "2026-11-06T17:30:00", self_approval: false }];
+  op.result = { code: "OK", dry_run: false, finished_at: "2026-11-06T17:32:27", evidence_sha256: [], steps: [] };
+  result.agents[0].at = "2026-11-06T17:33:28";
+  result.agents[0].last_poll_at = "2026-11-06T17:34:29";
+  mockApi({ "/api/runtime/operations": result });
+  renderAt("/runtime/operations", "/runtime/operations", <RuntimeOperationsPage />);
+  enterToken();
+  const button = await screen.findByRole("button", { name: "새 묶음 적용 · server-01" });
+  const cells = within(button.closest("tr")!).getAllByRole("cell");
+  expect(cells[3].textContent).toBe("요청: 2026-11-06 17:29:24결과: 2026-11-06 17:32:27");
+  expect(screen.getByText(/에이전트 마지막 조회 2026-11-06 17:34:29 · 상태 보고 2026-11-06 17:33:28/)).toBeTruthy();
+  fireEvent.click(button);
+  const detail = screen.getByRole("region", { name: "운영 요청 상세" });
+  expect(within(detail).getByText(/가져감 2026-11-06 17:30:25 · 실행 2026-11-06 17:31:26/)).toBeTruthy();
+  expect(within(detail).getByText(/승인자: approver-02.*2026-11-06 17:30:00/)).toBeTruthy();
+  expect(detail.textContent).not.toMatch(/AM|PM/);
 });
 
 it("정책 적용 요청은 토큰과 기대 current를 전송한다", async () => {
@@ -128,13 +274,14 @@ it("목록 우선 표시·상태 필터·행 상세·세부 사유와 증거를 
   enterToken();
   const list = screen.getByRole("region", { name: "운영 요청 목록" });
   expect(await within(list).findByText(/BUNDLE_ROLES_MISSING/)).toBeTruthy();
-  expect(within(list).getByText("e".repeat(64))).toBeTruthy();
+  expect(within(list).getByText(`${"e".repeat(12)}…`).title).toBe("e".repeat(64));
   expect(within(list).getByText(/요청됨 ✓ → 승인 생략 → 가져감 ✓ → 실행 생략 → 결과 ✓/)).toBeTruthy();
   fireEvent.change(screen.getByLabelText("상태 필터"), { target: { value: "failed" } });
   expect(within(list).getAllByRole("button", { name: /새 묶음 적용/ })).toHaveLength(1);
   fireEvent.click(within(list).getByRole("button", { name: /새 묶음 적용/ }));
   expect(screen.getByRole("region", { name: "운영 요청 상세" })).toBeTruthy();
   expect(screen.getByText("검증: 실패")).toBeTruthy();
+  expect(within(screen.getByRole("region", { name: "운영 요청 상세" })).getByText(`증거 SHA-256: ${"e".repeat(64)}`)).toBeTruthy();
   expect(screen.queryByRole("region", { name: "묶음 되돌리기" })).toBeNull();
 });
 

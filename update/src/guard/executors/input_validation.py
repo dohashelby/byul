@@ -66,8 +66,9 @@ class InputValidationExecutor(HttpCheckExecutor):
     def _finish(self, ctx):
         draft = super()._finish(ctx)
         if response_contract_state(ctx.check) == "current":
-            return append_artifact(draft, ctx, "input_response_samples.json", f"{self.name}/{self.version}")
-        return draft
+            draft = append_artifact(draft, ctx, "input_response_samples.json", f"{self.name}/{self.version}")
+        from .common_consumption import attach
+        return attach(draft, ctx, self.cfg, kind="runner-consumption")
 
     def collect(self, ctx):
         if request_field_probe.supported(ctx.check):

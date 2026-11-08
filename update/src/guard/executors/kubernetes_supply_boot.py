@@ -53,7 +53,8 @@ class KubernetesSupplyBootExecutor:
     def _load(self, env, values, role):
         from guard.collectors.lifecycle import load_prepared
         section = self.cfg[role]
-        if type(section) is not dict or set(section) != {"target", "prepared"}:
+        if (type(section) is not dict or set(section) - {"target", "prepared", "worker_shard_input"}
+                or not {"target", "prepared"} <= set(section)):
             raise ValueError
         with Path(section["target"]).open("rb") as stream:
             target = strict_json(stream.read(65537), limit=65536)
@@ -75,6 +76,20 @@ class KubernetesSupplyBootExecutor:
         except (KeyError, TypeError, ValueError, OSError, RuntimeError):
             row["diagnostic_codes"].append("SUPPLY_BOOT_INPUT_UNAVAILABLE")
             return result
+        if "worker_shard_input" in self.cfg[role]:
+            from .common_consumption import load_input, worker_shards
+            try:
+                if check.id != "SUP-06":
+                    raise ValueError("B_WORKER_SHARD_CHECK_UNSUPPORTED")
+                record, scope = load_input(self.cfg[role]["worker_shard_input"],
+                    environment_ref=env.ref().model_dump(mode="json"), target_sha256=digest,
+                    prepared_sha256=values[f"supply_{role}_prepared_sha256"])
+                result["worker_shards"] = worker_shards(record, scope, values)
+                row["worker_shard_input"] = {**result["worker_shards"], "data_origin": "EXAMPLE",
+                                            "record_sha256": sha256_hex(canonical_json(record))}
+            except (KeyError, TypeError, ValueError, OSError) as exc:
+                row["diagnostic_codes"].append("B_WORKER_SHARD_INPUT_UNAVAILABLE")
+                row["worker_shard_input_error"] = {"type": type(exc).__name__, "message": str(exc)[:1024]}
         reader = None
         try:
             reader = SupplyBootReader(target, env, prepared, runner=self.runner, binary=self.cfg.get("kubectl_binary", "kubectl"),
@@ -132,6 +147,11 @@ class KubernetesSupplyBootExecutor:
         violations, missing = [], []
         native_rows = []
         for role, part in collected.items():
+            shards = part.get("worker_shards")
+            if shards is not None:
+                missing.extend(f"{role}:{gap}" for gap in shards["missing"])
+                if role == "challenge":
+                    violations.extend(shards["violations"])
             if part["evaluated"] is not None:
                 found, gaps = part["evaluated"]
                 if role == "challenge":
@@ -190,9 +210,10 @@ class KubernetesSupplyBootExecutor:
         codes = sorted({code for row in sessions for code in row["diagnostic_codes"]})
         normal = {"attempted": any(row["collected"] for row in sessions[:1]), "succeeded": normal_ok if collected["normal"]["row"]["collected"] else None,
                   "detail": "승인 공급물로 준비된 기동 세션"}
+        input_examples = any("worker_shard_input" in self.cfg.get(role, {}) for role in contract.ROLES)
         return EvidenceDraft(
             status=ExecStatus.ABORTED if gap else ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE
-            if self.runner is not None or env.data_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED,
+            if input_examples or self.runner is not None or env.data_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED,
             normal_control=normal, challenges=[{"step": step, "attempted": bool(change and change["applied"])} for step in check.challenge_steps],
             observations=observations, artifacts=[DraftArtifact(name="supply_boot_summary.json", path=artifact, collector=f"{self.name}/{self.version}")],
             comparability={"fixture_sha256": sha256_hex(canonical_json({"profile": check.collection_profile})),

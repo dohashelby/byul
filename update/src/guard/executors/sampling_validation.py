@@ -43,6 +43,10 @@ class SamplingValidationExecutor(HttpCheckExecutor):
     requires_roles = False
     requires_route_scope = False
 
+    def _finish(self, ctx):
+        from .common_consumption import attach
+        return attach(super()._finish(ctx), ctx, self.cfg, kind="runner-consumption")
+
     def validate_policy(self, check, values):
         options = _strings(values.get("allowed_sampling_options"), "allowed_sampling_options")
         if set(options) - set(SUPPORTED_OPTIONS):

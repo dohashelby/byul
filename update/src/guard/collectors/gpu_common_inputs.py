@@ -122,6 +122,13 @@ KINDS = {
                    "path_sha256": "opt_sha", "path_file_sha256": "opt_sha", "peer_socket_inode": "opt_int", "peer_binding": "opt_int"},
         "complete_requires": ("process", "unix_socket"),
     },
+    # SUP-06(개발 담당, B 의존 반환 5): worker·rank별 필수 shard·배정 파일·적재 완료/실패·READY 후보. 파일은 세션 keyed 요약.
+    "worker-shard-load": {
+        "checks": ("SUP-06",),
+        "events": ("shard_required", "shard_assigned", "load_completed", "load_failed", "rank_ready"),
+        "fields": {"at_ms": "ms", "shard_sha256": "opt_sha", "bytes": "opt_int"},
+        "complete_requires": ("shard_assigned", "load_completed", "rank_ready"),
+    },
     "profiler-control": {
         "checks": ("LIF-14", "OBS-03"),
         "events": ("api_call", "rpc", "worker_control", "backend_state", "stop_failed", "trace_callback", "output_complete",
@@ -266,6 +273,17 @@ def violation_candidates(kind, events):
                 out.append({"seq": row["seq"], "reason": "listener_owned_outside_serving_roles"})
             if row["state"] in ("accepted", "connected") and row["peer_binding"] is None:
                 out.append({"seq": row["seq"], "reason": "peer_outside_container_roster"})
+    elif kind == "worker-shard-load":
+        for binding in sorted({r["binding"] for r in events}):
+            rows = [r for r in events if r["binding"] == binding]
+            required = {r["shard_sha256"] for r in rows if r["event"] == "shard_required"}
+            assigned = {r["shard_sha256"] for r in rows if r["event"] == "shard_assigned"}
+            if not any(r["event"] == "rank_ready" for r in rows):
+                continue
+            if required - assigned:
+                out.append({"binding": binding, "reason": "missing_required_shard_reported_ready"})
+            if any(r["event"] == "load_failed" for r in rows):
+                out.append({"binding": binding, "reason": "failed_load_reported_ready"})
     elif kind == "rank-fault":
         out += [{"seq": r["seq"], "reason": "fault_ack_missing"} for r in events if r["event"] == "fault_applied" and not r["ack"]]
     return out

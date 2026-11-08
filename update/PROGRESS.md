@@ -1,8 +1,15 @@
+## 2026-11-08 — SUP-06 worker shard 공통 입력(B 의존 반환 5)
+
+- 한 일: 엔진 콜백 센서에 선택 관측 `worker_shards`(기본 꺼짐)를 더하고 `DefaultModelLoader._prepare_weights`·`track_weights_loading`, `WorkerProc.monitor_death_pipe`(READY 직전)를 원 소스 해시로 감쌌다. 공통 입력 종류 `worker-shard-load`와 생산자 `guard-engine-callback-worker-shard-load`(미등록)를 만들고 기존 `supply_boot_contract._worker_shard` 입력 행으로 투영한다. 상세 `docs/dev-1/sup06-worker-shard.md`.
+- 테스트 결과: 새 시험 9 통과. k3d 임시 생산자 Pod 실제 3사례: 단일 파일·shard 2개+index는 배정=필수·적재 완료·READY, shard 하나 삭제는 배정 단계 예외·READY 없음. 위반 후보 없음.
+- 다음 단계: B 의존 반환 3·4·8, TP2에서 rank 2개 확인 뒤 등록.
+- 막힌 것: AWS 할당량 승인.
+
 ## 2026-11-08 — SUP-10 plugin runner 지원 계약(B 의존 반환 2)
 
 - 한 일: v1(10사례)을 그대로 두고 `guard-plugin-runner/1` 계약과 실제 생산자·수집 도구를 만들었다. IO processor를 실제 `VllmConfig`·renderer·`get_io_processor`로 선택해 생성자 ModelConfig·요청·출력 효과를 결합하고, 허용 목록 차단·미설정 시 비승인 등록 함수 호출(사실)을 구분한다. 상세 `docs/dev-1/sup10-plugin-runner.md`.
 - 테스트 결과: 새 시험 19 통과. 실제 4사례 complete·위반 없음.
-- 사고: 처음 서빙 엔진 컨테이너 안에서 생산자를 돌려 메모리 상한을 넘겨 k3d lab 엔진 Pod `serving-engine-dev1-k3d-18`이 OOM 종료(Failed)됐다. 별도 생산자 Pod로 측정한 뒤 지웠다. 엔진 복구는 사용자 확인 대기.
+- 사고: 처음 서빙 엔진 컨테이너 안에서 생산자를 돌려 메모리 상한을 넘겨 k3d lab 엔진 Pod `serving-engine-dev1-k3d-18`이 OOM 종료(Failed)됐다. 별도 생산자 Pod로 측정한 뒤 지웠다. 사용자 확인 뒤 같은 Pod 명세로 다시 띄워 Ready·정상 요청 200을 확인했다(새 Pod IP 10.42.0.77, 이전 target의 Pod 바인딩은 새로 만들어야 한다).
 - 다음 단계: B 의존 반환 3~5·8, TP2(할당량 대기).
 - 막힌 것: AWS 할당량 승인.
 

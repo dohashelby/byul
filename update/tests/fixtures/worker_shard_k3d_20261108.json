@@ -1,0 +1,443 @@
+{
+ "cases": {
+  "missing-shard": {
+   "engine_ready": false,
+   "exit_code": 1,
+   "rows": [
+    {
+     "actual_tensor_consumption_verified": false,
+     "authenticated_identity_verified": false,
+     "call_sha256": "3a44c45ae5a6aed08f9fb6d134a1d64bee1877b10b1ef3c8629ef3aa9d474b4b",
+     "entry_code_sha256": "3681eb1bc6b38264f7efe1662d73198fec3be6241e64f18b802e412f24e085be",
+     "entry_qualified_before": true,
+     "fields": {
+      "pid": 1950,
+      "start_ticks": 15395492,
+      "tp_rank": 0
+     },
+     "native_profile_installed": false,
+     "operation_finished_ns": 153958296364331,
+     "operation_started_ns": 153958296364331,
+     "parent_call_sha256": null,
+     "phase": "CALL",
+     "point": "DefaultModelLoader._prepare_weights",
+     "process_sha256": "dcf475276442348d495b674bbccefdfb65762d539ce4f2484a5e083fbfb6d5e1",
+     "runtime_context_injected": false,
+     "schema": "guard-vllm-worker-shard-callback/1",
+     "session_sha256": "6a9498b29616b133ea99618bbc2765d69caad5b19dd6051c9232a71ef95d2a1f",
+     "source_file_sha256": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+     "transitive_dependencies_verified": false
+    },
+    {
+     "actual_tensor_consumption_verified": false,
+     "authenticated_identity_verified": false,
+     "call_sha256": "3a44c45ae5a6aed08f9fb6d134a1d64bee1877b10b1ef3c8629ef3aa9d474b4b",
+     "entry_code_sha256": "3681eb1bc6b38264f7efe1662d73198fec3be6241e64f18b802e412f24e085be",
+     "entry_qualified_after": true,
+     "entry_qualified_before": true,
+     "fields": {
+      "pid": 1950,
+      "start_ticks": 15395492,
+      "tp_rank": 0
+     },
+     "native_finished_ns": 153958297179498,
+     "native_profile_installed": false,
+     "native_started_ns": 153958296563206,
+     "operation_finished_ns": 153958297179498,
+     "operation_started_ns": 153958296364331,
+     "parent_call_sha256": null,
+     "phase": "RAISE",
+     "point": "DefaultModelLoader._prepare_weights",
+     "process_sha256": "dcf475276442348d495b674bbccefdfb65762d539ce4f2484a5e083fbfb6d5e1",
+     "runtime_context_injected": false,
+     "schema": "guard-vllm-worker-shard-callback/1",
+     "session_sha256": "6a9498b29616b133ea99618bbc2765d69caad5b19dd6051c9232a71ef95d2a1f",
+     "source_file_sha256": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+     "transitive_dependencies_verified": false
+    }
+   ]
+  },
+  "sharded": {
+   "engine_ready": true,
+   "exit_code": 0,
+   "rows": [
+    {
+     "actual_tensor_consumption_verified": false,
+     "authenticated_identity_verified": false,
+     "call_sha256": "3a44c45ae5a6aed08f9fb6d134a1d64bee1877b10b1ef3c8629ef3aa9d474b4b",
+     "entry_code_sha256": "3681eb1bc6b38264f7efe1662d73198fec3be6241e64f18b802e412f24e085be",
+     "entry_qualified_before": true,
+     "fields": {
+      "pid": 1802,
+      "start_ticks": 15394034,
+      "tp_rank": 0
+     },
+     "native_profile_installed": false,
+     "operation_finished_ns": 153943667664824,
+     "operation_started_ns": 153943667664824,
+     "parent_call_sha256": null,
+     "phase": "CALL",
+     "point": "DefaultModelLoader._prepare_weights",
+     "process_sha256": "5629d643b416153c1626de49d4cb9dc7c0eb738627e82b7a95858f53ee4ed199",
+     "runtime_context_injected": false,
+     "schema": "guard-vllm-worker-shard-callback/1",
+     "session_sha256": "6a9498b29616b133ea99618bbc2765d69caad5b19dd6051c9232a71ef95d2a1f",
+     "source_file_sha256": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+     "transitive_dependencies_verified": false
+    },
+    {
+     "actual_tensor_consumption_verified": false,
+     "authenticated_identity_verified": false,
+     "call_sha256": "3a44c45ae5a6aed08f9fb6d134a1d64bee1877b10b1ef3c8629ef3aa9d474b4b",
+     "entry_code_sha256": "3681eb1bc6b38264f7efe1662d73198fec3be6241e64f18b802e412f24e085be",
+     "entry_qualified_after": true,
+     "entry_qualified_before": true,
+     "fields": {
+      "file_bytes": [
+       86248328,
+       241470392
+      ],
+      "files": [
+       "1c3d942ddb638b1fd18921997af82c36aedf3afae036a4597ee0f93f97d91713",
+       "14d71007adb2e41fe607a5a361e4072cac140fc03d495fb53d9a40bf8477af8b"
+      ],
+      "folder_sha256": "d24cacd34f22139f521398e1632429034535ab4ce3c3a1b703c19191b1ea297d",
+      "index_present": true,
+      "pid": 1802,
+      "required": [
+       "14d71007adb2e41fe607a5a361e4072cac140fc03d495fb53d9a40bf8477af8b",
+       "1c3d942ddb638b1fd18921997af82c36aedf3afae036a4597ee0f93f97d91713"
+      ],
+      "safetensors": true,
+      "start_ticks": 15394034,
+      "tp_rank": 0
+     },
+     "native_finished_ns": 153943668532241,
+     "native_profile_installed": false,
+     "native_started_ns": 153943667865199,
+     "operation_finished_ns": 153943668532241,
+     "operation_started_ns": 153943667664824,
+     "parent_call_sha256": null,
+     "phase": "RETURN",
+     "point": "DefaultModelLoader._prepare_weights",
+     "process_sha256": "5629d643b416153c1626de49d4cb9dc7c0eb738627e82b7a95858f53ee4ed199",
+     "runtime_context_injected": false,
+     "schema": "guard-vllm-worker-shard-callback/1",
+     "session_sha256": "6a9498b29616b133ea99618bbc2765d69caad5b19dd6051c9232a71ef95d2a1f",
+     "source_file_sha256": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+     "transitive_dependencies_verified": false
+    },
+    {
+     "actual_tensor_consumption_verified": false,
+     "authenticated_identity_verified": false,
+     "call_sha256": "c98d4489b155adfe75dffb08830923dc7550c9bb74375c39ee714a5a923efa60",
+     "entry_code_sha256": "741fb4c3de77e2b05f9a89348e4260e70c377a388db7400f63da193bf8ce466c",
+     "entry_qualified_before": true,
+     "fields": {
+      "pid": 1802,
+      "start_ticks": 15394034,
+      "tp_rank": 0
+     },
+     "native_profile_installed": false,
+     "operation_finished_ns": 153944263262866,
+     "operation_started_ns": 153944263262866,
+     "parent_call_sha256": null,
+     "phase": "CALL",
+     "point": "DefaultModelLoader.track_weights_loading",
+     "process_sha256": "5629d643b416153c1626de49d4cb9dc7c0eb738627e82b7a95858f53ee4ed199",
+     "runtime_context_injected": false,
+     "schema": "guard-vllm-worker-shard-callback/1",
+     "session_sha256": "6a9498b29616b133ea99618bbc2765d69caad5b19dd6051c9232a71ef95d2a1f",
+     "source_file_sha256": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+     "transitive_dependencies_verified": false
+    },
+    {
+     "actual_tensor_consumption_verified": false,
+     "authenticated_identity_verified": false,
+     "call_sha256": "c98d4489b155adfe75dffb08830923dc7550c9bb74375c39ee714a5a923efa60",
+     "entry_code_sha256": "741fb4c3de77e2b05f9a89348e4260e70c377a388db7400f63da193bf8ce466c",
+     "entry_qualified_after": true,
+     "entry_qualified_before": true,
+     "fields": {
+      "completed": true,
+      "pid": 1802,
+      "start_ticks": 15394034,
+      "tp_rank": 0
+     },
+     "native_finished_ns": 153944263834241,
+     "native_profile_installed": false,
+     "native_started_ns": 153944263451866,
+     "operation_finished_ns": 153944263834241,
+     "operation_started_ns": 153944263262866,
+     "parent_call_sha256": null,
+     "phase": "RETURN",
+     "point": "DefaultModelLoader.track_weights_loading",
+     "process_sha256": "5629d643b416153c1626de49d4cb9dc7c0eb738627e82b7a95858f53ee4ed199",
+     "runtime_context_injected": false,
+     "schema": "guard-vllm-worker-shard-callback/1",
+     "session_sha256": "6a9498b29616b133ea99618bbc2765d69caad5b19dd6051c9232a71ef95d2a1f",
+     "source_file_sha256": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+     "transitive_dependencies_verified": false
+    },
+    {
+     "actual_tensor_consumption_verified": false,
+     "authenticated_identity_verified": false,
+     "call_sha256": "0b48f5d8261ef15303d628ac3577c9b17a242741e1e092fd74495c58f7e3b0e2",
+     "entry_code_sha256": "5793885101e07c1365bde1594f8ec3865f332343eab7fca90ae342e3868db456",
+     "entry_qualified_before": true,
+     "fields": {
+      "pid": 1802,
+      "rank": 0,
+      "ready_candidate": true,
+      "start_ticks": 15394034,
+      "tp_rank": 0
+     },
+     "native_profile_installed": false,
+     "operation_finished_ns": 153944588950366,
+     "operation_started_ns": 153944588950366,
+     "parent_call_sha256": null,
+     "phase": "CALL",
+     "point": "WorkerProc.monitor_death_pipe",
+     "process_sha256": "5629d643b416153c1626de49d4cb9dc7c0eb738627e82b7a95858f53ee4ed199",
+     "runtime_context_injected": false,
+     "schema": "guard-vllm-worker-shard-callback/1",
+     "session_sha256": "6a9498b29616b133ea99618bbc2765d69caad5b19dd6051c9232a71ef95d2a1f",
+     "source_file_sha256": "11a1554380d1efa516bb481416c798798d5839f38ac3b0f379ef4b8b547f4d1b",
+     "transitive_dependencies_verified": false
+    },
+    {
+     "actual_tensor_consumption_verified": false,
+     "authenticated_identity_verified": false,
+     "call_sha256": "0b48f5d8261ef15303d628ac3577c9b17a242741e1e092fd74495c58f7e3b0e2",
+     "entry_code_sha256": "5793885101e07c1365bde1594f8ec3865f332343eab7fca90ae342e3868db456",
+     "entry_qualified_after": true,
+     "entry_qualified_before": true,
+     "fields": {
+      "pid": 1802,
+      "rank": 0,
+      "ready_candidate": true,
+      "start_ticks": 15394034,
+      "tp_rank": 0
+     },
+     "native_finished_ns": 153944589501158,
+     "native_profile_installed": false,
+     "native_started_ns": 153944589370741,
+     "operation_finished_ns": 153944589501158,
+     "operation_started_ns": 153944588950366,
+     "parent_call_sha256": null,
+     "phase": "RETURN",
+     "point": "WorkerProc.monitor_death_pipe",
+     "process_sha256": "5629d643b416153c1626de49d4cb9dc7c0eb738627e82b7a95858f53ee4ed199",
+     "runtime_context_injected": false,
+     "schema": "guard-vllm-worker-shard-callback/1",
+     "session_sha256": "6a9498b29616b133ea99618bbc2765d69caad5b19dd6051c9232a71ef95d2a1f",
+     "source_file_sha256": "11a1554380d1efa516bb481416c798798d5839f38ac3b0f379ef4b8b547f4d1b",
+     "transitive_dependencies_verified": false
+    },
+    {
+     "code": "CACHE_CALLBACK_WEAK_OBJECT_IDENTITY_UNAVAILABLE",
+     "detail_sha256": "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91",
+     "phase": "GAP",
+     "process_sha256": "5629d643b416153c1626de49d4cb9dc7c0eb738627e82b7a95858f53ee4ed199",
+     "schema": "guard-engine-callback-events/1"
+    },
+    {
+     "code": "DISTRIBUTED_NON_EXECUTE_RPC_UNSUPPORTED",
+     "detail_sha256": "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91",
+     "phase": "GAP",
+     "process_sha256": "5629d643b416153c1626de49d4cb9dc7c0eb738627e82b7a95858f53ee4ed199",
+     "schema": "guard-engine-callback-events/1"
+    }
+   ]
+  },
+  "single-file": {
+   "engine_ready": true,
+   "exit_code": 0,
+   "rows": [
+    {
+     "actual_tensor_consumption_verified": false,
+     "authenticated_identity_verified": false,
+     "call_sha256": "3a44c45ae5a6aed08f9fb6d134a1d64bee1877b10b1ef3c8629ef3aa9d474b4b",
+     "entry_code_sha256": "3681eb1bc6b38264f7efe1662d73198fec3be6241e64f18b802e412f24e085be",
+     "entry_qualified_before": true,
+     "fields": {
+      "pid": 1654,
+      "start_ticks": 15392523,
+      "tp_rank": 0
+     },
+     "native_profile_installed": false,
+     "operation_finished_ns": 153928591024817,
+     "operation_started_ns": 153928591024817,
+     "parent_call_sha256": null,
+     "phase": "CALL",
+     "point": "DefaultModelLoader._prepare_weights",
+     "process_sha256": "fc67f1df6387543f3e9ab904a7a65b0853ac89119be153d5f7f438df7e1be6f6",
+     "runtime_context_injected": false,
+     "schema": "guard-vllm-worker-shard-callback/1",
+     "session_sha256": "6a9498b29616b133ea99618bbc2765d69caad5b19dd6051c9232a71ef95d2a1f",
+     "source_file_sha256": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+     "transitive_dependencies_verified": false
+    },
+    {
+     "actual_tensor_consumption_verified": false,
+     "authenticated_identity_verified": false,
+     "call_sha256": "3a44c45ae5a6aed08f9fb6d134a1d64bee1877b10b1ef3c8629ef3aa9d474b4b",
+     "entry_code_sha256": "3681eb1bc6b38264f7efe1662d73198fec3be6241e64f18b802e412f24e085be",
+     "entry_qualified_after": true,
+     "entry_qualified_before": true,
+     "fields": {
+      "file_bytes": [
+       250540281
+      ],
+      "files": [
+       "7615324284fdbd77c5f6bd70d2260df5ece3740b32d289b31552037beb547ce7"
+      ],
+      "folder_sha256": "9b15870235b43f6232c88518f7330b73562416be58fae288c17e1671a7b1611d",
+      "index_present": false,
+      "pid": 1654,
+      "required": null,
+      "safetensors": false,
+      "start_ticks": 15392523,
+      "tp_rank": 0
+     },
+     "native_finished_ns": 153928594057276,
+     "native_profile_installed": false,
+     "native_started_ns": 153928591249359,
+     "operation_finished_ns": 153928594057276,
+     "operation_started_ns": 153928591024817,
+     "parent_call_sha256": null,
+     "phase": "RETURN",
+     "point": "DefaultModelLoader._prepare_weights",
+     "process_sha256": "fc67f1df6387543f3e9ab904a7a65b0853ac89119be153d5f7f438df7e1be6f6",
+     "runtime_context_injected": false,
+     "schema": "guard-vllm-worker-shard-callback/1",
+     "session_sha256": "6a9498b29616b133ea99618bbc2765d69caad5b19dd6051c9232a71ef95d2a1f",
+     "source_file_sha256": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+     "transitive_dependencies_verified": false
+    },
+    {
+     "actual_tensor_consumption_verified": false,
+     "authenticated_identity_verified": false,
+     "call_sha256": "c98d4489b155adfe75dffb08830923dc7550c9bb74375c39ee714a5a923efa60",
+     "entry_code_sha256": "741fb4c3de77e2b05f9a89348e4260e70c377a388db7400f63da193bf8ce466c",
+     "entry_qualified_before": true,
+     "fields": {
+      "pid": 1654,
+      "start_ticks": 15392523,
+      "tp_rank": 0
+     },
+     "native_profile_installed": false,
+     "operation_finished_ns": 153929186941776,
+     "operation_started_ns": 153929186941776,
+     "parent_call_sha256": null,
+     "phase": "CALL",
+     "point": "DefaultModelLoader.track_weights_loading",
+     "process_sha256": "fc67f1df6387543f3e9ab904a7a65b0853ac89119be153d5f7f438df7e1be6f6",
+     "runtime_context_injected": false,
+     "schema": "guard-vllm-worker-shard-callback/1",
+     "session_sha256": "6a9498b29616b133ea99618bbc2765d69caad5b19dd6051c9232a71ef95d2a1f",
+     "source_file_sha256": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+     "transitive_dependencies_verified": false
+    },
+    {
+     "actual_tensor_consumption_verified": false,
+     "authenticated_identity_verified": false,
+     "call_sha256": "c98d4489b155adfe75dffb08830923dc7550c9bb74375c39ee714a5a923efa60",
+     "entry_code_sha256": "741fb4c3de77e2b05f9a89348e4260e70c377a388db7400f63da193bf8ce466c",
+     "entry_qualified_after": true,
+     "entry_qualified_before": true,
+     "fields": {
+      "completed": true,
+      "pid": 1654,
+      "start_ticks": 15392523,
+      "tp_rank": 0
+     },
+     "native_finished_ns": 153929187561859,
+     "native_profile_installed": false,
+     "native_started_ns": 153929187222984,
+     "operation_finished_ns": 153929187561859,
+     "operation_started_ns": 153929186941776,
+     "parent_call_sha256": null,
+     "phase": "RETURN",
+     "point": "DefaultModelLoader.track_weights_loading",
+     "process_sha256": "fc67f1df6387543f3e9ab904a7a65b0853ac89119be153d5f7f438df7e1be6f6",
+     "runtime_context_injected": false,
+     "schema": "guard-vllm-worker-shard-callback/1",
+     "session_sha256": "6a9498b29616b133ea99618bbc2765d69caad5b19dd6051c9232a71ef95d2a1f",
+     "source_file_sha256": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+     "transitive_dependencies_verified": false
+    },
+    {
+     "actual_tensor_consumption_verified": false,
+     "authenticated_identity_verified": false,
+     "call_sha256": "0b48f5d8261ef15303d628ac3577c9b17a242741e1e092fd74495c58f7e3b0e2",
+     "entry_code_sha256": "5793885101e07c1365bde1594f8ec3865f332343eab7fca90ae342e3868db456",
+     "entry_qualified_before": true,
+     "fields": {
+      "pid": 1654,
+      "rank": 0,
+      "ready_candidate": true,
+      "start_ticks": 15392523,
+      "tp_rank": 0
+     },
+     "native_profile_installed": false,
+     "operation_finished_ns": 153929492031776,
+     "operation_started_ns": 153929492031776,
+     "parent_call_sha256": null,
+     "phase": "CALL",
+     "point": "WorkerProc.monitor_death_pipe",
+     "process_sha256": "fc67f1df6387543f3e9ab904a7a65b0853ac89119be153d5f7f438df7e1be6f6",
+     "runtime_context_injected": false,
+     "schema": "guard-vllm-worker-shard-callback/1",
+     "session_sha256": "6a9498b29616b133ea99618bbc2765d69caad5b19dd6051c9232a71ef95d2a1f",
+     "source_file_sha256": "11a1554380d1efa516bb481416c798798d5839f38ac3b0f379ef4b8b547f4d1b",
+     "transitive_dependencies_verified": false
+    },
+    {
+     "actual_tensor_consumption_verified": false,
+     "authenticated_identity_verified": false,
+     "call_sha256": "0b48f5d8261ef15303d628ac3577c9b17a242741e1e092fd74495c58f7e3b0e2",
+     "entry_code_sha256": "5793885101e07c1365bde1594f8ec3865f332343eab7fca90ae342e3868db456",
+     "entry_qualified_after": true,
+     "entry_qualified_before": true,
+     "fields": {
+      "pid": 1654,
+      "rank": 0,
+      "ready_candidate": true,
+      "start_ticks": 15392523,
+      "tp_rank": 0
+     },
+     "native_finished_ns": 153929492547943,
+     "native_profile_installed": false,
+     "native_started_ns": 153929492416735,
+     "operation_finished_ns": 153929492547943,
+     "operation_started_ns": 153929492031776,
+     "parent_call_sha256": null,
+     "phase": "RETURN",
+     "point": "WorkerProc.monitor_death_pipe",
+     "process_sha256": "fc67f1df6387543f3e9ab904a7a65b0853ac89119be153d5f7f438df7e1be6f6",
+     "runtime_context_injected": false,
+     "schema": "guard-vllm-worker-shard-callback/1",
+     "session_sha256": "6a9498b29616b133ea99618bbc2765d69caad5b19dd6051c9232a71ef95d2a1f",
+     "source_file_sha256": "11a1554380d1efa516bb481416c798798d5839f38ac3b0f379ef4b8b547f4d1b",
+     "transitive_dependencies_verified": false
+    },
+    {
+     "code": "CACHE_CALLBACK_WEAK_OBJECT_IDENTITY_UNAVAILABLE",
+     "detail_sha256": "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91",
+     "phase": "GAP",
+     "process_sha256": "fc67f1df6387543f3e9ab904a7a65b0853ac89119be153d5f7f438df7e1be6f6",
+     "schema": "guard-engine-callback-events/1"
+    },
+    {
+     "code": "DISTRIBUTED_NON_EXECUTE_RPC_UNSUPPORTED",
+     "detail_sha256": "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91",
+     "phase": "GAP",
+     "process_sha256": "fc67f1df6387543f3e9ab904a7a65b0853ac89119be153d5f7f438df7e1be6f6",
+     "schema": "guard-engine-callback-events/1"
+    }
+   ]
+  }
+ },
+ "source": "k3d vllm-openai-cpu 0.31.0 arm64 temporary producer pod, offline LLM mp executor, 2026-11-08, EXAMPLE"
+}

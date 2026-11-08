@@ -31,6 +31,7 @@ from . import vllm_profiler_callback as profiler
 from . import vllm_consumption_callback as consumption
 from . import vllm_consumption_v2_callback as consumption_v2
 from . import vllm_supply_read_callback as supply_read
+from . import vllm_worker_shard_callback as worker_shard
 
 PROFILE = 'vllm-engine-callback-metadata/1'
 SCHEMA = 'guard-engine-callback-events/1'
@@ -68,9 +69,12 @@ for _name, _points in consumption.TARGETS.items():
 # 같은 설정의 V2 runner 경로: V2 runner 모듈이 불릴 때만 감싼다(lab kernel 대조 세션은 graph replay가 같은 지점을 쓴다).
 for _name, _points in consumption_v2.TARGETS.items():
     MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
+# SUP-06 worker shard(B 의존 반환 5): settings의 worker_shards가 참일 때만 감싼다. multiproc 모듈은 분산 관측과 같은 모듈이다.
+for _name, _points in worker_shard.TARGETS.items():
+    MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
 # 선택 관측(이름, 대상): 같은 모듈에 여러 개가 있을 수 있어 지점별로 관측기를 고른다.
 OPTIONAL = (('attempt', attempt.TARGETS), ('transition', transition.TARGETS), ('health', health.TARGETS), ('profiler', profiler.TARGETS),
-            ('consumption', consumption.TARGETS), ('consumption_v2', consumption_v2.TARGETS))
+            ('consumption', consumption.TARGETS), ('consumption_v2', consumption_v2.TARGETS), ('shard', worker_shard.TARGETS))
 OPTIONAL_MODULES = frozenset(name for _, targets in OPTIONAL for name in targets)
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
@@ -249,6 +253,10 @@ class ConsumptionV2Observer(_Keyed, consumption_v2.ConsumptionV2Observer):
     pass
 
 
+class WorkerShardObserver(_Keyed, worker_shard.WorkerShardObserver):
+    pass
+
+
 class Sink:
     def __init__(self, directory):
         self.path = Path(directory) / f'callbacks-{os.getpid()}.jsonl'
@@ -267,7 +275,7 @@ class Sink:
 class EngineCallbacks:
     def __init__(self, session, secret, sink, *, context_provider=None, clock=None, fault_file=None, kernel_checks=False,
                  request_attempts=False, generation_transitions=False, health_causal=False, profiler_control=False,
-                 runner_consumption=False):
+                 runner_consumption=False, worker_shards=False):
         self.sink = sink; self.fault_file = fault_file
         options = {'sink': sink, 'context_provider': context_provider, 'clock': clock}
         self.cache = CacheObserver(session, **options)
@@ -301,6 +309,9 @@ class EngineCallbacks:
         self.consumption_v2 = ConsumptionV2Observer(session, **options) if runner_consumption else None
         if self.consumption_v2 is not None:
             self.consumption_v2.secret = secret
+        self.shard = WorkerShardObserver(session, **options) if worker_shards else None
+        if self.shard is not None:
+            self.shard.secret = secret
 
     def instrument(self, module):
         """Validate every point of a module before changing any of them."""
@@ -320,10 +331,7 @@ class EngineCallbacks:
                 return False
         if name in OPTIONAL_MODULES:
             return self._instrument_optional(module, name)
-        observer = (self.cache if name in CACHE_TARGETS else self.slot if name in SLOT_TARGETS
-                    else self.slot_v2 if name in SLOT_V2_TARGETS else self.weights if name in weights_lifetime.TARGETS
-                    else self.comm if name in comm_buffer.TARGETS
-                    else self.distributed)
+        observer = self._default_observer(name)
         try:
             changes = [(cache._function(module, point), observer.wrap(module, point)) for point in MODULES[name]]
         except Exception:
@@ -333,17 +341,28 @@ class EngineCallbacks:
             setattr(owner, method, self._fault(wrapped) if method == FAULT_POINT and self.fault_file else wrapped)
         return True
 
+    def _default_observer(self, name):
+        return (self.cache if name in CACHE_TARGETS else self.slot if name in SLOT_TARGETS
+                else self.slot_v2 if name in SLOT_V2_TARGETS else self.weights if name in weights_lifetime.TARGETS
+                else self.comm if name in comm_buffer.TARGETS
+                else self.distributed)
+
     def _instrument_optional(self, module, name):
-        """선택 관측이 있는 모듈: 지점마다 켜진 관측기를 고른다. 꺼진 관측기의 지점은 건드리지 않는다."""
+        """선택 관측이 있는 모듈: 지점마다 켜진 관측기를 고른다. 꺼진 관측기의 지점은 건드리지 않는다.
+
+        선택 관측에 속하지 않는 지점(예: multiproc 모듈의 분산 관측 지점)은 그 모듈의 기본 관측기가 그대로 감싼다.
+        """
         plan = []
         for point in MODULES[name]:
-            chosen = None
+            chosen = None; optional = False
             for attribute, targets in OPTIONAL:
                 if point in targets.get(name, ()):
-                    chosen = getattr(self, attribute)
+                    chosen = getattr(self, attribute); optional = True
                     break
             if chosen is None and name in CACHE_TARGETS and point in CACHE_TARGETS[name]:
                 chosen = self.cache
+            elif chosen is None and not optional and name in distributed.TARGETS and point in distributed.TARGETS[name]:
+                chosen = self._default_observer(name)
             if chosen is not None:
                 plan.append((chosen, point))
         try:
@@ -352,7 +371,8 @@ class EngineCallbacks:
             self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
             return False
         for (owner, method, _), wrapped in changes:
-            setattr(owner, method, wrapped)
+            # multiproc 모듈이 선택 관측 경로로 와도 기존 lab fault 감싸기를 그대로 유지한다.
+            setattr(owner, method, self._fault(wrapped) if method == FAULT_POINT and self.fault_file else wrapped)
         return bool(changes)
 
     def _fault(self, wrapped):
@@ -377,7 +397,7 @@ class EngineCallbacks:
 
     def flush_gaps(self):
         kernel = self.kernel.gaps | self.graph.gaps if self.kernel is not None else set()
-        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption, getattr(self, 'consumption_v2', None), getattr(self, 'supply', None), getattr(self, 'supply_watch', None)) if o is not None))
+        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption, getattr(self, 'consumption_v2', None), getattr(self, 'shard', None), getattr(self, 'supply', None), getattr(self, 'supply_watch', None)) if o is not None))
         for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | self.weights.gaps | self.comm.gaps | kernel | extra):
             self.gap(code)
 
@@ -425,7 +445,8 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
             generation_transitions=settings.get('generation_transitions') is True,
             health_causal=settings.get('health_causal') is True,
             profiler_control=settings.get('profiler_control') is True,
-            runner_consumption=settings.get('runner_consumption') is True)
+            runner_consumption=settings.get('runner_consumption') is True,
+            worker_shards=settings.get('worker_shards') is True)
         sys.meta_path.insert(0, Finder(callbacks))
         if settings.get('supply_roots'):
             # SUP-03(P2): 선언한 공급 루트 아래에서 실제로 연 파일. audit hook은 원 코드를 바꾸지 않는다.

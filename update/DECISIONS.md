@@ -737,3 +737,9 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - 2026-11-06 · OBS-09 Kubernetes 경로는 CRI가 LF 앞 CR을 지우므로 `kubectl attach --quiet` stdout 바이트를 CRI 줄과 끝 CR 하나 차이·유일 연속 위치로 맞춘 경우에만 쓴다. 못 맞추면 UNKNOWN이며 파서·판정·정책은 그대로다. · [CRI 경계](docs/dev-1/obs09-cri-boundary.md).
 - 열린 질문(2026-11-06, OBS-09): CRI 로그를 줄 단위로 읽는 기업 수집기는 입력 LF를 진짜 접두사를 가진 별도 사건으로 볼 수 있다. 기업 수집 경로를 OBS-09 대상에 넣을지 기업 수집기 입력과 함께 정한다.
 - 2026-11-06 · 사용자 결정: REQ-11 생성 출력 귀속 오라클은 요청별 배타 allowed_token_ids(exclusive-allowed-token-ids-v1)로 하고, 판정 정의를 rev7·PACK-BASELINE@33으로 올려 보안 PASS 규칙을 둔다. 과거 팩·EVD/RES는 소급 변경하지 않는다. GPU 정책 초안과 OBS-01 파생 팩 seed도 33으로 옮긴다. · [출력 오라클](docs/dev-1/req11-output-oracle.md).
+- 2026-11-06 · 사용자 결정: GPU 2장 실증(REQ-14 TP2·REQ-21)은 구성을 개발 담당이 정한다. 서울에 L4 2장 유형이 없어 g6.12xlarge(L4 4장 중 2장 사용, vCPU 48, 콘솔 표시 $5.65823/h)로 하고, 기존 인스턴스의 유형만 바꿔 같은 EBS·클러스터를 쓴다. G and VT 온디맨드 vCPU 할당량 8→48 증가를 15:50경 요청했다(승인 대기). 실행 비용 상한은 실행 전에 따로 승인받는다.
+- 2026-11-08 · 사용자 결정(권장안 일괄 승인): TP2는 g6.12xlarge 한 번 기동에 A+B 묶음, EC2 상한 $20(EBS 별도). REQ-16 모델은 Qwen2-VL-2B-Instruct를 그 세션 EC2 안에서 내려받는다. · [결정](docs/dev-1/user-decisions-20261108.md)
+- 2026-11-08 · 사용자 결정: P2-Q1은 당분간 시험 요청 제한(C)을 유지하고 단계 요약 행(A)을 `guard-gpu-common-input/2`로 구현한다(값 변화마다 끊고 첫·끝 행은 원 행, 상한 4,096 유지). P2-Q2 V2 logit bias는 관측값이 있으면 비교, 없으면 gap. 둘 다 미구현.
+- 2026-11-08 · 사용자 결정: SUP-11 `-OO`는 transformers 5.17 판본에서 지원 범위 밖(UNKNOWN)으로 두고 정상 대조 모델을 바꾸지 않는다. 운영 `-OO` 금지 정책은 두지 않는다.
+- 2026-11-08 · 사용자 결정: 정책 확정자는 사용자, 팩 검토자는 B 담당자. 점검별 impact는 초안(HIGH33·MEDIUM38·LOW6)을 사용자 확정 뒤 새 팩 판본으로 반영한다. 그 전 팩 `impact: null` 유지.
+- 2026-11-08 · 사용자 결정: REQ-13·REQ-17·OBS-05·REQ-03·LIF-13 정책 값을 BYUL 기준 정책으로 확정(EXAMPLE 아님, 값은 결정 문서 6-1). OBS-01·REQ-02·OBS-11·PLT-07·PLT-10·11·12·OBS-06·OBS-09·PLT-08은 1차 범위에서 제외하고 UNKNOWN 유지.

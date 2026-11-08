@@ -12,7 +12,7 @@ SCHEMA = 'guard-engine-callback-assets/1'
 PACKAGE = 'guard_engine_callbacks'
 MODULES = ('vllm_attempt_callback', 'vllm_consumption_callback', 'vllm_consumption_v2_callback', 'vllm_supply_read_callback', 'vllm_health_callback', 'vllm_profiler_callback', 'vllm_profiler_sensor', 'vllm_transition_callback', 'vllm_cache_callback', 'vllm_comm_buffer_callback', 'vllm_distributed_callback', 'vllm_engine_callback_sensor', 'vllm_graph_replay_callback', 'vllm_kernel_bounds_callback',
     'vllm_lifecycle_sensor', 'vllm_rank_failure_sensor', 'vllm_weights_lifetime_callback', 'vllm_worker_generation_contract',
-    'vllm_worker_startup_contract')
+    'vllm_worker_startup_contract', 'vllm_worker_shard_callback')
 SITECUSTOMIZE = (f'from {PACKAGE} import vllm_engine_callback_sensor\n'
     'vllm_engine_callback_sensor.install()\n')
 
@@ -26,7 +26,8 @@ def _sources():
 
 
 def prepare_assets(output, *, lab_faults=False, lab_kernel_checks=False, request_attempts=False, generation_transitions=False,
-                   health_causal=False, profiler_control=False, runner_consumption=False, supply_roots=None, supply_watch=False):
+                   health_causal=False, profiler_control=False, runner_consumption=False, supply_roots=None, supply_watch=False,
+                   worker_shards=False):
     if supply_roots is not None:
         from guard.adapters.vllm_supply_read_callback import normalize_roots
         supply_roots = normalize_roots(supply_roots)
@@ -47,11 +48,14 @@ def prepare_assets(output, *, lab_faults=False, lab_kernel_checks=False, request
         'request_attempts': request_attempts is True, 'generation_transitions': generation_transitions is True,
         'health_causal': health_causal is True, 'profiler_control': profiler_control is True,
         'runner_consumption': runner_consumption is True, 'supply_roots': supply_roots,
-        'supply_watch': supply_watch is True}), encoding='utf-8')
+        'supply_watch': supply_watch is True,
+        # SUP-06 worker shard(B 의존 반환 5): 켜면 가중치 파일 배정·적재·worker READY 후보를 감싼다.
+        'worker_shards': worker_shards is True}), encoding='utf-8')
     manifest = {'schema': SCHEMA, 'profile': sensor.PROFILE, 'session': session, 'engine_started': False, 'lab_faults': lab_faults, 'lab_kernel_checks': lab_kernel_checks,
         'request_attempts': request_attempts is True, 'generation_transitions': generation_transitions is True,
         'health_causal': health_causal is True, 'profiler_control': profiler_control is True,
-        'runner_consumption': runner_consumption is True, 'supply_roots': supply_roots, 'supply_watch': supply_watch is True, 'assets': {name: hashlib.sha256(data).hexdigest() for name, data in sorted(values.items())}}
+        'runner_consumption': runner_consumption is True, 'supply_roots': supply_roots, 'supply_watch': supply_watch is True,
+        'worker_shards': worker_shards is True, 'assets': {name: hashlib.sha256(data).hexdigest() for name, data in sorted(values.items())}}
     (output / 'manifest.json').write_text(json.dumps(manifest, sort_keys=True), encoding='utf-8')
     return manifest
 

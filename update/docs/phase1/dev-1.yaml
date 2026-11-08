@@ -1,10 +1,8 @@
 # 개발 담당 상태. DONE은 이 lab 단계 완료이며 보안 PASS/전체 질문 인증이 아니다.
 checks:
   LIF-13:
-    note: '2026-11-06: 가중치 수명 행을 경계 요청 대신 현재 컨테이너 세대(같은 노드 monotonic)로 결합하고 경계 전 release는
-      이번 실행에서 제외. 소비자 기동·release 뒤 재취득을 정본 실행의 lab 동작(weights_consumer_start)으로 넣음. 11-05 원자료
-      진단 재투영은 소비자2·거절1·fallback1(사후 수작업 행 포함). 정본 GPU 재실측과 release 기업 인가 필요. docs/dev-1/lif13-generation-scope.md'
-    state: GPU_CONFIRMATION_ONLY
+    note: '2026-11-06: L4 정본 실행 안 소비자 기동·release·재기동 완료, 소비자2·거절1·fallback1·위반 없음. release 기업 인가 정책 부재로 범위 미완 UNKNOWN. 좀비 소비자 정리 판정 결함 수정. docs/dev-1/gpu-20261106.md'
+    state: ENTERPRISE_INPUT_WAITING
   OBS-01:
     note: '2026-11-05: GPU 파생 DRAFT팩 Gateway 파일 소유/bytes·허용/거부/후속 기록 수집. 봉인·생산자 인증·독립
       사건 증명 부족 UNKNOWN. 초기 읽기 실패와 Ref 보존; 정본팩 집계 제외. docs/dev-1/gpu-20261105.md'
@@ -21,10 +19,8 @@ checks:
       docs/dev-1/gpu-20261105.md'
     state: ENTERPRISE_INPUT_WAITING
   OBS-09:
-    note: '2026-11-06: 11-05 GPU UNKNOWN 원인은 CRI 로그가 LF 앞 CR(native 연속 표식)을 지운 것(k3d 실측). 시험 동안
-      kubectl attach 원 stdout 바이트를 CRI 줄과 정확히 한 곳에서 맞춰 쓰고, 못 맞추면 UNKNOWN. k3d 진단에서 다섯 사례
-      정확 사건 복원. GPU 재실측 필요. docs/dev-1/obs09-cri-boundary.md'
-    state: GPU_CONFIRMATION_ONLY
+    note: '2026-11-06: L4 attach·CRI 정렬로 7사례 경계 보존. 첫 실행은 투영 재생의 CRI image ID 거부로 ABORTED(보존), 수정본 재측정 COMPLETED 보안/기능 PASS(EXAMPLE). 기업 수집기 범위는 열린 질문. docs/dev-1/gpu-20261106.md'
+    state: DONE
   OBS-11:
     note: Kubernetes 읽기 경로 구현(시험). 수집 상태 기록의 생산자가 없다. 기업 수집 파이프라인 또는 runtime observation
       feed(heartbeat·공백 표식) 연결과 수집기 중단·복구 절차가 필요
@@ -66,10 +62,8 @@ checks:
       않음(/v1/responses 생성·조회 404). Gateway가 이 경로를 열면 다시 적용'
     state: NOT_APPLICABLE_IN_TARGET
   REQ-11:
-    note: '2026-11-06: 생성 출력 귀속 오라클(요청별 배타 allowed_token_ids)과 판정 정의 rev7·PACK-BASELINE@33(보안
-      PASS 규칙) 추가. 11-05 GPU는 입력 투영·연결 검증/기능 PASS·보안 UNKNOWN(rev6) 그대로. 팩33 GPU 재실측 필요.
-      docs/dev-1/req11-output-oracle.md'
-    state: GPU_CONFIRMATION_ONLY
+    note: '2026-11-06: L4 팩33 rev7 COMPLETED 보안/기능 PASS(EXAMPLE). 8사례·대조 모두 입력 투영·연결·배타 allowed_token_ids 출력 귀속 확인. 기업 신원·공유 정책 전체 PASS 아님. docs/dev-1/gpu-20261106.md'
+    state: DONE
   REQ-13:
     note: '2026-11-05: GPU 엔진 금지 반환 옵션 수용 FAIL·Gateway3옵션400 거부·기능 PASS·증거 왕복. 허용
       응답/오류 필드 기업 입력 대기. docs/dev-1/gpu-20261105.md'

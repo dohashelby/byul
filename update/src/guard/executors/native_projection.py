@@ -174,7 +174,11 @@ def replay_native(sample):
         _require(all(_hash(identity[k]) for k in ("container_id_sha256", "started_at_sha256")))
         _require(type(identity["image"]) is str and len(identity["image"]) <= 512
             and re.fullmatch(r"[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64}", identity["image"]) is not None)
-        _require(type(identity["image_id"]) is str and re.fullmatch(r"sha256:[0-9a-f]{64}", identity["image_id"]) is not None)
+        # Docker는 로컬 image ID(sha256:…), Kubernetes CRI는 repo@sha256:…를 준다. CRI 형식은 실행 이미지와 같은 digest만 받는다.
+        _require(type(identity["image_id"]) is str and len(identity["image_id"]) <= 512 and (
+            re.fullmatch(r"sha256:[0-9a-f]{64}", identity["image_id"]) is not None
+            or re.fullmatch(r"[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64}", identity["image_id"]) is not None
+            and identity["image_id"].rsplit("@", 1)[1] == identity["image"].rsplit("@", 1)[1]))
         _require(identity["image_repo_digest_verified"] is True and identity["logging_controls_verified"] is True
             and identity["logging_profile"] == "request-info-v1")
     transport = sample["source_transport"]

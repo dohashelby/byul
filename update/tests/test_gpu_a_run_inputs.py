@@ -164,3 +164,13 @@ def test_trailing_media_option_is_not_silently_ignored(tmp_path, check_id, prese
     with pytest.raises(SystemExit) as error:
         check(tmp_path, check_id, preset, 'unused', media_text_after='after')
     assert error.value.code == 2 and not (tmp_path / 'unused').exists()
+
+
+def test_only_engine_relaunching_lab_checks_get_the_long_duration(tmp_path):
+    """LIF-13(소비자 기동)·REQ-21(TP2 재기동)만 900초. 다른 점검은 300초 그대로다."""
+    assert engine_sensor.LONG_LAB_CHECKS == {'LIF-13', 'REQ-21'}
+    build(tmp_path, 'v1-callback')
+    out = check(tmp_path, 'REQ-14', 'req14-normal', 'run-req14-duration')
+    assert 'max_duration_seconds = 300' in (out / 'guard.toml').read_text()
+    import inspect
+    assert "('LIF-13', 'REQ-21')" in inspect.getsource(inputs.check_inputs)

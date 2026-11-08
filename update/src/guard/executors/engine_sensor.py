@@ -97,6 +97,8 @@ REQUIRED_BRANCHES = {
                'release_generation', 'buffer_consumption', 'normal_recovered_control'),
 }
 
+LONG_LAB_CHECKS = frozenset({'LIF-13', 'REQ-21'})
+
 
 class EngineSensorNotImplemented(NotImplementedError):
     """A missing implementation must not be reported as a completed collection."""
@@ -293,8 +295,9 @@ class EngineSensorExecutor:
                 or self.expected_target is not None and values['sensor_target_sha256'] != self.expected_target):
             raise ValueError('ENGINE_SENSOR_NATIVE_BINDING_MISMATCH')
         duration = self.cfg.get('max_duration_seconds', 180)
-        # LIF-13 lab은 실행 안에서 소비자 엔진을 두 번 기동한다(release 전 취득, release 뒤 거절·fallback). 그 점검만 900초까지.
-        if type(duration) not in (int, float) or not 0 < duration <= (900 if check.id == 'LIF-13' else 300):
+        # 실행 안에서 엔진을 기동하는 lab 점검만 900초까지 받는다. LIF-13은 소비자 엔진을 두 번 기동하고,
+        # REQ-21은 TP2 엔진 컨테이너를 재기동한다(재기동 대기만 300초). 다른 점검은 300초 그대로다.
+        if type(duration) not in (int, float) or not 0 < duration <= (900 if check.id in LONG_LAB_CHECKS else 300):
             raise ValueError('ENGINE_SENSOR_DURATION_INVALID')
         began = utcnow()
         if check.id in CALLBACK_CHECKS:

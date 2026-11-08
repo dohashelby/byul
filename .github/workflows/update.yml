@@ -56,7 +56,9 @@ jobs:
   update-default:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
-    runs-on: ubuntu-latest
+    # Python 3.12.3 is pinned for the native sensor contracts and is not published for Ubuntu 26.04
+    # (ubuntu-latest from 2026-11). Keep the runner that the pinned interpreter supports.
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     defaults:
       run:

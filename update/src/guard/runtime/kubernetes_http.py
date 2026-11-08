@@ -165,20 +165,18 @@ print(json.dumps({"schema":"guard-lab-weights-consumer/1","status":status,"pid":
 '''
 WEIGHTS_CONSUMERS_STOP = r'''
 import json,os,signal,sys,time
+def live(item):
+    # 시작 ticks가 같고 좀비(Z)·소멸(X)이 아닐 때만 살아 있다. 엔진 PID 1이 소비자를 거두지 않아 좀비가 남는다(GPU 11-06 실측).
+    try:
+        rest=open("/proc/%d/stat"%item["pid"]).read().rsplit(")",1)[1].split()
+    except (OSError,ValueError,IndexError):return False
+    return int(rest[19])==item["start_ticks"] and rest[0] not in ("Z","X")
 left=[]
 for item in json.loads(sys.argv[1]):
-    try:
-        ticks=int(open("/proc/%d/stat"%item["pid"]).read().rsplit(")",1)[1].split()[19])
-    except (OSError,ValueError,IndexError):continue
-    if ticks!=item["start_ticks"]:continue
+    if not live(item):continue
     os.killpg(item["pid"],signal.SIGTERM);left.append(item)
 for _ in range(60):
-    alive=[]
-    for item in left:
-        try:
-            if int(open("/proc/%d/stat"%item["pid"]).read().rsplit(")",1)[1].split()[19])==item["start_ticks"]:alive.append(item)
-        except (OSError,ValueError,IndexError):pass
-    left=alive
+    left=[item for item in left if live(item)]
     if not left:break
     time.sleep(1)
 print(json.dumps({"schema":"guard-lab-weights-consumers-stop/1","status":"ok" if not left else "alive"}))
@@ -1158,6 +1156,44 @@ class KubernetesHTTP:
         if type(pod) is not dict or pod.get("metadata",{}).get("uid")!=engine["pod_uid"]:
             raise KubernetesBindingError()
         return pod
+
+    def engine_ipc_ownership(self):
+        """PLT-02 공통 입력: 엔진 컨테이너 안 unix socket의 실제 소유·상대(읽기 전용). 관측 앞뒤로 소유 Pod 바인딩을 확인한다.
+
+        (관측, 바인딩 Pod 신원, 앞뒤 바인딩 동일 여부)를 돌려준다. 관측 형식이 맞지 않으면 실패다.
+        """
+        from guard.collectors.ipc_ownership_observer import OBSERVER, decode
+        if self.profile not in {REQUEST_BINDING_PROFILE, ENGINE_CALLBACK_PROFILE}:
+            raise KubernetesBindingError()
+        self._verify();engine=deepcopy(self.binding["engine"])
+        value=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],
+            f"--container={engine['container']}","--","python3","-I","-S","-c",OBSERVER],cap=4*1024**2,budget=60)
+        self._verify()
+        try:
+            observed=decode(value)
+        except ValueError:
+            raise KubernetesBindingError() from None
+        pod={"pod_uid":engine["pod_uid"],"container_id":engine["container_id"],"restart_count":engine["restart_count"]}
+        return observed,pod,self.binding["engine"]==engine
+
+    def engine_group_resources(self):
+        """LIF-11 공통 입력: 엔진 컨테이너 안 소유 그룹 자원 inventory(읽기 전용). 관측 시점의 Pod 세대를 함께 돌려준다.
+
+        재기동 뒤에는 바인딩이 새 컨테이너로 옮겨진 다음 불러야 한다. (관측, Pod 세대, 앞뒤 바인딩 동일 여부)를 돌려준다.
+        """
+        from guard.collectors.group_resource_observer import OBSERVER, decode
+        if self.profile not in {REQUEST_BINDING_PROFILE, ENGINE_CALLBACK_PROFILE}:
+            raise KubernetesBindingError()
+        self._verify();engine=deepcopy(self.binding["engine"])
+        value=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],
+            f"--container={engine['container']}","--","python3","-I","-S","-c",OBSERVER],cap=4*1024**2,budget=60)
+        self._verify()
+        try:
+            observed=decode(value)
+        except ValueError:
+            raise KubernetesBindingError() from None
+        pod={"pod_uid":engine["pod_uid"],"container_id":engine["container_id"],"restart_count":engine["restart_count"]}
+        return observed,pod,self.binding["engine"]==engine
 
     def engine_device_open_test(self):
         """PLT-01·04: 엔진 컨테이너 안에서 보이는 GPU device node를 O_RDWR로 열었다 닫는다(ioctl 없음)."""

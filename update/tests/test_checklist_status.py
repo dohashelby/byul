@@ -183,7 +183,12 @@ def test_gpu_status_takes_strongest_record_and_never_claims_whole_question():
 
 def test_real_gpu_summaries_keep_exact_refs_and_separate_declared_components():
     runs = gpu_runs(ROOT)
-    assert {r["pack_revision"] for rows in runs.values() for r in rows} == {32}
+    assert {r["pack_revision"] for rows in runs.values() for r in rows} == {32, 33}
+    old11 = [r for r in runs["REQ-11"] if r["pack_revision"] == 32]
+    assert old11 and not any(r["current_definition"] for r in old11)  # rev6 기록은 이력만
+    assert all(r["current_definition"] for cid, rows in runs.items() if cid != "REQ-11" for r in rows)
+    assert gpu_status(runs["REQ-11"]) == "GPU_PARTIAL_EXAMPLE"  # 팩33 rev7 기록에서만
+    assert gpu_status(old11) == "DEFERRED_NOT_MEASURED"
     assert all(r["result_ref"].startswith("RES-") for rows in runs.values() for r in rows)
     assert gpu_status(runs["LIF-13"]) == "GPU_COMPONENT_DECLARED_ONLY"
     assert gpu_status(runs["PLT-01"]) == "GPU_PARTIAL_MEASURED"

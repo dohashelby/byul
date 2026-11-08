@@ -279,3 +279,28 @@ def test_transport_attach_is_log_profile_only_and_quiet():
     assert seen['argv'][-4:] == ['attach', 'p', '--container=engine', '--quiet'] and '-i' not in seen['argv']
     with pytest.raises(KubernetesBindingError):
         http.KubernetesHTTP.engine_attach(SimpleNamespace(**{**vars(stub), 'profile': http.PROFILE}), 1024, popen=Fake)
+
+
+def test_kubernetes_projection_attachments_are_written_and_execution_completes(tmp_path, monkeypatch):
+    """11-05·11-06 GPU OBS-09 ABORTED 원인: 투영 재생이 CRI image ID(repo@sha256)를 거부했다."""
+    draft, _, _ = run(tmp_path, monkeypatch)
+    names = {artifact.name for artifact in draft.artifacts}
+    assert {'log_integrity_samples.json', 'log_integrity_events.json', 'log_integrity_display.html'} <= names
+    assert getattr(draft, 'abort_reason', None) is None
+
+
+def test_projection_replay_accepts_only_the_same_digest_cri_image_id(tmp_path, monkeypatch):
+    from copy import deepcopy as _copy
+    from guard.executors import log_integrity as li, native_projection as projection
+    seen = []
+    real = projection.replay_native
+    monkeypatch.setattr(li, 'replay_native', lambda sample: (seen.append(_copy(sample)), real(sample))[1])
+    run(tmp_path, monkeypatch)
+    sample, = seen
+    identity = sample['source_identity_before']
+    assert identity['image_id'].endswith('@' + identity['image'].rsplit('@', 1)[1])
+    real(_copy(sample))  # 실제 CRI 형식 그대로 통과
+    for bad in ('docker.io/x@sha256:' + 'f' * 64, 'not-an-id'):
+        changed = _copy(sample); changed['source_identity_before']['image_id'] = bad
+        with pytest.raises(ValueError):
+            real(changed)

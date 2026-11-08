@@ -629,3 +629,42 @@
 - 미확인·다음: AWS 접속·실제 게시·브라우저 수동 검수 없음. 다음 서버 회차에 새 도구/Gateway·API 반영 후 ubuntu 사본 입력과 kubeconfig, 환경→선언 생성·권한/누락/JSON 이유코드, 실제 AWS 비파괴 사례 게시→Lab missing 해소, 0640/관측 GID·Gateway 읽기 성공/쓰기 거부, AWS ID·선택 범위·과거 시각·환경 표시, unknown/failed 보존을 확인한다. 소켓 허용 환경에서 보조 설정 없는 runtime/API 전체 통과와 Claude 독립 검수가 남았다. 작업 트리만 변경, 커밋·push·PR 없음. `contracts/`·`update/`와 금지 인계 문서는 변경하지 않았다.
 
 - 2026-11-08 사용자 명시 승인으로 Lab 보고서 계약 범위만 수정: kind L-01~L-08·AWS-01~AWS-20 및 선택 report.schema 두 형식을 허용하고 저장된 회차는 현재 통제 상태의 증명이 아님을 명시했다. 0.1/DRAFT 유지, platform의 파생 view를 제거해 공용 계약·생성 타입을 사용한다. 다른 팀 영향: 기존 kind L-01~L-08과 schema 없는 문서는 그대로 유효하여 하위 호환(종전 정규식만 허용하던 L-00·L-09~L-99는 거부), update·다른 계약 변경 없음. 기준 byul_runtime/59bbf9b, 커밋·푸시 없음.
+
+## 2026-11-09 3순위: 실제 반출 증거 목록과 예시 출처 구분 (Codex, 미커밋)
+
+- 실제 시작/종료 기준은 `byul_runtime` / HEAD `75a6dcfd731d8c1952403e4b1607dd6e5e4ed5b7`이다. 사용자 전달 `e823141`과 달랐으며 checkout/reset/pull 없이 현재 기준을 유지했다. 커밋·push·PR·AWS 접속·가동 없음. `contracts/`·`update/` 수정 없음. 사용자 금지 인계 문서는 읽거나 수정하지 않았고, 원래 있던 untracked 파일을 그대로 두었다.
+- 새 `tools/evidence_index.py`: tgz/폴더 다중 입력, 결과 문서/명시 SHA-256 대조, 스트리밍 크기 상한·경로/링크/특수 파일 거부, 비밀 패턴 파일 제외, `files/<run>/...` 복사, 로컬 계약 자체 검증 후 임시 출력 원자 게시. 같은 입력은 기존 출력과 내용 대조만 하고 다시 쓰지 않는다. 다른 결과는 덮어쓰지 않고 중단한다. 제외 파일명·값·원문을 출력하지 않으며 코드별 건수만 보고한다. 반출본·문서 해시를 refs에 연결하되 사건 연관성을 임의 생성하지 않는다.
+- 등급 근거: 계약의 실측 enum은 `MEASURED`이며 `real`이 아니다. 문서의 반출본 해시와 AWS GPU 서버 실측 회차 근거가 함께 확인된 입력에 적용한다. 근거 없는 입력은 `DECLARED`, 합성/mock 출처가 있는 파일은 보수적으로 `EXAMPLE`이다. 명시 origin 인자는 사람의 주장으로 구분한다. 파일시각을 collected_at에, 문서에서 확인한 기동 요청~stopped 구간을 window에 기록한다. 실서버 수집 등급이 후보 내용·모든 facts의 확정이나 운영 승인을 뜻하지 않는다. `pyproject.toml`에 선택 의존성 `evidence`(jsonschema)를 추가했고, 날짜 검증 선택 의존성이 없는 환경에서도 표준 라이브러리 보완 검증을 수행한다.
+- 플랫폼 `api/src/byul_platform/sources/evidence.py`, `routes/evidence.py`: 목록당 32 MiB 제한·순차 로드·동일 경로 중복 제거, 헤더 한 번/항목 한 번 검증, index 옆 **files/ 기준** regular file·경계·링크 검사. 목록 조회는 payload를 읽거나 해시하지 않는다. `web/src/pages/LandingPage.tsx`, `app/Layout.tsx`는 새 `components/SourceExampleBanner.tsx`로 예시인 수집원 이름만 표시한다. 개별 EXAMPLE 등급과 합성 표시는 유지했다. `scripts/run-with-runtime.sh`는 선택 `EVIDENCE_INDEX_PATHS`를 전달한다. `platform/README.md`에 실제 실행 예를 추가했다.
+- 새 파일 총 6개: `runtime/tools/evidence_index.py`, `runtime/tests/test_evidence_index.py`(20건), `runtime/docs/증거목록_생성과플랫폼연결.md`, `platform/api/tests/test_evidence_indexes.py`(5건), `platform/web/src/components/SourceExampleBanner.tsx`, `platform/web/tests/landing-evidence.test.tsx`(2건). 기존 변경은 앞 절의 소스/문서·개발 스크립트·runtime pyproject·이 STATUS다. [운영 문서](../docs/증거목록_생성과플랫폼연결.md)에 전체 옵션·설계·예시 표시 전수 점검표를 남겼다. 고정된 잘못된 경고는 첫 화면 배너만 발견해 수정했다.
+- 실제 반출본(읽기 전용) 검증: `/home/bobgy/.local/state/serving-runtime/aws-lab/evidence-20261108-run{12,13}.tgz`. 결과 문서 SHA-256 각각 `31a151e250562cec59ff9a5b3e57a8181b59cfb6e47877e77d804b29a542d098`, `bfdaf0da923667674b046d6bb743bf5482c3ab2d93b8bab6e2415a8557242a98`와 일치했다. `/tmp/byul-evidence-run12-run13/evidence-index.json`: run12 **17개·제외 0**, run13 **12개·제외 0**, 이유 코드 모두 `{}`, 29개 모두 MEASURED·window 확인. 같은 출력 재실행 성공·무재기록. 생성 도구 검증 및 플랫폼 독립 Contracts 검증 모두 오류 0, 실제 플랫폼 수집 경로도 **정상 29·invalid 0**. 이 연결에서 남은 예시 출처는 `runtime, update, store`다. 보고서 `/tmp/byul-evidence-real-import.log`, `/tmp/byul-evidence-platform-check.json`.
+- 절대 경로 runtime 시험: `/home/bobgy/bobproject/byul/runtime`에서 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: **954건 중 838 통과·115 skip·기존 AF_INET PermissionError 1**(`test_gateway_serves_snapshot_without_kubernetes_mutation`). 새 도구 20건 전부 통과. 로그 `/tmp/byul-evidence-runtime-final.log`.
+- 절대 경로 API 시험: `/home/bobgy/bobproject/byul/platform/api`에서 `uv run --frozen --with-editable ../../update --with-editable ../../runtime python -m pytest -q`는 기본 uv 캐시 읽기 전용으로 실행 전 실패(`/tmp/byul-evidence-api-prescribed.log`). 이전 회차의 저장소 밖 epoll 20ms 보조 설정과 `/tmp` 캐시로 `PYTHONPATH=/tmp/byul-run7-deps UV_CACHE_DIR=/tmp/byul-uv-cache uv run --offline --frozen --with-editable ../../update --with-editable ../../runtime python -m pytest -p byul_test_poll -q`를 실행했다. 최종 **318 통과·1 skip·기존 AF_INET PermissionError 1 실패**(`test_saved_confirmed_export_starts_temporary_gateway`, `/tmp/byul-evidence-api-final.log`). 증거 관련 5건 별도 실행은 전부 통과(`/tmp/byul-evidence-api-targeted.log`). 깊은 JSON 시험은 Python 3.12 C decoder 재귀 한도와 sys 재귀 한도가 별개임을 확인해 실제 깊은 입력으로 보완했다.
+- 절대 경로 web 시험: `/home/bobgy/bobproject/byul/platform/web`에서 `npm run typecheck`, `npm test -- --maxWorkers=1`: **타입 검사·159건 전부 통과**. 로그 `/tmp/byul-evidence-web-typecheck.log`, `/tmp/byul-evidence-web-final.log`. `git diff --check`·개발 스크립트 `bash -n` 통과.
+- 남은 제약: 소켓 허용 환경에서 보조 설정 없는 runtime/API 전체 시험, Claude 독립 검수·브라우저 수동 검수는 미확인이다. 비밀 패턴 검사는 인코딩/암호화/알려지지 않은 형식의 부재까지 증명하지 않는다. API는 목록별 읽기를 제한하지만 전체 응답의 페이지 나누기/전체 응답 크기 제한은 추가하지 않았다. 생성 도구는 과거 파일의 실측 수집 출처만 기록하며 현재 서버 상태·운영 승인·모든 후보 사실의 확정을 주장하지 않는다.
+
+
+## 2026-11-09 Claude 검수 보완: 과거 회차 증거 해시 근거
+
+- 기준 `byul_runtime` / HEAD `75a6dcfd731d8c1952403e4b1607dd6e5e4ed5b7` 유지. 이번 수정 범위는 `runtime/tools/evidence_index.py`, `runtime/tests/test_evidence_index.py`, `runtime/docs/증거목록_생성과플랫폼연결.md`, 이 STATUS 4개다. 앞선 미커밋 변경은 보존했다. 새 저장소 파일 추가 없음. 커밋·push·AWS 접속 없음, contracts/update 수정 없음, 금지 인계 문서는 읽거나 수정하지 않았다.
+- 도구 1.1: 문서와 입력의 반출본 언급/회차 제목 연관성을 먼저 확인하고, 해당 문서 어디든 계산한 전체 해시가 있으면 `document_full`로 인정한다. 일치 값 없이 다른 전체 해시만 있으면 중단한다. 전체 해시가 없는 문서의 SHA-256 접두가 맞으면 `document_prefix`, `hash_verified:"prefix_only"`, 자동 DECLARED다. 명시 SHA-256은 계산 값과 대조해 문서 해시 미기재도 `explicit`로 진행하며, 문서 전체/접두와의 불일치를 덮지 않는다. `basis`에 근거를 모두 기록하고, 사람이 명시한 등급은 `origin_assertion`에 남긴다. 접두만으로 MEASURED 지정은 거부하며, 명시 전체 SHA-256과 origin MEASURED가 함께 확인된 경우 수동 주장으로 기록한다. 근거 없음은 `none`/false다. 합성 EXAMPLE 하향·비밀 검사·안전 복사 규칙은 유지했다.
+- 문서에 환경·시간 표기가 없는 과거 실서버 회차도 회차 연관성·AWS 서버 결과 제목·전체 해시가 확인되면 MEASURED로 인정한다. 회차 구간을 기존 규칙으로 읽지 못하면 window는 그대로 null이며 시간 파싱을 확대하지 않았다. 운영 문서에 근거별 등급 표와 prefix_only truthiness 주의, 명시 인자 처리·충돌·수동 주장 규칙을 추가했다.
+- 관련 시험: `/home/bobgy/bobproject/byul/runtime`에서 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests -p test_evidence_index.py`: **33건 전부 통과**(이번 13건 추가). 별도 줄 전체 해시/다른 해시 동시 존재, 제목으로 문서 확인·잘못된 회차 거부, 접두·접두 불일치, 명시 인자와 문서 누락·충돌·수동 등급·CLI 경로를 검증했다. 로그 `/tmp/byul-evidence-review-targeted.log`.
+- 전체 시험: 같은 절대 경로에서 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: **967건: 851 통과·115 skip·기존 AF_INET PermissionError 1**(`test_gateway_serves_snapshot_without_kubernetes_mutation`). 로그 `/tmp/byul-evidence-review-runtime.log`. 전체 완전 통과는 소켓 허용 환경에서 재확인이 필요하다. `git diff --check` 통과. 이번 범위에서 API/web 소스는 수정하지 않았고 해당 전체 시험은 재실행하지 않았다.
+- 사용자 후속 답변대로 회차 번호가 있는 10개만 한 번에 `/tmp/byul-evidence-all`에 생성했다. 회차 미확정 반출본 1개는 제외했다. 아래 집계는 명시 해시·origin을 추가하지 않은 문서 근거 그대로다. 파일명·비밀 일치 값은 출력하지 않았다. 자체 계약 검사와 플랫폼 Contracts 독립 검증 모두 오류 0. 재실행에서도 파일 내용과 mtime을 바꾸지 않는 것을 확인했다. 집계 로그 `/tmp/byul-evidence-review-import.log`.
+
+| 회차 | 포함 파일 | 제외 | 이유 코드 | 근거 | origin 분포 |
+| --- | ---: | ---: | --- | --- | --- |
+| run3 | 41 | 0 | 없음 | document_prefix | DECLARED 41 |
+| run4 | 30 | 0 | 없음 | document_prefix | DECLARED 30 |
+| run5 | 35 | 2 | BEARER 2 | document_prefix | DECLARED 35 |
+| run6 | 13 | 0 | 없음 | document_prefix | DECLARED 13 |
+| run7 | 21 | 0 | 없음 | document_full | MEASURED 21 |
+| run8 | 19 | 0 | 없음 | document_prefix | DECLARED 19 |
+| run10 | 9 | 1 | BEARER 1 | document_full | MEASURED 9 |
+| run11 | 21 | 0 | 없음 | document_full | MEASURED 21 |
+| run12 | 17 | 0 | 없음 | document_full | MEASURED 17 |
+| run13 | 12 | 0 | 없음 | document_full | MEASURED 12 |
+| 합계 | 218 | 3 | BEARER 3 | 전체 대조 5회차·접두 5회차 | DECLARED 138·MEASURED 80 |
+
+- 남은 제약: 접두 대조는 전체 파일 동일성의 강한 근거가 아니므로 5개 회차는 DECLARED로 남는다. 수동 origin 주장은 독립 인증이 아니며 자동으로 만들어 넣지 않았다. 소켓 허용 환경의 전체 시험과 Claude 직접 검수가 남았다. 보고서 형식/collector 버전이 바뀌었으므로 이전 출력과 다른 경우 기존 멱등 규칙에 따라 덮어쓰지 않고 새 출력 폴더를 사용한다.

@@ -4,7 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useMeta } from "../api/hooks";
 import { ThemeToggle } from "../app/Layout";
 import { AREAS } from "../app/nav";
-import { Banner } from "../components/Misc";
+import { SourceExampleBanner } from "../components/SourceExampleBanner";
 import { carry } from "../lib/url";
 import s from "./LandingPage.module.css";
 
@@ -21,7 +21,7 @@ export function LandingPage() {
         </span>
         <ThemeToggle />
       </header>
-      {meta.data?.example_mode && <Banner kind="example">예시 데이터 · 일부 수집원은 합성 자료를 사용합니다 · 공식 판정 근거 제외</Banner>}
+      <SourceExampleBanner meta={meta.data} />
       <main className={s.main}>
         <nav className={s.grid} aria-label="영역">
           {AREAS.map((a) => (

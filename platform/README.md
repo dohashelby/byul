@@ -54,7 +54,19 @@ runtime 기록은 `platform/.runtime-data`에 쌓인다(git 제외). 조회 보�
 
 ## 예시 모드
 
-위 출처 환경변수가 없으면 그 출처는 `../contracts/examples/`를 읽는다(전부 `EXAMPLE` 등급). 하나라도 예시면 `/api/meta`의 `example_mode`가 `true`이고 화면 위에 "예시 데이터" 띠가 붙는다. 사이드바 아래에 출처별 모드(예시·실제 연결·파일)와 runtime 연결 상태가 보인다.
+위 출처 환경변수가 없으면 그 출처는 `../contracts/examples/`를 읽는다(전부 `EXAMPLE` 등급). 하나라도 예시면 `/api/meta`의 `example_mode`가 `true`이고 첫 화면과 내부 화면에 예시인 출처 이름을 나열한다. 사이드바 아래에 출처별 모드(예시·실제 연결·파일)와 runtime 연결 상태가 보인다.
+
+### 실제 반출 증거 연결
+
+runtime의 오프라인 [증거 목록 생성 도구와 운영 절차](../runtime/docs/증거목록_생성과플랫폼연결.md)로 만든 목록을 연결한다. AWS 접속 없이 tgz/폴더의 해시·비밀 검사·계약 검증을 수행한다.
+
+```sh
+cd /home/bobgy/bobproject/byul/platform/api
+EVIDENCE_INDEX_PATHS=/tmp/byul-evidence-run12-run13/evidence-index.json uv run byul-platform
+# 여러 목록은 ':'로 연결한다. 기존 개발 스크립트도 같은 환경변수를 받는다.
+```
+
+계약 항목 경로는 index 옆 `files/` 기준이다. 실제 파일 출처는 regular file 존재·경계·링크를 검사한다. 목록당 최대 32 MiB이며 파일 내용은 목록 조회 시 읽지 않는다. evidence 연결 후에도 runtime/update/store가 예시이면 그 이름은 배너에 남고 개별 `EXAMPLE` 등급도 유지한다.
 
 ## 데모 자료 (그래프 확인용 가짜 기록)
 

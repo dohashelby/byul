@@ -1,0 +1,156 @@
+{
+ "contract": "guard-plugin-runner/1",
+ "fixture_sha256": {
+  "byul_plugin_runner_probe/__init__.py": "ddf91ea6c60a1e711ffc136b03d6a63909730722e702bb6536f32313c9ea906f",
+  "byul_plugin_runner_probe-1.0.dist-info/METADATA": "a6d1b1d743bf17de994f18f296d2f31782c85b5ed1586e189f7d04b35523c7e6",
+  "byul_plugin_runner_probe-1.0.dist-info/entry_points.txt": "339a51fc0c711327536b02cbd13bfef5aafe5404f3baaac443018fc718c45b91"
+ },
+ "rows": [
+  {
+   "case_id": "io-config-approved",
+   "allowlist": "byul-approved",
+   "model_plugin": "byul-approved",
+   "contract": "guard-plugin-runner/1",
+   "case_identity": "513e19cf0033af16292eaa1e8ef0085d23f4abbf9ff3f33a3f50804714dd4cb1",
+   "outcome": "selected",
+   "selected_plugin": "byul-approved",
+   "selected_model_sha256": "9078cc97b7a75d0570f4299dcca12e201b31c1d3610178ff1e83347030ffec74",
+   "renderer_built": true,
+   "request_sha256": "1ddf0f2990f542382410be8316ea08092b6b8b6077db106da3327275da6e60ec",
+   "preprocess_output_sha256": "1516b3027ce22e3e4797f5532866056284fcc98f8218554f95d67b664e9dd3cb",
+   "renderer_type_sha256": "10dd59192b118cb5c304419e861b5a1a8d007b8f18eaaad5ab83b677eeefefbe",
+   "events": [
+    {
+     "plugin": "byul-approved",
+     "phase": "registration",
+     "model_sha256": null,
+     "request_sha256": null,
+     "effect_sha256": null
+    },
+    {
+     "plugin": "byul-approved",
+     "phase": "constructor",
+     "model_sha256": "9078cc97b7a75d0570f4299dcca12e201b31c1d3610178ff1e83347030ffec74",
+     "request_sha256": null,
+     "effect_sha256": null
+    },
+    {
+     "plugin": "byul-approved",
+     "phase": "io_preprocess",
+     "model_sha256": "9078cc97b7a75d0570f4299dcca12e201b31c1d3610178ff1e83347030ffec74",
+     "request_sha256": "1ddf0f2990f542382410be8316ea08092b6b8b6077db106da3327275da6e60ec",
+     "effect_sha256": "1516b3027ce22e3e4797f5532866056284fcc98f8218554f95d67b664e9dd3cb"
+    },
+    {
+     "plugin": "byul-approved",
+     "phase": "io_postprocess",
+     "model_sha256": "9078cc97b7a75d0570f4299dcca12e201b31c1d3610178ff1e83347030ffec74",
+     "request_sha256": "1ddf0f2990f542382410be8316ea08092b6b8b6077db106da3327275da6e60ec",
+     "effect_sha256": "a58bbbb68c3857ea1e414d878934489f6f24b49b9d6ffb14b60ca7eb45334b2f"
+    }
+   ],
+   "event_collection_status": "completed",
+   "vllm_version": "0.31.0",
+   "exit_code": 0
+  },
+  {
+   "case_id": "io-config-unapproved",
+   "allowlist": "byul-approved",
+   "model_plugin": "byul-unapproved",
+   "contract": "guard-plugin-runner/1",
+   "case_identity": "0f77abb969b6152bbeb3d07e0144bcd59b2ee02e9e3eaf9986f4ce10a42f39bf",
+   "outcome": "rejected_not_loadable",
+   "selected_plugin": null,
+   "selected_model_sha256": "d5b402b31f6e1a57dc804d5225425cc09a6ee42b91dc05e837eefbcd5604f26b",
+   "renderer_built": true,
+   "request_sha256": null,
+   "preprocess_output_sha256": null,
+   "renderer_type_sha256": "10dd59192b118cb5c304419e861b5a1a8d007b8f18eaaad5ab83b677eeefefbe",
+   "error_type": "ValueError",
+   "events": [
+    {
+     "plugin": "byul-approved",
+     "phase": "registration",
+     "model_sha256": null,
+     "request_sha256": null,
+     "effect_sha256": null
+    }
+   ],
+   "event_collection_status": "completed",
+   "vllm_version": "0.31.0",
+   "exit_code": 0
+  },
+  {
+   "case_id": "io-config-allowlist-unset",
+   "allowlist": null,
+   "model_plugin": "byul-approved",
+   "contract": "guard-plugin-runner/1",
+   "case_identity": "871a1e3b9a12adbdc261312f530be839a5df97150a4171dc8d4f82b5be8349ed",
+   "outcome": "selected",
+   "selected_plugin": "byul-approved",
+   "selected_model_sha256": "5d5c3dcbc0fb1d5024cea3ceada7ab06569fa58514e4067aa5494fe602fa4563",
+   "renderer_built": true,
+   "request_sha256": "7ca09655317bb3942a3d03d952c629d097b3cbad5fe66700b41fd2adb9e5c664",
+   "preprocess_output_sha256": "1516b3027ce22e3e4797f5532866056284fcc98f8218554f95d67b664e9dd3cb",
+   "renderer_type_sha256": "10dd59192b118cb5c304419e861b5a1a8d007b8f18eaaad5ab83b677eeefefbe",
+   "events": [
+    {
+     "plugin": "byul-approved",
+     "phase": "registration",
+     "model_sha256": null,
+     "request_sha256": null,
+     "effect_sha256": null
+    },
+    {
+     "plugin": "byul-unapproved",
+     "phase": "registration",
+     "model_sha256": null,
+     "request_sha256": null,
+     "effect_sha256": null
+    },
+    {
+     "plugin": "byul-approved",
+     "phase": "constructor",
+     "model_sha256": "5d5c3dcbc0fb1d5024cea3ceada7ab06569fa58514e4067aa5494fe602fa4563",
+     "request_sha256": null,
+     "effect_sha256": null
+    },
+    {
+     "plugin": "byul-approved",
+     "phase": "io_preprocess",
+     "model_sha256": "5d5c3dcbc0fb1d5024cea3ceada7ab06569fa58514e4067aa5494fe602fa4563",
+     "request_sha256": "7ca09655317bb3942a3d03d952c629d097b3cbad5fe66700b41fd2adb9e5c664",
+     "effect_sha256": "1516b3027ce22e3e4797f5532866056284fcc98f8218554f95d67b664e9dd3cb"
+    },
+    {
+     "plugin": "byul-approved",
+     "phase": "io_postprocess",
+     "model_sha256": "5d5c3dcbc0fb1d5024cea3ceada7ab06569fa58514e4067aa5494fe602fa4563",
+     "request_sha256": "7ca09655317bb3942a3d03d952c629d097b3cbad5fe66700b41fd2adb9e5c664",
+     "effect_sha256": "a58bbbb68c3857ea1e414d878934489f6f24b49b9d6ffb14b60ca7eb45334b2f"
+    }
+   ],
+   "event_collection_status": "completed",
+   "vllm_version": "0.31.0",
+   "exit_code": 0
+  },
+  {
+   "case_id": "io-config-none",
+   "allowlist": "byul-approved",
+   "model_plugin": null,
+   "contract": "guard-plugin-runner/1",
+   "case_identity": "d6c3c8ae68f2999852d00161b234775ed3dda9c86851b26d8568b7924c9b6492",
+   "outcome": "none_requested",
+   "selected_plugin": null,
+   "selected_model_sha256": "44020a326ba10c98d61b24989253605272c074b9271f9d0eee46328ac6b40416",
+   "renderer_built": true,
+   "request_sha256": null,
+   "preprocess_output_sha256": null,
+   "renderer_type_sha256": "10dd59192b118cb5c304419e861b5a1a8d007b8f18eaaad5ab83b677eeefefbe",
+   "events": [],
+   "event_collection_status": "completed",
+   "vllm_version": "0.31.0",
+   "exit_code": 0
+  }
+ ]
+}

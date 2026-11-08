@@ -330,6 +330,7 @@
   "update/src/guard/executors/owned_helper.py": "1018e4362cce8e772a6308d4432020ca7cccfb2e04e918b2dc2eff515c6e8ef7",
   "update/src/guard/executors/persistent_session_probe.py": "a687988eefb3e31f7a1f8c79c41e0da3649af89a4084ef5d6e4cf47ef4d9bf26",
   "update/src/guard/executors/plugin_loading.py": "5b5435b6fb108ded30848e40b3f213f0515df0167eb4e0ad1f639916a30a2d7e",
+  "update/src/guard/executors/plugin_runner.py": "583a82ee762ea3c41c18a36b63c8f2ae5a45d3e51e104c882d4752abcd2705c3",
   "update/src/guard/executors/pressure_resource_probe.py": "57b86a99d8189db855b5f60e46933e995d3afe3fe322c17e8b5686e5c143d0ef",
   "update/src/guard/executors/pressure_resources.py": "5b45af9130fbb7c12a5d0a4370b67cf65b42ac88d3c19b55f361958e91eba0c3",
   "update/src/guard/executors/profiler_lifecycle_cpu.py": "ff3d4e1d80c779e709a2acfff5a97b19d34c53ce93c052f63649db4842394c3a",

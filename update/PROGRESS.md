@@ -1,3 +1,11 @@
+## 2026-11-08 — SUP-10 plugin runner 지원 계약(B 의존 반환 2)
+
+- 한 일: v1(10사례)을 그대로 두고 `guard-plugin-runner/1` 계약과 실제 생산자·수집 도구를 만들었다. IO processor를 실제 `VllmConfig`·renderer·`get_io_processor`로 선택해 생성자 ModelConfig·요청·출력 효과를 결합하고, 허용 목록 차단·미설정 시 비승인 등록 함수 호출(사실)을 구분한다. 상세 `docs/dev-1/sup10-plugin-runner.md`.
+- 테스트 결과: 새 시험 19 통과. 실제 4사례 complete·위반 없음.
+- 사고: 처음 서빙 엔진 컨테이너 안에서 생산자를 돌려 메모리 상한을 넘겨 k3d lab 엔진 Pod `serving-engine-dev1-k3d-18`이 OOM 종료(Failed)됐다. 별도 생산자 Pod로 측정한 뒤 지웠다. 엔진 복구는 사용자 확인 대기.
+- 다음 단계: B 의존 반환 3~5·8, TP2(할당량 대기).
+- 막힌 것: AWS 할당량 승인.
+
 ## 2026-11-08 — SUP-09·11 model-entry 지원 계약(B 의존 반환 1)
 
 - 한 일: v1(12사례 import·constructor)을 그대로 두고 `guard-model-entry/1` 계약(실제 선택 모델 클래스 source·trust·모드·import/constructor/forward·정상 대조)과 실제 생산자(컨테이너 안 RUNNER, 무해 사용자 모델)·수집 도구를 만들었다. 로컬에 transformers가 없어 k3d vLLM CPU 이미지 안에서 실제 생산자를 돌렸다(의존성 추가 없음). 상세 `docs/dev-1/sup09-model-entry.md`.

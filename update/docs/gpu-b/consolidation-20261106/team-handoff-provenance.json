@@ -461,5 +461,13 @@
     "S2_only_AWS_query_and_operation": true,
     "S1_AWS_query_prohibited": true,
     "new_chat_agent_automation_or_deadline_reset": false
+  },
+  "external_input_register_20261108": {
+    "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/external-input-register-20261108-v1.json",
+    "sha256": "e19a6daf4430a7a6794389016bf1587a226fe54def8532101a2a5063521ac487",
+    "unique_IDs": 18,
+    "branch_rows": 22,
+    "scope": "기존 후속17+SUP16 제품 인계; 완료 개수/새실험수 아님",
+    "whole43_reclassification_or_new_test": false
   }
 }

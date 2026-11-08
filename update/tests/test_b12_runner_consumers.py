@@ -283,3 +283,33 @@ def test_input_exception_is_preserved_without_erasing_independent_failure(tmp_pa
     assert projection["projection"]["input_error"] == {"type": "ValueError", "message": "B_COMMON_INPUT_BYTES_MISMATCH"}
     assert draft.observations["reused_input_violations"].value == ["independent_fail"]
     assert draft.status.value == "ABORTED"
+
+
+@pytest.mark.parametrize("damage", ["generation", "pid_reused"])
+@pytest.mark.parametrize("independent", [False, True])
+def test_req09_unbound_process_cannot_create_confirmed_fail(tmp_path, damage, independent):
+    env = environment(); target = {"lab": True}
+    scope = {**SCOPE, "environment_ref": env.ref().model_dump(mode="json"), "target_sha256": sha256_hex(canonical_json(target))}
+    requests = {"token_id": "1" * 64}
+    record, _ = make_runner(scope, requests, rejected=("token_id",), received_rejections=("token_id",), max_id=100)
+    if damage == "generation":
+        record["bindings"][1]["restart_count"] += 1
+    else:
+        record["bindings"].append({**record["bindings"][1], "start_ticks": record["bindings"][1]["start_ticks"] + 1})
+        next(row for row in record["events"] if row["event"] == "sampler_applied")["binding"] = 2
+    existing = ["independent_fail"] if independent else []
+    draft = EvidenceDraft(status="COMPLETED", data_origin="EXAMPLE", normal_control={"attempted": True, "succeeded": True},
+        observations={"challenges_planned": {"collected": True, "value": ["token_id"]},
+                      "challenge_outcomes": {"collected": True, "value": {"token_id": "400"}},
+                      "confirmed_input_violations": {"collected": True, "value": existing}})
+    values = {"max_input_tokens": 8, "rejection_codes": ["400"]}
+    ctx = SimpleNamespace(check=PACK.checks["REQ-09"], env=env, target=target, policy_values=values, workdir=tmp_path)
+    bridge.attach(draft, ctx, {"vocab_size": 100, "runner_input": pinned(tmp_path, record, scope, requests)}, kind="runner-consumption")
+    projection = json.loads((tmp_path / "b_common_consumption.json").read_bytes())["projection"]
+    assert projection["supported"] and not projection["complete"]
+    assert not projection["cases"]["token_id"]["identity_binding_verified"]
+    gap = "B_RUNNER_PROCESS_GENERATION_MISMATCH" if damage == "generation" else "B_RUNNER_PROCESS_ID_REUSED"
+    assert gap in projection["gaps"]
+    assert draft.observations["confirmed_input_violations"].value == existing
+    _, result = judged(tmp_path, "REQ-09", draft, env, values)
+    assert result.verdicts.security.value == ("FAIL" if independent else "UNKNOWN")

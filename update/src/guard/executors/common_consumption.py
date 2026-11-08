@@ -98,6 +98,14 @@ def runner(record, scope, *, check_id, requests, required_cases):
         identities.setdefault(key, set()).add(binding["start_ticks"])
     if any(len(starts) > 1 for starts in identities.values()):
         gaps.append("B_RUNNER_PROCESS_ID_REUSED")
+    reused = {key for key, starts in identities.items() if len(starts) > 1}
+    for case, details in selected.items():
+        case_bindings = [record["bindings"][row["binding"]] for row in record["events"]
+                         if row["request_sha256"] == details["request_sha256"]]
+        generations = {(b["pod_uid"], b["container_id"], b["restart_count"]) for b in case_bindings}
+        details["identity_binding_verified"] = bool(case_bindings) and len(generations) == 1 and not any(
+            tuple(b[k] for k in ("pod_uid", "container_id", "restart_count", "worker_pid")) in reused
+            for b in case_bindings)
     candidates = [row for row in result["violation_candidates"] if row.get("request_sha256") in selected_requests]
     if candidates:
         gaps.append("B_RUNNER_CONSUMPTION_CONTRADICTION")
@@ -190,7 +198,7 @@ def attach(draft, ctx, cfg, *, kind):
                 found = []
                 if projected["supported"]:
                     for case, details in projected["cases"].items():
-                        if not details["causal_order_verified"]:
+                        if not details["causal_order_verified"] or not details["identity_binding_verified"]:
                             continue
                         for row in details["runner_values"]:
                             value = row["max_token_id"] if case == "token_id" else row["prompt_tokens"]

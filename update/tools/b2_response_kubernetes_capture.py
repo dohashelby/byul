@@ -31,7 +31,7 @@ SUPPORTED_ENGINE_VERSION = '0.31.0'
 A_HTTP_SOURCE_SHA256 = None
 HELPER_PINS = {
     'executors/response_error_contract.py':'2cf7d60d45c19114a17ca37ade0aeb46466e60e246a39076c4e3139ad5ed1a70',
-    'executors/template_validation.py':'0f96a26959180ed783160ec7b3d5a13e0c0e5d5f4d913ffe257f4b84926efe27',
+    'executors/template_validation.py':'4e7df5927b86b3eb6f6a2369a9fe5b9a78ff03bd30abb8d097a87f952f7e8419',
     'executors/content_common.py':'0f410e2ff6c91d77f411b1529023fc2d50fa1f2b8e502c6c2019fa375bcd2421',
     'executors/log_analysis_contract.py':'e03e86274894a9e6e0d0dc69407e71976b4ff7c5a41f1b7308a204f795f3a3a1',
 }

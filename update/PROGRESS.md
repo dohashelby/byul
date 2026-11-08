@@ -1,3 +1,10 @@
+## 2026-11-08 — PR232 CI 정합성과 B3/B5 후속
+
+- 한 일: aa3c6ac8의 양쪽 CI 원40실패를 source gate9·REQ13 helper pin30·상태생성물1로 분리했다. 기존 생성기로 검토된 source manifest와 상태 CSV를 갱신하고, AST가 같은 token helper의 정확 pin만 adapter/원 tool에서 함께 갱신했다. B5 impact·정책 검토 의견도 추가했다.
+- 검증: 원 실패40개를 포함한 집중74개는73통과/1기존Windows fixture줄바꿈 실패였다. fixture의정확UTF-8 bytes 쓰기정정후1통과를 연결했다. 추가로상태생성기의Path정렬을POSIX문자열로고정해플랫폼차이4사례를재현·수정하고관련21개통과,최종고유78개통과를 확인했다. 원로그/실패/시간은 CI_FOLLOWUP_20261108.md와 ci-fix-validation-20261108.json에 연결한다. source gate/HTTP승인/기존assert/판정·기본팩·state변경0.
+- 다음 단계: 고정CI수정집중검토 후 PR232 새head의 원격CI 확인과 동시에 S1 SUP15/16 원기록 소비/오류보존, S5 SUP05/07/12/13 신규 CPU실제API분기를 계속한다. 같은실패·원모델·전체불변suite를반복하지 않는다.
+- 남은 것: B3 각 새분기의 실제 관측/계약시험/미실행 구분과 고정 검토·원격CI 최종결과. A 공통 계약/등록/TP2 실제 입력 대기는 해당 분기만 유지하고 GPU를 추가기동하지 않는다.
+
 ## 2026-11-08 — B1·B2 기존 소비자 연결
 
 - 한 일: 고정 A /1 반환을 기존 B 소비자의 선택 입력으로 연결했다. lifecycle/OBS/PLT는 선언 필드·artifact에 원 기록·scope·gap을 보존하고, 요청·공급물은 runner V1/V2·supply-reads·IPC/group/shard/model-entry/plugin 계약을 소비한다. 원 기본 팩·등록 SHA·core/models/store/judges/registry·A 생산자는 수정하지 않았다.

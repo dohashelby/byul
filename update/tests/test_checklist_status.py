@@ -4,7 +4,7 @@ from __future__ import annotations
 import copy
 import csv
 import io
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import pytest
 
@@ -196,6 +196,43 @@ def test_real_gpu_summaries_keep_exact_refs_and_separate_declared_components():
     assert "OBS-03" not in runs  # 11-02 PACK31 결과는 현행 팩 기록이 아니다.
     first = [r for r in runs["REQ-17"] if r["source"].endswith("GPU_RESULTS.json")]
     assert first and {r["status"] for r in first} == {"GPU_ATTEMPTED_NOT_COLLECTED"}
+
+
+@pytest.mark.parametrize("flavour", [PureWindowsPath, PurePosixPath])
+@pytest.mark.parametrize("family", ["A", "B"])
+def test_gpu_summary_order_is_identical_across_path_flavours(tmp_path, flavour, family):
+    """같은 evidence 파일을 플랫폼별 Path 비교로 재정렬하지 않는다."""
+    from tools.checklist_status import GPU_A_GLOB, GPU_B_GLOB
+    names = ["REQ-18.json", "dev1.json"]
+    prefix = "docs/gpu-b"
+    if family == "A":
+        names = ["gpu-a-REQ-18.json", "gpu-a-dev1.json"]
+        prefix = "docs/evidence"
+    class SummaryPath(flavour):
+        def read_text(self, **kwargs):
+            if family == "A":
+                result = {"id": "RES-example", "revision": 1, "check_id": "REQ-18",
+                          "verification_level": "EXAMPLE", "data_origin": "EXAMPLE", "verdicts": {}}
+                evidence = {"id": "EVD-example", "revision": 1, "execution": {"status": "COMPLETED"}}
+                return json.dumps({"schema": "byul-gpu-a-check-summary/1", "runs": [{
+                    "run": self.name, "pack_ref": {"revision": 33}, "evidence_kind": "automated",
+                    "results": [result], "evidence": [evidence]}]})
+            return json.dumps({"schema": "byul-independent-GPU-public-summary/1", "runs": [{
+                "episode": self.name, "check_id": "REQ-18", "whole_question_complete": False,
+                "EVD_status": "COMPLETED", "EVD_origin": "EXAMPLE", "verification_level": "EXAMPLE",
+                "verdicts": {}, "refs": [{"kind": "PACK", "revision": 33}]}]})
+    class ExampleRoot:
+        def __fspath__(self):
+            return "fixture"
+        def __truediv__(self, other):
+            return tmp_path / "no-first-run.json"
+        def glob(self, pattern):
+            expected = GPU_A_GLOB if family == "A" else GPU_B_GLOB
+            return [SummaryPath("fixture") / prefix / name for name in reversed(names)] if pattern == expected else []
+    rows = gpu_runs(ExampleRoot())["REQ-18"]
+    assert [row["run"] for row in rows] == names
+    assert [row["source"] for row in rows] == [prefix + "/" + name for name in names]
+    assert all(row["status"] == "GPU_PARTIAL_EXAMPLE" for row in rows)
 
 
 def test_gpu_summary_from_other_pack_or_unknown_schema_is_rejected(tmp_path):

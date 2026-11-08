@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import re
+import ssl
 import stat
 import subprocess
 import sys
@@ -19,7 +20,7 @@ import tarfile
 import tempfile
 import time
 from urllib.parse import urlencode, urlparse
-from urllib.request import Request, build_opener, HTTPRedirectHandler
+from urllib.request import Request, build_opener, HTTPRedirectHandler, HTTPSHandler
 
 from .. import bundle_tools
 from ..enforcement.intent import load_intent, TETRAGON_RULE_MODES
@@ -57,7 +58,7 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 class PlatformClient:
-    def __init__(self, url: str, token_file: str):
+    def __init__(self, url: str, token_file: str, ca_file: str | None = None):
         parsed = urlparse(url)
         if (parsed.scheme not in {"https", "http"} or not parsed.hostname or parsed.username or parsed.password
                 or parsed.query or parsed.fragment or parsed.path not in {"", "/"}
@@ -71,7 +72,11 @@ class PlatformClient:
         if not self._token or "\n" in self._token or "\r" in self._token:
             raise ValueError("invalid agent token file")
         self.base = url.rstrip("/") + "/api/runtime/operations"
-        self.opener = build_opener(NoRedirect())
+        # cafile replaces the default trust store; never disable verification.
+        if ca_file is not None and not ca_file:
+            raise ValueError("CA file must not be empty")
+        context = ssl.create_default_context(cafile=ca_file)
+        self.opener = build_opener(NoRedirect(), HTTPSHandler(context=context))
 
     def request(self, path="", body=None, *, binary=False):
         req = Request(self.base + path, data=None if body is None else json.dumps(body).encode(),
@@ -536,7 +541,7 @@ class Agent:
 def add_arguments(parser):
     for flag in ("platform-url", "agent-token-file", "server", "bundle-root", "context", "namespace", "lock-file"):
         parser.add_argument("--" + flag, required=True)
-    for flag in ("kubeconfig", "token-env-file", "state-file", "review-file", "history-file"):
+    for flag in ("kubeconfig", "token-env-file", "state-file", "review-file", "history-file", "ca-file"):
         parser.add_argument("--" + flag)
     parser.add_argument("--tools-dir", default=Config.tools_dir)
     parser.add_argument("--status-url", default=Config.status_url,
@@ -554,7 +559,7 @@ def add_arguments(parser):
 def main(args):
     config = Config(**{k: getattr(args, k) for k in Config.__dataclass_fields__})
     try:
-        client = PlatformClient(args.platform_url, args.agent_token_file)
+        client = PlatformClient(args.platform_url, args.agent_token_file, args.ca_file)
         agent = Agent(client, config)
         with locked(args.lock_file):
             while True:

@@ -19,6 +19,25 @@ function data(): Operations {
     lab_self_approval: false, monitor_seconds: 86400 };
 }
 
+it.each([
+  [60, true, true], [60, false, true], [86400, true, true], [86400, false, false], [172800, false, false],
+])("운영 요청과 전환 카드 LAB 배지: %s초 · 자기 승인 %s", async (seconds, selfApproval, visible) => {
+  const result = { ...data(), monitor_seconds: seconds, lab_self_approval: selfApproval };
+  mockApi({ "/api/runtime/operations": result });
+  setOperationToken("test-only");
+  const listing = renderAt("/runtime/operations", "/runtime/operations", <RuntimeOperationsPage />);
+  await screen.findByText(/현재 역할: 승인자/);
+  const label = `LAB 설정: 모니터 기간 ${seconds}초 · 자기 승인 ${selfApproval ? "허용" : "비허용"}`;
+  expect(!!screen.queryByText(label)).toBe(visible);
+  listing.unmount();
+  renderAt("/runtime/enforce/tetragon", "/runtime/enforce/tetragon", <ModeRequests />);
+  fireEvent.click(screen.getByText("전환 조건 조회"));
+  await screen.findByRole("combobox", { name: /전환 모드/ });
+  expect(!!screen.queryByText(label)).toBe(visible);
+  fireEvent.click(screen.getByText("토큰 지우기"));
+  await waitFor(() => expect(screen.queryByText(label)).toBeNull());
+});
+
 it("모든 체크와 최신 에이전트 보고를 요구한다", () => {
   const agent = data().agents[0];
   const row = agent.policies[0];
@@ -332,7 +351,7 @@ it("자기 요청 승인은 기본 비활성이고 LAB 설정에서만 가능하
   expect((await screen.findByRole("button", { name: "승인" }) as HTMLButtonElement).disabled).toBe(true);
   result.lab_self_approval = true;
   fireEvent.click(screen.getByRole("button", { name: "운영 요청 조회" }));
-  await screen.findByText(/LAB 자기 승인 허용/);
+  await screen.findByText(/LAB 설정:.*자기 승인 허용/);
   expect((screen.getByRole("button", { name: "승인" }) as HTMLButtonElement).disabled).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "승인" }));
   await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/op-01/approve"))).toBe(true));
@@ -344,7 +363,7 @@ it("운영 요청자는 LAB에서 자기 요청만 승인한다", async () => {
   mockApi({ "/api/runtime/operations": result });
   renderAt("/runtime/operations", "/runtime/operations", <RuntimeOperationsPage />);
   enterToken();
-  await screen.findByText(/LAB 자기 승인 허용/);
+  await screen.findByText(/LAB 설정:.*자기 승인 허용/);
   expect(screen.getAllByRole("button", { name: "승인" })).toHaveLength(1);
 });
 

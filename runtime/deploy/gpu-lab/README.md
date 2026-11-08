@@ -79,6 +79,8 @@ UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`
 
    `runtime-agent`로 수집기를 실행할 때 Ubuntu의 `umask 002`에 주의한다. `tools.tetragon_status` 코드는 상태 파일·baseline을 명시 권한 0644, recovery를 0600으로 써서 그룹/기타 쓰기를 허용하지 않는다.
 
+   지속 운영용 상태·모니터 수집기 systemd 예시는 `deploy/agent/`에 있다. baseline 최초 캡처·그룹/폴더 권한·설치 검증, HTTPS/사설 CA 연결, 운영 토큰 발급·회전과 LAB 전용 값은 [원격운영 사용과 검증 §14~15](../../docs/원격운영_사용과검증.md#14-운영-배치-수집기https토큰)를 따른다.
+
    호스트의 CRI 확인에는 `crictl`도 필요하다(kubeadm 설치에 포함되지 않음). 클러스터 Kubernetes 버전에 맞는 `cri-tools` 버전을 별도로 설치하고, containerd 환경의 `/etc/crictl.yaml`을 아래처럼 준비한다. 설치 후 `sudo crictl info`로 연결을 확인한다.
    ```yaml
    runtime-endpoint: unix:///run/containerd/containerd.sock

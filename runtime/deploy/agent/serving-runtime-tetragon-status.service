@@ -1,0 +1,26 @@
+[Unit]
+Description=Serving Runtime Tetragon status collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=runtime-agent
+Group=runtime-agent
+# Gateway data group 10000 and serving-observe group 10010 (read only).
+SupplementaryGroups=10000 10010
+UMask=0022
+Environment=KUBECONFIG=/etc/serving-runtime/kubeconfig
+WorkingDirectory=/opt/byul/runtime
+# Replace lab-context and paths at installation; capture baseline before starting.
+ExecStart=/opt/byul/runtime/.venv/bin/python -B -m tools.tetragon_status --context lab-context --expected-policies /var/lib/serving-runtime/baseline.json --identities /srv/serving/observation/tetragon-identities.json --feed-heartbeat /srv/serving/observation/tetragon.heartbeat.json --observations /srv/serving/runtime/data/observations.jsonl --evidence-dir /var/lib/serving-runtime/evidence --output /var/lib/serving-runtime/tetragon-state.json --watch
+Restart=on-failure
+RestartSec=10
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/serving-runtime
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

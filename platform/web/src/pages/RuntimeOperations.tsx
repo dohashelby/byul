@@ -14,6 +14,13 @@ const CAPABILITY_REASONS = {
   capability_missing: "미확인: 차단 능력 정보 또는 커널 정보 없음",
 };
 
+function LabSettingsBadge({ data }: { data: Operations | null }) {
+  if (!data || (data.monitor_seconds >= 86400 && !data.lab_self_approval)) return null;
+  return <div><span className={`${ui.badge} ${ui.warn}`}>
+    LAB 설정: 모니터 기간 {data.monitor_seconds}초 · 자기 승인 {data.lab_self_approval ? "허용" : "비허용"}
+  </span></div>;
+}
+
 export function OperationCredentials({ token, setToken, actor, unknownRoleLabel = "현재 역할: 조회 후 확인" }: { token: string; setToken: (v: string) => void; actor?: Actor; unknownRoleLabel?: string }) {
   const [draft, setDraft] = useState("");
   return <div className="row wrap">
@@ -99,6 +106,7 @@ export function ModeRequests() {
     finally { setPending(false); }
   }
   return <section className="card card-pad stack"><h2>정책 모드 전환 요청</h2>
+    <LabSettingsBadge data={data} />
     <div className="row wrap"><OperationCredentials token={token} setToken={setToken} actor={data?.actor} unknownRoleLabel="역할 미확인(전환 조건 조회 시 확인)" /><button className="btn" disabled={!token} onClick={load}>전환 조건 조회</button></div>
     {data?.agents.map(agent => <div key={agent.server} className="stack"><strong>{agent.server} · 마지막 조회 {timeLabel(agent.last_poll_at)}</strong>
       {agent.policies.map(row => {
@@ -246,6 +254,7 @@ export function RuntimeOperationsPage() {
   const detail = data?.items.find(op => op.id === selected);
   const rows = (data?.items ?? []).filter(op => !filter || op.state === filter).slice().sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
   return <div className="page stack"><h1>운영 요청</h1>
+    <LabSettingsBadge data={data} />
     <div className="row wrap"><OperationCredentials token={token} setToken={setToken} actor={data?.actor} />
       <button className="btn" disabled={!token || pending} onClick={load}>운영 요청 조회</button></div>
     {message && <p role="status">{message}</p>}
@@ -254,7 +263,6 @@ export function RuntimeOperationsPage() {
         {Object.entries(STATE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select></label>
       {!data ? <p>{token ? "요청 목록 조회 중 또는 조회 실패" : "토큰을 저장하면 운영 요청을 조회합니다."}</p> : <>
-        {data.lab_self_approval && <p className="notice">LAB 자기 승인 허용 · 승인 기록에 자기 승인으로 표시</p>}
         {rows.length === 0 ? <p>표시할 운영 요청이 없습니다.</p> : <div className={ui.tableWrap}><table className={`${ui.table} ${styles.operations}`}><thead><tr>
           <th>요청 종류 / 대상 서버</th><th>상태 / 단계</th><th>요청자 / 승인자 (역할 ID)</th><th>시각</th><th>결과 코드 / 세부 사유</th><th>증거 해시</th><th>승인</th>
         </tr></thead><tbody>{rows.map(op => <tr key={op.id} className={selected === op.id ? ui.selected : undefined} onClick={() => setSelected(op.id)} aria-selected={selected === op.id} style={{ cursor: "pointer" }}>

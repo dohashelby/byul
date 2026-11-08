@@ -1011,7 +1011,11 @@
         "ENV_sealing_registry_EVD_RES_RPT_Store_Refs_created": false,
         "restore_rejudge_target_exists": false,
         "classification": "제품 절차 미확인 유지",
-        "whole_ID_complete_or_product_PASS": false
+        "whole_ID_complete_or_product_PASS": false,
+        "S6_final_summary": {
+          "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/r3-final-actual-handoff-v1.json",
+          "sha256": "8671dc328a6be5825b7c936a04a6bf344b247e015186979d03f6ce19033e9008"
+        }
       }
     },
     "SUP-04": {

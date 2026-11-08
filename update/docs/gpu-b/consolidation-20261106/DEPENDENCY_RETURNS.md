@@ -70,3 +70,8 @@ LIF11/SUP03 새 도구·시험·패킷은 우선 S6에 넘겼다. 실제 runtime
 과거 원본 미확인은 과거 미실행/소실의 단정이 아니다. 실제 보유자·공유 경로는 미확정이며 이미 답변한 미확인 상태를 재질문하지 않는다. 기업 승인·실제 권한은 LAB EXAMPLE와 별도이고 담당 개인이 확인되지 않은 부분은 위와 같이 미확정으로 둔다. 새 입력 수신 자체를 자동 실행/수신 ACK gate로 읽지 않고 지정된 새 변경/실제 환경·예산·보호 조건만 확인한다.
 
 원6열 합성 인계 참조는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/external-input-register-20261108-v1.json`, SHA256 `e19a6daf4430a7a6794389016bf1587a226fe54def8532101a2a5063521ac487`다. S4 과거5는 `worktrees/byul-gpu-b-history-6-20261106/out/history5-input-handoff-20261108-v1/history5-input-handoff-v1.json`(SHA256 `f3953ff236e0bce748dfdef4fa29f1bfcf26fcd56891872a0030c619ffb7244a`), SUP03 현재 경계는 S2 `r3-exact-input-boundary-handoff-v1.json`(SHA256 `004247c7a211860aeeac8cfb21716aec2713734d9b7797e22db80104d25d5ba7`)·S1 readiness 진단 `0b4c96fd93af980dcc5032b96074965598fec7579c40b21857ed44879d9aa55c`를 재사용한다. S5의 최신 역할별 반환과 기존 REQ08 `ca16d5dc`/H32 `0687ce88` 검증, 위 기존 S1 10ID 반환 계약의 source/범위 한계를 함께 보존한다.
+
+
+### SUP-03 미실측 제품 후속의 최종 보충
+
+현재 R3 원자료·운영 closeout 검증에 필요한 외부 입력은0이다. 위 SUP-03 factory 행은 향후 별도 배정 분기의 입력이며, 실제 원기한 내 Ready·target/ENV·정상대조·worker/factory 원기록과 생성된 saved PACK/원 as_of/정확 Ref·object bundle을 포함한다. 새 Ref가 있을 때만 그 source/실행 세대의 별도 DB로 복원·저장 팩 재판정을 수행한다. 이번에 없는 Ref를 과거 객체나 늦은 Ready로 대신하지 않는다. S6 `r3-unmeasured-followup-inputs-v1.json` SHA256 `c43ae9092e8ce7c100d68d0dc46cd7f79fcd7fa2df3b9a1f56ebfb5d912aaa34`의6열 반환을 추가 연결한 것으로,22행의 범위를 새 실험/승인 gate로 늘리지 않는다. 미측정 UNKNOWN 인계와 실제 제품 RES의 UNKNOWN 판정을 구분한다.

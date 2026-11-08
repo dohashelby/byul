@@ -468,6 +468,12 @@ root의 `$71.57966828492202`는 원intent부터 현재 중지관측까지의 공
 
 게시 담당은 위 고정 파일 bytes/SHA·결론과 비용 산술을 대조했고 원CRC/CPU/모델/Ref복원을 반복하지 않았다. 현재 가능한 readiness 로컬 진단·실행/Ref/정리 마감은 끝낸 범위로 인계한다. 초기 지연의 근본원인·원90초 내 지원기동 조건/구체변화와 공통·환경·정책·과거원자료 입력이 없는 분기는 기존6열표로 보류하며 다른 독립작업의 gate로 만들지 않는다. 현재 자료로 특정코드 patch가 필수라고 입증되지 않았으므로 임의수정/기한확대/진행표시용새실험을하지 않는다. 제품증거절차가 없으므로 SUP-03의 기존 '제품 절차 미확인'·25한정마감제안/18제품증거보완 분류는 유지한다.
 
+## 2026-11-08 S6 최종 통합 인계와 미실측 후속 구분
+
+S6 최종 통합 인계는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/r3-final-actual-handoff-v1.json`, SHA256 `8671dc328a6be5825b7c936a04a6bf344b247e015186979d03f6ce19033e9008`이다. 앞서 고정한 startup·GB11·control·현재 중지·root 비용 검증을 재사용하며 현재 R3 closeout의 필수 검증 잔여는 없다. 별도 요약문을 운영 gate로 기다리지 않은 기존 마감과 동일한 결론이다.
+
+같은 디렉터리의 `r3-unmeasured-followup-inputs-v1.json`, SHA256 `c43ae9092e8ce7c100d68d0dc46cd7f79fcd7fa2df3b9a1f56ebfb5d912aaa34`는 제품 미실측 후속의6열 입력을 명확히 한다. 현재 원자료 검증을 막는 외부 입력은0이다. 추후 별도 지정된 고정 실행의 실제 기한 내 Ready·target/ENV·정상 대조·worker/factory 기록, 생성됐다면 saved PACK/원 as_of/정확 Ref·object bundle을 반환해야 해당 새 Ref만 별도 DB로 복원·재판정할 수 있다. 이번 R3에 없는 Ref를 과거 Ref나 나중 Ready로 채우지 않는다. 이 UNKNOWN 후속 인계는 제품 RES가 생성한 UNKNOWN 판정이 아니며 현재 새 공통 코드/환경/모델/TP2/기업 승인을 검증의 gate로 요구하지 않는다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

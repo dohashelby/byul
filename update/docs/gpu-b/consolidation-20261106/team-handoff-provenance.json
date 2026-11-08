@@ -504,6 +504,11 @@
     "remaining_after_reserve_USD": 23.420331715077978,
     "actual_billing_or_16h_running_not_claimed": true,
     "new_R4_test_or_deadline_reset": false,
-    "classification_25_limited_proposal_18_product_evidence_unchanged": true
+    "classification_25_limited_proposal_18_product_evidence_unchanged": true,
+    "S6_final_summary_project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/r3-final-actual-handoff-v1.json",
+    "S6_final_summary_sha256": "8671dc328a6be5825b7c936a04a6bf344b247e015186979d03f6ce19033e9008",
+    "S6_unmeasured_input_handoff_sha256": "c43ae9092e8ce7c100d68d0dc46cd7f79fcd7fa2df3b9a1f56ebfb5d912aaa34",
+    "current_verification_external_inputs_remaining": [],
+    "unmeasured_UNKNOWN_handoff_is_not_a_created_product_RES": true
   }
 }

@@ -9,8 +9,8 @@ AWS 5–8회차의 계정·권한·baseline·systemd 수동 절차를 묶은 **�
 입력 파일의 소유자는 root 또는 설치 수행자여야 한다. `sudo` 실행 시 원래 호출자의 `SUDO_UID`도 허용하므로 같은 0600 입력으로 점검과 실제 설치를 실행할 수 있다.
 
 ```bash
-# runtime/에서 실행; 점검은 root 없이 가능하나 호스트 파일 읽기 권한이 필요하다.
-bash deploy/install/install-runtime-node.sh --config /secure/install.env --dry-run --capture-baseline
+# runtime/에서 실행; 기존 설치가 있거나 호스트 파일 읽기 권한이 부족하면 sudo로 점검한다.
+sudo bash deploy/install/install-runtime-node.sh --config /secure/install.env --dry-run --capture-baseline
 # 정상 monitor 정책의 spec·범위·mode를 먼저 검수한 뒤 최초 설치
 sudo bash deploy/install/install-runtime-node.sh --config /secure/install.env --capture-baseline
 # 운영 실행이 승인된 경우에만 설치할 에이전트를 execute로 설정
@@ -18,6 +18,10 @@ sudo bash deploy/install/install-runtime-node.sh --config /secure/install.env --
 ```
 
 설치기의 `--dry-run`은 **호스트 무변경 사전 점검**이다. 계정/파일/서비스/GRUB 변경, 클러스터 조회·접속, 다운로드를 하지 않는다. 실제 `visudo`·systemd 검증과 계정에서의 읽기·정책 수집은 설치 때 수행한다. `--execute`는 설치될 agent의 실행 모드만 바꾸므로 `--dry-run --execute`로 점검할 수 있다. 에이전트 기본은 기존 운영 값의 `--dry-run`이며 LAB 자기 승인·감시 기간 단축을 넣지 않는다. 입력 값, 파일 내용, 렌더링 결과, 외부 명령의 stdout/stderr는 출력하지 않는다. 셸 tracing을 켜지 않는다.
+
+일반 계정의 점검은 필요한 호스트 파일을 읽을 수 있을 때만 가능하다. 기존 `/var/lib/serving-runtime`·`/etc/serving-runtime`·`/etc/sudoers.d` 등의 접근이 거부되면 `PERMISSION_DENIED`로 중단하므로 sudo로 다시 점검한다. 실패 출력은 단계 번호·점검 이름·이유 코드와 고정된 설명을 제공한다(0/9는 입력·사전 점검·설치 잠금/서비스 중지). 예: `단계 4/9; 점검 SUDOERS_VALIDATE; 이유 VISUDO_FAILED`, `PERMISSION_DENIED:/var/lib/serving-runtime`, `COMMAND_FAILED:systemctl`. 권한 오류의 경로는 허용된 고정 시스템 경로만 표시하며 입력 경로·설정 값·토큰·명령 출력은 숨긴다.
+
+설치 전 `/etc/sudoers.d`의 관리 파일 `serving-runtime-agent` 이외 파일에서 `BYUL_BUNDLE_APPLY` 또는 `runtime-agent` 규칙을 발견하면 `SUDOERS_ALIAS_CONFLICT` 또는 `SUDOERS_RULE_CONFLICT`와 **파일 이름만** 보고하고 중단한다. 주석은 제외하며 백업 파일도 점검한다. 자동 삭제하지 않으므로 운영자가 기존 규칙을 검수·통합한 뒤 재실행한다. sudoers를 설치한 뒤 전체 `visudo -c`가 종료 0이고 stderr 경고가 없어야 systemd 설치·서비스 시작을 진행한다. 실패 시 설치한 sudoers는 남으므로 아래 백업·복원 절차를 따른다. context는 검증된 식별자에서 `-`·`_`를 유지하고 정규식의 `.`만 `\.`로 이스케이프한다.
 
 실제 설치는 세 서비스를 먼저 중지하고 계정 → root 소유 코드/venv/.pth → 비밀 설정 → sudoers → systemd → 공유 폴더 → baseline → 서비스 순으로 진행한다. Python 의존성이 없는 현재 runtime에 맞춰 `venv --without-pip`와 두 경로의 `.pth`를 사용하므로 패키지 다운로드도 없다. 동일 파일은 교체하지 않고 권한을 검증한다. 설정 파일은 root 소유 디렉터리(0750 root:runtime-agent)에 두며, agent.token만 0600 runtime-agent, viewer.env/kubeconfig/agent.env/선택 CA는 0640 root:runtime-agent다. 설치 경로의 링크, root 소유/go-w 위반은 거부한다. 실패하면 즉시 중단하며 이미 적용한 단계는 남으므로 원인을 수정한 뒤 같은 명령을 다시 실행한다.
 

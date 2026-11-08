@@ -30,6 +30,8 @@ GRUB = Path("/etc/default/grub.d/99-byul-bpf-lsm.cfg")
 LSM_FILE = Path("/sys/kernel/security/lsm")
 KERNEL_CONFIG = Path("/boot/config-" + os.uname().release)
 GRUB_DEFAULT = Path("/etc/default/grub")
+SUDOERS_DIR = Path("/etc/sudoers.d")
+SUDOERS_NAME = "serving-runtime-agent"
 UNITS = tuple(f"serving-runtime-{name}.service" for name in
               ("tetragon-status", "monitor-window", "agent"))
 COPY = ("src", "tools", "deploy", "pyproject.toml", "README.md")
@@ -41,12 +43,47 @@ REQUIRED = {"CONTEXT", "NAMESPACE", "SERVER_ID", "PLATFORM_URL",
 
 
 class InstallError(Exception):
-    pass
+    def __init__(self, message, code="CHECK_FAILED"):
+        super().__init__(message)
+        self.code = code
+        self.stage = None
+        self.check = None
 
 
-def require(condition, message):
+def require(condition, message, code="CHECK_FAILED"):
     if not condition:
-        raise InstallError(message)
+        raise InstallError(message, code)
+
+
+def permission_code(error):
+    # Never echo arbitrary input paths or exception text, even on permission errors.
+    filename = str(error.filename or "")
+    for path in ("/var/lib/serving-runtime", "/etc/serving-runtime", "/etc/sudoers.d",
+                 "/opt/byul/runtime", "/etc/systemd/system", "/srv/serving/observation",
+                 "/srv/serving/runtime/data", "/srv/serving/bundles",
+                 "/etc/default/grub.d", "/etc/default/grub", "/sys/kernel/security/lsm",
+                 "/run/byul-runtime-install.lock"):
+        if filename == path or filename.startswith(path + "/"):
+            return "PERMISSION_DENIED:" + path
+    return "PERMISSION_DENIED"
+
+
+@contextmanager
+def checking(stage, name):
+    try:
+        yield
+    except (InstallError, OSError, ValueError, KeyError, TypeError,
+            subprocess.SubprocessError) as error:
+        if isinstance(error, PermissionError):
+            failure = InstallError("읽기·실행·쓰기 권한을 확인하세요.", permission_code(error))
+        elif isinstance(error, InstallError):
+            failure = error
+        else:
+            failure = InstallError("입력·호스트 검증 또는 설치 실패(상세 값 비노출).",
+                                   "HOST_IO_FAILED" if isinstance(error, OSError) else "VALIDATION_FAILED")
+        if failure.stage is None:
+            failure.stage, failure.check = stage, name
+        raise failure from None
 
 
 def plain_path(path):
@@ -131,27 +168,67 @@ def render(config, execute=False):
                 text = text.replace(" --sudo-bundle-apply", " --ca-file /etc/serving-runtime/platform-ca.pem --sudo-bundle-apply")
         result[name] = text.encode()
     text = (SOURCE / "deploy/agent/sudoers.example").read_text()
-    # Literal context becomes a regex literal, with sudoers' extra backslash layer.
-    context = re.escape(config["CONTEXT"]).replace("\\", "\\\\")
+    # Validated identifiers contain only letters/digits/_.-; only '.' is an ERE
+    # metacharacter here. sudoers argument regexes need no extra backslash layer.
+    context = config["CONTEXT"].replace(".", r"\.")
     result["sudoers"] = text.replace("--context lab-context", "--context " + context).replace(
         "--namespace serving", "--namespace " + config["NAMESPACE"]).encode()
     result["agent.env"] = ("PLATFORM_URL=" + config["PLATFORM_URL"] + "\n").encode()
     return result
 
 
-def run(command, *, capture=False):
-    result = subprocess.run([str(v) for v in command], stdin=subprocess.DEVNULL,
-                            stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL, check=False, timeout=120,
-                            env={"PATH": PATH, "LANG": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1"})
-    require(result.returncode == 0, "외부 명령 검증에 실패했습니다(출력 생략).")
+def run(command, *, capture=False, reject_stderr=False):
+    name = Path(command[0]).name
+    # Executable names may also come from a path; emit only known tool labels.
+    if name not in {"visudo", "systemctl", "systemd-analyze", "sudo", "groupadd",
+                    "useradd", "usermod", "update-grub", "python", "python3", "python3.12"}:
+        name = "external"
+    code = "VISUDO_FAILED" if name == "visudo" else "COMMAND_FAILED:" + name
+    try:
+        result = subprocess.run([str(v) for v in command], stdin=subprocess.DEVNULL,
+                                stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
+                                stderr=subprocess.PIPE if reject_stderr else subprocess.DEVNULL,
+                                check=False, timeout=120,
+                                env={"PATH": PATH, "LANG": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1"})
+    except (OSError, subprocess.SubprocessError) as error:
+        if isinstance(error, PermissionError):
+            raise InstallError("명령 실행 권한이 없습니다(출력 생략).", permission_code(error)) from None
+        raise InstallError("외부 명령 실행 실패(출력 생략).", code) from None
+    require(result.returncode == 0 and not (reject_stderr and result.stderr),
+            "외부 명령 검증에 실패했습니다(출력 생략).", code)
     return result.stdout if capture else None
 
 
+def check_sudoers_conflicts():
+    """Inspect every other file, including backups; never remove or print contents."""
+    conflicts = []
+    alias_conflict = False
+    plain_path(SUDOERS_DIR)
+    for path in sorted(SUDOERS_DIR.iterdir()):
+        if path.name == SUDOERS_NAME:
+            continue  # The managed file is replaced and then checked by visudo -c.
+        plain_path(path)
+        require(path.is_file(), "sudoers 항목의 일반 파일 여부를 검수하세요.", "SUDOERS_FILE_INVALID")
+        text = path.read_text().replace("\\\n", "")
+        text = "\n".join(line.split("#", 1)[0] for line in text.splitlines())
+        alias = re.search(r"(?<![A-Za-z0-9_.-])BYUL_BUNDLE_APPLY(?![A-Za-z0-9_.-])", text)
+        rule = re.search(r"(?<![A-Za-z0-9_.-])runtime-agent(?![A-Za-z0-9_.-])", text)
+        if alias or rule:
+            conflicts.append(json.dumps(path.name, ensure_ascii=True))
+            alias_conflict |= bool(alias)
+    require(not conflicts, "충돌 파일: " + ", ".join(conflicts),
+            "SUDOERS_ALIAS_CONFLICT" if alias_conflict else "SUDOERS_RULE_CONFLICT")
+
+
 def active(unit):
-    result = subprocess.run(["systemctl", "is-active", "--quiet", unit],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                            timeout=15, env={"PATH": PATH})
+    try:
+        result = subprocess.run(["systemctl", "is-active", "--quiet", unit],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                timeout=15, env={"PATH": PATH})
+    except (OSError, subprocess.SubprocessError) as error:
+        if isinstance(error, PermissionError):
+            raise InstallError("명령 실행 권한이 없습니다(출력 생략).", permission_code(error)) from None
+        raise InstallError("서비스 확인 명령 실행 실패(출력 생략).", "COMMAND_FAILED:systemctl") from None
     return result.returncode == 0
 
 
@@ -255,11 +332,14 @@ def bpf_plan(enable):
 
 
 def preflight(config, args):
+    with checking("4", "SUDOERS_CONFLICTS"):
+        check_sudoers_conflicts()
     require(sys.version_info >= (3, 12), "Python 3.12 이상이 필요합니다.")
     for name in ("systemctl", "systemd-analyze", "visudo", "sudo", "kubectl", "groupadd", "useradd", "usermod"):
         require(shutil.which(name, path=PATH), "필수 호스트 도구가 없습니다. 설치 문서를 확인하세요.")
     require(shutil.which("crictl", path=PATH),
-            "crictl이 없습니다. 버전·체크섬·CRI endpoint를 검수해 수동 설치 후 재실행하세요. 자동 다운로드하지 않습니다.")
+            "crictl이 없습니다. 버전·체크섬·CRI endpoint를 검수해 수동 설치 후 재실행하세요. 자동 다운로드하지 않습니다.",
+            "MISSING_TOOL:crictl")
     for name, key in (("serving-bundles", "GATEWAY_DATA_GID"), ("serving-observe", "OBSERVE_GID")):
         group_check(name, int(config[key]))
     observer = pwd.getpwnam(config["OBSERVATION_USER"])
@@ -272,7 +352,7 @@ def preflight(config, args):
         require(account.pw_uid != 0 and account.pw_gid != 0
                 and grp.getgrgid(account.pw_gid).gr_name == "runtime-agent",
                 "기존 runtime-agent 계정을 검수해야 합니다.")
-    for target in (DEST, ETC, Path("/etc/systemd/system"), Path("/etc/sudoers.d"), STATE,
+    for target in (DEST, ETC, Path("/etc/systemd/system"), SUDOERS_DIR, STATE,
                    OBSERVATION.parent, DATA.parent, Path("/srv/serving/bundles")):
         # STATE may already be owned by runtime-agent; validate its parent only.
         secure_target(target.parent if target == STATE else target)
@@ -290,11 +370,12 @@ def preflight(config, args):
     grub = bpf_plan(args.enable_bpf_lsm)
     if grub is not None:
         secure_target(GRUB)
-    if BASELINE.exists():
-        check_baseline(config)
-    else:
-        require(args.capture_baseline or grub is not None,
-                "baseline이 없습니다. 정상 monitor 정책 확인 후 --capture-baseline을 명시하세요.")
+    with checking("9", "BASELINE_PREFLIGHT"):
+        if BASELINE.exists():
+            check_baseline(config)
+        else:
+            require(args.capture_baseline or grub is not None,
+                    "baseline이 없습니다. 정상 monitor 정책 확인 후 --capture-baseline을 명시하세요.")
     return grub
 
 
@@ -355,30 +436,35 @@ def install_code():
 
 
 def install_files(config, account, artifacts):
-    directory(ETC, mode=0o750, gid=account.pw_gid)
-    for key, name, uid, mode in (("AGENT_TOKEN_FILE", "agent.token", account.pw_uid, 0o600),
-                                ("VIEWER_ENV_FILE", "viewer.env", 0, 0o640),
-                                ("KUBECONFIG_FILE", "kubeconfig", 0, 0o640)):
-        write_file(ETC / name, input_bytes(config[key], private=key != "KUBECONFIG_FILE"),
-                   uid=uid, gid=account.pw_gid, mode=mode)
-    write_file(ETC / "agent.env", artifacts["agent.env"], gid=account.pw_gid, mode=0o640)
-    if config["PLATFORM_CA_FILE"]:
-        write_file(ETC / "platform-ca.pem", input_bytes(config["PLATFORM_CA_FILE"]),
-                   gid=account.pw_gid, mode=0o640)
+    with checking("3", "CONFIG_FILES"):
+        directory(ETC, mode=0o750, gid=account.pw_gid)
+        for key, name, uid, mode in (("AGENT_TOKEN_FILE", "agent.token", account.pw_uid, 0o600),
+                                    ("VIEWER_ENV_FILE", "viewer.env", 0, 0o640),
+                                    ("KUBECONFIG_FILE", "kubeconfig", 0, 0o640)):
+            write_file(ETC / name, input_bytes(config[key], private=key != "KUBECONFIG_FILE"),
+                       uid=uid, gid=account.pw_gid, mode=mode)
+        write_file(ETC / "agent.env", artifacts["agent.env"], gid=account.pw_gid, mode=0o640)
+        if config["PLATFORM_CA_FILE"]:
+            write_file(ETC / "platform-ca.pem", input_bytes(config["PLATFORM_CA_FILE"]),
+                       gid=account.pw_gid, mode=0o640)
     with tempfile.TemporaryDirectory(prefix="byul-install-") as temporary:
         temporary = Path(temporary)
-        sudoers = temporary / "sudoers"
-        write_file(sudoers, artifacts["sudoers"], mode=0o440)
-        run(["visudo", "-cf", sudoers])
-        write_file(Path("/etc/sudoers.d/serving-runtime-agent"), artifacts["sudoers"], mode=0o440)
-        run(["visudo", "-cf", "/etc/sudoers.d/serving-runtime-agent"])
-        # Verify rendered units before replacing the installed units.
-        for name in UNITS:
-            write_file(temporary / name, artifacts[name])
-        run(["systemd-analyze", "verify", *[temporary / name for name in UNITS]])
-        for name in UNITS:
-            write_file(Path("/etc/systemd/system") / name, artifacts[name])
-    run(["systemctl", "daemon-reload"])
+        with checking("4", "SUDOERS_VALIDATE"):
+            check_sudoers_conflicts()
+            sudoers = temporary / "sudoers"
+            write_file(sudoers, artifacts["sudoers"], mode=0o440)
+            run(["visudo", "-cf", sudoers], reject_stderr=True)
+            write_file(SUDOERS_DIR / SUDOERS_NAME, artifacts["sudoers"], mode=0o440)
+            # The full policy can fail or warn even when this file parses alone.
+            run(["visudo", "-c"], reject_stderr=True)
+        with checking("5", "SYSTEMD_VALIDATE"):
+            # Verify rendered units before replacing the installed units.
+            for name in UNITS:
+                write_file(temporary / name, artifacts[name])
+            run(["systemd-analyze", "verify", *[temporary / name for name in UNITS]])
+            for name in UNITS:
+                write_file(Path("/etc/systemd/system") / name, artifacts[name])
+            run(["systemctl", "daemon-reload"])
 
 
 def capture_baseline(config, capture):
@@ -440,45 +526,54 @@ def install_lock():
 
 
 def install(config, args, artifacts, grub):
-    with install_lock():
-        # Stop before changing code, credentials or baseline; failures leave services stopped.
-        for unit in reversed(UNITS):
-            if active(unit):
-                run(["systemctl", "stop", unit])
-            require(not active(unit), "서비스 중지 검증 실패.")
-        account = install_accounts(config)
-        print("1/9 계정·그룹 검증 완료")
-        install_code()
-        print("2/9 root 소유 코드·venv·.pth 검증 완료")
-        install_files(config, account, artifacts)
+    with checking("0", "INSTALL_LOCK"), install_lock():
+        with checking("4", "SUDOERS_CONFLICTS"):
+            check_sudoers_conflicts()
+        with checking("0", "SERVICES_STOP"):
+            # Stop before changing code, credentials or baseline; failures leave services stopped.
+            for unit in reversed(UNITS):
+                if active(unit):
+                    run(["systemctl", "stop", unit])
+                require(not active(unit), "서비스 중지 검증 실패.")
+        with checking("1", "ACCOUNTS"):
+            account = install_accounts(config)
+            print("1/9 계정·그룹 검증 완료")
+        with checking("2", "CODE_VENV"):
+            install_code()
+            print("2/9 root 소유 코드·venv·.pth 검증 완료")
+        with checking("3–5", "INSTALL_FILES"):
+            install_files(config, account, artifacts)
         print("3–5/9 설정·sudoers·systemd 검증 완료")
-        directory(STATE, account.pw_uid, account.pw_gid, 0o750)
-        directory(STATE / "evidence", account.pw_uid, account.pw_gid, 0o750)
-        directory(Path("/srv/serving/bundles"), 0, int(config["GATEWAY_DATA_GID"]), 0o2750)
-        directory(OBSERVATION, pwd.getpwnam(config["OBSERVATION_USER"]).pw_uid,
-                  int(config["OBSERVE_GID"]), 0o2750)
-        # The Gateway UID is 10000, independently of its configured data GID.
-        directory(DATA, 10000, int(config["GATEWAY_DATA_GID"]), 0o750)
-        for path in (ETC / "kubeconfig", ETC / "viewer.env", OBSERVATION, DATA):
-            run(["sudo", "-u", "runtime-agent", "--", "test", "-r", path])
-        print("6–7/9 공유 폴더·읽기 권한·crictl 확인 완료")
-        if grub is not None:
-            directory(GRUB.parent)
-            write_file(GRUB, grub)
-            run(["update-grub"])
-            print("8/9 재부팅 필요: BPF LSM 부팅 설정 검증 완료. 서비스는 중지 상태입니다.")
-            print("자동 재부팅하지 않습니다. 재부팅 후 같은 설치 명령을 다시 실행하세요.")
-            return 2
-        print("8/9 활성 BPF LSM 확인 완료")
-        capture_baseline(config, args.capture_baseline)
-        for unit in UNITS:
-            run(["systemctl", "enable", unit])
-            run(["systemctl", "is-enabled", "--quiet", unit])
-            run(["systemctl", "start", unit])
-            require(active(unit), "서비스 시작 검증 실패.")
-        print("9/9 서비스 enable/start 완료; active는 운영 준비 완료 판정이 아닙니다.")
-        time.sleep(6)
-        summary()
+        with checking("6–7", "SHARED_PERMISSIONS"):
+            directory(STATE, account.pw_uid, account.pw_gid, 0o750)
+            directory(STATE / "evidence", account.pw_uid, account.pw_gid, 0o750)
+            directory(Path("/srv/serving/bundles"), 0, int(config["GATEWAY_DATA_GID"]), 0o2750)
+            directory(OBSERVATION, pwd.getpwnam(config["OBSERVATION_USER"]).pw_uid,
+                      int(config["OBSERVE_GID"]), 0o2750)
+            # The Gateway UID is 10000, independently of its configured data GID.
+            directory(DATA, 10000, int(config["GATEWAY_DATA_GID"]), 0o750)
+            for path in (ETC / "kubeconfig", ETC / "viewer.env", OBSERVATION, DATA):
+                run(["sudo", "-u", "runtime-agent", "--", "test", "-r", path])
+            print("6–7/9 공유 폴더·읽기 권한·crictl 확인 완료")
+        with checking("8", "BPF_LSM"):
+            if grub is not None:
+                directory(GRUB.parent)
+                write_file(GRUB, grub)
+                run(["update-grub"])
+                print("8/9 재부팅 필요: BPF LSM 부팅 설정 검증 완료. 서비스는 중지 상태입니다.")
+                print("자동 재부팅하지 않습니다. 재부팅 후 같은 설치 명령을 다시 실행하세요.")
+                return 2
+            print("8/9 활성 BPF LSM 확인 완료")
+        with checking("9", "BASELINE_SERVICES"):
+            capture_baseline(config, args.capture_baseline)
+            for unit in UNITS:
+                run(["systemctl", "enable", unit])
+                run(["systemctl", "is-enabled", "--quiet", unit])
+                run(["systemctl", "start", unit])
+                require(active(unit), "서비스 시작 검증 실패.")
+            print("9/9 서비스 enable/start 완료; active는 운영 준비 완료 판정이 아닙니다.")
+            time.sleep(6)
+            summary()
     return 0
 
 
@@ -491,22 +586,24 @@ def main(argv=None):
     parser.add_argument("--capture-baseline", action="store_true", help="검수된 monitor 정책의 최초 baseline만 캡처")
     args = parser.parse_args(argv)
     try:
-        config = load_config(args.config)
-        artifacts = render(config, args.execute)
+        with checking("0", "CONFIG_INPUT"):
+            config = load_config(args.config)
+        with checking("0", "RENDER"):
+            artifacts = render(config, args.execute)
         print("설정·치환 검사 완료(값 비노출); agent 모드: " + ("execute" if args.execute else "dry-run"))
         print("사용자 서비스: 별도 사용자 설치 필요 — deploy/install/README.md 참조")
-        grub = preflight(config, args)
+        with checking("0", "PREFLIGHT"):
+            grub = preflight(config, args)
         if args.dry_run:
             print("dry-run: 1–9 사전 점검 완료; 계정·파일·서비스·GRUB 무변경, 클러스터 조회 없음")
             print("대기 작업: " + ("BPF LSM 설정·재부팅 후 재실행" if grub else "baseline 검증 후 서비스 시작"))
             return 0
-        require(os.geteuid() == 0, "실제 설치에는 root 권한이 필요합니다.")
+        with checking("0", "ROOT_PERMISSION"):
+            require(os.geteuid() == 0, "실제 설치에는 root 권한이 필요합니다.", "PERMISSION_DENIED")
         os.umask(0o022)
         return install(config, args, artifacts, grub)
     except InstallError as error:
-        print("중단: " + str(error), file=sys.stderr)
-    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
-        print("중단: 입력·호스트 검증 또는 설치에 실패했습니다(상세 값 비노출).", file=sys.stderr)
+        print(f"중단: 단계 {error.stage}/9; 점검 {error.check}; 이유 {error.code}; {error}", file=sys.stderr)
     return 1
 
 

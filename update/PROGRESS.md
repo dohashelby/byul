@@ -1,3 +1,10 @@
+## 2026-11-08 — GPU18 임시 입력의 실제 로컬 연결
+
+- 한 일: 기존 모의18개와 별도로 실제CPU/소스/guard·OS컴포넌트 관측14ID를 수집했다. 원0.31 renderer/InputProcessor·SamplingParams·SUP08 사전옵션 함수, 별도0.29 CPU엔진 정상2요청, 공급물·파일/FD·Python모드·pipe·소유UDS/namespace·SUP16고정API를 사용했다. GPU/AWS/다운로드0, 공통core/models/store/judges/packs/registry·기존prototype·원FAIL/UNKNOWN 변경0.
+- 검증: 실제 입력/반환/원예외·source/input SHA·프로세스종료·부모종료후PID/start·소유tmp정리를 보존했다. host IPC metadata불완전1건은 유지하고 별도소유namespace4조건 성공을 분리했다. 신규도구7개의 구문/CLI·OOV표기만 고친 AST동등성을 확인했다. 기존52개모의/회귀를 새실적으로 합산하지 않는다.
+- 다음 단계: PR232의 LOCAL_ACTUAL_VALIDATION.md와 local-actual-validation-20261108.json에서 항목별 실제 범위·원source/설치버전·GPU분기·공통producer/정책 반환물을 확인한다. 모의18/18과 제품 증거 필요18개 분류는 별도 유지한다.
+- 남은 것: LIF08/12/16·OBS02 새실행없음, 0.31최종worker·TP2/GPUrank/native소비·실제retry/restore/state producer·기업 승인/과거원본. 독립적으로 가능한 이번 CPU 묶음을 마친 뒤 추가GPU를 기동하지 않는다.
+
 ## 2026-11-06 — GPU 재측정 준비 중 LIF-13 실행 경로 보수
 
 - 한 일: GPU 실행 전 점검에서 두 결함을 찾아 고쳤다. (1) Kubernetes 콜백 전송의 300초 상한이 LIF-13 900초를 거부 → 소유 lab 콜백 전송만 900초, 입력 도구도 LIF-13에 900초. (2) 소비자 기동이 PID 1 `vllm serve`만 인정 → 실제 콘솔 스크립트 형태 `python /…/vllm serve`도 인정(k3d 엔진 PID 1에서 판별 확인, 소비자는 띄우지 않음).

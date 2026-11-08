@@ -256,7 +256,7 @@
     "new_GPU_experiment_completed_successfully": false,
     "whole43_counts_changed": false
   },
-  "current_work_reference": "SUP03_R3_actual_startup",
+  "current_work_reference": "SUP03_R3_recovery_20261108",
   "SUP03_R2_payload_ZIP_delta_review": {
     "review_project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-payload-zip-delta-20261107-v1/payload-zip-source-delta-review-v1.json",
     "review_sha256": "9589a039e4b0c77bf987062a1a83560fa6989c55a94c1e87fd73dc2ff1912396",
@@ -405,6 +405,30 @@
     "compute_IP_interval_open": true,
     "actual_current_health_guest_product_final_stop_verified_by_this_review": false,
     "billing_confirmed": false,
+    "whole43_counts_changed": false
+  },
+  "PR228_merged_before_R3_startup_followup": {
+    "url": "https://github.com/dohashelby/byul/pull/228",
+    "merged_at_KST": "2026-11-08T13:08:05+09:00",
+    "merged_head": "657400797060a8ff51976ade5564fc5c1e47067d",
+    "merge_commit": "d37f4d4a1b3e8c4a77510226598e72a40de6ed62"
+  },
+  "SUP03_R3_recovery_20261108": {
+    "root_recovery_snapshot_project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/operating-resume-status-20261108-v1.json",
+    "root_recovery_snapshot_sha256": "8cb189415c2b596c08e441d2584e35f33b74bfb80be80991ad6f5c9f03d0c831",
+    "S6_gap_review_sha256": "b00cffe66711b31e6b2c98a4d6546bb58e963bf1bb48ff65163d0fa8623e1004",
+    "S2_reported_current_observation_at_KST": "2026-11-08T13:23:03.972569+09:00",
+    "S2_reported_owned_three_stopped_publicIP0": true,
+    "S6_current_raw_GB11_control_Ref_final_scope_review_pending": true,
+    "root_cost_close_review_sha256": "7355473d815423b543c69fe2e3d7796f01ec8aa7b8f9face2f7759aebba8fd31",
+    "estimated_conservative_upper_bound_USD": 71.57966828492202,
+    "remaining_after_reserve_USD": 23.420331715077978,
+    "compute_IP_interval_closed": true,
+    "observation_gap_includes_possible_already_stopped_time": true,
+    "exact_off_billing_or_16h_running_not_claimed": true,
+    "EBS_continues": true,
+    "S1_AWS_backup_request_withdrawn_actual_actions0": true,
+    "new_remote_experiment_or_deadline_reset": false,
     "whole43_counts_changed": false
   }
 }

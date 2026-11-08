@@ -5,6 +5,7 @@ are declarations: neither elapsed time nor two snapshots prove that it happened.
 Only session/owner scoped native request IDs link model configuration observations.
 """
 from __future__ import annotations
+from copy import deepcopy
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -223,7 +224,8 @@ class LifecycleTransitionExecutor:
     version = '0.1.0'
 
     def __init__(self, cfg, *, runner=None, clock=None, wait=None, expected_target_sha256=None):
-        self.cfg = cfg; self.runner = runner; self.clock = clock or utcnow
+        self.b_common_inputs = deepcopy(cfg.get('common_inputs'))
+        self.cfg = {k: v for k, v in cfg.items() if k != 'common_inputs'}; self.runner = runner; self.clock = clock or utcnow
         self.wait = wait or time.sleep
         self.expected_target = expected_target_sha256
 
@@ -405,7 +407,7 @@ class LifecycleTransitionExecutor:
             artifacts.append(DraftArtifact(name=path.name, path=path, collector=self.name + '/' + self.version))
         except OSError:
             cleanup.append('TRANSITION_ARTIFACT_UNAVAILABLE')
-        return EvidenceDraft(status=ExecStatus.ABORTED if cleanup or diagnostics or projection['missing'] else ExecStatus.COMPLETED,
+        draft = EvidenceDraft(status=ExecStatus.ABORTED if cleanup or diagnostics or projection['missing'] else ExecStatus.COMPLETED,
             data_origin=DataOrigin.EXAMPLE if self.runner is not None or any(g.target.get('lab') for g in generations.values()) else DataOrigin.DECLARED,
             normal_control={'attempted': before['attempted'], 'succeeded': all(t['normal_shape_verified'] for t in trials if t['case_id'] in PHASES),
                 'detail': 'Scheduled normal HTTP shapes; native generation, consumption and admission guarantees are separate observations.'},
@@ -414,3 +416,12 @@ class LifecycleTransitionExecutor:
             observations={k: {'value': v, 'collected': True} for k, v in observations.items()}, artifacts=artifacts,
             config={'profile': check.collection_profile, 'manifest': manifest, 'sample_at': policy_values['transition_sample_at']},
             cleanup_errors=cleanup, started_at=started, finished_at=self.clock())
+
+        from .lifecycle_common_input_consumption import attach_inputs
+        if self.b_common_inputs is None:
+            return draft
+        selected = generations.get(self.b_common_inputs.get('generation')) if type(self.b_common_inputs) is dict else None
+        if selected is None:
+            return attach_inputs(draft, check, env, {}, {}, workdir)
+        return attach_inputs(draft, check, selected.env, selected.target, self.b_common_inputs, workdir,
+            prepared=selected.prepared, owner=selected.native_target['kubernetes']['engine'], generation=selected.key)

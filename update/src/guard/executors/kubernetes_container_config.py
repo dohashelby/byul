@@ -26,7 +26,10 @@ def collect_process_capture(environment,target,*,binary='kubectl',duration=300,c
     return transport.process_snapshot(candidate_paths)
 
 
-class KubernetesContainerConfigExecutor(HttpCheckExecutor):
+from .lifecycle_common_input_consumption import LifecycleCommonInputConsumer
+
+
+class KubernetesContainerConfigExecutor(LifecycleCommonInputConsumer, HttpCheckExecutor):
     name="container_config"
     version="0.2.0"
     requires_roles=False

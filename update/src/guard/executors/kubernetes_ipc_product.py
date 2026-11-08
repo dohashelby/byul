@@ -11,7 +11,10 @@ CONFIG_KEYS={'target','kubectl_binary','max_duration_seconds','actor_specs','con
 NORMAL_TIMEOUT=3
 
 
-class KubernetesIPCProductExecutor(HttpCheckExecutor):
+from .lifecycle_common_input_consumption import LifecycleCommonInputConsumer
+
+
+class KubernetesIPCProductExecutor(LifecycleCommonInputConsumer, HttpCheckExecutor):
     name='unix_ipc';version=VERSION;requires_roles=False;requires_route_scope=False;functional_via='engine'
 
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):

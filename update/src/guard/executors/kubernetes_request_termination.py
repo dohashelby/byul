@@ -43,7 +43,10 @@ def normalize_policy(values):
     except (KeyError,TypeError,ValueError):raise ValueError("TERMINATION_POLICY_INVALID") from None
 
 
-class KubernetesRequestTerminationExecutor(HttpCheckExecutor):
+from .lifecycle_common_input_consumption import LifecycleCommonInputConsumer
+
+
+class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpCheckExecutor):
     name="request_termination";version="0.2.0"
     requires_roles=False;requires_route_scope=False;functional_via="engine"
     check_id="LIF-10";collection_profile=PROFILE;policy_prefix="termination"
@@ -76,7 +79,7 @@ class KubernetesRequestTerminationExecutor(HttpCheckExecutor):
             raise ValueError('TERMINATION_PROFILE_UNSUPPORTED')
         implementation=branches[key]
         if implementation is None:return self
-        return implementation(self.cfg,runner=self.runner,environ=self._environ,
+        return implementation(self.common_input_config(),runner=self.runner,environ=self._environ,
             expected_target_sha256=self.expected_target_sha256)
 
     def run(self,check,env,policy_values,adapter,workdir):

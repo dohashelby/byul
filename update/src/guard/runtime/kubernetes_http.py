@@ -1176,6 +1176,25 @@ class KubernetesHTTP:
         pod={"pod_uid":engine["pod_uid"],"container_id":engine["container_id"],"restart_count":engine["restart_count"]}
         return observed,pod,self.binding["engine"]==engine
 
+    def engine_group_resources(self):
+        """LIF-11 공통 입력: 엔진 컨테이너 안 소유 그룹 자원 inventory(읽기 전용). 관측 시점의 Pod 세대를 함께 돌려준다.
+
+        재기동 뒤에는 바인딩이 새 컨테이너로 옮겨진 다음 불러야 한다. (관측, Pod 세대, 앞뒤 바인딩 동일 여부)를 돌려준다.
+        """
+        from guard.collectors.group_resource_observer import OBSERVER, decode
+        if self.profile not in {REQUEST_BINDING_PROFILE, ENGINE_CALLBACK_PROFILE}:
+            raise KubernetesBindingError()
+        self._verify();engine=deepcopy(self.binding["engine"])
+        value=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],
+            f"--container={engine['container']}","--","python3","-I","-S","-c",OBSERVER],cap=4*1024**2,budget=60)
+        self._verify()
+        try:
+            observed=decode(value)
+        except ValueError:
+            raise KubernetesBindingError() from None
+        pod={"pod_uid":engine["pod_uid"],"container_id":engine["container_id"],"restart_count":engine["restart_count"]}
+        return observed,pod,self.binding["engine"]==engine
+
     def engine_device_open_test(self):
         """PLT-01·04: 엔진 컨테이너 안에서 보이는 GPU device node를 O_RDWR로 열었다 닫는다(ioctl 없음)."""
         from guard.collectors.process_device_observer import DEVICE_OPEN_TEST, DEVICE_PATTERN, decode_open

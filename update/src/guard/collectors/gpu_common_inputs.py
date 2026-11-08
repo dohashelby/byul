@@ -69,9 +69,11 @@ KINDS = {
         "fields": {"at_ms": "ms", "ack": "bool", "fault_kind": "id", "request_sha256": "opt_sha"},
         "complete_requires": ("fault_applied", "fault_released", "detected", "recovered"),
     },
+    # failure_trigger·normal_inference(2026-11-08, B 의존 반환 7): 실패를 일으킨 시각·대상과 다음 세대의 정상 추론 시각.
+    # 조건부 기한은 failure_trigger의 at_ms에서 잰다. 기존 세 행과 완료 조건은 그대로다.
     "failed-group-resources": {
         "checks": ("LIF-11",),
-        "events": ("inventory_before", "inventory_after", "released"),
+        "events": ("inventory_before", "inventory_after", "released", "failure_trigger", "normal_inference"),
         "fields": {"at_ms": "ms", "resource": "enum:pid|ipc_socket|shm|nccl_communicator|device", "resource_sha256": "sha",
                    "owner_group_sha256": "sha", "next_generation": "opt_id"},
         "complete_requires": ("inventory_before", "inventory_after"),

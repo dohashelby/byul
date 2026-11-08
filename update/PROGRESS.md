@@ -1,3 +1,11 @@
+## 2026-11-08 — LIF-11 복구 계보 공통 입력(B 의존 반환 7)
+
+- 한 일: `failed-group-resources` 생산자(관측기·생산자·전송 메서드·계보 요약)를 만들고 계약에 `failure_trigger`·`normal_inference` 행을 더했다. 실패 전·후 소유 그룹의 프로세스·unix socket·/dev/shm·장치 fd inventory로 반환·잔존·다음 세대·정상 추론을 잇는다. GPU 메모리 반환은 공백으로 남긴다. 미등록. 상세 `docs/dev-1/lif11-recovery-lineage.md`.
+- 테스트 결과: 새 시험 16, 직접·계약 47 통과. 계약 의존 묶음에서 `test_a1_resource_recovery*` 29개 실패는 변경 없는 HEAD 임시 트리에서도 같아 로컬 환경 문제로 보며 Linux CI로 확인한다.
+- 참고: 작업 중 사용자가 작업 트리·증거 폴더를 `Desktop/Buyl/`로 옮겼다. 이 작업 트리의 git 연결을 `git worktree repair`로 새 경로에 맞췄다(다른 이동 트리 4개는 그대로 prunable 상태). venv 실행 파일이 옛 경로를 가리켜 `uv run python -m pytest`로 돌렸다.
+- 다음 단계: B 의존 반환 1~5·8, TP2(할당량 대기)에서 ipc-ownership·failed-group-resources 생산자 GPU 확인.
+- 막힌 것: AWS 할당량 승인.
+
 ## 2026-11-08 — PLT-02 실제 IPC 소유 공통 입력(B 의존 반환 6)
 
 - 한 일: origin/main을 합치고 새 PR dohashelby/byul#231을 올렸다. CI가 Ubuntu 26.04 러너에서 Python 3.12.3을 찾지 못해 update-default를 ubuntu-24.04로 고정했다(main도 같은 원인). B 의존 반환 6번으로 `ipc-ownership` 계약 종류·컨테이너 안 관측기(/proc+sock_diag)·생산자·전송 메서드·요약을 만들었다. 생산자는 GPU 확인 전이라 미등록이다. 상세 `docs/dev-1/plt02-ipc-ownership.md`.

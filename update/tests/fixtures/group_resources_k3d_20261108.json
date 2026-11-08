@@ -1,0 +1,125 @@
+{
+ "codes": [],
+ "generation": {
+  "pid1_start_ticks": 4261463
+ },
+ "processes": [
+  {
+   "device_fds": [],
+   "pid": 1,
+   "role": "api_server",
+   "shm_refs": [],
+   "stable": true,
+   "start_ticks": 4261463,
+   "unix_inodes": [
+    1283158,
+    1283159,
+    1283160,
+    1283181,
+    1283182,
+    1284248,
+    1285305
+   ]
+  },
+  {
+   "device_fds": [],
+   "pid": 75,
+   "role": "utility",
+   "shm_refs": [],
+   "stable": true,
+   "start_ticks": 4262735,
+   "unix_inodes": []
+  },
+  {
+   "device_fds": [],
+   "pid": 76,
+   "role": "engine_core",
+   "shm_refs": [
+    [
+     126,
+     2
+    ],
+    [
+     126,
+     5
+    ]
+   ],
+   "stable": true,
+   "start_ticks": 4262735,
+   "unix_inodes": [
+    1276839,
+    1276840,
+    1280387,
+    1280388,
+    1281456,
+    1283213,
+    1283214,
+    1287229
+   ]
+  },
+  {
+   "device_fds": [],
+   "pid": 113,
+   "role": "worker",
+   "shm_refs": [
+    [
+     126,
+     2
+    ],
+    [
+     126,
+     4
+    ],
+    [
+     126,
+     5
+    ]
+   ],
+   "stable": true,
+   "start_ticks": 4263049,
+   "unix_inodes": [
+    1283324,
+    1283330,
+    1283336,
+    1283342,
+    1283348,
+    1283354,
+    1283360,
+    1283366,
+    1283372,
+    1283378,
+    1283384,
+    1283390,
+    1283396,
+    1283399,
+    1283400,
+    1283401,
+    1283402,
+    1283403,
+    1283404
+   ]
+  }
+ ],
+ "realtime_ns": 1794112107326987427,
+ "schema": "guard-group-resources/1",
+ "shm": [
+  {
+   "dev": 126,
+   "ino": 5,
+   "name_sha256": "ab84e494a826163fdf58535b82dd57136aa0415da0fa06a50d87db5ebfcfe727",
+   "size": 251658260
+  },
+  {
+   "dev": 126,
+   "ino": 2,
+   "name_sha256": "350417a0165ecce14eec81359ff939ca106b38a9b0975bf8a7534ee6d028e226",
+   "size": 167772180
+  },
+  {
+   "dev": 126,
+   "ino": 4,
+   "name_sha256": "e06691e3354d26bdc53975c4f1ddae0a264528ec45bd8cb7887916a09a1faf5b",
+   "size": 32
+  }
+ ]
+}

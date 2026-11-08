@@ -430,5 +430,36 @@
     "S1_AWS_backup_request_withdrawn_actual_actions0": true,
     "new_remote_experiment_or_deadline_reset": false,
     "whole43_counts_changed": false
+  },
+  "SUP03_R3_GB11_first_integrity": {
+    "review_project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/GB11-first-integrity-review-v1.json",
+    "review_sha256": "6f1716814c0d5a529631befa965df3d89905cb12982f4901759712a2f3c1741b",
+    "archive_sha256": "9615e3f54b2e3902560c7be527b787aa5d9d8ca3523f2adfda19d60f15097c9c",
+    "bytes": 408550,
+    "first_CRC_members": 200,
+    "payload_SHA_members": 199,
+    "installed_asset_pins_equal_original_payload": 11,
+    "semantic_producer_Ref_cleanup_current_stop_review_pending": true,
+    "whole_question_complete": false,
+    "whole43_counts_changed": false
+  },
+  "latest_user_scope_20261108": {
+    "priority": "existing support/inputs/approved environment and independent concrete diagnosis first",
+    "hold_missing": [
+      "new common support",
+      "new environment/model/TP2",
+      "enterprise policy/approval"
+    ],
+    "input_handoff_fields": [
+      "ID",
+      "held branch",
+      "exact required input",
+      "return owner role",
+      "action after input",
+      "possible work without input"
+    ],
+    "S2_only_AWS_query_and_operation": true,
+    "S1_AWS_query_prohibited": true,
+    "new_chat_agent_automation_or_deadline_reset": false
   }
 }

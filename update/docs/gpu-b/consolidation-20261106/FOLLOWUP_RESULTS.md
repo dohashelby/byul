@@ -436,6 +436,14 @@ root는 현재 원full7 사본과 기존 ledger before/after/receipt의 SHA 연�
 
 S1 보조 AWS 조회 배정은 기존 사용자의 S1 AWS조회 금지 경계와 맞지 않아 철회됐고 실제 S1 AWS/browser/CLI/remote 동작은0이다. S2가 조회·운영을 단독 담당한다. legacyR1 archive health를 현재 R3 health/boot 근거로 사용하지 않고 정확 현재 CID/control·원 positive preflight로 연결한다.25개 한정 마감 제안/18개 제품 증거 추가 필요와 전체 분기 완료 미확정은 유지한다.
 
+## 2026-11-08 새 GB11 첫 무결성 검증과 독립 작업 우선순위
+
+세션6이 새 GB11 archive408,550 bytes/SHA256 `9615e3f54b2e3902560c7be527b787aa5d9d8ca3523f2adfda19d60f15097c9c`의200member 최초 전체 CRC·199 payload bytes/SHA·manifest 정확 집합·실제 UI 원본/사본 일치를 확인했다. archive에 보관된11자산은 원 payload6dd28 pin과 같다. 원manifest의 `whole_question_complete=false`·`retained_model_archived=false`는 유지한다. archive의 논리 R1 RUN 태그와 bootstrap-health legacyR1 부록을 현재 R3 health/boot 근거로 쓰지 않는다. producer CID/원 request·내용·제품 Ref/복원 여부·소유정리·현재원조회와의 의미 연결은 이어서 검증한다.
+
+첫 무결성 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/GB11-first-integrity-review-v1.json`, SHA256 `6f1716814c0d5a529631befa965df3d89905cb12982f4901759712a2f3c1741b`다. 같은 archive의 CRC/원모델·CPU·기존자료는 반복하지 않고 S1은 지정된 readiness 원로그/기한 기록만 로컬 진단한다. S2는원반출·정리·현재중지·비용만단독운영, S6는새원자료의의미·실행/Ref/정리검증을담당한다.
+
+새 공통 지원·새 환경/모델/TP2·기업 정책/승인이 없어 막힌 분기는 보류하고 기존 지원·자료·승인 환경으로 가능한 독립 작업을 먼저 수행한다. 보류 분기를 다른 작업의 선행조건으로 만들지 않는다. 부족 입력은 ID/보류 분기/정확 필요한 입력/반환 담당 역할/수신 후 할 일/입력 없이 가능한 일의6열로 기존 [반환 계약](DEPENDENCY_RETURNS.md)에 연결한다. 원 FAIL/UNKNOWN·출처·세대·정확 Ref를 유지하며 미측정 UNKNOWN 인계와 제품 PASS를 합치지 않는다. 새 채팅/에이전트/자동화·기한reset·진행 표시용 새실험은 만들지 않는다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

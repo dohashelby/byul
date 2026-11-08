@@ -159,7 +159,7 @@ umask 027
 
 `--public-report-dir`는 설치기가 준비한 관측 GID·2750 폴더에 실행 결과를 **0640 원자 게시**한다. 새 회차 파일만 생성하며 기존 회차를 덮어쓰지 않는다. 공개 형식 `serving-runtime-aws-lab-report/1.0`을 Gateway가 kind 형식과 구분해 읽는다. AWS-01~20 중 선택한 사례의 passed/failed/unknown/not_run만 그대로 표시하며 전체 결과도 그 선택 범위다. run_id·시작/완료 시각·환경(context/namespace)·엔진을 보존한다. 주소/클라우드 식별자/자격값이 든 환경명은 안정된 해시 별칭으로 표시한다. 원시 명령·facts·예외 이유·주소는 공개하지 않고, 상세 JSON/Markdown은 기존 evidence 회차 폴더의 0600 파일로 남긴다. 공개 게시 실패는 종료 2이며 상세 evidence는 남는다. 실패·미확인 실행도 게시하고 해당 인수 시험 종료 코드(1/3)를 유지한다. 실행 전 오류로 결과가 없으면 게시하지 않는다.
 
-**kind 전용 `tools/k8s_lab_check.py`는 fake engine과 관리 정책을 생성·삭제하므로 AWS 엔진에 사용하지 않는다.** kind의 `--public-report-dir`은 kind 시험 workload·유지보수 복원 절차가 갖춰진 별도 환경에서만 사용한다. AWS에서 Lab 칸을 채우려고 kind checker나 과거 JSON을 실행/복사하지 않는다. 플랫폼은 공유 kind 계약을 변경하지 않고 내부 조회 스키마에서 AWS 사례 ID를 허용하며, 웹은 ID·환경·시각을 그대로 표시한다.
+**kind 전용 `tools/k8s_lab_check.py`는 fake engine과 관리 정책을 생성·삭제하므로 AWS 엔진에 사용하지 않는다.** kind의 `--public-report-dir`은 kind 시험 workload·유지보수 복원 절차가 갖춰진 별도 환경에서만 사용한다. AWS에서 Lab 칸을 채우려고 kind checker나 과거 JSON을 실행/복사하지 않는다. 공용 계약 `runtime-lab-report`가 kind L-01~L-08과 AWS-01~AWS-20을 함께 허용하며(2026-11-08 사용자 승인), 웹은 ID·환경·시각을 그대로 표시한다.
 
 Gateway는 디렉터리의 최신 JSON(mtime, 동률이면 파일명)을 선택한다. 과거 보고서를 복사해 이번 결과로 삼지 말고 화면의 실행 시각·환경을 확인한다. 아직 JSON이 없으면 `missing`으로 표시하며 배포 때 예시를 채우지 않는다. 서버에서는 `stat`으로 상위/하위 폴더 2750·관측 GID와 두 공개 JSON의 0640·GID를 확인하고, Gateway UID 10000/보조 그룹 10010으로 읽기 성공·쓰기 거부, `/api/runtime/tetragon-status`의 fresh/오류·실제 모드 및 `/api/runtime/lab-report`의 missing→실행 결과·시각을 대조한다. 이번 수정에서는 AWS 접속·서버 실행을 하지 않았다.
 

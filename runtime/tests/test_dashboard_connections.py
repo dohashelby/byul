@@ -198,8 +198,11 @@ class ExternalEnforcementTests(unittest.TestCase):
             intent_path = root / "intent.json"
             intent_path.write_bytes((ROOT / "deploy/lab/intent.lab.json").read_bytes())
             bundle = {"policy_ref": {"policy_id": policy.policy_id, "policy_version": policy.policy_version,
-                                     "sha256": policy_state.sha256},
-                      "files": [{"role": "enforcement_intent", "applied": True}]}
+                                     "sha256": "b" * 64},
+                      "files": [{"role": "gateway_policy", "path": "runtime-policy.json",
+                                 "sha256": policy_state.sha256, "applied": True},
+                                {"role": "enforcement_intent", "path": "intent.json",
+                                 "sha256": hashlib.sha256(intent_path.read_bytes()).hexdigest(), "applied": True}]}
             public = root / "shared/state.json"
             config = MVPConfig(policy_path=str(policy_path), data_dir=str(root / "data"),
                 observation_intent_path=str(intent_path), policy_bundle=bundle, tetragon_state_path=str(public),
@@ -221,8 +224,15 @@ class ExternalEnforcementTests(unittest.TestCase):
                 status = app.status()
             self.assertEqual(status["policy"]["external_enforcement"], "monitor")
             self.assertEqual(status["policy_state"]["external_enforcement"], "monitor")
-            for unbound in (None, {**bundle, "policy_ref": {**bundle["policy_ref"], "sha256": "b" * 64}},
-                            {**bundle, "files": [{"role": "enforcement_intent", "applied": False}]}):
+            unbound_bundles = [None]
+            for field in ("policy_id", "policy_version"):
+                unbound_bundles.append({**bundle, "policy_ref": {**bundle["policy_ref"], field: "other"}})
+            unbound_bundles.extend([
+                {**bundle, "files": [{**bundle["files"][0], "sha256": "0" * 64}, bundle["files"][1]]},
+                {**bundle, "files": [bundle["files"][1]]},
+                {**bundle, "files": [bundle["files"][0], {**bundle["files"][1], "applied": False}]},
+            ])
+            for unbound in unbound_bundles:
                 unbound_app = GatewayApp(MVPConfig(policy_path=str(policy_path), data_dir=str(root / "unbound"),
                     observation_intent_path=str(intent_path), policy_bundle=unbound, tetragon_state_path=str(public),
                     observation_feeds=(("tetragon", str(root / "feed.jsonl")),)), policy_state, ("127.0.0.1", 1))

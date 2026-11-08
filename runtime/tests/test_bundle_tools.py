@@ -1,5 +1,6 @@
 import hashlib
 from contextlib import nullcontext, redirect_stdout
+from datetime import datetime, timezone
 import io
 import json
 import os
@@ -19,6 +20,11 @@ from serving_runtime.bundle_tools import (build_bundle, apply_bundle, _canonical
                                           _status, StatusMismatch,
                                           StatusUnavailable)
 from serving_runtime.cli import main
+from serving_runtime.enforcement.intent import load_intent
+from serving_runtime.enforcement.tetragon import comparable_spec, render_manifests
+from serving_runtime.mvp.app import GatewayApp
+from serving_runtime.mvp.config import MVPConfig
+from serving_runtime.mvp.policy import load_policy
 from serving_runtime.mvp.policy_bundle import verify_policy_bundle
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -65,6 +71,41 @@ class BundleToolsTest(unittest.TestCase):
         self.assertIn("자기 신고", output.getvalue())
         bundle = verify_policy_bundle(self.out / engine)
         return bundle, lab
+
+    def test_built_bundle_binds_external_enforcement_to_gateway_file_hash(self):
+        bundle, _ = self._build("vllm")
+        feeds = (("tetragon", str(self.root / "feed.jsonl")),)
+        options, bundle_status = bundle.mvp_options(feeds)
+        policy_state = load_policy(options["policy_path"])
+        self.assertTrue(policy_state.ok)
+        self.assertNotEqual(bundle_status["policy_ref"]["sha256"], policy_state.sha256)
+        gateway_file = next(f for f in bundle_status["files"] if f["role"] == "gateway_policy")
+        self.assertEqual(gateway_file["sha256"], policy_state.sha256)
+        public = self.root / "tetragon-state.json"
+        config = MVPConfig(**options, data_dir=str(self.root / "data"), policy_bundle=bundle_status,
+                           tetragon_state_path=str(public), observation_feeds=feeds)
+        app = GatewayApp(config, policy_state, ("127.0.0.1", 1))
+        context = json.loads(Path(options["target_path"]).read_text())["kubernetes"]["context"]
+        sample = {"schema_version": "runtime-tetragon-state/1.0", "context": context,
+                  "generated_at": datetime.now(timezone.utc).isoformat(), "state": "ok",
+                  "agents": [{"node": "test-node"}], "policies": [],
+                  "capabilities": [], "transitions": [], "verifications": []}
+        for manifest in render_manifests(load_intent(options["observation_intent_path"])).values():
+            digest = hashlib.sha256(json.dumps(comparable_spec(manifest["spec"]), sort_keys=True,
+                                               separators=(",", ":")).encode()).hexdigest()
+            sample["policies"].append({"node": "test-node", "namespace": manifest["metadata"]["namespace"],
+                                       "name": manifest["metadata"]["name"], "id": "1", "state": "enabled",
+                                       "mode": "monitor", "spec_sha256": digest})
+        public.write_text(json.dumps(sample))
+        self.assertEqual(app.policy_status()["external_enforcement"], "monitor")
+        sample["policies"][0]["mode"] = "enforce"
+        public.write_text(json.dumps(sample))
+        self.assertEqual(app.policy_status()["external_enforcement"], "mixed")
+
+        # Even the same ID/version cannot bind a different Gateway policy file.
+        gateway_file["sha256"] = "0" * 64
+        mismatched_app = GatewayApp(config, policy_state, ("127.0.0.1", 1))
+        self.assertEqual(mismatched_app.policy_status()["external_enforcement"], "unknown")
 
     def test_build_bundle_with_enforced_secret_intent(self):
         self._build("vllm")

@@ -25,6 +25,7 @@ ETC = Path("/etc/serving-runtime")
 STATE = Path("/var/lib/serving-runtime")
 OBSERVATION = Path("/srv/serving/observation")
 DATA = Path("/srv/serving/runtime/data")
+VERIFICATION = Path("/srv/serving/verification")
 BASELINE = STATE / "baseline.json"
 GRUB = Path("/etc/default/grub.d/99-byul-bpf-lsm.cfg")
 LSM_FILE = Path("/sys/kernel/security/lsm")
@@ -60,7 +61,7 @@ def permission_code(error):
     filename = str(error.filename or "")
     for path in ("/var/lib/serving-runtime", "/etc/serving-runtime", "/etc/sudoers.d",
                  "/opt/byul/runtime", "/etc/systemd/system", "/srv/serving/observation",
-                 "/srv/serving/runtime/data", "/srv/serving/bundles",
+                 "/srv/serving/runtime/data", "/srv/serving/bundles", "/srv/serving/verification",
                  "/etc/default/grub.d", "/etc/default/grub", "/sys/kernel/security/lsm",
                  "/run/byul-runtime-install.lock"):
         if filename == path or filename.startswith(path + "/"):
@@ -401,6 +402,12 @@ def install_accounts(config):
     if not required <= set(os.getgrouplist("runtime-agent", account.pw_gid)):
         run(["usermod", "--append", "--groups", ",".join(map(str, sorted(required))), "runtime-agent"])
     require(required <= set(os.getgrouplist("runtime-agent", account.pw_gid)), "계정 보조 그룹 검증 실패.")
+    observer = pwd.getpwnam(config["OBSERVATION_USER"])
+    observe_gid = int(config["OBSERVE_GID"])
+    if observe_gid not in os.getgrouplist(config["OBSERVATION_USER"], observer.pw_gid):
+        run(["usermod", "--append", "--groups", str(observe_gid), config["OBSERVATION_USER"]])
+    require(observe_gid in os.getgrouplist(config["OBSERVATION_USER"], observer.pw_gid),
+            "관측 사용자 보조 그룹 검증 실패.")
     return account
 
 
@@ -557,6 +564,13 @@ def install(config, args, artifacts, grub):
                       int(config["OBSERVE_GID"]), 0o2750)
             directory(OBSERVATION / "lab-reports", pwd.getpwnam(config["OBSERVATION_USER"]).pw_uid,
                       int(config["OBSERVE_GID"]), 0o2750)
+            # Only an administrator publishes reviewed inputs. Never seed approvals,
+            # including an empty revocation list, from the server's current state.
+            with checking("6–7", "VERIFICATION_PERMISSIONS"):
+                directory(VERIFICATION, 0, int(config["OBSERVE_GID"]), 0o2750)
+                directory(VERIFICATION / "approved", 0, int(config["GATEWAY_DATA_GID"]), 0o2750)
+                directory(VERIFICATION / "candidates", pwd.getpwnam(config["OBSERVATION_USER"]).pw_uid,
+                          int(config["OBSERVE_GID"]), 0o2750)
             # The Gateway UID is 10000, independently of its configured data GID.
             directory(DATA, 10000, int(config["GATEWAY_DATA_GID"]), 0o750)
             for path in (ETC / "kubeconfig", ETC / "viewer.env", OBSERVATION, DATA):

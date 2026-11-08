@@ -497,6 +497,25 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         stack.enter_context(redirect_stdout(io.StringIO()))
         return mocks
 
+    def test_observation_group_membership_is_added_once_without_gateway_data_group(self):
+        config = installer.load_config(self.config)
+        observer_name = config["OBSERVATION_USER"]
+        accounts = {"runtime-agent": SimpleNamespace(pw_uid=999, pw_gid=999),
+                    observer_name: SimpleNamespace(pw_uid=1000, pw_gid=1000)}
+        groups = {"runtime-agent": {999, 10000, 10010}, observer_name: {1000}}
+        def run(command):
+            self.assertEqual(command[:3], ["usermod", "--append", "--groups"])
+            groups[command[-1]].update(map(int, command[3].split(",")))
+        with patch.object(installer.grp, "getgrgid"), patch.object(installer.grp, "getgrnam"), \
+                patch.object(installer, "group_check"), \
+                patch.object(installer.pwd, "getpwnam", side_effect=accounts.__getitem__), \
+                patch.object(installer.os, "getgrouplist", side_effect=lambda name, gid: list(groups[name])), \
+                patch.object(installer, "run", side_effect=run) as runner:
+            installer.install_accounts(config)
+            installer.install_accounts(config)
+        runner.assert_called_once_with(["usermod", "--append", "--groups", "10010", observer_name])
+        self.assertNotIn(10000, groups[observer_name])
+
     def test_pending_bpf_reboot_never_captures_or_enables_services(self):
         config = installer.load_config(self.config)
         args = SimpleNamespace(capture_baseline=True)
@@ -540,6 +559,12 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         mocks["summary"].assert_called_once()
         mocks["directory"].assert_any_call(installer.OBSERVATION / "tetragon-status", 999, 10010, 0o2750)
         mocks["directory"].assert_any_call(installer.OBSERVATION / "lab-reports", 1000, 10010, 0o2750)
+        mocks["directory"].assert_any_call(installer.VERIFICATION, 0, 10010, 0o2750)
+        mocks["directory"].assert_any_call(installer.VERIFICATION / "approved", 0, 10000, 0o2750)
+        mocks["directory"].assert_any_call(installer.VERIFICATION / "candidates", 1000, 10010, 0o2750)
+        # Installation must never write an approval or silently seed empty revocations.
+        self.assertFalse(any(installer.VERIFICATION in call.args[0].parents
+                             for call in mocks["write_file"].call_args_list))
 
 
 if __name__ == "__main__":

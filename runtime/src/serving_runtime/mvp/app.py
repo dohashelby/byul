@@ -429,6 +429,8 @@ class GatewayApp:
         # Keep the module-level name so serving_runtime.mvp.app.check_assets remains
         # the patch point used by the asset collector tests.
         started = time.monotonic()
+        if not Path(self.config.asset_manifest_path).exists():
+            raise ValueError("ASSET_MANIFEST_NOT_APPROVED: 승인본 없음 — 무결성 기준 미설정/미승인")
         manifest = load_asset_manifest(self.config.asset_manifest_path)
         result = check_assets(manifest)
         result["duration_s"] = time.monotonic() - started

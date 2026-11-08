@@ -7,6 +7,9 @@
 #   /srv/serving/runtime/data   Gateway records, owner 10000, 0700
 #   /srv/serving/bundles        platform policy bundles, read-only here
 #   /srv/serving/observation    host collector output, group 10010 read-only
+# Before apply/restart: publish the reviewed revocations.json, then run
+# tools.gpu_lab_gateway_preflight on the target host with these final hostPaths.
+# See README.md; missing revocations fail closed, missing directories prevent startup.
 # The auth config is a Secret with token hashes only:
 #   kubectl -n serving-lab create secret generic serving-gateway-auth --from-file=auth.json
 # The enforcement intent comes in the bundle (role enforcement_intent); it is
@@ -46,6 +49,14 @@ spec:
             - /etc/serving/backend/backend.json
             - --policy-bundle
             - /etc/serving/bundles/current
+            - --asset-manifest
+            - /etc/serving/verification/asset-manifest.json
+            - --baseline
+            - /etc/serving/verification/baseline.json
+            - --manifest
+            - /etc/serving/verification/manifest.json
+            - --revocations
+            - /etc/serving/verification/revocations.json
             - --target-pod-snapshot
             - /srv/serving/observation/target-pods.json
             - --observation-timeline
@@ -86,6 +97,8 @@ spec:
           volumeMounts:
             - {name: backend-config, mountPath: /etc/serving/backend, readOnly: true}
             - {name: bundles, mountPath: /etc/serving/bundles, readOnly: true}
+            - {name: verification, mountPath: /etc/serving/verification, readOnly: true}
+            - {name: model, mountPath: /models, readOnly: true}
             - {name: auth, mountPath: /etc/serving/auth, readOnly: true}
             - {name: runtime-data, mountPath: /srv/serving/runtime/data}
             - {name: observation, mountPath: /srv/serving/observation, readOnly: true}
@@ -95,6 +108,13 @@ spec:
           configMap: {name: serving-gateway-backend}
         - name: bundles
           hostPath: {path: /srv/serving/bundles, type: Directory}
+        - name: verification
+          hostPath: {path: /srv/serving/verification/approved, type: Directory}
+        # SGLang's checked-in snapshot path. The live vLLM path is UNCONFIRMED:
+        # inspect it with kubectl in run 12 and update this server copy to match.
+        # Reconcile after every model switch; run preflight before apply/restart.
+        - name: model
+          hostPath: {path: /srv/serving/models/7ae557604adf67be50417f59c2c2f167def9a775, type: Directory}
         - name: auth
           secret: {secretName: serving-gateway-auth}
         - name: runtime-data

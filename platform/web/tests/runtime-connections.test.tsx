@@ -49,3 +49,15 @@ it("과거 Lab 결과의 회차·환경·시작/완료 시각과 현재 상태�
   expect(screen.getAllByText(/2020/).length).toBe(2);
   expect(screen.getByText(/현재 정책의 차단 상태를 보장하지 않습니다/)).toBeTruthy();
 });
+
+it.each([
+  ["not_revoked", "ok", "폐기 목록 확인됨 · 해당 정책 폐기 없음"],
+  ["REVOCATIONS_NOT_FOUND", "unknown", "폐기 목록 파일 없음"],
+  ["REVOCATIONS_READ_ERROR", "unknown", "폐기 목록 읽기 오류"],
+])("폐기 목록 결과 %s를 구분한다", async (result, state, text) => {
+  const status = structuredClone(STATUS);
+  status.policy.validity_items = [{ item: "revocation", state, result }];
+  mockApi({ "/api/runtime/status": { item: status, source: SOURCE } });
+  renderAt("/runtime/policy", "/runtime/policy", <RuntimePolicyPage />);
+  expect(await screen.findByText(text)).toBeTruthy();
+});

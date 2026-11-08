@@ -267,7 +267,12 @@ export const APPROVAL_DETAIL: Record<string, string> = {
 };
 
 export const VALIDITY_ITEM: Record<string, string> = { period: "기간", revocation: "철회", approval: "승인 확인" };
-export const VALIDITY_RESULT: Record<string, string> = { not_configured: "미설정", POLICY_APPROVAL_VERIFIED: "확인됨" };
+export const VALIDITY_RESULT: Record<string, string> = {
+  not_configured: "미설정", POLICY_APPROVAL_VERIFIED: "확인됨",
+  not_revoked: "폐기 목록 확인됨 · 해당 정책 폐기 없음", revoked: "폐기된 정책",
+  REVOCATIONS_NOT_FOUND: "폐기 목록 파일 없음", REVOCATIONS_READ_ERROR: "폐기 목록 읽기 오류",
+  MALFORMED_REVOCATIONS: "폐기 목록 JSON 오류", INVALID_REVOCATIONS: "폐기 목록 형식 오류",
+};
 
 export const RT_TRIGGER: Record<string, string> = {
   asset_changed: "자산 변경",

@@ -33,6 +33,8 @@ baseline이 없을 때만 `--capture-baseline`을 사용한다. runtime-agent로
 
 ## 별도 사용자 서비스
 
+공유 폴더 단계 `6–7/9`의 `VERIFICATION_PERMISSIONS`는 `/srv/serving/verification`을 root 소유·OBSERVE_GID·2750으로, `approved`를 root 소유·GATEWAY_DATA_GID·2750으로, `candidates`를 OBSERVATION_USER 소유·OBSERVE_GID·2750으로 멱등 준비한다. 계정 단계는 OBSERVATION_USER의 관측 그룹 가입도 확인·보완한다. 기존 사용자 서비스는 재시작 후 그룹을 확인한다. 승인 파일은 자동 생성/교체하지 않는다. [업데이트 검증 후보와 승인](../../docs/업데이트검증_후보와승인.md)의 도구가 후보/승인 문서·검토 기록을 명시 0640으로 원자 저장한다. Gateway에는 approved만 읽기 전용으로 붙인다. 모델 파일의 UID 10000 읽기 권한과 엔진/Gateway의 snapshot 일치는 운영자가 확인한다. 모델/구성 기준선은 설치기의 Tetragon baseline과 별개다. 새 Gateway의 폐기 목록 인자를 적용하기 전에 빈 목록 여부까지 사람이 검토·게시해야 하며, 파일 없음/읽기 오류는 기존 규칙대로 추론을 비활성화한다.
+
 `byul-observation-feed`·`byul-tetragon-identities`는 현재 서버처럼 **ubuntu 사용자 서비스**로 유지한다. 설치기는 이 둘을 중지·설치·시작하지 않는다. [GPU LAB README](../gpu-lab/README.md)의 식별 수집 절차에 따라 사용자 자신의 코드 사본·context·namespace·GID를 맞추고 사용자 manager의 그룹과 필요 시 linger를 검수한다. `/srv/serving/observation`의 소유자는 `OBSERVATION_USER`, GID는 10010, mode는 2750이며 새 식별 자료는 명시 0640이다. 실제 사용자 서비스 재시작 뒤 폴더 setgid와 파일 GID·0640, Gateway 읽기를 확인한다. 같은 경로에 수집기를 중복 실행하지 않는다.
 
 설치기는 관측 폴더 하위 `tetragon-status`를 runtime-agent 소유·관측 GID·2750으로, `lab-reports`를 OBSERVATION_USER 소유·관측 GID·2750으로 준비한다. 상위 2750에는 runtime-agent의 쓰기 권한이 없으므로 상태 전용 하위 폴더를 사용한다. 상태 서비스의 `--public-output`과 `ReadWritePaths`는 그 하위 폴더로 제한한다. 원본 `/var/lib/serving-runtime/tetragon-state.json`과 baseline/evidence 권한·위치는 유지한다. 공개 사본만 명시 0640으로 원자 교체하며 부모 setgid와 그룹을 보존한다. 최초 baseline 캡처에도 공개 사본 옵션을 쓴다.

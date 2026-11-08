@@ -1,6 +1,7 @@
 import copy
 from datetime import datetime, timedelta, timezone
 import json
+import os
 from pathlib import Path
 import shlex
 import subprocess
@@ -210,6 +211,26 @@ class AttributionTests(unittest.TestCase):
 
 
 class IdentityCollectorTests(unittest.TestCase):
+    def test_identity_permissions_survive_umask_and_atomic_replacement(self):
+        for mask in (0o002, 0o077):
+            with self.subTest(umask=mask), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "identities.json"
+                output.write_text("old")
+                output.chmod(0o644)
+                # Error snapshots contain the same sensitive scope metadata.
+                def unavailable(command):
+                    return SimpleNamespace(returncode=1, stdout="")
+                previous = os.umask(mask)
+                try:
+                    collector = IdentityCollector("test", "serving", "app=engine", output,
+                                                  runner=unavailable)
+                    self.assertEqual(collector.collect()["state"], "error")
+                    self.assertEqual(output.stat().st_mode & 0o777, 0o640)
+                    collector.collect()
+                    self.assertEqual(output.stat().st_mode & 0o777, 0o640)
+                finally:
+                    os.umask(previous)
+
     def test_procfs_is_read_inside_matching_node_and_data_is_scoped(self):
         calls = []
         def runner(command):
@@ -231,6 +252,7 @@ class IdentityCollectorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             result = IdentityCollector("kind-test", "serving", "app=engine", Path(directory)/"state.json", runner=runner).collect()
             self.assertEqual(result["state"], "ok")
+            self.assertEqual((Path(directory)/"state.json").stat().st_mode & 0o777, 0o640)
             self.assertEqual(result["records"][0]["ns_pid"], 12)
             self.assertTrue(result["policies"][0]["kernel_identity"])
             self.assertEqual(result["records"][0]["binary_aliases"],

@@ -1,3 +1,10 @@
+## 2026-11-08 — SUP-09·11 model-entry 지원 계약(B 의존 반환 1)
+
+- 한 일: v1(12사례 import·constructor)을 그대로 두고 `guard-model-entry/1` 계약(실제 선택 모델 클래스 source·trust·모드·import/constructor/forward·정상 대조)과 실제 생산자(컨테이너 안 RUNNER, 무해 사용자 모델)·수집 도구를 만들었다. 로컬에 transformers가 없어 k3d vLLM CPU 이미지 안에서 실제 생산자를 돌렸다(의존성 추가 없음). 상세 `docs/dev-1/sup09-model-entry.md`.
+- 테스트 결과: 새 시험 16 통과. 실제 행: trust=False 3모드 거부·코드 0, trust=True 3모드 선택·forward. -OO 내장 GPT2 정상 대조 실패로 complete=false(보존). 공급 boot 기존 7개 로컬 실패는 HEAD에서도 같음.
+- 다음 단계: B 의존 반환 2~5·8, TP2(할당량 대기).
+- 막힌 것: -OO 지원 범위는 라이브러리 담당 결정. AWS 할당량 승인.
+
 ## 2026-11-08 — LIF-11 복구 계보 공통 입력(B 의존 반환 7)
 
 - 한 일: `failed-group-resources` 생산자(관측기·생산자·전송 메서드·계보 요약)를 만들고 계약에 `failure_trigger`·`normal_inference` 행을 더했다. 실패 전·후 소유 그룹의 프로세스·unix socket·/dev/shm·장치 fd inventory로 반환·잔존·다음 세대·정상 추론을 잇는다. GPU 메모리 반환은 공백으로 남긴다. 미등록. 상세 `docs/dev-1/lif11-recovery-lineage.md`.

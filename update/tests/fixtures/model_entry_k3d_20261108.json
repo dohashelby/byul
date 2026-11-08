@@ -1,0 +1,254 @@
+{
+ "contract": "guard-model-entry/1",
+ "fixture_sha256": {
+  "config.json": "fa3bf4f210d38af33a18bbff24ebe3c8d5107451c685a4916913a911401a7c70",
+  "configuration_b2probe.py": "c1fdc8eddf21896524a9c209b7906d06305b2a8df67cde26f01ff6f08dde32e8",
+  "modeling_b2probe.py": "1b6f9f58c79f9100ea9bb765068f4d8584160906c44f3d043f610eb23c7a3eae"
+ },
+ "rows": [
+  {
+   "case_id": "model-entry-False-normal",
+   "entry": "model-entry",
+   "trust": false,
+   "mode": "normal",
+   "contract": "guard-model-entry/1",
+   "case_identity": "cb0a6345ac1de840344652bb6e2fc69ead5d19cf6d3280b79b0a66424ea1297d",
+   "outcome": "rejected_at_trust_gate",
+   "python_optimize": 0,
+   "selected_source_sha256": null,
+   "selected_source_matches": false,
+   "selected_class_sha256": null,
+   "forward_completed": false,
+   "before": {
+    "outcome": "accepted",
+    "forward_completed": true
+   },
+   "error_type": "ValueError",
+   "after": {
+    "outcome": "accepted",
+    "forward_completed": true
+   },
+   "events": [],
+   "event_collection_status": "completed",
+   "versions": {
+    "transformers": "5.17.0",
+    "torch": "2.13.0+cpu"
+   },
+   "exit_code": 0
+  },
+  {
+   "case_id": "model-entry-False-O",
+   "entry": "model-entry",
+   "trust": false,
+   "mode": "O",
+   "contract": "guard-model-entry/1",
+   "case_identity": "2b656066c4bc88e0e692c1c1355f45db7df1b3f2624c2d95308abbb83ef7b5b8",
+   "outcome": "rejected_at_trust_gate",
+   "python_optimize": 1,
+   "selected_source_sha256": null,
+   "selected_source_matches": false,
+   "selected_class_sha256": null,
+   "forward_completed": false,
+   "before": {
+    "outcome": "accepted",
+    "forward_completed": true
+   },
+   "error_type": "ValueError",
+   "after": {
+    "outcome": "accepted",
+    "forward_completed": true
+   },
+   "events": [],
+   "event_collection_status": "completed",
+   "versions": {
+    "transformers": "5.17.0",
+    "torch": "2.13.0+cpu"
+   },
+   "exit_code": 0
+  },
+  {
+   "case_id": "model-entry-False-OO",
+   "entry": "model-entry",
+   "trust": false,
+   "mode": "OO",
+   "contract": "guard-model-entry/1",
+   "case_identity": "44e0aaf63aca2e43ccf9a24611e3dafce829c63b2fc5c68b97f914e11ac7c2e3",
+   "outcome": "rejected_at_trust_gate",
+   "python_optimize": 2,
+   "selected_source_sha256": null,
+   "selected_source_matches": false,
+   "selected_class_sha256": null,
+   "forward_completed": false,
+   "before": {
+    "outcome": "execution_error",
+    "forward_completed": false,
+    "error_type": "ValueError"
+   },
+   "error_type": "ValueError",
+   "after": {
+    "outcome": "execution_error",
+    "forward_completed": false,
+    "error_type": "ValueError"
+   },
+   "events": [],
+   "event_collection_status": "completed",
+   "versions": {
+    "transformers": "5.17.0",
+    "torch": "2.13.0+cpu"
+   },
+   "exit_code": 0
+  },
+  {
+   "case_id": "model-entry-True-normal",
+   "entry": "model-entry",
+   "trust": true,
+   "mode": "normal",
+   "contract": "guard-model-entry/1",
+   "case_identity": "c7be0a46545baa23f7608813eb31fc1795ef1a1033fbc750e3376bb783583e90",
+   "outcome": "accepted",
+   "python_optimize": 0,
+   "selected_source_sha256": "1b6f9f58c79f9100ea9bb765068f4d8584160906c44f3d043f610eb23c7a3eae",
+   "selected_source_matches": true,
+   "selected_class_sha256": "161e671ec9d8230cdc7fc188662f985a0f8cf1c8c90033fbb863d31a4bc1a27e",
+   "forward_completed": true,
+   "before": {
+    "outcome": "accepted",
+    "forward_completed": true
+   },
+   "after": {
+    "outcome": "accepted",
+    "forward_completed": true
+   },
+   "events": [
+    {
+     "phase": "import",
+     "module": "configuration"
+    },
+    {
+     "phase": "import",
+     "module": "configuration"
+    },
+    {
+     "phase": "import",
+     "module": "modeling"
+    },
+    {
+     "phase": "constructor",
+     "module": "modeling"
+    },
+    {
+     "phase": "forward",
+     "module": "modeling"
+    }
+   ],
+   "event_collection_status": "completed",
+   "versions": {
+    "transformers": "5.17.0",
+    "torch": "2.13.0+cpu"
+   },
+   "exit_code": 0
+  },
+  {
+   "case_id": "model-entry-True-O",
+   "entry": "model-entry",
+   "trust": true,
+   "mode": "O",
+   "contract": "guard-model-entry/1",
+   "case_identity": "38d8d37186cba45ff0f6ff7de1363499b89211d9f6d9c144154ec4119bcf3865",
+   "outcome": "accepted",
+   "python_optimize": 1,
+   "selected_source_sha256": "1b6f9f58c79f9100ea9bb765068f4d8584160906c44f3d043f610eb23c7a3eae",
+   "selected_source_matches": true,
+   "selected_class_sha256": "161e671ec9d8230cdc7fc188662f985a0f8cf1c8c90033fbb863d31a4bc1a27e",
+   "forward_completed": true,
+   "before": {
+    "outcome": "accepted",
+    "forward_completed": true
+   },
+   "after": {
+    "outcome": "accepted",
+    "forward_completed": true
+   },
+   "events": [
+    {
+     "phase": "import",
+     "module": "configuration"
+    },
+    {
+     "phase": "import",
+     "module": "configuration"
+    },
+    {
+     "phase": "import",
+     "module": "modeling"
+    },
+    {
+     "phase": "constructor",
+     "module": "modeling"
+    },
+    {
+     "phase": "forward",
+     "module": "modeling"
+    }
+   ],
+   "event_collection_status": "completed",
+   "versions": {
+    "transformers": "5.17.0",
+    "torch": "2.13.0+cpu"
+   },
+   "exit_code": 0
+  },
+  {
+   "case_id": "model-entry-True-OO",
+   "entry": "model-entry",
+   "trust": true,
+   "mode": "OO",
+   "contract": "guard-model-entry/1",
+   "case_identity": "dd572779bcdefe19ff1946632021c61e6021bdfaa2d4eeadfdfe5639b4b576b5",
+   "outcome": "accepted",
+   "python_optimize": 2,
+   "selected_source_sha256": "1b6f9f58c79f9100ea9bb765068f4d8584160906c44f3d043f610eb23c7a3eae",
+   "selected_source_matches": true,
+   "selected_class_sha256": "161e671ec9d8230cdc7fc188662f985a0f8cf1c8c90033fbb863d31a4bc1a27e",
+   "forward_completed": true,
+   "before": {
+    "outcome": "execution_error",
+    "forward_completed": false,
+    "error_type": "ValueError"
+   },
+   "after": {
+    "outcome": "execution_error",
+    "forward_completed": false,
+    "error_type": "ValueError"
+   },
+   "events": [
+    {
+     "phase": "import",
+     "module": "configuration"
+    },
+    {
+     "phase": "import",
+     "module": "configuration"
+    },
+    {
+     "phase": "import",
+     "module": "modeling"
+    },
+    {
+     "phase": "constructor",
+     "module": "modeling"
+    },
+    {
+     "phase": "forward",
+     "module": "modeling"
+    }
+   ],
+   "event_collection_status": "completed",
+   "versions": {
+    "transformers": "5.17.0",
+    "torch": "2.13.0+cpu"
+   },
+   "exit_code": 0
+  }
+ ]
+}

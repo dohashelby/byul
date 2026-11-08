@@ -245,6 +245,7 @@
   "update/src/guard/executors/credential_revocation_contract.py": "64f20f0793d10d6ce2320c003cbbeb70f2067a3a92fa89866687f1156af7b402",
   "update/src/guard/executors/direct_route.py": "94688a29a8e027c431b91e5480a61f148f98abd6d2eb8bd3739143d371084077",
   "update/src/guard/executors/dynamic_code_cpu.py": "cf91f156ece53a4210d12eb936d890c4eab0cd5000d29d4cab9bd171d652d573",
+  "update/src/guard/executors/dynamic_model_entry.py": "0163bb6ed3104bda469523a72290a70a431645738a8c082a4bbf941c0015ecae",
   "update/src/guard/executors/egress_probe.py": "cd5b395f08dc141074964b0804b37f5f9cd3aafbe3db4271b0128dae57d23687",
   "update/src/guard/executors/egress_receiver.py": "f16f8544908e038ddd90d66516eafc3a52cc3bc8b673cccdf4b8e05254aae599",
   "update/src/guard/executors/embedding_cpu.py": "41370c01648ed53c6e9ee81d5b385ffc9533f94a19fa2df699af94872e31cea6",

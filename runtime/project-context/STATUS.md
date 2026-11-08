@@ -2,6 +2,8 @@
 
 최종 갱신: 2026-11-08
 
+- 2026-11-08 AWS 13회차 external_enforcement 해시 결속 보정(기준 `byul_runtime` `dd05d6d`, `58d0160`과 동일 내용, 미커밋): 정책 ID·판본과 `files.gateway_policy.sha256`을 Gateway 로드 해시에 대조하고 정책 정상·intent 적용 조건을 유지했다. 실제 bundle_tools 묶음의 원본/변환 해시 차이·monitor/mixed·파일 해시 불일치 unknown 회귀시험 추가, 기존 가짜 묶음 수정. 관련 43건 통과; 지정 전체 934건 중 818 통과·115 skip·기존 소켓 생성 PermissionError 1건(`test_gateway_serves_snapshot_without_kubernetes_mutation`), 로그 `/tmp/byul-runtime-policy-binding-unittest.log`. AWS 접속·contracts/update 수정·커밋·푸시 없음; 실서버 재확인·Claude 대화형 검수 대기.
+
 - 2026-11-08 AWS 11회차 설치기 실서버 재검증(Codex, 기준 `b2d5dd7`): 수정 설치기로 기존 서버 sudo dry-run·실제 1~9단계 설치 통과. 전체 visudo 정상, 두 허용 명령 형태/namespace·추가 인자 거부, 일반 계정 권한 오류, 임시 비활성 backup 별칭 충돌 감지·파일 보존·서비스 무변경을 실측했다. 실제 재부팅 후 root 서비스 3개·사용자 수집기 2개 자동 시작, 복구 healthy 4/4·모니터 ok·2750/0640·baseline/정책 네 개 보존, 새 에이전트 보고와 정상 추론 3/3 200 확인. 설치 코드·권한의 수동 보정 없음. LAB SSH 역방향 터널은 시험기가 재연결했으므로 터널 자동 복구를 주장하지 않는다.
 - 11회차 증거 반출·내부 artifact 20개 해시 검증 완료: `~/.local/state/serving-runtime/aws-lab/evidence-20261108-run11.tgz`, SHA-256 `5b77dcbab4ffd53a5d1e812d7e60d27d590435255f2699a024991dbdc37b277c`. 정상 요청 후 agent는 설치 전 disabled/inactive로 복원하고 17:05:08 KST Stop 요청 → 17:13:18 stopped 직접 확인(강제 중지 없음). [11회차 결과](../docs/AWS_GPU_서버11회차_결과_20261108.md)에 범위·한계·증거를 기록했다. 새 호스트 최초 설치/GRUB 변경/최초 baseline은 미실행. 기능 코드·계약·update·노트북 서버 프로세스는 변경하지 않았고 결과 문서·STATUS를 사용자 요청으로 문서 PR에 통합한다.
 

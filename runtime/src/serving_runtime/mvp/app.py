@@ -108,8 +108,11 @@ class GatewayApp:
             ref = bundle.get("policy_ref", {})
             policy = policy_state.policy
             if (policy_state.ok and policy is not None
-                    and ref == {"policy_id": policy.policy_id, "policy_version": policy.policy_version,
-                                "sha256": policy_state.sha256}
+                    and ref.get("policy_id") == policy.policy_id
+                    and ref.get("policy_version") == policy.policy_version
+                    # policy_ref.sha256 hashes the platform source, not the Gateway file.
+                    and any(f.get("role") == "gateway_policy" and f.get("sha256") == policy_state.sha256
+                            for f in bundle.get("files", []))
                     and any(f.get("role") == "enforcement_intent" and f.get("applied") is True
                             for f in bundle.get("files", []))):
                 self._expected_tetragon_policies = {

@@ -541,22 +541,37 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         mocks["capture_baseline"].assert_not_called()
         mocks["run"].assert_not_called()
 
+    def test_running_agent_after_install_fails(self):
+        config = installer.load_config(self.config)
+        with ExitStack() as stack:
+            mocks = self.install_mocks(stack)
+            stack.enter_context(patch.object(installer.time, "sleep"))
+            stack.enter_context(patch.object(installer, "active", side_effect=[False] * (2 * len(installer.UNITS)) + [True] * len(installer.AUTO_UNITS) + [True]))
+            with self.assertRaises(installer.InstallError):
+                installer.install(config, SimpleNamespace(capture_baseline=False), installer.render(config), None)
+        mocks["summary"].assert_not_called()
+
     def test_baseline_validation_precedes_ordered_service_start(self):
         config = installer.load_config(self.config)
         events = []
         with ExitStack() as stack:
             mocks = self.install_mocks(stack)
             stack.enter_context(patch.object(installer.time, "sleep"))
-            stack.enter_context(patch.object(installer, "active", side_effect=[False] * (2 * len(installer.UNITS)) + [True] * len(installer.UNITS)))
+            stack.enter_context(patch.object(installer, "active", side_effect=[False] * (2 * len(installer.UNITS)) + [True] * len(installer.AUTO_UNITS) + [False]))
             mocks["capture_baseline"].side_effect = lambda *args: events.append("baseline-verified")
             mocks["run"].side_effect = lambda cmd: events.append(cmd)
             result = installer.install(config, SimpleNamespace(capture_baseline=True), installer.render(config), None)
         self.assertEqual(result, 0)
         expected = ["baseline-verified"]
-        expected += [command for unit in installer.UNITS for command in
+        expected += [command for unit in installer.AUTO_UNITS for command in
                      (["systemctl", "enable", unit], ["systemctl", "is-enabled", "--quiet", unit],
                       ["systemctl", "start", unit])]
+        expected += [["systemctl", "disable", installer.AGENT_UNIT]]
         self.assertEqual(events[events.index("baseline-verified"):], expected)
+        # The agent can change the server, so the installer never enables or starts it.
+        self.assertNotIn(installer.AGENT_UNIT, installer.AUTO_UNITS)
+        self.assertFalse(any(c[:2] in (["systemctl", "enable"], ["systemctl", "start"]) and c[-1] == installer.AGENT_UNIT
+                             for c in events if isinstance(c, list)))
         mocks["summary"].assert_called_once()
         mocks["directory"].assert_any_call(installer.OBSERVATION / "tetragon-status", 999, 10010, 0o2750)
         mocks["directory"].assert_any_call(installer.OBSERVATION / "lab-reports", 1000, 10010, 0o2750)

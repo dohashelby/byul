@@ -35,6 +35,10 @@ SUDOERS_DIR = Path("/etc/sudoers.d")
 SUDOERS_NAME = "serving-runtime-agent"
 UNITS = tuple(f"serving-runtime-{name}.service" for name in
               ("tetragon-status", "gpu-status", "monitor-window", "agent"))
+# The agent can change the server on approved requests, so the installer installs
+# its unit but never enables or starts it. A person starts it explicitly.
+AGENT_UNIT = "serving-runtime-agent.service"
+AUTO_UNITS = tuple(unit for unit in UNITS if unit != AGENT_UNIT)
 COPY = ("src", "tools", "deploy", "pyproject.toml", "README.md")
 PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 DEFAULTS = {"PLATFORM_CA_FILE": "", "GATEWAY_DATA_GID": "10000",
@@ -503,10 +507,11 @@ def capture_baseline(config, capture):
 
 def summary():
     healthy = True
-    for name in UNITS:
+    for name in AUTO_UNITS:
         running = active(name)
         print(name + (": active" if running else ": inactive"))
         healthy &= running
+    print(AGENT_UNIT + (": active" if active(AGENT_UNIT) else ": inactive (수동 시작 대상)"))
     try:
         value = json.loads((STATE / "tetragon-state.json").read_bytes())
         at = datetime.fromisoformat(value["generated_at"].replace("Z", "+00:00"))
@@ -592,12 +597,16 @@ def install(config, args, artifacts, grub):
             print("8/9 활성 BPF LSM 확인 완료")
         with checking("9", "BASELINE_SERVICES"):
             capture_baseline(config, args.capture_baseline)
-            for unit in UNITS:
+            for unit in AUTO_UNITS:
                 run(["systemctl", "enable", unit])
                 run(["systemctl", "is-enabled", "--quiet", unit])
                 run(["systemctl", "start", unit])
                 require(active(unit), "서비스 시작 검증 실패.")
-            print("9/9 서비스 enable/start 완료; active는 운영 준비 완료 판정이 아닙니다.")
+            # Leave the agent stopped and not enabled at boot, whatever its mode.
+            run(["systemctl", "disable", AGENT_UNIT])
+            require(not active(AGENT_UNIT), "에이전트 중지 상태 검증 실패.")
+            print("9/9 수집 서비스 enable/start 완료; active는 운영 준비 완료 판정이 아닙니다.")
+            print("에이전트는 켜지 않았습니다(사람이 직접 시작: sudo systemctl enable --now " + AGENT_UNIT + ").")
             time.sleep(6)
             summary()
     return 0
@@ -607,7 +616,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="런타임 노드 설치(설정 값·자식 명령 출력 비노출)")
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true", help="무변경 로컬 사전 점검; 클러스터 조회 없음")
-    parser.add_argument("--execute", action="store_true", help="설치될 agent만 실제 운영 실행 모드로 설정")
+    parser.add_argument("--execute", action="store_true", help="설치될 agent만 실제 운영 실행 모드로 설정(설치기는 agent를 시작하지 않음)")
     parser.add_argument("--enable-bpf-lsm", action="store_true", help="필요할 때만 GRUB 설정; 자동 재부팅 없음")
     parser.add_argument("--capture-baseline", action="store_true", help="검수된 monitor 정책의 최초 baseline만 캡처")
     args = parser.parse_args(argv)

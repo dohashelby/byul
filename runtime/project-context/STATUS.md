@@ -712,3 +712,11 @@
 - 문서: `platform/docs/로그인_계정관리.md`, platform README 환경변수·역할 표, 실행 스크립트 주석.
 - 근거: API 345 통과(새 12), web 타입 검사·176 통과(새 7)·빌드 통과, 실제 서버 curl(미로그인 401·로그인 200·CSRF 없는 POST 403·파일 0600).
 - 미확인·다음: 브라우저 화면 확인, 실서버, Codex 교차 검수, 플랫폼 담당 확인.
+
+## 2026-11-09 AWS 14회차 — 10~14·B·C·F 실서버 확인
+
+- 15:21 기동 → 15:49:03 stopped 확인. 코드 `f079b2d`, 이미지 `rt-f079b2d`. 결과 [AWS_GPU_서버14회차_결과_20261109.md](../docs/AWS_GPU_서버14회차_결과_20261109.md), 증거 `evidence-20261109-run14.tgz`(2e5a0868…), 토큰·IP·계정·인스턴스 ID 0건.
+- 통과: 12 GPU(nvidia-smi 일치·stale 전환), 11(vLLM `chatcmpl-<요청 ID>`·로그 확인·`received`/`unavailable`), 10(dry-run → execute `succeeded`, 외부 집행 unknown→mixed, baseline 재캡처), 13(차단·stale·복구 알림, 유출 0), 14(로그인·역할 거부·에이전트 토큰 유지), B(실서버 연결 화면), C(bundle.apply 실제 적용·switch 되돌리기), F(명시 권한).
+- 새로 찾은 것: 설치기가 에이전트를 enabled·execute로 켬, agent kubeconfig 권한이 넓음, 터널 화면 로딩 지연, 오래된 identities.json 0664.
+- 다음: Codex 교차 검수(11~14) → 발견 처리 결정 → PR 한 번.
+- 14회차 발견 1 조치(사용자 결정 B, Claude 구현·Codex 교차 검수 전): 설치기가 에이전트를 enable·start 하지 않고 `disable`·중지 확인만 한다(모드와 무관). 요약 출력은 수집 서비스만 건강 판정, 에이전트는 "수동 시작 대상"으로 표시. README 재설치 예시를 `--execute` 없이로 변경. 설치기 시험 33건 통과(에이전트 enable/start 없음·켜져 있으면 실패 시험 추가). 실서버 재확인은 다음 회차.

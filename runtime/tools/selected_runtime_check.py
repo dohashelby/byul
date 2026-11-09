@@ -412,14 +412,33 @@ def isolated(data_dir, model, *, backend="mock", backend_config=None, timeout=15
             for index in range(60):
                 observations.append({"source": source, "kind": "network_flow" if source == "hubble" else "process_exec", "observed_at": now(),
                     "data_origin": "synthetic", "run_id": held_run if index==0 else config.run_id, "environment": "isolated-acceptance", "event_key": hashlib.sha256(f"{source}/{index}".encode()).hexdigest()})
+        from byul_platform.sources.runtime import gateway_event
+        final_records, final_corrupt = store.read_all()
+        expected_events = {"req:" + row["request_id"]: gateway_event(row) for row in final_records
+                           if row.get("phase") == "final"}
+        if final_corrupt or len(expected_events) != fixture_count:
+            raise ValueError("isolated final request fixture is incomplete")
         with platform_server(gateway_url, viewer) as (platform_url, counter):
             before = len(counter.calls)
-            batches = [document(request("GET", platform_url + "/api/runtime/events", timeout=timeout)) for _ in range(5)]
+            responses = [request("GET", platform_url + "/api/runtime/events", timeout=timeout) for _ in range(5)]
+            batches = [document(response) for response in responses]
+            projected = [[event for event in batch.get("items", [])
+                          if event.get("source") == "gateway" and event.get("category") == "request"]
+                         for batch in batches]
+            projection_matches = [len(events) == fixture_count and
+                                  {event.get("event_id") for event in events} == set(expected_events) and
+                                  all({key: event.get(key) for key in expected_events[event["event_id"]]} ==
+                                      expected_events[event["event_id"]] for event in events)
+                                  for events in projected]
             calls = counter.calls[before:]
             detail_calls = sum(bool(re.fullmatch(r"/api/requests/[0-9a-f]{32}", path)) for path in calls)
-            cases = [fact("A4-LIST-LOAD", detail_calls == fixture_count and calls.count("/api/requests") == 5,
+            cases = [fact("A4-LIST-LOAD", detail_calls == 0 and calls.count("/api/requests") == 5 and
+                          all(response.status == 200 for response in responses) and all(projection_matches),
                           {"fixture_requests": fixture_count, "polls": 5, "detail_gets": detail_calls, "list_gets": calls.count("/api/requests"),
-                           "synthetic_request_records": fixture_count - 2, "actual_normal_engine_requests": 2}, scope="isolated real HTTP/OS list cache; synthetic history load")]
+                           "synthetic_request_records": fixture_count - 2, "actual_normal_engine_requests": 2,
+                           "http_statuses": [response.status for response in responses],
+                           "gateway_events_per_poll": [len(events) for events in projected],
+                           "exact_projection_per_poll": projection_matches}, scope="isolated real HTTP/OS list cache; synthetic history load")]
             cases.append(fact("A4-SOURCE-WINDOW-FIXTURE", validate_windows(batches[-1]) is True and
                          all(batches[-1]["source_windows"][s]["total"] == 60 and batches[-1]["source_windows"][s]["returned"] == 50 for s in ("hubble", "tetragon")),
                          {"source_windows": batches[-1].get("source_windows"), "synthetic_observations": 120}, scope="isolated source query window fixture"))

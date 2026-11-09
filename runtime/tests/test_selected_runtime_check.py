@@ -105,8 +105,11 @@ def test_isolated_200_history_real_http_retention_auth_and_load(tmp_path):
     result = tool.isolated(tmp_path / "owned-stack", "test-model", fixture_count=200)
     assert all(c["result"] == "passed" for c in result["cases"]), result
     load = next(c for c in result["cases"] if c["id"] == "A4-LIST-LOAD")
-    assert load["facts"]["detail_gets"] == 200
+    assert load["facts"]["detail_gets"] == 0
     assert load["facts"]["list_gets"] == 5
+    assert load["facts"]["http_statuses"] == [200] * 5
+    assert load["facts"]["gateway_events_per_poll"] == [200] * 5
+    assert load["facts"]["exact_projection_per_poll"] == [True] * 5
     assert result["gpu_execution_verified"] is False
     assert (tmp_path / "owned-stack" / "OWNED-SELECTED-RUNTIME-TEST").is_file()
     managed = next(c for c in result['cases'] if c['id']=='A4-RETENTION-MANAGED4')
@@ -304,3 +307,33 @@ def test_response_cap_closes_handles_without_returning_partial_success(monkeypat
     with pytest.raises(ValueError, match="SELECTED_RESPONSE_LIMIT"):
         tool.request("GET", "http://127.0.0.1/", timeout=1)
     assert response.closed and connection.closed
+
+
+@pytest.mark.parametrize('corruption', ['missing-event', 'changed-projection'])
+def test_inline_load_requires_complete_exact_projection_on_every_poll(tmp_path, monkeypatch, corruption):
+    original = tool.document
+    changed = False
+
+    def document(response):
+        nonlocal changed
+        value = original(response)
+        if not changed and isinstance(value, dict) and 'source_windows' in value and 'items' in value:
+            event = next((event for event in value['items']
+                          if event.get('source') == 'gateway' and event.get('category') == 'request'), None)
+            if event is not None:
+                changed = True
+                if corruption == 'missing-event':
+                    value['items'].remove(event)
+                else:
+                    event['outcome'] = 'corrupted-fixture-projection'
+        return value
+
+    monkeypatch.setattr(tool, 'document', document)
+    result = tool.isolated(tmp_path / 'owned-stack', 'test-model', fixture_count=2)
+    load = next(case for case in result['cases'] if case['id'] == 'A4-LIST-LOAD')
+    assert changed is True
+    assert load['facts']['detail_gets'] == 0
+    assert load['facts']['list_gets'] == 5
+    assert load['facts']['http_statuses'] == [200] * 5
+    assert load['facts']['exact_projection_per_poll'] == [False, True, True, True, True]
+    assert load['result'] == 'failed'

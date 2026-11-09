@@ -92,14 +92,15 @@ class TemplateSourceCPUExecutor:
     version = '0.1.0-source-cpu'
 
     def __init__(self, cfg):
-        if type(cfg) is not dict or set(cfg) != _CONFIG or any(type(cfg[k]) is not str or not cfg[k] for k in _CONFIG):
+        if type(cfg) is not dict or set(cfg) not in (_CONFIG, _CONFIG - {'producer_checkout'}) or any(type(cfg[k]) is not str or not cfg[k] for k in cfg):
             raise ValueError('SUP13_SOURCE_CPU_CONFIGURATION_INVALID')
         if not _sha(cfg['collector_sha256']) or not _sha(cfg['callback_sha256']):
             raise ValueError('SUP13_INDEPENDENT_APPROVAL_REQUIRED')
         self.cfg = dict(cfg)
 
     def _paths(self):
-        repo = Path(self.cfg['producer_checkout']).resolve(strict=True)
+        repo = (Path(self.cfg['producer_checkout']).resolve(strict=True) if 'producer_checkout' in self.cfg
+                else Path(__file__).resolve().parents[2])
         source = Path(self.cfg['source_root']).resolve(strict=True)
         python = Path(self.cfg['python_binary']).absolute()
         if (not repo.is_dir() or not source.is_dir() or not (source / 'vllm').is_dir()
@@ -108,8 +109,14 @@ class TemplateSourceCPUExecutor:
         return repo, source, python
 
     def _verify_files(self, repo):
-        collector = repo / 'update/tools/b_sup13_template_cpu.py'
-        callback = repo / 'update/src/guard/adapters/vllm_template_boundary.py'
+        if 'producer_checkout' in self.cfg:
+            collector = repo / 'update/tools/b_sup13_template_cpu.py'
+            callback = repo / 'update/src/guard/adapters/vllm_template_boundary.py'
+        else:
+            from guard.reference.integrity import verify_packaged
+            verify_packaged('template')
+            collector = repo / 'guard/reference/template_cpu.py'
+            callback = repo / 'guard/adapters/vllm_template_boundary.py'
         if (_file_hash(collector) != self.cfg['collector_sha256']
                 or _file_hash(callback) != self.cfg['callback_sha256']):
             raise ValueError('SUP13_APPROVED_PRODUCER_BYTES_MISMATCH')
@@ -141,14 +148,16 @@ class TemplateSourceCPUExecutor:
             owned = workdir / 'source-cpu-capture'
             if owned.exists() or owned.is_symlink():
                 raise ValueError('SUP13_FRESH_CAPTURE_REQUIRED')
-            env_extra = {'PYTHONPATH': os.pathsep.join(map(str, (repo / 'update', repo / 'update/src', source))),
+            paths = (repo / 'update', repo / 'update/src', source) if 'producer_checkout' in self.cfg else (repo, source)
+            env_extra = {'PYTHONPATH': os.pathsep.join(map(str, paths)),
                 'PYTHONOPTIMIZE': '0', 'PYTHONINSPECT': '0', 'PYTHONHOME': '', 'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONNOUSERSITE': '1',
                 'CUDA_VISIBLE_DEVICES': '', 'VLLM_PLUGINS': '', 'VLLM_TARGET_DEVICE': 'cpu',
                 'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1', 'HF_DATASETS_OFFLINE': '1',
                 'VLLM_CACHE_ROOT': str(runtime / 'cache'), 'HF_HOME': str(runtime / 'hf'),
                 'XDG_CACHE_HOME': str(runtime / 'xdg'), 'TMPDIR': str(runtime / 'tmp'),
                 'TEMP': str(runtime / 'tmp'), 'TMP': str(runtime / 'tmp')}
-            child = capture_pipes([str(python), '-B', '-P', '-m', 'tools.b_sup13_template_cpu',
+            child = capture_pipes([str(python), '-B', '-P', '-m',
+                'tools.b_sup13_template_cpu' if 'producer_checkout' in self.cfg else 'guard.reference.template_cpu',
                 '--source-root', str(source), '--workdir', str(owned)], timeout=180,
                 env_extra=env_extra, max_stdout_bytes=4096, max_stderr_bytes=16384)
             # An unapproved child file is never promoted through its JSON claims.

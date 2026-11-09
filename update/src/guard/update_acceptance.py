@@ -64,7 +64,7 @@ def _coverage_blocks(check, evd):
     return blocks
 
 
-def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool = False) -> dict:
+def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool = False, profile: str = "legacy-five/1") -> dict:
     """Audit pinned rules/refs and require ten complete, concrete CPU results.
 
     A confirmed security FAIL is a valid trial outcome. Missing collection still
@@ -167,19 +167,22 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
         selected = [item for item in plan.items if item.selected]
         if len({item.check_id for item in plan.items}) != len(plan.items):
             raise ValueError("duplicate PLAN check")
-        if len(selected) != len(CHECKS) or {item.check_id for item in selected} != set(CHECKS):
-            raise ValueError("PLAN selection differs from the exact five required checks")
+        if profile not in {'plan-scope/2', 'legacy-five/1'}:
+            raise ValueError('ACCEPTANCE_PROFILE_UNSUPPORTED')
+        required_checks = CHECKS if profile == 'legacy-five/1' else tuple(item.check_id for item in selected)
+        if not selected or (profile == 'legacy-five/1' and {item.check_id for item in selected} != set(CHECKS)):
+            raise ValueError('PLAN selection differs from acceptance scope')
         if len({row.check_id for row in saved.by_check}) != len(saved.by_check):
             raise ValueError("duplicate report check row")
         rows = {row.check_id: row for row in saved.by_check if row.selected}
-        if set(rows) != set(CHECKS):
-            raise ValueError("selected report checks differ from the exact five required checks")
+        if set(rows) != set(required_checks):
+            raise ValueError("selected report checks differ from the exact PLAN scope")
         evidence = [obj for obj in inputs if getattr(obj, "kind", None) == "EVD"]
         results = [obj for obj in inputs if getattr(obj, "kind", None) == "RES"]
-        expected_pairs = {(cid, side) for cid in CHECKS for side in SIDES}
-        if (len(evidence) != 10 or {(obj.check_id, str(obj.side)) for obj in evidence} != expected_pairs
-                or len(results) != 10 or {(obj.check_id, str(obj.side)) for obj in results} != expected_pairs):
-            raise ValueError("RPT must retain exactly ten original EVD/RES side pairs")
+        expected_pairs = {(cid, side) for cid in required_checks for side in SIDES}
+        if (len(evidence) != len(expected_pairs) or {(obj.check_id, str(obj.side)) for obj in evidence} != expected_pairs
+                or len(results) != len(expected_pairs) or {(obj.check_id, str(obj.side)) for obj in results} != expected_pairs):
+            raise ValueError("RPT must retain every original EVD/RES side pair")
         required_refs = [pack.ref(), *plan.inputs.environments, policy.ref(), plan.ref(),
                          *[obj.ref() for obj in evidence], *[obj.ref() for obj in results]]
         if plan.inputs.change:
@@ -207,7 +210,7 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
                 "policy": policy.ref().model_dump(mode="json"), "report": saved.ref().model_dump(mode="json")}
         plugin = RuleTableJudge()
         evd_by_pair = {(evd.check_id, str(evd.side)): evd for evd in evidence}
-        for cid in CHECKS:
+        for cid in required_checks:
             check, item, row = pack.checks[cid], plan.item(cid), rows[cid]
             if row.applicability != item.applicability or row.gaps != item.gaps:
                 raise ValueError(f"{cid}: report applicability/gaps differ from the original PLAN")

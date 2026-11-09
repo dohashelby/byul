@@ -1,6 +1,8 @@
 """Owned Kubernetes metadata reads through fixed stdlib programs only."""
 from __future__ import annotations
 
+from guard.adapters.engine_profiles import supports
+
 import hashlib
 import math
 import re
@@ -55,9 +57,9 @@ def supervised_source(source):
 
 class KubernetesLifecycleReader:
     def __init__(self,target,env,prepared,*,binary="kubectl",duration=180,runner=None):
-        if prepared.get("profile") in {rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} and (env.engine.name!="vllm" or env.engine.version!="0.31.0"):
+        if prepared.get("profile") in {rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} and not supports(env.engine.name, env.engine.version):
             raise KubernetesCaptureError()
-        if prepared.get("profile") in {online.PROFILE,attempt.PROFILE,output_sensor.PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
+        if prepared.get("profile") in {online.PROFILE,attempt.PROFILE,output_sensor.PROFILE} and not supports(env.engine.name, env.engine.version):
             raise KubernetesCaptureError()
         from guard.collectors.model_read_scope import validate_binding
         validate_binding(prepared,env,target)

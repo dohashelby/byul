@@ -235,12 +235,13 @@ def validate_binding(env,target,source,prepared):
 
 
 def validate_session_binding(env,target,source,prepared):
-    if prepared["profile"]==rank_sensor.PROFILE and (env.engine.name!="vllm" or env.engine.version!="0.31.0"):
-        raise ValueError("LIFECYCLE_RANK_ENGINE_UNSUPPORTED")
-    if prepared["profile"] in {attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE} and (env.engine.name!="vllm" or env.engine.version!="0.31.0"):
-        raise ValueError("LIFECYCLE_ATTEMPT_ENGINE_UNSUPPORTED")
-    if prepared["profile"] == online.PROFILE and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
-        raise ValueError("LIFECYCLE_ONLINE_ENGINE_UNSUPPORTED")
+    from guard.adapters.engine_profiles import require
+    if prepared['profile'] in {rank_sensor.PROFILE, attempt.PROFILE, output_sensor.PROFILE, stream_sensor.PROFILE, online.PROFILE}:
+        try:
+            require(env.engine.name, env.engine.version, 'native_lifecycle')
+        except ValueError:
+            code = ('RANK' if prepared['profile'] == rank_sensor.PROFILE else 'ONLINE' if prepared['profile'] == online.PROFILE else 'ATTEMPT')
+            raise ValueError('LIFECYCLE_' + code + '_ENGINE_UNSUPPORTED') from None
     validate_owned_source(**source)
     try:
         validate_engine_target(env,target,source["container"],source["image"])

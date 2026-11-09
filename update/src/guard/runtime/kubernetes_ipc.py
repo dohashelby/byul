@@ -3,6 +3,8 @@
 No path content, environment, argv, messages or exception text is evidence.
 The existing REQUEST_BINDING_PROFILE supplies ENV/run and both Pod generations.
 """
+
+from guard.adapters.engine_profiles import supports
 from copy import deepcopy
 import base64
 import hashlib
@@ -187,7 +189,7 @@ def capture(transport,policy_values,*,actor_specs,connect_timeout,total_timeout)
     # This is a separate explicit lab capability. Native0.32 and production
     # worker/enterprise trust are not enabled by the HTTP sampling profile.
     require(transport.profile==REQUEST_BINDING_PROFILE and transport.lab is True
-        and transport.engine_name=='vllm' and transport.engine_version=='0.31.0')
+        and supports(transport.engine_name, transport.engine_version))
     program=source()
     record={'schema':RESULT_SCHEMA,'profile':PROFILE,'started_at':utcnow().isoformat(),'finished_at':None,
         'environment_ref':deepcopy(transport.environment_ref),'target_sha256':transport.target_sha256,

@@ -448,3 +448,27 @@ def test_revalidation_conversion(contracts):
     doc = revalidation_request(asset)
     assert contracts.errors("revalidation-request", doc) == []
     assert {"field": "asset:model/a.bin", "expected": None, "observed": "changed"} in doc["changed_fields"]
+
+
+@pytest.mark.parametrize("error_code,result", [
+    (None, "not_revoked"),
+    ("REVOCATIONS_NOT_FOUND", "REVOCATIONS_NOT_FOUND"),
+    ("REVOCATIONS_READ_ERROR", "REVOCATIONS_READ_ERROR"),
+])
+def test_revocations_empty_missing_and_read_error_reach_dashboard(contracts, error_code, result):
+    capture = copy.deepcopy(load_json(FIXTURES / "runtime" / "capture.json"))
+    endpoints = capture["endpoints"]
+    endpoints["policy"]["validity"] = [{"item": "revocation", "state": "unknown" if error_code else "ok",
+                                        "result": "unknown" if error_code else "not_revoked", "error_code": error_code}]
+    doc = runtime_status(endpoints["status"], endpoints["policy"], endpoints["collectors"])
+    assert doc["policy"]["validity_items"][0]["result"] == result
+    assert contracts.errors("runtime-status", doc) == []
+
+
+def test_missing_baseline_and_unreadable_manifest_have_visible_notes():
+    from byul_platform.sources.runtime import comparisons
+    result = comparisons({"baseline": {"state": "not_configured", "error_code": "BASELINE_NOT_FOUND"},
+                          "manifest": {"state": "error", "error_code": "MANIFEST_READ_ERROR"}}, {})
+    assert result["baseline"]["state"] == "not_configured"
+    assert any("미설정/미승인" in note for note in result["baseline"]["notes"])
+    assert any("읽기/검증 오류" in note for note in result["baseline"]["notes"])

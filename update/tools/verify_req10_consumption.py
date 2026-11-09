@@ -1,6 +1,7 @@
 """A1이 검토한 고정 REQ10 제품 snapshot. 런타임 해시 승인/경로 제외 없음."""
+from datetime import datetime
 from pathlib import Path
-import argparse,hashlib,json,os,sys
+import argparse,hashlib,json,os,re,sys
 
 # update/release/reviewed-source.json이 고정 범위 전체의 파일 해시를 담는다.
 # git이 없어도 검사하고, squash·rebase로 커밋이 바뀌어도 결과가 같다.
@@ -22,7 +23,65 @@ def manifest_id(repo):
     return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
 
 # 기존 기록 키를 유지한다. 값은 커밋이 아니라 파일 해시 목록의 SHA-256이다.
-REVIEWED_COMMON_COMMIT=manifest_id(Path(__file__).resolve().parents[2])
+RECEIPTS_PATH = Path(__file__).with_name('reviewed_manifest_receipts.json')
+RECEIPTS_SCHEMA = 'byul-source-review-receipts/1'
+RECEIPT_KEYS = frozenset({'manifest_sha256', 'reviewed_by', 'reviewed_at'})
+MAX_RECEIPTS = 4096
+MAX_REVIEWER_CHARS = 128
+_SHA256_HEX = re.compile(r'[0-9a-f]{64}')
+_INVALID = 'SOURCE_REVIEW_RECEIPTS_INVALID'
+
+def _unique_keys(pairs):
+    keys=[key for key,_ in pairs]
+    if len(set(keys))!=len(keys):raise ValueError(_INVALID)
+    return dict(pairs)
+
+def _valid_reviewer(value):
+    return (type(value) is str and 0<len(value)<=MAX_REVIEWER_CHARS and value==value.strip()
+            and all(ch.isprintable() for ch in value))
+
+def _valid_time(value):
+    if type(value) is not str:return False
+    try:parsed=datetime.fromisoformat(value)
+    except ValueError:return False
+    # 날짜만 있거나 시간대가 없는 시각은 검토 시점을 정하지 못한다.
+    return 'T' in value and parsed.tzinfo is not None and parsed.utcoffset() is not None
+
+def read_receipts(receipt_path=RECEIPTS_PATH):
+    """검토 기록 문서 전체를 엄격히 읽는다. 잘못된 행이 하나라도 있으면 그 행만 건너뛰지 않고 문서 전체를 거부한다.
+
+    검토자 문자열은 형식만 확인한다. 검토자 신원·독립성은 저장소의 검토·변경 관리 절차가 보장한다.
+    """
+    path=Path(receipt_path)
+    if path.is_symlink() or not path.is_file():raise ValueError(_INVALID)
+    try:value=json.loads(path.read_bytes(),object_pairs_hook=_unique_keys)
+    except (ValueError,UnicodeDecodeError):raise ValueError(_INVALID) from None
+    if (type(value) is not dict or set(value)!={'schema','receipts'} or value['schema']!=RECEIPTS_SCHEMA
+            or type(value['receipts']) is not list or len(value['receipts'])>MAX_RECEIPTS):
+        raise ValueError(_INVALID)
+    for row in value['receipts']:
+        if (type(row) is not dict or set(row)!=RECEIPT_KEYS or type(row['manifest_sha256']) is not str
+                or not _SHA256_HEX.fullmatch(row['manifest_sha256'])
+                or not _valid_reviewer(row['reviewed_by']) or not _valid_time(row['reviewed_at'])):
+            raise ValueError(_INVALID)
+    return value['receipts']
+
+def approved_manifest(repo, receipt_path=RECEIPTS_PATH):
+    """현재 목록 SHA에 맞는 검토 기록이 정확히 한 건일 때만 그 SHA를 돌려준다. 같은 SHA가 두 건 이상이면 미승인이다."""
+    receipts=read_receipts(receipt_path)
+    digest=manifest_id(repo)
+    if digest is None:return None
+    matches=[row for row in receipts if row['manifest_sha256']==digest]
+    return digest if len(matches)==1 else None
+
+def receipt_state(repo, receipt_path=RECEIPTS_PATH):
+    """(승인된 목록 SHA 또는 None, 거부 코드 또는 None). 잘못된 기록 문서는 미승인과 거부 코드로 남긴다."""
+    try:return approved_manifest(repo,receipt_path),None
+    except ValueError as error:return None,str(error)
+
+# Reading current bytes never approves them. No new receipt is shipped by an
+# implementation change or by --write. Historical exact gates remain separate.
+REVIEWED_COMMON_COMMIT,RECEIPTS_ERROR=receipt_state(Path(__file__).resolve().parents[2])
 
 def scan(repo):
     """고정 범위의 실제 파일 전부. ignored 파일이 import를 가리는 경우도 잡는다."""
@@ -58,9 +117,19 @@ def _helper(repo):
     return helper
 
 def _verify_manifest(repo):
+    if RECEIPTS_ERROR is not None:
+        raise ValueError(RECEIPTS_ERROR)
+    if REVIEWED_COMMON_COMMIT is None:
+        raise ValueError('SOURCE_REVIEW_RECEIPT_REQUIRED')
     path=repo/MANIFEST_PATH
     if path.is_symlink() or not path.is_file() or manifest_id(repo)!=REVIEWED_COMMON_COMMIT:
         raise ValueError('REQ10_MANIFEST_MISMATCH')
+    return verify_inventory(repo)
+
+def verify_inventory(repo):
+    """Verify bytes only. This operation confers no source/runtime approval."""
+    repo=Path(repo);path=repo/MANIFEST_PATH
+    if path.is_symlink() or not path.is_file():raise ValueError('REQ10_MANIFEST_MISMATCH')
     manifest=json.loads(path.read_text(encoding='utf-8'))
     if manifest.get('schema')!=MANIFEST_SCHEMA or tuple(manifest.get('paths',()))!=PINNED_PATHS:
         raise ValueError('REQ10_MANIFEST_MISMATCH')

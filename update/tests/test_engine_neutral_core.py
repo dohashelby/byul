@@ -1,4 +1,4 @@
-"""코어(core/, models/, store/)에 엔진 이름을 쓰지 않는다 (CLAUDE.md 3, SPEC §7.1)."""
+"""코어(core/, models/, store/)에 엔진 이름을 쓰지 않는다 (CLAUDE.md 1절, SPEC §7.1)."""
 
 import re
 from pathlib import Path

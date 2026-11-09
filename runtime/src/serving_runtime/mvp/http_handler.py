@@ -116,6 +116,7 @@ class HandlerDependencies:
     target_status: Callable[[], dict[str, Any]] = lambda: {"registration": {"state": "not_configured"}}
     phase_timeline: Callable[[], dict[str, Any]] = lambda: {"entries": [], "collector": {"state": "missing", "written_at": None, "fresh": False}}
     tetragon_status: Callable[[], dict[str, Any]] = lambda: {"state": "not_configured"}
+    gpu_status: Callable[[], dict[str, Any]] = lambda: {"schema_version": "runtime-gpu-status/1.0", "state": "not_configured", "fresh": False, "collected_at": None, "reason": None, "gpus": []}
     authorize_read: Callable[[str | None], tuple[int, str, str] | None] = lambda _header: None
     record_rejected: Callable[[str, str, str, int, str], None] = lambda *_args: None
 
@@ -360,6 +361,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/target",
                 "/api/phase-timeline",
                 "/api/tetragon-status",
+                "/api/gpu-status",
                 "/v1/chat/completions",
                 "/v1/completions",
             }
@@ -504,6 +506,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/tetragon-status":
             self._send_json(200, self.dependencies.tetragon_status())
+            return
+        if path == "/api/gpu-status":
+            self._send_json(200, self.dependencies.gpu_status())
             return
         if path == "/api/summary":
             self._send_json(200, self.dependencies.queries.summary())

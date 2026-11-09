@@ -42,6 +42,8 @@ class RunConfig:
     replace_manual: bool = False  # 사람이 입력한 최신 증거를 새 실행 기록으로 대체할지(기본: 대체하지 않음)
     side_configs: dict[str, RunConfig] = field(default_factory=dict)
     abort_reason: str | None = None
+    requested: dict | None = None
+    attempt_id: str | None = None
 
 
 def _not_run_origin(plan: Plan) -> DataOrigin:
@@ -63,12 +65,12 @@ def _empty_evidence_parts(check: CheckDef) -> dict[str, Any]:
     }
 
 
-def _blocked_reason(item: PlanItem, cfg: RunConfig) -> str | None:
+def _blocked_reason(item: PlanItem, cfg: RunConfig, env=None) -> str | None:
     if Gap.NO_EXECUTOR in item.gaps:
         return "NO_EXECUTOR: check has no automated executor (manual test required)"
     if item.executor not in cfg.executors:
         return f"executor {item.executor!r} not configured in guard.toml [executors]"
-    if registry.resolve_executor(item.executor, cfg.executors[item.executor]) is None:
+    if registry.resolve_executor(item.executor, cfg.executors[item.executor], engine=env.engine.name if env else None, version=env.engine.version if env else None) is None:
         return f"executor implementation {cfg.executors[item.executor]!r} not available"
     if Gap.NO_POLICY_VALUE in item.gaps:
         return "NO_POLICY_VALUE: required policy values missing"
@@ -103,6 +105,17 @@ def validate_update_run_config(cfg: RunConfig) -> None:
 
 
 def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side: Side | None = None) -> list[Evidence]:
+    from .execution_recipe import execution_lock, configuration_sha256, validate_policy_time
+    validate_policy_time(store.resolve(plan.inputs.policy))
+    environments = [store.resolve(r) for r in plan.inputs.environments]
+    if plan.inputs.execution_recipe_sha256 is not None and configuration_sha256(cfg.requested if cfg.requested is not None else cfg.raw, environments) != plan.inputs.execution_recipe_sha256:
+        raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
+    with execution_lock(store.root, plan.id):
+        cfg.attempt_id = cfg.attempt_id or new_id('ATTEMPT')
+        return _run_plan(store, pack, plan, cfg, only_side=only_side)
+
+
+def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side: Side | None = None) -> list[Evidence]:
     if plan.inputs.pack != pack.ref():
         raise ValueError("plan was made with a different pack revision")
     envs = [store.resolve(r) for r in plan.inputs.environments]
@@ -111,6 +124,13 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side:
         validate_update_run_config(cfg)
 
     plan_ref = plan.ref()
+    pending = Path(store.root) / 'pending-evidence' / cfg.attempt_id
+    if pending.is_dir():
+        for path in sorted(pending.glob('*.json')):
+            saved = Evidence.model_validate_json(path.read_bytes())
+            if saved.plan != plan_ref or saved.execution.attempt_id != cfg.attempt_id or not saved.hash_ok() or path.stem != saved.content_sha256:
+                raise ValueError('PENDING_EVIDENCE_BINDING_INVALID')
+            store.put(saved)  # Idempotent commit of the exact sealed fragment.
     existing = {
         (e.check_id, e.side): e for e in store.find_latest("EVD", lambda e: e.plan == plan_ref)
     }
@@ -123,10 +143,19 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side:
         for side, env in _sides(plan, envs):
             if only_side is not None and side != only_side:
                 continue
+            if plan.inputs.execution_recipe_sha256 is not None:
+                from .execution_recipe import configuration_sha256
+                if configuration_sha256(cfg.requested if cfg.requested is not None else cfg.raw, envs) != plan.inputs.execution_recipe_sha256:
+                    raise ValueError('EXECUTION_RECIPE_CHANGED_RESELECT_REQUIRED')
             side_cfg = cfg.side_configs.get(side.value, cfg)
-            adapter = registry.ADAPTERS[side_cfg.adapter]() if side_cfg.adapter in registry.ADAPTERS else None
+            adapter_factory = registry.adapter_factory(side_cfg.adapter)
+            adapter = adapter_factory() if adapter_factory else None
             adapter_info = PluginInfo(name=adapter.name, version=adapter.version) if adapter else None
             prev = existing.get((check.id, side))
+            if cfg.abort_reason or side_cfg.abort_reason:
+                if prev is not None and prev.execution.status == ExecStatus.COMPLETED and prev.execution.attempt_id == cfg.attempt_id:
+                    out.append(prev)
+                    continue  # A later operation failed; this completed fragment stays visible.
             if prev is not None and prev.execution.operator is not None and not cfg.replace_manual:
                 out.append(prev)  # 사람이 입력한 증거를 말 없이 덮지 않는다(SPEC §4.5 증거 대체 규칙)
                 continue
@@ -139,8 +168,20 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side:
                 environment=env.ref(),
                 refs=[plan_ref, env.ref()],
             )
+            side_cfg.attempt_id = cfg.attempt_id
             evd = _run_one(store, check, item, env, policy.values.get(check.id, {}), side_cfg, adapter, adapter_info, plan, common)
-            store.put(evd)
+            try:
+                store.put(evd)
+            except Exception:
+                # Keep the complete sealed result if the object index cannot
+                # accept it. Recovery never fabricates an empty replacement.
+                pending = Path(store.root) / 'pending-evidence' / cfg.attempt_id
+                pending.mkdir(parents=True, exist_ok=True)
+                with (pending / (evd.content_sha256 + '.json')).open('xb') as stream:
+                    stream.write(canonical_json(evd.to_dict()))
+                    import os
+                    stream.flush(); os.fsync(stream.fileno())
+                raise
             out.append(evd)
     return out
 
@@ -150,11 +191,11 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         return Evidence(
             **common,
             data_origin=_not_run_origin(plan),
-            execution=Execution(status=status, executor=executor_info, adapter=adapter_info, abort_reason=reason),
+            execution=Execution(status=status, executor=executor_info, adapter=adapter_info, abort_reason=reason, attempt_id=cfg.attempt_id),
             **_empty_evidence_parts(check),
         ).seal()
 
-    reason = _blocked_reason(item, cfg)
+    reason = _blocked_reason(item, cfg, env)
     if reason:
         return stopped(ExecStatus.NOT_RUN, reason)
     if cfg.abort_reason:
@@ -164,9 +205,13 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
     started = utcnow()
     info_stub: ExecutorInfo | None = None
     try:
-        executor = registry.build_executor(item.executor, impl_name, cfg.raw)
+        from guard.adapters.engine_provider import PROVIDERS
+        provider = PROVIDERS.get(env.engine.name)
+        if provider is not None: provider.validate_environment(env, item.executor, impl_name)
+        with registry.environment_binding(env):
+            executor = registry.build_executor(item.executor, impl_name, cfg.raw)
         info_stub = ExecutorInfo(name=executor.name, version=executor.version, config_sha256=sha256_hex(b""))
-        workdir = Path(store.root) / "work" / plan.id / check.id / str(common["side"])
+        workdir = Path(store.root) / "work" / plan.id / cfg.attempt_id / check.id / str(common["side"])
         draft = executor.run(check, env, policy_values, adapter, workdir)
         if not isinstance(draft, EvidenceDraft):
             raise TypeError(f"executor returned {type(draft).__name__}, not EvidenceDraft")
@@ -178,6 +223,10 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         parts = _normalize(check, draft)
         artifact_inputs = [(a.name, a.path, a.collector) for a in draft.artifacts]
         EvidenceDraft.model_validate(draft.model_dump())
+        from guard.models.artifacts import model_closure_sha256
+        if draft.comparability.model_inventory_sha256 == env.model.inventory_sha256:
+            draft = draft.model_copy(update={'comparability': draft.comparability.model_copy(update={
+                'model_inventory_sha256': model_closure_sha256(env.model)})})
         artifacts = []
         artifact_failed = False
         for name, path, collector in artifact_inputs:
@@ -207,6 +256,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                 finished_at=draft.finished_at,
                 abort_reason=abort_reason,
                 cleanup_errors=draft.cleanup_errors,
+                attempt_id=cfg.attempt_id,
             ),
             artifacts=artifacts,
             comparability=draft.comparability,

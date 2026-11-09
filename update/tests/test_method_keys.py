@@ -9,6 +9,8 @@ from urllib.parse import urlsplit
 from guard.core.judge import judge_plan
 from guard.core.run import RunConfig, run_plan
 from guard.core.select import select
+from guard.adapters.vllm import VllmAdapter
+from guard.adapters.base import ProbeRequest
 from guard.executors import registry
 from guard.executors.direct_route import DirectRouteExecutor
 from guard.executors.role_route import RoleRouteExecutor
@@ -17,6 +19,16 @@ from guard.store import Store
 from tests.builders import baseline_pack, environment, policy, completion_response
 
 ALLOWED, GENERAL, ADMIN, WRONG = "allowed-k1", "general-k2", "admin-k3", "wrong-k4"
+
+
+class ExampleMethodAdapter(VllmAdapter):
+    """Explicit EXAMPLE-only probe permission for this synthetic /multi API."""
+    name = 'EXAMPLE-method-probes'
+    version = '1'
+    def probe_request(self, route, model, *args, **kwargs):
+        if route.path in {'/multi', '/metrics'} and route.method in {'GET', 'POST'} and not route.mutating:
+            return ProbeRequest(route.method, route.path, {} if route.method == 'POST' else None)
+        return super().probe_request(route, model, *args, **kwargs)
 
 
 class MultiWorld:
@@ -77,6 +89,7 @@ def _target(tmp_path, exposed):
 
 def _run(tmp_path, check_id, executor_key, make_executor, values):
     registry.EXECUTORS[executor_key] = make_executor
+    registry.ADAPTERS['EXAMPLE-method-probes'] = ExampleMethodAdapter
     try:
         store = Store(tmp_path / ".guard")
         pack = baseline_pack()
@@ -86,11 +99,12 @@ def _run(tmp_path, check_id, executor_key, make_executor, values):
         store.put(env); store.put(pol)
         plan = select(pack, [env], pol); store.put(plan)
         name = executor_key.split(":")[0]
-        (evd,) = run_plan(store, pack, plan, RunConfig(executors={name: executor_key.split(":")[1]}, adapter="vllm"))
+        (evd,) = run_plan(store, pack, plan, RunConfig(executors={name: executor_key.split(":")[1]}, adapter='EXAMPLE-method-probes'))
         (res,) = judge_plan(store, pack, plan, as_of=env.created_at)
         return store, evd, res
     finally:
         del registry.EXECUTORS[executor_key]
+        del registry.ADAPTERS['EXAMPLE-method-probes']
 
 
 def _req01(tmp_path, world):

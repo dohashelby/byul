@@ -32,6 +32,10 @@ from . import vllm_consumption_callback as consumption
 from . import vllm_consumption_v2_callback as consumption_v2
 from . import vllm_supply_read_callback as supply_read
 from . import vllm_worker_shard_callback as worker_shard
+from . import vllm_transition_dispatch_callback as transition_dispatch
+from . import vllm_execution_link_callback as execution_link
+from . import vllm_auxiliary_link_callback as auxiliary_link
+from . import vllm_scoped_consumption_callback as scoped_consumption
 
 PROFILE = 'vllm-engine-callback-metadata/1'
 SCHEMA = 'guard-engine-callback-events/1'
@@ -72,9 +76,16 @@ for _name, _points in consumption_v2.TARGETS.items():
 # SUP-06 worker shard(B 의존 반환 5): settings의 worker_shards가 참일 때만 감싼다. multiproc 모듈은 분산 관측과 같은 모듈이다.
 for _name, _points in worker_shard.TARGETS.items():
     MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
+for _name, _points in transition_dispatch.TARGETS.items():
+    MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
+for _name, _points in execution_link.TARGETS.items():
+    MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
+for _name in auxiliary_link.MODULES:
+    MODULES.setdefault(_name, ())
 # 선택 관측(이름, 대상): 같은 모듈에 여러 개가 있을 수 있어 지점별로 관측기를 고른다.
-OPTIONAL = (('attempt', attempt.TARGETS), ('transition', transition.TARGETS), ('health', health.TARGETS), ('profiler', profiler.TARGETS),
-            ('consumption', consumption.TARGETS), ('consumption_v2', consumption_v2.TARGETS), ('shard', worker_shard.TARGETS))
+OPTIONAL = (('link', execution_link.TARGETS), ('attempt', attempt.TARGETS), ('transition', transition.TARGETS), ('health', health.TARGETS), ('profiler', profiler.TARGETS),
+            ('consumption', consumption.TARGETS), ('consumption_v2', consumption_v2.TARGETS), ('shard', worker_shard.TARGETS),
+            ('dispatch', transition_dispatch.TARGETS))
 OPTIONAL_MODULES = frozenset(name for _, targets in OPTIONAL for name in targets)
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
@@ -257,6 +268,30 @@ class WorkerShardObserver(_Keyed, worker_shard.WorkerShardObserver):
     pass
 
 
+class TransitionDispatchObserver(_Keyed, transition_dispatch.TransitionDispatchObserver):
+    pass
+
+
+class ExecutionLinkObserver(execution_link.ExecutionLinkObserver):
+    # Preserve exact IDs across the actual transport; do not use _Keyed.fingerprint.
+    _emit = _Keyed._emit
+
+
+class BoundedExecutionLinkObserver(ExecutionLinkObserver):
+    """Default connection observation never hashes model parameter contents."""
+    def _cpu_parameter(self, model):
+        self.gaps.add('EXECUTION_LINK_PARAMETER_CONTENT_NOT_SELECTED')
+        return None
+
+
+class ScopedConsumptionObserver(scoped_consumption._Scoped, _Keyed, consumption.ConsumptionObserver):
+    pass
+
+
+class ScopedConsumptionV2Observer(scoped_consumption._Scoped, _Keyed, consumption_v2.ConsumptionV2Observer):
+    pass
+
+
 class Sink:
     def __init__(self, directory):
         self.path = Path(directory) / f'callbacks-{os.getpid()}.jsonl'
@@ -275,7 +310,8 @@ class Sink:
 class EngineCallbacks:
     def __init__(self, session, secret, sink, *, context_provider=None, clock=None, fault_file=None, kernel_checks=False,
                  request_attempts=False, generation_transitions=False, health_causal=False, profiler_control=False,
-                 runner_consumption=False, worker_shards=False):
+                 runner_consumption=False, worker_shards=False, transition_dispatches=False, execution_links=False,
+                 auxiliary_roots=None, scoped_runner_consumption=False, execution_link_content_hashes=False):
         self.sink = sink; self.fault_file = fault_file
         options = {'sink': sink, 'context_provider': context_provider, 'clock': clock}
         self.cache = CacheObserver(session, **options)
@@ -303,19 +339,34 @@ class EngineCallbacks:
         self.profiler = ProfilerObserver(session, **options) if profiler_control else None
         if self.profiler is not None:
             self.profiler.secret = secret
-        self.consumption = ConsumptionObserver(session, **options) if runner_consumption else None
+        self.consumption = (ScopedConsumptionObserver if scoped_runner_consumption else ConsumptionObserver)(session, **options) if runner_consumption or scoped_runner_consumption else None
         if self.consumption is not None:
             self.consumption.secret = secret
-        self.consumption_v2 = ConsumptionV2Observer(session, **options) if runner_consumption else None
+        self.consumption_v2 = (ScopedConsumptionV2Observer if scoped_runner_consumption else ConsumptionV2Observer)(session, **options) if runner_consumption or scoped_runner_consumption else None
         if self.consumption_v2 is not None:
             self.consumption_v2.secret = secret
         self.shard = WorkerShardObserver(session, **options) if worker_shards else None
         if self.shard is not None:
             self.shard.secret = secret
+        self.dispatch = TransitionDispatchObserver(session, **options) if transition_dispatches else None
+        if self.dispatch is not None:
+            self.dispatch.secret = secret
+        self.link = (ExecutionLinkObserver if execution_link_content_hashes else BoundedExecutionLinkObserver)(session, **options) if execution_links else None
+        if self.link is not None:
+            self.link.secret = secret
+        self.auxiliary = auxiliary_link.AuxiliaryLinkObserver(auxiliary_roots, session=session, link=self.link, sink=sink) if self.link is not None and auxiliary_roots else None
 
     def instrument(self, module):
         """Validate every point of a module before changing any of them."""
         name = vars(module).get('__name__')
+        if name in auxiliary_link.MODULES:
+            if self.auxiliary is None:
+                return False
+            try:
+                return self.auxiliary.install(module)
+            except Exception:
+                self.gap('AUXILIARY_LINK_INSTALL_UNAVAILABLE', name)
+                return False
         if name in kernel_bounds.TARGETS or name in graph_replay.TARGETS:
             if self.kernel is None:
                 # kernel 대조를 끈 세션: V2 runner 모듈에서는 켜진 선택 관측(P2 V2 소비)만 감쌀 수 있다.
@@ -358,7 +409,8 @@ class EngineCallbacks:
             for attribute, targets in OPTIONAL:
                 if point in targets.get(name, ()):
                     chosen = getattr(self, attribute); optional = True
-                    break
+                    if chosen is not None:
+                        break
             if chosen is None and name in CACHE_TARGETS and point in CACHE_TARGETS[name]:
                 chosen = self.cache
             elif chosen is None and not optional and name in distributed.TARGETS and point in distributed.TARGETS[name]:
@@ -366,7 +418,11 @@ class EngineCallbacks:
             if chosen is not None:
                 plan.append((chosen, point))
         try:
-            changes = [(cache._function(module, point), observer.wrap(module, point)) for observer, point in plan]
+            changes = [((module.InputProcessor, 'assign_request_id', None), observer.wrap_assignment(module))
+                       if observer is getattr(self, 'link', None) and point == 'InputProcessor.assign_request_id'
+                       else ((module, 'apply_grammar_bitmask', None), observer.wrap_grammar(module))
+                       if observer is getattr(self, 'link', None) and point == 'apply_grammar_bitmask'
+                       else (cache._function(module, point), observer.wrap(module, point)) for observer, point in plan]
         except Exception:
             self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
             return False
@@ -396,8 +452,13 @@ class EngineCallbacks:
             pass
 
     def flush_gaps(self):
+        for observer in (self.consumption, getattr(self, 'consumption_v2', None)):
+            verify = getattr(observer, 'verify_sources', None)
+            if verify:
+                try: verify()
+                except Exception: observer.gaps.add('OBSERVER_SOURCE_POSTCHECK_FAILED')
         kernel = self.kernel.gaps | self.graph.gaps if self.kernel is not None else set()
-        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption, getattr(self, 'consumption_v2', None), getattr(self, 'shard', None), getattr(self, 'supply', None), getattr(self, 'supply_watch', None)) if o is not None))
+        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption, getattr(self, 'consumption_v2', None), getattr(self, 'shard', None), getattr(self, 'dispatch', None), getattr(self, 'link', None), getattr(self, 'auxiliary', None), getattr(self, 'supply', None), getattr(self, 'supply_watch', None)) if o is not None))
         for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | self.weights.gaps | self.comm.gaps | kernel | extra):
             self.gap(code)
 
@@ -437,7 +498,9 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
         settings = json.loads((Path(root) / 'settings.json').read_text(encoding='utf-8'))
         directory = Path(data_root) / settings['session']
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-        callbacks = EngineCallbacks(settings['session'], bytes.fromhex(settings['secret']), Sink(directory),
+        from .observer_runtime import JournalSink
+        sink = JournalSink(directory) if settings.get('scoped_runner_consumption') is True else Sink(directory)
+        callbacks = EngineCallbacks(settings['session'], bytes.fromhex(settings['secret']), sink,
             context_provider=context_provider,
             fault_file=str(directory / FAULT_FILE) if settings.get('lab_faults') is True else None,
             kernel_checks=settings.get('lab_kernel_checks') is True,
@@ -446,7 +509,12 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
             health_causal=settings.get('health_causal') is True,
             profiler_control=settings.get('profiler_control') is True,
             runner_consumption=settings.get('runner_consumption') is True,
-            worker_shards=settings.get('worker_shards') is True)
+            worker_shards=settings.get('worker_shards') is True,
+            transition_dispatches=settings.get('transition_dispatches') is True,
+            execution_links=settings.get('execution_links') is True,
+            execution_link_content_hashes=settings.get('execution_link_content_hashes') is True,
+            scoped_runner_consumption=settings.get('scoped_runner_consumption') is True,
+            auxiliary_roots=settings.get('supply_roots'))
         sys.meta_path.insert(0, Finder(callbacks))
         if settings.get('supply_roots'):
             # SUP-03(P2): 선언한 공급 루트 아래에서 실제로 연 파일. audit hook은 원 코드를 바꾸지 않는다.
@@ -463,6 +531,8 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
                     callbacks.supply_watch.start()
                 except FileExistsError:
                     pass
+        if hasattr(sink, 'close'):
+            atexit.register(sink.close)
         atexit.register(callbacks.flush_gaps)
         return True
     except Exception:

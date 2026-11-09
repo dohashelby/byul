@@ -16,6 +16,20 @@ def _absolute(value):
 
 def validate_model_mapping(env, value):
     """ENV의 기존 모델 신원을 바꾸지 않고 기술적 API 별칭만 검증한다. I/O 없음."""
+    if isinstance(value, dict) and value.get('schema') == 'guard.model-request-mapping/2':
+        from guard.adapters.artifact_identity import validate
+        try:
+            if set(value) != {'schema', 'environment_ref', 'artifact', 'served_model_name', 'host_snapshot', 'container_mount'} or not env.hash_ok() or value['environment_ref'] != env.ref().model_dump(mode='json'):
+                raise ValueError
+            artifact = value['artifact']
+            if set(artifact) != {'kind', 'identity', 'revision', 'sha256'} or (artifact['identity'], artifact['revision'], artifact['sha256']) != (env.model.id, env.model.revision, env.model.inventory_sha256):
+                raise ValueError
+            validate(artifact['kind'], artifact['identity'], artifact['revision'], artifact['sha256'])
+            if not _absolute(value['host_snapshot']) or not _absolute(value['container_mount']) or type(value['served_model_name']) is not str or not 1 <= len(value['served_model_name']) <= 256 or any(ord(c) < 32 or ord(c) == 127 for c in value['served_model_name']):
+                raise ValueError
+        except (KeyError, TypeError, ValueError):
+            raise ValueError('MODEL_MAPPING_INVALID') from None
+        return deepcopy(value)
     try:
         if (not env.hash_ok() or type(value) is not dict or set(value) != FIELDS
                 or value["schema"] != SCHEMA

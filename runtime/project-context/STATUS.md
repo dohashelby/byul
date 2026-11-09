@@ -1,6 +1,34 @@
 # 런타임 작업 상태
 
+- 2026-11-09 Codex 교차검수(기준 `byul_runtime` HEAD `2d78c38`, 목록 10번 제외): 로그인 root_path 우회(원본 미인증 200 → 수정 후 401), 알림 허용 목록·시각/지연 도착 커서·전송 전 대기열 저장·웹훅 URL 검증, chat SSE 응답 ID·엔진 로그 상세 캐시 갱신, GPU 비유한 수치 거부, 기존 agent 자동 시작 설정의 조기 해제, RBAC Pod watch 누락·과도한 Deployment/ReplicaSet 권한을 최소 수정하고 회귀시험을 추가했다. 로그 미발견을 미수신으로 단정하지 않는 처리와 수집 실패 뒤 구간 재시작은 유지했다.
+- 검증: runtime 전체 1,049건 중 932 통과·116 skip·기존 소켓 PermissionError 1건(`test_gateway_serves_snapshot_without_kubernetes_mutation`), 관련 선별 89건 통과. API 선별 20건 통과, 전체 364건 수집 확인; 지정 uv 명령은 캐시 쓰기/오프라인 의존성 설치 제약으로 실패했고 기존 venv+캐시 의존성으로 재시도한 전체는 TestClient 소켓 깨우기 차단으로 45초 후 중단했다. web 타입 검사·178건 통과, API 모델 변경 없음, `git diff --check` 통과. 증거 로그는 `/tmp/byul-review-{runtime-final,api-targeted-final,api-collection,api-deps,web}.log`.
+- 미확인: 소켓 허용 환경의 전체 runtime/API, 실제 호스트 재설치/재부팅·RBAC/admission·엔진/GPU·실제 웹훅. 알림은 최근 API 목록/500개 키·200개 대기열 범위이며 전송 성공 직후 중단 시 재전송 가능. AWS/kind 접속·contracts/update 수정·비공개 인계 파일 접근·커밋·push 없음(8개 로컬 커밋 유지).
+
+- 2026-11-09 외부 규칙 최초 적용 자동화(목록 10번): 승인된 `enforcement.apply`와 공통 `enforce sync`를 구현했다. current ID·해시·target 검증, Tetragon monitor 전용 생성/교체·unchanged/extra·live enforce/위험한 복원 spec 거부, Cilium CRD 부재 건너뜀·기본 SSA dry-run/diff·명시 실제 적용, 0600 임시 백업·경합 보호·실패 역순 복원·Gateway 상태/짧은 추론 확인, API·웹 폼/결과·내부 타입 재생성을 포함한다. 기준 `byul_runtime` HEAD `0355ab8`(main `ed5a0b3`와 tree 동일), 커밋·push·서버 접속·contracts/update 수정 없음. 금지 인계 파일은 접근하지 않고 보존했다.
+- 근거: runtime 지정 전체 991건(875 통과·115 skip·기존 소켓 PermissionError 1), 새 동기화 시험 24 통과; API 전체 재실행 327 통과·1 skip·기존 소켓 실패 1, 운영 API 56 통과·1 skip; web 타입 검사·163건 통과, 타입 재생성·diff 검사 통과. API 최초 전체는 기존 만료 시험 1건도 실패했으나 단독/전체 재실행 통과(원인 미확정·구현 미수정). 로그·전체 변경 파일·설계 보강은 `docs/외부규칙_최초적용_구현인계.md`, 사용은 `docs/외부규칙_최초적용.md`.
+- 미확인·다음: Claude 검수 후 실제 RBAC/CRD/admission·Tetragon 전체 daemon 로드/모드·Cilium 전달/추론/복원을 확인한다. 새 monitor 옵션 해시에 맞춰 관측·모니터 창·시험 근거 재검증이 필요하며, 임시 백업 정리·강제 종료/임대 만료/동시 변경의 unknown은 자동 재실행하지 않는다.
+
 최종 갱신: 2026-11-08
+
+- 2026-11-08 AWS 13회차 external_enforcement 해시 결속 보정(기준 `byul_runtime` `dd05d6d`, `58d0160`과 동일 내용, 미커밋): 정책 ID·판본과 `files.gateway_policy.sha256`을 Gateway 로드 해시에 대조하고 정책 정상·intent 적용 조건을 유지했다. 실제 bundle_tools 묶음의 원본/변환 해시 차이·monitor/mixed·파일 해시 불일치 unknown 회귀시험 추가, 기존 가짜 묶음 수정. 관련 43건 통과; 지정 전체 934건 중 818 통과·115 skip·기존 소켓 생성 PermissionError 1건(`test_gateway_serves_snapshot_without_kubernetes_mutation`), 로그 `/tmp/byul-runtime-policy-binding-unittest.log`. AWS 접속·contracts/update 수정·커밋·푸시 없음; 실서버 재확인·Claude 대화형 검수 대기.
+
+- 2026-11-08 AWS 11회차 설치기 실서버 재검증(Codex, 기준 `b2d5dd7`): 수정 설치기로 기존 서버 sudo dry-run·실제 1~9단계 설치 통과. 전체 visudo 정상, 두 허용 명령 형태/namespace·추가 인자 거부, 일반 계정 권한 오류, 임시 비활성 backup 별칭 충돌 감지·파일 보존·서비스 무변경을 실측했다. 실제 재부팅 후 root 서비스 3개·사용자 수집기 2개 자동 시작, 복구 healthy 4/4·모니터 ok·2750/0640·baseline/정책 네 개 보존, 새 에이전트 보고와 정상 추론 3/3 200 확인. 설치 코드·권한의 수동 보정 없음. LAB SSH 역방향 터널은 시험기가 재연결했으므로 터널 자동 복구를 주장하지 않는다.
+- 11회차 증거 반출·내부 artifact 20개 해시 검증 완료: `~/.local/state/serving-runtime/aws-lab/evidence-20261108-run11.tgz`, SHA-256 `5b77dcbab4ffd53a5d1e812d7e60d27d590435255f2699a024991dbdc37b277c`. 정상 요청 후 agent는 설치 전 disabled/inactive로 복원하고 17:05:08 KST Stop 요청 → 17:13:18 stopped 직접 확인(강제 중지 없음). [11회차 결과](../docs/AWS_GPU_서버11회차_결과_20261108.md)에 범위·한계·증거를 기록했다. 새 호스트 최초 설치/GRUB 변경/최초 baseline은 미실행. 기능 코드·계약·update·노트북 서버 프로세스는 변경하지 않았고 결과 문서·STATUS를 사용자 요청으로 문서 PR에 통합한다.
+
+- 2026-11-08 중단 작업 재개·배포 마무리(기준 `1fdd213`, main `1a3b8ac`): 이전 세션의 AWS 10회차/Claude 검수 기록을 인계받아 설치기 네 수정의 diff와 정상/실패 경로를 다시 검토했다. context 정규식·옛 sudoers 충돌(자동 삭제 없음)·단계/이유 코드·권한 부족 안내를 확인했고, 10회차 결과에 실제 수정 상태와 실서버 미재시험 범위를 기록했다. 16:24 서버 stopped는 이전 세션 확인 기록이며 이번 세션은 AWS에 접속하거나 서버를 켜지 않았다. 증거 tgz SHA-256 `6f40d3846291b2efec5b30a921fed07da88e502b4ce3f5313dd8c62f240a4c50` 일치 확인.
+- 최종 재검증: `runtime/`의 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests` **881건 전부 통과(skip 0, 143.299초)**. `platform/api/`의 `uv run --frozen --with-editable ../../update --with-editable ../../runtime python -m pytest -q` **259건 통과**. `platform/web/` 타입 검사·`npm test -- --maxWorkers=1` **143건 통과**. 계약 스키마 13개/예시 11개 오류 0, 셸 구문·diff 검사 통과. 이전 소켓 PermissionError/skip은 이번 일반 실행에서 재현하지 않았으며 시험 우회 플러그인을 사용하지 않았다. 로그 `/tmp/byul-resume10-{runtime,api,web,web-typecheck}.log`.
+- 통합 범위: 기존 로컬 `1fdd213`의 노드 설치 자동화·식별 자료 0640·9회차 결과와 이번 설치기 보완·10회차 결과를 한 PR로 올린다. 수정된 설치기의 실제 호스트 재설치·재부팅·sudo 명령 매치는 여전히 별도 현장 확인이다. 실측한 읽기 주체는 엔진 컨테이너 안 별도 프로세스이며 엔진 본체 오류 처리까지 보장하지 않는다. 기존 비밀 인계 파일은 보존하고 커밋에서 제외한다. 현재 CI의 update-default runner는 ubuntu-24.04로 이미 수정돼 있어 옛 Ubuntu 26.04/Python 3.12.3 문제를 현재 차단 사유로 사용하지 않는다.
+
+- 2026-11-08 AWS 10회차 설치기 보정(기준 `byul_runtime` `1fdd213`, 미커밋): sudoers context의 과도한 백슬래시 계층을 제거하고 검증된 식별자의 `.`만 `\.`로 처리한다(`-`·`_` 유지). `/etc/sudoers.d`의 다른 파일에 동일 별칭 또는 runtime-agent 규칙이 있으면 변경 전 중단하며 파일 이름만 보고하고 자동 삭제하지 않는다. 설치 후 전체 `visudo -c`의 종료 0·stderr 경고 없음이 확인돼야 systemd 설치를 진행한다. 실패 단계·점검 이름·제한된 이유 코드, 권한 오류의 허용된 고정 시스템 경로만 출력하며 설정 값·토큰·명령 출력 비노출을 유지했다. README의 기존 설치 점검은 sudo 사용으로 바로잡았다.
+- 변경 파일(4, 새 파일 없음): `deploy/install/install_runtime_node.py`, `deploy/install/README.md`, `tests/test_install_runtime_node.py`, 이 상태 문서. 설치기 시험 **31건 통과**(신규 10건): 예시와 동일한 sudoers 형태·Python re의 실제 두 명령 형태 매치/범위 거부, 별칭·사용자 규칙/백업 충돌과 파일 보존, 권한 오류·단계 진단, 명령 시작/timeout 실패, 전체 visudo 실패·경고 시 후속 중단/정상 순서를 확인했다. 로컬 `visudo -cf`·세 단위 `systemd-analyze verify` 구문 검사도 종료 0이다. 샌드박스의 `/etc/sudo.conf` 소유자 경고가 있으므로 실제 호스트에서 경고 없는 전체 visudo 검사가 통과했다는 뜻은 아니다.
+- 검증: runtime에서 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest tests.test_install_runtime_node` 31건 통과. 지정 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`는 **881건 중 765 통과·115 skip·기존 소켓 생성 PermissionError 1건**(`test_gateway_serves_snapshot_without_kubernetes_mutation`), 전체 통과 아님. 로그 `/tmp/byul-aws10-runtime-unittest-final.log`. `git diff --check` 통과.
+- 남은 제약·인계: 소켓 허용 환경의 전체 재시험과 실제 서버의 sudo 권한 매치·충돌 정리·전체 visudo·설치/서비스 복구 확인이 필요하다. AWS/kind 접속, 8700·5173·8443 프로세스 조작, contracts/update 수정, Git 쓰기·커밋·push 없음. 기존 미추적 `aws-gpu-lab-인계.md`와 작업 중 감지된 미추적 `docs/AWS_GPU_서버10회차_결과_20261108.md`는 수정하지 않았다. Claude 대화형 검수 대기.
+
+- 2026-11-08 식별 자료 0640·노드 설치 자동화(기준 `byul_runtime`/`origin/main` `1a3b8ac`, 미커밋): 식별 수집기의 성공/오류 스냅샷에 `mode=0o640`을 명시했다. `deploy/install/`에 셸 진입점·Python 설치기·설정 예시·설치/되돌리기 안내를 추가했다. 설정은 실행하지 않고 읽으며 값·자식 명령 출력은 숨긴다. 무변경 `--dry-run`, 계정·보조 그룹, root 소유 코드/venv/.pth, 설정 권한, 검증 후 sudoers/systemd 설치, 공유 폴더, 수동 설치가 필요한 crictl 확인, 명시적 BPF LSM 설정·재부팅 대기, 최초 baseline 검증·기존본 보존, 서비스 시작·복구 상태 요약을 구현했다. 에이전트 기본 dry-run·운영 감시값을 유지하고 `--execute`/선택 CA를 지원한다. 사용자 수집기는 별도 안내만 제공한다.
+- 변경 파일(5): `tools/tetragon_identities.py`, `tests/test_tetragon_attribution.py`, `deploy/gpu-lab/README.md`, `docs/원격운영_사용과검증.md`, 이 상태 문서. 새 파일(5): `deploy/install/install-runtime-node.sh`, `deploy/install/install_runtime_node.py`, `deploy/install/install.env.example`, `deploy/install/README.md`, `tests/test_install_runtime_node.py`.
+- 검증: runtime에서 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest tests.test_install_runtime_node tests.test_tetragon_attribution` **40건 통과**. 설정 주입/비밀 비노출·sudo 호출자 소유 입력·무변경 점검·치환/GID·crictl 누락·GRUB 충돌/재부팅 대기·baseline 보존/실패·멱등 파일 쓰기·단계 실패 중단·서비스 시작 순서를 확인했다. 실제 로컬 `visudo -cf`와 실행 파일 경로만 로컬 Python으로 치환한 세 단위의 `systemd-analyze verify`도 시험에서 통과했다. `bash -n deploy/install/install-runtime-node.sh` 통과; shellcheck는 미설치다.
+- 지정 전체 시험 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: **871건 중 755 통과·115 skip·기존 소켓 생성 PermissionError 1건**(`test_gateway_serves_snapshot_without_kubernetes_mutation`). 로그 `/tmp/byul-runtime-install-unittest-final.log`. 전체 통과로 보고하지 않으며 소켓 허용 환경에서 재시험이 필요하다. `git diff --check` 통과.
+- 남은 제약·인계: 실제 호스트 설치/재설치·권한·서비스 복구·GRUB 재부팅은 미검증이다. Git fast-forward는 최초 `.git` 읽기 전용으로 실패한 뒤 사용자가 완료했고 최종 기준점은 `1a3b8ac`다(runtime 파일은 시작 시에도 main과 동일했다). 기존 미추적 AWS 9회차 결과·인계 문서 보존, contracts/update 수정·AWS/kind 접속·8700/5173 프로세스 조작·커밋·push 없음. 대화형 검수 대기.
 
 - 2026-11-08 AWS 8회차 setgid 보존(기준 `byul_runtime` `7110fca`, 미커밋): `tools/k8s_observation_feed.py`의 출력 폴더 공유 시 chown 전에 기존 setgid를 읽어 보존한다. 폴더 기본 0750·파일 0640과 그룹/기타 쓰기 금지는 유지한다. 2750/2777 폴더가 공유 후 2750을 유지하고 새 파일이 폴더 그룹을 상속하는 회귀시험 1건을 추가했다. README의 2750·UMask=0027 절차를 확인하고 이전 0750 폴더의 복구·재시작 후 확인 방법을 보완했다.
 - 검증: 새 시험 수정 전 실패 확인, `TMPDIR=/dev/shm .venv/bin/python -B -m unittest tests.test_feed_redaction` 14건 통과. runtime에서 지정 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: 849건 중 733 통과·115 skip·기존 `test_gateway_serves_snapshot_without_kubernetes_mutation` 소켓 생성 PermissionError 1건. 로그 `/tmp/byul-aws8-setgid-unittest.log`. `git diff --check` 통과.
@@ -566,3 +594,148 @@
 - API `.venv/bin/python -B -m pytest`: yaml·guard 미설치로 수집 오류 2건. 로컬 update/src·기존 yaml·runtime 경로를 PYTHONPATH로 연결한 재실행은 TestClient 대기에서 중단. `/tmp` 전용 epoll 20ms 보조 플러그인으로 전체 재실행: **257 통과·1 skip·기존 AF_INET PermissionError 1 실패**. 저장소 시험/제품에 소켓 우회 수정 없음. 최종 명령: `PYTHONPATH=/home/bobgy/bobproject/byul/update/src:/home/bobgy/bobproject/byul/runtime/src:/home/bobgy/bobproject/byul/runtime:/tmp/byul-run7-deps .venv/bin/python -B -m pytest -p byul_test_poll`. 로그 `/tmp/byul-run7-api.log`, `/tmp/byul-run7-api-final.log`; 보조 파일 `/tmp/byul-run7-deps/byul_test_poll.py`.
 - web `npm run typecheck` 통과. `npm test` 첫 전체 143 통과, 재실행에서 기존 framework·pagination 시간 초과 2건 발생. `npm test -- --maxWorkers=1` 최종 전체 **143 통과**. 로그 `/tmp/byul-run7-tsc-final.log`, `/tmp/byul-run7-web-final.log`, `/tmp/byul-run7-web-serial.log`. `git diff --check` 통과.
 - 남은 확인: 소켓 허용 환경에서 보조 설정 없는 runtime/API 전체 통과, 새 생성 정책의 AWS trial·native 귀속·대시보드 운영 전환 실측, Claude 직접 코드·문서 검수. 수동 AWS 증거를 자동 trial 성공 보고서로 만들지 않았다.
+
+## 2026-11-08 대시보드 Tetragon·Lab 연결 (Codex 구현, 실서버 미확인)
+
+- 기준 `byul_runtime` / HEAD `4e0befa312206439084f8f52cddbd901f81b07f2`. 사용자 지정 기준 4e0befa와 일치하며 로컬 `main` 참조는 `e7fc0f19e2d20e06a07555f222c5019945738198`로 달랐다. 참조 변경·커밋·push·PR 없음. 금지된 인계 문서는 열거나 변경하지 않았고 `contracts/`, `update/`도 변경하지 않았다.
+- 상태 수집기 `--public-output`은 원본을 유지하고 허용 필드·일관된 사본 내 식별 별칭만 0640 원자 교체로 게시한다. 임의 필드/명령 출력/오류 원문/노드명·Pod UID·컨테이너 ID는 공개하지 않는다. 기존 시험의 커널 수치·시각·귀속 대조와 Gateway 재판정을 유지하는 회귀 시험을 추가했다. 설치기는 관측 상위 2750을 유지하고 `tetragon-status`(runtime-agent 소유)와 `lab-reports`(관측 사용자 소유)를 관측 GID·2750으로 준비한다. 서비스 쓰기 허용 범위는 전용 하위 폴더이며 Gateway는 기존 readOnly mount에서 읽는다.
+- `external_enforcement`: 자료 없음 `not_connected`, 읽기/검증·수집 오류 `error`, 기존 20초/미래 5초 신선도 밖 또는 현재 묶음 대조·전체 노드의 기대 정책 ENABLED/spec 일치 확인 불가 `unknown`. 시작 시 검증된 묶음 intent를 렌더한 spec SHA-256과 모든 에이전트의 현재 정책을 대조해 동일 모드 `monitor`/`monitor_only`/`enforce`, 모드 혼합 `mixed`를 표시한다. 실제 차단 효과·감시 복구와 구분한다. 플랫폼 어댑터는 문자열을 그대로 보존하므로 제품/API·demo·캡처 fixture는 변경할 필요가 없었고 전달 회귀 시험만 추가했다. 응답 필드·타입이 같아 OpenAPI/schema.d.ts 재생성은 불필요했다.
+- AWS Gateway에 `--tetragon-state`·`--lab-report`를 연결했다(SGLang도 상속). Lab checker의 `--public-report-dir`은 실제 회차의 최소 JSON만 0640 원자 게시하고 원본 0600 근거는 유지한다. 빈 폴더는 `missing`, 보고서의 회차·context/namespace·시작/완료 시각은 그대로 표시한다. 설치기는 checker를 자동 실행하지 않는다. checker는 관리 정책을 삭제/적용하는 도구이므로 시험 workload 전제·유지보수 백업·묶음/모드 복원과 실제 실행 절차를 `deploy/gpu-lab/README.md`에 기록했다. 과거 결과를 이번 성공으로 만들지 않는다.
+- 새 파일: `tools/tetragon_public.py`, `tests/test_dashboard_connections.py`, `platform/web/tests/runtime-connections.test.tsx`. 수집기/설치기/systemd/Gateway/문서·정책 판정·웹 표시·기존 시험을 수정했다. Cilium은 AWS의 현재 Gateway에 상태 수집기가 없어 집계 범위 밖이며 권한/수집기를 추가하지 않았다.
+- 검증(각 프로젝트 절대 경로에서 실행): runtime 지정 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`는 **891건 중 775 통과·115 skip·기존 AF_INET 소켓 생성 PermissionError 1**(`test_gateway_serves_snapshot_without_kubernetes_mutation`). 관련 5개 모듈 `PYTHONPATH=tests TMPDIR=/dev/shm .venv/bin/python -B -m unittest test_dashboard_connections test_agent_services test_install_runtime_node test_k8s_lab_check test_tetragon_file_open`은 **83건 전부 통과**. API 지정 `uv run --frozen --with-editable ../../update --with-editable ../../runtime python -m pytest -q`는 기본 uv 캐시가 읽기 전용이라 실행 전 실패했다. `/tmp` 캐시+offline 재시도는 TestClient event loop 대기로 중단했고, 이전 회차의 `/tmp/byul-run7-deps/byul_test_poll.py` 보조 설정으로 `PYTHONPATH=/tmp/byul-run7-deps UV_CACHE_DIR=/tmp/byul-uv-cache uv run --offline --frozen --with-editable ../../update --with-editable ../../runtime python -m pytest -p byul_test_poll -q`는 **265 통과·1 skip·기존 소켓 PermissionError 1 실패**(`test_saved_confirmed_export_starts_temporary_gateway`). web 지정 `npm run typecheck && npm test -- --maxWorkers=1`는 **타입 검사·153건 전부 통과**. 소켓 오류를 제품/시험 변경으로 숨기지 않았으며 전체 지정 명령 완전 통과는 미확인이다. `git diff --check` 통과. 로그 `/tmp/byul-dashboard-{runtime-final,runtime-targeted,api-prescribed,api-cache,api-final,web}.log`.
+- 미확인·다음: AWS 접속·기동·서비스 설치·실제 checker·브라우저 수동 검수는 하지 않았다. Claude가 다음 회차에 설치기/수집기 재시작과 Gateway 이미지·인자 반영, 2750/setgid·관측 GID/0640·Gateway 읽기 성공/쓰기 거부, 최신 상태·실제 spec/mode 대조·수집 중단 시 unknown/error, 빈 Lab 폴더 missing→실제 회차 게시와 원래 정책 복원을 확인한다. 소켓 허용 환경에서 보조 설정 없는 runtime/API 지정 전체 시험 통과 및 독립 검수가 필요하다.
+
+## 2026-11-08 업데이트 전후 검증 자료·GPU Lab 배포 연결 (Codex 구현, 실서버 미확인)
+
+- 기준 `byul_runtime` / HEAD `37eae600c35311ae30220bde48a34e4c26f21b39`. 작업 트리만 변경했다. 커밋·push·PR, AWS 접속/가동·실서비스 설치·실제 승인/자료 게시 없음. `contracts/`, `update/` 변경 없음. 사용자 금지 인계 문서는 읽거나 수정하지 않았다.
+- GPU Lab Gateway에 asset-manifest·baseline·manifest·revocations를 `/etc/serving/verification`(호스트 `/srv/serving/verification/approved`, readOnly)로 연결했다. 현재 엔진/SGLang과 같은 모델 snapshot을 `/models` readOnly로 연결했다. tokenizer는 같은 snapshot, `/cache`는 가변 캐시이므로 승인 모델 목록에 섞지 않았다. 모델 세대 변경 시 mount 일치·UID 10000 읽기·쓰기 거부/필요한 제한 ACL은 다음 서버 확인 사항이다.
+- 새 `tools/verification_material.py`는 실제 파일 해시·확인한 구성 필드·기존/빈 폐기 목록의 **후보**를 Gateway 로더가 받지 않는 봉투로 만든다. 별도 approve는 검토한 후보 SHA-256·검토자·사유를 요구하고 기존 검증기로 확인한 문서와 해시 연결 검토 기록을 0640 원자 게시한다. 기존 승인 교체는 명시 --replace만 허용한다. 승인 기준을 자동 판정하지 않으며 현재값을 자동 채택하지 않는다. 설치기는 상위 root:관측 GID·2750, candidates 관측 사용자:관측 GID·2750, approved root:Gateway data GID·2750만 준비하고 승인 파일을 만들지 않는다. 관측 사용자에게 관측 그룹만 멱등 보완해 후보 상위 경로를 통과하게 하며 Gateway data 그룹을 추가하지 않는다. 설치기의 Tetragon baseline은 별개다.
+- 자산 승인본 없음은 collector에 미설정/미승인 오류, baseline/manifest 파일 없음은 not_configured·승인본 없음, 읽기/검증 실패는 오류로 표시한다. 폐기 목록의 기존 empty ok/not_revoked·파일 없음·읽기 오류를 플랫폼 어댑터/한국어 표시까지 구분했다. 계약 필드 추가 없이 기존 result/notes를 사용했다. **새 폐기 목록 인자에서 파일 없음/오류는 기존 fail-closed 동작대로 Gateway 추론 503이므로 다음 재배포 전에 사람이 목록(빈 목록 포함)을 검토·게시해야 한다.**
+- 새 `tools/aws_environment_candidate.py`는 target 등록 기준 단일 Ready 엔진의 imageID digest, 설치 패키지 판본·모델 ID, 실제 /models hostPath 전체 inventory 해시(update all-scope 정규 형식), 해당 노드 커널·가시 GPU/드라이버·같은 노드 Tetragon/Cilium 실행 파일 판본을 get/읽기 exec로 수집하는 후보 도구다. 조회마다 8초 제한, 실패/다중 대상/누락은 미확인+이유이며 선언 digest로 대체하지 않는다. Pod/node 식별자·저장소 주소·env/Secret·명령/오류 원문은 저장하지 않는다. 자동 수집 성공은 모의 자료로만 확인했다.
+- 계약 제약: 기존 환경 계약은 source_commit/model revision 등 nullable 필드를 필수로 요구하므로 ‘null 없이 미확인 사유’와 동시에 완전한 환경 문서를 만들 수 없다. 계약은 수정하지 않고 기존 경로/자료형의 확인 값만 partial environment에 넣고 동반 observations/unconfirmed·candidate_incomplete·import_ready:false로 명시했다. kernel/agent 판본은 계약에 자리가 없어 동반 자료에만 둔다. 사람이 출처 commit·revision·facts·승인 intent를 근거로 완성하고 기존 계약 검증→환경/정책 새 판본→묶음 내보내기를 다음 회차에 확인해야 한다. 폴더명을 출처 revision으로 가장하거나 null/임의 digest로 내보내기를 통과시키지 않았다.
+- 새 파일: `tools/verification_material.py`, `tools/aws_environment_candidate.py`, `tests/test_verification_material.py`(12건), `tests/test_aws_environment_candidate.py`(9건), [업데이트 검증 후보와 승인](../docs/업데이트검증_후보와승인.md). 설치기 시험·API 전달 시험 4건·웹 폐기 상태 시험 3건을 보완했고 GPU Lab/설치 README에 다음 회차 순서를 기록했다.
+- 지정 시험(각 프로젝트 절대 경로에서 실행): runtime `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests` 최종 **913건: 797 통과·115 skip·기존 AF_INET 소켓 PermissionError 1**(`test_gateway_serves_snapshot_without_kubernetes_mutation`). 관련 `PYTHONPATH=tests TMPDIR=/dev/shm .venv/bin/python -B -m unittest test_verification_material test_aws_environment_candidate test_install_runtime_node test_mvp_assets test_mvp_policy_state`는 **76건: 72 통과·4 skip**. 로그 `/tmp/byul-verification-runtime-final.log`, `/tmp/byul-verification-runtime-targeted-final.log`.
+- API 지정 `uv run --frozen --with-editable ../../update --with-editable ../../runtime python -m pytest -q`는 기본 uv 캐시 읽기 전용으로 실행 전 실패했다. `/tmp` 캐시+offline은 TestClient event-loop 대기로 중단했다. 이전 회차의 저장소 밖 시험 전용 epoll 20ms 보조 설정으로 `PYTHONPATH=/tmp/byul-run7-deps UV_CACHE_DIR=/tmp/byul-uv-cache uv run --offline --frozen --with-editable ../../update --with-editable ../../runtime python -m pytest -p byul_test_poll -q`: **269 통과·1 skip·기존 소켓 PermissionError 1 실패**(`test_saved_confirmed_export_starts_temporary_gateway`). 로그 `/tmp/byul-verification-api-{prescribed,cache,final}.log`. 제품/저장소 시험에 소켓 우회 수정 없음. 소켓 허용 환경에서 보조 설정 없는 지정 전체 통과는 미확인이다.
+- web 지정 `npm run typecheck && npm test -- --maxWorkers=1`: **타입 검사·156건 전부 통과**(`/tmp/byul-verification-web-final.log`). `git diff --check` 통과. 남은 확인: Claude 직접 검수, 소켓 허용 전체 시험, 다음 AWS 회차에서 설치 권한·실제 mount 일치·미승인/읽기 오류·명시 승인/재시작·업데이트 drift·환경 후보와 새 묶음 내보내기. 실제 승인 기준/승인자와 미확인 nullable 필드 처리 방침은 Claude/사용자 결정이다.
+
+## 2026-11-08 2순위 Claude 검수 2건 보완 (기준 37eae60, 미커밋)
+
+- 새 `tools/gpu_lab_gateway_preflight.py`는 Gateway 적용/재시작 전에 대상 호스트의 최종 verification/model hostPath 디렉터리 존재·형식과 게시된 revocations.json을 기존 strict 로더로 읽기 전용 검사한다. 실패는 종료 1·고정 이유 코드(디렉터리 누락/형식/읽기, 폐기 목록 누락/읽기/JSON/스키마 오류 등)이며 경로·원문을 출력하지 않는다. 파일·폴더·빈 목록·승인 생성 없음. fail-closed 제품 규칙은 변경하지 않았다. 새 `tests/test_gpu_lab_gateway_preflight.py` **10건 전부 통과**: 누락·잘못된 형식·권한 오류·후보/링크/FIFO 거부·무변경·CLI 종료 코드·선택 승인 파일 누락에도 요청 허용 게이트 활성 확인.
+- GPU Lab README의 새 절과 기존 일반 적용 명령 모두 **승인본 게시 → 사전 점검 성공 → Gateway 적용**으로 연결했다(`&&`). 먼저 설치기 재실행으로 폴더를 준비해야 한다. gateway.yaml 주석과 후보/승인 문서를 수정했다. 이전 ‘실엔진과 같은 모델 경로’ 설명은 SGLang 매니페스트 근거만 있었으므로 정정: **vLLM 엔진의 실제 모델 hostPath를 12회차에서 kubectl로 확인 후 Gateway 서버 사본·후보 root·점검 인자를 일치시킬 것.** 하드코딩 자동 교체는 하지 않았고, 후속으로 확인한 경로 하나에서 Kustomize patch와 점검 인자를 함께 생성하는 방식을 제안했다.
+- 누락 영향 확인: asset-manifest는 collector 오류·미설정/미승인, baseline/manifest는 not_configured이며 이 누락만으로 추론을 차단하지 않는다. revocations 누락/오류는 기존 503, verification/model Directory hostPath 누락은 새 Pod 시작 불가다. 상세 표는 `docs/업데이트검증_후보와승인.md`. 사전 점검은 로컬 경로/형식만 확인하며 실제 엔진과의 일치·Pod UID 읽기·노드 배치·현재 정책이 명시 폐기됐는지는 별도다. 직접 적용을 기술적으로 봉쇄하는 admission 장치는 아니다.
+- 환경 완성 경로는 문서에 존재했고 구체화했다: 후보 environment만 별도 검토 사본으로 복사 → 사람이 미확인 필수값·기존 승인 intent/facts를 근거로 완성 → 기존 platform Contracts 검증 → 환경 새 판본·참조 정책 판본 → 묶음 내보내기. import_ready 플래그만 고쳐 등록하지 않는다. 계약 변경은 필요하지 않으며 미확인 근거를 확보하지 못하면 후보로 남긴다.
+- 절대 경로 재시험: `/home/bobgy/bobproject/byul/runtime`에서 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: **923건: 807 통과·115 skip·기존 소켓 PermissionError 1**(`test_gateway_serves_snapshot_without_kubernetes_mutation`). `/home/bobgy/bobproject/byul/platform/api`에서 지정 `uv run --frozen --with-editable ../../update --with-editable ../../runtime python -m pytest -q`는 기본 uv 캐시 읽기 전용으로 실행 전 실패. 이전 회차와 같은 저장소 밖 보조 설정으로 `PYTHONPATH=/tmp/byul-run7-deps UV_CACHE_DIR=/tmp/byul-uv-cache uv run --offline --frozen --with-editable ../../update --with-editable ../../runtime python -m pytest -p byul_test_poll -q`: **269 통과·1 skip·기존 AF_INET PermissionError 1 실패**(`test_saved_confirmed_export_starts_temporary_gateway`). `/home/bobgy/bobproject/byul/platform/web`에서 `npm run typecheck && npm test -- --maxWorkers=1`: **타입 검사·156건 전부 통과**. 로그 `/tmp/byul-verification-review-{runtime,api-prescribed,api-final,web}.log`. `git diff --check` 통과.
+- 이번 검수 보완은 새 도구/시험 2개와 Gateway 주석·GPU Lab README·후보/승인 문서·STATUS만 변경했다. 앞선 미커밋 2순위 구현 보존. `byul_runtime` / HEAD `37eae600c35311ae30220bde48a34e4c26f21b39` 유지. AWS 접속/가동·실서버 조회·실제 승인/적용·커밋/push/PR 없음. contracts/update 변경 및 금지 인계 파일 읽기/수정 없음. Claude 독립 검수·소켓 허용 전체 시험·12회차 실서버 경로/권한 확인은 남았다.
+
+## 2026-11-08 AWS 12회차 발견 2·3 보완 (Codex 구현, 실서버 미확인)
+
+- 기준 `byul_runtime` / HEAD `e594df2`. 사용자 전달 12회차 결과: 1순위 Tetragon 상태·Lab 경로 연결과 2순위 검증 자료·환경 후보 연결은 실서버 통과(환경 입력은 sudo 사본 우회 후 생성). 증거 `~/.local/state/serving-runtime/aws-lab/evidence-20261108-run12.tgz`, 결과 문서 [AWS GPU 서버 12회차 결과](../docs/AWS_GPU_서버12회차_결과_20261108.md)는 Claude 작성 영역이며 이번 작업에서 읽거나 수정하지 않았다.
+- 발견 1은 기록만: 실서버 `runtime-tg-secret-01`이 8회차 수동 적용본(`podSelector app=byul-tetragon-proof`)이라 묶음 intent와 불일치했다. `external_enforcement=unknown`은 정확한 판정이다. 다음 회차에 검토한 묶음 정책으로 맞추고 감시 baseline을 재캡처한다.
+- 발견 2: root:serving-bundles·2750 묶음을 serving-observe만 가진 ubuntu가 못 읽고 두 후보 도구가 원인을 숨겼다. 새 `tools/candidate_errors.py`와 환경/검증 도구에 고정 코드·입력이름(PERMISSION_DENIED/NOT_FOUND/INVALID_JSON/INVALID_INPUT/ALREADY_EXISTS/IO_ERROR)을 적용했다. CLI 인자 오류도 값·경로·예외 원문을 숨긴다. kubectl 실패는 부분 후보·미확인을 유지하며 KUBECTL_FAILED를 stderr에도 알린다. 명시한 policy의 읽기/검증 실패는 생성 중단. 후보/승인 문서와 GPU Lab README에 운영자의 sudo 읽기만으로 같은 묶음 세대의 0700 전용 폴더·0400 사본을 만들고 ubuntu kubeconfig로 수집→환경 후보 성공 확인→declaration을 실행하는 절차를 기록했다. 묶음 그룹 확대나 도구 전체 root 실행은 필요 없다.
+- 발견 3: `aws_lab_acceptance --public-report-dir`가 실제 실행의 최소 AWS 결과를 준비된 관측 폴더에 0640·상위 GID 상속·fsync·원자 게시한다. 기존 회차 덮어쓰기/링크/쓰기 가능한 그룹·기타 디렉터리를 거부하며 게시 실패에도 기존 0600 상세 evidence는 보존한다. AWS 사례를 kind L 사례로 바꾸면 의미가 달라지므로 별도 `serving-runtime-aws-lab-report/1.0`을 Gateway가 구분해 읽도록 했다. 선택한 AWS-01~20의 passed/failed/unknown/not_run과 원래 회차·시작/완료·환경·엔진을 보존하며, 원시 명령/facts/reason·토큰·IP는 공개하지 않는다. 민감한 환경명은 안정된 해시 별칭. 플랫폼은 공유 kind 계약을 그대로 두고 내부 `RuntimeLabReportView`로 AWS ID를 검증한다. OpenAPI/웹 타입과 API·웹 표시 회귀 시험을 맞췄다. GPU Lab README에 AWS 게시 절차와 kind checker의 AWS 사용 금지 경고를 유지했고 내부 기록형식·지원 목록을 갱신했다.
+- 절대 경로 시험: `/home/bobgy/bobproject/byul/runtime`의 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests` **933건: 817 통과·115 skip·기존 AF_INET PermissionError 1**(`test_gateway_serves_snapshot_without_kubernetes_mutation`). 관련 5개 모듈 **127건 전부 통과**. `/home/bobgy/bobproject/byul/platform/api`의 지정 `uv run --frozen --with-editable ../../update --with-editable ../../runtime python -m pytest -q`는 기본 uv 캐시 읽기 전용으로 시작 실패. 기존 저장소 밖 시험 보조 설정으로 `PYTHONPATH=/tmp/byul-run7-deps UV_CACHE_DIR=/tmp/byul-uv-cache uv run --offline --frozen --with-editable ../../update --with-editable ../../runtime python -m pytest -p byul_test_poll -q`: **272 통과·1 skip·기존 AF_INET PermissionError 1 실패**(`test_saved_confirmed_export_starts_temporary_gateway`). `/home/bobgy/bobproject/byul/platform/web`의 `npm run typecheck`와 `npm test -- --maxWorkers=1`: **타입 검사·157건 전부 통과**. 로그 `/tmp/byul-run12-{runtime-final,targeted-final,api-prescribed,api,web-final}.log`. 소켓 제한을 제품/저장소 시험 변경으로 우회하지 않았다.
+- 미확인·다음: AWS 접속·실제 게시·브라우저 수동 검수 없음. 다음 서버 회차에 새 도구/Gateway·API 반영 후 ubuntu 사본 입력과 kubeconfig, 환경→선언 생성·권한/누락/JSON 이유코드, 실제 AWS 비파괴 사례 게시→Lab missing 해소, 0640/관측 GID·Gateway 읽기 성공/쓰기 거부, AWS ID·선택 범위·과거 시각·환경 표시, unknown/failed 보존을 확인한다. 소켓 허용 환경에서 보조 설정 없는 runtime/API 전체 통과와 Claude 독립 검수가 남았다. 작업 트리만 변경, 커밋·push·PR 없음. `contracts/`·`update/`와 금지 인계 문서는 변경하지 않았다.
+
+- 2026-11-08 사용자 명시 승인으로 Lab 보고서 계약 범위만 수정: kind L-01~L-08·AWS-01~AWS-20 및 선택 report.schema 두 형식을 허용하고 저장된 회차는 현재 통제 상태의 증명이 아님을 명시했다. 0.1/DRAFT 유지, platform의 파생 view를 제거해 공용 계약·생성 타입을 사용한다. 다른 팀 영향: 기존 kind L-01~L-08과 schema 없는 문서는 그대로 유효하여 하위 호환(종전 정규식만 허용하던 L-00·L-09~L-99는 거부), update·다른 계약 변경 없음. 기준 byul_runtime/59bbf9b, 커밋·푸시 없음.
+
+## 2026-11-09 3순위: 실제 반출 증거 목록과 예시 출처 구분 (Codex, 미커밋)
+
+- 실제 시작/종료 기준은 `byul_runtime` / HEAD `75a6dcfd731d8c1952403e4b1607dd6e5e4ed5b7`이다. 사용자 전달 `e823141`과 달랐으며 checkout/reset/pull 없이 현재 기준을 유지했다. 커밋·push·PR·AWS 접속·가동 없음. `contracts/`·`update/` 수정 없음. 사용자 금지 인계 문서는 읽거나 수정하지 않았고, 원래 있던 untracked 파일을 그대로 두었다.
+- 새 `tools/evidence_index.py`: tgz/폴더 다중 입력, 결과 문서/명시 SHA-256 대조, 스트리밍 크기 상한·경로/링크/특수 파일 거부, 비밀 패턴 파일 제외, `files/<run>/...` 복사, 로컬 계약 자체 검증 후 임시 출력 원자 게시. 같은 입력은 기존 출력과 내용 대조만 하고 다시 쓰지 않는다. 다른 결과는 덮어쓰지 않고 중단한다. 제외 파일명·값·원문을 출력하지 않으며 코드별 건수만 보고한다. 반출본·문서 해시를 refs에 연결하되 사건 연관성을 임의 생성하지 않는다.
+- 등급 근거: 계약의 실측 enum은 `MEASURED`이며 `real`이 아니다. 문서의 반출본 해시와 AWS GPU 서버 실측 회차 근거가 함께 확인된 입력에 적용한다. 근거 없는 입력은 `DECLARED`, 합성/mock 출처가 있는 파일은 보수적으로 `EXAMPLE`이다. 명시 origin 인자는 사람의 주장으로 구분한다. 파일시각을 collected_at에, 문서에서 확인한 기동 요청~stopped 구간을 window에 기록한다. 실서버 수집 등급이 후보 내용·모든 facts의 확정이나 운영 승인을 뜻하지 않는다. `pyproject.toml`에 선택 의존성 `evidence`(jsonschema)를 추가했고, 날짜 검증 선택 의존성이 없는 환경에서도 표준 라이브러리 보완 검증을 수행한다.
+- 플랫폼 `api/src/byul_platform/sources/evidence.py`, `routes/evidence.py`: 목록당 32 MiB 제한·순차 로드·동일 경로 중복 제거, 헤더 한 번/항목 한 번 검증, index 옆 **files/ 기준** regular file·경계·링크 검사. 목록 조회는 payload를 읽거나 해시하지 않는다. `web/src/pages/LandingPage.tsx`, `app/Layout.tsx`는 새 `components/SourceExampleBanner.tsx`로 예시인 수집원 이름만 표시한다. 개별 EXAMPLE 등급과 합성 표시는 유지했다. `scripts/run-with-runtime.sh`는 선택 `EVIDENCE_INDEX_PATHS`를 전달한다. `platform/README.md`에 실제 실행 예를 추가했다.
+- 새 파일 총 6개: `runtime/tools/evidence_index.py`, `runtime/tests/test_evidence_index.py`(20건), `runtime/docs/증거목록_생성과플랫폼연결.md`, `platform/api/tests/test_evidence_indexes.py`(5건), `platform/web/src/components/SourceExampleBanner.tsx`, `platform/web/tests/landing-evidence.test.tsx`(2건). 기존 변경은 앞 절의 소스/문서·개발 스크립트·runtime pyproject·이 STATUS다. [운영 문서](../docs/증거목록_생성과플랫폼연결.md)에 전체 옵션·설계·예시 표시 전수 점검표를 남겼다. 고정된 잘못된 경고는 첫 화면 배너만 발견해 수정했다.
+- 실제 반출본(읽기 전용) 검증: `/home/bobgy/.local/state/serving-runtime/aws-lab/evidence-20261108-run{12,13}.tgz`. 결과 문서 SHA-256 각각 `31a151e250562cec59ff9a5b3e57a8181b59cfb6e47877e77d804b29a542d098`, `bfdaf0da923667674b046d6bb743bf5482c3ab2d93b8bab6e2415a8557242a98`와 일치했다. `/tmp/byul-evidence-run12-run13/evidence-index.json`: run12 **17개·제외 0**, run13 **12개·제외 0**, 이유 코드 모두 `{}`, 29개 모두 MEASURED·window 확인. 같은 출력 재실행 성공·무재기록. 생성 도구 검증 및 플랫폼 독립 Contracts 검증 모두 오류 0, 실제 플랫폼 수집 경로도 **정상 29·invalid 0**. 이 연결에서 남은 예시 출처는 `runtime, update, store`다. 보고서 `/tmp/byul-evidence-real-import.log`, `/tmp/byul-evidence-platform-check.json`.
+- 절대 경로 runtime 시험: `/home/bobgy/bobproject/byul/runtime`에서 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: **954건 중 838 통과·115 skip·기존 AF_INET PermissionError 1**(`test_gateway_serves_snapshot_without_kubernetes_mutation`). 새 도구 20건 전부 통과. 로그 `/tmp/byul-evidence-runtime-final.log`.
+- 절대 경로 API 시험: `/home/bobgy/bobproject/byul/platform/api`에서 `uv run --frozen --with-editable ../../update --with-editable ../../runtime python -m pytest -q`는 기본 uv 캐시 읽기 전용으로 실행 전 실패(`/tmp/byul-evidence-api-prescribed.log`). 이전 회차의 저장소 밖 epoll 20ms 보조 설정과 `/tmp` 캐시로 `PYTHONPATH=/tmp/byul-run7-deps UV_CACHE_DIR=/tmp/byul-uv-cache uv run --offline --frozen --with-editable ../../update --with-editable ../../runtime python -m pytest -p byul_test_poll -q`를 실행했다. 최종 **318 통과·1 skip·기존 AF_INET PermissionError 1 실패**(`test_saved_confirmed_export_starts_temporary_gateway`, `/tmp/byul-evidence-api-final.log`). 증거 관련 5건 별도 실행은 전부 통과(`/tmp/byul-evidence-api-targeted.log`). 깊은 JSON 시험은 Python 3.12 C decoder 재귀 한도와 sys 재귀 한도가 별개임을 확인해 실제 깊은 입력으로 보완했다.
+- 절대 경로 web 시험: `/home/bobgy/bobproject/byul/platform/web`에서 `npm run typecheck`, `npm test -- --maxWorkers=1`: **타입 검사·159건 전부 통과**. 로그 `/tmp/byul-evidence-web-typecheck.log`, `/tmp/byul-evidence-web-final.log`. `git diff --check`·개발 스크립트 `bash -n` 통과.
+- 남은 제약: 소켓 허용 환경에서 보조 설정 없는 runtime/API 전체 시험, Claude 독립 검수·브라우저 수동 검수는 미확인이다. 비밀 패턴 검사는 인코딩/암호화/알려지지 않은 형식의 부재까지 증명하지 않는다. API는 목록별 읽기를 제한하지만 전체 응답의 페이지 나누기/전체 응답 크기 제한은 추가하지 않았다. 생성 도구는 과거 파일의 실측 수집 출처만 기록하며 현재 서버 상태·운영 승인·모든 후보 사실의 확정을 주장하지 않는다.
+
+
+## 2026-11-09 Claude 검수 보완: 과거 회차 증거 해시 근거
+
+- 기준 `byul_runtime` / HEAD `75a6dcfd731d8c1952403e4b1607dd6e5e4ed5b7` 유지. 이번 수정 범위는 `runtime/tools/evidence_index.py`, `runtime/tests/test_evidence_index.py`, `runtime/docs/증거목록_생성과플랫폼연결.md`, 이 STATUS 4개다. 앞선 미커밋 변경은 보존했다. 새 저장소 파일 추가 없음. 커밋·push·AWS 접속 없음, contracts/update 수정 없음, 금지 인계 문서는 읽거나 수정하지 않았다.
+- 도구 1.1: 문서와 입력의 반출본 언급/회차 제목 연관성을 먼저 확인하고, 해당 문서 어디든 계산한 전체 해시가 있으면 `document_full`로 인정한다. 일치 값 없이 다른 전체 해시만 있으면 중단한다. 전체 해시가 없는 문서의 SHA-256 접두가 맞으면 `document_prefix`, `hash_verified:"prefix_only"`, 자동 DECLARED다. 명시 SHA-256은 계산 값과 대조해 문서 해시 미기재도 `explicit`로 진행하며, 문서 전체/접두와의 불일치를 덮지 않는다. `basis`에 근거를 모두 기록하고, 사람이 명시한 등급은 `origin_assertion`에 남긴다. 접두만으로 MEASURED 지정은 거부하며, 명시 전체 SHA-256과 origin MEASURED가 함께 확인된 경우 수동 주장으로 기록한다. 근거 없음은 `none`/false다. 합성 EXAMPLE 하향·비밀 검사·안전 복사 규칙은 유지했다.
+- 문서에 환경·시간 표기가 없는 과거 실서버 회차도 회차 연관성·AWS 서버 결과 제목·전체 해시가 확인되면 MEASURED로 인정한다. 회차 구간을 기존 규칙으로 읽지 못하면 window는 그대로 null이며 시간 파싱을 확대하지 않았다. 운영 문서에 근거별 등급 표와 prefix_only truthiness 주의, 명시 인자 처리·충돌·수동 주장 규칙을 추가했다.
+- 관련 시험: `/home/bobgy/bobproject/byul/runtime`에서 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests -p test_evidence_index.py`: **33건 전부 통과**(이번 13건 추가). 별도 줄 전체 해시/다른 해시 동시 존재, 제목으로 문서 확인·잘못된 회차 거부, 접두·접두 불일치, 명시 인자와 문서 누락·충돌·수동 등급·CLI 경로를 검증했다. 로그 `/tmp/byul-evidence-review-targeted.log`.
+- 전체 시험: 같은 절대 경로에서 `TMPDIR=/dev/shm .venv/bin/python -B -m unittest discover -s tests`: **967건: 851 통과·115 skip·기존 AF_INET PermissionError 1**(`test_gateway_serves_snapshot_without_kubernetes_mutation`). 로그 `/tmp/byul-evidence-review-runtime.log`. 전체 완전 통과는 소켓 허용 환경에서 재확인이 필요하다. `git diff --check` 통과. 이번 범위에서 API/web 소스는 수정하지 않았고 해당 전체 시험은 재실행하지 않았다.
+- 사용자 후속 답변대로 회차 번호가 있는 10개만 한 번에 `/tmp/byul-evidence-all`에 생성했다. 회차 미확정 반출본 1개는 제외했다. 아래 집계는 명시 해시·origin을 추가하지 않은 문서 근거 그대로다. 파일명·비밀 일치 값은 출력하지 않았다. 자체 계약 검사와 플랫폼 Contracts 독립 검증 모두 오류 0. 재실행에서도 파일 내용과 mtime을 바꾸지 않는 것을 확인했다. 집계 로그 `/tmp/byul-evidence-review-import.log`.
+
+| 회차 | 포함 파일 | 제외 | 이유 코드 | 근거 | origin 분포 |
+| --- | ---: | ---: | --- | --- | --- |
+| run3 | 41 | 0 | 없음 | document_prefix | DECLARED 41 |
+| run4 | 30 | 0 | 없음 | document_prefix | DECLARED 30 |
+| run5 | 35 | 2 | BEARER 2 | document_prefix | DECLARED 35 |
+| run6 | 13 | 0 | 없음 | document_prefix | DECLARED 13 |
+| run7 | 21 | 0 | 없음 | document_full | MEASURED 21 |
+| run8 | 19 | 0 | 없음 | document_prefix | DECLARED 19 |
+| run10 | 9 | 1 | BEARER 1 | document_full | MEASURED 9 |
+| run11 | 21 | 0 | 없음 | document_full | MEASURED 21 |
+| run12 | 17 | 0 | 없음 | document_full | MEASURED 17 |
+| run13 | 12 | 0 | 없음 | document_full | MEASURED 12 |
+| 합계 | 218 | 3 | BEARER 3 | 전체 대조 5회차·접두 5회차 | DECLARED 138·MEASURED 80 |
+
+- 남은 제약: 접두 대조는 전체 파일 동일성의 강한 근거가 아니므로 5개 회차는 DECLARED로 남는다. 수동 origin 주장은 독립 인증이 아니며 자동으로 만들어 넣지 않았다. 소켓 허용 환경의 전체 시험과 Claude 직접 검수가 남았다. 보고서 형식/collector 버전이 바뀌었으므로 이전 출력과 다른 경우 기존 멱등 규칙에 따라 덮어쓰지 않고 새 출력 폴더를 사용한다.
+
+## 2026-11-09 엔진 수신 기록(11)·GPU 지표(12) — Claude 구현분, Codex 교차 검수 전
+
+- Codex 사용 한도로 작업이 시작되지 않아 Claude가 구현했다. 10번(외부 규칙 최초 적용) 미커밋 변경 위에서 작업했고 그 파일은 건드리지 않았다. contracts/update는 수정하지 않았다. 서버에는 접속하지 않았다.
+- 11: Gateway가 외부 backend 응답의 `id`를 요청 ID와 대조한다. 결과는 `engine_response_id_matched/mismatch/absent`이고 ID 원문은 저장하지 않는다.
+  - 선택 기능 `tools/engine_receipts.py`: 엔진 로그에서 요청 ID와 시각만 추출한다. 로그 줄·프롬프트는 버린다.
+  - Gateway `--engine-receipts`를 켜면 요청 상세가 `received`(로그 발견)를 표시한다. 미발견은 미수신으로 단정하지 않는다.
+  - 서비스 예시 파일만 두었고 기본 꺼짐이다. 플랫폼 상세에 한국어 라벨을 붙였다.
+- 12: `tools/gpu_status.py`(nvidia-smi 고정 필드, UUID 등 미저장)와 `serving-runtime-gpu-status.service`를 설치기 UNITS에 추가했다.
+  - Gateway `--gpu-state`·`/api/gpu-status`, gateway.yaml 인자를 추가했다.
+  - 플랫폼 `/api/runtime/gpu-status`(플랫폼 전용 모델)와 현황 GPU 카드·"GPU 관측" 표시를 추가했다. stale은 "현재 값 아님"으로 경고한다.
+- 문서: [엔진 수신 기록과 GPU 지표](../docs/엔진수신기록_GPU지표.md). 내부 기록 형식 문서에 두 형식을 추가했다.
+- 미확인·다음
+  - 실제 vLLM/SGLang이 X-Request-Id를 응답 `id`·로그에 쓰는지
+  - runtime-agent kubeconfig의 `pods/log` 권한
+  - 서버 nvidia-smi 실행 권한과 값 대조, stale 전환
+  - 브라우저 화면
+  - Codex 교차 검수
+
+## 2026-11-09 알림 보내기(13) — Claude 구현분, Codex 교차 검수 전
+
+- Codex 사용 한도로 Claude가 구현했다. contracts/update 수정·서버 접속 없음.
+- `tools/alert_notifier.py`: Gateway 읽기 API만 조회해 웹훅(slack/discord/generic)으로 보낸다. 기본은 미리보기, `--send`일 때만 전송.
+  - 대상: DENIED 요청, Tetragon 허용 목록 밖 실행·보호 파일 접근(탐지/차단 구분), Hubble dropped, 수집기·Tetragon 상태·GPU·기록 저장소·Gateway 상태 이상/복구, Gateway 2회 연속 조회 실패.
+  - 첫 실행은 과거를 보내지 않음, 상태 변화 때만 알림, 웹훅 실패 시 0600 상태 파일 대기열(최대 200)에서 재전송.
+  - 프롬프트·요청 ID·토큰·IP·Pod/노드 이름·경로는 보내지 않고, 고정 형식이 아닌 값은 `OTHER`로 바꾼다.
+- 서비스 예시 `deploy/agent/serving-runtime-alerts.service.example`(설치기 미포함), 문서 [알림 보내기](../docs/알림_보내기.md), 내부 기록 형식 2행.
+- 근거: 단위 14건 통과; 로컬 mock Gateway 미리보기(차단 1건 → 1회 알림, 재실행 0건)와 로컬 웹훅 수신기 실제 전송(Gateway 중단 2회차 1건) 확인.
+- 미확인·다음: 실서버 읽기 토큰·포트포워드, 실제 Slack/Discord 표시, 실제 관측량, Codex 교차 검수. 플랫폼 화면 알림 목록은 만들지 않았다.
+
+## 2026-11-09 플랫폼 로그인(14) — Claude 구현분, Codex 교차 검수 전
+
+- Codex 사용 한도로 Claude가 구현했다. 플랫폼 담당과 범위 겹침은 미확인(사용자가 진행 지시). contracts/update 수정 없음.
+- API: `accounts.py`(0600 계정 파일, scrypt, 첫 실행 admin/admin, 마지막 관리자 보호), `auth.py`(메모리 세션·HttpOnly/SameSite=Strict 쿠키·CSRF 헤더·5회/10분 실패 시 5분 잠금·감사 기록 0600), `accounts_cli.py`(create/disable/enable/set-role/reset-password/list, 임시 비밀번호는 새 0600 파일만).
+  - `from_env`는 로그인 기본 켬(`BYUL_LOGIN_DISABLED=1`로 끔), 직접 만든 `Settings`(기존 시험)는 꺼짐. 변경 강제 `BYUL_REQUIRE_PASSWORD_CHANGE` 기본 끔.
+  - 운영 API: Bearer 토큰(에이전트) 유지, 없으면 세션 계정 역할 사용. admin은 목록 조회만.
+- 웹: 로그인 화면·변경 강제 화면·비밀번호 변경(`/account/password`)·상단 계정/로그아웃·기본 비밀번호 경고, CSRF 헤더, 401 시 로그인 화면, 로그인 시 운영 토큰 입력칸 대신 세션.
+- 문서: `platform/docs/로그인_계정관리.md`, platform README 환경변수·역할 표, 실행 스크립트 주석.
+- 근거: API 345 통과(새 12), web 타입 검사·176 통과(새 7)·빌드 통과, 실제 서버 curl(미로그인 401·로그인 200·CSRF 없는 POST 403·파일 0600).
+- 미확인·다음: 브라우저 화면 확인, 실서버, Codex 교차 검수, 플랫폼 담당 확인.
+
+## 2026-11-09 AWS 14회차 — 10~14·B·C·F 실서버 확인
+
+- 15:21 기동 → 15:49:03 stopped 확인. 코드 `f079b2d`, 이미지 `rt-f079b2d`. 결과 [AWS_GPU_서버14회차_결과_20261109.md](../docs/AWS_GPU_서버14회차_결과_20261109.md), 증거 `evidence-20261109-run14.tgz`(2e5a0868…), 토큰·IP·계정·인스턴스 ID 0건.
+- 통과: 12 GPU(nvidia-smi 일치·stale 전환), 11(vLLM `chatcmpl-<요청 ID>`·로그 확인·`received`/`unavailable`), 10(dry-run → execute `succeeded`, 외부 집행 unknown→mixed, baseline 재캡처), 13(차단·stale·복구 알림, 유출 0), 14(로그인·역할 거부·에이전트 토큰 유지), B(실서버 연결 화면), C(bundle.apply 실제 적용·switch 되돌리기), F(명시 권한).
+- 새로 찾은 것: 설치기가 에이전트를 enabled·execute로 켬, agent kubeconfig 권한이 넓음, 터널 화면 로딩 지연, 오래된 identities.json 0664.
+- 다음: Codex 교차 검수(11~14) → 발견 처리 결정 → PR 한 번.
+- 14회차 발견 1 조치(사용자 결정 B, Claude 구현·Codex 교차 검수 전): 설치기가 에이전트를 enable·start 하지 않고 `disable`·중지 확인만 한다(모드와 무관). 요약 출력은 수집 서비스만 건강 판정, 에이전트는 "수동 시작 대상"으로 표시. README 재설치 예시를 `--execute` 없이로 변경. 설치기 시험 33건 통과(에이전트 enable/start 없음·켜져 있으면 실패 시험 추가). 실서버 재확인은 다음 회차.
+
+## 2026-11-09 14회차 발견 2~4 처리 — Claude 구현분, Codex 교차 검수 전
+
+- 발견 2 권한: `tools/agent_rbac.py`(필요 권한 목록 하나로 Role/ClusterRole 렌더·`kubectl auth can-i` 점검, `--as` 흉내 지원), 예시 `deploy/agent/runtime-agent-rbac.example.json`, 문서 `docs/에이전트_권한_최소화.md`. 시험 8건.
+  - kind 실측: 기존 관리자 kubeconfig `too_broad`(금지 14개 모두 허용), 렌더한 권한 적용 후 SA `ok`(필요 28 yes·금지 14 no), SA로 실제 명령(정책 목록·tetra exec·server dry-run·로그·rollout·port-forward·patch) 성공, secrets·nodes·Pod 삭제 Forbidden. kind에 RBAC 객체는 남겨 둠.
+  - 14회차 수동 점검의 `pods/log` 질의 형식은 "log라는 Pod"로 해석되는 오류였다(도구는 `--subresource` 사용).
+- 발견 3 화면 지연: 플랫폼 live `events`가 요청 200개 상세를 하나씩 물어 원격 연결에서 첫 로드가 길었다. 지연 30ms/80ms 모의에서 7.6s/17.7s → 병렬 8개로 1.4s/2.6s. 순서 유지·병렬 시험 1건, API 346 통과.
+- 발견 4 옛 파일: `/var/lib/serving-runtime/identities.json`은 현재 코드·단위가 참조하지 않음(상태 서비스는 `/srv/serving/observation/tetragon-identities.json`). 다음 서버 회차에 서버의 단위·사용자 서비스 참조를 확인한 뒤 백업·삭제.
+- 다음 서버 회차 확인: 설치기 에이전트 미시작, 최소 권한 kubeconfig로 교체 후 수집·10번 dry-run·엔진 로그, 화면 로딩, 옛 파일 삭제.
+
+## 2026-11-09 AWS 15회차 — 14회차 발견 1~4 실서버 확인
+
+- 17:14 기동 → 17:37:11 stopped 확인. 코드 `5acbd26`. 결과 [AWS_GPU_서버15회차_결과_20261109.md](../docs/AWS_GPU_서버15회차_결과_20261109.md), 증거 `evidence-20261109-run15.tgz`(1e8edfd2…), 토큰·IP·계정·인스턴스 ID 0건.
+- 발견 1: 설치기 뒤 에이전트 disabled/inactive·dry-run 모드 확인. 발견 2: 에이전트 kubeconfig를 최소 권한 SA 토큰으로 교체, `too_broad`→`ok`, 수집·enforcement dry-run(Cilium 포함)·엔진 로그 정상. 발견 4: 옛 identities.json 참조 0건 확인 후 백업·삭제.
+- 발견 3: 일부 개선. 남은 원인은 Gateway 관측 조회가 65MB 파일을 매번 전부 읽는 것(1.2~1.4초). 관측 조회 병렬화는 503을 만들어 되돌림. 다음: Gateway 관측 캐시/이어 읽기.

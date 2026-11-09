@@ -1,0 +1,148 @@
+{
+ "contract": "guard-auxiliary-parser-input/1",
+ "data_origin": "EXAMPLE",
+ "diagnostic_codes": [],
+ "events": [
+  {
+   "call": "e82a8130d9ab4718aaa16efca9adad3c",
+   "complete": true,
+   "entry_sha256": "03ec23e737d0a690e283f302ed9822a40ff550d441e689073cd373d61c659bd9",
+   "file_bytes": 651,
+   "file_sha256": "54162c9cd0377110df1859dfabebb106fc0988c8aadb88207ce1ee0d34985df6",
+   "parser_input_bytes": 651,
+   "parser_input_sha256": "54162c9cd0377110df1859dfabebb106fc0988c8aadb88207ce1ee0d34985df6",
+   "path_sha256": "7fa507ef7370931f40ef11a1dc132854bd893c7d70d7841268cbea1e782f443f",
+   "phase": "READ_RETURN",
+   "pid": 80,
+   "point": "PreTrainedConfig._dict_from_json_file",
+   "qualified": true,
+   "role": "config",
+   "root": 0,
+   "schema": "guard-auxiliary-read/1",
+   "session": "322af6589b0e4eed99953562ed5a7d13",
+   "source_sha256": "02826ac9e987487b645135d8f1d747f60a7e567d1b8f72327de8514d02b6f15d",
+   "stable": true,
+   "start_ticks": 15612220
+  },
+  {
+   "call": "c7b95b10f6794de8aad6ac6c1310b193",
+   "complete": true,
+   "entry_sha256": "03ec23e737d0a690e283f302ed9822a40ff550d441e689073cd373d61c659bd9",
+   "file_bytes": 651,
+   "file_sha256": "54162c9cd0377110df1859dfabebb106fc0988c8aadb88207ce1ee0d34985df6",
+   "parser_input_bytes": 651,
+   "parser_input_sha256": "54162c9cd0377110df1859dfabebb106fc0988c8aadb88207ce1ee0d34985df6",
+   "path_sha256": "7fa507ef7370931f40ef11a1dc132854bd893c7d70d7841268cbea1e782f443f",
+   "phase": "READ_RETURN",
+   "pid": 80,
+   "point": "PreTrainedConfig._dict_from_json_file",
+   "qualified": true,
+   "role": "config",
+   "root": 0,
+   "schema": "guard-auxiliary-read/1",
+   "session": "322af6589b0e4eed99953562ed5a7d13",
+   "source_sha256": "02826ac9e987487b645135d8f1d747f60a7e567d1b8f72327de8514d02b6f15d",
+   "stable": true,
+   "start_ticks": 15612220
+  },
+  {
+   "call": "b95c7f36a3c84740bb22d3a0110f953b",
+   "complete": true,
+   "entry_sha256": "b10f51800fc5f6c4fa2573e74e56bec8ad9fcb44494166f1984abacb9e721615",
+   "file_bytes": 685,
+   "file_sha256": "d1e4185b43a0a06421ab7218d5c1a775350bd13024507b34fbed25dcf6c14c6b",
+   "parser_input_bytes": 685,
+   "parser_input_sha256": "d1e4185b43a0a06421ab7218d5c1a775350bd13024507b34fbed25dcf6c14c6b",
+   "path_sha256": "cf1f4d986823fa250aaba43bc457cd083fc527a267fbbb3f43093af62913a3db",
+   "phase": "READ_RETURN",
+   "pid": 80,
+   "point": "PreTrainedTokenizerBase._from_pretrained",
+   "qualified": true,
+   "role": "tokenizer",
+   "root": 0,
+   "schema": "guard-auxiliary-read/1",
+   "session": "322af6589b0e4eed99953562ed5a7d13",
+   "source_sha256": "e7eb23b77be31b251570936ca74b2a3f2c04f1a44a13aa079ac4957535916a4b",
+   "stable": true,
+   "start_ticks": 15612220
+  },
+  {
+   "call": "7f1cb10a4e7e4438a3533fdee237a2cd",
+   "complete": true,
+   "entry_sha256": "b10f51800fc5f6c4fa2573e74e56bec8ad9fcb44494166f1984abacb9e721615",
+   "file_bytes": 441,
+   "file_sha256": "0f3cd5f307a2735cfee31ddf33be88655e8be165ee2cdc26ced966f04258adf0",
+   "parser_input_bytes": 441,
+   "parser_input_sha256": "0f3cd5f307a2735cfee31ddf33be88655e8be165ee2cdc26ced966f04258adf0",
+   "path_sha256": "d95f41ff554f947f1294291fa60176a31ccb274ae68fbf050ea72457bad65af4",
+   "phase": "READ_RETURN",
+   "pid": 80,
+   "point": "PreTrainedTokenizerBase._from_pretrained",
+   "qualified": true,
+   "role": "tokenizer",
+   "root": 0,
+   "schema": "guard-auxiliary-read/1",
+   "session": "322af6589b0e4eed99953562ed5a7d13",
+   "source_sha256": "e7eb23b77be31b251570936ca74b2a3f2c04f1a44a13aa079ac4957535916a4b",
+   "stable": true,
+   "start_ticks": 15612220
+  },
+  {
+   "call": "2c3dbed8b3454b34aa5f7d2ab69b37d9",
+   "complete": true,
+   "entry_sha256": "7ac041cbdaa7d912660fd70cbac6e958e5b0a36dc351e8cb752c4d345abc886f",
+   "file_bytes": 347,
+   "file_sha256": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+   "parser_input_bytes": 347,
+   "parser_input_sha256": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+   "path_sha256": "968ecc65d796209cb3611abd4e678b70436b5f0d24504ddaf039f12033e3ddab",
+   "phase": "READ_RETURN",
+   "pid": 80,
+   "point": "_load_chat_template",
+   "qualified": true,
+   "role": "template",
+   "root": 1,
+   "schema": "guard-auxiliary-read/1",
+   "session": "322af6589b0e4eed99953562ed5a7d13",
+   "source_sha256": "4d442ec6bc7783f2ed37e7400390631a5f39c27e3a48add89991d1669fef13bd",
+   "stable": true,
+   "start_ticks": 15612220
+  }
+ ],
+ "pid": 80,
+ "producer": {
+  "name": "guard-auxiliary-parser",
+  "source_sha256": "3d0851ab8e8c7fd2ee2319d5d9350c49c9e0e059c221906a4b77a80ddcf1e296",
+  "version": "1"
+ },
+ "results": [
+  {
+   "accepted": true,
+   "output_sha256": "d28588143376c226efcbe4b4762b256aac63083a5fbcb2bf2224f9e8e362e2c3",
+   "read_calls": [
+    "e82a8130d9ab4718aaa16efca9adad3c"
+   ],
+   "role": "config"
+  },
+  {
+   "accepted": true,
+   "output_sha256": "1377f9ebd4839be55509cc807820bfcc9a0dee9c3f3646a25738da4815152888",
+   "read_calls": [
+    "b95c7f36a3c84740bb22d3a0110f953b",
+    "7f1cb10a4e7e4438a3533fdee237a2cd"
+   ],
+   "role": "tokenizer"
+  },
+  {
+   "accepted": true,
+   "output_sha256": "c5551c96f661b46d34f2c78920a9f0f09fe2b7a1a5bb307be97b99d2e0347624",
+   "read_calls": [
+    "2c3dbed8b3454b34aa5f7d2ab69b37d9"
+   ],
+   "role": "template"
+  }
+ ],
+ "session": "322af6589b0e4eed99953562ed5a7d13",
+ "source_ended": true,
+ "start_ticks": 15612220
+}

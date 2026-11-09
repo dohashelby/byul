@@ -10,6 +10,7 @@ import time
 
 from tools.tetragon_capability import classify_capabilities
 from tools.tetragon_trial import atomic_json, run
+from tools.tetragon_public import public_snapshot
 from serving_runtime.enforcement.tetragon import comparable_spec
 from serving_runtime.enforcement.recovery import RecoveryTracker
 
@@ -35,12 +36,13 @@ def method_from_spec(policy):
 
 
 class StatusCollector:
-    def __init__(self,context,output,evidence_dir,*,runner=run,recovery=None):
+    def __init__(self,context,output,evidence_dir,*,runner=run,recovery=None,public_output=None):
         self.context=context
         self.output=Path(output)
         self.evidence=Path(evidence_dir)
         self.run=runner
         self.recovery=recovery
+        self.public_output=Path(public_output) if public_output is not None else None
         self.capabilities=[]
         self.capabilities_at=0.0
         self.spec_fingerprint=None
@@ -163,6 +165,8 @@ class StatusCollector:
         else:
             result["monitoring"] = {"state":"not_configured","reasons":["recovery_check_not_configured"]}
         atomic_json(self.output,result,mode=0o644)
+        if self.public_output is not None:
+            atomic_json(self.public_output,public_snapshot(result),mode=0o640)
         return result
 
 
@@ -170,6 +174,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--context",required=True)
     parser.add_argument("--output",type=Path,required=True)
+    parser.add_argument("--public-output",type=Path,help="읽기 전용 대시보드용 최소 상태 사본(0640); 원본 유지")
     parser.add_argument("--evidence-dir",type=Path,required=True)
     parser.add_argument("--watch",action="store_true")
     parser.add_argument("--interval",type=float,default=5)
@@ -188,7 +193,9 @@ def main():
     recovery=(RecoveryTracker(args.context,args.output.with_name(args.output.name+".recovery.json"),
         baseline_path=args.expected_policies,identities_path=args.identities,
         heartbeat_path=args.feed_heartbeat,observations_path=args.observations) if all(checks) else None)
-    collector=StatusCollector(args.context,args.output,args.evidence_dir,recovery=recovery)
+    if args.public_output and args.public_output.resolve() == args.output.resolve():
+        parser.error("public-output must differ from the private output")
+    collector=StatusCollector(args.context,args.output,args.evidence_dir,recovery=recovery,public_output=args.public_output)
     while True:
         result=collector.collect()
         if not args.watch and result.get("error")=="정책 변경 감지: 로드 안정화 대기 중":

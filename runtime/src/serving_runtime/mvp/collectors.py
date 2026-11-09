@@ -312,6 +312,12 @@ def load_declaration(path: str | Path | None, *, kind: str) -> DeclarationState:
     path_text = str(path)
     try:
         raw = Path(path).read_bytes()
+    except FileNotFoundError:
+        return DeclarationState(
+            "not_configured", path_text, {}, loaded_at,
+            error_code=f"{kind.upper()}_NOT_FOUND",
+            error_message="기준/선언 승인본이 없습니다. 후보를 검토·승인해야 합니다.",
+        )
     except (OSError, ValueError) as error:
         return DeclarationState(
             "error", path_text, {}, loaded_at, error_code=f"{kind.upper()}_READ_ERROR",

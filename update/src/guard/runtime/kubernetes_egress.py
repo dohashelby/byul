@@ -1,4 +1,6 @@
 """Owned same-cluster egress transport. A2 owns receipt/operation adjudication."""
+
+from guard.adapters.engine_profiles import supports
 from copy import deepcopy
 from datetime import datetime,timezone
 from pathlib import Path
@@ -127,7 +129,7 @@ def _receiver(t,target,p):
 def capture(t,policy_values,*,receiver_target,actor_spec,connect_timeout,total_timeout):
     from .kubernetes_http import REQUEST_BINDING_PROFILE
     cfg=normalize(policy_values,actor_spec=actor_spec,connect_timeout=connect_timeout,total_timeout=total_timeout)
-    p=cfg['policy_values'];require(t.profile==REQUEST_BINDING_PROFILE and t.lab is True and t.engine_name=='vllm' and t.engine_version=='0.31.0')
+    p=cfg['policy_values'];require(t.profile==REQUEST_BINDING_PROFILE and t.lab is True and supports(t.engine_name, t.engine_version))
     require(p['source_target_sha256']==t.target_sha256 and p['subject_container_id']==t.binding['engine']['container_id'])
     receiver=_receiver(t,receiver_target,p);program,receiver_source=source();nonce=secrets.token_hex(16)
     deadline=min(t.deadline,t.clock()+total_timeout)

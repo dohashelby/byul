@@ -263,7 +263,9 @@ def run(tmp_path, monkeypatch, world=None, policy_values=None, extra=None, *, or
 
 
 def work_summary(store, plan, evd):
-    return store.root / "work" / plan.id / "PLT-07" / str(evd.side) / "boundary_egress.json"
+    root = store.root / 'work' / plan.id
+    if evd.execution.attempt_id is not None: root /= evd.execution.attempt_id
+    return root / 'PLT-07' / str(evd.side) / 'boundary_egress.json'
 
 
 def test_explicit_forbidden_connect_requires_both_owned_sources_and_remains_partial(tmp_path, monkeypatch):

@@ -18,7 +18,8 @@ from tests import test_method_keys as mk
 from tests import test_role_route as rr
 from tests.builders import baseline_pack, environment
 
-GOLDEN = Path(__file__).parent / "golden/http_executors.json"
+LEGACY_GOLDEN = Path(__file__).parent / "golden/http_executors.json"
+GOLDEN = Path(__file__).parent / "golden/http_executors_v2.json"
 VOLATILE = {"elapsed_ms", "started_at", "finished_at", "path", "id", "collected_at"}
 PACK = baseline_pack()
 
@@ -99,7 +100,7 @@ def _all(tmp_path):
 
 
 def test_http_executor_drafts_match_golden(tmp_path, monkeypatch):
-    # The immutable PACK27 golden still checks the complete original payload.
+    # The v2 PACK27 golden checks bounded reviewed probes and source grading.
     monkeypatch.setitem(globals(), "PACK", _pack27())
     current = _all(tmp_path)
     if os.environ.get("GUARD_UPDATE_GOLDEN") == "1":
@@ -155,3 +156,13 @@ def test_current_http_draft_changes_only_canonical_procedure_words(tmp_path):
     assert expected_changes == 33
     current = _all(tmp_path)
     assert current == expected
+
+
+def test_legacy_http_golden_bytes_and_draft_codec_are_preserved():
+    import hashlib
+    from guard.executors.base import EvidenceDraft
+    raw = LEGACY_GOLDEN.read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == 'd7444f2226d19a11c5ed35d424fdc2df4658a90cb5a5366c45764b27d3f614c2'
+    for payload in json.loads(raw).values():
+        draft = EvidenceDraft.model_validate({k: v for k, v in payload.items() if k != 'log'})
+        assert draft.data_origin.value == payload['data_origin']

@@ -34,6 +34,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 _BUNDLE_FILES = ("source-environment.json", "source-policy.json", "environment.json", "policy.json")
 _MAPPING_KEYS = frozenset({"format", "checked_at", "target_ref", "environment_ref", "byul_policy_ref",
                            "guard_environment_ref", "guard_policy_ref", "pack_ref", "validity", "limitations", "files"})
+# 계약 target.engine·target.runtime 중 guard ENV에 대응 필드가 있는 것. 나머지는 원본 bytes에만 남긴다.
+_GUARD_ENGINE_KEYS = ("name", "version", "source_commit", "image_digest")
+_GUARD_RUNTIME_KEYS = ("nodes", "tp_groups", "gpu_count", "gpu_model", "driver")
 
 
 class InputBoundaryError(ValueError):
@@ -106,7 +109,7 @@ def _time(value: str | datetime) -> datetime:
         raise InputBoundaryError("AS_OF_REQUIRES_TIMEZONE") from error
 
 
-def convert_documents(environment: dict, policy: dict, pack, contracts: Contracts, *, as_of: datetime):
+def convert_documents(environment: dict, policy: dict, pack, contracts: Contracts, *, as_of: datetime, version=1):
     """계약·정확한 원본 연결을 검증한 뒤 새 guard 객체와 내부 매핑 기록을 반환한다.
 
     입력 문서를 수정하지 않는다. 문서 판본과 guard 객체 판본은 서로 다른 ID 공간이다.
@@ -149,14 +152,20 @@ def convert_documents(environment: dict, policy: dict, pack, contracts: Contract
     approval = policy["approval"]
     confirmed = policy["status"] == "CONFIRMED"
     target = environment["target"]
-    # tokenizer_revision/deployment/runtime 정책은 guard에 대응 필드가 없다.
-    # 원본 bytes와 아래 기록에 보존하며 모델 revision 등으로 바꾸지 않는다.
-    model = {key: target["model"].get(key) for key in ("id", "revision", "inventory_sha256")}
+    # guard에 대응 필드가 없는 값(배치·runtime 정책 등)은 원본 bytes와 아래 기록에 보존하며 모델 revision 등으로 바꾸지 않는다.
+    # /2는 엔진 runtime_kind·frontend, 병렬 크기(tp/pp/dp_size), tokenizer·모델 구성요소를 guard 객체에 넣는다.
+    # /1(과거 결과 재생)은 guard가 원래 알던 필드만 넘기고 나머지는 원본에 남긴다.
+    model_keys = ("id", "revision", "inventory_sha256", *(("tokenizer_revision", "components") if version >= 2 else ()))
+    engine_keys = _GUARD_ENGINE_KEYS + (("runtime_kind", "frontend") if version >= 2 else ())
+    runtime_keys = _GUARD_RUNTIME_KEYS + (("tp_size", "pp_size", "dp_size") if version >= 2 else ())
+    model = {key: target["model"].get(key) for key in model_keys}
+    engine = {key: target["engine"][key] for key in engine_keys if key in target["engine"]}
+    guard_runtime = {key: runtime[key] for key in runtime_keys if key in runtime}
     try:
         env = Environment(
             id=new_id("ENV"), created_at=environment["created_at"],
-            data_origin=environment["data_origin"], engine=target["engine"],
-            runtime=runtime, model=model, facts=environment["facts"],
+            data_origin=environment["data_origin"], engine=engine,
+            runtime=guard_runtime, model=model, facts=environment["facts"],
         ).seal()
         pol = Policy(
             id=new_id("POL"), created_at=policy["created_at"], data_origin=policy["data_origin"],
@@ -164,22 +173,30 @@ def convert_documents(environment: dict, policy: dict, pack, contracts: Contract
             scope=policy["verification"]["scope"], exceptions=policy["verification"]["exceptions"],
             confirmed_by=approval["approved_by"] if confirmed else None,
             confirmed_at=approval["approved_at"] if confirmed else None,
+            **({'valid_from': start, 'valid_until': until, 'source_document_sha256': canonical_sha256(policy)} if version >= 2 else {}),
         ).seal()
     except ValueError as error:
         raise InputBoundaryError("GUARD_INPUT_MODEL_INVALID") from error
 
     limitations = [
         "NO_ENGINE_EXECUTED", "APPROVAL_IS_DECLARATION_NOT_AUTHENTICATION",
-        "POLICY_VALIDITY_MUST_BE_RECHECKED_AT_EXECUTION", "ADAPTER_NOT_IN_ENVIRONMENT_CONTRACT",
+        "POLICY_VALIDITY_RECHECKED_AT_EXECUTION" if version >= 2 else "POLICY_VALIDITY_MUST_BE_RECHECKED_AT_EXECUTION", "ADAPTER_NOT_IN_ENVIRONMENT_CONTRACT",
         "CPU_PROFILE_NOT_IN_ENVIRONMENT_CONTRACT", "DEPLOYMENT_RETAINED_IN_SOURCE_ONLY",
         "RUNTIME_POLICY_RETAINED_IN_SOURCE_ONLY",
     ]
     if target["model"].get("tokenizer_revision") is not None:
-        limitations.append("TOKENIZER_REVISION_RETAINED_IN_SOURCE_ONLY")
+        limitations.append("TOKENIZER_REVISION_BOUND_TO_SELECTION" if version >= 2 else "TOKENIZER_REVISION_RETAINED_IN_SOURCE_ONLY")
+    if version < 2:
+        if "runtime_kind" in target["engine"]:
+            limitations.append("ENGINE_RUNTIME_KIND_RETAINED_IN_SOURCE_ONLY")
+        if target["engine"].get("frontend") is not None:
+            limitations.append("ENGINE_FRONTEND_RETAINED_IN_SOURCE_ONLY")
+        if any(runtime.get(key) is not None for key in ("tp_size", "pp_size", "dp_size")):
+            limitations.append("RUNTIME_PARALLELISM_RETAINED_IN_SOURCE_ONLY")
     if start is None or until is None:
         limitations.append("POLICY_VALIDITY_PARTLY_UNDECLARED")
     mapping = {
-        "format": "guard-byul-input-import/1",
+        "format": "guard-byul-input-import/" + str(version),
         "checked_at": checked_at.isoformat(),
         "target_ref": target["target_ref"],
         "environment_ref": env_ref,
@@ -197,13 +214,13 @@ def convert_documents(environment: dict, policy: dict, pack, contracts: Contract
 
 
 def import_inputs(environment_path: Path, policy_path: Path, pack_path: Path, output: Path,
-                  *, contracts_dir: Path = REPO_ROOT / "contracts", as_of: datetime | None = None):
+                  *, contracts_dir: Path = REPO_ROOT / "contracts", as_of: datetime | None = None, version=2):
     """출력 경로는 새 디렉터리여야 한다. 모든 입력 검증 전에는 출력하지 않는다."""
     environment, env_raw = read_document(environment_path)
     policy, pol_raw = read_document(policy_path)
     pack = _load_input_pack(pack_path)
     env, pol, mapping = convert_documents(environment, policy, pack, Contracts(contracts_dir),
-                                           as_of=as_of or datetime.now(timezone.utc))
+                                           as_of=as_of or datetime.now(timezone.utc), version=version)
     payloads = {
         "source-environment.json": env_raw,
         "source-policy.json": pol_raw,
@@ -316,7 +333,7 @@ def verify_import(bundle: Path, pack_path: Path, *, contracts_dir: Path = REPO_R
         raise InputBoundaryError("IMPORT_BUNDLE_UNAVAILABLE") from error
     provenance_path = _bundle_file(root, "provenance.json")
     mapping, provenance_raw = read_document(provenance_path)
-    if set(mapping) != _MAPPING_KEYS or mapping.get("format") != "guard-byul-input-import/1":
+    if set(mapping) != _MAPPING_KEYS or mapping.get("format") not in {"guard-byul-input-import/1", "guard-byul-input-import/2"}:
         raise InputBoundaryError("IMPORT_MAPPING_FORMAT_INVALID")
     index = _file_index(mapping)
     actual_files = {path.name for path in root.iterdir()}
@@ -359,7 +376,7 @@ def verify_import(bundle: Path, pack_path: Path, *, contracts_dir: Path = REPO_R
     pack = _load_input_pack(pack_path)
     source_env, source_pol = documents["source-environment.json"], documents["source-policy.json"]
     expected_env, expected_pol, expected_mapping = convert_documents(source_env, source_pol, pack, contracts,
-                                                                      as_of=checked_at)
+                                                                      as_of=checked_at, version=int(mapping['format'].rsplit('/', 1)[1]))
     # 원래 생성 ID는 provenance와 정확히 연결한다. 값·revision·시각·출처는 바꾸지 않는다.
     expected_env = expected_env.model_copy(update={"id": env.id}).seal()
     expected_pol = expected_pol.model_copy(update={"id": pol.id}).seal()

@@ -32,14 +32,17 @@ from uuid import uuid4
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
+from serving_runtime.mvp.lab_report import LabReportSource, AWS_REPORT_SCHEMA
 from serving_runtime.mvp.backend import is_valid_credential_value
 from serving_runtime.mvp.kube_context import validate_kube_context
 from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA
 from serving_runtime.enforcement.execpolicy import ExecPolicy
 try:
     from tools.tetragon_mode import switch_mode
+    from tools.verification_material import atomic_write, encode, plain_path
 except ModuleNotFoundError:  # direct script execution
     from tetragon_mode import switch_mode
+    from verification_material import atomic_write, encode, plain_path
 
 
 CASE_IDS = tuple(f"AWS-{number:02d}" for number in range(1, 21))
@@ -778,6 +781,49 @@ def _report_reason(case: Mapping[str, Any]) -> str:
         for name in spec.required if _report_at(facts, name) is not True
     )
     return f"{case.get('reason') or '확인 못 함'}; 필수 항목: {values or '확인 못 함'}"
+
+
+def _public_label(value: str, secrets: Iterable[str]) -> str:
+    # Retain safe environment labels. Addresses/cloud identifiers and credentials
+    # become stable aliases, so distinct environments remain distinguishable.
+    if (re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", value)
+            and not re.search(r"(?:[0-9]{1,3}\.){3}[0-9]{1,3}", value)
+            and not any(secret and secret in value for secret in secrets)):
+        return value
+    return "environment-" + hashlib.sha256(value.encode()).hexdigest()[:16]
+
+
+def publish_report(report: Mapping[str, Any], directory: Path, secrets: Iterable[str]) -> Path:
+    """Allowlisted AWS view only; raw facts/commands/reasons stay in evidence."""
+    secrets = tuple(secrets)
+    run_id = report["run_id"]
+    if not re.fullmatch(r"aws-acceptance-[0-9]{8}T[0-9]{6}Z-[0-9]+", run_id):
+        raise ConfigurationError("PUBLIC_REPORT_INVALID_RUN_ID")
+    safe = {
+        "schema": AWS_REPORT_SCHEMA, "run_id": run_id,
+        "started_at": report["started_at"], "finished_at": report["ended_at"],
+        "context": _public_label(report["kube_context"], secrets),
+        "namespace": _public_label(report["namespace"], secrets),
+        "overall": _overall(report["cases"]),
+        "cases": [{
+            "id": case["case_id"], "title": CASE_TITLES[case["case_id"]],
+            "status": case["result"],
+            "summary": {"passed": "해당 사례 기준 충족", "failed": "해당 사례 기준 미충족",
+                        "unknown": "근거 부족·미확인", "not_run": "미실행"}[case["result"]],
+            "evidence": [], "limitation": REPORT_CASES[case["case_id"]].gap,
+            "note": "AWS · " + report["engine"] + " · 선택 사례의 해당 회차 결과만 표시. 상세 근거는 비공개 evidence에 보존.",
+        } for case in report["cases"]],
+    }
+    safe = LabReportSource._validate(safe)
+    raw = encode(safe)
+    if any(secret and secret.encode() in raw for secret in secrets):
+        raise ConfigurationError("PUBLIC_REPORT_SECRET_COLLISION")
+    try:
+        path = plain_path(directory) / (run_id + ".json")
+        atomic_write(path, raw)  # 0640, fsync, atomic link; never replace a past run
+    except (OSError, ValueError):
+        raise ConfigurationError("PUBLIC_REPORT_WRITE_FAILED") from None
+    return path
 
 
 class AWSAcceptance:
@@ -3752,6 +3798,9 @@ class AWSAcceptance:
         md_path = self.evidence_dir / "report.md"
         md_path.write_text(markdown, encoding="utf-8")
         os.chmod(md_path, 0o600)
+        public_dir = getattr(self.args, "public_report_dir", None)
+        if public_dir is not None:
+            publish_report(safe_report, Path(public_dir), secrets)
         return json_path, md_path
 
     def run(self) -> int:
@@ -3819,6 +3868,8 @@ def build_parser() -> argparse.ArgumentParser:
         default="evidence",
         help="parent for a new mode-0700 aws-acceptance-<UTC>-<pid> directory",
     )
+    parser.add_argument("--public-report-dir", type=Path,
+                        help="publish the actual run's minimal AWS Lab view as atomic 0640 JSON in a prepared directory")
     parser.add_argument(
         "--cases",
         action="append",

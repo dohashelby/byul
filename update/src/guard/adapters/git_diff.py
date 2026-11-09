@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml
 
+from .source_analysis import get_source_analysis
 from guard.models.checkdef import Pack
 from guard.models.enums import DataOrigin
 from guard.models.hashing import canonical_json, sha256_hex
@@ -19,11 +20,12 @@ from guard.runtime.git import changed_paths, read_blobs, resolve_commit
 RULES_PATH = Path(__file__).with_name("assets") / "vllm_change_rules.yaml"
 
 
-def prepare_source_repository(options: dict) -> Path:
+def prepare_source_repository(options: dict, *, engine="vllm") -> Path:
     """어댑터가 엔진 소스 캐시의 기본값과 git 취득을 소유한다."""
     from guard.runtime.git import ensure_repository
-    return ensure_repository(Path(options.get("cache", ".guard/cache/engine-src/vllm")),
-                             options.get("url", "https://github.com/vllm-project/vllm.git"))
+    profile = get_source_analysis(engine)
+    return ensure_repository(Path(options.get("cache", ".guard/cache/engine-src/" + engine)),
+                             options.get("url", profile.url))
 
 
 @dataclass(frozen=True)
@@ -50,13 +52,7 @@ def classify_path(path: str, rules: dict[str, Any]) -> tuple[list[str], bool]:
 
 
 def _entrypoint(path: str) -> str | None:
-    if path.startswith("rust/src/server/"):
-        return "native"
-    if path.startswith("vllm/entrypoints/"):
-        if "grpc" in path:
-            return "grpc"
-        return "http"
-    return None
+    return get_source_analysis('vllm').entrypoint(path)
 
 
 def _literal_routes(raw: bytes, path: str) -> list[dict]:
@@ -89,10 +85,13 @@ def _literal_routes(raw: bytes, path: str) -> list[dict]:
 
 
 def extract_git_change(repo_path: Path, baseline: str, candidate: str, *, rules_path: Path | None = None,
-                       baseline_env=None, candidate_env=None, pack: Pack | None = None) -> ExtractedChange:
+                       baseline_env=None, candidate_env=None, pack: Pack | None = None, engine: str = "vllm") -> ExtractedChange:
+    profile = get_source_analysis(engine)
+    if any(env is not None and env.engine.name != engine for env in (baseline_env, candidate_env)):
+        raise ValueError('ENGINE_SOURCE_ANALYSIS_IDENTITY_MISMATCH')
     repo = Path(repo_path)
     before_commit, after_commit = resolve_commit(repo, baseline), resolve_commit(repo, candidate)
-    rules_bytes = Path(rules_path or RULES_PATH).read_bytes()
+    rules_bytes = Path(rules_path or profile.rules).read_bytes()
     rules = yaml.safe_load(rules_bytes)
     rows = changed_paths(repo, before_commit, after_commit)
     requests = [(commit, row[key]) for row in rows
@@ -128,7 +127,7 @@ def extract_git_change(repo_path: Path, baseline: str, candidate: str, *, rules_
         for commit, key, side in ((before_commit, "before_path", "baseline"),
                                   (after_commit, "after_path", "candidate")):
             path = row[key]
-            kind = _entrypoint(path) if path else None
+            kind = profile.entrypoint(path) if path else None
             if kind and not next(p["excluded"] for p in path_classifications if p["side"] == side):
                 metadata = {"source_path": path, "kind": kind, "side": side,
                             "routes": [dict(route, source_side=side) for route in _literal_routes(blobs[(commit, path)], path)],
@@ -142,6 +141,7 @@ def extract_git_change(repo_path: Path, baseline: str, candidate: str, *, rules_
         classified.append((index, record, endpoints))
     evidence_data = {"schema": "guard.engine-source-diff/2", "baseline": {"version": baseline, "commit": before_commit},
                      "candidate": {"version": candidate, "commit": after_commit},
+                     "engine": engine, "analysis_profile": profile.id,
                      "rules_sha256": sha256_hex(rules_bytes), "changes": [r for _, r, _ in classified],
                      "excluded": excluded}
     artifact_bytes = canonical_json(evidence_data)
@@ -175,7 +175,7 @@ def extract_git_change(repo_path: Path, baseline: str, candidate: str, *, rules_
                        non_excluded=sum(not p["excluded"] for p in expanded),
                        recognized=sum(not p["excluded"] and not p["unmapped"] for p in expanded),
                        unmapped=sum(p["unmapped"] for p in expanded))
-    analysis = {"rules_sha256": sha256_hex(rules_bytes), "counts": {"changed_paths": len(rows),
+    analysis = {"engine": engine, "profile": profile.id, "path_profile_reviewed": profile.reviewed, "rules_sha256": sha256_hex(rules_bytes), "counts": {"changed_paths": len(rows),
                 "excluded": len(excluded), "classified": len(classified),
                 "non_excluded": len(classified),
                 "recognized": sum(not r["unmapped"] for _, r, _ in classified),

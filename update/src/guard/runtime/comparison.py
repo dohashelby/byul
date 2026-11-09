@@ -4,13 +4,17 @@ from guard.models import canonical_json, sha256_hex
 
 
 def model_request_conditions(mapping):
+    if type(mapping) is dict and mapping.get('schema') == 'guard.model-request-mapping/2':
+        return {key: mapping[key] for key in ('schema', 'artifact', 'served_model_name', 'container_mount')}
     # ENV Ref and host address bind provenance, not baseline/candidate conditions.
     if type(mapping) is dict and mapping.get("schema")=="guard.model-request-mapping/1":
         return {key:mapping[key] for key in ("schema","repository_id","revision","inventory_sha256","served_model_name","container_mount")}
     return mapping
 
 
-def execution_conditions(target: dict, settings: dict, roles: list[str]) -> dict:
+def execution_conditions(target: dict, settings: dict, roles: list[str], *, profile="execution-v2") -> dict:
+    if profile not in {'execution-v1', 'execution-v2'}:
+        raise ValueError('COMPARISON_PROFILE_UNSUPPORTED')
     groups = {}
     origins = {}
     for name, item in sorted(target.get("origins", {}).items()):
@@ -22,7 +26,7 @@ def execution_conditions(target: dict, settings: dict, roles: list[str]) -> dict
         return {"scheme": parsed.scheme, "path": parsed.path, "port": parsed.port}
 
     return {
-        "profile": "execution-v1",
+        "profile": profile,
         "topology": target.get("topology"),
         "engine_kind": target.get("engine_kind"),
         "engine_profile": target.get("engine_profile"),
@@ -39,5 +43,6 @@ def execution_conditions(target: dict, settings: dict, roles: list[str]) -> dict
         "roles": sorted(roles),
         **({"model_mapping_sha256":sha256_hex(canonical_json(model_request_conditions(target["model_mapping"])))} if "model_mapping" in target else {}),
         "settings": {k: v for k, v in settings.items()
-                     if k not in {"target", "container", "roles", "wrong_key_env", "allowed_key_env", "denied_key_env"}},
+                     if k not in {"target", "container", "roles", "wrong_key_env", "allowed_key_env", "denied_key_env",
+                                   *( {"constraint_engine_version", "constraint_source"} if profile == "execution-v2" else set())}},
     }

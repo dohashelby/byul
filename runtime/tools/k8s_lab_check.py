@@ -29,10 +29,13 @@ from serving_runtime.mvp.kube_context import (
     DEFAULT_KUBE_CONTEXT,
     validate_kube_context,
 )
+from serving_runtime.mvp.lab_report import LabReportSource
 try:
     from tools.tetragon_mode import switch_mode
+    from tools.tetragon_trial import atomic_json
 except ModuleNotFoundError:  # direct script execution
     from tetragon_mode import switch_mode
+    from tetragon_trial import atomic_json
 
 
 EXPECTED_CONTEXT = DEFAULT_KUBE_CONTEXT
@@ -2133,6 +2136,22 @@ def write_reports(report: dict[str, Any], state_dir: Path) -> tuple[Path, Path]:
     return json_path, markdown_path
 
 
+def publish_report(report: dict[str, Any], directory: Path) -> Path:
+    """Publish only the dashboard view, preserving the original run and times.
+
+    The operator/installer prepares the setgid directory. Never chmod it here.
+    Private command output and artifacts remain under --state-dir.
+    """
+    if not directory.is_dir():
+        raise ValueError("public report directory must already exist")
+    safe_report = LabReportSource._validate(sanitize_value(report))
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", safe_report["run_id"]):
+        raise ValueError("invalid public report run ID")
+    path = directory / (safe_report["run_id"] + ".json")
+    atomic_json(path, safe_report, mode=0o640)
+    return path
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="명시한 Kubernetes context에서 Cilium·Hubble·Tetragon lab 사례를 점검합니다."
@@ -2152,6 +2171,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--namespace", default="serving-lab")
     parser.add_argument("--state-dir", required=True, type=Path)
+    parser.add_argument("--public-report-dir", type=Path,
+                        help="기존 setgid 관측 폴더에 이번 실행의 최소 JSON을 0640으로 원자 게시")
     parser.add_argument(
         "--tetragon-wait",
         type=float,
@@ -2180,6 +2201,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.public_report_dir is not None and not args.public_report_dir.is_dir():
+        print("공개 보고서 폴더를 먼저 준비하세요.", file=sys.stderr)
+        return 2
+    if args.public_report_dir is not None and (args.secret_enforce_check or args.sigkill_probe_check):
+        print("공개 보고서는 L-01~L-08만 지원합니다. 별도 차단 시험 옵션은 분리 실행하세요.", file=sys.stderr)
+        return 2
     checker = LabChecker(
         context=args.kube_context,
         namespace=args.namespace,
@@ -2202,6 +2229,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ContextSafetyError as error:
         print(f"안전 중단: {error}", file=sys.stderr)
         return 2
+    if args.public_report_dir is not None:
+        try:
+            publish_report(report, args.public_report_dir)
+        except (OSError, ValueError):
+            print("공개 보고서 게시 실패: --state-dir의 원본 보고서와 공개 폴더 권한을 확인하세요.", file=sys.stderr)
+            return 2
     print(f"결과: {report['overall']}")
     print(f"JSON 보고서: {paths[0]}")
     print(f"Markdown 보고서: {paths[1]}")

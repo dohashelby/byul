@@ -51,10 +51,39 @@ runtime 기록은 `platform/.runtime-data`에 쌓인다(git 제외). 조회 보�
 | `PLATFORM_DATA_DIR` | 환경·정책 저장 폴더. `<kind>/<id>/<판본 6자리>.json`, 판본마다 새 파일(덮어쓰기 금지) | 임시 폴더에 예시 1판본, 종료 시 삭제 |
 | `EVIDENCE_INDEX_PATHS` | `evidence-index` 파일 경로(`:`로 여러 개) | 예시 모드 |
 | `BYUL_PLATFORM_PORT` | 포트 | `8700` |
+| `BYUL_ACCOUNTS_FILE` | 로그인 계정 파일(0600). 처음 실행 때 `admin`/`admin`을 만든다 | `PLATFORM_DATA_DIR/accounts/accounts.json`, 그것도 없으면 임시 폴더(종료 시 삭제) |
+| `BYUL_REQUIRE_PASSWORD_CHANGE` | `1`이면 변경이 필요한 계정은 비밀번호를 바꾸기 전에 다른 API를 못 쓴다 | 끔(개발 중) |
+| `BYUL_LOGIN_DISABLED` | `1`이면 로그인을 끈다(이전 동작, 개발용) | 로그인 켬 |
+| `BYUL_SESSION_IDLE_SECONDS` / `BYUL_SESSION_MAX_SECONDS` | 세션 미사용 만료 / 최대 유지 | 7200 / 43200 |
+| `BYUL_COOKIE_SECURE` | `1`이면 세션 쿠키에 Secure를 항상 붙인다(HTTPS 앞단 프록시 뒤) | HTTPS 요청일 때만 |
+
+## 로그인
+
+회원가입·비밀번호 찾기는 없다. 관리자가 명령어로 계정을 발급하고, 화면에는 로그인만 있다. 자세한 절차는 [로그인과 계정 관리](docs/로그인_계정관리.md).
+
+| 역할 | 할 수 있는 일 |
+| --- | --- |
+| `admin` | 모든 조회, 운영 요청 목록 보기, 계정 관리(명령어) |
+| `approver` | 조회 + 운영 요청 승인 |
+| `runtime_operator` | 조회 + 운영 요청 |
+| `viewer` | 조회만 |
+| `agent` | 사람 로그인 불가. 서버 에이전트는 기존 Bearer 토큰(`BYUL_OPERATION_TOKENS`)을 그대로 쓴다 |
 
 ## 예시 모드
 
-위 출처 환경변수가 없으면 그 출처는 `../contracts/examples/`를 읽는다(전부 `EXAMPLE` 등급). 하나라도 예시면 `/api/meta`의 `example_mode`가 `true`이고 화면 위에 "예시 데이터" 띠가 붙는다. 사이드바 아래에 출처별 모드(예시·실제 연결·파일)와 runtime 연결 상태가 보인다.
+위 출처 환경변수가 없으면 그 출처는 `../contracts/examples/`를 읽는다(전부 `EXAMPLE` 등급). 하나라도 예시면 `/api/meta`의 `example_mode`가 `true`이고 첫 화면과 내부 화면에 예시인 출처 이름을 나열한다. 사이드바 아래에 출처별 모드(예시·실제 연결·파일)와 runtime 연결 상태가 보인다.
+
+### 실제 반출 증거 연결
+
+runtime의 오프라인 [증거 목록 생성 도구와 운영 절차](../runtime/docs/증거목록_생성과플랫폼연결.md)로 만든 목록을 연결한다. AWS 접속 없이 tgz/폴더의 해시·비밀 검사·계약 검증을 수행한다.
+
+```sh
+cd /home/bobgy/bobproject/byul/platform/api
+EVIDENCE_INDEX_PATHS=/tmp/byul-evidence-run12-run13/evidence-index.json uv run byul-platform
+# 여러 목록은 ':'로 연결한다. 기존 개발 스크립트도 같은 환경변수를 받는다.
+```
+
+계약 항목 경로는 index 옆 `files/` 기준이다. 실제 파일 출처는 regular file 존재·경계·링크를 검사한다. 목록당 최대 32 MiB이며 파일 내용은 목록 조회 시 읽지 않는다. evidence 연결 후에도 runtime/update/store가 예시이면 그 이름은 배너에 남고 개별 `EXAMPLE` 등급도 유지한다.
 
 ## 데모 자료 (그래프 확인용 가짜 기록)
 
@@ -111,4 +140,4 @@ update 통합 시험에는 `guard`를 제공하는 update 패키지 overlay가 �
 
 ## 이번에 하지 않은 것
 
-로그인·권한, 정책 승인(CONFIRMED 전환), 번들 발행·runtime 배포, 재검증 시작·시험 실행 버튼, 외부 검색 엔진 연동, 알림.
+정책 승인(CONFIRMED 전환), 번들 발행·runtime 배포, 재검증 시작·시험 실행 버튼, 외부 검색 엔진 연동, 알림.

@@ -18,6 +18,8 @@ from .config import Settings
 from .sources.runtime import RuntimeNotFound, RuntimeUnauthorized, RuntimeUnavailable
 from .state import build_state
 from .routes import bundle_export, documents, evidence, operations, overview, runtime, verification
+from . import auth as auth_module
+from .accounts import AccountStore
 
 log = logging.getLogger("byul_platform")
 
@@ -35,6 +37,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.byul = state
     for module in (overview, runtime, verification, documents, bundle_export, operations, evidence):
         app.include_router(module.router)
+    app.include_router(auth_module.router)
+    if settings.login_enabled:
+        _enable_login(app, settings, state)
 
     @app.exception_handler(RuntimeUnavailable)
     async def _unavailable(_req: Request, _exc: RuntimeUnavailable) -> JSONResponse:
@@ -63,6 +68,42 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.openapi = custom_openapi  # type: ignore[method-assign]
     _mount_web(app, settings.web_dist)
     return app
+
+
+def _enable_login(app: FastAPI, settings: Settings, state: Any) -> None:
+    """모든 /api 요청에 로그인 세션을 요구한다(로그인 API·운영 API의 Bearer 토큰 제외)."""
+    if settings.accounts_file:
+        accounts_path = settings.accounts_file
+    elif settings.platform_data_dir:
+        accounts_path = settings.platform_data_dir / "accounts" / "accounts.json"
+    else:
+        import shutil
+        import tempfile
+
+        root = Path(tempfile.mkdtemp(prefix="byul-platform-accounts-"))
+        state._cleanup.append(lambda: shutil.rmtree(root, ignore_errors=True))
+        accounts_path = root / "accounts.json"
+    service = auth_module.AuthService(
+        accounts=AccountStore(accounts_path),
+        audit_path=accounts_path.with_name("auth-audit.jsonl"),
+        idle_s=settings.session_idle_seconds,
+        max_s=settings.session_max_seconds,
+        require_change=settings.require_password_change,
+        cookie_secure=settings.cookie_secure,
+    )
+    if service.accounts.ensure_bootstrap():
+        service.audit("account_bootstrap", username="admin")
+        log.warning("첫 계정 admin/admin을 만들었습니다. 기본 비밀번호를 바꾸세요: %s", accounts_path)
+    app.state.auth = service
+
+    @app.middleware("http")
+    async def _login_gate(request: Request, call_next):
+        path = auth_module.get_route_path(request.scope)
+        if path.startswith("/api/") or path == "/api":
+            refusal = auth_module.gate(service, request)
+            if refusal is not None:
+                return refusal
+        return await call_next(request)
 
 
 def _resolve_contract_markers(node: Any) -> Any:
@@ -110,7 +151,7 @@ def run() -> None:
 
     settings = Settings.from_env()
     if not _is_loopback(settings.host):
-        raise SystemExit(f"로그인이 없어 외부 주소로 열지 않습니다: {settings.host} (127.0.0.1만 허용)")
+        raise SystemExit(f"HTTPS·외부 노출 검토 전이라 외부 주소로 열지 않습니다: {settings.host} (127.0.0.1만 허용, 원격은 SSH 터널)")
     logging.basicConfig(level=logging.INFO)
     app = create_app(settings)
     state = app.state.byul

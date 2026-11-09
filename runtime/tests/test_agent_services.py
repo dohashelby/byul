@@ -30,12 +30,18 @@ class AgentServicesTest(unittest.TestCase):
                 self.assertEqual(service["ProtectSystem"], "strict")
                 for flag in ("ProtectHome", "PrivateTmp", "NoNewPrivileges"):
                     self.assertEqual(service[flag], "true")
-                self.assertEqual(service["ReadWritePaths"], "/var/lib/serving-runtime")
+                expected_writes = ["/var/lib/serving-runtime"]
+                if name == "tetragon-status":
+                    expected_writes.append("/srv/serving/observation/tetragon-status")
+                self.assertEqual(service["ReadWritePaths"].split(), expected_writes)
                 self.assertEqual(service["Restart"], "on-failure")
                 command = shlex.split(service["ExecStart"])
                 self.assertEqual(command[1:4], ["-B", "-m", module])
                 self.assertIn("--watch", command)
                 self.assertNotIn("--capture-baseline", command)
+                if name == "tetragon-status":
+                    self.assertEqual(command[command.index("--public-output") + 1],
+                                     "/srv/serving/observation/tetragon-status/tetragon-state.json")
         command = shlex.split(unit("monitor-window")["Service"]["ExecStart"])
         self.assertEqual(command[command.index("--trusted-owner-uid") + 1], "10000")
 

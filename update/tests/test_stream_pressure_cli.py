@@ -14,7 +14,7 @@ from tests.test_stream_pressure import inputs
 @pytest.fixture
 def pressure_cli(monkeypatch):
     with TemporaryDirectory(prefix="guard-pressure-cli-") as directory:
-        folder = Path(directory)
+        folder = Path(directory).resolve()
         env, target, cfg = inputs()
         for name, value in (("env", env.to_dict()), ("target", target), ("settings", cfg)):
             (folder / f"{name}.json").write_text(json.dumps(value), encoding="utf-8")

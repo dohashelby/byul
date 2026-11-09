@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 import re
 from pathlib import Path
 
@@ -12,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from byul_platform.config import Settings
 from byul_platform.main import create_app
-from byul_platform.sources.runtime import LiveRuntimeSource, RuntimeClient, RuntimeUnavailable
+from byul_platform.sources.runtime import LiveRuntimeSource, RuntimeClient, RuntimeUnauthorized, RuntimeUnavailable
 from conftest import FIXTURES, load_json
 
 RT = FIXTURES / "runtime"
@@ -80,6 +81,26 @@ def test_runtime_client_sends_only_get(live_client, fake):
     assert all(p.startswith("/api/") for _, p, _ in fake.calls)
     assert not any("/v1/" in p for _, p, _ in fake.calls)
     assert {auth for _, _, auth in fake.calls} == {f"Bearer {TOKEN}"}
+
+
+@pytest.mark.parametrize("value", ["not_connected", "error", "unknown", "monitor", "monitor_only", "enforce", "mixed"])
+def test_external_enforcement_modes_pass_through_contract(live_client, fake, value):
+    fake.endpoints = deepcopy(fake.endpoints)
+    fake.endpoints["status"]["policy"]["external_enforcement"] = value
+    response = live_client.get("/api/runtime/status")
+    assert response.status_code == 200
+    assert response.json()["item"]["policy"]["external_enforcement"] == value
+
+
+def test_configured_empty_lab_directory_stays_missing(live_client, fake):
+    fake.endpoints = deepcopy(fake.endpoints)
+    fake.endpoints["lab-report"] = {"state": "missing", "report": None,
+        "configured_path": "/srv/serving/observation/lab-reports", "path": None,
+        "generated_at": "2026-11-08T00:00:00Z", "error": "lab report directory has no JSON reports"}
+    response = live_client.get("/api/runtime/lab-report")
+    assert response.status_code == 200
+    assert response.json()["item"]["state"] == "missing"
+    assert response.json()["item"]["report"] is None
 
 
 @pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
@@ -179,3 +200,119 @@ def test_unreachable_runtime_returns_503_with_code(tmp_path, monkeypatch):
         o = client.get("/api/overview").json()
         assert o["requests"] is None and o["requests_error"]["code"] == "RUNTIME_UNREACHABLE"
         assert client.get("/api/meta").json()["runtime_connection"] == "disconnected"
+
+
+@pytest.mark.parametrize("case_id,valid", [
+    *[(f"AWS-{i:02d}", True) for i in range(1, 21)],
+    *[(f"L-{i:02d}", True) for i in range(1, 9)],
+    *[(case_id, False) for case_id in (
+        "AWS-00", "AWS-21", "AWS-1", "AWS-001", "aws-01", "AWS-01\n", "xAWS-01",
+        "L-00", "L-09", "L-99", "L-1",
+    )],
+])
+def test_lab_report_contract_preserves_ids_and_run(live_client, fake, case_id, valid):
+    report = {"run_id": "aws-acceptance-20200101T000000Z-1", "context": "byul-aws-lab", "namespace": "serving-lab",
+              "started_at": "2020-01-01T00:00:00Z", "finished_at": "2020-01-01T00:01:00Z", "overall": "unknown",
+              "cases": [{"id": case_id, "title": "AWS 시험", "status": "unknown", "summary": "미확인", "evidence": [], "limitation": None, "note": "해당 회차 선택 사례"}]}
+    fake.endpoints = {**fake.endpoints, "lab-report": {"state": "ok", "report": report, "generated_at": "2020-01-01T00:01:01Z"}}
+    body = live_client.get("/api/runtime/lab-report").json()
+    if valid:
+        assert body["invalid"] is None
+        assert body["item"]["report"] == report
+        assert live_client.app.state.byul.contracts.errors("runtime-lab-report", body["item"]) == []
+    else:
+        assert body["item"] is None and body["invalid"]
+
+
+@pytest.mark.parametrize("report_schema,valid", [
+    ("serving-runtime-k8s-lab-report/1.0", True),
+    ("serving-runtime-aws-lab-report/1.0", True),
+    ("serving-runtime-aws-lab-report/2.0", False),
+    (None, False),
+    (1, False),
+])
+def test_lab_report_optional_schema(contracts, report_schema, valid):
+    from conftest import EXAMPLES
+
+    document = load_json(EXAMPLES / "runtime-lab-report.json")
+    document["report"]["schema"] = report_schema
+    if report_schema == "serving-runtime-aws-lab-report/1.0":
+        document["report"]["cases"][0]["id"] = "AWS-01"
+    assert contracts.is_valid("runtime-lab-report", document) == valid
+
+
+def test_live_events_fetch_details_in_parallel_and_keep_order():
+    """원격 연결에서 첫 화면이 느려지지 않게 상세를 병렬로 묻되, 목록 순서는 그대로 둔다."""
+    import threading
+    import time as _time
+
+    capture = load_json(FIXTURES / "runtime" / "capture.json")
+    details = capture["details"]
+    listed = capture["endpoints"]["requests"]
+    state = {"now": 0, "max": 0}
+    lock = threading.Lock()
+
+    def fake(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path == "/api/requests":
+            return httpx.Response(200, json=listed)
+        if path.startswith("/api/requests/"):
+            with lock:
+                state["now"] += 1
+                state["max"] = max(state["max"], state["now"])
+            _time.sleep(0.05)
+            with lock:
+                state["now"] -= 1
+            rid = path.rsplit("/", 1)[1]
+            return httpx.Response(200, json=details[rid]) if rid in details else httpx.Response(404, json={})
+        if path == "/api/observations":
+            return httpx.Response(200, json={"observations": []})
+        return httpx.Response(404, json={})
+
+    source = LiveRuntimeSource(RuntimeClient("http://runtime.test", None, transport=httpx.MockTransport(fake)), "http://runtime.test")
+    started = _time.monotonic()
+    batch = source.events()
+    elapsed = _time.monotonic() - started
+    expected = [v["request_id"] for v in listed["requests"] if v["request_id"] in details]
+    assert state["max"] > 1
+    assert elapsed < 0.05 * len(expected)  # not one-by-one
+    sequential = LiveRuntimeSource(RuntimeClient("http://runtime.test", None, transport=httpx.MockTransport(fake)), "http://runtime.test")
+    sequential.DETAIL_WORKERS = 1
+    assert [repr(c) for c in sequential.events().candidates] == [repr(c) for c in batch.candidates]
+
+
+def test_final_request_engine_log_evidence_refreshes():
+    rid = "a" * 32
+    calls = []
+
+    def response(_request):
+        calls.append(1)
+        return httpx.Response(200, json={"gateway_records": [{"phase": "final"}],
+            "engine_live": {"evidence_kind": "engine_log", "status":
+                            "engine_log_unavailable" if len(calls) == 1 else "engine_log_observed"}})
+
+    client = RuntimeClient("http://runtime.test", None, transport=httpx.MockTransport(response))
+    source = LiveRuntimeSource(client, "http://runtime.test", cache_ttl=0)
+    try:
+        assert source._detail(rid)["engine_live"]["status"] == "engine_log_unavailable"
+        assert source._detail(rid)["engine_live"]["status"] == "engine_log_observed"
+        assert len(calls) == 2
+    finally:
+        client.close()
+
+
+@pytest.mark.parametrize("status,error", [(401, RuntimeUnauthorized), (503, RuntimeUnavailable)])
+def test_parallel_lookup_propagates_failures(status, error):
+    rid = "a" * 32
+
+    def response(request):
+        if request.url.path == "/api/requests":
+            return httpx.Response(200, json={"requests": [{"request_id": rid}]})
+        return httpx.Response(status, json={})
+
+    client = RuntimeClient("http://runtime.test", None, transport=httpx.MockTransport(response))
+    try:
+        with pytest.raises(error):
+            LiveRuntimeSource(client, "http://runtime.test").events()
+    finally:
+        client.close()

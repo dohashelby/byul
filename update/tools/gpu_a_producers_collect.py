@@ -21,18 +21,17 @@ from guard.collectors.file import load_environment
 from guard.collectors import gpu_input_producers as producers
 from guard.collectors import process_device_observer as device_observer
 from guard.collectors import process_device_producer as device_producer
-from guard.collectors import runner_consumption_v2_producer as consumption_v2
+from guard.collectors import scoped_consumption
 from guard.collectors.gpu_common_inputs import GpuInputError
 from guard.models import canonical_json, sha256_hex
-from guard.runtime.kubernetes_http import ENGINE_CALLBACK_PROFILE, KubernetesHTTP
+from guard.runtime.engine_http import ENGINE_CALLBACK_PROFILE, KubernetesHTTP
 
 SCHEMA = 'byul-gpu-a-producers-collect/1'
 # 준비 설정 플래그 → (기록 kind, 생산 함수)
 SIMPLE = (('request_attempts', 'request-attempt', producers.request_attempt_record),
           ('generation_transitions', 'generation-transition', producers.generation_transition_record),
           ('health_causal', 'health-worker-causal', producers.health_worker_record),
-          ('profiler_control', 'profiler-control', producers.profiler_control_record),
-          ('runner_consumption', 'runner-consumption', producers.runner_consumption_record))
+          ('profiler_control', 'profiler-control', producers.profiler_control_record))
 
 
 def _summary(record, result):
@@ -97,7 +96,7 @@ def collect_process_device(transport, scope, *, mode, spec_overrides=None):
     return {'record': record, 'validation': result, 'node_scanned': node['scanned'], 'open_test': opened}
 
 
-def collect(*, env_path, target_path, prepared_dir, duration=240, node_view_mode=None, spec_overrides=None):
+def collect(*, env_path, target_path, prepared_dir, duration=240, node_view_mode=None, spec_overrides=None, runner_scope=None, pages_dir=None, expected_requests=None, topology=None, request_actors=None):
     environment = load_environment(env_path)
     target = json.loads(Path(target_path).read_text())
     prepared = load_prepared(prepared_dir)
@@ -108,9 +107,24 @@ def collect(*, env_path, target_path, prepared_dir, duration=240, node_view_mode
              'session': prepared['session']}
     roots = settings.get('supply_roots') or []
     mount_before = transport.supply_mount_exclusivity(roots) if roots else None
-    value = transport.engine_attempt_events(prepared['session'])
+    value = transport.engine_attempt_events(prepared['session'], archive=pages_dir)
     processes, truncated = value['processes'], value['truncated']
+    page_refs = value.get('page_refs', [])
+    page_capture = {k: value[k] for k in ('diagnostic_codes', 'source_events', 'scope') if k in value}
     records, summaries = {}, []
+    if settings.get('runner_consumption') or settings.get('scoped_runner_consumption'):
+        # /1 writers remain available for historical reproduction only. New
+        # captures use scoped coverage even when reading a legacy prepared set.
+        try:
+            from guard.collectors import actor_consumption
+            record, result = actor_consumption.record(processes, topology=topology, request_actors=request_actors, truncated=truncated, expected_stage_ranks=runner_scope, expected_requests=expected_requests, qualification_scope={
+                'engine': environment.engine.name, 'engine_version': environment.engine.version,
+                'image_digest': environment.engine.image_digest, 'backend': 'gpu' if environment.runtime.gpu_count else 'cpu',
+                'origin': transport.process_observation_origin}, **scope)
+            records['scoped-runner-consumption'] = {'record': record, 'validation': result}
+            summaries.append(_summary(record, result))
+        except GpuInputError as error:
+            records['scoped-runner-consumption'] = {'contract_error': str(error)}
     for flag, kind, make in SIMPLE:
         if not settings.get(flag):
             continue
@@ -123,15 +137,6 @@ def collect(*, env_path, target_path, prepared_dir, duration=240, node_view_mode
             continue
         records[kind] = {'record': record, 'validation': result}
         summaries.append(_summary(record, result))
-    if settings.get('runner_consumption'):
-        # 같은 설정의 V2 runner 경로 기록. V1 경로 세대에서는 V2 행이 없어 CONSUMPTION_V2_RUNNER_UNOBSERVED로 남는다.
-        try:
-            record, result = consumption_v2.runner_consumption_v2_record(processes, truncated=truncated, **scope)
-            records['runner-consumption-v2'] = {'record': record, 'validation': result}
-            summaries.append(dict(_summary(record, result), kind='runner-consumption-v2'))
-        except GpuInputError as error:
-            records['runner-consumption-v2'] = {'contract_error': str(error)}
-            summaries.append({'kind': 'runner-consumption-v2', 'contract_error': str(error)})
     if roots:
         files = producers.supply_open_files(processes)
         hashes = transport.engine_supply_hashes(roots, files)
@@ -147,7 +152,7 @@ def collect(*, env_path, target_path, prepared_dir, duration=240, node_view_mode
                          else {'kind': 'process-device-provider', 'contract_error': value['contract_error']})
     return {'schema': SCHEMA, 'session': prepared['session'], 'truncated': truncated,
             'processes': [{'pid': p['pid'], 'start_ticks': p['start_ticks'], 'rows': len(p['events'])} for p in processes],
-            'summaries': summaries, 'records': records}
+            'summaries': summaries, 'records': records, 'raw_page_refs': page_refs, 'page_capture': page_capture}
 
 
 def main(argv=None):
@@ -155,6 +160,10 @@ def main(argv=None):
     parser.add_argument('--env', required=True); parser.add_argument('--target', required=True)
     parser.add_argument('--prepared', required=True); parser.add_argument('--out', required=True)
     parser.add_argument('--duration', type=int, default=240)
+    parser.add_argument('--expected-requests', type=Path, help='실행 전에 고정한 요청 HMAC 목록 JSON; 미입력은 범위 미확인')
+    parser.add_argument('--runner-scope', type=Path, help='단계별 기대 rank JSON; 미입력은 범위 미확인으로 남음')
+    parser.add_argument('--request-actors', type=Path, help='bootstrap에 해시로 결합한 요청별 단계/actor 할당 JSON')
+    parser.add_argument('--topology', type=Path, help='독립 bootstrap 관측으로 고정한 actor/group manifest; 미입력은 미완료')
     parser.add_argument('--node-view', help='PLT-01·04 노드 관측 위치: sudo 또는 pod:<namespace>/<name>')
     parser.add_argument('--node-dev-root', default='/dev', help='노드 관측에서 본 노드 /dev 경로(k3d 관측 Pod는 /host/dev)')
     args = parser.parse_args(argv)
@@ -162,7 +171,11 @@ def main(argv=None):
     if out.exists():
         raise SystemExit('출력 파일이 이미 있습니다')
     value = collect(env_path=args.env, target_path=args.target, prepared_dir=args.prepared, duration=args.duration,
-                    node_view_mode=args.node_view, spec_overrides={'dev_root': args.node_dev_root})
+                    node_view_mode=args.node_view, spec_overrides={'dev_root': args.node_dev_root},
+                    runner_scope=json.loads(args.runner_scope.read_text()) if args.runner_scope else None,
+                    pages_dir=out.with_suffix('.pages'), expected_requests=json.loads(args.expected_requests.read_text()) if args.expected_requests else None,
+                    topology=json.loads(args.topology.read_text()) if args.topology else None,
+                    request_actors=json.loads(args.request_actors.read_text()) if args.request_actors else None)
     out.write_text(json.dumps(value, ensure_ascii=False, indent=1, sort_keys=True) + '\n')
     for summary in value['summaries']:
         print(json.dumps({k: summary[k] for k in ('kind', 'contract_error', 'events', 'event_counts', 'source_ended', 'gaps',

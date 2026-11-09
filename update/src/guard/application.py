@@ -10,6 +10,7 @@ import re
 import secrets
 
 from guard.adapters.model_inventory import inventory
+from guard.adapters.engine_provider import get_provider
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan, validate_update_run_config
@@ -24,14 +25,12 @@ from guard.runtime.kubernetes_transition import KubernetesTransition
 
 
 def merge_config(base: dict, override: dict) -> dict:
-    out = deepcopy(base)
-    for key, value in override.items():
-        out[key] = merge_config(out.get(key, {}), value) if isinstance(value, dict) else deepcopy(value)
-    return out
+    from guard.configuration import merge_config as merge
+    return merge(base, override)
 
 
 def run_config(cfg: dict) -> RunConfig:
-    rc = RunConfig(executors=cfg.get("executors", {}), adapter=cfg.get("adapter", {}).get("name"), raw=cfg)
+    rc = RunConfig(executors=cfg.get("executors", {}), adapter=cfg.get("adapter", {}).get("name"), raw=cfg, requested=deepcopy(cfg))
     rc.side_configs = {
         side: RunConfig(executors=c.get("executors", {}), adapter=c.get("adapter", {}).get("name"), raw=c)
         for side in ("baseline", "candidate")
@@ -41,58 +40,8 @@ def run_config(cfg: dict) -> RunConfig:
 
 
 def _managed_config(env, cfg):
-    base = deepcopy(cfg.get("vllm", {}))
-    if env.engine.name != "vllm" or not env.engine.version:
-        raise ValueError("managed update needs an explicit vllm engine version")
-    image = env.engine.image_digest
-    if not image or not re.fullmatch(r".+@sha256:[0-9a-f]{64}", image):
-        raise ValueError("managed update needs a repository@sha256 pinned image in each ENV")
-    if not env.model.id or not env.model.revision or not env.model.inventory_sha256:
-        raise ValueError("managed update needs pinned model id, revision and complete inventory")
-    if env.runtime.gpu_count is None:
-        raise ValueError("managed update needs an explicit gpu_count")
-    model_dir = Path(base.get("models_dir", "")).expanduser()
-    layout = base.get("model_layout", "hf-cache")
-    if type(layout) is not str or layout not in {"hf-cache", "snapshot"}:
-        raise ValueError("model_layout must be hf-cache or snapshot")
-    snapshot = model_dir if layout == "snapshot" else model_dir / "hub" / ("models--" + env.model.id.replace("/", "--")) / "snapshots" / env.model.revision
-    if not snapshot.is_dir():
-        raise ValueError("model snapshot is missing; prepare the offline HF cache first")
-    actual = inventory(snapshot)
-    if not actual["file_count"] or actual["inventory_sha256"] != env.model.inventory_sha256:
-        raise ValueError("model inventory differs from ENV")
-    base.update(image=image, model=env.model.id, revision=env.model.revision,
-                expected_version=env.engine.version, inventory_sha256=env.model.inventory_sha256,
-                gpu=env.runtime.gpu_count > 0)
-    if env.runtime.cpu is not None:
-        base["cpu"] = env.runtime.cpu.model_dump(mode="json")
-    if env.runtime.platform:
-        base["platform"] = env.runtime.platform
-    generation_readiness.profile(base)  # Explicit startup generation is opt-in and CPU-only.
-    launch = sandbox._vllm_plan(base)  # Pure option validation before any engine resources are created.
-    if base.get("launch_profile") == "cpu-bounded":
-        from guard.adapters.vllm import CPU_LAUNCH_KEYS, CpuLaunchOptions
-        allowed = {"models_dir", "model_layout", "launch_profile", "ready_timeout", "image", "model", "revision",
-                   "expected_version", "inventory_sha256", "gpu", "cpu_kv_cache_gib", "cpu", "gpu_model", "driver",
-                   "platform", "expected_source_commit", "source_commit_observed", "source_commit_status",
-                   "generation_readiness_timeout",
-                   "files_read_by_engine_sha256", "files_read_by_engine_count", *CPU_LAUNCH_KEYS}
-        if set(base) - allowed:
-            raise ValueError(f"unknown bounded CPU settings: {sorted(set(base) - allowed)}")
-        cpu = CpuLaunchOptions.from_options(base)
-        if env.runtime.gpu_count != 0 or env.runtime.cpu is None or env.runtime.cpu.threads != cpu.cpu_threads:
-            raise ValueError("cpu-bounded requires gpu_count=0 and a CPU profile with matching cpu_threads")
-        ready_timeout = base.get("ready_timeout", 600)
-        if type(ready_timeout) not in (int, float) or not 0 < ready_timeout <= 3600:
-            raise ValueError("bounded CPU ready_timeout must be positive and at most 3600 seconds")
-        # Retain the host path only as launch input; its contents are identified
-        # by inventory, while argv uses a stable container path.
-        base["models_dir"] = str(model_dir.resolve())
-        if launch.gpus:
-            raise ValueError("cpu-bounded cannot request GPU passthrough")
-    elif base.get("launch_profile", "legacy") != "legacy" or layout != "hf-cache":
-        raise ValueError("snapshot models require launch_profile=cpu-bounded")
-    return base
+    from guard.adapters.engine_provider import get_provider
+    return get_provider(env.engine.name).prepare_managed(env, cfg)
 
 
 def _credentials(cfg, gateway_profile):
@@ -127,8 +76,8 @@ def update_inputs(envs, cfg: dict):
                     or options.get("gateway_profile", "single") not in {"single", "role_open", "role_enforced"}
                     or options.get("engine_profile", "default") not in sandbox.ENGINE_PROFILES):
                 raise ValueError(f"{side}: unsupported sandbox profile")
-            if c.get("adapter", {}).get("name") != "vllm" or not c.get("executors") or any(v != "real" for v in c["executors"].values()):
-                raise ValueError("managed update requires the vllm adapter and real executors")
+            if c.get("adapter", {}).get("name") != env.engine.name or not c.get("executors") or any(v != "real" for v in c["executors"].values()):
+                raise ValueError("managed update requires the matching engine adapter and real executors")
             if type(c.get("update", {}).get("credential_canary", False)) is not bool:
                 raise ValueError("credential_canary must be a boolean")
             managed[side] = _managed_config(env, c)
@@ -161,8 +110,22 @@ def update_inputs(envs, cfg: dict):
 
 def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: datetime,
                    *, change=None, previous_plan=None):
+    from guard.core.execution_recipe import validate_policy_time
+    from guard.runtime.resource_lease import provider_leases
+    validate_policy_time(policy)
+    cfg = deepcopy(cfg)
+    prepared = update_inputs(envs, cfg)
+    with provider_leases(envs, [prepared[2].get(s, {}) for s in ('baseline', 'candidate')]) as leases:
+        return _execute_update(store, pack, envs, policy, cfg, run_dir, as_of,
+            change=change, previous_plan=previous_plan, prepared=prepared, leases=leases)
+
+
+def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: datetime,
+                   *, change=None, previous_plan=None, prepared=None, leases=()):
     """Return (report, execution_failed). Never publish fake results as measured."""
-    mode, side_cfgs, managed = update_inputs(envs, cfg)
+    from guard.core.execution_recipe import bind_recipe, validate_policy_time
+    validate_policy_time(policy)
+    mode, side_cfgs, managed = prepared
     change_input = read_change(change, pack, store)
     previous = resolve_plan(store, previous_plan)
     if change_input is not None or previous is not None:
@@ -181,9 +144,10 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
                             as_of=as_of) if chg is not None or previous is not None else None
     plan = (select(pack, envs, policy, change=chg, mode=Mode.update, context=context)
             if context is not None else select(pack, envs, policy, mode=Mode.update))
+    plan = bind_recipe(plan, cfg, envs)
     store.put(plan)
     (run_dir / "plan.txt").write_text(plan.id + "\n", encoding="utf-8")
-    rc = RunConfig(executors=cfg.get("executors", {}))
+    rc = RunConfig(executors=cfg.get("executors", {}), requested=deepcopy(cfg))
     for side, c in side_cfgs.items():
         if mode == "managed":
             for name in c.get("executors", {}):
@@ -196,10 +160,15 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
         kube_transition=KubernetesTransition(envs,side_cfgs,timeout=cfg.get("update",{}).get("transition_timeout",300),
             poll_interval=cfg.get("update",{}).get("transition_poll_interval",0.25),
                 candidate_binding=cfg.get("update",{}).get("kubernetes_candidate_binding","prebound"))
+    candidate_blocked = False
     for side, env in zip((Side.baseline, Side.candidate), envs):
         if not any(item.selected for item in plan.items):
             break  # 이월 전용 PLAN은 엔진을 기동하지 않는다.
         side_cfg = rc.side_configs[side.value]
+        if side == Side.candidate and candidate_blocked:
+            side_cfg.abort_reason = 'BASELINE_RESOURCE_RELEASE_UNVERIFIED'
+            run_plan(store, pack, plan, rc, only_side=side)
+            continue
         if mode == "external":
             if kube_transition is not None:
                 try:
@@ -222,13 +191,15 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
         c, keys = _credentials(c, profile)
         executed = False
         run_id = "u" + secrets.token_hex(6)
+        for lease in leases: lease.note_owner(run_id)
         try:
             with Docker(run_id) as docker:
                 side_dir = run_dir / side.value
                 try:
                     sentinel_dir = _managed_sentinel_dir(run_dir, options.get("engine_profile", "default"), side.value)
+                    from guard.adapters.engine_provider import get_provider
                     target = sandbox.up(docker, options.get("topology", "isolated"), side_dir,
-                                        keys.get("GUARD_ALLOWED_KEY"), engine="vllm", vllm=managed[side.value],
+                                        keys.get("GUARD_ALLOWED_KEY"), engine=env.engine.name, **get_provider(env.engine.name).sandbox_arguments(managed[side.value]),
                                         gateway_profile=profile, gateway_keys=keys,
                                         engine_profile=options.get("engine_profile", "default"),
                                         sentinel_dir=sentinel_dir,
@@ -251,9 +222,14 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
                 # Do not replace completed evidence (including confirmed violations)
                 # with empty ABORTED evidence because post-run teardown failed.
                 lifecycle_errors.append(f"{side.value}: cleanup incomplete ({type(exc).__name__}); guard.run={run_id}")
+                candidate_blocked |= side == Side.baseline
+                for lease in leases: lease.mark_uncertain(run_id)
             else:
+                lifecycle_errors.append(f"{side.value}: startup/execution interrupted ({type(exc).__name__}); sealed evidence retained; guard.run={run_id}")
                 if _has_cleanup_note(exc, run_id):
                     lifecycle_errors.append(f"{side.value}: cleanup incomplete after startup/execution failure ({type(exc).__name__}); guard.run={run_id}")
+                    candidate_blocked |= side == Side.baseline
+                    for lease in leases: lease.mark_uncertain(run_id)
                 side_cfg.abort_reason = f"managed startup/execution failed: {type(exc).__name__}"
                 run_plan(store, pack, plan, rc, only_side=side)
     if kube_transition is not None:
@@ -324,24 +300,36 @@ def _validation_inputs(env, cfg: dict):
             or options.get("gateway_profile", "single") not in sandbox.GATEWAY_PROFILES
             or options.get("engine_profile", "default") not in sandbox.ENGINE_PROFILES):
         raise ValueError("unsupported validation sandbox profile")
-    if (effective.get("adapter", {}).get("name") != "vllm" or not effective.get("executors")
+    if (effective.get("adapter", {}).get("name") != env.engine.name or not effective.get("executors")
             or any(value != "real" for value in effective["executors"].values())):
-        raise ValueError("validate requires the vllm adapter and real executors")
+        raise ValueError("validate requires the matching engine adapter and real executors")
     return effective, _managed_config(env, effective)
 
 
 def execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_of: datetime):
+    from guard.core.execution_recipe import validate_policy_time
+    from guard.runtime.resource_lease import provider_leases
+    validate_policy_time(policy)
+    cfg = deepcopy(cfg)
+    prepared = _validation_inputs(env, deepcopy(cfg))
+    with provider_leases([env], [prepared[1]]) as leases:
+        return _execute_validation(store, pack, env, policy, cfg, run_dir, as_of, prepared=prepared, leases=leases)
+
+
+def _execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_of: datetime, *, prepared=None, leases=()):
     """Audit a single managed engine; retain evidence when teardown fails."""
     from guard.core.preflight import validate_pack
+    from guard.core.execution_recipe import bind_recipe, validate_policy_time
 
+    validate_policy_time(policy)
     validate_pack(pack)
-    effective, managed = _validation_inputs(env, cfg)
+    effective, managed = prepared
     options = effective.get("validation", {})
     if options.get("credential_canary", False) and policy.status.value != "DRAFT":
         raise ValueError("credential_canary is only available with a DRAFT sandbox policy")
     profile = options.get("gateway_profile", "single")
     effective, keys = _credentials(effective, profile)
-    plan = select(pack, [env], policy, mode=Mode.audit)
+    plan = bind_recipe(select(pack, [env], policy, mode=Mode.audit), cfg, [env])
     if not any(item.selected for item in plan.items):
         raise ValueError("validation policy selected no checks")
     run_dir.mkdir(parents=True, exist_ok=False)
@@ -354,16 +342,18 @@ def execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_of
     sentinel_dir = _managed_sentinel_dir(run_dir, options.get("engine_profile", "default"))
     for name in effective["executors"]:
         effective.setdefault(name, {})["target"] = str(target_dir / "target.json")
-    rc = RunConfig(executors=effective["executors"], adapter="vllm", raw=effective)
+    rc = RunConfig(executors=effective["executors"], adapter=env.engine.name, raw=effective, requested=deepcopy(cfg))
     completed = False
     lifecycle_errors = []
     diagnostic_refs = []
     run_id = "v" + secrets.token_hex(6)
+    for lease in leases: lease.note_owner(run_id)
     try:
         with Docker(run_id) as docker:
             try:
+                from guard.adapters.engine_provider import get_provider
                 target = sandbox.up(docker, options.get("topology", "isolated"), target_dir,
-                                    keys.get("GUARD_ALLOWED_KEY"), engine="vllm", vllm=managed,
+                                    keys.get("GUARD_ALLOWED_KEY"), engine=env.engine.name, **get_provider(env.engine.name).sandbox_arguments(managed),
                                     gateway_profile=profile, gateway_keys=keys,
                                     engine_profile=options.get("engine_profile", "default"), sentinel_dir=sentinel_dir,
                                     credential_canary=options.get("credential_canary", False))
@@ -379,9 +369,12 @@ def execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_of
     except Exception as exc:
         if completed:
             lifecycle_errors.append(f"single: cleanup incomplete ({type(exc).__name__}); guard.run={run_id}")
+            for lease in leases: lease.mark_uncertain(run_id)
         else:
+            lifecycle_errors.append(f"single: startup/execution interrupted ({type(exc).__name__}); sealed evidence retained; guard.run={run_id}")
             if _has_cleanup_note(exc, run_id):
                 lifecycle_errors.append(f"single: cleanup incomplete after startup/execution failure ({type(exc).__name__}); guard.run={run_id}")
+                for lease in leases: lease.mark_uncertain(run_id)
             rc.abort_reason = f"managed startup/execution failed: {type(exc).__name__}"
             run_plan(store, pack, plan, rc)
     judge_plan(store, pack, plan, as_of)
@@ -440,8 +433,9 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
             if item.gaps:
                 raise ValueError(f"{item.check_id}: unresolved selection gaps {item.gaps}")
             for side, c in prepared[1].items():
-                factory = registry.resolve_executor(item.executor, c.get("executors", {}).get(item.executor, ""))
-                kube=(item.executor=="request_binding" and c.get("executors",{}).get(item.executor)=="kubernetes" and prepared[0]=="external")
+                selected_env = envs[0] if side in {'single', 'baseline'} else envs[-1]
+                factory = registry.resolve_executor(item.executor, c.get("executors", {}).get(item.executor, ""), engine=selected_env.engine.name, version=selected_env.engine.version)
+                kube=(c.get("executors",{}).get(item.executor)=="kubernetes" and prepared[0]=="external")
                 if factory is None or c.get("executors", {}).get(item.executor) != "real" and not kube:
                     raise ValueError(f"{side}/{item.check_id}: real executor is required")
                 if prepared[0] == "managed":
@@ -492,10 +486,12 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 digest_ok = bool(info["digests"]) and ("@" not in image or image in info["digests"])
                 record(f"image:{image}", info["os"] == "linux" and normalize(info["architecture"]) == arch and digest_ok,
                        "local image must match daemon architecture and have a repository digest; no automatic pull")
-                bounded_images = {v["image"] for v in prepared[2].values() if v.get("launch_profile") == "cpu-bounded"}
-                if image in bounded_images:
-                    record(f"entrypoint:{image}", info.get("entrypoint") == ["vllm", "serve"],
-                           "cpu-bounded targets the official CPU image with vllm serve; it uses a fixed /usr/bin/env override to clear legacy KV sizing")
+                for side, env in zip(('single',) if single else ('baseline', 'candidate'), envs):
+                    options = prepared[2][side]
+                    expected = get_provider(env.engine.name).expected_image_entrypoint(options)
+                    if options['image'] == image and expected is not None:
+                        record(f'entrypoint:{image}', info.get('entrypoint') == expected,
+                               'local image entrypoint must match the selected engine launch provider')
             except Exception as exc:
                 record(f"image:{image}", False, f"local image unavailable ({type(exc).__name__})")
         for side, env in zip(("single",) if single else ("baseline", "candidate"), envs):
@@ -506,13 +502,13 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
             else:
                 record(f"hardware:{side}", bool(env.runtime.gpu_model and env.runtime.driver),
                        "GPU and driver must be declared; actual device availability requires engine validation")
-        bounded = {side: v for side, v in prepared[2].items() if v.get("launch_profile") == "cpu-bounded"}
+        bounded = {side: get_provider(env.engine.name).resource_limits(prepared[2][side])
+                   for side, env in zip(('single',) if single else ('baseline', 'candidate'), envs)}
+        bounded = {side: limits for side, limits in bounded.items() if limits is not None}
         if bounded:
             try:
                 capacity = docker.daemon_resources(timeout=15)
-                from guard.adapters.vllm import cpu_launch_limits
-                for side, settings in bounded.items():
-                    limits = cpu_launch_limits(settings)
+                for side, limits in bounded.items():
                     memory, cpus = capacity.get("memory_bytes"), capacity.get("cpus")
                     ok = (type(memory) is int and memory >= limits.memory_bytes
                           and type(cpus) is int and cpus >= limits.cpus)

@@ -19,6 +19,7 @@ PASS 관문(정상 대조 성공·모든 챌린지 시도·구조화 필수 관�
 from __future__ import annotations
 
 from guard.models import CheckDef, Evidence, Verdict
+from guard.log_policy_profiles import policy_supported as log_policy_supported
 from guard.input_policy import policy_context
 from guard.automation_policy import (string_list, validate_template_policy,
                                      validate_request_binding_policy, validate_log_integrity_policy)
@@ -35,7 +36,7 @@ AUTOMATION_RULE_CEILING_EXECUTORS = {"sampling_validation", "response_content", 
                                      "request_binding", "log_integrity"}
 
 
-def _automation_policy_valid(executor: str, values: dict) -> bool:
+def _automation_policy_valid(executor: str, values: dict, *, log_contract="legacy-native-info/1") -> bool:
     """Pure POL constraints of the bounded profiles, without executor/I/O setup.
 
     Runtime sources, credentials, endpoints and actual consumption are still
@@ -49,9 +50,7 @@ def _automation_policy_valid(executor: str, values: dict) -> bool:
                 return (values["result_binding"] == "originating_connection"
                         and values["client_request_id_trust"] == "untrusted_correlation")
             validate_log_integrity_policy(values)
-            return (values["collector_profile"] == "guard-vllm-native-info-v1"
-                    and values["client_request_id_trust"] == "untrusted_correlation"
-                    and set(values["required_trusted_fields"]) <= {"process", "level", "source"})
+            return log_policy_supported(values, log_contract)
         except (TypeError, ValueError, KeyError, AttributeError):
             return False
     if executor == "template_validation":
@@ -132,7 +131,7 @@ class DeclaredJudge:
                               and (check.executor in AUTOMATION_RULE_CEILING_EXECUTORS
                                    or check.judge.params.get("declared_pass_ceiling") is True))
         automation_policy_valid = (check.executor not in AUTOMATION_RULE_CEILING_EXECUTORS
-                                   or _automation_policy_valid(check.executor, policy_values))
+                                   or _automation_policy_valid(check.executor, policy_values, log_contract=params.get("log_policy_contract", "legacy-native-info/1")))
         if automation_ceiling:
             try:
                 # The declared default_judge must not bypass the pinned

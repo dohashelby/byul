@@ -1,0 +1,24 @@
+[Unit]
+Description=Serving Runtime GPU status collector
+After=network-online.target
+
+[Service]
+Type=simple
+User=runtime-agent
+Group=runtime-agent
+# serving-observe group 10010: the public snapshot is 0640 for the Gateway/observer.
+SupplementaryGroups=10000 10010
+UMask=0027
+WorkingDirectory=/opt/byul/runtime
+# Read-only nvidia-smi query; only index/name and numeric fields are written.
+ExecStart=/opt/byul/runtime/.venv/bin/python -B -m tools.gpu_status --output /srv/serving/observation/gpu-status/gpu-state.json --watch --interval 10
+Restart=on-failure
+RestartSec=10
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/serving/observation/gpu-status
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

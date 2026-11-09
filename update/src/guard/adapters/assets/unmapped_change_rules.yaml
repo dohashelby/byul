@@ -1,0 +1,4 @@
+version: 1
+basis: Conservative fallback; no engine path coverage is qualified.
+exclude: {}
+rules: []

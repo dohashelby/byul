@@ -1,0 +1,303 @@
+{
+ "data_origin": "EXAMPLE",
+ "engine": "vLLM 0.31.0 CPU arm64",
+ "image": "sha256:045fb648a61cfcd32d4b9ca5d0c391013afadae0178d2e23ac292597f2f64036",
+ "result": [
+  "[{\"index\": 0, \"outputs\": 1, \"tokens\": 2}, {\"prefix_reset\": true}, {\"index\": 1, \"outputs\": 1, \"tokens\": 2}]"
+ ],
+ "rows": [
+  {
+   "actual_tensor_consumption_verified": false,
+   "authenticated_identity_verified": false,
+   "call_sha256": "1cea2644c19c2dd250bbd2f2eb7f885c038988297304f7246f25022626131842",
+   "entry_code_sha256": "d802ed22069fc6052e4ce9f1875d99c56363c123c0b3fd7e137bd944532d85e2",
+   "entry_qualified_before": true,
+   "fields": {
+    "kv_sha256": "e16ab67dad8d09fd943338da610fd0a969a495a005da6aaac6aa657a1c8df41c",
+    "model_sha256": "c9a5edef1e08b663db8cc32293c5c7965a1532d6baa2bc6c5092ade8d10058b6",
+    "pid": 115,
+    "rank": 0,
+    "requests": [
+     {
+      "attempt_sha256": "3eb4f4b97f82cd8752c4173bf1b8ad0245459dc90fade038df98cd0fe6108838",
+      "request_sha256": "2c5d5fe9bdf2553dc4238ef6d1cca21aaeb2f240f2bc3382dc79c9af8c045c84"
+     }
+    ],
+    "start_ticks": 15521578,
+    "weights_sha256": "af4fb09ec4b86c597793f9a6db3617afc7e6b0c94e5c05a4b66d3cf31a2c48e7"
+   },
+   "native_profile_installed": false,
+   "operation_finished_ns": 155221567031115,
+   "operation_started_ns": 155221567031115,
+   "parent_call_sha256": null,
+   "phase": "CALL",
+   "point": "GPUModelRunner._model_forward",
+   "process_sha256": "e5491335e33562ca3d518b3f353261f17bf58bb49d59175c3b72cf99fce170c2",
+   "runtime_context_injected": false,
+   "schema": "guard-vllm-transition-dispatch/1",
+   "session_sha256": "e958d74d93cadd453fa68c564794168102b24a559ee00f3727ca6ef0c223b8a8",
+   "source_file_sha256": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a",
+   "transitive_dependencies_verified": false
+  },
+  {
+   "actual_tensor_consumption_verified": false,
+   "authenticated_identity_verified": false,
+   "call_sha256": "1cea2644c19c2dd250bbd2f2eb7f885c038988297304f7246f25022626131842",
+   "entry_code_sha256": "d802ed22069fc6052e4ce9f1875d99c56363c123c0b3fd7e137bd944532d85e2",
+   "entry_qualified_after": true,
+   "entry_qualified_before": true,
+   "fields": {
+    "kv_sha256": "e16ab67dad8d09fd943338da610fd0a969a495a005da6aaac6aa657a1c8df41c",
+    "model_sha256": "c9a5edef1e08b663db8cc32293c5c7965a1532d6baa2bc6c5092ade8d10058b6",
+    "pid": 115,
+    "rank": 0,
+    "requests": [
+     {
+      "attempt_sha256": "3eb4f4b97f82cd8752c4173bf1b8ad0245459dc90fade038df98cd0fe6108838",
+      "request_sha256": "2c5d5fe9bdf2553dc4238ef6d1cca21aaeb2f240f2bc3382dc79c9af8c045c84"
+     }
+    ],
+    "start_ticks": 15521578,
+    "weights_sha256": "af4fb09ec4b86c597793f9a6db3617afc7e6b0c94e5c05a4b66d3cf31a2c48e7"
+   },
+   "native_finished_ns": 155221581888115,
+   "native_profile_installed": false,
+   "native_started_ns": 155221568060907,
+   "operation_finished_ns": 155221581888115,
+   "operation_started_ns": 155221567031115,
+   "parent_call_sha256": null,
+   "phase": "RETURN",
+   "point": "GPUModelRunner._model_forward",
+   "process_sha256": "e5491335e33562ca3d518b3f353261f17bf58bb49d59175c3b72cf99fce170c2",
+   "runtime_context_injected": false,
+   "schema": "guard-vllm-transition-dispatch/1",
+   "session_sha256": "e958d74d93cadd453fa68c564794168102b24a559ee00f3727ca6ef0c223b8a8",
+   "source_file_sha256": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a",
+   "transitive_dependencies_verified": false
+  },
+  {
+   "actual_tensor_consumption_verified": false,
+   "authenticated_identity_verified": false,
+   "call_sha256": "65588e05464630fd3742533c258de3367dcd020356df0ca094741646eda75623",
+   "entry_code_sha256": "d802ed22069fc6052e4ce9f1875d99c56363c123c0b3fd7e137bd944532d85e2",
+   "entry_qualified_before": true,
+   "fields": {
+    "kv_sha256": "e16ab67dad8d09fd943338da610fd0a969a495a005da6aaac6aa657a1c8df41c",
+    "model_sha256": "c9a5edef1e08b663db8cc32293c5c7965a1532d6baa2bc6c5092ade8d10058b6",
+    "pid": 115,
+    "rank": 0,
+    "requests": [
+     {
+      "attempt_sha256": "3eb4f4b97f82cd8752c4173bf1b8ad0245459dc90fade038df98cd0fe6108838",
+      "request_sha256": "2c5d5fe9bdf2553dc4238ef6d1cca21aaeb2f240f2bc3382dc79c9af8c045c84"
+     }
+    ],
+    "start_ticks": 15521578,
+    "weights_sha256": "af4fb09ec4b86c597793f9a6db3617afc7e6b0c94e5c05a4b66d3cf31a2c48e7"
+   },
+   "native_profile_installed": false,
+   "operation_finished_ns": 155221590160240,
+   "operation_started_ns": 155221590160240,
+   "parent_call_sha256": null,
+   "phase": "CALL",
+   "point": "GPUModelRunner._model_forward",
+   "process_sha256": "e5491335e33562ca3d518b3f353261f17bf58bb49d59175c3b72cf99fce170c2",
+   "runtime_context_injected": false,
+   "schema": "guard-vllm-transition-dispatch/1",
+   "session_sha256": "e958d74d93cadd453fa68c564794168102b24a559ee00f3727ca6ef0c223b8a8",
+   "source_file_sha256": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a",
+   "transitive_dependencies_verified": false
+  },
+  {
+   "actual_tensor_consumption_verified": false,
+   "authenticated_identity_verified": false,
+   "call_sha256": "65588e05464630fd3742533c258de3367dcd020356df0ca094741646eda75623",
+   "entry_code_sha256": "d802ed22069fc6052e4ce9f1875d99c56363c123c0b3fd7e137bd944532d85e2",
+   "entry_qualified_after": true,
+   "entry_qualified_before": true,
+   "fields": {
+    "kv_sha256": "e16ab67dad8d09fd943338da610fd0a969a495a005da6aaac6aa657a1c8df41c",
+    "model_sha256": "c9a5edef1e08b663db8cc32293c5c7965a1532d6baa2bc6c5092ade8d10058b6",
+    "pid": 115,
+    "rank": 0,
+    "requests": [
+     {
+      "attempt_sha256": "3eb4f4b97f82cd8752c4173bf1b8ad0245459dc90fade038df98cd0fe6108838",
+      "request_sha256": "2c5d5fe9bdf2553dc4238ef6d1cca21aaeb2f240f2bc3382dc79c9af8c045c84"
+     }
+    ],
+    "start_ticks": 15521578,
+    "weights_sha256": "af4fb09ec4b86c597793f9a6db3617afc7e6b0c94e5c05a4b66d3cf31a2c48e7"
+   },
+   "native_finished_ns": 155221597934324,
+   "native_profile_installed": false,
+   "native_started_ns": 155221590597407,
+   "operation_finished_ns": 155221597934324,
+   "operation_started_ns": 155221590160240,
+   "parent_call_sha256": null,
+   "phase": "RETURN",
+   "point": "GPUModelRunner._model_forward",
+   "process_sha256": "e5491335e33562ca3d518b3f353261f17bf58bb49d59175c3b72cf99fce170c2",
+   "runtime_context_injected": false,
+   "schema": "guard-vllm-transition-dispatch/1",
+   "session_sha256": "e958d74d93cadd453fa68c564794168102b24a559ee00f3727ca6ef0c223b8a8",
+   "source_file_sha256": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a",
+   "transitive_dependencies_verified": false
+  },
+  {
+   "actual_tensor_consumption_verified": false,
+   "authenticated_identity_verified": false,
+   "call_sha256": "b3d38093f0fb11925a02a6c414872ef26edc95dd360585e9cff8c69d6bb9811f",
+   "entry_code_sha256": "d802ed22069fc6052e4ce9f1875d99c56363c123c0b3fd7e137bd944532d85e2",
+   "entry_qualified_before": true,
+   "fields": {
+    "kv_sha256": "e16ab67dad8d09fd943338da610fd0a969a495a005da6aaac6aa657a1c8df41c",
+    "model_sha256": "c9a5edef1e08b663db8cc32293c5c7965a1532d6baa2bc6c5092ade8d10058b6",
+    "pid": 115,
+    "rank": 0,
+    "requests": [
+     {
+      "attempt_sha256": "b5ef56ae38e071e0cc6baf093e2c3ba91ab06cdfb81bca71dbbc0d1780b533bc",
+      "request_sha256": "0c591b3ec604911b7f05bb7eefb18d58e8aa1870ad5c10e69ab40e15f61fe2c3"
+     }
+    ],
+    "start_ticks": 15521578,
+    "weights_sha256": "af4fb09ec4b86c597793f9a6db3617afc7e6b0c94e5c05a4b66d3cf31a2c48e7"
+   },
+   "native_profile_installed": false,
+   "operation_finished_ns": 155221605024282,
+   "operation_started_ns": 155221605024282,
+   "parent_call_sha256": null,
+   "phase": "CALL",
+   "point": "GPUModelRunner._model_forward",
+   "process_sha256": "e5491335e33562ca3d518b3f353261f17bf58bb49d59175c3b72cf99fce170c2",
+   "runtime_context_injected": false,
+   "schema": "guard-vllm-transition-dispatch/1",
+   "session_sha256": "e958d74d93cadd453fa68c564794168102b24a559ee00f3727ca6ef0c223b8a8",
+   "source_file_sha256": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a",
+   "transitive_dependencies_verified": false
+  },
+  {
+   "actual_tensor_consumption_verified": false,
+   "authenticated_identity_verified": false,
+   "call_sha256": "b3d38093f0fb11925a02a6c414872ef26edc95dd360585e9cff8c69d6bb9811f",
+   "entry_code_sha256": "d802ed22069fc6052e4ce9f1875d99c56363c123c0b3fd7e137bd944532d85e2",
+   "entry_qualified_after": true,
+   "entry_qualified_before": true,
+   "fields": {
+    "kv_sha256": "e16ab67dad8d09fd943338da610fd0a969a495a005da6aaac6aa657a1c8df41c",
+    "model_sha256": "c9a5edef1e08b663db8cc32293c5c7965a1532d6baa2bc6c5092ade8d10058b6",
+    "pid": 115,
+    "rank": 0,
+    "requests": [
+     {
+      "attempt_sha256": "b5ef56ae38e071e0cc6baf093e2c3ba91ab06cdfb81bca71dbbc0d1780b533bc",
+      "request_sha256": "0c591b3ec604911b7f05bb7eefb18d58e8aa1870ad5c10e69ab40e15f61fe2c3"
+     }
+    ],
+    "start_ticks": 15521578,
+    "weights_sha256": "af4fb09ec4b86c597793f9a6db3617afc7e6b0c94e5c05a4b66d3cf31a2c48e7"
+   },
+   "native_finished_ns": 155221613665782,
+   "native_profile_installed": false,
+   "native_started_ns": 155221605443449,
+   "operation_finished_ns": 155221613665782,
+   "operation_started_ns": 155221605024282,
+   "parent_call_sha256": null,
+   "phase": "RETURN",
+   "point": "GPUModelRunner._model_forward",
+   "process_sha256": "e5491335e33562ca3d518b3f353261f17bf58bb49d59175c3b72cf99fce170c2",
+   "runtime_context_injected": false,
+   "schema": "guard-vllm-transition-dispatch/1",
+   "session_sha256": "e958d74d93cadd453fa68c564794168102b24a559ee00f3727ca6ef0c223b8a8",
+   "source_file_sha256": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a",
+   "transitive_dependencies_verified": false
+  },
+  {
+   "actual_tensor_consumption_verified": false,
+   "authenticated_identity_verified": false,
+   "call_sha256": "5e3aeffd4c4226ac02de6cda890840cfe38e9a6379d66ec0e6ba811cb8089f98",
+   "entry_code_sha256": "d802ed22069fc6052e4ce9f1875d99c56363c123c0b3fd7e137bd944532d85e2",
+   "entry_qualified_before": true,
+   "fields": {
+    "kv_sha256": "e16ab67dad8d09fd943338da610fd0a969a495a005da6aaac6aa657a1c8df41c",
+    "model_sha256": "c9a5edef1e08b663db8cc32293c5c7965a1532d6baa2bc6c5092ade8d10058b6",
+    "pid": 115,
+    "rank": 0,
+    "requests": [
+     {
+      "attempt_sha256": "b5ef56ae38e071e0cc6baf093e2c3ba91ab06cdfb81bca71dbbc0d1780b533bc",
+      "request_sha256": "0c591b3ec604911b7f05bb7eefb18d58e8aa1870ad5c10e69ab40e15f61fe2c3"
+     }
+    ],
+    "start_ticks": 15521578,
+    "weights_sha256": "af4fb09ec4b86c597793f9a6db3617afc7e6b0c94e5c05a4b66d3cf31a2c48e7"
+   },
+   "native_profile_installed": false,
+   "operation_finished_ns": 155221618693615,
+   "operation_started_ns": 155221618693615,
+   "parent_call_sha256": null,
+   "phase": "CALL",
+   "point": "GPUModelRunner._model_forward",
+   "process_sha256": "e5491335e33562ca3d518b3f353261f17bf58bb49d59175c3b72cf99fce170c2",
+   "runtime_context_injected": false,
+   "schema": "guard-vllm-transition-dispatch/1",
+   "session_sha256": "e958d74d93cadd453fa68c564794168102b24a559ee00f3727ca6ef0c223b8a8",
+   "source_file_sha256": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a",
+   "transitive_dependencies_verified": false
+  },
+  {
+   "actual_tensor_consumption_verified": false,
+   "authenticated_identity_verified": false,
+   "call_sha256": "5e3aeffd4c4226ac02de6cda890840cfe38e9a6379d66ec0e6ba811cb8089f98",
+   "entry_code_sha256": "d802ed22069fc6052e4ce9f1875d99c56363c123c0b3fd7e137bd944532d85e2",
+   "entry_qualified_after": true,
+   "entry_qualified_before": true,
+   "fields": {
+    "kv_sha256": "e16ab67dad8d09fd943338da610fd0a969a495a005da6aaac6aa657a1c8df41c",
+    "model_sha256": "c9a5edef1e08b663db8cc32293c5c7965a1532d6baa2bc6c5092ade8d10058b6",
+    "pid": 115,
+    "rank": 0,
+    "requests": [
+     {
+      "attempt_sha256": "b5ef56ae38e071e0cc6baf093e2c3ba91ab06cdfb81bca71dbbc0d1780b533bc",
+      "request_sha256": "0c591b3ec604911b7f05bb7eefb18d58e8aa1870ad5c10e69ab40e15f61fe2c3"
+     }
+    ],
+    "start_ticks": 15521578,
+    "weights_sha256": "af4fb09ec4b86c597793f9a6db3617afc7e6b0c94e5c05a4b66d3cf31a2c48e7"
+   },
+   "native_finished_ns": 155221633961657,
+   "native_profile_installed": false,
+   "native_started_ns": 155221619141407,
+   "operation_finished_ns": 155221633961657,
+   "operation_started_ns": 155221618693615,
+   "parent_call_sha256": null,
+   "phase": "RETURN",
+   "point": "GPUModelRunner._model_forward",
+   "process_sha256": "e5491335e33562ca3d518b3f353261f17bf58bb49d59175c3b72cf99fce170c2",
+   "runtime_context_injected": false,
+   "schema": "guard-vllm-transition-dispatch/1",
+   "session_sha256": "e958d74d93cadd453fa68c564794168102b24a559ee00f3727ca6ef0c223b8a8",
+   "source_file_sha256": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a",
+   "transitive_dependencies_verified": false
+  },
+  {
+   "code": "CACHE_CALLBACK_WEAK_OBJECT_IDENTITY_UNAVAILABLE",
+   "detail_sha256": "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91",
+   "phase": "GAP",
+   "process_sha256": "e5491335e33562ca3d518b3f353261f17bf58bb49d59175c3b72cf99fce170c2",
+   "schema": "guard-engine-callback-events/1"
+  },
+  {
+   "code": "DISTRIBUTED_NON_EXECUTE_RPC_UNSUPPORTED",
+   "detail_sha256": "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91",
+   "phase": "GAP",
+   "process_sha256": "e5491335e33562ca3d518b3f353261f17bf58bb49d59175c3b72cf99fce170c2",
+   "schema": "guard-engine-callback-events/1"
+  }
+ ],
+ "scenario": "Two offline OPT requests separated by prefix reset; no live weights reload or rollback",
+ "session": "2a08c19bb3e951864dc25b07d229cd84",
+ "source_ended": true
+}

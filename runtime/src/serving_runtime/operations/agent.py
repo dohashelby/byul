@@ -307,7 +307,7 @@ class Agent:
         if op.get("server") != self.config.server:
             reject("TARGET_MISMATCH")
         kind, payload = op.get("kind"), op.get("payload", {})
-        if kind not in {"bundle.apply", "bundle.switch", "tetragon.mode"}:
+        if kind not in {"bundle.apply", "bundle.switch", "tetragon.mode", "enforcement.apply"}:
             reject("VALIDATION_FAILED")
         if op.get("state") != "claimed" or not recent(op.get("created_at"), 86400):
             reject("VALIDATION_FAILED")
@@ -318,19 +318,28 @@ class Agent:
             reject("VALIDATION_FAILED")
         if expired:
             reject("LEASE_EXPIRED")
-        needs = kind == "bundle.apply" or (kind == "tetragon.mode" and payload.get("mode") == "enforce")
+        needs = kind in {"bundle.apply", "enforcement.apply"} or (kind == "tetragon.mode" and payload.get("mode") == "enforce")
         if op.get("approval_required") is not needs:
             reject("APPROVAL_REQUIRED")
         if needs:
             approvals = op.get("approvals", [])
             approved = any((a.get("role") == "approver" and a.get("token_id") != op.get("requested_by"))
-                           or (self.config.lab_self_approval and op.get("lab_self_approval") is True
+                           or (kind != "enforcement.apply" and self.config.lab_self_approval and op.get("lab_self_approval") is True
                                and a.get("self_approval") is True and a.get("token_id") == op.get("requested_by")
                                and a.get("role") in {"runtime_operator", "approver"}) for a in approvals)
             if not approved:
                 reject("APPROVAL_REQUIRED")
         if op.get("requested_role") != "runtime_operator":
             reject("APPROVAL_REQUIRED")
+        if kind == "enforcement.apply":
+            if (payload.get("components") not in [["tetragon"], ["tetragon", "cilium"]]
+                    or type(payload.get("cilium_apply", False)) is not bool
+                    or (payload.get("cilium_apply") and "cilium" not in payload["components"])):
+                reject("VALIDATION_FAILED")
+            bundle = self.verified_bundle(Path(self.config.bundle_root) / before["bundle_id"])
+            self.check_target(bundle)
+            if payload.get("bundle_id") != before["bundle_id"] or payload.get("bundle_sha256") != bundle.sha256:
+                reject("STATE_CHANGED")
         if kind == "tetragon.mode":
             name, mode = payload.get("policy_name"), payload.get("mode")
             if not isinstance(name, str) or not ID.fullmatch(name) or mode not in {"monitor", "enforce"}:
@@ -407,7 +416,125 @@ class Agent:
         bundle_tools.apply_bundle(str(source) if source else None, cfg.bundle_root, cfg.context, cfg.namespace,
                                   cfg.status_url or "http://127.0.0.1:8080", cfg.token_env_file, kubeconfig=cfg.kubeconfig, existing=existing)
 
+    def sync_mode(self, name):
+        """Read every scheduled daemon; partial or mixed observations fail closed."""
+        result = self.run(["kubectl", "--context", self.config.context, "-n", "kube-system",
+                           "get", "daemonset", "tetragon", "-o", "json"])
+        if result.returncode:
+            return None
+        status = json.loads(result.stdout).get("status", {})
+        desired = status.get("desiredNumberScheduled", 0)
+        pods = self.run(["kubectl", "--context", self.config.context, "-n", "kube-system", "get", "pods",
+                         "-l", "app.kubernetes.io/name=tetragon", "-o", "json"])
+        if pods.returncode:
+            return None
+        items = json.loads(pods.stdout).get("items", [])
+        if not desired or len(items) != desired or status.get("numberReady") != desired:
+            return None
+        nodes, modes = set(), set()
+        tool = self.tool("tetragon_mode")
+        for pod in items:
+            node = pod.get("spec", {}).get("nodeName")
+            if (not node or node in nodes or pod.get("metadata", {}).get("deletionTimestamp")
+                    or not any(c.get("name") == "tetragon" and c.get("ready") is True
+                               for c in pod.get("status", {}).get("containerStatuses", []))):
+                return None
+            nodes.add(node)
+            result = self.run(["kubectl", "--context", self.config.context, "-n", "kube-system", "exec",
+                               pod["metadata"]["name"], "-c", "tetragon", "--", "tetra", "tracingpolicy", "list"])
+            row = tool.parse_policy_row(result.stdout, name, self.config.namespace) if not result.returncode else None
+            if not row or row.get("state") != "enabled":
+                return None
+            modes.add(row.get("mode"))
+        return next(iter(modes)) if len(modes) == 1 else None
+
+    def sync_gateway(self, inference=False):
+        self.current()
+        if not inference:
+            return
+        # One bounded inference request; credentials and response text never escape.
+        from contextlib import nullcontext
+        cfg = self.config
+        bundle = self.verified_bundle(Path(cfg.bundle_root) / os.readlink(Path(cfg.bundle_root) / "current"))
+        policy = json.loads(Path(bundle.role_paths()["gateway_policy"]).read_text())
+        models = policy.get("allowed_models", [])
+        if not models:
+            reject("VALIDATION_FAILED")
+        token = None
+        if cfg.token_env_file:
+            values = [line.partition("=")[2].strip().strip("\"'")
+                      for line in Path(cfg.token_env_file).read_text().splitlines()
+                      if line.startswith("RUNTIME_INFERENCE_TOKEN=")]
+            if len(values) != 1 or not values[0]:
+                reject("VALIDATION_FAILED")
+            token = values[0]
+        connection = (nullcontext(cfg.status_url) if cfg.status_url else
+                      bundle_tools._port_forward(cfg.context, cfg.namespace, cfg.kubeconfig, 8080))
+        with connection as url:
+            headers = {"Content-Type": "application/json"}
+            if token:
+                headers["Authorization"] = "Bearer " + token
+            request = Request(url + "/v1/completions", headers=headers, data=json.dumps({
+                "model": models[0], "prompt": "ping", "max_tokens": 1, "stream": False}).encode())
+            with build_opener(NoRedirect()).open(request, timeout=15) as response:
+                body = response.read(1024 * 1024 + 1)
+            value = json.loads(body)
+            if len(body) > 1024 * 1024 or not isinstance(value.get("choices"), list) or not value["choices"]:
+                reject("VALIDATION_FAILED")
+
+    def process_sync(self, op):
+        from ..enforcement.sync import SyncFailure, sync
+        report = {"lease_id": op["lease_id"], "started_at": now(), "before": None, "after": None,
+                  "state": "failed", "code": "VALIDATION_FAILED", "steps": [], "evidence_sha256": [],
+                  "dry_run": not self.config.execute}
+        try:
+            before, intent = self.current()
+            report["before"] = self.validate(op, before, intent)
+            payload = op["payload"]
+            running = False
+            def guard():
+                nonlocal running
+                if not running:
+                    self.client.request(f"/{op['id']}/result", {**report, "state": "running", "code": "OK"})
+                    running = True
+                try:
+                    current, current_intent = self.current()
+                    self.validate(op, current, current_intent)
+                except Rejected as error:
+                    raise SyncFailure(str(error)) from None
+            def verify(inference):
+                self.sync_gateway(inference)
+                observed, observed_intent = self.current()
+                bundle = self.verified_bundle(Path(self.config.bundle_root) / observed["bundle_id"])
+                if observed["bundle_id"] != payload["bundle_id"] or bundle.sha256 != payload["bundle_sha256"]:
+                    raise SyncFailure("STATE_CHANGED")
+            result = sync(intent, context=self.config.context, namespace=self.config.namespace, run=self.run,
+                          read_mode=self.sync_mode, verify_gateway=verify,
+                          components=payload["components"], cilium_apply=payload.get("cilium_apply", False),
+                          execute=self.config.execute, before_apply=guard)
+            report.update(result)
+            report["evidence_sha256"] = [payload["bundle_sha256"]]
+            try:
+                report["after"], _ = self.current()
+            except Exception:
+                if report["state"] in {"succeeded", "rolled_back"}:
+                    report.update(state="unknown", code="STATUS_UNKNOWN")
+        except Rejected as error:
+            report["code"] = str(error)
+            if error.reason_code:
+                report["reason_code"] = error.reason_code
+        except Exception:
+            pass
+        if not report["steps"]:
+            report["steps"] = [{"stage": "validation", "state": "failed"}] + [
+                {"stage": stage, "state": "skipped"} for stage in ("render", "dry-run", "apply", "verify")]
+        report["finished_at"] = now()
+        self.client.request(f"/{op['id']}/result", report)
+        return report
+
     def process(self, op):
+        if op.get("kind") == "enforcement.apply":
+            return self.process_sync(op)
         started = now()
         report = {"lease_id": op["lease_id"], "state": "failed", "code": "VALIDATION_FAILED", "started_at": started,
                   "dry_run": not self.config.execute, "before": None, "after": None, "steps": [], "evidence_sha256": []}

@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 import json
 import re
 import threading
@@ -667,7 +669,8 @@ def runtime_status(
             "approval_checked_at": _str_or_none(approval.get("checked_at")),
             "approval_reason_code": _str_or_none(approval.get("reason_code")),
             "validity_items": [
-                {"item": str(v.get("item")), "state": _str_or_none(v.get("state")), "result": _str_or_none(v.get("result"))}
+                {"item": str(v.get("item")), "state": _str_or_none(v.get("state")),
+                 "result": _str_or_none(v.get("error_code") if v.get("item") == "revocation" and v.get("error_code") else v.get("result"))}
                 for v in _l(policy.get("validity")) if isinstance(v, dict)
             ],
             "history": [
@@ -763,6 +766,10 @@ def comparisons(baseline: dict[str, Any], target: dict[str, Any]) -> dict[str, A
     base_meta = _d(baseline.get("baseline"))
     reg = _d(target.get("registration"))
     notes_base = [baseline["model_id_limit"]] if isinstance(baseline.get("model_id_limit"), str) else []
+    for name, meta in (("기준", base_meta), ("현재 선언", _d(baseline.get("manifest")))):
+        if meta.get("error_code"):
+            detail = "승인본 없음 — 미설정/미승인" if str(meta["error_code"]).endswith("_NOT_FOUND") else "읽기/검증 오류"
+            notes_base.append(f"{name}: {detail} ({meta['error_code']})")
     notes_target = [x for x in _l(target.get("limits")) if isinstance(x, str)]
     return {
         "baseline": {"state": _str_or_none(base_meta.get("state")), "rows": _comparison_rows(_l(baseline.get("rows"))), "notes": notes_base},
@@ -977,6 +984,7 @@ class RuntimeSource(Protocol):
     def ping(self) -> str: ...
     def phase_timeline(self) -> dict[str, Any]: ...
     def tetragon_status(self) -> dict[str, Any]: ...
+    def gpu_status(self) -> dict[str, Any]: ...
 
 
 def summary_from_events(events: Iterable[dict[str, Any]]) -> Summary:
@@ -1043,6 +1051,10 @@ class ExampleRuntimeSource:
 
     def tetragon_status(self) -> dict[str, Any]:
         return {"schema_version": "runtime-tetragon-state/1.0", "state": "not_configured", "fresh": False}
+
+    def gpu_status(self) -> dict[str, Any]:
+        # 예시 모드는 GPU 수치를 만들지 않는다(가짜 사용률을 실측처럼 보이지 않게).
+        return {"schema_version": "runtime-gpu-status/1.0", "state": "not_configured", "fresh": False, "gpus": []}
 
     def lab_report(self) -> Any:
         doc = self._json("runtime-lab-report.json")
@@ -1162,6 +1174,7 @@ class _TTLCache:
 class LiveRuntimeSource:
     mode = "live"
     REQUEST_LIMIT = 200
+    DETAIL_WORKERS = 8
 
     def __init__(self, client: RuntimeClient, base_url: str, cache_ttl: float = 2.5) -> None:
         self.client = client
@@ -1182,7 +1195,11 @@ class LiveRuntimeSource:
             return hit
         detail = self._get(f"/api/requests/{request_id}")
         records = detail.get("gateway_records", []) if isinstance(detail, dict) else []
-        if any(isinstance(r, dict) and r.get("phase") == "final" for r in records):
+        live = detail.get("engine_live", {}) if isinstance(detail, dict) else {}
+        # Engine-log evidence can arrive after the final Gateway record, and
+        # its availability/coverage keeps changing. Keep only the short TTL.
+        dynamic_evidence = isinstance(live, dict) and live.get("evidence_kind") == "engine_log"
+        if not dynamic_evidence and any(isinstance(r, dict) and r.get("phase") == "final" for r in records):
             with self._lock:
                 if len(self._final_details) > 5000:
                     self._final_details.clear()
@@ -1192,15 +1209,26 @@ class LiveRuntimeSource:
     def _gateway_events(self) -> EventBatch:
         listed = self._get("/api/requests", {"limit": self.REQUEST_LIMIT})
         views = listed.get("requests", []) if isinstance(listed, dict) else []
+        ids = [v.get("request_id") if isinstance(v, dict) else None for v in views]
+        valid = [rid for rid in ids if isinstance(rid, str) and _REQUEST_ID.fullmatch(rid)]
+
+        def fetch(rid: str) -> Any:
+            try:
+                return self._detail(rid)
+            except RuntimeNotFound:
+                return None
+
+        # 상세를 하나씩 순서대로 물으면 원격 연결(터널·port-forward)에서 첫 화면이 수십 초 걸린다.
+        # 끝난 요청은 캐시되므로 동시에 묻는 수를 작게 제한해 runtime 부하를 키우지 않는다.
+        with ThreadPoolExecutor(max_workers=self.DETAIL_WORKERS) as pool:
+            details = dict(zip(valid, pool.map(fetch, valid)))
         out: list[Any] = []
-        for view in views:
-            rid = view.get("request_id") if isinstance(view, dict) else None
+        for view, rid in zip(views, ids):
             if not isinstance(rid, str) or not _REQUEST_ID.fullmatch(rid):
                 out.append(view)
                 continue
-            try:
-                detail = self._detail(rid)
-            except RuntimeNotFound:
+            detail = details.get(rid)
+            if detail is None:
                 continue
             record = pick_gateway_record(detail.get("gateway_records", []) if isinstance(detail, dict) else [])
             out.append(gateway_event(record) if record is not None else detail)
@@ -1272,6 +1300,12 @@ class LiveRuntimeSource:
         except RuntimeNotFound:
             return {"schema_version": "runtime-tetragon-state/1.0", "state": "not_configured", "fresh": False,
                     "error": "연결된 Gateway가 Tetragon 상태 조회를 지원하지 않습니다"}
+
+    def gpu_status(self) -> dict[str, Any]:
+        try:
+            return self._get("/api/gpu-status")
+        except RuntimeNotFound:
+            return {"schema_version": "runtime-gpu-status/1.0", "state": "not_configured", "fresh": False, "gpus": []}
 
     def lab_report(self) -> Any:
         return lab_report_doc(self._get("/api/lab-report"))

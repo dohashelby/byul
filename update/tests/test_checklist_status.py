@@ -225,6 +225,9 @@ def test_gpu_summary_order_is_identical_across_path_flavours(tmp_path, flavour, 
         def __fspath__(self):
             return "fixture"
         def __truediv__(self, other):
+            # 현행 팩 판본은 하드코딩하지 않고 실제 팩 파일에서 읽는다(엔진·판본 앵커링 금지).
+            if other in ("packs/PACK-BASELINE", "reference/pack-definitions/PACK-BASELINE.json"):
+                return ROOT / other
             return tmp_path / "no-first-run.json"
         def glob(self, pattern):
             expected = GPU_A_GLOB if family == "A" else GPU_B_GLOB

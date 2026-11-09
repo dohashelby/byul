@@ -3,11 +3,13 @@
 고정 A1 전송만 사용한다. 관측 helper는 serving worker가 아니며 거부/불완전
 관측으로 전체 egress PASS나 정상 업무 성공을 만들지 않는다.
 """
+
+from guard.adapters.engine_profiles import supports
 from copy import deepcopy
 from datetime import datetime, timezone
 
 from guard.models import canonical_json, sha256_hex
-from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
+from guard.runtime.engine_http import KubernetesHTTP, OwnedKubernetesTransport, REQUEST_BINDING_PROFILE
 from guard.runtime import kubernetes_egress as common
 from guard.runtime.kubernetes_egress_contract import PROFILE, SCHEMA, normalize, integer, digest
 from .boundary_egress import _sender, _records, _when, _require, _CODES
@@ -79,9 +81,9 @@ def _helper(value, mode):
 
 def _read_record(ctx, config, receiver_target):
     t = ctx.cprobe
-    if (not isinstance(t, KubernetesHTTP) or t.profile != REQUEST_BINDING_PROFILE
+    if (not isinstance(t, OwnedKubernetesTransport) or t.profile != REQUEST_BINDING_PROFILE
             or ctx.target.get("lab") is not True or t.lab is not True
-            or t.engine_name != "vllm" or t.engine_version != "0.31.0"
+            or not supports(t.engine_name, t.engine_version)
             or t.target_sha256 != sha256_hex(canonical_json(ctx.target))
             or canonical_json(t.environment_ref) != canonical_json(ctx.env.ref().model_dump(mode="json"))):
         raise ValueError("EGRESS_COMMON_INTERFACE_UNAVAILABLE")

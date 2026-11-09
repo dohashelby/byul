@@ -34,6 +34,7 @@ class SelectionContext:
     carried_over: dict[str, CarriedOver] = field(default_factory=dict)
     full_scope: bool = False
     reason: str = ""
+    execution_recipe_sha256: str | None = None
 
 
 def input_diff(previous_env, current_env, previous_policy, current_policy, check_ids=()) -> InputDiff:
@@ -46,14 +47,15 @@ def input_diff(previous_env, current_env, previous_policy, current_policy, check
     return InputDiff(
         facts=sorted(key for key in oldfacts.keys() | newfacts.keys() if oldfacts.get(key) != newfacts.get(key)),
         runtime=sorted(f"runtime.{key}" for key in oldruntime.keys() | newruntime.keys()
-                       if oldruntime.get(key) != newruntime.get(key)),
+                       if oldruntime.get(key) != newruntime.get(key)) +
+                (['engine.runtime_kind'] if previous_env.engine.runtime_kind != current_env.engine.runtime_kind else []),
         policy_values=sorted(key for key in keys if previous_policy.values.get(key) != current_policy.values.get(key)),
         scope_added=sorted(cid for cid in check_ids if not _scope(cid, previous_policy) and _scope(cid, current_policy)),
         model_changed=any(getattr(previous_env.model, key) != getattr(current_env.model, key)
-                          for key in ("id", "revision", "inventory_sha256")),
+                          for key in ("id", "revision", "inventory_sha256", "tokenizer_revision", "components")),
         model_id_changed=previous_env.model.id != current_env.model.id,
         policy_metadata_changed=any(getattr(previous_policy, key) != getattr(current_policy, key)
-                                    for key in ("exceptions", "status", "confirmed_by", "confirmed_at")),
+                                    for key in ("exceptions", "status", "confirmed_by", "confirmed_at", "valid_from", "valid_until")),
     )
 
 
@@ -119,10 +121,8 @@ def selection_triggers(pack, change_type: str, change, diff: InputDiff, *, model
 
 
 def _merged(base, overlay):
-    result = deepcopy(base)
-    for key, value in overlay.items():
-        result[key] = _merged(result.get(key, {}), value) if isinstance(value, dict) else deepcopy(value)
-    return result
+    from guard.configuration import merge_config
+    return merge_config(base, overlay)
 
 
 def _effective_config(cfg, mode):
@@ -304,7 +304,10 @@ def build_context(store, previous_plan, pack, envs, policy, cfg, change=None, mo
         change_type = "MODEL" if diff.model_changed else "INPUT"
     triggers, full = selection_triggers(pack, change_type, change, diff,
                                       model_change_verified=_model_manifest_matches(change, oldenv, current))
-    context = SelectionContext(change_type, previous.ref(), triggers, full_scope=full)
+    from .execution_recipe import configuration_sha256
+    requested = cfg.requested if getattr(cfg, 'requested', None) is not None else (cfg.raw if hasattr(cfg, 'raw') else cfg)
+    context = SelectionContext(change_type, previous.ref(), triggers, full_scope=full,
+        execution_recipe_sha256=configuration_sha256(requested, envs))
     if change_type == "ENGINE_PATCH" and not _source_matches(change, envs):
         context.full_scope = True
         context.reason = "SOURCE_IMAGE_RELATION_UNVERIFIED_OR_MISMATCH"
@@ -325,6 +328,12 @@ def build_context(store, previous_plan, pack, envs, policy, cfg, change=None, mo
         if evaluate_check(check, envs)[0].value == "NOT_APPLICABLE":
             continue
         carried, reason = _eligible(store, previous, oldpack, pack, cid, target, policy, effective, now, read_only)
+        if carried is not None and mode == Mode.update:
+            candidate_cfg = cfg.side_configs['candidate'].raw if getattr(cfg, 'side_configs', None) else _merged(requested, requested.get('sides', {}).get('candidate', {}))
+            baseline_inputs = preview_inputs(check, target, policy.values.get(cid, {}), effective)
+            candidate_inputs = preview_inputs(check, current, policy.values.get(cid, {}), candidate_cfg)
+            if baseline_inputs is None or candidate_inputs != baseline_inputs:
+                carried, reason = None, 'CANDIDATE_PROCEDURE_OR_FIXTURE_CHANGED_OR_UNCONFIRMED'
         if carried is not None:
             context.carried_over[cid] = carried
         else:

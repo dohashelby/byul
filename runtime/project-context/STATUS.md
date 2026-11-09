@@ -1,5 +1,13 @@
 # 런타임 작업 상태
 
+- 2026-11-09 Codex 교차검수(기준 `byul_runtime` HEAD `2d78c38`, 목록 10번 제외): 로그인 root_path 우회(원본 미인증 200 → 수정 후 401), 알림 허용 목록·시각/지연 도착 커서·전송 전 대기열 저장·웹훅 URL 검증, chat SSE 응답 ID·엔진 로그 상세 캐시 갱신, GPU 비유한 수치 거부, 기존 agent 자동 시작 설정의 조기 해제, RBAC Pod watch 누락·과도한 Deployment/ReplicaSet 권한을 최소 수정하고 회귀시험을 추가했다. 로그 미발견을 미수신으로 단정하지 않는 처리와 수집 실패 뒤 구간 재시작은 유지했다.
+- 검증: runtime 전체 1,049건 중 932 통과·116 skip·기존 소켓 PermissionError 1건(`test_gateway_serves_snapshot_without_kubernetes_mutation`), 관련 선별 89건 통과. API 선별 20건 통과, 전체 364건 수집 확인; 지정 uv 명령은 캐시 쓰기/오프라인 의존성 설치 제약으로 실패했고 기존 venv+캐시 의존성으로 재시도한 전체는 TestClient 소켓 깨우기 차단으로 45초 후 중단했다. web 타입 검사·178건 통과, API 모델 변경 없음, `git diff --check` 통과. 증거 로그는 `/tmp/byul-review-{runtime-final,api-targeted-final,api-collection,api-deps,web}.log`.
+- 미확인: 소켓 허용 환경의 전체 runtime/API, 실제 호스트 재설치/재부팅·RBAC/admission·엔진/GPU·실제 웹훅. 알림은 최근 API 목록/500개 키·200개 대기열 범위이며 전송 성공 직후 중단 시 재전송 가능. AWS/kind 접속·contracts/update 수정·비공개 인계 파일 접근·커밋·push 없음(8개 로컬 커밋 유지).
+
+- 2026-11-09 외부 규칙 최초 적용 자동화(목록 10번): 승인된 `enforcement.apply`와 공통 `enforce sync`를 구현했다. current ID·해시·target 검증, Tetragon monitor 전용 생성/교체·unchanged/extra·live enforce/위험한 복원 spec 거부, Cilium CRD 부재 건너뜀·기본 SSA dry-run/diff·명시 실제 적용, 0600 임시 백업·경합 보호·실패 역순 복원·Gateway 상태/짧은 추론 확인, API·웹 폼/결과·내부 타입 재생성을 포함한다. 기준 `byul_runtime` HEAD `0355ab8`(main `ed5a0b3`와 tree 동일), 커밋·push·서버 접속·contracts/update 수정 없음. 금지 인계 파일은 접근하지 않고 보존했다.
+- 근거: runtime 지정 전체 991건(875 통과·115 skip·기존 소켓 PermissionError 1), 새 동기화 시험 24 통과; API 전체 재실행 327 통과·1 skip·기존 소켓 실패 1, 운영 API 56 통과·1 skip; web 타입 검사·163건 통과, 타입 재생성·diff 검사 통과. API 최초 전체는 기존 만료 시험 1건도 실패했으나 단독/전체 재실행 통과(원인 미확정·구현 미수정). 로그·전체 변경 파일·설계 보강은 `docs/외부규칙_최초적용_구현인계.md`, 사용은 `docs/외부규칙_최초적용.md`.
+- 미확인·다음: Claude 검수 후 실제 RBAC/CRD/admission·Tetragon 전체 daemon 로드/모드·Cilium 전달/추론/복원을 확인한다. 새 monitor 옵션 해시에 맞춰 관측·모니터 창·시험 근거 재검증이 필요하며, 임시 백업 정리·강제 종료/임대 만료/동시 변경의 unknown은 자동 재실행하지 않는다.
+
 최종 갱신: 2026-11-08
 
 - 2026-11-08 AWS 13회차 external_enforcement 해시 결속 보정(기준 `byul_runtime` `dd05d6d`, `58d0160`과 동일 내용, 미커밋): 정책 ID·판본과 `files.gateway_policy.sha256`을 Gateway 로드 해시에 대조하고 정책 정상·intent 적용 조건을 유지했다. 실제 bundle_tools 묶음의 원본/변환 해시 차이·monitor/mixed·파일 해시 불일치 unknown 회귀시험 추가, 기존 가짜 묶음 수정. 관련 43건 통과; 지정 전체 934건 중 818 통과·115 skip·기존 소켓 생성 PermissionError 1건(`test_gateway_serves_snapshot_without_kubernetes_mutation`), 로그 `/tmp/byul-runtime-policy-binding-unittest.log`. AWS 접속·contracts/update 수정·커밋·푸시 없음; 실서버 재확인·Claude 대화형 검수 대기.
@@ -668,3 +676,66 @@
 | 합계 | 218 | 3 | BEARER 3 | 전체 대조 5회차·접두 5회차 | DECLARED 138·MEASURED 80 |
 
 - 남은 제약: 접두 대조는 전체 파일 동일성의 강한 근거가 아니므로 5개 회차는 DECLARED로 남는다. 수동 origin 주장은 독립 인증이 아니며 자동으로 만들어 넣지 않았다. 소켓 허용 환경의 전체 시험과 Claude 직접 검수가 남았다. 보고서 형식/collector 버전이 바뀌었으므로 이전 출력과 다른 경우 기존 멱등 규칙에 따라 덮어쓰지 않고 새 출력 폴더를 사용한다.
+
+## 2026-11-09 엔진 수신 기록(11)·GPU 지표(12) — Claude 구현분, Codex 교차 검수 전
+
+- Codex 사용 한도로 작업이 시작되지 않아 Claude가 구현했다. 10번(외부 규칙 최초 적용) 미커밋 변경 위에서 작업했고 그 파일은 건드리지 않았다. contracts/update는 수정하지 않았다. 서버에는 접속하지 않았다.
+- 11: Gateway가 외부 backend 응답의 `id`를 요청 ID와 대조한다. 결과는 `engine_response_id_matched/mismatch/absent`이고 ID 원문은 저장하지 않는다.
+  - 선택 기능 `tools/engine_receipts.py`: 엔진 로그에서 요청 ID와 시각만 추출한다. 로그 줄·프롬프트는 버린다.
+  - Gateway `--engine-receipts`를 켜면 요청 상세가 `received`(로그 발견)를 표시한다. 미발견은 미수신으로 단정하지 않는다.
+  - 서비스 예시 파일만 두었고 기본 꺼짐이다. 플랫폼 상세에 한국어 라벨을 붙였다.
+- 12: `tools/gpu_status.py`(nvidia-smi 고정 필드, UUID 등 미저장)와 `serving-runtime-gpu-status.service`를 설치기 UNITS에 추가했다.
+  - Gateway `--gpu-state`·`/api/gpu-status`, gateway.yaml 인자를 추가했다.
+  - 플랫폼 `/api/runtime/gpu-status`(플랫폼 전용 모델)와 현황 GPU 카드·"GPU 관측" 표시를 추가했다. stale은 "현재 값 아님"으로 경고한다.
+- 문서: [엔진 수신 기록과 GPU 지표](../docs/엔진수신기록_GPU지표.md). 내부 기록 형식 문서에 두 형식을 추가했다.
+- 미확인·다음
+  - 실제 vLLM/SGLang이 X-Request-Id를 응답 `id`·로그에 쓰는지
+  - runtime-agent kubeconfig의 `pods/log` 권한
+  - 서버 nvidia-smi 실행 권한과 값 대조, stale 전환
+  - 브라우저 화면
+  - Codex 교차 검수
+
+## 2026-11-09 알림 보내기(13) — Claude 구현분, Codex 교차 검수 전
+
+- Codex 사용 한도로 Claude가 구현했다. contracts/update 수정·서버 접속 없음.
+- `tools/alert_notifier.py`: Gateway 읽기 API만 조회해 웹훅(slack/discord/generic)으로 보낸다. 기본은 미리보기, `--send`일 때만 전송.
+  - 대상: DENIED 요청, Tetragon 허용 목록 밖 실행·보호 파일 접근(탐지/차단 구분), Hubble dropped, 수집기·Tetragon 상태·GPU·기록 저장소·Gateway 상태 이상/복구, Gateway 2회 연속 조회 실패.
+  - 첫 실행은 과거를 보내지 않음, 상태 변화 때만 알림, 웹훅 실패 시 0600 상태 파일 대기열(최대 200)에서 재전송.
+  - 프롬프트·요청 ID·토큰·IP·Pod/노드 이름·경로는 보내지 않고, 고정 형식이 아닌 값은 `OTHER`로 바꾼다.
+- 서비스 예시 `deploy/agent/serving-runtime-alerts.service.example`(설치기 미포함), 문서 [알림 보내기](../docs/알림_보내기.md), 내부 기록 형식 2행.
+- 근거: 단위 14건 통과; 로컬 mock Gateway 미리보기(차단 1건 → 1회 알림, 재실행 0건)와 로컬 웹훅 수신기 실제 전송(Gateway 중단 2회차 1건) 확인.
+- 미확인·다음: 실서버 읽기 토큰·포트포워드, 실제 Slack/Discord 표시, 실제 관측량, Codex 교차 검수. 플랫폼 화면 알림 목록은 만들지 않았다.
+
+## 2026-11-09 플랫폼 로그인(14) — Claude 구현분, Codex 교차 검수 전
+
+- Codex 사용 한도로 Claude가 구현했다. 플랫폼 담당과 범위 겹침은 미확인(사용자가 진행 지시). contracts/update 수정 없음.
+- API: `accounts.py`(0600 계정 파일, scrypt, 첫 실행 admin/admin, 마지막 관리자 보호), `auth.py`(메모리 세션·HttpOnly/SameSite=Strict 쿠키·CSRF 헤더·5회/10분 실패 시 5분 잠금·감사 기록 0600), `accounts_cli.py`(create/disable/enable/set-role/reset-password/list, 임시 비밀번호는 새 0600 파일만).
+  - `from_env`는 로그인 기본 켬(`BYUL_LOGIN_DISABLED=1`로 끔), 직접 만든 `Settings`(기존 시험)는 꺼짐. 변경 강제 `BYUL_REQUIRE_PASSWORD_CHANGE` 기본 끔.
+  - 운영 API: Bearer 토큰(에이전트) 유지, 없으면 세션 계정 역할 사용. admin은 목록 조회만.
+- 웹: 로그인 화면·변경 강제 화면·비밀번호 변경(`/account/password`)·상단 계정/로그아웃·기본 비밀번호 경고, CSRF 헤더, 401 시 로그인 화면, 로그인 시 운영 토큰 입력칸 대신 세션.
+- 문서: `platform/docs/로그인_계정관리.md`, platform README 환경변수·역할 표, 실행 스크립트 주석.
+- 근거: API 345 통과(새 12), web 타입 검사·176 통과(새 7)·빌드 통과, 실제 서버 curl(미로그인 401·로그인 200·CSRF 없는 POST 403·파일 0600).
+- 미확인·다음: 브라우저 화면 확인, 실서버, Codex 교차 검수, 플랫폼 담당 확인.
+
+## 2026-11-09 AWS 14회차 — 10~14·B·C·F 실서버 확인
+
+- 15:21 기동 → 15:49:03 stopped 확인. 코드 `f079b2d`, 이미지 `rt-f079b2d`. 결과 [AWS_GPU_서버14회차_결과_20261109.md](../docs/AWS_GPU_서버14회차_결과_20261109.md), 증거 `evidence-20261109-run14.tgz`(2e5a0868…), 토큰·IP·계정·인스턴스 ID 0건.
+- 통과: 12 GPU(nvidia-smi 일치·stale 전환), 11(vLLM `chatcmpl-<요청 ID>`·로그 확인·`received`/`unavailable`), 10(dry-run → execute `succeeded`, 외부 집행 unknown→mixed, baseline 재캡처), 13(차단·stale·복구 알림, 유출 0), 14(로그인·역할 거부·에이전트 토큰 유지), B(실서버 연결 화면), C(bundle.apply 실제 적용·switch 되돌리기), F(명시 권한).
+- 새로 찾은 것: 설치기가 에이전트를 enabled·execute로 켬, agent kubeconfig 권한이 넓음, 터널 화면 로딩 지연, 오래된 identities.json 0664.
+- 다음: Codex 교차 검수(11~14) → 발견 처리 결정 → PR 한 번.
+- 14회차 발견 1 조치(사용자 결정 B, Claude 구현·Codex 교차 검수 전): 설치기가 에이전트를 enable·start 하지 않고 `disable`·중지 확인만 한다(모드와 무관). 요약 출력은 수집 서비스만 건강 판정, 에이전트는 "수동 시작 대상"으로 표시. README 재설치 예시를 `--execute` 없이로 변경. 설치기 시험 33건 통과(에이전트 enable/start 없음·켜져 있으면 실패 시험 추가). 실서버 재확인은 다음 회차.
+
+## 2026-11-09 14회차 발견 2~4 처리 — Claude 구현분, Codex 교차 검수 전
+
+- 발견 2 권한: `tools/agent_rbac.py`(필요 권한 목록 하나로 Role/ClusterRole 렌더·`kubectl auth can-i` 점검, `--as` 흉내 지원), 예시 `deploy/agent/runtime-agent-rbac.example.json`, 문서 `docs/에이전트_권한_최소화.md`. 시험 8건.
+  - kind 실측: 기존 관리자 kubeconfig `too_broad`(금지 14개 모두 허용), 렌더한 권한 적용 후 SA `ok`(필요 28 yes·금지 14 no), SA로 실제 명령(정책 목록·tetra exec·server dry-run·로그·rollout·port-forward·patch) 성공, secrets·nodes·Pod 삭제 Forbidden. kind에 RBAC 객체는 남겨 둠.
+  - 14회차 수동 점검의 `pods/log` 질의 형식은 "log라는 Pod"로 해석되는 오류였다(도구는 `--subresource` 사용).
+- 발견 3 화면 지연: 플랫폼 live `events`가 요청 200개 상세를 하나씩 물어 원격 연결에서 첫 로드가 길었다. 지연 30ms/80ms 모의에서 7.6s/17.7s → 병렬 8개로 1.4s/2.6s. 순서 유지·병렬 시험 1건, API 346 통과.
+- 발견 4 옛 파일: `/var/lib/serving-runtime/identities.json`은 현재 코드·단위가 참조하지 않음(상태 서비스는 `/srv/serving/observation/tetragon-identities.json`). 다음 서버 회차에 서버의 단위·사용자 서비스 참조를 확인한 뒤 백업·삭제.
+- 다음 서버 회차 확인: 설치기 에이전트 미시작, 최소 권한 kubeconfig로 교체 후 수집·10번 dry-run·엔진 로그, 화면 로딩, 옛 파일 삭제.
+
+## 2026-11-09 AWS 15회차 — 14회차 발견 1~4 실서버 확인
+
+- 17:14 기동 → 17:37:11 stopped 확인. 코드 `5acbd26`. 결과 [AWS_GPU_서버15회차_결과_20261109.md](../docs/AWS_GPU_서버15회차_결과_20261109.md), 증거 `evidence-20261109-run15.tgz`(1e8edfd2…), 토큰·IP·계정·인스턴스 ID 0건.
+- 발견 1: 설치기 뒤 에이전트 disabled/inactive·dry-run 모드 확인. 발견 2: 에이전트 kubeconfig를 최소 권한 SA 토큰으로 교체, `too_broad`→`ok`, 수집·enforcement dry-run(Cilium 포함)·엔진 로그 정상. 발견 4: 옛 identities.json 참조 0건 확인 후 백업·삭제.
+- 발견 3: 일부 개선. 남은 원인은 Gateway 관측 조회가 65MB 파일을 매번 전부 읽는 것(1.2~1.4초). 관측 조회 병렬화는 503을 만들어 되돌림. 다음: Gateway 관측 캐시/이어 읽기.

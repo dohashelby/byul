@@ -10,6 +10,7 @@ import { SOURCE_MODE, label } from "../lib/labels";
 import { PERIODS, fromLocalInput, toLocalInput, type PeriodKey } from "../lib/time";
 import { carry, useGlobalFilters, useParams } from "../lib/url";
 import { AREAS, areaFor, titleFor, type AreaKey } from "./nav";
+import { logout, ROLE_NAMES, useAuth } from "../api/auth";
 import l from "./Layout.module.css";
 
 const THEME_KEY = "byul-platform-theme";
@@ -255,8 +256,29 @@ function Pagebar() {
           </svg>
         </button>
         <ThemeToggle />
+        <UserMenu />
       </div>
     </header>
+  );
+}
+
+/** 로그인한 계정·역할, 비밀번호 변경, 로그아웃. 로그인이 꺼진 배포에서는 숨긴다. */
+function UserMenu() {
+  const auth = useAuth();
+  const [params] = useSearchParams();
+  if (auth.status !== "signed_in") return null;
+  return (
+    <span className={l.user}>
+      <span title={`역할: ${auth.user.role}`}>
+        {auth.user.id} · {ROLE_NAMES[auth.user.role]}
+      </span>
+      <Link to={`/account/password${carry(params)}`} className={l.userLink}>
+        비밀번호 변경
+      </Link>
+      <button type="button" className="btn btn-small" onClick={() => void logout()}>
+        로그아웃
+      </button>
+    </span>
   );
 }
 
@@ -274,6 +296,7 @@ function useRuntimeStale(): string | null {
 }
 
 export function Layout() {
+  const auth = useAuth();
   const meta = useMeta();
   const stale = useRuntimeStale();
   const { pathname } = useLocation();
@@ -292,6 +315,9 @@ export function Layout() {
       <Sidebar />
       <div className={l.main}>
         <Pagebar />
+        {auth.status === "signed_in" && auth.user.default_password && (
+          <Banner kind="unofficial">기본 비밀번호(admin) 사용 중 · 상단 [비밀번호 변경]에서 바꾸세요</Banner>
+        )}
         <SourceExampleBanner meta={meta.data} />
         {unavailable.length > 0 && (
           <Banner kind="unofficial">관측 불가: 해당 구간 이벤트 누락 가능 ({unavailable.join(", ")})</Banner>

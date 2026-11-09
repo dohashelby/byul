@@ -554,7 +554,8 @@ class ExternalBackendHttpTests(unittest.TestCase):
         request_id = headers["X-Request-ID"]
         final = self.records()[-1]
         self.assertEqual(final["backend_kind"], "vllm")
-        self.assertEqual(final["delivery"]["backend_receipt"], "not_available")
+        # fake backend id "fake-<id>" is not an engine echo of X-Request-ID.
+        self.assertEqual(final["delivery"]["backend_receipt"], "engine_response_id_mismatch")
         self.assertEqual(final["backend_cancel"], "not_observed")
         detail = self.get_json(gateway, f"/api/requests/{request_id}")
         self.assertEqual(detail["backend_kind"], "vllm")
@@ -580,6 +581,13 @@ class ExternalBackendHttpTests(unittest.TestCase):
         self.assertEqual(response.status, 200)
         self.assertTrue(first)
         self.assertTrue(payload.endswith(b"data: [DONE]\n\n"))
+        # Chat SSE must classify the first response ID just like non-streaming
+        # responses. The fake backend deliberately uses an unrelated ID.
+        deadline = time.monotonic() + 1
+        while not self.records() or self.records()[-1].get("phase") != "final":
+            self.assertLess(time.monotonic(), deadline)
+            time.sleep(0.01)
+        self.assertEqual(self.records()[-1]["delivery"]["backend_receipt"], "engine_response_id_mismatch")
 
     def test_policy_denials_unmapped_model_and_invalid_credentials_never_call_chat(self) -> None:
         gateway = self.start_gateway()

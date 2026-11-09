@@ -77,6 +77,8 @@ spec:
             - /srv/serving/observation/tetragon-identities.json
             - --tetragon-state
             - /srv/serving/observation/tetragon-status/tetragon-state.json
+            - --gpu-state
+            - /srv/serving/observation/gpu-status/gpu-state.json
             - --lab-report
             - /srv/serving/observation/lab-reports
             - --observation-heartbeat

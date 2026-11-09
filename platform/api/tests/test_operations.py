@@ -459,3 +459,48 @@ def test_confirmation_follows_actual_sigkill_actions(ops, method, contains_sigki
     assert response.status_code == expected_status
     if expected_status == 409:
         assert response.json()['detail']['code'] == 'CONFIRMATION_REQUIRED'
+
+
+def enforcement_payload(**extra):
+    return {"kind": "enforcement.apply", "server": "server-01", "expected": {"bundle_id": "current"},
+            "bundle_id": "current", "bundle_sha256": "a" * 64, "components": ["tetragon"], **extra}
+
+
+def test_enforcement_roles_approval_claim_and_safe_result(ops):
+    body = enforcement_payload()
+    for token in ("viewer-01", "approver-01", "agent-01"):
+        assert ops.post(BASE, headers=auth(token), json=body).status_code == 403
+    response = ops.post(BASE, headers=auth("operator-01"), json=body)
+    assert response.status_code == 201
+    item = response.json()
+    assert item["state"] == "requested" and item["approval_required"] is True
+    assert item["payload"] == {"bundle_id": "current", "bundle_sha256": "a" * 64, "components": ["tetragon"], "cilium_apply": False}
+    path = BASE + '/' + item['id']
+    assert ops.post(path + '/claim', headers=auth('agent-01'), json={}).status_code == 409
+    assert ops.post(path + '/approve', headers=auth('operator-01'), json={}).status_code == 403
+    assert ops.post(path + '/approve', headers=auth('approver-01'), json={}).status_code == 200
+    claimed = ops.post(path + '/claim', headers=auth('agent-01'), json={}).json()
+    result = {"lease_id": claimed['lease_id'], "state": "checked", "code": "DRY_RUN", "dry_run": True,
+              "started_at": datetime.now(timezone.utc).isoformat(), "finished_at": datetime.now(timezone.utc).isoformat(),
+              "policies": [{"name": "runtime-tg-secret-01", "component": "tetragon", "action": "created", "mode": "monitor", "spec_sha256": "b" * 64}],
+              "components": [{"component": "cilium", "state": "not_installed"}],
+              "steps": [{"stage": s, "state": "passed"} for s in ['validation', 'render', 'dry-run', 'apply', 'verify']]}
+    unsafe = {**result, "policies": [{**result['policies'][0], "stdout": "private"}]}
+    assert ops.post(path + '/result', headers=auth('agent-01'), json=unsafe).status_code == 422
+    assert ops.post(path + '/result', headers=auth('agent-01'), json=result).status_code == 200
+    assert ops.post(path + '/claim', headers=auth('agent-01'), json={}).status_code == 409
+
+
+@pytest.mark.parametrize('extra', [{"components": []}, {"components": ['cilium']}, {"components": ['tetragon', 'tetragon']},
+    {"bundle_id": 'other'}, {"bundle_sha256": None}, {"cilium_apply": True}, {"cilium_apply": 'true'}])
+def test_enforcement_bad_inputs(ops, extra):
+    assert ops.post(BASE, headers=auth('operator-01'), json=enforcement_payload(**extra)).status_code == 422
+
+
+def test_enforcement_lab_self_approval_is_always_forbidden(ops):
+    state = ops.app.state.byul
+    state.settings = replace(state.settings, operation_lab_self_approval=True)
+    item = ops.post(BASE, headers=auth('operator-01'), json=enforcement_payload(components=['tetragon', 'cilium'], cilium_apply=True)).json()
+    assert item['lab_self_approval'] is False
+    assert ops.post(BASE + '/' + item['id'] + '/approve', headers=auth('operator-01'), json={}).status_code == 403
+    assert ops.post(BASE + '/' + item['id'] + '/approve', headers=auth('approver-01'), json={}).status_code == 200

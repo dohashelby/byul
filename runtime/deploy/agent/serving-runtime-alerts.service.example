@@ -1,0 +1,27 @@
+[Unit]
+Description=Serving Runtime alerts (webhook, optional)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=runtime-agent
+Group=runtime-agent
+UMask=0077
+Environment=KUBECONFIG=/etc/serving-runtime/kubeconfig
+WorkingDirectory=/opt/byul/runtime
+# Optional and off by default. Install as serving-runtime-alerts.service only after a dry run.
+# /etc/serving-runtime/alerts.env (runtime-agent, 0600): ALERT_WEBHOOK_URL=https://... and,
+# when the Gateway read API is protected, RUNTIME_VIEWER_TOKEN=... (viewer role only).
+# Replace lab-context, serving namespace and the label. --format: slack | discord | generic.
+ExecStart=/opt/byul/runtime/.venv/bin/python -B -m tools.alert_notifier --context lab-context --namespace serving --env-file /etc/serving-runtime/alerts.env --state /var/lib/serving-runtime/alert-state.json --format slack --label aws-lab --send --watch --interval 30
+Restart=on-failure
+RestartSec=30
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/serving-runtime
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

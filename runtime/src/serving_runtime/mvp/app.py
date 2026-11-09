@@ -15,7 +15,7 @@ from uuid import uuid4
 
 from serving_runtime.enforcement.events import ObservationQuery
 from serving_runtime.enforcement.intent import load_intent
-from serving_runtime.enforcement.tetragon import comparable_spec, render_manifests
+from serving_runtime.enforcement.tetragon import comparable_spec, render_monitor_manifests
 
 from .assets import check as check_assets, load_manifest as load_asset_manifest
 from .backend import BackendConfig, load_backend_config
@@ -38,6 +38,8 @@ from .http_handler import (
 )
 from .lab_report import LabReportSource
 from .tetragon_state import read_tetragon_state
+from .gpu_state import read_gpu_state
+from .engine_receipts import EngineReceipts
 from .mock_engine import MockEngine, _utc_now
 from .observation_feed import ObservationFeed
 from .phase_timeline import read_phase_timeline
@@ -118,7 +120,7 @@ class GatewayApp:
                 self._expected_tetragon_policies = {
                     (m["metadata"]["namespace"], m["metadata"]["name"]): hashlib.sha256(
                         json.dumps(comparable_spec(m["spec"]), sort_keys=True, separators=(",", ":")).encode()
-                    ).hexdigest() for m in render_manifests(intent).values()
+                    ).hexdigest() for m in render_monitor_manifests(intent).values()
                 }
             allowed_binaries = intent.allowed_engine_binaries
             if intent.schema != "runtime-enforcement-intent/1.0":
@@ -201,11 +203,13 @@ class GatewayApp:
             Path(config.data_dir) / "observations.jsonl"
         )
         self._lab_report = LabReportSource(config.lab_report_path)
+        self._engine_receipts = EngineReceipts(config.engine_receipts_path)
         self._queries = QueryService(
             self._records.store,
             self._engine_store,
             self._records.status,
             self.observation_session_id,
+            engine_log_lookup=self._engine_receipts.lookup,
         )
         self._concurrency = ConcurrencyLimiter(config.max_concurrent_requests)
         self._request_flow = RequestFlow(
@@ -528,6 +532,9 @@ class GatewayApp:
             context=self._tetragon_context,
         )
 
+    def gpu_status(self) -> dict[str, Any]:
+        return read_gpu_state(self.config.gpu_state_path)
+
     def policy_status(self) -> dict[str, Any]:
         policy = self.policy_state.policy
         validity = evaluate_policy(
@@ -765,6 +772,7 @@ class GatewayApp:
                 observation_session_id=self.observation_session_id,
                 lab_report=self._lab_report.read,
                 tetragon_status=self.tetragon_status,
+                gpu_status=self.gpu_status,
                 record_transport_error=self._request_flow.record_without_relay,
                 request_header_timeout_s=self.config.request_header_timeout_s,
                 request_body_timeout_s=self.config.request_body_timeout_s,

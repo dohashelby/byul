@@ -1,4 +1,5 @@
 // API 호출. 화면은 플랫폼 API(/api/*)만 부른다. runtime·update를 직접 부르지 않는다.
+import { csrfHeaders, sessionExpired } from "./auth";
 
 export type ApiErrorKind = "disconnected" | "unauthorized" | "not_found" | "invalid" | "server" | "network";
 
@@ -35,6 +36,7 @@ async function parse(res: Response): Promise<unknown> {
 function errorFrom(status: number, body: unknown): ApiError {
   const b = body as { detail?: { code?: string; message?: string }; code?: string } | null;
   const code = b?.detail?.code ?? b?.code ?? `HTTP_${status}`;
+  if (status === 401 && code === "AUTH_REQUIRED") sessionExpired();
   const message = b?.detail?.message ?? `요청 실패 (${status})`;
   return new ApiError(status, code, message, body);
 }
@@ -56,7 +58,7 @@ export async function postJson<T>(path: string, payload: unknown): Promise<T> {
   try {
     res = await fetch(path, {
       method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      headers: { Accept: "application/json", "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify(payload),
     });
   } catch {

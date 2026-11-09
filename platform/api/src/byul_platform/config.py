@@ -40,6 +40,13 @@ class Settings:
     operation_monitor_seconds: int = 86400
     host: str = "127.0.0.1"
     port: int = 8700
+    # 로그인. 직접 만든 Settings(시험·라이브러리)는 꺼짐, 실행(from_env)은 기본 켜짐.
+    login_enabled: bool = False
+    accounts_file: Path | None = None
+    require_password_change: bool = False
+    session_idle_seconds: int = 7200
+    session_max_seconds: int = 43200
+    cookie_secure: bool = False
 
     @property
     def examples_dir(self) -> Path:
@@ -66,4 +73,10 @@ class Settings:
             bundle_runtime_python=_path("BYUL_BUNDLE_RUNTIME_PYTHON"),
             host=os.environ.get("BYUL_PLATFORM_HOST", "127.0.0.1").strip() or "127.0.0.1",
             port=int(os.environ.get("BYUL_PLATFORM_PORT", "8700")),
+            login_enabled=os.environ.get("BYUL_LOGIN_DISABLED") != "1",
+            accounts_file=_path("BYUL_ACCOUNTS_FILE"),
+            require_password_change=os.environ.get("BYUL_REQUIRE_PASSWORD_CHANGE") == "1",
+            session_idle_seconds=int(os.environ.get("BYUL_SESSION_IDLE_SECONDS", "7200")),
+            session_max_seconds=int(os.environ.get("BYUL_SESSION_MAX_SECONDS", "43200")),
+            cookie_secure=os.environ.get("BYUL_COOKIE_SECURE") == "1",
         )

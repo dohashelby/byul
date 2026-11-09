@@ -371,6 +371,21 @@ export const GATEWAY_REASON: Record<string, string> = {
 
 export const CACHE_GENERATION: Record<string, string> = { current: "현재 캐시 세대", other: "타 캐시 세대", outside: "캐시 범위 외" };
 
+// 엔진 측 수신 근거. 응답 ID 일치는 엔진 로그 근거보다 약하고, 로그 미발견은 미수신 확정이 아니다.
+export const BACKEND_RECEIPT: Record<string, string> = {
+  engine_response_id_matched: "엔진 응답 ID 일치 (Gateway 요청 ID를 엔진이 사용)",
+  engine_response_id_mismatch: "엔진 응답 ID 불일치 (엔진이 자체 ID 사용 · 수신 근거 아님)",
+  engine_response_id_absent: "엔진 응답 ID 없음",
+  not_available: "확인 수단 없음",
+  not_queried: "조회 안 함",
+};
+export const ENGINE_LIVE: Record<string, string> = {
+  engine_log_observed: "엔진 로그에서 요청 ID 확인",
+  engine_log_not_observed: "엔진 로그 수집 구간에서 미발견 (미수신 단정 불가)",
+  engine_log_unavailable: "엔진 로그 확인 불가 (수집 중단·구간 밖·파일 오류)",
+  not_available: "연결된 엔진 증거원 없음",
+};
+
 export const TIMELINE_PHASE: Record<string, string> = {
   started: "전달 전 시작 기록",
   response_started: "HTTP 200 응답 시작",

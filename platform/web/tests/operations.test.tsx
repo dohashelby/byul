@@ -476,3 +476,52 @@ it.each([false, true, null])("openat의 실제 Sigkill 포함 여부 %s로 확�
   expect((screen.getByRole("button", { name: "차단으로 전환" }) as HTMLButtonElement).disabled).toBe(needsConfirmation);
   if (!needsConfirmation) expect(screen.getByText("파일 열기만 거부, 프로세스 유지")).toBeTruthy();
 });
+
+it.each([false, true])("외부 규칙 적용 폼은 현재 묶음 해시와 명시 Cilium opt-in(%s)을 전송한다", async actual => {
+  const result = data(); result.actor = { id: "operator-01", role: "runtime_operator" };
+  mockApi({ "/api/runtime/operations": result });
+  renderAt("/runtime/operations", "/runtime/operations", <RuntimeOperationsPage />);
+  enterToken();
+  const form = await screen.findByRole("region", { name: "외부 규칙 적용" });
+  fireEvent.change(within(form).getByLabelText("규칙 대상 서버"), { target: { value: "server-01" } });
+  expect(within(form).getByText(/SHA-256: b+/)).toBeTruthy();
+  expect(within(form).queryByLabelText("Cilium 실제 적용")).toBeNull();
+  fireEvent.click(within(form).getByLabelText("Cilium 포함"));
+  expect(within(form).getByText(/즉시 트래픽이 차단될 수 있습니다/)).toBeTruthy();
+  const checkbox = within(form).getByLabelText("Cilium 실제 적용") as HTMLInputElement;
+  expect(checkbox.checked).toBe(false);
+  if (actual) fireEvent.click(checkbox);
+  fireEvent.click(within(form).getByRole("button", { name: "규칙 적용 요청" }));
+  await within(form).findByText(/별도 approver 승인 필요/);
+  const call = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === "POST")!;
+  expect(JSON.parse(call[1]!.body as string)).toEqual({ kind: "enforcement.apply", server: "server-01", expected: result.agents[0].current,
+    bundle_id: "old", bundle_sha256: "b".repeat(64), components: ["tetragon", "cilium"], cilium_apply: actual });
+});
+
+it("외부 규칙 결과 표는 정책 동작·모드와 Cilium 미설치를 보여 준다", async () => {
+  const result = data(); result.items[0].kind = "enforcement.apply";
+  result.items[0].result = { code: "OK", dry_run: false, evidence_sha256: [], steps: [],
+    policies: [{ name: "runtime-tg-secret-01", component: "tetragon", action: "created", mode: "monitor", spec_sha256: "a".repeat(64) }],
+    components: [{ component: "cilium", state: "not_installed" }] };
+  mockApi({ "/api/runtime/operations": result });
+  renderAt("/runtime/operations", "/runtime/operations", <RuntimeOperationsPage />);
+  enterToken();
+  fireEvent.click(await screen.findByRole("button", { name: "외부 규칙 적용 · server-01" }));
+  const table = screen.getByRole("table", { name: "정책별 적용 결과" });
+  expect(within(table).getByText("created")).toBeTruthy();
+  expect(within(table).getByText("monitor")).toBeTruthy();
+  expect(screen.getByText(/not_installed · 미설치 건너뜀/)).toBeTruthy();
+});
+
+it("외부 규칙 적용은 오래된 상태 보고와 LAB 자기 승인을 막는다", async () => {
+  const result = data(); result.actor = { id: "operator-01", role: "runtime_operator" }; result.lab_self_approval = true;
+  result.items[0].kind = "enforcement.apply";
+  result.agents[0].at = new Date(Date.now() - 31_000).toISOString();
+  mockApi({ "/api/runtime/operations": result });
+  renderAt("/runtime/operations", "/runtime/operations", <RuntimeOperationsPage />);
+  enterToken();
+  const form = await screen.findByRole("region", { name: "외부 규칙 적용" });
+  fireEvent.change(within(form).getByLabelText("규칙 대상 서버"), { target: { value: "server-01" } });
+  expect((within(form).getByRole("button", { name: "규칙 적용 요청" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "승인" }) as HTMLButtonElement).disabled).toBe(true);
+});

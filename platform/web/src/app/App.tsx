@@ -19,6 +19,10 @@ import { RuntimePolicyPage } from "../pages/runtime/RuntimePolicyPage";
 import { RuntimeSettingsPage } from "../pages/runtime/RuntimeSettingsPage";
 import { RuntimeTargetPage } from "../pages/runtime/RuntimeTargetPage";
 import { StateView } from "../components/Misc";
+import { useEffect, type ReactNode } from "react";
+import { loadMe, useAuth } from "../api/auth";
+import { AccountPage } from "../pages/AccountPage";
+import { ForcedPasswordPage, LoginPage } from "../pages/LoginPage";
 import { Layout } from "./Layout";
 
 export const routes: RouteObject[] = [
@@ -55,6 +59,7 @@ export const routes: RouteObject[] = [
       { path: "runtime/status", element: <Navigate to="/runtime/overview" replace /> },
       { path: "update/revalidation", element: <Navigate to="/runtime/revalidation" replace /> },
       { path: "evidence", element: <EvidencePage /> },
+      { path: "account/password", element: <AccountPage /> },
       { path: "*", element: <StateView kind="not_found" detail="없는 화면입니다." /> },
     ],
   },
@@ -69,10 +74,27 @@ export function makeQueryClient() {
 const client = makeQueryClient();
 const router = typeof window !== "undefined" ? createBrowserRouter(routes) : createMemoryRouter(routes);
 
+/** 로그인이 켜진 플랫폼이면 세션을 확인한 뒤에만 화면을 띄운다. 최종 권한 판단은 서버가 한다. */
+export function AuthGate({ children }: { children: ReactNode }) {
+  const auth = useAuth();
+  useEffect(() => {
+    void loadMe();
+  }, []);
+  useEffect(() => {
+    if (auth.status === "anonymous") client.clear(); // 다른 계정의 조회 결과를 남기지 않는다
+  }, [auth.status]);
+  if (auth.status === "loading") return <StateView kind="loading" />;
+  if (auth.status === "anonymous") return <LoginPage message={auth.message} />;
+  if (auth.status === "signed_in" && auth.user.password_change_required) return <ForcedPasswordPage user={auth.user} />;
+  return <>{children}</>;
+}
+
 export function App() {
   return (
     <QueryClientProvider client={client}>
-      <RouterProvider router={router} />
+      <AuthGate>
+        <RouterProvider router={router} />
+      </AuthGate>
     </QueryClientProvider>
   );
 }

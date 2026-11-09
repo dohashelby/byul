@@ -28,7 +28,9 @@ class QueryService:
         engine_store: JsonlStore,
         record_store_status: Callable[[], dict[str, Any]],
         current_session_id: str | None = None,
+        engine_log_lookup: Callable[[str, str | None], dict[str, Any]] | None = None,
     ) -> None:
+        self._engine_log_lookup = engine_log_lookup
         self._gateway_store = gateway_store
         self._engine_store = engine_store
         self._record_store_status = record_store_status
@@ -244,7 +246,44 @@ class QueryService:
                 if final_state is not None
                 else None
             )
-            if attempted is False:
+            response_id = (
+                final_state.get("delivery", {}).get("backend_receipt")
+                if final_state is not None
+                else None
+            )
+            started = next(
+                (r.get("recorded_at") for r in gateway_records if isinstance(r.get("recorded_at"), str)),
+                None,
+            )
+            log = (
+                self._engine_log_lookup(request_id, started)
+                if self._engine_log_lookup is not None and attempted is True
+                else None
+            )
+            if log is not None and log.get("status") != "not_configured":
+                live = {
+                    "status": f"engine_log_{log['status']}",
+                    "queried_at": log.get("collected_at"),
+                    "error": None,
+                    "evidence_kind": "engine_log",
+                }
+            if log is not None and log.get("status") == "observed":
+                # Engine-side evidence: the forwarded ID appeared in the engine's own log.
+                matching_receipts = [{
+                    "request_id": request_id,
+                    "received_at": log.get("observed_at"),
+                    "evidence_kind": "engine_log",
+                }]
+                evidence_state = "received"
+                evidence_summary = "엔진 로그에서 이 요청 ID 확인"
+            elif log is not None and log.get("status") == "not_observed":
+                # Logs may omit requests (logging options), so this is never "not_received".
+                evidence_summary = (
+                    "엔진 로그 수집 구간 안에서 이 요청 ID 미발견(로그 설정상 미수신 단정 불가)"
+                )
+            elif response_id == "engine_response_id_matched":
+                evidence_summary = "엔진 응답 ID가 Gateway 요청 ID와 일치(엔진 로그 근거는 미연결·미확인)"
+            elif attempted is False:
                 evidence_summary = (
                     "Gateway 미전달 확인, backend 미수신은 미확인(증거원 미연결)"
                 )

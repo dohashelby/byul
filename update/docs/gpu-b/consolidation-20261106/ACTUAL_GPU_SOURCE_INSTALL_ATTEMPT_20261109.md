@@ -1,4 +1,6 @@
-# GPU 1장 두 번째 실제 실행 — ZIP 전달 성공, 기존 Git 입력에서 설치 중단
+# GPU 1장 소스 설치 — 실패 원인과 수정 후 실제 검증
+
+아래 두 번째 실행의 실패 기록에 이어, 후속 실행에서 고정 설치기 수정의 실제 성공을 별도로 기록한다. 제품 Ready·REQ·SUP16 실측과 구분한다.
 
 고정 제품 source는 `b85dac21bfe380eaa7f06a7fe2b451a2e168daa2`, tree는 `d1a4d8fa7edecd6b18c3cebc348c318ade9bfc12`, reviewed-source manifest는 `2e400a46d78465144770afff4de54210cceb5ec8f58539666a11281f83e9126c`다. 같은 source의 전체 CI14/14 성공과 이 실제 실행 결과를 구분한다. 문서 추가 head는 실제 실행 source를 바꾸지 않는다.
 
@@ -39,3 +41,15 @@ Git clone·bundle fetch·새 source checkout·offline uv·새 runtime·모델 �
 수정본의 신규 로컬 계약 검증은7건이다. 실제 Git가 만든 linked worktree의 gitfile0664, 일반 저장소의 `.git` 디렉터리0775, 외부 objects를 참조하는 저장소의3정상 경로에서 checkout·파일 핀·offline uv·import origin을 확인했다. 잘못된 gitfile·hardlink·새 실행 경로의 쓰기 권한·잘못된 파일 핀의4음성 경로도 확인했다. fixture source를 사용한 CPU 검증이며 실제 노드의 b85 설치 결과로 집계하지 않는다. 독립 검토572개 대조 불일치0, 새 구체 결함0이며 검토 SHA-256은 `ff1cce7abbaf622acc027b72e49ce5fc1805284eb7d9e62276177f0f44391c6d`다. 과거 노드의 `.git` mode를 이 fixture 값으로 소급하지 않는다.
 
 원 43개 상태·FAIL/UNKNOWN·Ref는 변경하지 않았다. REQ-08·09·10 실제 요청 대응과 SUP16 역할별 실측은 계속 남아 있다.
+
+## 후속 실제 실행 — 설치 성공, controller 경로 결합에서 중단
+
+v7의 source-install CID `d028e0fc-85e1-4380-9971-23aa52278044`는 18:59:35 KST부터 2.776초 동안 실행해 Success0으로 종료됐다. 원 V2 bundle/pins의 현재 FD·해시 재사용 뒤, 실제 b85/tree d1a4·2,160파일·manifest2e400과 새 Git copy의 독립성을 검증했다. offline uv 후 실제 executable·prefix는 `/home/ubuntu/BYUL-SOURCE-REQ-SUP16-20261109-V3/repo/update/.venv` 아래이며, guard origin은 같은 source의 `update/src/guard/__init__.py`다. 원 cache 메타데이터는 불변이고 네트워크 다운로드·모델·GPU 제품 실행은0이다. 이번에 관측한 retained gitfile0664·gitdir0775 등의 값을 과거 실패 당시 값으로 소급하지 않는다.
+
+이어 18:59:43 KST의 preflight CID `c77d3b1b-3956-45bf-81de-c226af593690`가 Failed1로 종료됐다. 원 root_contract의 exact source 경로는 V2/repo인데 caller는 실제 설치한 V3/repo를 전달했다. 첫 경로 비교가 거짓이므로 `SOURCE_REPOSITORY_UID1000_REQUIRED` 오류를 실제 UID 불일치로 해석하지 않는다. 운영 builder의 경로 결합 누락이다. 사전 검토도 caller 변경의 영향을 받는 callee의 불변 literal을 놓쳤음을 SHA `e2d1a2556c0742b128f72699d5b48299523eba38478159d0d14a27d2e91c4955`의 후속 정정에 기록했으며 원 검토 JSON은 보존했다.
+
+원 execute3177은 exit1·reaped·group terminal·cleanup 오류0으로 종료했고 정상 stop1·원 stop180 미관측·supervisor final 부재를 보존했다. 19:07:20~21 KST full7 원 관측 `756332637fde0ab2352e95bee852f5cc58e111ba5c8309dc830c418b908c169c`에서 소유3대 stopped·IP0·활성 SSM0·EIP0·EBS440GiB를 확인했다. 이 시각 누적 보수 장부 추정은 **$74.14690091813922**이며 compute/IP 구간은 닫았고 저장비는 계속된다. 확정 청구나 정확한 off 전이 시각으로 표시하지 않는다.
+
+원 control ZIP은 999,846bytes·593members(원자료592개와 manifest), SHA `c166629e3584a9fa6bf1a7424ca91a7bd8aeff548664867032f537c944f60231`다. 로컬 CRC·전체 원자료 길이/SHA·목록의 중복·누락을 확인해 불일치0이며, source 성공과 preflight 원 실패 JSON을 직접 대조했다. 원 수락 기록은 start1·SSM16·stop1이다. 최종 독립 control/cost 검토는 후속 연결 대상으로 남긴다.
+
+다음 실행은 실제 성공한 V3 source/venv를 현재 FD·HEAD·전체 핀·manifest·origin으로 재검증해 재사용하고, 운영 경로 결합만 수정한다. 새 source 복사·Git fetch·uv 설치·bundle 재전송은 기본 절차가 아니다. controller→원 root_contract.preflight의 exact 경로 admission을 직접 연결한 정상·옛 경로 불일치 사례를 CPU에서 확인한 뒤 고정 운영본으로 진행한다. vLLM Ready·실제 REQ 제품 수집·SUP16 역할 관측은 계속 남아 있다.

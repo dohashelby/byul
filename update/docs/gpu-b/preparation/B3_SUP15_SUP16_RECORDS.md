@@ -34,3 +34,23 @@ writer 실제 API는 기존 cached CPU image에서 UID1000, network none, 1 CPU/
 외부 helper는 기존 `sup16-native17-ordering-writer-delta-v1/write_normal_boot.py`, SHA `2485ba44ce8398f833477b79a04c86624cc254316b566f399a4bc9b5f085e4bd`이다. 새 pair source SHA는 `ed9616091017c486cba9bb8e1b804969e6f1944c5fdbbd4b6c7408fa009bb519`이며 양 role 모두 같은 bytes를 사용한다. 기존 stage SHA `c61b7059419659419aa973c072095f5a0ca744c3a24072472ce63074ad9d6f94`는 변경하지 않는다. helper/원 journal/native17 자산을 다른 버전과 섞지 않는다.
 
 런타임 ENV/Pod UID/PID/boot/GPU 신원·target/prepared·정책 유효창은 실행 담당이 실제 실행 시 결합한다. 미래 값이나 기업 승인값을 생성하지 않는다. 기존 150초 및 각 절차의 종료·복구/정리 명령을 재사용한다. 현재 산출물은 **구현·CPU 검증 및 historical producer/consumer 연결 근거**이며, 실제 Kubernetes 양 role·native owner·완전한 GPU 실행 패킷 준비 완료를 뜻하지 않는다. 원 native producer가 없는 분기는 대체 record로 채우지 않는다.
+
+## SUP-16 정적 실측 준비 도구
+
+`tools/gpu_b_sup16_prepare.py`는 기존 도구·명령을 고정하는 준비 도구이며 실행기나 운영 controller가 아니다. GPU/모델/writer/SSH/SSM/AWS를 실행하지 않는다. `prepare_pair.py`를 복제 구현하지 않고, 원 source-owner 검사·정본 manifest 검사·새 도구와 공개 자산의 tracked/clean 검사를 수행한 뒤 다음 입력 bytes를 검증·보존한다.
+
+- 현재 공개 pair `ed961609…`와 공개 normal-helper snapshot `2485ba44…`, 실제 native17 sensor `e32c0a53…`의 호환.
+- 명시 외부 입력인 원 `prepare_pair.py`(`c1aff210…`), stage(`c61b7059…`), source-owner helper(`fb12dbe8…`), 원 normal 절차 `commands.json`(`e48fefc2…`). 이 값은 기존 자산 pin이며 새 source 승인값이 아니다. 없거나 bytes가 다르면 새 출력 생성 전에 거부한다.
+- 제공된 normal/challenge 사본의 stage receipt·7개 파일 실제 SHA/길이·동일한 전체 reference manifest·model inventory. 모델은 읽기·해시만 하며 복사/수정/적재하지 않는다. 모델 경로를 생략하면 미제공으로 기록한다. 두 역할 또는 reference가 섞인 입력은 거부한다.
+
+현재 source checkout과 같은 고정 commit을 사용하며 새 출력은 저장소·입력·기존 증거 밖이어야 한다.
+
+```text
+python -I -B update/tools/gpu_b_sup16_prepare.py --source-root <고정-checkout> --source-commit <40자리-commit> --manifest-sha256 <정본-파일SHA> --stage <원-sup16_stage_artifact.py> --prepare-pair <원-prepare_pair.py> --source-owner <원-source_owner_verify.py> --procedure <원-sup16-live-normal-v2/commands.json> --normal-model <기존-normal-사본> --challenge-model <기존-challenge-사본> --output <새-외부-준비경로>
+```
+
+출력 `assets/`는 위 검토된 코드·절차의 exact bytes다. `preparation.json`은 source/manifest·각 자산 SHA/길이·검증된 모델 metadata·누락 조건과 `commands.json` SHA를 담는다. `commands.json`의 기존 pair 준비 argv 및 역할별 writer argv는 **실행하지 않은 계획**이다. `ASSETS`·`ACTUAL_SOURCE`·`<actual-…>`는 운영자가 실제 경로/신원에 결합해야 할 자리표시자다. 원 절차의 옛 source/writer argv는 실행하지 않고 시간·소유 정리 근거만 참조한다. 양 역할은 같은 새 pair source를 사용하고 각각 실제 native journal 경로와 binding/receipt를 사용한다.
+
+운영 순서는 원 정상 대조→부분 challenge→복구 정상이며 세대와 role session을 분리한다. 실제 `prepare_pair.py`가 ENV/image/target·scope·factory/policy를 검증하고 native 자산을 만든 뒤, 기존 installer·`load_prepared`·collector가 실제 소유권을 재검증한다. 이 정적 도구는 그 경로를 실행하거나 새로운 ENV/target/prepared/session을 만들지 않는다. 따라서 자산·모델 두 사본 검증 성공도 `ready_for_execution=false`이며 실제 runtime/정책/Ready/복구 증거는 별도로 남는다. 후속 제품 객체가 실제 생성됐을 때만 원 EVD→RES→RPT·반출·별도 DB 복원·저장팩 재판정을 수행한다.
+
+SUP-16 원 절차의 **asset wait 90초 / collection 120초 / Pod 600초**와 더 엄격한 운영 종료·소유 정리 계약을 유지한다. 위 SUP-15의 **150초**를 SUP-16 기한으로 사용하지 않는다. 종료·출력 수집 실패 시에도 원 오류와 후속 오류를 보존하는 기존 운영 절차를 사용하며 기존 자원·보호 타이머를 임의로 변경하지 않는다. 새 writer LF/record 저장 수정으로 native 인증·worker 최종 소비·post-exit/복구 지원이 생긴 것으로 집계하지 않는다.

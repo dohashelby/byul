@@ -2,20 +2,25 @@
 
 사용자 요청 범위는 기존 세션을 재사용한 GPU 1장·TP1 실측이다. 실제 요청 대응, 고정 runtime·Ready·정상 대조를 먼저 확인하고, 생성된 증거만 반영한다. PR #232가 2026-11-09 14:25 KST에 병합되어 [후속 Draft PR #240](https://github.com/dohashelby/byul/pull/240)에서 이어간다. [#232의 연결 댓글](https://github.com/dohashelby/byul/pull/232#issuecomment-6733655479)도 남겼다. 이 문서는 원 43개 전체의 PASS 또는 전체 완료 판정이 아니다.
 
-## 실제 진행 상태 — 2026-11-09 19:07 KST 마감 관측
+## 실제 진행 상태 — 2026-11-09 19:48 KST 마감 관측
+
+후속 상태: 20:11 KST 정본에는 수정된 V9의 원 execute1668이 실행 중으로 기록돼 있다. 아래 자원·비용 행은 직전 실행의 마감 관측이다. 새 실행의 Ready·REQ 제품 결과는 아직 검증·반영하지 않았다. 문서 게시는 실제 실행 source b85와 운영 패킷을 변경하지 않는다.
 
 | 단계 | 실제 결과 |
 | --- | --- |
 | 단일 GPU 호스트 | 기존 노드의 L4 1장·CPU8·약32GiB·원 보호 타이머 활성 확인 |
 | 소스 전달·보존 입력 재사용 | ZIP 전달 성공 후, 후속 실행에서 보존 bundle/pins의 현재 FD·SHA를 확인해 재사용 |
 | B 소스·호스트 실행 환경 | 실제 b85/tree d1a4·2,160파일·manifest2e400·독립 새 Git copy·offline uv·표준 venv의 guard import origin 검증 성공 |
-| controller 사전검증 | callee에 남은 V2 source 경로와 caller의 실제 V3 경로 불일치로 중단. 수정 및 두 함수의 실제 연결 검증 진행 |
+| controller 사전검증 | 경로 결합 수정 후 실제 현재 source·host 실행 환경 preflight 통과 |
+| 모델 준비·Pod 생성 | 고정 모델 파일·영수증의 실제 FD 검증과 모델 준비 통과. Ready 측정 전 mount의 readOnly:false/키 생략 비교에서 중단 |
 | vLLM 엔진 runtime·Ready·정상 응답 | 아직 미도달 |
 | REQ-08·09·10 실제 제품 수집·EVD/RES/RPT | 아직 미실행 |
 | SUP-16 순차 역할 실측 | 아직 미실행. 역할 준비·stdin bridge 검증은 별도 완료 |
-| 자원·비용 | 소유3대 stopped·공인 IP0·활성 명령0. 누적 보수 추정 $74.14690091813922, 확정 청구 아님. EBS 저장비 계속 |
+| 자원·비용 | 소유3대 stopped·공인 IP0·활성 명령0. 서울 실행 장부의 누적 보수 추정 $74.46522181803866, 확정 청구 아님. EBS 저장비 계속 |
 
-세 차례 선행 실행의 원 오류와 원 stop180 관측 실패는 보존한다. source 설치 성공은 B 호스트 환경의 결과이며 vLLM 엔진이나 제품 PASS가 아니다. [첫 실행](ACTUAL_GPU_READY_ATTEMPT_20261109.md), [소스 설치 실패와 수정 후 실제 검증](ACTUAL_GPU_SOURCE_INSTALL_ATTEMPT_20261109.md)에 원자료·수정 범위를 연결한다. 실제 제품 source는 b85로 유지하며, PR의 문서·별도 설치 자산 보존 커밋과 구분한다.
+네 차례 선행 실행의 원 오류와 원 stop180 관측 실패는 보존한다. source 설치·모델 준비 성공을 vLLM 엔진 Ready나 제품 PASS로 집계하지 않는다. [첫 실행](ACTUAL_GPU_READY_ATTEMPT_20261109.md), [소스 설치 실패와 수정 후 검증](ACTUAL_GPU_SOURCE_INSTALL_ATTEMPT_20261109.md), [실제 모델 준비·Pod 기본값 처리](ACTUAL_GPU_MODEL_PREPARE_MOUNT_20261109.md)에 원자료·수정 범위를 연결한다. 실제 제품 source는 b85로 유지하며, PR의 문서·별도 설치 자산 보존 커밋과 구분한다.
+
+별도 [PR #241](https://github.com/dohashelby/byul/pull/241)은 B 상수·재생성 목록·실제 R2 검토 기록1건을 c60d2286에 반영한 뒤 Linux CI11,981통과·1skip/7check 성공을 확인했고 19:35:48 KST 병합됐다. 이 승인·CI 기준선과 현재 b85 GPU 실측을 구분한다. SUP16의 추가 연결 함수·실행 어댑터는 검토·보완 중이며 이 게시에 미검증 코드를 포함하지 않는다.
 
 ## 선정 범위
 

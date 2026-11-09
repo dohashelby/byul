@@ -19,7 +19,7 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
     def run(self, check, env, policy_values, adapter, workdir):
         allowed = {"target", "constraint_source", "constraint_engine_version", "max_output_tokens", "max_total_requests",
                    "max_probe_tokens", "max_duration_seconds", "request_timeout", "kubectl_binary", "roles",
-                   "wrong_key_env", "denied_key_env", "allow_mutating_routes"}
+                   "wrong_key_env", "denied_key_env", "allow_mutating_routes", "runner_input"}
         try:
             if set(self.cfg) - allowed or self.cfg.get("allow_mutating_routes", False) is not False:
                 raise ValueError

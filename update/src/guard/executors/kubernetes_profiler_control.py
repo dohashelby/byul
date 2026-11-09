@@ -139,7 +139,8 @@ class KubernetesProfilerControlExecutor:
     name = 'profiler_observation'; version = '0.1.0'; collection_profile = PROFILE
 
     def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None):
-        self.cfg = cfg; self.runner = runner; self.expected_target_sha256 = expected_target_sha256
+        self.b_common_inputs = deepcopy(cfg.get('common_inputs'))
+        self.cfg = {k: v for k, v in cfg.items() if k != 'common_inputs'}; self.runner = runner; self.expected_target_sha256 = expected_target_sha256
 
     def validate_policy(self, check, values):
         if check.id != 'LIF-14' or getattr(check, 'collection_profile', None) != PROFILE:
@@ -301,7 +302,7 @@ class KubernetesProfilerControlExecutor:
         except OSError: cleanup.append('PROFILER_CONTROL_ARTIFACT_UNAVAILABLE')
         gap = bool(diagnostics or cleanup or http['collection_gap']
             or any(v.startswith('profiler_control_api_unique_binding_unavailable') for v in projection['missing']))
-        return EvidenceDraft(status=ExecStatus.ABORTED if gap else ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
+        draft = EvidenceDraft(status=ExecStatus.ABORTED if gap else ExecStatus.COMPLETED, data_origin=DataOrigin.EXAMPLE,
             normal_control={'attempted': trials[0]['attempted'], 'succeeded': all(t['normal_shape_verified'] for t in normal_slots),
                 'detail': 'Closed API normal controls only; backend collection/output/next-start remain independently unverified.'},
             challenges=[{'step': 'observe prepared profiler stop failure and next start', 'attempted': any(t['attempted'] for t in stop_attempts),
@@ -310,3 +311,7 @@ class KubernetesProfilerControlExecutor:
             cleanup_errors=cleanup, config={'profile': PROFILE, 'target_sha256': digest, 'prepared_sha256': sha256_hex(canonical_json(prepared)),
                 'control_scope_declaration': scope_declaration},
             started_at=started, finished_at=utcnow())
+
+        from .lifecycle_common_input_consumption import attach_inputs
+        return attach_inputs(draft, check, env, target, self.b_common_inputs, workdir,
+                            prepared=prepared, owner=transport.binding["engine"])

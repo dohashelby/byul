@@ -44,7 +44,7 @@ class KubernetesObservationStateExecutor(KubernetesRequestTerminationExecutor):
         if type(self) is KubernetesObservationStateExecutor:
             from .kubernetes_observation_composite import PROFILE as COMPOSITE_PROFILE,KubernetesObservationCompositeExecutor
             if check.id=='OBS-02' and getattr(check,'collection_profile',None)==COMPOSITE_PROFILE:
-                return KubernetesObservationCompositeExecutor(self.cfg,runner=self.runner,environ=self._environ,
+                return KubernetesObservationCompositeExecutor(self.common_input_config(),runner=self.runner,environ=self._environ,
                     expected_target_sha256=self.expected_target_sha256)
         return super()._consumer(check)
 

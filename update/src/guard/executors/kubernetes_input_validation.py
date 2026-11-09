@@ -11,7 +11,7 @@ from .http_common import Ctx, fill_model, request_model
 from .input_validation import InputValidationExecutor
 
 _SETTINGS = {"target", "kubectl_binary", "request_timeout", "max_duration_seconds", "vocab_size", "vocab_source",
-             "max_probe_tokens", "reused_token_ids"}
+             "max_probe_tokens", "reused_token_ids", "runner_input"}
 
 
 class _WithBody:

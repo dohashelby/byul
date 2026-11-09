@@ -90,7 +90,10 @@ def _save_projection(ctx, value):
         text_artifact(ctx, filename, raw)
 
 
-class LogAnalysisExecutor(HttpCheckExecutor):
+from .lifecycle_common_input_consumption import LifecycleCommonInputConsumer
+
+
+class LogAnalysisExecutor(LifecycleCommonInputConsumer, HttpCheckExecutor):
     name = "log_analysis"
     version = "0.3.1"
     requires_roles = False

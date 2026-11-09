@@ -175,7 +175,7 @@ def gpu_runs(root: Path) -> dict[str, list[dict]]:
             raise ValueError(f"gpu_run_not_current_pack:{record['source']}")
         result.setdefault(check_id, []).append(record)
 
-    for path in sorted(root.glob(GPU_A_GLOB)):
+    for path in sorted(root.glob(GPU_A_GLOB), key=lambda path: path.as_posix()):
         data = json.loads(path.read_text(encoding="utf-8"))
         if data.get("schema") != "byul-gpu-a-check-summary/1":
             raise ValueError(f"gpu_a_schema:{path.name}")
@@ -194,7 +194,7 @@ def gpu_runs(root: Path) -> dict[str, list[dict]]:
                     "verification_level": res.get("verification_level"), "data_origin": res.get("data_origin"),
                     "verdicts": res["verdicts"], "result_ref": _ref(res), "evidence_ref": _ref(evd),
                 })
-    for path in sorted(root.glob(GPU_B_GLOB)):
+    for path in sorted(root.glob(GPU_B_GLOB), key=lambda path: path.as_posix()):
         data = json.loads(path.read_text(encoding="utf-8"))
         if data.get("schema") != "byul-independent-GPU-public-summary/1":
             raise ValueError(f"gpu_b_schema:{path.name}")
@@ -351,7 +351,7 @@ def build_rows(checks: list[dict], matrix: list[dict], *, pack_revision: int,
 
 def load_rows(root: Path = ROOT) -> list[dict[str, str]]:
     checks = []
-    for path in sorted((root / "packs/PACK-BASELINE/checks").glob("*.yaml")):
+    for path in sorted((root / "packs/PACK-BASELINE/checks").glob("*.yaml"), key=lambda path: path.as_posix()):
         check = yaml.safe_load(path.read_text(encoding="utf-8"))
         if check["id"] != path.stem:
             raise ValueError("check_filename_id_mismatch")

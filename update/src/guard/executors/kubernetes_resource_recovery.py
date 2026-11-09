@@ -12,7 +12,10 @@ from .lifecycle_session import capture_session
 from .resource_recovery_contract import PROFILE,normalize_policy,stamp,validate_selected_policy,project
 
 
-class KubernetesResourceRecoveryExecutor(HttpCheckExecutor):
+from .lifecycle_common_input_consumption import LifecycleCommonInputConsumer
+
+
+class KubernetesResourceRecoveryExecutor(LifecycleCommonInputConsumer, HttpCheckExecutor):
     name='resource_recovery';version='0.1.0';requires_roles=False;requires_route_scope=False;functional_via='engine'
 
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):

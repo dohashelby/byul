@@ -30,7 +30,10 @@ def normalize_check_policy(check,values):
     return normalize_policy({key:values[key] for key in POLICY_TYPES})
 
 
-class KubernetesInitializationExecutor(HttpCheckExecutor):
+from .lifecycle_common_input_consumption import LifecycleCommonInputConsumer
+
+
+class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckExecutor):
     name='initialization';version='0.4.0';requires_roles=False;requires_route_scope=False;functional_via='engine'
 
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):

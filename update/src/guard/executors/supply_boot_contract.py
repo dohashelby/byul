@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 
-from . import dynamic_code_cpu, plugin_loading
+from . import dynamic_code_cpu, plugin_loading, dynamic_model_entry, plugin_runner
 
 SCHEMA = "guard-supply-boot-record/1"
 CHECK_PROFILES = {
@@ -89,6 +89,11 @@ def validate_record(packet, *, check_id, role, environment_ref, target_sha256, s
     fields = _ROWS.get(check_id)
     if fields is not None and any(type(row) is not dict or set(row) != fields for row in packet["rows"]):
         raise ValueError("SUPPLY_BOOT_RECORD_INVALID")
+    if check_id == 'SUP-15' and any(
+            any(type(row[key]) is not bool for key in ('relevant_change', 'reused', 'compatibility_verified'))
+            or type(row['path_sha256']) is not str or _SHA.fullmatch(row['path_sha256']) is None
+            for row in packet['rows']):
+        raise ValueError('SUPPLY_BOOT_RECORD_INVALID')
     return packet
 
 
@@ -167,18 +172,44 @@ def _worker_shard(rows, values):
 
 
 def _plugin(rows, values):
-    projected = plugin_loading.project(rows)
+    legacy, added, invalid = _partition(rows, plugin_runner.CONTRACT)
+    projected = plugin_loading.project(legacy)
     missing = [] if projected["plugin_cpu_cases_complete"]["value"] else ["plugin_cases_incomplete"]
-    return [{"reason": "unapproved_plugin_executed", "case": key}
-            for key in projected["plugin_loading_confirmed_violations"]["value"] or []], missing
+    violations = [{"reason": "unapproved_plugin_executed", "case": key}
+                  for key in projected["plugin_loading_confirmed_violations"]["value"] or []]
+    if added:
+        found, gaps = plugin_runner.evaluate(added)
+        violations.extend(found); missing.extend(gaps)
+    if invalid:
+        missing.append("unsupported_supply_row_contract")
+    return violations, sorted(set(missing))
+
+
+def _partition(rows, contract):
+    legacy, added, invalid = [], [], []
+    for row in rows:
+        if type(row) is not dict or "contract" in row and row["contract"] != contract:
+            invalid.append(row)
+        elif row.get("contract") == contract:
+            added.append(row)
+        else:
+            legacy.append(row)
+    return legacy, added, invalid
 
 
 def _dynamic(check_id):
     def evaluate(rows, values):
-        projected = dynamic_code_cpu.project(rows)
+        legacy, added, invalid = _partition(rows, dynamic_model_entry.CONTRACT)
+        projected = dynamic_code_cpu.project(legacy)
         key = {"SUP-09": "dynamic_code_confirmed_violations", "SUP-11": "dynamic_mode_confirmed_violations"}[check_id]
-        return ([{"reason": "forbidden_code_imported", "case": case} for case in projected[check_id][key]["value"] or []],
-                [] if projected["complete"] else ["dynamic_code_cases_incomplete"])
+        violations = [{"reason": "forbidden_code_imported", "case": case} for case in projected[check_id][key]["value"] or []]
+        missing = [] if projected["complete"] else ["dynamic_code_cases_incomplete"]
+        if added:
+            found, gaps = dynamic_model_entry.evaluate(added, check_id)
+            violations.extend(found); missing.extend(gaps)
+        if invalid:
+            missing.append("unsupported_supply_row_contract")
+        return violations, sorted(set(missing))
     return evaluate
 
 

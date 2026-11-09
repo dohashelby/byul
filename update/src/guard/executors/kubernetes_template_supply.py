@@ -37,7 +37,7 @@ class KubernetesTemplateSupplyExecutor(HttpCheckExecutor):
     def run(self, check, env, policy_values, adapter, workdir):
         self.validate_policy(check, policy_values)
         try:
-            allowed = {"target", "kubectl_binary", "request_timeout", "endpoint", "tokenize_endpoint", *supply.DEFAULTS}
+            allowed = {"target", "kubectl_binary", "request_timeout", "endpoint", "tokenize_endpoint", "supply_reads_input", *supply.DEFAULTS}
             if type(self.cfg) is not dict or set(self.cfg) - allowed or adapter is None:
                 raise ValueError
             with Path(self.cfg["target"]).open("rb") as stream:
@@ -62,7 +62,8 @@ class KubernetesTemplateSupplyExecutor(HttpCheckExecutor):
         if getattr(ctx, "_template_fixture_sha256", None) is not None:
             draft.comparability.fixture_sha256 = ctx._template_fixture_sha256
         append_artifact(draft, ctx, "template_samples.json", f"{self.name}/{self.version}")
-        return draft
+        from .common_consumption import attach
+        return attach(draft, ctx, self.cfg, kind="supply-reads")
 
     def collect(self, ctx):
         return supply.collect(self, ctx, kubernetes=True)

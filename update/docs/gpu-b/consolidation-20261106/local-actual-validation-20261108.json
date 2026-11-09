@@ -1,0 +1,1822 @@
+{
+  "schema_version": 1,
+  "recorded_at_UTC": "2026-11-08T06:30:03.709269+00:00",
+  "phase": "actual_local_validation_with_synthetic_inputs",
+  "formal_data_origin": "EXAMPLE",
+  "official": false,
+  "new_gpu_starts": 0,
+  "AWS_operations": 0,
+  "dependency_or_model_downloads": 0,
+  "existing_mock_results_unchanged": true,
+  "existing_real_FAIL_UNKNOWN_unchanged": true,
+  "formal_closeout_classification": {
+    "limited_closeout_proposals": 25,
+    "product_evidence_needed": 18
+  },
+  "check_ids_with_new_actual_local_observations": [
+    "LIF-06",
+    "LIF-11",
+    "PLT-02",
+    "REQ-08",
+    "REQ-09",
+    "REQ-10",
+    "SUP-03",
+    "SUP-05",
+    "SUP-06",
+    "SUP-08",
+    "SUP-09",
+    "SUP-10",
+    "SUP-11",
+    "SUP-16"
+  ],
+  "new_actual_local_observed_id_count": 14,
+  "no_new_actual_execution_ids": [
+    "LIF-08",
+    "LIF-12",
+    "LIF-16",
+    "OBS-02"
+  ],
+  "source031_context": {
+    "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "new_input_cases": 6,
+    "assertions_satisfied": true,
+    "accepted": 3,
+    "standard_rejected": 3,
+    "renderer_call_cases": 4,
+    "InputProcessor_call_cases": 5,
+    "scope": "real ModelConfig/renderer/InputProcessor; no 0.31 engine/worker startup"
+  },
+  "installed029_cpu_engine": {
+    "version": "0.29.1rc1.dev422+gd05da62e9.cpu",
+    "device": "cpu",
+    "tensor_parallel_size": 1,
+    "normal_generation_requests": 2,
+    "output_tokens_per_request": [
+      2,
+      2
+    ],
+    "normal_outputs": [
+      [
+        {
+          "finished": true,
+          "outputs": [
+            {
+              "finish_reason": "length",
+              "stop_reason": null,
+              "text": " check check",
+              "token_ids": [
+                5,
+                5
+              ]
+            }
+          ],
+          "prompt_token_ids": [
+            3,
+            4,
+            5
+          ],
+          "request_id": "0"
+        }
+      ],
+      [
+        {
+          "finished": true,
+          "outputs": [
+            {
+              "finish_reason": "length",
+              "stop_reason": null,
+              "text": " word9 word9",
+              "token_ids": [
+                9,
+                9
+              ]
+            }
+          ],
+          "prompt_token_ids": [
+            7,
+            8,
+            9
+          ],
+          "request_id": "1"
+        }
+      ]
+    ],
+    "standard_rejections": [
+      "negative SamplingParams.temperature",
+      "out-of-vocabulary token 42"
+    ],
+    "effective_CPU_KV_cache_bytes": 1073741824,
+    "worker_shutdown": "graceful worker followed by internal EngineCore force kill; not all-graceful",
+    "post_parent_exit": "same parent/tracker/core/worker PID+start identities absent; owned short tmp absent",
+    "original_031_profile_pass_claimed": false,
+    "before_LLM_call_to_ready_marker_seconds": 57.30823308302206,
+    "timing_scope": "before_actual_cpu_engine to actual_cpu_engine_ready markers; includes post-constructor config/proc collection; not pure constructor time or comparable to past GPU deadline"
+  },
+  "ipc_scope": {
+    "host_probe_metadata_complete": false,
+    "host_original_error_code": "IPC_METADATA_UNAVAILABLE",
+    "original_hidden_exception_observed": false,
+    "separate_reproduction": {
+      "exception": "PermissionError",
+      "errno": 13,
+      "path": "/proc/1/fd",
+      "same_original_execution": false
+    },
+    "owned_user_pid_mount_namespace_probe_complete": true,
+    "owned_namespace_assertions_satisfied": 4,
+    "host_uid_before_after": [
+      1000,
+      1000
+    ],
+    "namespace_uid_map": "0 1000 1",
+    "host_permission_or_policy_changes": 0,
+    "original_host_assertion_failure_preserved": true
+  },
+  "rows": [
+    {
+      "check_id": "REQ-08",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 5,
+      "actual_scope": "local_component_only",
+      "remaining_real_integration": "0.31 실제 worker/model 최종 소비·허용 주체/문맥·정책 결합",
+      "selected_gpu_branch_remaining": false,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "REQ-09",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 6,
+      "actual_scope": "local_component_only",
+      "remaining_real_integration": "선정 실제 MM 모델/processor와 입력 규칙·worker 소비·동시/후속 정상 대조",
+      "selected_gpu_branch_remaining": false,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "REQ-10",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 2,
+      "actual_scope": "local_component_only",
+      "remaining_real_integration": "0.31 scheduler/runner/Sampler/V2·structured 옵션의 최종 소비와 정책",
+      "selected_gpu_branch_remaining": false,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "SUP-03",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 3,
+      "actual_scope": "local_component_only",
+      "remaining_real_integration": "승인 공급물 전체 inventory와 독립 worker 파일 선택·실제 소비·request 귀속",
+      "selected_gpu_branch_remaining": false,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "SUP-05",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 2,
+      "actual_scope": "local_component_only",
+      "remaining_real_integration": "승인 inventory/권한·pre-read loader/model causal-root·공식 scope·worker/FD 소비",
+      "selected_gpu_branch_remaining": false,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "SUP-06",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 2,
+      "actual_scope": "local_component_only",
+      "remaining_real_integration": "실제 모델 tensor/shard/rank 배정·TP2/GPU worker의 적재·누락/복구",
+      "selected_gpu_branch_remaining": true,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "SUP-08",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 6,
+      "actual_scope": "local_component_only",
+      "remaining_real_integration": "실제 Hub/model/code 판본·요청 필드 정책·최종 module/worker 소비 및 과거 원본",
+      "selected_gpu_branch_remaining": false,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "SUP-09",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 1,
+      "actual_scope": "local_component_only",
+      "remaining_real_integration": "선정 승인 model-code bytes/trust/mode·model-entry/forward의 실제 소비",
+      "selected_gpu_branch_remaining": false,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "SUP-10",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 1,
+      "actual_scope": "local_component_only",
+      "remaining_real_integration": "승인된 실제 plugin 선택·hook·runner/후처리까지 연결; 현재는 명시적 전체 비선택만 확인",
+      "selected_gpu_branch_remaining": false,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "SUP-11",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 1,
+      "actual_scope": "local_component_only",
+      "remaining_real_integration": "원 0.31/선정 모델의 지원 Python 모드·-OO 호환 문제·worker 코드 소비",
+      "selected_gpu_branch_remaining": false,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "SUP-16",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 4,
+      "actual_scope": "local_component_only",
+      "remaining_real_integration": "실제 writer.run/main·native emitter·worker FILE_READ와 원기록/정책/제품 factory 결합",
+      "selected_gpu_branch_remaining": true,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "PLT-02",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 2,
+      "actual_scope": "local_component_only",
+      "remaining_real_integration": "실제 엔진 IPC inventory/신원·허용/비허용 주체·명령 소비·선정 TP 범위",
+      "selected_gpu_branch_remaining": false,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "LIF-06",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 1,
+      "actual_scope": "local_component_only",
+      "remaining_real_integration": "실제 live/rolling 요청·weights/cache/replica 세대·부분 실패/복구; leaf helper와 구분",
+      "selected_gpu_branch_remaining": true,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "LIF-08",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 0,
+      "actual_scope": "no_new_actual_execution",
+      "remaining_real_integration": "GPU rank 장애·알림/통신·기한 내 복구 producer 및 과거 원자료",
+      "selected_gpu_branch_remaining": true,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "LIF-11",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 1,
+      "actual_scope": "local_component_only",
+      "remaining_real_integration": "실패 worker의 PID/IPC/SHM/GPU 소유·기한 내 회수·정상 재기동",
+      "selected_gpu_branch_remaining": true,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "LIF-12",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 0,
+      "actual_scope": "no_new_actual_execution",
+      "remaining_real_integration": "실제 retry 주체/attempt·작업·중복 비용·예산 producer와 과거 원자료",
+      "selected_gpu_branch_remaining": false,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "LIF-16",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 0,
+      "actual_scope": "no_new_actual_execution",
+      "remaining_real_integration": "실제 승인 backup/volume/설정/자격참조의 복원·접수·복구 producer와 과거 원자료",
+      "selected_gpu_branch_remaining": false,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    },
+    {
+      "check_id": "OBS-02",
+      "mock_verification": "complete_in_separate_example_profile",
+      "new_actual_local_records": 0,
+      "actual_scope": "no_new_actual_execution",
+      "remaining_real_integration": "같은 실행 세대의 API/Core/worker/backend 상태·관측 종료 producer와 과거 원자료",
+      "selected_gpu_branch_remaining": false,
+      "gpu_intrinsically_required_for_all_remaining_work": false
+    }
+  ],
+  "component_records": [
+    {
+      "check_id": "SUP-03",
+      "component": "guard.template_supply_approval.validate_policy",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "supply-host",
+      "source_record_index": 0,
+      "target_source": {
+        "path": "update/src/guard/executors/template_supply_approval.py",
+        "sha256": "e9336290d842928b6d1b720f2050a6e5cee7818bb9b36ad7a410593552abe5cf",
+        "version": "fixed-template-supply-v1"
+      },
+      "input_sha256": "48cb181a53b0a4c3d96cf968b1c1ca4a93b83fc061d5c118deb3da18431c2bce",
+      "assertions": [
+        {
+          "name": "normal policy returned normally",
+          "passed": true
+        },
+        {
+          "name": "standard invalid input refused",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "Actual repository policy validator only; no engine/API/worker.",
+        "Synthetic allowlist is not corporate approval; original CheckDef is read-only."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "SUP-03",
+      "component": "installed jinja2.FileSystemLoader/get_template/render",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "supply-host",
+      "source_record_index": 1,
+      "target_source": {
+        "path": "site-packages/jinja2/loaders.py",
+        "sha256": "c08ae7c63bdc6ea8795705b6f0d4a47e8b620eaf2a342c4839215b1948922c1e",
+        "version": "3.1.6"
+      },
+      "input_sha256": "30697eb72365ef370ea3c932384cb2492421a9d5d2d709ee61d90494740170a1",
+      "assertions": [
+        {
+          "name": "new literal template loaded/rendered",
+          "passed": true
+        },
+        {
+          "name": "ordinary absent template refused",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "Actual installed dependency API, not vLLM/HF selected template consumption.",
+        "No sandbox attack or custom filter/plugin. Jinja version is measured, not approved against another profile.",
+        "Existing SUP13 pinned 3.1.6 gate is not invoked or relaxed."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "SUP-03",
+      "component": "installed HF AutoTokenizer and selected benign chat template",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "supply-host",
+      "source_record_index": 2,
+      "target_source": {
+        "path": "site-packages/transformers/models/auto/tokenization_auto.py",
+        "sha256": "0be342af672191e3a010f1f75f7dd09827ca4fb32b1d90bf017712cd5ff31819",
+        "version": "5.17.0"
+      },
+      "input_sha256": "15049f7851b3b74fb1a6df342dbac52de86235747e07f8936494cc477081e75c",
+      "assertions": [
+        {
+          "name": "new local template consumed by real tokenizer",
+          "passed": true
+        },
+        {
+          "name": "real tokenizer produced input IDs",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "Actual installed tokenizer dependency; no vLLM engine/API or worker final consumption.",
+        "Synthetic built-in WordLevel assets only; no remote/custom code or past archive reuse."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "SUP-06",
+      "component": "guard strict_json → supply_boot_contract.validate_record/evaluate_record",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "supply-host",
+      "source_record_index": 3,
+      "target_source": {
+        "path": "update/src/guard/executors/supply_boot_contract.py",
+        "sha256": "5763900537d91a9955ee6f65b591742366baa324c6379a8c651f51deaae14ba9",
+        "version": "guard-supply-boot-record/1"
+      },
+      "input_sha256": "674ef019641419995e2016a724e3f1bcf82146f80dbdf29add1bfde496f0ba14",
+      "assertions": [
+        {
+          "name": "new file reached actual consumer",
+          "passed": true
+        },
+        {
+          "name": "normal record consumer returned no issues",
+          "passed": true
+        },
+        {
+          "name": "invalid record shape refused",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "Actual checkout consumer with synthetic JSON only; no real producer/rank/worker.",
+        "Empty consumer issues are not a product PASS, native authentication, or real shard loading."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "SUP-06",
+      "component": "installed CPU vLLM safetensors iterator and default_weight_loader",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "supply-host",
+      "source_record_index": 4,
+      "target_source": {
+        "path": "site-packages/vllm/model_executor/model_loader/weight_utils.py",
+        "sha256": "6b14dd83783f959e079ac021a011a276b3d56c226732c45b4cba5ce68a6981d4",
+        "version": "0.29.1rc1.dev422+gd05da62e9.cpu"
+      },
+      "input_sha256": "54616af7d3a77765802d8073064940f854d88b7cfd44af2d4687be57a86bfe53",
+      "assertions": [
+        {
+          "name": "real iterator and weight loader copied supplied values",
+          "passed": true
+        },
+        {
+          "name": "ordinary missing shard refused",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "Actual installed vLLM CPU loader component, not an admitted worker/rank/full model.",
+        "No GPU/TP, native production producer authentication or full required tensor inventory."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "SUP-09",
+      "component": "installed CPU vLLM get_config built-in control",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "supply-host",
+      "source_record_index": 5,
+      "target_source": {
+        "path": "site-packages/vllm/transformers_utils/config.py",
+        "sha256": "4d9ac7e5392ea915e7704b2276dcb206e54670ff2f3d43015cb376d1cdb01a71",
+        "version": "0.29.1rc1.dev422+gd05da62e9.cpu"
+      },
+      "input_sha256": "49642646af95240b9b3544456125f1d6f7e573a307efb4bd28a57e897419aa20",
+      "assertions": [
+        {
+          "name": "installed vLLM built-in config returned",
+          "passed": true
+        },
+        {
+          "name": "ordinary unsupported model_type refused",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "Actual installed alternate CPU profile, not approved v0.31 source gate or GPU.",
+        "No dynamic/custom code, weights, engine, worker or trust=True invocation."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "SUP-10",
+      "component": "installed vLLM plugin selector with explicit empty allowlist",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "supply-host",
+      "source_record_index": 6,
+      "target_source": {
+        "path": "site-packages/vllm/plugins/__init__.py",
+        "sha256": "06942d64e526c2c7407265e1903d625c4d2118d8d7fc39c616b1cc6aa6fc2c8f",
+        "version": "0.29.1rc1.dev422+gd05da62e9.cpu"
+      },
+      "input_sha256": "6c9fae400df961ceadec8ed4586de523002b791a9aa4b4051dfea114ffb92d52",
+      "assertions": [
+        {
+          "name": "actual selector kept explicit disable",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "Actual installed selection API only. No selected plugin hook executed or unapproved module imported.",
+        "Does not complete allowlisted plugin normal/hook/consumer or autoload branches."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "SUP-11",
+      "component": "actual Python startup modes and built-in loader",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "supply-host",
+      "source_record_index": 7,
+      "target_source": {
+        "path": "python3.12",
+        "sha256": "e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f",
+        "version": "3.12.3"
+      },
+      "input_sha256": "9e2cdf02b8f444c04bdacb8720b8a5f3f89f9c016bafedb6976d35ec82d8ee9b",
+      "assertions": [
+        {
+          "name": "two fresh normal children completed",
+          "passed": true
+        },
+        {
+          "name": "actual isolated/optimized modes observed",
+          "passed": true
+        },
+        {
+          "name": "new input consumed under both modes",
+          "passed": true
+        },
+        {
+          "name": "installed built-in vLLM loader returned in both actual modes",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "Real interpreter and, where recorded, installed built-in config loader; never a vLLM worker.",
+        "No custom module, unapproved code, optimization bypass or Python mode gate alteration."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "PLT-02",
+      "component": "actual guard ipc_probe on owned zero-payload Unix socket",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "supply-host",
+      "source_record_index": 8,
+      "target_source": {
+        "path": "update/src/guard/executors/ipc_probe.py",
+        "sha256": "f096e9d95aed61315b4d129369cd273786fa9dc106ac264d48c670e004269ca2",
+        "version": "guard-unix-ipc-probe/1"
+      },
+      "input_sha256": "05ad4d7fa40fd275cb39100b6f58f4a0f1b29dd2427728d5af0bdd8dcc2de37c",
+      "assertions": [
+        {
+          "name": "own path metadata collected",
+          "passed": false
+        },
+        {
+          "name": "actual zero-payload connect",
+          "passed": true
+        },
+        {
+          "name": "peer is current allowed subject",
+          "passed": true
+        },
+        {
+          "name": "only owned socket cleaned",
+          "passed": true
+        }
+      ],
+      "status": "assertion_failed",
+      "scope_limitations": [
+        "Own process listener is not an engine/worker; no real IPC inventory or command consumption.",
+        "Only same-subject normal control; no UID switch, permission bypass, SHM, TCP or unapproved subject."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "LIF-06",
+      "component": "installed vLLM native layerwise reload normal CPU component",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "supply-host",
+      "source_record_index": 9,
+      "target_source": {
+        "path": "site-packages/vllm/model_executor/model_loader/reload/layerwise.py",
+        "sha256": "362a623f3a2196327d7ce42157e69f48584cb675ce7d0865bc0f040fd543171e",
+        "version": "0.29.1rc1.dev422+gd05da62e9.cpu"
+      },
+      "input_sha256": "9d626c878b6604374dc7cdfa44861ad5d7547ec8cc57b244853e80c2e71a661d",
+      "assertions": [
+        {
+          "name": "actual native reloader retained normal supplied values",
+          "passed": true
+        },
+        {
+          "name": "actual normal linear operation used values",
+          "passed": true
+        },
+        {
+          "name": "native loading state closed",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "Real installed native helper with a standard torch layer; not a vLLM model/worker.",
+        "No live request, partial-update fault, rollback/fallback, KV generation or GPU concurrency tested."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "LIF-11",
+      "component": "guard.runtime.bounded.capture_pipes normal child/pipe cleanup",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "supply-host",
+      "source_record_index": 10,
+      "target_source": {
+        "path": "update/src/guard/runtime/bounded.py",
+        "sha256": "25c81666a17e13651c0b5b3bd67c9f310c6feee8311fcac408404d895dc67290",
+        "version": "guard-pipe-capture/1"
+      },
+      "input_sha256": "94b7bf78776c66341bf0b6e4cba273cf5c9f25be8b212076889986496876a7ca",
+      "assertions": [
+        {
+          "name": "normal owned child exited",
+          "passed": true
+        },
+        {
+          "name": "actual pipes closed and capture complete",
+          "passed": true
+        },
+        {
+          "name": "new input consumed",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "Actual collector helper only; no vLLM worker or resource recovery tested.",
+        "No fault, shared resource, external PID termination, timeout extension or IPC cleanup claim."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "PLT-02",
+      "component": "actual guard ipc_probe on owned zero-payload Unix socket",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "supply-owned-namespace",
+      "source_record_index": 0,
+      "target_source": {
+        "path": "update/src/guard/executors/ipc_probe.py",
+        "sha256": "f096e9d95aed61315b4d129369cd273786fa9dc106ac264d48c670e004269ca2",
+        "version": "guard-unix-ipc-probe/1"
+      },
+      "input_sha256": "05ad4d7fa40fd275cb39100b6f58f4a0f1b29dd2427728d5af0bdd8dcc2de37c",
+      "assertions": [
+        {
+          "name": "own path metadata collected",
+          "passed": true
+        },
+        {
+          "name": "actual zero-payload connect",
+          "passed": true
+        },
+        {
+          "name": "peer is current allowed subject",
+          "passed": true
+        },
+        {
+          "name": "only owned socket cleaned",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "Own process listener is not an engine/worker; no real IPC inventory or command consumption.",
+        "Only same-subject normal control; no UID switch, permission bypass, SHM, TCP or unapproved subject."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "REQ-08",
+      "component": "guard.executors.input_validation.InputValidationExecutor.validate_policy",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "input-final-handoff",
+      "source_record_index": 0,
+      "target_source": {
+        "path": "update/src/guard/executors/input_validation.py",
+        "sha256": "379365d7ea1d490aa8dc50466495d71a761d318ff1f1e157fa2966ba321db85d",
+        "version": "0.7.1"
+      },
+      "input_sha256": "f7caf952b9ba75158fb1e25e2fdc909f809ebbfe8b8aaf03aef7ccdafc038ec7",
+      "assertions": [
+        {
+          "name": "normal_configuration_returned",
+          "passed": true
+        },
+        {
+          "name": "standard_type_rejected",
+          "passed": true
+        },
+        {
+          "name": "standard_range_rejected",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "실제 guard 설정·정책 검증 함수만 실행; HTTP/Docker/renderer/model 미호출",
+        "임시 vocab·정책 값은 실제 모델 기준 또는 기업 승인이 아님"
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "REQ-09",
+      "component": "guard.executors.input_validation.InputValidationExecutor.validate_policy",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "input-final-handoff",
+      "source_record_index": 1,
+      "target_source": {
+        "path": "update/src/guard/executors/input_validation.py",
+        "sha256": "379365d7ea1d490aa8dc50466495d71a761d318ff1f1e157fa2966ba321db85d",
+        "version": "0.7.1"
+      },
+      "input_sha256": "fc8bb1c19170066f818f2f50e44ae092d065308ad04b1b36af56be95fa9ce1a7",
+      "assertions": [
+        {
+          "name": "normal_configuration_returned",
+          "passed": true
+        },
+        {
+          "name": "standard_type_rejected",
+          "passed": true
+        },
+        {
+          "name": "standard_range_rejected",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "실제 guard 설정·정책 검증 함수만 실행; HTTP/Docker/renderer/model 미호출",
+        "임시 vocab·정책 값은 실제 모델 기준 또는 기업 승인이 아님"
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "REQ-10",
+      "component": "guard.executors.sampling_validation.SamplingValidationExecutor.validate_policy",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "input-final-handoff",
+      "source_record_index": 2,
+      "target_source": {
+        "path": "update/src/guard/executors/sampling_validation.py",
+        "sha256": "76eb6b43767ad99e0b4a79912fc98edc57c8aa4b305d01e0231d6204c436a8a7",
+        "version": "0.2.1"
+      },
+      "input_sha256": "c1fc607d4f9d116ef51f13527626baa3f7d885b924270d9e216918edf87bca4a",
+      "assertions": [
+        {
+          "name": "normal_configuration_returned",
+          "passed": true
+        },
+        {
+          "name": "standard_type_rejected",
+          "passed": true
+        },
+        {
+          "name": "standard_range_rejected",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "실제 guard 설정·정책 검증 함수만 실행; HTTP/Docker/renderer/model 미호출",
+        "임시 vocab·정책 값은 실제 모델 기준 또는 기업 승인이 아님"
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "SUP-05",
+      "component": "guard.collectors.model_manifest.build_manifest/_load_manifest + vllm_file_read_sensor.dependency",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "input-final-handoff",
+      "source_record_index": 3,
+      "target_source": {
+        "path": "update/src/guard/collectors/model_manifest.py",
+        "sha256": "0d1270566c7350b272efc47f1ca8168fc01672fa8590e686a3108fb0ec6b137e",
+        "version": "guard.model-manifest/1"
+      },
+      "input_sha256": "68b114ebd8309d25f9e4c284075f87e502df27a8e22752527a3c3aea17f29f34",
+      "assertions": [
+        {
+          "name": "real_file_manifest_consumed",
+          "passed": true
+        },
+        {
+          "name": "bad_manifest_rejected",
+          "passed": true
+        },
+        {
+          "name": "real_fd_bytes_returned",
+          "passed": true
+        },
+        {
+          "name": "bad_fd_reference_rejected",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "실제 임시 파일 inventory·manifest consumer·FD hash 검증; vLLM 파일 읽기/loader/tensor 적용 관측은 아님",
+        "파일 race·symlink·mount 교체 및 권한 우회 실험 없음"
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "REQ-10",
+      "component": "vllm.sampling_params.SamplingParams",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "input-final-handoff",
+      "source_record_index": 4,
+      "target_source": {
+        "path": "vllm/sampling_params.py",
+        "sha256": "3c37c655a0a60851e3d96d946eb10d1cbb347dee6cd143f38a7fc18c6f66dd8b",
+        "version": "checkout:db9527a46873454610df6dbedf79a36d6bf1a7f6"
+      },
+      "input_sha256": "3a9e1d4a0630e88b930a44c789e250f917e7d2819eb5e11e38ad4c80460f7958",
+      "assertions": [
+        {
+          "name": "sampling_normal_returned",
+          "passed": true
+        },
+        {
+          "name": "sampling_negative_rejected",
+          "passed": true
+        },
+        {
+          "name": "sampling_zero_top_p_rejected",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "실제 source checkout의 SamplingParams 직접 구성; engine/sampler 최종 소비 아님"
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "REQ-08",
+      "component": "tokenizers.Tokenizer.encode",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "input-final-handoff",
+      "source_record_index": 5,
+      "target_source": {
+        "path": "site-packages/tokenizers/__init__.py",
+        "sha256": "b1cee924695651af5c3dab98e8c34406ab355a2cc1d633228646c470210e649e",
+        "version": "0.23.3"
+      },
+      "input_sha256": "be72cbd6e90d5bc957407d743587432f97d1674f60ab14c55879b2bd21d9b018",
+      "assertions": [
+        {
+          "name": "local_text_encoded",
+          "passed": true
+        },
+        {
+          "name": "invalid_text_type_rejected",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "실제 설치 tokenizer 의존성 API; vLLM renderer/reused-token 경로 또는 worker 소비 아님"
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "SUP-05",
+      "component": "safetensors.torch.save_file/load_file",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "input-final-handoff",
+      "source_record_index": 6,
+      "target_source": {
+        "path": "site-packages/safetensors/torch.py",
+        "sha256": "f3f476d1f8c04fe65fa3797426556a0b7afa43f8c4db9db6b799c7cf84748f3d",
+        "version": "0.8.0"
+      },
+      "input_sha256": "9e0ed547209685fd839feed49b7e564acf393ea931ba684ae07ea7e1adea80f5",
+      "assertions": [
+        {
+          "name": "native_tensor_values_preserved",
+          "passed": true
+        },
+        {
+          "name": "invalid_format_rejected",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "실제 설치 safetensors CPU decoder가 새 임시 tensor를 읽음; vLLM loader/root/승인 공급물 사용 차단은 미확인"
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "REQ-08",
+      "component": "original build_context -> renderer -> InputProcessor",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "input-final-handoff",
+      "source_record_index": 7,
+      "target_source": {
+        "path": "vllm/v1/engine/input_processor.py",
+        "sha256": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
+        "version": "checkout:db9527a46873454610df6dbedf79a36d6bf1a7f6"
+      },
+      "input_sha256": "f08ad4d30ca444952d6f0e10184270803b193cbc84eefea35edf4858a8664653",
+      "assertions": [
+        {
+          "name": "standard_normal_or_rejection_observed",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "실제 원 소스 checkout의 renderer/admission component; engine/worker 최종 추론 아님",
+        "synthetic 설정·입력, 기업 정책/전체 질문 PASS 아님"
+      ],
+      "source_version_qualifier": "version field supplied from the separately observed Git HEAD; target source bytes are the original receipt value",
+      "observations_summary": {
+        "outcome": "returned",
+        "events": [
+          {
+            "point": "renderer.render_cmpl",
+            "event": "call"
+          },
+          {
+            "point": "renderer.render_cmpl",
+            "event": "return"
+          },
+          {
+            "point": "InputProcessor.process_inputs",
+            "event": "call"
+          },
+          {
+            "point": "InputProcessor.process_inputs",
+            "event": "return"
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "REQ-08",
+      "component": "original build_context -> renderer -> InputProcessor",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "input-final-handoff",
+      "source_record_index": 8,
+      "target_source": {
+        "path": "vllm/v1/engine/input_processor.py",
+        "sha256": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
+        "version": "checkout:db9527a46873454610df6dbedf79a36d6bf1a7f6"
+      },
+      "input_sha256": "193a98d72df42d073785d19d2d08057ed90fa5229121ee5c27ced35e410fd29a",
+      "assertions": [
+        {
+          "name": "standard_normal_or_rejection_observed",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "실제 원 소스 checkout의 renderer/admission component; engine/worker 최종 추론 아님",
+        "synthetic 설정·입력, 기업 정책/전체 질문 PASS 아님"
+      ],
+      "source_version_qualifier": "version field supplied from the separately observed Git HEAD; target source bytes are the original receipt value",
+      "observations_summary": {
+        "outcome": "returned",
+        "events": [
+          {
+            "point": "renderer.render_cmpl",
+            "event": "call"
+          },
+          {
+            "point": "renderer.render_cmpl",
+            "event": "return"
+          },
+          {
+            "point": "InputProcessor.process_inputs",
+            "event": "call"
+          },
+          {
+            "point": "InputProcessor.process_inputs",
+            "event": "return"
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "REQ-09",
+      "component": "original build_context -> renderer -> InputProcessor",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "input-final-handoff",
+      "source_record_index": 9,
+      "target_source": {
+        "path": "vllm/v1/engine/input_processor.py",
+        "sha256": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
+        "version": "checkout:db9527a46873454610df6dbedf79a36d6bf1a7f6"
+      },
+      "input_sha256": "251e0876c0901ebe405182da208672b87517a2728b6ac92e79a7b39561c75ff6",
+      "assertions": [
+        {
+          "name": "standard_normal_or_rejection_observed",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "실제 원 소스 checkout의 renderer/admission component; engine/worker 최종 추론 아님",
+        "synthetic 설정·입력, 기업 정책/전체 질문 PASS 아님"
+      ],
+      "source_version_qualifier": "version field supplied from the separately observed Git HEAD; target source bytes are the original receipt value",
+      "observations_summary": {
+        "outcome": "raised",
+        "events": [
+          {
+            "point": "renderer.render_cmpl",
+            "event": "call"
+          },
+          {
+            "point": "renderer.render_cmpl",
+            "event": "return"
+          },
+          {
+            "point": "InputProcessor.process_inputs",
+            "event": "call"
+          },
+          {
+            "point": "InputProcessor.process_inputs",
+            "event": "return"
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "REQ-09",
+      "component": "original build_context -> renderer -> InputProcessor",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "input-final-handoff",
+      "source_record_index": 10,
+      "target_source": {
+        "path": "vllm/v1/engine/input_processor.py",
+        "sha256": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
+        "version": "checkout:db9527a46873454610df6dbedf79a36d6bf1a7f6"
+      },
+      "input_sha256": "5d32b879a19b1bf5fc46ef6ce29372b54ade8bce6f53680670b26e92d8751028",
+      "assertions": [
+        {
+          "name": "standard_normal_or_rejection_observed",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "실제 원 소스 checkout의 renderer/admission component; engine/worker 최종 추론 아님",
+        "synthetic 설정·입력, 기업 정책/전체 질문 PASS 아님"
+      ],
+      "source_version_qualifier": "version field supplied from the separately observed Git HEAD; target source bytes are the original receipt value",
+      "observations_summary": {
+        "outcome": "raised",
+        "events": [
+          {
+            "point": "renderer.render_cmpl",
+            "event": "call"
+          },
+          {
+            "point": "renderer.render_cmpl",
+            "event": "return"
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "REQ-09",
+      "component": "original build_context -> renderer -> InputProcessor",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "input-final-handoff",
+      "source_record_index": 11,
+      "target_source": {
+        "path": "vllm/v1/engine/input_processor.py",
+        "sha256": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
+        "version": "checkout:db9527a46873454610df6dbedf79a36d6bf1a7f6"
+      },
+      "input_sha256": "9f4b25032078e478e7b30d7af9ff00d9b686e06c178d925173aa9bb96171a045",
+      "assertions": [
+        {
+          "name": "standard_normal_or_rejection_observed",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "실제 원 소스 checkout의 renderer/admission component; engine/worker 최종 추론 아님",
+        "synthetic 설정·입력, 기업 정책/전체 질문 PASS 아님"
+      ],
+      "source_version_qualifier": "version field supplied from the separately observed Git HEAD; target source bytes are the original receipt value",
+      "observations_summary": {
+        "outcome": "returned",
+        "events": [
+          {
+            "point": "InputProcessor.process_inputs",
+            "event": "call"
+          },
+          {
+            "point": "InputProcessor.process_inputs",
+            "event": "return"
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "REQ-09",
+      "component": "original build_context -> renderer -> InputProcessor",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "input-final-handoff",
+      "source_record_index": 12,
+      "target_source": {
+        "path": "vllm/v1/engine/input_processor.py",
+        "sha256": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
+        "version": "checkout:db9527a46873454610df6dbedf79a36d6bf1a7f6"
+      },
+      "input_sha256": "895ad8abb421dd173292d14318e6304aa3f728942e4656e7583732ec677059b1",
+      "assertions": [
+        {
+          "name": "standard_normal_or_rejection_observed",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "실제 원 소스 checkout의 renderer/admission component; engine/worker 최종 추론 아님",
+        "synthetic 설정·입력, 기업 정책/전체 질문 PASS 아님"
+      ],
+      "source_version_qualifier": "version field supplied from the separately observed Git HEAD; target source bytes are the original receipt value",
+      "observations_summary": {
+        "outcome": "raised",
+        "events": [
+          {
+            "point": "InputProcessor.process_inputs",
+            "event": "call"
+          },
+          {
+            "point": "InputProcessor.process_inputs",
+            "event": "return"
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "REQ-09",
+      "component": "vllm.LLM.generate",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "input-final-handoff",
+      "source_record_index": 13,
+      "target_source": {
+        "bytes": 42038,
+        "path": "site-packages/vllm/entrypoints/llm.py",
+        "sha256": "9aee044ad8378f936c0ed3a7a0e72a97b5531e1bfcf80d4482113381e222f68b",
+        "version": "0.29.1rc1.dev422+gd05da62e9.cpu"
+      },
+      "input_sha256": "74f56ad835032e98eb932c7edf875e472bc516d78b546d15e013c9367181e45f",
+      "assertions": [
+        {
+          "name": "one_request_finished",
+          "passed": true
+        },
+        {
+          "name": "bounded_output_tokens",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "별도 설치 0.29 CPU 프로파일의 실제 정상 추론; 기존 0.31 프로파일/기업 전체 질문 판정 아님",
+        "worker 내부 sampling 값·파일 FD causal-root·승인 권한은 별도 미관측"
+      ],
+      "source_version_qualifier": "version field supplied from original recorded installed distribution metadata",
+      "observations_summary": {
+        "case": "normal_text"
+      }
+    },
+    {
+      "check_id": "REQ-08",
+      "component": "vllm.LLM.generate",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "input-final-handoff",
+      "source_record_index": 14,
+      "target_source": {
+        "bytes": 42038,
+        "path": "site-packages/vllm/entrypoints/llm.py",
+        "sha256": "9aee044ad8378f936c0ed3a7a0e72a97b5531e1bfcf80d4482113381e222f68b",
+        "version": "0.29.1rc1.dev422+gd05da62e9.cpu"
+      },
+      "input_sha256": "21719362af5aa002d68db290bf03c3508ff4596893bde45989b7601920f55abe",
+      "assertions": [
+        {
+          "name": "one_request_finished",
+          "passed": true
+        },
+        {
+          "name": "bounded_output_tokens",
+          "passed": true
+        },
+        {
+          "name": "prompt_ids_preserved_to_engine_output",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "별도 설치 0.29 CPU 프로파일의 실제 정상 추론; 기존 0.31 프로파일/기업 전체 질문 판정 아님",
+        "worker 내부 sampling 값·파일 FD causal-root·승인 권한은 별도 미관측"
+      ],
+      "source_version_qualifier": "version field supplied from original recorded installed distribution metadata",
+      "observations_summary": {
+        "case": "normal_token_array"
+      }
+    },
+    {
+      "check_id": "SUP-16",
+      "component": "fixed write_normal_boot.py:read_json",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "sup16-file-apis",
+      "source_record_index": 0,
+      "target_source": {
+        "path": "write_normal_boot.py",
+        "sha256": "2485ba44ce8398f833477b79a04c86624cc254316b566f399a4bc9b5f085e4bd",
+        "version": "existing SUP16 native17 ordering writer delta-v1"
+      },
+      "input_sha256": "16515d394b1f619bb7119ec86e51e80f3e2993413ad22e661f283cbe3548ca25",
+      "assertions": [
+        {
+          "name": "actual_child_exit_matches_standard_input_case",
+          "passed": true
+        },
+        {
+          "name": "actual_source_pin_matches",
+          "passed": true
+        },
+        {
+          "name": "actual_input_file_hash_matches_parent_written_bytes",
+          "passed": true
+        },
+        {
+          "name": "actual_standard_exception_or_normal_return",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "새 임시 합성 파일을 기존 실제 parser/input validator가 소비한 로컬 컴포넌트 관측이다.",
+        "합성 START/NATIVE/FILE_READ는 실제 센서·모델 파일 읽기·worker 소비를 의미하지 않는다.",
+        "read_json/hash/ordering 함수만 호출; 전체 writer run/main·native emitter·vLLM·GPU·정식 제품 경로는 미실행이다."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "SUP-16",
+      "component": "fixed write_normal_boot.py:read_json",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "sup16-file-apis",
+      "source_record_index": 1,
+      "target_source": {
+        "path": "write_normal_boot.py",
+        "sha256": "2485ba44ce8398f833477b79a04c86624cc254316b566f399a4bc9b5f085e4bd",
+        "version": "existing SUP16 native17 ordering writer delta-v1"
+      },
+      "input_sha256": "16515d394b1f619bb7119ec86e51e80f3e2993413ad22e661f283cbe3548ca25",
+      "assertions": [
+        {
+          "name": "actual_child_exit_matches_standard_input_case",
+          "passed": true
+        },
+        {
+          "name": "actual_source_pin_matches",
+          "passed": true
+        },
+        {
+          "name": "actual_input_file_hash_matches_parent_written_bytes",
+          "passed": true
+        },
+        {
+          "name": "actual_standard_exception_or_normal_return",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "새 임시 합성 파일을 기존 실제 parser/input validator가 소비한 로컬 컴포넌트 관측이다.",
+        "합성 START/NATIVE/FILE_READ는 실제 센서·모델 파일 읽기·worker 소비를 의미하지 않는다.",
+        "read_json/hash/ordering 함수만 호출; 전체 writer run/main·native emitter·vLLM·GPU·정식 제품 경로는 미실행이다."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "SUP-16",
+      "component": "fixed write_normal_boot.py:native17_ordering_from_raw",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "sup16-file-apis",
+      "source_record_index": 2,
+      "target_source": {
+        "path": "write_normal_boot.py",
+        "sha256": "2485ba44ce8398f833477b79a04c86624cc254316b566f399a4bc9b5f085e4bd",
+        "version": "existing SUP16 native17 ordering writer delta-v1"
+      },
+      "input_sha256": "556bc697c8cd8f24b6210a573a90d13b6733a4eb1f687f32e5476fd71ac657e3",
+      "assertions": [
+        {
+          "name": "actual_child_exit_matches_standard_input_case",
+          "passed": true
+        },
+        {
+          "name": "actual_source_pin_matches",
+          "passed": true
+        },
+        {
+          "name": "actual_input_file_hash_matches_parent_written_bytes",
+          "passed": true
+        },
+        {
+          "name": "actual_standard_exception_or_normal_return",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "새 임시 합성 파일을 기존 실제 parser/input validator가 소비한 로컬 컴포넌트 관측이다.",
+        "합성 START/NATIVE/FILE_READ는 실제 센서·모델 파일 읽기·worker 소비를 의미하지 않는다.",
+        "read_json/hash/ordering 함수만 호출; 전체 writer run/main·native emitter·vLLM·GPU·정식 제품 경로는 미실행이다."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "SUP-16",
+      "component": "fixed write_normal_boot.py:native17_ordering_from_raw",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "sup16-file-apis",
+      "source_record_index": 3,
+      "target_source": {
+        "path": "write_normal_boot.py",
+        "sha256": "2485ba44ce8398f833477b79a04c86624cc254316b566f399a4bc9b5f085e4bd",
+        "version": "existing SUP16 native17 ordering writer delta-v1"
+      },
+      "input_sha256": "fdff35bbf8b6fce880370026b72fc464ae5dbd7b56d0da06f0254f815593de5a",
+      "assertions": [
+        {
+          "name": "actual_child_exit_matches_standard_input_case",
+          "passed": true
+        },
+        {
+          "name": "actual_source_pin_matches",
+          "passed": true
+        },
+        {
+          "name": "actual_input_file_hash_matches_parent_written_bytes",
+          "passed": true
+        },
+        {
+          "name": "actual_standard_exception_or_normal_return",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "새 임시 합성 파일을 기존 실제 parser/input validator가 소비한 로컬 컴포넌트 관측이다.",
+        "합성 START/NATIVE/FILE_READ는 실제 센서·모델 파일 읽기·worker 소비를 의미하지 않는다.",
+        "read_json/hash/ordering 함수만 호출; 전체 writer run/main·native emitter·vLLM·GPU·정식 제품 경로는 미실행이다."
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {}
+    },
+    {
+      "check_id": "SUP-08",
+      "component": "vllm.entrypoints.generate.base.protocol.validate_request_mm_kwargs",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "source031-sup08-mm-gate",
+      "source_record_index": 0,
+      "target_source": {
+        "path": "vllm/entrypoints/generate/base/protocol.py",
+        "sha256": "67ede411b35a8344ddb87bfaaf1a1abea8acd39a4d23655e34032015505167c0",
+        "version": "checkout:db9527a46873454610df6dbedf79a36d6bf1a7f6"
+      },
+      "input_sha256": "bdaa8cb3957f40d9a14c8a97e6f4672dd3bcef1f52272a58fefd3932d23f419c",
+      "assertions": [
+        {
+          "name": "actual_return_or_original_typed_parameter_rejection",
+          "passed": true
+        },
+        {
+          "name": "input_not_mutated",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "원 0.31 사전 신뢰 플래그 검사만 직접 실행; request endpoint/멀티모달 처리·media I/O 미실행",
+        "trust=True 수락은 실제 권한·기업 승인·안전한 최종 소비를 증명하지 않음"
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {
+        "case": "none_untrusted",
+        "outcome": "returned"
+      }
+    },
+    {
+      "check_id": "SUP-08",
+      "component": "vllm.entrypoints.generate.base.protocol.validate_request_mm_kwargs",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "source031-sup08-mm-gate",
+      "source_record_index": 1,
+      "target_source": {
+        "path": "vllm/entrypoints/generate/base/protocol.py",
+        "sha256": "67ede411b35a8344ddb87bfaaf1a1abea8acd39a4d23655e34032015505167c0",
+        "version": "checkout:db9527a46873454610df6dbedf79a36d6bf1a7f6"
+      },
+      "input_sha256": "7d403dcd8a29f30061ed5951f6199e82071ca7290921866483b49b63591e1712",
+      "assertions": [
+        {
+          "name": "actual_return_or_original_typed_parameter_rejection",
+          "passed": true
+        },
+        {
+          "name": "input_not_mutated",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "원 0.31 사전 신뢰 플래그 검사만 직접 실행; request endpoint/멀티모달 처리·media I/O 미실행",
+        "trust=True 수락은 실제 권한·기업 승인·안전한 최종 소비를 증명하지 않음"
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {
+        "case": "empty_untrusted",
+        "outcome": "returned"
+      }
+    },
+    {
+      "check_id": "SUP-08",
+      "component": "vllm.entrypoints.generate.base.protocol.validate_request_mm_kwargs",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "source031-sup08-mm-gate",
+      "source_record_index": 2,
+      "target_source": {
+        "path": "vllm/entrypoints/generate/base/protocol.py",
+        "sha256": "67ede411b35a8344ddb87bfaaf1a1abea8acd39a4d23655e34032015505167c0",
+        "version": "checkout:db9527a46873454610df6dbedf79a36d6bf1a7f6"
+      },
+      "input_sha256": "e405756211dd3bc579d2006c7b52a495eccf587ba06816481b026e274130ea02",
+      "assertions": [
+        {
+          "name": "actual_return_or_original_typed_parameter_rejection",
+          "passed": true
+        },
+        {
+          "name": "input_not_mutated",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "원 0.31 사전 신뢰 플래그 검사만 직접 실행; request endpoint/멀티모달 처리·media I/O 미실행",
+        "trust=True 수락은 실제 권한·기업 승인·안전한 최종 소비를 증명하지 않음"
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {
+        "case": "processor_untrusted",
+        "outcome": "raised"
+      }
+    },
+    {
+      "check_id": "SUP-08",
+      "component": "vllm.entrypoints.generate.base.protocol.validate_request_mm_kwargs",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "source031-sup08-mm-gate",
+      "source_record_index": 3,
+      "target_source": {
+        "path": "vllm/entrypoints/generate/base/protocol.py",
+        "sha256": "67ede411b35a8344ddb87bfaaf1a1abea8acd39a4d23655e34032015505167c0",
+        "version": "checkout:db9527a46873454610df6dbedf79a36d6bf1a7f6"
+      },
+      "input_sha256": "889862e0b57223c9ebc7cc9268aac438adc37492324a8d77ffadbf7cc88ecba3",
+      "assertions": [
+        {
+          "name": "actual_return_or_original_typed_parameter_rejection",
+          "passed": true
+        },
+        {
+          "name": "input_not_mutated",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "원 0.31 사전 신뢰 플래그 검사만 직접 실행; request endpoint/멀티모달 처리·media I/O 미실행",
+        "trust=True 수락은 실제 권한·기업 승인·안전한 최종 소비를 증명하지 않음"
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {
+        "case": "media_untrusted",
+        "outcome": "raised"
+      }
+    },
+    {
+      "check_id": "SUP-08",
+      "component": "vllm.entrypoints.generate.base.protocol.validate_request_mm_kwargs",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "source031-sup08-mm-gate",
+      "source_record_index": 4,
+      "target_source": {
+        "path": "vllm/entrypoints/generate/base/protocol.py",
+        "sha256": "67ede411b35a8344ddb87bfaaf1a1abea8acd39a4d23655e34032015505167c0",
+        "version": "checkout:db9527a46873454610df6dbedf79a36d6bf1a7f6"
+      },
+      "input_sha256": "225a6f86734e39ae8ad18ab999edcae2f017d790a59e2a899986f94011301990",
+      "assertions": [
+        {
+          "name": "actual_return_or_original_typed_parameter_rejection",
+          "passed": true
+        },
+        {
+          "name": "input_not_mutated",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "원 0.31 사전 신뢰 플래그 검사만 직접 실행; request endpoint/멀티모달 처리·media I/O 미실행",
+        "trust=True 수락은 실제 권한·기업 승인·안전한 최종 소비를 증명하지 않음"
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {
+        "case": "processor_trusted",
+        "outcome": "returned"
+      }
+    },
+    {
+      "check_id": "SUP-08",
+      "component": "vllm.entrypoints.generate.base.protocol.validate_request_mm_kwargs",
+      "execution_kind": "actual_local_component",
+      "input_origin": "synthetic",
+      "formal_data_origin": "EXAMPLE",
+      "official": false,
+      "source_receipt": "source031-sup08-mm-gate",
+      "source_record_index": 5,
+      "target_source": {
+        "path": "vllm/entrypoints/generate/base/protocol.py",
+        "sha256": "67ede411b35a8344ddb87bfaaf1a1abea8acd39a4d23655e34032015505167c0",
+        "version": "checkout:db9527a46873454610df6dbedf79a36d6bf1a7f6"
+      },
+      "input_sha256": "6df4e4568f463cff64fa74cd9883b8740fa1a736c9de81e01e619d4c39b52428",
+      "assertions": [
+        {
+          "name": "actual_return_or_original_typed_parameter_rejection",
+          "passed": true
+        },
+        {
+          "name": "input_not_mutated",
+          "passed": true
+        }
+      ],
+      "status": "scoped_assertions_satisfied",
+      "scope_limitations": [
+        "원 0.31 사전 신뢰 플래그 검사만 직접 실행; request endpoint/멀티모달 처리·media I/O 미실행",
+        "trust=True 수락은 실제 권한·기업 승인·안전한 최종 소비를 증명하지 않음"
+      ],
+      "source_version_qualifier": null,
+      "observations_summary": {
+        "case": "media_trusted",
+        "outcome": "returned"
+      }
+    }
+  ],
+  "proof_refs": {
+    "supply-host": {
+      "sha256": "4ddcb5efed6d2382c5ba5b40d49452faf9cc01610db721771405802c3f43f69b",
+      "bytes": 40404
+    },
+    "supply-owned-namespace": {
+      "sha256": "5aec0d75dd5f943cb7b81cda3bb7779f30a8da18c1bde76fb38e80e31a44b6e6",
+      "bytes": 4801
+    },
+    "namespace-handoff": {
+      "sha256": "d9d45722f1149603b50c83963b4a6f749421ee024000b5abd588ca56a163f96c",
+      "bytes": 5146
+    },
+    "ipc-host-diagnostic": {
+      "sha256": "6f46b09a1b03bc724586b4bd70d730fa372dbd52a08722473a6c26d447011598",
+      "bytes": 3536
+    },
+    "input-final-handoff": {
+      "sha256": "b685a1003564d6f5fae70efbf761b9e2c06aca04331ccb81f13d6e21d0063044",
+      "bytes": 95634
+    },
+    "source031-context": {
+      "sha256": "e048379a58f2c3e209df1ce33146f74966be5ffce81ffe4c2fcb91c208642395",
+      "bytes": 25136
+    },
+    "source031-postexit": {
+      "sha256": "c1b1d204c193743193919df9922a04df8a770dac332cf6fd3d9b36135f3e3887",
+      "bytes": 1563
+    },
+    "installed029-cpu-engine": {
+      "sha256": "35632bf7cc4e9aced4c8b57476bc137987c0551f7a4242b1fce5b9db4a90cac6",
+      "bytes": 17048
+    },
+    "installed029-postexit": {
+      "sha256": "0963ec2d31bcd2e39767ad0969821785366dd282d13057b2ae9dc4f0dab8e660",
+      "bytes": 2384
+    },
+    "installed029-scope-notes": {
+      "sha256": "e96278a8dae01478b0205c4089d8764bf6b85dae4cc918a42faf97d44473cab2",
+      "bytes": 1900
+    },
+    "sup16-file-apis": {
+      "sha256": "8190db1a918cd01269db4d7fe00827f546bbb891cfba1bc5aed85c70326c6ea9",
+      "bytes": 18367
+    },
+    "source031-sup08-mm-gate": {
+      "sha256": "ee75c6822422d6ad4256fc5c3a4e204a09fb182d8fa96aad93646b8ccc1998c3",
+      "bytes": 13823
+    },
+    "source031-sup08-postexit": {
+      "sha256": "2ec7bf194677c2e84fb741b357e18e5e18cfdc464d23a3888090953392a76bc0",
+      "bytes": 1474
+    },
+    "independent-review-sup16": {
+      "sha256": "bb3be41e25a54af50e5584f5bedd6a15fe55d31257a6b0ba37838636b31f99b9",
+      "bytes": 30165
+    },
+    "independent-review-engine": {
+      "sha256": "1341239a722f5aa1d25c5d49f971a396de03456252c69c3c3e7a2da3b1200c92",
+      "bytes": 29726
+    },
+    "independent-review-supply-host": {
+      "sha256": "b66cf14dd4470c4d68af9216a3731e48bd9e2c3ec90420a8d81bddc4fd705449",
+      "bytes": 27457
+    },
+    "independent-review-supply-namespace": {
+      "sha256": "5aefb9f406f1de16ce8a638398cf1c19080f63bb388a8e492beb3e42787cd2f0",
+      "bytes": 13313
+    },
+    "independent-review-input-context-mm": {
+      "sha256": "5f72c9cb1ba6b7d959dc7dbb88e5a212960533989cce17821689c794c4af4881",
+      "bytes": 73270
+    }
+  },
+  "validation_tools_sha256": {
+    "gpu18_local_input.py": "4408717eea9498317322c5bca142ba84d9fc830edb1124ec46e8cb17049eb380",
+    "gpu18_local_input_context.py": "04a8b483e4a83aeb8c6ae81f889271d6f686777d0b490d15a97e5ffc88bbd110",
+    "gpu18_local_input_engine.py": "bde86c61c579574957ea8a5e563806a936c6cbaa355ae52167980a8e8cf42f6e",
+    "gpu18_local_input_mm_kwargs.py": "4ddd7e79274178fcab2d3a5cb836482596dff33d0866f25d2d4520c5df7dc7c9",
+    "gpu18_local_supply.py": "673a895c683362f48c81959e3c3cb0e6bd89ac18fc73c5ca644daa79ff97ff3b",
+    "gpu18_local_supply_ipc_diagnostic.py": "cf65312f8f89f9d647ab27b332733a0b8dac5a5fdeb955cc3b2843d3e831d40d",
+    "gpu18_local_supply_namespace.py": "5412dbffaed6bb05e764409c891d4d23d4862afb92a519bf7af20086a017e6ee"
+  },
+  "metadata_only_published_tool_correction": {
+    "tool": "gpu18_local_input_engine.py",
+    "original_execution_tool_sha256": "60bfbaf773a20ae8cd6a1be86270de15e1dfe57a4c301677f29c0a5a895140b5",
+    "published_tool_sha256": "bde86c61c579574957ea8a5e563806a936c6cbaa355ae52167980a8e8cf42f6e",
+    "change": "case label unsupported_prompt_container -> oov_prompt_token",
+    "callable_input_assertion_cleanup_AST_unchanged": true
+  },
+  "independent_review": {
+    "status": "complete_for_each_published_execution_scope",
+    "reviewer": "existing_session6",
+    "review_sha256": {
+      "sup16": "bb3be41e25a54af50e5584f5bedd6a15fe55d31257a6b0ba37838636b31f99b9",
+      "engine": "1341239a722f5aa1d25c5d49f971a396de03456252c69c3c3e7a2da3b1200c92",
+      "supply-host": "b66cf14dd4470c4d68af9216a3731e48bd9e2c3ec90420a8d81bddc4fd705449",
+      "supply-namespace": "5aefb9f406f1de16ce8a638398cf1c19080f63bb388a8e492beb3e42787cd2f0",
+      "input-context-mm": "5f72c9cb1ba6b7d959dc7dbb88e5a212960533989cce17821689c794c4af4881"
+    },
+    "unresolved_material_defects_in_published_scopes": 0,
+    "preserved_host_ipc_assertion_failure_count": 1,
+    "root_publication_consistency": "14 IDs, 4 without new execution, 37 scoped records, source hashes and EXAMPLE flags checked",
+    "consolidated_review": {
+      "sha256": "4808fa6d5ce9c8927d1260872ad3dc139fc9259aa3b7db3ffbfa11b3c8f3debc",
+      "reviewed_head": "3d37527d1833fb93635b41824abf747e5f95989a",
+      "reviewed_public_json_sha256": "af0bed90c2e0478680418fdd2de20c26c2de5f08518298a47f41ac200859a77c",
+      "followup_change": "Timing scope wording only and this review reference; execution records unchanged"
+    }
+  }
+}

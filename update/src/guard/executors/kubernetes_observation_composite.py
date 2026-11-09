@@ -1,5 +1,6 @@
 """OBS02 two independent, source-bound sessions; no cross-session causal claim."""
 from pathlib import Path
+from copy import deepcopy
 from guard.collectors.lifecycle import load_prepared
 from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
@@ -33,7 +34,8 @@ class KubernetesObservationCompositeExecutor:
     name='observation_state';version='0.1.0'
 
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
-        self.cfg=cfg;self.runner=runner;self.environ=environ;self.expected_target=expected_target_sha256
+        self.b_common_inputs=deepcopy(cfg.get('common_inputs'))
+        self.cfg={k:v for k,v in cfg.items() if k!='common_inputs'};self.runner=runner;self.environ=environ;self.expected_target=expected_target_sha256
 
     def validate_policy(self,check,values):
         if check.id!='OBS-02' or getattr(check,'collection_profile',None)!=PROFILE:
@@ -44,6 +46,8 @@ class KubernetesObservationCompositeExecutor:
         """Validate both bindings before the first child can send a probe."""
         self.validate_policy(check,values)
         try:
+            if self.b_common_inputs is not None and (type(self.b_common_inputs) is not dict
+                or not self.b_common_inputs or set(self.b_common_inputs)-{'identity','profiler'}):raise ValueError
             if (type(self.cfg) is not dict or set(self.cfg)-{'identity_target','profiler_target','identity_prepared','profiler_prepared','kubectl_binary','max_duration_seconds'}
                     or adapter is None or not env.hash_ok() or env.engine.name!='vllm' or env.engine.version!='0.31.0'
                     or any(type(v) is not str or not v for v in (env.model.id,env.model.revision))):raise ValueError
@@ -69,6 +73,8 @@ class KubernetesObservationCompositeExecutor:
                 if not start<=utcnow()<=end:raise ValueError
                 cfg={k:v for k,v in self.cfg.items() if k in {'kubectl_binary','max_duration_seconds'}}
                 cfg['target']=self.cfg[label+'_target'];cfg['prepared']=self.cfg[label+'_prepared']
+                if self.b_common_inputs is not None and label in self.b_common_inputs:
+                    cfg['common_inputs']=self.b_common_inputs[label]
                 executor=implementation(cfg,runner=self.runner,environ=self.environ,expected_target_sha256=expected[label])
                 child_check=check.model_copy(update={'collection_profile':contract.PROFILE})
                 executor.validate_policy(child_check,selected)
@@ -111,6 +117,13 @@ class KubernetesObservationCompositeExecutor:
             else:observations[key]=selected[0][1]
         observations['state_collection_sessions']={'value':sessions,'collected':True}
         observations['state_collection_scope_complete']={'value':False,'collected':True}
+        common = [d for d in drafts if 'b_common_inputs' in d.config]
+        if common:
+            # Keep each child's session/owner boundary, including its own FAILs.
+            for key in ('activation_steps','activation_missing','activation_violations'):
+                observations[key]={'value':[value for d in drafts for value in
+                    (d.observations[key].value if key in d.observations and d.observations[key].collected else [])], 'collected':True}
+            observations['activation_scope_complete']={'value':False,'collected':True}
         complete=all(d.status==ExecStatus.COMPLETED and not d.cleanup_errors for d in drafts)
         artifacts=[]
         for (label,*_),draft in zip(children,drafts):
@@ -118,6 +131,8 @@ class KubernetesObservationCompositeExecutor:
         return EvidenceDraft(status=ExecStatus.COMPLETED if complete else ExecStatus.ABORTED,
             data_origin=min((d.data_origin for d in drafts),key=lambda v:ORIGIN_STRENGTH[v]),
             normal_control={'attempted':any(d.normal_control.attempted for d in drafts),'succeeded':None},
-            observations=observations,artifacts=artifacts,config={'profile':PROFILE,'sessions':sessions},
+            observations=observations,artifacts=artifacts,config={'profile':PROFILE,'sessions':sessions,
+                **({'b_common_inputs':{'components':[label for (label,*_),d in zip(children,drafts)
+                    if 'b_common_inputs' in d.config], 'whole_question_complete':False}} if common else {})},
             started_at=started,finished_at=utcnow(),abort_reason=None if complete else 'OBSERVATION_COMPOSITE_COLLECTION_INCOMPLETE',
             cleanup_errors=[label+':'+error for (label,*_),draft in zip(children,drafts) for error in draft.cleanup_errors])

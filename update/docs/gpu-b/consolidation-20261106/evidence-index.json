@@ -993,7 +993,30 @@
         "sha256": "357c7bc4533208672ed0de00921c3f53150ef5e29f743144aa04453a89e4bf30",
         "json_pointer": "/checks/SUP-03"
       },
-      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님."
+      "자료분류_해석": "위 포인터의 각 source/환경/metadata/Ref를 해당 버전별로 재사용. 이 색인은 새 현황 정본이 아님.",
+      "2026_11_08_R3_verified_followup": {
+        "GB11_content": {
+          "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/GB11-runtime-content-review-v1.json",
+          "sha256": "14d2e1bd980a802829f6a56c88afc8285c5fa9061b5ea890c040b247ce01a73b"
+        },
+        "control_runtime": {
+          "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/r3-control-runtime-review-v1.json",
+          "sha256": "30184c76eaadac0243b9abac76dbbf516e5fd70fdc89d470b74057b2e975ce8f"
+        },
+        "S2_final_link_project_relative_path": "worktrees/byul-gpu-b-run-lif14-labels-20261105/out/SUP16-live-normal-v1-operator-20261105/SUP03-fixed-template-operating-packet-v1/browser-console-v5/whole-packet-v3/required-r3-final-actual-verification-link-v1.json",
+        "S2_final_link_sha256": "95fbd6262b98930d3d2fc8d101084c26aed536fd51411cb284047a80690f57c9",
+        "actual_L4_TP1_model_preparation_and_UID_cleanup_verified": true,
+        "original_Ready90_failed": true,
+        "later_Ready_not_retroactive_success": true,
+        "ENV_sealing_registry_EVD_RES_RPT_Store_Refs_created": false,
+        "restore_rejudge_target_exists": false,
+        "classification": "제품 절차 미확인 유지",
+        "whole_ID_complete_or_product_PASS": false,
+        "S6_final_summary": {
+          "project_relative_path": "worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/r3-final-actual-handoff-v1.json",
+          "sha256": "8671dc328a6be5825b7c936a04a6bf344b247e015186979d03f6ce19033e9008"
+        }
+      }
     },
     "SUP-04": {
       "기존_원질문_분기_담당_입력_참조": {

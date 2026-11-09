@@ -410,6 +410,70 @@ S2는 최초 runtime freeze의 `not_ready=false`와 이 고정 리뷰 참조 두
 
 최종 운영 리뷰 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-health-generation-delta-20261107-v1/r3-whole-operating-review-v1.json`, SHA256 `c01cf5d1e83079eab3d7e73c64208c291c236661739bfa540580271f4971738d`다. root는 고정 리뷰 bytes/SHA·결론과 비용 산술을 대조했으며 원CPU/source/archive/모델/GB09/Ref를 반복 실행하지 않았다. R1/R2 실패·원 정지 감시 실패·후속 실제 중지/비용 마감은 별도 이력으로 유지하고43ID 분류를 올리지 않는다.
 
+## 2026-11-07 SUP-03 R3 실제 패킷 발행·시작 감독 검증
+
+세션6이 R3 startup ZIP2,531 bytes의 원6member를 최초 CRC/bytes/SHA·실제 UI 원본·원 로컬 사본과 대조했다. 실제 runtime packet8,187 bytes/SHA256 `cbca7ea784b3a7d02342e2fabefc7691b382054f5cab1cc0c59137fc5c85d255`는 검토한 두 필드 최종화와 같았다. 실제 발행21:28:54.050930 KST의 actor·0600/단일 link·원 리뷰c01 결합, 원 exclusive start 부모/driver·argv·같은 packet·고정 driver b40ca의 연결을 확인했다. 소유 대상 stopped→pending 수락 응답과21:30:30.042035 KST 시작 감독 종료0·child 회수/group 종료·cleanup 오류 목록[]를 확인했다. 부모 proc의 존재를 active로 세지 않았고 원 최초start 창 안의 단일 제출이다.
+
+그 전 로컬 발행 입력 검토는 원proposal7871B/b87a에서 허용된 두 필드만 바뀌고13pins/나머지값·원 UTF-8/LF bytes가 유지됐음을 확인했다. publisher는 원 코드의7개 메타데이터 상수 외 전체 AST가 같고, 새3member 입력 ZIP의 원 short-input bytes/SHA가 같았다. 실제 원격 발행 이전의 로컬 검토와 actual startup6 검증을 구분한다. 로컬 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-health-generation-delta-20261107-v1/r3-local-publication-input-review-v1.json`, SHA256 `a0211165bedb801031584922e7b8763e8047e1015e04b19a1bbf4ccb2542858d`다.
+
+root는 원 R3 prestart-after 장부와 동일한 before-open부터 새 비용 산술·원 intent/실제 packet·receipt SHA를 확인했다. 원 intent **21:29:36.590233 KST**까지861.044192초 EBS 추정$0.013333747671004446만 추가돼 해당 시각 추정은 `$54.888651723296206`, 예비$5 제외 잔여 `$40.111348276703794`다. 그 intent부터 compute/IP 비용 구간을 보수적으로 열었다. wrapper의 intent anchor를 실제 API CLI 수락 시각으로 바꾸지 않고 후속 control에서 분리 확인한다. 실제 중지 관측 전에는 구간을 닫지 않으며 실청구 미확정·EBS 비용은 지속된다.
+
+실제 startup 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/r3-startup-actual-review-v1.json`, SHA256 `6245b8d4c37cb2147a3bf967c0a5a9ec8f5c1d2ce8e71a32241b9639430d8ab7`다. 비용 open 검토는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-r3-cost-open-actual-review-v1.json`, SHA256 `784f1e202cf87fa424dfe9969627eb5f8aff6026e7ffb58795c03983d50325b7`다. 게시 담당은 고정 리뷰 bytes/SHA·결론과 비용 산술을 대조했고 같은 원 archive/CPU/모델/GB09/Ref는 재실행하지 않았다.
+
+S2가 보고한21:33:11 KST poststart 양성값과21:35:08 KST execute 제출은 원raw/control 사본 도착 후 독립 검증할 범위다. 이 startup 검토만으로 현재 physical L4·fresh health·installer·guest 제품 source/system Python·모델/worker·제품 EVD/RES/RPT/Store Ref·복원/재판정·최종 정리 성공을 인정하지 않는다. legacyR1 archive부록을 현재 R3 health/boot 근거로 사용하지 않고 정확 현재 CID/control·원 양성 preflight를 별도로 연결한다. R1/R2의 실패·후속 마감과43ID 분류는 보존한다.
+
+## 2026-11-08 PR 병합 이후 R3 운영 복구·현재 확인 범위
+
+PR #228은11월8일13:08:05 KST에 head `657400797060a8ff51976ade5564fc5c1e47067d`로 병합됐다. 병합 commit은 `d37f4d4a1b3e8c4a77510226598e72a40de6ed62`다. 그 뒤 정리한 R3 actual startup 검증·비용 open과 현재 운영 복구 상태는 병합된 diff를 바꾸지 않고 별도 후속 Draft PR로 인계한다. 제품 source·guard·모델·권한·판정·기한은 변경하지 않는다.
+
+운영 채팅의 연결/압축 오류 후 마지막 로컬 정본은11월7일21:37 KST 원R3 execute 제출 단계에서 정체돼 있었다.2h timer 또는 과거 stopped 기록을 현재 자원 상태로 추정하지 않았다.11월8일 S2가 CUA 재초기화·원 CloudShell 복구 후 원 execute의11월7일21:51:41.702749 KST 종료1·child 회수/group 종료·cleanup 오류 목록[]를 읽었다. S2 보고상 health/install/preflight/prepare는 Success0, observe는 `GB49_CLI_FAILED:007-wait-ready-sup03-engine`, preserve/quiesce/archive는 Success0이다. 원정상stop1 수락과 원감시의 describe CLI 오류를 보존하고 새 start/execute/SSM/stop·Force·기한reset은 하지 않았다.
+
+S2는11월8일 **13:23:03.972569 KST current full7**에서 소유3대 stopped·공인IP0·읽기 전용 complete/mutations0을 보고했다. 이 원자료 SHA256은 `8de00926cacc1a59f4eccc4c1f7a762401117423b98522bf80adc61efd0556f7`이며 실제 CLI/UI producer·현재 자원·원control/stop 연결은 세션6이 독립 검증한다. 새 GB11 archive408,550 bytes/SHA256 `9615e3f54b2e3902560c7be527b787aa5d9d8ca3523f2adfda19d60f15097c9c`와 control도 회수됐지만 이 기록 시점의 의미/Ref/복원·재판정/실패 범위 검증은 진행 중이다. 원 단계 Success나 수령만으로 제품 PASS를 인정하지 않는다.
+
+root는 현재 원full7 사본과 기존 ledger before/after/receipt의 SHA 연결·새 close 산술을 검증했다. 원intent11월7일21:29:36.590233부터 현재 중지 관측11월8일13:23:03.972569 KST까지57,207.382336초를 보수 상계로 포함했다. 추정 상계는 `$71.57966828492202`, 예비$5 제외 잔여는 `$23.420331715077978`이며 compute/IP 장부 구간은 닫혔고 EBS 비용은 계속된다. **관측 공백에는 이미 중지됐을 수 있는 시간도 포함되므로16시간 실제 running이나$71.58 확정 청구를 뜻하지 않는다.** 정확 off 시각·실청구는 미확정이고 timer만으로 구간을 단축하지 않았다.
+
+비용 close 검토 참조는 `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-r3-cost-close-actual-review-v1.json`, SHA256 `7355473d815423b543c69fe2e3d7796f01ec8aa7b8f9face2f7759aebba8fd31`다. 운영 공백 후속은 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/coordination-gap-followup-20261108-v1.json`, SHA256 `b00cffe66711b31e6b2c98a4d6546bb58e963bf1bb48ff65163d0fa8623e1004`다. 현재 로컬 확인/운영 보고의 시점과 범위는 [참조 목록](team-handoff-provenance.json)에 연결하며 새 원자료가 도착한 범위만 검증한다.
+
+S1 보조 AWS 조회 배정은 기존 사용자의 S1 AWS조회 금지 경계와 맞지 않아 철회됐고 실제 S1 AWS/browser/CLI/remote 동작은0이다. S2가 조회·운영을 단독 담당한다. legacyR1 archive health를 현재 R3 health/boot 근거로 사용하지 않고 정확 현재 CID/control·원 positive preflight로 연결한다.25개 한정 마감 제안/18개 제품 증거 추가 필요와 전체 분기 완료 미확정은 유지한다.
+
+## 2026-11-08 새 GB11 첫 무결성 검증과 독립 작업 우선순위
+
+세션6이 새 GB11 archive408,550 bytes/SHA256 `9615e3f54b2e3902560c7be527b787aa5d9d8ca3523f2adfda19d60f15097c9c`의200member 최초 전체 CRC·199 payload bytes/SHA·manifest 정확 집합·실제 UI 원본/사본 일치를 확인했다. archive에 보관된11자산은 원 payload6dd28 pin과 같다. 원manifest의 `whole_question_complete=false`·`retained_model_archived=false`는 유지한다. archive의 논리 R1 RUN 태그와 bootstrap-health legacyR1 부록을 현재 R3 health/boot 근거로 쓰지 않는다. producer CID/원 request·내용·제품 Ref/복원 여부·소유정리·현재원조회와의 의미 연결은 이어서 검증한다.
+
+첫 무결성 검토 참조는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/GB11-first-integrity-review-v1.json`, SHA256 `6f1716814c0d5a529631befa965df3d89905cb12982f4901759712a2f3c1741b`다. 같은 archive의 CRC/원모델·CPU·기존자료는 반복하지 않고 S1은 지정된 readiness 원로그/기한 기록만 로컬 진단한다. S2는원반출·정리·현재중지·비용만단독운영, S6는새원자료의의미·실행/Ref/정리검증을담당한다.
+
+새 공통 지원·새 환경/모델/TP2·기업 정책/승인이 없어 막힌 분기는 보류하고 기존 지원·자료·승인 환경으로 가능한 독립 작업을 먼저 수행한다. 보류 분기를 다른 작업의 선행조건으로 만들지 않는다. 부족 입력은 ID/보류 분기/정확 필요한 입력/반환 담당 역할/수신 후 할 일/입력 없이 가능한 일의6열로 기존 [반환 계약](DEPENDENCY_RETURNS.md)에 연결한다. 원 FAIL/UNKNOWN·출처·세대·정확 Ref를 유지하며 미측정 UNKNOWN 인계와 제품 PASS를 합치지 않는다. 새 채팅/에이전트/자동화·기한reset·진행 표시용 새실험은 만들지 않는다.
+
+## 2026-11-08 SUP-03 R3·GB11 최종 필수 검증과 현재 건 마감
+
+현재 건의 필수 검증은 GB11 최초 무결성6f171·내용14d2·control 최초무결성7ca7/실행30184·root 비용close735547 및 S2 최종연결95fbd6으로 완료됐다. 별도 최종 요약문/수신 ACK를 추가 gate로 기다리지 않았다. 원pending/과거review·FAIL/UNKNOWN·실행세대는 그대로 보존하고 새 최종 연결로 마감했다. 새실험/R4·기한reset·같은모델/CPU/불변archive/전체suite 반복은0이다.
+
+실제 ZIP 입력→11자산 설치와 현재 R3 health CID/동일 boot·물리L4 UUID, guest root systemPython3.12.3의 isolated/no_site/dont_write_bytecode flags1·binary pin, host tool source3b3/import UID1000·모델FD manifest·실제 node/Pod/image·GPU1/TP1 모델 적재를 확인했다. 이는 준비·실행환경의 직접 관측이며 제품 질문 전체 성공이나 엔진 git source를 자동 확정한 결과가 아니다. 현재 health/양성preflight와 legacyR1 bootstrap-health 부록은 별도 출처로 분리했다.
+
+원 Ready90 대기는 남은88.366925994초 뒤 TimeoutExpired/-9·빈 stdout/stderr로11월7일21:41:28.039398 KST에 종료됐다. 같은 Pod의21:41:31 KST Ready는 나중 부분관측이며 원기한 판정을 바꾸지 않는다. 고정controller의 wait 실패에서 ENV sealing/제품 driver 호출까지 미도달한 사실을 원실제 commandtrace·미생성 산출물과 연결했다. 실제 registry factory·정상대조·ENV/POL/PLAN/EVD/RES/RPT StoreRef는 생성되지 않았다. 운영 preflight/result 파일을 제품 ENVRef/RES로 읽지 않고 Ref복원·저장팩 재판정 대상도 없다. 원입력 POL=EXAMPLE/DRAFT·PACK-BASELINE32와 공식RPT 미생성을 그대로 둔다.
+
+소유 namespace의 생성 UID/RV와 명시 DeleteOptions/grace30 정상삭제, waitdelete 성공·get --ignore-not-found 종료0/빈stdout·GPUprocess0 원기록을 확인했다. 정리는 원 양성preflight·현재boot/node/config/code·root/no-site를 결합한 source-independent cleanup이며 원FAIL을 보존했다. control은 start1/send54/stop1 수락·미확정수락0을 확인했고 send54에는 원helper 전송46이 포함된다. 새임의명령이나 중복실험으로 세지 않는다.
+
+원stop은 수락됐으나 뒤의 readonly describe는11월7일21:51:37~21:51:41 KST에 container-role 임시자격 metadata500 오류/종료255·빈stdout로 실패했다. 이는 stop 거절 증거가 아니며 원execute1·원감시실패·감독final 부재와 별도다.11월8일13:23:03.972569 KST current full7의 실제 CLI stdout/stderr→집계 연결에서 소유3대 stopped·공인IP0·각SSM0/EIP0/EBS440GiB를 독립 검증했다. 호출별 시각·현재query actor와 원terminal binding을 구분했고 정확off는 미확정이다.
+
+root의 `$71.57966828492202`는 원intent부터 현재 중지관측까지의 공백을 보수 포함한 장부상계이며 예비$5 제외 잔여는 `$23.420331715077978`다. 실제16시간가동/그금액확정청구를 뜻하지 않는다. compute/IP 구간은 닫혔고 EBS 비용은 계속된다. 원타이머나 나중Ready/후속stopped로 원기한/실패를 소급 성공으로 바꾸지 않는다.
+
+| 필수 검증 | 프로젝트 상대 참조 | SHA256 |
+| --- | --- | --- |
+| GB11 실제 도달단계·Ref/소유정리 | `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/GB11-runtime-content-review-v1.json` | `14d2e1bd980a802829f6a56c88afc8285c5fa9061b5ea890c040b247ce01a73b` |
+| control 최초 무결성 | 같은 디렉터리 `r3-control-integrity-review-v1.json` | `7ca7f651b2db279b7ecb34e1a20bb73da4b04924da11c39805969a4f703d1f6b` |
+| 원실행/정지·현재실제원조회 | 같은 디렉터리 `r3-control-runtime-review-v1.json` | `30184c76eaadac0243b9abac76dbbf516e5fd70fdc89d470b74057b2e975ce8f` |
+| 비용 close 산술 | `worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup03-r3-cost-close-actual-review-v1.json` | `7355473d815423b543c69fe2e3d7796f01ec8aa7b8f9face2f7759aebba8fd31` |
+| S2 현재건 최종 연결 | `worktrees/byul-gpu-b-run-lif14-labels-20261105/out/SUP16-live-normal-v1-operator-20261105/SUP03-fixed-template-operating-packet-v1/browser-console-v5/whole-packet-v3/required-r3-final-actual-verification-link-v1.json` | `95fbd6262b98930d3d2fc8d101084c26aed536fd51411cb284047a80690f57c9` |
+
+게시 담당은 위 고정 파일 bytes/SHA·결론과 비용 산술을 대조했고 원CRC/CPU/모델/Ref복원을 반복하지 않았다. 현재 가능한 readiness 로컬 진단·실행/Ref/정리 마감은 끝낸 범위로 인계한다. 초기 지연의 근본원인·원90초 내 지원기동 조건/구체변화와 공통·환경·정책·과거원자료 입력이 없는 분기는 기존6열표로 보류하며 다른 독립작업의 gate로 만들지 않는다. 현재 자료로 특정코드 patch가 필수라고 입증되지 않았으므로 임의수정/기한확대/진행표시용새실험을하지 않는다. 제품증거절차가 없으므로 SUP-03의 기존 '제품 절차 미확인'·25한정마감제안/18제품증거보완 분류는 유지한다.
+
+## 2026-11-08 S6 최종 통합 인계와 미실측 후속 구분
+
+S6 최종 통합 인계는 `worktrees/byul-gpu-b-next-verify-20261106/out/reviews/sup03-r3-actual-20261107-v1/r3-final-actual-handoff-v1.json`, SHA256 `8671dc328a6be5825b7c936a04a6bf344b247e015186979d03f6ce19033e9008`이다. 앞서 고정한 startup·GB11·control·현재 중지·root 비용 검증을 재사용하며 현재 R3 closeout의 필수 검증 잔여는 없다. 별도 요약문을 운영 gate로 기다리지 않은 기존 마감과 동일한 결론이다.
+
+같은 디렉터리의 `r3-unmeasured-followup-inputs-v1.json`, SHA256 `c43ae9092e8ce7c100d68d0dc46cd7f79fcd7fa2df3b9a1f56ebfb5d912aaa34`는 제품 미실측 후속의6열 입력을 명확히 한다. 현재 원자료 검증을 막는 외부 입력은0이다. 추후 별도 지정된 고정 실행의 실제 기한 내 Ready·target/ENV·정상 대조·worker/factory 기록, 생성됐다면 saved PACK/원 as_of/정확 Ref·object bundle을 반환해야 해당 새 Ref만 별도 DB로 복원·재판정할 수 있다. 이번 R3에 없는 Ref를 과거 Ref나 나중 Ready로 채우지 않는다. 이 UNKNOWN 후속 인계는 제품 RES가 생성한 UNKNOWN 판정이 아니며 현재 새 공통 코드/환경/모델/TP2/기업 승인을 검증의 gate로 요구하지 않는다.
+
 ## 반환 결과의 추가 원칙
 
 다음 반환은 고정 source/version·정확 산출물·필요 검토·실제 실행 환경과 한계를 함께 기록한다. CPU 계약이나 로컬 성능 관측을 실제 AWS 개선·GPU 제품 성공으로 올리지 않는다. 미검토 변경이나 실행되지 않은 계획은 별도로 유지한다. 기존 판정·기한·FAIL/UNKNOWN·원 source와 Ref를 변경하지 않는다.

@@ -1,0 +1,276 @@
+{
+  "schema": "guard-b-preparation-followup-validation/1",
+  "baseline_PR232_head": "8bcb8fa1d43f0a406b5e95e23a4bbc1134413dc9",
+  "fixed_integration_code": "b83b3937b6b32a2d744f46da96839b3c71822d1a",
+  "root_integrated_commits": {
+    "B4": "ca7c516f814f37ecf3695de24ce248a84e4823d8",
+    "SUP16": "86020d81",
+    "REQ_base": "85a32f258fa97602a3d3cda25418427caf113d67"
+  },
+  "source_files": [
+    {
+      "repository_path": "update/tools/b12_tp2_inputs.py",
+      "git_blob_bytes": 14774,
+      "git_blob_sha256": "26238b16594847a2c5ad83d86260da1d6913a83d434b08eb7db4291a1282cb75"
+    },
+    {
+      "repository_path": "update/tools/b12_tp2_verify.py",
+      "git_blob_bytes": 9370,
+      "git_blob_sha256": "03e1d47f19eefa1c7e2c1198730d14d72f6a218349bca97ff194ccb171eff1d6"
+    },
+    {
+      "repository_path": "update/tools/b_runner_inputs.py",
+      "git_blob_bytes": 11790,
+      "git_blob_sha256": "0175f8e85d801edae0ccbb9f46a31f334aa53878eac73356174b30ae2d0b206b"
+    },
+    {
+      "repository_path": "update/tools/gpu_b_sup16_prepare.py",
+      "git_blob_bytes": 13504,
+      "git_blob_sha256": "a4fd1024d78beceb1da8dc9b8e6b3da3c06824618da0f8164937c85cf52df504"
+    },
+    {
+      "repository_path": "update/tests/test_b12_tp2_verify.py",
+      "git_blob_bytes": 10103,
+      "git_blob_sha256": "d8421ba15389bb95d0ba4ca2d8e3413704de1d4543c40541d35c80b5aee3f302"
+    },
+    {
+      "repository_path": "update/tests/test_b_runner_inputs.py",
+      "git_blob_bytes": 17024,
+      "git_blob_sha256": "cb342e229a42a383e291873589f60507687549761f6e2f1fdc0f0ac16830f28b"
+    },
+    {
+      "repository_path": "update/tests/test_sup16_measurement_prepare.py",
+      "git_blob_bytes": 9507,
+      "git_blob_sha256": "c81fd2dc4591ba8267e1975241d0b8581f808441fd819ebbc575212662b39f41"
+    }
+  ],
+  "B4": {
+    "original_source_commit": "ca7c516f814f37ecf3695de24ce248a84e4823d8",
+    "opt_in": "--verify-inputs-root",
+    "existing_cases": 13,
+    "new_cases": 21,
+    "passed": 34,
+    "pytest_seconds": 10.71,
+    "parent_wall_seconds": 11.641,
+    "receipt": {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/b4-local-verification-v1/receipt.json",
+      "bytes": 1256,
+      "file_sha256": "aac321e289537ab3538de705778e5aba1ae221d57dbf2787262d90b0185697ad"
+    },
+    "source_freeze": {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/b4-local-verification-v1/source-freeze.json",
+      "bytes": 605,
+      "file_sha256": "7ca7679f0378265448b2af18d34fb0f2288bdee9d10134519ff7e0d944746f9c"
+    },
+    "junit": {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/b4-local-verification-v1/pytest.xml",
+      "bytes": 4959,
+      "file_sha256": "20cd2bf3769c1805eae649230a7e412e4b3e2e495f9fa2606f95aa9ae4f21c44"
+    },
+    "scope": "local regular JSON bytes and known declared bindings only; sealedENV object SHA differs from file SHA; same SUP06 role pair",
+    "default_plan_only_preserved": true,
+    "runtime_binding_verified": false,
+    "prepared_assets_verified": false,
+    "ready_for_execution": false
+  },
+  "REQ08_09_10": {
+    "original_source_commit": "d92b77a887388b0ce99684d9dfbe290a548ef012",
+    "passed_before_error_output_delta": 31,
+    "pytest_seconds": 8.91,
+    "parent_wall_seconds": 11.907,
+    "actual_offline_CLI_exit": 0,
+    "actual_offline_CLI_parent_seconds": 0.89,
+    "original_index": {
+      "project_relative_path": "worktrees/byul-req-s5-inputs-20261109/out/runner-inputs-handoff-v1/receipt.json",
+      "bytes": 7294,
+      "file_sha256": "6cfee2cb0a4771439e51171a57240fc945c4a85a77431c8400ea54d505523a96"
+    },
+    "original_producer_to_consumer": true,
+    "representative_path": "factory/_finish→normalize→EVD/artifact/Store→judge (EXAMPLE)",
+    "core_run_plan_and_RPT_executed": false,
+    "raw_record_bytes_reserialized": false,
+    "mapping_scope_expected_from_record": false,
+    "actual_native_request_mapping_verified": false,
+    "runtime_link_complete": false,
+    "GPU_ready": false,
+    "error_output_followup": {
+      "source_commit": "910835a994dc309d12d07cb57b5522705b373782",
+      "root_integrated_commit": "b83b3937b6b32a2d744f46da96839b3c71822d1a",
+      "index": {
+        "project_relative_path": "worktrees/byul-req-s5-inputs-20261109/out/runner-inputs-handoff-v2/receipt.json",
+        "bytes": 12668,
+        "file_sha256": "36f25141c82a62b35096c07cc52fc58205824dc956efc892e0732e12c1816746"
+      },
+      "stages": {
+        "runner-redaction-baseline-v1": {
+          "cases": 2,
+          "failures": 2,
+          "receipt": {
+            "project_relative_path": "worktrees/byul-req-s5-inputs-20261109/out/runner-redaction-baseline-v1/receipt.json",
+            "bytes": 887,
+            "file_sha256": "94fe0ed7c68c919470fa80ed45d161f338fa9481403bb2f1ed311baee4c4a534"
+          },
+          "junit": {
+            "project_relative_path": "worktrees/byul-req-s5-inputs-20261109/out/runner-redaction-baseline-v1/junit.xml",
+            "bytes": 5303,
+            "file_sha256": "5b5546ff287c760ffc8c37024a827bb8eeed37c460959c57e19ec73f8667fb06"
+          },
+          "parent_wall_seconds": 4.0
+        },
+        "runner-redaction-fixed-v1": {
+          "cases": 2,
+          "failures": 0,
+          "receipt": {
+            "project_relative_path": "worktrees/byul-req-s5-inputs-20261109/out/runner-redaction-fixed-v1/receipt.json",
+            "bytes": 1185,
+            "file_sha256": "352e511053da658c9e804d3aee288e3b0985e34e55606aec501bbfded2f84a01"
+          },
+          "junit": {
+            "project_relative_path": "worktrees/byul-req-s5-inputs-20261109/out/runner-redaction-fixed-v1/junit.xml",
+            "bytes": 547,
+            "file_sha256": "3437505f1fd6b3aa4ce67776fd1ccb434e2ddc0effe3256b429731f72d79edf2"
+          },
+          "parent_wall_seconds": 4.202999999979511
+        },
+        "runner-env-error-baseline-v1": {
+          "cases": 2,
+          "failures": 2,
+          "receipt": {
+            "project_relative_path": "worktrees/byul-req-s5-inputs-20261109/out/runner-env-error-baseline-v1/receipt.json",
+            "bytes": 1187,
+            "file_sha256": "3123006628dab9ce6e90ae5c52c21e4e031dd2c7c76b350fb7ab8d422ba0e93f"
+          },
+          "junit": {
+            "project_relative_path": "worktrees/byul-req-s5-inputs-20261109/out/runner-env-error-baseline-v1/junit.xml",
+            "bytes": 6018,
+            "file_sha256": "5944927ceec316f5fcf26cc3b6885d2c96d239d68e0d6aa2ebf8a32e0cfcc8f5"
+          },
+          "parent_wall_seconds": 4.530999999959022
+        },
+        "runner-env-error-fixed-v1": {
+          "cases": 2,
+          "failures": 0,
+          "receipt": {
+            "project_relative_path": "worktrees/byul-req-s5-inputs-20261109/out/runner-env-error-fixed-v1/receipt.json",
+            "bytes": 1171,
+            "file_sha256": "ee8a9017990ae46ee07298a87d066f930ab3160bd2f54a0b2dad5b57c4b419e5"
+          },
+          "junit": {
+            "project_relative_path": "worktrees/byul-req-s5-inputs-20261109/out/runner-env-error-fixed-v1/junit.xml",
+            "bytes": 530,
+            "file_sha256": "e2d016bfcaf4f1a2c2ef16219bee0a13755edca3601cb6c5331946765f85999d"
+          },
+          "parent_wall_seconds": 3.0
+        }
+      },
+      "fixed_case_executions": 4,
+      "final_unique_passing_cases_including_reused31": 34,
+      "base31_not_rerun": true,
+      "existing_v1_pinned_bytes_unchanged": {
+        "argv.json": true,
+        "environment.json": true,
+        "junit.xml": true,
+        "side-effect-audit.json": true,
+        "source-snapshot.json": true,
+        "stderr.txt": true,
+        "stdout.txt": true
+      },
+      "harness_path_correction_note": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-req-s5-inputs-20261109\\out\\runner-redaction-baseline-v1\\harness-path-note.json",
+        "bytes": 676,
+        "sha256": "52ce33a41b21658aa50d97676dc58363c78be0554a04a9024f0760b8e2fabecb"
+      },
+      "changes": "fixed missing entry code; typed ENV input failure wrapper preserving original type; no input body copied to stderr"
+    }
+  },
+  "SUP16": {
+    "original_source_commit": "9cc3f5824861d3bfdd479d117b26b00c253e3819",
+    "passed": 17,
+    "pytest_seconds": 6.06,
+    "parent_wall_seconds": 10.0483047,
+    "fixed_index": {
+      "project_relative_path": "worktrees/byul-sup16-measurement-prep-20261109/out/sup16-static-actual-v1/fixed-handoff.json",
+      "bytes": 6387,
+      "file_sha256": "1cea28a5b25c13d07b16c3b8bc728ecb0a6ce6ff2bdcda7f5ac4c2659b34a5bb"
+    },
+    "actual_S1_static_CLI_exit": 0,
+    "actual_S1_static_CLI_parent_seconds": 5.532,
+    "actual_S1_model_copies_SHA_verified": true,
+    "old_writer_model_archive_runs_repeated": false,
+    "generated_argv_parser_contracts": 3,
+    "actual_writer_or_runtime_executed": false,
+    "root_source_composition_only": {
+      "receipt": {
+        "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/sup16-root-source-integration-v1/receipt.json",
+        "bytes": 2259,
+        "file_sha256": "9b79fd7fef792dc49ddd98fba99e1126d795dfbf79b906b9ad6ad43aa9b32ddc"
+      },
+      "exit": 0,
+      "parent_seconds": 6.718,
+      "model_arguments_supplied": false,
+      "model_copy_verification_repeated": false
+    },
+    "ready_for_execution": false,
+    "producer_authenticated": false,
+    "worker_consumption_verified": false,
+    "native_assets_generated": false,
+    "new_runtime_identity_generated": false
+  },
+  "independent_reviews": {
+    "B4": {
+      "project_relative_path": "worktrees/byul-b12-review-20261108/out/reviews/b4-local-input-verification-20261109-v1/independent-review-v1.json",
+      "bytes": 3885,
+      "file_sha256": "8f70369c5112fddedb29e3cf6071615c0419b6c33dd9a5b7d08bcaf82f8954c2"
+    },
+    "SUP16": {
+      "project_relative_path": "worktrees/byul-b12-review-20261108/out/reviews/sup16-static-preparation-20261109-v1/independent-review-v1.json",
+      "bytes": 5583,
+      "file_sha256": "5b032264573b5ffc6ab9d86a1c930441c884587a69b3b79c7ebdfbd6d29654ab"
+    },
+    "REQ_final": {
+      "existing_review_thread": "01a1af2c-e5d2-7083-bbab-9d8e1758f1b2",
+      "turn": "01a1be7c-4805-7bb0-8ab6-1251ac288698",
+      "source_base": "d92b77a887388b0ce99684d9dfbe290a548ef012",
+      "source_final": "910835a994dc309d12d07cb57b5522705b373782",
+      "root_final_code": "b83b3937b6b32a2d744f46da96839b3c71822d1a",
+      "conclusion": "범위내미해결구체결함0",
+      "method": [
+        "original index and9receipts/31pass/actualCLI",
+        "3readonly Stores with9POL/EVD/REScontent hashes",
+        "final30filepins and3Gitblobs",
+        "two original failures to two passes for each of wrapper and ENV errors"
+      ],
+      "original_finding": {
+        "project_relative_path": "worktrees/byul-b12-review-20261108/out/reviews/req-runner-inputs-review-20261109-v1/error-boundary-finding-v1.json",
+        "bytes": 1911,
+        "file_sha256": "22960c71b883fc8fd314450f7a22060405a445b40fb843f1c506e30f2bf6e03f"
+      },
+      "finding_resolved_by_followup": true,
+      "old_finding_modified": false,
+      "suite_producer_model_API_or_restore_repeated": 0
+    }
+  },
+  "protected_scope": {
+    "source_product_pack_lock_pyproject_and_43states_or_status_files_diff": [],
+    "reviewed_source_manifest_sha256": "cb1828a8799752511c6c4817bfba1aedf89c79b274a46562f45d992e32045705",
+    "manifest_regenerated": false,
+    "existing_FAIL_UNKNOWN_Refs_preserved": true,
+    "formal_REVIEWED_CONFIRMED_official_changed": false,
+    "checklist_status_check": "checks77 real_connected23 supported_connected68"
+  },
+  "operations": {
+    "scope": "this offline preparation implementation and validation only",
+    "GPU_AWS_SSM_HTTP_engine_model_or_download_operations": 0,
+    "Git_and_local_file_source_checks_performed": true,
+    "tests_and_explicit_offline_CLI_harnesses_executed": true
+  },
+  "CI": {
+    "final_head": "confirm after publication; do not copy previous8bcb14success"
+  },
+  "remaining": [
+    "REQ real case/request callback correlation and capture/consumption time binding",
+    "actual runtime ENV/target/prepared/session/Pod/PID/start/role and policy windows",
+    "original deadline Ready/owned cleanup and actual EVD/RES/RPT/export/restore when created",
+    "B4 TP2 topology/registered sources/A6 harness and valid resource/budget inputs"
+  ]
+}

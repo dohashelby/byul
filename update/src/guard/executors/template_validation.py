@@ -111,7 +111,8 @@ class TemplateValidationExecutor(HttpCheckExecutor):
         append_artifact(draft, ctx, "template_samples.json", f"{self.name}/{self.version}")
         if getattr(ctx, "_native_artifact_written", False):
             append_artifact(draft, ctx, "template_native_observations.json", f"{self.name}/{self.version}")
-        return draft
+        from .common_consumption import attach
+        return attach(draft, ctx, self.cfg, kind="supply-reads")
 
     def run(self, check, env, policy_values, adapter, workdir):
         if getattr(check, "collection_profile", None) == template_sandbox.PROFILE:

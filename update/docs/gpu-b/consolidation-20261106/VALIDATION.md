@@ -1,5 +1,32 @@
 # 통합 검증 — 2026-11-06
 
+## 2026-11-08 B3 후속
+
+[B3 검증 근거](b3-validation-20261108.json)는 실제 CPU API·과거 journal 재생·EXAMPLE factory/저장/판정/보고/복원 계약·소유 정리와 원 실패를 구분한다. API/model/원archive·불변suite를 재실행하지 않고 고정 소스·원자료·기존 정확 Ref를 재사용했다. source manifest는 추가1/갱신2만 반영했고 원 B gate의 거부 경계도 함께 확인했다. 선행 CI수정 d1d91329의14성공과 B3 head의 원격 재검사는 별개다.
+
+## 2026-11-08 B1·B2 소비자와 B4 준비 추가 검증
+
+이번 신규 코드의 CPU fixture·원 factory/저장/판정/보고·복원/재판정·미등록/독립 FAIL 보존 범위는 [B12_B4_INTEGRATION.md](B12_B4_INTEGRATION.md), 실행별 원 실패와 수정·고정 SHA·검토는 [b12-b4-validation-20261108.json](b12-b4-validation-20261108.json)을 따른다. 이전 시험 횟수를 새 실적으로 합산하지 않는다. GPU·모델·Docker 기동과 다운로드는 하지 않았다.
+
+## 2026-11-08 추가: 실제 CPU·로컬 컴포넌트 연결
+
+- 기존 모의 결과와 별도로 새 실제 로컬 관측14ID를 확보했다. LIF-08·12·16, OBS-02에는 이번 새 실제 실행이 없다. 전체 제품 질문 완료 수와 구분한다.
+- 원0.31 renderer/InputProcessor 새6사례(수용3·표준거부3), SamplingParams 정상/범위 거부, SUP08의 trust-MM 옵션 함수6사례를 실제로 호출했다. renderer4사례/processor5사례로 실제 도달 범위를 구분한다.
+- 별도 설치 vLLM0.29 CPU에서 새 극소형 모델로 정상2요청·각2출력토큰을 확인했다. 원0.31 엔진/GPU 성공으로 승격하지 않는다. LLM 호출 직전→Ready 표기57.308초(후속 설정/proc 수집 포함)·실효CPU KV cache1GiB·Worker정상종료뒤내부Core강제종료·부모종료후동일PID/start부재를 원자료대로 기록했다.
+- S1 host11component기록 중10completed·PLT02 metadataassert1불충족/exit1을 유지했다. 별도 자기 소유 user/PID/mount namespace의 같은probe4조건은 충족했다. hostUID1000과 namespaceUID0 매핑을 구분하고 host권한/정책을 바꾸지 않았다.
+- SUP16은 새파일의 정상2·거부2/자식4실행·16assert 확인이다. 고정writer API/parser 범위이며 전체writer·native worker·제품factory 검증과 구분한다.
+- 신규7도구의 Python3.12 구문·CLI help 및 engine OOV 라벨만 고친 AST 동등성을 확인했다. 실제API 입력 사례가 직접 기능 검증이며 기존 모의/52tests·heavy모델/전체suite를 새 성과로 반복 집계하지 않는다.
+- 모의·실제·원자료SHA·버전·미실행·GPU/공통지원 잔여는 [상세 결과](LOCAL_ACTUAL_VALIDATION.md)와 [기계 판독 기록](local-actual-validation-20261108.json)에 분리했다. 전체37컴포넌트 기록을37개 항목/실험/제품PASS로 세지 않는다.
+
+## 2026-11-08 추가: GPU18 모의 연동
+
+- 전용 `guard.gpu18_prototype`에서 18개×정상/위반/누락54사례를 실행했다. 모의 계약은 PASS18/FAIL18/UNKNOWN18, 원팩 대조는 정상 PASS16/UNKNOWN2·위반 FAIL16/UNKNOWN2·누락 UNKNOWN18이다.
+- 6개 PLAN에서 EVD108·RES108·RPT6을 생성했다. 실제 내용 주소 Store·팩 snapshot·bundle155파일을 반출/복원하고, 고정 `as_of`로 정확 Result Ref와 보고서의 동등성을 확인했다. 모두 EXAMPLE·DRAFT 정책·비공식이며 GPU 추가 기동0이다.
+- 독립 테스트14개 통과(25.13초): 저장 객체/Ref·출처·모의 사건·원팩 대조·독립 FAIL·복원/재판정·변조3종 거부·기존 출력 보존·예외 시 registry 복원·CLI. 프로세스·네트워크 차단기의 시도0이다.
+- 기존 회귀38개 통과(43.31초): `tests/test_cli.py tests/test_evidence_bundle.py tests/invariants/test_inv_02.py tests/invariants/test_inv_11.py`. 추가 엔진·모델·Docker·전체 suite 실행은 없다.
+- 최초 통합에서 directory 팩과 stored 팩의 안내 문구 차이를 발견했다. 최초 보고서부터 저장 팩으로 생성하도록 수정해 동일 경로로 대조했다. 한계 문구 제거·판정 완화·공통 코드 수정은 없다.
+- [실행·실제 연동 인계](GPU18_PROTOTYPE.md), [정확 Ref·SHA 기록](gpu18-prototype-validation-20261108.json). 기존 실증25/18은 유지한다.
+
 ## 현재 통합 소스
 
 - main `e5a8ba7589be09fa472c35276e190b117426a0ae` 위에 기존 미반영7개 commit을 적용했다. 원 commit 순서는 `97cf8cfc`, `3a115bd6`, `ee44d8dd`, `4e4da648`, `678a20d8`, `58ee6dff`, `3b3ff137`이다.

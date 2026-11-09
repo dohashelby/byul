@@ -1,0 +1,174 @@
+{
+  "base": "aa3c6ac8f9b7e4a70f8ea76f6f35b89a3b40737c",
+  "failed_CI_unique_cases": {
+    "tests/test_a1_B160_http_product.py::test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack[unready]": "ValueError: pinned source untracked/ignored file: update/src/guard/executors/common_consumption.py",
+    "tests/test_a1_B160_http_product.py::test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack[partial-body]": "ValueError: pinned source untracked/ignored file: update/src/guard/executors/common_consumption.py",
+    "tests/test_a1_B160_http_product.py::test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack[cleanup-after-canary]": "ValueError: pinned source untracked/ignored file: update/src/guard/executors/common_consumption.py",
+    "tests/test_a1_B160_http_product.py::test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack[attachment]": "ValueError: pinned source untracked/ignored file: update/src/guard/executors/common_consumption.py",
+    "tests/test_a1_B_native21_consumption.py::test_new_A_full_common_pin_is_the_exact_B_reviewed_pair": "ValueError: pinned source untracked/ignored file: update/src/guard/executors/common_consumption.py",
+    "tests/test_b_lif07_readiness.py::test_actual_native_helper_default_public_entrypoint_store_restore_preserved": "SystemExit: 1",
+    "tests/test_b_native20_common_consumption.py::test_current394_real_gate_HTTP_main_and_exact_saved_pack[unready]": "ValueError: pinned source untracked/ignored file: update/src/guard/executors/common_consumption.py",
+    "tests/test_b_native20_common_consumption.py::test_current394_real_gate_HTTP_main_and_exact_saved_pack[cleanup-after-canary]": "ValueError: pinned source untracked/ignored file: update/src/guard/executors/common_consumption.py",
+    "tests/test_checklist_status.py::test_generation_is_deterministic_roundtrippable_and_matches_committed_outputs": "assert b'check_id,ar...DATE_SCOPE,\\n' == b'check_id,ar...DATE_SCOPE,\\n'",
+    "tests/test_kubernetes_response_error_adapter.py::test_installed_helper_paths_match_all_four_approved_bytes_and_function_origins": "ValueError: REQ13_HELPER_BYTES_MISMATCH",
+    "tests/test_kubernetes_response_error_adapter.py::test_current_old_a_source_is_closed_before_transport": "AssertionError: assert 'A_CAPABILITY_UNAVAILABLE' in ['A_SOURCE_POSTCHECK_UNAVAILABLE', 'CLEANUP_UNAVAILABLE', 'POLICY_UNSET', 'TRANSPORT_UNAVAILABLE']",
+    "tests/test_kubernetes_response_error_adapter.py::test_extraction_uses_exact_three_public_cases_and_original_safe_projection": "IndexError: list index out of range",
+    "tests/test_kubernetes_response_error_adapter.py::test_confirmed_field_violation_survives_late_or_incomplete_subset_capture[extra]": "IndexError: list index out of range",
+    "tests/test_kubernetes_response_error_adapter.py::test_confirmed_field_violation_survives_late_or_incomplete_subset_capture[after_error]": "IndexError: list index out of range",
+    "tests/test_kubernetes_response_error_adapter.py::test_confirmed_field_violation_survives_late_or_incomplete_subset_capture[status500]": "IndexError: list index out of range",
+    "tests/test_kubernetes_response_error_adapter.py::test_confirmed_field_violation_survives_late_or_incomplete_subset_capture[partial]": "IndexError: list index out of range",
+    "tests/test_kubernetes_response_error_adapter.py::test_explicit_empty_field_policy_has_its_own_hash_and_confirms_all_observed_fields": "IndexError: list index out of range",
+    "tests/test_kubernetes_response_error_adapter.py::test_missing_field_policy_is_not_replaced_by_empty_policy": "IndexError: list index out of range",
+    "tests/test_kubernetes_response_error_adapter.py::test_projection_rejects_different_policy_values_even_with_the_same_environment": "IndexError: list index out of range",
+    "tests/test_kubernetes_response_error_adapter.py::test_unconfirmed_primary_response_remains_uncollected[status200]": "IndexError: list index out of range",
+    "tests/test_kubernetes_response_error_adapter.py::test_unconfirmed_primary_response_remains_uncollected[empty_fields]": "IndexError: list index out of range",
+    "tests/test_kubernetes_response_error_adapter.py::test_unconfirmed_primary_response_remains_uncollected[bad_binding]": "IndexError: list index out of range",
+    "tests/test_kubernetes_response_error_adapter.py::test_unconfirmed_primary_response_remains_uncollected[wrong_id]": "IndexError: list index out of range",
+    "tests/test_kubernetes_response_error_adapter.py::test_helper_foreign_function_origin_is_rejected": "AssertionError: Regex pattern did not match.",
+    "tests/test_kubernetes_response_error_adapter.py::test_late_helper_postcheck_failure_keeps_previously_verified_field_facts": "IndexError: list index out of range",
+    "tests/test_a1_req10_consumption_pin.py::test_actual_fixed_integration_snapshot_passes_and_original_B_default_still_rejects": "ValueError: pinned source untracked/ignored file: update/src/guard/executors/common_consumption.py",
+    "tests/test_response_kubernetes_capture.py::test_a_unapproved_profile_closes_before_transport_without_empty_collected_evidence": "AssertionError: assert (None is None and 'A_CAPABILITY_UNAVAILABLE' in ['A_SOURCE_POSTCHECK_UNAVAILABLE', 'CLEANUP_UNAVAILABLE', 'POLICY_UNSET', 'TRANSPORT_UNAVAILABLE'])",
+    "tests/test_response_kubernetes_capture.py::test_example_capture_uses_three_closed_cases_api_alias_and_hash_only_metadata": "IndexError: list index out of range",
+    "tests/test_response_kubernetes_capture.py::test_after_failure_preserves_confirmed_forbidden_field_without_exception_or_body": "IndexError: list index out of range",
+    "tests/test_response_kubernetes_capture.py::test_unattributed_primary_response_is_not_projected[bad_binding]": "IndexError: list index out of range",
+    "tests/test_response_kubernetes_capture.py::test_unattributed_primary_response_is_not_projected[wrong_id]": "IndexError: list index out of range",
+    "tests/test_response_kubernetes_capture.py::test_http_success_is_not_classified_as_error_field_violation": "IndexError: list index out of range",
+    "tests/test_response_kubernetes_capture.py::test_error_status_mismatch_retains_independent_actual_error_field_violation": "IndexError: list index out of range",
+    "tests/test_response_kubernetes_capture.py::test_missing_error_body_is_uncollected": "IndexError: list index out of range",
+    "tests/test_response_kubernetes_capture.py::test_before_shape_mismatch_prevents_primary_but_runs_after_control": "IndexError: list index out of range",
+    "tests/test_response_kubernetes_capture.py::test_explicit_field_policy_unset_remains_unknown_in_helper": "TypeError: 'NoneType' object is not subscriptable",
+    "tests/test_response_kubernetes_capture.py::test_partial_capture_remains_gap_and_does_not_gain_complete_coverage": "IndexError: list index out of range",
+    "tests/test_response_kubernetes_capture.py::test_post_source_check_failure_does_not_erase_prior_verified_observation": "IndexError: list index out of range",
+    "tests/test_response_kubernetes_capture.py::test_explicit_policy_and_request_hashes_bind_the_real_selected_inputs": "IndexError: list index out of range",
+    "tests/test_response_kubernetes_capture.py::test_helper_decoded_utf8_hash_is_distinct_from_a_raw_wire_hash": "IndexError: list index out of range"
+  },
+  "failed_original_log_sha256": "4df872a2f01788a729b1350c2d2188851f0f2039d28e48473d9697b22efc6a13",
+  "manifest_added_files": [
+    "update/src/guard/executors/common_consumption.py",
+    "update/src/guard/executors/lifecycle_common_input_consumption.py",
+    "update/src/guard/gpu18_prototype/__init__.py",
+    "update/src/guard/gpu18_prototype/__main__.py",
+    "update/src/guard/gpu18_prototype/common_cases.py",
+    "update/src/guard/gpu18_prototype/cpu_cases.py",
+    "update/src/guard/gpu18_prototype/history_cases.py",
+    "update/src/guard/gpu18_prototype/native_case.py",
+    "update/src/guard/gpu18_prototype/runner.py"
+  ],
+  "manifest_changed_files": [
+    "update/src/guard/adapters/kubernetes_response_error.py",
+    "update/src/guard/executors/input_validation.py",
+    "update/src/guard/executors/kubernetes_container_config.py",
+    "update/src/guard/executors/kubernetes_initialization.py",
+    "update/src/guard/executors/kubernetes_input_validation.py",
+    "update/src/guard/executors/kubernetes_ipc_product.py",
+    "update/src/guard/executors/kubernetes_observation_composite.py",
+    "update/src/guard/executors/kubernetes_observation_state.py",
+    "update/src/guard/executors/kubernetes_profiler_control.py",
+    "update/src/guard/executors/kubernetes_profiler_observation.py",
+    "update/src/guard/executors/kubernetes_request_termination.py",
+    "update/src/guard/executors/kubernetes_resource_recovery.py",
+    "update/src/guard/executors/kubernetes_sampling.py",
+    "update/src/guard/executors/kubernetes_stream_buffer.py",
+    "update/src/guard/executors/kubernetes_supply_boot.py",
+    "update/src/guard/executors/kubernetes_template_supply.py",
+    "update/src/guard/executors/lab_activation.py",
+    "update/src/guard/executors/lifecycle_transition.py",
+    "update/src/guard/executors/log_analysis.py",
+    "update/src/guard/executors/sampling_validation.py",
+    "update/src/guard/executors/supply_boot_contract.py",
+    "update/src/guard/executors/template_validation.py"
+  ],
+  "manifest_removed_files": [],
+  "manifest_scope_and_pack_unchanged": true,
+  "local_unique_final_cases": 78,
+  "local_unique_final_cases_passed": 78,
+  "initial_local": "73 passed / 1 Windows synthetic newline fixture failed",
+  "fixture_delta": "1 passed in 1.55s; no production source change",
+  "GPU_operations": 0,
+  "fixed_files": {
+    "update/release/reviewed-source.json": "273f7a8891adfecdfb700945d150e2bb9d2bf4457f19f42edd41cb95b676e3a6",
+    "update/src/guard/adapters/kubernetes_response_error.py": "e423bb977cc2b607283f582930e02e0b0c58d4c46370edd80ea94db7aae19860",
+    "update/tools/b2_response_kubernetes_capture.py": "ae55d9b72e6e267c6cde7891563a4d48d169c025cd1689446e55777ba77ad12a",
+    "update/docs/checklist_validation_status.csv": "259f56e40c61d0d2ce33c6145255328234fff233ec5fc63db860eeda7251f4c7",
+    "update/tests/test_kubernetes_response_error_adapter.py": "fbdb11e47dece24bb77f34b600d7158012fd5dec7dfd5d2959a383a3c8c4f70c",
+    "update/tools/checklist_status.py": "069504b834640a719344b581c1c2ef3a74b40d514cc0ec3e68fb82aab809b4dd",
+    "update/tests/test_checklist_status.py": "51598d7de6b1fd178f7547914612ba9f3d928c5c86d24e2e53e192c10a1c047c"
+  },
+  "schema": "guard-ci-fix-validation/1",
+  "source_base": "aa3c6ac8f9b7e4a70f8ea76f6f35b89a3b40737c",
+  "no_assert_or_verdict_weakening": true,
+  "original_B_default_pin_changed": false,
+  "A_HTTP_capability_pin_changed": false,
+  "runtime_hash_approval": false,
+  "remote_CI_after_fix": {
+    "head": "d1d91329a4c1063256c4bfa2776391db68f38742",
+    "success": 14,
+    "failed": 0,
+    "unfinished": 0,
+    "receipt_project_relative": "worktrees/byul-b12-s2-plan-20261108/out/ci-pr232-d1d91329-20261108-v1/final-success-receipt-v1.json",
+    "file_sha256": "683078fa0437352e3e6149c715999d6b0059c7aa8c85d730bde6c5ea4827326a",
+    "B3_head_included": false
+  },
+  "token_AST_proof": {
+    "template_file_sha256": "4e7df5927b86b3eb6f6a2369a9fe5b9a78ff03bd30abb8d097a87f952f7e8419",
+    "old_file_sha256": "0f96a26959180ed783160ec7b3d5a13e0c0e5d5f4d913ffe257f4b84926efe27",
+    "token_ids_AST_unchanged": true,
+    "original_REVIEWED_COMMON_MANIFEST_SHA256": "42d8f65dddcf7037ffd97ae47199ea80c2f9d21679f20f0626591783c8715595"
+  },
+  "local_evidence": [
+    {
+      "path": "out/team-handoff/ci-fix-focused-v1/receipt.json",
+      "file_sha256": "318b7b6efbcca0ac7c6c46b4cbe72a7016a4e221ee617029efdcb66f3d6f33ce"
+    },
+    {
+      "path": "out/team-handoff/ci-fix-focused-v1/pytest.xml",
+      "file_sha256": "917ba45aed5805e3811dcfe25452261ff1ed216a1a51b318322684a712cf3db8"
+    },
+    {
+      "path": "out/team-handoff/ci-fix-fixture-pytest.xml",
+      "file_sha256": "cb71d7ad6a5752b94734a6bb0e8866e14fec2f5300720425684a49b11e2bfed7"
+    },
+    {
+      "path": "out/team-handoff/ci-order-repro-v1.txt",
+      "file_sha256": "cd523279e7c53df7df32c06773ec126ee4bbcb7d5613ef569684c107158783b3"
+    },
+    {
+      "path": "out/team-handoff/ci-order-fixed-v2.txt",
+      "file_sha256": "58b679a72bc48a9eb8e5eeed1c80c396031c46d6bc3a3a90fd1acc3bc66749ee"
+    },
+    {
+      "path": "out/team-handoff/ci-order-fixed-pytest.xml",
+      "file_sha256": "8f2aec8eca64fb58fbddf0ff043182f326e793fcfc6b45f59968d2f222525ccc"
+    },
+    {
+      "path": "out/team-handoff/ci-status-final-order-proof.json",
+      "file_sha256": "fbdb70a65c43749a26bd33e1a3969fd3de5e4a4e9b88ed380db5eabf05a561af"
+    }
+  ],
+  "cross_platform_ordering": {
+    "reproduction": "2 failed, 2 passed in 0.93s",
+    "fixed": "21 passed in 3.98s",
+    "CSV_semantics": {
+      "rows": 77,
+      "changed_fields": [
+        "phase1_note"
+      ],
+      "changed_notes": 27,
+      "gpu_runs_and_Refs_and_states_unchanged": true,
+      "CSV_sha256": "259f56e40c61d0d2ce33c6145255328234fff233ec5fc63db860eeda7251f4c7"
+    },
+    "key": "Path.as_posix() code-point order",
+    "asserts_unchanged": true
+  },
+  "reviews": {
+    "manifest_helper_fixture": {
+      "project_relative_path": "worktrees/byul-b12-review-20261108/out/reviews/ci-metadata-review-20261108-v1/ci-manifest-helper-fixture-review-v1.json",
+      "file_sha256": "cb01b345ea575e24204fadfbed5f77947699d6104da53c3483b8d5669faea46e"
+    },
+    "generator_order_delta": {
+      "project_relative_path": "worktrees/byul-b12-review-20261108/out/reviews/ci-metadata-review-20261108-v1/ci-metadata-and-order-independent-review-v2.json",
+      "file_sha256": "2087a6226d4d24b6f0aa03a0205efeac4e9bb4712bcc2103dbda50593fbb9fe9",
+      "result": "고정 d1d91329 범위 미해결 구체결함0"
+    }
+  }
+}

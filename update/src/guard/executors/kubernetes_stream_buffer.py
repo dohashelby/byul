@@ -15,7 +15,10 @@ BUDGET_PROFILE='kubernetes-stream-buffer-budget-observation-v1'
 CHECK_PROFILES={'LIF-04':PROFILE,'LIF-03':BUDGET_PROFILE}
 
 
-class KubernetesStreamBufferExecutor(HttpCheckExecutor):
+from .lifecycle_common_input_consumption import LifecycleCommonInputConsumer
+
+
+class KubernetesStreamBufferExecutor(LifecycleCommonInputConsumer, HttpCheckExecutor):
     name='stream_buffer';version='0.1.0';requires_roles=False;requires_route_scope=False;functional_via='engine'
 
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):

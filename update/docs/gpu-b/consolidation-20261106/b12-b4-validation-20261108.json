@@ -1,0 +1,1059 @@
+{
+  "schema": "guard-b12-b4-validation/1",
+  "scope": "B1/B2 소비 연결 및 B4 준비; CPU fixture; 추가 GPU 기동 없음",
+  "source_base": "37c284d91286dbcf2483f8fa654d2e50f32f9d38",
+  "source_commit_at_validation": "82ebeb2bee7a1681f63a7a1f526679fead66edac",
+  "A_return_source": "8402ff8947e78c85e75d76c62b0bd91d88cc0512",
+  "integrations": {
+    "S1_source": "bb4cf60dcbaf681ddd511c6433d7cb4131362ba0",
+    "S1_artifact_file_write_fix": "69362aef77cbf394af7f06fe09c1731ebfb73fac",
+    "S1_artifact_final_directory_fix": "4014364a4ac2d9a6ec55592bbbae746388460c10",
+    "S5_source": "edaa657023987659afb2521ec45c07433ec83e6f",
+    "S5_identity_fix": "28cf69ddf25c032c65a1dd645120e0d93cc46a91",
+    "S2_plan": "87d8ae18701c44891dd5dd8543d261ba1eb86a42",
+    "root_B4": "b928b760",
+    "root_canonical": "ea2fef65"
+  },
+  "origins": {
+    "external_inputs": [
+      "EXAMPLE",
+      "DECLARED"
+    ],
+    "CPU_fixture_only": true,
+    "GPU_execution_performed": false,
+    "new_product_completion": 0,
+    "official": false
+  },
+  "operation_scope": {
+    "AWS_GPU_starts": 0,
+    "Docker_or_models_started": 0,
+    "downloads": 0,
+    "note": "이번 배정 범위의 호출 수이며 별도 채팅의 운영 상태 전역 조회가 아니다."
+  },
+  "unchanged_status": {
+    "assigned_IDs": 43,
+    "lab_done": 2,
+    "lab_remaining": 41,
+    "limited_closeout": 25,
+    "product_evidence_needed": 18,
+    "prior_actual_local_IDs": 14,
+    "phase1_states_unchanged": true,
+    "original_refs_and_failure_records_preserved": true
+  },
+  "A_owned_paths_changed": [],
+  "current_common_contract": {
+    "schema": "guard-gpu-common-input/1",
+    "max_events": 4096,
+    "supported_producer_entries": 8,
+    "registration_is_authentication": false
+  },
+  "A_plan_original": {
+    "bytes": 3035,
+    "sha256": "e9c20d4381aef17be7a5d6585775ead317f25bc04fba804246355d84e0b5b981",
+    "prefix_preserved": true
+  },
+  "source_files": [
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/common_consumption.py",
+      "bytes": 14676,
+      "file_sha256": "dc32f17fa6b3e2bd47024a1247f5695d40951708a4fde498d75af426795cd2d8"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/input_validation.py",
+      "bytes": 11254,
+      "file_sha256": "514a984380c043346d13041fe15f4d1084edd00f2b4ac0965151d910e39ced9e"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_container_config.py",
+      "bytes": 5722,
+      "file_sha256": "1ea377cd99915c87e1e14a0859c8882ea6d9e92d9ca7e6533ab40086a4d8e33f"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_initialization.py",
+      "bytes": 13699,
+      "file_sha256": "3438ef84740d8597649acf6755a6f8be6e6065d33f36823df6bd04ee5e33d852"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_input_validation.py",
+      "bytes": 4262,
+      "file_sha256": "208db014aba3ec98a6b9ca364361abc74df209d86f59239e92834ced4ffbb193"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_ipc_product.py",
+      "bytes": 4019,
+      "file_sha256": "56f23a6cbcd0701500f747481c910d59e6e31908a41267804ea6d1b60321acd6"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_observation_composite.py",
+      "bytes": 10190,
+      "file_sha256": "73e2f8e2c1ddf6b05f096d28135f9a004858b512b379daeabbeb0da354a981a1"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_observation_state.py",
+      "bytes": 13435,
+      "file_sha256": "b6f3b0b8f9ce570a0e7a7d22c3a6f9fac2deb5a96963902f225d1f18c2a710d0"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_profiler_control.py",
+      "bytes": 24763,
+      "file_sha256": "32114b76067e99674b73a2c5af37a8934f63af0ae43170774dea3270ad3bc947"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_profiler_observation.py",
+      "bytes": 6384,
+      "file_sha256": "589e0ceda56d3c6010a1561a8aa859e880c3c415e7ad8069cbf718f7233047e3"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_request_termination.py",
+      "bytes": 15694,
+      "file_sha256": "7ef6afcb18dc79edc3e9589765fec57ec568cbd259f7d5e29b1d59cf29dfc29f"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_resource_recovery.py",
+      "bytes": 10354,
+      "file_sha256": "4740285e78223d3da6dd11e9c50f4741443cc700a81dd8170ca6796f6767d0d1"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_sampling.py",
+      "bytes": 3851,
+      "file_sha256": "d2e6b2d1a70907b6ef37cabd0610b3a1420d7adc3dc4549b5322857caa793a19"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_stream_buffer.py",
+      "bytes": 11947,
+      "file_sha256": "84f6fb9b1472073ef36ef99e9df5b583435d90118158948c2b28102f52142caa"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_supply_boot.py",
+      "bytes": 14152,
+      "file_sha256": "b37a410547d27c90142b29ff0389cb4b5732c6cadcf1ad35deb55c0366134527"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/kubernetes_template_supply.py",
+      "bytes": 3685,
+      "file_sha256": "4061574b278f6f97e1b94444b1790a689361040e8cab4b8aa3c95d9a402887ba"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/lab_activation.py",
+      "bytes": 107275,
+      "file_sha256": "26ba63057bc405d6e7fa6b6c95e5a133dc82a31a65f30b83914adf5419ebf17c"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/lifecycle_common_input_consumption.py",
+      "bytes": 12865,
+      "file_sha256": "e854bb28c293c4464ce1d00cec24b0e67e81dbd9c4cc770a4a5113149f239540"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/lifecycle_transition.py",
+      "bytes": 25335,
+      "file_sha256": "68191edb09bbbebf4a7ac4ec731cd3bf76af1790db57ccc19e17a4b8e9e92021"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/log_analysis.py",
+      "bytes": 20415,
+      "file_sha256": "ed3dca47f041243ae657edb8f60c378191b3d150acec04fe410037a5dde30b87"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/sampling_validation.py",
+      "bytes": 13844,
+      "file_sha256": "b7e78dd87461573e371d7905f3b888c04c0c84c151aefdb9b6277b019d7cf4b0"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/supply_boot_contract.py",
+      "bytes": 13055,
+      "file_sha256": "8b00ed0ce7f0f62dd4d1612b94b0ca45f16e5504274f1df1bb6a6c15b5cf8228"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/src/guard/executors/template_validation.py",
+      "bytes": 26858,
+      "file_sha256": "4e7df5927b86b3eb6f6a2369a9fe5b9a78ff03bd30abb8d097a87f952f7e8419"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/tests/test_b12_canonical_pipeline.py",
+      "bytes": 4627,
+      "file_sha256": "86bcc0217b7b231e1905c8437224b220ee9689ea11a3198e6e07356f1c5bc42e"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/tests/test_b12_common_input_consumption.py",
+      "bytes": 27998,
+      "file_sha256": "ee755e967103fe646c92a50194fd6c74f71c18df5902780c7cd4a796f7e99166"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/tests/test_b12_runner_consumers.py",
+      "bytes": 21145,
+      "file_sha256": "9effc234e76e04ac260e740eb11cd4d7f9114e8ee4c8c0647bc2f44a01a075a8"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/tests/test_b12_supply_consumers.py",
+      "bytes": 10075,
+      "file_sha256": "a6015a510943aa85ce97204ba9b39b0a18adfc550cf8e49b1a5445696bc2b514"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/tests/test_b12_tp2_inputs.py",
+      "bytes": 6335,
+      "file_sha256": "bcc0d34392d49227b37d535de2e6b0f934ebe4ec31df5e046399542791f96506"
+    },
+    {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/update/tools/b12_tp2_inputs.py",
+      "bytes": 13358,
+      "file_sha256": "494274f0b1cbee6efa553ebf62aa598fd5020b6f6530baeff0a2c509bc006632"
+    }
+  ],
+  "tests": {
+    "S1_initial": {
+      "log": {
+        "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/update/out/b12-consumption-v1/pytest.log",
+        "bytes": 11382,
+        "file_sha256": "e7f174ad2a31187abc1547f836c19624e963255c79ea1b1d3af42a32ea559e69"
+      },
+      "observed_summary": "4 failed, 42 passed"
+    },
+    "S1_final": {
+      "log": {
+        "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/update/out/b12-consumption-v2/pytest.log",
+        "bytes": 102,
+        "file_sha256": "55293e53029d1d5231b03fb9a4870ac89c14a766d045885b3dafe993705329d0"
+      },
+      "observed_summary": "53 passed in 45.60s",
+      "invocation": {
+        "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/update/out/b12-consumption-v2/invocation.json",
+        "bytes": 237,
+        "file_sha256": "cf1c440aa280a5f7aa1c0f86df70aeb932308e09e0c83a0fa844af39707f2d58"
+      }
+    },
+    "S1_related": {
+      "log": {
+        "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/update/out/b12-related-v1/pytest.log",
+        "bytes": 9751,
+        "file_sha256": "b1aca0cf57d909310b63cf4c7768112740dfcd89a2729a7a98976e53bf53965e"
+      },
+      "observed_summary": "2 failed, 651 passed in 1089.38s (0:18:09)",
+      "receipt": {
+        "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/out/b12-common-inputs-v1/related-result.json",
+        "bytes": 1680,
+        "file_sha256": "b475ac714ec91107ed644ea7a6229ea9f4be144e6916c96c7cd42235859d1b7f"
+      }
+    },
+    "S1_related_output_path_correction": {
+      "log": {
+        "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/update/out/b12-related-temp-v2/pytest.log",
+        "bytes": 101,
+        "file_sha256": "787c9c4760942be3ed0bb8a9963ec004a028a11f129307433f279e1cae1034a7"
+      },
+      "observed_summary": "2 passed in 12.86s",
+      "invocation": {
+        "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/update/out/b12-related-temp-v2/invocation.json",
+        "bytes": 391,
+        "file_sha256": "e83bc81317ae6ab22a94a0515f3772ecaba0ffc37a22669a27f8dd0640e7d04f"
+      },
+      "reason": "repo 내부 basetemp를 거부한 lifecycle 출력 경계 유지; 동일 source로 해당 2개만 repo 밖에서 재검증"
+    },
+    "S1_artifact_failure_reproduction": {
+      "log": {
+        "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/update/out/b12-activation-artifact-repro-v1/pytest.log",
+        "bytes": 3348,
+        "file_sha256": "7c10b03e88bc54f6101420bc60f7d57ac11ee57fcc4dbf7d086c7ebc505091ac"
+      },
+      "observed_summary": "1 failed"
+    },
+    "S1_artifact_fix": {
+      "log": {
+        "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/update/out/b12-activation-delta-v2/pytest.log",
+        "bytes": 265,
+        "file_sha256": "b98bf35438b1b0fccd4cd01d7d3ebd9b8a793086fd655409e7ce66b4c954e937"
+      },
+      "observed_summary": "192 passed in 14.02s",
+      "invocation": {
+        "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/update/out/b12-activation-delta-v2/invocation.json",
+        "bytes": 881,
+        "file_sha256": "89b53e15278583737506e7e978376baf6c8f9115785aa5852f2a22abea8252f0"
+      }
+    },
+    "S1_directory_preparation_fix": {
+      "log": {
+        "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/update/out/b12-activation-mkdir-delta-v3/pytest.log",
+        "bytes": 100,
+        "file_sha256": "7ad148363a857155a54f4a33da8ca0f2c7e5ba3035c0cab139ef9a54206449e5"
+      },
+      "observed_summary": "3 passed in 8.59s",
+      "invocation": {
+        "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/update/out/b12-activation-mkdir-delta-v3/invocation.json",
+        "bytes": 771,
+        "file_sha256": "b3625b365241b02c1f610c17689dcfb56d257f352050f3b0b419929bc92f0816"
+      }
+    },
+    "S1_directory_failure_reproduction": {
+      "log": {
+        "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/update/out/b12-activation-mkdir-repro-v1/pytest.log",
+        "bytes": 2741,
+        "file_sha256": "9538e2f596e17d354089d95581b0322469c2a46bcfe80b39cc38b6de9e5db52a"
+      },
+      "observed_summary": "1 failed in 3.71s"
+    },
+    "S1_exact_CPU_refs": {
+      "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/out/b12-common-inputs-v1/validation-evidence.json",
+      "bytes": 11024,
+      "file_sha256": "cf1e779dfb069f48394f71baaa771cd51b860305b49f57071cacddbfd169876e"
+    },
+    "S1_contract_returns": {
+      "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/out/b12-common-inputs-v1/contract-return.json",
+      "bytes": 10702,
+      "file_sha256": "bdfd14e87ff76491cfd291b95d3bee8d0b9226b9afa8b4f064d8ee347b99044c"
+    },
+    "S1_final_source_and_result": {
+      "project_relative_path": "worktrees/byul-b12-lifecycle-20261108/out/b12-common-inputs-v3/source-and-result.json",
+      "bytes": 3838,
+      "file_sha256": "4762419891d823e41639740b0e6e7986183f7e708990d43a489b2bd2c71ff51f"
+    },
+    "S5_runs_not_unique_sum": [
+      {
+        "version": 1,
+        "receipt": {
+          "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-v1/test-receipt.json",
+          "bytes": 1915,
+          "file_sha256": "7c4379571f35ed2ab687605ea1b61067d5d43deebc1b8e88f3bf9d7a5fc84648"
+        },
+        "stdout": {
+          "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-v1/pytest.stdout",
+          "bytes": 101,
+          "file_sha256": "f032f582db8837c9af6231989835ba6e9ea0483aea0c6e41a814cd5842fbc567"
+        },
+        "junit": {
+          "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-v1/pytest.xml",
+          "bytes": 4233,
+          "file_sha256": "bae50f2f35ab311f3acfdd65e0f7bad4e190db305cd1484e5de0ab9d622f3e70"
+        },
+        "observed": {
+          "tests": "28",
+          "failures": "0",
+          "errors": "0",
+          "time": "9.360"
+        },
+        "exit_code": 0,
+        "parent_wall_seconds": 11.087462800031062
+      },
+      {
+        "version": 2,
+        "receipt": {
+          "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-v2/test-receipt.json",
+          "bytes": 2165,
+          "file_sha256": "9328fe2e0387e625186b1cf99c44082c3be1479c1e7dfd02874baf6e0699e438"
+        },
+        "stdout": {
+          "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-v2/pytest.stdout",
+          "bytes": 100,
+          "file_sha256": "b339d655e0a682b6385267e5a380487830366f035f0a6dfc91913de5107bd16a"
+        },
+        "junit": {
+          "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-v2/pytest.xml",
+          "bytes": 686,
+          "file_sha256": "c35280b9cf579da8c505156d7a42cddd93f8ed428166dd9ce7014f01c0dbfa23"
+        },
+        "observed": {
+          "tests": "3",
+          "failures": "0",
+          "errors": "0",
+          "time": "3.826"
+        },
+        "exit_code": 0,
+        "parent_wall_seconds": 5.9689999999827705
+      },
+      {
+        "version": 3,
+        "receipt": {
+          "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-v3/test-receipt.json",
+          "bytes": 2169,
+          "file_sha256": "31468e15b39483fdfce941023fc44cf1ee57da66fda21688612b40a93af2fd0a"
+        },
+        "stdout": {
+          "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-v3/pytest.stdout",
+          "bytes": 2171,
+          "file_sha256": "33beaf2bfe2783042f6bd9c61e963ce10fe1331f905e0d7034d293fd2597ff3b"
+        },
+        "junit": {
+          "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-v3/pytest.xml",
+          "bytes": 3313,
+          "file_sha256": "a6c7b3f974c18231c774ad00ead7d87a29b05d357d83c068beab481df25217f2"
+        },
+        "observed": {
+          "tests": "4",
+          "failures": "1",
+          "errors": "0",
+          "time": "3.333"
+        },
+        "exit_code": 1,
+        "parent_wall_seconds": 5.4060000000172295
+      },
+      {
+        "version": 4,
+        "receipt": {
+          "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-v4/test-receipt.json",
+          "bytes": 1941,
+          "file_sha256": "88f68b5861d5ba177d494576664936b68ca3a7b9dd5e4dae89a07b55bbf72688"
+        },
+        "stdout": {
+          "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-v4/pytest.stdout",
+          "bytes": 100,
+          "file_sha256": "f62f8b49a0c0582a3d3af75ca059dfe4c1b68e73ee109ae4f47246fbd5402894"
+        },
+        "junit": {
+          "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-v4/pytest.xml",
+          "bytes": 399,
+          "file_sha256": "771c72b099ddaf539386347f34043d0ecd7f1ea48e06a6d97504a646abbc15d4"
+        },
+        "observed": {
+          "tests": "1",
+          "failures": "0",
+          "errors": "0",
+          "time": "1.815"
+        },
+        "exit_code": 0,
+        "parent_wall_seconds": 3.187999999965541
+      },
+      {
+        "version": 5,
+        "receipt": {
+          "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-v5/test-receipt.json",
+          "bytes": 2045,
+          "file_sha256": "08ef373eadd4fbd02f6409c7490c9ac20e188f853a81b918502d135cb84a29e4"
+        },
+        "stdout": {
+          "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-v5/pytest.stdout",
+          "bytes": 100,
+          "file_sha256": "d8fd384157c0f7573cae6166a689476a43d1cf6de0a9a26b6c2d45bdc99a843f"
+        },
+        "junit": {
+          "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-v5/pytest.xml",
+          "bytes": 1001,
+          "file_sha256": "50d8644791c3f265d2be7df8dc6ea705763b03d3caca2dd63f48254f222dd6b4"
+        },
+        "observed": {
+          "tests": "5",
+          "failures": "0",
+          "errors": "0",
+          "time": "2.980"
+        },
+        "exit_code": 0,
+        "parent_wall_seconds": 4.937000000034459
+      }
+    ],
+    "S5_final_source_receipt": {
+      "project_relative_path": "worktrees/byul-b12-s5-consumers-20261108/out/b12-s5-consumers-final-v2/receipt.json",
+      "bytes": 4077,
+      "file_sha256": "054a76c912db3042b3c990ada5608c1afe5138edd54687d55a6e457a0100aa09"
+    },
+    "root_canonical": {
+      "log": {
+        "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/b12-canonical-pytest.txt",
+        "bytes": 100,
+        "file_sha256": "5287ab7cc90e09858857d7e3b7a22a08a67a46ba5098a506b46f960a35b65b0e"
+      },
+      "observed_summary": "3 passed in 8.46s",
+      "junit": {
+        "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/b12-canonical-pytest.xml",
+        "bytes": 754,
+        "file_sha256": "57a54a8dcb81b34198e339888c7f6d87e6459fdf07c2f5514bca25c3aca873bd"
+      },
+      "branches": [
+        "등록 PASS",
+        "미등록 UNKNOWN",
+        "미등록과 기존 독립 FAIL 보존"
+      ]
+    },
+    "root_B4": {
+      "log": {
+        "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/b12-tp2-pytest-final.txt",
+        "bytes": 101,
+        "file_sha256": "d050fb74129a7687b2dd687beed4cfc8313a5798a1b6751ad229deab259d08dc"
+      },
+      "observed_summary": "13 passed in 6.15s"
+    },
+    "root_B4_initial": {
+      "observed": "12 passed / 1 failed",
+      "failure": "Windows CP949 stdout와 UTF-8 수신 간 UnicodeDecodeError",
+      "correction": "CLI stdout/stderr UTF-8 및 시험 수신 encoding 명시",
+      "evidence_kind": "최초 도구 실행 반환. 별도 원 로그 파일을 생성했다고 주장하지 않음"
+    },
+    "deduplication_note": "실행별 수치다. 재확인과 수정분을 합산해 고유 시험·완료 ID로 쓰지 않는다."
+  },
+  "TP2_preparation": {
+    "original_manifest": {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/b12-tp2-prepare-final/manifest.json",
+      "bytes": 17635,
+      "file_sha256": "47e83067a972a195109163033d7da6e9082ffbe22076734a0f9661ddd7c7bb8f"
+    },
+    "integrated_manifest": {
+      "project_relative_path": "worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/b12-tp2-prepare-integrated-v2/manifest.json",
+      "bytes": 17635,
+      "file_sha256": "3105142ff7fec73f10f03697b1b5f080a66b6f514e9d2c3a20f2baa9fb6cefab"
+    },
+    "source_ref_delta_only": [
+      "update/src/guard/executors/supply_boot_contract.py"
+    ],
+    "five_members_byte_identical": true,
+    "current_manifest": {
+      "schema": "guard-b-tp2-prepare/1",
+      "input_schema": "guard-b-tp2-inputs/1",
+      "checks": [
+        "LIF-08",
+        "LIF-11",
+        "SUP-06"
+      ],
+      "pack_ref": {
+        "kind": "PACK",
+        "id": "PACK-BASELINE",
+        "revision": 33,
+        "sha256": "74219b48b241775e4c4fa153a950b2a94029147f512c731f055e91cf945cd5b6"
+      },
+      "data_origin": "EXAMPLE",
+      "official": false,
+      "preparation_only": true,
+      "execution_authorized": false,
+      "ready_for_execution": false,
+      "GPU_or_AWS_operations": 0,
+      "subprocesses_started": 0,
+      "file_pointers_opened_or_verified": false,
+      "unresolved": [
+        {
+          "check_id": "LIF-08",
+          "field": "runtime_refs.ENV",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "runtime_refs.target",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "runtime_refs.prepared",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "runtime_refs.selection",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "runtime_refs.scenario",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "controls.normal",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "controls.failure",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "controls.recovery",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_environment_sha256",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_target_sha256",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_prepared_sha256",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_validity_start",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_validity_end",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_executor_backend",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_expected_ranks",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_output_rank",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_exception_detection_ms",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_exception_notification_ms",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_death_detection_ms",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_death_notification_ms",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_delay_detection_ms",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_delay_notification_ms",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_communication_stall_detection_ms",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "policy_values.rank_communication_stall_notification_ms",
+          "reason": "not_provided",
+          "owner": "A 공통 생산자 / B 실행 준비 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "planned_upper_seconds",
+          "reason": "no_branch_time_upper_bound",
+          "owner": "B 입력 / A6 시간표"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "producer",
+          "reason": "producer_identity_not_returned",
+          "owner": "A 공통 생산자 / J1 등록"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "runtime_binding",
+          "reason": "declared_file_pointers_not_runtime_verified",
+          "owner": "A6 실제 ENV/target/prepared/세대 확인"
+        },
+        {
+          "check_id": "LIF-08",
+          "field": "execution_authorization",
+          "reason": "current_request_is_prepare_only_no_gpu",
+          "owner": "공동 실행 조정"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "runtime_refs.ENV",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "runtime_refs.target",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "runtime_refs.prepared",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "runtime_refs.selection",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "runtime_refs.scenario",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "controls.normal",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "controls.failure",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "controls.recovery",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "policy_values.recovery_environment_sha256",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "policy_values.recovery_target_sha256",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "policy_values.recovery_prepared_sha256",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "policy_values.recovery_selection_sha256",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "policy_values.recovery_scenario_sha256",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "policy_values.recovery_validity_start",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "policy_values.recovery_validity_end",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "policy_values.recovery_branch",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "policy_values.recovery_executor_backend",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "policy_values.recovery_expected_ranks",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "policy_values.recovery_phase",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "policy_values.recovery_deadline_basis",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "policy_values.recovery_required_absent_after",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "policy_values.recovery_max_clock_skew_ms",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "policy_values.recovery_required_resource_kinds",
+          "reason": "not_provided",
+          "owner": "B 소유 자원 선택 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "planned_upper_seconds",
+          "reason": "no_branch_time_upper_bound",
+          "owner": "B 입력 / A6 시간표"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "producer",
+          "reason": "producer_not_registered",
+          "owner": "A 공통 생산자 / J1 등록"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "runtime_binding",
+          "reason": "declared_file_pointers_not_runtime_verified",
+          "owner": "A6 실제 ENV/target/prepared/세대 확인"
+        },
+        {
+          "check_id": "LIF-11",
+          "field": "execution_authorization",
+          "reason": "current_request_is_prepare_only_no_gpu",
+          "owner": "공동 실행 조정"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "runtime_refs.ENV",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "runtime_refs.target",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "runtime_refs.prepared",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "runtime_refs.selection",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "runtime_refs.scenario",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "controls.normal",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "controls.failure",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "controls.recovery",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "policy_values.supply_environment_sha256",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "policy_values.supply_normal_target_sha256",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "policy_values.supply_challenge_target_sha256",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "policy_values.supply_normal_prepared_sha256",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "policy_values.supply_challenge_prepared_sha256",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "policy_values.supply_record_source_sha256",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "policy_values.supply_validity_start",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "policy_values.supply_validity_end",
+          "reason": "not_provided",
+          "owner": "B 모델/shard 준비 / A 생산자 / A6 하네스"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "planned_upper_seconds",
+          "reason": "no_branch_time_upper_bound",
+          "owner": "B 입력 / A6 시간표"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "producer",
+          "reason": "producer_not_registered",
+          "owner": "A 공통 생산자 / J1 등록"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "runtime_binding",
+          "reason": "declared_file_pointers_not_runtime_verified",
+          "owner": "A6 실제 ENV/target/prepared/세대 확인"
+        },
+        {
+          "check_id": "SUP-06",
+          "field": "execution_authorization",
+          "reason": "current_request_is_prepare_only_no_gpu",
+          "owner": "공동 실행 조정"
+        }
+      ],
+      "source_refs": [
+        {
+          "path": "update/tools/b12_tp2_inputs.py",
+          "file_sha256": "494274f0b1cbee6efa553ebf62aa598fd5020b6f6530baeff0a2c509bc006632"
+        },
+        {
+          "path": "update/src/guard/collectors/gpu_common_inputs.py",
+          "file_sha256": "86f660af81fa77dab05618e5021aba1bd52eabd9b96ddbb941ec7d1a55d82134"
+        },
+        {
+          "path": "update/src/guard/collectors/group_resource_producer.py",
+          "file_sha256": "34d534686c7bb6af0dfafe3b96168c39c9ccf7fbf37479fb7d03cd237964f9b0"
+        },
+        {
+          "path": "update/src/guard/collectors/worker_shard_producer.py",
+          "file_sha256": "27bdd63baa80a99071e718a94fe9990d91474f9dfaf940d15f8f0c5730218c0f"
+        },
+        {
+          "path": "update/src/guard/executors/rank_failure_contract.py",
+          "file_sha256": "34d2dd4718c8648271859c6f0ff23bfe901615ea13320fb8dd682ab1f97a2e76"
+        },
+        {
+          "path": "update/src/guard/executors/resource_recovery_contract.py",
+          "file_sha256": "cd183b31f4c7cf63f3769a247315eb254c76e99364ffe697ea3f43ca863d2949"
+        },
+        {
+          "path": "update/src/guard/executors/supply_boot_contract.py",
+          "file_sha256": "8b00ed0ce7f0f62dd4d1612b94b0ca45f16e5504274f1df1bb6a6c15b5cf8228"
+        },
+        {
+          "path": "update/packs/PACK-BASELINE/pack.yaml",
+          "file_sha256": "154cd52d6f038539e87d42074edbbdb63e5d198c4db22f64d0290975382500ba"
+        }
+      ],
+      "time_plan": {
+        "B_total_upper_seconds": null,
+        "A_work_and_download_and_registration_seconds": null,
+        "cleanup_and_stop_reserve_seconds": null,
+        "joint_EC2_budget_USD_from_instruction": 20,
+        "EBS_included": false,
+        "joint_budget_fit_verified": false
+      },
+      "artifacts": [
+        {
+          "path": "declared-inputs.json",
+          "file_sha256": "dfd568da38d90c283ab09f32422390010a1b414857a2eca1b003005718165785"
+        },
+        {
+          "path": "inputs-template.json",
+          "file_sha256": "dfd568da38d90c283ab09f32422390010a1b414857a2eca1b003005718165785"
+        },
+        {
+          "path": "LIF-08-plan.json",
+          "file_sha256": "3da472d9f2d4ef3337c1127e265cedfaf3258f74ae2b497f0e6943be3e5e9dd1"
+        },
+        {
+          "path": "LIF-11-plan.json",
+          "file_sha256": "ee3fafaa387cceff9a6dd235a1615180c1103d72b90352ad8c0381fc4e0fab2e"
+        },
+        {
+          "path": "SUP-06-plan.json",
+          "file_sha256": "f1ff9b378a547b23874da6e629f16e7bc9519507efb1157e12a17f26f22704c5"
+        }
+      ]
+    },
+    "execution_ready": false
+  },
+  "reviews": {
+    "B4": {
+      "project_relative_path": "worktrees/byul-b12-review-20261108/out/reviews/b4-fixed-review-20261108-v1/b4-prepare-and-document-independent-review-v2.json",
+      "bytes": 15232,
+      "file_sha256": "3fd6079dfa54318f406e7141e13b6660d686b95f09a35e312d9825cbbfb7c45f"
+    },
+    "S5": {
+      "project_relative_path": "worktrees/byul-b12-review-20261108/out/reviews/s5-fixed-consumer-review-20261108-v1/s5-consumer-independent-review-v2.json",
+      "bytes": 43612,
+      "file_sha256": "2504cc1b74a111c2aaf836691f76261309aa541232ae6d65f787a7092ce3de19"
+    },
+    "S1_final": {
+      "project_relative_path": "worktrees/byul-b12-review-20261108/out/reviews/s1-fixed-consumer-review-20261108-v1/s1-final-mkdir-delta-review-v3.json",
+      "bytes": 5009,
+      "file_sha256": "85353ec6d20e0c92f09dee6f79900dc966dc5c03582f65af13c21441dcd683f0"
+    }
+  },
+  "remaining": [
+    "REQ12와 OBS02 복합 profiler 대상 선언·기본 PLT02 profile·LIF11 기능 축 및 PLT/OBS named 관측 spec",
+    "A1 transition-dispatch/A2 aux 소비/A3 MM·최종 sampling/A4 호환 schema2 커밋 반환",
+    "rank-fault 생산자 구현·신원 및 IPC/group/shard 실제 TP2 확인·지원 등록",
+    "A6 실제 하네스·ENV/POL/target/prepared·rank/shard·normal/failure/recovery 제어/시각",
+    "실제 GPU/TP2 EVD·RES·RPT·반출·복원/재판정·소유 정리; 이번에는 실행하지 않음"
+  ]
+}

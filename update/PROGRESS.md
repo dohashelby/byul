@@ -1,3 +1,51 @@
+## 2026-11-09 — GPU 미기동 B4·REQ·SUP16 준비 보강
+
+- 한 일: B4는 opt-in 로컬 파일/bytes SHA와 sealed ENV/content·선언 결합을 검사한다. REQ08/09/10은 원 record bytes·독립 scope·사례 매핑을 기존 consumer에 인계하고 오류 입력 본문을 출력하지 않는다. SUP16은 기존 pinned 자산·정상/부분 사본·명령을 정적으로 고정한다. 제품 src·공통 계약·팩·등록·manifest·43state는 유지한다.
+- 검증: B4 기존13+새21=34통과(10.71초/부모11.641), REQ 기본31통과(8.91초/11.907)와 오류출력추가4통과 중1중복으로최종고유34, SUP16 새17통과(6.06초/10.048). REQ 실제오프라인CLI exit0/0.890초·SUP16 staticCLI exit0/5.532초, root 소스통합만의CLI exit0/6.718초를 구분한다. 기존 모델·writer·원archive·불변suite 반복0.
+- 다음 단계: 세묶음의 고정 변경/원 증거 독립 검토 완료(범위내미해결구체결함0). PR232에 게시하고 새 최종 head CI를 확인한다. 상세는 PREPARATION_FOLLOWUP_20261109.md와 preparation-validation-20261109.json을 따른다.
+- 남은 것: 실제 HTTP 요청↔callback 인과·현재 runtime ENV/target/prepared/Pod/PID/start·유효 정책·원기한 Ready·소유 정리·TP2 하네스/등록. 이번 준비 작업에서 GPU/AWS/SSM/엔진/모델·HTTP 실험0이며 ready·인증·실측 완료로 올리지 않는다.
+
+## 2026-11-08 — boot 저장 오류의 독립 FAIL 보존
+
+- 한 일: CONTINUATION 독립 점검에서 SUP15/16 외 공통 boot 저장 오류의 위반 소실과 기존 시험 파일 덮어쓰기를 발견했다. 기존 persist를 전체13 profile에 재사용해 원 관측·normal·출처·진단을 보존하고 저장 gap/ABORTED·complete=false를 유지한다. 수집·정책·팩·SUP15/16 raw/session·helper 실행 로직은 그대로다.
+- 검증: 원 대표3실패를 보존하고 새 직접21+진단/cleanup1+다른profile6의 고유28개를 확인했다. 원 모델/통과 suite 반복·GPU/AWS/SSM 추가기동0. manifest465개 중 정확2파일 해시만 변경했고 원Bdefault거부를 포함한 source gate1통과를 확인했다.
+- 다음 단계: 고정 source·원/수정 증거·Store 객체12개·manifest2해시의 독립 검토를 완료했다(범위내 미해결 구체결함0). PR232에 반영하고 해당 최종 head CI를 확인한다. 선행 B3 c1ae7bcd는14/14 성공이며 다음 head에 복사하지 않는다. 현재 입력으로 가능한 구체 추가 결함은 이 저장 경계까지 점검했고, 실제 worker/승인·A계약/등록·TP2·과거원자료 대기는 해당 분기로 남긴다.
+
+## 2026-11-08 — B3 공급물 후속 고정·통합
+
+- 한 일: SUP05 C mapping, SUP07/12 원0.31 npcache, SUP13 HF/Jinja의 신규 CPU API를 실제 관측했다. SUP15 strict bool/SHA와 SUP15/16 원 record·보고행·저장 오류 보존을 보완하고, SUP16 pair를 고정2485 helper에 연결했다. 새 모델/worker/GPU/AWS 기동은 없다.
+- 검증: 실제 C5·np7·HF/B정책5 assertion, 원기록 직접9·EXAMPLE role 재생10·관련13을 확인했다. 실제 normal writer3 및 legacy pair실패→새pair2의 source/FD/기존bytes·정리/소비를 검증했다. 원180/120 준비실패와 실행판본·조회시각 한계는 보존했다. 두 묶음 고정 검토의 잔여 구체결함0, 새 manifest는 추가1/갱신2·삭제0만 반영하고 원source gate1통과를 확인했다.
+- 다음 단계: B3_CPU_FOLLOWUP_20261108.md 및 b3-validation-20261108.json으로 실제 API·historical 재생·제품 계약 시험·남은 실제 연결을 인계하고 PR232의 최종B3 head CI를 확인한다. 선행 CI수정 d1d91329는 두 이벤트14/14성공이다.
+- 남은 것: 실제 승인/pre-read/worker·native owner, cache 집행/reader전체효과, endpoint·양role target/prepared/정책, A1~A4·등록/TP2 입력. 현재 지원된 CPU 묶음에서 독립적으로 가능한 구현·관측·오류보존은 마쳤고, 같은실패/기존모델/불변suite는 반복하지 않는다. 43state·원FAIL/UNKNOWN/Ref와 lab2/41·한정25/18·이전로컬14 스냅샷은 유지한다.
+
+## 2026-11-08 — PR232 CI 정합성과 B3/B5 후속
+
+- 한 일: aa3c6ac8의 양쪽 CI 원40실패를 source gate9·REQ13 helper pin30·상태생성물1로 분리했다. 기존 생성기로 검토된 source manifest와 상태 CSV를 갱신하고, AST가 같은 token helper의 정확 pin만 adapter/원 tool에서 함께 갱신했다. B5 impact·정책 검토 의견도 추가했다.
+- 검증: 원 실패40개를 포함한 집중74개는73통과/1기존Windows fixture줄바꿈 실패였다. fixture의정확UTF-8 bytes 쓰기정정후1통과를 연결했다. 추가로상태생성기의Path정렬을POSIX문자열로고정해플랫폼차이4사례를재현·수정하고관련21개통과,최종고유78개통과를 확인했다. 원로그/실패/시간은 CI_FOLLOWUP_20261108.md와 ci-fix-validation-20261108.json에 연결한다. source gate/HTTP승인/기존assert/판정·기본팩·state변경0.
+- 다음 단계: 고정CI수정집중검토 후 PR232 새head의 원격CI 확인과 동시에 S1 SUP15/16 원기록 소비/오류보존, S5 SUP05/07/12/13 신규 CPU실제API분기를 계속한다. 같은실패·원모델·전체불변suite를반복하지 않는다.
+- 남은 것: B3 각 새분기의 실제 관측/계약시험/미실행 구분과 고정 검토·원격CI 최종결과. A 공통 계약/등록/TP2 실제 입력 대기는 해당 분기만 유지하고 GPU를 추가기동하지 않는다.
+
+## 2026-11-08 — B1·B2 기존 소비자 연결
+
+- 한 일: 고정 A /1 반환을 기존 B 소비자의 선택 입력으로 연결했다. lifecycle/OBS/PLT는 선언 필드·artifact에 원 기록·scope·gap을 보존하고, 요청·공급물은 runner V1/V2·supply-reads·IPC/group/shard/model-entry/plugin 계약을 소비한다. 원 기본 팩·등록 SHA·core/models/store/judges/registry·A 생산자는 수정하지 않았다.
+- 검증: 신규 lifecycle 53통과, 요청/공급물28통과 및 직접 delta, 원 등록 factory→run_plan→저장 원 팩→judge_plan→RPT 3분기 통과. 기존21파일651통과/2저장소내 출력거부를 보존하고 같은소스의 외부temp 정정2통과를 연결했다. 검토에서 REQ09 세대/PID 귀속 오류를 수정해 직접5통과, activation artifact 쓰기 오류의 독립FAIL 소실을 좁게 수정해 직접분+기존lab3파일192통과를 확인했다. 후속 mkdir 1줄을 같은 guard로 옮겨 직접3통과도 확인했다. 실행별 수치이며 중복을 완료 ID로 합산하지 않는다.
+- 다음 단계: PR232의 B12_B4_INTEGRATION.md 및 b12-b4-validation-20261108.json에서 코드·원 실패/수정·검토 SHA·담당별 실제 반환물을 확인한다. 실제 GPU 기동 없이 가능한 이번 소비 경로와 B4 준비를 구분한다.
+- 남은 것: REQ12/OBS02 복합profiler 대상 선언, 기본 PLT02 profile, LIF11 기능 축·PLT/OBS named관측, 미커밋 A1~A4, rank-fault 신원·IPC/group/shard 지원 등록·TP2 원자료/A6 runtime 입력. 이전 lab2/41·한정25/18·로컬14ID 상태와 원FAIL/UNKNOWN은 유지한다.
+
+## 2026-11-08 — B4 TP2 입력 준비
+
+- 한 일: A 공통 반환물을 고정 통합한 `37c284d9`를 기준으로 B 전용 `tools/b12_tp2_inputs.py`를 구현했다. LIF-08·LIF-11·SUP-06의 기존 PACK33 정책·profile, 파일 포인터·정상/실패/복구·시간 선언과 미충족 담당을 별도 계획 파일로 반환한다. `docs/dev-1/tp2-run-plan.md`는 기존 A 본문을 보존하고 B 절만 추가했다.
+- 검증: 고정 생성기의 직접 영향 시험 13개 통과(루트 6.15초), 독립 검토 13개 통과(7.10초, 별도 실적으로 합산하지 않음). 실제 준비 CLI 출력의 파일/manifest SHA를 대조했다. 잘못된 입력·기존 출력 덮어쓰기·실행 옵션을 거부하며 외부 명령 호출은 없다.
+- 다음 단계: S1/S5의 B1·B2 소비자 고정 변경을 통합하고 원 factory→EVD→저장 팩 판정→RPT 경로를 확인해 PR232에 함께 인계한다.
+- 남은 것: rank-fault 생산자 신원, IPC/실패 그룹/worker-shard 지원 등록·TP2 원자료, A6 실제 하네스·ENV/POL/target/prepared·제어 입력. 준비 문서의 시간/단가는 가정이며 실제 실행·비용 충족·권한을 부여하지 않는다. 이번 B4 AWS/GPU 작업은 0이다.
+
+## 2026-11-08 — GPU18 임시 입력의 실제 로컬 연결
+
+- 한 일: 기존 모의18개와 별도로 실제CPU/소스/guard·OS컴포넌트 관측14ID를 수집했다. 원0.31 renderer/InputProcessor·SamplingParams·SUP08 사전옵션 함수, 별도0.29 CPU엔진 정상2요청, 공급물·파일/FD·Python모드·pipe·소유UDS/namespace·SUP16고정API를 사용했다. GPU/AWS/다운로드0, 공통core/models/store/judges/packs/registry·기존prototype·원FAIL/UNKNOWN 변경0.
+- 검증: 실제 입력/반환/원예외·source/input SHA·프로세스종료·부모종료후PID/start·소유tmp정리를 보존했다. host IPC metadata불완전1건은 유지하고 별도소유namespace4조건 성공을 분리했다. 신규도구7개의 구문/CLI·OOV표기만 고친 AST동등성을 확인했다. 기존52개모의/회귀를 새실적으로 합산하지 않는다.
+- 다음 단계: PR232의 LOCAL_ACTUAL_VALIDATION.md와 local-actual-validation-20261108.json에서 항목별 실제 범위·원source/설치버전·GPU분기·공통producer/정책 반환물을 확인한다. 모의18/18과 제품 증거 필요18개 분류는 별도 유지한다.
+- 남은 것: LIF08/12/16·OBS02 새실행없음, 0.31최종worker·TP2/GPUrank/native소비·실제retry/restore/state producer·기업 승인/과거원본. 독립적으로 가능한 이번 CPU 묶음을 마친 뒤 추가GPU를 기동하지 않는다.
+
 ## 2026-11-08 — SUP-06 worker shard 공통 입력(B 의존 반환 5)
 
 - 한 일: 엔진 콜백 센서에 선택 관측 `worker_shards`(기본 꺼짐)를 더하고 `DefaultModelLoader._prepare_weights`·`track_weights_loading`, `WorkerProc.monitor_death_pipe`(READY 직전)를 원 소스 해시로 감쌌다. 공통 입력 종류 `worker-shard-load`와 생산자 `guard-engine-callback-worker-shard-load`(미등록)를 만들고 기존 `supply_boot_contract._worker_shard` 입력 행으로 투영한다. 상세 `docs/dev-1/sup06-worker-shard.md`.

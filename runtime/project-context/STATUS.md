@@ -690,3 +690,14 @@
   - 서버 nvidia-smi 실행 권한과 값 대조, stale 전환
   - 브라우저 화면
   - Codex 교차 검수
+
+## 2026-11-09 알림 보내기(13) — Claude 구현분, Codex 교차 검수 전
+
+- Codex 사용 한도로 Claude가 구현했다. contracts/update 수정·서버 접속 없음.
+- `tools/alert_notifier.py`: Gateway 읽기 API만 조회해 웹훅(slack/discord/generic)으로 보낸다. 기본은 미리보기, `--send`일 때만 전송.
+  - 대상: DENIED 요청, Tetragon 허용 목록 밖 실행·보호 파일 접근(탐지/차단 구분), Hubble dropped, 수집기·Tetragon 상태·GPU·기록 저장소·Gateway 상태 이상/복구, Gateway 2회 연속 조회 실패.
+  - 첫 실행은 과거를 보내지 않음, 상태 변화 때만 알림, 웹훅 실패 시 0600 상태 파일 대기열(최대 200)에서 재전송.
+  - 프롬프트·요청 ID·토큰·IP·Pod/노드 이름·경로는 보내지 않고, 고정 형식이 아닌 값은 `OTHER`로 바꾼다.
+- 서비스 예시 `deploy/agent/serving-runtime-alerts.service.example`(설치기 미포함), 문서 [알림 보내기](../docs/알림_보내기.md), 내부 기록 형식 2행.
+- 근거: 단위 14건 통과; 로컬 mock Gateway 미리보기(차단 1건 → 1회 알림, 재실행 0건)와 로컬 웹훅 수신기 실제 전송(Gateway 중단 2회차 1건) 확인.
+- 미확인·다음: 실서버 읽기 토큰·포트포워드, 실제 Slack/Discord 표시, 실제 관측량, Codex 교차 검수. 플랫폼 화면 알림 목록은 만들지 않았다.

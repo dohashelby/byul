@@ -126,6 +126,8 @@ UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`
 
 GPU 지표(`--gpu-state /srv/serving/observation/gpu-status/gpu-state.json`, 설치기의 `serving-runtime-gpu-status` 서비스)와 선택 기능인 엔진 로그 수신 기록(`--engine-receipts`, 기본 꺼짐)은 [엔진 수신 기록과 GPU 지표](../../docs/엔진수신기록_GPU지표.md)의 순서로 확인한다.
 
+차단·이상 탐지·수집 중단 웹훅 알림(선택, 기본 꺼짐)은 [알림 보내기](../../docs/알림_보내기.md)의 순서로 미리보기 후 켠다.
+
 Gateway는 기존 `/srv/serving/observation` readOnly mount에서 `--tetragon-state /srv/serving/observation/tetragon-status/tetragon-state.json`과 `--lab-report /srv/serving/observation/lab-reports`를 읽는다. SGLang 배포도 이 Gateway 정의를 상속한다. [호스트 설치기](../install/README.md)가 하위 폴더 소유자·관측 그룹·2750을 준비한다. 설치기를 쓰지 않으면 관리자가 다음을 준비한다(상위 관측 폴더와 그룹은 아래 1번대로 준비).
 
 ```bash

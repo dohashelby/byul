@@ -505,7 +505,7 @@
   "update/src/guard/update_validation.py": "20f9ca969c3430f2ec063253e6b4c99f5f5cd9bf7109db0068e4b88406fba738",
   "update/src/guard/validation_evidence.py": "875a820a72a14d64b6c7b008c0ad86d5d4278b25cf82c595b200ed72e343e48e",
   "update/tools/b1_integration_cpu.py": "858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf",
-  "update/tools/b_lif07_native_capture.py": "c133d7a4fd6d367b792175df74861dea4ac8ecbd87887bd836c76ebe6ef6aae2",
+  "update/tools/b_lif07_native_capture.py": "efb27b05ae88c4b3f8d326a247e1e691b779d8fd4f60aee38ab3246c593610b1",
   "update/tools/b_lif07_readiness.py": "7c3ef7f1b6055cac33b0f6f0216105d5cb102296d475a0024c74015c81c70346",
   "update/uv.lock": "a45e375165df38d7f916568f9cb6d6de32e9b289c81beb2e9d0ed68fe49b923b"
  },

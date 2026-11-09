@@ -89,6 +89,7 @@ export function areaFor(pathname: string, last: AreaKey | null): AreaKey {
 
 export function titleFor(pathname: string): string {
   if (pathname === "/dashboard") return "현황";
+  if (pathname === "/account/password") return "비밀번호 변경";
   for (const a of AREAS) for (const g of a.groups) for (const i of g.items) if (hit(pathname, i.path)) return i.label;
   return "byul";
 }

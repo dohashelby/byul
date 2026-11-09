@@ -701,3 +701,14 @@
 - 서비스 예시 `deploy/agent/serving-runtime-alerts.service.example`(설치기 미포함), 문서 [알림 보내기](../docs/알림_보내기.md), 내부 기록 형식 2행.
 - 근거: 단위 14건 통과; 로컬 mock Gateway 미리보기(차단 1건 → 1회 알림, 재실행 0건)와 로컬 웹훅 수신기 실제 전송(Gateway 중단 2회차 1건) 확인.
 - 미확인·다음: 실서버 읽기 토큰·포트포워드, 실제 Slack/Discord 표시, 실제 관측량, Codex 교차 검수. 플랫폼 화면 알림 목록은 만들지 않았다.
+
+## 2026-11-09 플랫폼 로그인(14) — Claude 구현분, Codex 교차 검수 전
+
+- Codex 사용 한도로 Claude가 구현했다. 플랫폼 담당과 범위 겹침은 미확인(사용자가 진행 지시). contracts/update 수정 없음.
+- API: `accounts.py`(0600 계정 파일, scrypt, 첫 실행 admin/admin, 마지막 관리자 보호), `auth.py`(메모리 세션·HttpOnly/SameSite=Strict 쿠키·CSRF 헤더·5회/10분 실패 시 5분 잠금·감사 기록 0600), `accounts_cli.py`(create/disable/enable/set-role/reset-password/list, 임시 비밀번호는 새 0600 파일만).
+  - `from_env`는 로그인 기본 켬(`BYUL_LOGIN_DISABLED=1`로 끔), 직접 만든 `Settings`(기존 시험)는 꺼짐. 변경 강제 `BYUL_REQUIRE_PASSWORD_CHANGE` 기본 끔.
+  - 운영 API: Bearer 토큰(에이전트) 유지, 없으면 세션 계정 역할 사용. admin은 목록 조회만.
+- 웹: 로그인 화면·변경 강제 화면·비밀번호 변경(`/account/password`)·상단 계정/로그아웃·기본 비밀번호 경고, CSRF 헤더, 401 시 로그인 화면, 로그인 시 운영 토큰 입력칸 대신 세션.
+- 문서: `platform/docs/로그인_계정관리.md`, platform README 환경변수·역할 표, 실행 스크립트 주석.
+- 근거: API 345 통과(새 12), web 타입 검사·176 통과(새 7)·빌드 통과, 실제 서버 curl(미로그인 401·로그인 200·CSRF 없는 POST 403·파일 0600).
+- 미확인·다음: 브라우저 화면 확인, 실서버, Codex 교차 검수, 플랫폼 담당 확인.

@@ -8,7 +8,7 @@ import json
 from typing import Annotated, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -139,7 +139,11 @@ class Heartbeat(Closed):
     bundles: list[AvailableBundle] = Field(default_factory=list, max_length=256)
 
 
-def actor(state: AppState = Depends(get_state), authorization: str | None = Header(default=None)):
+def actor(request: Request, state: AppState = Depends(get_state), authorization: str | None = Header(default=None)):
+    # Bearer tokens (agents, scripts) win; otherwise the login session's account and role.
+    account = getattr(request.state, "account", None)
+    if account is not None and not (authorization or "").startswith("Bearer "):
+        return {"id": account["id"], "role": account["role"], "via": "session"}
     return authenticate(state.settings, authorization)
 
 
@@ -255,7 +259,7 @@ def request_operation(body: OperationRequest, state: AppState = Depends(get_stat
 
 @router.get("")
 def list_operations(server: str | None = None, state: AppState = Depends(get_state), who=Depends(actor)):
-    _role(who, {"viewer", "runtime_operator", "approver", "agent"})
+    _role(who, {"viewer", "runtime_operator", "approver", "agent", "admin"})
     if who["role"] == "agent":
         if not server:
             deny("SERVER_REQUIRED", 422)

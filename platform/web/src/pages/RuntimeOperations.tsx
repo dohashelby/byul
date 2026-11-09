@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import ui from "../components/ui.module.css";
 import styles from "./RuntimeOperations.module.css";
-import { CHECK_LABELS, enforceReady, operationApi, type Actor, type Operation, type AgentState, type Operations, type Readiness } from "../api/operations";
+import { CHECK_LABELS, SESSION_CREDENTIAL, enforceReady, operationApi, type Actor, type Operation, type AgentState, type Operations, type Readiness } from "../api/operations";
 
 import { useOperationToken } from "../api/operationSession";
 import { formatLocal } from "../lib/time";
 
-const ROLE_LABELS: Record<string, string> = { viewer: "조회자", runtime_operator: "운영 요청자", approver: "승인자", agent: "에이전트" };
+const ROLE_LABELS: Record<string, string> = { viewer: "조회자", runtime_operator: "운영 요청자", approver: "승인자", agent: "에이전트", admin: "관리자" };
 const CAPABILITY_REASONS = {
   static_unavailable: "거부: 사전 점검에서 불가 (실측 근거보다 우선)",
   evidence_required: "미확인: 동일 노드·커널·방식·정책 spec의 실측 시험 필요",
@@ -23,6 +23,9 @@ function LabSettingsBadge({ data }: { data: Operations | null }) {
 
 export function OperationCredentials({ token, setToken, actor, unknownRoleLabel = "현재 역할: 조회 후 확인" }: { token: string; setToken: (v: string) => void; actor?: Actor; unknownRoleLabel?: string }) {
   const [draft, setDraft] = useState("");
+  if (token === SESSION_CREDENTIAL) return <div className="row wrap">
+    <span>로그인 계정으로 요청 · {actor ? `현재 역할: ${ROLE_LABELS[actor.role] ?? actor.role} (${actor.role}) · ${actor.id}` : unknownRoleLabel}</span>
+  </div>;
   return <div className="row wrap">
     {token ? <><span>운영 토큰 저장됨 · {actor ? `현재 역할: ${ROLE_LABELS[actor.role]} (${actor.role}) · ${actor.id}` : unknownRoleLabel}</span>
       <button className="btn" type="button" onClick={() => { setToken(""); setDraft(""); }}>토큰 지우기</button></> : <>

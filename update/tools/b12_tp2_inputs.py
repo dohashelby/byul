@@ -14,6 +14,7 @@ import re
 import sys
 
 if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from guard.collectors import gpu_common_inputs, group_resource_producer, worker_shard_producer
@@ -133,7 +134,7 @@ def validate_inputs(value, pack):
 
 def _source_refs(root):
     names = [
-        "tools/b12_tp2_inputs.py", "src/guard/collectors/gpu_common_inputs.py",
+        "tools/b12_tp2_inputs.py", "tools/b12_tp2_verify.py", "src/guard/collectors/gpu_common_inputs.py",
         "src/guard/collectors/group_resource_producer.py", "src/guard/collectors/worker_shard_producer.py",
         "src/guard/executors/rank_failure_contract.py", "src/guard/executors/resource_recovery_contract.py",
         "src/guard/executors/supply_boot_contract.py", "packs/PACK-BASELINE/pack.yaml",
@@ -142,13 +143,17 @@ def _source_refs(root):
             for name in names]
 
 
-def prepare(output: Path, inputs: dict | None = None) -> dict:
+def prepare(output: Path, inputs: dict | None = None, *, verify_inputs_root: Path | None = None) -> dict:
     update = Path(__file__).resolve().parents[1]
     pack = load_pack(update / "packs/PACK-BASELINE")
     values = validate_inputs(_template(pack) if inputs is None else inputs, pack)
     output = Path(output)
     if output.exists():
         raise ValueError("NEW_B_TP2_OUTPUT_DIRECTORY_REQUIRED")
+    verification = None
+    if verify_inputs_root is not None:
+        from tools.b12_tp2_verify import verify_local_inputs
+        verification = verify_local_inputs(values, verify_inputs_root)
     # Validate the entire input before creating any output. Never clean an existing path.
     output.mkdir(parents=True, exist_ok=False)
     branches, unresolved = [], []
@@ -201,6 +206,8 @@ def prepare(output: Path, inputs: dict | None = None) -> dict:
         _dump(output / (cid + "-plan.json"), branch)
     _dump(output / "inputs-template.json", _template(pack))
     _dump(output / "declared-inputs.json", values)
+    if verification is not None:
+        _dump(output / "local-verification.json", verification)
     times = [b["planned_upper_seconds"] for b in branches]
     manifest = {"schema": OUTPUT_SCHEMA, "input_schema": INPUT_SCHEMA, "checks": list(CHECK_IDS),
                 "pack_ref": pack.ref().model_dump(mode="json"), "data_origin": "EXAMPLE", "official": False,
@@ -215,6 +222,15 @@ def prepare(output: Path, inputs: dict | None = None) -> dict:
                               "EBS_included": False, "joint_budget_fit_verified": False},
                 "artifacts": [{"path": p.name, "file_sha256": _digest(p.read_bytes())}
                               for p in sorted(output.iterdir()) if p.is_file()]}
+    if verification is not None:
+        manifest["local_verification"] = {
+            "path": "local-verification.json", "status": verification["status"],
+            "all_declared_files_verified": verification["all_declared_files_verified"],
+            "all_declared_json_objects_verified": verification["all_declared_json_objects_verified"],
+            "runtime_binding_verified": False, "prepared_assets_verified": False,
+            "errors": verification["errors"], "unresolved": verification["unresolved"],
+        }
+        manifest["file_pointers_opened_or_verified"] = any(v.get("bytes_read", False) for v in verification["file_checks"])
     _dump(output / "manifest.json", manifest)
     return manifest
 
@@ -226,6 +242,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--inputs", type=Path)
+    parser.add_argument("--verify-inputs-root", type=Path,
+                        help="이 로컬 루트 안의 선언된 JSON 파일과 SHA/결합만 검사. 명령을 실행하지 않음")
     args = parser.parse_args()
     try:
         if args.inputs:
@@ -233,10 +251,12 @@ def main():
                 supplied = strict_json(stream.read(1024 * 1024 + 1), limit=1024 * 1024)
         else:
             supplied = None
-        manifest = prepare(args.output, supplied)
+        manifest = prepare(args.output, supplied, verify_inputs_root=args.verify_inputs_root)
     except (ValueError, OSError):
         parser.exit(2, "TP2 준비 입력이나 출력 경로를 확인하십시오. 기존 결과는 덮어쓰지 않습니다.\n")
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
+    if manifest.get("local_verification", {}).get("status") == "FAILED":
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":

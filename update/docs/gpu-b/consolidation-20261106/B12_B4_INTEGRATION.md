@@ -61,3 +61,19 @@ python update/tools/b12_tp2_inputs.py --output <다른-새-디렉터리> --input
 | B 실행·검증 담당 | 위 실제 입력을 현재 소비자에 결합하고 원 EVD/RES/RPT·반출·복원/재판정·소유 정리 확인 | 실제 GPU/TP2 결과는 아직 없음. 현재 기록의 독립 FAIL/UNKNOWN 유지 |
 
 새 지시서의 lab DONE **2개/잔여41개**, 기존 한정 마감 **25개/제품 증거 보완18개**, 이전 실제 로컬 추가 관측 **14 ID**는 서로 다른 축으로 유지한다. 이번 소비자 코드·CPU 시험·준비 파일로 lab DONE이나 전체 질문 완료 수를 늘리지 않는다. 기준 시점의 등록·반환 대조는 [B1/B2 수신 표](../b12-readiness-20261108.md), 소비자별 인터페이스는 [수명주기·관측·플랫폼 인계](../preparation/B12_COMMON_INPUT_CONSUMPTION.md)와 [요청·공급물 인계](../../b-work/B12_S5_CONSUMERS_20261108.md)를 따른다. 원 로그·DB는 각 세션의 로컬 고정 경로에 보존하며 PR에는 코드·결과·정확한 SHA/참조를 반영한다.
+
+## B4 로컬 입력 사전검증 보강 — 2026-11-09
+
+기존 plan-only 인터페이스는 그대로 두고 선택 옵션 `--verify-inputs-root`를 추가했다. 다음 명령은 명시한 로컬 루트 안의 파일만 읽으며 GPU·kubectl·HTTP·subprocess를 실행하지 않는다.
+
+```text
+python update/tools/b12_tp2_inputs.py --output <새-출력> --inputs <입력.json> --verify-inputs-root <로컬-입력-루트>
+```
+
+포인터 경로는 지정 루트 기준 또는 그 안의 절대 경로다. 루트 밖·UNC/URL·링크/reparse·일반 파일 아님·빈 파일/2MiB 초과·읽는 동안 교체·SHA 불일치를 거부한다. 정규 JSON object만 내용 결합을 검사하며 중복 키도 거부한다. ENV는 기존 모델이 검증한 sealed JSON과 content hash를 사용한다. YAML·축약 ENV를 새 ID로 생성하거나 승인·정책 값을 보충하지 않는다. 원 파일 내용·비밀·정책 값은 검증 보고서에 복사하지 않는다.
+
+파일 bytes SHA와 ENV 객체 Ref/content SHA는 별도로 비교한다. 기존 정책 값의 타입·완전 입력 시 normalize 검사는 재사용하고, ENV/target/prepared 및 LIF-11 selection/scenario canonical hash를 대조한다. 제어 파일과 model_read_scope에 선언된 ENV/target/prepared/session의 불일치도 진단한다. SUP-06의 단일 target/prepared는 두 역할 중 **같은 역할**의 정책 해시 쌍과 일치해야 한다. 정상 target+challenge prepared의 혼입은 거부하며, 실제 role 배정 인증은 미확인으로 남긴다.
+
+추가 파일 `local-verification.json`은 실제 bytes/JSON 검사와 알려진 선언 결합의 결과만 담는다. 입력 오류 시 `status=FAILED`, 진단과 출력 파일을 보존하고 CLI는2로 종료한다. 누락·prepared 자산 지원·제어 절차/현재 runtime 검증이 남으면 `INCOMPLETE`다. manifest의 `local_verification`과 artifact SHA로 연결하며 `ready_for_execution/execution_authorized/runtime_binding_verified/prepared_assets_verified`는 false다. 파일 검증 성공은 생산자 등록·정책 승인·현재 GPU 신원·실행 준비 완료가 아니다. 옵션이 없으면 기존처럼 포인터 파일을 열지 않는다.
+
+고정 source의 기존13+신규21, 총34개가 통과했다(pytest10.71초/부모11.641초). 파일 누락·SHA·경로·크기·중복 JSON·ENV content 변조·다른 ENV/session·SUP06 역할 쌍 혼입·기존 출력 보존·격리 CLI 종료를 확인했다. 원 명령/시각/JUnit/source freeze는 통합 worktree의 `out/team-handoff/b4-local-verification-v1/`에 보존한다. 기존 B1/B2·모델·API·전체 suite·GPU/SSM 실행을 반복하지 않았고 43ID state/원 판정은 변경하지 않았다.

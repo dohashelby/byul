@@ -32,7 +32,9 @@ SOURCES = {
     "entrypoints/openai/chat_completion/serving.py": "532dadea845c77a5a79011027b9989987c3e32467614e993f439f29c924de002",
     "entrypoints/openai/chat_completion/protocol.py": "4bdc71f668e4820d8ae5bae2a153fed0296b430cd6353ace8c0c27cfb982ebc1",
 }
-_RESPONSE_ID = re.compile(r"(?:chatcmpl|cmpl)-[0-9a-f]{32}")
+# db9527a vllm.utils.random_uuid masks UUID4 to64 bits and formats016x.
+# _bounded excludes custom IDs; accept only that fixed default source shape.
+_RESPONSE_ID = re.compile(r"(?:chatcmpl|cmpl)-[0-9a-f]{16}")
 
 
 def _preparer():

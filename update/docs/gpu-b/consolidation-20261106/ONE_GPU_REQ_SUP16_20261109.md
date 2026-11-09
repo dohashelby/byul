@@ -4,7 +4,7 @@
 
 ## 실제 진행 상태 — 2026-11-09 21:54 KST 마감 관측
 
-V12에서 실제97초 Ready→직접 HTTP health200→정상 chat/completion 각200까지 확인했다. 이후 선정 REQ 제품 입력 준비가 디렉터리 보호 조건에서 중단됐다. 실제 응답16hex와 B parser의32hex 가정도 대조 중이다. 원 오류·미측정을 보존하며 문서 게시는 실제 실행 source b85를 변경하지 않는다.
+V12에서 실제97초 Ready→직접 HTTP health200→정상 chat/completion 각200까지 확인했다. 이후 선정 REQ 제품 입력 준비가 디렉터리 보호 조건에서 중단됐다. [준비 권한·native ID 최소 수정](NATIVE_ID_AND_PRIVATE_PREPARATION_FIX_20261109.md)은 CPU·독립 검토를 마치고 신규 source2cb를 별도로 고정했다. 기존 b85 결과는 보존하며 새 실제 결과를 선반영하지 않는다. [CPU 업무 완료·실제 연결 잔여](CPU_SUBTASK_STATUS_B_20261109.md)도 원43개 결과와 구분한다.
 
 | 단계 | 실제 결과 |
 | --- | --- |

@@ -16,6 +16,7 @@ from guard.store.packs import put_pack
 from tests.builders import environment, policy, completion_response
 from tests.test_gpu_input_producers import api_rows, crow, PARAMS
 from tests.test_kubernetes_sampling import World as PodWorld, inputs as target_inputs
+from tests.req_response_id_source import response_id
 from tools import b_req_runner_capture as driver
 
 PACK_DIR = Path(__file__).parents[1] / "packs/PACK-BASELINE"
@@ -31,6 +32,7 @@ class World(PodWorld):
         self.prepared, self.damage, self.consume_reused = prepared, damage, consume_reused
         self.api, self.worker, self.sent = [], [], []
         self.serial = 0
+        self.duplicate_response_ids = {}
         self.fingerprinter = object.__new__(link.sensor.ConsumptionObserver)
         self.fingerprinter.secret = load_secret(Path(prepared["_directory"]))
         self.expected = {(0, name): digest for name, digest in link.SOURCES.items()}
@@ -78,7 +80,9 @@ class World(PodWorld):
                     reply = {"id": request["id"], "outcome": 400, "body": json.dumps({"error": {"message": "EXAMPLE bounded rejection", "type": "BadRequestError", "code": 400}})}
                 else:
                     chat = request["url"].endswith("/v1/chat/completions")
-                    rid = ("chatcmpl-" if chat else "cmpl-") + format(1 if self.damage == "duplicate" else serial, "032x")
+                    rid = response_id(chat)
+                    if self.damage == "duplicate":
+                        rid = self.duplicate_response_ids.setdefault(chat, rid)
                     reply = completion_response(request)
                     payload = json.loads(reply["body"])
                     payload.update(id=rid, model="fixture-model", prompt_token_ids=body.get("prompt_token_ids", [5, 6]))

@@ -10,6 +10,7 @@ import { matchesTarget, useEnvTarget } from "../lib/filters";
 import { bucketize, inRange } from "../lib/time";
 import { carry, useGlobalFilters } from "../lib/url";
 import p from "./pages.module.css";
+import { GpuPanel } from "./runtime/GpuPanel";
 
 const AREAS = ["SUP", "REQ", "PLT", "LIF", "OBS"] as const;
 const DAY = 24 * 60 * 60 * 1000;
@@ -59,6 +60,7 @@ export function DashboardPage() {
         <MetricCard title="수집 상태" value={`${connected}/${total}`} caption={total && connected === total ? "정상" : "주의"} dot={total && connected === total ? "ok" : "warn"} onClick={() => go("/runtime/observe/collectors")} label="수집 상태 보기"><span className="small muted">정상 수집기 / 전체 수집기</span></MetricCard>
         </div>
       </section>
+      <GpuPanel />
       {status && <details className="card" style={{ padding: 16 }}><summary>요청 통제 정책 자세히</summary><KeyValue items={[["Gateway 활성", status.policy.gateway_active ? "활성" : "비활성"], ["사용자별 캐시 분리", <span style={status.policy.cache_isolation.mode === "per_principal" && !status.policy.cache_isolation.ready ? { color: "var(--error)" } : undefined}>{status.policy.cache_isolation.mode === "off" ? "비활성 (사용자 간 prefix cache 공유)" : status.policy.cache_isolation.mode === "per_principal" ? status.policy.cache_isolation.ready ? "활성" : `준비 불가(${status.policy.cache_isolation.unavailable_reason_code ?? "unknown"})` : "미확인"}</span>]]} /></details>}
       <div className={`${p.chartRow} ${p.dashboardChartRow}`}>
         <div className={p.chartSide}>

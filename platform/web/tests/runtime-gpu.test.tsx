@@ -48,3 +48,23 @@ describe("GPU 상태 카드", () => {
     expect(gpuChipState(item as never)).toEqual([label, kind]);
   });
 });
+
+describe("현황(대시보드) 화면의 GPU 패널", () => {
+  const overview = { status: null, requests: null, latest_verification: null, open_revalidation: 0 };
+  it("실제 현황 화면에 GPU 값이 보인다", async () => {
+    const { DashboardPage } = await import("../src/pages/DashboardPage");
+    mockApi({ ...routes({ schema_version: "runtime-gpu-status/1.0", state: "ok", fresh: true, collected_at: "2026-11-09T00:00:00Z", reason: null, gpus: [L4] }), "/api/overview": overview });
+    renderAt("/runtime/overview", "/runtime/overview", <DashboardPage />);
+    const panel = await screen.findByLabelText("GPU 상태");
+    expect(await screen.findByText("NVIDIA L4")).toBeTruthy();
+    expect(panel.textContent).toContain("수집 정상 · 1개");
+    expect(panel.textContent).toContain("18120 / 23034 MiB");
+  });
+
+  it("미연결이면 0이 아니라 연결 안 됨으로 보인다", async () => {
+    const { DashboardPage } = await import("../src/pages/DashboardPage");
+    mockApi({ ...routes({ schema_version: "runtime-gpu-status/1.0", state: "not_configured", fresh: false, collected_at: null, reason: null, gpus: [] }), "/api/overview": overview });
+    renderAt("/runtime/overview", "/runtime/overview", <DashboardPage />);
+    expect(await screen.findByText(/GPU 수집기가 연결되지 않았습니다/)).toBeTruthy();
+  });
+});

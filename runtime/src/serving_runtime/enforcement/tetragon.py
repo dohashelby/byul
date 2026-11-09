@@ -12,6 +12,16 @@ from .attribution import KERNEL_DATA
 _STATUS = "candidate-cluster-unapplied-unverified"
 
 
+def render_monitor_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
+    """Initial synchronization never activates enforcement actions."""
+    manifests = render_manifests(intent)
+    for manifest in manifests.values():
+        options = manifest["spec"].setdefault("options", [])
+        options[:] = [o for o in options if o.get("name") != "policy-mode"]
+        options.append({"name": "policy-mode", "value": "monitor"})
+    return manifests
+
+
 def comparable_spec(spec: dict[str, Any]) -> dict[str, Any]:
     """Ignore only observed 1.7.1 CRD defaults on kprobe argument definitions."""
     result = copy.deepcopy(spec)

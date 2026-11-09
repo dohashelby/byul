@@ -1,7 +1,7 @@
 // runtime 현황. 삭제된 runtime 대시보드의 "현황" 화면(renderStatus·renderSummary·renderCharts·renderObservations)을 그대로 옮겼다.
 import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useRequestSummary, useRequests, useRuntimeEvents, useRuntimeStatus } from "../../api/hooks";
+import { useGpuStatus, useRequestSummary, useRequests, useRuntimeEvents, useRuntimeStatus } from "../../api/hooks";
 import type { RuntimeStatus } from "../../api/types";
 import { KeyValue } from "../../components/DetailPanel";
 import { Dot, Query, StateView, WarningBox, ui } from "../../components/Misc";
@@ -10,6 +10,7 @@ import { Value } from "../../components/Value";
 import { APPROVAL_DETAIL, ENGINE_NAME } from "../../lib/labels";
 import { bucketize, inRange } from "../../lib/time";
 import { isTetragonBlockAttempt } from "../../lib/tetragon";
+import { fmt, gpuChipState } from "../../lib/gpu";
 import { carry, useGlobalFilters } from "../../lib/url";
 import p from "../pages.module.css";
 import { ControlModeBadges, ObservationChip, formatTime, observationState, rt } from "./parts";
@@ -62,6 +63,8 @@ export function RuntimeOverviewPage() {
   const summaryQ = useRequestSummary();
   const requests = useRequests();
   const events = useRuntimeEvents();
+  const gpuQ = useGpuStatus();
+  const gpu = gpuQ.data?.item;
   const { range } = useGlobalFilters();
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -328,13 +331,32 @@ export function RuntimeOverviewPage() {
                   </h3>
                   <Kv rows={storeRows} />
                 </article>
+                <article className="card card-pad stack" style={{ gap: 10 }} aria-label="GPU 상태">
+                  <h3 className="row" style={{ gap: 8 }}>
+                    <Dot state={gpu?.state === "ok" ? "ok" : !gpu || gpu.state === "not_configured" ? "none" : "bad"} />
+                    GPU
+                  </h3>
+                  <Kv
+                    rows={[
+                      ["수집", gpuChipState(gpu)[0], { problem: !!gpu && !["ok", "not_configured"].includes(gpu.state) }],
+                      ["수집 시각", formatTime(gpu?.collected_at ?? null)],
+                      ...(gpu?.gpus ?? []).flatMap((g): Row[] => [
+                        [`#${g.index} 모델`, g.name],
+                        [`#${g.index} 사용률`, fmt(g.utilization_percent, "%")],
+                        [`#${g.index} 메모리`, `${fmt(g.memory_used_mib, "")} / ${fmt(g.memory_total_mib, " MiB")}`],
+                        [`#${g.index} 온도·전력`, `${fmt(g.temperature_c, "°C")} · ${fmt(g.power_w, " W", 1)}`],
+                      ]),
+                      ...(gpu?.state === "stale" ? ([["주의", "수집기가 멈춰 마지막 값이 오래됐습니다(현재 값 아님)", { problem: true }]] as Row[]) : []),
+                    ]}
+                  />
+                </article>
               </div>
 
               <div className={rt.chipRow} aria-label="수집 상태">
                 <ObservationChip label="네트워크" state={observationState(origins.network_flow, col.observation_feed_hubble)} />
                 <ObservationChip label="프로세스" state={observationState(origins.process_exec, col.observation_feed_tetragon)} />
                 <ObservationChip label="파일" state={observationState(origins.file_access, col.observation_feed_tetragon)} />
-                <ObservationChip label="GPU" state={["미연결", "off"]} />
+                <ObservationChip label="GPU" state={gpuChipState(gpu)} />
               </div>
             </>
           );

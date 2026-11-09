@@ -7,7 +7,7 @@ import { JsonView } from "../../components/JsonView";
 import { Query, StateView } from "../../components/Misc";
 import { OriginBadge, EnumBadge } from "../../components/Badges";
 import { Short, Time } from "../../components/Value";
-import { AUTH_RESULT, CONTEXT_RESULT, EXTRA_FIELD_MODE, GATEWAY_REASON, REQUEST_RESULT, TIMELINE_PHASE, label } from "../../lib/labels";
+import { AUTH_RESULT, BACKEND_RECEIPT, CONTEXT_RESULT, ENGINE_LIVE, EXTRA_FIELD_MODE, GATEWAY_REASON, REQUEST_RESULT, TIMELINE_PHASE, label } from "../../lib/labels";
 import { ScopeBadges, formatTime, rt } from "./parts";
 
 type Row = [string, ReactNode, { mono?: boolean; problem?: boolean }?];
@@ -78,7 +78,7 @@ function Overview({ d }: { d: RuntimeRequestDetail }) {
       <Kv
         rows={[
           ["전달 시도", d.delivery.attempted ? "예" : d.delivery.attempted === false ? "아니요 (엔진 미호출)" : null],
-          ["기록 시점 수신 확인", d.delivery.backend_receipt],
+          ["기록 시점 수신 확인", label(BACKEND_RECEIPT, d.delivery.backend_receipt)],
           ["응답", d.delivery.response],
           ["오류 코드", d.delivery.error_code, { mono: true }],
           ["backend 취소", d.backend_cancel === "mock_engine_recorded" ? "모의 엔진 기록 (실제 엔진 취소 확인 아님)" : d.backend_cancel],
@@ -97,7 +97,7 @@ function Overview({ d }: { d: RuntimeRequestDetail }) {
       <Kv
         rows={[
           ["수신 기록 파일", d.engine_receipts.count ? `${d.engine_receipts.count}건 (${formatTime(d.engine_receipts.first_received_at)})` : "없음"],
-          ["실시간 조회", `${d.engine_live.status ?? "–"} · ${formatTime(d.engine_live.queried_at)}`],
+          ["실시간 조회", `${label(ENGINE_LIVE, d.engine_live.status)} · ${formatTime(d.engine_live.queried_at)}`],
           ["같은 관측 세션", d.same_observation_session ? "예" : d.same_observation_session === false ? "아니요" : null],
           ["손상 줄", `Gateway ${d.corrupt_lines.gateway ?? "–"} · 엔진 ${d.corrupt_lines.engine ?? "–"}`],
         ]}

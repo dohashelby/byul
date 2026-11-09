@@ -194,6 +194,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runtime/gpu-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gpu Status */
+        get: operations["gpu_status_api_runtime_gpu_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/update/results": {
         parameters: {
             query?: never;
@@ -540,10 +557,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Me */
+        get: operations["me_api_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login */
+        post: operations["login_api_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["logout_api_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Password */
+        post: operations["change_password_api_auth_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AuthMe */
+        AuthMe: {
+            /** Login Enabled */
+            login_enabled: boolean;
+            user?: components["schemas"]["AuthUser"] | null;
+            /** Csrf Token */
+            csrf_token?: string | null;
+        };
+        /** AuthUser */
+        AuthUser: {
+            /** Id */
+            id: string;
+            /** Role */
+            role: string;
+            /** Default Password */
+            default_password: boolean;
+            /** Must Change */
+            must_change: boolean;
+            /** Password Change Required */
+            password_change_required: boolean;
+        };
         /** AvailableBundle */
         AvailableBundle: {
             /** Bundle Id */
@@ -593,6 +699,38 @@ export interface components {
             before?: unknown;
             /** After */
             after?: unknown;
+        };
+        /** EnforcementComponentResult */
+        EnforcementComponentResult: {
+            /**
+             * Component
+             * @enum {string}
+             */
+            component: "tetragon" | "cilium";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "apply" | "dry_run" | "not_installed";
+        };
+        /** EnforcementPolicyResult */
+        EnforcementPolicyResult: {
+            /** Name */
+            name: string;
+            /**
+             * Component
+             * @enum {string}
+             */
+            component: "tetragon" | "cilium";
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "created" | "replaced" | "unchanged" | "extra" | "skipped";
+            /** Mode */
+            mode?: ("monitor" | "monitor_only" | "enforce") | null;
+            /** Spec Sha256 */
+            spec_sha256: string;
         };
         /** EnvironmentRevision */
         EnvironmentRevision: {
@@ -654,6 +792,53 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** GpuRow */
+        GpuRow: {
+            /** Index */
+            index: number;
+            /** Name */
+            name: string;
+            /** Utilization Percent */
+            utilization_percent?: number | null;
+            /** Memory Used Mib */
+            memory_used_mib?: number | null;
+            /** Memory Total Mib */
+            memory_total_mib?: number | null;
+            /** Temperature C */
+            temperature_c?: number | null;
+            /** Power W */
+            power_w?: number | null;
+        };
+        /** GpuSnapshot */
+        GpuSnapshot: {
+            /**
+             * Schema Version
+             * @default runtime-gpu-status/1.0
+             * @constant
+             */
+            schema_version: "runtime-gpu-status/1.0";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ok" | "stale" | "error" | "missing" | "not_configured";
+            /**
+             * Fresh
+             * @default false
+             */
+            fresh: boolean;
+            /** Collected At */
+            collected_at?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Gpus */
+            gpus?: components["schemas"]["GpuRow"][];
+        };
+        /** GpuStatusResponse */
+        GpuStatusResponse: {
+            item: components["schemas"]["GpuSnapshot"];
+            source: components["schemas"]["SourceInfo"];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -687,6 +872,13 @@ export interface components {
             item: components["schemas"]["RuntimeLabReport"] | null;
             invalid?: components["schemas"]["InvalidItem"] | null;
             source: components["schemas"]["SourceInfo"];
+        };
+        /** LoginBody */
+        LoginBody: {
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
         };
         /** ManifestRef */
         ManifestRef: {
@@ -751,7 +943,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "bundle.apply" | "bundle.switch" | "tetragon.mode";
+            kind: "bundle.apply" | "bundle.switch" | "tetragon.mode" | "enforcement.apply";
             expected: components["schemas"]["Expected"];
             /** Policy Id */
             policy_id?: string | null;
@@ -763,6 +955,15 @@ export interface components {
             environment_revision?: number | null;
             /** Bundle Id */
             bundle_id?: string | null;
+            /** Bundle Sha256 */
+            bundle_sha256?: string | null;
+            /** Components */
+            components?: ("tetragon" | "cilium")[] | null;
+            /**
+             * Cilium Apply
+             * @default false
+             */
+            cilium_apply: boolean;
             /** Server Values Override */
             server_values_override?: {
                 [key: string]: unknown;
@@ -787,6 +988,13 @@ export interface components {
             /** Open Revalidation */
             open_revalidation: number | null;
             revalidation_error?: components["schemas"]["ErrorBody"] | null;
+        };
+        /** PasswordBody */
+        PasswordBody: {
+            /** Current Password */
+            current_password: string;
+            /** New Password */
+            new_password: string;
         };
         /** PhaseCollector */
         PhaseCollector: {
@@ -1166,6 +1374,10 @@ export interface components {
              * @default false
              */
             dry_run: boolean;
+            /** Policies */
+            policies?: components["schemas"]["EnforcementPolicyResult"][];
+            /** Components */
+            components?: components["schemas"]["EnforcementComponentResult"][];
         };
         /** RevalidationList */
         RevalidationList: {
@@ -1279,7 +1491,7 @@ export interface components {
              * Stage
              * @enum {string}
              */
-            stage: "validation" | "link" | "restart" | "status" | "set-mode" | "rollback";
+            stage: "validation" | "link" | "restart" | "status" | "set-mode" | "rollback" | "render" | "dry-run" | "apply" | "verify";
             /**
              * State
              * @enum {string}
@@ -3124,6 +3336,26 @@ export interface operations {
             };
         };
     };
+    gpu_status_api_runtime_gpu_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GpuStatusResponse"];
+                };
+            };
+        };
+    };
     results_api_update_results_get: {
         parameters: {
             query?: never;
@@ -3838,6 +4070,112 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvidenceList"];
+                };
+            };
+        };
+    };
+    me_api_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthMe"];
+                };
+            };
+        };
+    };
+    login_api_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthMe"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_api_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    change_password_api_auth_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthMe"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

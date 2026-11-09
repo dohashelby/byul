@@ -2,6 +2,7 @@ import { BundleApplyRequest } from "./RuntimeOperations";
 import { useEffect, useState } from "react";
 import { useDocList, useDocRevisions, useEnvironmentRevision, usePolicyRevision } from "../api/hooks";
 import type { RevisionMeta } from "../api/types";
+import { csrfHeaders } from "../api/auth";
 
 type Metadata = {
   bundle_id: string;
@@ -71,7 +72,7 @@ export function BundleExport({ policyId, revisions }: { policyId: string; revisi
     setPending(true);
     try {
       const response = await fetch(`/api/policies/${encodeURIComponent(policyId)}/revisions/${policyRevision}/bundle`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", ...csrfHeaders() },
         body: JSON.stringify({ environment_id: envId, environment_revision: envRevision,
           requested_by_role: role, server_values_override: serverValuesOverride, bundle_id: bundleId.trim() || undefined }),
       });

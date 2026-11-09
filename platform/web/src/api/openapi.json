@@ -275,6 +275,27 @@
         }
       }
     },
+    "/api/runtime/gpu-status": {
+      "get": {
+        "tags": [
+          "runtime"
+        ],
+        "summary": "Gpu Status",
+        "operationId": "gpu_status_api_runtime_gpu_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GpuStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/update/results": {
       "get": {
         "tags": [
@@ -1361,10 +1382,199 @@
           }
         }
       }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Me",
+        "operationId": "me_api_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthMe"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthMe"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout",
+        "operationId": "logout_api_auth_logout_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Change Password",
+        "operationId": "change_password_api_auth_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthMe"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AuthMe": {
+        "properties": {
+          "login_enabled": {
+            "type": "boolean",
+            "title": "Login Enabled"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuthUser"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "csrf_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Csrf Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "login_enabled"
+        ],
+        "title": "AuthMe"
+      },
+      "AuthUser": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "default_password": {
+            "type": "boolean",
+            "title": "Default Password"
+          },
+          "must_change": {
+            "type": "boolean",
+            "title": "Must Change"
+          },
+          "password_change_required": {
+            "type": "boolean",
+            "title": "Password Change Required"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "default_password",
+          "must_change",
+          "password_change_required"
+        ],
+        "title": "AuthUser"
+      },
       "AvailableBundle": {
         "properties": {
           "bundle_id": {
@@ -1508,6 +1718,92 @@
           "change"
         ],
         "title": "DiffEntry"
+      },
+      "EnforcementComponentResult": {
+        "properties": {
+          "component": {
+            "type": "string",
+            "enum": [
+              "tetragon",
+              "cilium"
+            ],
+            "title": "Component"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "apply",
+              "dry_run",
+              "not_installed"
+            ],
+            "title": "State"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "component",
+          "state"
+        ],
+        "title": "EnforcementComponentResult"
+      },
+      "EnforcementPolicyResult": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9.-]{0,252}$",
+            "title": "Name"
+          },
+          "component": {
+            "type": "string",
+            "enum": [
+              "tetragon",
+              "cilium"
+            ],
+            "title": "Component"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "created",
+              "replaced",
+              "unchanged",
+              "extra",
+              "skipped"
+            ],
+            "title": "Action"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "monitor",
+                  "monitor_only",
+                  "enforce"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "spec_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Spec Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "component",
+          "action",
+          "spec_sha256"
+        ],
+        "title": "EnforcementPolicyResult"
       },
       "EnvironmentRevision": {
         "properties": {
@@ -1703,6 +1999,167 @@
         ],
         "title": "FieldIssue"
       },
+      "GpuRow": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Index"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "utilization_percent": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization Percent"
+          },
+          "memory_used_mib": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Used Mib"
+          },
+          "memory_total_mib": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Total Mib"
+          },
+          "temperature_c": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature C"
+          },
+          "power_w": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power W"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "index",
+          "name"
+        ],
+        "title": "GpuRow"
+      },
+      "GpuSnapshot": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "runtime-gpu-status/1.0",
+            "title": "Schema Version",
+            "default": "runtime-gpu-status/1.0"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "stale",
+              "error",
+              "missing",
+              "not_configured"
+            ],
+            "title": "State"
+          },
+          "fresh": {
+            "type": "boolean",
+            "title": "Fresh",
+            "default": false
+          },
+          "collected_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collected At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/GpuRow"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Gpus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "GpuSnapshot"
+      },
+      "GpuStatusResponse": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/GpuSnapshot"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "source"
+        ],
+        "title": "GpuStatusResponse"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1816,6 +2273,27 @@
           "source"
         ],
         "title": "LabReportResponse"
+      },
+      "LoginBody": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "Password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginBody"
       },
       "ManifestRef": {
         "properties": {
@@ -2005,7 +2483,8 @@
             "enum": [
               "bundle.apply",
               "bundle.switch",
-              "tetragon.mode"
+              "tetragon.mode",
+              "enforcement.apply"
             ],
             "title": "Kind"
           },
@@ -2071,6 +2550,41 @@
               }
             ],
             "title": "Bundle Id"
+          },
+          "bundle_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bundle Sha256"
+          },
+          "components": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "tetragon",
+                    "cilium"
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Components"
+          },
+          "cilium_apply": {
+            "type": "boolean",
+            "title": "Cilium Apply",
+            "default": false
           },
           "server_values_override": {
             "anyOf": [
@@ -2228,6 +2742,27 @@
           "open_revalidation"
         ],
         "title": "Overview"
+      },
+      "PasswordBody": {
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "Current Password"
+          },
+          "new_password": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "New Password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "PasswordBody"
       },
       "PhaseCollector": {
         "properties": {
@@ -3737,6 +4272,22 @@
             "type": "boolean",
             "title": "Dry Run",
             "default": false
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/EnforcementPolicyResult"
+            },
+            "type": "array",
+            "maxItems": 512,
+            "title": "Policies"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/EnforcementComponentResult"
+            },
+            "type": "array",
+            "maxItems": 2,
+            "title": "Components"
           }
         },
         "additionalProperties": false,
@@ -4087,7 +4638,11 @@
               "restart",
               "status",
               "set-mode",
-              "rollback"
+              "rollback",
+              "render",
+              "dry-run",
+              "apply",
+              "verify"
             ],
             "title": "Stage"
           },

@@ -103,7 +103,8 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         for name in installer.UNITS:
             unit = result[name].decode()
             self.assertIn("SupplementaryGroups=12000 12010", unit)
-            self.assertIn("--context cluster.test", unit)
+            if name != "serving-runtime-gpu-status.service":  # nvidia-smi only; no Kubernetes access
+                self.assertIn("--context cluster.test", unit)
             self.assertNotIn("lab-context", unit)
             self.assertNotIn("--namespace serving ", unit)
         agent = result["serving-runtime-agent.service"].decode()
@@ -529,6 +530,33 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         self.assertIn(["update-grub"], commands)
         self.assertFalse(any(c[0] == "systemctl" and c[1] in {"enable", "start", "reboot"} for c in commands))
 
+    def test_existing_agent_is_disabled_before_failed_or_reboot_pending_install(self):
+        config = installer.load_config(self.config)
+        unit_file = self.root / installer.AGENT_UNIT
+        unit_file.write_text("[Unit]\n")
+        for fails in (True, False):
+            with self.subTest(fails=fails), ExitStack() as stack:
+                mocks = self.install_mocks(stack)
+                stack.enter_context(patch.object(installer, "AGENT_UNIT_FILE", unit_file))
+                events = []
+                mocks["run"].side_effect = lambda command: events.append(command)
+
+                def install_code():
+                    events.append("code")
+                    if fails:
+                        raise installer.InstallError("test install failure")
+
+                mocks["install_code"].side_effect = install_code
+                if fails:
+                    with self.assertRaises(installer.InstallError):
+                        installer.install(config, SimpleNamespace(capture_baseline=True), installer.render(config), None)
+                else:
+                    result = installer.install(config, SimpleNamespace(capture_baseline=True), installer.render(config), b"grub")
+                    self.assertEqual(result, 2)
+                self.assertLess(events.index(["systemctl", "disable", installer.AGENT_UNIT]), events.index("code"))
+                self.assertFalse(any(isinstance(c, list) and c[:2] in
+                                     (["systemctl", "enable"], ["systemctl", "start"]) for c in events))
+
     def test_failed_code_install_stops_all_following_stages(self):
         config = installer.load_config(self.config)
         with ExitStack() as stack:
@@ -540,25 +568,42 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         mocks["capture_baseline"].assert_not_called()
         mocks["run"].assert_not_called()
 
+    def test_running_agent_after_install_fails(self):
+        config = installer.load_config(self.config)
+        with ExitStack() as stack:
+            mocks = self.install_mocks(stack)
+            stack.enter_context(patch.object(installer.time, "sleep"))
+            stack.enter_context(patch.object(installer, "active", side_effect=[False] * (2 * len(installer.UNITS)) + [True] * len(installer.AUTO_UNITS) + [True]))
+            with self.assertRaises(installer.InstallError):
+                installer.install(config, SimpleNamespace(capture_baseline=False), installer.render(config), None)
+        mocks["summary"].assert_not_called()
+
     def test_baseline_validation_precedes_ordered_service_start(self):
         config = installer.load_config(self.config)
         events = []
         with ExitStack() as stack:
             mocks = self.install_mocks(stack)
             stack.enter_context(patch.object(installer.time, "sleep"))
-            stack.enter_context(patch.object(installer, "active", side_effect=[False] * 6 + [True] * 3))
+            stack.enter_context(patch.object(installer, "active", side_effect=[False] * (2 * len(installer.UNITS)) + [True] * len(installer.AUTO_UNITS) + [False]))
             mocks["capture_baseline"].side_effect = lambda *args: events.append("baseline-verified")
             mocks["run"].side_effect = lambda cmd: events.append(cmd)
             result = installer.install(config, SimpleNamespace(capture_baseline=True), installer.render(config), None)
         self.assertEqual(result, 0)
         expected = ["baseline-verified"]
-        expected += [command for unit in installer.UNITS for command in
+        expected += [command for unit in installer.AUTO_UNITS for command in
                      (["systemctl", "enable", unit], ["systemctl", "is-enabled", "--quiet", unit],
                       ["systemctl", "start", unit])]
+        expected += [["systemctl", "disable", installer.AGENT_UNIT]]
         self.assertEqual(events[events.index("baseline-verified"):], expected)
+        # The agent can change the server, so the installer never enables or starts it.
+        self.assertNotIn(installer.AGENT_UNIT, installer.AUTO_UNITS)
+        self.assertFalse(any(c[:2] in (["systemctl", "enable"], ["systemctl", "start"]) and c[-1] == installer.AGENT_UNIT
+                             for c in events if isinstance(c, list)))
         mocks["summary"].assert_called_once()
         mocks["directory"].assert_any_call(installer.OBSERVATION / "tetragon-status", 999, 10010, 0o2750)
         mocks["directory"].assert_any_call(installer.OBSERVATION / "lab-reports", 1000, 10010, 0o2750)
+        mocks["directory"].assert_any_call(installer.OBSERVATION / "gpu-status", 999, 10010, 0o2750)
+        mocks["directory"].assert_any_call(installer.OBSERVATION / "engine-receipts", 999, 10010, 0o2750)
         mocks["directory"].assert_any_call(installer.VERIFICATION, 0, 10010, 0o2750)
         mocks["directory"].assert_any_call(installer.VERIFICATION / "approved", 0, 10000, 0o2750)
         mocks["directory"].assert_any_call(installer.VERIFICATION / "candidates", 1000, 10010, 0o2750)

@@ -1344,7 +1344,8 @@ def _run_s3a_01(runner: _Runner) -> AcceptanceResult:
         and body.get("model") == "backend-test-model"
         and receipt.get("model") == "backend-test-model"
         and final.get("backend_kind") == "vllm"
-        and final.get("delivery", {}).get("backend_receipt") == "not_available"
+        # The fake backend answers "fake-<id>", not vLLM's chatcmpl-<id>: never a match.
+        and final.get("delivery", {}).get("backend_receipt") == "engine_response_id_mismatch"
         and detail.get("evidence_summary")
         == "Gateway 전달·응답 수신, backend 측 수신 기록 미연결"
         and not detail.get("engine_receipts")

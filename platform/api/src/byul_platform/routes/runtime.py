@@ -19,6 +19,7 @@ from ..models import (
 )
 from ..sources.runtime import RuntimeNotFound, request_row
 from ..tetragon_models import TetragonSnapshot, TetragonStatusResponse
+from ..gpu_models import GpuSnapshot, GpuStatusResponse
 from pydantic import ValidationError
 from ..state import AppState, get_state, invalid_one, partition
 from .evidence import evidence_for_refs
@@ -129,4 +130,14 @@ def tetragon_status(state: AppState = Depends(get_state)) -> dict[str, Any]:
     except ValidationError:
         item = TetragonSnapshot(schema_version="runtime-tetragon-state/1.0", state="error", fresh=False,
                                 error="Tetragon 상태 자료의 형식을 확인할 수 없습니다")
+    return {"item": item, "source": state.source("runtime")}
+
+
+@router.get("/gpu-status", response_model=GpuStatusResponse)
+def gpu_status(state: AppState = Depends(get_state)) -> dict[str, Any]:
+    reader = getattr(state.runtime, "gpu_status", None)
+    try:
+        item = GpuSnapshot.model_validate(reader() if reader else {"state": "not_configured"})
+    except ValidationError:
+        item = GpuSnapshot(state="error", reason="INVALID_SNAPSHOT")
     return {"item": item, "source": state.source("runtime")}

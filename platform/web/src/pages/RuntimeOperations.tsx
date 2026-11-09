@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import ui from "../components/ui.module.css";
 import styles from "./RuntimeOperations.module.css";
-import { CHECK_LABELS, enforceReady, operationApi, type Actor, type Operation, type AgentState, type Operations, type Readiness } from "../api/operations";
+import { CHECK_LABELS, SESSION_CREDENTIAL, enforceReady, operationApi, type Actor, type Operation, type AgentState, type Operations, type Readiness } from "../api/operations";
 
 import { useOperationToken } from "../api/operationSession";
 import { formatLocal } from "../lib/time";
 
-const ROLE_LABELS: Record<string, string> = { viewer: "조회자", runtime_operator: "운영 요청자", approver: "승인자", agent: "에이전트" };
+const ROLE_LABELS: Record<string, string> = { viewer: "조회자", runtime_operator: "운영 요청자", approver: "승인자", agent: "에이전트", admin: "관리자" };
 const CAPABILITY_REASONS = {
   static_unavailable: "거부: 사전 점검에서 불가 (실측 근거보다 우선)",
   evidence_required: "미확인: 동일 노드·커널·방식·정책 spec의 실측 시험 필요",
@@ -23,6 +23,9 @@ function LabSettingsBadge({ data }: { data: Operations | null }) {
 
 export function OperationCredentials({ token, setToken, actor, unknownRoleLabel = "현재 역할: 조회 후 확인" }: { token: string; setToken: (v: string) => void; actor?: Actor; unknownRoleLabel?: string }) {
   const [draft, setDraft] = useState("");
+  if (token === SESSION_CREDENTIAL) return <div className="row wrap">
+    <span>로그인 계정으로 요청 · {actor ? `현재 역할: ${ROLE_LABELS[actor.role] ?? actor.role} (${actor.role}) · ${actor.id}` : unknownRoleLabel}</span>
+  </div>;
   return <div className="row wrap">
     {token ? <><span>운영 토큰 저장됨 · {actor ? `현재 역할: ${ROLE_LABELS[actor.role]} (${actor.role}) · ${actor.id}` : unknownRoleLabel}</span>
       <button className="btn" type="button" onClick={() => { setToken(""); setDraft(""); }}>토큰 지우기</button></> : <>
@@ -59,6 +62,42 @@ export function BundleApplyRequest({ policyId, revision, environmentId, environm
     <button className="btn" type="button" onClick={request} disabled={pending || !confirmed || !token || !server || !expected || !environmentId || !environmentRevision}>적용 요청</button>
     {message && <p role="status">{message}</p>}<Link to="/runtime/operations">운영 요청 목록</Link>
   </div>;
+}
+
+function EnforcementApplyRequest({ data, token, refresh }: { data: Operations; token: string; refresh: () => Promise<void> }) {
+  const [server, setServer] = useState("");
+  const [cilium, setCilium] = useState(false);
+  const [applyCilium, setApplyCilium] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState("");
+  const agent = data.agents.find(a => a.server === server);
+  const bundle = agent?.bundles?.find(b => b.bundle_id === agent.current?.bundle_id);
+  async function submit() {
+    if (!agent?.current || !bundle || !agentFresh(agent)) return;
+    setPending(true);
+    try {
+      await operationApi(token, "", { kind: "enforcement.apply", server, expected: agent.current,
+        bundle_id: bundle.bundle_id, bundle_sha256: bundle.sha256,
+        components: cilium ? ["tetragon", "cilium"] : ["tetragon"], cilium_apply: cilium && applyCilium });
+      setMessage("규칙 적용 요청 등록 · 별도 approver 승인 필요");
+      await refresh();
+    } catch (e) { setMessage(e instanceof Error ? e.message : "요청 실패"); }
+    finally { setPending(false); }
+  }
+  return <section className="card card-pad stack" aria-label="외부 규칙 적용"><h2>외부 규칙 처음 적용·동기화</h2>
+    <label>규칙 대상 서버 <select className="input" value={server} onChange={e => setServer(e.target.value)}>
+      <option value="">서버 선택</option>{data.agents.map(a => <option key={a.server} value={a.server}>{a.server}</option>)}
+    </select></label>
+    <p>현재 묶음: {bundle?.bundle_id ?? "미확인"} · SHA-256: {bundle?.sha256 ?? "미확인"}</p>
+    <p>Tetragon은 항상 monitor로 생성·교체합니다. enforce 정책 변경은 먼저 기존 경로로 monitor 복귀가 필요합니다.</p>
+    <label><input type="checkbox" checked disabled /> Tetragon</label>
+    <label><input type="checkbox" checked={cilium} onChange={e => { setCilium(e.target.checked); setApplyCilium(false); }} /> Cilium 포함</label>
+    {cilium && <><p className="notice">Cilium은 monitor 모드가 없어 즉시 트래픽이 차단될 수 있습니다. 기본은 dry-run·diff이며, CRD가 없으면 건너뜁니다.</p>
+      <label><input type="checkbox" checked={applyCilium} onChange={e => setApplyCilium(e.target.checked)} /> Cilium 실제 적용</label></>}
+    <p>실행 에이전트의 --execute가 필요하며 별도 approver만 승인할 수 있습니다. 자기 승인은 허용하지 않습니다.</p>
+    <button className="btn" disabled={pending || !token || !bundle || !agentFresh(agent)} onClick={submit}>규칙 적용 요청</button>
+    {message && <p role="status">{message}</p>}
+  </section>;
 }
 
 function MonitorWindows({ row }: { row: Readiness }) {
@@ -138,8 +177,8 @@ const STATE_LABELS: Record<string, string> = {
   requested: "승인 대기", approved: "승인됨", claimed: "가져감", running: "실행 중", succeeded: "완료",
   checked: "실행 없이 확인 완료", failed: "실패", rolled_back: "되돌림", unknown: "확인 필요", expired: "만료",
 };
-const KIND_LABELS: Record<string, string> = { "bundle.apply": "새 묶음 적용", "bundle.switch": "이전 묶음으로 되돌리기", "tetragon.mode": "정책 모드 전환" };
-const STEP_LABELS: Record<string, string> = { validation: "검증", link: "묶음 연결", restart: "재시작", status: "상태 확인", "set-mode": "모드 전환", rollback: "되돌림" };
+const KIND_LABELS: Record<string, string> = { "enforcement.apply": "외부 규칙 적용", "bundle.apply": "새 묶음 적용", "bundle.switch": "이전 묶음으로 되돌리기", "tetragon.mode": "정책 모드 전환" };
+const STEP_LABELS: Record<string, string> = { render: "렌더", "dry-run": "서버 dry-run·비교", apply: "규칙 적용", verify: "적용 확인", validation: "검증", link: "묶음 연결", restart: "재시작", status: "상태 확인", "set-mode": "모드 전환", rollback: "되돌림" };
 const STEP_STATES: Record<string, string> = { passed: "통과", failed: "실패", unknown: "미확인", skipped: "생략" };
 const REASON_LABELS: Record<string, string> = {
   BUNDLE_ROLES_MISSING: "필수 4역할이 없는 묶음", BUNDLE_INVALID: "묶음 검증 실패", CURRENT_LINK_INVALID: "현재 적용 묶음 링크 오류",
@@ -178,6 +217,7 @@ function progress(op: Operation) {
 function approvalAllowed(op: Operation, data: Operations) {
   const actor = data.actor;
   const self = actor?.id === op.requested_by;
+  if (op.kind === "enforcement.apply") return actor?.role === "approver" && !self;
   return actor?.role === "approver" ? (!self || data.lab_self_approval) :
     actor?.role === "runtime_operator" && self && data.lab_self_approval;
 }
@@ -289,6 +329,12 @@ export function RuntimeOperationsPage() {
       <p>실행 전 현재 적용 묶음: {detail.result?.before?.bundle_id ?? "미확인"} · 실행 후 현재 적용 묶음: {detail.result?.after?.bundle_id ?? "미확인"}</p>
       <div>결과: <ResultSummary op={detail} /></div>
       {detail.result?.steps.map((s, i) => <div key={i}>{STEP_LABELS[s.stage] ?? s.stage}: {STEP_STATES[s.state] ?? s.state}</div>)}
+      {detail.result?.components?.map(c => <p key={c.component}>{c.component}: {c.state === "not_installed" ? "not_installed · 미설치 건너뜀" : c.state}</p>)}
+      {!!detail.result?.policies?.length && <div className={ui.tableWrap}><table className={ui.table} aria-label="정책별 적용 결과"><thead><tr>
+        <th>정책</th><th>구성요소</th><th>동작</th><th>모드</th><th>spec SHA-256</th>
+      </tr></thead><tbody>{detail.result.policies.map(p => <tr key={`${p.component}-${p.name}`}>
+        <td>{p.name}</td><td>{p.component}</td><td>{p.action}</td><td>{p.mode ?? "해당 없음"}</td><td title={p.spec_sha256}>{p.spec_sha256.slice(0, 12)}…</td>
+      </tr>)}</tbody></table></div>}
       {evidenceHashes(detail.result?.evidence_sha256).map(hash => <div className="mono" key={hash} style={{ overflowWrap: "anywhere" }}>증거 SHA-256: {hash}</div>)}
       {!evidenceHashes(detail.result?.evidence_sha256).length && <p>증거 SHA-256: 없음</p>}
       {detail.state === "unknown" && <p className="notice">서버 상태를 수동 확인하세요. 자동으로 다시 실행하지 않습니다.</p>}
@@ -319,6 +365,7 @@ export function RuntimeOperationsPage() {
       <div className="row wrap"><button className="btn" disabled={pending || !token || !server || !current || !bundle || bundle === current || !canSwitch} onClick={switchBundle}>되돌리기 요청</button>
         <button className="btn" disabled={pending} onClick={() => setShowSwitch(false)}>취소</button></div>
     </section>}
-    <p>새 묶음 적용·차단 전환은 별도 승인이 필요합니다. 기본 에이전트는 실행 없이 확인만 수행합니다.</p>
+    {data?.actor?.role === "runtime_operator" && <EnforcementApplyRequest data={data} token={token} refresh={load} />}
+    <p>새 묶음 적용·차단 전환·외부 규칙 적용은 별도 승인이 필요합니다. 기본 에이전트는 실행 없이 확인만 수행합니다.</p>
   </div>;
 }

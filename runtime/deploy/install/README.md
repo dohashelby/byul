@@ -13,9 +13,15 @@ AWS 5–8회차의 계정·권한·baseline·systemd 수동 절차를 묶은 **�
 sudo bash deploy/install/install-runtime-node.sh --config /secure/install.env --dry-run --capture-baseline
 # 정상 monitor 정책의 spec·범위·mode를 먼저 검수한 뒤 최초 설치
 sudo bash deploy/install/install-runtime-node.sh --config /secure/install.env --capture-baseline
+# 코드 갱신 등 다시 설치할 때도 기본은 --execute 없이(에이전트 dry-run 모드로 설치)
+sudo bash deploy/install/install-runtime-node.sh --config /secure/install.env
 # 운영 실행이 승인된 경우에만 설치할 에이전트를 execute로 설정
 sudo bash deploy/install/install-runtime-node.sh --config /secure/install.env --execute
+# 에이전트는 설치기가 켜지 않는다. 사람이 확인한 뒤 직접 시작한다.
+sudo systemctl enable --now serving-runtime-agent
 ```
+
+**에이전트는 자동으로 켜지지 않는다.** 설치기는 에이전트 단위 파일만 설치하고, 마지막 단계에서 `disable`해 부팅 때도 켜지지 않게 둔다. 모드(`--dry-run`/`--execute`)와 상관없다. 에이전트는 승인된 요청으로 서버를 바꿀 수 있으므로, 플랫폼 연결·승인 대기 요청을 확인한 사람만 위 명령으로 시작한다. 다시 설치하면 에이전트는 다시 꺼진 상태가 된다.
 
 설치기의 `--dry-run`은 **호스트 무변경 사전 점검**이다. 계정/파일/서비스/GRUB 변경, 클러스터 조회·접속, 다운로드를 하지 않는다. 실제 `visudo`·systemd 검증과 계정에서의 읽기·정책 수집은 설치 때 수행한다. `--execute`는 설치될 agent의 실행 모드만 바꾸므로 `--dry-run --execute`로 점검할 수 있다. 에이전트 기본은 기존 운영 값의 `--dry-run`이며 LAB 자기 승인·감시 기간 단축을 넣지 않는다. 입력 값, 파일 내용, 렌더링 결과, 외부 명령의 stdout/stderr는 출력하지 않는다. 셸 tracing을 켜지 않는다.
 
@@ -29,7 +35,7 @@ BPF LSM이 활성 목록에 없으면 기본 중단한다. 유지보수 승인�
 
 baseline이 없을 때만 `--capture-baseline`을 사용한다. runtime-agent로 `umask 022`를 명시하고 후보 파일에 캡처한 뒤 monitor/monitor_only 정책·context·spec 해시를 검증해 채택한다. 기존 baseline은 검증하고 보존한다. 재캡처가 필요하면 서비스를 중지하고 기존 baseline을 별도로 보관·제거한 뒤 정책을 다시 검수한다. 실패 시 남은 `/var/lib/serving-runtime/baseline.capture.json`도 검수·제거해야 한다. baseline 캡처는 실제 클러스터 **조회**를 수행하지만 정책을 변경하지 않는다.
 
-서비스는 status → monitor-window → agent 순으로 enable/start한다. 활성 여부와 최신 상태의 복구 상태·4조건 충족 수만 출력한다. `active`와 `recovering`을 준비 완료로 해석하지 않는다. 기존 실측 evidence, 관측 feed·식별 자료·sentinel·Gateway 관측 JSONL이 있어야 복구가 healthy가 되고 모니터 창이 쌓인다. 이들 파일이 없으면 기존 운영 안전 조건이 전환을 거부한다. 서비스 시작 실패는 종료 1, 서비스 활성·설치 완료는 종료 0이다. 복구 unknown/recovering은 운영자가 최신 상태를 다시 확인해야 한다.
+수집 서비스(status → gpu-status → monitor-window)만 enable/start하고 에이전트는 disable·중지 상태로 둔다. 활성 여부와 최신 상태의 복구 상태·4조건 충족 수만 출력한다. `active`와 `recovering`을 준비 완료로 해석하지 않는다. 기존 실측 evidence, 관측 feed·식별 자료·sentinel·Gateway 관측 JSONL이 있어야 복구가 healthy가 되고 모니터 창이 쌓인다. 이들 파일이 없으면 기존 운영 안전 조건이 전환을 거부한다. 서비스 시작 실패는 종료 1, 서비스 활성·설치 완료는 종료 0이다. 복구 unknown/recovering은 운영자가 최신 상태를 다시 확인해야 한다.
 
 ## 별도 사용자 서비스
 

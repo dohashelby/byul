@@ -1,0 +1,26 @@
+[Unit]
+Description=BYUL continuous cache metadata and Pod mount observer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=10000
+EnvironmentFile=/etc/byul/cache-observer.env
+Environment=PYTHONPATH=/opt/byul/runtime/src
+Environment=PYTHONPYCACHEPREFIX=/run/byul-cache/python-cache
+ExecStart=/opt/byul/.venv/bin/python /opt/byul/runtime/tools/cache_observation_feed.py --settings ${CACHE_SETTINGS} --settings-sha256 ${CACHE_SETTINGS_SHA256} --reader-gid ${CACHE_READER_GID} --kubeconfig ${CACHE_KUBECONFIG} --kubectl ${CACHE_KUBECTL} --output /run/byul-cache/current.json
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=byul-cache
+RuntimeDirectoryMode=0750
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/run/byul-cache
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

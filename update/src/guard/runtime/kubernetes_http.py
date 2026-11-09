@@ -28,6 +28,8 @@ MODEL_AUTHORIZATION_PROFILE = "kubernetes-owned-model-authorization-http-v1"
 ROUTE_AUTHENTICATION_PROFILE = "kubernetes-owned-native-route-http-v1"
 ONLINE_INPUT_PROFILE = "kubernetes-owned-online-input-http-v1"
 TERMINATION_PROFILE = "kubernetes-owned-termination-http-v1"
+SGLANG_TERMINATION_PROFILE = "kubernetes-owned-sglang-termination-http-v1"
+_TERMINATION_PROFILES=frozenset({TERMINATION_PROFILE,SGLANG_TERMINATION_PROFILE})
 REQUEST_ATTEMPTS_PROFILE = "kubernetes-owned-request-attempts-http-v1"
 ENGINE_CALLBACK_PROFILE = "kubernetes-owned-engine-callback-http-v1"
 INPUT_VALIDATION_PROFILE = "kubernetes-owned-input-validation-http-v1"
@@ -37,15 +39,15 @@ USAGE_CONTROL_PROFILE = "kubernetes-owned-usage-control-http-v1"
 GATEWAY_EVENT_PROFILE = "kubernetes-owned-gateway-event-http-v1"
 from .kubernetes_observation import PROFILE as REQUIRED_EVENT_PROFILE
 from .kubernetes_observation_state import PROFILE as OBSERVATION_STATE_PROFILE
-_CLOSE_PROFILES = frozenset({TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, OBSERVATION_STATE_PROFILE})
-_BINDING_PROFILES = frozenset({ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE, RESPONSE_CONTENT_PROFILE, LOG_INTEGRITY_PROFILE, USAGE_CONTROL_PROFILE, GATEWAY_EVENT_PROFILE})
+_CLOSE_PROFILES = frozenset({SGLANG_TERMINATION_PROFILE,TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, OBSERVATION_STATE_PROFILE})
+_BINDING_PROFILES = frozenset({SGLANG_TERMINATION_PROFILE,ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE, RESPONSE_CONTENT_PROFILE, LOG_INTEGRITY_PROFILE, USAGE_CONTROL_PROFILE, GATEWAY_EVENT_PROFILE})
 _INPUT_FIELD = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}")
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
                                  validate_container_binding, verify_owned_pod, project_owned_snapshot)
 
 
-BINDING_PROBE_SHA256 = "6ffd129cd855170a1a2fefb496efef4abfcfd7928d2dc6795c22344bd152a765"
+BINDING_PROBE_SHA256 = "b37e17fe543cb352887f8ac214091b6f4899e63a972c63e3eb6ded819ae6656f"
 TEMPLATE_READER_SHA256 = "badf4bc4b01fc5bacbba103a606cac994e0921be28ef054116bd34dfd4b1c74b"
 
 
@@ -354,6 +356,7 @@ class KubernetesHTTP:
         self.profile = profile
         if profile==ROUTE_AUTHENTICATION_PROFILE and (target.get('lab') is not True or env.engine.name!='vllm' or env.engine.version!='0.31.0'):
             raise KubernetesBindingError()
+        if profile==SGLANG_TERMINATION_PROFILE and (env.engine.name!="sglang"or env.engine.version!="0.5.22"):raise KubernetesBindingError()
         self.lab = target.get('lab')
         self.engine_name = env.engine.name
         self.engine_version = env.engine.version
@@ -394,7 +397,7 @@ class KubernetesHTTP:
         self.injected = runner is not None
         self.process_observation_origin = ('EXAMPLE' if self.injected or target['lab']
             or env.data_origin.value == 'EXAMPLE' else 'MEASURED')
-        if profile in {ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE} and self.process_observation_origin != 'EXAMPLE':
+        if profile in {ONLINE_INPUT_PROFILE, SGLANG_TERMINATION_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE} and self.process_observation_origin != 'EXAMPLE':
             self.process_observation_origin = env.data_origin.value
         # This profile admits only its pinned HTTP Pod endpoint below. Preserve
         # its published source/fixture bytes when the general probe evolves.
@@ -623,7 +626,7 @@ class KubernetesHTTP:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
                     self._online_input_request(request, timeout)
-                elif self.profile == TERMINATION_PROFILE:
+                elif self.profile in _TERMINATION_PROFILES:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
                     self._termination_request(request, timeout)
@@ -724,7 +727,8 @@ class KubernetesHTTP:
                 if row.get("body") is not None and (type(row["body"]) is not str or len(row["body"].encode("utf-8"))>128*1024):
                     raise KubernetesBindingError()
                 kept={key:row[key] for key in keys if key in row}
-                if self.profile == GATEWAY_EVENT_PROFILE:
+                if self.profile == GATEWAY_EVENT_PROFILE or (
+                        self.profile == ENGINE_CALLBACK_PROFILE and hasattr(self, "gateway_routes")):
                     # OBS-01 Gateway 경로: Gateway가 발급한 요청 ID만 넘긴다. 다른 응답 header는 넘기지 않는다.
                     rid=(row.get("response_headers") or {}).get("x-request-id")
                     kept["gateway_request_id"]=rid if type(rid) is str and re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}",rid) else None
@@ -1608,7 +1612,7 @@ class KubernetesHTTP:
                     **({"input_contract_version":1,"data_origin":self.process_observation_origin,
                         "native_consumption_verified":False} if self.profile==ONLINE_INPUT_PROFILE else {}),
                     **({"data_origin":self.process_observation_origin,"native_termination_verified":False,
-                        "termination_contract_version":1} if self.profile==TERMINATION_PROFILE else {}),
+                        "termination_contract_version":1} if self.profile in _TERMINATION_PROFILES else {}),
                     **({"data_origin":self.process_observation_origin,"attempt_contract_version":1,
                         "native_attempt_delivery_verified":False} if self.profile==REQUEST_ATTEMPTS_PROFILE else {}),
                     **({'data_origin':self.process_observation_origin,'state_contract_version':1,

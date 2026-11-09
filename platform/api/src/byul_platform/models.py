@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, WithJsonSchema
+from pydantic import BaseModel, Field, WithJsonSchema, model_serializer
 
 
 def _contract(name: str) -> Any:
@@ -82,11 +82,27 @@ class RequestRow(BaseModel):
     origin_detail: str | None
 
 
+class RuntimeSourceWindow(BaseModel):
+    returned: int = Field(ge=0)
+    total: int | None = Field(default=None, ge=0)
+    limit: int | None = Field(default=None, ge=1)
+    truncated: bool | None = None
+    total_lower_bound: int | None = Field(default=None, ge=0)
+
+    @model_serializer(mode="wrap")
+    def serialize_window(self, handler):
+        result = handler(self)
+        if self.total_lower_bound is None:
+            result.pop("total_lower_bound", None)
+        return result
+
+
 class RuntimeEventList(BaseModel):
     items: list[RuntimeEventDoc]
     invalid: list[InvalidItem]
     source: SourceInfo
     truncated: bool = False
+    source_windows: dict[str, RuntimeSourceWindow] = Field(default_factory=dict)
 
 
 class RequestList(BaseModel):
@@ -121,6 +137,8 @@ class RequestSummary(BaseModel):
     corrupt_lines: int | None
     generated_at: str | None
     source: SourceInfo
+    counts_lower_bound: bool = False
+    history_truncated: bool = False
 
 
 class RuntimeStatusResponse(BaseModel):
@@ -160,6 +178,7 @@ class PhaseTimelineResponse(BaseModel):
     extraction: PhaseExtraction
     data_origin: Literal["real", "synthetic"]
     source: SourceInfo
+    scope_ref: str | None = None
 
 
 class RevalidationList(BaseModel):

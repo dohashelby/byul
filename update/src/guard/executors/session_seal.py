@@ -95,3 +95,8 @@ try:
   'recordings_closed':count,'terminal_inventory_sha256':digest},separators=(',',':')))
 finally:os.close(root)
 '''
+
+# The legacy program bytes are preserved. Only the explicit new 4MiB reader
+# selects this bounded variant; old profiles keep their original argv/program.
+LARGE_SESSION_SEALER = SESSION_SEALER.replace(
+    'limit not in (262144,2097152)', 'limit not in (4194304,)', 1)

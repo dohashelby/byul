@@ -1,0 +1,82 @@
+[
+  {
+    "module": "vllm.v1.worker.gpu.model_runner",
+    "file": "vllm__v1__worker__gpu__model_runner.py.txt",
+    "sha256": "725c47114e148ade3a26b4cc9c5f7295588fdd387afc3cb5fdb2d16513a1bb5c",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "origin": "existing local fixed v0.31.0 source archive; no latest remote query",
+    "license": "Apache-2.0"
+  },
+  {
+    "module": "vllm.v1.worker.gpu.states",
+    "file": "vllm__v1__worker__gpu__states.py.txt",
+    "sha256": "8c899b8ef63d95f450876d3f01e56772f9534938a95383a46659fddf85573fa3",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "origin": "existing local fixed v0.31.0 source archive; no latest remote query",
+    "license": "Apache-2.0"
+  },
+  {
+    "module": "vllm.v1.worker.gpu.async_utils",
+    "file": "vllm__v1__worker__gpu__async_utils.py.txt",
+    "sha256": "10875f3e7ab28fea5b6ec0dfa1a840ae69675882468cb90f9f3ca0a66db1598f",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "origin": "existing local fixed v0.31.0 source archive; no latest remote query",
+    "license": "Apache-2.0"
+  },
+  {
+    "module": "vllm.entrypoints.openai.chat_completion.api_router",
+    "file": "vllm__entrypoints__openai__chat_completion__api_router.py.txt",
+    "sha256": "77f858fe0079b9dd131c26d22641c79d4ac0f2b22688d033863954a8a669d7d3",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "origin": "existing local fixed v0.31.0 source archive; no latest remote query",
+    "license": "Apache-2.0"
+  },
+  {
+    "module": "vllm.v1.worker.gpu.kv_connector",
+    "file": "vllm__v1__worker__gpu__kv_connector.py.txt",
+    "sha256": "dad1aa1764f1bd0b95fe08a1b2bff6f6fffb633fd167bd65c0657fcb3d296fba",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "origin": "existing local fixed v0.31.0 source archive; no latest remote query",
+    "license": "Apache-2.0"
+  },
+  {
+    "module": "vllm.v1.worker.gpu.ec_connector",
+    "file": "vllm__v1__worker__gpu__ec_connector.py.txt",
+    "sha256": "ea65e79446ce84fa0573ed4dc52129a80d80be66a08380189c25e3811a793cc7",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "origin": "existing local fixed v0.31.0 source archive; no latest remote query",
+    "license": "Apache-2.0"
+  },
+  {
+    "module": "vllm.model_executor.models.qwen2",
+    "file": "vllm__model_executor__models__qwen2.py.txt",
+    "sha256": "6684104ba6dc40325bb1f6e632ec90633fa83a7b95883bb2181e9dc0008c3e21",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "origin": "existing local fixed v0.31.0 source archive; no latest remote query",
+    "license": "Apache-2.0"
+  },
+  {
+    "module": "vllm.model_executor.offloader.base",
+    "file": "vllm__model_executor__offloader__base.py.txt",
+    "sha256": "982e295299e2a282703ef6bec91897883f187f1ca31c21b6b46bda9566e09303",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "origin": "existing local fixed v0.31.0 source archive; no latest remote query",
+    "license": "Apache-2.0"
+  },
+  {
+    "module": "vllm.v1.core.sched.scheduler",
+    "file": "vllm__v1__core__sched__scheduler.py.txt",
+    "sha256": "f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "origin": "existing local fixed v0.31.0 source archive; no latest remote query",
+    "license": "Apache-2.0"
+  },
+  {
+    "module": "vllm.v1.request",
+    "file": "vllm__v1__request.py.txt",
+    "sha256": "dd7c30bf8b0894dc123a739c299c0133566f8cc075b081e45905f1c29506e69d",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "origin": "existing local fixed v0.31.0 source archive; no latest remote query",
+    "license": "Apache-2.0"
+  }
+]

@@ -45,6 +45,7 @@
       "enum": [
         "gateway",
         "management_listener",
+        "engine_health",
         "hubble",
         "tetragon",
         "policy_state",
@@ -394,6 +395,14 @@
                 "boolean",
                 "null"
               ]
+            },
+            "scope_ref": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9a-f]{64}$",
+              "description": "확인된 context/namespace/Pod/container 세대의 정규 SHA256 참조"
             }
           }
         }

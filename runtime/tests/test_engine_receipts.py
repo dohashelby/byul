@@ -23,7 +23,7 @@ PROMPT = "my secret prompt: the launch code is 7777"
 
 
 class ResponseIdTests(unittest.TestCase):
-    def test_chat_relay_records_id_without_changing_forwarded_chunks(self):
+    def test_chat_relay_records_id_preserving_sse_bytes_and_event_boundaries(self):
         chunks = [b'data: {"id":"chat', f'cmpl-{RID}","choices":[]}}\n\n'.encode(), b'data: [DONE]\n\n']
         upstream = Mock(status=200)
         upstream.getheader.return_value = "text/event-stream"
@@ -41,7 +41,10 @@ class ResponseIdTests(unittest.TestCase):
             watcher.return_value.finish.return_value = False
             result, outcome, started = relay.relay_stream(downstream, RID, {}, allowed, time.monotonic(), lambda: None)
         self.assertEqual((result, outcome, started), (allowed, "completed", True))
-        self.assertEqual([c.args[0] for c in downstream.write_stream_chunk.call_args_list], chunks)
+        writes = [c.args[0] for c in downstream.write_stream_chunk.call_args_list]
+        self.assertEqual(b"".join(writes), b"".join(chunks))
+        self.assertTrue(all(event.endswith(b"\n\n") for event in writes))
+        self.assertEqual(len(writes), 2)
         self.assertEqual(relay.response_id_receipt(RID), "engine_response_id_matched")
 
     def test_chat_stream_id_across_chunks_and_first_event_only(self):

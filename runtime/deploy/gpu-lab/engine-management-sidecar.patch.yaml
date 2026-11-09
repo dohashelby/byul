@@ -69,6 +69,20 @@ spec:
             - "8001"
             - --engine-url
             - http://127.0.0.1:8000
+            - --record-file
+            - /srv/serving/runtime/management-access/access.jsonl
+            - --heartbeat-file
+            - /srv/serving/runtime/management-access/heartbeat.json
+            - --target-ref
+            - REPLACE_TARGET_REF
+            - --run-id
+            - REPLACE_RUN_ID
+            - --environment
+            - REPLACE_ENVIRONMENT
+            - --policy-ref
+            - REPLACE_POLICY_REF
+          volumeMounts:
+            - {name: management-access, mountPath: /srv/serving/runtime/management-access}
           ports:
             - {name: management, containerPort: 8001}
           securityContext:
@@ -81,6 +95,8 @@ spec:
             requests: {cpu: "50m", memory: 64Mi}
             limits: {cpu: "200m", memory: 128Mi}
       volumes:
+        - name: management-access
+          hostPath: {path: /srv/serving/runtime/management-access, type: Directory}
         - name: probe-file
           configMap:
             name: serving-engine-probe-file

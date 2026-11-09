@@ -2052,3 +2052,112 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 직접 검증: macOS Python 3.12.13에서 관련 콜백·준비 자산·Kubernetes 전송·현황표·불변식 400 passed / 기존 skip1 / 기존 제외1, pytest6.77초·부모7.203초. 일반 요청4xx·위조 요청5xx/응답 없음/불완전4xx·위조 요청만 있는 경우와 media 순서/상한/거부/manifest 결합을 검증했다. 소스 목록428파일 검증(420e4513), 팩32·원B pin 유지, 현황표 --check·diff --check 통과. 전체 기본suite·wheel은 현재 HEAD의 Linux CI에서 확인할 예정이며 아직 통과로 세지 않는다.
 - Linux 최종 검증: 코드 HEAD9547bfc·CI merge0adcd0d, run41813358952. Python3.12.3 기본 suite11147 passed / 기존skip1, pytest771.64초·부모772.913초. wheel 생성·저장소 밖 설치본 검증 통과. Docker대역2통과(36.48초/부모37.128초), platform187통과(11.08초/부모13.076초), 양OS 공용 계약·update-ci-ok 포함7개 작업 모두success. 새skip/제외/assert완화0. 코드 고정 뒤 source8파일 변경0, 근거는 외부 byul-dev1-evidence/20261104-codex-continuation/validation.json·CI로그. PR215 제목/설명에 묶음3과 최종 검증을 반영했다. 이 마지막 기록은 문서만 바꾼 것이며 제품 소스·팩·도구·시험·설정·고정 manifest는 검증 코드와 같다.
 - 2026-11-04 #215 정리: 묶음 2에서 수집기를 구현한 LIF-13·REQ-14·REQ-18·REQ-19·REQ-20을 `GPU_CONFIRMATION_ONLY`로 갱신했다. REQ-21은 엔진 재기동 lab 동작이 없어 `CPU_DEVELOPMENT_REMAINING`을 유지한다. 현황표만 재생성했고 제품 소스·팩·manifest는 변경 없음. dev-1: CPU 개발 남음 19 / GPU 확인만 6 / 기업 입력 대기 1.
+
+### C remaining: owned fault-ready receipt boundary
+- Standalone read-only fault_control ready loader added; owner/mode/no-follow/stable file/nonce/session/target/request/rank/clock/expiry required. Selection receipt supplies no native/security completion verdict.
+- Related CPU16 pass, imports confirmed from remaining-dev-c. New profile23/24 producers/projectors and real-engine validation remain in progress. Existing profile8~22 bytes/raw artifacts unchanged.
+
+## 2026-11-06 C native23 producer (local implementation)
+
+- Added an opt-in profile23 over immutable native8: real CPython body observations for V2 worker request slots, exact scheduler pre/post counters, both OpenAI routes with invocation binding, weak output lifetime and bounded observer-owned main/copy stream Event receipts. Original engine results, exceptions, decorators and native cleanup remain in place.
+- Exact fixed vLLM0.31 source fixtures and source hashes are included. Code-contract hashes were computed separately on local CPython3.12.13 and root Linux/amd64 CPython3.12.3/3.12.15.
+- Related producer/control/base parser tests: 102 passed locally. CPU examples are not GPU evidence. Full stream-set qualification and the closure projector/executor are separate review boundaries; incomplete/unqualified facts retain UNKNOWN. Older profiles8–22 and historical AWS raw/Refs are preserved.
+
+## 2026-11-06 C LAB control artifact boundary
+
+- Added exact owned ARM/action readers and immutable assigned/ready publication over the reviewed receipt boundary. Actor ARM/actions and source assigned/ready have separate write roles; source publication never replaces an existing receipt.
+- Related ARM/receipt CPU tests:34 passed. This file boundary alone performs no signal, native barrier or final fault verdict. Profile24 producer and case validator remain a separate implementation group.
+
+## 2026-11-06 C native23 reviewed installation boundaries
+
+- Followed independent review with ABCMeta-compatible exact class/body verification and explicit `ubatch_runner is None` for full stream qualification. Recorded actual positive-token scheduled IDs separately from finished-only cleanup IDs; only actual work IDs receive GPU fences.
+- Related103 CPU tests passed with real fixed native bodies and representative ABCMeta classes. Root Linux/amd64 read-only stdlib ABI compile on exact raw33d6566 confirmed CPython3.12.3 a4db500e... and3.12.15 7fb56bee...; local3.12.13 equals the latter. No actual engine/GPU execution is claimed by this compilation.
+
+## 2026-11-06 C native23 request closure consumer
+
+- Added a strict native23 projector for exact HTTP invocation/native assignment, stable session/owner/process/clock/image coverage, source returns, V2 slots, matching KV pools/deferred queue, both actual-work stream receipts and weak AsyncOutput lifetime. Positive residual state with a native observation lower bound can produce a deadline violation. A late record-write time alone remains a candidate.
+- Connected the existing LIF10 executor to profile23 and original PACK33 activation4 fields. The observation window is idle; sealing precedes the after-control request. Original packs/judge and older8/9 output ceilings remain unchanged. Evidence completeness and successful termination are separate when a confirmed violation exists.
+- Explicit-import related183 tests passed locally, with one real-socket test deselected after local bind EPERM; root ran that exact test separately with full access:1 passed. Pure EXAMPLE closure/transport composition tests33 passed.
+- Actual Kubernetes image proof remains a required integration boundary: the historical reader defaults to image_check=False, and this consumer retains UNKNOWN until an independently scoped node runtime image proof is connected. No GPU run is asserted by these CPU checks.
+
+## 2026-11-07 C SGLang registration and bounded transport
+
+- Registered reviewed SGLang profile1 with its own64-hex OCI source reference, exact7-module source map, immutable native8 dependency, prepared manifest validation, closed SG wire parser and native request index. Existing vLLM profiles retain their original references and payloads.
+- Added explicit owned-jsonl-4m-v1 for SG reads and a separate4MiB seal program. The legacy sealer literal SHA7b40e8da... and2MiB/default budgets remain unchanged.
+- Added exact SGLang0.5.22 termination HTTP profile reusing the fixed owned endpoint/request/close procedure. Existing vLLM0.31-only gate remains in place. The LIF10 public consumer dispatches to the reviewed SG projector and original activation4 observation fields.
+- Actual-import related257 CPU tests passed, covering prepared assets, source/schema/private-field rejection, request index, partial tails,4MiB bounds, old seal bytes, exact engine versions and existing lifecycle capture/seal contracts. No engine/GPU execution is claimed here. SG projector closure followup and actual middleware launch binding remain independently owned root/A work.
+
+## 2026-11-07 C complete-scope and SG typed-wire correction
+
+- Independent PACK33 review found that a diagnostic scope subset could still set the original activation completion field. Corrected native23 complete termination/activation fields to require every architecture scope; requested_scope_complete retains only the partial diagnostic result. The dedicated release flag also requires scheduler/worker/KV/GPU proof. Confirmed residuals remain violations across the mandatory architecture scopes.
+- SG parser rejects negative initial monotonic timestamps and validates optional hash fields even on verified=False MODULE rows. Added independent-shaped one-row/closed minimal counterexamples so later source checks cannot hide those type failures.
+### 2026-11-07 개발A — 고정 SGLang HTTP launcher 연결
+- 한 일: 고정 공식0.5.22 launch/http source2파일을 읽고, 기존 bootstrap의 동일 센서 객체를 원 FastAPI app.add_middleware에 연결한 뒤 runpy 기존 entrypoint로 넘기는 opt-in stdlib launcher를 추가했다. source/version/sensor byte gate와 args/예외 보존, 새 독립 원문fixture·시험·문서를 작성했다. root sensor/projector 및 C registry/parser·manifest 변경0.
+- 검증: root bd78 고정 archive+A신규3파일 overlay의 실제 import를 확인하고 관련 CPU19개 통과(0.39초). 실제 ASGI disconnect와 고정 _init_req_state 원문 함수의 invocation/native RID 결속 회귀 포함. 전체 SGLang/실엔진/GPU/AWS0.
+- 다음: 고정diff R2 검토 후 root/C의 기존 자산 등록·정확 source/image 배포와 실제 capture 인수. 실제 OCI 파일 불일치는 미인수로 보존한다.
+
+## 2026-11-07 C opt-in local containerd image chain
+
+- Added local-containerd-v1: exact KubeNode/kernel binding, CID Kubernetes labels, named-image index/manifest/config byte-digest chain, config rootfs chain to active snapshot parent, live task PID/start/namespace/CID-cgroup and repeated metadata/process reads. Reads are bounded at30s; no image layer payloads or node mutations are performed.
+- Connected optional KubernetesLifecycleReader argument and request_termination configuration. Existing default image check remainsFalse. Public native capture CLI exposes explicit --node-image-verification and optional --seal before capture.
+- OCI config/CRI Spec/env raw bytes remain memory-only; dynamic Spec raw hashes are omitted too. Public receipts retain selected identity/digests. Source commands are fixed readonly ctr and isolated /proc readers.
+- Related95 UPDATE tests and18 runtime adapter tests passed in separate processes to avoid the existing tools namespace collision; module __file__ confirmed remaining-dev-c. New20 CPU examples include explicit CLI routing/seal, wrong node/CID/content/platform/snapshot/task/cgroup, incomplete pipes and secret-free receipts. Actual node/engine/GPU execution remains pending independent review and deployment.
+
+## 2026-11-07 C live rootfs binding followup
+
+- Independent review found that mutable container Image/SnapshotKey metadata could name an unused snapshot. Added read-only Snapshots/Mounts RPC and exact actual-task root overlay lowerdir/upperdir/workdir directory-object comparison in the isolated /proc reader, repeated before accepting the proof. Path/mountinfo raw data remains memory-only.
+- The descriptor declares Mounts only; no ctr mounts/Activate/prepare mutation is used. grpcurl1.9.3 Linux/amd64 binary is pinned to root-verified SHA62e2e431... and exact size/owner/mode/stable file identity. Minimal proto matches official containerd2.3.7 field numbers.
+- Node/CLI/capture/seal related99 CPU tests passed, including unused-root directory objects and escaped kernel mount paths. Root installed the pinned tool after independent official archive checksum validation; actual node/RPC execution is still separate pending fixed review.
+### 2026-11-07 개발A — 고정 SGLang HTTP launcher 연결
+- 한 일: 고정 공식0.5.22 launch/http source2파일을 읽고, 기존 bootstrap의 동일 센서 객체를 원 FastAPI app.add_middleware에 연결한 뒤 runpy 기존 entrypoint로 넘기는 opt-in stdlib launcher를 추가했다. source/version/sensor byte gate와 args/예외 보존, 새 독립 원문fixture·시험·문서를 작성했다. root sensor/projector 및 C registry/parser·manifest 변경0.
+- 검증: root bd78 고정 archive+A신규3파일 overlay의 실제 import를 확인하고 관련 CPU19개 통과(0.39초). 실제 ASGI disconnect와 고정 _init_req_state 원문 함수의 invocation/native RID 결속 회귀 포함. 전체 SGLang/실엔진/GPU/AWS0.
+- 다음: 고정diff R2 검토 후 root/C의 기존 자산 등록·정확 source/image 배포와 실제 capture 인수. 실제 OCI 파일 불일치는 미인수로 보존한다.
+
+## 2026-11-07 C SG launch asset registration
+
+- Registered A/R2-reviewed launcher7b46777 as an additional SG-only read-only asset. prepare/load require exact launcher1e5eb483... and matching sensor83b071c1...; old profiles keep their asset sets.
+- Collector/registration/launcher/base capture CPU tests57 passed. Actual pinned OCI launch/http source verification remains the deployment precondition, and the bootstrap sensor module/context is reused.
+
+## 2026-11-07 C runtime request/native termination binding
+
+- Reused reviewed native23/SG projectors for both OpenAI chat/completions runtime routes. The exact started/final snapshot, native request hash, Pod/CID/restart/image, run/context, namespace owner, observation session and sealed policy/bundle hashes must bind before native termination/release flags are exposed. Partial/missing joins remain incomplete.
+- Capture and node-image receipts retain EXAMPLE for explicit LAB targets or injected transports. Technical native source facts stay separate from the unchanged new_security_verdict=None and actual_engine_execution_verified=False ceilings. Existing legacy adapter flags retain their historical ceiling.
+- First Gateway capture uses one slow SSE probe, the declared idle window, seal/capture, then a separate normal probe; viewer records use the actual server UUID. Existing pair-before-capture helper must not substitute this order.
+
+## 2026-11-07 C actual-node permission and Unix resolver correction
+
+- Root actual-node capture first found an unreadable root0600 DMI file under the ubuntu operator. Documented same-node privileged operator/KUBECONFIG requirements; reader records only fixed allowlisted permission/missing/unverified codes. File permissions and proof gates remain unchanged.
+- After privileged re-read, pinned grpcurl1.9.3 reached an actual TCP-address error despite -unix. Its official BlockingDial does not consume the network argument. Changed the fixed read-only RPC target to unix:///run/containerd/containerd.sock and added an exact argv assertion. Root actual URI diagnostic independently reached the daemon; final full proof remains pending.
+## 2026-11-07 C native24 bounded control mechanics
+
+- Added standalone SourceControl mechanics over the already reviewed owned ARM/action/READY readers. Exact external-to-native assignment, unique arm, rank0 selection, immutable assigned/ready receipts, same-clock bounded barrier, activate/release ordering, hard timeout and fork reset are implemented. No signals or engine imports occur in this module.
+- CPU32 tests passed with the prior receipt boundary, including two signal kinds with no actuation, exception intent, IPC-only response point, release-before-activate, ambiguous/changed ARM and assignment source/clock/type rejection. Native attachment, typed native24 recording, strict end-to-end fault projection and actual GPU execution remain the next separate integration group.
+
+## 2026-11-07 C native24 late-action boundary correction
+
+- Independent review reproduced a slow owned action read finishing beyond the same-clock barrier. Added clock checks after release/activate reads and after emitting activation intent; an expired read cannot produce exception activation. Cleanup release remains allowed.
+- Related33 CPU tests passed, including the new40ms read/30ms barrier counterexample. Native attachment and final physical fault qualification remain separate pending work.
+
+## 2026-11-07 C actual native23 owner expiry and retired import process
+
+- Actual PID100 metadata had297 state checkpoints over299s, followed849s after the first checkpoint by repeated fixed observer-gap hashes. Reproduced the same-function stale owner/token KeyError on CPU before changing the code. Owner watch/expiry now share the existing RLock, remove both expired mappings and create a fresh bounded watch for a later native operation. Existing300s/8ID budgets remain unchanged.
+- A recording with only START/verified MODULE/complete PROCESS_EXIT before the selected native assignment is retained as historical_import_only_recordings rather than requiring it to supply later request completion. Exact owner/image/file identities, exited-process metadata and same clock/ns/uid are required. Any native/request event, later/unclosed/tail/unknown module or incomplete physical scope preserves UNKNOWN. Actual request Core/scheduler/worker/KV/GPU receipts remain mandatory.
+- Core related68 and broader191 CPU tests passed; one unchanged HTTP socket test hit the local sandbox bind EPERM. Root independently compiled the exact fixed sensor on CPython3.12.3/.15/.16, all matching local.13 codecontract16f636f8.... Old actual raw/Refs/gaps remain unchanged and are interpreted with their fixed source version.
+
+## 2026-11-07 C CPython patch-version source ABI correction
+
+- Corrected the prior claim that the6e sensor had identical code contracts on every Python patch version. Root's earlier Docker import reused a CPython3.12.13 pyc with the same cpython312 cache tag; it did not establish the3.12.3 source ABI. Actual OCI3.12.3 correctly rejected that old table and produced zero recordings; those raw results remain UNKNOWN.
+- Root then compiled both sensor and immutable base directly from read_bytes with dont_inherit=True,optimize=0 and no import/cache reuse. Exact sensor97c644 code is75785d52... on3.12.3,16f636f8... on3.12.15/.16 and local3.12.13. This change replaces only the3.12.3 contract literal; function bodies, source pins and proof gates remain unchanged. Actual new engine/session collection follows this correction.
+
+## 2026-11-07 C native24 source hooks, typed registry and strict fault joins
+
+- Registered native24 with9 exact RO assets and actual canonical target SHA. Reused immutable8, reviewed23 and rank13 source bodies; existing8–22 raw sensors/wires remain unchanged. Same-CID holder/prestart→prepare→child exec resolves target-hash preparation without logical-ID substitution.
+- Source-controlled RPC/GPU entry barriers, actual worker exception catch, weak async-output mapping and read-only other-thread worker loop qualification now connect ARM/ASSIGNED/READY to native source packets. No actuation occurs during preparation or CPU tests.
+- Strict controller validator reparses canonical/hashchained bytes against current sensor/settings, checks pre-signal physical selection and source ASGI/native ID, exact nonce/generation/PID/start/clock and actual signal/action interval, paired source failure/Future/Core ACKs and final client error. Deadline violations remain FAIL; incomplete evidence remains UNKNOWN. Live append and killed-worker prefixes have separate scoped receipts and retain original global/END flags.
+- Root directly source-compiled the final producer on Python3.12.3/.15/.16 without pyc reuse; .3 uses5c100165..., others/local.13c43083a3.... Actual engine/ARM/signals remain pending fixed independent review and fresh AWS generation.
+
+## 2026-11-09 SUP16 merge compatibility (local CPU)
+
+- Replaced the current static packet's historical ordering dependency with a separately reviewed current-generation helper. Retained historical normal-boot snapshot stays byte-identical and accepts historical sensor e32c only; the new helper accepts current sensor 554206 only. Pair/helper/preparer SHA chain stays exact and closed.
+- Tests: SUP16 20 passed; combined serialized native17 scope preparation/load and SUP16 37 passed (0.46s), external temporary paths. Broader host diagnostic: 85 passed, 55 failed (unsupported CPython3.12.13 observer runtime); supported Linux rerun remains required.
+- No SUP16 registry/packs/contracts or sensor changes, actual engine/GPU/AWS execution, remote writes, or support-status promotion. Integration owner regenerates shared source manifest and runs final Linux validation.

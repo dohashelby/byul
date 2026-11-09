@@ -1,0 +1,15 @@
+{
+  "source_repository": "https://github.com/dohashelby/byul",
+  "source_commit": "391506a71b8b444b89f9a852a426bc7c5fbad237",
+  "purpose": "Exact original B160 reviewed bytes; available without an unreachable Git object.",
+  "sha256": {
+    "update/docs/b-lif07/WORKER_READINESS.md": "5ede75e817cd57af5364be475d1d7eb0d6ff41423d37a2549019d405b5f2ab5f",
+    "update/docs/b-lif13/WEIGHTS_LIFETIME.md": "074edb488ae421c5fb8f2b71b0efa80479c33f344c157b3b9f9ad1a9d61548f2",
+    "update/tests/test_b_lif07_http_readiness.py": "8e8a9323132b32b7e5444cbc48954352dbab07809a5cf6bbfa04505c9226b1b0",
+    "update/tests/test_b_lif07_native_capture.py": "5376fc3eafbed4bf566ce48a1b1c4ca78936a74bb823971d5410c4c260f51585",
+    "update/tests/test_b_lif07_readiness.py": "5f31b26ecf6629744b45cd64816d69984a12432448e498c96dd0074bbe5abb4c",
+    "update/tools/b_lif07_native_capture.py": "3aa4ca2d21d9531859b6f19de5d5e7f206e3ec8d5f2050122275309e9417396d",
+    "update/tools/b_lif07_readiness.py": "172c726fa06a94a51963d3d20438178c96f02944ab42382d3de3e09f9e2e2dab",
+    "update/tests/linux_cpu/lif13_peer_probe.py": "789b08ff1acc549e478558fa8317eac074905e675d4cce87deede99f5d528e2d"
+  }
+}

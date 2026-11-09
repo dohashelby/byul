@@ -1,0 +1,22 @@
+# SYSTEM service. UID10000 owns Gateway records; no record permission expansion.
+# Administrator supplies this UID a read-only /etc/serving-runtime/kubeconfig.
+[Unit]
+Description=byul Tetragon status and four-condition recovery evidence
+After=network-online.target
+
+[Service]
+User=10000
+Group=10000
+SupplementaryGroups=10010
+WorkingDirectory=/home/ubuntu/byul/runtime
+Environment=PYTHONPATH=/home/ubuntu/byul/runtime/src
+Environment=KUBECONFIG=/etc/serving-runtime/kubeconfig
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStartPre=/usr/bin/test -r /srv/serving/runtime/data/tetragon-baseline.json
+ExecStart=/usr/bin/python3 -B -m tools.tetragon_status --context byul-aws-lab --output /srv/serving/runtime/data/tetragon-state.json --public-output /srv/serving/observation/tetragon-status/tetragon-state.json --evidence-dir /srv/serving/runtime/data/tetragon-evidence --expected-policies /srv/serving/runtime/data/tetragon-baseline.json --identities /srv/serving/observation/tetragon-identities.json --feed-heartbeat /srv/serving/observation/tetragon.heartbeat.json --observations /srv/serving/runtime/data/observations.jsonl --watch
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

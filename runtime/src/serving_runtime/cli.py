@@ -16,9 +16,9 @@ from .file_info import inspect_file
 
 def _observation_feed(value: str) -> tuple[str, str]:
     kind, separator, path = value.partition("=")
-    if separator != "=" or kind not in {"hubble", "tetragon"} or not path.strip():
+    if separator != "=" or kind not in {"hubble", "tetragon", "management_listener"} or not path.strip():
         raise argparse.ArgumentTypeError(
-            "observation feed must be hubble=PATH or tetragon=PATH"
+            "observation feed must be hubble=PATH, tetragon=PATH or management_listener=PATH"
         )
     return kind, path
 
@@ -63,6 +63,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     bundle_apply_parser.add_argument("--token-env-file", metavar="FILE", help="RUNTIME_VIEWER_TOKEN을 읽을 env 파일(조회가 비보호면 생략 가능)")
     bundle_apply_parser.add_argument("--dry-run", action="store_true")
     bundle_apply_parser.add_argument("--operation-result", action="store_true", help="에이전트용 제한된 JSON 결과")
+    bundle_apply_parser.add_argument("--deployment-guard", metavar="FILE", help="현재 외부 승인·필수 UPDATE 근거를 적용/복귀 전에 검증")
     mvp_parser = commands.add_parser("mvp", help="로컬 Gateway와 선택한 backend 실행")
     mvp_parser.add_argument("--policy", metavar="PATH")
     mvp_parser.add_argument(
@@ -154,6 +155,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     mvp_parser.add_argument("--retention-hold", metavar="PATH", help="삭제하지 않을 실행·요청 ID 목록")
     mvp_parser.add_argument("--lab-report", metavar="PATH")
+    mvp_parser.add_argument("--cache-observation", metavar="PATH")
+    mvp_parser.add_argument("--cache-observation-reader-gid", type=int)
+    mvp_parser.add_argument("--cache-observation-producer-sha256")
+    mvp_parser.add_argument("--cache-observation-binding-sha256")
+    mvp_parser.add_argument("--native-receipt-feed", metavar="PATH")
+    mvp_parser.add_argument("--native-receipt-reader-gid", type=int)
+    mvp_parser.add_argument("--native-receipt-producer-sha256")
     mvp_parser.add_argument("--tetragon-state", metavar="PATH", help="호스트에서 수집한 Tetragon 정책·시험 상태 JSON")
     mvp_parser.add_argument("--gpu-state", metavar="PATH", help="호스트 수집기가 쓴 GPU 사용률·메모리·온도 공개 상태 JSON")
     mvp_parser.add_argument("--engine-receipts", metavar="PATH", help="선택: 엔진 로그에서 요청 ID만 추출한 공개 JSON(tools.engine_receipts)")
@@ -209,6 +217,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         metavar="PATH",
         help="최소 접근 JSONL 추가 기록(접근 기록은 항상 stdout에도 출력)",
     )
+    management_parser.add_argument("--heartbeat-file", metavar="PATH", help="연속 관리접근 수집기의 writer 상태 파일")
+    for field in ("target-ref", "run-id", "environment", "policy-ref"):
+        management_parser.add_argument("--" + field, help="관리 접근 감사에 남길 설정 기반 참조")
     demo_parser = commands.add_parser("mvp-demo", help="실행 중인 MVP 시연 사례 전송")
     demo_parser.add_argument("--gateway", default="http://127.0.0.1:8080", metavar="URL")
     demo_parser.add_argument("--data-dir", metavar="PATH")
@@ -367,18 +378,25 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = apply_bundle(args.bundle_dir, args.bundle_root, args.context,
                                   args.namespace, args.status_url, args.token_env_file,
                                   kubeconfig=args.kubeconfig,
-                                  dry_run=args.dry_run, existing=args.existing)
+                                  dry_run=args.dry_run, existing=args.existing,
+                                  deployment_guard_path=args.deployment_guard)
         except (OSError, ValueError, RuntimeError) as error:
             if args.operation_result:
-                restored = "이전 링크 복원 및 재시작 완료" in str(error)
+                restored = getattr(error, "outcome", {}).get("state") == "rolled_back"
                 print(json.dumps({"state": "rolled_back" if restored else "unknown",
                                   "code": "ROLLED_BACK" if restored else "STATUS_UNKNOWN"}))
             else:
                 print(f"정책 묶음 적용 실패: {error}", file=sys.stderr)
+                if getattr(error, "outcome", None) is not None:
+                    print(json.dumps(error.outcome, ensure_ascii=False), file=sys.stderr)
             return 1
         if args.operation_result:
             print(json.dumps({"state": "succeeded", "code": "OK"}))
             return 0
+        if result.get("deployment_guard") is not None:
+            print("현재 외부 승인·필수 UPDATE 근거 확인 완료")
+            print(json.dumps({"deployment_guard": result["deployment_guard"],
+                              "final_verification": result.get("final_verification")}, ensure_ascii=False))
         print(f"묶음 {'적용 계획' if result['dry_run'] else '적용·상태 확인'} 성공: "
               f"{result['previous']} -> {result['bundle_id']}")
         return 0
@@ -435,6 +453,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "environment": args.environment,
                 "run_id": args.run_id,
                 "lab_report_path": args.lab_report,
+                "cache_observation_path": args.cache_observation,
+                "cache_observation_reader_gid": args.cache_observation_reader_gid,
+                "cache_observation_producer_sha256": args.cache_observation_producer_sha256,
+                "cache_observation_binding_sha256": args.cache_observation_binding_sha256,
+                "native_receipt_feed_path": args.native_receipt_feed,
+                "native_receipt_reader_gid": args.native_receipt_reader_gid,
+                "native_receipt_producer_sha256": args.native_receipt_producer_sha256,
                 "tetragon_state_path": args.tetragon_state,
                 "gpu_state_path": args.gpu_state,
                 "engine_receipts_path": args.engine_receipts,
@@ -484,6 +509,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "max_response_bytes": args.max_response_bytes,
                 "credential_file": args.credential_file,
                 "record_path": args.record_file,
+                "heartbeat_path": args.heartbeat_file,
+                "target_ref": args.target_ref, "run_id": args.run_id,
+                "environment": args.environment, "policy_ref": args.policy_ref,
             }
             if args.allow_path:
                 options["allowed_paths"] = tuple(args.allow_path)

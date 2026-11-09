@@ -9,12 +9,16 @@ import { carry } from "../lib/url";
 export function EvidencePage() {
   const q = useEvidence();
   const [params] = useSearchParams();
+  const evidenceId = params.get("evidence_id");
+  const sha256 = params.get("sha256");
+  const ref = params.get("ref");
   return (
     <div className="page">
       <PageHead title="증거 목록" />
       <Query q={q}>
         {(data) => (
           <>
+            {(evidenceId || ref) && <p className="small muted">증거 참조 {evidenceId ?? ref}{sha256 ? ` · SHA-256 ${sha256}` : ""} · <Link to="/evidence">전체 보기</Link></p>}
             <DataTable
               columns={[
                 { id: "collected_at", header: "수집 시각", cell: (e) => <Time iso={e.item.collected_at} />, sort: (e) => e.item.collected_at },
@@ -63,7 +67,7 @@ export function EvidencePage() {
                 { id: "origin", header: "자료 등급", cell: (e) => <OriginBadge origin={e.item.data_origin} /> },
                 { id: "index", header: "목록 파일", cell: (e) => <Value v={e.index_path} mono />, hidden: true },
               ]}
-              rows={data.items}
+              rows={data.items.filter((e) => (!evidenceId || e.item.evidence_id === evidenceId) && (!sha256 || e.item.sha256 === sha256) && (!ref || e.item.refs?.includes(ref)))}
               rowKey={(e) => `${e.index_path}:${e.item.evidence_id}`}
               initialSort={{ id: "collected_at", dir: "desc" }}
               storageKey="evidence"

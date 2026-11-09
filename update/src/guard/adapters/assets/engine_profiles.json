@@ -46,6 +46,16 @@
         "validation_error",
         "worker_readiness"
       ]
+    },
+    {
+      "id": "sglang-runtime-request-lifecycle/1",
+      "engine": "sglang",
+      "versions": [
+        "0.5.22"
+      ],
+      "features": [
+        "sglang-native-lifecycle-metadata/1"
+      ]
     }
   ],
   "implementations": [

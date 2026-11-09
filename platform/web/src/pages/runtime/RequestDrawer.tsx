@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 // 요청 상세 드로어. 삭제된 runtime 대시보드 renderDetail()의 구성을 그대로 옮기고, platform의 증거 목록 탭을 더했다.
 import type { ReactNode } from "react";
 import { useRequestDetail } from "../../api/hooks";
@@ -9,6 +10,7 @@ import { OriginBadge, EnumBadge } from "../../components/Badges";
 import { Short, Time } from "../../components/Value";
 import { AUTH_RESULT, BACKEND_RECEIPT, CONTEXT_RESULT, ENGINE_LIVE, EXTRA_FIELD_MODE, GATEWAY_REASON, REQUEST_RESULT, TIMELINE_PHASE, label } from "../../lib/labels";
 import { ScopeBadges, formatTime, rt } from "./parts";
+import { nativeTermination } from "../../lib/nativeTermination";
 
 type Row = [string, ReactNode, { mono?: boolean; problem?: boolean }?];
 
@@ -29,6 +31,27 @@ function authText(d: RuntimeRequestDetail): string | null {
   if (!d.auth.state) return null;
   const l = AUTH_RESULT[d.auth.state] ?? d.auth.state;
   return d.auth.principal_id ? `${l} · ${d.auth.principal_id} (${d.auth.roles.join(", ") || "역할 없음"})` : l;
+}
+
+export function NativeTerminationDetail({ d }: { d: RuntimeRequestDetail }) {
+  const native = nativeTermination(d.request_id, d.native.engine_receipts, d.backend_kind);
+  if (!native) return null;
+  return <section aria-label="요청별 native 종결">
+    <h4 className={rt.h4}>요청별 native 종결 · {native.verdict}</h4>
+    <Kv rows={[
+      ["자료", `${native.historical ? "보존된 요청 근거" : "요청 관측 근거"} · ${native.source ?? "출처 미확인"}`],
+      ["수집 시각", formatTime(native.capturedAt)],
+      ["판정 기한", native.deadlineMs === null ? "미확인" : `${native.deadlineMs} ms`],
+      ["종결 근거", native.basis === "live_checkpoint" ? "요청 창 체크포인트" : native.basis === "sealed_capture" ? "봉인된 캡처" : "미확인"],
+      ["당시 capture 상태", native.captureState],
+      ["위반·미확인 사유", native.reasons.join(" · ") || (native.verdict === "미확인" ? "요청별 필수 근거 불완전" : null)],
+    ]} />
+    <table className={rt.statusTable}>
+      <thead><tr><th>종결·회수 범위</th><th>판정</th><th>종결까지</th></tr></thead>
+      <tbody>{native.scopes.map(row => <tr key={row.scope}><td>{row.label}</td><td>{row.verdict}</td><td>{row.elapsedMs === null ? "미확인" : `${row.elapsedMs.toFixed(3)} ms`}</td></tr>)}</tbody>
+    </table>
+    <p className="small muted">요청 기준 종결 소요시간 · <Link to="/runtime/observe/collectors">현재 센서 수집 상태</Link></p>
+  </section>;
 }
 
 function Overview({ d }: { d: RuntimeRequestDetail }) {
@@ -102,6 +125,7 @@ function Overview({ d }: { d: RuntimeRequestDetail }) {
           ["손상 줄", `Gateway ${d.corrupt_lines.gateway ?? "–"} · 엔진 ${d.corrupt_lines.engine ?? "–"}`],
         ]}
       />
+      <NativeTerminationDetail d={d} />
       <p style={{ marginTop: 16 }}>
         <a className={rt.download} href={`/api/runtime/requests/${encodeURIComponent(d.request_id)}/evidence`} download={`evidence-${d.request_id}.json`}>
           증거 JSON 내려받기
@@ -126,7 +150,7 @@ export function RequestDrawer({ id, onClose }: { id: string; onClose: () => void
             {
               id: "detail",
               label: "상세",
-              content: res.detail ? <Overview d={res.detail} /> : <StateView kind="invalid" detail={res.detail_invalid?.errors.join(" / ")} />,
+              content: res.detail && res.detail.request_id === id ? <div className="stack">{res.event?.related_checks?.length ? <p>관련 점검 {res.event.related_checks.map((check) => <Link key={check} to={`/runtime/observe/checks?check=${encodeURIComponent(check)}`} style={{ marginRight: 8 }}>{check}</Link>)}</p> : null}<Overview d={res.detail} /></div> : <StateView kind="invalid" detail={res.detail_invalid?.errors.join(" / ")} />,
             },
             { id: "raw", label: "원본 기록", content: <JsonView value={res.detail?.native ?? res.detail_invalid?.raw ?? res.event?.native ?? null} /> },
             {

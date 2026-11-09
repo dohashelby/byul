@@ -178,3 +178,51 @@ def test_two_different_model_references_are_not_a_pair(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match='SAME_REFERENCE_REQUIRED'):
         prep.prepare(args)
     assert not args.output.exists()
+
+
+def ordering_bytes(sensor, *, session='1' * 32, profile='vllm-native-lifecycle-metadata/17', read_time=30):
+    rows = [('START', 10, {'profile': profile, 'session': session, 'sensor_sha256': sensor}),
+            ('NATIVE', 20, {'point': 'DefaultModelLoader.load_weights', 'phase': 'CALL'}),
+            ('FILE_READ', read_time, {'phase': 'READ_RETURN'}), ('END', 40, {})]
+    previous, raw = '0' * 64, b''
+    for seq, (event, timestamp, payload) in enumerate(rows):
+        row = {'seq': seq, 'previous_sha256': previous, 'monotonic_ns': timestamp, 'event': event, 'payload': payload}
+        line = (json.dumps(row, sort_keys=True, separators=(',', ':'), ensure_ascii=True) + '\n').encode()
+        raw += line
+        previous = hashlib.sha256(line).hexdigest()
+    return raw
+
+
+def test_serialized_current_chain_and_retained_historical_generation(tmp_path, monkeypatch):
+    args = fixture_args(tmp_path, monkeypatch)
+    result = prep.prepare(args)
+    asset = args.output / 'assets/ordering.py'
+    helper = prep.module(asset.read_bytes(), asset)
+    current = ordering_bytes(prep.SENSOR_SHA)
+    binding = {'session': '1' * 32}
+    assert helper['native17_ordering_from_raw'](current, binding) is True
+    assert helper['native17_ordering_from_raw'](ordering_bytes(prep.SENSOR_SHA, read_time=19), binding) is False
+    retained = prep.ROOT / prep.SNAPSHOTS / 'sup16-write_normal_boot.py.txt'
+    assert hashlib.sha256(retained.read_bytes()).hexdigest() == '2485ba44ce8398f833477b79a04c86624cc254316b566f399a4bc9b5f085e4bd'
+    historical = prep.module(retained.read_bytes(), retained)
+    old_sha = 'e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d'
+    assert historical['native17_ordering_from_raw'](ordering_bytes(old_sha), binding) is True
+    for parser, raw in [(helper, ordering_bytes(old_sha)), (historical, current), (helper, ordering_bytes('f' * 64)),
+                        (helper, ordering_bytes(prep.SENSOR_SHA, session='2' * 32)),
+                        (helper, ordering_bytes(prep.SENSOR_SHA, profile='vllm-native-lifecycle-metadata/18'))]:
+        with pytest.raises(ValueError, match='HEADER_INVALID'):
+            parser['native17_ordering_from_raw'](raw, binding)
+    for raw, error in [(current[:-1], 'RECORD_INVALID'), (current.replace(b'"seq":1', b'"seq":9'), 'CHAIN_INVALID'),
+                       (current.replace(b'"seq":0', b'"seq": 0'), 'CHAIN_INVALID')]:
+        with pytest.raises(ValueError, match=error):
+            helper['native17_ordering_from_raw'](raw, binding)
+    assert result['native17_sensor_sha256'] == prep.SENSOR_SHA
+
+
+@pytest.mark.parametrize('asset', ['pair.py', 'ordering.py'])
+def test_current_public_asset_tampering_rejected_before_output(tmp_path, monkeypatch, asset):
+    args = fixture_args(tmp_path, monkeypatch)
+    monkeypatch.setitem(prep.PINS, asset, '0' * 64)
+    with pytest.raises(ValueError, match='FILE_READ_DEPENDENCY_UNAVAILABLE'):
+        prep.prepare(args)
+    assert not args.output.exists()

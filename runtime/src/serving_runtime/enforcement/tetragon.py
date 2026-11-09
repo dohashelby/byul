@@ -139,8 +139,9 @@ def _secret_enforcement_policy(intent: EnforcementIntent) -> dict[str, Any]:
         manifest["spec"]["kprobes"] = [{
             # Tetragon 1.7.1 resolves the architecture prefix for syscall:true.
             "call": "sys_openat", "syscall": True,
-            # Two args + three identity data entries fit the 1.7.1 limit of five.
-            "args": [{"index": 0, "type": "int"}, {"index": 1, "type": "string"}],
+            # Only filename participates in this selector. Tetragon 1.7.1
+            # counts args + identity data toward its five-field maximum.
+            "args": [{"index": 1, "type": "string"}],
             "selectors": [{"matchArgs": [{"index": 1, "operator": "Equal",
                                           # Keep the legacy terminator for manifest compatibility.
                                           # Tetragon 1.7.1 trims trailing NULs for string Equal.

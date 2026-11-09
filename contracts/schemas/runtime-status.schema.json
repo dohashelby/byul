@@ -698,6 +698,9 @@
                 "type": "null"
               },
               {
+                "$ref": "#/$defs/native_receipt_detail"
+              },
+              {
                 "$ref": "#/$defs/feed_detail"
               },
               {
@@ -816,6 +819,8 @@
         "origins_by_kind"
       ],
       "properties": {
+        "counts_lower_bound": {"type": "boolean", "default": false},
+        "history_truncated": {"type": "boolean", "default": false},
         "by_source": {
           "type": "object",
           "additionalProperties": {
@@ -936,6 +941,156 @@
         }
       }
     },
+    "native_receipt_detail": {
+      "description": "Native observer의 reader liveness와 source recorder 상태를 분리한다. 봉인 자료는 과거 요청 근거이며 향후 감시 가능성을 뜻하지 않는다.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "capture_state",
+        "producer_updated_at",
+        "capture_observed_at",
+        "producer_fresh",
+        "capture_fresh",
+        "source_event_freshness",
+        "future_observation_available",
+        "observed_requests",
+        "historical_receipts",
+        "source_event_times"
+      ],
+      "properties": {
+        "truncated": {"type": ["boolean", "null"]},
+        "historical_pending_receipts": {"type": ["integer", "null"], "minimum": 0},
+        "historical_pending_dropped": {"type": ["integer", "null"], "minimum": 0},
+        "historical_storage_state": {"enum": ["connected", "memory_only", "error", null]},
+        "capture_health_reason": {"type": ["string", "null"]},
+        "kind": {
+          "const": "native_receipt"
+        },
+        "capture_state": {
+          "enum": [
+            "active",
+            "closed",
+            "bound_reached",
+            "stopped",
+            "unavailable",
+            null
+          ]
+        },
+        "producer_updated_at": {
+          "$ref": "common.schema.json#/$defs/nullable_timestamp"
+        },
+        "capture_observed_at": {
+          "$ref": "common.schema.json#/$defs/nullable_timestamp"
+        },
+        "producer_fresh": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "capture_fresh": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "source_event_freshness": {
+          "enum": [
+            "unknown",
+            null
+          ]
+        },
+        "future_observation_available": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "observed_requests": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "historical_receipts": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "source_event_times": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "pid",
+              "start_ticks",
+              "monotonic_ns",
+              "boot_sha256",
+              "pid_namespace",
+              "time_namespace",
+              "time_offsets_sha256"
+            ],
+            "properties": {
+              "pid": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "start_ticks": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "monotonic_ns": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "boot_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "pid_namespace": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "time_namespace": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "time_offsets_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
     "feed_detail": {
       "description": "observation_feed_hubble·observation_feed_tetragon: 실시간 수집기 처리 결과와 writer heartbeat.",
       "type": "object",
@@ -1005,12 +1160,18 @@
         },
         "lost_events_total": {
           "description": "Hubble lost_events의 누적 손실 수. Hubble 유효 줄을 아직 처리하지 않았거나 해당 없는 수집원은 null. 0은 손실 없음이 아니라 처리한 줄에서 loss 레코드를 보지 못했다는 뜻이다.",
-          "type": ["integer", "null"],
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
         },
         "lost_events_by_source": {
           "description": "Hubble loss source별 누적 손실 수. 해당 없거나 아직 보고 여부를 판단할 수 없으면 null.",
-          "type": ["object", "null"],
+          "type": [
+            "object",
+            "null"
+          ],
           "additionalProperties": {
             "type": "integer",
             "minimum": 0
@@ -1021,7 +1182,43 @@
         },
         "loss_detected": {
           "description": "현재 freshness window에 Hubble loss가 관측됐는지. 해당 없거나 Hubble 유효 줄 미처리면 null.",
-          "type": ["boolean", "null"]
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "dropped_lines_total": {
+          "description": "Tetragon writer가 정제 과정에서 버린 줄의 누적 수. 미제공 또는 해당 없으면 null.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "last_redaction_error_class": {
+          "description": "writer가 제공한 최근 정제 오류 종류. 오류 원문이나 비밀 값은 포함하지 않는다.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "writer_write_failure_count": {"type": ["integer", "null"], "minimum": 0},
+        "writer_write_failed": {"type": ["boolean", "null"]},
+        "writer_last_write_error_class": {"type": ["string", "null"]},
+        "writer_last_write_error_at": {"$ref": "common.schema.json#/$defs/nullable_timestamp"},
+        "last_redaction_drop_reason": {
+          "type": ["string", "null"],
+          "enum": ["INVALID_UTF8", "INVALID_JSON", "JSON_TOO_DEEP", "OBJECT_REQUIRED", "FILTER_REJECTED", null]
+        },
+        "last_redaction_drop_at": {
+          "$ref": "common.schema.json#/$defs/nullable_timestamp"
+        },
+        "redaction_loss_detected": {
+          "description": "현재 freshness window의 Tetragon 정제 손실 여부. 미제공 또는 해당 없으면 null.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "writer": {
           "type": "object",
@@ -1065,17 +1262,113 @@
                     "closed_at"
                   ],
                   "properties": {
+                    "gap_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "opened_at": {
                       "$ref": "common.schema.json#/$defs/nullable_timestamp"
                     },
                     "closed_at": {
                       "$ref": "common.schema.json#/$defs/nullable_timestamp"
+                    },
+                    "backfill": {
+                      "description": "writer의 복구 상태. requested_unverified는 복구 요청이며 완전 복구 확인이 아니다.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "attempts": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 0
+                    }
+                  }
+                }
+              ]
+            },
+            "open_gap": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "opened_at",
+                    "closed_at"
+                  ],
+                  "properties": {
+                    "gap_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "opened_at": {
+                      "$ref": "common.schema.json#/$defs/nullable_timestamp"
+                    },
+                    "closed_at": {
+                      "$ref": "common.schema.json#/$defs/nullable_timestamp"
+                    },
+                    "backfill": {
+                      "description": "writer의 복구 상태. requested_unverified는 복구 요청이며 완전 복구 확인이 아니다.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "attempts": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 0
                     }
                   }
                 }
               ]
             }
           }
+        },
+        "redaction_dropped_lines_total": {
+          "description": "Gateway가 관측한 Tetragon 정제 폐기수의 누적 합. writer counter 재설정 후에도 checkpoint에 보존한다.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "storage_errors_total": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "last_storage_error_class": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_storage_error_at": {
+          "$ref": "common.schema.json#/$defs/nullable_timestamp"
+        },
+        "last_storage_operation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "checkpoint_pending": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       }
     },

@@ -13,12 +13,12 @@
         "volumes": [{"name": "fake-file", "emptyDir": {}}],
         "initContainers": [{
           "name": "fake-file", "image": "serving-runtime-lab:dev", "imagePullPolicy": "IfNotPresent",
-          "command": ["python", "-c", "from pathlib import Path; Path('/run/byul-runtime-sentinel/read.txt').write_text('FAKE-HEALTH-CHECK')"],
+          "command": ["/usr/local/bin/python3.12", "-c", "from pathlib import Path; Path('/run/byul-runtime-sentinel/read.txt').write_text('FAKE-HEALTH-CHECK')"],
           "volumeMounts": [{"name": "fake-file", "mountPath": "/run/byul-runtime-sentinel"}]
         }],
         "containers": [{
           "name": "sentinel", "image": "serving-runtime-lab:dev", "imagePullPolicy": "IfNotPresent",
-          "command": ["python", "-u", "-c", "import time\nwhile True:\n with open('/run/byul-runtime-sentinel/read.txt','rb') as f: f.read(1)\n time.sleep(5)"],
+          "command": ["/usr/local/bin/python3.12", "-u", "-c", "import time\nwhile True:\n with open('/run/byul-runtime-sentinel/read.txt','rb') as f: f.read(1)\n time.sleep(5)"],
           "securityContext": {"allowPrivilegeEscalation": false, "readOnlyRootFilesystem": true, "capabilities": {"drop": ["ALL"]}},
           "resources": {"requests": {"cpu": "5m", "memory": "16Mi"}, "limits": {"cpu": "100m", "memory": "64Mi"}},
           "volumeMounts": [{"name": "fake-file", "mountPath": "/run/byul-runtime-sentinel", "readOnly": true}]

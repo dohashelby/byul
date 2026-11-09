@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import tomllib
 from urllib.parse import urlsplit
 
 SOURCE = Path(__file__).resolve().parents[2]
@@ -442,6 +443,15 @@ def install_code():
     sites = list(venv.glob("lib/python3.*/site-packages"))
     require(len(sites) == 1, "venv site-packages 검증 실패.")
     write_file(sites[0] / "byul-runtime.pth", f"{DEST}/src\n{DEST}\n".encode())
+    # The agent invokes the package CLI, which reads distribution metadata.
+    # Source-only .pth installation must provide the same metadata as Gateway.
+    version = tomllib.loads((DEST / "pyproject.toml").read_text())["project"]["version"]
+    require(re.fullmatch(r"[A-Za-z0-9_.+-]+", version), "패키지 판본 형식이 잘못됐습니다.")
+    dist_info = sites[0] / f"serving_runtime-{version}.dist-info"
+    directory(dist_info)
+    write_file(dist_info / "METADATA",
+               f"Metadata-Version: 2.1\nName: serving-runtime\nVersion: {version}\n".encode())
+    run([venv / "bin/python", "-I", "-B", "-m", "serving_runtime", "--help"])
     run([venv / "bin/python", "-I", "-B", "-c",
          "import serving_runtime, tools.tetragon_status, tools.tetragon_monitor_window, tools.gpu_status; "
          "import sys; assert sys.version_info >= (3,12)"])

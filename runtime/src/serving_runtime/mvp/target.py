@@ -685,6 +685,9 @@ class TargetRegistry:
             ),
             "verification_state": verification["state"] if verification else None,
             "last_confirmed_at": verification["last_confirmed_at"] if verification else None,
+            **{key: current.get(key) if current else None for key in (
+                "pod_uid", "container_id", "restart_count", "image_digest",
+            )},
         }
 
     def hold(

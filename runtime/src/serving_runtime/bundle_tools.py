@@ -202,6 +202,14 @@ class StatusMismatch(RuntimeError):
     """A valid status response disagreed with the intended bundle."""
 
 
+class BundleApplyError(RuntimeError):
+    """Failed apply with a non-secret record of the actual recovery outcome."""
+
+    def __init__(self, message: str, outcome: dict):
+        super().__init__(message)
+        self.outcome = outcome
+
+
 def _kubectl(context: str, namespace: str, kubeconfig: str | None) -> list[str]:
     command = ["kubectl"]
     if kubeconfig:
@@ -267,14 +275,14 @@ def _status(url: str, token: str | None) -> dict:
     return document
 
 
-def _token(path: str | None) -> str | None:
+def _token(path: str | None, name: str = "RUNTIME_VIEWER_TOKEN") -> str | None:
     if path is None:
         return None
     raw = Path(path).read_text(encoding="utf-8")
     matches = [line.partition("=")[2].strip().strip('"\'') for line in raw.splitlines()
-               if line.startswith("RUNTIME_VIEWER_TOKEN=")]
+               if line.startswith(name + "=")]
     if len(matches) > 1 or (matches and not matches[0]):
-        raise ValueError("env 파일의 RUNTIME_VIEWER_TOKEN이 중복되거나 비었습니다")
+        raise ValueError(f"env 파일의 {name}이 중복되거나 비었습니다")
     return matches[0] if matches else None
 
 
@@ -295,26 +303,84 @@ def _gateway_status(context: str, namespace: str, kubeconfig: str | None,
         time.sleep(min(0.5, max(0, deadline - time.monotonic())))
 
 
+def _normal_canary(url: str, token: str | None, model: str, max_tokens: int) -> dict:
+    """One bounded ordinary chat request through the deployed Gateway."""
+    headers = {"Content-Type": "application/json"}
+    if token is not None:
+        headers["Authorization"] = "Bearer " + token
+    raw = json.dumps({"model": model, "messages": [{"role": "user", "content": "Reply OK."}],
+                      "max_tokens": max_tokens, "stream": False}).encode("utf-8")
+    try:
+        with urlopen(Request(url + "/v1/chat/completions", data=raw, headers=headers), timeout=20) as response:
+            if response.status != 200:
+                raise StatusMismatch("normal canary returned a non-success status")
+            body = response.read(1024 * 1024 + 1)
+            request_id = response.headers.get("X-Request-ID")
+    except HTTPError as error:
+        raise StatusMismatch(f"normal canary rejected (HTTP {error.code})") from error
+    if len(body) > 1024 * 1024:
+        raise StatusMismatch("normal canary response exceeded its byte limit")
+    try:
+        value = _strict_json(body, "normal canary")
+        choices = value["choices"]
+        content = choices[0]["message"]["content"]
+        if (not isinstance(choices, list) or len(choices) != 1 or not isinstance(content, str)
+                or not content.strip() or choices[0].get("finish_reason") not in {"stop", "length"}):
+            raise ValueError("normal generation missing")
+    except (ValueError, KeyError, TypeError, IndexError) as error:
+        raise StatusMismatch("normal canary did not produce a valid completed chat response") from error
+    return {"state": "verified", "model": model, "max_tokens": max_tokens,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "request_id": request_id if isinstance(request_id, str) and _ID.fullmatch(request_id) else None,
+            "response_sha256": _sha(body)}
+
+
 def _checked_status(context: str, namespace: str, kubeconfig: str | None,
                     remote_port: int, token: str | None, bundle_id: str,
-                    *, timeout: float = 90) -> None:
-    # Recreate 배치에서 이전 Pod 종료 유예(보통 최대 30초)와 새 Pod 연결 시간을 함께 둔다.
+                    *, timeout: float = 90, expected_target_id: str | None = None,
+                    expected_bundle_sha256: str | None = None, canary_model: str | None = None,
+                    canary_token: str | None = None, canary_max_tokens: int = 8) -> dict | None:
     deadline = time.monotonic() + timeout
     last_error = ""
     while True:
         try:
-            status = _gateway_status(context, namespace, kubeconfig, remote_port, token, timeout=0)
-            bundle_status = status.get("policy_bundle")
-            policy_status = status.get("policy")
-            if not isinstance(bundle_status, dict) or not isinstance(policy_status, dict) or not isinstance(policy_status.get("approval"), dict):
-                raise StatusUnavailable("/api/status 묶음·승인 필드가 없어 확인할 수 없습니다")
-            actual_id = bundle_status.get("bundle_id")
-            approval = policy_status["approval"]
-            if actual_id is None or approval.get("state") is None:
-                raise StatusUnavailable("/api/status 묶음·승인 값이 없어 확인할 수 없습니다")
-            if actual_id != bundle_id or approval.get("state") != "verified":
-                raise StatusMismatch(f"/api/status 불일치: bundle_id={actual_id!r}, approval.state={approval.get('state')!r}")
-            return
+            with _port_forward(context, namespace, kubeconfig, remote_port) as url:
+                status = _status(url, token)
+                bundle_status = status.get("policy_bundle")
+                policy_status = status.get("policy")
+                if not isinstance(bundle_status, dict) or not isinstance(policy_status, dict) or not isinstance(policy_status.get("approval"), dict):
+                    raise StatusUnavailable("/api/status 묶음·승인 필드가 없어 확인할 수 없습니다")
+                actual_id = bundle_status.get("bundle_id")
+                approval = policy_status["approval"]
+                if actual_id is None or approval.get("state") is None:
+                    raise StatusUnavailable("/api/status 묶음·승인 값이 없어 확인할 수 없습니다")
+                if actual_id != bundle_id or approval.get("state") != "verified":
+                    raise StatusMismatch(f"/api/status 불일치: bundle_id={actual_id!r}, approval.state={approval.get('state')!r}")
+                if expected_bundle_sha256 is not None:
+                    if bundle_status.get("sha256") is None:
+                        raise StatusUnavailable("/api/status 정확 묶음 해시가 없습니다")
+                    if bundle_status["sha256"] != expected_bundle_sha256:
+                        raise StatusMismatch("/api/status 묶음 해시가 승인 판본과 다릅니다")
+                if expected_target_id is not None:
+                    target = status.get("target")
+                    if not isinstance(target, dict) or target.get("target_id") is None:
+                        raise StatusUnavailable("/api/status 대상 확인 필드가 없습니다")
+                    if target["target_id"] != expected_target_id:
+                        raise StatusMismatch("/api/status 등록 대상이 승인 target과 다릅니다")
+                    verification = target.get("verification")
+                    if (target.get("registration") != "ok" or target.get("gateway_hold") is not None
+                            or not isinstance(verification, dict) or verification.get("state") != "ok"):
+                        raise StatusUnavailable("/api/status 현재 실행 대상 확인이 완료되지 않았습니다")
+                    if policy_status.get("gateway_active") is not True:
+                        raise StatusMismatch("/api/status 정책이 현재 요청을 허용하지 않습니다")
+                    backend = status.get("backend")
+                    if not isinstance(backend, dict) or backend.get("healthy") is not True:
+                        raise StatusUnavailable("/api/status 실행 엔진의 정상 상태가 확인되지 않았습니다")
+                if canary_model is not None:
+                    canary = _normal_canary(url, canary_token, canary_model, canary_max_tokens)
+                    return {"bundle_id": bundle_id, "bundle_sha256": expected_bundle_sha256,
+                            "target_id": expected_target_id, "canary": canary}
+                return None
         except (URLError, TimeoutError, OSError, ValueError, StatusUnavailable) as error:
             last_error = str(error) if isinstance(error, StatusUnavailable) else type(error).__name__
         if time.monotonic() >= deadline:
@@ -335,7 +401,8 @@ def _check_deployed_permissions(directory: Path) -> None:
 
 def apply_bundle(bundle_dir: str | None, bundle_root: str, context: str, namespace: str,
                  status_url: str, token_env_file: str | None, *, kubeconfig: str | None = None,
-                 dry_run: bool = False, existing: str | None = None) -> dict:
+                 dry_run: bool = False, existing: str | None = None,
+                 deployment_guard_path: str | None = None) -> dict:
     parsed_url = urlparse(status_url)
     if parsed_url.scheme != "http" or parsed_url.hostname not in {"127.0.0.1", "localhost"} or not parsed_url.port or parsed_url.path not in {"", "/"} or parsed_url.query or parsed_url.fragment:
         raise ValueError("--status-url은 로컬 http://127.0.0.1:PORT 형식이어야 합니다")
@@ -374,9 +441,28 @@ def apply_bundle(bundle_dir: str | None, bundle_root: str, context: str, namespa
             raise FileExistsError("current.rollback이 이미 있습니다")
     except PermissionError as error:
         raise PermissionError("묶음 루트 조회 권한이 없습니다: --dry-run도 sudo로 실행해야 합니다") from error
+    def guarded(candidate):
+        if deployment_guard_path is not None:
+            from .mvp.deployment_guard import verify_deployment_guard
+            targets = [item for item in candidate.files if item.role == "target"]
+            if len(targets) != 1:
+                raise ValueError("guarded deployment requires one target registration")
+            target = _strict_json(targets[0].content, "target")
+            scope = target.get("kubernetes")
+            if (not isinstance(scope, dict) or scope.get("context") != context
+                    or scope.get("namespace") != namespace):
+                raise ValueError("적용 context/namespace가 승인 target과 다릅니다")
+            result = verify_deployment_guard(candidate, deployment_guard_path)
+            result["deployment_scope"] = {"context": context, "namespace": namespace}
+            return result
+        return None
+
+    guard_result = guarded(source)
     if dry_run:
-        return {"bundle_id": source.bundle_id, "previous": previous, "dry_run": True}
+        return {"bundle_id": source.bundle_id, "previous": previous, "dry_run": True,
+                "deployment_guard": guard_result}
     token = _token(token_env_file)
+    inference_token = _token(token_env_file, "RUNTIME_INFERENCE_TOKEN") if deployment_guard_path else None
     if existing is None:
         with tempfile.TemporaryDirectory(prefix=".bundle-apply-", dir=root) as temporary:
             staging = Path(temporary)
@@ -399,8 +485,24 @@ def apply_bundle(bundle_dir: str | None, bundle_root: str, context: str, namespa
                 raise PermissionError("root:10000 소유권·권한 설정 실패: sudo로 실행해야 합니다") from error
             _rename_new(staging, root / source.bundle_id)
         verify_policy_bundle(root / source.bundle_id)
+    def guarded_status(candidate):
+        target_file = next(item for item in candidate.files if item.role == "target")
+        policy_file = next(item for item in candidate.files if item.role == "gateway_policy")
+        target_document = _strict_json(target_file.content, "target")
+        policy_document = _strict_json(policy_file.content, "gateway policy")
+        return _checked_status(context, namespace, kubeconfig, parsed_url.port, token, candidate.bundle_id,
+                               expected_target_id=candidate.target_ref, expected_bundle_sha256=candidate.sha256,
+                               canary_model=target_document["model"]["id"], canary_token=inference_token,
+                               canary_max_tokens=min(8, policy_document["output_max_tokens"]))
+
     switched = False
     try:
+        # Re-read current external authority after staging and immediately
+        # before changing the serving link.
+        staged = verify_policy_bundle(root / source.bundle_id)
+        if staged.sha256 != source.sha256:
+            raise ValueError("배치된 묶음이 최초 검증 판본과 다릅니다")
+        guard_result = guarded(staged)
         os.symlink(source.bundle_id, root / "current.next")
         os.replace(root / "current.next", current)
         switched = True
@@ -409,13 +511,24 @@ def apply_bundle(bundle_dir: str | None, bundle_root: str, context: str, namespa
         base = _kubectl(context, namespace, kubeconfig) + ["rollout"]
         _run(base + ["restart", "deployment/serving-gateway"])
         _run(base + ["status", "deployment/serving-gateway", "--timeout=180s"])
-        _checked_status(context, namespace, kubeconfig, parsed_url.port, token, source.bundle_id)
-        return {"bundle_id": source.bundle_id, "previous": previous, "dry_run": False}
+        if deployment_guard_path is not None:
+            final_verification = guarded_status(source)
+        else:
+            _checked_status(context, namespace, kubeconfig, parsed_url.port, token, source.bundle_id)
+            final_verification = None
+        return {"bundle_id": source.bundle_id, "previous": previous, "dry_run": False,
+                "deployment_guard": guard_result, "final_verification": final_verification}
     except StatusUnavailable:
         raise
     except Exception as error:
         if switched:
             try:
+                # Rollback is a fresh use of the previous deployment. An old
+                # in-bundle approval cannot override today's revocation.
+                if (root / previous).is_symlink():
+                    raise ValueError("previous bundle directory became a symbolic link")
+                previous_bundle = verify_policy_bundle(root / previous)
+                previous_guard = guarded(previous_bundle)
                 os.symlink(previous, root / "current.rollback")
                 os.replace(root / "current.rollback", current)
                 if os.readlink(current) != previous:
@@ -423,6 +536,15 @@ def apply_bundle(bundle_dir: str | None, bundle_root: str, context: str, namespa
                 base = _kubectl(context, namespace, kubeconfig) + ["rollout"]
                 _run(base + ["restart", "deployment/serving-gateway"])
                 _run(base + ["status", "deployment/serving-gateway", "--timeout=180s"])
+                rollback_verification = guarded_status(previous_bundle) if deployment_guard_path is not None else None
             except Exception as rollback_error:
-                raise RuntimeError(f"적용 실패; 되돌리기도 실패: {rollback_error}") from error
-        raise RuntimeError(f"적용 실패; 이전 링크 복원 및 재시작 완료: {error}") from error
+                raise BundleApplyError(f"적용 실패; 되돌리기도 실패: {rollback_error}",
+                                       {"state": "rollback_failed", "candidate_bundle_id": source.bundle_id,
+                                        "previous_bundle_id": previous, "current_link": os.readlink(current),
+                                        "rollback_verified": False}) from error
+        if switched:
+            raise BundleApplyError(f"적용 실패; 이전 링크 복원 및 재시작 완료: {error}",
+                                   {"state": "rolled_back", "bundle_id": previous,
+                                    "deployment_guard": previous_guard,
+                                    "final_verification": rollback_verification}) from error
+        raise RuntimeError(f"적용 전 검증 실패; current 링크 유지: {error}") from error

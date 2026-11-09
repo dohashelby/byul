@@ -38,6 +38,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runtime/route-audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Route Audit */
+        get: operations["route_audit_api_runtime_route_audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runtime/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Checks */
+        get: operations["checks_api_runtime_checks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runtime/events": {
         parameters: {
             query?: never;
@@ -684,6 +718,26 @@ export interface components {
             /** Bundle Id */
             bundle_id?: string | null;
         };
+        /** CheckEvidenceRef */
+        CheckEvidenceRef: {
+            /** Evidence Id */
+            evidence_id: string;
+            /** Sha256 */
+            sha256?: string | null;
+        };
+        /** CheckPackLink */
+        CheckPackLink: {
+            /** Id */
+            id: string;
+            /** Revision */
+            revision: number;
+            /** Retired */
+            retired: boolean;
+            /** Executor */
+            executor: string | null;
+            /** Sha256 */
+            sha256: string;
+        };
         /** Claim */
         Claim: Record<string, never>;
         /** DiffEntry */
@@ -1037,6 +1091,8 @@ export interface components {
              */
             data_origin: "real" | "synthetic";
             source: components["schemas"]["SourceInfo"];
+            /** Scope Ref */
+            scope_ref?: string | null;
         };
         /** PolicyConfirm */
         PolicyConfirm: {
@@ -1339,6 +1395,16 @@ export interface components {
             /** Generated At */
             generated_at: string | null;
             source: components["schemas"]["SourceInfo"];
+            /**
+             * Counts Lower Bound
+             * @default false
+             */
+            counts_lower_bound: boolean;
+            /**
+             * History Truncated
+             * @default false
+             */
+            history_truncated: boolean;
         };
         /** Result */
         Result: {
@@ -1424,6 +1490,176 @@ export interface components {
             /** Target Ref */
             target_ref?: string | null;
         };
+        /** RouteAuditActor */
+        RouteAuditActor: {
+            /**
+             * State
+             * @default unattributed
+             * @constant
+             */
+            state: "unattributed";
+            /** Principal Id */
+            principal_id?: null;
+        };
+        /** RouteAuditDocument */
+        RouteAuditDocument: {
+            /** Items */
+            items: components["schemas"]["RouteAuditEntry"][];
+            status: components["schemas"]["RouteAuditStatus"];
+            window: components["schemas"]["RouteAuditWindow"];
+            /** Generated At */
+            generated_at: string;
+        };
+        /** RouteAuditEntry */
+        RouteAuditEntry: {
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "runtime-route-rejection/1.0";
+            /** Event Id */
+            event_id?: string | null;
+            /** Request Id */
+            request_id: string;
+            /** Recorded At */
+            recorded_at: string;
+            /** Method */
+            method: string;
+            /** Path */
+            path: string;
+            /** Response Code */
+            response_code: number;
+            /** Reason */
+            reason: string;
+            /**
+             * Forwarded To Engine
+             * @constant
+             */
+            forwarded_to_engine: false;
+            /** Scope */
+            scope?: {
+                [key: string]: string | null;
+            };
+            actor?: components["schemas"]["RouteAuditActor"];
+        };
+        /** RouteAuditResponse */
+        RouteAuditResponse: {
+            item: components["schemas"]["RouteAuditDocument"] | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ok" | "not_configured" | "unsupported" | "invalid";
+            source: components["schemas"]["SourceInfo"];
+        };
+        /** RouteAuditStatus */
+        RouteAuditStatus: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ok" | "partial" | "error";
+            /**
+             * Scope
+             * @constant
+             */
+            scope: "process_lifetime";
+            /** Attempted Count */
+            attempted_count: number;
+            /** Recorded Count */
+            recorded_count: number;
+            /** Overflow Count */
+            overflow_count: number;
+            /** Write Failure Count */
+            write_failure_count: number;
+            /** Last Write Error Class */
+            last_write_error_class: string | null;
+            /** Last Write Failure At */
+            last_write_failure_at: string | null;
+            /** Last Recorded At */
+            last_recorded_at: string | null;
+            /** Window Count */
+            window_count: number;
+            /** Window Limit */
+            window_limit: number;
+            /** Window Seconds */
+            window_seconds: number;
+            /** Window Started At */
+            window_started_at: string;
+        };
+        /** RouteAuditWindow */
+        RouteAuditWindow: {
+            /**
+             * Scope
+             * @constant
+             */
+            scope: "journal_tail_bytes";
+            /** Total */
+            total?: null;
+            /** Returned */
+            returned: number;
+            /** Truncated */
+            truncated: boolean;
+            /** Scanned Bytes */
+            scanned_bytes: number;
+            /** Max Bytes */
+            max_bytes: number;
+            /** Limit */
+            limit: number;
+            /** Corrupt Lines */
+            corrupt_lines: number;
+            /** Read Error Class */
+            read_error_class: string | null;
+        };
+        /** RuntimeCheckCoverage */
+        RuntimeCheckCoverage: {
+            /** Mapping Version */
+            mapping_version: string;
+            /** Fixed Sha */
+            fixed_sha: string;
+            /** Pack Revision */
+            pack_revision: number;
+            /** Selected Count */
+            selected_count: number;
+            /** Excluded Count */
+            excluded_count: number;
+            /** Items */
+            items: components["schemas"]["RuntimeCheckLink"][];
+            /** Truncated */
+            truncated: boolean;
+            source: components["schemas"]["SourceInfo"];
+            /** Source Windows */
+            source_windows?: {
+                [key: string]: components["schemas"]["RuntimeSourceWindow"];
+            };
+        };
+        /** RuntimeCheckLink */
+        RuntimeCheckLink: {
+            /** Framework Id */
+            framework_id: string;
+            /** Question */
+            question: string;
+            /** Devs */
+            devs: string[];
+            /** Sources */
+            sources: string[];
+            /** Rules */
+            rules: string[];
+            /** Condition */
+            condition: string;
+            /** Limitation */
+            limitation: string;
+            update: components["schemas"]["CheckPackLink"];
+            /** Observed Events */
+            observed_events: number;
+            /** Evidence Refs */
+            evidence_refs: components["schemas"]["CheckEvidenceRef"][];
+            /**
+             * Observation State
+             * @enum {string}
+             */
+            observation_state: "observed" | "unobserved";
+        };
         /** RuntimeEventList */
         RuntimeEventList: {
             /** Items */
@@ -1436,6 +1672,23 @@ export interface components {
              * @default false
              */
             truncated: boolean;
+            /** Source Windows */
+            source_windows?: {
+                [key: string]: components["schemas"]["RuntimeSourceWindow"];
+            };
+        };
+        /** RuntimeSourceWindow */
+        RuntimeSourceWindow: {
+            /** Returned */
+            returned: number;
+            /** Total */
+            total?: number | null;
+            /** Limit */
+            limit?: number | null;
+            /** Truncated */
+            truncated?: boolean | null;
+            /** Total Lower Bound */
+            total_lower_bound?: number | null;
         };
         /** RuntimeStatusResponse */
         RuntimeStatusResponse: {
@@ -2066,9 +2319,15 @@ export interface components {
                 /** @description 논리 대상 ID. runtime 정책의 target_id와 같은 값이어야 한다. */
                 target_ref: components["schemas"]["Common_local_id"];
                 engine: {
+                    /** @description 엔진 식별자(소문자). 정규 값은 vllm·sglang·tensorrt-llm이고 모의 엔진은 mock이다. 화면 표시 이름(vLLM·SGLang 등)은 넣지 않는다. 소비자는 모르는 식별자를 지원하지 않는 엔진으로 다룬다. */
                     name: string;
-                    /** @enum {unknown} */
-                    runtime_kind?: "mock" | "vllm" | "sglang";
+                    /** @description runtime이 연결할 driver 식별자(소문자). 정해진 목록이 아니라 형식만 검사한다. 예: mock·vllm·sglang·tensorrt-llm. 형식이 맞아도 그 runtime 설치가 등록하지 않은 driver면 runtime이 거부한다. */
+                    runtime_kind?: string;
+                    /**
+                     * @description 선택. 요청을 받는 서빙 앞단. engine-server는 엔진 자체 서버(vllm serve·sglang.launch_server·trtllm-serve), triton은 Triton Inference Server 경유다. 모르면 null.
+                     * @enum {unknown}
+                     */
+                    frontend?: "engine-server" | "triton" | null;
                     version: string | null;
                     image_digest: string | null;
                     source_commit: string | null;
@@ -2082,7 +2341,14 @@ export interface components {
                 };
                 runtime?: {
                     nodes?: number;
+                    /** @description TP 그룹 수(기존 필드). 병렬 크기는 tp_size·pp_size·dp_size에 적는다. */
                     tp_groups?: number;
+                    /** @description 선택. tensor parallel 크기. 모르면 null. */
+                    tp_size?: number | null;
+                    /** @description 선택. pipeline parallel 크기. 모르면 null. */
+                    pp_size?: number | null;
+                    /** @description 선택. data parallel 크기(엔진 안 복제 수). 모르면 null. */
+                    dp_size?: number | null;
                     gpu_count?: number | null;
                     gpu_model?: string | null;
                     driver?: string | null;
@@ -2182,6 +2448,7 @@ export interface components {
             nonexposed: boolean | null;
             references: string[];
             target: {
+                /** @description environment의 target.engine.name과 같은 엔진 식별자(소문자). */
                 engine: string | null;
                 version: string | null;
                 source_commit: string | null;
@@ -2408,7 +2675,7 @@ export interface components {
             /** @description runtime이 기록한 시각. */
             recorded_at: components["schemas"]["Common_timestamp"];
             /** @enum {unknown} */
-            source: "gateway" | "management_listener" | "hubble" | "tetragon" | "policy_state" | "target_monitor" | "collector";
+            source: "gateway" | "management_listener" | "engine_health" | "hubble" | "tetragon" | "policy_state" | "target_monitor" | "collector";
             /** @enum {unknown} */
             category: "request" | "network" | "process" | "file" | "policy" | "target" | "collector";
             /**
@@ -2474,11 +2741,13 @@ export interface components {
                 exception_id: string | null;
                 cache_generation: string | null;
                 allowed_binary: boolean | null;
+                /** @description 확인된 context/namespace/Pod/container 세대의 정규 SHA256 참조 */
+                scope_ref?: string | null;
             };
         } & (unknown & unknown);
         /**
          * 통제 적용 시험 결과 (runtime → platform)
-         * @description runtime /api/lab-report에서 옮긴 저장된 kind L-01~L-08·AWS-01~AWS-20 실행 회차이며 현재 통제 상태의 증명이 아님. 원본 형식은 serving-runtime-k8s-lab-report/1.0 또는 serving-runtime-aws-lab-report/1.0이다. 정책 설정과 실제 차단 확인은 다르며, 로컬 kind·가짜 backend 결과는 정식 환경 검증이 아니다.
+         * @description runtime /api/lab-report에서 옮긴 저장된 kind L-01~L-08 및 선택 L-05b/L-05c·AWS-01~AWS-20 실행 회차이며 현재 통제 상태의 증명이 아님. 원본 형식은 serving-runtime-k8s-lab-report/1.0 또는 serving-runtime-aws-lab-report/1.0이다. 정책 설정과 실제 차단 확인은 다르며, 로컬 kind·가짜 backend 결과는 정식 환경 검증이 아니다.
          */
         RuntimeLabReport: {
             /** @constant */
@@ -2594,6 +2863,13 @@ export interface components {
              */
             evidence_state: "received" | "not_received" | "unknown" | "gateway_only" | null;
             evidence_summary: string | null;
+            /** @description 원본을 삭제하지 않고 적용한 실시간 조회 범위. 범위 밖의 UUID 부재는 확정하지 않는다. */
+            query_window?: null | {
+                truncated: boolean;
+                gateway_search_complete: boolean;
+                engine_search_complete: boolean;
+                max_search_bytes: number;
+            };
             engine_receipts: {
                 count: number;
                 first_received_at: string | null;
@@ -2756,7 +3032,7 @@ export interface components {
                 data_origin: components["schemas"]["Common_data_origin"] | null;
                 origin_detail: components["schemas"]["Common_origin_detail"];
                 /** @description 수집원별 요약. 해당 없는 수집원은 null. */
-                detail: null | components["schemas"]["RuntimeStatus_feed_detail"] | components["schemas"]["RuntimeStatus_retention_detail"] | components["schemas"]["RuntimeStatus_metrics_detail"] | components["schemas"]["RuntimeStatus_asset_detail"] | components["schemas"]["RuntimeStatus_cilium_detail"];
+                detail: null | components["schemas"]["RuntimeStatus_native_receipt_detail"] | components["schemas"]["RuntimeStatus_feed_detail"] | components["schemas"]["RuntimeStatus_retention_detail"] | components["schemas"]["RuntimeStatus_metrics_detail"] | components["schemas"]["RuntimeStatus_asset_detail"] | components["schemas"]["RuntimeStatus_cilium_detail"];
             }[];
             store: {
                 /** @enum {unknown} */
@@ -2778,6 +3054,10 @@ export interface components {
             };
             /** @description 저장된 관측 사건 집계(/api/observations). */
             observations: {
+                /** @default false */
+                counts_lower_bound: boolean;
+                /** @default false */
+                history_truncated: boolean;
                 by_source: {
                     [key: string]: number;
                 };
@@ -2811,6 +3091,37 @@ export interface components {
             line: number | null;
             reason: string;
         };
+        /** @description Native observer의 reader liveness와 source recorder 상태를 분리한다. 봉인 자료는 과거 요청 근거이며 향후 감시 가능성을 뜻하지 않는다. */
+        RuntimeStatus_native_receipt_detail: {
+            truncated?: boolean | null;
+            historical_pending_receipts?: number | null;
+            historical_pending_dropped?: number | null;
+            /** @enum {unknown} */
+            historical_storage_state?: "connected" | "memory_only" | "error" | null;
+            capture_health_reason?: string | null;
+            /** @constant */
+            kind: "native_receipt";
+            /** @enum {unknown} */
+            capture_state: "active" | "closed" | "bound_reached" | "stopped" | "unavailable" | null;
+            producer_updated_at: components["schemas"]["Common_nullable_timestamp"];
+            capture_observed_at: components["schemas"]["Common_nullable_timestamp"];
+            producer_fresh: boolean | null;
+            capture_fresh: boolean | null;
+            /** @enum {unknown} */
+            source_event_freshness: "unknown" | null;
+            future_observation_available: boolean | null;
+            observed_requests: number | null;
+            historical_receipts: number | null;
+            source_event_times: {
+                pid: number | null;
+                start_ticks: number | null;
+                monotonic_ns: number | null;
+                boot_sha256: string | null;
+                pid_namespace: number | null;
+                time_namespace: number | null;
+                time_offsets_sha256: string | null;
+            }[];
+        };
         /** @description observation_feed_hubble·observation_feed_tetragon: 실시간 수집기 처리 결과와 writer heartbeat. */
         RuntimeStatus_feed_detail: {
             /** @constant */
@@ -2834,16 +3145,48 @@ export interface components {
             last_lost_at: components["schemas"]["Common_nullable_timestamp"];
             /** @description 현재 freshness window에 Hubble loss가 관측됐는지. 해당 없거나 Hubble 유효 줄 미처리면 null. */
             loss_detected: boolean | null;
+            /** @description Tetragon writer가 정제 과정에서 버린 줄의 누적 수. 미제공 또는 해당 없으면 null. */
+            dropped_lines_total?: number | null;
+            /** @description writer가 제공한 최근 정제 오류 종류. 오류 원문이나 비밀 값은 포함하지 않는다. */
+            last_redaction_error_class?: string | null;
+            writer_write_failure_count?: number | null;
+            writer_write_failed?: boolean | null;
+            writer_last_write_error_class?: string | null;
+            writer_last_write_error_at?: components["schemas"]["Common_nullable_timestamp"];
+            /** @enum {string|null} */
+            last_redaction_drop_reason?: "INVALID_UTF8" | "INVALID_JSON" | "JSON_TOO_DEEP" | "OBJECT_REQUIRED" | "FILTER_REJECTED" | null;
+            last_redaction_drop_at?: components["schemas"]["Common_nullable_timestamp"];
+            /** @description 현재 freshness window의 Tetragon 정제 손실 여부. 미제공 또는 해당 없으면 null. */
+            redaction_loss_detected?: boolean | null;
             writer: {
                 configured: boolean;
                 state: string | null;
                 updated_at: components["schemas"]["Common_nullable_timestamp"];
                 reconnect_count: number | null;
                 last_gap: null | {
+                    gap_id?: string | null;
                     opened_at: components["schemas"]["Common_nullable_timestamp"];
                     closed_at: components["schemas"]["Common_nullable_timestamp"];
+                    /** @description writer의 복구 상태. requested_unverified는 복구 요청이며 완전 복구 확인이 아니다. */
+                    backfill?: string | null;
+                    attempts?: number | null;
+                };
+                open_gap?: null | {
+                    gap_id?: string | null;
+                    opened_at: components["schemas"]["Common_nullable_timestamp"];
+                    closed_at: components["schemas"]["Common_nullable_timestamp"];
+                    /** @description writer의 복구 상태. requested_unverified는 복구 요청이며 완전 복구 확인이 아니다. */
+                    backfill?: string | null;
+                    attempts?: number | null;
                 };
             };
+            /** @description Gateway가 관측한 Tetragon 정제 폐기수의 누적 합. writer counter 재설정 후에도 checkpoint에 보존한다. */
+            redaction_dropped_lines_total?: number | null;
+            storage_errors_total?: number | null;
+            last_storage_error_class?: string | null;
+            last_storage_error_at?: components["schemas"]["Common_nullable_timestamp"];
+            last_storage_operation?: string | null;
+            checkpoint_pending?: boolean | null;
         };
         /** @description record_retention: 기록 보존 정리 결과. */
         RuntimeStatus_retention_detail: {
@@ -3004,13 +3347,15 @@ export interface components {
                         functional: components["schemas"]["Common_verdict"] | null;
                         performance: components["schemas"]["Common_verdict"] | null;
                         verification_level: components["schemas"]["Common_data_origin"] | null;
+                        /** @description 선택. 이 쪽(baseline·candidate·single)에만 있는 공백. 예: 기준 판본은 지원되고 후보 판본만 ENGINE_VERSION_UNSUPPORTED. 점검 행의 gaps는 모든 쪽의 합이다. */
+                        gaps?: components["schemas"]["VerificationResult_gap"][];
                     };
                 };
                 comparison: components["schemas"]["VerificationResult_comparison"] | null;
                 functional_comparison: components["schemas"]["VerificationResult_comparison"] | null;
                 /** @description 비교 불일치·미확인 필드(update 모드). 없으면 빈 배열. */
                 comparison_reasons: string[];
-                gaps: ("NO_EXECUTOR" | "NO_POLICY_VALUE" | "NO_FIXTURE" | "NO_ENV_FACT" | "ADAPTER_UNSUPPORTED")[];
+                gaps: components["schemas"]["VerificationResult_gap"][];
                 /** @enum {unknown} */
                 evidence_source: "automated" | "manual" | null;
                 /** @description 정책 예외 표시. 판정을 바꾸지 않는다(0.1의 exception_approved를 대체). */
@@ -3051,6 +3396,11 @@ export interface components {
         };
         /** @enum {unknown} */
         VerificationResult_comparison: "NO_CHANGE" | "REGRESSED" | "FIXED" | "STILL_FAILING" | "UNKNOWN" | "NOT_COMPARABLE" | "CARRIED_OVER";
+        /**
+         * @description ADAPTER_UNSUPPORTED는 그 엔진을 지원하는 어댑터가 없음, ENGINE_VERSION_UNSUPPORTED는 엔진은 지원하지만 그 판본의 관측 고정값·지원표가 없음(검토 전 판본)이다.
+         * @enum {unknown}
+         */
+        VerificationResult_gap: "NO_EXECUTOR" | "NO_POLICY_VALUE" | "NO_FIXTURE" | "NO_ENV_FACT" | "ADAPTER_UNSUPPORTED" | "ENGINE_VERSION_UNSUPPORTED";
         VerificationResult_axis_summary: {
             security: components["schemas"]["Common_verdict"];
             /** @description 점검 목록 완결 여부. 거짓이면 집계 PASS가 될 수 없다(SPEC INV-13). RPT에 없으면 null. */
@@ -3130,6 +3480,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Overview"];
+                };
+            };
+        };
+    };
+    route_audit_api_runtime_route_audit_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteAuditResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    checks_api_runtime_checks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuntimeCheckCoverage"];
                 };
             };
         };

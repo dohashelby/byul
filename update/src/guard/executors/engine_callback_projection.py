@@ -181,6 +181,19 @@ def sequence_rows(events, cases):
     return {case['case_id']: rows for case, rows in zip(cases, list(ordered.values())[len(ordered) - len(cases):])}
 
 
+def gateway_rows(events, secret, cases, request_ids):
+    """Join by Gateway-issued IDs returned on the matching HTTP connection.
+
+    Independent concurrent requests, callback ordering and missing rows cannot
+    become a cohort member. Duplicate IDs make every affected case unbound.
+    """
+    ids = [request_ids.get(case['case_id']) for case in cases]
+    tags = {case['case_id']: 'byul-cb-' + rid for case, rid in zip(cases, ids)
+            if type(rid) is str and re.fullmatch(r'[0-9a-f]{32}', rid)
+            and ids.count(rid) == 1}
+    return computed_rows(events, secret, tags)
+
+
 def project_identity(cases, rows, rejected=()):
     """인증 주체가 salt를 정하는지 본다. 위조한 salt는 거부되거나 무시돼야 한다."""
     salts = {}; forged = {}; omitted = {}

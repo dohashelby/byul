@@ -388,6 +388,102 @@ def _slow_profile(**changes):
             "close_after_reads": 3, **changes}
 
 
+def _marker_profile(**changes):
+    return {"profile": "generated-marker-close-v1", "chunk_bytes": 4096, "interval_ms": 1,
+            "close_after_reads": 32, "marker": "ALPHA0123456789ab", **changes}
+
+
+def _generated_event(text):
+    return b"data: " + json.dumps({"choices": [{"delta": {"content": text}}]}).encode() + b"\n\n"
+
+
+def test_generated_marker_closes_after_complete_events_before_terminal():
+    peer_eof = threading.Event()
+    def handler(conn, *_):
+        conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: 9999\r\n\r\n")
+        conn.sendall(_generated_event("ALPHA")); time.sleep(.02)
+        conn.sendall(_generated_event("0123456789ab"))
+        if conn.recv(1) == b"": peer_eof.set()
+    with _server(handler) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse", read_profile=_marker_profile())], 1)
+        assert peer_eof.wait(.5)
+    assert value["marker_close_observed"] and value["marker_json_valid"]
+    assert value["client_closed"] and value["stop_reason"] == "client_close" and not value["terminal_seen"]
+    assert value["read_count"] < 32 and len(value["events"]) == 2
+
+
+def test_generated_marker_never_relabels_terminal_already_in_same_read():
+    body = _generated_event("ALPHA0123456789ab") + b"data: [DONE]\n\n"
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse", read_profile=_marker_profile())], 1)
+    assert value["terminal_seen"] and not value["marker_close_observed"] and not value["client_closed"]
+    assert value["capture_complete"]
+
+
+def test_generated_marker_never_relabels_already_completed_http_framing():
+    body = _generated_event("ALPHA0123456789ab")
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse", read_profile=_marker_profile())], 1)
+    assert not value["terminal_seen"] and not value["marker_close_observed"] and not value["client_closed"]
+    assert value["eof"]
+
+
+@pytest.mark.parametrize("body", [
+    b'data: {"model":"ALPHA0123456789ab","choices":[]}\n\n',
+    b'data: {invalid-json}\n\n' + _generated_event("ALPHA0123456789ab"),
+    _generated_event("ALPHA0123456789ab")[:-1],
+])
+def test_generated_marker_requires_valid_complete_generated_content(body):
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse", read_profile=_marker_profile())], 1)
+    assert not value["marker_close_observed"] and not value["client_closed"]
+
+
+def test_generated_marker_read_limit_is_not_a_successful_semantic_close():
+    body = _generated_event("no synthetic marker")
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse", read_profile=_marker_profile(chunk_bytes=1,close_after_reads=2))], 1)
+    assert value["client_closed"] and value["read_count"] == 2
+    assert value["stop_reason"] == "marker_read_limit" and not value["marker_close_observed"]
+
+
+def test_generated_marker_keeps_body_limit(monkeypatch):
+    monkeypatch.setattr(stream_probe, "MAX_BODY", 32)
+    body = _generated_event("ALPHA0123456789ab")
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse", read_profile=_marker_profile())], 1)
+    assert value["body_truncated"] and value["stop_reason"] == "body_limit" and value["body_bytes"] == 32
+    assert not value["marker_close_observed"] and not value["client_closed"]
+
+
+def test_generated_marker_keeps_deadline_before_complete_event():
+    def handler(conn, request, index, stop):
+        conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: 9999\r\n\r\ndata: {")
+        stop.wait(.3)
+    with _server(handler) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse", read_profile=_marker_profile())], .06)
+    assert not value["marker_close_observed"] and not value["client_closed"]
+    assert value["stop_reason"] in {"deadline", "timeout"}
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_generated_marker_rejects_nonfinite_json_constants_before_close(constant):
+    event = b'data: {"choices":[{"delta":{"content":"ALPHA0123456789ab"}}],"extension":' + constant.encode() + b'}\n\n'
+    def handler(conn, *_):
+        conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\n" + event)
+        time.sleep(.04);conn.sendall(b'data: [DONE]\n\n')
+    with _server(handler) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse", read_profile=_marker_profile())], 1)
+    assert value["marker_json_valid"] is False and value["marker_close_observed"] is False
+    assert not value["client_closed"]
+
+
+@pytest.mark.parametrize("marker", ["credential", "ALPHA0123456789AB", "ALPHA0123456789ab\n", "BETA0123456789ab"])
+def test_generated_marker_profile_has_closed_synthetic_input(marker):
+    with pytest.raises(ValueError):
+        stream_probe.collect([_request("http://127.0.0.1:1", mode="sse", read_profile=_marker_profile(marker=marker))], 1)
+
+
 def test_slow_reader_pauses_between_each_read_and_closes_peer_while_control_completes():
     arrived = threading.Barrier(2)
     peer_eof = threading.Event()

@@ -72,6 +72,27 @@ class MethodTests(unittest.TestCase):
         with self.assertRaises(IntentError):
             parse_intent(bad)
 
+    def test_all_methods_fit_tetragon_argument_budget_with_exact_identity(self):
+        for method in ("override_lsm", "sigkill_fd_install", "override_syscall"):
+            with self.subTest(method=method):
+                document = sample()
+                document["protected_paths"]["secret_paths"] = ["/run/probe/token"]
+                document["protected_paths"]["enforce_exact_files"] = ["/run/probe/token"]
+                document["tetragon_rule_modes"] = {"TG-SECRET-01": "enforce"}
+                document["tetragon_enforce_method"] = method
+                if method == "override_syscall":
+                    document["tetragon_openat_symbol"] = "__x64_sys_openat"
+                plain = render_manifests(parse_intent(document))["tetragon-tg-secret-01.json"]
+                document["tetragon_kernel_identity"] = True
+                verified = render_manifests(parse_intent(document))["tetragon-tg-secret-01.json"]
+                probe = verified["spec"]["kprobes"][0]
+                self.assertLessEqual(len(probe.get("args", [])) + len(probe.get("data", [])), 5)
+                self.assertEqual(probe["selectors"], plain["spec"]["kprobes"][0]["selectors"])
+                self.assertEqual(probe["call"], plain["spec"]["kprobes"][0]["call"])
+                self.assertEqual(len(probe["data"]), 3)
+                if method == "override_syscall":
+                    self.assertEqual(probe["args"], [{"index": 1, "type": "string"}])
+
     def test_fourth_run_cannot_claim_lsm(self):
         capability = classify_capabilities(kernel="7.0.0-test", config="CONFIG_BPF_KPROBE_OVERRIDE=y\nCONFIG_BPF_LSM=y\n",
                                            lsm="lockdown,yama,apparmor", injection_list="__x64_sys_openat [sys_openat]",
@@ -155,38 +176,125 @@ class ModeTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0][-2:], ["tracingpolicy", "list"])
 
-    def test_replacement_loads_new_before_removing_old(self):
-        with tempfile.TemporaryDirectory() as temp:
-            manifest = Path(temp) / "new.json"
-            manifest.write_text(json.dumps({"metadata": {"name": "runtime-tg-secret-02", "namespace": "serving-lab"}}))
-            calls = []
-            def run(command):
-                calls.append(command)
-                if command[-2:] == ["tracingpolicy", "list"]:
-                    name = "runtime-tg-secret-01" if len(calls) == 1 else "runtime-tg-secret-02"
-                    return Result(output=table(name=name))
-                return Result()
-            outcome = replace_after_load("ctx", "serving-lab", "runtime-tg-secret-01", manifest, run=run)
-            self.assertTrue(outcome["ok"])
-            self.assertLess(next(i for i, c in enumerate(calls) if "apply" in c), next(i for i, c in enumerate(calls) if "delete" in c))
+    def replacement(self, *, mode="monitor", actual_spec=None, effect=True, load_state="enabled", existing=False, mutate=False, expected_mode="monitor"):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        manifest = Path(directory.name) / "new.json"
+        document = {"apiVersion": "cilium.io/v1alpha1", "kind": "TracingPolicyNamespaced",
+                    "metadata": {"name": "runtime-tg-secret-02", "namespace": "serving-lab"},
+                    "spec": {"options": [{"name": "policy-mode", "value": expected_mode}],
+                             "kprobes": [{"call": "fd_install"}]}}
+        manifest.write_text(json.dumps(document))
+        calls, state = [], {"applied": False, "verified": False}
+        def run(command):
+            calls.append(command)
+            if "create" in command:
+                state["applied"] = True
+                created = copy.deepcopy(document)
+                created["metadata"].update(uid="new-uid", resourceVersion="2")
+                return Result(output=json.dumps(created))
+            if command[-2:] == ["tracingpolicy", "list"]:
+                rows = table() + table(name="runtime-tg-secret-02", mode=mode, state=load_state).split("\n", 1)[1]
+                if mutate and state["verified"]:
+                    rows = rows.replace("runtime-tg-secret-02 enabled", "runtime-tg-secret-02 disabled")
+                return Result(output=rows)
+            if "get" in command:
+                if "runtime-tg-secret-01" in command:
+                    old = copy.deepcopy(document)
+                    old["metadata"].update(name="runtime-tg-secret-01", uid="old-uid", resourceVersion="1")
+                    return Result(output=json.dumps(old))
+                if not state["applied"] and not existing:
+                    return Result()
+                actual = copy.deepcopy(document)
+                actual["metadata"].update(uid="new-uid", resourceVersion="2")
+                if actual_spec is not None:
+                    actual["spec"] = actual_spec
+                return Result(output=json.dumps(actual))
+            if "delete" in command:
+                options = json.loads(Path(command[-1]).read_text())
+                self.assertIn(options["preconditions"]["uid"], {"new-uid", "old-uid"})
+                calls[-1] = [*command, options["preconditions"]["uid"]]
+            return Result()
+        def verify(row):
+            self.assertEqual(row["name"], "runtime-tg-secret-02")
+            calls.append(["effect-probe"])
+            state["verified"] = True
+            if isinstance(effect, Exception):
+                raise effect
+            return effect
+        outcome = replace_after_load("ctx", "serving-lab", "runtime-tg-secret-01", manifest,
+                                     expected_mode=expected_mode, verify_effect=verify, run=run)
+        return outcome, calls
 
-    def test_replacement_load_failure_keeps_old_policy(self):
-        with tempfile.TemporaryDirectory() as temp:
-            manifest = Path(temp) / "new.json"
-            manifest.write_text(json.dumps({"metadata": {"name": "runtime-tg-secret-02", "namespace": "serving-lab"}}))
+    def test_replacement_verifies_spec_mode_and_live_effect_before_old_removal(self):
+        outcome, calls = self.replacement()
+        self.assertTrue(outcome["ok"])
+        self.assertLess(calls.index(["effect-probe"]), next(i for i, c in enumerate(calls) if "delete" in c))
+        self.assertTrue(any("/runtime-tg-secret-01" in token for token in calls[-1]))
+
+    def test_replacement_mismatch_or_missing_effect_keeps_old(self):
+        for params in ({"mode": "enforce"}, {"load_state": "load_error"}, {"actual_spec": {"kprobes": []}},
+                       {"effect": False}, {"effect": None}, {"effect": RuntimeError("probe failed")}, {"mutate": True}):
+            with self.subTest(params=params):
+                outcome, calls = self.replacement(**params)
+                self.assertFalse(outcome["ok"])
+                deletes = [c for c in calls if "delete" in c]
+                self.assertEqual(len(deletes), 1)
+                self.assertTrue(any("/runtime-tg-secret-02" in token for token in deletes[0]))
+                self.assertFalse(any("/runtime-tg-secret-01" in token for token in deletes[0]))
+
+    def test_replacement_allows_explicit_mode_change(self):
+        outcome, _ = self.replacement(mode="enforce", expected_mode="enforce")
+        self.assertTrue(outcome["ok"])
+        self.assertEqual(outcome["old"]["mode"], "monitor")
+        self.assertEqual(outcome["new"]["mode"], "enforce")
+
+    def test_replacement_waits_for_async_load_before_effect(self):
+        real_read = __import__("tools.tetragon_mode", fromlist=["_read_policy"])._read_policy
+        from unittest.mock import patch
+        reads = []
+        def delayed(run, context, tetragon_namespace, policy_name, policy_namespace):
+            if policy_name == "runtime-tg-secret-02":
+                reads.append(policy_name)
+                if len(reads) == 1:
+                    return None
+                if len(reads) == 2:
+                    return {"state": "loading"}
+            return real_read(run, context, tetragon_namespace, policy_name, policy_namespace)
+        with patch("tools.tetragon_mode._read_policy", side_effect=delayed):
+            outcome, calls = self.replacement()
+        self.assertTrue(outcome["ok"])
+        self.assertGreaterEqual(len(reads), 3)
+        self.assertEqual(calls.count(["effect-probe"]), 1)
+
+    def test_replacement_create_conflict_keeps_concurrent_object(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            manifest = Path(temporary) / "new.json"
+            manifest.write_text(json.dumps({"kind": "TracingPolicyNamespaced",
+                "metadata": {"name": "new", "namespace": "serving-lab"},
+                "spec": {"options": [{"name": "policy-mode", "value": "monitor"}], "kprobes": [{"call": "fd_install"}]}}))
             calls = []
             def run(command):
                 calls.append(command)
                 if command[-2:] == ["tracingpolicy", "list"]:
-                    return Result(output=table() if len([c for c in calls if c[-2:] == ["tracingpolicy", "list"]]) == 1
-                                  else table(name="runtime-tg-secret-02", state="load_error"))
-                return Result()
-            outcome = replace_after_load("ctx", "serving-lab", "runtime-tg-secret-01", manifest, run=run)
-            self.assertFalse(outcome["ok"])
-            deletes = [command for command in calls if "delete" in command]
-            self.assertEqual(len(deletes), 1)
-            self.assertIn("runtime-tg-secret-02", deletes[0])
-            self.assertNotIn("runtime-tg-secret-01", deletes[0])
+                    return Result(output=table(name="old"))
+                if "get" in command and "old" in command:
+                    return Result(output=json.dumps({"metadata": {"name": "old", "namespace": "serving-lab", "uid": "old-uid", "resourceVersion": "1"}}))
+                if "get" in command:
+                    return Result()
+                if "create" in command:
+                    return Result(code=1)  # a competing actor won the name
+                self.fail("unexpected mutation: " + str(command))
+            result = replace_after_load("ctx", "serving-lab", "old", manifest,
+                expected_mode="monitor", verify_effect=lambda _: True, run=run)
+            self.assertFalse(result["ok"])
+            self.assertTrue(any("create" in c for c in calls))
+            self.assertFalse(any("delete" in c or "apply" in c for c in calls))
+
+    def test_replacement_existing_name_is_not_overwritten_or_deleted(self):
+        outcome, calls = self.replacement(existing=True)
+        self.assertFalse(outcome["ok"])
+        self.assertFalse(any("create" in c or "delete" in c for c in calls))
 
 
 if __name__ == "__main__":

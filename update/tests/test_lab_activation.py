@@ -218,7 +218,6 @@ def test_clean_target_completes_scope_with_no_violation(check_id):
     ('LIF-04', {'stuck': True}, 'SLOW_READER_NOT_RELEASED_BEFORE_DEADLINE'),
     ('LIF-05', {'model': 'other'}, 'DISALLOWED_MODEL_SERVED_DURING_TRANSITION'),
     ('LIF-06', {'faulty_ready': True}, 'PARTIAL_CHANGE_ACCEPTED'),
-    ('LIF-08', {'hang': True}, 'FAULT_NOT_DETECTED_BEFORE_DEADLINE'),
     ('LIF-09', {'faulty_ready': True}, 'PARTIAL_INITIALIZATION_REPORTED_READY'),
 ])
 def test_activated_fault_produces_the_named_violation(check_id, modes, code):
@@ -232,6 +231,14 @@ def test_request_that_ended_before_the_fault_is_not_evidence(monkeypatch):
     monkeypatch.setattr(world, 'http', lambda item: {**original(item), 'elapsed_ms': 1})
     facts, _ = lab.run_scenario('LIF-08', BASE, POLICY, runner=world, clock=world.clock, wait=world.wait)
     assert facts['activation_scope_complete'] is False and 'FAULT_AFTER_REQUEST_FINISHED:death' in facts['activation_missing']
+
+
+def test_remote_timeout_without_fault_overlap_is_unverified_detection_timing():
+    facts, _ = scenario('LIF-08', hang=True)
+    assert facts['activation_scope_complete'] is False
+    assert 'FAULT_REQUEST_OVERLAP_UNOBSERVED:death' in facts['activation_missing']
+    assert 'FAULT_DETECTION_TIMING_UNVERIFIED:death' in facts['activation_missing']
+    assert 'FAULT_NOT_DETECTED_BEFORE_DEADLINE' not in {v['code'] for v in facts['activation_violations']}
 
 
 @pytest.mark.parametrize('modes,code', [
@@ -608,12 +615,19 @@ def test_fault_violation_survives_final_cleanup_failure_and_attempts_stay_incomp
     def broken_restore(self):
         raise OSError('restore refused')
     monkeypatch.setattr(lab.Lab, 'restore', broken_restore)
-    world = Cluster(hang=True)
+    world = Cluster()
+    original_http = world.http
+    def incomplete_response(item):
+        row = original_http(item)
+        if item.get('body') and item['body']['messages'][0]['content'].startswith('fault'):
+            return {**row, 'outcome': 200, 'complete': False}
+        return row
+    monkeypatch.setattr(world, 'http', incomplete_response)
     executor = lab.ActivatedExecutor(Passive(), BASE, runner=world, clock=world.clock, wait=world.wait)
     draft = executor.run(SimpleNamespace(id='LIF-08', challenge_steps=['death', 'delay', 'stall', 'exception']),
         None, POLICY, None, tmp_path / 'work')
     facts = json.loads((tmp_path / 'work' / 'lab-activation.json').read_text(encoding='utf-8'))
-    assert any(v['code'] == 'FAULT_NOT_DETECTED_BEFORE_DEADLINE' for v in facts['activation_violations'])
+    assert any(v['code'] == 'INCOMPLETE_WORK_REPORTED_AS_SUCCESS' for v in facts['activation_violations'])
     assert 'FINAL_RESTORE_FAILED:OSError' in facts['activation_missing']
     assert draft.status == ExecStatus.COMPLETED
     assert 'LAB_ACTIVATION_FINAL_RESTORE_FAILED:OSError' in draft.cleanup_errors

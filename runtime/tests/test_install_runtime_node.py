@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -56,6 +57,36 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         for value in ("private-value-never-print", "private-platform.invalid", "cluster.test", "node-test"):
             self.assertNotIn(value, output.getvalue())
         return code, output.getvalue()
+
+    @unittest.skipUnless(sys.platform == "linux" and os.geteuid() == 0,
+                         "fresh installer ownership/venv path requires Linux root")
+    def test_fresh_install_code_has_distribution_metadata_and_working_agent_cli(self):
+        # Use the actual installer writes, root ownership checks and fresh venv.
+        # A wheel in the runner must not mask missing metadata in the install.
+        # Production install lives below root-owned /opt, not world-writable /tmp.
+        temporary = tempfile.TemporaryDirectory(prefix="byul-installer-test-", dir="/opt")
+        self.addCleanup(temporary.cleanup)
+        destination = Path(temporary.name) / "fresh-runtime"
+        self.assertFalse(destination.exists())
+        with patch.object(installer, "DEST", destination):
+            installer.install_code()
+        python = destination / ".venv/bin/python"
+        command = [str(python), "-I", "-B", "-m", "serving_runtime", "agent", "--help"]
+        result = subprocess.run(command, capture_output=True, text=True, timeout=30,
+                                env={"PATH": installer.PATH, "LANG": "C.UTF-8"})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--platform-url", result.stdout)
+        metadata = list(destination.glob(
+            ".venv/lib/python*/site-packages/serving_runtime-*.dist-info/METADATA"))
+        self.assertEqual(len(metadata), 1)
+        self.assertIn("Name: serving-runtime\n", metadata[0].read_text())
+        for path in (metadata[0].parent, metadata[0],
+                     metadata[0].parent.parent / "byul-runtime.pth"):
+            self.assertEqual(path.stat().st_uid, 0)
+            self.assertEqual(path.stat().st_mode & 0o022, 0)
+        # Reinstall stays idempotent and still never starts a service.
+        with patch.object(installer, "DEST", destination):
+            installer.install_code()
 
     def test_wrapper_dry_run_rejects_shell_config_without_executing_it(self):
         marker = self.root / "executed"

@@ -11,6 +11,8 @@ import hashlib
 import json
 import math
 import os
+import re
+import shlex
 from pathlib import Path
 import signal
 import socket
@@ -150,10 +152,26 @@ def _start(
 # Plan §6.5: process argument text is excluded from default collection. The
 # raw Tetragon file is persisted, so arguments are removed before it is written.
 _TETRAGON_PROCESS_KEYS = ("process", "parent")
+_AWS20_PROBE_ID = re.compile(r"byul-read-probe-[a-f0-9]{32}(?:-monitor)?")
 
 
-def redact_tetragon_line(line: bytes) -> bytes | None:
-    """Return the event line without process arguments, or None to drop it.
+def _probe_id(event: dict) -> str | None:
+    """Keep only one synthetic trial token; ordinary argv never leaves memory."""
+    if event.get("policy_name") != "runtime-tg-secret-01":
+        return None
+    arguments = (event.get("process") or {}).get("arguments")
+    if not isinstance(arguments, str) or len(arguments) > 65536:
+        return None
+    try:
+        matches = [token for token in shlex.split(arguments) if _AWS20_PROBE_ID.fullmatch(token)]
+    except ValueError:
+        return None
+    return matches[0] if len(matches) == 1 else None
+
+
+
+def _redact_tetragon_result(line: bytes) -> tuple[bytes | None, str | None]:
+    """Return sanitized bytes and a fixed discard code when no line is stored.
 
     Lines that are not a JSON object are dropped instead of being stored
     verbatim, because their content cannot be checked for arguments.
@@ -161,13 +179,22 @@ def redact_tetragon_line(line: bytes) -> bytes | None:
 
     try:
         document = json.loads(line)
-    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
-        return None
+    except UnicodeDecodeError:
+        return None, "INVALID_UTF8"
+    except json.JSONDecodeError:
+        return None, "INVALID_JSON"
+    except RecursionError:
+        return None, "JSON_TOO_DEEP"
     if not isinstance(document, dict):
-        return None
+        return None, "OBJECT_REQUIRED"
     for event in document.values():
         if not isinstance(event, dict):
             continue
+        # Never trust an input extension: regenerate from the exact argv token.
+        event.pop("runtime_probe_id", None)
+        probe_id = _probe_id(event) if isinstance(event.get("process"), dict) else None
+        if probe_id is not None:
+            event["runtime_probe_id"] = probe_id
         for key in _TETRAGON_PROCESS_KEYS:
             process = event.get(key)
             if isinstance(process, dict):
@@ -179,7 +206,37 @@ def redact_tetragon_line(line: bytes) -> bytes | None:
                 if isinstance(ancestor, dict):
                     for private in ("arguments","environment_variables","environment","env","envs"):
                         ancestor.pop(private, None)
-    return (json.dumps(document, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
+    return (json.dumps(document, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8"), None
+
+
+def redact_tetragon_line(line: bytes) -> bytes | None:
+    """Keep the original bytes-or-None filter contract."""
+    return _redact_tetragon_result(line)[0]
+
+
+REDACTION_DROP_REASONS = frozenset({
+    "INVALID_UTF8", "INVALID_JSON", "JSON_TOO_DEEP", "OBJECT_REQUIRED", "FILTER_REJECTED",
+})
+
+
+class _RedactionDrops:
+    """One bounded last-drop receipt; never retain input or exception text."""
+
+    def __init__(self, dropped: list[int]) -> None:
+        self.dropped = dropped
+        self.lock = threading.Lock()
+        self.last_reason: str | None = None
+        self.last_at: str | None = None
+
+    def record(self, reason: str | None) -> None:
+        with self.lock:
+            self.dropped[0] += 1
+            self.last_reason = reason if reason in REDACTION_DROP_REASONS else "FILTER_REJECTED"
+            self.last_at = _utc_now()
+
+    def snapshot(self) -> tuple[int, str | None, str | None]:
+        with self.lock:
+            return self.dropped[0], self.last_reason, self.last_at
 
 
 def _pump(
@@ -188,12 +245,19 @@ def _pump(
     transform: Callable[[bytes], bytes | None],
     dropped: list[int],
     error_class: list[str | None],
+    drop_state: _RedactionDrops | None = None,
 ) -> None:
     try:
         for line in iter(source.readline, b""):
-            cleaned = transform(line)
+            if transform is redact_tetragon_line:
+                cleaned, reason = _redact_tetragon_result(line)
+            else:
+                cleaned, reason = transform(line), "FILTER_REJECTED"
             if cleaned is None:
-                dropped[0] += 1
+                if drop_state is None:
+                    dropped[0] += 1
+                else:
+                    drop_state.record(reason)
                 continue
             output.write(cleaned)
             output.flush()
@@ -440,6 +504,7 @@ class _Child:
         self.process: subprocess.Popen[bytes] | None = None
         self.pump: threading.Thread | None = None
         self.dropped_lines = [0]
+        self.redaction_drops = _RedactionDrops(self.dropped_lines)
         self.pump_error: list[str | None] = [None]
 
     def returncode(self) -> int | None:
@@ -494,9 +559,12 @@ class _FeedGroup:
         }
         redacting = [child for child in self.children if child.transform is not None]
         if redacting:
-            extra["dropped_lines_total"] = sum(
-                child.dropped_lines[0] for child in redacting
-            )
+            receipts = [child.redaction_drops.snapshot() for child in redacting]
+            extra["dropped_lines_total"] = sum(count for count, _, _ in receipts)
+            latest = max((row for row in receipts if row[2] is not None),
+                         key=lambda row: row[2], default=None)
+            extra["last_redaction_drop_reason"] = latest[1] if latest else None
+            extra["last_redaction_drop_at"] = latest[2] if latest else None
             extra["last_redaction_error_class"] = (
                 self.last_redaction_error_class
             )
@@ -734,6 +802,7 @@ class EnginePhaseTimelineWriter:
         self.loading_start = next(item.expression for item in self.patterns if item.signal == "loading_start")
         self.interval_s, self.timeout_s, self.runner = interval_s, timeout_s, runner
         self._uid: str | None = None
+        self._generation: tuple[object, ...] | None = None
         self._phase: _TimelineState | None = None
         self._cursor: datetime | None = None
         self._boundary: set[bytes] = set()
@@ -745,6 +814,7 @@ class EnginePhaseTimelineWriter:
 
     def _reset(self, uid: str | None, year: int) -> None:
         self._uid = uid
+        self._generation = None
         self._phase = _TimelineState(engine=self.engine, year=year, timezone_offset="Z") if uid else None
         self._cursor = None
         self._boundary.clear()
@@ -838,9 +908,26 @@ class EnginePhaseTimelineWriter:
         extraction["history_incomplete"] = self._incomplete
         return ([] if self._incomplete else timeline["entries"]), extraction
 
+    def _container_generation(self, pod: dict[str, object]) -> tuple[object, ...]:
+        """Only current running container logs belong to the current startup."""
+        statuses = pod.get("status", {}).get("containerStatuses", [])
+        matches = [item for item in statuses if isinstance(item, dict)
+                   and item.get("name") == self.selector.container]
+        if len(matches) != 1:
+            raise ValueError("selected container identity unavailable")
+        item = matches[0]
+        running = item.get("state", {}).get("running")
+        cid, restart = item.get("containerID"), item.get("restartCount")
+        started = running.get("startedAt") if isinstance(running, dict) else None
+        if (not isinstance(cid, str) or not cid or type(restart) is not int or restart < 0
+                or not isinstance(started, str) or not started):
+            raise ValueError("selected running container generation unavailable")
+        return (pod["metadata"].get("uid"), cid, restart, started)
+
     def collect_once(self) -> dict[str, object]:
         now = datetime.now(timezone.utc)
         state, uid, name, entries, extraction = "pod_error", None, None, [], None
+        generation = None
         last_log_at = None
         try:
             pods = self.runner(pods_command(self.selector), stdin=subprocess.DEVNULL,
@@ -862,8 +949,10 @@ class EnginePhaseTimelineWriter:
                     if not isinstance(uid, str) or not uid or not isinstance(name, str) or not name:
                         state = "pod_error"
                     else:
-                        if uid != self._uid:
+                        generation = self._container_generation(current[0])
+                        if generation != self._generation:
                             self._reset(uid, now.year)
+                            self._generation = generation
                         command = ["kubectl", "--context", self.selector.context,
                                    "--namespace", self.selector.namespace, "logs", "pod/" + name,
                                    "-c", self.selector.container, "--timestamps=true",
@@ -894,7 +983,7 @@ class EnginePhaseTimelineWriter:
                                              and isinstance(item.get("status"), dict)
                                              and item["status"].get("phase") == "Running"
                                              and not item["metadata"].get("deletionTimestamp")] if isinstance(confirmed_items, list) else []
-                            if len(current_after) != 1 or current_after[0]["metadata"].get("uid") != uid:
+                            if len(current_after) != 1 or self._container_generation(current_after[0]) != generation:
                                 self._reset(None, now.year)
                                 raise ValueError("Pod identity changed during log fetch")
                             self._ingest(result.stdout, limited=len(result.stdout) >= PHASE_LOG_LIMIT_BYTES,
@@ -914,6 +1003,8 @@ class EnginePhaseTimelineWriter:
         document: dict[str, object] = {
             "schema_version": "runtime-phase-timeline/1.0", "entries": entries,
             "collector": {"state": state, "pod_uid": uid, "pod_name": name,
+                          "context": self.selector.context, "namespace": self.selector.namespace,
+                          "container_id": generation[1] if generation is not None and state in {"running", "incomplete_history"} else None,
                           "written_at": written.isoformat(),
                           "last_log_at": last_log_at, "log_delivery_lag_seconds": lag},
         }
@@ -1053,6 +1144,7 @@ class _Supervisor:
                             child.transform,
                             child.dropped_lines,
                             child.pump_error,
+                            child.redaction_drops,
                         ),
                         name=f"{child.name}-redact",
                         daemon=True,
@@ -1149,6 +1241,7 @@ def run(
     context: str,
     *,
     include_forwarded: bool = False,
+    hubble_only: bool = False,
     max_ticks: int | None = None,
     reader_gid: int | None = None,
     target_selector: tuple[tuple[str, str], ...] | None = None,
@@ -1187,11 +1280,11 @@ def run(
     final_state = "error"
     with ExitStack() as stack:
         hubble_output = stack.enter_context(_open_append(hubble_path))
-        tetragon_output = stack.enter_context(_open_append(tetragon_path))
+        tetragon_output = None if hubble_only else stack.enter_context(_open_append(tetragon_path))
         hubble_error = stack.enter_context(
             _open_append(output_dir / "hubble.stderr.log")
         )
-        tetragon_error = stack.enter_context(
+        tetragon_error = None if hubble_only else stack.enter_context(
             _open_append(output_dir / "tetragon.stderr.log")
         )
         port_forward_log = stack.enter_context(
@@ -1240,7 +1333,7 @@ def run(
                 )
             ],
         )
-        groups = [hubble_group, tetragon_group]
+        groups = [hubble_group] if hubble_only else [hubble_group, tetragon_group]
         supervisor = _Supervisor(groups, context=context, stop_requested=stop_requested)
         previous_signal_handlers = _install_stop_signal_handlers(stop_requested)
         target_thread: threading.Thread | None = None
@@ -1267,11 +1360,9 @@ def run(
                         supervisor._open_gap(group, [{"name": "initial_start", "returncode": None, "error": str(error)}])
                 supervisor.write()
                 print(f"Hubble feed: {hubble_path}", flush=True)
-                print(f"Tetragon feed: {tetragon_path}", flush=True)
-                print(
-                    f"Heartbeat: {hubble_group.heartbeat_path}, {tetragon_group.heartbeat_path}",
-                    flush=True,
-                )
+                if not hubble_only:
+                    print(f"Tetragon feed: {tetragon_path}", flush=True)
+                print("Heartbeat: " + ", ".join(str(group.heartbeat_path) for group in groups), flush=True)
                 print(
                     "끊기면 끊긴 구간을 *.gaps.jsonl에 남기고 자동으로 다시 연결합니다. "
                     "Ctrl-C 또는 SIGTERM/SIGHUP으로 follow 프로세스를 함께 종료합니다.",
@@ -1315,6 +1406,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="명시적으로 사용할 Kubernetes context (기본: kind-runtime-lab)",
     )
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--hubble-only", action="store_true",
+                        help="scoped tetragon_stream과 병행할 때 legacy Tetragon writer를 끔")
     parser.add_argument(
         "--reader-group",
         type=int,
@@ -1369,6 +1462,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.output_dir.expanduser(),
             args.kube_context,
             include_forwarded=args.include_forwarded,
+            hubble_only=args.hubble_only,
             reader_gid=args.reader_group,
             target_selector=target_selector,
             target_namespace=args.target_namespace,

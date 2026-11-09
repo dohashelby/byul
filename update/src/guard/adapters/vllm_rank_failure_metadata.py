@@ -15,13 +15,14 @@ POINT_MODULES={cls+'.'+method:module for module,classes in sensor.TARGETS.items(
 def fingerprint(value):return type(value) is str and re.fullmatch('[0-9a-f]{64}',value) is not None
 
 
-def validate_sample(v):
+def validate_sample(v, *, runtime_contracts=None):
+    contracts=sensor.RUNTIME_CODE_CONTRACTS if runtime_contracts is None else runtime_contracts
     try:
         if (type(v) is not dict or set(v)!=FIELDS or v['schema']!=sensor.EVENT_SCHEMA or type(v['point']) is not str
                 or v['point'] not in POINT_MODULES or v['source_module']!=POINT_MODULES[v['point']]
                 or v['source_sha256']!=sensor.SOURCES[v['source_module']] or v['phase'] not in {'CALL','RETURN','RAISE'}
-                or type(v['observer_runtime']) is not str or v['observer_runtime'] not in sensor.RUNTIME_CODE_CONTRACTS
-                or v['observer_code_sha256']!=sensor.RUNTIME_CODE_CONTRACTS[v['observer_runtime']]):raise ValueError
+                or type(v['observer_runtime']) is not str or v['observer_runtime'] not in contracts
+                or v['observer_code_sha256']!=contracts[v['observer_runtime']]):raise ValueError
         role={'MultiprocExecutor':'executor','FutureWrapper':'future','WorkerProc':'worker','EngineCoreProc':'core'}[v['point'].split('.')[0]]
         if v['role']!=role:raise ValueError
         for key in ('source_verified','executor_failed_marker_observed','monitor_caller_verified','fault_activation_verified','cross_process_group_verified','upper_client_receipt_verified'):

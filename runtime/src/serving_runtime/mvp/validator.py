@@ -102,6 +102,21 @@ def _decision(
     return Decision(result, status, reason_code, rule_id, message, model, max_tokens)
 
 
+def _require_utf8_strings(value: object) -> None:
+    """Reject lone surrogates decoded from JSON escapes, including object keys."""
+
+    pending = [value]
+    while pending:
+        current = pending.pop()
+        if isinstance(current, str):
+            current.encode("utf-8")
+        elif isinstance(current, dict):
+            pending.extend(current.keys())
+            pending.extend(current.values())
+        elif isinstance(current, list):
+            pending.extend(current)
+
+
 def validate_request(
     body: bytes,
     content_type: str | None,
@@ -133,9 +148,20 @@ def validate_request(
     except UnicodeDecodeError:
         return _decision("INVALID", 400, "MALFORMED_JSON", "request body is not UTF-8")
     except DuplicateKeyError as error:
+        # A duplicate key is reported before the decoded document is available.
+        # Do not put an unencodable key into the HTTP error response or record.
+        try:
+            str(error).encode("utf-8")
+        except UnicodeEncodeError:
+            return _decision("INVALID", 400, "INVALID_UNICODE", "request contains invalid Unicode")
         return _decision("INVALID", 400, "DUPLICATE_KEY", str(error))
     except (json.JSONDecodeError, ValueError, RecursionError) as error:
         return _decision("INVALID", 400, "MALFORMED_JSON", f"invalid JSON: {error}")
+
+    try:
+        _require_utf8_strings(document)
+    except UnicodeEncodeError:
+        return _decision("INVALID", 400, "INVALID_UNICODE", "request contains invalid Unicode")
 
     if not isinstance(document, dict):
         return _decision("INVALID", 400, "INVALID_REQUEST", "request must be a JSON object")

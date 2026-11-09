@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 // update 격리 검증 보고서 화면. 삭제된 update HTML 보고서(guard/report/html.py)의 내용을 모두 옮겼고,
 // 모양은 runtime에서 가져온 platform 디자인을 따른다. 판정·집계 값은 서버가 RPT에서 꺼낸 그대로 쓴다.
 import type { ReactNode } from "react";
@@ -142,6 +143,7 @@ function FindingGroup({ title, note, ids, byId, update, onOpen, pageParam }: { t
 
 function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Report; raw: unknown; onClose: () => void }) {
   const update = report.mode === "update";
+  const rawRow = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
   const sides = (update ? (["baseline", "candidate"] as const) : (["single"] as const)).filter((k) => c[k]);
   return (
     <DetailPanel
@@ -173,6 +175,9 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
                     : []),
                 ]}
               />
+              <p><Link to={`/runtime/observe/checks?check=${encodeURIComponent(c.check_id)}`}>현재 운영 점검 범위·연결 증거</Link></p>
+              {rawRow?.carried_over != null && <section><h4>이월 근거</h4><JsonView value={rawRow.carried_over} /></section>}
+              {rawRow?.previous_result != null && <section><h4>이전 판정</h4><JsonView value={rawRow.previous_result} /></section>}
               {sides.map((k) => {
                 const s = c[k]!;
                 return (

@@ -181,10 +181,17 @@ def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
         raise IntentError(f"schema_version must be {TIMELINE_SCHEMA}")
     collector = document.get("collector")
     if collector is not None:
-        if not isinstance(collector, dict) or set(collector) != {
+        required_collector = {
             "state", "pod_uid", "pod_name", "written_at", "last_log_at", "log_delivery_lag_seconds"
-        } or collector["state"] not in {"running", "no_target", "multiple_targets", "pod_error", "log_error", "incomplete_history", "stopped"}:
+        }
+        optional_collector = {"context", "namespace", "container_id"}
+        if (not isinstance(collector, dict) or not required_collector <= set(collector)
+                or set(collector) - required_collector - optional_collector
+                or collector["state"] not in {"running", "no_target", "multiple_targets", "pod_error", "log_error", "incomplete_history", "stopped"}):
             raise IntentError("timeline.collector is invalid")
+        for key in optional_collector:
+            if collector.get(key) is not None and (not isinstance(collector[key], str) or not collector[key]):
+                raise IntentError(f"timeline.collector.{key} is invalid")
         _time(collector["written_at"], "timeline.collector.written_at")
         if collector["last_log_at"] is not None:
             _time(collector["last_log_at"], "timeline.collector.last_log_at")

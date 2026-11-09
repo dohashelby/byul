@@ -510,11 +510,12 @@ def prepare_engine_callbacks(output: Path = typer.Option(..., "--output", help="
 @app.command("prepare-lifecycle-sensor")
 def prepare_lifecycle_sensor(output: Path = typer.Option(..., "--output"),
     profile: str | None = typer.Option(None, "--profile"),
-    model_read_scope: Path | None = typer.Option(None, "--model-read-scope")) -> None:
+    model_read_scope: Path | None = typer.Option(None, "--model-read-scope"),
+    fault_control_target_sha256: str | None = typer.Option(None,"--fault-control-target-sha256")) -> None:
     """소유 대상용 native metadata 센서를 준비한다. 엔진·클라이언트를 만들지 않는다."""
     from guard.collectors.lifecycle import prepare_assets
     try:
-        value = prepare_assets(output, Path(__file__).resolve().parents[3], profile=profile,model_read_scope=model_read_scope)
+        value = prepare_assets(output, Path(__file__).resolve().parents[3], profile=profile,model_read_scope=model_read_scope,fault_control_target_sha256=fault_control_target_sha256)
     except (OSError, ValueError, TypeError):
         typer.echo("LIFECYCLE_PREPARATION_FAILED")
         raise typer.Exit(2)

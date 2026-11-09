@@ -5,6 +5,11 @@
       "manifest_sha256": "19279425c13106d3eea28441114f16da520444b30ba28a0d671b51fcf85d091d",
       "reviewed_by": "Codex / BYUL UPDATE B / PR241 R2",
       "reviewed_at": "2026-11-09T18:47:16+09:00"
+    },
+    {
+      "manifest_sha256": "1b6d81bb5ed3f3f6d2934400e98f48d883742490061c7d6a9276bdf548ceb772",
+      "reviewed_by": "Codex / non-author merge boundary review / selected37",
+      "reviewed_at": "2026-11-10T00:43:41+09:00"
     }
   ]
 }

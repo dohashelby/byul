@@ -186,7 +186,7 @@ def test_activation_preserves_both_independent_fails_and_example_ceiling(tmp_pat
     passive = attach_inputs(draft(), check, env, target, descriptor, tmp_path/'passive', prepared=prepared, owner=POD)
     active = {'activation_steps': [{'step':'active'}], 'activation_violations':[{'code':'ACTIVE_INDEPENDENT_FAIL'}],
               'activation_missing':[], 'activation_scope_complete':True}
-    lab = SimpleNamespace(normal=[True], cleanup_errors=[], diagnostic_write_errors=[], write_diagnostics=lambda _: [])
+    lab = SimpleNamespace(initialization_case=None, fault_evidence=[], normal=[True], cleanup_errors=[], diagnostic_write_errors=[], write_diagnostics=lambda _: [])
     monkeypatch.setattr(lab_activation, 'run_scenario', lambda *a, **kw: (deepcopy(active), lab))
     if primary_artifact_error is True:
         original = Path.write_bytes
@@ -310,7 +310,7 @@ def test_primary_artifact_error_keeps_original_judge_fail_remaining_artifacts_re
     monkeypatch.setattr('guard.executors.kubernetes_lifecycle_capture.capture_pipes',world.runner)
     active={'activation_steps':[{'step':'EXAMPLE-active'}], 'activation_violations':[{'code':'EXAMPLE_CONFIRMED_ACTIVE_FAIL'}],
             'activation_missing':[], 'activation_scope_complete':False}
-    lab=SimpleNamespace(normal=[True], cleanup_errors=[], diagnostic_write_errors=[], write_diagnostics=lambda _:[])
+    lab=SimpleNamespace(initialization_case=None, fault_evidence=[], normal=[True], cleanup_errors=[], diagnostic_write_errors=[], write_diagnostics=lambda _:[])
     monkeypatch.setattr(lab_activation,'run_scenario',lambda *a,**kw:(deepcopy(active),lab))
     original=Path.write_bytes
     def write(path,data):
@@ -417,3 +417,70 @@ def test_transition_requires_explicit_selected_generation_not_time_proximity(tmp
     report=value.observations['activation_steps'].value[-1]
     assert bool(report['records']) is (selected_key=='old')
     assert not value.observations['activation_scope_complete'].value
+
+
+def test_activation_common_input_preserves_initialization_and_fault_artifacts(tmp_path, monkeypatch):
+    env, target, prepared, _, _, descriptor = inputs(tmp_path/'input')
+    check = load_pack(ROOT/'packs/PACK-BASELINE').checks['LIF-10']
+    passive = attach_inputs(draft(), check, env, target, descriptor, tmp_path/'passive', prepared=prepared, owner=POD)
+    active = {'activation_steps': [], 'activation_violations': [{'code': 'ACTIVE_INDEPENDENT_FAIL'}],
+              'activation_missing': [], 'activation_scope_complete': True}
+    primary = {'schema': 'EXAMPLE-initialization-primary'}
+    fault = {'schema': 'EXAMPLE-fault-receipt'}
+    lab = SimpleNamespace(normal=[True], cleanup_errors=[], diagnostic_write_errors=[],
+        initialization_case=primary, fault_evidence=[{'name': 'fault-receipt.json', 'document': fault}],
+        write_diagnostics=lambda _: [])
+    monkeypatch.setattr(lab_activation, 'run_scenario', lambda *a, **kw: (deepcopy(active), lab))
+    result = lab_activation.ActivatedExecutor(SimpleNamespace(run=lambda *a, **kw: passive), {}).run(
+        check, env, {}, None, tmp_path/'active')
+    artifacts = {item.name: item.path for item in result.artifacts}
+    assert artifacts['initialization-primary-case.json'].read_bytes() == canonical_json(primary)
+    assert artifacts['fault-receipt.json'].read_bytes() == canonical_json(fault)
+    assert [v['code'] for v in result.observations['activation_violations'].value] == [
+        'ACTIVE_INDEPENDENT_FAIL', 'ORIGINAL_INDEPENDENT_FAIL']
+    assert result.data_origin == DataOrigin.EXAMPLE
+    assert not result.observations['activation_scope_complete'].value
+
+
+@pytest.mark.parametrize('failed_name,gap', [
+    ('initialization-primary-case.json', 'LAB_ACTIVATION_INITIALIZATION_ARTIFACT_UNAVAILABLE'),
+    ('fault-receipt.json', 'LAB_ACTIVATION_FAULT_ARTIFACT_UNAVAILABLE')])
+@pytest.mark.parametrize('common_input', [False, True])
+def test_activation_supplemental_artifact_failure_preserves_independent_fails(tmp_path, monkeypatch, failed_name, gap, common_input):
+    env, target, prepared, _, _, descriptor = inputs(tmp_path/'input')
+    check = load_pack(ROOT/'packs/PACK-BASELINE').checks['LIF-10']
+    passive = draft()
+    if common_input:
+        passive = attach_inputs(passive, check, env, target, descriptor, tmp_path/'passive', prepared=prepared, owner=POD)
+    active = {'activation_steps': [], 'activation_violations': [{'code': 'ACTIVE_INDEPENDENT_FAIL'}],
+              'activation_missing': [], 'activation_scope_complete': True}
+    lab = SimpleNamespace(normal=[True], cleanup_errors=[], diagnostic_write_errors=[],
+        initialization_case={'schema': 'EXAMPLE-initialization'},
+        fault_evidence=[{'name': 'fault-receipt.json', 'document': {'schema': 'EXAMPLE-fault'}}],
+        write_diagnostics=lambda _: [])
+    monkeypatch.setattr(lab_activation, 'run_scenario', lambda *a, **kw: (deepcopy(active), lab))
+    original = Path.write_bytes
+    def write(path, data):
+        if path.name == failed_name:
+            raise OSError('EXAMPLE-private-error-must-not-enter-evidence')
+        return original(path, data)
+    monkeypatch.setattr(Path, 'write_bytes', write)
+    result = lab_activation.ActivatedExecutor(SimpleNamespace(run=lambda *a, **kw: passive), {}).run(
+        check, env, {}, None, tmp_path/'active')
+    assert result.status == ExecStatus.ABORTED
+    assert result.abort_reason == gap and gap in result.cleanup_errors
+    assert not result.observations['activation_scope_complete'].value
+    assert gap in result.observations['activation_missing'].value
+    codes = [v['code'] for v in result.observations['activation_violations'].value]
+    assert 'ACTIVE_INDEPENDENT_FAIL' in codes
+    if common_input:
+        assert 'ORIGINAL_INDEPENDENT_FAIL' in codes
+        assert result.data_origin != DataOrigin.MEASURED
+    names = {item.name for item in result.artifacts}
+    assert failed_name not in names
+    assert 'lab-activation.json' in names
+    primary_artifact = next(item for item in result.artifacts if item.name == 'lab-activation.json')
+    assert gap in json.loads(primary_artifact.path.read_bytes())['activation_missing']
+    assert ({'initialization-primary-case.json', 'fault-receipt.json'} - {failed_name}) <= names
+    assert all(item in result.artifacts for item in passive.artifacts)
+    assert 'EXAMPLE-private-error' not in repr(result)

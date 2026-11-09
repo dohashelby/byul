@@ -37,7 +37,7 @@ def test_original_B160_eight_files_are_exact_confirmed_bytes():
     for name,digest in REVIEWED_B_BYTES.items():
         # Keep B160's original eight approvals as historical bytes. The owner
         # later fixed these files; each exact successor is a separate review.
-        original=subprocess.check_output(['git','show',REVIEWED_B_COMMIT+':'+name],cwd=ROOT)
+        original=(Path(__file__).parent/'fixtures'/'historical-b160'/name).read_bytes()
         assert hashlib.sha256(original).hexdigest()==digest
         if name in REVIEWED_B_FIXTURE_BYTES:
             successor=subprocess.check_output(['git','show',REVIEWED_B_FIXTURE_COMMIT+':'+name],cwd=ROOT)
@@ -78,7 +78,8 @@ def test_B_owner_fixture_successor_preserves_product_sources_and_other_tests():
         'f277fecd6df1e59505c0ad731032593f6fb22885','df6255e96a877ebfbe185230ed87320aa84d2c30',
         'adcde856375a4de43d4a5d789c00de875e43e321','2247aabb3447ccb3210b100cade06bce51ed771e',
         native.MANIFEST_REVIEWED_COMMON})
-    assert len(native.APPROVED_GATE_PROFILES)==7
+    assert len(native.APPROVED_GATE_PROFILES)==10
+    assert (native.CURRENT_MANIFEST_GATE_SHA256,native.MANIFEST_REVIEWED_COMMON) in native.APPROVED_GATE_PROFILES
 
 
 def test_public_PR171_392_snapshot_remains_historical_and_rejects_current394():
@@ -111,7 +112,10 @@ def test_B_reviewed_exact_A152_A156_A158_PR171_native20_pairs_are_closed_and_lit
         ("00979cf6b5139e0337d1f7976acad2b816e1018c4422cf8a44a087b0c28fc233","df6255e96a877ebfbe185230ed87320aa84d2c30"),
         ("61c29e98ece3c27c3fb978c180b86c6ef1a2ba6bf60edcf9263a2fc3943acab7","adcde856375a4de43d4a5d789c00de875e43e321"),
         ("eb2337fd75d8e5b5f66802758ef7d8a0a78df9603ce7d069752cf92d4e73dee4","2247aabb3447ccb3210b100cade06bce51ed771e"),
-        (native.MANIFEST_GATE_SHA256,native.MANIFEST_REVIEWED_COMMON)})
+        (native.MANIFEST_GATE_SHA256,native.MANIFEST_REVIEWED_COMMON),
+        (native.CURRENT_MANIFEST_GATE_SHA256,native.MANIFEST_REVIEWED_COMMON),
+        (native.MAIN_MANIFEST_GATE_SHA256,native.MANIFEST_REVIEWED_COMMON),
+        (native.MERGED_MANIFEST_GATE_SHA256,native.MANIFEST_REVIEWED_COMMON)})
     assert gate.REVIEWED_COMMON_COMMIT==native.MANIFEST_REVIEWED_COMMON
     assert native.NATIVE20_GATE_SOURCE_COMMIT=='d8904d0ee9d666d9d0070dbf2003b15f4e0b14bd'
     assert gate.REVIEWED_COMMON_COMMIT in native.APPROVED_REVIEWED_COMMON_COMMITS

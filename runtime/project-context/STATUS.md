@@ -739,3 +739,7 @@
 - 17:14 기동 → 17:37:11 stopped 확인. 코드 `5acbd26`. 결과 [AWS_GPU_서버15회차_결과_20261109.md](../docs/AWS_GPU_서버15회차_결과_20261109.md), 증거 `evidence-20261109-run15.tgz`(1e8edfd2…), 토큰·IP·계정·인스턴스 ID 0건.
 - 발견 1: 설치기 뒤 에이전트 disabled/inactive·dry-run 모드 확인. 발견 2: 에이전트 kubeconfig를 최소 권한 SA 토큰으로 교체, `too_broad`→`ok`, 수집·enforcement dry-run(Cilium 포함)·엔진 로그 정상. 발견 4: 옛 identities.json 참조 0건 확인 후 백업·삭제.
 - 발견 3: 일부 개선. 남은 원인은 Gateway 관측 조회가 65MB 파일을 매번 전부 읽는 것(1.2~1.4초). 관측 조회 병렬화는 503을 만들어 되돌림. 다음: Gateway 관측 캐시/이어 읽기.
+
+## Selected37 integration
+
+Latest-main integration and validation scope: [public validation note](../docs/selected37-integration-validation.md). Final merged-revision validation and GitHub CI are pending.

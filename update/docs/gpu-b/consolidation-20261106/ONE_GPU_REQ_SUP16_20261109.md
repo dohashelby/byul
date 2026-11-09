@@ -1,6 +1,6 @@
 # REQ-08·09·10 / SUP-16 GPU 1장 선정 검증
 
-사용자 요청 범위는 기존 세션을 재사용한 GPU 1장·TP1 실측이다. 실제 요청 대응, 고정 runtime·Ready·정상 대조를 먼저 확인하고, 생성된 증거만 PR #232에 반영한다. 이 문서는 원 43개 전체의 PASS 또는 전체 완료 판정이 아니다.
+사용자 요청 범위는 기존 세션을 재사용한 GPU 1장·TP1 실측이다. 실제 요청 대응, 고정 runtime·Ready·정상 대조를 먼저 확인하고, 생성된 증거만 반영한다. PR #232가 2026-11-09 14:25 KST에 병합되어 [후속 Draft PR #240](https://github.com/dohashelby/byul/pull/240)에서 이어간다. [#232의 연결 댓글](https://github.com/dohashelby/byul/pull/232#issuecomment-6733655479)도 남겼다. 이 문서는 원 43개 전체의 PASS 또는 전체 완료 판정이 아니다.
 
 ## 선정 범위
 
@@ -24,6 +24,14 @@ SUP-16 역할별 준비의 고유 사례는 11개다. 후속 previous-binding �
 통합 제품 해시 목록은 B 전용 소스 1개 추가·기존 5개 변경만 반영해 466개 파일을 검증했다. 기본 팩·A 공통 계약·코어·등록·판정은 변경하지 않았다. 기존 소스 gate 고유 8개도 통과했다. 최초 5개 setup 오류는 Windows의 긴 임시 경로 때문으로, 짧은 별도 경로에서 해당 5개만 재실행했다. 시험·제품 코드는 수정하지 않았다.
 
 근거: [준비 검증](one-gpu-preparation-validation-20261109.json), [REQ 고정 인계](one-gpu-req-preparation-handoff-20261109.json), [SUP-16 독립 검토](one-gpu-sup16-preparation-review-20261109.json), [요청 ID 소스 7개](one-gpu-request-id-source-review-20261109.json).
+
+### 후반 검증 실패 시 callback 보존 보강
+
+독립 검토에서 callback 수신 후 source/세대 재확인에 실패하면 수신 자료가 artifact 저장 전에 소실되는 오류를 확인했다. `5543eec6`은 후반 검사 전에 canonical parsed callback 결과를 원자적으로 보존하고, 실패 EVD·반출·복원에도 포함한다. 원 pipe stdout bytes나 인증된 worker 기록으로 표시하지 않으며 원 오류와 별도 staging 정리 오류를 함께 보존한다.
+
+원 한정 4실패 후 수정 4통과(pytest 24.55초 / 부모 26.297초)를 확인했다. 정상 대표 1개는 기존 사례의 재검증이고 신규 후반 실패는 3개다. 앞선 209개·14개 전체는 반복하지 않았다. 독립 검토의 236개 대조에서 오류 0개, 기존 결함 해소와 독립 FAIL 보존을 확인했다. source hash 목록은 해당 B 파일 1개의 hash만 갱신해 466개 전체를 재확인했다.
+
+근거: [보존 보강 검증](one-gpu-req-preservation-followup-20261109.json), [후속 고정 인계](one-gpu-req-preparation-handoff-v2-20261109.json), [독립 검토](one-gpu-req-preservation-review-20261109.json). 원 준비·실패·검토 기록은 유지한다. `0729e7b0`의 CI14/14 성공은 해당 이전 snapshot의 결과이며 새 제품 수집 snapshot의 CI와 구분한다. 독립적으로 끝나는 runtime·Ready 전용 운영은 문제가 있는 Capture 경로를 호출하지 않음을 실제 고정 운영 join에서 확인한 범위에 한해 이전 snapshot을 사용할 수 있다.
 
 ## SUP-16 제품 연결 한계
 

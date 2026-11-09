@@ -1,0 +1,11 @@
+{
+  "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+  "source_file": "vllm/utils/__init__.py",
+  "license": "Apache-2.0",
+  "copyright": "Copyright contributors to the vLLM project",
+  "source_file_sha256": "c58b3f45deeb98bccca22c945526fd15d483a2f5eb8a3c62cf7df218b081885f",
+  "source_git_blob": "e8287b0cd1148437f994eafdb5c1529c23a37e2c",
+  "mask_source": "MASK_64_BITS = (1 << 64) - 1",
+  "function_source": "def random_uuid() -> str:\n    return f\"{uuid.uuid4().int & MASK_64_BITS:016x}\"",
+  "function_sha256": "ec67b6dae269ff1d6f0842a0c1e5ecfd31a4e58c2e6f5fd12d76e219c8d8c909"
+}

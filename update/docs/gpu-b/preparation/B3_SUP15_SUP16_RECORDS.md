@@ -54,3 +54,20 @@ python -I -B update/tools/gpu_b_sup16_prepare.py --source-root <고정-checkout>
 운영 순서는 원 정상 대조→부분 challenge→복구 정상이며 세대와 role session을 분리한다. 실제 `prepare_pair.py`가 ENV/image/target·scope·factory/policy를 검증하고 native 자산을 만든 뒤, 기존 installer·`load_prepared`·collector가 실제 소유권을 재검증한다. 이 정적 도구는 그 경로를 실행하거나 새로운 ENV/target/prepared/session을 만들지 않는다. 따라서 자산·모델 두 사본 검증 성공도 `ready_for_execution=false`이며 실제 runtime/정책/Ready/복구 증거는 별도로 남는다. 후속 제품 객체가 실제 생성됐을 때만 원 EVD→RES→RPT·반출·별도 DB 복원·저장팩 재판정을 수행한다.
 
 SUP-16 원 절차의 **asset wait 90초 / collection 120초 / Pod 600초**와 더 엄격한 운영 종료·소유 정리 계약을 유지한다. 위 SUP-15의 **150초**를 SUP-16 기한으로 사용하지 않는다. 종료·출력 수집 실패 시에도 원 오류와 후속 오류를 보존하는 기존 운영 절차를 사용하며 기존 자원·보호 타이머를 임의로 변경하지 않는다. 새 writer LF/record 저장 수정으로 native 인증·worker 최종 소비·post-exit/복구 지원이 생긴 것으로 집계하지 않는다.
+
+## 1GPU 순차 역할별 운영 준비
+
+`tools/gpu_b_sup16_operating_prepare.py`는 위 불변 정적 묶음을 소비한다. `plan`은 원 pair template(`0c6e9b02…`)에서 한 번에 Pod 하나만 남겨 normal-before → challenge-partial → normal-recovered 템플릿과 명령 계획을 생성한다. 원 installer·launcher·runtime probe·UID1000·GPU1/TP1·RO 모델/native mount·자원 한도를 유지하고, ConfigMap의 옛 writer를 새 `pair.py`(`ed961609…`), `ordering.py`(`2485ba44…`), 원 `stage.py`(`c61b7059…`)로 치환한다. 모델을 복사·적재하거나 명령을 실행하지 않는다. GPU1장을 두 rank로 표현하지 않는다.
+
+```text
+python -I -B update/tools/gpu_b_sup16_operating_prepare.py plan --source-root <고정-source> --source-commit <고정-commit> --manifest-sha256 <정본SHA> --static-packet <불변-SUP16-정적묶음> --static-sha256 <preparation.json-SHA> --pair-template <원-environment.pair.template.json> --capture-helper <원-capture_normal.py> --output <새-운영계획경로>
+python -I -B update/tools/gpu_b_sup16_operating_prepare.py bind-role --phase <normal-before|challenge-partial|normal-recovered> --source-root <고정-source> --source-commit <고정-commit> --manifest-sha256 <정본SHA> --static-packet <불변-SUP16-정적묶음> --static-sha256 <preparation.json-SHA> --environment <세션2-실제-sealed-ENV.json> --target <세션2-실제-target.json> --model-manifest <실제-reference-manifest.json> --model-manifest-sha256 <파일SHA> --previous-binding <제공된-이전-role-preparation.json> --output <새-역할입력경로>
+```
+
+첫 역할에는 previous-binding이 없으며, 후속 역할은 해당되는 기존 영수증들을 반복 옵션으로 제공한다. 제공된 이전 역할의 Pod UID 재사용은 거부한다. `bind-role`은 제공된 ENV/target·원 reference 결합을 검증하고 기존 build_scope→prepare_assets→load_prepared→validate_binding을 거쳐 그 역할의 fresh native17 session·binding·installer payload를 만든다. 새 ENV/Pod UID/container ID/PID·정책은 만들지 않으며 파일 입력 검증을 실제 live 신원 확인으로 표시하지 않는다. 정상과 복구 정상은 record role=normal이지만 phase/Pod/native session을 분리한다. 원 정상/부분 사본의 기존 검증은 재사용하며 원격 출처·실제 SHA·컨테이너 접근은 세션2가 확인한다.
+
+원 `capture_normal.py`(`bb9a2839…`)와 짝 source-owner helper를 operator-assets에 exact bytes로 보존한다. 새 source/manifest·각 실제 role 입력을 가리키는 capture argv와 원 binding publication의 role별 파일명 delta만 명령으로 낸다. `--execute`가 포함된 capture 명령도 생성했을 뿐 실행하지 않는다. 현재 common live reader가 종료한 challenge engine을 읽지 못하면 원 진단을 보존한다. 첫 준비의 작은 metadata 계약과 실제 운영·native worker 소비를 구분한다.
+
+세션2만 새 실제 source·host/GPU/기동 구성·template의 운영 자리표시자를 결합하고 순차 배포·native 설치·원기한 내 Ready·정상 응답·native 봉인/수집·새 pair boot 기록·반출·소유 정리·EC2 stop을 실행한다. 실제 engine 종료로 기존 live capture에 도달하지 못하면 원 exit/stderr·preparation-owned raw와 미지원 원인을 그대로 남기며 인증된 worker 기록으로 승격하지 않는다. 정상·challenge·복구 사이 소유 자원 정리/불확실성 차단과 원 90/120/600초 앵커를 재시작하지 않는다. g6.xlarge→g6.2xlarge 후보의 CPU/RAM 변화는 실제 환경 차이로 기록하며 Ready 개선 성공을 미리 가정하지 않는다. GB09/GB11의 원 실패와 결과를 새 세대에 합치지 않는다.
+
+**현재 전체 제품 pair 제약:** 기존 supply_boot.run은 같은 호출에서 두 live role을 읽고, 정책은 실행 전에 두 target/prepared SHA를 요구한다. Pending challenge Pod에는 container_id/image_id/started_at 등 실제 필드가 없으므로 Pod UID만으로 사전 target을 만들 수 없다. 단일 GPU에서 정상 Pod 삭제 후 그 입력을 reader로 재생하거나, 수집 결과를 주입해 factory 실행으로 표시하지 않는다. 따라서 이 도구의 역할별 native 준비·actual component 명령은 전체 paired EVD/RES/RPT 연결 완료가 아니며 `ready_for_execution=false`와 정확 차단 원인을 유지한다. 지원되는 실제 paired factory 입력이 마련됐을 때만 원 select/run/judge/report·Store 반출·별도 DB 복원·저장팩 재판정을 진행한다. core/registry/judge/공통 collector/기본팩/정책 계약을 이 도구가 바꾸지 않는다.

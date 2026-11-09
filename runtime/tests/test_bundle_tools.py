@@ -21,7 +21,7 @@ from serving_runtime.bundle_tools import (build_bundle, apply_bundle, _canonical
                                           StatusUnavailable)
 from serving_runtime.cli import main
 from serving_runtime.enforcement.intent import load_intent
-from serving_runtime.enforcement.tetragon import comparable_spec, render_manifests
+from serving_runtime.enforcement.tetragon import comparable_spec, render_monitor_manifests
 from serving_runtime.mvp.app import GatewayApp
 from serving_runtime.mvp.config import MVPConfig
 from serving_runtime.mvp.policy import load_policy
@@ -90,7 +90,7 @@ class BundleToolsTest(unittest.TestCase):
                   "generated_at": datetime.now(timezone.utc).isoformat(), "state": "ok",
                   "agents": [{"node": "test-node"}], "policies": [],
                   "capabilities": [], "transitions": [], "verifications": []}
-        for manifest in render_manifests(load_intent(options["observation_intent_path"])).values():
+        for manifest in render_monitor_manifests(load_intent(options["observation_intent_path"])).values():
             digest = hashlib.sha256(json.dumps(comparable_spec(manifest["spec"]), sort_keys=True,
                                                separators=(",", ":")).encode()).hexdigest()
             sample["policies"].append({"node": "test-node", "namespace": manifest["metadata"]["namespace"],

@@ -1509,6 +1509,92 @@
         ],
         "title": "DiffEntry"
       },
+      "EnforcementComponentResult": {
+        "properties": {
+          "component": {
+            "type": "string",
+            "enum": [
+              "tetragon",
+              "cilium"
+            ],
+            "title": "Component"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "apply",
+              "dry_run",
+              "not_installed"
+            ],
+            "title": "State"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "component",
+          "state"
+        ],
+        "title": "EnforcementComponentResult"
+      },
+      "EnforcementPolicyResult": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9.-]{0,252}$",
+            "title": "Name"
+          },
+          "component": {
+            "type": "string",
+            "enum": [
+              "tetragon",
+              "cilium"
+            ],
+            "title": "Component"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "created",
+              "replaced",
+              "unchanged",
+              "extra",
+              "skipped"
+            ],
+            "title": "Action"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "monitor",
+                  "monitor_only",
+                  "enforce"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "spec_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Spec Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "component",
+          "action",
+          "spec_sha256"
+        ],
+        "title": "EnforcementPolicyResult"
+      },
       "EnvironmentRevision": {
         "properties": {
           "meta": {
@@ -2005,7 +2091,8 @@
             "enum": [
               "bundle.apply",
               "bundle.switch",
-              "tetragon.mode"
+              "tetragon.mode",
+              "enforcement.apply"
             ],
             "title": "Kind"
           },
@@ -2071,6 +2158,41 @@
               }
             ],
             "title": "Bundle Id"
+          },
+          "bundle_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bundle Sha256"
+          },
+          "components": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "tetragon",
+                    "cilium"
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Components"
+          },
+          "cilium_apply": {
+            "type": "boolean",
+            "title": "Cilium Apply",
+            "default": false
           },
           "server_values_override": {
             "anyOf": [
@@ -3907,6 +4029,22 @@
             "type": "boolean",
             "title": "Truncated",
             "default": false
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/EnforcementPolicyResult"
+            },
+            "type": "array",
+            "maxItems": 512,
+            "title": "Policies"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/EnforcementComponentResult"
+            },
+            "type": "array",
+            "maxItems": 2,
+            "title": "Components"
           }
         },
         "type": "object",
@@ -4087,7 +4225,11 @@
               "restart",
               "status",
               "set-mode",
-              "rollback"
+              "rollback",
+              "render",
+              "dry-run",
+              "apply",
+              "verify"
             ],
             "title": "Stage"
           },

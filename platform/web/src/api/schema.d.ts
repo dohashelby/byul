@@ -594,6 +594,38 @@ export interface components {
             /** After */
             after?: unknown;
         };
+        /** EnforcementComponentResult */
+        EnforcementComponentResult: {
+            /**
+             * Component
+             * @enum {string}
+             */
+            component: "tetragon" | "cilium";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "apply" | "dry_run" | "not_installed";
+        };
+        /** EnforcementPolicyResult */
+        EnforcementPolicyResult: {
+            /** Name */
+            name: string;
+            /**
+             * Component
+             * @enum {string}
+             */
+            component: "tetragon" | "cilium";
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "created" | "replaced" | "unchanged" | "extra" | "skipped";
+            /** Mode */
+            mode?: ("monitor" | "monitor_only" | "enforce") | null;
+            /** Spec Sha256 */
+            spec_sha256: string;
+        };
         /** EnvironmentRevision */
         EnvironmentRevision: {
             meta: components["schemas"]["RevisionMeta"];
@@ -751,7 +783,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "bundle.apply" | "bundle.switch" | "tetragon.mode";
+            kind: "bundle.apply" | "bundle.switch" | "tetragon.mode" | "enforcement.apply";
             expected: components["schemas"]["Expected"];
             /** Policy Id */
             policy_id?: string | null;
@@ -763,6 +795,15 @@ export interface components {
             environment_revision?: number | null;
             /** Bundle Id */
             bundle_id?: string | null;
+            /** Bundle Sha256 */
+            bundle_sha256?: string | null;
+            /** Components */
+            components?: ("tetragon" | "cilium")[] | null;
+            /**
+             * Cilium Apply
+             * @default false
+             */
+            cilium_apply: boolean;
             /** Server Values Override */
             server_values_override?: {
                 [key: string]: unknown;
@@ -1166,6 +1207,10 @@ export interface components {
              * @default false
              */
             dry_run: boolean;
+            /** Policies */
+            policies?: components["schemas"]["EnforcementPolicyResult"][];
+            /** Components */
+            components?: components["schemas"]["EnforcementComponentResult"][];
         };
         /** RevalidationList */
         RevalidationList: {
@@ -1279,7 +1324,7 @@ export interface components {
              * Stage
              * @enum {string}
              */
-            stage: "validation" | "link" | "restart" | "status" | "set-mode" | "rollback";
+            stage: "validation" | "link" | "restart" | "status" | "set-mode" | "rollback" | "render" | "dry-run" | "apply" | "verify";
             /**
              * State
              * @enum {string}

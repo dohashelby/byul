@@ -1,5 +1,9 @@
 # 런타임 작업 상태
 
+- 2026-11-09 외부 규칙 최초 적용 자동화(목록 10번): 승인된 `enforcement.apply`와 공통 `enforce sync`를 구현했다. current ID·해시·target 검증, Tetragon monitor 전용 생성/교체·unchanged/extra·live enforce/위험한 복원 spec 거부, Cilium CRD 부재 건너뜀·기본 SSA dry-run/diff·명시 실제 적용, 0600 임시 백업·경합 보호·실패 역순 복원·Gateway 상태/짧은 추론 확인, API·웹 폼/결과·내부 타입 재생성을 포함한다. 기준 `byul_runtime` HEAD `0355ab8`(main `ed5a0b3`와 tree 동일), 커밋·push·서버 접속·contracts/update 수정 없음. 금지 인계 파일은 접근하지 않고 보존했다.
+- 근거: runtime 지정 전체 991건(875 통과·115 skip·기존 소켓 PermissionError 1), 새 동기화 시험 24 통과; API 전체 재실행 327 통과·1 skip·기존 소켓 실패 1, 운영 API 56 통과·1 skip; web 타입 검사·163건 통과, 타입 재생성·diff 검사 통과. API 최초 전체는 기존 만료 시험 1건도 실패했으나 단독/전체 재실행 통과(원인 미확정·구현 미수정). 로그·전체 변경 파일·설계 보강은 `docs/외부규칙_최초적용_구현인계.md`, 사용은 `docs/외부규칙_최초적용.md`.
+- 미확인·다음: Claude 검수 후 실제 RBAC/CRD/admission·Tetragon 전체 daemon 로드/모드·Cilium 전달/추론/복원을 확인한다. 새 monitor 옵션 해시에 맞춰 관측·모니터 창·시험 근거 재검증이 필요하며, 임시 백업 정리·강제 종료/임대 만료/동시 변경의 unknown은 자동 재실행하지 않는다.
+
 최종 갱신: 2026-11-08
 
 - 2026-11-08 AWS 13회차 external_enforcement 해시 결속 보정(기준 `byul_runtime` `dd05d6d`, `58d0160`과 동일 내용, 미커밋): 정책 ID·판본과 `files.gateway_policy.sha256`을 Gateway 로드 해시에 대조하고 정책 정상·intent 적용 조건을 유지했다. 실제 bundle_tools 묶음의 원본/변환 해시 차이·monitor/mixed·파일 해시 불일치 unknown 회귀시험 추가, 기존 가짜 묶음 수정. 관련 43건 통과; 지정 전체 934건 중 818 통과·115 skip·기존 소켓 생성 PermissionError 1건(`test_gateway_serves_snapshot_without_kubernetes_mutation`), 로그 `/tmp/byul-runtime-policy-binding-unittest.log`. AWS 접속·contracts/update 수정·커밋·푸시 없음; 실서버 재확인·Claude 대화형 검수 대기.

@@ -249,6 +249,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         "enforce", help="Cilium·Tetragon 후보 생성과 관측 이벤트 변환"
     )
     enforce_commands = enforce_parser.add_subparsers(dest="enforce_command")
+    sync_parser = enforce_commands.add_parser("sync", help="현재 검증 묶음의 외부 정책 동기화(기본 dry-run)")
+    source = sync_parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--bundle-dir")
+    source.add_argument("--existing")
+    sync_parser.add_argument("--bundle-root", default="/srv/serving/bundles")
+    for flag in ("context", "namespace"):
+        sync_parser.add_argument("--" + flag, required=True)
+    for flag in ("kubeconfig", "token-env-file", "status-url"):
+        sync_parser.add_argument("--" + flag)
+    sync_parser.add_argument("--components", nargs="+", choices=("tetragon", "cilium"), default=["tetragon"])
+    sync_parser.add_argument("--cilium-apply", action="store_true")
+    sync_parser.add_argument("--execute", action="store_true")
+    sync_parser.add_argument("--lock-file", default="/tmp/serving-runtime-enforcement.lock")
     render_parser = enforce_commands.add_parser(
         "render", help="통제 의도에서 클러스터 미검증 JSON 후보 생성"
     )
@@ -483,6 +496,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         from .mvp.acceptance import run_cli
 
         return run_cli(args.report_dir)
+    if args.command == "enforce" and args.enforce_command == "sync":
+        from .enforcement.sync_cli import main as sync_main
+        return sync_main(args)
     if args.command == "enforce" and args.enforce_command == "render":
         from .enforcement.cilium import render_manifests as render_cilium
         from .enforcement.cilium import write_manifests

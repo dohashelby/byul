@@ -10,7 +10,9 @@ export type Operation = { id: string; server: string; kind: string; state: strin
   expected?: Expected; payload?: Record<string, unknown>; lab_self_approval?: boolean;
   approvals: { token_id: string; role?: string; at?: string; self_approval: boolean }[];
   result?: { code: string; reason_code?: string | null; dry_run: boolean; started_at?: string; finished_at?: string;
-    before?: Expected | null; after?: Expected | null; evidence_sha256: string[]; steps: {stage: string; state: string}[] }; error_code?: string };
+    before?: Expected | null; after?: Expected | null; evidence_sha256: string[]; steps: {stage: string; state: string}[];
+    policies?: {name: string; component: string; action: string; mode: string | null; spec_sha256: string}[];
+    components?: {component: string; state: string}[] }; error_code?: string };
 export type AgentState = { server: string; at?: string; last_poll_at?: string; current: Expected | null; policies: Readiness[];
   bundles?: { bundle_id: string; sha256: string }[] };
 export type Operations = { items: Operation[]; agents: AgentState[]; actor?: Actor; lab_self_approval: boolean; monitor_seconds: number };

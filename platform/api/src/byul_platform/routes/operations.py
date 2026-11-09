@@ -35,13 +35,16 @@ class Expected(Closed):
 
 class OperationRequest(Closed):
     server: Identifier
-    kind: Literal["bundle.apply", "bundle.switch", "tetragon.mode"]
+    kind: Literal["bundle.apply", "bundle.switch", "tetragon.mode", "enforcement.apply"]
     expected: Expected
     policy_id: Identifier | None = None
     policy_revision: int | None = Field(default=None, ge=1)
     environment_id: Identifier | None = None
     environment_revision: int | None = Field(default=None, ge=1)
     bundle_id: Identifier | None = None
+    bundle_sha256: Digest | None = None
+    components: list[Literal["tetragon", "cilium"]] | None = None
+    cilium_apply: bool = Field(default=False, strict=True)
     server_values_override: dict | None = None
     policy_name: Identifier | None = None
     mode: Literal["monitor", "enforce"] | None = None
@@ -63,12 +66,25 @@ class StateSummary(Closed):
 
 
 class Step(Closed):
-    stage: Literal["validation", "link", "restart", "status", "set-mode", "rollback"]
+    stage: Literal["validation", "link", "restart", "status", "set-mode", "rollback", "render", "dry-run", "apply", "verify"]
     state: Literal["passed", "failed", "unknown", "skipped"]
 
 
 ReasonCode = Literal["BUNDLE_ROLES_MISSING", "BUNDLE_INVALID", "CURRENT_LINK_INVALID",
                      "STATUS_UNREACHABLE", "STATUS_MISMATCH"]
+
+
+class EnforcementPolicyResult(Closed):
+    name: str = Field(pattern=r"^[a-z0-9][a-z0-9.-]{0,252}$")
+    component: Literal["tetragon", "cilium"]
+    action: Literal["created", "replaced", "unchanged", "extra", "skipped"]
+    mode: Literal["monitor", "monitor_only", "enforce"] | None = None
+    spec_sha256: Digest
+
+
+class EnforcementComponentResult(Closed):
+    component: Literal["tetragon", "cilium"]
+    state: Literal["apply", "dry_run", "not_installed"]
 
 
 class Result(Closed):
@@ -85,6 +101,8 @@ class Result(Closed):
     steps: list[Step] = Field(default_factory=list, max_length=12)
     evidence_sha256: list[Digest] = Field(default_factory=list, max_length=64)
     dry_run: bool = False
+    policies: list[EnforcementPolicyResult] = Field(default_factory=list, max_length=512)
+    components: list[EnforcementComponentResult] = Field(default_factory=list, max_length=2)
 
 
 class MonitorWindow(Closed):
@@ -192,6 +210,11 @@ def request_operation(body: OperationRequest, state: AppState = Depends(get_stat
         deny("BUNDLE_INPUT_REQUIRED", 422)
     if body.kind == "tetragon.mode" and (not body.policy_name or not body.mode or not body.expected.policy_id or not body.expected.mode or not body.expected.spec_sha256):
         deny("MODE_INPUT_REQUIRED", 422)
+    if body.kind == "enforcement.apply" and (
+            not body.bundle_id or not body.bundle_sha256 or body.bundle_id != body.expected.bundle_id
+            or body.components not in [["tetragon"], ["tetragon", "cilium"]]
+            or (body.cilium_apply and "cilium" not in body.components)):
+        deny("ENFORCEMENT_INPUT_REQUIRED", 422)
     servers = {t.get("server") for t in state.settings.operation_tokens if t["role"] == "agent"}
     if body.server not in servers:
         deny("TARGET_MISMATCH", 422)
@@ -202,6 +225,9 @@ def request_operation(body: OperationRequest, state: AppState = Depends(get_stat
             _check_ready(heartbeats, body)
         payload = ({"bundle_id": body.bundle_id} if body.kind == "bundle.switch" else
                    {"policy_name": body.policy_name, "mode": body.mode, "confirmation": body.confirmation})
+        if body.kind == "enforcement.apply":
+            payload = {"bundle_id": body.bundle_id, "bundle_sha256": body.bundle_sha256,
+                       "components": body.components, "cilium_apply": body.cilium_apply}
         if body.kind == "bundle.apply":
             response = export_bundle(body.policy_id, body.policy_revision, BundleExportRequest(
                 environment_id=body.environment_id, environment_revision=body.environment_revision,
@@ -217,11 +243,11 @@ def request_operation(body: OperationRequest, state: AppState = Depends(get_stat
             payload = {"bundle_id": metadata["bundle_id"], "bundle_sha256": metadata["bundle_sha256"],
                        "archive_sha256": hashlib.sha256(response.body).hexdigest(),
                        "policy_id": body.policy_id, "policy_revision": body.policy_revision}
-        needs = body.kind == "bundle.apply" or (body.kind == "tetragon.mode" and body.mode == "enforce")
+        needs = body.kind in {"bundle.apply", "enforcement.apply"} or (body.kind == "tetragon.mode" and body.mode == "enforce")
         op = {"id": op_id, "server": body.server, "kind": body.kind, "payload": payload,
               "expected": body.expected.model_dump(mode="json"), "state": "requested" if needs else "approved",
               "approval_required": needs, "requested_by": who["id"], "requested_role": who["role"],
-              "approvals": [], "lab_self_approval": state.settings.operation_lab_self_approval,
+              "approvals": [], "lab_self_approval": state.settings.operation_lab_self_approval and body.kind != "enforcement.apply",
               "created_at": utcnow(), "expires_at": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()}
         _record(store, op, who, "requested")
         return _public(op)
@@ -272,7 +298,7 @@ def approve(op_id: str, state: AppState = Depends(get_state), who=Depends(actor)
         if op["state"] != "requested" or not op["approval_required"]:
             deny("STATE_CONFLICT")
         self_approval = op["requested_by"] == who["id"]
-        if self_approval and not state.settings.operation_lab_self_approval:
+        if self_approval and (not state.settings.operation_lab_self_approval or op["kind"] == "enforcement.apply"):
             deny("SELF_APPROVAL_FORBIDDEN", 403)
         if who["role"] != "approver" and not self_approval:
             deny("FORBIDDEN", 403)

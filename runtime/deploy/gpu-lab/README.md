@@ -26,6 +26,8 @@ sudo /opt/byul/runtime/.venv/bin/python -B -m tools.gpu_lab_gateway_preflight \
 3. **폐기 목록:** `approved/revocations.json`을 사람이 검토·게시한다(빈 목록도 명시 승인). **새 배포 인자에서 파일 없음/읽기 오류는 기존 fail-closed 동작으로 추론 503을 만든다.** 운영 재배포 전에 게시하고, 유지보수용 시험 경로에서 파일 없음·읽기 오류·유효한 빈 목록이 화면에 서로 다르게 표시되는지 확인한다. 목록 변경 후 Gateway 재시작이 필요하다.
 4. **환경:** `tools.aws_environment_candidate`는 ubuntu로 실행한다. root:serving-bundles·2750 묶음은 serving-observe만 가진 ubuntu가 읽지 못하므로 운영자가 sudo 읽기만으로 같은 current 세대의 target/Gateway policy를 전용 0700 폴더·0400 사본으로 준비한다. [후보 생성 명령](../../docs/업데이트검증_후보와승인.md#후보-생성-runtime-디렉터리에서)을 따른다. 도구 전체를 sudo로 실행하면 ubuntu kubeconfig와 달라질 수 있으므로 피한다. 고정 이유코드·입력이름으로 권한/누락/JSON 실패를 구분하고 환경 후보 성공 후 declaration을 실행한다. 단일 Ready 엔진의 imageID digest, 해당 노드 커널·GPU/드라이버·Tetragon/Cilium 판본을 후보에서 대조한다. 권한 실패·다중 대상은 ‘미확인+이유’이며 선언 digest로 대체하지 않는다. 계약에 자리가 없는 커널/에이전트 판본은 동반 관측 자료에 둔다. 필수 미확인 필드가 생략된 환경 후보는 `import_ready: false`이므로 source commit·모델 출처 revision·사실·승인 intent를 사람이 완성하고 **기존 계약 검증 → 환경/정책 새 판본 → 묶음 내보내기**까지 확인한다. `null` 허용 여부는 다음 회차 결정 사항이며 자동 입력하지 않는다.
 
+5. **외부 규칙 최초 적용:** 승인·검증된 current 묶음과 Gateway 활성 상태를 먼저 확인한 뒤 [외부 규칙 처음 적용·동기화](../../docs/외부규칙_최초적용.md)에 따라 `enforcement.apply`를 요청하고 별도 approver 승인을 받는다. 기본 dry-run 결과를 검토한 뒤 새 요청을 실행한다. Tetragon은 monitor로만 만들며 Cilium 실제 적용은 기본 꺼짐이다. 외부 정책 spec이 바뀌면 수집 상태·baseline·모니터 창·시험 근거를 다시 확인하고, 그 다음 기존 readiness와 `tetragon.mode`로 차단 전환한다. `unknown`은 재실행하지 말고 실제 객체·Gateway·복원을 먼저 확인한다.
+
 Gateway의 새 mount는 모두 readOnly이고 후보 폴더는 마운트하지 않는다. 설치기는 승인본·빈 폐기 목록을 만들지 않는다. 승인 도구가 명시 0640 원자 저장하며, 설치 후 그룹/모드와 Gateway 읽기·쓰기 거부를 확인한다. SGLang은 같은 Gateway 설정을 상속한다.
 
 ## AWS 묶음이 이미 만드는 것 (여기서 다시 만들지 않음)

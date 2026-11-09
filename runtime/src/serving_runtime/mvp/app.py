@@ -15,7 +15,7 @@ from uuid import uuid4
 
 from serving_runtime.enforcement.events import ObservationQuery
 from serving_runtime.enforcement.intent import load_intent
-from serving_runtime.enforcement.tetragon import comparable_spec, render_manifests
+from serving_runtime.enforcement.tetragon import comparable_spec, render_monitor_manifests
 
 from .assets import check as check_assets, load_manifest as load_asset_manifest
 from .backend import BackendConfig, load_backend_config
@@ -118,7 +118,7 @@ class GatewayApp:
                 self._expected_tetragon_policies = {
                     (m["metadata"]["namespace"], m["metadata"]["name"]): hashlib.sha256(
                         json.dumps(comparable_spec(m["spec"]), sort_keys=True, separators=(",", ":")).encode()
-                    ).hexdigest() for m in render_manifests(intent).values()
+                    ).hexdigest() for m in render_monitor_manifests(intent).values()
                 }
             allowed_binaries = intent.allowed_engine_binaries
             if intent.schema != "runtime-enforcement-intent/1.0":

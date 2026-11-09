@@ -745,3 +745,10 @@ declared0.9.1과 기존 캐시 helper만 변경한다. 수동 구조/1·양식/3
 - 엔진 경로 규칙·추출기는 `adapters/`, 모델 파일 규칙은 `collectors/`, 변경 종류 → 점검 표·패치 항상 시험 목록·모델 변경 종류 → 점검·`fact_triggers`는 팩(`change_selection.yaml`)에 둔다.
 - CheckDef에 프레임워크 `framework_id`(CHK-…)·`mechanism_ids`를 더하되 내부 ID(`REQ-01` 등)는 바꾸지 않는다. 체크리스트 원본은 mg-princess/serving-security-framework `0ec5fb5fa5633b0817468b27684690a66fc7b4f5`(77행·순서·subtest_ids 동일, 질문 문구 개정) 기준으로 갱신한다.
 - 기존 audit(이전 PLAN 없이), 기존 `guard update`(이전 PLAN 없이)의 시험 범위·`guard.update_validation`, 저장 증거 재판정은 그대로 둔다.
+
+
+## 2026-11-08 호환 확장 — 반복 업데이트 실행 경계
+
+사용자 승인 보수: ENV의 engine.runtime_kind, model.tokenizer_revision/components(role/kind/identity/sha256/inputs), POL의 valid_from/valid_until/source_document_sha256, PLAN.inputs.execution_recipe_sha256, EVD.execution.attempt_id는 선택 필드다. 미입력 필드는 기존 직렬화에서 제외해 원 hash/Ref를 유지한다. 정책 유효기간은 새 실행의 현재 시각에서 검사하며 과거 EVD의 재판정은 기존 as-of 규칙을 따른다. recipe는 선정 시 요청 설정·입력 파일·실제 구현 bytes에 결합하고 실행 전 재검사한다. 새 attempt는 별도 작업 경로·동시 실행 배제를 사용한다. 동일 attempt의 부분 완료 관측은 다른 조각의 저장/정리 오류로 빈 중단 증거에 대체되지 않는다.
+
+엔진·버전의 의미 있는 기능과 실제 factory·fixture/normalizer·지원 scope는 adapter provider가 공급한다. 선언 catalog나 현재 소스 inventory 자체는 runtime 자격/검토 승인이 아니다. actor 관측 /3과 BYUL import /2는 /1·/2 역사 decoder를 대체하지 않는 별도 계약이며, 관측하지 않은 topology·공급물 역할·비교 조건은 UNKNOWN/미지원으로 남긴다.

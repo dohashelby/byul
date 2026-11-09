@@ -54,7 +54,24 @@
               "description": "마운트한 모델 snapshot 전체 파일 목록의 해시(update 비교 조건).",
               "oneOf": [{ "$ref": "common.schema.json#/$defs/sha256" }, { "type": "null" }]
             },
-            "tokenizer_revision": { "type": ["string", "null"] }
+            "tokenizer_revision": { "type": ["string", "null"] },
+            "components": {
+              "description": "독립 공급물과 변환 입력의 해시 관계. 실행 지원은 engine provider가 별도로 검증한다.",
+              "type": ["array", "null"],
+              "maxItems": 128,
+              "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["role", "kind", "identity", "sha256"],
+                "properties": {
+                  "role": { "type": "string", "minLength": 1 },
+                  "kind": { "type": "string", "minLength": 1 },
+                  "identity": { "type": "string", "minLength": 1 },
+                  "sha256": { "$ref": "common.schema.json#/$defs/sha256" },
+                  "inputs": { "type": "array", "maxItems": 128, "uniqueItems": true,
+                    "items": { "$ref": "common.schema.json#/$defs/sha256" } }
+                }
+              }
+            }
           }
         },
         "runtime": {

@@ -32,7 +32,7 @@ class OpenAIEngineAdapter:
     base_url: str | None = None
     launch_spec: LaunchSpec | None = None
     name: str = field(default="", init=False)
-    version: str = field(default="0.1.0", init=False)
+    version: str = field(default="0.2.0", init=False)
     admin_mutating = frozenset()
     admin_readonly = frozenset()
     version_path = "/version"
@@ -66,7 +66,12 @@ class OpenAIEngineAdapter:
             return None
         path = _PATH_PARAM.sub("guard-probe-nonexistent-id", route.path)
         if route.method == "GET":
-            return ProbeRequest("GET", path)
+            known = LIVENESS_ROUTES | DOCS_ROUTES | DIAGNOSTIC_ROUTES | {'/v1/models', '/v1/models/{model}', '/get_model_info', '/get_server_info', '/get_load'}
+            if _PATH_PARAM.sub('{id}', route.path) in {_PATH_PARAM.sub('{id}', p) for p in known}:
+                return ProbeRequest("GET", path)
+            return None  # Discovery does not authorize probing an unknown action.
+        if route.method != 'POST':
+            return None
         if route.path == "/v1/completions":
             return ProbeRequest("POST", path, {"model": model, "prompt": PROBE_PROMPT, "max_tokens": 1})
         if route.path == "/v1/chat/completions":

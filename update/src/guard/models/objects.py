@@ -75,10 +75,13 @@ class EngineInfo(Strict):
     # 고정 소스 commit과의 일치 확인 결과: MATCH | ABBREVIATED_MATCH | MISMATCH | UNVERIFIED
     source_commit_status: Literal["MATCH", "ABBREVIATED_MATCH", "MISMATCH", "UNVERIFIED"] | None = None
     expected_source_commit: str | None = None
+    runtime_kind: str | None = Field(default=None, pattern=r'^[a-z][a-z0-9_.-]{0,63}$')
+    # 요청을 받는 서빙 앞단(공용 계약 environment.target.engine.frontend). 모르면 None.
+    frontend: Literal["engine-server", "triton"] | None = None
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("source_commit_status", "expected_source_commit"))
+        return _drop_none(handler(self), ("source_commit_status", "expected_source_commit", "runtime_kind", "frontend"))
 
 
 class AdapterInfo(Strict):
@@ -102,10 +105,14 @@ class RuntimeInfo(Strict):
     driver: str | None = None
     cpu: CpuProfile | None = None
     platform: str | None = None  # 실행 환경 설명. 예: "CPU, arm64, Docker Desktop on macOS"
+    # 병렬 크기(공용 계약 environment.target.runtime). 엔진마다 rank·프로세스 구성을 해석하는 데 쓴다. 모르면 None.
+    tp_size: int | None = Field(default=None, ge=1)
+    pp_size: int | None = Field(default=None, ge=1)
+    dp_size: int | None = Field(default=None, ge=1)
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("platform", "cpu"))
+        return _drop_none(handler(self), ("platform", "cpu", "tp_size", "pp_size", "dp_size"))
 
     @model_validator(mode="after")
     def _cpu_needs_zero_gpus(self):
@@ -121,15 +128,45 @@ class FilesReadByEngine(Strict):
     inventory_sha256: str
 
 
+class ModelComponent(Strict):
+    role: str = Field(min_length=1)
+    kind: str = Field(min_length=1)
+    identity: str = Field(min_length=1)
+    sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
+    inputs: list[str] = Field(default_factory=list, max_length=128)
+
+
 class ModelInfo(Strict):
     id: str | None = None
     revision: str | None = None
     inventory_sha256: str | None = None  # 비교용: 마운트한 snapshot 전체 (tools/model_inventory.py --scope all)
     files_read_by_engine: FilesReadByEngine | None = None  # 참고용 (엔진이 읽는 파일만)
+    tokenizer_revision: str | None = None
+    components: list[ModelComponent] | None = Field(default=None, max_length=128)
+
+    @model_validator(mode="after")
+    def _component_closure(self):
+        if self.components is None: return self
+        by_sha = {c.sha256: c for c in self.components}
+        if len(by_sha) != len(self.components) or len({(c.role, c.identity) for c in self.components}) != len(self.components):
+            raise ValueError('MODEL_COMPONENT_AMBIGUOUS')
+        known = set(by_sha) | ({self.inventory_sha256} if self.inventory_sha256 is not None else set())
+        for c in self.components:
+            if len(set(c.inputs)) != len(c.inputs) or not set(c.inputs) <= known:
+                raise ValueError('MODEL_COMPONENT_INPUT_UNBOUND')
+        visiting, visited = set(), set()
+        def visit(digest):
+            if digest in visiting: raise ValueError('MODEL_COMPONENT_CYCLE')
+            if digest in visited or digest not in by_sha: return
+            visiting.add(digest)
+            for parent in by_sha[digest].inputs: visit(parent)
+            visiting.remove(digest); visited.add(digest)
+        for digest in by_sha: visit(digest)
+        return self
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("files_read_by_engine",))
+        return _drop_none(handler(self), ("files_read_by_engine", "tokenizer_revision", "components"))
 
 
 class Environment(GuardObject):
@@ -173,6 +210,21 @@ class Policy(GuardObject):
     exceptions: list[PolicyException] = Field(default_factory=list)
     confirmed_by: str | None = None
     confirmed_at: datetime | None = None
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    source_document_sha256: str | None = Field(default=None, pattern=r'^[0-9a-f]{64}$')
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("valid_from", "valid_until", "source_document_sha256"))
+
+    @model_validator(mode="after")
+    def _validity(self):
+        if any(v is not None and (v.tzinfo is None or v.utcoffset() is None) for v in (self.valid_from, self.valid_until)):
+            raise ValueError('POLICY_VALIDITY_REQUIRES_TIMEZONE')
+        if self.valid_from is not None and self.valid_until is not None and self.valid_from >= self.valid_until:
+            raise ValueError('POLICY_VALIDITY_INVALID')
+        return self
 
     @model_validator(mode="after")
     def _confirmed_needs_who_when(self) -> "Policy":
@@ -257,10 +309,11 @@ class PlanInputs(Strict):
     policy: Ref
     change: Ref | None = None
     previous_plan: Ref | None = None
+    execution_recipe_sha256: str | None = Field(default=None, pattern=r'^[0-9a-f]{64}$')
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("previous_plan",))
+        return _drop_none(handler(self), ("previous_plan", "execution_recipe_sha256"))
 
 
 class ConditionEval(Strict):
@@ -379,10 +432,11 @@ class Execution(Strict):
     operator: Operator | None = None
     override_reason: str | None = None
     cleanup_errors: list[str] = Field(default_factory=list)
+    attempt_id: str | None = None
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        data = _drop_none(handler(self), ("operator", "override_reason"))
+        data = _drop_none(handler(self), ("operator", "override_reason", "attempt_id"))
         if not self.cleanup_errors:
             data.pop("cleanup_errors", None)
         return data

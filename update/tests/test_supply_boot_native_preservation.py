@@ -57,7 +57,7 @@ def product(tmp_path, patch, *, mismatch=True, normal_record=False, report_error
                                                       mismatch and role == 'challenge')
         (tmp_path / (role + '-native-producer.json')).write_bytes(canonical_json(data[role]))
     assert prepared['normal']['session'] != prepared['challenge']['session']
-    env = environment(model={'id': 'test'})
+    env = environment(engine={'name': 'vllm', 'version': '0.31.0'}, model={'id': 'test'})
     values = base_values(env, 'SUP-05')
     cfg, targets = {}, {}
     for role in ('normal', 'challenge'):

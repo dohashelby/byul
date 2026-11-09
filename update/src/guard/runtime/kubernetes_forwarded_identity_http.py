@@ -1,4 +1,6 @@
 """REQ04 closed Gateway requests over the existing four-Pod owner boundary."""
+
+from guard.adapters.engine_profiles import supports
 from copy import deepcopy
 import re
 import threading
@@ -19,7 +21,7 @@ class KubernetesForwardedIdentityHTTP(KubernetesRoutesHTTP):
     profile=HTTP_PROFILE
 
     def __init__(self,target,env,*,header_contract,credential,normal_claim,alternate_claim,duration=120,binary='kubectl',runner=None):
-        if (target.get('lab') is not True or env.engine.name!='vllm' or env.engine.version!='0.31.0'
+        if (target.get('lab') is not True or not supports(env.engine.name, env.engine.version)
                 or any(type(v) is not str or not v for v in (env.model.id,env.model.revision))):raise KubernetesBindingError()
         self.header_contract=normalize_header_contract(header_contract)
         if (not all(header_value(v) for v in (credential,normal_claim,alternate_claim))

@@ -17,7 +17,7 @@ from tests.test_template_validation import IMAGE
 @pytest.fixture
 def route_input(monkeypatch):
     with TemporaryDirectory(prefix="guard-route-cli-") as directory:
-        folder = Path(directory)
+        folder = Path(directory).resolve()
         env = environment(origin=DataOrigin.EXAMPLE)
         packet = native_record(env, kind="route")
         (folder / "env.json").write_text(json.dumps(env.to_dict()), encoding="utf-8")

@@ -1,8 +1,10 @@
 """LIF04 closed existing stdlib requests; client facts are not server memory."""
+
+from guard.adapters.engine_profiles import supports
 from copy import deepcopy
 import math,re,threading
 from guard.models import canonical_json,sha256_hex
-from .kubernetes_http import KubernetesHTTP,KubernetesBindingError,REQUEST_BINDING_PROFILE
+from .engine_http import KubernetesHTTP,KubernetesBindingError,REQUEST_BINDING_PROFILE
 from .kubernetes_stream_buffer import normalize_read_profiles
 
 HTTP_PROFILE='kubernetes-owned-stream-buffer-http-v1'
@@ -12,7 +14,7 @@ SLOTS=('normal-before','normal','slow','slow-close','normal-after')
 class KubernetesStreamBufferHTTP:
     profile=HTTP_PROFILE
     def __init__(self,target,env,*,read_profiles,runner=None,duration=120,binary='kubectl'):
-        if target.get('lab') is not True or env.engine.name!='vllm' or env.engine.version!='0.31.0':raise KubernetesBindingError()
+        if target.get('lab') is not True or not supports(env.engine.name, env.engine.version):raise KubernetesBindingError()
         self.read_profiles=normalize_read_profiles(read_profiles)
         self.base=KubernetesHTTP(target,env,runner=runner,duration=duration,binary=binary,profile=REQUEST_BINDING_PROFILE)
         self.binding=deepcopy(self.base.binding);self.api_model=self.base.api_model;self.model_mapping=deepcopy(self.base.model_mapping)

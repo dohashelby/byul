@@ -1,0 +1,67 @@
+{
+  "schema": "guard-engine-profile-catalog/1",
+  "profiles": [
+    {
+      "id": "bound-platform-identity/1",
+      "engine": "*",
+      "versions": [],
+      "features": [
+        "pod_identity",
+        "process_identity",
+        "http_transport"
+      ]
+    },
+    {
+      "id": "vllm-native-source/1",
+      "engine": "vllm",
+      "versions": [
+        "0.31.0"
+      ],
+      "features": [
+        "boundary_egress",
+        "credential_revocation",
+        "forwarded_identity",
+        "initialization",
+        "lifecycle_transition",
+        "log_minimization",
+        "model_authorization",
+        "native_input",
+        "native_lifecycle",
+        "native_route",
+        "observation_identity",
+        "observation_state",
+        "online_input",
+        "profiler_control",
+        "rank_failure",
+        "request_attempts",
+        "required_events",
+        "resource_recovery",
+        "response_error",
+        "scoped_consumption",
+        "session_revocation",
+        "stored_responses",
+        "stream_buffer",
+        "termination",
+        "unix_ipc",
+        "validation_error",
+        "worker_readiness"
+      ]
+    }
+  ],
+  "implementations": [
+    {
+      "feature": "length_cause",
+      "engine": "vllm",
+      "engine_version": "0.32.0",
+      "image_digest": "vllm/vllm-openai-cpu@sha256:827ef38187f9b52f2bb838695ef815ec5b65f4bf3e4c061b002b2b0a19cb0701",
+      "backend": "cpu",
+      "model": "facebook/opt-125m",
+      "model_revision": "27dcfa74d334bc871f3234de431e71c6eeba5dd6",
+      "model_inventory_sha256": "b11bc2cafab45720afd3d2f19c8250352977bc216efb88fc0afb9d90edc2aea6",
+      "profile": "vllm-cpu-length-cause/1",
+      "data": "reviewed_profiles/vllm-cpu-length-cause-1.json",
+      "data_sha256": "16f4f61acc8747916f8a2cb6b2d9855b25f178ac69b4b831ed45767b201ee8ed",
+      "factory": "guard.adapters.vllm_length_cause:VllmLengthCause"
+    }
+  ]
+}

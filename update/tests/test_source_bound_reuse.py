@@ -51,7 +51,7 @@ def _archive(tmp_path, *, violation=False, origin="DECLARED", cid="PLT-04"):
     store.put_many([env, pol])
     prior = select(pack, [env], pol)
     store.put(prior)
-    target = {"run_id": run, "environment_ref": env.ref().model_dump(mode="json"),
+    target = {"run_id": run, "synthetic": True, "environment_ref": env.ref().model_dump(mode="json"),
               "engine": {"container": container, "trusted_url": "http://engine:8000"},
               "origins": {"trusted": {"network": "EXAMPLE-trusted"}},
               "comparison_config": {"profile": "EXAMPLE-source-reuse-contract"}}

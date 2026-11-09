@@ -145,7 +145,7 @@ def test_registered_identity_records_native_candidates_and_exact_refs(tmp_path,g
     assert e.normal_control.succeeded is None
     preflight=mode in {'version032','prepared-mismatch','actual-lab-false'}
     if preflight:
-        assert not world.sent and world.record_reads==0 and e.execution.status.value=='ABORTED'
+        assert not world.sent and world.record_reads==0 and e.execution.status.value==('NOT_RUN' if mode=='version032' else 'ABORTED')
         assert all(e.observations[key].collected is False for key in contract.TRUTH_FIELDS)
     else:
         for key in contract.TRUTH_FIELDS:assert e.observations[key].value is False
@@ -165,8 +165,8 @@ def test_registered_identity_records_native_candidates_and_exact_refs(tmp_path,g
         if mode in {'duplicate-approval','duplicate-consumption','wrong-declared-target','wrong-declared-policy'}:
             assert e.observations['identity_conflict_candidates'].value and not any(c['declared_record_pair_consistent'] for c in candidates)
         if mode in {'record-extra','wrong-record-source','wrong-record-target','forged-authentication'}:
-            assert not e.observations['identity_declared_records'].value and e.execution.status.value=='ABORTED'
-        if mode in {'attachment','late-record-error','record-cleanup','record-missing','record-dropped','record-unended'}:assert e.execution.status.value=='ABORTED'
+            assert not e.observations['identity_declared_records'].value and e.execution.status.value==('NOT_RUN' if mode=='version032' else 'ABORTED')
+        if mode in {'attachment','late-record-error','record-cleanup','record-missing','record-dropped','record-unended'}:assert e.execution.status.value==('NOT_RUN' if mode=='version032' else 'ABORTED')
         assert set(contract.SEMANTIC_GAPS).issubset(e.observations['identity_missing'].value)
     assert PRIVATE not in canonical_json(e.to_dict()).decode()
     for artifact in e.artifacts:assert PRIVATE.encode() not in (tmp_path/'store'/artifact.path).read_bytes()

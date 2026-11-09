@@ -5,6 +5,8 @@ from copy import deepcopy
 import pytest
 
 from guard.adapters.vllm import SAFE_PROBE_REVIEWED_IMAGES
+from guard.adapters.vllm import VllmAdapter
+from guard.adapters.base import ProbeRequest
 from guard.core.judge import judge_plan
 from guard.core.run import RunConfig, run_plan
 from guard.core.select import select
@@ -16,6 +18,16 @@ from guard.store import Store
 from tests.builders import baseline_pack, environment, policy
 from tests.test_direct_route import ALLOWED, DENIED, World, _target as direct_target
 from tests.test_role_route import ADMIN, GENERAL, WRONG, RoleWorld, _target as role_target
+
+
+class ExampleFixedAdapter(VllmAdapter):
+    """Explicit bounded EXAMPLE request, independent of route discovery."""
+    name = 'EXAMPLE-fixed-route'
+    version = '1'
+    def probe_request(self, route, model, *args, **kwargs):
+        if route.method == 'POST' and route.path == '/v1/systemone' and not route.mutating:
+            return ProbeRequest('POST', route.path, {})
+        return super().probe_request(route, model, *args, **kwargs)
 
 
 def run(tmp_path, monkeypatch, check_id, world, version, routes):
@@ -52,7 +64,8 @@ def run(tmp_path, monkeypatch, check_id, world, version, routes):
     store.put_many([env, pol])
     plan = select(pack, [env], pol)
     store.put(plan)
-    (evd,) = run_plan(store, pack, plan, RunConfig(executors={cls.name: "fixed-test"}, adapter="vllm"))
+    monkeypatch.setitem(registry.ADAPTERS, 'EXAMPLE-fixed-route', ExampleFixedAdapter)
+    (evd,) = run_plan(store, pack, plan, RunConfig(executors={cls.name: "fixed-test"}, adapter='EXAMPLE-fixed-route'))
     (result,) = judge_plan(store, pack, plan, as_of=env.created_at)
     summary = (json.loads((store.root / evd.artifacts[0].path).read_text(encoding="utf-8").splitlines()[-1])
                if evd.artifacts else None)

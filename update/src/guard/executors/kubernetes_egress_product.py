@@ -1,9 +1,11 @@
 """A1 registration boundary for A2's immutable PLT07 Kubernetes consumer."""
+
+from guard.adapters.engine_profiles import supports
 from pathlib import Path
 import math
 from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
-from guard.runtime.kubernetes_http import KubernetesHTTP,REQUEST_BINDING_PROFILE
+from guard.runtime.engine_http import KubernetesHTTP,REQUEST_BINDING_PROFILE
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_boundary_egress import collect_kubernetes_boundary_egress,validate_inputs,VERSION
 
@@ -24,7 +26,7 @@ class KubernetesEgressProductExecutor(HttpCheckExecutor):
         try:
             duration=self.cfg.get('max_duration_seconds',120)
             if (set(self.cfg)-CONFIG_KEYS or adapter is None or type(duration) not in (int,float) or not math.isfinite(duration)
-                    or not self.cfg['total_timeout']+1<duration<=300 or env.engine.name!='vllm' or env.engine.version!='0.31.0'
+                    or not self.cfg['total_timeout']+1<duration<=300 or not supports(env.engine.name, env.engine.version)
                     or any(type(v) is not str or not v for v in (env.model.id,env.model.revision))):raise ValueError
             def load(name):
                 with Path(self.cfg[name]).open('rb') as stream:return strict_json(stream.read(65537),limit=65536)

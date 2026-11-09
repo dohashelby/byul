@@ -17,6 +17,7 @@ GPU 실증 담당의 소비자(LIF-03·05·06·07·08·09·10·11·12·14, PLT-0
 """
 from __future__ import annotations
 
+import hashlib
 import re
 
 SCHEMA = "guard-gpu-common-input/1"
@@ -62,6 +63,17 @@ KINDS = {
         "fields": {"at_ms": "ms", "request_sha256": "opt_sha", "generation": "id", "component": "enum:worker|weights|adapter|cache|service",
                    "state": "opt_id", "error_sha256": "opt_sha", "alias_sha256": "opt_sha"},
         "complete_requires": ("in_flight", "consumed", "service_gate"),
+    },
+    # LIF-06: actual V1 worker model dispatch objects, separate from scheduled consumption.
+    # Complete means closed, source-bound dispatches only; not weights bytes or KV kernel reads.
+    "transition-dispatch": {
+        "checks": ("LIF-06",),
+        "events": ("forward_entered", "forward_returned", "forward_failed"),
+        "fields": {"at_ms": "ms", "request_sha256": "sha", "attempt_sha256": "sha",
+                   "model_sha256": "sha", "weights_sha256": "sha", "kv_sha256": "sha",
+                   "native_session_sha256": "sha", "native_process_sha256": "sha", "native_call_sha256": "sha",
+                   "source_sha256": "sha", "entry_sha256": "sha"},
+        "complete_requires": ("forward_entered", "forward_returned"),
     },
     "rank-fault": {
         "checks": ("LIF-08",),
@@ -173,6 +185,14 @@ def _binding(value):
 
 def validate(record, *, kind, environment_ref, target_sha256, prepared_sha256, session):
     """닫힌 형식 검사와 판정 재료 정리. 실패는 GpuInputError. 형식이 맞아도 지원·완료는 별도 필드로 낸다."""
+    if type(record) is dict and record.get('schema') == 'guard-gpu-common-input/3':
+        from .actor_consumption import validate as validate_actors
+        return validate_actors(record, kind=kind, environment_ref=environment_ref,
+            target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)
+    if type(record) is dict and record.get('schema') == 'guard-gpu-common-input/2':
+        from .scoped_consumption import validate as validate_scoped
+        return validate_scoped(record, kind=kind, environment_ref=environment_ref, target_sha256=target_sha256,
+                               prepared_sha256=prepared_sha256, session=session)
     spec = KINDS.get(kind)
     if spec is None:
         raise GpuInputError("GPU_INPUT_KIND_UNSUPPORTED")
@@ -221,6 +241,20 @@ def validate(record, *, kind, environment_ref, target_sha256, prepared_sha256, s
     gaps += [f"GPU_INPUT_PRODUCER_DIAGNOSTIC:{code}" for code in completeness["diagnostic_codes"]]
     if kind == 'runner-consumption':
         gaps += _consumption_gaps(events)
+    if kind == 'transition-dispatch':
+        calls = {}
+        for row in events:
+            if row['native_session_sha256'] != hashlib.sha256(session.encode()).hexdigest():
+                raise GpuInputError('GPU_INPUT_SCOPE_MISMATCH')
+            key = (row['binding'], row['native_process_sha256'], row['native_call_sha256'],
+                   row['request_sha256'], row['attempt_sha256'])
+            calls.setdefault(key, []).append(row)
+        for rows in calls.values():
+            if ([r['event'] for r in rows] not in (["forward_entered", "forward_returned"], ["forward_entered", "forward_failed"])
+                    or rows[-1]['at_ms'] < rows[0]['at_ms']
+                    or any(rows[0][key] != rows[-1][key] for key in ('native_session_sha256', 'source_sha256', 'entry_sha256'))):
+                gaps.append('GPU_INPUT_DISPATCH_CALL_UNPAIRED')
+                break
     return {"kind": kind, "checks": list(spec["checks"]), "supported": supported, "producer_authenticated": False,
             "complete": supported and not gaps, "gaps": gaps, "generations": len(generations), "events": len(events),
             "violation_candidates": violation_candidates(kind, events)}
@@ -246,6 +280,15 @@ def violation_candidates(kind, events):
                 mixed.setdefault((row["request_sha256"], row["component"]), set()).add(row["generation"])
         out += [{"request_sha256": key[0], "component": key[1], "reason": "mixed_generation_consumption"}
                 for key, values in sorted(mixed.items()) if len(values) > 1]
+    elif kind == 'transition-dispatch':
+        identities = {}
+        for row in events:
+            if row['event'] not in ('forward_entered', 'forward_returned'):
+                continue
+            key = (row['binding'], row['request_sha256'], row['attempt_sha256'])
+            identities.setdefault(key, set()).add(tuple(row[k] for k in ('model_sha256', 'weights_sha256', 'kv_sha256')))
+        out += [{'binding': key[0], 'request_sha256': key[1], 'attempt_sha256': key[2],
+                 'reason': 'dispatch_identity_changed_within_attempt'} for key, values in sorted(identities.items()) if len(values) > 1]
     elif kind == "failed-group-resources":
         before = {r["resource_sha256"] for r in events if r["event"] == "inventory_before"}
         after = {r["resource_sha256"] for r in events if r["event"] == "inventory_after"}

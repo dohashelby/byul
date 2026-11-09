@@ -1,0 +1,23 @@
+{
+  "components": {
+    "slot": {
+      "adapters/vllm_slot_mask.py": "659d615f133cdc96ef54163678753a60e6b8ee51aa0e78e0560e0d308f7f50da",
+      "executors/structured_tools.py": "2f3ab5cbb0f2eeeb2969cf995a9d57b84f9642924e5c8410383dd52e9d013f4c",
+      "executors/structured_tools_cpu.py": "1eac6f0fe8067a9ace386ee3d8b3e5bbc728387578c4b1f429e1495dc576cb87",
+      "reference/integrity.py": "d83ab4500d8537bfaeffda5caba46f81a9109c8dc6ccf7b6891a389b0e71fdd9",
+      "reference/slot_cpu.py": "2a8e4504d6b1ab0df60fa9acb9f569db144690f6a315502577bcd8cb27ee8d53",
+      "reference/slot_result.py": "1b3755331089b1a139878a4be3bd62b464bc126e4ae87e4abd174e1d4773371b"
+    },
+    "template": {
+      "adapters/assets/chat/guard-type-boundary-v1.jinja": "38110f6e668d55f240ecfde0d38f5fecc7c11a742d76823ffd9d0918abb9fe36",
+      "adapters/template_boundary_evidence.py": "d900a15741d12f564854c6dc94030ec4018981ecc5d06ce15d023799d9ebfcc7",
+      "adapters/vllm_template_boundary.py": "e41aac44f75370f08301887fcb951548e848bfcf67340de4a05c2fe0eca034c4",
+      "executors/structured_tools.py": "2f3ab5cbb0f2eeeb2969cf995a9d57b84f9642924e5c8410383dd52e9d013f4c",
+      "executors/structured_tools_cpu.py": "1eac6f0fe8067a9ace386ee3d8b3e5bbc728387578c4b1f429e1495dc576cb87",
+      "reference/input_context.py": "82faf2566aa5883e351185d22e5794a8c157ab9b5a782674ef94672ddd56aed9",
+      "reference/integrity.py": "d83ab4500d8537bfaeffda5caba46f81a9109c8dc6ccf7b6891a389b0e71fdd9",
+      "reference/template_cpu.py": "ca2c07d757b41aacf394f985dad823ad1a6c9988bb504eafeb3fe4ae131d8949"
+    }
+  },
+  "schema": "guard-source-cpu-components/2"
+}

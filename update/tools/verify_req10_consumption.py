@@ -22,7 +22,18 @@ def manifest_id(repo):
     return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
 
 # 기존 기록 키를 유지한다. 값은 커밋이 아니라 파일 해시 목록의 SHA-256이다.
-REVIEWED_COMMON_COMMIT=manifest_id(Path(__file__).resolve().parents[2])
+RECEIPTS_PATH = Path(__file__).with_name('reviewed_manifest_receipts.json')
+
+def approved_manifest(repo, receipt_path=RECEIPTS_PATH):
+    value=json.loads(Path(receipt_path).read_bytes())
+    if value.get('schema')!='byul-source-review-receipts/1':raise ValueError('SOURCE_REVIEW_RECEIPTS_INVALID')
+    digest=manifest_id(repo)
+    matches=[r for r in value['receipts'] if r.get('manifest_sha256')==digest and r.get('reviewed_by') and r.get('reviewed_at')]
+    return digest if len(matches)==1 else None
+
+# Reading current bytes never approves them. No new receipt is shipped by an
+# implementation change or by --write. Historical exact gates remain separate.
+REVIEWED_COMMON_COMMIT=approved_manifest(Path(__file__).resolve().parents[2])
 
 def scan(repo):
     """고정 범위의 실제 파일 전부. ignored 파일이 import를 가리는 경우도 잡는다."""
@@ -58,9 +69,17 @@ def _helper(repo):
     return helper
 
 def _verify_manifest(repo):
+    if REVIEWED_COMMON_COMMIT is None:
+        raise ValueError('SOURCE_REVIEW_RECEIPT_REQUIRED')
     path=repo/MANIFEST_PATH
     if path.is_symlink() or not path.is_file() or manifest_id(repo)!=REVIEWED_COMMON_COMMIT:
         raise ValueError('REQ10_MANIFEST_MISMATCH')
+    return verify_inventory(repo)
+
+def verify_inventory(repo):
+    """Verify bytes only. This operation confers no source/runtime approval."""
+    repo=Path(repo);path=repo/MANIFEST_PATH
+    if path.is_symlink() or not path.is_file():raise ValueError('REQ10_MANIFEST_MISMATCH')
     manifest=json.loads(path.read_text(encoding='utf-8'))
     if manifest.get('schema')!=MANIFEST_SCHEMA or tuple(manifest.get('paths',()))!=PINNED_PATHS:
         raise ValueError('REQ10_MANIFEST_MISMATCH')

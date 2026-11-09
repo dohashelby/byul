@@ -75,15 +75,15 @@ def test_real_registered_factory_canonical_cli_independent_fail_and_exact_refs(t
     assert res.verdicts.functional.value==res.verdicts.performance.value=='UNKNOWN'
     assert e.data_origin.value=='EXAMPLE' and (VALUES,ACTORS)==before
     if mode in {'lab-false','version032'}:
-        assert world.ipc_reads==0 and not world.packets and e.execution.status.value=='ABORTED'
+        assert world.ipc_reads==0 and not world.packets and e.execution.status.value==('NOT_RUN' if mode=='version032' else 'ABORTED')
     else:
         assert world.ipc_reads==1 and e.observations['ipc_scope_complete'].value is False
         assert bool(e.observations['unix_ipc_violations'].value)==fail
         if mode=='normal':assert e.execution.status.value=='COMPLETED' and e.normal_control.succeeded is True
         if mode in {'normal','violation','partial','later-metadata','cleanup','child-reap','attachment','report-error'}:
             assert e.observations['unix_ipc_trials'].value[0]['actor_groups']==[55,2000]
-        if cleanup:assert e.execution.cleanup_errors and e.execution.status.value=='ABORTED'
-        if mode in {'attachment','report-error','normal-exception','normal-wrong-id','partial','later-metadata'}:assert e.execution.status.value=='ABORTED'
+        if cleanup:assert e.execution.cleanup_errors and e.execution.status.value==('NOT_RUN' if mode=='version032' else 'ABORTED')
+        if mode in {'attachment','report-error','normal-exception','normal-wrong-id','partial','later-metadata'}:assert e.execution.status.value==('NOT_RUN' if mode=='version032' else 'ABORTED')
     assert PRIVATE not in canonical_json(e.to_dict()).decode() and NORMAL_PRIVATE not in canonical_json(e.to_dict()).decode()
     for artifact in e.artifacts:
         raw=(tmp_path/'store'/artifact.path).read_bytes();assert PRIVATE.encode() not in raw and NORMAL_PRIVATE.encode() not in raw

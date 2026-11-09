@@ -3,6 +3,19 @@
 from __future__ import annotations
 
 from typing import Any, Callable
+from contextlib import contextmanager
+from contextvars import ContextVar
+
+_ENVIRONMENT = ContextVar('guard_executor_environment', default=(None, None))
+_PORTABLE_KUBERNETES = frozenset({'direct_route', 'role_route', 'container_config', 'credential_exposure',
+    'api_transport', 'request_binding', 'lifecycle_transition'})
+
+
+@contextmanager
+def environment_binding(environment):
+    token = _ENVIRONMENT.set((environment.engine.name, environment.engine.version))
+    try: yield
+    finally: _ENVIRONMENT.reset(token)
 
 from guard.adapters.base import EngineAdapter
 from guard.adapters.fake import FakeAdapter
@@ -139,13 +152,35 @@ ACTIVATED = frozenset({"stream_buffer", "initialization", "rank_failure", "reque
     "lifecycle_transition", "profiler_observation", "observation_state"})
 
 
-def resolve_executor(executor: str, impl: str) -> Callable[[dict[str, Any]], Executor] | None:
+def adapter_factory(name):
+    from guard.adapters.engine_provider import PROVIDERS, load_installed_providers
+    load_installed_providers()
+    return PROVIDERS[name].adapter_factory if name in PROVIDERS else ADAPTERS.get(name)
+
+
+def resolve_executor(executor: str, impl: str, *, engine=None, version=None) -> Callable[[dict[str, Any]], Executor] | None:
+    if engine is not None:
+        from guard.adapters.engine_provider import PROVIDERS, load_installed_providers
+        load_installed_providers()
+        provider = PROVIDERS.get(engine)
+        if provider is None and impl == 'kubernetes' and executor not in _PORTABLE_KUBERNETES:
+            return None
+        if provider is not None:
+            selected = provider.executor(executor, impl, version)
+            if selected is not None:
+                return selected
+            if impl == 'kubernetes' and executor not in _PORTABLE_KUBERNETES and not provider.allows_legacy_native(version):
+                return None
     return EXECUTORS.get(f"{executor}:{impl}") or EXECUTORS.get(impl)
 
 
-def build_executor(executor: str, impl: str, cfg: dict[str, Any]) -> Executor:
+def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None, version=None) -> Executor:
     """실행 설정에 lab_activation·record_attestation이 있으면 해당 계층을 덧씌운다."""
-    factory = resolve_executor(executor, impl)
+    bound_engine, bound_version = _ENVIRONMENT.get()
+    engine, version = engine or bound_engine, version or bound_version
+    factory = resolve_executor(executor, impl, engine=engine, version=version)
+    if factory is None:
+        raise ValueError('EXECUTOR_UNAVAILABLE')
     if impl == "kubernetes":
         factory = activated(factory) if executor in ACTIVATED else attested(factory)
     return factory(cfg)

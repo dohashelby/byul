@@ -154,7 +154,7 @@ def test_registered_cli_auth_samples_absolute_constraint_and_exact_refs(tmp_path
             'revocation_normal_before_issuer_verified','revocation_new_connection_receipt_verified','revocation_scope_complete'))
         assert len(world.sent)=={'before-shape':2,'engine-replaced':1,'late-protocol':3}.get(mode,5)
     if mode in {'native-unbound','native-duplicate','engine-replaced','native-partial','attachment','after-timeout','http-cleanup','late-protocol',
-        'actual-lab-false','version032','missing-credential','same-credential'}:assert e.execution.status.value=='ABORTED'
+        'actual-lab-false','version032','missing-credential','same-credential'}:assert e.execution.status.value==('NOT_RUN' if mode=='version032' else 'ABORTED')
     assert bool(e.execution.cleanup_errors)==(mode=='http-cleanup')
     private=(RETIRED,CONTROL,PRIVATE,hashlib.sha256(RETIRED.encode()).hexdigest(),hashlib.sha256(CONTROL.encode()).hexdigest())
     assert all(secret not in canonical_json(e.to_dict()).decode() for secret in private)

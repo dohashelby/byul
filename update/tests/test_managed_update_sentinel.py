@@ -190,22 +190,30 @@ def test_managed_update_sentinel_failures_preserve_completed_violations_and_clea
     report, failed = application.execute_update(store, pack, envs, pol, cfg, run_dir, T0)
 
     assert failed is True
-    assert [side for side, _ in launches] == ["baseline", "candidate"]
+    blocked = failure in {'cleanup', 'startup_cleanup'}
+    assert [side for side, _ in launches] == (['baseline'] if blocked else ['baseline', 'candidate'])
     evds = {e.side.value: e for e in store.iter_kind("EVD")}
     results = {r.side.value: r for r in store.iter_kind("RES")}
-    assert evds["candidate"].execution.status.value == "COMPLETED"
-    assert results["candidate"].verdicts.security.value == "FAIL"
-    if failure == "cleanup":
-        assert evds["baseline"].execution.status.value == "COMPLETED"
-        assert results["baseline"].verdicts.security.value == "FAIL"
+    if blocked:
+        assert evds['candidate'].execution.status.value == 'ABORTED'
+        assert evds['candidate'].execution.abort_reason == 'BASELINE_RESOURCE_RELEASE_UNVERIFIED'
+        assert results['candidate'].verdicts.security.value == 'UNKNOWN'
+        assert ('candidate', 'cleanup') not in events
+        assert not (run_dir / 'candidate-sentinel').exists()
     else:
-        assert evds["baseline"].execution.status.value == "ABORTED"
-        assert results["baseline"].verdicts.security.value == "UNKNOWN"
-    for side in ("baseline", "candidate"):
-        assert (side, "cleanup") in events
-        assert (run_dir / f"{side}-sentinel" / "synthetic-write.txt").exists()
-    if failure in {"cleanup", "startup_cleanup"}:
-        assert any("cleanup incomplete" in note for note in report.limitations)
+        assert evds['candidate'].execution.status.value == 'COMPLETED'
+        assert results['candidate'].verdicts.security.value == 'FAIL'
+        assert ('candidate', 'cleanup') in events
+        assert (run_dir / 'candidate-sentinel' / 'synthetic-write.txt').exists()
+    if failure == 'cleanup':
+        assert evds['baseline'].execution.status.value == 'COMPLETED'
+        assert results['baseline'].verdicts.security.value == 'FAIL'
+    else:
+        assert evds['baseline'].execution.status.value == 'ABORTED'
+        assert results['baseline'].verdicts.security.value == 'UNKNOWN'
+    assert ('baseline', 'cleanup') in events
+    assert (run_dir / 'baseline-sentinel' / 'synthetic-write.txt').exists()
+    if blocked: assert any('cleanup incomplete' in note for note in report.limitations)
     assert "private" not in json.dumps(report.to_dict())
     assert not store.verify()
 

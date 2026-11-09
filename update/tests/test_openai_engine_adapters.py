@@ -34,7 +34,8 @@ def test_chat_probe_is_one_token():
 
 
 def test_path_parameter_uses_a_nonexistent_id():
-    assert SGLangAdapter().probe_request(Route('GET', '/v1/items/{id}'), 'm').path == '/v1/items/guard-probe-nonexistent-id'
+    assert SGLangAdapter().probe_request(Route('GET', '/v1/models/{model_id}'), 'm').path == '/v1/models/guard-probe-nonexistent-id'
+    assert SGLangAdapter().probe_request(Route('GET', '/v1/items/{id}'), 'm') is None
 
 
 def test_start_commands_bind_the_requested_port():

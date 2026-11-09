@@ -148,6 +148,16 @@ def test_managed_update_uses_distinct_targets_and_cleans_up(workdir, monkeypatch
     monkeypatch.setitem(registry.EXECUTORS, "direct_route:real", executor)
     result = invoke()
     assert result.exit_code == (1 if fail_baseline or cleanup_failure else 0), result.output + repr(result.exception)
+    if cleanup_failure:
+        assert len(exited) == len(set(exited)) == len(set(calls)) == 1
+        assert len(seen) == 1 and 'baseline' in seen[0]
+        row = next(r for r in report()['by_check'] if r['check_id'] == 'REQ-01')
+        assert row['baseline']['security'] == 'FAIL' and row['candidate']['security'] == 'UNKNOWN'
+        candidate, = [e for e in Store(Path('.guard')).iter_kind('EVD') if e.side.value == 'candidate']
+        assert candidate.execution.status.value == 'ABORTED'
+        assert candidate.execution.abort_reason == 'BASELINE_RESOURCE_RELEASE_UNVERIFIED'
+        assert any('cleanup' in note for note in report()['limitations'])
+        return
     assert len(exited) == 2 and len(set(exited)) == 2
     assert len(set(calls)) == 2
     row = next(r for r in report()["by_check"] if r["check_id"] == "REQ-01")
@@ -156,11 +166,9 @@ def test_managed_update_uses_distinct_targets_and_cleans_up(workdir, monkeypatch
         assert row["comparison"] != "FIXED"
         assert len(seen) == 1 and "candidate" in seen[0]
     else:
-        assert row["baseline"]["security"] == ("FAIL" if cleanup_failure else "PASS")
+        assert row["baseline"]["security"] == "PASS"
         assert len(set(seen)) == 2
         assert "baseline" in seen[0] and "candidate" in seen[1]
-    if cleanup_failure:
-        assert any("cleanup" in note for note in report()["limitations"])
     assert "private engine error" not in str(report())
 
 

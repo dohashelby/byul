@@ -1,4 +1,6 @@
 """REQ02 native8 auth/registered-handler facts through the existing CLI/session."""
+
+from guard.adapters.engine_profiles import supports
 from guard.models import canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_http import ROUTE_AUTHENTICATION_PROFILE
@@ -20,7 +22,7 @@ class KubernetesNativeRouteExecutor(KubernetesRequestTerminationExecutor):
         self.validate_policy(check,policy_values)
         from guard.collectors.lifecycle import load_prepared
         try:
-            if env.engine.name!='vllm' or env.engine.version!='0.31.0':raise ValueError
+            if not supports(env.engine.name, env.engine.version):raise ValueError
             self._route_probe_key=None
             if 'probe_key_env' in self.cfg:
                 name=self.cfg['probe_key_env']

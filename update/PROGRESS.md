@@ -1,3 +1,19 @@
+## 2026-11-09 — A 설계 보수 정리(브랜치 `claude/a-design-repairs`)
+
+- 한 일:
+  - A 작업 트리(`Buyl/byul-dev1-k8s`, 기준 `8402ff89`)의 미커밋 변경(수정 103·신규 83·삭제 1)을 PR #239 최신 커밋 위로 옮겼다. 스냅샷과 A 작업 트리 파일 186개가 바이트까지 같음을 확인했다. 원본은 A 작업 트리에 그대로 있다.
+  - 충돌 5개(계약 스키마, `import_byul_inputs.py`, DECISIONS, PROGRESS, `reviewed-source.json`)를 풀었다. 결정 1-4대로 `EngineInfo.frontend`, `RuntimeInfo.tp_size`·`pp_size`·`dp_size`를 더하고, `/2` 변환이 이 값들을 넣는다. 계약에 `model.components`를 더했다.
+  - runtime 9파일·platform 시험 1·CI 1줄은 이 브랜치에서 뺐다(별도 브랜치 `claude/a-runtime-platform-proposal`). 루트 `AGENTS.md` 삭제는 넣지 않았다.
+  - 앵커링 점검: 판본 비교가 남은 runtime 3파일과 vLLM 소스 분석 CPU 실행기 6개를 옮길 대상으로 `CLAUDE.md`·`AGENTS.md` 1절과 DECISIONS에 적었다. 엔진 provider는 SGLang·TensorRT-LLM을 기본 provider로 등록하고 설치 패키지 provider를 받는다.
+  - `CLAUDE.md`·`AGENTS.md`(1~11절 동일): 판본 profile·provider 반영, TensorRT-LLM 포기 조건, 전체 시험은 PR CI에 맡긴다는 사용자 지시를 넣었다. `AGENTS.md` 12절에 Python 3.12.3 사용을 적었다.
+  - 정리: SGLang 후보는 로컬 브랜치 `claude/sglang-request-attempt`에 커밋(`2b49fe8f`)하고 그 작업 트리를 지웠다. 쓰지 않는 지원표 세션은 보관하고 그 브랜치 2개를 지웠다.
+- 테스트 결과:
+  - 로컬 전체 시험은 돌리지 않았다(사용자 지시: PR CI에 맡김). 시작한 두 번은 중간에 멈춰 결과가 없다.
+  - 로컬 확인: 계약 검사 오류 0, 현황표 `--check` 통과, CI 문서 경로 목록 누락 0, `test_engine_neutral_core` 통과. `reviewed-source.json`을 Python 3.12.3으로 다시 만들었다.
+  - A의 11-08 기록: 전체 11,692 통과·19 실패(Linux 전용 8, B 승인 대기 11). B 승인 대기 11개는 이 브랜치 CI에서도 실패할 것으로 본다.
+- 다음 단계: PR CI 확인, B에 source gate 검토 요청, #239 병합 뒤 이 브랜치 병합, A/B 작업지시서.
+- 막힌 것: B 검토 전에는 시험 11개가 실패해 병합할 수 없다.
+
 ## 2026-11-09 — SGLang 준비·vLLM 완성 결정과 개발 문서 반영
 
 - 한 일:
@@ -79,6 +95,77 @@
 - 검증: 실제 입력/반환/원예외·source/input SHA·프로세스종료·부모종료후PID/start·소유tmp정리를 보존했다. host IPC metadata불완전1건은 유지하고 별도소유namespace4조건 성공을 분리했다. 신규도구7개의 구문/CLI·OOV표기만 고친 AST동등성을 확인했다. 기존52개모의/회귀를 새실적으로 합산하지 않는다.
 - 다음 단계: PR232의 LOCAL_ACTUAL_VALIDATION.md와 local-actual-validation-20261108.json에서 항목별 실제 범위·원source/설치버전·GPU분기·공통producer/정책 반환물을 확인한다. 모의18/18과 제품 증거 필요18개 분류는 별도 유지한다.
 - 남은 것: LIF08/12/16·OBS02 새실행없음, 0.31최종worker·TP2/GPUrank/native소비·실제retry/restore/state producer·기업 승인/과거원본. 독립적으로 가능한 이번 CPU 묶음을 마친 뒤 추가GPU를 기동하지 않는다.
+
+## 2026-11-08 — 아홉 설계 경계 CPU 보수·최종 검증 (미커밋)
+
+- 한 일: D01~D12/F01~F14/G01~G07을 아홉 책임 경계로 보수했다. worker/rank·actor/group과 버전 앵커링을 우선 처리하고 provider→실제 factory, recipe·양쪽 비교/이월, 기업 입력·tokenizer/component·정책 기간, attempt·부분 저장 복구·cleanup/lease fence, capture cut/cursor, 독립 receipt와 안전 probe를 연결했다. SGLang/TRT 예제 provider를 별도 wheel로 설치해 공통 선정→실행→판정→보고를 EXAMPLE로 확인했다. 상세 `docs/dev-1/design-repairs-2-20261108.md`.
+- 테스트 결과: snapshot13의 핵심 계약 342 통과/기존 제외1. CPython3.12.3 기본 전체 11,692 통과/19 실패/기존 skip1(pytest252.64초, 부모253.149623초). 19개는 Linux 전용8(별도 Linux CPU 66건에서 모두 통과), 독립 source gate 승인 대기11이다. API26, runtime91+subtest119 통과. guard 설치 파일387/runtime57 일치·반출/복원/재판정 통과, runtime 설치 driver4 통과. 새 skip/제외나 승인 pin 갱신은 없다. 준비 오류·중간 실패도 산출물 `design-repair-2/`에 보존했다.
+- 보존: source1,501경로 검증 중 변경0, 보호 증거·팩·fixture·golden267경로 변경/누락0, published legacy8모듈·B gate3파일·producer8종 유지. HEAD8402ff8947e78c85e75d76c62b0bd91d88cc0512 유지, 커밋·push 없음. 캐시된 Linux CPU 이미지만 사용했고 엔진/GPU 기동·신규 이미지/모델/의존성 다운로드 없음. 최종 검증 뒤 변경은 결과 문서3개뿐이다.
+- 다음 단계/막힌 것: 독립 source gate 알고리즘 검토·review receipt 이후 B positive 통합11건 재검증. 실제 SGLang/TRT native factory·bootstrap producer와 두 릴리스/TP·replica/GPU/계측 자격은 별도다. 예제 확장 성공을 실제 엔진 지원·출하 수락으로 선언하지 않는다. 기능 추가는 계속 보류한다.
+
+## 2026-11-08 — 아홉 설계 경계 구현·검증 진행 (미커밋)
+
+- worker/rank 및 actor group 관측, 엔진 profile→실제 factory, 독립 자격/검토 receipt, recipe·attempt·부분 복구·자원 반환 fence, 기업 입력·공급물 identity, callback cut/cursor, 안전 probe를 보수했다. 기존 원 증거·판정·qualified source pin은 보존한다.
+- CPU 회귀 코드를 추가하고 구현 snapshot을 동결한 뒤 검증한다. 실제 엔진/GPU·신규 의존성 다운로드·커밋 없음. 결과 및 미확인 범위: `docs/dev-1/design-repairs-2-20261108.md`.
+
+## 2026-11-08 — 반복 업데이트·세 엔진 통합 설계 검토
+
+- 한 일: D01~D12와 F01~F14를 실제 파이프라인 경계로 합쳐 다시 추적했다. 부분 저장 실패 뒤 독립 FAIL 은폐, 같은 PLAN의 동시 실행에서 첨부 혼입, cleanup 실패 뒤 후보 기동, tokenizer 변경 입력 손실, 미검증 GET 요청 후보, GPU 수량→all 축소, 현재 manifest 해시의 자동 허용을 추가 G01~G07로 재현했다. 중복을 제외해 엔진/기능 선택·actor/topology·release/qualification·비교/이월·기업 입력·attempt/복구·capture·설치/계약 진화·safe probe의 아홉 책임으로 묶었다. 상세 `docs/dev-1/design-architecture-final-review-20261108.md`.
+- 검증: 저장소 밖 EXAMPLE 실행기·실제 로컬 Store·동기화한 thread·가짜 transport·소스 복사본으로 확인했다. 실제 엔진/GPU를 실행하지 않았다. 전체 기본 시험10,767 passed /814 failed /92 errors /1 skipped /19 deselected(pytest504.89초, 부모505.753초). 호스트는 Darwin arm64/CPython3.12.13이며 진단 문구 기준817건은 code/runtime 계약 미가용 계열,4건은 Linux renameat2 부재다. 나머지85건도 환경 제약과 소비/source binding/호출 계약 실패가 섞여 있어 개별 원인을 구분해야 한다. 실패906건을 독립 결함906개나 전부 새 회귀로 집계하지 않는다. 기존 assert·기대값·제외·skip을 수정하지 않았다.
+- 판단: 현재 설계 동결·출하·세 엔진 지원 완료를 선언할 수 없다. 버전·엔진 추가 때 공통 코드를 수정하지 않는 실제 확장 경로와 실패/반복 실행 관문을 문서화했다. 버전마다 신원/qualification 확인은 필요하지만 센서 구현을 매번 새로 작성해야 하는 것은 아니다. 향후 구조 변경0회를 보장하지 않는다.
+- 보존: 시작1363경로 bytes 변경0·누락0, HEAD8402ff89 유지. 이번 변경은 감사 문서와 이 기록이며 기존 구현·증거·판정·source pin과 AGENTS.md 삭제 상태를 보존했다. 커밋·push·GPU/AWS·엔진/모델/의존성 다운로드 없음. 원자료 `architecture-final-review`에 전체 시험 로그와 준비 오류를 포함해 보존했다.
+- 다음 단계: worker/rank/topology와 독립 release receipt 경계를 먼저 고정하고 부분 완료/attempt/자원 반환을 정리한다. 이어 resolver→factory→비교/이월을 하나의 고정 절차에 연결하고 기업 원본 번역·capture·설치본 수락을 검증한다. 기능 추가는 보류 중이다.
+
+## 2026-11-08 — 2차 설계 감사: 추가·잔존14항목 확인
+
+- 한 일: 사용자의 재감사 요청에 따라 보수된 경계와 실제 factory/collector/비교/이월/기업 입력을 다시 추적했다. 새 producer 자기 참조 등록, native 비교 필드 미기록, rank 전환 시 전체 거부, flat TP 집단·자기 신고 topology, journal 유실 상태 게시 공백, 활성 0.31 gate, candidate 설정 이월 누락, 공용 ENV 번역 실패, 공통 HF 매핑, preview projection 차이, 반복 수집/migration, 정책 기간 전달, lab/EXAMPLE 결합을 문서화했다. 이전 보수의 잔여 작업은 GPU 실증만이 아니다. `docs/dev-1/design-anchor-audit-2-20261108.md`.
+- 검증: CPU/파일/메모리 EXAMPLE 반례와 기존 DECLARED 이월 fixture로 확인. 관련 기존 시험204 passed /1 skipped(pytest2.91초). 원 counterexample·잘못 정렬한 최초 probe 실패·수정한 재현 입력을 구분해 보존했다.
+- 보존: 시작 snapshot1268파일 bytes 변경0, HEAD8402ff89 그대로. 제품 source/팩/시험/승인 목록/기존 증거·판정은 수정하지 않았고 감사 문서와 이 진행 기록만 썼다. 커밋·push·엔진/GPU/AWS/네트워크/다운로드 없음.
+- 다음 단계: F01/F03을 GPU 없이 먼저 수정하고, F04/F05의 actor scope·epoch/watermark 계약을 고정한 뒤 F02/F06/F07/F10의 실제 비교·이월 경로를 연결한다. 기업 입력→격리 실행과 정책/증거 등급은 F08/F09/F13/F14에서 함께 정리한다. 이번 요청은 감사로 마쳤으며 기능 추가는 보류 중이다.
+
+## 2026-11-08 — 사용자 지시: 기능 중단, D01~D12 설계 보수
+
+- 반영: worker/rank·프로세스 세대·native admission·기대 요청을 보존하는 `/2` 소비 계약을 우선 구현했다. 공통 실행의 vLLM/0.31 지식은 provider와 feature profile resolver로 옮겼다. 새 producer/schema/qualification 범위, source-analysis provider, 설치 가능한 CPU helper, 비교 v2, 실행 binding v2, PLAN 기반 acceptance, 팩 정의 hash 현황, bounded page·journal과 계측 범위도 분리했다. 상세 `docs/dev-1/design-fixes-20261108.md`.
+- 검증: 관련 회귀 1,185 passed / 1 skipped(pytest 20.45초, 부모20.67초), 마지막 전체 유실 경계 포함48개 별도 통과. 저장소 밖 offline wheel 설치·과거 pack 재판정·증거 복원·변조 거부·source-CPU 설치 자원도 확인했다. 중간 실패 기록을 보존했고 기존 assert를 완화하지 않았다.
+- 보존: 시작 snapshot의 원 증거·fixture·팩/seed·`.guard` 보호 파일359개 bytes 동일, 등록8종·기존 Ref/FAIL 보존. 기본 팩33은 유지하고 검토용 DRAFT 팩34를 별도 산출했다. 커밋·push·AWS·GPU·모델/의존성 다운로드 없음.
+- 남은 실증: 새 scoped 생산자 TP2 GPU qualification, native 인접 릴리스 source 검토, SGLang/TRT 실제 launch/native, 계측 on/off 대조. 새 생산자는 미등록이고 timing은 미검증이다. 기능 추가는 보류한다.
+
+## 2026-11-08 — 설계 앵커링 감사(사용자 요청, A 기능 추가 중단)
+
+- 한 일: 제품 Python345파일의 AST/import/상수 목록과 주요 경로를 조사해 구조적 앵커링12항목을 기록했다. `docs/dev-1/design-anchor-audit-20261108.md`. core/models/store/report의 중립 경계는 유지할 자산으로 구분한다.
+- 재현: 합성2-worker runner 입력에서 두 번째 worker 소비 행이 사라지고 rank0으로 기록되며 complete=True. 공통 파일 주석만으로 등록8종 중7개 source identity 변화. 대상 버전 메타데이터 차이만으로 NOT_COMPARABLE. managed SGLang 거부·Protocol에 없는 메서드·common startup0.31 gate·real/kubernetes 지원 불일치·source-cpu 설치본 tools 누락·전역 schema와 producer identity 분리도 확인했다. 실제 GPU/타 엔진 취약점 검증이 아니다.
+- 기존 관련 회귀: 계약·runner V1/V2·지원 안내·어댑터94통과(pytest0.55초/부모0.727초), 원 assert 변경0. 합성 반례를 잡지 못하는 기존 회귀의 범위 한계도 구분한다.
+- 다음 단계: TP2 이전 worker/rank/attempt 범위 보존을 우선하고, engine provider/profile/capability·producer/schema·배포·비교 조건·정책 binding 경계를 정리한다. 기존 source pin이나 시험을 완화해 우회하지 않는다. 앞선 A 일정 추정은 이 구조 보수를 포함하지 않았다.
+- 보존: 감사 중 제품345파일 변경0, 원 코드·과거 Ref/FAIL·source pin·등록8종 유지. 감사 문서 외 제품 수정·커밋·푸시·AWS·GPU·다운로드0. 원자료는 Codex 산출물 architecture-audit/.
+
+## 2026-11-08 — 실제 CPU 소비 연결 후속(LIF-06·SUP-03·REQ-09·10)
+
+- 한 일: 실제 OPT 7요청16단계의 ID assignment/admission/attempt/전송/worker/model logits/Sampler/grammar를 연결했다. 진행 중 원 reload_weights 부분 실패·명시 복구와 선택 parameter A/B/A/A를 기록한다. Python read→boot config 내용→worker, tokenizer loader→cached 복사→요청 renderer도 연결했다.
+- REQ-09: 별도 랜덤 소형 Qwen2-VL·합성 tokenizer·dummy weights로 raw RGB/gray→실제 vLLM MM worker/gather→전처리→모델 입력을 4요청8단계로 연결했다. 실제 HF processor/vision/language 4사례의 token 불일치 거부·정상 복구도 별도 보존한다. 상세 `docs/dev-1/consumption-links-cpu.md`.
+- 테스트 결과: 최초 416통과/7실패/기존제외1(pytest2.16초/부모2.355초) 보존. 손상된 forward 단계가 사라져도 완료로 표시되던 제품 결함을 고치고 같은 관련·인접·불변식 423통과/기존제외1(2.16초/부모2.331초), 검증 중1,698파일 변경0. source466파일/팩33·기존GPU등록8종·현황표/diff 검사 통과. offline wheel 별도 target 설치, 제품355파일/자산26개와 세 실제 fixture 소비 일치. 전체 suite·Linux CI·새GPU는 미실행. 원 GAP2·부분 실패 후보 보존, 커밋·푸시0.
+- 정리: 소유 임시 Pod guard-a-links-codex-1108 삭제 완료, 기존 serving/probe Running·재시작0. background 수집·스케줄 없음.
+- 다음 단계/남은 것: 선정 2B snapshot·V2·GPU/전체 weights 원자성/KV kernel·native Rust 읽기·전체 보조물 인가/집행. CPU 연결을 전체 PASS로 올리지 않는다. 기존 GPU 등록8종·B 판정·원 Ref/FAIL·팩33 보존, 새 다운로드·의존성·AWS 0.
+
+## 2026-11-08 — A 인수: REQ-09·10 CPU 소비 지원
+
+- 한 일: REQ-10 실제 SamplingParams→Request/Scheduler→InputBatch→SamplingMetadata→Sampler의 8사례 지원 계약과 수집 도구를 추가했다. REQ-09는 typed embedding→실제 V1 `_gather_mm_embeddings` 6사례를 추가했다. 원 source 전후 SHA·생산자 bytes·닫힌 행·후속 수집 오류에도 독립 후보 보존을 적용했다. `docs/dev-1/req09-10-consumption-cpu.md`.
+- 테스트 결과: k3d CPU 별도 Pod에서 Sampling 성공5/정확 typed 거부3, MM gather4/실제 cache miss1/hidden 불일치1을 확인했다(EXAMPLE). 원 sampling driver의 num_gpu_blocks 미입력·잘못된 예외 분류 실패와 후속 원본을 보존했다. 직접·소스 고정 42 passed(pytest 0.76초, 부모 0.913초), 검증 중 파일 변경 0. 소스 목록461파일/팩33 검증·현황표 --check·diff --check 통과.
+- 다음 단계: 실제 admitted worker/요청 세대와 모델 logits·grammar/V2·선정 MM processor/model 소비를 연결한다. 준비·지원 구성요소 확인과 원 질문 완료를 구분한다. 사용자 지시대로 커밋·푸시하지 않았다.
+- 남은 것: Sampling logits·KV 용량과 MM embedding·협력 상태는 합성이다. 실제 worker 생성/`_update_states`, 실제 모델 소비, 선정 MM model/processor는 미확인이다. model_binding=None·worker_verified=False를 유지하며 텍스트 OPT에 MM 이름을 붙이지 않았다. GPU 등록·B 소비자·원 Ref/FAIL은 변경하지 않았다.
+
+## 2026-11-08 — A 인수: SUP-03 auxiliary parser 부분 관측
+
+- 한 일: 검토 source/code의 Python config·tokenizer·template 로더에서 실제 read 반환, 안정된 FD/경로의 파일 bytes SHA, parser 입력 bytes SHA와 성공한 로더 출력을 연결했다. 별도 `guard-auxiliary-parser-input/1` 지원 계약과 수집 도구를 추가했으며 기존 native17·SUP-03 판정·GPU 등록은 보존했다.
+- 테스트 결과: k3d 별도 임시 Pod에서 config 651bytes, tokenizer 설정 685/441bytes, template 347bytes를 실제 읽었다(EXAMPLE). 원 capture-v1의 qualname 불일치·config 누락과 후속 v2/v3를 보존했다. 직접·소스 고정 28 passed(pytest 0.70초, 부모 0.848초), 고정 파일 변경 0. 명시 빈 LAB 목록과 미입력의 의미·독립 후보 보존을 검증했다.
+- 다음 단계: 같은 임시 Pod에서 REQ-10의 typed 옵션→실제 scheduler/batch/Sampler CPU 구성요소 경로를 확인하고 정리한다. 커밋·푸시는 하지 않는다.
+- 남은 것: native tokenizer 실제 read·admitted worker/rank·캐시/변환 이후 소비·fresh boot 인가/집행은 미확인이다. parser 구성요소 확인을 전체 SUP-03 완료·MEASURED로 올리지 않는다. 상세 `docs/dev-1/sup03-auxiliary-parser.md`.
+
+## 2026-11-08 — A 인수: LIF-06 worker dispatch 부분 관측
+
+- 한 일: 루트의 잘못 적용된 B 전용 AGENTS.md를 사용자 지시로 삭제했다. A측 기존 worktree/브랜치를 이어받아 선택 관측 `transition_dispatches`와 미등록 `transition-dispatch` 생산자를 추가했다. 실제 모델 호출의 요청·attempt 객체 후보·model/parameter/KV 객체와 원 native session/process/call/source/entry 참조를 보존한다. 기존 B transition 판정과 등록 8종은 보존했다.
+- 테스트 결과: 별도 k3d CPU 임시 Pod에서 OPT 요청 두 개·호출 전후 8행을 수집했다(EXAMPLE). 원 GAP 2개와 최초 driver 시작 실패를 보존했다. 직접·인접·불변식 283 passed, 기존 제외 1개(pytest 2.11초, 부모 2.452초), 검증 중 고정 파일 변경 0. 임시 Pod 삭제·기존 서빙/probe Running 확인.
+- 다음 단계: SUP-03 보조 공급물의 실제 읽기·소비 경로, REQ-09·10 최종 소비 반환. 사용자 답변에 따라 커밋·푸시 없이 계속한다.
+- 남은 것: LIF-06의 실제 weights bytes·요청별 KV kernel read·admission attempt 연결·live 전환 부분 실패/복구는 미완료다. 이번 객체 신원을 실제 텐서 소비·전체 LIF-06 완료로 올리지 않는다. 상세 `docs/dev-1/lif06-transition-dispatch.md`.
 
 ## 2026-11-08 — SUP-06 worker shard 공통 입력(B 의존 반환 5)
 

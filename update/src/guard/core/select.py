@@ -252,6 +252,7 @@ def select(
             policy=policy.ref(),
             change=change.ref() if change else None,
             previous_plan=context.previous_plan if context is not None else None,
+            execution_recipe_sha256=context.execution_recipe_sha256 if context is not None else None,
         ),
         change_type=context.change_type if context is not None else None,
         items=items,

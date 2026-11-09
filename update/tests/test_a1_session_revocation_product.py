@@ -113,7 +113,7 @@ def test_registered_cli_existing_connection_constraints_and_exact_refs(tmp_path,
         assert all(e.observations[key].value is False for key in ('session_issuer_event_verified','session_provider_propagation_verified',
             'session_application_session_or_handle_verified','session_serving_session_receipt_verified','session_scope_complete'))
     if mode in {'native-unbound','native-duplicate','engine-replaced','native-partial','native-one-missing','attachment','after-timeout',
-        'http-cleanup','late-capture-gap','wrong-response-id','actual-lab-false','version032','missing-credential','same-credential'}:assert e.execution.status.value=='ABORTED'
+        'http-cleanup','late-capture-gap','wrong-response-id','actual-lab-false','version032','missing-credential','same-credential'}:assert e.execution.status.value==('NOT_RUN' if mode=='version032' else 'ABORTED')
     assert bool(e.execution.cleanup_errors)==(mode=='http-cleanup')
     secrets=(RETIRED,CONTROL,PRIVATE,hashlib.sha256(RETIRED.encode()).hexdigest(),hashlib.sha256(CONTROL.encode()).hexdigest())
     assert all(secret not in canonical_json(e.to_dict()).decode() for secret in secrets)

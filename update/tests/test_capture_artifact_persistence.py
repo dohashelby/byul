@@ -118,12 +118,12 @@ def scenario(tmp_path_factory, monkeypatch):
 
 @pytest.mark.parametrize("fault",["sample-write","partial","missing","sample-serialize","log-open","log-serialize","mkdir","exists"])
 @pytest.mark.parametrize("violation",[False,True],ids=["no-violation","violation"])
-@pytest.mark.parametrize("lab",[False,True],ids=["synthetic-measured","example"])
+@pytest.mark.parametrize("lab",[False,True],ids=["example-without-lab","example-with-lab"])
 def test_capture_failure_preserves_valid_observations_and_successful_refs(scenario,fault,violation,lab):
     case = scenario(fault=fault,violation=violation,lab=lab)
     evd = case.evd
     assert evd.execution.status == ExecStatus.ABORTED and evd.execution.abort_reason == CODE
-    assert evd.data_origin == (DataOrigin.EXAMPLE if lab else DataOrigin.DECLARED)
+    assert evd.data_origin == DataOrigin.EXAMPLE
     assert evd.normal_control.attempted and evd.normal_control.succeeded
     assert all(step.attempted for step in evd.challenges)
     assert {key:value.model_dump() for key,value in evd.observations.items()} == case.expected

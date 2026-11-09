@@ -306,7 +306,7 @@ def test_real_factory_core_run_serializes_write_failure_with_same_config_hash_an
 
     pack = load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE')
     check = pack.checks['LIF-09']
-    env = environment()
+    env = environment(engine={"name": "vllm", "version": "0.31.0"})
     values = {'init_environment_sha256': env.ref().sha256, 'init_target_sha256': 'a' * 64,
         'init_prepared_sha256': 'b' * 64, 'init_validity_start': (T0 - timedelta(minutes=1)).isoformat(),
         'init_validity_end': (T0 + timedelta(minutes=1)).isoformat(), 'init_executor_backend': 'mp',

@@ -1,4 +1,6 @@
 """Closed REQ06 Responses operations; no generic mutating route relaxation."""
+
+from guard.adapters.engine_profiles import supports
 from copy import deepcopy
 import threading
 from guard.models import canonical_json,sha256_hex
@@ -18,7 +20,7 @@ class KubernetesStoredResponsesHTTP(KubernetesRoutesHTTP):
     profile=HTTP_PROFILE
 
     def __init__(self,target,env,*,scope,credentials,duration=300,binary='kubectl',runner=None):
-        if (target.get('lab') is not True or env.engine.name!='vllm' or env.engine.version!='0.31.0'
+        if (target.get('lab') is not True or not supports(env.engine.name, env.engine.version)
                 or any(type(v) is not str or not v for v in (env.model.id,env.model.revision))
                 or type(credentials) is not dict or set(credentials)!={'A','B'}
                 or not all(header_value(v) for v in credentials.values()) or credentials['A']==credentials['B']):raise KubernetesBindingError()

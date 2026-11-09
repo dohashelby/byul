@@ -7,6 +7,8 @@ Only session/owner scoped native request IDs link model configuration observatio
 from __future__ import annotations
 from copy import deepcopy
 
+from guard.adapters.engine_profiles import supports
+
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -23,7 +25,7 @@ from guard.adapters import vllm_ready_endpoint_metadata as endpoint_metadata
 from guard.collectors.file import load_environment
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
-from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
+from guard.runtime.engine_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
 from .base import DraftArtifact, EvidenceDraft
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader, validate_target
 from .lifecycle_session import capture_session, request_index
@@ -123,7 +125,7 @@ def load_generations(cfg, env, values):
             if set(row) != {'id', 'target', 'prepared', 'environment'} or not re.fullmatch('[a-z][a-z0-9-]{0,31}', row['id']):
                 raise ValueError
             selected_env = load_environment(Path(row['environment']))
-            if selected_env.engine.name != 'vllm' or selected_env.engine.version != '0.31.0':
+            if not supports(selected_env.engine.name, selected_env.engine.version):
                 raise ValueError
             with Path(row['target']).open('rb') as stream:
                 target = strict_json(stream.read(65537), limit=65536)

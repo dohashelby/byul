@@ -1,11 +1,13 @@
 """Read-only LIF12 declarations using the existing owned OBS01 file reader."""
+
+from guard.adapters.engine_profiles import supports
 from pathlib import Path
 import os
 import stat
 
 from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import capture_pipes, strict_json
-from guard.runtime.kubernetes_http import KubernetesHTTP, REQUIRED_EVENT_PROFILE
+from guard.runtime.engine_http import KubernetesHTTP, REQUIRED_EVENT_PROFILE
 from .http_common import Ctx, HttpCheckExecutor
 from .kubernetes_observation import RequiredEventReader
 from .owned_capture import MAX_BYTES
@@ -58,7 +60,7 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
                 raise ValueError
             if 'prepared' in self.cfg and (type(self.cfg['prepared']) is not str or not self.cfg['prepared']):
                 raise ValueError
-            if env.engine.name != 'vllm' or env.engine.version != '0.31.0':
+            if not supports(env.engine.name, env.engine.version):
                 raise ValueError
             start, end = contract.normalize_policy(policy_values)
             if env.ref().sha256 != policy_values['retry_environment_sha256'] or not start <= utcnow() <= end:

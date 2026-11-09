@@ -46,7 +46,8 @@ def scenario(tmp_path_factory, monkeypatch):
         plan = select(pack, [env], pol)
         store.put(plan)
         assert plan.item("OBS-09").selected
-        work = store.root / "work" / plan.id / "OBS-09" / "single"
+        attempt = 'ATTEMPT-EXAMPLE-HTML'
+        work = store.root / "work" / plan.id / attempt / "OBS-09" / "single"
         original_write, original_mkdir, original_exists = Path.write_bytes, Path.mkdir, Path.exists
         original_put = store.put_artifact
         mkdir_failed = []
@@ -83,7 +84,7 @@ def scenario(tmp_path_factory, monkeypatch):
             patch.setattr(Path, "mkdir", mkdir)
             patch.setattr(Path, "exists", exists)
             patch.setattr(store, "put_artifact", put)
-            evd, = run_plan(store, pack, plan, RunConfig(executors={"log_integrity":"html-test"}, adapter="vllm"))
+            evd, = run_plan(store, pack, plan, RunConfig(executors={"log_integrity":"html-test"}, adapter="vllm", attempt_id=attempt))
         res, = judge_plan(store, pack, plan, as_of=T0)
         return SimpleNamespace(store=store, pack=pack, plan=plan, evd=evd, res=res, world=world, work=work)
     return invoke

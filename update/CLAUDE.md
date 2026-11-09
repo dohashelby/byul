@@ -6,17 +6,17 @@
 
 ## 1. 가장 먼저: 엔진·판본에 묶이지 않는다 (2026-11-09 사용자 결정)
 
-- 지원 대상 엔진은 vLLM, SGLang(반드시 확장), TensorRT-LLM(가능하면 확장)이다. 어떤 계층도 vLLM이나 특정 판본(예: `0.31.0`)을 전제하지 않는다.
+- 지원 대상 엔진은 vLLM, SGLang(반드시 확장), TensorRT-LLM(가능하면 확장)이다. 어떤 계층도 vLLM이나 특정 판본(예: `0.31.0`)을 전제하지 않는다. TensorRT-LLM 때문에 중대한 설계 문제가 생기면 TensorRT-LLM은 포기할 수 있다(2026-11-09 사용자 지시). SGLang은 포기하지 않는다.
 - 이 결정에 맞춰 SPEC §0 범위표·§7.1·§12 D7을 고쳤다(2026-11-09). `DECISIONS.md` 2026-11-02의 "내부 센서·Kubernetes 수집기는 vLLM 0.31 전용"은 이 결정으로 대체됐다.
 - **지금 범위**(2026-11-09 사용자 결정, [결정 기록](docs/dev-1/user-decisions-20261109.md)):
   - SGLang은 구조 준비까지만 한다. 엔진 provider, 판본 profile, 공통 입력 계약 의미(2절), 엔진 식별 계약(11절)이 여기에 해당한다.
-  - SGLang 생산자·설치기·수집 도구·lab·GPU 실측·등록은 하지 않는다. SGLang request-attempt 후보(`byul-sglang` 작업 트리)는 보류한다.
+  - SGLang 생산자·설치기·수집 도구·lab·GPU 실측·등록은 하지 않는다. SGLang request-attempt 후보(로컬 브랜치 `claude/sglang-request-attempt`, 병합하지 않음)는 보류한다.
   - vLLM을 먼저 완성한다(완성 기준은 5절).
 - 계층별로 엔진 지식을 둘 수 있는 곳:
 
 | 계층 | 엔진·판본 지식 | 규칙 |
 |---|---|---|
-| `core/`·`models/`·`store/`·`judges/` | 없음 | 엔진 이름·판본 문자열을 쓰지 않는다. `tests/test_engine_neutral_core.py`가 core·models·store를 검사한다. `judges/declared.py`의 `guard-vllm-native-info-v1` 수집 프로파일 비교는 기존 예외이고, 옮길 대상이다. |
+| `core/`·`models/`·`store/`·`judges/` | 없음 | 엔진 이름·판본 문자열을 쓰지 않는다. `tests/test_engine_neutral_core.py`가 core·models·store를 검사한다. 수동 로그 정책의 수집 프로파일 이름(`guard-vllm-native-info-v1`)은 `log_policy_profiles.py`의 계약 데이터로 옮겨졌다. |
 | 판정 입력 | 엔진 중립 계약만 | 판정은 엔진 원시 관측 행을 직접 읽지 않는다. 공통 입력 계약(`collectors/gpu_common_inputs.py`)의 `validate()` 결과처럼 엔진과 무관한 형식을 읽는다. |
 | `executors/`·`runtime/`·`collectors/`의 변환 | 없음 | 엔진·판본 확인은 지원표 조회로만 한다. `engine.name != 'vllm'`, `version != '0.31.0'` 같은 문자열 비교를 새로 쓰지 않는다. |
 | `adapters/` | 엔진·판본별 데이터 | 관측 지점, 소스 고정값, HTTP 경로표, 프로세스 역할 이름, 로그 형식, 기동 명령, 변경 경로표는 여기에만 둔다. |
@@ -32,7 +32,11 @@
   - 엔진 고유 사실이 계약 의미에 맞지 않으면 값을 지어내거나 다른 엔진의 의미로 바꾸지 않는다. null과 진단 코드로 남긴다.
   - 계약 의미를 바꿔야 하면 schema 판본을 올리는 안으로 올리고 `DECISIONS.md` 열린 질문에 적는다.
 - **기존 vLLM 고정 코드는 옮길 대상이다.**
-  - 실행기·Kubernetes 수집 파일 27개가 `vllm`·`0.31.0` 문자열을 비교하고, 관측기 `adapters/vllm_*.py`가 0.31.0 소스에 고정돼 있다. 이 파일을 고칠 때는 지원표 조회로 바꾸는 것을 먼저 검토하고, 새 고정 조건은 더하지 않는다. 지원표는 A 설계 보수의 엔진 provider·판본 profile(`adapters/engine_provider.py`·`adapters/engine_profiles.py`·`adapters/assets/engine_profiles.json`)로 들어온다(아직 미병합).
+  - 엔진·판본 지원은 판본 profile 목록(`adapters/assets/engine_profiles.json`, 조회는 `adapters/engine_profiles.py`의 `supports`·`require`·`require_transport`)과 엔진 provider(`adapters/engine_provider.py`의 `EngineProvider`·`VllmProvider`, 설치 패키지는 `guard.engine_providers` entry point)가 정한다. 새 엔진·판본은 profile 행과 provider를 더해 지원하고 공통 코드는 고치지 않는다. 실행기·수집 파일 27개에 있던 `vllm`·`0.31.0` 비교는 24개 파일에서 이 조회로 바뀌었다(2026-11-09 A 설계 보수).
+  - 남은 고정 지점(옮길 대상, 새로 더하지 않는다):
+    - `runtime/kubernetes_http.py`·`runtime/kubernetes_startup_binding.py`·`runtime/kubernetes_worker_readiness.py`의 판본 비교. 이 파일 bytes가 증거의 수집기 신원과 B 검토 원본 대조에 쓰여, B 검토(source gate)와 함께 옮긴다.
+    - vLLM 소스를 직접 분석하는 CPU 실행기: `executors/engine_sensor.py`의 source slot, `profiler_lifecycle_cpu.py`, `structured_tools_cpu.py`, `template_source_cpu.py`, `sampling_consumption_cpu.py`, `multimodal_gather_cpu.py`. vLLM 구현이므로 provider(`adapters/`) 쪽으로 옮긴다.
+    - 관측기 `adapters/vllm_*.py`의 0.31.0 소스 고정값은 엔진·판본별 데이터라 그대로 두되, 새 판본은 고정값 행을 더해 지원한다.
   - 이름이 `vllm_`로 시작해도 엔진 공통 기반인 파일이 있다. 예를 들어 `adapters/vllm_cache_callback.py`는 감싸기·자격 확인 기반이다. 이런 파일에 엔진별 값을 넣지 않고, 관측기마다 자기 고정값 표를 넘긴다.
   - 등록된 생산자 신원이 걸린 파일의 이름 변경이나 분리는 별도 결정으로 한다.
 - **결과는 엔진·판본별로 따로 둔다.** 한 엔진·판본의 CPU·GPU 결과를 다른 엔진·판본의 결과로 옮기거나 합치지 않는다.
@@ -114,6 +118,7 @@
 ## 7. 작업 방식
 
 1. SPEC §8 개발 순서를 따른다. **사용자 지시(2026-10-19):** 합의한 구현 묶음을 마친 뒤 테스트 → 실패 수정 → 필요한 재검증 순서로 한다. 묶음 안의 각 단계마다 테스트를 반복하지 않는다. 불변식 회귀는 `tests/invariants/test_inv_XX.py`에 유지하고, 구현이 불변식을 어기면 구현을 고친다.
+   - **사용자 지시(2026-11-09):** 전체 기본 suite는 로컬에서 돌리지 않고 PR의 Linux CI(Python 3.12.3)에 맡긴다. 로컬에서는 바꾼 부분의 직접 시험과 빠른 정합성 검사(`tools.checklist_status --check`, 계약 검사)만 한다. CI 결과가 나오기 전에는 전체 시험이 통과했다고 말하지 않는다.
 2. 실행하지 않은 시험의 결과를 만들거나 예시 값을 `MEASURED`로 표시하지 않는다(INV-02).
 3. **사용자 지시(2026-10-24): 60초를 넘겨도 중단하지 않고, 시간 초과 실패 gate를 추가하지 않는다.**
    - 전체 suite의 pytest 시간과 부모 프로세스 벽시계를 각각 기록한다.
@@ -171,7 +176,7 @@
 - **공용 계약(`../contracts/`)은 제안만 한다.** 스키마·enum·생산자·표시 소유권 변경은 사용자 검토 뒤 반영한다. `../contracts/README.md`와 실제 스키마가 외부 교환 형식의 기준이다. guard 내부 모델은 유지하고 경계에서 변환한다.
 - **엔진 식별 계약**(2026-11-09 사용자 승인, `../contracts/README.md` 변경 이력):
   - `environment.target.engine.name`과 `runtime_kind`는 소문자 식별자 형식(`^[a-z][a-z0-9_.-]{0,63}$`)이다. 정해진 목록이 아니어서 엔진이 늘어도 계약을 고치지 않는다. 정규 값은 `vllm`·`sglang`·`tensorrt-llm`이고 모의 엔진은 `mock`이다. update의 provider·판본 profile·생산자 이름도 같은 식별자를 쓴다.
-  - 환경 변환(`tools/import_byul_inputs.py`의 `convert_documents()`)은 `guard-byul-input-import/2`로 아래 값을 guard 객체에 직접 넣는다. A 설계 보수를 병합할 때 반영하며, `/1`은 과거 결과 재생용으로 남긴다. 그 전까지는 원본(`source-environment.json`)에 보존하고 `limitations`에 표시한다.
+  - 환경 변환(`tools/import_byul_inputs.py`의 `convert_documents()`)의 기본은 `guard-byul-input-import/2`이며 아래 값을 guard 객체에 직접 넣는다. `/1`은 과거 결과 재생용이며, 이 값들을 원본(`source-environment.json`)에 보존하고 `limitations`에 표시한다.
     - `EngineInfo`: `runtime_kind`·`frontend`(`engine-server`·`triton`)
     - `RuntimeInfo`: `tp_size`·`pp_size`·`dp_size`
     - `ModelInfo`: `tokenizer_revision`·`components`

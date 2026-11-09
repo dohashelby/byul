@@ -6,11 +6,11 @@ coverage, engine identity and the security/functional result remain unmeasured.
 """
 from __future__ import annotations
 
+from guard.adapters.engine_provider import evidence_contract, get_provider
+
 from collections.abc import Iterable
 import re
 
-from guard.adapters.vllm import (CHAT_REVIEWED_IMAGE, CHAT_TEMPLATE_CONTAINER_PATH,
-                                 CHAT_TEMPLATE_SHA256, VllmAdapter)
 from guard.automation_policy import (string_list, validate_log_integrity_policy,
                                      validate_request_binding_policy, validate_template_policy)
 from guard.core.select import check_policy_value
@@ -30,6 +30,7 @@ from guard.input_policy import policy_context
 
 # Descriptions of the existing collectors, not a second plugin registry.
 _SCOPES = {
+    "engine_sensor": "source-qualified native feature with exact runtime artifact and worker scope verification",
     "unix_ipc": "owned Linux Unix SOCK_STREAM zero-payload UID access only; no full IPC PASS",
     "direct_route": "registered route access and bounded normal inference controls",
     "role_route": "declared general/admin roles over registered route kinds",
@@ -88,12 +89,17 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
     never removes selected checks or promotes declared inputs to observations.
     """
     rows = []
-    adapter = VllmAdapter()
+    try:
+        provider = get_provider(env.engine.name)
+        adapter = provider.adapter()
+    except ValueError:
+        provider, adapter = None, None
     for check_id in dict.fromkeys(selected_check_ids):
         check = pack.checks.get(check_id)
         executor = check.executor if check is not None else None
         row = {"check_id": check_id, "executor": executor, "status": "UNKNOWN",
                "policy_valid": None, "policy_supported": None,
+               "code_available": False, "profile_available": False, "runtime_qualified": False,
                "scope": _SCOPES.get(executor, "manual evidence; no automatic collection profile"),
                "reasons": [], "limitations": [_COMMON_LIMIT]}
         rows.append(row)
@@ -121,23 +127,37 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             continue
         row["policy_valid"] = True
         implementation = cfg.get("executors", {}).get(executor)
-        kube=executor=="request_binding" and implementation=="kubernetes" and not managed
-        if implementation != "real" and not kube or registry.resolve_executor(executor, implementation) is None:
+        kube = implementation == "kubernetes" and not managed
+        if (implementation != "real" and not kube) or registry.resolve_executor(executor, implementation, engine=env.engine.name, version=env.engine.version) is None:
             row["status"] = "UNSUPPORTED"
             row["reasons"].append("a registered real collector is not selected; fake execution is not engine support")
+            continue
+        row['code_available'] = True
+        if executor == 'engine_sensor':
+            selected_factory = registry.resolve_executor(executor, implementation, engine=env.engine.name, version=env.engine.version)
+            selected_executor = selected_factory(cfg)
+            describe = getattr(selected_executor, 'support', None)
+            state = describe(check.id, check.collection_profile, env) if callable(describe) else {'implemented': False, 'reason': 'PLUGIN_SUPPORT_CONTRACT_UNAVAILABLE'}
+            row.update(code_available=state.get('code_available', state['implemented']),
+                       profile_available=state['implemented'], runtime_qualified=False)
+            row['status'] = 'SUPPORTED' if state['implemented'] else 'UNSUPPORTED'
+            row['policy_supported'] = state['implemented']
+            row['reasons'].append(state.get('reason') or 'runtime source, artifact and worker scope qualification is required')
             continue
         if executor not in _SCOPES:
             row["reasons"].append("no static support description exists for this collector")
             continue
-        if cfg.get("adapter", {}).get("name") != "vllm" or env.engine.name != "vllm":
+        if provider is None or cfg.get("adapter", {}).get("name") != env.engine.name:
             row["reasons"].append("declared adapter/engine identity does not match the existing engine adapter")
             continue
         row["status"] = "SUPPORTED"
         row["policy_supported"] = True
+        row["profile_available"] = True
         row["reasons"].append("declared configuration selects the existing bounded real collector")
 
         def unsupported(reason, *, policy_scope=False):
             row["status"] = "UNSUPPORTED"
+            row["profile_available"] = False
             if policy_scope:
                 row["policy_supported"] = False
             row["reasons"].append(reason)
@@ -174,12 +194,12 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                     row["status"] = "UNKNOWN"
                 row["reasons"].append("external target ownership and launch metadata require runtime verification")
                 if kube:
-                    if adapter.request_binding_contract(env.engine.image_digest,env.engine.version) is None:
+                    if evidence_contract(adapter, "request_binding_contract", env.engine.image_digest,env.engine.version) is None:
                         unsupported("REQ-11 has no inspected consumer-source contract for the exact image/version")
                     row["limitations"].append("Kubernetes direct Pod JSON/SSE only; no Service/Gateway/TLS or GPU-release proof")
                 continue
-            launch = cfg.get("vllm", {})
-            if launch.get("launch_profile") != "cpu-bounded" or env.runtime.gpu_count != 0:
+            launch = cfg.get(env.engine.name, {})
+            if not provider.bounded_cpu_evidence(launch, env):
                 unsupported("this inspected collection profile requires an explicit bounded CPU launch")
             image, version = env.engine.image_digest, env.engine.version
             if not image or not version:
@@ -189,26 +209,26 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             elif executor == "template_validation":
                 # The adapter's template_rejection_evidence returns only this
                 # image/version's inspected pre-generation rejection proofs.
-                if not template_supply and (image != CHAT_REVIEWED_IMAGE or version != "0.31.0"):
+                if not template_supply and not provider.template_rejection_supported(image, version):
                     unsupported("REQ-07 pre-generation source evidence is inspected only for the exact pinned image/version")
                 if template_supply and (len(image) > 512 or re.fullmatch(
                         r"[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64}", image) is None):
                     unsupported("template supply collection requires an explicit repository-pinned image; a bare manifest digest is not a launch reference")
             elif executor == "request_binding":
-                if adapter.request_binding_contract(image, version) is None:
+                if evidence_contract(adapter, "request_binding_contract", image, version) is None:
                     unsupported("REQ-11 has no inspected consumer-source contract for the exact image/version")
-            elif adapter.native_log_contract(image, version) is None:
+            elif evidence_contract(adapter, "native_log_contract", image, version) is None:
                 unsupported("OBS-09 has no inspected native logging contract for the exact image/version")
 
             if executor in {"template_validation", "request_binding"}:
                 metadata = {"profile": launch.get("chat_template_profile"), "version": "1",
-                            "sha256": CHAT_TEMPLATE_SHA256, "container_path": CHAT_TEMPLATE_CONTAINER_PATH,
+                            "sha256": provider.template_profile().get("sha256"), "container_path": provider.template_profile().get("container_path"),
                             "content_format": "string", "request_overrides": False}
-                if not adapter.supports_template_profile(metadata):
+                if not evidence_contract(adapter, "supports_template_profile", metadata):
                     unsupported("the declared fixed chat-template profile is absent or unsupported")
                 row["limitations"].append("readonly template bytes, launch argv and owned container identity need runtime verification")
             if executor == "template_validation":
-                if CHAT_TEMPLATE_SHA256 not in values.get("allowed_template_sha256", []):
+                if provider.template_profile().get("sha256") not in values.get("allowed_template_sha256", []):
                     row["limitations"].append("the selected fixed template is outside the unchanged policy allowlist; a runtime violation may be observed")
             elif executor == "log_integrity":
                 if launch.get("logging_profile") != "request-info-v1":

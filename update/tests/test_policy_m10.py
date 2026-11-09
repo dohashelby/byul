@@ -189,6 +189,7 @@ def test_invalid_normal_profile_preflight_and_offline(pack, change):
 
 
 def test_endpoint_comes_from_definition_and_request_not_policy(tmp_path, monkeypatch, pack):
+    pack = with_legacy_check(pack, 'REQ-09')
     c = pack.checks["REQ-09"].model_copy(deep=True); c.functional_probes[0].path = "/EXAMPLE-custom"
     p = pack.model_copy(update={"checks": {**pack.checks, "REQ-09": c}})
     st, _, evd, res, calls = run(tmp_path, monkeypatch, p, values(c))
@@ -203,10 +204,9 @@ def test_endpoint_comes_from_definition_and_request_not_policy(tmp_path, monkeyp
 
 @pytest.mark.parametrize("boundary,expected", [(400,"PASS"),(200,"FAIL"),(206,"FAIL"),("timeout","UNKNOWN"),(500,"UNKNOWN"),(401,"UNKNOWN")])
 def test_boundary_results_keep_existing_meaning(tmp_path, monkeypatch, pack, boundary, expected):
-    # These two status-only FAIL cases exercise the immutable historical
-    # definition. New definitions never treat raw 2xx as consumption proof.
-    if boundary in (200, 206):
-        pack = with_legacy_check(pack, "REQ-09")
+    # This status-only table exercises the immutable historical definition.
+    # Current semantics require a separate rejection/consumption proof.
+    pack = with_legacy_check(pack, "REQ-09")
     def probe(requests):
         return [synthetic_input_response(r, 200 if r.get("id")=="ready" or r["body"]["prompt"]==[0] else boundary) for r in requests]
     _, _, evd, res, _ = run(tmp_path, monkeypatch, pack, values(pack.checks["REQ-09"]), probe)
@@ -402,6 +402,7 @@ def test_automatic_report_forwards_only_safe_context(tmp_path,monkeypatch,pack):
 
 
 def test_comparison_keeps_conditions_and_cpu_performance(tmp_path,monkeypatch,pack):
+    pack = with_legacy_check(pack, 'REQ-09')
     _,_,evd,res,_=run(tmp_path,monkeypatch,pack,values(pack.checks["REQ-09"]))
     comp=evd.comparability.model_copy(update={"fixture_sha256":"a"*64,"config_sha256":"b"*64,
         "model_inventory_sha256":"c"*64})
@@ -409,3 +410,11 @@ def test_comparison_keeps_conditions_and_cpu_performance(tmp_path,monkeypatch,pa
     assert compare_results(res.verdicts.security,comp,res.verdicts.security,comp.model_copy(update={"fixture_sha256":"d"*64}))=="NOT_COMPARABLE"
     assert compare_results(res.verdicts.security,comp,res.verdicts.security,comp.model_copy(update={"cpu":None}))=="NOT_COMPARABLE"
     assert res.verdicts.performance=="UNKNOWN"
+
+
+def test_current_definition_withholds_pass_for_status_only_rejection(tmp_path, monkeypatch, pack):
+    _, _, evd, result, _ = run(tmp_path, monkeypatch, pack, values(pack.checks['REQ-09']))
+    assert evd.execution.status.value == 'COMPLETED' and evd.normal_control.succeeded
+    assert result.verdicts.security.value == 'UNKNOWN'
+    assert result.verdicts.functional.value == 'PASS'
+    assert evd.data_origin.value == 'EXAMPLE'

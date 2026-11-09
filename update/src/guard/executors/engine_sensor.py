@@ -73,6 +73,19 @@ except Exception:
 print('BYUL_ENGINE_SENSOR_SLOT='+json.dumps(record,separators=(',',':')))
 '''
 
+PACKAGED_CPU_PROGRAM = r'''
+import json,pathlib,sys
+sys.path.insert(0,sys.argv[1])
+from guard.reference import slot_cpu as slot
+slot.verify_component()
+record=slot.capture_slot_cpu(pathlib.Path(sys.argv[2]),pathlib.Path(sys.argv[3]),source_profile='target031')
+try: slot.verify_component()
+except Exception:
+ record['capture_status']='incomplete'
+ record['engine_sensor_component_postcheck']='unavailable'
+print('BYUL_ENGINE_SENSOR_SLOT='+json.dumps(record,separators=(',',':')))
+'''
+
 # These are required observations, not promises that current sensors emit them.
 # Keeping them per check prevents a successful HTTP control from standing in for
 # the actual question, or another check's evidence from supplying missing facts.
@@ -111,7 +124,10 @@ def _verify_frozen_component(root):
     therefore be checked before the child gets their import path, even though
     the original gate checks its own files again after import.
     """
-    from tools import b_req18_slot as slot, b1_integration_cpu as helper
+    try:
+        from tools import b_req18_slot as slot, b1_integration_cpu as helper
+    except ImportError:
+        raise ValueError('ENGINE_SENSOR_LEGACY_ARTIFACT_REQUIRED') from None
     own_repo = Path(__file__).resolve().parents[4]
     try:
         for module, function, relative, digest in (
@@ -124,14 +140,13 @@ def _verify_frozen_component(root):
     except Exception:
         raise ValueError('ENGINE_SENSOR_FROZEN_COMPONENT_PARENT_VERIFICATION_FAILED') from None
 
-
 def _component_argv(cfg, cache):
     # -B alone disables cache writes, not reads. The private fresh prefix makes
     # every component import compile its verified source instead of old pyc.
     return [cfg.get('python_binary', sys.executable), '-I', '-B', '-X', 'pycache_prefix='+str(cache),
-            '-c', CPU_PROGRAM, str(Path(cfg['component_root']).resolve()),
+            '-c', CPU_PROGRAM if 'component_root' in cfg else PACKAGED_CPU_PROGRAM,
+            str(Path(cfg['component_root']).resolve()) if 'component_root' in cfg else str(Path(__file__).resolve().parents[2]),
             str(Path(cfg['source_root']).resolve()), str(Path(cfg['owned_parent']).resolve())]
-
 
 def _answer(body):
     """비교용 답변 해시. 원문은 증거에 남기지 않는다."""
@@ -145,28 +160,33 @@ def _sha(value):
     return type(value) is str and re.fullmatch('[0-9a-f]{64}', value) is not None
 
 
-def native_capability(check_id):
-    """Read only reviewed program constants; never approve pins from input/HEAD."""
+def native_capability(check_id, env=None, *, implementation="kubernetes"):
+    """Code availability is separate from profile and runtime qualification."""
+    if env is not None:
+        from guard.adapters.engine_profiles import resolve
+        profile = resolve(env.engine.name, env.engine.version, "native_lifecycle")
+        if implementation != "kubernetes" or not profile.available:
+            return {"implemented": False, "reason": "ENGINE_SENSOR_PROFILE_UNREVIEWED",
+                    "code_available": check_id in PROFILES, "profile_available": False, "runtime_qualified": False}
     if check_id not in PROFILES:
         raise ValueError('ENGINE_SENSOR_CHECK_UNSUPPORTED')
     if check_id in CALLBACK_CHECKS:
         return {'implemented': True, 'reason': None}
     if check_id == 'REQ-18':
-        from tools import b_req18_slot as slot
-        from guard.runtime import kubernetes_http
-        ready = (type(slot.A_SOURCE_PINS) is dict and bool(slot.A_SOURCE_PINS)
-                 and all(_sha(v) for v in slot.A_SOURCE_PINS.values())
-                 and type(slot.POINT_CONTRACTS) is dict and bool(slot.POINT_CONTRACTS)
-                 and _sha(slot.CALLBACK_CODE_SHA256)
-                 and type(getattr(kubernetes_http, 'SLOT_MASK_PROFILE', None)) is str)
-        return {'implemented': bool(ready), 'reason': None if ready else 'REVIEWED_SLOT_NATIVE_CONTRACT_UNAVAILABLE'}
+        return {'implemented': False, 'reason': 'REVIEWED_SLOT_NATIVE_CONTRACT_UNAVAILABLE'}
     return {'implemented': False, 'reason': 'ENGINE_SENSOR_NATIVE_PRODUCER_UNIMPLEMENTED'}
 
 
 def slot_observations(record):
     """Reuse the unchanged source-invariant qualifier, including positive facts."""
-    from tools import b_req18_slot as slot
-    result = slot._cpu_result(record)
+    from guard.reference import slot_result as slot
+    if isinstance(record, dict) and record.get('sensor_artifact') == 'guard-source-cpu/2':
+        from guard.reference.integrity import verify_packaged
+        pins = verify_packaged('slot')
+        result = slot._cpu_result(record, collector_sha256=pins['reference/slot_cpu.py'],
+                                  callback_sha256=pins['adapters/vllm_slot_mask.py'])
+    else:
+        result = slot._cpu_result(record)
     collected = result is not None and result.get('collected') is True
     return {
         'engine_sensor_violation': {'value': result['mismatch'] if collected else None, 'collected': collected},
@@ -179,7 +199,7 @@ def slot_observations(record):
 class EngineSensorExecutor:
     """A single executor name; source CPU is never substituted for Kubernetes."""
     name = 'engine_sensor'
-    version = '0.1.4'
+    version = '0.3.0'
 
     def __init__(self, cfg, *, implementation='kubernetes', expected_target_sha256=None):
         self.cfg = deepcopy(cfg)
@@ -187,14 +207,19 @@ class EngineSensorExecutor:
         self.expected_target = expected_target_sha256
         self.transport = None
 
-    def support(self, check_id, collection_profile):
+    def support(self, check_id, collection_profile, env=None):
         if self.implementation == 'source-cpu':
             good = check_id == 'REQ-18' and collection_profile == CPU_PROFILE
             return {'implemented': good, 'scope': 'source_component',
                     'reason': None if good else 'ENGINE_SENSOR_CPU_PROFILE_UNSUPPORTED'}
-        if self.implementation != 'kubernetes' or PROFILES.get(check_id) != collection_profile:
+        from guard.runtime.sensor_binding import SUFFIX
+        if self.implementation != 'kubernetes' or collection_profile not in (PROFILES.get(check_id), (PROFILES.get(check_id) or '') + SUFFIX):
             return {'implemented': False, 'scope': 'native', 'reason': 'ENGINE_SENSOR_PROFILE_UNSUPPORTED'}
-        return {**native_capability(check_id), 'scope': 'native'}
+        state = native_capability(check_id, env, implementation=self.implementation)
+        return {**state, 'scope': 'native',
+                'code_available': check_id in CALLBACK_CHECKS or check_id == 'REQ-18',
+                'profile_available': state.get('profile_available', state['implemented'] if env is not None else None),
+                'runtime_qualified': False}
 
     def validate_policy(self, check, values):
         if check.executor != self.name:
@@ -206,21 +231,38 @@ class EngineSensorExecutor:
             if values:
                 raise ValueError('ENGINE_SENSOR_SOURCE_CPU_POLICY_UNSUPPORTED')
         else:
-            required = {'sensor_environment_sha256', 'sensor_target_sha256',
-                        'sensor_prepared_sha256', 'sensor_manifest_sha256'}
+            from guard.runtime.sensor_binding import KEYS, SUFFIX, values as binding_values
+            required = KEYS
+            if check.collection_profile.endswith(SUFFIX):
+                binding_values(self.cfg.get('binding'))
+                if set(values) & KEYS:
+                    raise ValueError('SENSOR_RUN_BINDING_BELONGS_TO_EXECUTION')
+                return
             if type(values) is not dict or not required <= set(values) or any(not _sha(values[k]) for k in required):
                 raise ValueError('ENGINE_SENSOR_EXACT_POLICY_BINDING_REQUIRED')
 
     def run(self, check, env, policy_values, adapter, workdir):
+        state = self.support(check.id, check.collection_profile, env)
+        if not state['implemented']:
+            raise EngineSensorNotImplemented(state['reason'])
         self.validate_policy(check, policy_values)
         if self.implementation == 'source-cpu':
             return self._source_cpu(check, env, workdir)
-        return self._native(check, env, policy_values, workdir)
+        from guard.runtime.sensor_binding import SUFFIX, values as binding_values
+        bound = binding_values(self.cfg.get('binding')) if check.collection_profile.endswith(SUFFIX) else policy_values
+        return self._native(check, env, bound, workdir)
+
+    def _verify_cpu_component(self):
+        if 'component_root' in self.cfg:
+            _verify_frozen_component(self.cfg['component_root'])
+        else:
+            from guard.reference.integrity import verify_packaged
+            verify_packaged('slot')
 
     def _source_cpu(self, check, env, workdir):
-        from tools import b_req18_slot as slot
+        from guard.reference import slot_result as slot
         if (set(self.cfg) - {'source_root', 'owned_parent', 'component_root', 'python_binary'}
-                or not {'source_root', 'owned_parent', 'component_root'} <= set(self.cfg) or not env.hash_ok()
+                or not {'source_root', 'owned_parent'} <= set(self.cfg) or not env.hash_ok()
                 or env.engine.name != 'vllm' or env.engine.version != 'source-' + slot.SOURCE_COMMIT
                 or env.engine.image_digest is not None
                 or any(v is not None for v in (env.model.id, env.model.revision, env.model.inventory_sha256))):
@@ -228,7 +270,7 @@ class EngineSensorExecutor:
         # The historical component gate covers the entire original src/pack tree.
         # Execute it in its frozen checkout, never relax it to admit this new file.
         from guard.runtime.bounded import capture_pipes, strict_json
-        _verify_frozen_component(self.cfg['component_root'])
+        self._verify_cpu_component()
         began = utcnow()
         cache = tempfile.TemporaryDirectory(prefix='guard-engine-sensor-import-')
         cache_cleanup_failed = False
@@ -254,7 +296,7 @@ class EngineSensorExecutor:
         if cache_cleanup_failed:
             gap.append('ENGINE_SENSOR_IMPORT_CACHE_CLEANUP_UNVERIFIED')
         try:
-            _verify_frozen_component(self.cfg['component_root'])
+            self._verify_cpu_component()
         except Exception:
             gap.append('ENGINE_SENSOR_PARENT_COMPONENT_POSTCHECK_UNAVAILABLE')
         if pipe.get('pipes_closed') is False or 'child_reap' in pipe.get('read_errors', []):
@@ -271,19 +313,24 @@ class EngineSensorExecutor:
             started_at=began, finished_at=utcnow(),
             abort_reason=None if complete else 'ENGINE_SENSOR_SOURCE_CPU_INCOMPLETE',
             cleanup_errors=list(raw.get('cleanup_errors', [])),
-            config={'profile': CPU_PROFILE, 'source_commit': slot.SOURCE_COMMIT,
+            config={'profile': CPU_PROFILE if 'component_root' in self.cfg else CPU_PROFILE + '-packaged-v2', 'source_commit': slot.SOURCE_COMMIT,
                     'scope': 'source_component', 'installed_target': None, 'gpu_execution_verified': False})
         return self._artifact(draft, workdir, {'safe_facts': result, 'diagnostic_codes': gap})
 
     def _native(self, check, env, values, workdir):
+        from guard.adapters.engine_profiles import require
         from guard.collectors.lifecycle import load_prepared
         from guard.collectors import engine_callbacks
         from guard.runtime.bounded import strict_json
         from guard.executors.kubernetes_lifecycle_capture import validate_target
-        if (set(self.cfg) - {'target', 'prepared', 'manifest', 'max_duration_seconds', 'kubectl_binary', 'principal_token_env', 'gateway_target'}
+        if (set(self.cfg) - {'target', 'prepared', 'manifest', 'max_duration_seconds', 'kubectl_binary', 'principal_token_env', 'gateway_target', 'binding', 'comparison_settings'}
                 or not {'target', 'prepared', 'manifest'} <= set(self.cfg)
-                or not env.hash_ok() or env.engine.name != 'vllm' or env.engine.version != '0.31.0'):
+                or not env.hash_ok()):
             raise ValueError('ENGINE_SENSOR_NATIVE_CONFIGURATION_INVALID')
+        try:
+            require(env.engine.name, env.engine.version, 'native_lifecycle')
+        except ValueError:
+            raise ValueError('ENGINE_SENSOR_NATIVE_CONFIGURATION_INVALID') from None
         def read(path):
             with Path(path).open('rb') as stream:
                 return strict_json(stream.read(262145), limit=262144)
@@ -302,38 +349,12 @@ class EngineSensorExecutor:
         began = utcnow()
         if check.id in CALLBACK_CHECKS:
             return self._callback(check, env, values, target, prepared, manifest, duration, began, workdir)
-        if check.id == 'REQ-18':
-            from tools import b_req18_slot as slot
-            from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
-            validate_target(slot._capture_target(env, target), env)
-            transport = KubernetesHTTP(target, env, duration=duration, binary=self.cfg.get('kubectl_binary', 'kubectl'), profile=REQUEST_BINDING_PROFILE)
-            slot._validate_manifest(env, target, prepared, manifest, transport)
-            result = slot._capture_kubernetes(env, target, prepared, manifest, duration=duration, binary=self.cfg.get('kubectl_binary', 'kubectl'))
-            observed = result is not None and result.get('collected') is True
-            violation = result.get('mismatch') if observed else None
-            # This collector proves a scoped host-mask argument invariant only.
-            scope = False
-            cleanup = (result or {}).get('cleanup_errors', [])
-            normal = (result or {}).get('standalone_unrestricted_source_path_observed')
-        else:
-            raise EngineSensorNotImplemented(native_capability(check.id)['reason'])
-        draft = EvidenceDraft(status=ExecStatus.ABORTED,
-            data_origin=DataOrigin.EXAMPLE if env.data_origin == DataOrigin.EXAMPLE or target.get('lab') else DataOrigin.DECLARED,
-            normal_control={'attempted': result is not None, 'succeeded': normal},
-            observations={'engine_sensor_violation': {'value': violation, 'collected': observed},
-                          'engine_sensor_full_scope': {'value': scope, 'collected': True}},
-            challenges=[{'step': step, 'attempted': False} for step in check.challenge_steps],
-            cleanup_errors=cleanup, started_at=began, finished_at=utcnow(),
-            abort_reason='ENGINE_SENSOR_NATIVE_SCOPE_INCOMPLETE',
-            config={'profile': PROFILES[check.id], 'target_sha256': values['sensor_target_sha256'],
-                    'prepared_sha256': values['sensor_prepared_sha256'], 'manifest_sha256': values['sensor_manifest_sha256'],
-                    'implementation': 'kubernetes', 'engine_started': False})
-        return self._artifact(draft, workdir, {'safe_facts': result, 'required_branches': REQUIRED_BRANCHES[check.id]})
+        raise EngineSensorNotImplemented(native_capability(check.id)['reason'])
 
     def _callback(self, check, env, values, target, prepared, manifest, duration, began, workdir):
         """Send the fixed cohort once, then project the session's native rows."""
         from guard.collectors import engine_callbacks
-        from guard.runtime.kubernetes_http import KubernetesBindingError, KubernetesHTTP, ENGINE_CALLBACK_PROFILE
+        from guard.runtime.engine_http import KubernetesBindingError, KubernetesHTTP, ENGINE_CALLBACK_PROFILE
         from . import engine_callback_projection as projection
         if (type(manifest) is not dict or manifest.get('schema') != projection.SCHEMA or manifest.get('session') != prepared['session']
                 or manifest.get('target_sha256') != values['sensor_target_sha256']
@@ -364,7 +385,7 @@ class EngineSensorExecutor:
             # A Bearer header on a direct unauthenticated engine is not a
             # principal binding. Join the independently pinned Gateway target.
             from guard.runtime.bounded import strict_json
-            from guard.runtime.kubernetes_callback_gateway import KubernetesCallbackGatewayHTTP
+            from guard.runtime.engine_callback_gateway import KubernetesCallbackGatewayHTTP
             try:
                 if check.id != 'REQ-15':
                     raise ValueError
@@ -380,6 +401,8 @@ class EngineSensorExecutor:
         if transport is None:
             transport = KubernetesHTTP(target, env, duration=duration,
                 binary=self.cfg.get('kubectl_binary', 'kubectl'), profile=ENGINE_CALLBACK_PROFILE)
+        if isinstance(transport, KubernetesHTTP):
+            transport.page_archive = Path(workdir) / 'callback-pages'
         endpoint = transport.endpoint.scheme + '://' + transport.endpoint.netloc + '/v1/chat/completions'
         tags = {}; elapsed = {}; outputs = {}; trials = []; cleanup = []; switches = []
         if lab is not None:
@@ -389,6 +412,8 @@ class EngineSensorExecutor:
                 cleanup.append('ENGINE_SENSOR_LAB_OWNERSHIP_UNVERIFIED')
         # 같은 엔진을 다시 시험해도 이전 실행의 캐시가 교차 적중으로 보이지 않게 한다.
         # 경계 요청: 이 요청 앞의 세션 기록은 이번 시험 근거에서 뺀다.
+        if hasattr(transport, 'begin_callback_trial'):
+            transport.begin_callback_trial(prepared['session'])
         barrier = 'byul-cb-' + uuid.uuid4().hex
         try:
             transport('kubernetes-probe', [{'id': 'cb-9999', 'mode': 'json', 'method': 'POST', 'url': endpoint,
@@ -488,6 +513,16 @@ class EngineSensorExecutor:
         # Gateway가 위조 salt를 4xx로 거부한 것은 도전의 기대 결과다. 정상 대조에서는 뺀다.
         forged = {c['case_id'] for c in cases if 'forged_salt' in c}
         normal_trials = [t for t in trials if not (gateway and t['case_id'] in forged and t['case_id'] in rejected)]
+        from guard.runtime.comparison import execution_conditions
+        conditions = execution_conditions(target, {'sensor_profile': check.collection_profile,
+            'duration': duration, 'options': self.cfg.get('comparison_settings', {})},
+            sorted({c['principal'] for c in cases if 'principal' in c}))
+        fixture = {'schema': 'guard-native-trials/1', 'check': check.id, 'cases': cases,
+            'reference_outputs': manifest.get('reference_outputs'), 'lab_contexts': manifest.get('lab_contexts')}
+        comparison = {'model_inventory_sha256': env.model.inventory_sha256,
+            'fixture_sha256': sha256_hex(canonical_json(fixture)),
+            'config_sha256': sha256_hex(canonical_json(conditions)) if target.get('comparison_config') or self.cfg.get('comparison_settings') else None,
+            'gpu': env.runtime.gpu_model, 'driver': env.runtime.driver, 'cpu': env.runtime.cpu}
         # INV-02: 끝나지 않은 실행은 MEASURED가 될 수 없다.
         draft = EvidenceDraft(status=ExecStatus.COMPLETED if finished else ExecStatus.ABORTED,
             data_origin=origin if finished or origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED,
@@ -497,10 +532,11 @@ class EngineSensorExecutor:
             challenges=[{'step': step, 'attempted': True} for step in check.challenge_steps],
             cleanup_errors=cleanup, started_at=began, finished_at=utcnow(),
             abort_reason=None if collected and not cleanup else 'ENGINE_SENSOR_CALLBACK_SCOPE_INCOMPLETE',
-            config={'profile': PROFILES[check.id], 'target_sha256': values['sensor_target_sha256'],
-                    'prepared_sha256': values['sensor_prepared_sha256'], 'manifest_sha256': values['sensor_manifest_sha256'],
+            comparability=comparison,
+            config={'profile': check.collection_profile, 'conditions': conditions,
                     'implementation': 'kubernetes', 'engine_started': False})
         return self._artifact(draft, workdir, {'safe_facts': {**result, 'trials': trials, 'sensor_gaps': gaps,
+                'run_binding': {key: values[key] for key in ('sensor_environment_sha256', 'sensor_target_sha256', 'sensor_prepared_sha256', 'sensor_manifest_sha256')},
                 **({'comparison_nonce_sha256': sha256_hex(nonce.encode())} if 'comparison_nonce' in manifest else {}),
                 **({'lab_switches': switches} if lab is not None else {})},
             'required_branches': REQUIRED_BRANCHES[check.id]})
@@ -521,6 +557,9 @@ class EngineSensorExecutor:
             with path.open('xb') as stream:
                 stream.write(canonical_json(payload))
             draft.artifacts.append(DraftArtifact(name=path.name, path=path, collector='engine_sensor'))
+            for page in sorted((Path(workdir) / 'callback-pages').glob('capture-*/page-*.json')):
+                draft.artifacts.append(DraftArtifact(name=page.parent.name + '-' + page.name, path=page,
+                                                     collector='engine_sensor/callback-page-2'))
         except Exception:
             return incomplete_artifact_capture(draft)
         return draft

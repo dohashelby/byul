@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import tempfile
+import os
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
@@ -168,13 +170,24 @@ class Store:
         digest = sha256_hex(data)
         rel = f"artifacts/{digest}"
         path = self.root / rel
+        if path.is_symlink():
+            raise IntegrityError('artifact symlink refused')
         if path.exists():
             if sha256_hex(path.read_bytes()) != digest:
                 raise IntegrityError(f"artifact corrupted: {rel}")
         else:
-            tmp = path.with_suffix(".tmp")
-            tmp.write_bytes(data)
-            tmp.replace(path)
+            staging = self.root / 'artifact-staging'
+            staging.mkdir(exist_ok=True)
+            with tempfile.NamedTemporaryFile(dir=staging, delete=False) as stream:
+                tmp = Path(stream.name)
+                stream.write(data); stream.flush(); os.fsync(stream.fileno())
+            try:
+                try: os.link(tmp, path)
+                except FileExistsError:
+                    if path.is_symlink() or sha256_hex(path.read_bytes()) != digest:
+                        raise IntegrityError('artifact publication conflict')
+            finally:
+                tmp.unlink(missing_ok=True)
         return StoredArtifact(path=rel, sha256=digest, bytes=len(data))
 
     # --- 일괄 검증 (guard verify) ---------------------------------------------

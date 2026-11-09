@@ -9,16 +9,18 @@ from tools import b1_integration_cpu as original
 from tests.test_b1_integration_pin import pinned_repo,overlay_repo,git,commit_fixture
 
 
-def test_actual_fixed_integration_snapshot_passes_and_original_B_default_still_rejects():
+def test_current_inventory_cannot_approve_itself_and_original_B_pin_stays_fixed():
     repo=Path(__file__).resolve().parents[2]
-    assert consumer.REVIEWED_COMMON_COMMIT==consumer.manifest_id(repo)
+    assert consumer.manifest_id(repo) is not None
+    assert consumer.REVIEWED_COMMON_COMMIT is None
     assert consumer.PINNED_PATHS==original.PINNED_PATHS
     assert original.BASE_SHA=='c9af729cd1893eda14d0bb222a8fab46c2a6d7b8'
     with pytest.raises(ValueError,match='outside selected overlay'):
         original.verify_baseline(repo,selected_overlay=original.SELECTED_PROFILE)
-    receipt=consumer.verify(repo)
-    assert receipt['files_verified']>200 and receipt['paths_excluded']==[] and not receipt['runtime_hash_approval']
-    assert not receipt['original_B_default_pin_changed']
+    manifest=consumer.verify_inventory(repo)
+    assert len(manifest['files'])>200 and manifest['paths']==list(original.PINNED_PATHS)
+    with pytest.raises(ValueError,match='SOURCE_REVIEW_RECEIPT_REQUIRED'):
+        consumer.verify(repo)
 
 
 def _synthetic(repo,monkeypatch):

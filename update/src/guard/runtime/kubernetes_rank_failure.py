@@ -1,9 +1,11 @@
 """Draft closed read probes; phase names never activate or prove rank faults."""
+
+from guard.adapters.engine_profiles import supports
 from copy import deepcopy
 import re,threading
 from guard.models import canonical_json,sha256_hex
 from .bounded import strict_json
-from .kubernetes_http import KubernetesHTTP,KubernetesBindingError,REQUEST_BINDING_PROFILE
+from .engine_http import KubernetesHTTP,KubernetesBindingError,REQUEST_BINDING_PROFILE
 
 PROFILE='kubernetes-owned-mp-rank-failure-http-v1'
 SLOTS=('normal-before','observe-exception','observe-death','observe-delay','observe-communication-stall','normal-after')
@@ -12,7 +14,7 @@ SLOTS=('normal-before','observe-exception','observe-death','observe-delay','obse
 class KubernetesRankFailureHTTP:
     profile=PROFILE
     def __init__(self,target,env,*,runner=None,duration=120,binary='kubectl'):
-        if target.get('lab') is not True or env.engine.name!='vllm' or env.engine.version!='0.31.0':raise KubernetesBindingError()
+        if target.get('lab') is not True or not supports(env.engine.name, env.engine.version):raise KubernetesBindingError()
         self.base=KubernetesHTTP(target,env,runner=runner,duration=duration,binary=binary,profile=REQUEST_BINDING_PROFILE)
         self.binding=deepcopy(self.base.binding);self.api_model=self.base.api_model;self.model_mapping=deepcopy(self.base.model_mapping)
         self.target_sha256=sha256_hex(canonical_json(target));self.engine_url=target['engine']['trusted_url']

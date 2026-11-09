@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 import json
 import re
 import threading
@@ -1172,6 +1174,7 @@ class _TTLCache:
 class LiveRuntimeSource:
     mode = "live"
     REQUEST_LIMIT = 200
+    DETAIL_WORKERS = 8
 
     def __init__(self, client: RuntimeClient, base_url: str, cache_ttl: float = 2.5) -> None:
         self.client = client
@@ -1202,15 +1205,26 @@ class LiveRuntimeSource:
     def _gateway_events(self) -> EventBatch:
         listed = self._get("/api/requests", {"limit": self.REQUEST_LIMIT})
         views = listed.get("requests", []) if isinstance(listed, dict) else []
+        ids = [v.get("request_id") if isinstance(v, dict) else None for v in views]
+        valid = [rid for rid in ids if isinstance(rid, str) and _REQUEST_ID.fullmatch(rid)]
+
+        def fetch(rid: str) -> Any:
+            try:
+                return self._detail(rid)
+            except RuntimeNotFound:
+                return None
+
+        # 상세를 하나씩 순서대로 물으면 원격 연결(터널·port-forward)에서 첫 화면이 수십 초 걸린다.
+        # 끝난 요청은 캐시되므로 동시에 묻는 수를 작게 제한해 runtime 부하를 키우지 않는다.
+        with ThreadPoolExecutor(max_workers=self.DETAIL_WORKERS) as pool:
+            details = dict(zip(valid, pool.map(fetch, valid)))
         out: list[Any] = []
-        for view in views:
-            rid = view.get("request_id") if isinstance(view, dict) else None
+        for view, rid in zip(views, ids):
             if not isinstance(rid, str) or not _REQUEST_ID.fullmatch(rid):
                 out.append(view)
                 continue
-            try:
-                detail = self._detail(rid)
-            except RuntimeNotFound:
+            detail = details.get(rid)
+            if detail is None:
                 continue
             record = pick_gateway_record(detail.get("gateway_records", []) if isinstance(detail, dict) else [])
             out.append(gateway_event(record) if record is not None else detail)

@@ -720,3 +720,12 @@
 - 새로 찾은 것: 설치기가 에이전트를 enabled·execute로 켬, agent kubeconfig 권한이 넓음, 터널 화면 로딩 지연, 오래된 identities.json 0664.
 - 다음: Codex 교차 검수(11~14) → 발견 처리 결정 → PR 한 번.
 - 14회차 발견 1 조치(사용자 결정 B, Claude 구현·Codex 교차 검수 전): 설치기가 에이전트를 enable·start 하지 않고 `disable`·중지 확인만 한다(모드와 무관). 요약 출력은 수집 서비스만 건강 판정, 에이전트는 "수동 시작 대상"으로 표시. README 재설치 예시를 `--execute` 없이로 변경. 설치기 시험 33건 통과(에이전트 enable/start 없음·켜져 있으면 실패 시험 추가). 실서버 재확인은 다음 회차.
+
+## 2026-11-09 14회차 발견 2~4 처리 — Claude 구현분, Codex 교차 검수 전
+
+- 발견 2 권한: `tools/agent_rbac.py`(필요 권한 목록 하나로 Role/ClusterRole 렌더·`kubectl auth can-i` 점검, `--as` 흉내 지원), 예시 `deploy/agent/runtime-agent-rbac.example.json`, 문서 `docs/에이전트_권한_최소화.md`. 시험 8건.
+  - kind 실측: 기존 관리자 kubeconfig `too_broad`(금지 14개 모두 허용), 렌더한 권한 적용 후 SA `ok`(필요 28 yes·금지 14 no), SA로 실제 명령(정책 목록·tetra exec·server dry-run·로그·rollout·port-forward·patch) 성공, secrets·nodes·Pod 삭제 Forbidden. kind에 RBAC 객체는 남겨 둠.
+  - 14회차 수동 점검의 `pods/log` 질의 형식은 "log라는 Pod"로 해석되는 오류였다(도구는 `--subresource` 사용).
+- 발견 3 화면 지연: 플랫폼 live `events`가 요청 200개 상세를 하나씩 물어 원격 연결에서 첫 로드가 길었다. 지연 30ms/80ms 모의에서 7.6s/17.7s → 병렬 8개로 1.4s/2.6s. 순서 유지·병렬 시험 1건, API 346 통과.
+- 발견 4 옛 파일: `/var/lib/serving-runtime/identities.json`은 현재 코드·단위가 참조하지 않음(상태 서비스는 `/srv/serving/observation/tetragon-identities.json`). 다음 서버 회차에 서버의 단위·사용자 서비스 참조를 확인한 뒤 백업·삭제.
+- 다음 서버 회차 확인: 설치기 에이전트 미시작, 최소 권한 kubeconfig로 교체 후 수집·10번 dry-run·엔진 로그, 화면 로딩, 옛 파일 삭제.

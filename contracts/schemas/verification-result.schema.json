@@ -114,7 +114,12 @@
                   "oneOf": [{ "$ref": "common.schema.json#/$defs/verdict" }, { "type": "null" }]
                 },
                 "performance": { "oneOf": [{ "$ref": "common.schema.json#/$defs/verdict" }, { "type": "null" }] },
-                "verification_level": { "oneOf": [{ "$ref": "common.schema.json#/$defs/data_origin" }, { "type": "null" }] }
+                "verification_level": { "oneOf": [{ "$ref": "common.schema.json#/$defs/data_origin" }, { "type": "null" }] },
+                "gaps": {
+                  "description": "선택. 이 쪽(baseline·candidate·single)에만 있는 공백. 예: 기준 판본은 지원되고 후보 판본만 ENGINE_VERSION_UNSUPPORTED. 점검 행의 gaps는 모든 쪽의 합이다.",
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/gap" }
+                }
               }
             }
           },
@@ -127,7 +132,7 @@
           },
           "gaps": {
             "type": "array",
-            "items": { "enum": ["NO_EXECUTOR", "NO_POLICY_VALUE", "NO_FIXTURE", "NO_ENV_FACT", "ADAPTER_UNSUPPORTED"] }
+            "items": { "$ref": "#/$defs/gap" }
           },
           "evidence_source": { "enum": ["automated", "manual", null] },
           "exception": {
@@ -218,6 +223,10 @@
   },
   "$defs": {
     "comparison": { "enum": ["NO_CHANGE", "REGRESSED", "FIXED", "STILL_FAILING", "UNKNOWN", "NOT_COMPARABLE", "CARRIED_OVER"] },
+    "gap": {
+      "description": "ADAPTER_UNSUPPORTED는 그 엔진을 지원하는 어댑터가 없음, ENGINE_VERSION_UNSUPPORTED는 엔진은 지원하지만 그 판본의 관측 고정값·지원표가 없음(검토 전 판본)이다.",
+      "enum": ["NO_EXECUTOR", "NO_POLICY_VALUE", "NO_FIXTURE", "NO_ENV_FACT", "ADAPTER_UNSUPPORTED", "ENGINE_VERSION_UNSUPPORTED"]
+    },
     "axis_summary": {
       "type": "object",
       "additionalProperties": false,

@@ -743,3 +743,24 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - 2026-11-08 · 사용자 결정: SUP-11 `-OO`는 transformers 5.17 판본에서 지원 범위 밖(UNKNOWN)으로 두고 정상 대조 모델을 바꾸지 않는다. 운영 `-OO` 금지 정책은 두지 않는다.
 - 2026-11-08 · 사용자 결정: 정책 확정자는 사용자, 팩 검토자는 B 담당자. 점검별 impact는 초안(HIGH33·MEDIUM38·LOW6)을 사용자 확정 뒤 새 팩 판본으로 반영한다. 그 전 팩 `impact: null` 유지.
 - 2026-11-08 · 사용자 결정: REQ-13·REQ-17·OBS-05·REQ-03·LIF-13 정책 값을 BYUL 기준 정책으로 확정(EXAMPLE 아님, 값은 결정 문서 6-1). OBS-01·REQ-02·OBS-11·PLT-07·PLT-10·11·12·OBS-06·OBS-09·PLT-08은 1차 범위에서 제외하고 UNKNOWN 유지.
+- 2026-11-09 · 사용자 결정: 지원 엔진은 vLLM·SGLang(반드시 확장)·TensorRT-LLM(가능하면 확장)이며, 어떤 계층도 vLLM이나 특정 판본을 전제하지 않는다. 엔진·판본 지식은 `adapters/`의 엔진·판본별 데이터(관측 지점·소스 고정값·경로표·프로세스 이름·로그 형식·기동 명령·변경 경로표)에만 둔다. 실행기·수집 변환·판정·팩은 지원표 조회와 엔진 중립 계약만 쓰고, 기존 `vllm`·`0.31.0` 문자열 비교는 옮길 대상이다. 새 판본은 코드 복사가 아니라 고정값·지원표 행 추가로 지원한다. SPEC §0 범위표의 SGLang·TensorRT-LLM 제외, §12 D7, 2026-11-02의 "내부 센서·Kubernetes 수집기는 vLLM 0.31 전용" 결정을 대체한다(SPEC 본문 개정 전까지 `CLAUDE.md` 1절을 따른다). · 사용자 지시.
+- 2026-11-09 · 쓰지 않는 개발 문서 143개를 지웠다. 역할 A-1·A-2·B-1·B-2 시기(10-23~11-02)의 계획·통합·인수·제품 계약 초안 메모다. 남긴 것: 코드·시험·CI가 읽는 문서, README·SPEC·CLAUDE·DECISIONS와 남긴 문서가 링크하는 문서, 실측·증거 기록(`evidence`·`gpu-a`·`gpu-b`·`gpu-completion`·`pack-baseline-owner2`), 현행 담당 폴더(`dev-1`·`b-work`·`phase1`). 원문은 git 이력에 있다. 앞으로 끝난 계획·통합 메모는 요점을 PROGRESS·DECISIONS에 남기고 지운다. · 사용자 지시.
+- ~~열린 질문(2026-11-09, U1 판본 규칙)~~ → 2026-11-09 사용자 결정: SGLang도 vLLM과 같은 규칙(아래). 원문: 정식/패치 판별을 엔진별로 정해야 한다. 현재 U1은 모든 엔진에 "셋째 자리만 오르면 패치" 규칙을 쓰는데, SGLang은 정식 릴리스도 셋째 자리가 오른다(0.5.21→0.5.22). 그대로면 SGLang 새 릴리스를 매번 패치로 보고 시험을 줄인다.
+- 2026-11-09 · 사용자 승인: 공용 계약에 엔진 식별·병렬 구성·판본 지원 공백을 더했다. 판본·DRAFT는 그대로이고 기존 문서는 유효하다.
+  - `environment`: 엔진 `name` 소문자 식별자 형식, `runtime_kind`에 tensorrt-llm, 선택 `frontend`, 선택 `tp_size`·`pp_size`·`dp_size`
+  - `verification-result`: `ENGINE_VERSION_UNSUPPORTED`와 쪽별 `gaps`
+  - `framework-input`: 엔진 식별자 형식
+  - 처음 제안한 엔진 `name` 닫힌 목록은 platform 시험의 `example-engine` 값과 충돌해, 소문자 형식만 강제하는 쪽으로 바꿨다.
+  - update `tools/import_byul_inputs.py`는 guard ENV에 대응 필드가 없는 `runtime_kind`·`frontend`·병렬 크기를 원본에 보존하고 제한 사항으로 표시한다. 그 전에는 화면이 넣는 `runtime_kind`만 있어도 `GUARD_INPUT_MODEL_INVALID`로 거부했다.
+  - · 사용자 지시. [변경 이력](../contracts/README.md)
+- 2026-11-09 · 사용자 결정(SGLang 확장 준비·vLLM 완성, [결정 기록](docs/dev-1/user-decisions-20261109.md)):
+  - A 작업 트리(`Buyl/byul-dev1-k8s`)의 미커밋 설계 보수(엔진 provider·판본 profile·생산자 자격 receipt 등)는 A/B 작업 분배 전에 main에 넣는다. 순서는 PR dohashelby/byul#239 → A 설계 보수다.
+  - A 작업 안의 runtime 코드·platform 시험·CI 변경은 update PR에서 빼서 각 담당 검토용으로 따로 둔다.
+  - 계약 `runtime_kind`는 정해진 목록이 아니라 소문자 driver 식별자 형식(`^[a-z][a-z0-9_.-]{0,63}$`)만 검사한다. 엔진 이름·framework-input 엔진 칸도 같은 형식이다(위 계약 줄의 "`runtime_kind`에 tensorrt-llm"을 대체).
+  - 환경 변환은 A 방식(`guard-byul-input-import/2`, 값을 `EngineInfo`·`RuntimeInfo`·`ModelInfo`·`Policy`에 직접 넣음)으로 하고 `frontend`·`tp_size`·`pp_size`·`dp_size`도 넣는다. #239의 원본 보존 방식은 그때까지의 임시다.
+  - 공통 입력 계약 `/2`에 KV 단위 필드, `limit_enforced` 집행 방식 필드, 생산자 신원의 공통 감싸기 기반 포함을 더한다(11-08 결정과 함께 한 번에 구현·재등록).
+  - vLLM 완성 기준은 0.31.0 69개 GPU lab 제품 경로 실측과 0.32.0 두 판본 비교(일부러 넣은 회귀 사례로 `REGRESSED` 확인)다. 1차 제외 점검은 UNKNOWN으로 남긴 상태를 완성으로 본다.
+  - 영향도 77개는 11-08 초안대로 확정한다. 새 팩 판본에 반영한다.
+  - 정식/패치 판별은 SGLang도 vLLM과 같은 규칙이다. 그 엔진의 소스 diff 경로표가 없으면 전체 시험한다.
+  - SGLang request-attempt 후보는 보류한다. 지금 SGLang은 구조 준비까지만 한다.
+  - · 사용자 결정.

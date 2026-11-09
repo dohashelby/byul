@@ -26,8 +26,18 @@
           "additionalProperties": false,
           "required": ["name", "version", "image_digest", "source_commit"],
           "properties": {
-            "name": { "type": "string", "minLength": 1, "maxLength": 64 },
-            "runtime_kind": { "enum": ["mock", "vllm", "sglang"] },
+            "name": {
+              "description": "엔진 식별자(소문자). 정규 값은 vllm·sglang·tensorrt-llm이고 모의 엔진은 mock이다. 화면 표시 이름(vLLM·SGLang 등)은 넣지 않는다. 소비자는 모르는 식별자를 지원하지 않는 엔진으로 다룬다.",
+              "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z][a-z0-9_.-]{0,63}$"
+            },
+            "runtime_kind": {
+              "description": "runtime이 연결할 driver 식별자(소문자). 정해진 목록이 아니라 형식만 검사한다. 예: mock·vllm·sglang·tensorrt-llm. 형식이 맞아도 그 runtime 설치가 등록하지 않은 driver면 runtime이 거부한다.",
+              "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,63}$"
+            },
+            "frontend": {
+              "description": "선택. 요청을 받는 서빙 앞단. engine-server는 엔진 자체 서버(vllm serve·sglang.launch_server·trtllm-serve), triton은 Triton Inference Server 경유다. 모르면 null.",
+              "enum": ["engine-server", "triton", null]
+            },
             "version": { "type": ["string", "null"] },
             "image_digest": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
             "source_commit": { "type": ["string", "null"], "pattern": "^[0-9a-f]{7,40}$" }
@@ -52,7 +62,10 @@
           "additionalProperties": false,
           "properties": {
             "nodes": { "type": "integer", "minimum": 1 },
-            "tp_groups": { "type": "integer", "minimum": 1 },
+            "tp_groups": { "description": "TP 그룹 수(기존 필드). 병렬 크기는 tp_size·pp_size·dp_size에 적는다.", "type": "integer", "minimum": 1 },
+            "tp_size": { "description": "선택. tensor parallel 크기. 모르면 null.", "type": ["integer", "null"], "minimum": 1 },
+            "pp_size": { "description": "선택. pipeline parallel 크기. 모르면 null.", "type": ["integer", "null"], "minimum": 1 },
+            "dp_size": { "description": "선택. data parallel 크기(엔진 안 복제 수). 모르면 null.", "type": ["integer", "null"], "minimum": 1 },
             "gpu_count": { "type": ["integer", "null"], "minimum": 0 },
             "gpu_model": { "type": ["string", "null"] },
             "driver": { "type": ["string", "null"] }

@@ -45,3 +45,17 @@ GPU 실증 담당이 #196에서 요청한 공통 입력의 형식을 공통 계�
 2. 그 판본·소스 SHA를 `SUPPORTED_PRODUCERS`에 더한다.
 3. GPU 담당 소비자가 `validate()` 결과를 읽어 기존 판정에 연결한다(GPU 담당 파일).
 4. 행 형식을 실제 생산자에 맞춰 바꿔야 하면 schema 판본을 올리고 이 문서를 고친다.
+
+## `/2` 확정 사항 (2026-11-08·11-09 사용자 결정, 미구현)
+
+`guard-gpu-common-input/2`는 아래 다섯 가지를 한 번에 담는다. `/1` 기록은 계속 읽는다. 생산자 소스가 바뀌어 등록이 풀리므로 TP2 GPU 세션에서 한 번에 다시 확인·등록한다. 근거: [11-08 결정 3절](user-decisions-20261108.md), [11-09 결정 2절](user-decisions-20261109.md).
+
+| 항목 | 내용 | 엔진 중립 이유 |
+|---|---|---|
+| 반복 행 요약 | 같은 요청·attempt·단계의 연속 `stage`·`gpu_fence`·`kv_owned`(transition `consumed`, health `worker_state`)를 묶는다. 값이 바뀔 때마다 끊고, 첫·끝 행은 원 행으로 남긴다. 요약 행은 첫·끝 시각, 개수, 최대값을 가진다. 상한 4,096은 그대로다. | 출력 길이에 비례하는 행 수를 엔진과 무관하게 줄인다 |
+| V2 logit bias 비교 | sampler 행 `logit_bias`가 null이 아니면 API 값과 비교한다(다르면 `value_changed_before_consumption` 후보). null이면 지금처럼 gap. | 관측이 있을 때만 비교를 더한다 |
+| KV 단위 | KV 값은 엔진 고유 단위 그대로 두고 단위 필드(예: `kv_unit`: `block`·`token_slot`)와 알면 단위당 token 수(예: `kv_unit_tokens`)를 함께 적는다. 단위를 모르면 값도 null이다. | vLLM은 블록, SGLang은 token slot(page) 단위다 |
+| 한도 집행 | `limit_enforced`는 모든 한도 집행이다. 집행 방식 필드(예: `alloc_refused`·`preempted`·`rejected`)를 둔다. SGLang retraction은 이 사건(`preempted`)과 `retry`를 함께 낸다. | vLLM은 할당 거부, SGLang은 retraction으로 집행한다 |
+| 생산자 신원 | `source_sha256`에 관측기·변환 파일과 함께 공통 감싸기 기반 파일(예: `adapters/vllm_cache_callback.py`)을 넣는다. | 기반이 바뀌면 자동으로 미지원이 된다 |
+
+필드 이름은 구현 때 정하고 이 표를 고친다. 소비자(GPU 담당)는 `/1`·`/2`를 모두 읽고, `/2` 요약 행을 원 행처럼 존재·순서·마지막 값 판단에 쓸 수 있어야 한다.

@@ -140,6 +140,23 @@ Hubble `DROPPED`는 출발·목적지·정책 귀속과 수신 대조 전에는 
 
 ## 변경 이력
 
+### 사용자 승인(2026-11-09) · 엔진 식별·병렬 구성·판본 지원 공백
+
+update가 vLLM이나 특정 판본에 묶이지 않고 SGLang(반드시)·TensorRT-LLM(가능하면)으로 확장하도록, 엔진을 식별하는 값과 판본 지원 공백을 계약에 넣었다. 모든 변경은 선택 필드이거나 값을 더하는 것이라 기존 문서는 그대로 유효하다. 각 스키마의 판본(environment·framework-input 0.1, verification-result 0.2)과 DRAFT 상태는 유지한다.
+
+- `environment` `target.engine.name`: 소문자 식별자 형식(`^[a-z][a-z0-9_.-]{0,63}$`)을 강제하고 정규 값을 적었다(vllm·sglang·tensorrt-llm, 모의 엔진 mock). 화면 표시 이름은 넣지 않는다.
+- `environment` `target.engine.runtime_kind`: 정해진 목록(`mock`·`vllm`·`sglang`) 대신 같은 소문자 식별자 형식만 검사한다. 엔진이 늘어도 계약을 고치지 않기 위해서다. 형식이 맞아도 runtime 설치가 등록하지 않은 driver면 runtime이 거부한다. 기존 세 값은 그대로 유효하다.
+- `environment` `target.engine.frontend`(선택): `engine-server`·`triton`·null. TensorRT-LLM 직접 서빙과 Triton 경유를 다른 시험으로 구분하기 위해서다.
+- `environment` `target.runtime.tp_size`·`pp_size`·`dp_size`(선택, 모르면 null): 엔진마다 다른 rank·프로세스 구성을 해석하는 데 쓴다. 기존 `tp_groups`는 그대로 둔다.
+- `verification-result` 점검 행 `gaps`: 값 `ENGINE_VERSION_UNSUPPORTED`(엔진은 지원하지만 그 판본의 관측 고정값·지원표가 없음)를 더하고 enum을 `$defs/gap`으로 옮겼다. `ADAPTER_UNSUPPORTED`(엔진 자체 미지원)와 구분한다.
+- `verification-result` `sides.<side>.gaps`(선택): 한쪽에만 있는 공백. 예: update에서 기준 판본은 지원되고 후보 판본만 미지원.
+- `framework-input` `target.engine`: `environment`의 엔진 식별자와 같은 형식을 강제했다.
+- 따라 할 일:
+  - update: 환경 문서를 guard ENV로 바꾸는 `update/tools/import_byul_inputs.py`가 guard에 대응 필드가 없는 `runtime_kind`·`frontend`·병렬 크기를 원본에 보존하고 제한 사항으로 표시하도록 고쳤다(그 전에는 `runtime_kind`가 있으면 거부했다). `ENGINE_VERSION_UNSUPPORTED`를 내는 것은 update의 엔진·판본 지원표 작업에서 한다.
+  - update(후속): A 설계 보수가 병합되면 `convert_documents()`가 `guard-byul-input-import/2`로 `runtime_kind`·`frontend`·병렬 크기·`tokenizer_revision`·`model.components`·정책 유효 기간을 guard ENV·POL에 직접 넣는다. 그때 위의 원본 보존 방식을 대신한다(`update/docs/dev-1/user-decisions-20261109.md`). `model.components` 계약 필드도 그 작업과 함께 들어온다.
+  - platform: 생성 타입(`npm run gen:types`), 입력 화면 선택지(`runtime_kind` 자유 입력 또는 tensorrt-llm 추가, `frontend`, 병렬 크기), 새 공백 표시 이름, 쪽별 `gaps` 변환은 platform 담당이 맞춘다.
+  - runtime: 바꾸지 않는다. 등록하지 않은 driver(`tensorrt-llm` 등)는 runtime이 지원할 때까지 거부된다.
+
 ### 사용자 승인(2026-11-08) · Lab 보고서 AWS 사례 ID 허용
 
 승인 범위는 Lab 보고서 사례 계약이다. `runtime-lab-report` 0.1과 DRAFT 상태를 유지하며 사례 ID를 kind `L-01`~`L-08` 및 AWS `AWS-01`~`AWS-20`으로 명시했다. 선택 `report.schema`는 `serving-runtime-k8s-lab-report/1.0`·`serving-runtime-aws-lab-report/1.0`을 허용한다. 기존 kind 문서는 schema 필드 없이도 유효하므로 실제 kind 생산자와 하위 호환된다. 종전 정규식이 허용하던 범위 밖 L ID(`L-00`, `L-09`~`L-99`)는 이제 거부한다. 저장된 실행 회차는 현재 통제 상태의 증명이 아니다. 소비자인 platform은 공용 계약을 직접 검증하며 별도 조회용 파생 스키마를 제거했다. update 계약과 나머지 runtime 계약은 변경하지 않았다.

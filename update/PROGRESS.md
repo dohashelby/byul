@@ -1,3 +1,37 @@
+## 2026-11-09 — SGLang 준비·vLLM 완성 결정과 개발 문서 반영
+
+- 한 일:
+  - 사용자와 11개 결정을 정했다([결정 기록](docs/dev-1/user-decisions-20261109.md)). A 미커밋 설계 보수를 분배 전에 병합(#239 먼저), runtime·platform 변경 분리, `runtime_kind` 형식 검사, 환경 변환 `/2`, 계약 `/2` 세 항목, vLLM 완성 기준, 영향도 확정, SGLang 판본 규칙, SGLang 후보 보류다.
+  - 공용 계약 `runtime_kind`·엔진 이름·framework-input 엔진 칸을 같은 소문자 식별자 형식으로 바꿨다.
+  - 이 결정에 맞춰 SPEC §0·§7.1·§12(D2·D7), `CLAUDE.md`·`AGENTS.md`(1~11절 동일), `docs/UPDATE_SELECTION.md` §1, 공통 입력 계약 설계 "/2 확정 사항"을 고쳤다.
+- 테스트 결과: 계약 검사 스키마 13·예시 11 오류 0. 문서 정합성(`test_workflow_paths`·`test_checklist_status`·`test_engine_neutral_core`) 32 통과, 현황표 `--check` 통과. platform 교차 시험 315 통과·5 실패(pytest 6.26초·벽시계 7초). 실패 5개는 변경 전 `0bcc2f2`와 같은 묶음 내보내기·임시 Gateway 로컬 환경 실패다.
+- 다음 단계: #239 병합, A 설계 보수 정리·병합, 그 뒤 A/B 작업지시서.
+- 막힌 것: A 설계 보수 병합 전에는 엔진 provider·판본 profile이 main에 없다.
+
+## 2026-11-09 — 엔진 식별 공용 계약 반영·Codex 지침 확장
+
+- 한 일:
+  - 사용자 승인으로 공용 계약에 엔진 식별·병렬 구성·판본 지원 공백을 더했다. 모두 선택 필드이거나 값 추가다. 대상은 `environment`·`verification-result`·`framework-input`이고, 이력은 `contracts/README.md`에 있다.
+  - update 환경 변환기(`tools/import_byul_inputs.py`)가 guard에 없는 필드를 원본에 보존하고 제한 사항으로 표시하게 고쳤다. 기존 `runtime_kind` 거부 결함도 함께 고쳐졌다.
+  - `AGENTS.md`를 `CLAUDE.md`와 같은 규칙 1~11절에 Codex 실행 메모 12절을 더한 형태로 다시 썼다. `CLAUDE.md`에는 계약 반영 내용과 두 파일을 함께 고치는 규칙을 더했다.
+- 테스트 결과:
+  - 계약 검사: 스키마 13·예시 11, 오류 0
+  - 변환기 직접 확인: 기존 예시, `runtime_kind`, SGLang 전 필드, TensorRT-LLM+triton 모두 변환되고 해당 제한 사항이 붙는다. `vLLM` 표시 이름은 `ENVIRONMENT_SCHEMA_INVALID`로 거부된다.
+  - platform 교차 시험: 315 통과·5 실패(pytest 6.51초·벽시계 8초). 실패 5개(묶음 내보내기·임시 Gateway의 `BUNDLE_BUILD_FAILED`)는 변경 전 `0bcc2f2`에서도 같은 시험 ID로 실패한다.
+  - runtime·platform 코드는 바꾸지 않았다.
+- 다음 단계:
+  - platform 생성 타입·화면 선택지·쪽별 gaps 변환(platform 담당)
+  - 변환기 새 필드 회귀 시험을 platform 교차 시험에 추가(platform 시험 파일이라 담당 확인 필요)
+  - update의 `ENGINE_VERSION_UNSUPPORTED` 생성(엔진·판본 지원표 작업)
+- 막힌 것: 없음.
+
+## 2026-11-09 — 개발 문서 정리·엔진 중립 작업 규칙
+
+- 한 일: 최신 main(`0bcc2f2`)에서 쓰지 않는 개발 문서 143개를 지웠다(docs 340→197파일). `CLAUDE.md`를 엔진·판본 중립 원칙(vLLM·SGLang 필수·TensorRT-LLM 가능하면) 중심으로 다시 쓰고, Codex용 `AGENTS.md`를 새로 만들었다. 역할 A-1·A-2 시기 규칙은 2026-11-04 분담으로 바꿨다. 결정·열린 질문은 DECISIONS에 적었다.
+- 테스트 결과: 지운 문서를 코드·시험·CI·남긴 문서가 참조하지 않음을 경로·파일명 검색으로 확인했다. 문서 정합성 시험(`test_workflow_paths`·`test_checklist_status`·현황표 `--check`)을 돌렸다. 제품 소스·팩은 바꾸지 않았다.
+- 다음 단계: SPEC §0·§12 D7 본문 개정, 실행기의 `vllm`·`0.31.0` 비교를 엔진·판본 지원표 조회로 옮기기, 프레임워크 `SGLang_v0.5.22.md` 동기화, 공용 계약 제안 검토.
+- 막힌 것: 공용 계약(`contracts/`) 변경은 사용자 검토 대기. U1 엔진별 판본 규칙은 열린 질문.
+
 ## 2026-11-09 — GPU 미기동 B4·REQ·SUP16 준비 보강
 
 - 한 일: B4는 opt-in 로컬 파일/bytes SHA와 sealed ENV/content·선언 결합을 검사한다. REQ08/09/10은 원 record bytes·독립 scope·사례 매핑을 기존 consumer에 인계하고 오류 입력 본문을 출력하지 않는다. SUP16은 기존 pinned 자산·정상/부분 사본·명령을 정적으로 고정한다. 제품 src·공통 계약·팩·등록·manifest·43state는 유지한다.

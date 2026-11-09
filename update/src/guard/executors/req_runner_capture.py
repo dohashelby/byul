@@ -5,9 +5,11 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path, PurePosixPath
 import re
 import threading
+import tempfile
 from urllib.parse import urlsplit
 
 from guard.adapters import vllm_engine_callback_sensor as sensor
@@ -211,6 +213,25 @@ class Capture:
 
     def finish(self):
         value = self.transport.engine_attempt_events(self.prepared["session"])
+        # 반환된 parsed envelope를 후반 환경 검사/투영보다 먼저 보존한다. 원 pipe bytes라는 주장은 하지 않는다.
+        output = self.ctx.workdir / "runner-capture"
+        output.mkdir(parents=True, exist_ok=False)
+        self.callback_cleanup_errors = []
+        fd, temporary = tempfile.mkstemp(prefix="callback-received-", suffix=".tmp", dir=output)
+        temporary = Path(temporary)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(canonical_json(value))
+            stream.flush()
+            os.fsync(stream.fileno())
+        self.callback_payload_path = temporary
+        # link는 기존 목적지를 덮어쓰지 않고 완성된 파일만 원자적으로 공개한다.
+        destination = output / "callback-received.json"
+        os.link(temporary, destination)
+        self.callback_payload_path = destination
+        try:
+            os.unlink(temporary)
+        except OSError as error:
+            self.callback_cleanup_errors.append({"type": type(error).__name__, "code": "B_REQ_CALLBACK_STAGING_CLEANUP_UNAVAILABLE"})
         after = self._snapshot()
         self.after = after
         if after != self.before:
@@ -240,8 +261,6 @@ class Capture:
             proof.append({**row, "same_native_request_api_join": matched,
                           "event_sequences": [event["seq"] for event in selected],
                           "duplicate_response_id": row["response_id_sha256"] is not None and not unique})
-        output = self.ctx.workdir / "runner-capture"
-        output.mkdir(parents=True, exist_ok=False)
         raw_files = {"environment.json": self.environment_raw, "target.json": self.target_raw,
             "prepared.json": canonical_json(self.prepared), "requests.json": canonical_json(requests),
             "wrapper.json": canonical_json({"schema": self.tool.WRAPPER_SCHEMA, "session": self.prepared["session"],
@@ -301,6 +320,14 @@ def finish(ctx, draft, cfg):
             "cases": capture.calls, "native_request_mapping_verified": False,
             "runtime_link_complete": False, "gpu_ready": False}
         draft.cleanup_errors.append("B_REQ_CAPTURE_INCOMPLETE")
+    received = getattr(capture, "callback_payload_path", None)
+    cleanup = getattr(capture, "callback_cleanup_errors", [])
+    draft.cleanup_errors.extend(row["code"] for row in cleanup)
+    summary["callback_payload"] = {"preserved": bool(received and received.is_file()),
+        "authenticated": False, "encoding": "canonical JSON of parsed engine_attempt_events result",
+        "published_atomically": bool(received and received.name == "callback-received.json"), "cleanup_errors": cleanup}
+    if received and received.is_file():
+        draft.artifacts.append(DraftArtifact(name="req_runner_callback_received.json", path=received, collector="b-native-req-runner-link/1"))
     for relative, name in (("wrapper.json", "req_runner_wrapper.json"), ("callback-delta.json", "req_runner_callback_delta.json"),
                            ("requests.json", "req_runner_requests.json"), ("fixed/receipt.json", "req_runner_prepare_receipt.json")):
         captured_path = ctx.workdir / "runner-capture" / relative

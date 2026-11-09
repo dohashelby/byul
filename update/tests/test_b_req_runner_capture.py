@@ -144,6 +144,7 @@ def test_same_native_requests_reach_original_pipeline_and_exact_restored_report(
     evidence = list(store.iter_kind("EVD"))
     assert all(e.data_origin == DataOrigin.EXAMPLE for e in evidence)
     assert all(any(a.name == "req_runner_capture.json" for a in e.artifacts) for e in evidence)
+    assert all(any(a.name == "req_runner_callback_received.json" for a in e.artifacts) for e in evidence)
     proofs = [json.loads((store.root / next(a.path for a in e.artifacts if a.name == "req_runner_capture.json")).read_bytes()) for e in evidence]
     assert all(p["capture_origin"] == "EXAMPLE" and not p["native_request_mapping_verified"] for p in proofs)
     assert all(any(row["same_native_request_api_join"] for row in p["cases"]) for p in proofs)
@@ -219,3 +220,46 @@ def test_native_bounds_do_not_admit_other_choice_counts_or_endpoint(damage):
         request["url"] = "http://unused/v1/completions"
     with pytest.raises(ValueError, match="OUTSIDE_SELECTED_SCOPE"):
         link._bounded(request, "REQ-08")
+
+
+@pytest.mark.parametrize("late", ["source", "generation", "source-cleanup"])
+def test_received_callback_survives_late_failure_and_exact_export(tmp_path, monkeypatch, late):
+    data = case(tmp_path, consume_reused=True, selected=("REQ-08",))
+    monkeypatch.setattr(kube, "capture_pipes", data["world"].runner)
+    original_snapshot = link.Capture._snapshot
+
+    def snapshot(capture):
+        value = original_snapshot(capture)
+        if hasattr(capture, "before_events"):
+            if late == "generation":
+                return {**value, "restart_count": value["restart_count"] + 1}
+            raise ValueError("B_REQ_RUNTIME_SOURCE_OR_ASSET_MISMATCH")
+        return value
+
+    monkeypatch.setattr(link.Capture, "_snapshot", snapshot)
+    if late == "source-cleanup":
+        import os
+        unlink = os.unlink
+        def failing_staging_cleanup(path, *args, **kwargs):
+            if Path(path).name.startswith("callback-received-") and str(path).endswith(".tmp"):
+                raise OSError("EXAMPLE staging cleanup failure")
+            return unlink(path, *args, **kwargs)
+        monkeypatch.setattr(os, "unlink", failing_staging_cleanup)
+    result = driver.run(data["source"].root, data["plan"].id, data["path"], tmp_path / "run", collect=True)
+    assert result["exact_refs_restored"] and result["saved_pack_rejudge_equal"]
+    assert result["results"][0]["security"] == "FAIL" and result["evidence"][0]["status"] == "ABORTED"
+    store = Store.read_only(tmp_path / "run/restored")
+    evd, = store.iter_kind("EVD")
+    artifact = next(a for a in evd.artifacts if a.name == "req_runner_callback_received.json")
+    raw = (store.root / artifact.path).read_bytes()
+    value = json.loads(raw)
+    assert sha256_hex(raw) == artifact.sha256 and raw == canonical_json(value)
+    assert value["processes"][0]["events"] == data["world"].api
+    assert value["processes"][1]["events"] == data["world"].worker
+    proof = json.loads((store.root / next(a.path for a in evd.artifacts if a.name == "req_runner_capture.json")).read_bytes())
+    expected = "B_REQ_RUNTIME_GENERATION_OR_SOURCE_CHANGED" if late == "generation" else "B_REQ_RUNTIME_SOURCE_OR_ASSET_MISMATCH"
+    assert proof["error"] == {"type": "ValueError", "code": expected}
+    assert proof["callback_payload"]["preserved"] and not proof["callback_payload"]["authenticated"]
+    assert not proof["native_request_mapping_verified"] and not proof["runtime_link_complete"] and not proof["gpu_ready"]
+    if late == "source-cleanup":
+        assert "B_REQ_CALLBACK_STAGING_CLEANUP_UNAVAILABLE" in evd.execution.cleanup_errors

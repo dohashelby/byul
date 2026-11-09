@@ -64,11 +64,13 @@ class InputValidationExecutor(HttpCheckExecutor):
             raise ValueError("rejection_codes must explicitly name supported input rejection responses")
 
     def _finish(self, ctx):
+        from .req_runner_capture import begin, finish
+        begin(ctx, self.cfg)
         draft = super()._finish(ctx)
         if response_contract_state(ctx.check) == "current":
             draft = append_artifact(draft, ctx, "input_response_samples.json", f"{self.name}/{self.version}")
         from .common_consumption import attach
-        return attach(draft, ctx, self.cfg, kind="runner-consumption")
+        return attach(draft, ctx, finish(ctx, draft, self.cfg), kind="runner-consumption")
 
     def collect(self, ctx):
         if request_field_probe.supported(ctx.check):
@@ -96,7 +98,8 @@ class InputValidationExecutor(HttpCheckExecutor):
         cases = {"token_id": [self.cfg["vocab_size"]],
                  "length": [0] * (ctx.policy_values["max_input_tokens"] + 1)}
         def send(req, label):
-            r = bounded_probe(ctx, ctx.trusted_net, req)
+            from .req_runner_capture import case_call
+            r = case_call(ctx, label, req, lambda: bounded_probe(ctx, ctx.trusted_net, req))
             record_content(ctx, "trusted", "input-validation", label, _log_projection(r))
             if semantic:
                 # Native rejection and length-cause review need full transient

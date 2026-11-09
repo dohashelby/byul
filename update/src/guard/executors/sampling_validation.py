@@ -45,7 +45,10 @@ class SamplingValidationExecutor(HttpCheckExecutor):
 
     def _finish(self, ctx):
         from .common_consumption import attach
-        return attach(super()._finish(ctx), ctx, self.cfg, kind="runner-consumption")
+        from .req_runner_capture import begin, finish
+        begin(ctx, self.cfg)
+        draft = super()._finish(ctx)
+        return attach(draft, ctx, finish(ctx, draft, self.cfg), kind="runner-consumption")
 
     def validate_policy(self, check, values):
         options = _strings(values.get("allowed_sampling_options"), "allowed_sampling_options")
@@ -115,7 +118,9 @@ class SamplingValidationExecutor(HttpCheckExecutor):
             request = deepcopy(request)
             request["id"] = label
             try:
-                result = ctx.cprobe(ctx.trusted_net, [request], min(ctx.timeout, remaining))
+                from .req_runner_capture import case_call
+                result = case_call(ctx, label, request,
+                                   lambda: ctx.cprobe(ctx.trusted_net, [request], min(ctx.timeout, remaining)))
                 if len(result) != 1 or not isinstance(result[0], dict) or result[0].get("id") != label:
                     return {"id": label, "outcome": "incomplete_probe_result", "dispatched": True}
                 outcome = result[0].get("outcome")

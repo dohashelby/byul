@@ -1,3 +1,10 @@
+## 2026-11-09 — GPU 미기동 B4·REQ·SUP16 준비 보강
+
+- 한 일: B4는 opt-in 로컬 파일/bytes SHA와 sealed ENV/content·선언 결합을 검사한다. REQ08/09/10은 원 record bytes·독립 scope·사례 매핑을 기존 consumer에 인계하고 오류 입력 본문을 출력하지 않는다. SUP16은 기존 pinned 자산·정상/부분 사본·명령을 정적으로 고정한다. 제품 src·공통 계약·팩·등록·manifest·43state는 유지한다.
+- 검증: B4 기존13+새21=34통과(10.71초/부모11.641), REQ 기본31통과(8.91초/11.907)와 오류출력추가4통과 중1중복으로최종고유34, SUP16 새17통과(6.06초/10.048). REQ 실제오프라인CLI exit0/0.890초·SUP16 staticCLI exit0/5.532초, root 소스통합만의CLI exit0/6.718초를 구분한다. 기존 모델·writer·원archive·불변suite 반복0.
+- 다음 단계: 세묶음의 고정 변경/원 증거 독립 검토 완료(범위내미해결구체결함0). PR232에 게시하고 새 최종 head CI를 확인한다. 상세는 PREPARATION_FOLLOWUP_20261109.md와 preparation-validation-20261109.json을 따른다.
+- 남은 것: 실제 HTTP 요청↔callback 인과·현재 runtime ENV/target/prepared/Pod/PID/start·유효 정책·원기한 Ready·소유 정리·TP2 하네스/등록. 이번 준비 작업에서 GPU/AWS/SSM/엔진/모델·HTTP 실험0이며 ready·인증·실측 완료로 올리지 않는다.
+
 ## 2026-11-08 — boot 저장 오류의 독립 FAIL 보존
 
 - 한 일: CONTINUATION 독립 점검에서 SUP15/16 외 공통 boot 저장 오류의 위반 소실과 기존 시험 파일 덮어쓰기를 발견했다. 기존 persist를 전체13 profile에 재사용해 원 관측·normal·출처·진단을 보존하고 저장 gap/ABORTED·complete=false를 유지한다. 수집·정책·팩·SUP15/16 raw/session·helper 실행 로직은 그대로다.

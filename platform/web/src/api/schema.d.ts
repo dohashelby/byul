@@ -2338,6 +2338,14 @@ export interface components {
                     /** @description 마운트한 모델 snapshot 전체 파일 목록의 해시(update 비교 조건). */
                     inventory_sha256: components["schemas"]["Common_sha256"] | null;
                     tokenizer_revision?: string | null;
+                    /** @description 독립 공급물과 변환 입력의 해시 관계. 실행 지원은 engine provider가 별도로 검증한다. */
+                    components?: {
+                        role: string;
+                        kind: string;
+                        identity: string;
+                        sha256: components["schemas"]["Common_sha256"];
+                        inputs?: components["schemas"]["Common_sha256"][];
+                    }[] | null;
                 };
                 runtime?: {
                     nodes?: number;

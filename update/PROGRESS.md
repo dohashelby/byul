@@ -1,3 +1,12 @@
+## 2026-11-09 — PR #241 CI 실패 보수
+
+- 한 일: PR #241 첫 CI(update-default)는 28 실패·11,931 통과였다(pytest 888.19초, 부모 889.147초). 같은 시점 #239는 전부 통과했다. 28개 중 11개는 예상한 B 승인 대기 시험이고, 나머지 17개는 A 작업(기준 `8402ff89`)과 그 뒤 main에 들어온 B 변경이 의미상 엇갈린 것이었다.
+  - 공급·기동 13개(`test_b3_supply_records` 10, `test_b2_boot_evidence_persistence` 3): A의 실행기 선택은 provider가 없는 엔진에서 엔진 무관 목록의 Kubernetes 실행기만 허용하는데, `supply_boot`가 목록에 없어 `engine-x`·`CPU-Inductor-cache-component` 환경에서 NOT_RUN이 됐다. `supply_boot`는 기록 계약과 생산자 source SHA로 검증하는 엔진 무관 실행기라 `_PORTABLE_KUBERNETES`에 넣었다. 그다음 남은 저장 장애 시험 5개는 A의 실행 시도별 작업 폴더(`work/<plan>/<attempt>/<check>/<side>`) 때문에 예전 경로에 둔 장애가 걸리지 않았다. 두 B 시험이 시도 ID를 정해 넘기도록 경로만 고쳤다(assert는 그대로).
+  - 현황 도구 4개(`test_checklist_status` 경로 순서 시험): A가 현행 팩 판본 33 하드코딩을 `pack.yaml` 읽기로 바꿨는데, 시험의 가짜 root에는 팩 파일이 없었다. 가짜 root가 실제 팩 파일을 가리키게 시험만 고쳤다.
+- 테스트 결과: 직접 시험 3파일 68 통과, A 설계 경계·실행기 표 4파일 93 통과(CPython 3.12.3). `release/reviewed-source.json` 재생성(`registry.py` 한 줄). 전체는 PR CI로 확인한다.
+- 다음 단계: CI에서 B 승인 대기 11개만 남는지 확인 → B에 source gate 검토 요청.
+- 막힌 것: B 검토.
+
 ## 2026-11-09 — A 설계 보수 정리(브랜치 `claude/a-design-repairs`)
 
 - 한 일:

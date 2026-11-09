@@ -8,7 +8,7 @@ from guard.core.judge import judge_evidence, judge_plan
 from guard.core.run import RunConfig, _normalize, run_plan
 from guard.core.select import select
 from guard.executors import kubernetes_supply_boot as boot, registry, supply_boot_contract as contract
-from guard.models import Evidence, canonical_json, sha256_hex, utcnow
+from guard.models import Evidence, canonical_json, new_id, sha256_hex, utcnow
 from guard.store import Store
 from guard.store.packs import put_pack
 from tests.builders import dummy_ref, environment, policy
@@ -147,9 +147,11 @@ def test_registered_collection_draft_evd_and_judge_keep_fail(tmp_path, monkeypat
     store = Store(tmp_path / "store"); put_pack(store, PACK.path)
     pol = policy(PACK.ref(), scope={"include": [cid]}, values={cid: values})
     store.put_many([env, pol]); plan = select(PACK, [env], pol); store.put(plan)
-    workdir = store.root / "work" / plan.id / cid / "single"
+    # 작업 폴더는 실행 시도마다 따로다(work/<plan>/<attempt>/<check>/<side>). 시도 ID를 정해 같은 경로에 장애를 둔다.
+    attempt = new_id("ATTEMPT")
+    workdir = store.root / "work" / plan.id / attempt / cid / "single"
     original = storage_fault(monkeypatch, workdir, fault)
-    evd, = run_plan(store, PACK, plan, RunConfig(executors={"supply_boot": "kubernetes"}, adapter="vllm",
+    evd, = run_plan(store, PACK, plan, RunConfig(executors={"supply_boot": "kubernetes"}, adapter="vllm", attempt_id=attempt,
         raw={"supply_boot": {"normal": {}, "challenge": {}}}))
     result, = judge_plan(store, PACK, plan, as_of=utcnow())
     assert result.verdicts.security.value == "FAIL"

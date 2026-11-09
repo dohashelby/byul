@@ -7,8 +7,10 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 
 _ENVIRONMENT = ContextVar('guard_executor_environment', default=(None, None))
+# 엔진 provider에 묶지 않는 Kubernetes 실행기. 엔진별 부분이 생산자 기록에 있고 실행기는 계약·생산자 source SHA로
+# 검증만 하므로 어느 엔진에서도 같은 코드를 쓴다. supply_boot는 supply_boot_contract로 역할별 기록을 검증한다.
 _PORTABLE_KUBERNETES = frozenset({'direct_route', 'role_route', 'container_config', 'credential_exposure',
-    'api_transport', 'request_binding', 'lifecycle_transition'})
+    'api_transport', 'request_binding', 'lifecycle_transition', 'supply_boot'})
 
 
 @contextmanager

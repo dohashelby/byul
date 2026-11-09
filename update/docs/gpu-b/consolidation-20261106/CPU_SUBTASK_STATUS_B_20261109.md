@@ -7,7 +7,7 @@
 | B1·B2 | 고정 입력의 B 소비자·기존 판정 연결, 독립 FAIL/UNKNOWN·artifact 보존, 대표 factory/Store/judge/RPT CPU3분기, REQ offline 준비 | 새 A 실제 반환의 연결, REQ12 선언/기본 profile·미등록/기능 경계, 실제 native 요청·worker·시간 결합 |
 | B3 | 실제 CPU API/파일 writer 한정 관측, boot/paired I/O·artifact 보존, SUP16 역할별 준비 | 현재 실제 worker·역할·입력/정책 연결. full pair에는 한 호출의 두 actual live target·자원 및 지원 구성 필요 |
 | B4 | TP2 계획/입력 생성, opt-in 로컬 JSON·실제SHA·scope 검사34사례(기존13+신규21) | A6 하네스와 실제 topology/rank/shard 연결·실제 TP2 runtime |
-| B5 | impact77개(33/38/6)와 결정6-1에 대한 검토 의견 | A5 typed 반영본·사용자 확정·새 팩 reviewed/공식 판정 |
+| B5 | impact77개(33/38/6)와 결정6-1에 대한 검토 의견 | A5 typed 반영본·확정 영향도의 새 팩 반영·reviewed/공식 후속 |
 
 CPU 완료 조건에 새 공식 판정이나 모든 미측정 분기의 전수 실험을 덧붙이지 않았다. 위 범위를 B1~B5 전체 완료로 올리지도 않았다. 새 A1~A3 CPU 부분 반환은 존재하므로 과거 미커밋 대기를 현재 상태로 복사하지 않는다.
 
@@ -28,3 +28,9 @@ SUP16 full pair를 단일 GPU 순차 실행의 완료 가능 범위에 포함하
 ## 후속 실제 관측
 
 [V13 선정 REQ 실제 결과](ACTUAL_GPU_SELECTED_REQ_20261109.md)는 CPU 완료 목록과 구분한다. EVD3·RES3·공유RPT1 및 독립 복원·재판정이 연결됐지만, EXAMPLE/DRAFT·FAIL·UNKNOWN과 원43개 상태는 유지한다. [SUP-16 신규 CPU 준비와 실제 잔여](SUP16_SEQUENTIAL_PREPARATION_20261110.md)도 실제 실측 완료 수로 합산하지 않는다.
+
+## 2026-11-10 현재 결정·독립 개발
+
+커밋된 [11-09 사용자 결정 §3-3](../../dev-1/user-decisions-20261109.md)은 영향도33/38/6 확정을 명시한다. 사용자 확정을 다시 기다리지 않는다. 현재 PACK-BASELINE의77개 impact는 모두 null이라 새 팩 반영은 별도 잔여이며, 원팩을 소급 변경하지 않았다. 이 공식 후속을 LAB의 추가 완료 조건으로 붙이지 않는다.
+
+[SUP-16 새 운영 연결·실제 CLI CPU 검증](SUP16_SEQUENTIAL_PREPARATION_20261110.md)과 [REQ09/10 A 반환 요청](A_REQ_NOID_RETURNS_20261110.md)을 연결한다. [LIF06/SUP03의 커밋된 실제 CPU 반환 연결](CPU_SUPPORT_CONNECTION_20261110.md)은 원직접11·새FD3 및 독립검토를 마쳤다. 역사 지원 artifact와 원 ABORTED/UNKNOWN을 유지하고 실제 GPU/live target 미연결은 별도다.

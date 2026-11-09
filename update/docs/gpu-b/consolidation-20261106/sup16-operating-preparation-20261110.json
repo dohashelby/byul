@@ -1,0 +1,127 @@
+{
+  "schema": "byul-sup16-operator-preparation-summary/2",
+  "base_PR_commit": "618c8992597474b4ad1b2af31b2064f5384504e1",
+  "selected_GPU_product_source": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+  "selected_GPU_source_manifest_sha256": "ac423c8243af7b824bd66f7dadc5bd4ef5d827026a86d66f0c32dd28f3b4cf8b",
+  "assets": [
+    {
+      "path": "update/tools/gpu_b_sup16_phase_supervisor.py",
+      "bytes": 15935,
+      "sha256": "6c9584521401b8138f96be2882245b2081cea20b82094a6f2801b408ecf3a48c"
+    },
+    {
+      "path": "update/tools/gpu_b_sup16_actionwise.py",
+      "bytes": 8145,
+      "sha256": "8439c34bb28515beff55cdfd91590f550e90c1bf524bcee8ac45a2525ab63ec8"
+    },
+    {
+      "path": "update/tools/gpu_b_sup16_aggregate_archive.py",
+      "bytes": 6911,
+      "sha256": "c56640251fd2406d3734b8109725d5fe1394965e90b0e7222472b68ea924c3ce"
+    },
+    {
+      "path": "update/tools/gpu_b_sup16_config_assembly.py",
+      "bytes": 14357,
+      "sha256": "cfaa394bc7e2dbc7e351038992c4a4a463da4e375e6e2f88ffee774dda7da97a"
+    },
+    {
+      "path": "update/tools/gpu_b_sup16_whole_entry.py",
+      "bytes": 17489,
+      "sha256": "2a5a54f842af8506ecaff84f1922a8a22db4fed969ad5d5817caa9064d7bb166"
+    }
+  ],
+  "public_assets_equal_frozen_tested_bytes": true,
+  "private_controller_CONFIG_raw_and_personal_paths_published": false,
+  "CPU_evidence": [
+    {
+      "component": "supervisor",
+      "original_v1_passed": 12,
+      "v2_new_boundaries_passed": 4,
+      "v2_review_sha256": "eecae451edbbd87438d71296ddd1e2dfe46a82985dab2e7551ae68b2f16763c2",
+      "scope": "actual Linux UID1000 CLI/child wait/reap/terminal boundaries; not actual GPU/controller proof"
+    },
+    {
+      "component": "actionwise",
+      "v1_passed": 9,
+      "v2_new_boundary_passed": 1,
+      "before_v2_new_case": "original OSError preserved but blocked=false and later quiesce/archive ran",
+      "after_v2_new_case": "same OSError, blocked=true, later events0",
+      "review_sha256": "edc3f0e0907c9bb111c0278a28cb275b9e990f375999cf756e902d5200d14590"
+    },
+    {
+      "component": "aggregate",
+      "v2_new_boundaries_passed": 3,
+      "proof_shape": "actual original observed has path/uid/euid/version/flags; flags and version consumed without discarding extras",
+      "review_sha256": "edc3f0e0907c9bb111c0278a28cb275b9e990f375999cf756e902d5200d14590",
+      "old7_repeated": false,
+      "reduced_fixture_candidate_preserved_not_promoted": true
+    },
+    {
+      "component": "real_CLI_action_integration",
+      "new_boundaries_passed": 3,
+      "tested_components": [
+        "supervisor6c958",
+        "action9cff"
+      ],
+      "review_sha256": "8ff8c5fdae410b9d4294b72080910d3467c3c6423e8275cff82ca8ea3248e60b",
+      "reuse_limit": "new action8439 differs only at completed-receipt read error; that boundary has its separate new test, no claim that CLI3 tested that changed error path",
+      "scope": "actual CLI context/action and child terminal; EXAMPLE context, no Kube currentproof"
+    },
+    {
+      "component": "static_CONFIG_and_UID1000_render",
+      "generated_files": 25,
+      "new_render_boundary_passed": 1,
+      "real_CLI_calls": 3,
+      "review_sha256": "d3677f01edae22f62c96fdda3c9f2f3c717398fb0bc7ec2618dc64aba14450a2",
+      "scope": "old CODE0/700 EACCES vs new separate UID1000 render sibling; original CODE metadata and missing role.runtime preserved; local guard origin/AST scope only"
+    },
+    {
+      "component": "whole_caller_binding",
+      "new_wiring_cases_passed": 7,
+      "test_sha256": "251e1400fa5a8ab1b75ab3827e90d629902f5356b8f51cca51166b60467bf8c0",
+      "result_sha256": "07ecbac624efbb0bcc9aaeac9a02ca154a06e5ac6d206984cad402213a845729",
+      "originals_zip_sha256": "02ffa9742cd4f8d7935f2f6031a06af839cda3a174195d6e5cfcb74576fe24ca",
+      "inner_seconds": 1.0686956670251675,
+      "parent_wall_seconds": 7.3086892,
+      "scope": "Linux3.12.3 -I-S-B root temporary EXAMPLE wiring; 14 frozen modules/same role objects and supervisor. Missing/invalid current inputs reject before identity/CLI/write/guard; readonly replay and missing CLI execute proof arguments. No positive current GPU proof supplied.",
+      "review_state": "REVIEWED_SELECTED_SCOPE_NO_MISMATCH",
+      "review_sha256": "c2f35ce90f0692e0a48aa38a6146940b74edab57deea64e26ff7deaa97d15e6c",
+      "review_checks": 23,
+      "integrity_review_sha256": "67b950a998ba70d5fd6b6b2690e57aa17f8951d375c2cb9ab5e73a55f04e5c86",
+      "integrity_checks": 153,
+      "parent_launch_evidence_limit": "Parent Linux version/flags/exit/wall are handoff report; no separate parent launch raw. Child argv/exit/stderr directly preserved in original ZIP."
+    }
+  ],
+  "GPU_actual_SUP16_performed": false,
+  "current_remote_CONFIG_or_proof_verified": false,
+  "runtime_ready": false,
+  "actual_fresh_budget_checked": false,
+  "budget_or_deadlines_changed": false,
+  "whole_pair_connected": false,
+  "completed_check_IDs_added_by_CPU_counts": 0,
+  "remaining": [
+    "original transport/start-stop driver admission; actual remote staging/owner/mode; current same-CONFIG role/health/preflight/model proofs and original timer/stop boundaries",
+    "browser/computer automation connection recovery",
+    "fresh original resource/auth/budget/protection checks",
+    "actual GPU1 normal-before/partial/normal-recovered sequential role measurement and new evidence verification",
+    "separate two-live-target fullpair contract"
+  ],
+  "original_failures": {
+    "supervisor_spawn_handoff": "preserved; corrected in supervisor v2",
+    "action_receipt_read": "preserved before/after",
+    "aggregate_reduced_observed_fixture": "preserved; full original shape tested separately",
+    "render_first_sudo": "script not started",
+    "render_initial_canonical_json_path": "failed before render/CPU case0; initial metadata raw recovery limitation retained"
+  },
+  "note": "CPU cases and evidence comparisons are not check-ID completion counts. Original product verdicts/Refs and previous measured V13 are unchanged.",
+  "whole_caller_local_composition_complete": true,
+  "whole_caller_entry": {
+    "API": "FrozenCaller(request).describe()/replay_only()/execute(current_inputs)",
+    "CLI": "inspect by default; --replay-only; explicit --execute with --current-inputs and --current-inputs-sha256",
+    "fixed_modules": 14,
+    "private_staging_plan_files": 41,
+    "remote_files_staged": false,
+    "current_proofs_created": false,
+    "scope": "Local composition only. Exact private frozen assets/config and original active timer/identity/admission are still required."
+  }
+}

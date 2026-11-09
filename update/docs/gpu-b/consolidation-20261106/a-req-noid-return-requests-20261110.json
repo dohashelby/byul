@@ -1,0 +1,39 @@
+[
+  {
+    "id": "REQ-NOID-A-CAUSAL-REJECTION-RETURN-01",
+    "owner": "A common observation/contract/projection; adapter/provider owner for engine facts",
+    "evidence": "REQ09 HTTP400 has no response ID; native api_rejected exists but has no independent case correlation in preserved capture",
+    "required": [
+      "actual same HTTP dispatch/response ↔ server rejection/native call causal reference",
+      "original source-qualified process/call/session/generation refs, without fabricating a request ID",
+      "closed rejection-stage semantics; worker reached remains null/false only when actual scope proves it",
+      "committed source closure, schema, fixture and projection; duplicate/missing/conflicting refs retained as gaps"
+    ],
+    "forbidden": [
+      "remaining-one-row assignment",
+      "time/order/metadata-count matching",
+      "HTTP400 relabeled as native api_rejected"
+    ]
+  },
+  {
+    "id": "REQ-NOID-A-SAMPLING-REJECTION-OBSERVABILITY-02",
+    "owner": "A observer/provider/profile and common projection",
+    "evidence": "REQ10 HTTP temperature/top_p 400 are preserved, but original selected observer has zero api_rejected rows",
+    "required": [
+      "actual observed rejection call and unchanged original exception/response linkage",
+      "confirm exact V13 failure stage before claiming a specific typed/handler root cause",
+      "do not reuse A3 CPU typed_rejected EXAMPLE rows as V13 native observations"
+    ]
+  },
+  {
+    "id": "REQ-NOID-A-SCHEMA2-QUALIFICATION-03",
+    "owner": "A producer registration/release authority",
+    "evidence": "decoder /2 exists, producer_qualifications.json receipts empty; schema presence is not producer support",
+    "required": [
+      "explicit supported release/qualification scope for any newly selected producer, or preserve unsupported gaps",
+      "keep registered legacy /1 records unchanged; no copied/hypothetical approval",
+      "return exact commit/source SHA/schema/projection and qualification scope after approved source changes"
+    ],
+    "not_a_new_gate": "This is the existing producer support contract, not new human ACK/main-merge/global engine gating"
+  }
+]

@@ -2,7 +2,15 @@
 
 사용자 요청 범위는 기존 세션을 재사용한 GPU 1장·TP1 실측이다. 실제 요청 대응, 고정 runtime·Ready·정상 대조를 먼저 확인하고, 생성된 증거만 반영한다. PR #232가 2026-11-09 14:25 KST에 병합되어 [후속 Draft PR #240](https://github.com/dohashelby/byul/pull/240)에서 이어간다. [#232의 연결 댓글](https://github.com/dohashelby/byul/pull/232#issuecomment-6733655479)도 남겼다. 이 문서는 원 43개 전체의 PASS 또는 전체 완료 판정이 아니다.
 
-## 현재 실제 진행 — V13-r4, 2026-11-10 마감 정리
+## 2026-11-10 현재 LAB 잔여 재개
+
+[43개 최신 업무표](LAB43_CURRENT_20261110.md)를 기준으로 명시 선정/1차 제외 LAB 범위 완료6개·잔여37개로 갱신했다. 기존2개와 근거가 확인된 REQ08·PLT01·04·08을 합친 값이며 모든 분기·보안 PASS나 새코드/실험 개수는 아니다. 원 FAIL/UNKNOWN·출처·정확Ref와 미측정은 보존한다.
+
+SUP16의 per-action 감독기·cleanup 연결·독립aggregate·CONFIG·실UID1000렌더 준비는 새CPU/독립검토를 마쳤다. [선정 코드·한계](SUP16_SEQUENTIAL_PREPARATION_20261110.md)를 따른다. 현재 브라우저/컴퓨터 자동화 연결 오류로 새 AWS/GPU를 실행하지 않았으며 wholecaller의 로컬 결합·새CPU7은 완료했고 currentproof·fresh자원/예산·원격실측은 남아 있다.
+
+[LIF06/SUP03 역사CPU 지원 연결](CPU_SUPPORT_CONNECTION_20261110.md)은 원실행·판정값을 보존한 선택입력으로 통합했다. [REQ09/10 무ID거부 A반환 요청](A_REQ_NOID_RETURNS_20261110.md)은 해당 관측 공백만 대상으로 하며 다른 B업무의 전역 차단 조건이 아니다. 현재 제품 통합source는510파일/e1d3, 원V13 GPU source는466파일/2cb로 구분한다. 아래는 기존 V13 실제 수행·마감 이력이다.
+
+## V13-r4 실제 선정 실측 — 기존 완료 기록
 
 [실제 선정 REQ 결과·정확 Ref·복원 검증](ACTUAL_GPU_SELECTED_REQ_20261109.md)에서 source2cb/V4의 결과를 확정했다. EVD3·RES3·공유RPT1이 생성됐고, 독립 별도 DB의 정확 Ref10 복원·원 저장 팩 재판정264개와 실제 의미702개 대조는 불일치0이다.
 

@@ -155,6 +155,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     mvp_parser.add_argument("--retention-hold", metavar="PATH", help="삭제하지 않을 실행·요청 ID 목록")
     mvp_parser.add_argument("--lab-report", metavar="PATH")
     mvp_parser.add_argument("--tetragon-state", metavar="PATH", help="호스트에서 수집한 Tetragon 정책·시험 상태 JSON")
+    mvp_parser.add_argument("--engine-receipts", metavar="PATH", help="선택: 엔진 로그에서 요청 ID만 추출한 공개 JSON(tools.engine_receipts)")
     mvp_parser.add_argument("--tetragon-identities", metavar="PATH", help="노드에서 확인한 Tetragon 프로세스·컨테이너 식별 자료")
     mvp_parser.add_argument(
         "--observation-feed",
@@ -434,6 +435,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "run_id": args.run_id,
                 "lab_report_path": args.lab_report,
                 "tetragon_state_path": args.tetragon_state,
+                "engine_receipts_path": args.engine_receipts,
                 "tetragon_identities_path": args.tetragon_identities,
                 "observation_feeds": tuple(args.observation_feed),
                 "observation_heartbeats": tuple(args.observation_heartbeat),

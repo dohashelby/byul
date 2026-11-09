@@ -730,8 +730,12 @@ class RequestFlow:
                 backend_receipt = (
                     self._engine_client.receipt_not_queried()
                     if final_outcome == "deadline_exceeded"
+                    else self._relay.response_id_receipt(request_id)
+                    if self._backend.external
                     else self._engine_client.backend_receipt(request_id)
                 )
+                if final_outcome == "deadline_exceeded":
+                    self._relay.response_id_receipt(request_id)
                 abnormal_started = response_started and final_outcome not in {
                     "completed",
                     "backend_truncated",
@@ -791,8 +795,12 @@ class RequestFlow:
             backend_receipt = (
                 self._engine_client.receipt_not_queried()
                 if final_decision.reason_code == "ENGINE_DEADLINE"
+                else self._relay.response_id_receipt(request_id)
+                if self._backend.external
                 else self._engine_client.backend_receipt(request_id)
             )
+            if final_decision.reason_code == "ENGINE_DEADLINE":
+                self._relay.response_id_receipt(request_id)
             completed = (
                 final_decision.result == "ALLOWED" and engine_body is not None
             )

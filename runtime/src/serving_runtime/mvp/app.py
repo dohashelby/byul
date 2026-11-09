@@ -38,6 +38,7 @@ from .http_handler import (
 )
 from .lab_report import LabReportSource
 from .tetragon_state import read_tetragon_state
+from .engine_receipts import EngineReceipts
 from .mock_engine import MockEngine, _utc_now
 from .observation_feed import ObservationFeed
 from .phase_timeline import read_phase_timeline
@@ -201,11 +202,13 @@ class GatewayApp:
             Path(config.data_dir) / "observations.jsonl"
         )
         self._lab_report = LabReportSource(config.lab_report_path)
+        self._engine_receipts = EngineReceipts(config.engine_receipts_path)
         self._queries = QueryService(
             self._records.store,
             self._engine_store,
             self._records.status,
             self.observation_session_id,
+            engine_log_lookup=self._engine_receipts.lookup,
         )
         self._concurrency = ConcurrencyLimiter(config.max_concurrent_requests)
         self._request_flow = RequestFlow(
@@ -527,6 +530,7 @@ class GatewayApp:
             self.config.tetragon_state_path or Path(self.config.data_dir) / "tetragon-state.json",
             context=self._tetragon_context,
         )
+
 
     def policy_status(self) -> dict[str, Any]:
         policy = self.policy_state.policy

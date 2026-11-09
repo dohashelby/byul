@@ -1,0 +1,31 @@
+# Optional (off by default; not installed by install-runtime-node.sh).
+# Copy to /etc/systemd/system/serving-runtime-engine-receipts.service after
+# replacing lab-context / serving / the engine label selector, then add
+# `--engine-receipts /srv/serving/observation/engine-receipts/engine-receipts.json`
+# to the Gateway args. Only request IDs and timestamps are written; log lines,
+# prompts and responses are discarded in memory. Confirm the engine actually
+# logs the forwarded X-Request-ID before relying on "observed" (see docs).
+[Unit]
+Description=Serving Runtime engine-log request ID collector (optional)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=runtime-agent
+Group=runtime-agent
+SupplementaryGroups=10000 10010
+UMask=0027
+Environment=KUBECONFIG=/etc/serving-runtime/kubeconfig
+WorkingDirectory=/opt/byul/runtime
+ExecStart=/opt/byul/runtime/.venv/bin/python -B -m tools.engine_receipts --context lab-context --namespace serving --selector app=serving-engine --output /srv/serving/observation/engine-receipts/engine-receipts.json --interval 10 --since-seconds 60 --watch
+Restart=on-failure
+RestartSec=10
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/serving/observation/engine-receipts
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

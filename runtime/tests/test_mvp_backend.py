@@ -554,7 +554,8 @@ class ExternalBackendHttpTests(unittest.TestCase):
         request_id = headers["X-Request-ID"]
         final = self.records()[-1]
         self.assertEqual(final["backend_kind"], "vllm")
-        self.assertEqual(final["delivery"]["backend_receipt"], "not_available")
+        # fake backend id "fake-<id>" is not an engine echo of X-Request-ID.
+        self.assertEqual(final["delivery"]["backend_receipt"], "engine_response_id_mismatch")
         self.assertEqual(final["backend_cancel"], "not_observed")
         detail = self.get_json(gateway, f"/api/requests/{request_id}")
         self.assertEqual(detail["backend_kind"], "vllm")

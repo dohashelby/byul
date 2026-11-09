@@ -5,7 +5,9 @@ from __future__ import annotations
 from http.client import HTTPException
 import json
 import re
+from collections import OrderedDict
 import socket
+import threading
 import time
 from typing import Any, Callable, Protocol
 from urllib.error import URLError
@@ -273,6 +275,41 @@ def sse_done(buffer: bytes, chunk: bytes) -> tuple[bytes, bool]:
     return remainder, done
 
 
+def response_id_receipt(request_id: str, value: object) -> str:
+    """Classify the engine response ``id`` against the forwarded X-Request-ID.
+
+    vLLM's OpenAI server names responses ``chatcmpl-<X-Request-Id>`` /
+    ``cmpl-<X-Request-Id>`` when the header is honored; other engines may use
+    their own IDs. Only exact forms count as a match; the ID itself is not kept.
+    """
+    if not isinstance(value, str) or not value:
+        return "engine_response_id_absent"
+    if value in {request_id, f"chatcmpl-{request_id}", f"cmpl-{request_id}"}:
+        return "engine_response_id_matched"
+    return "engine_response_id_mismatch"
+
+
+class _ResponseIds:
+    """Bounded per-request classification; read once by the final record."""
+
+    def __init__(self, limit: int = 4096) -> None:
+        self._items: OrderedDict[str, str] = OrderedDict()
+        self._limit = limit
+        self._lock = threading.Lock()
+
+    def note(self, request_id: str, value: object) -> None:
+        with self._lock:
+            if request_id in self._items:
+                return  # The first chunk decides for streams.
+            self._items[request_id] = response_id_receipt(request_id, value)
+            while len(self._items) > self._limit:
+                self._items.popitem(last=False)
+
+    def pop(self, request_id: str) -> str:
+        with self._lock:
+            return self._items.pop(request_id, "not_available")
+
+
 class Relay:
     """Relay validated completion requests to one fixed backend."""
 
@@ -287,6 +324,11 @@ class Relay:
         self._relay_timeout_s = relay_timeout_s
         self._stream_idle_timeout_s = stream_idle_timeout_s
         self._request_deadline_s = request_deadline_s
+        self._response_ids = _ResponseIds()
+
+    def response_id_receipt(self, request_id: str) -> str:
+        """Return and forget the engine response ID classification (not_available if none)."""
+        return self._response_ids.pop(request_id)
 
     def _backend_label(self) -> str:
         return "mock engine" if self._backend.kind == "mock" else "backend"
@@ -397,7 +439,7 @@ class Relay:
                 )
             body = read_body(_COMPLETION_BODY_LIMIT)
             try:
-                json.loads(body.decode("utf-8"))
+                parsed = json.loads(body.decode("utf-8"))
             except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
                 return (
                     engine_error(
@@ -420,6 +462,7 @@ class Relay:
                 )
             if watchdog.finish():
                 raise _RelayDeadline()
+            self._response_ids.note(request_id, parsed.get("id") if isinstance(parsed, dict) else None)
             return allowed, body
         except _RelayOversize:
             return (engine_error(502, "ENGINE_BAD_RESPONSE", "backend returned an oversized response", allowed), None)
@@ -615,6 +658,8 @@ class Relay:
                                     code, outcome = "ENGINE_BAD_RESPONSE", "invalid_completion_stream"
                                     stop_stream = True
                                     break
+                                if not saw_chunk:
+                                    self._response_ids.note(request_id, item.get("id"))
                                 saw_chunk = True
                         if stop_stream:
                             break

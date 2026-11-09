@@ -2,9 +2,9 @@
 
 사용자 요청 범위는 기존 세션을 재사용한 GPU 1장·TP1 실측이다. 실제 요청 대응, 고정 runtime·Ready·정상 대조를 먼저 확인하고, 생성된 증거만 반영한다. PR #232가 2026-11-09 14:25 KST에 병합되어 [후속 Draft PR #240](https://github.com/dohashelby/byul/pull/240)에서 이어간다. [#232의 연결 댓글](https://github.com/dohashelby/byul/pull/232#issuecomment-6733655479)도 남겼다. 이 문서는 원 43개 전체의 PASS 또는 전체 완료 판정이 아니다.
 
-## 실제 진행 상태 — 2026-11-09 20:22 KST 마감 관측
+## 실제 진행 상태 — 2026-11-09 21:10 KST 마감 관측
 
-V9에서 같은 실제 Pod의 Ready 전이를 확인했다. 원 90초 대기 실패 후 98초에 도달했으므로 두 결과를 구분한다. 별도 후속 분기는 실제 Ready와 직접 HTTP health를 정상 요청보다 먼저 확인하도록 준비 중이다. 문서 게시는 실제 실행 source b85와 운영 패킷을 변경하지 않는다.
+V9는 원90초 실패 뒤98초 Ready를 확인했다. V11에서는 별도600초 진행 조건으로 실제97초 Ready까지 도달했고, 이후 target 결합 도구의 격리 import 오류로 중단됐다. HTTP health·정상 요청·선정 REQ 제품 수집은 아직 미실행이다. 문서 게시는 실제 실행 source b85와 운영 패킷을 변경하지 않는다.
 
 | 단계 | 실제 결과 |
 | --- | --- |
@@ -13,15 +13,16 @@ V9에서 같은 실제 Pod의 Ready 전이를 확인했다. 원 90초 대기 실
 | B 소스·호스트 실행 환경 | 실제 b85/tree d1a4·2,160파일·manifest2e400·독립 새 Git copy·offline uv·표준 venv의 guard import origin 검증 성공 |
 | controller 사전검증 | 경로 결합 수정 후 실제 현재 source·host 실행 환경 preflight 통과 |
 | 모델 준비·Pod 생성 | 고정 모델 파일·영수증의 실제 FD 검증과 모델 준비 통과. mount 기본값 비교 수정 후 실제 Ready 관측까지 진행 |
-| vLLM 엔진 runtime·Ready | 실제 모델 적재·엔진/API 기동·같은 Pod Ready=True 확인. 원 90초 조건은 실패, 생성 후 98초 전이 |
+| vLLM 엔진 runtime·Ready | 실제 모델 적재·엔진/API 기동·같은 Pod Ready=True 확인. V9 98초·V11 97초, 원90초 성능 조건은 실패 |
+| 실제 입력·target 결합 | 현재 원 JSON·입력 ENV 생성. target CLI가 tools 모듈을 찾지 못해 중단, 최소 수정 CPU 검증 중 |
 | 정상 추론 응답 | 아직 미실행. Pod Ready·health 로그와 구분 |
 | REQ-08·09·10 실제 제품 수집·EVD/RES/RPT | 아직 미실행 |
 | SUP-16 순차 역할 실측 | 아직 미실행. 역할 준비·stdin bridge 검증은 별도 완료 |
-| 자원·비용 | 20:22:49 KST 관측에서 소유3대 stopped·공인 IP0·활성 SSM0. 서울 실행 장부의 누적 보수 추정 $74.8135829332048, 확정 청구 아님. EBS 저장비 계속 |
+| 자원·비용 | 21:10:41 KST EC2 조회에서 소유3대 stopped·공인 IP0. 직전 full 조회의 활성 SSM0은 해당 원 조회 시각으로 구분. 서울 실행 장부 보수 추정 $75.16934681084811, 확정 청구 아님. EBS 저장비 계속 |
 
-다섯 차례 선행 실행의 원 오류와 원 stop180 관측 실패는 보존한다. Ready 관측을 정상 추론·제품 PASS로 집계하지 않는다. [첫 실행](ACTUAL_GPU_READY_ATTEMPT_20261109.md), [소스 설치 실패와 수정 후 검증](ACTUAL_GPU_SOURCE_INSTALL_ATTEMPT_20261109.md), [실제 모델 준비·Pod 기본값 처리](ACTUAL_GPU_MODEL_PREPARE_MOUNT_20261109.md), [Ready90 실패·기한 후 Ready와 마감](ACTUAL_GPU_LATE_READY_20261109.md)에 원자료·수정 범위를 연결한다. 실제 제품 source는 b85로 유지하며, PR 통합 소스·문서·설치 자산 보존 커밋과 구분한다.
+여섯 차례 선행 실행의 원 오류와 원 stop180 관측 실패는 보존한다. Ready 관측을 정상 추론·제품 PASS로 집계하지 않는다. [첫 실행](ACTUAL_GPU_READY_ATTEMPT_20261109.md), [소스 설치 실패와 수정 후 검증](ACTUAL_GPU_SOURCE_INSTALL_ATTEMPT_20261109.md), [모델 준비·Pod 기본값 처리](ACTUAL_GPU_MODEL_PREPARE_MOUNT_20261109.md), [Ready90 실패·기한 후 Ready](ACTUAL_GPU_LATE_READY_20261109.md), [실제 Ready97초·target 연결 오류와 마감](ACTUAL_GPU_TARGET_BIND_20261109.md)에 근거를 연결한다. [PR main 통합 검증](PR240_MAIN_INTEGRATION_20261109.md)과 실제 GPU source b85는 별도 기준선이다.
 
-별도 [PR #241](https://github.com/dohashelby/byul/pull/241)은 B 상수·재생성 목록·실제 R2 검토 기록1건을 c60d2286에 반영한 뒤 Linux CI11,981통과·1skip/7check 성공을 확인했고 19:35:48 KST 병합됐다. 이 승인·CI 기준선과 현재 b85 GPU 실측을 구분한다. SUP16의 추가 연결 함수·실행 어댑터는 검토·보완 중이며 이 게시에 미검증 코드를 포함하지 않는다.
+별도 [PR #241](https://github.com/dohashelby/byul/pull/241)은 B 상수·재생성 목록·실제 R2 검토 기록1건을 c60d2286에 반영한 뒤 Linux CI11,981통과·1skip/7check 성공을 확인했고 19:35:48 KST 병합됐다. 이 승인·CI 기준선과 현재 b85 GPU 실측을 구분한다. SUP16의 join·실행 adapter 준비와 context binder 정적 검토는 끝났으며 실제 운영 context/state·새 역할 관측 연결은 남아 있다. 이 준비를 GPU 실측 완료로 집계하지 않는다.
 
 ## 선정 범위
 

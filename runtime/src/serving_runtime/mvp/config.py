@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .kube_context import validate_kube_context
+from .backend_drivers import DRIVERS
 
 
 DEFAULT_COLLECTOR_INTERVAL_S = 5.0
@@ -74,8 +75,8 @@ class MVPConfig:
     cilium_timeout_s: float = 10.0
 
     def __post_init__(self) -> None:
-        if self.backend not in {"mock", "vllm", "sglang"}:
-            raise ValueError("backend must be mock, vllm, or sglang")
+        if type(self.backend) is not str or self.backend not in {'mock', *DRIVERS}:
+            raise ValueError("backend must be " + ", ".join(('mock', *DRIVERS)))
         if self.backend != "mock" and (
             self.backend_config_path is None or not str(self.backend_config_path).strip()
         ):

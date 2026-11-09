@@ -12,6 +12,7 @@ import sys
 import threading
 
 from .file_info import inspect_file
+from .mvp.backend_drivers import DRIVERS
 
 
 def _observation_feed(value: str) -> tuple[str, str]:
@@ -72,7 +73,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     mvp_parser.add_argument("--gateway-port", type=int, default=8080, metavar="N")
     mvp_parser.add_argument("--engine-port", type=int, default=8088, metavar="N")
-    mvp_parser.add_argument("--backend", choices=("mock", "vllm", "sglang"), default="mock")
+    mvp_parser.add_argument("--backend", choices=("mock", *DRIVERS), default="mock")
     mvp_parser.add_argument("--backend-config", metavar="PATH")
     mvp_parser.add_argument("--data-dir", metavar="PATH")
     mvp_parser.add_argument("--relay-timeout", type=float, default=5.0, metavar="SECONDS")

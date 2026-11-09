@@ -26,6 +26,7 @@ from typing import Any, Callable
 from .policy import DuplicateKeyError, _object_without_duplicates, _reject_json_constant
 from .kube_context import validate_kube_context
 from .store import JsonlStore
+from .backend_drivers import DRIVERS
 
 
 SCHEMA_VERSION = "runtime-target/1.0"
@@ -184,8 +185,8 @@ def _parse(document: object) -> dict[str, Any]:
         raise ValueError("target_id must be a non-empty string")
     engine = _object(document, "engine", _ENGINE)
     kind = engine.get("kind")
-    if kind not in {"mock", "vllm", "sglang"}:
-        raise ValueError("engine.kind must be mock, vllm, or sglang")
+    if kind != 'mock' and kind not in DRIVERS:
+        raise ValueError("engine.kind requires an installed registered driver")
     image_digest = _optional_string(engine, "image_digest", "engine")
     if image_digest is not None and _DIGEST.fullmatch(image_digest) is None:
         raise ValueError("engine.image_digest must be sha256:<64 lowercase hex>")

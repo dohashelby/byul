@@ -15,6 +15,7 @@ from typing import Any, Mapping
 from urllib.parse import urlsplit
 
 from .auth import CHAT_ROUTE
+from .backend_drivers import DRIVERS, driver
 from .policy import DuplicateKeyError, _object_without_duplicates, _reject_json_constant
 
 
@@ -37,7 +38,7 @@ _TOP_LEVEL_FIELDS = frozenset(
 )
 # External serving engines this Gateway can relay to. Each keeps its own
 # request field names; see BackendConfig.output_tokens_field.
-EXTERNAL_BACKEND_KINDS = frozenset({"vllm", "sglang"})
+EXTERNAL_BACKEND_KINDS = DRIVERS.keys()
 _TIMEOUT_FIELDS = frozenset(
     {"relay_timeout_s", "status_timeout_s", "stream_idle_timeout_s", "request_deadline_s"}
 )
@@ -141,11 +142,7 @@ class BackendConfig:
     def output_tokens_field(self, route: str) -> str:
         """The engine and request route determine the output-token field."""
 
-        return (
-            "max_completion_tokens"
-            if self.kind == "sglang" and route == CHAT_ROUTE
-            else "max_tokens"
-        )
+        return driver(self.kind).chat_output_field if route == CHAT_ROUTE else 'max_tokens'
 
     @property
     def authorization(self) -> str | None:
@@ -342,7 +339,7 @@ def load_backend_config(
         raise ValueError("unsupported backend schema_version")
     kind = document["kind"]
     if not isinstance(kind, str) or kind not in EXTERNAL_BACKEND_KINDS:
-        raise ValueError("backend kind must be vllm or sglang")
+        raise ValueError("backend kind must be " + " or ".join(EXTERNAL_BACKEND_KINDS) + " (installed registered driver required)")
     headroom = document.get("context_headroom_tokens", 0)
     if isinstance(headroom, bool) or not isinstance(headroom, int) or headroom < 0:
         raise ValueError("context_headroom_tokens must be a non-negative integer")
@@ -360,7 +357,7 @@ def load_backend_config(
             raise ValueError("model_map keys and values must be non-empty strings")
         model_map[policy_model] = backend_model
 
-    health_path = _route(document.get("health_path", "/ready" if kind == "sglang" else "/health"), "health_path")
+    health_path = _route(document.get("health_path", driver(kind).health_path), "health_path")
     # Both engines expose the served model through the OpenAI model list.
     models_path = _route(
         document.get("models_path", "/v1/models"),
@@ -370,7 +367,7 @@ def load_backend_config(
     # /server_info, which also returns the resolved server arguments. The
     # default therefore skips version collection for sglang (null = disabled).
     raw_version_path = document.get(
-        "version_path", "/version" if kind == "vllm" else None
+        "version_path", driver(kind).version_path
     )
     version_path = (
         None if raw_version_path is None else _route(raw_version_path, "version_path")

@@ -31,6 +31,7 @@ from .cilium_status import CiliumPolicyCollector
 from .kube_context import DEFAULT_KUBE_CONTEXT
 from .config import MVPConfig
 from .engine_client import EngineClient
+from .backend_drivers import driver
 from .http_handler import (
     HandlerDependencies,
     LimitedThreadingHTTPServer,
@@ -140,9 +141,9 @@ class GatewayApp:
         self.request_deadline_s = self.backend.timeouts.get(
             "request_deadline_s", config.request_deadline_s
         )
-        self._engine_client = EngineClient(self.backend, self.relay_timeout_s)
+        self._engine_client = driver(self.backend.kind).make_client(self.backend, self.relay_timeout_s)
         self.status_timeout_s = self.backend.timeouts.get("status_timeout_s", 5.0)
-        self._status_engine_client = EngineClient(self.backend, self.status_timeout_s)
+        self._status_engine_client = driver(self.backend.kind).make_client(self.backend, self.status_timeout_s)
         self._relay = Relay(
             self.backend,
             self.relay_timeout_s,
@@ -841,7 +842,8 @@ def run(config: MVPConfig) -> None:
             engine_url = f"http://{engine.address[0]}:{engine.address[1]}"
             print(f"Mock engine: {engine_url}", flush=True)
         else:
-            backend_name = "vLLM" if gateway.backend.kind == "vllm" else "SGLang"
+            from .backend_drivers import driver
+            backend_name = driver(gateway.backend.kind).label
             print(f"External {backend_name} backend: {gateway.backend.base_url}", flush=True)
         print(f"Data directory: {data_dir}", flush=True)
         print(f"Query API: {gateway_url}/api/ (화면: byul platform, RUNTIME_BASE_URL={gateway_url})", flush=True)

@@ -434,3 +434,34 @@ def test_sup03_saved_observation_projects_unknown_without_consumption_claim(
     assert any("API" in limitation and "projection" in limitation for limitation in converted["limitations"])
     assert report.to_dict() == before and report.hash_ok()
     assert store.resolve(evidence.ref()).observations["selected_template_approved"].value is approved
+
+
+
+def test_import_v2_retains_runtime_tokenizer_policy_and_artifact_closure(contracts, current_pack, tmp_path):
+    source_env, source_pol = _documents(current_pack)
+    source_env['target']['engine']['runtime_kind'] = 'example-driver'
+    source_env['target']['model'].update(inventory_sha256='a' * 64, tokenizer_revision='EXAMPLE-tokenizer',
+        components=[{'role': 'compiled-engine', 'kind': 'example-build', 'identity': 'EXAMPLE-build',
+            'sha256': 'b' * 64, 'inputs': ['a' * 64]}])
+    source_pol['environment_ref']['sha256'] = canonical_sha256(source_env)
+    source_pol['validity'] = {'valid_from': (T0 - timedelta(days=1)).isoformat(), 'valid_until': (T0 + timedelta(days=1)).isoformat()}
+    env, pol, mapping = boundary.convert_documents(source_env, source_pol, current_pack, contracts, as_of=T0, version=2)
+    assert env.engine.runtime_kind == 'example-driver' and env.model.tokenizer_revision == 'EXAMPLE-tokenizer'
+    assert env.model.components[0].inputs == ['a' * 64] and mapping['format'] == 'guard-byul-input-import/2'
+    assert pol.source_document_sha256 == canonical_sha256(source_pol)
+    assert pol.valid_from is not None and pol.valid_until is not None
+    assert 'TOKENIZER_REVISION_RETAINED_IN_SOURCE_ONLY' not in mapping['limitations']
+    assert 'TOKENIZER_REVISION_BOUND_TO_SELECTION' in mapping['limitations']
+    expired = pol.model_copy(update={'id': 'POL-EXAMPLE-EXPIRED', 'valid_until': T0}).seal()
+    store = Store(tmp_path / 'store'); store.put_many([env, expired])
+    plan = select(current_pack, [env], expired); store.put(plan)
+    with pytest.raises(ValueError, match='POLICY_EXPIRED'):
+        run_plan(store, current_pack, plan, RunConfig())
+
+
+def test_legacy_conversion_keeps_old_optional_field_serialization(contracts, current_pack):
+    source_env, source_pol = _documents(current_pack)
+    env, pol, mapping = boundary.convert_documents(source_env, source_pol, current_pack, contracts, as_of=T0, version=1)
+    assert mapping['format'] == 'guard-byul-input-import/1'
+    assert not {'valid_from', 'valid_until', 'source_document_sha256'} & pol.to_dict().keys()
+    assert 'POLICY_VALIDITY_MUST_BE_RECHECKED_AT_EXECUTION' in mapping['limitations']

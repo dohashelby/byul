@@ -89,6 +89,8 @@ jobs:
           print(f"Default suite parent wall clock: {time.perf_counter() - start:.3f}s", flush=True)
           raise SystemExit(result.returncode)
           PY
+      - name: Verify engine profile and capture contracts
+        run: uv run python -m pytest -q tests/test_design_boundaries.py tests/test_callback_paging_runtime.py tests/test_scoped_consumption.py
       - run: uv build --wheel
       - name: Verify installed wheel outside checkout
         run: uv run python tools/verify_installed.py --wheel dist/guard-0.1.0-py3-none-any.whl --output "${{ runner.temp }}/byul-update-installed"

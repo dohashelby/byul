@@ -1,3 +1,11 @@
+# 2026-11-08 업데이트 설계 경계 연동 — 미커밋
+
+- runtime backend 의미를 설치 가능한 `byul.runtime_drivers` driver로 분리했다. 기존 vLLM·SGLang tokenize/model 선택 동작을 유지하고 신규 driver가 client 수정 없이 등록되도록 했다. TRT 기본 항목은 metadata만 제공하며 tokenizer 자격이 없으면 요청 전 미지원으로 끝난다.
+- 실제 Gateway의 client 생성과 config·CLI·대상 선택도 등록 driver를 사용한다. 새 파일은 `src/serving_runtime/mvp/backend_drivers.py`, `tests/test_backend_driver_extension.py`이며 기존 backend/client와 app/config/cli/target을 연결했다. 운영 bundle의 기존 enforcement profile 지원 범위는 유지한다.
+- CPU 관련 회귀: runtime에서 `python -m pytest -q -c /dev/null tests/test_mvp_backend.py tests/test_mvp_sglang_backend.py tests/test_mvp_engine_client_deadlines.py tests/test_mvp_target.py tests/test_target_pod_snapshot.py tests/test_backend_driver_extension.py` 범위 91 통과·subtest119 통과·실패0(25.08초). 전체 runtime suite는 이번에 실행하지 않았다. 격리 runtime wheel의 source/설치57파일 동일, driver 시험4 통과도 확인했다. 로그는 Codex 산출물 `design-repair-2/runtime-3.log`, `runtime-installed.log`다.
+- update 쪽 엔진 profile/factory·기업 입력·시도/복구 보수에 맞춘 사용자 승인 작업이다. 별도 설치한 SGLang/TRT 예제 provider는 공통 실행·판정·보고를 통과했으나 EXAMPLE이며 실제 엔진 native 지원/자격은 아니다. update 전체 결과의 독립 source 승인 대기11건과 실제 엔진/bootstrap/GPU 자격은 남아 있다. 상세는 `../../update/docs/dev-1/design-repairs-2-20261108.md`.
+- 실제 엔진/GPU 미실행, 기존 증거·판정/소스 pin 보존, 커밋·push 없음. 기준 HEAD `8402ff8947e78c85e75d76c62b0bd91d88cc0512`. 다음은 독립 검토 후 승인 통합 재검증과 준비된 실제 엔진 시험이며, CPU 예제로 물리적 관측·성능 자격을 발급하지 않았다.
+
 # 런타임 작업 상태
 
 최종 갱신: 2026-11-08

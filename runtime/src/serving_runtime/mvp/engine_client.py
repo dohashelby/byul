@@ -12,6 +12,7 @@ from urllib.parse import urlencode
 from urllib.request import urlopen
 
 from .backend import BackendConfig, parse_prometheus_metrics
+from .backend_drivers import driver
 from .mock_engine import _utc_now
 from .response_timeout import DeadlineWatchdog, set_response_timeout
 
@@ -145,10 +146,12 @@ class EngineClient:
             raise ValueError("unsupported request kind")
         # vLLM's tokenize API accepts this template option. SGLang v0.5.22's
         # TokenizeRequest has model/messages but no add_generation_prompt field.
-        if request_kind == "chat" and self.backend.kind == "vllm":
+        if request_kind == "chat" and driver(self.backend.kind).add_generation_prompt:
             tokenize_request["add_generation_prompt"] = True
         payload = json.dumps(tokenize_request, ensure_ascii=False).encode("utf-8")
-        endpoint = "/tokenize"
+        endpoint = driver(self.backend.kind).tokenize_path
+        if endpoint is None:
+            raise ValueError('BACKEND_TOKENIZER_PROFILE_UNAVAILABLE')
         status, _, body = self.request(
             "POST",
             endpoint,
@@ -204,14 +207,7 @@ class EngineClient:
         model_id = None
         max_model_len = None
         if isinstance(entries, list):
-            if self.backend.kind == "sglang":
-                main_model = next((item for item in entries if isinstance(item, dict)
-                                   and item.get("id") in self.backend.model_map.values()), None)
-                if main_model is None:
-                    main_model = next((item for item in entries if isinstance(item, dict)
-                                       and item.get("max_model_len") is not None), None)
-            else:
-                main_model = entries[0] if entries and isinstance(entries[0], dict) else None
+            main_model = driver(self.backend.kind).select_model(entries, self.backend.model_map.values())
             if main_model is not None:
                 model_id = main_model.get("id")
                 max_model_len = main_model.get("max_model_len")
@@ -263,11 +259,11 @@ class EngineClient:
             "model.ids": available_ids,
             "model.map": mapped_availability,
         }
-        if self.backend.kind == "sglang":
+        if driver(self.backend.kind).unknown_model_length:
             value["option.max_model_len"] = max_model_len if max_model_len is not None else "unknown"
         if len(mapped_ids) == 1 and mapped_ids[0] in available_ids:
             value["model.id"] = mapped_ids[0]
-        if self.backend.kind == "vllm" and max_model_len is not None:
+        if not driver(self.backend.kind).unknown_model_length and max_model_len is not None:
             value["option.max_model_len"] = max_model_len
         value = {key: item for key, item in value.items() if item is not None}
         return value, "external_backend"

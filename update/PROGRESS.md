@@ -1,3 +1,13 @@
+## 2026-11-09 — SGLang 준비·vLLM 완성 결정과 개발 문서 반영
+
+- 한 일:
+  - 사용자와 11개 결정을 정했다([결정 기록](docs/dev-1/user-decisions-20261109.md)). A 미커밋 설계 보수를 분배 전에 병합(#239 먼저), runtime·platform 변경 분리, `runtime_kind` 형식 검사, 환경 변환 `/2`, 계약 `/2` 세 항목, vLLM 완성 기준, 영향도 확정, SGLang 판본 규칙, SGLang 후보 보류다.
+  - 공용 계약 `runtime_kind`·엔진 이름·framework-input 엔진 칸을 같은 소문자 식별자 형식으로 바꿨다.
+  - 이 결정에 맞춰 SPEC §0·§7.1·§12(D2·D7), `CLAUDE.md`·`AGENTS.md`(1~11절 동일), `docs/UPDATE_SELECTION.md` §1, 공통 입력 계약 설계 "/2 확정 사항"을 고쳤다.
+- 테스트 결과: 계약 검사 스키마 13·예시 11 오류 0. 문서 정합성(`test_workflow_paths`·`test_checklist_status`·`test_engine_neutral_core`) 32 통과, 현황표 `--check` 통과. platform 교차 시험 315 통과·5 실패(pytest 6.26초·벽시계 7초). 실패 5개는 변경 전 `0bcc2f2`와 같은 묶음 내보내기·임시 Gateway 로컬 환경 실패다.
+- 다음 단계: #239 병합, A 설계 보수 정리·병합, 그 뒤 A/B 작업지시서.
+- 막힌 것: A 설계 보수 병합 전에는 엔진 provider·판본 profile이 main에 없다.
+
 ## 2026-11-09 — 엔진 식별 공용 계약 반영·Codex 지침 확장
 
 - 한 일:

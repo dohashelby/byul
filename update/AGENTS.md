@@ -7,10 +7,11 @@
 ## 1. 가장 먼저: 엔진·판본에 묶이지 않는다 (2026-11-09 사용자 결정)
 
 - 지원 대상 엔진은 vLLM, SGLang(반드시 확장), TensorRT-LLM(가능하면 확장)이다. 어떤 계층도 vLLM이나 특정 판본(예: `0.31.0`)을 전제하지 않는다.
-- 이 결정은 아래를 대체한다. SPEC 본문을 고치기 전까지 이 절을 따른다.
-  - SPEC §0 범위표의 "SGLang·TensorRT-LLM 어댑터 구현 제외"
-  - SPEC §12 D7
-  - `DECISIONS.md` 2026-11-02의 "내부 센서·Kubernetes 수집기는 vLLM 0.31 전용"
+- 이 결정에 맞춰 SPEC §0 범위표·§7.1·§12 D7을 고쳤다(2026-11-09). `DECISIONS.md` 2026-11-02의 "내부 센서·Kubernetes 수집기는 vLLM 0.31 전용"은 이 결정으로 대체됐다.
+- **지금 범위**(2026-11-09 사용자 결정, [결정 기록](docs/dev-1/user-decisions-20261109.md)):
+  - SGLang은 구조 준비까지만 한다. 엔진 provider, 판본 profile, 공통 입력 계약 의미(2절), 엔진 식별 계약(11절)이 여기에 해당한다.
+  - SGLang 생산자·설치기·수집 도구·lab·GPU 실측·등록은 하지 않는다. SGLang request-attempt 후보(`byul-sglang` 작업 트리)는 보류한다.
+  - vLLM을 먼저 완성한다(완성 기준은 5절).
 - 계층별로 엔진 지식을 둘 수 있는 곳:
 
 | 계층 | 엔진·판본 지식 | 규칙 |
@@ -31,7 +32,7 @@
   - 엔진 고유 사실이 계약 의미에 맞지 않으면 값을 지어내거나 다른 엔진의 의미로 바꾸지 않는다. null과 진단 코드로 남긴다.
   - 계약 의미를 바꿔야 하면 schema 판본을 올리는 안으로 올리고 `DECISIONS.md` 열린 질문에 적는다.
 - **기존 vLLM 고정 코드는 옮길 대상이다.**
-  - 실행기·Kubernetes 수집 파일 27개가 `vllm`·`0.31.0` 문자열을 비교하고, 관측기 `adapters/vllm_*.py`가 0.31.0 소스에 고정돼 있다. 이 파일을 고칠 때는 지원표 조회로 바꾸는 것을 먼저 검토하고, 새 고정 조건은 더하지 않는다.
+  - 실행기·Kubernetes 수집 파일 27개가 `vllm`·`0.31.0` 문자열을 비교하고, 관측기 `adapters/vllm_*.py`가 0.31.0 소스에 고정돼 있다. 이 파일을 고칠 때는 지원표 조회로 바꾸는 것을 먼저 검토하고, 새 고정 조건은 더하지 않는다. 지원표는 A 설계 보수의 엔진 provider·판본 profile(`adapters/engine_provider.py`·`adapters/engine_profiles.py`·`adapters/assets/engine_profiles.json`)로 들어온다(아직 미병합).
   - 이름이 `vllm_`로 시작해도 엔진 공통 기반인 파일이 있다. 예를 들어 `adapters/vllm_cache_callback.py`는 감싸기·자격 확인 기반이다. 이런 파일에 엔진별 값을 넣지 않고, 관측기마다 자기 고정값 표를 넘긴다.
   - 등록된 생산자 신원이 걸린 파일의 이름 변경이나 분리는 별도 결정으로 한다.
 - **결과는 엔진·판본별로 따로 둔다.** 한 엔진·판본의 CPU·GPU 결과를 다른 엔진·판본의 결과로 옮기거나 합치지 않는다.
@@ -45,6 +46,11 @@
   - 생산자 이름·판본·소스 SHA로 지원 여부를 정한다(`SUPPORTED_PRODUCERS`).
   - `supported`·`complete`·`gaps`·`violation_candidates`를 따로 내고, `producer_authenticated`는 항상 False다.
   - 등록은 그 엔진·판본의 실제 이미지 대조와 GPU 확인을 마친 생산자만 한다.
+- **공통 입력 계약 `/2`**(확정, 미구현. [설계 "/2 확정 사항"](docs/dev-1/gpu-common-inputs-196.md)): 아래를 한 번의 판본 변경으로 넣는다. 생산자 SHA가 바뀌므로 TP2 GPU 세션에서 한 번에 다시 확인·등록한다.
+  - 반복 행 요약과 V2 logit bias 비교(2026-11-08 결정)
+  - KV 값은 엔진 고유 단위 그대로 두고 단위 필드(와 알면 단위당 token 수)를 함께 적는다.
+  - `limit_enforced`는 모든 한도 집행이며 집행 방식 필드를 둔다(할당 거부·retraction 등).
+  - 생산자 신원(소스 SHA)에 공통 감싸기 기반 파일을 넣는다.
 - **관측은 읽기만 한다.**
   - property를 실행하지 않는다.
   - 요청 ID는 session 키 HMAC 지문으로만 남긴다.
@@ -65,12 +71,12 @@
   - 패치 릴리스는 diff로 선정하고 나머지는 이월한다.
   - 모델·환경·정책 변경은 증분 감사와 이월로 처리한다.
 - 소스 변경 경로표는 엔진별로 둔다(현재 `adapters/assets/vllm_change_rules.yaml` 하나). vLLM 표를 다른 엔진에 쓰지 않는다.
-- 정식/패치 판별은 엔진별 판본 규칙이 필요하다(열린 질문). SGLang은 정식 릴리스도 셋째 자리가 오른다(예: 0.5.21→0.5.22).
+- 정식/패치 판별은 엔진과 무관하게 같은 규칙이다. SGLang도 셋째 자리만 오르면 패치 릴리스다(2026-11-09 사용자 결정). 그 엔진의 소스 diff 경로표가 없으면 diff로 시험을 줄일 근거가 없으니 전체 시험한다.
 - 두 이미지 비교는 같은 엔진의 두 판본끼리 한다. 기준·후보를 같은 엔진 재사용으로 대신하지 않는다.
 
 ## 4. 정본과 참고
 
-- **`SPEC.md`가 정본이다.** 객체 7종, 불변식 INV-01~19, 파이프라인, 플러그인 인터페이스, 개발 순서(§8)가 있다. 1절이 대체한 항목만 예외다.
+- **`SPEC.md`가 정본이다.** 객체 7종, 불변식 INV-01~19, 파이프라인, 플러그인 인터페이스, 개발 순서(§8)가 있다. 2026-11-09 결정은 SPEC §0·§7.1·§12에 반영돼 있다.
 - `reference/framework/`: 점검 77행의 원천 데이터(`data/checklist.json`)와 환경·결과 템플릿이다. **필요할 때만 찾아본다.**
   - `03_체크리스트와_보완가이드.md`는 37만 자다. 통째로 읽지 않고, 필요한 행만 grep으로 찾는다.
   - 점검 데이터는 `data/checklist.json`을 코드로 읽는다(문서를 파싱하지 않는다).
@@ -86,6 +92,11 @@
   - 실행기 수는 점검 절차의 자극·관측 위치로 정한다.
   - 점검별 차이는 프로파일로, 대상 시스템별 차이는 커넥터로 흡수한다.
   - 관측이 안 되는 분기는 UNKNOWN으로 남긴다.
+- **vLLM 완성 기준**(2026-11-09 사용자 결정):
+  - vLLM 0.31.0에서 69개를 GPU lab 제품 경로(EVD→RES→RPT)로 실측한다.
+  - 0.32.0 고정값을 만들어 두 판본 비교(`guard update`)까지 한다. 일부러 넣은 회귀 사례 하나로 `REGRESSED` 탐지를 확인한다.
+  - 1차 범위에서 뺀 점검(REQ-02, OBS-01·06·11, PLT-07·10·11·12, OBS-09 기업 수집기 범위, PLT-08 TLS 구성)은 실행 경로를 준비하고 UNKNOWN으로 남긴 상태를 완성으로 본다.
+  - 영향도(`impact`)는 2026-11-08 초안(HIGH 33·MEDIUM 38·LOW 6)으로 확정했다. 새 팩 판본에 반영한 뒤 공식(official) 재판정을 한다.
 - 현황은 `uv run python -m tools.checklist_status`로 재생성한다(`docs/CHECKLIST_VALIDATION_STATUS.md`). 현황표의 DONE은 lab 단계 완료이고, 보안 PASS·기업 승인·원 질문 전체 완료가 아니다.
 - 1단계 분담(2026-11-04)은 실행기 파일 소유로 나눈다.
   - 개발 담당 26개, GPU 실증 담당 43개다.
@@ -159,8 +170,12 @@
 - **update 작업에서 `../runtime/`은 고치지 않는다.**
 - **공용 계약(`../contracts/`)은 제안만 한다.** 스키마·enum·생산자·표시 소유권 변경은 사용자 검토 뒤 반영한다. `../contracts/README.md`와 실제 스키마가 외부 교환 형식의 기준이다. guard 내부 모델은 유지하고 경계에서 변환한다.
 - **엔진 식별 계약**(2026-11-09 사용자 승인, `../contracts/README.md` 변경 이력):
-  - `environment.target.engine.name`은 소문자 식별자다. 정규 값은 `vllm`·`sglang`·`tensorrt-llm`이고 모의 엔진은 `mock`이다. update의 어댑터·지원표·생산자 이름도 같은 식별자를 쓴다.
-  - `runtime_kind`·`frontend`(`engine-server`·`triton`)와 병렬 크기(`tp_size`·`pp_size`·`dp_size`)는 guard ENV에 대응 필드가 없다. `tools/import_byul_inputs.py`가 원본에 보존하고 제한 사항으로 표시한다. guard 모델에 넣는 것은 그 값을 쓰는 소비자가 생길 때 한다.
+  - `environment.target.engine.name`과 `runtime_kind`는 소문자 식별자 형식(`^[a-z][a-z0-9_.-]{0,63}$`)이다. 정해진 목록이 아니어서 엔진이 늘어도 계약을 고치지 않는다. 정규 값은 `vllm`·`sglang`·`tensorrt-llm`이고 모의 엔진은 `mock`이다. update의 provider·판본 profile·생산자 이름도 같은 식별자를 쓴다.
+  - 환경 변환(`tools/import_byul_inputs.py`의 `convert_documents()`)은 `guard-byul-input-import/2`로 아래 값을 guard 객체에 직접 넣는다. A 설계 보수를 병합할 때 반영하며, `/1`은 과거 결과 재생용으로 남긴다. 그 전까지는 원본(`source-environment.json`)에 보존하고 `limitations`에 표시한다.
+    - `EngineInfo`: `runtime_kind`·`frontend`(`engine-server`·`triton`)
+    - `RuntimeInfo`: `tp_size`·`pp_size`·`dp_size`
+    - `ModelInfo`: `tokenizer_revision`·`components`
+    - `Policy`: `valid_from`·`valid_until`·`source_document_sha256`
   - 판정 결과의 공백은 둘로 나눈다.
     - 엔진 자체를 지원하지 않으면 `ADAPTER_UNSUPPORTED`
     - 엔진은 지원하지만 그 판본의 고정값·지원표가 없으면 `ENGINE_VERSION_UNSUPPORTED`

@@ -28,11 +28,11 @@
           "properties": {
             "name": {
               "description": "엔진 식별자(소문자). 정규 값은 vllm·sglang·tensorrt-llm이고 모의 엔진은 mock이다. 화면 표시 이름(vLLM·SGLang 등)은 넣지 않는다. 소비자는 모르는 식별자를 지원하지 않는 엔진으로 다룬다.",
-              "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z0-9][a-z0-9._-]*$"
+              "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z][a-z0-9_.-]{0,63}$"
             },
             "runtime_kind": {
-              "description": "runtime이 연결할 엔진 종류. runtime이 아직 연결하지 않는 값이면 runtime이 거부한다.",
-              "enum": ["mock", "vllm", "sglang", "tensorrt-llm"]
+              "description": "runtime이 연결할 driver 식별자(소문자). 정해진 목록이 아니라 형식만 검사한다. 예: mock·vllm·sglang·tensorrt-llm. 형식이 맞아도 그 runtime 설치가 등록하지 않은 driver면 runtime이 거부한다.",
+              "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,63}$"
             },
             "frontend": {
               "description": "선택. 요청을 받는 서빙 앞단. engine-server는 엔진 자체 서버(vllm serve·sglang.launch_server·trtllm-serve), triton은 Triton Inference Server 경유다. 모르면 null.",

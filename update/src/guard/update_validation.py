@@ -72,7 +72,7 @@ def reserve_output(output: Path, *, protected: list[Path]) -> Path:
     return output
 
 
-def _conditions(cfg: dict, side: str) -> dict:
+def _conditions(cfg: dict, side: str, *, profile="execution-v1") -> dict:
     value = merge_config(cfg, cfg.get("sides", {}).get(side, {}))
     value.pop("sides", None)
     value.pop("store", None)
@@ -83,10 +83,14 @@ def _conditions(cfg: dict, side: str) -> dict:
                 "source_commit_status", "expected_source_commit", "files_read_by_engine_sha256",
                 "files_read_by_engine_count"):
         launch.pop(key, None)
+    if profile == 'execution-v2':
+        sampling = value.get('sampling_validation', {})
+        sampling.pop('constraint_engine_version', None)
+        sampling.pop('constraint_source', None)
     return value
 
 
-def validate_inputs(pack, envs, policy, cfg: dict) -> dict:
+def validate_inputs(pack, envs, policy, cfg: dict, *, profile="legacy-five/1") -> dict:
     """Pure declared-input checks, never an observed engine-identity claim."""
     if cfg.get("update", {}).get("mode") != "managed":
         raise ValueError("the harness requires update.mode=managed")
@@ -95,8 +99,12 @@ def validate_inputs(pack, envs, policy, cfg: dict) -> dict:
         if settings.get("vllm", {}).get("launch_profile") != "cpu-bounded":
             raise ValueError("both sides require the explicit cpu-bounded launch profile")
     selected = {item.check_id for item in select(pack, envs, policy, mode=Mode.update).items if item.selected}
-    if selected != set(CHECKS):
-        raise ValueError("scope must select exactly the five minimum checks; run optional checks separately")
+    if profile not in {'legacy-five/1', 'plan-scope/2'}:
+        raise ValueError('ACCEPTANCE_PROFILE_UNSUPPORTED')
+    if profile == 'legacy-five/1' and selected != set(CHECKS):
+        raise ValueError('legacy-five/1 scope must select exactly the five minimum checks')
+    if not selected:
+        raise ValueError('scope must select at least one check')
     digests = []
     for env in envs:
         if env.data_origin.value == "EXAMPLE":
@@ -116,20 +124,20 @@ def validate_inputs(pack, envs, policy, cfg: dict) -> dict:
         raise ValueError("model identity and inventory must match")
     if envs[0].runtime.model_dump() != envs[1].runtime.model_dump():
         raise ValueError("declared CPU/runtime conditions must match; performance remains UNKNOWN")
-    if _conditions(cfg, "baseline") != _conditions(cfg, "candidate"):
+    if _conditions(cfg, 'baseline', profile='execution-v2' if profile == 'plan-scope/2' else 'execution-v1') != _conditions(cfg, 'candidate', profile='execution-v2' if profile == 'plan-scope/2' else 'execution-v1'):
         raise ValueError("meaningful side execution conditions differ; profile diagnostics are not image-update acceptance")
-    return {"comparison_kind": "image-comparison" if envs[0].engine.version == envs[1].engine.version else "version-upgrade",
+    return {"selected_checks": sorted(selected), "comparison_kind": "image-comparison" if envs[0].engine.version == envs[1].engine.version else "version-upgrade",
             "declared_images": [env.engine.image_digest for env in envs],
             "declared_versions": [env.engine.version for env in envs],
             "limitations": ["Declared inputs are not observed identities or engine results.",
                             "CPU security/functional comparison only; performance remains UNKNOWN."]}
 
 
-def _support_ready(readiness: dict) -> bool:
+def _support_ready(readiness: dict, expected_checks=None) -> bool:
     rows = {(row.get("side"), row.get("check_id")): row for row in readiness.get("check_support", [])}
     return readiness.get("ready") is True and all(
         rows.get((side, check), {}).get("status") == "SUPPORTED"
-        for side in ("baseline", "candidate") for check in CHECKS)
+        for side in ("baseline", "candidate") for check in (CHECKS if expected_checks is None else expected_checks))
 
 
 def _command(args: list[str], label: str, timeout: int) -> tuple[dict, str]:
@@ -163,7 +171,7 @@ def _assess_store(store: Path, report_path: Path, *, diagnostic: bool = False) -
     objects = read_objects(store)
     pack = verify_store_files(store, objects)
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    return assess_update(report, objects, pack, diagnostic=diagnostic)
+    return assess_update(report, objects, pack, diagnostic=diagnostic, profile="plan-scope/2")
 
 
 def _report_pair(report_path: Path) -> dict:
@@ -421,7 +429,7 @@ def main(argv: list[str] | None = None) -> int:
                               change_input.change if change_input else None, mode=Mode.update, read_only=True)
                 extra = {"change": change_input, "previous_plan": previous, "source_store": source}
             try:
-                declared = validate_inputs(pack, envs, policy, cfg)
+                declared = validate_inputs(pack, envs, policy, cfg, profile="plan-scope/2")
             except Exception as exc:
                 raise PreparationInputError(input_failure([contract_issue(exc)])["guidance"]) from exc
             if extra:
@@ -444,7 +452,7 @@ def main(argv: list[str] | None = None) -> int:
             _new_json(output / "inputs.json", {"schema": SCHEMA, "inputs": input_hashes,
                                                "pack": pack.ref().model_dump(mode="json"), "pack_files": pack_files})
             readiness = annotate(update_readiness(pack, envs, policy, cfg, **extra))
-            ready = _support_ready(readiness)
+            ready = _support_ready(readiness, declared["selected_checks"])
             if args.execute and ready:
                 run_extra = {"change": args.change, "previous_plan": args.previous_plan,
                              "previous_store": args.previous_store} if extra else {}

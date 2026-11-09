@@ -1,0 +1,10 @@
+{
+  "schema": "byul-source-review-receipts/1",
+  "receipts": [
+    {
+      "manifest_sha256": "19279425c13106d3eea28441114f16da520444b30ba28a0d671b51fcf85d091d",
+      "reviewed_by": "Codex / BYUL UPDATE B / PR241 R2",
+      "reviewed_at": "2026-11-09T18:47:16+09:00"
+    }
+  ]
+}

@@ -70,6 +70,8 @@ def installed_worker(root: Path, wheel: Path) -> dict:
     assert all((installed.parent / name).read_bytes() == body for name, body in shipped.items())
     assert not any(".assessment" in Path(entry).parts or Path(entry).name in {"src", "tools", "tests"}
                    for entry in sys.path if entry), "source checkout leaked into isolated sys.path"
+    from guard.conformance import inspect_installation
+    installation_conformance = inspect_installation()
     from guard.cli import app
     from guard.models import load_pack
     from guard.validation_evidence import inventory_tree, read_objects, verify_store_files, verify_saved_bundle
@@ -181,7 +183,8 @@ def installed_worker(root: Path, wheel: Path) -> dict:
                "wheel_sha256": digest(wheel.read_bytes()), "commands": commands,
                "example_fake_audit": True, "saved_pack_replay": True, "tampering_rejected": True,
                "source_unchanged": True, "req15": req15, "analysis": analysis,
-               "real_engine_executed": False, "product_network_and_subprocess_blocked": True}
+               "real_engine_executed": False, "product_network_and_subprocess_blocked": True,
+               "installation_conformance": installation_conformance}
     write_json(root / "summary.json", summary)
     print(json.dumps(summary, ensure_ascii=False))
     return summary

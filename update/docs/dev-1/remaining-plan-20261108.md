@@ -48,7 +48,9 @@ B 인계가 "개발26 공통"으로 남긴 것 중 A가 할 일이다. 등록을
 | **SUP-09·11 model-entry 지원 계약** | SUP-09·11 | 2026-11-08 반환(`sup09-model-entry.md`). -OO 정상 대조는 라이브러리 지원 범위 결정 대기 |
 | **SUP-10 plugin runner 지원 계약** | SUP-10 | 2026-11-08 반환(`sup10-plugin-runner.md`) |
 | **SUP-06 worker shard 공통 입력** | SUP-06 | 2026-11-08 반환(`sup06-worker-shard.md`, 미등록·TP2 확인 대기) |
-| B 의존 반환 3·4·8 | LIF-06, SUP-03, REQ-09·10 | 미착수. 대상 함수·검증 방법은 `gpu-b/consolidation-20261106/DEPENDENCY_RETURNS.md` |
+| B 의존 반환 3 | LIF-06 | 실제 요청 admission/attempt→전송→worker/model 및 진행 요청의 reload 부분 실패·선택 CPU parameter A/B/A 복구 연결(`consumption-links-cpu.md`). 전체 weights 원자성·KV kernel/GPU 미확인; 전체 반환 미완료 |
+| B 의존 반환 4 | SUP-03 | 실제 Python read→boot config 내용→worker HF config, tokenizer loader→cached 복사→요청 renderer 연결(`consumption-links-cpu.md`). native Rust 읽기·전체 보조물·인가/집행 미확인; 전체 반환 미완료 |
+| B 의존 반환 8 | REQ-09·10 | 실제 OPT worker/model logits/grammar·Sampler 7요청16단계 및 랜덤 소형 Qwen2-VL raw image→실제 MM worker→모델 embedding 4요청8단계(`consumption-links-cpu.md`). 선정 2B·V2·GPU 미확인; 전체 반환 미완료 |
 | 계약 합의 P2-Q1(사건 상한)·P2-Q2(V2 logit bias) | #196 소비 전반 | B 답변 대기 |
 
 ### 2-4. 정리 작업

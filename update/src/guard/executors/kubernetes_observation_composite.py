@@ -1,10 +1,12 @@
 """OBS02 two independent, source-bound sessions; no cross-session causal claim."""
+
+from guard.adapters.engine_profiles import supports
 from pathlib import Path
 from copy import deepcopy
 from guard.collectors.lifecycle import load_prepared
 from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
-from guard.runtime.kubernetes_http import KubernetesHTTP
+from guard.runtime.engine_http import KubernetesHTTP
 from .base import EvidenceDraft
 from .kubernetes_observation_state import OBSERVATIONS as BASE_OBSERVATIONS
 from .kubernetes_observation_identity import KubernetesObservationIdentityExecutor
@@ -49,7 +51,7 @@ class KubernetesObservationCompositeExecutor:
             if self.b_common_inputs is not None and (type(self.b_common_inputs) is not dict
                 or not self.b_common_inputs or set(self.b_common_inputs)-{'identity','profiler'}):raise ValueError
             if (type(self.cfg) is not dict or set(self.cfg)-{'identity_target','profiler_target','identity_prepared','profiler_prepared','kubectl_binary','max_duration_seconds'}
-                    or adapter is None or not env.hash_ok() or env.engine.name!='vllm' or env.engine.version!='0.31.0'
+                    or adapter is None or not env.hash_ok() or not supports(env.engine.name, env.engine.version)
                     or any(type(v) is not str or not v for v in (env.model.id,env.model.revision))):raise ValueError
             expected={label:values[label+'_target_sha256'] for label in ('identity','profiler')}
             if (env.ref().sha256!=values['observation_state_environment_sha256']

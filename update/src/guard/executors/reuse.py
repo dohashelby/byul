@@ -27,9 +27,9 @@ class ExecutionPreview:
 def preview_inputs(check, env, values: dict, cfg: dict) -> ExecutionPreview | None:
     """기존 실행 골격과 같은 순수 fixture/config 계산을 쓴다. 실패는 이월 불가다."""
     impl = cfg.get("executors", {}).get(check.executor)
-    factory = registry.resolve_executor(check.executor, impl) if impl else None
+    factory = registry.resolve_executor(check.executor, impl, engine=env.engine.name, version=env.engine.version) if impl else None
     adapter_name = cfg.get("adapter", {}).get("name")
-    adapter_factory = registry.ADAPTERS.get(adapter_name)
+    adapter_factory = registry.adapter_factory(adapter_name)
     if factory is None or adapter_factory is None:
         return None
     try:
@@ -56,6 +56,7 @@ def preview_inputs(check, env, values: dict, cfg: dict) -> ExecutionPreview | No
                 **executor.cfg,
                 "request_timeout": float(executor.cfg.get("request_timeout", 3.0)),
                 "allow_mutating_routes": bool(executor.cfg.get("allow_mutating_routes", False)),
+                "http_probe_profile": executor.cfg.get("http_probe_profile", "http-probe/2"),
             }, list(executor.roles())), secrets)
             comparison = sha256_hex(canonical_json(config)) if target.get("comparison_config") else None
             fixture = _http_fixture(executor, check, env, values, adapter, target, keys)

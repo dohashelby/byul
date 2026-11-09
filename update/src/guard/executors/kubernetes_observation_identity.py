@@ -1,4 +1,6 @@
 """OBS02 reuses closed OBS01 record reads and native8 model attribution facts."""
+
+from guard.adapters.engine_profiles import supports
 from guard.models import canonical_json,sha256_hex,utcnow
 from guard.adapters import vllm_safe_open_mapping_sensor as mapping_sensor
 from guard.adapters import vllm_safe_open_mapping_metadata as mapping_metadata
@@ -96,7 +98,7 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
         self.validate_policy(check,policy_values)
         from guard.collectors.lifecycle import load_prepared
         try:
-            if env.engine.name!='vllm' or env.engine.version!='0.31.0':raise ValueError
+            if not supports(env.engine.name, env.engine.version):raise ValueError
             prepared=load_prepared(self.cfg['prepared'])
             if sha256_hex(canonical_json(prepared))!=policy_values['identity_prepared_sha256']:raise ValueError
         except (KeyError,ValueError,TypeError,OSError,RuntimeError):raise ValueError('OBSERVATION_IDENTITY_PREPARED_UNAVAILABLE') from None

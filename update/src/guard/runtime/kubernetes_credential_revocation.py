@@ -1,9 +1,11 @@
 """Closed fresh-connection probe design; no issuer/credential mutation."""
+
+from guard.adapters.engine_profiles import supports
 from copy import deepcopy
 import re,threading
 from guard.models import canonical_json,sha256_hex
 from .bounded import strict_json
-from .kubernetes_http import KubernetesHTTP,KubernetesBindingError,REQUEST_BINDING_PROFILE
+from .engine_http import KubernetesHTTP,KubernetesBindingError,REQUEST_BINDING_PROFILE
 from guard.executors.credential_revocation_contract import SLOTS
 
 PROFILE='kubernetes-owned-credential-revocation-http-v1'
@@ -12,7 +14,7 @@ PROFILE='kubernetes-owned-credential-revocation-http-v1'
 class KubernetesCredentialRevocationHTTP:
     profile=PROFILE
     def __init__(self,target,env,keys,*,runner=None,duration=120,binary='kubectl'):
-        if target.get('lab') is not True or env.engine.name!='vllm' or env.engine.version!='0.31.0':raise KubernetesBindingError()
+        if target.get('lab') is not True or not supports(env.engine.name, env.engine.version):raise KubernetesBindingError()
         if (type(keys) is not dict or set(keys)!={'retired','control'} or any(type(v) is not str or not 0<len(v)<=8192 or any(ord(c)<33 or ord(c)>126 for c in v) for v in keys.values())
                 or len(set(keys.values()))!=2):raise KubernetesBindingError()
         self._keys=deepcopy(keys)

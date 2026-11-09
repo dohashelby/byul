@@ -1,5 +1,7 @@
 """REQ13 selected error-field capture via the approved public Kubernetes profile."""
 from __future__ import annotations
+
+from guard.adapters.engine_profiles import supports
 from datetime import datetime,timezone
 import hashlib
 import math
@@ -9,7 +11,7 @@ import sys
 from guard.models import DataOrigin,ExecStatus,canonical_json
 from guard.automation_policy import string_list
 from guard.runtime.bounded import strict_json
-from guard.runtime.kubernetes_http import KubernetesHTTP
+from guard.runtime.engine_http import KubernetesHTTP
 from .base import DraftArtifact,EvidenceDraft
 from .http_common import incomplete_artifact_capture
 from .response_content import OPTIONS,ResponseContentExecutor
@@ -89,13 +91,13 @@ class KubernetesResponseErrorExecutor(ResponseContentExecutor):
     def run(self,check,env,policy_values,adapter,workdir):
         if sys.flags.optimize:raise ValueError('REQ13_NORMAL_PYTHON_REQUIRED')
         self.validate_policy(check,policy_values)
-        if not env.hash_ok() or env.engine.name!='vllm':raise ValueError('REQ13_ENVIRONMENT_INVALID')
+        if not env.hash_ok() or not supports(env.engine.name, env.engine.version, 'http_transport'):raise ValueError('REQ13_ENVIRONMENT_INVALID')
         if self._transport_factory is not None and env.data_origin!=DataOrigin.EXAMPLE:raise ValueError('REQ13_INJECTION_REQUIRES_EXAMPLE')
         record=None;target=None;api_model=None;diagnostics=[];capture_calls=0
         began=datetime.now(timezone.utc)
         if not _rule_supported(check):diagnostics.append('REQ13_RULE_UNSUPPORTED')
         elif 'engine' not in policy_values['required_targets']:diagnostics.append('REQ13_ENGINE_NOT_SELECTED')
-        elif env.engine.version!='0.31.0':diagnostics.append('REQ13_UNSUPPORTED_ENGINE_VERSION')
+        elif not supports(env.engine.name, env.engine.version, 'response_error'):diagnostics.append('REQ13_UNSUPPORTED_ENGINE_VERSION')
         else:
             file=Path(self.cfg['target'])
             if file.is_symlink() or not file.is_file():raise ValueError('REQ13_TARGET_FILE_INVALID')

@@ -354,6 +354,7 @@ class LaunchPlan:
     entrypoint: str | None = None
     chat_template: dict | None = None
     log_profile: dict | None = None
+    gpu_devices: tuple[str, ...] | None = None
 
 
 @dataclass
@@ -363,15 +364,15 @@ class VllmAdapter:
     base_url: str | None = None
     launch_spec: LaunchSpec | None = None
     name: str = field(default="vllm", init=False)
-    version: str = field(default="0.4.2", init=False)
+    version: str = field(default="0.5.0", init=False)
 
     def input_rejection_proof(self, **kwargs) -> dict:
         return _input_rejection_proof(**kwargs)
 
     def input_length_cause_collector(self, ctx):
         """Optional source-correlated CPU evidence; ordinary requests unchanged."""
-        from .vllm_length_cause import VllmLengthCause
-        return VllmLengthCause(ctx)
+        from .engine_profiles import create_implementation
+        return create_implementation('length_cause', ctx, backend='cpu')
 
     # --- 기동 ------------------------------------------------------------------
 
@@ -623,6 +624,16 @@ class VllmAdapter:
             return safe
         if route.mutating:
             return None  # 검증된 안전 프로브가 없는 상태 변경 경로는 보내지 않는다
+        safe_get = LIVENESS_ROUTES | DOCS_ROUTES | DIAGNOSTIC_ROUTES | READONLY_ADMIN_ROUTES | {
+            '/v1/models', '/v1/models/{model}', '/v1/responses/{response_id}',
+            '/v1/chat/completions/{completion_id}'}
+        safe_post = {'/v1/completions', '/invocations', '/v1/chat/completions',
+            '/tokenize', '/v1/tokenize', '/detokenize', '/v1/detokenize',
+            '/v1/embeddings', '/pooling', '/classify'}
+        get_path = _PATH_PARAM.sub('{id}', route.path)
+        if not (route.method == 'GET' and get_path in {_PATH_PARAM.sub('{id}', p) for p in safe_get}
+                or route.method == 'POST' and route.path in safe_post):
+            return None
         pr = self._probe_request(route, model or DEFAULT_MODEL)
         # 경로 변수는 존재하지 않는 고정 ID로 채운다(실제 객체에 닿지 않음)
         return ProbeRequest(pr.method, _PATH_PARAM.sub(PATH_PARAM_PLACEHOLDER, pr.path), pr.body)

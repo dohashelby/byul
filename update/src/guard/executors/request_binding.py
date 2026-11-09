@@ -8,6 +8,8 @@ No abort, stored-result, retry, child-request or tenant authorization is tested.
 """
 from __future__ import annotations
 
+from guard.adapters.engine_provider import evidence_contract
+
 import hashlib
 import math
 import secrets
@@ -334,7 +336,7 @@ class RequestBindingExecutor(HttpCheckExecutor):
         template_supported = False
         try:
             template_supported = (launch.get("profile") == (contract or {}).get("launch_profile", "cpu-bounded-v1")
-                and ctx.adapter.supports_template_profile(identity) and type(argv) is list
+                and evidence_contract(ctx.adapter, "supports_template_profile", identity) and type(argv) is list
                 and "--chat-template" in argv and argv.index("--chat-template") + 1 < len(argv)
                 and argv[argv.index("--chat-template") + 1] == identity["container_path"])
         except Exception:

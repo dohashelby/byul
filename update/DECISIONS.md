@@ -764,3 +764,15 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
   - 정식/패치 판별은 SGLang도 vLLM과 같은 규칙이다. 그 엔진의 소스 diff 경로표가 없으면 전체 시험한다.
   - SGLang request-attempt 후보는 보류한다. 지금 SGLang은 구조 준비까지만 한다.
   - · 사용자 결정.
+
+## 2026-11-08 — 반복 업데이트 아홉 경계 보수 (사용자 승인, 미커밋)
+
+사용자는 worker/rank·0.31 앵커링부터 기존 및 추가 설계 문제를 보수하고 공통 파이프라인을 유지하는 엔진 확장을 요청했다. Engine provider/factory/profile, actor topology /3, 독립 qualification/review receipts, 실행 recipe/attempt, model component/tokenizer 신원, 정책 유효기간을 선택 필드와 별도 버전의 계약으로 추가한다. 기존 객체의 미입력 직렬화와 /1 importer replay, 승인된 고정 소스는 보존한다. manifest 생성은 검토 승인과 분리한다. 완료 관측은 후속 오류로 가리지 않고 자원 반환 미확인은 다음 의존 실행을 막는다. 상세와 검증 결과는 `docs/dev-1/design-repairs-2-20261108.md`에 기록한다.
+- 2026-11-09 · A 설계 보수(A 작업 트리 미커밋 변경, 기준 `8402ff89`)를 PR #239 위 브랜치 `claude/a-design-repairs`로 정리했다. 원본은 A 작업 트리에 그대로 둔다. · 사용자 지시(제1원칙 앵커링 금지, SGLang 반드시·TensorRT-LLM 가능하면).
+  - 계약 `environment`: #239 필드에 A의 `target.model.components`를 더했다. `runtime_kind`는 형식 검사로 같다.
+  - 환경 변환: `guard-byul-input-import/2`가 기본이다. A가 넣은 값에 더해 `EngineInfo.frontend`, `RuntimeInfo.tp_size`·`pp_size`·`dp_size`를 넣는다. `/1`은 과거 결과 재생용이며 #239의 원본 보존·제한 사항 표시를 쓴다.
+  - runtime 9파일·platform 시험·CI 1줄 변경은 update 브랜치에서 빼서 `claude/a-runtime-platform-proposal`에 둔다.
+  - 실행기·수집 파일의 `vllm`·`0.31.0` 비교는 27개 파일 중 24개가 판본 profile 조회로 바뀌었다. 남은 `runtime/kubernetes_http.py`·`kubernetes_startup_binding.py`·`kubernetes_worker_readiness.py`는 bytes가 증거의 수집기 신원과 B 검토 원본 대조에 쓰여, B 검토(source gate)와 함께 옮긴다.
+  - vLLM 소스를 직접 분석하는 CPU 실행기 6개(`engine_sensor.py` source slot, `profiler_lifecycle_cpu.py`, `structured_tools_cpu.py`, `template_source_cpu.py`, `sampling_consumption_cpu.py`, `multimodal_gather_cpu.py`)는 provider(`adapters/`)로 옮길 대상이다.
+  - TensorRT-LLM은 기본 `EngineProvider`와 외부 HTTP 범위로 둔다. 정리 중 TensorRT-LLM 때문에 바뀌어야 할 중대한 설계 문제는 보지 못했다.
+  - B 승인이 필요한 시험 11개(source gate 알고리즘 변경)는 B 검토를 먼저 요청한다(11-09 결정 (가)). 검토 전에는 CI에서 실패한다.

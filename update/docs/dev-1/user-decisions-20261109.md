@@ -6,15 +6,15 @@
 
 | # | 결정 | 반영 상태 |
 |---|---|---|
-| 1-1 | A 작업 트리(`Buyl/byul-dev1-k8s`, 기준 `8402ff89`)의 미커밋 설계 보수는 **A/B 작업 분배 전에 먼저 정리해 main에 넣는다.** 들어 있는 것: 엔진 provider(`adapters/engine_provider.py`), 판본 profile 목록(`adapters/engine_profiles.py`, `adapters/assets/engine_profiles.json`), 생산자 자격 receipt(`collectors/producer_qualifications.json`·`producer_approvals.py`·`producer_release.py`), 실행 recipe(`core/execution_recipe.py`) 등 R1~R9 경계. | 미반영. 분배 전 선행 작업 |
-| 1-2 | 병합 순서는 **PR dohashelby/byul#239 → A 설계 보수**다. #239에는 아래 1-3 계약 형식을 반영해 먼저 병합한다. A 작업은 최신 main으로 옮기면서 충돌을 푼다. | #239 반영 완료(이 커밋), A 미반영 |
+| 1-1 | A 작업 트리(`Buyl/byul-dev1-k8s`, 기준 `8402ff89`)의 미커밋 설계 보수는 **A/B 작업 분배 전에 먼저 정리해 main에 넣는다.** 들어 있는 것: 엔진 provider(`adapters/engine_provider.py`), 판본 profile 목록(`adapters/engine_profiles.py`, `adapters/assets/engine_profiles.json`), 생산자 자격 receipt(`collectors/producer_qualifications.json`·`producer_approvals.py`·`producer_release.py`), 실행 recipe(`core/execution_recipe.py`) 등 R1~R9 경계. | 반영: 브랜치 `claude/a-design-repairs`(PR #239 위). 원본은 A 작업 트리 그대로 보존 |
+| 1-2 | 병합 순서는 **PR dohashelby/byul#239 → A 설계 보수**다. #239에는 아래 1-3 계약 형식을 반영해 먼저 병합한다. A 작업은 최신 main으로 옮기면서 충돌을 푼다. | #239 반영, A는 `claude/a-design-repairs`로 정리(PR #239 병합 뒤 병합) |
 | 1-3 | 계약 `environment.target.engine.runtime_kind`는 정해진 목록이 아니라 **소문자 driver 식별자 형식**(`^[a-z][a-z0-9_.-]{0,63}$`)만 검사한다. 엔진 이름(`target.engine.name`)과 `framework-input` 엔진 칸도 같은 형식이다. | 반영(`contracts/schemas/*`, `contracts/README.md`) |
-| 1-4 | 환경 변환은 **A 방식**으로 한다. `tools/import_byul_inputs.py`의 `convert_documents(..., version=)`에서 `guard-byul-input-import/1`은 과거 결과 재생, `/2`가 새 기본이다. `/2`는 아래 값을 guard 객체에 직접 넣는다. 값이 없으면 직렬화에서 빠져 기존 객체 해시는 그대로다. 이때 #239의 `*_RETAINED_IN_SOURCE_ONLY` 제한 코드는 `/2`에서 쓰지 않는다(`/1` 재생에서만 남는다). | 미반영. A 병합 때 |
+| 1-4 | 환경 변환은 **A 방식**으로 한다. `tools/import_byul_inputs.py`의 `convert_documents(..., version=)`에서 `guard-byul-input-import/1`은 과거 결과 재생, `/2`가 새 기본이다. `/2`는 아래 값을 guard 객체에 직접 넣는다. 값이 없으면 직렬화에서 빠져 기존 객체 해시는 그대로다. 이때 #239의 `*_RETAINED_IN_SOURCE_ONLY` 제한 코드는 `/2`에서 쓰지 않는다(`/1` 재생에서만 남는다). | 반영(`claude/a-design-repairs`): `EngineInfo.frontend`, `RuntimeInfo.tp_size`·`pp_size`·`dp_size` 추가 |
 |  | - `EngineInfo`: `runtime_kind`(A), `frontend`(#239 계약 필드, 이번 결정으로 추가) |  |
 |  | - `RuntimeInfo`: `tp_size`·`pp_size`·`dp_size`(#239 계약 필드, 이번 결정으로 추가) |  |
 |  | - `ModelInfo`: `tokenizer_revision`·`components`(A) |  |
 |  | - `Policy`: `valid_from`·`valid_until`·`source_document_sha256`(A) |  |
-| 1-5 | A 미커밋 작업 안의 **runtime 코드 변경**(`runtime/src/serving_runtime/mvp/backend_drivers.py` 새 파일, `cli.py`·`mvp/app.py`·`mvp/backend.py`·`mvp/config.py`·`mvp/engine_client.py`·`mvp/target.py`, `runtime/tests/test_backend_driver_extension.py`, `runtime/project-context/STATUS.md`)과 **platform 시험·CI 변경**(`platform/api/tests/test_update_integration_contracts.py`, `.github/workflows/update.yml`)은 **update PR에서 빼서** 각 담당 검토용으로 따로 둔다. update 작업은 runtime을 고치지 않는다. | 미반영. A 병합 때 |
+| 1-5 | A 미커밋 작업 안의 **runtime 코드 변경**(`runtime/src/serving_runtime/mvp/backend_drivers.py` 새 파일, `cli.py`·`mvp/app.py`·`mvp/backend.py`·`mvp/config.py`·`mvp/engine_client.py`·`mvp/target.py`, `runtime/tests/test_backend_driver_extension.py`, `runtime/project-context/STATUS.md`)과 **platform 시험·CI 변경**(`platform/api/tests/test_update_integration_contracts.py`, `.github/workflows/update.yml`)은 **update PR에서 빼서** 각 담당 검토용으로 따로 둔다. update 작업은 runtime을 고치지 않는다. | 반영: update PR에서 뺐고 브랜치 `claude/a-runtime-platform-proposal`에 따로 둔다 |
 
 ## 2. 공통 입력 계약 `guard-gpu-common-input/2`
 

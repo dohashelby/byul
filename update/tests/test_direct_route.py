@@ -245,9 +245,9 @@ def test_missing_allowed_key_is_aborted_unknown(tmp_path):
     assert res.verdicts.security == Verdict.UNKNOWN
 
 
-def test_non_lab_target_is_measured(tmp_path):
+def test_injected_probe_is_example_even_without_lab_permission(tmp_path):
     _, evd, _ = _run(tmp_path, World(exposed=False), lab=False)
-    assert evd.data_origin == DataOrigin.MEASURED
+    assert evd.data_origin == DataOrigin.EXAMPLE
 
 
 def test_representative_order():

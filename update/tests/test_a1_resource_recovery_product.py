@@ -141,7 +141,10 @@ def test_both_registered_cli_branches_independent_fail_unknown_and_exact_refs(tm
         assert all(e.observations[k].value is False for k in ('recovery_global_resources_released','recovery_next_normal_launch_verified','recovery_scope_complete'))
         assert len(world.sent)==(1 if mode in {'engine-replaced','retained-http-failure'} else 2)
         if mode=='released-descriptors':assert e.observations['recovery_selected_absence_observed'].value is True
-    if mode in {'census-failure','invalid-census','clock-skew','engine-replaced','native-partial','attachment','http-cleanup','retained-http-failure','actual-lab-false','version032'}:assert e.execution.status.value=='ABORTED'
+    if mode in {'census-failure','invalid-census','clock-skew','engine-replaced','native-partial','attachment','http-cleanup','retained-http-failure','actual-lab-false'}:assert e.execution.status.value=='ABORTED'
+    if mode=='version032':
+        assert e.execution.status.value=='NOT_RUN' and world.sent==[]
+        assert 'not available' in e.execution.abort_reason
     assert bool(e.execution.cleanup_errors)==(mode=='http-cleanup')
     assert PRIVATE not in canonical_json(e.to_dict()).decode()
     for artifact in e.artifacts:assert PRIVATE.encode() not in (tmp_path/'store'/artifact.path).read_bytes()

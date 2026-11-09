@@ -1,0 +1,151 @@
+"""Read one immutable file prefix. Stdlib only; never delete or acknowledge data."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import sys
+import time
+
+MAX_PAGE = 384 * 1024
+MAX_ROW = 256 * 1024
+NAME = re.compile(r'callbacks-([1-9][0-9]*)(?:-[0-9]{4})?\.jsonl')
+
+
+def page(root, snapshot=None, cursor=None, capture_id=None, seek_end=False):
+    root = Path(root)
+    if root.is_symlink() or not root.is_dir():
+        raise ValueError('CALLBACK_ROOT_INVALID')
+    names = [p.name for p in root.iterdir()]
+    files = sorted(name for name in names if NAME.fullmatch(name))
+    if len(files) > 256:
+        raise ValueError('CALLBACK_PROCESS_LIMIT')
+    start_cursor = dict(cursor or {})
+    checkpoints, checkpoint_gaps = {}, []
+    if snapshot is None and capture_id is not None:
+        if re.fullmatch('[0-9a-f]{32}', capture_id) is None:
+            raise ValueError('CALLBACK_CAPTURE_ID_INVALID')
+        request = root / 'capture-request.json'
+        tmp = root / ('capture-request-' + capture_id + '.tmp')
+        with tmp.open('x') as stream: json.dump({'capture_id': capture_id}, stream)
+        os.replace(tmp, request)
+        pids = {int(m[1]) for name in names if (m := re.fullmatch(r'callbacks-([1-9][0-9]*)\.state\.json', name))}
+        until = time.monotonic() + 1
+        while pids - checkpoints.keys() and time.monotonic() < until:
+            for pid in pids - checkpoints.keys():
+                ack = root / f'checkpoint-{pid}-{capture_id}.json'
+                if ack.is_file() and not ack.is_symlink():
+                    with ack.open('rb') as stream: raw = stream.read(65537)
+                    item = json.loads(raw)
+                    if len(raw) > 65536 or item.get('capture_id') != capture_id or item.get('pid') != pid or item.get('schema') != 'guard-observer-checkpoint/1':
+                        raise ValueError('CALLBACK_CHECKPOINT_INVALID')
+                    checkpoints[pid] = item
+            if pids - checkpoints.keys(): time.sleep(0.01)
+        if pids - checkpoints.keys(): checkpoint_gaps.append('CALLBACK_CHECKPOINT_UNAVAILABLE')
+    elif capture_id is not None:
+        for pid in {v['pid'] for v in snapshot.values()}:
+            ack = root / f'checkpoint-{pid}-{capture_id}.json'
+            if ack.is_file() and not ack.is_symlink():
+                with ack.open('rb') as stream: raw = stream.read(65537)
+                item = json.loads(raw)
+                if len(raw) > 65536 or item.get('capture_id') != capture_id or item.get('pid') != pid:
+                    raise ValueError('CALLBACK_CHECKPOINT_INVALID')
+                checkpoints[pid] = item
+    if snapshot is None:
+        names = [p.name for p in root.iterdir()]
+        files = sorted(name for name in names if NAME.fullmatch(name))
+        snapshot = {}
+        for name in files:
+            info = (root / name).lstat()
+            if not stat.S_ISREG(info.st_mode):
+                raise ValueError('CALLBACK_FILE_INVALID')
+            pid = int(NAME.fullmatch(name)[1])
+            if pid in checkpoints and name not in checkpoints[pid]['offsets']:
+                continue  # A segment born after the acknowledged cut.
+            try:
+                ticks = int(Path('/proc/' + str(pid) + '/stat').read_text().rsplit(')', 1)[1].split()[19])
+            except (OSError, ValueError, IndexError):
+                ticks = None
+            snapshot[name] = dict(inode=info.st_ino, device=info.st_dev, size=info.st_size, pid=pid, start_ticks=ticks)
+            if pid in checkpoints:
+                snapshot[name]['size'] = checkpoints[pid]['offsets'].get(name, 0)
+    cursor = dict(cursor or {})
+    rows, size, gaps = [], 0, list(checkpoint_gaps)
+    for pid in ({item['pid'] for item in snapshot.values()} | {int(found[1]) for name in names
+                if (found := re.fullmatch(r'callbacks-([1-9][0-9]*)\.state\.json', name))}):
+        path = root / f'callbacks-{pid}.state.json'
+        segmented = any(name.startswith(f'callbacks-{pid}-') for name in snapshot)
+        if path.exists():
+            if path.is_symlink():
+                raise ValueError('CALLBACK_STATE_INVALID')
+            with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW), 'rb') as stream:
+                raw = stream.read(4097)
+            if len(raw) > 4096:
+                raise ValueError('CALLBACK_STATE_INVALID')
+            state = json.loads(raw)
+            if pid in checkpoints:
+                state = checkpoints[pid]
+            if (state.get('schema') not in {'guard-observer-journal/2', 'guard-observer-journal/3', 'guard-observer-checkpoint/1'}
+                    or any(type(state.get(k)) is not int or state[k] < 0 for k in ('accepted', 'written', 'dropped', 'errors'))
+                    or pid not in checkpoints and type(state.get('closed')) is not bool or state.get('dropped') != 0
+                    or state.get('errors') != 0 or state.get('accepted') != state.get('written')):
+                gaps.append('CALLBACK_JOURNAL_INCOMPLETE')
+            if pid not in checkpoints and state.get('closed') is not True:
+                gaps.append('CALLBACK_CAPTURE_NOT_FINALIZED')
+        elif segmented:
+            gaps.append('CALLBACK_JOURNAL_STATE_UNAVAILABLE')
+    if (not checkpoints and files != sorted(snapshot)) or any(name not in files for name in snapshot):
+        gaps.append('CALLBACK_SOURCE_SET_CHANGED')
+    if capture_id is not None and any(item['pid'] not in checkpoints for item in snapshot.values()):
+        gaps.append('CALLBACK_CHECKPOINT_UNAVAILABLE')
+    if seek_end:
+        return dict(schema='guard-callback-page/2', snapshot=snapshot, cursor={k:v['size'] for k,v in snapshot.items()},
+            start_cursor=start_cursor, rows=[], gaps=gaps, done=True, capture_id=capture_id)
+    for name, expected in sorted(snapshot.items()):
+        if NAME.fullmatch(name) is None:
+            raise ValueError('CALLBACK_CURSOR_INVALID')
+        offset = cursor.get(name, 0)
+        if type(offset) is not int or not 0 <= offset <= expected['size']:
+            raise ValueError('CALLBACK_CURSOR_INVALID')
+        fd = os.open(root / name, os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(fd, 'rb') as stream:
+            info = os.fstat(stream.fileno())
+            if (not stat.S_ISREG(info.st_mode) or info.st_ino != expected['inode'] or info.st_dev != expected['device']
+                    or info.st_size < expected['size']):
+                raise ValueError('CALLBACK_FILE_REPLACED')
+            stream.seek(offset)
+            while stream.tell() < expected['size']:
+                begin = stream.tell()
+                raw = stream.readline(min(MAX_ROW + 1, expected['size'] - begin))
+                if len(raw) > MAX_ROW or not raw.endswith(b'\n'):
+                    gaps.append('CALLBACK_ROW_INCOMPLETE')
+                    cursor[name] = expected['size']
+                    break
+                if size + len(raw) > MAX_PAGE:
+                    cursor[name] = begin
+                    return dict(schema='guard-callback-page/2', snapshot=snapshot, cursor=cursor, start_cursor=start_cursor, rows=rows, gaps=gaps, done=False, capture_id=capture_id)
+                value = json.loads(raw)
+                rows.append(dict(file=name, offset=begin, end=stream.tell(), raw_sha256=hashlib.sha256(raw).hexdigest(), event=value))
+                size += len(raw)
+                cursor[name] = stream.tell()
+    return dict(schema='guard-callback-page/2', snapshot=snapshot, cursor=cursor, start_cursor=start_cursor, rows=rows, gaps=gaps, done=True, capture_id=capture_id)
+
+
+def container_start():
+    try:
+        import time
+        ticks = int(Path('/proc/1/stat').read_text().rsplit(')', 1)[1].split()[19])
+        offset = time.clock_gettime_ns(time.CLOCK_BOOTTIME) - time.monotonic_ns()
+        return ticks * 1000000000 // os.sysconf('SC_CLK_TCK') - offset
+    except (OSError, ValueError, IndexError, AttributeError):
+        return None
+
+
+if __name__ == '__main__':
+    spec = json.loads(sys.argv[1])
+    if re.fullmatch('[0-9a-f]{32}', spec['session']) is None:
+        raise ValueError('CALLBACK_SESSION_INVALID')
+    value = page('/guard-lifecycle/data/' + spec['session'], spec.get('snapshot'), spec.get('cursor'), spec.get('capture_id'), spec.get('seek_end', False))
+    value['container_start_monotonic_ns'] = container_start()
+    print(json.dumps(value, separators=(',', ':')))

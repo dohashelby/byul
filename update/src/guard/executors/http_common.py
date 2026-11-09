@@ -405,7 +405,7 @@ class HttpCheckExecutor:
         draft = EvidenceDraft(
             status=ExecStatus.COMPLETED,
             # 실험실(stub) 대상은 EXAMPLE. 실제 엔진 대상만 MEASURED (DECISIONS 5a/5b)
-            data_origin=DataOrigin.EXAMPLE if ctx.target.get("lab") else DataOrigin.MEASURED,
+            data_origin=DataOrigin.EXAMPLE if ctx.env.data_origin == DataOrigin.EXAMPLE or self._container_probe is not None or ctx.target.get('synthetic') is True or ctx.target.get('engine_kind') == 'stub' else DataOrigin.MEASURED,
             normal_control=normal,
             challenges=challenges,
             observations=observations,

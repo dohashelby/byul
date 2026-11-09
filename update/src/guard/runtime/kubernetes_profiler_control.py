@@ -3,13 +3,15 @@
 Reuses bounded HTTP and target verification, plus the opt-in owned trace fixture.
 No engine lifecycle, dynamic routes, credentials, body previews or backend-state claim.
 """
+
+from guard.adapters.engine_profiles import supports
 from copy import deepcopy
 from pathlib import Path
 import re
 
 from guard.models import canonical_json, sha256_hex
 from .bounded import strict_json
-from .kubernetes_http import KubernetesHTTP, KubernetesBindingError, REQUEST_BINDING_PROFILE
+from .engine_http import KubernetesHTTP, KubernetesBindingError, REQUEST_BINDING_PROFILE
 from . import profiler_owned_trace as trace_fixture
 
 PROFILE = 'kubernetes-owned-profiler-control-http-v1'
@@ -20,7 +22,7 @@ CONTROL_PATHS = {'start': '/start_profile', 'stop': '/stop_profile',
 
 class KubernetesProfilerControlHTTP(KubernetesHTTP):
     def __init__(self, target, env, **kwargs):
-        if target.get('lab') is not True or env.engine.name != 'vllm' or env.engine.version != '0.31.0':
+        if target.get('lab') is not True or not supports(env.engine.name, env.engine.version):
             raise KubernetesBindingError()
         super().__init__(target, env, profile=REQUEST_BINDING_PROFILE, **kwargs)
         self._last_slot = -1; self._control_token = None

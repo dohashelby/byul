@@ -274,7 +274,9 @@ def test_update_retains_startup_and_cleanup_failures_for_both_sides(tmp_path, mo
     assert failed
     assert len(list(st.iter_kind("EVD"))) == 2
     assert all(e.execution.status.value == "ABORTED" for e in st.iter_kind("EVD"))
-    assert len([s for s in rpt.limitations if "cleanup incomplete" in s and "guard.run=" in s]) == 2
+    assert len([s for s in rpt.limitations if "cleanup incomplete" in s and "guard.run=" in s]) == 1
+    candidate_evd, = [e for e in st.iter_kind('EVD') if e.side.value == 'candidate']
+    assert candidate_evd.execution.abort_reason == 'BASELINE_RESOURCE_RELEASE_UNVERIFIED'
     assert "sensitive daemon output" not in json.dumps(rpt.to_dict())
 
 

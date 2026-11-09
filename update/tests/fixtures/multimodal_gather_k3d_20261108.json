@@ -1,0 +1,105 @@
+{
+ "contract": "guard-mm-gather-cpu/1",
+ "data_origin": "EXAMPLE",
+ "model_binding": null,
+ "producer": {
+  "name": "guard-mm-gather-cpu",
+  "source_sha256": "4170493b9108e076fb253af326d05ba410e2988b9086e1320932958cfe376c55",
+  "version": "1"
+ },
+ "rows": [
+  {
+   "case": "embeddings",
+   "embedding_shapes": [
+    [
+     2,
+     8
+    ]
+   ],
+   "error_sha256": null,
+   "mask": [
+    false,
+    true,
+    true,
+    false
+   ],
+   "outcome": "gathered",
+   "reference_matches": true
+  },
+  {
+   "case": "masked",
+   "embedding_shapes": [
+    [
+     2,
+     8
+    ]
+   ],
+   "error_sha256": null,
+   "mask": [
+    false,
+    true,
+    false,
+    true,
+    false
+   ],
+   "outcome": "gathered",
+   "reference_matches": true
+  },
+  {
+   "case": "partial-window",
+   "embedding_shapes": [
+    [
+     2,
+     8
+    ]
+   ],
+   "error_sha256": null,
+   "mask": [
+    true,
+    true
+   ],
+   "outcome": "gathered",
+   "reference_matches": true
+  },
+  {
+   "case": "missing-cache",
+   "embedding_shapes": [],
+   "error_sha256": "162ccf34ae8505deab955f33e9c2c82734fddb0b470864b7c4a0ea1d9904c69e",
+   "mask": [],
+   "outcome": "cache_miss",
+   "reference_matches": false
+  },
+  {
+   "case": "hidden-mismatch",
+   "embedding_shapes": [],
+   "error_sha256": "0757dbe0d345c12a9935ef92dbb9728a0bdd0ad96914dbb950e1992223d3948c",
+   "mask": [],
+   "outcome": "parser_rejected",
+   "reference_matches": false
+  },
+  {
+   "case": "text-default",
+   "embedding_shapes": [],
+   "error_sha256": null,
+   "mask": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "outcome": "gathered",
+   "reference_matches": true
+  }
+ ],
+ "source_ended": true,
+ "sources_after": {
+  "vllm.multimodal.inputs": "3ce5d3cc5bedf0343d75e1a7cfbca10a0061b960de56a9fb6465cde0f14bc8b9",
+  "vllm.multimodal.parse": "deb26b02631df848aa6562ffd0ff2a4430d827957c79cf3d9d0b01d75ab584c5",
+  "vllm.v1.worker.gpu_model_runner": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a"
+ },
+ "sources_before": {
+  "vllm.multimodal.inputs": "3ce5d3cc5bedf0343d75e1a7cfbca10a0061b960de56a9fb6465cde0f14bc8b9",
+  "vllm.multimodal.parse": "deb26b02631df848aa6562ffd0ff2a4430d827957c79cf3d9d0b01d75ab584c5",
+  "vllm.v1.worker.gpu_model_runner": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a"
+ }
+}

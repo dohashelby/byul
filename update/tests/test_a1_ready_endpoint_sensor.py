@@ -166,7 +166,9 @@ def example_pair(tmp_path,patch):
 def test_exact_creator_receiver_sender_original_behavior_and_cleanup(tmp_path,monkeypatch,mode):
     world=make_world(tmp_path,monkeypatch,mode=mode)
     try:
-        if sys.platform!='linux' or mode in {'eof','constructor-failure','send-failure'}:
+        # Unsupported observation must not change the original call's outcome.
+        # The explicit unsupported-platform metadata gap is checked below.
+        if mode in {'eof','constructor-failure','send-failure'}:
             with pytest.raises(Exception):world.invoke()
         else:world.invoke()
     finally:world.close()
@@ -191,9 +193,7 @@ def test_observer_failure_preserves_original_source_behavior(tmp_path,monkeypatc
     def fail(*args,**kwargs):raise RuntimeError(PRIVATE)
     monkeypatch.setattr(world.observer,{'event':'endpoint_event','snapshot':'endpoint_snapshot','binding':'endpoint_binding'}[failure],fail)
     try:
-        if sys.platform=='linux':world.invoke()
-        else:
-            with pytest.raises(AssertionError):world.invoke()
+        world.invoke()  # Metadata failure cannot invent a native exception on any OS.
         assert world.original_starts
     finally:world.close()
     assert all(value.closed for value in world.created)
@@ -224,9 +224,7 @@ def test_context_observer_failure_never_masks_original_startup(tmp_path,monkeypa
             if failure=='reset':raise RuntimeError(PRIVATE)
     monkeypatch.setattr(sensor,'_INIT',BrokenContext())
     try:
-        if sys.platform=='linux':world.invoke()
-        else:
-            with pytest.raises(AssertionError):world.invoke()
+        world.invoke()  # Metadata failure cannot invent a native exception on any OS.
         assert world.original_starts
     finally:world.close()
     assert all(value.closed for value in world.created)

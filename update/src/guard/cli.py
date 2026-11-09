@@ -134,7 +134,7 @@ def policy_update(base: str = typer.Option(..., "--base"), patch: Path = typer.O
 
 
 @app.command("diff")
-def engine_diff(baseline: str = typer.Option(..., "--from"), candidate: str = typer.Option(..., "--to"),
+def engine_diff(engine: Optional[str] = typer.Option(None, "--engine"), baseline: str = typer.Option(..., "--from"), candidate: str = typer.Option(..., "--to"),
                 repository: Optional[Path] = typer.Option(None, "--repository", help="기존 git 저장소; 지정 시 fetch하지 않음"),
                 pack: Path = typer.Option(Path("packs/PACK-BASELINE"), "--pack"),
                 config: Path = ConfigOpt, store: Optional[Path] = StoreOpt):
@@ -143,9 +143,10 @@ def engine_diff(baseline: str = typer.Option(..., "--from"), candidate: str = ty
     cfg = _config(config)
     pk = load_pack(pack)
     options = cfg.get("engine_source", {})
+    engine = engine or options.get("engine") or (cfg.get("adapter", {}).get("name") if cfg.get("adapter", {}).get("name") != "fake" else None) or "vllm"
     if repository is None:
-        repository = prepare_source_repository(options)
-    extracted = extract_git_change(repository, baseline, candidate, pack=pk)
+        repository = prepare_source_repository(options, engine=engine)
+    extracted = extract_git_change(repository, baseline, candidate, pack=pk, engine=engine)
     saved = save_change(_store(store, cfg), extracted_input(extracted, pk))
     typer.echo(f"{saved.id}@{saved.revision} sha256={saved.content_sha256}")
     typer.echo(json.dumps(saved.analysis or {}, ensure_ascii=False, sort_keys=True))
@@ -191,6 +192,8 @@ def select(
     chg = save_change(st, change_input) if change_input is not None else None
     context = build_context(st, previous, p, [e], pol, cfg, chg) if chg is not None or previous is not None else None
     plan = select_plan(p, [e], pol, change=chg, context=context) if context is not None else select_plan(p, [e], pol)
+    from guard.core.execution_recipe import bind_recipe
+    plan = bind_recipe(plan, cfg, [e])
     st.put(plan)
     selected = [i for i in plan.items if i.selected]
     auto = [i for i in selected if not i.gaps]

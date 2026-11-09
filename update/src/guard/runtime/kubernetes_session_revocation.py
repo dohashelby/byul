@@ -1,11 +1,13 @@
 """One bounded owned probe process preserves a selected HTTP connection."""
+
+from guard.adapters.engine_profiles import supports
 from copy import deepcopy
 from pathlib import Path
 import re,threading
 from guard.models import canonical_json,sha256_hex
 from guard.executors.persistent_session_probe import SCHEMA,SLOTS
 from guard.executors.session_revocation_contract import normalize_policy,epoch_ns
-from .kubernetes_http import KubernetesHTTP,KubernetesBindingError,REQUEST_BINDING_PROFILE,BINDING_PROBE_SHA256
+from .engine_http import KubernetesHTTP,KubernetesBindingError,REQUEST_BINDING_PROFILE,BINDING_PROBE_SHA256
 
 PROFILE='kubernetes-owned-existing-http-session-v1'
 PROBE_SHA256='a687988eefb3e31f7a1f8c79c41e0da3649af89a4084ef5d6e4cf47ef4d9bf26'
@@ -49,7 +51,7 @@ def validate_packet(packet,token):
 class KubernetesSessionRevocationHTTP:
     profile=PROFILE
     def __init__(self,target,env,keys,*,runner=None,duration=120,binary='kubectl'):
-        if target.get('lab') is not True or env.engine.name!='vllm' or env.engine.version!='0.31.0':raise KubernetesBindingError()
+        if target.get('lab') is not True or not supports(env.engine.name, env.engine.version):raise KubernetesBindingError()
         if (type(keys) is not dict or set(keys)!={'retired','control'} or any(type(v) is not str or not 0<len(v)<=8192 or any(ord(c)<33 or ord(c)>126 for c in v) for v in keys.values())
                 or len(set(keys.values()))!=2):raise KubernetesBindingError()
         self._keys=deepcopy(keys);self.base=KubernetesHTTP(target,env,runner=runner,duration=duration,binary=binary,profile=REQUEST_BINDING_PROFILE)

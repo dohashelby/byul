@@ -76,10 +76,6 @@ PHASE1_STATES = frozenset({
 GPU_A_GLOB = "docs/evidence/gpu-a-*.json"  # byul-gpu-a-check-summary/1, gpu-a README 기준 PACK32
 GPU_B_GLOB = "docs/gpu-b/*.json"  # byul-independent-GPU-public-summary/1, refs에 PACK Ref
 GPU_FIRST = Path("docs/gpu-completion/20261102/GPU_RESULTS.json")  # 11-02 인계 요약 기준 PACK32 9묶음
-CURRENT_PACK_REVISION = 33
-# 팩33은 REQ-11 정의만 바꿨다(rev6→7, 2026-11-06 사용자 결정). 팩32의 다른 76개 정의는 그대로라
-# 그 GPU 기록은 현행 정의의 기록이다. REQ-11의 팩32 기록은 이전 정의 이력으로 남기고 상태 계산에서 뺀다.
-CHANGED_SINCE_PACK32 = frozenset({"REQ-11"})
 GPU_STATUS_ORDER = (
     "GPU_PARTIAL_MEASURED", "GPU_PARTIAL_EXAMPLE", "GPU_COMPONENT_DECLARED_ONLY", "GPU_ATTEMPTED_NOT_COLLECTED",
 )
@@ -164,15 +160,22 @@ def _run_status(*, completed: bool, verification: str | None, manual: bool) -> s
 def gpu_runs(root: Path) -> dict[str, list[dict]]:
     """현행 팩 GPU 실행 공개 요약을 점검별로 모은다. 형식이 다르면 조용히 건너뛰지 않고 거부한다."""
     result: dict[str, list[dict]] = {}
+    pack_root = root / 'packs/PACK-BASELINE'
+    current = (yaml.safe_load((pack_root / 'pack.yaml').read_text()) if (pack_root / 'pack.yaml').is_file()
+               else {'revision': None, 'files_sha256': []})
+    current_revision = current['revision']
+    current_checks = {f['path'].removeprefix('checks/').removesuffix('.yaml'): f['sha256']
+                      for f in current['files_sha256'] if f['path'].startswith('checks/')}
+    index_path = root / 'reference/pack-definitions/PACK-BASELINE.json'
+    historical = json.loads(index_path.read_text())['revisions'] if index_path.exists() else {}
 
     def add(check_id: str, record: dict) -> None:
-        revision = record["pack_revision"]
-        if revision == CURRENT_PACK_REVISION:
-            record["current_definition"] = True
-        elif revision == 32:
-            record["current_definition"] = check_id not in CHANGED_SINCE_PACK32
-        else:
-            raise ValueError(f"gpu_run_not_current_pack:{record['source']}")
+        revision = record['pack_revision']
+        if current_revision is None:
+            raise ValueError('gpu_run_not_current_pack:' + record['source'])
+        old_checks = current_checks if revision == current_revision else historical.get(str(revision), {}).get('checks', {})
+        # An unavailable historical definition remains unverified, never current.
+        record['current_definition'] = (check_id in current_checks and old_checks.get(check_id) == current_checks[check_id])
         result.setdefault(check_id, []).append(record)
 
     for path in sorted(root.glob(GPU_A_GLOB), key=lambda path: path.as_posix()):

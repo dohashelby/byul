@@ -102,7 +102,7 @@ def test_path_variables_replaced_with_nonexistent_fixed_id():
     r = VllmAdapter().probe_request(Route("GET", "/v1/responses/{response_id}"), None)
     assert r.path == f"/v1/responses/{PATH_PARAM_PLACEHOLDER}" and "{" not in r.path
     assert VllmAdapter().probe_request(Route("POST", "/v1/responses/{response_id}/cancel", kind="admin", mutating=True), None) is None
-    assert VllmAdapter().probe_request(Route("POST", "/a/{x}/b/{y}"), None).path == f"/a/{PATH_PARAM_PLACEHOLDER}/b/{PATH_PARAM_PLACEHOLDER}"
+    assert VllmAdapter().probe_request(Route("POST", "/a/{x}/b/{y}"), None) is None
 
 
 def test_detect_version_and_ready():

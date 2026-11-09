@@ -3,10 +3,12 @@
 원래 groups를 그대로 검증한다. 관측 actor/collector/owner는 serving worker나
 기업 승인 주체의 증명이 아니며, 전체 IPC PASS를 생성하지 않는다.
 """
+
+from guard.adapters.engine_profiles import supports
 from datetime import datetime
 
 from guard.models import canonical_json, sha256_hex
-from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
+from guard.runtime.engine_http import KubernetesHTTP, OwnedKubernetesTransport, REQUEST_BINDING_PROFILE
 from guard.runtime import kubernetes_ipc as common
 from guard.runtime.kubernetes_ipc_contract import PROFILE, RESULT_SCHEMA, normalize_inputs
 from .http_common import functional_requests, functional_results
@@ -47,9 +49,9 @@ def validate_inputs(check, values, *, actor_specs, connect_timeout, total_timeou
 
 def _read_record(ctx, config):
     transport = ctx.cprobe
-    if (not isinstance(transport, KubernetesHTTP) or transport.profile != REQUEST_BINDING_PROFILE
+    if (not isinstance(transport, OwnedKubernetesTransport) or transport.profile != REQUEST_BINDING_PROFILE
             or ctx.target.get("lab") is not True or transport.lab is not True
-            or transport.engine_name != "vllm" or transport.engine_version != "0.31.0"
+            or not supports(transport.engine_name, transport.engine_version)
             or transport.target_sha256 != sha256_hex(canonical_json(ctx.target))
             or canonical_json(transport.environment_ref) != canonical_json(ctx.env.ref().model_dump(mode="json"))):
         raise ValueError("KUBERNETES_IPC_CONSUMER_INTERFACE_UNAVAILABLE")

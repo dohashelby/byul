@@ -127,7 +127,7 @@ def test_registered_cli_preparation_and_aggregate_claims_exact_refs(tmp_path,gro
         assert all(e.observations[k].value is False for k in flags)
         assert len(world.sent)=={'engine-replaced':1,'wrong-response-id':1,'probe-not-ready':0}.get(mode,2)
         if mode=='wrong-response-id':
-            assert e.execution.status.value=='ABORTED'
+            assert e.execution.status.value==('NOT_RUN' if mode=='version032' else 'ABORTED')
             trials=e.observations['init_observation_trials'].value
             assert len(trials)==2 and all('outcome' not in row for row in trials)
             assert all('normal_shape_verified' not in row for row in trials)
@@ -139,7 +139,7 @@ def test_registered_cli_preparation_and_aggregate_claims_exact_refs(tmp_path,gro
         if mode=='partial-failure':
             assert any(c['ready_failure_propagation_observed'] for c in correspondence)
             assert all(t['engine_readiness_before']=={'pod_ready':False,'container_ready':False} for t in e.observations['init_observation_trials'].value)
-    if mode in {'dead-process','mp-unobserved','invalid-native','native-partial','engine-replaced','probe-not-ready','actual-lab-false','version032'}:assert e.execution.status.value=='ABORTED'
+    if mode in {'dead-process','mp-unobserved','invalid-native','native-partial','engine-replaced','probe-not-ready','actual-lab-false','version032'}:assert e.execution.status.value==('NOT_RUN' if mode=='version032' else 'ABORTED')
     assert bool(e.execution.cleanup_errors)==(mode=='http-cleanup')
     assert PRIVATE not in canonical_json(e.to_dict()).decode()
     for artifact in e.artifacts:assert PRIVATE.encode() not in (tmp_path/'store'/artifact.path).read_bytes()

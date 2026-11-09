@@ -1,0 +1,305 @@
+{
+ "contract": "guard-sampling-consumption-cpu/1",
+ "data_origin": "EXAMPLE",
+ "producer": {
+  "name": "guard-sampling-consumption-cpu",
+  "source_sha256": "9a74f79ef7ca433556d41546261c97975875a52e07a92af0a349b47ab17dd6eb",
+  "version": "1"
+ },
+ "rows": [
+  {
+   "case": "normal",
+   "error_sha256": null,
+   "error_stage": null,
+   "expected_output_matched": true,
+   "outcome": "sampled",
+   "request_sha256": "861b251e49ea24a230e5d4d6dd170eb36a395434712045364a84439559da62f9",
+   "same_scheduler_params": true,
+   "slot": 0,
+   "stages": {
+    "batch": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 0.0,
+     "presence_penalty": 0.0,
+     "repetition_penalty": 1.0,
+     "temperature": 0.0,
+     "top_k": 0,
+     "top_p": 1.0
+    },
+    "metadata": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 0,
+     "presence_penalty": 0,
+     "repetition_penalty": 1,
+     "temperature": 0,
+     "top_k": 0,
+     "top_p": 1
+    },
+    "scheduler": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 0.0,
+     "presence_penalty": 0.0,
+     "repetition_penalty": 1.0,
+     "temperature": 0,
+     "top_k": 0,
+     "top_p": 1.0
+    },
+    "typed": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 0.0,
+     "presence_penalty": 0.0,
+     "repetition_penalty": 1.0,
+     "temperature": 0,
+     "top_k": 0,
+     "top_p": 1.0
+    }
+   }
+  },
+  {
+   "case": "allowed",
+   "error_sha256": null,
+   "error_stage": null,
+   "expected_output_matched": true,
+   "outcome": "sampled",
+   "request_sha256": "2ff6ce473019fdabb5c1fbd434b08dd0f596cb5045a4deb3713550af24ebf14b",
+   "same_scheduler_params": true,
+   "slot": 0,
+   "stages": {
+    "batch": {
+     "allowed_tokens": 1,
+     "frequency_penalty": 0.0,
+     "presence_penalty": 0.0,
+     "repetition_penalty": 1.0,
+     "temperature": 0.0,
+     "top_k": 0,
+     "top_p": 1.0
+    },
+    "metadata": {
+     "allowed_tokens": 1,
+     "frequency_penalty": 0,
+     "presence_penalty": 0,
+     "repetition_penalty": 1,
+     "temperature": 0,
+     "top_k": 0,
+     "top_p": 1
+    },
+    "scheduler": {
+     "allowed_tokens": 1,
+     "frequency_penalty": 0.0,
+     "presence_penalty": 0.0,
+     "repetition_penalty": 1.0,
+     "temperature": 0,
+     "top_k": 0,
+     "top_p": 1.0
+    },
+    "typed": {
+     "allowed_tokens": 1,
+     "frequency_penalty": 0.0,
+     "presence_penalty": 0.0,
+     "repetition_penalty": 1.0,
+     "temperature": 0,
+     "top_k": 0,
+     "top_p": 1.0
+    }
+   }
+  },
+  {
+   "case": "normal-after-allowed",
+   "error_sha256": null,
+   "error_stage": null,
+   "expected_output_matched": true,
+   "outcome": "sampled",
+   "request_sha256": "699a34546f3c84815a4f2482a3bb5e6989c9cd54257de853853ec1dc37d05a85",
+   "same_scheduler_params": true,
+   "slot": 0,
+   "stages": {
+    "batch": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 0.0,
+     "presence_penalty": 0.0,
+     "repetition_penalty": 1.0,
+     "temperature": 0.0,
+     "top_k": 0,
+     "top_p": 1.0
+    },
+    "metadata": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 0,
+     "presence_penalty": 0,
+     "repetition_penalty": 1,
+     "temperature": 0,
+     "top_k": 0,
+     "top_p": 1
+    },
+    "scheduler": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 0.0,
+     "presence_penalty": 0.0,
+     "repetition_penalty": 1.0,
+     "temperature": 0,
+     "top_k": 0,
+     "top_p": 1.0
+    },
+    "typed": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 0.0,
+     "presence_penalty": 0.0,
+     "repetition_penalty": 1.0,
+     "temperature": 0,
+     "top_k": 0,
+     "top_p": 1.0
+    }
+   }
+  },
+  {
+   "case": "top-k",
+   "error_sha256": null,
+   "error_stage": null,
+   "expected_output_matched": true,
+   "outcome": "sampled",
+   "request_sha256": "ea9b43b9895589e1ae3215a184716ee8411a9f33e4ebfabd17b434ddc6b3bddd",
+   "same_scheduler_params": true,
+   "slot": 0,
+   "stages": {
+    "batch": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 0.0,
+     "presence_penalty": 0.0,
+     "repetition_penalty": 1.0,
+     "temperature": 0.7,
+     "top_k": 1,
+     "top_p": 0.8
+    },
+    "metadata": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 0,
+     "presence_penalty": 0,
+     "repetition_penalty": 1,
+     "temperature": 0.7,
+     "top_k": 1,
+     "top_p": 0.8
+    },
+    "scheduler": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 0.0,
+     "presence_penalty": 0.0,
+     "repetition_penalty": 1.0,
+     "temperature": 0.7,
+     "top_k": 1,
+     "top_p": 0.8
+    },
+    "typed": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 0.0,
+     "presence_penalty": 0.0,
+     "repetition_penalty": 1.0,
+     "temperature": 0.7,
+     "top_k": 1,
+     "top_p": 0.8
+    }
+   }
+  },
+  {
+   "case": "penalties",
+   "error_sha256": null,
+   "error_stage": null,
+   "expected_output_matched": true,
+   "outcome": "sampled",
+   "request_sha256": "ba61b391b3d75bac35903837193cc0f1f9254f6bc660340b95d7ec70cb0c4804",
+   "same_scheduler_params": true,
+   "slot": 0,
+   "stages": {
+    "batch": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 1.0,
+     "presence_penalty": 1.0,
+     "repetition_penalty": 2.0,
+     "temperature": 0.0,
+     "top_k": 0,
+     "top_p": 1.0
+    },
+    "metadata": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 1.0,
+     "presence_penalty": 1.0,
+     "repetition_penalty": 2.0,
+     "temperature": 0,
+     "top_k": 0,
+     "top_p": 1
+    },
+    "scheduler": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 1,
+     "presence_penalty": 1,
+     "repetition_penalty": 2,
+     "temperature": 0,
+     "top_k": 0,
+     "top_p": 1.0
+    },
+    "typed": {
+     "allowed_tokens": 0,
+     "frequency_penalty": 1,
+     "presence_penalty": 1,
+     "repetition_penalty": 2,
+     "temperature": 0,
+     "top_k": 0,
+     "top_p": 1.0
+    }
+   }
+  },
+  {
+   "case": "invalid-temperature",
+   "error_sha256": "b5525544bde1a8048f28da80c94589c2109ee70d8c03b88be74d91229f520787",
+   "error_stage": "typed",
+   "expected_output_matched": null,
+   "outcome": "typed_rejected",
+   "request_sha256": "8d6fe878f2e01232433d571a588bed88a664adbc5906202c9f92f9f81d4f10b8",
+   "same_scheduler_params": false,
+   "slot": null,
+   "stages": {}
+  },
+  {
+   "case": "invalid-top-p",
+   "error_sha256": "b5525544bde1a8048f28da80c94589c2109ee70d8c03b88be74d91229f520787",
+   "error_stage": "typed",
+   "expected_output_matched": null,
+   "outcome": "typed_rejected",
+   "request_sha256": "c08ad91910b1abe3ce47f8a87f0b3e2a058503f7003c5f7ee0aa5796d57bfff5",
+   "same_scheduler_params": false,
+   "slot": null,
+   "stages": {}
+  },
+  {
+   "case": "invalid-top-k",
+   "error_sha256": "b5525544bde1a8048f28da80c94589c2109ee70d8c03b88be74d91229f520787",
+   "error_stage": "typed",
+   "expected_output_matched": null,
+   "outcome": "typed_rejected",
+   "request_sha256": "0de3fc2ab789b8e7e1ea2062e8f373b98ea64009d56ea2bd8eb007820ca7a164",
+   "same_scheduler_params": false,
+   "slot": null,
+   "stages": {}
+  }
+ ],
+ "source_ended": true,
+ "sources_after": {
+  "vllm.exceptions": "22fe819c7ef10438f740c251d81af204871a04c3aa3eb1fd0e68604dc4c2146f",
+  "vllm.sampling_params": "3c37c655a0a60851e3d96d946eb10d1cbb347dee6cd143f38a7fc18c6f66dd8b",
+  "vllm.v1.core.sched.scheduler": "f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a",
+  "vllm.v1.request": "dd7c30bf8b0894dc123a739c299c0133566f8cc075b081e45905f1c29506e69d",
+  "vllm.v1.sample.metadata": "6582cfe1a240c7ddb975f0ef6dd7dcd28dcf0fc7670394390250013977aa7ffd",
+  "vllm.v1.sample.ops.topk_topp_sampler": "c5c7de950e4e1380c97328057aa6a39c86e734c8b2de35beffa9695b705fbba3",
+  "vllm.v1.sample.sampler": "d299305528479ff505b416b759db208fcf08ca6e86cc1f7cfc38be85bbd0e844",
+  "vllm.v1.worker.gpu_input_batch": "e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d"
+ },
+ "sources_before": {
+  "vllm.exceptions": "22fe819c7ef10438f740c251d81af204871a04c3aa3eb1fd0e68604dc4c2146f",
+  "vllm.sampling_params": "3c37c655a0a60851e3d96d946eb10d1cbb347dee6cd143f38a7fc18c6f66dd8b",
+  "vllm.v1.core.sched.scheduler": "f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a",
+  "vllm.v1.request": "dd7c30bf8b0894dc123a739c299c0133566f8cc075b081e45905f1c29506e69d",
+  "vllm.v1.sample.metadata": "6582cfe1a240c7ddb975f0ef6dd7dcd28dcf0fc7670394390250013977aa7ffd",
+  "vllm.v1.sample.ops.topk_topp_sampler": "c5c7de950e4e1380c97328057aa6a39c86e734c8b2de35beffa9695b705fbba3",
+  "vllm.v1.sample.sampler": "d299305528479ff505b416b759db208fcf08ca6e86cc1f7cfc38be85bbd0e844",
+  "vllm.v1.worker.gpu_input_batch": "e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d"
+ }
+}

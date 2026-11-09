@@ -125,7 +125,7 @@ def test_registered_cli_selected_mp_facts_four_missing_faults_and_exact_refs(tmp
         assert e.observations['rank_native_samples'].value and e.observations['rank_native_calls'].value
         candidates=e.observations['rank_failure_candidates'].value;assert candidates
         assert all(not c['confirmed_violation'] and not c['four_fault_kind_inferred'] for c in candidates)
-    if mode in {'mp-unobserved','invalid-native','native-partial','engine-replaced','actual-lab-false','version032'}:assert e.execution.status.value=='ABORTED'
+    if mode in {'mp-unobserved','invalid-native','native-partial','engine-replaced','actual-lab-false','version032'}:assert e.execution.status.value==('NOT_RUN' if mode=='version032' else 'ABORTED')
     assert bool(e.execution.cleanup_errors)==(mode=='http-cleanup')
     assert PRIVATE not in canonical_json(e.to_dict()).decode()
     for a in e.artifacts:assert PRIVATE.encode() not in (tmp_path/'store'/a.path).read_bytes()

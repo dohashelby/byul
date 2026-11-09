@@ -108,7 +108,7 @@ def test_registered_cli_profiler_facts_and_source_failures_exact_refs(tmp_path,g
         assert all(not c['actual_backend_stop_failed_verified'] and not c['actual_collection_continued_verified'] and not c['confirmed_full_state_violation'] for c in candidates)
     if mode in {'normal','backend-stop-failure','post-stop-output-failure','start-failure'}:assert e.execution.status.value=='COMPLETED'
     if mode in {'native-one-missing','native-partial','native-census-gap','after-timeout','attachment','seal-failure','engine-replaced','wrong-response-id',
-        'missing-profiler','wrong-rank','profile8','version032','actual-lab-false','prepared-mismatch','http-cleanup','unsafe-profiler-record'}:assert e.execution.status.value=='ABORTED'
+        'missing-profiler','wrong-rank','profile8','version032','actual-lab-false','prepared-mismatch','http-cleanup','unsafe-profiler-record'}:assert e.execution.status.value==('NOT_RUN' if mode=='version032' else 'ABORTED')
     assert bool(e.execution.cleanup_errors)==(mode=='http-cleanup')
     assert PRIVATE not in canonical_json(e.to_dict()).decode()
     for artifact in e.artifacts:assert PRIVATE.encode() not in (tmp_path/'store'/artifact.path).read_bytes()

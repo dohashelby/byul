@@ -131,7 +131,7 @@ def external_capture_dir():
     # Successful evidence publication must remain outside every real checkout,
     # including when pytest's configured basetemp is inside this repository.
     with tempfile.TemporaryDirectory(prefix="guard-route-capture-") as folder:
-        yield Path(folder)
+        yield Path(folder).resolve()
 
 
 def test_route_cli_execute_keeps_example_origin_in_saved_attachment(external_capture_dir, monkeypatch, capsys):

@@ -1,6 +1,8 @@
 """선정 Pod stdout의 시험 요청 연결 predicate만 반환하는 B 전용 수집기."""
 from __future__ import annotations
 
+from guard.adapters.engine_profiles import supports
+
 from copy import deepcopy
 from datetime import datetime, timezone
 import hashlib
@@ -58,7 +60,7 @@ def _validate(env,target,values,source_id,policy_ref,binary,duration,timeout,inj
         raise ValueError('LOG_MIN_BINARY_INVALID')
     for value,maximum in ((duration,300),(timeout,5)):
         if type(value) not in (int,float) or not math.isfinite(value) or not 0<value<=maximum:raise ValueError('LOG_MIN_BUDGET_INVALID')
-    if env.engine.name!='vllm' or env.engine.version!='0.31.0':raise ValueError('LOG_MIN_ENGINE_UNSUPPORTED')
+    if not supports(env.engine.name, env.engine.version):raise ValueError('LOG_MIN_ENGINE_UNSUPPORTED')
     # 공개 생성자는 I/O 없이 정확 ENV·모델 alias·Pod/probe 소유 대상을 검사한다.
     try:
         transport=kubernetes_http.KubernetesHTTP(target,env,duration=duration,binary=binary,profile=kubernetes_http.REQUEST_BINDING_PROFILE)

@@ -30,6 +30,8 @@ def _ok(args):
                                                 ("refused_without_positive_control", "UNKNOWN"),
                                                 ("partial_routes", "UNKNOWN"), ("direct_200_on_invocations", "FAIL")])
 def test_end_to_end(workdir, scenario, expected):
+    cfg = workdir / 'guard.toml'
+    cfg.write_text(cfg.read_text().replace('scenario = "pass"', 'scenario = ' + json.dumps(scenario), 1))
     out = _ok(["select", "--pack", "packs/PACK-BASELINE", "--env", "examples/env.yaml", "--policy", "examples/policy.yaml"])
     plan_id = out.strip().splitlines()[-1]
     assert plan_id.startswith("PLAN-")

@@ -197,11 +197,15 @@ class Docker:
                      cap_add: list[str] | None = None, cap_drop: list[str] | None = None, read_only: bool = False,
                      tmpfs: list[str] | None = None, user: str | None = None,
                      security_opt: list[str] | None = None, limits: ContainerLimits | None = None,
-                     entrypoint: str | None = None) -> str:
+                     entrypoint: str | None = None, gpu_devices: tuple[str, ...] | None = None) -> str:
         name = self.name(suffix)
         secret_env = secret_env or {}
         args = ["run", "-d", *self._common_run_args(name, networks, mounts or [], public_env or {}, secret_env)]
-        if gpus:
+        if gpu_devices is not None:
+            if not gpus or not gpu_devices or len(set(gpu_devices)) != len(gpu_devices) or any(type(d) is not str or re.fullmatch(r'(?:[0-9]+|GPU-[A-Za-z0-9-]+|MIG-[A-Za-z0-9/-]+)', d) is None for d in gpu_devices):
+                raise ValueError('GPU_DEVICE_ASSIGNMENT_INVALID')
+            args += ['--gpus', '"device=' + ','.join(gpu_devices) + '"']
+        elif gpus:
             args += ["--gpus", "all"]
         if limits is not None:
             if not isinstance(limits, ContainerLimits):

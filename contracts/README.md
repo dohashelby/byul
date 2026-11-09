@@ -151,9 +151,10 @@ update가 vLLM이나 특정 판본에 묶이지 않고 SGLang(반드시)·Tensor
 - `verification-result` 점검 행 `gaps`: 값 `ENGINE_VERSION_UNSUPPORTED`(엔진은 지원하지만 그 판본의 관측 고정값·지원표가 없음)를 더하고 enum을 `$defs/gap`으로 옮겼다. `ADAPTER_UNSUPPORTED`(엔진 자체 미지원)와 구분한다.
 - `verification-result` `sides.<side>.gaps`(선택): 한쪽에만 있는 공백. 예: update에서 기준 판본은 지원되고 후보 판본만 미지원.
 - `framework-input` `target.engine`: `environment`의 엔진 식별자와 같은 형식을 강제했다.
+- `environment` `target.model.components`(선택, A 설계 보수와 함께): 모델 snapshot 밖의 독립 공급물 목록이다. 항목마다 role·kind·identity·content SHA와 입력 content SHA 목록을 둔다. update는 중복·미결합 입력·순환 관계를 거부하고, 실제로 이 구성을 실행할 수 있는지는 엔진 provider가 따로 확인한다.
 - 따라 할 일:
   - update: 환경 문서를 guard ENV로 바꾸는 `update/tools/import_byul_inputs.py`가 guard에 대응 필드가 없는 `runtime_kind`·`frontend`·병렬 크기를 원본에 보존하고 제한 사항으로 표시하도록 고쳤다(그 전에는 `runtime_kind`가 있으면 거부했다). `ENGINE_VERSION_UNSUPPORTED`를 내는 것은 update의 엔진·판본 지원표 작업에서 한다.
-  - update(후속): A 설계 보수가 병합되면 `convert_documents()`가 `guard-byul-input-import/2`로 `runtime_kind`·`frontend`·병렬 크기·`tokenizer_revision`·`model.components`·정책 유효 기간을 guard ENV·POL에 직접 넣는다. 그때 위의 원본 보존 방식을 대신한다(`update/docs/dev-1/user-decisions-20261109.md`). `model.components` 계약 필드도 그 작업과 함께 들어온다.
+  - update(A 설계 보수 병합): `convert_documents()`의 기본이 `guard-byul-input-import/2`가 되어 `runtime_kind`·`frontend`·병렬 크기·`tokenizer_revision`·`model.components`·정책 유효 기간을 guard ENV·POL에 직접 넣는다. 위의 원본 보존 방식은 `/1` 재생에만 남는다(`update/docs/dev-1/user-decisions-20261109.md` 1-4).
   - platform: 생성 타입(`npm run gen:types`), 입력 화면 선택지(`runtime_kind` 자유 입력 또는 tensorrt-llm 추가, `frontend`, 병렬 크기), 새 공백 표시 이름, 쪽별 `gaps` 변환은 platform 담당이 맞춘다.
   - runtime: 바꾸지 않는다. 등록하지 않은 driver(`tensorrt-llm` 등)는 runtime이 지원할 때까지 거부된다.
 
@@ -188,4 +189,3 @@ runtime 자체 대시보드(삭제)가 보여주던 항목을 platform이 계약
 - `revalidation-request` 0.2: `opened_at`, `current_evidence_present`
 - 신규 `runtime-lab-report` 0.1, `runtime-request-detail` 0.1
 - 쓰는 곳: platform만. 예시는 모두 EXAMPLE이며 `tools/check_contracts.py` 통과
-

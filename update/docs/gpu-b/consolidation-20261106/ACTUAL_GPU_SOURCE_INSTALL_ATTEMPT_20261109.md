@@ -34,4 +34,8 @@ Git clone·bundle fetch·새 source checkout·offline uv·새 runtime·모델 �
 
 후속은 기존 cache를 변경하지 않고, 기존 source-owner가 허용한 Git 디렉터리·gitfile 입력을 구분해 새 보호 복사본에 연결하는 최소 수정이다. 새 실행 root·정확 commit/tree·2,160개 파일 핀·manifest·offline uv·실제 import origin 검사는 유지한다. 이미 전달한 ZIP·bundle·pins는 현재 FD·SHA를 다시 확인해 재사용하며, 같은 입력을 다시 전송하거나 같은 실패 조건으로 재기동하는 것을 기본 절차로 삼지 않는다.
 
+고정 설치 자산은 [gpu_b_exact_source_install.py](../../../tools/gpu_b_exact_source_install.py)에 동일 bytes로 보존했다. SHA-256은 `5ba1faaa290c967498c9c6b2a32fbc6d4dff0a9ec5194ec1282c35fca119a842`다. Linux UID1000에서 `--config`와 `--config-sha256`으로 받는 독립 설치 도구이며, config의 `retained_repository`, `pins_path`, `pins_sha256`, `bundle_path`, `new_root`를 소비한다. 새 실행 경로와 파일의 원 guard는 유지하고, 기존 `.git` 입력의 실제 종류·FD·소유자·메타데이터를 기록한다. 새 복사본의 기존 object 의존성은 분리해 검사한다.
+
+수정본의 신규 로컬 계약 검증은7건이다. 실제 Git가 만든 linked worktree의 gitfile0664, 일반 저장소의 `.git` 디렉터리0775, 외부 objects를 참조하는 저장소의3정상 경로에서 checkout·파일 핀·offline uv·import origin을 확인했다. 잘못된 gitfile·hardlink·새 실행 경로의 쓰기 권한·잘못된 파일 핀의4음성 경로도 확인했다. fixture source를 사용한 CPU 검증이며 실제 노드의 b85 설치 결과로 집계하지 않는다. 독립 검토572개 대조 불일치0, 새 구체 결함0이며 검토 SHA-256은 `ff1cce7abbaf622acc027b72e49ce5fc1805284eb7d9e62276177f0f44391c6d`다. 과거 노드의 `.git` mode를 이 fixture 값으로 소급하지 않는다.
+
 원 43개 상태·FAIL/UNKNOWN·Ref는 변경하지 않았다. REQ-08·09·10 실제 요청 대응과 SUP16 역할별 실측은 계속 남아 있다.

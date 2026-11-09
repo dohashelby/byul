@@ -7,6 +7,7 @@ from pathlib import Path
 import stat
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from tools import alert_notifier as notifier
 
@@ -126,6 +127,8 @@ class CollectTests(unittest.TestCase):
         result = {(a["kind"], a["details"]["target"]) for a in self.run_once()}
         self.assertEqual(result, {("health_recovered", "collector:engine_health"), ("health_recovered", "gpu_status"),
                                   ("health_down", "record_store")})
+        self.gateway.data["/api/status"]["status"] = "degraded"
+        self.assertEqual(self.run_once()[0]["details"]["state"], "degraded")
 
     def test_gateway_unreachable_needs_two_failures_and_alerts_once(self):
         self.run_once()
@@ -143,6 +146,47 @@ class CollectTests(unittest.TestCase):
         self.gateway.down = False
         self.gateway.data["/api/requests"] = {"requests": [request(RID1, "2026-11-09T02:00:00Z")]}
         self.assertIn("gateway_denied", [a["kind"] for a in self.run_once()])
+
+    def test_late_observations_are_counted_once(self):
+        self.gateway.data["/api/observations?tetragon"]["observations"] = [exec_obs("2026-11-09T02:00:10Z")]
+        self.run_once()
+        self.gateway.data["/api/observations?tetragon"]["observations"].append(file_obs("2026-11-09T02:00:05Z"))
+        self.assertEqual([(a["kind"], a["count"]) for a in self.run_once()], [("tetragon_file_blocked", 1)])
+        self.assertEqual(self.run_once(), [])
+
+    def test_fractional_and_offset_timestamps_do_not_hide_new_requests(self):
+        self.gateway.data["/api/requests"] = {"requests": [request(RID1, "2026-11-09T01:00:00Z")]}
+        self.run_once()
+        self.gateway.data["/api/requests"]["requests"].extend([
+            request(RID2, "2026-11-09T01:00:00.100Z"), request(RID3, "2026-11-09T10:00:01+09:00")])
+        alert = self.run_once()[0]
+        self.assertEqual(alert["count"], 2)
+        self.assertEqual(alert["last_at"], "2026-11-09T01:00:01.000000Z")
+        self.assertEqual(self.run_once(), [])
+
+    def test_existing_cursor_upgrade_does_not_replay_same_timestamp(self):
+        cursor = {"at": "2026-11-09T01:00:00Z", "keys": [RID1]}
+        found, cursor = notifier.denied_alerts({"requests": [request(RID1, cursor["at"])]}, cursor, 200)
+        self.assertEqual(found, [])
+        found, _ = notifier.denied_alerts({"requests": [request(RID1, cursor["at"]), request(RID2, cursor["at"])]}, cursor, 200)
+        self.assertEqual(found[0]["count"], 1)
+
+    def test_identifiers_disguised_as_codes_never_leave_host(self):
+        self.run_once()
+        marker = "private-token-like-identifier"
+        self.gateway.data["/api/requests"] = {"requests": [request(RID1, "2026-11-09T01:00:01Z", marker)]}
+        event = file_obs("2026-11-09T01:00:02Z")
+        event.update(rule_id=marker, data_origin=marker)
+        self.gateway.data["/api/observations?tetragon"]["observations"] = [event]
+        event = drop_obs("2026-11-09T01:00:03Z")
+        event["reason"] = marker
+        self.gateway.data["/api/observations?hubble"]["observations"] = [event]
+        self.gateway.data["/api/status"]["status"] = marker
+        self.state["health"]["gateway"] = marker  # older state files may contain an unsafe code
+        self.gateway.data["/api/collectors"]["collectors"].append({"source": marker, "state": "error"})
+        body = json.dumps(notifier.payload(self.run_once(), "lab", "generic"))
+        self.assertNotIn(marker, body)
+        self.assertIn("OTHER", body)
 
 
 class DeliveryTests(unittest.TestCase):
@@ -214,6 +258,22 @@ class ConfigTests(unittest.TestCase):
         for bad in ("http://hooks.example.test/a", "https://user:pw@hooks.example.test/a", "file:///etc/passwd"):
             with self.subTest(bad=bad), self.assertRaises(SystemExit):
                 notifier.check_webhook_url(bad)
+
+    def test_malformed_webhook_is_rejected_without_echoing_url(self):
+        for bad in ("https:///missing-host", "https://hooks.example.test:bad/x", "https://[broken/x",
+                    "https://hooks.example.test/x#fragment", "https://hooks.example.test/a\nb"):
+            with self.subTest(case="malformed"), self.assertRaises(SystemExit) as failure:
+                notifier.check_webhook_url(bad)
+            self.assertNotIn(bad, str(failure.exception))
+
+    def test_pending_alerts_are_saved_before_delivery_can_fail(self):
+        path = self.root / "state.json"
+        alert = notifier._alert("gateway_denied", "warning", "Gateway 요청 차단", count=1)
+        with patch.object(notifier, "collect", return_value=[alert]), \
+                patch.object(notifier, "flush", side_effect=RuntimeError("interrupted")):
+            with self.assertRaises(RuntimeError):
+                notifier.main(["--gateway-url", "https://gateway.test", "--state", str(path)])
+        self.assertEqual(notifier.load_state(path)["pending"], [alert])
 
     def test_state_file_is_private_and_bad_state_restarts(self):
         path = self.root / "state" / "alert-state.json"

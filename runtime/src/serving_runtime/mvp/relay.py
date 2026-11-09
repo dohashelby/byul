@@ -310,6 +310,40 @@ class _ResponseIds:
             return self._items.pop(request_id, "not_available")
 
 
+class _StreamResponseId:
+    """Inspect the first chat SSE data line in memory, with bounded buffering."""
+
+    LIMIT = 64 * 1024
+
+    def __init__(self) -> None:
+        self.pending = b""
+        self.finished = False
+
+    def feed(self, chunk: bytes) -> tuple[bool, object]:
+        if self.finished:
+            return False, None
+        self.pending += chunk
+        while b"\n" in self.pending:
+            line, self.pending = self.pending.split(b"\n", 1)
+            if len(line) > self.LIMIT:
+                break
+            if not line.startswith(b"data:"):
+                continue
+            try:
+                value = json.loads(line[5:].strip())
+            except (ValueError, UnicodeDecodeError, RecursionError):
+                continue
+            if isinstance(value, dict):
+                self.finished, self.pending = True, b""
+                return True, value.get("id")
+        else:
+            if len(self.pending) <= self.LIMIT:
+                return False, None
+        # An oversized first event cannot supply trustworthy ID evidence.
+        self.finished, self.pending = True, b""
+        return False, None
+
+
 class Relay:
     """Relay validated completion requests to one fixed backend."""
 
@@ -708,6 +742,7 @@ class Relay:
             on_response_started()
 
             line_buffer = b""
+            stream_id = _StreamResponseId()
             saw_done = False
             last_chunk_at = time.monotonic()
             response_socket = connection.sock
@@ -752,6 +787,9 @@ class Relay:
                     code, outcome = "STREAM_TRUNCATED", "backend_truncated"
                     break
                 last_chunk_at = time.monotonic()
+                found_id, value = stream_id.feed(chunk)
+                if found_id:
+                    self._response_ids.note(request_id, value)
                 try:
                     response.write_stream_chunk(chunk)
                 except (BrokenPipeError, ConnectionResetError):

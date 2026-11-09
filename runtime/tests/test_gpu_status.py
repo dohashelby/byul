@@ -117,6 +117,14 @@ class ReadStateTests(unittest.TestCase):
         self.snapshot(state="error", reason="TIMEOUT", gpus=[])
         self.assertEqual((read_gpu_state(self.path)["state"], read_gpu_state(self.path)["reason"]), ("error", "TIMEOUT"))
 
+    def test_nonfinite_snapshot_is_rejected_before_json_response(self):
+        for number in (float("nan"), float("inf"), -float("inf")):
+            row = gpu_status.parse(L4)[0]
+            row["power_w"] = number
+            self.snapshot(gpus=[row])
+            result = read_gpu_state(self.path)
+            self.assertEqual((result["state"], result["reason"], result["gpus"]), ("error", "INVALID_SNAPSHOT", []))
+
     def test_invalid_snapshots_are_errors(self):
         for change in ({"schema_version": "other"}, {"gpus": [{"index": 0, "name": "x", "power_w": -1}]},
                        {"gpus": [{"index": True, "name": "x"}]}, {"state": "error", "reason": "free text"},

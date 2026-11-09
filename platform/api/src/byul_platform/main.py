@@ -98,7 +98,8 @@ def _enable_login(app: FastAPI, settings: Settings, state: Any) -> None:
 
     @app.middleware("http")
     async def _login_gate(request: Request, call_next):
-        if request.url.path.startswith("/api/") or request.url.path == "/api":
+        path = auth_module.get_route_path(request.scope)
+        if path.startswith("/api/") or path == "/api":
             refusal = auth_module.gate(service, request)
             if refusal is not None:
                 return refusal

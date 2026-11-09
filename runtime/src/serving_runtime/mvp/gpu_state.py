@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +22,8 @@ def _gpu(value: Any) -> dict[str, Any]:
     row = {"index": value["index"], "name": name}
     for key in NUMERIC:
         number = value.get(key)
-        if number is not None and (isinstance(number, bool) or not isinstance(number, (int, float)) or number < 0):
+        if number is not None and (isinstance(number, bool) or not isinstance(number, (int, float))
+                                   or (isinstance(number, float) and not math.isfinite(number)) or number < 0):
             raise ValueError("invalid gpu")
         row[key] = number
     return row

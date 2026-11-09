@@ -19,6 +19,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
+from starlette._utils import get_route_path
 
 from .accounts import AccountError, AccountStore, utcnow
 
@@ -152,11 +153,11 @@ def deny(status: int, code: str, message: str) -> JSONResponse:
 
 def gate(service: AuthService, request: Request) -> JSONResponse | None:
     """Decide whether an /api request may proceed. Sets request.state.account for sessions."""
-    path = request.url.path
+    path = get_route_path(request.scope)
     if path in PUBLIC_PATHS:
         return None
     authorization = request.headers.get("authorization", "")
-    if path.startswith("/api/runtime/operations") and authorization.startswith("Bearer "):
+    if (path == "/api/runtime/operations" or path.startswith("/api/runtime/operations/")) and authorization.startswith("Bearer "):
         return None  # agent / script tokens are checked by the operations routes
     resolved = service.resolve(request.cookies.get(COOKIE))
     if resolved is None:

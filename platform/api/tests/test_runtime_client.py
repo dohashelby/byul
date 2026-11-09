@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from byul_platform.config import Settings
 from byul_platform.main import create_app
-from byul_platform.sources.runtime import LiveRuntimeSource, RuntimeClient, RuntimeUnavailable
+from byul_platform.sources.runtime import LiveRuntimeSource, RuntimeClient, RuntimeUnauthorized, RuntimeUnavailable
 from conftest import FIXTURES, load_json
 
 RT = FIXTURES / "runtime"
@@ -279,3 +279,40 @@ def test_live_events_fetch_details_in_parallel_and_keep_order():
     sequential = LiveRuntimeSource(RuntimeClient("http://runtime.test", None, transport=httpx.MockTransport(fake)), "http://runtime.test")
     sequential.DETAIL_WORKERS = 1
     assert [repr(c) for c in sequential.events().candidates] == [repr(c) for c in batch.candidates]
+
+
+def test_final_request_engine_log_evidence_refreshes():
+    rid = "a" * 32
+    calls = []
+
+    def response(_request):
+        calls.append(1)
+        return httpx.Response(200, json={"gateway_records": [{"phase": "final"}],
+            "engine_live": {"evidence_kind": "engine_log", "status":
+                            "engine_log_unavailable" if len(calls) == 1 else "engine_log_observed"}})
+
+    client = RuntimeClient("http://runtime.test", None, transport=httpx.MockTransport(response))
+    source = LiveRuntimeSource(client, "http://runtime.test", cache_ttl=0)
+    try:
+        assert source._detail(rid)["engine_live"]["status"] == "engine_log_unavailable"
+        assert source._detail(rid)["engine_live"]["status"] == "engine_log_observed"
+        assert len(calls) == 2
+    finally:
+        client.close()
+
+
+@pytest.mark.parametrize("status,error", [(401, RuntimeUnauthorized), (503, RuntimeUnavailable)])
+def test_parallel_lookup_propagates_failures(status, error):
+    rid = "a" * 32
+
+    def response(request):
+        if request.url.path == "/api/requests":
+            return httpx.Response(200, json={"requests": [{"request_id": rid}]})
+        return httpx.Response(status, json={})
+
+    client = RuntimeClient("http://runtime.test", None, transport=httpx.MockTransport(response))
+    try:
+        with pytest.raises(error):
+            LiveRuntimeSource(client, "http://runtime.test").events()
+    finally:
+        client.close()

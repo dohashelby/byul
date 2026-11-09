@@ -530,6 +530,33 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         self.assertIn(["update-grub"], commands)
         self.assertFalse(any(c[0] == "systemctl" and c[1] in {"enable", "start", "reboot"} for c in commands))
 
+    def test_existing_agent_is_disabled_before_failed_or_reboot_pending_install(self):
+        config = installer.load_config(self.config)
+        unit_file = self.root / installer.AGENT_UNIT
+        unit_file.write_text("[Unit]\n")
+        for fails in (True, False):
+            with self.subTest(fails=fails), ExitStack() as stack:
+                mocks = self.install_mocks(stack)
+                stack.enter_context(patch.object(installer, "AGENT_UNIT_FILE", unit_file))
+                events = []
+                mocks["run"].side_effect = lambda command: events.append(command)
+
+                def install_code():
+                    events.append("code")
+                    if fails:
+                        raise installer.InstallError("test install failure")
+
+                mocks["install_code"].side_effect = install_code
+                if fails:
+                    with self.assertRaises(installer.InstallError):
+                        installer.install(config, SimpleNamespace(capture_baseline=True), installer.render(config), None)
+                else:
+                    result = installer.install(config, SimpleNamespace(capture_baseline=True), installer.render(config), b"grub")
+                    self.assertEqual(result, 2)
+                self.assertLess(events.index(["systemctl", "disable", installer.AGENT_UNIT]), events.index("code"))
+                self.assertFalse(any(isinstance(c, list) and c[:2] in
+                                     (["systemctl", "enable"], ["systemctl", "start"]) for c in events))
+
     def test_failed_code_install_stops_all_following_stages(self):
         config = installer.load_config(self.config)
         with ExitStack() as stack:

@@ -1,5 +1,9 @@
 # 런타임 작업 상태
 
+- 2026-11-09 Codex 교차검수(기준 `byul_runtime` HEAD `2d78c38`, 목록 10번 제외): 로그인 root_path 우회(원본 미인증 200 → 수정 후 401), 알림 허용 목록·시각/지연 도착 커서·전송 전 대기열 저장·웹훅 URL 검증, chat SSE 응답 ID·엔진 로그 상세 캐시 갱신, GPU 비유한 수치 거부, 기존 agent 자동 시작 설정의 조기 해제, RBAC Pod watch 누락·과도한 Deployment/ReplicaSet 권한을 최소 수정하고 회귀시험을 추가했다. 로그 미발견을 미수신으로 단정하지 않는 처리와 수집 실패 뒤 구간 재시작은 유지했다.
+- 검증: runtime 전체 1,049건 중 932 통과·116 skip·기존 소켓 PermissionError 1건(`test_gateway_serves_snapshot_without_kubernetes_mutation`), 관련 선별 89건 통과. API 선별 20건 통과, 전체 364건 수집 확인; 지정 uv 명령은 캐시 쓰기/오프라인 의존성 설치 제약으로 실패했고 기존 venv+캐시 의존성으로 재시도한 전체는 TestClient 소켓 깨우기 차단으로 45초 후 중단했다. web 타입 검사·178건 통과, API 모델 변경 없음, `git diff --check` 통과. 증거 로그는 `/tmp/byul-review-{runtime-final,api-targeted-final,api-collection,api-deps,web}.log`.
+- 미확인: 소켓 허용 환경의 전체 runtime/API, 실제 호스트 재설치/재부팅·RBAC/admission·엔진/GPU·실제 웹훅. 알림은 최근 API 목록/500개 키·200개 대기열 범위이며 전송 성공 직후 중단 시 재전송 가능. AWS/kind 접속·contracts/update 수정·비공개 인계 파일 접근·커밋·push 없음(8개 로컬 커밋 유지).
+
 - 2026-11-09 외부 규칙 최초 적용 자동화(목록 10번): 승인된 `enforcement.apply`와 공통 `enforce sync`를 구현했다. current ID·해시·target 검증, Tetragon monitor 전용 생성/교체·unchanged/extra·live enforce/위험한 복원 spec 거부, Cilium CRD 부재 건너뜀·기본 SSA dry-run/diff·명시 실제 적용, 0600 임시 백업·경합 보호·실패 역순 복원·Gateway 상태/짧은 추론 확인, API·웹 폼/결과·내부 타입 재생성을 포함한다. 기준 `byul_runtime` HEAD `0355ab8`(main `ed5a0b3`와 tree 동일), 커밋·push·서버 접속·contracts/update 수정 없음. 금지 인계 파일은 접근하지 않고 보존했다.
 - 근거: runtime 지정 전체 991건(875 통과·115 skip·기존 소켓 PermissionError 1), 새 동기화 시험 24 통과; API 전체 재실행 327 통과·1 skip·기존 소켓 실패 1, 운영 API 56 통과·1 skip; web 타입 검사·163건 통과, 타입 재생성·diff 검사 통과. API 최초 전체는 기존 만료 시험 1건도 실패했으나 단독/전체 재실행 통과(원인 미확정·구현 미수정). 로그·전체 변경 파일·설계 보강은 `docs/외부규칙_최초적용_구현인계.md`, 사용은 `docs/외부규칙_최초적용.md`.
 - 미확인·다음: Claude 검수 후 실제 RBAC/CRD/admission·Tetragon 전체 daemon 로드/모드·Cilium 전달/추론/복원을 확인한다. 새 monitor 옵션 해시에 맞춰 관측·모니터 창·시험 근거 재검증이 필요하며, 임시 백업 정리·강제 종료/임대 만료/동시 변경의 unknown은 자동 재실행하지 않는다.

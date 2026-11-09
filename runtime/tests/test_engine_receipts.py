@@ -5,11 +5,14 @@ import json
 from pathlib import Path
 import subprocess
 import tempfile
+import time
 import unittest
+from unittest.mock import Mock, patch
 
 from serving_runtime.mvp.engine_receipts import EngineReceipts
 from serving_runtime.mvp.query import QueryService
-from serving_runtime.mvp.relay import _ResponseIds, response_id_receipt
+from serving_runtime.mvp.relay import Relay, _ResponseIds, _StreamResponseId, response_id_receipt
+from serving_runtime.mvp.validator import Decision
 from serving_runtime.mvp.store import JsonlStore
 from tools import engine_receipts as collector
 
@@ -20,6 +23,46 @@ PROMPT = "my secret prompt: the launch code is 7777"
 
 
 class ResponseIdTests(unittest.TestCase):
+    def test_chat_relay_records_id_without_changing_forwarded_chunks(self):
+        chunks = [b'data: {"id":"chat', f'cmpl-{RID}","choices":[]}}\n\n'.encode(), b'data: [DONE]\n\n']
+        upstream = Mock(status=200)
+        upstream.getheader.return_value = "text/event-stream"
+        upstream.read1.side_effect = chunks + [b""]
+        connection = Mock(sock=None)
+        connection.getresponse.return_value = upstream
+        backend = Mock(kind="vllm")
+        backend.connection.return_value = (connection, "/v1/chat/completions")
+        relay = Relay(backend, relay_timeout_s=2, stream_idle_timeout_s=2, request_deadline_s=5)
+        downstream = Mock()
+        allowed = Decision("ALLOWED", 200, "REQUEST_ALLOWED", None, "allowed", "model", 10)
+        with patch("serving_runtime.mvp.relay.DeadlineWatchdog") as watcher, \
+                patch("serving_runtime.mvp.relay.relay_payload", return_value=b"{}"):
+            watcher.return_value.expired.return_value = False
+            watcher.return_value.finish.return_value = False
+            result, outcome, started = relay.relay_stream(downstream, RID, {}, allowed, time.monotonic(), lambda: None)
+        self.assertEqual((result, outcome, started), (allowed, "completed", True))
+        self.assertEqual([c.args[0] for c in downstream.write_stream_chunk.call_args_list], chunks)
+        self.assertEqual(relay.response_id_receipt(RID), "engine_response_id_matched")
+
+    def test_chat_stream_id_across_chunks_and_first_event_only(self):
+        stream = _StreamResponseId()
+        ids = _ResponseIds()
+        chunks = [b": keepalive\n\n", b'data: {"i', f'd":"chatcmpl-{RID}","choices":[]}}\n\n'.encode(),
+                  b'data: {"id":"other"}\n\ndata: [DONE]\n\n']
+        for chunk in chunks:
+            found, value = stream.feed(chunk)
+            if found:
+                ids.note(RID, value)
+        self.assertEqual(ids.pop(RID), "engine_response_id_matched")
+        self.assertEqual(stream.pending, b"")
+
+    def test_chat_stream_without_id_and_oversized_line_are_bounded(self):
+        for chunk, expected in ((b'data: {"choices":[]}\n', (True, None)),
+                                (b"data: " + b"x" * _StreamResponseId.LIMIT, (False, None))):
+            stream = _StreamResponseId()
+            self.assertEqual(stream.feed(chunk), expected)
+            self.assertEqual(stream.pending, b"")
+
     def test_only_exact_engine_echo_forms_match(self):
         for value, expected in ((f"chatcmpl-{RID}", "matched"), (f"cmpl-{RID}", "matched"), (RID, "matched"),
                                 (f"chatcmpl-{OTHER}", "mismatch"), (f"chatcmpl-{RID}-0", "mismatch"),

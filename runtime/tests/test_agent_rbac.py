@@ -7,7 +7,7 @@ import unittest
 from tools import agent_rbac
 
 
-def allowed(objects, scope, verb, resource, group, namespace="serving-lab", tetragon="kube-system"):
+def allowed(objects, scope, verb, resource, group, namespace="serving-lab", tetragon="kube-system", name=None):
     """Tiny RBAC evaluator for the rendered objects (exact names, no wildcards)."""
     kinds = {"ns": ("Role", namespace), "tetragon": ("Role", tetragon), "cluster": ("ClusterRole", None)}
     kind, ns = kinds[scope]
@@ -16,7 +16,8 @@ def allowed(objects, scope, verb, resource, group, namespace="serving-lab", tetr
             continue
         for rule in obj["rules"]:
             if group in rule["apiGroups"] and resource in rule["resources"] and verb in rule["verbs"]:
-                return True
+                if name is None or "resourceNames" not in rule or name in rule["resourceNames"]:
+                    return True
     return False
 
 
@@ -50,6 +51,18 @@ class RenderTests(unittest.TestCase):
             self.assertEqual(b["subjects"], [{"kind": "ServiceAccount", "name": "runtime-agent", "namespace": "serving-lab"}])
         self.assertFalse(self.objects[0]["automountServiceAccountToken"])
 
+    def test_only_gateway_deployment_and_tetragon_daemonset_are_accessible(self):
+        self.assertTrue(allowed(self.objects, "ns", "patch", "deployments", "apps", name="serving-gateway"))
+        self.assertFalse(allowed(self.objects, "ns", "patch", "deployments", "apps", name="serving-engine"))
+        self.assertFalse(allowed(self.objects, "ns", "get", "replicasets", "apps"))
+        self.assertTrue(allowed(self.objects, "tetragon", "get", "daemonsets", "apps", name="tetragon"))
+        self.assertFalse(allowed(self.objects, "tetragon", "get", "daemonsets", "apps", name="other"))
+
+    def test_pod_waits_are_supported_without_broadening_exec(self):
+        for scope in ("ns", "tetragon"):
+            self.assertTrue(allowed(self.objects, scope, "watch", "pods", ""))
+        self.assertFalse(allowed(self.objects, "ns", "get", "pods/exec", ""))
+
     def test_rejects_bad_names(self):
         with self.assertRaises(ValueError):
             agent_rbac.render("Bad_NS", "kube-system")
@@ -72,7 +85,8 @@ def least(command):
     verb, target = command[command.index("can-i") + 1], command[command.index("can-i") + 2]
     if "--subresource" in command:
         target += "/" + command[command.index("--subresource") + 1]
-    target = target.replace("/ciliumnetworkpolicies.cilium.io", "")
+    for names in agent_rbac.RESOURCE_NAMES.values():
+        target = target.removesuffix("/" + names[0])
     for scope, v, resource, group, _ in agent_rbac.REQUIRED:
         base, _, sub = resource.partition("/")
         name = (f"{base}.{group}" if group else base) + (f"/{sub}" if sub else "")
@@ -95,6 +109,8 @@ class CheckTests(unittest.TestCase):
         self.assertIn(["auth", "can-i", "get", "customresourcedefinitions.apiextensions.k8s.io/ciliumnetworkpolicies.cilium.io",
                        "--all-namespaces"], [c[5:] for c in run.commands])
         self.assertIn(["auth", "can-i", "list", "tracingpoliciesnamespaced.cilium.io", "--all-namespaces"],
+                      [c[5:] for c in run.commands])
+        self.assertIn(["auth", "can-i", "patch", "deployments.apps/serving-gateway", "-n", "serving-lab"],
                       [c[5:] for c in run.commands])
 
     def test_admin_like_account_is_too_broad(self):

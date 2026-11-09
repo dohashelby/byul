@@ -3,12 +3,16 @@ from __future__ import annotations
 import hashlib
 import json
 import stat
+import asyncio
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from byul_platform import accounts_cli
+from byul_platform import auth as auth_module
 from byul_platform.accounts import AccountStore
 from byul_platform.config import Settings
 from byul_platform.main import create_app
@@ -198,3 +202,105 @@ def test_login_disabled_keeps_old_behaviour(tmp_path):
         assert client.get("/api/auth/me").json()["login_enabled"] is False
         assert client.get("/api/meta").status_code == 200
         assert client.post("/api/auth/login", json={"username": "admin", "password": "admin"}).status_code == 404
+
+
+@pytest.mark.parametrize("root_path,path,expected", [
+    ("/prefix", "/prefix/api/meta", 401),
+    ("/prefix", "/api/meta", 401),
+    ("/prefix", "/prefix/api/auth/me", 200),
+    ("/prefix", "/prefix/api/auth/login", 200),
+    ("/prefix", "/prefix/runtime/overview", 200),
+])
+def test_login_middleware_uses_router_path(tmp_path, root_path, path, expected):
+    # Exercise the installed middleware directly; no network or portal thread.
+    app = create_app(Settings(platform_data_dir=tmp_path, login_enabled=True))
+    dispatch = app.user_middleware[0].kwargs["dispatch"]
+    request = Request({"type": "http", "method": "GET", "path": path, "root_path": root_path,
+                       "headers": [], "query_string": b""})
+
+    async def next_handler(_request):
+        return JSONResponse({"ok": True})
+
+    assert asyncio.run(dispatch(request, next_handler)).status_code == expected
+
+
+@pytest.mark.parametrize("path,expected", [
+    ("/api/runtime/operations", 200),
+    ("/api/runtime/operations/example/claim", 200),
+    ("/api/runtime/operations-extra", 401),
+    ("/api/runtime/status", 401),
+    ("/api/policies", 401),
+])
+def test_bearer_exemption_stays_inside_operations(tmp_path, path, expected):
+    app = create_app(Settings(platform_data_dir=tmp_path, login_enabled=True))
+    dispatch = app.user_middleware[0].kwargs["dispatch"]
+    request = Request({"type": "http", "method": "POST", "path": path, "root_path": "",
+                       "headers": [(b"authorization", b"Bearer test-value")], "query_string": b""})
+
+    async def next_handler(_request):
+        return JSONResponse({"ok": True})
+
+    assert asyncio.run(dispatch(request, next_handler)).status_code == expected
+
+
+@pytest.mark.parametrize("idle_s,max_s", [(10, 100), (100, 10)])
+def test_session_service_expires_idle_and_absolute_limits(tmp_path, monkeypatch, idle_s, max_s):
+    store = AccountStore(tmp_path / "accounts.json")
+    store.ensure_bootstrap()
+    service = auth_module.AuthService(store, tmp_path / "audit.jsonl", idle_s=idle_s, max_s=max_s)
+    monkeypatch.setattr(auth_module.time, "monotonic", lambda: 0)
+    sid, _ = service.login("admin", "admin", "test-client")
+    monkeypatch.setattr(auth_module.time, "monotonic", lambda: 11)
+    assert service.resolve(sid) is None
+
+
+def test_session_service_cli_epoch_and_csrf_checks(tmp_path):
+    store = AccountStore(tmp_path / "accounts.json")
+    store.ensure_bootstrap()
+    service = auth_module.AuthService(store, tmp_path / "audit.jsonl")
+    sid, session = service.login("admin", "admin", "test-client")
+    scope = {"type": "http", "method": "POST", "path": "/api/policies", "root_path": "",
+             "headers": [(b"cookie", f"byul_session={sid}".encode())], "query_string": b""}
+    assert auth_module.gate(service, Request(scope)).status_code == 403
+    scope["headers"].append((b"x-csrf-token", session.csrf.encode()))
+    assert auth_module.gate(service, Request(scope)) is None
+    AccountStore(store.path).set_password("admin", STRONG)
+    assert auth_module.gate(service, Request(scope)).status_code == 401
+
+
+def test_account_lock_preserves_last_admin_under_concurrent_changes(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+    from byul_platform.accounts import AccountError
+
+    path = tmp_path / "accounts.json"
+    store = AccountStore(path)
+    store.ensure_bootstrap()
+    store.create("admin2", "admin")
+    barrier = threading.Barrier(2)
+
+    def demote(username):
+        barrier.wait(timeout=5)
+        try:
+            AccountStore(path).set_role(username, "viewer")
+            return "ok"
+        except AccountError as error:
+            return error.code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(demote, ["admin", "admin2"]))
+    assert sorted(outcomes) == ["LAST_ADMIN", "ok"]
+    assert sum(a["role"] == "admin" and a["enabled"] for a in store.list()) == 1
+
+
+def test_session_service_lockout_recovers_after_timeout(tmp_path, monkeypatch):
+    store = AccountStore(tmp_path / "accounts.json")
+    store.ensure_bootstrap()
+    service = auth_module.AuthService(store, tmp_path / "audit.jsonl")
+    monkeypatch.setattr(auth_module.time, "monotonic", lambda: 100)
+    for _ in range(auth_module.FAILURES_BEFORE_LOCK):
+        assert service.login("admin", "wrong", "test-client") == "INVALID_CREDENTIALS"
+    assert service.login("admin", "admin", "test-client") == "LOCKED"
+    monkeypatch.setattr(auth_module.time, "monotonic", lambda: 100 + auth_module.LOCK_S + 1)
+    assert isinstance(service.login("admin", "admin", "test-client"), tuple)
+    assert "wrong" not in (tmp_path / "audit.jsonl").read_text()

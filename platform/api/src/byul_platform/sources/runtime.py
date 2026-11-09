@@ -1195,7 +1195,11 @@ class LiveRuntimeSource:
             return hit
         detail = self._get(f"/api/requests/{request_id}")
         records = detail.get("gateway_records", []) if isinstance(detail, dict) else []
-        if any(isinstance(r, dict) and r.get("phase") == "final" for r in records):
+        live = detail.get("engine_live", {}) if isinstance(detail, dict) else {}
+        # Engine-log evidence can arrive after the final Gateway record, and
+        # its availability/coverage keeps changing. Keep only the short TTL.
+        dynamic_evidence = isinstance(live, dict) and live.get("evidence_kind") == "engine_log"
+        if not dynamic_evidence and any(isinstance(r, dict) and r.get("phase") == "final" for r in records):
             with self._lock:
                 if len(self._final_details) > 5000:
                     self._final_details.clear()

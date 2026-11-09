@@ -40,7 +40,25 @@ MAX_KEYS = 500
 GATEWAY_FAILURES_BEFORE_ALERT = 2
 SUSPICIOUS_EXEC = {"outside_allowlist", "suspect_binary", "exec_from_cache"}
 BAD_HEALTH = {"stale", "error"}
-CODE = re.compile(r"[A-Za-z0-9_.:-]{1,80}")
+# A character-class check also accepts credentials, Pod names and addresses.
+# Only known protocol vocabulary may leave the host, including in generic JSON.
+REASON_CODES = frozenset({
+    "REQUEST_ALLOWED", "POLICY_MODEL_NOT_ALLOWED", "MODEL_NOT_ALLOWED", "MAX_TOKENS_EXCEEDED",
+    "PRINCIPAL_MODEL_NOT_ALLOWED", "ROLE_NOT_ALLOWED", "AUTH_REQUIRED", "AUTH_INVALID",
+    "AUTH_UNAVAILABLE", "CONTEXT_LIMIT_EXCEEDED", "CONCURRENCY_LIMIT", "CONNECTION_LIMIT",
+    "POLICY_UNAVAILABLE", "POLICY_EXPIRED", "POLICY_REVOKED", "POLICY_NOT_YET_VALID",
+    "CACHE_ISOLATION_UNAVAILABLE", "ASSET_INTEGRITY_FAILED", "ASSET_INTEGRITY_UNAVAILABLE",
+    "APPROVAL_REQUIRED", "REVALIDATION_REQUIRED", "STORE_UNAVAILABLE",
+})
+RULE_IDS = frozenset({"TG-EXEC-01", "TG-SECRET-01", "TG-ASSET-01", "TG-ASSET-02",
+                      "TG-CACHE-01", "TG-DENY-01", "TG-HEALTH-01"})
+DROP_REASONS = frozenset({"POLICY_DENIED", "Policy denied", "POLICY_DENY", "INVALID_SOURCE_IP",
+                          "CT_TRUNCATED_OR_INVALID_HEADER", "CT_MISSING_TCP_ACK_FLAG", "UNKNOWN_L3_TARGET_ADDR"})
+ORIGINS = frozenset({"real", "live", "synthetic"})
+STATES = frozenset({"ok", "degraded", "stale", "error", "missing", "never", "partial", "disconnected", "not_configured"})
+SOURCES = frozenset({"engine_health", "engine_info", "metrics", "record_retention", "asset_integrity",
+                     "observation_feed_tetragon", "observation_feed_hubble", "cilium_policy", "target_pods"})
+FAILURE_REASONS = frozenset({"UNREACHABLE", "RESPONSE_TOO_LARGE", "INVALID_JSON", "PORT_FORWARD_FAILED"})
 LABEL = re.compile(r"[A-Za-z0-9_.-]{1,40}")
 FORMATS = ("slack", "discord", "generic")
 
@@ -58,10 +76,19 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _code(value: object) -> str:
-    """Fixed identifiers only; anything else is replaced so free text never leaves the host."""
-    text = str(value) if value is not None else ""
-    return text if CODE.fullmatch(text) else "OTHER"
+def _code(value: object, allowed: frozenset[str] | set[str] = REASON_CODES) -> str:
+    return value if isinstance(value, str) and value in allowed else "OTHER"
+
+
+def _timestamp(value: object) -> str:
+    """Normalize before comparing; never persist or send arbitrary timestamp text."""
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00")) if isinstance(value, str) else None
+        if parsed is not None and parsed.tzinfo is not None:
+            return parsed.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    except (ValueError, OverflowError):
+        pass
+    return ""
 
 
 def read_env_file(path: Path) -> dict[str, str]:
@@ -77,8 +104,14 @@ def read_env_file(path: Path) -> dict[str, str]:
 
 
 def check_webhook_url(url: str) -> str:
-    parts = urlsplit(url)
-    host = parts.hostname or ""
+    try:
+        parts = urlsplit(url)
+        host = parts.hostname or ""
+        port = parts.port
+    except ValueError:
+        raise SystemExit("ALERT_WEBHOOK_URL is invalid") from None
+    if not host or parts.fragment or any(c.isspace() or ord(c) < 32 for c in url) or port == 0:
+        raise SystemExit("ALERT_WEBHOOK_URL is invalid")
     local = host == "localhost"
     try:
         local = local or ipaddress.ip_address(host).is_loopback
@@ -134,20 +167,29 @@ def _alert(kind: str, severity: str, title: str, *, count: int | None = None,
 
 def _new_items(items: list[dict[str, Any]], at_key: str, key_fn: Callable[[dict], str],
                cursor: dict[str, Any] | None) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Items newer than the cursor. Ties on the timestamp are resolved by remembered keys."""
-    dated = [(str(item.get(at_key) or ""), key_fn(item), item) for item in items if item.get(at_key)]
+    """Remember a bounded set of visible keys, including late arrivals behind the watermark."""
+    dated = [(at, key_fn(item), item) for item in items if (at := _timestamp(item.get(at_key)))]
     if cursor is None:  # first run: remember the position, do not replay history
         latest = max((at for at, _, _ in dated), default="")
-        return [], {"at": latest, "keys": sorted(k for at, k, _ in dated if at == latest)[:MAX_KEYS]}
-    seen_at, seen_keys = cursor.get("at", ""), set(cursor.get("keys", []))
-    fresh = [(at, k, item) for at, k, item in dated if at > seen_at or (at == seen_at and k not in seen_keys)]
-    if not fresh:
-        return [], cursor
-    latest = max(at for at, _, _ in fresh)
+        return [], {"at": latest, "keys": sorted(k for at, k, _ in dated if at == latest)[:MAX_KEYS],
+                    "recent_keys": list(dict.fromkeys(k for _, k, _ in dated))[-MAX_KEYS:]}
+    seen_at, seen_keys = _timestamp(cursor.get("at")), set(cursor.get("keys", []))
+    recent = cursor.get("recent_keys")
+    seen = set(recent) if recent is not None else seen_keys.copy()
+    # Polling sources may deliver an earlier event late. Remember the whole
+    # visible page, rather than discarding everything behind a time watermark.
+    fresh = []
+    for at, key, item in dated:
+        eligible = recent is not None or at >= seen_at
+        if eligible and key not in seen:
+            fresh.append((at, key, item))
+            seen.add(key)
+    latest = max([seen_at] + [at for at, _, _ in dated])
     keys = {k for at, k, _ in dated if at == latest}
     if latest == seen_at:
         keys |= seen_keys
-    return [item for _, _, item in fresh], {"at": latest, "keys": sorted(keys)[:MAX_KEYS]}
+    remembered = list(dict.fromkeys((recent or []) + [k for _, k, _ in dated]))[-MAX_KEYS:]
+    return [item for _, _, item in fresh], {"at": latest, "keys": sorted(keys)[:MAX_KEYS], "recent_keys": remembered}
 
 
 def _fingerprint(item: dict[str, Any]) -> str:
@@ -155,13 +197,17 @@ def _fingerprint(item: dict[str, Any]) -> str:
 
 
 def _span(items: list[dict[str, Any]], key: str) -> tuple[str | None, str | None]:
-    times = sorted(str(item[key]) for item in items if item.get(key))
+    times = sorted(at for item in items if (at := _timestamp(item.get(key))))
     return (times[0], times[-1]) if times else (None, None)
 
 
 def denied_alerts(response: dict[str, Any], cursor, limit: int):
     items = [item for item in response.get("requests", []) if isinstance(item, dict)]
-    new, cursor = _new_items(items, "recorded_at", lambda item: _code(item.get("request_id")), cursor)
+    def request_key(item):
+        rid = item.get("request_id")
+        # Keep compatibility with existing cursors without retaining arbitrary text.
+        return rid if isinstance(rid, str) and re.fullmatch(r"[0-9a-f]{32}", rid) else _fingerprint({"id": rid})
+    new, cursor = _new_items(items, "recorded_at", request_key, cursor)
     if not new:
         return [], cursor
     reasons = Counter(_code(item.get("reason_code")) for item in new)
@@ -200,17 +246,17 @@ def observation_alerts(response: dict[str, Any], source: str, cursor, total_befo
             alerts.append(_alert(
                 f"tetragon_{cls}_{'blocked' if blocked else 'detected'}", "critical" if blocked else "warning",
                 f"Tetragon {name} {'차단' if blocked else '탐지'}", count=len(group),
-                details={"rule_ids": dict(Counter(_code(i.get("rule_id")) for i in group).most_common(10)),
-                         **({"exec_verdicts": dict(Counter(_code(i.get("exec_verdict")) for i in group))} if cls == "exec" else {}),
-                         "data_origin": sorted({_code(i.get("data_origin")) for i in group})},
+                details={"rule_ids": dict(Counter(_code(i.get("rule_id"), RULE_IDS) for i in group).most_common(10)),
+                         **({"exec_verdicts": dict(Counter(_code(i.get("exec_verdict"), SUSPICIOUS_EXEC) for i in group))} if cls == "exec" else {}),
+                         "data_origin": sorted({_code(i.get("data_origin"), ORIGINS) for i in group})},
                 first_at=first, last_at=last))
     else:
         dropped = [item for item in new if item.get("verdict") == "dropped"]
         if dropped:
             first, last = _span(dropped, "observed_at")
             alerts.append(_alert("hubble_dropped", "critical", "Cilium 네트워크 차단", count=len(dropped),
-                                 details={"reasons": dict(Counter(_code(i.get("reason")) for i in dropped).most_common(10)),
-                                          "data_origin": sorted({_code(i.get("data_origin")) for i in dropped})},
+                                 details={"reasons": dict(Counter(_code(i.get("reason"), DROP_REASONS) for i in dropped).most_common(10)),
+                                          "data_origin": sorted({_code(i.get("data_origin"), ORIGINS) for i in dropped})},
                                  first_at=first, last_at=last))
     if (alerts and isinstance(total, int) and isinstance(total_before, int)
             and len(items) >= 50 and len(new) == len(items) and total - total_before > len(new)):
@@ -224,14 +270,14 @@ def health_states(status: dict, collectors: dict, summary: dict, tetragon: dict 
     states: dict[str, str] = {}
     for item in collectors.get("collectors", []):
         if isinstance(item, dict) and item.get("source"):
-            states["collector:" + _code(item["source"])] = _code(item.get("state"))
+            states["collector:" + _code(item["source"], SOURCES)] = _code(item.get("state"), STATES)
     store = summary.get("record_store") or {}
     states["record_store"] = "ok" if store.get("ok") is True else "error"
     if tetragon is not None:
-        states["tetragon_status"] = _code(tetragon.get("state"))
+        states["tetragon_status"] = _code(tetragon.get("state"), STATES)
     if gpu is not None:
-        states["gpu_status"] = _code(gpu.get("state"))
-    gateway = _code(status.get("status"))
+        states["gpu_status"] = _code(gpu.get("state"), STATES)
+    gateway = _code(status.get("status"), STATES)
     states["gateway"] = "ok" if gateway == "ok" else gateway
     return states
 
@@ -256,6 +302,7 @@ def health_alerts(previous: dict[str, str], current: dict[str, str], first_run: 
         before, after = previous.get(key), current.get(key)
         if after is None:
             continue
+        before = _code(before, STATES) if before is not None else None
         if _is_bad(key, after) and (first_run or before is None or not _is_bad(key, before) or before != after):
             alerts.append(_alert("health_down", "critical", f"{_health_name(key)} 이상: {after}",
                                  details={"target": key, "state": after, "previous": before}))
@@ -279,7 +326,9 @@ def unreachable(state: dict[str, Any], reason: str) -> list[dict[str, Any]]:
     if state["gateway_failures"] >= GATEWAY_FAILURES_BEFORE_ALERT and not state.get("gateway_down_alerted"):
         state["gateway_down_alerted"] = True
         return [_alert("gateway_unreachable", "critical", "Gateway 조회 실패",
-                       details={"reason": _code(reason), "consecutive_failures": state["gateway_failures"]})]
+                       details={"reason": (reason if re.fullmatch(r"HTTP_[1-5][0-9]{2}", reason)
+                                            else _code(reason, FAILURE_REASONS)),
+                                "consecutive_failures": state["gateway_failures"]})]
     return []
 
 
@@ -459,6 +508,7 @@ def main(argv=None) -> int:
         except (OSError, RuntimeError, subprocess.SubprocessError):  # port-forward could not start (StatusUnavailable is a RuntimeError)
             alerts = unreachable(state, "PORT_FORWARD_FAILED")
         queue(state, alerts)
+        save_state(args.state, state)  # Persist cursors and retry queue before network delivery.
         sent = flush(state, send)
         save_state(args.state, state)
         print(json.dumps({"new": len(alerts), "sent": sent, "pending": len(state["pending"]),

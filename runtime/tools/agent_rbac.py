@@ -43,14 +43,14 @@ REQUIRED: tuple[tuple[str, str, str, str, str], ...] = (
     ("ns", "list", "deployments", "apps", "rollout status"),
     ("ns", "watch", "deployments", "apps", "rollout status"),
     ("ns", "patch", "deployments", "apps", "Gateway rollout restart(묶음 적용)"),
-    ("ns", "get", "replicasets", "apps", "rollout status"),
-    ("ns", "list", "replicasets", "apps", "rollout status"),
     ("ns", "get", "pods", "", "포트포워드·로그 대상"),
     ("ns", "list", "pods", "", "포트포워드·로그 대상"),
+    ("ns", "watch", "pods", "", "포트포워드 대상 Pod 생성 대기"),
     ("ns", "create", "pods/portforward", "", "Gateway 상태 확인"),
     ("ns", "get", "pods/log", "", "엔진 수신 기록(선택)"),
     ("tetragon", "get", "pods", "", "Tetragon 에이전트 조회"),
     ("tetragon", "list", "pods", "", "Tetragon 에이전트 조회"),
+    ("tetragon", "watch", "pods", "", "daemonset exec 대상 Pod 생성 대기"),
     ("tetragon", "get", "daemonsets", "apps", "Tetragon daemonset"),
     ("tetragon", "create", "pods/exec", "", "tetra 정책 모드 조회"),
     ("cluster", "list", "tracingpoliciesnamespaced", "cilium.io", "전체 정책 상태 수집(-A)"),
@@ -63,6 +63,7 @@ FORBIDDEN: tuple[tuple[str, str, str, str], ...] = (
     ("tetragon", "get", "secrets", ""),
     ("ns", "get", "configmaps", ""),
     ("ns", "create", "pods/exec", ""),          # no shell into the engine or Gateway
+    ("ns", "get", "pods/exec", ""),             # WebSocket exec must also be forbidden
     ("ns", "delete", "pods", ""),
     ("ns", "create", "deployments", "apps"),
     ("ns", "delete", "deployments", "apps"),
@@ -76,6 +77,8 @@ FORBIDDEN: tuple[tuple[str, str, str, str], ...] = (
 )
 
 CRD_NAMES = ["ciliumnetworkpolicies.cilium.io"]
+RESOURCE_NAMES = {"customresourcedefinitions": CRD_NAMES,
+                  "deployments": ["serving-gateway"], "daemonsets": ["tetragon"]}
 
 
 def _split(resource: str) -> tuple[str, str | None]:
@@ -90,8 +93,8 @@ def _rules(entries) -> list[dict[str, Any]]:
     rules = []
     for (group, resource), verbs in sorted(grouped.items()):
         rule = {"apiGroups": [group], "resources": [resource], "verbs": sorted(verbs)}
-        if resource == "customresourcedefinitions":
-            rule["resourceNames"] = CRD_NAMES
+        if resource in RESOURCE_NAMES:
+            rule["resourceNames"] = RESOURCE_NAMES[resource]
         rules.append(rule)
     return rules
 
@@ -134,8 +137,8 @@ def _can_i(base: list[str], scope: str, verb: str, resource: str, group: str,
            namespace: str, tetragon_namespace: str) -> list[str]:
     base_resource, sub = _split(resource)
     target = f"{base_resource}.{group}" if group else base_resource
-    if base_resource == "customresourcedefinitions" and verb == "get":
-        target += "/" + CRD_NAMES[0]  # the rule is limited to this one name
+    if base_resource in RESOURCE_NAMES and (scope, verb, resource, group) in {r[:4] for r in REQUIRED}:
+        target += "/" + RESOURCE_NAMES[base_resource][0]
     command = base + ["auth", "can-i", verb, target]
     if sub:  # "pods/log" would mean "the pod named log"; subresources need the flag
         command += ["--subresource", sub]

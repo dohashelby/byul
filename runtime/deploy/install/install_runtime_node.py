@@ -38,6 +38,7 @@ UNITS = tuple(f"serving-runtime-{name}.service" for name in
 # The agent can change the server on approved requests, so the installer installs
 # its unit but never enables or starts it. A person starts it explicitly.
 AGENT_UNIT = "serving-runtime-agent.service"
+AGENT_UNIT_FILE = Path("/etc/systemd/system") / AGENT_UNIT
 AUTO_UNITS = tuple(unit for unit in UNITS if unit != AGENT_UNIT)
 COPY = ("src", "tools", "deploy", "pyproject.toml", "README.md")
 PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -544,6 +545,10 @@ def install(config, args, artifacts, grub):
         with checking("4", "SUDOERS_CONFLICTS"):
             check_sudoers_conflicts()
         with checking("0", "SERVICES_STOP"):
+            # Remove an old boot enablement before any partial install or
+            # reboot-required return can leave an executable agent behind.
+            if AGENT_UNIT_FILE.exists() or AGENT_UNIT_FILE.is_symlink():
+                run(["systemctl", "disable", AGENT_UNIT])
             # Stop before changing code, credentials or baseline; failures leave services stopped.
             for unit in reversed(UNITS):
                 if active(unit):

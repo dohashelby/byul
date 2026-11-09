@@ -93,6 +93,9 @@ def plan(args):
         publish = deepcopy(publication)
         publish['inside_preparation_argv'] = [v.replace('normal.binding.json', role + '.binding.json') for v in publish['inside_preparation_argv']]
         publish['stdin'] = '<new-' + phase + '-inputs>/' + role + '.binding.json'
+        previous_args = []
+        for previous_phase in list(PHASES)[:list(PHASES).index(phase)]:
+            previous_args.extend(['--previous-binding', '<new-' + previous_phase + '-inputs>/role-preparation.json'])
         plans[phase] = {'role': role, 'template_sha256': sha(path.read_bytes()),
             'apply': ['kubectl', '--context=<actual-context>', 'apply', '-f', '<rendered-' + phase + '.json>'],
             'bind': ['python3', '-I', '-B', 'SOURCE/update/tools/gpu_b_sup16_operating_prepare.py', 'bind-role',
@@ -100,7 +103,8 @@ def plan(args):
                 '--manifest-sha256', context['manifest_sha256'], '--static-packet', 'STATIC_PACKET',
                 '--static-sha256', args.static_sha256, '--environment', '<actual-' + phase + '-ENV.json>',
                 '--target', '<actual-' + phase + '-target.json>', '--model-manifest', '<actual-reference-manifest.json>',
-                '--model-manifest-sha256', '<actual-reference-manifest-SHA>', '--output', '<new-' + phase + '-inputs>'],
+                '--model-manifest-sha256', '<actual-reference-manifest-SHA>',
+                *previous_args, '--output', '<new-' + phase + '-inputs>'],
             'writer': static.commands(context, meta.get('models', {}))['writers'][role],
             'binding_publication': publish,
             'installer': ['python3', '-I', '-S', '-B', '/guard-prepare/native17_install.py', '--tool-sha256',

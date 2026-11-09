@@ -147,6 +147,10 @@ def test_plan_has_one_pod_per_phase_and_exact_reused_pair_assets(tmp_path, monke
         role = op.PHASES[phase]
         assert result['phases'][phase]['binding_publication']['inside_preparation_argv'][-1] == role + '.binding.json'
         assert result['phases'][phase]['capture'][result['phases'][phase]['capture'].index('--source-commit') + 1] == args.source_commit
+        bind = result['phases'][phase]['bind']
+        expected = list(op.PHASES)[:list(op.PHASES).index(phase)]
+        prior = [bind[i + 1] for i, value in enumerate(bind) if value == '--previous-binding']
+        assert prior == ['<new-' + p + '-inputs>/role-preparation.json' for p in expected]
     assert result['ready_for_execution'] is False and result['executed'] is False
     assert result['product_pair_blocker'] == op.PAIR_BLOCKER
     assert result['deadlines_seconds'] == {'asset_wait': 90, 'collection': 120, 'Pod': 600}

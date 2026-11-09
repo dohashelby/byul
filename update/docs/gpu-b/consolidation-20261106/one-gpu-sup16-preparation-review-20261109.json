@@ -1,0 +1,138 @@
+{
+  "schema": "byul-s6-sup16-tp1-role-component-review/2",
+  "created_at_utc": "2026-11-09T05:51:34.330136+00:00",
+  "request": "SUP16-TP1-ROLE-COMPONENT-20261109-01",
+  "baseline": "17736f579bbf36bdcd4f76867d560b598079071b",
+  "commits": [
+    "dc5f53cf1ec2900ca10979a3744ce45339fa1583",
+    "31f4b33036f201d953b6f35edb232f8a5c294311"
+  ],
+  "final_source_files": [
+    {
+      "path": "update/tests/test_sup16_operating_prepare.py",
+      "bytes": 10140,
+      "sha256": "f5bc71d27458f9ba2dc3a371e12f00c0b7d2a4ecfde3779f98a3b648c9ad9a32"
+    },
+    {
+      "path": "update/tools/gpu_b_sup16_operating_prepare.py",
+      "bytes": 14203,
+      "sha256": "f3c6a33cdaa5480b7c04593a46118cdff9cdd029f1ace4c3cea4a56a437c29fe"
+    }
+  ],
+  "handoffs": [
+    {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-sup16-operating-packet-20261109\\out\\operating-plan-actual-v1\\fixed-handoff.json",
+      "bytes": 7995,
+      "sha256": "c34768e035ea2a69f9b26de54cd3839e79c0cac3ae11fd6847c4b985df6188f9"
+    },
+    {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-sup16-operating-packet-20261109\\out\\operating-plan-actual-v2\\fixed-handoff.json",
+      "bytes": 5127,
+      "sha256": "b8edabf052fb99c05ddc811d71a62ce5a5162a05ddbf404434fa7d506f54e6e6"
+    }
+  ],
+  "final_plan": {
+    "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\guard-output\\gpu-stage1-3sessions\\prepare\\SUP16-TP1-role-component\\v2\\operating-plan.json",
+    "bytes": 14704,
+    "sha256": "389eea229fa5e6b065ee1caa732eb8a6d2c7e8de0c338da51442afded8792163"
+  },
+  "result": "고정 역할별 준비 범위의 미해결 구체 코드결함0. 실제운영join/기동/worker관측/fullpair완료판정은아님.",
+  "integrity": {
+    "v1_receipt_pins_verified": 15,
+    "v2_receipt_pins_verified": 11,
+    "source_Git_blob_exact": true,
+    "v1_unchanged": true,
+    "S6_new_test_model_writer_archive_operations": 0
+  },
+  "checks": [
+    "기존template0c6e9b02를phase별Pod1/GPU1/TP1로추출. 원UID1000·ROmount·installer/launcher/runtime-probe·자원/90·120·600 유지, ConfigMap paired961/helper2485/stagec61와operator capturebb9a/sourceownerfb12 exact bytes 확인.",
+    "제공ENV/target에서build_scope→prepare_assets→load_prepared→validate_binding→등록factory._load의시험계약 연결. 기존CPU role3출력의binding/session·target/prepared canonical/fileSHA·installerpayload와 EXAMPLE/liveidentityfalse/readyfalse를대조. 실제K8s수집/판정/fullfactory실행아님.",
+    "Pending필수필드누락/잘못된reference/충돌·제공previous PodUID재사용 거부 유지. 새ENV/POL·실제Pod/PID를만들지않고제공파일기반native17 session/자산만준비.",
+    "31f4에서bind_role/packet 등plan외함수AST는dc5와동일. 기존17/writer/모델·archive/S6API반복0."
+  ],
+  "previous_binding": {
+    "initial_gap": "dc5 생성후속argv에는optional previous-binding 입력이없어거부검사가적용되지않았음. S6가필수join입력누락으로반환;기존v1불변.",
+    "fixed_argv": {
+      "challenge-partial": [
+        "<new-normal-before-inputs>/role-preparation.json"
+      ],
+      "normal-before": [],
+      "normal-recovered": [
+        "<new-normal-before-inputs>/role-preparation.json",
+        "<new-challenge-partial-inputs>/role-preparation.json"
+      ]
+    },
+    "evidence": "새실제v2와영향plan1node에서0/1/2경로확인. 새로운SHA CLI옵션이나bind-role gate추가0.",
+    "actual_join_needed": "S2실제이전role receipt 경로/bytes/SHA·전후보호metadata·최종source·실제PodUID/container/start/session·UID+guard.run정리/부재를결합. 미생성실패role receipt를미래값으로만들지않고후속중단."
+  },
+  "tests": {
+    "initial": "11pass4.72s/parent6.782692s",
+    "plan_delta": "해당2pass1.32s/parent2.5115639s",
+    "fixture_correction": "capturefixture유효화후원templateSHA거부1pass1.78s/parent3.2105121s. 이전test가capturepin에서먼저거부됐다는한계를보존,제품추가수정0.",
+    "previous_delta": "해당plan1pass1.74s/parent3.0901475s",
+    "unique_cases": 11,
+    "actual_static_CLI": [
+      "v1 exit0/parent6.438s",
+      "v2 exit0/parent3.875s"
+    ],
+    "not_14_or_15_new_cases": true
+  },
+  "state": {
+    "gpus": 1,
+    "tp": 1,
+    "runtime_values_supplied": false,
+    "ready_for_execution": false,
+    "full_product_pair_connected": false,
+    "product_factory_EVD_RES_RPT_executed": false,
+    "deadlines_seconds": {
+      "Pod": 600,
+      "asset_wait": 90,
+      "collection": 120
+    },
+    "pair_blocker": "Current supply_boot.run reads two live role targets in one call. One-GPU sequential Pod deletion and the exited partial worker are not an archived-input backend. Do not replay a deleted normal Pod or injected collector results into a product factory.",
+    "limits": "종료worker/livecapture미지원은원exit/stderr/raw/미지원으로보존. 삭제Pod reader재생/결과주입을native·제품Ref로승격0. 새phase로원기한/총보호/stop을리셋하거나연장하지않음."
+  },
+  "preflight_readonly": {
+    "summary": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\one-gpu-req-sup16-join-20261109-v1\\preflight-summary-v1.json",
+      "bytes": 9870,
+      "sha256": "343743d09b3e5f1a5853b96fde9b4426b1d9562c722e8fa22b247a6bab1f3c05"
+    },
+    "raw": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\one-gpu-req-sup16-join-20261109-v1\\resources-readonly-v3.json",
+      "bytes": 85388,
+      "sha256": "7f73c068a62c3c201c28964f332ddcad0208ff6cf917110a63270c50ce9abfc9"
+    },
+    "asof": "2026-11-09T05:35:30.282572+00:00",
+    "scope": "identity/instances05:32:42~43Z와후속10조회05:35:27~30Z분리. 후보i-05e8da8ea99593196는당시stopped g6.xlarge·제안g6.2xlarge/물리GPU1유지이며resize/boot/SSMOnline/guest/Ready미관측. S6 AWS/SSM0.",
+    "arithmetic": {
+      "prior": 71.57966828492202,
+      "EBS_elapsed": 1.4052570250131236,
+      "task_estimate": 72.98492530993515,
+      "next_worst": 6.21,
+      "total_with_worst": 79.19492530993514,
+      "cap_after_reserve": 95,
+      "remaining_after_worst_and_reserve": 15.805074690064856
+    },
+    "verified": "440GiB EBS/0.055748USD/h 증분과합산산술검증. 2.75h는회계상수평선이며타이머연장아님. 계정credit/net으로태스크추정을낮추지않음.",
+    "fresh_start_admission": false
+  },
+  "remaining_required_inputs": [
+    "최종운영join source/actualargv·ENV/target/prepared/session·beforeimport runtime/지원image/GPU/node/Pod/PID/start",
+    "실제이전receipt·원기한앵커/정상대조/잔여budget·기존보호·반출/소유정리/stop",
+    "실제제품Ref생성시에만정확EVD/RES/RPT와반출·별도DB복원/저장팩재판정. 未生成Ref대체0."
+  ],
+  "QA": "읽기검증기의invocation.output 필수키가정을정정하여실제argv --output값으로대조. 제품/원자료변경0.",
+  "ownership": {
+    "S2_first_summary_sent": true,
+    "root_S1_sent": true,
+    "delivery_not_ack_or_resume": true,
+    "own_out_only": true,
+    "source_manifest_central_writes": 0,
+    "S6_AWS_SSM_GPU_operations": 0,
+    "continuation_read": true,
+    "tracked_clean": true,
+    "checkpoint_updated_at": "2026-11-08T04:50:01.245238+00:00",
+    "new_ACK_or_approval_gate": false
+  }
+}

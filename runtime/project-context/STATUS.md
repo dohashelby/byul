@@ -733,3 +733,9 @@
 - 발견 3 화면 지연: 플랫폼 live `events`가 요청 200개 상세를 하나씩 물어 원격 연결에서 첫 로드가 길었다. 지연 30ms/80ms 모의에서 7.6s/17.7s → 병렬 8개로 1.4s/2.6s. 순서 유지·병렬 시험 1건, API 346 통과.
 - 발견 4 옛 파일: `/var/lib/serving-runtime/identities.json`은 현재 코드·단위가 참조하지 않음(상태 서비스는 `/srv/serving/observation/tetragon-identities.json`). 다음 서버 회차에 서버의 단위·사용자 서비스 참조를 확인한 뒤 백업·삭제.
 - 다음 서버 회차 확인: 설치기 에이전트 미시작, 최소 권한 kubeconfig로 교체 후 수집·10번 dry-run·엔진 로그, 화면 로딩, 옛 파일 삭제.
+
+## 2026-11-09 AWS 15회차 — 14회차 발견 1~4 실서버 확인
+
+- 17:14 기동 → 17:37:11 stopped 확인. 코드 `5acbd26`. 결과 [AWS_GPU_서버15회차_결과_20261109.md](../docs/AWS_GPU_서버15회차_결과_20261109.md), 증거 `evidence-20261109-run15.tgz`(1e8edfd2…), 토큰·IP·계정·인스턴스 ID 0건.
+- 발견 1: 설치기 뒤 에이전트 disabled/inactive·dry-run 모드 확인. 발견 2: 에이전트 kubeconfig를 최소 권한 SA 토큰으로 교체, `too_broad`→`ok`, 수집·enforcement dry-run(Cilium 포함)·엔진 로그 정상. 발견 4: 옛 identities.json 참조 0건 확인 후 백업·삭제.
+- 발견 3: 일부 개선. 남은 원인은 Gateway 관측 조회가 65MB 파일을 매번 전부 읽는 것(1.2~1.4초). 관측 조회 병렬화는 503을 만들어 되돌림. 다음: Gateway 관측 캐시/이어 읽기.

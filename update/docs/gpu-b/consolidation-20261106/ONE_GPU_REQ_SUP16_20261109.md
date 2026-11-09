@@ -2,7 +2,22 @@
 
 사용자 요청 범위는 기존 세션을 재사용한 GPU 1장·TP1 실측이다. 실제 요청 대응, 고정 runtime·Ready·정상 대조를 먼저 확인하고, 생성된 증거만 반영한다. PR #232가 2026-11-09 14:25 KST에 병합되어 [후속 Draft PR #240](https://github.com/dohashelby/byul/pull/240)에서 이어간다. [#232의 연결 댓글](https://github.com/dohashelby/byul/pull/232#issuecomment-6733655479)도 남겼다. 이 문서는 원 43개 전체의 PASS 또는 전체 완료 판정이 아니다.
 
-## 실제 진행 상태 — 2026-11-09 21:54 KST 마감 관측
+## 현재 실제 진행 — V13-r4, 2026-11-10 마감 정리
+
+[실제 선정 REQ 결과·정확 Ref·복원 검증](ACTUAL_GPU_SELECTED_REQ_20261109.md)에서 source2cb/V4의 결과를 확정했다. EVD3·RES3·공유RPT1이 생성됐고, 독립 별도 DB의 정확 Ref10 복원·원 저장 팩 재판정264개와 실제 의미702개 대조는 불일치0이다.
+
+| 구분 | 확정한 범위 | 남은 범위 |
+| --- | --- | --- |
+| runtime·Ready·정상 대조 | 실제 Ready97초·원Pod600초 안·health/정상응답·source/실제utils/준비권한 연결 | 원90초 성능 실패 보존 |
+| REQ-08 | 실제 선정3요청 대응·EVD COMPLETED, EXAMPLE 기능/보안 PASS | 성능 UNKNOWN·인증/토큰동일성/전체정책 범위 |
+| REQ-09 | 실제선정5요청·EVD ABORTED·length독립보안FAIL 보존 | ID없는거부요청의공통소비연결, 기능/성능UNKNOWN |
+| REQ-10 | 실제선정9요청·EVD ABORTED·원3축UNKNOWN 보존 | ID없는거부응답의공통소비연결·전체runner 소비 |
+| SUP-16 | 순차역할 caller·pureCONFIG·독립aggregate 준비 및 CPU 경계 검증 | 실제 phase별감독기·현재proof 최종결합·실제3역할 관측·별도fullpair |
+| 정지·비용 | 원stop180미관측보존후14:45:25~26UTC 소유3대stopped/IP0후속관측, 보수추정$76.24573072675766 | 원control회수·독립최종운영/비용200개대조일치, EBS440GiB계속 |
+
+원43개 상태는 자동 상향하지 않았다. 제품은 EXAMPLE/DRAFT·RPT official=false이며 API 대응을 worker 인증으로 바꾸지 않는다. [SUP-16 준비·재개 입력](SUP16_SEQUENTIAL_PREPARATION_20261110.md)을 별도로 인계한다. 아래는 변경하지 않은 V12 이전 실행 이력이다.
+
+## 이전 실제 진행 상태 — V12, 2026-11-09 21:54 KST 마감 관측
 
 V12에서 실제97초 Ready→직접 HTTP health200→정상 chat/completion 각200까지 확인했다. 이후 선정 REQ 제품 입력 준비가 디렉터리 보호 조건에서 중단됐다. [준비 권한·native ID 최소 수정](NATIVE_ID_AND_PRIVATE_PREPARATION_FIX_20261109.md)은 CPU·독립 검토를 마치고 신규 source2cb를 별도로 고정했다. 기존 b85 결과는 보존하며 새 실제 결과를 선반영하지 않는다. [CPU 업무 완료·실제 연결 잔여](CPU_SUBTASK_STATUS_B_20261109.md)도 원43개 결과와 구분한다.
 

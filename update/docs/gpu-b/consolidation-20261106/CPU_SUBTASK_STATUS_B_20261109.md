@@ -24,3 +24,7 @@ SUP16 full pair를 단일 GPU 순차 실행의 완료 가능 범위에 포함하
 추가로 확인한 [실제 정상 응답](ACTUAL_GPU_NORMAL_AND_REQ_PREPARE_20261109.md)과 [ID/준비 경계 수정](NATIVE_ID_AND_PRIVATE_PREPARATION_FIX_20261109.md)은 위 기존 대조와 별도 시점이다. 신규 CPU32 및 통합 회귀32는 같은 사례의 다른 source 문맥이며64개로 합산하지 않는다. 실제 GPU source와 PR509파일 통합 source, EXAMPLE·공식 여부·null·FAIL/UNKNOWN·정확 Ref를 계속 구분한다.
 
 공개 자료는 개인 경로39곳을 명시적 alias로 치환했다. [치환 내역](publication-path-alias-changes-v2.json)과 [S4 설명](cpu-subtask-closure-mapping-20261109-v2.publish.md)을 연결하며 원 개인 경로 장부는 게시하지 않는다. 새 행정 대조를 위해 시험·원자료 복원·AWS 실행을 반복하지 않았다.
+
+## 후속 실제 관측
+
+[V13 선정 REQ 실제 결과](ACTUAL_GPU_SELECTED_REQ_20261109.md)는 CPU 완료 목록과 구분한다. EVD3·RES3·공유RPT1 및 독립 복원·재판정이 연결됐지만, EXAMPLE/DRAFT·FAIL·UNKNOWN과 원43개 상태는 유지한다. [SUP-16 신규 CPU 준비와 실제 잔여](SUP16_SEQUENTIAL_PREPARATION_20261110.md)도 실제 실측 완료 수로 합산하지 않는다.

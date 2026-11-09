@@ -167,16 +167,19 @@ def test_wrapper_rejections_preserve_diagnostics_without_publishing_a_config(tmp
     else:
         value = json.loads(raw)
         if mode == "contract-error":
-            value["records"][tool.KIND] = {"contract_error": "original-producer-error"}
+            value["records"][tool.KIND] = {"contract_error": "EXAMPLE_NOT_FOR_LOG"}
         elif mode == "wrapper-session":
             value["session"] = "0" * 32
         else:
             value["truncated"] = True
         raw = canonical_json(value)
     case["spec"]["sources"]["wrapper"] = pin(path, raw)
-    expected = "DUPLICATE_KEY" if mode == "duplicate-json-key" else "original-producer-error" if mode == "contract-error" else "SESSION|COMPLETENESS"
-    with pytest.raises(ValueError, match=expected):
+    expected = "DUPLICATE_KEY" if mode == "duplicate-json-key" else "B_RUNNER_WRAPPER_RECORD_MISSING" if mode == "contract-error" else "SESSION|COMPLETENESS"
+    with pytest.raises(ValueError, match=expected) as caught:
         run(case, tmp_path / "fixed")
+    if mode == "contract-error":
+        (tmp_path / "observed-error.txt").write_text(str(caught.value), encoding="utf-8")
+        assert str(caught.value) == "B_RUNNER_WRAPPER_RECORD_MISSING"
     assert not (tmp_path / "fixed").exists()
 
 
@@ -261,3 +264,51 @@ def test_preparation_does_not_invent_a_seal_origin_or_enabled_sensor(tmp_path, p
     with pytest.raises(ValueError):
         run(case, tmp_path / "fixed")
     assert not (tmp_path / "fixed").exists()
+
+
+def test_cli_missing_entry_does_not_copy_wrapper_content_to_stderr(tmp_path, prepared, capsys):
+    case = inputs(tmp_path, prepared)
+    wrapper_path = Path(case["spec"]["sources"]["wrapper"]["path"])
+    for index, entry in enumerate(("EXAMPLE_NOT_FOR_LOG", {"contract_error": "EXAMPLE_NOT_FOR_LOG"})):
+        value = json.loads(case["wrapper_raw"])
+        value["records"][tool.KIND] = entry
+        case["spec"]["sources"]["wrapper"] = pin(wrapper_path, canonical_json(value))
+        case["path"].write_bytes(canonical_json(case["spec"]))
+        code = tool.main(["--inputs", str(case["path"]), "--inputs-sha256", sha256_hex(case["path"].read_bytes()),
+                          "--output", str(tmp_path / "fixed")])
+        captured = capsys.readouterr()
+        (tmp_path / ("observed-stderr-" + str(index) + ".txt")).write_text(captured.err, encoding="utf-8")
+        error = json.loads(captured.err)
+        assert code == 2 and captured.out == ""
+        assert error["error"] == {"type": "ValueError", "message": "B_RUNNER_WRAPPER_RECORD_MISSING"}
+        assert "EXAMPLE_NOT_FOR_LOG" not in captured.err
+        assert error["gpu_ready"] is False and not (tmp_path / "fixed").exists()
+
+
+@pytest.mark.parametrize("mode", ["direct", "cli"])
+def test_environment_validation_error_does_not_copy_input_values(tmp_path, prepared, capsys, mode):
+    marker = "EXAMPLE_LOCAL_ERROR_BOUNDARY_20261109"
+    case = inputs(tmp_path, prepared)
+    path = Path(case["spec"]["sources"]["environment"]["path"])
+    value = json.loads(path.read_bytes())
+    value["kind"] = marker
+    case["spec"]["sources"]["environment"] = pin(path, canonical_json(value))
+    case["path"].write_bytes(canonical_json(case["spec"]))
+    if mode == "direct":
+        with pytest.raises(ValueError) as caught:
+            run(case, tmp_path / "fixed")
+        text = str(caught.value)
+        (tmp_path / "observed-env-error.txt").write_text(text, encoding="utf-8")
+        assert text == "B_RUNNER_ENVIRONMENT_INVALID"
+        assert caught.value.original_error_type == "ValidationError"
+    else:
+        code = tool.main(["--inputs", str(case["path"]), "--inputs-sha256", sha256_hex(case["path"].read_bytes()),
+                          "--output", str(tmp_path / "fixed")])
+        captured = capsys.readouterr()
+        text = captured.err
+        (tmp_path / "observed-env-stderr.txt").write_text(text, encoding="utf-8")
+        error = json.loads(text)
+        assert code == 2 and captured.out == ""
+        assert error["error"] == {"type": "ValidationError", "message": "B_RUNNER_ENVIRONMENT_INVALID"}
+        assert not error["runtime_link_complete"] and not error["gpu_ready"]
+    assert marker not in text and not (tmp_path / "fixed").exists()

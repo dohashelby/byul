@@ -34,6 +34,12 @@ _SESSION = re.compile(r"[0-9a-f]{32}")
 _WS = re.compile(r"[ \t\r\n]*")
 
 
+class _EnvironmentInputError(ValueError):
+    def __init__(self, original_error_type):
+        super().__init__("B_RUNNER_ENVIRONMENT_INVALID")
+        self.original_error_type = original_error_type
+
+
 def _sha(raw):
     return hashlib.sha256(raw).hexdigest()
 
@@ -92,7 +98,7 @@ def extract_record(raw):
         raise ValueError("B_RUNNER_WRAPPER_INVALID")
     entry = wrapper["records"].get(KIND)
     if type(entry) is not dict or "record" not in entry:
-        raise ValueError("B_RUNNER_WRAPPER_RECORD_MISSING:" + str(entry))
+        raise ValueError("B_RUNNER_WRAPPER_RECORD_MISSING")
     text = raw.decode("utf-8")
     start = 0
     for key in ("records", KIND, "record"):
@@ -127,9 +133,13 @@ def prepare(inputs, inputs_sha256, output):
     for name in SOURCE_NAMES:
         sources[name], pins[name] = _read_pin(spec["sources"][name], base=inputs.parent,
             limit=MAX_WRAPPER_BYTES if name == "wrapper" else common_consumption.MAX_INPUT_BYTES)
-    env = Environment.model_validate(strict_json(sources["environment"], limit=common_consumption.MAX_INPUT_BYTES))
-    # ref() verifies the sealed object's content hash. Shorthand/record ENV refs are not an independent ENV.
-    env_ref = env.ref().model_dump(mode="json")
+    env_data = strict_json(sources["environment"], limit=common_consumption.MAX_INPUT_BYTES)
+    try:
+        env = Environment.model_validate(env_data)
+        # ref() verifies the seal; malformed ENV input values must not become error text.
+        env_ref = env.ref().model_dump(mode="json")
+    except ValueError as error:
+        raise _EnvironmentInputError(type(error).__name__) from None
     target = strict_json(sources["target"], limit=common_consumption.MAX_INPUT_BYTES)
     prepared = strict_json(sources["prepared"], limit=common_consumption.MAX_INPUT_BYTES)
     if (type(target) is not dict or not target or type(prepared) is not dict
@@ -193,7 +203,8 @@ def main(argv=None):
     try:
         receipt = prepare(args.inputs, args.inputs_sha256, args.output)
     except (OSError, ValueError, TypeError, KeyError) as error:
-        print(json.dumps({"schema": OUTPUT_SCHEMA, "error": {"type": type(error).__name__, "message": str(error)},
+        print(json.dumps({"schema": OUTPUT_SCHEMA, "error": {
+                          "type": getattr(error, "original_error_type", type(error).__name__), "message": str(error)},
                           "runtime_link_complete": False, "gpu_ready": False}, ensure_ascii=False), file=sys.stderr)
         return 2
     print(json.dumps({"schema": OUTPUT_SCHEMA, "check_id": receipt["check_id"], "output": str(args.output.absolute()),

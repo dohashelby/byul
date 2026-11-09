@@ -37,7 +37,8 @@ def test_original_B160_eight_files_are_exact_confirmed_bytes():
     for name,digest in REVIEWED_B_BYTES.items():
         # Keep B160's original eight approvals as historical bytes. The owner
         # later fixed these files; each exact successor is a separate review.
-        original=(Path(__file__).parent/'fixtures'/'historical-b160'/name).read_bytes()
+        storage_name = name + '.txt' if name.endswith('.py') else name
+        original=(Path(__file__).parent/'fixtures'/'historical-b160'/storage_name).read_bytes()
         assert hashlib.sha256(original).hexdigest()==digest
         if name in REVIEWED_B_FIXTURE_BYTES:
             successor=subprocess.check_output(['git','show',REVIEWED_B_FIXTURE_COMMIT+':'+name],cwd=ROOT)

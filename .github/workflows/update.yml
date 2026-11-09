@@ -77,7 +77,7 @@ jobs:
       - run: uv sync --frozen
       - name: Measure default suite parent wall clock
         run: |
-          uv run python - <<'PY'
+          uv run --project ../platform/api --frozen --with-editable . --with-editable ../runtime python - <<'PY'
           import os
           import subprocess
           import sys

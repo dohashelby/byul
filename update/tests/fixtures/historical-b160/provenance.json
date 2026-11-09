@@ -11,5 +11,15 @@
     "update/tools/b_lif07_native_capture.py": "3aa4ca2d21d9531859b6f19de5d5e7f206e3ec8d5f2050122275309e9417396d",
     "update/tools/b_lif07_readiness.py": "172c726fa06a94a51963d3d20438178c96f02944ab42382d3de3e09f9e2e2dab",
     "update/tests/linux_cpu/lif13_peer_probe.py": "789b08ff1acc549e478558fa8317eac074905e675d4cce87deede99f5d528e2d"
+  },
+  "storage_paths": {
+    "update/docs/b-lif07/WORKER_READINESS.md": "update/docs/b-lif07/WORKER_READINESS.md",
+    "update/docs/b-lif13/WEIGHTS_LIFETIME.md": "update/docs/b-lif13/WEIGHTS_LIFETIME.md",
+    "update/tests/test_b_lif07_http_readiness.py": "update/tests/test_b_lif07_http_readiness.py.txt",
+    "update/tests/test_b_lif07_native_capture.py": "update/tests/test_b_lif07_native_capture.py.txt",
+    "update/tests/test_b_lif07_readiness.py": "update/tests/test_b_lif07_readiness.py.txt",
+    "update/tools/b_lif07_native_capture.py": "update/tools/b_lif07_native_capture.py.txt",
+    "update/tools/b_lif07_readiness.py": "update/tools/b_lif07_readiness.py.txt",
+    "update/tests/linux_cpu/lif13_peer_probe.py": "update/tests/linux_cpu/lif13_peer_probe.py.txt"
   }
 }

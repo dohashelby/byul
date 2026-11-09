@@ -18,24 +18,24 @@ def _entries(state: AppState) -> tuple[list[dict[str, Any]], list[dict[str, Any]
     counter = 0
     for index_file in state.evidence.indexes():
         doc = index_file.document
-        errors = state.contracts.errors("evidence-index", doc)
-        if not errors:
-            for item in doc["items"]:
-                entries.append({"producer": doc["producer"], "index_created_at": doc["created_at"], "index_path": index_file.path, "item": item})
-            continue
-        # 목록 전체가 틀렸으면 항목별로 다시 검증해 맞는 항목은 살리고 틀린 항목만 형식 오류로 둔다.
+        # Validate the header once and each row once (never build N-item error
+        # messages before validating the same N rows a second time).
         items = doc.get("items") if isinstance(doc, dict) and isinstance(doc.get("items"), list) else None
         head_ok = isinstance(doc, dict) and items is not None and state.contracts.is_valid(
             "evidence-index", {**doc, "items": []}
         )
         if not head_ok:
+            errors = state.contracts.errors("evidence-index", doc)
             invalid.append({"index": counter, "errors": [f"{index_file.path} {e.path}: {e.message}" for e in errors], "raw": doc})
             counter += 1
             continue
         for item in items:
             item_errors = state.contracts.errors("evidence-index", {**doc, "items": [item]})
+            path_error = None if item_errors else state.evidence.path_error(index_file.path, item["path"])
             if item_errors:
                 invalid.append({"index": counter, "errors": [f"{e.path}: {e.message}" for e in item_errors], "raw": item})
+            elif path_error:
+                invalid.append({"index": counter, "errors": [path_error], "raw": item})
             else:
                 entries.append({"producer": doc["producer"], "index_created_at": doc["created_at"], "index_path": index_file.path, "item": item})
             counter += 1

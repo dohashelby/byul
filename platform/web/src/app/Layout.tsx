@@ -5,6 +5,7 @@ import { useDocList, useMeta, useRevalidation, useRuntimeStatus } from "../api/h
 import { useRuntimeProblems, type RuntimeProblems } from "../pages/runtime/problems";
 import { observationState } from "../pages/runtime/parts";
 import { Banner, Dot } from "../components/Misc";
+import { SourceExampleBanner } from "../components/SourceExampleBanner";
 import { SOURCE_MODE, label } from "../lib/labels";
 import { PERIODS, fromLocalInput, toLocalInput, type PeriodKey } from "../lib/time";
 import { carry, useGlobalFilters, useParams } from "../lib/url";
@@ -291,11 +292,7 @@ export function Layout() {
       <Sidebar />
       <div className={l.main}>
         <Pagebar />
-        {meta.data?.example_mode && (
-          <Banner kind="example">
-            {meta.data.sources.some((s) => s.mode !== "example") ? "예시 자료" : "예시 데이터"} · {meta.data.sources.filter((x) => x.mode === "example").map((x) => x.name).join(", ")} · 해당 자료는 공식 판정 근거 제외
-          </Banner>
-        )}
+        <SourceExampleBanner meta={meta.data} />
         {unavailable.length > 0 && (
           <Banner kind="unofficial">관측 불가: 해당 구간 이벤트 누락 가능 ({unavailable.join(", ")})</Banner>
         )}

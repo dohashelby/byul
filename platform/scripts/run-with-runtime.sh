@@ -9,6 +9,7 @@
 #   RUNTIME_LAB_REPORT kind lab 시험 보고서(파일 또는 폴더). 기본: ~/.local/state/serving-runtime/k8s-lab/reports 가 있으면 그것
 #   RUNTIME_CILIUM=1   Cilium 정책 상태 조회(kind-runtime-lab context 필요)
 #   RUNTIME_VIEWER_TOKEN  runtime 조회 보호를 켰다면 platform이 서버 쪽에서 보낸다
+#   EVIDENCE_INDEX_PATHS  오프라인 생성 증거 index 절대 경로(:로 여러 개). 생략하면 예시 증거
 #   RUNTIME_TETRAGON_STATE=1  명시한 context의 Tetragon 상태를 읽기 전용으로 수집
 #   RUNTIME_KUBE_CONTEXT     기본 kind-runtime-lab
 #   TETRAGON_EVIDENCE_DIR    Tetragon 시험·모드 전환 기록 폴더
@@ -149,6 +150,7 @@ fi
 
 # update 보고서(RPT JSON) 폴더. 기본은 저장소의 update/out(update CLI가 만든 실제 보고서).
 export UPDATE_REPORTS_DIR="${UPDATE_REPORTS_DIR:-$ROOT/update/out}"
+export EVIDENCE_INDEX_PATHS="${EVIDENCE_INDEX_PATHS:-}"
 echo "update 보고서: $UPDATE_REPORTS_DIR"
 echo "platform: http://127.0.0.1:${BYUL_PLATFORM_PORT:-8700}"
 cd "$ROOT/platform/api"

@@ -18,6 +18,7 @@ import type {
   RevisionList,
   LabReportResponse,
   TetragonStatusResponse,
+  GpuStatusResponse,
   RuntimeEventList,
   RuntimeStatusResponse,
   PhaseTimelineResponse,
@@ -41,6 +42,8 @@ export const useLabReport = () =>
   useQuery({ queryKey: ["runtime", "lab-report"], queryFn: () => getJson<LabReportResponse>("/api/runtime/lab-report"), ...live });
 export const useTetragonStatus = () =>
   useQuery({ queryKey: ["runtime", "tetragon-status"], queryFn: () => getJson<TetragonStatusResponse>("/api/runtime/tetragon-status"), ...live });
+export const useGpuStatus = () =>
+  useQuery({ queryKey: ["runtime", "gpu-status"], queryFn: () => getJson<GpuStatusResponse>("/api/runtime/gpu-status"), ...live });
 export const useRequestDetail = (id: string | null) =>
   useQuery({
     queryKey: ["runtime", "request", id],

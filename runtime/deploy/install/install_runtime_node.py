@@ -34,7 +34,7 @@ GRUB_DEFAULT = Path("/etc/default/grub")
 SUDOERS_DIR = Path("/etc/sudoers.d")
 SUDOERS_NAME = "serving-runtime-agent"
 UNITS = tuple(f"serving-runtime-{name}.service" for name in
-              ("tetragon-status", "monitor-window", "agent"))
+              ("tetragon-status", "gpu-status", "monitor-window", "agent"))
 COPY = ("src", "tools", "deploy", "pyproject.toml", "README.md")
 PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 DEFAULTS = {"PLATFORM_CA_FILE": "", "GATEWAY_DATA_GID": "10000",
@@ -438,7 +438,7 @@ def install_code():
     require(len(sites) == 1, "venv site-packages 검증 실패.")
     write_file(sites[0] / "byul-runtime.pth", f"{DEST}/src\n{DEST}\n".encode())
     run([venv / "bin/python", "-I", "-B", "-c",
-         "import serving_runtime, tools.tetragon_status, tools.tetragon_monitor_window; "
+         "import serving_runtime, tools.tetragon_status, tools.tetragon_monitor_window, tools.gpu_status; "
          "import sys; assert sys.version_info >= (3,12)"])
 
 
@@ -561,6 +561,11 @@ def install(config, args, artifacts, grub):
                       int(config["OBSERVE_GID"]), 0o2750)
             # Give the status writer its own directory; the shared parent stays go-w.
             directory(OBSERVATION / "tetragon-status", account.pw_uid,
+                      int(config["OBSERVE_GID"]), 0o2750)
+            directory(OBSERVATION / "gpu-status", account.pw_uid,
+                      int(config["OBSERVE_GID"]), 0o2750)
+            # Optional engine-log receipt collector output (service not enabled by default).
+            directory(OBSERVATION / "engine-receipts", account.pw_uid,
                       int(config["OBSERVE_GID"]), 0o2750)
             directory(OBSERVATION / "lab-reports", pwd.getpwnam(config["OBSERVATION_USER"]).pw_uid,
                       int(config["OBSERVE_GID"]), 0o2750)

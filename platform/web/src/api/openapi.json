@@ -275,6 +275,27 @@
         }
       }
     },
+    "/api/runtime/gpu-status": {
+      "get": {
+        "tags": [
+          "runtime"
+        ],
+        "summary": "Gpu Status",
+        "operationId": "gpu_status_api_runtime_gpu_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GpuStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/update/results": {
       "get": {
         "tags": [
@@ -1788,6 +1809,167 @@
           "message"
         ],
         "title": "FieldIssue"
+      },
+      "GpuRow": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Index"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "utilization_percent": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization Percent"
+          },
+          "memory_used_mib": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Used Mib"
+          },
+          "memory_total_mib": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Total Mib"
+          },
+          "temperature_c": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature C"
+          },
+          "power_w": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power W"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "index",
+          "name"
+        ],
+        "title": "GpuRow"
+      },
+      "GpuSnapshot": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "runtime-gpu-status/1.0",
+            "title": "Schema Version",
+            "default": "runtime-gpu-status/1.0"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "stale",
+              "error",
+              "missing",
+              "not_configured"
+            ],
+            "title": "State"
+          },
+          "fresh": {
+            "type": "boolean",
+            "title": "Fresh",
+            "default": false
+          },
+          "collected_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collected At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/GpuRow"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Gpus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "GpuSnapshot"
+      },
+      "GpuStatusResponse": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/GpuSnapshot"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "source"
+        ],
+        "title": "GpuStatusResponse"
       },
       "HTTPValidationError": {
         "properties": {
@@ -3859,6 +4041,22 @@
             "type": "boolean",
             "title": "Dry Run",
             "default": false
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/EnforcementPolicyResult"
+            },
+            "type": "array",
+            "maxItems": 512,
+            "title": "Policies"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/EnforcementComponentResult"
+            },
+            "type": "array",
+            "maxItems": 2,
+            "title": "Components"
           }
         },
         "additionalProperties": false,
@@ -4029,22 +4227,6 @@
             "type": "boolean",
             "title": "Truncated",
             "default": false
-          },
-          "policies": {
-            "items": {
-              "$ref": "#/components/schemas/EnforcementPolicyResult"
-            },
-            "type": "array",
-            "maxItems": 512,
-            "title": "Policies"
-          },
-          "components": {
-            "items": {
-              "$ref": "#/components/schemas/EnforcementComponentResult"
-            },
-            "type": "array",
-            "maxItems": 2,
-            "title": "Components"
           }
         },
         "type": "object",

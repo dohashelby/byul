@@ -38,6 +38,7 @@ from .http_handler import (
 )
 from .lab_report import LabReportSource
 from .tetragon_state import read_tetragon_state
+from .gpu_state import read_gpu_state
 from .engine_receipts import EngineReceipts
 from .mock_engine import MockEngine, _utc_now
 from .observation_feed import ObservationFeed
@@ -531,6 +532,8 @@ class GatewayApp:
             context=self._tetragon_context,
         )
 
+    def gpu_status(self) -> dict[str, Any]:
+        return read_gpu_state(self.config.gpu_state_path)
 
     def policy_status(self) -> dict[str, Any]:
         policy = self.policy_state.policy
@@ -769,6 +772,7 @@ class GatewayApp:
                 observation_session_id=self.observation_session_id,
                 lab_report=self._lab_report.read,
                 tetragon_status=self.tetragon_status,
+                gpu_status=self.gpu_status,
                 record_transport_error=self._request_flow.record_without_relay,
                 request_header_timeout_s=self.config.request_header_timeout_s,
                 request_body_timeout_s=self.config.request_body_timeout_s,

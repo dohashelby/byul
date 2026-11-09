@@ -672,3 +672,21 @@
 | 합계 | 218 | 3 | BEARER 3 | 전체 대조 5회차·접두 5회차 | DECLARED 138·MEASURED 80 |
 
 - 남은 제약: 접두 대조는 전체 파일 동일성의 강한 근거가 아니므로 5개 회차는 DECLARED로 남는다. 수동 origin 주장은 독립 인증이 아니며 자동으로 만들어 넣지 않았다. 소켓 허용 환경의 전체 시험과 Claude 직접 검수가 남았다. 보고서 형식/collector 버전이 바뀌었으므로 이전 출력과 다른 경우 기존 멱등 규칙에 따라 덮어쓰지 않고 새 출력 폴더를 사용한다.
+
+## 2026-11-09 엔진 수신 기록(11)·GPU 지표(12) — Claude 구현분, Codex 교차 검수 전
+
+- Codex 사용 한도로 작업이 시작되지 않아 Claude가 구현했다. 10번(외부 규칙 최초 적용) 미커밋 변경 위에서 작업했고 그 파일은 건드리지 않았다. contracts/update는 수정하지 않았다. 서버에는 접속하지 않았다.
+- 11: Gateway가 외부 backend 응답의 `id`를 요청 ID와 대조한다. 결과는 `engine_response_id_matched/mismatch/absent`이고 ID 원문은 저장하지 않는다.
+  - 선택 기능 `tools/engine_receipts.py`: 엔진 로그에서 요청 ID와 시각만 추출한다. 로그 줄·프롬프트는 버린다.
+  - Gateway `--engine-receipts`를 켜면 요청 상세가 `received`(로그 발견)를 표시한다. 미발견은 미수신으로 단정하지 않는다.
+  - 서비스 예시 파일만 두었고 기본 꺼짐이다. 플랫폼 상세에 한국어 라벨을 붙였다.
+- 12: `tools/gpu_status.py`(nvidia-smi 고정 필드, UUID 등 미저장)와 `serving-runtime-gpu-status.service`를 설치기 UNITS에 추가했다.
+  - Gateway `--gpu-state`·`/api/gpu-status`, gateway.yaml 인자를 추가했다.
+  - 플랫폼 `/api/runtime/gpu-status`(플랫폼 전용 모델)와 현황 GPU 카드·"GPU 관측" 표시를 추가했다. stale은 "현재 값 아님"으로 경고한다.
+- 문서: [엔진 수신 기록과 GPU 지표](../docs/엔진수신기록_GPU지표.md). 내부 기록 형식 문서에 두 형식을 추가했다.
+- 미확인·다음
+  - 실제 vLLM/SGLang이 X-Request-Id를 응답 `id`·로그에 쓰는지
+  - runtime-agent kubeconfig의 `pods/log` 권한
+  - 서버 nvidia-smi 실행 권한과 값 대조, stale 전환
+  - 브라우저 화면
+  - Codex 교차 검수

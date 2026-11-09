@@ -300,6 +300,7 @@ class LabPublicationTests(unittest.TestCase):
     def test_aws_gateway_connects_public_sources_on_readonly_mount(self):
         text = (ROOT / "deploy/gpu-lab/gateway.yaml").read_text()
         self.assertIn("- --tetragon-state\n            - /srv/serving/observation/tetragon-status/tetragon-state.json", text)
+        self.assertIn("- --gpu-state\n            - /srv/serving/observation/gpu-status/gpu-state.json", text)
         self.assertIn("- --lab-report\n            - /srv/serving/observation/lab-reports", text)
         self.assertIn("mountPath: /srv/serving/observation, readOnly: true", text)
         self.assertNotIn("/var/lib/serving-runtime", text)

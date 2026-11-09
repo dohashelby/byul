@@ -194,6 +194,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runtime/gpu-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gpu Status */
+        get: operations["gpu_status_api_runtime_gpu_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/update/results": {
         parameters: {
             query?: never;
@@ -685,6 +702,53 @@ export interface components {
             path: string;
             /** Message */
             message: string;
+        };
+        /** GpuRow */
+        GpuRow: {
+            /** Index */
+            index: number;
+            /** Name */
+            name: string;
+            /** Utilization Percent */
+            utilization_percent?: number | null;
+            /** Memory Used Mib */
+            memory_used_mib?: number | null;
+            /** Memory Total Mib */
+            memory_total_mib?: number | null;
+            /** Temperature C */
+            temperature_c?: number | null;
+            /** Power W */
+            power_w?: number | null;
+        };
+        /** GpuSnapshot */
+        GpuSnapshot: {
+            /**
+             * Schema Version
+             * @default runtime-gpu-status/1.0
+             * @constant
+             */
+            schema_version: "runtime-gpu-status/1.0";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ok" | "stale" | "error" | "missing" | "not_configured";
+            /**
+             * Fresh
+             * @default false
+             */
+            fresh: boolean;
+            /** Collected At */
+            collected_at?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Gpus */
+            gpus?: components["schemas"]["GpuRow"][];
+        };
+        /** GpuStatusResponse */
+        GpuStatusResponse: {
+            item: components["schemas"]["GpuSnapshot"];
+            source: components["schemas"]["SourceInfo"];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -3165,6 +3229,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TetragonStatusResponse"];
+                };
+            };
+        };
+    };
+    gpu_status_api_runtime_gpu_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GpuStatusResponse"];
                 };
             };
         };

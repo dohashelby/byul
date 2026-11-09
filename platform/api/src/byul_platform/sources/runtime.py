@@ -982,6 +982,7 @@ class RuntimeSource(Protocol):
     def ping(self) -> str: ...
     def phase_timeline(self) -> dict[str, Any]: ...
     def tetragon_status(self) -> dict[str, Any]: ...
+    def gpu_status(self) -> dict[str, Any]: ...
 
 
 def summary_from_events(events: Iterable[dict[str, Any]]) -> Summary:
@@ -1048,6 +1049,10 @@ class ExampleRuntimeSource:
 
     def tetragon_status(self) -> dict[str, Any]:
         return {"schema_version": "runtime-tetragon-state/1.0", "state": "not_configured", "fresh": False}
+
+    def gpu_status(self) -> dict[str, Any]:
+        # 예시 모드는 GPU 수치를 만들지 않는다(가짜 사용률을 실측처럼 보이지 않게).
+        return {"schema_version": "runtime-gpu-status/1.0", "state": "not_configured", "fresh": False, "gpus": []}
 
     def lab_report(self) -> Any:
         doc = self._json("runtime-lab-report.json")
@@ -1277,6 +1282,12 @@ class LiveRuntimeSource:
         except RuntimeNotFound:
             return {"schema_version": "runtime-tetragon-state/1.0", "state": "not_configured", "fresh": False,
                     "error": "연결된 Gateway가 Tetragon 상태 조회를 지원하지 않습니다"}
+
+    def gpu_status(self) -> dict[str, Any]:
+        try:
+            return self._get("/api/gpu-status")
+        except RuntimeNotFound:
+            return {"schema_version": "runtime-gpu-status/1.0", "state": "not_configured", "fresh": False, "gpus": []}
 
     def lab_report(self) -> Any:
         return lab_report_doc(self._get("/api/lab-report"))

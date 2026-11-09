@@ -103,7 +103,8 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         for name in installer.UNITS:
             unit = result[name].decode()
             self.assertIn("SupplementaryGroups=12000 12010", unit)
-            self.assertIn("--context cluster.test", unit)
+            if name != "serving-runtime-gpu-status.service":  # nvidia-smi only; no Kubernetes access
+                self.assertIn("--context cluster.test", unit)
             self.assertNotIn("lab-context", unit)
             self.assertNotIn("--namespace serving ", unit)
         agent = result["serving-runtime-agent.service"].decode()
@@ -546,7 +547,7 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         with ExitStack() as stack:
             mocks = self.install_mocks(stack)
             stack.enter_context(patch.object(installer.time, "sleep"))
-            stack.enter_context(patch.object(installer, "active", side_effect=[False] * 6 + [True] * 3))
+            stack.enter_context(patch.object(installer, "active", side_effect=[False] * (2 * len(installer.UNITS)) + [True] * len(installer.UNITS)))
             mocks["capture_baseline"].side_effect = lambda *args: events.append("baseline-verified")
             mocks["run"].side_effect = lambda cmd: events.append(cmd)
             result = installer.install(config, SimpleNamespace(capture_baseline=True), installer.render(config), None)
@@ -559,6 +560,8 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         mocks["summary"].assert_called_once()
         mocks["directory"].assert_any_call(installer.OBSERVATION / "tetragon-status", 999, 10010, 0o2750)
         mocks["directory"].assert_any_call(installer.OBSERVATION / "lab-reports", 1000, 10010, 0o2750)
+        mocks["directory"].assert_any_call(installer.OBSERVATION / "gpu-status", 999, 10010, 0o2750)
+        mocks["directory"].assert_any_call(installer.OBSERVATION / "engine-receipts", 999, 10010, 0o2750)
         mocks["directory"].assert_any_call(installer.VERIFICATION, 0, 10010, 0o2750)
         mocks["directory"].assert_any_call(installer.VERIFICATION / "approved", 0, 10000, 0o2750)
         mocks["directory"].assert_any_call(installer.VERIFICATION / "candidates", 1000, 10010, 0o2750)

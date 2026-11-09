@@ -34,6 +34,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 _BUNDLE_FILES = ("source-environment.json", "source-policy.json", "environment.json", "policy.json")
 _MAPPING_KEYS = frozenset({"format", "checked_at", "target_ref", "environment_ref", "byul_policy_ref",
                            "guard_environment_ref", "guard_policy_ref", "pack_ref", "validity", "limitations", "files"})
+# 계약 target.engine·target.runtime 중 guard ENV에 대응 필드가 있는 것. 나머지는 원본 bytes에만 남긴다.
+_GUARD_ENGINE_KEYS = ("name", "version", "source_commit", "image_digest")
+_GUARD_RUNTIME_KEYS = ("nodes", "tp_groups", "gpu_count", "gpu_model", "driver")
 
 
 class InputBoundaryError(ValueError):
@@ -151,12 +154,15 @@ def convert_documents(environment: dict, policy: dict, pack, contracts: Contract
     target = environment["target"]
     # tokenizer_revision/deployment/runtime 정책은 guard에 대응 필드가 없다.
     # 원본 bytes와 아래 기록에 보존하며 모델 revision 등으로 바꾸지 않는다.
+    # 엔진 runtime_kind·frontend와 병렬 크기(tp/pp/dp_size)도 guard에 대응 필드가 없어 같은 방식으로 보존한다.
     model = {key: target["model"].get(key) for key in ("id", "revision", "inventory_sha256")}
+    engine = {key: target["engine"].get(key) for key in _GUARD_ENGINE_KEYS}
+    guard_runtime = {key: runtime[key] for key in _GUARD_RUNTIME_KEYS if key in runtime}
     try:
         env = Environment(
             id=new_id("ENV"), created_at=environment["created_at"],
-            data_origin=environment["data_origin"], engine=target["engine"],
-            runtime=runtime, model=model, facts=environment["facts"],
+            data_origin=environment["data_origin"], engine=engine,
+            runtime=guard_runtime, model=model, facts=environment["facts"],
         ).seal()
         pol = Policy(
             id=new_id("POL"), created_at=policy["created_at"], data_origin=policy["data_origin"],
@@ -176,6 +182,12 @@ def convert_documents(environment: dict, policy: dict, pack, contracts: Contract
     ]
     if target["model"].get("tokenizer_revision") is not None:
         limitations.append("TOKENIZER_REVISION_RETAINED_IN_SOURCE_ONLY")
+    if "runtime_kind" in target["engine"]:
+        limitations.append("ENGINE_RUNTIME_KIND_RETAINED_IN_SOURCE_ONLY")
+    if target["engine"].get("frontend") is not None:
+        limitations.append("ENGINE_FRONTEND_RETAINED_IN_SOURCE_ONLY")
+    if any(runtime.get(key) is not None for key in ("tp_size", "pp_size", "dp_size")):
+        limitations.append("RUNTIME_PARALLELISM_RETAINED_IN_SOURCE_ONLY")
     if start is None or until is None:
         limitations.append("POLICY_VALIDITY_PARTLY_UNDECLARED")
     mapping = {

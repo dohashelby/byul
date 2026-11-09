@@ -50,7 +50,7 @@
           "additionalProperties": false,
           "required": ["engine", "version", "source_commit", "image_digest", "environment_snapshot_sha256"],
           "properties": {
-            "engine": { "type": ["string", "null"] },
+            "engine": { "description": "environment의 target.engine.name과 같은 엔진 식별자(소문자).", "type": ["string", "null"], "pattern": "^[a-z0-9][a-z0-9._-]*$" },
             "version": { "type": ["string", "null"] },
             "source_commit": { "type": ["string", "null"] },
             "image_digest": { "type": ["string", "null"], "pattern": "^(?:[a-z0-9][a-z0-9._:/-]*@)?sha256:[0-9a-f]{64}$" },

@@ -162,6 +162,13 @@ def _abort_incomplete(draft):
         draft.data_origin = DataOrigin.DECLARED
 
 
+def _qualified_runner_fact(record, projection):
+    """Current /2-/3 scope qualification is separate from source registration."""
+    return projection["supported"] and (record["schema"] == "guard-gpu-common-input/1" or (
+        record["schema"] in {"guard-gpu-common-input/2", "guard-gpu-common-input/3"}
+        and projection.get("runtime_qualified") is True))
+
+
 def attach(draft, ctx, cfg, *, kind):
     """Existing registered executor _finish → unchanged EVD/judge path."""
     key = "runner_input" if kind == "runner-consumption" else "supply_reads_input"
@@ -211,7 +218,7 @@ def attach(draft, ctx, cfg, *, kind):
                 draft.observations["runner_consumption_verified"] = Observation(collected=True, value=projected["complete"])
             elif ctx.check.id == "REQ-08":
                 case = projected["cases"].get("reused_input", {})
-                if (ctx.policy_values.get("reused_token_allowed") is False and projected["supported"]
+                if (ctx.policy_values.get("reused_token_allowed") is False and _qualified_runner_fact(record, projected)
                         and case.get("api_state") == "api_rejected"
                         and case.get("causal_order_verified") and case.get("identity_binding_verified")
                         and case.get("process_start_identity_observed")):

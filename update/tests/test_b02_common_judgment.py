@@ -115,6 +115,14 @@ def test_real_unqualified_schema2_schema3_seq_candidate_is_preserved_without_fab
     assert gpu_common_inputs.SUPPORTED_PRODUCERS == before
 
 
+@pytest.mark.parametrize('schema', ['guard-gpu-common-input/2', 'guard-gpu-common-input/3'])
+def test_source_support_alone_never_qualifies_a_runner_fact_in_an_unreviewed_scope(schema):
+    # Negative predicate input only: do not invent a registered record or
+    # patch A's producers/qualification registry to simulate positive support.
+    assert not subject._qualified_runner_fact({'schema': schema},
+        {'supported': True, 'runtime_qualified': False})
+
+
 def test_existing_factory_run_select_judge_report_preserves_new_FAIL_exact_artifacts(tmp_path, monkeypatch):
     pack = old.PACK
     env = environment(model={'id': 'test'}, engine={'name': 'vllm', 'version': '0.31.0'})

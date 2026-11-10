@@ -72,13 +72,12 @@ class Evaluation:
 
 
 def evaluate_asset_integrity(
-    result: dict[str, Any], data_origin: str | None
+    result: dict[str, Any], data_origin: str | None, *, scope: str = "asset_integrity"
 ) -> Evaluation:
     """Turn one complete asset check into zero or one condition."""
 
     if not isinstance(result, dict) or not isinstance(result.get("intact"), bool):
         raise ValueError("asset_integrity result must contain boolean intact")
-    scope = "asset_integrity"
     observed = {scope: data_origin}
     if result["intact"]:
         return Evaluation("asset_changed", (), observed)
@@ -145,6 +144,9 @@ def evaluate_asset_integrity(
         "counts": counts,
         "manifest_sha256": result.get("manifest_sha256"),
     }
+    if "cache_metadata" in result:
+        evidence["cache_metadata"] = result["cache_metadata"]
+        identity["cache_metadata"] = result["cache_metadata"]
     condition = Condition(
         "asset_changed",
         scope,
@@ -363,6 +365,10 @@ class RevalidationRequests:
             target_id,
             policy,
         )
+
+    def observe_cache(self, result, *, data_origin, observation_session_id, target_id, policy):
+        self._safe_observe("cache_integrity", lambda: evaluate_asset_integrity(result, data_origin, scope="cache_integrity"),
+                           observation_session_id, target_id, policy)
 
     def observe_baseline(
         self,

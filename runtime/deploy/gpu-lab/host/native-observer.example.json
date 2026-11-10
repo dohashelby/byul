@@ -1,0 +1,23 @@
+{
+  "schema": "byul-native-observer-service/1",
+  "kubeconfig": "/etc/serving-runtime/native-kubeconfig",
+  "producer_source_sha256": "REPLACE_WITH_APPROVED_RUNTIME_TOOLS_UPDATE_ENGINE_LINK_SHA256",
+  "environment": "/etc/serving-runtime/native/ENV.json",
+  "target": "/etc/serving-runtime/native/target.json",
+  "prepared": "/etc/serving-runtime/native/assets/manifest.json",
+  "input_sha256": {
+    "environment": "REPLACE_WITH_APPROVED_ENV_BYTES_SHA256",
+    "target": "REPLACE_WITH_APPROVED_TARGET_BYTES_SHA256",
+    "prepared": "REPLACE_WITH_APPROVED_MANIFEST_BYTES_SHA256"
+  },
+  "records": "/srv/serving/runtime/data/gateway_records.jsonl",
+  "output": "/srv/serving/observation/native/receipts.json",
+  "capture_dir": "/srv/serving/runtime/native-snapshots",
+  "reader_gid": 10010,
+  "gateway_writer_uid": 10000,
+  "interval": 5,
+  "duration": 10,
+  "max_delay_ms": 1000,
+  "required_scopes": ["asgi_transport", "frontend_request", "engine_core", "scheduler_state", "worker_batch", "kv_references", "gpu_transfers"],
+  "node_image_verification": "local-containerd-v1"
+}

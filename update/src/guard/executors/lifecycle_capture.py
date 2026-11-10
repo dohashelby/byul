@@ -7,6 +7,7 @@ import re
 from copy import deepcopy
 
 from guard.adapters import vllm_lifecycle_sensor as sensor
+from guard.adapters import sglang_request_termination_sensor as sglang_sensor
 from guard.adapters import vllm_safe_open_mapping_sensor as mapping_sensor
 from guard.adapters import vllm_safe_open_mapping_metadata as mapping_metadata
 from guard.adapters import vllm_ready_endpoint_sensor as endpoint_sensor,vllm_ready_endpoint_contract as endpoint_contract,vllm_ready_endpoint_metadata as endpoint_metadata
@@ -22,14 +23,16 @@ from guard.adapters import vllm_request_output_sensor as output_sensor, vllm_req
 from guard.adapters import vllm_stream_buffer_sensor as stream_sensor, vllm_stream_buffer_metadata as stream_metadata
 from guard.adapters import vllm_rank_failure_sensor as rank_sensor
 from guard.adapters import vllm_initialization_sensor as init_sensor
+from guard.adapters import vllm_termination_sensor as termination_sensor,vllm_termination_metadata as termination_metadata
+from guard.adapters import vllm_fault_sensor as fault_sensor,vllm_fault_metadata as fault_metadata
 from guard.adapters import vllm_profiler_sensor as profiler_sensor,vllm_profiler_metadata as profiler_metadata
 from guard.adapters import vllm_file_read_sensor as read_sensor,vllm_file_read_metadata as read_metadata
 from guard.adapters import vllm_weight_iteration_sensor as weight_sensor,vllm_weight_iteration_metadata as weight_metadata
 from guard.adapters import vllm_initialization_metadata as init_metadata, vllm_rank_failure_metadata as rank_metadata
-from .owned_capture import _read_owned_file, strict_json, validate_owned_source, EXTENDED_RECORDING_PROFILE
+from .owned_capture import _read_owned_file, strict_json, validate_owned_source, EXTENDED_RECORDING_PROFILE,LARGE_RECORDING_PROFILE
 
 CONTEXT_READER = r"""
-import hashlib,json,os,pathlib,sys
+import hashlib,json,os,pathlib,sys,time
 pid=int(sys.argv[1]); p=pathlib.Path("/proc")/str(pid)
 def read_context():
     raw=(p/"stat").read_text(); fields=raw[raw.rfind(")")+2:].split()
@@ -48,7 +51,9 @@ except (FileNotFoundError,ProcessLookupError):
   if p.exists():raise
   print(json.dumps({"schema":"guard-lifecycle-process-absent/1","pid":pid}));raise SystemExit(0)
 print(json.dumps({"schema":"guard-lifecycle-process-context/1","context":before,
-  "stable":before==after,"same_executable":same}))
+  "stable":before==after,"same_executable":same,"monotonic_ns":time.monotonic_ns(),
+  "clock_context_same":os.stat('/proc/self/ns/time').st_ino==before['time_namespace'] and
+    hashlib.sha256(pathlib.Path('/proc/self/timens_offsets').read_bytes()).hexdigest()==before['time_offsets_sha256']}))
 """
 
 KEYS = set("""
@@ -73,7 +78,7 @@ POINTS = set(profiles.point_sources(sensor.PROFILE))
 WORDS = {*profiles.SCHEMAS, *profiles.SCHEMAS.values(), sensor.COMMIT, "START", "MODULE", "NATIVE", "ASGI", "END",
     "SELECTION",
     "SEALED", "PROCESS_EXIT", "BOUND_REACHED", "CONTROL_UNAVAILABLE", "CALL", "RETURN", "RAISE",
-    "SAMPLE_UNAVAILABLE", "DISCONNECT_RECEIVED", "BODY_SEND_RETURN", "APP_RETURN", "APP_RAISE",
+    "SEGMENT_ROLLOVER", "SAMPLE_UNAVAILABLE", "DISCONNECT_RECEIVED", "BODY_SEND_RETURN", "APP_RETURN", "APP_RAISE",
     *sensor.SOURCE_SHA, *POINTS}
 
 
@@ -99,12 +104,17 @@ def canonical_row(row):
 
 
 def parse_recording(raw, prepared):
+    if prepared.get("profile")==sglang_sensor.PROFILE:
+        from .sglang_lifecycle_capture import parse_recording as parse_sglang
+        return parse_sglang(raw,prepared)
+    is_fault=prepared["profile"]==fault_sensor.PROFILE
+    is_termination=prepared["profile"]in {fault_sensor.PROFILE,termination_sensor.PROFILE}
     is_endpoint = prepared["profile"] == endpoint_sensor.PROFILE
     is_generation = prepared["profile"] in {generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_online = prepared["profile"] == online.PROFILE
     is_output = prepared["profile"] == output_sensor.PROFILE
     is_stream = prepared["profile"] == stream_sensor.PROFILE
-    is_rank = prepared["profile"] == rank_sensor.PROFILE
+    is_rank = prepared["profile"]in {fault_sensor.PROFILE,rank_sensor.PROFILE}
     is_read = prepared["profile"] == read_sensor.PROFILE
     is_worker_startup = prepared["profile"] in {startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_mapping = prepared["profile"] in {mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
@@ -112,12 +122,12 @@ def parse_recording(raw, prepared):
     is_profiler = prepared["profile"] == profiler_sensor.PROFILE
     is_init = prepared["profile"] in {init_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_attempt = prepared["profile"] in {attempt.PROFILE,output_sensor.PROFILE}
-    if type(raw) is not bytes or not 0 < len(raw) <= (weight_sensor.MAX_BYTES if is_weight else profiler_sensor.MAX_BYTES if is_profiler else init_sensor.MAX_BYTES if is_init else rank_sensor.MAX_BYTES if is_rank else stream_sensor.MAX_BYTES if is_stream else attempt.MAX_BYTES if is_attempt else online.MAX_BYTES if is_online else sensor.MAX_BYTES):
+    if type(raw) is not bytes or not 0 < len(raw) <= (termination_sensor.MAX_BYTES if is_termination else weight_sensor.MAX_BYTES if is_weight else profiler_sensor.MAX_BYTES if is_profiler else init_sensor.MAX_BYTES if is_init else rank_sensor.MAX_BYTES if is_rank else stream_sensor.MAX_BYTES if is_stream else attempt.MAX_BYTES if is_attempt else online.MAX_BYTES if is_online else sensor.MAX_BYTES):
         raise ValueError("LIFECYCLE_RECORDING_BYTES_INVALID")
     lines = raw.splitlines(keepends=True)
     incomplete_tail = not raw.endswith(b"\n")
     tail = lines.pop() if incomplete_tail else b""
-    if not 1 <= len(lines) <= (weight_sensor.MAX_ROWS if is_weight else profiler_sensor.MAX_ROWS if is_profiler else init_sensor.MAX_ROWS if is_init else rank_sensor.MAX_ROWS if is_rank else stream_sensor.MAX_ROWS if is_stream else attempt.MAX_ROWS if is_attempt else online.MAX_ROWS if is_online else sensor.MAX_ROWS):
+    if not 1 <= len(lines) <= (termination_sensor.MAX_ROWS if is_termination else weight_sensor.MAX_ROWS if is_weight else profiler_sensor.MAX_ROWS if is_profiler else init_sensor.MAX_ROWS if is_init else rank_sensor.MAX_ROWS if is_rank else stream_sensor.MAX_ROWS if is_stream else attempt.MAX_ROWS if is_attempt else online.MAX_ROWS if is_online else sensor.MAX_ROWS):
         raise ValueError("LIFECYCLE_RECORDING_ROW_BOUND")
     previous, clock, rows = "0"*64, -1, []
     keys = KEYS - {"asgi_request_sha256"} if prepared["profile"] == profiles.LEGACY_PROFILE else KEYS
@@ -125,11 +135,19 @@ def parse_recording(raw, prepared):
         keys = keys - {"model_selection","owner_model_sha256","argument_model_sha256","returned_model_sha256",
             "configured_model_sha256","configured_revision_sha256","load_format_sha256","load_dummy_weights",
             "lora_config_present","speculative_config_present"}
-    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V4_PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
-    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
-    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
-    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
+    if prepared["profile"] not in {fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V4_PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
+    if prepared["profile"] not in {fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
+    if prepared["profile"] not in {fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
+    if prepared["profile"] not in {fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
     words = WORDS
+    if is_termination:
+        keys=keys|termination_metadata.FIELDS|termination_metadata.STATE_FIELDS|termination_metadata.SCHEDULER_FIELDS
+        words=words|{'TERMINATION',termination_sensor.EVENT_SCHEMA,*termination_metadata.PHASES,*termination_metadata.POINT_MODULES,*termination_metadata.POINT_MODULES.values(),*termination_sensor.SOURCE_ADDITIONS,*termination_sensor.RUNTIME_CODE_CONTRACTS,'main','copy','native-exception','observer-bound','stream-unavailable'}
+    if is_fault:
+        keys=keys|fault_metadata.FIELDS
+        words=words|{'FAULT_CONTROL',fault_sensor.EVENT_SCHEMA,*fault_metadata.PHASES,*fault_metadata.POINT_MODULES,
+            *fault_metadata.POINT_MODULES.values(),*fault_sensor.RUNTIME_CODE_CONTRACTS,*fault_sensor.RANK_CODE_CONTRACTS,
+            *fault_metadata.control.KINDS}
     if is_online:
         keys = keys | {"online_input", "online_code_sha256", "online_runtime"}
         words = words | {online.PROFILE, online.SCHEMA, online.CALLBACK_MODULE, *online.SOURCE_ADDITIONS,
@@ -193,11 +211,22 @@ def parse_recording(raw, prepared):
                 online_metadata.validate_snapshot(metadata["online_input"], payload.get("point"), payload.get("phase"))
                 safe_row = deepcopy(row)
                 safe_row["payload"]["metadata"]["online_input"] = None
+        if type(row) is dict and row.get('event') == 'SEGMENT':
+            from .lifecycle_rolling import segment_marker
+            if not is_termination or not segment_marker(row,prepared['session']):raise ValueError('LIFECYCLE_SEGMENT_INVALID')
+            safe_row=deepcopy(row);safe_row['event']='MODULE';safe_row['payload']={}
+        if type(row) is dict and row.get('event') == 'CHECKPOINT':
+            from .lifecycle_checkpoint import marker
+            if not is_termination or not marker(row, prepared['session']):
+                raise ValueError('LIFECYCLE_CHECKPOINT_INVALID')
+            safe_row = deepcopy(row)
+            safe_row['event'] = 'MODULE'
+            safe_row['payload'] = {}
         if (type(row) is not dict or set(row) != {"seq","event","monotonic_ns","previous_sha256","payload"}
                 or not _safe(safe_row, keys=keys, words=words) or type(row["seq"]) is not int or row["seq"] != seq
                 or type(row["monotonic_ns"]) is not int or row["monotonic_ns"] < clock
                 or row["previous_sha256"] != previous or canonical_row(row) != line
-                or row["event"] not in ({"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","SAFE_OPEN_MAPPING","WORKER_STARTUP","WORKER_STARTUP_LINK","WORKER_STARTUP_CLOSE","WORKER_STARTUP_LIMIT"} | ({"INITIALIZATION"} if prepared["profile"] in {joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()) | (set(generation_metadata.VALIDATORS) if is_generation else set()) | (set(endpoint_metadata.VALIDATORS) if is_endpoint else set()) if is_worker_startup else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","SAFE_OPEN_MAPPING"} if is_mapping else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","FILE_READ"} if is_read else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION"} if is_weight else {"START","MODULE","NATIVE","ASGI","END","SELECTION","PROFILER"} if is_profiler else {"START","MODULE","NATIVE","ASGI","END","SELECTION","INITIALIZATION"} if is_init else {"START","MODULE","NATIVE","ASGI","END","SELECTION","RANK_FAILURE"} if is_rank else {"START","MODULE","NATIVE","ASGI","END","SELECTION","STREAM_BUFFER"} if is_stream else {"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT","OUTPUT"} if is_output else {"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT"} if is_attempt else {"START","MODULE","NATIVE","ASGI","END","SELECTION"})
+                or row["event"] not in {"CHECKPOINT","SEGMENT"} and row["event"] not in ({"START","MODULE","NATIVE","ASGI","END","SELECTION","TERMINATION","RANK_FAILURE","FAULT_CONTROL"}if is_fault else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","SAFE_OPEN_MAPPING","WORKER_STARTUP","WORKER_STARTUP_LINK","WORKER_STARTUP_CLOSE","WORKER_STARTUP_LIMIT"} | ({"INITIALIZATION"} if prepared["profile"] in {joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()) | (set(generation_metadata.VALIDATORS) if is_generation else set()) | (set(endpoint_metadata.VALIDATORS) if is_endpoint else set()) if is_worker_startup else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","SAFE_OPEN_MAPPING"} if is_mapping else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","FILE_READ"} if is_read else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION"} if is_weight else {"START","MODULE","NATIVE","ASGI","END","SELECTION","PROFILER"} if is_profiler else {"START","MODULE","NATIVE","ASGI","END","SELECTION","INITIALIZATION"} if is_init else {"START","MODULE","NATIVE","ASGI","END","SELECTION","RANK_FAILURE"} if is_rank else {"START","MODULE","NATIVE","ASGI","END","SELECTION","STREAM_BUFFER"} if is_stream else {"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT","OUTPUT"} if is_output else {"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT"} if is_attempt else {"START","MODULE","NATIVE","ASGI","END","SELECTION","TERMINATION"}if is_termination else {"START","MODULE","NATIVE","ASGI","END","SELECTION"})
                 or type(row["payload"]) is not dict):
             raise ValueError("LIFECYCLE_RECORDING_ROW_INVALID")
         previous, clock = hashlib.sha256(line).hexdigest(), row["monotonic_ns"]
@@ -208,7 +237,7 @@ def parse_recording(raw, prepared):
             "sensor_sha256","context","producer_authenticated"}
             or header["schema"] != profiles.SCHEMAS.get(prepared["profile"])
             or header["profile"] != prepared["profile"]
-            or header["commit"] != sensor.COMMIT or header["session"] != prepared["session"]
+            or header["commit"] != profiles.public_commit(prepared["profile"]) or header["session"] != prepared["session"]
             or header["settings_sha256"] != prepared["assets"]["settings.json"]["sha256"]
             or header["sensor_sha256"] != prepared["assets"]["guard_lifecycle_sensor.py"]["sha256"]
             or header["producer_authenticated"] is not False):
@@ -225,6 +254,7 @@ def parse_recording(raw, prepared):
     online_calls = {}
     online_orphans = 0
     online_runtime = None
+    termination_runtime=None;termination_events=0
     attempt_runtime=None;attempt_calls={};attempt_events=0
     output_runtime=None;output_calls={};output_events=0;stream_runtime=None;stream_events=0;rank_runtime=None;rank_events=0;init_runtime=None;init_events=0
     profiler_runtime=None;profiler_events=0;profiler_calls={};weight_events=[]
@@ -263,8 +293,17 @@ def parse_recording(raw, prepared):
                 if "inherited" in payload and payload["inherited"] is not True:
                     raise ValueError("LIFECYCLE_RECORDING_INHERITANCE_INVALID")
                 ready.add(payload["module"])
-            elif is_online or is_output or is_stream or is_rank or is_init or is_weight:
+            elif is_termination or is_online or is_output or is_stream or is_rank or is_init or is_weight:
                 ready.discard(payload["module"])
+        if row['event']=='TERMINATION':
+            termination_metadata.validate_sample(payload)
+            if termination_runtime is not None and termination_runtime!=payload['observer_runtime']:raise ValueError('TERMINATION_OBSERVER_RUNTIME_MISMATCH')
+            termination_runtime=payload['observer_runtime'];termination_events+=1
+            if not is_termination:raise ValueError('TERMINATION_PROFILE_INVALID')
+            if payload['source_module']=='observer.asgi':
+                if payload['source_sha256']!=(fault_sensor.ASSETS['guard_termination.py']if is_fault else header['sensor_sha256']):raise ValueError('TERMINATION_OBSERVER_SOURCE_INVALID')
+            elif payload['source_module']not in ready:raise ValueError('TERMINATION_SOURCE_PROVENANCE_UNAVAILABLE')
+            if payload['operation_started_ns']>row['monotonic_ns']or payload['operation_finished_ns']is not None and payload['operation_finished_ns']>row['monotonic_ns']:raise ValueError('TERMINATION_EVENT_CLOCK_INVALID')
         if row['event']=='INITIALIZATION':
             init_metadata.validate_sample(payload)
             if not is_init or payload['source_verified'] and payload['source_module'] not in ready:
@@ -274,8 +313,16 @@ def parse_recording(raw, prepared):
             if init_runtime is not None and init_runtime!=payload['observer_runtime']:
                 raise ValueError('INITIALIZATION_RUNTIME_MISMATCH')
             init_runtime=payload['observer_runtime'];init_events+=1
+        if row['event']=='FAULT_CONTROL':
+            if not is_fault:raise ValueError('FAULT_CONTROL_PROFILE_INVALID')
+            fault_metadata.validate_control(payload)
+            if payload['session']!=prepared['session']or payload['target_sha256']!=prepared['fault_control_target_sha256']:
+                raise ValueError('FAULT_CONTROL_SCOPE_INVALID')
+            if payload['source_module']not in ready:raise ValueError('FAULT_CONTROL_SOURCE_PROVENANCE_UNAVAILABLE')
+            if payload['observation_ns']>row['monotonic_ns']or payload['clock_context']!={k:header['context'][k]for k in ('boot_sha256','time_namespace','time_offsets_sha256')}:
+                raise ValueError('FAULT_CONTROL_CLOCK_INVALID')
         if row['event']=='RANK_FAILURE':
-            rank_metadata.validate_sample(payload)
+            fault_metadata.validate_rank(payload)if is_fault else rank_metadata.validate_sample(payload)
             if not is_rank or payload['source_verified'] and payload['source_module'] not in ready:
                 raise ValueError('RANK_FAILURE_SOURCE_PROVENANCE_UNAVAILABLE')
             if payload['operation_finished_ns'] is not None and payload['operation_finished_ns']>row['monotonic_ns']:
@@ -293,7 +340,7 @@ def parse_recording(raw, prepared):
                 raise ValueError('STREAM_BUFFER_RUNTIME_MISMATCH')
             stream_runtime=payload['observer_runtime'];stream_events+=1
         if row["event"] in {"NATIVE","SELECTION"}:
-            if row["event"]=="SELECTION" and (header["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}
+            if row["event"]=="SELECTION" and (header["profile"] not in {fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}
                     or payload.get("point")!="InputProcessor.assign_request_id" or payload.get("requests")!=[]
                     or payload.get("selection_observed") is not False
                     or type(payload.get("metadata")) is not dict
@@ -447,7 +494,7 @@ def parse_recording(raw, prepared):
     mapping_journal=mapping_metadata.journal([row for row in rows if row['event']=='SAFE_OPEN_MAPPING'],prepared,weight_events) if is_mapping else None
     read_journal=read_metadata.journal([row for row in rows if row['event']=='FILE_READ'],prepared,weight_events) if is_read else None
     end = rows[-1]["payload"] if rows[-1]["event"] == "END" else {}
-    if rows[-1]["event"] == "END" and (set(end) != {"reason"} or end["reason"] not in {"SEALED","PROCESS_EXIT","BOUND_REACHED","CONTROL_UNAVAILABLE"}):
+    if rows[-1]["event"] == "END" and (set(end) != {"reason"} or end["reason"] not in {"SEALED","PROCESS_EXIT","BOUND_REACHED","CONTROL_UNAVAILABLE","SEGMENT_ROLLOVER"}):
         raise ValueError("LIFECYCLE_RECORDING_END_INVALID")
     weight_journal=weight_metadata.journal(weight_events) if is_weight else {}
     return rows, {"recording_closed": bool(end) and not incomplete_tail, "recording_end": end.get("reason"),
@@ -489,7 +536,7 @@ class ProcessAbsent(ValueError):
     """The recorded process no longer exists; distinct from a failed read."""
 
 
-def process_context(docker, container, pid):
+def process_context(docker, container, pid, *, with_clock=False):
     result = docker.exec_bounded(container, ["python3","-c",CONTEXT_READER,str(pid)], timeout=5, max_bytes=4096)
     pipe = result.capture or {}
     if (result.returncode != 0 or pipe.get("complete") is not True
@@ -501,16 +548,28 @@ def process_context(docker, container, pid):
     value = strict_json(result.stdout.encode(), limit=4096)
     if value == {"schema":"guard-lifecycle-process-absent/1","pid":pid}:
         raise ProcessAbsent("LIFECYCLE_PROCESS_ABSENT")
-    if (type(value) is not dict or set(value) != {"schema","context","stable","same_executable"}
+    legacy_fields={"schema","context","stable","same_executable"}
+    current_fields=legacy_fields|{"monotonic_ns","clock_context_same"}
+    if (type(value) is not dict or set(value) not in (legacy_fields,current_fields)
             or value["schema"] != "guard-lifecycle-process-context/1"
             or value["stable"] is not True or value["same_executable"] is not True):
         raise ValueError("LIFECYCLE_PROCESS_CONTEXT_UNVERIFIED")
+    if set(value)==current_fields and (type(value['monotonic_ns']) is not int or value['monotonic_ns'] < 0
+            or type(value['clock_context_same']) is not bool):
+        raise ValueError('LIFECYCLE_PROCESS_CONTEXT_UNVERIFIED')
+    if with_clock:
+        if value.get('clock_context_same') is not True or type(value.get('monotonic_ns')) is not int or value['monotonic_ns'] < 0:
+            raise ValueError('LIFECYCLE_CHECKPOINT_CLOCK_UNVERIFIED')
+        return value['context'], value['monotonic_ns']
     return value["context"]
 
 
-def capture(docker, target, *, source, prepared, read_file=None, image_check=None):
+def capture(docker, target, *, source, prepared, read_file=None, image_check=None, checkpoint=False, rolling=False, segment=None):
     validate_owned_source(**source)
     read = _read_owned_file if read_file is None else read_file
+    is_sglang=prepared["profile"]==sglang_sensor.PROFILE
+    is_fault=prepared["profile"]==fault_sensor.PROFILE
+    is_termination=prepared["profile"]in {fault_sensor.PROFILE,termination_sensor.PROFILE}
     is_online = prepared["profile"] == online.PROFILE
     is_attempt=prepared["profile"] in {attempt.PROFILE,output_sensor.PROFILE}
     is_stream=prepared["profile"]==stream_sensor.PROFILE
@@ -518,15 +577,29 @@ def capture(docker, target, *, source, prepared, read_file=None, image_check=Non
     is_weight=prepared["profile"] in {weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_profiler=prepared["profile"]==profiler_sensor.PROFILE
     is_init=prepared["profile"] in {init_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
-    limit = weight_sensor.MAX_BYTES if is_weight else profiler_sensor.MAX_BYTES if is_profiler else init_sensor.MAX_BYTES if is_init else rank_sensor.MAX_BYTES if is_rank else stream_sensor.MAX_BYTES if is_stream else attempt.MAX_BYTES if is_attempt else online.MAX_BYTES if is_online else sensor.MAX_BYTES
-    read_options = {"read_profile":EXTENDED_RECORDING_PROFILE} if (is_online or is_attempt or is_stream or is_rank or is_init or is_profiler or is_weight) and read_file is None else {}
+    limit = sglang_sensor.MAX_BYTES if is_sglang else termination_sensor.MAX_BYTES if is_termination else weight_sensor.MAX_BYTES if is_weight else profiler_sensor.MAX_BYTES if is_profiler else init_sensor.MAX_BYTES if is_init else rank_sensor.MAX_BYTES if is_rank else stream_sensor.MAX_BYTES if is_stream else attempt.MAX_BYTES if is_attempt else online.MAX_BYTES if is_online else sensor.MAX_BYTES
+    read_options = {"read_profile":LARGE_RECORDING_PROFILE}if is_sglang and read_file is None else {"read_profile":EXTENDED_RECORDING_PROFILE} if (is_termination or is_online or is_attempt or is_stream or is_rank or is_init or is_profiler or is_weight) and read_file is None else {}
     raw, provenance = read(docker, target, **source, max_bytes=limit, **read_options)
     records, summary = parse_recording(raw, prepared)
+    checkpoint_prefix = None
+    checkpoint_tail = []
+    checkpoint_tail_sha256 = None
+    if checkpoint:
+        from .lifecycle_checkpoint import prefix
+        selected_prefix = prefix(records, summary, prepared['session'])
+        if selected_prefix is not None:
+            records, raw_prefix, checkpoint_prefix = selected_prefix
+            records, summary = parse_recording(raw_prefix, prepared)
+        else:
+            raw_prefix = None
     context = records[0]["payload"]["context"]
     expected_path = f"/guard-lifecycle/data/{prepared['session']}/pid-{context['pid']}-{context['start_ticks']}.jsonl"
+    if rolling and segment is not None:
+        if type(segment) is not int or not 0<=segment<10**10:raise ValueError('LIFECYCLE_SEGMENT_INVALID')
+        expected_path=expected_path.removesuffix('.jsonl')+f'-segment-{segment}.jsonl'
     if source["path"] != expected_path:
         raise ValueError("LIFECYCLE_RECORDING_PROCESS_PATH_INVALID")
-    verified, image_verified, diagnostic = False, False, []
+    verified, image_verified, diagnostic = False, False, [];active_prefix_binding=None
     recheck = {"pid":context["pid"],"start_ticks":context["start_ticks"],"recording_end":summary["recording_end"],
         "recording_closed":summary["recording_closed"],"result":"unavailable"}
     # Keep the first safe recording if a later recheck fails.
@@ -544,13 +617,49 @@ def capture(docker, target, *, source, prepared, read_file=None, image_check=Non
     try:
         before = process_context(docker, source["container"], context["pid"])
         later, second = read(docker, target, **source, max_bytes=limit, **read_options)
-        after = process_context(docker, source["container"], context["pid"])
+        observed_clock = None
+        if checkpoint:
+            after, observed_clock = process_context(docker, source['container'], context['pid'], with_clock=True)
+        else:
+            after = process_context(docker, source["container"], context["pid"])
+        later_checkpoint_healthy = False
+        if checkpoint:
+            later_records, later_summary = parse_recording(later, prepared)
+            later_checkpoint_healthy = prefix(later_records, later_summary, prepared['session']) is not None
+            if later_checkpoint_healthy and checkpoint_prefix is not None and later.startswith(raw_prefix):
+                checkpoint_tail = deepcopy(later_records[len(records):])
+                checkpoint_tail_sha256 = hashlib.sha256(later).hexdigest()
         verified = (before == context == after and raw == later
                     and provenance["owner"] == second["owner"]
                     and provenance["file_identity"] == second["file_identity"]
                     and provenance.get("owner_binding_verified",True) is True
                     and second.get("owner_binding_verified",True) is True)
+        if (checkpoint and checkpoint_prefix is not None and later_checkpoint_healthy and before == context == after
+                and 0 <= observed_clock - checkpoint_prefix["monotonic_ns"] <= 15_000_000_000
+                and raw.startswith(raw_prefix) and later.startswith(raw_prefix)
+                and provenance["owner"] == second["owner"]
+                and all(type(provenance['file_identity'].get(k)) is int and provenance['file_identity'][k] > 0
+                        and provenance['file_identity'][k] == second['file_identity'].get(k) for k in ('device', 'inode'))
+                and provenance.get('owner_binding_verified', True) is True
+                and second.get('owner_binding_verified', True) is True):
+            verified = True
+        if checkpoint and (checkpoint_prefix is None or not later_checkpoint_healthy or observed_clock is None
+                or not 0 <= observed_clock - checkpoint_prefix['monotonic_ns'] <= 15_000_000_000):
+            verified = False
+            diagnostic.append('LIFECYCLE_CHECKPOINT_STALE_OR_UNAVAILABLE')
         recheck["result"] = "matched" if verified else "mismatch" if before != context or after != context else "not_verified"
+        if(is_fault and before==context==after and later.startswith(raw)
+                and provenance['owner']==second['owner']
+                and all(type(provenance['file_identity'].get(k))is int and provenance['file_identity'][k]>0
+                    and provenance['file_identity'][k]==second['file_identity'].get(k)for k in ('device','inode'))
+                and provenance.get('owner_binding_verified',True)is True and second.get('owner_binding_verified',True)is True
+                and summary['incomplete_final_row']is False and summary['discarded_tail_bytes']==0):
+            active_prefix_binding={'schema':'guard-live-lifecycle-prefix/1',
+                'context_sha256':hashlib.sha256(json.dumps(context,sort_keys=True,separators=(',',':')).encode()).hexdigest(),
+                'capture_sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw),
+                'later_capture_sha256':hashlib.sha256(later).hexdigest(),'later_bytes':len(later),
+                'file_device':provenance['file_identity']['device'],'file_inode':provenance['file_identity']['inode'],
+                'process_context_identity_verified':True,'prefix_extension_verified':True}
     except ProcessAbsent:
         # A recording closed by its own exit keeps its past identity only. This is
         # neither a current-worker binding nor a failed read of a live process.
@@ -578,7 +687,9 @@ def capture(docker, target, *, source, prepared, read_file=None, image_check=Non
     return {"schema":"guard-lifecycle-capture/1", "records":records, "summary":summary,
         **({"online_callback_provenance":summary["online_callback_provenance"],
             "online_code_contract":online.CODE_CONTRACT} if is_online else {}),
+        **({"checkpoint_prefix":checkpoint_prefix,"checkpoint_tail":checkpoint_tail,"checkpoint_tail_sha256":checkpoint_tail_sha256} if checkpoint else {}),
         "provenance":safe_provenance, "process_context_verified":verified, "process_recheck":recheck,
+        **({"active_prefix_binding":active_prefix_binding}if is_fault else{}),
         "image_digest_verified":image_verified,
         "diagnostic_codes":diagnostic, "product_connected":False, "security":"UNKNOWN",
         "producer_authenticated":False, "record_authenticity_verified":False,

@@ -102,9 +102,11 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
     assert observation['source_validation']['reviewed_common_commit']==proof['reviewed_common_commit']
     assert observation['source_validation']['runtime_hash_approval'] is False
     assert observation['report_validated'] is True
-    assert packet['collector_source_sha256']==helper.HTTP_EXPECTED_SOURCES['collector']
-    assert packet['binding_source_sha256']==helper.HTTP_EXPECTED_SOURCES['binding']
-    assert packet['probe_source_sha256']==helper.HTTP_EXPECTED_SOURCES['probe']
+    from guard.runtime.reviewed_http_contract import expected_http_sources
+    sources=expected_http_sources(proof)
+    assert packet['collector_source_sha256']==sources['collector']
+    assert packet['binding_source_sha256']==sources['binding']
+    assert packet['probe_source_sha256']==sources['probe']
     assert all(packet[k] is False for k in FLAGS)
     assert packet['requests'][0]['outcome']==200
     assert packet['collection_gap']==(mode in {'partial-body','cleanup-after-canary'})

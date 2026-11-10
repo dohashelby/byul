@@ -95,6 +95,7 @@ export function RuntimeOverviewPage() {
           const eng = s.backend;
           const external = eng.kind !== "mock";
           const counts = summary?.counts;
+          const requestCountPrefix = summary?.counts_lower_bound ? "≥ " : "";
           const max = counts ? Math.max(1, ...Object.values(counts)) : 1;
           const store = s.store;
           const corruptTotal = store.corrupt_lines.gateway + store.corrupt_lines.engine;
@@ -159,7 +160,7 @@ export function RuntimeOverviewPage() {
             ["경로", store.data_dir, { mono: true }],
             ["상태", { ok: "정상", error: "오류", unknown: "미확인" }[store.state], { problem: store.state === "error" }],
             ["손상 줄", `Gateway ${store.corrupt_lines.gateway} · 엔진 ${store.corrupt_lines.engine}`, { problem: corruptTotal > 0 }],
-            ["전체 요청", summary?.total],
+            [summary?.counts_lower_bound ? "최근 조회 범위 요청" : "전체 요청", `${requestCountPrefix}${summary?.total ?? "–"}`],
             ...(store.last_error ? ([["마지막 오류", `${formatTime(store.last_error_at)} ${store.last_error}`, { problem: true }]] as Row[]) : []),
             ...(["gateway", "engine"] as const)
               .map((src) => [src, store.corrupt_details.filter((d) => d.source === src)] as const)
@@ -180,8 +181,8 @@ export function RuntimeOverviewPage() {
                 <article className={ui.metric}>
                   <span className={ui.metricTitle}>요청</span>
                   <span className={ui.bigNumber}>
-                    <span>{summary?.total ?? "–"}</span>
-                    <span className={ui.bigCaption}>전체 요청 기록</span>
+                    <span>{requestCountPrefix}{summary?.total ?? "–"}</span>
+                    <span className={ui.bigCaption}>{summary?.counts_lower_bound ? "최근 조회 범위 요청 기록" : "전체 요청 기록"}</span>
                   </span>
                   <div className={ui.barList} role="group" aria-label="결과별 요청 수">
                     {REQUEST_SERIES.map((x) => (
@@ -190,7 +191,7 @@ export function RuntimeOverviewPage() {
                         <span className={ui.barTrack}>
                           <span className={ui.barFill} style={{ width: `${((counts?.[x.key] ?? 0) / max) * 100}%` }} />
                         </span>
-                        <span className={ui.barCount}>{counts?.[x.key] ?? "–"}</span>
+                        <span className={ui.barCount}>{requestCountPrefix}{counts?.[x.key] ?? "–"}</span>
                       </button>
                     ))}
                   </div>
@@ -228,8 +229,8 @@ export function RuntimeOverviewPage() {
                 <article className={ui.metric}>
                   <span className={ui.metricTitle}>관측 사건</span>
                   <span className={ui.bigNumber}>
-                    <span>{Object.values(s.observations.by_source).reduce((a, b) => a + b, 0)}</span>
-                    <span className={ui.bigCaption}>누적 관측 사건</span>
+                    <span>{s.observations.counts_lower_bound ? "≥ " : ""}{Object.values(s.observations.by_source).reduce((a, b) => a + b, 0)}</span>
+                    <span className={ui.bigCaption}>{s.observations.counts_lower_bound ? "최근 조회 범위 관측 사건" : "누적 관측 사건"}</span>
                   </span>
                   <table className={ui.miniTable}>
                     <thead>
@@ -283,8 +284,8 @@ export function RuntimeOverviewPage() {
                   ]}
                   active={mixMode}
                   onTab={setMixMode}
-                  total={mixMode === "results" ? (summary?.total ?? "–") : ruleRows.slice(0, 8).reduce((a, [, n]) => a + n, 0)}
-                  note={mixMode === "results" ? "누적 요청 결과" : "누적 관측 사건(규칙별)"}
+                  total={mixMode === "results" ? `${requestCountPrefix}${summary?.total ?? "–"}` : ruleRows.slice(0, 8).reduce((a, [, n]) => a + n, 0)}
+                  note={mixMode === "results" ? (summary?.counts_lower_bound ? "최근 조회 범위 요청 결과 · 확인된 최소 건수" : "누적 요청 결과") : "조회된 관측 사건(규칙별)"}
                 >
                   {mixMode === "results" ? (
                     <Donut items={REQUEST_SERIES.map((x) => ({ key: x.key, label: x.label, value: counts?.[x.key] ?? 0, color: x.color }))} />

@@ -11,6 +11,7 @@ import time
 from serving_runtime.enforcement.attribution import KERNEL_DATA, SCHEMA
 from serving_runtime.enforcement.tetragon import comparable_spec
 from tools.tetragon_trial import atomic_json, run
+from tools.k8s_observation_feed import check_reader_group
 
 # The process list is restricted by Kubernetes container IDs before any exe
 # metadata is read. Only argv0 and PATH are used locally to verify an alias;
@@ -102,9 +103,11 @@ done
 
 
 class IdentityCollector:
-    def __init__(self, context, namespace, selector, output, *, runner=run):
+    def __init__(self, context, namespace, selector, output, *, runner=run, reader_gid=None):
         self.context, self.namespace, self.selector = context, namespace, selector
         self.output, self.run = Path(output), runner
+        check_reader_group(reader_gid)
+        self.reader_gid = reader_gid
 
     def kube(self, *args, namespace=None):
         result = self.run(["kubectl", "--context", self.context, "-n", namespace or self.namespace, *args])
@@ -170,7 +173,7 @@ class IdentityCollector:
         except (OSError, ValueError, KeyError, TypeError, AttributeError, StopIteration):
             result.update(state="error", error="scoped process identities could not be verified", records=[], policies=[])
         result["generated_at"] = datetime.now(timezone.utc).isoformat()
-        atomic_json(self.output, result, mode=0o640)
+        atomic_json(self.output, result, mode=0o640, reader_gid=self.reader_gid)
         return result
 
 
@@ -181,11 +184,12 @@ def main():
     parser.add_argument("--selector", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--watch", action="store_true")
+    parser.add_argument("--reader-group", type=int)
     parser.add_argument("--interval", type=float, default=5)
     args = parser.parse_args()
     if args.interval < 1:
         parser.error("interval must be at least one second")
-    collector = IdentityCollector(args.context, args.namespace, args.selector, args.output)
+    collector = IdentityCollector(args.context, args.namespace, args.selector, args.output, reader_gid=args.reader_group)
     while True:
         result = collector.collect()
         print(json.dumps({"state": result["state"], "processes": len(result["records"])}), flush=True)

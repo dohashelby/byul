@@ -41,7 +41,7 @@ baseline이 없을 때만 `--capture-baseline`을 사용한다. runtime-agent로
 
 공유 폴더 단계 `6–7/9`의 `VERIFICATION_PERMISSIONS`는 `/srv/serving/verification`을 root 소유·OBSERVE_GID·2750으로, `approved`를 root 소유·GATEWAY_DATA_GID·2750으로, `candidates`를 OBSERVATION_USER 소유·OBSERVE_GID·2750으로 멱등 준비한다. 계정 단계는 OBSERVATION_USER의 관측 그룹 가입도 확인·보완한다. 기존 사용자 서비스는 재시작 후 그룹을 확인한다. 승인 파일은 자동 생성/교체하지 않는다. [업데이트 검증 후보와 승인](../../docs/업데이트검증_후보와승인.md)의 도구가 후보/승인 문서·검토 기록을 명시 0640으로 원자 저장한다. Gateway에는 approved만 읽기 전용으로 붙인다. 모델 파일의 UID 10000 읽기 권한과 엔진/Gateway의 snapshot 일치는 운영자가 확인한다. 모델/구성 기준선은 설치기의 Tetragon baseline과 별개다. 새 Gateway의 폐기 목록 인자를 적용하기 전에 빈 목록 여부까지 사람이 검토·게시해야 하며, 파일 없음/읽기 오류는 기존 규칙대로 추론을 비활성화한다.
 
-`byul-observation-feed`·`byul-tetragon-identities`는 현재 서버처럼 **ubuntu 사용자 서비스**로 유지한다. 설치기는 이 둘을 중지·설치·시작하지 않는다. [GPU LAB README](../gpu-lab/README.md)의 식별 수집 절차에 따라 사용자 자신의 코드 사본·context·namespace·GID를 맞추고 사용자 manager의 그룹과 필요 시 linger를 검수한다. `/srv/serving/observation`의 소유자는 `OBSERVATION_USER`, GID는 10010, mode는 2750이며 새 식별 자료는 명시 0640이다. 실제 사용자 서비스 재시작 뒤 폴더 setgid와 파일 GID·0640, Gateway 읽기를 확인한다. 같은 경로에 수집기를 중복 실행하지 않는다.
+`byul-observation-feed`·`byul-tetragon-identities`는 현재 서버처럼 **ubuntu 사용자 서비스**로 유지한다. 설치기는 이 둘을 중지·설치·시작하지 않는다. [GPU LAB README](../gpu-lab/README.md)의 식별 수집 절차에 따라 설치기의 root 소유 코드·context·namespace·GID를 맞추고 사용자 manager의 그룹과 필요 시 linger를 검수한다. `/srv/serving/observation`의 소유자는 `OBSERVATION_USER`, GID는 10010, mode는 2750이며 새 식별 자료는 명시 0640이다. 실제 사용자 서비스 재시작 뒤 폴더 setgid와 파일 GID·0640, Gateway 읽기를 확인한다. 같은 경로에 수집기를 중복 실행하지 않는다.
 
 설치기는 관측 폴더 하위 `tetragon-status`를 runtime-agent 소유·관측 GID·2750으로, `lab-reports`를 OBSERVATION_USER 소유·관측 GID·2750으로 준비한다. 상위 2750에는 runtime-agent의 쓰기 권한이 없으므로 상태 전용 하위 폴더를 사용한다. 상태 서비스의 `--public-output`과 `ReadWritePaths`는 그 하위 폴더로 제한한다. 원본 `/var/lib/serving-runtime/tetragon-state.json`과 baseline/evidence 권한·위치는 유지한다. 공개 사본만 명시 0640으로 원자 교체하며 부모 setgid와 그룹을 보존한다. 최초 baseline 캡처에도 공개 사본 옵션을 쓴다.
 
@@ -56,3 +56,68 @@ Lab 보고서는 자동 생성하지 않는다. [GPU LAB의 보고서 생성 절
 서비스 세 개를 `systemctl disable --now`로 중지한 뒤 기존 단위·코드·설정을 복원한다. sudoers 복원본은 반드시 `visudo -cf`를 통과한 뒤 설치하고 `systemctl daemon-reload`한다. 신규 설치 제거 시에는 이 설치기가 만든 세 단위와 sudoers만 제거한다. 원래 활성/enable 상태는 기록에 맞춰 복구한다. 비밀 설정과 코드 삭제는 경로를 직접 확인한 후 수행한다. 공유 데이터·묶음·baseline/evidence와 사용자 수집기는 보존하고, 계정·그룹은 다른 사용자가 없음을 확인하기 전 삭제하지 않는다. BPF LSM 변경을 되돌리려면 관리 파일만 백업/제거하고 기존 GRUB 설정을 복원해 `update-grub` 후 유지보수 재부팅한다. 자동 uninstall·자동 재부팅은 제공하지 않는다.
 
 근거: [AWS 5회차](../../docs/AWS_GPU_서버5회차_결과_20261106.md), [6회차](../../docs/AWS_GPU_서버6회차_결과_20261108.md), [7회차](../../docs/AWS_GPU_서버7회차_결과_20261108.md), [8회차](../../docs/AWS_GPU_서버8회차_결과_20261108.md), [원격운영 §14](../../docs/원격운영_사용과검증.md#14-운영-배치-수집기https토큰).
+
+## Scoped Tetragon stream으로 명시 전환
+
+상태 writer는 설치기의 `serving-runtime-tetragon-status.service` 하나다. root 소유 `/opt/byul/runtime` 코드·venv, `/etc/serving-runtime/kubeconfig`, `/var/lib/serving-runtime/baseline.json`·evidence와 기존 복구 4조건을 유지한다. 이전 LAB `byul-tetragon-status.service`는 설치 중 disable/stop 및 중지 확인 후 canonical unit으로 대체한다. 이전 `/srv/serving/runtime/data`의 baseline·evidence는 삭제·자동 병합하지 않는다. 기존 canonical baseline이 없으면 정상 최초 캡처·검수 절차를 따른다.
+
+`byul-observation-feed` template은 기존 Hubble+legacy Tetragon 기본 동작을 유지한다. template을 복사하는 것만으로 Tetragon을 끄지 않는다. 전환 시 기존 observation owner로 다음 한 명령을 실행한다. root system 설치기를 먼저 완료하고, `prepare_tetragon_deployment`로 생성·검토한 정책 이름과 실제 적용 정책·sentinel·현재 context를 대조한다. 이 명령은 클러스터 정책과 canonical 상태 서비스를 변경하지 않는다.
+
+기존 user feed가 `/usr/bin/python3`나 `%h` 코드 사본을 사용한다면, 먼저 동일 observation 사용자로 unit만 이행한다. 기존 unit과 실행/enable 상태를 사용자 전용 0700 백업 위치에 보존하고, root 설치기에서 복사한 새 template이 legacy Tetragon을 계속 포함하는지 검토한다. 다음 단계는 새 template의 기존 context·output·reader-group·selector·interval을 해당 서버의 원래 값과 대조한 뒤 수행한다. 값이 다르면 검토된 같은 값으로 조정하고 기존 unit을 덮기 전에 백업한다.
+
+```sh
+byul_unit_backup=$(mktemp -d "$HOME/.byul-observation-backup.XXXXXX")
+chmod 700 "$byul_unit_backup"
+cp -p "$HOME/.config/systemd/user/byul-observation-feed.service" "$byul_unit_backup/"
+chmod 600 "$byul_unit_backup/byul-observation-feed.service"
+systemctl --user is-active byul-observation-feed.service > "$byul_unit_backup/active-state.txt"
+systemctl --user is-enabled byul-observation-feed.service > "$byul_unit_backup/enabled-state.txt"
+cp /opt/byul/runtime/deploy/gpu-lab/host/byul-observation-feed.service "$byul_unit_backup/reviewed-feed.service"
+```
+
+`reviewed-feed.service`의 context·output·reader-group·selector·interval을 기존 unit과 대조·조정한 뒤 다음을 실행한다. interpreter와 코드 경로는 `/opt/byul/runtime`을 유지한다.
+
+```sh
+cp "$byul_unit_backup/reviewed-feed.service" "$HOME/.config/systemd/user/byul-observation-feed.service"
+systemctl --user daemon-reload
+export BYUL_FEED_RESTARTED_AT=$(date +%s)
+systemctl --user restart byul-observation-feed.service
+systemctl --user is-active --quiet byul-observation-feed.service
+# 새 프로세스의 Hubble/Tetragon heartbeat를 최대 30초 기다려 검증한다.
+/opt/byul/runtime/.venv/bin/python - <<'PYVERIFY'
+from datetime import datetime
+import json, os, time
+from pathlib import Path
+started = float(os.environ['BYUL_FEED_RESTARTED_AT'])
+for attempt in range(30):
+    try:
+        rows = [json.loads((Path('/srv/serving/observation') / (kind+'.heartbeat.json')).read_bytes()) for kind in ('hubble','tetragon')]
+        def valid(row):
+            at = datetime.fromisoformat(row['updated_at'].replace('Z','+00:00')).timestamp()
+            began = datetime.fromisoformat(row['started_at'].replace('Z','+00:00')).timestamp()
+            return (row['state']=='running' and row['kube_context']=='byul-aws-lab' and started <= began <= at <= time.time() and time.time()-at <= 10 and bool(row['processes']) and all(p['running'] is True for p in row['processes']))
+        if all(valid(row) for row in rows):
+            break
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    time.sleep(1)
+else:
+    raise SystemExit('Legacy feed freshness failed: restore the backed-up unit before rollout.')
+PYVERIFY
+```
+
+이 단계는 legacy 수집을 유지하며 source 경로만 root 설치본으로 이행한다. restart가 실패하면 백업 unit을 원래 위치에 복원하고 daemon-reload/restart한 뒤 active를 확인한다. 이행 완료 후에만 아래 rollout을 **같은 observation 사용자**로 실행한다. root와 관측 디렉터리 소유자가 아닌 UID는 잠금 파일 생성 전 거부한다.
+
+```sh
+/opt/byul/runtime/.venv/bin/python /opt/byul/runtime/deploy/install/rollout_tetragon_stream.py --prepared-dir /path/to/reviewed-prepared-directory
+```
+
+기존 사용자 feed가 active이고 별도 stream unit이 없는 최초 전환만 허용한다. 기존 feed 파일은 그대로 보존하고, feed를 중지한 뒤 해시가 일치하는 prepared stream을 시작한다. 현재 전환 이후 시작한 heartbeat가 10초 이내이며 올바른 context·feed 경로·running 프로세스·해소된 gap과 session namespace/정책 목록을 만족해야 `--hubble-only`를 기존 feed 인자에 추가한다. feed를 재시작한 뒤 stream freshness를 다시 확인하고 stream을 enable한다. 기존 사용자 manager의 kubeconfig와 권한은 유지한다. stream에는 기존 Tetragon agent discovery·scoped exec 권한이 필요하며 설치기는 RBAC를 확대하지 않는다.
+
+진행·실패는 `/srv/serving/observation/tetragon-rollout.json`에 남긴다. 실패하면 새 stream을 중지·disable하고 기존 feed의 정확한 바이트를 복원·재시작해 active를 확인한다. 복구 실패는 `failed_manual_recovery_required`와 종료 1로 남긴다. 이 경우 두 수집기의 상태·로그를 비밀값 없이 검수하고 기존 feed를 복구한다. 기존 heartbeat가 남아 있거나 source scope가 다르면 완료로 처리하지 않는다. 전환 중 gap은 연속 관측 성공으로 해석하지 않는다.
+
+전환 성공은 수집 서비스 연결 결과다. 기존 canonical 상태의 baseline 일치·writer/identity/event 복구 조건, Gateway freshness와 공개 사본 읽기 확인은 계속 필요하다. 새 unit의 코드는 사용자 홈 사본 대신 설치기의 root 소유 `/opt/byul/runtime`을 사용한다.
+
+## 선택 캐시 관측
+
+[캐시 관측 설정](../../docs/cache-observer.md)의 root 승인 파일·전용 namespace 한정 read-only kubeconfig를 준비하고 `install.env.example`의 CACHE 세 필드를 함께 채운다. 비어 있으면 설치/시작하지 않는다. 기존 agent 수동 시작, baseline 보존, BPF 재부팅 필요 시 수집 서비스 중지 규칙은 그대로 적용한다.

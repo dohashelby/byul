@@ -1,5 +1,6 @@
 // 통신·행위 관측. 삭제된 runtime 대시보드 renderCollectors()·collectorSummary()·renderObservations()를 옮겼다.
 import type { ReactNode } from "react";
+import { RouteAuditPanel } from "./RouteAuditPanel";
 import { useParams as useRouteParams } from "react-router-dom";
 import { useRuntimeEvents, useRuntimeStatus } from "../../api/hooks";
 import type { Collector, RuntimeEvent } from "../../api/types";
@@ -10,6 +11,8 @@ import { Value } from "../../components/Value";
 import { CACHE_GENERATION, EXEC_VERDICT, METRIC_STATE, PARENT_ATTRIBUTION, PARENT_CHECK, PHASE, SUSPECT_CONTEXT, label } from "../../lib/labels";
 import { isTetragonBlockAttempt, isTetragonSigkill } from "../../lib/tetragon";
 import { useRuntimeProblems } from "./problems";
+import { EventWindowNote } from "./EventWindowNote";
+import { RuntimeCheckScope } from "./RuntimeCheckScope";
 import { ObservationOriginBadge, ScopeBadges, StateBadge, Subtabs, TableCard, formatTime, rt } from "./parts";
 
 const FLAGGED = ["outside_allowlist", "suspect_binary", "exec_from_cache", "phase_unknown", "phase_signal_unverified"];
@@ -29,7 +32,31 @@ function CollectorSummary({ c }: { c: Collector }) {
   const d = c.detail;
   if (!d) return null;
   const lines: [ReactNode, boolean][] = [];
+  if (d.kind === "native_receipt") {
+    const state: Record<string, string> = { active: "미봉인 관측", closed: "봉인 자료(과거)", bound_reached: "기록 한도 도달", stopped: "기록 종료", unavailable: "수집 미확인" };
+    lines.push([
+      <>native 상태 {state[d.capture_state ?? "unavailable"]} · reader 갱신 <Value v={d.producer_updated_at ? formatTime(d.producer_updated_at) : null} /> · 실제 capture 읽기 <Value v={d.capture_observed_at ? formatTime(d.capture_observed_at) : null} /></>,
+      d.capture_state !== "active",
+    ]);
+    lines.push([
+      <>reader 신선도 <Value v={d.producer_fresh} /> · 활성 capture 신선도 <Value v={d.capture_fresh} /> · 향후 감시 가능성 <Value v={d.future_observation_available} /> · 보존된 요청 근거 <Value v={d.historical_receipts} />건 · native 발생 시각 신선도 미확인</>,
+      true,
+    ]);
+    lines.push([
+      <>feed 범위 최근 최대 100요청·4MiB · 생산자 잘림 <Value v={d.truncated ?? null} /> · 저널 {d.historical_storage_state === "connected" ? "연결" : d.historical_storage_state === "memory_only" ? "메모리 보관" : d.historical_storage_state === "error" ? "오류" : "미확인"}</>,
+      d.truncated === true || d.historical_storage_state === "error",
+    ]);
+    lines.push([
+      <>현재 미저장 <Value v={d.historical_pending_receipts ?? null} />건 · 현재 프로세스의 미저장 폐기 <Value v={d.historical_pending_dropped ?? null} />건{d.capture_health_reason ? ` · 원인 ${d.capture_health_reason}` : ""}</>,
+      (d.historical_pending_dropped ?? 0) > 0 || (d.historical_pending_receipts ?? 0) > 0,
+    ]);
+    lines.push([
+      <>원 단조시각 {d.source_event_times.slice(0, 3).map((e) => `PID ${e.pid}/${e.start_ticks}: ${e.monotonic_ns}ns`).join(" · ") || "미확인"} (각 프로세스의 단조시계 원값)</>,
+      false,
+    ]);
+  }
   if (d.kind === "asset_integrity") {
+    if (d.limit) lines.push([d.limit, false]);
     lines.push([
       <>
         일치 {d.match}/{d.total ?? "–"} · 변경 {d.changed} · 누락 {d.missing} · 읽기 불가 {d.unreadable} · 링크 {d.symlink} · 목록 밖 파일 <Value v={d.extra_files} /> · 목록 밖 링크 <Value v={d.extra_symlinks} /> · 순회 오류 <Value v={d.walk_errors} />
@@ -42,6 +69,12 @@ function CollectorSummary({ c }: { c: Collector }) {
       `최근 처리 ${d.processed} · 저장 ${d.accepted} · 미지원 건너뜀 누적 ${d.skipped_unsupported_total} · 중복 ${d.duplicates} · 거부 ${d.rejected} · 손상 누적 ${d.corrupt_lines_total} · 실행 전 이벤트 누적 ${d.out_of_window_total}`,
       d.rejected > 0 || d.corrupt_lines_total > 0 || d.out_of_window_total > 0,
     ]);
+    if (c.source === "observation_feed_management_listener") {
+      lines.push([
+        <>접근 기록 쓰기 실패 누적 <Value v={d.writer_write_failure_count ?? null} /> · 현재 실패 <Value v={d.writer_write_failed ?? null} /> · 최근 오류 <Value v={d.writer_last_write_error_at ? formatTime(d.writer_last_write_error_at) : null} /> · 오류 종류 <Value v={d.writer_last_write_error_class ?? null} /></>,
+        d.writer_write_failed === true,
+      ]);
+    }
     if (c.source === "observation_feed_hubble") {
       const bySource = d.lost_events_by_source
         ? Object.entries(d.lost_events_by_source).map(([source, count]) => `${source} ${count}`).join(" · ")
@@ -54,6 +87,18 @@ function CollectorSummary({ c }: { c: Collector }) {
         d.loss_detected === true,
       ]);
     }
+    if (c.source === "observation_feed_tetragon") {
+      lines.push([
+        <>정제 중 폐기 누적 <Value v={d.redaction_dropped_lines_total ?? null} /> · 현재 수집기 <Value v={d.dropped_lines_total ?? null} /> · 최근 폐기 <Value v={d.last_redaction_drop_at ? formatTime(d.last_redaction_drop_at) : null} /> · 폐기 원인 <Value v={d.last_redaction_drop_reason ?? null} /> · 오류 종류 <Value v={d.last_redaction_error_class ?? null} /></>,
+        d.redaction_loss_detected === true,
+      ]);
+    }
+    if ((d.storage_errors_total ?? 0) > 0 || d.checkpoint_pending) {
+      lines.push([
+        <>저장 실패 누적 <Value v={d.storage_errors_total ?? null} /> · 최근 실패 <Value v={d.last_storage_error_at ? formatTime(d.last_storage_error_at) : null} /> · {d.last_storage_operation === "checkpoint" ? "체크포인트" : d.last_storage_operation === "event_record" ? "이벤트 기록" : d.last_storage_operation ?? "저장 위치 미확인"} · <Value v={d.last_storage_error_class ?? null} />{d.checkpoint_pending ? " · 체크포인트 저장 재시도 대기" : c.state === "ok" || c.state === "partial" ? " · 최근 수집 정상" : " · 저장 상태 확인 필요"}</>,
+        d.checkpoint_pending === true || c.state === "error",
+      ]);
+    }
     if (d.rejected_details.length) lines.push([d.rejected_details.map((x) => `#${x.line}: ${x.reason}`).join(" · "), true]);
     lines.push([
       d.writer.configured
@@ -61,11 +106,20 @@ function CollectorSummary({ c }: { c: Collector }) {
         : "수집기 생존 신호 미설정 · 수집기 상태 확인 불가",
       !d.writer.configured,
     ]);
-    if (d.writer.last_gap)
+    if (d.writer.open_gap) {
+      const gap = d.writer.open_gap;
       lines.push([
-        `재연결 ${d.writer.reconnect_count ?? 0}회 · 최근 연결 단절 구간 ${formatTime(d.writer.last_gap.opened_at)} ~ ${formatTime(d.writer.last_gap.closed_at)} · 구간 이벤트 복원 완전성 미확인`,
+        `연결 중단 ${formatTime(gap.opened_at)}부터 · 재연결 시도 ${gap.attempts ?? "–"}회 · 구간 ${gap.gap_id ?? "미확인"}`,
         true,
       ]);
+    }
+    if (d.writer.last_gap) {
+      const gap = d.writer.last_gap;
+      lines.push([
+        `재연결 ${d.writer.reconnect_count ?? 0}회 · 최근 연결 단절 구간 ${formatTime(gap.opened_at)} ~ ${formatTime(gap.closed_at)} · 복구 ${gap.backfill === "requested_unverified" ? "재수집 요청·완전성 미확인" : gap.backfill ?? "미확인"} · 시도 ${gap.attempts ?? "–"}회 · 구간 ${gap.gap_id ?? "미확인"}`,
+        true,
+      ]);
+    }
   }
   if (d.kind === "record_retention") {
     lines.push([
@@ -145,23 +199,26 @@ export function RuntimeObservePage() {
   const pagination = usePagination(sub === "hubble" ? hubble.length : sub === "tetragon" ? tetragon.length : item?.collectors.length ?? 0);
   return (
     <div className="page">
-      <PageHead title={sub === "hubble" ? "네트워크 이벤트 (Hubble)" : sub === "tetragon" ? "프로세스·파일 이벤트 (Tetragon)" : "수집 상태"}>
+      <PageHead title={sub === "checks" ? "점검 범위" : sub === "hubble" ? "네트워크 이벤트 (Hubble)" : sub === "tetragon" ? "프로세스·파일 이벤트 (Tetragon)" : "수집 상태"}>
         {item && (
           <span className="row small muted" style={{ gap: 12 }}>
-            <span>네트워크 이벤트 {item.observations.by_source.hubble ?? 0}건 · 프로세스·파일 이벤트 {item.observations.by_source.tetragon ?? 0}건</span>
+            <span>{item.observations.counts_lower_bound ? "최근 조회 범위 · " : ""}네트워크 이벤트 {item.observations.by_source.hubble ?? 0}건 · 프로세스·파일 이벤트 {item.observations.by_source.tetragon ?? 0}건</span>
             <span>손상 줄 {item.observations.corrupt_lines}</span>
           </span>
         )}
       </PageHead>
+      {sub !== "checks" && sub !== "collectors" && <EventWindowNote data={events.data} />}
       <p className="notice">관측 자료의 환경(예: kind lab)은 행마다 표시됩니다. 요청 화면의 엔진과 다른 환경일 수 있습니다.</p>
       <Subtabs
         tabs={[
+          { to: "/runtime/observe/checks", label: "점검 범위", active: sub === "checks" },
           { to: "/runtime/observe/collectors", label: "수집 상태", badge: problems?.observe, title: problems?.collectorProblems.join(" · "), active: sub === "collectors" },
           { to: "/runtime/observe/hubble", label: "네트워크 이벤트 (Hubble)", count: hubble.length, active: sub === "hubble" },
           { to: "/runtime/observe/tetragon", label: "프로세스·파일 이벤트 (Tetragon)", count: tetragon.length, badge: problems?.tetragonFlagged, title: problems?.tetragonFlagged ? `허용 목록 외 실행·의심·확인 필요 실행 ${problems.tetragonFlagged}건` : undefined, active: sub === "tetragon" },
           { to: "/runtime/observe/phases", label: "엔진 실행 단계", active: sub === "phases" },
         ]}
       />
+      {sub === "checks" && <RuntimeCheckScope />}
       {sub === "collectors" && (
         <Query q={status}>
           {(res) =>
@@ -196,6 +253,7 @@ export function RuntimeObservePage() {
           }
         </Query>
       )}
+      {sub === "collectors" && <RouteAuditPanel />}
       {sub === "hubble" && (
         <TableCard title="네트워크 이벤트 (Hubble)">
           <table className={rt.statusTable}>

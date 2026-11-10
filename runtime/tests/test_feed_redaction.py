@@ -11,6 +11,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+from datetime import datetime
 
 from tools import k8s_observation_feed as feed
 
@@ -20,6 +22,17 @@ FIXTURE = ROOT / "tests" / "fixtures" / "enforcement" / "tetragon_events.synthet
 
 
 class RedactTetragonLineTests(unittest.TestCase):
+    def test_only_single_synthetic_probe_token_is_preserved(self):
+        tag = "byul-read-probe-" + "a" * 32
+        for argv in (tag + "-secret", "prefix" + tag, tag + " " + tag, "'" + tag,
+                     "ordinary-private-command", None):
+            raw = {"process_kprobe": {"policy_name": "runtime-tg-secret-01", "runtime_probe_id": tag,
+                                      "process": {"arguments": argv}}}
+            clean = json.loads(feed.redact_tetragon_line(json.dumps(raw).encode()))
+            self.assertNotIn("runtime_probe_id", clean["process_kprobe"])
+        raw = {"process_kprobe": {"policy_name": "unrelated", "process": {"arguments": tag}}}
+        self.assertNotIn("runtime_probe_id", json.loads(feed.redact_tetragon_line(json.dumps(raw).encode()))["process_kprobe"])
+
     def test_environment_variables_are_removed_from_every_actor(self) -> None:
         private={"arguments":"example-private-args","environment_variables":[{"key":"EXAMPLE","value":"example-private-env"}]}
         raw={"process_exec":{"process":{"binary":"/bin/a",**private},"parent":dict(private),"ancestors":[dict(private)]}}
@@ -116,6 +129,116 @@ class RedactTetragonLineTests(unittest.TestCase):
         child.process.wait(timeout=10)
         self.assertNotIn(b"do-not-store", output.getvalue())
         self.assertIn(b"/bin/x", output.getvalue())
+
+
+class RedactionDropReceiptTests(unittest.TestCase):
+    def child_group(self):
+        child = feed._Child("tetragon", lambda _since: [], io.BytesIO(), io.BytesIO(),
+                            transform=feed.redact_tetragon_line)
+        group = feed._FeedGroup("tetragon", feed_path=Path("unused"),
+                                heartbeat_path=Path("unused"), gap_path=Path("unused"),
+                                children=[child])
+        return child, group
+
+    def pump(self, child, raw):
+        feed._pump(io.BytesIO(raw), child.output, child.transform,
+                   child.dropped_lines, child.pump_error, child.redaction_drops)
+
+    def test_drop_codes_and_actual_pump_time_without_input(self):
+        samples = [(b"\xff\n", "INVALID_UTF8"),
+                   (b"EXAMPLE_PRIVATE_NOT_JSON\n", "INVALID_JSON"),
+                   (b"[1,2]\n", "OBJECT_REQUIRED")]
+        for raw, reason in samples:
+            with self.subTest(reason=reason):
+                child, group = self.child_group()
+                stamp = "2026-11-08T07:00:00.123456+00:00"
+                with patch.object(feed, "_utc_now", return_value=stamp):
+                    self.pump(child, raw)
+                extra = group.heartbeat_extra()
+                self.assertEqual(extra["dropped_lines_total"], 1)
+                self.assertEqual(extra["last_redaction_drop_reason"], reason)
+                self.assertEqual(extra["last_redaction_drop_at"], stamp)
+                self.assertIsNotNone(datetime.fromisoformat(stamp).tzinfo)
+                self.assertIsNone(extra["last_redaction_error_class"])
+                self.assertEqual(child.output.getvalue(), b"")
+                self.assertNotIn("EXAMPLE_PRIVATE", json.dumps(extra))
+
+    def test_decoder_recursion_failure_uses_fixed_code(self):
+        child, group = self.child_group()
+        with patch.object(feed.json, "loads", side_effect=RecursionError("EXAMPLE_PRIVATE")):
+            self.pump(child, b"EXAMPLE_DEEP_LINE\n")
+        extra = group.heartbeat_extra()
+        self.assertEqual(extra["last_redaction_drop_reason"], "JSON_TOO_DEEP")
+        self.assertEqual(extra["dropped_lines_total"], 1)
+        self.assertNotIn("EXAMPLE", json.dumps(extra))
+
+    def test_recovery_reconnect_and_idle_keep_original_receipt(self):
+        child, group = self.child_group()
+        stamp = "2026-11-08T07:00:00+00:00"
+        with patch.object(feed, "_utc_now", return_value=stamp):
+            self.pump(child, b"EXAMPLE_BAD\n")
+        original = group.heartbeat_extra()
+        # Same child/state is reused when the follow subprocess reconnects.
+        group.state = "reconnecting"
+        group.reconnect_count += 1
+        self.pump(child, b'{"process_exec":{"process":{"arguments":"EXAMPLE_SECRET"}}}\n')
+        group.state = "running"
+        for _ in range(3):
+            current = group.heartbeat_extra()
+            for field in ("dropped_lines_total", "last_redaction_drop_reason", "last_redaction_drop_at"):
+                self.assertEqual(current[field], original[field])
+        self.assertNotIn(b"EXAMPLE_SECRET", child.output.getvalue())
+        with patch.object(feed, "_utc_now", return_value="2026-11-08T07:01:00+00:00"):
+            self.pump(child, b"[]\n")
+        self.assertEqual(group.heartbeat_extra()["dropped_lines_total"], 2)
+        self.assertEqual(group.heartbeat_extra()["last_redaction_drop_reason"], "OBJECT_REQUIRED")
+        self.assertEqual(group.heartbeat_extra()["last_redaction_drop_at"], "2026-11-08T07:01:00+00:00")
+
+    def test_unrecognized_reason_is_bounded_without_raw_value(self):
+        child, group = self.child_group()
+        child.redaction_drops.record("EXAMPLE_PRIVATE_REASON")
+        extra = group.heartbeat_extra()
+        self.assertEqual(extra["last_redaction_drop_reason"], "FILTER_REJECTED")
+        self.assertNotIn("EXAMPLE_PRIVATE", json.dumps(extra))
+
+    def test_new_writer_resets_count_and_receipt_without_fabricated_time(self):
+        child, first = self.child_group()
+        self.pump(child, b"EXAMPLE_BAD\n")
+        _, second = self.child_group()
+        self.assertEqual(first.heartbeat_extra()["dropped_lines_total"], 1)
+        self.assertEqual(second.heartbeat_extra()["dropped_lines_total"], 0)
+        self.assertIsNone(second.heartbeat_extra()["last_redaction_drop_reason"])
+        self.assertIsNone(second.heartbeat_extra()["last_redaction_drop_at"])
+
+    def test_heartbeat_write_preserves_event_time_separate_from_emission(self):
+        child, group = self.child_group()
+        with patch.object(feed, "_utc_now", return_value="2026-11-08T07:00:00+00:00"):
+            self.pump(child, b"EXAMPLE_BAD\n")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "tetragon.heartbeat.json"
+            with patch.object(feed, "_utc_now", return_value="2026-11-08T07:05:00+00:00"):
+                feed.write_heartbeats({"tetragon": (path, Path(directory)/"raw.jsonl", group.started_at, [])},
+                                      state="running", extra={"tetragon": group.heartbeat_extra()})
+            value = json.loads(path.read_text())
+        self.assertEqual(value["last_redaction_drop_at"], "2026-11-08T07:00:00+00:00")
+        self.assertEqual(value["updated_at"], "2026-11-08T07:05:00+00:00")
+        self.assertEqual(value["last_redaction_drop_reason"], "INVALID_JSON")
+        self.assertEqual(value["dropped_lines_total"], 1)
+        self.assertNotIn("EXAMPLE_BAD", json.dumps(value))
+
+    def test_pump_failure_does_not_invent_filter_drop(self):
+        child, group = self.child_group()
+        class BrokenOutput(io.BytesIO):
+            def write(self, value):
+                raise OSError("EXAMPLE_PRIVATE_ERROR")
+        child.output = BrokenOutput()
+        self.pump(child, b"{}\n")
+        self.assertEqual(child.pump_error[0], "OSError")
+        extra = group.heartbeat_extra()
+        self.assertEqual(extra["dropped_lines_total"], 0)
+        self.assertIsNone(extra["last_redaction_drop_reason"])
+        self.assertIsNone(extra["last_redaction_drop_at"])
+        self.assertNotIn("EXAMPLE_PRIVATE", json.dumps(extra))
 
 
 class ReaderGroupSharingTests(unittest.TestCase):

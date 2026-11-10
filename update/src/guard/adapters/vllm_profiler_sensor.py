@@ -11,7 +11,7 @@ SCHEMA='guard-native-lifecycle-events/15'
 EVENT_SCHEMA='guard-native-profiler/2'
 LEGACY_EVENT_SCHEMA='guard-native-profiler/1'
 COMMIT='db9527a46873454610df6dbedf79a36d6bf1a7f6'
-BASE8_SHA256='2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd'
+BASE8_SHA256='e537d1d1b19813f171aa30b9344c1dbb49139eed3dea60bfa6dc71744d0d4f39'
 WRAPPER='vllm.profiler.wrapper'
 WORKER='vllm.v1.worker.gpu_worker'
 ROUTER='vllm.entrypoints.serve.profile.api_router'
@@ -29,7 +29,7 @@ MAX_BYTES=2*1024**2
 CODE_FILENAME='guard/adapters/vllm_profiler_sensor.py'
 LEGACY_RUNTIME_CODE_CONTRACTS={'cpython-3.12.15': '40ce580a64fec147cc1fa5ecc33d8eafae24d61a0753d3b06aa7d61d58701628', 'cpython-3.12.14':'40ce580a64fec147cc1fa5ecc33d8eafae24d61a0753d3b06aa7d61d58701628','cpython-3.12.3':'423b896038c2ab86cf4b718d4be0ff71c6f22ce7102e7d58c97ccb68589308de'}
 RUNTIME_CODE_CONTRACTS={'cpython-3.12.3':'6c47eb56e6ff474eda9c5b40231559fef440fd7934e8f8d0d1568d4d49272f59',
- 'cpython-3.12.14':'f21bb6cf60090a6f75110deb50162c42735b9a94dcdd0304873bce5d13022485'}
+ 'cpython-3.12.14':'f21bb6cf60090a6f75110deb50162c42735b9a94dcdd0304873bce5d13022485','cpython-3.12.15':'f21bb6cf60090a6f75110deb50162c42735b9a94dcdd0304873bce5d13022485'}
 _BASE=None
 _CALL=contextvars.ContextVar('guard_profiler_call',default=None)
 

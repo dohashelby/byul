@@ -11,7 +11,7 @@ COMMIT='db9527a46873454610df6dbedf79a36d6bf1a7f6'
 EVENT_SCHEMA='guard-native-worker-generation/1';LINK_SCHEMA='guard-native-worker-generation-link/1'
 PIPE_SCHEMA='guard-native-worker-ready-send/1';GAP_SCHEMA='guard-native-worker-generation-gap/1'
 CLOSE_SCHEMA='guard-native-worker-generation-close/1'
-JOINT20_SHA256='b7447db52f40b61b20361703ce786d591ada767602e6ec5ea38404e90e559cf1'
+JOINT20_SHA256='435ae1963c035966fea156abd47a7e99f1d840b888a36d8282685f713061c6e6'
 CONTRACT_SHA256='f0c37215577292ce7b89b535cf147553ac22f5ae6ef6a08708cf055f4d4eb27a'
 MAX_BYTES=2097152;MAX_ROWS=2048;MAX_CALLS=256
 CODE_FILENAME='guard/adapters/vllm_worker_generation_sensor.py'

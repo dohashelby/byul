@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.byul.invalid/0.1/runtime-lab-report.schema.json",
   "title": "통제 적용 시험 결과 (runtime → platform)",
-  "description": "runtime /api/lab-report에서 옮긴 저장된 kind L-01~L-08·AWS-01~AWS-20 실행 회차이며 현재 통제 상태의 증명이 아님. 원본 형식은 serving-runtime-k8s-lab-report/1.0 또는 serving-runtime-aws-lab-report/1.0이다. 정책 설정과 실제 차단 확인은 다르며, 로컬 kind·가짜 backend 결과는 정식 환경 검증이 아니다.",
+  "description": "runtime /api/lab-report에서 옮긴 저장된 kind L-01~L-08 및 선택 L-05b/L-05c·AWS-01~AWS-20 실행 회차이며 현재 통제 상태의 증명이 아님. 원본 형식은 serving-runtime-k8s-lab-report/1.0 또는 serving-runtime-aws-lab-report/1.0이다. 정책 설정과 실제 차단 확인은 다르며, 로컬 kind·가짜 backend 결과는 정식 환경 검증이 아니다.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "generated_at", "state", "configured_path", "path", "error", "report"],
@@ -38,7 +38,7 @@
                 "additionalProperties": false,
                 "required": ["id", "title", "status", "summary", "evidence", "limitation", "note"],
                 "properties": {
-                  "id": { "type": "string", "pattern": "^(?:L-0[1-8]|AWS-(?:0[1-9]|1[0-9]|20))(?![\\s\\S])" },
+                  "id": { "type": "string", "pattern": "^(?:L-0[1-8]|L-05[bc]|AWS-(?:0[1-9]|1[0-9]|20))(?![\\s\\S])" },
                   "title": { "type": "string" },
                   "status": { "description": "runtime 시험 상태(passed, failed, not_run, blocked_by_environment 등).", "type": "string" },
                   "summary": { "type": "string" },

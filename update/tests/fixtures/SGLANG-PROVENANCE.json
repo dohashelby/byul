@@ -1,0 +1,30 @@
+{
+  "upstream_repository": "https://github.com/sgl-project/sglang",
+  "upstream_version": "v0.5.22",
+  "license_file": "SGLANG-LICENSE.txt",
+  "license_source": "LICENSE member in sglang0522-termination-source.zip",
+  "fixtures": [
+    "sglang0522-launch-source.zip",
+    "sglang0522-termination-source.zip"
+  ],
+  "source_metadata": "Launch archive MANIFEST.json records original URLs for http_server.py and launch_server.py; termination archive SOURCE.json records its source metadata.",
+  "launch_source_sha256": [
+    {
+      "file": "http_server.py",
+      "sha256": "a89d20bb2fa8a86c511ab4d9d054f74d707423ab220f733ff25e62fcc0e49979"
+    },
+    {
+      "file": "launch_server.py",
+      "sha256": "374976475a62ee53a3f32454bf17071eb9b18bab7ed293390e2c765e3669a7a2"
+    },
+    {
+      "file": "server_args.py",
+      "sha256": "d1b9ffc79edcbc857efd02a47d47eed9b414f8ac44bc4e3214d78a7922e90e03"
+    },
+    {
+      "file": "engine.py",
+      "sha256": "e0c9beca051d080ef712fa54e914e337f97d9d04a36b3ae2e2551b8ca7a1520f"
+    }
+  ],
+  "modifications": "Fixture archives retained unchanged."
+}

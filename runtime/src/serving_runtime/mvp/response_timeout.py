@@ -13,6 +13,7 @@ class DeadlineWatchdog:
         self.connection = connection
         self.deadline_at = deadline_at
         self.response: Any = None
+        self._sockets: list[Any] = []
         self._lock = threading.Lock()
         self._active = True
         self._expired = False
@@ -58,6 +59,13 @@ class DeadlineWatchdog:
         with self._lock:
             self.response = response
 
+    def watch_socket(self, sock: Any) -> None:
+        """Also interrupt a blocked downstream write at the same deadline."""
+        if sock is None:
+            return
+        with self._lock:
+            self._sockets.append(sock)
+
     def expired(self) -> bool:
         return self._expired or time.monotonic() >= self.deadline_at
 
@@ -85,7 +93,7 @@ class DeadlineWatchdog:
             response_socket = getattr(
                 getattr(getattr(response, "fp", None), "raw", None), "_sock", None
             )
-            sockets = (getattr(connection, "sock", None), response_socket)
+            sockets = (getattr(connection, "sock", None), response_socket, *self._sockets)
             unique_sockets: list[Any] = []
             for sock in sockets:
                 if sock is not None and all(sock is not prior for prior in unique_sockets):
@@ -101,6 +109,30 @@ class DeadlineWatchdog:
                     pass
             try:
                 connection.close()
+            except (OSError, AttributeError):
+                pass
+
+
+def write_response_before(response: Any, deadline_at: float, write: Any) -> None:
+    """Bound one buffered client delivery, including headers and body."""
+    sock = getattr(response, "connection", None)
+    remaining = deadline_at - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError("response deadline exceeded")
+    previous = sock.gettimeout() if sock is not None else None
+    watchdog = DeadlineWatchdog(None, deadline_at)
+    watchdog.watch_socket(sock)
+    watchdog.start()
+    try:
+        set_response_timeout(sock, remaining)
+        write()
+        if watchdog.expired():
+            raise TimeoutError("response deadline exceeded")
+    finally:
+        expired = watchdog.finish()
+        if sock is not None and not expired:
+            try:
+                sock.settimeout(previous)
             except OSError:
                 pass
 

@@ -25,6 +25,16 @@
       "manifest_sha256": "8ff741fcc2ab223008fd6e2543b12e5c7e9aed468602010b190916e67e1ac004",
       "reviewed_by": "Codex / 신규 세션6 / 독립 검토",
       "reviewed_at": "2026-11-10T05:25:32.953312+00:00"
+    },
+    {
+      "manifest_sha256": "1b6d81bb5ed3f3f6d2934400e98f48d883742490061c7d6a9276bdf548ceb772",
+      "reviewed_by": "Codex / non-author merge boundary review / selected37",
+      "reviewed_at": "2026-11-10T00:43:41+09:00"
+    },
+    {
+      "manifest_sha256": "6ba867aa1600ccd653c588387764c91196ec453904fa2e6ad2cffbab841b8e33",
+      "reviewed_by": "Codex / 신규 세션6 / 독립 검토",
+      "reviewed_at": "2026-11-10T19:08:33.045456+09:00"
     }
   ]
 }

@@ -20,6 +20,7 @@ import type {
   TetragonStatusResponse,
   GpuStatusResponse,
   RuntimeEventList,
+  RuntimeCheckCoverage,
   RuntimeStatusResponse,
   PhaseTimelineResponse,
   VerificationDetail,
@@ -36,6 +37,8 @@ const live = { refetchInterval: RUNTIME_REFRESH_MS, refetchIntervalInBackground:
 
 export const useRuntimeEvents = () =>
   useQuery({ queryKey: ["runtime", "events"], queryFn: () => getJson<RuntimeEventList>("/api/runtime/events"), ...live });
+export const useRuntimeChecks = () =>
+  useQuery({ queryKey: ["runtime", "checks"], queryFn: () => getJson<RuntimeCheckCoverage>("/api/runtime/checks"), ...live });
 export const useRequests = () =>
   useQuery({ queryKey: ["runtime", "requests"], queryFn: () => getJson<RequestList>("/api/runtime/requests"), ...live });
 export const useLabReport = () =>
@@ -49,6 +52,7 @@ export const useRequestDetail = (id: string | null) =>
     queryKey: ["runtime", "request", id],
     queryFn: () => getJson<RequestDetail>(`/api/runtime/requests/${enc(id!)}`),
     enabled: !!id,
+    ...live,
   });
 export const useRequestSummary = () =>
   useQuery({ queryKey: ["runtime", "summary"], queryFn: () => getJson<RequestSummary>("/api/runtime/summary"), ...live });

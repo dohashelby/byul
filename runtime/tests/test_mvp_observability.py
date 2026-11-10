@@ -452,6 +452,21 @@ class ObservationFeedTests(unittest.TestCase):
 
 
 class LabReportTests(unittest.TestCase):
+    def test_optional_secret_and_sigkill_probes_preserve_status_and_limits(self) -> None:
+        document = lab_report("extended-probes")
+        for ident, status in (("L-05b", "passed"), ("L-05c", "unknown")):
+            document["cases"].append(dict(id=ident, title=ident, status=status,
+                summary="fixture", evidence=["probe receipt"], limitation="test Pod scope", note=None))
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "report.json"
+            path.write_text(json.dumps(document))
+            result = LabReportSource(path).read()
+            self.assertEqual(result["state"], "ok")
+            by_id = {c["id"]: c for c in result["report"]["cases"]}
+            self.assertEqual(by_id["L-05b"]["status"], "passed")
+            self.assertEqual(by_id["L-05c"]["status"], "unknown")
+            self.assertEqual(by_id["L-05c"]["limitation"], "test Pod scope")
+
     def test_not_configured_missing_malformed_and_latest_directory(self) -> None:
         self.assertEqual(LabReportSource(None).read()["state"], "not_configured")
         with tempfile.TemporaryDirectory() as temporary:

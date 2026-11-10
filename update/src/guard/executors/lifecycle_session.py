@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
+from copy import copy
 import json
 import re
 
@@ -167,18 +169,25 @@ def parse_inventory(raw, session):
     return value
 
 
-def inventory(docker,target,*,container,image,session,owner_identity=None):
+def inventory(docker,target,*,container,image,session,owner_identity=None,rolling=False):
     validate_owned_source(container=container,image=image,path="/guard-lifecycle/data/"+session)
     if re.fullmatch(r"[0-9a-f]{32}",session) is None:raise ValueError("LIFECYCLE_SESSION_INVALID")
     owner=identity if owner_identity is None else owner_identity
     before=owner(docker,target,container,image,5)
-    result=docker.exec_bounded(container,["python3","-c",INVENTORY_READER,session],timeout=5,max_bytes=65536)
+    program=INVENTORY_READER
+    if rolling:
+        from .lifecycle_rolling import inventory_reader
+        program=inventory_reader(program)
+    result=docker.exec_bounded(container,["python3","-c",program,session],timeout=5,max_bytes=131072 if rolling else 65536)
     pipe=result.capture or {}
     if (result.returncode!=0 or pipe.get("complete") is not True or pipe.get("bounded_at_source") is not True
             or pipe.get("timed_out") is not False or pipe.get("truncated") is not False):
         raise ValueError("LIFECYCLE_INVENTORY_TRANSPORT_INVALID")
     raw=result.stdout.encode()
-    value=parse_inventory(raw,session)
+    if rolling:
+        from .lifecycle_rolling import parse_inventory as parse_rolling
+        value=parse_rolling(raw,session)
+    else:value=parse_inventory(raw,session)
     try:stable=(owner(docker,target,container,image,5)==before and pipe.get("owner_binding_verified",True) is True)
     except Exception:stable=False
     return {"metadata":value,"owner":safe_owner(before),"owner_stable":stable,
@@ -236,42 +245,88 @@ def request_index(recordings):
             "whole_run_coverage_verified":False,"scope":"declared fingerprint equality, ASGI header-context association and native assignment events; no stop duration or reclamation verdict"}
 
 
-def capture_session(docker,target,*,container,image,prepared,owner_identity=None,read_file=None,image_check=None):
+def capture_session(docker,target,*,container,image,prepared,owner_identity=None,read_file=None,image_check=None,checkpoint=False,rolling=False):
     result={"schema":"guard-lifecycle-session-capture/1","session":prepared["session"],"before":None,"after":None,
         "recordings":[],"diagnostic_codes":[],"live_census_stable":False,"recorded_files_covered":False,
         "python_processes_without_recording":[],"producer_authenticated":False,"record_authenticity_verified":False,
         "whole_run_coverage_verified":False,"product_connected":False,"security":"UNKNOWN"}
+    if checkpoint:result["capture_mode"]="live_checkpoint_rolling" if rolling else "live_checkpoint"
     arguments={"container":container,"image":image,"session":prepared["session"]}
     if owner_identity is not None:arguments["owner_identity"]=owner_identity
+    if rolling:arguments["rolling"]=True
     try:result["before"]=inventory(docker,target,**arguments)
     except Exception:result["diagnostic_codes"].append("LIFECYCLE_INITIAL_INVENTORY_UNAVAILABLE")
     before=result["before"]
     if before is not None:
-        for file in before["metadata"]["files"]:
+        def read_recording(item):
+            file, reader = item
             source={"container":container,"image":image,
-                "path":f"/guard-lifecycle/data/{prepared['session']}/pid-{file['pid']}-{file['start_ticks']}.jsonl"}
+                "path":f"/guard-lifecycle/data/{prepared['session']}/pid-{file['pid']}-{file['start_ticks']}"+(f"-segment-{file['segment']}" if rolling and file['segment'] is not None else '')+'.jsonl'}
             row={"pid":file["pid"],"start_ticks":file["start_ticks"],"capture":None,"session_owner_match":False,
                  "listed_file_identity_match":False,"diagnostic_codes":[]}
+            if rolling:row["segment"]=file["segment"]
             try:
                 if (not file["regular"] or file["uid"]!=before["metadata"]["directory_before"]["uid"]
                         or file["mode"]&0o077):raise ValueError("LIFECYCLE_SESSION_FILE_UNVERIFIED")
                 options={}
-                if read_file is not None:options["read_file"]=read_file
-                if image_check is not None:options["image_check"]=image_check
-                row["capture"]=capture(docker,target,source=source,prepared=prepared,**options)
+                if read_file is not None:options["read_file"]=reader.read_file if reader is not docker else read_file
+                if image_check is not None:options["image_check"]=reader.image_check if reader is not docker else image_check
+                if checkpoint:options["checkpoint"]=not rolling or file["segment"] is None
+                if rolling:options["segment"]=file["segment"];options["rolling"]=True
+                row["capture"]=capture(reader,target,source=source,prepared=prepared,**options)
                 row["session_owner_match"]=row["capture"]["provenance"]["owner"]==before["owner"]
                 if not row["session_owner_match"]:row["diagnostic_codes"].append("LIFECYCLE_SESSION_OWNER_CHANGED")
                 expected={k:file["bytes" if k=="size" else k] for k in ("device","inode","size","mtime_ns","ctime_ns")}
                 row["listed_file_identity_match"]=row["capture"]["provenance"]["file_identity"]==expected
+                if checkpoint and row['capture'].get('checkpoint_prefix') is not None:
+                    observed=row['capture']['provenance']['file_identity']
+                    row['listed_file_identity_match']=all(observed.get(k)==expected[k] for k in ('device','inode'))
                 if not row["listed_file_identity_match"]:row["diagnostic_codes"].append("LIFECYCLE_LISTED_FILE_CHANGED")
             except Exception:row["diagnostic_codes"].append("LIFECYCLE_PROCESS_RECORDING_UNAVAILABLE")
-            result["recordings"].append(row)
+            return row, reader
+        files=before['metadata']['files']
+        # Only the production reader's stdlib subprocess runner is independently
+        # callable. Custom/injected runners keep their existing serial contract.
+        from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
+        from guard.runtime.bounded import capture_pipes
+        parallel=(type(docker) is KubernetesLifecycleReader and not docker.injected
+            and docker.runner is capture_pipes and read_file==docker.read_file
+            and image_check==docker.image_check and len(files)>1
+            and len(docker.node_image_receipts)+len(files)<=64)
+        if parallel:
+            readers=[]
+            for _ in files:
+                reader=copy(docker)
+                # Immutable binding/programs/deadline remain identical. Every
+                # per-file owner/image/context/second-read still runs in full.
+                reader.rows=[];reader.gap=False;reader._parent_cleanup_failures=0
+                reader.node_image_receipts=[];reader.node_image_proof_failures=0
+                reader.node_image_failure_codes=set()
+                readers.append(reader)
+            with ThreadPoolExecutor(max_workers=min(4,len(files))) as pool:
+                captured=list(pool.map(read_recording,zip(files,readers)))
+            # Input order controls records, references and transport diagnostics,
+            # regardless of worker completion order. Census runs after all joins.
+            for row,reader in captured:
+                result['recordings'].append(row)
+                docker.rows.extend(reader.rows);docker.gap|=reader.gap
+                docker._parent_cleanup_failures+=reader._parent_cleanup_failures
+                docker.node_image_receipts.extend(reader.node_image_receipts)
+                docker.node_image_proof_failures+=reader.node_image_proof_failures
+                codes=getattr(docker,'node_image_failure_codes',set())
+                codes.update(reader.node_image_failure_codes);docker.node_image_failure_codes=codes
+        else:
+            result['recordings']=[read_recording((file,docker))[0] for file in files]
     try:result["after"]=inventory(docker,target,**arguments)
     except Exception:result["diagnostic_codes"].append("LIFECYCLE_FINAL_INVENTORY_UNAVAILABLE")
     after=result["after"]
     if before is not None and after is not None:
         result["live_census_stable"]=(bool(_complete(before) and _complete(after))
             and before["owner"]==after["owner"] and before["metadata"]==after["metadata"])
+        if checkpoint:
+            from .lifecycle_checkpoint import census
+            result['live_census_stable']=(bool(_complete(before) and _complete(after))
+                and before['owner']==after['owner'] and census(before['metadata'])==census(after['metadata']))
     if not result["live_census_stable"]:result["diagnostic_codes"].append("LIFECYCLE_SESSION_CENSUS_UNVERIFIED")
     result["recorded_files_covered"]=(result["live_census_stable"] and bool(result["recordings"])
         and all(r["capture"] is not None and r["session_owner_match"] and r["listed_file_identity_match"] for r in result["recordings"]))
@@ -279,6 +334,10 @@ def capture_session(docker,target,*,container,image,prepared,owner_identity=None
         recorded={(r["pid"],r["start_ticks"]) for r in result["recordings"] if r["capture"] is not None}
         result["python_processes_without_recording"]=[{"pid":p["pid"],"start_ticks":p["start_ticks"]}
             for p in before["metadata"]["processes"] if p["same_executable"] and (p["pid"],p["start_ticks"]) not in recorded]
+    if rolling:
+        from .lifecycle_rolling import active_for
+        result['rolling_history_evicted']=any(
+            (row.get('segment') or 0)>0 for row in result['recordings']) and not any(row.get('segment')==0 for row in result['recordings'])
     result["request_index"]=request_index(result["recordings"])
     result["route_authentication_index"]=vllm_route_authentication.index(result["recordings"])
     result["route_handler_index"]=vllm_route_authentication.handler_index(result["recordings"])

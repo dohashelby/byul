@@ -52,6 +52,13 @@ _SAMPLE = re.compile(
 )
 
 
+def upstream_request_id(kind: str, request_id: str) -> str:
+    """Use the existing UPDATE callback tag contract for vLLM native IDs."""
+    if kind == "vllm" and re.fullmatch(r"[0-9a-f]{32}", request_id):
+        return "byul-cb-" + request_id
+    return request_id
+
+
 def is_valid_credential_value(value: str) -> bool:
     """Return whether a secret is safe to place in an HTTP header value."""
 
@@ -173,7 +180,7 @@ class BackendConfig:
         if content_type is not None:
             headers["Content-Type"] = content_type
         if request_id is not None:
-            headers["X-Request-ID"] = request_id
+            headers["X-Request-ID"] = upstream_request_id(self.kind, request_id)
         authorization = self._metrics_authorization if metrics else self._authorization
         if authorization is not None:
             headers["Authorization"] = authorization

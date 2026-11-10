@@ -1,0 +1,281 @@
+{
+  "request_id": "5af3771dcd2449d4a4d0b28552d25f9b",
+  "backend_kind": "vllm",
+  "gateway_records": [
+    {
+      "schema_version": "runtime-mvp-record/1.0",
+      "phase": "started",
+      "request_id": "5af3771dcd2449d4a4d0b28552d25f9b",
+      "upstream_request_id": "byul-cb-5af3771dcd2449d4a4d0b28552d25f9b",
+      "route": "POST /v1/chat/completions",
+      "observation_session_id": "c45502ad7a9d4cefa07dc8cc71049984",
+      "environment": "aws-lab",
+      "run_id": null,
+      "target_id": "serving-engine-aws-lab",
+      "target": {
+        "registration": "ok",
+        "target_id": "serving-engine-aws-lab",
+        "instance_id": "b508e3ee4ecab9fc",
+        "instance_state": "ok",
+        "verification_state": "ok",
+        "last_confirmed_at": "2026-11-06T09:37:47.928490+00:00",
+        "pod_uid": "73c3c5dd-f086-4dfb-8488-6a0dba1a8a5e",
+        "container_id": "containerd://08a11e647247d89c2d3f3ee69eb182e87c3d9c7574c0a4673aafeb9bc488ac74",
+        "restart_count": 0,
+        "image_digest": "sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b"
+      },
+      "recorded_at": "2026-11-06T09:37:51.442704+00:00",
+      "policy": {
+        "schema_version": "runtime-mvp/1.2",
+        "profile": "default",
+        "policy_id": "user-lab-vllm-per_principal-20261106",
+        "policy_version": "3",
+        "sha256": "1bc3379d8b9b6b2847ebbfff94b0d19e667f9e3472813dfa2a8c421f5bd61577",
+        "path": "/tmp/serving-runtime-policy-bundle-blfl3fyk/runtime-policy.json"
+      },
+      "policy_bundle": {
+        "bundle_id": "vllm-per_principal-lab-20261106-v3",
+        "sha256": "d674ba08cda474b4cdb863f0bca061beb5cd524536c152330bf3914a5e49bd30",
+        "policy_ref": {
+          "policy_id": "user-lab-vllm-per_principal-20261106",
+          "policy_version": "3",
+          "sha256": "4aba2ea5790009280c83fb460ea9f09018567683436c67c0787678d4eef09376"
+        },
+        "files": [
+          {
+            "role": "gateway_policy",
+            "path": "runtime-policy.json",
+            "sha256": "1bc3379d8b9b6b2847ebbfff94b0d19e667f9e3472813dfa2a8c421f5bd61577",
+            "applied": true
+          },
+          {
+            "role": "policy_approvals",
+            "path": "policy-approvals.json",
+            "sha256": "d42712b9fe64c8a7ce0d2eb51d0b815388a928ecb2ff31c846b9c10389bc2801",
+            "applied": true
+          },
+          {
+            "role": "enforcement_intent",
+            "path": "intent.json",
+            "sha256": "08889d0b90d87da74c5e3741ed63df0e5f46505f9c1986403d823aa340523482",
+            "applied": true
+          },
+          {
+            "role": "target",
+            "path": "target.json",
+            "sha256": "451e32ce369e1e93505561319c1f6b3e8bf446a4662cb79783fbe47529fa9cbd",
+            "applied": true
+          }
+        ],
+        "verified_at": "2026-11-06T09:34:17.889919+00:00"
+      },
+      "auth": {
+        "state": "authenticated",
+        "method": "bearer_sha256",
+        "principal_id": "client-a",
+        "roles": [
+          "inference"
+        ]
+      },
+      "decision": {
+        "result": "ALLOWED",
+        "reason_code": "REQUEST_ALLOWED",
+        "rule_id": null,
+        "message": "request is allowed",
+        "http_status": 200,
+        "source": "gateway",
+        "engine_http_status": null
+      },
+      "request": {
+        "model": "test-model",
+        "max_tokens": 8,
+        "n": null,
+        "extra_fields": [],
+        "cache_isolation": {
+          "mode": "per_principal",
+          "applied": true
+        },
+        "context": {
+          "limit": 2048,
+          "input_tokens": 36,
+          "requested_total": 44,
+          "result": "within_limit"
+        }
+      },
+      "delivery": {
+        "attempted": false,
+        "backend_receipt": "not_available",
+        "response": "none",
+        "error_code": null
+      },
+      "stream": false,
+      "http_start_status": null,
+      "final_outcome": null,
+      "response_started": false,
+      "backend_cancel": "not_observed",
+      "backend_kind": "vllm",
+      "data_origin": "external_backend"
+    },
+    {
+      "schema_version": "runtime-mvp-record/1.0",
+      "phase": "final",
+      "request_id": "5af3771dcd2449d4a4d0b28552d25f9b",
+      "upstream_request_id": "byul-cb-5af3771dcd2449d4a4d0b28552d25f9b",
+      "route": "POST /v1/chat/completions",
+      "observation_session_id": "c45502ad7a9d4cefa07dc8cc71049984",
+      "environment": "aws-lab",
+      "run_id": null,
+      "target_id": "serving-engine-aws-lab",
+      "target": {
+        "registration": "ok",
+        "target_id": "serving-engine-aws-lab",
+        "instance_id": "b508e3ee4ecab9fc",
+        "instance_state": "ok",
+        "verification_state": "ok",
+        "last_confirmed_at": "2026-11-06T09:37:47.928490+00:00",
+        "pod_uid": "73c3c5dd-f086-4dfb-8488-6a0dba1a8a5e",
+        "container_id": "containerd://08a11e647247d89c2d3f3ee69eb182e87c3d9c7574c0a4673aafeb9bc488ac74",
+        "restart_count": 0,
+        "image_digest": "sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b"
+      },
+      "recorded_at": "2026-11-06T09:37:51.512328+00:00",
+      "policy": {
+        "schema_version": "runtime-mvp/1.2",
+        "profile": "default",
+        "policy_id": "user-lab-vllm-per_principal-20261106",
+        "policy_version": "3",
+        "sha256": "1bc3379d8b9b6b2847ebbfff94b0d19e667f9e3472813dfa2a8c421f5bd61577",
+        "path": "/tmp/serving-runtime-policy-bundle-blfl3fyk/runtime-policy.json"
+      },
+      "policy_bundle": {
+        "bundle_id": "vllm-per_principal-lab-20261106-v3",
+        "sha256": "d674ba08cda474b4cdb863f0bca061beb5cd524536c152330bf3914a5e49bd30",
+        "policy_ref": {
+          "policy_id": "user-lab-vllm-per_principal-20261106",
+          "policy_version": "3",
+          "sha256": "4aba2ea5790009280c83fb460ea9f09018567683436c67c0787678d4eef09376"
+        },
+        "files": [
+          {
+            "role": "gateway_policy",
+            "path": "runtime-policy.json",
+            "sha256": "1bc3379d8b9b6b2847ebbfff94b0d19e667f9e3472813dfa2a8c421f5bd61577",
+            "applied": true
+          },
+          {
+            "role": "policy_approvals",
+            "path": "policy-approvals.json",
+            "sha256": "d42712b9fe64c8a7ce0d2eb51d0b815388a928ecb2ff31c846b9c10389bc2801",
+            "applied": true
+          },
+          {
+            "role": "enforcement_intent",
+            "path": "intent.json",
+            "sha256": "08889d0b90d87da74c5e3741ed63df0e5f46505f9c1986403d823aa340523482",
+            "applied": true
+          },
+          {
+            "role": "target",
+            "path": "target.json",
+            "sha256": "451e32ce369e1e93505561319c1f6b3e8bf446a4662cb79783fbe47529fa9cbd",
+            "applied": true
+          }
+        ],
+        "verified_at": "2026-11-06T09:34:17.889919+00:00"
+      },
+      "auth": {
+        "state": "authenticated",
+        "method": "bearer_sha256",
+        "principal_id": "client-a",
+        "roles": [
+          "inference"
+        ]
+      },
+      "decision": {
+        "result": "ALLOWED",
+        "reason_code": "REQUEST_ALLOWED",
+        "rule_id": null,
+        "message": "request is allowed",
+        "http_status": 200,
+        "source": "gateway",
+        "engine_http_status": null
+      },
+      "request": {
+        "model": "test-model",
+        "max_tokens": 8,
+        "n": null,
+        "extra_fields": [],
+        "cache_isolation": {
+          "mode": "per_principal",
+          "applied": true
+        },
+        "context": {
+          "limit": 2048,
+          "input_tokens": 36,
+          "requested_total": 44,
+          "result": "within_limit"
+        }
+      },
+      "delivery": {
+        "attempted": true,
+        "backend_receipt": "not_available",
+        "response": "completed",
+        "error_code": null
+      },
+      "stream": false,
+      "http_start_status": 200,
+      "final_outcome": "completed",
+      "response_started": true,
+      "backend_cancel": "not_observed",
+      "backend_kind": "vllm",
+      "data_origin": "external_backend"
+    }
+  ],
+  "final_state": {
+    "request_id": "5af3771dcd2449d4a4d0b28552d25f9b",
+    "recorded_at": "2026-11-06T09:37:51.512328+00:00",
+    "observation_session_id": "c45502ad7a9d4cefa07dc8cc71049984",
+    "environment": "aws-lab",
+    "run_id": null,
+    "model": "test-model",
+    "max_tokens": 8,
+    "policy_profile": "default",
+    "extra_fields": [],
+    "cache_isolation": {
+      "mode": "per_principal",
+      "applied": true
+    },
+    "result": "ALLOWED",
+    "reason_code": "REQUEST_ALLOWED",
+    "http_status": 200,
+    "source": "gateway",
+    "engine_http_status": null,
+    "stream": false,
+    "http_start_status": 200,
+    "final_outcome": "completed",
+    "response_started": true,
+    "backend_cancel": "not_observed",
+    "backend_kind": "vllm",
+    "delivery": {
+      "attempted": true,
+      "backend_receipt": "not_available",
+      "response": "completed",
+      "error_code": null
+    }
+  },
+  "engine_receipts": [],
+  "engine_live": {
+    "status": "not_available",
+    "queried_at": null,
+    "error": null,
+    "evidence_kind": "not_connected"
+  },
+  "corrupt_lines": {
+    "gateway": 0,
+    "engine": 0
+  },
+  "same_observation_session": false,
+  "evidence_state": "gateway_only",
+  "evidence_summary": "Gateway 전달·응답 수신, backend 측 수신 기록 미연결",
+  "generated_at": "2026-11-06T09:44:19.956804+00:00"
+}

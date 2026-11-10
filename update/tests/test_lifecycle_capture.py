@@ -264,3 +264,36 @@ def test_malformed_input_reports_fixed_diagnostic_without_secret_or_client(case,
         "--image",IMAGE,"--path",case.source["path"],"--output",str(case.root/"capture.json")])
     assert result.exit_code==2 and result.output.strip()=="LIFECYCLE_CAPTURE_FAILED"
     assert CANARY not in result.output and not (case.root/"capture.json").exists()
+
+
+@pytest.mark.parametrize('with_clock',[False,True])
+def test_actual_linux_context_reader_round_trip(with_clock):
+    import os,subprocess,sys
+    if sys.platform!='linux':pytest.skip('actual Linux proc/namespace boundary')
+    class ActualReader:
+        def exec_bounded(self,container,argv,*,timeout,max_bytes):
+            assert container=='local-owned-process' and argv[2]==capture_module.CONTEXT_READER
+            completed=subprocess.run([sys.executable,'-I','-S','-B','-c',argv[2],argv[3]],capture_output=True,text=True,timeout=timeout,check=True)
+            assert len(completed.stdout.encode())<=max_bytes
+            return SimpleNamespace(returncode=0,stdout=completed.stdout,capture=dict(complete=True,bounded_at_source=True,timed_out=False,truncated=False,owner_binding_verified=True))
+    result=capture_module.process_context(ActualReader(),'local-owned-process',os.getpid(),with_clock=with_clock)
+    context,clock=result if with_clock else (result,None)
+    assert context['pid']==os.getpid() and context['uid']==os.geteuid() and context['start_ticks']>0
+    if with_clock:assert type(clock) is int and clock>0
+
+
+@pytest.mark.parametrize(('mutation','with_clock'),[('extra',False),('missing_clock',True),('bool_timestamp',False),('negative_timestamp',False),('nonbool_clock',False),('different_clock',True),('unstable',False),('wrong_executable',False),('legacy',True)])
+def test_process_context_rejects_invalid_current_clock_and_identity(mutation,with_clock):
+    value=dict(schema='guard-lifecycle-process-context/1',context=dict(CONTEXT),stable=True,same_executable=True,monotonic_ns=123,clock_context_same=True)
+    if mutation=='extra':value['untrusted']=True
+    elif mutation=='missing_clock':value.pop('monotonic_ns')
+    elif mutation=='bool_timestamp':value['monotonic_ns']=True
+    elif mutation=='negative_timestamp':value['monotonic_ns']=-1
+    elif mutation=='nonbool_clock':value['clock_context_same']=1
+    elif mutation=='different_clock':value['clock_context_same']=False
+    elif mutation=='unstable':value['stable']=False
+    elif mutation=='wrong_executable':value['same_executable']=False
+    elif mutation=='legacy':value.pop('monotonic_ns');value.pop('clock_context_same')
+    class Reader:
+        def exec_bounded(self,*args,**kwargs):return SimpleNamespace(returncode=0,stdout=json.dumps(value),capture=dict(complete=True,bounded_at_source=True,timed_out=False,truncated=False,owner_binding_verified=True))
+    with pytest.raises(ValueError):capture_module.process_context(Reader(),'local',42,with_clock=with_clock)

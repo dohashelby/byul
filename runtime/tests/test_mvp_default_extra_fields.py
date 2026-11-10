@@ -6,6 +6,7 @@ from contextlib import closing
 import json
 from pathlib import Path
 import tempfile
+import time
 import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -315,16 +316,22 @@ class DefaultExtraFieldGatewayHttpTests(unittest.TestCase):
         )
         self.assertEqual(status, 200)
         request_id = headers["X-Request-ID"]
-        received = [item for item in self.fake.requests if item["request_id"] == request_id]
+        received = [item for item in self.fake.requests if item["request_id"] == "byul-cb-" + request_id]
         self.assertEqual(len(received), 1)
         self.assertEqual(
             received[0]["extra_values"],
             {"temperature": 0.7, "top_p": 0.9, "seed": INT64_MIN, "stop": [marker]},
         )
 
-        records, corrupt = JsonlStore(
-            self.directory / "data" / "gateway_records.jsonl"
-        ).read_all()
+        store = JsonlStore(self.directory / "data" / "gateway_records.jsonl")
+        deadline = time.monotonic() + 3
+        while True:
+            records, corrupt = store.read_all()
+            if any(row.get("request_id") == request_id and row.get("phase") == "final" for row in records):
+                break
+            if time.monotonic() >= deadline:
+                self.fail("Gateway final record was not persisted after the response")
+            time.sleep(0.01)
         self.assertEqual(corrupt, [])
         final = [
             record

@@ -8,6 +8,7 @@ import { ChartCard } from "../../components/StackedBars";
 import { alertSeverity, EXEC_VERDICT, PARENT_CHECK, PHASE, SEVERITY_ORDER } from "../../lib/labels";
 import { formatTime, Subtabs } from "./parts";
 import s from "./runtime.module.css";
+import { matchesTimeline } from "../../lib/eventScope";
 
 const PHASE_COLORS: Record<string, string> = {
   loading: "var(--accent-soft)",
@@ -44,7 +45,9 @@ function TimelinePlot({ data, events }: { data: PhaseTimelineResponse; events: R
   const start = Math.min(...starts);
   const end = Math.max(...ends, start + 1000);
   const x = (time: number) => 8 + Math.max(0, Math.min(1, (time - start) / (end - start))) * (width - 16);
-  const points = events.filter((event) => event.source === "tetragon" && event.observation && event.occurred_at && Date.parse(event.occurred_at) >= start && Date.parse(event.occurred_at) <= end);
+  const inWindow = events.filter((event) => event.source === "tetragon" && event.observation && event.occurred_at && Date.parse(event.occurred_at) >= start && Date.parse(event.occurred_at) <= end);
+  const points = inWindow.filter((event) => matchesTimeline(event, data));
+  const unbound = inWindow.length - points.length;
 
   return <>
     <div ref={ref} className={s.phasePlot}>
@@ -77,6 +80,7 @@ function TimelinePlot({ data, events }: { data: PhaseTimelineResponse; events: R
     </div>
     <div className={s.phaseAxis}><span>{formatTime(new Date(start).toISOString())}</span><span>{formatTime(new Date(end).toISOString())}</span></div>
     <Legend items={LEGEND} />
+    {unbound > 0 && <p className="small muted">동일 실행 세대 확인 필요 {unbound}건 · <Link to="/runtime/observe/tetragon">별도 이벤트 보기</Link></p>}
     {points.length === 0 && <p className="small muted">해당 구간 프로세스 이벤트 없음. <Link to="/runtime/observe/tetragon">프로세스·파일 이벤트 보기</Link></p>}
   </>;
 }

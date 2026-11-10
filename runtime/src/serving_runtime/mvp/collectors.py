@@ -32,6 +32,15 @@ class NoCollectionUpdate(RuntimeError):
         self.data_origin = data_origin
 
 
+class CollectionFailure(Exception):
+    """A failed collection with current source metadata for status reporting."""
+
+    def __init__(self, message: str, *, last_value: Any, data_origin: str | None = None) -> None:
+        super().__init__(message)
+        self.last_value = last_value
+        self.data_origin = data_origin
+
+
 class Collector:
     """One polling source that retains its last successful observation."""
 
@@ -44,6 +53,7 @@ class Collector:
         dedicated_thread: bool = False,
         on_collected: Callable[[Any, str | None], None] | None = None,
         engine_group: bool = False,
+        on_updated: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         if interval_s <= 0 or stale_after_s <= 0:
             raise ValueError("collector intervals must be positive")
@@ -56,6 +66,7 @@ class Collector:
         self.dedicated_thread = dedicated_thread
         self.engine_group = engine_group
         self.on_collected = on_collected
+        self.on_updated = on_updated
         self.last_attempt_at: str | None = None
         self.last_success_at: str | None = None
         self.last_error: str | None = None
@@ -96,6 +107,11 @@ class Collector:
                 self._last_attempt_monotonic = attempted_monotonic
                 self.last_error = str(error)
                 self.last_error_kind = type(error).__name__
+                if isinstance(error, CollectionFailure):
+                    self.last_value = error.last_value
+                    self.data_origin = error.data_origin
+            self._notify_updated({'source':self.source,'success':False,'attempted_at':attempted_at,
+                                  'observed_at':_utc_now(),'error_kind':type(error).__name__})
             return
         completed_at = _utc_now()
         completed_monotonic = time.monotonic()
@@ -115,6 +131,18 @@ class Collector:
                 # Observation consumers must not turn a successful collection
                 # into a collector failure or stop its polling thread.
                 pass
+
+        self._notify_updated({'source':self.source,'success':True,'attempted_at':attempted_at,
+                              'observed_at':completed_at,'error_kind':None})
+
+    def _notify_updated(self, sample: dict[str, Any]) -> None:
+        if self.on_updated is None:return
+        try:self.on_updated(sample)
+        except Exception:
+            with self._lock:
+                cause='engine health event journal unavailable'
+                self.last_error=(self.last_error+'; '+cause) if self.last_error else cause
+                self.last_error_kind='ObservationPersistenceError'
 
     def due(self, now: float | None = None) -> bool:
         with self._lock:
@@ -140,6 +168,10 @@ class Collector:
             state = "ok"
         else:
             state = "never"
+        if state == "ok" and self.source == "native_receipt_observer":
+            # A successful read is partial observation, not proof that a native
+            # recorder remains able to observe future requests.
+            state = "partial"
         if (
             state == "ok"
             and self.source == "observation_feed_hubble"

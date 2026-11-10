@@ -6,10 +6,12 @@ from pathlib import Path
 import tempfile
 import unittest
 from contextlib import redirect_stderr
+from unittest.mock import patch
 
 from serving_runtime.cli import main
 from serving_runtime.mvp.demo import (
     demo_cases,
+    run_demo_cases,
     evaluate_case,
     print_results,
     write_demo_report,
@@ -31,6 +33,16 @@ def detail(result: str = "ALLOWED", *, evidence: str = "received",
 
 
 class DemoJudgementTests(unittest.TestCase):
+    def test_demo_waits_for_post_write_final_record_before_judgement(self):
+        case = demo_cases()[0]
+        with patch("serving_runtime.mvp.demo.demo_cases", return_value=(case,)), \
+                patch("serving_runtime.mvp.demo._post_case", return_value=(200, "a"*32, None)), \
+                patch("serving_runtime.mvp.demo._get_detail", side_effect=[
+                    {"final_state": {"result": "INCOMPLETE"}, "gateway_records": []}, detail()]) as get:
+            result = run_demo_cases("http://127.0.0.1:1", timeout=1)
+        self.assertTrue(result[0].passed)
+        self.assertEqual(get.call_count, 2)
+
     def test_case_order_keeps_recovery_immediately_after_denial(self) -> None:
         identifiers = [case.case_id for case in demo_cases()]
         self.assertEqual(identifiers[:5], ["MVP-01", "MVP-02a", "MVP-02b", "MVP-03", "MVP-04"])

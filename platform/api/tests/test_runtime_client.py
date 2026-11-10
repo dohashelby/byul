@@ -46,6 +46,8 @@ class FakeRuntime:
         name = path.removeprefix("/api/")
         source = request.url.params.get("source")
         key = f"{name}?source={source}" if source else name
+        if source == "management_listener" and key not in self.endpoints:
+            return httpx.Response(200, json={"observations": [], "counts": {"total": 0}})
         if key in self.endpoints:
             return httpx.Response(200, json=self.endpoints[key])
         return httpx.Response(404, json={"error": {"code": "NOT_FOUND"}})
@@ -316,3 +318,56 @@ def test_parallel_lookup_propagates_failures(status, error):
             LiveRuntimeSource(client, "http://runtime.test").events()
     finally:
         client.close()
+
+
+def test_status_api_keeps_tetragon_loss_and_backfill_metadata(live_client, fake):
+    import copy
+
+    fake.endpoints = copy.deepcopy(fake.endpoints)
+    gap = {"gap_id": "gap-api", "opened_at": "2026-11-06T00:00:00Z",
+           "closed_at": "2026-11-06T00:00:02Z", "backfill": "requested_unverified", "attempts": 2}
+    fake.endpoints["collectors"]["collectors"].append({
+        "source": "observation_feed_tetragon", "state": "partial", "data_origin": "real",
+        "last_value": {"dropped_lines_total": 3, "last_redaction_error_class": "OSError",
+                       "last_redaction_drop_at": "2026-11-06T00:00:00Z", "redaction_loss_detected": True,
+                       "writer": {"configured": True, "state": "running", "last_gap": gap}},
+    })
+    response = live_client.get("/api/runtime/status")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["invalid"] is None
+    collector = next(c for c in body["item"]["collectors"] if c["source"] == "observation_feed_tetragon")
+    assert collector["state"] == "partial" and collector["origin_detail"] == "real"
+    assert collector["detail"]["dropped_lines_total"] == 3
+    assert collector["detail"]["last_redaction_error_class"] == "OSError"
+    assert collector["detail"]["last_redaction_drop_at"] == "2026-11-06T00:00:00Z"
+    assert collector["detail"]["redaction_loss_detected"] is True
+    assert collector["detail"]["writer"]["last_gap"] == gap
+
+
+def test_observation_windows_preserve_full_count_and_returned_slice(live_client, fake):
+    import copy
+    fake.endpoints = copy.deepcopy(fake.endpoints)
+    for source, total in (("hubble", 120), ("tetragon", 51)):
+        payload = fake.endpoints[f"observations?source={source}"]
+        sample = payload["observations"][0]
+        payload["observations"] = [copy.deepcopy(sample) for _ in range(50)]
+        payload["counts"]["total"] = total
+    response = live_client.get("/api/runtime/events")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["truncated"] is True
+    assert body["source_windows"]["hubble"] == {"total": 120, "returned": 50, "limit": 50, "truncated": True}
+    assert body["source_windows"]["tetragon"] == {"total": 51, "returned": 50, "limit": 50, "truncated": True}
+    assert body["source_windows"]["gateway"]["total"] is None
+    # Observation truncation does not claim the Gateway request list was cut.
+    assert live_client.get("/api/runtime/requests").json()["truncated"] is False
+
+
+def test_unknown_observation_total_stays_unknown(live_client, fake):
+    import copy
+    fake.endpoints = copy.deepcopy(fake.endpoints)
+    fake.endpoints["observations?source=hubble"].pop("counts")
+    response = live_client.get("/api/runtime/events")
+    window = response.json()["source_windows"]["hubble"]
+    assert window["total"] is None and window["truncated"] is None

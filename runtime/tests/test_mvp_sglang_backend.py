@@ -470,8 +470,17 @@ class SglangGatewayHttpTests(unittest.TestCase):
         self.assertEqual(received[0]["model"], "backend-test-model")
         self.assertEqual(received[0]["max_completion_tokens"], 32)
         self.assertIsNone(received[0]["max_tokens"])
-        records, _ = JsonlStore(self.directory / "data" / "gateway_records.jsonl").read_all()
-        final = [r for r in records if r["request_id"] == headers["X-Request-ID"] and r["phase"] == "final"][-1]
+        # Receiving the response can precede the server's final journal append.
+        # Wait for this request's exact final row, retaining duplicate detection.
+        stop_at = time.monotonic() + 3
+        while True:
+            records, _ = JsonlStore(self.directory / "data" / "gateway_records.jsonl").read_all()
+            finals = [r for r in records if r["request_id"] == headers["X-Request-ID"] and r["phase"] == "final"]
+            if finals or time.monotonic() >= stop_at:
+                break
+            time.sleep(0.02)
+        self.assertEqual(len(finals), 1)
+        final = finals[0]
         self.assertEqual(final["backend_kind"], "sglang")
         self.assertEqual(final["data_origin"], "external_backend")
         detail = self.get_json(f"/api/requests/{headers['X-Request-ID']}")

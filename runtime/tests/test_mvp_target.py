@@ -565,8 +565,17 @@ class TargetGatewayHttpTests(TempMixin, unittest.TestCase):
             return json.loads(response.read())
 
     def final(self, request_id: str) -> dict[str, object]:
-        records, _ = JsonlStore(self.data_dir / "gateway_records.jsonl").read_all()
-        return [r for r in records if r["request_id"] == request_id and r["phase"] == "final"][-1]
+        # Body receipt can precede the handler's final journal append. Wait for
+        # that asynchronous boundary; a missing final remains a bounded failure.
+        deadline = time.monotonic() + 3
+        while True:
+            records, _ = JsonlStore(self.data_dir / "gateway_records.jsonl").read_all()
+            finals = [r for r in records if r["request_id"] == request_id and r["phase"] == "final"]
+            if finals:
+                return finals[-1]
+            if time.monotonic() >= deadline:
+                self.fail("final journal record not committed within test deadline")
+            time.sleep(0.01)
 
     def receipts(self) -> int:
         records, _ = JsonlStore(self.data_dir / "engine_receipts.jsonl").read_all()

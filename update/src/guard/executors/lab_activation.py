@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+from datetime import datetime
 import hashlib
 import ipaddress
 import json
@@ -34,7 +35,10 @@ CONFIG_KEYS = {'namespace', 'selector', 'container', 'probe_pod', 'probe_contain
     'update_manifest', 'allowed_models', 'trace_directory', 'fault_directory', 'max_duration_seconds',
     'generation_models', 'change_path', 'failure_marker', 'restore_objects', 'tampered_objects',
     'worker_pod', 'worker_pid', 'worker_start_ticks', 'worker_rank', 'worker_rank_regex',
-    'probe_progress_directory', 'good_manifest_sha256', 'update_manifest_sha256'}
+    'probe_progress_directory', 'good_manifest_sha256', 'update_manifest_sha256', 'restore_timeout_ms',
+    'fault_control_directory','fault_control_session','fault_control_target_sha256','fault_control_rank',
+    'fault_control_environment','fault_control_target','fault_control_prepared','fault_control_kind','initialization_failure_kind',
+    'faulty_manifest_sha256','fault_control_node_image_verification'}
 # 해시로 비교할 수 있는 복원 대상. volume·snapshot 내용은 이 실행기가 읽지 않는다.
 RESTORE_KINDS = frozenset({'configmap', 'secret'})
 REQUIRED_KEYS = {'namespace', 'selector', 'container', 'probe_pod', 'probe_container', 'service_url', 'model',
@@ -43,6 +47,8 @@ POLL_SECONDS = 0.5
 KUBECTL_CALL_TIMEOUT = 60
 REQUEST_CALL_TIMEOUT = 120
 FAULT_FILE = 'lab-fault-exception'
+FAULT_CONTROL_KEYS=frozenset({'fault_control_directory','fault_control_session','fault_control_target_sha256',
+    'fault_control_rank','fault_control_environment','fault_control_target','fault_control_prepared'})
 # Signals are sent by a Python helper inside the Linux engine container.
 # They must not depend on the controller host's signal module (e.g. Windows).
 POSIX_SIGKILL, POSIX_SIGSTOP, POSIX_SIGCONT = 9, 19, 18
@@ -51,21 +57,44 @@ CLIENT = r'''
 import concurrent.futures as f,hashlib,http.client,json,os,re,sys,time
 from urllib.parse import urlsplit
 spec=json.load(sys.stdin);base=urlsplit(spec["url"])
+def clock_context():
+    try:
+        def digest(path):
+            with open(path,'rb') as stream:return hashlib.sha256(stream.read(4096)).hexdigest()
+        return {'boot_sha256':digest('/proc/sys/kernel/random/boot_id'),
+            'time_namespace':os.stat('/proc/self/ns/time').st_ino,
+            'time_offsets_sha256':digest('/proc/self/timens_offsets')}
+    except OSError:return None
 def one(item):
-    began=time.monotonic();row=dict(outcome="error",elapsed_ms=None,sha256=None,model=None,closed_early=False,complete=False,
-        first_chunk_elapsed_ms=None)
+    began=time.monotonic();started=time.monotonic_ns();clock_before=clock_context()
+    row=dict(outcome="error",elapsed_ms=None,sha256=hashlib.sha256(b"").hexdigest(),bytes=0,model=None,closed_early=False,complete=False,
+        first_chunk_elapsed_ms=None,connection_established=False,request_sent=False,error_stage=None,error_kind=None,
+        request_started_ns=started,response_finished_ns=None,clock_context=None,external_request_sha256=None,
+        request_body_sha256=None,normal_shape_verified=False,errno=None,connect_refused=False,
+        fault_nonce=item.get('fault_nonce') if type(item.get('fault_nonce')) is str and re.fullmatch('[0-9a-f]{32}',item['fault_nonce']) else None)
     connection=http.client.HTTPConnection(base.hostname,base.port or 80,timeout=item.get("timeout",30))
+    stage='connect'
     try:
         body=item.get("body");raw=None if body is None else json.dumps(body).encode()
+        row['request_body_sha256']=None if raw is None else hashlib.sha256(raw).hexdigest()
         headers=dict(item.get("headers",{}))
+        identifiers=[v for k,v in headers.items() if k.lower()=='x-request-id']
+        if len(identifiers)==1 and type(identifiers[0]) is str and 0<len(identifiers[0])<=512:
+            row['external_request_sha256']=hashlib.sha256(identifiers[0].encode()).hexdigest()
         if raw is not None:headers["Content-Type"]="application/json"
+        connection.connect();row['connection_established']=True;stage='write'
         connection.request(item["method"],item["path"],raw,headers)
+        row['request_sent']=True;stage='headers'
         response=connection.getresponse();row["outcome"]=response.status
+        stage='read'
         digest=hashlib.sha256();got=0;close_after=item.get("close_after_bytes");delay=item.get("read_delay_ms",0)/1000
         text=b""
         while True:
             part=response.read(256)
-            if not part:row["complete"]=True;break
+            if not part:
+                if response.length not in (None,0):
+                    row['error_stage']='read';row['error_kind']='incomplete-body';break
+                row["complete"]=True;break
             if row["first_chunk_elapsed_ms"] is None:
                 row["first_chunk_elapsed_ms"]=int((time.monotonic()-began)*1000)
                 if spec.get("progress_path"):
@@ -73,7 +102,7 @@ def one(item):
                         fd=os.open(spec["progress_path"],os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o600)
                         with os.fdopen(fd,"wb") as stream:stream.write(b"first-body")
                     except OSError:pass
-            digest.update(part);got+=len(part)
+            digest.update(part);got+=len(part);row["sha256"]=digest.hexdigest();row["bytes"]=got
             if len(text)<65536:text+=part
             if delay:time.sleep(delay)
             if close_after is not None and got>=close_after:row["closed_early"]=True;break
@@ -82,16 +111,158 @@ def one(item):
             row["models"]=sorted({m.decode("utf-8","replace") for m in re.findall(rb'"model":\s*"([^"]{1,200})"',text)})
             document=json.loads(text);row["model"]=document.get("model")
             row["answer"]=hashlib.sha256(document["choices"][0]["message"]["content"].encode()).hexdigest()
+            row["normal_shape_verified"]=bool(response.status==200 and row["complete"] is True and type(document.get("model")) is str and type(body) is dict and document["model"]==body.get("model") and type(document["choices"]) is list and len(document["choices"])>0 and type(document["choices"][0]["message"]["content"]) is str)
         except Exception:pass
         if item.get("metrics"):row["metrics"]=text.decode("utf-8","replace")
     except (OSError,http.client.HTTPException) as error:
+        if stage=='read' and isinstance(error,http.client.IncompleteRead) and type(error.partial)is bytes:
+            digest.update(error.partial);got+=len(error.partial);row['sha256']=digest.hexdigest();row['bytes']=got
+        row['errno']=error.errno if type(getattr(error,'errno',None)) is int else None
+        row['connect_refused']=stage=='connect' and isinstance(error,ConnectionRefusedError)
+        row['error_stage']=stage
+        row['error_kind']='connection-refused' if isinstance(error,ConnectionRefusedError) else 'timeout' if isinstance(error,TimeoutError) else 'transport-error'
         if row["outcome"]=="error" or isinstance(error,TimeoutError):
             row["outcome"]="timeout" if isinstance(error,TimeoutError) else row["outcome"]
     finally:
         connection.close()
+        row['response_finished_ns']=time.monotonic_ns()
+        clock_after=clock_context()
+        if clock_before is not None and clock_before==clock_after:row['clock_context']=clock_before
     row["elapsed_ms"]=int((time.monotonic()-began)*1000);return row
 with f.ThreadPoolExecutor(max_workers=max(1,len(spec["requests"]))) as pool:
     print(json.dumps(list(pool.map(one,spec["requests"]))))
+'''
+
+FAULT_CONTROL = r'''
+import hashlib,json,os,signal,stat,sys,time
+def clock_context():
+    def digest(path):
+        with open(path,'rb') as stream:return hashlib.sha256(stream.read(4096)).hexdigest()
+    return {'boot_sha256':digest('/proc/sys/kernel/random/boot_id'),
+        'time_namespace':os.stat('/proc/self/ns/time').st_ino,
+        'time_offsets_sha256':digest('/proc/self/timens_offsets')}
+def process(pid):
+    try:
+        with open('/proc/'+str(pid)+'/stat') as stream:value=stream.read()
+        fields=value[value.rfind(')')+2:].split()
+        return {'start_ticks':int(fields[19]),'state':fields[0]}
+    except FileNotFoundError:return None
+def read_file(root,name):
+    fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=root)
+    try:
+        before=os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode) or before.st_uid!=os.geteuid() or stat.S_IMODE(before.st_mode)!=0o600 or not 0<before.st_size<=16384:raise ValueError('CONTROL_FILE_NOT_OWNED')
+        raw=os.read(fd,16385);after=os.fstat(fd);entry=os.stat(name,dir_fd=root,follow_symlinks=False)
+        identity=lambda s:(s.st_dev,s.st_ino,s.st_uid,s.st_mode,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
+        if len(raw)!=before.st_size or len({identity(s) for s in (before,after,entry)})!=1:raise ValueError('CONTROL_FILE_CHANGED')
+        return raw
+    finally:os.close(fd)
+def write_file(root,name,value):
+    fd=os.open(name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=root)
+    try:
+        raw=json.dumps(value,sort_keys=True,separators=(',',':')).encode()
+        with os.fdopen(fd,'wb',closefd=False) as stream:stream.write(raw);stream.flush();os.fsync(fd)
+    finally:os.close(fd)
+    return hashlib.sha256(raw).hexdigest()
+def perform(payload,lib):
+    action=payload['action'];token=payload['control'];directory=payload['directory']
+    if action not in {'arm','ready','signal','activate','release','clear'}:raise ValueError('CONTROL_ACTION_INVALID')
+    expected={'schema','nonce','fault_kind','rank','external_request_sha256','session','target_sha256','expires_unix_ns','hold_timeout_ms'}
+    if (type(token)is not dict or set(token)!=expected or token['schema']!='byul-lab-fault-control/1'
+        or token['fault_kind']not in lib['KINDS'] or type(token['rank'])is not int or not 0<=token['rank']<=63
+        or not lib['fingerprint'](token['nonce'],32) or not lib['fingerprint'](token['session'],32)
+        or not lib['fingerprint'](token['target_sha256']) or not lib['fingerprint'](token['external_request_sha256'])
+        or type(token['hold_timeout_ms'])is not int or not 0<token['hold_timeout_ms']<=30000
+        or type(token['expires_unix_ns'])is not int):raise ValueError('CONTROL_SCOPE_INVALID')
+    root=lib['_directory'](directory);nonce=token['nonce'];before=time.monotonic_ns()
+    try:
+        if action=='arm':
+            if not time.time_ns()<token['expires_unix_ns']<=time.time_ns()+35000*1000000:raise ValueError('CONTROL_EXPIRED')
+            if len([n for n in os.listdir(root) if n.endswith('.arm.json')])>=8:raise ValueError('CONTROL_CAPACITY')
+            return {'armed':True,'control_sha256':write_file(root,nonce+'.arm.json',token)}
+        raw=read_file(root,nonce+'.arm.json')
+        if lib['strict_json'](raw)!=token:raise ValueError('CONTROL_ARM_CHANGED')
+        if action=='clear':
+            cleared=[]
+            for suffix in ('assigned','ready','activate','release','arm'):
+                name=nonce+'.'+suffix+'.json'
+                try:data=lib['strict_json'](read_file(root,name))
+                except FileNotFoundError:continue
+                if any(data.get(k)!=token[k] for k in ('nonce','session','target_sha256')):raise ValueError('CONTROL_FOREIGN_FILE')
+                os.unlink(name,dir_fd=root);cleared.append(suffix)
+            return {'cleared':cleared}
+        point='WorkerProc.enqueue_output' if token['fault_kind']=='communication-stall' else 'WorkerProc._execute_worker_rpc'
+        if action in {'ready','signal','activate'}:
+            loaded=lib['load_control_receipt'](directory,nonce,session=token['session'],target_sha256=token['target_sha256'],
+                expected_external_sha=token['external_request_sha256'],rank=token['rank'],point=point)
+            ready=loaded['receipt']
+            if ready['fault_kind']!=token['fault_kind']:raise ValueError('CONTROL_KIND_CHANGED')
+            if action=='ready':return loaded
+            context=clock_context()
+            if lib['clock_context'](context)!=lib['clock_context'](ready['clock_context']):raise ValueError('CONTROL_CLOCK_MISMATCH')
+            if time.monotonic_ns()>=ready['barrier_deadline_ns']:raise ValueError('CONTROL_BARRIER_EXPIRED')
+        if action=='signal':
+            target=payload['target'];number={'death':9,'delay':19}.get(token['fault_kind'])
+            current=process(target['pid'])
+            if (number is None or target['pid']<=1 or target['pid']==os.getpid() or target['pid']!=ready['pid']
+                or target['start_ticks']!=ready['start_ticks'] or current is None or current['start_ticks']!=target['start_ticks']
+                or ready['pid_namespace']!=os.stat('/proc/self/ns/pid').st_ino):raise ValueError('CONTROL_PROCESS_CHANGED')
+            # pidfd pins this incarnation across /proc reads and the send. No
+            # numeric-PID fallback can safely recover a missing pidfd API.
+            descriptor=os.pidfd_open(target['pid'],0)
+            try:
+                current=process(target['pid'])
+                if current is None or current['start_ticks']!=target['start_ticks']:raise ValueError('CONTROL_PROCESS_CHANGED')
+                signal_before=time.monotonic_ns()
+                if not ready['ready_ns']<=signal_before<ready['barrier_deadline_ns']:raise ValueError('CONTROL_BARRIER_EXPIRED')
+                signal.pidfd_send_signal(descriptor,number,None,0)
+                signal_after=time.monotonic_ns()
+            finally:os.close(descriptor)
+            observed=None;until=time.monotonic_ns()+1000000000
+            while time.monotonic_ns()<until:
+                value=process(target['pid'])
+                if value is None:observed='absent';break
+                if value['start_ticks']!=target['start_ticks']:observed='replaced';break
+                if value['state'] in ('T','t','Z','X'):observed=value['state'];break
+                time.sleep(.002)
+            return {'action':'signal','nonce':nonce,'fault_kind':token['fault_kind'],'signal':number,'target':target,
+                'signal_before_ns':signal_before,'signal_after_ns':signal_after,'state_observed_ns':time.monotonic_ns(),
+                'observed_state':observed,'clock_context':context,'ready_receipt_sha256':loaded['receipt_sha256'],
+                'barrier_deadline_ns':ready['barrier_deadline_ns'],'signal_requested':True}
+        if action=='release' and token['fault_kind']=='delay':
+            target=payload.get('target');current=process(target['pid']) if target else None
+            if current is not None:
+                # Expiry can never suppress SIGCONT, but the original exact
+                # process/nonce proof remains mandatory even during cleanup.
+                ready=lib['validate_ready'](lib['strict_json'](read_file(root,nonce+'.ready.json')),
+                    nonce=nonce,session=token['session'],target_sha256=token['target_sha256'],
+                    expected_external_sha=token['external_request_sha256'],rank=token['rank'],point=point)
+                if (target['pid']<=1 or target['pid']==os.getpid() or current['start_ticks']!=target['start_ticks']
+                    or ready['pid']!=target['pid'] or ready['start_ticks']!=target['start_ticks']
+                    or ready['pid_namespace']!=os.stat('/proc/self/ns/pid').st_ino
+                    or lib['clock_context'](clock_context())!=lib['clock_context'](ready['clock_context'])):raise ValueError('CONTROL_RELEASE_PROCESS_CHANGED')
+                descriptor=os.pidfd_open(target['pid'],0)
+                try:
+                    current=process(target['pid'])
+                    if current is None or current['start_ticks']!=target['start_ticks']:raise ValueError('CONTROL_RELEASE_PROCESS_CHANGED')
+                    signal.pidfd_send_signal(descriptor,18,None,0)
+                finally:os.close(descriptor)
+        value={'schema':'byul-lab-fault-action/1','nonce':nonce,'session':token['session'],
+            'target_sha256':token['target_sha256'],'action':action}
+        if action not in {'activate','release'}:raise ValueError('CONTROL_ACTION_INVALID')
+        if action=='activate':
+            before=time.monotonic_ns()
+            if not ready['ready_ns']<=before<ready['barrier_deadline_ns']:raise ValueError('CONTROL_BARRIER_EXPIRED')
+        digest=write_file(root,nonce+'.'+action+'.json',value)
+        return {'action':action,'nonce':nonce,'action_sha256':digest,'publish_before_ns':before,
+            'publish_after_ns':time.monotonic_ns(),'clock_context':clock_context()}
+    finally:os.close(root)
+def main():
+    os.umask(0o077);payload=json.load(sys.stdin);source=payload.pop('reader_source')
+    if hashlib.sha256(source.encode()).hexdigest()!=payload.pop('reader_sha256'):raise ValueError('CONTROL_READER_CHANGED')
+    lib={'__name__':'guard_fault_control'};exec(compile(source,'guard/adapters/vllm_fault_control.py','exec'),lib)
+    print(json.dumps(perform(payload,lib)))
+if __name__=='__main__':main()
 '''
 
 CENSUS = r'''
@@ -176,6 +347,25 @@ class Lab:
             raise ActivationRefused('LAB_ACTIVATION_CONFIG_INVALID')
         if type(cfg['deadline_ms']) is not int or not 0 < cfg['deadline_ms'] <= 600000:
             raise ActivationRefused('LAB_ACTIVATION_DEADLINE_INVALID')
+        if 'restore_timeout_ms' in cfg and (type(cfg['restore_timeout_ms']) is not int
+                or not 0 < cfg['restore_timeout_ms'] <= 600000):
+            raise ActivationRefused('LAB_ACTIVATION_RESTORE_TIMEOUT_INVALID')
+        if FAULT_CONTROL_KEYS & set(cfg):
+            if (not FAULT_CONTROL_KEYS<=set(cfg) or type(cfg['fault_control_rank']) is not int
+                    or not 0<=cfg['fault_control_rank']<=63 or type(cfg['fault_control_session']) is not str
+                    or re.fullmatch('[0-9a-f]{32}',cfg['fault_control_session']) is None
+                    or type(cfg['fault_control_target_sha256']) is not str
+                    or re.fullmatch('[0-9a-f]{64}',cfg['fault_control_target_sha256']) is None
+                    or any(type(cfg[k]) is not str or not cfg[k].startswith('/') for k in (
+                        'fault_control_directory','fault_control_environment','fault_control_target','fault_control_prepared'))):
+                raise ActivationRefused('LAB_ACTIVATION_FAULT_CONTROL_INVALID')
+        if 'fault_control_kind' in cfg and (not FAULT_CONTROL_KEYS<=set(cfg) or cfg['fault_control_kind'] not in {'death','delay','communication-stall','exception'}):
+            raise ActivationRefused('LAB_ACTIVATION_FAULT_KIND_INVALID')
+        if 'fault_control_node_image_verification' in cfg and (cfg['fault_control_node_image_verification']!='local-containerd-v1'
+                or not FAULT_CONTROL_KEYS<=set(cfg)):
+            raise ActivationRefused('LAB_ACTIVATION_NODE_IMAGE_VERIFICATION_INVALID')
+        if 'initialization_failure_kind' in cfg and cfg['initialization_failure_kind'] not in {'config','model'}:
+            raise ActivationRefused('LAB_ACTIVATION_INITIALIZATION_KIND_INVALID')
         self.cfg = cfg; self.injected = runner is not None
         self.runner = runner or capture_pipes; self.clock = clock or time.monotonic; self.wait = wait or time.sleep
         self.binary = cfg.get('kubectl_binary', 'kubectl')
@@ -184,11 +374,18 @@ class Lab:
         self.steps = []; self.violations = []; self.missing = []; self.mutated = False; self.normal = []
         self.cleanup_errors = []; self.fault_restore_failed = False
         self.restore_model = cfg['model']
+        self.fault_evidence = []
+        self.initialization_case=None
+        self.sequence_scope=uuid.uuid4().hex;self.sequence_number=0
         # Diagnostic records never participate in activation predicates.
         self.diagnostics = []; self.diagnostic_write_errors = []; self.diagnostic_namespace = None
         self.diagnostic_poll = None; self.diagnostic_deadline = None
         self.diagnostic_idle_overrun = False
         self.observation_deadline = None
+
+    def sequence(self):
+        self.sequence_number+=1
+        return self.sequence_number
 
     def diagnostic(self, event, **facts):
         self.diagnostics.append({'poll': self.diagnostic_poll, 'event': event,
@@ -386,8 +583,7 @@ class Lab:
             expected = self.cfg[pin_key]
             if (type(expected) is not str or not re.fullmatch('[0-9a-f]{64}', expected)
                     or hashlib.sha256(raw).hexdigest() != expected):
-                raise ValueError('LAB_ACTIVATION_GOOD_MANIFEST_CHANGED' if name == 'good_manifest'
-                    else 'LAB_ACTIVATION_UPDATE_MANIFEST_CHANGED')
+                raise ValueError('LAB_ACTIVATION_'+name.upper()+'_CHANGED')
         self.mutated = True
         self._kubectl('apply', '-f', '-', stdin=raw)
 
@@ -482,12 +678,23 @@ class Lab:
             and status.get('containerID') in (None, '') and status.get('imageID') in (None, '')
             and status.get('lastState', {}) == {})
 
-    def wait_ready(self):
-        end = self.clock() + self.cfg['deadline_ms'] / 1000
+    def wait_ready(self, *, timeout_ms=None, previous=None):
+        end = min(self.deadline, self.clock() + (timeout_ms or self.cfg['deadline_ms']) / 1000)
         while True:
             try:
-                if self.ready_pods():
-                    return True
+                if previous is None:
+                    if self.ready_pods():return True
+                else:
+                    pods = self._pods()
+                    if len(pods)==1 and _pod_ready(pods[0]):
+                        pod=pods[0];uid=pod['metadata'].get('uid')
+                        identity=self.engine_container_identity(pod)
+                        if (uid and identity is not None and (uid not in previous
+                                or previous[uid] is not None and identity[1:]!=previous[uid])
+                                and _deployment_lineage(self,pod) is not None):
+                            self.note('recovery-generation-ready',pod=pod['metadata']['name'],pod_uid=uid,
+                                engine_container_identity=identity,operational_wait_ms=timeout_ms)
+                            return True
             except (OSError, TimeoutError, ValueError):
                 pass
             if self.clock() >= end:
@@ -519,13 +726,36 @@ class Lab:
 
     def restore(self):
         """시나리오 뒤 정상 세대로 되돌리고 정상 대조로 확인한다."""
+        previous = None
+        if self.mutated and 'restore_timeout_ms' in self.cfg:
+            previous={p['metadata']['uid']:(identity[1:] if (identity:=self.engine_container_identity(p,
+                require_ready=False)) is not None else None) for p in self._pods() if p['metadata'].get('uid')}
         if 'good_manifest' in self.cfg and self.mutated:
             self.apply('good_manifest')
         elif self.mutated:
             self.rollout()
-        if not self.wait_ready():
+        ready=(self.wait_ready(timeout_ms=self.cfg['restore_timeout_ms'],previous=previous)
+            if 'restore_timeout_ms' in self.cfg else self.wait_ready())
+        if not ready:
             self.miss('RECOVERY_NOT_READY_WITHIN_DEADLINE')
             return False
+        if self.initialization_case is not None:
+            receipt=_primary_normal(self,'recovered')
+            self.initialization_case['recovery']=receipt
+            if receipt is not None:self.mutated=False
+            return receipt is not None
+        if previous is not None:
+            pods=self._pods()
+            token='byul-recovery-'+uuid.uuid4().hex
+            row=(_bound_pod_request(self,pods[0],self.chat(model=self.restore_model,
+                timeout=self.cfg['deadline_ms']/1000,headers={'X-Request-Id':token}),
+                require_ready=True,scope_bound=True,observation_end=self.deadline) if len(pods)==1 else None)
+            good=bool(row and row.get('outcome')==200 and row.get('complete') is True
+                and row.get('external_request_sha256')==hashlib.sha256(token.encode()).hexdigest())
+            self.normal.append(good);self.note('recovered',succeeded=good,
+                source='fresh-generation-bound-direct-request',outcome=row.get('outcome') if row else None)
+            if good:self.mutated=False
+            return good
         return self.normal_request('recovered', model=self.restore_model) is not None
 
 
@@ -712,18 +942,19 @@ def _live_change(lab, values):
 
 
 def _rejected(lab, code, marker=None, *, request_model=None, require_new_faulty_uid=False,
-              restore_targets=None):
+              restore_targets=None, verify_initialization=False, limit_ms=None):
     """잘못된 세대는 Ready가 되지 않고, 그동안 나간 응답도 허용 세대에서만 와야 한다."""
     allowed = set(lab.cfg.get('allowed_models') or ())
     fresh_required = require_new_faulty_uid or restore_targets is not None
     prior_uids = {p['metadata'].get('uid') for p in lab._pods()} if fresh_required else set()
-    if require_new_faulty_uid:
+    if require_new_faulty_uid and not verify_initialization:
         lab.miss('FAULTY_REQUEST_GENERATION_UNATTRIBUTED')
     lab.apply('faulty_manifest')
-    end = lab.clock() + lab.cfg['deadline_ms'] / 1000; served = False; seen = set(); activated = marker is None
+    end = min(lab.deadline,lab.clock() + (limit_ms or lab.cfg['deadline_ms']) / 1000); served = False; seen = set(); activated = marker is None
     faulty = []; faulty_uids = set(); marker_bindings = {}; diagnostic_uids = set()
     ready_uids = set(); accepted_uids = set(); referenced_uids = set(); current_container_unverified = False
     pending_container_uids = set()
+    failed_attempts = {}; rejected_attempts = set()
     poll = 0
     while lab.clock() < end:
         poll += 1; lab.diagnostic_poll = poll
@@ -778,6 +1009,24 @@ def _rejected(lab, code, marker=None, *, request_model=None, require_new_faulty_
             c.get('type') == 'Ready' and c.get('status') == 'True'
             for c in p.get('status', {}).get('conditions', []))}
         ready_uids.update(current_ready_uids)
+        if verify_initialization:
+            if len(faulty)>1:lab.miss('INITIALIZATION_FAULTY_TARGET_AMBIGUOUS')
+            for pod in faulty if len(faulty)==1 else []:
+                try:
+                    proof=_initialization_failure_marker(lab,pod,marker,end)
+                    if proof is None:continue
+                    uid=pod['metadata']['uid'];failed_attempts[uid]=proof
+                    pending_container_uids.discard(uid);activated=True
+                    if uid in rejected_attempts:continue
+                    receipt=_initialization_admission(lab,pod,proof,end,request_model or lab.cfg['model'])
+                    if receipt is None:continue
+                    lab.note('startup-failure-admission',**receipt)
+                    if lab.initialization_case is not None:
+                        lab.initialization_case['failure']=proof;lab.initialization_case['admission']=receipt
+                    if receipt['request_rejected']:rejected_attempts.add(uid)
+                    if receipt['request_accepted']:lab.violate(code,pod_uid=uid,source='bound-failed-attempt-request')
+                except (OSError,TimeoutError,ValueError,KeyError,TypeError):
+                    pass
         if restore_targets is not None:
             referenced_uids.update(p['metadata']['uid'] for p in faulty
                 if _restore_references(p) & set(restore_targets))
@@ -803,6 +1052,11 @@ def _rejected(lab, code, marker=None, *, request_model=None, require_new_faulty_
             lab.diagnostic('service-request-error', reason=_diagnostic_error_kind(error))
         lab.wait(POLL_SECONDS)
         lab.diagnostic('poll-end', reason='CONTINUE')
+        if (verify_initialization and rejected_attempts and faulty_uids<=rejected_attempts
+                and not current_ready_uids):
+            # An explicit failed boot plus its bound refused request is already
+            # a completed startup trial; it need not idle out the recovery budget.
+            break
     lab.diagnostic_poll = None
     lab.note('faulty-generation', became_ready=served, served_models=sorted(m for m in seen if m),
         failure_marker_seen=None if marker is None else activated,
@@ -822,9 +1076,15 @@ def _rejected(lab, code, marker=None, *, request_model=None, require_new_faulty_
         lab.miss('NEW_FAULTY_POD_UID_UNOBSERVED')
     if restore_targets is not None and not referenced_uids:
         lab.miss('TAMPERED_RESTORE_REFERENCE_UNOBSERVED')
-    if require_new_faulty_uid and (current_container_unverified or pending_container_uids) and not accepted_uids:
+    if verify_initialization and not failed_attempts:
+        lab.miss('INITIALIZATION_FAILURE_EXIT_UNOBSERVED')
+    if verify_initialization and not (faulty_uids and faulty_uids<=rejected_attempts):
+        lab.miss('FAILED_INITIALIZATION_ADMISSION_UNVERIFIED')
+        lab.miss('FAULTY_REQUEST_GENERATION_UNATTRIBUTED')
+    if require_new_faulty_uid and (current_container_unverified or pending_container_uids) and not accepted_uids \
+            and not (verify_initialization and rejected_attempts):
         lab.miss('FAULTY_CURRENT_ENGINE_CONTAINER_UNVERIFIED')
-    if require_new_faulty_uid and diagnostic_uids and not marker_bindings:
+    if require_new_faulty_uid and diagnostic_uids and not marker_bindings and not (verify_initialization and failed_attempts):
         lab.miss('FAULTY_MARKER_ONLY_IN_PREVIOUS_OR_OTHER_CONTAINER')
     if require_new_faulty_uid and marker_bindings and ready_uids and not accepted_uids:
         lab.miss('FAULTY_MARKER_READY_CONTAINER_MISMATCH' if set(marker_bindings) & ready_uids
@@ -910,7 +1170,7 @@ def _pod_ready(pod):
         for c in pod.get('status', {}).get('conditions', []))
 
 
-def _bound_pod_request(lab, pod, item, *, require_ready=False, observation_end=None):
+def _bound_pod_request(lab, pod, item, *, require_ready=False, observation_end=None,scope_bound=False):
     """직접 Pod 주소 요청과 전후 컨테이너 신원만 연결한다. Service 귀속은 주장하지 않는다."""
     original_deadline = lab.observation_deadline
     lab.observation_deadline = min(lab.deadline, lab.clock() + 10,
@@ -919,7 +1179,7 @@ def _bound_pod_request(lab, pod, item, *, require_ready=False, observation_end=N
         before = lab.engine_container_identity(pod)
         if before is None or require_ready and not _pod_ready(pod):
             return None
-        url = _owned_direct_pod_url(lab, pod)
+        url = _owned_direct_pod_url(lab, pod,scope_bound=scope_bound)
         if url is None:
             return None
         row, = lab.requests([item], url=url)
@@ -1015,19 +1275,200 @@ def _startup_gate(lab, values):
 def _partial_start(lab, values):
     """한 구성요소만 실패시킨 세대. 그 실패가 실제로 일어났다는 로그 표식이 있어야 범위가 찬다."""
     if _needs(lab, 'faulty_manifest', 'good_manifest', 'failure_marker'):
+        lab.initialization_case={'context':lab.cfg.get('kubectl_context'),'sequence_scope':lab.sequence_scope,
+            'normal_before':_primary_normal(lab,'normal-before-initialization'),'failure':None,'admission':None,'recovery':None}
+        if lab.initialization_case['normal_before'] is None:
+            lab.miss('INITIALIZATION_NORMAL_BEFORE_UNVERIFIED')
         _rejected(lab, 'PARTIAL_INITIALIZATION_REPORTED_READY', lab.cfg['failure_marker'],
-            require_new_faulty_uid=True)
+            require_new_faulty_uid=True,verify_initialization=True,
+            limit_ms=_limit(values,'init_preparation_deadline_ms',lab))
+
+
+def _primary_pod(pod,container):
+    """Kubernetes identity/state projection; never command/env/annotations/log text."""
+    def take(value,keys):return {k:deepcopy(value[k]) for k in keys if k in value}
+    def state(value):
+        return {kind:take(fields,('startedAt','finishedAt','containerID','exitCode','signal','reason'))
+            for kind,fields in value.items() if kind in ('running','waiting','terminated') and type(fields)is dict}
+    meta=take(pod['metadata'],('name','namespace','uid','deletionTimestamp','ownerReferences'))
+    meta['labels']={k:v for k,v in pod['metadata'].get('labels',{}).items()
+        if k in ('guard.run','app','lab-profile','byul.lab/generation',OWNED_LABEL)}
+    spec=take(pod['spec'],('nodeName','hostNetwork','hostPID','hostIPC'))
+    spec['containers']=[take(row,('name','image','ports')) for row in pod['spec']['containers'] if row.get('name')==container]
+    status=take(pod['status'],('phase','podIP'))
+    status['conditions']=[take(row,('type','status')) for row in pod['status'].get('conditions',[]) if row.get('type')=='Ready']
+    status['containerStatuses']=[]
+    for row in pod['status'].get('containerStatuses',[]):
+        if row.get('name')!=container:continue
+        selected=take(row,('name','containerID','imageID','restartCount','ready'))
+        selected['state']=state(row.get('state',{}));selected['lastState']=state(row.get('lastState',{}))
+        status['containerStatuses'].append(selected)
+    return {'metadata':meta,'spec':spec,'status':status}
+
+
+def _primary_http(row):
+    return {k:deepcopy(row[k]) for k in ('outcome','complete','sha256','bytes','model','normal_shape_verified',
+        'error_stage','error_kind','errno','connect_refused','connection_established','request_sent',
+        'external_request_sha256','request_body_sha256') if k in row}
+
+
+def _primary_direct(lab,pod,model,*,failure=None):
+    """Exact before/request/after graph, with controller order only (not latency)."""
+    sequence={}
+    def snapshot(suffix):
+        rawns=strict_json(lab._kubectl('get','namespace',lab.cfg['namespace'],'-o','json'),limit=262144)
+        ns=_diagnostic_namespace_identity(rawns,lab.cfg['namespace']);sequence['namespace_'+suffix]=lab.sequence()
+        selected=strict_json(lab._kubectl('get','pod',pod['metadata']['name'],'-o','json'),limit=2*1024**2)
+        sequence['pod_'+suffix+'_request']=lab.sequence()
+        client=strict_json(lab._kubectl('get','pod',lab.cfg['probe_pod'],'-o','json'),limit=2*1024**2)
+        sequence['probe_'+suffix+'_request']=lab.sequence()
+        clientid=_diagnostic_pod_identity(client,lab.cfg['probe_container'],lab.cfg['namespace'])
+        lineage=_deployment_lineage(lab,selected,receipt=True);sequence['lineage_'+suffix]=lab.sequence()
+        if ns is None or clientid is None or clientid['state']!='running' or not clientid['ready'] or lineage is None:return None
+        if (selected['metadata'].get('uid')!=pod['metadata']['uid']
+                or selected['metadata'].get('namespace')!=lab.cfg['namespace'] or selected['metadata'].get('deletionTimestamp')
+                or selected['spec'].get('hostNetwork',False) is not False):return None
+        if failure is not None:
+            if (_failed_start_attempt(selected,lab.cfg['container'])!=failure['attempt']
+                    or selected['metadata'].get('labels',{}).get('byul.lab/generation')!='faulty'):return None
+            identity={'pod_uid':selected['metadata']['uid'],'pod':selected['metadata']['name'],
+                'node':selected['spec']['nodeName'],'pod_ip':selected['status']['podIP'],'attempt':failure['attempt']}
+        else:
+            identity=_diagnostic_pod_identity(selected,lab.cfg['container'],lab.cfg['namespace'])
+            if identity is None or identity['state']!='running' or not identity['ready'] or not _pod_ready(selected):return None
+        return {'namespace':ns,'pod':_primary_pod(selected,lab.cfg['container']),
+            'probe':_primary_pod(client,lab.cfg['probe_container']),'identity':identity,'client':clientid,'lineage':lineage}
+    before=snapshot('before')
+    if before is None:return None
+    url=_owned_direct_pod_url(lab,pod,scope_bound=True)
+    if url is None or url!=f"http://{before['identity']['pod_ip']}:8000":return None
+    token='byul-lif09-'+uuid.uuid4().hex
+    item=lab.chat(model=model,timeout=5,headers={'X-Request-Id':token})
+    row,=lab.requests([item],timeout=5,url=url);sequence['direct_request']=lab.sequence()
+    after=snapshot('after')
+    if after is None or after!=before:return None
+    request_sha=hashlib.sha256(token.encode()).hexdigest()
+    if row.get('external_request_sha256')!=request_sha:return None
+    return {'namespace':before['namespace'],'engine':before['identity'],'probe':before['client'],
+        'namespace_before':before['namespace'],'namespace_after':after['namespace'],
+        'pod_before_request':before['pod'],'pod_after_request':after['pod'],
+        'probe_before_request':before['probe'],'probe_after_request':after['probe'],
+        'lineage_before':before['lineage'],'lineage_after':after['lineage'],'sequence':sequence,
+        'direct_request':{'url':url,'method':item['method'],'path':item['path'],'request_id_sha256':request_sha,
+            'body_sha256':hashlib.sha256(json.dumps(item['body']).encode()).hexdigest(),
+            'transport':'http.client.HTTPConnection','used_proxy':False,'followed_redirects':False,'http':_primary_http(row)},
+        'http':_diagnostic_http_metadata(row),'request_id_sha256':request_sha}
+
+
+def _primary_normal(lab,label):
+    try:
+        pods=lab._pods()
+        receipt=_primary_direct(lab,pods[0],lab.restore_model) if len(pods)==1 else None
+        row=receipt['direct_request']['http'] if receipt else {}
+        good=(row.get('outcome')==200 and row.get('complete') is True and row.get('normal_shape_verified') is True
+            and row.get('model')==lab.restore_model)
+    except (OSError,TimeoutError,ValueError,KeyError,TypeError,AttributeError):receipt=None;good=False
+    lab.normal.append(good);lab.note(label,succeeded=good,source='bound-direct-normal',outcome=row.get('outcome') if receipt else None)
+    return receipt if good else None
+
+
+def _failed_start_attempt(pod, container):
+    """A terminal boot attempt, never an older attempt attached to a running one."""
+    try:
+        if pod['metadata'].get('deletionTimestamp') or _pod_ready(pod):return None
+        ready=[v for v in pod['status'].get('conditions',[]) if v.get('type')=='Ready']
+        if len(ready)!=1 or ready[0].get('status')!='False':return None
+        statuses=[s for s in pod['status']['containerStatuses'] if s.get('name')==container]
+        if len(statuses)!=1:return None
+        status=statuses[0];state=status['state']
+        if status.get('ready') is not False or type(status.get('restartCount')) is not int or status['restartCount']<0:return None
+        if type(state) is not dict or len(state)!=1:return None
+        previous=False
+        if type(state.get('terminated')) is dict:terminal=state['terminated']
+        elif type(state.get('waiting')) is dict and state['waiting'].get('reason')=='CrashLoopBackOff':
+            terminal=status.get('lastState',{}).get('terminated');previous=True
+        else:return None
+        if type(terminal) is not dict or type(terminal.get('exitCode')) is not int or not 1<=terminal['exitCode']<=255:return None
+        cid=terminal.get('containerID')
+        if type(cid) is not str or re.fullmatch(r'[a-z][a-z0-9+.-]*://[0-9a-f]{64}',cid) is None:return None
+        start=terminal['startedAt'];finish=terminal['finishedAt']
+        stamps=[datetime.fromisoformat(v.replace('Z','+00:00')) for v in (start,finish)]
+        if any(v.tzinfo is None for v in stamps) or stamps[1]<stamps[0]:return None
+        return {'container_id':cid,'restart_count':status['restartCount'],'started_at':start,
+            'finished_at':finish,'exit_code':terminal['exitCode'],'previous':previous}
+    except (KeyError,TypeError,ValueError):return None
+
+
+def _initialization_failure_marker(lab,pod,marker,end):
+    """Bind the original error bytes to the exact unsuccessful startup attempt.
+
+    Kubelet v1.36 validateContainerLogStatus selects LastTerminationState's CID
+    for --previous. Only a still-waiting attempt is admitted here; a running
+    replacement can never inherit that old error or its readiness result.
+    https://github.com/kubernetes/kubernetes/blob/v1.36.5/pkg/kubelet/kubelet_pods.go
+    """
+    if type(marker) is not str or not marker:return None
+    name=pod['metadata']['name'];uid=pod['metadata']['uid']
+    before=next((p for p in lab._pods() if p['metadata'].get('uid')==uid),None)
+    before_sequence=lab.sequence()
+    attempt=_failed_start_attempt(before,lab.cfg['container']) if before else None
+    if attempt is None:return None
+    original=lab.diagnostic_deadline;lab.diagnostic_deadline=min(end,lab.deadline)
+    try:
+        flags=['--previous'] if attempt['previous'] else []
+        raw=lab._kubectl('logs',name,f"--container={lab.cfg['container']}",*flags,'--tail=2000',cap=8*1024**2)
+        log_sequence=lab.sequence()
+        after=next((p for p in lab._pods() if p['metadata'].get('uid')==uid),None)
+        after_sequence=lab.sequence()
+        if after is None or _failed_start_attempt(after,lab.cfg['container'])!=attempt or marker.encode() not in raw:return None
+        return {'pod_uid':uid,'attempt':attempt,'original_error_sha256':hashlib.sha256(raw).hexdigest(),
+            'original_error_bytes':len(raw),'marker_sha256':hashlib.sha256(marker.encode()).hexdigest(),
+            'source':'kubelet-terminal-container-attempt','upper_boot_failure':True,
+            'pod_before_log':_primary_pod(before,lab.cfg['container']),
+            'pod_after_log':_primary_pod(after,lab.cfg['container']),
+            'sequence':{'pod_before_log':before_sequence,'log_receipt':log_sequence,'pod_after_log':after_sequence},
+            'log_receipt':{'namespace':lab.cfg['namespace'],'pod':name,'pod_uid':uid,'container':lab.cfg['container'],
+                **attempt,'returncode':0,'stdout_sha256':hashlib.sha256(raw).hexdigest(),'stdout_bytes':len(raw),
+                'marker_sha256':hashlib.sha256(marker.encode()).hexdigest(),'marker_observed':True,'capture_complete':True,
+                'endpoint':{'context':lab.cfg.get('kubectl_context'),'namespace':lab.cfg['namespace'],'pod':name,
+                    'container':lab.cfg['container'],'previous':attempt['previous']}}}
+    finally:lab.diagnostic_deadline=original
+
+
+def _initialization_admission(lab,pod,proof,end,model):
+    """Primary terminal-attempt request and exact replay inputs on both sides."""
+    original=lab.diagnostic_deadline;lab.diagnostic_deadline=min(end,lab.deadline)
+    try:
+        receipt=_primary_direct(lab,pod,model,failure=proof)
+        if receipt is None:return None
+        row=receipt['direct_request']['http'];outcome=row.get('outcome')
+        rejected=(type(outcome)is int and 500<=outcome<600 and row.get('complete')is True
+            or outcome=='error' and row.get('error_kind')=='connection-refused' and row.get('error_stage')=='connect'
+            and row.get('connection_established')is False and row.get('request_sent')is False)
+        return {**receipt,'failure':proof,'request_rejected':bool(rejected),
+            'request_accepted':outcome==200 and row.get('complete')is True,'readiness_closed':True,
+            'attribution':'same-failed-Pod-address-and-terminal-attempt','service_routing_attribution':False}
+    except (OSError,TimeoutError,ValueError,KeyError,TypeError,AttributeError):return None
+    finally:lab.diagnostic_deadline=original
 
 
 FAULTS = {'death': (POSIX_SIGKILL, 'rank_death_detection_ms'), 'delay': (POSIX_SIGSTOP, 'rank_delay_detection_ms'),
-    'communication-stall': (POSIX_SIGSTOP, 'rank_communication_stall_detection_ms')}
+    'communication-stall': (None, 'rank_communication_stall_detection_ms')}
 
 
 def _rank_faults(lab, values):
+    if FAULT_CONTROL_KEYS<=set(lab.cfg):
+        # A sealed session and restored incarnation cannot serve a second case.
+        # The explicit one-kind entry runs actor-before-consumer; a closed plan
+        # consumes four independently prepared case artifacts afterwards.
+        return lab.miss('FAULT_CONTROL_EXPLICIT_ONE_KIND_ENTRY_REQUIRED')
     for fault, (number, key) in FAULTS.items():
         if fault == 'communication-stall':
             continue
-        _one_fault(lab, fault, lambda target: lab.signal_worker(number, target), _limit(values, key, lab), number)
+        limit=_limit(values,key,lab)
+        notification=values.get('rank_'+fault.replace('-','_')+'_notification_ms')
+        _one_fault(lab, fault, lambda target: lab.signal_worker(number, target), limit, number,
+            notification_ms=notification if type(notification)is int and notification>=0 else None)
         if lab.fault_restore_failed:
             lab.miss('SUBSEQUENT_FAULTS_BLOCKED_BY_RESTORE_FAILURE')
             return
@@ -1036,7 +1477,11 @@ def _rank_faults(lab, values):
     injected = {}
     def exception(target):
         injected['done'] = lab.touch_fault(target)
-    _one_fault(lab, 'exception', exception, _limit(values, 'rank_exception_detection_ms', lab), None)
+    limit=values.get('rank_exception_detection_ms')
+    if not (type(limit)is int and limit>=0):limit=lab.cfg['deadline_ms']
+    notification=values.get('rank_exception_notification_ms')
+    _one_fault(lab, 'exception', exception, limit, None,
+        notification_ms=notification if type(notification)is int and notification>=0 else None)
     if 'fault_directory' not in lab.cfg:
         lab.miss('CONFIG_REQUIRED:fault_directory')
     elif injected.get('done'):
@@ -1044,11 +1489,14 @@ def _rank_faults(lab, values):
         lab.miss('EXCEPTION_RANK_ATTRIBUTION_UNOBSERVED')
 
 
-def _one_fault(lab, fault, inject, limit_ms, number):
+def _one_fault(lab, fault, inject, limit_ms, number,*,notification_ms=None):
     """각 장애의 모든 종료 경로에서 복원하고 실패하면 다음 주입을 막는다."""
     if lab.fault_restore_failed:
         lab.miss('SUBSEQUENT_FAULTS_BLOCKED_BY_RESTORE_FAILURE')
         return
+    if FAULT_CONTROL_KEYS<=set(getattr(lab,'cfg',{})):
+        if lab.cfg.get('fault_control_kind',fault)!=fault:raise ActivationRefused('FAULT_CONTROL_CONFIG_KIND_MISMATCH')
+        return _controlled_fault(lab,fault,limit_ms,number,notification_ms=notification_ms)
     try:
         lab.normal_request('normal-before-' + fault)
         began = lab.clock()
@@ -1056,9 +1504,12 @@ def _one_fault(lab, fault, inject, limit_ms, number):
         try:
             with ThreadPoolExecutor(max_workers=1) as pool:
                 running = pool.submit(lab.requests, [lab.chat('fault ' * 16, max_tokens=256, timeout=limit_ms / 1000 + 5)])
-                lab.wait(POLL_SECONDS); injected_ms = (lab.clock() - began) * 1000
+                lab.wait(POLL_SECONDS)
                 target = lab.selected_worker()
+                request_finished_before_injection = running.done()
+                injected_ms = (lab.clock() - began) * 1000
                 inject(target)
+                injection_returned_ms = (lab.clock() - began) * 1000
                 if number == POSIX_SIGSTOP:
                     stopped = next((p['state'] for p in lab.census(target['pod'], target['pod_uid'])['processes']
                         if p['pid'] == target['pid'] and p.get('start_ticks') == target['start_ticks']), None)
@@ -1076,16 +1527,23 @@ def _one_fault(lab, fault, inject, limit_ms, number):
                 except Exception as error:  # noqa: BLE001 - 계속해서 정상 세대 복원을 시도한다
                     lab.miss('FAULT_NOT_RELEASED:' + fault + ':' + type(error).__name__)
         lab.note('fault-' + fault, outcome=row['outcome'], elapsed_ms=row['elapsed_ms'], complete=row['complete'],
-            injected_ms=int(injected_ms), target=target, stopped_state=stopped, before_release_state=before_release)
+            injected_ms=int(injected_ms), injection_returned_ms=int(injection_returned_ms),
+            injection_clock_scope='controller_call', request_elapsed_clock_scope='remote_client',
+            request_finished_before_injection=request_finished_before_injection,
+            request_fault_overlap_verified=False, fault_detection_latency_verified=False,
+            target=target, stopped_state=stopped, before_release_state=before_release)
         if number == POSIX_SIGSTOP and stopped not in ('T', 't'):
             lab.miss('WORKER_STOP_NOT_OBSERVED:' + fault)
         if number == POSIX_SIGSTOP and before_release not in ('T', 't'):
             lab.miss('WORKER_RESUMED_OR_REPLACED_BEFORE_RELEASE:' + fault)
-        if row['outcome'] == 200 and row['complete'] and row['elapsed_ms'] < injected_ms:
+        # The remote request and controller have different clock origins. A
+        # completed Future proves completion before this injection call, but a
+        # pending Future cannot prove the request overlaps the physical signal.
+        lab.miss('FAULT_REQUEST_OVERLAP_UNOBSERVED:' + fault)
+        lab.miss('FAULT_DETECTION_TIMING_UNVERIFIED:' + fault)
+        if request_finished_before_injection:
             lab.miss('FAULT_AFTER_REQUEST_FINISHED:' + fault)
-        elif row['outcome'] == 'timeout' or row['elapsed_ms'] > limit_ms:
-            lab.violate('FAULT_NOT_DETECTED_BEFORE_DEADLINE', fault=fault, elapsed_ms=row['elapsed_ms'])
-        elif row['outcome'] == 200 and not row['complete']:
+        if row['outcome'] == 200 and not row['complete']:
             lab.violate('INCOMPLETE_WORK_REPORTED_AS_SUCCESS', fault=fault)
     finally:
         try:
@@ -1099,6 +1557,209 @@ def _one_fault(lab, fault, inject, limit_ms, number):
             lab.fault_restore_failed = True
             lab.miss('FAULT_RESTORE_FAILED:' + fault + ':' + type(error).__name__)
             lab.cleanup_errors.append('LAB_ACTIVATION_FAULT_RESTORE_FAILED:' + fault + ':' + type(error).__name__)
+
+
+def _control_context(lab):
+    from guard.adapters import vllm_fault_control as control
+    from guard.collectors.lifecycle import load_prepared
+    from guard.models import Environment
+    from guard.runtime.kubernetes_binding import validate_capture_target
+    cfg=lab.cfg
+    env=Environment.model_validate_json(Path(cfg['fault_control_environment']).read_bytes())
+    target=strict_json(Path(cfg['fault_control_target']).read_bytes(),limit=65536)
+    prepared=load_prepared(cfg['fault_control_prepared'])
+    if (hashlib.sha256(canonical_json(target)).hexdigest()!=cfg['fault_control_target_sha256']
+            or prepared.get('profile')!=control.PROFILE or prepared.get('session')!=cfg['fault_control_session']):
+        raise ActivationRefused('FAULT_CONTROL_PREPARED_SCOPE_CHANGED')
+    binding=validate_capture_target(target,env)
+    if (binding['engine']['namespace']!=cfg['namespace'] or binding['engine']['container']!=cfg['container']
+            or binding['context']!=cfg.get('kubectl_context')):
+        raise ActivationRefused('FAULT_CONTROL_ACTOR_SCOPE_MISMATCH')
+    return {'module':control,'env':env,'target':target,'prepared':prepared,'binding':binding}
+
+
+def _control_capture(lab,ctx,*,seal=False):
+    from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
+    from .lifecycle_session import capture_session
+    remaining=min(120,lab.deadline-lab.clock())
+    if remaining<=0:raise TimeoutError('FAULT_CONTROL_CAPTURE_BUDGET')
+    options={'runner':lab.runner} if lab.injected else {}
+    if 'fault_control_node_image_verification' in lab.cfg:
+        options['node_image_verification']=lab.cfg['fault_control_node_image_verification']
+    reader=KubernetesLifecycleReader(ctx['target'],ctx['env'],ctx['prepared'],
+        binary=lab.binary,duration=remaining,**options)
+    reader.snapshot()
+    sealed=reader.seal_session().get('sealed') is True if seal else False
+    engine=reader.binding['engine']
+    packet=capture_session(reader,ctx['target'],container=engine['container'],image=engine['image'],
+        prepared=ctx['prepared'],owner_identity=reader.owner_identity,read_file=reader.read_file,image_check=reader.image_check)
+    return {'packet':packet,'transport':reader.report(),'sealed':sealed}
+
+
+def _control_seed(lab,ctx,packet,rank):
+    """Delegate selected native profile rank validation; no command-name PID guess."""
+    validate_source_rank=getattr(ctx['module'],'validate_source_rank',None)
+    if not callable(validate_source_rank):raise ActivationRefused('FAULT_CONTROL_RANK_VALIDATOR_UNAVAILABLE')
+    if packet.get('schema')!='guard-lifecycle-session-capture/1':raise ValueError('FAULT_CONTROL_PACKET_INVALID')
+    if any((packet.get(k) or {}).get('metadata',{}).get('sealed') is not False for k in ('before','after')):
+        raise ActivationRefused('FAULT_CONTROL_SESSION_NOT_OPEN')
+    candidates=set();single=False
+    for recording in packet.get('recordings',[]):
+        capture=recording.get('capture') or {}
+        if not(capture.get('process_context_verified') is True and capture.get('image_digest_verified') is True
+                and recording.get('session_owner_match') is True and recording.get('listed_file_identity_match') is True):continue
+        records=capture.get('records') or []
+        if not records:continue
+        physical=records[0]['payload']['context']
+        for row in records:
+            if row.get('event')!='RANK_FAILURE':continue
+            value=row['payload'];validate_source_rank(value)
+            if value['source_verified'] is not True:continue
+            if value['role']=='executor' and value['world_size']==1 and value['configured_output_rank']==0:single=True
+            if (rank==0 and value['role']=='worker' and value['rank']==rank
+                    and value['point']=='WorkerProc._execute_worker_rpc' and value['rpc_method']=='execute_model'):
+                candidates.add((physical['pid'],physical['start_ticks']))
+    if not single or len(candidates)!=1:raise ActivationRefused('FAULT_CONTROL_SINGLE_WORKER_SOURCE_UNAVAILABLE')
+    pid,start=next(iter(candidates));engine=ctx['binding']['engine']
+    if type(pid)is not int or pid<=1 or type(start)is not int or start<=0:raise ActivationRefused('FAULT_CONTROL_PHYSICAL_WORKER_INVALID')
+    if any(key in lab.cfg and lab.cfg[key]!=expected for key,expected in (
+        ('worker_pod',engine['pod']),('worker_pid',pid),('worker_start_ticks',start),('worker_rank',rank))):
+        raise ActivationRefused('FAULT_CONTROL_SELECTED_WORKER_MISMATCH')
+    current={p['pid']:p for p in lab.census(engine['pod'],engine['pod_uid'])['processes']}.get(pid)
+    if current is None or current.get('start_ticks')!=start:raise ActivationRefused('FAULT_CONTROL_WORKER_CHANGED')
+    return {'pod':engine['pod'],'pod_uid':engine['pod_uid'],'pid':pid,'start_ticks':start,'state':current['state']}
+
+
+def _control_rpc(lab,ctx,action,token,target):
+    from guard.runtime.kubernetes_binding import verify_owned_pod
+    engine=ctx['binding']['engine'];lab.verify_owned()
+    def identity():
+        pod=next((p for p in lab._pods() if p['metadata'].get('name')==engine['pod']
+            and p['metadata'].get('uid')==engine['pod_uid']),None)
+        if pod is None:raise ActivationRefused('FAULT_CONTROL_ENGINE_INCARNATION_CHANGED')
+        namespace=strict_json(lab._kubectl('get','namespace',engine['namespace'],'-o','json'),limit=262144)
+        return verify_owned_pod(pod,namespace['metadata'],engine,ctx['binding']['run_id'],require_ready=False)
+    before=identity();source=Path(ctx['module'].__file__).read_text()
+    payload={'action':action,'directory':lab.cfg['fault_control_directory'],'control':token,'target':target,
+        'reader_source':source,'reader_sha256':hashlib.sha256(source.encode()).hexdigest()}
+    raw=lab._kubectl('exec','-i',engine['pod'],f"--container={lab.cfg['container']}",'--',
+        'python3','-I','-S','-B','-c',FAULT_CONTROL,stdin=canonical_json(payload),timeout=15,cap=65536)
+    value=strict_json(raw,limit=65536)
+    # A held non-Python PID1 preserves the transport even after the vLLM child dies.
+    if before!=identity():raise ActivationRefused('FAULT_CONTROL_ENGINE_CHANGED_DURING_COMMAND')
+    if type(value)is not dict:raise ValueError('FAULT_CONTROL_REPLY_INVALID')
+    return value
+
+
+def _controlled_fault(lab,fault,limit_ms,number,*,notification_ms):
+    """Existing fault actor with a native nonce barrier and same-kernel receipts."""
+    if fault not in {'death','delay','exception','communication-stall'}:raise ActivationRefused('FAULT_CONTROL_KIND_INVALID')
+    if number!={'death':POSIX_SIGKILL,'delay':POSIX_SIGSTOP,'exception':None,'communication-stall':None}[fault]:
+        raise ActivationRefused('FAULT_CONTROL_ACTION_KIND_MISMATCH')
+    ctx=None;token=None;target=None;row=None;injection=None;ready=None;before=None;after=None;projection=None
+    armed=False;issued=False;released=False;error=None;seed=None;scope=None;deadlines=None;restore_confirmed=False
+    nonce=uuid.uuid4().hex;header='byul-lif08-'+nonce;external=hashlib.sha256(header.encode()).hexdigest()
+    try:
+        ctx=_control_context(lab)
+        if lab.normal_request('normal-before-'+fault) is None:
+            lab.miss('FAULT_NORMAL_CONTROL_UNAVAILABLE:'+fault);return
+        seed=_control_capture(lab,ctx)
+        target=_control_seed(lab,ctx,seed['packet'],lab.cfg['fault_control_rank'])
+        token={'schema':'byul-lab-fault-control/1','nonce':nonce,'fault_kind':fault,'rank':lab.cfg['fault_control_rank'],
+            'external_request_sha256':external,'session':lab.cfg['fault_control_session'],
+            'target_sha256':lab.cfg['fault_control_target_sha256'],'hold_timeout_ms':30000,
+            'expires_unix_ns':time.time_ns()+30000*1000000}
+        armed=True;_control_rpc(lab,ctx,'arm',token,target)
+        # Transport covers the owned 30s source barrier and capture overhead.
+        # Detection/notification/response verdict deadlines stay independent.
+        timeout=40
+        item=lab.chat('fault '*16,max_tokens=256,timeout=timeout,headers={'X-Request-Id':header},fault_nonce=nonce)
+        try:
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                running=pool.submit(lab.requests,[item],timeout=45)
+                end=min(lab.deadline,lab.clock()+10)
+                while lab.clock()<end:
+                    try:ready=_control_rpc(lab,ctx,'ready',token,target);break
+                    except (OSError,ValueError):
+                        if running.done():break
+                        lab.wait(.1)
+                if ready is None:raise ActivationRefused('FAULT_CONTROL_ACTIVE_ACK_UNAVAILABLE')
+                before=_control_capture(lab,ctx)
+                if running.done():
+                    row,=running.result()
+                    lab.miss('FAULT_CONTROL_REQUEST_ENDED_BEFORE_INJECTION:'+fault)
+                    raise ActivationRefused('FAULT_CONTROL_REQUEST_ENDED_BEFORE_INJECTION')
+                # Only the native packet can establish active work; the ready
+                # file alone never becomes a measured fault verdict.
+                lab.mutated=True;issued=True
+                injection=_control_rpc(lab,ctx,'signal' if number in (POSIX_SIGKILL,POSIX_SIGSTOP) else 'activate',token,target)
+                row,=running.result()
+        finally:
+            if armed:
+                try:_control_rpc(lab,ctx,'release',token,target if issued else None);released=True
+                except Exception as failure:
+                    lab.miss('FAULT_CONTROL_RELEASE_UNVERIFIED:'+fault+':'+type(failure).__name__)
+                    lab.cleanup_errors.append('FAULT_CONTROL_RELEASE_UNVERIFIED:'+fault)
+        lab.wait(POLL_SECONDS)
+        after=_control_capture(lab,ctx,seal=True)
+        if (before['transport'].get('collection_gap') is not False or after['transport'].get('collection_gap') is not False
+                or after['sealed'] is not True):raise ValueError('FAULT_CONTROL_CAPTURE_INCOMPLETE')
+        scope={'source_profile':ctx['module'].PROFILE,'session':token['session'],'target_sha256':token['target_sha256'],
+            'pod_uid':ctx['binding']['engine']['pod_uid'],'container_id':ctx['binding']['engine']['container_id'],
+            'external_request_sha256':external,'nonce':nonce,'fault_kind':fault,'rank':token['rank']}
+        deadlines={'detection_ms':limit_ms,'notification_ms':notification_ms,'response_ms':lab.cfg['deadline_ms']}
+        injection={**injection,'pre_signal_packet':before['packet']}
+        projection=ctx['module'].validate_fault_case(after['packet'],row,injection,scope,deadlines)
+        if type(projection)is not dict or type(projection.get('missing'))is not list or type(projection.get('violations'))is not list:
+            raise ValueError('FAULT_CONTROL_PROJECTION_INVALID')
+        flags=('occurrence_verified','request_fault_overlap_verified','detection_deadline_verified',
+            'upper_notification_deadline_verified','affected_request_error_verified','clock_verified','whole_kind_complete')
+        if any(type(projection.get(k))is not bool for k in flags) or type(projection.get('evidence_refs'))is not list:
+            raise ValueError('FAULT_CONTROL_PROJECTION_INVALID')
+        for reason in projection['missing']:lab.miss('FAULT_CONTROL:'+fault+':'+str(reason))
+        for violation in projection['violations']:
+            if type(violation)is not dict or type(violation.get('code'))is not str:raise ValueError('FAULT_CONTROL_VIOLATION_INVALID')
+            lab.violate(violation['code'],fault=fault,source='native-control-profile24')
+        coherent=(all(projection[k] for k in ('occurrence_verified','request_fault_overlap_verified','clock_verified'))
+            and (all(projection[k] for k in flags[:-1]) or bool(projection['violations'])))
+        if projection['whole_kind_complete'] is not True or not projection['evidence_refs'] or not coherent or projection['missing']:
+            lab.miss('FAULT_CONTROL_KIND_INCOMPLETE:'+fault)
+        lab.note('fault-'+fault,protocol='native-nonce-barrier/1',nonce=nonce,target=target,
+            outcome=row.get('outcome'),complete=row.get('complete'),released=released,
+            request_fault_overlap_verified=projection.get('request_fault_overlap_verified')is True,
+            fault_detection_latency_verified=projection.get('detection_deadline_verified')is True,
+            upper_notification_deadline_verified=projection.get('upper_notification_deadline_verified')is True,
+            affected_request_error_verified=projection.get('affected_request_error_verified')is True,
+            evidence_refs=projection.get('evidence_refs',[]))
+    except Exception as failure:
+        error=type(failure).__name__;lab.miss('FAULT_CONTROL_UNVERIFIED:'+fault+':'+error)
+    finally:
+        if ctx is not None and armed:
+            try:_control_rpc(lab,ctx,'clear',token,target)
+            except Exception as failure:
+                lab.miss('FAULT_CONTROL_CLEANUP_UNVERIFIED:'+fault+':'+type(failure).__name__)
+                lab.cleanup_errors.append('FAULT_CONTROL_CLEANUP_UNVERIFIED:'+fault)
+        lab.fault_evidence.append({'name':'fault-'+fault+'-'+nonce+'.json','document':{
+            'schema':'byul-lab-native-fault-trial/1','fault_kind':fault,'nonce':nonce,'control':token,
+            'ready':ready,'client':row,'injection':injection,'seed_capture':seed,'pre_signal_capture':before,'post_capture':after,
+            'expected_scope':scope,'deadlines':deadlines,
+            'binding':None if ctx is None else ctx['binding'],
+            'environment':None if ctx is None else ctx['env'].model_dump(mode='json'),
+            'target':None if ctx is None else ctx['target'],
+            'prepared':None if ctx is None else ctx['prepared'],
+            'projection':projection,'issued':issued,'released':released,'error_kind':error,
+            'deadline_ms':limit_ms,'notification_deadline_ms':notification_ms,
+            'response_deadline_ms':lab.cfg['deadline_ms'],'per_request_gpu_release_verified':False}})
+        if lab.mutated:
+            try:
+                if lab.restore() is not True:
+                    lab.fault_restore_failed=True;lab.miss('FAULT_RESTORE_NOT_CONFIRMED:'+fault)
+                    lab.cleanup_errors.append('LAB_ACTIVATION_FAULT_RESTORE_NOT_CONFIRMED:'+fault)
+                else:lab.mutated=False;restore_confirmed=True
+            except Exception as failure:
+                lab.fault_restore_failed=True;lab.miss('FAULT_RESTORE_FAILED:'+fault+':'+type(failure).__name__)
+                lab.cleanup_errors.append('LAB_ACTIVATION_FAULT_RESTORE_FAILED:'+fault+':'+type(failure).__name__)
+        lab.fault_evidence[-1]['document']['restore_confirmed']=restore_confirmed
 
 def _disconnect(lab, values):
     lab.miss('REQUEST_SCOPED_CORE_WORKER_AND_REFERENCE_RELEASE_UNOBSERVED')
@@ -1124,7 +1785,7 @@ def _controller_ref(value, kind):
     return refs[0] if len(refs) == 1 else None
 
 
-def _deployment_lineage(lab, pod):
+def _deployment_lineage(lab, pod, *, receipt=False):
     """Bind a Pod to the selected Deployment through its controller ReplicaSet."""
     try:
         deployment = strict_json(lab._kubectl('get', 'deployment', lab.cfg['deployment'], '-o', 'json'), limit=262144)
@@ -1139,6 +1800,10 @@ def _deployment_lineage(lab, pod):
                 or parent is None or parent['uid'] != uid
                 or parent['name'] != lab.cfg['deployment']):
             return None
+        if receipt:
+            def metadata(obj):
+                return {k:deepcopy(obj['metadata'][k]) for k in ('name','namespace','uid','ownerReferences') if k in obj['metadata']}
+            return {'deployment':metadata(deployment),'replicaset':metadata(replica),'pod':metadata(pod)}
         return uid
     except (KeyError, OSError, TimeoutError, ValueError):
         return None
@@ -1325,7 +1990,7 @@ def _diagnostic_fault_pod_request(lab, pods, end, model, *, idle_end):
         lab.diagnostic_deadline = None
 
 
-def _owned_direct_pod_url(lab, pod, *, diagnostic=False):
+def _owned_direct_pod_url(lab, pod, *, diagnostic=False,scope_bound=False):
     """Resolve a Service port to this engine Pod's declared listening port."""
     try:
         selected = urlsplit(lab.cfg['service_url'])
@@ -1340,12 +2005,14 @@ def _owned_direct_pod_url(lab, pod, *, diagnostic=False):
         service = strict_json(lab._kubectl('get', 'service', service_name, '-o', 'json'), limit=262144)
         if service['metadata'].get('namespace') != lab.cfg['namespace']:
             return None
-        if diagnostic:
+        if diagnostic or scope_bound:
             selector_items = [item.split('=', 1) for item in lab.cfg['selector'].split(',')]
             selector = dict(selector_items)
             if not selector or len(selector) != len(selector_items) \
                     or any(not key or not value or '=' in value for key, value in selector.items()) \
-                    or service['spec'].get('selector') != selector \
+                    or (not scope_bound and service['spec'].get('selector')!=selector) \
+                    or (scope_bound and (type(service['spec'].get('selector')) is not dict or not service['spec']['selector']
+                        or any(selector.get(k)!=v for k,v in service['spec']['selector'].items()))) \
                     or any(pod['metadata'].get('labels', {}).get(key) != value for key, value in selector.items()):
                 return None
             declared_ports = service['spec']['ports']
@@ -1817,6 +2484,28 @@ SCENARIOS = {'LIF-03': _budget, 'LIF-04': _slow_reader, 'LIF-05': _redeploy, 'LI
     'LIF-14': _profiler, 'LIF-16': _restore_material, 'OBS-02': _record_state, 'REQ-12': _late_result}
 
 
+def _canonical_initialization(lab):
+    cfg=lab.cfg
+    try:
+        from .initialization_terminal_case import project_terminal_case
+        expected={'context':cfg.get('kubectl_context'),'namespace':cfg['namespace'],
+            'namespace_uid':(lab.diagnostic_namespace or {}).get('namespace_uid'),
+            'container':cfg['container'],'probe_container':cfg['probe_container'],'port':8000,'model':cfg['model'],
+            'failure_kind':cfg['initialization_failure_kind'],
+            'failure_marker_sha256':hashlib.sha256(cfg['failure_marker'].encode()).hexdigest()}
+        projected=project_terminal_case(lab.initialization_case,expected=expected)
+        if type(projected)is not dict or set(projected)!=set(OBSERVATIONS) or type(projected['activation_scope_complete'])is not bool:
+            raise ValueError('INITIALIZATION_CANONICAL_PROJECTION_INVALID')
+        if any(type(projected[k])is not list for k in ('activation_steps','activation_violations','activation_missing')):
+            raise ValueError('INITIALIZATION_CANONICAL_PROJECTION_INVALID')
+        lab.steps.extend(projected['activation_steps'])
+        for row in projected['activation_violations']:
+            if row not in lab.violations:lab.violations.append(row)
+        for gap in projected['activation_missing']:lab.miss(gap)
+        if projected['activation_scope_complete']is not True:lab.miss('INITIALIZATION_CANONICAL_SCOPE_INCOMPLETE')
+    except Exception as error:
+        lab.miss('INITIALIZATION_CANONICAL_UNAVAILABLE:'+type(error).__name__)
+
 def run_scenario(check_id, cfg, values, *, runner=None, clock=None, wait=None):
     lab = Lab(cfg, runner=runner, clock=clock, wait=wait)
     lab.verify_owned()
@@ -1826,6 +2515,7 @@ def run_scenario(check_id, cfg, values, *, runner=None, clock=None, wait=None):
         lab.miss('SCENARIO_INTERRUPTED:' + type(error).__name__)
     finally:
         _final_restore(lab)
+    if check_id=='LIF-09' and 'initialization_failure_kind' in cfg:_canonical_initialization(lab)
     return {'activation_steps': lab.steps, 'activation_violations': lab.violations, 'activation_missing': lab.missing,
         'activation_scope_complete': not lab.missing and bool(lab.normal) and all(lab.normal)}, lab
 
@@ -1853,6 +2543,9 @@ class ActivatedExecutor:
 
     def run(self, check, env, policy_values, adapter, workdir):
         workdir = Path(workdir); started = utcnow(); passive = None; passive_gap = None
+        if FAULT_CONTROL_KEYS & set(self.cfg):
+            # Never let a passive collector seal a native-control session first.
+            return self._refused(check,None,'FAULT_CONTROL_EXPLICIT_ONE_KIND_ENTRY_REQUIRED',started)
         try:
             passive = self.child.run(check, env, policy_values, adapter, workdir / 'passive')
         except Exception as error:  # noqa: BLE001 - 수동 수집 실패가 능동 측정을 막지 않는다
@@ -1881,6 +2574,29 @@ class ActivatedExecutor:
             primary_artifact_gap = True
             facts['activation_missing'].append('LAB_ACTIVATION_COMMON_INPUT_ARTIFACT_UNAVAILABLE')
             facts['activation_scope_complete'] = False
+        fault_artifacts=[]; supplemental_artifact_gaps=[]
+        documents = []
+        if lab.initialization_case is not None:
+            documents.append(('initialization-primary-case.json', lab.initialization_case,
+                              'LAB_ACTIVATION_INITIALIZATION_ARTIFACT_UNAVAILABLE'))
+        documents.extend((item['name'], item['document'], 'LAB_ACTIVATION_FAULT_ARTIFACT_UNAVAILABLE')
+                         for item in lab.fault_evidence)
+        for name, document, gap in documents:
+            try:
+                fault_path=workdir/name;fault_path.write_bytes(canonical_json(document))
+                fault_artifacts.append(DraftArtifact(name=fault_path.name,path=fault_path,collector='lab_activation/0.1.0'))
+            except OSError:
+                if gap not in supplemental_artifact_gaps:
+                    supplemental_artifact_gaps.append(gap)
+                if gap not in facts['activation_missing']:
+                    facts['activation_missing'].append(gap)
+                facts['activation_scope_complete'] = False
+        if supplemental_artifact_gaps and artifact is not None:
+            try:
+                path.write_bytes(canonical_json(facts))
+            except OSError:
+                artifact = None; primary_artifact_gap = True
+                facts['activation_missing'].append('LAB_ACTIVATION_COMMON_INPUT_ARTIFACT_UNAVAILABLE')
         # Preserve the primary verdict facts before optional diagnostic writes.
         try:
             diagnostics = lab.write_diagnostics(workdir)
@@ -1889,7 +2605,7 @@ class ActivatedExecutor:
             diagnostics = []
         observations = {**(passive.observations if passive else {}),
             **{k: Observation(value=v, collected=True) for k, v in facts.items()}}
-        complete = not primary_artifact_gap and (facts['activation_scope_complete'] or bool(facts['activation_violations']))
+        complete = not primary_artifact_gap and not supplemental_artifact_gaps and (facts['activation_scope_complete'] or bool(facts['activation_violations']))
         origin = DataOrigin.EXAMPLE if self.runner is not None else DataOrigin.MEASURED if complete else DataOrigin.DECLARED
         if passive is not None and 'b_common_inputs' in passive.config:
             # Registration does not authenticate an external record. Preserve
@@ -1900,12 +2616,13 @@ class ActivatedExecutor:
             normal_control={'attempted': bool(lab.normal), 'succeeded': bool(lab.normal) and all(lab.normal),
                 'detail': 'Parent-measured normal requests around the activated fault.'},
             challenges=[{'step': step, 'attempted': facts['activation_scope_complete']} for step in check.challenge_steps],
-            observations=observations, artifacts=[*(passive.artifacts if passive else []), *diagnostics, *([artifact] if artifact else [])],
+            observations=observations, artifacts=[*(passive.artifacts if passive else []), *diagnostics, *fault_artifacts, *([artifact] if artifact else [])],
             config={**(passive.config if passive else {}), 'lab_activation': {k: v for k, v in self.cfg.items() if k != 'kubectl_context'}},
             started_at=started, finished_at=utcnow(),
-            abort_reason=None if complete else 'LAB_ACTIVATION_COMMON_INPUT_ARTIFACT_UNAVAILABLE' if primary_artifact_gap else 'LAB_ACTIVATION_SCOPE_INCOMPLETE',
+            abort_reason=None if complete else 'LAB_ACTIVATION_COMMON_INPUT_ARTIFACT_UNAVAILABLE' if primary_artifact_gap else supplemental_artifact_gaps[0] if supplemental_artifact_gaps else 'LAB_ACTIVATION_SCOPE_INCOMPLETE',
             cleanup_errors=[*(passive.cleanup_errors if passive else []), *lab.cleanup_errors,
                 *(['LAB_ACTIVATION_COMMON_INPUT_ARTIFACT_UNAVAILABLE'] if primary_artifact_gap else []),
+                *supplemental_artifact_gaps,
                 *(['LAB_ACTIVATION_DIAGNOSTIC_ARTIFACT_UNAVAILABLE'] if lab.diagnostic_write_errors else [])])
 
     def _refused(self, check, passive, reason, started):

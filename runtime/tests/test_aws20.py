@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from tools.k8s_observation_feed import redact_tetragon_line
 from tools.aws_lab_acceptance import (
     AWSAcceptance, CommandResult, HTTPResponse, _aws20_method, _aws20_raw_action,
     evaluate_case, parse_args,
@@ -91,6 +92,27 @@ class AWS20Tests(unittest.TestCase):
             path.write_text(json.dumps(raw) + '\n')
             self.assertTrue(_aws20_raw_action(path, since='2026-11-08T00:00:00Z', pod_uid='uid',
                 namespace='serving-lab', action='KPROBE_ACTION_OVERRIDE', method='lsm_file_open'))
+
+    def test_probe_survives_default_redaction_and_remains_exactly_bound(self):
+        tag = "byul-read-probe-" + "a" * 32
+        event = {"time": "2026-11-05T00:01:00Z", "process_kprobe": {
+            "policy_name": "runtime-tg-secret-01", "action": "KPROBE_ACTION_SIGKILL",
+            "process": {"arguments": "-c 'private payload' " + tag,
+                        "pod": {"namespace": "serving-lab", "uid": "pod-uid"}},
+            "args": [{"file_arg": {"path": PATH}}]}}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "tetragon.jsonl"
+            cleaned = redact_tetragon_line(json.dumps(event).encode())
+            self.assertNotIn(b"private payload", cleaned)
+            self.assertNotIn(b"arguments", cleaned)
+            path.write_bytes(cleaned)
+            arguments = dict(since="2026-11-05T00:00:00Z", pod_uid="pod-uid", namespace="serving-lab",
+                             action="KPROBE_ACTION_SIGKILL", method="sigkill_fd_install", probe_tag=tag)
+            self.assertTrue(_aws20_raw_action(path, **arguments))
+            for wrong in ({"probe_tag": tag + "-monitor"}, {"pod_uid": "other"},
+                          {"namespace": "other"}, {"since": "2026-11-05T00:02:00Z"},
+                          {"action": "KPROBE_ACTION_OVERRIDE"}):
+                self.assertFalse(_aws20_raw_action(path, **{**arguments, **wrong}))
 
     def test_method_specific_verdicts_and_opt_in(self):
         override = dict.fromkeys(("enforce_active", "monitor_read_ok", "read_eperm", "raw_override", "normal_200", "cleanup_ok", "restore_read_ok"), True)

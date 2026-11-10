@@ -9,8 +9,8 @@ import hashlib, os, stat, sys, types
 PROFILE = 'vllm-native-lifecycle-metadata/20'
 SCHEMA = 'guard-native-lifecycle-events/20'
 COMMIT = 'db9527a46873454610df6dbedf79a36d6bf1a7f6'
-STARTUP19_SHA256 = '2fb8b6386bc59e236c9227251da05f8e8704e08a935dcff27a8c18bc57ed91f4'
-INITIALIZATION14_SHA256 = 'eefd1a435ae07e703c0fbb02ad7b54b7e7b44f33b67716d44eb55af93a504fa9'
+STARTUP19_SHA256 = '7515a6d023db8056524220ee61fbfbb82fd9cc92520f605d511bfdc04283aae5'
+INITIALIZATION14_SHA256 = '654b22da19bd6ff8cd0e72edb29fa705afa6c01e6fb3616cef9a091e17e9977f'
 MAX_BYTES = 2*1024**2
 MAX_ROWS = 2048
 CODE_FILENAME = 'guard/adapters/vllm_worker_initialization_sensor.py'

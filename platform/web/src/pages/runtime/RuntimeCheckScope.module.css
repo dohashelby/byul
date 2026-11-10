@@ -1,0 +1,6 @@
+.cell {
+  min-width: 160px;
+  max-width: 360px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

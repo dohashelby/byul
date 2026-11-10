@@ -267,6 +267,30 @@ class GatewayRelayTests(unittest.TestCase):
             (self.data_dir / "engine_receipts.jsonl").read_text(encoding="utf-8"),
         )
 
+    def test_lone_surrogate_has_a_final_400_without_engine_delivery(self) -> None:
+        for route in ("/v1/chat/completions", "/v1/completions"):
+            for stream in (False, True):
+                with self.subTest(route=route, stream=stream):
+                    document = {"model": "test-model", "max_tokens": 8, "stream": stream}
+                    if route == "/v1/chat/completions":
+                        document["messages"] = [{"role": "user", "content": "\ud800"}]
+                    else:
+                        document["prompt"] = "\udfff"
+                    before = len(self.engine.receipts)
+                    with closing(http.client.HTTPConnection(self.host, self.port, timeout=2)) as connection:
+                        connection.request("POST", route, body=json.dumps(document).encode(),
+                                           headers={"Content-Type": "application/json"})
+                        response = connection.getresponse()
+                        request_id = response.getheader("X-Request-ID")
+                        self.assertEqual(response.status, 400)
+                        self.assertEqual(json.loads(response.read())["error"]["code"], "INVALID_UNICODE")
+                    self.assertEqual(len(self.engine.receipts), before)
+                    final = next(record for record in reversed(self.gateway_records())
+                                 if record["request_id"] == request_id and record["phase"] == "final")
+                    self.assertFalse(final["delivery"]["attempted"])
+                    self.assertEqual(final["decision"]["reason_code"], "INVALID_UNICODE")
+                    self.assertEqual(self.post()[0], 200)
+
 
 if __name__ == "__main__":
     unittest.main()

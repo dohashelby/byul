@@ -1,6 +1,8 @@
 """Read-only request and evidence queries over the MVP JSONL journals."""
 
 from collections.abc import Callable
+import json
+import os
 from typing import Any
 
 from .mock_engine import _utc_now
@@ -19,6 +21,10 @@ class RequestNotFoundError(LookupError):
     """No Gateway record exists for a request ID."""
 
 
+class QueryWindowIncompleteError(LookupError):
+    """A bounded search cannot establish that the requested record is absent."""
+
+
 class QueryService:
     """Build request-level views without treating individual log lines as requests."""
 
@@ -29,12 +35,16 @@ class QueryService:
         record_store_status: Callable[[], dict[str, Any]],
         current_session_id: str | None = None,
         engine_log_lookup: Callable[[str, str | None], dict[str, Any]] | None = None,
+        native_receipt_lookup: Callable | None = None,
+        native_receipt_restore: Callable | None = None,
     ) -> None:
         self._engine_log_lookup = engine_log_lookup
         self._gateway_store = gateway_store
         self._engine_store = engine_store
         self._record_store_status = record_store_status
         self._current_session_id = current_session_id
+        self._native_receipt_lookup = native_receipt_lookup
+        self._native_receipt_restore = native_receipt_restore
 
     @staticmethod
     def _group(records: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
@@ -106,7 +116,7 @@ class QueryService:
             ),
             "result": result,
             "reason_code": decision.get("reason_code"),
-            "http_status": decision.get("http_status"),
+            "http_status": decision.get("http_status") if final is not None else None,
             "source": decision.get("source"),
             "engine_http_status": decision.get("engine_http_status"),
             "stream": source.get("stream"),
@@ -116,7 +126,7 @@ class QueryService:
             "backend_cancel": source.get("backend_cancel"),
             "backend_kind": source.get("backend_kind", "mock"),
             "delivery": {
-                "attempted": delivery.get("attempted"),
+                "attempted": delivery.get("attempted") if final is not None else None,
                 "backend_receipt": delivery.get("backend_receipt"),
                 "response": delivery.get("response"),
                 "error_code": delivery.get("error_code"),
@@ -126,7 +136,11 @@ class QueryService:
     def _read_gateway(
         self,
     ) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
-        records, corrupt = self._gateway_store.read_all()
+        grouped, corrupt, _ = self._read_gateway_window()
+        return grouped, corrupt
+
+    @staticmethod
+    def _normalize(records):
         normalized: list[dict[str, Any]] = []
         for record in records:
             item = dict(record)
@@ -136,11 +150,24 @@ class QueryService:
                 policy.setdefault("schema_version", None)
                 item["policy"] = policy
             normalized.append(item)
-        return self._group(normalized), corrupt
+        return normalized
+
+    def _read_gateway_window(self):
+        records, corrupt, truncated = self._gateway_store.read_recent()
+        return self._group(self._normalize(records)), corrupt, truncated
+
+    @staticmethod
+    def _window(truncated, total):
+        return {'truncated': bool(truncated), 'counts_lower_bound': bool(truncated),
+                'total_lower_bound': total, 'max_bytes': 4 * 1024 * 1024, 'max_records': 4096}
+
+    @staticmethod
+    def _matching_records(store, request_id):
+        return store.read_matching_request(request_id)
 
     def summary(self) -> dict[str, Any]:
-        grouped, gateway_corrupt = self._read_gateway()
-        _, engine_corrupt = self._engine_store.read_all()
+        grouped, gateway_corrupt, gateway_truncated = self._read_gateway_window()
+        _, engine_corrupt, engine_truncated = self._engine_store.read_recent()
         counts = {result: 0 for result in _FINAL_RESULTS}
         incomplete = 0
         for request_id, records in grouped.items():
@@ -166,16 +193,24 @@ class QueryService:
             },
             "record_store": self._record_store_status(),
             "generated_at": _utc_now(),
+            "window": self._window(gateway_truncated or engine_truncated or bool(gateway_corrupt or engine_corrupt), sum(counts.values()) + incomplete),
         }
 
     def requests(
         self, *, result: str | None = None, limit: int = 200
     ) -> list[dict[str, Any]]:
+        return self.request_page(result=result, limit=limit)['requests']
+
+    def request_page(self, *, result=None, limit=200, include_records=False):
         if result is not None and result not in _FILTER_RESULTS:
             raise QueryError("invalid result filter")
         if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
             raise QueryError("limit must be an integer from 1 through 1000")
-        grouped, _ = self._read_gateway()
+        if not isinstance(include_records, bool):
+            raise QueryError("include_records must be a boolean")
+        if include_records and limit > 200:
+            raise QueryError("include_records limit must not exceed 200")
+        grouped, corrupt, truncated = self._read_gateway_window()
         views = [
             view
             for request_id, records in grouped.items()
@@ -194,7 +229,16 @@ class QueryService:
             ),
             reverse=True,
         )
-        return views[:limit]
+        window = self._window(truncated or bool(corrupt), len(views))
+        window['truncated'] = window['truncated'] or len(views) > limit
+        selected = views[:limit]
+        payload = {'requests': selected, 'window': window, 'generated_at': _utc_now()}
+        if include_records:
+            # Same authorized, bounded journal snapshot as the list. Never fall
+            # back to full per-request scans or expand the current window.
+            payload['gateway_records'] = {view['request_id']: grouped[view['request_id']]
+                                          for view in selected}
+        return payload
 
     def detail(
         self,
@@ -202,11 +246,13 @@ class QueryService:
         live_lookup: Callable[[str], dict[str, Any]],
         current_session_id: str,
     ) -> dict[str, Any]:
-        grouped, gateway_corrupt = self._read_gateway()
-        gateway_records = grouped.get(request_id)
+        gateway_records, gateway_corrupt, gateway_truncated = self._matching_records(self._gateway_store, request_id)
+        gateway_records = self._normalize(gateway_records)
         if not gateway_records:
+            if gateway_truncated or gateway_corrupt:
+                raise QueryWindowIncompleteError(request_id)
             raise RequestNotFoundError(request_id)
-        engine_records, engine_corrupt = self._engine_store.read_all()
+        engine_records, engine_corrupt, engine_truncated = self._matching_records(self._engine_store, request_id)
         final_state = self._request_view(request_id, gateway_records)
         backend_kind = (
             final_state.get("backend_kind", "mock")
@@ -217,7 +263,7 @@ class QueryService:
             [
                 record
                 for record in engine_records
-                if record.get("request_id") == request_id
+                if record.get("request_id") == request_id and record.get("kind") != "source_qualified_native_receipt"
             ]
             if backend_kind == "mock"
             else []
@@ -267,6 +313,20 @@ class QueryService:
                     "error": None,
                     "evidence_kind": "engine_log",
                 }
+            if final_state is not None and final_state.get('result') == 'INCOMPLETE':
+                evidence_summary = '최종 기록이 없어 Gateway 전달 여부 미확인'
+            elif attempted is False:
+                evidence_summary = (
+                    "Gateway 미전달 확인, backend 미수신은 미확인(증거원 미연결)"
+                )
+            elif attempted is True and response == "completed":
+                evidence_summary = (
+                    "Gateway 전달·응답 수신, backend 측 수신 기록 미연결"
+                )
+            else:
+                evidence_summary = (
+                    "Gateway 전달 시도, backend 미수신 여부는 미확인(증거원 미연결)"
+                )
             if log is not None and log.get("status") == "observed":
                 # Engine-side evidence: the forwarded ID appeared in the engine's own log.
                 matching_receipts = [{
@@ -283,25 +343,29 @@ class QueryService:
                 )
             elif response_id == "engine_response_id_matched":
                 evidence_summary = "엔진 응답 ID가 Gateway 요청 ID와 일치(엔진 로그 근거는 미연결·미확인)"
-            elif attempted is False:
-                evidence_summary = (
-                    "Gateway 미전달 확인, backend 미수신은 미확인(증거원 미연결)"
-                )
-            elif attempted is True and response == "completed":
-                evidence_summary = (
-                    "Gateway 전달·응답 수신, backend 측 수신 기록 미연결"
-                )
-            else:
-                evidence_summary = (
-                    "Gateway 전달 시도, backend 미수신 여부는 미확인(증거원 미연결)"
-                )
+            if self._native_receipt_restore is not None and engine_records:
+                self._native_receipt_restore(engine_records)
+            native = self._native_receipt_lookup(gateway_records,request_id,current_session_id) if self._native_receipt_lookup is not None else None
+            if native is None and any(row.get('kind') == 'source_qualified_native_receipt' for row in engine_records):
+                evidence_state = 'unknown'
+                evidence_summary = '보존된 native 근거의 현재 판본·요청 문맥 검증 미확인'
+            if native is not None:
+                matching_receipts = [native,*native.pop('historical_related_receipts',[])]
+                projection = native['projection'];facts=projection.get('native_projection')or{}
+                physical = (facts.get('anchor')or{}).get('physical_process_binding_verified')is True
+                measured = projection['source_data_origin'] == 'MEASURED' and (physical or backend_kind=='sglang' and facts.get('native_termination_verified')is True)
+                evidence_state = 'received' if measured else 'unknown'
+                historical = native.get('capture_state')=='closed' or native.get('historical_receipt') is True
+                checkpoint = projection.get('closure_basis') == 'live_checkpoint' and projection.get('checkpoint_coverage_verified') is True
+                evidence_summary = ('과거 native 요청 근거, 현재 센서 감시 상태는 별도' if historical else 'native 요청 checkpoint·범위별 종결 근거' if checkpoint else '미봉인 native 요청 관측, 종결·향후 감시는 미확인')+' ('+projection['source_data_origin']+')'
+                live = {'status':'not_available' if historical else 'confirmed' if measured else 'unknown','queried_at':None,'error':None,'evidence_kind':'source_qualified_native_history' if historical else 'source_qualified_native_projection'}
         else:
             live = live_lookup(request_id)
             live_status = live.get("status")
             if matching_receipts or live_status == "confirmed":
                 evidence_state = "received"
                 evidence_summary = "엔진 수신 확인"
-            elif live_status == "not_found" and same_session and not engine_corrupt:
+            elif live_status == "not_found" and same_session and not engine_corrupt and not engine_truncated and final_state is not None and final_state.get('result') != 'INCOMPLETE':
                 evidence_state = "not_received"
                 evidence_summary = (
                     "Gateway 미전달, 엔진 미수신 확인"
@@ -316,6 +380,8 @@ class QueryService:
                     evidence_summary = "이전 관측 세션 요청이라 실시간 조회로 미수신을 확인할 수 없음"
                 else:
                     evidence_summary = "엔진 수신 기록 손상으로 수신 확인 불가"
+        if gateway_truncated or engine_truncated:
+            evidence_summary += ' · 최근 기록 범위의 근거이며 이전 기록 일부는 조회 범위 밖'
         return {
             "request_id": request_id,
             "backend_kind": backend_kind,
@@ -331,4 +397,8 @@ class QueryService:
             "evidence_state": evidence_state,
             "evidence_summary": evidence_summary,
             "generated_at": _utc_now(),
+            "window": {'truncated': gateway_truncated or engine_truncated,
+                       'gateway_search_complete': not gateway_truncated and not gateway_corrupt,
+                       'engine_search_complete': not engine_truncated and not engine_corrupt,
+                       'max_search_bytes': 64 * 1024 * 1024},
         }

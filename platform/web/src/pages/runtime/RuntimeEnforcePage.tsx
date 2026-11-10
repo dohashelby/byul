@@ -126,6 +126,7 @@ export function RuntimeEnforcePage() {
                   <td title={c.limitation ?? c.note ?? ""}>
                     {c.summary}
                     {c.evidence.length ? ` · 증거: ${c.evidence.join(" · ")}` : ""}
+                    {c.limitation && <div className={rt.sub}>범위·한계: {c.limitation}</div>}
                     {c.note && <div className={rt.sub}>{c.note}</div>}
                   </td>
                 </tr>

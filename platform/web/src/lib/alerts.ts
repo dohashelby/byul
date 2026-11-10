@@ -1,6 +1,7 @@
 import type { RuntimeEvent } from "../api/types";
 import { alertSeverity, EXEC_VERDICT, PHASE, SEVERITY_ORDER, type AlertSeverity } from "./labels";
 import { isTetragonBlockAttempt, isTetragonSigkill } from "./tetragon";
+import { alertScope } from "./eventScope";
 
 export type AlertGroup = { key: string; severity: AlertSeverity; title: string; first: string | null; last: string | null; items: RuntimeEvent[] };
 
@@ -15,7 +16,7 @@ export function groupAlerts(events: RuntimeEvent[]): AlertGroup[] {
       : o.binary ?? o.rule_id ?? event.rule_ref ?? event.source;
     const phase = o.phases?.join("+") || event.phase || "unknown";
     const blocked = isTetragonBlockAttempt(event);
-    const key = JSON.stringify([verdict, subject, phase, blocked]);
+    const key = JSON.stringify([alertScope(event), verdict, subject, phase, blocked]);
     const severity = alertSeverity(o.exec_verdict ?? o.verdict, o.rule_id ?? event.rule_ref, event.source);
     const kind = event.source === "hubble" ? "통신" : o.kind === "file_access" ? /secret/i.test(o.rule_id ?? event.rule_ref ?? "") ? "보호 파일 읽기" : "파일 접근" : "프로그램 실행";
     const explanation = o.exec_verdict ? EXEC_VERDICT[o.exec_verdict] ?? "판정 미분류" : o.verdict?.toLowerCase() === "dropped" ? "차단됨(정보)" : "관측";

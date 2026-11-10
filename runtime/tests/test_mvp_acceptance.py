@@ -3,9 +3,11 @@
 import json
 from pathlib import Path
 import tempfile
+import threading
+from unittest.mock import patch
 import unittest
 
-from serving_runtime.mvp.acceptance import execute_acceptance, write_reports
+from serving_runtime.mvp.acceptance import execute_acceptance, write_reports, _Runner, _run_s4_06, _run_s1_06
 from serving_runtime.mvp.app import GatewayApp
 from serving_runtime.mvp.config import MVPConfig
 from serving_runtime.mvp.policy import load_policy
@@ -51,6 +53,63 @@ class M4UnitTests(unittest.TestCase):
 
 
 class FullAcceptanceTests(unittest.TestCase):
+    def test_zeroday_passthrough_binds_recorded_upstream_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            runner = _Runner(Path(temporary))
+            try:
+                result = _run_s4_06(runner)
+            except PermissionError as error:
+                self.skipTest(f"local sockets are unavailable: {error}")
+            finally:
+                runner.stop()
+            self.assertTrue(result.passed, result.actual)
+            self.assertTrue(result.actual["backend_values_match"])
+            self.assertTrue(result.actual["backend_request_id_matches_recorded_upstream"])
+            records, _ = JsonlStore(Path(temporary) / "s4-06" / "gateway_records.jsonl").read_all()
+            normal_id = result.evidence_request_ids[0]
+            final = next(r for r in records if r.get("request_id") == normal_id and r.get("phase") == "final")
+            self.assertEqual(final["upstream_request_id"], "byul-cb-" + normal_id)
+
+    def test_s1_06_waits_for_regular_final_after_http_body(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            pending, release = threading.Event(), threading.Event()
+            class DelayedRunner(_Runner):
+                def start_gateway(self, *args, **kwargs):
+                    super().start_gateway(*args, **kwargs)
+                    if kwargs.get("data_dir") != self.data_dir:
+                        return
+                    append = self.gateway._records.append
+                    def delayed_final(record):
+                        if record.get("phase") == "final":
+                            pending.set()
+                            if not release.wait(3):
+                                raise AssertionError("test final append not released")
+                        return append(record)
+                    self.gateway._records.append = delayed_final
+            runner = DelayedRunner(Path(temporary))
+            read_all = JsonlStore.read_all
+            main_thread = threading.get_ident()
+            observed = []
+            def release_after_missing_regular_final(store):
+                rows, corrupt = read_all(store)
+                if (pending.is_set() and not release.is_set() and threading.get_ident() == main_thread
+                        and store.path == runner.data_dir / "gateway_records.jsonl"):
+                    observed.append(True)
+                    release.set()
+                return rows, corrupt
+            try:
+                with patch.object(JsonlStore, "read_all", release_after_missing_regular_final):
+                    result = _run_s1_06(runner)
+            except PermissionError as error:
+                self.skipTest(f"local sockets are unavailable: {error}")
+            finally:
+                release.set()
+                runner.stop()
+            self.assertTrue(pending.is_set() and observed)
+            self.assertTrue(result.passed, result.actual)
+            self.assertTrue(result.actual["final_records_ready"])
+            self.assertEqual(result.actual["duplicate_final_ids"], [])
+
     def test_mvp_s1_s2_s3a_and_s4_cases(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             data_dir = Path(temporary) / "data"

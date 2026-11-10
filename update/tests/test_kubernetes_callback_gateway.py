@@ -19,7 +19,8 @@ def configured(*, late=False):
             world.packets.append(requests)
             if late:
                 world.changed = True
-            return world.result([{'id': r['id'], 'outcome': 200, 'capture_complete': True, 'body': '{}'} for r in requests])
+            return world.result([{'id': r['id'], 'outcome': 200, 'capture_complete': True, 'body': '{}',
+                'response_headers': {'x-request-id': 'gateway-issued-1', 'set-cookie': 'sensitive'}} for r in requests])
         return world.runner(argv, **kwargs)
     return env, base, full, world, runner
 
@@ -39,6 +40,8 @@ def test_dispatches_to_gateway_and_keeps_callback_source_on_engine():
     assert transport.binding['engine'] == base['kubernetes']['engine']
     assert sum('gateway-pod' in call for call in world.calls) >= 2
     assert transport.report()['principal_authenticity_verified'] is False
+    assert result['gateway_request_id'] == 'gateway-issued-1'
+    assert 'response_headers' not in result and 'sensitive' not in json.dumps(result)
 
 
 def test_rejects_engine_dispatch_and_late_gateway_replacement():

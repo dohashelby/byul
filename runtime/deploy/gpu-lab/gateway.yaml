@@ -41,6 +41,17 @@ spec:
         - name: gateway
           image: serving-gateway
           imagePullPolicy: Never
+          readinessProbe:
+            exec:
+              command:
+                - python3
+                - -I
+                - -S
+                - -c
+                - "import socket; socket.create_connection(('127.0.0.1', 8080), timeout=0.5).close()"
+            periodSeconds: 1
+            timeoutSeconds: 1
+            failureThreshold: 1
           args:
             - mvp
             - --backend
@@ -69,6 +80,14 @@ spec:
             - /srv/serving/runtime/data
             - --environment
             - aws-lab
+            - --native-receipt-feed
+            - /srv/serving/observation/native/receipts.json
+            - --native-receipt-reader-gid
+            - "10010"
+            - --native-receipt-producer-sha256
+            - 3c8bda5a7b6a841728b70b1cdb6c982132f03d4b5acc52cf5f6488295880e3f8
+            - --observation-feed
+            - management_listener=/srv/serving/runtime/management-access/access.jsonl
             - --observation-feed
             - hubble=/srv/serving/observation/hubble.jsonl
             - --observation-feed
@@ -82,9 +101,13 @@ spec:
             - --lab-report
             - /srv/serving/observation/lab-reports
             - --observation-heartbeat
+            - management_listener=/srv/serving/runtime/management-access/heartbeat.json
+            - --observation-heartbeat
             - hubble=/srv/serving/observation/hubble.heartbeat.json
             - --observation-heartbeat
             - tetragon=/srv/serving/observation/tetragon.heartbeat.json
+            - --kube-context
+            - byul-aws-lab
             - --observation-origin
             - real
             - --observation-environment
@@ -102,10 +125,13 @@ spec:
             - {name: verification, mountPath: /etc/serving/verification, readOnly: true}
             - {name: model, mountPath: /models, readOnly: true}
             - {name: auth, mountPath: /etc/serving/auth, readOnly: true}
+            - {name: management-access, mountPath: /srv/serving/runtime/management-access, readOnly: true}
             - {name: runtime-data, mountPath: /srv/serving/runtime/data}
             - {name: observation, mountPath: /srv/serving/observation, readOnly: true}
             - {name: tmp, mountPath: /tmp}
       volumes:
+        - name: management-access
+          hostPath: {path: /srv/serving/runtime/management-access, type: Directory}
         - name: backend-config
           configMap: {name: serving-gateway-backend}
         - name: bundles

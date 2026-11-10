@@ -11,6 +11,7 @@ import time
 from tools.tetragon_capability import classify_capabilities
 from tools.tetragon_trial import atomic_json, run
 from tools.tetragon_public import public_snapshot
+from tools.k8s_observation_feed import check_reader_group
 from serving_runtime.enforcement.tetragon import comparable_spec
 from serving_runtime.enforcement.recovery import RecoveryTracker
 
@@ -36,7 +37,9 @@ def method_from_spec(policy):
 
 
 class StatusCollector:
-    def __init__(self,context,output,evidence_dir,*,runner=run,recovery=None,public_output=None):
+    def __init__(self,context,output,evidence_dir,*,runner=run,recovery=None,reader_gid=None,public_output=None):
+        check_reader_group(reader_gid)
+        self.reader_gid=reader_gid
         self.context=context
         self.output=Path(output)
         self.evidence=Path(evidence_dir)
@@ -164,9 +167,9 @@ class StatusCollector:
                 result["monitoring"] = {"state":"error","reasons":["recovery_evidence_unavailable"]}
         else:
             result["monitoring"] = {"state":"not_configured","reasons":["recovery_check_not_configured"]}
-        atomic_json(self.output,result,mode=0o644)
+        atomic_json(self.output,result,reader_gid=self.reader_gid)
         if self.public_output is not None:
-            atomic_json(self.public_output,public_snapshot(result),mode=0o640)
+            atomic_json(self.public_output,public_snapshot(result),mode=0o640,reader_gid=self.reader_gid)
         return result
 
 
@@ -177,6 +180,7 @@ def main():
     parser.add_argument("--public-output",type=Path,help="읽기 전용 대시보드용 최소 상태 사본(0640); 원본 유지")
     parser.add_argument("--evidence-dir",type=Path,required=True)
     parser.add_argument("--watch",action="store_true")
+    parser.add_argument("--reader-group",type=int)
     parser.add_argument("--interval",type=float,default=5)
     parser.add_argument("--capture-baseline",type=Path,help="현재 정책 spec·모드를 기대값 파일로 저장; 원격 변경 없음")
     parser.add_argument("--expected-policies",type=Path)
@@ -195,7 +199,7 @@ def main():
         heartbeat_path=args.feed_heartbeat,observations_path=args.observations) if all(checks) else None)
     if args.public_output and args.public_output.resolve() == args.output.resolve():
         parser.error("public-output must differ from the private output")
-    collector=StatusCollector(args.context,args.output,args.evidence_dir,recovery=recovery,public_output=args.public_output)
+    collector=StatusCollector(args.context,args.output,args.evidence_dir,recovery=recovery,public_output=args.public_output,reader_gid=args.reader_group)
     while True:
         result=collector.collect()
         if not args.watch and result.get("error")=="정책 변경 감지: 로드 안정화 대기 중":

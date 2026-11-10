@@ -95,6 +95,7 @@ def load_holds(path: str | Path | None) -> tuple[set[str], set[str], dict[str, A
 class _Unit:
     newest: datetime | None
     lines: dict[str, list[int]]
+    times: dict[str, list[datetime]]
     size: int
     held: bool
     classified: bool
@@ -157,8 +158,18 @@ class RecordRetention:
                     key = f"request:{group}"
                 else:
                     key = f"{managed.name}:line:{line_number}"
+                # The first route-audit v1 writer stored its run only in scope.
+                # Preserve existing records and their cross-file request units
+                # when either declared run is held, including conflicting data.
+                route_scope_run = None
+                if (managed.name == "gateway_route_rejections.jsonl" and isinstance(record, dict)
+                        and record.get("schema_version") == "runtime-route-rejection/1.0"):
+                    scope = record.get("scope")
+                    route_scope_run = scope.get("run_id") if isinstance(scope, dict) else None
                 held = (
                     isinstance(run_id, str) and run_id in hold_runs
+                ) or (
+                    isinstance(route_scope_run, str) and route_scope_run in hold_runs
                 ) or (
                     isinstance(request_id, str) and request_id in hold_requests
                 )
@@ -174,12 +185,15 @@ class RecordRetention:
                     units[key] = _Unit(
                         timestamp,
                         {managed.name: [line_number]},
+                        {managed.name: [timestamp] if timestamp is not None else []},
                         len(raw_line),
                         held,
                         timestamp is not None,
                     )
                 else:
                     unit.lines.setdefault(managed.name, []).append(line_number)
+                    if timestamp is not None:
+                        unit.times.setdefault(managed.name, []).append(timestamp)
                     unit.size += len(raw_line)
                     unit.held = unit.held or held
                     unit.classified = unit.classified and timestamp is not None
@@ -240,9 +254,9 @@ class RecordRetention:
         for name, (unclassified, size, file_units) in scanned.items():
             chosen = {key: removal[key] for key in file_units if key in removal}
             removed_times = [
-                units[key].newest
+                timestamp
                 for key in chosen
-                if units[key].newest is not None
+                for timestamp in units[key].times.get(name, [])
             ]
             lines = sorted(
                 line

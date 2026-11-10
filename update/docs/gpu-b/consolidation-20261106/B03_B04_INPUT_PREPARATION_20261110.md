@@ -37,6 +37,20 @@ main `7a985052`의 관련 21파일을 고정해 확인했다. native24의 mp-wor
 
 S4 인계서 SHA `322d345dfc134d51a994ffde57b9e4a6977d53a506938ed306ae7a595361a48b`, 실제 사전점검 기록 SHA `16739ee83cc33385bcfb7f0158be074b5bda452755a12feecb525524fb04ece0`다. private 경로·원 신원 자료는 공개하지 않았다. 새 모델 다운로드·대용량 재해시·제품 코드 수정·AWS/GPU 실행은 0이다.
 
+이 원 준비 범위의 S6 검토 SHA는 `9171f6d7ee230f1cb5ecc660a72c254516071bf7b22e0141f525231c2a85757e`다. 유효49대조를 재사용하고 요약/전체 record 형태에 대한 검증기 가정1건은 후속3대조/불일치0(SHA `1881241d7fb55d2f1ea357b9a2cdf4c1ddd1d086d0744b21744d1e5878f88a32`)으로 해소했다. 원 준비 검사와 이후 제어 계획 ID·역할 혼입에 대한 새 보강은 별도다.
+
+## B04 제어 계획 혼입 사전검증 보강
+
+기존 검증기는 파일 SHA와 JSON object가 맞아도 정상·복구 포인터 교환이나 다른 점검의 제어 계획 혼입을 구분하지 못했다. 두 경우 모두 실행 준비는 INCOMPLETE였으며 실행 승인이 잘못 발급된 결함은 아니다.
+
+[B 검증기](../../../tools/b12_tp2_verify.py)에 기존 `B04-declared-control-plan/1` 계획의 `check_id`와 `role`을 현재 점검 ID·제어 역할과 대조하는 6줄을 추가했다. 다른 generic/미지 schema의 지원을 변경하지 않았고 경로·파일 SHA·runtime/prepared·권한·정리·기한 guard는 유지했다. case/rank/source/시간의 실행 의미를 모두 검증하는 기능으로 확대하지 않았다.
+
+WSL CPython3.12.3 `-I -S -B`에서 변경된 3경계를 직접 확인했다. 기존 실제 계획9개는 새18개 MATCH 외 결과가 동일한 INCOMPLETE/오류0이다. 정상↔복구 교환은 역할 불일치2건, 다른ID 혼입은 ID 불일치1건으로 FAILED를 반환한다. runtime/prepared/ready는 false다. 원9파일을 재생성하지 않고 `/mnt/c`에서 같은 bytes/SHA로 읽었다. FD 권한 모델·NTFS/ext4 동등성·실제 엔진·생산자 자격·전체 CLI 적용 완료를 주장하지 않는다.
+
+최초 Windows3.12.14 오프라인 검사에 붙인 qualified 표기는 부정확해 원본을 보존한 후속에서 취소했다. 이번 WSL 검증을 별도 수행했으며 단순 파일명은 검증 환경의 근거가 아니다. 새 source-freeze SHA `fc04c2e7cafc137b59e140dd1766562500f2cf6dd518247d28bdfe427308aed5`, WSL 직접 결과 SHA `9ae1aa7f97e2a94d8c086be77195ae0dc5666d1b81f19a2e9f79fdf214ea46f2`, 소스 SHA `6cf0647e47a7c9c05aa32f85d66f448cb17ba080695f6a59e76e397262ae7bb5`다.
+
+새6줄의 S6 독립 검토 SHA `0a5975410ce15f1e7ac41cdd4827178fc59d53a490662149a0f2f82efa938733`의 유효25대조와 후속5대조/불일치0(SHA `3ec89c79d9b3de772f7c66e8b03edf1c6404a85cd79a329fdc87111d2068066d`)을 연결했다. 원 검토26/잘못된 기대값1건은 이력으로 보존했다. 원 파일 bytes 변경이 아닌 포인터 교환을 사용한 실제 입력임을 후속에서 확인했으며 제품 결함으로 집계하지 않는다. root 공개 소스는 검토된 원 bytes와 동일하고 제품 목록528파일은 변경하지 않았다. 새 전체 CLI·TP2 실행 완료는 아니다.
+
 ## 다음 반환과 실행 분리
 
 S5는 B03 실입력과 CPU 준비, S4는 B04 case별 반환 요구, S2는 실제 운영·현재 신원·요청 대응, S6는 새 변경 독립 검토, root는 [실행 순서·공유 조건](B03_EXECUTION_SHARING_ORDER_20261110.md)과 PR 통합을 맡는다. A의 남은 공통 producer·정본팩·자격/TP2 반환과 권한자의 정책값은 해당 분기에만 적용한다. B03/B04를 현재 SUP16의 전역 시작 조건으로 붙이지 않는다.

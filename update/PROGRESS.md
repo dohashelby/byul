@@ -1,5 +1,6 @@
 ## 2026-11-10 — B03 실제 입력 소비·B04 준비와 R4 실패 정리
 
+- 후속 보강: `b12_tp2_verify.py`에 기존 B04 계획의 ID·역할 결합6줄을 추가했다. 실제9계획의 포인터교환을 WSL3.12.3-I-S-B로 직접 대조해 정상INCOMPLETE유지·역할혼입2건/점검혼입1건FAILED를 확인했다. 독립 유효25대조+검증기후속5대조/불일치0·root exactcopy를 연결했다. 원Windows qualified표현은취소/원본보존했고 실제TP2·rank배정·engine자격은아니다. 후속R5는copy helper·wrapper 내부해시·내장argv/manifest핀과phase를수정해독립71대조/불일치0 후 같은GPU1대 기동·running/SSMOnline을확인하고21:48:03KST 실행1회착수했다. 역할별실측성공은원관측확인전미완료다.
 - B03: 선정7개 실제 입력 생성·EXAMPLE 정책6개 수용·SUP13 누락 진단을 준비했다. 원 계약 producer→consumer CPU18경계와 추가 CLI/TOML→RunConfig/registry 구성1경계를 검증했고 S6 독립250대조/불일치0을 확인했다. 실제 HTTP·application.run·현재 target·GPU 완료는 아니다. 검토한 공개 B 도구와40행 정적 요약을 정확 복사했고 engine 공유는 미검증으로 유지한다.
 - B04: LIF08·11/SUP06의 설계case7개·계획 단계/rank행42개를 구체화했다. 기존 도구로 control JSON9개의SHA·object를 확인했으며 실제 신원·정책·TP2 배정이 없어 INCOMPLETE다. native24의 기존TP1 코드와TP2·공통producer·자격을 구분한다. [준비 범위와 반환](docs/gpu-b/consolidation-20261106/B03_B04_INPUT_PREPARATION_20261110.md), [순서·공유·시간](docs/gpu-b/consolidation-20261106/B03_EXECUTION_SHARING_ORDER_20261110.md).
 - R4: 기존GPU1대/TP1에서42파일 설치·host health는 성공했지만 역할 전 copy 단계에서 R3 목적지 상수와 R4 실제입력 불일치로 실패했다. 첫 실패capsule·원stderr297bytes를 회수했다. 후속selector phase 불일치도 분리해 원4receipt 오프라인7경계와 독립14대조/불일치0으로 최소후보를 확인했다. 원 R4 불변·같은실패 재기동0. [실패 원인·증거·정리](docs/gpu-b/consolidation-20261106/SUP16_R4_PRE_ROLE_FAILURE_20261110.md).

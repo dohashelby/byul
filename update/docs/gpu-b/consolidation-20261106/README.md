@@ -1,5 +1,7 @@
 # GPU43 1단계 통합 현황 — 2026-11-06
 
+> **2026-11-10 후속:** [B03·B04 입력 준비·소비 범위와 남은 반환](B03_B04_INPUT_PREPARATION_20261110.md), [실행 순서·공유 조건](B03_EXECUTION_SHARING_ORDER_20261110.md), [SUP16 R4 실제 실패·정리](SUP16_R4_PRE_ROLE_FAILURE_20261110.md)를 먼저 확인한다. 검토된 B03 실제 생성·CPU 설정 소비와 실제 GPU 완료를 구분한다. R4는 역할 전 복사 경로 불일치로 실패했고 후속 실제 stopped를 확인했다. 현재 인계 PR은 #240이며 아래 시점별 원 결과·FAIL·UNKNOWN·Ref는 보존한다.
+
 > **최신 준비 보강(2026-11-09):** [B4·REQ08/09/10·SUP16의 GPU 미기동 준비](PREPARATION_FOLLOWUP_20261109.md)를 따른다. 실제 파일/선언 결합·기록 인계·고정 자산을 확인했으며 runtime/권한·GPU-ready는 별도로 남는다.
 
 > **최신 후속(2026-11-08): CI 수정·B3 CPU 실제 API/기록기 연결·B5 검토.** 원40개 CI 실패를 수정한 d1d91329는14/14성공했다. 추가 공급물 CPU 관측·기록 보존과 쌍 기록기 연결은 [B3 결과와 잔여](B3_CPU_FOLLOWUP_20261108.md), [CI 수정](CI_FOLLOWUP_20261108.md), [B5 의견](../B5_REVIEW_OPINION_20261108.md)을 따른다. B3 통합 head의 CI는 별도 확인한다. GPU 추가 기동0이며 실제 API·historical 재생·EXAMPLE 계약 시험을 실측 완료 수에 합산하지 않는다.

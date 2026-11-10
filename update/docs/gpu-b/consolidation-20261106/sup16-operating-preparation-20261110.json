@@ -905,7 +905,7 @@
     ],
     "final_query_end_UTC": "2026-11-10T12:19:15.741679Z",
     "exact_poweroff_UTC": null,
-    "final_delta_independent_review": "pending",
+    "final_delta_independent_review": "complete",
     "force": 0,
     "stop_resubmissions": 0,
     "timer_reset": 0,
@@ -914,6 +914,10 @@
     "resource_budget_confirmation_owner": "user",
     "new_full_resource_inventory": false,
     "new_cost_estimate": null,
-    "product_complete_claimed": false
+    "product_complete_claimed": false,
+    "normal_stop_driver_anchor_UTC": "2026-11-10T12:11:27.414192Z",
+    "actual_stop_CLI_acceptance_result_UTC": "2026-11-10T12:11:35.017359Z",
+    "final_delta_S6_review_sha256": "e1bcc9ca935116b3f0f950b3267b561cfdbd915168e8c8e6576b03f2684beec5",
+    "final_delta_required_followup_sha256": "ad5839a06751b16c738a09d84a2c4a0af1477591c4e269a6a01a83c33c6a6c14"
   }
 }

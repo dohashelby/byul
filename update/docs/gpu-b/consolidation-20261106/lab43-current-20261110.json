@@ -662,7 +662,7 @@
       ],
       "final_query_end_UTC": "2026-11-10T12:19:15.741679Z",
       "exact_poweroff_UTC": null,
-      "final_delta_independent_review": "pending",
+      "final_delta_independent_review": "complete",
       "force": 0,
       "stop_resubmissions": 0,
       "timer_reset": 0,
@@ -671,7 +671,11 @@
       "resource_budget_confirmation_owner": "user",
       "new_full_resource_inventory": false,
       "new_cost_estimate": null,
-      "product_complete_claimed": false
+      "product_complete_claimed": false,
+      "normal_stop_driver_anchor_UTC": "2026-11-10T12:11:27.414192Z",
+      "actual_stop_CLI_acceptance_result_UTC": "2026-11-10T12:11:35.017359Z",
+      "final_delta_S6_review_sha256": "e1bcc9ca935116b3f0f950b3267b561cfdbd915168e8c8e6576b03f2684beec5",
+      "final_delta_required_followup_sha256": "ad5839a06751b16c738a09d84a2c4a0af1477591c4e269a6a01a83c33c6a6c14"
     },
     "B03_B04_preparation_20261110": {
       "record": "B03_B04_INPUT_PREPARATION_20261110.md",
@@ -691,7 +695,19 @@
       "B04_control_JSON_files_verified": 9,
       "B04_preflight_status": "INCOMPLETE",
       "new_EVD_RES_RPT_Refs": false,
-      "current_runtime_identity": null
+      "current_runtime_identity": null,
+      "B04_control_header_binding": {
+        "source_sha256": "6cf0647e47a7c9c05aa32f85d66f448cb17ba080695f6a59e76e397262ae7bb5",
+        "scope": "known existing B04 plan check_id and role only",
+        "WSL_Python": "3.12.3 -I -S -B",
+        "actual_input_boundaries": 3,
+        "normal_result": "INCOMPLETE",
+        "role_pointer_swap_errors": 2,
+        "check_pointer_swap_errors": 1,
+        "actual_TP2_or_engine_qualification": false,
+        "S6_review_sha256": "0a5975410ce15f1e7ac41cdd4827178fc59d53a490662149a0f2f82efa938733",
+        "required_followup_sha256": "3ec89c79d9b3de772f7c66e8b03edf1c6404a85cd79a329fdc87111d2068066d"
+      }
     }
   },
   "B4_B5_B6_crosscut": {

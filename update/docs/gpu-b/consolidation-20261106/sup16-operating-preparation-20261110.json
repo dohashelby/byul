@@ -814,5 +814,65 @@
     "pending_history_resolution": "원 S2 0f633의 required_final_actual_verification_pending=true와 main1cfdd의 당시 control/stop/cost pending은 이력으로 보존. 후속 S6 b202 최종47대조/불일치0으로 해당 필수 검증 해소",
     "next_scope": "R2 종료 당시 다음 범위였던 과거 기록: S5 한정 필드수정 이후 전체 새 pin-chain·명시 frame/plan/roots·새 외부 attempt는 S2 준비 중·기동0이었다. 후속 R3 현재 상태는 별도 원자료를 따른다. 기존 guest R1 CODE/OPERATOR/RUNTIME/ASSETS/HEALTH·원ZIP14의 보존 범위, 원 기한·승인 범위를 유지하며 새 실행 gate를 추가하지 않는다.",
     "temporal_scope": "R2 종료시점의 실제 관측·정리·비용과 당시 다음 준비 범위를 보존한다. 후속 R3의 현재 실행/반출/종료 상태를 나타내지 않는다. sidecar 후속 검토 완료는 별도 갱신한다."
+  },
+  "latest_R3_capture_resource_status_20261110": {
+    "observed_UTC": "2026-11-10T10:44:38.757843+00:00",
+    "record": "SUP16_R3_CAPTURE_TRANSPORT_CLOSEOUT_20261110.md",
+    "scope": "original selected LAB snapshot; not PACK34/J01-J04 completion",
+    "actual_runtime_source_commit": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+    "current_PR_product_files": 528,
+    "current_PR_product_manifest_sha256": "6ba867aa1600ccd653c588387764c91196ec453904fa2e6ad2cffbab841b8e33",
+    "capture_failure": "FileNotFoundError required source_owner_verify.py sibling absent in declared41 plan; before capture execution",
+    "capture_recovery_review_sha256": "604c9d5b07f7338ceb630850f00f1e4f472ef5da3ed5c23db54765f15493ad47",
+    "source_layout_finding_sha256": "49cad4a60a696151b94a8477ba0ec13458e452f2ff91691067971304a61bb238",
+    "owned_stopped": 3,
+    "public_IPs": 0,
+    "normal_stop_submissions": 0,
+    "force": 0,
+    "exact_poweroff_UTC": null,
+    "specific_timer_execution_proven": false,
+    "missing_API_acceptance_UNKNOWN": 2,
+    "whole_archive_exported": false,
+    "product_completion_inferred": false,
+    "S6_final_stop_cost_review": {
+      "sha256": "4c96dabb9b2198fdae311ce7f8cfd4f5eb5efceabc293618ba838d848fa7f507",
+      "checks": 83,
+      "mismatches": 0
+    },
+    "cumulative_estimate_USD": 80.53692960227087,
+    "reserve_excluded_remaining_USD": 14.463070397729126,
+    "not_invoice": true,
+    "compute_IP_rate_after_stopped": 0,
+    "preserved_EBS_GiB": 440,
+    "EBS_USD_per_hour": 0.055748,
+    "new_CPU_scopes": {
+      "generic": 20,
+      "actual_layout": 3,
+      "installer": 3,
+      "not_sum_of_product_IDs": true
+    },
+    "new_candidate_integration": "v4 real callsite3/root1 and v5 firstworker1 CPU verified; independent112/75/58 checks passed; runtime newframe/pins/source coupling separate",
+    "selected_six_ready_observation": {
+      "record": "sup16-r3-ready-observation-20261110.json",
+      "sha256": "0f510c913550c4ea13e7842bcfbe1e57bf4221805fae7f0f52b05db8daf8bb5e",
+      "HTTP_ready": true,
+      "HTTP_status": 200,
+      "same_Pod_Ready_before_after": true,
+      "generation": 1,
+      "preparation_metadata_engine_imported": false,
+      "preparation_metadata_GPU_execution_claimed": false,
+      "no_whole_GPU_or_future_boot_promotion": true
+    },
+    "verified_new_B_code": {
+      "source_freeze_sha256": "c6cf0ab62ebba83904ba92a78373016c88ec7cbafbdb135861e8bebb13f951c8",
+      "public_files": 18,
+      "worker_first_delta_CPU": 1,
+      "S6_worker_first_checks": 75,
+      "S6_freeze_checks": 58,
+      "S6_callsite_checks": 112,
+      "source_review_mismatches": 0,
+      "current_original_R3_modified": false,
+      "new_operating_source_pins_data_connection": "in progress; user immediate existingGPU1/TP1 approval; resource/budget review delegated to user; no new inventory/ACK/CI start gate"
+    }
   }
 }

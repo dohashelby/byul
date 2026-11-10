@@ -1,0 +1,12 @@
+{
+  "original_raw_sha256": "a1f57baf2b7060db7d897c5ec0ed9459a867e5af84dec66206a7886fed6f42aa",
+  "fixture_sha256": "a55f5fcd614c1c0eeaa5957ccdcd74672cff37b6b20bf115a3a3cc03cccade57",
+  "function_AST_equal": {
+    "require": true,
+    "pairs": true,
+    "pack": true,
+    "unpack_bundle": true,
+    "unpack": true
+  },
+  "substitution": "Only WRAPPER_PATH/RECEIPT_PATH use EXAMPLE fixture paths; this is not the original full raw hash"
+}

@@ -1,3 +1,10 @@
+## 2026-11-10 — B 소비 연결·GPU 실행 묶음과 실패 증거 회수
+
+- 한 일: B02의 선정 `/1`~`/3` 소비 판정 보강과 LAB10/33 기록을 보존했다. SUP-16 R1의 전송 형식, R2의 helper descriptor 투영을 보강했고, R3는 원 stderr와 실제 배치 계획을 대조해 필수 `source_owner_verify.py` sibling 누락을 확인했다. 원41개를 보존한42개 배치안·설치기 후보를 만들고, 첫 실패 capsule·수락 응답 선행 저장·원900초 기한 전달/부분 기록의 최소 보강을 준비했다. 원 R3의 실제 실행본과 실패를 바꾸지 않았다.
+- 검증: 새 generic CPU20/0, 실제 생성42 소비3/0, 설치기42 decode·ASSETS18개 실제 생성·원 소비3/0을 별도 범위로 검증했다. 제품26개 완료로 합산하지 않는다. v2 private 통합에서 누락된 observer attach·driver 기한/GET argv를 실제 호출부 CPU3/0·native root finally1/0·독립112대조/불일치0으로 보수했다. v5는 원worker 최초 예외/traceback 순서를 복원해 관련 CPU1/0·독립75+58대조/불일치0을 확인했다. main `7a985052`를 병합한 제품528파일 목록 `6ba867aa…`은 S6 독립30대조/불일치0·기존6검토행 보존+새독립1행·원 hash gate528/exit0으로 확인했다. 로컬 전체 suite는 반복하지 않고 최종 PR Linux CI로 확인한다.
+- 실제 관측·정리: R3 당시 HTTP health ready=true/status200·전후 동일 PodReady=True를 기존 원문으로 확인했다. prep metadata와 engine 프로세스·GPU 내부 소비는 구분한다. 후속 EC2 소유3대 stopped·공인IP0/SSM·pending·executing0, S6 정리·비용83대조/불일치0으로 현재 자원을 마감했다. 누적$80.53692960227087는 비청구 추정이며 compute/IP 보수 구간을 닫고 EBS 보존비는 계속된다. 추가 GPU 기동은 없다.
+- 다음 단계·잔여: 검토 완료 코드와 실제 Ready·정리 기록을 PR #240에 반영하고 최종 head CI를 확인한다. 사용자의 기존1GPU/TP1 즉시 재개·예산사용자담당 지시에 따라 새source/pin 묶음 결합 후 S2가 실측하며 전체resource/budget fresh조회·새ACK·PRCI를 기동조건으로 추가하지 않는다. 새 GPU 재검증·실제 capture/writer/factory 및 정확 제품 Ref·전체 GB18 무결성은 별도다. 원 whole FAIL, 수락 미확정2건, EXAMPLE/DRAFT/official 값과43개 항목의 원 Ref·판정은 보존한다. [R3 원인·검증 범위·자원 마감](docs/gpu-b/consolidation-20261106/SUP16_R3_CAPTURE_TRANSPORT_CLOSEOUT_20261110.md).
+
 ## 2026-11-09 — A·B 작업지시서 2차(vLLM 1차 완성)
 
 - 한 일: PR #241 병합(`3bd6a995`) 뒤 `docs/WORK_ORDER_VLLM_1.md`를 썼다. 1차 완성 기준(69개 0.31.0 정본 실측, 1차 제외 10개 UNKNOWN 기록, 0.32.0 비교와 회귀 탐지, 공식 재판정), A01~A10·B01~B07·J01~J04, 69개 배정표가 들어 있다. 영향도를 넣는 새 팩(@34)이 77개 정의를 모두 바꾸므로 새 팩을 정본 실측보다 먼저 둔다. 11-08·11-09의 "공통 입력 `/2`" 내용은 `/2`·`/3`이 이미 쓰여 `/4`로 옮기자고 적었다(사용자 확인 필요). `CLAUDE.md`·`AGENTS.md` 5절에 작업지시서 링크를 더했다.

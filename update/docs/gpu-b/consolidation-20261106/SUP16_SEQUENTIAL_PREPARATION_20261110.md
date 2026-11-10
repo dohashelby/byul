@@ -1,5 +1,7 @@
 # SUP-16 순차 역할 준비와 남은 실제 연결
 
+최신 R3 후속: 필수 sibling 파일 누락을 원 stderr로 확인했고, 소유3대 stopped·공인IP0 및 보수 비용 마감은 S6 83대조/불일치0으로 검증했다. 새 수정 후보의 CPU·통합 검토와 실제 GPU 재검증은 구분한다. [R3 원인·정리 기록](SUP16_R3_CAPTURE_TRANSPORT_CLOSEOUT_20261110.md). 기존43행·Ref·LAB10/33은 유지한다.
+
 R2에서 전송·설치·host health·normal7FD/partial 입력 준비를 실제 확인했지만 SUP-16 모델Ready·3역할/worker·제품 실행 완료는 아니다. first normal-before bind의 명령파일 게시 전 계약 실패와 원 실패/정리 결과를 분리한다. 기존 normal-before→challenge-partial→normal-recovered·fullpair 이력은 유지한다.
 
 > R2 전 서두 이력: 2026-11-10 마감 기준으로 이번 선정 GPU 실행에서 SUP-16 실제 관측은 없다. normal-before → challenge-partial → normal-recovered 순차 component 준비와 실제 실행을 구분한다. 삭제한 Pod 재생이나 미래 target/prepared 신원 발급으로 전체 pair를 채우지 않는다.

@@ -1,0 +1,31 @@
+[
+  {
+    "original_alias": "helper.py",
+    "fixture": "original_transport.py",
+    "original_raw_sha256": "51ccda6e7dea0d2cb960905ee617f0b85852fa7172dd386a8647342529767e01",
+    "fixture_raw_sha256": "a890ca93d7c9609b4c98c02b056bfef84695a473f781f7cf4c75261a26d5048c",
+    "function_AST_equal": {
+      "put_name": true,
+      "get_name": true,
+      "local_source": true,
+      "checked_local_parent": true,
+      "open_new_local": true,
+      "hash_fd": true,
+      "Transfer": true
+    },
+    "replaced_values": "helper INSTANCE/REMOTE_SOURCE are explicit EXAMPLE seams; no real remote program executed"
+  },
+  {
+    "original_alias": "root_contract.py",
+    "fixture": "original_cli.py",
+    "original_raw_sha256": "27eef88640bb654236102a9e176d3bc4a3f700caeb40abd952c7dd675825d745",
+    "fixture_raw_sha256": "dd5235b4b42c149a83b0e12e3c802964ef8a09d0b8a38d82bf53bd6c7a4a371b",
+    "function_AST_equal": {
+      "require": true,
+      "group_active": true,
+      "wait_child": true,
+      "call_cli": true
+    },
+    "replaced_values": null
+  }
+]

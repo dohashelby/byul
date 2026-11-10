@@ -1,5 +1,7 @@
 # REQ-08·09·10 / SUP-16 GPU 1장 선정 검증
 
+최신 R3 후속: 필수 sibling 파일 누락을 원 stderr로 확인했고, 소유3대 stopped·공인IP0 및 보수 비용 마감은 S6 83대조/불일치0으로 검증했다. 새 수정 후보의 CPU·통합 검토와 실제 GPU 재검증은 구분한다. [R3 원인·정리 기록](SUP16_R3_CAPTURE_TRANSPORT_CLOSEOUT_20261110.md). 기존43행·Ref·LAB10/33은 유지한다.
+
 사용자 요청 범위는 기존 세션을 재사용한 GPU 1장·TP1 실측이다. 실제 요청 대응, 고정 runtime·Ready·정상 대조를 먼저 확인하고, 생성된 증거만 반영한다. PR #232가 2026-11-09 14:25 KST에 병합되어 [후속 Draft PR #240](https://github.com/dohashelby/byul/pull/240)에서 이어간다. [#232의 연결 댓글](https://github.com/dohashelby/byul/pull/232#issuecomment-6733655479)도 남겼다. 이 문서는 원 43개 전체의 PASS 또는 전체 완료 판정이 아니다.
 
 ## 2026-11-10 현재 LAB 잔여 재개

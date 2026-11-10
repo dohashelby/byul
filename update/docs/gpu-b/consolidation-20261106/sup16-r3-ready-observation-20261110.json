@@ -1,0 +1,142 @@
+{
+  "schema": "s4-R3-selected-six-ready-public-summary/1",
+  "scope": "R3 normal-before 당시 HTTP health와 동일 Pod Ready의 원 실행 관측. 준비 컨테이너 runtime metadata. 현재boot/engine과 전체GPU질문 완료로 확대하지 않음",
+  "evidence": [
+    {
+      "original_member": "operator/normal-before/controller/observe/188-sup16-ready-normal-before.stdout",
+      "bytes": 31,
+      "sha256": "c9b873f885b1d0d2485c3bfe5494271da3599516026b34e749d62f2fa1f8be97",
+      "header_SHA_matches": true,
+      "raw_deflate_complete_EOF": true,
+      "exact_uncompressed_size": true,
+      "selected_member_CRC_passes": 1,
+      "original_CLI_row_stdout_SHA_matches": true
+    },
+    {
+      "original_member": "operator/normal-before/controller/observe/186-sup16-ready-normal-before-before-namespace.stdout",
+      "bytes": 626,
+      "sha256": "854b5bf721dac73eb16614ed32c76aad3d549906bba7e6c072976ee8925a274d",
+      "header_SHA_matches": true,
+      "raw_deflate_complete_EOF": true,
+      "exact_uncompressed_size": true,
+      "selected_member_CRC_passes": 1,
+      "original_CLI_row_stdout_SHA_matches": true
+    },
+    {
+      "original_member": "operator/normal-before/controller/observe/187-sup16-ready-normal-before-before.stdout",
+      "bytes": 20808,
+      "sha256": "fd25f2f41889919fe52ccda3c85ef56f1a52801a4ad860f14633d502eaa543f7",
+      "header_SHA_matches": true,
+      "raw_deflate_complete_EOF": true,
+      "exact_uncompressed_size": true,
+      "selected_member_CRC_passes": 1,
+      "original_CLI_row_stdout_SHA_matches": true
+    },
+    {
+      "original_member": "operator/normal-before/controller/observe/189-sup16-ready-normal-before-after-namespace.stdout",
+      "bytes": 626,
+      "sha256": "854b5bf721dac73eb16614ed32c76aad3d549906bba7e6c072976ee8925a274d",
+      "header_SHA_matches": true,
+      "raw_deflate_complete_EOF": true,
+      "exact_uncompressed_size": true,
+      "selected_member_CRC_passes": 1,
+      "original_CLI_row_stdout_SHA_matches": true
+    },
+    {
+      "original_member": "operator/normal-before/controller/observe/190-sup16-ready-normal-before-after.stdout",
+      "bytes": 20808,
+      "sha256": "fd25f2f41889919fe52ccda3c85ef56f1a52801a4ad860f14633d502eaa543f7",
+      "header_SHA_matches": true,
+      "raw_deflate_complete_EOF": true,
+      "exact_uncompressed_size": true,
+      "selected_member_CRC_passes": 1,
+      "original_CLI_row_stdout_SHA_matches": true
+    },
+    {
+      "original_member": "operator/normal-before/controller/observe/033-actual-installed-image-support.stdout",
+      "bytes": 787,
+      "sha256": "7fc0664545af519ef935ca5af233d4bc292e77d339ca7d431e985da588f4aa83",
+      "header_SHA_matches": true,
+      "raw_deflate_complete_EOF": true,
+      "exact_uncompressed_size": true,
+      "selected_member_CRC_passes": 1,
+      "original_CLI_row_stdout_SHA_matches": true
+    }
+  ],
+  "facts": {
+    "health_JSON_ready_is_true": true,
+    "health_HTTP_status": 200,
+    "actual_health_probe_source_SHA_matches_original_pin": true,
+    "health_command_is_preparation_container_exec": true,
+    "namespace_UID_nonempty_and_equal": true,
+    "namespace_name_matches_both_pods": true,
+    "run_label_nonempty_and_equal": true,
+    "pod_UID_nonempty_and_equal": true,
+    "pod_generation_before": 1,
+    "pod_generation_after": 1,
+    "pod_generation_equal": true,
+    "nodeName_nonempty_and_equal": true,
+    "engine_containerID_nonempty_and_equal": true,
+    "engine_spec_image_matches_fixed_digest": true,
+    "engine_status_imageID_equal_and_matches_fixed_digest": true,
+    "engine_status_image_equal": true,
+    "engine_restart_count_before": 0,
+    "engine_restart_count_after": 0,
+    "engine_restart_counts_zero": true,
+    "podIP_nonempty_and_equal": true,
+    "namespace_and_pod_deletionTimestamp_absent": true,
+    "before_PodReady_source013_predicate": true,
+    "after_PodReady_source013_predicate": true,
+    "actual_source013_ready_AND_latest_PodReady": true,
+    "metadata_command_is_preparation_container_exec": true,
+    "metadata_vllm_version": "0.31.0",
+    "metadata_python_version": "3.12.3",
+    "metadata_preparation_OS_UID_matches_original_contract": true,
+    "metadata_support_matches_existing_native17": true,
+    "metadata_engine_imported": false,
+    "metadata_GPU_execution_claimed": false
+  },
+  "PodReady_before": {
+    "condition_count": 1,
+    "condition_status": "True",
+    "observedGeneration": 1,
+    "metadata_generation": 1,
+    "source013_83_90_predicate": true
+  },
+  "PodReady_after": {
+    "condition_count": 1,
+    "condition_status": "True",
+    "observedGeneration": 1,
+    "metadata_generation": 1,
+    "source013_83_90_predicate": true
+  },
+  "source013_ready_AND_condition_fulfilled": true,
+  "scope_status": {
+    "HTTP_health_200_and_ready_true_confirmed": true,
+    "same_namespace_Pod_generation_and_pinned_image_confirmed": true,
+    "preparation_metadata_vllm_version": "0.31.0",
+    "engine_process_direct_observation": false,
+    "current_node_boot_ID_link_observed_in_this_scope": false,
+    "request_inference_kernel_worker_factory_claimed": false,
+    "future_boot_Ready_claimed": false,
+    "full_GB18_restore_complete": false,
+    "product_Refs_created": 0
+  },
+  "actions": {
+    "selected_members": 6,
+    "selected_member_CRC_total_passes": 6,
+    "needed_successful_control_stdout_members_read": 3,
+    "decoded_positive_original_bytes": 36000,
+    "original_intent_body_reopened": 0,
+    "other_8_target_bodies_read": 0,
+    "opaque_partial_reads": 0,
+    "new_localheader_walks": 0,
+    "full_archive_reconstruction": 0,
+    "full_control_or_GB18_CRC": 0,
+    "new_model_or_CPU_tests_AWS_GPU": 0,
+    "old_S6_or_root_writes": 0,
+    "product_Refs_created": 0,
+    "new_gates": 0
+  },
+  "preserved": "원R3 capture 경로누락 실패·자원정리83/0·missing2 UNKNOWN과 S5v4/S6 독립검토의 원 범위 유지. 새gate0"
+}

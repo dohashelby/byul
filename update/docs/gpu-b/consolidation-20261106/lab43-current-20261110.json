@@ -101,7 +101,8 @@
   },
   "latest_coordination": {
     "source": "root의 이번 사용자 전달(2026-11-10)",
-    "GPU_actual": "브라우저 연결 복구 어려움으로 실제 GPU만 보류. CPU/정합성 업무 전체 차단 아님",
+    "previous_GPU_browser_block": "브라우저 연결 복구 어려움으로 실제 GPU만 보류. CPU/정합성 업무 전체 차단 아님",
+    "GPU_actual": "2026-11-10 13:58 KST AWS 조회 연결 복구·설치기 수정판 독립 검토 완료. driver/currentproof·실제 staging 미완료로 NOT_RUNTIME_READY, 새 역할 실측0. 이전 브라우저 장애는 이력이며 CPU/정합성 업무 전역 차단 아님",
     "REQ09_10": "S5 고정60d8/8627·S6독립1eee85대조완료. 정확 요청은A_REQ_NOID_RETURNS_20261110.md 참조",
     "LIF06_SUP03": "source35bf의선택적지원연결·원11과새FD3·선정독립검토·원Ref5보존·최종manifest/gate 완료. 새PR CI는별도, 실제GPU/currenttarget은아님"
   },

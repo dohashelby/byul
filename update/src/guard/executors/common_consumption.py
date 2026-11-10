@@ -107,7 +107,7 @@ def runner(record, scope, *, check_id, requests, required_cases):
             tuple(b[k] for k in ("pod_uid", "container_id", "restart_count", "worker_pid")) in reused
             for b in case_bindings)
         # Only the new native rejection/consumption confirmation uses this
-        # fact. /1 completeness keeps its original optional-ticks contract.
+        # fact. /1 retains its original integer-ticks binding contract.
         details["process_start_identity_observed"] = bool(case_bindings) and all(
             b["start_ticks"] is not None for b in case_bindings)
     candidates = []

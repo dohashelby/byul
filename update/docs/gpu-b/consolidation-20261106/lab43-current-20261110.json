@@ -102,9 +102,184 @@
   "latest_coordination": {
     "source": "root의 이번 사용자 전달(2026-11-10)",
     "previous_GPU_browser_block": "브라우저 연결 복구 어려움으로 실제 GPU만 보류. CPU/정합성 업무 전체 차단 아님",
-    "GPU_actual": "2026-11-10 13:58 KST AWS 조회 연결 복구·설치기 수정판 독립 검토 완료. driver/currentproof·실제 staging 미완료로 NOT_RUNTIME_READY, 새 역할 실측0. 이전 브라우저 장애는 이력이며 CPU/정합성 업무 전역 차단 아님",
+    "GPU_actual": "SUP16 R1은 .json PUT 형식 거부로 install/health/whole/model·역할/제품0. 원stop180 실패/final부재 보존, 2026-11-10 06:36:41.813243~42.773418Z EC2-only 소유3stopped/IP0 및 S6 최종88c43/44·CLI138 불일치0으로 정리검증 완료. NOT_RUNTIME_READY·역할실측0 유지; 다음S5 data-only ZIP/installer 최소CPU 준비·해당변경 S6검토 뒤 원조건 재확인. LAB10/33·기존source/판정불변.",
     "REQ09_10": "S5 고정60d8/8627·S6독립1eee85대조완료. 정확 요청은A_REQ_NOID_RETURNS_20261110.md 참조",
-    "LIF06_SUP03": "source35bf의선택적지원연결·원11과새FD3·선정독립검토·원Ref5보존·최종manifest/gate 완료. 새PR CI는별도, 실제GPU/currenttarget은아님"
+    "LIF06_SUP03": "source35bf의선택적지원연결·원11과새FD3·선정독립검토·원Ref5보존·최종manifest/gate 완료. 새PR CI는별도, 실제GPU/currenttarget은아님",
+    "previous_GPU_actual_before_R1": "2026-11-10 13:58 KST AWS 조회 연결 복구·설치기 수정판 독립 검토 완료. driver/currentproof·실제 staging 미완료로 NOT_RUNTIME_READY, 새 역할 실측0. 이전 브라우저 장애는 이력이며 CPU/정합성 업무 전역 차단 아님",
+    "SUP16_R1_closeout": {
+      "scope": "R1 원격 운영 시도: 로컬 PUT 형식 guard 거부·후속 소유 정리/비용 검증. SUP16 역할/제품 실측 아님",
+      "state": "R1_TRANSPORT_REJECTED_OWNED_STOPPED_NOT_RUNTIME_READY",
+      "closeout_summary_sha256": "3769f3593369421c9ce0b34463752548f6ed8af1dfe2411a36b0a0d6a298e328",
+      "closeout_summary_bytes": 4462,
+      "final_actual_review": {
+        "sha256": "88c43b8a9858e8829b854d31169e5ff9b74649b0540dbc109c501f2787edabd1",
+        "bytes": 20869,
+        "check_count": 44,
+        "mismatch_count": 0,
+        "CLI_calls_linked": 68,
+        "CLI_request_stdout_stderr_checks": 138,
+        "CLI_mismatches": 0,
+        "complete": true
+      },
+      "first_integrity_review_reused": {
+        "cache_sha256": "f08102b3bd2998a1203190927df730dceb1ac6dccc35519efe473d571f665c1a",
+        "members": 318,
+        "CRC_errors": 0,
+        "original_files_equal": 11,
+        "new_CRC_passes_by_S4": 0
+      },
+      "control_archive": {
+        "bytes": 612153,
+        "sha256": "c7e22460f0e7d0663424bfdace80b7d640936abe0e98094eb97b567ecc042b70",
+        "members": 318
+      },
+      "final_operator_freeze_sha256": "d0b7feab87fa0504153af928d041e47dea49b172379576895b2e2a9fbfe96249",
+      "timeline": {
+        "start_intent_anchor_UTC": "2026-11-10T06:25:54.329316+00:00",
+        "start_actual_CLI": {
+          "started_at": "2026-11-10T06:25:58.311780+00:00",
+          "ended_at": "2026-11-10T06:25:59.927949+00:00",
+          "exit_code": 0
+        },
+        "transport_terminal_UTC": "2026-11-10T06:28:54.966157+00:00",
+        "normal_stop_intent_anchor_UTC": "2026-11-10T06:28:58.518766+00:00",
+        "stop_response_legacy_anchor_UTC": "2026-11-10T06:28:58.519061+00:00",
+        "stop_actual_CLI": {
+          "started_at": "2026-11-10T06:29:00.680143+00:00",
+          "ended_at": "2026-11-10T06:29:01.782944+00:00",
+          "exit_code": 0
+        },
+        "execute_terminal_UTC": "2026-11-10T06:32:04.957959+00:00",
+        "full8_query_interval": {
+          "started_at": "2026-11-10T06:33:13.831620+00:00",
+          "finished_at": "2026-11-10T06:33:19.899537+00:00",
+          "scope": "원 full8; 아래 각 query의 서로 다른 시각을 유지",
+          "EC2_selected_state": "stopping",
+          "other_EC2_stopped": 2,
+          "selected_SSM_ping": "Online",
+          "active_pending_executing_commands": 0,
+          "EIP": 0,
+          "EBS_GiB": 440,
+          "per_service_intervals": {
+            "identity": {
+              "started_at": "2026-11-10T06:33:13.831633+00:00",
+              "finished_at": "2026-11-10T06:33:14.435370+00:00",
+              "exit_code": 0
+            },
+            "instances": {
+              "started_at": "2026-11-10T06:33:14.435405+00:00",
+              "finished_at": "2026-11-10T06:33:15.282877+00:00",
+              "exit_code": 0
+            },
+            "instance_status": {
+              "started_at": "2026-11-10T06:33:15.282907+00:00",
+              "finished_at": "2026-11-10T06:33:16.101086+00:00",
+              "exit_code": 0
+            },
+            "ssm_nodes": {
+              "started_at": "2026-11-10T06:33:16.101124+00:00",
+              "finished_at": "2026-11-10T06:33:16.787998+00:00",
+              "exit_code": 0
+            },
+            "pending_commands": {
+              "started_at": "2026-11-10T06:33:16.788034+00:00",
+              "finished_at": "2026-11-10T06:33:17.459819+00:00",
+              "exit_code": 0
+            },
+            "executing_commands": {
+              "started_at": "2026-11-10T06:33:17.459849+00:00",
+              "finished_at": "2026-11-10T06:33:18.116234+00:00",
+              "exit_code": 0
+            },
+            "addresses": {
+              "started_at": "2026-11-10T06:33:18.116266+00:00",
+              "finished_at": "2026-11-10T06:33:19.029248+00:00",
+              "exit_code": 0
+            },
+            "volumes": {
+              "started_at": "2026-11-10T06:33:19.029328+00:00",
+              "finished_at": "2026-11-10T06:33:19.899500+00:00",
+              "exit_code": 0
+            }
+          }
+        },
+        "later_EC2_only": {
+          "started_at": "2026-11-10T06:36:41.813243+00:00",
+          "ended_at": "2026-11-10T06:36:42.773418+00:00",
+          "exit_code": 0,
+          "mutation_count": 0
+        },
+        "later_owned_EC2_stopped": 3,
+        "later_public_IP_count": 0,
+        "exact_power_off_UTC": null
+      },
+      "transport_contract": {
+        "accepted_suffixes_as_original_contract": [
+          ".py",
+          ".zip",
+          ".tar.gz",
+          ".whl"
+        ],
+        "R1_payload_suffix": ".json",
+        "helper_error": "ValueError: put accepts prepared code or bundle files only",
+        "driver_error": "upload AssertionError, empty original message",
+        "guard_changed": false
+      },
+      "actual_operations": {
+        "start": 1,
+        "execute_actor": 1,
+        "normal_stop": 1,
+        "SSM_send_commands": 0,
+        "new_retry_submitted": false,
+        "followup_query_mutations": 0,
+        "current_jobs_as_closeout": 0
+      },
+      "original_failure_preserved": {
+        "execute_exit_code": 1,
+        "transport_exit_code": 1,
+        "execute_reaped_group_terminal_cleanup_empty": true,
+        "transport_reaped_group_terminal_cleanup_empty": true,
+        "stop180_not_observed": true,
+        "supervisor_final_absent": true,
+        "anchor_not_actual_AWS_action_timestamp": true
+      },
+      "not_reached": {
+        "remote_install": true,
+        "health": true,
+        "whole_caller": true,
+        "model_worker_native": true,
+        "product_factory": true
+      },
+      "EVD_RES_RPT_or_product_Refs_created": 0,
+      "restore_or_saved_pack_rejudge_target_created": false,
+      "GPU_MEASURED_or_product_PASS_added": false,
+      "runtime_ready": false,
+      "current_remote_proof_verified": false,
+      "whole_pair_connected": false,
+      "cost": {
+        "as_of": "2026-11-10T06:36:42.773418+00:00",
+        "compute_IP_conservative_start_anchor": "2026-11-10T06:25:54.329316+00:00",
+        "source_estimate_USD": 77.34701794824997,
+        "published_estimate_USD": 77.34701794825,
+        "source_remaining_after_reserve5_USD": 17.65298205175003,
+        "published_remaining_after_reserve5_USD": 17.65298205175,
+        "display_rounding_only": true,
+        "recalculated_by_S4": false,
+        "billing_confirmed": false,
+        "EBS_GiB": 440,
+        "EBS_storage_cost_continues": true,
+        "exact_power_off_UTC": null
+      },
+      "previous_pending_resolution": "원 요약3769의 required_actual_verification_pending=true는 당시 기록으로 보존; 후속 S6 최종검토88c43/44·CLI138 불일치0으로 해소",
+      "software_and_actual_GPU_separate": {
+        "current_software_manifest_files": 510,
+        "current_software_manifest_sha256": "8ff741fcc2ab223008fd6e2543b12e5c7e9aed468602010b190916e67e1ac004",
+        "existing_V13_GPU_manifest_files": 466,
+        "existing_V13_GPU_source": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+        "R1_product_source_verified_by_install": false
+      },
+      "next_work": "S5의 정상 data-only ZIP과 installer 최소 delta 한정 CPU 준비·S6 해당 변경 검토 뒤 S2가 현재 자원·원예산·원기한을 재확인. 기존 PUT guard/실패/원 attempt 유지. 새 source 변경이나 새 실행 gate를 이 문서에서 추가하지 않음"
+    }
   },
   "B4_B5_B6_crosscut": {
     "B4": {

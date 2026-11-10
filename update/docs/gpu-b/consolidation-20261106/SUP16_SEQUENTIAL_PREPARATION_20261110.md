@@ -2,7 +2,13 @@
 
 2026-11-10 마감 기준으로 이번 선정 GPU 실행에서 SUP-16 실제 관측은 없다. normal-before → challenge-partial → normal-recovered 순차 component 준비와 실제 실행을 구분한다. 삭제한 Pod 재생이나 미래 target/prepared 신원 발급으로 전체 pair를 채우지 않는다.
 
-## 2026-11-10 후속 개발·검증
+## 최신 R1 전송 실패·정리
+
+[R1 기록](SUP16_R1_TRANSPORT_CLOSEOUT_20261110.md): 원 PUT helper의 `.json` 형식 거부 ValueError와 상위 upload AssertionError를 보존했다. 원격 install/health/whole/model·역할 실행0·제품 Ref0, 원stop180 관측실패/final부재 뒤 별도15:36 EC2-only3stopped/IP0으로 후속 정리했다. S6 최종88c43의44개·CLI138개 불일치0, 기존 최초무결성f081 재사용으로 필수검증 완료이며 새CRC 반복0이다. 현재GPU 중지는 해당 후속 조회 시각의 관측이고 정확 power-off 시각은null이다.
+
+다음은 S5 data-only ZIP/installer 최소delta 한정CPU 준비·S6 변경검토 뒤 원조건 재확인이다. 기존 역할/fullpair 미완료·원보호/개별기한·원실패·13:58 준비검토 이력은 유지하며 새 role/GPU/제품 성공으로 상향하지 않는다.
+
+## R1 이전 13:58 준비·후속 개발/검증 이력
 
 이전의 한 cleanup guard를 action별 원 기한과 종료 검증에 연결했다. 검증된 일반 구성요소는 아래 B 전용 도구로 게시했다. 실행할 때는 정확히 고정한 원 controller/outer/adapter 자산과 실제 입력이 별도로 필요하며, 아래 다섯 파일만으로 AWS 자원이나 실제 proof가 준비되는 것은 아니다.
 

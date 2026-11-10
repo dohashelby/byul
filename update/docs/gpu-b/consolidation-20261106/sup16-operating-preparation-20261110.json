@@ -100,10 +100,10 @@
   "whole_pair_connected": false,
   "completed_check_IDs_added_by_CPU_counts": 0,
   "remaining": [
-    "original transport/start-stop driver admission; actual remote staging/owner/mode; current same-CONFIG role/health/preflight/model proofs and original timer/stop boundaries",
-    "actual GPU1 normal-before/partial/normal-recovered sequential role measurement and new evidence verification",
-    "separate two-live-target fullpair contract",
-    "fresh resource/budget recheck and actual original active protection timers before execution; prior read-only resource/budget observation is 2026-11-10 13:58 KST"
+    "S5 정상 data-only ZIP+installer 최소 delta의 한정CPU 준비/독립 변경 검토; 기존 PUT 형식 guard 유지",
+    "S2 원 자원·예산·원 보호/정리기한 재확인 및 실제 같은 CONFIG/boot/model/role proof·staging; 원실패 attempt 덮어쓰기 없음",
+    "실제 GPU1 normal-before/partial/normal-recovered component 관측과 새로 생성되는 증거의 해당 범위 검증",
+    "별도의 두 실제 live target/prepared fullpair contract; 순차component/이번transport정리로 채우지 않음"
   ],
   "original_failures": {
     "supervisor_spawn_handoff": "preserved; corrected in supervisor v2",
@@ -140,5 +140,207 @@
     "new_remote_install_or_execution_claimed": false,
     "runtime_ready": false,
     "older_browser_error_is_historical": true
+  },
+  "operating_preparation_history_before_R1_20261110": {
+    "source_commit": "c16f4991118e56031230ee77be1ecc6084ada604",
+    "remaining": [
+      "original transport/start-stop driver admission; actual remote staging/owner/mode; current same-CONFIG role/health/preflight/model proofs and original timer/stop boundaries",
+      "actual GPU1 normal-before/partial/normal-recovered sequential role measurement and new evidence verification",
+      "separate two-live-target fullpair contract",
+      "fresh resource/budget recheck and actual original active protection timers before execution; prior read-only resource/budget observation is 2026-11-10 13:58 KST"
+    ],
+    "latest_readonly_recovery_20261110": {
+      "observed_KST": "2026-11-10 13:58:26~33",
+      "receipt_sha256": "42a18713a7c95cac9cdca469fcb39b0df8055b8899a59a3b100403cca616a83a",
+      "instances_stopped": 3,
+      "IP_EIP": 0,
+      "active_SSM": 0,
+      "EBS_GiB": 440,
+      "estimate_USD": 77.03839263213317,
+      "with_next_worst_case_USD": 83.24839263213316,
+      "execution_limit_USD": 95,
+      "final_bill": false,
+      "installer_v2_sha256": "7311f63618c8b6938c3ac8d07a39cc15b28fcab098e6f23b59a3a33fdc7766a4",
+      "installer_independent_review_sha256": "9070fc334f4002e37cf9af2112ea9e733ddf23d659ac341384ab08dc0099e826",
+      "driver_and_current_proofs": "in preparation",
+      "new_remote_install_or_execution_claimed": false,
+      "runtime_ready": false,
+      "older_browser_error_is_historical": true
+    },
+    "interpretation": "원13:58 준비/조회/설치기 검토 이력. 원 값은 그대로 보존; 최신 운영은 R1 closeout에 분리"
+  },
+  "latest_R1_transport_closeout_20261110": {
+    "scope": "R1 원격 운영 시도: 로컬 PUT 형식 guard 거부·후속 소유 정리/비용 검증. SUP16 역할/제품 실측 아님",
+    "state": "R1_TRANSPORT_REJECTED_OWNED_STOPPED_NOT_RUNTIME_READY",
+    "closeout_summary_sha256": "3769f3593369421c9ce0b34463752548f6ed8af1dfe2411a36b0a0d6a298e328",
+    "closeout_summary_bytes": 4462,
+    "final_actual_review": {
+      "sha256": "88c43b8a9858e8829b854d31169e5ff9b74649b0540dbc109c501f2787edabd1",
+      "bytes": 20869,
+      "check_count": 44,
+      "mismatch_count": 0,
+      "CLI_calls_linked": 68,
+      "CLI_request_stdout_stderr_checks": 138,
+      "CLI_mismatches": 0,
+      "complete": true
+    },
+    "first_integrity_review_reused": {
+      "cache_sha256": "f08102b3bd2998a1203190927df730dceb1ac6dccc35519efe473d571f665c1a",
+      "members": 318,
+      "CRC_errors": 0,
+      "original_files_equal": 11,
+      "new_CRC_passes_by_S4": 0
+    },
+    "control_archive": {
+      "bytes": 612153,
+      "sha256": "c7e22460f0e7d0663424bfdace80b7d640936abe0e98094eb97b567ecc042b70",
+      "members": 318
+    },
+    "final_operator_freeze_sha256": "d0b7feab87fa0504153af928d041e47dea49b172379576895b2e2a9fbfe96249",
+    "timeline": {
+      "start_intent_anchor_UTC": "2026-11-10T06:25:54.329316+00:00",
+      "start_actual_CLI": {
+        "started_at": "2026-11-10T06:25:58.311780+00:00",
+        "ended_at": "2026-11-10T06:25:59.927949+00:00",
+        "exit_code": 0
+      },
+      "transport_terminal_UTC": "2026-11-10T06:28:54.966157+00:00",
+      "normal_stop_intent_anchor_UTC": "2026-11-10T06:28:58.518766+00:00",
+      "stop_response_legacy_anchor_UTC": "2026-11-10T06:28:58.519061+00:00",
+      "stop_actual_CLI": {
+        "started_at": "2026-11-10T06:29:00.680143+00:00",
+        "ended_at": "2026-11-10T06:29:01.782944+00:00",
+        "exit_code": 0
+      },
+      "execute_terminal_UTC": "2026-11-10T06:32:04.957959+00:00",
+      "full8_query_interval": {
+        "started_at": "2026-11-10T06:33:13.831620+00:00",
+        "finished_at": "2026-11-10T06:33:19.899537+00:00",
+        "scope": "원 full8; 아래 각 query의 서로 다른 시각을 유지",
+        "EC2_selected_state": "stopping",
+        "other_EC2_stopped": 2,
+        "selected_SSM_ping": "Online",
+        "active_pending_executing_commands": 0,
+        "EIP": 0,
+        "EBS_GiB": 440,
+        "per_service_intervals": {
+          "identity": {
+            "started_at": "2026-11-10T06:33:13.831633+00:00",
+            "finished_at": "2026-11-10T06:33:14.435370+00:00",
+            "exit_code": 0
+          },
+          "instances": {
+            "started_at": "2026-11-10T06:33:14.435405+00:00",
+            "finished_at": "2026-11-10T06:33:15.282877+00:00",
+            "exit_code": 0
+          },
+          "instance_status": {
+            "started_at": "2026-11-10T06:33:15.282907+00:00",
+            "finished_at": "2026-11-10T06:33:16.101086+00:00",
+            "exit_code": 0
+          },
+          "ssm_nodes": {
+            "started_at": "2026-11-10T06:33:16.101124+00:00",
+            "finished_at": "2026-11-10T06:33:16.787998+00:00",
+            "exit_code": 0
+          },
+          "pending_commands": {
+            "started_at": "2026-11-10T06:33:16.788034+00:00",
+            "finished_at": "2026-11-10T06:33:17.459819+00:00",
+            "exit_code": 0
+          },
+          "executing_commands": {
+            "started_at": "2026-11-10T06:33:17.459849+00:00",
+            "finished_at": "2026-11-10T06:33:18.116234+00:00",
+            "exit_code": 0
+          },
+          "addresses": {
+            "started_at": "2026-11-10T06:33:18.116266+00:00",
+            "finished_at": "2026-11-10T06:33:19.029248+00:00",
+            "exit_code": 0
+          },
+          "volumes": {
+            "started_at": "2026-11-10T06:33:19.029328+00:00",
+            "finished_at": "2026-11-10T06:33:19.899500+00:00",
+            "exit_code": 0
+          }
+        }
+      },
+      "later_EC2_only": {
+        "started_at": "2026-11-10T06:36:41.813243+00:00",
+        "ended_at": "2026-11-10T06:36:42.773418+00:00",
+        "exit_code": 0,
+        "mutation_count": 0
+      },
+      "later_owned_EC2_stopped": 3,
+      "later_public_IP_count": 0,
+      "exact_power_off_UTC": null
+    },
+    "transport_contract": {
+      "accepted_suffixes_as_original_contract": [
+        ".py",
+        ".zip",
+        ".tar.gz",
+        ".whl"
+      ],
+      "R1_payload_suffix": ".json",
+      "helper_error": "ValueError: put accepts prepared code or bundle files only",
+      "driver_error": "upload AssertionError, empty original message",
+      "guard_changed": false
+    },
+    "actual_operations": {
+      "start": 1,
+      "execute_actor": 1,
+      "normal_stop": 1,
+      "SSM_send_commands": 0,
+      "new_retry_submitted": false,
+      "followup_query_mutations": 0,
+      "current_jobs_as_closeout": 0
+    },
+    "original_failure_preserved": {
+      "execute_exit_code": 1,
+      "transport_exit_code": 1,
+      "execute_reaped_group_terminal_cleanup_empty": true,
+      "transport_reaped_group_terminal_cleanup_empty": true,
+      "stop180_not_observed": true,
+      "supervisor_final_absent": true,
+      "anchor_not_actual_AWS_action_timestamp": true
+    },
+    "not_reached": {
+      "remote_install": true,
+      "health": true,
+      "whole_caller": true,
+      "model_worker_native": true,
+      "product_factory": true
+    },
+    "EVD_RES_RPT_or_product_Refs_created": 0,
+    "restore_or_saved_pack_rejudge_target_created": false,
+    "GPU_MEASURED_or_product_PASS_added": false,
+    "runtime_ready": false,
+    "current_remote_proof_verified": false,
+    "whole_pair_connected": false,
+    "cost": {
+      "as_of": "2026-11-10T06:36:42.773418+00:00",
+      "compute_IP_conservative_start_anchor": "2026-11-10T06:25:54.329316+00:00",
+      "source_estimate_USD": 77.34701794824997,
+      "published_estimate_USD": 77.34701794825,
+      "source_remaining_after_reserve5_USD": 17.65298205175003,
+      "published_remaining_after_reserve5_USD": 17.65298205175,
+      "display_rounding_only": true,
+      "recalculated_by_S4": false,
+      "billing_confirmed": false,
+      "EBS_GiB": 440,
+      "EBS_storage_cost_continues": true,
+      "exact_power_off_UTC": null
+    },
+    "previous_pending_resolution": "원 요약3769의 required_actual_verification_pending=true는 당시 기록으로 보존; 후속 S6 최종검토88c43/44·CLI138 불일치0으로 해소",
+    "software_and_actual_GPU_separate": {
+      "current_software_manifest_files": 510,
+      "current_software_manifest_sha256": "8ff741fcc2ab223008fd6e2543b12e5c7e9aed468602010b190916e67e1ac004",
+      "existing_V13_GPU_manifest_files": 466,
+      "existing_V13_GPU_source": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+      "R1_product_source_verified_by_install": false
+    },
+    "next_work": "S5의 정상 data-only ZIP과 installer 최소 delta 한정 CPU 준비·S6 해당 변경 검토 뒤 S2가 현재 자원·원예산·원기한을 재확인. 기존 PUT guard/실패/원 attempt 유지. 새 source 변경이나 새 실행 gate를 이 문서에서 추가하지 않음"
   }
 }

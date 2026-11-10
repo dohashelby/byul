@@ -8,7 +8,9 @@
 
 [B02 판정 연결](B02_JUDGMENT_CONNECTION_20261110.md)은 기존 /1 재사용 입력 위반 사실과 /2·/3 사건 대응을 보강했다. 최종 소스 f8d431ba, 제품 목록510파일/SHA8ff741fc와 세션6 독립 영수증·해시 gate를 연결했다. 이는 소프트웨어 검증이며 /2·/3의 실제 자격 영수증이나 B02 전체20개 완료가 아니다. [B03·B04 입력 준비](B03_B04_WORK_ORDER_PREPARATION_20261110.md)는 비TP2 40개·TP2 3개 템플릿/계획이며 실제 입력·PACK34·TP2 실행 완료와 구분한다.
 
-SUP-16은 [순차 역할 준비 기록](SUP16_SEQUENTIAL_PREPARATION_20261110.md)을 따른다. 이전 브라우저 연결 장애 이후 세션2가 11월10일13:58:26~33 KST AWS 조회에 성공했다. 당시 소유3대 stopped·IP/EIP0·활성SSM0이며 EBS440GiB 저장비는 계속된다. 설치기 수정판의 독립 검토는 끝났고 운영 드라이버·현재 proof 결합은 진행 중이다. 이 갱신은 새 GPU 기동·역할 실측 완료를 주장하지 않는다.
+SUP-16 최신 상태는 [R1 전송 실패·후속 정리](SUP16_R1_TRANSPORT_CLOSEOUT_20261110.md)다. R1은 로컬 PUT의 `.json` 형식 거부로 install/health/whole/model·역할 실행0, 제품 Ref0이었다. 원 stop180 실패·final 부재를 보존한 뒤 11월10일15:36:41.813~42.773 KST EC2-only에서 소유3대 stopped·공인IP0을 확인했다. S6 최종88c43의44개·CLI138개 대조 불일치0으로 필수 검증은 끝났지만 runtime 준비/역할 실측 완료는 아니다. 보수 누적77.34701794825는 비청구 추정이며 EBS440GiB 저장비가 계속된다. 다음은 data-only ZIP/installer 최소 CPU 경계 준비·검토 후 원 조건 재확인이다.
+
+> R1 전 준비 이력: SUP-16은 [순차 역할 준비 기록](SUP16_SEQUENTIAL_PREPARATION_20261110.md)을 따른다. 이전 브라우저 연결 장애 이후 세션2가 11월10일13:58:26~33 KST AWS 조회에 성공했다. 당시 소유3대 stopped·IP/EIP0·활성SSM0이며 EBS440GiB 저장비는 계속된다. 설치기 수정판의 독립 검토는 끝났고 운영 드라이버·현재 proof 결합은 진행 중이다. 이 갱신은 새 GPU 기동·역할 실측 완료를 주장하지 않는다.
 
 [LIF06/SUP03 역사CPU 지원 연결](CPU_SUPPORT_CONNECTION_20261110.md)과 [REQ09/10 무ID거부 A반환 요청](A_REQ_NOID_RETURNS_20261110.md)은 원 범위를 유지한다. 현재 제품510/8ff와 아래 원V13 실제 GPU466/2cb는 서로 다른 기준선이다.
 

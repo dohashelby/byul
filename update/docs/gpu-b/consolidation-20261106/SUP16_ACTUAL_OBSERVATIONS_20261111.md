@@ -23,6 +23,25 @@ actionwise의 adapter 지문과 join의 resolver 지문 두 곳, 이에 따른 �
 - 운영·종료 root 대조: `e9d5af6e0d6b54b718a739b1b0a5c13d57425c3c27406b6d7f6e0215d7ebf380`
 - 다음 실행 수정·경로·staging 독립 검토: `ddcf4b6b067a0e28fd5d7c383753583d56634a6ed4fdbdd481d79fd586d68d40`
 
-## 다음 실행
+## R7: 실제 API 성공, 첫 capture 실패와 부분 회수
 
-R7 실제 모델·역할·반출·정리 결과는 새로운 원자료를 대조한 뒤 별도로 추가한다. R6 성공으로 대체하지 않는다. 원 runtime `2cb01e9f`/466파일과 공개 저장소 계열의 제품528파일도 구분한다. CPU 준비 요약의 actual=false는 작성 당시 범위로 보존한다.
+같은 기존 인스턴스의 새 기동에서도 실제 API preflight가 성공했다. 후속 normal-before capture 명령은 `GB49_CLI_FAILED:200-sup16-capture-normal-before`로 실패했다. 원 stderr는 helper의 `_private_runtime`이 output 디렉터리를 확인하다 `OWNED_SOURCE_DIRECTORY_REQUIRED`로 실패한 것을 보존한다. component factory와 첫 snapshot에는 도달하지 않았고, capture stdout의 collector transport는 존재하며 `reads=[]`, `capture_executed=false`다. 별도 RootClientError payload와 구분한다. collector의 일부 engine/producer false 필드를 VM·Pod·worker·모델 전체 상태로 확대하지 않는다. 실제 output UID·mode·ACL은 초기 원자료에 없어 어느 조건이 거부됐는지는 미확정이다.
+
+초기 원자료25는 S4가 CID·신원·첫 오류·부분 진입 범위를 독립 대조했다. 66개 자료가 일치했으며 이는 실패 시험이 성공으로 바뀌었다는 뜻이 아니다. API 성공과 capture 실패, 원 outer의 빈 AssertionError 두 건을 각각 보존한다. whole stdout의 명시적 truncation과 작은 원자료 조회 당시 whole-return 부재도 남는다.
+
+큰 GB08 archive 회수는 `ORIGINAL_TOTAL_DEADLINE_NO_NEW_RANGE`로 원 기한 안에 완료되지 못했다. 목적 파일은 원 helper가 전체 크기 7,521,242B를 미리 할당하므로 길이가 같아도 완료 증거가 아니다. 부분 목적 파일의 SHA는 원 archive SHA와 다르며 불완전한 opaque 자료로 보존했다. 이 파일을 완성 ZIP으로 열거나 내부 CRC·Ref 복원을 통과했다고 표시하지 않았다.
+
+전송 actor와 실행 actor는 각각 실패 exit1로 회수됐고 process group 종료·cleanup 오류 없음이 확인됐다. 원 정상 stop 한 번 수락 뒤 180초 감시는 `STOPPED_NOT_YET_OBSERVED`로 실패했다. 후속 대상 한 대의 읽기 전용 조회에서 2026-11-11 03:35:38 KST 실제 stopped·공인 IP 없음·SSM node0·진행 command0을 확인했다. 정확 전원 종료시각과 새 비용은 null이다.
+
+새 로컬 control ZIP은 9,133개 member, 1,241개 CLI 영수증, 511개 수락(start1/send509/stop1), 509개 command 종료(508 Success/1 Failed)를 포함한다. 원 요청·응답 SHA·CID·actor·정지 관측을 대조했다. 이 로컬 묶음의 무결성 검사를 GB08 전체 원자료 회수 성공으로 대체하지 않는다.
+
+- R7 초기 원자료25 독립 검토: `d14265b8534cf7214cf2dd153e85e5dc70e81c17cb9389eefacb80beba9bf0a2`
+- R7 로컬 control ZIP: `d6f5d498f07ca2a8c8b2245b6beb1467a6e8480457025940026c19ea83267fb2`
+- R7 운영·종료 root 대조: `a3d69875cb71681acaa1229925cc32c21063a043a9b4f572d8359a3a82ff20e5`
+- 부분 회수·원 오류 한정 후속 대조: `132b9937b0e06bb890666702e035e73408bd3516377050c0b81939b8b79e213f`
+
+## 다음 실행과 범위
+
+B 전용 private 제어·진단 경로를 일반 capture 출력과 분리하고, 해당 파일의 archive 보존 연결과 읽기 전용 조회 병목을 수정·검증 중이다. 기존 output·A 코드의 권한을 바꾸거나 source guard·기한을 완화하지 않는다. 새 모델·정상/도전/복구 세 역할·전체 반출 성공은 해당 실측 원자료로 별도 확인해야 한다.
+
+원 runtime `2cb01e9f`/466파일과 공개 저장소 계열의 제품528파일을 구분한다. CPU 준비 요약의 actual=false는 작성 당시 범위로 보존한다.

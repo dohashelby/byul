@@ -21,21 +21,7 @@ import types
 import zipfile
 
 PHASES=('normal-before','challenge-partial','normal-recovered')
-MODULE_PINS={
-    'controller':'02899e3e8d9f46516eb09855f516ae074780c312988571f2f8fba20f15569b52',
-    'root_contract':'27eef88640bb654236102a9e176d3bc4a3f700caeb40abd952c7dd675825d745',
-    'outer':'84df302b544dd14fca67096ea0dd1992523cc7362842f2c8c80411380847e5f8',
-    'adapter':'5348d6086a550fd156c001bb2a20d404b3a382d1545c69ef53ee012ec51aee9a',
-    'actionwise':'8439c34bb28515beff55cdfd91590f550e90c1bf524bcee8ac45a2525ab63ec8',
-    'aggregate':'c56640251fd2406d3734b8109725d5fe1394965e90b0e7222472b68ea924c3ce',
-    'supervisor':'6c9584521401b8138f96be2882245b2081cea20b82094a6f2801b408ecf3a48c',
-    'config_assembly':'cfaa394bc7e2dbc7e351038992c4a4a463da4e375e6e2f88ffee774dda7da97a',
-    'context_binder':'97d0cede6e68eccabd7dafc2a76e85d84ac2b0807969315a87fc894ee4d28359',
-    'state_factories':'d04b853567fd02b98e3f522655ec12f0b0af529e3e7adbcf73a488c4a2aaf76c',
-    'bounded_preflight':'ff20552ba29efaa4900cdb096d9771b7b82959bed71058e58b59a17918f0b153',
-    'actual_assembly':'d0941ca2916fd7fdfd44597d7e10477206bba01a8a36178ddbaa3136f2cf7556',
-    'deadlines':'cdfd792252cd3f9f0218bc5a790eb816b3f3974a3e14459a4cd2d17f348f3f17',
-    'join':'a9e71b59d3650bb5eb7251d31b17623f895c07f18a91875c053a03a3b44074a1'}
+MODULE_PINS={'controller': '02899e3e8d9f46516eb09855f516ae074780c312988571f2f8fba20f15569b52', 'root_contract': '27eef88640bb654236102a9e176d3bc4a3f700caeb40abd952c7dd675825d745', 'outer': '84df302b544dd14fca67096ea0dd1992523cc7362842f2c8c80411380847e5f8', 'adapter': 'e0e96e2bb8d8656f35c39db6f51d158f6eab2a020e8dca730fc06343862a4917', 'actionwise': '74d338e18b43db82819fcb748b47f5060d66a7d391808480c31a8e9181e8e440', 'aggregate': 'c56640251fd2406d3734b8109725d5fe1394965e90b0e7222472b68ea924c3ce', 'supervisor': '6c9584521401b8138f96be2882245b2081cea20b82094a6f2801b408ecf3a48c', 'config_assembly': 'cfaa394bc7e2dbc7e351038992c4a4a463da4e375e6e2f88ffee774dda7da97a', 'context_binder': '97d0cede6e68eccabd7dafc2a76e85d84ac2b0807969315a87fc894ee4d28359', 'state_factories': 'd04b853567fd02b98e3f522655ec12f0b0af529e3e7adbcf73a488c4a2aaf76c', 'bounded_preflight': 'ff20552ba29efaa4900cdb096d9771b7b82959bed71058e58b59a17918f0b153', 'actual_assembly': 'd0941ca2916fd7fdfd44597d7e10477206bba01a8a36178ddbaa3136f2cf7556', 'deadlines': 'cdfd792252cd3f9f0218bc5a790eb816b3f3974a3e14459a4cd2d17f348f3f17', 'join': 'a9e71b59d3650bb5eb7251d31b17623f895c07f18a91875c053a03a3b44074a1'}
 BASE_CONFIG_SHA='3a102855bd3da2313a21406931e8e42a1dd37c0b4029bdf4e4b03f45bd6a09b2'
 KINDS={'normal':'observe','preserve':'preserve','quiesce':'quiesce',
        'archive':'archive','aggregate':'archive'}

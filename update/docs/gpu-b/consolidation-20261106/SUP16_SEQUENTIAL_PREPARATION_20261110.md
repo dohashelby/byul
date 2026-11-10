@@ -1,8 +1,16 @@
 # SUP-16 순차 역할 준비와 남은 실제 연결
 
-2026-11-10 마감 기준으로 이번 선정 GPU 실행에서 SUP-16 실제 관측은 없다. normal-before → challenge-partial → normal-recovered 순차 component 준비와 실제 실행을 구분한다. 삭제한 Pod 재생이나 미래 target/prepared 신원 발급으로 전체 pair를 채우지 않는다.
+R2에서 전송·설치·host health·normal7FD/partial 입력 준비를 실제 확인했지만 SUP-16 모델Ready·3역할/worker·제품 실행 완료는 아니다. first normal-before bind의 명령파일 게시 전 계약 실패와 원 실패/정리 결과를 분리한다. 기존 normal-before→challenge-partial→normal-recovered·fullpair 이력은 유지한다.
 
-## 최신 R1 전송 실패·정리
+> R2 전 서두 이력: 2026-11-10 마감 기준으로 이번 선정 GPU 실행에서 SUP-16 실제 관측은 없다. normal-before → challenge-partial → normal-recovered 순차 component 준비와 실제 실행을 구분한다. 삭제한 Pod 재생이나 미래 target/prepared 신원 발급으로 전체 pair를 채우지 않는다.
+
+## R2 bind 계약 실패·정리 이력
+
+[R2 원 기록](SUP16_R2_BIND_CONTRACT_CLOSEOUT_20261110.md)은 전송/41설치·host health/입력준비 성공과 capture_helper 투영 누락의 실제 bind 실패를 구분한다. 모델Ready·세role·worker/factory·제품저장Ref 완료가 아니며 원stop180실패/final부재·후속EC2-only3stopped/IP0·정확off=null을 보존한다. S6 최종b202의47대조·main49·CLI1124 불일치0으로 이 actual 검증은 끝났다.
+
+S5 e0e96 adapter 필드1·CPU7 및 S6 d905 한정47대조 완료는 explicit read/reserve/write seams의 범위다. 실제OpenRole/MAKE_INPUTS/FD/mount/worker를 새 관측한 것이 아니다. sidecar10414171의 후속 S6 `2a34256add8bda6ee08fae805d6a1c2b1366151fe3f2cd774e4499ad08de981c`7대조·불일치0 검토도 완료됐다. 전체새pin-chain·새frame/plan/roots·새외부attempt의 S2 준비중/기동0은 R2 종료 당시의 과거 상태이며 후속 R3의 현재 상태가 아니다. 기존 guestR1 CODE/OPERATOR/RUNTIME/ASSETS/HEALTH·ZIP14 보존 범위와 원 기한·승인 범위는 유지한다.
+
+## 이전 R1 전송 실패·정리 이력
 
 [R1 기록](SUP16_R1_TRANSPORT_CLOSEOUT_20261110.md): 원 PUT helper의 `.json` 형식 거부 ValueError와 상위 upload AssertionError를 보존했다. 원격 install/health/whole/model·역할 실행0·제품 Ref0, 원stop180 관측실패/final부재 뒤 별도15:36 EC2-only3stopped/IP0으로 후속 정리했다. S6 최종88c43의44개·CLI138개 불일치0, 기존 최초무결성f081 재사용으로 필수검증 완료이며 새CRC 반복0이다. 현재GPU 중지는 해당 후속 조회 시각의 관측이고 정확 power-off 시각은null이다.
 

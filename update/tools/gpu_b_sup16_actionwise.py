@@ -8,7 +8,7 @@ import math
 from pathlib import Path
 
 OUTER_SHA = '84df302b544dd14fca67096ea0dd1992523cc7362842f2c8c80411380847e5f8'
-ADAPTER_SHA = '5348d6086a550fd156c001bb2a20d404b3a382d1545c69ef53ee012ec51aee9a'
+ADAPTER_SHA = 'e0e96e2bb8d8656f35c39db6f51d158f6eab2a020e8dca730fc06343862a4917'
 ACTIONS = (('preserve', 300), ('quiesce', 360), ('archive', 300))
 SCHEMA = 'byul-sup16-original-action-receipt/1'
 

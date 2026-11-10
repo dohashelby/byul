@@ -1,0 +1,73 @@
+{
+  "schema": "gpu-b-retained-recovery-preparation-verification-scope/1",
+  "source_frozen_before_CPU_and_review": true,
+  "source_bytes_modified_for_publication": false,
+  "contracts": [
+    {
+      "source": "collector_glue.py",
+      "kind": "synthetic control",
+      "new_affected_cases": 6,
+      "prior_cases_preserved": 22,
+      "review_sha256": "c9316d1e5c691f874bb6df2cfa4f032d7a58f8451b9dd97f0e1b799788514fff",
+      "actual_AWS": false
+    },
+    {
+      "source": "recovery_controller.py",
+      "kind": "mock driver/SSM/GET",
+      "new_affected_cases": 5,
+      "prior_cases_preserved": 9,
+      "review_sha256": "b9b8ac6e0fe6a4866a015d72c12af7fc5b5cb710683d9f82aab1af7d63853c18",
+      "actual_child_API_or_GET": false
+    },
+    {
+      "source": "private_loader.py + aws_cli_adapter_v2.py",
+      "kind": "actual native files and module loading plus one harmless default script-directory child import",
+      "contract_count": 1,
+      "boundaries": 14,
+      "receipt_sha256": "a84215857cf28ddb9f357b0eea2d1e44d12d265f58dc8be75add4270063cee0d",
+      "review_sha256": "43047a01664e9b50427bad0cdecf0b8992275a0bc210228ef210b8847b5b0581",
+      "parent_flags": "-I -S -B",
+      "child_flags": "default 0/0/0, no sys.path injection",
+      "FD_count_before_after": [
+        4,
+        4
+      ],
+      "private_module_slots_restored": 5,
+      "actual_helper_main_API_controller_or_codec": false
+    },
+    {
+      "source": "private_loader.py + aws_cli_adapter_v2.py",
+      "kind": "actual local root/publish child to actual parent journal/barrier with explicitly synthetic UNKNOWN",
+      "contract_count": 1,
+      "boundaries": 2,
+      "receipt_sha256": "41cda559e9aa152a6ee8ce8b8d259e3d6fc18ca4e3207c31e41c5e769a62b6a7",
+      "review_sha256": "503f548223f387a758bab9cc9a4fe196eee489390c89f2bdaa230f0090261299",
+      "actual_AWS_request_or_CommandId": false,
+      "historical_UNKNOWN_resolved": false
+    },
+    {
+      "source": "invoke_recovery_once.py",
+      "kind": "synthetic Popen/wait and outcome projection",
+      "new_affected_cases": 5,
+      "prior_cases_preserved": 7,
+      "receipt_sha256": "fc0336bf6e51cbaa6e20f04b09c9d5276923ae056d455fe23c94c3c51718c760",
+      "review_sha256": "6d3a4473892fc0a059fe7b6ba8a7edce00b5526edba42d18159979c5d863d4d4",
+      "actual_child_main_or_API": false
+    }
+  ],
+  "counts_are_not_product_ID_or_whole_suite_totals": true,
+  "prior_cases_not_rerun_or_relabelled_as_full_new_source_pass": true,
+  "first_harness_and_source_findings_preserved": true,
+  "original_FAIL_UNKNOWN_null_and_Refs_unchanged": true,
+  "actual_CloudShell_file_stage_and_check": {
+    "receipt_sha256": "55b0a1df9280e1006d8886d965fdb516ef2aa02cf31703fe3c090ca70fdaf025",
+    "source_files": 11,
+    "including_packet": 12,
+    "exit_code": 0,
+    "scope": "actual check mode only; no actor/health/GET/resource API/GPU",
+    "actual_experiment_runtime_ready": false
+  },
+  "actual_archive_compression_ratio_whole_recovery_CRC_Refs_model_roles": false,
+  "not_ready": true,
+  "execution_ready": false
+}

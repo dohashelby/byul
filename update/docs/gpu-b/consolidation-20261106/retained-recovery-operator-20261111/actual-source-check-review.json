@@ -1,0 +1,50 @@
+{
+  "schema": "gpu-b-actual-CloudShell-file-and-module-check-review/1",
+  "original_receipt_sha256": "55b0a1df9280e1006d8886d965fdb516ef2aa02cf31703fe3c090ca70fdaf025",
+  "observed_UTC": "2026-11-10T22:39:38.635887+00:00",
+  "observed_KST": "2026-11-11 07:39:38 KST",
+  "source_files": 11,
+  "including_packet_files": 12,
+  "source_bytes_SHA_linked_to_repository_manifest": true,
+  "REG600_owner1000_single_link": true,
+  "private700": true,
+  "before_after_file_and_directory_identity_same": true,
+  "FD_set_before_after": [
+    [
+      "0",
+      "1",
+      "2",
+      "3"
+    ],
+    [
+      "0",
+      "1",
+      "2",
+      "3"
+    ]
+  ],
+  "actual_check_stdout_bytes": 1298,
+  "actual_check_stdout_sha256": "3a36101656f7f24b4142d65ac2c86ea3e38a10d2bfcf2fbbfa1a79954ed9540f",
+  "actual_stderr_bytes": 0,
+  "exit_code": 0,
+  "platform": {
+    "UID": 1000,
+    "EUID": 1000,
+    "GID": 996,
+    "python": "3.13.16 (main, Oct  8 2026, 00:00:00) [GCC 11.5.0 20240719 (Red Hat 11.5.0-5)]",
+    "executable": "/usr/local/python3.13/bin/python3",
+    "isolated": 1,
+    "no_site": 1,
+    "dont_write_bytecode": true,
+    "scope": "CloudShell file preparation, not EC2 experimental guest"
+  },
+  "driver_and_adapter_new_paths_verified": true,
+  "CLI_directory_created": false,
+  "not_ready": true,
+  "execution_ready": false,
+  "actual_EC2_boot_CID_GPU_actor": null,
+  "actual_collect_health_GET_AWS_CLI_EC2_SSM_or_GPU_executed": false,
+  "actual_archive_restored_or_product_pass": false,
+  "old_R8_non_touch_scope": "Receipt declaration plus reviewed path restrictions; no new old-R8/EC2 archive inventory or whole integrity test performed",
+  "source_of_receipt": "S2 reported browser remote receipt SHA matched downloaded raw; root checks exact local raw and embedded channels/source metadata"
+}

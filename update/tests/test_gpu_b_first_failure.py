@@ -92,4 +92,3 @@ class FirstFailure(unittest.TestCase):
         self.assertEqual(len(accepted), 3)  # stat and two admitted reads, never a new range after FAIL
         self.assertEqual(self.sdk.stat_count, 1)
         self.assertFalse(list(self.transfer.records.glob('*.publishing')))
-

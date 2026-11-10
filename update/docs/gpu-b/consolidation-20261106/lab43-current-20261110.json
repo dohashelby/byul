@@ -16635,19 +16635,22 @@
   },
   "current_implementation_snapshot": {
     "source_commits": [
-      "8fb9c8b9e4367e91b9669bfd909ba7ce4e039053",
-      "35bf4bf7329a9d010d7c55299a3dd37cf18e71eb"
+      "f8d431ba830dd2eb657fbdc1943e85cf7ce59437"
     ],
+    "inventory_commit": "7906ff817ce24eaf55962f0e6584fd129393514d",
+    "receipt_integration_commit": "a5cc612c00b9b2ade1b4a45974663cebbcbd5ed5",
     "manifest_files": 510,
-    "manifest_sha256": "e1d3b55e4781567d31ef1498c390120c9d71d5b81db48c6b7e09f74e65a8f580",
-    "independent_manifest_review_sha256": "c4e2fa284d169e5225d8666274f947f1c6ddf7de7add8c46a055f16a271460a1",
+    "manifest_sha256": "8ff741fcc2ab223008fd6e2543b12e5c7e9aed468602010b190916e67e1ac004",
+    "independent_manifest_review_sha256": "7be42269ffa99ac10e78b6f096ee97b2245dcc4b9dd0b7dd7d71a6cdd91b5b6b",
     "new_exact_receipt": {
-      "manifest_sha256": "e1d3b55e4781567d31ef1498c390120c9d71d5b81db48c6b7e09f74e65a8f580",
+      "manifest_sha256": "8ff741fcc2ab223008fd6e2543b12e5c7e9aed468602010b190916e67e1ac004",
       "reviewed_by": "Codex / 신규 세션6 / 독립 검토",
-      "reviewed_at": "2026-11-09T17:32:24.564014+00:00"
+      "reviewed_at": "2026-11-10T05:25:32.953312+00:00"
     },
     "fresh_gate_exit": 0,
-    "actual_V13_source_remains_separate": true
+    "actual_V13_source_remains_separate": true,
+    "new_GPU_execution_claimed": false,
+    "note": "소프트웨어 통합 검증. 실제 GPU source2cb, LAB10/33, 새 PACK34/J03/J04 완료와 구분"
   },
   "scope_completion_review": {
     "sha256": "cb8eb10f0c484eb48af4a9ae2ba875adcddd161d0ae306ec13902051abcf48a4",
@@ -16723,5 +16726,21 @@
     },
     "remaining33_exhaustively_reaudited": false,
     "new_test_CRC_DB_restore_CI_GPU_or_source_runs": 0
+  },
+  "previous_implementation_snapshot_before_B02": {
+    "source_commits": [
+      "8fb9c8b9e4367e91b9669bfd909ba7ce4e039053",
+      "35bf4bf7329a9d010d7c55299a3dd37cf18e71eb"
+    ],
+    "manifest_files": 510,
+    "manifest_sha256": "e1d3b55e4781567d31ef1498c390120c9d71d5b81db48c6b7e09f74e65a8f580",
+    "independent_manifest_review_sha256": "c4e2fa284d169e5225d8666274f947f1c6ddf7de7add8c46a055f16a271460a1",
+    "new_exact_receipt": {
+      "manifest_sha256": "e1d3b55e4781567d31ef1498c390120c9d71d5b81db48c6b7e09f74e65a8f580",
+      "reviewed_by": "Codex / 신규 세션6 / 독립 검토",
+      "reviewed_at": "2026-11-09T17:32:24.564014+00:00"
+    },
+    "fresh_gate_exit": 0,
+    "actual_V13_source_remains_separate": true
   }
 }

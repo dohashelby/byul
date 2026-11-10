@@ -4,11 +4,13 @@
 
 ## 2026-11-10 현재 LAB 잔여 재개
 
-[43개 최신 업무표](LAB43_CURRENT_20261110.md)를 기준으로 명시 선정/1차 제외 LAB 범위 완료6개·잔여37개로 갱신했다. 기존2개와 근거가 확인된 REQ08·PLT01·04·08을 합친 값이며 모든 분기·보안 PASS나 새코드/실험 개수는 아니다. 원 FAIL/UNKNOWN·출처·정확Ref와 미측정은 보존한다.
+[43개 최신 업무표](LAB43_CURRENT_20261110.md)의 명시 선정/1차 제외 LAB 범위는 **완료10개·잔여33개**다. 기존6개에 실제 CPU 지원 프로파일의 REQ-07·LIF-02·PLT-03·PLT-05를 근거 대조 후 추가했다. 모든 분기·보안 PASS나 새 실험 개수가 아니며 원 FAIL/UNKNOWN·등급·정확 Ref는 보존한다.
 
-SUP16의 per-action 감독기·cleanup 연결·독립aggregate·CONFIG·실UID1000렌더 준비는 새CPU/독립검토를 마쳤다. [선정 코드·한계](SUP16_SEQUENTIAL_PREPARATION_20261110.md)를 따른다. 현재 브라우저/컴퓨터 자동화 연결 오류로 새 AWS/GPU를 실행하지 않았으며 wholecaller의 로컬 결합·새CPU7은 완료했고 currentproof·fresh자원/예산·원격실측은 남아 있다.
+[B02 판정 연결](B02_JUDGMENT_CONNECTION_20261110.md)은 기존 /1 재사용 입력 위반 사실과 /2·/3 사건 대응을 보강했다. 최종 소스 f8d431ba, 제품 목록510파일/SHA8ff741fc와 세션6 독립 영수증·해시 gate를 연결했다. 이는 소프트웨어 검증이며 /2·/3의 실제 자격 영수증이나 B02 전체20개 완료가 아니다. [B03·B04 입력 준비](B03_B04_WORK_ORDER_PREPARATION_20261110.md)는 비TP2 40개·TP2 3개 템플릿/계획이며 실제 입력·PACK34·TP2 실행 완료와 구분한다.
 
-[LIF06/SUP03 역사CPU 지원 연결](CPU_SUPPORT_CONNECTION_20261110.md)은 원실행·판정값을 보존한 선택입력으로 통합했다. [REQ09/10 무ID거부 A반환 요청](A_REQ_NOID_RETURNS_20261110.md)은 해당 관측 공백만 대상으로 하며 다른 B업무의 전역 차단 조건이 아니다. 현재 제품 통합source는510파일/e1d3, 원V13 GPU source는466파일/2cb로 구분한다. 아래는 기존 V13 실제 수행·마감 이력이다.
+SUP-16은 [순차 역할 준비 기록](SUP16_SEQUENTIAL_PREPARATION_20261110.md)을 따른다. 이전 브라우저 연결 장애 이후 세션2가 11월10일13:58:26~33 KST AWS 조회에 성공했다. 당시 소유3대 stopped·IP/EIP0·활성SSM0이며 EBS440GiB 저장비는 계속된다. 설치기 수정판의 독립 검토는 끝났고 운영 드라이버·현재 proof 결합은 진행 중이다. 이 갱신은 새 GPU 기동·역할 실측 완료를 주장하지 않는다.
+
+[LIF06/SUP03 역사CPU 지원 연결](CPU_SUPPORT_CONNECTION_20261110.md)과 [REQ09/10 무ID거부 A반환 요청](A_REQ_NOID_RETURNS_20261110.md)은 원 범위를 유지한다. 현재 제품510/8ff와 아래 원V13 실제 GPU466/2cb는 서로 다른 기준선이다.
 
 ## V13-r4 실제 선정 실측 — 기존 완료 기록
 

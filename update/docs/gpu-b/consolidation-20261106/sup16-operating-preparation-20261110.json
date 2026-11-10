@@ -95,16 +95,15 @@
   "GPU_actual_SUP16_performed": false,
   "current_remote_CONFIG_or_proof_verified": false,
   "runtime_ready": false,
-  "actual_fresh_budget_checked": false,
+  "actual_fresh_budget_checked": true,
   "budget_or_deadlines_changed": false,
   "whole_pair_connected": false,
   "completed_check_IDs_added_by_CPU_counts": 0,
   "remaining": [
     "original transport/start-stop driver admission; actual remote staging/owner/mode; current same-CONFIG role/health/preflight/model proofs and original timer/stop boundaries",
-    "browser/computer automation connection recovery",
-    "fresh original resource/auth/budget/protection checks",
     "actual GPU1 normal-before/partial/normal-recovered sequential role measurement and new evidence verification",
-    "separate two-live-target fullpair contract"
+    "separate two-live-target fullpair contract",
+    "fresh resource/budget recheck and actual original active protection timers before execution; prior read-only resource/budget observation is 2026-11-10 13:58 KST"
   ],
   "original_failures": {
     "supervisor_spawn_handoff": "preserved; corrected in supervisor v2",
@@ -123,5 +122,23 @@
     "remote_files_staged": false,
     "current_proofs_created": false,
     "scope": "Local composition only. Exact private frozen assets/config and original active timer/identity/admission are still required."
+  },
+  "latest_readonly_recovery_20261110": {
+    "observed_KST": "2026-11-10 13:58:26~33",
+    "receipt_sha256": "42a18713a7c95cac9cdca469fcb39b0df8055b8899a59a3b100403cca616a83a",
+    "instances_stopped": 3,
+    "IP_EIP": 0,
+    "active_SSM": 0,
+    "EBS_GiB": 440,
+    "estimate_USD": 77.03839263213317,
+    "with_next_worst_case_USD": 83.24839263213316,
+    "execution_limit_USD": 95,
+    "final_bill": false,
+    "installer_v2_sha256": "7311f63618c8b6938c3ac8d07a39cc15b28fcab098e6f23b59a3a33fdc7766a4",
+    "installer_independent_review_sha256": "9070fc334f4002e37cf9af2112ea9e733ddf23d659ac341384ab08dc0099e826",
+    "driver_and_current_proofs": "in preparation",
+    "new_remote_install_or_execution_claimed": false,
+    "runtime_ready": false,
+    "older_browser_error_is_historical": true
   }
 }

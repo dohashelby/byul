@@ -36,10 +36,92 @@ def write(path,value):
     return dict(path=str(path),bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest())
 
 
+def materialize_plt01(spec,base,root,output):
+    """Explicit EXAMPLE preparation only; retain original seven-check selection."""
+    import ast
+    from guard.models import Environment,sha256_hex
+    from guard.executors.http_common import fill_model,request_model
+    pins={}
+    for relative,sha in spec['source_files'].items():
+        _,pins[relative]=pinned({'path':str(root/relative),'sha256':sha},base)
+    pack=load_pack(root/'update/packs/PACK-BASELINE')
+    if pack.ref().model_dump(mode='json')!=spec['pack_ref']:
+        raise ValueError('B03_PACK_INPUT_MISMATCH')
+    env_raw,env_pin=pinned(spec['environment'],base)
+    target_raw,target_pin=pinned(spec['target'],base)
+    policy_raw,policy_pin=pinned(spec['permission_policy_source'],base)
+    env=Environment.model_validate(strict_json(env_raw))
+    target=strict_json(target_raw)
+    if (not env.hash_ok() or env.data_origin.value!='EXAMPLE' or target.get('lab') is not True
+            or target.get('environment_ref')!=env.ref().model_dump(mode='json')):
+        raise ValueError('B03_EXISTING_PLT01_EXAMPLE_INPUT_REQUIRED')
+    assignments=[n.value for n in ast.parse(policy_raw).body if isinstance(n,ast.Assign)
+        and len(n.targets)==1 and isinstance(n.targets[0],ast.Name) and n.targets[0].id=='PERMISSION_VALUES']
+    if len(assignments)!=1:raise ValueError('B03_EXISTING_PERMISSION_LITERAL_REQUIRED')
+    values=ast.literal_eval(assignments[0])
+    check=pack.checks['PLT-01']
+    if type(values) is not dict or set(values)!={p.key for p in check.policy_params}:
+        raise ValueError('B03_PERMISSION_FIELDS_REQUIRED')
+    config={'_kubernetes_target_sha256':sha256_hex(canonical_json(target)),
+        'adapter':{'name':env.engine.name},'executors':{check.executor:'kubernetes'},
+        check.executor:{'target':target_pin['path']}}
+    executor=registry.build_executor(check.executor,'kubernetes',config,
+        engine=env.engine.name,version=env.engine.version)
+    executor.validate_policy(check,values)
+    alias=request_model(env,target)
+    if output.is_relative_to(root):raise ValueError('B03_OUTPUT_OUTSIDE_SOURCE_REQUIRED')
+    # Exact input, policy and factory checks precede all output writes.
+    plan=prepare_checklist_cases.prepare_cases(pack,output/'definition-plan',['PLT-01'])
+    folder=output/'PLT-01';folder.mkdir(mode=0o700)
+    policy=yaml.safe_load((output/'definition-plan/PLT-01/policy-template.yaml').read_bytes())
+    policy.update(data_origin='EXAMPLE',status='DRAFT',values={'PLT-01':deepcopy(values)})
+    normal={'schema':'b03-request-input/1','check_id':'PLT-01','role':'normal',
+        'functional_probes':[p.model_dump(mode='json') for p in check.functional_probes],
+        'bodies':[fill_model(deepcopy(p.body),alias) for p in check.functional_probes],
+        'planned_model_alias':alias,'planned_alias_is_current_observation':False,
+        'served_model_name':None,'runtime_target':target_pin['path']}
+    challenge={'schema':'b03-request-input/1','check_id':'PLT-01','role':'challenge',
+        'steps':list(check.challenge_steps),'policy_values':deepcopy(values),
+        'runtime_target':target_pin['path'],'native_record':None}
+    outputs={name:write(folder/name,value) for name,value in (
+        ('policy.existing-lab.json',policy),('config.json',config),('normal.json',normal),('challenge.json',challenge))}
+    toml='_kubernetes_target_sha256 = '+json.dumps(config['_kubernetes_target_sha256'])+'\n'
+    toml+='\n'.join('['+name+']\n'+'\n'.join(k+' = '+json.dumps(v) for k,v in table.items())
+        for name,table in config.items() if type(table) is dict)+'\n'
+    if tomllib.loads(toml)!=config:raise ValueError('B03_CONFIG_TOML_ROUNDTRIP_MISMATCH')
+    outputs['config.toml']=write(folder/'config.toml',toml.encode())
+    row={'check_id':'PLT-01','executor':check.executor,'backend':'kubernetes',
+        'factory_type':type(executor).__module__+'.'+type(executor).__name__,
+        'policy_source':policy_pin,'policy_data_origin':'EXAMPLE','policy_is_enterprise_approval':False,
+        'policy_input_keys_missing':[],'existing_policy_validator_accepted':True,'policy_diagnostic':None,
+        'ready_to_execute':False,'filled_static_inputs':True,
+        'normal':outputs['normal.json'],'challenge':outputs['challenge.json'],'config':outputs['config.toml'],
+        'config_inspection_json':outputs['config.json'],'policy':outputs['policy.existing-lab.json'],
+        'target':target_pin,'environment':env_pin,
+        'pending':[{'field':f,'owner':o} for f,o in (
+            ('actual_owned_environment_target_worker_identity','root/S2'),
+            ('enterprise_policy_authority_and_existing_canonical_POL','권한자/root'),
+            ('actual_mount_device_access_and_whole_worker_observations','해당producer/root'),
+            ('normal_inference_GPU_TP1_product_path','실행담당/root'))],
+        'prepare_command':['guard','prepare-validation','--pack',str(root/'update/packs/PACK-BASELINE'),
+            '--env',env_pin['path'],'--policy',outputs['policy.existing-lab.json']['path'],
+            '--config',outputs['config.toml']['path']],
+        'prepare_command_executed':False,'full_policy_loader_would_issue_POL':True}
+    result={'schema':'b03-materialized-existing-inputs/1','source_commit':spec['source_commit'],
+        'source_files':pins,'pack_ref':pack.ref().model_dump(mode='json'),'rows':[row],
+        'definition_plan_cases':len(plan['cases']),'engine_GPU_AWS_executed':False,
+        'EVD_RES_RPT_Refs_created':False,'POL_ENV_current_target_created':False,
+        'producer_authenticated':False,'ready_for_GPU':False}
+    write(output/'materialized-inputs.json',result)
+    return result
+
+
 def materialize(spec_path,source_root,output):
     """No POL/ENV/PLAN/Ref issuance; unknown runtime identity stays null."""
     spec_path=Path(spec_path).absolute()
     spec=strict_json(spec_path.read_bytes(),limit=262144)
+    if spec.get('schema')=='b03-static-input-selection/1' and spec.get('check_ids')==['PLT-01']:
+        return materialize_plt01(spec,spec_path.parent,Path(source_root).absolute(),Path(output).absolute())
     if spec.get('schema')!='b03-static-input-selection/1' or spec.get('check_ids')!=list(SELECTED):
         raise ValueError('B03_SELECTION_INVALID')
     root=Path(source_root).absolute()

@@ -56,3 +56,13 @@ WSL CPython3.12.3 `-I -S -B`에서 변경된 3경계를 직접 확인했다. 기
 S5는 B03 실입력과 CPU 준비, S4는 B04 case별 반환 요구, S2는 실제 운영·현재 신원·요청 대응, S6는 새 변경 독립 검토, root는 [실행 순서·공유 조건](B03_EXECUTION_SHARING_ORDER_20261110.md)과 PR 통합을 맡는다. A의 남은 공통 producer·정본팩·자격/TP2 반환과 권한자의 정책값은 해당 분기에만 적용한다. B03/B04를 현재 SUP16의 전역 시작 조건으로 붙이지 않는다.
 
 PACK33 DRAFT·EXAMPLE·기존 FAIL/UNKNOWN/Refs·LAB10/33을 보존하며, 이 준비로 새 EVD/RES/RPT·PACK34 Ref나 실제 GPU 완료를 생성하지 않았다.
+
+## PLT-01 입력 준비 연결
+
+기존 선정 7개의 입력 생성과 별도로 `check_ids=["PLT-01"]` 단독 선택을 준비했다. 원 `SELECTED`와 HTTP 입력 지원표는 유지하고, 기존 7개와 PLT-01을 혼합한 요청은 거부한다. 기존 EXAMPLE ENV·target과 고정된 `PERMISSION_VALUES` 5개 값만 재사용하며 새 기업 정책값이나 현재 실행 신원을 채우지 않는다.
+
+새 CPU 경계는 CPython 3.12.3 `-I -S -B`에서 실제 argparse main→기존 case 준비기→normal/challenge·정책 초안·TOML 생성→실제 CLI 설정 로더→RunConfig→registry factory·정책값 검증이다. 정상 연결 1건과 정책 원본 포인터 누락·혼합 선택 거부 2건을 확인했다. 거부 입력에서는 출력 파일을 생성하지 않았다. 기존 PLT-01 native 원출력→현재 registry 실행기 소비 연결은 이전 CPU 1건의 검토 결과를 재사용했다. 이 횟수를 제품 점검 완료 수로 합산하지 않는다.
+
+새 생성 정책은 EXAMPLE/DRAFT다. 전체 `load_policy`는 이 입력에서 새 POL을 발급하므로 이번 경계에서는 호출하지 않았다. 실제 하부 읽기와 원 실행기의 `validate_policy`까지 확인했으며, 전체 prepare-validation·정본 정책 적재·실제 executor.run·정상 추론·GPU 완료로 표시하지 않는다. 현재 ENV/target/worker·mount/device 접근·정본 POL은 남은 입력이다.
+
+고정 후보 SHA `8ca562ef1d943bb3a384f0cb8ff558d690e0a91acd0efa7f745c01e5ca7db1a5`, source freeze SHA `8d85c4ea77e3e945fbb8ac44cd2e85f9b7636b716e037fd1623524f6035df1c6`, 새 CLI/config CPU 결과 SHA `79c20c10b5d332dfb77ca4c898d0c2d214fc9783c7abe8c4fe21b729b962cd01`이다. S6 독립 검토 87대조/불일치0(SHA `07167210dc39d0c76a1b2bd611da5559c8232a87f5cfbb9bc592e86665c0738c`)을 확인하고 검토된 원 bytes를 공개 복사했다. 적용 후 selection의 도구 pin과 source_commit은 새 bytes·반영 커밋에 다시 연결해야 하며, 미적용 후보 검증에 쓴 옛 selection은 그대로 재사용하지 않는다. 원 제품 528파일 목록·PACK33 DRAFT·기존 FAIL/UNKNOWN/Refs·LAB10/33은 유지한다.

@@ -1,3 +1,10 @@
+## 2026-11-11 — PLT-01 준비 CLI 연결과 실제 수집 잔여
+
+- 한 일: B 입력 도구에 PLT-01 단독 선택을 추가했다. 기존 7개 선택·원 실행 본문은 AST로 동일하며 혼합 선택은 거부한다. 기존 EXAMPLE ENV·target·정책값으로 normal/challenge·TOML을 준비하고 새 기업값·현재 신원을 만들지 않는다.
+- 검증: CPython3.12.3 `-I -S -B`의 실제 CLI→준비기→TOML/config→RunConfig→registry factory·정책값 검증 양성1·거부2(출력0), 독립87대조/불일치0을 확인했다. 이전 native 원출력→PLT01 소비 CPU1은 재사용했다. root는 검토 원bytes·기존7 AST·diff를 확인했으며 전체 suite는 변경 head PR CI에서 확인한다.
+- 실제 관측: 별도 D1에서 같은 기존GPU1대의 UID1000→기존sudo root→선정 Kubernetes API 조회는 성공했다. 일반stop1회 뒤 11월10일23:26 KST 실제stopped/IP없음·SSM/active0을 확인했다. 원180초 정지 관측 실패·정확off시각null은 보존한다. 이 API 성공은 SUP16 3역할 수집 완료가 아니다.
+- 다음 단계·잔여: C1 요청별 root 자식 회수 구현은 S2, 검토된 N1 소비 연결은 S5, 독립 검토는 S6가 맡는다. 실제 SUP16 수집·과거원입력3개·전체archive·제품 Ref는 미완료다. PLT01 full policy loader/새POL/실executor·GPU는0이며 적용후 selection source pin·commit을 재결합한다. PACK33 DRAFT·LAB10/33·기존43행/Refs를 유지한다.
+
 ## 2026-11-10 — B03 실제 입력 소비·B04 준비와 R4 실패 정리
 
 - 후속 보강: `b12_tp2_verify.py`에 기존 B04 계획의 ID·역할 결합6줄을 추가했다. 실제9계획의 포인터교환을 WSL3.12.3-I-S-B로 직접 대조해 정상INCOMPLETE유지·역할혼입2건/점검혼입1건FAILED를 확인했다. 독립 유효25대조+검증기후속5대조/불일치0·root exactcopy를 연결했다. 원Windows qualified표현은취소/원본보존했고 실제TP2·rank배정·engine자격은아니다. 후속R5는copy helper·wrapper 내부해시·내장argv/manifest핀과phase를수정해독립71대조/불일치0 후 같은GPU1대 기동·running/SSMOnline을확인하고21:48:03KST 실행1회착수했다. 역할별실측성공은원관측확인전미완료다.

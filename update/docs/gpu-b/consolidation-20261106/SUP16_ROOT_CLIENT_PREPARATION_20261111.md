@@ -1,5 +1,7 @@
 # SUP-16 요청별 root client 준비
 
+아래 CPU 준비 기록은 작성 당시 범위를 보존한다. 이후 실제 API 연결·역할 실행 전 오류·정리 관측은 [실제 운영 관측](SUP16_ACTUAL_OBSERVATIONS_20261111.md)에 별도로 기록한다.
+
 실제 SUP-16 R5는 UID1000 helper의 `reader.snapshot()`에서 `KUBERNETES_CAPTURE_BINDING_UNAVAILABLE`로 실패했다. 바깥 root 운영과 helper의 kubeconfig 전달 경계가 달랐으며, 이후 D1에서 기존 sudo root→선정 Kubernetes API 조회가 성공했다. 이 API 조회 성공은 실제 capture나 제품 Ref 생성 성공이 아니다.
 
 B 전용 요청별 감독 후보는 UID1000 helper·입력·출력을 유지하면서, 정확한 기존 root client에 한 요청만 위임한다. 상주 서비스·새 권한·kubeconfig 복사·chmod·A 공통 코드 변경은 없다. 선정 context/namespace/pod/container와 고정 wrapper 네 개의 SHA를 바인딩하고, 원 파이프 수집기 6,134bytes/SHA `25c81666a17e13651c0b5b3bd67c9f310c6feee8311fcac408404d895dc67290`를 변경 없이 전용 namespace에서 사용한다.

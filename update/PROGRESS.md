@@ -1,3 +1,9 @@
+## 2026-11-11 — SUP-16 요청별 root client CPU 준비
+
+- 한 일: 기존 UID1000 helper를 유지하는 B 전용 요청별 root client 도구의 검토 원bytes를 공개 복사했다. 파일 FD/hash 선행 확인·같은 최대5초 안의 정리/전달 예약·정확 caller와 자기 요청 자식 회수·일회성 PID/mount namespace·UIDdrop 후 부모종료 보호를 연결했다. A 공통 코드·원수집 source·권한·kubeconfig는 바꾸지 않았다.
+- 검증: core6와 namespace4의 원version/검증범위를 재사용하고 새 bootstrap/postdrop4의 raw/receipt를 확인했다. root source/raw50 및 S4 새delta56대조/불일치0을 연결했으며 기존 assert14개를 유지했다. bootstrap fixture 성공은 전체 sudo/entry/wire 성공이 아니다. namespace4 projection·새receipt의 patch version 미관측·원실패 이력을 보존했다. [범위와 한계](docs/gpu-b/consolidation-20261106/SUP16_ROOT_CLIENT_PREPARATION_20261111.md).
+- 다음 단계·잔여: S5의 N1 소비3B와 S2의 새43 운영배치를 결합·검토한 뒤 같은 기존GPU1대의 한boot에서 실제rootPython/namespace/APIwire preflight→준비된3역할을 확인한다. 현재 추가 GPU 기동·제품 Ref 생성은0이고 LAB10/33·PACK33 DRAFT·기존 FAIL/UNKNOWN을 유지한다. 새head 전체 시험은 PR Linux CI에서 확인한다.
+
 ## 2026-11-11 — PLT-01 준비 CLI 연결과 실제 수집 잔여
 
 - 한 일: B 입력 도구에 PLT-01 단독 선택을 추가했다. 기존 7개 선택·원 실행 본문은 AST로 동일하며 혼합 선택은 거부한다. 기존 EXAMPLE ENV·target·정책값으로 normal/challenge·TOML을 준비하고 새 기업값·현재 신원을 만들지 않는다.

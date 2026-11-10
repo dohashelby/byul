@@ -1,0 +1,82 @@
+{
+  "schema_version": "byul-runtime-lab-report/0.1",
+  "generated_at": "2026-10-25T01:05:00Z",
+  "state": "ok",
+  "configured_path": "/var/lib/serving-runtime/k8s-lab/reports",
+  "path": "/var/lib/serving-runtime/k8s-lab/reports/k8s-lab-EXAMPLE.json",
+  "error": null,
+  "report": {
+    "run_id": "k8s-lab-EXAMPLE",
+    "context": "kind-runtime-lab",
+    "namespace": "serving-lab",
+    "started_at": "2026-10-25T00:40:00Z",
+    "finished_at": "2026-10-25T00:52:00Z",
+    "overall": "partial",
+    "cases": [
+      {
+        "id": "L-01",
+        "title": "정책 적용 전 기준선",
+        "status": "passed",
+        "summary": "EXAMPLE 정책 적용 전 기준선 결과 요약",
+        "evidence": [
+          "raw/l-01.json"
+        ],
+        "limitation": "EXAMPLE 자료: 실제 시험 결과가 아님",
+        "note": null
+      },
+      {
+        "id": "L-02",
+        "title": "Cilium 통신 정책",
+        "status": "passed",
+        "summary": "EXAMPLE Cilium 통신 정책 결과 요약",
+        "evidence": [
+          "raw/l-02.json"
+        ],
+        "limitation": "EXAMPLE 자료: 실제 시험 결과가 아님",
+        "note": null
+      },
+      {
+        "id": "L-03",
+        "title": "Hubble DROPPED 증거",
+        "status": "passed",
+        "summary": "EXAMPLE Hubble DROPPED 증거 결과 요약",
+        "evidence": [
+          "raw/l-03.json"
+        ],
+        "limitation": "EXAMPLE 자료: 실제 시험 결과가 아님",
+        "note": null
+      },
+      {
+        "id": "L-04",
+        "title": "Tetragon 파일·실행 관측",
+        "status": "passed",
+        "summary": "EXAMPLE Tetragon 파일·실행 관측 결과 요약",
+        "evidence": [
+          "raw/l-04.json"
+        ],
+        "limitation": "EXAMPLE 자료: 실제 시험 결과가 아님",
+        "note": null
+      },
+      {
+        "id": "L-05",
+        "title": "Tetragon probe 차단",
+        "status": "passed",
+        "summary": "EXAMPLE Tetragon probe 차단 결과 요약",
+        "evidence": [
+          "raw/l-05.json"
+        ],
+        "limitation": "EXAMPLE 자료: 실제 시험 결과가 아님",
+        "note": null
+      },
+      {
+        "id": "L-06",
+        "title": "적용 정책 정리",
+        "status": "not_run",
+        "summary": "EXAMPLE 적용 정책 정리 결과 요약",
+        "evidence": [],
+        "limitation": "EXAMPLE 자료: 실제 시험 결과가 아님",
+        "note": null
+      }
+    ]
+  }
+}

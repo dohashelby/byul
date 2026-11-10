@@ -1,0 +1,41 @@
+{
+  "commit": "3bd6a99511b628b6824a7bafd2de0cb7daa614bc",
+  "files": [
+    {
+      "source_path": "contracts/schemas/common.schema.json",
+      "sha256": "4cb3a9618e19d5eb0d54538d5378a4ea53541ce65275cdace15ac646f4f313b8"
+    },
+    {
+      "source_path": "contracts/schemas/runtime-event.schema.json",
+      "sha256": "2847c8a79adc0acfc9e4d5ec5ca4bef4f008694f78e605ca07c534a7422990ac"
+    },
+    {
+      "source_path": "contracts/schemas/runtime-request-detail.schema.json",
+      "sha256": "aeaa8c2a403b80deabb577d4951fa1709f43658a9f81174209f5b8aa525577c6"
+    },
+    {
+      "source_path": "contracts/schemas/runtime-status.schema.json",
+      "sha256": "aeda851a2d67ea0bcdb4bb329f1fd44a552c63de81caa39adda91b28a0f04b97"
+    },
+    {
+      "source_path": "contracts/schemas/runtime-lab-report.schema.json",
+      "sha256": "80f46ebee5eba1bc1a9fb8b0ee86611f2e92169ed736f317b000e79b8a6a6cf4"
+    },
+    {
+      "source_path": "contracts/examples/runtime-events.jsonl",
+      "sha256": "d18f70b2b92e3a0be654d6ec4eb778fa499bc0662062640ce77a38fc3230e2db"
+    },
+    {
+      "source_path": "contracts/examples/runtime-request-detail.json",
+      "sha256": "9cbf542d23bd316a789bab778108c8c7187a435706dac0ad3344d409eebca4f2"
+    },
+    {
+      "source_path": "contracts/examples/runtime-status.json",
+      "sha256": "905d276aa7f57f37ecd24b0f63a3a619ba9ea2b9e1ad0cdc2803bb8d28b16de8"
+    },
+    {
+      "source_path": "contracts/examples/runtime-lab-report.json",
+      "sha256": "f8c6354429acc7a66a25d7657576b473b55954ed98cd3d934587111b62416962"
+    }
+  ]
+}

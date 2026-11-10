@@ -150,7 +150,7 @@ describe("통합 개요", () => {
     const chart = (await screen.findByRole("heading", { name: "시간별 요청" })).closest("article")!;
     const eventChart = screen.getByRole("heading", { name: "시간별 관측 이벤트" }).closest("article")!;
     expect(screen.queryByRole("heading", { name: "시간대별 추이" })).toBeNull();
-    expect(chart.querySelector(".bigNumber")?.textContent).toBe("56최근 요청");
+    expect(chart.querySelector(".bigNumber")?.textContent).toBe("56조회된 요청 · 선택한 기간");
     expect(eventChart.textContent).toContain("관측 이벤트 5건");
     expect(eventChart.textContent).toContain("기타(관측·허용 등)");
     const totalTab = within(chart).getByRole("tab", { name: "전체" });

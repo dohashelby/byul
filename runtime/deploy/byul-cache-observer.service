@@ -7,10 +7,10 @@ Wants=network-online.target
 Type=simple
 User=root
 Group=10000
-EnvironmentFile=/etc/byul/cache-observer.env
+EnvironmentFile=/etc/serving-runtime/cache-observer.env
 Environment=PYTHONPATH=/opt/byul/runtime/src
 Environment=PYTHONPYCACHEPREFIX=/run/byul-cache/python-cache
-ExecStart=/opt/byul/.venv/bin/python /opt/byul/runtime/tools/cache_observation_feed.py --settings ${CACHE_SETTINGS} --settings-sha256 ${CACHE_SETTINGS_SHA256} --reader-gid ${CACHE_READER_GID} --kubeconfig ${CACHE_KUBECONFIG} --kubectl ${CACHE_KUBECTL} --output /run/byul-cache/current.json
+ExecStart=/opt/byul/runtime/.venv/bin/python /opt/byul/runtime/tools/cache_observation_feed.py --settings ${CACHE_SETTINGS} --settings-sha256 ${CACHE_SETTINGS_SHA256} --reader-gid ${CACHE_READER_GID} --kubeconfig ${CACHE_KUBECONFIG} --kubectl ${CACHE_KUBECTL} --output /run/byul-cache/current.json
 Restart=on-failure
 RestartSec=5
 RuntimeDirectory=byul-cache
@@ -21,6 +21,13 @@ ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=/run/byul-cache
 PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_CHOWN
+ReadOnlyPaths=/etc/serving-runtime
 
 [Install]
 WantedBy=multi-user.target

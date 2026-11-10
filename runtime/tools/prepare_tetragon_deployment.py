@@ -51,6 +51,8 @@ def prepare(intent_path: Path, image: str, output: Path):
     (output / "byul-tetragon-stream.service").write_text(stream_service)
     record = {"state": "prepared-unapplied", "context": "byul-aws-lab", "namespace": intent.namespace,
               "identity_selector": SELECTOR, "policies": names,
+              "status_service": "serving-runtime-tetragon-status.service",
+              "rollout_script": "/opt/byul/runtime/deploy/install/rollout_tetragon_stream.py",
               "sentinel_image": image,
               "sha256": {name: hashlib.sha256((output/name).read_bytes()).hexdigest() for name in [*files, "byul-tetragon-stream.service"]}}
     atomic_json(output / "prepared.json", record)

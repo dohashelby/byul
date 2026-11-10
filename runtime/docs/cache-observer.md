@@ -7,9 +7,9 @@
 ```json
 {
   "schema": "runtime-cache-observer-settings/1",
-  "target_path": "/etc/byul/target.json",
+  "target_path": "/etc/serving-runtime/target.json",
   "target_sha256": "<target 파일 SHA256>",
-  "intent_path": "/etc/byul/intent.json",
+  "intent_path": "/etc/serving-runtime/intent.json",
   "intent_sha256": "<intent 파일 SHA256>",
   "policy_sha256": "<현재 정책 SHA256>",
   "bundle_id": "<현재 bundle_id>",
@@ -26,17 +26,13 @@ Pod의 컨테이너·Pod securityContext 순서로 선언 UID/GID를 확인하�
 
 서비스는 현재 Pod를 두 번 조회하여 사이에 Pod/CID·이미지·기동·마운트 바인딩이 바뀌었는지 확인한다. 캐시 메타데이터는 최대 512개 항목을 방문한다. 방문 한도·조회 실패·입력 판본 변경·동시 재기동은 관측 불가로 표시한다. 다른 격리 세대의 존재만으로 현재 세대를 실패 처리하지 않는다.
 
-`deploy/byul-cache-observer.service`는 `/opt/byul` 설치와 reader GID 10000을 사용하는 LAB 기본안이다. reader GID를 바꾸면 서비스의 Group, `CACHE_READER_GID`, Gateway GID 및 마운트 권한을 함께 맞춘다. `/etc/byul/cache-observer.env`에는 다음 값을 지정한다.
+설치기는 `/opt/byul/runtime/.venv/bin/python`과 `/etc/serving-runtime`을 공통으로 사용한다. `install.env`의 `CACHE_SETTINGS_FILE`, `CACHE_SETTINGS_SHA256`, `CACHE_KUBECONFIG_FILE`을 모두 명시한 경우에만 `byul-cache-observer.service`를 설치·시작한다. 설정 해시가 다르거나 일부만 지정하면 설치 전에 중단한다. 기존 설치의 기본 수집 범위는 유지한다.
 
-```text
-CACHE_SETTINGS=/etc/byul/cache-observer.json
-CACHE_SETTINGS_SHA256=<설정 파일 SHA256>
-CACHE_READER_GID=10000
-CACHE_KUBECONFIG=/etc/byul/kubeconfig
-CACHE_KUBECTL=/usr/local/bin/kubectl
-```
+설치기는 승인 설정을 `/etc/serving-runtime/cache-observer.json`, 전용 kubeconfig를 `cache-kubeconfig`, 환경 파일을 `cache-observer.env`로 root 소유 0600 복사한다. `CACHE_KUBECTL`은 root 소유·go-w 금지 실행 파일의 절대 경로이며 기본값은 `/usr/local/bin/kubectl`이다. 전용 Kubernetes principal에는 승인된 엔진 namespace의 Pod get/list만 부여한다. Gateway와 다른 수집기에는 이 자격 파일을 공유하지 않는다.
 
-Kubeconfig는 root 소유 0600, kubectl은 root 소유의 그룹·다른 사용자 쓰기 금지 실행 파일로 배치한다. 스냅샷 디렉터리는 root:10000 0750, 파일은 root:10000 0640이다. Gateway에는 디렉터리를 읽기 전용으로 마운트한다.
+생산자는 `CacheObservationProducer.__init__`의 root 검사, `read_protected`의 root 소유 0600/명시 GID 0640 입력 검사, `atomic_snapshot`의 root 소유 출력 검사를 유지한다. 엔진 소유 0700 캐시 디렉터리의 metadata traversal에도 호스트 읽기 권한이 필요하다. root 실행은 이 경계를 보존하며 별도 UID를 위해 승인 파일 권한을 넓히지 않는다. unit은 `CAP_DAC_READ_SEARCH`와 출력 reader GID 지정용 `CAP_CHOWN`만 남기고 시스템·커널·cgroup 쓰기와 권한 상승을 제한한다. 쓰기 허용은 `/run/byul-cache`이다.
+
+스냅샷 디렉터리는 root:GATEWAY_DATA_GID 0750, 파일은 같은 소유자·그룹의 0640이다. Gateway에는 디렉터리를 읽기 전용으로 마운트한다. reader GID를 바꾸면 설치 설정·Gateway 인자·마운트 읽기 권한을 함께 맞춘다. 새 설정·세대 적용 시 설치기를 다시 실행하고 최신 스냅샷의 producer/binding 해시와 unavailable 상태를 확인한다.
 
 Gateway 옵션:
 

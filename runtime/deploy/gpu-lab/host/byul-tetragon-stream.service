@@ -3,10 +3,10 @@
 Description=byul scoped Tetragon stream and agent epoch supervision
 
 [Service]
-WorkingDirectory=%h/byul/runtime
-Environment=PYTHONPATH=%h/byul/runtime/src
+WorkingDirectory=/opt/byul/runtime
+Environment=PYTHONPATH=/opt/byul/runtime/src
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
-ExecStart=/usr/bin/python3 -B -m tools.tetragon_stream --context byul-aws-lab --namespace serving-lab --policy runtime-tg-asset-01 --policy runtime-tg-cache-01 --policy runtime-tg-secret-01 --policy runtime-tg-health-01 --output /srv/serving/observation --reader-group 10010
+ExecStart=/opt/byul/runtime/.venv/bin/python -B -m tools.tetragon_stream --context byul-aws-lab --namespace serving-lab --policy runtime-tg-asset-01 --policy runtime-tg-cache-01 --policy runtime-tg-secret-01 --policy runtime-tg-health-01 --output /srv/serving/observation --reader-group 10010
 Restart=on-failure
 RestartSec=5
 

@@ -10,6 +10,7 @@ import { matchesTarget, useEnvTarget } from "../lib/filters";
 import { bucketize, inRange } from "../lib/time";
 import { carry, useGlobalFilters } from "../lib/url";
 import p from "./pages.module.css";
+import { EventWindowNote } from "./runtime/EventWindowNote";
 import { GpuPanel } from "./runtime/GpuPanel";
 
 const AREAS = ["SUP", "REQ", "PLT", "LIF", "OBS"] as const;
@@ -48,8 +49,11 @@ export function DashboardPage() {
     const connected = status?.collectors.filter((c) => c.state === "ok").length ?? 0;
     const total = status?.collectors.length ?? 0;
     const verification = o.latest_verification;
+    const requestPartial = requests.data?.truncated || o.requests?.counts_lower_bound || o.requests?.history_truncated;
     return <>
       {(requests.isError || events.isError) && <StateView kind="disconnected" detail="실시간 관측 장애로 일부 집계가 누락될 수 있습니다. 수집 상태를 확인하세요." />}
+      <p className="small muted" aria-label="대시보드 집계 범위">카드·차트는 조회된 기록 중 선택한 기간·환경·대상의 집계입니다.{requestPartial ? " 요청 이력은 최근 조회 범위의 일부이며, 표시된 건수는 확인된 최소 건수입니다." : ""}</p>
+      <EventWindowNote data={events.data} />
       <section className={p.statusPanel} aria-labelledby="control-observation-heading">
         <div className={p.statusPanelHead}><h2 id="control-observation-heading">통제·관측 현황</h2><span className="small muted">선택한 기간 기준</span></div>
         <div className={p.fiveCards}>
@@ -73,7 +77,7 @@ export function DashboardPage() {
             active={requestMode}
             onTab={setRequestMode}
             total={reqRows.length}
-            note="최근 요청"
+            note="조회된 요청 · 선택한 기간"
           >
             {requestMode === "total"
               ? <TimeLine buckets={reqDayChart.buckets} size={reqDayChart.size} keys={REQUEST_SERIES.map((x) => x.key)} onSelectRange={openRequests} />
@@ -85,7 +89,7 @@ export function DashboardPage() {
           </ChartCard>
         </div>
         <div className={p.chartSide}>
-          <ChartCard title="구성 비율" note="선택한 기간의 요청 결과" total={reqRows.length}>
+          <ChartCard title="구성 비율" note="조회된 요청의 결과 비율 · 선택한 기간" total={reqRows.length}>
             <Donut items={REQUEST_SERIES.map((series) => ({ ...series, value: resultCounts.get(series.key) ?? 0 }))} />
           </ChartCard>
           <ChartCard title="거부·오류 사유" footer={<p className="small muted">최근 요청 중 거부·오류 상위 5개 사유</p>}>

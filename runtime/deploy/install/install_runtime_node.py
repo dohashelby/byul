@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 import fcntl
 import grp
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -44,7 +45,9 @@ AUTO_UNITS = tuple(unit for unit in UNITS if unit != AGENT_UNIT)
 COPY = ("src", "tools", "deploy", "pyproject.toml", "README.md")
 PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 DEFAULTS = {"PLATFORM_CA_FILE": "", "GATEWAY_DATA_GID": "10000",
-            "OBSERVE_GID": "10010", "OBSERVATION_USER": "ubuntu"}
+            "OBSERVE_GID": "10010", "OBSERVATION_USER": "ubuntu",
+            "CACHE_SETTINGS_FILE": "", "CACHE_SETTINGS_SHA256": "",
+            "CACHE_KUBECONFIG_FILE": "", "CACHE_KUBECTL": "/usr/local/bin/kubectl"}
 REQUIRED = {"CONTEXT", "NAMESPACE", "SERVER_ID", "PLATFORM_URL",
             "AGENT_TOKEN_FILE", "VIEWER_ENV_FILE", "KUBECONFIG_FILE"}
 
@@ -154,7 +157,22 @@ def load_config(path):
         if config[key]:
             require(re.fullmatch(r"/[A-Za-z0-9_./+-]+", config[key]), "입력 경로 형식이 잘못됐습니다.")
             input_bytes(config[key], private=key in {"AGENT_TOKEN_FILE", "VIEWER_ENV_FILE"})
+    cache = [config[key] for key in ("CACHE_SETTINGS_FILE", "CACHE_SETTINGS_SHA256", "CACHE_KUBECONFIG_FILE")]
+    require(not any(cache) or all(cache), "캐시 관측 설정·해시·전용 kubeconfig를 함께 지정하세요.")
+    if all(cache):
+        require(re.fullmatch(r"[a-f0-9]{64}", config["CACHE_SETTINGS_SHA256"]), "캐시 설정 해시가 잘못됐습니다.")
+        for key in ("CACHE_SETTINGS_FILE", "CACHE_KUBECONFIG_FILE", "CACHE_KUBECTL"):
+            require(re.fullmatch(r"/[A-Za-z0-9_./+-]+", config[key]), "캐시 입력 경로 형식이 잘못됐습니다.")
+        raw = input_bytes(config["CACHE_SETTINGS_FILE"], private=True)
+        require(hashlib.sha256(raw).hexdigest() == config["CACHE_SETTINGS_SHA256"], "캐시 설정 해시 불일치.")
+        input_bytes(config["CACHE_KUBECONFIG_FILE"], private=True)
+        secure_target(Path(config["CACHE_KUBECTL"]))
+        require(os.access(config["CACHE_KUBECTL"], os.X_OK), "kubectl 실행 권한이 없습니다.")
     return config
+
+
+def selected_units(config):
+    return UNITS + (("byul-cache-observer.service",) if config["CACHE_SETTINGS_FILE"] else ())
 
 
 def render(config, execute=False):
@@ -174,6 +192,15 @@ def render(config, execute=False):
             if config["PLATFORM_CA_FILE"]:
                 text = text.replace(" --sudo-bundle-apply", " --ca-file /etc/serving-runtime/platform-ca.pem --sudo-bundle-apply")
         result[name] = text.encode()
+    if config["CACHE_SETTINGS_FILE"]:
+        text = (SOURCE / "deploy/byul-cache-observer.service").read_text()
+        text = text.replace("Group=10000", "Group=" + config["GATEWAY_DATA_GID"])
+        result["byul-cache-observer.service"] = text.encode()
+        result["cache-observer.env"] = ("CACHE_SETTINGS=/etc/serving-runtime/cache-observer.json\n"
+            + "CACHE_SETTINGS_SHA256=" + config["CACHE_SETTINGS_SHA256"] + "\n"
+            + "CACHE_READER_GID=" + config["GATEWAY_DATA_GID"] + "\n"
+            + "CACHE_KUBECONFIG=/etc/serving-runtime/cache-kubeconfig\n"
+            + "CACHE_KUBECTL=" + config["CACHE_KUBECTL"] + "\n").encode()
     text = (SOURCE / "deploy/agent/sudoers.example").read_text()
     # Validated identifiers contain only letters/digits/_.-; only '.' is an ERE
     # metacharacter here. sudoers argument regexes need no extra backslash layer.
@@ -466,6 +493,11 @@ def install_files(config, account, artifacts):
             write_file(ETC / name, input_bytes(config[key], private=key != "KUBECONFIG_FILE"),
                        uid=uid, gid=account.pw_gid, mode=mode)
         write_file(ETC / "agent.env", artifacts["agent.env"], gid=account.pw_gid, mode=0o640)
+        if config["CACHE_SETTINGS_FILE"]:
+            for key, name in (("CACHE_SETTINGS_FILE", "cache-observer.json"),
+                              ("CACHE_KUBECONFIG_FILE", "cache-kubeconfig")):
+                write_file(ETC / name, input_bytes(config[key], private=True), mode=0o600)
+            write_file(ETC / "cache-observer.env", artifacts["cache-observer.env"], mode=0o600)
         if config["PLATFORM_CA_FILE"]:
             write_file(ETC / "platform-ca.pem", input_bytes(config["PLATFORM_CA_FILE"]),
                        gid=account.pw_gid, mode=0o640)
@@ -481,10 +513,10 @@ def install_files(config, account, artifacts):
             run(["visudo", "-c"], reject_stderr=True)
         with checking("5", "SYSTEMD_VALIDATE"):
             # Verify rendered units before replacing the installed units.
-            for name in UNITS:
+            for name in selected_units(config):
                 write_file(temporary / name, artifacts[name])
-            run(["systemd-analyze", "verify", *[temporary / name for name in UNITS]])
-            for name in UNITS:
+            run(["systemd-analyze", "verify", *[temporary / name for name in selected_units(config)]])
+            for name in selected_units(config):
                 write_file(Path("/etc/systemd/system") / name, artifacts[name])
             run(["systemctl", "daemon-reload"])
 
@@ -560,7 +592,17 @@ def install(config, args, artifacts, grub):
             if AGENT_UNIT_FILE.exists() or AGENT_UNIT_FILE.is_symlink():
                 run(["systemctl", "disable", AGENT_UNIT])
             # Stop before changing code, credentials or baseline; failures leave services stopped.
-            for unit in reversed(UNITS):
+            # Retire the superseded LAB writer before the canonical unit can start.
+            legacy = "byul-tetragon-status.service"
+            legacy_path = Path("/etc/systemd/system") / legacy
+            if legacy_path.exists() or legacy_path.is_symlink() or active(legacy):
+                run(["systemctl", "disable", "--now", legacy])
+                require(not active(legacy), "중복 Tetragon 상태 writer 중지 실패.")
+            cache_unit = "byul-cache-observer.service"
+            if not config["CACHE_SETTINGS_FILE"] and (Path("/etc/systemd/system") / cache_unit).exists():
+                run(["systemctl", "disable", "--now", cache_unit])
+                require(not active(cache_unit), "선택 해제한 캐시 관측 서비스 중지 실패.")
+            for unit in reversed(selected_units(config)):
                 if active(unit):
                     run(["systemctl", "stop", unit])
                 require(not active(unit), "서비스 중지 검증 실패.")
@@ -612,7 +654,9 @@ def install(config, args, artifacts, grub):
             print("8/9 활성 BPF LSM 확인 완료")
         with checking("9", "BASELINE_SERVICES"):
             capture_baseline(config, args.capture_baseline)
-            for unit in AUTO_UNITS:
+            for unit in selected_units(config):
+                if unit == AGENT_UNIT:
+                    continue
                 run(["systemctl", "enable", unit])
                 run(["systemctl", "is-enabled", "--quiet", unit])
                 run(["systemctl", "start", unit])

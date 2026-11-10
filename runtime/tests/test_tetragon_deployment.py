@@ -21,6 +21,9 @@ class DeploymentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
             record = prepare(ROOT / "deploy/gpu-lab/intent.aws-lab.json", "python@sha256:" + "a"*64, output)
+            self.assertEqual(record['status_service'], 'serving-runtime-tetragon-status.service')
+            self.assertFalse((ROOT/'deploy/gpu-lab/host/byul-tetragon-status.service').exists())
+            self.assertNotIn('--hubble-only', (ROOT/'deploy/gpu-lab/host/byul-observation-feed.service').read_text())
             documents = [json.loads(path.read_text()) for path in output.glob("tetragon-*.json")]
             self.assertEqual(set(record["policies"]), {d["metadata"]["name"] for d in documents})
             service = (output / "byul-tetragon-stream.service").read_text()

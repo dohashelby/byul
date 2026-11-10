@@ -46,6 +46,27 @@ class InstallRuntimeNodeTests(unittest.TestCase):
                      f"KUBECONFIG_FILE={self.inputs['kubeconfig']}\n")
         self.write_config(self.text)
 
+
+    def test_cache_observer_is_opt_in_and_uses_installed_root_paths(self):
+        config = installer.load_config(self.config)
+        self.assertNotIn("byul-cache-observer.service", installer.selected_units(config))
+        config.update(CACHE_SETTINGS_FILE="/approved/settings.json", CACHE_SETTINGS_SHA256="a"*64,
+                      CACHE_KUBECONFIG_FILE="/approved/readonly-kubeconfig")
+        artifacts = installer.render(config)
+        unit = artifacts["byul-cache-observer.service"].decode()
+        self.assertIn("/opt/byul/runtime/.venv/bin/python", unit)
+        self.assertIn("EnvironmentFile=/etc/serving-runtime/cache-observer.env", unit)
+        self.assertIn("CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_CHOWN", unit)
+        self.assertIn("ProtectSystem=strict", unit)
+        self.assertNotIn("/etc/byul", unit)
+        self.assertIn("CACHE_KUBECONFIG=/etc/serving-runtime/cache-kubeconfig", artifacts["cache-observer.env"].decode())
+        self.assertIn("byul-cache-observer.service", installer.selected_units(config))
+
+    def test_partial_cache_configuration_is_rejected(self):
+        self.write_config(self.text + "CACHE_SETTINGS_FILE=/approved/settings.json\n")
+        with self.assertRaises(installer.InstallError):
+            installer.load_config(self.config)
+
     def write_config(self, text):
         self.config.write_text(text)
         self.config.chmod(0o600)
@@ -588,6 +609,40 @@ class InstallRuntimeNodeTests(unittest.TestCase):
                 self.assertFalse(any(isinstance(c, list) and c[:2] in
                                      (["systemctl", "enable"], ["systemctl", "start"]) for c in events))
 
+    def test_existing_cache_writer_must_stop_before_replacing_same_unit(self):
+        config = installer.load_config(self.config)
+        config.update(CACHE_SETTINGS_FILE="/approved/settings.json", CACHE_SETTINGS_SHA256="a"*64,
+                      CACHE_KUBECONFIG_FILE="/approved/kubeconfig")
+        with ExitStack() as stack:
+            mocks = self.install_mocks(stack)
+            stack.enter_context(patch.object(installer, "active", side_effect=lambda name:
+                name == "byul-cache-observer.service"))
+            with self.assertRaises(installer.InstallError):
+                installer.install(config, SimpleNamespace(capture_baseline=False), installer.render(config), None)
+        mocks["run"].assert_called_once_with(["systemctl", "stop", "byul-cache-observer.service"])
+        mocks["install_code"].assert_not_called()
+        mocks["install_files"].assert_not_called()
+        mocks["capture_baseline"].assert_not_called()
+
+    def test_duplicate_status_writer_is_stopped_before_code_change(self):
+        config = installer.load_config(self.config)
+        events = []
+        legacy_states = iter([True, False])
+        with ExitStack() as stack:
+            mocks = self.install_mocks(stack)
+            stack.enter_context(patch.object(installer, "active", side_effect=lambda name:
+                next(legacy_states) if name == "byul-tetragon-status.service" else False))
+            mocks["run"].side_effect = lambda command: events.append(command)
+            def fail_code():
+                events.append("code")
+                raise installer.InstallError("test failure")
+            mocks["install_code"].side_effect = fail_code
+            with self.assertRaises(installer.InstallError):
+                installer.install(config, SimpleNamespace(capture_baseline=False), installer.render(config), None)
+        self.assertLess(events.index(["systemctl", "disable", "--now", "byul-tetragon-status.service"]), events.index("code"))
+        mocks["capture_baseline"].assert_not_called()
+        mocks["install_files"].assert_not_called()
+
     def test_failed_code_install_stops_all_following_stages(self):
         config = installer.load_config(self.config)
         with ExitStack() as stack:
@@ -604,7 +659,7 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         with ExitStack() as stack:
             mocks = self.install_mocks(stack)
             stack.enter_context(patch.object(installer.time, "sleep"))
-            stack.enter_context(patch.object(installer, "active", side_effect=[False] * (2 * len(installer.UNITS)) + [True] * len(installer.AUTO_UNITS) + [True]))
+            stack.enter_context(patch.object(installer, "active", side_effect=[False] * (1 + 2 * len(installer.UNITS)) + [True] * len(installer.AUTO_UNITS) + [True]))
             with self.assertRaises(installer.InstallError):
                 installer.install(config, SimpleNamespace(capture_baseline=False), installer.render(config), None)
         mocks["summary"].assert_not_called()
@@ -615,7 +670,7 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         with ExitStack() as stack:
             mocks = self.install_mocks(stack)
             stack.enter_context(patch.object(installer.time, "sleep"))
-            stack.enter_context(patch.object(installer, "active", side_effect=[False] * (2 * len(installer.UNITS)) + [True] * len(installer.AUTO_UNITS) + [False]))
+            stack.enter_context(patch.object(installer, "active", side_effect=[False] * (1 + 2 * len(installer.UNITS)) + [True] * len(installer.AUTO_UNITS) + [False]))
             mocks["capture_baseline"].side_effect = lambda *args: events.append("baseline-verified")
             mocks["run"].side_effect = lambda cmd: events.append(cmd)
             result = installer.install(config, SimpleNamespace(capture_baseline=True), installer.render(config), None)

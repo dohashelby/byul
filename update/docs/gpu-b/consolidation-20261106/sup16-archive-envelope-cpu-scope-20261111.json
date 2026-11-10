@@ -1,0 +1,211 @@
+{
+  "schema": "gpu-b-archive-envelope-cpu-scope/1",
+  "source": {
+    "path": "update/tools/gpu_b_archive_envelope.py",
+    "bytes": 22363,
+    "sha256": "6de3190f37d333bd1055e6abe706addb2a606405f701cf710712150852e1591f"
+  },
+  "status": "CPU_PREPARATION_VERIFIED_NOT_OPERATIONAL_READY",
+  "uid1000": {
+    "python": {
+      "EUID": 1000,
+      "GID": 1000,
+      "UID": 1000,
+      "dont_write_bytecode": 1,
+      "executable": "/home/youngjo/byul-s5-b-cpu-support-links-20261110/venv/bin/python",
+      "isolated": 1,
+      "no_site": 1,
+      "version": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]"
+    },
+    "contract_count": 1,
+    "cases": [
+      {
+        "name": "actual_encoder_to_bounded_decoder",
+        "passed": true
+      },
+      {
+        "diagnostic": "EXACT_DELIVERED_ENVELOPE_BYTES_SHA256_REQUIRED",
+        "exception_type": "_s5_exact_s2_archive_codec.CodecError",
+        "name": "trusted_delivery_hash",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "ENCODER_RECEIPT_METADATA_MIXING",
+        "exception_type": "_s5_exact_s2_archive_codec.CodecError",
+        "name": "request_metadata_mixing",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "Memory usage limit exceeded",
+        "exception_type": "_lzma.LZMAError",
+        "name": "decoder_liblzma_memory_limit",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "COMPRESSED_BYTES_SHA256_MISMATCH",
+        "exception_type": "_s5_exact_s2_archive_codec.CodecError",
+        "name": "corrupt_payload_hash",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "Corrupt input data",
+        "exception_type": "_lzma.LZMAError",
+        "name": "corrupt_xz_stream",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "XZ_TRAILING_OR_CONCATENATED_STREAM",
+        "exception_type": "_s5_exact_s2_archive_codec.CodecError",
+        "name": "xz_trailing_bytes",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "XZ_TRAILING_OR_CONCATENATED_STREAM",
+        "exception_type": "_s5_exact_s2_archive_codec.CodecError",
+        "name": "concatenated_stream",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "CANONICAL_SINGLE_JSON_OBJECT_REQUIRED",
+        "exception_type": "_s5_exact_s2_archive_codec.CodecError",
+        "name": "noncanonical_json_trailing",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "DECOMPRESSED_OUTPUT_CEILING",
+        "exception_type": "_s5_exact_s2_archive_codec.CodecError",
+        "name": "actual_bounded_decompression_overflow",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "EXACT_SCHEMA_AND_REFERENCE_REQUIRED",
+        "exception_type": "_s5_exact_s2_archive_codec.CodecError",
+        "name": "declared_size_reference_mix",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "RESTORED_ORIGINAL_BYTES_SHA256_REQUIRED",
+        "exception_type": "_s5_exact_s2_archive_codec.CodecError",
+        "name": "actual_restored_hash_check",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "BOUNDED_ORIGINAL_SIZE_REQUIRED",
+        "exception_type": "_s5_exact_s2_archive_codec.CodecError",
+        "name": "original_size_ceiling",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "INPUT_SIZE_CEILING",
+        "exception_type": "_s5_exact_s2_archive_codec.CodecError",
+        "name": "whole_envelope_input_ceiling",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "/home/youngjo/byul-s5-b-cpu-support-links-20261110/archive-envelope-codec-cpu-v4/artifacts/outputs/existing.keep",
+        "exception_type": "builtins.FileExistsError",
+        "name": "existing_decode_destination",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "/home/youngjo/byul-s5-b-cpu-support-links-20261110/archive-envelope-codec-cpu-v4/artifacts/outputs/existing.keep",
+        "exception_type": "builtins.FileExistsError",
+        "name": "existing_encode_destination",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "[Errno 40] Too many levels of symbolic links: 'source-symlink.zip'",
+        "exception_type": "builtins.OSError",
+        "name": "symlink_source",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "[Errno 40] Too many levels of symbolic links: 'envelope-symlink.json'",
+        "exception_type": "builtins.OSError",
+        "name": "symlink_envelope",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "/home/youngjo/byul-s5-b-cpu-support-links-20261110/archive-envelope-codec-cpu-v4/artifacts/outputs/destination-symlink.zip",
+        "exception_type": "builtins.FileExistsError",
+        "name": "symlink_destination",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "[Errno 20] Not a directory: 'symlink-parent'",
+        "exception_type": "builtins.NotADirectoryError",
+        "name": "symlink_parent",
+        "owned_scratch_removed": true,
+        "passed": true
+      },
+      {
+        "diagnostic": "EXPLICIT_CPU_CALLER_DEADLINE_EXPIRED",
+        "exception_type": "builtins.TimeoutError",
+        "name": "caller_deadline_exception_preserved",
+        "owned_scratch_removed": true,
+        "passed": true
+      }
+    ],
+    "cases_passed": 21,
+    "failures": 0,
+    "raw_receipt_bytes": 20097,
+    "raw_receipt_sha256": "b73657674221e89c9838af4c6ba151ed853da33d8edcbc31769e8737dd72cab6",
+    "fixture_origin": "EXPLICIT_SYNTHETIC_CPU",
+    "fixture_bytes": 12583257,
+    "fixture_sha256": "92f059322b2c36cd8a58928135a7945ad7e7e1a08e42e4dfbfa6edb9dc52dd2b",
+    "restored_bytes_equal": true,
+    "FD_before": 4,
+    "FD_after": 4,
+    "own_scratch_remaining": [],
+    "negative_trusted_receipts": "Explicit synthetic negative receipts only; positive uses actual encoder receipt"
+  },
+  "root0": {
+    "contract_count": 1,
+    "python": "3.12.15 (main, Oct  1 2026, 20:59:04) [Clang 22.1.3 ]",
+    "UID": 0,
+    "raw_stdout_bytes": 1989,
+    "raw_stdout_sha256": "635dcf4955127d75388fed1e181884cfee5be276a4a95a613b816bbdc732e236",
+    "existing_parent_uid": 0,
+    "existing_parent_mode": "0755",
+    "new_output_uid": 1000,
+    "new_output_gid": 1000,
+    "new_output_mode": "0600",
+    "existing_parent_source_marker_preserved": true,
+    "existing_destination_rejected": true,
+    "decoder_executed": false
+  },
+  "source_review": {
+    "independent": "S4",
+    "checks": 41,
+    "mismatches": 0,
+    "report_sha256": "2d2516ee86294d97a3648c5f0f3206a1ff5476ab72831b31a64695a29ef6d5b8",
+    "scope": "Static source comparison; separate from CPU case count"
+  },
+  "actual_R8_archive_used": false,
+  "actual_compression_ratio_measured": false,
+  "guest_lzma_verified": false,
+  "AWS_or_GPU_executed": false,
+  "whole_ZIP_CRC_verified": false,
+  "product_PASS_claimed": false,
+  "liblzma_memlimit_bytes": 16777216,
+  "process_RSS_limit_measured": false,
+  "caller_deadline": "Supplied callback; no new deadline or retry policy"
+}

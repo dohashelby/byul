@@ -40,8 +40,25 @@ actionwise의 adapter 지문과 join의 resolver 지문 두 곳, 이에 따른 �
 - R7 운영·종료 root 대조: `a3d69875cb71681acaa1229925cc32c21063a043a9b4f572d8359a3a82ff20e5`
 - 부분 회수·원 오류 한정 후속 대조: `132b9937b0e06bb890666702e035e73408bd3516377050c0b81939b8b79e213f`
 
+## R8: 실제 준비 통과, 후보 연결 실패와 정리 완료
+
+같은 기존 인스턴스에서 설치·health·실제 API preflight는 통과했다. whole는 2026-11-11 04:31:38 KST `SUP16_JOIN_ONE_ACTUAL_CANDIDATE_REQUIRED`로 Failed/1 종료했다. 완전히 회수한 challenge local-entry 원자료에서는 후보0, 기록 파일0, collection gap·seal transport 오류를 확인했다. 첫 root client 결과에는 capture 기한 초과·returncode -9가 기록됐다. 자식 회수·그룹 종료는 확인됐으나 이것을 모델·세 역할 성공으로 바꾸지 않는다.
+
+engine Pod는 관측 당시 Running/Ready였고 installer 명령은 rc0이었다. launcher가 lifecycle 설정과 함께 vLLM을 exec하는 구조를 확인했다. 최초 launcher argv의 `-I -S`만으로 hook 미동작의 원인이라고 단정하지 않는다. journal 미생성의 구체 원인은 아직 미확정이며, 추가 installer 출력·실제 설정 등 원자료가 필요하다.
+
+GB12 원 archive 14,636,464B/1,971 member의 전체 회수는 실패했다. 원 GET의 CLI 연결 시간 초과와 고정 파일 12,000B 읽기 SendCommand 한 건의 수락 UNKNOWN을 보존했다. 부분 구간에서 완전히 포함된 개별 local-entry만 bytes·SHA·CRC를 대조했다. 이 검증은 전체 ZIP/원 SHA/1,971 member CRC 성공이 아니다.
+
+실행·전송 actor를 회수하고, 기존 승인된 자원 정리 범위에서 별도 감사 기록으로 정상 stop을 한 번 수락받았다(04:54:30 KST). 원 UNKNOWN과 자동 운영기의 barrier는 해소·수정하지 않았다. stop180 감시 실패 뒤 05:02:06 KST 실제 stopped·공인 IP 없음·SSM node0·활성 command0을 확인했다. 정확 전원 종료시각·새 비용은 null이며 운영 정리는 완료했다.
+
+로컬 control 묶음 7,056 member와 별도 최종 정지 원자료를 대조했다. API 영수증 1,016개 중 정상 1,015/연결 시간 초과1, 수락379/UNKNOWN1, 수락된 SSM command377개의 종료(376 Success/1 Failed)를 확인했다. 이 수치는 운영 기록 수다. root의 자료 대조 9,244개와 후속 raw 연결15개는 불일치0이며 시험 통과 수로 합산하지 않는다.
+
+- 운영·정지 root 대조: `76b5ba5be18fb81e40f494727efa34d75ddcf1b306ba8ce99f14ee8e5bda998d`
+- 최종 정지 raw 연결 대조: `9cecbb21f09e686288fe8a138b98854f41562ff4be62e4013ad47e36a45c994d`
+- challenge capture 개별 entry 독립 대조: `1561f2fc8aa2cae56e7cbd4ecd277a2ee86105e8288fa8cdcb693a10d9d3ce57`
+- 실제 launcher/Pod/installer terminal 개별 entry 독립 대조: `19c17cf452239c055fefbaf406ebb14edb0506ca76225941e348c5801f72fc3e`
+
 ## 다음 실행과 범위
 
-B 전용 private 제어·진단 경로를 일반 capture 출력과 분리하고, 해당 파일의 archive 보존 연결과 읽기 전용 조회 병목을 수정·검증 중이다. 기존 output·A 코드의 권한을 바꾸거나 source guard·기한을 완화하지 않는다. 새 모델·정상/도전/복구 세 역할·전체 반출 성공은 해당 실측 원자료로 별도 확인해야 한다.
+B 전용 private 제어·진단 경로와 읽기 전용 조회를 보강했고 R8에서 실제 준비·실패 범위를 확인했다. 현재 GPU는 중지 상태다. 이미 확보한 원자료를 진단하고 [archive 압축·복원 준비](SUP16_ARCHIVE_ENVELOPE_PREPARATION_20261111.md)를 CPU에서 검증했다. 기존 output·A 코드의 권한을 바꾸거나 source guard·기한을 완화하지 않는다. 새 모델·정상/도전/복구 세 역할·전체 반출 성공은 해당 실측 원자료로 별도 확인해야 한다.
 
 원 runtime `2cb01e9f`/466파일과 공개 저장소 계열의 제품528파일을 구분한다. CPU 준비 요약의 actual=false는 작성 당시 범위로 보존한다.

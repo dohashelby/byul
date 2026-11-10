@@ -59,3 +59,5 @@ export type ReportView = S["ReportView"];
 export type ReportCheck = S["ReportCheck"];
 export type ReportSide = S["ReportSide"];
 export type ReportMark = S["ReportMark"];
+
+export type RuntimeCheckCoverage = S["RuntimeCheckCoverage"];

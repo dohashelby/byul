@@ -14,6 +14,8 @@ import { countBy, matchesTarget, useEnvTarget } from "../lib/filters";
 import { bucketize, inRange } from "../lib/time";
 import { carry, useGlobalFilters, useParams } from "../lib/url";
 import p from "./pages.module.css";
+import { EventWindowNote } from "./runtime/EventWindowNote";
+import { sameEventContext } from "../lib/eventScope";
 
 const FACETS = [
   { key: "source", title: "출처", get: (e: RuntimeEvent) => e.source, table: SOURCE },
@@ -40,7 +42,8 @@ export function eventMatches(e: RuntimeEvent, f: Record<string, string | null>):
     (!f.rule || e.rule_ref === f.rule) &&
     (!f.run || e.scope.run_id === f.run) &&
     (!f.request || e.scope.request_id === f.request) &&
-    (!f.policy || e.policy_ref?.sha256 === f.policy)
+    (!f.policy || e.policy_ref?.sha256 === f.policy) &&
+    (!f.check || (e.related_checks ?? []).includes(f.check))
   );
 }
 
@@ -56,7 +59,7 @@ const columns: Column<RuntimeEvent>[] = [
   { id: "recorded_at", header: "기록 시각", cell: (e) => <Time iso={e.recorded_at} />, sort: (e) => e.recorded_at, hidden: true },
 ];
 
-const FILTER_KEYS = ["source", "category", "outcome", "rule", "run", "request", "policy"] as const;
+const FILTER_KEYS = ["source", "category", "outcome", "rule", "run", "request", "policy", "check"] as const;
 
 export function EventsPage() {
   const q = useRuntimeEvents();
@@ -80,6 +83,8 @@ export function EventsPage() {
         {(data) => (
           <>
             <PageHead title="runtime 사건" />
+            <EventWindowNote data={data} />
+            {filters.check && <p className="small muted">관련 점검 {filters.check} · <button type="button" onClick={() => patch({ check: null })}>필터 해제</button></p>}
             <ChartCard
               title="시간별 사건"
               total={rows.length}
@@ -157,12 +162,13 @@ export function EventsPage() {
 
 function EventPanel({ event: e, all, params, onClose }: { event: RuntimeEvent; all: RuntimeEvent[]; params: URLSearchParams; onClose: () => void }) {
   const results = useResults();
-  const sameRequest = e.scope.request_id ? all.filter((x) => x.scope.request_id === e.scope.request_id && x.event_id !== e.event_id) : [];
-  const sameRun = e.scope.run_id ? all.filter((x) => x.scope.run_id === e.scope.run_id && x.event_id !== e.event_id) : [];
+  const sameContext = (x: RuntimeEvent) => sameEventContext(e, x);
+  const sameRequest = e.scope.request_id ? all.filter((x) => sameContext(x) && x.scope.request_id === e.scope.request_id && x.event_id !== e.event_id) : [];
+  const sameRun = e.scope.run_id ? all.filter((x) => sameContext(x) && x.scope.run_id === e.scope.run_id && x.event_id !== e.event_id) : [];
   const samePolicy = e.policy_ref ? all.filter((x) => x.policy_ref?.sha256 === e.policy_ref!.sha256 && x.event_id !== e.event_id) : [];
   const policyResults = e.policy_ref
     ? (results.data?.items ?? []).filter(
-        (r) => r.byul_policy_ref?.policy_id === e.policy_ref!.policy_id && r.byul_policy_ref?.policy_version === e.policy_ref!.policy_version,
+        (r) => r.byul_policy_ref?.policy_id === e.policy_ref!.policy_id && r.byul_policy_ref?.policy_version === e.policy_ref!.policy_version && r.byul_policy_ref?.sha256 === e.policy_ref!.sha256,
       )
     : [];
   const runResults = e.scope.run_id ? (results.data?.items ?? []).filter((r) => r.plan_ref.id === e.scope.run_id) : [];
@@ -249,7 +255,8 @@ function EventPanel({ event: e, all, params, onClose }: { event: RuntimeEvent; a
                   ...policyResults.map((r) => ({ to: link("/update/results", { report: r.report_ref.id }), text: `검증 결과 ${r.report_ref.id} (정책 ID·판본 일치)` })),
                 ]}
               />
-              <p className="small muted">시간이 가깝다는 것만으로는 연결하지 않습니다. 연결 키가 같은 기록만 보여줍니다.</p>
+              <LinkGroup title="관련 점검" items={(e.related_checks ?? []).map((id) => ({ to: `/runtime/observe/checks?check=${encodeURIComponent(id)}`, text: id }))} />
+              <LinkGroup title="원증거" items={e.evidence_refs.map((ref) => ({ to: `/evidence?evidence_id=${encodeURIComponent(ref.evidence_id)}${ref.sha256 ? `&sha256=${encodeURIComponent(ref.sha256)}` : ""}`, text: `${ref.evidence_id}${ref.sha256 ? ` · ${ref.sha256}` : ""}` }))} />
             </div>
           ),
         },

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from serving_runtime.enforcement.execpolicy import parse_timeline
+from .identity_scope import identity_scope_ref
 
 
 def read_phase_timeline(path: str | None, *, demo: bool = False, observed_times: Iterable[str] = ()) -> dict[str, Any]:
@@ -55,6 +56,8 @@ def read_phase_timeline(path: str | None, *, demo: bool = False, observed_times:
             "collector": {"state": "stale" if not fresh else state, "written_at": timestamp.isoformat(), "fresh": fresh},
             "extraction": {"engine": extraction.get("engine"), "support_level": extraction.get("support_level"), "limitations": limitations},
             "data_origin": "real",
+            "scope_ref": identity_scope_ref(collector.get("context"), collector.get("namespace"),
+                                             collector.get("pod_uid"), collector.get("container_id")),
         }
     except (OSError, ValueError, TypeError, KeyError) as error:
         return {"entries": [], "collector": {"state": "error", "written_at": None, "fresh": False},

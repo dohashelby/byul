@@ -15,7 +15,7 @@
 #
 # Assumes the byul repository at ~/byul (stdlib only, no venv needed), the
 # bundle's kubectl/cilium/hubble in PATH, and /srv/serving/observation owned by
-# ubuntu with group 10010 (README.md). Tetragon process arguments are removed
+# ubuntu with group 10010 (README.md). The scoped Tetragon stream runs in its own service. Process arguments are removed
 # before the raw file is written.
 #
 # Target timing rule: writer interval + kubectl timeout + Gateway poll interval
@@ -26,10 +26,10 @@ Description=byul live Hubble/Tetragon collector (context byul-aws-lab)
 
 [Service]
 Type=simple
-WorkingDirectory=%h/byul/runtime
-Environment=PYTHONPATH=%h/byul/runtime/src
+WorkingDirectory=/opt/byul/runtime
+Environment=PYTHONPATH=/opt/byul/runtime/src
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
-ExecStart=/usr/bin/python3 -B tools/k8s_observation_feed.py --kube-context byul-aws-lab --output-dir /srv/serving/observation --reader-group 10010 --target-selector app=serving-engine --target-interval 5 --phase-timeline
+ExecStart=/opt/byul/runtime/.venv/bin/python -B tools/k8s_observation_feed.py --kube-context byul-aws-lab --output-dir /srv/serving/observation --reader-group 10010 --target-selector app=serving-engine --target-interval 5 --phase-timeline
 Restart=on-failure
 RestartSec=15
 # Exit 2 = configuration error (for example not a member of group 10010).

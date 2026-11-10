@@ -19,6 +19,17 @@ def clock(context):
 
 
 def project_native(packet, request_sha256, max_delay_ms, required_scopes):
+    if type(packet)is dict and type(packet.get('recordings'))is list and any(type(r)is dict and type(r.get('capture'))is dict and r['capture'].get('records')and r['capture']['records'][0].get('payload',{}).get('profile')=='sglang-native-lifecycle-metadata/1'for r in packet['recordings']):
+        from .sglang_request_termination import project_native as project_sglang
+        projected=project_sglang(packet,request_sha256,max_delay_ms,required_scopes)
+        rows=projected['scope_status']
+        return {**projected,'whole_scope_complete':projected['native_termination_verified'],
+            'deadline_conflict_candidates':[],'activation_steps':rows,'activation_violations':[],
+            'activation_missing':[r['scope']for r in rows if not r['termination_verified']],
+            'activation_scope_complete':projected['native_termination_verified']}
+    if type(packet)is dict and type(packet.get('recordings'))is list and any(type(r)is dict and type(r.get('capture'))is dict and r['capture'].get('records')and r['capture']['records'][0].get('payload',{}).get('profile')=='vllm-native-lifecycle-metadata/23'for r in packet['recordings']):
+        from .vllm_termination_projection import project_native as project23
+        return project23(packet,request_sha256,max_delay_ms,required_scopes)
     result={"binding_observed":False,"anchor":None,"events":[],"deadline_conflict_candidates":[],
         "scope_status":[{"scope":s,"required":s in required_scopes,"observed_events":0,
             "termination_verified":False} for s in sorted(SCOPES)],

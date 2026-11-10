@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.byul.invalid/0.1/common.schema.json",
+  "title": "byul 공통 정의",
+  "description": "모든 계약이 함께 쓰는 ID·참조·enum. 데이터에는 영문 enum만 쓰고 한국어 표시는 화면에서만 바꾼다.",
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "timestamp": {
+      "description": "시간대가 있는 RFC 3339 시각. 모르면 필드를 null로 두고 0이나 빈 문자열을 만들지 않는다.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "nullable_timestamp": {
+      "oneOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }]
+    },
+    "local_id": {
+      "description": "사람이 정하는 ID(target_ref, policy_id 등). serving-runtime의 _ID 규칙과 같다.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "check_id": {
+      "description": "점검 행 ID. serving-guard 팩의 CheckDef ID.",
+      "type": "string",
+      "pattern": "^(SUP|REQ|PLT|LIF|OBS)-[0-9]{2}$"
+    },
+    "data_origin": {
+      "description": "계약 수준의 자료 등급. MEASURED=실제 환경에서 수집·실행, DECLARED=사람이 입력, EXAMPLE=합성·모의·데모(공식 판정 근거 불가).",
+      "enum": ["MEASURED", "DECLARED", "EXAMPLE"]
+    },
+    "origin_detail": {
+      "description": "생산자의 원래 출처 값(예: runtime의 mock, synthetic, real, external_backend, kubernetes_api). 등급 변환 전 값을 잃지 않으려고 둔다.",
+      "type": ["string", "null"]
+    },
+    "verdict": {
+      "enum": ["PASS", "FAIL", "UNKNOWN", "NOT_APPLICABLE"]
+    },
+    "object_ref": {
+      "description": "serving-guard 객체 참조(SPEC §2.2 Ref). 항상 정확한 revision과 해시까지 고정한다.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "revision", "sha256"],
+      "properties": {
+        "kind": { "enum": ["ENV", "POL", "CHG", "PLAN", "EVD", "RES", "RPT"] },
+        "id": { "type": "string", "pattern": "^(ENV|POL|CHG|PLAN|EVD|RES|RPT)-[0-9A-HJKMNP-TV-Z]{26}$" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "doc_ref": {
+      "description": "byul 계약 문서(environment, policy 등) 참조. id와 revision, 정규 JSON 해시를 함께 고정한다.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "revision", "sha256"],
+      "properties": {
+        "id": { "$ref": "#/$defs/local_id" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "policy_ref": {
+      "description": "정책 판본 식별. runtime의 policy_id + policy_version + sha256 연결 키와 같다. ID·version이 같고 해시가 다르면 다른 판본이다.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "policy_version", "sha256"],
+      "properties": {
+        "policy_id": { "$ref": "#/$defs/local_id" },
+        "policy_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "nullable_policy_ref": {
+      "oneOf": [{ "$ref": "#/$defs/policy_ref" }, { "type": "null" }]
+    },
+    "evidence_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_id"],
+      "properties": {
+        "evidence_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "approval": {
+      "description": "누가·언제 승인했는지의 기록. 서명이 아니며 인증된 신원도 아니다(자기 신고).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approved_by", "approved_at", "approval_ref"],
+      "properties": {
+        "approved_by": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "approved_at": { "$ref": "#/$defs/timestamp" },
+        "approval_ref": { "$ref": "#/$defs/local_id" }
+      }
+    },
+    "validity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["valid_from", "valid_until"],
+      "properties": {
+        "valid_from": { "$ref": "#/$defs/nullable_timestamp" },
+        "valid_until": { "$ref": "#/$defs/nullable_timestamp" }
+      }
+    },
+    "runtime_phase": {
+      "enum": ["loading", "compiling", "inferring", "maintenance", "unknown"]
+    }
+  }
+}

@@ -16,6 +16,16 @@ from .mock_engine import _utc_now
 from .response_timeout import DeadlineWatchdog, set_response_timeout
 
 
+# Tokenizer/model/health responses are small in the supported text profile.
+# Metrics can contain many sample series and have a separate, larger cap.
+_AUX_RESPONSE_BODY_LIMIT = 1024 * 1024
+_METRICS_RESPONSE_BODY_LIMIT = 8 * 1024 * 1024
+
+
+class ResponseTooLargeError(OSError):
+    """An auxiliary backend response exceeded its in-memory byte limit."""
+
+
 class TokenizeHTTPError(OSError):
     """A body-free tokenizer HTTP failure safe for request records."""
 
@@ -76,7 +86,9 @@ class EngineClient:
                 if request_deadline is not None and time.monotonic() >= request_deadline:
                     raise RequestDeadlineExceeded()
                 raise TimeoutError()
+            body_limit = _METRICS_RESPONSE_BODY_LIMIT if metrics else _AUX_RESPONSE_BODY_LIMIT
             chunks: list[bytes] = []
+            size = 0
             response_socket = getattr(connection, "sock", None) or getattr(
                 getattr(getattr(response, "fp", None), "raw", None), "_sock", None
             )
@@ -90,7 +102,7 @@ class EngineClient:
                     response_socket, min(self.timeout_s, remaining)
                 )
                 try:
-                    chunk = response.read1(4096)
+                    chunk = response.read1(min(4096, body_limit + 1 - size))
                 except (socket.timeout, TimeoutError, OSError) as error:
                     if watchdog.expired():
                         if request_deadline is not None and time.monotonic() >= request_deadline:
@@ -102,6 +114,9 @@ class EngineClient:
                     raise TimeoutError()
                 if not chunk:
                     break
+                size += len(chunk)
+                if size > body_limit:
+                    raise ResponseTooLargeError("backend response exceeds the byte limit")
                 chunks.append(chunk)
             result = response.status, dict(response.getheaders()), b"".join(chunks)
             if watchdog.finish():

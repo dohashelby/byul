@@ -53,6 +53,7 @@ export const AREAS: Area[] = [
       {
         title: "관측",
         items: [
+          { path: "/runtime/observe/checks", label: "점검 범위", description: "선정 점검의 적용 조건·관측원·증거와 미확인 범위" },
           { path: "/runtime/observe/collectors", label: "수집 상태", badge: "observe", description: "관측 수집기의 연결·지연·오류 상태" },
           { path: "/runtime/observe/hubble", label: "네트워크 이벤트 (Hubble)", description: "네트워크 통신 결과와 차단 기록" },
           { path: "/runtime/observe/tetragon", label: "프로세스·파일 이벤트 (Tetragon)", badge: "tetragonFlagged", description: "엔진 내부 실행과 파일 접근 기록" },

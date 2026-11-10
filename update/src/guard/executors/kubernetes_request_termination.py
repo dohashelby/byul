@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 import re
+import time
 import uuid
 from guard.adapters.vllm_request_termination import SCOPES, project_native
 from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
-from guard.runtime.kubernetes_http import KubernetesHTTP, TERMINATION_PROFILE
+from guard.runtime.kubernetes_http import KubernetesHTTP, TERMINATION_PROFILE,SGLANG_TERMINATION_PROFILE
 from .http_common import Ctx, HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
 from .lifecycle_session import capture_session
@@ -47,12 +48,12 @@ from .lifecycle_common_input_consumption import LifecycleCommonInputConsumer
 
 
 class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpCheckExecutor):
-    name="request_termination";version="0.2.0"
+    name="request_termination";version="0.3.0"
     requires_roles=False;requires_route_scope=False;functional_via="engine"
     check_id="LIF-10";collection_profile=PROFILE;policy_prefix="termination"
     policy_normalizer=staticmethod(normalize_policy);transport_profile=TERMINATION_PROFILE
-    supported_native_profiles=frozenset({"vllm-native-lifecycle-metadata/8","vllm-native-lifecycle-metadata/9"})
-    configuration_keys=frozenset({'target','prepared','retry_scope','kubectl_binary','max_duration_seconds'})
+    supported_native_profiles=frozenset({"vllm-native-lifecycle-metadata/8","vllm-native-lifecycle-metadata/9","vllm-native-lifecycle-metadata/23","sglang-native-lifecycle-metadata/1"})
+    configuration_keys=frozenset({'target','prepared','retry_scope','kubectl_binary','max_duration_seconds','node_image_verification'})
 
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target_sha256=expected_target_sha256
@@ -88,7 +89,7 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
         self.validate_policy(check,policy_values)
         from guard.collectors.lifecycle import load_prepared
         try:
-            if set(self.cfg)-self.configuration_keys or adapter is None:raise ValueError
+            if set(self.cfg)-self.configuration_keys or adapter is None or self.cfg.get('node_image_verification')not in (None,'local-containerd-v1'):raise ValueError
             if 'retry_scope' in self.cfg and (type(self.cfg['retry_scope']) is not str or not self.cfg['retry_scope']):raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
             with Path(self.cfg["target"]).open("rb") as stream:target=strict_json(stream.read(65537),limit=65536)
@@ -100,11 +101,12 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
             start,end=self.policy_normalizer(policy_values)
             if not start<=utcnow()<=end:raise ValueError
         except (KeyError,ValueError,TypeError,OSError,RuntimeError):raise ValueError("TERMINATION_CONFIGURATION_INVALID") from None
+        selected_transport=SGLANG_TERMINATION_PROFILE if prepared["profile"]=="sglang-native-lifecycle-metadata/1"else self.transport_profile
         transport=KubernetesHTTP(target,env,duration=self.cfg.get("max_duration_seconds",120),runner=self.runner,
-            binary=self.cfg.get("kubectl_binary","kubectl"),profile=self.transport_profile)
+            binary=self.cfg.get("kubectl_binary","kubectl"),profile=selected_transport)
         ctx=Ctx(check=check,env=env,adapter=adapter,target=target,policy_values=policy_values,timeout=10,
             allow_mutating=False,keys={"none":None},secrets=[],cprobe=transport,workdir=workdir,started=utcnow(),
-            http_probe_profile=self.transport_profile)
+            http_probe_profile=selected_transport)
         ctx._termination_prepared=prepared
         return self._finish(ctx)
 
@@ -117,12 +119,23 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
             "run_id":ctx.cprobe.binding["run_id"],"environment_ref":ctx.env.ref().model_dump(mode="json"),
             "kubernetes":{"context":ctx.cprobe.binding["context"],"engine":ctx.cprobe.binding["engine"]}}
         reader=None;packet=None;replies={};token=uuid.uuid4().hex
-        request_sha=None;sealed=False
+        request_sha=None;sealed=False;seal_attempted=False
+        modern=ctx._termination_prepared["profile"] in {"vllm-native-lifecycle-metadata/23","sglang-native-lifecycle-metadata/1"}
         try:
             reader=KubernetesLifecycleReader(native_target,ctx.env,ctx._termination_prepared,
-                runner=self.runner,binary=self.cfg.get("kubectl_binary","kubectl"),duration=self.cfg.get("max_duration_seconds",120))
+                runner=self.runner,binary=self.cfg.get("kubectl_binary","kubectl"),duration=self.cfg.get("max_duration_seconds",120),node_image_verification=self.cfg.get("node_image_verification"))
             reader.snapshot()
             for slot in ("before","disconnect","after"):
+                if modern and slot=="after" and replies.get("disconnect",{}).get("attempted"):
+                    # Keep the engine idle for the declared observation window.
+                    # Seal the snapshot before a control request can lazily clear
+                    # the canceled request's worker slot. Native clock receipts,
+                    # not this controller wait, determine the policy deadline.
+                    window=ctx.policy_values["termination_max_delay_ms"]/1000
+                    summary["post_disconnect_observation_wait_ms"]=ctx.policy_values["termination_max_delay_ms"]
+                    time.sleep(window);seal_attempted=True
+                    try:sealed=reader.seal_session()["sealed"]
+                    except Exception:sealed=False
                 if slot=="disconnect" and not replies.get("before",{}).get("normal_shape_verified"):continue
                 rid="byul-lif10-"+token+"-"+slot
                 body={"model":ctx.api_model,"prompt":"hello","max_tokens":8 if slot=="disconnect" else 1,
@@ -162,8 +175,10 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
         except Exception:summary["diagnostic_codes"].append("TERMINATION_NATIVE_PREFLIGHT_UNAVAILABLE")
         finally:
             if reader is not None:
-                try:sealed=reader.seal_session()["sealed"]
-                except Exception:sealed=False
+                if not seal_attempted:
+                    seal_attempted=True
+                    try:sealed=reader.seal_session()["sealed"]
+                    except Exception:sealed=False
                 if not sealed:summary["diagnostic_codes"].append("TERMINATION_SESSION_SEAL_UNVERIFIED")
                 try:
                     engine=reader.binding["engine"]
@@ -195,6 +210,13 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
             "termination_deadline_conflict_candidates":projected["deadline_conflict_candidates"],
             "termination_required_scope_status":projected["scope_status"],"termination_binding_observed":projected["binding_observed"],
             "termination_scope_complete":False,"worker_gpu_release_verified":False}
+        case_complete=bool(sealed and replies.get("before",{}).get("normal_shape_verified")and replies.get("after",{}).get("normal_shape_verified")and replies.get("disconnect",{}).get("expected_client_close")and all(r.get("policy_window_verified")for r in summary["attempts"])and not summary["http_transport"]["collection_gap"])
+        full=bool(modern and case_complete and projected["whole_scope_complete"])
+        values.update(termination_scope_complete=full,worker_gpu_release_verified=bool(full and projected["worker_gpu_release_verified"]),
+            activation_steps=projected.get("activation_steps",projected["scope_status"]),
+            activation_violations=projected.get("activation_violations",[])if case_complete else[],
+            activation_missing=projected.get("activation_missing",["legacy_native_full_resource_evidence"])+([]if case_complete else["termination_procedure_incomplete"]),activation_scope_complete=bool(modern and case_complete and projected.get('activation_scope_complete',False)))
+        summary["whole_scope_complete"]=full;summary["worker_gpu_release_verified"]=values["worker_gpu_release_verified"]
         observations={k:{"value":v,"collected":True} for k,v in values.items()}
         normal={"attempted":bool(replies.get("before",{}).get("attempted")),
             "succeeded":bool(replies.get("before",{}).get("normal_shape_verified")) if "before" in replies else None,

@@ -11,7 +11,7 @@ PROFILE='vllm-native-lifecycle-metadata/12'
 SCHEMA='guard-native-lifecycle-events/12'
 STREAM_SCHEMA='guard-native-stream-buffer/1'
 COMMIT='db9527a46873454610df6dbedf79a36d6bf1a7f6'
-BASE8_SHA256='2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd'
+BASE8_SHA256='e537d1d1b19813f171aa30b9344c1dbb49139eed3dea60bfa6dc71744d0d4f39'
 UVICORN_COMMIT='3eb9a9ab9af69005c687728097461c1fd2a95db9'
 SOURCE_ADDITIONS={'uvicorn.protocols.http.h11_impl':'a3154a6c2cfaaaebe19ac7aa255dfe9b6b7b490de1da95274c033aa093e8c322',
  'uvicorn.protocols.http.httptools_impl':'1d4e1c579df4168433a61a01f10c628b31c1790e72dd9769d2b8633b22214033',

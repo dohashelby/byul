@@ -4,6 +4,8 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+import os
+import tempfile
 import hashlib
 import os
 from pathlib import Path
@@ -63,16 +65,25 @@ def run(command, *, timeout=30):
         return subprocess.CompletedProcess(command,124,"","command timed out")
 
 
-def atomic_json(path, value, mode=0o644):
-    path=Path(path)
-    path.parent.mkdir(parents=True,exist_ok=True)
-    temporary=path.with_name(path.name+".next")
-    temporary.unlink(missing_ok=True)
-    fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
-    with os.fdopen(fd,"w",encoding="utf-8") as target:
-        os.fchmod(target.fileno(),mode)
-        target.write(json.dumps(value,ensure_ascii=False,indent=2)+"\n")
-    temporary.replace(path)
+def atomic_json(path, value, mode=0o644, *, reader_gid=None):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Remove only a stale legacy temporary name; never open or follow it.
+    path.with_name(path.name + ".next").unlink(missing_ok=True)
+    descriptor, name = tempfile.mkstemp(prefix=path.name+".", suffix=".next", dir=path.parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+            if reader_gid is not None:
+                os.fchown(output.fileno(), -1, reader_gid)
+                mode = 0o640
+            os.fchmod(output.fileno(), mode)
+            output.write(json.dumps(value, ensure_ascii=False, indent=2)+"\n")
+            output.flush()
+            os.fsync(output.fileno())
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 class KindDockerAccess:

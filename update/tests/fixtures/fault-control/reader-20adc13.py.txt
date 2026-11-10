@@ -1,0 +1,120 @@
+"""Owned LAB fault receipt boundary; no signals, engine imports or state writes.
+
+The private ready receipt authorizes only exact-process selection. A final
+fault judgment additionally needs the independently parsed native recording.
+This module is also exported unchanged for an isolated engine-side reader.
+"""
+from __future__ import annotations
+import hashlib
+import json
+import os
+from pathlib import PurePosixPath
+import re
+import stat
+import time
+
+PROFILE = 'vllm-native-lifecycle-metadata/24'
+CONTROL_SCHEMA = 'byul-lab-fault-control/1'
+ASSIGNED_SCHEMA = 'byul-lab-fault-assigned/1'
+READY_SCHEMA = 'byul-lab-fault-ready/1'
+KINDS = frozenset({'death','delay','exception','communication-stall'})
+READY_POINTS = frozenset({'WorkerProc._execute_worker_rpc','WorkerProc.enqueue_output'})
+CLOCK_FIELDS = frozenset({'boot_sha256','time_namespace','time_offsets_sha256'})
+READY_FIELDS = frozenset({'schema','nonce','fault_kind','rank','external_request_sha256',
+    'native_request_sha256','session','target_sha256','pid','start_ticks','pid_namespace',
+    'call_sha256','point','clock_context','operation_started_ns','ready_ns','barrier_deadline_ns','active',
+    'bounded_barrier','expires_unix_ns','observer_runtime','observer_code_sha256',
+    'source_module','source_sha256'})
+MP = 'vllm.v1.executor.multiproc_executor'
+MP_SHA256 = '11a1554380d1efa516bb481416c798798d5839f38ac3b0f379ef4b8b547f4d1b'
+MAX_RECEIPT_BYTES = 16384
+MAX_HOLD_MS = 30000
+
+
+def fingerprint(value, size=64):
+    return type(value) is str and re.fullmatch('[0-9a-f]{'+str(size)+'}',value) is not None
+
+
+def clock_context(value):
+    if (type(value) is not dict or set(value)!=CLOCK_FIELDS
+            or not fingerprint(value.get('boot_sha256')) or not fingerprint(value.get('time_offsets_sha256'))
+            or type(value.get('time_namespace')) is not int or not 0<value['time_namespace']<2**64):
+        raise ValueError('FAULT_CONTROL_CLOCK_INVALID')
+    return tuple(value[k] for k in sorted(CLOCK_FIELDS))
+
+
+def strict_json(raw):
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result:raise ValueError('FAULT_CONTROL_DUPLICATE_KEY')
+            result[key]=value
+        return result
+    return json.loads(raw,object_pairs_hook=pairs,parse_constant=lambda _:(_ for _ in ()).throw(ValueError('FAULT_CONTROL_NONFINITE')))
+
+
+def validate_ready(value, *, nonce, session, target_sha256, expected_external_sha, rank, point):
+    try:
+        if (type(value) is not dict or set(value)!=READY_FIELDS or value['schema']!=READY_SCHEMA
+                or not fingerprint(nonce,32) or not fingerprint(session,32)
+                or not fingerprint(target_sha256) or not fingerprint(expected_external_sha)
+                or type(rank) is not int or not 0<=rank<=63 or point not in READY_POINTS
+                or value['nonce']!=nonce or value['session']!=session or value['target_sha256']!=target_sha256
+                or value['external_request_sha256']!=expected_external_sha or value['rank']!=rank
+                or type(value['rank']) is not int or value['point']!=point or value['fault_kind']not in KINDS
+                or value['active']is not True or value['bounded_barrier']is not True
+                or value['source_module']!=MP or value['source_sha256']!=MP_SHA256
+                or not fingerprint(value['native_request_sha256']) or not fingerprint(value['call_sha256'])
+                or not fingerprint(value['observer_code_sha256']) or type(value['observer_runtime'])is not str
+                or re.fullmatch(r'cpython-3\.12\.[0-9]{1,2}',value['observer_runtime'])is None):raise ValueError
+        clock_context(value['clock_context'])
+        for key in ('pid','start_ticks','pid_namespace','operation_started_ns','ready_ns','barrier_deadline_ns','expires_unix_ns'):
+            if type(value[key]) is not int or not 0<value[key]<2**64:raise ValueError
+        if value['pid']<=1 or value['operation_started_ns']>value['ready_ns']:raise ValueError
+        if not value['ready_ns']<value['barrier_deadline_ns']<=value['ready_ns']+MAX_HOLD_MS*1_000_000:raise ValueError
+        if point=='WorkerProc.enqueue_output' and value['fault_kind']!='communication-stall':raise ValueError
+        if point=='WorkerProc._execute_worker_rpc' and value['fault_kind']=='communication-stall':raise ValueError
+    except (KeyError,TypeError,ValueError):raise ValueError('FAULT_CONTROL_READY_INVALID') from None
+    return value
+
+
+def _directory(path):
+    parts=PurePosixPath(path).parts
+    if not parts or parts[0]!='/'or any(v in {'.','..'}for v in parts):raise ValueError('FAULT_CONTROL_DIRECTORY_INVALID')
+    fd=os.open('/',os.O_RDONLY|os.O_DIRECTORY)
+    try:
+        for part in parts[1:]:
+            child=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd)
+            os.close(fd);fd=child
+        value=os.fstat(fd)
+        if value.st_uid!=os.geteuid()or stat.S_IMODE(value.st_mode)!=0o700:raise ValueError('FAULT_CONTROL_DIRECTORY_NOT_OWNED')
+        return fd
+    except BaseException:
+        os.close(fd);raise
+
+
+def load_control_receipt(directory, nonce, *, session, target_sha256, expected_external_sha, rank, point):
+    """Read <nonce>.ready.json under exact owner/mode/inode and expected scope.
+
+    `active` is an actuation seed, not an authenticated native work verdict.
+    The caller still rechecks the live PID/start, Pod/container and clock before
+    sending a signal. No receipt content or exception body is printed here.
+    """
+    if not fingerprint(nonce,32):raise ValueError('FAULT_CONTROL_NONCE_INVALID')
+    root=_directory(directory);fd=None;name=nonce+'.ready.json'
+    def identity(v):return(v.st_dev,v.st_ino,v.st_uid,v.st_mode,v.st_size,v.st_mtime_ns,v.st_ctime_ns)
+    try:
+        fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=root);before=os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode)or before.st_uid!=os.geteuid()or stat.S_IMODE(before.st_mode)!=0o600 or not 0<before.st_size<=MAX_RECEIPT_BYTES:
+            raise ValueError('FAULT_CONTROL_RECEIPT_NOT_OWNED')
+        raw=os.read(fd,MAX_RECEIPT_BYTES+1);after=os.fstat(fd);entry=os.stat(name,dir_fd=root,follow_symlinks=False)
+        if len(raw)!=before.st_size or identity(before)!=identity(after)or identity(before)!=identity(entry):raise ValueError('FAULT_CONTROL_RECEIPT_CHANGED')
+        value=validate_ready(strict_json(raw),nonce=nonce,session=session,target_sha256=target_sha256,
+            expected_external_sha=expected_external_sha,rank=rank,point=point)
+        if not time.time_ns()<value['expires_unix_ns']<=time.time_ns()+(MAX_HOLD_MS+5000)*1_000_000:
+            raise ValueError('FAULT_CONTROL_RECEIPT_EXPIRED')
+        return {'receipt':value,'receipt_sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw),
+            'owned_file_verified':True,'selection_only':True,'native_fault_verified':False}
+    finally:
+        if fd is not None:os.close(fd)
+        os.close(root)

@@ -472,3 +472,140 @@ def test_missing_baseline_and_unreadable_manifest_have_visible_notes():
     assert result["baseline"]["state"] == "not_configured"
     assert any("미설정/미승인" in note for note in result["baseline"]["notes"])
     assert any("읽기/검증 오류" in note for note in result["baseline"]["notes"])
+
+
+def _feed_status_document(collector):
+    endpoints = copy.deepcopy(load_json(FIXTURES / "runtime" / "capture.json"))["endpoints"]
+    endpoints["collectors"]["collectors"].append(collector)
+    return runtime_status(
+        endpoints["status"], endpoints["policy"], endpoints["collectors"],
+        target=endpoints["target"], summary=endpoints["summary"],
+        revalidation=endpoints["revalidation"], observations=endpoints["observations"],
+        baseline=endpoints["baseline"],
+    )
+
+
+def _tetragon_feed_collector():
+    return {
+        "source": "observation_feed_tetragon", "state": "partial",
+        "data_origin": "real", "last_value": {
+            "dropped_lines_total": 3,
+            "last_redaction_drop_reason": "INVALID_JSON",
+            "last_redaction_error_class": "OSError",
+            "last_redaction_drop_at": "2026-11-06T00:00:00Z",
+            "redaction_loss_detected": True,
+            "writer": {"configured": True, "state": "running", "reconnect_count": 2,
+                       "last_gap": {"gap_id": "gap-fixture", "opened_at": "2026-11-06T00:00:00Z",
+                                    "closed_at": "2026-11-06T00:00:02Z", "backfill": "requested_unverified", "attempts": 2}},
+        },
+    }
+
+
+def test_tetragon_drop_and_backfill_survive_status_contract(contracts):
+    collector = _tetragon_feed_collector()
+    doc = _feed_status_document(collector)
+    converted = next(c for c in doc["collectors"] if c["source"] == collector["source"])
+    assert converted["state"] == "partial"
+    assert converted["data_origin"] == "MEASURED"
+    assert converted["origin_detail"] == "real"
+    detail = converted["detail"]
+    for key in ("dropped_lines_total", "last_redaction_drop_reason", "last_redaction_error_class", "last_redaction_drop_at", "redaction_loss_detected"):
+        assert detail[key] == collector["last_value"][key]
+    assert detail["writer"]["last_gap"] == collector["last_value"]["writer"]["last_gap"]
+    assert contracts.errors("runtime-status", doc) == []
+
+
+@pytest.mark.parametrize("source", ["observation_feed_tetragon", "observation_feed_hubble"])
+def test_missing_feed_loss_metadata_stays_unknown(contracts, source):
+    doc = _feed_status_document({"source": source, "state": "ok", "last_value": {"writer": {"last_gap": {}}}})
+    detail = next(c["detail"] for c in doc["collectors"] if c["source"] == source)
+    for key in ("dropped_lines_total", "last_redaction_drop_reason", "last_redaction_error_class", "last_redaction_drop_at", "redaction_loss_detected"):
+        assert detail[key] is None
+    assert detail["writer"]["last_gap"] == dict.fromkeys(("gap_id", "opened_at", "closed_at", "backfill", "attempts"))
+    assert contracts.errors("runtime-status", doc) == []
+
+
+def test_zero_and_false_loss_metadata_are_preserved(contracts):
+    collector = _tetragon_feed_collector()
+    collector["data_origin"] = "synthetic"
+    collector["state"] = "ok"
+    collector["last_value"].update(dropped_lines_total=0, redaction_loss_detected=False,
+                                  last_redaction_error_class=None, last_redaction_drop_at=None)
+    collector["last_value"]["writer"]["last_gap"]["attempts"] = 0
+    doc = _feed_status_document(collector)
+    converted = next(c for c in doc["collectors"] if c["source"] == collector["source"])
+    assert converted["data_origin"] == "EXAMPLE" and converted["origin_detail"] == "synthetic"
+    assert converted["detail"]["dropped_lines_total"] == 0
+    assert converted["detail"]["redaction_loss_detected"] is False
+    assert converted["detail"]["writer"]["last_gap"]["attempts"] == 0
+    assert contracts.errors("runtime-status", doc) == []
+
+
+def test_feed_contract_still_accepts_older_documents(contracts):
+    doc = _feed_status_document(_tetragon_feed_collector())
+    detail = next(c["detail"] for c in doc["collectors"] if c["source"] == "observation_feed_tetragon")
+    for key in ("dropped_lines_total", "last_redaction_drop_reason", "last_redaction_error_class", "last_redaction_drop_at", "redaction_loss_detected"):
+        detail.pop(key)
+    for key in ("gap_id", "backfill", "attempts"):
+        detail["writer"]["last_gap"].pop(key)
+    assert contracts.errors("runtime-status", doc) == []
+
+
+def test_feed_failure_metadata_and_open_gap_survive_contract(contracts):
+    collector = _tetragon_feed_collector()
+    collector["state"] = "error"
+    value = collector["last_value"]
+    value.update(storage_errors_total=2, last_storage_error_class="OSError",
+                 last_storage_error_at="2026-11-06T00:00:03Z", last_storage_operation="checkpoint",
+                 checkpoint_pending=True)
+    value["writer"].update(state="reconnecting", open_gap={"gap_id": "open1", "opened_at": "2026-11-06T00:00:00Z",
+                                                          "closed_at": None, "backfill": None, "attempts": 2})
+    doc = _feed_status_document(collector)
+    converted = next(c for c in doc["collectors"] if c["source"] == collector["source"])
+    assert converted["state"] == "error"
+    detail = converted["detail"]
+    assert detail["writer"]["state"] == "reconnecting"
+    assert detail["writer"]["open_gap"] == value["writer"]["open_gap"]
+    for key in ("storage_errors_total", "last_storage_error_class", "last_storage_error_at", "last_storage_operation", "checkpoint_pending"):
+        assert detail[key] == value[key]
+    assert contracts.errors("runtime-status", doc) == []
+
+
+@pytest.mark.parametrize("case_id", ["L-05b", "L-05c"])
+def test_optional_lab_probes_survive_platform_contract(contracts, case_id):
+    from byul_platform.sources.runtime import lab_report_doc
+    payload = dict(state="ok", generated_at="2026-11-06T00:00:00Z", report=dict(
+        run_id="probe-run", context="kind-runtime-lab", namespace="serving-lab", started_at=None,
+        finished_at=None, overall="partial", cases=[dict(id=case_id, title=case_id, status="unknown",
+        summary="fixture", evidence=["probe.json"], limitation="test Pod scope", note=None)]))
+    doc = lab_report_doc(payload)
+    assert contracts.errors("runtime-lab-report", doc) == []
+    assert doc["report"]["cases"][0]["id"] == case_id
+    assert doc["report"]["cases"][0]["status"] == "unknown"
+    assert doc["report"]["cases"][0]["limitation"] == "test Pod scope"
+
+
+def test_runtime_event_check_and_evidence_links_stay_with_source(contracts):
+    record = copy.deepcopy(load_json(FIXTURES / "runtime" / "capture.json")["details"])
+    detail = next(iter(record.values()))
+    raw = next(r for r in detail["gateway_records"] if r["phase"] == "final")
+    raw["decision"]["rule_id"] = "authentication"
+    raw["evidence_refs"] = [{"evidence_id": "ev1", "sha256": "a" * 64}, {"evidence_id": "invalid", "sha256": "oops"}]
+    event = gateway_event(raw)
+    assert "REQ-04" in event["related_checks"] and "OBS-01" in event["related_checks"]
+    assert event["evidence_refs"] == [{"evidence_id": "ev1", "sha256": "a" * 64}]
+    assert contracts.errors("runtime-event", event) == []
+
+
+@pytest.mark.parametrize("source_schema", ["serving-runtime-k8s-lab-report/1.0", "serving-runtime-aws-lab-report/1.0"])
+def test_lab_report_conversion_preserves_source_schema(contracts, source_schema):
+    from byul_platform.sources.runtime import lab_report_doc
+    from conftest import EXAMPLES
+
+    payload = load_json(EXAMPLES / "runtime-lab-report.json")
+    payload["report"]["schema"] = source_schema
+    if source_schema == "serving-runtime-aws-lab-report/1.0":
+        payload["report"]["cases"][0]["id"] = "AWS-01"
+    document = lab_report_doc(payload)
+    assert document["report"]["schema"] == source_schema
+    assert contracts.errors("runtime-lab-report", document) == []

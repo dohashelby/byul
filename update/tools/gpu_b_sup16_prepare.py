@@ -22,14 +22,14 @@ from tools.lif14_stop_restart_prepare import reserve_preparation_output
 ROOT = Path(__file__).resolve().parents[2]
 SNAPSHOTS = 'update/docs/gpu-b/consolidation-20261106/implementation-snapshots'
 PINS = {
-    'pair.py': 'ed9616091017c486cba9bb8e1b804969e6f1944c5fdbbd4b6c7408fa009bb519',
-    'ordering.py': '2485ba44ce8398f833477b79a04c86624cc254316b566f399a4bc9b5f085e4bd',
+    'pair.py': '13ca837b8aa80ea572d663b2531ae2baf26c343ee79852b3a5597096042073d8',
+    'ordering.py': '9d797a7f154663e1d64b820204fd6c54682aa5a48f063d0855c27a09d7e5796f',
     'stage.py': 'c61b7059419659419aa973c072095f5a0ca744c3a24072472ce63074ad9d6f94',
     'prepare_pair.py': 'c1aff2108495722676977c46638ad64ea9dc39a12270bb1e239ce74a383a158d',
     'source_owner.py': 'fb12dbe8d82d6bc027b613a477d6e1a432fa4693c46c6f1380cb38cecdf79fc9',
     'original-procedure.json': 'e48fefc221cbbbba3f365a21fba61c5b27cb94fe861299c8657dc6b4cdba5831',
 }
-SENSOR_SHA = 'e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d'
+SENSOR_SHA = '5542067206f0d92a68575f6fd9cfbaf1c85fa97c35a707f50d9cb1ee260a0b64'
 GPU_IMAGE = 'vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b'
 RUNTIME_MISSING = [
     'actual sealed ENV with supported image/runtime/model/GPU identity',
@@ -64,7 +64,7 @@ def source_context(root, commit, manifest_sha, owner_raw, owner_path):
     # and the already reviewed public inputs without changing its allowed scope.
     repo, prefix, _, _ = owner['_git_context'](root)
     paths = ['update/tools/gpu_b_sup16_prepare.py', 'update/tools/gpu_b_sup16_pair_writer.py',
-             SNAPSHOTS + '/sup16-write_normal_boot.py.txt', 'update/tools/lif14_stop_restart_prepare.py']
+             'update/tools/gpu_b_sup16_ordering.py', 'update/tools/lif14_stop_restart_prepare.py']
     owner['_git'](repo, prefix, ['ls-files', '--error-unmatch', *paths])
     owner['_git'](repo, prefix, ['diff', '--exit-code', 'HEAD', '--', *paths])
     return {'commit': commit, 'manifest_sha256': manifest_sha, 'verification': verified,
@@ -152,7 +152,7 @@ def commands(source, models):
 def prepare(args):
     root = Path(args.source_root).absolute()
     paths = {'pair.py': root / 'update/tools/gpu_b_sup16_pair_writer.py',
-             'ordering.py': root / SNAPSHOTS / 'sup16-write_normal_boot.py.txt',
+             'ordering.py': root / 'update/tools/gpu_b_sup16_ordering.py',
              'stage.py': Path(args.stage), 'prepare_pair.py': Path(args.prepare_pair),
              'source_owner.py': Path(args.source_owner), 'original-procedure.json': Path(args.procedure)}
     # Validate before reserving output. Missing inputs never become empty assets.
@@ -162,7 +162,7 @@ def prepare(args):
     ordering = module(raws['ordering.py'], paths['ordering.py'])
     sensor = root / 'update/src/guard/adapters/vllm_file_read_sensor.py'
     read(sensor, SENSOR_SHA)
-    if pair['ORDERING_HELPER_SHA256'] != PINS['ordering.py'] or 'native17_ordering_from_raw' not in ordering:
+    if pair['ORDERING_HELPER_SHA256'] != PINS['ordering.py'] or 'native17_ordering_from_raw' not in ordering or ordering['PRODUCER_SOURCES'] != {'vllm-native-lifecycle-metadata/17': SENSOR_SHA}:
         raise ValueError('SUP16_PREPARATION_ASSET_COMPATIBILITY_MISMATCH')
     models, missing = {}, list(RUNTIME_MISSING)
     for role in ('normal', 'challenge'):

@@ -9,13 +9,13 @@ VERSION='0.1.0'
 SCHEMA='guard-native-startup-file-context-candidates/1'
 SOURCE_PINS={
     'vllm_worker_startup_metadata.py':'b5d0be2de94fe9453a5f68b58e019b62a2f454bd59718fb43512a321755e651a',
-    'vllm_worker_startup_sensor.py':'2fb8b6386bc59e236c9227251da05f8e8704e08a935dcff27a8c18bc57ed91f4',
+    'vllm_worker_startup_sensor.py':'7515a6d023db8056524220ee61fbfbb82fd9cc92520f605d511bfdc04283aae5',
     'vllm_worker_startup_contract.py':'6788df2f4c6f04f46e681eb5eab48631e2ba037754d26166bb02341e4b592950',
     'vllm_safe_open_mapping_metadata.py':'833030d5d24aad97bc7ec0050ef105488daeb0f2023987d75bb1d8ffdbc0be29',
-    'vllm_safe_open_mapping_sensor.py':'dd9e75f2752e042b43527ddd9cf13cc06a3c82fd4c5ba73cfe7114df7dcafaf1',
+    'vllm_safe_open_mapping_sensor.py':'8753a0d6cb06229ab0661e1e7548c6213c368a76243543851baf385cc207f3da',
     'vllm_weight_iteration_metadata.py':'f8ced901b1b1c7d918f96c9ef8ec0899696c2d161efbaefdd43dbedd340f04c0',
-    'vllm_weight_iteration_sensor.py':'6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648',
-    'vllm_file_read_sensor.py':'e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d',
+    'vllm_weight_iteration_sensor.py':'74d0b65aaf4b45185c3d53b520d0881ebe711950e89b17dd48b0a1ca10e1a87a',
+    'vllm_file_read_sensor.py':'5542067206f0d92a68575f6fd9cfbaf1c85fa97c35a707f50d9cb1ee260a0b64',
 }
 MAX_CANDIDATES=128
 MAX_LOCATORS=64

@@ -24,7 +24,7 @@ function secret(id: string, override: boolean): RuntimeEvent {
 }
 
 function flagged(id: string, verdict: string): RuntimeEvent {
-  return { ...sample, event_id: id, occurred_at: "2026-11-04T10:00:00Z", observation: { ...sample.observation!, kind: "process_exec", binary: "/bin/sh", exec_verdict: verdict, phases: ["compiling"] } };
+  return { ...sample, event_id: id, occurred_at: "2026-11-04T10:00:00Z", observation: { ...sample.observation!, kind: "process_exec", scope_ref: "a".repeat(64), binary: "/bin/sh", exec_verdict: verdict, phases: ["compiling"] } };
 }
 
 describe("알림 심각도와 묶음", () => {
@@ -69,7 +69,7 @@ describe("알림 심각도와 묶음", () => {
   it("알림 페이지에 건수와 자세히 연결을 보여준다", async () => {
     mockApi({ "/api/runtime/events": { items: [flagged("a", "suspect_binary"), flagged("b", "suspect_binary")], invalid: [], source: SOURCE, truncated: false } });
     renderAt("/runtime/alerts", "/runtime/alerts", <AlertsPage />);
-    expect(await screen.findByText(/동일 판정·실행 파일/)).toBeTruthy();
+    expect(await screen.findByText(/동일 대상·실행 세대·판정/)).toBeTruthy();
     expect(screen.getByText(/셸 실행 — 의심 실행/)).toBeTruthy();
   });
   it("탐지 알림 묶음 목록을 URL 페이지에서 25개씩 보여준다", async () => {
@@ -150,7 +150,7 @@ describe("통합 개요", () => {
     const chart = (await screen.findByRole("heading", { name: "시간별 요청" })).closest("article")!;
     const eventChart = screen.getByRole("heading", { name: "시간별 관측 이벤트" }).closest("article")!;
     expect(screen.queryByRole("heading", { name: "시간대별 추이" })).toBeNull();
-    expect(chart.querySelector(".bigNumber")?.textContent).toBe("56최근 요청");
+    expect(chart.querySelector(".bigNumber")?.textContent).toBe("56조회된 요청 · 선택한 기간");
     expect(eventChart.textContent).toContain("관측 이벤트 5건");
     expect(eventChart.textContent).toContain("기타(관측·허용 등)");
     const totalTab = within(chart).getByRole("tab", { name: "전체" });

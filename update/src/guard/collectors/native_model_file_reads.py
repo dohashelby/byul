@@ -13,9 +13,9 @@ VERSION='0.1.0'
 SCHEMA='guard-native-scoped-file-read-candidates/1'
 SOURCE_PINS={
     'vllm_file_read_metadata.py':'b8c08652687eaf03a4749f85f099b0bcf3a09e2ec27a7e96eb767efdff346c93',
-    'vllm_file_read_sensor.py':'e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d',
+    'vllm_file_read_sensor.py':'5542067206f0d92a68575f6fd9cfbaf1c85fa97c35a707f50d9cb1ee260a0b64',
     'vllm_weight_iteration_metadata.py':'f8ced901b1b1c7d918f96c9ef8ec0899696c2d161efbaefdd43dbedd340f04c0',
-    'vllm_weight_iteration_sensor.py':'6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648',
+    'vllm_weight_iteration_sensor.py':'74d0b65aaf4b45185c3d53b520d0881ebe711950e89b17dd48b0a1ca10e1a87a',
 }
 MAX_CANDIDATES=256
 MAX_UNJOINED=64

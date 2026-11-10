@@ -13,7 +13,7 @@ import types
 PROFILE="vllm-native-lifecycle-metadata/10"
 SCHEMA="guard-native-lifecycle-events/10"
 COMMIT="db9527a46873454610df6dbedf79a36d6bf1a7f6"
-BASE_SHA256="2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd"
+BASE_SHA256="e537d1d1b19813f171aa30b9344c1dbb49139eed3dea60bfa6dc71744d0d4f39"
 MAX_ROWS=2048
 MAX_BYTES=2*1024**2
 BODY_HASH_LIMIT=65536

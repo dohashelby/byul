@@ -7,13 +7,13 @@ Description=byul scoped Tetragon process identities (context byul-aws-lab)
 
 [Service]
 Type=simple
-WorkingDirectory=%h/byul/runtime
-Environment=PYTHONPATH=%h/byul/runtime/src
+WorkingDirectory=/opt/byul/runtime
+Environment=PYTHONPATH=/opt/byul/runtime/src
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 UMask=0027
 ExecStartPre=/usr/bin/test -g /srv/serving/observation
 ExecStartPre=/usr/bin/test -w /srv/serving/observation
-ExecStart=/usr/bin/python3 -B -m tools.tetragon_identities --context byul-aws-lab --namespace serving-lab --selector "app in (serving-engine,byul-tetragon-proof,byul-tetragon-sentinel)" --output /srv/serving/observation/tetragon-identities.json --watch
+ExecStart=/opt/byul/runtime/.venv/bin/python -B -m tools.tetragon_identities --context byul-aws-lab --namespace serving-lab --selector "app in (serving-engine,byul-tetragon-proof,byul-tetragon-sentinel)" --output /srv/serving/observation/tetragon-identities.json --reader-group 10010 --watch
 Restart=on-failure
 RestartSec=15
 

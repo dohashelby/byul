@@ -6,7 +6,10 @@ from contextlib import closing
 import json
 from pathlib import Path
 import tempfile
+import threading
+import time
 import unittest
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -113,10 +116,53 @@ class ContextCheckHttpTests(unittest.TestCase):
                 return error.code, error.headers.get("X-Request-ID"), json.loads(error.read())
 
     def final_record(self, request_id: str | None) -> dict:
-        records, _ = JsonlStore(self.data_dir / "gateway_records.jsonl").read_all()
-        finals = [r for r in records if r["request_id"] == request_id and r["phase"] == "final"]
-        self.assertEqual(len(finals), 1)
-        return finals[0]
+        # Match the target/stream tests: HTTP body receipt can precede the
+        # handler's final append. Wait only for this exact request's final.
+        deadline = time.monotonic() + 3
+        while True:
+            records, corrupt = JsonlStore(self.data_dir / "gateway_records.jsonl").read_all()
+            self.assertEqual(corrupt, [])
+            finals = [r for r in records if r["request_id"] == request_id and r["phase"] == "final"]
+            if finals or time.monotonic() >= deadline:
+                self.assertEqual(len(finals), 1, "exact final journal record not committed within test deadline")
+                return finals[0]
+            time.sleep(0.01)
+
+    def test_final_record_waits_for_append_after_body_receipt(self) -> None:
+        policy = write_policy(self.directory, max_context_tokens=200)
+        _engine, gateway = self.start_mock(policy)
+        pending, release = threading.Event(), threading.Event()
+        self.addCleanup(release.set)
+        append = gateway._records.append
+        def delayed_final(record):
+            if record.get("phase") == "final":
+                pending.set()
+                self.assertTrue(release.wait(3), "test final append was not released")
+            return append(record)
+        with patch.object(gateway._records, "append", delayed_final):
+            status, request_id, _body = self.post(gateway, chat_body("one two three"))
+            self.assertEqual(status, 200)
+            self.assertTrue(pending.wait(1), "handler did not reach final append")
+            read_all = JsonlStore.read_all
+            reader_thread = threading.get_ident()
+            empty_observed = []
+            def release_after_empty_read(store):
+                rows, corrupt = read_all(store)
+                if store.path == self.data_dir / "gateway_records.jsonl" and threading.get_ident() == reader_thread:
+                    matching = [r for r in rows if r.get("request_id") == request_id and r.get("phase") == "final"]
+                    if not matching:
+                        empty_observed.append(True)
+                        release.set()
+                return rows, corrupt
+            try:
+                with patch.object(JsonlStore, "read_all", release_after_empty_read):
+                    final = self.final_record(request_id)
+            finally:
+                release.set()
+        self.assertTrue(empty_observed, "test must observe the response/final boundary")
+        self.assertEqual(final["request_id"], request_id)
+        self.assertEqual(final["phase"], "final")
+        self.assertEqual(final["request"]["context"]["result"], "within_limit")
 
     def test_within_limit_is_relayed_and_recorded(self) -> None:
         policy = write_policy(self.directory, max_context_tokens=200)

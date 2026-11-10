@@ -126,6 +126,22 @@
       "enum": ["received", "not_received", "unknown", "gateway_only", null]
     },
     "evidence_summary": { "type": ["string", "null"] },
+    "query_window": {
+      "description": "원본을 삭제하지 않고 적용한 실시간 조회 범위. 범위 밖의 UUID 부재는 확정하지 않는다.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["truncated", "gateway_search_complete", "engine_search_complete", "max_search_bytes"],
+          "properties": {
+            "truncated": { "type": "boolean" },
+            "gateway_search_complete": { "type": "boolean" },
+            "engine_search_complete": { "type": "boolean" },
+            "max_search_bytes": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    },
     "engine_receipts": {
       "type": "object",
       "additionalProperties": false,

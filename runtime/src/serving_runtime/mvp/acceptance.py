@@ -950,7 +950,15 @@ def _run_s1_06(runner: _Runner) -> AcceptanceResult:
 
     runner.start_gateway(_EXAMPLE_POLICY, data_dir=runner.data_dir)
     regular_status, regular_id, _ = runner.post_chat()
-    records, _ = JsonlStore(runner.data_dir / "gateway_records.jsonl").read_all()
+    # As in the other S1 cases, receiving the HTTP body can precede final
+    # append. Wait for both exact IDs before asserting journal uniqueness.
+    def completed_records():
+        rows, _ = JsonlStore(runner.data_dir / "gateway_records.jsonl").read_all()
+        ids = {row.get("request_id") for row in rows if row.get("phase") == "final"}
+        return rows if first_id and regular_id and {first_id, regular_id} <= ids else None
+    records = _wait_for(completed_records)
+    final_records_ready = records is not None
+    records = records or []
     final_counts: dict[str, int] = {}
     for record in records:
         if record.get("phase") == "final" and isinstance(record.get("request_id"), str):
@@ -965,6 +973,7 @@ def _run_s1_06(runner: _Runner) -> AcceptanceResult:
         and store_body.get("error", {}).get("code") == "STORE_UNAVAILABLE"
         and before == after
         and regular_status == 200
+        and final_records_ready
         and final_counts.get(first_id) == 1
         and final_counts.get(regular_id) == 1
         and all(count == 1 for count in final_counts.values())
@@ -980,6 +989,7 @@ def _run_s1_06(runner: _Runner) -> AcceptanceResult:
             "store_http_error": [store_status, store_body.get("error", {}).get("code")],
             "engine_receipts_before_after": [before, after],
             "regular_http": regular_status,
+            "final_records_ready": final_records_ready,
             "duplicate_final_ids": [key for key, count in final_counts.items() if count != 1],
         },
         passed,
@@ -2517,14 +2527,6 @@ def _run_s4_06(runner: _Runner) -> AcceptanceResult:
         "POST", "/v1/chat/completions", body=normal_body
     )
     normal_id = normal_headers.get("X-Request-ID")
-    normal_received = next(
-        (
-            item
-            for item in runner.fake_backend.requests
-            if item.get("request_id") == normal_id
-        ),
-        {},
-    )
     rejected_body = json.dumps(
         {
             "model": "test-model",
@@ -2541,6 +2543,10 @@ def _run_s4_06(runner: _Runner) -> AcceptanceResult:
     rejected_id = rejected_headers.get("X-Request-ID")
     normal_final = _final_record(runner, normal_id) if normal_id else {}
     rejected_final = _final_record(runner, rejected_id) if rejected_id else {}
+    upstream_id = normal_final.get("upstream_request_id") if normal_final else None
+    normal_matches = [item for item in runner.fake_backend.requests
+                      if upstream_id is not None and item.get("request_id") == upstream_id]
+    normal_received = normal_matches[0] if len(normal_matches) == 1 else {}
     stored = (data_dir / "gateway_records.jsonl").read_text(encoding="utf-8")
     backend_count = runner.fake_backend.request_count
     expected_fields = [
@@ -2570,6 +2576,7 @@ def _run_s4_06(runner: _Runner) -> AcceptanceResult:
         "정상 요청만 fake backend 1회 전달, 이름·모드·n만 기록, n=3은 400 미전달",
         {
             "normal_http": normal_status,
+            "backend_request_id_matches_recorded_upstream": len(normal_matches) == 1,
             "backend_values_match": (
                 values.get("temperature") == 0.7
                 and values.get("cache_salt") == marker

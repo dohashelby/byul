@@ -15,11 +15,12 @@ from .log_analysis import _FILE_READER
 
 MAX_BYTES = 65536
 EXTENDED_RECORDING_PROFILE = "owned-jsonl-2m-v1"
+LARGE_RECORDING_PROFILE = "owned-jsonl-4m-v1"
 
 
 def _read_budget(max_bytes, read_profile):
-    ceiling = 2 * 1024**2 if read_profile == EXTENDED_RECORDING_PROFILE else 262144
-    if (read_profile not in (None, EXTENDED_RECORDING_PROFILE) or type(max_bytes) is not int
+    ceiling = 4 * 1024**2 if read_profile == LARGE_RECORDING_PROFILE else 2 * 1024**2 if read_profile == EXTENDED_RECORDING_PROFILE else 262144
+    if (read_profile not in (None, EXTENDED_RECORDING_PROFILE,LARGE_RECORDING_PROFILE) or type(max_bytes) is not int
             or not MAX_BYTES <= max_bytes <= ceiling):
         raise ValueError("CAPTURE_READ_BUDGET_INVALID")
 

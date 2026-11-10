@@ -56,6 +56,23 @@ class RetentionTests(unittest.TestCase):
         records, _ = JsonlStore(self.data / "gateway_records.jsonl").read_all()
         return [record["request_id"] for record in records]
 
+    def test_deletion_range_tracks_each_files_actual_removed_timestamps(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            data = Path(temporary)
+            gateway = JsonlStore(data / "gateway_records.jsonl")
+            receipts = JsonlStore(data / "engine_receipts.jsonl")
+            gateway.append({"request_id": "joined", "recorded_at": iso(12)})
+            gateway.append({"request_id": "joined", "recorded_at": iso(10)})
+            receipts.append({"request_id": "joined", "received_at": iso(9)})
+            result = RecordRetention(data, enforce=True).run(now=NOW)
+            expected = {"from": iso(12), "to": iso(10)}
+            self.assertEqual(result["files"]["gateway_records.jsonl"]["removable_range"], expected)
+            self.assertEqual(result["files"]["engine_receipts.jsonl"]["removable_range"],
+                             {"from": iso(9), "to": iso(9)})
+            self.assertEqual(gateway.read_all()[0], [])
+            restarted = RecordRetention(data).run(now=NOW)
+            self.assertEqual(restarted["last_deletion"]["files"]["gateway_records.jsonl"]["removable_range"], expected)
+
     def test_report_only_by_default_changes_nothing(self) -> None:
         before = (self.data / "gateway_records.jsonl").read_bytes()
         summary = RecordRetention(self.data).run(now=NOW)

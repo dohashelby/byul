@@ -12,6 +12,7 @@ import threading
 import time
 from uuid import uuid4
 
+from tools import k8s_observation_feed as feed
 from tools.k8s_observation_feed import (
     _Child, _FeedGroup, _Supervisor, _StopRequested, _stop_children, _open_append,
     _install_stop_signal_handlers, _restore_signal_handlers, redact_tetragon_line,
@@ -27,6 +28,7 @@ class StreamScopeError(ValueError):
 def discovery_pending(output, context, opened_at, gap_id, *, first):
     output=Path(output).absolute()
     output.mkdir(parents=True,exist_ok=True,mode=0o700)
+    feed._share(output,directory=True)
     with _open_append(output/"tetragon.jsonl"): pass
     gap={"gap_id":gap_id,"opened_at":opened_at,"backfill_since":opened_at,
          "last_healthy_at":None,"cause":[{"name":"agent_discovery","error":"SourceUnavailable"}],"attempts":0}
@@ -35,7 +37,7 @@ def discovery_pending(output, context, opened_at, gap_id, *, first):
     atomic_json(output/"tetragon.heartbeat.json",{"schema":"runtime-observation-feed-heartbeat/1.0",
         "kind":"tetragon","kube_context":context,"feed_path":str(output/"tetragon.jsonl"),
         "started_at":opened_at,"updated_at":_utc_now(),"state":"reconnecting","open_gap":gap,
-        "processes":[{"name":"agent_discovery","running":False,"returncode":None}]})
+        "processes":[{"name":"agent_discovery","running":False,"returncode":None}]},reader_gid=feed._reader_gid)
 
 
 class AgentEpochGuard:
@@ -105,6 +107,7 @@ class TetragonStream:
             if len(matches) != 1 or matches[0]["metadata"]["namespace"] != self.namespace:
                 raise StreamScopeError("stream policy scope is missing or ambiguous")
         self.output.mkdir(parents=True, exist_ok=True, mode=0o700)
+        feed._share(self.output, directory=True)
         lock=self.stack.enter_context(_open_append(self.output/"stream.lock"))
         try:
             fcntl.flock(lock.fileno(),fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -185,7 +188,10 @@ def main():
     parser.add_argument("--namespace",required=True)
     parser.add_argument("--policy",action="append",required=True)
     parser.add_argument("--output",type=Path,required=True)
+    parser.add_argument("--reader-group",type=int)
     args=parser.parse_args()
+    feed.check_reader_group(args.reader_group)
+    feed._reader_gid=args.reader_group
     stop_requested=threading.Event()
     # Signal handlers must not acquire Event/Condition locks. systemd and uv
     # can deliver duplicate termination signals while the first is handled.

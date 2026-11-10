@@ -406,7 +406,7 @@ class AuthHeaderNotForwardedTests(TempFiles, unittest.TestCase):
         with urlopen(request, timeout=3) as response:
             self.assertEqual(response.status, 200)
             request_id = response.headers["X-Request-ID"]
-        received = [item for item in fake.requests if item["request_id"] == request_id]
+        received = [item for item in fake.requests if item["request_id"] == "byul-cb-" + request_id]
         self.assertEqual(len(received), 1)
         self.assertFalse(received[0]["authorization_present"])
 

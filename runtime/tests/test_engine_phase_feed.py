@@ -33,13 +33,21 @@ class Runner:
         self.fail_logs = False
         self.count = 1
         self.uid_after_logs = None
+        self.container_id = "containerd://one"
+        self.restart_count = 0
+        self.started_at = "2026-11-02T09:59:00Z"
+        self.container_after_logs = None
         self.log_commands: list[list[str]] = []
         self.log_bytes = 0
 
     def __call__(self, argv, **_kwargs):
         if "pods" in argv:
             items = [{"metadata": {"name": "engine-1", "uid": self.uid},
-                      "status": {"phase": "Running"}} for _ in range(self.count)]
+                      "status": {"phase": "Running", "containerStatuses": [{
+                          "name": "engine", "containerID": self.container_id,
+                          "restartCount": self.restart_count,
+                          "state": {"running": {"startedAt": self.started_at}},
+                      }]}} for _ in range(self.count)]
             return subprocess.CompletedProcess(argv, 0, json.dumps({"items": items}).encode(), b"")
         self.log_commands.append(argv)
         if self.fail_logs:
@@ -58,6 +66,9 @@ class Runner:
         if self.uid_after_logs is not None:
             self.uid = self.uid_after_logs
             self.uid_after_logs = None
+        if self.container_after_logs is not None:
+            self.container_id = self.container_after_logs
+            self.container_after_logs = None
         return subprocess.CompletedProcess(argv, 0, output, b"")
 
 
@@ -73,6 +84,37 @@ def writer(path: Path, runner: Runner) -> EnginePhaseTimelineWriter:
 
 
 class EnginePhaseFeedTests(unittest.TestCase):
+    def test_same_pod_new_container_generation_discards_old_phase(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runner = Runner()
+            source = writer(Path(directory) / "timeline.json", runner)
+            self.assertTrue(source.collect_once()["entries"])
+            for field, value in (("container_id", "containerd://two"),
+                                 ("restart_count", 1), ("started_at", "2026-11-02T10:01:00Z")):
+                setattr(runner, field, value)
+                runner.log = b""
+                doc = source.collect_once()
+                self.assertEqual(doc["entries"], [])
+                self.assertFalse(any(v.startswith("--since-time=") for v in runner.log_commands[-1]))
+
+    def test_container_restart_during_log_fetch_rejects_captured_old_logs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runner = Runner()
+            runner.container_after_logs = "containerd://two"
+            doc = writer(Path(directory) / "timeline.json", runner).collect_once()
+            self.assertEqual(doc["entries"], [])
+            self.assertEqual(doc["collector"]["state"], "log_error")
+
+    def test_missing_container_generation_never_reuses_previous_phase(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runner = Runner()
+            source = writer(Path(directory) / "timeline.json", runner)
+            self.assertTrue(source.collect_once()["entries"])
+            runner.container_id = None
+            doc = source.collect_once()
+            self.assertEqual(doc["entries"], [])
+            self.assertEqual(doc["collector"]["state"], "log_error")
+
     def test_sglang_writer_collects_cached_start_boundaries(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             runner = Runner()

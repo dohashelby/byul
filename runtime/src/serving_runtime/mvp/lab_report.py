@@ -13,8 +13,8 @@ REPORT_SCHEMA = "serving-runtime-k8s-lab-report/1.0"
 AWS_REPORT_SCHEMA = "serving-runtime-aws-lab-report/1.0"
 AWS_CASE_IDS = tuple(f"AWS-{index:02d}" for index in range(1, 21))
 CASE_IDS = tuple(f"L-{index:02d}" for index in range(1, 7))
-# Present only when the checker ran with --task-checks (SP4/SP1).
-OPTIONAL_CASE_IDS = ("L-07", "L-08")
+# Optional probes and --task-checks (SP4/SP1) extend the original six cases.
+OPTIONAL_CASE_IDS = ("L-05b", "L-05c", "L-07", "L-08")
 
 
 class LabReportSource:

@@ -21,6 +21,7 @@ from .policy import PolicyState
 from .policy_state import RevocationState, evaluate_policy
 from .relay import Relay, StreamResponse, engine_error
 from .request_records import RequestRecords
+from .response_timeout import write_response_before
 from .validator import Decision, validate_request
 
 
@@ -337,6 +338,7 @@ class RequestFlow:
     ) -> None:
         self._records.clear_context(route)
         policy_snapshot = self._policy_state()
+        self._records.bind_context(policy_snapshot)
         policy_runtime = evaluate_policy(
             policy_snapshot,
             self._revocation_state(),
@@ -804,6 +806,29 @@ class RequestFlow:
             completed = (
                 final_decision.result == "ALLOWED" and engine_body is not None
             )
+            delivery_attempted = False
+            if completed:
+                def deliver_body() -> None:
+                    nonlocal delivery_attempted
+                    delivery_attempted = True
+                    response.send_response_body(
+                        200, "application/json; charset=utf-8", engine_body,
+                        request_id=request_id,
+                    )
+                try:
+                    write_response_before(
+                        response, acquired_at + self._relay.request_deadline_s,
+                        deliver_body,
+                    )
+                except OSError:
+                    expired = time.monotonic() >= acquired_at + self._relay.request_deadline_s
+                    final_decision = engine_error(
+                        200 if delivery_attempted else 504,
+                        "ENGINE_DEADLINE" if expired else "CLIENT_DISCONNECTED",
+                        "response deadline exceeded" if expired else "client disconnected",
+                        decision, source="gateway" if expired else "client",
+                    )
+                    completed = False
             self._records.append(
                 self._records.build(
                     "final",
@@ -818,16 +843,10 @@ class RequestFlow:
                     final_outcome=(
                         "completed" if completed else final_decision.reason_code
                     ),
+                    response_started=delivery_attempted,
                 )
             )
-            if completed:
-                response.send_response_body(
-                    200,
-                    "application/json; charset=utf-8",
-                    engine_body,
-                    request_id=request_id,
-                )
-            else:
+            if not delivery_attempted:
                 response.send_error_decision(
                     final_decision,
                     request_id,

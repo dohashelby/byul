@@ -475,7 +475,7 @@ class ObservationApiTests(unittest.TestCase):
         payload = json.loads(body)
         self.assertEqual(status, 200)
         self.assertEqual(payload["counts"]["rule_id"], {"TG-EXEC-01": 1})
-        self.assertEqual(len(payload["observations"]), 1)
+        self.assertEqual(len([item for item in payload["observations"] if item.get("source")=="tetragon"]), 1)
         self.assertEqual(payload["corrupt_lines"], 1)
         self.assertEqual(self.get("/api/observations?source=tetragon")[0], 200)
         self.assertEqual(self.get("/api/observations?unknown=x")[0], 400)

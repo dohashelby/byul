@@ -15,7 +15,7 @@ PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',
     'update/pyproject.toml','update/reference/framework')
 # 승인 조합을 담은 B 파일도 같은 목록으로 고정한다.
 REVIEWED_TOOLS=('update/tools/b1_integration_cpu.py','update/tools/b_lif07_native_capture.py',
-    'update/tools/b_lif07_readiness.py')
+    'update/tools/b_lif07_readiness.py','update/tools/b_lif08_fault_control.py')
 FRAMEWORK_COMMIT='91e84c778f4fc8ee1108eaf0551bf51f2f6a2061'
 
 def manifest_id(repo):

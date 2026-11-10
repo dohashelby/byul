@@ -42,9 +42,9 @@
 | dev-1 | GPU_CONFIRMATION_ONLY | 3 |
 | dev-1 | MEASUREMENT_REMAINING | 1 |
 | dev-1 | NOT_APPLICABLE_IN_TARGET | 2 |
-| gpu | CPU_DEVELOPMENT_REMAINING | 33 |
-| gpu | DONE | 6 |
-| gpu | MEASUREMENT_REMAINING | 4 |
+| gpu | CPU_DEVELOPMENT_REMAINING | 30 |
+| gpu | DONE | 10 |
+| gpu | MEASUREMENT_REMAINING | 3 |
 
 우선순위는 연결된 점검의 관측 공백(P1), 로컬 신규 구현(P2), 추가 인프라(P3), 기업 환경(P4)이다. 기존 점검 재실증은 실행기·정의·설정·시험 자료·환경의 변경 영향이 있을 때만 해당 범위를 수행한다. 팩 revision 변경만으로 기존 5개 전체 재실증을 요구하지 않는다. 어려운 계측 하나가 독립적인 신규 점검을 모두 막지는 않는다.
 

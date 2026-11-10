@@ -5,7 +5,7 @@
   "source_snapshot": "618c8992597474b4ad1b2af31b2064f5384504e1",
   "scope": "GPU43 각 ID의 CPU 완료 세부업무/LAB 실제 수행·증거검증/실제 연결·GPU1·TP2/원입력 담당·정확 반환물·재개조건",
   "criteria": {
-    "ordinary": "기본 대상은 vLLM0.31 LAB 제품 EVD→RES→RPT. CPU/K8s/컴포넌트 대역은 별도 표기하여 GPU ID DONE으로 변환하지 않음",
+    "ordinary": "실제 CPU/K8s 지원 프로파일이 자극→실제 관측→B 소비/원판정→제품 EVD/RES/RPT·기존 증거/정리 검증까지 충족하면 그 명시 LAB 선정 범위 DONE. GPU 필수 관측·미도달/ABORTED·단순 fixture/helper는 실제 미충족 조건을 별도 기록하며 전체질문/원등급/보안판정을 올리지 않는다.",
     "excluded": "최신 사용자 결정의 1차 제외 범위는 실행 경로+UNKNOWN 인계로 해당 범위 완료 가능",
     "not_new_gates": [
       "보안 PASS",
@@ -21,8 +21,8 @@
     "assigned_ids": 43,
     "rows": 43,
     "missing_ids": 0,
-    "new_LAB_DONE_total": 6,
-    "why_LAB_DONE_total_unset": "원 S4 초안은 합계 미확정이었고 root가 명시 선정/제외 범위 완료6개를 근거와 함께 갱신. 나머지37은 새코드37/새GPU실험37을 의미하지 않음",
+    "new_LAB_DONE_total": 10,
+    "why_LAB_DONE_total_unset": "원 S4 초안 null→root 명시6/37→확정 검토 ad971ee4의 실제 CPU 선정4행만 정정해10/33. 모든 후속 분기 완료 수 아님",
     "old_state_counts_are_not_current_remaining_tasks": true,
     "old_limited25_and_evidence18_are_not_copied_as_current_remaining": true,
     "V13_actual": {
@@ -44,11 +44,14 @@
       "PLT-04",
       "PLT-08",
       "SUP-04",
-      "PLT-09"
+      "PLT-09",
+      "REQ-07",
+      "LIF-02",
+      "PLT-03",
+      "PLT-05"
     ],
     "current_LAB_remaining_scope_IDs": [
       "LIF-01",
-      "LIF-02",
       "LIF-03",
       "LIF-04",
       "LIF-05",
@@ -64,11 +67,8 @@
       "OBS-02",
       "OBS-03",
       "PLT-02",
-      "PLT-03",
-      "PLT-05",
       "PLT-06",
       "REQ-05",
-      "REQ-07",
       "REQ-09",
       "REQ-10",
       "REQ-12",
@@ -85,9 +85,9 @@
       "SUP-15",
       "SUP-16"
     ],
-    "current_LAB_remaining_scope_count": 37,
+    "current_LAB_remaining_scope_count": 33,
     "whole_question_or_all_branches_done_claimed": false,
-    "remaining_count_meaning": "현재 명시 LAB 완료를 확정하지 않은 ID37개. 새코드/새GPU실험 수 또는 모든 후속분기 전수목록 확정을 뜻하지 않음"
+    "remaining_count_meaning": "현재 명시 LAB 완료를 확정하지 않은 ID33개. 새 코드33건·새 GPU실험33회·모든 후속분기 전수검토 완료를 뜻하지 않음"
   },
   "source_versions": {
     "PR_head": "618c8992597474b4ad1b2af31b2064f5384504e1",
@@ -680,7 +680,7 @@
         "aggregate_LAB_DONE_inferred": false,
         "new_enterprise_approval_official_or_032_comparison_gate": false
       },
-      "collection_ABORTED_or_unsupported_and_actual_connection_remaining": "중첩 재시도 전체 계층·독립 누적 bytes/비용 및 실제 공급 경로 확대. 선정 SDK 정상/도전의 실행과 판정은 완료 범위",
+      "collection_ABORTED_or_unsupported_and_actual_connection_remaining": "선정 CPU LAB 업무 완료. 별도 후속/전체질문 미측정: 전체 weights/Xet·상위/중첩 retry 계층·독립 누적 비용·실제 승인 예산·추가 임시파일 잔존 분기; 현재 raw는 config651B의 loopback SDK 요청/응답-body 계수·자기 temp 정리이며 worker producer 인증 아님",
       "whole_question_unmeasured_branches": {
         "source": {
           "reference_id": "original_branch_coordinates",
@@ -689,10 +689,10 @@
         "summary": "중첩 재시도 전체 계층·독립 누적 bytes/비용 및 실제 공급 경로 확대. 선정 SDK 정상/도전의 실행과 판정은 완료 범위",
         "all_branches_enumerated": false
       },
-      "GPU1_branches": "원 선정 범위/기존 실증과 CPU 가능 분리; 새 고정 입력/관측 목적이 있는 분기만 선정. 모든 잔여의 GPU 필수성은 확정하지 않음",
+      "GPU1_branches": "WORK_ORDER_VLLM_1 J02의 PACK34 정본 GPU 재실행은 별도 축. 현재 선정 CPU 완료를 취소하거나 GPU 관측으로 환산하지 않음",
       "TP2_branches": "현재 B4 선정 TP2 대상 아님",
       "input_owner": "세션1 공급 전용 producer·분기별 입력 준비; 세션2 실제 환경·실행; 실제 정책값은 권한자",
-      "exact_required_return": "원 retry/body 계약을 유지한 실제 계층·대상·정책과 역할별 원record/정확Ref/정리",
+      "exact_required_return": "완료된 동일 선정 CPU 범위에 추가 반환물 요구 없음. 새 GPU/다른 지원 범위를 선정할 때만 다음 후속 입력을 구체화: 전체 weights/Xet·상위/중첩 retry 계층·독립 누적 비용·실제 승인 예산·추가 임시파일 잔존 분기; 현재 raw는 config651B의 loopback SDK 요청/응답-body 계수·자기 temp 정리이며 worker producer 인증 아님",
       "resume_conditions": "입력·코드 차이와 새 확인 목적/고정 source가 있는 분기만 재개. 원 기한·실제 신원·독립 FAIL/UNKNOWN을 유지; 같은 상태 재시험/삭제 Pod·미래 신원 대체 없음",
       "historical_originals": {
         "scope": "원자료 상태는 근거 원문 그대로. 이번에 새 가용성 검색하지 않음"
@@ -949,14 +949,39 @@
         {
           "reference_id": "review_LIF-02",
           "json_pointer_or_section": "/rows/LIF-02"
+        },
+        {
+          "reference_id": "four_cpu_assessment_20261110",
+          "json_pointer_or_section": "/rows/1"
         }
       ],
       "current_LAB_scope_status": {
-        "state": "REMAINING_SCOPE",
-        "scope": "중첩 재시도 전체 계층·독립 누적 bytes/비용 및 실제 공급 경로 확대. 선정 SDK 정상/도전의 실행과 판정은 완료 범위",
+        "state": "DONE",
+        "scope": "선정 실제 CPU/K8s SDK config 취득 normal/challenge의 재시도·body bytes 예산 관측과 B 소비/원 판정·제품/복원/정리 검증 완료",
         "whole_question_complete": false,
         "canonical_update_proposed": false,
-        "canonical_state": "CPU_DEVELOPMENT_REMAINING"
+        "canonical_state": "DONE",
+        "completion_band": "선정 실제 CPU/K8s LAB 업무",
+        "new_GPU_MEASURED_added": false,
+        "assessment_reference_id": "four_cpu_assessment_20261110"
+      },
+      "selected_cpu_scope_correction_history_v1": {
+        "source_commit": "66f4dbead5a719c78c869e368fc84faeba4e2d10",
+        "matrix_sha256": "8f41e617a41858e1e13f0eb43499ea1e1fdc746841396d96f76919d01c805c55",
+        "gpu_yaml_sha256": "b74e961d2426d4a3555dabf77ee55661f4d9a09f393a22003e3ebdc6c47b8930",
+        "previous_current_LAB_scope_status": {
+          "state": "REMAINING_SCOPE",
+          "scope": "중첩 재시도 전체 계층·독립 누적 bytes/비용 및 실제 공급 경로 확대. 선정 SDK 정상/도전의 실행과 판정은 완료 범위",
+          "whole_question_complete": false,
+          "canonical_update_proposed": false,
+          "canonical_state": "CPU_DEVELOPMENT_REMAINING"
+        },
+        "previous_current_connection_remaining": "중첩 재시도 전체 계층·독립 누적 bytes/비용 및 실제 공급 경로 확대. 선정 SDK 정상/도전의 실행과 판정은 완료 범위",
+        "previous_exact_required_return": "원 retry/body 계약을 유지한 실제 계층·대상·정책과 역할별 원record/정확Ref/정리",
+        "previous_GPU1_branches": "원 선정 범위/기존 실증과 CPU 가능 분리; 새 고정 입력/관측 목적이 있는 분기만 선정. 모든 잔여의 GPU 필수성은 확정하지 않음",
+        "previous_canonical_state": "CPU_DEVELOPMENT_REMAINING",
+        "previous_canonical_note": "docs/gpu-b/supply-preparation.md 및 packs/PACK-BASELINE/checks/LIF-02.yaml: 장애 저장소·재시도 주체/중첩 계층·누적 bytes 생산자와 정상/도전 준비가 없음. 미실측 UNKNOWN.",
+        "interpretation": "당시 상태/준비없음 메모의 역사 보존. 기존 실행/판정/등급·Ref·실제 후속을 변경하지 않음"
       }
     },
     {
@@ -7400,7 +7425,7 @@
         "aggregate_LAB_DONE_inferred": false,
         "new_enterprise_approval_official_or_032_comparison_gate": false
       },
-      "collection_ABORTED_or_unsupported_and_actual_connection_remaining": "선정 LAB SDK 정상/거부/비허용 객체 취득 외 실제 기업 신원·독립 감사/전체 경로 확대(새 LAB 승인 gate 아님)",
+      "collection_ABORTED_or_unsupported_and_actual_connection_remaining": "선정 CPU LAB 업무 완료. 별도 후속/전체질문 미측정: 실제 기업 취득 신원/저장소 ACL·독립 저장소 감사·기업 승인 scope·전체 공급 경로; 현재 독립 보안 FAIL과 EXAMPLE을 보존. 기업 감사 부재는 보안 PASS/전체 질문의 한계",
       "whole_question_unmeasured_branches": {
         "source": {
           "reference_id": "original_branch_coordinates",
@@ -7409,10 +7434,10 @@
         "summary": "선정 LAB SDK 정상/거부/비허용 객체 취득 외 실제 기업 신원·독립 감사/전체 경로 확대(새 LAB 승인 gate 아님)",
         "all_branches_enumerated": false
       },
-      "GPU1_branches": "원 선정 범위/기존 실증과 CPU 가능 분리; 새 고정 입력/관측 목적이 있는 분기만 선정. 모든 잔여의 GPU 필수성은 확정하지 않음",
+      "GPU1_branches": "WORK_ORDER_VLLM_1 J02의 PACK34 정본 GPU 재실행은 별도 축. 현재 선정 CPU 완료를 취소하거나 GPU 관측으로 환산하지 않음",
       "TP2_branches": "현재 B4 선정 TP2 대상 아님",
       "input_owner": "실제 신원·정책·감사는 권한자; 세션1 전용 준비/consumer 입력; 세션2 실측",
-      "exact_required_return": "기업 권한자의 승인 scope/신원과 독립 감사, 해당경로 normal/challenge source/ENV/record·원archive/Ref/정리",
+      "exact_required_return": "완료된 동일 선정 CPU 범위에 추가 반환물 요구 없음. 새 GPU/다른 지원 범위를 선정할 때만 다음 후속 입력을 구체화: 실제 기업 취득 신원/저장소 ACL·독립 저장소 감사·기업 승인 scope·전체 공급 경로; 현재 독립 보안 FAIL과 EXAMPLE을 보존. 기업 감사 부재는 보안 PASS/전체 질문의 한계",
       "resume_conditions": "입력·코드 차이와 새 확인 목적/고정 source가 있는 분기만 재개. 원 기한·실제 신원·독립 FAIL/UNKNOWN을 유지; 같은 상태 재시험/삭제 Pod·미래 신원 대체 없음",
       "historical_originals": {
         "scope": "원자료 상태는 근거 원문 그대로. 이번에 새 가용성 검색하지 않음"
@@ -7669,14 +7694,39 @@
         {
           "reference_id": "review_LIF-02",
           "json_pointer_or_section": "/rows/PLT-03"
+        },
+        {
+          "reference_id": "four_cpu_assessment_20261110",
+          "json_pointer_or_section": "/rows/2"
         }
       ],
       "current_LAB_scope_status": {
-        "state": "REMAINING_SCOPE",
-        "scope": "선정 LAB SDK 정상/거부/비허용 객체 취득 외 실제 기업 신원·독립 감사/전체 경로 확대(새 LAB 승인 gate 아님)",
+        "state": "DONE",
+        "scope": "선정 실제 CPU/K8s SDK 허용·거부·비허용 객체 취득 normal/challenge의 B 소비/독립 FAIL·제품/복원/정리 검증 완료",
         "whole_question_complete": false,
         "canonical_update_proposed": false,
-        "canonical_state": "CPU_DEVELOPMENT_REMAINING"
+        "canonical_state": "DONE",
+        "completion_band": "선정 실제 CPU/K8s LAB 업무",
+        "new_GPU_MEASURED_added": false,
+        "assessment_reference_id": "four_cpu_assessment_20261110"
+      },
+      "selected_cpu_scope_correction_history_v1": {
+        "source_commit": "66f4dbead5a719c78c869e368fc84faeba4e2d10",
+        "matrix_sha256": "8f41e617a41858e1e13f0eb43499ea1e1fdc746841396d96f76919d01c805c55",
+        "gpu_yaml_sha256": "b74e961d2426d4a3555dabf77ee55661f4d9a09f393a22003e3ebdc6c47b8930",
+        "previous_current_LAB_scope_status": {
+          "state": "REMAINING_SCOPE",
+          "scope": "선정 LAB SDK 정상/거부/비허용 객체 취득 외 실제 기업 신원·독립 감사/전체 경로 확대(새 LAB 승인 gate 아님)",
+          "whole_question_complete": false,
+          "canonical_update_proposed": false,
+          "canonical_state": "CPU_DEVELOPMENT_REMAINING"
+        },
+        "previous_current_connection_remaining": "선정 LAB SDK 정상/거부/비허용 객체 취득 외 실제 기업 신원·독립 감사/전체 경로 확대(새 LAB 승인 gate 아님)",
+        "previous_exact_required_return": "기업 권한자의 승인 scope/신원과 독립 감사, 해당경로 normal/challenge source/ENV/record·원archive/Ref/정리",
+        "previous_GPU1_branches": "원 선정 범위/기존 실증과 CPU 가능 분리; 새 고정 입력/관측 목적이 있는 분기만 선정. 모든 잔여의 GPU 필수성은 확정하지 않음",
+        "previous_canonical_state": "CPU_DEVELOPMENT_REMAINING",
+        "previous_canonical_note": "docs/gpu-b/supply-preparation.md 및 packs/PACK-BASELINE/checks/PLT-03.yaml: 저장소 허용/비허용 객체·동일 주체·독립 감사 생산자와 격리 준비 없음. 신고 기록만으로 PASS 불가; 미실측 UNKNOWN.",
+        "interpretation": "당시 상태/준비없음 메모의 역사 보존. 기존 실행/판정/등급·Ref·실제 후속을 변경하지 않음"
       }
     },
     {
@@ -8922,7 +8972,7 @@
         "aggregate_LAB_DONE_inferred": false,
         "new_enterprise_approval_official_or_032_comparison_gate": false
       },
-      "collection_ABORTED_or_unsupported_and_actual_connection_remaining": "선정 SDK provider/cache/file/anonymous 관측 외 실제 수명/갱신·독립 감사/전체 공급 경로 확대",
+      "collection_ABORTED_or_unsupported_and_actual_connection_remaining": "선정 CPU LAB 업무 완료. 별도 후속/전체질문 미측정: 실제 issuer TTL·기업 자격·독립 provider 감사·적용되는 갱신/OIDC/OAuth/Colab/외부 redirect; 401·cache/file/anonymous 선정 관측을 실제 TTL 갱신/전체 공급 경로로 일반화하지 않음",
       "whole_question_unmeasured_branches": {
         "source": {
           "reference_id": "original_branch_coordinates",
@@ -8931,10 +8981,10 @@
         "summary": "선정 SDK provider/cache/file/anonymous 관측 외 실제 수명/갱신·독립 감사/전체 공급 경로 확대",
         "all_branches_enumerated": false
       },
-      "GPU1_branches": "원 선정 범위/기존 실증과 CPU 가능 분리; 새 고정 입력/관측 목적이 있는 분기만 선정. 모든 잔여의 GPU 필수성은 확정하지 않음",
+      "GPU1_branches": "WORK_ORDER_VLLM_1 J02의 PACK34 정본 GPU 재실행은 별도 축. 현재 선정 CPU 완료를 취소하거나 GPU 관측으로 환산하지 않음",
       "TP2_branches": "현재 B4 선정 TP2 대상 아님",
       "input_owner": "실제 issuer/정책 권한자; 세션1 자격별 전용 입력·준비; 세션2 실측",
-      "exact_required_return": "권한자의 실제 자격상태/TTL·허용provider/cache POL·독립감사와 적용 경로별 고정입력/원record/Ref/정리",
+      "exact_required_return": "완료된 동일 선정 CPU 범위에 추가 반환물 요구 없음. 새 GPU/다른 지원 범위를 선정할 때만 다음 후속 입력을 구체화: 실제 issuer TTL·기업 자격·독립 provider 감사·적용되는 갱신/OIDC/OAuth/Colab/외부 redirect; 401·cache/file/anonymous 선정 관측을 실제 TTL 갱신/전체 공급 경로로 일반화하지 않음",
       "resume_conditions": "입력·코드 차이와 새 확인 목적/고정 source가 있는 분기만 재개. 원 기한·실제 신원·독립 FAIL/UNKNOWN을 유지; 같은 상태 재시험/삭제 Pod·미래 신원 대체 없음",
       "historical_originals": {
         "scope": "원자료 상태는 근거 원문 그대로. 이번에 새 가용성 검색하지 않음"
@@ -9191,14 +9241,39 @@
         {
           "reference_id": "review_LIF-02",
           "json_pointer_or_section": "/rows/PLT-05"
+        },
+        {
+          "reference_id": "four_cpu_assessment_20261110",
+          "json_pointer_or_section": "/rows/3"
         }
       ],
       "current_LAB_scope_status": {
-        "state": "REMAINING_SCOPE",
-        "scope": "선정 SDK provider/cache/file/anonymous 관측 외 실제 수명/갱신·독립 감사/전체 공급 경로 확대",
+        "state": "DONE",
+        "scope": "선정 실제 CPU/K8s SDK provider·401/cache/file/anonymous normal/challenge의 B 소비/독립 FAIL·제품/복원/정리 검증 완료",
         "whole_question_complete": false,
         "canonical_update_proposed": false,
-        "canonical_state": "CPU_DEVELOPMENT_REMAINING"
+        "canonical_state": "DONE",
+        "completion_band": "선정 실제 CPU/K8s LAB 업무",
+        "new_GPU_MEASURED_added": false,
+        "assessment_reference_id": "four_cpu_assessment_20261110"
+      },
+      "selected_cpu_scope_correction_history_v1": {
+        "source_commit": "66f4dbead5a719c78c869e368fc84faeba4e2d10",
+        "matrix_sha256": "8f41e617a41858e1e13f0eb43499ea1e1fdc746841396d96f76919d01c805c55",
+        "gpu_yaml_sha256": "b74e961d2426d4a3555dabf77ee55661f4d9a09f393a22003e3ebdc6c47b8930",
+        "previous_current_LAB_scope_status": {
+          "state": "REMAINING_SCOPE",
+          "scope": "선정 SDK provider/cache/file/anonymous 관측 외 실제 수명/갱신·독립 감사/전체 공급 경로 확대",
+          "whole_question_complete": false,
+          "canonical_update_proposed": false,
+          "canonical_state": "CPU_DEVELOPMENT_REMAINING"
+        },
+        "previous_current_connection_remaining": "선정 SDK provider/cache/file/anonymous 관측 외 실제 수명/갱신·독립 감사/전체 공급 경로 확대",
+        "previous_exact_required_return": "권한자의 실제 자격상태/TTL·허용provider/cache POL·독립감사와 적용 경로별 고정입력/원record/Ref/정리",
+        "previous_GPU1_branches": "원 선정 범위/기존 실증과 CPU 가능 분리; 새 고정 입력/관측 목적이 있는 분기만 선정. 모든 잔여의 GPU 필수성은 확정하지 않음",
+        "previous_canonical_state": "CPU_DEVELOPMENT_REMAINING",
+        "previous_canonical_note": "docs/gpu-b/supply-preparation.md 및 packs/PACK-BASELINE/checks/PLT-05.yaml: 선정 SDK provider chain·만료/누락 자격의 실제 취득/신원 생산자와 준비 필요. 미실측 UNKNOWN; 자격 원문 수집 금지.",
+        "interpretation": "당시 상태/준비없음 메모의 역사 보존. 기존 실행/판정/등급·Ref·실제 후속을 변경하지 않음"
       }
     },
     {
@@ -10726,7 +10801,7 @@
         "aggregate_LAB_DONE_inferred": false,
         "new_enterprise_approval_official_or_032_comparison_gate": false
       },
-      "collection_ABORTED_or_unsupported_and_actual_connection_remaining": "선정 고정 text template/token127 경계·render128 거부·override2/전후 정상 CPU LAB 범위 완료. 임의 processor/MM/다른 판본 확대는 별도",
+      "collection_ABORTED_or_unsupported_and_actual_connection_remaining": "선정 CPU LAB 업무 완료. 별도 후속/전체질문 미측정: 허용 override 정책·임의 Jinja/processor/default/fallback/MM·성능의 새 지원/관측; 선언 ENV의 정확 engine source commit 미확인. 현재 CPU 실제 token 관측을 전체 GPU/다른 이미지로 확대하지 않음",
       "whole_question_unmeasured_branches": {
         "source": {
           "reference_id": "original_branch_coordinates",
@@ -10735,10 +10810,10 @@
         "summary": "선정 고정 text template/token127 경계·render128 거부·override2/전후 정상 CPU LAB 범위 완료. 임의 processor/MM/다른 판본 확대는 별도",
         "all_branches_enumerated": false
       },
-      "GPU1_branches": "원 선정 범위/기존 실증과 CPU 가능 분리; 새 고정 입력/관측 목적이 있는 분기만 선정. 모든 잔여의 GPU 필수성은 확정하지 않음",
+      "GPU1_branches": "WORK_ORDER_VLLM_1 J02의 PACK34 정본 GPU 재실행은 별도 축. 현재 선정 CPU 완료를 취소하거나 GPU 관측으로 환산하지 않음",
       "TP2_branches": "현재 B4 선정 TP2 대상 아님",
       "input_owner": "세션1: 후속지원/준비. 세션2: 다른미완료ID/분기와실행순서선정. 세션3: 새고정본/원증거검증. 승인정책은기존권한자",
-      "exact_required_return": "실제 채택template/processor/정책 목록과 지원하는 소비producer·원token/argv/세대·추가고정packet/Ref",
+      "exact_required_return": "완료된 동일 선정 CPU 범위에 추가 반환물 요구 없음. 새 GPU/다른 지원 범위를 선정할 때만 다음 후속 입력을 구체화: 허용 override 정책·임의 Jinja/processor/default/fallback/MM·성능의 새 지원/관측; 선언 ENV의 정확 engine source commit 미확인. 현재 CPU 실제 token 관측을 전체 GPU/다른 이미지로 확대하지 않음",
       "resume_conditions": "입력·코드 차이와 새 확인 목적/고정 source가 있는 분기만 재개. 원 기한·실제 신원·독립 FAIL/UNKNOWN을 유지; 같은 상태 재시험/삭제 Pod·미래 신원 대체 없음",
       "historical_originals": {
         "scope": "원자료 상태는 근거 원문 그대로. 이번에 새 가용성 검색하지 않음"
@@ -10991,14 +11066,39 @@
         {
           "reference_id": "review_PLT-06",
           "json_pointer_or_section": "/rows/REQ-07"
+        },
+        {
+          "reference_id": "four_cpu_assessment_20261110",
+          "json_pointer_or_section": "/rows/0"
         }
       ],
       "current_LAB_scope_status": {
-        "state": "REMAINING_SCOPE",
-        "scope": "선정 고정 text template/token127 경계·render128 거부·override2/전후 정상 CPU LAB 범위 완료. 임의 processor/MM/다른 판본 확대는 별도",
+        "state": "DONE",
+        "scope": "선정 실제 CPU 고정 text template·token127 경계/render128 거부·고정 override2·전후 정상의 B 소비/판정·제품 EVD/RES/RPT·증거/정리 검증 완료",
         "whole_question_complete": false,
         "canonical_update_proposed": false,
-        "canonical_state": "MEASUREMENT_REMAINING"
+        "canonical_state": "DONE",
+        "completion_band": "선정 실제 CPU/K8s LAB 업무",
+        "new_GPU_MEASURED_added": false,
+        "assessment_reference_id": "four_cpu_assessment_20261110"
+      },
+      "selected_cpu_scope_correction_history_v1": {
+        "source_commit": "66f4dbead5a719c78c869e368fc84faeba4e2d10",
+        "matrix_sha256": "8f41e617a41858e1e13f0eb43499ea1e1fdc746841396d96f76919d01c805c55",
+        "gpu_yaml_sha256": "b74e961d2426d4a3555dabf77ee55661f4d9a09f393a22003e3ebdc6c47b8930",
+        "previous_current_LAB_scope_status": {
+          "state": "REMAINING_SCOPE",
+          "scope": "선정 고정 text template/token127 경계·render128 거부·override2/전후 정상 CPU LAB 범위 완료. 임의 processor/MM/다른 판본 확대는 별도",
+          "whole_question_complete": false,
+          "canonical_update_proposed": false,
+          "canonical_state": "MEASUREMENT_REMAINING"
+        },
+        "previous_current_connection_remaining": "선정 고정 text template/token127 경계·render128 거부·override2/전후 정상 CPU LAB 범위 완료. 임의 processor/MM/다른 판본 확대는 별도",
+        "previous_exact_required_return": "실제 채택template/processor/정책 목록과 지원하는 소비producer·원token/argv/세대·추가고정packet/Ref",
+        "previous_GPU1_branches": "원 선정 범위/기존 실증과 CPU 가능 분리; 새 고정 입력/관측 목적이 있는 분기만 선정. 모든 잔여의 GPU 필수성은 확정하지 않음",
+        "previous_canonical_state": "MEASUREMENT_REMAINING",
+        "previous_canonical_note": "packs/PACK-BASELINE/checks/REQ-07.yaml 및 기존 docs/checklist_validation_status.csv: 고정 CPU text-chat/output1 소비 대조 범위만 지원. GPU 이미지/임의 template·override·processor·fallback·멀티모달 미확인 UNKNOWN; GPU용 고정 준비 없음.",
+        "interpretation": "당시 상태/준비없음 메모의 역사 보존. 기존 실행/판정/등급·Ref·실제 후속을 변경하지 않음"
       }
     },
     {
@@ -16474,6 +16574,25 @@
       "sha256": "96441919d48b33d37c0e716978fe803bf64b032f4eb5fa726d8d747e410e86b9",
       "bytes": 7295,
       "read_scope": "기존 검토/파생 JSON. 원 archive/Store/DB/모델은 열지 않음"
+    },
+    "four_cpu_assessment_20261110": {
+      "path": "$PROJECT_ROOT/worktrees/byul-gpu-b-stage1-closeout-handoff-20261106/out/team-handoff/lab-four-cpu-scope-review-20261110-v1/four-selected-cpu-scope-assessment-v1.json",
+      "bytes": 76680,
+      "sha256": "ad971ee4fb736842e09705858a88f7ae0034ce00bf2e77e75d8cfd35f1a44e31",
+      "scope": "선정 CPU4행의 root 확정 검토. 원archive/DB 검증 재실행 아님"
+    },
+    "four_cpu_S6_plt03_plt05_20261110": {
+      "path": "$PROJECT_ROOT/worktrees/byul-b12-review-20261108/out/reviews/plt03-plt05-LAB-reason-consistency-20261110-v1/reason-consistency-v3.json",
+      "bytes": 14565,
+      "sha256": "619194f39b32cdb8abd3a5e981af16fab9e66b76f94d078b4b199dd0694527c6",
+      "scope": "PLT03/05 이유·완료기준 정합성 검토17/불일치0"
+    },
+    "WORK_ORDER_VLLM_1_9c225d9a": {
+      "repo_path": "update/docs/WORK_ORDER_VLLM_1.md",
+      "source_commit": "9c225d9a5c6919e6b37fbda0bb92830787076cd6",
+      "bytes": 24515,
+      "sha256": "90c7ec78a1cd2bf4f80ded78edb534380a1fe89c18493e23829f6188d210aff6",
+      "sha_basis": "git blob bytes"
     }
   },
   "this_run": {
@@ -16503,16 +16622,16 @@
   "canonical_update": {
     "file": "update/docs/phase1/gpu.yaml",
     "updated_IDs": [
-      "REQ-08",
-      "PLT-01",
-      "PLT-04",
-      "PLT-08"
+      "REQ-07",
+      "LIF-02",
+      "PLT-03",
+      "PLT-05"
     ],
-    "LAB_scope_DONE": 6,
-    "remaining_scope_IDs": 37,
+    "LAB_scope_DONE": 10,
+    "remaining_scope_IDs": 33,
     "old_original_values_preserved_in_history_and_notes": true,
     "new_security_or_enterprise_or_official_gate": false,
-    "source": "S4 b17c 초안·47c95166 추가대조·기존 실제 검증 exactRef 재사용"
+    "source": "root 확정검토 ad971ee4 및 S6 619194f3 재사용: 선정 실제 CPU4행의 현황 정정. 원 판정/Ref 불변"
   },
   "current_implementation_snapshot": {
     "source_commits": [
@@ -16536,5 +16655,73 @@
     "mismatches": 0,
     "new_tests_or_original_raw_revalidation": false,
     "other_37_exhaustive_branch_list_certified": false
+  },
+  "selected_cpu_scope_correction_v1": {
+    "assessment_sha256": "ad971ee4fb736842e09705858a88f7ae0034ce00bf2e77e75d8cfd35f1a44e31",
+    "S6_sha256": "619194f39b32cdb8abd3a5e981af16fab9e66b76f94d078b4b199dd0694527c6",
+    "status_base_commit": "66f4dbead5a719c78c869e368fc84faeba4e2d10",
+    "new_work_order_commit": "9c225d9a5c6919e6b37fbda0bb92830787076cd6",
+    "changed_IDs": [
+      "REQ-07",
+      "LIF-02",
+      "PLT-03",
+      "PLT-05"
+    ],
+    "before_counts": {
+      "done": 6,
+      "remaining": 37
+    },
+    "after_counts": {
+      "done": 10,
+      "remaining": 33
+    },
+    "previous_canonical_update": {
+      "file": "update/docs/phase1/gpu.yaml",
+      "updated_IDs": [
+        "REQ-08",
+        "PLT-01",
+        "PLT-04",
+        "PLT-08"
+      ],
+      "LAB_scope_DONE": 6,
+      "remaining_scope_IDs": 37,
+      "old_original_values_preserved_in_history_and_notes": true,
+      "new_security_or_enterprise_or_official_gate": false,
+      "source": "S4 b17c 초안·47c95166 추가대조·기존 실제 검증 exactRef 재사용"
+    },
+    "axes": {
+      "selected_existing_LAB_scope": {
+        "done": 10,
+        "remaining": 33,
+        "meaning": "선정/제외 LAB 업무 상태. 원 질문 전체 PASS/실제 GPU 관측 수 아님"
+      },
+      "J01_J02_PACK34_canonical_GPU": {
+        "expected_pack_revision": 34,
+        "current_pack_revision": 33,
+        "expected_PACK34_fulfilled": false,
+        "current_ordinary_GPU_profile": {
+          "id": "vllm-native-source/1",
+          "engine": "vllm",
+          "versions": [
+            "0.31.0"
+          ]
+        },
+        "current_qualification_receipts": 0,
+        "new_registration_requirement_fulfilled": false,
+        "rule": "A04 PACK34 및 J01/J02 등록·정본 입력/실제 실행은 별도 미충족 축. 과거 CPU 완료 취소/새 팩·GPU 관측 전환 없음"
+      },
+      "J03_032_comparison": {
+        "axis": "0.31.0/0.32.0 두 이미지 실행·guard update·의도한 회귀의 REGRESSED 확인",
+        "fulfilled_by_this_candidate": false,
+        "rule": "일부 CPU0.32 feature 구현은 J03 두 판본 실측 완료를 뜻하지 않음. 현재 CPU LAB 완료의 새 gate 아님"
+      },
+      "J04_official_true": {
+        "axis": "확정 정책·검토 팩·J01~J03을 이용한 official=true RPT",
+        "fulfilled_by_this_candidate": false,
+        "rule": "원 DRAFT/EXAMPLE/DECLARED/official=false 유지. 과거 CPU LAB 완료와 별도"
+      }
+    },
+    "remaining33_exhaustively_reaudited": false,
+    "new_test_CRC_DB_restore_CI_GPU_or_source_runs": 0
   }
 }

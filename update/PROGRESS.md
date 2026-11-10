@@ -1,3 +1,10 @@
+## 2026-11-10 — B03 실제 입력 소비·B04 준비와 R4 실패 정리
+
+- B03: 선정7개 실제 입력 생성·EXAMPLE 정책6개 수용·SUP13 누락 진단을 준비했다. 원 계약 producer→consumer CPU18경계와 추가 CLI/TOML→RunConfig/registry 구성1경계를 검증했고 S6 독립250대조/불일치0을 확인했다. 실제 HTTP·application.run·현재 target·GPU 완료는 아니다. 검토한 공개 B 도구와40행 정적 요약을 정확 복사했고 engine 공유는 미검증으로 유지한다.
+- B04: LIF08·11/SUP06의 설계case7개·계획 단계/rank행42개를 구체화했다. 기존 도구로 control JSON9개의SHA·object를 확인했으며 실제 신원·정책·TP2 배정이 없어 INCOMPLETE다. native24의 기존TP1 코드와TP2·공통producer·자격을 구분한다. [준비 범위와 반환](docs/gpu-b/consolidation-20261106/B03_B04_INPUT_PREPARATION_20261110.md), [순서·공유·시간](docs/gpu-b/consolidation-20261106/B03_EXECUTION_SHARING_ORDER_20261110.md).
+- R4: 기존GPU1대/TP1에서42파일 설치·host health는 성공했지만 역할 전 copy 단계에서 R3 목적지 상수와 R4 실제입력 불일치로 실패했다. 첫 실패capsule·원stderr297bytes를 회수했다. 후속selector phase 불일치도 분리해 원4receipt 오프라인7경계와 독립14대조/불일치0으로 최소후보를 확인했다. 원 R4 불변·같은실패 재기동0. [실패 원인·증거·정리](docs/gpu-b/consolidation-20261106/SUP16_R4_PRE_ROLE_FAILURE_20261110.md).
+- 정리·CI: normal stop1회 수락 뒤 원180초 감시는 실패했고 후속21:19 KST 실제 stopped/IP없음·SSM node/Pending/Executing0을 확인했다. 감시FAIL·정확off시각null·과거R3 수락UNKNOWN2건은 보존한다. PR head ba1aa295의CI18개는 전부 성공했다. 이 후속 변경 head CI와 수정 후3역할 실측은 별도다. S2는 새 정확frame/pin 수정, S5는REQ07/SUP13 real target 계약 준비, S6는새delta 검토를 병행한다. LAB10/33·원43행/Refs·PACK33DRAFT를 변경하지 않았다.
+
 ## 2026-11-10 — B 소비 연결·GPU 실행 묶음과 실패 증거 회수
 
 - 한 일: B02의 선정 `/1`~`/3` 소비 판정 보강과 LAB10/33 기록을 보존했다. SUP-16 R1의 전송 형식, R2의 helper descriptor 투영을 보강했고, R3는 원 stderr와 실제 배치 계획을 대조해 필수 `source_owner_verify.py` sibling 누락을 확인했다. 원41개를 보존한42개 배치안·설치기 후보를 만들고, 첫 실패 capsule·수락 응답 선행 저장·원900초 기한 전달/부분 기록의 최소 보강을 준비했다. 원 R3의 실제 실행본과 실패를 바꾸지 않았다.

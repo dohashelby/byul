@@ -874,5 +874,46 @@
       "current_original_R3_modified": false,
       "new_operating_source_pins_data_connection": "in progress; user immediate existingGPU1/TP1 approval; resource/budget review delegated to user; no new inventory/ACK/CI start gate"
     }
+  },
+  "latest_R4_pre_role_failure_20261110": {
+    "observed_UTC": "2026-11-10T12:23:52.036485+00:00",
+    "record": "SUP16_R4_PRE_ROLE_FAILURE_20261110.md",
+    "scope": "selected existing GPU1 TP1; not PACK34/J01-J04",
+    "runtime_source": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+    "start_performed": true,
+    "roles_reached": false,
+    "whole_status": "Failed",
+    "first_failed_phase": "014-fixed-challenge-current-copy",
+    "cause": "copy DESTINATION retained R3 while actual input destination is R4",
+    "separate_selector_failure": "BINDING_PHASE: actual whole-result-probe vs expected compressed-v2",
+    "first_failure_capsule_bytes": 14312,
+    "original_failed_child_stderr_bytes": 297,
+    "current_known_API_requests": 190,
+    "accepted_commands": 77,
+    "terminal_commands": 77,
+    "tracked_children": 20,
+    "all_tracked_children_terminal": true,
+    "normal_stop_requests": 1,
+    "original_stop_watch_seconds": 180,
+    "original_watch_result": "STOPPED_NOT_YET_OBSERVED",
+    "selected_EC2_stopped_query_end_UTC": "2026-11-10T12:19:13.026860Z",
+    "selected_public_IP_absent": true,
+    "subsequent_SSM_nodes_pending_executing": [
+      0,
+      0,
+      0
+    ],
+    "final_query_end_UTC": "2026-11-10T12:19:15.741679Z",
+    "exact_poweroff_UTC": null,
+    "final_delta_independent_review": "pending",
+    "force": 0,
+    "stop_resubmissions": 0,
+    "timer_reset": 0,
+    "historical_R3_unknown_acceptance": 2,
+    "full_archive_integrity_proven": false,
+    "resource_budget_confirmation_owner": "user",
+    "new_full_resource_inventory": false,
+    "new_cost_estimate": null,
+    "product_complete_claimed": false
   }
 }

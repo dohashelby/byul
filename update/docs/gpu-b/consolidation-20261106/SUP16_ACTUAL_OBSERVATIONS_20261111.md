@@ -57,8 +57,33 @@ GB12 원 archive 14,636,464B/1,971 member의 전체 회수는 실패했다. 원 
 - challenge capture 개별 entry 독립 대조: `1561f2fc8aa2cae56e7cbd4ecd277a2ee86105e8288fa8cdcb693a10d9d3ce57`
 - 실제 launcher/Pod/installer terminal 개별 entry 독립 대조: `19c17cf452239c055fefbaf406ebb14edb0506ca76225941e348c5801f72fc3e`
 
+## R1: 보관 원본 회수 재개, 압축 상한 초과와 정리 완료
+
+11월 11일 09:01 KST의 새 읽기 전용 조회에서 선정 인스턴스의 stopped·공인 IP 없음·SSM node0·진행 명령0·관련 CloudShell actor0을 확인했다. 원영수증 SHA는 `c2ce57eb37d65f9ff49cc587f54ecbe6c2f8b9c2504a0fe812406f50d1b40c4c`다. 이전 정지 관측을 현재 값으로 복사하지 않았다.
+
+검토된 회수 source11은 그대로 재사용했다. 기존 `driver.start()`를 한 번만 연결하는 새 진입점 `0e7e79bfa7376ddad7bfe73dd795a2e414aec87574b0dac1f467455848412a4a`는 새 영향 모의 CPU 1계약·4사례와 독립 검토를 마쳤다. 후보와 별도인 최종 운영 packet은 `ab44a31f7b17c489dc0d1758bb1703305c073cb378cc12cbd5adbd54cab76115`다. 이 packet의 runtime_ready는 원자료 회수 진입 준비이며 실제 엔진 Ready 관측이 아니다.
+
+09:16 KST 정상 start1이 수락됐고, running·SSM Online과 진행 명령 없음을 확인한 뒤 collect1을 실행했다. 실제 health CID `f5d0e68c-86a2-42c1-9acb-9b81dbef7ad9`는 Success/0이며 새 boot `542a2593-8afe-4d35-9f96-1b329248d104`, L4 1장, 이전 GPU 프로세스0, 기존 2시간 보호 타이머 active·reset=false를 연결했다. 모델·factory 실행은 이 health 범위에 포함되지 않는다.
+
+encoder CID `c4d64e32-fef6-44dc-80e6-763265213f20`는 Failed/1로 종료했다. 실제 stderr는 고정 codec `6de3190f`의 encode 287행에서 `EnvelopeTooLarge: COMPRESSED_TRANSPORT_INPUT_CEILING`을 기록했고 stdout은 비어 있다. 기존 3MiB 상한을 늘리지 않았으며 trusted encoder receipt·archive GET·decode·전체 GB12 SHA/CRC 검증은 실행되지 않았다. 상위 프로그램의 원 오류는 빈 메시지의 `AssertionError`로 따로 보존한다.
+
+정상 stop은 한 번 수행했다. 로컬 stop 기록의 기준 시각은 09:20:30 KST이고, 실제 CLI 요청·응답 구간은 09:20:33~34 KST다. 원180초 감시는 `STOPPED_NOT_YET_OBSERVED`로 실패했고, collect 자식은 09:23:37 KST에 rc1·회수·그룹 종료·cleanup 오류 없음으로 종료했다. 09:26:57~58 KST의 후속 선정 EC2 조회에서 stopped·IP 없음, 이어진 조회에서 SSM node0·진행 명령0·현재 private의 unresolved0을 확인했다. 읽기 전용 관측은 09:27:01 KST에 끝났다. 새 stop·Force·재시도는 없었다.
+
+보수적인 compute/IP 장부 구간은 start 로컬 기록부터 마지막 읽기 전용 관측까지 632.443304초다. 정확 전원 종료시각과 새 비용은 null이며 실청구로 표시하지 않는다. EBS는 보존한다. 새 로컬 control ZIP 392,093B·381 member의 첫 CRC·index와 운영 원문을 독립 대조했지만, 이 ZIP은 미회수 GB12 원 archive가 아니다. 원 R8 UNKNOWN1·whole FAIL·1971 member 전체 CRC/Refs 미완료는 유지한다.
+
+- R1 control ZIP: `072ea1e9c3824887199e3c3d23d4e5af31e515ea90d830a5bc518f15ecbbf57e`
+- R1 실제 encoder terminal: `28791257e4b21d1ebc1b25bfe27b60b81a4d84f66c47f0a63ff1c4fd6d02a760`
+- R1 후속 selected 정지 원문: `eafe42f2ce06a8aca01e2faddfd71b4142ffdac98c37baf32141d5d9b265e7b1`
+- R1 실행·정지·비용 독립 대조: `f3ab591d1f7f1ef9f084c988cfd6ff71de1541a990cf7141db7fae91822cc401`
+
+## 기록 파일0의 해석과 다음 관측
+
+실제 공급된 lifecycle base 원문 56,479B·SHA `2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd`를 대조했다. install 1032~1052행의 성공은 Observer/Finder 구성이다. Observer는 writer=None으로 시작하고(334~336행), 첫 관측 사건에서 Writer를 만든다(374~391행). Writer의 파일 생성·START 기록은 255~272행이며 emit의 쓰기 예외는 disabled_pid로 흡수된다(393~397행).
+
+따라서 files/recordings0만으로 sitecustomize 미실행·install 실패를 확정할 수 없다. 설치 성공 후 대상 사건 미도달, Writer 생성·쓰기 실패도 구분해야 한다. 후행 SEALED 표시는 설치 시점에 marker가 이미 있었다는 증거가 아니다. 같은 PID/start_ticks/boot의 entrypoint·import origin·install 반환, hook·첫 emit, 파일 FD·원 예외, seal 순서를 최소 관측으로 연결해야 한다. 원인이 입증된 B 수정은 아직 없다. 로컬 분석의 EVD/RES/RPT 별칭은 제품 store의 공식 객체가 아니다.
+
 ## 다음 실행과 범위
 
-B 전용 private 제어·진단 경로와 읽기 전용 조회를 보강했고 R8에서 실제 준비·실패 범위를 확인했다. 현재 GPU는 중지 상태다. 이미 확보한 원자료를 진단하고 [archive 압축·복원 준비](SUP16_ARCHIVE_ENVELOPE_PREPARATION_20261111.md)를 CPU에서 검증했다. 기존 output·A 코드의 권한을 바꾸거나 source guard·기한을 완화하지 않는다. 새 모델·정상/도전/복구 세 역할·전체 반출 성공은 해당 실측 원자료로 별도 확인해야 한다.
+B 전용 private 제어·진단 경로와 읽기 전용 조회를 보강했고 R8·R1에서 실제 준비·실패 범위를 확인했다. 마지막 실제 정지 관측은 R1의 09:27 KST다. 이미 확보한 원자료를 진단하고 [archive 압축·복원 준비](SUP16_ARCHIVE_ENVELOPE_PREPARATION_20261111.md)를 CPU에서 검증했지만 실제 GB12는 기존 압축 상한을 넘었다. 다음 전송은 기존 Session Manager 관리 문서와 설치된 플러그인의 지원을 확인한 별도 스트림 후보로 준비한다. 전송·종료·기한 연결과 실제 원자료 검증은 별도다. 기존 output·A 코드의 권한을 바꾸거나 source guard·기한을 완화하지 않는다. 새 모델·정상/도전/복구 세 역할·전체 반출 성공은 해당 실측 원자료로 별도 확인해야 한다.
 
 원 runtime `2cb01e9f`/466파일과 공개 저장소 계열의 제품528파일을 구분한다. CPU 준비 요약의 actual=false는 작성 당시 범위로 보존한다.

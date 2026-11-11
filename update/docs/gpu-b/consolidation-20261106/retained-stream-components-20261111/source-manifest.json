@@ -1,0 +1,21 @@
+{
+  "schema": "gpu-b-retained-stream-components/1",
+  "scope": "Fixed GB12 data transfer components and existing-instance start entry",
+  "operating_ready": false,
+  "actual_GB12_stream_transfer": false,
+  "new_product_measured_IDs": 0,
+  "sources": {
+    "gb12_stream.py": {
+      "repository_path": "update/docs/gpu-b/consolidation-20261106/retained-stream-components-20261111/gb12_stream.py",
+      "bytes": 19502,
+      "sha256": "8e2261a0162271288397f962526a9086cc1edf0b983ff6bc4c941fae3bf039e7"
+    },
+    "start_existing_once.py": {
+      "repository_path": "update/docs/gpu-b/consolidation-20261106/retained-stream-components-20261111/start_existing_once.py",
+      "bytes": 3097,
+      "sha256": "0e7e79bfa7376ddad7bfe73dd795a2e414aec87574b0dac1f467455848412a4a"
+    }
+  },
+  "dependency_source_map": "../retained-recovery-operator-20261111/source-manifest.json",
+  "raw_source_bytes_changed_for_publication": false
+}

@@ -1,0 +1,3 @@
+# Preserve qualified source and receipt bytes, including original CRLF.
+*.py -text whitespace=cr-at-eol,-blank-at-eof
+*.json -text whitespace=cr-at-eol,-blank-at-eof

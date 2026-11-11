@@ -1,0 +1,63 @@
+{
+  "scope": "EXPLICIT_SYNTHETIC_CPU_FD_DELTA_ONLY",
+  "source_sha256": "53c93af43d4c26d14add32c78db2f5bbad03c43b154df313bb5dbb7a81dc89ed",
+  "checks": 8,
+  "failures": [],
+  "cases": [
+    {
+      "name": "sender_write_fd_to_receiver_read_fd_CRLF",
+      "passed": true,
+      "detail": {
+        "bytes": 65792,
+        "kind": "EXPLICIT_SYNTHETIC_CPU",
+        "child_exit": 0,
+        "reaped": true,
+        "same_deadline_object": true,
+        "fd_flags_restored": true
+      }
+    },
+    {
+      "name": "sender_backpressure_uses_original_deadline",
+      "passed": true,
+      "exception_type": "StreamError",
+      "code": "ORIGINAL_DEADLINE_EXPIRED",
+      "errno": null
+    },
+    {
+      "name": "footer_without_EOF_never_publishes",
+      "passed": true,
+      "detail": {
+        "published_before_EOF": false
+      }
+    },
+    {
+      "name": "new_output_created_during_stream_is_preserved",
+      "passed": true,
+      "exception_type": "FileExistsError",
+      "code": "[Errno 17] File exists: '.gb12-508f9274fb5a46d88bee2780408337a3.partial' -> 'raced-output'",
+      "errno": 17
+    },
+    {
+      "name": "synthetic_wire_rejected_by_actual_GB12_receiver",
+      "passed": true,
+      "exception_type": "StreamError",
+      "code": "SOURCE_IDENTITY_INVALID",
+      "errno": null
+    },
+    {
+      "name": "no_owned_partials",
+      "passed": true
+    },
+    {
+      "name": "synthetic_source_unchanged",
+      "passed": true
+    },
+    {
+      "name": "all_FDs_restored",
+      "passed": true
+    }
+  ],
+  "actual_GB12_read": false,
+  "AWS_GPU_operations": 0,
+  "product_complete": false
+}

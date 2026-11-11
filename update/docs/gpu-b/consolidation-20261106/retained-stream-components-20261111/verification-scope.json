@@ -1,0 +1,88 @@
+{
+  "schema": "gpu-b-retained-stream-components-verification/1",
+  "stream_source": "8e2261a0162271288397f962526a9086cc1edf0b983ff6bc4c941fae3bf039e7",
+  "start_entry_source": "0e7e79bfa7376ddad7bfe73dd795a2e414aec87574b0dac1f467455848412a4a",
+  "start_entry": {
+    "CPU_contracts": 1,
+    "CPU_stub_cases": 4,
+    "CPU_receipt_sha256": "586e9da33c21e7de9bcc3e0ea72603fb9709618e7d9f6024b251bbdef7bdbee8",
+    "S4_review_sha256": "f75dbba181e68fb196cb29f2feed6b5682d150d69ae7516044c67aac094ff8c6",
+    "actual_R1_start_response_sha256": "d000c9cca77ff790d982362a934a4a7a61c92864b923e1eb7f3a62ae15d9113d",
+    "actual_R1_control_sha256": "072ea1e9c3824887199e3c3d23d4e5af31e515ea90d830a5bc518f15ecbbf57e",
+    "actual_R1_review_sha256": "f3ab591d1f7f1ef9f084c988cfd6ff71de1541a990cf7141db7fae91822cc401"
+  },
+  "stream_versions": {
+    "v1": {
+      "sha256": "a132c7bc1600ee6086a5eada98c6d1a2ab618072c1b85093b1d471fd88737269",
+      "synthetic_CPU_cases": 30,
+      "failures": 2,
+      "operating_allowed": false,
+      "findings": [
+        "Footer frames accepted bool as int",
+        "Stored output FD bytes not rehashed before publication"
+      ]
+    },
+    "v2": {
+      "sha256": "53c93af43d4c26d14add32c78db2f5bbad03c43b154df313bb5dbb7a81dc89ed",
+      "synthetic_protocol_cases": 30,
+      "direct_native_FD_cases": 8,
+      "failures": 0,
+      "S4_baseline_review_sha256": "d5ed7d8089fea2deaf816a8ff23e911b1625f07c947fff33aa346eba869adc7e",
+      "source_guard_followup_required": true,
+      "not_relabelled_as_full_v3_suite": true
+    },
+    "v3": {
+      "sha256": "9010f741d78c80f45c9a04af9e1cbf6ffa75cef9ea5a85b10028148ef55f76b1",
+      "new_guard_and_affected_cases": 19,
+      "failures": 0,
+      "CHUNK_bytes": 12000,
+      "inherited_source_contract": "REG UID1000 mode0600 nlink1; exact FD and named file/parent identity",
+      "source_parent_new_owner_or_private700_requirement": false,
+      "native_CPU": "Python3.12.3 -I -S -B; UID0 parent and actual UID1000 child; explicit synthetic files only",
+      "cleanup_fstat_failure_followup_required": true
+    },
+    "v4": {
+      "sha256": "8e2261a0162271288397f962526a9086cc1edf0b983ff6bc4c941fae3bf039e7",
+      "new_cleanup_fault_cases": 2,
+      "failures": 0,
+      "change_scope": "Move two new parent identity reads inside existing cleanup protection; retain original OSError and restore FDs",
+      "previous_protocol_and_guard_results_preserved_at_original_versions": true,
+      "S4_review_sha256": "bf6af039cc546b0dfa08820496a24c75af78b5c6964ee05af1e22e42183d19c3"
+    }
+  },
+  "raw_CPU_receipts": {
+    "synthetic-CPU-v2-protocol-receipt.json": {
+      "bytes": 6734,
+      "sha256": "abf61b7cb4c4439910c1dd7d7c1949f80ff1d8e1a1fee21228b4019554c4790f"
+    },
+    "synthetic-CPU-v2-FD-receipt.json": {
+      "bytes": 1612,
+      "sha256": "81e94b896bf2c5d0db55e69e665add11d9e6803be974d65f5e754d1bb61194f1"
+    },
+    "synthetic-CPU-v3-guard-receipt.json": {
+      "bytes": 6302,
+      "sha256": "9b4d7bfafa2a3e85211a4374b87a6ee8fcbf1ffd68182eeaa70d994d7a80e82f"
+    },
+    "synthetic-CPU-v3-native-launcher.json": {
+      "bytes": 1289,
+      "sha256": "f05537a5d29d3d0884b1442607128b856f68d9b89ecf41b352225a9a031a38e6"
+    },
+    "synthetic-CPU-v4-cleanup-receipt.json": {
+      "bytes": 2700,
+      "sha256": "ea385e1af1eaec45758faf9368bcabf1289dd51b32ad7bfa34dbf0d4d1d1a014"
+    },
+    "synthetic-CPU-v4-native-launcher.json": {
+      "bytes": 1239,
+      "sha256": "8d40abc45b62e42a7da45f35e46c3a660d099947d0bd01c7da818f7c63d62ef7"
+    }
+  },
+  "actual_GB12_archive_read_or_restored_by_CPU": false,
+  "official_product_EVD_RES_RPT_created": false,
+  "remaining_actual_binding": [
+    "Reviewed SessionManager supervisor and exact managed document",
+    "Original pre-auth900 host deadline and conservative guest clock/boot mapping",
+    "Actual StartSession/TerminateSession authorization and RunAs identity",
+    "Remote success marker, native CLI group termination and exact server session terminal before publication",
+    "Whole GB12 bytes/SHA, first full ZIP CRC, restore and exact Ref review"
+  ]
+}

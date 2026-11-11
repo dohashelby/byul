@@ -1,0 +1,207 @@
+{
+  "scope": "EXPLICIT_SYNTHETIC_CPU_V3_GUARD_AND_CHUNK_DELTA_ONLY",
+  "native": {
+    "argv": [
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v1/venv/bin/python",
+      "-I",
+      "-S",
+      "-B",
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v3/cpu_guard_delta.py",
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v3/gb12_stream.py",
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v3/cpu-guard-v3.json"
+    ],
+    "executable": "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v1/venv/bin/python",
+    "python": "3.12.3",
+    "uid": 0,
+    "gid": 0,
+    "euid": 0,
+    "pid": 737,
+    "ppid": 736,
+    "start_ticks": "40222406",
+    "flags": {
+      "I": 1,
+      "S": 1,
+      "B": true
+    },
+    "harness_bytes": 12049,
+    "harness_sha256": "0e8265d777a38fa27e6afc6334e1be43dd58455d87f5f8d3ebbfcf7a7ec34631",
+    "source_bytes": 19494,
+    "source_sha256": "9010f741d78c80f45c9a04af9e1cbf6ffa75cef9ea5a85b10028148ef55f76b1",
+    "module_origin": "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v3/gb12_stream.py",
+    "boot": "1228df3e-7732-49b6-8883-487a127bc287"
+  },
+  "source_sha256": "9010f741d78c80f45c9a04af9e1cbf6ffa75cef9ea5a85b10028148ef55f76b1",
+  "fixture_bytes": 3146000,
+  "CHUNK": 12000,
+  "cases": [
+    {
+      "name": "root_source_parent0755_allowed_outputFD_only_owner1000_singlelink",
+      "passed": true,
+      "observed": "accepted",
+      "detail": {
+        "bytes": 3146000,
+        "frame_count": 263,
+        "max_unit": 12000,
+        "source_parent_uid": 0,
+        "source_parent_mode": 493,
+        "output_uid": 1000,
+        "output_mode": 384,
+        "final_nlink": 1
+      }
+    },
+    {
+      "name": "source_UID0_refused",
+      "passed": true,
+      "observed": "rejected",
+      "type": "StreamError",
+      "code": "OWNER1000_REGULAR600_SINGLE_LINK_REQUIRED",
+      "errno": null
+    },
+    {
+      "name": "source_mode0644_refused",
+      "passed": true,
+      "observed": "rejected",
+      "type": "StreamError",
+      "code": "OWNER1000_REGULAR600_SINGLE_LINK_REQUIRED",
+      "errno": null
+    },
+    {
+      "name": "source_nlink2_refused",
+      "passed": true,
+      "observed": "rejected",
+      "type": "StreamError",
+      "code": "OWNER1000_REGULAR600_SINGLE_LINK_REQUIRED",
+      "errno": null
+    },
+    {
+      "name": "source_named_input_replaced_no_footer",
+      "passed": true,
+      "observed": "rejected",
+      "type": "StreamError",
+      "code": "SOURCE_PATH_REPLACED",
+      "errno": null
+    },
+    {
+      "name": "source_named_parent_replaced_no_footer",
+      "passed": true,
+      "observed": "rejected",
+      "type": "StreamError",
+      "code": "NAMED_PARENT_IDENTITY_CHANGED",
+      "errno": null
+    },
+    {
+      "name": "source_parent_mode_changed_no_footer",
+      "passed": true,
+      "observed": "rejected",
+      "type": "StreamError",
+      "code": "NAMED_PARENT_IDENTITY_CHANGED",
+      "errno": null
+    },
+    {
+      "name": "output_scratch_nlink2_refused",
+      "passed": true,
+      "observed": "rejected",
+      "type": "StreamError",
+      "code": "OUTPUT_IDENTITY_CHANGED",
+      "errno": null
+    },
+    {
+      "name": "output_named_parent_replaced_refused",
+      "passed": true,
+      "observed": "rejected",
+      "type": "StreamError",
+      "code": "NAMED_PARENT_IDENTITY_CHANGED",
+      "errno": null
+    },
+    {
+      "name": "output_parent_mode_changed_refused",
+      "passed": true,
+      "observed": "rejected",
+      "type": "StreamError",
+      "code": "NAMED_PARENT_IDENTITY_CHANGED",
+      "errno": null
+    },
+    {
+      "name": "output_named_staging_replaced_preserved",
+      "passed": true,
+      "observed": "rejected",
+      "type": "StreamError",
+      "code": "OUTPUT_IDENTITY_CHANGED",
+      "errno": null
+    },
+    {
+      "name": "publication_extra_link_refused",
+      "passed": true,
+      "observed": "rejected",
+      "type": "StreamError",
+      "code": "PUBLISHED_IDENTITY_CHANGED",
+      "errno": null
+    },
+    {
+      "name": "final_named_output_substitution_preserved",
+      "passed": true,
+      "observed": "rejected",
+      "type": "StreamError",
+      "code": "PUBLISHED_FINAL_IDENTITY_CHANGED",
+      "errno": null
+    },
+    {
+      "name": "decoded_chunk12001_refused",
+      "passed": true,
+      "observed": "rejected",
+      "type": "StreamError",
+      "code": "DATA_LENGTH_OR_ENCODING",
+      "errno": null
+    },
+    {
+      "name": "header_source_UID0_refused",
+      "passed": true,
+      "observed": "rejected",
+      "type": "StreamError",
+      "code": "SOURCE_IDENTITY_INVALID",
+      "errno": null
+    },
+    {
+      "name": "header_source_nlink2_refused",
+      "passed": true,
+      "observed": "rejected",
+      "type": "StreamError",
+      "code": "SOURCE_IDENTITY_INVALID",
+      "errno": null
+    },
+    {
+      "name": "native_UID1000_sender_receiver_same_source",
+      "passed": true,
+      "observed": "accepted",
+      "detail": {
+        "uid": 1000,
+        "gid": 1000,
+        "flags": {
+          "I": 1,
+          "S": 1,
+          "B": true
+        },
+        "output_uid": 1000,
+        "final_nlink": 1,
+        "child_reaped": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "name": "valid_source_identity_and_bytes_preserved",
+      "passed": true
+    },
+    {
+      "name": "all_owned_FDs_restored",
+      "passed": true,
+      "before": 4,
+      "after": 4
+    }
+  ],
+  "checks": 19,
+  "failures": [],
+  "actual_GB12_read": false,
+  "AWS_GPU_operations": 0,
+  "product_complete": false,
+  "fixture_cleanup": "only this TemporaryDirectory removed; foreign replacements preserved until fixture teardown"
+}

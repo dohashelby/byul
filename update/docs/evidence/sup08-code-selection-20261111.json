@@ -1,5 +1,5 @@
 {
-  "schema": "byul-gpu-a-check-summary/1",
+  "schema": "byul-sup08-code-selection-poc-summary/1",
   "date_kst": "2026-11-11",
   "check_id": "SUP-08",
   "scope": "one NVIDIA L4 on existing ap-northeast-2 g6.2xlarge; sequential Kubernetes runs",

@@ -188,7 +188,7 @@ class AttributionTests(unittest.TestCase):
             root=Path(directory)
             (root/"ids").write_text(json.dumps(index));(root/"feed").write_text(json.dumps(raw)+"\n")
             feed=ObservationFeed(kind="tetragon",path=root/"feed",data_dir=root,data_origin="real",environment=None,
-                run_id=None,identity_path=root/"ids",kube_context="kind-test")
+                run_id=None,identity_path=root/"ids",kube_context="kind-test",health_receipt_mode=0o640)
             feed.collect()
             self.assertFalse((root/"observations.jsonl").exists())
             receipt=json.loads((root/"tetragon-health-receipts.json").read_text())

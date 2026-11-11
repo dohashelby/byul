@@ -47,6 +47,7 @@ export const DATA_ORIGIN: Record<string, Entry> = {
 export const SOURCE: Record<string, string> = {
   gateway: "요청 통제 (Gateway)",
   management_listener: "관리 요청 수신기",
+  engine_health: "엔진 상태",
   hubble: "네트워크 이벤트 (Hubble)",
   tetragon: "프로세스·파일 이벤트 (Tetragon)",
   policy_state: "정책 상태",

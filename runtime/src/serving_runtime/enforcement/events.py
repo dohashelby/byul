@@ -353,7 +353,7 @@ def parse_tetragon(
 
     binary, pod = _process(event, "$.process_kprobe", require_binary=False)
     function_name = _string(event.get("function_name"), "$.process_kprobe.function_name")
-    if (event_name == "process_lsm" and function_name != "file_open") or (event_name == "process_kprobe" and function_name not in {"security_file_permission", "fd_install", "sys_openat", "__x64_sys_openat", "__arm64_sys_openat"}):
+    if (event_name == "process_lsm" and function_name != "file_open") or (event_name == "process_kprobe" and function_name not in {"security_file_permission", "security_file_open", "fd_install", "sys_openat", "__x64_sys_openat", "__arm64_sys_openat"}):
         raise UnsupportedTetragonEvent(f"unsupported kprobe function: {function_name}")
     policy_name = _string(event.get("policy_name"), "$.process_kprobe.policy_name")
     match = _RULE_ID.search(policy_name)
@@ -377,7 +377,8 @@ def parse_tetragon(
                 mask = int(value)
             except (TypeError, ValueError) as error:
                 raise EventError("int_arg is not an integer") from error
-    if not file_path:
+    code_rule = match.group(1).upper() == "TG-CODE-01"
+    if not file_path and not code_rule:
         raise EventError("process_kprobe has no file_arg.path")
     if mask is None and function_name == "security_file_permission":
         raise EventError("process_kprobe has no int_arg")
@@ -415,6 +416,9 @@ def parse_tetragon(
     )
     if exec_policy is not None and normalized["rule_id"] == "TG-CACHE-01":
         normalized.update(exec_policy.classify_cache_write(file_path))
+    if code_rule:
+        from .codeload import classify_code_open
+        classify_code_open(normalized, event, exec_policy, identity)
     if identity is not None:
         normalized["identity"] = identity
     if (normalized["rule_id"] == "TG-HEALTH-01" and file_path == "/run/byul-runtime-sentinel/read.txt"
@@ -422,6 +426,62 @@ def parse_tetragon(
         and identity.get("container_name") == "sentinel" and action.upper() == "KPROBE_ACTION_POST"):
         normalized["observation_purpose"] = "health_check"
     return normalized
+
+
+def parse_management_access(document: Any, *, data_origin: str, environment=None, run_id=None) -> dict[str, Any]:
+    """Consume the local listener journal; actor identity remains unattributed."""
+    from datetime import datetime, timezone
+    document = _object(document, "management access")
+    if document.get("schema") != "runtime-management-access/1.0":
+        raise EventError("management access schema is invalid")
+    event_id = document.get("event_id")
+    if not isinstance(event_id, str) or re.fullmatch(r"[0-9a-f]{32}", event_id) is None:
+        raise EventError("management event_id is invalid")
+    stamp = document.get("recorded_at")
+    try:
+        observed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+        if observed.tzinfo is None or (observed.astimezone(timezone.utc)-datetime.now(timezone.utc)).total_seconds() > 60:
+            raise ValueError
+    except (AttributeError, TypeError, ValueError, OverflowError):
+        raise EventError("management recorded_at must be a timezone timestamp within clock tolerance") from None
+    scope = _object(document.get("scope"), "management scope")
+    cleaned = {}
+    for name in ("target_ref", "policy_ref", "environment", "run_id"):
+        value = scope.get(name)
+        if value is not None and (not isinstance(value, str) or re.fullmatch(r"[\w.:-]{1,128}", value) is None):
+            raise EventError("management scope reference is invalid")
+        cleaned[name] = value
+    for name, configured in (("environment", environment), ("run_id", run_id)):
+        if configured is not None and cleaned[name] != configured:
+            raise EventError("management scope differs from configured feed")
+    method, path, status = document.get("method"), document.get("path"), document.get("status_code")
+    if not isinstance(method,str) or re.fullmatch(r"[A-Z]{1,32}",method) is None:
+        raise EventError("management method is invalid")
+    if not isinstance(path,str) or not path or len(path)>2048 or any(ord(c)<32 or ord(c)==127 for c in path) or "?" in path or "#" in path:
+        raise EventError("management path is invalid")
+    # Journal paths are already redacted; reject external authorities to avoid
+    # surfacing userinfo from an untrusted or older writer.
+    if "://" in path and "@" in path.split("://",1)[1].split("/",1)[0]:
+        raise EventError("management authority contains userinfo")
+    if type(status) is not int or not 100 <= status <= 599:
+        raise EventError("management status_code is invalid")
+    allowed = document.get("allowed")
+    if allowed is not None and type(allowed) is not bool:
+        raise EventError("management allowed is invalid")
+    for field in ("allowed_count", "denied_count"):
+        if type(document.get(field)) is not int or document[field]<0:
+            raise EventError("management count is invalid")
+    recording = _object(document.get("recording"), "management recording")
+    if type(recording.get("write_failure_count")) is not int or recording["write_failure_count"]<0:
+        raise EventError("management write failure count is invalid")
+    item = _base(stamp, "management_listener", "management_access", data_origin,
+                 environment=cleaned["environment"], run_id=cleaned["run_id"])
+    item.update({"event_id":event_id,"target_ref":cleaned["target_ref"],"policy_ref":cleaned["policy_ref"],
+                 "actor":{"state":"unattributed","principal_id":None},"method":method,"path":path,
+                 "status_code":status,"allowed":allowed,"allowed_count":document["allowed_count"],
+                 "denied_count":document["denied_count"],"write_failure_count":recording["write_failure_count"],
+                 "verdict":"allowed" if allowed is True else "denied" if allowed is False else "unknown"})
+    return item
 
 
 def transform_lines(
@@ -459,8 +519,8 @@ def transform_lines_with_loss(
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Transform lines while retaining only line numbers and safe error reasons."""
 
-    if kind not in {"hubble", "tetragon"}:
-        raise ValueError("kind must be hubble or tetragon")
+    if kind not in {"hubble", "tetragon", "management_listener"}:
+        raise ValueError("kind must be hubble, tetragon or management_listener")
     if data_origin not in {"synthetic", "real"}:
         raise ValueError("data_origin must be synthetic or real")
     accepted: list[dict[str, Any]] = []
@@ -469,7 +529,9 @@ def transform_lines_with_loss(
     for line_number, line in enumerate(lines, start=1):
         try:
             document = json.loads(line)
-            if kind == "hubble":
+            if kind == "management_listener":
+                item = parse_management_access(document, data_origin=data_origin, environment=environment, run_id=run_id)
+            elif kind == "hubble":
                 loss = parse_hubble_loss(document)
                 if loss is not None:
                     losses.append(loss)
@@ -570,7 +632,7 @@ class ObservationQuery:
         unknown = set(active) - self.FILTERS
         if unknown:
             raise ValueError(f"unknown observation filters: {', '.join(sorted(unknown))}")
-        records, corrupt = self.store.read_all()
+        records, corrupt, history_truncated = self.store.read_recent()
         filtered = [
             item
             for item in records
@@ -624,5 +686,7 @@ class ObservationQuery:
             "observations": filtered[:50],
             "corrupt_lines": len(corrupt),
             "corrupt_details": corrupt[:20],
+            "window":{"truncated":history_truncated,"counts_lower_bound":history_truncated,
+                      "max_bytes":4*1024*1024,"max_records":4096,"scope":"recent_journal_tail"},
             "generated_at": _utc_now(),
         }

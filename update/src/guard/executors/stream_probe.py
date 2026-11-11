@@ -43,6 +43,10 @@ class InvalidUTF8(Exception):
     """A complete SSE line was not strict UTF-8."""
 
 
+def _reject_nonfinite_json(_value):
+    raise ValueError("nonfinite JSON constant")
+
+
 class SourceDeadlineError(Exception):
     """A fixed-code source clock or deadline guard failure."""
 
@@ -178,12 +182,15 @@ def _prepare(requests, timeout):
         read_profile = None
         if "read_profile" in request:
             candidate = request["read_profile"]
+            semantic = type(candidate) is dict and candidate.get("profile") == "generated-marker-close-v1"
             if (mode != "sse" or type(candidate) is not dict
-                    or set(candidate) != {"profile", "chunk_bytes", "interval_ms", "close_after_reads"}
-                    or type(candidate["profile"]) is not str or candidate["profile"] != "slow-reader-v1"
+                    or set(candidate) != ({"profile", "chunk_bytes", "interval_ms", "close_after_reads", "marker"} if semantic else
+                                          {"profile", "chunk_bytes", "interval_ms", "close_after_reads"})
+                    or type(candidate["profile"]) is not str or candidate["profile"] not in {"slow-reader-v1", "generated-marker-close-v1"}
                     or any(type(candidate[key]) is not int or not 1 <= candidate[key] <= maximum
                            for key, maximum in (("chunk_bytes", 4096), ("interval_ms", MAX_DELAY_MS),
-                                                ("close_after_reads", 32)))):
+                                                ("close_after_reads", 32)))
+                    or semantic and (type(candidate["marker"]) is not str or re.fullmatch(r"ALPHA[0-9a-f]{12}", candidate["marker"]) is None)):
                 raise ValueError("invalid bounded SSE read profile")
             read_profile = dict(candidate)
         url = request.get("url")
@@ -299,6 +306,9 @@ def collect(requests: list[dict], timeout: float, *, deadline_guard=None) -> lis
     client connection intervals, never concurrent execution in engine workers.
     ``slow-reader-v1`` alone adds sustained inter-read delays and intentional
     client closure. Its metadata does not prove engine cancellation or cleanup.
+    ``generated-marker-close-v1`` uses the same bounds and closes after complete
+    generated SSE content contains its declared synthetic marker, provided no
+    terminal was parsed in that read. Its read limit remains an unknown witness.
     """
     prepared = _prepare(requests, timeout)
     guard = _prepare_deadline_guard(deadline_guard)
@@ -368,6 +378,11 @@ def collect(requests: list[dict], timeout: float, *, deadline_guard=None) -> lis
         conn = None
         response = None
         read_profile = request.get("read_profile")
+        semantic = read_profile is not None and read_profile["profile"] == "generated-marker-close-v1"
+        marker_text, marker_events, marker_valid = "", 0, True
+        if semantic:
+            output.update(marker_close_observed=False, marker_json_valid=True,
+                          close_marker_sha256=hashlib.sha256(read_profile["marker"].encode()).hexdigest())
 
         def publish():
             # A late DNS/OS call must not replace a result frozen at the batch
@@ -423,7 +438,7 @@ def collect(requests: list[dict], timeout: float, *, deadline_guard=None) -> lis
             seen = set()
             for name, value in response.getheaders():
                 key = name.lower()
-                if key in {"content-length", "transfer-encoding", "content-type", "content-encoding"} and key in seen:
+                if key in {"content-length", "transfer-encoding", "content-type", "content-encoding", "x-request-id"} and key in seen:
                     raise http.client.HTTPException("ambiguous response headers")
                 seen.add(key)
                 if key in _RESPONSE_HEADERS:
@@ -497,12 +512,39 @@ def collect(requests: list[dict], timeout: float, *, deadline_guard=None) -> lis
                 if parser is not None:
                     parser.feed(accepted)
                     output["terminal_seen"] = parser.terminal
+                marker_ready = False
+                if semantic and parser is not None:
+                    for event in parser.events[marker_events:]:
+                        if event["data"] == "[DONE]":
+                            continue
+                        try:
+                            document = json.loads(event["data"], parse_constant=_reject_nonfinite_json)
+                            choices = document.get("choices", [])
+                            if type(choices) is not list or len(choices) > 1:
+                                raise ValueError("choices")
+                            for choice in choices:
+                                if type(choice.get("index", 0)) is not int or choice.get("index", 0) != 0:
+                                    raise ValueError("single selected choice required")
+                                delta = choice.get("delta") or {}
+                                piece = delta.get("content") if "content" in delta else choice.get("text")
+                                if piece is not None:
+                                    if type(piece) is not str:
+                                        raise ValueError("content")
+                                    marker_text += piece
+                        except (ValueError, TypeError, AttributeError):
+                            marker_valid = False
+                    marker_events = len(parser.events)
+                    output["marker_json_valid"] = marker_valid
+                    # Parse the entire read first. A DONE already received in
+                    # this batch cannot be relabelled as a preterminal close.
+                    marker_ready = (marker_valid and read_profile["marker"] in marker_text and not parser.terminal
+                                    and not response.isclosed() and response.length != 0)
                 if len(accepted) != len(value):
                     output.update(body_truncated=True, stop_reason="body_limit")
                     break
                 output["body_bytes"] = len(raw)
                 publish()
-                if read_profile is not None and output["read_count"] >= read_profile["close_after_reads"]:
+                if marker_ready or read_profile is not None and output["read_count"] >= read_profile["close_after_reads"]:
                     remaining()  # A deadline shutdown must never be relabelled as an intentional close.
                     try:
                         tracked.shutdown(socket.SHUT_RDWR)
@@ -513,6 +555,10 @@ def collect(requests: list[dict], timeout: float, *, deadline_guard=None) -> lis
                     conn.close()
                     output.update(client_closed=True, client_close_ms=milliseconds(),
                                   capture_complete=False, eof=False, stop_reason="client_close")
+                    if semantic:
+                        output["marker_close_observed"] = marker_ready
+                        if not marker_ready:
+                            output["stop_reason"] = "marker_read_limit"
                     break
         except CaptureLimit as exc:
             output.update(stop_reason=f"{exc.args[0]}_limit", body_truncated=True)

@@ -57,7 +57,11 @@ def configure(case, monkeypatch, mode='normal'):
     original = public.KubernetesWorkerReadinessHTTP
     created = []
     def collector(*args, **kwargs):
-        value = original(*args, **kwargs, runner=world.runner); created.append(value); return value
+        value = original(*args, **kwargs, runner=world.runner)
+        # This fixture injects a historical source proof and historical wire metadata.
+        # Current source bytes are exercised separately through the real B gate.
+        value.base.source_sha256 = SOURCES['probe']
+        created.append(value); return value
     # helper 원파일을 바꾸지 않는 소비기 단독 source 계약 대역이다. 실제 source gate 시험은 root 통합에 분리한다.
     monkeypatch.setattr(helper, 'HTTP_REVIEWED_COMMON_COMMIT', COMMON, raising=False)
     monkeypatch.setattr(helper, 'HTTP_EXPECTED_SOURCES', SOURCES, raising=False)

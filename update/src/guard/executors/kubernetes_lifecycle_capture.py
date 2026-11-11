@@ -20,16 +20,21 @@ from guard.adapters import vllm_attempt_sensor as attempt
 from guard.adapters import vllm_request_output_sensor as output_sensor
 from guard.adapters import vllm_stream_buffer_sensor as stream_sensor
 from guard.adapters import vllm_rank_failure_sensor as rank_sensor
+from guard.adapters import vllm_termination_sensor as termination_sensor
+from guard.adapters import vllm_fault_sensor as fault_sensor
+from guard.adapters import sglang_request_termination_sensor as sglang_sensor
 from guard.adapters import vllm_initialization_sensor as init_sensor
 from guard.adapters import vllm_profiler_sensor as profiler_sensor
 from guard.adapters import vllm_file_read_sensor as read_sensor
 from guard.adapters import vllm_weight_iteration_sensor as weight_sensor
 from guard.runtime.bounded import capture_pipes
 from guard.runtime.kubernetes_binding import validate_capture_target, verify_owned_pod, project_owned_snapshot
-from .owned_capture import _FILE_READER, MAX_BYTES, strict_json, validate_file_result, validate_owned_source, EXTENDED_RECORDING_PROFILE
+from .owned_capture import _FILE_READER, MAX_BYTES, strict_json, validate_file_result, validate_owned_source, EXTENDED_RECORDING_PROFILE,LARGE_RECORDING_PROFILE
 from .lifecycle_capture import CONTEXT_READER
 from .lifecycle_session import INVENTORY_READER
-from .session_seal import SESSION_SEALER
+from .lifecycle_rolling import inventory_reader
+ROLLING_INVENTORY_READER=inventory_reader(INVENTORY_READER)
+from .session_seal import SESSION_SEALER,LARGE_SESSION_SEALER
 
 PROFILE = "kubernetes-owned-lifecycle-read-v1"
 
@@ -56,8 +61,11 @@ def supervised_source(source):
 
 
 class KubernetesLifecycleReader:
-    def __init__(self,target,env,prepared,*,binary="kubectl",duration=180,runner=None):
-        if prepared.get("profile") in {rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} and not supports(env.engine.name, env.engine.version):
+    def __init__(self,target,env,prepared,*,binary="kubectl",duration=180,runner=None,node_image_verification=None):
+        if node_image_verification not in (None,"local-containerd-v1"):raise KubernetesCaptureError()
+        self.node_image_verification=node_image_verification;self.node_image_receipts=[];self.node_image_proof_failures=0
+        if prepared.get("profile")==sglang_sensor.PROFILE and not supports(env.engine.name,env.engine.version,sglang_sensor.PROFILE):raise KubernetesCaptureError()
+        if prepared.get("profile") in {fault_sensor.PROFILE,termination_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} and not supports(env.engine.name,env.engine.version):
             raise KubernetesCaptureError()
         if prepared.get("profile") in {online.PROFILE,attempt.PROFILE,output_sensor.PROFILE} and not supports(env.engine.name, env.engine.version):
             raise KubernetesCaptureError()
@@ -72,13 +80,13 @@ class KubernetesLifecycleReader:
                 or not math.isfinite(duration) or not 0<duration<=300
                 or type(prepared.get("session")) is not str or re.fullmatch(r"[0-9a-f]{32}",prepared["session"]) is None):
             raise KubernetesCaptureError()
-        self.target_sha256=sha256_hex(canonical_json(target))
+        self.target_sha256=sha256_hex(canonical_json(target));self.lab=target.get("lab")is True
         self.session=prepared["session"]
-        self.file_read_profile = EXTENDED_RECORDING_PROFILE if prepared.get("profile") in {online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else None
-        self.file_read_limit = weight_sensor.MAX_BYTES if prepared.get("profile") in {weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else profiler_sensor.MAX_BYTES if prepared.get("profile")==profiler_sensor.PROFILE else init_sensor.MAX_BYTES if prepared.get("profile")==init_sensor.PROFILE else rank_sensor.MAX_BYTES if prepared.get("profile")==rank_sensor.PROFILE else stream_sensor.MAX_BYTES if prepared.get("profile")==stream_sensor.PROFILE else attempt.MAX_BYTES if prepared.get("profile") in {attempt.PROFILE,output_sensor.PROFILE} else online.MAX_BYTES if self.file_read_profile is not None else 262144
+        self.file_read_profile = LARGE_RECORDING_PROFILE if prepared.get("profile")==sglang_sensor.PROFILE else EXTENDED_RECORDING_PROFILE if prepared.get("profile") in {fault_sensor.PROFILE,termination_sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else None
+        self.file_read_limit = sglang_sensor.MAX_BYTES if prepared.get("profile")==sglang_sensor.PROFILE else termination_sensor.MAX_BYTES if prepared.get("profile")in {fault_sensor.PROFILE,termination_sensor.PROFILE} else weight_sensor.MAX_BYTES if prepared.get("profile") in {weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else profiler_sensor.MAX_BYTES if prepared.get("profile")==profiler_sensor.PROFILE else init_sensor.MAX_BYTES if prepared.get("profile")==init_sensor.PROFILE else rank_sensor.MAX_BYTES if prepared.get("profile")==rank_sensor.PROFILE else stream_sensor.MAX_BYTES if prepared.get("profile")==stream_sensor.PROFILE else attempt.MAX_BYTES if prepared.get("profile") in {attempt.PROFILE,output_sensor.PROFILE} else online.MAX_BYTES if self.file_read_profile is not None else 262144
         self.binary=binary;self.deadline=time.monotonic()+duration
         self.runner=runner or capture_pipes;self.injected=runner is not None
-        self.programs={"file":_FILE_READER,"context":CONTEXT_READER,"inventory":INVENTORY_READER,"seal":SESSION_SEALER}
+        self.programs={"file":_FILE_READER,"context":CONTEXT_READER,"inventory":INVENTORY_READER,"inventory_rolling":ROLLING_INVENTORY_READER,"seal":LARGE_SESSION_SEALER if prepared.get("profile")==sglang_sensor.PROFILE else SESSION_SEALER}
         self.wrapped={key:supervised_source(value) for key,value in self.programs.items()}
         self.rows=[];self.gap=False;self._parent_cleanup_failures=0
 
@@ -147,14 +155,16 @@ class KubernetesLifecycleReader:
             if not MAX_BYTES<=budget<=self.file_read_limit or str(budget)!=argv[4] or max_bytes!=2*budget:
                 raise KubernetesCaptureError()
             prefix=re.escape("/guard-lifecycle/data/"+self.session+"/")
-            if re.fullmatch(prefix+r"pid-[1-9][0-9]{0,9}-[1-9][0-9]{0,19}\.jsonl",argv[3]) is None:
+            if re.fullmatch(prefix+r"pid-[1-9][0-9]{0,9}-[1-9][0-9]{0,19}(?:-segment-[0-9]{1,10})?\.jsonl",argv[3]) is None:
                 raise KubernetesCaptureError()
             return "file"
         if argv[2]==CONTEXT_READER and len(argv)==4 and max_bytes==4096 and re.fullmatch(r"[1-9][0-9]{0,9}",argv[3]):
             return "context"
         if argv[2]==INVENTORY_READER and len(argv)==4 and max_bytes==65536 and argv[3]==self.session:
             return "inventory"
-        if (argv[2]==SESSION_SEALER and len(argv)==5 and max_bytes==4096 and argv[3]==self.session
+        if argv[2]==ROLLING_INVENTORY_READER and len(argv)==4 and max_bytes==131072 and argv[3]==self.session:
+            return "inventory_rolling"
+        if (argv[2]==self.programs["seal"] and len(argv)==5 and max_bytes==4096 and argv[3]==self.session
                 and argv[4]==str(self.file_read_limit)):
             return "seal"
         raise KubernetesCaptureError()
@@ -224,7 +234,7 @@ class KubernetesLifecycleReader:
         cleanup_before=self._parent_cleanup_failures
         try:
             result=self.exec_bounded(self.binding["engine"]["container"],
-                ["python3","-c",SESSION_SEALER,self.session,str(self.file_read_limit)],timeout=5,max_bytes=4096)
+                ["python3","-c",self.programs["seal"],self.session,str(self.file_read_limit)],timeout=5,max_bytes=4096)
             value=strict_json(result.stdout.encode(),limit=4096)
             if (type(value) is not dict or set(value)!={"schema","session","sealed","recordings_closed","terminal_inventory_sha256"}
                     or value["schema"]!="guard-session-seal/1" or value["session"]!=self.session
@@ -239,16 +249,34 @@ class KubernetesLifecycleReader:
             self.gap=True
             return {"sealed":False}
 
-    @staticmethod
-    def image_check(provenance,source):
-        # Pod spec/status matching is not the Docker RepoDigests proof used by this flag.
-        return False
+    def image_check(self,provenance,source):
+        if getattr(self,'node_image_verification',None) is None:return False
+        from .node_image_proof import collect_local_node_image_proof,validate_node,kernel_identity,failure_code
+        try:
+            engine=self.binding['engine']
+            if source.get('container')!=engine['container']or source.get('image')!=engine['image']:raise ValueError
+            owner=self._owner(5)
+            if provenance.get('owner')!=owner:raise ValueError
+            def node():
+                return strict_json(self._request(['get','node',engine['node'],'-o','json'],deadline=time.monotonic()+5,cap=262144),limit=262144)
+            before=node();proof=collect_local_node_image_proof({**self.binding,"lab":getattr(self,"lab",False)},before,runner=self.runner if self.injected else None,timeout=min(30,self._remaining(self.deadline)))
+            receipt=proof.public_receipt()
+            if not proof.matches(engine)or validate_node(node(),engine['node'],kernel_identity())!=receipt['node']or self._owner(5)!=owner:raise ValueError
+            if len(self.node_image_receipts)>=64:raise ValueError
+            self.node_image_receipts.append(receipt)
+            if type(provenance.get('native_image_reference'))is dict:
+                provenance['native_image_reference'].update(node_runtime_image_verified=True,manifest_ancestry_verified=True,node_image_proof_sha256=sha256_hex(canonical_json(receipt)))
+            return True
+        except Exception as error:
+            codes=getattr(self,'node_image_failure_codes',set());codes.add(failure_code(error));self.node_image_failure_codes=codes
+            self.node_image_proof_failures=getattr(self,'node_image_proof_failures',0)+1;self.gap=True;return False
 
     def report(self):
         return {"profile":PROFILE,"target_binding_sha256":sha256_hex(canonical_json(self.binding)),
             "context_sha256":hashlib.sha256(self.binding["context"].encode()).hexdigest(),
             "programs":{k:{"source_sha256":hashlib.sha256(v.encode()).hexdigest(),
                 "supervisor_sha256":hashlib.sha256(self.wrapped[k].encode()).hexdigest()} for k,v in self.programs.items()},
-            "reads":self.rows,"collection_gap":self.gap,"node_runtime_image_verified":False,
+            "reads":self.rows,"collection_gap":self.gap,"node_image_failure_codes":sorted(getattr(self,"node_image_failure_codes",set())),"node_runtime_image_verified":bool(getattr(self,"node_image_receipts",[])and not getattr(self,"node_image_proof_failures",0)),
+            **({"node_image_proofs":self.node_image_receipts}if getattr(self,"node_image_receipts",[])else{}),
             **({"parent_cleanup_unverified":True} if self._parent_cleanup_failures else {}),
             "producer_authenticated":False,"engine_started":False,"injected_runner":self.injected}

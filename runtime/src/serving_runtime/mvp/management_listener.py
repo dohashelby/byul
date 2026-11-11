@@ -11,9 +11,13 @@ import os
 from pathlib import Path
 import sys
 import threading
-from typing import BinaryIO, TextIO
+import re
+from datetime import datetime, timezone
+from uuid import uuid4
+from typing import TextIO
 
 from .backend import URLTarget, _parse_origin, _read_credential
+from .store import JsonlStore
 
 
 DEFAULT_ALLOWED_PATHS = ("/metrics", "/health", "/v1/models", "/version")
@@ -69,6 +73,11 @@ class ManagementListenerConfig:
     authorization: str | None = field(default=None, repr=False, compare=False)
     credential_status: str = "not_configured"
     record_path: Path | None = None
+    heartbeat_path: Path | None = None
+    target_ref: str | None = None
+    run_id: str | None = None
+    environment: str | None = None
+    policy_ref: str | None = None
 
     @classmethod
     def build(
@@ -82,6 +91,11 @@ class ManagementListenerConfig:
         max_response_bytes: int = 1024 * 1024,
         credential_file: str | Path | None = None,
         record_path: str | Path | None = None,
+        heartbeat_path: str | Path | None = None,
+        target_ref: str | None = None,
+        run_id: str | None = None,
+        environment: str | None = None,
+        policy_ref: str | None = None,
     ) -> "ManagementListenerConfig":
         if not isinstance(listen_host, str) or not listen_host.strip():
             raise ValueError("listen host must be non-empty")
@@ -110,7 +124,14 @@ class ManagementListenerConfig:
         credential_status = "not_configured"
         if credential_file is not None:
             credential_status, authorization = _load_credential_file(credential_file)
+        for label, value in (("target_ref", target_ref), ("run_id", run_id), ("environment", environment), ("policy_ref", policy_ref)):
+            if value is not None and (not isinstance(value, str) or re.fullmatch(r"[\w.:-]{1,128}", value) is None):
+                raise ValueError(f"{label} must be a safe configured reference")
+        if heartbeat_path is not None and (record_path is None or Path(heartbeat_path).expanduser().absolute() == Path(record_path).expanduser().absolute()):
+            raise ValueError("heartbeat requires a distinct record file")
         return cls(
+            heartbeat_path=None if heartbeat_path is None else Path(heartbeat_path).expanduser(),
+            target_ref=target_ref, run_id=run_id, environment=environment, policy_ref=policy_ref,
             listen_host=listen_host,
             listen_port=listen_port,
             engine_target=target,
@@ -131,22 +152,71 @@ class AccessRecorder:
         path: Path | None = None,
         *,
         stream: TextIO | None = None,
+        scope: dict | None = None,
+        heartbeat_path: Path | None = None,
     ) -> None:
+        self._heartbeat_path = heartbeat_path
+        self._feed_path = path
+        self._started_at = datetime.now(timezone.utc).isoformat()
+        self._heartbeat_stop = threading.Event()
+        self._heartbeat_thread = None
         self._lock = threading.Lock()
         self._allowed_count = 0
         self._denied_count = 0
         self._stream = stream
-        self._file: BinaryIO | None = None
+        self._scope = dict(scope or {})
+        self._write_failure_count = 0
+        self._write_failed = False
+        self._last_write_error_class = None
+        self._last_write_error_at = None
+        self._store = None
         if path is not None:
-            descriptor = os.open(
-                path,
-                os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW,
-                0o600,
-            )
-            self._file = os.fdopen(descriptor, "ab")
+            store = JsonlStore(path)
+            store.check_writable()
+            self._store = store
 
-    def record(self, *, allowed: bool, path: str, status_code: int) -> None:
-        safe_path = path[:_MAX_RECORDED_PATH]
+    def start_heartbeat(self) -> None:
+        if self._heartbeat_path is None:
+            return
+        self._write_heartbeat("running")
+        def pulse():
+            while not self._heartbeat_stop.wait(1.0):
+                self._write_heartbeat("running")
+        self._heartbeat_thread = threading.Thread(target=pulse, daemon=True)
+        self._heartbeat_thread.start()
+
+    def _write_heartbeat(self, state: str) -> None:
+        if self._heartbeat_path is None:
+            return
+        status = self.status()
+        document = {"schema":"runtime-observation-feed-heartbeat/1.0", "kind":"management_listener",
+            "feed_path":str(self._feed_path.absolute()), "started_at":self._started_at,
+            "updated_at":datetime.now(timezone.utc).isoformat(), "state":state,
+            "processes":[{"name":"management_listener", "running":state=="running", "returncode":None}],
+            "recording":status}
+        temporary = self._heartbeat_path.with_name("."+self._heartbeat_path.name+"."+uuid4().hex+".tmp")
+        try:
+            fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+            with os.fdopen(fd,"w") as output:
+                output.write(json.dumps(document)+"\n");output.flush();os.fsync(output.fileno())
+            os.replace(temporary,self._heartbeat_path)
+        except OSError:
+            # A missing/stale heartbeat exposes a writer failure to its collector.
+            pass
+        finally:
+            try:temporary.unlink()
+            except FileNotFoundError:pass
+
+    def record(self, *, allowed: bool, path: str, status_code: int, method: str = "UNKNOWN") -> None:
+        safe_path = re.sub(r"[\x00-\x1f\x7f]", "?", path.split("?", 1)[0].split("#", 1)[0])
+        # Absolute-form probes can carry userinfo; keep the path spelling while
+        # excluding credentials in their authority.
+        if "://" in safe_path:
+            scheme, suffix = safe_path.split("://", 1)
+            authority, slash, tail = suffix.partition("/")
+            safe_path = scheme + "://" + authority.rsplit("@", 1)[-1] + slash + tail
+        safe_path = safe_path[:_MAX_RECORDED_PATH]
+        safe_method = method if re.fullmatch(r"[A-Z]{1,32}", method) else "OTHER"
         with self._lock:
             if allowed:
                 self._allowed_count += 1
@@ -154,25 +224,49 @@ class AccessRecorder:
                 self._denied_count += 1
             record = {
                 "schema": ACCESS_SCHEMA,
+                "event_id": uuid4().hex,
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
+                "method": safe_method,
+                "scope": self._scope,
+                "actor": {"state": "unattributed", "principal_id": None},
+                "recording": {"write_failure_count": self._write_failure_count, "last_write_error_class": self._last_write_error_class},
                 "allowed_count": self._allowed_count,
                 "denied_count": self._denied_count,
                 "path": safe_path,
                 "status_code": status_code,
+                "allowed": allowed,
             }
             line = json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n"
-            if self._file is not None:
-                self._file.write(line.encode("utf-8"))
-                self._file.flush()
-                os.fsync(self._file.fileno())
-            if self._stream is not None:
-                self._stream.write(line)
-                self._stream.flush()
+            self._write_failed = False
+            for sink in (self._store, self._stream):
+                if sink is None:
+                    continue
+                try:
+                    if sink is self._store:
+                        sink.append(record)
+                    else:
+                        sink.write(line)
+                        sink.flush()
+                except OSError as error:
+                    self._write_failed = True
+                    self._write_failure_count += 1
+                    self._last_write_error_class = type(error).__name__
+                    self._last_write_error_at = datetime.now(timezone.utc).isoformat()
+
+    def status(self) -> dict:
+        with self._lock:
+            return {"write_failed": self._write_failed, "allowed_count": self._allowed_count, "denied_count": self._denied_count,
+                    "write_failure_count": self._write_failure_count,
+                    "last_write_error_class": self._last_write_error_class,
+                    "last_write_error_at": self._last_write_error_at}
 
     def close(self) -> None:
+        self._heartbeat_stop.set()
+        if self._heartbeat_thread is not None:
+            self._heartbeat_thread.join(timeout=2)
+        self._write_heartbeat("stopped")
         with self._lock:
-            if self._file is not None:
-                self._file.close()
-                self._file = None
+            self._store = None
 
 
 @dataclass(frozen=True)
@@ -290,6 +384,10 @@ class ManagementRequestHandler(BaseHTTPRequestHandler):
             return
         try:
             response = self.server.proxy.request(self.command, request_target)
+            if head and response.status == 405:
+                # Some engine read endpoints implement GET only. Obtain that
+                # same bounded representation and suppress its body below.
+                response = self.server.proxy.request("GET", request_target)
         except TimeoutError:
             self.close_connection = True
             self._reply(
@@ -363,6 +461,7 @@ class ManagementRequestHandler(BaseHTTPRequestHandler):
             allowed=allowed,
             path=self._record_path(),
             status_code=status,
+            method=self.command,
         )
         self.send_response(status)
         self.send_header("Content-Type", content_type)
@@ -382,6 +481,11 @@ class ManagementRequestHandler(BaseHTTPRequestHandler):
         return
 
 
+def _configured_scope(config: ManagementListenerConfig) -> dict:
+    return {"target_ref": config.target_ref, "run_id": config.run_id,
+            "environment": config.environment, "policy_ref": config.policy_ref}
+
+
 class ManagementListener:
     """Lifecycle helper used by tests and embedders."""
 
@@ -392,7 +496,7 @@ class ManagementListener:
         record_stream: TextIO | None = None,
     ) -> None:
         self.config = config
-        self.recorder = AccessRecorder(config.record_path, stream=record_stream)
+        self.recorder = AccessRecorder(config.record_path, stream=record_stream, scope=_configured_scope(config), heartbeat_path=config.heartbeat_path)
         try:
             self.server = ManagementHTTPServer(config, self.recorder)
         except Exception:
@@ -406,6 +510,7 @@ class ManagementListener:
         return str(host), int(port)
 
     def start(self) -> "ManagementListener":
+        self.recorder.start_heartbeat()
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         return self
@@ -423,12 +528,13 @@ class ManagementListener:
 def run(config: ManagementListenerConfig) -> None:
     """Run the listener until interrupted; emit access JSONL to stdout."""
 
-    recorder = AccessRecorder(config.record_path, stream=sys.stdout)
+    recorder = AccessRecorder(config.record_path, stream=sys.stdout, scope=_configured_scope(config), heartbeat_path=config.heartbeat_path)
     try:
         server = ManagementHTTPServer(config, recorder)
     except Exception:
         recorder.close()
         raise
+    recorder.start_heartbeat()
     host, port = server.server_address[:2]
     print(
         f"management listener: http://{host}:{port} -> {config.engine_target.display_url}",

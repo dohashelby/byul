@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -47,6 +49,86 @@ class Check:
 
 def _check(name: str, status: str, reason: str) -> Check:
     return Check(name, status, reason)
+
+
+def lab_management_scope(bundle_dir: str | Path, *, run_id: str, environment: str) -> dict[str,str]:
+    """Derive audit references from the same verified immutable bundle as Gateway."""
+    from serving_runtime.mvp.policy_bundle import verify_policy_bundle
+    bundle=verify_policy_bundle(bundle_dir)
+    result={'target_ref':bundle.target_ref,'policy_ref':bundle.policy_ref['sha256'],
+        'run_id':run_id,'environment':environment}
+    if any(type(v)is not str or re.fullmatch(r'[\w.:-]{1,128}',v) is None for v in result.values()):
+        raise ValueError('lab management scope must contain four safe explicit references')
+    return result
+
+
+def _bind_lab_flag(arguments: list, flag: str, value: str, placeholder: str) -> None:
+    positions=[i for i,item in enumerate(arguments) if item==flag or type(item)is str and item.startswith(flag+'=')]
+    if len(positions)>1:raise ValueError('duplicate lab deployment flag: '+flag)
+    if not positions:arguments.extend([flag,value]);return
+    index=positions[0]
+    if arguments[index]!=flag:
+        old=arguments[index].split('=',1)[1]
+        if old not in (value,placeholder):raise ValueError('mismatched lab deployment flag: '+flag)
+        arguments[index]=flag+'='+value;return
+    if index+1>=len(arguments) or arguments[index+1] not in (value,placeholder):
+        raise ValueError('mismatched lab deployment flag: '+flag)
+    arguments[index+1]=value
+
+
+def bind_lab_management(engine_deployment: dict, scope: dict[str,str]) -> dict:
+    """Prepare only; no cluster operations and no invented actor attribution."""
+    if type(scope)is not dict or set(scope)!={'target_ref','policy_ref','run_id','environment'} or any(
+            type(v)is not str or re.fullmatch(r'[\w.:-]{1,128}',v) is None for v in scope.values()):
+        raise ValueError('four explicit management scope references are required')
+    engine=deepcopy(engine_deployment);template=engine['spec']['template']
+    labels=template.setdefault('metadata',{}).setdefault('labels',{})
+    if labels.get('guard.run') not in (None,'REPLACE_RUN_ID',scope['run_id']):
+        raise ValueError('management scope run differs from engine guard.run')
+    labels['guard.run']=scope['run_id']
+    containers=[c for c in template['spec']['containers'] if c.get('name')=='management-listener']
+    if len(containers)!=1:raise ValueError('one existing management listener is required')
+    args=containers[0]['args']
+    for name,value in scope.items():
+        _bind_lab_flag(args,'--'+name.replace('_','-'),value,'REPLACE_'+name.upper())
+    return engine
+
+
+def bind_lab_report(gateway_deployment: dict, *, host_directory: str | Path,
+                    report_file: str='report.json') -> tuple[dict,dict]:
+    """Mount an actual LabChecker report read-only; other verification schemas fail closed.
+
+    The operator supplies the protected public report directory (root:10000,
+    directory0750/file0640) after the existing report writer and secret scan.
+    The full source remains immutable; Runtime's existing LabReportSource
+    controls the API projection. No report result is synthesized here.
+    """
+    from serving_runtime.mvp.lab_report import LabReportSource
+    directory=Path(host_directory)
+    if not directory.is_absolute() or directory.is_symlink() or Path(report_file).name!=report_file \
+            or not report_file.endswith('.json') or report_file in ('.','..'):
+        raise ValueError('lab report source must be one explicit JSON in an absolute directory')
+    source=directory/report_file
+    if source.is_symlink():raise ValueError('lab report source cannot be a symlink')
+    raw=source.read_bytes();document=json.loads(raw);view=LabReportSource._validate(document)
+    if not {'L-05b','L-05c'}<={c['id'] for c in view['cases']}:
+        raise ValueError('actual lab report must include L-05b and L-05c outcomes')
+    gateway=deepcopy(gateway_deployment);spec=gateway['spec']['template']['spec']
+    containers=[c for c in spec['containers'] if c.get('name')=='gateway']
+    if len(containers)!=1:raise ValueError('one existing Gateway is required')
+    container=containers[0]
+    _bind_lab_flag(container['args'],'--lab-report','/runtime-lab/'+report_file,'REPLACE_LAB_REPORT')
+    volume={'name':'runtime-lab-report','hostPath':{'path':str(directory),'type':'Directory'}}
+    mount={'name':'runtime-lab-report','mountPath':'/runtime-lab','readOnly':True}
+    for values,value,key in ((spec.setdefault('volumes',[]),volume,'name'),
+            (container.setdefault('volumeMounts',[]),mount,'mountPath')):
+        found=[old for old in values if old.get(key)==value[key]]
+        if len(found)>1 or found and found[0]!=value:raise ValueError('conflicting lab report mount')
+        if not found:values.append(value)
+    return gateway,{'schema':'byul-lab-report-deployment-input/1','report_run_id':view['run_id'],
+        'source_schema':view['schema'],'context':view['context'],'namespace':view['namespace'],
+        'source_sha256':hashlib.sha256(raw).hexdigest(),'source_bytes':len(raw),
+        'mounted_path':'/runtime-lab/'+report_file,'read_only':True,'outcomes_preserved':True}
 
 
 def _json_command(runner: Runner, argv: Sequence[str]) -> tuple[dict | None, str]:

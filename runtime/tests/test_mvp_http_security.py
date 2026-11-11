@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import closing
 import json
+import re
 from pathlib import Path
 import socket
 import tempfile
@@ -506,7 +507,15 @@ class SlowClientHttpTests(unittest.TestCase):
                 time.sleep(wait)
             chunks = []
             while True:
-                chunk = sock.recv(4096)
+                try:
+                    chunk = sock.recv(4096)
+                except ConnectionResetError:
+                    received = b"".join(chunks)
+                    headers, sep, payload = received.partition(b"\r\n\r\n")
+                    length = re.search(rb"(?im)^Content-Length:\s*(\d+)\s*$", headers)
+                    if sep and length and len(payload) >= int(length.group(1)):
+                        break
+                    raise
                 if not chunk:
                     break
                 chunks.append(chunk)
@@ -567,6 +576,10 @@ class SlowClientHttpTests(unittest.TestCase):
         self.assertEqual(gateway._server.connection_status()["active"], 0)
 
         for stream in (False, True):
+            deadline = time.monotonic() + 3
+            while gateway._server.connection_status()["active"] and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertEqual(gateway._server.connection_status()["active"], 0)
             request = Request(
                 f"http://{gateway.address[0]}:{gateway.address[1]}/v1/chat/completions",
                 data=body(stream=stream),
@@ -578,6 +591,42 @@ class SlowClientHttpTests(unittest.TestCase):
             self.assertEqual(response.status, 200)
             if stream:
                 self.assertIn(b"[DONE]", payload)
+
+    def test_free_capacity_is_reported_after_permit_release(self) -> None:
+        gateway = self.start_gateway(max_connections=1)
+        server = gateway._server
+        original = server._connection_slots
+        releasing, resume, observed = threading.Event(), threading.Event(), threading.Event()
+        result = []
+
+        class DelayedRelease:
+            def acquire(self, *args, **kwargs):
+                return original.acquire(*args, **kwargs)
+            def release(self):
+                releasing.set()
+                if not resume.wait(3):
+                    raise AssertionError("release gate timed out")
+                original.release()
+
+        server._connection_slots = DelayedRelease()
+        request = Request(f"http://{gateway.address[0]}:{gateway.address[1]}/v1/chat/completions",
+                          data=body(), headers={"Content-Type": "application/json"}, method="POST")
+        with closing(urlopen(request, timeout=2)) as response:
+            self.assertEqual(response.status, 200)
+            response.read()
+        self.assertTrue(releasing.wait(1))
+        def read_status():
+            result.append(server.connection_status())
+            observed.set()
+        observer = threading.Thread(target=read_status)
+        observer.start()
+        try:
+            self.assertFalse(observed.wait(0.05), "status advertised capacity before permit release")
+        finally:
+            resume.set()
+            observer.join(timeout=2)
+        self.assertTrue(observed.is_set())
+        self.assertEqual(result[0]["active"], 0)
 
 
 if __name__ == "__main__":

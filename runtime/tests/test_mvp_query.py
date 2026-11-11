@@ -199,6 +199,21 @@ class QueryHttpTests(unittest.TestCase):
         self.assertIn(f'filename="evidence-{denied}.json"', headers["Content-Disposition"])
         self.assertEqual(json.loads(body)["request_id"], denied)
 
+    def test_opt_in_records_share_list_and_preserve_default_response(self) -> None:
+        request_id = self.post(64)
+        status, _, body = self.get("/api/requests")
+        self.assertEqual(status, 200)
+        self.assertNotIn("gateway_records", json.loads(body))
+        status, _, body = self.get("/api/requests?include_records=1&limit=200")
+        self.assertEqual(status, 200)
+        page = json.loads(body)
+        self.assertEqual(set(page["gateway_records"]), {request_id})
+        _, _, body = self.get(f"/api/requests/{request_id}")
+        self.assertEqual(page["gateway_records"][request_id], json.loads(body)["gateway_records"])
+        for query in ("include_records=true", "include_records=", "include_records=1&include_records=0",
+                      "include_records=1&limit=201"):
+            self.assertEqual(self.get("/api/requests?" + query)[0], 400)
+
     def test_bad_queries(self) -> None:
         self.assertEqual(self.get("/api/requests?result=BOGUS")[0], 400)
         self.assertEqual(self.get("/api/requests?limit=abc")[0], 400)

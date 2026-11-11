@@ -6,7 +6,7 @@ the existing collector's job. This tool starts no process, engine or AWS action.
 from pathlib import Path
 import argparse,hashlib,importlib.util,json,os,re,stat,sys
 
-ORDERING_HELPER_SHA256='2485ba44ce8398f833477b79a04c86624cc254316b566f399a4bc9b5f085e4bd'
+ORDERING_HELPER_SHA256='9d797a7f154663e1d64b820204fd6c54682aa5a48f063d0855c27a09d7e5796f'
 
 REFERENCE_SHA='077edec6c7a19ddbcbee084d4763a63b72293cee16837cdfcd4b95f7b9f51251'
 REFERENCE_BYTES=250500968

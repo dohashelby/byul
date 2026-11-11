@@ -238,7 +238,7 @@ REVIEWED_GATE_FIXTURES = {
     tool.PR171_REVIEWED_COMMON_COMMIT:(tool.PR171_GATE_SOURCE_COMMIT,tool.PR171_GATE_SHA256),
     tool.NATIVE20_REVIEWED_COMMON_COMMIT:(tool.NATIVE20_GATE_SOURCE_COMMIT,tool.NATIVE20_GATE_SHA256),
     tool.PR184_REVIEWED_COMMON_COMMIT:(tool.PR184_GATE_SOURCE_COMMIT,tool.PR184_GATE_SHA256),
-    tool.MANIFEST_REVIEWED_COMMON:(None,tool.MANIFEST_GATE_SHA256),
+    tool.MANIFEST_REVIEWED_COMMON:(None,tool.MERGED_MANIFEST_GATE_SHA256),
 }
 
 
@@ -317,6 +317,17 @@ def test_reviewed_gate_pair_delegates_unchanged_fullscope_and_records_source(exa
 def test_unreviewed_or_mixed_gate_pair_rejected_before_fullscope(example_source_gate,common,file_common,mutate):
     select,calls,_=example_source_gate;select(common,file_common,mutate)
     with pytest.raises(ValueError,match='LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE'):tool.verify_source()
+    assert calls==[]
+
+
+@pytest.mark.parametrize('common,file_common', [
+    (tool.MANIFEST_REVIEWED_COMMON, tool.REVIEWED_COMMON_COMMIT),
+    (tool.REVIEWED_COMMON_COMMIT, tool.MANIFEST_REVIEWED_COMMON),
+])
+def test_current_manifest_gate_rejects_mixed_historical_pair(example_source_gate,common,file_common):
+    select,calls,_=example_source_gate;select(common,file_common)
+    with pytest.raises(ValueError,match='LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE'):
+        tool.verify_source()
     assert calls==[]
 
 
@@ -423,4 +434,6 @@ def test_pr171_HTTP_known_common_scope_excludes_native_only_histories():
     assert tool.HTTP_REVIEWED_COMMON_COMMIT=='f277fecd6df1e59505c0ad731032593f6fb22885'
     assert tool.REVIEWED_COMMON_COMMIT not in tool.HTTP_APPROVED_REVIEWED_COMMON_COMMITS
     assert '9d8987a5a306ffce28fcb735e012c400589303f2' not in tool.HTTP_APPROVED_REVIEWED_COMMON_COMMITS
-    assert len(tool.APPROVED_GATE_PROFILES)==7
+    assert len(tool.APPROVED_GATE_PROFILES)==10
+    assert (tool.MANIFEST_GATE_SHA256,tool.MANIFEST_REVIEWED_COMMON) in tool.APPROVED_GATE_PROFILES
+    assert (tool.CURRENT_MANIFEST_GATE_SHA256,tool.MANIFEST_REVIEWED_COMMON) in tool.APPROVED_GATE_PROFILES

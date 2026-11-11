@@ -10,7 +10,7 @@ PROFILE='vllm-native-lifecycle-metadata/22';SCHEMA='guard-native-lifecycle-event
 COMMIT='db9527a46873454610df6dbedf79a36d6bf1a7f6'
 EVENT_SCHEMA='guard-native-ready-endpoint/1';GAP_SCHEMA='guard-native-ready-endpoint-gap/1'
 CLOSE_SCHEMA='guard-native-ready-endpoint-close/1'
-GENERATION21_SHA256='186ee38bcc29da4ffa4cc88c6b386f60f67d343cbc58613cf925213611ab18d2'
+GENERATION21_SHA256='c34f933b8ac53a6e51da0ec3608a6b81badc7a0ef688268bdc98887d718bfa32'
 CONTRACT_SHA256='ddae1078d9807910c9f79a815f2abeab6b1c340e8122eb4c3bca9a7b71ef3d7d'
 MAX_BYTES=2097152;MAX_ROWS=2048;MAX_CALLS=256
 CODE_FILENAME='guard/adapters/vllm_ready_endpoint_sensor.py'

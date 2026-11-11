@@ -1,5 +1,18 @@
 # 런타임 작업 상태
 
+- 2026-11-11 AWS 16회차(vLLM): D1~D3·D6 실측 통과(요청 행렬 31/31, AWS-04·05·09, TG-CODE-01 detected·오탐 0, SUP-008 5건, lsm_file_open EPERM). 발견: PR #243 data 파일 0644 거부(서버 0600 조치), TG-CODE-01은 kernel identity 필요. 결과: docs/AWS_GPU_서버16회차_결과_20261111.md
+
+- 2026-11-11 D3 요청 시험 도구 확장(기준 `byul_runtime` HEAD `7a985052`, D1+D2 미커밋 변경 보존): `REQ-CODE-SELECT-{chat-mm,messages,completions}`와 `REQ-ROUTE-POST-/tokenize` 추가. 응답·원본 기록·플랫폼의 합성 값 노출, decision rule/path, 미전달을 대조하며 zeroday-lab의 명시적 chat 최상위 개방만 건너뛴다.
+- `AWS-04` 보조 시도: 같은 `other-client`→engine:8000 경로에 직통 POST `/tokenize` + 합성 `mm_processor_kwargs.code_revision` 본문 시도를 통합했다. 케이스 ID·보고서 허용 목록은 기존 AWS-01~20만 유지하며 `lab_report.py`는 HEAD 원본으로 복원했다. 기존 4개 필수 통과 항목과 Hubble 대조는 유지한다. `tokenize_direct_failed`·probe 원자료, 요약·공개 evidence의 연결 errno를 남긴다. 두 직통 시도 중 하나라도 CONNECTED면 후속 대조 오류에도 `failed`; 보조 시도의 다른 errno·실행 오류는 `unknown`이다. 연결 단계 차단이면 본문 미전송이며 엔진 필드 거부 증거가 아니다. ACCEPTANCE의 AWS-04 설명도 갱신했다.
+- 엔진 미도달 추가 검증은 설계 제안만: `engine_receipts`는 신선한 수집 구간의 로그 미발견만 표시하고 요청 상세 조회는 전달 시도 True에 한정한다. native feed도 요청에 결합된 양성 근거이며 거부 ID 부재를 증명하지 않는다. `engine_log_nonarrival_verified=False` 유지.
+- D3 보정 검증: `test_aws_tokenize_acceptance.py`·`test_aws_lab_acceptance.py` **131 통과·128 subtest 통과**, 보고서 읽기·발행·플랫폼 변환 선별 **10 통과·5 subtest 통과**. CASE_IDS 전체의 계약 ID 패턴과 20개 케이스를 발행→읽기→플랫폼 `Contracts.errors`로 검증했다. 첫 실행의 기존 callback 시험 2건은 `update/src` import 경로 누락이었고 경로 보완 후 모두 통과했다(코드 수정 없음). 명령·결과: `/tmp/claude-1000/-home-bobgy-bobproject-byul/19673862-6388-464e-b937-b09b0f6543a7/scratchpad/codex-d3fix/REPORT.md`. 앞선 D3 묶음의 소켓 제한 미확인은 남아 있다. 실제 Gateway/AWS/kind 미접속, 금지 인계 파일 미열람·미수정, update/contracts·D1+D2 파일 수정 및 커밋·push 없음. 실제 환경 확인·대화형 검수 대기.
+
+- 2026-11-11 CHK-SUP-008 요청 코드 선택 차단(기준 `byul_runtime` HEAD/origin/main `7a985052a7b501cd4a44073c5a03b3e77baccb65`, 미커밋): `selected_profile.UNSUPPORTED_ENTRY_GROUPS`의 두 묶음을 재사용하여 JSON·UTF-8·object 확인 직후, alias/허용 필드/messages 검사 전에 중첩 object·배열의 키를 명시적 스택으로 검사한다. `INVALID`/400, reason `CODE_SELECTION_FIELD` 또는 `INPUT_PROCESSOR_FIELD`, rule `request_code_selection`; message는 값 없는 필드 경로만 남기며 256자 제한·제어문자 치환을 적용한다. 기본 프로필은 extra_fields로 열어도 차단한다.
+- 범위 판단: 기존 zeroday-lab의 `chat_template_kwargs` 전달 구현·HTTP 회귀시험과 충돌하므로, 명시적으로 열린 chat 최상위 extra_fields 및 그 하위 값은 실험 동작을 보존했다. 미등록 필드/messages·completions에는 새 검사를 적용한다. 기본 프로필은 토큰화·추론 이전에 차단됨을 실제 오류 직렬화·JSONL 기록과 호출 부재로 시험했다. lab의 명시적 개방 경로까지 보호한다고 주장하지 않는다.
+- 플랫폼: CHK-SUP-008 rules에 `request_code_selection` 연결. source gateway의 decision.rule_id 및 기존 최상위 rule fallback을 통해 SUP-08 관련 건수로 집계한다. 생성기·rules 고정 스키마는 검색에서 발견되지 않았고, PACK 대상의 FIXED_SHA/판본/파일 해시와 매핑 형식 버전은 유지했다. 기존 PACK 해시 대조 시험 통과; contracts/update 및 웹 스키마 변경 불필요.
+- 검증: runtime 선별 `python -B -m pytest -q runtime/tests/test_mvp_validator.py runtime/tests/test_mvp_request_boundaries.py runtime/tests/test_selected_profile.py runtime/tests/test_mvp_zeroday_profile.py --import-mode=importlib` **56 통과·7 skip**, 플랫폼 `python -B -m pytest -q platform/api/tests/test_checklist_links.py --import-mode=importlib` **6 통과**. 전체 pytest는 runtime **1,421 통과·49 실패·130 skip**, API **438 통과·1 실패·1 skip**; 실패는 모두 소켓 생성 PermissionError다. uv frozen 실행은 DNS/설치 제한으로 실패했고, 전체 수치는 기존 venv·추가 의존성 PYTHONPATH·이벤트 루프 대기 주기만 제한하는 `/tmp/byul-code-selection-poll/sitecustomize.py` 보조 실행 결과다. 보조 설정 없는 전체 실행은 대기/시간 제한으로 미완료다. 명령·환경: `/tmp/byul-code-selection-test-commands.txt`; 로그: `/tmp/byul-code-selection-{runtime-targeted,runtime-final,api-links-final,api-poll}.log`. `git diff --check` 통과.
+- 미확인·다음: 소켓 허용·의존성 설치 가능 환경에서 보조 설정 없이 전체 runtime/API 재시험, 실제 엔진/GPU 전달 경로 확인 및 대화형 검수. 저장소 새 파일 없음. 금지 인계 파일 미열람·미수정/untracked 유지, contracts/update 수정·커밋·push 없음.
+
 - 2026-11-09 Codex 교차검수(기준 `byul_runtime` HEAD `2d78c38`, 목록 10번 제외): 로그인 root_path 우회(원본 미인증 200 → 수정 후 401), 알림 허용 목록·시각/지연 도착 커서·전송 전 대기열 저장·웹훅 URL 검증, chat SSE 응답 ID·엔진 로그 상세 캐시 갱신, GPU 비유한 수치 거부, 기존 agent 자동 시작 설정의 조기 해제, RBAC Pod watch 누락·과도한 Deployment/ReplicaSet 권한을 최소 수정하고 회귀시험을 추가했다. 로그 미발견을 미수신으로 단정하지 않는 처리와 수집 실패 뒤 구간 재시작은 유지했다.
 - 검증: runtime 전체 1,049건 중 932 통과·116 skip·기존 소켓 PermissionError 1건(`test_gateway_serves_snapshot_without_kubernetes_mutation`), 관련 선별 89건 통과. API 선별 20건 통과, 전체 364건 수집 확인; 지정 uv 명령은 캐시 쓰기/오프라인 의존성 설치 제약으로 실패했고 기존 venv+캐시 의존성으로 재시도한 전체는 TestClient 소켓 깨우기 차단으로 45초 후 중단했다. web 타입 검사·178건 통과, API 모델 변경 없음, `git diff --check` 통과. 증거 로그는 `/tmp/byul-review-{runtime-final,api-targeted-final,api-collection,api-deps,web}.log`.
 - 미확인: 소켓 허용 환경의 전체 runtime/API, 실제 호스트 재설치/재부팅·RBAC/admission·엔진/GPU·실제 웹훅. 알림은 최근 API 목록/500개 키·200개 대기열 범위이며 전송 성공 직후 중단 시 재전송 가능. AWS/kind 접속·contracts/update 수정·비공개 인계 파일 접근·커밋·push 없음(8개 로컬 커밋 유지).
@@ -739,3 +752,15 @@
 - 17:14 기동 → 17:37:11 stopped 확인. 코드 `5acbd26`. 결과 [AWS_GPU_서버15회차_결과_20261109.md](../docs/AWS_GPU_서버15회차_결과_20261109.md), 증거 `evidence-20261109-run15.tgz`(1e8edfd2…), 토큰·IP·계정·인스턴스 ID 0건.
 - 발견 1: 설치기 뒤 에이전트 disabled/inactive·dry-run 모드 확인. 발견 2: 에이전트 kubeconfig를 최소 권한 SA 토큰으로 교체, `too_broad`→`ok`, 수집·enforcement dry-run(Cilium 포함)·엔진 로그 정상. 발견 4: 옛 identities.json 참조 0건 확인 후 백업·삭제.
 - 발견 3: 일부 개선. 남은 원인은 Gateway 관측 조회가 65MB 파일을 매번 전부 읽는 것(1.2~1.4초). 관측 조회 병렬화는 503을 만들어 되돌림. 다음: Gateway 관측 캐시/이어 읽기.
+
+## Selected37 integration
+
+Latest-main integration and validation scope: [public validation note](../docs/selected37-integration-validation.md). Final merged-revision validation and GitHub CI are pending.
+
+## 2026-11-11 추론 중 코드 파일 open monitor — TG-CODE-01
+
+- 기준 `byul_runtime` / `f4ea84c9`. 경로 Prefix + 코드 확장자 Postfix의 monitor/Post 전용 정책, 기존 ExecPolicy 단계·귀속 재사용, 공백/미상 unknown, 플랫폼 CHK-SUP-008(SUP-08) 집계를 구현했다. 기동 기준선은 수집량·상태 관리·지연 import 오탐 때문에 보류했다. 추가 HF_MODULES_CACHE 경로는 내부 intent의 code_load_watch_paths로 지정한다.
+- 새 파일 `enforcement/codeload.py`, `tests/test_codeload.py`, [설계·D4(16회차) 확인 절차](../docs/code-load-monitor.md). 기존 정책 바이트 해시 유지 확인. 계약 필드·enum·AWS 케이스 ID 추가 없음, request_code_selection 유지. 상세 변경·제약·시험 명령은 위 문서에 있다.
+- 새 기능/플랫폼 매핑 **34 통과·2 deselected**. 요청 CI 명령 사용(임시·uv 캐시는 지정 scratch 내부, 로컬 캐시 복사 후 offline). 전체는 기존 TestClient hang으로 중단; 해당 파일 9건 제외 후 **1539 통과·130 skip·49 소켓 PermissionError 실패, subtests 931 통과**. 전체 통과 아님. `git diff --check` 통과. 로그: 지정 scratch의 `targeted-final.log`, `runtime-verified.log`, `runtime-diagnostic.log`.
+- 실서버·실제 공격·커널 적재는 미확인이다. D4에서는 무해한 모듈 import/정상 이미지 대조/기동 대조/수집 공백을 별도 절차로 확인한다. open은 실행 증명이 아니며 쓰기 open·정상 JIT 오탐, 감시 범위 밖·메모리 내 코드 미탐이 남는다. 외부 계약 검증은 통과했다.
+- 금지 인계 문서 읽기·수정, update/contracts 수정, AWS/kind/실클러스터 접속, 커밋·push 없음. 작업 시작 때 금지 인계 문서의 미추적 파일 존재만 확인했고 보존했다. 소켓 허용 환경의 전체 시험과 Claude 직접 검수가 남았다.

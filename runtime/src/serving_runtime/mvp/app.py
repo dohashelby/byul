@@ -194,8 +194,17 @@ class GatewayApp:
             config.environment,
             config.run_id,
             target_context=self._target_record_context,
+            policy_bundle=self._policy_bundle,
         )
-        self._route_rejections = RouteRejections(config.data_dir)
+        self._route_rejections = RouteRejections(config.data_dir, scope={
+            "environment": config.environment, "run_id": config.run_id,
+            "observation_session_id": self.observation_session_id,
+            "target_id": self.policy_state.policy.target_id if self.policy_state.policy else None,
+            "policy_id": self.policy_state.policy.policy_id if self.policy_state.policy else None,
+            "policy_version": self.policy_state.policy.policy_version if self.policy_state.policy else None,
+            "policy_sha256": self.policy_state.sha256,
+            "bundle_id": (self._policy_bundle or {}).get("bundle_id"),
+        })
         self._engine_store = JsonlStore(
             Path(config.data_dir) / "engine_receipts.jsonl"
         )
@@ -204,12 +213,16 @@ class GatewayApp:
         )
         self._lab_report = LabReportSource(config.lab_report_path)
         self._engine_receipts = EngineReceipts(config.engine_receipts_path)
+        from .native_receipts import NativeReceiptFeed
+        self._native_receipts = (NativeReceiptFeed(config.native_receipt_feed_path, reader_gid=config.native_receipt_reader_gid, producer_source_sha256=config.native_receipt_producer_sha256, stale_after_s=config.collector_stale_after_s, receipt_store=self._engine_store) if config.native_receipt_feed_path else None)
         self._queries = QueryService(
             self._records.store,
             self._engine_store,
             self._records.status,
             self.observation_session_id,
             engine_log_lookup=self._engine_receipts.lookup,
+            native_receipt_lookup=self._native_receipts.lookup if self._native_receipts else None,
+            native_receipt_restore=self._native_receipts.restore_matching if self._native_receipts else None,
         )
         self._concurrency = ConcurrencyLimiter(config.max_concurrent_requests)
         self._request_flow = RequestFlow(
@@ -235,6 +248,11 @@ class GatewayApp:
             enforce=config.retention_enforce,
             hold_path=config.retention_hold_path,
         )
+        from .engine_health_events import EngineHealthEvents
+        self._engine_health_events=EngineHealthEvents(self._observations.store,
+            lambda:{**self._revalidation_context(),'environment':self.config.environment,
+                    'run_id':self.config.run_id,'backend_kind':self.backend.kind,
+                    'target':self._target_record_context(),'policy_bundle':copy.deepcopy(self._policy_bundle)})
         collectors = [
             Collector(
                 "engine_health",
@@ -242,6 +260,7 @@ class GatewayApp:
                 config.collector_interval_s,
                 config.collector_stale_after_s,
                 engine_group=True,
+                on_updated=self._engine_health_events.observe,
             ),
             Collector(
                 "engine_info",
@@ -282,6 +301,8 @@ class GatewayApp:
                 on_collected=self._evaluate_asset_revalidation,
             ),
         ]
+        if self._native_receipts is not None:
+            collectors.append(Collector("native_receipt_observer", self._native_receipts.collect, config.collector_interval_s, config.collector_stale_after_s))
         self._observation_feeds: list[ObservationFeed] = []
         observation_heartbeats = dict(config.observation_heartbeats)
         for kind, path in config.observation_feeds:
@@ -297,6 +318,7 @@ class GatewayApp:
                 heartbeat_stale_after_s=config.collector_stale_after_s,
                 exec_policy=self._exec_policy,
                 identity_path=config.tetragon_identities_path,
+                health_receipt_mode=0o640 if kind == "tetragon" and config.tetragon_state_path else 0o600,
             )
             self._observation_feeds.append(feed)
             collectors.append(
@@ -307,6 +329,20 @@ class GatewayApp:
                     config.collector_stale_after_s,
                 )
             )
+        if config.cache_observation_path is not None:
+            from .cache_observation import CacheObservationReader
+            self._cache_observation = CacheObservationReader(config.cache_observation_path,
+                reader_gid=config.cache_observation_reader_gid,
+                producer_sha256=config.cache_observation_producer_sha256,
+                binding_sha256=config.cache_observation_binding_sha256,
+                stale_after_s=config.collector_stale_after_s,
+                current_binding=lambda: {"target_sha256": self._target.registration.sha256,
+                    "policy_sha256": self.policy_state.sha256,
+                    "bundle_id": (self._policy_bundle or {}).get("bundle_id"),
+                    "instance_id": (self._target.current_instance() or {}).get("instance_id")})
+            collectors.append(Collector("cache_integrity", self._cache_observation.collect,
+                config.collector_interval_s, config.collector_stale_after_s,
+                on_collected=self._evaluate_cache_revalidation))
         registration = self._target.registration
         if config.target_pod_snapshot is not None and (
             registration.state != "ok" or registration.kubernetes is None
@@ -417,6 +453,9 @@ class GatewayApp:
         self._revalidation.observe_asset(
             result, data_origin=data_origin, **self._revalidation_context()
         )
+
+    def _evaluate_cache_revalidation(self, result, data_origin):
+        self._revalidation.observe_cache(result, data_origin=data_origin, **self._revalidation_context())
 
     def _evaluate_baseline_revalidation(
         self, _result: Any, _data_origin: str | None
@@ -698,6 +737,7 @@ class GatewayApp:
                 "approval": policy_runtime["approval"],
             },
             "policy_bundle": copy.deepcopy(self._policy_bundle),
+            "route_audit": self._route_rejections.status(),
             "policy_history_store": policy_runtime["history_storage"],
             "record_store": record_store,
             "concurrency": self._concurrency.status(),
@@ -787,6 +827,7 @@ class GatewayApp:
                 ),
                 authorize_read=lambda header: self.auth_state.authorize_read(header),
                 record_rejected=self._route_rejections.record,
+                route_rejections=self._route_rejections.query,
             )
         )
         self._server = LimitedThreadingHTTPServer(

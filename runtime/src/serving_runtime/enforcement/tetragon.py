@@ -7,6 +7,7 @@ import copy
 
 from .intent import EnforcementIntent
 from .attribution import KERNEL_DATA
+from .codeload import CODE_SUFFIXES, RULE_ID, watch_prefixes
 
 
 _STATUS = "candidate-cluster-unapplied-unverified"
@@ -139,8 +140,9 @@ def _secret_enforcement_policy(intent: EnforcementIntent) -> dict[str, Any]:
         manifest["spec"]["kprobes"] = [{
             # Tetragon 1.7.1 resolves the architecture prefix for syscall:true.
             "call": "sys_openat", "syscall": True,
-            # Two args + three identity data entries fit the 1.7.1 limit of five.
-            "args": [{"index": 0, "type": "int"}, {"index": 1, "type": "string"}],
+            # Only filename participates in this selector. Tetragon 1.7.1
+            # counts args + identity data toward its five-field maximum.
+            "args": [{"index": 1, "type": "string"}],
             "selectors": [{"matchArgs": [{"index": 1, "operator": "Equal",
                                           # Keep the legacy terminator for manifest compatibility.
                                           # Tetragon 1.7.1 trims trailing NULs for string Equal.
@@ -157,6 +159,28 @@ def _secret_enforcement_policy(intent: EnforcementIntent) -> dict[str, Any]:
     manifest["metadata"]["annotations"]["serving-runtime.local/serving-impact"] = (
         "file open denied only; process survives" if method in {"lsm_file_open", "override_syscall"} else
         "engine process termination -> Gateway target check fails -> 503 without engine delivery -> Kubernetes restart"
+    )
+    return manifest
+
+
+def _code_policy(intent: EnforcementIntent) -> dict[str, Any]:
+    manifest = _policy(intent, RULE_ID, [], 4)
+    prefixes = watch_prefixes(intent)
+    manifest["spec"]["options"] = [{"name": "policy-mode", "value": "monitor"}]
+    manifest["spec"]["kprobes"] = [{
+        "call": "security_file_open", "syscall": False,
+        # Two copies of the same file pointer use distinct spec argument slots.
+        # v1.7.1 args:[n] selects the slot, index selects the function argument.
+        # This avoids two operators on one index. With kernel identity: 2+3=5.
+        "args": [{"index": 0, "type": "file", "label": "watch_path"},
+                 {"index": 0, "type": "file", "label": "code_path"}],
+        "selectors": [{"matchArgs": [
+            {"args": [0], "operator": "Prefix", "values": prefixes[i:i + 8]},
+            {"args": [1], "operator": "Postfix", "values": list(CODE_SUFFIXES)},
+        ], "matchActions": [{"action": "Post"}]} for i in range(0, len(prefixes), 8)],
+    }]
+    manifest["metadata"]["annotations"]["serving-runtime.local/limit"] = (
+        "monitor only; code open attempt, not proof of import/execution; phase classified in adapter; kernel >=5.3; path coverage limited"
     )
     return manifest
 
@@ -202,6 +226,7 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
             exact_path=True,
             override=True,
         )
+    manifests["tetragon-tg-code-01.json"] = _code_policy(intent)
     if intent.tetragon_kernel_identity:
         for manifest in manifests.values():
             # LsmHookSpec in 1.7.1 has no data field. Never claim kernel identity

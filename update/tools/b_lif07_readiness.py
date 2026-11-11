@@ -383,6 +383,8 @@ def _collect_http(env, target, prepared, manifest, start, end):
         reviewed_common = proof.get('reviewed_common_commit') if type(proof) is dict else None
         if type(reviewed_common) is not str or reviewed_common not in helper.HTTP_APPROVED_REVIEWED_COMMON_COMMITS:
             raise ValueError
+        from guard.runtime.reviewed_http_contract import expected_http_sources
+        sources = expected_http_sources(proof)
         result['source_validation'] = {'reviewed_common_commit': reviewed_common,
             'runtime_hash_approval': False, 'producer_authenticated': False}
     except Exception:
@@ -394,7 +396,7 @@ def _collect_http(env, target, prepared, manifest, start, end):
         expected = {'sample_id': sample_id, 'environment_ref': env.ref().model_dump(mode='json'),
             'target_sha256': digest(target), 'session': prepared['session'], 'cohort_sha256': digest(manifest),
             'run_id': manifest['run_id'], 'binding_sha256': digest(collector.binding),
-            'expected_sources': helper.HTTP_EXPECTED_SOURCES}
+            'expected_sources': sources}
         result['sample_attempted'] = True
         result['snapshot'] = validate_snapshot(collector.sample(values, sample_id=sample_id), **expected)
     except Exception:

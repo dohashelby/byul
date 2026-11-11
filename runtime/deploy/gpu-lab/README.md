@@ -285,3 +285,8 @@ serving-runtime enforce render --intent deploy/gpu-lab/intent.aws-lab.json --out
 - 관리 수신부 우회(같은 Pod의 loopback 공유) 시험 — AWS 묶음 README도 별도 시험 대상으로 둠
 - observer 수집 프로그램, Gateway의 클러스터 노출 방식(현재 127.0.0.1 bind)
 - SGLang 전환(AWS 묶음 범위는 vLLM만)
+
+
+## Tetragon 운영 연결 갱신
+
+scoped stream·kernel identity·sentinel·사전 baseline·status의 설치 순서는 [TETRAGON_ACTIVATION.md](TETRAGON_ACTIVATION.md)를 따른다. 기존 host feed unit은 Hubble 전용으로 갱신됐으며, Tetragon 수집은 생성된 scoped stream unit으로 시작한다. 로컬 준비 상태와 서울 실환경 인수는 해당 문서에서 구분한다.

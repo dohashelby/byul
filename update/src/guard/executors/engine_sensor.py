@@ -404,7 +404,7 @@ class EngineSensorExecutor:
         if isinstance(transport, KubernetesHTTP):
             transport.page_archive = Path(workdir) / 'callback-pages'
         endpoint = transport.endpoint.scheme + '://' + transport.endpoint.netloc + '/v1/chat/completions'
-        tags = {}; elapsed = {}; outputs = {}; trials = []; cleanup = []; switches = []
+        tags = {}; elapsed = {}; outputs = {}; trials = []; cleanup = []; switches = []; gateway_ids = {}
         if lab is not None:
             try:
                 transport.declare_callback_lab(lab)
@@ -458,6 +458,8 @@ class EngineSensorExecutor:
                 'capture_complete': row.get('capture_complete') is True, 'normal_shape': good})
             if good:
                 outputs[case['case_id']] = _answer(row.get('body'))
+                if 'principal' in case:
+                    gateway_ids[case['case_id']] = row.get('gateway_request_id')
             latency = _callback_elapsed_ms(row)
             if good and latency is not None:
                 elapsed[case['case_id']] = latency
@@ -485,7 +487,9 @@ class EngineSensorExecutor:
         served = [c for c in cases if outputs.get(c['case_id']) is not None or c['case_id'] in elapsed]
         # Gateway가 4xx로 막은 위조 요청은 엔진에 닿지 않는다.
         rejected = {t['case_id'] for t in trials if t['capture_complete'] and type(t['outcome']) is int and 400 <= t['outcome'] < 500}
-        rows = projection.sequence_rows(events, served) if gateway else projection.computed_rows(events, secret, tags)
+        rows = projection.gateway_rows(events, secret, served, gateway_ids) if gateway else projection.computed_rows(events, secret, tags)
+        if gateway and any(case['case_id'] not in rows for case in served):
+            cleanup.append('ENGINE_SENSOR_GATEWAY_REQUEST_BINDING_UNAVAILABLE')
         if check.id == 'REQ-14':
             result = projection.project_distributed(events, secret, tags)
         elif check.id == 'REQ-15':
@@ -535,7 +539,13 @@ class EngineSensorExecutor:
             comparability=comparison,
             config={'profile': check.collection_profile, 'conditions': conditions,
                     'implementation': 'kubernetes', 'engine_started': False})
-        return self._artifact(draft, workdir, {'safe_facts': {**result, 'trials': trials, 'sensor_gaps': gaps,
+        return self._artifact(draft, workdir, {'transport': transport.report() if hasattr(transport, 'report') else None, 'safe_facts': {**result, 'trials': trials, 'sensor_gaps': gaps,
+                **({'runtime_request_bindings': [
+                    {'case_id': case_id, 'runtime_request_sha256': sha256_hex(rid.encode()),
+                     'upstream_request_sha256': sha256_hex(('byul-cb-' + rid).encode()),
+                     'native_rows_observed': case_id in rows}
+                    for case_id, rid in gateway_ids.items() if type(rid) is str and re.fullmatch('[0-9a-f]{32}', rid)]}
+                   if gateway else {}),
                 'run_binding': {key: values[key] for key in ('sensor_environment_sha256', 'sensor_target_sha256', 'sensor_prepared_sha256', 'sensor_manifest_sha256')},
                 **({'comparison_nonce_sha256': sha256_hex(nonce.encode())} if 'comparison_nonce' in manifest else {}),
                 **({'lab_switches': switches} if lab is not None else {})},

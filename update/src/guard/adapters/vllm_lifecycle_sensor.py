@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import atexit
 import contextvars
-from collections import deque
+from collections import deque, defaultdict
 from itertools import islice
 import functools
 import hashlib
@@ -267,9 +267,15 @@ class Writer:
             self.fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
         finally:
             os.close(directory)
-        self.write("START", {"schema": SCHEMA, "profile": PROFILE, "commit": COMMIT, "session": config["session"],
-            "settings_sha256": config_sha, "sensor_sha256": sha(Path(__file__).read_bytes()),
-            "context": context, "producer_authenticated": False})
+        try:
+            self.write("START", {"schema": SCHEMA, "profile": PROFILE, "commit": COMMIT, "session": config["session"],
+                "settings_sha256": config_sha, "sensor_sha256": sha(Path(__file__).read_bytes()),
+                "context": context, "producer_authenticated": False})
+        except BaseException:
+            if self.fd is not None:
+                os.close(self.fd); self.fd = None
+            self.closed = True
+            raise
         try:
             thread = threading.Thread(target=self._watch, name="guard-lifecycle-seal", daemon=True)
             thread.start()
@@ -423,7 +429,7 @@ class Observer:
         data = attrs(owner)
         manager = data.get("kv_cache_manager", owner)
         managers = attrs(attrs(manager).get("coordinator")).get("single_type_managers")
-        if type(attrs(manager).get("req_to_blocks")) is dict:
+        if type(attrs(manager).get("req_to_blocks")) in (dict, defaultdict):
             managers = (manager,)
         if type(managers) not in (list, tuple) or len(managers) > MAX_IDS:
             return {"complete": False, "groups": []}
@@ -433,7 +439,7 @@ class Observer:
             pool = values.get("block_pool")
             entry = self.pool(pool)
             mapping = values.get("req_to_blocks")
-            if entry is None or type(mapping) is not dict:
+            if entry is None or type(mapping) not in (dict, defaultdict):
                 complete = False
                 continue
             for rid in request_ids:
@@ -503,6 +509,9 @@ class Observer:
                 metadata["asgi_request_sha256"] = context[1]
         if returned and point.endswith(".abort_requests"):
             raw_ids = ids(result)
+            if point == "EngineCore.abort_requests":
+                chain = _CHAIN.get()
+                raw_ids = chain[-1].get("_abort_request_ids", ()) if chain and chain[-1]["point"] == point else ()
         if returned and point.endswith(".finish_requests"):
             raw_ids = _request_ids(result)
         data = attrs(owner)
@@ -530,7 +539,7 @@ class Observer:
         for rid in raw_ids:
             request = (data.get("requests") or {}).get(rid) if type(data.get("requests")) is dict else None
             row = {"request_sha256": id_sha(rid),
-                   "request_present": _present(owner, "requests", rid),
+                   "request_present": _present(data.get("scheduler") if point == "EngineCore.abort_requests" else owner, "requests", rid),
                    "output_state_present": _present(owner, "request_states", rid),
                    "batch_row_present": _present(batch, "req_id_to_index", rid),
                    "status_code": _int(attrs(request).get("status"))}
@@ -786,6 +795,10 @@ class Observer:
             before = sample(args, kwargs)
             chain = _CHAIN.get()
             frame={"point":point,"request_sha256":[r["request_sha256"] for r in before["requests"]]}
+            if point == "EngineCore.abort_requests":
+                # Copy bounded ID strings before native work can consume/mutate
+                # its input. Private chain keys never enter emitted call_chain.
+                frame["_abort_request_ids"] = ids(args[1] if len(args) > 1 else kwargs.get("request_ids"))
             if point=="AuthenticationMiddleware.__call__":
                 try:
                     metadata=before["metadata"]["route_authentication"]
@@ -1029,13 +1042,14 @@ class Middleware:
                 _ASGI_REQUEST.reset(context_token)
 
 
-def install(path=None):
+def install(path=None, *, open_sink=False):
     global _OBSERVER
     if _OBSERVER is not None:
         return False
     path = path or os.environ.get(CONFIG_ENV)
     if path is None:
         return False
+    observer = None
     try:
         if path != CONFIG_PATH or any(name in sys.modules for name in SOURCE_SHA):
             return False
@@ -1044,7 +1058,11 @@ def install(path=None):
         if Path(config["control_path"]).exists():
             return False
         observer = Observer(config, config_sha)
+        if open_sink and observer._writer().closed:
+            raise ValueError("NATIVE_SENSOR_START_SINK_UNAVAILABLE")
     except Exception:
+        if open_sink and observer is not None:
+            observer.close()  # Own file/monitor only; no native cleanup.
         return False
     _OBSERVER = observer
     sys.meta_path.insert(0, Finder(observer))

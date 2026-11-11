@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from copy import deepcopy
 import threading
 from typing import Any, Callable
 
 from .mock_engine import _utc_now
+from .backend import upstream_request_id
 from .policy import PolicyState
 from .store import JsonlStore
 from .validator import Decision
@@ -24,8 +26,10 @@ class RequestRecords:
         environment: str | None = None,
         run_id: str | None = None,
         target_context: Callable[[], dict[str, Any]] | None = None,
+        policy_bundle: dict[str, Any] | None = None,
     ) -> None:
         self._target_context = target_context
+        self._policy_bundle = deepcopy(policy_bundle)
         self.store = JsonlStore(Path(data_dir) / "gateway_records.jsonl")
         self._data_dir = str(data_dir)
         self._observation_session_id = observation_session_id
@@ -45,6 +49,22 @@ class RequestRecords:
         self._request_local.auth = None
         self._request_local.route = route
         self._request_local.cache_isolation_applied = False
+        self._request_local.policy_snapshot = None
+        self._request_local.target_snapshot = None
+
+    def bind_context(self, policy_state: PolicyState) -> None:
+        """Freeze the admission policy and target generation for this request.
+
+        Final records describe the request's admission context even if a policy
+        reload or a container restart occurs while the upstream call runs.
+        """
+        self._request_local.policy_snapshot = deepcopy(policy_state)
+        self._request_local.target_snapshot = deepcopy(
+            self._target_context() if self._target_context is not None else {
+                "registration": "not_configured", "target_id": None,
+                "instance_id": None, "instance_state": "not_configured",
+            }
+        )
 
     def mark_cache_isolation_applied(self) -> None:
         self._request_local.cache_isolation_applied = True
@@ -59,9 +79,7 @@ class RequestRecords:
 
     def check_store(self) -> None:
         try:
-            self.store.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-            with self.store.path.open("ab"):
-                pass
+            self.store.check_writable()
         except OSError as error:
             with self._state_lock:
                 self._store_state = "error"
@@ -110,20 +128,22 @@ class RequestRecords:
         response_started: bool = False,
         backend_cancel: str | None = None,
     ) -> dict[str, Any]:
-        policy_state = self._policy_state()
+        policy_state = getattr(self._request_local, "policy_snapshot", None) or self._policy_state()
         policy = policy_state.policy
         return {
             "schema_version": "runtime-mvp-record/1.0",
             "phase": phase,
             "request_id": request_id,
+            "upstream_request_id": upstream_request_id(self._backend_kind, request_id),
             "route": getattr(self._request_local, "route", None),
             "observation_session_id": self._observation_session_id,
             "environment": self._environment,
             "run_id": self._run_id,
             "target_id": policy.target_id if policy else None,
             "target": (
-                self._target_context()
-                if self._target_context is not None
+                deepcopy(self._request_local.target_snapshot)
+                if getattr(self._request_local, "target_snapshot", None) is not None
+                else self._target_context() if self._target_context is not None
                 else {"registration": "not_configured", "target_id": None, "instance_id": None, "instance_state": "not_configured"}
             ),
             "recorded_at": _utc_now(),
@@ -135,6 +155,7 @@ class RequestRecords:
                 "sha256": policy_state.sha256,
                 "path": policy_state.path,
             },
+            "policy_bundle": deepcopy(self._policy_bundle),
             "auth": getattr(self._request_local, "auth", None)
             or {"state": "not_evaluated", "method": None, "principal_id": None, "roles": []},
             "decision": {

@@ -53,6 +53,13 @@ class MVPConfig:
     retention_enforce: bool = False
     retention_hold_path: str | None = None
     lab_report_path: str | None = None
+    native_receipt_feed_path: str | None = None
+    native_receipt_reader_gid: int | None = None
+    native_receipt_producer_sha256: str | None = None
+    cache_observation_path: str | None = None
+    cache_observation_reader_gid: int | None = None
+    cache_observation_producer_sha256: str | None = None
+    cache_observation_binding_sha256: str | None = None
     tetragon_state_path: str | None = None
     gpu_state_path: str | None = None
     engine_receipts_path: str | None = None
@@ -164,16 +171,33 @@ class MVPConfig:
             raise ValueError("retention_interval_s must be positive")
         if self.observation_origin not in {"synthetic", "real"}:
             raise ValueError("observation_origin must be synthetic or real")
+        if self.native_receipt_feed_path is not None:
+            import re
+            if (not self.native_receipt_feed_path.strip() or type(self.native_receipt_reader_gid) is not int or self.native_receipt_reader_gid < 0
+                    or not isinstance(self.native_receipt_producer_sha256,str) or re.fullmatch(r"[0-9a-f]{64}",self.native_receipt_producer_sha256) is None):
+                raise ValueError("native receipt feed requires explicit reader GID and producer source pin")
+        elif self.native_receipt_reader_gid is not None or self.native_receipt_producer_sha256 is not None:
+            raise ValueError("native receipt feed path required")
+        if self.cache_observation_path is not None:
+            import re
+            if (not self.cache_observation_path.strip() or type(self.cache_observation_reader_gid) is not int or self.cache_observation_reader_gid < 0
+                    or any(not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None
+                           for value in (self.cache_observation_producer_sha256, self.cache_observation_binding_sha256))):
+                raise ValueError("cache observation requires reader GID, producer and binding pins")
+            if self.target_path is None:
+                raise ValueError("cache observation requires target registration")
+        elif any(value is not None for value in (self.cache_observation_reader_gid, self.cache_observation_producer_sha256, self.cache_observation_binding_sha256)):
+            raise ValueError("cache observation path required")
         kinds = [kind for kind, _path in self.observation_feeds]
-        if any(kind not in {"hubble", "tetragon"} for kind in kinds):
-            raise ValueError("observation feed kind must be hubble or tetragon")
+        if any(kind not in {"hubble", "tetragon", "management_listener"} for kind in kinds):
+            raise ValueError("observation feed kind must be hubble, tetragon or management_listener")
         if len(kinds) != len(set(kinds)):
             raise ValueError("only one observation feed per kind may be configured")
         if any(not str(path).strip() for _kind, path in self.observation_feeds):
             raise ValueError("observation feed path must not be empty")
         heartbeat_kinds = [kind for kind, _path in self.observation_heartbeats]
-        if any(kind not in {"hubble", "tetragon"} for kind in heartbeat_kinds):
-            raise ValueError("observation heartbeat kind must be hubble or tetragon")
+        if any(kind not in {"hubble", "tetragon", "management_listener"} for kind in heartbeat_kinds):
+            raise ValueError("observation heartbeat kind must be hubble, tetragon or management_listener")
         if len(heartbeat_kinds) != len(set(heartbeat_kinds)):
             raise ValueError("only one observation heartbeat per kind may be configured")
         if any(not str(path).strip() for _kind, path in self.observation_heartbeats):

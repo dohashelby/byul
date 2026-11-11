@@ -22,6 +22,8 @@ from typing import Any, Protocol
 import httpx
 
 from ..contracts import canonical_sha256
+from .identity_scope import observation_scope_ref
+from .checklist_links import checks_for_record, evidence_refs
 
 EVENT_SCHEMA = "byul-runtime-event/0.2"
 STATUS_SCHEMA = "byul-runtime-status/0.2"
@@ -60,6 +62,10 @@ class RuntimeUnauthorized(RuntimeError):
 
 class RuntimeNotFound(LookupError):
     pass
+
+
+class RuntimeWindowIncomplete(LookupError):
+    """One UUID was not found inside a bounded search; Runtime remains available."""
 
 
 # --- 등급·참조 --------------------------------------------------------------
@@ -183,10 +189,10 @@ def gateway_event(record: dict[str, Any]) -> dict[str, Any]:
             "observation_session_id": _str_or_none(record.get("observation_session_id")),
             "request_id": request_id if isinstance(request_id, str) and _REQUEST_ID.fullmatch(request_id) else None,
         },
-        "related_checks": [],
+        "related_checks": checks_for_record(record, "gateway"),
         "data_origin": grade(origin),
         "origin_detail": _str_or_none(origin),
-        "evidence_refs": [],
+        "evidence_refs": evidence_refs(record),
         "observation": None,
         "native": {"schema_version": _str_or_none(record.get("schema_version")), "record": record},
     }
@@ -202,12 +208,19 @@ _TETRAGON_UNKNOWN = {"phase_unknown", "phase_signal_unverified"}
 def observation_outcome(record: dict[str, Any]) -> str:
     """contracts README 'runtime 관측 → outcome' 표. 표에 없는 경우는 unknown(미확인)."""
     source = record.get("source")
+    if source == "engine_health":
+        return "error" if record.get("health_state")=="unavailable" else "observed" if record.get("health_state")=="healthy" else "unknown"
+    if source == "management_listener":
+        return record.get("verdict") if record.get("verdict") in {"allowed", "denied"} else "unknown"
     if source == "hubble":
         return "observed"  # dropped 포함. Hubble은 거부 확인이 아니다.
     if source == "tetragon":
         if _action_mode(record) == "enforce":
             return "enforce_attempted"
         if record.get("kind") == "file_access":
+            if record.get("rule_id") == "TG-CODE-01":
+                verdict = record.get("code_load_verdict")
+                return verdict if verdict in {"detected", "observed"} and _action_mode(record) == "monitor" else "unknown"
             if _action_mode(record) != "monitor":
                 return "unknown"
             rule_id = record.get("rule_id")
@@ -244,6 +257,10 @@ def _action_mode(record: dict[str, Any]) -> str | None:
 
 
 def _observation_category(record: dict[str, Any]) -> str:
+    if record.get("source") == "engine_health":
+        return "process"
+    if record.get("source") == "management_listener":
+        return "request"
     if record.get("source") == "hubble":
         return "network"
     kind = str(record.get("kind") or "")
@@ -272,6 +289,7 @@ def observation_detail(record: dict[str, Any]) -> dict[str, Any]:
     allowed = record.get("allowed_binary")
     return {
         "kind": str(record.get("kind") or ""),
+        "scope_ref": observation_scope_ref(record),
         "verdict": _str_or_none(record.get("verdict")),
         "reason": _str_or_none(record.get("reason")) or _str_or_none(record.get("drop_reason")),
         "direction": _str_or_none(record.get("traffic_direction")),
@@ -327,22 +345,22 @@ def observation_event(record: dict[str, Any]) -> dict[str, Any]:
         "source": source,
         "category": _observation_category(record),
         "outcome": observation_outcome(record),
-        "enforcer": "tetragon" if source == "tetragon" else None,
+        "enforcer": source if source in {"tetragon", "management_listener"} else None,
         "rule_ref": rule_ref,
         "phase": phase,
-        "target_ref": _local_id(record.get("target_id")),
-        "target_instance_id": None,
-        "policy_ref": None,
+        "target_ref": _local_id(record.get("target_ref") if source == "management_listener" else record.get("target_id")),
+        "target_instance_id": _str_or_none(record.get("target_instance_id")) if source=="engine_health" else None,
+        "policy_ref": _policy_ref(record.get("policy")) if source=="engine_health" else None,
         "scope": {
             "environment": _str_or_none(record.get("environment")),
             "run_id": _str_or_none(record.get("run_id")),
-            "observation_session_id": None,
+            "observation_session_id": _str_or_none(record.get("observation_session_id")) if source=="engine_health" else None,
             "request_id": None,
         },
-        "related_checks": [],
+        "related_checks": ["LIF-08"] if source=="engine_health" else checks_for_record(record, str(source)),
         "data_origin": grade(origin),
         "origin_detail": _str_or_none(origin),
-        "evidence_refs": [],
+        "evidence_refs": evidence_refs(record),
         "observation": observation_detail(record),
         "native": {"schema_version": _str_or_none(record.get("schema_version") or record.get("schema")), "record": record},
     }
@@ -440,11 +458,29 @@ def _collector_detail(item: dict[str, Any]) -> dict[str, Any] | None:
     value = item.get("last_value")
     if not isinstance(value, dict):
         return None
+    if source == "native_receipt_observer":
+        return {"kind":"native_receipt", "capture_state":_str_or_none(value.get("capture_state")),
+            "producer_updated_at":_str_or_none(value.get("producer_updated_at")),
+            "capture_observed_at":_str_or_none(value.get("capture_observed_at")),
+            "producer_fresh":_bool(value.get("producer_fresh")),"capture_fresh":_bool(value.get("capture_fresh")),
+            "source_event_freshness":_str_or_none(value.get("source_event_freshness")),
+            "future_observation_available":_bool(value.get("future_observation_available")),
+            "observed_requests":_int(value.get("observed_requests")),"historical_receipts":_int(value.get("historical_receipts")),
+            "source_event_times":[{k:event.get(k)for k in ("pid","start_ticks","monotonic_ns","boot_sha256","pid_namespace","time_namespace","time_offsets_sha256")}for event in _l(value.get("source_event_times"))if isinstance(event,dict)],
+            **({"truncated":_bool(value.get("truncated"))} if "truncated" in value else {}),
+            **{key:_int(value.get(key)) for key in ("historical_pending_receipts","historical_pending_dropped") if key in value},
+            **{key:_str_or_none(value.get(key)) for key in ("historical_storage_state","capture_health_reason") if key in value}}
     if source.startswith("observation_feed_"):
         writer = _d(value.get("writer"))
+        recording = _d(writer.get("recording"))
         gap = writer.get("last_gap")
+        open_gap = writer.get("open_gap")
         return {
             "kind": "observation_feed",
+            "writer_write_failure_count": _int(recording.get("write_failure_count")),
+            "writer_write_failed": _bool(recording.get("write_failed")),
+            "writer_last_write_error_class": _str_or_none(recording.get("last_write_error_class")),
+            "writer_last_write_error_at": _str_or_none(recording.get("last_write_error_at")),
             "processed": _nonneg(value.get("processed")),
             "accepted": _nonneg(value.get("accepted")),
             "duplicates": _nonneg(value.get("duplicates")),
@@ -470,12 +506,36 @@ def _collector_detail(item: dict[str, Any]) -> dict[str, Any] | None:
                 if isinstance(value.get("loss_detected"), bool)
                 else None
             ),
+            "dropped_lines_total": _int(value.get("dropped_lines_total")),
+            "last_redaction_error_class": _str_or_none(value.get("last_redaction_error_class")),
+            "last_redaction_drop_at": _str_or_none(value.get("last_redaction_drop_at")),
+            "last_redaction_drop_reason": _str_or_none(value.get("last_redaction_drop_reason")),
+            "redaction_loss_detected": _bool(value.get("redaction_loss_detected")),
+            "redaction_dropped_lines_total": _int(value.get("redaction_dropped_lines_total")),
+            "storage_errors_total": _int(value.get("storage_errors_total")),
+            "last_storage_error_class": _str_or_none(value.get("last_storage_error_class")),
+            "last_storage_error_at": _str_or_none(value.get("last_storage_error_at")),
+            "last_storage_operation": _str_or_none(value.get("last_storage_operation")),
+            "checkpoint_pending": _bool(value.get("checkpoint_pending")),
             "writer": {
                 "configured": writer.get("configured") is True,
                 "state": _str_or_none(writer.get("state")),
                 "updated_at": _str_or_none(writer.get("updated_at")),
                 "reconnect_count": _int(writer.get("reconnect_count")),
-                "last_gap": {"opened_at": _str_or_none(gap.get("opened_at")), "closed_at": _str_or_none(gap.get("closed_at"))}
+                "open_gap": {
+                    "gap_id": _str_or_none(open_gap.get("gap_id")),
+                    "opened_at": _str_or_none(open_gap.get("opened_at")),
+                    "closed_at": _str_or_none(open_gap.get("closed_at")),
+                    "backfill": _str_or_none(open_gap.get("backfill")),
+                    "attempts": _int(open_gap.get("attempts")),
+                } if isinstance(open_gap, dict) else None,
+                "last_gap": {
+                    "gap_id": _str_or_none(gap.get("gap_id")),
+                    "opened_at": _str_or_none(gap.get("opened_at")),
+                    "closed_at": _str_or_none(gap.get("closed_at")),
+                    "backfill": _str_or_none(gap.get("backfill")),
+                    "attempts": _int(gap.get("attempts")),
+                }
                 if isinstance(gap, dict) else None,
             },
         }
@@ -524,7 +584,7 @@ def _collector_detail(item: dict[str, Any]) -> dict[str, Any] | None:
                 "last_counter_reset_at": _str_or_none(last_reset.get("detected_at")),
             })
         return {"kind": "metrics", "fields": fields}
-    if source == "asset_integrity":
+    if source in {"asset_integrity","cache_integrity"}:
         counts = _d(value.get("counts"))
         return {
             "kind": "asset_integrity",
@@ -732,6 +792,8 @@ def runtime_status(
         },
         "comparisons": comparisons(_d(baseline), target),
         "observations": {
+            **({"counts_lower_bound":_d(observations.get("window")).get("counts_lower_bound") is True,
+                "history_truncated":_d(observations.get("window")).get("truncated") is True} if isinstance(observations.get("window"),dict) else {}),
             "by_source": {str(k): _nonneg(v) for k, v in _d(obs_counts.get("source")).items()},
             "corrupt_lines": _nonneg(observations.get("corrupt_lines")),
             "real_hubble_dropped": _nonneg(_d(observations.get("verification")).get("real_hubble_dropped")),
@@ -907,6 +969,7 @@ def request_detail_doc(detail: dict[str, Any]) -> dict[str, Any]:
         "corrupt_lines": {"gateway": _int(corrupt.get("gateway")), "engine": _int(corrupt.get("engine"))},
         "data_origin": grade(origin),
         "origin_detail": _str_or_none(origin),
+        **({"query_window":{k:detail["window"].get(k) for k in ("truncated","gateway_search_complete","engine_search_complete","max_search_bytes")}} if isinstance(detail.get("window"),dict) else {}),
         "native": {"gateway_records": records, "engine_receipts": receipts},
     }
 
@@ -925,6 +988,7 @@ def lab_report_doc(payload: dict[str, Any]) -> dict[str, Any]:
         "path": _str_or_none(payload.get("path")),
         "error": _str_or_none(payload.get("error")),
         "report": {
+            **({"schema": report["schema"]} if "schema" in report else {}),
             "run_id": str(report.get("run_id")),
             "context": str(report.get("context")),
             "namespace": str(report.get("namespace")),
@@ -954,6 +1018,7 @@ def lab_report_doc(payload: dict[str, Any]) -> dict[str, Any]:
 class EventBatch:
     candidates: list[Any]
     truncated: bool = False
+    source_windows: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 @dataclass
@@ -968,6 +1033,8 @@ class Summary:
     total: int
     corrupt_lines: int | None
     generated_at: str | None
+    counts_lower_bound: bool = False
+    history_truncated: bool = False
 
 
 class RuntimeSource(Protocol):
@@ -1138,6 +1205,13 @@ class RuntimeClient:
             raise RuntimeUnauthorized(str(response.status_code))
         if response.status_code == 404:
             raise RuntimeNotFound(path)
+        if response.status_code==503 and re.fullmatch(r'/api/requests/[0-9a-f]{32}(?:/evidence)?',path) and len(response.content)<=8192:
+            try:
+                payload=response.json()
+                detail=payload.get('error',payload.get('detail')) if isinstance(payload,dict) else None
+                code=detail.get('code') if isinstance(detail,dict) else payload.get('code') if isinstance(payload,dict) else None
+                if code=='REQUEST_WINDOW_INCOMPLETE':raise RuntimeWindowIncomplete(path)
+            except ValueError:pass
         if response.status_code >= 400:
             raise RuntimeUnavailable(f"HTTP {response.status_code}")
         return response
@@ -1175,76 +1249,151 @@ class LiveRuntimeSource:
     mode = "live"
     REQUEST_LIMIT = 200
     DETAIL_WORKERS = 8
+    FINAL_EVENT_TTL = 60.0
 
     def __init__(self, client: RuntimeClient, base_url: str, cache_ttl: float = 2.5) -> None:
         self.client = client
         self.detail = base_url
         self._cache = _TTLCache(cache_ttl)
-        # final 기록이 있는 요청 상세는 바뀌지 않으므로 다시 묻지 않는다(3초 갱신 부하를 줄임).
-        self._final_details: dict[str, Any] = {}
-        self._lock = threading.Lock()
+        # 목록 전용 캐시: 상세/증거를 보관하지 않고 현재 목록의 final 사건만 유지한다.
+        self._final_events: dict[str, tuple[float, Any]] = {}
+        self._final_lock = threading.Lock()
+        self._events_lock = threading.Lock()
+        self._final_generation = 0
 
     def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         key = path + "?" + json.dumps(params or {}, sort_keys=True)
         return self._cache.get(key, lambda: self.client.get(path, params))
 
+    def _invalidate_final_events(self, request_id: str | None = None) -> None:
+        with self._final_lock:
+            self._final_generation += 1
+            if request_id is None:
+                self._final_events.clear()
+            else:
+                self._final_events.pop(request_id, None)
+
     def _detail(self, request_id: str) -> Any:
-        with self._lock:
-            hit = self._final_details.get(request_id)
-        if hit is not None:
-            return hit
-        detail = self._get(f"/api/requests/{request_id}")
-        records = detail.get("gateway_records", []) if isinstance(detail, dict) else []
-        live = detail.get("engine_live", {}) if isinstance(detail, dict) else {}
-        # Engine-log evidence can arrive after the final Gateway record, and
-        # its availability/coverage keeps changing. Keep only the short TTL.
-        dynamic_evidence = isinstance(live, dict) and live.get("evidence_kind") == "engine_log"
-        if not dynamic_evidence and any(isinstance(r, dict) and r.get("phase") == "final" for r in records):
-            with self._lock:
-                if len(self._final_details) > 5000:
-                    self._final_details.clear()
-                self._final_details[request_id] = detail
-        return detail
+        # 상세/증거는 매번 원천의 보존 상태와 권한을 확인한다.
+        try:
+            return self.client.get(f"/api/requests/{request_id}")
+        except (RuntimeNotFound,RuntimeWindowIncomplete):
+            self._invalidate_final_events(request_id)
+            raise
+        except (RuntimeUnauthorized, RuntimeUnavailable):
+            self._invalidate_final_events()
+            raise
 
     def _gateway_events(self) -> EventBatch:
-        listed = self._get("/api/requests", {"limit": self.REQUEST_LIMIT})
-        views = listed.get("requests", []) if isinstance(listed, dict) else []
-        ids = [v.get("request_id") if isinstance(v, dict) else None for v in views]
-        valid = [rid for rid in ids if isinstance(rid, str) and _REQUEST_ID.fullmatch(rid)]
-
-        def fetch(rid: str) -> Any:
+        # 동시 목록 갱신을 직렬화해 오래된 목록/상세가 새 캐시를 덮지 못하게 한다.
+        with self._events_lock:
+            with self._final_lock:
+                generation = self._final_generation
             try:
-                return self._detail(rid)
+                # 권한 변경과 삭제를 TTL 대기 없이 확인한다.
+                listed = self.client.get("/api/requests", {"limit": self.REQUEST_LIMIT, "include_records": 1})
+            except (RuntimeNotFound, RuntimeUnauthorized, RuntimeUnavailable):
+                self._invalidate_final_events()
+                raise
+            views = listed.get("requests", []) if isinstance(listed, dict) else []
+            active_ids = {v.get("request_id") for v in views[:self.REQUEST_LIMIT] if isinstance(v, dict)
+                          and isinstance(v.get("request_id"), str) and _REQUEST_ID.fullmatch(v["request_id"])}
+            with self._final_lock:
+                self._final_events = {rid: hit for rid, hit in self._final_events.items()
+                                      if rid in active_ids and time.monotonic() - hit[0] < self.FINAL_EVENT_TTL}
+            out: list[Any] = []
+            detail_window_limited=False
+            def fetch(rid: str) -> tuple[Any, Exception | None]:
+                with self._final_lock:
+                    hit = self._final_events.get(rid)
+                if hit is not None:
+                    return hit[1], None
+                try:
+                    detail = self._detail(rid)
+                except (RuntimeNotFound, RuntimeWindowIncomplete) as error:
+                    return None, error
+                record = pick_gateway_record(detail.get("gateway_records", []) if isinstance(detail, dict) else [])
+                event = gateway_event(record) if record is not None else detail
+                if record is not None and record.get("phase") == "final":
+                    with self._final_lock:
+                        if generation == self._final_generation:
+                            self._final_events[rid] = (time.monotonic(), event)
+                return event, None
+
+            valid = list(dict.fromkeys(v.get("request_id") for v in views[:self.REQUEST_LIMIT]
+                         if isinstance(v, dict) and isinstance(v.get("request_id"), str)
+                         and _REQUEST_ID.fullmatch(v["request_id"])))
+            inline = listed.get("gateway_records") if isinstance(listed, dict) else None
+            if isinstance(inline, dict):
+                # New Gateways return records from the very same fresh bounded
+                # list read. Prefer them over cached finals and detail fanout.
+                details = {}
+                for rid in valid:
+                    records = inline.get(rid)
+                    if (not isinstance(records, list) or not records
+                            or any(not isinstance(record, dict) or record.get("request_id") != rid
+                                   for record in records)):
+                        self._invalidate_final_events(rid)
+                        details[rid] = (None, RuntimeWindowIncomplete(rid))
+                        continue
+                    record = pick_gateway_record(records)
+                    if record is None:
+                        self._invalidate_final_events(rid)
+                    details[rid] = ((gateway_event(record), None) if record is not None
+                                    else (None, RuntimeWindowIncomplete(rid)))
+            else:
+                # Older Gateways ignore the optional flag. Retain their existing
+                # fresh-authorized list + bounded event-only detail cache path.
+                with ThreadPoolExecutor(max_workers=self.DETAIL_WORKERS) as pool:
+                    details = dict(zip(valid, pool.map(fetch, valid)))
+            for view in views[:self.REQUEST_LIMIT]:
+                rid = view.get("request_id") if isinstance(view, dict) else None
+                if not isinstance(rid, str) or not _REQUEST_ID.fullmatch(rid):
+                    out.append(view)
+                    continue
+                event, error = details[rid]
+                if error is not None:
+                    if isinstance(error, RuntimeWindowIncomplete):
+                        detail_window_limited = True
+                    continue
+                out.append(event)
+            window=_d(listed.get('window')) if isinstance(listed,dict) else {}
+            listed_cut=window['truncated'] if isinstance(window.get('truncated'),bool) else len(views)>=self.REQUEST_LIMIT
+            cut=detail_window_limited or listed_cut
+            lower=window.get('counts_lower_bound') is True
+            return EventBatch(out, truncated=cut, source_windows={
+                "gateway": {"returned": len(out), "total":_int(window.get("total_lower_bound")) if not lower else None, "limit": self.REQUEST_LIMIT,
+                            "truncated": cut,
+                            **({'total_lower_bound':_int(window.get('total_lower_bound')) or len(views)} if lower else {})}})
+
+    def _observation_events(self) -> EventBatch:
+        out: list[Any] = []
+        windows: dict[str, dict[str, Any]] = {}
+        for source in ("hubble", "tetragon", "management_listener", "engine_health"):
+            try:
+                payload = self._get("/api/observations", {"source": source})
             except RuntimeNotFound:
-                return None
-
-        # 상세를 하나씩 순서대로 물으면 원격 연결(터널·port-forward)에서 첫 화면이 수십 초 걸린다.
-        # 끝난 요청은 캐시되므로 동시에 묻는 수를 작게 제한해 runtime 부하를 키우지 않는다.
-        with ThreadPoolExecutor(max_workers=self.DETAIL_WORKERS) as pool:
-            details = dict(zip(valid, pool.map(fetch, valid)))
-        out: list[Any] = []
-        for view, rid in zip(views, ids):
-            if not isinstance(rid, str) or not _REQUEST_ID.fullmatch(rid):
-                out.append(view)
-                continue
-            detail = details.get(rid)
-            if detail is None:
-                continue
-            record = pick_gateway_record(detail.get("gateway_records", []) if isinstance(detail, dict) else [])
-            out.append(gateway_event(record) if record is not None else detail)
-        return EventBatch(out, truncated=len(views) >= self.REQUEST_LIMIT)
-
-    def _observation_events(self) -> list[Any]:
-        out: list[Any] = []
-        for source in ("hubble", "tetragon"):
-            payload = self._get("/api/observations", {"source": source})
-            for record in payload.get("observations", []) if isinstance(payload, dict) else []:
+                if source!="engine_health":raise
+                # Older Gateways can lack this new observation source. Its
+                # coverage stays unknown while existing event feeds remain readable.
+                payload = {}
+            records = payload.get("observations", []) if isinstance(payload, dict) else []
+            for record in records:
                 out.append(observation_event(record) if isinstance(record, dict) else record)
-        return out
+            total = _int(_d(payload.get("counts")).get("total")) if isinstance(payload, dict) else None
+            window=_d(payload.get('window')) if isinstance(payload,dict) else {}
+            lower=window.get('counts_lower_bound') is True or window.get('truncated') is True
+            windows[source] = {"returned": len(records), "total": None if lower else total, "limit": 50,
+                               "truncated": True if lower else total > len(records) if total is not None else None,
+                               **({'total_lower_bound':total} if lower and total is not None else {})}
+        return EventBatch(out, truncated=any(w["truncated"] is True for w in windows.values()), source_windows=windows)
 
     def events(self) -> EventBatch:
         gateway = self._gateway_events()
-        return EventBatch(gateway.candidates + self._observation_events(), truncated=gateway.truncated)
+        observations = self._observation_events()
+        return EventBatch(gateway.candidates + observations.candidates,
+                          truncated=gateway.truncated or observations.truncated,
+                          source_windows={**gateway.source_windows, **observations.source_windows})
 
     def request_detail(self, request_id: str) -> DetailResult:
         if not _REQUEST_ID.fullmatch(request_id):
@@ -1259,7 +1408,14 @@ class LiveRuntimeSource:
     def request_evidence(self, request_id: str) -> bytes:
         if not _REQUEST_ID.fullmatch(request_id):
             raise RuntimeNotFound(request_id)
-        return self.client.get_bytes(f"/api/requests/{request_id}/evidence")
+        try:
+            return self.client.get_bytes(f"/api/requests/{request_id}/evidence")
+        except (RuntimeNotFound,RuntimeWindowIncomplete):
+            self._invalidate_final_events(request_id)
+            raise
+        except (RuntimeUnauthorized, RuntimeUnavailable):
+            self._invalidate_final_events()
+            raise
 
     def summary(self) -> Summary:
         data = self._get("/api/summary")
@@ -1273,6 +1429,8 @@ class LiveRuntimeSource:
             total=int(data.get("total", sum(counts.values()))),
             corrupt_lines=corrupt_total,
             generated_at=_str_or_none(data.get("generated_at")),
+            counts_lower_bound=_d(data.get("window")).get("counts_lower_bound") is True,
+            history_truncated=_d(data.get("window")).get("truncated") is True,
         )
 
     def status(self) -> Any:

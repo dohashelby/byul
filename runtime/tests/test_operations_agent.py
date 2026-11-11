@@ -525,6 +525,7 @@ class TransportFailureTest(unittest.TestCase):
 class PrivilegedApplyTest(unittest.TestCase):
     def test_privileged_restore_is_reverified_and_output_bounded(self):
         from serving_runtime.operations.agent import RestoreReported
+        from serving_runtime.bundle_tools import BundleApplyError
         from serving_runtime.cli import main
         from contextlib import redirect_stdout
         agent = Agent(Mock(), Config("server-01", "/fixed-root", "test", "test", execute=True, sudo_bundle_apply=True))
@@ -536,8 +537,15 @@ class PrivilegedApplyTest(unittest.TestCase):
         self.assertIn("--operation-result", command)
         self.assertEqual(command[:2], ["sudo", "-n"])
         output = io.StringIO()
-        with patch("serving_runtime.bundle_tools.apply_bundle", side_effect=RuntimeError("이전 링크 복원 및 재시작 완료: private diagnostic")), redirect_stdout(output):
+        with patch("serving_runtime.bundle_tools.apply_bundle", side_effect=BundleApplyError("이전 링크 복원 및 재시작 완료: private diagnostic", {"state": "rolled_back"})), redirect_stdout(output):
             code = main(["bundle", "apply", "--bundle-root", "/fixed-root", "--context", "test", "--namespace", "test", "--status-url", "http://127.0.0.1:8080", "--existing", "previous", "--operation-result"])
         self.assertEqual(code, 1)
         self.assertEqual(json.loads(output.getvalue()), {"state": "rolled_back", "code": "ROLLED_BACK"})
+        self.assertNotIn("private", output.getvalue())
+        # A diagnostic containing the legacy success phrase cannot attest rollback.
+        output = io.StringIO()
+        with patch("serving_runtime.bundle_tools.apply_bundle", side_effect=RuntimeError("이전 링크 복원 및 재시작 완료: private diagnostic")), redirect_stdout(output):
+            code = main(["bundle", "apply", "--bundle-root", "/fixed-root", "--context", "test", "--namespace", "test", "--status-url", "http://127.0.0.1:8080", "--existing", "previous", "--operation-result"])
+        self.assertEqual(code, 1)
+        self.assertEqual(json.loads(output.getvalue()), {"state": "unknown", "code": "STATUS_UNKNOWN"})
         self.assertNotIn("private", output.getvalue())

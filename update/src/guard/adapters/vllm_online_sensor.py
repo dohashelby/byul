@@ -37,7 +37,7 @@ FUNCTION_ADDITIONS = {
     "vllm.entrypoints.generate.base.protocol": ("validate_request_mm_kwargs",),
 }
 # REVIEWED_PINS
-BASE_SHA256 = '2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd'
+BASE_SHA256 = 'e537d1d1b19813f171aa30b9344c1dbb49139eed3dea60bfa6dc71744d0d4f39'
 CALLBACK_SHA256 = "bd15958029e91ba189c2fe588009a97ddd4d3d339e32824e5e5016a52fa736b1"
 MODULE_CONTRACTS = {'vllm.entrypoints.generate.base.protocol': {'filename': 'vllm/entrypoints/generate/base/protocol.py',
                                              'source_sha256': '67ede411b35a8344ddb87bfaaf1a1abea8acd39a4d23655e34032015505167c0'},

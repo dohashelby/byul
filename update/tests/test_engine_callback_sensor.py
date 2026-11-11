@@ -148,7 +148,8 @@ def test_output_from_the_previous_batch_is_allowed_in_pipelined_execution():
     assert projection.project_distributed(events, SECRET, {'a': TAGS['a'], 'b': TAGS['b']})['violation'] is False
 
 
-def test_real_sources_and_shared_key_bind_engine_ids_back_to_the_parent_tag(tmp_path):
+@pytest.mark.parametrize('through_gateway', [False, True])
+def test_real_sources_and_shared_key_bind_engine_ids_back_to_the_parent_tag(tmp_path, through_gateway):
     from guard.adapters import vllm_cache_callback as callback
     manager_module = source_module('vllm.v1.core.kv_cache_manager', tmp_path)
     pool_module = source_module('vllm.v1.core.block_pool', tmp_path)
@@ -163,7 +164,8 @@ def test_real_sources_and_shared_key_bind_engine_ids_back_to_the_parent_tag(tmp_
     manager.coordinator = SimpleNamespace(find_longest_cache_hit=lambda keys, maximum: ([[]], 4, 0))
     request = SimpleNamespace(request_id=f"chatcmpl-{TAGS['a']}-1234", cache_salt='private-salt-value', block_hashes=[b'x'], lora_request=None, num_tokens=5)
     manager.get_computed_blocks(request)
-    found = projection.computed_rows(rows, SECRET, {'a': TAGS['a']})
+    found = (projection.gateway_rows(rows, SECRET, [{'case_id': 'a'}], {'a': 'a' * 32})
+             if through_gateway else projection.computed_rows(rows, SECRET, {'a': TAGS['a']}))
     assert found['a'][0]['tokens'] == 4 and 'private-salt-value' not in json.dumps(rows) and TAGS['a'] not in json.dumps(rows)
 
 
@@ -428,9 +430,10 @@ class GatewayTransport(Transport):
         self.count += 1
         tokens = 16 if request['id'] != 'cb-9999' and self.count % 3 == 0 else 0
         self.events.append({'point': projection.COMPUTED, 'phase': 'RETURN', 'entry_qualified_before': True,
-            'entry_qualified_after': True, 'fields': {'request_sha256': 'gw-%d' % self.count, 'num_computed_tokens': tokens,
+            'entry_qualified_after': True, 'fields': {'request_sha256': projection.tag_digest(self.secret, 'byul-cb-%032x' % self.count), 'num_computed_tokens': tokens,
                 'request_block_hashes_sha256': ['h' + request['body']['messages'][0]['content'][-2:]], 'request_cache_salt_sha256': 'salt-' + principal}})
-        return [{'outcome': 200, 'capture_complete': True, 'elapsed_ms': 5, 'body': '{}'}]
+        return [{'outcome': 200, 'capture_complete': True, 'elapsed_ms': 5, 'body': '{}',
+                 'gateway_request_id': '%032x' % self.count}]
 
 
 def run_gateway(tmp_path, monkeypatch, *, outcomes=None, cases=GATEWAY_CASES):
@@ -461,6 +464,28 @@ def test_gateway_rejecting_forged_salt_is_not_a_failed_normal_control(tmp_path, 
     assert draft.observations['engine_sensor_full_scope'].value is True
     assert len(facts['trials']) == len(GATEWAY_CASES)
     assert [t['outcome'] for t in facts['trials'] if 'forged' in t['case_id']] == [403, 403]
+
+
+def test_gateway_rows_ignore_concurrent_noise_and_callback_order():
+    ids = {'a': 'a' * 32, 'b': 'b' * 32, 'c': 'c' * 32}
+    events = [computed('byul-cb-' + ids['c'], 0), computed('unrelated-request', 999),
+              computed('byul-cb-' + ids['b'], 16), computed('byul-cb-' + ids['a'], 0), computed('later-request', 999)]
+    rows = projection.gateway_rows(events, SECRET, GROUP_CASES, ids)
+    assert {key: value[0]['tokens'] for key, value in rows.items()} == {'a': 0, 'b': 16, 'c': 0}
+
+
+@pytest.mark.parametrize('ids', [{}, {'a': 'same', 'b': 'same'}, {'a': 'bad\nheader'}])
+def test_gateway_missing_or_duplicate_ids_never_fall_back_to_sequence(ids):
+    events = [computed('same', 16), computed('noise', 16)]
+    assert projection.gateway_rows(events, SECRET, GROUP_CASES, ids) == {}
+
+
+def test_gateway_missing_callback_does_not_borrow_another_requests_hit():
+    ids = {'a': 'a' * 32, 'b': 'b' * 32, 'c': 'c' * 32}
+    events = [computed('byul-cb-' + ids['b'], 16), computed('unrelated', 0)]
+    rows = projection.gateway_rows(events, SECRET, GROUP_CASES, ids)
+    assert set(rows) == {'b'}
+    assert projection.project_cache_group(GROUP_CASES, rows, GROUP_POLICY)['violation'] is None
 
 
 @pytest.mark.parametrize('case_id,outcome,capture_complete', [

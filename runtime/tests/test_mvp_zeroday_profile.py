@@ -433,7 +433,7 @@ class ZerodayGatewayHttpTests(unittest.TestCase):
         )
         self.assertEqual(status, 200)
         request_id = headers["X-Request-ID"]
-        received = [item for item in self.fake.requests if item["request_id"] == request_id]
+        received = [item for item in self.fake.requests if item["request_id"] == "byul-cb-" + request_id]
         self.assertEqual(len(received), 1)
         values = received[0]["extra_values"]
         self.assertEqual(values["temperature"], 0.7)
@@ -466,7 +466,7 @@ class ZerodayGatewayHttpTests(unittest.TestCase):
         status, headers, body = self.post(chat(stream=True, temperature=1, ignore_eos=True))
         self.assertEqual(status, 200)
         self.assertIn(b"[DONE]", body)
-        received = [i for i in self.fake.requests if i["request_id"] == headers["X-Request-ID"]]
+        received = [i for i in self.fake.requests if i["request_id"] == "byul-cb-" + headers["X-Request-ID"]]
         self.assertTrue(received[0]["stream"])
         self.assertEqual(received[0]["extra_values"], {"temperature": 1, "ignore_eos": True})
 
@@ -505,7 +505,7 @@ class ZerodayGatewayHttpTests(unittest.TestCase):
         self.assertEqual(sent["chat_template_kwargs"], kwargs)
         self.assertEqual(sent["temperature"], 0.5)
         self.assertEqual(sent["model"], "backend-test-model")
-        received = [i for i in self.fake.requests if i["request_id"] == headers["X-Request-ID"]]
+        received = [i for i in self.fake.requests if i["request_id"] == "byul-cb-" + headers["X-Request-ID"]]
         self.assertEqual(received[0]["extra_values"]["chat_template_kwargs"], kwargs)
 
     def test_tokenizer_rejecting_extra_fields_holds_the_request(self) -> None:

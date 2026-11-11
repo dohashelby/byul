@@ -167,6 +167,7 @@ class ArgumentTests(unittest.TestCase):
             checker = AWSAcceptance(arguments(Path(directory)), runner=LogRunner(), http=FakeHTTP(responses))
             checker._context_limits = lambda: (2048, 256)
             checker._context_probe = lambda route, token, limit, output: (True, True, {"route": route})
+            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
             facts, evidence = checker.aws_18()
             self.assertEqual(evaluate_case("AWS-18", facts)[0], "passed")
             self.assertEqual(len(evidence["requests"]), 4)
@@ -177,6 +178,7 @@ class ArgumentTests(unittest.TestCase):
                                                   response(200, {"choices": [{"text": "ok"}]}, "comp-n"),
                                                   sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\n', "comp-s"),
                                                   response(200, detail("ALLOWED", attempted=True, outcome="completed"))]
+            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
             facts, evidence = checker.aws_18()
             self.assertIsNone(facts["usage"])
             self.assertFalse(facts["stream"])
@@ -201,6 +203,7 @@ class ArgumentTests(unittest.TestCase):
             checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(),
                                     http=FakeHTTP(responses))
             checker._context_limits = lambda: None
+            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
             facts, evidence = checker.aws_18()
         self.assertFalse(facts["stream"])
         self.assertEqual(evidence["requests"][3]["record"]["delivery"]["error_code"],
@@ -238,6 +241,7 @@ class ArgumentTests(unittest.TestCase):
             checker._route_rejection_record = lambda _id: {"found": True, "reason": "NOT_FOUND",
                                                             "response_code": 404, "forwarded_to_engine": False}
             checker._detail = lambda _id: detail("INVALID", reason="UNSUPPORTED_FIELD", attempted=False, status=400)
+            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
             facts, evidence = checker.aws_19()
             self.assertEqual(evaluate_case("AWS-19", facts)[0], "passed")
             self.assertEqual(len(evidence["attempts"]), 16)
@@ -276,6 +280,7 @@ class ArgumentTests(unittest.TestCase):
             self.assertEqual(evaluate_case("AWS-19", facts)[0], "unknown")
             checker.http.responses = list(replies)
             checker._route_rejection_record = lambda _id: {"found": False}
+            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
             facts, evidence = checker.aws_19()
             self.assertFalse(facts["records"])
             self.assertEqual(evaluate_case("AWS-19", facts)[0], "failed")
@@ -843,6 +848,61 @@ class FakeExecutionTests(unittest.TestCase):
             self.assertFalse(checker._log_received(chat, request_id, "/v1/completions"))
             self.assertTrue(checker._log_received(completion, request_id, "/v1/completions"))
 
+    def test_callback_log_exact_uuid_and_record_generation(self):
+        rid = "a" * 32
+        generation = {"name": "engine", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}
+        with tempfile.TemporaryDirectory() as directory:
+            checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(), http=FakeHTTP([]))
+            checker._engine_log_generation = generation
+            final = {"target": {"pod_uid": "pod-1", "container_id": "containerd://1"},
+                     "upstream_request_id": "byul-cb-" + rid, "phase": "final", "request_id": rid}
+            checker._detail = lambda _: {"final_state": {"result": "ALLOWED"}, "gateway_records": [final]}
+            log = "Received request chatcmpl-byul-cb-" + rid + ": prompt omitted"
+            self.assertTrue(checker._log_received(log, rid, "/v1/chat/completions"))
+            final.update(phase="final", request_id=rid)
+            checker._detail = lambda _: {"final_state": {"result": "ALLOWED"}, "gateway_records": [final]}
+            self.assertTrue(checker._log_received(log, rid, "/v1/chat/completions"))
+            checker._detail = lambda _: {"final_state": {"result": "ALLOWED"}, "gateway_records": [final, final]}
+            self.assertFalse(checker._log_received(log, rid, "/v1/chat/completions"))
+            checker._detail = lambda _: {"final_state": {"result": "ALLOWED"}, "gateway_records": [final]}
+            self.assertFalse(checker._log_received(log, "b" * 32, "/v1/chat/completions"))
+            self.assertFalse(checker._log_received(log.replace(rid, rid[:-1]), rid, "/v1/chat/completions"))
+            self.assertFalse(checker._log_received(log.replace(rid, rid + "b"), rid, "/v1/chat/completions"))
+            final["target"]["container_id"] = "containerd://other"
+            self.assertFalse(checker._log_received(log, rid, "/v1/chat/completions"))
+
+    def test_actual_api_detail_shape_and_closed_metadata_boundaries(self):
+        document = json.loads((Path(__file__).parent / "fixtures/aws-request-detail-20261106.json").read_text())
+        rid = document["request_id"]
+        final = next(row for row in document["gateway_records"] if row["phase"] == "final")
+        with tempfile.TemporaryDirectory() as directory:
+            checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(), http=FakeHTTP([]))
+            checker._engine_log_generation = {"uid": final["target"]["pod_uid"], "container_id": final["target"]["container_id"]}
+            checker._detail = lambda _: document
+            log = "Received request chatcmpl-" + final["upstream_request_id"] + ":"
+            self.assertTrue(checker._log_received(log, rid, "/v1/chat/completions"))
+            for malformed in [None, {}, "invalid", [], [final, final], [{**final, "request_id": "other"}], [{**final, "phase": "started"}]]:
+                with self.subTest(rows=type(malformed).__name__):
+                    # Even a context-looking projection cannot bypass canonical rows.
+                    checker._detail = lambda _, rows=malformed: {"final_state": final, "gateway_records": rows}
+                    self.assertFalse(checker._log_received(log, rid, "/v1/chat/completions"))
+
+    def test_engine_logs_bind_one_unchanged_generation(self):
+        generation = {"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}
+        with tempfile.TemporaryDirectory() as directory:
+            runner = FakeRunner([CommandResult(0, "bounded log")])
+            checker = AWSAcceptance(arguments(Path(directory)), runner=runner, http=FakeHTTP([]))
+            checker._engine_pod = lambda: (generation, CommandResult(0))
+            result, log = checker._engine_logs("2026-11-06T00:00:00Z")
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(log, "bounded log")
+            self.assertIn("pod/engine-1", runner.history[0]["argv"])
+            generations = iter([generation, {**generation, "container_id": "containerd://2"}])
+            checker._engine_pod = lambda: (next(generations), CommandResult(0))
+            result, log = checker._engine_logs("2026-11-06T00:00:00Z")
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(log, "")
+
     def test_all_in_pod_python_snippets_compile(self) -> None:
         for code in (TCP_PROBE_CODE, WRITE_DENY_CODE, CACHE_WRITE_CODE, ROUTE_RECORD_PROBE_CODE, COUNT_TOKENS_CODE):
             with self.subTest(code=code[:30]):
@@ -875,6 +935,7 @@ class FakeExecutionTests(unittest.TestCase):
                 runner=fake_runner,
                 http=fake_http,
             )
+            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
             checker._run_case("AWS-01", checker.aws_01)
             self.assertEqual(checker.cases[0]["result"], "passed")
             self.assertTrue(checker.engine_log_format_confirmed)
@@ -900,6 +961,7 @@ class FakeExecutionTests(unittest.TestCase):
                 runner=FakeRunner([CommandResult(0, "Received request chatcmpl-normal-1\n")]),
                 http=fake_http,
             )
+            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
             checker._run_case("AWS-01", checker.aws_01)
             self.assertEqual(checker.cases[0]["result"], "failed")
             self.assertFalse(checker.cases[0]["facts"]["stream_ok"])
@@ -922,6 +984,7 @@ class FakeExecutionTests(unittest.TestCase):
                 runner=FakeRunner([CommandResult(0, "Received request chatcmpl-normal-1\n")]),
                 http=fake_http,
             )
+            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
             checker._run_case("AWS-01", checker.aws_01)
             case = checker.cases[0]
             self.assertEqual(case["result"], "unknown")
@@ -961,6 +1024,7 @@ class FakeExecutionTests(unittest.TestCase):
                 http=fake_http,
             )
             checker.engine_log_format_confirmed = True
+            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
             checker._run_case("AWS-02", checker.aws_02)
             self.assertEqual(checker.cases[0]["result"], "passed")
             serialized = json.dumps(checker.cases)
@@ -995,6 +1059,7 @@ class FakeExecutionTests(unittest.TestCase):
                 http=fake_http,
             )
             checker.engine_log_format_confirmed = True
+            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
             checker._run_case("AWS-03", checker.aws_03)
             self.assertEqual(checker.cases[0]["result"], "passed")
             self.assertEqual(checker.cases[0]["evidence"]["policy_limit"], 128)
@@ -1021,6 +1086,7 @@ class FakeExecutionTests(unittest.TestCase):
                     http=http,
                 )
                 checker.engine_log_format_confirmed = confirmed
+                checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
                 checker._run_case("AWS-03", checker.aws_03)
                 return checker.cases[0]["result"]
 
@@ -1034,6 +1100,7 @@ class FakeExecutionTests(unittest.TestCase):
         runner = FakeRunner(
             [
                 CommandResult(1, "CONNECTED\n"),
+                CommandResult(0, "CONNECT_FAILED errno=110 name=ETIMEDOUT\n"),
                 CommandResult(0, "CONNECT_FAILED errno=110 name=ETIMEDOUT\n"),
                 CommandResult(1, "CONNECTED\n"),
             ]
@@ -1077,6 +1144,7 @@ class FakeExecutionTests(unittest.TestCase):
             [
                 CommandResult(1, "CONNECTED\n"),
                 CommandResult(0, "CONNECT_FAILED errno=111 name=ECONNREFUSED\n"),
+                CommandResult(0, "CONNECT_FAILED errno=110 name=ETIMEDOUT\n"),
                 CommandResult(1, "CONNECTED\n"),
             ]
         )

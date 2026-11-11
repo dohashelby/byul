@@ -973,9 +973,10 @@ class LabIntentTests(unittest.TestCase):
         manifests.update(render_tetragon(intent))
         self.assertIn("cilium-engine-ingress.json", manifests)
         self.assertIn("tetragon-tg-deny-01.json", manifests)
+        self.assertIn("tetragon-tg-code-01.json", manifests)
         with tempfile.TemporaryDirectory() as temporary:
             written = write_manifests(manifests, temporary)
-            self.assertEqual(len(written), 7)
+            self.assertEqual(len(written), 8)
             self.assertTrue(all(path.is_file() for path in written))
 
     def test_fake_backend_host_default_is_unchanged_and_lab_host_is_selectable(self) -> None:

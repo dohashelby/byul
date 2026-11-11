@@ -12,7 +12,6 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 from ipaddress import ip_address
 import json
-import shlex
 import math
 import os
 from pathlib import Path
@@ -130,6 +129,16 @@ TCP_PROBE_CODE = (
     "name=errno.errorcode.get(r,'UNKNOWN'); "
     "print(('CONNECT_FAILED errno=%d name=%s' % (r,name)) if r else 'CONNECTED'); "
     "sys.exit(0 if r else 1)"
+)
+TOKENIZE_PROBE_CODE = (
+    "import errno,json,socket,sys; "
+    "body=json.dumps({'model':'test-model','messages':[{'role':'user','content':'Say hello in one short sentence.'}],"
+    "'max_tokens':8,'mm_processor_kwargs':{'code_revision':'BYUL_SYNTHETIC_CODE_SELECTION'}}).encode(); "
+    "s=socket.socket(); s.settimeout(3); r=s.connect_ex((sys.argv[1],int(sys.argv[2]))); "
+    "\nif r:\n s.close(); print('CONNECT_FAILED errno=%d name=%s' % (r,errno.errorcode.get(r,'UNKNOWN'))); sys.exit(0)\n"
+    "print('CONNECTED',flush=True); "
+    "s.sendall(('POST /tokenize HTTP/1.1\\r\\nHost: serving-engine:8000\\r\\nContent-Type: application/json\\r\\n'"
+    "+'Connection: close\\r\\nContent-Length: %d\\r\\n\\r\\n' % len(body)).encode()+body); s.close(); sys.exit(1)"
 )
 WRITE_DENY_CODE = (
     "import errno,os,sys; p=sys.argv[1]; "
@@ -338,13 +347,12 @@ def _aws20_raw_action(path: Path, *, since: str, pod_uid: str, namespace: str,
                     root = json.loads(line)
                     event = root.get("process_lsm" if method == "lsm_file_open" else "process_kprobe") or {}
                     pod = (event.get("process") or {}).get("pod") or {}
-                    arguments = (event.get("process") or {}).get("arguments", "")
                     args = event.get("args") or []
                     if (_after(root.get("time"), since)
                         and event.get("policy_name") == "runtime-tg-secret-01"
                         and event.get("action") == action
                         and pod.get("uid") == pod_uid and pod.get("namespace") == namespace
-                        and (probe_tag is None or probe_tag in shlex.split(arguments))
+                        and (probe_tag is None or event.get("runtime_probe_id") == probe_tag)
                         and any(isinstance(arg, dict) and ((arg.get("file_arg") or {}).get("path") == _SECRET_PROBE_PATH
                                                            or str(arg.get("string_arg", "")).rstrip("\x00") == _SECRET_PROBE_PATH) for arg in args)
                         and (method != "override_lsm" or any(isinstance(arg, dict) and str(arg.get("int_arg")) == "4" for arg in args))):
@@ -442,6 +450,12 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
 
     if case_id not in CASE_IDS:
         raise ValueError("unknown AWS acceptance case")
+    # Either direct connection disproves denial, even if controls are missing.
+    # The tokenize fact is supplementary: its absence is not a pass requirement.
+    if case_id == "AWS-04" and (
+        facts.get("direct_connected") is True or facts.get("tokenize_direct_failed") is False
+    ):
+        return "failed", "직통 연결 성공: TCP 또는 POST /tokenize(코드 선택 본문)"
     if case_id in {"AWS-12", "AWS-13", "AWS-15", "AWS-16", "AWS-20"} and facts.get("cleanup_ok") is False:
         return "failed", "시험 뒤 정리 또는 복구 실패"
     if facts.get("not_run_reason"):
@@ -670,6 +684,14 @@ def _report_binary_path(value: object) -> str:
     return "확인 못 함"
 
 
+def _tokenize_probe_summary(evidence: Mapping[str, Any]) -> str:
+    marker = _report_at(evidence, "tokenize_direct_probe", "marker")
+    number = 0 if marker == "CONNECTED" else _report_at(evidence, "tokenize_direct_probe", "errno")
+    name = "CONNECTED" if marker == "CONNECTED" else _report_at(evidence, "tokenize_direct_probe", "errno_name")
+    return ("직통 POST /tokenize(코드 선택 본문) 연결 errno "
+            f"{_report_value(number)} ({_report_code(name)})")
+
+
 def _report_summary(case: Mapping[str, Any]) -> str:
     case_id = case.get("case_id")
     facts = case.get("facts") or {}
@@ -700,7 +722,7 @@ def _report_summary(case: Mapping[str, Any]) -> str:
     if case_id == "AWS-04":
         return (f"직통 연결 {_report_code(at('direct_probe', 'errno_name'))}, "
                 f"Gateway 앞/뒤 연결 {fact('gateway_tcp_control')}, 요청 200 {fact('gateway_control_200')}, "
-                f"Hubble dropped {fact('hubble_dropped')}")
+                f"Hubble dropped {fact('hubble_dropped')}; {_tokenize_probe_summary(evidence)}")
     if case_id == "AWS-05":
         return (f"engine→receiver 연결 {_report_code(at('engine_receiver_probe', 'errno_name'))}, "
                 f"other-client 대조 연결 {fact('receiver_control_connected')}, Hubble dropped {fact('receiver_hubble_dropped')}")
@@ -810,7 +832,9 @@ def publish_report(report: Mapping[str, Any], directory: Path, secrets: Iterable
             "status": case["result"],
             "summary": {"passed": "해당 사례 기준 충족", "failed": "해당 사례 기준 미충족",
                         "unknown": "근거 부족·미확인", "not_run": "미실행"}[case["result"]],
-            "evidence": [], "limitation": REPORT_CASES[case["case_id"]].gap,
+            "evidence": ([_tokenize_probe_summary(case["evidence"])]
+                         if case["case_id"] == "AWS-04" and "tokenize_direct_probe" in (case.get("evidence") or {}) else []),
+            "limitation": REPORT_CASES[case["case_id"]].gap,
             "note": "AWS · " + report["engine"] + " · 선택 사례의 해당 회차 결과만 표시. 상세 근거는 비공개 evidence에 보존.",
         } for case in report["cases"]],
     }
@@ -1054,14 +1078,21 @@ class AWSAcceptance:
         return detail if response.status == 200 else None
 
     def _engine_logs(self, since: str) -> tuple[CommandResult, str]:
+        # A deployment can select another Pod while a rollout is in progress.
+        # Read one actual container and require that generation to stay fixed.
+        self._engine_log_generation = None
+        before, _ = self._engine_pod()
+        keys = ("name", "uid", "container_id", "started_at")
+        if not before or any(not before.get(key) for key in keys):
+            return CommandResult(1, "", "engine log generation unavailable"), ""
         result = self._kubectl(
-            "logs",
-            "deployment/serving-engine",
-            "-c",
-            "engine",
-            f"--since-time={since}",
-            timeout=60,
+            "logs", "pod/" + before["name"], "-c", "engine",
+            f"--since-time={since}", timeout=60,
         )
+        after, _ = self._engine_pod()
+        if not after or any(before.get(key) != after.get(key) for key in keys):
+            return CommandResult(1, "", "engine log generation changed"), ""
+        self._engine_log_generation = before
         return result, result.stdout + result.stderr
 
     def _log_received(self, logs: str, request_id: str | None, route: str) -> bool:
@@ -1088,7 +1119,35 @@ class AWSAcceptance:
             engine_id = f"cmpl-{request_id}-0"
         else:
             return False
-        return f"Received request {engine_id}" in logs
+        expected = {engine_id}
+        # Reuse the existing UPDATE callback tag grammar. Only the trusted
+        # Gateway UUID may supply the tag; response completion IDs are unused.
+        if re.fullmatch(r"[0-9a-f]{32}", request_id):
+            try:
+                from guard.adapters.vllm_engine_callback_sensor import TAG
+            except ImportError:
+                TAG = None
+            tag = "byul-cb-" + request_id
+            if TAG is not None and TAG.fullmatch(tag):
+                generation = getattr(self, "_engine_log_generation", None)
+                detail = self._detail(request_id) if generation else None
+                # Context comes only from the immutable full journal rows.
+                # final_state is an API verdict projection, never metadata.
+                records = detail.get("gateway_records") if isinstance(detail, dict) else None
+                rows = [row for row in records
+                        if isinstance(row, dict) and row.get("phase") == "final"
+                        and row.get("request_id") == request_id] if isinstance(records, list) else []
+                final = rows[0] if len(rows) == 1 else None
+                target = final.get("target") if isinstance(final, dict) else None
+                bound = (isinstance(target, dict)
+                         and target.get("pod_uid") == generation.get("uid")
+                         and target.get("container_id") == generation.get("container_id")
+                         and final.get("upstream_request_id") == tag)
+                if bound:
+                    expected.add("chatcmpl-" + tag if route == "/v1/chat/completions" else "cmpl-" + tag + "-0")
+        # Parse a complete ID token, so a prefix/partial ID cannot match.
+        return any(match.group(1) in expected for match in re.finditer(
+            r"Received request ([A-Za-z0-9_-]+)(?=[:.\s]|$)", logs))
 
     @staticmethod
     def _sglang_prompt_fields(logs: str) -> list[str]:
@@ -1211,9 +1270,9 @@ class AWSAcceptance:
             "ready": ready,
         }, result
 
-    def _tcp_probe(self, pod: str, container: str, host: str, port: int) -> dict[str, Any]:
+    def _tcp_probe(self, pod: str, container: str, host: str, port: int, *, probe_code: str = TCP_PROBE_CODE) -> dict[str, Any]:
         result = self._kubectl(
-            "exec", pod, "-c", container, "--", "python3", "-c", TCP_PROBE_CODE, host, str(port), timeout=15
+            "exec", pod, "-c", container, "--", "python3", "-c", probe_code, host, str(port), timeout=15
         )
         marker = "CONNECT_FAILED" if "CONNECT_FAILED" in result.stdout else (
             "CONNECTED" if "CONNECTED" in result.stdout else None
@@ -1616,8 +1675,8 @@ class AWSAcceptance:
             "engine_evidence": {
                 "state": "observed" if log_match else "unknown",
                 "match": ("JSON request.received/request.finished headers.x-request-id"
-                          if self.engine == "sglang" else "Received request chatcmpl-<gateway request id>"),
-                "reference": "kubectl logs deployment/serving-engine -c engine --since-time",
+                          if self.engine == "sglang" else "generation-bound Received request exact UUID/callback tag"),
+                "reference": "kubectl logs pod/<exact-generation> -c engine --since-time",
                 "prompt_fields": self._sglang_prompt_fields(logs) if self.engine == "sglang" else None,
             },
         }
@@ -1898,7 +1957,7 @@ class AWSAcceptance:
             "attempts": attempts,
             "engine_evidence": {
                 "state": "not_observed" if log_absent and self.engine_log_format_confirmed else "unknown",
-                "reference": "kubectl logs deployment/serving-engine -c engine --since-time",
+                "reference": "kubectl logs pod/<exact-generation> -c engine --since-time",
                 "note": "positive log format must first be confirmed by AWS-01",
             },
         }
@@ -1958,7 +2017,7 @@ class AWSAcceptance:
             },
             "engine_evidence": {
                 "state": "not_observed" if log_absent is True and self.engine_log_format_confirmed else "unknown",
-                "reference": "kubectl logs deployment/serving-engine -c engine --since-time",
+                "reference": "kubectl logs pod/<exact-generation> -c engine --since-time",
                 "note": "positive log format must first be confirmed by AWS-01",
             },
         }
@@ -1969,26 +2028,48 @@ class AWSAcceptance:
             "deployment/serving-gateway", "gateway", "serving-engine", 8000
         )
         probe = self._tcp_probe("pod/other-client", "client", "serving-engine", 8000)
-        gateway_after = self._tcp_probe(
-            "deployment/serving-gateway", "gateway", "serving-engine", 8000
-        )
-        control, request_id, valid = self._completion(
-            token=self.tokens["RUNTIME_INFERENCE_TOKEN"]
-        )
-        control_record = _record_fields(self._detail(request_id))
-        available, refs = self._wait_observation_refs(
-            "hubble",
-            since,
-            lambda item: (
-                str((item.get("src") or {}).get("pod", "")).startswith("other-client")
-                and str((item.get("dst") or {}).get("pod", "")).startswith("serving-engine")
-                and (item.get("dst") or {}).get("port") == 8000
-                and str(item.get("verdict", "")).lower() == "dropped"
-            ),
-        )
+        try:
+            tokenize_probe = self._tcp_probe(
+                "pod/other-client", "client", "serving-engine", 8000, probe_code=TOKENIZE_PROBE_CODE
+            )
+        except Exception as error:
+            # Keep the primary probe and its evidence if this auxiliary exec fails.
+            tokenize_probe = {"marker": None, "errno": None, "errno_name": None,
+                              "connection_timed_out": False, "error": _safe_exception(error)}
+        gateway_after = {"connected": False, "marker": None, "python_available": True}
+        control = None
+        control_record = None
+        available, refs = False, []
+        control_error = None
+        try:
+            gateway_after = self._tcp_probe(
+                "deployment/serving-gateway", "gateway", "serving-engine", 8000
+            )
+            control, request_id, valid = self._completion(
+                token=self.tokens["RUNTIME_INFERENCE_TOKEN"]
+            )
+            control_record = _record_fields(self._detail(request_id))
+            available, refs = self._wait_observation_refs(
+                "hubble",
+                since,
+                lambda item: (
+                    str((item.get("src") or {}).get("pod", "")).startswith("other-client")
+                    and str((item.get("dst") or {}).get("pod", "")).startswith("serving-engine")
+                    and (item.get("dst") or {}).get("port") == 8000
+                    and str(item.get("verdict", "")).lower() == "dropped"
+                ),
+            )
+        except Exception as error:
+            # An observed direct success must survive a later control failure.
+            control_error = _safe_exception(error)
         gateway_tcp_control = gateway_before["connected"] and gateway_after["connected"]
         facts: dict[str, Any] = {
             "direct_failed": probe["connection_timed_out"] if probe["marker"] is not None else None,
+            "direct_connected": probe["marker"] == "CONNECTED",
+            "tokenize_direct_failed": (
+                False if tokenize_probe["marker"] == "CONNECTED"
+                else True if tokenize_probe["connection_timed_out"] else None
+            ),
             "gateway_tcp_control": (
                 gateway_tcp_control
                 if gateway_before["marker"] is not None and gateway_after["marker"] is not None
@@ -1996,7 +2077,7 @@ class AWSAcceptance:
             ),
             "gateway_control_200": (
                 None
-                if control_record is None
+                if control is None or control_record is None
                 else control.status == 200
                 and valid
                 and control_record["result"] == "ALLOWED"
@@ -2004,21 +2085,29 @@ class AWSAcceptance:
             ),
             "hubble_dropped": bool(refs) if available else None,
         }
-        if not probe["python_available"]:
-            facts = {"not_run_reason": "other-client에 python3가 없음"}
+        if control_error is not None:
+            facts["unknown_reason"] = f"AWS-04 대조 실행 오류({control_error})"
+        elif not probe["python_available"]:
+            facts["not_run_reason"] = "other-client에 python3가 없음"
         elif not gateway_before["python_available"] or not gateway_after["python_available"]:
-            facts = {"unknown_reason": "Gateway 컨테이너에서 TCP 대조 probe를 실행하지 못함"}
+            facts["unknown_reason"] = "Gateway 컨테이너에서 TCP 대조 probe를 실행하지 못함"
         elif probe["connection_failed"] and not probe["connection_timed_out"]:
-            facts = {
-                "unknown_reason": (
-                    "other-client→engine 연결 실패가 시간 초과가 아님"
-                    f"({probe['errno_name'] or 'errno 미확인'})"
-                )
-            }
+            facts["unknown_reason"] = (
+                "other-client→engine 연결 실패가 시간 초과가 아님"
+                f"({probe['errno_name'] or 'errno 미확인'})"
+            )
+        elif facts["tokenize_direct_failed"] is None:
+            facts["unknown_reason"] = (
+                "직통 POST /tokenize(코드 선택 본문) 연결 시간 초과 미확인"
+                f"({tokenize_probe['errno_name'] or 'errno 미확인'}); 다른 errno 또는 실행 오류"
+            )
         return facts, {
             "direct_probe": probe,
+            "tokenize_direct_probe": {**tokenize_probe, "method": "POST", "path": "/tokenize",
+                                      "note": "합성 mm_processor_kwargs.code_revision 본문; 연결 단계 차단이면 본문 미전송"},
             "gateway_tcp_control": {"before": gateway_before, "after": gateway_after},
             "record_fields_used": control_record,
+            "control_error": control_error,
             "observation_references": refs,
             "observation": {
                 "state": "observed" if refs else "not_observed",

@@ -27,6 +27,7 @@ class EngineServer(ThreadingHTTPServer):
 
     def __init__(self) -> None:
         self.requests: list[dict[str, object]] = []
+        self.reject_head = False
         super().__init__(("127.0.0.1", 0), EngineHandler)
         self.thread = threading.Thread(target=self.serve_forever, daemon=True)
 
@@ -57,6 +58,11 @@ class EngineHandler(BaseHTTPRequestHandler):
                 "headers": dict(self.headers.items()),
             }
         )
+        if head and self.server.reject_head:
+            self.send_response(405)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         if self.path == "/slow":
             time.sleep(0.2)
         body = b"x" * 64 if self.path == "/large" else b"engine-management"
@@ -193,6 +199,31 @@ class ManagementListenerHTTPTests(unittest.TestCase):
             [("GET", "/health"), ("HEAD", "/health")],
         )
 
+    def test_head_uses_bounded_get_when_engine_rejects_head(self) -> None:
+        self.engine.reject_head = True
+        status, headers, body = self.request("HEAD", "/health")
+        self.assertEqual((status, body), (200, b""))
+        self.assertEqual(int(headers["Content-Length"]), len(b"engine-management"))
+        self.assertEqual([r["method"] for r in self.engine.requests], ["HEAD", "GET"])
+        records = self.parsed_records()
+        self.assertEqual(len(records), 1)
+        self.assertEqual((records[0]["method"], records[0]["status_code"], records[0]["allowed_count"]), ("HEAD", 200, 1))
+
+    def test_head_get_fallback_retains_size_and_time_bounds(self) -> None:
+        self.engine.reject_head = True
+        for path, expected in (("/large", 502), ("/slow", 504)):
+            with self.subTest(path=path):
+                status, _, body = self.request("HEAD", path)
+                self.assertEqual((status, body), (expected, b""))
+        self.assertEqual([r["method"] for r in self.engine.requests], ["HEAD", "GET", "HEAD", "GET"])
+
+    def test_head_body_and_unknown_path_never_reach_fallback(self) -> None:
+        self.engine.reject_head = True
+        self.assertEqual(self.request("HEAD", "/health", body=b"private-body")[0], 400)
+        self.assertEqual(self.request("HEAD", "/not-allowed")[0], 404)
+        self.assertEqual(self.engine.requests, [])
+        self.assertNotIn("private-body", self.records.getvalue())
+
     def test_method_body_and_path_variants_are_not_relayed(self) -> None:
         cases = [
             ("POST", "/health", None, 405),
@@ -266,7 +297,7 @@ class ManagementListenerHTTPTests(unittest.TestCase):
         )
         self.assertNotIn(b"x" * 8, body)
 
-    def test_records_contain_only_schema_counts_path_and_status(self) -> None:
+    def test_records_contain_safe_access_identity_and_counts(self) -> None:
         self.request(
             "GET",
             "/health",
@@ -281,7 +312,7 @@ class ManagementListenerHTTPTests(unittest.TestCase):
         self.assertEqual(records[1]["path"], "/health")
         self.assertEqual(
             set(records[0]),
-            {"schema", "allowed_count", "denied_count", "path", "status_code"},
+            {"schema", "allowed_count", "denied_count", "path", "status_code", "event_id", "recorded_at", "method", "scope", "actor", "recording", "allowed"},
         )
         serialized = self.records.getvalue()
         self.assertNotIn("hidden-client-secret", serialized)

@@ -42,7 +42,7 @@ it("성공하면 묶음 ID와 해시 및 적용 명령을 보여준다", async (
   const metadata = { bundle_id: "bundle-test", bundle_sha256: "b".repeat(64), policy_sha256: "c".repeat(64),
     files: [{ role: "target", sha256: "d".repeat(64), bytes: 100 }], server_values_source: "environment_revision", human_input_paths: [] };
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
-    if (init?.method === "POST") return new Response(new Blob(["archive"]), { status: 200,
+    if (init?.method === "POST") return new Response("archive", { status: 200,
       headers: { "X-Byul-Bundle-Metadata": btoa(JSON.stringify(metadata)) } });
     return new Response(JSON.stringify(routes[url]), { status: 200 });
   }));

@@ -16,7 +16,7 @@ from uuid import uuid4
 from serving_runtime.enforcement.events import ObservationQuery
 
 from .mock_engine import _utc_now
-from .query import QueryError, QueryService, RequestNotFoundError
+from .query import QueryError, QueryService, RequestNotFoundError, QueryWindowIncompleteError
 from .request_flow import ChatIO, transport_decision
 from .validator import Decision
 
@@ -119,6 +119,7 @@ class HandlerDependencies:
     gpu_status: Callable[[], dict[str, Any]] = lambda: {"schema_version": "runtime-gpu-status/1.0", "state": "not_configured", "fresh": False, "collected_at": None, "reason": None, "gpus": []}
     authorize_read: Callable[[str | None], tuple[int, str, str] | None] = lambda _header: None
     record_rejected: Callable[[str, str, str, int, str], None] = lambda *_args: None
+    route_rejections: Callable[..., dict[str, Any]] = lambda **_kwargs: {"items": [], "status": {"state": "not_configured"}, "window": {}}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -362,6 +363,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/phase-timeline",
                 "/api/tetragon-status",
                 "/api/gpu-status",
+                "/api/route-rejections",
                 "/v1/chat/completions",
                 "/v1/completions",
             }
@@ -372,12 +374,7 @@ class Handler(BaseHTTPRequestHandler):
         request_id = getattr(self, "_post_request_id", None)
         close_connection = request_id is not None
         if self._known_path():
-            self._send_json(
-                405,
-                {"error": {"code": "METHOD_NOT_ALLOWED"}},
-                request_id=request_id,
-                close_connection=close_connection,
-            )
+            self._method_not_allowed(close_connection=close_connection)
         else:
             self._record_route_rejection(404, "NOT_FOUND")
             self._send_json(
@@ -387,14 +384,29 @@ class Handler(BaseHTTPRequestHandler):
                 close_connection=close_connection,
             )
 
-    def _record_route_rejection(self, status: int, reason: str) -> None:
+    def _method_not_allowed(self, *, close_connection: bool = False) -> None:
+        request_id = self._record_route_rejection(405, "METHOD_NOT_ALLOWED")
+        allowed = "POST" if urlsplit(self.path).path in {
+            "/v1/chat/completions", "/v1/completions"
+        } else "GET"
+        self._send_json(
+            405,
+            {"error": {"code": "METHOD_NOT_ALLOWED"}},
+            request_id=request_id,
+            close_connection=close_connection,
+            extra_headers={"Allow": allowed},
+        )
+
+    def _record_route_rejection(self, status: int, reason: str) -> str:
+        request_id = getattr(self, "_transport_request_id", uuid4().hex)
         self.dependencies.record_rejected(
-            getattr(self, "_transport_request_id", uuid4().hex),
+            request_id,
             self.command,
             urlsplit(self.path).path,
             status,
             reason,
         )
+        return request_id
 
     def _send_query_error(self, status: int, code: str, message: str) -> None:
         self._send_json(status, {"error": {"code": code, "message": message}})
@@ -406,14 +418,21 @@ class Handler(BaseHTTPRequestHandler):
         if not raw_limit.isdigit():
             self._send_query_error(400, "INVALID_QUERY", "limit must be an integer")
             return
+        raw_records = parse_qs(query, keep_blank_values=True).get("include_records", ["0"])
+        if len(raw_records) != 1 or raw_records[0] not in {"0", "1"}:
+            self._send_query_error(400, "INVALID_QUERY", "include_records must be 0 or 1")
+            return
         try:
-            items = self.dependencies.queries.requests(
-                result=result, limit=int(raw_limit)
+            payload = self.dependencies.queries.request_page(
+                result=result, limit=int(raw_limit), include_records=raw_records[0] == "1"
             )
         except QueryError as error:
             self._send_query_error(400, "INVALID_QUERY", str(error))
             return
-        self._send_json(200, {"requests": items, "generated_at": _utc_now()})
+        except OSError:
+            self._send_query_error(503, "QUERY_UNAVAILABLE", "request journal is unavailable")
+            return
+        self._send_json(200, payload)
 
     def _observation_list(self, query: str) -> None:
         params = parse_qs(query, keep_blank_values=True)
@@ -447,6 +466,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.dependencies.receipt_lookup,
                 self.dependencies.observation_session_id,
             )
+        except QueryWindowIncompleteError:
+            self._send_query_error(503, "REQUEST_WINDOW_INCOMPLETE", "request is outside the bounded live search window")
+            return
+        except OSError:
+            self._send_query_error(503, "QUERY_UNAVAILABLE", "request journal is unavailable")
+            return
         except RequestNotFoundError:
             self._send_query_error(404, "REQUEST_NOT_FOUND", "request ID not found")
             return
@@ -477,6 +502,21 @@ class Handler(BaseHTTPRequestHandler):
                     self._record_route_rejection(status, code)
                 self._send_read_refusal(status, code, message)
                 return
+        if path == "/api/route-rejections":
+            params = parse_qs(parsed.query, keep_blank_values=True)
+            if set(params) - {"limit"} or any(len(v) != 1 for v in params.values()):
+                self._send_query_error(400, "INVALID_QUERY", "only one limit is supported")
+                return
+            raw_limit = params.get("limit", ["100"])[0]
+            try:
+                if not raw_limit.isdigit():
+                    raise ValueError("limit must be an integer")
+                document = self.dependencies.route_rejections(limit=int(raw_limit))
+            except ValueError as error:
+                self._send_query_error(400, "INVALID_QUERY", str(error))
+                return
+            self._send_json(200, document)
+            return
         if path == "/api/status":
             self._send_json(200, self.dependencies.status())
             return
@@ -520,7 +560,7 @@ class Handler(BaseHTTPRequestHandler):
             self._request_detail(path[len("/api/requests/") :])
             return
         if path in {"/v1/chat/completions", "/v1/completions"}:
-            self._send_json(405, {"error": {"code": "METHOD_NOT_ALLOWED"}})
+            self._method_not_allowed()
             return
         self._record_route_rejection(404, "NOT_FOUND")
         self._send_json(404, {"error": {"code": "NOT_FOUND"}})
@@ -623,18 +663,21 @@ class LimitedThreadingHTTPServer(ThreadingHTTPServer):
         try:
             super().process_request(request, client_address)
         except BaseException:
-            with self._connection_lock:
-                self._active_connections -= 1
-            self._connection_slots.release()
+            self._release_connection_slot()
             raise
+
+    def _release_connection_slot(self) -> None:
+        # A status reader must not observe free capacity before the actual
+        # permit is available to the accept loop.
+        with self._connection_lock:
+            self._connection_slots.release()
+            self._active_connections -= 1
 
     def process_request_thread(self, request: Any, client_address: Any) -> None:
         try:
             super().process_request_thread(request, client_address)
         finally:
-            with self._connection_lock:
-                self._active_connections -= 1
-            self._connection_slots.release()
+            self._release_connection_slot()
 
     def connection_status(self) -> dict[str, int]:
         with self._connection_lock:

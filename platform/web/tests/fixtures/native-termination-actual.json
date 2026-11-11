@@ -1,0 +1,100 @@
+{
+  "request_id": "2ffcace6d9c94a7ba2d3060b7ecf58b9",
+  "capture_observed_at": "2026-11-08T15:40:20.864922+00:00",
+  "capture_state": "active",
+  "session_sealed": false,
+  "historical_receipt": true,
+  "projection": {
+    "schema": "byul-runtime-termination/1",
+    "runtime_native_binding": {
+      "gaps": [],
+      "state": "bound"
+    },
+    "source_data_origin": "MEASURED",
+    "actual_engine_execution_verified": false,
+    "closure_basis": "live_checkpoint",
+    "checkpoint_coverage_verified": true,
+    "configured_deadline_ms": 5000,
+    "required_scopes": [
+      "asgi_transport",
+      "frontend_request",
+      "engine_core",
+      "scheduler_state",
+      "worker_batch",
+      "kv_references",
+      "gpu_transfers"
+    ],
+    "native_termination_verified": true,
+    "worker_gpu_release_verified": true,
+    "request": {
+      "context": {
+        "request_id": "2ffcace6d9c94a7ba2d3060b7ecf58b9"
+      }
+    },
+    "native_projection": {
+      "binding_observed": true,
+      "checkpoint_coverage_verified": true,
+      "whole_scope_complete": true,
+      "worker_gpu_release_verified": true,
+      "activation_violations": [],
+      "scope_status": [
+        {
+          "completion_elapsed_ns": 1244588,
+          "evidence_complete": true,
+          "observed_events": 1,
+          "required": true,
+          "scope": "asgi_transport",
+          "termination_verified": true
+        },
+        {
+          "completion_elapsed_ns": 25692366,
+          "evidence_complete": true,
+          "observed_events": 2,
+          "required": true,
+          "scope": "engine_core",
+          "termination_verified": true
+        },
+        {
+          "completion_elapsed_ns": 600063,
+          "evidence_complete": true,
+          "observed_events": 1,
+          "required": true,
+          "scope": "frontend_request",
+          "termination_verified": true
+        },
+        {
+          "completion_elapsed_ns": 45080752,
+          "evidence_complete": true,
+          "observed_events": 36,
+          "required": true,
+          "scope": "gpu_transfers",
+          "termination_verified": true
+        },
+        {
+          "completion_elapsed_ns": 25487242,
+          "evidence_complete": true,
+          "observed_events": 1,
+          "required": true,
+          "scope": "kv_references",
+          "termination_verified": true
+        },
+        {
+          "completion_elapsed_ns": 25604024,
+          "evidence_complete": true,
+          "observed_events": 1,
+          "required": true,
+          "scope": "scheduler_state",
+          "termination_verified": true
+        },
+        {
+          "completion_elapsed_ns": 27086888,
+          "evidence_complete": true,
+          "observed_events": 8,
+          "required": true,
+          "scope": "worker_batch",
+          "termination_verified": true
+        }
+      ]
+    }
+  }
+}

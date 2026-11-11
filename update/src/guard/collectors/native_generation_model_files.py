@@ -15,21 +15,21 @@ PROFILES=frozenset('vllm-native-lifecycle-metadata/'+str(v) for v in (20,21,22))
 SOURCE_PINS={
     'vllm_generation_file_metadata.py':'82391549d2767f76b1e550d2a8fd467e82a253795b9dc34ef6eab906e39b3b1f',
     'vllm_worker_startup_metadata.py':'b5d0be2de94fe9453a5f68b58e019b62a2f454bd59718fb43512a321755e651a',
-    'vllm_worker_startup_sensor.py':'2fb8b6386bc59e236c9227251da05f8e8704e08a935dcff27a8c18bc57ed91f4',
+    'vllm_worker_startup_sensor.py':'7515a6d023db8056524220ee61fbfbb82fd9cc92520f605d511bfdc04283aae5',
     'vllm_worker_startup_contract.py':'6788df2f4c6f04f46e681eb5eab48631e2ba037754d26166bb02341e4b592950',
     'vllm_worker_initialization_metadata.py':'7070261a91e4ff0754a4612b2253af89ebe896dd2b9aa47c0e98d086a07680d2',
-    'vllm_worker_initialization_sensor.py':'b7447db52f40b61b20361703ce786d591ada767602e6ec5ea38404e90e559cf1',
+    'vllm_worker_initialization_sensor.py':'435ae1963c035966fea156abd47a7e99f1d840b888a36d8282685f713061c6e6',
     'vllm_worker_generation_metadata.py':'db9b79d796e954acee143be45b825109beff332fa86a5e7ede4b4c5087360623',
-    'vllm_worker_generation_sensor.py':'186ee38bcc29da4ffa4cc88c6b386f60f67d343cbc58613cf925213611ab18d2',
+    'vllm_worker_generation_sensor.py':'c34f933b8ac53a6e51da0ec3608a6b81badc7a0ef688268bdc98887d718bfa32',
     'vllm_worker_generation_contract.py':'f0c37215577292ce7b89b535cf147553ac22f5ae6ef6a08708cf055f4d4eb27a',
     'vllm_ready_endpoint_metadata.py':'c722aec3fa4a5eafee9ed478d970f5b82e26335b2788ec4cbb2d714128007c8e',
-    'vllm_ready_endpoint_sensor.py':'e2d35ed9730df734dac6e62b0ab0c6a7cf3e2f10728509b069cb8721e64c4fe3',
+    'vllm_ready_endpoint_sensor.py':'55753bfcaa3838cb3fdcd20429dbfbf50f037f3fee6d00466223870b854f4fe0',
     'vllm_ready_endpoint_contract.py':'ddae1078d9807910c9f79a815f2abeab6b1c340e8122eb4c3bca9a7b71ef3d7d',
     'vllm_weight_iteration_metadata.py':'f8ced901b1b1c7d918f96c9ef8ec0899696c2d161efbaefdd43dbedd340f04c0',
-    'vllm_weight_iteration_sensor.py':'6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648',
+    'vllm_weight_iteration_sensor.py':'74d0b65aaf4b45185c3d53b520d0881ebe711950e89b17dd48b0a1ca10e1a87a',
     'vllm_safe_open_mapping_metadata.py':'833030d5d24aad97bc7ec0050ef105488daeb0f2023987d75bb1d8ffdbc0be29',
-    'vllm_safe_open_mapping_sensor.py':'dd9e75f2752e042b43527ddd9cf13cc06a3c82fd4c5ba73cfe7114df7dcafaf1',
-    'vllm_file_read_sensor.py':'e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d',
+    'vllm_safe_open_mapping_sensor.py':'8753a0d6cb06229ab0661e1e7548c6213c368a76243543851baf385cc207f3da',
+    'vllm_file_read_sensor.py':'5542067206f0d92a68575f6fd9cfbaf1c85fa97c35a707f50d9cb1ee260a0b64',
 }
 TRUTH=tuple(sorted(set(legacy.TRUTH)|set(common.TRUTH)))
 MAX_LOCAL_LINKS=64

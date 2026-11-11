@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import json
 import sys
+import time
 from typing import Any, TextIO
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -217,7 +218,19 @@ def run_demo_cases(gateway: str, *, timeout: float = 5.0) -> list[DemoResult]:
     results: list[DemoResult] = []
     for case in demo_cases():
         status, request_id, saw_done = _post_case(base, case, timeout)
-        detail = _get_detail(base, request_id, timeout) if request_id else None
+        detail = None
+        deadline = time.monotonic() + timeout
+        while request_id:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            detail = _get_detail(base, request_id, remaining)
+            records = detail.get("gateway_records", []) if isinstance(detail, dict) else []
+            if any(isinstance(row, dict) and row.get("phase") == "final" for row in records):
+                break
+            # The client can finish reading before the Gateway appends its
+            # post-write final record. Preserve the deadline and verdict checks.
+            time.sleep(min(0.02, max(0, deadline - time.monotonic())))
         results.append(evaluate_case(case, status, request_id, detail, saw_done))
     return results
 

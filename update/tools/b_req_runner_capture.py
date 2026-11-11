@@ -17,7 +17,7 @@ if __package__ in (None, ""):
 from guard.core.run import RunConfig, run_plan
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
-from guard.executors.req_runner_capture import PREPARER_SHA
+from guard.executors import runner_inputs
 from guard.adapters.vllm_runner_capture import SOURCE_COMMIT, SOURCES
 from guard.models import canonical_json, sha256_hex
 from guard.runtime.bounded import strict_json
@@ -62,7 +62,7 @@ def run(source, plan_id, config, output, *, collect=False):
     prepared = {"schema": "guard-b-req-native-driver/1", "selected": sorted(selected),
         "plan": plan.ref().model_dump(mode="json"), "pack": pack.ref().model_dump(mode="json"),
         "config": {"path": str(config), "file_sha256": sha256_hex(raw)}, "source_store_sha256": before,
-        "vllm_source_commit": SOURCE_COMMIT, "vllm_source_files": SOURCES, "preparer_source_sha256": PREPARER_SHA,
+        "vllm_source_commit": SOURCE_COMMIT, "vllm_source_files": SOURCES, "preparer_source_sha256": runner_inputs.source_files()["src/guard/executors/runner_inputs.py"],
         "collect_invoked": collect, "native_request_mapping_verified": False, "gpu_ready": False,
         "required_runtime": ["owned Ready LAB Pod, fixed 0.31 image/source and readonly callback assets before import",
             "literal VLLM_DISABLE_REQUEST_ID_RANDOMIZATION=1 and VLLM_USE_V2_MODEL_RUNNER=0",

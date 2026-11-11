@@ -4,7 +4,6 @@
 """
 from __future__ import annotations
 
-import importlib.util
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -19,10 +18,8 @@ from guard.collectors import gpu_input_producers as producers
 from guard.models import canonical_json, sha256_hex
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_http import KubernetesHTTP, ENGINE_CALLBACK_PROFILE
+from . import runner_inputs
 from .base import DraftArtifact
-
-PREPARER_SHA = "0175f8e85d801edae0ccbb9f46a31f334aa53878eac73356174b30ae2d0b206b"
-
 
 def _profile(env):
     if not supports(env.engine.name, env.engine.version, "runner_capture"):
@@ -31,17 +28,6 @@ def _profile(env):
     if profile is None or env.engine.image_digest != profile.image:
         raise ValueError("B_REQ_CAPTURE_SCOPE_INVALID")
     return profile
-
-
-def _preparer():
-    # 선택 모드는 고정 full source 배치를 요구한다. CWD/PYTHONPATH에서 동명 도구를 탐색하지 않는다.
-    path = Path(__file__).resolve().parents[3] / "tools/b_runner_inputs.py"
-    if not path.is_file() or sha256_hex(path.read_bytes()) != PREPARER_SHA:
-        raise ValueError("B_REQ_FIXED_SOURCE_BUNDLE_REQUIRED")
-    spec = importlib.util.spec_from_file_location("guard._fixed_b_runner_inputs", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def _label(check_id, value):
@@ -73,7 +59,7 @@ class Capture:
             ["before", "token_id", "length", "after_token_id", "after_length"] if ctx.check.id == "REQ-09" else
             ["before", *(case for option in ctx.policy_values["allowed_sampling_options"]
                          for case in (option, option + ":boundary", option + ":concurrent", option + ":after"))])
-        self.tool = _preparer()
+        self.tool = runner_inputs
         self.environment_raw, self.environment_pin = self.tool._read_pin(spec["environment"], base=Path.cwd(), limit=2*1024**2)
         env_value = strict_json(self.environment_raw, limit=2*1024**2)
         if canonical_json(env_value) != canonical_json(ctx.env.to_dict()):

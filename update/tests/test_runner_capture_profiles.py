@@ -20,9 +20,9 @@ def env(name="vllm", version="0.31.0", image=None):
     ("vllm", "0.31.0", "EXAMPLE/wrong-image"),
 ])
 def test_unsupported_capture_rejected_before_tool_or_native_io(monkeypatch, name, version, image):
-    def unexpected():
+    def unexpected(*args, **kwargs):
         pytest.fail("unsupported capture must not load the tool or perform I/O")
-    monkeypatch.setattr(capture, "_preparer", unexpected)
+    monkeypatch.setattr(capture.runner_inputs, "_read_pin", unexpected)
     with pytest.raises(ValueError, match="^B_REQ_CAPTURE_SCOPE_INVALID$"):
         capture.Capture(SimpleNamespace(env=env(name, version, image)), {})
 

@@ -1,5 +1,0 @@
-*.py -text whitespace=cr-at-eol,-blank-at-eof
-*.json -text whitespace=cr-at-eol,-blank-at-eof
-*.md -text whitespace=cr-at-eol,-blank-at-eof
-# Frozen unified diffs preserve their required space-only context lines.
-*.diff -text whitespace=cr-at-eol,-blank-at-eof,-blank-at-eol

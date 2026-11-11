@@ -171,6 +171,7 @@ def installed_worker(root: Path, wheel: Path) -> dict:
         assert "REQ-15" in template.read_text(encoding="utf-8")
         req15 = verify_req15(pack)
         analysis = verify_analysis_modules(root, store, report)
+        runner_inputs = verify_runner_inputs(root)
         for name, module in list(sys.modules.items()):
             if name == "guard" or name.startswith("guard."):
                 if getattr(module, "__file__", None):
@@ -183,11 +184,70 @@ def installed_worker(root: Path, wheel: Path) -> dict:
                "wheel_sha256": digest(wheel.read_bytes()), "commands": commands,
                "example_fake_audit": True, "saved_pack_replay": True, "tampering_rejected": True,
                "source_unchanged": True, "req15": req15, "analysis": analysis,
+               "runner_inputs": runner_inputs,
                "real_engine_executed": False, "product_network_and_subprocess_blocked": True,
                "installation_conformance": installation_conformance}
     write_json(root / "summary.json", summary)
     print(json.dumps(summary, ensure_ascii=False))
     return summary
+
+
+def verify_runner_inputs(root) -> dict:
+    """Exercise installed preparation/consumption with an incomplete EXAMPLE record."""
+    from guard.collectors import gpu_common_inputs, gpu_input_producers
+    from guard.collectors.engine_callbacks import prepare_assets
+    from guard.executors import common_consumption, req_runner_capture, runner_inputs
+    from guard.models import Environment, canonical_json, sha256_hex
+    assert req_runner_capture.runner_inputs is runner_inputs
+    folder = root / "runner-input-check"
+    folder.mkdir()
+    env = Environment(id="ENV-WHEEL-RUNNER", data_origin="EXAMPLE",
+        engine={"name": "mock", "version": "EXAMPLE"}, facts={}).seal()
+    prepared = prepare_assets(folder / "prepared-assets", runner_consumption=True)
+    target = {"lab": False, "fixture": "EXAMPLE installed input preparation"}
+    scope = {"environment_ref": env.ref().model_dump(mode="json"),
+        "target_sha256": sha256_hex(canonical_json(target)),
+        "prepared_sha256": sha256_hex(canonical_json(prepared)), "session": prepared["session"]}
+    # No event coverage or live identity is fabricated for a packaging check.
+    record = {"schema": gpu_common_inputs.SCHEMA, "kind": "runner-consumption",
+        "producer": gpu_input_producers.consumption_producer(), **scope,
+        "bindings": [{"pod_uid": "10000000-0000-0000-0000-000000000001",
+            "container_id": "e" * 64, "restart_count": 0, "worker_pid": 1, "start_ticks": 1, "rank": 0}],
+        "events": [], "completeness": {"source_ended": False, "dropped": 0, "diagnostic_codes": []}}
+    record_raw = json.dumps(record, indent=2).encode()
+    wrapper = (b'{"schema":"byul-gpu-a-producers-collect/1","session":' +
+        json.dumps(prepared["session"]).encode() +
+        b',"truncated":false,"records":{"runner-consumption":{"record":' + record_raw + b'}}}')
+    values = {"environment": canonical_json(env.to_dict()), "target": canonical_json(target),
+        "prepared": canonical_json(prepared), "requests": canonical_json({"before": "f" * 64}), "wrapper": wrapper}
+    pointers = {}
+    for name, raw in values.items():
+        path = folder / (name + ".json")
+        path.write_bytes(raw)
+        pointers[name] = {"path": str(path), "file_sha256": sha256_hex(raw)}
+    spec = {"schema": runner_inputs.INPUT_SCHEMA, "check_id": "REQ-08", "session": prepared["session"],
+        "required_cases": ["before"], "sources": pointers, "data_origin": "EXAMPLE"}
+    source = folder / "inputs.json"
+    source.write_bytes(canonical_json(spec))
+    receipt = runner_inputs.prepare(source, sha256_hex(source.read_bytes()), folder / "fixed")
+    assert not receipt["consumer_projection"]["complete"] and receipt["consumer_projection"]["gaps"]
+    assert not receipt["runtime_link_complete"] and not receipt["gpu_ready"]
+    assert (folder / "fixed/runner-record.json").read_bytes() == record_raw
+    assert not any(name.startswith("tools/") for name in receipt["source_files"])
+    loaded, observed_scope = common_consumption.load_input(receipt["runner_input"], **{
+        key: scope[key] for key in ("environment_ref", "target_sha256", "prepared_sha256")})
+    assert loaded == record and observed_scope == scope
+    Path(pointers["wrapper"]["path"]).write_bytes(b"{}")
+    try:
+        runner_inputs.prepare(source, sha256_hex(source.read_bytes()), folder / "tampered")
+    except ValueError as error:
+        assert str(error) == "B_RUNNER_SOURCE_BYTES_MISMATCH"
+    else:
+        raise AssertionError("installed preparation accepted altered source bytes")
+    assert not (folder / "tampered").exists()
+    return {"installed_preparer_and_consumer": True, "tools_dependency": False,
+        "record_bytes_preserved": True, "tampering_rejected": True,
+        "incomplete_example_stays_incomplete": True}
 
 
 def verify_req15(pack) -> dict:

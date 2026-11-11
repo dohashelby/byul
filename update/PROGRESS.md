@@ -1,39 +1,11 @@
-## 2026-11-11 — PR #240 실행기와 엔진별 프로필 분리
+## 2026-11-11 — PR #240 검토 수정과 B 인계 정리
 
-- 한 일: REQ 요청 수집 실행기의 지원 여부를 `engine_profiles.supports`로 확인하고 provider에서 프로필을 받도록 바꿨다. 소스 7개 SHA·커밋, 이미지, 응답 ID 형식·자식 ID 변환, 관측 경로와 환경 조건은 vLLM adapter의 판본별 표로 옮겼다. 응답 ID 고정 자료는 `tests/fixtures/vllm-0.31.0/`로 옮겼다.
-- 테스트 결과: CPython 3.12.3에서 요청 연결·저장·복원·오류 보존 시험과 새 지원 경계·provider 확장 시험 등 39개가 통과했다. 미지원 엔진·판본·이미지는 도구 로드와 실제 전송 전에 거부한다. 기존 요청은 한 번만 발송하며 EXAMPLE을 실측으로 올리지 않는다.
-- 검토 결과: 최종 소스 목록 529개 파일의 독립 대조와 소스 게이트가 통과했다. 기존 소스 핀·HMAC·지원 범위·오류 보존 조건이 유지됐다. main의 검토 기록 2건은 보존하고, 이번 PR의 이전 목록 기록 5건을 제거한 뒤 최종 목록 `afed826c…`의 검토 기록 한 건만 추가했다.
-- CI 후속 수정: 첫 변경 head의 전체 시험에서 기존 응답 ID 계약 시험 15개가 제거된 실행기 내부 속성을 참조해 실패했다. 해당 시험 초기화와 동일한 assert의 참조 대상을 adapter 프로필로 옮긴 뒤 직접 영향 시험 39개가 통과했다. 독립 검토에서도 기존 사례·assert·거부 조건이 유지됨을 확인했다. 제품 소스와 최종 목록은 추가로 바꾸지 않았다.
-- 다음 단계: 변경 head의 전체 시험은 Linux CI에서 확인하고 검토자에게 필수 의견 1·2번의 재확인을 요청한다.
-- 막힌 것·범위: 이번 수정은 검토 의견 1·2번과 관련된 4·6번을 대상으로 한다. 제품 실행기의 `tools/` 의존 제거와 기존 날짜별 문서 정리는 별도 작업이다. GPU를 기동하거나 실측 완료 수를 바꾸지 않았다.
-
-## 2026-11-11 — SUP-16 요청별 root client CPU 준비
-
-- 한 일: 기존 UID1000 helper를 유지하는 B 전용 요청별 root client 도구의 검토 원bytes를 공개 복사했다. 파일 FD/hash 선행 확인·같은 최대5초 안의 정리/전달 예약·정확 caller와 자기 요청 자식 회수·일회성 PID/mount namespace·UIDdrop 후 부모종료 보호를 연결했다. A 공통 코드·원수집 source·권한·kubeconfig는 바꾸지 않았다.
-- 검증: core6와 namespace4의 원version/검증범위를 재사용하고 새 bootstrap/postdrop4의 raw/receipt를 확인했다. root source/raw50 및 S4 새delta56대조/불일치0을 연결했으며 기존 assert14개를 유지했다. bootstrap fixture 성공은 전체 sudo/entry/wire 성공이 아니다. namespace4 projection·새receipt의 patch version 미관측·원실패 이력을 보존했다. [범위와 한계](docs/gpu-b/consolidation-20261106/SUP16_ROOT_CLIENT_PREPARATION_20261111.md).
-- 다음 단계·잔여: S5의 N1 소비3B와 S2의 새43 운영배치를 결합·검토한 뒤 같은 기존GPU1대의 한boot에서 실제rootPython/namespace/APIwire preflight→준비된3역할을 확인한다. 현재 추가 GPU 기동·제품 Ref 생성은0이고 LAB10/33·PACK33 DRAFT·기존 FAIL/UNKNOWN을 유지한다. 새head 전체 시험은 PR Linux CI에서 확인한다.
-
-## 2026-11-11 — PLT-01 준비 CLI 연결과 실제 수집 잔여
-
-- 한 일: B 입력 도구에 PLT-01 단독 선택을 추가했다. 기존 7개 선택·원 실행 본문은 AST로 동일하며 혼합 선택은 거부한다. 기존 EXAMPLE ENV·target·정책값으로 normal/challenge·TOML을 준비하고 새 기업값·현재 신원을 만들지 않는다.
-- 검증: CPython3.12.3 `-I -S -B`의 실제 CLI→준비기→TOML/config→RunConfig→registry factory·정책값 검증 양성1·거부2(출력0), 독립87대조/불일치0을 확인했다. 이전 native 원출력→PLT01 소비 CPU1은 재사용했다. root는 검토 원bytes·기존7 AST·diff를 확인했으며 전체 suite는 변경 head PR CI에서 확인한다.
-- 실제 관측: 별도 D1에서 같은 기존GPU1대의 UID1000→기존sudo root→선정 Kubernetes API 조회는 성공했다. 일반stop1회 뒤 11월10일23:26 KST 실제stopped/IP없음·SSM/active0을 확인했다. 원180초 정지 관측 실패·정확off시각null은 보존한다. 이 API 성공은 SUP16 3역할 수집 완료가 아니다.
-- 다음 단계·잔여: C1 요청별 root 자식 회수 구현은 S2, 검토된 N1 소비 연결은 S5, 독립 검토는 S6가 맡는다. 실제 SUP16 수집·과거원입력3개·전체archive·제품 Ref는 미완료다. PLT01 full policy loader/새POL/실executor·GPU는0이며 적용후 selection source pin·commit을 재결합한다. PACK33 DRAFT·LAB10/33·기존43행/Refs를 유지한다.
-
-## 2026-11-10 — B03 실제 입력 소비·B04 준비와 R4 실패 정리
-
-- 후속 보강: `b12_tp2_verify.py`에 기존 B04 계획의 ID·역할 결합6줄을 추가했다. 실제9계획의 포인터교환을 WSL3.12.3-I-S-B로 직접 대조해 정상INCOMPLETE유지·역할혼입2건/점검혼입1건FAILED를 확인했다. 독립 유효25대조+검증기후속5대조/불일치0·root exactcopy를 연결했다. 원Windows qualified표현은취소/원본보존했고 실제TP2·rank배정·engine자격은아니다. 후속R5는copy helper·wrapper 내부해시·내장argv/manifest핀과phase를수정해독립71대조/불일치0 후 같은GPU1대 기동·running/SSMOnline을확인하고21:48:03KST 실행1회착수했다. 역할별실측성공은원관측확인전미완료다.
-- B03: 선정7개 실제 입력 생성·EXAMPLE 정책6개 수용·SUP13 누락 진단을 준비했다. 원 계약 producer→consumer CPU18경계와 추가 CLI/TOML→RunConfig/registry 구성1경계를 검증했고 S6 독립250대조/불일치0을 확인했다. 실제 HTTP·application.run·현재 target·GPU 완료는 아니다. 검토한 공개 B 도구와40행 정적 요약을 정확 복사했고 engine 공유는 미검증으로 유지한다.
-- B04: LIF08·11/SUP06의 설계case7개·계획 단계/rank행42개를 구체화했다. 기존 도구로 control JSON9개의SHA·object를 확인했으며 실제 신원·정책·TP2 배정이 없어 INCOMPLETE다. native24의 기존TP1 코드와TP2·공통producer·자격을 구분한다. [준비 범위와 반환](docs/gpu-b/consolidation-20261106/B03_B04_INPUT_PREPARATION_20261110.md), [순서·공유·시간](docs/gpu-b/consolidation-20261106/B03_EXECUTION_SHARING_ORDER_20261110.md).
-- R4: 기존GPU1대/TP1에서42파일 설치·host health는 성공했지만 역할 전 copy 단계에서 R3 목적지 상수와 R4 실제입력 불일치로 실패했다. 첫 실패capsule·원stderr297bytes를 회수했다. 후속selector phase 불일치도 분리해 원4receipt 오프라인7경계와 독립14대조/불일치0으로 최소후보를 확인했다. 원 R4 불변·같은실패 재기동0. [실패 원인·증거·정리](docs/gpu-b/consolidation-20261106/SUP16_R4_PRE_ROLE_FAILURE_20261110.md).
-- 정리·CI: normal stop1회 수락 뒤 원180초 감시는 실패했고 후속21:19 KST 실제 stopped/IP없음·SSM node/Pending/Executing0을 확인했다. 감시FAIL·정확off시각null·과거R3 수락UNKNOWN2건은 보존한다. PR head ba1aa295의CI18개는 전부 성공했다. 이 후속 변경 head CI와 수정 후3역할 실측은 별도다. S2는 새 정확frame/pin 수정, S5는REQ07/SUP13 real target 계약 준비, S6는새delta 검토를 병행한다. LAB10/33·원43행/Refs·PACK33DRAFT를 변경하지 않았다.
-
-## 2026-11-10 — B 소비 연결·GPU 실행 묶음과 실패 증거 회수
-
-- 한 일: B02의 선정 `/1`~`/3` 소비 판정 보강과 LAB10/33 기록을 보존했다. SUP-16 R1의 전송 형식, R2의 helper descriptor 투영을 보강했고, R3는 원 stderr와 실제 배치 계획을 대조해 필수 `source_owner_verify.py` sibling 누락을 확인했다. 원41개를 보존한42개 배치안·설치기 후보를 만들고, 첫 실패 capsule·수락 응답 선행 저장·원900초 기한 전달/부분 기록의 최소 보강을 준비했다. 원 R3의 실제 실행본과 실패를 바꾸지 않았다.
-- 검증: 새 generic CPU20/0, 실제 생성42 소비3/0, 설치기42 decode·ASSETS18개 실제 생성·원 소비3/0을 별도 범위로 검증했다. 제품26개 완료로 합산하지 않는다. v2 private 통합에서 누락된 observer attach·driver 기한/GET argv를 실제 호출부 CPU3/0·native root finally1/0·독립112대조/불일치0으로 보수했다. v5는 원worker 최초 예외/traceback 순서를 복원해 관련 CPU1/0·독립75+58대조/불일치0을 확인했다. main `7a985052`를 병합한 제품528파일 목록 `6ba867aa…`은 S6 독립30대조/불일치0·기존6검토행 보존+새독립1행·원 hash gate528/exit0으로 확인했다. 로컬 전체 suite는 반복하지 않고 최종 PR Linux CI로 확인한다.
-- 실제 관측·정리: R3 당시 HTTP health ready=true/status200·전후 동일 PodReady=True를 기존 원문으로 확인했다. prep metadata와 engine 프로세스·GPU 내부 소비는 구분한다. 후속 EC2 소유3대 stopped·공인IP0/SSM·pending·executing0, S6 정리·비용83대조/불일치0으로 현재 자원을 마감했다. 누적$80.53692960227087는 비청구 추정이며 compute/IP 보수 구간을 닫고 EBS 보존비는 계속된다. 추가 GPU 기동은 없다.
-- 다음 단계·잔여: 검토 완료 코드와 실제 Ready·정리 기록을 PR #240에 반영하고 최종 head CI를 확인한다. 사용자의 기존1GPU/TP1 즉시 재개·예산사용자담당 지시에 따라 새source/pin 묶음 결합 후 S2가 실측하며 전체resource/budget fresh조회·새ACK·PRCI를 기동조건으로 추가하지 않는다. 새 GPU 재검증·실제 capture/writer/factory 및 정확 제품 Ref·전체 GB18 무결성은 별도다. 원 whole FAIL, 수락 미확정2건, EXAMPLE/DRAFT/official 값과43개 항목의 원 Ref·판정은 보존한다. [R3 원인·검증 범위·자원 마감](docs/gpu-b/consolidation-20261106/SUP16_R3_CAPTURE_TRANSPORT_CLOSEOUT_20261110.md).
+- 한 일: REQ 수집 실행기는 지원표와 provider에서 엔진 프로필을 받도록 바꿨다. 소스 핀·응답 ID·환경/관측 경로는 adapter에 두고 입력 준비 구현은 설치 가능한 `guard.executors.runner_inputs`로 옮겼다. `tools/b_runner_inputs.py`는 CLI만 남겼다. source hash는 설치된 모듈에서 기록한다.
+- 테스트 결과: CPython 3.12.3 직접 영향 시험 73개가 통과했다(68.44초). 문서·현황 관련 시험 31개와 체크리스트 정합성도 통과했다. 체크아웃 밖 설치 wheel에서도 실제 입력 준비·소비, 원 record 바이트 보존, 변조 거부와 불완전 EXAMPLE 유지를 확인했다. 기존 사례·assert·기대값·거부 조건을 완화하지 않았다. 이전 CI의 응답 ID 계약 시험 15개에서 발견된 내부 속성 참조 누락도 새 프로필로 연결해 수정했다.
+- 문서 정리: 이번 PR이 추가했던 날짜별 기록·원자료·검토 파일 144개는 현행 트리에서 지우고 [현재 인계](docs/gpu-b/CURRENT_HANDOFF.md)로 통합했다. 원문과 고정 후보는 커밋 `451292db`에 남아 있으며 복원 명령과 실제 한계를 인계에 적었다. main의 기존 공개 GPU 결과·로컬/AWS 원본과 과거 Ref는 유지했다.
+- 기존 B 작업: B03의 공급 입력 SHA/ENV·정책 검사, B02 소비 연결, B04 TP2 입력 계획과 PLT-01 준비 CLI를 유지했다. SUP-16 GB12 원자료의 SHA·CRC 회수 확인과 실제 종료 기록은 전체 정상·부분 파일·복구 실측 성공과 구분한다. 원 전체 FAIL·미확인 분기·EXAMPLE/UNVERIFIED 출처와 LAB10/33·PACK33 DRAFT 상태를 변경하지 않았다.
+- 다음 단계: 변경된 제품 목록 530개 파일의 독립 대조와 소스 게이트가 통과했다. main의 기존 검토 기록 2건은 보존하고 최종 목록 `b7d5035a…`의 검토 기록 한 건만 남겼다. 변경 head의 전체 시험은 PR Linux CI에서 확인한다. CI에 실패가 있으면 해당 원인을 수정한다.
+- 막힌 것: 전체 제품 실측에는 A 공통 계약/점검 선언·새 팩·실제 target/정책·TP2 반환과 SUP-16 실제 수집이 더 필요하다. 이번 요청 범위는 검토 수정과 CI 확인이며 GPU를 기동하지 않는다.
 
 ## 2026-11-09 — A·B 작업지시서 2차(vLLM 1차 완성)
 

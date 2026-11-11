@@ -1,5 +1,7 @@
 # DECISIONS
 
+- 2026-11-11 · PR #240의 종료 기록·원자료·검토 JSON·미통합 후보는 커밋 `451292db`에 보존하고 docs의 중복 사본 144개를 정리한다. 현행 상태·잔여·담당·정확 복원 명령은 `docs/gpu-b/CURRENT_HANDOFF.md`에 둔다. 원 FAIL/UNKNOWN·Ref·출처와 로컬/AWS 원본은 유지하며, 후보 복원은 실행 승인이나 제품 완료가 아니다.
+
 - 2026-11-01 · PACK31 원본은 reference/pack-seeds에 보존하고 현행 팩은 tools/regenerate_baseline_pack로 만든다. 복합 프로파일은 하위 수집별 세션을 따로 두고 결과만 모은다. · 파생 팩·과거 Ref를 현행 팩 변경과 분리하고 시간이 가까운 결과를 합치지 않기 위함이다.
 
 - 2026-10-29 · process collector는 입력/정적 옵션을 처리하고 runtime 생성/프로그램 검증/포착은 기존 Kubernetes executor 경계에 둔다. · 기본 전체 시험에서 확인된 runtime 의존 아키텍처를 보존하고 같은 CLI/정책·출처·프로그램 bytes의 의미를 유지하기 위함이다.

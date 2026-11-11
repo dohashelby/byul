@@ -3,6 +3,7 @@ import copy
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -11,6 +12,8 @@ from serving_runtime.enforcement.events import parse_tetragon
 from serving_runtime.enforcement.execpolicy import ExecPolicy
 from serving_runtime.enforcement.intent import IntentError, parse_intent
 from serving_runtime.enforcement.tetragon import render_manifests, render_monitor_manifests
+from serving_runtime.enforcement.attribution import KERNEL_DATA
+from tools.tetragon_identities import IdentityCollector
 from serving_runtime.mvp.collectors import Collector
 from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA, ObservationFeed
 from byul_platform.config import DEFAULT_CONTRACTS_DIR
@@ -51,9 +54,10 @@ def parse(raw, policy=None, **kwargs):
 
 
 @pytest.mark.parametrize("engine", ["gpu-lab", "gpu-lab-sglang"])
-def test_render_kernel_scope_and_suffix_conjunction_monitor_only(engine):
+@pytest.mark.parametrize("kernel_identity", [False, True])
+def test_render_kernel_scope_and_suffix_conjunction_monitor_only(engine, kernel_identity):
     doc = intent_document(engine)
-    doc.update(tetragon_kernel_identity=True, code_load_watch_paths=["/download/hf_modules"])
+    doc.update(tetragon_kernel_identity=kernel_identity, code_load_watch_paths=["/download/hf_modules"])
     intent = parse_intent(doc)
     for render in (render_manifests, render_monitor_manifests):
         manifest = render(intent)["tetragon-tg-code-01.json"]
@@ -61,6 +65,8 @@ def test_render_kernel_scope_and_suffix_conjunction_monitor_only(engine):
         assert spec["podSelector"] == {"matchLabels": {"app": "serving-engine"}}
         assert spec["options"] == [{"name": "policy-mode", "value": "monitor"}]
         probe = spec["kprobes"][0]
+        assert probe["data"] == KERNEL_DATA
+        assert manifest["metadata"]["annotations"]["serving-runtime.local/kernel-identity"] == "v2"
         assert probe["call"] == "security_file_open" and probe["syscall"] is False
         assert len(probe["args"]) + len(probe["data"]) == 5
         assert [arg["index"] for arg in probe["args"]] == [0, 0]
@@ -80,6 +86,40 @@ def test_render_kernel_scope_and_suffix_conjunction_monitor_only(engine):
             assert kernel_match(path)
         for path in ("/cache/a.safetensors", "/usr/local/lib/python3.12/site-packages/a.py", "/tmp-other/a.py"):
             assert not kernel_match(path)
+
+
+def test_default_code_policy_identity_index_can_classify_kernel_only_event(tmp_path):
+    document = intent_document()
+    assert document.get("tetragon_kernel_identity", False) is False
+    manifests = render_manifests(parse_intent(document))
+    # Exercise the collector's actual spec-based decision, without a cluster.
+    def runner(command):
+        items = list(manifests.values()) if "tracingpoliciesnamespaced" in command else []
+        return SimpleNamespace(returncode=0, stdout=json.dumps({"items": items}))
+    index = IdentityCollector("test", "serving-lab", "app=serving-engine",
+                              tmp_path / "identities.json", runner=runner).collect()
+    assert index["state"] == "ok"
+    code = next(p for p in index["policies"] if p["name"] == "runtime-tg-code-01")
+    assert code["kernel_identity"] is True
+    assert all(not p["kernel_identity"] for p in index["policies"] if p != code)
+    index["generated_at"] = AT.isoformat()
+    index["records"] = [{"node": "node", "namespace": "serving-lab", "pod_name": "serving-engine-demo",
+        "pod_uid": "pod-1", "container_name": "engine", "container_id": "a" * 64,
+        "binary": "/usr/bin/python3", "node_pid": 77, "ns_pid": 12, "pidns": 123,
+        "start_ticks": 1000, "clock_ticks": 100, "stable": True, "labels": {"app": "serving-engine"}}]
+    raw = raw_event()
+    raw["node_name"] = "node"
+    event = raw["process_kprobe"]
+    event["process"] = {"pid": 42, "flags": "unknown"}
+    event["data"] = [{"label": "runtime_pid", "int_arg": 42},
+        {"label": "runtime_start_ns", "size_arg": "10005000000"},
+        {"label": "runtime_pidns", "uint_arg": 123}]
+    result = parse(raw, phase_policy(tmp_path), identity_index=index)
+    assert result["identity"]["state"] == "confirmed"
+    assert result["identity"]["source"] == "kernel_task_procfs"
+    assert result["code_load_verdict"] == "detected"
+    event.pop("data")
+    assert parse(raw, phase_policy(tmp_path), identity_index=index)["code_load_verdict"] == "unknown"
 
 
 @pytest.mark.parametrize("engine", ["gpu-lab", "gpu-lab-sglang"])

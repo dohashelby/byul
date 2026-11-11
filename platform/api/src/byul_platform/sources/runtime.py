@@ -24,6 +24,7 @@ import httpx
 from ..contracts import canonical_sha256
 from .identity_scope import observation_scope_ref
 from .checklist_links import checks_for_record, evidence_refs
+from .checklist_data import CHECKS
 
 EVENT_SCHEMA = "byul-runtime-event/0.2"
 STATUS_SCHEMA = "byul-runtime-status/0.2"
@@ -1378,14 +1379,67 @@ class LiveRuntimeSource:
                 # coverage stays unknown while existing event feeds remain readable.
                 payload = {}
             records = payload.get("observations", []) if isinstance(payload, dict) else []
+            rule_cut = False
+            rule_history_limited = False
+            limit = 50
+            if source == "tetragon":
+                # Keep the general feed, then reserve ten recent observations
+                # per checklist rule within Gateway's protected 4MiB/4096-row
+                # tail. New Gateways batch five rules into one tail read; older
+                # ones retain their exact rule_id filter and parallel fanout.
+                rules = sorted({rule for check in CHECKS for rule in check["rules"]
+                                if rule.startswith("TG-")})
+                limit += 10 * len(rules)
+                capabilities = _d(_d(payload.get("window")).get("rule_groups")) if isinstance(payload, dict) else {}
+                grouped = capabilities.get("max_rules") == 5 and capabilities.get("per_rule_limit") == 10
+                groups = [rules[i:i + 5] for i in range(0, len(rules), 5)] if grouped else [[r] for r in rules]
+                def fetch_rules(group):
+                    return self._get("/api/observations", {"source": source,
+                                     "rule_ids" if grouped else "rule_id": ",".join(group)})
+                if len(groups) == 1:
+                    group_payloads = [fetch_rules(groups[0])]
+                else:
+                    with ThreadPoolExecutor(max_workers=5) as pool:
+                        group_payloads = list(pool.map(fetch_rules, groups))
+                rule_payloads = [extra for group, extra in zip(groups, group_payloads) for _ in group]
+                base_records = records
+                records = []
+                seen: set[str] = set()
+                for record in base_records:
+                    if isinstance(record, dict):
+                        key = observation_event(record)["event_id"]
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                    records.append(record)
+                for rule, extra in zip(rules, rule_payloads):
+                    candidates = extra.get("observations", []) if isinstance(extra, dict) else []
+                    candidates = [r for r in candidates if isinstance(r, dict)
+                                  and r.get("source") == source and r.get("rule_id") == rule]
+                    rule_window = _d(extra.get("window")) if isinstance(extra, dict) else {}
+                    counts = _d(extra.get("counts")) if isinstance(extra, dict) else {}
+                    rule_total = _int(_d(counts.get("rule_id")).get(rule)) if grouped else _int(counts.get("total"))
+                    rule_history_limited |= (rule_window.get("truncated") is True
+                                             or rule_window.get("counts_lower_bound") is True)
+                    for record in candidates[:10]:
+                        key = observation_event(record)["event_id"]
+                        if key not in seen:
+                            records.append(record)
+                            seen.add(key)
+                    represented = sum(isinstance(r, dict) and r.get("source") == source
+                                      and r.get("rule_id") == rule for r in records)
+                    rule_cut |= len(candidates) > represented or (rule_total is not None and rule_total > represented)
+                records.sort(key=lambda r: (str(r.get("observed_at", "")), observation_event(r)["event_id"])
+                             if isinstance(r, dict) else ("", ""), reverse=True)
             for record in records:
                 out.append(observation_event(record) if isinstance(record, dict) else record)
             total = _int(_d(payload.get("counts")).get("total")) if isinstance(payload, dict) else None
             window=_d(payload.get('window')) if isinstance(payload,dict) else {}
             lower=window.get('counts_lower_bound') is True or window.get('truncated') is True
-            windows[source] = {"returned": len(records), "total": None if lower else total, "limit": 50,
-                               "truncated": True if lower else total > len(records) if total is not None else None,
-                               **({'total_lower_bound':total} if lower and total is not None else {})}
+            lower = lower or rule_history_limited or (total is not None and total < len(records))
+            windows[source] = {"returned": len(records), "total": None if lower else total, "limit": limit,
+                               "truncated": True if lower or rule_cut else total > len(records) if total is not None else None,
+                               **({'total_lower_bound':max(total, len(records))} if lower and total is not None else {})}
         return EventBatch(out, truncated=any(w["truncated"] is True for w in windows.values()), source_windows=windows)
 
     def events(self) -> EventBatch:

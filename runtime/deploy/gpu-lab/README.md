@@ -180,7 +180,9 @@ Gateway는 디렉터리의 최신 JSON(mtime, 동률이면 파일명)을 선택�
    ```
    `/srv/serving/runtime`이 없으면 먼저 만든다. `usermod` 뒤에는 이미 떠 있는 systemd 사용자 매니저가 예전 그룹 목록을 유지하므로(다른 SSH·tmux 세션이나 linger가 있으면 재로그인만으로 부족) `sudo systemctl restart user@$(id -u ubuntu)` 후 `systemd-run --user --wait --pipe id -G`에 10010이 보이는지 확인한다. 그룹이 없으면 수집기는 명확한 오류와 함께 종료 코드 2로 멈춘다(재시작 반복 없음).
 
-   운영 수집기(`runtime-agent`)가 Gateway 정규화 기록을 읽을 때는 해당 계정을 그룹 10000에 넣고 `/srv/serving/runtime/data`를 그룹 10000·0750으로 준비한다(수집기가 없으면 기존 0700 유지). Gateway의 `observations.jsonl`은 0644, `tetragon-health-receipts.json`은 0640이다. 기존 0600 receipt는 새 Gateway가 다음 sentinel receipt를 기록하면 0640으로 교체된다. monitor window 수집에는 `--trusted-owner-uid 10000`을 명시한다. 추가 UID는 반복 지정할 수 있고, 생략하면 root·자기 UID만 신뢰하며 그룹/기타 쓰기 가능한 입력은 계속 거부한다.
+   운영 수집기(`runtime-agent`)가 Gateway receipt를 읽을 때는 해당 계정을 그룹 10000에 넣고 `/srv/serving/runtime/data`를 그룹 10000·0750으로 준비한다(수집기가 없으면 기존 0700 유지). Gateway의 JSONL 기록(`observations.jsonl` 포함)은 0600, `tetragon-health-receipts.json`은 0640이다. 기존 0600 receipt는 새 Gateway가 다음 sentinel receipt를 기록하면 0640으로 교체된다. monitor window 수집에는 `--trusted-owner-uid 10000`을 명시한다. 추가 UID는 반복 지정할 수 있고, 생략하면 root·자기 UID만 신뢰하며 그룹/기타 쓰기 가능한 입력은 계속 거부한다.
+
+   **기존 기록 권한 이전:** Gateway와 해당 data 폴더의 writer를 중지한 뒤 저장소 루트에서 `sudo python3 runtime/tools/migrate_gateway_data_permissions.py --data-dir /srv/serving/runtime/data`로 점검한다. 기본 실행은 과도한 권한의 `*.jsonl` 파일명만 보고하며 종료 1, 문제 없으면 0이다. 운영자가 목록을 검토한 뒤 같은 명령에 `--fix-permissions`를 붙일 때만 해당 파일을 0600으로 바꾼다. 내용·소유자·디렉터리·JSON receipt는 바꾸지 않는다. 기본 소유 UID는 Gateway의 10000이며 다른 배포는 `--owner-uid`로 지정한다. 링크·특수 파일·다중 hardlink·다른 소유자·안전하지 않은 폴더는 자동 수정하지 않으므로 manual_review(파일) 또는 종료 2(폴더)를 별도 점검한다. 재점검 종료 0을 확인하고 Gateway를 시작한다. 설치기와 Gateway는 기존 파일을 자동 chmod하지 않는다. 별도 도구로 분리해 일반 설치가 기록 파일 권한을 암묵적으로 바꾸지 않게 했다. 0600 JSONL은 수집기 계정에 직접 공유하지 않고 기존 0640 health receipt로 감시 상태를 확인한다.
 
    `runtime-agent`로 수집기를 실행할 때 Ubuntu의 `umask 002`에 주의한다. `tools.tetragon_status` 코드는 상태 파일·baseline을 명시 권한 0644, recovery를 0600으로 써서 그룹/기타 쓰기를 허용하지 않는다.
 

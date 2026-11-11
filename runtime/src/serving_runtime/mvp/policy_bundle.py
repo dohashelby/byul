@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hashlib
@@ -98,8 +98,9 @@ class VerifiedPolicyBundle:
     def materialized_files(self) -> Iterator[dict[str, str]]:
         """Expose only the already verified bytes for the lifetime of one run."""
 
-        try:
-            with tempfile.TemporaryDirectory(prefix="serving-runtime-policy-bundle-") as temporary:
+        with ExitStack() as stack:
+            try:
+                temporary = stack.enter_context(tempfile.TemporaryDirectory(prefix="serving-runtime-policy-bundle-"))
                 snapshot_root = Path(temporary)
                 paths: dict[str, str] = {}
                 written: dict[str, bytes] = {}
@@ -117,13 +118,12 @@ class VerifiedPolicyBundle:
                             f"{item.relative_path}: 같은 경로에 서로 다른 검증 바이트가 있습니다"
                         )
                     paths[item.role] = str(target)
-                yield paths
-        except PolicyBundleError:
-            raise
-        except OSError as error:
-            raise PolicyBundleError(
-                f"bundle.json: 검증 파일의 시작 스냅샷을 만들 수 없습니다({type(error).__name__})"
-            ) from error
+            except OSError as error:
+                raise PolicyBundleError(
+                    f"bundle.json: 검증 파일의 시작 스냅샷을 만들 수 없습니다({type(error).__name__})"
+                ) from error
+            # Exceptions from the caller and snapshot cleanup keep their cause.
+            yield paths
 
     def mvp_options(
         self,

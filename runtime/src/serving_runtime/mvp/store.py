@@ -52,32 +52,40 @@ class JsonlStore:
         Existing directories and files are never chmod'ed. Shared read access
         requires an explicit reader GID; write access belongs to the writer UID.
         """
-        if create:
-            self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        directory = os.open(self.path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            if create:
+                self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            directory = os.open(self.path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        except PermissionError:
+            raise PermissionError(f"{self.path.name}: record directory access denied") from None
         descriptor = -1
         try:
             parent = os.fstat(directory)
             if parent.st_uid != os.geteuid() or stat.S_IMODE(parent.st_mode) & 0o022:
-                raise PermissionError("record directory owner or write permissions are unsafe")
-            descriptor = os.open(
-                self.path.name,
-                flags | os.O_NOFOLLOW | os.O_NONBLOCK | (os.O_CREAT if create else 0),
-                0o600,
-                dir_fd=directory,
-            )
+                raise PermissionError(f"{self.path.name}: record directory owner or write permissions are unsafe")
+            try:
+                descriptor = os.open(
+                    self.path.name,
+                    flags | os.O_NOFOLLOW | os.O_NONBLOCK | (os.O_CREAT if create else 0),
+                    0o600,
+                    dir_fd=directory,
+                )
+            except PermissionError:
+                raise PermissionError(f"{self.path.name}: record file access denied") from None
             info = os.fstat(descriptor)
             mode = stat.S_IMODE(info.st_mode)
-            if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
-                    or mode & 0o137
-                    or (mode & 0o040 and info.st_gid not in self._allowed_reader_gids)):
-                raise PermissionError("record file owner or reader permissions are unsafe")
+            if not stat.S_ISREG(info.st_mode):
+                raise PermissionError(f"{self.path.name}: record file is not a regular file")
+            if info.st_uid != os.geteuid():
+                raise PermissionError(f"{self.path.name}: record file owner differs from writer UID")
+            if mode & 0o137 or (mode & 0o040 and info.st_gid not in self._allowed_reader_gids):
+                raise PermissionError(f"{self.path.name}: record file reader permissions are unsafe (mode {mode:04o})")
             try:
                 current = os.stat(self.path.name, dir_fd=directory, follow_symlinks=False)
             except FileNotFoundError:
                 raise OSError('record file disappeared after opening') from None
             if (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino):
-                raise PermissionError("record file changed while opening")
+                raise PermissionError(f"{self.path.name}: record file changed while opening")
             with os.fdopen(descriptor, "ab" if flags & os.O_APPEND else "rb") as stream:
                 descriptor = -1
                 yield stream

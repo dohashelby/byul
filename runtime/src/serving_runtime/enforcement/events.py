@@ -619,6 +619,7 @@ class ObservationQuery:
         "kind",
         "verdict",
         "rule_id",
+        "rule_ids",
         "data_origin",
         "environment",
         "run_id",
@@ -628,15 +629,24 @@ class ObservationQuery:
         self.store = JsonlStore(path)
 
     def query(self, filters: dict[str, str] | None = None) -> dict[str, Any]:
-        active = filters or {}
+        active = dict(filters or {})
         unknown = set(active) - self.FILTERS
         if unknown:
             raise ValueError(f"unknown observation filters: {', '.join(sorted(unknown))}")
+        rule_ids = active.pop("rule_ids", None)
+        rules = None
+        if rule_ids is not None:
+            rules = rule_ids.split(",")
+            if (active.get("source") != "tetragon" or "rule_id" in active
+                    or not 1 <= len(rules) <= 5 or len(set(rules)) != len(rules)
+                    or any(not re.fullmatch(r"TG-[A-Z]+-[0-9]{2}", rule) for rule in rules)):
+                raise ValueError("rule_ids requires source=tetragon and 1 through 5 distinct TG rule IDs; cannot combine with rule_id")
         records, corrupt, history_truncated = self.store.read_recent()
         filtered = [
             item
             for item in records
             if all(item.get(name) == value for name, value in active.items())
+            and (rules is None or item.get("rule_id") in rules)
         ]
         filtered.sort(key=lambda item: str(item.get("observed_at", "")), reverse=True)
         dimensions = (
@@ -678,15 +688,27 @@ class ObservationQuery:
         hubble_observations = (
             hubble_dropped + hubble_other[: 50 - len(hubble_dropped)]
         )
+        observations = filtered[:50]
+        if rules is not None:
+            # One protected tail read for the whole group; reserve ten rows for
+            # each rule before applying the existing 50-row response ceiling.
+            selected = Counter()
+            observations = []
+            for item in filtered:
+                rule = item["rule_id"]
+                if selected[rule] < 10:
+                    observations.append(item)
+                    selected[rule] += 1
         return {
             "counts": counts,
             "origins_by_kind": origins_by_kind,
             "verification": {"real_hubble_dropped": real_hubble_dropped},
             "hubble_observations": hubble_observations,
-            "observations": filtered[:50],
+            "observations": observations,
             "corrupt_lines": len(corrupt),
             "corrupt_details": corrupt[:20],
             "window":{"truncated":history_truncated,"counts_lower_bound":history_truncated,
-                      "max_bytes":4*1024*1024,"max_records":4096,"scope":"recent_journal_tail"},
+                      "max_bytes":4*1024*1024,"max_records":4096,"scope":"recent_journal_tail",
+                      "rule_groups":{"max_rules":5,"per_rule_limit":10}},
             "generated_at": _utc_now(),
         }

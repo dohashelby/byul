@@ -1,22 +1,26 @@
 """Exact default producer→consumer contract; all transport is explicitly CPU."""
 from copy import deepcopy
 import json
+import re
 import threading
 from types import SimpleNamespace
 import uuid
 
 import pytest
+from guard.adapters.vllm import VllmAdapter
 from guard.executors import req_runner_capture as link
 from guard.models import sha256_hex
 from tests.req_response_id_source import DATA, response_id
+
+PROFILE = VllmAdapter().runner_capture_profile('0.31.0')
 
 
 def capture(cid):
     value = object.__new__(link.Capture)
     value.ctx = SimpleNamespace(check=SimpleNamespace(id=cid))
     value.lock, value.calls = threading.Lock(), []
-    value.fingerprinter = object.__new__(link.sensor.ConsumptionObserver)
-    value.fingerprinter.secret = b'EXAMPLE-response-contract-key-01!'
+    value.profile = PROFILE
+    value.fingerprinter = PROFILE.fingerprinter(b'EXAMPLE-response-contract-key-01!')
     return value
 
 
@@ -45,7 +49,7 @@ def test_exact_upstream_default_generator_to_unchanged_native_hmac_mapping(cid):
     assert row['response_id_sha256'] == sha256_hex(rid.encode())
     assert row['request_sha256'] == value.fingerprinter.fingerprint(rid if cid=='REQ-08' else rid+'-0')
     assert row['diagnostic'] is None
-    assert DATA['source_commit'] == link.SOURCE_COMMIT and len(link.SOURCES) == 7
+    assert DATA['source_commit'] == PROFILE.source_commit and len(PROFILE.sources) == 7
 
 
 @pytest.mark.parametrize('bad', ['old32','short15','long17','uppercase','wrong-prefix','suffix','nonhex'])
@@ -82,4 +86,4 @@ def test_default_generator_scope_still_rejects_override_before_dispatch(override
 def test_preserved_v12_actual_http_id_shape_matches_pinned_default_source(rid):
     # Only public-format strings from the actual normal receipt; no worker,
     # authentication event, token, prompt or new live observation is created.
-    assert link._RESPONSE_ID.fullmatch(rid)
+    assert re.fullmatch(PROFILE.response_id_pattern, rid)

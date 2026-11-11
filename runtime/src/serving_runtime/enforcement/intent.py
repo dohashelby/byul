@@ -181,6 +181,8 @@ class EnforcementIntent:
     tetragon_enforce_method: str | None = None
     tetragon_openat_symbol: str | None = None
     tetragon_kernel_identity: bool = False
+    # Additional download/code locations, e.g. a custom HF_MODULES_CACHE.
+    code_load_watch_paths: tuple[str, ...] = ()
 
     def tetragon_rule_mode(self, rule_id: str) -> str:
         return dict(self.tetragon_rule_modes).get(rule_id, "monitor")
@@ -408,6 +410,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
             "tetragon_enforce_method",
             "tetragon_openat_symbol",
             "tetragon_kernel_identity",
+            "code_load_watch_paths",
         },
     )
     schema = _required(root, "schema", "$")
@@ -429,6 +432,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
         "tetragon_enforce_method",
         "tetragon_openat_symbol",
         "tetragon_kernel_identity",
+        "code_load_watch_paths",
     }
     if not v11:
         present = sorted(v11_fields & set(root))
@@ -790,6 +794,13 @@ def parse_intent(document: Any) -> EnforcementIntent:
             _validate_kubernetes_selector(labels, path)
         _validate_distinct_roles(roles)
 
+    code_paths = _binary_list(root.get("code_load_watch_paths", []), "$.code_load_watch_paths")
+    if len(code_paths) > 8 or any(
+        len(path.encode("utf-8")) > 255 or path == "/" or not path.isprintable()
+        for path in code_paths
+    ):
+        raise IntentError("code_load_watch_paths requires at most 8 printable directory paths (max 255 characters, not /)")
+
     return EnforcementIntent(
         namespace,
         gateway,
@@ -816,6 +827,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
         tetragon_enforce_method=root.get("tetragon_enforce_method"),
         tetragon_openat_symbol=root.get("tetragon_openat_symbol"),
         tetragon_kernel_identity=root.get("tetragon_kernel_identity", False),
+        code_load_watch_paths=code_paths,
     )
 
 

@@ -161,6 +161,7 @@ class ManifestTests(unittest.TestCase):
                 "tetragon-tg-asset-01.json",
                 "tetragon-tg-cache-01.json",
                 "tetragon-tg-secret-01.json",
+                "tetragon-tg-code-01.json",
             },
         )
         serialized = json.dumps(manifests)

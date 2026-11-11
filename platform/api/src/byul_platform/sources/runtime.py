@@ -218,6 +218,9 @@ def observation_outcome(record: dict[str, Any]) -> str:
         if _action_mode(record) == "enforce":
             return "enforce_attempted"
         if record.get("kind") == "file_access":
+            if record.get("rule_id") == "TG-CODE-01":
+                verdict = record.get("code_load_verdict")
+                return verdict if verdict in {"detected", "observed"} and _action_mode(record) == "monitor" else "unknown"
             if _action_mode(record) != "monitor":
                 return "unknown"
             rule_id = record.get("rule_id")

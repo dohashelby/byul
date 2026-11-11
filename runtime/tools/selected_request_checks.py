@@ -34,6 +34,10 @@ def record_for(base, rid, viewer, timeout, *, marker=None):
         finals = [r for r in rows if r.get("phase") == "final"]
         if len(finals) == 1:
             final = finals[0]
+            decision = final.get("decision") or {}
+            message = decision.get("message")
+            if marker and isinstance(message, str):
+                message = message.replace(marker, "[synthetic_marker]")
             context = ("request_id", "upstream_request_id", "observation_session_id", "run_id", "target_id", "target", "policy", "policy_bundle", "route", "auth")
             stable = len(starts) == 1 and all(starts[0].get(k) == final.get(k) for k in context)
             return {"state": "observed", "request_id": rid, "record_request_ids_match_query": True,
@@ -46,6 +50,8 @@ def record_for(base, rid, viewer, timeout, *, marker=None):
                     "target_id": final.get("target_id"), "target_instance_id": (final.get("target") or {}).get("instance_id"),
                     "run_id": final.get("run_id"), "observation_session_id": final.get("observation_session_id"),
                     "decision_result": (final.get("decision") or {}).get("result"),
+                    "decision_rule_id": decision.get("rule_id"),
+                    "decision_message": message,
                     "record_http_status": (final.get("decision") or {}).get("http_status"),
                     "reason_code": (final.get("decision") or {}).get("reason_code"),
                     "delivery_attempted": (final.get("delivery") or {}).get("attempted"),
@@ -58,7 +64,7 @@ def record_for(base, rid, viewer, timeout, *, marker=None):
     return {"state": "unknown", "reason": "final_deadline"}
 
 
-def route_record_for(base, rid, viewer, timeout):
+def route_record_for(base, rid, viewer, timeout, *, marker=None):
     if not isinstance(rid, str) or not UUID.fullmatch(rid):
         return {"state": "unknown", "reason": "server_uuid_not_exposed", "witness": "external_http_only"}
     reply = request("GET", base + "/api/route-rejections?limit=100", token=viewer, timeout=timeout)
@@ -68,11 +74,12 @@ def route_record_for(base, rid, viewer, timeout):
         return {"state": "unknown", "http_status": reply.status, "reason": "route_audit_not_unique_in_window", "window": value.get("window")}
     row = rows[0]
     return {"state": "observed", "request_id": rid, "record_request_ids_match_query": True,
+            "synthetic_marker_present": (marker.encode() in reply.body or marker in json.dumps(value)) if marker else None,
             "delivery_attempted": row.get("forwarded_to_engine"), "reason_code": row.get("reason"),
             "http_status": row.get("response_code"), "run_id": row.get("run_id"), "journal_kind": "route_rejection"}
 
 
-def platform_comparison(platform, rid, raw, timeout):
+def platform_comparison(platform, rid, raw, timeout, *, marker=None):
     if not platform or raw.get("state") != "observed":
         return {"state": "not_run"}
     reply = request("GET", origin(platform) + "/api/runtime/requests/" + rid, timeout=timeout)
@@ -83,6 +90,7 @@ def platform_comparison(platform, rid, raw, timeout):
              "decision_result": (detail.get("decision") or {}).get("result"),
              "delivery_attempted": (detail.get("delivery") or {}).get("attempted"), "final_outcome": detail.get("final_outcome")}
     return {"state": "observed" if detail else "unknown", "http_status": reply.status,
+            "synthetic_marker_present": (marker.encode() in reply.body or marker in json.dumps(data)) if marker else None,
             "same_trusted_fields": bool(detail) and all(raw.get(k) == v for k, v in pairs.items()),
             "invalid": bool(data.get("detail_invalid") or data.get("event_invalid"))}
 
@@ -110,7 +118,8 @@ def request_matrix(gateway_url, platform_url, model, inference, viewer, *, timeo
     marker = "BYUL_SYNTHETIC_" + uuid4().hex
 
     def send(ident, *, method="POST", path="/v1/chat/completions", payload=None, token=inference,
-             headers=None, expected=None, forged=False, route=False, rejection=None):
+             headers=None, expected=None, forged=False, route=False, rejection=None, decision_path=None,
+             check_marker=False):
         nonlocal baseline
         idle, capacity = concurrent_precondition(base, viewer, timeout, required_slots=1)
         if idle is not True:
@@ -120,8 +129,8 @@ def request_matrix(gateway_url, platform_url, model, inference, viewer, *, timeo
                         body=json.dumps(body if payload is None else payload, ensure_ascii=True).encode() if method == "POST" else None,
                         timeout=timeout, extra_headers=headers)
         rid = header(reply, "X-Request-ID")
-        raw = route_record_for(base, rid, viewer, timeout) if route else record_for(base, rid, viewer, timeout, marker=marker)
-        comparison = platform_comparison(platform_url, rid, raw, timeout) if not route else {"state": "not_applicable_route_audit"}
+        raw = route_record_for(base, rid, viewer, timeout, marker=marker) if route else record_for(base, rid, viewer, timeout, marker=marker)
+        comparison = platform_comparison(platform_url, rid, raw, timeout, marker=marker) if not route else {"state": "not_applicable_route_audit"}
         error = document(reply).get("error", {}) if reply.status != 200 else {}
         rejected = 400 <= reply.status < 500
         status_ok = reply.status == 200 if expected == "normal" else rejected
@@ -164,6 +173,14 @@ def request_matrix(gateway_url, platform_url, model, inference, viewer, *, timeo
                         ('principal_id','policy_sha256','target_id','target_instance_id','run_id'))
         if forged:
             journal_ok = journal_ok and raw.get("synthetic_marker_present") is False
+        if decision_path:
+            journal_ok = (journal_ok and raw.get("decision_rule_id") == "request_code_selection"
+                          and raw.get("decision_message") == decision_path)
+        response_marker_present = marker.encode() in reply.body or marker in json.dumps(document(reply))
+        if check_marker:
+            journal_ok = journal_ok and raw.get("synthetic_marker_present") is False
+            if platform_url and not route:
+                api_ok = api_ok and comparison.get("synthetic_marker_present") is False
         passed = status_ok and journal_ok and api_ok
         if not status_ok:
             passed = False
@@ -177,15 +194,24 @@ def request_matrix(gateway_url, platform_url, model, inference, viewer, *, timeo
             passed = None
         if platform_url and comparison.get("invalid") is True:
             passed = False
-        cases.append(fact(ident, passed, {"dispatched": True, "http_status": reply.status, "server_uuid": rid,
+        if check_marker and raw.get("state") == "observed" and not journal_ok:
+            passed = False
+        # Positive leak evidence remains a failure even when another witness is unavailable.
+        if check_marker and (response_marker_present or raw.get("synthetic_marker_present") is True
+                             or comparison.get("synthetic_marker_present") is True):
+            passed = False
+        case = fact(ident, passed, {"dispatched": True, "http_status": reply.status, "server_uuid": rid,
                           "client_id_was_replaced": rid != marker and isinstance(rid, str) and UUID.fullmatch(rid) is not None,
                           "error_code": error.get("code"), "response_bytes": len(reply.body),
+                          "response_synthetic_marker_present": response_marker_present,
                           "expected_rejection": list(rejection) if rejection else None,
                           "response_sha256": hashlib.sha256(reply.body).hexdigest(), "journal": raw,
                           "same_baseline_trusted_fields": same_context, "platform": comparison,
                           "gateway_journal_not_delivered": raw.get("delivery_attempted") is False,
                           "external_rejection_observed": rejected,
-                          "engine_log_nonarrival_verified": False}, scope="live Gateway request/structured journal/API boundary; backend logs are a separate witness"))
+                          "engine_log_nonarrival_verified": False}, scope="live Gateway request/structured journal/API boundary; backend logs are a separate witness")
+        # Preserve leak booleans, never copy the synthetic value into exported facts.
+        cases.append(json.loads(json.dumps(case).replace(marker, "[synthetic_marker]")))
 
     send("REQ-CONTROL-BEFORE", expected="normal")
     for name, token, headers in (("missing", None, None), ("invalid", "BYUL_SYNTHETIC_INVALID", None),
@@ -209,6 +235,25 @@ def request_matrix(gateway_url, platform_url, model, inference, viewer, *, timeo
         rejection = ((403,'MAX_TOKENS_EXCEEDED','DENIED') if field=='max_tokens' else
                      (400,'N_UNSUPPORTED','INVALID') if field=='n' else (400,'UNSUPPORTED_FIELD','INVALID'))
         send("REQ-FIELD-" + field, payload={**body, field: value},rejection=rejection)
+    attack_body = {**body, "mm_processor_kwargs": {"code_revision": marker}}
+    code_cases = (
+        ("chat-mm", "/v1/chat/completions", attack_body, "mm_processor_kwargs.code_revision", "mm_processor_kwargs"),
+        ("messages", "/v1/chat/completions", {**body, "messages": [{**body["messages"][0], "code_revision": marker}]},
+         "messages[0].code_revision", "messages"),
+        ("completions", "/v1/completions", {"model": model, "prompt": "Say hello in one short sentence.",
+         "max_tokens": min(8, limit), "mm_processor_kwargs": {"code_revision": marker}},
+         "mm_processor_kwargs.code_revision", None),
+    )
+    for name, path, payload, decision_path, chat_root in code_cases:
+        if current.get("profile") == "zeroday-lab" and chat_root in configured:
+            cases.append(fact("REQ-CODE-SELECT-" + name, None,
+                              {"dispatched": False, "reason": "zeroday_lab_explicit_chat_field_exception", "field": chat_root},
+                              scope="D1 explicit lab chat-field exception"))
+            continue
+        send("REQ-CODE-SELECT-" + name, path=path, payload=payload,
+             rejection=(400, "CODE_SELECTION_FIELD", "INVALID"), decision_path=decision_path, check_marker=True)
+    send("REQ-ROUTE-POST-/tokenize", path="/tokenize", payload=attack_body, route=True,
+         rejection=(404, "NOT_FOUND", "INVALID"), check_marker=True)
     for method, path in (("GET", "/v1/chat/completions"), ("POST", "/v1/embeddings"),
                          ("POST", "/v1//chat/completions"), ("POST", "/v1/%63hat/completions")):
         send("REQ-ROUTE-" + method + "-" + path, method=method, path=path, route=True,

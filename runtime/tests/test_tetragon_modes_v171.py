@@ -34,10 +34,15 @@ class Result:
 class MethodTests(unittest.TestCase):
     def test_legacy_bytes_and_explicit_extensionless_file(self):
         original = sample()
-        before = json.dumps(render_manifests(parse_intent(original)), ensure_ascii=False, separators=(",", ":"))
+        def legacy_bytes(document):
+            manifests = render_manifests(parse_intent(document))
+            # The new monitor is additive; preserve the exact legacy policy hash.
+            manifests.pop("tetragon-tg-code-01.json")
+            return json.dumps(manifests, ensure_ascii=False, separators=(",", ":"))
+        before = legacy_bytes(original)
         self.assertEqual(hashlib.sha256(before.encode()).hexdigest(),
                          "58cbc5924122a2f61d525516eae8a3de5a321515f763abdd79272b24a1691d3e")
-        self.assertEqual(before, json.dumps(render_manifests(parse_intent(copy.deepcopy(original))), ensure_ascii=False, separators=(",", ":")))
+        self.assertEqual(before, legacy_bytes(copy.deepcopy(original)))
         original["protected_paths"]["secret_paths"] = ["/var/run/secrets/serviceaccount/token"]
         original["protected_paths"]["enforce_exact_files"] = ["/var/run/secrets/serviceaccount/token"]
         original["tetragon_rule_modes"] = {"TG-SECRET-01": "enforce"}

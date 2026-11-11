@@ -1,0 +1,372 @@
+{
+  "schema": "S4-preseal-inventory-CPU-body-and-code-pins-focused-review/1",
+  "at_UTC": "2026-11-11T03:24:44.808901+00:00",
+  "owner": "S4",
+  "id": "SUP-16/R8 후속 진단 준비",
+  "branch_scope": "f868 실제 원producer AST→새consumer CPU원문 및 고정5개핀 정적 대조",
+  "source_commit": null,
+  "source_identity": "새 준비source f868은 미커밋 out. CPU가 소비한 lifecycle snapshot은 2cb와 bytes385 일치하는 원 source이다. 전체 module import나 current reader60c 실행으로 확대하지 않는다.",
+  "files": {
+    "v1-preseal-inventory-source-static-baseline-review-v1.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\sup16-preseal-inventory-focused-review-20261111-v1\\v1-preseal-inventory-source-static-baseline-review-v1.json",
+      "bytes": 6577,
+      "sha256": "10c30cb34c2538a2c0ce6bc5ca29a5a3000acd2dee23a2f85898afc44bba9311"
+    },
+    "capture_normal.py": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\capture_normal.py",
+      "bytes": 20279,
+      "sha256": "f868ee1d9c4bbb0c56c981691d08b91476408aa93c34239193846eaeeed6df96"
+    },
+    "cpu-v1_2.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\cpu-v1_2.json",
+      "bytes": 18067,
+      "sha256": "590b11f6c715f939844489809a88372454da3d3861ac00c2079a6f8ad99303b6"
+    },
+    "cpu_contract_v1_2.py": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\cpu_contract_v1_2.py",
+      "bytes": 12539,
+      "sha256": "7c1e7e73a22587324d65c598bff40531ee363065d6c83f68b64e59dcbe931933"
+    },
+    "cpu-v1_1.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\cpu-v1_1.json",
+      "bytes": 12556,
+      "sha256": "e60dc073b9bc75e234898bf80875da5ea9f2cd52a7b0d1ae17fbf4ce7b3ae2be"
+    },
+    "cpu_contract_v1_1.py": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\cpu_contract_v1_1.py",
+      "bytes": 12552,
+      "sha256": "61a218233deac935aa03ea78bb21ebbf6e630ca7d9d3fd443ecc17b3fad5e2f9"
+    },
+    "2cb01e9f-capture-session.source.txt": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-r8-observation-boundary-trace-20261111-v1\\source-refs\\2cb01e9f-capture-session.source.txt",
+      "bytes": 16846,
+      "sha256": "38526674e8df7de6b25499e924f30c4ed6e94e3346ff944249a5fee00de467e1"
+    },
+    "original-bounded.py.source.txt": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\original-bounded.py.source.txt",
+      "bytes": 6134,
+      "sha256": "25c81666a17e13651c0b5b3bd67c9f310c6feee8311fcac408404d895dc67290"
+    },
+    "original-owned_capture.py.source.txt": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\original-owned_capture.py.source.txt",
+      "bytes": 8183,
+      "sha256": "81d23f82cb4a619d86a30d3bab65adfb305edb9633faa496bdd401924851e950"
+    },
+    "SUP16-preseal-CPU-producer-source-reference-crosscheck-20261111.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-gpu-b-stage1-closeout-handoff-20261106\\out\\team-handoff\\SUP16-preseal-CPU-producer-source-reference-crosscheck-20261111.json",
+      "bytes": 1070,
+      "sha256": "04fb184114a601dfc3cfe19b81a435da019f5f5812ca9a61f50c03ac69592f2a"
+    },
+    "code-pin-closure-v1.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\code-pin-closure-v1.json",
+      "bytes": 5346,
+      "sha256": "ad36379a96fda849505ec788cfe823a07a53f1f1c5d919aa63815c84bdf2b18f"
+    },
+    "pin-code-delta.diff": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\pin-code-delta.diff",
+      "bytes": 5805,
+      "sha256": "3a7c334716ea96de4758e9434fc35c01c9434a801a5bb1108f8590e8b19dbca2"
+    }
+  },
+  "checks": [
+    {
+      "check": "앞 정적baseline10c30 재사용·고정 sourcef868 일치",
+      "matched": true
+    },
+    {
+      "check": "CPU본문18067 590b 및 harness12539 7c1e 정확SHA",
+      "matched": true
+    },
+    {
+      "check": "원2cb source snapshot16846 385 및 root 교차근거 일치",
+      "matched": true
+    },
+    {
+      "check": "실제원함수 AST선택 및 수정source main 실제slice 소비",
+      "matched": true
+    },
+    {
+      "check": "원 native program1046 그대로 실행하는 container 소비자",
+      "matched": true
+    },
+    {
+      "check": "실제 본문4체크0 실패·3 native 사례와 FD수 별도",
+      "matched": true
+    },
+    {
+      "check": "기본·unknown entry native PID ticks boot 파일메타 연결 및 원값 보존",
+      "matched": true
+    },
+    {
+      "check": "native 오류 원producer ValueError·errno null 및 원seal marker 객체 유지",
+      "matched": true
+    },
+    {
+      "check": "이전 실패본문 보존 및 통과 invalid-session capture marker만 재사용",
+      "matched": true
+    },
+    {
+      "check": "harness1.1→1.2는 Docker stdin -i 및 이미통과 분기 재사용",
+      "matched": true
+    },
+    {
+      "check": "명시대역 Reader owner capture·원현재reader 실행없음",
+      "matched": true
+    },
+    {
+      "check": "native UID GID1000·outer3123 inner31214 ISB 구분",
+      "matched": true
+    },
+    {
+      "check": "CPU container3 원성공·삭제관측·networknone read-only UID1000",
+      "matched": true
+    },
+    {
+      "check": "FD4→4 및 stub deadline 원값 유지 범위",
+      "matched": true
+    },
+    {
+      "check": "actualR8추가기록0 archiveexec0 GPUAWS0 판정불변",
+      "matched": true
+    },
+    {
+      "check": "코드핀 descriptor5346 ad36 및 diff5805 3a7 고정",
+      "matched": true
+    },
+    {
+      "check": "5개pin source는 지정digest literal만 변경·각bytesSHA 일치",
+      "matched": true
+    },
+    {
+      "check": "실 R8 source계약2cb tree912 manifestac423 유지",
+      "matched": true
+    }
+  ],
+  "checks_count": 18,
+  "mismatches": 0,
+  "result": "원 CPU본문·고정하네스·producer snapshot 및 5개코드핀 정적 연결은 일치한다. v1.2의 native3분기와 FD체크, v1.1에서 이미통과한 invalid-session/capture오류1분기를 구분해 재사용했다. native tool 원trace와 최종직접핀소비/운영metadata는 별도 미확인이다.",
+  "CPU_scope": {
+    "v1_2_checks": 4,
+    "v1_2_failures": [],
+    "unique_scenarios": [
+      "basic",
+      "unsupported-entry",
+      "native-error",
+      "invalid-session(원v1.1에서만 재사용)"
+    ],
+    "FD_check": "번호나 객체신원 집합이 아닌 개수4→4",
+    "actual_producer": "2cb 원 inventory/parse/safe_owner 등 선택 AST 및 원 INVENTORY_READER1046을 CPU fixture에서 실제 소비",
+    "actual_consumer": "새 source module을 로드한 뒤 main의 snapshot→before_seal→seal→capture할당 AST 구간만 실행. 전체 main CLI/source검증/원 except-finally/receipt파일저장 경로는 실행하지 않음.",
+    "explicit_substitutes": "Kubernetes reader/owner/transport/capture_session은 CPU대역. 원 current60c 및 2cb cf255 reader 실행0.",
+    "basic_unknown": "원PID/start/boot SHA/파일native metadata와 producer_result 동일객체·JSON roundtrip 보존. unknown_entries1도 producer_returnedtrue이며 지원/성공으로 정규화하지 않음.",
+    "error_seal": "실제 native inventory 프로그램의 directory mode 오류→ValueError LIFECYCLE_INVENTORY_TRANSPORT_INVALID/errno null를 보존한 뒤 명시CPU seal OSError 동일객체 유지.",
+    "error_capture_reuse": "원v1.1 overall 실패 중 invalid-session은 함수단계 거부 후 명시CPU capture RuntimeError 동일객체 유지한 통과분기. native program은 이 분기에서 실행되지 않음.",
+    "native_original_stderr": "first-client failure의 stderr 86바이트 동일성은 당시 하네스 직접assert 범위. 임시 fixture는 정리돼 원raw 지속보관 Ref로 주장하지 않음.",
+    "deadline": "대역 reader.deadline 값불변을 확인한 CPU. 실제K8s120 기한동작 검증으로 확대하지 않으며 기존 정적기한 근거를 재사용.",
+    "native_runtime_outer": {
+      "argv": [
+        "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v1/venv/bin/python",
+        "-I",
+        "-S",
+        "-B",
+        "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/sup16-preseal-inventory-20261111-v1/cpu_contract_v1_2.py",
+        "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/sup16-preseal-inventory-20261111-v1/capture_normal.py",
+        "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/sup16-preseal-inventory-20261111-v1/cpu-v1_2.json"
+      ],
+      "executable": "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v1/venv/bin/python",
+      "uid": 1000,
+      "gid": 1000,
+      "python": "3.12.3",
+      "flags": {
+        "I": 1,
+        "S": 1,
+        "B": true
+      },
+      "source_sha256": "f868ee1d9c4bbb0c56c981691d08b91476408aa93c34239193846eaeeed6df96",
+      "harness_sha256": "7c1e7e73a22587324d65c598bff40531ee363065d6c83f68b64e59dcbe931933",
+      "original_inventory_module_sha256": "38526674e8df7de6b25499e924f30c4ed6e94e3346ff944249a5fee00de467e1",
+      "native_inventory_program_sha256": "1046b712c6184475fd9020b1c496695cd802e3f9efbea6028d5d4d42ebfffac2",
+      "CPU_image_id": "sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f"
+    },
+    "native_runtime_inner": "cached CPU image f77ac9e4/Python3.12.14/UID-GID1000/ISB. outer는Py3.12.3이며 EUID/PID/ticks 부재값을 추정하지 않음.",
+    "removed_containers": {
+      "count": 3,
+      "inspection": "하네스가 각 container inspect의 No such container를 확인해 removed=true 기록. S4가 Docker를 새로조회하지 않음."
+    }
+  },
+  "prior_failures_preserved": {
+    "v1_1_failures": [
+      "basic",
+      "unsupported-entry",
+      "native-error"
+    ],
+    "reused_only_case": {
+      "name": "invalid-session",
+      "passed": true,
+      "detail": {
+        "calls": [
+          "snapshot",
+          "seal",
+          "capture"
+        ],
+        "deadline_unchanged": true,
+        "observation": {
+          "stage": "before_seal",
+          "producer_returned": false,
+          "started_monotonic_ns": 410639513748082,
+          "error": {
+            "type": "ValueError",
+            "message": "LIFECYCLE_SESSION_INVALID",
+            "errno": null
+          },
+          "finished_monotonic_ns": 410639513812377
+        },
+        "first_client_failure": {
+          "attempted": false,
+          "saved": false
+        },
+        "native_CPU": null,
+        "original_capture_exception_same_object": true
+      }
+    },
+    "cause_scope": "S5보고 및 하네스diff로 Docker stdin -i 추가를 확인. 이전native3 실패는 삭제하거나 통과로 바꾸지 않고 고유분기 중복가산0. 최초v1 native assert 실패는 S5직접도구보고 범위."
+  },
+  "tool_provenance": {
+    "source": "S5와 총괄 직접 전달. 별도 raw tooltrace 파일은 현재 미인계로 독립확인 전.",
+    "v1_2": {
+      "initial_chunk": "231b2c",
+      "session": 1179,
+      "terminal_chunk": "2d3b54",
+      "reported_exit": 0
+    },
+    "v1_1": {
+      "initial_chunk": "10a599",
+      "session": 89932,
+      "terminal_chunk": "54df80",
+      "reported_exit": 1
+    },
+    "v1": {
+      "initial_chunk": "abac05",
+      "session": 16824,
+      "terminal_chunk": "c6160f",
+      "reported_exit": 1
+    },
+    "independent_raw_tool_trace_verified": false
+  },
+  "code_pin_static": {
+    "files": [
+      {
+        "name": "003-adapter.py",
+        "baseline": {
+          "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\one-gpu-req-sup16-join-20261109-v1\\sup16-roles-operating-20261110-v1\\next-selected-operating-binding-r8-v1\\fixed43-candidate-v1\\files\\003-adapter.py",
+          "bytes": 21679,
+          "sha256": "1aefbdf251c99bd89559da437359b2e46302e14b8ffc1c041291690b019a4fc6"
+        },
+        "candidate": {
+          "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\003-adapter.py",
+          "bytes": 21679,
+          "sha256": "7d839a0a0a8385822a9d8262739e0c89093241262c8e638deb3cc425f01876fc"
+        },
+        "only_selected_pin_literals_changed": true
+      },
+      {
+        "name": "021-resolver.py",
+        "baseline": {
+          "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\one-gpu-req-sup16-join-20261109-v1\\sup16-roles-operating-20261110-v1\\next-selected-operating-binding-r8-v1\\fixed43-candidate-v1\\files\\021-resolver.py",
+          "bytes": 28500,
+          "sha256": "3f8d1ae28f6199baaf6827bb627d5ebb03ab999d256d5e59ba58c9f93131b075"
+        },
+        "candidate": {
+          "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\021-resolver.py",
+          "bytes": 28500,
+          "sha256": "9a840fb0fa61c9c11adcc3fa4121f778d4d4747f3f00eaf9b87c1a420ce9e340"
+        },
+        "only_selected_pin_literals_changed": true
+      },
+      {
+        "name": "004-actionwise.py",
+        "baseline": {
+          "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\one-gpu-req-sup16-join-20261109-v1\\sup16-roles-operating-20261110-v1\\next-selected-operating-binding-r8-v1\\fixed43-candidate-v1\\files\\004-actionwise.py",
+          "bytes": 8145,
+          "sha256": "6c8db7c825551ea657ebed7f7ea52ce0efc31913fb582c3683830508db5fb341"
+        },
+        "candidate": {
+          "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\004-actionwise.py",
+          "bytes": 8145,
+          "sha256": "cdeca47d1a7d40f5c0eda0f5e0d208e5c0918c5b00b9b81b86cade6f2684a2ce"
+        },
+        "only_selected_pin_literals_changed": true
+      },
+      {
+        "name": "013-join.py",
+        "baseline": {
+          "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\one-gpu-req-sup16-join-20261109-v1\\sup16-roles-operating-20261110-v1\\next-selected-operating-binding-r8-v1\\fixed43-candidate-v1\\files\\013-join.py",
+          "bytes": 18924,
+          "sha256": "b203e6be4061a3734bb0d52aee2d211cdcd9bba4efed009206580a440b3a1fee"
+        },
+        "candidate": {
+          "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\013-join.py",
+          "bytes": 18924,
+          "sha256": "fb276ca37b703958856886a0819a0755a205859739ea12217eb4e97debaa360a"
+        },
+        "only_selected_pin_literals_changed": true
+      },
+      {
+        "name": "039-whole_entry.py",
+        "baseline": {
+          "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\one-gpu-req-sup16-join-20261109-v1\\sup16-roles-operating-20261110-v1\\next-selected-operating-binding-r8-v1\\fixed43-candidate-v1\\files\\039-whole_entry.py",
+          "bytes": 17446,
+          "sha256": "6b9caa8c0f9cbe76b4477cd6b8e689f6384d451bba43de798c48e89244082e88"
+        },
+        "candidate": {
+          "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\039-whole_entry.py",
+          "bytes": 17446,
+          "sha256": "0bd54c6e0d1ace6cf08a6b3d05e6005b44866b692ae8c43e6ecca0056199ac10"
+        },
+        "only_selected_pin_literals_changed": true
+      }
+    ],
+    "status_original": "CODE_PINS_FIXED_CPU_PENDING_OPERATION_NOT_READY",
+    "source_contract": {
+      "commit": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+      "tree": "912cb0924559343af939b5b525e865590a91795c",
+      "manifest": "ac423c8243af7b824bd66f7dadc5bd4ef5d827026a86d66f0c32dd28f3b4cf8b",
+      "root": "/home/ubuntu/BYUL-SOURCE-REQ-SUP16-20261109-V4/repo"
+    },
+    "new_functional_helper_files": 1,
+    "pin_only_implementation_files": 5,
+    "direct_callsite_consumption_pending": true,
+    "S2_metadata_pending": [
+      "015 assembly_inputs capture_helper/resolver refs",
+      "040 fixedrequest module_files adapter/actionwise/join",
+      "039 entry self pin in installer/operator source-map",
+      "source-map/fileinstall/fixed43payload PLAN/DIRS/PAYLOAD/operator local_files"
+    ],
+    "limit": "지정문자열1회 치환 외 bytes불변으로 확인. 과거동명capture embed/ready/normal/bootstrap의 별도 argv·A/worker를 전역치환하지 않음. 최종040/015·operator목록·고정43payload 전체완료 주장은 하지 않음."
+  },
+  "producer_reader_version_scope": {
+    "inventory_2cb_and_snapshot": "16846B/38526674 동일·root immutable교차근거 재사용",
+    "reader_2cb": "16144B/cf255faa84d654f4fce3082ca1dbfdbc816a5306bedcff5a2bb7e9d2c187f415",
+    "reader_current": "16177B/60c1f8ee158072f6c0950e2067945f01dc24ac8b974ac9d867e5eb57e812f600",
+    "difference": "총괄정적diff 보고: supports import 및 프로필 검사 두곳 차이. deadline/owner/exec/seal 메서드불변 근거를 재사용. 둘의 전체byte동일성 주장0."
+  },
+  "verification_level": "준비source 정적baseline재사용 + 실제합성CPU본문/하네스·원 AST프로그램 연결 + 지정pin literal 정적대조",
+  "data_origin": "EXPLICIT_SYNTHETIC_CPU_NEW_B_OBSERVATION_ONLY. actualR8관측0·archive code실행0·GPUAWS0.",
+  "policy_official": "원R8 files0/후보0·FAIL/UNKNOWN/null·정확Ref/정책/official·A/worker 판정 변경0. 원errno하위원인을 복원하지 않음.",
+  "counts": {
+    "metadata_checks": 18,
+    "new_native_scenarios_v1_2": 3,
+    "reused_invalid_session_v1_1": 1,
+    "FD_count_check": 1,
+    "unique_scenarios": 4,
+    "S4_new_executions_API_GPU_CRC": 0,
+    "product_ID_counts_changed": 0
+  },
+  "pending": [
+    "S5 제공 native tooltrace 원문 인계분 대조",
+    "고정 codepin 실제직접소비증거 및 S2 최종운영metadata/040/015/43map 결합"
+  ],
+  "operational_ready": false,
+  "new_gate_or_approval_added": false,
+  "next_owner": "S5 기존 진행중 원trace/직접소비증거 및 구현핀 단일작성·S2 운영metadata. 새 재시험/승인 요구0."
+}

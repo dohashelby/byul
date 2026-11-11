@@ -16,4 +16,4 @@ S2 실제 실행은 health/clock 뒤 Session CLI의 빈 prefix/min1 입력 검�
 
 v1 합성 CPU30의 실패2를 보존했고 v2에서 해당 결함을 고쳤다. v2 protocol30·실제 로컬 FD8은 당시 source의 결과다. v3는 기존 접근 guard와 frame 단위 변경의 새 영향19를 확인했다. 독립 검토에서 새 부모 FD 상태 조회 실패의 정리 누락을 찾아 v4에서 두 조회를 정리 보호 구간으로 옮기고 새 실패 주입2를 확인했다. 이 숫자는 제품 점검 완료 수가 아니며, 기존 결과를 v4 전체 suite 통과로 바꾸지 않는다.
 
-이 공개 묶음은 부품 준비 범위다. 실제 GB12 스트림 전송·전체 SHA/CRC·복원·Ref 검증 및 SUP-16 정상/부분 파일/복구 실증은 아직 미완료다. 원 FAIL·UNKNOWN·이전 partial·팩·제품 source 목록을 유지한다.
+이 source와 각 CPU·source-only 영수증은 작성 당시의 부품 준비 범위로 보존한다. 후속 S3에서 실제 GB12 스트림 전송·로컬 전체 SHA와 최초1971 CRC·안전 index를 통과했고 [원자료 사실 검토](GB12-archive-facts-review.json)를 연결했다. 정상 전/부분 파일/복구 후의 후보는1/0/1이고 기록 파일은3/0/3이다. 원 ENV의 EXAMPLE·engine UNVERIFIED·producer 인증false/product 연결false를 유지하며 원인 분석·Store 복원/재판정·정식 SUP-16 제품 실증은 별도다. 원 FAIL·UNKNOWN·이전 partial·팩·제품 source 목록을 유지한다.

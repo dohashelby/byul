@@ -1,0 +1,2418 @@
+{
+  "schema": "S4-original-GB12-phase-provenance-first-failure-raw-facts/1",
+  "at_UTC": "2026-11-11T02:44:06.912561+00:00",
+  "owner": "S4",
+  "request_id": "S4-GB12-ORIGINAL-ARCHIVE-FIRST-CRC-MEANING-20261111-01",
+  "id": "SUP-16/R8 원 actual whole",
+  "branch_scope": "최초 archive 무결성·source/ENV/target/phase capture·원 receipt·payload/ConfigMap·정확Ref 원문사실만",
+  "archive": {
+    "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v8\\GB2026111112-original-evidence.zip",
+    "bytes": 14636464,
+    "sha256": "2681a23c1545647e4b25711cb4c570336efdc6e7a604332de452c9cc2a663219"
+  },
+  "source_commit": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+  "source_identity_scope": "원 manifest/preflight/phase 준비·capture receipt에 고정된 operator/preparation source commit. vLLM engine.source_commit은 원문대로 null/UNVERIFIED. repo 전체 소스466 재검증이나 엔진commit 확정은 하지 않음.",
+  "files": {
+    "first_CRC_safe_index": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\gb12-original-archive-first-CRC-meaning-review-20261111-v1\\GB12-original1971-first-CRC-safe-member-index-v1.json",
+      "bytes": 764003,
+      "sha256": "5847c9e6938fc7f0f15b672bfe2a7502b918751e9ee2e980f91fdeeaf9379792"
+    },
+    "raw_manifest1970_check": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\gb12-original-archive-first-CRC-meaning-review-20261111-v1\\GB12-original-raw-manifest1970-exact-byte-SHA-check-v1.json",
+      "bytes": 1284,
+      "sha256": "c07c176a720f6416aff333c4a21fe844fcb5cfac3975b40e08a01e523390790e"
+    }
+  },
+  "checks": [
+    {
+      "check": "normal-before ENV 정확Ref와 target·prep 연결",
+      "matched": true
+    },
+    {
+      "check": "normal-before prep raw ENV/target/manifest SHA 연결",
+      "matched": true
+    },
+    {
+      "check": "normal-before payload6 및 base64 manifest와 보존 native파일 일치",
+      "matched": true
+    },
+    {
+      "check": "normal-before settings·manifest·capture 세션 연결",
+      "matched": true
+    },
+    {
+      "check": "normal-before ConfigMap data 및 실제 Pod대상 UID 연결",
+      "matched": true
+    },
+    {
+      "check": "normal-before source2cb·EXAMPLE·UNKNOWN·제품연결false 원값 보존",
+      "matched": true
+    },
+    {
+      "check": "normal-before sitecustomize 원sensor핀과 install 호출 정적존재",
+      "matched": true
+    },
+    {
+      "check": "challenge-partial ENV 정확Ref와 target·prep 연결",
+      "matched": true
+    },
+    {
+      "check": "challenge-partial prep raw ENV/target/manifest SHA 연결",
+      "matched": true
+    },
+    {
+      "check": "challenge-partial payload6 및 base64 manifest와 보존 native파일 일치",
+      "matched": true
+    },
+    {
+      "check": "challenge-partial settings·manifest·capture 세션 연결",
+      "matched": true
+    },
+    {
+      "check": "challenge-partial ConfigMap data 및 실제 Pod대상 UID 연결",
+      "matched": true
+    },
+    {
+      "check": "challenge-partial source2cb·EXAMPLE·UNKNOWN·제품연결false 원값 보존",
+      "matched": true
+    },
+    {
+      "check": "challenge-partial sitecustomize 원sensor핀과 install 호출 정적존재",
+      "matched": true
+    },
+    {
+      "check": "normal-recovered ENV 정확Ref와 target·prep 연결",
+      "matched": true
+    },
+    {
+      "check": "normal-recovered prep raw ENV/target/manifest SHA 연결",
+      "matched": true
+    },
+    {
+      "check": "normal-recovered payload6 및 base64 manifest와 보존 native파일 일치",
+      "matched": true
+    },
+    {
+      "check": "normal-recovered settings·manifest·capture 세션 연결",
+      "matched": true
+    },
+    {
+      "check": "normal-recovered ConfigMap data 및 실제 Pod대상 UID 연결",
+      "matched": true
+    },
+    {
+      "check": "normal-recovered source2cb·EXAMPLE·UNKNOWN·제품연결false 원값 보존",
+      "matched": true
+    },
+    {
+      "check": "normal-recovered sitecustomize 원sensor핀과 install 호출 정적존재",
+      "matched": true
+    },
+    {
+      "check": "최초 CRC safeindex5847 및 manifest1970 일치",
+      "matched": true
+    },
+    {
+      "check": "원 manifest와 preflight 고정source2cb 및 boot78fd",
+      "matched": true
+    },
+    {
+      "check": "phase candidate 원값1·0·1 및 recording3·0·3",
+      "matched": true
+    },
+    {
+      "check": "첫오류 challenge phase와 whole stack 후보1 guard 정확연결",
+      "matched": true
+    },
+    {
+      "check": "challenge files0·후보0·unsealed·PID1 미기록 사실",
+      "matched": true
+    },
+    {
+      "check": "firstwire3377 SHA42f6·stderr0 원 receipt 메타연결",
+      "matched": true
+    },
+    {
+      "check": "firstwire 원 timeout -9·capture불완전·정리성공 범위",
+      "matched": true
+    },
+    {
+      "check": "원 whole미완료·retained model미보존 원값 유지",
+      "matched": true
+    }
+  ],
+  "checks_count": 29,
+  "mismatches": 0,
+  "result": "원 GB12 archive의 외부SHA·최초1971CRC·raw-manifest1970 bytesSHA가 일치한다. 원 whole의 첫 후보수 오류는 challenge-partial의 candidates0와 연결된다. 정상 전후 phase의 후보1/recording3도 전체 제품 성공이나 인증된 권한·보안 판정으로 승격하지 않는다.",
+  "phase_order": [
+    "normal-before",
+    "challenge-partial",
+    "normal-recovered"
+  ],
+  "phases": [
+    {
+      "phase": "normal-before",
+      "source_commit": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+      "environment_raw": {
+        "member": "runtime/normal-before/ENV.json",
+        "bytes": 828,
+        "sha256": "b762a0c1861fc7aa6c32193bcdc1d1caba6728dae9be333c300c032a817ef30e",
+        "CRC32": "f69769ce"
+      },
+      "exact_environment_ref": {
+        "kind": "ENV",
+        "id": "ENV-01M73EPQPHQ69YQ1XYJWWAYRDK",
+        "revision": 1,
+        "sha256": "5d0afd68437ea199e90ebfb7fa196694932a6637048056f6c28dd7b5d2471318"
+      },
+      "original_ENV_data_origin": "EXAMPLE",
+      "engine_metadata": {
+        "image_digest": "vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+        "name": "vllm",
+        "source_commit": null,
+        "source_commit_status": "UNVERIFIED",
+        "version": "0.31.0"
+      },
+      "target": {
+        "environment_ref": {
+          "id": "ENV-01M73EPQPHQ69YQ1XYJWWAYRDK",
+          "kind": "ENV",
+          "revision": 1,
+          "sha256": "5d0afd68437ea199e90ebfb7fa196694932a6637048056f6c28dd7b5d2471318"
+        },
+        "kubernetes": {
+          "context": "default",
+          "engine": {
+            "container": "engine",
+            "container_id": "containerd://e591db1919ca14a642ffdf18dbd5b5a77b1b8eb5404f33ef76dbc435b169a96e",
+            "image": "vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+            "image_id": "docker.io/vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+            "namespace": "byul-b-sup16-20261111-r8-normal-before",
+            "namespace_uid": "b0f894f8-a45e-4126-a3fd-3d534296ced4",
+            "node": "byul-b-tp2-node0",
+            "pod": "sup16-normal-before",
+            "pod_ip": "10.42.0.47",
+            "pod_uid": "dacdb7f3-19fd-436e-b12a-837c8dbaf0bb",
+            "restart_count": 0,
+            "started_at": "2026-11-10T19:24:29Z"
+          }
+        },
+        "lab": true,
+        "run_id": "gpu-b-sup16-20261111-r8-normal-before",
+        "schema": "guard-kubernetes-lifecycle-target/1"
+      },
+      "preparation": {
+        "ready_for_execution": false,
+        "live_identity_checked": false,
+        "input_metadata_origin": "EXAMPLE",
+        "native_assets_created_from_supplied_files": true,
+        "source": {
+          "commit": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+          "manifest_sha256": "ac423c8243af7b824bd66f7dadc5bd4ef5d827026a86d66f0c32dd28f3b4cf8b",
+          "operating_tool_sha256": "f3c6a33cdaa5480b7c04593a46118cdff9cdd029f1ace4c3cea4a56a437c29fe",
+          "preparation_tool_sha256": "a4fd1024d78beceb1da8dc9b8e6b3da3c06824618da0f8164937c85cf52df504",
+          "verification": {
+            "B_source_commit": "57a7537968c0c09a7aab8f741965d64a7eb0f0d5",
+            "actual_CPU_execution": false,
+            "files_verified": 466,
+            "fixed_B_helper_sha256": "858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf",
+            "original_B_default_pin_changed": false,
+            "pack_ref": {
+              "id": "PACK-BASELINE",
+              "kind": "PACK",
+              "revision": 33,
+              "sha256": "74219b48b241775e4c4fa153a950b2a94029147f512c731f055e91cf945cd5b6"
+            },
+            "paths_excluded": [],
+            "pinned_paths": [
+              "update/src/guard",
+              "update/packs",
+              "update/uv.lock",
+              "update/pyproject.toml",
+              "update/reference/framework"
+            ],
+            "reviewed_common_commit": "ac423c8243af7b824bd66f7dadc5bd4ef5d827026a86d66f0c32dd28f3b4cf8b",
+            "runtime_hash_approval": false,
+            "verified_manifest_sha256": "d8e67e608b08ecea0cd00f86b117d815a279e91a86435a2d04686a78c6841c12"
+          }
+        },
+        "product_pair_blocker": "Current supply_boot.run reads two live role targets in one call. One-GPU sequential Pod deletion and the exited partial worker are not an archived-input backend. Do not replay a deleted normal Pod or injected collector results into a product factory.",
+        "supplied_previous_phase_count": 0
+      },
+      "payload6": [
+        {
+          "name": "guard_lifecycle_base.py",
+          "bytes": 56479,
+          "sha256": "2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        },
+        {
+          "name": "guard_lifecycle_sensor.py",
+          "bytes": 15718,
+          "sha256": "e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        },
+        {
+          "name": "guard_weight_iteration.py",
+          "bytes": 18435,
+          "sha256": "6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        },
+        {
+          "name": "model-read-scope.json",
+          "bytes": 1201,
+          "sha256": "67aa6551fea29b3358fb3746a94e710d13c9da0c2ac27dfc707fc7e3411460b5",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        },
+        {
+          "name": "settings.json",
+          "bytes": 258,
+          "sha256": "1d9454d154a7300da4a204ec274f0cefeffed5431e144a156e3a1c8ad5d9700d",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        },
+        {
+          "name": "sitecustomize.py",
+          "bytes": 574,
+          "sha256": "692ead848047ab20eab7b0976de121d36c361f69968fc6064eeee5b9f6297c63",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        }
+      ],
+      "native_manifest_flags": {
+        "profile": "vllm-native-lifecycle-metadata/17",
+        "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "engine_started": false,
+        "image_contents_verified": false,
+        "product_connected": false,
+        "session": "8502daf7a38d4d0f935fac6ff4a3ca28"
+      },
+      "settings": {
+        "control_path": "/guard-lifecycle/data/8502daf7a38d4d0f935fac6ff4a3ca28/SEALED",
+        "output_dir": "/guard-lifecycle/data/8502daf7a38d4d0f935fac6ff4a3ca28",
+        "schema": "guard-native-lifecycle-settings/1",
+        "session": "8502daf7a38d4d0f935fac6ff4a3ca28"
+      },
+      "sitecustomize_fact": "고정 sensor SHA 검사를 거쳐 module.install()을 호출하는 파일이 원 payload와 보존 파일에 있다. 정적 파일 존재·일치 사실이며 실제 해당 실행의 install 완료 증거로 승격하지 않는다.",
+      "sensor_install_runtime_completion": null,
+      "ConfigMap": {
+        "name": "sup16-pair-producer",
+        "namespace": "byul-b-sup16-20261111-r8-normal-before",
+        "UID": "91261bf8-bf91-4586-9f83-451a5e6b5ed6",
+        "resourceVersion": "36897",
+        "creationTimestamp": "2026-11-10T19:24:26Z",
+        "data_source_pins": {
+          "launch_native_engine.py": {
+            "bytes": 1858,
+            "sha256": "5a8449be21c87999d4d1d03ad29c9a9184071bcd6ef2bc35671178cfb3359722"
+          },
+          "native17_install.py": {
+            "bytes": 2991,
+            "sha256": "b4b7e104997f8560ab4c1ef1301f87b0fa720585d81b64b99cbcd95a8a831d57"
+          },
+          "ordering.py": {
+            "bytes": 7644,
+            "sha256": "2485ba44ce8398f833477b79a04c86624cc254316b566f399a4bc9b5f085e4bd"
+          },
+          "pair.py": {
+            "bytes": 6896,
+            "sha256": "ed9616091017c486cba9bb8e1b804969e6f1944c5fdbbd4b6c7408fa009bb519"
+          },
+          "prepare_native_mountpoint.py": {
+            "bytes": 4953,
+            "sha256": "47204eb83bd2031e333f732336e6e0b84116ec7bd343323c153f82f814d0e97c"
+          },
+          "runtime_probe.py": {
+            "bytes": 2138,
+            "sha256": "f105393636dbd063688431281827f736ffe5c4f9a9bf6281de06278d133d27c6"
+          },
+          "stage.py": {
+            "bytes": 8319,
+            "sha256": "c61b7059419659419aa973c072095f5a0ca744c3a24072472ce63074ad9d6f94"
+          }
+        },
+        "planned_vs_returned_data_equal": true
+      },
+      "pod_launch_facts": {
+        "UID": "dacdb7f3-19fd-436e-b12a-837c8dbaf0bb",
+        "engine_command": [
+          "python3",
+          "-I",
+          "-S",
+          "-B",
+          "/guard-prepare/launch_native_engine.py"
+        ],
+        "prepare_code_configmap": "sup16-pair-producer",
+        "generation_boot": "78fd6444-4138-4b60-8833-333e14805550",
+        "generation_GPU": "NVIDIA L4, GPU-e13e623b-c8c9-6eca-b93b-6680e31a3501\n"
+      },
+      "capture": {
+        "member": {
+          "member": "runtime/normal-before/capture/capture.json",
+          "bytes": 2116414,
+          "sha256": "1112e2a7d2f12044bf0251188b98f2b36ea6f1fbf74b6a934ab16db25b5d6102",
+          "CRC32": "00209f09"
+        },
+        "session": "8502daf7a38d4d0f935fac6ff4a3ca28",
+        "recording_count": 3,
+        "recordings": [
+          {
+            "pid": 1,
+            "start_ticks": 23775,
+            "listed_file_identity_match": true,
+            "session_owner_match": true,
+            "record_count": 27,
+            "first_event": "START",
+            "last_event": "END"
+          },
+          {
+            "pid": 71,
+            "start_ticks": 28400,
+            "listed_file_identity_match": true,
+            "session_owner_match": true,
+            "record_count": 8,
+            "first_event": "START",
+            "last_event": "END"
+          },
+          {
+            "pid": 98,
+            "start_ticks": 30589,
+            "listed_file_identity_match": true,
+            "session_owner_match": true,
+            "record_count": 1176,
+            "first_event": "START",
+            "last_event": "END"
+          }
+        ],
+        "inventory_before_files": 3,
+        "inventory_after_files": 3,
+        "inventory_before_processes": [
+          {
+            "boot_sha256": "80978da6304cc07c0f4439421e571b92320dc21083634688971772e911216de7",
+            "parent_pid": 0,
+            "pid": 1,
+            "pid_namespace": 4026533252,
+            "same_executable": true,
+            "start_ticks": 23775,
+            "time_namespace": 4026531834,
+            "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+            "uid": 1000
+          },
+          {
+            "boot_sha256": "80978da6304cc07c0f4439421e571b92320dc21083634688971772e911216de7",
+            "parent_pid": 1,
+            "pid": 97,
+            "pid_namespace": 4026533252,
+            "same_executable": true,
+            "start_ticks": 30589,
+            "time_namespace": 4026531834,
+            "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+            "uid": 1000
+          },
+          {
+            "boot_sha256": "80978da6304cc07c0f4439421e571b92320dc21083634688971772e911216de7",
+            "parent_pid": 1,
+            "pid": 98,
+            "pid_namespace": 4026533252,
+            "same_executable": true,
+            "start_ticks": 30589,
+            "time_namespace": 4026531834,
+            "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+            "uid": 1000
+          }
+        ],
+        "python_processes_without_recording": [
+          {
+            "pid": 97,
+            "start_ticks": 30589
+          }
+        ],
+        "security": "UNKNOWN",
+        "producer_authenticated": false,
+        "record_authenticity_verified": false,
+        "product_connected": false,
+        "whole_run_coverage_verified": false,
+        "recorded_files_covered": true,
+        "live_census_stable": true
+      },
+      "native_analysis": {
+        "member": {
+          "member": "runtime/normal-before/capture/native-analysis.json",
+          "bytes": 4237,
+          "sha256": "979608c01339e9d9f838c4cf9e7689790a1061f98e53a5f7a1548666f6427778",
+          "CRC32": "546f9bf8"
+        },
+        "candidates_count": 1,
+        "candidates": [
+          {
+            "actual_model_generation_verified": false,
+            "approved_model_file_verified": false,
+            "close_observed": true,
+            "declared_reference_bytes_match_observed": true,
+            "declared_reference_comparison_observed": true,
+            "declared_reference_mismatch_observed": false,
+            "decoder_completion_verified": false,
+            "fd_metadata_stable_observed": true,
+            "full_fd_read_return_observed": true,
+            "full_inventory_verified": false,
+            "handle_sha256": "41926fc5e9bfe574aeb6d05ff99059c99386f404aea256f893302b75310a32ec",
+            "hash_status": "complete",
+            "loader_call_sha256": "bdf7596f7068f14fd214db347be9d1a968576f9ea9b1921bc49421fa2ee45488",
+            "multiple_loader_roots_observed": false,
+            "nofollow_components_verified": false,
+            "normalized_path_sha256": "5b03e01bac8758844a320709f7edac4856a70361cc211cb54e966a47fb6c825f",
+            "observed_loader_root_count": 1,
+            "observed_model_object_sha256": "4eb811e2165b3fe250b9f4d8c43c85eeeb6d5a33e34a15feb57d714be47fbc40",
+            "path_fd_metadata_match_observed": true,
+            "per_file_consumption_verified": false,
+            "pid": 98,
+            "producer_authenticated": false,
+            "read_return_bytes": 250500968,
+            "read_return_bytes_sha256": "077edec6c7a19ddbcbee084d4763a63b72293cee16837cdfcd4b95f7b9f51251",
+            "recording": 2,
+            "recording_closed": true,
+            "reference_authority_verified": false,
+            "reference_bytes": 250500968,
+            "reference_sha256": "077edec6c7a19ddbcbee084d4763a63b72293cee16837cdfcd4b95f7b9f51251",
+            "root_event": [
+              2,
+              14
+            ],
+            "root_exhausted_observed": false,
+            "root_last_seq": 1156,
+            "root_load_sha256": "47e649acd51d682e23fc314b29a2cfdc56b59c1434aa203925e06210bd84eaa7",
+            "root_operation_pairs_complete": false,
+            "scope_complete": false,
+            "source_events": [
+              [
+                2,
+                25
+              ],
+              [
+                2,
+                26
+              ],
+              [
+                2,
+                27
+              ]
+            ],
+            "start_ticks": 30589,
+            "tensor_storage_applied_verified": false,
+            "worker_assignment_verified": false
+          }
+        ],
+        "security": "UNKNOWN",
+        "scope_complete": false,
+        "reference_authority_verified": false,
+        "producer_authenticated": false,
+        "actual_model_generation_verified": false,
+        "reference_origin": "EXAMPLE",
+        "missing": [
+          "approval_and_inspection_authority_unverified",
+          "ordinary_C_safe_open_read_and_mmap_unobserved",
+          "source_bound_eager_fd_read_unavailable",
+          "tensor_storage_and_backend_apply_completion_unverified",
+          "weight_iterator_not_observed_closed",
+          "weight_operation_pair_unavailable",
+          "worker_FD_read_and_range_unverified",
+          "worker_assignment_and_rank_shard_inventory_unverified"
+        ]
+      },
+      "capture_receipt": {
+        "member": {
+          "member": "runtime/normal-before/capture/capture-receipt.json",
+          "bytes": 3309,
+          "sha256": "49c4ab9b0528598ceaf8c40076d23ef33ef23d5b3619dda727bce9d664654724",
+          "CRC32": "c13cb541"
+        },
+        "capture_executed": true,
+        "errors": [],
+        "first_client_failure": {
+          "attempted": false,
+          "saved": false
+        },
+        "missing": [
+          "approval_and_inspection_authority_unverified",
+          "ordinary_C_safe_open_read_and_mmap_unobserved",
+          "source_bound_eager_fd_read_unavailable",
+          "tensor_storage_and_backend_apply_completion_unverified",
+          "weight_iterator_not_observed_closed",
+          "weight_operation_pair_unavailable",
+          "worker_FD_read_and_range_unverified",
+          "worker_assignment_and_rank_shard_inventory_unverified"
+        ],
+        "model_root_read_candidates": 1,
+        "scope": "normal live native diagnostic; paired SUP16 product execution not performed",
+        "seal": {
+          "sealed": true
+        },
+        "security_verdict_generated": false,
+        "source": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+        "transport": {
+          "collection_gap": false,
+          "context_sha256": "37a8eec1ce19687d132fe29051dca629d164e2c4958ba141d5f4133a33f0688f",
+          "engine_started": false,
+          "injected_runner": true,
+          "node_runtime_image_verified": false,
+          "producer_authenticated": false,
+          "profile": "kubernetes-owned-lifecycle-read-v1",
+          "programs": {
+            "context": {
+              "source_sha256": "24f678bca3c5cb0238c5eb5a0c8e9c447f0db2604ad0ca959b7963edcd9be25f",
+              "supervisor_sha256": "0e713bed5c8990e5625df6ce8a82c4074f8753d322d1010a7068663c007245ca"
+            },
+            "file": {
+              "source_sha256": "f8de10f8a6eaaeeb21a31e177e2db617e94dc6a31bdccb8e2c47cc739d38de13",
+              "supervisor_sha256": "ce5bf977d9b6170085e23fcfbd34f439f0f14260bfacf52062a17b1f301522a2"
+            },
+            "inventory": {
+              "source_sha256": "1046b712c6184475fd9020b1c496695cd802e3f9efbea6028d5d4d42ebfffac2",
+              "supervisor_sha256": "4f19d9c427d4a51e165d6870a8b80248da507b12bbf73931a8b3f7b9e878f671"
+            },
+            "seal": {
+              "source_sha256": "7b40e8da40cbd7607954edb01d6d7c3b5ae257925468c158f1cdfe7ab8c698ec",
+              "supervisor_sha256": "0567222e3675f272909412f44bd08a77efcf85c0c7a93a0dd9f1a6b09b3d9368"
+            }
+          },
+          "reads": [
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "seal",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "inventory",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "file",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "pid": 1,
+              "program": "context",
+              "result": "context",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "file",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "pid": 1,
+              "program": "context",
+              "result": "context",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "file",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "pid": 71,
+              "program": "context",
+              "result": "process_absent",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "file",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "pid": 98,
+              "program": "context",
+              "result": "context",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "file",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "pid": 98,
+              "program": "context",
+              "result": "context",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "inventory",
+              "transport_complete": true
+            }
+          ],
+          "target_binding_sha256": "22b8c9efcd9bdc9141cdd48c6e0db0da46882239a7968b0988d8dd3a962bb9a5"
+        }
+      },
+      "phase_terminal_facts": {
+        "normal": {
+          "at": "2026-11-10T19:26:43.214449+00:00",
+          "phase": "observe",
+          "role_phase": "normal-before",
+          "original_error": null,
+          "terminal": true,
+          "success_claimed": false,
+          "phase_expired": false,
+          "deadline_reset": false
+        },
+        "preserve": {
+          "at": "2026-11-10T19:26:46.523604+00:00",
+          "phase": "preserve",
+          "role_phase": "normal-before",
+          "original_error": null,
+          "terminal": true,
+          "success_claimed": false,
+          "phase_expired": false,
+          "deadline_reset": false
+        },
+        "quiesce": {
+          "at": "2026-11-10T19:27:29.728771+00:00",
+          "phase": "quiesce",
+          "role_phase": "normal-before",
+          "original_error": null,
+          "terminal": true,
+          "success_claimed": false,
+          "phase_expired": false,
+          "deadline_reset": false
+        },
+        "archive": {
+          "at": "2026-11-10T19:27:31.616304+00:00",
+          "phase": "archive",
+          "role_phase": "normal-before",
+          "original_error": null,
+          "terminal": true,
+          "success_claimed": false,
+          "phase_expired": false,
+          "deadline_reset": false
+        }
+      }
+    },
+    {
+      "phase": "challenge-partial",
+      "source_commit": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+      "environment_raw": {
+        "member": "runtime/challenge-partial/ENV.json",
+        "bytes": 828,
+        "sha256": "a6cba5cc482c27fe265b5d4a80f3fbbe570b295b54b6d019a3aec51b6abea3fe",
+        "CRC32": "3950e37a"
+      },
+      "exact_environment_ref": {
+        "kind": "ENV",
+        "id": "ENV-01M73EWE9JQV7T89XGDAAC8STD",
+        "revision": 1,
+        "sha256": "28d087fb407ebd4fcd02a10b07d7ac541a373f587d2715aa566bf92c0979ad7c"
+      },
+      "original_ENV_data_origin": "EXAMPLE",
+      "engine_metadata": {
+        "image_digest": "vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+        "name": "vllm",
+        "source_commit": null,
+        "source_commit_status": "UNVERIFIED",
+        "version": "0.31.0"
+      },
+      "target": {
+        "environment_ref": {
+          "id": "ENV-01M73EWE9JQV7T89XGDAAC8STD",
+          "kind": "ENV",
+          "revision": 1,
+          "sha256": "28d087fb407ebd4fcd02a10b07d7ac541a373f587d2715aa566bf92c0979ad7c"
+        },
+        "kubernetes": {
+          "context": "default",
+          "engine": {
+            "container": "engine",
+            "container_id": "containerd://fc9633966e5528565644e731c811b159d73dccbdeb07a5158b8b87dc1cf63b4f",
+            "image": "vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+            "image_id": "docker.io/vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+            "namespace": "byul-b-sup16-20261111-r8-challenge-partial",
+            "namespace_uid": "90d561f1-9185-4200-af12-f8e4fa62b41f",
+            "node": "byul-b-tp2-node0",
+            "pod": "sup16-challenge-partial",
+            "pod_ip": "10.42.0.48",
+            "pod_uid": "38a350e5-c51f-4f2e-b05a-c93b53807796",
+            "restart_count": 0,
+            "started_at": "2026-11-10T19:27:37Z"
+          }
+        },
+        "lab": true,
+        "run_id": "gpu-b-sup16-20261111-r8-challenge-partial",
+        "schema": "guard-kubernetes-lifecycle-target/1"
+      },
+      "preparation": {
+        "ready_for_execution": false,
+        "live_identity_checked": false,
+        "input_metadata_origin": "EXAMPLE",
+        "native_assets_created_from_supplied_files": true,
+        "source": {
+          "commit": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+          "manifest_sha256": "ac423c8243af7b824bd66f7dadc5bd4ef5d827026a86d66f0c32dd28f3b4cf8b",
+          "operating_tool_sha256": "f3c6a33cdaa5480b7c04593a46118cdff9cdd029f1ace4c3cea4a56a437c29fe",
+          "preparation_tool_sha256": "a4fd1024d78beceb1da8dc9b8e6b3da3c06824618da0f8164937c85cf52df504",
+          "verification": {
+            "B_source_commit": "57a7537968c0c09a7aab8f741965d64a7eb0f0d5",
+            "actual_CPU_execution": false,
+            "files_verified": 466,
+            "fixed_B_helper_sha256": "858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf",
+            "original_B_default_pin_changed": false,
+            "pack_ref": {
+              "id": "PACK-BASELINE",
+              "kind": "PACK",
+              "revision": 33,
+              "sha256": "74219b48b241775e4c4fa153a950b2a94029147f512c731f055e91cf945cd5b6"
+            },
+            "paths_excluded": [],
+            "pinned_paths": [
+              "update/src/guard",
+              "update/packs",
+              "update/uv.lock",
+              "update/pyproject.toml",
+              "update/reference/framework"
+            ],
+            "reviewed_common_commit": "ac423c8243af7b824bd66f7dadc5bd4ef5d827026a86d66f0c32dd28f3b4cf8b",
+            "runtime_hash_approval": false,
+            "verified_manifest_sha256": "d8e67e608b08ecea0cd00f86b117d815a279e91a86435a2d04686a78c6841c12"
+          }
+        },
+        "product_pair_blocker": "Current supply_boot.run reads two live role targets in one call. One-GPU sequential Pod deletion and the exited partial worker are not an archived-input backend. Do not replay a deleted normal Pod or injected collector results into a product factory.",
+        "supplied_previous_phase_count": 1
+      },
+      "payload6": [
+        {
+          "name": "guard_lifecycle_base.py",
+          "bytes": 56479,
+          "sha256": "2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        },
+        {
+          "name": "guard_lifecycle_sensor.py",
+          "bytes": 15718,
+          "sha256": "e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        },
+        {
+          "name": "guard_weight_iteration.py",
+          "bytes": 18435,
+          "sha256": "6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        },
+        {
+          "name": "model-read-scope.json",
+          "bytes": 1201,
+          "sha256": "87578d829c0465d86c6f03b016c4f6d6e6e6a03e46524a07dd71aa1a678f4737",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        },
+        {
+          "name": "settings.json",
+          "bytes": 258,
+          "sha256": "0a910f49227eed5e61510289ce0da4cd7c5e6aed1de7493c29af3ba537c86448",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        },
+        {
+          "name": "sitecustomize.py",
+          "bytes": 574,
+          "sha256": "692ead848047ab20eab7b0976de121d36c361f69968fc6064eeee5b9f6297c63",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        }
+      ],
+      "native_manifest_flags": {
+        "profile": "vllm-native-lifecycle-metadata/17",
+        "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "engine_started": false,
+        "image_contents_verified": false,
+        "product_connected": false,
+        "session": "fa5761b3d76347cb9c30b702bc69419f"
+      },
+      "settings": {
+        "control_path": "/guard-lifecycle/data/fa5761b3d76347cb9c30b702bc69419f/SEALED",
+        "output_dir": "/guard-lifecycle/data/fa5761b3d76347cb9c30b702bc69419f",
+        "schema": "guard-native-lifecycle-settings/1",
+        "session": "fa5761b3d76347cb9c30b702bc69419f"
+      },
+      "sitecustomize_fact": "고정 sensor SHA 검사를 거쳐 module.install()을 호출하는 파일이 원 payload와 보존 파일에 있다. 정적 파일 존재·일치 사실이며 실제 해당 실행의 install 완료 증거로 승격하지 않는다.",
+      "sensor_install_runtime_completion": null,
+      "ConfigMap": {
+        "name": "sup16-pair-producer",
+        "namespace": "byul-b-sup16-20261111-r8-challenge-partial",
+        "UID": "e28356a2-8c6d-4971-8736-edddd7dbacfc",
+        "resourceVersion": "37017",
+        "creationTimestamp": "2026-11-10T19:27:35Z",
+        "data_source_pins": {
+          "launch_native_engine.py": {
+            "bytes": 1858,
+            "sha256": "5a8449be21c87999d4d1d03ad29c9a9184071bcd6ef2bc35671178cfb3359722"
+          },
+          "native17_install.py": {
+            "bytes": 2991,
+            "sha256": "b4b7e104997f8560ab4c1ef1301f87b0fa720585d81b64b99cbcd95a8a831d57"
+          },
+          "ordering.py": {
+            "bytes": 7644,
+            "sha256": "2485ba44ce8398f833477b79a04c86624cc254316b566f399a4bc9b5f085e4bd"
+          },
+          "pair.py": {
+            "bytes": 6896,
+            "sha256": "ed9616091017c486cba9bb8e1b804969e6f1944c5fdbbd4b6c7408fa009bb519"
+          },
+          "prepare_native_mountpoint.py": {
+            "bytes": 4953,
+            "sha256": "47204eb83bd2031e333f732336e6e0b84116ec7bd343323c153f82f814d0e97c"
+          },
+          "runtime_probe.py": {
+            "bytes": 2138,
+            "sha256": "f105393636dbd063688431281827f736ffe5c4f9a9bf6281de06278d133d27c6"
+          },
+          "stage.py": {
+            "bytes": 8319,
+            "sha256": "c61b7059419659419aa973c072095f5a0ca744c3a24072472ce63074ad9d6f94"
+          }
+        },
+        "planned_vs_returned_data_equal": true
+      },
+      "pod_launch_facts": {
+        "UID": "38a350e5-c51f-4f2e-b05a-c93b53807796",
+        "engine_command": [
+          "python3",
+          "-I",
+          "-S",
+          "-B",
+          "/guard-prepare/launch_native_engine.py"
+        ],
+        "prepare_code_configmap": "sup16-pair-producer",
+        "generation_boot": "78fd6444-4138-4b60-8833-333e14805550",
+        "generation_GPU": "NVIDIA L4, GPU-e13e623b-c8c9-6eca-b93b-6680e31a3501\n"
+      },
+      "capture": {
+        "member": {
+          "member": "runtime/challenge-partial/capture/capture.json",
+          "bytes": 5192,
+          "sha256": "9774f2c7f1f3c07e754802f46d52d3a49d5d8da383dc4088873e996b2f3a3710",
+          "CRC32": "532e87b5"
+        },
+        "session": "fa5761b3d76347cb9c30b702bc69419f",
+        "recording_count": 0,
+        "recordings": [],
+        "inventory_before_files": 0,
+        "inventory_after_files": 0,
+        "inventory_before_processes": [
+          {
+            "boot_sha256": "80978da6304cc07c0f4439421e571b92320dc21083634688971772e911216de7",
+            "parent_pid": 0,
+            "pid": 1,
+            "pid_namespace": 4026533252,
+            "same_executable": true,
+            "start_ticks": 42515,
+            "time_namespace": 4026531834,
+            "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+            "uid": 1000
+          }
+        ],
+        "python_processes_without_recording": [
+          {
+            "pid": 1,
+            "start_ticks": 42515
+          }
+        ],
+        "security": "UNKNOWN",
+        "producer_authenticated": false,
+        "record_authenticity_verified": false,
+        "product_connected": false,
+        "whole_run_coverage_verified": false,
+        "recorded_files_covered": false,
+        "live_census_stable": true
+      },
+      "native_analysis": {
+        "member": {
+          "member": "runtime/challenge-partial/capture/native-analysis.json",
+          "bytes": 1595,
+          "sha256": "27110f1cbc8932a46f4459b9d880eece5da52cfce0dab4255ff63366251a3e39",
+          "CRC32": "e39d001f"
+        },
+        "candidates_count": 0,
+        "candidates": [],
+        "security": "UNKNOWN",
+        "scope_complete": false,
+        "reference_authority_verified": false,
+        "producer_authenticated": false,
+        "actual_model_generation_verified": false,
+        "reference_origin": "EXAMPLE",
+        "missing": [
+          "approval_and_inspection_authority_unverified",
+          "ordinary_C_safe_open_read_and_mmap_unobserved",
+          "same_loader_model_file_read_candidate_unavailable",
+          "source_bound_weight_iteration_unavailable",
+          "tensor_storage_and_backend_apply_completion_unverified",
+          "worker_FD_read_and_range_unverified",
+          "worker_assignment_and_rank_shard_inventory_unverified"
+        ]
+      },
+      "capture_receipt": {
+        "member": {
+          "member": "runtime/challenge-partial/capture/capture-receipt.json",
+          "bytes": 2790,
+          "sha256": "ca17c72b667c02c7db5d00cb319cb13ecf6f503c523938c5ceefcf8b39f90758",
+          "CRC32": "32c9169c"
+        },
+        "capture_executed": true,
+        "errors": [],
+        "first_client_failure": {
+          "attempted": true,
+          "metadata": {
+            "bytes": 3377,
+            "dev": 66306,
+            "gid": 1000,
+            "inode": 1894961,
+            "mode": "0o600",
+            "nlink": 1,
+            "path": "/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-ASSETS/client-private-challenge-partial/first-client-failure/first-failure.json",
+            "sha256": "42f63acaefe795745fe859d17d12c4497ad27c025825d7d9ce59265d63c0ada2",
+            "uid": 1000
+          },
+          "saved": true,
+          "stderr": {
+            "bytes": 0,
+            "dev": 66306,
+            "gid": 1000,
+            "inode": 1894960,
+            "mode": "0o600",
+            "nlink": 1,
+            "path": "/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-ASSETS/client-private-challenge-partial/first-client-failure/stderr.raw",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "uid": 1000
+          }
+        },
+        "missing": [
+          "approval_and_inspection_authority_unverified",
+          "ordinary_C_safe_open_read_and_mmap_unobserved",
+          "same_loader_model_file_read_candidate_unavailable",
+          "source_bound_weight_iteration_unavailable",
+          "tensor_storage_and_backend_apply_completion_unverified",
+          "worker_FD_read_and_range_unverified",
+          "worker_assignment_and_rank_shard_inventory_unverified"
+        ],
+        "model_root_read_candidates": 0,
+        "scope": "normal live native diagnostic; paired SUP16 product execution not performed",
+        "seal": {
+          "sealed": false
+        },
+        "security_verdict_generated": false,
+        "source": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+        "transport": {
+          "collection_gap": true,
+          "context_sha256": "37a8eec1ce19687d132fe29051dca629d164e2c4958ba141d5f4133a33f0688f",
+          "engine_started": false,
+          "injected_runner": true,
+          "node_runtime_image_verified": false,
+          "producer_authenticated": false,
+          "profile": "kubernetes-owned-lifecycle-read-v1",
+          "programs": {
+            "context": {
+              "source_sha256": "24f678bca3c5cb0238c5eb5a0c8e9c447f0db2604ad0ca959b7963edcd9be25f",
+              "supervisor_sha256": "0e713bed5c8990e5625df6ce8a82c4074f8753d322d1010a7068663c007245ca"
+            },
+            "file": {
+              "source_sha256": "f8de10f8a6eaaeeb21a31e177e2db617e94dc6a31bdccb8e2c47cc739d38de13",
+              "supervisor_sha256": "ce5bf977d9b6170085e23fcfbd34f439f0f14260bfacf52062a17b1f301522a2"
+            },
+            "inventory": {
+              "source_sha256": "1046b712c6184475fd9020b1c496695cd802e3f9efbea6028d5d4d42ebfffac2",
+              "supervisor_sha256": "4f19d9c427d4a51e165d6870a8b80248da507b12bbf73931a8b3f7b9e878f671"
+            },
+            "seal": {
+              "source_sha256": "7b40e8da40cbd7607954edb01d6d7c3b5ae257925468c158f1cdfe7ab8c698ec",
+              "supervisor_sha256": "0567222e3675f272909412f44bd08a77efcf85c0c7a93a0dd9f1a6b09b3d9368"
+            }
+          },
+          "reads": [
+            {
+              "diagnostic_codes": [
+                "KUBERNETES_READ_TRANSPORT_UNAVAILABLE"
+              ],
+              "owner_before_after_verified": false,
+              "program": "seal",
+              "transport_complete": false
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "inventory",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "inventory",
+              "transport_complete": true
+            }
+          ],
+          "target_binding_sha256": "894312c484987def6a3e1e75bebbcc239d7909a7dc3959aca56c5e3bc2eaa932"
+        }
+      },
+      "phase_terminal_facts": {
+        "normal": {
+          "at": "2026-11-10T19:28:01.373466+00:00",
+          "phase": "observe",
+          "role_phase": "challenge-partial",
+          "original_error": "ValueError('SUP16_JOIN_ONE_ACTUAL_CANDIDATE_REQUIRED')",
+          "terminal": true,
+          "success_claimed": false,
+          "phase_expired": false,
+          "deadline_reset": false
+        },
+        "preserve": {
+          "at": "2026-11-10T19:28:04.039479+00:00",
+          "phase": "preserve",
+          "role_phase": "challenge-partial",
+          "original_error": null,
+          "terminal": true,
+          "success_claimed": false,
+          "phase_expired": false,
+          "deadline_reset": false
+        },
+        "quiesce": {
+          "at": "2026-11-10T19:28:47.270227+00:00",
+          "phase": "quiesce",
+          "role_phase": "challenge-partial",
+          "original_error": null,
+          "terminal": true,
+          "success_claimed": false,
+          "phase_expired": false,
+          "deadline_reset": false
+        },
+        "archive": {
+          "at": "2026-11-10T19:28:48.134707+00:00",
+          "phase": "archive",
+          "role_phase": "challenge-partial",
+          "original_error": null,
+          "terminal": true,
+          "success_claimed": false,
+          "phase_expired": false,
+          "deadline_reset": false
+        }
+      }
+    },
+    {
+      "phase": "normal-recovered",
+      "source_commit": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+      "environment_raw": {
+        "member": "runtime/normal-recovered/ENV.json",
+        "bytes": 828,
+        "sha256": "2a1e6ab02a8321884d57a2066de7eb252d88046baaaac4c2edfc5e834bbc5bc8",
+        "CRC32": "511a81b5"
+      },
+      "exact_environment_ref": {
+        "kind": "ENV",
+        "id": "ENV-01M73EYS1ZNY7W65K45VXN5TD4",
+        "revision": 1,
+        "sha256": "14599babf69026e9d6e8fb1972f38d4d544e771493ea7451174a7a14d0296c3b"
+      },
+      "original_ENV_data_origin": "EXAMPLE",
+      "engine_metadata": {
+        "image_digest": "vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+        "name": "vllm",
+        "source_commit": null,
+        "source_commit_status": "UNVERIFIED",
+        "version": "0.31.0"
+      },
+      "target": {
+        "environment_ref": {
+          "id": "ENV-01M73EYS1ZNY7W65K45VXN5TD4",
+          "kind": "ENV",
+          "revision": 1,
+          "sha256": "14599babf69026e9d6e8fb1972f38d4d544e771493ea7451174a7a14d0296c3b"
+        },
+        "kubernetes": {
+          "context": "default",
+          "engine": {
+            "container": "engine",
+            "container_id": "containerd://d10c4ba71e10ffd460cb8e84dd52e07df54eb555393fc45951dbeaa0b6d20506",
+            "image": "vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+            "image_id": "docker.io/vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+            "namespace": "byul-b-sup16-20261111-r8-normal-recovered",
+            "namespace_uid": "61b115b4-b07b-449f-8e3a-909c0305f4ee",
+            "node": "byul-b-tp2-node0",
+            "pod": "sup16-normal-recovered",
+            "pod_ip": "10.42.0.49",
+            "pod_uid": "fd862970-165a-4d28-ae92-6e818014f3b3",
+            "restart_count": 0,
+            "started_at": "2026-11-10T19:28:53Z"
+          }
+        },
+        "lab": true,
+        "run_id": "gpu-b-sup16-20261111-r8-normal-recovered",
+        "schema": "guard-kubernetes-lifecycle-target/1"
+      },
+      "preparation": {
+        "ready_for_execution": false,
+        "live_identity_checked": false,
+        "input_metadata_origin": "EXAMPLE",
+        "native_assets_created_from_supplied_files": true,
+        "source": {
+          "commit": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+          "manifest_sha256": "ac423c8243af7b824bd66f7dadc5bd4ef5d827026a86d66f0c32dd28f3b4cf8b",
+          "operating_tool_sha256": "f3c6a33cdaa5480b7c04593a46118cdff9cdd029f1ace4c3cea4a56a437c29fe",
+          "preparation_tool_sha256": "a4fd1024d78beceb1da8dc9b8e6b3da3c06824618da0f8164937c85cf52df504",
+          "verification": {
+            "B_source_commit": "57a7537968c0c09a7aab8f741965d64a7eb0f0d5",
+            "actual_CPU_execution": false,
+            "files_verified": 466,
+            "fixed_B_helper_sha256": "858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf",
+            "original_B_default_pin_changed": false,
+            "pack_ref": {
+              "id": "PACK-BASELINE",
+              "kind": "PACK",
+              "revision": 33,
+              "sha256": "74219b48b241775e4c4fa153a950b2a94029147f512c731f055e91cf945cd5b6"
+            },
+            "paths_excluded": [],
+            "pinned_paths": [
+              "update/src/guard",
+              "update/packs",
+              "update/uv.lock",
+              "update/pyproject.toml",
+              "update/reference/framework"
+            ],
+            "reviewed_common_commit": "ac423c8243af7b824bd66f7dadc5bd4ef5d827026a86d66f0c32dd28f3b4cf8b",
+            "runtime_hash_approval": false,
+            "verified_manifest_sha256": "d8e67e608b08ecea0cd00f86b117d815a279e91a86435a2d04686a78c6841c12"
+          }
+        },
+        "product_pair_blocker": "Current supply_boot.run reads two live role targets in one call. One-GPU sequential Pod deletion and the exited partial worker are not an archived-input backend. Do not replay a deleted normal Pod or injected collector results into a product factory.",
+        "supplied_previous_phase_count": 2
+      },
+      "payload6": [
+        {
+          "name": "guard_lifecycle_base.py",
+          "bytes": 56479,
+          "sha256": "2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        },
+        {
+          "name": "guard_lifecycle_sensor.py",
+          "bytes": 15718,
+          "sha256": "e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        },
+        {
+          "name": "guard_weight_iteration.py",
+          "bytes": 18435,
+          "sha256": "6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        },
+        {
+          "name": "model-read-scope.json",
+          "bytes": 1201,
+          "sha256": "2df22eefc11ff40d4ad319c0cd92da75ba498ac02a4abf3150f09cdb47ddcc43",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        },
+        {
+          "name": "settings.json",
+          "bytes": 258,
+          "sha256": "3d4fbf71a632d40263ed5c58bd241d70bdebd3c7733cee8080ae04eac91ebab6",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        },
+        {
+          "name": "sitecustomize.py",
+          "bytes": 574,
+          "sha256": "692ead848047ab20eab7b0976de121d36c361f69968fc6064eeee5b9f6297c63",
+          "payload_equals_archived_file": true,
+          "manifest_pin_matches": true
+        }
+      ],
+      "native_manifest_flags": {
+        "profile": "vllm-native-lifecycle-metadata/17",
+        "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "engine_started": false,
+        "image_contents_verified": false,
+        "product_connected": false,
+        "session": "e90aae84276647f59a4155a8dd793f82"
+      },
+      "settings": {
+        "control_path": "/guard-lifecycle/data/e90aae84276647f59a4155a8dd793f82/SEALED",
+        "output_dir": "/guard-lifecycle/data/e90aae84276647f59a4155a8dd793f82",
+        "schema": "guard-native-lifecycle-settings/1",
+        "session": "e90aae84276647f59a4155a8dd793f82"
+      },
+      "sitecustomize_fact": "고정 sensor SHA 검사를 거쳐 module.install()을 호출하는 파일이 원 payload와 보존 파일에 있다. 정적 파일 존재·일치 사실이며 실제 해당 실행의 install 완료 증거로 승격하지 않는다.",
+      "sensor_install_runtime_completion": null,
+      "ConfigMap": {
+        "name": "sup16-pair-producer",
+        "namespace": "byul-b-sup16-20261111-r8-normal-recovered",
+        "UID": "f30a75e7-63be-4a68-8dc6-79bbcf77290c",
+        "resourceVersion": "37088",
+        "creationTimestamp": "2026-11-10T19:28:51Z",
+        "data_source_pins": {
+          "launch_native_engine.py": {
+            "bytes": 1858,
+            "sha256": "5a8449be21c87999d4d1d03ad29c9a9184071bcd6ef2bc35671178cfb3359722"
+          },
+          "native17_install.py": {
+            "bytes": 2991,
+            "sha256": "b4b7e104997f8560ab4c1ef1301f87b0fa720585d81b64b99cbcd95a8a831d57"
+          },
+          "ordering.py": {
+            "bytes": 7644,
+            "sha256": "2485ba44ce8398f833477b79a04c86624cc254316b566f399a4bc9b5f085e4bd"
+          },
+          "pair.py": {
+            "bytes": 6896,
+            "sha256": "ed9616091017c486cba9bb8e1b804969e6f1944c5fdbbd4b6c7408fa009bb519"
+          },
+          "prepare_native_mountpoint.py": {
+            "bytes": 4953,
+            "sha256": "47204eb83bd2031e333f732336e6e0b84116ec7bd343323c153f82f814d0e97c"
+          },
+          "runtime_probe.py": {
+            "bytes": 2138,
+            "sha256": "f105393636dbd063688431281827f736ffe5c4f9a9bf6281de06278d133d27c6"
+          },
+          "stage.py": {
+            "bytes": 8319,
+            "sha256": "c61b7059419659419aa973c072095f5a0ca744c3a24072472ce63074ad9d6f94"
+          }
+        },
+        "planned_vs_returned_data_equal": true
+      },
+      "pod_launch_facts": {
+        "UID": "fd862970-165a-4d28-ae92-6e818014f3b3",
+        "engine_command": [
+          "python3",
+          "-I",
+          "-S",
+          "-B",
+          "/guard-prepare/launch_native_engine.py"
+        ],
+        "prepare_code_configmap": "sup16-pair-producer",
+        "generation_boot": "78fd6444-4138-4b60-8833-333e14805550",
+        "generation_GPU": "NVIDIA L4, GPU-e13e623b-c8c9-6eca-b93b-6680e31a3501\n"
+      },
+      "capture": {
+        "member": {
+          "member": "runtime/normal-recovered/capture/capture.json",
+          "bytes": 2116052,
+          "sha256": "2e95eeed0e5d7a72991ca52d8dee6b5da2e57e5929944ea9d9712e0cd25f6baf",
+          "CRC32": "82d06939"
+        },
+        "session": "e90aae84276647f59a4155a8dd793f82",
+        "recording_count": 3,
+        "recordings": [
+          {
+            "pid": 1,
+            "start_ticks": 50131,
+            "listed_file_identity_match": true,
+            "session_owner_match": true,
+            "record_count": 27,
+            "first_event": "START",
+            "last_event": "END"
+          },
+          {
+            "pid": 71,
+            "start_ticks": 53224,
+            "listed_file_identity_match": true,
+            "session_owner_match": true,
+            "record_count": 8,
+            "first_event": "START",
+            "last_event": "END"
+          },
+          {
+            "pid": 98,
+            "start_ticks": 55088,
+            "listed_file_identity_match": true,
+            "session_owner_match": true,
+            "record_count": 1176,
+            "first_event": "START",
+            "last_event": "END"
+          }
+        ],
+        "inventory_before_files": 3,
+        "inventory_after_files": 3,
+        "inventory_before_processes": [
+          {
+            "boot_sha256": "80978da6304cc07c0f4439421e571b92320dc21083634688971772e911216de7",
+            "parent_pid": 0,
+            "pid": 1,
+            "pid_namespace": 4026533252,
+            "same_executable": true,
+            "start_ticks": 50131,
+            "time_namespace": 4026531834,
+            "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+            "uid": 1000
+          },
+          {
+            "boot_sha256": "80978da6304cc07c0f4439421e571b92320dc21083634688971772e911216de7",
+            "parent_pid": 1,
+            "pid": 97,
+            "pid_namespace": 4026533252,
+            "same_executable": true,
+            "start_ticks": 55088,
+            "time_namespace": 4026531834,
+            "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+            "uid": 1000
+          },
+          {
+            "boot_sha256": "80978da6304cc07c0f4439421e571b92320dc21083634688971772e911216de7",
+            "parent_pid": 1,
+            "pid": 98,
+            "pid_namespace": 4026533252,
+            "same_executable": true,
+            "start_ticks": 55088,
+            "time_namespace": 4026531834,
+            "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+            "uid": 1000
+          }
+        ],
+        "python_processes_without_recording": [
+          {
+            "pid": 97,
+            "start_ticks": 55088
+          }
+        ],
+        "security": "UNKNOWN",
+        "producer_authenticated": false,
+        "record_authenticity_verified": false,
+        "product_connected": false,
+        "whole_run_coverage_verified": false,
+        "recorded_files_covered": true,
+        "live_census_stable": true
+      },
+      "native_analysis": {
+        "member": {
+          "member": "runtime/normal-recovered/capture/native-analysis.json",
+          "bytes": 4237,
+          "sha256": "af83fdf0e4324a159b9359faf66f01d645f3c36ce843ea8beebcfec4b8115da6",
+          "CRC32": "c33a2973"
+        },
+        "candidates_count": 1,
+        "candidates": [
+          {
+            "actual_model_generation_verified": false,
+            "approved_model_file_verified": false,
+            "close_observed": true,
+            "declared_reference_bytes_match_observed": true,
+            "declared_reference_comparison_observed": true,
+            "declared_reference_mismatch_observed": false,
+            "decoder_completion_verified": false,
+            "fd_metadata_stable_observed": true,
+            "full_fd_read_return_observed": true,
+            "full_inventory_verified": false,
+            "handle_sha256": "308802064a6e895e3a4932114bb932eda4960c212417b805510bc866d3a24f5f",
+            "hash_status": "complete",
+            "loader_call_sha256": "a3b3866d2405831e15ee88efef057436419711fd24dee3e83b0f93679153d7c2",
+            "multiple_loader_roots_observed": false,
+            "nofollow_components_verified": false,
+            "normalized_path_sha256": "5b03e01bac8758844a320709f7edac4856a70361cc211cb54e966a47fb6c825f",
+            "observed_loader_root_count": 1,
+            "observed_model_object_sha256": "9cfdf5ae2a9714d6e68f1bf8733e5fff3acddbbd89a5f89d5d805e1141527d11",
+            "path_fd_metadata_match_observed": true,
+            "per_file_consumption_verified": false,
+            "pid": 98,
+            "producer_authenticated": false,
+            "read_return_bytes": 250500968,
+            "read_return_bytes_sha256": "077edec6c7a19ddbcbee084d4763a63b72293cee16837cdfcd4b95f7b9f51251",
+            "recording": 2,
+            "recording_closed": true,
+            "reference_authority_verified": false,
+            "reference_bytes": 250500968,
+            "reference_sha256": "077edec6c7a19ddbcbee084d4763a63b72293cee16837cdfcd4b95f7b9f51251",
+            "root_event": [
+              2,
+              14
+            ],
+            "root_exhausted_observed": false,
+            "root_last_seq": 1151,
+            "root_load_sha256": "35056f1eab2f42f583e2218e231c41b5ebfbfca1342804ab44956a8b0e039ead",
+            "root_operation_pairs_complete": false,
+            "scope_complete": false,
+            "source_events": [
+              [
+                2,
+                25
+              ],
+              [
+                2,
+                26
+              ],
+              [
+                2,
+                27
+              ]
+            ],
+            "start_ticks": 55088,
+            "tensor_storage_applied_verified": false,
+            "worker_assignment_verified": false
+          }
+        ],
+        "security": "UNKNOWN",
+        "scope_complete": false,
+        "reference_authority_verified": false,
+        "producer_authenticated": false,
+        "actual_model_generation_verified": false,
+        "reference_origin": "EXAMPLE",
+        "missing": [
+          "approval_and_inspection_authority_unverified",
+          "ordinary_C_safe_open_read_and_mmap_unobserved",
+          "source_bound_eager_fd_read_unavailable",
+          "tensor_storage_and_backend_apply_completion_unverified",
+          "weight_iterator_not_observed_closed",
+          "weight_operation_pair_unavailable",
+          "worker_FD_read_and_range_unverified",
+          "worker_assignment_and_rank_shard_inventory_unverified"
+        ]
+      },
+      "capture_receipt": {
+        "member": {
+          "member": "runtime/normal-recovered/capture/capture-receipt.json",
+          "bytes": 3309,
+          "sha256": "eecbd6f5dccb15efeaffaf662ada6323d05c28340c3249c0bc9e810297fc29ff",
+          "CRC32": "78033656"
+        },
+        "capture_executed": true,
+        "errors": [],
+        "first_client_failure": {
+          "attempted": false,
+          "saved": false
+        },
+        "missing": [
+          "approval_and_inspection_authority_unverified",
+          "ordinary_C_safe_open_read_and_mmap_unobserved",
+          "source_bound_eager_fd_read_unavailable",
+          "tensor_storage_and_backend_apply_completion_unverified",
+          "weight_iterator_not_observed_closed",
+          "weight_operation_pair_unavailable",
+          "worker_FD_read_and_range_unverified",
+          "worker_assignment_and_rank_shard_inventory_unverified"
+        ],
+        "model_root_read_candidates": 1,
+        "scope": "normal live native diagnostic; paired SUP16 product execution not performed",
+        "seal": {
+          "sealed": true
+        },
+        "security_verdict_generated": false,
+        "source": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+        "transport": {
+          "collection_gap": false,
+          "context_sha256": "37a8eec1ce19687d132fe29051dca629d164e2c4958ba141d5f4133a33f0688f",
+          "engine_started": false,
+          "injected_runner": true,
+          "node_runtime_image_verified": false,
+          "producer_authenticated": false,
+          "profile": "kubernetes-owned-lifecycle-read-v1",
+          "programs": {
+            "context": {
+              "source_sha256": "24f678bca3c5cb0238c5eb5a0c8e9c447f0db2604ad0ca959b7963edcd9be25f",
+              "supervisor_sha256": "0e713bed5c8990e5625df6ce8a82c4074f8753d322d1010a7068663c007245ca"
+            },
+            "file": {
+              "source_sha256": "f8de10f8a6eaaeeb21a31e177e2db617e94dc6a31bdccb8e2c47cc739d38de13",
+              "supervisor_sha256": "ce5bf977d9b6170085e23fcfbd34f439f0f14260bfacf52062a17b1f301522a2"
+            },
+            "inventory": {
+              "source_sha256": "1046b712c6184475fd9020b1c496695cd802e3f9efbea6028d5d4d42ebfffac2",
+              "supervisor_sha256": "4f19d9c427d4a51e165d6870a8b80248da507b12bbf73931a8b3f7b9e878f671"
+            },
+            "seal": {
+              "source_sha256": "7b40e8da40cbd7607954edb01d6d7c3b5ae257925468c158f1cdfe7ab8c698ec",
+              "supervisor_sha256": "0567222e3675f272909412f44bd08a77efcf85c0c7a93a0dd9f1a6b09b3d9368"
+            }
+          },
+          "reads": [
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "seal",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "inventory",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "file",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "pid": 1,
+              "program": "context",
+              "result": "context",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "file",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "pid": 1,
+              "program": "context",
+              "result": "context",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "file",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "pid": 71,
+              "program": "context",
+              "result": "process_absent",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "file",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "pid": 98,
+              "program": "context",
+              "result": "context",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "file",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "pid": 98,
+              "program": "context",
+              "result": "context",
+              "transport_complete": true
+            },
+            {
+              "diagnostic_codes": [],
+              "owner_before_after_verified": true,
+              "program": "inventory",
+              "transport_complete": true
+            }
+          ],
+          "target_binding_sha256": "34c41c823db65f664e558925ec70c1ad83135df32e2a6ed6352823ae371d92a6"
+        }
+      },
+      "phase_terminal_facts": {
+        "normal": {
+          "at": "2026-11-10T19:30:43.464039+00:00",
+          "phase": "observe",
+          "role_phase": "normal-recovered",
+          "original_error": null,
+          "terminal": true,
+          "success_claimed": false,
+          "phase_expired": false,
+          "deadline_reset": false
+        },
+        "preserve": {
+          "at": "2026-11-10T19:30:46.490699+00:00",
+          "phase": "preserve",
+          "role_phase": "normal-recovered",
+          "original_error": null,
+          "terminal": true,
+          "success_claimed": false,
+          "phase_expired": false,
+          "deadline_reset": false
+        },
+        "quiesce": {
+          "at": "2026-11-10T19:31:29.717112+00:00",
+          "phase": "quiesce",
+          "role_phase": "normal-recovered",
+          "original_error": null,
+          "terminal": true,
+          "success_claimed": false,
+          "phase_expired": false,
+          "deadline_reset": false
+        },
+        "archive": {
+          "at": "2026-11-10T19:31:31.473368+00:00",
+          "phase": "archive",
+          "role_phase": "normal-recovered",
+          "original_error": null,
+          "terminal": true,
+          "success_claimed": false,
+          "phase_expired": false,
+          "deadline_reset": false
+        }
+      }
+    }
+  ],
+  "original_whole_first_error": {
+    "member": {
+      "member": "operator/outer-first-error.txt",
+      "bytes": 986,
+      "sha256": "31ede30d592104639767145dc593b5736d353aecdab57b9471cfb7497ce88ecc",
+      "CRC32": "315dc541"
+    },
+    "text": "Traceback (most recent call last):\n  File \"/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-CODE/outer.py\", line 402, in run\n    results = self.join.run_roles(self.adapter, open_role=self._open,\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-CODE/join.py\", line 347, in run_roles\n    raise first\n  File \"/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-CODE/join.py\", line 321, in run_roles\n    result = run_role(c, frame, list(previous))\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-CODE/join.py\", line 253, in run_role\n    require(len(analysis['candidates']) == 1, 'SUP16_JOIN_ONE_ACTUAL_CANDIDATE_REQUIRED')\n  File \"/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-CODE/join.py\", line 51, in require\n    raise ValueError(message)\nValueError: SUP16_JOIN_ONE_ACTUAL_CANDIDATE_REQUIRED\n",
+    "first_failed_role": "challenge-partial",
+    "condition": "len(analysis.candidates) == 1",
+    "observed_candidates": 0,
+    "cause_inference": "하지 않음. 원 sensor.install 실행 실패/미호출·lazyWriter·Pod/ENV 순서 인과는 S5 별도 담당."
+  },
+  "first_client_failure": {
+    "member": {
+      "member": "operator/challenge-partial/preservation-client-private/first-client-failure/first-failure.json",
+      "bytes": 3377,
+      "sha256": "42f63acaefe795745fe859d17d12c4497ad27c025825d7d9ce59265d63c0ada2",
+      "CRC32": "1ac3ee90"
+    },
+    "value": {
+      "argc": 17,
+      "argv_body_persisted": false,
+      "argv_bytes": 5135,
+      "argv_scope": "caller-requested-reader-argv",
+      "argv_sha256": "aff3af46619b453c76c3210c22223aa66073941a39332b7b3cc1aefd5ac8cabd",
+      "capture": {
+        "bounded_at_source": true,
+        "complete": false,
+        "hash_scope": "exact retained CLI pipe bytes, before UTF-8 decoding or redaction; not daemon-file bytes",
+        "pipes_closed": true,
+        "read_errors": [],
+        "schema": "guard-pipe-capture/1",
+        "streams": {
+          "stderr": {
+            "limit": 4096,
+            "observed_bytes": 0,
+            "retained_bytes": 0,
+            "retained_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "truncated": false
+          },
+          "stdout": {
+            "limit": 4096,
+            "observed_bytes": 0,
+            "retained_bytes": 0,
+            "retained_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "truncated": false
+          }
+        },
+        "timed_out": true,
+        "truncated": false
+      },
+      "result_layer": "root-client-result",
+      "returncode": -9,
+      "root_supervision": {
+        "absolute_deadline": 445.731696846,
+        "caller": {
+          "pgid": 13808,
+          "pid": 13809,
+          "ppid": 13808,
+          "sid": 13808,
+          "start": 43905,
+          "state": "R",
+          "uid": 1000
+        },
+        "capture_deadline": 444.731696846,
+        "child_identity": {
+          "pgid": 2,
+          "pid": 2,
+          "ppid": 1,
+          "sid": 2,
+          "start": 44110,
+          "state": "R",
+          "uid": 0
+        },
+        "cleanup_deadline": 445.38169684599995,
+        "cleanup_deadline_exceeded": false,
+        "cleanup_errors": [],
+        "cleanup_reserve": 0.65,
+        "deadline_reduced_argv": true,
+        "direct_child_reaped": true,
+        "effective_argv_sha256": "ce897d10dc412509d62cc19dec81af52c88f1a0029c44639beb151d276ed2f70",
+        "finished": 444.739922896,
+        "group_kill_sent": true,
+        "group_terminal": true,
+        "injected": true,
+        "namespace_inode": "pid:[4026533257]",
+        "namespace_outer_parent": {
+          "pgid": 13808,
+          "pid": 13935,
+          "ppid": 13932,
+          "sid": 13808,
+          "start": 44106,
+          "state": "R",
+          "uid": 0
+        },
+        "pgid": 2,
+        "pid_scope": "transient_request_namespace",
+        "reaped_adopted_pids": [],
+        "remaining_group": [],
+        "requested_argv_sha256": "aff3af46619b453c76c3210c22223aa66073941a39332b7b3cc1aefd5ac8cabd",
+        "root_pid": 1,
+        "root_uid": 0,
+        "schema": "byul-root-client-supervision/1",
+        "started": 441.105990924,
+        "termination_reason": "capture_timeout",
+        "wire_reserve": 0.35
+      },
+      "schema": "byul-first-client-failure/1",
+      "scope": "first runner-observed producer failure only; not consumer JSON/identity failure",
+      "stderr": {
+        "original_bytes": 0,
+        "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "retained": {
+          "bytes": 0,
+          "dev": 66306,
+          "gid": 1000,
+          "inode": 1894960,
+          "mode": "0o600",
+          "nlink": 1,
+          "path": "/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-ASSETS/client-private-challenge-partial/first-client-failure/stderr.raw",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "uid": 1000
+        },
+        "retained_truncated": false
+      },
+      "stdout": {
+        "body_persisted": false,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "meaning": "첫 runner-observed producer failure의 원 pipe capture timeout이다. 후보수 guard나 consumer JSON/identity 실패와 같은 오류로 바꾸지 않는다. HTTP 상태/응답 body가 확인된 자료로 해석하지 않는다."
+  },
+  "preflight": {
+    "at": "2026-11-10T19:24:21.772618+00:00",
+    "GPU": "NVIDIA L4, GPU-e13e623b-c8c9-6eca-b93b-6680e31a3501\n",
+    "boot": "78fd6444-4138-4b60-8833-333e14805550",
+    "node_uid": "4e518b3c-fb86-44b1-b6d2-7ce3f914ecaf",
+    "timer_raw_sha256": "77fd7cc338074832ee4990df4bb04185ad88b8cfe707f2ef672de19ee2622ed0",
+    "configuration_sha256": "2f12dab86502d1a0d8c24afc6b6bf50abf31dc8f6c97e0e8dc72211635fd4e17",
+    "system_python": {
+      "binary": {
+        "path": "/usr/bin/python3.12",
+        "sha256": "e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f",
+        "dev": 66306,
+        "inode": 2111,
+        "uid": 0,
+        "gid": 0,
+        "mode": 493,
+        "bytes": 8020928,
+        "mtime_ns": 1788171506000000000,
+        "ctime_ns": 1792749942411732754
+      },
+      "observed": {
+        "path": "/usr/bin/python3.12",
+        "uid": 0,
+        "euid": 0,
+        "version": [
+          3,
+          12,
+          3
+        ],
+        "flags": {
+          "isolated": 1,
+          "no_site": 1,
+          "dont_write_bytecode": 1
+        }
+      }
+    },
+    "source": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+    "no_timer_reset": true
+  },
+  "current_inputs": {
+    "health": {
+      "owner": 0,
+      "path": "/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-HEALTH/health-receipt.json",
+      "sha256": "2f33541f16da1071a90444b814023e7923681cd54f45539c1cf34b137e245c07"
+    },
+    "model_proofs": {
+      "challenge-partial": {
+        "owner": 0,
+        "path": "/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-OPERATOR/challenge-model-current.json",
+        "sha256": "8db9ff5f34e21578bff71be248a22bdb88b64959dfd35bce600b7bb4357ce823"
+      },
+      "normal-before": {
+        "owner": 0,
+        "path": "/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-OPERATOR/normal-model-current.json",
+        "sha256": "c7b278dc46242e28cf5ba26f29747d2495461ea255c8b7ed9ccc65802f009927"
+      },
+      "normal-recovered": {
+        "owner": 0,
+        "path": "/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-OPERATOR/normal-model-current.json",
+        "sha256": "c7b278dc46242e28cf5ba26f29747d2495461ea255c8b7ed9ccc65802f009927"
+      }
+    },
+    "original_additional_deadlines": {
+      "aggregate": {
+        "aggregate": []
+      },
+      "challenge-partial": {
+        "archive": [],
+        "normal": [],
+        "preserve": [],
+        "quiesce": []
+      },
+      "normal-before": {
+        "archive": [],
+        "normal": [],
+        "preserve": [],
+        "quiesce": []
+      },
+      "normal-recovered": {
+        "archive": [],
+        "normal": [],
+        "preserve": [],
+        "quiesce": []
+      }
+    },
+    "positive_preflight": {
+      "owner": 0,
+      "path": "/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-OPERATOR/preflight-complete.json",
+      "sha256": "c3a0a14d0cc54b5256829ac38a2e5d16b427bf987d6da8c24e7d4ecbe0a3be33"
+    }
+  },
+  "fixed_whole_request_member": {
+    "member": "operator-code/whole-fixed-request.json",
+    "bytes": 5399,
+    "sha256": "e0c41069cfaf8eb9bb7a81c0066a6ad79539c2a76ccf7cc286786e45d4f1fc26",
+    "CRC32": "066fef16"
+  },
+  "exact_member_evidence": {
+    "operator/outer-first-error.txt": {
+      "member": "operator/outer-first-error.txt",
+      "bytes": 986,
+      "sha256": "31ede30d592104639767145dc593b5736d353aecdab57b9471cfb7497ce88ecc",
+      "CRC32": "315dc541"
+    },
+    "operator/preflight-complete.json": {
+      "member": "operator/preflight-complete.json",
+      "bytes": 1104,
+      "sha256": "c3a0a14d0cc54b5256829ac38a2e5d16b427bf987d6da8c24e7d4ecbe0a3be33",
+      "CRC32": "693e008a"
+    },
+    "operator/current-inputs.json": {
+      "member": "operator/current-inputs.json",
+      "bytes": 1660,
+      "sha256": "58531a1064730856f0a25a8906c858390539c03c14a6b3bcf4a9e5d1efcdcc22",
+      "CRC32": "bd2be223"
+    },
+    "operator-code/whole-fixed-request.json": {
+      "member": "operator-code/whole-fixed-request.json",
+      "bytes": 5399,
+      "sha256": "e0c41069cfaf8eb9bb7a81c0066a6ad79539c2a76ccf7cc286786e45d4f1fc26",
+      "CRC32": "066fef16"
+    },
+    "runtime/normal-before/ENV.json": {
+      "member": "runtime/normal-before/ENV.json",
+      "bytes": 828,
+      "sha256": "b762a0c1861fc7aa6c32193bcdc1d1caba6728dae9be333c300c032a817ef30e",
+      "CRC32": "f69769ce"
+    },
+    "runtime/normal-before/target.json": {
+      "member": "runtime/normal-before/target.json",
+      "bytes": 970,
+      "sha256": "c4e4959046f7625fcf4c048c0d37fff858afc53e1e0b1ca7e3d2a702ec362c00",
+      "CRC32": "198f8aa5"
+    },
+    "runtime/normal-before/role/role-preparation.json": {
+      "member": "runtime/normal-before/role/role-preparation.json",
+      "bytes": 3379,
+      "sha256": "541c6b84e3df63cb07721179f1cf2972026373eaf489224ff524194cf3eaa582",
+      "CRC32": "cbca9d14"
+    },
+    "runtime/normal-before/role/installer-payload.json": {
+      "member": "runtime/normal-before/role/installer-payload.json",
+      "bytes": 130729,
+      "sha256": "c9f7dd2f06752725ec6dd28f975d3806fc5bd64911030656b31c8234fa156918",
+      "CRC32": "9ec2a193"
+    },
+    "runtime/normal-before/role/native17/manifest.json": {
+      "member": "runtime/normal-before/role/native17/manifest.json",
+      "bytes": 5234,
+      "sha256": "773b7dbbd4021aeee89b73a245137aabacb92ad9eeab4b563ac5cfb8189d0862",
+      "CRC32": "dc8dfa89"
+    },
+    "runtime/normal-before/role/native17/settings.json": {
+      "member": "runtime/normal-before/role/native17/settings.json",
+      "bytes": 258,
+      "sha256": "1d9454d154a7300da4a204ec274f0cefeffed5431e144a156e3a1c8ad5d9700d",
+      "CRC32": "3013f530"
+    },
+    "runtime/normal-before/role/native17/sitecustomize.py": {
+      "member": "runtime/normal-before/role/native17/sitecustomize.py",
+      "bytes": 574,
+      "sha256": "692ead848047ab20eab7b0976de121d36c361f69968fc6064eeee5b9f6297c63",
+      "CRC32": "919f0948"
+    },
+    "runtime/normal-before/capture/capture.json": {
+      "member": "runtime/normal-before/capture/capture.json",
+      "bytes": 2116414,
+      "sha256": "1112e2a7d2f12044bf0251188b98f2b36ea6f1fbf74b6a934ab16db25b5d6102",
+      "CRC32": "00209f09"
+    },
+    "runtime/normal-before/capture/native-analysis.json": {
+      "member": "runtime/normal-before/capture/native-analysis.json",
+      "bytes": 4237,
+      "sha256": "979608c01339e9d9f838c4cf9e7689790a1061f98e53a5f7a1548666f6427778",
+      "CRC32": "546f9bf8"
+    },
+    "runtime/normal-before/capture/capture-receipt.json": {
+      "member": "runtime/normal-before/capture/capture-receipt.json",
+      "bytes": 3309,
+      "sha256": "49c4ab9b0528598ceaf8c40076d23ef33ef23d5b3619dda727bce9d664654724",
+      "CRC32": "c13cb541"
+    },
+    "operator/normal-before/phase-normal-terminal.json": {
+      "member": "operator/normal-before/phase-normal-terminal.json",
+      "bytes": 29472298,
+      "sha256": "70c89ef256531ea091730d9018b46fea89f6d563e29be32251d5ce83d675cc29",
+      "CRC32": "ad00bdff"
+    },
+    "runtime/normal-before/pod.json": {
+      "member": "runtime/normal-before/pod.json",
+      "bytes": 9673,
+      "sha256": "9650c2fb14d51656c8b6626422f129ac561b841d5d2e5e0b6bb032a425f61ea3",
+      "CRC32": "4a16a654"
+    },
+    "operator/normal-before/actual-generation-before-publish.json": {
+      "member": "operator/normal-before/actual-generation-before-publish.json",
+      "bytes": 27292,
+      "sha256": "0f63444f7c86d6a710839910518a7703d71fb92d25dd7bd43c5112764b650d03",
+      "CRC32": "9cf83456"
+    },
+    "operator/normal-before/prepare-code-configmap.json": {
+      "member": "operator/normal-before/prepare-code-configmap.json",
+      "bytes": 35810,
+      "sha256": "4ac0378e6dfe3bc6a20ecd0f7020625d525b62cb3ab263323895ee1d23cbb764",
+      "CRC32": "60a20e19"
+    },
+    "operator/normal-before/controller/observe/015-create-prepare-code-configmap.stdout": {
+      "member": "operator/normal-before/controller/observe/015-create-prepare-code-configmap.stdout",
+      "bytes": 36106,
+      "sha256": "c1c7b5ed4a93d096bac53ccea657b29b422bb98ed00a9cae7629fb82176404f9",
+      "CRC32": "92090bec"
+    },
+    "runtime/normal-before/role/native17/guard_lifecycle_base.py": {
+      "member": "runtime/normal-before/role/native17/guard_lifecycle_base.py",
+      "bytes": 56479,
+      "sha256": "2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd",
+      "CRC32": "09bed919"
+    },
+    "runtime/normal-before/role/native17/guard_lifecycle_sensor.py": {
+      "member": "runtime/normal-before/role/native17/guard_lifecycle_sensor.py",
+      "bytes": 15718,
+      "sha256": "e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d",
+      "CRC32": "21f69822"
+    },
+    "runtime/normal-before/role/native17/guard_weight_iteration.py": {
+      "member": "runtime/normal-before/role/native17/guard_weight_iteration.py",
+      "bytes": 18435,
+      "sha256": "6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648",
+      "CRC32": "839c9ecb"
+    },
+    "runtime/normal-before/role/native17/model-read-scope.json": {
+      "member": "runtime/normal-before/role/native17/model-read-scope.json",
+      "bytes": 1201,
+      "sha256": "67aa6551fea29b3358fb3746a94e710d13c9da0c2ac27dfc707fc7e3411460b5",
+      "CRC32": "686fc6f5"
+    },
+    "operator/normal-before/phase-preserve-terminal.json": {
+      "member": "operator/normal-before/phase-preserve-terminal.json",
+      "bytes": 115687,
+      "sha256": "8c35d8c968e896fe45b6c67b4ef289a453afe9ce6bbf819b172aba1efd9d775e",
+      "CRC32": "84fba465"
+    },
+    "operator/normal-before/phase-quiesce-terminal.json": {
+      "member": "operator/normal-before/phase-quiesce-terminal.json",
+      "bytes": 45291,
+      "sha256": "ee04ff8d5046e5d4f29059a1b69a53d7a9891bd341f4bef0be588e5604922ee7",
+      "CRC32": "4f77c9c6"
+    },
+    "operator/normal-before/phase-archive-terminal.json": {
+      "member": "operator/normal-before/phase-archive-terminal.json",
+      "bytes": 16969,
+      "sha256": "552f7e3a8daa474a7b4f07b4c579d2396c4277f609b35ee93570cbbe9d5dc8f3",
+      "CRC32": "f4346e1c"
+    },
+    "runtime/challenge-partial/ENV.json": {
+      "member": "runtime/challenge-partial/ENV.json",
+      "bytes": 828,
+      "sha256": "a6cba5cc482c27fe265b5d4a80f3fbbe570b295b54b6d019a3aec51b6abea3fe",
+      "CRC32": "3950e37a"
+    },
+    "runtime/challenge-partial/target.json": {
+      "member": "runtime/challenge-partial/target.json",
+      "bytes": 982,
+      "sha256": "35b321f35901435ec8142e27810f33019be5fb441237571ae5ddfe22057fdc64",
+      "CRC32": "44084459"
+    },
+    "runtime/challenge-partial/role/role-preparation.json": {
+      "member": "runtime/challenge-partial/role/role-preparation.json",
+      "bytes": 3394,
+      "sha256": "a13f0de4ae25cff105de3e53bf632f9eb7a81b5a4eb04a3894224cdb0a747ea8",
+      "CRC32": "eaeaad09"
+    },
+    "runtime/challenge-partial/role/installer-payload.json": {
+      "member": "runtime/challenge-partial/role/installer-payload.json",
+      "bytes": 130729,
+      "sha256": "7fca20195a7140e1e28846c0e4b7f80f4ca73f876fdf71fa355af2c1040ef224",
+      "CRC32": "5366add7"
+    },
+    "runtime/challenge-partial/role/native17/manifest.json": {
+      "member": "runtime/challenge-partial/role/native17/manifest.json",
+      "bytes": 5234,
+      "sha256": "e39f9e047397977e4836fbd962c49299945a4f14100d07d09544f33468f02d43",
+      "CRC32": "603779f3"
+    },
+    "runtime/challenge-partial/role/native17/settings.json": {
+      "member": "runtime/challenge-partial/role/native17/settings.json",
+      "bytes": 258,
+      "sha256": "0a910f49227eed5e61510289ce0da4cd7c5e6aed1de7493c29af3ba537c86448",
+      "CRC32": "99760d5e"
+    },
+    "runtime/challenge-partial/role/native17/sitecustomize.py": {
+      "member": "runtime/challenge-partial/role/native17/sitecustomize.py",
+      "bytes": 574,
+      "sha256": "692ead848047ab20eab7b0976de121d36c361f69968fc6064eeee5b9f6297c63",
+      "CRC32": "919f0948"
+    },
+    "runtime/challenge-partial/capture/capture.json": {
+      "member": "runtime/challenge-partial/capture/capture.json",
+      "bytes": 5192,
+      "sha256": "9774f2c7f1f3c07e754802f46d52d3a49d5d8da383dc4088873e996b2f3a3710",
+      "CRC32": "532e87b5"
+    },
+    "runtime/challenge-partial/capture/native-analysis.json": {
+      "member": "runtime/challenge-partial/capture/native-analysis.json",
+      "bytes": 1595,
+      "sha256": "27110f1cbc8932a46f4459b9d880eece5da52cfce0dab4255ff63366251a3e39",
+      "CRC32": "e39d001f"
+    },
+    "runtime/challenge-partial/capture/capture-receipt.json": {
+      "member": "runtime/challenge-partial/capture/capture-receipt.json",
+      "bytes": 2790,
+      "sha256": "ca17c72b667c02c7db5d00cb319cb13ecf6f503c523938c5ceefcf8b39f90758",
+      "CRC32": "32c9169c"
+    },
+    "operator/challenge-partial/phase-normal-terminal.json": {
+      "member": "operator/challenge-partial/phase-normal-terminal.json",
+      "bytes": 4160961,
+      "sha256": "fa04065378294c58dd5b6a24ffae10281866e7b790a3261dd6207da8dc9a1dbd",
+      "CRC32": "d03c0309"
+    },
+    "runtime/challenge-partial/pod.json": {
+      "member": "runtime/challenge-partial/pod.json",
+      "bytes": 9686,
+      "sha256": "457ebb8881023b5f74637ae8fbdca3fb4ac7dbddaaa8427028878379a04d1981",
+      "CRC32": "95aaf482"
+    },
+    "operator/challenge-partial/actual-generation-before-publish.json": {
+      "member": "operator/challenge-partial/actual-generation-before-publish.json",
+      "bytes": 27317,
+      "sha256": "32f8ef0a89267354c2618cf8953332697c2f7af49313b52c3a2d20d22816deec",
+      "CRC32": "38298e46"
+    },
+    "operator/challenge-partial/prepare-code-configmap.json": {
+      "member": "operator/challenge-partial/prepare-code-configmap.json",
+      "bytes": 35818,
+      "sha256": "315699a16e9d0fbbbd87fd25e115076359a7db7604689b53ee185aa56c1ea872",
+      "CRC32": "ea10775a"
+    },
+    "operator/challenge-partial/controller/observe/015-create-prepare-code-configmap.stdout": {
+      "member": "operator/challenge-partial/controller/observe/015-create-prepare-code-configmap.stdout",
+      "bytes": 36114,
+      "sha256": "52633abb244b0e4f59c127934da5323107302fd857e2f34c072678502c12c613",
+      "CRC32": "248dc323"
+    },
+    "runtime/challenge-partial/role/native17/guard_lifecycle_base.py": {
+      "member": "runtime/challenge-partial/role/native17/guard_lifecycle_base.py",
+      "bytes": 56479,
+      "sha256": "2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd",
+      "CRC32": "09bed919"
+    },
+    "runtime/challenge-partial/role/native17/guard_lifecycle_sensor.py": {
+      "member": "runtime/challenge-partial/role/native17/guard_lifecycle_sensor.py",
+      "bytes": 15718,
+      "sha256": "e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d",
+      "CRC32": "21f69822"
+    },
+    "runtime/challenge-partial/role/native17/guard_weight_iteration.py": {
+      "member": "runtime/challenge-partial/role/native17/guard_weight_iteration.py",
+      "bytes": 18435,
+      "sha256": "6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648",
+      "CRC32": "839c9ecb"
+    },
+    "runtime/challenge-partial/role/native17/model-read-scope.json": {
+      "member": "runtime/challenge-partial/role/native17/model-read-scope.json",
+      "bytes": 1201,
+      "sha256": "87578d829c0465d86c6f03b016c4f6d6e6e6a03e46524a07dd71aa1a678f4737",
+      "CRC32": "33883d7e"
+    },
+    "operator/challenge-partial/phase-preserve-terminal.json": {
+      "member": "operator/challenge-partial/phase-preserve-terminal.json",
+      "bytes": 116471,
+      "sha256": "8a87676ed537e2f6410e274a027a32481b8620f08ce63905c21433f966271cbc",
+      "CRC32": "1c1aae91"
+    },
+    "operator/challenge-partial/phase-quiesce-terminal.json": {
+      "member": "operator/challenge-partial/phase-quiesce-terminal.json",
+      "bytes": 45420,
+      "sha256": "4b3d2153a2039ddef8e8afeb17efea0a1bfb028206fe6523ece994ba364947fe",
+      "CRC32": "9a3cde4e"
+    },
+    "operator/challenge-partial/phase-archive-terminal.json": {
+      "member": "operator/challenge-partial/phase-archive-terminal.json",
+      "bytes": 17001,
+      "sha256": "8a7e5abd9ebf7a584c7203b3f8bc97e1fb136db34d4d2f4394362a65031711c4",
+      "CRC32": "81be71b8"
+    },
+    "runtime/normal-recovered/ENV.json": {
+      "member": "runtime/normal-recovered/ENV.json",
+      "bytes": 828,
+      "sha256": "2a1e6ab02a8321884d57a2066de7eb252d88046baaaac4c2edfc5e834bbc5bc8",
+      "CRC32": "511a81b5"
+    },
+    "runtime/normal-recovered/target.json": {
+      "member": "runtime/normal-recovered/target.json",
+      "bytes": 979,
+      "sha256": "d1c76750302900529bdaa8f6259a07ffe857586a55c629a3d420629ef81456ad",
+      "CRC32": "ee8a9503"
+    },
+    "runtime/normal-recovered/role/role-preparation.json": {
+      "member": "runtime/normal-recovered/role/role-preparation.json",
+      "bytes": 3388,
+      "sha256": "4b6204f0f8181599901828d1c5bb29a015af6c88b2a9b523d2ec8ec2ee94589e",
+      "CRC32": "e374d2f6"
+    },
+    "runtime/normal-recovered/role/installer-payload.json": {
+      "member": "runtime/normal-recovered/role/installer-payload.json",
+      "bytes": 130729,
+      "sha256": "0d102ddd60cae24c1b1d64b5abe64ea3cef8e8720ace587adee9905dbb8eb8d9",
+      "CRC32": "745af4e2"
+    },
+    "runtime/normal-recovered/role/native17/manifest.json": {
+      "member": "runtime/normal-recovered/role/native17/manifest.json",
+      "bytes": 5234,
+      "sha256": "0535d04317d8a62106d37d60ec83a9fc0177d87fcca03498a2438ffe5a5e6379",
+      "CRC32": "049a9749"
+    },
+    "runtime/normal-recovered/role/native17/settings.json": {
+      "member": "runtime/normal-recovered/role/native17/settings.json",
+      "bytes": 258,
+      "sha256": "3d4fbf71a632d40263ed5c58bd241d70bdebd3c7733cee8080ae04eac91ebab6",
+      "CRC32": "de906e40"
+    },
+    "runtime/normal-recovered/role/native17/sitecustomize.py": {
+      "member": "runtime/normal-recovered/role/native17/sitecustomize.py",
+      "bytes": 574,
+      "sha256": "692ead848047ab20eab7b0976de121d36c361f69968fc6064eeee5b9f6297c63",
+      "CRC32": "919f0948"
+    },
+    "runtime/normal-recovered/capture/capture.json": {
+      "member": "runtime/normal-recovered/capture/capture.json",
+      "bytes": 2116052,
+      "sha256": "2e95eeed0e5d7a72991ca52d8dee6b5da2e57e5929944ea9d9712e0cd25f6baf",
+      "CRC32": "82d06939"
+    },
+    "runtime/normal-recovered/capture/native-analysis.json": {
+      "member": "runtime/normal-recovered/capture/native-analysis.json",
+      "bytes": 4237,
+      "sha256": "af83fdf0e4324a159b9359faf66f01d645f3c36ce843ea8beebcfec4b8115da6",
+      "CRC32": "c33a2973"
+    },
+    "runtime/normal-recovered/capture/capture-receipt.json": {
+      "member": "runtime/normal-recovered/capture/capture-receipt.json",
+      "bytes": 3309,
+      "sha256": "eecbd6f5dccb15efeaffaf662ada6323d05c28340c3249c0bc9e810297fc29ff",
+      "CRC32": "78033656"
+    },
+    "operator/normal-recovered/phase-normal-terminal.json": {
+      "member": "operator/normal-recovered/phase-normal-terminal.json",
+      "bytes": 21903930,
+      "sha256": "f777a1e47ffe10559733cd77a5a04da25d6f644f8f2e2a278e55375b4b46d61d",
+      "CRC32": "b7e50b64"
+    },
+    "runtime/normal-recovered/pod.json": {
+      "member": "runtime/normal-recovered/pod.json",
+      "bytes": 9682,
+      "sha256": "232587ee8648204e093b354be4c17394d7d26c1a2a59a6d4552e920044242834",
+      "CRC32": "d3bdcb87"
+    },
+    "operator/normal-recovered/actual-generation-before-publish.json": {
+      "member": "operator/normal-recovered/actual-generation-before-publish.json",
+      "bytes": 27310,
+      "sha256": "9253998e8757bdc4d2749d29cc6ba9d70ed92fbe9a6c57a795fdb33f4dad3392",
+      "CRC32": "f9aac22e"
+    },
+    "operator/normal-recovered/prepare-code-configmap.json": {
+      "member": "operator/normal-recovered/prepare-code-configmap.json",
+      "bytes": 35816,
+      "sha256": "17bd20d3a5ef89c3b74accfcdfb78ab1e49decd87b36f2aa1ed6d184fd4fc3d6",
+      "CRC32": "272d03c2"
+    },
+    "operator/normal-recovered/controller/observe/015-create-prepare-code-configmap.stdout": {
+      "member": "operator/normal-recovered/controller/observe/015-create-prepare-code-configmap.stdout",
+      "bytes": 36112,
+      "sha256": "2968c4e1375dff364cd378b6e4ea5c8751286972f410ebc8af198ea903d12f14",
+      "CRC32": "39a0d5c7"
+    },
+    "runtime/normal-recovered/role/native17/guard_lifecycle_base.py": {
+      "member": "runtime/normal-recovered/role/native17/guard_lifecycle_base.py",
+      "bytes": 56479,
+      "sha256": "2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd",
+      "CRC32": "09bed919"
+    },
+    "runtime/normal-recovered/role/native17/guard_lifecycle_sensor.py": {
+      "member": "runtime/normal-recovered/role/native17/guard_lifecycle_sensor.py",
+      "bytes": 15718,
+      "sha256": "e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d",
+      "CRC32": "21f69822"
+    },
+    "runtime/normal-recovered/role/native17/guard_weight_iteration.py": {
+      "member": "runtime/normal-recovered/role/native17/guard_weight_iteration.py",
+      "bytes": 18435,
+      "sha256": "6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648",
+      "CRC32": "839c9ecb"
+    },
+    "runtime/normal-recovered/role/native17/model-read-scope.json": {
+      "member": "runtime/normal-recovered/role/native17/model-read-scope.json",
+      "bytes": 1201,
+      "sha256": "2df22eefc11ff40d4ad319c0cd92da75ba498ac02a4abf3150f09cdb47ddcc43",
+      "CRC32": "89a58144"
+    },
+    "operator/normal-recovered/phase-preserve-terminal.json": {
+      "member": "operator/normal-recovered/phase-preserve-terminal.json",
+      "bytes": 116284,
+      "sha256": "cde6c450151ea74157501131a4f8149f1104c2dda1c50bbb2162c344ceb1f9d1",
+      "CRC32": "7344e911"
+    },
+    "operator/normal-recovered/phase-quiesce-terminal.json": {
+      "member": "operator/normal-recovered/phase-quiesce-terminal.json",
+      "bytes": 45425,
+      "sha256": "b7223b0819a0034f1228714a4f1e02b07ca48b7f5f80fcaea8592b9e3e9f80de",
+      "CRC32": "cad76ed5"
+    },
+    "operator/normal-recovered/phase-archive-terminal.json": {
+      "member": "operator/normal-recovered/phase-archive-terminal.json",
+      "bytes": 16992,
+      "sha256": "fe27b3ec9af04957b1ec6c1efeeb3fdff16fd39844c1704bce5aa648a78a664c",
+      "CRC32": "f35cdf21"
+    },
+    "operator/challenge-partial/preservation-client-private/first-client-failure/first-failure.json": {
+      "member": "operator/challenge-partial/preservation-client-private/first-client-failure/first-failure.json",
+      "bytes": 3377,
+      "sha256": "42f63acaefe795745fe859d17d12c4497ad27c025825d7d9ce59265d63c0ada2",
+      "CRC32": "1ac3ee90"
+    },
+    "operator/challenge-partial/preservation-client-private/first-client-failure/stderr.raw": {
+      "member": "operator/challenge-partial/preservation-client-private/first-client-failure/stderr.raw",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "CRC32": "00000000"
+    }
+  },
+  "Ref_scope": {
+    "verified": "세 phase target.environment_ref 및 role-preparation.environment_ref의 kind/id/revision/sha가 각 ENV 원 content_sha256와 일치하는 원문 연결. Ref의 sha는 ENV 파일 raw SHA와 구분.",
+    "not_performed": "Store/DB 복원·Ref 내용해시 알고리즘 재판정·저장 pack/POL 실행은 이번 한정 범위에서 수행하지 않았다. 기존 유효 covered-prefix 및 Ref/POL 결과를 소급 변경하지 않는다.",
+    "pack_ref_from_original_preparation": {
+      "id": "PACK-BASELINE",
+      "kind": "PACK",
+      "revision": 33,
+      "sha256": "74219b48b241775e4c4fa153a950b2a94029147f512c731f055e91cf945cd5b6"
+    }
+  },
+  "sensor_install_scope": {
+    "static_payload_and_files_match": true,
+    "sitecustomize_calls_install_in_source": true,
+    "challenge_runtime_install_completed": null,
+    "claim": "challenge files0/recordings0는 원 관측 사실이다. 이것만으로 sensor.install 미호출·실패·실행완료 중 하나를 단정하지 않는다. 정상 phase의 기록 존재도 challenge의 완료 증거가 아니다."
+  },
+  "provenance_preservation": {
+    "original_ENV_data_origin": "EXAMPLE",
+    "native_analysis_reference_origin": "EXAMPLE",
+    "original_capture_security": "UNKNOWN",
+    "producer_authenticated": false,
+    "product_connected": false,
+    "engine_source_commit": null,
+    "engine_source_commit_status": "UNVERIFIED",
+    "original_manifest_whole_question_complete": false,
+    "original_manifest_retained_model_archived": false,
+    "official_policy": "원 필드·정확 Ref·policy/official을 수정하지 않는다. 부재 필드를 승인·official=true로 보완하지 않는다.",
+    "actual_vs_metadata": "원 GPU/Pod/파일·phase 실행 관측과 EXAMPLE 입력 메타/인증false/미완료 제품 범위를 함께 보존한다."
+  },
+  "recovery_separation": {
+    "S3_full_archive_recovery": "S2/root 직접 보고 및 로컬 원 archive 외부SHA·CRC 일치 확인. SessionCLI2252/1220frame/회수boot39955의 전체 원control·정지비용은 별도 미인계 범위.",
+    "original_experiment_boot": "78fd6444-4138-4b60-8833-333e14805550",
+    "old_R8_UNKNOWN1": "원자료회수로 해소하지 않음.",
+    "product_result": "원 SUP16 whole FAIL/미완료 유지. API 응답 성공·파일회수 성공을 paired product/실GPU 제품 완수로 바꾸지 않음."
+  },
+  "verification_level": "원 archive 최초 CRC·색인 bytesSHA 및 원문 사실/메타 Ref 연결·payload 무결성 대조",
+  "data_origin": "새로 도착한 실제 원 GB12 archive. 내부 ENV/참조는 원 EXAMPLE 표기를 그대로 보존. S4 신규 runtime/CPU/API 실행0.",
+  "limits": [
+    "원 archive 전체 CRC는 최초1회만 수행했다. 이후 정확 member의 좁은 원문 조회만 했으며 광역 추출·원본복사/이동/수정0.",
+    "ConfigMap 파일·API 반환 data·Pod mount/command 및 payload 바이트 일치는 실제 sensor 설치 완료나 후속 worker 소비의 인과증명이 아니다.",
+    "원 capture/analysis/receipt의 false·UNKNOWN·권한/범위 누락은 그대로다. normal phase의 candidate1도 승인된 모델 생성/전체 inventory/완전한 tensor storage 소비를 뜻하지 않는다.",
+    "source/phase/lazyWriter 인과분석·수정 제안은 S5 담당. S4는 이를 대신하지 않았으며 CPU·모델·AWS·GPU·원control482 CRC 재검0."
+  ],
+  "counts": {
+    "original_archive_files": 1,
+    "first_CRC_members": 1971,
+    "raw_manifest_entries": 1970,
+    "observed_phase_records": 3,
+    "metadata_checks": 29,
+    "new_S4_CPU_model_API_GPU": 0,
+    "code_modifications": 0,
+    "unique_product_branch_total": null,
+    "development26_GPU43_historical6_status_changes": 0
+  },
+  "remaining_inputs": "S5의 원2cb 및 phase별 인과 분석, 별도 S3 운영control/정지비용 원자료, 필요한 후속 Ref/저장팩 작업은 해당 소관에서 별도 연결. 새 시험/승인 gate 추가0.",
+  "next_owner": "S5 인과분석 / S2 실제 운영control·정리 / 총괄 정본 반영",
+  "S4_review_scope_complete": true,
+  "product_complete": false,
+  "new_gate_or_approval_added": false
+}

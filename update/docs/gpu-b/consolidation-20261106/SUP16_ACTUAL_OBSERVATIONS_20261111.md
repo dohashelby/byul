@@ -110,14 +110,48 @@ v8은 request_for의 빈 optional prefix 두 키만 생략한다. 고정 관리 
 
 원 S2 실패·각 UNKNOWN·정지 감시 실패와 제품 미실증을 보존한다. 새 control 473385B·482 member의 최초 CRC와 index481의 집합·bytes/SHA, 실제 health/clock의 원 wire·terminal, CLI 실패·별도 정리 근거·정지·해당 비용 행을 [독립 검토](retained-stream-components-20261111/session-S2-actual-review.json)에서 대조했다(31/불일치0, `afa63410ba8eeaf537c4b148804d399cb37550b699eb944c4248c12038ab5b07`). 실제 health는 새 boot `d3bcb559-45b2-42cd-9365-eab3df779704`와 L4 1장·이전 GPU 프로세스0·기존2시간 timer active/noreset을 관측했으며 engine/factory는 실행하지 않았다. 원 request·새 request·생성 stdout/stderr 바이트의 [후속 대조](retained-stream-components-20261111/prefix-v8-actual-raw-review-addendum.json)9/불일치0도 완료했다. 이 control 검증은 원 GB12 1971 member 전체 회수/CRC가 아니다. 후속 실제 회수는 새 private/final packet·현재 선정 상태·실제 생성자 사전검사를 결합한 별도 S3로 진행한다. 이 절의 시점은 S2 정리 및 v8 로컬 검사이며, S3 실행·전송 성공을 선행 집계하지 않는다.
 
+## Session S3: 원자료 전체 회수·무결성 완료
+
+v8 core `ab804382`와 entry `cf67a54e`, 원 stream `8e2261a0`의 source15와 새 private/final packet을 실제 사전검사로 결합했다. 기존 선정 인스턴스의 정상 start1이 수락됐고 11:32 KST running·SSM Online1·활성 명령0을 확인한 뒤 11:33:01 KST collect1을 제출했다. 실제 health 이후 원 Session CLI2252는 11:33:19.230594~47.705374 KST rc0·자식 회수·그룹 종료·cleanup 오류 없음·stdout19,631,430B/stderr0으로 끝났다. nonce·새 회수 boot·고정 sender SHA·원격 UID/EUID0·rc0 marker와 정확 SessionId의 Target/Owner/Reason/문서·Terminated/EndDate를 연결했다. receiver는 11:33:49.759793 KST 1,220 frame·14,636,464B를 게시했다.
+
+원 ZIP을 로컬로 반출해 전체 SHA `2681a23c1545647e4b25711cb4c570336efdc6e7a604332de452c9cc2a663219` 일치를 확인했다. S4 단독 최초 전체 CRC1회에서 1,971 member·비압축131,826,305B·오류0을 확인했다. 위험 경로·중복/대소문자 충돌·symlink·암호화는 없었다. safeindex는 764,003B·SHA `5847c9e6938fc7f0f15b672bfe2a7502b918751e9ee2e980f91fdeeaf9379792`다. 전체 CRC는 반복하지 않았다. rawmanifest1970의 파일 집합·bytes/SHA와 정확 phase/ENV/target/Pod UID·설치 payload를 [원문 사실 검토](retained-stream-components-20261111/GB12-archive-facts-review.json)에서 확인했다(29/불일치0, SHA `7d1e43502ee70a397ca3cfc0d12128d9be4ea2e1929d002d440ad3f4ccdd222a`).
+
+| 원 phase | 후보 | 기록 파일 | 봉인 | 원 observe 오류 |
+| --- | ---: | ---: | --- | --- |
+| normal-before | 1 | 3 | true | null |
+| challenge-partial | 0 | 0 | false | SUP16_JOIN_ONE_ACTUAL_CANDIDATE_REQUIRED |
+| normal-recovered | 1 | 3 | true | null |
+
+첫 오류는 challenge-partial의 후보 부재와 연결된다. 세 phase 자료의 생성과 정상 전후 봉인 기록을 확인했으며, 원 ENV의 EXAMPLE·engine source UNVERIFIED·producer_authenticated=false·product_connected=false·security UNKNOWN·success_claimed=false를 보존한다. 정확 Ref의 kind/id/revision/content_sha 연결을 확인한 범위이며 Store 복원·POL 재판정·정식 제품 PASS는 수행하지 않았다. 부분 파일 단계의 실제 install 반환·첫 emit·Writer 원예외는 원문에서 아직 확정되지 않았다. 기존 lifecycle source의 지연 Writer 생성 계약과 함께 별도 인과분석 대상으로 둔다.
+
+회수 성공 뒤 원180초 정지 감시는 `STOPPED_NOT_YET_OBSERVED`로 실패했다. 원 collect2178은 11:37:01 KST rc1·회수·그룹 종료·cleanup 오류 없음으로 끝났다. 원 Session 전송/native0·정확 서버 종료·원 ZIP 회수/CRC 성공과 정지 감시 실패를 각각 보존한다. 후속 11:40:53 KST EC2 조회에서 stopped·공인 IP 없음, 이어 SSM node0·활성 명령0·현재 private unresolved0을 확인했고 관측은 11:40:56 KST 끝났다. 정상 stop1·추가 stop/Force/reset0이며 보수 compute/IP 구간581.566939초/user 관리·새 USD null·정확 off 시각 null·EBS 보존이다. 다른2대의 새 상태를 이 선정 조회에서 추정하지 않는다.
+
+- 선정 정지 원문9103B: `30825543086b59eefd40c1fde870ff602d8f10ac54371e27ac7aa898bb7d21d0`
+- S3 운영 마감11271B: `8a5a05cfe3ad1368d9b70b1262fc0316870d75198e5073cb4f42faae946552f7`
+- 별도 원 control477 member·13,989,782B: `b984b4db9525e20752353d09645627d80fd5386517f5171987379bebd652bd37`
+
+새 control477의 최초CRC·index476과 실제 source15/packet, 원 stdout의 H1/D1220/F1·remote marker, 정확 Session 종료, receiver와 원 ZIP의 전체 SHA, 정지/장부를 [운영 독립 검토](retained-stream-components-20261111/session-S3-actual-review.json)에서 대조했다(31/불일치0, `3f134a9c1e71caf8d3ac5be36c8992b024d4ba5c48a357ba1a2a62d61792c3da`). 이 검토는 receiver/Session을 다시 실행하거나 전체 archive CRC를 반복하지 않고 원 bytes와 최초 검사 결과를 재사용했다.
+
+원 R8 whole FAIL·읽기 요청 수락 UNKNOWN1과 과거 실패·partial을 보존한다. 이번에 해결한 것은 전체 원자료 회수·무결성이며, 제품 세 역할의 판정 완료로 확대하지 않는다.
+
 ## 기록 파일0의 해석과 다음 관측
 
 실제 공급된 lifecycle base 원문 56,479B·SHA `2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd`를 대조했다. install 1032~1052행의 성공은 Observer/Finder 구성이다. Observer는 writer=None으로 시작하고(334~336행), 첫 관측 사건에서 Writer를 만든다(374~391행). Writer의 파일 생성·START 기록은 255~272행이며 emit의 쓰기 예외는 disabled_pid로 흡수된다(393~397행).
 
 따라서 files/recordings0만으로 sitecustomize 미실행·install 실패를 확정할 수 없다. 설치 성공 후 대상 사건 미도달, Writer 생성·쓰기 실패도 구분해야 한다. 후행 SEALED 표시는 설치 시점에 marker가 이미 있었다는 증거가 아니다. 같은 PID/start_ticks/boot의 entrypoint·import origin·install 반환, hook·첫 emit, 파일 FD·원 예외, seal 순서를 최소 관측으로 연결해야 한다. 원인이 입증된 B 수정은 아직 없다. 로컬 분석의 EVD/RES/RPT 별칭은 제품 store의 공식 객체가 아니다.
 
+## B 봉인 전 관측·입력 준비 마감
+
+실제 R8 캡처 helper 19308B/7ed08793의 같은 reader120에서 snapshot 다음·seal 직전 기존 inventory의 원반환과 오류 type/message/errno를 기존 receipt에 보존하는 후보 f868ee1d/20279B를 만들었다. helper와 그 SHA가 전달되는 adapter/resolver 및 상위 코드 핀·설치 metadata만 갱신했다. 기존 A/worker·정책/후보 요구·기한은 바꾸지 않았다.
+
+[고정 소스·직접 검증·최종 검토](retained-preseal-components-20261111/README.md)와 [A 반환 경계](retained-preseal-components-20261111/causal_handoff.md)를 보존했다. 관측CPU4·코드핀7·새metadata4는 각각 선정 범위이며 실제 원2cb 함수의 선택 AST·원native inventory와 명시적 Kubernetes 대역을 소비했다. 전체 main/CLI·43모듈 fanout·실제 GPU를 실행한 것으로 확대하지 않는다. 원 stdin 누락 및 입력 context 누락 하네스 실패를 보존하고 고정 생산 코드는 바꾸지 않았다. 최종 집중 검토16/불일치0을 확인했다. CPU의 성공 읽기35와 거부 전15를 합친50건·고유Ref35는 모두43plan에 연결됐고, 검토 보고의 집계 조건만 정정했다.
+
+정상 전후의 원 PID98 journal은 각각1176행 중 WEIGHT_ITERATION1153/FILE_READ3 뒤 END.reason=BOUND_REACHED, root_operation_pairs_complete=false/root_exhausted=false였다. 후보1·봉인 성공을 root 연산 완전성으로 바꾸지 않는다. challenge의 install/첫emit/Writer 원인은 미확정이며 실제 engine PID/start/boot/import origin·install 반환/원예외·writer/SEALED 순서는 A 공통 반환이 필요하다.
+
+현재 case용 새 Session 수집 binding은 원 driver의 과거 GET ConnectTimeout 경로를 자동 재사용하지 않기 위한 별도 로컬 준비다. 원 GB12 성공은 그 신규 경로의 검증을 대신하지 않는다. 마감 요청에 따라 새 GPU·추가 실측·staging은 시작하지 않고, 현재 고정 변경의 검증 범위와 미완료를 PR에 인계한다. 마지막 실제 자원 상태는 S3 선정 stopped/IP0/SSM0 확인이며 이후 추가 기동은 없다.
+
 ## 다음 실행과 범위
 
-B 전용 private 제어·진단 경로와 읽기 전용 조회를 보강했고 R8·R1·S1·S2에서 실제 준비·실패 범위를 확인했다. 이 기록의 마지막 정리 관측은 S2의 11:23 KST다. 이미 확보한 원자료를 진단하고 [archive 압축·복원 준비](SUP16_ARCHIVE_ENVELOPE_PREPARATION_20261111.md)를 CPU에서 검증했지만 실제 GB12는 기존 압축 상한을 넘었다. 다음 전송은 기존 Session Manager 관리 문서와 설치된 플러그인을 사용하는 별도 스트림 경로와 v7 객체 결합·v8 CLI 선택값 수정으로 이어간다. 실제 전송·종료·기한 연결과 원자료 무결성은 별도 확인한다. 기존 output·A 코드의 권한을 바꾸거나 source guard·기한을 완화하지 않는다. 새 모델·정상/도전/복구 세 역할·전체 반출 성공은 해당 실측 원자료로 별도 확인해야 한다.
+B 전용 private 제어·진단 경로와 읽기 전용 조회를 보강했고 R8·R1·S1·S2에서 실제 준비·실패 범위를 확인했다. 이 기록의 마지막 정리 관측은 S3의 11:40 KST다. 이미 확보한 원자료를 진단하고 [archive 압축·복원 준비](SUP16_ARCHIVE_ENVELOPE_PREPARATION_20261111.md)를 CPU에서 검증했지만 실제 GB12는 기존 압축 상한을 넘었다. 기존 Session Manager 관리 문서·설치된 플러그인과 v7 객체 결합·v8 CLI 선택값 수정의 실제 스트림 회수·종료·무결성은 S3에서 확인했다. 원자료 인과 대조와 B 관측 보강의 CPU 준비·한정 검토를 마감했다. 신규 case 수집 binding·새 실제 관측 및 A 반환은 잔여로 인계한다. 기존 output·A 코드의 권한을 바꾸거나 source guard·기한을 완화하지 않는다. 새 모델·정상/도전/복구 세 역할·전체 반출 성공은 해당 실측 원자료로 별도 확인해야 한다.
 
 원 runtime `2cb01e9f`/466파일과 공개 저장소 계열의 제품528파일을 구분한다. CPU 준비 요약의 actual=false는 작성 당시 범위로 보존한다.

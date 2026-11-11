@@ -1,0 +1,144 @@
+"""CPU-only checks of the unintegrated current-archive Session draft.
+
+The original wire pack/select functions consume explicit CPU metadata, not AWS
+receipts. Actual checked_file and Recovery constructor are used without APIs.
+No original stream/core suite, archive CRC, model or remote command is run.
+"""
+import ast,base64,copy,datetime,hashlib,json,os,pathlib,shlex,sys,tempfile,time,types,uuid
+from contextlib import contextmanager
+
+HERE=pathlib.Path(__file__).parent;B=HERE.parent;P=B.parents[2]
+OLD=B/'one-gpu-req-sup16-join-20261109-v1/sup16-roles-operating-20261110-v1/next-selected-operating-binding-r8-v1/packet-v2'
+CORE=B/'r8-session-stream-recovery-prep-20261111-v8/session_recovery.py'
+STREAM=P/'worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v4/gb12_stream.py'
+sha=lambda raw:hashlib.sha256(raw).hexdigest()
+def load(name,path):
+ raw=path.read_bytes();m=types.ModuleType(name);m.__file__=str(path);sys.modules[name]=m
+ exec(compile(raw,str(path),'exec'),m.__dict__);return m
+def pin(path):
+ raw=path.read_bytes();return {'path':str(path),'bytes':len(raw),'sha256':sha(raw)}
+
+started=time.monotonic();fds_before=sorted(os.listdir('/proc/self/fd'));cases=[];api=[]
+def check(label,fn):
+ fn();cases.append({'case':label,'passed':True})
+def rejected(fn,expected=None):
+ try:fn()
+ except (ValueError,AssertionError) as error:
+  if expected is not None:assert str(error)==expected,(str(error),expected)
+ else:raise AssertionError('rejection required')
+def no_api(*a,**kw):api.append('forbidden');raise AssertionError('CPU_NO_API_ALLOWED')
+assert os.getuid()==os.geteuid()==1000 and sys.version_info[:2]==(3,12)
+c=load('new_selected_session_component_cpu',HERE/'selected_archive_session.py')
+binding=load('actual_original_archive_binding_cpu',OLD/'archive_binding.py')
+driver=load('actual_original_driver_cpu',OLD/'driver.py')
+assert (CORE.stat().st_size,sha(CORE.read_bytes()))==c.CORE
+assert (STREAM.stat().st_size,sha(STREAM.read_bytes()))==c.STREAM
+original_modules={n:sys.modules.get(n) for n in ('s2_selected_session_fixed_core','s2_selected_session_fixed_stream')}
+
+with tempfile.TemporaryDirectory(prefix='s2-current-archive-component-') as td:
+ root=pathlib.Path(td);root.chmod(0o700)
+ for name,path in [('session_core.py',CORE),('gb12_stream.py',STREAM)]:
+  dest=root/name;dest.write_bytes(path.read_bytes());dest.chmod(0o600)
+ driver.OUT=root;driver.PACKET={'local_files':{n:{'bytes':(root/n).stat().st_size,'sha256':sha((root/n).read_bytes())} for n in ('session_core.py','gb12_stream.py')}}
+ driver.boto3=types.SimpleNamespace(assert_identity=no_api)
+ def actual_constructor():
+  with c.qualified_runtime(driver) as (rt,core,stream,raw,recovery):
+   assert rt.packet is driver.PACKET and recovery.rt.packet is driver.PACKET
+   assert recovery.driver is driver and recovery.cli.driver is driver
+   assert recovery.session_submitted is False and recovery.sid is None
+   rejected(lambda:c.same_packet(types.SimpleNamespace(driver=driver,packet=copy.deepcopy(driver.PACKET))),
+    'SELECTED_SESSION_SAME_DRIVER_PACKET_REQUIRED')
+ check('real_original_checked_file_to_fixed_Recovery_constructor_and_packet_identity_API0',actual_constructor)
+ assert all(sys.modules.get(n) is old for n,old in original_modules.items())
+ def wrong_file_mode():
+  p=root/'session_core.py';p.chmod(0o644)
+  try:
+   def open_bad():
+    with c.qualified_runtime(driver):pass
+   rejected(open_bad)
+  finally:p.chmod(0o600)
+ check('original_checked_file_refuses_0644_before_constructor',wrong_file_mode)
+ assert all(sys.modules.get(n) is old for n,old in original_modules.items())
+
+ # Old static names are used only as the original producer's CPU contract inputs.
+ # No new generation/archive identity or actual bytes are claimed here.
+ whole_argv=['/cpu-only/whole','--execute'];probe_argv=['/cpu-only/probe'];config='1'*64
+ driver.PACKET.update(selected_archive_session_scope={'instance_id':c.IID,'GET_fallback':False,
+  'remote_path':binding.ARCHIVE,'remote_name':binding.ARCHIVE.rsplit('/',1)[1]},
+  whole_argv_prefix=whole_argv,probe_argv=probe_argv,configuration_sha256=config)
+ def submission(phase,argv,seconds):
+  req={'InstanceIds':[binding.INSTANCE],'DocumentName':'AWS-RunShellScript','MaxConcurrency':'1','MaxErrors':'0','TimeoutSeconds':120,
+   'Parameters':{'commands':[shlex.join(argv)],'executionTimeout':[str(seconds)]}}
+  cid=str(uuid.uuid4());record={'phase':phase,'request':req,'request_sha256':sha(json.dumps(req,sort_keys=True).encode()),
+   'response':{'Command':{'CommandId':cid}},'actual_argv':argv}
+  return record,{'CommandId':cid,'InstanceId':binding.INSTANCE,'Status':'Success','ResponseCode':0}
+ ws,wt=submission('whole',whole_argv,7200);ps,pt=submission('whole-result-probe',probe_argv,60)
+ wt.update(Status='Failed',ResponseCode=1)
+ wrapper={'tracked_children_terminal':True,'phase_or_outer_blocked':False,'external_SSM_terminal_still_required':True,
+  'wrapper_pid':123,'boot_id':str(uuid.uuid4()),'caller_constructed':True,'configuration_sha256':config,
+  'actual_children':[{'pid':124,'returncode':1,'group_terminal':True}]}
+ receipt={'archive':binding.ARCHIVE,'source':binding.SOURCE,'guard_run':binding.GUARD_RUN,'bytes':12345,'members':2,
+  'sha256':'2'*64,'product_complete_claimed':False,'at':'2026-11-11T00:00:00+00:00'}
+ def wire(w,r):
+  value={'wrapper':w,'archive_receipt':r};files={}
+  for path,obj in [(binding.WRAPPER_PATH,w)]+([(binding.RECEIPT_PATH,r)] if r is not None else []):
+   raw=json.dumps(obj).encode();files[path]={'bytes':len(raw),'sha256':sha(raw),'raw_base64':base64.b64encode(raw).decode()}
+  return binding.pack(json.dumps(value).encode(),files)
+ def consume(w=wrapper,r=receipt,terminal=None):
+  p=dict(pt if terminal is None else terminal);p['StandardOutputContent']=wire(w,r)
+  return c.positive_binding(driver,binding,ws,wt,ps,p)
+ def positive():
+  selected,boot=consume();assert selected['bytes']==12345 and selected['whole_status']=='Failed'
+  assert selected['whole_response_code']==1 and selected['product_complete_claimed'] is False and boot==wrapper['boot_id']
+ check('real_pack_select_producer_to_new_binding_preserves_failed_whole_and_positive_archive',positive)
+ def no_archive():assert consume(wrapper,None)==(None,None)
+ check('real_pack_select_valid_no_archive_stays_None',no_archive)
+ for label,w,r,t in [
+  ('unconfirmed_probe_terminal',wrapper,receipt,dict(pt,Status='InProgress')),
+  ('mixed_probe_CID',wrapper,receipt,dict(pt,CommandId=str(uuid.uuid4()))),
+  ('stale_configuration',dict(wrapper,configuration_sha256='3'*64),receipt,None),
+  ('different_archive_path',wrapper,dict(receipt,archive=binding.ARCHIVE+'.other'),None),
+  ('wire_above_unchanged_24MiB',wrapper,dict(receipt,bytes=24*1024*1024),None)]:
+  check('refuse_'+label,lambda w=w,r=r,t=t:rejected(lambda:consume(w,r,t)))
+ selected,boot=consume()
+ def command_only():
+  with c.qualified_runtime(driver) as (_,core,stream,raw,_):
+   ref=stream.Reference('ACTUAL_CURRENT_CASE_ARCHIVE',selected['remote_path'],selected['bytes'],selected['sha256'])
+   cmd=c.remote_command(raw,c.STREAM[1],ref,str(uuid.uuid4()),boot,time.monotonic()+900)
+   argv=shlex.split(cmd);assert argv[:6]==['sudo','-n','/usr/bin/python3.12','-I','-S','-B']
+   ast.parse(argv[-1]);assert 'ACTUAL_CURRENT_CASE_ARCHIVE' in argv[-1]
+   rejected(lambda:c.remote_command(raw,'0'*64,ref,str(uuid.uuid4()),boot,time.monotonic()+900),'SELECTED_SESSION_REMOTE_SOURCE_PIN')
+ check('new_remote_command_exact_stream_source_and_explicit_current_reference_syntax_only',command_only)
+ def primary_preserved():
+  old_q,old_receive=c.qualified_runtime,c.receive_bound
+  primary=KeyboardInterrupt('explicit CPU primary');secondary=OSError('explicit CPU cleanup')
+  class R:
+   def reconcile_cleanup_once(self):raise secondary
+  @contextmanager
+  def injected_q(d):yield object(),object(),object(),b'',R()
+  def fail(*a):raise primary
+  c.qualified_runtime=injected_q;c.receive_bound=fail
+  values={};driver.put=lambda n,v:values.setdefault(n,v)
+  try:
+   actual_pt=dict(pt,StandardOutputContent=wire(wrapper,receipt))
+   try:c.collect(driver,binding,ws,wt,ps,actual_pt)
+   except KeyboardInterrupt as error:
+    assert error is primary and error.mutation_uncertain is True
+    assert any('Independent own-Session cleanup' in note for note in error.__notes__)
+   else:raise AssertionError('original BaseException was lost')
+  finally:c.qualified_runtime=old_q;c.receive_bound=old_receive
+ check('injected_original_BaseException_identity_preserved_through_cleanup_error_no_stop',primary_preserved)
+ assert api==[]
+fds_after=sorted(os.listdir('/proc/self/fd'));assert fds_before==fds_after
+result={'schema':'selected-current-archive-session-unintegrated-component-CPU/1','at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+ 'source':pin(HERE/'selected_archive_session.py'),'harness':pin(pathlib.Path(__file__)),
+ 'dependencies':[pin(OLD/'driver.py'),pin(OLD/'archive_binding.py'),pin(CORE),pin(STREAM)],
+ 'cases':cases,'checks':len(cases),'failures':0,'elapsed_seconds':time.monotonic()-started,
+ 'runtime':{'UID':os.getuid(),'EUID':os.geteuid(),'Python':sys.version,'executable':sys.executable,'isolated':sys.flags.isolated,
+  'no_site':sys.flags.no_site,'dont_write_bytecode':sys.dont_write_bytecode},'FD_before':fds_before,'FD_after':fds_after,
+ 'AWS_API_calls':api,'actual_wire_receipts':False,'synthetic_metadata_CPU_only':True,
+ 'real_driver_main_or_qualified_entry_used':False,'original_stream_sender_or_receiver_executed':False,
+ 'live_driver_integrated':False,'new_actual_generation_bound':False,'operational_ready':False,'product_success':False}
+out=HERE/'component-CPU-receipt-v1.json'
+with out.open('x',encoding='utf-8') as f:json.dump(result,f,ensure_ascii=False,indent=2);f.write('\n')
+print(json.dumps({'receipt':str(out),'checks':len(cases),'failures':0,'operational_ready':False}))

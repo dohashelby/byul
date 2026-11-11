@@ -1,0 +1,436 @@
+{
+  "scope": "EXPLICIT_SYNTHETIC_CPU_NEW_B_OBSERVATION_ONLY",
+  "native": {
+    "argv": [
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v1/venv/bin/python",
+      "-I",
+      "-S",
+      "-B",
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/sup16-preseal-inventory-20261111-v1/cpu_contract_v1_2.py",
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/sup16-preseal-inventory-20261111-v1/capture_normal.py",
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/sup16-preseal-inventory-20261111-v1/cpu-v1_2.json"
+    ],
+    "executable": "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v1/venv/bin/python",
+    "uid": 1000,
+    "gid": 1000,
+    "python": "3.12.3",
+    "flags": {
+      "I": 1,
+      "S": 1,
+      "B": true
+    },
+    "source_sha256": "f868ee1d9c4bbb0c56c981691d08b91476408aa93c34239193846eaeeed6df96",
+    "harness_sha256": "7c1e7e73a22587324d65c598bff40531ee363065d6c83f68b64e59dcbe931933",
+    "original_inventory_module_sha256": "38526674e8df7de6b25499e924f30c4ed6e94e3346ff944249a5fee00de467e1",
+    "native_inventory_program_sha256": "1046b712c6184475fd9020b1c496695cd802e3f9efbea6028d5d4d42ebfffac2",
+    "CPU_image_id": "sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f"
+  },
+  "cases": [
+    {
+      "name": "basic",
+      "passed": true,
+      "detail": {
+        "calls": [
+          "snapshot",
+          "native_inventory",
+          "seal",
+          "capture"
+        ],
+        "deadline_unchanged": true,
+        "observation": {
+          "stage": "before_seal",
+          "producer_returned": true,
+          "started_monotonic_ns": 410767537531176,
+          "producer_result": {
+            "metadata": {
+              "directory_after": {
+                "device": 2096,
+                "inode": 5852828,
+                "mode": 448,
+                "mtime_ns": 1794366817382482106,
+                "uid": 1000
+              },
+              "directory_before": {
+                "device": 2096,
+                "inode": 5852828,
+                "mode": 448,
+                "mtime_ns": 1794366817382482106,
+                "uid": 1000
+              },
+              "directory_stable": true,
+              "files": [
+                {
+                  "bytes": 37,
+                  "ctime_ns": 1794366817382482106,
+                  "device": 2096,
+                  "inode": 5852834,
+                  "mode": 384,
+                  "mtime_ns": 1794366817382482106,
+                  "pid": 1,
+                  "regular": true,
+                  "start_ticks": 41076855,
+                  "uid": 1000
+                }
+              ],
+              "files_truncated": false,
+              "processes": [
+                {
+                  "boot_sha256": "31fac7ca32d7dd4a63613efeb35ce82d8d9da1106629843ed83378c59e798289",
+                  "parent_pid": 0,
+                  "pid": 1,
+                  "pid_namespace": 4026533651,
+                  "same_executable": true,
+                  "start_ticks": 41076855,
+                  "time_namespace": 4026531834,
+                  "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+                  "uid": 1000
+                }
+              ],
+              "processes_truncated": false,
+              "schema": "guard-lifecycle-session-inventory/1",
+              "sealed": false,
+              "session": "a431b09c7700407da532901f36dea44b",
+              "unknown_entries": 0,
+              "unreadable_pids": []
+            },
+            "owner": {
+              "identity_scope": "CPU substitute; no Kubernetes/API identity",
+              "started_at_sha256": "383e6a261960702fc811ffdd029447d96564abb03e39df191c687842dff38c62"
+            },
+            "owner_stable": true,
+            "capture_sha256": "a075c1722fabda852f9235148dce32aaa5ae11e3e6f7a565c1a2d80fa5777a6a",
+            "bytes": 937
+          },
+          "finished_monotonic_ns": 410770148838327
+        },
+        "first_client_failure": {
+          "attempted": false,
+          "saved": false
+        },
+        "native_CPU": {
+          "uid": 1000,
+          "gid": 1000,
+          "pid": 1,
+          "start_ticks": 41076855,
+          "boot_sha256": "31fac7ca32d7dd4a63613efeb35ce82d8d9da1106629843ed83378c59e798289",
+          "file": {
+            "device": 2096,
+            "inode": 5852834,
+            "mode": 384,
+            "uid": 1000,
+            "bytes": 37,
+            "mtime_ns": 1794366817382482106,
+            "ctime_ns": 1794366817382482106
+          },
+          "python": "3.12.14",
+          "flags": {
+            "I": 1,
+            "S": 1,
+            "B": true
+          }
+        }
+      }
+    },
+    {
+      "name": "unsupported-entry",
+      "passed": true,
+      "detail": {
+        "calls": [
+          "snapshot",
+          "native_inventory",
+          "seal",
+          "capture"
+        ],
+        "deadline_unchanged": true,
+        "observation": {
+          "stage": "before_seal",
+          "producer_returned": true,
+          "started_monotonic_ns": 410770150451482,
+          "producer_result": {
+            "metadata": {
+              "directory_after": {
+                "device": 2096,
+                "inode": 5852832,
+                "mode": 448,
+                "mtime_ns": 1794366819685230834,
+                "uid": 1000
+              },
+              "directory_before": {
+                "device": 2096,
+                "inode": 5852832,
+                "mode": 448,
+                "mtime_ns": 1794366819685230834,
+                "uid": 1000
+              },
+              "directory_stable": true,
+              "files": [
+                {
+                  "bytes": 37,
+                  "ctime_ns": 1794366819677026339,
+                  "device": 2096,
+                  "inode": 5852840,
+                  "mode": 384,
+                  "mtime_ns": 1794366819677026339,
+                  "pid": 1,
+                  "regular": true,
+                  "start_ticks": 41077098,
+                  "uid": 1000
+                }
+              ],
+              "files_truncated": false,
+              "processes": [
+                {
+                  "boot_sha256": "31fac7ca32d7dd4a63613efeb35ce82d8d9da1106629843ed83378c59e798289",
+                  "parent_pid": 0,
+                  "pid": 1,
+                  "pid_namespace": 4026533651,
+                  "same_executable": true,
+                  "start_ticks": 41077098,
+                  "time_namespace": 4026531834,
+                  "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+                  "uid": 1000
+                }
+              ],
+              "processes_truncated": false,
+              "schema": "guard-lifecycle-session-inventory/1",
+              "sealed": false,
+              "session": "41d1fba02b7049e0bd8e37a924d8a462",
+              "unknown_entries": 1,
+              "unreadable_pids": []
+            },
+            "owner": {
+              "identity_scope": "CPU substitute; no Kubernetes/API identity",
+              "started_at_sha256": "383e6a261960702fc811ffdd029447d96564abb03e39df191c687842dff38c62"
+            },
+            "owner_stable": true,
+            "capture_sha256": "5f8891865c78c1f084dbe02615ed18a1cf5f33d544a4abcaa605fe0131dcfdd7",
+            "bytes": 937
+          },
+          "finished_monotonic_ns": 410772275990556
+        },
+        "first_client_failure": {
+          "attempted": false,
+          "saved": false
+        },
+        "native_CPU": {
+          "uid": 1000,
+          "gid": 1000,
+          "pid": 1,
+          "start_ticks": 41077098,
+          "boot_sha256": "31fac7ca32d7dd4a63613efeb35ce82d8d9da1106629843ed83378c59e798289",
+          "file": {
+            "device": 2096,
+            "inode": 5852840,
+            "mode": 384,
+            "uid": 1000,
+            "bytes": 37,
+            "mtime_ns": 1794366819677026339,
+            "ctime_ns": 1794366819677026339
+          },
+          "python": "3.12.14",
+          "flags": {
+            "I": 1,
+            "S": 1,
+            "B": true
+          }
+        }
+      }
+    },
+    {
+      "name": "native-error",
+      "passed": true,
+      "detail": {
+        "calls": [
+          "snapshot",
+          "native_inventory",
+          "seal"
+        ],
+        "deadline_unchanged": true,
+        "observation": {
+          "stage": "before_seal",
+          "producer_returned": false,
+          "started_monotonic_ns": 410772277285868,
+          "error": {
+            "type": "ValueError",
+            "message": "LIFECYCLE_INVENTORY_TRANSPORT_INVALID",
+            "errno": null
+          },
+          "finished_monotonic_ns": 410774653293510
+        },
+        "first_client_failure": {
+          "attempted": true,
+          "saved": true,
+          "metadata": {
+            "path": "/tmp/s5-preseal-native-nbpr5ly4/native-error/private/first-client-failure/first-failure.json",
+            "bytes": 1781,
+            "sha256": "44d6a5305eefdfbf170c269eae727dc4a84edf283310996a23f7a66e5d51d928",
+            "dev": 2096,
+            "inode": 5852816,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": "0o600",
+            "nlink": 1
+          },
+          "stderr": {
+            "path": "/tmp/s5-preseal-native-nbpr5ly4/native-error/private/first-client-failure/stderr.raw",
+            "bytes": 86,
+            "sha256": "770a166abd05ea5420d07e72a6a446e8ef06d94f0a6eb51ff882007ceca20d8e",
+            "dev": 2096,
+            "inode": 5852815,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": "0o600",
+            "nlink": 1
+          }
+        },
+        "native_CPU": {
+          "uid": 1000,
+          "gid": 1000,
+          "pid": 1,
+          "start_ticks": 41077296,
+          "boot_sha256": "31fac7ca32d7dd4a63613efeb35ce82d8d9da1106629843ed83378c59e798289",
+          "file": {
+            "device": 2096,
+            "inode": 5852845,
+            "mode": 384,
+            "uid": 1000,
+            "bytes": 37,
+            "mtime_ns": 1794366821512069361,
+            "ctime_ns": 1794366821512069361
+          },
+          "python": "3.12.14",
+          "flags": {
+            "I": 1,
+            "S": 1,
+            "B": true
+          }
+        },
+        "original_seal_exception_same_object": true
+      }
+    },
+    {
+      "name": "FDs_restored",
+      "passed": true,
+      "before": 4,
+      "after": 4
+    }
+  ],
+  "checks": 4,
+  "failures": [],
+  "CPU_containers": [
+    {
+      "name": "byul-s5-preseal-926c63e5cfeb40948b4a0f1cda31ce00",
+      "argv": [
+        "docker",
+        "run",
+        "-i",
+        "--rm",
+        "--name",
+        "byul-s5-preseal-926c63e5cfeb40948b4a0f1cda31ce00",
+        "--label",
+        "byul.s5.cpu=preseal",
+        "--network",
+        "none",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--pids-limit",
+        "32",
+        "--memory",
+        "128m",
+        "--cpus",
+        "1",
+        "--user",
+        "1000:1000",
+        "--mount",
+        "type=bind,src=/tmp/s5-preseal-native-nbpr5ly4/basic/data,dst=/guard-lifecycle/data",
+        "sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f",
+        "python",
+        "-I",
+        "-S",
+        "-B",
+        "-c",
+        "\nimport hashlib,json,os,stat,subprocess,sys\nfrom pathlib import Path\np=json.loads(sys.stdin.buffer.read(131072))\nsession=p['session'];root=Path('/guard-lifecycle/data')/session\nroot.mkdir(mode=0o700)\nticks=int(Path('/proc/self/stat').read_text().rsplit(') ',1)[1].split()[19])\njournal=root/('pid-%s-%s.jsonl'%(os.getpid(),ticks))\nfd=os.open(journal,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)\nos.write(fd,b'EXPLICIT_SYNTHETIC_CPU_METADATA_ONLY\\n');os.close(fd)\nif p['case']=='unsupported-entry':(root/'unsupported.fixture').write_bytes(b'CPU_ONLY')\nif p['case']=='native-error':root.chmod(0o777)\nfacts=os.stat(journal)\nnative={'uid':os.getuid(),'gid':os.getgid(),'pid':os.getpid(),'start_ticks':ticks,\n        'boot_sha256':hashlib.sha256(Path('/proc/sys/kernel/random/boot_id').read_bytes()).hexdigest(),\n        'file':{'device':facts.st_dev,'inode':facts.st_ino,'mode':stat.S_IMODE(facts.st_mode),\n                'uid':facts.st_uid,'bytes':facts.st_size,'mtime_ns':facts.st_mtime_ns,'ctime_ns':facts.st_ctime_ns},\n        'python':sys.version.split()[0],'flags':{'I':sys.flags.isolated,'S':sys.flags.no_site,'B':sys.dont_write_bytecode}}\nr=subprocess.run([sys.executable,'-I','-S','-B','-c',p['program'],session],capture_output=True,timeout=5)\nassert len(r.stdout)<=65536 and len(r.stderr)<=4096\nprint(json.dumps({'returncode':r.returncode,'stdout':r.stdout.decode(),'stderr':r.stderr.decode(),'native':native}))\n"
+      ],
+      "returncode": 0,
+      "removed": true
+    },
+    {
+      "name": "byul-s5-preseal-e12a4f082afc4d799a84b2ad98fcc845",
+      "argv": [
+        "docker",
+        "run",
+        "-i",
+        "--rm",
+        "--name",
+        "byul-s5-preseal-e12a4f082afc4d799a84b2ad98fcc845",
+        "--label",
+        "byul.s5.cpu=preseal",
+        "--network",
+        "none",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--pids-limit",
+        "32",
+        "--memory",
+        "128m",
+        "--cpus",
+        "1",
+        "--user",
+        "1000:1000",
+        "--mount",
+        "type=bind,src=/tmp/s5-preseal-native-nbpr5ly4/unsupported-entry/data,dst=/guard-lifecycle/data",
+        "sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f",
+        "python",
+        "-I",
+        "-S",
+        "-B",
+        "-c",
+        "\nimport hashlib,json,os,stat,subprocess,sys\nfrom pathlib import Path\np=json.loads(sys.stdin.buffer.read(131072))\nsession=p['session'];root=Path('/guard-lifecycle/data')/session\nroot.mkdir(mode=0o700)\nticks=int(Path('/proc/self/stat').read_text().rsplit(') ',1)[1].split()[19])\njournal=root/('pid-%s-%s.jsonl'%(os.getpid(),ticks))\nfd=os.open(journal,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)\nos.write(fd,b'EXPLICIT_SYNTHETIC_CPU_METADATA_ONLY\\n');os.close(fd)\nif p['case']=='unsupported-entry':(root/'unsupported.fixture').write_bytes(b'CPU_ONLY')\nif p['case']=='native-error':root.chmod(0o777)\nfacts=os.stat(journal)\nnative={'uid':os.getuid(),'gid':os.getgid(),'pid':os.getpid(),'start_ticks':ticks,\n        'boot_sha256':hashlib.sha256(Path('/proc/sys/kernel/random/boot_id').read_bytes()).hexdigest(),\n        'file':{'device':facts.st_dev,'inode':facts.st_ino,'mode':stat.S_IMODE(facts.st_mode),\n                'uid':facts.st_uid,'bytes':facts.st_size,'mtime_ns':facts.st_mtime_ns,'ctime_ns':facts.st_ctime_ns},\n        'python':sys.version.split()[0],'flags':{'I':sys.flags.isolated,'S':sys.flags.no_site,'B':sys.dont_write_bytecode}}\nr=subprocess.run([sys.executable,'-I','-S','-B','-c',p['program'],session],capture_output=True,timeout=5)\nassert len(r.stdout)<=65536 and len(r.stderr)<=4096\nprint(json.dumps({'returncode':r.returncode,'stdout':r.stdout.decode(),'stderr':r.stderr.decode(),'native':native}))\n"
+      ],
+      "returncode": 0,
+      "removed": true
+    },
+    {
+      "name": "byul-s5-preseal-ff573aa43d374ce69e7329126b08e010",
+      "argv": [
+        "docker",
+        "run",
+        "-i",
+        "--rm",
+        "--name",
+        "byul-s5-preseal-ff573aa43d374ce69e7329126b08e010",
+        "--label",
+        "byul.s5.cpu=preseal",
+        "--network",
+        "none",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--pids-limit",
+        "32",
+        "--memory",
+        "128m",
+        "--cpus",
+        "1",
+        "--user",
+        "1000:1000",
+        "--mount",
+        "type=bind,src=/tmp/s5-preseal-native-nbpr5ly4/native-error/data,dst=/guard-lifecycle/data",
+        "sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f",
+        "python",
+        "-I",
+        "-S",
+        "-B",
+        "-c",
+        "\nimport hashlib,json,os,stat,subprocess,sys\nfrom pathlib import Path\np=json.loads(sys.stdin.buffer.read(131072))\nsession=p['session'];root=Path('/guard-lifecycle/data')/session\nroot.mkdir(mode=0o700)\nticks=int(Path('/proc/self/stat').read_text().rsplit(') ',1)[1].split()[19])\njournal=root/('pid-%s-%s.jsonl'%(os.getpid(),ticks))\nfd=os.open(journal,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)\nos.write(fd,b'EXPLICIT_SYNTHETIC_CPU_METADATA_ONLY\\n');os.close(fd)\nif p['case']=='unsupported-entry':(root/'unsupported.fixture').write_bytes(b'CPU_ONLY')\nif p['case']=='native-error':root.chmod(0o777)\nfacts=os.stat(journal)\nnative={'uid':os.getuid(),'gid':os.getgid(),'pid':os.getpid(),'start_ticks':ticks,\n        'boot_sha256':hashlib.sha256(Path('/proc/sys/kernel/random/boot_id').read_bytes()).hexdigest(),\n        'file':{'device':facts.st_dev,'inode':facts.st_ino,'mode':stat.S_IMODE(facts.st_mode),\n                'uid':facts.st_uid,'bytes':facts.st_size,'mtime_ns':facts.st_mtime_ns,'ctime_ns':facts.st_ctime_ns},\n        'python':sys.version.split()[0],'flags':{'I':sys.flags.isolated,'S':sys.flags.no_site,'B':sys.dont_write_bytecode}}\nr=subprocess.run([sys.executable,'-I','-S','-B','-c',p['program'],session],capture_output=True,timeout=5)\nassert len(r.stdout)<=65536 and len(r.stderr)<=4096\nprint(json.dumps({'returncode':r.returncode,'stdout':r.stdout.decode(),'stderr':r.stderr.decode(),'native':native}))\n"
+      ],
+      "returncode": 0,
+      "removed": true
+    }
+  ],
+  "actual_R8_new_observations": 0,
+  "new_GPU_AWS": 0,
+  "archive_code_executed": false,
+  "A_source_modified": false,
+  "whole_CRC_repeated": false,
+  "product_complete": false
+}

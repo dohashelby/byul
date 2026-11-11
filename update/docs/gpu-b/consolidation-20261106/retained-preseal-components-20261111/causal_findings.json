@@ -1,0 +1,479 @@
+{
+  "version": "v1",
+  "at": "2026-11-11T03:37:38.226610+00:00",
+  "scope": "SUP16 GB12 exact-member causal read-only analysis",
+  "source": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+  "manifest": "ac423c8243af7b824bd66f7dadc5bd4ef5d827026a86d66f0c32dd28f3b4cf8b",
+  "original_experiment_boot": "78fd6444-4138-4b60-8833-333e14805550",
+  "original_native_boot_SHA": "80978da6304cc07c0f4439421e571b92320dc21083634688971772e911216de7",
+  "recovery_boot_not_substituted": true,
+  "S4_verification_reused": {
+    "S4_safeindex": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\gb12-original-archive-first-CRC-meaning-review-20261111-v1\\GB12-original1971-first-CRC-safe-member-index-v1.json",
+      "bytes": 764003,
+      "sha256": "5847c9e6938fc7f0f15b672bfe2a7502b918751e9ee2e980f91fdeeaf9379792"
+    },
+    "S4_manifest": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\gb12-original-archive-first-CRC-meaning-review-20261111-v1\\GB12-original-raw-manifest1970-exact-byte-SHA-check-v1.json",
+      "bytes": 1284,
+      "sha256": "c07c176a720f6416aff333c4a21fe844fcb5cfac3975b40e08a01e523390790e"
+    },
+    "S4_facts": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\gb12-original-archive-first-CRC-meaning-review-20261111-v1\\GB12-original-phase-provenance-first-failure-facts-v1.json",
+      "bytes": 100145,
+      "sha256": "7d1e43502ee70a397ca3cfc0d12128d9be4ea2e1929d002d440ad3f4ccdd222a"
+    }
+  },
+  "local_evidence": {
+    "step01-phase-analysis-receipts.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-gb12-causal-readonly-20261111-v1\\step01-phase-analysis-receipts.json",
+      "bytes": 35868,
+      "sha256": "010a21bdfb00e6d46b2e4acaa3bcacd3f1e14a1a4abba454489b5867e3bb898b"
+    },
+    "step02-phase-observe-terminal-summary.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-gb12-causal-readonly-20261111-v1\\step02-phase-observe-terminal-summary.json",
+      "bytes": 3444,
+      "sha256": "ac48c59bec0387e655a296963709addec983d96a8dc96b0a01cd5727888190f0"
+    },
+    "step04-corrected-original-cli-timeline.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-gb12-causal-readonly-20261111-v1\\step04-corrected-original-cli-timeline.json",
+      "bytes": 17361,
+      "sha256": "c361e68447a125a9aa7762825227e483ee3eb9b5064ec33c2d345c2347783b64"
+    },
+    "step07-actual-normal-pair-writer-outputs.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-gb12-causal-readonly-20261111-v1\\step07-actual-normal-pair-writer-outputs.json",
+      "bytes": 5259,
+      "sha256": "357b200c8f6b1175cb302f33cbbf275aaefe99f427160d9842473179bcd77bd8"
+    },
+    "step08-capture-journal-first-last-events.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-gb12-causal-readonly-20261111-v1\\step08-capture-journal-first-last-events.json",
+      "bytes": 83663,
+      "sha256": "baf5a850ff7a5d43e62cc78848710cd8aa05d9e521fa4b8289ea6753cc92252a"
+    },
+    "step09-first-failure-wire-result.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-gb12-causal-readonly-20261111-v1\\step09-first-failure-wire-result.json",
+      "bytes": 3305,
+      "sha256": "7b832fd952b2b142811da56993abecf614ee361fcdb5bcd9bffcd4e86601bea6"
+    },
+    "SUP-16-original-2cb.CheckDef.source.txt": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-gb12-causal-readonly-20261111-v1\\SUP-16-original-2cb.CheckDef.source.txt",
+      "bytes": 4422,
+      "sha256": "482996c0386654117bf45d613e7f8f032027a306e3e4dabf14e484f5884a8621"
+    },
+    "actual-pair.py.source.txt": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-gb12-causal-readonly-20261111-v1\\actual-pair.py.source.txt",
+      "bytes": 6896,
+      "sha256": "ed9616091017c486cba9bb8e1b804969e6f1944c5fdbbd4b6c7408fa009bb519"
+    },
+    "original-kubernetes_supply_boot.py.source.txt": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-gb12-causal-readonly-20261111-v1\\original-kubernetes_supply_boot.py.source.txt",
+      "bytes": 14625,
+      "sha256": "a845602875402b4f6868752161389af081357114ff64cf2f64120d655c898486"
+    },
+    "original-supply_boot_contract.py.source.txt": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-gb12-causal-readonly-20261111-v1\\original-supply_boot_contract.py.source.txt",
+      "bytes": 13395,
+      "sha256": "23d0c7befe31de52888131b64459d37e3f277480031d7e741902525a33aff697"
+    },
+    "original-lifecycle-collector.py.source.txt": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-gb12-causal-readonly-20261111-v1\\original-lifecycle-collector.py.source.txt",
+      "bytes": 23526,
+      "sha256": "d7ea97b41c19ba2acc4d29517911a2e5b6bc041dd4fc89484ba31ccfa2441fe2"
+    }
+  },
+  "phases": [
+    {
+      "phase": "normal-before",
+      "source": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+      "ENV_ref": {
+        "id": "ENV-01M73EPQPHQ69YQ1XYJWWAYRDK",
+        "kind": "ENV",
+        "revision": 1,
+        "sha256": "5d0afd68437ea199e90ebfb7fa196694932a6637048056f6c28dd7b5d2471318"
+      },
+      "session": "8502daf7a38d4d0f935fac6ff4a3ca28",
+      "analysis_ref": {
+        "member": "runtime/normal-before/capture/native-analysis.json",
+        "bytes": 4237,
+        "compressed_bytes": 1414,
+        "sha256": "979608c01339e9d9f838c4cf9e7689790a1061f98e53a5f7a1548666f6427778",
+        "CRC32": "546f9bf8",
+        "CRC_match": true,
+        "unix_mode": 384,
+        "is_directory": false,
+        "safe_relative_path": true
+      },
+      "receipt_ref": {
+        "member": "runtime/normal-before/capture/capture-receipt.json",
+        "bytes": 3309,
+        "compressed_bytes": 1123,
+        "sha256": "49c4ab9b0528598ceaf8c40076d23ef33ef23d5b3619dda727bce9d664654724",
+        "CRC32": "c13cb541",
+        "CRC_match": true,
+        "unix_mode": 384,
+        "is_directory": false,
+        "safe_relative_path": true
+      },
+      "capture_ref": {
+        "member": "runtime/normal-before/capture/capture.json",
+        "bytes": 2116414,
+        "compressed_bytes": 133846,
+        "sha256": "1112e2a7d2f12044bf0251188b98f2b36ea6f1fbf74b6a934ab16db25b5d6102",
+        "CRC32": "00209f09",
+        "CRC_match": true,
+        "unix_mode": 384,
+        "is_directory": false,
+        "safe_relative_path": true
+      },
+      "observe_terminal_ref": {
+        "member": "operator/normal-before/phase-normal-terminal.json",
+        "bytes": 29472298,
+        "compressed_bytes": 2143350,
+        "sha256": "70c89ef256531ea091730d9018b46fea89f6d563e29be32251d5ce83d675cc29",
+        "CRC32": "ad00bdff",
+        "CRC_match": true,
+        "unix_mode": 384,
+        "is_directory": false,
+        "safe_relative_path": true
+      },
+      "candidate_count": 1,
+      "candidate_processes": [
+        {
+          "pid": 98,
+          "start_ticks": 30589,
+          "recording": 2,
+          "full_FD_read": true,
+          "reference_bytes": 250500968,
+          "read_return_bytes": 250500968,
+          "read_SHA": "077edec6c7a19ddbcbee084d4763a63b72293cee16837cdfcd4b95f7b9f51251",
+          "root_operation_pairs_complete": false,
+          "root_exhausted": false
+        }
+      ],
+      "security": "UNKNOWN",
+      "producer_authenticated": false,
+      "declared_reference_origin": "EXAMPLE",
+      "seal": {
+        "sealed": true
+      },
+      "transport_gap": false,
+      "original_error": null,
+      "publication_finished_UTC": "2026-11-10T19:24:42.421903+00:00",
+      "capture_started_UTC": "2026-11-10T19:26:17.173057+00:00",
+      "publication_to_capture_seconds": 94.751154,
+      "recordings": 3,
+      "inventory_files": 3,
+      "engine_processes_without_recording": [
+        {
+          "pid": 97,
+          "start_ticks": 30589
+        }
+      ],
+      "journal_ends": [
+        {
+          "pid": 1,
+          "start_ticks": 23775,
+          "START_monotonic_ns": 280978504101,
+          "END_monotonic_ns": 347563474350,
+          "END_reason": "SEALED",
+          "events": 27
+        },
+        {
+          "pid": 71,
+          "start_ticks": 28400,
+          "START_monotonic_ns": 299198806952,
+          "END_monotonic_ns": 300691626384,
+          "END_reason": "PROCESS_EXIT",
+          "events": 8
+        },
+        {
+          "pid": 98,
+          "start_ticks": 30589,
+          "START_monotonic_ns": 320474731878,
+          "END_monotonic_ns": 332439697500,
+          "END_reason": "BOUND_REACHED",
+          "events": 1176
+        }
+      ]
+    },
+    {
+      "phase": "challenge-partial",
+      "source": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+      "ENV_ref": {
+        "id": "ENV-01M73EWE9JQV7T89XGDAAC8STD",
+        "kind": "ENV",
+        "revision": 1,
+        "sha256": "28d087fb407ebd4fcd02a10b07d7ac541a373f587d2715aa566bf92c0979ad7c"
+      },
+      "session": "fa5761b3d76347cb9c30b702bc69419f",
+      "analysis_ref": {
+        "member": "runtime/challenge-partial/capture/native-analysis.json",
+        "bytes": 1595,
+        "compressed_bytes": 773,
+        "sha256": "27110f1cbc8932a46f4459b9d880eece5da52cfce0dab4255ff63366251a3e39",
+        "CRC32": "e39d001f",
+        "CRC_match": true,
+        "unix_mode": 384,
+        "is_directory": false,
+        "safe_relative_path": true
+      },
+      "receipt_ref": {
+        "member": "runtime/challenge-partial/capture/capture-receipt.json",
+        "bytes": 2790,
+        "compressed_bytes": 1381,
+        "sha256": "ca17c72b667c02c7db5d00cb319cb13ecf6f503c523938c5ceefcf8b39f90758",
+        "CRC32": "32c9169c",
+        "CRC_match": true,
+        "unix_mode": 384,
+        "is_directory": false,
+        "safe_relative_path": true
+      },
+      "capture_ref": {
+        "member": "runtime/challenge-partial/capture/capture.json",
+        "bytes": 5192,
+        "compressed_bytes": 1458,
+        "sha256": "9774f2c7f1f3c07e754802f46d52d3a49d5d8da383dc4088873e996b2f3a3710",
+        "CRC32": "532e87b5",
+        "CRC_match": true,
+        "unix_mode": 384,
+        "is_directory": false,
+        "safe_relative_path": true
+      },
+      "observe_terminal_ref": {
+        "member": "operator/challenge-partial/phase-normal-terminal.json",
+        "bytes": 4160961,
+        "compressed_bytes": 544625,
+        "sha256": "fa04065378294c58dd5b6a24ffae10281866e7b790a3261dd6207da8dc9a1dbd",
+        "CRC32": "d03c0309",
+        "CRC_match": true,
+        "unix_mode": 384,
+        "is_directory": false,
+        "safe_relative_path": true
+      },
+      "candidate_count": 0,
+      "candidate_processes": [],
+      "security": "UNKNOWN",
+      "producer_authenticated": false,
+      "declared_reference_origin": "EXAMPLE",
+      "seal": {
+        "sealed": false
+      },
+      "transport_gap": true,
+      "original_error": "ValueError('SUP16_JOIN_ONE_ACTUAL_CANDIDATE_REQUIRED')",
+      "publication_finished_UTC": "2026-11-10T19:27:49.135705+00:00",
+      "capture_started_UTC": "2026-11-10T19:27:50.874686+00:00",
+      "publication_to_capture_seconds": 1.738981,
+      "recordings": 0,
+      "inventory_files": 0,
+      "engine_processes_without_recording": [
+        {
+          "pid": 1,
+          "start_ticks": 42515
+        }
+      ],
+      "journal_ends": []
+    },
+    {
+      "phase": "normal-recovered",
+      "source": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+      "ENV_ref": {
+        "id": "ENV-01M73EYS1ZNY7W65K45VXN5TD4",
+        "kind": "ENV",
+        "revision": 1,
+        "sha256": "14599babf69026e9d6e8fb1972f38d4d544e771493ea7451174a7a14d0296c3b"
+      },
+      "session": "e90aae84276647f59a4155a8dd793f82",
+      "analysis_ref": {
+        "member": "runtime/normal-recovered/capture/native-analysis.json",
+        "bytes": 4237,
+        "compressed_bytes": 1414,
+        "sha256": "af83fdf0e4324a159b9359faf66f01d645f3c36ce843ea8beebcfec4b8115da6",
+        "CRC32": "c33a2973",
+        "CRC_match": true,
+        "unix_mode": 384,
+        "is_directory": false,
+        "safe_relative_path": true
+      },
+      "receipt_ref": {
+        "member": "runtime/normal-recovered/capture/capture-receipt.json",
+        "bytes": 3309,
+        "compressed_bytes": 1121,
+        "sha256": "eecbd6f5dccb15efeaffaf662ada6323d05c28340c3249c0bc9e810297fc29ff",
+        "CRC32": "78033656",
+        "CRC_match": true,
+        "unix_mode": 384,
+        "is_directory": false,
+        "safe_relative_path": true
+      },
+      "capture_ref": {
+        "member": "runtime/normal-recovered/capture/capture.json",
+        "bytes": 2116052,
+        "compressed_bytes": 135069,
+        "sha256": "2e95eeed0e5d7a72991ca52d8dee6b5da2e57e5929944ea9d9712e0cd25f6baf",
+        "CRC32": "82d06939",
+        "CRC_match": true,
+        "unix_mode": 384,
+        "is_directory": false,
+        "safe_relative_path": true
+      },
+      "observe_terminal_ref": {
+        "member": "operator/normal-recovered/phase-normal-terminal.json",
+        "bytes": 21903930,
+        "compressed_bytes": 1713915,
+        "sha256": "f777a1e47ffe10559733cd77a5a04da25d6f644f8f2e2a278e55375b4b46d61d",
+        "CRC32": "b7e50b64",
+        "CRC_match": true,
+        "unix_mode": 384,
+        "is_directory": false,
+        "safe_relative_path": true
+      },
+      "candidate_count": 1,
+      "candidate_processes": [
+        {
+          "pid": 98,
+          "start_ticks": 55088,
+          "recording": 2,
+          "full_FD_read": true,
+          "reference_bytes": 250500968,
+          "read_return_bytes": 250500968,
+          "read_SHA": "077edec6c7a19ddbcbee084d4763a63b72293cee16837cdfcd4b95f7b9f51251",
+          "root_operation_pairs_complete": false,
+          "root_exhausted": false
+        }
+      ],
+      "security": "UNKNOWN",
+      "producer_authenticated": false,
+      "declared_reference_origin": "EXAMPLE",
+      "seal": {
+        "sealed": true
+      },
+      "transport_gap": false,
+      "original_error": null,
+      "publication_finished_UTC": "2026-11-10T19:29:05.808722+00:00",
+      "capture_started_UTC": "2026-11-10T19:30:17.867939+00:00",
+      "publication_to_capture_seconds": 72.059217,
+      "recordings": 3,
+      "inventory_files": 3,
+      "engine_processes_without_recording": [
+        {
+          "pid": 97,
+          "start_ticks": 55088
+        }
+      ],
+      "journal_ends": [
+        {
+          "pid": 1,
+          "start_ticks": 50131,
+          "START_monotonic_ns": 530018396811,
+          "END_monotonic_ns": 588264486845,
+          "END_reason": "SEALED",
+          "events": 27
+        },
+        {
+          "pid": 71,
+          "start_ticks": 53224,
+          "START_monotonic_ns": 547388653114,
+          "END_monotonic_ns": 548927730441,
+          "END_reason": "PROCESS_EXIT",
+          "events": 8
+        },
+        {
+          "pid": 98,
+          "start_ticks": 55088,
+          "START_monotonic_ns": 565464788026,
+          "END_monotonic_ns": 574150962715,
+          "END_reason": "BOUND_REACHED",
+          "events": 1176
+        }
+      ]
+    }
+  ],
+  "first_failure": {
+    "role": "challenge-partial",
+    "guard": "SUP16_JOIN_ONE_ACTUAL_CANDIDATE_REQUIRED",
+    "where": "operator-code/join.py:253",
+    "outer_first_error_ref": {
+      "member": "operator/outer-first-error.txt",
+      "bytes": 986,
+      "compressed_bytes": 349,
+      "sha256": "31ede30d592104639767145dc593b5736d353aecdab57b9471cfb7497ce88ecc",
+      "CRC32": "315dc541",
+      "CRC_match": true,
+      "unix_mode": 384,
+      "is_directory": false,
+      "safe_relative_path": true
+    },
+    "wire_capsule_match": "step09 wire result와 원 first-client-failure의 requested/effective argv SHA 및 supervision/capture가 동일. 원 rows의 실패program=seal과 호출순서/한정성을 함께 사용. argv body가 직접 저장됐다고 주장하지 않음.",
+    "distinction": "candidate0 semantic guard와 앞선 seal transport capture_timeout을 독립 보존. 의도된 partial 거부로 정상화하지 않음."
+  },
+  "established": [
+    "실제 normal-before/challenge-partial/normal-recovered 세 phase 생성. 정상전후 observe 원오류null·candidate1/sealtrue, challenge만candidate0/sealfalse/gap 및 first guard error.",
+    "원 source 2cb·native sensor e32c/base2a058·원 R8 VM boot와 Ref를 결합. recovery성공/source현재publichead로 과거실행을 대체하지 않음.",
+    "정상전후 native PID98은 fullFD250500968B/referenceSHA 일치 관측을 남겼지만 END BOUND_REACHED·root operation/종료완료false. 모델/제품 완료 아님.",
+    "정상전후 pair writer는 local boot metadata2개만 생성. challenge는 guard 앞에서 중단해writer/boot-record/제품pair 연결이 없음.",
+    "CheckDef SUP16은 부분bytes소비 위반과 관측부재를 구분. 원collector는 challenge mismatch를 violation으로, boot/native unavailable을 missing으로 구성한다.",
+    "설치 후 capture까지1.738981s인 challenge와94.751154/72.059217s의정상전후 차이가 실제callerUTC에 존재. 인과 확정 또는 기한연장 근거로 전용하지 않음."
+  ],
+  "unproven": [
+    "challenge에서 실제sitecustomize/센서install 호출·반환, 최초hook/emit·Writer open/write·원errno는없다. files0이install실패라는 결론 불가.",
+    "나중SEALED=true는install시점marker 존재·실제원인 증명이 아니다. 원helper는seal후에첫inventory를읽어선행상태가없다.",
+    "원sealer는 빈session census를최대4초시도한뒤negative ACK를출력한다(원source83-95). 원실패root capture잔여3.625705922s와상호작용 가능하나 원격exec도달/실행시간trace가없어유일원인/실제4초실행으로확정하지않음.",
+    "preparation probe의Python3.12.3/sourcepin성공은enginePID1의후속importorigin/install반환이아니다. 정상source통과가challenge설치성공증거도아님."
+  ],
+  "CheckDef_and_registry_scope": {
+    "check": "SUP-16/revision3/supply-boot-partial-artifact-v1",
+    "pack_ref": {
+      "kind": "PACK",
+      "id": "PACK-BASELINE",
+      "revision": 33,
+      "sha256": "74219b48b241775e4c4fa153a950b2a94029147f512c731f055e91cf945cd5b6"
+    },
+    "normal_boot_rows": "normal role/change.appliedfalse/worker_consumption_claimedfalse, same ENV/target SHA local metadata",
+    "official_EVD_RES_RPT_created": 0,
+    "Store_DB_restore_or_POL_rejudgment": 0,
+    "old_R8_FAIL_UNKNOWN_or_Ref_changed": false
+  },
+  "B_minimal_preparation": {
+    "source": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\capture_normal.py",
+    "sha256": "f868ee1d9c4bbb0c56c981691d08b91476408aa93c34239193846eaeeed6df96",
+    "purpose": "기존inventory의선행SEALED/files/PID-start/boot/FD 원반환·오류를새before_seal진단필드에보존. 과거없는관측을채우지않음.",
+    "original_guard_deadline_and_A_source_unchanged": true,
+    "runtime_selection_owner": "S2. 아직 NOT_READY/실GPU실행0."
+  },
+  "A_single_writer_handoff": [
+    {
+      "git_path": "update/src/guard/collectors/lifecycle.py",
+      "commit": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+      "lines": "54-66",
+      "boundary": "생성sitecustomize가module.install() 반환을버리고예외를pass. 실제enginePID내 install도달/반환과원예외type·errno의bounded sidechannel이필요."
+    },
+    {
+      "git_path": "update/src/guard/adapters/vllm_file_read_sensor.py",
+      "sha256": "e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d",
+      "lines": "221-228",
+      "boundary": "_private_base 및base.install 실패를False로흡수. 실제PID/start/boot·단계·반환·원예외필드 필요. B외부새Python검사를원호출관측으로대체할수없음."
+    },
+    {
+      "git_path": "update/src/guard/adapters/vllm_lifecycle_sensor.py",
+      "sha256": "2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd",
+      "lines": "255-272,334-336,374-397,1032-1052",
+      "boundary": "지연Writer/emit예외흡수/설치false분기. 실제첫emit도달·Writer open/START/write 시도/원errno 및설치시점SEALED를동일enginePID/start/boot/importorigin으로관측해야함. 상한/판정완화 없이A담당 설계·단일작성 필요."
+    }
+  ],
+  "next_runtime_command_scope": "S2가새fixedpacket의실제ENVtarget/요청·boot·root source2cb/ac423과수정helper/closure를검토후결합해resolver bind-commands stage=capture가생성하는argv만사용. 과거3b3전사argv나손명령으로실행하지않음. A변경이선정되면별도source/profile/asset SHA검토를담당에게인계.",
+  "intermediate_note": "step03의selected_cli는숫자prefix미처리한분석중간값이며step04원label대조로대체. step03 probe/installer내용은원문값이다.",
+  "counts": {
+    "whole_CRC_repeat": 0,
+    "archive_code_execution": 0,
+    "new_GPU_AWS": 0,
+    "A_common_code_edits": 0,
+    "actual_R8_new_observations": 0
+  },
+  "continuation_gate": {
+    "read_only_causal_scope_complete": true,
+    "actual_cause": "challenge source/install/first-emission 원인은미확정",
+    "independent_B_delta": "f868/preseal+codepinclosure+새영향CPU 진행·S4후속검토와S2metadata결합",
+    "next_owner": "B관측준비 S5, 운영 S2, A반환/상한관측은A단일작성담당·총괄",
+    "automatic_monitoring": false
+  }
+}

@@ -1,0 +1,167 @@
+"""Current-case positive archive binding -> reused fixed Session transport.
+
+No CLI/main/API on import. No path/size/SHA override interface or GET fallback.
+The original driver remains the only normal-stop owner; Recovery.run_once is unused.
+"""
+from contextlib import contextmanager
+from pathlib import Path
+from types import SimpleNamespace,ModuleType
+import base64,datetime,hashlib,json,re,shlex,sys,time,uuid
+
+BASE='/home/ubuntu/byul-gpu-b-tp2-20261103/'
+IID='i-05e8da8ea99593196'
+CORE=(23600,'ab804382e3f2a9d15bfeba8dbcaa5155f417b807fb468104ba6423088939681d')
+STREAM=(19502,'8e2261a0162271288397f962526a9086cc1edf0b983ff6bc4c941fae3bf039e7')
+STREAM_CAP=24*1024*1024
+sha=lambda b:hashlib.sha256(b).hexdigest()
+
+def require(ok,code):
+ if not ok:raise ValueError(code)
+
+def same_packet(runtime):
+ require(runtime.packet is runtime.driver.PACKET,'SELECTED_SESSION_SAME_DRIVER_PACKET_REQUIRED')
+
+@contextmanager
+def qualified_runtime(driver):
+ """Consume the original driver's actual checked-file loader and packet object."""
+ names=('s2_selected_session_fixed_core','s2_selected_session_fixed_stream')
+ missing=object();saved={n:sys.modules.get(n,missing) for n in names}
+ try:
+  modules=[];raws=[]
+  for name,filename,expected in zip(names,('session_core.py','gb12_stream.py'),(CORE,STREAM)):
+   pin=driver.PACKET['local_files'][filename]
+   require((pin['bytes'],pin['sha256'])==expected,'SELECTED_SESSION_FIXED_DEPENDENCY_PIN')
+   raw=driver.checked_file(filename,pin);require((len(raw),sha(raw))==expected,'SELECTED_SESSION_FIXED_DEPENDENCY_BYTES')
+   m=ModuleType(name);m.__file__=str(driver.OUT/filename);sys.modules[name]=m
+   exec(compile(raw,m.__file__,'exec'),m.__dict__);modules.append(m);raws.append(raw)
+  core,stream=modules
+  runtime=SimpleNamespace(driver=driver,adapter=driver.boto3,packet=driver.PACKET,root=driver.OUT)
+  same_packet(runtime)
+  recovery=core.Recovery(runtime,stream,raws[1],driver.PACKET['local_files']['gb12_stream.py'])
+  require(recovery.rt is runtime and recovery.driver is driver and recovery.rt.packet is driver.PACKET,'SELECTED_SESSION_QUALIFIED_CONSTRUCTOR_IDENTITY')
+  require(core.STREAM_CAP==STREAM_CAP and stream.CHUNK==12000,'SELECTED_SESSION_ORIGINAL_CAP_CHUNK_REQUIRED')
+  yield runtime,core,stream,raws[1],recovery
+ finally:
+  for n,prior in saved.items():
+   if prior is missing:sys.modules.pop(n,None)
+   else:sys.modules[n]=prior
+
+def wire_upper_bound(size):
+ require(type(size) is int and size>0,'SELECTED_SESSION_POSITIVE_INTEGER_BYTES')
+ # D frame overhead <=160 bytes for fixed UUIDs, 12k chunks and <=512MiB archive.
+ # H/F+remote terminal+all banner allowance remain bounded below this reserve.
+ frames=(size+11999)//12000
+ return 4*((size+2)//3)+frames*160+8192+65536
+
+def positive_binding(driver,binding,whole_submission,whole_terminal,probe_submission,probe_terminal):
+ packet=driver.PACKET;scope=packet['selected_archive_session_scope']
+ expected=scope['remote_path'];name=scope['remote_name']
+ require(scope['instance_id']==driver.IID==IID and scope['GET_fallback'] is False,'SELECTED_SESSION_EXACT_TARGET_NO_FALLBACK')
+ require(type(name) is str and re.fullmatch(r'GB[0-9]{2,}-original-evidence\.zip',name) is not None
+  and expected==BASE+name and binding.ARCHIVE==expected,'SELECTED_SESSION_FROZEN_CURRENT_ARCHIVE_PATH')
+ prefix=packet['whole_argv_prefix'];actual=whole_submission['actual_argv']
+ require(type(actual) is list and actual[:len(prefix)]==prefix,'SELECTED_SESSION_CURRENT_WHOLE_PREFIX')
+ selected=binding.select_archive(whole_submission,whole_terminal,probe_submission,probe_terminal,
+  expected_whole_argv=actual,expected_probe_argv=packet['probe_argv'],configuration_sha256=packet['configuration_sha256'])
+ if selected is None:return None,None
+ require(selected['remote_path']==expected and selected['remote_name']==name,'SELECTED_SESSION_DISCOVERY_SCOPE')
+ require(selected['product_complete_claimed'] is False and wire_upper_bound(selected['bytes'])<=STREAM_CAP,'SELECTED_SESSION_ORIGINAL24MIB_WIRE_CAP')
+ # select_archive already validated this exact wire's positive current wrapper.
+ value=json.loads(binding.unpack(probe_terminal['StandardOutputContent']))
+ wrapper=value['wrapper'];boot=wrapper['boot_id']
+ require(str(uuid.UUID(boot))==boot and uuid.UUID(boot).int!=0,'SELECTED_SESSION_ACTUAL_WRAPPER_BOOT')
+ require(selected['whole_command_id']==whole_terminal['CommandId'] and selected['probe_command_id']==probe_terminal['CommandId'],'SELECTED_SESSION_CURRENT_CID_JOIN')
+ return selected,boot
+
+def remote_command(source,source_sha,reference,nonce,current_boot,guest_end):
+ require((len(source),sha(source))==STREAM and source_sha==STREAM[1],'SELECTED_SESSION_REMOTE_SOURCE_PIN')
+ # Reference is only produced from the bound current-case discovery, never CLI arguments.
+ data={'kind':reference.kind,'path':reference.path,'size':reference.size,'sha256':reference.sha256}
+ code='''import base64,hashlib,json,os,sys,types
+raw=base64.b64decode(SOURCE,validate=True)
+assert len(raw)==19502 and hashlib.sha256(raw).hexdigest()==SHA
+m=types.ModuleType('s2_fixed_selected_archive_sender');m.__file__='<fixed-selected-archive-stream>'
+sys.modules[m.__name__]=m;exec(compile(raw,m.__file__,'exec'),m.__dict__)
+ref=m.Reference(**REFERENCE);deadline=m.Deadline(END)
+assert m.boot_id()==BOOT
+rc=1;fd=sys.stdout.fileno();prior=os.get_blocking(fd)
+try:
+ os.set_blocking(fd,False)
+ m._send_reference(ref,NONCE,BOOT,deadline,lambda b:m.write_fd(fd,deadline,b));rc=0
+except BaseException:
+ rc=1
+finally:
+ os.set_blocking(fd,prior)
+ print('GB12_TERMINAL '+json.dumps({'nonce':NONCE,'source_sha256':SHA,'recovery_boot':BOOT,'sender_UID':os.getuid(),'sender_EUID':os.geteuid(),'returncode':rc},sort_keys=True,separators=(',',':')),flush=True)
+raise SystemExit(rc)
+'''
+ values={'SOURCE':repr(base64.b64encode(source).decode()),'SHA':repr(source_sha),'REFERENCE':repr(data),
+  'NONCE':repr(nonce),'BOOT':repr(current_boot),'END':repr(guest_end)}
+ for key,value in values.items():code=re.sub(r'\b'+key+r'\b',lambda _:value,code)
+ command=shlex.join(['sudo','-n','/usr/bin/python3.12','-I','-S','-B','-c',code])
+ require(len(command.encode())<=65535,'SELECTED_SESSION_MANAGED_COMMAND_BOUND')
+ return command
+
+def receive_bound(runtime,core,stream,source,recovery,selected,current_boot,output):
+ same_packet(runtime);driver=runtime.driver;nonce=str(uuid.uuid4())
+ core.canonical(nonce);core.canonical(current_boot)
+ ref=stream.Reference('ACTUAL_CURRENT_CASE_ARCHIVE',selected['remote_path'],selected['bytes'],selected['sha256'])
+ host_boot=core.boot();end=time.monotonic()+900
+ driver.put('selected-session-original-deadline.json',{'at':core.utc(),'host_boot':host_boot,'absolute_end':end,'seconds':900,'reset':False,
+  'binding':selected,'actual_wrapper_boot':current_boot,'request_nonce':nonce})
+ identity=runtime.adapter.assert_identity();core.require(identity['Account']==core.ACCOUNT,'ACCOUNT_REQUIRED')
+ core.remaining(end);recovery.owners=(identity['Arn'],identity['UserId'])
+ guest_end=recovery.clock_once(end,nonce,current_boot)
+ command=remote_command(source,STREAM[1],ref,nonce,current_boot,guest_end)
+ recovery.request=core.request_for(command,nonce)
+ driver.uncertainty_barrier('before-current-archive-session-once')
+ core.require(driver.states()[IID]=='running' and not driver.active_commands(),'SELECTED_RUNNING_IDLE_REQUIRED')
+ core.require(core.boot()==host_boot,'HOST_BOOT_CHANGED')
+ receiver=stream.Receiver(str(output),nonce,current_boot,stream.Deadline(end),reference=ref)
+ recovery.transcript=core.Transcript(receiver,nonce,STREAM[1],current_boot)
+ try:
+  recovery.started_after=datetime.datetime.now(datetime.timezone.utc).timestamp()
+  driver.put('start-session-once-intent.json',{'at':core.utc(),'request':recovery.request,
+   'request_sha256':core.sha(core.jb(recovery.request)),'actual_STS_owner_values':recovery.owners,'original_end':end,'host_boot':host_boot,
+   'current_archive_positive_binding':selected})
+  recovery.session_submitted=True
+  recovery.cli.invoke('start-session',recovery.request,end,recovery.transcript)
+  recovery.sid=recovery.transcript.sid
+  row=recovery.wait_original_session_terminal(end)
+  recovery.server_terminal=row['Status'] in ('Terminated','Failed') and row.get('EndDate') is not None
+  core.require(recovery.server_terminal and row['Status']=='Terminated','POSITIVE_ORIGINAL_SESSION_TERMINATED_REQUIRED')
+  core.require(core.boot()==host_boot,'HOST_BOOT_CHANGED');core.remaining(end)
+  result=receiver.finish()
+  driver.put('selected-archive-session-recovered.json',{'at':core.utc(),'current_positive_binding':selected,
+   'request_sha256':core.sha(core.jb(recovery.request)),'Session':row,'remote_terminal':recovery.transcript.marker,'receiver':result,
+   'old_GB12_or_R8_result_reused':False,'whole_archive_CRC_complete':False,'product_success':False})
+  return result
+ except BaseException as original:
+  try:receiver.abort()
+  except BaseException as cleanup:original.add_note('Receiver abort: '+type(cleanup).__name__)
+  raise
+
+def collect(driver,binding,whole_submission,whole_terminal,probe_submission,probe_terminal):
+ selected,current_boot=positive_binding(driver,binding,whole_submission,whole_terminal,probe_submission,probe_terminal)
+ driver.put('exact-new-archive-binding.json',{'at':driver.now(),'selected':selected,'static_old_archive_lookup_used':False,
+  'collector':'qualified-current-case-Session','actual_wrapper_boot':current_boot})
+ if selected is None:return False
+ folder=driver.OUT/'actual-original';folder.mkdir(mode=0o700)
+ output=folder/selected['remote_name'];original=None;result=None
+ with qualified_runtime(driver) as (runtime,core,stream,source,recovery):
+  try:result=receive_bound(runtime,core,stream,source,recovery,selected,current_boot,output)
+  except BaseException as error:original=error
+  try:recovery.reconcile_cleanup_once()
+  except BaseException as cleanup:
+   if original is None:original=cleanup
+   else:
+    original.mutation_uncertain=True
+    original.add_note('Independent own-Session cleanup: '+type(cleanup).__name__+': '+str(cleanup))
+  if original is not None:raise original.with_traceback(original.__traceback__)
+ require(result['bytes']==selected['bytes'] and result['sha256']==selected['sha256'],'SELECTED_SESSION_EXACT_RECEIVER_RESULT')
+ # Preserve the original final exact-byte guard after transport success.
+ require(output.stat().st_size==selected['bytes'] and sha(output.read_bytes())==selected['sha256'],'SELECTED_SESSION_LOCAL_ARCHIVE_INTEGRITY')
+ driver.put('exact-new-archive-recovered.json',{'at':driver.now(),'binding':selected,'local':str(output),
+  'exact_bytes_SHA_verified':True,'inner_CRC_or_semantics_verified':False,
+  'normal_stop_owner':'original-driver-finally-only','GET_fallback_used':False,'product_success':False})
+ return True

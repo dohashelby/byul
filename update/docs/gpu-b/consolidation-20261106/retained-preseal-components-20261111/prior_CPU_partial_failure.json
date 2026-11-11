@@ -1,0 +1,271 @@
+{
+  "scope": "EXPLICIT_SYNTHETIC_CPU_NEW_B_OBSERVATION_ONLY",
+  "native": {
+    "argv": [
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v1/venv/bin/python",
+      "-I",
+      "-S",
+      "-B",
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/sup16-preseal-inventory-20261111-v1/cpu_contract_v1_1.py",
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/sup16-preseal-inventory-20261111-v1/capture_normal.py",
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/sup16-preseal-inventory-20261111-v1/cpu-v1_1.json"
+    ],
+    "executable": "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v1/venv/bin/python",
+    "uid": 1000,
+    "gid": 1000,
+    "python": "3.12.3",
+    "flags": {
+      "I": 1,
+      "S": 1,
+      "B": true
+    },
+    "source_sha256": "f868ee1d9c4bbb0c56c981691d08b91476408aa93c34239193846eaeeed6df96",
+    "harness_sha256": "61a218233deac935aa03ea78bb21ebbf6e630ca7d9d3fd443ecc17b3fad5e2f9",
+    "original_inventory_module_sha256": "38526674e8df7de6b25499e924f30c4ed6e94e3346ff944249a5fee00de467e1",
+    "native_inventory_program_sha256": "1046b712c6184475fd9020b1c496695cd802e3f9efbea6028d5d4d42ebfffac2",
+    "CPU_image_id": "sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f"
+  },
+  "cases": [
+    {
+      "name": "basic",
+      "passed": false,
+      "detail": {
+        "calls": [
+          "snapshot",
+          "native_inventory",
+          "seal",
+          "capture"
+        ],
+        "deadline_unchanged": true,
+        "observation": {
+          "stage": "before_seal",
+          "producer_returned": false,
+          "started_monotonic_ns": 410633766527125,
+          "error": {
+            "type": "AssertionError",
+            "message": "Traceback (most recent call last):\n  File \"<string>\", line 4, in <module>\n  File \"/usr/local/lib/python3.12/json/__init__.py\", line 346, in loads\n    return _default_decoder.decode(s)\n           ^^^^^",
+            "errno": null
+          },
+          "finished_monotonic_ns": 410636140270001
+        },
+        "first_client_failure": {
+          "attempted": false,
+          "saved": false
+        },
+        "native_CPU": null
+      }
+    },
+    {
+      "name": "unsupported-entry",
+      "passed": false,
+      "detail": {
+        "calls": [
+          "snapshot",
+          "native_inventory",
+          "seal",
+          "capture"
+        ],
+        "deadline_unchanged": true,
+        "observation": {
+          "stage": "before_seal",
+          "producer_returned": false,
+          "started_monotonic_ns": 410636141442842,
+          "error": {
+            "type": "AssertionError",
+            "message": "Traceback (most recent call last):\n  File \"<string>\", line 4, in <module>\n  File \"/usr/local/lib/python3.12/json/__init__.py\", line 346, in loads\n    return _default_decoder.decode(s)\n           ^^^^^",
+            "errno": null
+          },
+          "finished_monotonic_ns": 410637774853032
+        },
+        "first_client_failure": {
+          "attempted": false,
+          "saved": false
+        },
+        "native_CPU": null
+      }
+    },
+    {
+      "name": "native-error",
+      "passed": false,
+      "detail": {
+        "calls": [
+          "snapshot",
+          "native_inventory",
+          "seal"
+        ],
+        "deadline_unchanged": true,
+        "observation": {
+          "stage": "before_seal",
+          "producer_returned": false,
+          "started_monotonic_ns": 410637776950955,
+          "error": {
+            "type": "AssertionError",
+            "message": "Traceback (most recent call last):\n  File \"<string>\", line 4, in <module>\n  File \"/usr/local/lib/python3.12/json/__init__.py\", line 346, in loads\n    return _default_decoder.decode(s)\n           ^^^^^",
+            "errno": null
+          },
+          "finished_monotonic_ns": 410639511312406
+        },
+        "first_client_failure": {
+          "attempted": false,
+          "saved": false
+        },
+        "native_CPU": null,
+        "original_seal_exception_same_object": true
+      }
+    },
+    {
+      "name": "invalid-session",
+      "passed": true,
+      "detail": {
+        "calls": [
+          "snapshot",
+          "seal",
+          "capture"
+        ],
+        "deadline_unchanged": true,
+        "observation": {
+          "stage": "before_seal",
+          "producer_returned": false,
+          "started_monotonic_ns": 410639513748082,
+          "error": {
+            "type": "ValueError",
+            "message": "LIFECYCLE_SESSION_INVALID",
+            "errno": null
+          },
+          "finished_monotonic_ns": 410639513812377
+        },
+        "first_client_failure": {
+          "attempted": false,
+          "saved": false
+        },
+        "native_CPU": null,
+        "original_capture_exception_same_object": true
+      }
+    },
+    {
+      "name": "FDs_restored",
+      "passed": true,
+      "before": 4,
+      "after": 4
+    }
+  ],
+  "checks": 5,
+  "failures": [
+    "basic",
+    "unsupported-entry",
+    "native-error"
+  ],
+  "CPU_containers": [
+    {
+      "name": "byul-s5-preseal-6c655952d79d49e4a591ba5252d7a4d3",
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "byul-s5-preseal-6c655952d79d49e4a591ba5252d7a4d3",
+        "--label",
+        "byul.s5.cpu=preseal",
+        "--network",
+        "none",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--pids-limit",
+        "32",
+        "--memory",
+        "128m",
+        "--cpus",
+        "1",
+        "--user",
+        "1000:1000",
+        "--mount",
+        "type=bind,src=/tmp/s5-preseal-native-u3umd90z/basic/data,dst=/guard-lifecycle/data",
+        "sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f",
+        "python",
+        "-I",
+        "-S",
+        "-B",
+        "-c",
+        "\nimport hashlib,json,os,stat,subprocess,sys\nfrom pathlib import Path\np=json.loads(sys.stdin.buffer.read(131072))\nsession=p['session'];root=Path('/guard-lifecycle/data')/session\nroot.mkdir(mode=0o700)\nticks=int(Path('/proc/self/stat').read_text().rsplit(') ',1)[1].split()[19])\njournal=root/('pid-%s-%s.jsonl'%(os.getpid(),ticks))\nfd=os.open(journal,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)\nos.write(fd,b'EXPLICIT_SYNTHETIC_CPU_METADATA_ONLY\\n');os.close(fd)\nif p['case']=='unsupported-entry':(root/'unsupported.fixture').write_bytes(b'CPU_ONLY')\nif p['case']=='native-error':root.chmod(0o777)\nfacts=os.stat(journal)\nnative={'uid':os.getuid(),'gid':os.getgid(),'pid':os.getpid(),'start_ticks':ticks,\n        'boot_sha256':hashlib.sha256(Path('/proc/sys/kernel/random/boot_id').read_bytes()).hexdigest(),\n        'file':{'device':facts.st_dev,'inode':facts.st_ino,'mode':stat.S_IMODE(facts.st_mode),\n                'uid':facts.st_uid,'bytes':facts.st_size,'mtime_ns':facts.st_mtime_ns,'ctime_ns':facts.st_ctime_ns},\n        'python':sys.version.split()[0],'flags':{'I':sys.flags.isolated,'S':sys.flags.no_site,'B':sys.dont_write_bytecode}}\nr=subprocess.run([sys.executable,'-I','-S','-B','-c',p['program'],session],capture_output=True,timeout=5)\nassert len(r.stdout)<=65536 and len(r.stderr)<=4096\nprint(json.dumps({'returncode':r.returncode,'stdout':r.stdout.decode(),'stderr':r.stderr.decode(),'native':native}))\n"
+      ],
+      "returncode": 1,
+      "removed": true
+    },
+    {
+      "name": "byul-s5-preseal-6a419a70bf3945abb1bbbaa6315f0e72",
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "byul-s5-preseal-6a419a70bf3945abb1bbbaa6315f0e72",
+        "--label",
+        "byul.s5.cpu=preseal",
+        "--network",
+        "none",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--pids-limit",
+        "32",
+        "--memory",
+        "128m",
+        "--cpus",
+        "1",
+        "--user",
+        "1000:1000",
+        "--mount",
+        "type=bind,src=/tmp/s5-preseal-native-u3umd90z/unsupported-entry/data,dst=/guard-lifecycle/data",
+        "sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f",
+        "python",
+        "-I",
+        "-S",
+        "-B",
+        "-c",
+        "\nimport hashlib,json,os,stat,subprocess,sys\nfrom pathlib import Path\np=json.loads(sys.stdin.buffer.read(131072))\nsession=p['session'];root=Path('/guard-lifecycle/data')/session\nroot.mkdir(mode=0o700)\nticks=int(Path('/proc/self/stat').read_text().rsplit(') ',1)[1].split()[19])\njournal=root/('pid-%s-%s.jsonl'%(os.getpid(),ticks))\nfd=os.open(journal,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)\nos.write(fd,b'EXPLICIT_SYNTHETIC_CPU_METADATA_ONLY\\n');os.close(fd)\nif p['case']=='unsupported-entry':(root/'unsupported.fixture').write_bytes(b'CPU_ONLY')\nif p['case']=='native-error':root.chmod(0o777)\nfacts=os.stat(journal)\nnative={'uid':os.getuid(),'gid':os.getgid(),'pid':os.getpid(),'start_ticks':ticks,\n        'boot_sha256':hashlib.sha256(Path('/proc/sys/kernel/random/boot_id').read_bytes()).hexdigest(),\n        'file':{'device':facts.st_dev,'inode':facts.st_ino,'mode':stat.S_IMODE(facts.st_mode),\n                'uid':facts.st_uid,'bytes':facts.st_size,'mtime_ns':facts.st_mtime_ns,'ctime_ns':facts.st_ctime_ns},\n        'python':sys.version.split()[0],'flags':{'I':sys.flags.isolated,'S':sys.flags.no_site,'B':sys.dont_write_bytecode}}\nr=subprocess.run([sys.executable,'-I','-S','-B','-c',p['program'],session],capture_output=True,timeout=5)\nassert len(r.stdout)<=65536 and len(r.stderr)<=4096\nprint(json.dumps({'returncode':r.returncode,'stdout':r.stdout.decode(),'stderr':r.stderr.decode(),'native':native}))\n"
+      ],
+      "returncode": 1,
+      "removed": true
+    },
+    {
+      "name": "byul-s5-preseal-3afefd1440a14fc6b48f7687e89de208",
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "byul-s5-preseal-3afefd1440a14fc6b48f7687e89de208",
+        "--label",
+        "byul.s5.cpu=preseal",
+        "--network",
+        "none",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--pids-limit",
+        "32",
+        "--memory",
+        "128m",
+        "--cpus",
+        "1",
+        "--user",
+        "1000:1000",
+        "--mount",
+        "type=bind,src=/tmp/s5-preseal-native-u3umd90z/native-error/data,dst=/guard-lifecycle/data",
+        "sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f",
+        "python",
+        "-I",
+        "-S",
+        "-B",
+        "-c",
+        "\nimport hashlib,json,os,stat,subprocess,sys\nfrom pathlib import Path\np=json.loads(sys.stdin.buffer.read(131072))\nsession=p['session'];root=Path('/guard-lifecycle/data')/session\nroot.mkdir(mode=0o700)\nticks=int(Path('/proc/self/stat').read_text().rsplit(') ',1)[1].split()[19])\njournal=root/('pid-%s-%s.jsonl'%(os.getpid(),ticks))\nfd=os.open(journal,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)\nos.write(fd,b'EXPLICIT_SYNTHETIC_CPU_METADATA_ONLY\\n');os.close(fd)\nif p['case']=='unsupported-entry':(root/'unsupported.fixture').write_bytes(b'CPU_ONLY')\nif p['case']=='native-error':root.chmod(0o777)\nfacts=os.stat(journal)\nnative={'uid':os.getuid(),'gid':os.getgid(),'pid':os.getpid(),'start_ticks':ticks,\n        'boot_sha256':hashlib.sha256(Path('/proc/sys/kernel/random/boot_id').read_bytes()).hexdigest(),\n        'file':{'device':facts.st_dev,'inode':facts.st_ino,'mode':stat.S_IMODE(facts.st_mode),\n                'uid':facts.st_uid,'bytes':facts.st_size,'mtime_ns':facts.st_mtime_ns,'ctime_ns':facts.st_ctime_ns},\n        'python':sys.version.split()[0],'flags':{'I':sys.flags.isolated,'S':sys.flags.no_site,'B':sys.dont_write_bytecode}}\nr=subprocess.run([sys.executable,'-I','-S','-B','-c',p['program'],session],capture_output=True,timeout=5)\nassert len(r.stdout)<=65536 and len(r.stderr)<=4096\nprint(json.dumps({'returncode':r.returncode,'stdout':r.stdout.decode(),'stderr':r.stderr.decode(),'native':native}))\n"
+      ],
+      "returncode": 1,
+      "removed": true
+    }
+  ],
+  "actual_R8_new_observations": 0,
+  "new_GPU_AWS": 0,
+  "archive_code_executed": false,
+  "A_source_modified": false,
+  "whole_CRC_repeated": false,
+  "product_complete": false
+}

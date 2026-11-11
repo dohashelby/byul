@@ -1,0 +1,85 @@
+{
+  "status": "CODE_PINS_FIXED_CPU_PENDING_OPERATION_NOT_READY",
+  "helper": {
+    "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\capture_normal.py",
+    "bytes": 20279,
+    "sha256": "f868ee1d9c4bbb0c56c981691d08b91476408aa93c34239193846eaeeed6df96"
+  },
+  "code": {
+    "003-adapter.py": {
+      "baseline": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\one-gpu-req-sup16-join-20261109-v1\\sup16-roles-operating-20261110-v1\\next-selected-operating-binding-r8-v1\\fixed43-candidate-v1\\files\\003-adapter.py",
+        "bytes": 21679,
+        "sha256": "1aefbdf251c99bd89559da437359b2e46302e14b8ffc1c041291690b019a4fc6"
+      },
+      "candidate": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\003-adapter.py",
+        "bytes": 21679,
+        "sha256": "7d839a0a0a8385822a9d8262739e0c89093241262c8e638deb3cc425f01876fc"
+      }
+    },
+    "021-resolver.py": {
+      "baseline": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\one-gpu-req-sup16-join-20261109-v1\\sup16-roles-operating-20261110-v1\\next-selected-operating-binding-r8-v1\\fixed43-candidate-v1\\files\\021-resolver.py",
+        "bytes": 28500,
+        "sha256": "3f8d1ae28f6199baaf6827bb627d5ebb03ab999d256d5e59ba58c9f93131b075"
+      },
+      "candidate": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\021-resolver.py",
+        "bytes": 28500,
+        "sha256": "9a840fb0fa61c9c11adcc3fa4121f778d4d4747f3f00eaf9b87c1a420ce9e340"
+      }
+    },
+    "004-actionwise.py": {
+      "baseline": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\one-gpu-req-sup16-join-20261109-v1\\sup16-roles-operating-20261110-v1\\next-selected-operating-binding-r8-v1\\fixed43-candidate-v1\\files\\004-actionwise.py",
+        "bytes": 8145,
+        "sha256": "6c8db7c825551ea657ebed7f7ea52ce0efc31913fb582c3683830508db5fb341"
+      },
+      "candidate": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\004-actionwise.py",
+        "bytes": 8145,
+        "sha256": "cdeca47d1a7d40f5c0eda0f5e0d208e5c0918c5b00b9b81b86cade6f2684a2ce"
+      }
+    },
+    "013-join.py": {
+      "baseline": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\one-gpu-req-sup16-join-20261109-v1\\sup16-roles-operating-20261110-v1\\next-selected-operating-binding-r8-v1\\fixed43-candidate-v1\\files\\013-join.py",
+        "bytes": 18924,
+        "sha256": "b203e6be4061a3734bb0d52aee2d211cdcd9bba4efed009206580a440b3a1fee"
+      },
+      "candidate": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\013-join.py",
+        "bytes": 18924,
+        "sha256": "fb276ca37b703958856886a0819a0755a205859739ea12217eb4e97debaa360a"
+      }
+    },
+    "039-whole_entry.py": {
+      "baseline": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\one-gpu-req-sup16-join-20261109-v1\\sup16-roles-operating-20261110-v1\\next-selected-operating-binding-r8-v1\\fixed43-candidate-v1\\files\\039-whole_entry.py",
+        "bytes": 17446,
+        "sha256": "6b9caa8c0f9cbe76b4477cd6b8e689f6384d451bba43de798c48e89244082e88"
+      },
+      "candidate": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\039-whole_entry.py",
+        "bytes": 17446,
+        "sha256": "0bd54c6e0d1ace6cf08a6b3d05e6005b44866b692ae8c43e6ecca0056199ac10"
+      }
+    }
+  },
+  "S2_owned_metadata_pending": [
+    "015 assembly_inputs capture_helper/resolver refs",
+    "040 fixedrequest module_files adapter/actionwise/join",
+    "039 entry self pin in installer/operator source-map",
+    "source-map/fileinstall/fixed43payload PLAN/DIRS/PAYLOAD/operator local_files"
+  ],
+  "source_contract": {
+    "commit": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+    "tree": "912cb0924559343af939b5b525e865590a91795c",
+    "manifest": "ac423c8243af7b824bd66f7dadc5bd4ef5d827026a86d66f0c32dd28f3b4cf8b",
+    "root": "/home/ubuntu/BYUL-SOURCE-REQ-SUP16-20261109-V4/repo"
+  },
+  "changes_outside_selected_pin_literals": false,
+  "old_main_executed": false,
+  "new_GPU_AWS": 0
+}

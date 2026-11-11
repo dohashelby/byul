@@ -1,0 +1,10 @@
+{
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "platform": "linux",
+  "pytest_version": "8.3.5",
+  "exit_code": 0,
+  "wall_seconds_including_environment": 31.3452901650453,
+  "engine_or_AWS_executed": false,
+  "dependency_files_changed_in_project": false,
+  "plugin_autoload_disabled": true
+}

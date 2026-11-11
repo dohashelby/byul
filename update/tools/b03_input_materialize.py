@@ -120,6 +120,8 @@ def materialize(spec_path,source_root,output):
     """No POL/ENV/PLAN/Ref issuance; unknown runtime identity stays null."""
     spec_path=Path(spec_path).absolute()
     spec=strict_json(spec_path.read_bytes(),limit=262144)
+    if spec.get('schema')=='b03-supply-pair-inputs/1':
+        return preflight_supply_pair(spec,spec_path.parent,Path(source_root).absolute(),Path(output).absolute())
     if spec.get('schema')=='b03-static-input-selection/1' and spec.get('check_ids')==['PLT-01']:
         return materialize_plt01(spec,spec_path.parent,Path(source_root).absolute(),Path(output).absolute())
     if spec.get('schema')!='b03-static-input-selection/1' or spec.get('check_ids')!=list(SELECTED):
@@ -257,6 +259,105 @@ def materialize(spec_path,source_root,output):
         'engine_GPU_AWS_executed':False,'EVD_RES_RPT_Refs_created':False,
         'current_runtime_IDs_created':False,'producer_authenticated':False,'ready_for_GPU':False}
     write(output/'materialized-inputs.json',result)
+    return result
+
+
+def preflight_supply_pair(spec,base,root,output):
+    """Read actual paired local inputs through the existing boot validator only.
+
+    A passing receipt covers files/policy/binding, never live worker identity,
+    producer qualification, complete collection or execution authorization.
+    """
+    from guard.executors import supply_boot_contract as contract
+    from guard.executors.kubernetes_supply_boot import CONFIG_KEYS, KubernetesSupplyBootExecutor
+    from guard.models import Environment, utcnow, sha256_hex
+    import re
+    if (set(spec)!={'schema','check_id','pack_ref','environment','policy','config','roles'}
+            or spec['check_id'] not in contract.CHECK_PROFILES
+            or type(spec['roles']) is not dict or set(spec['roles'])!=set(contract.ROLES)):
+        raise ValueError('B03_SUPPLY_PAIR_SPEC_INVALID')
+    def required_pointer(value):
+        if (type(value) is not dict or set(value)!={'path','sha256'}
+                or type(value['path']) is not str or not value['path'].strip()
+                or '\x00' in value['path'] or type(value['sha256']) is not str
+                or re.fullmatch('[0-9a-f]{64}',value['sha256']) is None):
+            raise ValueError('B03_SUPPLY_EXACT_FILE_POINTER_REQUIRED')
+    # dependency(None) deliberately means an unpinned read in legacy code.
+    # This new exact-pointer mode must reject it before opening any input.
+    for name in ('environment','policy','config'):
+        required_pointer(spec[name])
+    for role in contract.ROLES:
+        pointers=spec['roles'][role]
+        if type(pointers) is not dict or set(pointers)!={'target','prepared'}:
+            raise ValueError('B03_SUPPLY_ROLE_POINTERS_REQUIRED')
+        for value in pointers.values():required_pointer(value)
+    pack=load_pack(root/'update/packs/PACK-BASELINE')
+    if spec['pack_ref']!=pack.ref().model_dump(mode='json'):
+        raise ValueError('B03_PACK_INPUT_MISMATCH')
+    raw,p_env=pinned(spec['environment'],base)
+    env=Environment.model_validate(strict_json(raw))
+    if not env.hash_ok():raise ValueError('B03_ENV_HASH_INVALID')
+    raw,p_policy=pinned(spec['policy'],base)
+    policy=strict_json(raw)
+    cid=spec['check_id']
+    if (type(policy) is not dict or policy.get('data_origin') not in {'EXAMPLE','DECLARED'}
+            or policy.get('status') not in {'DRAFT','CONFIRMED'}
+            or policy.get('pack')!={'id':pack.ref().id,'revision':pack.ref().revision}
+            or type(policy.get('values')) is not dict or set(policy['values'])!={cid}):
+        raise ValueError('B03_SUPPLY_POLICY_INPUT_INVALID')
+    values=policy['values'][cid]
+    raw,p_cfg=pinned(spec['config'],base)
+    config=strict_json(raw)
+    if (type(config) is not dict or set(config)!={'adapter','executors','supply_boot'}
+            or config['executors']!={'supply_boot':'kubernetes'}
+            or config['adapter']!={'name':env.engine.name}
+            or type(config['supply_boot']) is not dict
+            or set(config['supply_boot'])-CONFIG_KEYS
+            or not set(contract.ROLES)<=set(config['supply_boot'])):
+        raise ValueError('B03_SUPPLY_CONFIG_INPUT_INVALID')
+    executor=KubernetesSupplyBootExecutor(config['supply_boot'])
+    executor.validate_policy(pack.checks[cid],values)
+    if env.ref().sha256!=values['supply_environment_sha256']:
+        raise ValueError('B03_SUPPLY_ENV_BINDING_MISMATCH')
+    begin,end=contract.normalize_policy(cid,values)
+    observed=utcnow()
+    if not begin<=observed<=end:raise ValueError('SUPPLY_BOOT_POLICY_WINDOW_EXPIRED')
+    roles=[]
+    for role in contract.ROLES:
+        pointers=spec['roles'][role]
+        if type(pointers) is not dict or set(pointers)!={'target','prepared'}:
+            raise ValueError('B03_SUPPLY_ROLE_POINTERS_REQUIRED')
+        pins={name:pinned(pointers[name],base)[1] for name in ('target','prepared')}
+        section=config['supply_boot'][role]
+        if (type(section) is not dict or set(section)!={'target','prepared'}
+                or any(not Path(section[name]).is_absolute()
+                       or Path(section[name])!=Path(pins[name]['path']) for name in pins)):
+            raise ValueError('B03_SUPPLY_ROLE_PATH_MISMATCH')
+        target,prepared,target_sha=executor._load(env,values,role)
+        if target.get('environment_ref')!=env.ref().model_dump(mode='json'):
+            raise ValueError('B03_SUPPLY_TARGET_ENV_MISMATCH')
+        # Recheck the original exact pointers after the existing file consumer.
+        for name in pins:
+            if pinned(pointers[name],base)[1]!=pins[name]:
+                raise ValueError('B03_SUPPLY_INPUT_CHANGED')
+        roles.append({'role':role,'target':pins['target'],'prepared':pins['prepared'],
+            'target_object_sha256':target_sha,'prepared_object_sha256':sha256_hex(canonical_json(prepared)),
+            'session':prepared['session']})
+    if (roles[0]['session']==roles[1]['session']
+            or roles[0]['target_object_sha256']==roles[1]['target_object_sha256']):
+        raise ValueError('B03_SUPPLY_DISTINCT_ROLE_INPUTS_REQUIRED')
+    if output.resolve().is_relative_to(root.resolve()):raise ValueError('B03_OUTPUT_OUTSIDE_SOURCE_REQUIRED')
+    result={'schema':'b03-supply-pair-preflight/1','check_id':cid,
+        'pack_ref':pack.ref().model_dump(mode='json'),'observed_at':observed.isoformat(),
+        'environment':p_env,'policy':p_policy,'config':p_cfg,'roles':roles,
+        'policy_data_origin':policy['data_origin'],'environment_data_origin':env.data_origin.value,
+        'local_input_checks_passed':True,'ready_for_GPU':False,
+        'engine_GPU_AWS_executed':False,'EVD_RES_RPT_Refs_created':False,
+        'remaining':['current worker/boot identity','collection and producer qualification',
+                     'execution authorization and resource cleanup','canonical pack/policy authority'],
+        'rows':[{'check_id':cid,'existing_policy_validator_accepted':True}]}
+    output.mkdir(mode=0o700,parents=True,exist_ok=False)
+    write(output/'supply-pair-preflight.json',result)
     return result
 
 

@@ -212,6 +212,55 @@
       "bytes": 39046,
       "sha256": "afa63410ba8eeaf537c4b148804d399cb37550b699eb944c4248c12038ab5b07",
       "kind": "actual_operating_control_health_clock_rejection_cleanup_review"
+    },
+    "GB12-archive-facts-review.json": {
+      "bytes": 100145,
+      "sha256": "7d1e43502ee70a397ca3cfc0d12128d9be4ea2e1929d002d440ad3f4ccdd222a",
+      "kind": "actual_recovered_archive_integrity_and_bounded_raw_provenance_review"
+    },
+    "session-S3-actual-review.json": {
+      "bytes": 37191,
+      "sha256": "3f134a9c1e71caf8d3ac5be36c8992b024d4ba5c48a357ba1a2a62d61792c3da",
+      "kind": "actual_stream_wire_receiver_identity_session_terminal_resource_cleanup_review"
     }
+  },
+  "actual_S3_archive_result": {
+    "archive_bytes": 14636464,
+    "archive_sha256": "2681a23c1545647e4b25711cb4c570336efdc6e7a604332de452c9cc2a663219",
+    "first_full_CRC_owner": "S4",
+    "first_full_CRC_passes": 1,
+    "member_count": 1971,
+    "CRC_mismatches": 0,
+    "uncompressed_bytes": 131826305,
+    "safeindex_sha256": "5847c9e6938fc7f0f15b672bfe2a7502b918751e9ee2e980f91fdeeaf9379792",
+    "raw_manifest_entries": 1970,
+    "archive_facts_review_sha256": "7d1e43502ee70a397ca3cfc0d12128d9be4ea2e1929d002d440ad3f4ccdd222a",
+    "phase_candidates": [
+      1,
+      0,
+      1
+    ],
+    "phase_recordings": [
+      3,
+      0,
+      3
+    ],
+    "phase_order": [
+      "normal-before",
+      "challenge-partial",
+      "normal-recovered"
+    ],
+    "original_runtime_source_commit": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+    "actual_ENV_data_origin": "EXAMPLE",
+    "engine_source_verification": "UNVERIFIED",
+    "producer_authenticated": false,
+    "product_connected": false,
+    "product_store_restore_or_reassessment_performed": false,
+    "original_SUP16_whole_FAIL_and_UNKNOWN_preserved": true,
+    "prepared_component_flags_are_historical_and_not_rewritten_as_actual_success": true,
+    "operating_control_review_sha256": "3f134a9c1e71caf8d3ac5be36c8992b024d4ba5c48a357ba1a2a62d61792c3da",
+    "stream_frames_independently_decoded_to_matching_archive_SHA": true,
+    "original_resource_watch_failure_preserved": true,
+    "actual_selected_stopped_and_cost_window_closed": true
   }
 }

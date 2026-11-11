@@ -1,0 +1,203 @@
+{
+  "scope": "EXPLICIT_SYNTHETIC_CPU_NEW_PIN_BOUNDARIES_ONLY",
+  "native": {
+    "argv": [
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v1/venv/bin/python",
+      "-I",
+      "-S",
+      "-B",
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/sup16-preseal-inventory-20261111-v1/cpu_pin_closure_v1_1.py",
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/sup16-preseal-inventory-20261111-v1",
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-b12-s2-plan-20261108/out/one-gpu-req-sup16-join-20261109-v1/sup16-roles-operating-20261110-v1/next-selected-operating-binding-r8-v1/fixed43-candidate-v1/files",
+      "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/sup16-preseal-inventory-20261111-v1/cpu-pin-v1_1.json"
+    ],
+    "uid": 0,
+    "gid": 0,
+    "python": "3.12.3",
+    "flags": {
+      "I": 1,
+      "S": 1,
+      "B": true
+    },
+    "harness_sha256": "db58c970bda88bb44d83a3e7e56a6bb94d2b5cec8d3b536bd0e3c4d7d7fa6ed5",
+    "code_pins": {
+      "003-adapter.py": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\003-adapter.py",
+        "bytes": 21679,
+        "sha256": "7d839a0a0a8385822a9d8262739e0c89093241262c8e638deb3cc425f01876fc"
+      },
+      "021-resolver.py": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\021-resolver.py",
+        "bytes": 28500,
+        "sha256": "9a840fb0fa61c9c11adcc3fa4121f778d4d4747f3f00eaf9b87c1a420ce9e340"
+      },
+      "004-actionwise.py": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\004-actionwise.py",
+        "bytes": 8145,
+        "sha256": "cdeca47d1a7d40f5c0eda0f5e0d208e5c0918c5b00b9b81b86cade6f2684a2ce"
+      },
+      "013-join.py": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\013-join.py",
+        "bytes": 18924,
+        "sha256": "fb276ca37b703958856886a0819a0755a205859739ea12217eb4e97debaa360a"
+      },
+      "039-whole_entry.py": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\pin-closure-v1\\039-whole_entry.py",
+        "bytes": 17446,
+        "sha256": "0bd54c6e0d1ace6cf08a6b3d05e6005b44866b692ae8c43e6ecca0056199ac10"
+      }
+    },
+    "helper": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-s5-b-cpu-support-links-20261110\\out\\sup16-preseal-inventory-20261111-v1\\capture_normal.py",
+      "bytes": 20279,
+      "sha256": "f868ee1d9c4bbb0c56c981691d08b91476408aa93c34239193846eaeeed6df96"
+    }
+  },
+  "child_UID1000": {
+    "native_uid": 1000,
+    "cases": [
+      {
+        "name": "adapter_actual_inputs_to_resolver_actual_capture_argv",
+        "passed": true,
+        "argv": [
+          "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v1/venv/bin/python",
+          "-I",
+          "-B",
+          "/tmp/s5-preseal-pin-vz4nhzn1/assets/capture_normal.py",
+          "--source-root",
+          "/home/ubuntu/BYUL-SOURCE-REQ-SUP16-20261109-V4/repo",
+          "--source-commit",
+          "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+          "--manifest-sha256",
+          "ac423c8243af7b824bd66f7dadc5bd4ef5d827026a86d66f0c32dd28f3b4cf8b",
+          "--tool-sha256",
+          "f868ee1d9c4bbb0c56c981691d08b91476408aa93c34239193846eaeeed6df96",
+          "--environment",
+          "/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-RUNTIME/challenge-partial/ENV.json",
+          "--target",
+          "/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-RUNTIME/challenge-partial/target.json",
+          "--prepared",
+          "/tmp/s5-preseal-pin-vz4nhzn1/runtime/role/native17/manifest.json",
+          "--output",
+          "/tmp/s5-preseal-pin-vz4nhzn1/runtime/capture",
+          "--client-private-root",
+          "/tmp/s5-preseal-pin-vz4nhzn1/assets/client-private-challenge-partial",
+          "--kubectl-binary",
+          "/usr/local/bin/kubectl",
+          "--kubeconfig",
+          "/etc/rancher/k3s/k3s.yaml",
+          "--use-existing-root-kubectl",
+          "--execute"
+        ],
+        "helper_pin": {
+          "path": "/tmp/s5-preseal-pin-vz4nhzn1/assets/capture_normal.py",
+          "file_sha256": "f868ee1d9c4bbb0c56c981691d08b91476408aa93c34239193846eaeeed6df96"
+        },
+        "native_UID": 1000,
+        "source_guard_read": true
+      },
+      {
+        "name": "stale_helper_pin_refused",
+        "passed": true,
+        "error": "SUP16_DELTA_CAPTURE_SOURCE_PIN_REQUIRED"
+      },
+      {
+        "name": "helper_actual_bytes_mismatch_refused",
+        "passed": true,
+        "error": "SUP16_DELTA_FILE_BYTES_CHANGED"
+      }
+    ],
+    "input_producer": "exact adapter Assign node",
+    "consumer": "exact resolver capture branch/read/command; broader inputs/role_result/runtime not executed",
+    "original_source_values_from_actual_R8_inputs": {
+      "commit": "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+      "manifest": "ac423c8243af7b824bd66f7dadc5bd4ef5d827026a86d66f0c32dd28f3b4cf8b",
+      "root": "/home/ubuntu/BYUL-SOURCE-REQ-SUP16-20261109-V4/repo"
+    }
+  },
+  "cases": [
+    {
+      "name": "adapter_actual_inputs_to_resolver_actual_capture_argv",
+      "passed": true,
+      "argv": [
+        "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-s5-b-cpu-support-links-20261110/out/gb12-fixed-stream-20261111-v1/venv/bin/python",
+        "-I",
+        "-B",
+        "/tmp/s5-preseal-pin-vz4nhzn1/assets/capture_normal.py",
+        "--source-root",
+        "/home/ubuntu/BYUL-SOURCE-REQ-SUP16-20261109-V4/repo",
+        "--source-commit",
+        "2cb01e9f08f9a123b8fffff00f9e798060115db9",
+        "--manifest-sha256",
+        "ac423c8243af7b824bd66f7dadc5bd4ef5d827026a86d66f0c32dd28f3b4cf8b",
+        "--tool-sha256",
+        "f868ee1d9c4bbb0c56c981691d08b91476408aa93c34239193846eaeeed6df96",
+        "--environment",
+        "/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-RUNTIME/challenge-partial/ENV.json",
+        "--target",
+        "/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-RUNTIME/challenge-partial/target.json",
+        "--prepared",
+        "/tmp/s5-preseal-pin-vz4nhzn1/runtime/role/native17/manifest.json",
+        "--output",
+        "/tmp/s5-preseal-pin-vz4nhzn1/runtime/capture",
+        "--client-private-root",
+        "/tmp/s5-preseal-pin-vz4nhzn1/assets/client-private-challenge-partial",
+        "--kubectl-binary",
+        "/usr/local/bin/kubectl",
+        "--kubeconfig",
+        "/etc/rancher/k3s/k3s.yaml",
+        "--use-existing-root-kubectl",
+        "--execute"
+      ],
+      "helper_pin": {
+        "path": "/tmp/s5-preseal-pin-vz4nhzn1/assets/capture_normal.py",
+        "file_sha256": "f868ee1d9c4bbb0c56c981691d08b91476408aa93c34239193846eaeeed6df96"
+      },
+      "native_UID": 1000,
+      "source_guard_read": true
+    },
+    {
+      "name": "stale_helper_pin_refused",
+      "passed": true,
+      "error": "SUP16_DELTA_CAPTURE_SOURCE_PIN_REQUIRED"
+    },
+    {
+      "name": "helper_actual_bytes_mismatch_refused",
+      "passed": true,
+      "error": "SUP16_DELTA_FILE_BYTES_CHANGED"
+    },
+    {
+      "name": "entry_real_pointer_read_pin_consumes_new_modules",
+      "passed": true,
+      "changed_pins": {
+        "adapter": "7d839a0a0a8385822a9d8262739e0c89093241262c8e638deb3cc425f01876fc",
+        "actionwise": "cdeca47d1a7d40f5c0eda0f5e0d208e5c0918c5b00b9b81b86cade6f2684a2ce",
+        "join": "fb276ca37b703958856886a0819a0755a205859739ea12217eb4e97debaa360a"
+      },
+      "owner": 0,
+      "loaded_or_executed_operator_modules": false
+    },
+    {
+      "name": "entry_stale_adapter_reference_refused",
+      "passed": true,
+      "error": "SUP16_ENTRY_FROZEN_COMPONENT_CHANGED:adapter"
+    },
+    {
+      "name": "entry_old_actual_adapter_bytes_refused",
+      "passed": true,
+      "error": "SUP16_ENTRY_INPUT_BYTES_OR_IDENTITY_CHANGED"
+    },
+    {
+      "name": "all_FDs_restored",
+      "passed": true
+    }
+  ],
+  "checks": 7,
+  "failures": [],
+  "old_main_executed": false,
+  "whole_module_load_or_controller_init": false,
+  "new_GPU_AWS": 0,
+  "A_source_modified": false,
+  "S2_operating_metadata_changed": false,
+  "operation_ready": false
+}

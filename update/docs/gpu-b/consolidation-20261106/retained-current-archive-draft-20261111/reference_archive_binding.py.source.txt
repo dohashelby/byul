@@ -1,0 +1,454 @@
+"""Private first-failed-CLI evidence; no execution, resource or verdict API."""
+import base64
+from copy import deepcopy
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import uuid
+import zlib
+
+CAPSULE_SCHEMA = 'byul-first-failed-cli-capsule/1'
+RAW_LIMIT = 262144
+WIRE_LIMIT = 20000  # Existing source-byte wire bound, not the API's larger cap.
+CAPSULE_LIMIT = 3 * 1024**2 - 1  # Existing source-file reader bound.
+
+
+def digest(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+
+def canonical(value):
+    return (json.dumps(value, sort_keys=True, allow_nan=False, separators=(',', ':')) + '\n').encode()
+
+
+def identity(s):
+    return (s.st_dev, s.st_ino, s.st_mode, s.st_uid, s.st_gid, s.st_nlink,
+            s.st_size, s.st_mtime_ns, s.st_ctime_ns)
+
+
+def read_exact(path, *, owner, limit):
+    path = Path(path).absolute()
+    if any(p.is_symlink() or p.is_junction() for p in (path, *path.parents)):
+        raise ValueError('CAPSULE_INPUT_LINK')
+    before = path.lstat()
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        opened = os.fstat(fd)
+        if (identity(before) != identity(opened) or not stat.S_ISREG(opened.st_mode)
+                or opened.st_uid != owner or opened.st_gid != owner
+                or stat.S_IMODE(opened.st_mode) != 0o600 or opened.st_nlink != 1
+                or not 0 <= opened.st_size <= limit):
+            raise ValueError('CAPSULE_INPUT_IDENTITY_MODE_OR_BOUND')
+        with os.fdopen(fd, 'rb', closefd=False) as stream:
+            raw = stream.read(limit + 1)
+        if (len(raw) != opened.st_size or identity(opened) != identity(os.fstat(fd))
+                or identity(opened) != identity(path.lstat())):
+            raise ValueError('CAPSULE_INPUT_CHANGED')
+        return raw
+    finally:
+        os.close(fd)
+
+
+def publish_new(path, raw, *, owner):
+    """Same exclusive temporary-file/link publication used by the existing SDK."""
+    path = Path(path).absolute()
+    parent = path.parent
+    if any(p.is_symlink() or p.is_junction() for p in (parent, *parent.parents)):
+        raise ValueError('CAPSULE_OUTPUT_LINK')
+    st = parent.lstat()
+    if (not stat.S_ISDIR(st.st_mode) or st.st_uid != owner or st.st_gid != owner
+            or stat.S_IMODE(st.st_mode) != 0o700):
+        raise ValueError('CAPSULE_PRIVATE_PARENT_REQUIRED')
+    temporary = parent / ('.' + path.name + '.' + uuid.uuid4().hex + '.publishing')
+    fd = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+    try:
+        with os.fdopen(fd, 'wb') as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.link(temporary, path, follow_symlinks=False)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+class FirstFailure:
+    """Observe the existing call_cli's first exception without replacing it."""
+    def __init__(self):
+        self.failure = None
+
+    def attach(self, module):
+        original = module.call_cli
+
+        def call(name, argv, stage, update, environment, receipts, **options):
+            try:
+                return original(name, argv, stage, update, environment, receipts, **options)
+            except BaseException as error:
+                if self.failure is None:
+                    try:
+                        row = receipts[-1]
+                        if row.get('phase') != name or row.get('argv') != argv:
+                            raise ValueError('CAPSULE_SAME_FAILED_COMMAND_REQUIRED')
+                        self.failure = dict(stage=Path(stage), row=deepcopy(row),
+                            exception={'type': type(error).__name__, 'message': str(error)})
+                    except BaseException as secondary:
+                        error.add_note('First failure metadata unavailable: ' + type(secondary).__name__)
+                raise
+
+        module.call_cli = call
+
+    def write(self, destination, *, binding, owner, input_owner=None):
+        if self.failure is None:
+            return None
+        row, stage = self.failure['row'], self.failure['stage']
+        phase = row.get('phase')
+        if not isinstance(phase, str) or re.fullmatch('[A-Za-z0-9_-]{1,160}', phase) is None:
+            raise ValueError('CAPSULE_PHASE_REQUIRED')
+        if row.get('child_reaped') is not True or row.get('group_terminal') is not True:
+            raise ValueError('CAPSULE_FAILED_CHILD_NOT_TERMINAL')
+        channels = {}
+        for channel in ('stdout', 'stderr'):
+            path = stage / (phase + '.' + channel)
+            raw = read_exact(path, owner=owner, limit=RAW_LIMIT)
+            pin = row.get(channel + '_sha256')
+            if pin != digest(raw):
+                raise ValueError('CAPSULE_ORIGINAL_CHANNEL_SHA_MISMATCH')
+            channels[channel] = dict(bytes=len(raw), sha256=pin,
+                raw_base64=base64.b64encode(raw).decode('ascii'), complete=True)
+        joined = deepcopy(binding)
+        argv = row['argv']
+        joined['input_context_status'] = 'not supplied by this failed command'
+        if input_owner is not None and '--inputs' in argv:
+            try:
+                if argv.count('--inputs') != 1 or argv.count('--inputs-sha256') != 1:
+                    raise ValueError('CAPSULE_INPUT_POINTER_REQUIRED')
+                pointer, pin = argv[argv.index('--inputs') + 1], argv[argv.index('--inputs-sha256') + 1]
+                input_raw = read_exact(pointer, owner=input_owner, limit=RAW_LIMIT)
+                if digest(input_raw) != pin:
+                    raise ValueError('CAPSULE_INPUT_POINTER_SHA')
+                current = json.loads(input_raw)
+                joined.update(input_pointer={'path': pointer, 'file_sha256': pin},
+                    context=current.get('context'), source_commit=current.get('source_commit'),
+                    source_manifest_sha256=current.get('source_manifest_sha256'),
+                    input_context_status='exact original failed-command input bytes')
+            except BaseException as error:
+                # Losing optional context must not lose the first original stderr.
+                joined.update(input_context_status='unavailable', input_context_error=type(error).__name__ + ': ' + str(error))
+        value = dict(schema=CAPSULE_SCHEMA, cli_row=row, original_exception=self.failure['exception'],
+            binding=joined, channels=channels,
+            SSM_CID_requires_original_submission_join=True, product_complete_claimed=False)
+        raw = canonical(value)
+        publish_new(destination, raw, owner=owner)
+        return dict(bytes=len(raw), sha256=digest(raw), same_failed_phase=phase)
+
+
+def consume(raw, *, expected_binding=None, expected_error=None):
+    """Validate exact bytes from a source-file wire entry, never a new verdict."""
+    def pairs(rows):
+        result = {}
+        for key, value in rows:
+            if key in result:
+                raise ValueError('CAPSULE_DUPLICATE_KEY')
+            result[key] = value
+        return result
+    value = json.loads(raw, object_pairs_hook=pairs,
+                       parse_constant=lambda _: (_ for _ in ()).throw(ValueError('CAPSULE_NONFINITE')))
+    if (type(value) is not dict or value.get('schema') != CAPSULE_SCHEMA
+            or value.get('product_complete_claimed') is not False
+            or value.get('SSM_CID_requires_original_submission_join') is not True):
+        raise ValueError('CAPSULE_SCHEMA_OR_SCOPE')
+    row = value['cli_row']
+    if row.get('child_reaped') is not True or row.get('group_terminal') is not True:
+        raise ValueError('CAPSULE_FAILED_CHILD_NOT_TERMINAL')
+    if not isinstance(row.get('argv'), list) or any(type(a) is not str for a in row['argv']):
+        raise ValueError('CAPSULE_ORIGINAL_ARGV')
+    if set(value['channels']) != {'stdout', 'stderr'}:
+        raise ValueError('CAPSULE_CHANNELS')
+    for name, channel in value['channels'].items():
+        original = base64.b64decode(channel['raw_base64'], validate=True)
+        if (channel.get('complete') is not True or type(channel['bytes']) is not int
+                or len(original) != channel['bytes'] or len(original) > RAW_LIMIT
+                or digest(original) != channel['sha256']
+                or channel['sha256'] != row.get(name + '_sha256')):
+            raise ValueError('CAPSULE_ORIGINAL_CHANNEL_BINDING')
+    if expected_binding is not None and any(value['binding'].get(k) != v for k, v in expected_binding.items()):
+        raise ValueError('CAPSULE_CURRENT_WRAPPER_BINDING')
+    if expected_error is not None and (value['original_exception']['type'] != expected_error['type']
+            or value['original_exception']['message'][:1600] != expected_error['message']):
+        raise ValueError('CAPSULE_SAME_WRAPPER_EXCEPTION')
+    return value
+
+
+def pack_wire(original_pack, result_raw, sources, *, capsule_raw=None, capsule_path=None, diagnostic=None):
+    """Keep the entire original wire as-is, adding a separately pinned capsule."""
+    original_wire = original_pack(result_raw, sources)
+    if capsule_raw is None:
+        return original_wire
+    try:
+        if not 0 < len(capsule_raw) <= CAPSULE_LIMIT or not isinstance(capsule_path, str):
+            raise ValueError('CAPSULE_SOURCE_BOUND_OR_PATH')
+        consume(capsule_raw)
+        value = dict(schema='byul-original-wire-with-first-failure/1', original_wire=original_wire,
+            capsule_path=capsule_path, capsule_bytes=len(capsule_raw), capsule_sha256=digest(capsule_raw),
+            capsule_zlib_base64=base64.b64encode(zlib.compress(capsule_raw, 9)).decode('ascii'))
+        wire = canonical(value).decode().rstrip('\n')
+        if len(wire.encode()) > WIRE_LIMIT:
+            raise ValueError('CAPSULE_COMBINED_WIRE_BOUND')
+        return wire
+    except (ValueError, TypeError, KeyError) as error:
+        if diagnostic is not None:
+            diagnostic(error)
+        return original_wire  # Optional diagnostic failure adds no stop gate.
+
+
+def unpack_wire(original_unpack, wire, *, capsule_path):
+    if type(wire) is not str or len(wire.encode()) > WIRE_LIMIT:
+        raise ValueError('CAPSULE_COMBINED_WIRE_BOUND')
+    def pairs(rows):
+        value = {}
+        for key, item in rows:
+            if key in value:
+                raise ValueError('CAPSULE_DUPLICATE_KEY')
+            value[key] = item
+        return value
+    value = json.loads(wire, object_pairs_hook=pairs)
+    if value.get('schema') != 'byul-original-wire-with-first-failure/1':
+        return original_unpack(wire), None
+    bundle = original_unpack(value['original_wire'])  # Original terminal guards are authoritative.
+    try:
+        return bundle, _consume_wire_capsule(value, bundle, capsule_path)
+    except (ValueError, TypeError, KeyError, zlib.error) as error:
+        return bundle, {'validated': False, 'error': type(error).__name__ + ': ' + str(error),
+                        'original_terminal_bundle_validated': True}
+
+
+def _consume_wire_capsule(value, bundle, capsule_path):
+    if (set(value) != {'schema', 'original_wire', 'capsule_path', 'capsule_bytes',
+            'capsule_sha256', 'capsule_zlib_base64'} or value['capsule_path'] != capsule_path
+            or type(value['capsule_bytes']) is not int or not 0 < value['capsule_bytes'] <= CAPSULE_LIMIT):
+        raise ValueError('CAPSULE_WIRE_SCHEMA_OR_SOURCE_PATH')
+    compressed = base64.b64decode(value['capsule_zlib_base64'], validate=True)
+    decoder = zlib.decompressobj()
+    raw = decoder.decompress(compressed, value['capsule_bytes'] + 1)
+    if (not decoder.eof or decoder.unused_data or decoder.unconsumed_tail
+            or len(raw) != value['capsule_bytes'] or digest(raw) != value['capsule_sha256']):
+        raise ValueError('CAPSULE_EXACT_ORIGINAL_SOURCE_BYTES')
+    result = json.loads(base64.b64decode(bundle['result_json_base64'], validate=True))
+    wrapper = result['wrapper']
+    capsule = consume(raw, expected_binding={k: wrapper.get(k) for k in ('boot_id', 'configuration_sha256')},
+        expected_error={'type': wrapper.get('exception_type'), 'message': wrapper.get('exception_message')})
+    return dict(validated=True, path=capsule_path, bytes=len(raw), sha256=digest(raw),
+        raw_base64=base64.b64encode(raw).decode('ascii'), value=capsule)
+
+
+def bind_wire_consumer(original_unpack, wrapper_path):
+    def linked(wire):
+        bundle, linked.first_failure_capsule = unpack_wire(original_unpack, wire,
+            capsule_path=str(Path(wrapper_path).with_name('first-failure-capsule.json')))
+        return bundle
+    linked.first_failure_capsule = None
+    return linked
+
+
+import base64,hashlib,json,zlib
+MAX_RAW=6*1024**2
+MAX_WIRE=20000
+SCHEMA='SUP16-original-result-filebytes-zlib/2'
+WRAPPER_PATH='/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-OPERATOR/current-wrapper-finally.json'
+RECEIPT_PATH='/home/ubuntu/byul-gpu-b-tp2-20261103/SUP16-ROLES-20261111-R8-OPERATOR/outer-archive-receipt.json'
+def require(ok,code):
+    if not ok:raise ValueError(code)
+def pairs(rows):
+    d={}
+    for k,v in rows:
+        require(k not in d,'WIRE_DUPLICATE_KEY');d[k]=v
+    return d
+def pack(raw,sources):
+    raw=json.dumps({'result_json_base64':base64.b64encode(raw).decode('ascii'),'source_files':sources},separators=(',',':')).encode()
+    require(type(raw) is bytes and 0<len(raw)<=MAX_RAW,'WIRE_RAW_BOUND')
+    d={'schema':SCHEMA,'raw_bytes':len(raw),'raw_sha256':hashlib.sha256(raw).hexdigest(),
+       'zlib_base64':base64.b64encode(zlib.compress(raw,9)).decode('ascii')}
+    wire=json.dumps(d,separators=(',',':'))
+    require(len(wire.encode('ascii'))<=MAX_WIRE,'WIRE_OUTPUT_BOUND')
+    return wire
+def unpack_bundle(wire):
+    require(type(wire) is str and len(wire.encode('utf-8'))<=MAX_WIRE,'WIRE_OUTPUT_BOUND')
+    d=json.loads(wire,object_pairs_hook=pairs)
+    require(type(d) is dict and set(d)=={'schema','raw_bytes','raw_sha256','zlib_base64'}
+            and d['schema']==SCHEMA,'WIRE_SCHEMA')
+    require(type(d['raw_bytes']) is int and 0<d['raw_bytes']<=MAX_RAW,'WIRE_RAW_BOUND')
+    blob=base64.b64decode(d['zlib_base64'],validate=True)
+    z=zlib.decompressobj();raw=z.decompress(blob,d['raw_bytes']+1)
+    require(z.eof and not z.unused_data and not z.unconsumed_tail
+            and len(raw)==d['raw_bytes'] and hashlib.sha256(raw).hexdigest()==d['raw_sha256'],
+            'WIRE_EXACT_ORIGINAL_BYTES')
+    bundle=json.loads(raw,object_pairs_hook=pairs)
+    require(type(bundle) is dict and set(bundle)=={'result_json_base64','source_files'},'WIRE_BUNDLE')
+    result_raw=base64.b64decode(bundle['result_json_base64'],validate=True)
+    result=json.loads(result_raw,object_pairs_hook=pairs)
+    require(type(result) is dict and set(result)=={'wrapper','archive_receipt'},'WIRE_RESULT')
+    files=bundle['source_files']
+    expected={WRAPPER_PATH}|({RECEIPT_PATH} if result['archive_receipt'] is not None else set())
+    require(type(files) is dict and set(files)==expected,'WIRE_ORIGINAL_SOURCE_PATHS')
+    for path,value in files.items():
+        require(type(value) is dict and set(value)=={'bytes','sha256','raw_base64'}
+                and type(value['bytes']) is int and 0<value['bytes']<3*1024**2,'WIRE_ORIGINAL_FILE_BOUND')
+        original=base64.b64decode(value['raw_base64'],validate=True)
+        require(len(original)==value['bytes'] and hashlib.sha256(original).hexdigest()==value['sha256'],
+                'WIRE_ORIGINAL_FILE_BYTES')
+        source_value=json.loads(original,object_pairs_hook=pairs)
+        field='wrapper' if path==WRAPPER_PATH else 'archive_receipt'
+        canonical=lambda v:json.dumps(v,sort_keys=True,separators=(',',':'),allow_nan=False)
+        require(canonical(source_value)==canonical(result[field]),'WIRE_ORIGINAL_FILE_RESULT_MATCH')
+    return bundle
+unpack_bundle = bind_wire_consumer(unpack_bundle, WRAPPER_PATH)
+
+def unpack(wire):
+    return base64.b64decode(unpack_bundle(wire)['result_json_base64'],validate=True)
+
+"""Offline selection of current SUP16 archive metadata; performs no I/O."""
+import datetime
+import hashlib
+import json
+import re
+import shlex
+import uuid
+
+INSTANCE = 'i-05e8da8ea99593196'
+ARCHIVE = '/home/ubuntu/byul-gpu-b-tp2-20261103/GB2026111112-original-evidence.zip'
+SOURCE = '2cb01e9f08f9a123b8fffff00f9e798060115db9'
+GUARD_RUN = 'gpu-b-sup16-20261111-r8-aggregate'
+
+
+def require(condition, code):
+    if not condition:
+        raise ValueError(code)
+
+
+def integer(value):
+    return type(value) is int
+
+
+def sha(value):
+    return isinstance(value, str) and re.fullmatch('[0-9a-f]{64}', value) is not None
+
+
+def uuid_text(value):
+    if not isinstance(value, str):
+        return False
+    try:
+        return str(uuid.UUID(value)) == value.lower()
+    except (ValueError, AttributeError):
+        return False
+
+
+def binding(submission, terminal, phase, argv, seconds):
+    require(isinstance(submission, dict) and isinstance(terminal, dict), 'BINDING_OBJECT')
+    require(submission.get('phase') == phase, 'BINDING_PHASE')
+    require(isinstance(argv, (list, tuple)) and len(argv) > 0
+            and all(isinstance(x, str) and x for x in argv), 'BINDING_ARGV')
+    request = submission.get('request')
+    require(isinstance(request, dict), 'BINDING_REQUEST')
+    require(request.get('InstanceIds') == [INSTANCE]
+            and request.get('DocumentName') == 'AWS-RunShellScript'
+            and request.get('MaxConcurrency') == '1' and request.get('MaxErrors') == '0'
+            and type(request.get('TimeoutSeconds')) is int
+            and request['TimeoutSeconds'] == 120, 'BINDING_REQUEST_SCOPE')
+    require(request.get('Parameters') == {
+        'commands': [shlex.join(argv)], 'executionTimeout': [str(seconds)]},
+        'BINDING_REQUEST_COMMAND')
+    try:
+        digest = hashlib.sha256(json.dumps(request, sort_keys=True).encode()).hexdigest()
+    except (TypeError, ValueError):
+        raise ValueError('BINDING_REQUEST_JSON') from None
+    require(submission.get('request_sha256') == digest, 'BINDING_REQUEST_SHA')
+    response = submission.get('response')
+    require(isinstance(response, dict) and isinstance(response.get('Command'), dict),
+            'BINDING_RESPONSE')
+    command_id = response['Command'].get('CommandId')
+    require(uuid_text(command_id), 'BINDING_COMMAND_ID')
+    require(terminal.get('CommandId') == command_id
+            and terminal.get('InstanceId') == INSTANCE, 'BINDING_TERMINAL_ID')
+    status, rc = terminal.get('Status'), terminal.get('ResponseCode')
+    require(status in ('Success', 'Failed', 'TimedOut', 'Cancelled') and integer(rc),
+            'BINDING_TERMINAL_STATE')
+    require(status != 'Success' or rc == 0, 'BINDING_SUCCESS_RC')
+    return command_id, digest, status, rc
+
+
+def no_duplicate_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        require(key not in result, 'BINDING_PROBE_JSON')
+        result[key] = value
+    return result
+
+
+def select_archive(whole_submission, whole_terminal, probe_submission, probe_terminal,
+                   *, expected_whole_argv, expected_probe_argv, configuration_sha256):
+    """Return bound metadata, or None for a valid terminal attempt without an archive.
+
+    remote_name is the basename expected by the existing transfer helper. A returned
+    receipt is not a claim of downloaded-file integrity or product completion.
+    Whole-command failures and child nonzero return codes remain observations.
+    """
+    require(sha(configuration_sha256), 'BINDING_CONFIGURATION_SHA')
+    whole = binding(whole_submission, whole_terminal, 'whole', expected_whole_argv, 7200)
+    probe = binding(probe_submission, probe_terminal, 'whole-result-probe',
+                    expected_probe_argv, 60)
+    require(whole[0] != probe[0], 'BINDING_DISTINCT_COMMANDS')
+    require(probe[2] == 'Success' and probe[3] == 0, 'BINDING_PROBE_SUCCESS')
+    stdout = probe_terminal.get('StandardOutputContent')
+    require(isinstance(stdout, str), 'BINDING_PROBE_JSON')
+    try:
+        result = json.loads(unpack(stdout), object_pairs_hook=no_duplicate_keys,
+                            parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+    except (ValueError, TypeError, RecursionError):
+        raise ValueError('BINDING_PROBE_JSON') from None
+    require(isinstance(result, dict) and set(result) == {'wrapper', 'archive_receipt'},
+            'BINDING_PROBE_OBJECT')
+    wrapper, receipt = result['wrapper'], result['archive_receipt']
+    require(isinstance(wrapper, dict), 'BINDING_WRAPPER')
+    require(wrapper.get('tracked_children_terminal') is True
+            and wrapper.get('phase_or_outer_blocked') is False
+            and wrapper.get('external_SSM_terminal_still_required') is True,
+            'BINDING_WRAPPER_TERMINAL')
+    require(integer(wrapper.get('wrapper_pid')) and wrapper['wrapper_pid'] > 0
+            and uuid_text(wrapper.get('boot_id')), 'BINDING_WRAPPER_ID')
+    constructed, children = wrapper.get('caller_constructed'), wrapper.get('actual_children')
+    require(type(constructed) is bool and isinstance(children, list), 'BINDING_WRAPPER_CHILDREN')
+    if constructed:
+        require(wrapper.get('configuration_sha256') == configuration_sha256,
+                'BINDING_CONFIGURATION_MATCH')
+    else:
+        require(wrapper.get('configuration_sha256') is None and children == []
+                and receipt is None, 'BINDING_EARLY_REFUSAL')
+    for child in children:
+        require(isinstance(child, dict) and integer(child.get('pid')) and child['pid'] > 0
+                and integer(child.get('returncode')) and child.get('group_terminal') is True,
+                'BINDING_CHILD_TERMINAL')
+    if receipt is None:
+        return None
+    require(constructed and bool(children), 'BINDING_ARCHIVE_CHILDREN')
+    require(isinstance(receipt, dict), 'BINDING_ARCHIVE_OBJECT')
+    require(receipt.get('archive') == ARCHIVE and receipt.get('source') == SOURCE
+            and receipt.get('guard_run') == GUARD_RUN, 'BINDING_ARCHIVE_SCOPE')
+    require(integer(receipt.get('bytes')) and 0 < receipt['bytes'] <= 512 * 1024**2
+            and integer(receipt.get('members')) and receipt['members'] > 0
+            and sha(receipt.get('sha256')), 'BINDING_ARCHIVE_METADATA')
+    require(receipt.get('product_complete_claimed') is False, 'BINDING_PRODUCT_CLAIM')
+    try:
+        at = datetime.datetime.fromisoformat(receipt['at'])
+        require(at.tzinfo is not None and at.utcoffset() is not None, 'BINDING_ARCHIVE_TIME')
+    except (KeyError, TypeError, ValueError, OverflowError):
+        raise ValueError('BINDING_ARCHIVE_TIME') from None
+    return {'whole_command_id': whole[0], 'probe_command_id': probe[0],
+            'whole_request_sha256': whole[1], 'probe_request_sha256': probe[1],
+            'whole_status': whole[2], 'whole_response_code': whole[3],
+            'probe_status': probe[2], 'probe_response_code': probe[3],
+            'remote_name': ARCHIVE.rsplit('/', 1)[1], 'remote_path': ARCHIVE,
+            'bytes': receipt['bytes'], 'sha256': receipt['sha256'],
+            'members': receipt['members'], 'configuration_sha256': configuration_sha256,
+            'product_complete_claimed': False}

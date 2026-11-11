@@ -1,0 +1,31 @@
+{
+  "schema": "B03-exact-pointer-delta/2",
+  "original_patch_sha256": "63eb692e1cee8f460b16afec6f8284ba187acdc706f1f2fac8e4516b4ce84b8a",
+  "code_only_delta": {
+    "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b-next-input-audit-20261111\\out\\B03-null-SHA-fix-code-only-v2.patch",
+    "bytes": 3818,
+    "sha256": "062bcdbc3ff3caabcf64f872de4ad5498259e00642780a5b98889c7e736a53bf",
+    "cached_apply_check_on_original_patch": "passed"
+  },
+  "files": [
+    {
+      "path": "update/tools/b03_input_materialize.py",
+      "full_file": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b-next-input-audit-20261111\\update\\tools\\b03_input_materialize.py",
+      "bytes": 23303,
+      "sha256": "aed1f2cc30f686fc6d0f432e9538167296c373f99d6c45612e32d6398fd92b4d",
+      "LF_sha256": "aed1f2cc30f686fc6d0f432e9538167296c373f99d6c45612e32d6398fd92b4d"
+    },
+    {
+      "path": "update/tests/test_b03_supply_pair_preflight.py",
+      "full_file": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b-next-input-audit-20261111\\update\\tests\\test_b03_supply_pair_preflight.py",
+      "bytes": 7458,
+      "sha256": "03f3ca53bd5900e4aaba87ef7a4969cb3524e3d076ab6ee75715cc701168ef46",
+      "LF_sha256": "03f3ca53bd5900e4aaba87ef7a4969cb3524e3d076ab6ee75715cc701168ef46"
+    }
+  ],
+  "scope": "Only new supply-pair mode validates all seven path/SHA pointers before any input read. Legacy pinned/dependency and all five existing functions unchanged apart from new dispatch.",
+  "test": "v2:25 passed in21.25s (original9 plus16 new pointer boundaries), Linux CPython3.12.3/pytest8.3.5; v1:9passed historical preserved; GPU/AWS0",
+  "test_receipt": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b-next-input-audit-20261111\\out\\supply-pair-preflight-check-v2\\receipt.json",
+  "product_source_or_pack_changed": false,
+  "documents_in_delta": false
+}

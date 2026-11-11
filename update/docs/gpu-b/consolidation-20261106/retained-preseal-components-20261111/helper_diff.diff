@@ -1,0 +1,52 @@
+--- confirmed-S2-baseline/024-capture_normal.py
++++ S5-candidate-v1/capture_normal.py
+@@ -3,7 +3,7 @@
+ No engine creation/restart, product verdict, paired policy or AWS management.
+ """
+ from pathlib import Path
+-import argparse,hashlib,json,sys,traceback,os,stat,threading
++import argparse,hashlib,json,sys,traceback,os,stat,threading,time
+ def verify_source(repo,commit,manifest):
+     helper=Path(__file__).with_name('source_owner_verify.py');raw=helper.read_bytes()
+     if hashlib.sha256(raw).hexdigest()!='fb12dbe8d82d6bc027b613a477d6e1a432fa4693c46c6f1380cb38cecdf79fc9':raise ValueError('SUP16_SOURCE_OWNER_HELPER_CHANGED')
+@@ -255,6 +255,23 @@
+         return result
+ 
+ 
++def observe_pre_seal_inventory(reader, target, prepared, producer):
++    """Preserve one existing producer return before seal; no verdict or timer."""
++    observation = {'stage': 'before_seal', 'producer_returned': False,
++                   'started_monotonic_ns': time.monotonic_ns()}
++    try:
++        engine = reader.binding['engine']
++        observation['producer_result'] = producer(reader, target,
++            container=engine['container'], image=engine['image'],
++            session=prepared['session'], owner_identity=reader.owner_identity)
++        observation['producer_returned'] = True
++    except Exception as error:
++        observation['error'] = {'type': type(error).__name__, 'message': str(error),
++                                'errno': getattr(error, 'errno', None)}
++    observation['finished_monotonic_ns'] = time.monotonic_ns()
++    return observation
++
++
+ def main():
+  p=argparse.ArgumentParser(description=__doc__)
+  for n in ['source-root','environment','target','prepared','output','client-private-root']:p.add_argument('--'+n,type=Path,required=True)
+@@ -268,7 +285,7 @@
+  from guard.collectors.model_read_scope import validate_binding
+  from guard.collectors.native_model_file_reads import analyze
+  from guard.executors.kubernetes_lifecycle_capture import KubernetesLifecycleReader
+- from guard.executors.lifecycle_session import capture_session
++ from guard.executors.lifecycle_session import capture_session,inventory
+  from guard.models import canonical_json
+  from guard.update_validation import reserve_output
+  if hashlib.sha256(Path(__file__).read_bytes()).hexdigest()!=a.tool_sha256:raise ValueError('SUP16_NORMAL_CAPTURE_SOURCE_CHANGED')
+@@ -294,6 +311,7 @@
+   reader=KubernetesLifecycleReader(target,env,prepared,binary=a.kubectl_binary,duration=120,runner=bridge)
+   bridge.bind_reader(reader)
+   reader.snapshot()
++  report['before_seal']=observe_pre_seal_inventory(reader,target,prepared,inventory)
+   report['seal']=reader.seal_session()
+   engine=reader.binding['engine']
+   packet=capture_session(reader,target,container=engine['container'],image=engine['image'],prepared=prepared,

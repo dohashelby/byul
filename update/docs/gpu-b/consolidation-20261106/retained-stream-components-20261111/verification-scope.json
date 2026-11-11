@@ -53,35 +53,63 @@
   "raw_CPU_receipts": {
     "synthetic-CPU-v2-protocol-receipt.json": {
       "bytes": 6734,
-      "sha256": "abf61b7cb4c4439910c1dd7d7c1949f80ff1d8e1a1fee21228b4019554c4790f"
+      "sha256": "abf61b7cb4c4439910c1dd7d7c1949f80ff1d8e1a1fee21228b4019554c4790f",
+      "kind": "explicit_synthetic_CPU_evidence"
     },
     "synthetic-CPU-v2-FD-receipt.json": {
       "bytes": 1612,
-      "sha256": "81e94b896bf2c5d0db55e69e665add11d9e6803be974d65f5e754d1bb61194f1"
+      "sha256": "81e94b896bf2c5d0db55e69e665add11d9e6803be974d65f5e754d1bb61194f1",
+      "kind": "explicit_synthetic_CPU_evidence"
     },
     "synthetic-CPU-v3-guard-receipt.json": {
       "bytes": 6302,
-      "sha256": "9b4d7bfafa2a3e85211a4374b87a6ee8fcbf1ffd68182eeaa70d994d7a80e82f"
+      "sha256": "9b4d7bfafa2a3e85211a4374b87a6ee8fcbf1ffd68182eeaa70d994d7a80e82f",
+      "kind": "explicit_synthetic_CPU_evidence"
     },
     "synthetic-CPU-v3-native-launcher.json": {
       "bytes": 1289,
-      "sha256": "f05537a5d29d3d0884b1442607128b856f68d9b89ecf41b352225a9a031a38e6"
+      "sha256": "f05537a5d29d3d0884b1442607128b856f68d9b89ecf41b352225a9a031a38e6",
+      "kind": "explicit_synthetic_CPU_evidence"
     },
     "synthetic-CPU-v4-cleanup-receipt.json": {
       "bytes": 2700,
-      "sha256": "ea385e1af1eaec45758faf9368bcabf1289dd51b32ad7bfa34dbf0d4d1d1a014"
+      "sha256": "ea385e1af1eaec45758faf9368bcabf1289dd51b32ad7bfa34dbf0d4d1d1a014",
+      "kind": "explicit_synthetic_CPU_evidence"
     },
     "synthetic-CPU-v4-native-launcher.json": {
       "bytes": 1239,
-      "sha256": "8d40abc45b62e42a7da45f35e46c3a660d099947d0bd01c7da818f7c63d62ef7"
+      "sha256": "8d40abc45b62e42a7da45f35e46c3a660d099947d0bd01c7da818f7c63d62ef7",
+      "kind": "explicit_synthetic_CPU_evidence"
     },
     "synthetic-CPU-supervisor-v6-server-receipt.json": {
       "bytes": 2022,
-      "sha256": "9725d9f4505a968bfafb0f90bc68a7984873ece4964b8ac98c47c3d75aa6976a"
+      "sha256": "9725d9f4505a968bfafb0f90bc68a7984873ece4964b8ac98c47c3d75aa6976a",
+      "kind": "explicit_synthetic_CPU_evidence"
     },
     "session-supervisor-focused-review.json": {
       "bytes": 11795,
-      "sha256": "fe392575ef0ece69caf309e0d3af85829787f3ba985b3d6458f0040f4ac3418c"
+      "sha256": "fe392575ef0ece69caf309e0d3af85829787f3ba985b3d6458f0040f4ac3418c",
+      "kind": "focused_source_review"
+    },
+    "synthetic-CPU-entry-v7-constructor-receipt.json": {
+      "bytes": 2058,
+      "sha256": "b1a01a183c3e0eba5f8abecb25b7f6339d00531ea20ce2da99baa59fa9a2e81a",
+      "kind": "explicit_synthetic_CPU_evidence"
+    },
+    "synthetic-CPU-entry-v7-native-launcher.json": {
+      "bytes": 1800,
+      "sha256": "89527f4417ffdb49ee301255b758cb202b8044afe6057a26f32d87b1457ce2c1",
+      "kind": "explicit_synthetic_CPU_evidence"
+    },
+    "entry-v7-focused-review.json": {
+      "bytes": 12266,
+      "sha256": "af35625cc2509466cc5ebf18547ba898ca8ae5dc074e5f3d12a0e65ec6f2c008",
+      "kind": "focused_source_review"
+    },
+    "session-S1-actual-review.json": {
+      "bytes": 30338,
+      "sha256": "55f56f09f08e01af1138ad225a165effe18c59cb64bc214627f5e00fc7ab996a",
+      "kind": "actual_operating_control_review"
     }
   },
   "actual_GB12_archive_read_or_restored_by_CPU": false,
@@ -125,5 +153,22 @@
     "final_operating_packet_is_separate": true,
     "source_commit_in_original_review": null,
     "source_bytes_not_rewritten_to_claim_review_at_publication_commit": true
+  },
+  "entry_v7_actual_packet_binding_fix": {
+    "source_sha256": "80dea4be043870b3e757826149a380c003c56879a0c739350a91d60a841b40bb",
+    "old_entry_v6_sha256": "44c6b7a84972ab7433b5af2d04def667ab4385cb7eb466718a982ce2be506069",
+    "old_bytes_published_at_commit": "33c7a084ad1c9a6c61ca49c4ca11b7b5f83142e2",
+    "actual_S1_old_entry_failure": "SAME_FIXED_DRIVER_PACKET_REQUIRED before health/Session/stream",
+    "cause": "Outer separately parsed dict passed to original Controller instead of identical runtime.packet from qualified loader",
+    "original_is_identity_guard_preserved": true,
+    "qualified_loader_to_original_constructor_and_entry_new_CPU_cases": 3,
+    "first_harness_failure": "Wrong expectation that the harmless CLI journal directory must not exist; original failure retained",
+    "corrected_harness_scope": "Empty CLI directory permitted, request files0/API spy0; same three cases, not double counted",
+    "S4_review_sha256": "af35625cc2509466cc5ebf18547ba898ca8ae5dc074e5f3d12a0e65ec6f2c008",
+    "final_ready_check_now_constructs_original_Controller_and_new_Recovery_without_API": true,
+    "actual_CloudShell_v7_check_or_next_GPU_trial_not_proven_by_CPU": true,
+    "core180e_stream8e_original_loader_and_Controller_unchanged": true,
+    "old_S1_failure_stop180_failure_and_old_UNKNOWN1_preserved": true,
+    "actual_S1_control_review_sha256": "55f56f09f08e01af1138ad225a165effe18c59cb64bc214627f5e00fc7ab996a"
   }
 }

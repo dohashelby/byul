@@ -8,6 +8,8 @@ Deadline은 기존 absolute CLOCK_MONOTONIC 끝값을 소비한다. 인증·연�
 
 `session_recovery.py`는 기존 관리 문서 `AWS-StartNonInteractiveCommand`와 정식 AWS CLI/plugin을 사용한다. 전송용 첫 인증 전에 만든 원900초, 보수적인 guest boot/clock mapping, 최초 수락 관측65초, 고정 in-memory sender와 원격 종료 marker, 로컬 CLI 회수·EOF·정확한 server session 종료를 연결한 뒤 receiver를 게시한다. Terminating·일시적0행은 같은 기한 안에서 읽기 재관측한다. 자기 SessionId만 Terminate1회로 정리하고 최초 오류와 불확실성을 보존한다. `invoke_session_recovery.py`는 고정 파일·entry dispatch와 실제 정지 영수증의 nonce를 기존 child outcome에 연결한다. 이 source/후보·CPU의 [집중 검토 원문](session-supervisor-focused-review.json)을 함께 보존했다. 실제 StartSession 권한·RunAs·전송 성공은 CPU 결과에 포함하지 않는다.
 
+S1 실제 실행에서는 v6 진입점이 loader 외부에서 별도 파싱한 packet을 원 Controller에 넘겨 `SAME_FIXED_DRIVER_PACKET_REQUIRED`로 health 전에 실패했다. v7은 동일한 `runtime.packet`을 공급하고 원 `is` 검사를 유지한다. 최종 준비 packet의 check 모드는 실제 원 Controller·새 Recovery 생성자까지 API 호출 없이 검사한다. 실제 고정 loader→원 생성자→진입점의 새 CPU3과 [최소 수정 검토](entry-v7-focused-review.json)를 연결했다. 원 v6 source·CPU 결과와 실제 S1 실패는 당시 범위로 보존한다.
+
 `start_existing_once.py`는 검토된 invoker·loader와 기존 driver.start()를 연결한다. dependency는 이전 회수 source map의 동일 원문이며 driver.main/execute를 호출하지 않는다. R1에서 기존 인스턴스 start1은 실제 수락됐고 health는 통과했으나 원 압축 codec의3MiB 상한으로 archive GET 이전에 실패했다. [실제 운영 기록](../SUP16_ACTUAL_OBSERVATIONS_20261111.md)에 원 오류·정지 감시 실패·후속 실제 정지를 구분했다.
 
 v1 합성 CPU30의 실패2를 보존했고 v2에서 해당 결함을 고쳤다. v2 protocol30·실제 로컬 FD8은 당시 source의 결과다. v3는 기존 접근 guard와 frame 단위 변경의 새 영향19를 확인했다. 독립 검토에서 새 부모 FD 상태 조회 실패의 정리 누락을 찾아 v4에서 두 조회를 정리 보호 구간으로 옮기고 새 실패 주입2를 확인했다. 이 숫자는 제품 점검 완료 수가 아니며, 기존 결과를 v4 전체 suite 통과로 바꾸지 않는다.

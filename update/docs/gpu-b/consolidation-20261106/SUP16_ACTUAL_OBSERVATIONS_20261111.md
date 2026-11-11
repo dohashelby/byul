@@ -1,6 +1,6 @@
 # SUP-16 실제 운영 관측 — 2026-11-11
 
-이 기록은 CPU 준비 검증과 실제 시스템 관측을 구분한다. 모델·역할·제품 판정은 해당 원자료가 확인된 범위만 반영한다. 원 PACK33 DRAFT·LAB10/33·FAIL/UNKNOWN/정확 Ref를 변경하지 않는다.
+이 기록은 S1 정리 시점까지의 CPU 준비 검증과 실제 시스템 관측을 구분한다. 후속 운영 상태는 [PR #240](https://github.com/dohashelby/byul/pull/240) 본문에서 시점별로 갱신한다. 모델·역할·제품 판정은 해당 원자료가 확인된 범위만 반영한다. 원 PACK33 DRAFT·LAB10/33·FAIL/UNKNOWN/정확 Ref를 변경하지 않는다.
 
 ## R6: 실제 API 성공, 역할 실행 전 중단
 
@@ -76,6 +76,23 @@ encoder CID `c4d64e32-fef6-44dc-80e6-763265213f20`는 Failed/1로 종료했다. 
 - R1 후속 selected 정지 원문: `eafe42f2ce06a8aca01e2faddfd71b4142ffdac98c37baf32141d5d9b265e7b1`
 - R1 실행·정지·비용 독립 대조: `f3ab591d1f7f1ef9f084c988cfd6ff71de1541a990cf7141db7fae91822cc401`
 
+## Session S1: 설정 객체 결합 실패와 정리
+
+기존 관리 문서 `AWS-StartNonInteractiveCommand`와 CloudShell의 설치된 plugin1.2.835.0을 확인한 뒤 별도 스트림 회수를 준비했다. 10:27 KST 선정 stopped·IP 없음·SSM0·활성 명령0을 새로 조회하고 고정 source15·운영 packet·진입 검사를 연결했다. 당시 진입 검사는 파일·모듈 결합 범위였다.
+
+정상 start1의 실제 CLI 구간은 10:33:49~51 KST이며, 10:35 KST running·SSM Online을 확인했다. collect parent591→child592는 10:37:42 KST에 `RecoveryError: SAME_FIXED_DRIVER_PACKET_REQUIRED`로 즉시 rc1·회수·그룹 종료·cleanup 오류 없음으로 끝났다. 원 entry가 loader 외부에서 파싱한 packet을 원 Controller에 넘겨 `driver.PACKET is packet` 검사가 실패한 것이다. health·clock·Session·stream·모델 실행은 없었으며 세션 권한 거부가 관측된 사례도 아니다.
+
+검토된 loader가 만든 동일 `runtime.packet`을 전달하도록 entry v7 `80dea4be043870b3e757826149a380c003c56879a0c739350a91d60a841b40bb`를 수정했다. 원 `is` 검사는 유지했다. 최종 준비 packet의 `check` 모드는 실제 원 Controller와 새 Recovery 생성자를 API 호출 없이 확인한다. 실제 고정 loader의 생성 결과를 소비하는 새 CPU3과 독립 검토를 연결했다. 첫 하네스는 빈 CLI 저널 디렉터리 생성까지 금지하는 잘못된 기대 때문에 exit1이었고, 요청 파일0/API0으로 기대를 정정해 같은 세 사례를 확인했다. 원 하네스 실패를 보존하며 세 사례를 두 번 가산하지 않는다. 원 core180e·stream8e·loader·Controller는 변경하지 않았다.
+
+정상 stop1의 실제 CLI 요청·응답은 10:39:59~10:40:01 KST다. 180초 감시는 `STOPPED_NOT_YET_OBSERVED`로 실패했다. 후속 10:45 KST 관측은 stopping·IP 있음·SSM Online이었으며, 10:47:40 KST EC2 조회에서 stopped·IP 없음, 이어 SSM node0·활성 명령0·현재 private unresolved0을 확인했다. 읽기 전용 관측은 10:47:43 KST에 끝났다. 추가 stop·Force·타이머 reset은 없었다. 보수 장부는 start 로컬 기록 10:33:44부터 관측 끝까지 839.075131초이며 user 관리·새 비용 null·정확 off 시각 null·EBS 보존을 유지한다. 로컬 기록과 실제 API 요청·응답 시각을 구분한다.
+
+새 control 337,653B·356 member의 첫 CRC와 index355·bytes/SHA, 실행·정지·장부 연결을 독립 대조했다. 이 자료는 전체 GB12 원 archive가 아니다. 원 S1 실패·정지 감시 실패·이전 UNKNOWN1·실제 제품 미실증을 유지한다.
+
+- S1 후속 selected 정지 원문: `5e6eb1c04e4ce947ccf4b314e1c79bd57290e87fb677bdd09eb1f82f83c0cd65`
+- S1 실제 운영·정리 검토: `55f56f09f08e01af1138ad225a165effe18c59cb64bc214627f5e00fc7ab996a`
+- v7 실제 loader→원 생성자 CPU3: `b1a01a183c3e0eba5f8abecb25b7f6339d00531ea20ce2da99baa59fa9a2e81a`
+- v7 최소 수정 독립 검토: `af35625cc2509466cc5ebf18547ba898ca8ae5dc074e5f3d12a0e65ec6f2c008`
+
 ## 기록 파일0의 해석과 다음 관측
 
 실제 공급된 lifecycle base 원문 56,479B·SHA `2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd`를 대조했다. install 1032~1052행의 성공은 Observer/Finder 구성이다. Observer는 writer=None으로 시작하고(334~336행), 첫 관측 사건에서 Writer를 만든다(374~391행). Writer의 파일 생성·START 기록은 255~272행이며 emit의 쓰기 예외는 disabled_pid로 흡수된다(393~397행).
@@ -84,6 +101,6 @@ encoder CID `c4d64e32-fef6-44dc-80e6-763265213f20`는 Failed/1로 종료했다. 
 
 ## 다음 실행과 범위
 
-B 전용 private 제어·진단 경로와 읽기 전용 조회를 보강했고 R8·R1에서 실제 준비·실패 범위를 확인했다. 마지막 실제 정지 관측은 R1의 09:27 KST다. 이미 확보한 원자료를 진단하고 [archive 압축·복원 준비](SUP16_ARCHIVE_ENVELOPE_PREPARATION_20261111.md)를 CPU에서 검증했지만 실제 GB12는 기존 압축 상한을 넘었다. 다음 전송은 기존 Session Manager 관리 문서와 설치된 플러그인의 지원을 확인한 별도 스트림 후보로 준비한다. 전송·종료·기한 연결과 실제 원자료 검증은 별도다. 기존 output·A 코드의 권한을 바꾸거나 source guard·기한을 완화하지 않는다. 새 모델·정상/도전/복구 세 역할·전체 반출 성공은 해당 실측 원자료로 별도 확인해야 한다.
+B 전용 private 제어·진단 경로와 읽기 전용 조회를 보강했고 R8·R1·S1에서 실제 준비·실패 범위를 확인했다. 이 기록의 마지막 정리 관측은 S1의 10:47 KST다. 이미 확보한 원자료를 진단하고 [archive 압축·복원 준비](SUP16_ARCHIVE_ENVELOPE_PREPARATION_20261111.md)를 CPU에서 검증했지만 실제 GB12는 기존 압축 상한을 넘었다. 다음 전송은 기존 Session Manager 관리 문서와 설치된 플러그인을 사용하는 별도 스트림 경로와 v7 객체 결합 수정으로 이어간다. 실제 전송·종료·기한 연결과 원자료 무결성은 별도 확인한다. 기존 output·A 코드의 권한을 바꾸거나 source guard·기한을 완화하지 않는다. 새 모델·정상/도전/복구 세 역할·전체 반출 성공은 해당 실측 원자료로 별도 확인해야 한다.
 
 원 runtime `2cb01e9f`/466파일과 공개 저장소 계열의 제품528파일을 구분한다. CPU 준비 요약의 actual=false는 작성 당시 범위로 보존한다.

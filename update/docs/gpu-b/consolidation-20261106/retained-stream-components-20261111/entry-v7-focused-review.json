@@ -1,0 +1,223 @@
+{
+  "schema": "S4-qualified-packet-identity-entry-v7-focused-review/1",
+  "at_UTC": "2026-11-11T01:49:43.677491+00:00",
+  "owner": "S4",
+  "request_id": "S4-GB12-QUALIFIED-PACKET-IDENTITY-ENTRY-20261111-01",
+  "id": "SUP-16/R8 후속 준비",
+  "branch_scope": "qualified loader packet 객체 신원 → 원 Controller 생성자 → v7 check/child 연결",
+  "source_commit": null,
+  "source_identity": "미커밋 out 준비 entry의 정확 bytes/SHA. core/stream 및 원 guard 고정 버전 재사용.",
+  "files": {
+    "invoke_session_recovery.py": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v7\\invoke_session_recovery.py",
+      "bytes": 6679,
+      "sha256": "80dea4be043870b3e757826149a380c003c56879a0c739350a91d60a841b40bb"
+    },
+    "v6-old-invoke_session_recovery.py": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v6\\invoke_session_recovery.py",
+      "bytes": 5878,
+      "sha256": "44c6b7a84972ab7433b5af2d04def667ab4385cb7eb466718a982ce2be506069"
+    },
+    "entry-packet-identity-delta.diff": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v7\\entry-packet-identity-delta.diff",
+      "bytes": 3267,
+      "sha256": "440f31d7a9df9861050bd99600617bfe9b93fc2c99e68d8e53fd593b72fda3ff"
+    },
+    "test_qualified_packet_identity_harness2.py": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v7\\test_qualified_packet_identity_harness2.py",
+      "bytes": 6135,
+      "sha256": "ff4c3d1111877fdea4f67846aad4cfda27cb959e61a56525225afc513ed61dea"
+    },
+    "test_qualified_packet_identity.py": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v7\\test_qualified_packet_identity.py",
+      "bytes": 6032,
+      "sha256": "a024d1769622ddef958220fe47b8fc71b3e0b43f43374b171db88f4d5d5d5eb6"
+    },
+    "qualified-packet-identity-CPU-v7-harness2.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v7\\qualified-packet-identity-CPU-v7-harness2.json",
+      "bytes": 2058,
+      "sha256": "b1a01a183c3e0eba5f8abecb25b7f6339d00531ea20ce2da99baa59fa9a2e81a"
+    },
+    "qualified-packet-native-host-link-v7.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v7\\qualified-packet-native-host-link-v7.json",
+      "bytes": 1800,
+      "sha256": "89527f4417ffdb49ee301255b758cb202b8044afe6057a26f32d87b1457ce2c1"
+    },
+    "first-harness-directory-expectation-failure-v1.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v7\\first-harness-directory-expectation-failure-v1.json",
+      "bytes": 1162,
+      "sha256": "cca4f6f986777c4894ced2af66104eec1ec1c684043577f0d9f6ad5d5b84e4d8"
+    },
+    "entry-candidate-freeze-v7.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v7\\entry-candidate-freeze-v7.json",
+      "bytes": 1918,
+      "sha256": "c2fcc1c24b321248f5e055c0c04f36dcb24349784672414ed39f2f2d153e18d2"
+    },
+    "S2-R8-source-only-11files-345840af2c9ac6b5.json.zlib": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-envelope-private-entry-prep-20261111-v2\\S2-R8-source-only-11files-345840af2c9ac6b5.json.zlib",
+      "bytes": 71547,
+      "sha256": "345840af2c9ac6b5798c0ce3c25c31d4c25858f8caa2f3348e390fcbcd01345a"
+    },
+    "v6-supervisor-entry-candidate-CPU8-final-focused-review-v1.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\session-supervisor-focused-review-20261111-v1\\v6-supervisor-entry-candidate-CPU8-final-focused-review-v1.json",
+      "bytes": 11795,
+      "sha256": "fe392575ef0ece69caf309e0d3af85829787f3ba985b3d6458f0040f4ac3418c"
+    }
+  },
+  "checks": [
+    {
+      "check": "v6 기존 entry 고정 SHA",
+      "matched": true
+    },
+    {
+      "check": "v7 새 entry 6679바이트 고정 SHA",
+      "matched": true
+    },
+    {
+      "check": "AST에서 helper 2개 추가 및 child_once/main만 변경",
+      "matched": true
+    },
+    {
+      "check": "construct_health 및 main child에 동일 runtime.packet 공급",
+      "matched": true
+    },
+    {
+      "check": "check_runtime_binding에서 실제 원 생성자와 새 core 생성자 결합",
+      "matched": true
+    },
+    {
+      "check": "core180e 및 stream8e 고정 불변",
+      "matched": true
+    },
+    {
+      "check": "실제 소비 loader와 Controller 원 바이트 고정",
+      "matched": true
+    },
+    {
+      "check": "원 loader 재해석 및 동일 객체 연결·원 is 검사 불변",
+      "matched": true
+    },
+    {
+      "check": "native host entry 바이트와 SHA 일치",
+      "matched": true
+    },
+    {
+      "check": "native host harness 바이트와 SHA 일치",
+      "matched": true
+    },
+    {
+      "check": "native host receipt 바이트와 SHA 일치",
+      "matched": true
+    },
+    {
+      "check": "native host 첫 하네스 실패 바이트와 SHA 일치",
+      "matched": true
+    },
+    {
+      "check": "CPU 자체 entry 및 harness SHA 일치",
+      "matched": true
+    },
+    {
+      "check": "CPU3 실제 loader·생성자·다른 객체 거부·원격 차단 범위",
+      "matched": true
+    },
+    {
+      "check": "CPU native UID/EUID1000·Python3.12.3·ISB·PID·ticks",
+      "matched": true
+    },
+    {
+      "check": "FD 번호집합 원복·API spy0·실제 AWS/Session/GPU/GB12 false",
+      "matched": true
+    },
+    {
+      "check": "native6507b3 즉시 종료0·stdout 메타 일관성",
+      "matched": true
+    },
+    {
+      "check": "첫 하네스 실패 보존·빈 CLI 기대값 및 결과명만 수정",
+      "matched": true
+    },
+    {
+      "check": "후보 고정 핀·not_ready true·실행 false·새 private 및 fresh null",
+      "matched": true
+    }
+  ],
+  "checks_count": 19,
+  "mismatches": 0,
+  "result": "v7은 실제 runtime.packet 객체를 원 Controller와 새 child 경로에 공급한다. 원 is guard 유지 및 다른 객체 거부를 확인했으며, 검토 범위에서 명확한 추가 source 차단 결함은 확인되지 않았다.",
+  "prior_review_gap": "이전 집중검토는 qualified loader가 다시 파싱한 packet 객체와 원 Controller 생성자 사이의 연결을 직접 검증하지 않아 실제 S1에서 드러난 결함을 발견하지 못했다. 이전 CPU 통과가 이 경계의 완전 검증이었다고 소급하지 않는다.",
+  "actual_S1_failure": {
+    "origin": "S2 및 총괄 직접 전달. 원 control·stderr 미반출 상태라 S4 독립 원문 검증 전.",
+    "reported_error": "SAME_FIXED_DRIVER_PACKET_REQUIRED",
+    "reported_collect_PID": 592,
+    "reported_returncode": 1,
+    "reported_health_Session_GET": 0,
+    "status": "원 실제 실패 보존. v7 CPU로 실제 S1 실패를 지우거나 성공으로 승격하지 않음.",
+    "cleanup_and_cost_scope": "원 stop180 실패·stopping 후속·장부 열림은 별도 원문 반출 후 검토 대상. 현재 상태를 이 문서로 확정하지 않음."
+  },
+  "CPU3": {
+    "receipt": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v7\\qualified-packet-identity-CPU-v7-harness2.json",
+      "bytes": 2058,
+      "sha256": "b1a01a183c3e0eba5f8abecb25b7f6339d00531ea20ce2da99baa59fa9a2e81a"
+    },
+    "cases": [
+      {
+        "case": "actual-qualified-loader-runtime-packet-real-original-constructor-new-entry-check",
+        "passed": true
+      },
+      {
+        "case": "same-values-different-packet-object-rejected-by-unchanged-original-guard",
+        "passed": true
+      },
+      {
+        "case": "new-entry-child-path-real-qualified-health-constructor-then-explicit-no-remote-barrier",
+        "passed": true
+      }
+    ],
+    "runtime": {
+      "UID": 1000,
+      "EUID": 1000,
+      "Python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "executable": "/usr/bin/python3.12",
+      "isolated": 1,
+      "no_site": 1,
+      "dont_write_bytecode": true,
+      "argv": [
+        "/mnt/c/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/worktrees/byul-b12-s2-plan-20261108/out/r8-session-stream-recovery-prep-20261111-v7/test_qualified_packet_identity_harness2.py"
+      ],
+      "boot": "1228df3e-7732-49b6-8883-487a127bc287",
+      "PID": 701,
+      "PPID": 700,
+      "start_ticks": 40550064
+    },
+    "elapsed_seconds": 0.09067203401355073,
+    "API_spy_calls": 0,
+    "scope": "실제 고정 loader 함수/원 Controller 생성자/새 entry 함수 및 core 생성자를 로컬 임시 private·packet에서 소비. child는 실제 core 상속 후 run_once를 명시 BlockRemote로 대체해 API 전 차단. 원 original error 객체와 원 child_outcome 소비 보존.",
+    "FD_scope": "번호 0/1/2/3 집합만 동일. 열린 객체 신원 집합 주장은 하지 않음."
+  },
+  "limits": [
+    "CPU는 check_runtime_binding 및 child_once 함수를 직접 호출했다. main CLI dispatch와 실제 CloudShell Python3.13의 새 v7 entry 실행은 아직 이 증거에 없다. main에서 동일 runtime.packet을 전달하는 변경은 정적 대조 범위다.",
+    "하네스의 임시 root/packet은 실제 S1 운영 입력 그대로가 아니다. 기반 final packet의 정확 실행 당시 raw SHA는 CPU 영수증에 자체 고정되지 않았다. 따라서 실제 운영 packet 전체 재현·최종 admission 검증으로 주장하지 않는다.",
+    "native tool 연결은 S2 원 host 메타를 재사용했다. stdout 85바이트/SHA는 하네스 print 형식과 receipt 값으로 재구성해 일관성만 확인했으며 독립 raw stdout 관측이 아니다. 별도 stderr 바이트 핀 없음.",
+    "원 S1 stderr·control·정상 stop 및 현재 off/SSM/IP/비용은 별도 검토 요청 전이며 이번 범위 밖이다. 기존 원 archive CRC·Ref 복원·저장 팩·실제 GPU/Session/GB12 성공 판정 변경 0.",
+    "기존 v6 및 과거 CPU 전체 suite 재실행 0. S4 대상 import/exec·CPU 실행·AWS/SSM/GPU·정본/운영 코드 수정 0."
+  ],
+  "verification_level": "준비 entry 정적 delta 및 실제 로컬 CPU/합성 입력/명시 원격 차단 증거의 메타 연결",
+  "data_origin": "S2 WSL 실제 고정 loader와 원 Controller 코드 소비. 임시 packet/FD·API spy·BlockRemote 대역. 실제 AWS/Session/GPU/GB12 0.",
+  "policy_official": "원 FAIL·UNKNOWN1·null·정확 Ref·정책·official 보존. 새 승인·ACK·CI gate 없음.",
+  "counts": {
+    "changed_preparation_entry_files": 1,
+    "new_S2_CPU_unique_cases": 3,
+    "reported_CPU_execution_attempts": 2,
+    "initial_harness_failure_preserved": 1,
+    "S4_new_CPU_cases": 0,
+    "GPU_tests": 0,
+    "unique_product_branch_total": null,
+    "development26_GPU43_historical6_status_changes": 0
+  },
+  "remaining_inputs": "동일 고정 v7에 대한 실제 source-only/final-ready check 및 실제 운영 결과는 S2/root 원 절차 소관. 추가 S4 ACK를 새 gate로 두지 않는다.",
+  "operational_ready": false,
+  "new_gate_or_approval_added": false,
+  "next_owner": "S2 및 총괄"
+}

@@ -22,8 +22,8 @@
     },
     "invoke_session_recovery.py": {
       "repository_path": "update/docs/gpu-b/consolidation-20261106/retained-stream-components-20261111/invoke_session_recovery.py",
-      "bytes": 5878,
-      "sha256": "44c6b7a84972ab7433b5af2d04def667ab4385cb7eb466718a982ce2be506069"
+      "bytes": 6679,
+      "sha256": "80dea4be043870b3e757826149a380c003c56879a0c739350a91d60a841b40bb"
     }
   },
   "dependency_source_map": "../retained-recovery-operator-20261111/source-manifest.json",

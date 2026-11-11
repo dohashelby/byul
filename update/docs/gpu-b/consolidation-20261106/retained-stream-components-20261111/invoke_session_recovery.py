@@ -32,6 +32,17 @@ def checked_components(loader,root,packet):
     assert source['invoke_session_recovery.py']==Path(__file__).read_bytes()
     return source
 
+def construct_health(runtime):
+    # qualified loader가 만든 실제 동일 packet 객체만 원 guard에 공급한다.
+    return runtime.controller_module.Controller(runtime.driver,runtime.glue,runtime.packet,runtime.codec_raw)
+
+def check_runtime_binding(runtime,core,stream,source):
+    health=construct_health(runtime)
+    assert health.packet is runtime.packet and runtime.driver.PACKET is runtime.packet
+    supervisor=core.Recovery(runtime,stream,source['gb12_stream.py'],runtime.packet['session_component_files']['gb12_stream.py'])
+    assert supervisor.driver is runtime.driver
+    return True
+
 def child_once(inv,runtime,core,stream,source,packet,packet_sha):
     parent=json.loads((runtime.root/'collect-invocation-once-v1.json').read_bytes())
     assert parent['packet_sha256']==packet_sha and parent['PID']==os.getppid()
@@ -40,7 +51,7 @@ def child_once(inv,runtime,core,stream,source,packet,packet_sha):
     try:
         assert not packet['not_ready'] and packet['execution_ready'] is True
         runtime.driver.uncertainty_barrier('before-session-recovery-child')
-        health=runtime.controller_module.Controller(runtime.driver,runtime.glue,packet,runtime.codec_raw)
+        health=construct_health(runtime)
         supervisor=core.Recovery(runtime,stream,source['gb12_stream.py'],packet['session_component_files']['gb12_stream.py'])
         result=supervisor.run_once(health,packet['collector_request_id'],str(runtime.root/'GB2026111112-original-evidence.zip'))
     except BaseException as error:original=error
@@ -74,8 +85,12 @@ def main():
         stream=module(names[1],root/'gb12_stream.py',source['gb12_stream.py'])
         with loader.load_private(root,raw,a.packet_sha256) as runtime:
             if a.mode=='check':
+                verified=False
+                if runtime.packet['not_ready'] is False:
+                    verified=check_runtime_binding(runtime,core,stream,source)
                 print(json.dumps({'source_only_check':True,'API_GPU_Session_called':False,'packet_sha256':a.packet_sha256,
-                    'session_sources':{n:hashlib.sha256(b).hexdigest() for n,b in source.items()},'runtime_ready_claimed':False}),flush=True)
+                    'session_sources':{n:hashlib.sha256(b).hexdigest() for n,b in source.items()},
+                    'actual_qualified_health_constructor_binding_verified':verified,'runtime_ready_claimed':False}),flush=True)
                 return 0
             assert packet['not_ready'] is False and packet['execution_ready'] is True
             assert packet['session_required_verification_complete'] is True
@@ -83,7 +98,7 @@ def main():
                 # 원 parent 함수의 실행 대상만 검증된 이 entry로 결합. 함수/원 wait/group/outcome bytes 불변.
                 inv.__file__=str(Path(__file__))
                 return inv.run_parent(packet,a.packet_sha256)
-            child_once(inv,runtime,core,stream,source,packet,a.packet_sha256)
+            child_once(inv,runtime,core,stream,source,runtime.packet,a.packet_sha256)
             return 0
     finally:
         for name,old in saved.items():

@@ -366,6 +366,10 @@ class VllmAdapter:
     name: str = field(default="vllm", init=False)
     version: str = field(default="0.5.0", init=False)
 
+    def runner_capture_profile(self, version):
+        from .vllm_runner_capture import profile
+        return profile(version)
+
     def input_rejection_proof(self, **kwargs) -> dict:
         return _input_rejection_proof(**kwargs)
 

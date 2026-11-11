@@ -1,6 +1,6 @@
 """B native 요청을 변경하지 않고 응답 ID→기존 callback HMAC을 연결한다.
 
-선정 0.31 단일 prompt/n=1/LAB 환경만 지원한다. A 전송·생산자·schema·판정은 바꾸지 않는다.
+지원표와 provider가 허용하는 단일 prompt/n=1/LAB 환경만 지원한다. A 전송·생산자·schema·판정은 바꾸지 않는다.
 """
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ import threading
 import tempfile
 from urllib.parse import urlsplit
 
-from guard.adapters import vllm_engine_callback_sensor as sensor
-from guard.adapters.vllm import REQUEST_BINDING_GPU_IMAGE
+from guard.adapters.engine_profiles import supports
+from guard.adapters.engine_provider import get_provider
 from guard.collectors.engine_callbacks import load_prepared, load_secret
 from guard.collectors import gpu_input_producers as producers
 from guard.models import canonical_json, sha256_hex
@@ -22,19 +22,15 @@ from guard.runtime.kubernetes_http import KubernetesHTTP, ENGINE_CALLBACK_PROFIL
 from .base import DraftArtifact
 
 PREPARER_SHA = "0175f8e85d801edae0ccbb9f46a31f334aa53878eac73356174b30ae2d0b206b"
-SOURCE_COMMIT = "db9527a46873454610df6dbedf79a36d6bf1a7f6"
-SOURCES = {
-    "entrypoints/serve/engine/serving.py": "e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02",
-    "entrypoints/openai/completion/serving.py": "aac889978efb034b95ab81ec59695d83ba7c879ab48cd5be2448c980f109a3bd",
-    "v1/engine/input_processor.py": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
-    "v1/engine/async_llm.py": "ff933ed78aa3195782cf1c6d18c53897adfa5bf920421bd2bcc330f2adc84d1e",
-    "entrypoints/openai/completion/protocol.py": "4616cd6887ef0a23fd8a77468e82f2668e3d0b53075112f2d97f3de960c22c81",
-    "entrypoints/openai/chat_completion/serving.py": "532dadea845c77a5a79011027b9989987c3e32467614e993f439f29c924de002",
-    "entrypoints/openai/chat_completion/protocol.py": "4bdc71f668e4820d8ae5bae2a153fed0296b430cd6353ace8c0c27cfb982ebc1",
-}
-# db9527a vllm.utils.random_uuid masks UUID4 to64 bits and formats016x.
-# _bounded excludes custom IDs; accept only that fixed default source shape.
-_RESPONSE_ID = re.compile(r"(?:chatcmpl|cmpl)-[0-9a-f]{16}")
+
+
+def _profile(env):
+    if not supports(env.engine.name, env.engine.version, "runner_capture"):
+        raise ValueError("B_REQ_CAPTURE_SCOPE_INVALID")
+    profile = get_provider(env.engine.name).evidence_contract("runner_capture_profile", env.engine.version)
+    if profile is None or env.engine.image_digest != profile.image:
+        raise ValueError("B_REQ_CAPTURE_SCOPE_INVALID")
+    return profile
 
 
 def _preparer():
@@ -59,40 +55,15 @@ def _label(check_id, value):
     return (match[1] if match[2] == "challenge" else match[1] + ":" + match[2]) if match else None
 
 
-def _bounded(request, check_id):
-    body = request.get("body")
-    url = urlsplit(request.get("url", ""))
-    expected_path = "/v1/chat/completions" if check_id == "REQ-08" else "/v1/completions"
-    if (request.get("method") != "POST" or url.path != expected_path or url.query or url.fragment
-            or request.get("headers", {}) != {} or type(body) is not dict
-            or body.get("n", 1) != 1 or type(body.get("n", 1)) is not int
-            or body.get("stream", False) is not False or body.get("use_beam_search", False) is not False
-            or type(body.get("max_tokens")) is not int or not 1 <= body["max_tokens"] <= 8
-            or "request_id" in body):
-        raise ValueError("B_REQ_NATIVE_REQUEST_OUTSIDE_SELECTED_SCOPE")
-    if check_id == "REQ-08":
-        messages = body.get("messages")
-        if (type(messages) is not list or len(messages) != 1 or type(messages[0]) is not dict
-                or set(messages[0]) != {"role", "content"} or messages[0]["role"] != "user"
-                or type(messages[0]["content"]) is not str or not 0 < len(messages[0]["content"].encode("utf-8")) <= 512):
-            raise ValueError("B_REQ_SINGLE_SMALL_PROMPT_REQUIRED")
-        return
-    prompt = body.get("prompt")
-    if not (type(prompt) is str and 0 < len(prompt.encode("utf-8")) <= 512 or type(prompt) is list
-            and 0 < len(prompt) <= 64 and all(type(token) is int and token >= 0 for token in prompt)):
-        raise ValueError("B_REQ_SINGLE_SMALL_PROMPT_REQUIRED")
-
-
 class Capture:
     def __init__(self, ctx, cfg):
         self.ctx, self.cfg = ctx, cfg
         self.lock = threading.Lock()
         self.calls = []
-        self.tool = _preparer()
+        self.profile = _profile(ctx.env)
         spec = cfg["runner_capture"]
-        if (type(spec) is not dict or set(spec) != {"environment", "prepared_dir", "prepared_sha256", "vllm_source_root"}
-                or "runner_input" in cfg or ctx.check.id not in {"REQ-08", "REQ-09", "REQ-10"} or ctx.target.get("lab") is not True
-                or ctx.env.engine.version != "0.31.0" or ctx.env.engine.image_digest != REQUEST_BINDING_GPU_IMAGE):
+        if (type(spec) is not dict or set(spec) != {"environment", "prepared_dir", "prepared_sha256", self.profile.source_root_key}
+                or "runner_input" in cfg or ctx.check.id not in {"REQ-08", "REQ-09", "REQ-10"} or ctx.target.get("lab") is not True):
             raise ValueError("B_REQ_CAPTURE_SCOPE_INVALID")
         if ctx.check.id == "REQ-10" and set(ctx.policy_values["allowed_sampling_options"]) - {"temperature", "top_p"}:
             raise ValueError("B_REQ_V1_SELECTED_OPTIONS_REQUIRED")
@@ -102,6 +73,7 @@ class Capture:
             ["before", "token_id", "length", "after_token_id", "after_length"] if ctx.check.id == "REQ-09" else
             ["before", *(case for option in ctx.policy_values["allowed_sampling_options"]
                          for case in (option, option + ":boundary", option + ":concurrent", option + ":after"))])
+        self.tool = _preparer()
         self.environment_raw, self.environment_pin = self.tool._read_pin(spec["environment"], base=Path.cwd(), limit=2*1024**2)
         env_value = strict_json(self.environment_raw, limit=2*1024**2)
         if canonical_json(env_value) != canonical_json(ctx.env.to_dict()):
@@ -119,13 +91,12 @@ class Capture:
         if len(secret) != 32:
             raise ValueError("B_REQ_PREPARED_KEY_INVALID")
         # 공식 fingerprint만 사용한다. 호스트에서 Linux 엔진 센서의 수집 context를 초기화하지 않는다.
-        self.fingerprinter = object.__new__(sensor.ConsumptionObserver)
-        self.fingerprinter.secret = secret
-        root = spec["vllm_source_root"]
+        self.fingerprinter = self.profile.fingerprinter(secret)
+        root = spec[self.profile.source_root_key]
         if type(root) is not str or not root.startswith("/") or str(PurePosixPath(root)) != root or ".." in PurePosixPath(root).parts:
             raise ValueError("B_REQ_SOURCE_ROOT_REQUIRED")
-        self.roots = [root, sensor.ROOT]
-        self.expected_files = {(0, name): digest for name, digest in SOURCES.items()}
+        self.roots = [root, self.profile.callback_root]
+        self.expected_files = {(0, name): digest for name, digest in self.profile.sources.items()}
         self.expected_files.update({(1, name): digest for name, digest in self.prepared["assets"].items()})
         native = getattr(ctx.cprobe, "transport", ctx.cprobe)
         if not isinstance(native, KubernetesHTTP):
@@ -148,16 +119,16 @@ class Capture:
         state, = [row for row in pod["status"]["containerStatuses"] if row["name"] == name]
         env = {}
         for row in container.get("env", []):
-            if row.get("name") in {"VLLM_DISABLE_REQUEST_ID_RANDOMIZATION", "VLLM_USE_V2_MODEL_RUNNER", "PYTHONPATH"}:
+            if row.get("name") in {*self.profile.required_environment, "PYTHONPATH"}:
                 if row["name"] in env or "valueFrom" in row:
                     raise ValueError("B_REQ_LITERAL_RUNTIME_ENV_REQUIRED")
                 env[row["name"]] = row.get("value", "")
-        if (env.get("VLLM_DISABLE_REQUEST_ID_RANDOMIZATION") != "1" or env.get("VLLM_USE_V2_MODEL_RUNNER") != "0"
-                or sensor.ROOT not in env.get("PYTHONPATH", "").split(":")
-                or container.get("image") != REQUEST_BINDING_GPU_IMAGE):
+        if (any(env.get(key) != value for key, value in self.profile.required_environment.items())
+                or self.profile.callback_root not in env.get("PYTHONPATH", "").split(":")
+                or container.get("image") != self.profile.image):
             raise ValueError("B_REQ_VERIFIED_LAB_V1_ENV_REQUIRED")
         mounts = [row for row in container.get("volumeMounts", [])
-                  if sensor.ROOT == row.get("mountPath") or sensor.ROOT.startswith(str(row.get("mountPath", "!")) + "/")]
+                  if self.profile.callback_root == row.get("mountPath") or self.profile.callback_root.startswith(str(row.get("mountPath", "!")) + "/")]
         if not mounts or any(row.get("readOnly") is not True or row.get("subPathExpr") for row in mounts):
             raise ValueError("B_REQ_READONLY_CALLBACK_MOUNT_REQUIRED")
         files = [{"root": key[0], "relative": key[1]} for key in self.expected_files]
@@ -177,7 +148,7 @@ class Capture:
         if request.get("method") == "GET":
             return dispatch()
         case = _label(self.ctx.check.id, label)
-        _bounded(request, self.ctx.check.id)
+        self.profile.validate_request(request, self.ctx.check.id)
         if case is None:
             raise ValueError("B_REQ_NATIVE_CASE_UNSUPPORTED")
         body = canonical_json(request["body"])
@@ -205,10 +176,10 @@ class Capture:
         except (ValueError, AttributeError, UnicodeError):
             value = None
         rid = value.get("id") if type(value) is dict else None
-        prefix = "chatcmpl-" if self.ctx.check.id == "REQ-08" else "cmpl-"
-        if type(rid) is str and rid.startswith(prefix) and _RESPONSE_ID.fullmatch(rid) and not response.get("body_truncated"):
+        request_id = self.profile.request_id(self.ctx.check.id, rid)
+        if request_id is not None and not response.get("body_truncated"):
             row["response_id_sha256"] = sha256_hex(rid.encode())
-            row["request_sha256"] = self.fingerprinter.fingerprint(rid if self.ctx.check.id == "REQ-08" else rid + "-0")
+            row["request_sha256"] = self.fingerprinter.fingerprint(request_id)
         else:
             row["diagnostic"] = "B_REQ_HTTP_REJECTION_WITHOUT_ID" if type(outcome) is int and 400 <= outcome < 500 else "B_REQ_RESPONSE_ID_UNAVAILABLE"
         return result
@@ -280,7 +251,7 @@ class Capture:
         manifest_path.write_bytes(canonical_json(manifest))
         result = self.tool.prepare(manifest_path, sha256_hex(manifest_path.read_bytes()), output / "fixed")
         summary = {"schema": "guard-b-native-req-runner-link/1", "check_id": self.ctx.check.id,
-            "source_commit": SOURCE_COMMIT, "before": self.before, "after": after, "cases": proof,
+            "source_commit": self.profile.source_commit, "before": self.before, "after": after, "cases": proof,
             "request_id_join_complete": {row["case"] for row in proof} == set(self.required_cases) and all(row["same_native_request_api_join"] for row in proof),
             "native_request_mapping_verified": False,
             "consumer_projection": result["consumer_projection"], "runtime_link_complete": False, "gpu_ready": False,

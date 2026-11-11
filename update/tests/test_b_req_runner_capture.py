@@ -19,6 +19,8 @@ from tests.test_kubernetes_sampling import World as PodWorld, inputs as target_i
 from tests.req_response_id_source import response_id
 from tools import b_req_runner_capture as driver
 
+CAPTURE_PROFILE = VllmAdapter().runner_capture_profile("0.31.0")
+
 PACK_DIR = Path(__file__).parents[1] / "packs/PACK-BASELINE"
 
 
@@ -33,9 +35,8 @@ class World(PodWorld):
         self.api, self.worker, self.sent = [], [], []
         self.serial = 0
         self.duplicate_response_ids = {}
-        self.fingerprinter = object.__new__(link.sensor.ConsumptionObserver)
-        self.fingerprinter.secret = load_secret(Path(prepared["_directory"]))
-        self.expected = {(0, name): digest for name, digest in link.SOURCES.items()}
+        self.fingerprinter = CAPTURE_PROFILE.fingerprinter(load_secret(Path(prepared["_directory"])))
+        self.expected = {(0, name): digest for name, digest in CAPTURE_PROFILE.sources.items()}
         self.expected.update({(1, name): digest for name, digest in prepared["assets"].items()})
 
     def runner(self, argv, **kwargs):
@@ -50,8 +51,8 @@ class World(PodWorld):
                 if value["metadata"]["name"] == self.target["kubernetes"]["engine"]["pod"]:
                     container = value["spec"]["containers"][0]
                     container["env"] += [{"name": "VLLM_DISABLE_REQUEST_ID_RANDOMIZATION", "value": "0" if self.damage == "flag" else "1"},
-                        {"name": "VLLM_USE_V2_MODEL_RUNNER", "value": "0"}, {"name": "PYTHONPATH", "value": link.sensor.ROOT}]
-                    container["volumeMounts"] = [{"name": "callbacks", "mountPath": link.sensor.ROOT, "readOnly": self.damage != "mount"}]
+                        {"name": "VLLM_USE_V2_MODEL_RUNNER", "value": "0"}, {"name": "PYTHONPATH", "value": CAPTURE_PROFILE.callback_root}]
+                    container["volumeMounts"] = [{"name": "callbacks", "mountPath": CAPTURE_PROFILE.callback_root, "readOnly": self.damage != "mount"}]
             return {**result, "stderr_bytes": b"", "stdout_bytes": canonical_json(value)}
         if "--container=engine" in argv:
             if "input_bytes" in kwargs:
@@ -223,7 +224,7 @@ def test_native_bounds_do_not_admit_other_choice_counts_or_endpoint(damage):
     else:
         request["url"] = "http://unused/v1/completions"
     with pytest.raises(ValueError, match="OUTSIDE_SELECTED_SCOPE"):
-        link._bounded(request, "REQ-08")
+        CAPTURE_PROFILE.validate_request(request, "REQ-08")
 
 
 @pytest.mark.parametrize("late", ["source", "generation", "source-cleanup"])

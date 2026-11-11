@@ -17,7 +17,8 @@ if __package__ in (None, ""):
 from guard.core.run import RunConfig, run_plan
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
-from guard.executors.req_runner_capture import PREPARER_SHA, SOURCE_COMMIT, SOURCES
+from guard.executors.req_runner_capture import PREPARER_SHA
+from guard.adapters.vllm_runner_capture import SOURCE_COMMIT, SOURCES
 from guard.models import canonical_json, sha256_hex
 from guard.runtime.bounded import strict_json
 from guard.store import Store

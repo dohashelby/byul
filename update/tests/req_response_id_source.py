@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import uuid
 
-DATA = json.loads((Path(__file__).parent / 'fixtures/vllm_db952_response_id_generator.json').read_bytes())
+DATA = json.loads((Path(__file__).parent / 'fixtures/vllm-0.31.0/vllm_db952_response_id_generator.json').read_bytes())
 assert DATA['source_commit'] == 'db9527a46873454610df6dbedf79a36d6bf1a7f6'
 assert hashlib.sha256(DATA['function_source'].encode()).hexdigest() == DATA['function_sha256']
 _namespace = {'uuid': uuid}

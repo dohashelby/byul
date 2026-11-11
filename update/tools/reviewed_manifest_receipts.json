@@ -7,34 +7,14 @@
       "reviewed_at": "2026-11-09T18:47:16+09:00"
     },
     {
-      "manifest_sha256": "3ff0bb695cfd2bf2ea70a1ca80cab8835eb36436f7bb59b1c538b5eade62fe73",
-      "reviewed_by": "Codex / 신규 세션6 / 독립 검토",
-      "reviewed_at": "2026-11-09T12:11:31.272029+00:00"
-    },
-    {
-      "manifest_sha256": "b74b04353e0664de7c2c6289883e094b813884289ea7c86a3619d2eaa8402b01",
-      "reviewed_by": "Codex / 신규 세션6 / 독립 검토",
-      "reviewed_at": "2026-11-09T14:12:57.199776+00:00"
-    },
-    {
-      "manifest_sha256": "e1d3b55e4781567d31ef1498c390120c9d71d5b81db48c6b7e09f74e65a8f580",
-      "reviewed_by": "Codex / 신규 세션6 / 독립 검토",
-      "reviewed_at": "2026-11-09T17:32:24.564014+00:00"
-    },
-    {
-      "manifest_sha256": "8ff741fcc2ab223008fd6e2543b12e5c7e9aed468602010b190916e67e1ac004",
-      "reviewed_by": "Codex / 신규 세션6 / 독립 검토",
-      "reviewed_at": "2026-11-10T05:25:32.953312+00:00"
-    },
-    {
       "manifest_sha256": "1b6d81bb5ed3f3f6d2934400e98f48d883742490061c7d6a9276bdf548ceb772",
       "reviewed_by": "Codex / non-author merge boundary review / selected37",
       "reviewed_at": "2026-11-10T00:43:41+09:00"
     },
     {
-      "manifest_sha256": "6ba867aa1600ccd653c588387764c91196ec453904fa2e6ad2cffbab841b8e33",
-      "reviewed_by": "Codex / 신규 세션6 / 독립 검토",
-      "reviewed_at": "2026-11-10T19:08:33.045456+09:00"
+      "manifest_sha256": "afed826c64ccfba7b93e44c9431d7bd9311af46dc6cdd6a234c8049420db48b4",
+      "reviewed_by": "Codex / BYUL UPDATE B / S4 independent PR240 final source review",
+      "reviewed_at": "2026-11-11T14:30:41+09:00"
     }
   ]
 }

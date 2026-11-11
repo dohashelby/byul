@@ -46,6 +46,17 @@
         "validation_error",
         "worker_readiness"
       ]
+    },
+    {
+      "id": "vllm-input-validation-http/1",
+      "engine": "vllm",
+      "versions": [
+        "0.7.0",
+        "0.30.0"
+      ],
+      "features": [
+        "native_input"
+      ]
     }
   ],
   "implementations": [

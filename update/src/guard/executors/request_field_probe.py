@@ -15,9 +15,60 @@ from .http_common import functional_requests
 REUSED_TOKEN_PROFILE = "reused-token-input-v1"
 CODE_SELECTION_PROFILE = "request-code-selection-v1"
 PROFILES = frozenset({REUSED_TOKEN_PROFILE, CODE_SELECTION_PROFILE})
-VERSION = "0.9.0"
+VERSION = "0.10.0"
 UNAPPROVED_REVISION = "byul-unapproved-revision"
 _FIELD = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}(\.[A-Za-z_][A-Za-z0-9_]{0,63}){0,3}")
+_REVISION = re.compile(r"[0-9a-f]{40}")
+_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}")
+_IMAGE = re.compile(r"data:image/(png|jpeg);base64,[A-Za-z0-9+/=]{16,3000}")
+MODULE_SETTINGS = ("code_module_root", "code_module_repository")
+
+
+def code_module_settings(cfg):
+    """Optional engine-side dynamic-module listing; both keys or neither."""
+    present = [key for key in MODULE_SETTINGS if key in cfg]
+    if not present:
+        return None
+    if len(present) != len(MODULE_SETTINGS) or any(type(cfg[key]) is not str or not cfg[key] for key in MODULE_SETTINGS):
+        raise ValueError("code module observation needs code_module_root and code_module_repository")
+    return {key: cfg[key] for key in MODULE_SETTINGS}
+
+
+def challenge_revision(cfg):
+    value = cfg.get("unapproved_revision", UNAPPROVED_REVISION)
+    if type(value) is not str or _REF.fullmatch(value) is None or ".." in value.split("/"):
+        raise ValueError("unapproved_revision must be a bounded revision name")
+    return value
+
+
+def control_body(body, cfg):
+    """Attach the configured image to the control's last user message so a multimodal processor is built."""
+    image = cfg.get("control_image")
+    if image is None:
+        return body
+    if type(image) is not str or _IMAGE.fullmatch(image) is None:
+        raise ValueError("control_image must be a bounded PNG/JPEG data URI")
+    body = deepcopy(body)
+    messages = body.get("messages")
+    if type(messages) is not list or not messages or type(messages[-1]) is not dict or type(messages[-1].get("content")) is not str:
+        raise ValueError("control_image needs a chat control whose last message has text content")
+    text = messages[-1]["content"]
+    messages[-1]["content"] = [{"type": "text", "text": text}, {"type": "image_url", "image_url": {"url": image}}]
+    return body
+
+
+def nested_fields(fields, value):
+    """Dotted field paths as top-level request members; each path needs its own top-level member."""
+    result = {}
+    for field in fields:
+        top, *rest = field.split(".")
+        if top in result:
+            raise ValueError("code_selection_fields need distinct top-level members")
+        node = value
+        for part in reversed(rest):
+            node = {part: node}
+        result[top] = node
+    return result
 
 
 def supported(check):
@@ -39,6 +90,10 @@ def _field(value):
 
 def validate_configuration(check, cfg):
     if getattr(check, "collection_profile", None) != REUSED_TOKEN_PROFILE:
+        code_module_settings(cfg)
+        challenge_revision(cfg)
+        if "control_image" in cfg:
+            control_body({"messages": [{"role": "user", "content": "x"}]}, cfg)
         return
     ids, size = cfg.get("reused_token_ids"), cfg.get("vocab_size")
     if (type(size) is not int or size < 1 or not cfg.get("vocab_source") or type(ids) is not list
@@ -59,8 +114,13 @@ def validate_policy(check, values):
     if (type(fields) is not list or not 1 <= len(fields) <= 8 or len(set(map(str, fields))) != len(fields)
             or any(_field(field) is None for field in fields)):
         raise ValueError("code_selection_fields requires 1..8 distinct field names")
+    nested_fields(fields, None)
     if type(values.get("code_selection_allowed")) is not bool:
         raise ValueError("code_selection_allowed must be an explicit boolean")
+    approved = values.get("approved_code_revisions")
+    if approved is not None and (type(approved) is not list or not 1 <= len(approved) <= 16
+            or len(set(approved)) != len(approved) or any(type(v) is not str or not _REVISION.fullmatch(v) for v in approved)):
+        raise ValueError("approved_code_revisions must list 1..16 distinct commit SHA-1 values")
 
 
 def _assign(body, path, value):
@@ -103,6 +163,32 @@ def classify_selection(result, *, rejection_codes):
     return "accepted_unverified" if type(outcome) is int and 200 <= outcome < 300 else "unknown"
 
 
+def classify_modules(state, before, after, approved):
+    """Refine an accepted challenge with the engine's dynamic-module revisions listed before and after it.
+
+    consumed: a revision outside the approved list appeared because of this challenge.
+    ignored: only approved revisions are present after the challenge.
+    Anything else stays accepted_unverified; a pre-existing unapproved folder cannot be attributed.
+    """
+    if state != "accepted_unverified" or approved is None or not _inventory_ok(before) or not _inventory_ok(after):
+        return state, None
+    old, new = set(before["revisions"]), set(after["revisions"])
+    if any(rev not in approved for rev in old):
+        return state, {"reason": "UNAPPROVED_REVISION_PRESENT_BEFORE_CHALLENGE"}
+    selected = sorted(rev for rev in new - old if rev not in approved)
+    if selected:
+        return "consumed", {"selected_revisions": selected, "module_files": {rev: after["revisions"][rev] for rev in selected}}
+    present = sorted(rev for rev in new if rev in approved)
+    if present and new <= set(approved):
+        return "ignored", {"approved_revisions_present": present}
+    return state, {"reason": "NO_APPROVED_MODULE_OBSERVED"}
+
+
+def _inventory_ok(value):
+    return (type(value) is dict and value.get("present") is True and type(value.get("revisions")) is dict
+            and all(type(k) is str for k in value["revisions"]))
+
+
 def _hash(value):
     return sha256_hex(canonical_json(value))
 
@@ -119,6 +205,25 @@ def collect(ctx, cfg):
     if reused:
         template = deepcopy(template)
         template["body"]["return_token_ids"] = True
+    else:
+        template = deepcopy(template)
+        template["body"] = control_body(template["body"], cfg)
+    modules = None if reused else code_module_settings(cfg)
+    observer = getattr(getattr(ctx, "cprobe", None), "engine_code_modules", None) if modules else None
+    approved = None if reused else values.get("approved_code_revisions")
+    module_rows = []
+
+    def inventory(label):
+        if observer is None:
+            return None
+        try:
+            value = observer(modules["code_module_root"], modules["code_module_repository"])
+        except Exception:
+            module_rows.append({"label": label, "state": "unavailable"})
+            return None
+        module_rows.append({"label": label, "state": "collected", "present": value.get("present"),
+                            "revisions": value.get("revisions")})
+        return value
 
     def send(request, label):
         result = bounded_probe(ctx, ctx.trusted_net, request)
@@ -131,15 +236,22 @@ def collect(ctx, cfg):
     if controls["before"] == "pass":
         control_tokens = consumed_tokens(first) if reused else None
         cases = ([(values["reused_token_field"], cfg["reused_token_ids"])] if reused
-                 else [(field, UNAPPROVED_REVISION) for field in values["code_selection_fields"]])
+                 else [(field, challenge_revision(cfg)) for field in values["code_selection_fields"]])
         for index, (field, fixture) in enumerate(cases):
             request = deepcopy(template)
             _assign(request["body"], field, fixture)
+            before = None if reused else inventory(f"before-challenge-{index}")
             result = send(request, f"challenge-{index}")
-            state = (classify_reused(result, fixture=fixture, control_tokens=control_tokens, rejection_codes=rejections)
-                     if reused else classify_selection(result, rejection_codes=rejections))
+            module_evidence = None
+            if reused:
+                state = classify_reused(result, fixture=fixture, control_tokens=control_tokens, rejection_codes=rejections)
+            else:
+                state = classify_selection(result, rejection_codes=rejections)
+                after = inventory(f"after-challenge-{index}")
+                state, module_evidence = classify_modules(state, before, after, approved)
             trials.append({"field": field, "outcome": str(result.get("outcome")), "state": state,
-                           "request_fixture_sha256": _hash(request["body"])})
+                           "request_fixture_sha256": _hash(request["body"]),
+                           **({"module_evidence": module_evidence} if module_evidence is not None else {})})
             label = f"after-{index}"
             controls[label] = control_state(send(deepcopy(template), label), expected_model, endpoint)
     normal = {"attempted": True, "succeeded": len(controls) > 1 and all(v == "pass" for v in controls.values()),
@@ -161,11 +273,23 @@ def collect(ctx, cfg):
                                                 "collected": done}})
     else:
         fields = values["code_selection_fields"]
+        forbidden = not values["code_selection_allowed"]
+        resolved = {"rejected", "ignored", "consumed"}
+        violations = [{"field": r["field"], "submitted_revision": challenge_revision(cfg),
+                       "selected_revisions": r["module_evidence"]["selected_revisions"],
+                       "module_files": r["module_evidence"]["module_files"],
+                       "basis": "engine dynamic-module folder created after the challenge and absent from approved_code_revisions"}
+                      for r in trials if r["state"] == "consumed"]
         obs.update({"code_selection_trials": {"value": trials, "collected": done},
-                    "code_selection_forbidden": {"value": not values["code_selection_allowed"], "collected": True},
+                    "code_selection_forbidden": {"value": forbidden, "collected": True},
                     "code_selection_fields_planned": {"value": fields, "collected": True},
                     "code_selection_rejected_fields": {"value": [r["field"] for r in trials if r["state"] == "rejected"], "collected": done},
-                    "code_selection_unverified_fields": {"value": [r["field"] for r in trials if r["state"] != "rejected"], "collected": done},
-                    "code_selection_confirmed_violations": {"value": [], "collected": done},
-                    "code_selection_final_code_verified": {"value": False, "collected": True}})
+                    "code_selection_ignored_fields": {"value": [r["field"] for r in trials if r["state"] == "ignored"], "collected": done},
+                    "code_selection_resolved_fields": {"value": [r["field"] for r in trials if r["state"] in resolved], "collected": done},
+                    "code_selection_unverified_fields": {"value": [r["field"] for r in trials if r["state"] not in resolved], "collected": done},
+                    "code_selection_confirmed_violations": {"value": violations, "collected": done},
+                    # True only when the engine's module listing actually showed the final revision for every trial.
+                    "code_selection_final_code_verified": {"value": done and all(r["state"] in {"ignored", "consumed"} for r in trials),
+                                                           "collected": True}})
+        summary["code_module_inventory"] = module_rows
     return obs, normal, [{"step": step, "attempted": done} for step in ctx.check.challenge_steps], summary

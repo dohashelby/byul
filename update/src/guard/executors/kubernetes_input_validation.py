@@ -11,7 +11,8 @@ from .http_common import Ctx, fill_model, request_model
 from .input_validation import InputValidationExecutor
 
 _SETTINGS = {"target", "kubectl_binary", "request_timeout", "max_duration_seconds", "vocab_size", "vocab_source",
-             "max_probe_tokens", "reused_token_ids", "runner_input"}
+             "max_probe_tokens", "reused_token_ids", "runner_input", "code_module_root", "code_module_repository",
+             "unapproved_revision", "control_image"}
 
 
 class _WithBody:
@@ -42,7 +43,9 @@ def _contract(check, values, cfg, model):
             control["return_token_ids"] = True
             fields[values["reused_token_field"]] = list(cfg["reused_token_ids"])
         else:
-            fields = dict.fromkeys(values["code_selection_fields"], request_field_probe.UNAPPROVED_REVISION)
+            control = request_field_probe.control_body(control, cfg)
+            fields = request_field_probe.nested_fields(values["code_selection_fields"],
+                                                       request_field_probe.challenge_revision(cfg))
     else:
         # The token-id case sends vocab_size itself; the length case sends one more than the policy limit.
         prompt_tokens = {"max_length": values["max_input_tokens"] + 1, "max_value": cfg["vocab_size"]}
@@ -59,8 +62,7 @@ class KubernetesInputValidationExecutor(InputValidationExecutor):
 
     def run(self, check, env, policy_values, adapter, workdir):
         try:
-            if (type(self.cfg) is not dict or set(self.cfg) - _SETTINGS or adapter is None
-                    or any("." in field for field in policy_values.get("code_selection_fields") or [])):
+            if type(self.cfg) is not dict or set(self.cfg) - _SETTINGS or adapter is None:
                 raise ValueError
             self.validate_policy(check, policy_values)
             target = json.loads(Path(self.cfg["target"]).read_text(encoding="utf-8"))

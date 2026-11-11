@@ -1,3 +1,14 @@
+## 2026-11-11 — SUP-08 실행 판본 관측(코드 선택 PoC 준비)
+
+- 한 일: SUP-08을 "요청 2xx면 UNKNOWN"에서 "엔진이 실제로 불러온 동적 모듈 판본으로 PASS/FAIL"로 넓혔다.
+  - 판본 지원표(`engine_profiles.json`)에 `vllm-input-validation-http/1`(vLLM 0.7.0·0.30.0, `native_input`만) 행을 더했다. `kubernetes_http.py`의 `0.31.0` 고정 비교(입력 검증 등 8개 profile)를 `require_transport` 조회로 바꿨다. 0.31.0 동작은 그대로.
+  - `kubernetes_http.py`에 `engine_code_modules`(읽기 전용 `kubectl exec`로 `transformers_modules/<repo>/<revision>/*.py` 이름·크기·SHA-256만 수집, import·실행 없음)를 더했다. 고정 인벤토리 스크립트는 `python3 -I -S -B`로 돈다.
+  - `request_field_probe.py`: 공격 요청 전후 모듈 목록을 비교해 `consumed`(승인 목록 밖 판본이 시도 직후 생김)/`ignored`/`accepted_unverified`로 분류. `code_selection_confirmed_violations`에 필드·판본·근거를 채우고, 보고서 사유로 쓴다. `mm_processor_kwargs.code_revision` 같은 중첩 필드와 이미지 입력(control_image)을 보낸다. 쿠버네티스 실행기의 점(`.`) 필드 거부를 풀었다.
+  - 새 정책 키 `approved_code_revisions`(승인 커밋 목록). DRAFT 팩은 `tools/build_code_selection_pack.py`가 PACK-BASELINE에서 SUP-08만 revision 5로 바꾼 PACK-CODE-SELECTION을 만든다(나머지 76개 bytes 불변).
+- 테스트 결과: `tests/test_code_selection_observation.py` 28개 신규 통과(분류·닫힌 계약·인벤토리 스크립트·FakeEngine 파이프라인 FAIL/PASS). 영향 받는 기존 시험(executor_extensions, kubernetes_input_validation, golden_http, vllm_adapter, request_binding, role_route 등) 재실행 통과. `reviewed-source.json` 다시 생성. 전체 suite는 PR CI.
+- 다음 단계: AWS 실행 구성(멀티모달 시험 모델, `--trust-remote-code` 켬/끔 generation, 오프라인 HF 캐시의 승인·비승인 판본 fixture)과 http-check 설정에 모듈 관측 키 연결. 그 뒤 PoC: 0.7.0 PASS → 0.30 FAIL(REGRESSED) + 0.31 기본 거부.
+- 막힌 것: SUP-08 실행기 파일은 B 소유라 PR에 적고 B 검토. GPU 회차는 비용 승인 뒤. 멀티모달 시험 모델(0.7.0·0.30 둘 다 구동)·무해 판본 fixture 미정.
+
 ## 2026-11-09 — A·B 작업지시서 2차(vLLM 1차 완성)
 
 - 한 일: PR #241 병합(`3bd6a995`) 뒤 `docs/WORK_ORDER_VLLM_1.md`를 썼다. 1차 완성 기준(69개 0.31.0 정본 실측, 1차 제외 10개 UNKNOWN 기록, 0.32.0 비교와 회귀 탐지, 공식 재판정), A01~A10·B01~B07·J01~J04, 69개 배정표가 들어 있다. 영향도를 넣는 새 팩(@34)이 77개 정의를 모두 바꾸므로 새 팩을 정본 실측보다 먼저 둔다. 11-08·11-09의 "공통 입력 `/2`" 내용은 `/2`·`/3`이 이미 쓰여 `/4`로 옮기자고 적었다(사용자 확인 필요). `CLAUDE.md`·`AGENTS.md` 5절에 작업지시서 링크를 더했다.

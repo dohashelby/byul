@@ -40,6 +40,26 @@ from .kubernetes_observation_state import PROFILE as OBSERVATION_STATE_PROFILE
 _CLOSE_PROFILES = frozenset({TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, OBSERVATION_STATE_PROFILE})
 _BINDING_PROFILES = frozenset({ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE, RESPONSE_CONTENT_PROFILE, LOG_INTEGRITY_PROFILE, USAGE_CONTROL_PROFILE, GATEWAY_EVENT_PROFILE})
 _INPUT_FIELD = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}")
+_MODULE_ROOT = re.compile(r"/[A-Za-z0-9._/-]{1,255}")
+_MODULE_REPO = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}(/[A-Za-z0-9][A-Za-z0-9._-]{0,127})?")
+# Fixed read-only listing: names, sizes and SHA-256 of *.py files under <root>/<repository>/<revision>/.
+_MODULE_INVENTORY_SCRIPT = (
+    "import hashlib,json,os,sys\n"
+    "root,repo=sys.argv[1],sys.argv[2]\n"
+    "base=os.path.join(root,repo)\n"
+    "out={'schema':'guard-code-module-inventory/1','present':os.path.isdir(base),'revisions':{}}\n"
+    "if out['present']:\n"
+    " for rev in sorted(os.listdir(base))[:64]:\n"
+    "  path=os.path.join(base,rev)\n"
+    "  if os.path.islink(path) or not os.path.isdir(path):continue\n"
+    "  files={}\n"
+    "  for name in sorted(os.listdir(path))[:64]:\n"
+    "   item=os.path.join(path,name)\n"
+    "   if name.endswith('.py') and os.path.isfile(item) and not os.path.islink(item):\n"
+    "    data=open(item,'rb').read(1048577)\n"
+    "    files[name]={'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()}\n"
+    "  out['revisions'][rev]=files\n"
+    "sys.stdout.write(json.dumps(out,sort_keys=True))\n")
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
                                  validate_container_binding, verify_owned_pod, project_owned_snapshot)
@@ -357,8 +377,13 @@ class KubernetesHTTP:
         self.lab = target.get('lab')
         self.engine_name = env.engine.name
         self.engine_version = env.engine.version
-        if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
-            raise KubernetesBindingError()
+        if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE}:
+            # Release availability lives in the engine profile catalog, not here.
+            from guard.adapters.engine_profiles import require_transport
+            try:
+                require_transport(env.engine.name, env.engine.version, profile)
+            except ValueError:
+                raise KubernetesBindingError() from None
         if profile==OBSERVATION_STATE_PROFILE and target.get('lab') is not True:raise KubernetesBindingError()
         if profile in _BINDING_PROFILES:
             try:
@@ -852,6 +877,24 @@ class KubernetesHTTP:
                 "image":spec["image"],"image_id":state["imageID"],"argv":argv,"env":env}
         except (KeyError,TypeError,ValueError):
             raise KubernetesBindingError() from None
+
+    def engine_code_modules(self, root, repository):
+        """SUP-08: read-only listing of one repository's dynamic-module revision folders in the engine container.
+
+        Only folder names, file names, sizes and SHA-256 are returned. Nothing is imported or executed.
+        """
+        if (self.profile != INPUT_VALIDATION_PROFILE or type(root) is not str or not _MODULE_ROOT.fullmatch(root)
+                or type(repository) is not str or not _MODULE_REPO.fullmatch(repository)
+                or ".." in root.split("/") or ".." in repository.split("/")):
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        document=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],f"--container={engine['container']}",
+            "--","python3","-I","-S","-B","-c",_MODULE_INVENTORY_SCRIPT,root,repository],cap=65536)
+        self._verify()
+        if (type(document) is not dict or document.get("schema")!="guard-code-module-inventory/1"
+                or type(document.get("revisions")) is not dict or type(document.get("present")) is not bool):
+            raise KubernetesBindingError()
+        return document
 
     def engine_logs(self, since, cap):
         """OBS-09: 엔진 컨테이너 stdout의 since 이후 구간. 읽은 그대로의 bytes와 수집 상태를 돌려준다."""

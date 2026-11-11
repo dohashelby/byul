@@ -1101,6 +1101,7 @@ class FakeExecutionTests(unittest.TestCase):
             [
                 CommandResult(1, "CONNECTED\n"),
                 CommandResult(0, "CONNECT_FAILED errno=110 name=ETIMEDOUT\n"),
+                CommandResult(0, "CONNECT_FAILED errno=110 name=ETIMEDOUT\n"),
                 CommandResult(1, "CONNECTED\n"),
             ]
         )
@@ -1143,6 +1144,7 @@ class FakeExecutionTests(unittest.TestCase):
             [
                 CommandResult(1, "CONNECTED\n"),
                 CommandResult(0, "CONNECT_FAILED errno=111 name=ECONNREFUSED\n"),
+                CommandResult(0, "CONNECT_FAILED errno=110 name=ETIMEDOUT\n"),
                 CommandResult(1, "CONNECTED\n"),
             ]
         )

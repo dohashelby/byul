@@ -43,6 +43,24 @@ def test_refs_keep_exact_hash_and_drop_malformed_values():
     assert evidence_refs({"evidence_refs": "secret"}) == []
 
 
+def test_code_selection_gateway_rule_counts_as_sup_008_only_for_gateway():
+    record = {"decision": {"rule_id": "request_code_selection", "result": "INVALID"}}
+    related = checks_for_record(record, "gateway")
+    assert related == ["OBS-01", "SUP-08"]
+    for source in ("tetragon", "hubble", "management_listener", "unknown"):
+        assert "SUP-08" not in checks_for_record(record, source)
+        assert "SUP-08" not in checks_for_record({"rule_id": "request_code_selection"}, source)
+    # Legacy gateway records without a decision object use the top-level rule.
+    assert checks_for_record({"rule_id": "request_code_selection"}, "gateway") == related
+    assert checks_for_record({"decision": {"rule_id": None},
+                              "rule_id": "request_code_selection"}, "gateway") == ["OBS-01"]
+    report = coverage([{"related_checks": related}])
+    row = next(r for r in report["items"] if r["framework_id"] == "CHK-SUP-008")
+    assert row["rules"] == ["request_code_selection"]
+    assert row["observed_events"] == 1 and row["observation_state"] == "observed"
+    assert not any(k in row for k in ("verdict", "pass", "approved"))
+
+
 def test_endpoint_reports_every_row_even_without_events(example_client):
     response = example_client.get("/api/runtime/checks")
     assert response.status_code == 200

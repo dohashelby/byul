@@ -19,6 +19,7 @@ def run_matrix(monkeypatch, *, drift_after=False, invalid_platform=False, anonym
         normal = (method == 'POST' and url.endswith('/v1/chat/completions')
                   and kw.get('token') == 'inference'
                   and not (set(payload) - {'model', 'messages', 'max_tokens', 'stream'})
+                  and all('code_revision' not in message for message in payload.get('messages', []))
                   and payload.get('max_tokens', 0) <= 16
                   and not (kw.get('extra_headers') or {}).get('authorization'))
         if normal:

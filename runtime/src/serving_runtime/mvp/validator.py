@@ -12,6 +12,60 @@ from .policy import (
     _object_without_duplicates,
     _reject_json_constant,
 )
+from .selected_profile import UNSUPPORTED_ENTRY_GROUPS
+
+
+_CODE_SELECTION_GROUPS = {
+    name: group
+    for group in ("code_selection", "input_processors")
+    for name in UNSUPPORTED_ENTRY_GROUPS[group]
+}
+_FIELD_PATH_LIMIT = 256  # Match the route audit's bounded path policy.
+
+
+def _field_path(parent: str, key: str | int) -> str:
+    if isinstance(key, int):
+        path = f"{parent}[{key}]"
+    else:
+        # Only keys enter the diagnostic. Bound work before sanitizing and keep
+        # the final field visible even when its ancestors exceed the limit.
+        part = "".join(char if char.isprintable() else "?" for char in key[:_FIELD_PATH_LIMIT])
+        path = f"{parent}.{part}" if parent else part
+    if len(path) > _FIELD_PATH_LIMIT:
+        path = "..." + path[-(_FIELD_PATH_LIMIT - 3):]
+    return path
+
+
+def _code_selection_field(
+    document: dict[str, Any], ignored_roots: set[str]
+) -> tuple[str, str] | None:
+    """Find a forbidden key without recursion or inspecting string values.
+
+    Visit children before their container key so mm_processor_kwargs.code_revision
+    identifies the specific selector. Iterator frames use memory bounded by JSON
+    depth; every retained path is bounded independently of request depth/width.
+    """
+    pending = [(iter(document.items()), "", None)]
+    while pending:
+        entries, parent, parent_group = pending[-1]
+        try:
+            key, value = next(entries)
+        except StopIteration:
+            pending.pop()
+            if parent_group is not None:
+                return parent, parent_group
+            continue
+        if len(pending) == 1 and key in ignored_roots:
+            continue
+        path = _field_path(parent, key)
+        group = _CODE_SELECTION_GROUPS.get(key)
+        if isinstance(value, dict):
+            pending.append((iter(value.items()), path, group))
+        elif isinstance(value, list):
+            pending.append((iter(enumerate(value)), path, group))
+        elif group is not None:
+            return path, group
+    return None
 
 
 @dataclass(frozen=True)
@@ -165,6 +219,25 @@ def validate_request(
 
     if not isinstance(document, dict):
         return _decision("INVALID", 400, "INVALID_REQUEST", "request must be a JSON object")
+
+    # The lab deliberately forwards explicitly opened chat fields (including
+    # chat_template_kwargs) and their arbitrary values to /tokenize and inference.
+    # Preserve that experiment contract; default and completions have no bypass.
+    lab_fields = (
+        {rule.name for rule in policy.extra_fields}
+        if policy.profile == "zeroday-lab" and request_kind == "chat"
+        else set()
+    )
+    forbidden = _code_selection_field(document, lab_fields)
+    if forbidden is not None:
+        path, group = forbidden
+        return _decision(
+            "INVALID",
+            400,
+            "CODE_SELECTION_FIELD" if group == "code_selection" else "INPUT_PROCESSOR_FIELD",
+            path,
+            rule_id="request_code_selection",
+        )
 
     if "max_completion_tokens" in document:
         return _decision(

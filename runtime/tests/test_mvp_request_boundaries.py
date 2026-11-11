@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 
 from serving_runtime.mvp.backend import BackendConfig
 from serving_runtime.mvp.engine_client import EngineClient
+from serving_runtime.mvp.http_handler import Handler
 from serving_runtime.mvp.policy import ExtraFieldRule, load_policy
 from serving_runtime.mvp.policy_state import load_revocations
 from serving_runtime.mvp.relay import Relay, engine_rejection
@@ -89,6 +90,62 @@ class RequestIO:
 
     def write_stream_chunk(self, chunk):
         self.chunks.append(chunk)
+
+
+class CodeSelectionBoundaryTests(unittest.TestCase):
+    def test_rejection_response_and_journal_omit_values_and_never_call_engine(self):
+        marker = "PRIVATE_CODE_SELECTION_MARKER_71c29"
+        policy = load_policy(POLICY.parent / "policy-v1.1-context.json")
+        self.assertTrue(policy.ok)
+        for route in ("chat", "completions"):
+            for fields, reason, path in (
+                ({"mm_processor_kwargs": {"code_revision": marker}},
+                 "CODE_SELECTION_FIELD", "mm_processor_kwargs.code_revision"),
+                ({"processor_kwargs": {"note": marker}},
+                 "INPUT_PROCESSOR_FIELD", "processor_kwargs"),
+            ):
+                with self.subTest(route=route, reason=reason), tempfile.TemporaryDirectory() as directory:
+                    records = RequestRecords(directory, "session", lambda: policy, "mock")
+                    engine = Mock()
+                    engine.receipt_not_queried.return_value = "not_queried"
+                    relay = Mock(request_deadline_s=5)
+                    limiter = ConcurrencyLimiter(1)
+                    flow = RequestFlow(BackendConfig.mock(("127.0.0.1", 1)), lambda: policy,
+                                       lambda: load_revocations(None), records, engine, relay, limiter)
+                    document = {"model": marker, **fields}
+                    if route == "chat":
+                        document["messages"] = [{"role": "user", "content": marker}]
+                    else:
+                        document["prompt"] = marker
+                    response = RequestIO(json.dumps(document).encode())
+                    # Exercise the production Decision -> HTTP JSON serializer
+                    # without a listening socket, including in restricted CI.
+                    handler = object.__new__(Handler)
+                    handler._send = Mock()
+                    response.send_error_decision = handler.send_error_decision
+                    getattr(flow, route)(response, "a" * 32)
+                    status, content_type, wire = handler._send.call_args.args
+                    self.assertEqual(status, 400)
+                    self.assertEqual(content_type, "application/json; charset=utf-8")
+                    self.assertEqual(json.loads(wire), {"error": {
+                        "code": reason, "message": path, "result": "INVALID",
+                        "source": "gateway", "request_id": "a" * 32,
+                    }})
+                    self.assertNotIn(marker.encode(), wire)
+                    raw = records.store.path.read_text()
+                    self.assertNotIn(marker, raw)
+                    stored, corrupt = records.store.read_all()
+                    self.assertEqual(corrupt, [])
+                    self.assertEqual(len(stored), 1)
+                    record = stored[0]
+                    self.assertEqual(record["decision"]["rule_id"], "request_code_selection")
+                    self.assertEqual(record["decision"]["message"], path)
+                    self.assertEqual(record["decision"]["reason_code"], reason)
+                    self.assertEqual(record["phase"], "final")
+                    self.assertFalse(record["delivery"]["attempted"])
+                    engine.count_input_tokens.assert_not_called()
+                    relay.relay.assert_not_called()
+                    self.assertEqual(limiter.status()["in_flight"], 0)
 
 
 class RequestUnicodeBoundaryTests(unittest.TestCase):

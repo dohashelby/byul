@@ -353,7 +353,7 @@ def parse_tetragon(
 
     binary, pod = _process(event, "$.process_kprobe", require_binary=False)
     function_name = _string(event.get("function_name"), "$.process_kprobe.function_name")
-    if (event_name == "process_lsm" and function_name != "file_open") or (event_name == "process_kprobe" and function_name not in {"security_file_permission", "fd_install", "sys_openat", "__x64_sys_openat", "__arm64_sys_openat"}):
+    if (event_name == "process_lsm" and function_name != "file_open") or (event_name == "process_kprobe" and function_name not in {"security_file_permission", "security_file_open", "fd_install", "sys_openat", "__x64_sys_openat", "__arm64_sys_openat"}):
         raise UnsupportedTetragonEvent(f"unsupported kprobe function: {function_name}")
     policy_name = _string(event.get("policy_name"), "$.process_kprobe.policy_name")
     match = _RULE_ID.search(policy_name)
@@ -377,7 +377,8 @@ def parse_tetragon(
                 mask = int(value)
             except (TypeError, ValueError) as error:
                 raise EventError("int_arg is not an integer") from error
-    if not file_path:
+    code_rule = match.group(1).upper() == "TG-CODE-01"
+    if not file_path and not code_rule:
         raise EventError("process_kprobe has no file_arg.path")
     if mask is None and function_name == "security_file_permission":
         raise EventError("process_kprobe has no int_arg")
@@ -415,6 +416,9 @@ def parse_tetragon(
     )
     if exec_policy is not None and normalized["rule_id"] == "TG-CACHE-01":
         normalized.update(exec_policy.classify_cache_write(file_path))
+    if code_rule:
+        from .codeload import classify_code_open
+        classify_code_open(normalized, event, exec_policy, identity)
     if identity is not None:
         normalized["identity"] = identity
     if (normalized["rule_id"] == "TG-HEALTH-01" and file_path == "/run/byul-runtime-sentinel/read.txt"

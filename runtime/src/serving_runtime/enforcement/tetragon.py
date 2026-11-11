@@ -7,6 +7,7 @@ import copy
 
 from .intent import EnforcementIntent
 from .attribution import KERNEL_DATA
+from .codeload import CODE_SUFFIXES, RULE_ID, watch_prefixes
 
 
 _STATUS = "candidate-cluster-unapplied-unverified"
@@ -162,6 +163,28 @@ def _secret_enforcement_policy(intent: EnforcementIntent) -> dict[str, Any]:
     return manifest
 
 
+def _code_policy(intent: EnforcementIntent) -> dict[str, Any]:
+    manifest = _policy(intent, RULE_ID, [], 4)
+    prefixes = watch_prefixes(intent)
+    manifest["spec"]["options"] = [{"name": "policy-mode", "value": "monitor"}]
+    manifest["spec"]["kprobes"] = [{
+        "call": "security_file_open", "syscall": False,
+        # Two copies of the same file pointer use distinct spec argument slots.
+        # v1.7.1 args:[n] selects the slot, index selects the function argument.
+        # This avoids two operators on one index. With kernel identity: 2+3=5.
+        "args": [{"index": 0, "type": "file", "label": "watch_path"},
+                 {"index": 0, "type": "file", "label": "code_path"}],
+        "selectors": [{"matchArgs": [
+            {"args": [0], "operator": "Prefix", "values": prefixes[i:i + 8]},
+            {"args": [1], "operator": "Postfix", "values": list(CODE_SUFFIXES)},
+        ], "matchActions": [{"action": "Post"}]} for i in range(0, len(prefixes), 8)],
+    }]
+    manifest["metadata"]["annotations"]["serving-runtime.local/limit"] = (
+        "monitor only; code open attempt, not proof of import/execution; phase classified in adapter; kernel >=5.3; path coverage limited"
+    )
+    return manifest
+
+
 def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
     """Render file policies; TG-EXEC-01 is intentionally adapter-only."""
 
@@ -203,6 +226,7 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
             exact_path=True,
             override=True,
         )
+    manifests["tetragon-tg-code-01.json"] = _code_policy(intent)
     if intent.tetragon_kernel_identity:
         for manifest in manifests.values():
             # LsmHookSpec in 1.7.1 has no data field. Never claim kernel identity

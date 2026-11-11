@@ -56,7 +56,7 @@ def test_code_selection_gateway_rule_counts_as_sup_008_only_for_gateway():
                               "rule_id": "request_code_selection"}, "gateway") == ["OBS-01"]
     report = coverage([{"related_checks": related}])
     row = next(r for r in report["items"] if r["framework_id"] == "CHK-SUP-008")
-    assert row["rules"] == ["request_code_selection"]
+    assert row["rules"] == ["request_code_selection", "TG-CODE-01"]
     assert row["observed_events"] == 1 and row["observation_state"] == "observed"
     assert not any(k in row for k in ("verdict", "pass", "approved"))
 

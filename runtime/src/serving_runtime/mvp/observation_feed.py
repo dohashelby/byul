@@ -727,6 +727,9 @@ class ObservationFeed:
                 skipped_count += 1
                 continue
             item = accepted[0] if accepted else losses[0]
+            if self.kind == "tetragon":
+                from serving_runtime.enforcement.codeload import apply_collection_evidence
+                apply_collection_evidence(item, heartbeat)
             if writer_started_at is not None:
                 try:
                     observed_at = self._parse_time(

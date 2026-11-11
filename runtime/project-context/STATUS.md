@@ -754,3 +754,11 @@
 ## Selected37 integration
 
 Latest-main integration and validation scope: [public validation note](../docs/selected37-integration-validation.md). Final merged-revision validation and GitHub CI are pending.
+
+## 2026-11-11 추론 중 코드 파일 open monitor — TG-CODE-01
+
+- 기준 `byul_runtime` / `f4ea84c9`. 경로 Prefix + 코드 확장자 Postfix의 monitor/Post 전용 정책, 기존 ExecPolicy 단계·귀속 재사용, 공백/미상 unknown, 플랫폼 CHK-SUP-008(SUP-08) 집계를 구현했다. 기동 기준선은 수집량·상태 관리·지연 import 오탐 때문에 보류했다. 추가 HF_MODULES_CACHE 경로는 내부 intent의 code_load_watch_paths로 지정한다.
+- 새 파일 `enforcement/codeload.py`, `tests/test_codeload.py`, [설계·D4(16회차) 확인 절차](../docs/code-load-monitor.md). 기존 정책 바이트 해시 유지 확인. 계약 필드·enum·AWS 케이스 ID 추가 없음, request_code_selection 유지. 상세 변경·제약·시험 명령은 위 문서에 있다.
+- 새 기능/플랫폼 매핑 **34 통과·2 deselected**. 요청 CI 명령 사용(임시·uv 캐시는 지정 scratch 내부, 로컬 캐시 복사 후 offline). 전체는 기존 TestClient hang으로 중단; 해당 파일 9건 제외 후 **1539 통과·130 skip·49 소켓 PermissionError 실패, subtests 931 통과**. 전체 통과 아님. `git diff --check` 통과. 로그: 지정 scratch의 `targeted-final.log`, `runtime-verified.log`, `runtime-diagnostic.log`.
+- 실서버·실제 공격·커널 적재는 미확인이다. D4에서는 무해한 모듈 import/정상 이미지 대조/기동 대조/수집 공백을 별도 절차로 확인한다. open은 실행 증명이 아니며 쓰기 open·정상 JIT 오탐, 감시 범위 밖·메모리 내 코드 미탐이 남는다. 외부 계약 검증은 통과했다.
+- 금지 인계 문서 읽기·수정, update/contracts 수정, AWS/kind/실클러스터 접속, 커밋·push 없음. 작업 시작 때 금지 인계 문서의 미추적 파일 존재만 확인했고 보존했다. 소켓 허용 환경의 전체 시험과 Claude 직접 검수가 남았다.

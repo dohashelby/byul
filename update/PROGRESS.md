@@ -1,3 +1,10 @@
+## 2026-11-11 — SUP-08 0.30.0 trust 비활성 추가 대조
+
+- 한 일: 사용자 지적에 따라 같은 Phi-3 vision fixture와 vLLM 0.30.0 고정 이미지에서 `--trust-remote-code`만 제거해 순차 GPU 대조를 실행했다. 제품 후보와 모델·이미지·코드 revision·기동 명령 및 나머지 인자가 같은지 렌더 기록으로 확인했다. 상세 결과는 [GPU 실측 결과](docs/gpu-a/RESULTS-20261111-SUP08.md), 기계 판독 요약은 [PoC JSON](docs/evidence/sup08-code-selection-20261111.json)에 기록했다.
+- 시험 결과: 모델의 사용자 정의 코드를 허용해야 한다는 ModelConfig 오류로 기동 실패(이전 종료 코드 1, import 표식 파일 0개). 정상 요청을 보낼 수 없었으므로 SUP-08 PASS/FAIL이나 제품 보고서를 새로 만들지 않았다. 원시 로그·Pod·렌더와 신뢰 활성 후보의 인자 비교를 저장소 밖 `SUP08-v030-no-trust-20261111.zip`(SHA-256 `042757f433447216b491a94b986fc4fe850927c644dd108e615756d9afcb8095`)에 보존했다.
+- 정리: 추가 시험 Probe Pod 삭제, 원래 `serving-engine` Deployment replicas=0, GPU 0 MiB 확인. EC2 정상 중지 요청 후 18:51 KST 콘솔에서 `stopped`와 공인 IP 해제를 확인했다. 추가 비용은 [GPU 비용 장부](docs/gpu-a/COST_LEDGER.md)에 기록했다.
+- 다음 단계/막힌 것: 독립 B 소스 검토 receipt와 기존 Linux CI의 B 고정 SHA 불일치는 이 추가 대조로 해소되지 않았다. 기업 승인이나 새 공식 판정을 주장하지 않는다.
+
 ## 2026-11-11 — SUP-08 코드 판본 선택 PoC 실측
 
 - 한 일: Phi-3 vision 고정 모델과 소유 processor 승인/비승인 두 커밋을 오프라인 fixture로 만들었다. Kubernetes 코드 캐시의 Transformers 4/5 경로, import 표식, Pod 신원 및 판본별 launch를 검증했다. `guard update`의 `input_validation` 순차 Pod 전환과 비교 조건을 연결했다. 상세 재현 입력·근거는 [GPU 실측 결과](docs/gpu-a/RESULTS-20261111-SUP08.md)에 보존했다.

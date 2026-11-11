@@ -88,12 +88,23 @@
       "challenge_state": "rejected"
     }
   ],
-  "trust_disabled_control": "vLLM 0.31.0 custom-code model failed startup; no SUP-08 PASS claim",
+  "trust_disabled_control": "vLLM 0.30.0 and 0.31.0 custom-code model failed startup; no SUP-08 PASS claim",
+  "trust_disabled_030_evidence": {
+    "run_id": "sup08-v030-notrust-20261111-1",
+    "outcome": "STARTUP_FAILED_CUSTOM_CODE_REQUIRED",
+    "normal_request_executed": false,
+    "sup08_result": null,
+    "trusted_candidate_run_id": "sup08-update-v030-20261111-3",
+    "only_launch_argument_removed": "--trust-remote-code",
+    "startup_log_sha256": "cfbde981b419c4dcbbf26eea9b1bba6ce3fc11ffdc3bcebd504b53debb19418a",
+    "evidence_bundle_name": "SUP08-v030-no-trust-20261111.zip",
+    "evidence_bundle_sha256": "042757f433447216b491a94b986fc4fe850927c644dd108e615756d9afcb8095"
+  },
   "verification": "guard verify OK for all three final Stores; guard evidence export succeeded",
   "limitations": [
     "single model/configuration PoC",
     "B-owned source review receipt pending",
     "no enterprise policy approval",
-    "full Linux PR CI pending"
+    "Linux PR CI has source-review-receipt and frozen-SHA failures"
   ]
 }

@@ -4,18 +4,52 @@ import json
 
 import pytest
 
+from byul_platform.sources.checklist_data import CHECKS
 from tools import selected_runtime_check as tool
 from tools.selected_runtime_check import HTTPResponse
+
+TETRAGON_LIMIT = 50 + 10 * len({rule for check in CHECKS for rule in check["rules"] if rule.startswith("TG-")})
 
 
 def test_window_contract_distinguishes_unknown_and_truncated():
     assert tool.validate_windows({}) is None
     good = {"source_windows": {"gateway": {"returned": 2, "total": None, "limit": 200, "truncated": False},
         "hubble": {"returned": 50, "total": 80, "limit": 50, "truncated": True},
-        "tetragon": {"returned": 0, "total": None, "limit": 50, "truncated": None}}}
+        "tetragon": {"returned": 0, "total": None, "limit": TETRAGON_LIMIT, "truncated": None}}}
     assert tool.validate_windows(good) is True
     good["source_windows"]["hubble"]["truncated"] = False
     assert tool.validate_windows(good) is False
+
+
+@pytest.mark.parametrize("returned,limit,expected", [
+    (50, TETRAGON_LIMIT, True),
+    (TETRAGON_LIMIT, TETRAGON_LIMIT, True),
+    (TETRAGON_LIMIT + 1, TETRAGON_LIMIT, False),
+    (-1, TETRAGON_LIMIT, False),
+    (True, TETRAGON_LIMIT, False),
+    (50, TETRAGON_LIMIT - 10, False),
+    (50, TETRAGON_LIMIT + 10, False),
+    (50, float(TETRAGON_LIMIT), False),
+])
+def test_tetragon_window_requires_checklist_limit_and_bounded_integer_returned(returned, limit, expected):
+    body = {"source_windows": {
+        "gateway": {"returned": 0, "total": 0, "limit": 200, "truncated": False},
+        "hubble": {"returned": 0, "total": 0, "limit": 50, "truncated": False},
+        "tetragon": {"returned": returned, "total": TETRAGON_LIMIT + 10, "limit": limit, "truncated": True}}}
+    assert tool.validate_windows(body) is expected
+
+
+def test_tetragon_window_counts_unique_checklist_rules(monkeypatch):
+    from byul_platform.sources import checklist_data
+    monkeypatch.setattr(checklist_data, "CHECKS", [
+        {"rules": ["TG-TEST-01", "other-rule"]},
+        {"rules": ["TG-TEST-01", "TG-TEST-02"]},
+    ])
+    body = {"source_windows": {
+        "gateway": {"returned": 0, "total": 0, "limit": 200, "truncated": False},
+        "hubble": {"returned": 0, "total": 0, "limit": 50, "truncated": False},
+        "tetragon": {"returned": 70, "total": 70, "limit": 70, "truncated": False}}}
+    assert tool.validate_windows(body) is True
 
 
 def test_existing_data_directory_is_never_used_for_retention(tmp_path):

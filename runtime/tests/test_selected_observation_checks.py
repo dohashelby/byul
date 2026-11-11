@@ -6,6 +6,9 @@ from tools import selected_runtime_check as tool
 from byul_platform.sources.checklist_data import CHECKS,FIXED_SHA,PACK_REVISION
 
 
+TETRAGON_LIMIT = 50 + 10 * len({rule for check in CHECKS for rule in check["rules"] if rule.startswith("TG-")})
+
+
 def feed(*,platform=False,count=10):
     detail={k:None for k in checks.FIELDS};detail.update(redaction_dropped_lines_total=count,storage_errors_total=2,
         last_storage_error_class='OSError',last_storage_error_at='2026-11-06T00:00:00Z',checkpoint_pending=True,
@@ -34,7 +37,7 @@ def test_source_changed_during_snapshot_is_unknown_but_stable_loss_is_failure():
 
 def run_observe(monkeypatch,*,wrong_scope=False,wrong_ids=False,invalid=False):
     window={'source_windows':{'gateway':{'returned':0,'total':None,'limit':200,'truncated':False},
-            'hubble':{'returned':0,'total':0,'limit':50,'truncated':False},'tetragon':{'returned':50,'total':100,'limit':50,'truncated':True}}}
+            'hubble':{'returned':0,'total':0,'limit':50,'truncated':False},'tetragon':{'returned':50,'total':100,'limit':TETRAGON_LIMIT,'truncated':True}}}
     raw={'auth':{'protected_routes':['GET /api/*']},'policy':{'sha256':'policy'},'target':{'target_id':'target'},
          'run_id':'run','observation_session_id':'session','collectors':[feed()]}
     item={'policy':{'policy_ref':{'sha256':'other' if wrong_scope else 'policy'}},'target':{'target_id':'target'},
@@ -69,7 +72,7 @@ def test_same_count_of_unrelated_checks_is_not_selected37(monkeypatch):
 
 
 def test_string_truncation_flag_is_not_a_valid_window():
-    data={'source_windows':{name:{'returned':0,'total':None if name=='gateway' else 0,'limit':200 if name=='gateway' else 50,'truncated':'false' if name=='gateway' else False} for name in ('gateway','hubble','tetragon')}}
+    data={'source_windows':{name:{'returned':0,'total':None if name=='gateway' else 0,'limit':{'gateway':200,'hubble':50,'tetragon':TETRAGON_LIMIT}[name],'truncated':'false' if name=='gateway' else False} for name in ('gateway','hubble','tetragon')}}
     assert tool.validate_windows(data) is False
 
 

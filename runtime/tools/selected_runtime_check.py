@@ -149,9 +149,11 @@ def validate_windows(body):
     windows = body.get("source_windows")
     if not isinstance(windows, dict) or not {"gateway", "hubble", "tetragon"} <= windows.keys():
         return None
-    for source, limit in (("gateway", 200), ("hubble", 50), ("tetragon", 50)):
+    from byul_platform.sources.checklist_data import CHECKS
+    tetragon_rules = {rule for check in CHECKS for rule in check["rules"] if rule.startswith("TG-")}
+    for source, limit in (("gateway", 200), ("hubble", 50), ("tetragon", 50 + 10 * len(tetragon_rules))):
         row = windows[source]
-        if not isinstance(row, dict) or type(row.get("returned")) is not int or not 0 <= row["returned"] <= limit or row.get("limit") != limit:
+        if not isinstance(row, dict) or type(row.get("returned")) is not int or not 0 <= row["returned"] <= limit or type(row.get("limit")) is not int or row["limit"] != limit:
             return False
         total = row.get("total")
         if row.get('truncated') is not None and type(row.get('truncated')) is not bool:
@@ -439,6 +441,7 @@ def isolated(data_dir, model, *, backend="mock", backend_config=None, timeout=15
                            "http_statuses": [response.status for response in responses],
                            "gateway_events_per_poll": [len(events) for events in projected],
                            "exact_projection_per_poll": projection_matches}, scope="isolated real HTTP/OS list cache; synthetic history load")]
+            # These observations have no rule_id, so only the general 50-row feed contributes.
             cases.append(fact("A4-SOURCE-WINDOW-FIXTURE", validate_windows(batches[-1]) is True and
                          all(batches[-1]["source_windows"][s]["total"] == 60 and batches[-1]["source_windows"][s]["returned"] == 50 for s in ("hubble", "tetragon")),
                          {"source_windows": batches[-1].get("source_windows"), "synthetic_observations": 120}, scope="isolated source query window fixture"))

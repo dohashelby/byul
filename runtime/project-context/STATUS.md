@@ -1,5 +1,11 @@
 # 런타임 작업 상태
 
+- 2026-11-11 Codex, byul_runtime/fa4ad454: AWS 16회차 A1~A3 후속 수정(코드 정책 기본 신원, 체크리스트 규칙 묶음 조회, 기록 권한 명시 이전·오류 원인 보존). 계약·update 무변경, 커밋/push·AWS/kind 접속 없음.
+- 검증: 관련 111 passed/22 subtests. 표준 전체 실행은 TestClient/AnyIO 대기로 중단; 해당 대기만 skip한 보충 전체는 runtime 1567 passed/49 EPERM failed/131 skipped/931 subtests, 플랫폼 277 passed/166 skipped. 기존 STATUS 본문 보존; 실제 서버 재적용·속도는 미확인.
+- Claude 검수(로컬, CI 명령): A2로 바뀐 Tetragon 창 한도(50+10×TG 규칙 수)에 점검 도구 `selected_runtime_check.validate_windows`와 시험 fixture를 맞춤. runtime 1749 passed/4 skipped(`test_mvp_zeroday_profile` 1건 간헐 실패, 단독 3회 통과), platform API 443 passed. 서버 반영은 17회차.
+
+- 2026-11-11 사용자 요청으로 [런타임 PoC 시연영상 촬영 절차](../docs/런타임_PoC_시연영상_촬영절차_20261111.md)를 작성했다. PR #245·16회차 실측과 현재 실행 스크립트·화면 경로를 근거로 Windows/WSL 창 준비, 기존 AWS 연결, 별도 플랫폼 18700 실행, 요청·직통 접근·코드 파일 열기 탐지 촬영, 저장·종료를 정리했다. 문서 작업이며 실서버 기동·접속·배포·정책 변경·재시험·녹화는 하지 않았다.
+
 - 2026-11-11 AWS 16회차(vLLM): D1~D3·D6 실측 통과(요청 행렬 31/31, AWS-04·05·09, TG-CODE-01 detected·오탐 0, SUP-008 5건, lsm_file_open EPERM). 발견: PR #243 data 파일 0644 거부(서버 0600 조치), TG-CODE-01은 kernel identity 필요. 결과: docs/AWS_GPU_서버16회차_결과_20261111.md
 
 - 2026-11-11 D3 요청 시험 도구 확장(기준 `byul_runtime` HEAD `7a985052`, D1+D2 미커밋 변경 보존): `REQ-CODE-SELECT-{chat-mm,messages,completions}`와 `REQ-ROUTE-POST-/tokenize` 추가. 응답·원본 기록·플랫폼의 합성 값 노출, decision rule/path, 미전달을 대조하며 zeroday-lab의 명시적 chat 최상위 개방만 건너뛴다.
@@ -764,3 +770,9 @@ Latest-main integration and validation scope: [public validation note](../docs/s
 - 새 기능/플랫폼 매핑 **34 통과·2 deselected**. 요청 CI 명령 사용(임시·uv 캐시는 지정 scratch 내부, 로컬 캐시 복사 후 offline). 전체는 기존 TestClient hang으로 중단; 해당 파일 9건 제외 후 **1539 통과·130 skip·49 소켓 PermissionError 실패, subtests 931 통과**. 전체 통과 아님. `git diff --check` 통과. 로그: 지정 scratch의 `targeted-final.log`, `runtime-verified.log`, `runtime-diagnostic.log`.
 - 실서버·실제 공격·커널 적재는 미확인이다. D4에서는 무해한 모듈 import/정상 이미지 대조/기동 대조/수집 공백을 별도 절차로 확인한다. open은 실행 증명이 아니며 쓰기 open·정상 JIT 오탐, 감시 범위 밖·메모리 내 코드 미탐이 남는다. 외부 계약 검증은 통과했다.
 - 금지 인계 문서 읽기·수정, update/contracts 수정, AWS/kind/실클러스터 접속, 커밋·push 없음. 작업 시작 때 금지 인계 문서의 미추적 파일 존재만 확인했고 보존했다. 소켓 허용 환경의 전체 시험과 Claude 직접 검수가 남았다.
+
+## 2026-11-11 selected runtime source window 검증 보정
+
+- 기준 `byul_runtime` / `fa4ad4541232fd8c6aff015a99e0d2ab424f96dd`의 기존 미커밋 작업 위에서 `tools/selected_runtime_check.py`, `tests/test_selected_runtime_check.py`와 이 상태 기록만 수정했다. 새 파일·커밋·push 없음.
+- `validate_windows()`는 플랫폼과 같은 `checklist_data.CHECKS`의 중복 없는 `TG-` 규칙 수로 Tetragon 한도 `50 + 10 * 규칙 수`를 검증한다. 정수 한도와 반환 수 범위, 기존 total/truncated 검증을 유지한다. isolated 관측 fixture는 rule_id가 없어 반환 50건·전체 60건 기대값을 유지했다. 한도 경계·타입·규칙 중복 회귀 시험을 추가했다.
+- 시험: `UV_CACHE_DIR=/tmp/byul-selected-runtime-uv-xObe7g UV_OFFLINE=1 PYTHONPATH=runtime:runtime/tests:runtime/src:update/src:platform/api/src uv run --project platform/api --frozen --with-editable ./runtime --with-editable ./update python -m pytest -q runtime/tests/test_selected_runtime_check.py --import-mode=importlib --basetemp=/tmp/byul-selected-runtime-after-20261111` → **26 통과·6 실패**. 기본 uv 캐시가 읽기 전용이어서 `/tmp`에 캐시를 복사했다. 6건 모두 소켓 생성 `PermissionError: [Errno 1] Operation not permitted`이며 요청한 두 HTTP 통합 시험도 실제 검증에 도달하지 못했다. 소켓 허용 환경에서 재시험 필요. `git diff --check` 통과.

@@ -227,8 +227,10 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
             override=True,
         )
     manifests["tetragon-tg-code-01.json"] = _code_policy(intent)
-    if intent.tetragon_kernel_identity:
-        for manifest in manifests.values():
+    for filename, manifest in manifests.items():
+        # Code-open classification requires confirmed identity even when the
+        # other file policies retain their legacy, opt-in instrumentation.
+        if intent.tetragon_kernel_identity or filename == "tetragon-tg-code-01.json":
             # LsmHookSpec in 1.7.1 has no data field. Never claim kernel identity
             # for that policy; native workload attribution is still required.
             if "lsmhooks" in manifest["spec"]:

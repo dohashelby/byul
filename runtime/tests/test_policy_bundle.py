@@ -13,6 +13,7 @@ import shutil
 import tempfile
 import unittest
 from unittest.mock import patch
+import pytest
 
 from serving_runtime.cli import main
 from serving_runtime.mvp.app import GatewayApp
@@ -25,6 +26,27 @@ from serving_runtime.enforcement.intent import load_intent
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_BUNDLE = ROOT.parent / "contracts" / "examples" / "bundle"
 NOW = datetime(2026, 10, 26, 0, 0, tzinfo=timezone.utc)
+
+
+@pytest.mark.parametrize("error", [PermissionError("records.jsonl: reader permissions are unsafe"),
+                                  OSError("body failed")])
+def test_materialized_body_oserror_is_propagated_and_snapshot_cleaned(error):
+    bundle = verify_policy_bundle(SOURCE_BUNDLE, now=NOW)
+    with pytest.raises(type(error)) as raised:
+        with bundle.materialized_files() as paths:
+            snapshot = Path(paths["gateway_policy"])
+            assert snapshot.exists()
+            raise error
+    assert raised.value is error
+    assert not snapshot.exists()
+
+
+def test_materialized_snapshot_creation_oserror_has_bundle_context():
+    bundle = verify_policy_bundle(SOURCE_BUNDLE, now=NOW)
+    with patch("serving_runtime.mvp.policy_bundle.tempfile.TemporaryDirectory", side_effect=PermissionError("private")):
+        with pytest.raises(PolicyBundleError, match=r"bundle.json: .*스냅샷.*PermissionError"):
+            with bundle.materialized_files():
+                pytest.fail("snapshot creation must fail")
 
 
 def _copy_bundle(parent: Path) -> Path:

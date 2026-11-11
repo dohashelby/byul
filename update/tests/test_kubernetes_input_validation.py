@@ -116,5 +116,6 @@ def test_run_inputs_write_kubernetes_input_configs(tmp_path, check_id):
     inputs.main(['http-check', '--check', check_id, '--env', str(tmp_path / 'env.json'), '--target', str(tmp_path / 'target.json'),
         '--policy-draft', str(UPDATE / 'docs/gpu-a/policy-a-draft.yaml'), '--out', str(tmp_path / check_id)])
     config = (tmp_path / check_id / 'guard.toml').read_text()
-    assert "input_validation = 'kubernetes'" in config and 'vocab_size = 151936' in config
+    assert "input_validation = 'kubernetes'" in config
+    assert ('vocab_size = 151936' in config) is (check_id in {'REQ-08', 'REQ-09'})
     assert ('reused_token_ids' in config) is (check_id == 'REQ-08')

@@ -1,0 +1,99 @@
+{
+  "schema": "byul-gpu-a-check-summary/1",
+  "date_kst": "2026-11-11",
+  "check_id": "SUP-08",
+  "scope": "one NVIDIA L4 on existing ap-northeast-2 g6.2xlarge; sequential Kubernetes runs",
+  "enterprise_approval_claimed": false,
+  "official": false,
+  "policy_status": "DRAFT",
+  "policy_data_origin": "EXAMPLE",
+  "pack_review_status": "DRAFT",
+  "selected_check_count": 69,
+  "executed_check_count": 1,
+  "other_selected_checks": "NOT_RUN",
+  "evidence_bundle": {
+    "name": "SUP08-evidence-20261111.zip",
+    "location": "outside repository; delivered to requesting user",
+    "sha256": "719ccd77b9daf34d711e5c9691545b12e17e2644968c4e3bdedc97b73fc6b84a",
+    "bytes": 998017,
+    "verified_zip_entries": 40,
+    "store_exports": {
+      "product/evidence.zip": {
+        "sha256": "e8f6f8f09bcb84db6dcbf5fc5fdbbe4f4849a67e12cd97665fd3ba6c623d150b",
+        "bytes": 358226
+      },
+      "standalone-v070/evidence.zip": {
+        "sha256": "195974a1ad979c61969fe7dadde2474f3dc0db8b72695420be4aa481fa874ec6",
+        "bytes": 219941
+      },
+      "standalone-v031/evidence.zip": {
+        "sha256": "d0ba653bc7011ce4869ba639a408d9886782254be89c6d65a2003b6bf62bbc6b",
+        "bytes": 296195
+      }
+    }
+  },
+  "product_update": {
+    "report_ref": "RPT-01M74WJ5RFY5DSD00PR5YMNF4T@1",
+    "report_sha256": "9328cc7be068cc68a97cde5f00331a004597bcc91fe8d0b4109a14bfd7d87119",
+    "baseline": {
+      "version": "0.7.0",
+      "image_digest": "docker.io/vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8",
+      "result_ref": "RES-01M74WJ5KN8ZN9PXHHA8K7SCYX@1",
+      "evidence_ref": "EVD-01M74WE09HAFWHTYPVXHD2VA0H@1",
+      "security": "PASS",
+      "functional": "PASS",
+      "challenge_state": "ignored"
+    },
+    "candidate": {
+      "version": "0.30.0",
+      "image_digest": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "result_ref": "RES-01M74WJ5KX9J223JKAKD0X3F03@1",
+      "evidence_ref": "EVD-01M74WHW1TDFS4YX8GT22V7379@1",
+      "security": "FAIL",
+      "functional": "PASS",
+      "challenge_state": "consumed"
+    },
+    "security_comparison": "REGRESSED",
+    "functional_comparison": "NO_CHANGE",
+    "comparison_reasons": [],
+    "model_inventory_sha256": "c2dd67477c1899b775e5fa0d0585861e62166ff94c7b94a7c8ba531c2756ac52",
+    "fixture_sha256": "92050000a09280d1d36f440b099b02a18c7ffe9970711c102a99b846959165ca",
+    "config_sha256": "56d3f5b3b7c4ea5e1dc41cf6522aa689603add9dc97fba92bfb4e9be22a5911f"
+  },
+  "standalone_controls": [
+    {
+      "report_ref": "RPT-01M74TS7C5E2N4B7YR18D9GJC3@1",
+      "report_sha256": "cd919960a6cd92c07fa0dce2fe8ccf3b1815c4ca3a0a0fb7ea49c0425bbe6eef",
+      "official": false,
+      "security": "PASS",
+      "functional": "PASS",
+      "version": "0.7.0",
+      "image_digest": "docker.io/vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8",
+      "evidence_ref": "EVD-01M74TS2MRMEPJYHPV62Q9W9SY@1",
+      "evidence_sha256": "d2f7dd78a017bb0b3f6ece2bb9c3c9b43a8b6b5385ea1b0088831db60380fb2d",
+      "result_ref": "RES-01M74TS6XTHEJYYSDZ08T7CE55@1",
+      "challenge_state": "ignored"
+    },
+    {
+      "report_ref": "RPT-01M74WRGXQN4E1WN669MRTQC8G@1",
+      "report_sha256": "251d380f6584611aa25582c5c49a3527b9e485c45fb96acf7dace9cd624d6787",
+      "official": false,
+      "security": "PASS",
+      "functional": "PASS",
+      "version": "0.31.0",
+      "image_digest": "docker.io/vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b",
+      "evidence_ref": "EVD-01M74WR9T02G545D6S7DA0SHJ8@1",
+      "evidence_sha256": "30979a19b760d2906683880389de4e3515deba16ac737ba3ea3fff4fd709ccf8",
+      "result_ref": "RES-01M74WRGDTHEMNC4JX8HY7TZPF@1",
+      "challenge_state": "rejected"
+    }
+  ],
+  "trust_disabled_control": "vLLM 0.31.0 custom-code model failed startup; no SUP-08 PASS claim",
+  "verification": "guard verify OK for all three final Stores; guard evidence export succeeded",
+  "limitations": [
+    "single model/configuration PoC",
+    "B-owned source review receipt pending",
+    "no enterprise policy approval",
+    "full Linux PR CI pending"
+  ]
+}

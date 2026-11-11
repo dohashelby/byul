@@ -5,7 +5,7 @@ import time
 
 from .bounded import strict_json
 from .kubernetes_binding import verify_owned_pod
-from .kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
+from .kubernetes_http import KubernetesHTTP, INPUT_VALIDATION_PROFILE, REQUEST_BINDING_PROFILE
 
 
 class KubernetesTransition:
@@ -19,22 +19,27 @@ class KubernetesTransition:
         self.duration=timeout;self.deadline=self.clock()+timeout;self.interval=poll_interval
         self.transports={};self.events=[];self.candidate_binding=candidate_binding
         self.envs=dict(zip(("baseline","candidate"),envs));self.side_configs=side_configs;self.runner=runner
+        executors={side:side_configs[side].get("executors") for side in ("baseline","candidate")}
+        supported={"request_binding":REQUEST_BINDING_PROFILE,"input_validation":INPUT_VALIDATION_PROFILE}
+        if executors["baseline"]!=executors["candidate"] or executors["baseline"] not in (
+                {"request_binding":"kubernetes"},{"input_validation":"kubernetes"}):
+            raise ValueError("KUBERNETES_TRANSITION_SCOPE_UNSUPPORTED")
+        self.executor=next(iter(executors["baseline"]))
+        self.profile=supported[self.executor]
         for side in ("baseline","candidate"):
             cfg=side_configs[side]
-            if cfg.get("executors")!={"request_binding":"kubernetes"}:
-                raise ValueError("KUBERNETES_TRANSITION_SCOPE_UNSUPPORTED")
             if side=="candidate" and candidate_binding=="after_baseline":
-                if Path(cfg["request_binding"]["target"]).exists():
+                if Path(cfg[self.executor]["target"]).exists():
                     raise ValueError("KUBERNETES_CANDIDATE_BINDING_MUST_BE_FRESH")
                 continue
             self.transports[side]=self._load(side)
         if "candidate" in self.transports:self._verify_pair()
 
     def _load(self,side):
-        cfg=self.side_configs[side]["request_binding"]
+        cfg=self.side_configs[side][self.executor]
         with Path(cfg["target"]).open("rb") as stream:target=strict_json(stream.read(65537))
         transport=KubernetesHTTP(target,self.envs[side],duration=self.duration,
-            binary=cfg.get("kubectl_binary","kubectl"),runner=self.runner,profile=REQUEST_BINDING_PROFILE,clock=self.clock)
+            binary=cfg.get("kubectl_binary","kubectl"),runner=self.runner,profile=self.profile,clock=self.clock)
         transport.deadline=self.deadline
         return transport
 

@@ -2,6 +2,7 @@
 from copy import deepcopy
 import hashlib
 import json
+import os
 import subprocess
 import sys
 
@@ -9,6 +10,7 @@ import pytest
 
 from guard.adapters import engine_profiles
 from guard.executors import request_field_probe as probe
+from guard.executors.registry import resolve_executor
 from guard.executors.kubernetes_input_validation import _contract
 from guard.judges.rule_table import RuleTableJudge
 from guard.models import Evidence, Verdict, load_pack
@@ -24,8 +26,12 @@ IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAD
 FIELD = "mm_processor_kwargs.code_revision"
 
 
-def inv(*revisions, present=True):
-    return {"schema": "guard-code-module-inventory/1", "present": present,
+def inv(*revisions, present=True, complete=True, marker_revisions=None):
+    marked = revisions if marker_revisions is None else marker_revisions
+    return {"schema": "guard-code-module-inventory/2", "present": present, "complete": complete,
+            "markers_present": True,
+            "markers": {rev: {"schema": "guard-code-import-marker/1", "revision": rev,
+                              "module_sha256": "c" * 64} for rev in marked},
             "revisions": {rev: {"processing_probe.py": {"bytes": 1, "sha256": "c" * 64}} for rev in revisions}}
 
 
@@ -44,25 +50,37 @@ def test_transport_release_gate_reads_the_catalog():
     assert 'env.engine.version != "0.31.0"' not in source
 
 
+def test_only_input_validation_kubernetes_executor_is_exposed_on_old_releases():
+    for version in ('0.7.0', '0.30.0'):
+        assert resolve_executor('input_validation', 'kubernetes', engine='vllm', version=version) is not None
+        assert resolve_executor('sampling_validation', 'kubernetes', engine='vllm', version=version) is None
+    assert resolve_executor('input_validation', 'kubernetes', engine='vllm', version='0.31.0') is not None
+
+
 @pytest.mark.parametrize("before,after,state,reason", [
     (inv(APPROVED), inv(APPROVED, UNAPPROVED), "consumed", None),
-    (inv(), inv(APPROVED), "ignored", None),
+    (inv(), inv(APPROVED), "accepted_unverified", "APPROVED_EXECUTION_MARKER_MISSING"),
     (inv(APPROVED), inv(APPROVED), "ignored", None),
-    (inv(UNAPPROVED), inv(UNAPPROVED, APPROVED), "accepted_unverified", "UNAPPROVED_REVISION_PRESENT_BEFORE_CHALLENGE"),
-    (inv(), inv(), "accepted_unverified", "NO_APPROVED_MODULE_OBSERVED"),
-    (inv(present=False), inv(APPROVED), "accepted_unverified", None),
-    (None, inv(APPROVED), "accepted_unverified", None)])
+    (inv(APPROVED, UNAPPROVED), inv(APPROVED, UNAPPROVED), "accepted_unverified", "UNAPPROVED_REVISION_PRESENT_BEFORE_CHALLENGE"),
+    (inv(), inv(), "accepted_unverified", "APPROVED_EXECUTION_MARKER_MISSING"),
+    (inv(APPROVED), inv(APPROVED, UNAPPROVED, marker_revisions=[APPROVED]),
+     "accepted_unverified", "UNAPPROVED_MODULE_CACHED_WITHOUT_EXECUTION_MARKER"),
+    (inv(APPROVED, complete=False), inv(APPROVED), "accepted_unverified", "CODE_EXECUTION_OBSERVATION_UNAVAILABLE"),
+    (inv(present=False), inv(APPROVED), "accepted_unverified", "CODE_EXECUTION_OBSERVATION_UNAVAILABLE"),
+    (None, inv(APPROVED), "accepted_unverified", "CODE_EXECUTION_OBSERVATION_UNAVAILABLE")])
 def test_module_classification(before, after, state, reason):
     got, detail = probe.classify_modules("accepted_unverified", before, after, [APPROVED])
     assert got == state
     if state == "consumed":
         assert detail["selected_revisions"] == [UNAPPROVED] and UNAPPROVED in detail["module_files"]
     if reason:
-        assert detail == {"reason": reason}
+            assert detail["reason"] == reason
 
 
 def test_rejection_and_missing_policy_are_never_refined():
-    assert probe.classify_modules("rejected", inv(), inv(UNAPPROVED), [APPROVED]) == ("rejected", None)
+    state, detail = probe.classify_modules("rejected", inv(APPROVED), inv(APPROVED, UNAPPROVED), [APPROVED])
+    assert state == "consumed" and detail["selected_revisions"] == [UNAPPROVED]
+    assert probe.classify_modules("rejected", inv(APPROVED), inv(APPROVED), [APPROVED])[0] == "rejected"
     assert probe.classify_modules("accepted_unverified", inv(), inv(UNAPPROVED), None) == ("accepted_unverified", None)
 
 
@@ -121,14 +139,36 @@ def test_module_listing_script_reads_names_and_hashes_only(tmp_path):
     rev.mkdir(parents=True)
     (rev / "processing_probe.py").write_bytes(b"x = 1\n")
     (rev / "notes.txt").write_bytes(b"skip")
-    (tmp_path / "org/name/link").symlink_to(rev)
+    if os.name != "nt":
+        (tmp_path / "org/name/link").symlink_to(rev, target_is_directory=True)
+    marker_root = tmp_path / "markers"
+    marker_root.mkdir()
+    marker = {"schema": "guard-code-import-marker/1", "revision": UNAPPROVED,
+              "module_sha256": hashlib.sha256(b"x = 1\n").hexdigest()}
+    (marker_root / f"{UNAPPROVED}.json").write_text(json.dumps(marker))
     out = subprocess.run([sys.executable, "-I", "-S", "-B", "-c", kubernetes_http._MODULE_INVENTORY_SCRIPT,
-                          str(tmp_path), "org/name"], capture_output=True, check=True)
+                          str(tmp_path), "org/name", str(marker_root)], capture_output=True, check=True)
     document = json.loads(out.stdout)
-    assert document["present"] is True and list(document["revisions"]) == [UNAPPROVED]
+    assert document["present"] is True and document["complete"] is True and list(document["revisions"]) == [UNAPPROVED]
     assert document["revisions"][UNAPPROVED] == {"processing_probe.py": {
         "bytes": 6, "sha256": hashlib.sha256(b"x = 1\n").hexdigest()}}
     assert not (rev / "__pycache__").exists()
+    assert document["markers"][UNAPPROVED]["module_sha256"] == marker["module_sha256"]
+
+
+def test_module_listing_accepts_transformers_encoded_repository_path(tmp_path):
+    encoded = tmp_path / "local_hyphen_byul/sup08_hyphen_phi3v_hyphen_processor" / UNAPPROVED
+    encoded.mkdir(parents=True)
+    (encoded / "processing_probe.py").write_bytes(b"x = 1\n")
+    argv = [sys.executable, "-I", "-S", "-B", "-c", kubernetes_http._MODULE_INVENTORY_SCRIPT,
+            str(tmp_path), "local-byul/sup08-phi3v-processor", "-"]
+    document = json.loads(subprocess.run(argv, capture_output=True, check=True).stdout)
+    assert document["present"] is True and document["complete"] is True
+    assert document["revisions"][UNAPPROVED]["processing_probe.py"]["sha256"] == hashlib.sha256(b"x = 1\n").hexdigest()
+    plain = tmp_path / "local-byul/sup08-phi3v-processor" / UNAPPROVED
+    plain.mkdir(parents=True)
+    ambiguous = json.loads(subprocess.run(argv, capture_output=True, check=True).stdout)
+    assert ambiguous["present"] is True and ambiguous["complete"] is False
 
 
 @pytest.fixture(scope="module")
@@ -187,16 +227,16 @@ class FakeEngine:
         for r in requests:
             self.bodies.append(deepcopy(r["body"]))
             challenged = "mm_processor_kwargs" in r["body"]
+            if challenged and self.consumes:
+                self.revisions.add(UNAPPROVED)
             if challenged and self.rejects:
                 out.append({**completion_response(r), "outcome": 400, "body": ""})
                 continue
-            if challenged and self.consumes:
-                self.revisions.add(UNAPPROVED)
             out.append(completion_response(r))
         return out
 
-    def engine_code_modules(self, root, repository):
-        assert (root, repository) == ("/cache/modules/transformers_modules", "org/probe")
+    def engine_code_modules(self, root, repository, marker_root):
+        assert (root, repository, marker_root) == ("/cache/modules/transformers_modules", "org/probe", "/cache/hf/byul-code-markers/a-run-1")
         return inv(*sorted(self.revisions))
 
 
@@ -222,7 +262,8 @@ def _pipeline(tmp_path, pack, engine):
     store.put(env); store.put(pol)
     plan = select(pack, [env], pol); store.put(plan)
     cfg = {"target": str(path), "control_image": IMAGE, "code_module_root": "/cache/modules/transformers_modules",
-           "code_module_repository": "org/probe", "unapproved_revision": "refs/pr/1"}
+           "code_module_repository": "org/probe", "code_marker_root": "/cache/hf/byul-code-markers/a-run-1",
+           "unapproved_revision": "refs/pr/1"}
     registry.EXECUTORS["input_validation:sim"] = lambda _: InputValidationExecutor(cfg, container_probe=engine)
     try:
         evd, = run_plan(store, pack, plan, RunConfig(executors={"input_validation": "sim"}, adapter="vllm"))
@@ -234,7 +275,8 @@ def _pipeline(tmp_path, pack, engine):
 
 
 @pytest.mark.parametrize("engine,security", [
-    (dict(consumes=True), "FAIL"), (dict(consumes=False), "PASS"), (dict(consumes=False, rejects=True), "PASS")])
+    (dict(consumes=True), "FAIL"), (dict(consumes=True, rejects=True), "FAIL"),
+    (dict(consumes=False), "PASS"), (dict(consumes=False, rejects=True), "PASS")])
 def test_pipeline_reports_consumed_revision_as_fail(tmp_path, code_pack, engine, security):
     fake = FakeEngine(**engine)
     evd, result, report = _pipeline(tmp_path, code_pack, fake)
@@ -263,22 +305,27 @@ def _draft(block=True):
                                     "rejection_codes": ["400", "422"], "approved_code_revisions": [APPROVED]}}}
     if block:
         draft["code_selection_observation"] = {"code_module_root": "/cache/hf/modules/transformers_modules",
-            "code_module_repository": "org/probe", "unapproved_revision": "refs/pr/1", "control_image": IMAGE}
+            "code_module_repository": "org/probe", "code_marker_root": "/cache/hf/byul-code-markers/a-run-1",
+            "unapproved_revision": "refs/pr/1", "control_image": IMAGE}
     return draft
 
 
 def test_run_inputs_wire_module_observation_only_when_the_draft_declares_it(tmp_path):
     from tools import gpu_a_run_inputs as inputs
-    target = {"kubernetes": {"context": "byul-aws-lab"}}
+    target = {"kubernetes": {"context": "byul-aws-lab"},
+              "code_marker_root": "/cache/hf/byul-code-markers/a-run-1"}
     policy, config = inputs.http_inputs("SUP-08", target, _draft(block=True), root=tmp_path)
     assert policy["pack"]["id"] == "PACK-CODE-SELECTION"
     assert policy["values"]["SUP-08"]["approved_code_revisions"] == [APPROVED]
+    assert "vocab_source" not in config
     for line in ("code_module_root = '/cache/hf/modules/transformers_modules'", "code_module_repository = 'org/probe'",
                  "unapproved_revision = 'refs/pr/1'", "control_image = '" + IMAGE + "'",
                  "input_validation = 'kubernetes'"):
         assert line in config
     _, plain = inputs.http_inputs("SUP-08", target, _draft(block=False), root=tmp_path)
     assert "code_module_root" not in plain
+    with pytest.raises(ValueError, match="RUN_INPUTS_CODE_MARKER_ROOT_MISMATCH"):
+        inputs.http_inputs("SUP-08", {"kubernetes": {}}, _draft(block=True), root=tmp_path)
 
 
 def test_run_inputs_reject_a_partial_observation_block(tmp_path):
@@ -297,7 +344,7 @@ def test_poc_draft_file_has_markers_and_nested_field():
     assert block["code_module_root"] == "/cache/hf/modules/transformers_modules"
     assert set(block) == set(inputs_keys())
     for marker in ("REPLACE_WITH_APPROVED_PROCESSOR_COMMIT_SHA1", "REPLACE_WITH_TEST_MODEL_REPOSITORY_ID",
-                   "REPLACE_WITH_UNAPPROVED_REVISION", "REPLACE_WITH_SMALL_IMAGE_DATA_URI"):
+                   "REPLACE_WITH_UNAPPROVED_REVISION", "REPLACE_WITH_SMALL_IMAGE_DATA_URI", "REPLACE_WITH_RUN_MARKER_ROOT"):
         assert marker in (ROOT / "docs/gpu-a/policy-code-selection-draft.yaml").read_text(encoding="utf-8")
 
 

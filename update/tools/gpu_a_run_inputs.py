@@ -75,20 +75,33 @@ def cases(preset, *, media_text_after=None):
     raise ValueError('RUN_INPUTS_CASE_PRESET_UNKNOWN')
 
 
-def environment(render, *, model_id=None, inventory=None, gpu_model, driver, data_origin='DECLARED'):
+def environment(render, *, model_id=None, inventory=None, gpu_model, driver, observed_engine_version=None,
+                data_origin='DECLARED'):
     generation = render['generation']
-    model_id = model_id or render['model_id']
-    if model_id != render['model_id']:
+    legacy = render.get('schema') == 'byul-gpu-a-aws-render/1'
+    if not legacy and render.get('schema') != 'byul-gpu-a-aws-render/2':
+        raise ValueError('RUN_INPUTS_RENDER_SCHEMA_UNKNOWN')
+    model_id = model_id or render.get('model_id', MODEL_ID)
+    if not legacy and model_id != render['model_id']:
         raise ValueError('RUN_INPUTS_MODEL_RENDER_MISMATCH')
-    launch = render['launch']
+    version = render.get('engine_version', '0.31.0') if legacy else render['engine_version']
+    if 'code-selection' in generation and (observed_engine_version is None or observed_engine_version != version):
+        raise ValueError('RUN_INPUTS_INSTALLED_ENGINE_VERSION_MISMATCH')
+    if observed_engine_version is not None and observed_engine_version != version:
+        raise ValueError('RUN_INPUTS_INSTALLED_ENGINE_VERSION_MISMATCH')
+    # /1 렌더 기록은 실행 메타데이터가 없었다. 과거 환경 생성 의미만 재생한다.
+    launch = render.get('launch') or {'runner': 'v2' if generation == 'v2-default' else 'v1',
+                                      'async_requested': generation != 'v1-callback-sync',
+                                      'prefix_cache': generation != 'v2-default'}
     # facts는 등록된 키만 받는다. 세대 구분은 서술 필드에 남기고 결과를 세대끼리 섞지 않는다.
     platform = ('GPU, amd64, AWS g6 kubeadm serving-lab; ' + '; '.join(f'{k}={v}' for k, v in (
         ('generation', generation), ('run', render['run_id']), ('profile', render['profile']),
         ('runner', launch['runner']), ('async_requested', launch['async_requested']),
+        ('engine_version_observed', observed_engine_version is not None),
         ('eager', render['enforce_eager']), ('render_engine_sha256', render['outputs_sha256']['engine.yaml']))))
     origin = DataOrigin(data_origin)
     env = Environment(id=new_id('ENV'), data_origin=origin,
-        engine={'name': 'vllm', 'version': render['engine_version'], 'image_digest': render['engine_image']},
+        engine={'name': 'vllm', 'version': version, 'image_digest': render['engine_image']},
         adapter={'name': 'vllm', 'version': VllmAdapter().version},
         runtime={'nodes': 1, 'tp_groups': 1, 'gpu_count': 1, 'gpu_model': gpu_model, 'driver': driver, 'platform': platform},
         model={'id': model_id, 'revision': render['model_revision'], 'inventory_sha256': inventory},
@@ -120,6 +133,22 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
     probe = _binding(probe_pod, namespace, 'probe', 'engine-test-probe')
     if engine['image'] != render['engine_image'] or engine['image'] != env.engine.image_digest:
         raise ValueError('RUN_INPUTS_ENGINE_IMAGE_MISMATCH')
+    if probe['image'] != render['engine_image']:
+        raise ValueError('RUN_INPUTS_PROBE_IMAGE_MISMATCH')
+    if env.engine.version != render.get('engine_version', '0.31.0'):
+        raise ValueError('RUN_INPUTS_ENGINE_VERSION_MISMATCH')
+    if render.get('schema') == 'byul-gpu-a-aws-render/2':
+        spec, = (c for c in engine_pod['spec']['containers'] if c['name'] == 'engine')
+        model_volume, = (v for v in engine_pod['spec']['volumes'] if v['name'] == 'model')
+        if (spec.get('command') != render['launch']['command']
+                or spec.get('args') != render['launch']['argv']
+                or model_volume['hostPath']['path'] != render['model_host_snapshot']):
+            raise ValueError('RUN_INPUTS_RENDERED_LAUNCH_MISMATCH')
+        marker_root = render.get('code_marker_root')
+        if marker_root is not None and not any(
+                item.get('name') == 'BYUL_CODE_MARKER_ROOT' and item.get('value') == marker_root
+                for item in spec.get('env', [])):
+            raise ValueError('RUN_INPUTS_CODE_MARKER_ROOT_MISMATCH')
     value = {'schema': TARGET_SCHEMA, 'lab': bool(render['lab_namespace_owner_label_required']),
         'topology': 'kubernetes-owned-direct', 'engine_kind': 'vllm', 'origins': {'trusted': {'network': 'kubernetes-probe'}},
         'engine': {'trusted_url': f"http://{engine['pod_ip']}:8000", 'image_digest': env.engine.image_digest},
@@ -128,8 +157,19 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
         # 정식 매핑은 콜백 전송과 HTTP 점검(G-A3) 전송이 함께 받는다. 경로는 인계 템플릿의 hostPath·mountPath다.
         'model_mapping': {'schema': 'guard.model-request-mapping/1', 'environment_ref': env.ref().model_dump(mode='json'),
             'repository_id': env.model.id, 'revision': env.model.revision, 'served_model_name': api_model,
-            'host_snapshot': render['model_host_snapshot'], 'container_mount': '/models',
+            'host_snapshot': render.get('model_host_snapshot', f"/srv/serving/models/{render['model_revision']}"),
+            'container_mount': '/models',
             'inventory_sha256': env.model.inventory_sha256}}
+    if render.get('code_marker_root') is not None:
+        value['code_marker_root'] = render['code_marker_root']
+        # Pin equivalent launch conditions while excluding version-specific entrypoint syntax
+        # and the per-run cache/marker directories. The Pod command and args were checked above.
+        value['comparison_config'] = {'profile': 'byul-code-selection-launch/1',
+            'model_id': env.model.id, 'model_revision': env.model.revision,
+            'served_model_name': api_model, 'code_revision': render['code_revision'],
+            'trust_remote_code': render['generation'] == 'v2-code-selection-trust',
+            'max_model_len': render['max_model_len'], 'max_num_seqs': 2,
+            'gpu_memory_utilization': '0.70'}
     if 'chat_template' in render:
         # SUP-03: 실제 Pod의 command·args와 고정 템플릿 신원. 실행기가 엔진 컨테이너에서 파일 bytes를 다시 읽는다.
         container, = (c for c in engine_pod['spec']['containers'] if c['name'] == 'engine')
@@ -190,7 +230,8 @@ HTTP_CHECKS = {'REQ-10': ('sampling_validation', {
     **{check_id: ('input_validation', {'vocab_size': 151936,
         'vocab_source': 'Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775 config.json vocab_size',
         'max_probe_tokens': 4096, 'max_duration_seconds': 120, 'request_timeout': 10,
-        **({'reused_token_ids': [9707]} if check_id == 'REQ-08' else {})}) for check_id in ('REQ-08', 'REQ-09', 'SUP-08')}}
+        **({'reused_token_ids': [9707]} if check_id == 'REQ-08' else {})}) for check_id in ('REQ-08', 'REQ-09')},
+    'SUP-08': ('input_validation', {'max_probe_tokens': 4096, 'max_duration_seconds': 120, 'request_timeout': 10})}
 
 
 def _http_values(check_id, draft):
@@ -203,7 +244,8 @@ def _http_values(check_id, draft):
 
 # SUP-08 코드 선택 PoC의 실행 판본 관측 설정. 값은 정책 초안의 code_selection_observation 블록(데이터)에서
 # 받는다. 블록이 없으면 기존처럼 kwargs 전달까지만 보는 입력 검증으로 돈다. 모델·판본 이름을 코드에 넣지 않는다.
-_CODE_OBSERVATION_KEYS = ('code_module_root', 'code_module_repository', 'unapproved_revision', 'control_image')
+_CODE_OBSERVATION_KEYS = ('code_module_root', 'code_module_repository', 'code_marker_root',
+                          'unapproved_revision', 'control_image')
 
 
 def _code_selection_settings(draft):
@@ -222,6 +264,8 @@ def http_inputs(check_id, target_value, draft, *, root):
     executor, settings = HTTP_CHECKS[check_id]
     if check_id == 'SUP-08':
         settings = {**settings, **_code_selection_settings(draft)}
+        if 'code_marker_root' in settings and settings['code_marker_root'] != target_value.get('code_marker_root'):
+            raise ValueError('RUN_INPUTS_CODE_MARKER_ROOT_MISMATCH')
     policy = {'data_origin': 'EXAMPLE' if check_id in EXAMPLE_POLICY_CHECKS else 'DECLARED', 'status': 'DRAFT',
         'pack': deepcopy(draft['pack']), 'values': {check_id: _http_values(check_id, draft)},
         'scope': {'include': [check_id], 'exclude': []}, 'exceptions': [], 'confirmed_by': None, 'confirmed_at': None}
@@ -243,6 +287,7 @@ def main(argv=None):
     e = sub.add_parser('env'); e.add_argument('--render', type=Path, required=True); e.add_argument('--gpu-model', required=True)
     e.add_argument('--driver', required=True); e.add_argument('--model-inventory'); e.add_argument('--out', type=Path, required=True)
     e.add_argument('--model-id', help='렌더 기록의 모델 ID와 일치해야 한다')
+    e.add_argument('--observed-engine-version', help='Pod 안에서 조회한 실제 vLLM 판본(코드 선택 세대 필수)')
     t = sub.add_parser('target'); t.add_argument('--env', type=Path, required=True); t.add_argument('--render', type=Path, required=True)
     for name in ('namespace', 'engine-pod', 'probe-pod'):
         t.add_argument('--' + name, type=Path, required=True)
@@ -264,6 +309,7 @@ def main(argv=None):
     load = lambda path: json.loads(Path(path).read_text(encoding='utf-8'))
     if args.kind == 'env':
         env = environment(load(args.render), model_id=args.model_id, gpu_model=args.gpu_model, driver=args.driver,
+            observed_engine_version=args.observed_engine_version,
             inventory=args.model_inventory)
         _write(args.out, env.model_dump(mode='json'))
         if load_environment(args.out).ref() != env.ref():

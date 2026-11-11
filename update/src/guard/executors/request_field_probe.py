@@ -1,7 +1,7 @@
 """REQ-08·SUP-08: 요청 필드 한 개의 거부·제거·소비를 정상 대조와 비교한다.
 
-증거는 응답 상태와 응답이 돌려준 소비 토큰뿐이다. 필드 값은 무해한 고정 fixture이고 본문은
-해시로만 남긴다. 2xx를 곧 위반으로 보지 않으며 실제 소비 증거가 있을 때만 위반으로 적는다.
+필드 값은 무해한 고정 fixture이고 본문은 해시로만 남긴다. SUP-08은 캐시 파일 목록과
+시험 코드가 import 시 남긴 판본 표식을 함께 대조한다. 캐시 파일만으로 실행을 주장하지 않는다.
 """
 from __future__ import annotations
 
@@ -22,16 +22,22 @@ _REVISION = re.compile(r"[0-9a-f]{40}")
 _REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}")
 _IMAGE = re.compile(r"data:image/(png|jpeg);base64,[A-Za-z0-9+/=]{16,3000}")
 MODULE_SETTINGS = ("code_module_root", "code_module_repository")
+_MARKER_ROOT = re.compile(r"(/[A-Za-z0-9][A-Za-z0-9._-]{0,63}){2,12}")
 
 
 def code_module_settings(cfg):
     """Optional engine-side dynamic-module listing; both keys or neither."""
     present = [key for key in MODULE_SETTINGS if key in cfg]
+    marker_root = cfg.get("code_marker_root")
+    if marker_root is not None and (type(marker_root) is not str or not _MARKER_ROOT.fullmatch(marker_root)):
+        raise ValueError("code_marker_root must be a bounded absolute path")
     if not present:
+        if marker_root is not None:
+            raise ValueError("code_marker_root needs module observation")
         return None
     if len(present) != len(MODULE_SETTINGS) or any(type(cfg[key]) is not str or not cfg[key] for key in MODULE_SETTINGS):
         raise ValueError("code module observation needs code_module_root and code_module_repository")
-    return {key: cfg[key] for key in MODULE_SETTINGS}
+    return {**{key: cfg[key] for key in MODULE_SETTINGS}, "code_marker_root": marker_root}
 
 
 def challenge_revision(cfg):
@@ -164,29 +170,53 @@ def classify_selection(result, *, rejection_codes):
 
 
 def classify_modules(state, before, after, approved):
-    """Refine an accepted challenge with the engine's dynamic-module revisions listed before and after it.
+    """Use new import markers, bound to cached module bytes, to resolve one challenge.
 
-    consumed: a revision outside the approved list appeared because of this challenge.
-    ignored: only approved revisions are present after the challenge.
-    Anything else stays accepted_unverified; a pre-existing unapproved folder cannot be attributed.
+    An HTTP rejection can follow an import. Cache creation alone proves neither import nor execution.
+    The marker directory must be present and an approved marker must calibrate the normal control.
     """
-    if state != "accepted_unverified" or approved is None or not _inventory_ok(before) or not _inventory_ok(after):
+    if approved is None:
         return state, None
+    if not _inventory_ok(before) or not _inventory_ok(after):
+        return "accepted_unverified", {"reason": "CODE_EXECUTION_OBSERVATION_UNAVAILABLE"}
     old, new = set(before["revisions"]), set(after["revisions"])
-    if any(rev not in approved for rev in old):
-        return state, {"reason": "UNAPPROVED_REVISION_PRESENT_BEFORE_CHALLENGE"}
-    selected = sorted(rev for rev in new - old if rev not in approved)
+    prior_markers, final_markers = before["markers"], after["markers"]
+    if (not before["markers_present"] or not after["markers_present"]
+            or not any(rev in approved and rev in old and _marker_matches(prior_markers[rev], before["revisions"][rev])
+                       for rev in prior_markers)):
+        return "accepted_unverified", {"reason": "APPROVED_EXECUTION_MARKER_MISSING"}
+    if any(rev not in approved for rev in old | set(prior_markers)):
+        return "accepted_unverified", {"reason": "UNAPPROVED_REVISION_PRESENT_BEFORE_CHALLENGE"}
+    selected = sorted(rev for rev in set(final_markers) - set(prior_markers) if rev not in approved)
     if selected:
-        return "consumed", {"selected_revisions": selected, "module_files": {rev: after["revisions"][rev] for rev in selected}}
-    present = sorted(rev for rev in new if rev in approved)
-    if present and new <= set(approved):
-        return "ignored", {"approved_revisions_present": present}
-    return state, {"reason": "NO_APPROVED_MODULE_OBSERVED"}
+        if all(rev in new and _marker_matches(final_markers[rev], after["revisions"][rev]) for rev in selected):
+            return "consumed", {"selected_revisions": selected,
+                                "module_files": {rev: after["revisions"][rev] for rev in selected},
+                                "execution_markers": {rev: final_markers[rev] for rev in selected}}
+        return "accepted_unverified", {"reason": "UNAPPROVED_MARKER_MODULE_MISMATCH"}
+    cached = sorted(rev for rev in new - old if rev not in approved)
+    if cached:
+        return "accepted_unverified", {"reason": "UNAPPROVED_MODULE_CACHED_WITHOUT_EXECUTION_MARKER",
+                                       "cached_revisions": cached}
+    if state == "rejected":
+        return "rejected", {"approved_revisions_present": sorted(rev for rev in new if rev in approved)}
+    if state == "accepted_unverified" and new <= set(approved):
+        return "ignored", {"approved_revisions_present": sorted(rev for rev in new if rev in approved)}
+    return "accepted_unverified", {"reason": "CODE_SELECTION_UNRESOLVED"}
 
 
 def _inventory_ok(value):
-    return (type(value) is dict and value.get("present") is True and type(value.get("revisions")) is dict
-            and all(type(k) is str for k in value["revisions"]))
+    return (type(value) is dict and value.get("present") is True and value.get("complete") is True
+            and type(value.get("revisions")) is dict and type(value.get("markers")) is dict
+            and type(value.get("markers_present")) is bool
+            and all(type(k) is str for k in value["revisions"])
+            and all(type(k) is str for k in value["markers"]))
+
+
+def _marker_matches(marker, files):
+    return (type(marker) is dict and type(files) is dict and marker.get("schema") == "guard-code-import-marker/1"
+            and type(marker.get("module_sha256")) is str and any(
+                type(item) is dict and item.get("sha256") == marker["module_sha256"] for item in files.values()))
 
 
 def _hash(value):
@@ -217,12 +247,14 @@ def collect(ctx, cfg):
         if observer is None:
             return None
         try:
-            value = observer(modules["code_module_root"], modules["code_module_repository"])
+            value = observer(modules["code_module_root"], modules["code_module_repository"],
+                             modules["code_marker_root"])
         except Exception:
             module_rows.append({"label": label, "state": "unavailable"})
             return None
         module_rows.append({"label": label, "state": "collected", "present": value.get("present"),
-                            "revisions": value.get("revisions")})
+                            "complete": value.get("complete"), "revisions": value.get("revisions"),
+                            "markers_present": value.get("markers_present"), "markers": value.get("markers")})
         return value
 
     def send(request, label):
@@ -278,7 +310,8 @@ def collect(ctx, cfg):
         violations = [{"field": r["field"], "submitted_revision": challenge_revision(cfg),
                        "selected_revisions": r["module_evidence"]["selected_revisions"],
                        "module_files": r["module_evidence"]["module_files"],
-                       "basis": "engine dynamic-module folder created after the challenge and absent from approved_code_revisions"}
+                       "execution_markers": r["module_evidence"]["execution_markers"],
+                       "basis": "new import marker matches the cached module SHA-256 and was absent before the challenge"}
                       for r in trials if r["state"] == "consumed"]
         obs.update({"code_selection_trials": {"value": trials, "collected": done},
                     "code_selection_forbidden": {"value": forbidden, "collected": True},

@@ -42,7 +42,7 @@ class EngineProvider:
         if len(matches) > 1: raise ValueError('ENGINE_EXECUTOR_AMBIGUOUS')
         return matches[0] if matches else None
 
-    def allows_legacy_native(self, version):
+    def allows_legacy_native(self, version, *, executor=None):
         return False
 
     def sandbox_arguments(self, options):
@@ -121,8 +121,10 @@ class VllmProvider(EngineProvider):
         # Published callers/fixtures retain their legacy keyword contract.
         return {'vllm': options}
 
-    def allows_legacy_native(self, version):
+    def allows_legacy_native(self, version, *, executor=None):
         from .engine_profiles import resolve
+        if executor == 'input_validation' and resolve(self.name, version, 'native_input').profile == 'vllm-input-validation-http/1':
+            return True
         return resolve(self.name, version, 'native_lifecycle').profile == 'vllm-native-source/1'
 
     def resource_lease_keys(self, options):

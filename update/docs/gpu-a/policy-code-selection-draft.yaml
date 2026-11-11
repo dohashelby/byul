@@ -1,5 +1,5 @@
 # SUP-08 코드 선택 PoC 정책 초안. 기업 승인값이 아니다(EXAMPLE).
-# 요청의 code_revision으로 비승인 동적 처리기 코드를 고를 수 있는지, 실제 import된 판본으로 판정한다.
+# 요청의 code_revision으로 비승인 동적 처리기 코드를 고를 수 있는지, 캐시와 무해한 import 표식으로 판정한다.
 # REPLACE_WITH_* 값은 실행할 때 고른 멀티모달 시험 모델과 무해 판본으로 바꾼다(SUP-03의 템플릿 SHA와 같은 방식).
 # 근거: docs/2차발표_시나리오_SC-11-01.md, PROGRESS 2026-11-11
 data_origin: EXAMPLE
@@ -22,6 +22,8 @@ code_selection_observation:
   code_module_root: /cache/hf/modules/transformers_modules
   # 시험 모델 저장소 id(동적 처리기 auto_map을 쓰는 멀티모달 모델). 실제 값으로 바꾼다.
   code_module_repository: REPLACE_WITH_TEST_MODEL_REPOSITORY_ID
+  # 시험 코드가 import 때만 쓰는 전용 경로. render.json#code_marker_root와 일치시킨다.
+  code_marker_root: REPLACE_WITH_RUN_MARKER_ROOT
   # 공격 요청이 고를 비승인 판본 이름(무해 판본). HF PR ref 또는 커밋.
   unapproved_revision: REPLACE_WITH_UNAPPROVED_REVISION
   # 멀티모달 처리기가 만들어지도록 요청에 넣는 작은 이미지(PNG/JPEG data URI).

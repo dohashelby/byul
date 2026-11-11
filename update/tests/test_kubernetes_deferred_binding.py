@@ -3,6 +3,7 @@ from copy import deepcopy
 import json
 import socket
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
@@ -13,6 +14,7 @@ from guard.cli import app
 from guard.executors import registry
 from guard.executors.kubernetes_request_binding import KubernetesRequestBindingExecutor
 from guard.models import canonical_json, sha256_hex
+from guard.models import ExecStatus
 from guard.runtime.kubernetes_transition import KubernetesTransition
 from guard.store import Store
 from tests.builders import baseline_pack, policy, T0
@@ -62,6 +64,28 @@ def test_explicit_late_mode_rejects_stale_file_before_any_query(tmp_path):
     with pytest.raises(ValueError,match="MODE_INVALID"):
         KubernetesTransition(pair.envs,cfg,runner=pair.runner,candidate_binding="automatic-discovery")
     assert not pair.calls
+
+
+def test_input_validation_uses_same_read_only_transition_gate(tmp_path):
+    pair=Pair();clock=Clock();cfg,path=late_inputs(tmp_path,pair)
+    for side in cfg:
+        cfg[side]["executors"]={"input_validation":"kubernetes"}
+        cfg[side]["input_validation"]=cfg[side].pop("request_binding")
+    def sleep(delay):
+        clock.sleep(delay)
+        if not path.exists():path.write_bytes(canonical_json(pair.worlds[1].target))
+    gate=KubernetesTransition(pair.envs,cfg,runner=pair.runner,clock=clock,sleep=sleep,
+        timeout=.04,poll_interval=.01,candidate_binding="after_baseline")
+    gate.prepare_baseline();gate.candidate_ready()
+    assert gate.report()["events"][-1]=="CANDIDATE_READY_OBSERVED"
+    assert all("get" in call for call in pair.calls)
+
+
+def test_baseline_transition_allows_unimplemented_checks_but_requires_completed_probe():
+    rows=lambda *states:[SimpleNamespace(execution=SimpleNamespace(status=state)) for state in states]
+    assert application._baseline_ran_without_abort(rows(ExecStatus.COMPLETED,ExecStatus.NOT_RUN))
+    assert not application._baseline_ran_without_abort(rows(ExecStatus.NOT_RUN))
+    assert not application._baseline_ran_without_abort(rows(ExecStatus.COMPLETED,ExecStatus.ABORTED))
 
 
 def test_selected_target_hash_is_consumed_by_real_registry_before_any_io(tmp_path,monkeypatch):

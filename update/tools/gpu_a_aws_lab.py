@@ -14,7 +14,7 @@ import re
 
 import yaml
 
-SCHEMA = 'byul-gpu-a-aws-render/1'
+SCHEMA = 'byul-gpu-a-aws-render/2'
 HANDOFF_ZIP_SHA256 = '717fa446e62588f39caaee0e159a354c344b5d64da082e9a52bfaa6f697c5445'
 TEMPLATE_SHA256 = '09cd45a4e10fae83b2eed07c8c4d4490311da4cf98646b681b0c91405c1f6eda'
 TEST_ACCESS_SHA256 = '043bd977d53eed7ed457de6d544e181af3fb13da6d65e81478ec4f3cb23e78cc'
@@ -42,7 +42,7 @@ GENERATIONS = {
     # SUP-08 코드 선택 PoC. 동적 처리기 코드(auto_map)를 실행하는 구성: --trust-remote-code 켬.
     # 성립 조건을 갖춘 취약 판본(예: 0.30)에서 FAIL을 보이는 세대다. 센서 없음.
     'v2-code-selection-trust': {'sensor': False, 'args': ['--trust-remote-code'], 'env': {}},
-    # 같은 PoC의 정상 대조: --trust-remote-code 끔(args에 더하지 않음). 저장소 코드를 실행하지 않아 PASS.
+    # trust 비활성 대조. 동적 처리기가 필수라 기동 실패할 수도 있으므로 PASS를 가정하지 않는다.
     'v2-code-selection-notrust': {'sensor': False, 'args': [], 'env': {}},
     # SUP-03. guard 고정 템플릿 파일을 읽기 전용으로 마운트하고 --chat-template으로 고른다.
     'v2-template': {'sensor': False, 'template': True, 'args': ['--chat-template', CHAT_TEMPLATE_PATH], 'env': {}},
@@ -88,18 +88,28 @@ def _fill(template, values):
 
 
 def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revision, host_root, enforce_eager=False,
-           engine_version='0.31.0', model_id='Qwen/Qwen2.5-0.5B-Instruct', model_host_snapshot=None,
-           code_revision=None, extra_engine_args=()):
+           engine_version=None, model_id=None, model_host_snapshot=None,
+           code_revision=None, extra_engine_args=(), max_model_len=2048):
     if (generation not in GENERATIONS or profile not in PROFILES or not _RUN_ID.fullmatch(run_id or '')
             or not _IMAGE.fullmatch(engine_image or '') or not re.fullmatch(r'[0-9a-f]{40}', model_revision or '')
             or not _HOST_PATH.fullmatch(host_root or '')):
         raise ValueError('AWS_RENDER_INPUT_INVALID')
+    code_selection = generation in {'v2-code-selection-trust', 'v2-code-selection-notrust'}
+    if code_selection and (engine_version is None or model_id is None or code_revision is None):
+        raise ValueError('AWS_CODE_SELECTION_IDENTITY_REQUIRED')
+    engine_version = engine_version or '0.31.0'
+    model_id = model_id or 'Qwen/Qwen2.5-0.5B-Instruct'
     if (not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:[a-zA-Z0-9.+-]*)', engine_version or '')
             or not isinstance(model_id, str) or not _HOST_PATH.fullmatch('/' + model_id)
             or (model_host_snapshot is not None and not _HOST_PATH.fullmatch(model_host_snapshot))
             or (code_revision is not None and not re.fullmatch(r'[0-9a-f]{40}', code_revision))
+            or type(max_model_len) is not int or not 256 <= max_model_len <= 131072
             or not isinstance(extra_engine_args, (list, tuple)) or len(extra_engine_args) > 32
-            or any(not isinstance(arg, str) or not arg or '\x00' in arg or len(arg) > 2048 for arg in extra_engine_args)):
+            or any(not isinstance(arg, str) or not arg or '\x00' in arg or len(arg) > 2048 for arg in extra_engine_args)
+            or any(arg in {'--model', '--revision', '--code-revision', '--trust-remote-code', '--served-model-name',
+                           '--max-model-len'}
+                   or arg.startswith(('--model=', '--revision=', '--code-revision=', '--trust-remote-code=',
+                                      '--served-model-name=', '--max-model-len=')) for arg in extra_engine_args)):
         raise ValueError('AWS_RENDER_INPUT_INVALID')
     raw = (Path(handoff_dir) / 'engine.yaml.template').read_bytes()
     if _sha(raw) != TEMPLATE_SHA256:
@@ -107,7 +117,9 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
     if _sha((Path(handoff_dir) / 'engine-test-access.yaml').read_bytes()) != TEST_ACCESS_SHA256:
         raise ValueError('AWS_HANDOFF_TEST_ACCESS_CHANGED')
     cpu_request, cpu_limit, memory_request, memory_limit = PROFILES[profile]
-    cache = f'/srv/serving/cache/vllm/{engine_image.rsplit("@sha256:", 1)[1]}/{model_revision}/{profile}-profile-01'
+    cache_suffix = f'{profile}-{run_id}' if code_selection else f'{profile}-profile-01'
+    cache = f'/srv/serving/cache/vllm/{engine_image.rsplit("@sha256:", 1)[1]}/{model_revision}/{cache_suffix}'
+    marker_root = f'/cache/hf/byul-code-markers/{run_id}' if code_selection else None
     text = _fill(raw.decode(), {'ENGINE_IMAGE': engine_image, 'MODEL_REVISION': model_revision, 'CACHE_PATH': cache,
         'LAB_PROFILE': profile, 'ENGINE_CPU_REQUEST': cpu_request, 'ENGINE_CPU_LIMIT': cpu_limit,
         'ENGINE_MEMORY_REQUEST': memory_request, 'ENGINE_MEMORY_LIMIT': memory_limit})
@@ -120,12 +132,20 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
     pod['metadata']['labels'].update(labels)
     pod['spec']['enableServiceLinks'] = False  # Service 링크 환경 변수가 MP worker 초기화를 깨뜨렸다(첫 실증).
     engine, = (c for c in pod['spec']['containers'] if c['name'] == 'engine')
+    # 0.7.0 이미지에는 인계 템플릿의 nonroot wrapper가 없고 API 서버가 --model을 받는다.
+    # 0.30.0과 0.31.0 이미지는 wrapper가 vllm serve의 위치 인자를 받는다.
+    if code_selection and engine_version == '0.7.0':
+        engine['command'] = ['python3', '-m', 'vllm.entrypoints.openai.api_server']
+        engine['args'] = ['--model', *engine['args']]
+    engine['args'][engine['args'].index('--max-model-len') + 1] = str(max_model_len)
     engine['args'] = [*engine['args'], *spec['args'], *(['--enforce-eager'] if enforce_eager else [])]
     engine['args'] += [*(['--code-revision', code_revision] if code_revision else []), *extra_engine_args]
     if model_host_snapshot is not None:
         model_volume, = (v for v in pod['spec']['volumes'] if v['name'] == 'model')
         model_volume['hostPath']['path'] = model_host_snapshot
     engine['env'] = [*engine['env'], *({'name': k, 'value': v} for k, v in spec['env'].items())]
+    if marker_root is not None:
+        engine['env'].append({'name': 'BYUL_CODE_MARKER_ROOT', 'value': marker_root})
     run_root = f'{host_root}/{run_id}'
     if spec['sensor']:
         engine['env'].append({'name': 'PYTHONPATH', 'value': CALLBACKS})
@@ -160,10 +180,11 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
     record = {'schema': SCHEMA, 'handoff_zip_sha256': HANDOFF_ZIP_SHA256, 'template_sha256': TEMPLATE_SHA256,
         'generation': generation, 'profile': profile, 'run_id': run_id, 'engine_image': engine_image,
         'model_revision': model_revision, 'cache_path': cache, 'enforce_eager': enforce_eager,
+        'max_model_len': max_model_len,
         'engine_version': engine_version, 'model_id': model_id,
         'model_host_snapshot': model_host_snapshot or f'/srv/serving/models/{model_revision}',
-        'code_revision': code_revision,
-        'launch': {'argv': list(engine['args']),
+        'code_revision': code_revision, 'code_marker_root': marker_root,
+        'launch': {'command': list(engine['command']), 'argv': list(engine['args']),
             'runner': {'0': 'v1', '1': 'v2'}.get(spec['env'].get('VLLM_USE_V2_MODEL_RUNNER'), 'engine-default'),
             'async_requested': False if '--no-async-scheduling' in engine['args'] else None,
             'prefix_cache': True if '--enable-prefix-caching' in engine['args'] else None},
@@ -184,9 +205,10 @@ def main(argv=None):
     parser.add_argument('--run-id', required=True)
     parser.add_argument('--engine-image', required=True, help='인계 images.lock의 첫 줄')
     parser.add_argument('--model-revision', default='7ae557604adf67be50417f59c2c2f167def9a775')
-    parser.add_argument('--engine-version', default='0.31.0', help='실제 설치본에서 확인한 판본')
-    parser.add_argument('--model-id', default='Qwen/Qwen2.5-0.5B-Instruct')
+    parser.add_argument('--engine-version', help='코드 선택 세대에서는 필수이며 실제 설치본과 대조한다')
+    parser.add_argument('--model-id', help='코드 선택 세대에서는 필수인 모델 저장소 ID')
     parser.add_argument('--model-host-snapshot')
+    parser.add_argument('--max-model-len', type=int, default=2048)
     parser.add_argument('--code-revision')
     parser.add_argument('--extra-engine-args-json', default='[]', help='추가 기동 인자의 JSON 배열')
     parser.add_argument('--host-root', default='/srv/byul-a')
@@ -197,7 +219,7 @@ def main(argv=None):
         run_id=args.run_id, engine_image=args.engine_image, model_revision=args.model_revision,
         host_root=args.host_root, enforce_eager=args.enforce_eager, engine_version=args.engine_version,
         model_id=args.model_id, model_host_snapshot=args.model_host_snapshot, code_revision=args.code_revision,
-        extra_engine_args=json.loads(args.extra_engine_args_json))
+        extra_engine_args=json.loads(args.extra_engine_args_json), max_model_len=args.max_model_len)
     args.out.mkdir(parents=True)
     (args.out / 'engine.yaml').write_bytes(engine_yaml); (args.out / 'probe.yaml').write_bytes(probe_yaml)
     (args.out / 'render.json').write_text(json.dumps(record, indent=1, sort_keys=True) + '\n', encoding='utf-8')

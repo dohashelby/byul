@@ -15,6 +15,9 @@ REVISION = '7ae557604adf67be50417f59c2c2f167def9a775'
 
 
 def rendered(generation, **options):
+    if 'code-selection' in generation:
+        options = {'engine_version': '0.30.0', 'model_id': 'microsoft/Phi-3-vision-128k-instruct',
+                   'code_revision': 'b' * 40, **options}
     engine, probe, record = lab.render(HANDOFF, generation=generation, profile=options.pop('profile', 'dev'), run_id='a-run-1',
         engine_image=IMAGE, model_revision=REVISION, host_root='/srv/byul-a', **options)
     deployment, service = yaml.safe_load_all(engine)
@@ -32,12 +35,21 @@ def test_overlay_keeps_the_handoff_engine_and_adds_only_a_requirements(generatio
     engine, = pod['spec']['containers']; base_engine, = base['spec']['containers']
     assert engine['image'] == IMAGE and engine['resources'] == base_engine['resources']
     assert engine['securityContext'] == base_engine['securityContext'] and pod['spec']['securityContext'] == base['spec']['securityContext']
-    assert engine['args'][:len(base_engine['args'])] == base_engine['args'] and engine['env'][:len(base_engine['env'])] == base_engine['env']
+    command_prefix = []
+    assert engine['args'][:len(base_engine['args']) + len(command_prefix)] == [*command_prefix, *base_engine['args']]
+    assert engine['env'][:len(base_engine['env'])] == base_engine['env']
     assert pod['metadata']['labels'] == {**base['metadata']['labels'], 'guard.run': 'a-run-1', 'byul.a/generation': generation}
     assert pod['spec']['enableServiceLinks'] is False and 'enableServiceLinks' not in base['spec']
-    added = engine['args'][len(base_engine['args']):]
-    assert added == lab.GENERATIONS[generation]['args']
+    added = engine['args'][len(base_engine['args']) + len(command_prefix):]
+    expected = lab.GENERATIONS[generation]['args']
+    if 'code-selection' in generation:
+        expected = [*expected, '--code-revision', 'b' * 40]
+    assert added == expected
     env = {e['name']: e['value'] for e in engine['env']}
+    if 'code-selection' in generation:
+        assert env['BYUL_CODE_MARKER_ROOT'] == record['code_marker_root']
+        assert record['engine_version'] == '0.30.0' and record['cache_path'].endswith('/dev-a-run-1')
+        assert engine['command'] == record['launch']['command'] == ['/usr/local/bin/vllm-nonroot-entrypoint.sh']
     mounts = {m['mountPath']: m for m in engine['volumeMounts']}
     if lab.GENERATIONS[generation]['sensor']:
         # 센서 세대는 V1 runner 고정이다. P2 V2 runner 확인 세대만 V2를 명시한다.
@@ -118,3 +130,37 @@ def test_cli_writes_engine_probe_and_record(tmp_path, capsys):
     engine, = deployment['spec']['template']['spec']['containers']
     assert engine['args'][-1] == '--enforce-eager' and engine['resources']['limits']['memory'] == '24Gi'
     assert json.loads(capsys.readouterr().out)['probe.yaml'] == record['outputs_sha256']['probe.yaml']
+
+
+def test_code_selection_requires_pinned_identity_and_preserves_model_mount():
+    with pytest.raises(ValueError, match='AWS_CODE_SELECTION_IDENTITY_REQUIRED'):
+        lab.render(HANDOFF, generation='v2-code-selection-trust', profile='dev', run_id='sup08-1',
+                   engine_image=IMAGE, model_revision=REVISION, host_root='/srv/byul-a')
+    deployment, _, _, record = rendered('v2-code-selection-trust', model_host_snapshot='/srv/serving/models/phi3v-test')
+    pod = deployment['spec']['template']['spec']
+    model, = (v for v in pod['volumes'] if v['name'] == 'model')
+    assert model['hostPath']['path'] == record['model_host_snapshot'] == '/srv/serving/models/phi3v-test'
+    assert record['launch']['argv'][-2:] == ['--code-revision', 'b' * 40]
+    assert record['code_marker_root'] == '/cache/hf/byul-code-markers/a-run-1'
+    with pytest.raises(ValueError, match='AWS_RENDER_INPUT_INVALID'):
+        rendered('v2-code-selection-trust', extra_engine_args=['--trust-remote-code'])
+
+
+@pytest.mark.parametrize('version,expected', [
+    ('0.7.0', ['python3', '-m', 'vllm.entrypoints.openai.api_server']),
+    ('0.30.0', ['/usr/local/bin/vllm-nonroot-entrypoint.sh']),
+    ('0.31.0', ['/usr/local/bin/vllm-nonroot-entrypoint.sh']),
+])
+def test_code_selection_command_matches_pinned_image_family(version, expected):
+    deployment, _, _, record = rendered('v2-code-selection-trust', engine_version=version)
+    assert deployment['spec']['template']['spec']['containers'][0]['command'] == expected
+    assert record['launch']['command'] == expected
+    assert record['launch']['argv'][:2 if version == '0.7.0' else 1] == (
+        ['--model', '/models'] if version == '0.7.0' else ['/models'])
+
+
+def test_phi3_vision_can_use_measured_context_length():
+    deployment, _, _, record = rendered('v2-code-selection-trust', max_model_len=4096)
+    args = deployment['spec']['template']['spec']['containers'][0]['args']
+    assert args[args.index('--max-model-len') + 1] == '4096'
+    assert record['max_model_len'] == 4096 and record['launch']['argv'] == args

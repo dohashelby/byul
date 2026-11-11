@@ -12,7 +12,7 @@ from .input_validation import InputValidationExecutor
 
 _SETTINGS = {"target", "kubectl_binary", "request_timeout", "max_duration_seconds", "vocab_size", "vocab_source",
              "max_probe_tokens", "reused_token_ids", "runner_input", "code_module_root", "code_module_repository",
-             "unapproved_revision", "control_image"}
+             "code_marker_root", "unapproved_revision", "control_image"}
 
 
 class _WithBody:

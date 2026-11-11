@@ -75,20 +75,24 @@ def cases(preset, *, media_text_after=None):
     raise ValueError('RUN_INPUTS_CASE_PRESET_UNKNOWN')
 
 
-def environment(render, *, model_id=MODEL_ID, inventory=None, gpu_model, driver, data_origin='DECLARED'):
+def environment(render, *, model_id=None, inventory=None, gpu_model, driver, data_origin='DECLARED'):
     generation = render['generation']
+    model_id = model_id or render['model_id']
+    if model_id != render['model_id']:
+        raise ValueError('RUN_INPUTS_MODEL_RENDER_MISMATCH')
+    launch = render['launch']
     # facts는 등록된 키만 받는다. 세대 구분은 서술 필드에 남기고 결과를 세대끼리 섞지 않는다.
     platform = ('GPU, amd64, AWS g6 kubeadm serving-lab; ' + '; '.join(f'{k}={v}' for k, v in (
         ('generation', generation), ('run', render['run_id']), ('profile', render['profile']),
-        ('runner', 'v2' if generation == 'v2-default' else 'v1'), ('async_requested', generation != 'v1-callback-sync'),
+        ('runner', launch['runner']), ('async_requested', launch['async_requested']),
         ('eager', render['enforce_eager']), ('render_engine_sha256', render['outputs_sha256']['engine.yaml']))))
     origin = DataOrigin(data_origin)
     env = Environment(id=new_id('ENV'), data_origin=origin,
-        engine={'name': 'vllm', 'version': '0.31.0', 'image_digest': render['engine_image']},
+        engine={'name': 'vllm', 'version': render['engine_version'], 'image_digest': render['engine_image']},
         adapter={'name': 'vllm', 'version': VllmAdapter().version},
         runtime={'nodes': 1, 'tp_groups': 1, 'gpu_count': 1, 'gpu_model': gpu_model, 'driver': driver, 'platform': platform},
         model={'id': model_id, 'revision': render['model_revision'], 'inventory_sha256': inventory},
-        facts={'prefix_cache': {'value': generation != 'v2-default', 'origin': origin, 'source': 'render.json#generation'}}).seal()
+        facts={'prefix_cache': {'value': launch['prefix_cache'], 'origin': origin, 'source': 'render.json#launch.prefix_cache'}}).seal()
     return env
 
 
@@ -124,7 +128,7 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
         # 정식 매핑은 콜백 전송과 HTTP 점검(G-A3) 전송이 함께 받는다. 경로는 인계 템플릿의 hostPath·mountPath다.
         'model_mapping': {'schema': 'guard.model-request-mapping/1', 'environment_ref': env.ref().model_dump(mode='json'),
             'repository_id': env.model.id, 'revision': env.model.revision, 'served_model_name': api_model,
-            'host_snapshot': f"/srv/serving/models/{render['model_revision']}", 'container_mount': '/models',
+            'host_snapshot': render['model_host_snapshot'], 'container_mount': '/models',
             'inventory_sha256': env.model.inventory_sha256}}
     if 'chat_template' in render:
         # SUP-03: 실제 Pod의 command·args와 고정 템플릿 신원. 실행기가 엔진 컨테이너에서 파일 bytes를 다시 읽는다.
@@ -138,7 +142,9 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
         value['comparison_config'] = {'launch': {'argv': list(container['args']), 'chat_template': identity,
             'max_model_len': int(container['args'][container['args'].index('--max-model-len') + 1])}}
     # 전송 계층 생성자는 kubectl을 부르지 않고 target 형식과 신원 결합만 검사한다.
-    KubernetesHTTP(value, env, duration=1, runner=_no_kubectl, profile=ENGINE_CALLBACK_PROFILE)
+    from guard.runtime.kubernetes_http import INPUT_VALIDATION_PROFILE
+    profile = INPUT_VALIDATION_PROFILE if 'code-selection' in render['generation'] else ENGINE_CALLBACK_PROFILE
+    KubernetesHTTP(value, env, duration=1, runner=_no_kubectl, profile=profile)
     return value
 
 
@@ -236,7 +242,7 @@ def main(argv=None):
     sub = parser.add_subparsers(dest='kind', required=True)
     e = sub.add_parser('env'); e.add_argument('--render', type=Path, required=True); e.add_argument('--gpu-model', required=True)
     e.add_argument('--driver', required=True); e.add_argument('--model-inventory'); e.add_argument('--out', type=Path, required=True)
-    e.add_argument('--model-id', default=MODEL_ID, help='REQ-16 media_identity 세대는 멀티모달 모델')
+    e.add_argument('--model-id', help='렌더 기록의 모델 ID와 일치해야 한다')
     t = sub.add_parser('target'); t.add_argument('--env', type=Path, required=True); t.add_argument('--render', type=Path, required=True)
     for name in ('namespace', 'engine-pod', 'probe-pod'):
         t.add_argument('--' + name, type=Path, required=True)

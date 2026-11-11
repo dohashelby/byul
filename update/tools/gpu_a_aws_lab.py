@@ -87,10 +87,19 @@ def _fill(template, values):
     return text
 
 
-def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revision, host_root, enforce_eager=False):
+def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revision, host_root, enforce_eager=False,
+           engine_version='0.31.0', model_id='Qwen/Qwen2.5-0.5B-Instruct', model_host_snapshot=None,
+           code_revision=None, extra_engine_args=()):
     if (generation not in GENERATIONS or profile not in PROFILES or not _RUN_ID.fullmatch(run_id or '')
             or not _IMAGE.fullmatch(engine_image or '') or not re.fullmatch(r'[0-9a-f]{40}', model_revision or '')
             or not _HOST_PATH.fullmatch(host_root or '')):
+        raise ValueError('AWS_RENDER_INPUT_INVALID')
+    if (not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:[a-zA-Z0-9.+-]*)', engine_version or '')
+            or not isinstance(model_id, str) or not _HOST_PATH.fullmatch('/' + model_id)
+            or (model_host_snapshot is not None and not _HOST_PATH.fullmatch(model_host_snapshot))
+            or (code_revision is not None and not re.fullmatch(r'[0-9a-f]{40}', code_revision))
+            or not isinstance(extra_engine_args, (list, tuple)) or len(extra_engine_args) > 32
+            or any(not isinstance(arg, str) or not arg or '\x00' in arg or len(arg) > 2048 for arg in extra_engine_args)):
         raise ValueError('AWS_RENDER_INPUT_INVALID')
     raw = (Path(handoff_dir) / 'engine.yaml.template').read_bytes()
     if _sha(raw) != TEMPLATE_SHA256:
@@ -112,6 +121,10 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
     pod['spec']['enableServiceLinks'] = False  # Service 링크 환경 변수가 MP worker 초기화를 깨뜨렸다(첫 실증).
     engine, = (c for c in pod['spec']['containers'] if c['name'] == 'engine')
     engine['args'] = [*engine['args'], *spec['args'], *(['--enforce-eager'] if enforce_eager else [])]
+    engine['args'] += [*(['--code-revision', code_revision] if code_revision else []), *extra_engine_args]
+    if model_host_snapshot is not None:
+        model_volume, = (v for v in pod['spec']['volumes'] if v['name'] == 'model')
+        model_volume['hostPath']['path'] = model_host_snapshot
     engine['env'] = [*engine['env'], *({'name': k, 'value': v} for k, v in spec['env'].items())]
     run_root = f'{host_root}/{run_id}'
     if spec['sensor']:
@@ -147,6 +160,13 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
     record = {'schema': SCHEMA, 'handoff_zip_sha256': HANDOFF_ZIP_SHA256, 'template_sha256': TEMPLATE_SHA256,
         'generation': generation, 'profile': profile, 'run_id': run_id, 'engine_image': engine_image,
         'model_revision': model_revision, 'cache_path': cache, 'enforce_eager': enforce_eager,
+        'engine_version': engine_version, 'model_id': model_id,
+        'model_host_snapshot': model_host_snapshot or f'/srv/serving/models/{model_revision}',
+        'code_revision': code_revision,
+        'launch': {'argv': list(engine['args']),
+            'runner': {'0': 'v1', '1': 'v2'}.get(spec['env'].get('VLLM_USE_V2_MODEL_RUNNER'), 'engine-default'),
+            'async_requested': False if '--no-async-scheduling' in engine['args'] else None,
+            'prefix_cache': True if '--enable-prefix-caching' in engine['args'] else None},
         'lab_namespace_owner_label_required': bool(spec.get('lab')),
         'host_directories': ({'engine_callbacks': run_root + '/engine-callbacks', 'lifecycle_data': run_root + '/lifecycle-data'}
             if spec['sensor'] else {}),
@@ -164,13 +184,20 @@ def main(argv=None):
     parser.add_argument('--run-id', required=True)
     parser.add_argument('--engine-image', required=True, help='인계 images.lock의 첫 줄')
     parser.add_argument('--model-revision', default='7ae557604adf67be50417f59c2c2f167def9a775')
+    parser.add_argument('--engine-version', default='0.31.0', help='실제 설치본에서 확인한 판본')
+    parser.add_argument('--model-id', default='Qwen/Qwen2.5-0.5B-Instruct')
+    parser.add_argument('--model-host-snapshot')
+    parser.add_argument('--code-revision')
+    parser.add_argument('--extra-engine-args-json', default='[]', help='추가 기동 인자의 JSON 배열')
     parser.add_argument('--host-root', default='/srv/byul-a')
     parser.add_argument('--enforce-eager', action='store_true')
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args(argv)
     engine_yaml, probe_yaml, record = render(args.handoff_dir, generation=args.generation, profile=args.profile,
         run_id=args.run_id, engine_image=args.engine_image, model_revision=args.model_revision,
-        host_root=args.host_root, enforce_eager=args.enforce_eager)
+        host_root=args.host_root, enforce_eager=args.enforce_eager, engine_version=args.engine_version,
+        model_id=args.model_id, model_host_snapshot=args.model_host_snapshot, code_revision=args.code_revision,
+        extra_engine_args=json.loads(args.extra_engine_args_json))
     args.out.mkdir(parents=True)
     (args.out / 'engine.yaml').write_bytes(engine_yaml); (args.out / 'probe.yaml').write_bytes(probe_yaml)
     (args.out / 'render.json').write_text(json.dumps(record, indent=1, sort_keys=True) + '\n', encoding='utf-8')

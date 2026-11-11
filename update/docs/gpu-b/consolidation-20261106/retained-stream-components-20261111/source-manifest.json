@@ -1,6 +1,6 @@
 {
   "schema": "gpu-b-retained-stream-components/1",
-  "scope": "Fixed GB12 data transfer components and existing-instance start entry",
+  "scope": "Fixed GB12 stream components, official SessionManager supervisor and existing-instance start entry",
   "operating_ready": false,
   "actual_GB12_stream_transfer": false,
   "new_product_measured_IDs": 0,
@@ -14,6 +14,16 @@
       "repository_path": "update/docs/gpu-b/consolidation-20261106/retained-stream-components-20261111/start_existing_once.py",
       "bytes": 3097,
       "sha256": "0e7e79bfa7376ddad7bfe73dd795a2e414aec87574b0dac1f467455848412a4a"
+    },
+    "session_recovery.py": {
+      "repository_path": "update/docs/gpu-b/consolidation-20261106/retained-stream-components-20261111/session_recovery.py",
+      "bytes": 23681,
+      "sha256": "180e6b0abb5ba02a6c7e958f3f560d0947c533a52f2566ca3e6d6ca4c1edbe40"
+    },
+    "invoke_session_recovery.py": {
+      "repository_path": "update/docs/gpu-b/consolidation-20261106/retained-stream-components-20261111/invoke_session_recovery.py",
+      "bytes": 5878,
+      "sha256": "44c6b7a84972ab7433b5af2d04def667ab4385cb7eb466718a982ce2be506069"
     }
   },
   "dependency_source_map": "../retained-recovery-operator-20261111/source-manifest.json",

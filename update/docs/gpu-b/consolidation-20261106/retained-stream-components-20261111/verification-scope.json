@@ -74,15 +74,56 @@
     "synthetic-CPU-v4-native-launcher.json": {
       "bytes": 1239,
       "sha256": "8d40abc45b62e42a7da45f35e46c3a660d099947d0bd01c7da818f7c63d62ef7"
+    },
+    "synthetic-CPU-supervisor-v6-server-receipt.json": {
+      "bytes": 2022,
+      "sha256": "9725d9f4505a968bfafb0f90bc68a7984873ece4964b8ac98c47c3d75aa6976a"
+    },
+    "session-supervisor-focused-review.json": {
+      "bytes": 11795,
+      "sha256": "fe392575ef0ece69caf309e0d3af85829787f3ba985b3d6458f0040f4ac3418c"
     }
   },
   "actual_GB12_archive_read_or_restored_by_CPU": false,
   "official_product_EVD_RES_RPT_created": false,
   "remaining_actual_binding": [
-    "Reviewed SessionManager supervisor and exact managed document",
+    "Fresh selected state, final admission, exact private files and runtime bindings",
     "Original pre-auth900 host deadline and conservative guest clock/boot mapping",
     "Actual StartSession/TerminateSession authorization and RunAs identity",
     "Remote success marker, native CLI group termination and exact server session terminal before publication",
     "Whole GB12 bytes/SHA, first full ZIP CRC, restore and exact Ref review"
-  ]
+  ],
+  "native_tool_provenance_correction": {
+    "S4_correction_sha256": "e4bed8a744210608227bbc48e0ca4df37bccc44f302a877ba47508d3c5a20908",
+    "original_receipts_unchanged": true,
+    "v1_failed_CPU30": "session80361 / pollafeedb / exit1",
+    "v2_successful_CPU30": "chunk0ff262 / immediate exit0 / no session ID",
+    "v2_native_FD8": "chunkc91dca / session20046 / pollefe632 / exit0",
+    "old_v1_session_not_used_as_v2_success_proof": true
+  },
+  "SessionManager_supervisor": {
+    "source_v6_sha256": "180e6b0abb5ba02a6c7e958f3f560d0947c533a52f2566ca3e6d6ca4c1edbe40",
+    "entry_v6_sha256": "44c6b7a84972ab7433b5af2d04def667ab4385cb7eb466718a982ce2be506069",
+    "review_sha256": "fe392575ef0ece69caf309e0d3af85829787f3ba985b3d6458f0040f4ac3418c",
+    "review_scope": "Fixed source, entry, candidate and new mock server transition8; earlier version deltas reused",
+    "prior_version_scopes": {
+      "v1": "direct controls28; source3adc1875",
+      "v2": "actual synthetic sender -> Transcript -> actual Receiver and abort/first-banner65 controls9",
+      "v3": "close secondary and deadline before first transfer STS4",
+      "v4": "UNKNOWN diagnostic write and entry source/output binding6",
+      "v5": "actual stop producer nonce -> entry -> original4feb outcome3",
+      "v6": "same original deadline, transient empty/Terminating waits, exact identity and exclusive Terminate8"
+    },
+    "counts_not_combined_as_one_version_full_suite_or_product_IDs": true,
+    "original_transfer_deadline_seconds": 900,
+    "request_authentication_limit_seconds": 65,
+    "original_normal_stop_observation_seconds": 180,
+    "official_document": "AWS-StartNonInteractiveCommand",
+    "actual_document_content_sha256": "3c6fff6f4fd03784f52e47b5b008ef991762d01c0db5dfebf1e3105cc4510dee",
+    "actual_existing_plugin_version": "1.2.835.0",
+    "actual_StartSession_TerminateSession_RunAs_or_GB12_transfer_proven_by_CPU": false,
+    "final_operating_packet_is_separate": true,
+    "source_commit_in_original_review": null,
+    "source_bytes_not_rewritten_to_claim_review_at_publication_commit": true
+  }
 }

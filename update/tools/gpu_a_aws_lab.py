@@ -39,6 +39,11 @@ GENERATIONS = {
         'env': {'VLLM_USE_V2_MODEL_RUNNER': '0'}},
     # REQ-08·09·10, SUP-08. 기본 V2 runner, 센서 없음.
     'v2-default': {'sensor': False, 'args': [], 'env': {}},
+    # SUP-08 코드 선택 PoC. 동적 처리기 코드(auto_map)를 실행하는 구성: --trust-remote-code 켬.
+    # 성립 조건을 갖춘 취약 판본(예: 0.30)에서 FAIL을 보이는 세대다. 센서 없음.
+    'v2-code-selection-trust': {'sensor': False, 'args': ['--trust-remote-code'], 'env': {}},
+    # 같은 PoC의 정상 대조: --trust-remote-code 끔(args에 더하지 않음). 저장소 코드를 실행하지 않아 PASS.
+    'v2-code-selection-notrust': {'sensor': False, 'args': [], 'env': {}},
     # SUP-03. guard 고정 템플릿 파일을 읽기 전용으로 마운트하고 --chat-template으로 고른다.
     'v2-template': {'sensor': False, 'template': True, 'args': ['--chat-template', CHAT_TEMPLATE_PATH], 'env': {}},
     # 2단계 P1·P2 생산자 GPU 확인. 콜백 센서의 선택 관측(prepare-engine-callbacks 플래그)을 한 엔진에서 함께 켠다.

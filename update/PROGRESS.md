@@ -6,8 +6,9 @@
   - `request_field_probe.py`: 공격 요청 전후 모듈 목록을 비교해 `consumed`(승인 목록 밖 판본이 시도 직후 생김)/`ignored`/`accepted_unverified`로 분류. `code_selection_confirmed_violations`에 필드·판본·근거를 채우고, 보고서 사유로 쓴다. `mm_processor_kwargs.code_revision` 같은 중첩 필드와 이미지 입력(control_image)을 보낸다. 쿠버네티스 실행기의 점(`.`) 필드 거부를 풀었다.
   - 새 정책 키 `approved_code_revisions`(승인 커밋 목록). DRAFT 팩은 `tools/build_code_selection_pack.py`가 PACK-BASELINE에서 SUP-08만 revision 5로 바꾼 PACK-CODE-SELECTION을 만든다(나머지 76개 bytes 불변).
 - 테스트 결과: `tests/test_code_selection_observation.py` 28개 신규 통과(분류·닫힌 계약·인벤토리 스크립트·FakeEngine 파이프라인 FAIL/PASS). 영향 받는 기존 시험(executor_extensions, kubernetes_input_validation, golden_http, vllm_adapter, request_binding, role_route 등) 재실행 통과. `reviewed-source.json` 다시 생성. 전체 suite는 PR CI.
-- 다음 단계: AWS 실행 구성(멀티모달 시험 모델, `--trust-remote-code` 켬/끔 generation, 오프라인 HF 캐시의 승인·비승인 판본 fixture)과 http-check 설정에 모듈 관측 키 연결. 그 뒤 PoC: 0.7.0 PASS → 0.30 FAIL(REGRESSED) + 0.31 기본 거부.
-- 막힌 것: SUP-08 실행기 파일은 B 소유라 PR에 적고 B 검토. GPU 회차는 비용 승인 뒤. 멀티모달 시험 모델(0.7.0·0.30 둘 다 구동)·무해 판본 fixture 미정.
+- AWS 실행 구성(이어서): `gpu_a_aws_lab.py`에 `v2-code-selection-trust`(`--trust-remote-code` 켬)·`v2-code-selection-notrust`(끔) generation을 더했다. `gpu_a_run_inputs.http_inputs`가 정책 초안의 `code_selection_observation` 블록이 있을 때만 모듈 관측 키(root·repo·unapproved_revision·control_image)를 SUP-08 guard.toml에 넣는다(블록 없으면 기존 입력 검증 그대로). PoC 정책 초안 `docs/gpu-a/policy-code-selection-draft.yaml`을 만들었다(PACK-CODE-SELECTION, 중첩 필드, 모델별 값은 SUP-03 템플릿 SHA처럼 REPLACE 마커).
+- 다음 단계: 멀티모달 시험 모델(auto_map 처리기, 0.7.0·0.30 둘 다 구동) 선정과 승인·비승인 무해 판본 fixture를 만들어 초안의 REPLACE 마커를 채운다. 그 뒤 PoC: 0.7.0 PASS → 0.30 FAIL(REGRESSED) + 0.31 기본 거부.
+- 막힌 것: SUP-08 실행기 파일은 B 소유라 PR에 적고 B 검토. GPU 회차는 비용 승인 뒤. 멀티모달 시험 모델·무해 판본 fixture 미정(초안 REPLACE 마커 4개).
 
 ## 2026-11-09 — A·B 작업지시서 2차(vLLM 1차 완성)
 

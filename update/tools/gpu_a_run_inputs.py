@@ -195,10 +195,27 @@ def _http_values(check_id, draft):
     return values
 
 
+# SUP-08 코드 선택 PoC의 실행 판본 관측 설정. 값은 정책 초안의 code_selection_observation 블록(데이터)에서
+# 받는다. 블록이 없으면 기존처럼 kwargs 전달까지만 보는 입력 검증으로 돈다. 모델·판본 이름을 코드에 넣지 않는다.
+_CODE_OBSERVATION_KEYS = ('code_module_root', 'code_module_repository', 'unapproved_revision', 'control_image')
+
+
+def _code_selection_settings(draft):
+    block = draft.get('code_selection_observation')
+    if block is None:
+        return {}
+    missing = [key for key in _CODE_OBSERVATION_KEYS if key not in block]
+    if missing or set(block) - set(_CODE_OBSERVATION_KEYS):
+        raise ValueError('RUN_INPUTS_CODE_OBSERVATION_INVALID')
+    return {key: block[key] for key in _CODE_OBSERVATION_KEYS}
+
+
 def http_inputs(check_id, target_value, draft, *, root):
     if check_id not in HTTP_CHECKS:
         raise ValueError('RUN_INPUTS_CHECK_UNSUPPORTED')
     executor, settings = HTTP_CHECKS[check_id]
+    if check_id == 'SUP-08':
+        settings = {**settings, **_code_selection_settings(draft)}
     policy = {'data_origin': 'EXAMPLE' if check_id in EXAMPLE_POLICY_CHECKS else 'DECLARED', 'status': 'DRAFT',
         'pack': deepcopy(draft['pack']), 'values': {check_id: _http_values(check_id, draft)},
         'scope': {'include': [check_id], 'exclude': []}, 'exceptions': [], 'confirmed_by': None, 'confirmed_at': None}

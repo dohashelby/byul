@@ -249,3 +249,58 @@ def test_pipeline_reports_consumed_revision_as_fail(tmp_path, code_pack, engine,
     else:
         assert violations == []
     assert "SUP-08" in [row.check_id for row in report.by_check]
+
+
+def test_aws_generations_toggle_trust_remote_code():
+    from tools import gpu_a_aws_lab as lab
+    assert lab.GENERATIONS["v2-code-selection-trust"] == {"sensor": False, "args": ["--trust-remote-code"], "env": {}}
+    assert lab.GENERATIONS["v2-code-selection-notrust"] == {"sensor": False, "args": [], "env": {}}
+
+
+def _draft(block=True):
+    draft = {"pack": {"id": "PACK-CODE-SELECTION", "revision": 1},
+             "values": {"SUP-08": {"code_selection_fields": [FIELD], "code_selection_allowed": False,
+                                    "rejection_codes": ["400", "422"], "approved_code_revisions": [APPROVED]}}}
+    if block:
+        draft["code_selection_observation"] = {"code_module_root": "/cache/hf/modules/transformers_modules",
+            "code_module_repository": "org/probe", "unapproved_revision": "refs/pr/1", "control_image": IMAGE}
+    return draft
+
+
+def test_run_inputs_wire_module_observation_only_when_the_draft_declares_it(tmp_path):
+    from tools import gpu_a_run_inputs as inputs
+    target = {"kubernetes": {"context": "byul-aws-lab"}}
+    policy, config = inputs.http_inputs("SUP-08", target, _draft(block=True), root=tmp_path)
+    assert policy["pack"]["id"] == "PACK-CODE-SELECTION"
+    assert policy["values"]["SUP-08"]["approved_code_revisions"] == [APPROVED]
+    for line in ("code_module_root = '/cache/hf/modules/transformers_modules'", "code_module_repository = 'org/probe'",
+                 "unapproved_revision = 'refs/pr/1'", "control_image = '" + IMAGE + "'",
+                 "input_validation = 'kubernetes'"):
+        assert line in config
+    _, plain = inputs.http_inputs("SUP-08", target, _draft(block=False), root=tmp_path)
+    assert "code_module_root" not in plain
+
+
+def test_run_inputs_reject_a_partial_observation_block(tmp_path):
+    from tools import gpu_a_run_inputs as inputs
+    draft = _draft(block=True); del draft["code_selection_observation"]["control_image"]
+    with pytest.raises(ValueError, match="RUN_INPUTS_CODE_OBSERVATION_INVALID"):
+        inputs.http_inputs("SUP-08", {"kubernetes": {}}, draft, root=tmp_path)
+
+
+def test_poc_draft_file_has_markers_and_nested_field():
+    import yaml
+    draft = yaml.safe_load((ROOT / "docs/gpu-a/policy-code-selection-draft.yaml").read_text(encoding="utf-8"))
+    assert draft["pack"]["id"] == "PACK-CODE-SELECTION"
+    assert draft["values"]["SUP-08"]["code_selection_fields"] == [FIELD]
+    block = draft["code_selection_observation"]
+    assert block["code_module_root"] == "/cache/hf/modules/transformers_modules"
+    assert set(block) == set(inputs_keys())
+    for marker in ("REPLACE_WITH_APPROVED_PROCESSOR_COMMIT_SHA1", "REPLACE_WITH_TEST_MODEL_REPOSITORY_ID",
+                   "REPLACE_WITH_UNAPPROVED_REVISION", "REPLACE_WITH_SMALL_IMAGE_DATA_URI"):
+        assert marker in (ROOT / "docs/gpu-a/policy-code-selection-draft.yaml").read_text(encoding="utf-8")
+
+
+def inputs_keys():
+    from tools import gpu_a_run_inputs as inputs
+    return inputs._CODE_OBSERVATION_KEYS

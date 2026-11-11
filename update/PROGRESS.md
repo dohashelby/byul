@@ -3,7 +3,7 @@
 - 한 일: Phi-3 vision 고정 모델과 소유 processor 승인/비승인 두 커밋을 오프라인 fixture로 만들었다. Kubernetes 코드 캐시의 Transformers 4/5 경로, import 표식, Pod 신원 및 판본별 launch를 검증했다. `guard update`의 `input_validation` 순차 Pod 전환과 비교 조건을 연결했다. 상세 재현 입력·근거는 [GPU 실측 결과](docs/gpu-a/RESULTS-20261111-SUP08.md)에 보존했다.
 - GPU 제품 결과: 기존 서울 L4 단일 GPU에서 0.7.0 `MEASURED PASS/PASS`, 0.30.0 `MEASURED FAIL/PASS`, 제품 `guard update` SUP-08 `REGRESSED`/기능 `NO_CHANGE`·비교 차이 없음. 0.31.0 기본 설정은 시도 400 사전 거부, `MEASURED PASS/PASS`. trust 비활성은 모델 사용자 코드 필요 오류로 기동 실패하여 PASS로 세지 않았다. 팩과 정책은 DRAFT/EXAMPLE, `official=false`; 68개 다른 선택 점검은 NOT_RUN이다.
 - 검증: CPython 3.12.3 범위 시험 214 통과, 현황표 `--check` 및 소스 목록 재생성·diff 검토. 최종 제품·0.7.0·0.31.0 Store 세 개 `guard verify OK` 후 export. 전체 suite와 정확 HEAD Linux PR CI는 별도 확인. B 소유 실행기/수집기 검토 receipt·기업 승인 없음.
-- 정리: 별도 SUP-08 Probe Pod와 임시 NetworkPolicy를 제거하고 원래 엔진 Deployment 템플릿을 replicas=0으로 돌린다. AWS 인스턴스 중지 확인은 실행 뒤 이 항목에 기록한다.
+- 정리: 별도 SUP-08 Probe Pod 12개와 임시 NetworkPolicy를 제거하고 원래 엔진 Deployment 템플릿을 replicas=0으로 복원했다. GPU 0 MiB 확인. AWS `i-04f510eaa76c2bc89`는 정상 OS 종료로 중지 요청하고 18:07 KST 콘솔에서 `stopped`와 공인 IP 해제를 확인했다. 비용은 `docs/gpu-a/COST_LEDGER.md`에 기록했다.
 
 ## 2026-11-11 — SUP-08 작업 중 변경 저장과 원격 인계
 

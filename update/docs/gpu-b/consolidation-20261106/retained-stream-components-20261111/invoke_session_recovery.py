@@ -4,7 +4,7 @@ import argparse,hashlib,json,os,sys,types
 
 ORIGINAL_INVOKER=(13965,'4feb36f05b4dede32bec1e319304128e0af56b9e6ede235d91e33db6e292faf2')
 STREAM=(19502,'8e2261a0162271288397f962526a9086cc1edf0b983ff6bc4c941fae3bf039e7')
-CORE=(23681,'180e6b0abb5ba02a6c7e958f3f560d0947c533a52f2566ca3e6d6ca4c1edbe40')
+CORE=(23600,'ab804382e3f2a9d15bfeba8dbcaa5155f417b807fb468104ba6423088939681d')
 CONTENT='3c6fff6f4fd03784f52e47b5b008ef991762d01c0db5dfebf1e3105cc4510dee'
 
 def module(name,path,raw):

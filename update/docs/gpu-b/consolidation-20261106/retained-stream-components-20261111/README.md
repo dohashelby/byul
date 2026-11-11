@@ -10,6 +10,8 @@ Deadline은 기존 absolute CLOCK_MONOTONIC 끝값을 소비한다. 인증·연�
 
 S1 실제 실행에서는 v6 진입점이 loader 외부에서 별도 파싱한 packet을 원 Controller에 넘겨 `SAME_FIXED_DRIVER_PACKET_REQUIRED`로 health 전에 실패했다. v7은 동일한 `runtime.packet`을 공급하고 원 `is` 검사를 유지한다. 최종 준비 packet의 check 모드는 실제 원 Controller·새 Recovery 생성자까지 API 호출 없이 검사한다. 실제 고정 loader→원 생성자→진입점의 새 CPU3과 [최소 수정 검토](entry-v7-focused-review.json)를 연결했다. 원 v6 source·CPU 결과와 실제 S1 실패는 당시 범위로 보존한다.
 
+S2 실제 실행은 health/clock 뒤 Session CLI의 빈 prefix/min1 입력 검사에서 native252로 실패했다. v8은 관리 문서의 기본값을 쓰도록 빈 optional prefix 두 필드만 생략하고 진입점 CORE 핀을 갱신했다. [실제 CloudShell 로컬 CLI 영수증](actual-CloudShell-CLI-v8-local-validation-receipt.json)과 [고정 수정 검토](prefix-v8-focused-review.json)를 연결했다. 원 retained 요청의 command·nonce를 새 producer에 넣고 실제 CLI의 `--generate-cli-skeleton output --no-sign-request`로 API 없이 입력을 검사했다. 생성 표본과 실제 서비스 응답을 구분하며 원 source·CPU·실패·UNKNOWN을 보존한다.
+
 `start_existing_once.py`는 검토된 invoker·loader와 기존 driver.start()를 연결한다. dependency는 이전 회수 source map의 동일 원문이며 driver.main/execute를 호출하지 않는다. R1에서 기존 인스턴스 start1은 실제 수락됐고 health는 통과했으나 원 압축 codec의3MiB 상한으로 archive GET 이전에 실패했다. [실제 운영 기록](../SUP16_ACTUAL_OBSERVATIONS_20261111.md)에 원 오류·정지 감시 실패·후속 실제 정지를 구분했다.
 
 v1 합성 CPU30의 실패2를 보존했고 v2에서 해당 결함을 고쳤다. v2 protocol30·실제 로컬 FD8은 당시 source의 결과다. v3는 기존 접근 guard와 frame 단위 변경의 새 영향19를 확인했다. 독립 검토에서 새 부모 FD 상태 조회 실패의 정리 누락을 찾아 v4에서 두 조회를 정리 보호 구간으로 옮기고 새 실패 주입2를 확인했다. 이 숫자는 제품 점검 완료 수가 아니며, 기존 결과를 v4 전체 suite 통과로 바꾸지 않는다.

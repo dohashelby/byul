@@ -17,13 +17,13 @@
     },
     "session_recovery.py": {
       "repository_path": "update/docs/gpu-b/consolidation-20261106/retained-stream-components-20261111/session_recovery.py",
-      "bytes": 23681,
-      "sha256": "180e6b0abb5ba02a6c7e958f3f560d0947c533a52f2566ca3e6d6ca4c1edbe40"
+      "bytes": 23600,
+      "sha256": "ab804382e3f2a9d15bfeba8dbcaa5155f417b807fb468104ba6423088939681d"
     },
     "invoke_session_recovery.py": {
       "repository_path": "update/docs/gpu-b/consolidation-20261106/retained-stream-components-20261111/invoke_session_recovery.py",
       "bytes": 6679,
-      "sha256": "80dea4be043870b3e757826149a380c003c56879a0c739350a91d60a841b40bb"
+      "sha256": "cf67a54e1c10669184c2231941530852dacf2aa16ad0c3c96b9863b5da7374f0"
     }
   },
   "dependency_source_map": "../retained-recovery-operator-20261111/source-manifest.json",

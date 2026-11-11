@@ -1,0 +1,746 @@
+{
+  "schema": "S4-S2-actual-control-health-clock-local-rejection-stop-cost-focused-review/1",
+  "at_UTC": "2026-11-11T02:31:46.036646+00:00",
+  "owner": "S4",
+  "request_id": "S4-GB12-SESSION-S2-ACTUAL-CONTROL-STOPPED-20261111-01",
+  "id": "SUP-16/R8 후속 회수 준비",
+  "branch_scope": "실제 S2 health/clock·Session CLI 로컬검사 실패·별도 정리 근거·정상 stop/후 선정 관측·특정 비용행 및 v8 raw 연결",
+  "source_commit": null,
+  "source_identity": "미커밋 out 원 core180e/entry80de와 localvalidation coreab804를 archive member 정확 bytes/SHA로 식별. 원 guard/제품/정본 수정0.",
+  "archive": {
+    "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v7\\S2-R8-SESSION-S2-original-local-control-v1.zip",
+    "bytes": 473385,
+    "sha256": "8d107c0239abf38a59d40904116d9eb07262affc2e6580394e795e482c32b7e4"
+  },
+  "files": {
+    "control482-first-CRC-exact-member-manifest-v1.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\control482-first-CRC-exact-member-manifest-v1.json",
+      "bytes": 187129,
+      "sha256": "3ca53d41253745a02be851a22fd5489e583ef6f570da29adfe2e61cd7e6b8298"
+    },
+    "control-index481-exact-byte-SHA-check-v1.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\control-index481-exact-byte-SHA-check-v1.json",
+      "bytes": 3236,
+      "sha256": "cd1b0c7d52a7b41f9fa5a92748e2a83fe5d1015462184fb7af7c46a71683a9e2"
+    },
+    "S2-native-CLI-exact-receipt-catalog-v1.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\S2-native-CLI-exact-receipt-catalog-v1.json",
+      "bytes": 277488,
+      "sha256": "d556d26e7c4b02e5eb604f0f4f4f5f6161ccf3c3b221d58c862c7efaf4c60881"
+    },
+    "S2-request-selected-wire-exact-member-manifest-v1.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\S2-request-selected-wire-exact-member-manifest-v1.json",
+      "bytes": 117736,
+      "sha256": "904cebcee63b8ef9291c6b76c1377bac082970c48d6c72944729c202655aa930"
+    },
+    "v8-original-request-skeleton-raw-closure-addendum-v1.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\v8-original-request-skeleton-raw-closure-addendum-v1.json",
+      "bytes": 6356,
+      "sha256": "8f7bfe54b5b0ac83d8e3f1f2c978e75214b7262023c1804ddfd2ef3aa769ca00"
+    },
+    "S2-actual-selected-stopped-v1.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v7\\S2-actual-selected-stopped-v1.json",
+      "bytes": 9103,
+      "sha256": "34f6991e9045e0c7677b98c2ce02acb33c43dc440497ae478186eed9e478fae5"
+    },
+    "S2-ledger-after-actual-selected-stopped-v1.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v7\\S2-ledger-after-actual-selected-stopped-v1.json",
+      "bytes": 141883,
+      "sha256": "71bea93c0b84128163129d5e3cac64156e1084c5441f647fbe3a2a718e156d24"
+    },
+    "normal_stop_S2_paramvalidation_once.py": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v7\\normal_stop_S2_paramvalidation_once.py",
+      "bytes": 4875,
+      "sha256": "28d45510502b78514eb7b7cc46e1b136efeddf28fae7a2ba5551ad84b68604ec"
+    },
+    "collect_S2_original_control_v1.py": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v7\\collect_S2_original_control_v1.py",
+      "bytes": 4592,
+      "sha256": "99d827fcdf0d45e3faea50b936a7c26d8e49d3876ca032196c35d809e88d7976"
+    }
+  },
+  "checks": [
+    {
+      "check": "새 control473385 bytes SHA8d107c02",
+      "matched": true
+    },
+    {
+      "check": "최초482 CRC1회 및 index481 집합·bytesSHA 불일치0",
+      "matched": true
+    },
+    {
+      "check": "원 수집 native REG600 UID1000 nlink1 metadata 일치",
+      "matched": true
+    },
+    {
+      "check": "실제 source15 packet핀·core180e entry80de 불변",
+      "matched": true
+    },
+    {
+      "check": "실제 final packet0d04 및 parent child 원 argv 일치",
+      "matched": true
+    },
+    {
+      "check": "start wrapper1241 및 child1307 실패회수 group종료",
+      "matched": true
+    },
+    {
+      "check": "원 adapter CLI99 실제 operation·exit0·wire SHA 일치",
+      "matched": true
+    },
+    {
+      "check": "adapter99는 main74+readonly5묶음25·SessionCLI별도",
+      "matched": true
+    },
+    {
+      "check": "health 및 clock native wire와 원 root terminal exact JSON 일치",
+      "matched": true
+    },
+    {
+      "check": "healthCID a38c 및 clockCID e704 실제 Success0",
+      "matched": true
+    },
+    {
+      "check": "실제 health boot GPU1 prior0 timer active noreset engine factory false",
+      "matched": true
+    },
+    {
+      "check": "원 remote health binding3734 SHA66b3 정확 연결",
+      "matched": true
+    },
+    {
+      "check": "guest clock nonce boot UID0 및 원900 host end 재사용·resetfalse",
+      "matched": true
+    },
+    {
+      "check": "Session CLI001 원 request153b 및 PID1380 ticks503218",
+      "matched": true
+    },
+    {
+      "check": "Session CLI001 native252 reaped groupterminal cleanup close[] stdout0",
+      "matched": true
+    },
+    {
+      "check": "원 stderr273 SHAed81694f 두 빈prefix min1 오류",
+      "matched": true
+    },
+    {
+      "check": "Session CLI002 History 실제0 빈Sessions·요청SHA일치",
+      "matched": true
+    },
+    {
+      "check": "Session CLI003 Active 실제0 빈Sessions·요청SHA일치",
+      "matched": true
+    },
+    {
+      "check": "원 primary CLI_NATIVE_EXIT_NONZERO와 별도 UNKNOWN·null 보존",
+      "matched": true
+    },
+    {
+      "check": "positive resolution은 원153b stderr ed816 전용 별도기록·원UNKNOWN보존",
+      "matched": true
+    },
+    {
+      "check": "정상 stop1430 최초1회 및 원180 실패 보존",
+      "matched": true
+    },
+    {
+      "check": "실제start stopped→pending·stop running→stopping·Force없음",
+      "matched": true
+    },
+    {
+      "check": "후 stopped 원9103 SHA34f699와 archive 정확바이트 일치",
+      "matched": true
+    },
+    {
+      "check": "후 readonly native wire와 identity EC2 SSM exact JSON 일치",
+      "matched": true
+    },
+    {
+      "check": "후 account stage native projection 빈목록과 wrapper 빈Commands 연결",
+      "matched": true
+    },
+    {
+      "check": "02:23 후 선정 stopped IPnone SSM0 active0 현재privateunresolved0",
+      "matched": true
+    },
+    {
+      "check": "기존선정1대 동일 profile volume group 및 다른2대 새조회0",
+      "matched": true
+    },
+    {
+      "check": "S2 ledger141883 SHA71bea 해당행 startintent→관측끝 보수닫음",
+      "matched": true
+    },
+    {
+      "check": "장부1173.390235초·user 관리·USDnull exactoffnull EBS계속",
+      "matched": true
+    },
+    {
+      "check": "v8 미확인 raw 후속9대조0 exact결과 재사용",
+      "matched": true
+    },
+    {
+      "check": "원 R8 UNKNOWN1·GB12미회수·제품미성공 보존",
+      "matched": true
+    }
+  ],
+  "checks_count": 31,
+  "mismatches": 0,
+  "result": "새 control 최초 CRC·색인·실제 health/clock·클라이언트 입력검사 실패·별도 정리 근거·후 stopped 관측·해당 S2 비용구간의 연결에서 불일치를 확인하지 않았다. 실제 S2 회수는 Session CLI의 빈 optional prefix 입력검사에서 실패했으며 실제 Session stream/GB12 회수 성공은 없다.",
+  "exact_evidence": {
+    "private/operator-freeze.json": {
+      "member": "private/operator-freeze.json",
+      "bytes": 13405,
+      "sha256": "0d0403743cc4065c4441c8354adf1d7c96eb2a7476ecbbd64042cb76f5b1f900",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\operator-freeze.json"
+    },
+    "private/required-admission.json": {
+      "member": "private/required-admission.json",
+      "bytes": 3708,
+      "sha256": "940474a68b291f80d0503a8ad315661f087f732e7fb7650b5fe8b5bc0983fb3f",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\required-admission.json"
+    },
+    "private/health-submission.json": {
+      "member": "private/health-submission.json",
+      "bytes": 10400,
+      "sha256": "10f3f1bbbdf60612d4d748aa4701f87508097c0072cb29bf57f40ee8627f5951",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\health-submission.json"
+    },
+    "private/health-terminal.json": {
+      "member": "private/health-terminal.json",
+      "bytes": 2477,
+      "sha256": "baab75672e69ba316cbce8707125517e47c935be958cb0463aa86496f2b0fa20",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\health-terminal.json"
+    },
+    "private/current-health-binding.json": {
+      "member": "private/current-health-binding.json",
+      "bytes": 519,
+      "sha256": "10e3fa15587bd2bddb94c40c046149e12c6392ca18d2a7055587042e09596c92",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\current-health-binding.json"
+    },
+    "private/recovery-clock-once-submission.json": {
+      "member": "private/recovery-clock-once-submission.json",
+      "bytes": 2570,
+      "sha256": "86273bfe5d0554f14dbfc3c5b8c7d038fd71bc0b242a310b129aed8c0bd2736f",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\recovery-clock-once-submission.json"
+    },
+    "private/recovery-clock-once-terminal.json": {
+      "member": "private/recovery-clock-once-terminal.json",
+      "bytes": 1392,
+      "sha256": "36c564047aaa795f648eb419446f7d24a0c4b9e4c798c392ed7cb39f7fe38ef3",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\recovery-clock-once-terminal.json"
+    },
+    "private/session-clock-map.json": {
+      "member": "private/session-clock-map.json",
+      "bytes": 569,
+      "sha256": "f768d3ed1e24f56e56fa6659642f76c85eba1d72b87e7853790943068ec5d902",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\session-clock-map.json"
+    },
+    "private/session-001-start-session.request.json": {
+      "member": "private/session-001-start-session.request.json",
+      "bytes": 27693,
+      "sha256": "153b6d835c69d4e8d753ababba66dfb754d9e0a713bdc6d1517be896deb04afa",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\session-001-start-session.request.json"
+    },
+    "private/session-001-start-session.terminal.json": {
+      "member": "private/session-001-start-session.terminal.json",
+      "bytes": 596,
+      "sha256": "25707fce9cc115494be7db093c0f77f3baffecc75297a2f13b6ff0ba821a1aa3",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\session-001-start-session.terminal.json"
+    },
+    "private/session-001-start-session.stdout": {
+      "member": "private/session-001-start-session.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\session-001-start-session.stdout"
+    },
+    "private/session-001-start-session.stderr": {
+      "member": "private/session-001-start-session.stderr",
+      "bytes": 273,
+      "sha256": "ed81694f7e49b39d68e840d15afb5626beacd5c624fb7ef80dc82cafa09f5d96",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\session-001-start-session.stderr"
+    },
+    "private/session-002-describe-sessions.request.json": {
+      "member": "private/session-002-describe-sessions.request.json",
+      "bytes": 95,
+      "sha256": "36189e004db8848cb3a62238a156a2538d9c9909e2abe918877f9808470a7a91",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\session-002-describe-sessions.request.json"
+    },
+    "private/session-002-describe-sessions.stdout": {
+      "member": "private/session-002-describe-sessions.stdout",
+      "bytes": 23,
+      "sha256": "de5480d1026d35dbff56a620b490e9982167c5a7be5af6f538acd0b60da601f0",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\session-002-describe-sessions.stdout"
+    },
+    "private/session-003-describe-sessions.request.json": {
+      "member": "private/session-003-describe-sessions.request.json",
+      "bytes": 94,
+      "sha256": "f1286ddf33d269fb569c675883c30b455d3901b7f5bffd2820c05ee4bd17ab84",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\session-003-describe-sessions.request.json"
+    },
+    "private/session-003-describe-sessions.stdout": {
+      "member": "private/session-003-describe-sessions.stdout",
+      "bytes": 23,
+      "sha256": "de5480d1026d35dbff56a620b490e9982167c5a7be5af6f538acd0b60da601f0",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\session-003-describe-sessions.stdout"
+    },
+    "private/session-UNKNOWN-no-following-mutation.json": {
+      "member": "private/session-UNKNOWN-no-following-mutation.json",
+      "bytes": 234,
+      "sha256": "ef5361cacc50fe4a91dd80b7be06930a1b0435aea4dab3bb01c31eb19cb93238",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\session-UNKNOWN-no-following-mutation.json"
+    },
+    "private/S2-client-parameter-rejection-positive-resolution.json": {
+      "member": "private/S2-client-parameter-rejection-positive-resolution.json",
+      "bytes": 633,
+      "sha256": "e06114395c48115930fb8eba9a128883d837d773a3da33a2cc52d8817b32d616",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\S2-client-parameter-rejection-positive-resolution.json"
+    },
+    "private/collect-local-terminal-v1.json": {
+      "member": "private/collect-local-terminal-v1.json",
+      "bytes": 1116,
+      "sha256": "64ece24d9bfb2a6b8b6cb71d92f114acfa8f4d7176afef41752644a6e13fbc53",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\collect-local-terminal-v1.json"
+    },
+    "private/collect.stderr": {
+      "member": "private/collect.stderr",
+      "bytes": 2714,
+      "sha256": "14c1f9851ef7fd6de14a342666184829de125c3e601a89deb105cc899f188cf6",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\collect.stderr"
+    },
+    "private/recovery-child-outcome-v1.json": {
+      "member": "private/recovery-child-outcome-v1.json",
+      "bytes": 1178,
+      "sha256": "8f413d354a2f974d9afe0e67a0e1ef00a01c91fdb43d0e86dccbf95ec9912bd9",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\recovery-child-outcome-v1.json"
+    },
+    "private/normal-stop-continuation-once-intent.json": {
+      "member": "private/normal-stop-continuation-once-intent.json",
+      "bytes": 271,
+      "sha256": "245911e45f3b0869cedae613f08094fb7cbfeb281974faaf6efdadada9f7e1d9",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\normal-stop-continuation-once-intent.json"
+    },
+    "private/normal-stop-continuation-local-terminal.json": {
+      "member": "private/normal-stop-continuation-local-terminal.json",
+      "bytes": 407,
+      "sha256": "380f80e8e10571cdd6c0d92d923e26cd059f5c2ab81f5d26a3c96eb3e99507e7",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\normal-stop-continuation-local-terminal.json"
+    },
+    "private/READONLY-poststop-022258586120/selected-readonly.json": {
+      "member": "private/READONLY-poststop-022258586120/selected-readonly.json",
+      "bytes": 9103,
+      "sha256": "34f6991e9045e0c7677b98c2ce02acb33c43dc440497ae478186eed9e478fae5",
+      "exact_extracted_path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\READONLY-poststop-022258586120\\selected-readonly.json"
+    }
+  },
+  "source_pins": {
+    "legacy_driver.py": {
+      "bytes": 31815,
+      "sha256": "64a1e0fb9f3cdeb469233d706eb099d1978646b14ce90e37f958b682c9d10eab"
+    },
+    "original_aws_cli_adapter_v2.py": {
+      "bytes": 16609,
+      "sha256": "22f25f41ba67d88a022dd922ba82936f6d4dad23618004107d5ab88f58b9de91"
+    },
+    "get_command_invocation_once.py": {
+      "bytes": 4587,
+      "sha256": "7a057bca14ab3f164414d8b8aa2c737d041550ba168b55f4d004c3bc29684656"
+    },
+    "copy_helper-exact-download-v1.py": {
+      "bytes": 33089,
+      "sha256": "5a6d67b20412e3060fbf31a5770ff0018dae39630db07ba909267ebfb49f7080"
+    },
+    "health_readonly.py": {
+      "bytes": 5793,
+      "sha256": "fc0859878bea4ddede1d4d9d006f37e1320cb5162751891d9c41fbf1e2693bd9"
+    },
+    "archive_envelope_codec.py": {
+      "bytes": 22363,
+      "sha256": "6de3190f37d333bd1055e6abe706addb2a606405f701cf710712150852e1591f"
+    },
+    "collector_glue.py": {
+      "bytes": 11746,
+      "sha256": "1077c5270ed530d330d9916356c621279893a5161b44cc8260ada804b27f707f"
+    },
+    "recovery_controller.py": {
+      "bytes": 11693,
+      "sha256": "208deca33fef591ebd1b7a955633583deaa79b9b2370a7b1a8457c7f701d13d4"
+    },
+    "private_loader.py": {
+      "bytes": 7402,
+      "sha256": "c363b1ddfc46c9b84e417c871e250cf6597635b8ad8b5d3720a365cb0ee24c90"
+    },
+    "aws_cli_adapter_v2.py": {
+      "bytes": 2982,
+      "sha256": "b027a5376d7601f6d3e4cfb7701f94865083af5bc97f426ce87fa250fa9f058b"
+    },
+    "invoke_recovery_once.py": {
+      "bytes": 13965,
+      "sha256": "4feb36f05b4dede32bec1e319304128e0af56b9e6ede235d91e33db6e292faf2"
+    },
+    "session_recovery.py": {
+      "bytes": 23681,
+      "sha256": "180e6b0abb5ba02a6c7e958f3f560d0947c533a52f2566ca3e6d6ca4c1edbe40"
+    },
+    "invoke_session_recovery.py": {
+      "bytes": 6679,
+      "sha256": "80dea4be043870b3e757826149a380c003c56879a0c739350a91d60a841b40bb"
+    },
+    "gb12_stream.py": {
+      "bytes": 19502,
+      "sha256": "8e2261a0162271288397f962526a9086cc1edf0b983ff6bc4c941fae3bf039e7"
+    },
+    "start_existing_once.py": {
+      "bytes": 3097,
+      "sha256": "0e7e79bfa7376ddad7bfe73dd795a2e414aec87574b0dac1f467455848412a4a"
+    }
+  },
+  "actual_execution": {
+    "start_wrapper": {
+      "at": "2026-11-11T02:03:37.274688+00:00",
+      "packet_sha256": "0d0403743cc4065c4441c8354adf1d7c96eb2a7476ecbbd64042cb76f5b1f900",
+      "local_identity": {
+        "PID": 1241,
+        "PGID": 1241,
+        "start_ticks": 451173
+      },
+      "returncode": 0,
+      "original_error": null,
+      "resource_cleanup_complete_claimed": false,
+      "remaining_resource_stop_verification_required": true
+    },
+    "collect_parent": {
+      "at": "2026-11-11T02:11:53.999575+00:00",
+      "PID": 1306,
+      "PGID": 1306,
+      "parent_start_ticks": 501662,
+      "packet_sha256": "0d0403743cc4065c4441c8354adf1d7c96eb2a7476ecbbd64042cb76f5b1f900",
+      "scope": "one new data-only recovery child; no model/whole/source installation"
+    },
+    "collect_child": {
+      "at": "2026-11-11T02:11:54.000349+00:00",
+      "PID": 1307,
+      "PGID": 1307,
+      "argv": [
+        "/usr/local/python3.13/bin/python3",
+        "-I",
+        "-S",
+        "-B",
+        "/home/cloudshell-user/BYUL-R8-ENVELOPE-STREAM-20261111-S2/invoke_session_recovery.py",
+        "child",
+        "--packet-sha256",
+        "0d0403743cc4065c4441c8354adf1d7c96eb2a7476ecbbd64042cb76f5b1f900"
+      ],
+      "packet_sha256": "0d0403743cc4065c4441c8354adf1d7c96eb2a7476ecbbd64042cb76f5b1f900",
+      "local_start_ticks": 501671
+    },
+    "collect_terminal": {
+      "timed_out": false,
+      "child_reaped": true,
+      "group_terminal": true,
+      "cleanup_errors": [],
+      "returncode": 1,
+      "at": "2026-11-11T02:12:12.100986+00:00",
+      "PID": 1307,
+      "PGID": 1307,
+      "argv": [
+        "/usr/local/python3.13/bin/python3",
+        "-I",
+        "-S",
+        "-B",
+        "/home/cloudshell-user/BYUL-R8-ENVELOPE-STREAM-20261111-S2/invoke_session_recovery.py",
+        "child",
+        "--packet-sha256",
+        "0d0403743cc4065c4441c8354adf1d7c96eb2a7476ecbbd64042cb76f5b1f900"
+      ],
+      "packet_sha256": "0d0403743cc4065c4441c8354adf1d7c96eb2a7476ecbbd64042cb76f5b1f900",
+      "resource_cleanup_complete_claimed": false,
+      "remaining_resource_stop_verification_required": true,
+      "original_archive_restored_or_product_success_claimed": false,
+      "selected_stopped_observed": false,
+      "remaining_selected_IP_SSM_observation_required": true,
+      "original_child_error": {
+        "type": "RecoveryError",
+        "message": "CLI_NATIVE_EXIT_NONZERO",
+        "notes": [
+          "Independent cleanup: UnknownSession: EXACT_SESSION_TERMINAL_UNPROVEN",
+          "Selected-stop evidence: FileNotFoundError(2, 'No such file or directory')"
+        ]
+      }
+    },
+    "original_primary": {
+      "type": "RecoveryError",
+      "message": "CLI_NATIVE_EXIT_NONZERO",
+      "notes": [
+        "Independent cleanup: UnknownSession: EXACT_SESSION_TERMINAL_UNPROVEN",
+        "Selected-stop evidence: FileNotFoundError(2, 'No such file or directory')"
+      ]
+    },
+    "health": {
+      "CommandId": "a38c8852-359f-4bcd-8ab8-e6f57adcc257",
+      "Status": "Success",
+      "ResponseCode": 0,
+      "summary": {
+        "health_complete": true,
+        "timer_reset": false,
+        "engine_created": false,
+        "factory_executed": false,
+        "output": "/home/ubuntu/byul-gpu-b-tp2-20261103/HEALTH-R8-SESSION-STREAM-20261111-S2",
+        "at": "2026-11-11T02:11:59.659269+00:00",
+        "boot_id": "d3bcb559-45b2-42cd-9365-eab3df779704",
+        "GPU": {
+          "name": "NVIDIA L4",
+          "uuid": "GPU-f2f1aa55-668e-fe00-9e1a-2190f26e66f5",
+          "driver": "595.112.07"
+        },
+        "physical_GPU_count": 1,
+        "prior_GPU_processes": 0,
+        "host_cpu_count": 8,
+        "host_MemTotal_KiB": 31619240,
+        "timer": "Unit=byul-tp2-resume-budget.service\nTimersMonotonic={ OnActiveUSec=2h ; next_elapse=2h 7.649851s }\nNextElapseUSecMonotonic=2h 7.649851s\nActiveState=active\nActiveEnterTimestamp=Wed 2026-11-11 02:03:51 UTC\nActiveEnterTimestampMonotonic=7649857\n",
+        "PG_terminal": true,
+        "source_origin_or_model_cache_verified": false
+      },
+      "remote_health_binding": {
+        "path": "/home/ubuntu/byul-gpu-b-tp2-20261103/HEALTH-R8-SESSION-STREAM-20261111-S2/health-receipt.json",
+        "bytes": 3734,
+        "sha256": "66b33a037f587b1ddcd4e0bbaeb22d87ca9c6d3152bb109c31c6050f7ad38747",
+        "health_complete": true,
+        "physical_GPU_count": 1,
+        "prior_GPU_processes": 0,
+        "timer_reset": false,
+        "PG_terminal": true
+      },
+      "limit": "실제 health stdout의 장치/환경 요약 및 원 binding만 확보했다. remote health-receipt.json 3734바이트 본문을 복원·재해시한 것은 아니다. GPU 장치 열거이며 GPU 제품 시험·모델 실행 아님."
+    },
+    "clock": {
+      "CommandId": "e7041a97-a92d-4d0f-9879-76836294270d",
+      "Status": "Success",
+      "ResponseCode": 0,
+      "mapping": {
+        "at": "2026-11-11T02:12:06.503779+00:00",
+        "CommandId": "e7041a97-a92d-4d0f-9879-76836294270d",
+        "nonce": "a568d674-6fde-4055-9c7a-7562dd7d8525",
+        "host_boot": "a5851c6d-54f5-46ff-9a85-7a99737f8e21",
+        "host_before": 5023.809403847,
+        "host_after": 5029.218291251,
+        "host_original_end": 5922.974343545,
+        "guest_observation": {
+          "nonce": "a568d674-6fde-4055-9c7a-7562dd7d8525",
+          "boot": "d3bcb559-45b2-42cd-9365-eab3df779704",
+          "monotonic": 502.229038231,
+          "UID": 0,
+          "EUID": 0
+        },
+        "guest_absolute_end": 1395.9850905250003,
+        "reset": false
+      },
+      "limit": "SSM RunShellScript의 실제 guest UID/EUID0 clock 관측이다. SessionManager RunAs 권한/실제 Session sender 실행을 입증하지 않는다."
+    },
+    "Session_CLI": {
+      "local_PID": 1380,
+      "PGID": 1380,
+      "ticks": 503218,
+      "terminal": {
+        "started_at": "2026-11-11T02:12:09.473651+00:00",
+        "ended_at": "2026-11-11T02:12:10.322057+00:00",
+        "PID": 1380,
+        "PGID": 1380,
+        "start_ticks": 503218,
+        "operation": "start-session",
+        "request_sha256": "153b6d835c69d4e8d753ababba66dfb754d9e0a713bdc6d1517be896deb04afa",
+        "terminal": {
+          "timed_out": false,
+          "child_reaped": true,
+          "group_terminal": true,
+          "cleanup_errors": [],
+          "returncode": 252
+        },
+        "original_error_type": "RecoveryError",
+        "close_errors": [],
+        "stdout_bytes": 0,
+        "stderr_bytes": 273,
+        "credentials_or_token_or_env_or_proc_argv_logged": false
+      },
+      "stderr_SHA": "ed81694f7e49b39d68e840d15afb5626beacd5c624fb7ef80dc82cafa09f5d96",
+      "stdout_bytes": 0,
+      "stderr_bytes": 273
+    },
+    "observation_class": "실제 기존 선정1대 준비/health/clock 및 로컬 CLI 부분 실행. GPU 제품/CPU 제품/Session stream 성공 아님."
+  },
+  "UNKNOWN_resolution_distinction": {
+    "original_unknown_record_preserved": {
+      "at": "2026-11-11T02:12:12.083493+00:00",
+      "original_request_sha256": "153b6d835c69d4e8d753ababba66dfb754d9e0a713bdc6d1517be896deb04afa",
+      "SessionId": null,
+      "error_type": "RecoveryError",
+      "following_stop_or_retry": false
+    },
+    "separate_positive_resolution": {
+      "at": "2026-11-11T02:15:37.515752+00:00",
+      "request_sha256": "153b6d835c69d4e8d753ababba66dfb754d9e0a713bdc6d1517be896deb04afa",
+      "original_unknown_preserved": true,
+      "basis": "Original native252, exact ParamValidation stderr, stdout0: client-side input rejection before service request; original History/Active empty separately preserved",
+      "SessionId": null,
+      "new_StartSession_or_TerminateSession": false,
+      "original_stderr_sha256": "ed81694f7e49b39d68e840d15afb5626beacd5c624fb7ef80dc82cafa09f5d96",
+      "scope": "current rejected request only; old R8 UNKNOWN1 unchanged",
+      "product_or_archive_success_claimed": false
+    },
+    "basis": "원 native252+stdout0+정확 ParamValidation 두필드 min1 stderr는 client 입력검사 거부의 근거다. 후 History/Active 빈결과는 보조 관측이며 그것만으로 서버 미송신·모든 Session 없음의 증명으로 사용하지 않는다.",
+    "local_flag": "session_submitted=true와 server_terminal=false는 원 실패 자료에 그대로 남는다. local 시도 flag를 실제 서버 Session 생성으로 바꾸지 않는다.",
+    "disposition": "별도 resolution은 현재 거부된 request153b만 다루며 원 UNKNOWN을 삭제·덮어쓰기하지 않았다. old R8 UNKNOWN1 해소·원격 Session positive terminal·제품 성공을 주장하지 않는다.",
+    "network_limit": "독립 네트워크 송신 추적은 없으며 원 CLI 실패 종류·입력 바이트 및 공식 파라미터 계약에 근거한 구분이다."
+  },
+  "CLI_counts": {
+    "adapter_native": 99,
+    "adapter_operation_counts": {
+      "sts.get_caller_identity": 7,
+      "ec2.describe_instances": 56,
+      "ssm.list_commands": 22,
+      "ec2.describe_instance_attribute": 1,
+      "ec2.start_instances": 1,
+      "ssm.describe_instance_information": 7,
+      "ssm.send_command": 2,
+      "ssm.get_command_invocation": 2,
+      "ec2.stop_instances": 1
+    },
+    "adapter_exit_counts": {
+      "0": 99
+    },
+    "SessionCLI_separate": {
+      "start_session_local_rejection": 1,
+      "describe_sessions_History": 1,
+      "describe_sessions_Active": 1,
+      "exit_codes": [
+        252,
+        0,
+        0
+      ]
+    },
+    "local_skeleton_component_reused": 1,
+    "count_limit": "adapter99, SessionCLI3, localcheck1은 별도 경로다. CPU/제품 분기/ID 수와 합산하지 않는다."
+  },
+  "time_anchors_UTC": {
+    "cost_start_intent": "2026-11-11T02:03:29.932841+00:00",
+    "native_start_started": "2026-11-11T02:03:35.358309+00:00",
+    "native_start_ended": "2026-11-11T02:03:37.267644+00:00",
+    "session_CLI_started": "2026-11-11T02:12:09.473651+00:00",
+    "session_CLI_ended": "2026-11-11T02:12:10.322057+00:00",
+    "normal_stop_wrapper_anchor": "2026-11-11T02:15:37.518534+00:00",
+    "native_stop_started": "2026-11-11T02:15:45.092681+00:00",
+    "native_stop_ended": "2026-11-11T02:15:48.131792+00:00",
+    "original180watch_failed": "2026-11-11T02:18:49.242869+00:00",
+    "selected_EC2_stopped_query_finished": "2026-11-11T02:23:00.574991+00:00",
+    "all_poststop_readonly_finished": "2026-11-11T02:23:03.323076+00:00",
+    "exact_off_transition_UTC": null,
+    "limit": "wrapper anchor와 실제 CLI 시작/끝 및 후속 관측 시각을 분리한다. StateTransitionReason 또는 stop 수락을 정확 off 시각으로 바꾸지 않는다."
+  },
+  "normal_stop": {
+    "local_identity": {
+      "PID": 1430,
+      "PGID": 1430,
+      "start_ticks": 523421
+    },
+    "count": 1,
+    "original_watch_failure": {
+      "type": "AssertionError",
+      "message": "STOPPED_NOT_YET_OBSERVED"
+    },
+    "original_returncode": 1,
+    "Force_retry_reset": false,
+    "later_stopped_does_not_erase_original_watch_failure": true
+  },
+  "poststop": {
+    "at": "2026-11-11T02:23:03.323076+00:00",
+    "state": "stopped",
+    "public_IP": null,
+    "SSM_nodes": 0,
+    "active_account_stage_commands": 0,
+    "current_readonly_private_unresolved": [],
+    "current_original_private_unresolved": [],
+    "owned_collect_group1307_active_at_collection": [],
+    "other_instances_newly_observed": false,
+    "scope": "후속 순차 관측 및 소유 collect 그룹만. 전역 모든 프로세스 정리·과거UNKNOWN1 해소·정확off 주장0."
+  },
+  "cost_scope": {
+    "ledger_key": "SUP16_GB12_session_stream_recovery_S2_current_interval",
+    "interval": {
+      "account": "834058543745",
+      "instance_id": "i-05e8da8ea99593196",
+      "compute_IP_open_from": "2026-11-11T02:03:29.932841+00:00",
+      "closed_at": "2026-11-11T02:23:03.323076+00:00",
+      "actual_selected_stopped_not_yet_observed": false,
+      "resource_budget_confirmation_owner": "user",
+      "new_USD_estimate": null,
+      "retained_EBS_storage_continues": true,
+      "exact_off_transition_UTC": null,
+      "original_start_PID": 1241,
+      "start_packet_sha256": "0d0403743cc4065c4441c8354adf1d7c96eb2a7476ecbbd64042cb76f5b1f900",
+      "final_state": "stopped",
+      "closed_conservatively": true,
+      "actual_selected_stopped_receipt": {
+        "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b12-s2-plan-20261108\\out\\r8-session-stream-recovery-prep-20261111-v7\\S2-actual-selected-stopped-v1.json",
+        "bytes": 9103,
+        "sha256": "34f6991e9045e0c7677b98c2ce02acb33c43dc440497ae478186eed9e478fae5"
+      },
+      "conservative_elapsed_seconds": 1173.390235
+    },
+    "verified_conservative_seconds": 1173.390235,
+    "new_USD_estimate": null,
+    "actual_bill_verified": false,
+    "retained_EBS_storage_continues": true,
+    "other_ledger_fields_reestimated_by_S4": false,
+    "scope": "해당 S2 행만 원 startintent와 후관측 끝에 연결. 장부 전체 변경내역·타 자원 현재비용 검증 아님."
+  },
+  "original_R8_reference": {
+    "origin": "ACTUAL_RETAINED_R8",
+    "original_path": "/home/ubuntu/byul-gpu-b-tp2-20261103/GB2026111112-original-evidence.zip",
+    "original_bytes": 14636464,
+    "original_sha256": "2681a23c1545647e4b25711cb4c570336efdc6e7a604332de452c9cc2a663219",
+    "original_boot_id": "78fd6444-4138-4b60-8833-333e14805550",
+    "original_execution_command_id": "8a5e8bdc-e5fb-48df-9f87-f5147b8cbe4c",
+    "original_discovery_command_id": "dd87580f-ce50-435c-9e26-6a7cceb9a9af"
+  },
+  "v8_raw_followup": {
+    "report": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\v8-original-request-skeleton-raw-closure-addendum-v1.json",
+      "bytes": 6356,
+      "sha256": "8f7bfe54b5b0ac83d8e3f1f2c978e75214b7262023c1804ddfd2ef3aa769ca00"
+    },
+    "old_request_new_request_stdout_stderr_direct_bytes_completed": true,
+    "old_scope_review_repeated": false,
+    "new_CLI_execution": false
+  },
+  "verification_level": "새 실제 control 최초 CRC/색인 및 원 CLI·health/clock/실패·후 정지·특정 비용행·기존 localcheck raw 바이트 연결",
+  "data_origin": "S2 실제 CloudShell 로컬 control/CLI 원 JSON·stdout·stderr와 원 ledger snapshot. S4 로컬 읽기·hash·메타 해석만.",
+  "policy_official": "원 FAIL·UNKNOWN·null·정확 Ref·정책·official 및 준비/운영/제품 구분 보존. 실제 GB12 회수·복원·저장팩 성공 변경0.",
+  "limits": [
+    "원 수집기의 개별 파일 same-FD identity 안정성 범위이며 전체481파일의 원자 snapshot 주장은 하지 않는다.",
+    "원 collect1307 reaped/groupterminal 및 수집 당시 active[]는 확인했다. stop1430은 자체 terminal rc1 자료 범위이며 전역 actor 재관측을 하지 않았다.",
+    "원 remote GB12 ZIP은 이 local control과 다르며 여전히 미회수다. 과거 ZIP/CRC/Refs/CPU 재검0.",
+    "v8 raw 후속은 인계된 request/stdout/stderr 범위만 마감한다. wrapper 별도 terminal/정확 CLI binary·version/독립 네트워크 계측 등은 새 증거가 없다.",
+    "S4 대상 source import/exec·새 CPU/CLI·AWS/SSM·GPU·기동정지·정본/장부 수정0."
+  ],
+  "counts": {
+    "actual_S2_local_collect_attempts": 1,
+    "health_commands": 1,
+    "clock_commands": 1,
+    "normal_start_count": 1,
+    "normal_stop_count": 1,
+    "SessionCLI_local_attempts": 3,
+    "control_members": 482,
+    "indexed_payload_files": 481,
+    "metadata_checks": 31,
+    "S4_new_executions_API_GPU": 0,
+    "old_whole_CRC_repeated": 0,
+    "unique_product_branch_total": null,
+    "development26_GPU43_historical6_status_changes": 0
+  },
+  "remaining_inputs": "새 실제 회수 결과·원 GB12 bytes·Ref 복원·저장팩은 S2/root 소관. 다음 기존 승인 절차의 운영/사전검사를 대신하지 않으며 추가 root/S4 ACK·PR·CI gate를 만들지 않는다.",
+  "S4_review_scope_complete": true,
+  "operational_ready": false,
+  "new_gate_or_approval_added": false,
+  "next_owner": "S2 및 총괄"
+}

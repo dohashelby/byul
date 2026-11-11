@@ -110,6 +110,11 @@
       "bytes": 30338,
       "sha256": "55f56f09f08e01af1138ad225a165effe18c59cb64bc214627f5e00fc7ab996a",
       "kind": "actual_operating_control_review"
+    },
+    "prefix-v8-focused-review.json": {
+      "bytes": 12312,
+      "sha256": "5f1b0140219ae55a1c252128866ee5e923475056d56dd2b321b75355b3d19246",
+      "kind": "focused_source_and_actual_local_CLI_receipt_review"
     }
   },
   "actual_GB12_archive_read_or_restored_by_CPU": false,
@@ -170,5 +175,43 @@
     "core180e_stream8e_original_loader_and_Controller_unchanged": true,
     "old_S1_failure_stop180_failure_and_old_UNKNOWN1_preserved": true,
     "actual_S1_control_review_sha256": "55f56f09f08e01af1138ad225a165effe18c59cb64bc214627f5e00fc7ab996a"
+  },
+  "prefix_v8_actual_CLI_boundary_fix": {
+    "source_sha256": "ab804382e3f2a9d15bfeba8dbcaa5155f417b807fb468104ba6423088939681d",
+    "entry_sha256": "cf67a54e1c10669184c2231941530852dacf2aa16ad0c3c96b9863b5da7374f0",
+    "prior_source_bytes_published_at_commit": "4cf0f08528db632e3c7c8c4d6094d37ff2c18602",
+    "actual_S2_prior_failure": "CLI ParamValidation native252: empty stdoutSeparatorPrefix/stderrSeparatorPrefix elements violate string min1",
+    "minimal_delta": "Omit only two optional prefix keys; entry changes only CORE source pin",
+    "fixed_managed_document_optional_prefix_default": "",
+    "original_command_Transcript_deadlines_cleanup_UNKNOWN_unchanged": true,
+    "actual_producer_consumer_connection": "Original retained S2 request command and nonce -> fixed request_for -> real CloudShell AWS CLI generate-cli-skeleton output/no-sign-request",
+    "actual_local_CLI_component_executions": 1,
+    "actual_local_CLI_receipt_sha256": "3d97c1663faf3994fcad763b86cf772e6c0dba34521ca9e48278f0027c8a26c1",
+    "S4_review_sha256": "5f1b0140219ae55a1c252128866ee5e923475056d56dd2b321b75355b3d19246",
+    "actual_API_plugin_GPU_GB12_access_by_local_validation": false,
+    "stdout_kind": "Generated sample, not service response",
+    "independent_raw_request_and_stdout_rehash_in_original_review": false,
+    "original_failures_UNKNOWN_and_stop_observation_failures_preserved": true,
+    "prior_CPU_results_remain_at_their_original_sources_not_full_v8_suite": true,
+    "independent_raw_request_and_stdout_followup_sha256": "8f7bfe54b5b0ac83d8e3f1f2c978e75214b7262023c1804ddfd2ef3aa769ca00",
+    "independent_raw_request_and_stdout_rehash_after_original_review": true,
+    "actual_S2_control_review_sha256": "afa63410ba8eeaf537c4b148804d399cb37550b699eb944c4248c12038ab5b07"
+  },
+  "raw_actual_component_receipts": {
+    "actual-CloudShell-CLI-v8-local-validation-receipt.json": {
+      "bytes": 1420,
+      "sha256": "3d97c1663faf3994fcad763b86cf772e6c0dba34521ca9e48278f0027c8a26c1",
+      "kind": "actual_CloudShell_local_CLI_component_validation_no_API"
+    },
+    "prefix-v8-actual-raw-review-addendum.json": {
+      "bytes": 6356,
+      "sha256": "8f7bfe54b5b0ac83d8e3f1f2c978e75214b7262023c1804ddfd2ef3aa769ca00",
+      "kind": "actual_local_CLI_request_output_raw_review_addendum"
+    },
+    "session-S2-actual-review.json": {
+      "bytes": 39046,
+      "sha256": "afa63410ba8eeaf537c4b148804d399cb37550b699eb944c4248c12038ab5b07",
+      "kind": "actual_operating_control_health_clock_rejection_cleanup_review"
+    }
   }
 }

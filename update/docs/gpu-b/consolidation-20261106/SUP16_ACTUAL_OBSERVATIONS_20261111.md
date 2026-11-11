@@ -93,6 +93,23 @@ encoder CID `c4d64e32-fef6-44dc-80e6-763265213f20`는 Failed/1로 종료했다. 
 - v7 실제 loader→원 생성자 CPU3: `b1a01a183c3e0eba5f8abecb25b7f6339d00531ea20ce2da99baa59fa9a2e81a`
 - v7 최소 수정 독립 검토: `af35625cc2509466cc5ebf18547ba898ca8ae5dc074e5f3d12a0e65ec6f2c008`
 
+## Session S2: CLI 입력 검사 실패와 최소 수정
+
+v7의 실제 고정 loader→원 Controller 생성자 check/API0을 통과한 뒤, 11:03 KST 원 start actor1241의 terminal0/수락을 확인했다. 11:05 KST running·SSM Online1·활성 명령0을 확인하고 11:11:54 KST collect를 정확1회 제출했다. 실제 health·guest clock 이후 StartSession CLI는 11:12:09~10 KST native252·stdout0·stderr273B로 종료했다. `Parameters.stdoutSeparatorPrefix[0]`와 `stderrSeparatorPrefix[0]`의 빈 문자열이 min1 입력 제약을 위반한 `ParamValidation`이다. 권한 거부 또는 실제 Session 생성 성공으로 표시하지 않는다. 원 collect 자식1307은 11:12:12 KST rc1·회수·그룹 종료·cleanup 오류 없음으로 끝났다.
+
+원 core는 CLI 호출 전에 session_submitted를 기록한다. 이 로컬 intent/UNKNOWN과 실제 서버 요청 여부를 구분한다. 원 UNKNOWN 파일을 삭제하지 않고, 원 request·native252·정확 오류·SessionId 없음·History/Active 빈 결과를 별도 정리 근거로 연결했다. 동일 collect/Session 재제출은 없었다. 기존 사용자 정리 권한의 정상 stop1의 로컬 기준은 11:15:37 KST이고 실제 CLI 요청·응답은 11:15:45~48 KST다. 원180초 감시는 11:18:49 KST 실패했다. 후속 EC2 조회 11:23:00 KST stopped·공인 IP 없음, 이어 SSM0·활성 명령0·현재 private unresolved0을 확인했고 읽기 전용 관측은 11:23:03 KST 끝났다. 보수 compute/IP 장부는 원 start 로컬 기록부터 관측 끝까지 1173.390235초/user 관리·새 USD null·정확 off 시각 null·EBS 보존이다. 추가 stop·Force는 없었다.
+
+- S2 후속 선정 상태 원문 9103B: `34f6991e9045e0c7677b98c2ce02acb33c43dc440497ae478186eed9e478fae5`
+- 원 v6 core는 `4cf0f085` 커밋의 원문으로 보존한다. v8 core 23600B: `ab804382e3f2a9d15bfeba8dbcaa5155f417b807fb468104ba6423088939681d`
+- v8 entry 6679B의 변경은 CORE 핀뿐이다: `cf67a54e1c10669184c2231941530852dacf2aa16ad0c3c96b9863b5da7374f0`
+
+v8은 request_for의 빈 optional prefix 두 키만 생략한다. 고정 관리 문서는 두 prefix의 기본값을 빈 문자열로 선언하며 separateOutputStream=false를 유지한다. 나머지 source AST·Transcript·원900/65·정리·UNKNOWN·동일 runtime.packet 보완은 불변이다. 실제 원 retained 요청의 command·nonce를 새 request_for에 공급하고 두 키만 뺀 expected와 동일한지 확인한 뒤, 같은 CloudShell의 실제 AWS CLI `--generate-cli-skeleton output --no-sign-request`에 전달했다. 11:19:55~56 KST 이 로컬 입력검사1회는 rc0·stderr0·자식 회수·그룹 종료·cleanup 오류 없음이었다. 출력95B는 생성 표본이며 서비스 응답이 아니다. API·plugin·GPU 기동·GB12 읽기/전송은 없었다.
+
+- 실제 CLI 로컬 입력 검사 원영수증: `3d97c1663faf3994fcad763b86cf772e6c0dba34521ca9e48278f0027c8a26c1`
+- 최소 source·실제 CLI 영수증 집중 검토: `5f1b0140219ae55a1c252128866ee5e923475056d56dd2b321b75355b3d19246`
+
+원 S2 실패·각 UNKNOWN·정지 감시 실패와 제품 미실증을 보존한다. 새 control 473385B·482 member의 최초 CRC와 index481의 집합·bytes/SHA, 실제 health/clock의 원 wire·terminal, CLI 실패·별도 정리 근거·정지·해당 비용 행을 [독립 검토](retained-stream-components-20261111/session-S2-actual-review.json)에서 대조했다(31/불일치0, `afa63410ba8eeaf537c4b148804d399cb37550b699eb944c4248c12038ab5b07`). 실제 health는 새 boot `d3bcb559-45b2-42cd-9365-eab3df779704`와 L4 1장·이전 GPU 프로세스0·기존2시간 timer active/noreset을 관측했으며 engine/factory는 실행하지 않았다. 원 request·새 request·생성 stdout/stderr 바이트의 [후속 대조](retained-stream-components-20261111/prefix-v8-actual-raw-review-addendum.json)9/불일치0도 완료했다. 이 control 검증은 원 GB12 1971 member 전체 회수/CRC가 아니다. 후속 실제 회수는 새 private/final packet·현재 선정 상태·실제 생성자 사전검사를 결합한 별도 S3로 진행한다. 이 절의 시점은 S2 정리 및 v8 로컬 검사이며, S3 실행·전송 성공을 선행 집계하지 않는다.
+
 ## 기록 파일0의 해석과 다음 관측
 
 실제 공급된 lifecycle base 원문 56,479B·SHA `2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd`를 대조했다. install 1032~1052행의 성공은 Observer/Finder 구성이다. Observer는 writer=None으로 시작하고(334~336행), 첫 관측 사건에서 Writer를 만든다(374~391행). Writer의 파일 생성·START 기록은 255~272행이며 emit의 쓰기 예외는 disabled_pid로 흡수된다(393~397행).
@@ -101,6 +118,6 @@ encoder CID `c4d64e32-fef6-44dc-80e6-763265213f20`는 Failed/1로 종료했다. 
 
 ## 다음 실행과 범위
 
-B 전용 private 제어·진단 경로와 읽기 전용 조회를 보강했고 R8·R1·S1에서 실제 준비·실패 범위를 확인했다. 이 기록의 마지막 정리 관측은 S1의 10:47 KST다. 이미 확보한 원자료를 진단하고 [archive 압축·복원 준비](SUP16_ARCHIVE_ENVELOPE_PREPARATION_20261111.md)를 CPU에서 검증했지만 실제 GB12는 기존 압축 상한을 넘었다. 다음 전송은 기존 Session Manager 관리 문서와 설치된 플러그인을 사용하는 별도 스트림 경로와 v7 객체 결합 수정으로 이어간다. 실제 전송·종료·기한 연결과 원자료 무결성은 별도 확인한다. 기존 output·A 코드의 권한을 바꾸거나 source guard·기한을 완화하지 않는다. 새 모델·정상/도전/복구 세 역할·전체 반출 성공은 해당 실측 원자료로 별도 확인해야 한다.
+B 전용 private 제어·진단 경로와 읽기 전용 조회를 보강했고 R8·R1·S1·S2에서 실제 준비·실패 범위를 확인했다. 이 기록의 마지막 정리 관측은 S2의 11:23 KST다. 이미 확보한 원자료를 진단하고 [archive 압축·복원 준비](SUP16_ARCHIVE_ENVELOPE_PREPARATION_20261111.md)를 CPU에서 검증했지만 실제 GB12는 기존 압축 상한을 넘었다. 다음 전송은 기존 Session Manager 관리 문서와 설치된 플러그인을 사용하는 별도 스트림 경로와 v7 객체 결합·v8 CLI 선택값 수정으로 이어간다. 실제 전송·종료·기한 연결과 원자료 무결성은 별도 확인한다. 기존 output·A 코드의 권한을 바꾸거나 source guard·기한을 완화하지 않는다. 새 모델·정상/도전/복구 세 역할·전체 반출 성공은 해당 실측 원자료로 별도 확인해야 한다.
 
 원 runtime `2cb01e9f`/466파일과 공개 저장소 계열의 제품528파일을 구분한다. CPU 준비 요약의 actual=false는 작성 당시 범위로 보존한다.

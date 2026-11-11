@@ -82,8 +82,7 @@ raise SystemExit(rc)
 def request_for(command,nonce):
     canonical(nonce)
     return {'Target':IID,'DocumentName':DOCUMENT,'Reason':'GB12-readonly-recovery-'+nonce,
-        'Parameters':{'command':[command],'separateOutputStream':['false'],
-                      'stdoutSeparatorPrefix':[''],'stderrSeparatorPrefix':['']}}
+        'Parameters':{'command':[command],'separateOutputStream':['false']}}
 
 class Transcript:
     """frame는 Receiver.feed만 호출. EOF/CLI/server 검증 전 finish하지 않는다."""

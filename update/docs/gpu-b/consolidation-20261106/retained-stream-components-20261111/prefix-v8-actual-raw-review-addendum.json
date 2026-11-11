@@ -1,0 +1,130 @@
+{
+  "schema": "S4-v8-original-request-skeleton-raw-closure-addendum/1",
+  "at_UTC": "2026-11-11T02:28:33.048931+00:00",
+  "owner": "S4",
+  "request_id": "S4-GB12-SESSION-OPTIONAL-PREFIX-OMISSION-DELTA-20261111-01/raw-followup",
+  "id": "SUP-16/R8 후속 준비",
+  "branch_scope": "기존 v8 검토의 미인계 원 request·stdout·stderr 바이트 연결만",
+  "source_commit": null,
+  "files": {
+    "v8-prefix-omission-source-official-local-CLI-focused-review-v1.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\session-prefix-omission-focused-review-20261111-v1\\v8-prefix-omission-source-official-local-CLI-focused-review-v1.json",
+      "bytes": 12312,
+      "sha256": "5f1b0140219ae55a1c252128866ee5e923475056d56dd2b321b75355b3d19246"
+    },
+    "control482-first-CRC-exact-member-manifest-v1.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\control482-first-CRC-exact-member-manifest-v1.json",
+      "bytes": 187129,
+      "sha256": "3ca53d41253745a02be851a22fd5489e583ef6f570da29adfe2e61cd7e6b8298"
+    },
+    "session-001-start-session.request.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\private\\session-001-start-session.request.json",
+      "bytes": 27693,
+      "sha256": "153b6d835c69d4e8d753ababba66dfb754d9e0a713bdc6d1517be896deb04afa"
+    },
+    "request.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\local-validation\\request.json",
+      "bytes": 27635,
+      "sha256": "9cb38e778e69838eb66b760f0e919459b91f52f177dafcef826f9717b2bb32c4"
+    },
+    "local-CLI-validation-receipt.json": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\local-validation\\local-CLI-validation-receipt.json",
+      "bytes": 1420,
+      "sha256": "3d97c1663faf3994fcad763b86cf772e6c0dba34521ca9e48278f0027c8a26c1"
+    },
+    "local-skeleton.stdout": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\local-validation\\local-skeleton.stdout",
+      "bytes": 95,
+      "sha256": "f90b434c884d9851e805d3313fd0491967b69fcaba8155a44728223023aed2ee"
+    },
+    "local-skeleton.stderr": {
+      "path": "C:\\Users\\dudwh\\.codex\\.chatgpt-projects\\g-p-6ad495c4b4b88191a115b83333cdb9c3\\worktrees\\byul-b5-s4-opinion-20261108\\out\\r8-session-S2-actual-control-focused-review-20261111-v1\\exact-members\\local-validation\\local-skeleton.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "checks": [
+    {
+      "check": "기존 v8 검토5f1b 정확 버전 재사용",
+      "matched": true
+    },
+    {
+      "check": "원 request153b 실제 바이트SHA",
+      "matched": true
+    },
+    {
+      "check": "새 request9cb3 실제 바이트SHA",
+      "matched": true
+    },
+    {
+      "check": "두 optional 키만 생략·원 command Reason Target document separatefalse 동일",
+      "matched": true
+    },
+    {
+      "check": "새 request의 고정 jb canonical 바이트 일치",
+      "matched": true
+    },
+    {
+      "check": "원영수증1420 3d97 byte for byte 동일",
+      "matched": true
+    },
+    {
+      "check": "stdout95 f90b raw 및 stderr0 raw 정확",
+      "matched": true
+    },
+    {
+      "check": "raw 출력은 생성 sample 값·서비스 토큰 아님",
+      "matched": true
+    },
+    {
+      "check": "실제 검사에 저장된 source ab804는 검토 v8 정확 핀",
+      "matched": true
+    }
+  ],
+  "checks_count": 9,
+  "mismatches": 0,
+  "result": "기존 미확인 원 request/새 request/stdout/stderr 바이트 대조를 완료했다. 기존 v8 source·실제 로컬 CLI 입력검사 영수증 연결과 일치한다. 새 실행 또는 기존 시험 반복은 없다.",
+  "original_command": {
+    "bytes": 27298,
+    "sha256": "a81d17231d9c5e6e7ce9cc5347751e8e38fe48168b09466aebf0500a6be49092",
+    "unchanged": true
+  },
+  "actual_terminal_reused": {
+    "timed_out": false,
+    "child_reaped": true,
+    "group_terminal": true,
+    "cleanup_errors": [],
+    "returncode": 0
+  },
+  "actual_local_identity_reused": {
+    "PID": 1721,
+    "PGID": 1721,
+    "ticks": 549858
+  },
+  "closed_prior_limits": [
+    "원 request153b 바이트/SHA",
+    "새 request9cb3 바이트/SHA 및 두 키만 삭제",
+    "stdout95 f90b 바이트/SHA 및 생성 sample 구조",
+    "stderr 실제0바이트",
+    "검사 sourceab804와 원영수증1420의 exact bytes"
+  ],
+  "remaining_limits": [
+    "validator wrapper 자체의 별도 terminal·정확 CLI binary/version 핀·독립 네트워크 계측은 새로 추가되지 않았다. 기존 범위와 한계를 그대로 유지한다.",
+    "원 S2 client failure/UNKNOWN 및 별도 정지·비용 검토는 실제 control 결과로 분리한다. 새 sample 성공으로 원 실패·UNKNOWN을 삭제하지 않는다."
+  ],
+  "verification_level": "새 S2 control 최초 CRC/색인 결과를 재사용한 정확 원 member 바이트SHA 및 의미 연결",
+  "data_origin": "실제 CloudShell localcheck의 기존 원 request/생성 stdout/stderr. S4 재실행0.",
+  "policy_official": "생성 sample이며 실제 Session·RunAs·GPU·GB12 성공/official·정책·원UNKNOWN 변경0.",
+  "counts": {
+    "metadata_checks": 9,
+    "new_S4_execution_API_GPU": 0,
+    "new_or_repeated_CLI_validation": 0,
+    "old_CRC_repeated": 0,
+    "unique_product_branch_total": null
+  },
+  "source_scope_passed": true,
+  "raw_transferred_scope_complete": true,
+  "operational_ready": false,
+  "new_gate_or_approval_added": false,
+  "next_owner": "S2 및 총괄"
+}

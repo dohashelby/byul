@@ -1,5 +1,7 @@
 # 런타임 작업 상태
 
+- 2026-11-11 AWS 16회차(vLLM): D1~D3·D6 실측 통과(요청 행렬 31/31, AWS-04·05·09, TG-CODE-01 detected·오탐 0, SUP-008 5건, lsm_file_open EPERM). 발견: PR #243 data 파일 0644 거부(서버 0600 조치), TG-CODE-01은 kernel identity 필요. 결과: docs/AWS_GPU_서버16회차_결과_20261111.md
+
 - 2026-11-11 D3 요청 시험 도구 확장(기준 `byul_runtime` HEAD `7a985052`, D1+D2 미커밋 변경 보존): `REQ-CODE-SELECT-{chat-mm,messages,completions}`와 `REQ-ROUTE-POST-/tokenize` 추가. 응답·원본 기록·플랫폼의 합성 값 노출, decision rule/path, 미전달을 대조하며 zeroday-lab의 명시적 chat 최상위 개방만 건너뛴다.
 - `AWS-04` 보조 시도: 같은 `other-client`→engine:8000 경로에 직통 POST `/tokenize` + 합성 `mm_processor_kwargs.code_revision` 본문 시도를 통합했다. 케이스 ID·보고서 허용 목록은 기존 AWS-01~20만 유지하며 `lab_report.py`는 HEAD 원본으로 복원했다. 기존 4개 필수 통과 항목과 Hubble 대조는 유지한다. `tokenize_direct_failed`·probe 원자료, 요약·공개 evidence의 연결 errno를 남긴다. 두 직통 시도 중 하나라도 CONNECTED면 후속 대조 오류에도 `failed`; 보조 시도의 다른 errno·실행 오류는 `unknown`이다. 연결 단계 차단이면 본문 미전송이며 엔진 필드 거부 증거가 아니다. ACCEPTANCE의 AWS-04 설명도 갱신했다.
 - 엔진 미도달 추가 검증은 설계 제안만: `engine_receipts`는 신선한 수집 구간의 로그 미발견만 표시하고 요청 상세 조회는 전달 시도 True에 한정한다. native feed도 요청에 결합된 양성 근거이며 거부 ID 부재를 증명하지 않는다. `engine_log_nonarrival_verified=False` 유지.

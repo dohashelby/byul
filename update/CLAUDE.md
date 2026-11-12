@@ -97,9 +97,9 @@
   - 점검별 차이는 프로파일로, 대상 시스템별 차이는 커넥터로 흡수한다.
   - 관측이 안 되는 분기는 UNKNOWN으로 남긴다.
 - **현재 작업지시서:** [작업지시서 3차 — vLLM MVP(1차 완성)](docs/WORK_ORDER_VLLM_MVP.md). 담당·순서·세션은 이 문서를 따른다. [2차](docs/WORK_ORDER_VLLM_1.md)의 남은 항목은 3차로 옮겼다.
-- **vLLM 완성 기준**(2026-11-09 사용자 결정):
-  - vLLM 0.31.0에서 69개를 GPU lab 제품 경로(EVD→RES→RPT)로 실측한다.
-  - 0.32.0 고정값을 만들어 두 판본 비교(`guard update`)까지 한다. 일부러 넣은 회귀 사례 하나로 `REGRESSED` 탐지를 확인한다.
+- **vLLM 완성 기준**(2026-11-09 사용자 결정, 판본 쌍은 2026-11-12 결정으로 변경):
+  - 작업지시서의 MVP 판본 표(기준 판본·후보 판본)에서 69개를 GPU lab 제품 경로(`guard update`, EVD→RES→RPT)로 실행하고 비교한다. 판본은 그 표에만 적고, 이 파일과 코드는 특정 판본을 전제하지 않는다.
+  - 두 판본 지원은 고정값·지원표 행 추가로만 한다. 실제 회귀(SUP-08 코드 판본 선택)가 `REGRESSED`로 나와야 한다.
   - 1차 범위에서 뺀 점검(REQ-02, OBS-01·06·11, PLT-07·10·11·12, OBS-09 기업 수집기 범위, PLT-08 TLS 구성)은 실행 경로를 준비하고 UNKNOWN으로 남긴 상태를 완성으로 본다.
   - 영향도(`impact`)는 2026-11-08 초안(HIGH 33·MEDIUM 38·LOW 6)으로 확정했다. 새 팩 판본에 반영한 뒤 공식(official) 재판정을 한다.
 - 현황은 `uv run python -m tools.checklist_status`로 재생성한다(`docs/CHECKLIST_VALIDATION_STATUS.md`). 현황표의 DONE은 lab 단계 완료이고, 보안 PASS·기업 승인·원 질문 전체 완료가 아니다.

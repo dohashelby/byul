@@ -1,3 +1,9 @@
+## 2026-11-12 — PR #240 현황 상태 정정
+
+- 한 일: 이 PR이 DONE으로 올린 B 점검 8개를 근거별로 나눴다. 현행 팩 GPU 실측 기록이 있는 REQ-08·PLT-01·PLT-04와 1차 제외 기준(실행 경로 준비+UNKNOWN)을 따른 PLT-08은 DONE을 유지했다. 선정 CPU 결과만 있는 REQ-07·PLT-03·PLT-05·LIF-02는 CPU 결과를 DONE으로 올리지 않는다는 규칙에 따라 `MEASUREMENT_REMAINING`으로 정정했다. 상태 메모의 `lab43-current-20261110.json`은 고정 커밋 `451292db` URL로, 짧은 해시 `ad971ee4`·`619194f3`은 저장소 밖 검토 파일 이름과 전체 SHA-256으로 바꿨다. 판정·Ref·제품 소스는 바꾸지 않았다.
+- 테스트 결과: 현황표 재생성과 `tools.checklist_status --check` 통과, 현황·workflow 경로 직접 시험 31개 통과(CPython 3.12.3). 제품 소스 변경이 없어 소스 목록과 검토 기록은 그대로다. 전체 시험은 PR CI로 확인한다.
+- 다음 단계: B가 정정 내용을 확인한다. 네 점검은 J02 GPU 정본 실측 뒤 DONE으로 올린다.
+
 ## 2026-11-11 — PR #240 검토 수정과 B 인계 정리
 
 - 한 일: REQ 수집 실행기는 지원표와 provider에서 엔진 프로필을 받도록 바꿨다. 소스 핀·응답 ID·환경/관측 경로는 adapter에 두고 입력 준비 구현은 설치 가능한 `guard.executors.runner_inputs`로 옮겼다. `tools/b_runner_inputs.py`는 CLI만 남겼다. source hash는 설치된 모듈에서 기록한다.

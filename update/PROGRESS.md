@@ -5,6 +5,12 @@
 - 테스트 결과: 바꾼 부분과 인접 시험 71개 파일을 로컬에서 돌려 1,759개 통과. 실패 1건(`test_b_lif07_readiness.py::test_actual_native_helper_default_public_entrypoint_store_restore_preserved`)은 소스 목록 SHA가 바뀌어 B 검토 기록(`tools/reviewed_manifest_receipts.json`)이 없기 때문이다. 기록을 임의로 만들지 않았다. 수집 오류 1건(`test_runtime_native_receipt_feed.py`, `serving_runtime` 없음)은 main에서도 같다. 지운 시험: `test_input_length_cause.py`(대상 코드 제거), `test_cpu_case_manifest.py`(CPU 사례 실행 제거), 길이 원인 시험 2개, CPU 진입점 사례 1개. 소스 목록 재생성(변경 파일과 일치), `checklist_status --check` 통과. 전체 시험은 PR CI로 확인한다.
 - 막힌 것: 결정 13 승인, 새 소스 목록의 B 검토 기록(또는 면제 지시). GPU 이미지용 REQ-07 사전 거부 계약은 아직 없다(CPU 이미지 계약만 있음, M-A6·M-B4에서 판본 고정값으로 더할 대상).
 
+## 2026-11-12 — CPU 이미지 제외·69개 두 판본 실제 비교
+
+- 한 일: 사용자 결정 두 가지를 [작업지시서 3차](docs/WORK_ORDER_VLLM_MVP.md)·`CLAUDE.md`·`AGENTS.md`·`DECISIONS.md`·SPEC §12 D7에 반영했다. (1) CPU용 vLLM 이미지 실증을 하지 않고 GPU 이미지로만 실증한다. CPU 이미지 전용 코드 정리를 M-A9로 넣었다. (2) 69개 모두 두 판본에서 실제 관측·비교를 목표로 하고, 고정값 불일치는 M-A6·M-B4의 분류(a~d)로 대상표·adapter 관측기를 만든다. 너무 오래 걸리거나 어려운 항목만 사용자 승인 뒤 UNKNOWN(결정 10). M-A6에 선행 확인(엔진 Python 3.12 여부, 판본별 기능표, 시험 모델)을 넣고 결정 9~13을 더했다.
+- 테스트 결과: 문서만 변경. 판본 번호는 0.1절 표에만 있는지 확인. `tools.checklist_status --check`, `tests/test_workflow_paths.py` 16개 통과.
+- 다음 단계: M-A6 선행 확인(특히 두 이미지 엔진 Python 판본)과 M-A9 분류표.
+
 ## 2026-11-12 — 작업지시서 3차 개정(MVP 판본·SUP-08 분담)
 
 - 한 일: 사용자 결정으로 MVP 판본 쌍을 기준 0.7.0·후보 0.30.0으로 바꾸고 [작업지시서 3차](docs/WORK_ORDER_VLLM_MVP.md)를 고쳤다. 판본은 0.1절 "MVP 판본 표"에만 두고 나머지는 기준·후보 판본으로 썼다. 완료 기준에 "판본 추가는 데이터만으로 된다"(5)와 SUP-08 실제 회귀(4)를 넣었다. 정본 실측과 두 판본 비교를 J02 하나로 합쳤다. A는 SUP-08(M-A8), B는 SUP-08을 피해 나머지 42개를 맡고, A 전용 파일과 함께 쓰는 파일의 부분 소유를 정했다. 새 작업: M-A6 판본 적용표·고정값 도구, M-B4 B 관측기의 두 판본 고정값. `CLAUDE.md`·`AGENTS.md` 5절 완성 기준과 DECISIONS를 같은 결정으로 고쳤다.

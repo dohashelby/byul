@@ -5,7 +5,7 @@ import argparse,ast,hashlib,json,os,pathlib,re,signal,subprocess,sys,time,types
 from pathlib import Path
 
 import importlib.util
-_capsule_path=Path(__file__).resolve().parents[2]/'tools/gpu_b_failure_capsule.py'
+_capsule_path=Path(__file__).resolve().parents[3]/'tools/gpu_b_failure_capsule.py'
 _spec=importlib.util.spec_from_file_location('portable_first_failure_capsule',_capsule_path)
 _capsule=importlib.util.module_from_spec(_spec);_spec.loader.exec_module(_capsule)
 FirstFailure=_capsule.FirstFailure

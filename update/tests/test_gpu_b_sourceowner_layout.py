@@ -22,7 +22,7 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 
-FIX=Path(__file__).resolve().parent/'fixtures/layout'
+FIX=Path(__file__).resolve().parent/'fixtures/gpu-b-sup16/layout'
 OWNER='fb12dbe8d82d6bc027b613a477d6e1a432fa4693c46c6f1380cb38cecdf79fc9'
 def sha(raw):return hashlib.sha256(raw).hexdigest()
 def load(path,name):

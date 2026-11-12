@@ -14,7 +14,7 @@ import threading
 import unittest
 
 PUBLIC = Path(__file__).resolve().parents[1]
-FIX = Path(__file__).resolve().parent / 'fixtures'
+FIX = Path(__file__).resolve().parent / 'fixtures' / 'gpu-b-sup16'
 
 
 def load(path, name):

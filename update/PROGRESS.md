@@ -2,7 +2,8 @@
 
 - 한 일: 이 PR이 DONE으로 올린 B 점검 8개를 근거별로 나눴다. 현행 팩 GPU 실측 기록이 있는 REQ-08·PLT-01·PLT-04와 1차 제외 기준(실행 경로 준비+UNKNOWN)을 따른 PLT-08은 DONE을 유지했다. 선정 CPU 결과만 있는 REQ-07·PLT-03·PLT-05·LIF-02는 CPU 결과를 DONE으로 올리지 않는다는 규칙에 따라 `MEASUREMENT_REMAINING`으로 정정했다. 상태 메모의 `lab43-current-20261110.json`은 고정 커밋 `451292db` URL로, 짧은 해시 `ad971ee4`·`619194f3`은 저장소 밖 검토 파일 이름과 전체 SHA-256으로 바꿨다. 판정·Ref·제품 소스는 바꾸지 않았다.
 - 테스트 결과: 현황표 재생성과 `tools.checklist_status --check` 통과, 현황·workflow 경로 직접 시험 31개 통과(CPython 3.12.3). 제품 소스 변경이 없어 소스 목록과 검토 기록은 그대로다. 전체 시험은 PR CI로 확인한다.
-- 다음 단계: B가 정정 내용을 확인한다. 네 점검은 J02 GPU 정본 실측 뒤 DONE으로 올린다.
+- fixture 정리: `tests/fixtures/` 최상위에 있던 SUP-16 운영 코드 사본(`original_*.py`·`integration_boundaries.py`·`layout/`·provenance JSON)을 `tests/fixtures/gpu-b-sup16/`로 옮기고 시험 3개의 경로만 고쳤다(assert 동일). 로컬 macOS에서는 이동 전과 같은 24개가 임시 경로 문제로 실패해 결과는 Linux CI로 확인한다.
+- 다음 단계: 네 점검은 J02 GPU 정본 실측 뒤 DONE으로 올린다. 사용자 지시로 이 PR은 B 추가 검토 없이 마무리한다(DECISIONS 2026-11-12).
 
 ## 2026-11-11 — PR #240 검토 수정과 B 인계 정리
 

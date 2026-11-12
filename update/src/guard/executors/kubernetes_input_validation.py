@@ -3,6 +3,7 @@ from copy import deepcopy
 from pathlib import Path
 import json
 
+from guard.adapters.engine_profiles import supports
 from guard.models import DataOrigin, canonical_json, sha256_hex
 from guard.models.base import utcnow
 from guard.runtime.kubernetes_http import INPUT_VALIDATION_PROFILE, KubernetesHTTP
@@ -65,6 +66,11 @@ class KubernetesInputValidationExecutor(InputValidationExecutor):
             if type(self.cfg) is not dict or set(self.cfg) - _SETTINGS or adapter is None:
                 raise ValueError
             self.validate_policy(check, policy_values)
+            # native_input opens the transport only. Token/length and reused-token checks also need a
+            # release whose catalog row lists request_input_checks; code selection needs native_input alone.
+            if (getattr(check, "collection_profile", None) != request_field_probe.CODE_SELECTION_PROFILE
+                    and not supports(env.engine.name, env.engine.version, "request_input_checks")):
+                raise ValueError
             target = json.loads(Path(self.cfg["target"]).read_text(encoding="utf-8"))
             if self._expected_target_sha256 is not None and sha256_hex(canonical_json(target)) != self._expected_target_sha256:
                 raise ValueError

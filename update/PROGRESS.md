@@ -1,50 +1,19 @@
-## 2026-11-11 — SUP-08 0.30.0 trust 비활성 추가 대조
+## 2026-11-12 — PR #246 검토 수정
 
-- 한 일: 사용자 지적에 따라 같은 Phi-3 vision fixture와 vLLM 0.30.0 고정 이미지에서 `--trust-remote-code`만 제거해 순차 GPU 대조를 실행했다. 제품 후보와 모델·이미지·코드 revision·기동 명령 및 나머지 인자가 같은지 렌더 기록으로 확인했다. 상세 결과는 [GPU 실측 결과](docs/gpu-a/RESULTS-20261111-SUP08.md), 기계 판독 요약은 [PoC JSON](docs/evidence/sup08-code-selection-20261111.json)에 기록했다.
-- 시험 결과: 모델의 사용자 정의 코드를 허용해야 한다는 ModelConfig 오류로 기동 실패(이전 종료 코드 1, import 표식 파일 0개). 정상 요청을 보낼 수 없었으므로 SUP-08 PASS/FAIL이나 제품 보고서를 새로 만들지 않았다. 원시 로그·Pod·렌더와 신뢰 활성 후보의 인자 비교를 저장소 밖 `SUP08-v030-no-trust-20261111.zip`(SHA-256 `042757f433447216b491a94b986fc4fe850927c644dd108e615756d9afcb8095`)에 보존했다.
-- 정리: 추가 시험 Probe Pod 삭제, 원래 `serving-engine` Deployment replicas=0, GPU 0 MiB 확인. EC2 정상 중지 요청 후 18:51 KST 콘솔에서 `stopped`와 공인 IP 해제를 확인했다. 추가 비용은 [GPU 비용 장부](docs/gpu-a/COST_LEDGER.md)에 기록했다.
-- 다음 단계/막힌 것: 독립 B 소스 검토 receipt와 기존 Linux CI의 B 고정 SHA 불일치는 이 추가 대조로 해소되지 않았다. 기업 승인이나 새 공식 판정을 주장하지 않는다.
+- 한 일: 0.7.0·0.30.0 지원표 행(`native_input`)이 같은 실행기를 쓰는 REQ-08·REQ-09까지 여는 문제를 고쳤다. 0.31.0 행에 `request_input_checks` 기능을 더하고, Kubernetes 입력 검증 실행기는 코드 선택(SUP-08)이 아닌 점검에 이 기능을 지원표로 요구한다. 0.31.0 동작은 그대로다. 끝난 인계 지시서 `docs/WORK_ORDER_SUP08_HANDOFF.md`는 지우고(원문은 git 이력) 같은 날 진행 기록 6개를 아래 두 개로 줄였다. 결과 문서에 U1 범위 한계를 적었다.
+- 테스트 결과: 새 시험(구판에서 REQ-09 거부, 0.31.0 대조 통과)이 수정 전 실패·수정 후 통과. 직접/인접 시험 236개 통과(CPython 3.12.3). 소스 목록 재생성(2파일 변경). 전체 시험은 PR CI로 확인한다.
+- 막힌 것: B 검토 기록과 `kubernetes_http.py`의 B 고정 SHA 갱신은 B가 한다. 작성자는 넣지 않는다.
 
 ## 2026-11-11 — SUP-08 코드 판본 선택 PoC 실측
 
-- 한 일: Phi-3 vision 고정 모델과 소유 processor 승인/비승인 두 커밋을 오프라인 fixture로 만들었다. Kubernetes 코드 캐시의 Transformers 4/5 경로, import 표식, Pod 신원 및 판본별 launch를 검증했다. `guard update`의 `input_validation` 순차 Pod 전환과 비교 조건을 연결했다. 상세 재현 입력·근거는 [GPU 실측 결과](docs/gpu-a/RESULTS-20261111-SUP08.md)에 보존했다.
-- GPU 제품 결과: 기존 서울 L4 단일 GPU에서 0.7.0 `MEASURED PASS/PASS`, 0.30.0 `MEASURED FAIL/PASS`, 제품 `guard update` SUP-08 `REGRESSED`/기능 `NO_CHANGE`·비교 차이 없음. 0.31.0 기본 설정은 시도 400 사전 거부, `MEASURED PASS/PASS`. trust 비활성은 모델 사용자 코드 필요 오류로 기동 실패하여 PASS로 세지 않았다. 팩과 정책은 DRAFT/EXAMPLE, `official=false`; 68개 다른 선택 점검은 NOT_RUN이다.
-- 검증: CPython 3.12.3 범위 시험 214 통과, 현황표 `--check` 및 소스 목록 재생성·diff 검토. 최종 제품·0.7.0·0.31.0 Store 세 개 `guard verify OK` 후 export. 전체 suite와 정확 HEAD Linux PR CI는 별도 확인. B 소유 실행기/수집기 검토 receipt·기업 승인 없음.
-- 통합: 실측 소스 커밋 `94a31486`을 푸시하고 PR #246을 draft로 열었다. 최신 `main`의 SGLang profile과 SUP-08 vLLM profile을 함께 유지하며 `kubernetes_http.py`의 독립 추가를 통합했다. 통합 소스 목록 재생성 뒤 직접/인접 시험 246개, SGLang 인접 시험 55개(임시 폴더를 저장소 밖에 둠), 현황표 `--check` 통과. 소스 검토 receipt가 없어 gate는 `SOURCE_REVIEW_RECEIPT_REQUIRED`로 대기한다. GPU 실측은 통합 전 커밋에서 했으므로 통합 HEAD에서 GPU 재실측했다고 주장하지 않는다.
-- 정리: 별도 SUP-08 Probe Pod 12개와 임시 NetworkPolicy를 제거하고 원래 엔진 Deployment 템플릿을 replicas=0으로 복원했다. GPU 0 MiB 확인. AWS `i-04f510eaa76c2bc89`는 정상 OS 종료로 중지 요청하고 18:07 KST 콘솔에서 `stopped`와 공인 IP 해제를 확인했다. 비용은 `docs/gpu-a/COST_LEDGER.md`에 기록했다.
-
-## 2026-11-11 — SUP-08 작업 중 변경 저장과 원격 인계
-
-- 한 일: 사용자 커밋·푸시 요청에 따라 두 도구의 실행 메타데이터 변경, 인계 지시서와 진행 기록을 `codex/sup08-code-selection-poc` 브랜치에 기록한다. 기존 루트 AGENTS.md 삭제와 .claude/는 제외한다. 지시서에 원격 브랜치 clone 명령과 ZIP 중복 적용 방지를 추가했다.
-- 시험: 코드 수정 후 CPython 3.12.3/macOS arm64 직접 시험 5파일 134 통과·6.38초. 전체 suite·Linux CI·GPU 실측은 실행하지 않았다.
-- 남은 것: 새 옵션·과거 렌더 호환성 검증, Phi-3 후보 실제 이미지 확인, 실행 표식 관측 구현, GPU 실측·두 판본 제품 비교. 작업 중 상태를 유지한다.
-
-## 2026-11-11 — SUP-08 실행 배선 보수 시작과 다른 컴퓨터 인계
-
-- 한 일: `codex/sup08-code-selection-poc` 브랜치를 만들고 원격 갱신. 렌더러의 엔진 판본·모델·hostPath·코드 판본·추가 인자 입력과 ENV 전달을 도구 두 파일에서 보수하기 시작했다. 미커밋·미푸시이며 수정 후 시험 전이다. [작업지시서](docs/WORK_ORDER_SUP08_HANDOFF.md)에 복원 절차와 미완료 범위를 반영했다.
-- 시험: 변경 전 CPython 3.12.3/macOS arm64 직접 시험 5파일 134 통과·7.74초. 변경 후 시험·전체 suite·CI는 실행하지 않았다.
-- 조사: Phi-3-vision-128k-instruct `ed2772fa…`를 우선 후보로 잡았다. auto_map과 0.7.0/0.30.0 Phi3V 구현 차이를 확인했으나 GPU 호환·정상 요청·판정은 미검증이다. 모델 다운로드·fixture 생성은 하지 않았다.
-- AWS: 사용자 로그인 후 기존 `i-04f510eaa76c2bc89`(g6.2xlarge, 서울)가 stopped임을 확인했다. 시작·SSH·배포·보안 그룹 변경 없음.
-- 다음 단계: 사용자 요청으로 여기서 다른 컴퓨터에 인계한다. 미커밋 diff와 과거 렌더 호환성 확인 → 직접 시험 → 모델 이미지 검증 → 실행 표식 관측 → GPU 실측·제품 비교. 원본 2커밋과 작업 중 패치를 전송 묶음으로 준비한다.
-
-## 2026-11-11 — SUP-08 다음 AI 인계 작업지시서
-
-- 한 일: 클로드 최신 대화와 `d11d4a4f`·`b5cad9f0`을 대조해 [다음 AI 작업지시서](docs/WORK_ORDER_SUP08_HANDOFF.md)를 작성했다. 사용자 최종 지시인 모델 자동 선정·GPU 실증, 0.7.0 PASS→0.30.0 FAIL/REGRESSED 목표, 0.31.0 기본 거부 대조를 반영했다.
-- 검증: 문서 링크·시험 파일 경로·코드 블록·공백 검사 통과. 문서만 작성해 제품 시험은 실행하지 않았다.
-- 다음 단계: ENV의 0.31.0 고정값과 모델 배포 연결을 보수하고, 캐시 파일 생성과 실제 사용·실행을 구분한 뒤 모델·fixture 확정 및 GPU 실측.
-- 남은 것: 구판 모델 호환성·실제 처리 경로·두 판본 비교 가능성·현재 GPU 접근/자원 상태 확인. 실측 결과는 아직 없다.
-
-## 2026-11-11 — SUP-08 실행 판본 관측(코드 선택 PoC 준비)
-
 - 한 일: SUP-08을 "요청 2xx면 UNKNOWN"에서 "엔진이 실제로 불러온 동적 모듈 판본으로 PASS/FAIL"로 넓혔다.
-  - 판본 지원표(`engine_profiles.json`)에 `vllm-input-validation-http/1`(vLLM 0.7.0·0.30.0, `native_input`만) 행을 더했다. `kubernetes_http.py`의 `0.31.0` 고정 비교(입력 검증 등 8개 profile)를 `require_transport` 조회로 바꿨다. 0.31.0 동작은 그대로.
-  - `kubernetes_http.py`에 `engine_code_modules`(읽기 전용 `kubectl exec`로 `transformers_modules/<repo>/<revision>/*.py` 이름·크기·SHA-256만 수집, import·실행 없음)를 더했다. 고정 인벤토리 스크립트는 `python3 -I -S -B`로 돈다.
-  - `request_field_probe.py`: 공격 요청 전후 모듈 목록을 비교해 `consumed`(승인 목록 밖 판본이 시도 직후 생김)/`ignored`/`accepted_unverified`로 분류. `code_selection_confirmed_violations`에 필드·판본·근거를 채우고, 보고서 사유로 쓴다. `mm_processor_kwargs.code_revision` 같은 중첩 필드와 이미지 입력(control_image)을 보낸다. 쿠버네티스 실행기의 점(`.`) 필드 거부를 풀었다.
-  - 새 정책 키 `approved_code_revisions`(승인 커밋 목록). DRAFT 팩은 `tools/build_code_selection_pack.py`가 PACK-BASELINE에서 SUP-08만 revision 5로 바꾼 PACK-CODE-SELECTION을 만든다(나머지 76개 bytes 불변).
-- 테스트 결과: `tests/test_code_selection_observation.py` 28개 신규 통과(분류·닫힌 계약·인벤토리 스크립트·FakeEngine 파이프라인 FAIL/PASS). 영향 받는 기존 시험(executor_extensions, kubernetes_input_validation, golden_http, vllm_adapter, request_binding, role_route 등) 재실행 통과. `reviewed-source.json` 다시 생성. 전체 suite는 PR CI.
-- AWS 실행 구성(이어서): `gpu_a_aws_lab.py`에 `v2-code-selection-trust`(`--trust-remote-code` 켬)·`v2-code-selection-notrust`(끔) generation을 더했다. `gpu_a_run_inputs.http_inputs`가 정책 초안의 `code_selection_observation` 블록이 있을 때만 모듈 관측 키(root·repo·unapproved_revision·control_image)를 SUP-08 guard.toml에 넣는다(블록 없으면 기존 입력 검증 그대로). PoC 정책 초안 `docs/gpu-a/policy-code-selection-draft.yaml`을 만들었다(PACK-CODE-SELECTION, 중첩 필드, 모델별 값은 SUP-03 템플릿 SHA처럼 REPLACE 마커).
-- 다음 단계: 멀티모달 시험 모델(auto_map 처리기, 0.7.0·0.30 둘 다 구동) 선정과 승인·비승인 무해 판본 fixture를 만들어 초안의 REPLACE 마커를 채운다. 그 뒤 PoC: 0.7.0 PASS → 0.30 FAIL(REGRESSED) + 0.31 기본 거부.
-- 막힌 것: SUP-08 실행기 파일은 B 소유라 PR에 적고 B 검토. GPU 회차는 비용 승인 뒤. 멀티모달 시험 모델·무해 판본 fixture 미정(초안 REPLACE 마커 4개).
+  - 지원표에 `vllm-input-validation-http/1`(vLLM 0.7.0·0.30.0, `native_input`)을 더하고, `kubernetes_http.py`의 `0.31.0` 고정 비교를 `require_transport` 조회로 바꿨다.
+  - `kubernetes_http.py`의 `engine_code_modules`는 읽기 전용 `kubectl exec`로 동적 모듈 캐시의 이름·크기·SHA-256과 import 표식만 읽는다. `request_field_probe.py`는 시도 전후 목록과 표식을 비교해 `consumed`/`ignored`/`rejected`/`accepted_unverified`로 분류한다. 새 정책 키는 `approved_code_revisions`, DRAFT 팩은 `tools/build_code_selection_pack.py`가 만든다(SUP-08만 revision 5).
+  - `guard update`에 `input_validation` 순차 Pod 전환을 연결하고, AWS 도구에 판본·모델·코드 판본 입력과 trust 켬/끔 generation을 더했다.
+- GPU 결과(서울 L4 1장, Phi-3 vision 고정 snapshot과 무해한 승인/비승인 processor fixture): 0.7.0 `MEASURED PASS/PASS`, 0.30.0 `MEASURED FAIL/PASS`, 제품 비교 SUP-08 `REGRESSED`/기능 `NO_CHANGE`. 0.31.0은 시도를 400으로 import 전 거부해 `MEASURED PASS/PASS`. 0.30.0 trust 비활성 대조는 기동 실패라 판정하지 않았다. 팩·정책은 DRAFT/EXAMPLE, `official=false`, 나머지 68개는 NOT_RUN. 상세는 [GPU 실측 결과](docs/gpu-a/RESULTS-20261111-SUP08.md), [PoC JSON](docs/evidence/sup08-code-selection-20261111.json).
+- 검증: 실측 소스 `94a31486`에서 범위 시험 214개, 통합 HEAD에서 직접/인접 246개·SGLang 인접 55개 통과. 통합 HEAD에서 GPU 재실측은 하지 않았다.
+- 정리: Probe Pod·임시 NetworkPolicy 제거, Deployment replicas=0, GPU 0 MiB, EC2 stopped·공인 IP 해제 확인. 비용은 [GPU 비용 장부](docs/gpu-a/COST_LEDGER.md).
+- 막힌 것: SUP-08 실행기·수집기는 B 소유라 B 검토 기록이 필요하다. PR CI의 실패 15건은 이 검토 기록 부재 14건과 `kubernetes_http.py` B 고정 SHA 불일치 1건이다.
 
 ## 2026-11-09 — A·B 작업지시서 2차(vLLM 1차 완성)
 

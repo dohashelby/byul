@@ -351,3 +351,34 @@ def test_poc_draft_file_has_markers_and_nested_field():
 def inputs_keys():
     from tools import gpu_a_run_inputs as inputs
     return inputs._CODE_OBSERVATION_KEYS
+
+
+@pytest.mark.parametrize("version,available", [("0.7.0", False), ("0.30.0", False), ("0.31.0", True)])
+def test_request_input_checks_stay_on_reviewed_release(version, available):
+    assert engine_profiles.supports("vllm", version, "request_input_checks") is available
+
+
+@pytest.mark.parametrize("check_id,values", [
+    ("REQ-09", {"max_input_tokens": 127, "rejection_codes": ["400"], "allowed_endpoints": ["POST /v1/completions"],
+                "allowed_input_formats": ["token_ids"]}),
+])
+@pytest.mark.parametrize("version", ["0.7.0", "0.30.0"])
+def test_old_release_row_does_not_open_other_input_checks(tmp_path, check_id, values, version):
+    from guard.collectors.file import load_environment
+    from guard.executors.kubernetes_input_validation import KubernetesInputValidationExecutor
+    from tests.builders import baseline_pack
+    from tests.test_gpu_a_run_inputs import build
+
+    def no_kubectl(*args, **kwargs):
+        raise AssertionError("gate must reject before kubectl")
+
+    build(tmp_path, "v2-default")
+    env = load_environment(tmp_path / "env.json")
+    env = env.model_copy(update={"engine": env.engine.model_copy(update={"version": version})})
+    executor = KubernetesInputValidationExecutor({"target": str(tmp_path / "target.json"), "vocab_size": 151936,
+        "vocab_source": "EXAMPLE"}, runner=no_kubectl)
+    with pytest.raises(ValueError, match="KUBERNETES_INPUT_CONFIGURATION_INVALID"):
+        executor.run(baseline_pack().checks[check_id], env, values, object(), tmp_path / "work")
+    # Control: the same policy and target on the reviewed release passes the gate and yields a draft.
+    reviewed = env.model_copy(update={"engine": env.engine.model_copy(update={"version": "0.31.0"})})
+    assert executor.run(baseline_pack().checks[check_id], reviewed, values, object(), tmp_path / "work") is not None

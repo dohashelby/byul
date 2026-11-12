@@ -34,6 +34,7 @@
         "profiler_control",
         "rank_failure",
         "request_attempts",
+        "request_input_checks",
         "required_events",
         "resource_recovery",
         "response_error",

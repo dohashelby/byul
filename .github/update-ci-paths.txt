@@ -5,6 +5,7 @@
 .github/update-ci-paths.txt
 update/**
 !update/docs/**/*.md
+!update/*.md
 update/docs/AUTOMATION_HARDENING.md
 update/docs/AUTOMATION_PHASE1.md
 update/docs/AUTOMATION_PHASE2.md

@@ -10,6 +10,8 @@ on:
       - "update/**"
       # Prose-only docs skip CI; the docs tests read stay listed (test_workflow_paths.py checks this).
       - "!update/docs/**/*.md"
+      # Top-level prose (SPEC·README·PROGRESS·DECISIONS·CLAUDE·AGENTS) is not read by code either.
+      - "!update/*.md"
       - "update/docs/AUTOMATION_HARDENING.md"
       - "update/docs/AUTOMATION_PHASE1.md"
       - "update/docs/AUTOMATION_PHASE2.md"

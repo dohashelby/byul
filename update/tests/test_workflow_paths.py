@@ -35,6 +35,19 @@ def test_docs_read_by_code_still_trigger_ci():
         assert referenced <= set(paths[skip + 1:])
 
 
+ROOT_DOC_READ = re.compile(r"""(?:/\s*['"]|['"]update/)(SPEC|README|PROGRESS|DECISIONS|CLAUDE|AGENTS)\.md['"]""")
+
+
+def test_skipped_top_level_docs_are_not_read_by_code():
+    """`!update/*.md`로 건너뛰는 최상위 문서를 테스트·도구·제품 코드가 경로로 읽지 않는다."""
+    hits = [f"{path.relative_to(ROOT)}: {match.group(0)}" for base in ("tests", "tools", "src")
+            for path in (ROOT / base).rglob("*.py") if path.resolve() != Path(__file__).resolve()
+            for match in ROOT_DOC_READ.finditer(path.read_text(encoding="utf-8"))]
+    assert hits == []
+    for paths in (yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))[True]["push"]["paths"], RELEVANCE.patterns()):
+        assert "!update/*.md" in paths
+
+
 def test_pull_request_runs_always_and_job_filter_matches_push_filter():
     workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
     assert "paths" not in (workflow[True]["pull_request"] or {})
@@ -55,6 +68,11 @@ def test_pull_request_runs_always_and_job_filter_matches_push_filter():
     (["update/docs/gpu-b/notes.md", "contracts/schemas/common.schema.json"], True),
     ([".github/workflows/update.yml"], True),
     ([".github/update-ci-paths.txt"], True),
+    (["update/PROGRESS.md", "update/CLAUDE.md", "update/AGENTS.md", "update/docs/WORK_ORDER.md"], False),
+    (["update/SPEC.md"], False),
+    (["update/PROGRESS.md", "update/src/guard/cli.py"], True),
+    (["update/tests/fixtures/uvicorn-054/LICENSE.md"], True),
+    (["update/reference/framework/README.md"], True),
 ])
 def test_relevance_follows_last_matching_rule(files, expected):
     assert RELEVANCE.relevant(files, RELEVANCE.patterns()) is expected

@@ -1,3 +1,8 @@
+## 2026-11-12 — update CI 문서 제외 범위 확대
+
+- 한 일: update CI가 `update/docs/**/*.md`만 건너뛰어 `CLAUDE.md`·`AGENTS.md`·`PROGRESS.md`처럼 `update/` 바로 아래 문서만 바꾼 PR도 전체 시험을 돌렸다. `.github/workflows/update.yml` push 경로와 `.github/update-ci-paths.txt`에 `!update/*.md`를 더했다. 하위 폴더의 `.md`(fixture·reference)는 그대로 시험 대상이다. runtime·platform CI는 바꾸지 않았다.
+- 테스트 결과: `tests/test_workflow_paths.py` 16개 통과. 최상위 문서를 코드가 경로로 읽으면 실패하는 시험과 경로 판정 사례 5개를 더했다. #248 변경 파일은 이제 시험 대상이 아니다.
+
 ## 2026-11-12 — 작업지시서 3차(vLLM MVP)
 
 - 한 일: #240·#246 병합(`e2219176`) 뒤 [작업지시서 3차](docs/WORK_ORDER_VLLM_MVP.md)를 썼다. MVP를 "기업이 vLLM 0.31.0→0.32.0 업데이트를 guard 하나로 끝까지 검증받는 상태"로 정의하고 2차의 완료 기준 5개를 그대로 썼다. 남은 작업은 A 7개(M-A1~A7), B 7개(M-B1~B7), 합동 세션 J01~J04, 사용자 결정 7개, 69개 배정표다. 가장 긴 경로는 PACK-BASELINE@34(M-A4) → J02 → J03 → J04다. `CLAUDE.md`·`AGENTS.md` 5절의 현재 작업지시서 링크를 3차로 바꿨다.

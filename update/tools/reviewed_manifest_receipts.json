@@ -20,6 +20,11 @@
       "manifest_sha256": "d1f19dc0caa629a2b4579401cdd18e14be18430583e115c337100fdcd1909e72",
       "reviewed_by": "Claude / BYUL UPDATE A / PR246 after PR240 merge self-review; B review waived by user 2026-11-12",
       "reviewed_at": "2026-11-12T13:53:19+09:00"
+    },
+    {
+      "manifest_sha256": "a75f81a1b85ce674aed7dea277eed8b5525c85038b60484be5f8e46d0970e4c9",
+      "reviewed_by": "Claude / BYUL UPDATE A / M-A6 판본별 고정값 행 self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-12T19:46:36+09:00"
     }
   ]
 }

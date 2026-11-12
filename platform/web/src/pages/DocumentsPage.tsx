@@ -140,6 +140,7 @@ export function PolicyEditorPage() {
   const [doc, setDoc] = useState<PolicyDoc | null>(isNew ? newPolicy() : null);
   const [issues, setIssues] = useState<FieldIssue[]>([]);
   const [savedRev, setSavedRev] = useState<number | null>(null);
+  const [serverWarnings, setServerWarnings] = useState<FieldIssue[]>([]);
 
   useEffect(() => {
     if (!isNew && current.data && !doc) {
@@ -153,6 +154,7 @@ export function PolicyEditorPage() {
     save.mutate(isNew ? doc : { ...doc, policy_version: nextPolicyVersion(doc.policy_version) }, {
       onSuccess: (res) => {
         setIssues([]);
+        setServerWarnings(res.warnings);
         setSavedRev(res.saved.meta.revision);
         setDoc(res.saved.document);
         if (isNew) navigate(`/policies/${encodeURIComponent(res.saved.meta.doc_id)}`, { replace: true });
@@ -166,7 +168,8 @@ export function PolicyEditorPage() {
   return (
     <div className="page">
       <SaveBar onSave={onSave} pending={save.isPending} issues={issues} savedRev={savedRev} />
-      <PolicyForm doc={doc} setDoc={setDoc} issues={issues} warnings={[]} isNew={isNew} />
+      {serverWarnings.length > 0 && <div className="notice">저장했지만 실행 준비는 완료되지 않았습니다. 입력 연결·준비 상태에서 부족한 값을 확인하세요.</div>}
+      <PolicyForm doc={doc} setDoc={setDoc} issues={issues} warnings={serverWarnings} isNew={isNew} />
       {!isNew && id && latest !== null && current.data && (
         <ConfirmPolicy id={id} revision={latest} stored={current.data.document} edited={doc} onConfirmed={(d) => setDoc({ ...d, status: "DRAFT" })} />
       )}

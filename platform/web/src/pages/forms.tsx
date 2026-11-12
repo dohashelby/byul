@@ -1,8 +1,8 @@
 // 계약 스키마(environment, policy)의 필드와 프레임워크 입력(framework_profile, framework_values)을 구역별 폼으로 나눈다.
 // 프레임워크 입력은 선택지 위주다. 값이 없으면 미입력, null이면 '모름'으로 저장한다.
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useDocList, useDocRevisions, useEnvironmentRevision } from "../api/hooks";
-import type { EnvironmentDoc, FieldIssue, PolicyDoc } from "../api/types";
+import { useDocList, useDocRevisions, useEnvironmentRevision, usePolicyRevision, useInputCatalog, usePolicyInputPreview } from "../api/hooks";
+import type { EnvironmentDoc, FieldIssue, PolicyDoc, InputCatalog, PolicyInputPreview } from "../api/types";
 import { InputFieldView, KvInput, NumberEntry, Segmented, type PolicyNumber } from "../components/Choice";
 import {
   DateTimeField,
@@ -33,6 +33,7 @@ import {
   type Requirement,
 } from "../lib/frameworkCatalog";
 import { DEPLOYMENT_KIND, ENGINE_NAME, FACT_LABEL } from "../lib/labels";
+import { packFields, versionFieldVisible, versionProfile } from "../lib/inputPreparation";
 import p from "./pages.module.css";
 
 export const REGISTERED_FACTS = Object.keys(FACT_LABEL);
@@ -80,7 +81,7 @@ export function newPolicy(): PolicyDoc {
     environment_ref: null,
     validity: { valid_from: null, valid_until: null },
     approval: null,
-    verification: { pack: { id: "PACK-BASELINE", revision: 1 }, values: {}, scope: { include: [], exclude: [] }, exceptions: [] },
+    verification: { pack: { id: "", revision: 0 }, values: {}, scope: { include: [], exclude: [] }, exceptions: [] },
     runtime: {
       gateway: { allowed_models: [], output_default_tokens: 128, output_max_tokens: 128, max_body_bytes: 65536, max_context_tokens: null },
       enforcement: null,
@@ -205,11 +206,6 @@ function profileOf(doc: EnvironmentDoc): Profile | null {
 }
 
 // 엔진·GPU 칸에서 고를 수 있는 값. 목록 밖 값도 직접 입력할 수 있다.
-const ENGINE_VERSIONS: Record<string, string[]> = {
-  vllm: ["0.32.0", "0.31.0", "0.29.0"],
-  sglang: ["0.5.22", "0.5.21"],
-  "tensorrt-llm": ["0.18.2"],
-};
 const GPU_MODELS = ["H200", "H100", "A100", "L40S", "L4", "A10G"];
 
 /** 사실(facts)마다 묻는 조건 카드. 사실 하나는 한 카드에서만 묻는다. */
@@ -229,9 +225,7 @@ export const FIXED_FACTS: Record<string, { value: boolean; source: string; note:
 
 type DerivedFact = { cond: string; key: string; from: string; yes: string[]; no: string[] };
 /** 조건 답 하나로 정해지는 사실. 따로 묻지 않고 그 답을 고칠 때 함께 바꾼다. 목록에 없는 답은 모름(null)이다. */
-export const DERIVED_FACTS: Record<string, DerivedFact> = {
-  shared_or_remote_weights: { cond: "weights", key: "delivery", from: "가중치 공급 방식", yes: ["shared_daemon", "remote_streaming"], no: ["local_file"] },
-};
+export const DERIVED_FACTS: Record<string, DerivedFact> = {};
 
 /** 조건 답에서 사실 값. 답이 없으면 undefined(정하지 않음). */
 export function deriveFact(rule: DerivedFact, answer: unknown): boolean | null | undefined {
@@ -290,6 +284,13 @@ function withCondition(d: EnvironmentDoc, key: string, values: Values): Environm
   const next = { origin: null, source: null, ...before, values };
   const empty = !Object.keys(values).length && next.origin === null && next.source === null;
   let out = withProfile(d, (pr) => ({ ...pr, conditions: putKey(pr.conditions, key, empty ? undefined : next) as Profile["conditions"] }));
+  if (key === "placement") {
+    for (const runtimeKey of ["tp_size", "pp_size"] as const) {
+      if (Object.is(before?.values[runtimeKey], values[runtimeKey])) continue;
+      if (values[runtimeKey] !== undefined && values[runtimeKey] !== null) out = setIn(out, `/target/runtime/${runtimeKey}`, values[runtimeKey]);
+      else if (out.target.runtime) out = deleteIn(out, `/target/runtime/${runtimeKey}`) as EnvironmentDoc;
+    }
+  }
   for (const name of CONDITION_FACTS[key] ?? []) {
     const rule = DERIVED_FACTS[name];
     const changed = rule && !Object.is(before?.values[rule.key], next.values[rule.key]);
@@ -336,13 +337,13 @@ function normalizeEnv(d: EnvironmentDoc): EnvironmentDoc {
 }
 
 /** 카드 진행도: 보이는 조건 항목 + 따로 묻는 사실. 조건 답이나 전제로 정해지는 사실은 세지 않는다. */
-function cardProgress(cond: EnvCondition, doc: EnvironmentDoc, profile: Profile | null): [number, number] {
-  const [d, t] = filled(cond.fields, profile?.conditions[cond.key]?.values ?? {}, conditionValues(profile));
+function cardProgress(cond: EnvCondition, doc: EnvironmentDoc, profile: Profile | null, hidden: string[] = []): [number, number] {
+  const [d, t] = filled(cond.fields.filter((f) => f.key !== "echo_logprobs" && versionFieldVisible(hidden, cond.key, f.key)), profile?.conditions[cond.key]?.values ?? {}, conditionValues(profile));
   const asked = (CONDITION_FACTS[cond.key] ?? []).filter((n) => !DERIVED_FACTS[n] && !FIXED_FACTS[n]);
   return [d + asked.filter((n) => doc.facts?.[n] !== undefined).length, t + asked.length];
 }
 
-type EnvEdit = { ctx: FormCtx; doc: EnvironmentDoc; profile: Profile | null; apply: (fn: (d: EnvironmentDoc) => EnvironmentDoc) => void; snapshot: string | null };
+type EnvEdit = { ctx: FormCtx; doc: EnvironmentDoc; profile: Profile | null; apply: (fn: (d: EnvironmentDoc) => EnvironmentDoc) => void; snapshot: string | null; hiddenFields: string[]; catalog?: InputCatalog };
 
 export function EnvironmentForm(props: FormProps<EnvironmentDoc>) {
   const setDoc = (d: EnvironmentDoc) => props.setDoc(normalizeEnv(d));
@@ -350,7 +351,9 @@ export function EnvironmentForm(props: FormProps<EnvironmentDoc>) {
   const { doc } = props;
   const profile = profileOf(doc);
   const apply = (fn: (d: EnvironmentDoc) => EnvironmentDoc) => setDoc(fn(doc));
-  const setProfile = (fn: (pr: Profile) => Profile) => apply((d) => withProfile(d, fn));
+  const catalogQuery = useInputCatalog();
+  const catalog = catalogQuery.data;
+  const selectedProfile = versionProfile(catalog, doc);
   const [snapshot, setSnapshot] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
@@ -362,12 +365,12 @@ export function EnvironmentForm(props: FormProps<EnvironmentDoc>) {
 
   const condDone = ENV_CONDITIONS.reduce(
     (acc, c) => {
-      const [d, t] = cardProgress(c, doc, profile);
+      const [d, t] = cardProgress(c, doc, profile, selectedProfile?.hidden_fields ?? []);
       return [acc[0] + d, acc[1] + t];
     },
     [0, 0],
   );
-  const edit: EnvEdit = { ctx, doc, profile, apply, snapshot };
+  const edit: EnvEdit = { ctx, doc, profile, apply, snapshot, hiddenFields: selectedProfile?.hidden_fields ?? [], catalog };
 
   return (
     <div className="stack">
@@ -388,36 +391,10 @@ export function EnvironmentForm(props: FormProps<EnvironmentDoc>) {
           <ReadOnly label="현재 판본" value={String(doc.revision)} />
           <TextField ctx={ctx} path="/target/target_ref" label="대상 ID (target_ref)" hint="runtime 정책의 target_id와 같은 값" required />
         </div>
-        <div className={p.qGrid}>
-          <div className={p.qField}>
-            <div className={p.qLabel}>환경 역할</div>
-            <Segmented
-              label="환경 역할"
-              value={profile?.role ?? undefined}
-              onChange={(v) => setProfile((pr) => ({ ...pr, role: (v ?? null) as string | null }))}
-              options={[
-                { value: "current", label: "현재 운영" },
-                { value: "candidate", label: "업데이트 후보" },
-                { value: "test", label: "시험 환경" },
-              ]}
-            />
-            <span className="muted small">업데이트 평가에서는 현재·후보·시험 환경을 각각 다른 환경 ID로 저장합니다.</span>
-          </div>
-          <div className={p.qField}>
-            <div className={p.qLabel}>
-              <span className={p.req}>입력값 상태</span>
-            </div>
-            <Segmented
-              label="입력값 상태"
-              value={profile?.profile_status ?? undefined}
-              onChange={(v) => setProfile((pr) => ({ ...pr, profile_status: (v ?? null) as string | null }))}
-              options={[
-                { value: "planned", label: "계획값" },
-                { value: "observed", label: "실제 확인값" },
-              ]}
-            />
-            <span className="muted small">계획값이면 비사용 근거가 있어도 비적용 후보가 되지 않습니다.</span>
-          </div>
+        <Note>기준·후보 역할은 비교 실행 설정에서 선택합니다. 기존 입력 상태와 출처는 그대로 보존합니다.</Note>
+        <div className="small muted" role="status">
+          {selectedProfile ? `판본 지원 프로파일: ${selectedProfile.profiles.join(", ")}. 등록된 기능 범위만 확인되며 모든 시험 지원을 뜻하지 않습니다.` : "판본별 지원 정보 미확인 — 공통 필드를 유지합니다."}
+          {catalogQuery.isError && " 지원 정보를 불러오지 못했습니다."}
         </div>
         {doc.data_origin === "EXAMPLE" && <Note>예시·시연용 자료로 저장돼 있습니다. 판정 근거로 쓰지 않습니다.</Note>}
         <FieldMessages ctx={ctx} path="/framework_profile" exact />
@@ -429,7 +406,7 @@ export function EnvironmentForm(props: FormProps<EnvironmentDoc>) {
 }
 
 /** 조건 카드 안에 그리는 계약 필드(target·deployment). 다른 구역에서 다시 묻지 않는다. */
-function ContractFields({ cond, ctx, doc }: { cond: string; ctx: FormCtx; doc: EnvironmentDoc }) {
+function ContractFields({ cond, ctx, doc, catalog }: { cond: string; ctx: FormCtx; doc: EnvironmentDoc; catalog?: InputCatalog }) {
   switch (cond) {
     case "engine": {
       const name = doc.target.engine.name;
@@ -437,7 +414,7 @@ function ContractFields({ cond, ctx, doc }: { cond: string; ctx: FormCtx; doc: E
         <div className={p.formGrid}>
           <SelectField ctx={ctx} path="/target/engine/name" label="엔진" options={Object.entries(ENGINE_NAME).map(([value, label]) => ({ value, label }))} required />
           <SelectField ctx={ctx} path="/target/engine/runtime_kind" label="런타임 엔진 종류" options={["vllm", "sglang", "mock"].map((value) => ({ value, label: value }))} />
-          <TextField ctx={ctx} path="/target/engine/version" label="버전" nullable required suggestions={ENGINE_VERSIONS[name]} placeholder="목록에서 고르거나 입력 (모르면 비워 둠)" />
+          <TextField ctx={ctx} path="/target/engine/version" label="버전" nullable required suggestions={catalog?.versions.filter((v) => v.engine === name).map((v) => v.version)} placeholder="목록에서 고르거나 입력 (모르면 비워 둠)" />
           <TextField ctx={ctx} path="/target/engine/image_digest" label="이미지 digest" nullable required placeholder="sha256:… (모르면 비워 둠)" />
           <TextField ctx={ctx} path="/target/engine/source_commit" label="소스 커밋" nullable placeholder="7~40자리 hex (모르면 비워 둠)" />
         </div>
@@ -446,9 +423,9 @@ function ContractFields({ cond, ctx, doc }: { cond: string; ctx: FormCtx; doc: E
     case "supply":
       return (
         <div className={p.formGrid}>
-          <TextField ctx={ctx} path="/target/model/id" label="모델 ID" nullable required />
+          <TextField ctx={ctx} path="/target/model/id" label="API 모델명" hint="요청의 model 값과 일치하는 이름" nullable required />
           <TextField ctx={ctx} path="/target/model/revision" label="모델 판본" nullable required />
-          <TextField ctx={ctx} path="/target/model/inventory_sha256" label="snapshot 목록 해시" nullable />
+          {doc.target.model.inventory_sha256 && <ReadOnly label="snapshot 목록 해시" value={doc.target.model.inventory_sha256} />}
           <TextField ctx={ctx} path="/target/model/tokenizer_revision" label="토크나이저 판본" nullable />
         </div>
       );
@@ -718,7 +695,7 @@ function ConditionsSection({ edit }: { edit: EnvEdit }) {
         해당 점검이 미정으로 남고 자동 제외되지 않습니다. 기능 '사용 안 함'은 실제 비활성·비노출을 확인한 근거가 있어야 인정되며, 근거가 있어도 비적용 '후보'일 뿐입니다.
       </div>
       {ENV_CONDITIONS.map((cond) => {
-        const [done, total] = cardProgress(cond, edit.doc, edit.profile);
+        const [done, total] = cardProgress(cond, edit.doc, edit.profile, edit.hiddenFields);
         if (onlyMissing && done === total) return null;
         return <ConditionCard key={cond.key} cond={cond} done={done} total={total} edit={edit} />;
       })}
@@ -756,10 +733,11 @@ function ConditionCard({ cond, done, total, edit }: { cond: EnvCondition; done: 
             {cond.runtime && <div>byul runtime: {cond.runtime}</div>}
           </Note>
         )}
-        <ContractFields cond={cond.key} ctx={ctx} doc={doc} />
+        <ContractFields cond={cond.key} ctx={ctx} doc={doc} catalog={edit.catalog} />
+        {cond.key === "features" && values.echo_logprobs !== undefined && <Note>이전 입력 반환·logprobs 통합 답변: {FACT_VALUE_LABEL(values.echo_logprobs)}. 원본만 보존하며 세 기능의 개별 답변으로 추정하지 않습니다.</Note>}
         <div className={p.qGrid}>
           {cond.fields
-            .filter((f) => visible(f, values, others))
+            .filter((f) => f.key !== "echo_logprobs" && visible(f, values, others) && (versionFieldVisible(edit.hiddenFields, cond.key, f.key) || issuesAt(ctx.issues, `${path}/values/${f.key}`).length > 0))
             .map((f) => (
               <InputFieldView
                 key={f.key}
@@ -816,6 +794,27 @@ function valuesOf(doc: PolicyDoc): FrameworkValues | null {
   return v && typeof v === "object" ? (v as FrameworkValues) : null;
 }
 
+function PolicyPreparation({ catalog, preview, failed, pending }: { catalog?: InputCatalog; preview?: PolicyInputPreview; failed: boolean; pending: boolean }) {
+  const issues = [...(preview?.errors ?? []), ...(preview?.gaps ?? []), ...(preview?.warnings ?? [])];
+  return <section className="card card-pad stack" aria-label="입력 연결·준비 상태">
+    <h2>입력 연결·준비 상태</h2>
+    <div role="status">{!catalog?.available ? catalog?.reason ?? "Pack 준비 상태 미확인" : pending ? "현재 입력 확인 중" : "Pack 정의 확인됨 — 실제 대상·수집 준비와 시험 결과는 별도입니다."}</div>
+    {failed && <div className={p.fieldWarn}>입력 연결 정보를 불러오지 못했습니다. 준비 완료로 처리하지 않습니다.</div>}
+    {(catalog?.limitations ?? []).map((message) => <div key={message} className="small muted">{message}</div>)}
+    <table className={p.blockedTable}><tbody>
+      <tr><th>정책에서 요구한 값</th><td>{preview ? `${preview.connected.length}개 카드 연결 확인` : "입력 형식 확인 후 연결값을 표시합니다."}
+        {preview && <details><summary>실행에 전달할 정책값</summary><pre>{JSON.stringify(preview.document.verification.values, null, 2)}</pre></details>}
+      </td></tr>
+      <tr><th>현재 설정에서 확인한 값</th><td>이 화면에서 실제 적용 설정을 확인하지 않았습니다.</td></tr>
+      <tr><th>시험으로 확인한 결과</th><td>이 입력에 연결된 시험 결과가 없습니다.</td></tr>
+    </tbody></table>
+    {issues.length > 0 && <details><summary>부족한 값·충돌·미연결 항목 {issues.length}건</summary>
+      <div className="small muted">해시·세션 등 준비·수집 단계에서 생성할 값도 포함합니다. 고객이 직접 만들어 입력하지 않습니다.</div>
+      {issues.map((issue, i) => <div key={i} className="small">{issue.path}: {issue.message}</div>)}
+    </details>}
+  </section>;
+}
+
 /** 구체적인 질문은 '변경'을 고를 때 나타난다. 이미 저장된 값이 있으면 숨기지 않는다. */
 function showDetail(entry: ReqEntry | undefined): boolean {
   return entry?.decision === "change" || Object.keys(entry?.values ?? {}).length > 0 || Object.keys(entry?.numbers ?? {}).length > 0;
@@ -826,12 +825,17 @@ function shownNumbers(req: Requirement, values: Values, numbers: Record<string, 
   return req.numbers.filter((d) => visible(d, values, others) || numbers[d.key]);
 }
 
+export function decisionComplete(entry: ReqEntry | undefined): boolean {
+  if (entry?.decision === "change") return true;
+  return entry?.decision === "keep" && (Object.values(entry.values).some((v) => v != null) || Object.values(entry.numbers).some((n) => n.status === "confirmed" && n.value != null));
+}
+
 function reqProgress(req: Requirement, entry: ReqEntry | undefined, others: Record<string, Values | undefined>): [number, number] {
-  if (!showDetail(entry)) return [entry?.decision ? 1 : 0, 1];
+  if (!showDetail(entry)) return [decisionComplete(entry) ? 1 : 0, 1];
   const [d, t] = filled(req.fields, entry?.values ?? {}, others);
   const shown = shownNumbers(req, entry?.values ?? {}, entry?.numbers ?? {}, others);
   const nums = shown.filter((x) => entry?.numbers[x.key]).length;
-  return [d + nums + (entry?.decision ? 1 : 0), t + shown.length + 1];
+  return [d + nums + (decisionComplete(entry) ? 1 : 0), t + shown.length + 1];
 }
 
 /** 저장할 때마다 정책 판본을 올린다. 끝의 숫자를 올리고, 숫자가 없으면 붙인다. */
@@ -1005,7 +1009,23 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
   const envRevs = useDocRevisions("environments", envId);
   const baseEnv = useEnvironmentRevision(envId, doc.environment_ref?.revision ?? null).data?.document;
   const envAnswers = { ...conditionValues(baseEnv ? profileOf(baseEnv) : null), facts: Object.fromEntries(Object.entries(baseEnv?.facts ?? {}).map(([k, f]) => [k, f?.value])) };
-  const fv = valuesOf(doc);
+  const catalogQuery = useInputCatalog();
+  const catalog = catalogQuery.data;
+  const preview = usePolicyInputPreview(doc);
+  const policyRevs = useDocRevisions("policies", props.isNew ? null : doc.policy_id);
+  const confirmedRev = policyRevs.data?.items.filter((r) => r.status === "CONFIRMED").at(-1)?.revision ?? null;
+  const previous = usePolicyRevision(props.isNew ? null : doc.policy_id, confirmedRev).data?.document;
+  const rawFv = valuesOf(doc);
+  const priorFv = previous ? valuesOf(previous) : null;
+  const fv = rawFv ? { ...rawFv, requirements: Object.fromEntries(Object.entries(rawFv.requirements).map(([id, e]) => {
+    if (e.decision !== "keep") return [id, e];
+    const direct = Object.fromEntries((catalog?.bindings ?? []).filter((b) => b.requirement === id && b.source === "values" && previous?.verification.values[b.check_id]?.[b.key] !== undefined).map((b) => [b.field, previous!.verification.values[b.check_id][b.key]]));
+    const prior = priorFv?.requirements[id] ?? (Object.keys(direct).length ? { ...emptyReq(), values: direct } : undefined);
+    return [id, prior ? { ...prior, decision: "keep" } : { ...emptyReq(), decision: "keep" }];
+  })) } : null;
+  useEffect(() => {
+    if (props.isNew && catalog && !doc.verification.pack.id) ctx.set("/verification/pack", catalog.pack);
+  }, [catalog, props.isNew, doc.verification.pack.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const setFv = (fn: (v: FrameworkValues) => FrameworkValues) => setDoc({ ...doc, framework_values: fn(fv ?? emptyValues()) } as PolicyDoc);
   const [filter, setFilter] = useState<"all" | "undecided" | "measure">("all");
 
@@ -1025,7 +1045,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
       active.reduce(
         (acc, r) => {
           const e = fv?.requirements[r.id];
-          return { decided: acc.decided + (e?.decision ? 1 : 0), measure: acc.measure + Object.values(e?.numbers ?? {}).filter((x) => x.status === "after_measurement").length };
+          return { decided: acc.decided + (decisionComplete(e) ? 1 : 0), measure: acc.measure + Object.values(e?.numbers ?? {}).filter((x) => x.status === "after_measurement").length };
         },
         { decided: 0, measure: 0 },
       ),
@@ -1056,6 +1076,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
         {doc.data_origin === "EXAMPLE" && <Note>예시·시연용 자료로 저장돼 있습니다. 판정 근거로 쓰지 않습니다.</Note>}
         <div className={p.formGrid}>
           {props.isNew ? <TextField ctx={ctx} path="/policy_id" label="정책 ID" required /> : <ReadOnly label="정책 ID" value={doc.policy_id} />}
+          <ReadOnly label="사용 Pack (백엔드 지정)" value={`${doc.verification.pack.id || catalog?.pack.id || "확인 중"}@${doc.verification.pack.id ? doc.verification.pack.revision : catalog?.pack.revision ?? "미확인"}`} />
           <label className={p.field}>
             기준 환경
             <select
@@ -1100,6 +1121,8 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
         </div>
       </section>
 
+      <PolicyPreparation catalog={catalog} preview={preview.data} failed={catalogQuery.isError || preview.isError} pending={preview.isFetching} />
+
       <section id="pol-approval" className="card card-pad stack">
         <h2>승인 조건</h2>
         <div className="small muted">여기에는 무엇을 어떤 조건으로 승인하는지 적습니다. 승인자는 저장한 뒤 아래 '판본 승인'에서 기록합니다. 서명이 아닙니다.</div>
@@ -1139,7 +1162,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
               placeholder={entries.length ? "예: 보안정책 v3 §4" : "보호 요구를 하나 이상 결정하면 입력할 수 있습니다"}
               onChange={(e) => {
                 const value = e.target.value || null;
-                setFv((x) => ({ ...x, requirements: Object.fromEntries(Object.entries(x.requirements).map(([k, v]) => [k, { ...v, basis: value }])) }));
+                setFv((x) => ({ ...x, requirements: Object.fromEntries(Object.entries(x.requirements).map(([k, v]) => [k, v.decision === "change" ? { ...v, basis: value } : v])) }));
               }}
             />
           </label>
@@ -1188,13 +1211,13 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
         {SECURITY_FUNCTIONS.map((fn) => {
           const reqs = fn.requirements.filter((r) => {
             const e = fv?.requirements[r.id];
-            if (filter === "undecided") return !r.fixed && !e?.decision;
+            if (filter === "undecided") return !r.fixed && !decisionComplete(e);
             if (filter === "measure") return Object.values(e?.numbers ?? {}).some((x) => x.status === "after_measurement");
             return true;
           });
           if (!reqs.length) return null;
           const countable = fn.requirements.filter((r) => !r.fixed);
-          const decided = countable.filter((r) => fv?.requirements[r.id]?.decision).length;
+          const decided = countable.filter((r) => decisionComplete(fv?.requirements[r.id])).length;
           return (
             <div key={fn.no} className="stack" style={{ gap: 8 }}>
               <div className={p.fnHead}>
@@ -1212,6 +1235,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
                   isNew={props.isNew}
                   emptyModels={!doc.runtime.gateway.allowed_models.length}
                   envAnswers={envAnswers}
+                  catalog={catalog}
                   onChange={(next) => setFv((x) => ({ ...x, requirements: putKey(x.requirements, r.id, next && next.basis === null ? { ...next, basis } : next) as FrameworkValues["requirements"] }))}
                 />
               ))}
@@ -1227,8 +1251,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
         <div className={`${p.foldBody} stack`}>
           <div className="small muted">update POL 고유 필드와 runtime 집행 의도 원문입니다. 예외는 판정을 바꾸지 않고 '예외 승인됨'으로만 표시됩니다.</div>
           <div className={p.formGrid}>
-            <TextField ctx={ctx} path="/verification/pack/id" label="팩 ID" />
-            <NumberField ctx={ctx} path="/verification/pack/revision" label="팩 판본" />
+            <FieldMessages ctx={ctx} path="/verification/pack" />
             <ListField ctx={ctx} path="/verification/scope/include" label="범위 포함" />
             <ListField ctx={ctx} path="/verification/scope/exclude" label="범위 제외" />
             <SelectField ctx={ctx} path="/runtime/gateway/profile" label="runtime profile" options={[{ value: "default", label: "기본 (default)" }, { value: "zeroday-lab", label: "시험용 (zeroday-lab)" }]} />
@@ -1243,10 +1266,11 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
   );
 }
 
-function RequirementCard({ req, entry, ctx, isNew, emptyModels, envAnswers, onChange }: { req: Requirement; entry: ReqEntry | undefined; ctx: FormCtx; isNew: boolean; emptyModels: boolean; envAnswers: Record<string, Values | undefined>; onChange: (e: ReqEntry | undefined) => void }) {
+function RequirementCard({ req, entry, ctx, isNew, emptyModels, envAnswers, catalog, onChange }: { req: Requirement; entry: ReqEntry | undefined; ctx: FormCtx; isNew: boolean; emptyModels: boolean; envAnswers: Record<string, Values | undefined>; catalog?: InputCatalog; onChange: (e: ReqEntry | undefined) => void }) {
   const cur = entry ?? emptyReq();
+  const connectedFields = packFields(catalog, req.id, req.fields);
   const update = (patch: Partial<ReqEntry>) => {
-    const next = { ...cur, ...patch };
+    const next = { ...cur, ...patch, ...(cur.decision === "keep" && (patch.values || patch.numbers) ? { decision: "change" } : {}) };
     const empty = next.decision === null && !Object.keys(next.values).length && !Object.keys(next.numbers).length && next.note === null;
     onChange(empty ? undefined : next);
   };
@@ -1308,6 +1332,15 @@ function RequirementCard({ req, entry, ctx, isNew, emptyModels, envAnswers, onCh
                   onChange={(v) => update({ values: putKey(cur.values, f.key, v) })}
                 />
               ))}
+          </div>
+        )}
+        {cur.decision === "keep" && !decisionComplete(cur) && <Note>유지할 이전 승인 정책값이 없습니다. 미정으로 남깁니다.</Note>}
+        {showDetail(entry) && connectedFields.length > 0 && (
+          <div className="stack">
+            <div className={p.qLabel}>Pack 실행 기준</div>
+            <div className={p.qGrid}>
+              {connectedFields.map((field) => <InputFieldView key={field.key} field={field} value={cur.values[field.key]} onChange={(v) => update({ values: putKey(cur.values, field.key, v) })} />)}
+            </div>
           </div>
         )}
         {showDetail(entry) && numbers.length > 0 && (

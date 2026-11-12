@@ -4,6 +4,9 @@ import type { components } from "./schema";
 
 type S = components["schemas"];
 
+export type InputCatalog = S["InputCatalog"];
+export type PolicyInputPreview = S["PolicyInputPreview"];
+
 export type RuntimeEvent = S["RuntimeEvent"];
 export type RuntimeStatus = S["RuntimeStatus"];
 export type VerificationResult = S["VerificationResult"];

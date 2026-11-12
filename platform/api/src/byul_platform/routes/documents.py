@@ -21,10 +21,28 @@ from ..models import (
     SaveRejected,
 )
 from ..models import EnvironmentDoc, PolicyDoc
+from ..input_models import InputCatalog, PolicyInputRequest, PolicyInputPreview
+from ..inputs import MVP_PACK, environment_input_errors, input_catalog, resolve_policy
 from ..store import DocumentStore, InvalidDocId, RevisionExists, StoredRevision, now_utc
 from ..state import AppState, get_state
 
 router = APIRouter(prefix="/api", tags=["documents"])
+
+
+@router.get("/inputs/catalog", response_model=InputCatalog)
+def get_input_catalog(state: AppState = Depends(get_state)):
+    return input_catalog(state)
+
+
+@router.post("/inputs/policy-preview", response_model=PolicyInputPreview)
+def preview_policy_inputs(body: PolicyInputRequest, state: AppState = Depends(get_state)):
+    document = copy.deepcopy(body.document)
+    if isinstance(document.get("verification"), dict) and document["verification"].get("pack") == {"id": "", "revision": 0}:
+        document["verification"]["pack"] = dict(MVP_PACK)
+    errors = _schema_errors(state, "policy", document)
+    if errors:
+        return PolicyInputPreview(document=document, errors=errors, warnings=[], gaps=[], connected=[], pack_available=False)
+    return resolve_policy(state, document)
 
 
 def _reject(code: str, errors: list[dict[str, str]], status: int = 422) -> JSONResponse:
@@ -150,6 +168,9 @@ def save_environment(document: EnvironmentDoc = Body(...), state: AppState = Dep
     errors = _schema_errors(state, "environment", doc)
     if errors:
         return _reject("SCHEMA_INVALID", errors)
+    contradictions = environment_input_errors(doc)
+    if contradictions:
+        return _reject("SCHEMA_INVALID", contradictions)
     try:
         saved = state.environments.append(doc_id, doc["revision"], doc, status="DRAFT", label=None)
     except RevisionExists:
@@ -189,6 +210,8 @@ def policy_diff(doc_id: str, from_revision: int, to_revision: int, state: AppSta
 )
 def save_policy(document: PolicyDoc = Body(...), state: AppState = Depends(get_state)) -> Any:
     doc = copy.deepcopy(document)
+    if isinstance(doc.get("verification"), dict) and doc["verification"].get("pack") == {"id": "", "revision": 0}:
+        doc["verification"]["pack"] = dict(MVP_PACK)
     if doc.get("status", "DRAFT") != "DRAFT":
         return _reject("STATUS_NOT_ALLOWED", [{"path": "/status", "message": "DRAFT로만 저장합니다. 확정은 판본 승인으로 합니다"}])
     doc["status"] = "DRAFT"
@@ -212,6 +235,13 @@ def save_policy(document: PolicyDoc = Body(...), state: AppState = Depends(get_s
     errors = _schema_errors(state, "policy", doc)
     if errors:
         return _reject("SCHEMA_INVALID", errors)
+    prepared = resolve_policy(state, doc)
+    if prepared.errors:
+        return _reject("SCHEMA_INVALID", [e.model_dump() for e in prepared.errors])
+    doc = prepared.document
+    resolved_errors = _schema_errors(state, "policy", doc)
+    if resolved_errors:
+        return _reject("SCHEMA_INVALID", resolved_errors)
     try:
         revision = state.policies.next_revision(doc_id)
         saved = state.policies.append(doc_id, revision, doc, status="DRAFT", label=str(doc.get("policy_version")))
@@ -219,7 +249,7 @@ def save_policy(document: PolicyDoc = Body(...), state: AppState = Depends(get_s
         return _reject("SCHEMA_INVALID", [{"path": "/policy_id", "message": "ID 형식이 맞지 않습니다"}])
     except RevisionExists:
         return _reject("BAD_REQUEST", [{"path": "/", "message": "같은 판본이 이미 있습니다. 다시 저장하세요"}], 409)
-    return JSONResponse(status_code=201, content={"saved": _revision_out(saved), "warnings": []})
+    return JSONResponse(status_code=201, content={"saved": _revision_out(saved), "warnings": [w.model_dump() for w in [*prepared.warnings, *prepared.gaps]]})
 
 
 @router.post(

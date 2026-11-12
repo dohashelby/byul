@@ -1,4 +1,4 @@
-"""Pure acceptance audit of the original five-check CPU update evidence.
+"""Pure acceptance audit of GPU update evidence (decision 13, 2026-11-12).
 
 This does not execute an engine, amend a verdict, or authenticate an operator.
 The caller must first verify the stored pack bytes, content-addressed artifacts,
@@ -65,7 +65,7 @@ def _coverage_blocks(check, evd):
 
 
 def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool = False, profile: str = "legacy-five/1") -> dict:
-    """Audit pinned rules/refs and require ten complete, concrete CPU results.
+    """Audit pinned rules/refs and require complete, concrete GPU results per side.
 
     A confirmed security FAIL is a valid trial outcome. Missing collection still
     prevents trial acceptance, even where an independently established FAIL is
@@ -143,14 +143,18 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
             if (not env.model.id or not env.model.revision
                     or not _HASH.fullmatch(env.model.inventory_sha256 or "")):
                 raise ValueError("ENV requires actual model id/revision/inventory")
-            if env.runtime.gpu_count != 0 or env.runtime.cpu is None or env.runtime.cpu.system != "Linux":
-                raise ValueError("ENV requires an explicit Linux CPU profile with gpu_count=0")
+            runtime = env.runtime
+            if (type(runtime.gpu_count) is not int or runtime.gpu_count < 1 or not runtime.gpu_model
+                    or not runtime.driver or runtime.cpu is not None or runtime.tp_size is None
+                    or runtime.tp_size * (runtime.pp_size or 1) * (runtime.dp_size or 1) != runtime.gpu_count):
+                raise ValueError("ENV requires an explicit GPU profile: gpu_count>=1, gpu_model, driver, tp_size layout and no CPU profile")
         for side, env in zip(SIDES, environments):
             identities[side] = {"environment": env.ref().model_dump(mode="json"),
                                 "image_digest": env.engine.image_digest,
                                 "engine_version": env.engine.version,
                                 "model": env.model.model_dump(mode="json"),
-                                "cpu": env.runtime.cpu.model_dump(mode="json")}
+                                "gpu": {key: getattr(env.runtime, key) for key in
+                                        ("gpu_model", "driver", "gpu_count", "tp_size", "pp_size", "dp_size")}}
         base_env, cand_env = environments
         if base_env.engine.name != cand_env.engine.name:
             comparison_problems.append("engine kinds differ")
@@ -163,6 +167,8 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
         if any(getattr(base_env.model, key) != getattr(cand_env.model, key)
                for key in ("id", "revision", "inventory_sha256")):
             comparison_problems.append("model identity/revision/inventory differ")
+        if base_env.runtime != cand_env.runtime:
+            comparison_problems.append("declared GPU/runtime conditions differ (GPU model, driver, GPU count, TP/PP/DP)")
 
         selected = [item for item in plan.items if item.selected]
         if len({item.check_id for item in plan.items}) != len(plan.items):
@@ -254,12 +260,12 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
                 if (evd.execution.started_at is None or evd.execution.finished_at is None
                         or evd.execution.finished_at < evd.execution.started_at):
                     raise ValueError(f"{cid}/{side}: valid original execution timestamps are required")
-                if (evd.comparability.cpu != env.runtime.cpu or evd.comparability.gpu is not None
-                        or evd.comparability.driver is not None
+                if (evd.comparability.cpu is not None or evd.comparability.gpu != env.runtime.gpu_model
+                        or evd.comparability.driver != env.runtime.driver
                         or evd.comparability.model_inventory_sha256 != env.model.inventory_sha256
                         or not _HASH.fullmatch(evd.comparability.config_sha256 or "")
                         or not _HASH.fullmatch(evd.comparability.fixture_sha256 or "")):
-                    raise ValueError(f"{cid}/{side}: explicit EVD CPU/model/fixture/config identity mismatch")
+                    raise ValueError(f"{cid}/{side}: explicit EVD GPU/model/fixture/config identity mismatch")
                 matches = [obj for obj in results if obj.evidence == evd.ref() and obj.check_id == cid and str(obj.side) == side]
                 if len(matches) != 1:
                     raise ValueError(f"{cid}/{side}: exact original RES/EVD relation is required")
@@ -277,7 +283,6 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
                     raise ValueError(f"{cid}/{side}: duplicate or unrecognized challenge records")
                 expected = {axis: str(raw.verdicts.get(axis, "UNKNOWN")) for axis in AXES}
                 expected = {axis: "UNKNOWN" if value == "PASS" and blocks else value for axis, value in expected.items()}
-                expected["performance"] = "UNKNOWN"
                 actual = result.verdicts.model_dump(mode="json")
                 shown = getattr(row, side)
                 checks[cid][side] = {"evidence": evd.ref().model_dump(mode="json"),
@@ -304,8 +309,6 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
                     incomplete.append(f"{cid}/{side}: incomplete collection coverage: {coverage_blocks}")
                 if any(actual[axis] not in {"PASS", "FAIL"} for axis in ("security", "functional")):
                     incomplete.append(f"{cid}/{side}: concrete security and functional PASS/FAIL are required")
-                if actual["performance"] != "UNKNOWN":
-                    contract_problems.append(f"{cid}/{side}: CPU performance must remain UNKNOWN")
             base, cand = (evd_by_pair[cid, side] for side in SIDES)
             differences = comparison_differences(base.comparability, cand.comparability)
             for axis, field in (("security", "comparison"), ("functional", "functional_comparison")):
@@ -326,7 +329,7 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
     problems = [*contract_problems, *incomplete, *comparison_problems]
     if diagnostic:
         problems.append("profile diagnostic only; this is not an accepted image-update trial")
-    return {"schema": "guard-update-acceptance/1", "accepted": not problems, "diagnostic": diagnostic,
+    return {"schema": "guard-update-acceptance/2", "accepted": not problems, "diagnostic": diagnostic,
             "evidence_contract_valid": not contract_problems,
             "comparison_kind": kind, "version_upgrade_verified": not problems and kind == "version-upgrade",
             "checks": checks, "identities": identities, "refs": refs,
@@ -335,6 +338,7 @@ def assess_update(report: dict, objects: list[dict], pack, *, diagnostic: bool =
                 "This audits original saved evidence; it does not execute an engine or authenticate source claims.",
                 "The caller must independently verify stored pack/artifact bytes and actual target identity.",
                 "MEASURED/COMPLETED and process exit 0 alone never establish trial acceptance.",
-                "CPU comparison covers security/function only; performance remains UNKNOWN.",
+                "Acceptance requires concrete security/function results; performance is not accepted here.",
+                "Declared GPU conditions are not observed device identities.",
                 "Accepted evidence can contain FAIL/STILL_FAILING; acceptance is not a release approval.",
             ]}

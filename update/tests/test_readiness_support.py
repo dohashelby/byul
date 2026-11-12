@@ -185,7 +185,7 @@ def test_runtime_gaps_for_existing_partial_collectors_are_visible(pack):
     import tomllib
     import yaml
     root = Path(__file__).resolve().parents[1]
-    cfg = tomllib.loads((root / "examples/windows-cpu-binding-logs.toml").read_text(encoding="utf-8"))
+    cfg = tomllib.loads((root / "examples/gpu-bounded-binding-logs.toml").read_text(encoding="utf-8"))
     raw = yaml.safe_load((root / "examples/automation-binding-logs-policy.yaml").read_text(encoding="utf-8"))
     env, _, _ = declared_inputs(pack)
     pol = policy(pack.ref(), values=raw["values"])
@@ -203,7 +203,7 @@ def test_valid_token_input_scope_and_chat_private_scope_are_never_silently_reduc
     import tomllib
     import yaml
     root = Path(__file__).resolve().parents[1]
-    cfg = tomllib.loads((root / "examples/windows-cpu-binding-logs.toml").read_text(encoding="utf-8"))
+    cfg = tomllib.loads((root / "examples/gpu-bounded-binding-logs.toml").read_text(encoding="utf-8"))
     raw = yaml.safe_load((root / "examples/automation-binding-logs-policy.yaml").read_text(encoding="utf-8"))
     env, _, _ = declared_inputs(pack)
     values = deepcopy(raw["values"])
@@ -246,7 +246,7 @@ def test_unsupported_policy_keeps_execution_rejection_and_independent_config_val
     import yaml
     from guard.executors import registry
     root = Path(__file__).resolve().parents[1]
-    cfg = tomllib.loads((root / "examples/windows-cpu-binding-logs.toml").read_text(encoding="utf-8"))
+    cfg = tomllib.loads((root / "examples/gpu-bounded-binding-logs.toml").read_text(encoding="utf-8"))
     raw = yaml.safe_load((root / "examples/automation-binding-logs-policy.yaml").read_text(encoding="utf-8"))
     values = {**raw["values"][check_id], **changed_values}
     factory = registry.resolve_executor(executor, "real")
@@ -265,7 +265,7 @@ def log_inputs(pack):
     import tomllib
     import yaml
     root = Path(__file__).resolve().parents[1]
-    cfg = tomllib.loads((root / "examples/windows-cpu-binding-logs.toml").read_text(encoding="utf-8"))
+    cfg = tomllib.loads((root / "examples/gpu-bounded-binding-logs.toml").read_text(encoding="utf-8"))
     raw = yaml.safe_load((root / "examples/automation-binding-logs-policy.yaml").read_text(encoding="utf-8"))
     env, _, _ = declared_inputs(pack)
     return env, policy(pack.ref(), values={"OBS-03": raw["values"]["OBS-03"]}), cfg

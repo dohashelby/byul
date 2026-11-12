@@ -60,34 +60,17 @@ def test_product_evidence_omits_raw_content_but_preserves_proof_hashes_and_verdi
     assert store.verify()==[]
 
 
-def test_length_cause_reviewer_still_receives_complete_transient_samples(tmp_path, monkeypatch):
-    from tests.test_input_length_cause import make_ctx, context, rejected
-    ctx=make_ctx(tmp_path);sent=[];seen=[]
-    def probe(network, requests, timeout):
-        req,=requests;sent.append(deepcopy(req))
-        if req["body"]["prompt"]==[50272]:
-            return [{**semantic.response(semantic.error("Token id 50272 is out of vocabulary")),"body_preview":PRIVATE,"detail":PRIVATE}]
-        if len(req["body"]["prompt"])==128:return [{**rejected(),"body_preview":PRIVATE,"detail":PRIVATE}]
-        return [private_success(req)]
-    ctx.cprobe=probe
-    class Reviewer:
-        def start(self):assert not sent
-        def finish(self, samples):
-            assert len(samples)==len(sent)==5
-            assert PRIVATE in samples[0]["response"]["body"]
-            assert samples[0]["request"]["body"]["prompt"]==[0]
-            assert samples[1]["response"]["outcome"]==400 and samples[3]["response"]["body"]
-            seen.extend(samples)
-            return context()
-    monkeypatch.setattr(ctx.adapter,"input_length_cause_collector",lambda _:Reviewer())
-    executor=InputValidationExecutor({"vocab_size":50272,"vocab_source":"EXAMPLE source","max_probe_tokens":128,"length_cause_evidence":True})
-    draft=executor._finish(ctx)
-    assert seen and draft.normal_control.succeeded
-    assert draft.observations["challenge_rejection_results"].value=={"token_id":"verified","length":"verified"}
-    assert draft.observations["challenge_consumption"].value=={"token_id":"unknown","length":"unknown"}
-    for artifact in draft.artifacts:assert PRIVATE not in artifact.path.read_text(encoding="utf-8")
-    # The privacy reducer must not mutate data already handed to the reviewer.
-    assert PRIVATE in seen[0]["response"]["body"] and seen[0]["request"]["body"]["prompt"]==[0]
+@pytest.mark.parametrize("value", [True, False])
+def test_removed_length_cause_option_is_refused_not_ignored(value):
+    # The CPU-image length-cause evidence was removed (2026-11-12); the old opt-in is a configuration error.
+    from guard.models import load_pack
+    from pathlib import Path
+    check = load_pack(Path(__file__).resolve().parents[1] / "packs" / "PACK-BASELINE").checks["REQ-09"]
+    executor = InputValidationExecutor({"vocab_size": 50272, "vocab_source": "EXAMPLE source",
+                                        "max_probe_tokens": 128, "length_cause_evidence": value})
+    assert executor.version == "0.7.1"
+    with pytest.raises(ValueError, match="LENGTH_CAUSE_EVIDENCE_UNSUPPORTED"):
+        executor.validate_configuration(check)
 
 
 @pytest.mark.parametrize("elapsed", [True, float("nan"), float("inf"), -1, 10**400, PRIVATE])

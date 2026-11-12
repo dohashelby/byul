@@ -17,7 +17,7 @@ from guard.runtime import sandbox
 from guard.runtime.docker import DockerError
 from guard.store import Store
 from tests.builders import T0, policy
-from tests.test_windows_cpu_launch import setup_inputs
+from tests.test_managed_gpu_launch import setup_inputs
 
 
 def _inputs(tmp_path, profiles):

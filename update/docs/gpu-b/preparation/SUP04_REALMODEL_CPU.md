@@ -1,5 +1,7 @@
 # SUP-04 실제 모델 CPU 준비
 
+> 2026-11-12 CPU 이미지 제외 결정 이후 이 문서는 과거 CPU 준비 기록이다. `tools.gpu_b_sup04_realmodel`은 이제 `gpu-bounded` 기동과 `gpu_count>=1` ENV만 받는다(M-A9).
+
 전용 `tools.gpu_b_sup04_realmodel`은 기존 REQ-07의 고정 CPU image/model/readonly template 및 `cpu-bounded` 설정을 재사용한다. 새 공통 실행기나 AWS 운영 기능을 만들지 않는다. 기본 실행은 소스·manifest·모델 inventory·ENV·두 DRAFT 정책·실제 registry factory의 입력 검증만 하며 엔진을 만들지 않는다. `--execute`는 세션2가 실행한다.
 
 실제 `sandbox.up` target은 ENV ref가 없으므로 원 target을 수정하지 않고 실제 Docker 전후 snapshot·소유 label·RepoDigest와 sealed ENV를 확인하여 별도 `bound-target.json`을 쓴다. 다른 ENV ref·교체·불일치·누락은 거부한다. 기존 collector가 실제 수집 시 이미지 신원을 다시 관측한다. 과거 Python stub의 501 결과는 새 실제 vLLM 모델 결과와 구분한다.

@@ -12,7 +12,7 @@ from guard.runtime import sandbox
 from guard.runtime.docker import CmdResult, Docker, DockerError
 from guard.store import Store
 from tests.builders import policy
-from tests.test_windows_cpu_launch import setup_inputs
+from tests.test_managed_gpu_launch import setup_inputs
 
 
 def test_diagnostic_docker_reads_only_owned_state_and_bounded_tail():

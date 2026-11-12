@@ -9,7 +9,7 @@ from guard import application
 from guard.adapters import vllm
 from guard.adapters.base import LaunchSpec
 from guard.runtime import sandbox
-from tests.test_windows_cpu_launch import launch, setup_inputs
+from tests.test_managed_gpu_launch import launch, setup_inputs
 
 
 PROFILE_ENV = {"VLLM_CONFIGURE_LOGGING": "1", "VLLM_LOGGING_LEVEL": "INFO",

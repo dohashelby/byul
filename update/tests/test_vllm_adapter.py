@@ -52,8 +52,9 @@ def test_launch_plan_offline_readonly_and_key_not_in_argv():
 def test_launch_plan_device():
     gpu = VllmAdapter().launch_plan(spec())
     assert gpu.gpus and "VLLM_CPU_KVCACHE_SPACE" not in gpu.env
-    cpu = VllmAdapter().launch_plan(spec(device="cpu", cpu_kv_cache_gib=2))
-    assert not cpu.gpus and cpu.env["VLLM_CPU_KVCACHE_SPACE"] == "2"
+    # 2026-11-12 (M-A9): CPU image launches were removed; device=cpu is refused.
+    with pytest.raises(ValueError, match="VLLM_CPU_DEVICE_UNSUPPORTED"):
+        VllmAdapter().launch_plan(spec(device="cpu", cpu_kv_cache_gib=2))
     with pytest.raises(ValueError):
         VllmAdapter().launch_plan(spec(device="tpu"))
 

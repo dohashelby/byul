@@ -1,4 +1,8 @@
-"""CPU launch/configuration contracts. No Docker daemon or model is executed."""
+"""Bounded GPU launch/configuration contracts. No Docker daemon or model is executed.
+
+2026-11-12 (M-A9): CPU images are out of scope; the former CPU launch cases
+were converted to the gpu-bounded profile and CPU-only cases were removed.
+"""
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -10,7 +14,7 @@ from typer.testing import CliRunner
 from guard import application
 from guard.adapters.base import LaunchSpec
 from guard.adapters.model_inventory import inventory
-from guard.adapters.vllm import CpuLaunchOptions, VllmAdapter
+from guard.adapters.vllm import VllmAdapter
 from guard.cli import app
 from guard.executors import registry
 from guard.executors.fake import FakeExecutor
@@ -22,48 +26,54 @@ from tests.builders import baseline_pack, environment, policy
 
 
 def launch(**options):
-    return LaunchSpec(model="facebook/opt-125m", port=8000, image="cpu@sha256:" + "a" * 64,
-                      options={"revision": "rev", "models_dir": Path("C:/models/snapshot"),
-                               "device": "cpu", "launch_profile": "cpu-bounded", "model_layout": "snapshot", **options})
+    return LaunchSpec(model="facebook/opt-125m", port=8000, image="gpu@sha256:" + "a" * 64,
+                      options={"revision": "rev", "models_dir": Path("/srv/models/snapshot"),
+                               "device": "gpu", "launch_profile": "gpu-bounded", "model_layout": "snapshot", **options})
 
 
-def test_bounded_cpu_uses_local_readonly_snapshot_and_clears_image_kv_default():
+GPU_RESOURCES = {"cpus": 4, "memory_bytes": 17179869184, "shm_bytes": 2147483648, "pids_limit": 512}
+
+
+def test_bounded_gpu_uses_local_readonly_snapshot_and_image_entrypoint():
     plan = VllmAdapter().launch_plan(launch())
-    assert plan.entrypoint == "/usr/bin/env"
-    assert plan.argv[:5] == ["-u", "VLLM_CPU_KVCACHE_SPACE", "vllm", "serve", "/models"]
+    assert plan.entrypoint is None
+    assert plan.argv[:2] == ["--model", "/models"]
     assert plan.argv[plan.argv.index("--served-model-name") + 1] == "facebook/opt-125m"
-    assert plan.argv[plan.argv.index("--kv-cache-memory-bytes") + 1] == "67108864"
+    assert plan.argv[plan.argv.index("--gpu-memory-utilization") + 1] == "0.5"
+    assert plan.argv[plan.argv.index("--tensor-parallel-size") + 1] == "1"
     assert plan.argv[plan.argv.index("--load-format") + 1] == "auto"
     assert "--enforce-eager" in plan.argv and "--disable-log-requests" not in plan.argv
-    assert "VLLM_CPU_KVCACHE_SPACE" not in plan.env
+    assert "--kv-cache-memory-bytes" not in plan.argv
+    assert not any(key.startswith("VLLM_CPU") or key == "OMP_NUM_THREADS" for key in plan.env)
     assert plan.env["HF_HUB_OFFLINE"] == plan.env["TRANSFORMERS_OFFLINE"] == "1"
-    assert plan.env["OMP_NUM_THREADS"] == "2" and plan.env["VLLM_CPU_OMP_THREADS_BIND"] == "nobind"
+    assert plan.env["VLLM_NO_USAGE_STATS"] == plan.env["DO_NOT_TRACK"] == "1"
     assert plan.mounts[0].read_only and plan.mounts[0].target == "/models"
-    assert not plan.gpus and plan.shm_size is None
-    assert plan.limits.to_dict() == {"cpus": 2, "memory_bytes": 3221225472, "memory_swap_bytes": 5368709120,
-                                   "shm_bytes": 536870912, "pids_limit": 256}
+    # Shared memory and container bounds come from the provider's resources table.
+    assert plan.gpus and plan.shm_size is None and plan.limits is None
 
 
 @pytest.mark.parametrize("options", [
     {"max_model_len": True}, {"max_num_seqs": 0}, {"max_num_batched_tokens": 127},
-    {"kv_cache_memory_bytes": "64m"}, {"enforce_eager": "true"}, {"cpu_threads": 3},
-    {"dtype": "auto"}, {"dtype": []}, {"device": "gpu"}, {"cpu_kv_cache_gib": 1},
-    {"arbitrary_argv": ["--trust-remote-code"]}, {"resources": {"privileged": True}},
-    {"resources": {"cpus": True}}, {"resources": {"memory_bytes": 1}},
-    {"resources": {"shm_bytes": 4000000000}}, {"resources": {"pids_limit": -1}},
+    {"gpu_memory_utilization": 0}, {"gpu_memory_utilization": 1.5}, {"gpu_memory_utilization": True},
+    {"enforce_eager": "true"}, {"tensor_parallel_size": 0}, {"dtype": "int8"}, {"dtype": []},
+    {"device": "cpu"}, {"cpu_kv_cache_gib": 1}, {"kv_cache_memory_bytes": 67108864}, {"cpu_threads": 2},
+    {"arbitrary_argv": ["--trust-remote-code"]},
 ])
-def test_cpu_profile_rejects_invalid_or_unbounded_options(options):
+def test_gpu_profile_rejects_invalid_unbounded_or_removed_cpu_options(options):
     with pytest.raises(ValueError):
         VllmAdapter().launch_plan(launch(**options))
 
 
-def test_legacy_launch_and_gib_cache_remain_unchanged():
-    spec = LaunchSpec(model="model", port=8000, image="img", options={"revision": "rev", "models_dir": Path("/cache"),
-                                                                    "device": "cpu", "cpu_kv_cache_gib": 2})
+def test_legacy_gpu_launch_is_unchanged_and_cpu_device_is_rejected():
+    spec = LaunchSpec(model="model", port=8000, image="img", options={"revision": "rev", "models_dir": Path("/cache")})
     plan = VllmAdapter().launch_plan(spec)
-    assert plan.argv[:4] == ["--model", "model", "--revision", "rev"]
-    assert plan.env["VLLM_CPU_KVCACHE_SPACE"] == "2"
-    assert plan.entrypoint is None and plan.limits is None and plan.shm_size == "1g"
+    assert plan.argv == ["--model", "model", "--revision", "rev", "--served-model-name", "model",
+                         "--host", "0.0.0.0", "--port", "8000"]
+    assert plan.gpus and plan.entrypoint is None and plan.limits is None and plan.shm_size == "1g"
+    cpu = LaunchSpec(model="model", port=8000, image="img", options={"revision": "rev", "models_dir": Path("/cache"),
+                                                                    "device": "cpu", "cpu_kv_cache_gib": 2})
+    with pytest.raises(ValueError):
+        VllmAdapter().launch_plan(cpu)
 
 
 @pytest.mark.parametrize("values", [{"cpus": float("nan")}, {"memory_bytes": True},
@@ -101,13 +111,13 @@ def setup_inputs(tmp_path):
     (snapshot / "config.json").write_text('{"vocab_size":50272}', encoding="utf-8")
     # Deliberately a synthetic file for inventory tests; never passed to an engine.
     (snapshot / "pytorch_model.bin").write_bytes(b"synthetic inventory fixture")
-    cpu = {"architecture": "x86_64", "model": "test CPU", "system": "Linux", "kernel": "test", "threads": 2}
-    env = environment(engine={"name": "vllm", "version": "0.31.0", "image_digest": "cpu@sha256:" + "a" * 64},
-                      runtime={"gpu_count": 0, "cpu": cpu},
+    env = environment(engine={"name": "vllm", "version": "0.31.0", "image_digest": "gpu@sha256:" + "a" * 64},
+                      runtime={"gpu_count": 1, "gpu_model": "EXAMPLE-GPU", "driver": "EXAMPLE-DRIVER", "tp_size": 1},
                       model={"id": "facebook/opt-125m", "revision": "rev", "inventory_sha256": inventory(snapshot)["inventory_sha256"]})
     cfg = {"adapter": {"name": "vllm"}, "executors": {"input_validation": "real"},
            "validation": {"mode": "managed", "gateway_profile": "single"},
-           "vllm": {"models_dir": str(snapshot), "model_layout": "snapshot", "launch_profile": "cpu-bounded"},
+           "vllm": {"models_dir": str(snapshot), "model_layout": "snapshot", "launch_profile": "gpu-bounded",
+                    "gpu_devices": ["0"], "resources": dict(GPU_RESOURCES)},
            "input_validation": {"vocab_size": 50272, "vocab_source": "synthetic unit fixture"}}
     pack = baseline_pack()
     pol = policy(pack.ref(), scope={"include": ["REQ-09"]}, values={"REQ-09": {
@@ -116,28 +126,43 @@ def setup_inputs(tmp_path):
     return pack, env, pol, cfg
 
 
-def test_managed_snapshot_pins_inventory_and_rejects_thread_or_inventory_mismatch(tmp_path):
+def test_managed_snapshot_pins_inventory_and_rejects_layout_cpu_or_inventory_mismatch(tmp_path):
     _, env, _, cfg = setup_inputs(tmp_path)
     managed = application._managed_config(env, cfg)
     assert Path(managed["models_dir"]).is_absolute() and managed["image"] == env.engine.image_digest
-    assert sandbox._vllm_plan(managed).argv[4] == "/models"
+    plan = sandbox._vllm_plan(managed)
+    assert plan.argv[1] == "/models" and plan.gpu_devices == ("0",) and plan.limits.to_dict() == GPU_RESOURCES
     bad = deepcopy(cfg)
-    bad["vllm"]["cpu_threads"] = 1
-    with pytest.raises(ValueError, match="matching cpu_threads"):
+    bad["vllm"]["tensor_parallel_size"] = 2
+    with pytest.raises(ValueError, match="GPU_PARALLEL_LAYOUT_MISMATCH"):
         application._managed_config(env, bad)
+    no_shm = deepcopy(cfg)
+    del no_shm["vllm"]["resources"]["shm_bytes"]
+    with pytest.raises(ValueError, match="shm_bytes"):
+        application._managed_config(env, no_shm)
+    cpu_env = env.model_copy(update={"runtime": env.runtime.model_copy(update={"gpu_count": 0})}).seal()
+    with pytest.raises(ValueError, match="VLLM_GPU_REQUIRED"):
+        application._managed_config(cpu_env, cfg)
+    for resources in ({**GPU_RESOURCES, "privileged": True}, {**GPU_RESOURCES, "cpus": True},
+                      {**GPU_RESOURCES, "pids_limit": -1}, {"cpus": 4, "memory_bytes": 17179869184}):
+        unbounded = deepcopy(cfg)
+        unbounded["vllm"]["resources"] = resources
+        with pytest.raises(ValueError):
+            application._managed_config(env, unbounded)
     (Path(cfg["vllm"]["models_dir"]) / "config.json").write_text("changed", encoding="utf-8")
     with pytest.raises(ValueError, match="inventory differs"):
         application._managed_config(env, cfg)
 
 
-@pytest.mark.parametrize("memory_bytes, entrypoint, ready", [(8 << 30, ["vllm", "serve"], True),
-    (2 << 30, ["vllm", "serve"], False), (8 << 30, ["bash"], False)])
+# The former CPU-only entrypoint case was removed: GPU launches keep the image entrypoint.
+@pytest.mark.parametrize("memory_bytes, entrypoint, ready", [(32 << 30, ["vllm", "serve"], True),
+    (2 << 30, ["vllm", "serve"], False)])
 def test_single_readiness_checks_capacity_without_starting_or_pulling(tmp_path, monkeypatch, memory_bytes, entrypoint, ready):
     pack, env, pol, cfg = setup_inputs(tmp_path)
     class Local:
         def __init__(self, *args): pass
         def daemon_info(self, **kwargs): return {"os": "linux", "architecture": "amd64"}
-        def daemon_resources(self, **kwargs): return {"memory_bytes": memory_bytes, "cpus": 4}
+        def daemon_resources(self, **kwargs): return {"memory_bytes": memory_bytes, "cpus": 8}
         def image_info(self, image, **kwargs):
             return {"os": "linux", "architecture": "amd64", "digests": [image if "@" in image else image + "@sha256:" + "c" * 64],
                     "entrypoint": entrypoint}
@@ -192,10 +217,10 @@ def test_single_managed_validation_retains_completed_violations_on_cleanup_failu
     assert not st.verify()
 
 
-def test_windows_example_uses_literal_paths_and_separates_policy_from_launch():
-    cfg = tomllib.loads((Path(__file__).resolve().parents[1] / "examples/windows-cpu.toml").read_text(encoding="utf-8"))
-    assert cfg["vllm"]["models_dir"] == "C:\\guard-models\\opt-125m-snapshot"
-    assert cfg["vllm"]["resources"]["shm_bytes"] == 536870912
+def test_gpu_example_uses_bounded_gpu_launch_and_separates_policy_from_launch():
+    cfg = tomllib.loads((Path(__file__).resolve().parents[1] / "examples/gpu-bounded.toml").read_text(encoding="utf-8"))
+    assert cfg["vllm"]["launch_profile"] == "gpu-bounded" and cfg["vllm"]["gpu_devices"] == ["0"]
+    assert cfg["vllm"]["resources"]["shm_bytes"] == 2147483648
     assert "max_input_tokens" not in cfg["vllm"] and set(cfg["executors"].values()) == {"real"}
 
 
@@ -207,8 +232,9 @@ def test_credential_canary_is_fixed_opt_in_and_absent_when_disabled(enabled):
             calls.append(kwargs)
             return "recording-engine"
     sandbox._start_engine(Recording(), "vllm", ["net"], [],
-        {"model": "test", "revision": "rev", "image": "cpu", "models_dir": "/snapshot", "gpu": False,
-         "launch_profile": "cpu-bounded", "model_layout": "snapshot"}, credential_canary=enabled)
+        {"model": "test", "revision": "rev", "image": "gpu", "models_dir": "/snapshot", "gpu": True,
+         "gpu_devices": ["0"], "resources": dict(GPU_RESOURCES),
+         "launch_profile": "gpu-bounded", "model_layout": "snapshot"}, credential_canary=enabled)
     values = calls[0]["public_env"]
     if enabled:
         assert values["GUARD_TEST_CREDENTIAL"] == "EXAMPLE_NOT_A_SECRET"
@@ -229,9 +255,9 @@ def test_canary_rejects_non_boolean_and_confirmed_policy_before_engine_creation(
     assert not (tmp_path / "run").exists()
 
 
-def test_bounded_cpu_launch_conditions_do_not_depend_on_host_snapshot_path():
-    first = VllmAdapter().launch_plan(launch(models_dir=Path("C:/first")))
-    second = VllmAdapter().launch_plan(launch(models_dir=Path("D:/second")))
+def test_bounded_gpu_launch_conditions_do_not_depend_on_host_snapshot_path():
+    first = VllmAdapter().launch_plan(launch(models_dir=Path("/srv/first")))
+    second = VllmAdapter().launch_plan(launch(models_dir=Path("/mnt/second")))
     assert first.argv == second.argv and first.env == second.env and first.limits == second.limits
 
 
@@ -254,8 +280,8 @@ def test_requested_image_digest_wins_over_other_repository_digest():
 
 def test_update_retains_startup_and_cleanup_failures_for_both_sides(tmp_path, monkeypatch):
     pack, baseline, _, cfg = setup_inputs(tmp_path)
-    candidate = baseline.model_copy(update={"id": "ENV-CPU-CANDIDATE", "engine": baseline.engine.model_copy(update={
-        "image_digest": "cpu@sha256:" + "b" * 64})}).seal()
+    candidate = baseline.model_copy(update={"id": "ENV-GPU-CANDIDATE", "engine": baseline.engine.model_copy(update={
+        "image_digest": "gpu@sha256:" + "b" * 64})}).seal()
     cfg["executors"] = {"direct_route": "real"}
     cfg["direct_route"] = {"roles": {"allowed": "TEST_GENERAL"}}
     cfg["update"] = {"mode": "managed", "gateway_profile": "single"}
@@ -294,9 +320,9 @@ def test_cleanup_notes_are_bound_to_local_run_id_and_never_echoed():
     ("vllm", False, "hardened", None),
     ("stub", False, "hardened", None),
 ])
-def test_triton_cache_fix_is_limited_to_hardened_bounded_cpu_without_relaxing_tmp(engine, bounded, profile, triton):
+def test_triton_cache_fix_is_limited_to_hardened_bounded_gpu_without_relaxing_tmp(engine, bounded, profile, triton):
     before = deepcopy(sandbox.ENGINE_PROFILES)
-    cfg = {"launch_profile": "cpu-bounded"} if bounded else {}
+    cfg = {"launch_profile": "gpu-bounded"} if bounded else {}
     prof = sandbox._engine_profile(engine, cfg, profile)
     assert prof.get("env", {}).get("TRITON_CACHE_DIR") == triton
     if triton:
@@ -310,10 +336,10 @@ def test_triton_cache_fix_is_limited_to_hardened_bounded_cpu_without_relaxing_tm
         assert prof["cap_drop"] == ["ALL"] and prof["security_opt"] == ["no-new-privileges:true"]
         assert "/tmp:rw,noexec,nosuid,size=2g,mode=1777" in prof["tmpfs"]
         assert "/guard-cache:rw,exec,nosuid,size=2g,mode=1777" in prof["tmpfs"]
-    assert sandbox.ENGINE_PROFILES == before  # Later legacy launches must not inherit the CPU-only change.
+    assert sandbox.ENGINE_PROFILES == before  # Later legacy launches must not inherit the bounded-only change.
 
 
-def test_cpu_target_hash_conditions_record_effective_cache_environment_and_permissions(tmp_path, monkeypatch):
+def test_gpu_target_hash_conditions_record_effective_cache_environment_and_permissions(tmp_path, monkeypatch):
     captured = []
     class Recording:
         run_id = "random-local-run"
@@ -327,18 +353,21 @@ def test_cpu_target_hash_conditions_record_effective_cache_environment_and_permi
     monkeypatch.setattr(sandbox, "pull_images", lambda docker: {sandbox.NGINX_IMAGE: "nginx@sha256:fixed",
                                                                sandbox.PYTHON_IMAGE: "python@sha256:fixed"})
     monkeypatch.setattr(sandbox, "probe", lambda *args, **kwargs: {"outcome": 401})
-    cfg = {"model": "test", "revision": "rev", "image": "cpu@sha256:fixed", "models_dir": "C:/private/model",
-           "gpu": False, "launch_profile": "cpu-bounded", "model_layout": "snapshot"}
+    cfg = {"model": "test", "revision": "rev", "image": "gpu@sha256:fixed", "models_dir": "/private/model",
+           "gpu": True, "gpu_devices": ["0"], "resources": dict(GPU_RESOURCES),
+           "launch_profile": "gpu-bounded", "model_layout": "snapshot"}
     target = sandbox.up(Recording(), "isolated", tmp_path / "run", "secret-not-persisted", engine="vllm", vllm=cfg,
                         wait_ready=False, engine_profile="hardened", credential_canary=True)
     conditions = target["comparison_config"]["launch"]
     assert conditions["environment"] == captured[0]["public_env"]
     assert conditions["environment"]["TRITON_CACHE_DIR"] == "/guard-cache/triton"
     assert conditions["environment"]["TMPDIR"] == "/guard-cache"
-    assert conditions["environment"]["VLLM_CPU_OMP_THREADS_BIND"] == "nobind"
+    assert conditions["environment"]["VLLM_NO_USAGE_STATS"] == "1"
+    assert conditions["profile"] == "gpu-bounded-v1" and conditions["gpu_count"] == 1
+    assert conditions["resources"] == GPU_RESOURCES
     assert conditions["environment"]["GUARD_TEST_CREDENTIAL"] == "EXAMPLE_NOT_A_SECRET"
     assert conditions["engine_permissions"] == {key: captured[0][key] for key in
         ("cap_drop", "read_only", "tmpfs", "user", "security_opt")}
     encoded = json.dumps(target["comparison_config"])
-    assert "C:/private/model" not in encoded and "random-local-run" not in encoded
+    assert "/private/model" not in encoded and "random-local-run" not in encoded
     assert "secret-not-persisted" not in (tmp_path / "run" / "target.json").read_text(encoding="utf-8")

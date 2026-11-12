@@ -1,5 +1,6 @@
 # 런타임 작업 상태
 
+- 2026-11-12 AWS 17회차(vLLM, 코드 `1c094bc`·Gateway `rt-19b1c46`): 요청 31/31, AWS-04·05·09, A1 기본 렌더 커널 신원, A2 창(TG-CODE-01 유지·SUP-008 16), A3 권한 점검 통과. **D7 실측**: 승인값 match → `--trust-request-mm-kwargs` 추가 시 drift·config_drift 재검증 요청 생성 → 복귀 match. 발견: 수집기 컨테이너 누락(수정 `1c094bc`), D7 재검증이 플랫폼 SUP-008/014 집계에 미반영(미수정). SGLang은 사용자 요청으로 중단. 결과: docs/AWS_GPU_서버17회차_결과_20261112.md
 - 2026-11-12 D7 AWS 17회차 snapshot 누락 보정(기준 `byul_runtime` HEAD `19b1c463`, 미커밋): 호스트 수집기에 Kubernetes 이름을 검증하는 `--target-container`(기본 `engine`)를 추가해 Pod snapshot·phase writer에 함께 전달했다. 기존 빈 문자열은 D7 이전 Pod 조회에서 컨테이너명을 사용하지 않던 흔적이며, `_reduce_pod`의 기존 생략/빈 이름 동작은 유지했다. 기존 writer 시험은 등록값 `engine`을, D7 축약 시험도 명시적 `engine`을 사용해 CLI 연결 누락을 놓쳤다. 서비스·설치 문서는 기존 명령이 기본값으로 동작하므로 유지하고 D7 문서에 한 줄 추가했다.
 - 검증: 서버와 같은 CLI 옵션의 snapshot 누락을 수정 전 재현했다. 신규 `main()` 회귀 7건(기본·사용자 지정 컨테이너의 실제 snapshot 저장, 잘못된 이름 5건 거부) 포함 요청 pytest 선택식은 기존 venv·읽기 전용 PyYAML 캐시로 **118 passed / 7 skipped / 31 subtests passed**. 지정 uv 명령은 기본 캐시 읽기 전용, `/tmp` 캐시 재시도는 의존성 다운로드 DNS 제한으로 실행 전 실패했다. 로그 `/tmp/byul-d7-container-verified.log`. diff 검사 통과; 새 파일·update/contracts 변경·금지 인계 파일 열람·AWS 접속·커밋·push 없음. 실제 서버 재적용은 미확인이다.
 

@@ -1,4 +1,5 @@
 """SUP03 consumes existing Kubernetes HTTP/template reads; no new transport."""
+from copy import deepcopy
 from pathlib import Path
 
 from guard.models import DataOrigin, canonical_json, sha256_hex, utcnow
@@ -17,7 +18,8 @@ class KubernetesTemplateSupplyExecutor(HttpCheckExecutor):
     functional_via = "engine"
 
     def __init__(self, cfg, *, runner=None, environ=None, expected_target_sha256=None):
-        super().__init__(cfg, environ=environ)
+        self.b_cpu_support_input = deepcopy(cfg.get('cpu_support_input'))
+        super().__init__({k: v for k, v in cfg.items() if k != 'cpu_support_input'}, environ=environ)
         if expected_target_sha256 is not None and (type(expected_target_sha256) is not str
                 or len(expected_target_sha256) != 64
                 or any(c not in "0123456789abcdef" for c in expected_target_sha256)):
@@ -63,7 +65,9 @@ class KubernetesTemplateSupplyExecutor(HttpCheckExecutor):
             draft.comparability.fixture_sha256 = ctx._template_fixture_sha256
         append_artifact(draft, ctx, "template_samples.json", f"{self.name}/{self.version}")
         from .common_consumption import attach
-        return attach(draft, ctx, self.cfg, kind="supply-reads")
+        from .committed_cpu_support import attach as attach_cpu_support
+        return attach_cpu_support(attach(draft, ctx, self.cfg, kind="supply-reads"),
+                                  ctx.check, self.b_cpu_support_input, ctx.workdir)
 
     def collect(self, ctx):
         return supply.collect(self, ctx, kubernetes=True)

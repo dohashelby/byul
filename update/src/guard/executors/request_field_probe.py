@@ -121,7 +121,8 @@ def collect(ctx, cfg):
         template["body"]["return_token_ids"] = True
 
     def send(request, label):
-        result = bounded_probe(ctx, ctx.trusted_net, request)
+        from .req_runner_capture import case_call
+        result = case_call(ctx, label, request, lambda: bounded_probe(ctx, ctx.trusted_net, request))
         record_content(ctx, "trusted", "request-field", label, {key: result.get(key) for key in ("outcome", "body_bytes", "body_sha256")})
         return result
 

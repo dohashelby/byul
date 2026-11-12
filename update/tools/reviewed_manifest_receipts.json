@@ -10,6 +10,11 @@
       "manifest_sha256": "1b6d81bb5ed3f3f6d2934400e98f48d883742490061c7d6a9276bdf548ceb772",
       "reviewed_by": "Codex / non-author merge boundary review / selected37",
       "reviewed_at": "2026-11-10T00:43:41+09:00"
+    },
+    {
+      "manifest_sha256": "b7d5035a41e5add875eaa491c163bf0810ca9c3e5b1fc871437e029d19801498",
+      "reviewed_by": "Codex / BYUL UPDATE B / S4 independent PR240 package preparation review",
+      "reviewed_at": "2026-11-11T15:14:26+09:00"
     }
   ]
 }

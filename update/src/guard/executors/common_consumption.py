@@ -106,7 +106,24 @@ def runner(record, scope, *, check_id, requests, required_cases):
         details["identity_binding_verified"] = bool(case_bindings) and len(generations) == 1 and not any(
             tuple(b[k] for k in ("pod_uid", "container_id", "restart_count", "worker_pid")) in reused
             for b in case_bindings)
-    candidates = [row for row in result["violation_candidates"] if row.get("request_sha256") in selected_requests]
+        # Only the new native rejection/consumption confirmation uses this
+        # fact. /1 retains its original integer-ticks binding contract.
+        details["process_start_identity_observed"] = bool(case_bindings) and all(
+            b["start_ticks"] is not None for b in case_bindings)
+    candidates = []
+    for candidate in result["violation_candidates"]:
+        # /2 and /3 rejected-input candidates point to an exact validated
+        # event seq instead of repeating its request identity. Preserve that
+        # reference; never use time, order of cases or a leftover request.
+        request = candidate.get("request_sha256")
+        seq = candidate.get("seq")
+        if (request is None and record["schema"] in {"guard-gpu-common-input/2", "guard-gpu-common-input/3"}
+                and type(seq) is int and 0 <= seq < len(record["events"])):
+            event = record["events"][seq]
+            if event["seq"] == seq:
+                request = event["request_sha256"]
+        if request in selected_requests:
+            candidates.append({**candidate, "request_sha256": request})
     if candidates:
         gaps.append("B_RUNNER_CONSUMPTION_CONTRADICTION")
     return {**result, "complete": result["complete"] and not gaps, "gaps": sorted(set(gaps)),
@@ -143,6 +160,13 @@ def _abort_incomplete(draft):
     draft.abort_reason = "; ".join(filter(None, (draft.abort_reason, "B_COMMON_CONSUMPTION_INCOMPLETE")))
     if draft.data_origin == DataOrigin.MEASURED:
         draft.data_origin = DataOrigin.DECLARED
+
+
+def _qualified_runner_fact(record, projection):
+    """Current /2-/3 scope qualification is separate from source registration."""
+    return projection["supported"] and (record["schema"] == "guard-gpu-common-input/1" or (
+        record["schema"] in {"guard-gpu-common-input/2", "guard-gpu-common-input/3"}
+        and projection.get("runtime_qualified") is True))
 
 
 def attach(draft, ctx, cfg, *, kind):
@@ -192,6 +216,18 @@ def attach(draft, ctx, cfg, *, kind):
             projected["complete"] = projected["complete"] and not projected["gaps"]
             if ctx.check.id == "REQ-10":
                 draft.observations["runner_consumption_verified"] = Observation(collected=True, value=projected["complete"])
+            elif ctx.check.id == "REQ-08":
+                case = projected["cases"].get("reused_input", {})
+                if (ctx.policy_values.get("reused_token_allowed") is False and _qualified_runner_fact(record, projected)
+                        and case.get("api_state") == "api_rejected"
+                        and case.get("causal_order_verified") and case.get("identity_binding_verified")
+                        and case.get("process_start_identity_observed")):
+                    obs = draft.observations.get("reused_input_violations")
+                    existing = list(obs.value or []) if obs is not None and obs.collected else []
+                    code = "native_rejected_reused_input_consumed"
+                    if code not in existing:
+                        existing.append(code)
+                    draft.observations["reused_input_violations"] = Observation(collected=True, value=existing)
             elif ctx.check.id == "REQ-09":
                 obs = draft.observations.get("confirmed_input_violations")
                 existing = list(obs.value or []) if obs is not None and obs.collected else []

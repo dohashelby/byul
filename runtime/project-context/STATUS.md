@@ -1,5 +1,8 @@
 # 런타임 작업 상태
 
+- 2026-11-12 D7 AWS 17회차 snapshot 누락 보정(기준 `byul_runtime` HEAD `19b1c463`, 미커밋): 호스트 수집기에 Kubernetes 이름을 검증하는 `--target-container`(기본 `engine`)를 추가해 Pod snapshot·phase writer에 함께 전달했다. 기존 빈 문자열은 D7 이전 Pod 조회에서 컨테이너명을 사용하지 않던 흔적이며, `_reduce_pod`의 기존 생략/빈 이름 동작은 유지했다. 기존 writer 시험은 등록값 `engine`을, D7 축약 시험도 명시적 `engine`을 사용해 CLI 연결 누락을 놓쳤다. 서비스·설치 문서는 기존 명령이 기본값으로 동작하므로 유지하고 D7 문서에 한 줄 추가했다.
+- 검증: 서버와 같은 CLI 옵션의 snapshot 누락을 수정 전 재현했다. 신규 `main()` 회귀 7건(기본·사용자 지정 컨테이너의 실제 snapshot 저장, 잘못된 이름 5건 거부) 포함 요청 pytest 선택식은 기존 venv·읽기 전용 PyYAML 캐시로 **118 passed / 7 skipped / 31 subtests passed**. 지정 uv 명령은 기본 캐시 읽기 전용, `/tmp` 캐시 재시도는 의존성 다운로드 DNS 제한으로 실행 전 실패했다. 로그 `/tmp/byul-d7-container-verified.log`. diff 검사 통과; 새 파일·update/contracts 변경·금지 인계 파일 열람·AWS 접속·커밋·push 없음. 실제 서버 재적용은 미확인이다.
+
 - 2026-11-12 Claude 검수(로컬, CI 명령): D7 약어 우회 지적 → Codex 수정 확인. runtime **1802 passed**/4 skipped, platform API **462 passed**, 계약 검사 오류 0, web 직렬 216 passed(기본 병렬은 시간 초과 2~4건, CI 확인 필요). 로컬 커밋 후 AWS 17회차에서 실측.
 - 2026-11-12 D7 검수 보정(기준 `byul_runtime` `5b2c9ae6`, 미커밋): argparse 약어를 기본값 match로 오인하는 지적을 재현했다. 감시 플래그·vLLM no-형·config의 진부분 접두어(vLLM `_` 정규화 포함)를 만나면 값 소비를 추정하지 않고 파싱을 중단해 적용 가능한 키 모두 unknown으로 둔다. 회귀 15건 수정 전 실패 → 관련 runtime **94 통과·8 skip·28 subtests**(D7 52건 포함), diff 검사 통과. 실행 명령·결과 `/tmp/byul-d7-abbrev-review.txt`.
 - 웹 시간 확인만 수행: HEAD와 현재 복사본의 framework 시험을 작업자 1개로 번갈아 3회씩 실행해 전부 통과(27건/28건). weights 시험 중앙값 **404.6ms → 349.1ms**, D7 추가 시험 **116.9ms**; 기존 시험의 일관된 지연 증거 없음. 기본 병렬 전체의 시간 초과 원인은 확정하지 않았고 웹 코드는 변경하지 않았다. `update/` 수정·금지 인계 파일 열람·커밋·push 없음.

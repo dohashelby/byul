@@ -1253,6 +1253,7 @@ def run(
     reader_gid: int | None = None,
     target_selector: tuple[tuple[str, str], ...] | None = None,
     target_namespace: str = LAB_NAMESPACE,
+    target_container: str = "engine",
     target_interval_s: float = DEFAULT_TARGET_INTERVAL_S,
     phase_timeline: bool = False,
     phase_engine: str = "vllm",
@@ -1260,6 +1261,7 @@ def run(
     global _reader_gid
     if phase_timeline and target_selector is None:
         raise ValueError("--phase-timeline requires --target-selector")
+    validate_kubernetes_name(target_container, "target container")
     assert_safe_context(context)
     check_reader_group(reader_gid)
     _reader_gid = reader_gid
@@ -1272,13 +1274,13 @@ def run(
         validate_kubernetes_name(target_namespace, "target namespace")
         target_writer = TargetPodSnapshotWriter(
             output_dir / "target-pods.json",
-            KubernetesSelector(context, target_namespace, target_selector, ""),
+            KubernetesSelector(context, target_namespace, target_selector, target_container),
             interval_s=target_interval_s,
         )
         if phase_timeline:
             phase_writer = EnginePhaseTimelineWriter(
                 output_dir / "phase-timeline.json",
-                KubernetesSelector(context, target_namespace, target_selector, "engine"),
+                KubernetesSelector(context, target_namespace, target_selector, target_container),
                 engine=phase_engine,
             )
     hubble_path = output_dir / "hubble.jsonl"
@@ -1445,6 +1447,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="대상 Pod namespace (기본: serving-lab)",
     )
     parser.add_argument(
+        "--target-container",
+        default="engine",
+        metavar="NAME",
+        help="실행 설정과 단계 시간표를 수집할 대상 컨테이너 (기본: engine)",
+    )
+    parser.add_argument(
         "--target-interval",
         type=_target_interval_argument,
         default=DEFAULT_TARGET_INTERVAL_S,
@@ -1473,6 +1481,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             reader_gid=args.reader_group,
             target_selector=target_selector,
             target_namespace=args.target_namespace,
+            target_container=args.target_container,
             target_interval_s=args.target_interval,
             phase_timeline=args.phase_timeline,
             phase_engine=args.phase_engine,

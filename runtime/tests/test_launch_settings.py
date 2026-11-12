@@ -1,5 +1,6 @@
 """D7 parsing, safe transport and revalidation lifecycle."""
 import json
+import subprocess
 from unittest.mock import Mock
 
 import pytest
@@ -153,6 +154,71 @@ def test_host_transport_excludes_non_engine_containers():
     reduced = _reduce_pod(raw, 'engine')
     assert 'unrelated' not in json.dumps(reduced)
     assert len(reduced['spec']['containers']) == 1
+
+
+@pytest.mark.parametrize('target_container', [None, 'inference'])
+def test_observation_feed_main_writes_launch_settings(tmp_path, monkeypatch, target_container):
+    from tools import k8s_observation_feed as feed
+
+    container = target_container or 'engine'
+    marker = 'D7_UNRELATED_VALUE_MUST_NOT_SURVIVE'
+    raw = pod(['--trust-remote-code', '--revision=approved', '--api-key', marker])
+    raw['spec']['containers'][0]['name'] = container
+    raw['status']['containerStatuses'][0]['name'] = container
+    raw['spec']['containers'].append({'name': 'sidecar', 'args': ['--revision', marker]})
+    runner = Mock(return_value=subprocess.CompletedProcess(
+        [], 0, json.dumps({'items': [raw]}), ''))
+
+    # Run the real CLI, writer construction, reduction and atomic file write;
+    # replace external feeds, host group changes and recurring collection only.
+    def collect_once(writer, _stop):
+        writer.runner = runner
+        writer.collect_once()
+
+    phase_containers = []
+    monkeypatch.setattr(feed.TargetPodSnapshotWriter, 'follow', collect_once)
+    monkeypatch.setattr(feed.EnginePhaseTimelineWriter, 'follow',
+                        lambda writer, _stop: phase_containers.append(writer.selector.container))
+    monkeypatch.setattr(feed._Supervisor, 'start_group', Mock())
+    monkeypatch.setattr(feed._Supervisor, 'tick', Mock(side_effect=KeyboardInterrupt))
+    monkeypatch.setattr(feed, 'check_reader_group', Mock())
+    monkeypatch.setattr(feed, '_share', Mock())
+    monkeypatch.setattr(feed, '_share_fd', Mock())
+    monkeypatch.setattr(feed, '_reader_gid', None)
+    argv = ['--kube-context', 'byul-aws-lab', '--output-dir', str(tmp_path),
+            '--reader-group', '10010', '--target-selector', 'app=serving-engine',
+            '--target-interval', '5', '--phase-timeline']
+    if target_container is not None:
+        argv.extend(['--target-container', target_container])
+
+    assert feed.main(argv) == 0
+    stored = json.loads((tmp_path / 'target-pods.json').read_text())
+    assert stored['state'] == 'ok'
+    assert stored['context'] == 'byul-aws-lab'
+    assert [c['name'] for c in stored['items'][0]['spec']['containers']] == [container]
+    settings = stored['items'][0]['spec']['containers'][0]['launch_settings']
+    assert set(settings) == {'vllm', 'sglang'}
+    assert settings['vllm']['settings']['trust_remote_code'] == {'state': 'observed', 'value': True}
+    assert settings['vllm']['settings']['revision'] == {'state': 'observed', 'value': 'approved'}
+    assert summarize_pods(stored, container, 'vllm')['launch_settings'] == settings['vllm']
+    assert marker not in json.dumps(stored)
+    assert not {'command', 'args', 'env'} & stored['items'][0]['spec']['containers'][0].keys()
+    assert phase_containers == [container]
+    feed.check_reader_group.assert_called_once_with(10010)
+    assert runner.call_args.args[0] == [
+        'kubectl', '--context', 'byul-aws-lab', '--namespace', 'serving-lab',
+        'get', 'pods', '--selector', 'app=serving-engine', '-o', 'json']
+
+
+@pytest.mark.parametrize('container', ['', 'Bad_Name', '-engine', 'engine/sidecar', 'a' * 64])
+def test_observation_feed_main_rejects_invalid_target_container(tmp_path, capsys, container):
+    from tools import k8s_observation_feed as feed
+
+    output = tmp_path / 'observation'
+    assert feed.main(['--output-dir', str(output), '--target-selector', 'app=serving-engine',
+                      f'--target-container={container}']) == 1
+    assert 'target container must be a Kubernetes name' in capsys.readouterr().err
+    assert not output.exists()
 
 
 def test_gateway_pod_callback_runs_existing_revalidation_flow(tmp_path):

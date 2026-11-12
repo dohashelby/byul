@@ -511,7 +511,7 @@
   "update/src/guard/runtime/kubernetes_worker_readiness.py": "ab933ca4a869272d37143643f2bec0519c17e52af1a33814ae86f92338d312a6",
   "update/src/guard/runtime/profiler_owned_trace.py": "e685efdd9a5dc016276b845348dda9c7c55199461a5fe02b150bbbb8b8fb4c1f",
   "update/src/guard/runtime/resource_lease.py": "2eba72ef2589bc2f3ccfc436a0aaa0a79b2dcacc72c31f12bca3f38e6840d7df",
-  "update/src/guard/runtime/reviewed_http_contract.py": "0579a1a744abfff606d529e5e72ad9d3b0bce2e2b23f4507925a47113c63b1aa",
+  "update/src/guard/runtime/reviewed_http_contract.py": "3dcb81fc3d217f830cc27b82c8b38357661335f79f29983634354e4002104426",
   "update/src/guard/runtime/sandbox.py": "4fc28fd60994810c1a50596344dd76250bfb78e1fd7c28780183eff20e590883",
   "update/src/guard/runtime/sensor_binding.py": "b7a9e01cd7cdf7ec015c32b48cb39765bdeef4c17942176a3daabb4ccce86293",
   "update/src/guard/store/__init__.py": "c3c68922dec8668bc18d6c13720bad8f7d0178920a3e483dd833b9fda4accb5a",

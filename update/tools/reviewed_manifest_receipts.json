@@ -10,6 +10,11 @@
       "manifest_sha256": "1b6d81bb5ed3f3f6d2934400e98f48d883742490061c7d6a9276bdf548ceb772",
       "reviewed_by": "Codex / non-author merge boundary review / selected37",
       "reviewed_at": "2026-11-10T00:43:41+09:00"
+    },
+    {
+      "manifest_sha256": "67695522c51c6779444a12e3712e62db7011008443f38a9494cb603645b6880a",
+      "reviewed_by": "Claude / BYUL UPDATE A / PR246 self-review; B review waived by user 2026-11-12",
+      "reviewed_at": "2026-11-12T13:28:47+09:00"
     }
   ]
 }

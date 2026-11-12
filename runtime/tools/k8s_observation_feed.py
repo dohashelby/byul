@@ -637,7 +637,7 @@ def _strings(document: object) -> dict[str, str]:
     }
 
 
-def _reduce_pod(item: object) -> dict[str, object] | None:
+def _reduce_pod(item: object, engine_container: str | None = None) -> dict[str, object] | None:
     """Keep only the non-secret Pod fields used by ``summarize_pods``."""
 
     if not isinstance(item, dict):
@@ -656,6 +656,13 @@ def _reduce_pod(item: object) -> dict[str, object] | None:
     spec: dict[str, object] = {}
     if isinstance(source_spec.get("nodeName"), str):
         spec["nodeName"] = source_spec["nodeName"]
+    from serving_runtime.mvp.launch_settings import observe
+    containers = source_spec.get("containers")
+    if isinstance(containers, list):
+        spec["containers"] = [
+            {"name": c["name"], "launch_settings": {engine: observe(c, engine) for engine in ("vllm", "sglang")}}
+            for c in containers if isinstance(c, dict) and c.get("name") == engine_container
+        ]
 
     source_status = item.get("status") if isinstance(item.get("status"), dict) else {}
     status: dict[str, object] = {}
@@ -763,7 +770,7 @@ class TargetPodSnapshotWriter:
                                 "items": [
                                     reduced
                                     for item in items
-                                    if (reduced := _reduce_pod(item)) is not None
+                                    if (reduced := _reduce_pod(item, self.selector.container)) is not None
                                 ],
                             }
                         )

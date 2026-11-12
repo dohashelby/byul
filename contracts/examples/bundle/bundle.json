@@ -5,7 +5,7 @@
   "policy_ref": {
     "policy_id": "local-policy-001",
     "policy_version": "3",
-    "sha256": "f9a8112ae54cacb0e14330c5d2b36231ddc19a7bb7daff3b7505261c9d35cce3"
+    "sha256": "9dbf1504c87cc7b9b0016af599f346ab574c1dfc346302e69023411fb80ce0a1"
   },
   "target_ref": "mock-engine-001",
   "approval": {

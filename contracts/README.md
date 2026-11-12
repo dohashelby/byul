@@ -189,3 +189,19 @@ runtime 자체 대시보드(삭제)가 보여주던 항목을 platform이 계약
 - `revalidation-request` 0.2: `opened_at`, `current_evidence_present`
 - 신규 `runtime-lab-report` 0.1, `runtime-request-detail` 0.1
 - 쓰는 곳: platform만. 예시는 모두 EXAMPLE이며 `tools/check_contracts.py` 통과
+
+### 환경 0.2 실행 설정과 0.1 호환
+
+새 환경 문서는 `byul-environment/0.2`를 사용한다. 현재 environment 스키마와
+platform 검증기는 0.1·0.2를 모두 읽으며, 0.1은 `launch_settings`가 없는 기존 형태다.
+0.1 문서에 실행 설정을 넣으려면 0.2로 올린다. 스키마 `$id`의 `/0.1/` 경로는
+다른 계약의 참조를 유지하는 위치이며 문서의 `schema_version`과 별개다.
+기존 0.1 strict 소비자는 0.2를 거부하므로 소비자부터 갱신해야 한다.
+
+선택 필드 `deployment.launch_settings`는 null 또는 허용 목록의 6개 키만 받는 객체다.
+키 생략은 승인값 미정(비교 제외), null은 확인 안 됨이며 false로 바꾸지 않는다.
+플랫폼 bundle은 이 값을 `server.target.launch_settings` → 해시로 결속된 `target.json`에
+옮겨 runtime으로 전달한다. 0.1에서는 이 필드를 전달하지 않는다.
+엔진별 선언값·기본값 비교, `unknown`/`not_applicable`, 탐지 후 `config_drift`
+재검증 요청은 runtime이 담당한다. 자동 차단이나 재시작은 하지 않는다.
+`check_contracts.py`는 0.1 호환·0.2 nullable/선택 필드·허용 목록과 길이 제한을 검사한다.

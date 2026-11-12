@@ -53,7 +53,7 @@ const FACT_HINT: Record<string, string> = {
 
 export function newEnvironment(): EnvironmentDoc {
   return {
-    schema_version: "byul-environment/0.1",
+    schema_version: "byul-environment/0.2",
     environment_id: "",
     revision: 1,
     created_at: new Date().toISOString(),
@@ -489,6 +489,7 @@ function ContractFields({ cond, ctx, doc }: { cond: string; ctx: FormCtx; doc: E
               <NumberField ctx={ctx} path="/deployment/management_port" label="관리 포트" nullable />
               <LabelsField ctx={ctx} path="/deployment/gateway_labels" label="Gateway labels" />
               <LabelsField ctx={ctx} path="/deployment/engine_labels" label="엔진 labels" />
+              <LaunchSettingsFields ctx={ctx} />
               <JsonField ctx={ctx} path="/deployment/enforcement_intent" label="환경 집행 intent (정책에 없을 때)" rows={8} hint="runtime-enforcement-intent/1.1 원본 JSON. 모르면 비워 둡니다." />
             </div>
           )}
@@ -498,6 +499,39 @@ function ContractFields({ cond, ctx, doc }: { cond: string; ctx: FormCtx; doc: E
     default:
       return null;
   }
+}
+
+/** 승인값의 생략·null·false를 구분해서 편집한다. */
+function LaunchSettingsFields({ ctx }: { ctx: FormCtx }) {
+  const keys = ["trust_remote_code", "trust_request_mm_kwargs", "code_revision", "revision", "tokenizer_revision", "enable_multimodal"];
+  const bools = new Set(["trust_remote_code", "trust_request_mm_kwargs", "enable_multimodal"]);
+  const set = (key: string, value: unknown) => {
+    const settings = { ...((getIn(ctx.doc, "/deployment/launch_settings") ?? {}) as Values) };
+    if (value === undefined) delete settings[key];
+    else settings[key] = value;
+    ctx.set("/", { ...setIn(ctx.doc, "/deployment/launch_settings", settings), schema_version: "byul-environment/0.2" });
+  };
+  return <fieldset>
+    <legend>승인한 엔진 실행 설정</legend>
+    <p className="notice">미입력은 승인값 미정, 모름은 null입니다. 선언된 Pod 설정과 다르면 재검증을 요청합니다.</p>
+    {keys.map((key) => {
+      const value = getIn(ctx.doc, `/deployment/launch_settings/${key}`);
+      const mode = value === undefined ? "absent" : value === null ? "unknown" : "value";
+      return <div key={key}>
+        <label>{key}
+          <select className="select" aria-label={`${key} 승인 상태`} value={bools.has(key) && mode === "value" ? String(value) : mode}
+            onChange={(e) => set(key, e.target.value === "absent" ? undefined : e.target.value === "unknown" ? null : bools.has(key) ? e.target.value === "true" : "")}>
+            <option value="absent">미입력 (비교 안 함)</option>
+            <option value="unknown">모름 (null)</option>
+            {bools.has(key) ? <><option value="false">꺼짐 (false)</option><option value="true">켜짐 (true)</option></> : <option value="value">승인 판본 입력</option>}
+          </select>
+        </label>
+        {!bools.has(key) && mode === "value" && <input className="input" aria-label={`${key} 승인 판본`} maxLength={128} value={String(value)} onChange={(e) => set(key, e.target.value)} />}
+        <FieldMessages ctx={ctx} path={`/deployment/launch_settings/${key}`} />
+      </div>;
+    })}
+    <FieldMessages ctx={ctx} path="/deployment/launch_settings" exact />
+  </fieldset>;
 }
 
 /** Kubernetes label 같은 문자열 표. 비우면 필드를 넣지 않는다. */

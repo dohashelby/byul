@@ -7367,7 +7367,10 @@
         ],
         "properties": {
           "schema_version": {
-            "const": "byul-environment/0.1"
+            "enum": [
+              "byul-environment/0.1",
+              "byul-environment/0.2"
+            ]
           },
           "environment_id": {
             "$ref": "#/components/schemas/Common_local_id"
@@ -7622,6 +7625,59 @@
                       "null"
                     ]
                   },
+                  "launch_settings": {
+                    "description": "승인한 엔진 실행 설정(보안에 영향이 있는 항목만). runtime이 실행 중 엔진과 비교하고, 다르면 설정 변화(config_drift)로 재검증을 요청한다. 키가 없으면 승인값 미정이며 비교하지 않는다. null은 확인 안 됨이고 false로 대신 채우지 않는다.",
+                    "oneOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "trust_remote_code": {
+                            "type": [
+                              "boolean",
+                              "null"
+                            ]
+                          },
+                          "trust_request_mm_kwargs": {
+                            "type": [
+                              "boolean",
+                              "null"
+                            ]
+                          },
+                          "code_revision": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "maxLength": 128
+                          },
+                          "revision": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "maxLength": 128
+                          },
+                          "tokenizer_revision": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "maxLength": 128
+                          },
+                          "enable_multimodal": {
+                            "type": [
+                              "boolean",
+                              "null"
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
                   "engine_container": {
                     "type": [
                       "string",
@@ -7699,7 +7755,30 @@
             "description": "선택. 프레임워크 12개 환경 조건·환경 역할·확인 상태·구조화된 비사용 근거. 없거나 null이면 기존 소비자 동작과 같다.",
             "$ref": "#/components/schemas/FrameworkInput_framework_profile"
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "schema_version": {
+                  "const": "byul-environment/0.1"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "deployment": {
+                  "not": {
+                    "type": "object",
+                    "required": [
+                      "launch_settings"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
       },
       "Environment_labels": {
         "type": "object",

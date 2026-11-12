@@ -391,10 +391,11 @@ class GatewayApp:
                     KubernetesTargetCollector(
                         registration.kubernetes,
                         timeout_s=config.cilium_timeout_s,
+                        engine_kind=registration.engine_kind,
                     ).collect,
                     config.collector_interval_s,
                     config.collector_stale_after_s,
-                    on_collected=self._target.observe_kubernetes,
+                    on_collected=self._observe_target_pods,
                 )
             )
         if config.target_pod_snapshot is not None and registration.kubernetes is not None:
@@ -406,10 +407,11 @@ class GatewayApp:
                         registration.kubernetes,
                         stale_after_s=config.collector_stale_after_s,
                         not_before=datetime.now(timezone.utc),
+                        engine_kind=registration.engine_kind,
                     ).collect,
                     config.collector_interval_s,
                     config.collector_stale_after_s,
-                    on_collected=self._target.observe_kubernetes,
+                    on_collected=self._observe_target_pods,
                 )
             )
         self._collectors = CollectorManager(
@@ -461,9 +463,7 @@ class GatewayApp:
         self, _result: Any, _data_origin: str | None
     ) -> None:
         try:
-            comparison = compare_baseline(
-                self._baseline, self._manifest, self._collectors
-            )
+            comparison = self.baseline_status()
         except Exception as error:
             self._revalidation.record_evaluation_error("baseline", error)
             return
@@ -632,7 +632,17 @@ class GatewayApp:
         }
 
     def baseline_status(self) -> dict[str, Any]:
-        return compare_baseline(self._baseline, self._manifest, self._collectors)
+        from .launch_settings import comparison_rows
+
+        comparison = compare_baseline(self._baseline, self._manifest, self._collectors)
+        registration = self._target.registration
+        if registration.state == "ok" and registration.engine_kind in {"vllm", "sglang"}:
+            comparison["rows"].extend(comparison_rows(registration.launch_settings, self._collectors.get("target_pods")))
+        return comparison
+
+    def _observe_target_pods(self, result: Any, data_origin: str | None) -> None:
+        self._target.observe_kubernetes(result, data_origin)
+        self._evaluate_baseline_revalidation(result, data_origin)
 
     def collectors_status(self) -> dict[str, Any]:
         return {

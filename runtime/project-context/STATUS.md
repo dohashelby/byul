@@ -1,5 +1,13 @@
 # 런타임 작업 상태
 
+- 2026-11-12 Claude 검수(로컬, CI 명령): D7 약어 우회 지적 → Codex 수정 확인. runtime **1802 passed**/4 skipped, platform API **462 passed**, 계약 검사 오류 0, web 직렬 216 passed(기본 병렬은 시간 초과 2~4건, CI 확인 필요). 로컬 커밋 후 AWS 17회차에서 실측.
+- 2026-11-12 D7 검수 보정(기준 `byul_runtime` `5b2c9ae6`, 미커밋): argparse 약어를 기본값 match로 오인하는 지적을 재현했다. 감시 플래그·vLLM no-형·config의 진부분 접두어(vLLM `_` 정규화 포함)를 만나면 값 소비를 추정하지 않고 파싱을 중단해 적용 가능한 키 모두 unknown으로 둔다. 회귀 15건 수정 전 실패 → 관련 runtime **94 통과·8 skip·28 subtests**(D7 52건 포함), diff 검사 통과. 실행 명령·결과 `/tmp/byul-d7-abbrev-review.txt`.
+- 웹 시간 확인만 수행: HEAD와 현재 복사본의 framework 시험을 작업자 1개로 번갈아 3회씩 실행해 전부 통과(27건/28건). weights 시험 중앙값 **404.6ms → 349.1ms**, D7 추가 시험 **116.9ms**; 기존 시험의 일관된 지연 증거 없음. 기본 병렬 전체의 시간 초과 원인은 확정하지 않았고 웹 코드는 변경하지 않았다. `update/` 수정·금지 인계 파일 열람·커밋·push 없음.
+
+- 2026-11-12 D7 엔진 실행 설정 감시(기준 `byul_runtime` HEAD `5b2c9ae6`, 미커밋): 확정 계약 environment 0.2/0.1 호환·6개 선택 실행 설정, 플랫폼 입력·bundle 전달·생성 타입, Pod 선언 허용 목록 추출·기본값 비교 → 기존 config_drift 재검증 요청을 구현했다. 출처 kubernetes_spec, 관측 불가 unknown·해당 없음 not_applicable·미입력 비교 제외·null 보존. 자동 차단 없음. SUP-008/014 rules·sources 연결; SUP-002는 CHECKS에 없어 유지했다. [설명](../docs/launch-settings-monitor.md).
+- 시험: D7 37건 포함 runtime 관련 **124 통과·8 skip·32 subtests**, 보충 전체 **1,614 통과·49 소켓 EPERM 실패·130 skip·931 subtests**. API 관련 **97 통과·소켓 실패 1**, 최종 전체 **459 통과·2 실패·1 skip**(소켓 1, `test_platform_agent_apply_temporary_gateway_verified[gateway-core]` VALIDATION_FAILED 1 → 단독 재실행 통과, 원인 미확정). 지정 uv는 캐시 권한/DNS 제한으로 실행 전 실패; 전체 보충 실행은 기존 venv·PyYAML 캐시·EpollSelector 대기만 제한하는 외부 보조 설정을 썼다. web 기본 병렬 시험 시간 초과/DOM 대기 5건 → 작업자 1개로 **216 통과**, 빌드 통과. 계약 **스키마 13/예시 11 오류 0**, diff 검사 통과. 명령 `/tmp/byul-d7-test-commands.txt`, 최종 로그 `/tmp/byul-d7-{runtime-last,api-last,api-operation-recheck,web-final,web-build-final}.log`.
+- update 읽기 확인: guard 파일 수집기는 별도 ENV 형식이고 BYUL import는 공유 Contracts로 0.1/0.2 모두 수용한다. launch_settings는 원본에만 보존되며 guard ENV/실행 검증으로 전달하지 않는다(두 버전 import·load 시험 통과). `update/` 수정·금지 인계 파일 열람·실서버 접속·커밋·push 없음. 실제 Pod/프로세스·kind/AWS 시험, 다른 엔진 판본 기본값, 표준 CI 전체 재시험 및 Claude 대화형 검수는 남았다.
+
 - 2026-11-11 Codex, byul_runtime/fa4ad454: AWS 16회차 A1~A3 후속 수정(코드 정책 기본 신원, 체크리스트 규칙 묶음 조회, 기록 권한 명시 이전·오류 원인 보존). 계약·update 무변경, 커밋/push·AWS/kind 접속 없음.
 - 검증: 관련 111 passed/22 subtests. 표준 전체 실행은 TestClient/AnyIO 대기로 중단; 해당 대기만 skip한 보충 전체는 runtime 1567 passed/49 EPERM failed/131 skipped/931 subtests, 플랫폼 277 passed/166 skipped. 기존 STATUS 본문 보존; 실제 서버 재적용·속도는 미확인.
 - Claude 검수(로컬, CI 명령): A2로 바뀐 Tetragon 창 한도(50+10×TG 규칙 수)에 점검 도구 `selected_runtime_check.validate_windows`와 시험 fixture를 맞춤. runtime 1749 passed/4 skipped(`test_mvp_zeroday_profile` 1건 간헐 실패, 단독 3회 통과), platform API 443 passed. 서버 반영은 17회차.

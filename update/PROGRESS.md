@@ -1,3 +1,9 @@
+## 2026-11-12 — 작업지시서 3차 개정(MVP 판본·SUP-08 분담)
+
+- 한 일: 사용자 결정으로 MVP 판본 쌍을 기준 0.7.0·후보 0.30.0으로 바꾸고 [작업지시서 3차](docs/WORK_ORDER_VLLM_MVP.md)를 고쳤다. 판본은 0.1절 "MVP 판본 표"에만 두고 나머지는 기준·후보 판본으로 썼다. 완료 기준에 "판본 추가는 데이터만으로 된다"(5)와 SUP-08 실제 회귀(4)를 넣었다. 정본 실측과 두 판본 비교를 J02 하나로 합쳤다. A는 SUP-08(M-A8), B는 SUP-08을 피해 나머지 42개를 맡고, A 전용 파일과 함께 쓰는 파일의 부분 소유를 정했다. 새 작업: M-A6 판본 적용표·고정값 도구, M-B4 B 관측기의 두 판본 고정값. `CLAUDE.md`·`AGENTS.md` 5절 완성 기준과 DECISIONS를 같은 결정으로 고쳤다.
+- 테스트 결과: 문서만 변경. 판본 표기는 0.1절 표에만 있는지, 배정표 69행(A 27·B 42)을 확인했다.
+- 다음 단계: 결정 1~8, 단계 0(M-A1~A8, M-B1~B6). 판본 적용표(M-A6)를 GPU 비용 승인 전에 낸다.
+
 ## 2026-11-12 — update CI 문서 제외 범위 확대
 
 - 한 일: update CI가 `update/docs/**/*.md`만 건너뛰어 `CLAUDE.md`·`AGENTS.md`·`PROGRESS.md`처럼 `update/` 바로 아래 문서만 바꾼 PR도 전체 시험을 돌렸다. `.github/workflows/update.yml` push 경로와 `.github/update-ci-paths.txt`에 `!update/*.md`를 더했다. 하위 폴더의 `.md`(fixture·reference)는 그대로 시험 대상이다. runtime·platform CI는 바꾸지 않았다.

@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "environment_id", "revision", "created_at", "data_origin", "target", "facts"],
   "properties": {
-    "schema_version": { "const": "byul-environment/0.1" },
+    "schema_version": { "enum": ["byul-environment/0.1", "byul-environment/0.2"] },
     "environment_id": { "$ref": "common.schema.json#/$defs/local_id" },
     "revision": { "type": "integer", "minimum": 1 },
     "created_at": { "$ref": "common.schema.json#/$defs/timestamp" },
@@ -102,6 +102,59 @@
             "kind": { "enum": ["kubernetes", "docker", "host"] },
             "kubernetes_context": { "type": ["string", "null"] },
             "namespace": { "type": ["string", "null"] },
+            "launch_settings": {
+              "description": "승인한 엔진 실행 설정(보안에 영향이 있는 항목만). runtime이 실행 중 엔진과 비교하고, 다르면 설정 변화(config_drift)로 재검증을 요청한다. 키가 없으면 승인값 미정이며 비교하지 않는다. null은 확인 안 됨이고 false로 대신 채우지 않는다.",
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "trust_remote_code": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "trust_request_mm_kwargs": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "code_revision": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 128
+                    },
+                    "revision": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 128
+                    },
+                    "tokenizer_revision": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 128
+                    },
+                    "enable_multimodal": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
             "engine_container": { "type": ["string", "null"], "minLength": 1 },
             "gateway_schema_version": { "enum": ["runtime-mvp/1.1", "runtime-mvp/1.2"] },
             "gateway_cache_isolation": { "enum": ["off", "per_principal"] },
@@ -138,6 +191,7 @@
       "$ref": "framework-input.schema.json#/$defs/framework_profile"
     }
   },
+  "allOf": [{"if": {"properties": {"schema_version": {"const": "byul-environment/0.1"}}}, "then": {"properties": {"deployment": {"not": {"type": "object", "required": ["launch_settings"]}}}}}],
   "$defs": {
     "labels": {
       "type": "object",

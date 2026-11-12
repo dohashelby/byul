@@ -158,14 +158,14 @@ def evaluate_asset_integrity(
 
 
 def evaluate_config_drift(comparison: dict[str, Any]) -> Evaluation:
-    """Select conclusive engine_api drift/match rows from a baseline comparison."""
+    """Select conclusive API and declared launch setting drift/match rows."""
 
     if not isinstance(comparison, dict) or not isinstance(comparison.get("rows"), list):
         raise ValueError("baseline comparison must contain rows")
     conditions: list[Condition] = []
     observed: dict[str, str | None] = {}
     for row in comparison["rows"]:
-        if not isinstance(row, dict) or row.get("source") != "engine_api":
+        if not isinstance(row, dict) or row.get("source") not in {"engine_api", "kubernetes_spec"}:
             continue
         field = row.get("field")
         if not isinstance(field, str) or not field:
@@ -175,7 +175,8 @@ def evaluate_config_drift(comparison: dict[str, Any]) -> Evaluation:
             # A missing, failed, stale, or never-collected observation does not
             # prove that an earlier drift has cleared.
             continue
-        scope = f"engine_api:{field}"
+        source = row["source"]
+        scope = f"{source}:{field}"
         origin = row.get("data_origin")
         origin = origin if isinstance(origin, str) else None
         observed[scope] = origin
@@ -185,7 +186,7 @@ def evaluate_config_drift(comparison: dict[str, Any]) -> Evaluation:
             "field": field,
             "expected": row.get("expected"),
             "observed": row.get("observed"),
-            "source": "engine_api",
+            "source": source,
             "observed_at": row.get("observed_at"),
         }
         identity = {
@@ -247,7 +248,8 @@ def _scope(record: dict[str, Any]) -> str | None:
     if trigger == "config_drift" and isinstance(evidence, dict):
         field = evidence.get("field")
         if isinstance(field, str):
-            return f"engine_api:{field}"
+            source = evidence.get("source", "engine_api")
+            return f"{source}:{field}"
     return None
 
 

@@ -26,13 +26,14 @@ from typing import Any, Callable
 from .policy import DuplicateKeyError, _object_without_duplicates, _reject_json_constant
 from .kube_context import validate_kube_context
 from .store import JsonlStore
+from .launch_settings import observe as observe_launch_settings, validate_settings
 
 
 SCHEMA_VERSION = "runtime-target/1.0"
 SNAPSHOT_SCHEMA = "runtime-target-snapshot/1.0"
 POD_SNAPSHOT_SCHEMA = "runtime-target-pods-snapshot/1.0"
 POD_SNAPSHOT_MAX_BYTES = 4 * 1024 * 1024
-_TOP = {"schema_version", "target_id", "target_ref", "engine", "model", "baseline_ref", "kubernetes"}
+_TOP = {"schema_version", "target_id", "target_ref", "engine", "model", "baseline_ref", "kubernetes", "launch_settings"}
 _ENGINE = {"kind", "version", "image_digest"}
 _MODEL = {"id", "revision"}
 _KUBERNETES = {"context", "namespace", "selector", "container"}
@@ -121,6 +122,7 @@ class TargetRegistration:
     kubernetes: KubernetesSelector | None = None
     error_code: str | None = None
     error_message: str | None = None
+    launch_settings: dict[str, Any] | None = None
 
     def view(self) -> dict[str, Any]:
         return {
@@ -137,6 +139,7 @@ class TargetRegistration:
             },
             "model": {"id": self.model_id, "revision": self.model_revision},
             "baseline_ref": self.baseline_ref,
+            "launch_settings": self.launch_settings,
             "kubernetes": (
                 {
                     "context": self.kubernetes.context,
@@ -222,6 +225,7 @@ def _parse(document: object) -> dict[str, Any]:
         "model_revision": _optional_string(model, "revision", "model"),
         "baseline_ref": _optional_string(document, "baseline_ref", "target"),
         "kubernetes": kubernetes,
+        "launch_settings": validate_settings(document.get("launch_settings")),
     }
 
 
@@ -293,7 +297,7 @@ def instance_id(pod_uid: str, container_id: str) -> str:
     return hashlib.sha256(f"{pod_uid}\0{container_id}".encode("utf-8")).hexdigest()[:16]
 
 
-def summarize_pods(document: object, container: str) -> dict[str, Any]:
+def summarize_pods(document: object, container: str, engine_kind: str | None = None) -> dict[str, Any]:
     """Reduce a ``kubectl get pods -o json`` document to the observed instance."""
 
     if not isinstance(document, dict) or not isinstance(document.get("items"), list):
@@ -304,6 +308,9 @@ def summarize_pods(document: object, container: str) -> dict[str, Any]:
             continue
         metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
         spec = item.get("spec") if isinstance(item.get("spec"), dict) else {}
+        containers = spec.get("containers")
+        engine_spec = next((entry for entry in containers
+                           if isinstance(entry, dict) and entry.get("name") == container), None) if isinstance(containers, list) else None
         status = item.get("status") if isinstance(item.get("status"), dict) else {}
         statuses = status.get("containerStatuses")
         matched = None
@@ -337,6 +344,7 @@ def summarize_pods(document: object, container: str) -> dict[str, Any]:
                 "start_time": _text(status.get("startTime")),
                 "deleting": metadata.get("deletionTimestamp") is not None,
                 "container": container_view,
+                "launch_settings": observe_launch_settings(engine_spec, engine_kind),
             }
         )
     pods.sort(key=lambda pod: pod["name"] or "")
@@ -368,7 +376,8 @@ def summarize_pods(document: object, container: str) -> dict[str, Any]:
             "image": pod["container"]["image"],
             "image_digest": pod["container"]["image_digest"],
         }
-    return {"state": state, "pods": pods, "instance": current}
+    return {"state": state, "pods": pods, "instance": current,
+            "launch_settings": live[0]["launch_settings"] if state == "ok" else observe_launch_settings(None, engine_kind)}
 
 
 class KubernetesTargetCollector:
@@ -380,9 +389,11 @@ class KubernetesTargetCollector:
         *,
         timeout_s: float,
         context: str | None = None,
+        engine_kind: str | None = None,
         runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     ) -> None:
         self.selector = selector
+        self.engine_kind = engine_kind
         if context is not None and context != selector.context:
             raise ValueError("kube context must match the target registration kubernetes.context")
         self.context = validate_kube_context(selector.context)
@@ -405,7 +416,7 @@ class KubernetesTargetCollector:
             document = json.loads(result.stdout)
         except (json.JSONDecodeError, RecursionError) as error:
             raise ValueError("Pod response is not valid JSON") from error
-        summary = summarize_pods(document, self.selector.container)
+        summary = summarize_pods(document, self.selector.container, self.engine_kind)
         summary["context"] = self.context
         summary["namespace"] = self.selector.namespace
         summary["selector"] = dict(self.selector.selector)
@@ -423,11 +434,13 @@ class TargetPodSnapshotCollector:
         stale_after_s: float,
         now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
         not_before: datetime | None = None,
+        engine_kind: str | None = None,
     ) -> None:
         if stale_after_s <= 0:
             raise ValueError("target Pod snapshot stale window must be positive")
         self.path = Path(path).expanduser()
         self.selector = selector
+        self.engine_kind = engine_kind
         self.stale_after_s = float(stale_after_s)
         self.now = now
         self.not_before = not_before.astimezone(timezone.utc) if not_before else None
@@ -540,7 +553,7 @@ class TargetPodSnapshotCollector:
         age_s = (self.now().astimezone(timezone.utc) - collected_at).total_seconds()
         if age_s > self.stale_after_s:
             raise OSError("target Pod snapshot is stale")
-        summary = summarize_pods({"items": document["items"]}, self.selector.container)
+        summary = summarize_pods({"items": document["items"]}, self.selector.container, self.engine_kind)
         summary.update(
             {
                 "context": self.selector.context,

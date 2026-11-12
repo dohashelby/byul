@@ -2309,8 +2309,8 @@ export interface components {
          * @description 통합 플랫폼에서 입력하는 서빙 환경. update는 ENV 객체로, runtime은 runtime-target/1.0 등록으로 변환해 쓴다. 값을 모르면 null로 둔다.
          */
         Environment: {
-            /** @constant */
-            schema_version: "byul-environment/0.1";
+            /** @enum {unknown} */
+            schema_version: "byul-environment/0.1" | "byul-environment/0.2";
             environment_id: components["schemas"]["Common_local_id"];
             revision: number;
             created_at: components["schemas"]["Common_timestamp"];
@@ -2368,6 +2368,15 @@ export interface components {
                 kind: "kubernetes" | "docker" | "host";
                 kubernetes_context?: string | null;
                 namespace?: string | null;
+                /** @description 승인한 엔진 실행 설정(보안에 영향이 있는 항목만). runtime이 실행 중 엔진과 비교하고, 다르면 설정 변화(config_drift)로 재검증을 요청한다. 키가 없으면 승인값 미정이며 비교하지 않는다. null은 확인 안 됨이고 false로 대신 채우지 않는다. */
+                launch_settings?: null | {
+                    trust_remote_code?: boolean | null;
+                    trust_request_mm_kwargs?: boolean | null;
+                    code_revision?: string | null;
+                    revision?: string | null;
+                    tokenizer_revision?: string | null;
+                    enable_multimodal?: boolean | null;
+                };
                 engine_container?: string | null;
                 /** @enum {unknown} */
                 gateway_schema_version?: "runtime-mvp/1.1" | "runtime-mvp/1.2";
@@ -2386,7 +2395,7 @@ export interface components {
             };
             /** @description 선택. 프레임워크 12개 환경 조건·환경 역할·확인 상태·구조화된 비사용 근거. 없거나 null이면 기존 소비자 동작과 같다. */
             framework_profile?: components["schemas"]["FrameworkInput_framework_profile"];
-        };
+        } & unknown;
         Environment_labels: {
             [key: string]: string;
         };

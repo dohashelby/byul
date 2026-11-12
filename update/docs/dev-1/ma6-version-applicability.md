@@ -22,8 +22,11 @@
 | 기준 | 이미지 config history의 빌드 인자 `PYTHON_VERSION=3.12`(`vllm-base` 단계의 `apt-get install python3.12`, `update-alternatives python3 → python3.12`) [레지스트리]. 태그 소스 `Dockerfile` `ARG PYTHON_VERSION=3.12`, 설치 경로 `/usr/local/lib/python3.12/dist-packages` [소스] | 3.12 |
 | 후보 | 이미지 config history의 빌드 인자 `PYTHON_VERSION=3.12` [레지스트리]. 태그 소스 `docker/Dockerfile` `ARG PYTHON_VERSION=3.12` [소스] | 3.12 |
 
-- 관측기 공통 기반의 `sys.version_info[:2] != (3, 12)` 조건에 두 판본 모두 들어온다. **결정 11은 필요 없다.**
-- 패치 판본(3.12.x)은 레지스트리 메타데이터에 없다. 관측기 조건은 minor까지만 보므로 이 단계의 판단에 영향이 없다. 바이트코드 code 객체 지문은 minor 판본에 묶이므로, 2단계 고정값 계산도 3.12로 한다.
+- 관측기 공통 기반의 `sys.version_info[:2] != (3, 12)` 조건에 두 판본 모두 들어온다. **minor 판본 기준으로는 결정 11이 필요 없다.**
+- **패치 판본(3.12.x)은 아직 모른다.** 레지스트리 메타데이터에 없고, Python을 설치한 레이어 안에만 있다(기준 레이어 7번 427.6 MB, 후보 레이어 7번 233.4 MB. 이미지 전체는 기준 5.56 GB, 후보 8.73 GB).
+- 패치 판본이 중요한 관측기가 있다. 엔진 안 sensor 15개(`vllm_attempt_sensor`·`vllm_fault_sensor`·`vllm_file_read_sensor`·`vllm_initialization_sensor`·`vllm_profiler_sensor`·`vllm_ready_endpoint_sensor`·`vllm_rank_failure_sensor`·`vllm_request_output_sensor`·`vllm_safe_open_mapping_sensor`·`vllm_stream_buffer_sensor`·`vllm_termination_sensor`·`vllm_weight_iteration_sensor`·`vllm_worker_startup_sensor`·`vllm_worker_initialization_sensor`·`vllm_worker_generation_sensor`)는 `RUNTIME_CODE_CONTRACTS`에서 CPython **패치 판본별** 자기 코드 지문을 찾는다(지금 `cpython-3.12.3`·`.13`·`.14`·`.15`·`.16`). 이미지의 패치 판본이 이 목록에 없으면 그 sensor는 기동 시 거부(`*_RUNTIME_UNAVAILABLE`)한다.
+- 이것은 엔진 판본이 아니라 guard 관측기 코드 쪽 데이터다. 그 패치 판본 CPython으로 관측기 코드 지문을 계산해 행을 더하면 된다(분류 (a)와 같은 데이터 추가). 패치 판본을 알려면 위 Python 레이어를 받아야 한다(사용자 승인 필요, 2단계 보고에서 묻는다).
+- 바이트코드 code 객체 지문은 minor 판본(3.12)에 묶이므로, 2단계 vLLM 대상 함수 비교도 3.12로 한다.
 
 ## 3. 기본 엔진과 실행 구조
 
@@ -110,3 +113,123 @@ git clone --depth 1 --branch <0.1절 후보 태그> https://github.com/vllm-proj
 ```
 
 레지스트리 확인은 익명 pull 토큰으로 `GET /v2/vllm/vllm-openai/manifests/sha256:<digest>`와 그 config blob만 받았다(레이어 없음).
+
+---
+
+# M-A6 2단계 — 판본 고정값 비교 도구와 판본 적용표
+
+## 8. 비교 도구 `tools/engine_pin_compare.py`
+
+- `inventory`: `guard.adapters.vllm_*` 관측기 모듈을 import해 module-level 고정값 표를 모은다. 엔진 모듈별 고정 SHA-256, 대상 함수(`Class.method`·함수 이름), 그 값을 적은 관측기 표를 낸다. 지금 68개 엔진 모듈, 142개 대상 함수를 찾는다. 엔진 밖 라이브러리 고정값(`uvicorn.protocols.http.*`, `transformers.configuration_utils`·`tokenization_utils_base`, safetensors 파일)은 `other_pins`로 따로 낸다.
+- `compare --reference <현재 고정값 판본 소스> --side base=<기준> --side candidate=<후보> [--diff-dir]`: 대상 함수마다 code 객체 지문(관측기와 같은 `base.code_digest(relative_code(...))`)과 줄 위치를 뺀 지문, docstring을 뺀 AST, 인자 목록을 비교한다. 결과 상태:
+
+| 상태 | 뜻 | 제안 분류 |
+|---|---|---|
+| `FILE_IDENTICAL` | 파일 SHA-256까지 같음 | (a) |
+| `CODE_IDENTICAL` | 함수 지문까지 같음(파일은 다름) | (a) |
+| `CODE_EQUAL_LINES_SHIFTED` | 줄 위치만 다름(지문은 새로 계산) | (a) |
+| `DOCSTRING_ONLY` | docstring만 다름(지문은 새로 계산) | (a) |
+| `CHANGED` | 실행 코드가 다름. `signature_equal`로 인자·sync/async 유지 여부 표시 | 검토 |
+| `MOVED_EQUAL` / `MOVED_CHANGED` | 같은 qualname이 다른 모듈에 있음(같음/다름) | (b) / 검토 |
+| `ABSENT` / `MODULE_ABSENT` | 함수 / 모듈이 없음 | (c) 이상 |
+
+- 도구는 (d)를 정하지 않는다. (d)는 아래 10절에서 항목별 근거로 제안한다.
+- `--side name=ROOT:image`로 이미지에서 꺼낸 설치 파일 트리를 주면 고정값이 `image_pin`이 된다. 태그 소스는 `candidate_pin`이다. 이번 결과는 모두 `candidate_pin`이다.
+- 직접 시험: `tests/test_engine_pin_compare.py` 11개(합성 소스 트리, 실제 관측기 표 inventory).
+- 이번 실행: reference = 이전 판본 소스(`vllm-0.31.0-src`, 고정 SHA 대조로 확인), base = 기준 태그 `5204ff5c…`, candidate = 후보 태그 `ced6857a…`, CPython 3.12.13. 결과 전체는 [ma6-pin-compare.json](ma6-pin-compare.json)이다.
+
+| 대상 함수 142개 | FILE/CODE 같음 | 줄 이동 | docstring만 | 바뀜(인자 같음/다름) | 옮겨짐(같음/다름) | 함수 없음 | 모듈 없음 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 후보 판본 | 11 | 68 | 19 | 36 (30/6) | 0/0 | 1 | 0 |
+| 기준 판본 | 0 | 1 | 1 | 30 (10/20) | 2/11 | 32 | 58 |
+
+엔진 모듈 68개 중 기준 판본에 없는 모듈은 46개, 후보 판본에 없는 모듈은 0개다. 단, 기준 판본에 "있는" V1 모듈도 기본 기동(V0)에서는 import되지 않는다(3절).
+
+도구의 한계:
+- 관측기 고정값이 module-level 표가 아닌 형태(예: `vllm_stored_responses`의 짧은 키, `vllm_worker_generation_contract`의 중첩 표, `MODULE_CONTRACTS`)는 파일 단위만 잡히거나 빠진다. 해당 관측기는 11절 표에서 따로 적는다.
+- `RUNTIME_CODE_CONTRACTS`(관측기 자기 코드의 CPython 패치 판본별 지문)와 엔진 밖 라이브러리 고정값은 태그 소스로 비교할 수 없다. 이미지 bytes가 필요하다(12절).
+
+## 9. 관측 계열별 판본 적용표
+
+분류는 쪽(기준/후보)마다 따로 적는다. 후보 판본은 이전 판본과 한 단계 차이라 거의 (a)다. 기준 판본은 V0 기본이라 엔진 내부 관측이 대부분 (c) 이상이다.
+
+| # | 관측 계열(관측기·수집 경로) | 주 점검 | 후보 판본 | 기준 판본 | 근거 |
+|---|---|---|---|---|---|
+| 1 | HTTP·Kubernetes 외부 관측(경로표 `adapters/vllm.py` SAFE_PROBES, `kubernetes_*` 수집기, 프로세스 역할 이름) | REQ-01·02·03·13, PLT-01·04·07·08·09, SUP-04, OBS-04·05·06·09·11, OBS-01, PLT-10·11·12 | (b) 판본 행 추가 | (b) 판본 행 추가 | 엔진 내부 고정값이 없다. `SAFE_PROBES`·`SAFE_PROBE_REVIEWED_IMAGES`·길이 오류 형식(`_LENGTH_ERROR_031/032`)·`kubernetes_response_error.SUPPORTED_ENGINE_VERSION`·`engine_provider` 검토 이미지가 판본 문자열 키라 두 판본 행이 필요하다. 기준 판본은 `/ready`·`/v1/responses`·`/sleep` 계열이 없고(5절) 프런트엔드가 V0 `MQLLMEngine` 다중 프로세스라 역할 이름표가 다르다 |
+| 2 | 기동 데이터(provider·판본 profile) | 전체 | (b) | (b) | 이미지 명령(`vllm serve` / `api_server --model`), 로그 옵션, profiler 옵션, prefix cache 기본값(4절) |
+| 3 | 요청 입구 관측 `vllm_lifecycle_sensor`·`vllm_lifecycle_profiles` (serving·auth middleware·models router·input_processor·output_processor·async_llm) | PLT-10·11(1차 제외), REQ-05, OBS-02, LIF-05·06 계열 기반 | (a) 대부분 + 검토 8(인자 같음) | 모듈 17/26 없음. models 경로 `MOVED_CHANGED`(→`entrypoints/openai/api_server`·`serving_models`), 인증은 `build_app` 안 지역 함수 `authentication` → (c)/(d) | 기반 sensor라 다른 sensor 15개가 이 위에 선다 |
+| 4 | 요청 시도·캐시 조회 `vllm_attempt_callback`·`vllm_cache_callback`·`vllm_scoped_consumption_callback` | REQ-15·16·17, LIF-03·12 | (a) (cache는 docstring만) + attempt 검토 5 | V1 scheduler·block_pool 없음(V0는 `core/scheduler.py`·`core/block/prefix_caching_block.py`, 객체 모델이 다름) → (c)/(d) | 기준 판본은 prefix cache 기본 꺼짐 |
+| 5 | 실행 연결·소비 `vllm_execution_link_callback`·`vllm_consumption_callback`·`vllm_consumption_v2_callback`·`vllm_engine_callback_sensor`(slot) | REQ-08·09·10·12, LIF-05·06, REQ-18 | (a) + 검토(input_processor 3, gpu_model_runner 3, V2 runner 4) | V1 input_processor·structured_output·V2 runner 없음, V0 `worker/model_runner.py`로 구조가 다름 → (c)/(d) | |
+| 6 | TP 통신 버퍼 `vllm_comm_buffer_callback`·`vllm_distributed_callback` | REQ-14·21 | (a) + 검토 2(`CustomAllreduce.__init__` 인자 다름, `close`) | `custom_all_reduce` 모듈 있음, 대상 4개 중 바뀜 3·docstring만 1 → (b)/(c) 후보. distributed는 V1 `gpu_model_runner` 대상이라 (c) | 같은 기능이 두 판본에 있는 몇 안 되는 엔진 내부 대상 |
+| 7 | CUDA Graph·커널 경계 `vllm_graph_replay_callback`·`vllm_kernel_bounds_callback`·`vllm_graph_buffers`·`vllm_slot_mask` | REQ-18·19·20 | (a) + 검토 1 | V2 runner(`v1/worker/gpu/*`) 없음. V0는 `CUDAGraphRunner`(`worker/model_runner.py`) → (c)/(d) | |
+| 8 | 가중치 공급·적재 `vllm_weight_iteration_sensor`·`vllm_file_read_sensor`·`vllm_safe_open_mapping_sensor`·`vllm_worker_startup_*`·`vllm_worker_shard_callback`·`vllm_supply_read_callback` | SUP-05·06·07·15·16, LIF-01·02, PLT-03·05 | (a) + 검토(`_get_weights_iterator` 인자 다름 등 3) | `weight_utils` 있음(대상 7 중 바뀜 3·없음 4), loader는 `model_loader/loader.py`로 `MOVED_CHANGED` → (b)+(c) | safetensors 라이브러리 파일 고정값은 이미지 필요 |
+| 9 | 공유 가중치 수명 `vllm_weights_lifetime_callback` | LIF-13 | (a) + 검토 3 | `weight_cache` 모듈 없음 → 기능 부재(결정 9) | |
+| 10 | 동적 import·플러그인(`transformers` 고정값, `vllm.plugins`) | SUP-09·10·11·12 | 라이브러리 판본 확인 필요 | 같음. 기준 Transformers 계열이 다르다(4.x / 5.x) | `other_pins`의 `transformers.*`는 이미지 bytes로만 대조 가능 |
+| 11 | 템플릿·보조 공급 `vllm_auxiliary_read`·`vllm_auxiliary_link_callback`·`vllm_template_boundary` | SUP-03·13, REQ-07 | (a) | `entrypoints/chat_utils` 있음. 대상 표가 다른 형태라 도구는 파일 단위만 비교 → 수동 검토 | |
+| 12 | 온라인 입력 `vllm_online_sensor` (renderers·input_processor·`validate_request_mm_kwargs`) | REQ-08·09, SUP-08 내부 원인 | 대상 1개 **없음**(`validate_request_mm_kwargs`) + 검토 4 | 3개 모듈 모두 없음 → (c)/(d) | 없는 함수는 이전 판본이 SUP-08 요청을 import 전에 거부한 검증 지점이다. 후보 판본에 없는 것이 실측 회귀(`consumed`)와 맞는다 |
+| 13 | 수명 전환 `vllm_transition_callback`·`vllm_transition_dispatch_callback`·`vllm_ready_endpoint_*`·`vllm_worker_generation_*` | LIF-05·06·07·16, OBS-02 | (a) + 검토 2 | `EngineCore` sleep/wake/pause 등 9개 없음, `/ready` 없음 → 기능 부재(결정 9) 또는 (c) | |
+| 14 | 초기화·rank 장애 `vllm_initialization_sensor`·`vllm_rank_failure_sensor`·`vllm_fault_*`·`vllm_worker_initialization_sensor` | LIF-07·08·09·11 | (a) | V1 `multiproc_executor` 대상 18개 중 8개 없음, V0 기본은 `executor/mp_distributed_executor.py` → (c)/(d) | 후보는 `v1/fault_tolerance`도 있음 |
+| 15 | 요청 종료 `vllm_termination_sensor`·`vllm_request_output_sensor` | REQ-12, LIF-10·12, OBS-02 | (a) + 검토 5(`AsyncOutput.__init__` 인자 다름) | 모듈 8/10 없음 → (c)/(d) | |
+| 16 | 프로파일러 `vllm_profiler_sensor`·`vllm_profiler_callback` | LIF-14 | (a) + 검토 3 | `profiler/wrapper` 없음. V0 profiler는 `worker/worker.py`의 `VLLM_TORCH_PROFILER_DIR` 경로 → (c) | 기동 옵션도 다르다(4절) |
+| 17 | 저장 응답 `vllm_stored_responses` | REQ-06(대상 비적용) | 파일 3개 수동 확인 필요 | `/v1/responses` 없음 → 기능 부재 | 정본 선정에서 대상 비적용 근거만 남기는 점검 |
+| 18 | 실행기 소스 분석(`*_cpu.py`, `executors/engine_sensor.py` source slot) | REQ-10·SUP-13 등 | 소스 commit 행 추가 (b) | 같음, 분석 대상 모듈이 없으면 (c) | M-A9 대상이 아니다(CLAUDE.md 5절) |
+| 19 | 스트림 버퍼 `vllm_stream_buffer_sensor`(uvicorn 고정값) | LIF-03·04 | 이미지 필요 | 이미지 필요 | uvicorn 판본이 이미지마다 다르다. 태그 소스로 비교할 수 없음 |
+
+공통 입력 생산자(`SUPPORTED_PRODUCERS` 8종: request-attempt, generation-transition, health-worker, profiler-control, runner-consumption(/v2), supply-reads, node-process-device-provider)의 생산자 SHA는 guard 쪽 파일 bytes라 판본과 무관하다. 다만 생산자가 감싸는 엔진 관측기가 위 4·5·8·13·16행이라, 그 행의 분류를 따른다. 등록은 그 판본의 GPU 확인 뒤(J01·J02)다.
+
+## 10. 점검별 예상 결과 (69개)
+
+"외부" = 엔진 내부 고정값 없이 HTTP·Kubernetes로 관측한다. 분류는 [후보 / 기준] 순서.
+
+| 묶음 | 점검 | 후보 | 기준 | 예상 J02 결과 |
+|---|---|---|---|---|
+| A. 외부 관측, 판본 행만 추가 | REQ-01·03·13, PLT-01·04·08·09, SUP-04, OBS-04·05·09 | (b) | (b) | 두 판본 실행 가능 |
+| B. 1차 제외(UNKNOWN 완성) | REQ-02, OBS-01·06·11, PLT-07·10·11·12, (PLT-08 TLS 구성 분기) | (b) | (b) | 두 판본 정본 실행 → UNKNOWN+원인. PLT-10·11의 엔진 내부 근거는 기준 쪽 (d) 후보 |
+| C. 대상 비적용 | REQ-04·06 | - | - | 선정 기록. REQ-06은 기준 판본에 `/v1/responses` 자체가 없다는 근거를 더할 수 있다 |
+| D. SUP-08 | SUP-08 | 실행됨(PoC) | 실행됨(PoC) | `REGRESSED` (A, M-A8) |
+| E. 엔진 내부, 후보는 (a), 기준은 같은 기능 있음 | REQ-21(통신 버퍼), SUP-05·06·15·16·LIF-01·02·PLT-03·05의 가중치 적재 부분, SUP-03·13·REQ-07 템플릿 | (a)+검토 | (b)/(c) | 후보 실행 가능. 기준은 대상표·관측기 추가로 실행 가능 후보 |
+| F. 엔진 내부, 기준은 V0 구조라 새 설계 | REQ-14·15·16·17·18·19·20, REQ-08·09·10·11·12, LIF-03·04·07·08·09·10·11·12·14, OBS-02·03, PLT-02·06, SUP-07·09·10·11·12 | (a)+검토 | (c) 또는 (d) | 후보 실행 가능. 기준은 10절 결정 전까지 `ENGINE_VERSION_UNSUPPORTED` → 비교 `NOT_COMPARABLE` |
+| G. 기준 판본에 기능 자체가 없음 | LIF-13(공유 가중치 캐시), LIF-05·06·16의 실행 중 sleep/wake/pause·가중치 갱신 분기, LIF-07의 `/ready` 분기 | (a)+검토 | 기능 부재 | 결정 9 |
+
+- 위 묶음은 관측 계열(9절)에서 점검으로 옮긴 예상이다. 한 점검이 여러 계열을 쓰면 가장 어려운 계열을 따랐다. 점검별 실행기 입력을 만들 때(M-A7·M-B2) 다시 확인한다.
+- 후보 판본 "검토" 36개 함수(인자 다름 6개 포함)는 함수 단위 diff(`--diff-dir`)를 관측 의미와 대조해야 (a)로 확정된다. 3단계 구현 때 관측기별로 한다.
+
+## 11. 결정 9 — 한 판본에 기능이 없을 때 (점검별 승인 요청)
+
+판정 의미 변경이라 점검별로 묻는다. 승인 전 기본은 UNKNOWN이다.
+
+| 점검 | 기준 판본에 없는 것 (근거) | 제안 |
+|---|---|---|
+| LIF-13 | `model_executor/model_loader/weight_cache/*` 모듈 없음(공유 가중치 데몬·IPC loader) [소스] | 기준 쪽 UNKNOWN(원인: 기능 부재). 비적용으로 바꾸려면 "그 판본은 공유 가중치를 제공하지 않는다"를 선정 근거로 남겨야 해 사용자 판단 |
+| LIF-05·06·16 (실행 중 전환 분기) | 서버 `/sleep`·`/wake_up`·`/pause`·`/resume`·`/update_weights` 경로 없음, `EngineCore.sleep/wake_up/pause_scheduler` 없음 [소스] | 재배포(Pod 교체) 분기는 외부 관측으로 두 판본 실행. 실행 중 전환 분기만 기준 쪽 UNKNOWN |
+| LIF-07 (`/ready` 분기) | `/ready`·`/readyz` 없음 [소스] | 기준 쪽은 `/health`만으로 준비 상태를 판단할 근거가 없으므로 그 분기 UNKNOWN |
+| REQ-06 | `/v1/responses` 없음 [소스] | 이미 대상 비적용. 근거 문장만 더함 |
+| REQ-10 (`tool_choice=required`, `structured_outputs` 필드) | `tool_choice`에 `required` 없음, 구조화 출력 필드가 `guided_json` [소스] | `structured_outputs`→`guided_json` 대응은 (b) 요청 필드표로 실행. `required` 사례만 기준 쪽 UNKNOWN |
+| REQ-16·17 (prefix cache) | 기능은 있으나 기본 꺼짐 [소스] | 결정 9가 아니라 기동 조건 문제다. 두 판본 모두 `--enable-prefix-caching`을 명시하는 안(비교 조건 동일)을 제안 |
+
+## 12. 결정 10 — UNKNOWN으로 남길 어려운 항목 (항목별 승인 요청)
+
+숫자 기준을 만들지 않고, 항목마다 원인과 영향 점검을 적는다. 모두 **기준 판본 쪽만**이다. 후보 판본 쪽은 (a)라 (d) 제안이 없다.
+
+| # | 항목 | 원인 | 영향 점검 | (c)로 하려면 필요한 것 |
+|---|---|---|---|---|
+| D1 | V0 scheduler·block manager 기반 요청 시도·캐시 조회·종료 관측 | V0 `core/scheduler.py`·`core/block_manager.py`·`prefix_caching_block.py`는 V1과 객체 모델이 다르다(SequenceGroup 단위, block allocator). 지금 계약 사건(시도·적중·해제)의 의미를 V0 객체로 다시 정의해야 한다 | REQ-12·15·16·17, LIF-03·10·12 | V0 관측기 신규 설계, V0 모의 엔진 시험 자료, GPU 확인 |
+| D2 | V0 model runner·CUDA Graph·slot·커널 경계 관측 | V0 `worker/model_runner.py`(`CUDAGraphRunner`)는 V2 runner(`v1/worker/gpu/*`)와 버퍼·slot 구조가 다르다 | REQ-18·19·20, REQ-08·09·10의 소비 부분 | 같은 의미의 버퍼·slot 식별 재설계 |
+| D3 | V0 다중 프로세스 프런트엔드·executor 기반 초기화·rank 장애·자원 회수 | V0 `MQLLMEngine`(ZMQ) + `executor/mp_distributed_executor.py`는 V1 `MultiprocExecutor`·`EngineCoreProc`와 프로세스 구성·장애 전달 경로가 다르다 | LIF-07·08·09·11, PLT-02·06(엔진 내부 근거) | 프로세스 역할·rank 의미 재확인(CLAUDE.md 2절), TP2 GPU |
+| D4 | 인증 middleware 내부 관측 | 기준 판본 인증은 `build_app` 안 지역 함수(`@app.middleware("http") authentication`)라 module 속성으로 감쌀 대상이 없다 | PLT-10·11(1차 제외라 원래 UNKNOWN) | 감싸기 방식 자체를 바꿔야 함 |
+| D5 | V0 profiler 관측 | profiler가 Worker 메서드와 환경 변수로만 열리고 `profiler/wrapper` 대상이 없다 | LIF-14 | V0 worker profiler 대상표 + 기동 데이터. 비교적 작을 수 있어 (c) 후보로도 둔다 |
+
+(c)로 진행을 제안하는 기준 쪽 항목: 9절 1·2행(판본 데이터), 6행 `custom_all_reduce`(REQ-21), 8행 가중치 적재(`weight_utils`·`loader.py`), 11행 템플릿, 16행 profiler(D5를 승인하지 않으면). 이 항목들은 같은 기능이 두 판본에 있어 대상표·고정값 데이터로 다루거나 관측기를 작게 더하는 범위다.
+
+**별도로 물을 것 — 기준 판본 엔진 선택.** 기준 판본을 기본(V0)으로 띄우면 D1~D3가 남는다. `VLLM_USE_V1=1`로 띄우면 V1 관측기 일부를 대상표로 공유할 여지가 있다. 하지만 기업 기본 구성이 아니고, 그 시기 V1 초기 구현의 기능 공백이 시험 조건 차이로 들어간다. 이 문서는 기본(V0) 유지를 권한다. 기준을 바꾸려면 결정이 필요하다.
+
+## 13. 이미지 bytes 대조 (승인 요청)
+
+태그 소스 고정값을 확정하고 아래를 알려면 두 이미지의 일부 레이어가 필요하다. GPU·클라우드 비용은 없고 로컬 다운로드만 한다.
+
+| 필요한 것 | 레이어 | 크기 |
+|---|---|---|
+| CPython 패치 판본(`RUNTIME_CODE_CONTRACTS` 행) | 기준 7번, 후보 7번(Python 설치) | 427.6 MB + 233.4 MB |
+| `vllm/` 설치 파일 bytes(고정값 `image_pin`, 기준 빌드 커밋 확인), uvicorn·transformers·safetensors 판본 | vLLM wheel·의존성 설치 레이어 | 레이어별 수백 MB~수 GB(이미지 전체 기준 5.56 GB, 후보 8.73 GB) |
+
+승인을 받으면 레이어를 파일 단위로 풀지 않고, 필요한 경로만 꺼내 `engine_pin_compare compare --side base=<꺼낸 site-packages>:image`로 다시 비교한다.

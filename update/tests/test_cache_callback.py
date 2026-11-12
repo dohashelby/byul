@@ -20,7 +20,7 @@ FIXTURES = Path(__file__).parent / 'fixtures/cache-callback-native'
 def source_module(name, tmp_path, *, targets=None, sources=None):
     targets = targets or callback.TARGETS; sources = sources or callback.base.SOURCE_SHA
     raw = (FIXTURES / (name.rsplit('.', 1)[-1] + '.py.txt')).read_bytes()
-    assert sha256_hex(raw) == sources[name]
+    assert sha256_hex(raw) in callback._pins(sources, name)
     path = tmp_path / (name.rsplit('.', 1)[-1] + '.py'); path.write_bytes(raw)
     module = ModuleType(name); module.__file__ = str(path)
     codes = {}

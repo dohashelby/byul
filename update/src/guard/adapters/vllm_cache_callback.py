@@ -51,13 +51,41 @@ def _digest(code, name):
     return base.code_digest(relative_code(code, filename))
 
 
+def _pins(sources, name):
+    """A module's reviewed source pins. One SHA-256 string, or a tuple of them when the
+    same observer reviews several engine releases (one exact-byte row per release)."""
+    pins = sources[name]
+    pins = (pins,) if type(pins) is str else pins
+    if (type(pins) is not tuple or not pins or len(set(pins)) != len(pins)
+            or any(type(pin) is not str or re.fullmatch('[0-9a-f]{64}', pin) is None for pin in pins)):
+        raise ValueError('CACHE_CALLBACK_SOURCE_UNSUPPORTED')
+    return pins
+
+
+def _source(module, sources):
+    """Read the module file once per pin until exact bytes match. No pin is widened."""
+    name = vars(module).get('__name__')
+    path = vars(module).get('__file__')
+    error = None
+    for pin in _pins(sources, name):
+        try:
+            return pin, artifact(path, pin, **({'limit': SOURCE_BYTES[pin]} if pin in SOURCE_BYTES else {}))
+        except ValueError as exc:
+            error = exc
+    raise error
+
+
+def source_pin(module, sources):
+    """The reviewed pin that the module's current bytes match (for evidence rows)."""
+    return _source(module, sources)[0]
+
+
 def _codes(module, targets=TARGETS, sources=base.SOURCE_SHA):
     name = vars(module).get('__name__')
     if name not in targets or name not in sources or sys.version_info[:2] != (3, 12) or sys.flags.optimize:
         raise ValueError('CACHE_CALLBACK_SOURCE_UNSUPPORTED')
     path = vars(module).get('__file__')
-    pin = sources[name]
-    raw = artifact(path, pin, **({'limit': SOURCE_BYTES[pin]} if pin in SOURCE_BYTES else {}))
+    pin, raw = _source(module, sources)
     key = (name, path, pin)
     if key not in _COMPILED:
         result = {}
@@ -234,6 +262,7 @@ class CacheCallbackObserver:
         expected = _codes(module, self.targets, self.sources).get(point)
         if expected is None or _digest(original.__code__, name) != expected:
             raise ValueError('CACHE_CALLBACK_ENTRY_UNSUPPORTED')
+        pin = source_pin(module, self.sources)
 
         def qualified():
             current = vars(cls).get(method)
@@ -261,7 +290,7 @@ class CacheCallbackObserver:
             try:
                 common = {'schema': self.schema, 'session_sha256': base.sha(self.session.encode()), 'process_sha256': self.process_sha256,
                     'call_sha256': call, 'parent_call_sha256': parent['call'] if parent else None, 'point': point,
-                    'source_file_sha256': self.sources[name], 'entry_code_sha256': expected,
+                    'source_file_sha256': pin, 'entry_code_sha256': expected,
                     'entry_qualified_before': before, 'runtime_context_injected': self.injected_context,
                     'authenticated_identity_verified': False, 'actual_tensor_consumption_verified': False,
                     'transitive_dependencies_verified': False, 'native_profile_installed': False}

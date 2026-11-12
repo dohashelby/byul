@@ -1,3 +1,10 @@
+## 2026-11-12 — M-A6 판본 적용표·판본별 고정값 구조 (1차)
+
+- 한 일: [M-A6 문서](docs/dev-1/ma6-version-applicability.md)에 선행 확인(두 GPU 이미지 엔진 Python 3.12, 기준 V0 기본·후보 V1만, 기능·모델 표)과 판본 적용표(관측 계열 19행, 점검 69개 묶음, 결정 9·10 요청)를 썼다. 함수 단위 비교 도구 `tools/engine_pin_compare.py`를 만들었다. 결정 10(D4·D5 UNKNOWN 승인, D1~D3는 (c) 후속·미구현)을 DECISIONS·적용표 12절에 기록했다. 3단계 첫 구현으로 공통 감싸기 기반(`vllm_cache_callback._codes`)이 모듈당 검토 고정값 여러 개(판본별 정확 bytes 행)를 받게 하고, REQ-21 `vllm_comm_buffer_callback`에 두 판본 후보 고정값 행(`PIN_ROWS`)과 태그 소스 고정 자료(`tests/fixtures/vllm-<판본>/`)를 더했다. 고정값 검사는 넓히지 않았다(파일 bytes와 함수 지문이 같은 행에 정확히 맞아야 감싼다).
+- 테스트 결과: 도구 시험 11개, 판본별 고정값 시험 8개, 기존 comm buffer·cache callback·distributed TP 시험 통과(70개). 감싸기 기반을 쓰는 인접 시험 40파일은 변경 전 HEAD와 비교해 새 실패 1개(`test_b_lif07_readiness::test_actual_native_helper_default_public_entrypoint_store_restore_preserved`)만 생겼다. 나머지 113개 실패·오류는 HEAD에서도 같은 로컬 macOS 환경 실패다. 새 실패는 소스 목록 재생성 뒤 `verify_req10_consumption`이 `SOURCE_REVIEW_RECEIPT_REQUIRED`가 되어 LIF-07 수집의 소스 검토 관문이 닫힌 것이다. `checklist_status --check` 통과. 전체 suite는 CI에서 확인한다.
+- 다음 단계: 결정 5(소스 검토 기록) 처리, 후보 판본 검토 36개 함수의 관측 의미 대조, A 담당 나머지 관측기(REQ-14·15~20, LIF-13)의 후보 판본 (a) 행, 이미지 bytes 대조.
+- 막힌 것: 결정 9, 기준 판본 V0 유지, 이미지 레이어 다운로드, 결정 5(검토 기록) — 사용자 결정 대기. push·PR은 사용자 확인 뒤.
+
 ## 2026-11-12 — CPU 이미지 제외·69개 두 판본 실제 비교
 
 - 한 일: 사용자 결정 두 가지를 [작업지시서 3차](docs/WORK_ORDER_VLLM_MVP.md)·`CLAUDE.md`·`AGENTS.md`·`DECISIONS.md`·SPEC §12 D7에 반영했다. (1) CPU용 vLLM 이미지 실증을 하지 않고 GPU 이미지로만 실증한다. CPU 이미지 전용 코드 정리를 M-A9로 넣었다. (2) 69개 모두 두 판본에서 실제 관측·비교를 목표로 하고, 고정값 불일치는 M-A6·M-B4의 분류(a~d)로 대상표·adapter 관측기를 만든다. 너무 오래 걸리거나 어려운 항목만 사용자 승인 뒤 UNKNOWN(결정 10). M-A6에 선행 확인(엔진 Python 3.12 여부, 판본별 기능표, 시험 모델)을 넣고 결정 9~13을 더했다.

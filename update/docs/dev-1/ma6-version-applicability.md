@@ -187,7 +187,7 @@ git clone --depth 1 --branch <0.1절 후보 태그> https://github.com/vllm-proj
 | B. 1차 제외(UNKNOWN 완성) | REQ-02, OBS-01·06·11, PLT-07·10·11·12, (PLT-08 TLS 구성 분기) | (b) | (b) | 두 판본 정본 실행 → UNKNOWN+원인. PLT-10·11의 엔진 내부 근거는 기준 쪽 (d) 후보 |
 | C. 대상 비적용 | REQ-04·06 | - | - | 선정 기록. REQ-06은 기준 판본에 `/v1/responses` 자체가 없다는 근거를 더할 수 있다 |
 | D. SUP-08 | SUP-08 | 실행됨(PoC) | 실행됨(PoC) | `REGRESSED` (A, M-A8) |
-| E. 엔진 내부, 후보는 (a), 기준은 같은 기능 있음 | REQ-21(통신 버퍼), SUP-05·06·15·16·LIF-01·02·PLT-03·05의 가중치 적재 부분, SUP-03·13·REQ-07 템플릿 | (a)+검토 | (b)/(c) | 후보 실행 가능. 기준은 대상표·관측기 추가로 실행 가능 후보 |
+| E. 엔진 내부, 후보는 (a), 기준은 같은 기능 있음 | REQ-21(통신 버퍼), REQ-05(모델 목록·선택 경로: 기준은 `entrypoints/openai/api_server`·`serving_models`로 `MOVED_CHANGED`, (b) 대상표 후보), SUP-05·06·15·16·LIF-01·02·PLT-03·05의 가중치 적재 부분, SUP-03·13·REQ-07 템플릿 | (a)+검토 | (b)/(c) | 후보 실행 가능. 기준은 대상표·관측기 추가로 실행 가능 후보 |
 | F. 엔진 내부, 기준은 V0 구조라 새 설계 | REQ-14·15·16·17·18·19·20, REQ-08·09·10·11·12, LIF-03·04·07·08·09·10·11·12·14, OBS-02·03, PLT-02·06, SUP-07·09·10·11·12 | (a)+검토 | (c) 또는 (d) | 후보 실행 가능. 기준은 10절 결정 전까지 `ENGINE_VERSION_UNSUPPORTED` → 비교 `NOT_COMPARABLE` |
 | G. 기준 판본에 기능 자체가 없음 | LIF-13(공유 가중치 캐시), LIF-05·06·16의 실행 중 sleep/wake/pause·가중치 갱신 분기, LIF-07의 `/ready` 분기 | (a)+검토 | 기능 부재 | 결정 9 |
 
@@ -208,6 +208,13 @@ git clone --depth 1 --branch <0.1절 후보 태그> https://github.com/vllm-proj
 | REQ-16·17 (prefix cache) | 기능은 있으나 기본 꺼짐 [소스] | 결정 9가 아니라 기동 조건 문제다. 두 판본 모두 `--enable-prefix-caching`을 명시하는 안(비교 조건 동일)을 제안 |
 
 ## 12. 결정 10 — UNKNOWN으로 남길 어려운 항목 (항목별 승인 요청)
+
+**결정 결과 (2026-11-12 사용자):**
+- **D4·D5 승인** — 기준 판본 쪽 UNKNOWN으로 남긴다. 원인과 영향 점검(D4: PLT-10·11, D5: LIF-14)을 RES·문서에 남기고 PASS·NOT_APPLICABLE로 바꾸지 않는다.
+- **D1·D2·D3 미승인** — UNKNOWN으로 남기지 않고 **(c) 후속, 미구현**으로 둔다. 나중에 V0 관측기로 만들 대상이고 지금 구현 순서에서는 뒤로 미룬다. 미구현 동안 해당 점검(D1: REQ-12·15·16·17, LIF-03·10·12 / D2: REQ-18·19·20, REQ-08·09·10의 소비 부분 / D3: LIF-07·08·09·11, PLT-02·06의 엔진 내부 근거)의 기준 쪽은 `ENGINE_VERSION_UNSUPPORTED`이며 **MVP 완료로 세지 않는다**.
+- 결정 9, 기준 판본 V0 유지, 이미지 레이어 다운로드는 아직 결정 대기다. 다운로드 승인 전 고정값은 모두 후보(`candidate_pin`)다.
+
+아래는 승인 요청 당시의 표다.
 
 숫자 기준을 만들지 않고, 항목마다 원인과 영향 점검을 적는다. 모두 **기준 판본 쪽만**이다. 후보 판본 쪽은 (a)라 (d) 제안이 없다.
 
@@ -233,3 +240,24 @@ git clone --depth 1 --branch <0.1절 후보 태그> https://github.com/vllm-proj
 | `vllm/` 설치 파일 bytes(고정값 `image_pin`, 기준 빌드 커밋 확인), uvicorn·transformers·safetensors 판본 | vLLM wheel·의존성 설치 레이어 | 레이어별 수백 MB~수 GB(이미지 전체 기준 5.56 GB, 후보 8.73 GB) |
 
 승인을 받으면 레이어를 파일 단위로 풀지 않고, 필요한 경로만 꺼내 `engine_pin_compare compare --side base=<꺼낸 site-packages>:image`로 다시 비교한다.
+
+## 14. 3단계 구현 현황 (결정 10 뒤, 승인 범위만)
+
+**구조 — 판본별 데이터를 넘긴다(코드 복사 없음).** 공통 감싸기 기반 `adapters/vllm_cache_callback.py`의 `_codes`는 관측기 표의 모듈 고정값으로 SHA-256 문자열 하나 또는 **검토 고정값 tuple**(판본별 정확 bytes 행)을 받는다.
+- 파일 bytes가 그중 하나와 정확히 같을 때만 그 파일의 함수 지문으로 대상 함수를 감싼다. 다른 판본 파일의 함수 코드를 섞으면 `CACHE_CALLBACK_ENTRY_UNSUPPORTED`로 거부한다.
+- 증거 행의 `source_file_sha256`에는 실제로 맞은 행의 고정값을 적는다. 표 형식이 틀리면(빈 tuple, 중복, SHA 아님) 거부한다.
+- 고정값 검사를 넓히지 않았다. 판본 문자열 비교는 없다. 등록 생산자 신원(`SUPPORTED_PRODUCERS`)에는 이 파일이 들어가지 않아 등록 상태는 바뀌지 않는다.
+
+| 관측기 | 점검 | 후보 판본 | 기준 판본 | 상태 |
+|---|---|---|---|---|
+| `vllm_comm_buffer_callback` | REQ-21 | 행 추가 `a048c132…` (candidate). 바뀐 것은 MNNVL multimem 경로 삭제뿐이고 관측 속성은 같음 | 행 추가 `f3e7b346…` (candidate). 생성자 인자 `max_size`만, MNNVL 없음. `_ptr`·`buffer_ptrs`·`disabled`·`rank`·`world_size`·해제 순서는 같음 | 구현·직접 시험. GPU 확인·이미지 bytes 대조 전 |
+
+- `PIN_ROWS`의 `candidate`는 태그 소스 bytes라는 뜻이다. 이미지 설치 파일과 대조하면(13절) `reviewed`로 올린다.
+- 기준 판본 쪽은 엔진 안 설치 경로(sitecustomize → `vllm_engine_callback_sensor.install`)가 V0 기본 기동에서 이 모듈을 실제로 감싸는지 GPU에서 확인해야 한다. 설치 경로의 다른 V1 전제는 확인하지 않았다.
+
+**알려진 영향 — 소스 검토 관문.** 제품 소스를 바꿔 `release/reviewed-source.json`을 다시 만들었다. 그 결과 `verify_req10_consumption`이 `SOURCE_REVIEW_RECEIPT_REQUIRED`를 낸다. 이 관문을 쓰는 LIF-07 수집 시험(`test_b_lif07_readiness::test_actual_native_helper_default_public_entrypoint_store_restore_preserved`)도 실패한다. 결정 5(검토 기록 규칙)가 미결이라 검토 기록을 만들지 않았다.
+
+**남은 3단계 (승인 범위 안, 미착수):**
+- A 담당 엔진 내부 관측기의 후보 판본 (a) 행: REQ-14 `vllm_distributed_callback`, REQ-15~17 `vllm_cache_callback`·`vllm_scoped_consumption_callback`, REQ-18~20 slot·graph·kernel, LIF-13 `vllm_weights_lifetime_callback`. 이 관측기들은 `base.SOURCE_SHA` 등 공유 표를 써서, 같은 tuple 행 구조를 공유 표에 들이는 작업이 먼저다.
+- 판본 문자열 키 표(`adapters/vllm.py` SAFE_PROBES·길이 오류 형식, `kubernetes_response_error`, `engine_provider`, `vllm_runner_capture`)를 판본 행 조회로 바꾸는 일. `adapters/vllm.py`는 M-A9와 같은 파일이라 이 세션에서 고치지 않았다.
+- 기준 판본 쪽 D1~D3은 "(c) 후속, 미구현"이다.

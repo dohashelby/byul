@@ -301,6 +301,8 @@
 - 2026-10-19 · 모델: `Execution.operator{by,at}`·`override_reason`, `ExecutorInfo.default_judge`, `CheckRow.evidence_source`·`replaced`, `Report.evidence_counts` — 모두 비어 있으면 직렬화에서 빠짐(기존 해시 유지). 사람이 입력한 증거(operator 있음)는 모델이 MEASURED를 거부.
 
 ## 열린 질문
+### M-A9 GPU 수락 조건 (2026-11-12, 미승인 초안)
+- M-A9-Q1 — 결정 13 초안(양쪽 GPU 모델·드라이버·GPU 수·TP 구성 일치, `gpu-bounded` 기동, CPU 프로필 없음)을 구현했으나 사용자 승인 전이다. 초안과 다른 점: 성능은 UNKNOWN 강제 대신 수락 대상에서 제외(GPU RES는 성능 규칙을 그대로 적용), 결과 형식 `guard-update-acceptance/2`. 잠정: 구현 유지, 승인 시 확정.
 ### dev-1 2단계 생산자 (2026-11-05)
 - P2-Q1 — 긴 요청이 #196 계약 사건 상한 4,096에 닿는다(요청 14개 세션에서 request-attempt 2,383행, 1,300 토큰 KV 압박 세션은 초과로 거부). 단계 요약 행(schema `/2`)·기록 분할·요청 선택 중 무엇으로 할지 B 소비자와 합의가 필요하다. 잠정: 요청 선택으로 상한 안에서 시험, 계약은 그대로. 상세는 `docs/dev-1/phase2-contract-questions.md`.
 - P2-Q2 — V2 runner는 sampler 단계 logit bias 개수를 읽을 수 있는데, 계약은 V1 한계 때문에 이 gap을 고정으로 붙인다. 관측이 있을 때 비교로 바꿀지 B 확인이 필요하다. 잠정: 계약 그대로.

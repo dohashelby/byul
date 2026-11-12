@@ -1,3 +1,10 @@
+## 2026-11-12 — M-A9 CPU 이미지 경로 정리 (결정 13은 미승인 초안)
+
+- 한 일: 2026-11-12 GPU 전용 결정에 따라 CPU용 vLLM 이미지 경로를 정리했다. REQ-09 CPU 길이 원인 증거(`vllm_length_cause.py`·검토 프로필·판본 profile 행·`input_length_cause_collector`)를 지우고, 설정의 `length_cause_evidence`는 무시하지 않고 `LENGTH_CAUSE_EVIDENCE_UNSUPPORTED`로 거부한다(REQ-09 기본 경로 0.7.1은 그대로). `cpu-bounded` 기동을 `gpu-bounded`로 바꿨다(엔진 직접 기동 vLLM은 `gpu_count>=1`, TP=할당 GPU 수, `resources.shm_bytes` 필수, 이미지 진입점 유지). 준비 단계 지원 판단(`readiness_support`)·기동 생성 확인·준비 안내·두 이미지 비교 수락 조건을 GPU 조건으로 바꿨다. 예시 `windows-cpu*.toml`은 `gpu-bounded*.toml`로 바꿨다. `tools/validate_cpu_cases.py`는 과거 CPU 실행 분석(`--analyze-existing`)만 남겼다. 과거 CPU 결과·CPU 이미지 계약 고정값은 지우지 않았다.
+- **결정 13(두 이미지 비교 GPU 수락 조건)은 사용자 미승인 초안이다.** 구현은 초안대로 넣었고(양쪽 GPU 모델·드라이버·GPU 수·TP 구성 일치, `gpu-bounded`, 할당 GPU 수 일치, CPU 프로필 없음), 초안과 다른 점 두 가지는 판단을 받아야 한다. (1) 성능을 UNKNOWN으로 강제하지 않고 수락 대상에서 뺐다. core 판정은 CPU 비교일 때만 성능을 UNKNOWN으로 두어, GPU 결과에 강제하면 정상 RES가 계약 위반으로 잡히기 때문이다. (2) 수락 결과 형식을 `guard-update-acceptance/2`로 올렸다(`identities.<side>.cpu`→`gpu`, 성능 조건 변경).
+- 테스트 결과: 바꾼 부분과 인접 시험 71개 파일을 로컬에서 돌려 1,759개 통과. 실패 1건(`test_b_lif07_readiness.py::test_actual_native_helper_default_public_entrypoint_store_restore_preserved`)은 소스 목록 SHA가 바뀌어 B 검토 기록(`tools/reviewed_manifest_receipts.json`)이 없기 때문이다. 기록을 임의로 만들지 않았다. 수집 오류 1건(`test_runtime_native_receipt_feed.py`, `serving_runtime` 없음)은 main에서도 같다. 지운 시험: `test_input_length_cause.py`(대상 코드 제거), `test_cpu_case_manifest.py`(CPU 사례 실행 제거), 길이 원인 시험 2개, CPU 진입점 사례 1개. 소스 목록 재생성(변경 파일과 일치), `checklist_status --check` 통과. 전체 시험은 PR CI로 확인한다.
+- 막힌 것: 결정 13 승인, 새 소스 목록의 B 검토 기록(또는 면제 지시). GPU 이미지용 REQ-07 사전 거부 계약은 아직 없다(CPU 이미지 계약만 있음, M-A6·M-B4에서 판본 고정값으로 더할 대상).
+
 ## 2026-11-12 — 작업지시서 3차 개정(MVP 판본·SUP-08 분담)
 
 - 한 일: 사용자 결정으로 MVP 판본 쌍을 기준 0.7.0·후보 0.30.0으로 바꾸고 [작업지시서 3차](docs/WORK_ORDER_VLLM_MVP.md)를 고쳤다. 판본은 0.1절 "MVP 판본 표"에만 두고 나머지는 기준·후보 판본으로 썼다. 완료 기준에 "판본 추가는 데이터만으로 된다"(5)와 SUP-08 실제 회귀(4)를 넣었다. 정본 실측과 두 판본 비교를 J02 하나로 합쳤다. A는 SUP-08(M-A8), B는 SUP-08을 피해 나머지 42개를 맡고, A 전용 파일과 함께 쓰는 파일의 부분 소유를 정했다. 새 작업: M-A6 판본 적용표·고정값 도구, M-B4 B 관측기의 두 판본 고정값. `CLAUDE.md`·`AGENTS.md` 5절 완성 기준과 DECISIONS를 같은 결정으로 고쳤다.

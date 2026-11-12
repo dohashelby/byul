@@ -171,7 +171,7 @@ def resolve_executor(executor: str, impl: str, *, engine=None, version=None) -> 
             selected = provider.executor(executor, impl, version)
             if selected is not None:
                 return selected
-            if impl == 'kubernetes' and executor not in _PORTABLE_KUBERNETES and not provider.allows_legacy_native(version):
+            if impl == 'kubernetes' and executor not in _PORTABLE_KUBERNETES and not provider.allows_legacy_native(version, executor=executor):
                 return None
     return EXECUTORS.get(f"{executor}:{impl}") or EXECUTORS.get(impl)
 

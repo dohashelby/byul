@@ -16,7 +16,7 @@ _LEGACY = {
 _CURRENT_RAW = {
     "update/src/guard/runtime/kubernetes_worker_readiness.py": _LEGACY["collector"],
     "update/src/guard/runtime/kubernetes_startup_binding.py": _LEGACY["binding"],
-    "update/src/guard/runtime/kubernetes_http.py": "6580cb47a521df74e97e47555bba9de00ef9018dc2ea1e22331de15f742b404f",
+    "update/src/guard/runtime/kubernetes_http.py": "03d159ed092a4eff69fe8dda698f1bc6d4d06b026531c5cf6670b80c251c9dd9",
     "update/src/guard/executors/stream_probe.py": "b37e17fe543cb352887f8ac214091b6f4899e63a972c63e3eb6ded819ae6656f",
 }
 _CURRENT_WRAPPER = "a84a47605aa38cb36303acc2b6c5f90e19e217be21cf476445f1b535f455a62d"

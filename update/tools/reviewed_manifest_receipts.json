@@ -15,6 +15,11 @@
       "manifest_sha256": "b7d5035a41e5add875eaa491c163bf0810ca9c3e5b1fc871437e029d19801498",
       "reviewed_by": "Codex / BYUL UPDATE B / S4 independent PR240 package preparation review",
       "reviewed_at": "2026-11-11T15:14:26+09:00"
+    },
+    {
+      "manifest_sha256": "d1f19dc0caa629a2b4579401cdd18e14be18430583e115c337100fdcd1909e72",
+      "reviewed_by": "Claude / BYUL UPDATE A / PR246 after PR240 merge self-review; B review waived by user 2026-11-12",
+      "reviewed_at": "2026-11-12T13:53:19+09:00"
     }
   ]
 }

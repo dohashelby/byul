@@ -44,6 +44,12 @@ def _managed_config(env, cfg):
     return get_provider(env.engine.name).prepare_managed(env, cfg)
 
 
+def _baseline_ran_without_abort(evidence) -> bool:
+    """A transition can continue past unrelated NOT_RUN checks, but not a failed run."""
+    states = [item.execution.status for item in evidence]
+    return ExecStatus.COMPLETED in states and ExecStatus.ABORTED not in states
+
+
 def _credentials(cfg, gateway_profile):
     cfg = deepcopy(cfg)
     cfg.setdefault("direct_route", {}).setdefault("roles", {"allowed": "GUARD_UPDATE_GENERAL"})
@@ -93,10 +99,13 @@ def update_inputs(envs, cfg: dict):
                         or not actual or actual.split("@")[-1] != (env.engine.image_digest or "").split("@")[-1]):
                     raise ValueError(f"{side}: target identity differs from ENV; regenerate/verify target metadata")
 
-    if any(c.get("executors",{}).get("request_binding")=="kubernetes" for c in side_cfgs.values()):
+    if any(c.get("executors",{}).get(name)=="kubernetes" for c in side_cfgs.values()
+           for name in ("request_binding","input_validation")):
         if mode!="external" or cfg.get("update",{}).get("kubernetes_transition",True) is not True:
             raise ValueError("KUBERNETES_TRANSITION_REQUIRED")
-        paths=[c.get("request_binding",{}).get("target") for c in side_cfgs.values()]
+        name=next(name for name in ("request_binding","input_validation")
+                  if any(c.get("executors",{}).get(name)=="kubernetes" for c in side_cfgs.values()))
+        paths=[c.get(name,{}).get("target") for c in side_cfgs.values()]
         if not all(paths) or Path(paths[0]).resolve()==Path(paths[1]).resolve():
             raise ValueError("KUBERNETES_TRANSITION_TARGETS_UNVERIFIED")
         try:
@@ -156,7 +165,8 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
     lifecycle_errors = []
     diagnostic_refs = []
     kube_transition=None
-    if any(c.get("executors",{}).get("request_binding")=="kubernetes" for c in side_cfgs.values()):
+    if any(c.get("executors",{}).get(name)=="kubernetes" for c in side_cfgs.values()
+           for name in ("request_binding","input_validation")):
         kube_transition=KubernetesTransition(envs,side_cfgs,timeout=cfg.get("update",{}).get("transition_timeout",300),
             poll_interval=cfg.get("update",{}).get("transition_poll_interval",0.25),
                 candidate_binding=cfg.get("update",{}).get("kubernetes_candidate_binding","prebound"))
@@ -176,7 +186,7 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
                         kube_transition.prepare_baseline()
                     else:
                         previous_evidence=store.find_latest("EVD",lambda e:e.plan==plan.ref() and e.side==Side.baseline)
-                        if any(e.execution.status!=ExecStatus.COMPLETED for e in previous_evidence):
+                        if not _baseline_ran_without_abort(previous_evidence):
                             raise ValueError("BASELINE_EXECUTION_FAILED")
                         kube_transition.candidate_ready()
                     side_cfg.raw["_kubernetes_target_sha256"]=kube_transition.transports[side.value].target_sha256

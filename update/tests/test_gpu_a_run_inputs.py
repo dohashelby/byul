@@ -11,6 +11,7 @@ from guard.collectors import engine_callbacks
 from guard.collectors.file import load_environment
 from guard.executors import engine_sensor
 from guard.models import canonical_json, sha256_hex
+from guard.runtime.comparison import execution_conditions
 from tests.builders import baseline_pack
 from tests.test_req16_lab_contexts import CohortTransport
 from tools import gpu_a_aws_lab as lab
@@ -23,9 +24,10 @@ IMAGE = 'docker.io/vllm/vllm-openai@sha256:' + 'a' * 64
 NS_UID = '11111111-2222-3333-4444-555555555555'
 
 
-def deployed(tmp_path, generation):
+def deployed(tmp_path, generation, **render_options):
     engine_yaml, probe_yaml, record = lab.render(HANDOFF, generation=generation, profile='dev', run_id='a-run-1',
-        engine_image=IMAGE, model_revision='7ae557604adf67be50417f59c2c2f167def9a775', host_root='/srv/byul-a')
+        engine_image=IMAGE, model_revision='7ae557604adf67be50417f59c2c2f167def9a775', host_root='/srv/byul-a',
+        **render_options)
     deployment, _ = yaml.safe_load_all(engine_yaml)
     pods = {'engine': {'metadata': {**deployment['spec']['template']['metadata'], 'name': 'serving-engine-7d9f-x2k',
             'namespace': 'serving-lab'}, 'spec': deployment['spec']['template']['spec']}, 'probe': yaml.safe_load(probe_yaml)}
@@ -74,6 +76,57 @@ def test_env_and_target_bind_the_rendered_generation(tmp_path):
     assert target['engine']['trusted_url'] == 'http://10.244.0.11:8000' and target['kubernetes']['run_id'] == 'a-run-1'
     assert target['kubernetes']['probe']['pod'] == 'engine-test-probe-a-run-1' and target['model_mapping']['served_model_name'] == 'test-model'
     assert load_environment(tmp_path / 'env.json').ref() == env.ref()
+
+
+def test_code_selection_env_requires_installed_version_and_target_checks_launch(tmp_path):
+    pods, render = deployed(tmp_path, 'v2-code-selection-trust', engine_version='0.30.0',
+                            model_id='microsoft/Phi-3-vision-128k-instruct', code_revision='b' * 40,
+                            model_host_snapshot='/srv/serving/models/phi3v-test')
+    args = {'gpu_model': 'NVIDIA L4', 'driver': 'test'}
+    with pytest.raises(ValueError, match='RUN_INPUTS_INSTALLED_ENGINE_VERSION_MISMATCH'):
+        inputs.environment(render, **args)
+    with pytest.raises(ValueError, match='RUN_INPUTS_INSTALLED_ENGINE_VERSION_MISMATCH'):
+        inputs.environment(render, observed_engine_version='0.7.0', **args)
+    env = inputs.environment(render, observed_engine_version='0.30.0', **args)
+    assert env.engine.version == '0.30.0' and env.model.id == render['model_id']
+    assert env.facts['prefix_cache'].value is None
+    namespace = json.loads((tmp_path / 'namespace.json').read_text())
+    target = inputs.target(env, render, namespace, pods['engine'], pods['probe'], context='byul-aws-lab')
+    assert target['code_marker_root'] == render['code_marker_root']
+    assert target['comparison_config']['code_revision'] == 'b' * 40
+    assert target['comparison_config']['max_model_len'] == render['max_model_len']
+    assert target['comparison_config']['trust_remote_code'] is True
+    pods['engine']['spec']['containers'][0]['args'].append('--trust-request-mm-kwargs')
+    with pytest.raises(ValueError, match='RUN_INPUTS_RENDERED_LAUNCH_MISMATCH'):
+        inputs.target(env, render, namespace, pods['engine'], pods['probe'], context='byul-aws-lab')
+    pods['engine']['spec']['containers'][0]['args'].pop()
+    pods['engine']['spec']['containers'][0]['command'] = ['sleep', 'infinity']
+    with pytest.raises(ValueError, match='RUN_INPUTS_RENDERED_LAUNCH_MISMATCH'):
+        inputs.target(env, render, namespace, pods['engine'], pods['probe'], context='byul-aws-lab')
+
+
+def test_code_selection_comparison_normalizes_version_launch_and_run_paths(tmp_path):
+    conditions=[]
+    for version in ('0.7.0','0.30.0'):
+        folder=tmp_path/version;folder.mkdir()
+        pods, render=deployed(folder,'v2-code-selection-trust',engine_version=version,
+                              model_id='local-byul/sup08-phi3v-derived',code_revision='b'*40)
+        env=inputs.environment(render,gpu_model='NVIDIA L4',driver='test',observed_engine_version=version)
+        namespace=json.loads((folder/'namespace.json').read_text())
+        target=inputs.target(env,render,namespace,pods['engine'],pods['probe'],context='byul-aws-lab')
+        settings={'target':str(folder/'target.json'),'code_marker_root':f'/cache/hf/markers/{version}',
+                  'code_module_root':'/cache/hf/modules/transformers_modules'}
+        conditions.append(execution_conditions(target,settings,[]))
+    assert sha256_hex(canonical_json(conditions[0])) == sha256_hex(canonical_json(conditions[1]))
+
+
+def test_legacy_render_can_replay_custom_model_id(tmp_path):
+    _, render = deployed(tmp_path, 'v2-default')
+    render['schema'] = 'byul-gpu-a-aws-render/1'
+    for key in ('engine_version', 'model_id', 'model_host_snapshot', 'code_revision', 'code_marker_root', 'launch'):
+        render.pop(key)
+    env = inputs.environment(render, model_id='Qwen/Qwen2-VL-2B-Instruct', gpu_model='NVIDIA L4', driver='test')
+    assert env.engine.version == '0.31.0' and env.model.id == 'Qwen/Qwen2-VL-2B-Instruct'
 
 
 @pytest.mark.parametrize('damage', ['run-label', 'generation-label', 'probe-role', 'engine-image'])

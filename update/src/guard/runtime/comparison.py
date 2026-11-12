@@ -44,5 +44,6 @@ def execution_conditions(target: dict, settings: dict, roles: list[str], *, prof
         **({"model_mapping_sha256":sha256_hex(canonical_json(model_request_conditions(target["model_mapping"])))} if "model_mapping" in target else {}),
         "settings": {k: v for k, v in settings.items()
                      if k not in {"target", "container", "roles", "wrong_key_env", "allowed_key_env", "denied_key_env",
+                                   "code_marker_root",
                                    *( {"constraint_engine_version", "constraint_source"} if profile == "execution-v2" else set())}},
     }

@@ -1,9 +1,26 @@
+## 2026-11-12 — PR #246 검토 수정
+
+- 한 일: 0.7.0·0.30.0 지원표 행(`native_input`)이 같은 실행기를 쓰는 REQ-08·REQ-09까지 여는 문제를 고쳤다. 0.31.0 행에 `request_input_checks` 기능을 더하고, Kubernetes 입력 검증 실행기는 코드 선택(SUP-08)이 아닌 점검에 이 기능을 지원표로 요구한다. 0.31.0 동작은 그대로다. 끝난 인계 지시서 `docs/WORK_ORDER_SUP08_HANDOFF.md`는 지우고(원문은 git 이력) 같은 날 진행 기록 6개를 아래 두 개로 줄였다. 결과 문서에 U1 범위 한계를 적었다.
+- 테스트 결과: 새 시험(구판에서 REQ-09 거부, 0.31.0 대조 통과)이 수정 전 실패·수정 후 통과. 직접/인접 시험 236개 통과(CPython 3.12.3). 소스 목록 재생성(2파일 변경). 전체 시험은 PR CI로 확인한다.
+- B 검토 면제(사용자 지시, DECISIONS 2026-11-12): `reviewed_http_contract.py`의 `kubernetes_http.py` 고정값을 현재 bytes(`03d159ed…`)로 갱신하고, 최종 소스 목록 검토 기록을 A가 넣었다(`reviewed_by`에 면제 명시). #240 병합 뒤 main을 통합하며 충돌(입력 검증 설정 키, 진행·결정 기록, 소스 목록, 검토 기록)을 풀고 목록을 다시 만들어 `d1f19dc0…` 기록으로 바꿨다. 이전 CI 실패 15건의 시험 파일 5개와 직접 시험이 통과했다(152개, 임시 폴더는 저장소 밖).
+
 ## 2026-11-12 — PR #240 현황 상태 정정
 
 - 한 일: 이 PR이 DONE으로 올린 B 점검 8개를 근거별로 나눴다. 현행 팩 GPU 실측 기록이 있는 REQ-08·PLT-01·PLT-04와 1차 제외 기준(실행 경로 준비+UNKNOWN)을 따른 PLT-08은 DONE을 유지했다. 선정 CPU 결과만 있는 REQ-07·PLT-03·PLT-05·LIF-02는 CPU 결과를 DONE으로 올리지 않는다는 규칙에 따라 `MEASUREMENT_REMAINING`으로 정정했다. 상태 메모의 `lab43-current-20261110.json`은 고정 커밋 `451292db` URL로, 짧은 해시 `ad971ee4`·`619194f3`은 저장소 밖 검토 파일 이름과 전체 SHA-256으로 바꿨다. 판정·Ref·제품 소스는 바꾸지 않았다.
 - 테스트 결과: 현황표 재생성과 `tools.checklist_status --check` 통과, 현황·workflow 경로 직접 시험 31개 통과(CPython 3.12.3). 제품 소스 변경이 없어 소스 목록과 검토 기록은 그대로다. 전체 시험은 PR CI로 확인한다.
 - fixture 정리: `tests/fixtures/` 최상위에 있던 SUP-16 운영 코드 사본(`original_*.py`·`integration_boundaries.py`·`layout/`·provenance JSON)을 `tests/fixtures/gpu-b-sup16/`로 옮기고 시험 3개의 경로만 고쳤다(assert 동일). 로컬 macOS에서는 이동 전과 같은 24개가 임시 경로 문제로 실패해 결과는 Linux CI로 확인한다.
 - 다음 단계: 네 점검은 J02 GPU 정본 실측 뒤 DONE으로 올린다. 사용자 지시로 이 PR은 B 추가 검토 없이 마무리한다(DECISIONS 2026-11-12).
+
+## 2026-11-11 — SUP-08 코드 판본 선택 PoC 실측
+
+- 한 일: SUP-08을 "요청 2xx면 UNKNOWN"에서 "엔진이 실제로 불러온 동적 모듈 판본으로 PASS/FAIL"로 넓혔다.
+  - 지원표에 `vllm-input-validation-http/1`(vLLM 0.7.0·0.30.0, `native_input`)을 더하고, `kubernetes_http.py`의 `0.31.0` 고정 비교를 `require_transport` 조회로 바꿨다.
+  - `kubernetes_http.py`의 `engine_code_modules`는 읽기 전용 `kubectl exec`로 동적 모듈 캐시의 이름·크기·SHA-256과 import 표식만 읽는다. `request_field_probe.py`는 시도 전후 목록과 표식을 비교해 `consumed`/`ignored`/`rejected`/`accepted_unverified`로 분류한다. 새 정책 키는 `approved_code_revisions`, DRAFT 팩은 `tools/build_code_selection_pack.py`가 만든다(SUP-08만 revision 5).
+  - `guard update`에 `input_validation` 순차 Pod 전환을 연결하고, AWS 도구에 판본·모델·코드 판본 입력과 trust 켬/끔 generation을 더했다.
+- GPU 결과(서울 L4 1장, Phi-3 vision 고정 snapshot과 무해한 승인/비승인 processor fixture): 0.7.0 `MEASURED PASS/PASS`, 0.30.0 `MEASURED FAIL/PASS`, 제품 비교 SUP-08 `REGRESSED`/기능 `NO_CHANGE`. 0.31.0은 시도를 400으로 import 전 거부해 `MEASURED PASS/PASS`. 0.30.0 trust 비활성 대조는 기동 실패라 판정하지 않았다. 팩·정책은 DRAFT/EXAMPLE, `official=false`, 나머지 68개는 NOT_RUN. 상세는 [GPU 실측 결과](docs/gpu-a/RESULTS-20261111-SUP08.md), [PoC JSON](docs/evidence/sup08-code-selection-20261111.json).
+- 검증: 실측 소스 `94a31486`에서 범위 시험 214개, 통합 HEAD에서 직접/인접 246개·SGLang 인접 55개 통과. 통합 HEAD에서 GPU 재실측은 하지 않았다.
+- 정리: Probe Pod·임시 NetworkPolicy 제거, Deployment replicas=0, GPU 0 MiB, EC2 stopped·공인 IP 해제 확인. 비용은 [GPU 비용 장부](docs/gpu-a/COST_LEDGER.md).
+- 막힌 것: SUP-08 실행기·수집기는 B 소유라 B 검토 기록이 필요하다. PR CI의 실패 15건은 이 검토 기록 부재 14건과 `kubernetes_http.py` B 고정 SHA 불일치 1건이다.
 
 ## 2026-11-11 — PR #240 검토 수정과 B 인계 정리
 

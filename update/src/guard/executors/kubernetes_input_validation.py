@@ -3,6 +3,7 @@ from copy import deepcopy
 from pathlib import Path
 import json
 
+from guard.adapters.engine_profiles import supports
 from guard.models import DataOrigin, canonical_json, sha256_hex
 from guard.models.base import utcnow
 from guard.runtime.kubernetes_http import INPUT_VALIDATION_PROFILE, KubernetesHTTP
@@ -11,7 +12,8 @@ from .http_common import Ctx, fill_model, request_model
 from .input_validation import InputValidationExecutor
 
 _SETTINGS = {"target", "kubectl_binary", "request_timeout", "max_duration_seconds", "vocab_size", "vocab_source",
-             "max_probe_tokens", "reused_token_ids", "runner_input", "runner_capture"}
+             "max_probe_tokens", "reused_token_ids", "runner_input", "runner_capture", "code_module_root",
+             "code_module_repository", "code_marker_root", "unapproved_revision", "control_image"}
 
 
 class _WithBody:
@@ -42,7 +44,9 @@ def _contract(check, values, cfg, model):
             control["return_token_ids"] = True
             fields[values["reused_token_field"]] = list(cfg["reused_token_ids"])
         else:
-            fields = dict.fromkeys(values["code_selection_fields"], request_field_probe.UNAPPROVED_REVISION)
+            control = request_field_probe.control_body(control, cfg)
+            fields = request_field_probe.nested_fields(values["code_selection_fields"],
+                                                       request_field_probe.challenge_revision(cfg))
     else:
         # The token-id case sends vocab_size itself; the length case sends one more than the policy limit.
         prompt_tokens = {"max_length": values["max_input_tokens"] + 1, "max_value": cfg["vocab_size"]}
@@ -59,10 +63,14 @@ class KubernetesInputValidationExecutor(InputValidationExecutor):
 
     def run(self, check, env, policy_values, adapter, workdir):
         try:
-            if (type(self.cfg) is not dict or set(self.cfg) - _SETTINGS or adapter is None
-                    or any("." in field for field in policy_values.get("code_selection_fields") or [])):
+            if type(self.cfg) is not dict or set(self.cfg) - _SETTINGS or adapter is None:
                 raise ValueError
             self.validate_policy(check, policy_values)
+            # native_input opens the transport only. Token/length and reused-token checks also need a
+            # release whose catalog row lists request_input_checks; code selection needs native_input alone.
+            if (getattr(check, "collection_profile", None) != request_field_probe.CODE_SELECTION_PROFILE
+                    and not supports(env.engine.name, env.engine.version, "request_input_checks")):
+                raise ValueError
             target = json.loads(Path(self.cfg["target"]).read_text(encoding="utf-8"))
             if self._expected_target_sha256 is not None and sha256_hex(canonical_json(target)) != self._expected_target_sha256:
                 raise ValueError

@@ -1,5 +1,7 @@
 # DECISIONS
 
+- 2026-11-12 · 사용자 지시("B 배제하고 그냥 우리가 다해"): PR #240·#246은 B 검토 없이 A가 마무리한다. #246의 `reviewed_http_contract.py` B 고정값(`kubernetes_http.py`)과 최종 소스 목록 검토 기록은 A가 직접 넣고, 기록의 `reviewed_by`에 B 검토 면제를 밝힌다. 작업지시서의 일반 병합 규칙(B 검토 기록)은 바꾸지 않는다.
+
 - 2026-11-11 · PR #240의 종료 기록·원자료·검토 JSON·미통합 후보는 커밋 `451292db`에 보존하고 docs의 중복 사본 144개를 정리한다. 현행 상태·잔여·담당·정확 복원 명령은 `docs/gpu-b/CURRENT_HANDOFF.md`에 둔다. 원 FAIL/UNKNOWN·Ref·출처와 로컬/AWS 원본은 유지하며, 후보 복원은 실행 승인이나 제품 완료가 아니다.
 
 - 2026-11-01 · PACK31 원본은 reference/pack-seeds에 보존하고 현행 팩은 tools/regenerate_baseline_pack로 만든다. 복합 프로파일은 하위 수집별 세션을 따로 두고 결과만 모은다. · 파생 팩·과거 Ref를 현행 팩 변경과 분리하고 시간이 가까운 결과를 합치지 않기 위함이다.

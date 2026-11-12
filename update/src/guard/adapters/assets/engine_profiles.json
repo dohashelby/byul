@@ -38,6 +38,7 @@
         "required_events",
         "resource_recovery",
         "response_error",
+        "runner_capture",
         "scoped_consumption",
         "session_revocation",
         "stored_responses",

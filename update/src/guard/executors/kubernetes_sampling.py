@@ -19,7 +19,7 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
     def run(self, check, env, policy_values, adapter, workdir):
         allowed = {"target", "constraint_source", "constraint_engine_version", "max_output_tokens", "max_total_requests",
                    "max_probe_tokens", "max_duration_seconds", "request_timeout", "kubectl_binary", "roles",
-                   "wrong_key_env", "denied_key_env", "allow_mutating_routes", "runner_input"}
+                   "wrong_key_env", "denied_key_env", "allow_mutating_routes", "runner_input", "runner_capture"}
         try:
             if set(self.cfg) - allowed or self.cfg.get("allow_mutating_routes", False) is not False:
                 raise ValueError
@@ -31,7 +31,8 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
             raise ValueError("KUBERNETES_SAMPLING_ENV_UNAVAILABLE")
         transport = KubernetesHTTP(target, env, duration=self.cfg["max_duration_seconds"],
                                    binary=self.cfg.get("kubectl_binary", "kubectl"), runner=self._kubectl_runner)
-        target["probe_image"] = transport.binding["probe"]["image"]
+        if "runner_capture" not in self.cfg:
+            target["probe_image"] = transport.binding["probe"]["image"]
         keys = self.keys()
         ctx = Ctx(check=check, env=env, adapter=adapter, target=target, policy_values=policy_values,
                   timeout=float(self.cfg.get("request_timeout", 3)), allow_mutating=False, keys=keys,

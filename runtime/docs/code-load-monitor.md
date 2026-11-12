@@ -1,6 +1,7 @@
 # 추론 중 코드 파일 열기 탐지 — TG-CODE-01
 
-2026-11-11 구현. monitor 전용 후보이며 실제 커널 적재·실서버 탐지는 미확인이다.
+2026-11-11 구현. monitor 전용이며 [AWS 16회차](AWS_GPU_서버16회차_결과_20261111.md)에서
+vLLM 컨테이너의 별도 프로세스로 적재·탐지를 확인했다. 아래 커널 신원 기본화 수정본은 서버 미적용이다.
 SC-11-01/02의 공통 행동을 파일 열기 시도로 관측한다. 요청 필드명, 네트워크 다운로드 여부,
 `trust_remote_code` 값과 독립적이다. 파일 열기는 import 성공·코드 실행·공격 성공을 증명하지 않는다.
 
@@ -20,9 +21,15 @@ SC-11-01/02의 공통 행동을 파일 열기 시도로 관측한다. 요청 필
   동일 index에 두 연산자를 중복 선언하지 않는다.
   [인자 슬롯 구성 소스](https://github.com/cilium/tetragon/blob/v1.7.1/pkg/sensors/tracing/generickprobe.go)와
   [선택자 해석 소스](https://github.com/cilium/tetragon/blob/v1.7.1/pkg/selectors/kernel.go)를 확인했다.
-  kernel identity를 켜도 file 2개 + 기존 identity data 3개로 최대 5필드 이내다.
+  TG-CODE-01은 전역 `tetragon_kernel_identity`가 false여도 항상 `KERNEL_DATA`와
+  `serving-runtime.local/kernel-identity: v2` 주석을 포함한다. file 슬롯 2개 + identity data
+  3개로 Tetragon 1.7.1의 최대 5필드를 지킨다. 다른 정책의 커널 신원 수집은 기존 전역 옵션을 따른다.
+  정책 index는 주석 대신 모든 kprobe의 data가 KERNEL_DATA와 같은지 확인해
+  `kernel_identity: true`로 판정한다. 기본 intent에서도 kernel_task/procfs 대조가 가능하며,
+  최신 identity·Pod/컨테이너·단계 증거가 부족하면 여전히 unknown이다.
   경로 값은 selector당 8개씩 나누고 디렉터리 경계 `/`를 붙인다. kernel >=5.3을 전제로 한다.
-  이 형식의 서버 dry-run, 정책 loaded 상태와 양성 이벤트는 D4에서 검증해야 한다.
+  16회차에서는 TG-CODE-01만 커널 신원으로 재렌더해 양성 이벤트를 확인했다.
+  기본 렌더 수정 후 실제 재적용·재검증은 다음 서버 회차에 남는다.
 - `ExecPolicy`/`phase_signals.py`의 기존 timeline을 재사용한다. loading/compiling/inferring별
   실행 허용 목록 TG-EXEC-01은 **새 프로세스 실행**을 분류하며, 기존 Python 프로세스의 import를
   승인하는 목록이 아니다. 코드 규칙은 그 목록/예외 판정을 사용하지 않고 단계 증거만 복사한다.
@@ -170,6 +177,15 @@ with tempfile.TemporaryDirectory(prefix="byul-codeload-", dir=modules) as direct
 감시 범위 밖 경로·경로 해석 한계, 수집 공백, 추론 중 합법 JIT는 남는 제약이다.
 
 ## 로컬 검증 결과
+
+AWS 16회차 후속 수정은 기본 false intent의 렌더·정책 index·커널 신원 대조로 detected까지
+네트워크 없이 회귀 검증한다. 플랫폼은 일반 Tetragon 최근 50건에 체크리스트의 TG-* 규칙별
+최근 10건을 중복 제거해 합친다. Gateway 관측 조회의 선택적 `rule_ids`(최대 5개)는
+한 번의 tail 읽기에서 규칙별 10건, 합계 최대 50건을 반환한다. `window.rule_groups`로
+지원 여부를 알리고, 이전 Gateway에서는 기존 `rule_id` 필터를 병렬 조회한다.
+두 방식 모두 기존 관측 캐시 TTL과 4MiB/4096행 tail을 사용하므로 그 범위보다 오래된 사건은
+반환하지 못한다. 잘린 이력·응답 제한은 source_windows/truncated로 표시하며,
+관측 건수는 전체 보존 이력의 전수 집계가 아니다. 64MiB 요청 상세 검색 한도도 변경하지 않는다.
 
 기준 byul_runtime / f4ea84c9, 커밋·push 없음. 새 기능 runtime/tests/test_codeload.py와
 플랫폼 checklist_links의 네트워크 없는 시험은 **34 passed, 2 deselected**다.

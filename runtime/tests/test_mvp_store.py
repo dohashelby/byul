@@ -72,7 +72,9 @@ def test_new_journal_ignores_permissive_umask_and_preserves_existing_directory(t
 def test_unsafe_existing_journal_rejected_without_chmod_or_write(tmp_path,mode):
     path=tmp_path/'old.jsonl';path.write_bytes(b'{"example":1}\n');path.chmod(mode)
     store=JsonlStore(path)
-    with pytest.raises(PermissionError):store.check_writable()
+    with pytest.raises(PermissionError, match=rf'^old\.jsonl: .*permissions.*{mode:04o}') as error:
+        store.check_writable()
+    assert str(tmp_path) not in str(error.value)
     with pytest.raises(PermissionError):store.append({'example':2})
     with pytest.raises(PermissionError):store.read_all()
     assert stat.S_IMODE(path.stat().st_mode)==mode

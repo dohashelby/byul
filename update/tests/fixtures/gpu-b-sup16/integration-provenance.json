@@ -1,0 +1,52 @@
+[
+  {
+    "alias": "wrapper.py",
+    "original_full_raw_sha256": "5b7defa65ecd95982b0d34932ccdc74107c023117237de85509c6c66b3078e1f",
+    "selected_function_AST": {
+      "track_actual_children": "14067c0d7dd4e0c2e763f8a26f85f48f2ea775c078ddbb0a3af7863ce7cb0c13",
+      "record_wrapper_finally": "590bdaca78cdc91ea3c99e2ef4ceec2ff5aa98c233f665ec728dfab7c284fc64"
+    }
+  },
+  {
+    "alias": "driver.py",
+    "original_full_raw_sha256": "e5662e668edbfa11cd24424f6916840b1554ed4e340a076d8a8ebec4feb58be1",
+    "selected_function_AST": {
+      "group_active": "c1c11c7a48de6c8ef9b534ca031252b197f4a1c313c9186b87a5a50392ecd7fd",
+      "wait_child": "224f7c1c0ab5408161bd1718e3453f9fa41b017def0736b04173efa296493fac",
+      "run_transfer_group": "20504ea586c5cb0d759049177a0b65c6ccdca772d496ced03e94210ecf93ad2b"
+    }
+  },
+  {
+    "alias": "helper.py",
+    "original_full_raw_sha256": "5a6d67b20412e3060fbf31a5770ff0018dae39630db07ba909267ebfb49f7080",
+    "selected_function_AST": {
+      "main": "71e6d1a507671af259dae13d10d4a292f80f5de08f54137599b82a87632ac7d1"
+    },
+    "previous_full_raw_sha256": "f07fbe1b4f86c84ec5549206196304d29388fd575e6979917c6d2975300fd565",
+    "v5_change": "inline bounded getter worker-first exception preservation; main AST unchanged"
+  },
+  {
+    "alias": "023-original_ready_controller.py",
+    "original_full_raw_sha256": "45046718557d1d2b5a77f210f9a77c23a7d965af92c65ca1a1354b7e8b212fe4",
+    "selected_function_AST": {
+      "command": "62e1b307dbeffc351021b2d7a900003f13bc8a452ccc67729a99bcbe59c78450"
+    }
+  },
+  {
+    "alias": "008-context_binder.py",
+    "original_full_raw_sha256": "97d0cede6e68eccabd7dafc2a76e85d84ac2b0807969315a87fc894ee4d28359",
+    "selected_function_AST": {
+      "require": "9d23a2530e904cebabe2467786e20040907000b83dcf290f0cf71d7e79f978d9",
+      "_function": "21863c1f04e60dff740a0f84a2d601dc47d803f6d3bd6849f93ca9521b0e7faf",
+      "_rebind": "290b9736bce89e4653db58bf23163082bb8399c181c4c00e165e577abdf10abd"
+    }
+  },
+  {
+    "alias": "build_integration.py",
+    "original_full_raw_sha256": "14a0a7554f687f538de32c2338d9786b0e704dee173b7b3d8a543a31c3e528ce",
+    "selected_function_AST": {
+      "once": "4ee09d5b5ff876aa9841299ac3508787c03bf70c82844abec1053eb0d2d2643d",
+      "validate_sites": "3c2ef179416a923a1ecc8a1614457381b4950dcd9f768ec0f1001931ba7c10fd"
+    }
+  }
+]

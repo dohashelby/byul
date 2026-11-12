@@ -107,6 +107,12 @@ def verify_local_inputs(inputs, root):
                     diagnostic("errors", cid, field, "INPUT_FILE_UNAVAILABLE")
                 except (ValueError, TypeError, UnicodeError, RecursionError):
                     diagnostic("errors", cid, field, "INPUT_JSON_INVALID")
+        # B04의 기존 계획 문서만 ID/역할을 결합한다. 실제 제어 의미는 미검증이다.
+        for role in section["controls"]:
+            control = payloads.get("controls." + role)
+            if control is not None and control.get("schema") == "B04-declared-control-plan/1":
+                match(cid, "controls." + role + ".check_id", control.get("check_id"), cid)
+                match(cid, "controls." + role + ".role", control.get("role"), role)
         env = None
         if "runtime_refs.ENV" in payloads:
             try:

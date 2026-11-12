@@ -227,7 +227,8 @@ class LifecycleTransitionExecutor:
 
     def __init__(self, cfg, *, runner=None, clock=None, wait=None, expected_target_sha256=None):
         self.b_common_inputs = deepcopy(cfg.get('common_inputs'))
-        self.cfg = {k: v for k, v in cfg.items() if k != 'common_inputs'}; self.runner = runner; self.clock = clock or utcnow
+        self.b_cpu_support_input = deepcopy(cfg.get('cpu_support_input'))
+        self.cfg = {k: v for k, v in cfg.items() if k not in {'common_inputs', 'cpu_support_input'}}; self.runner = runner; self.clock = clock or utcnow
         self.wait = wait or time.sleep
         self.expected_target = expected_target_sha256
 
@@ -420,10 +421,13 @@ class LifecycleTransitionExecutor:
             cleanup_errors=cleanup, started_at=started, finished_at=self.clock())
 
         from .lifecycle_common_input_consumption import attach_inputs
+        from .committed_cpu_support import attach as attach_cpu_support
         if self.b_common_inputs is None:
-            return draft
+            return attach_cpu_support(draft, check, self.b_cpu_support_input, workdir)
         selected = generations.get(self.b_common_inputs.get('generation')) if type(self.b_common_inputs) is dict else None
         if selected is None:
-            return attach_inputs(draft, check, env, {}, {}, workdir)
-        return attach_inputs(draft, check, selected.env, selected.target, self.b_common_inputs, workdir,
+            return attach_cpu_support(attach_inputs(draft, check, env, {}, {}, workdir),
+                                      check, self.b_cpu_support_input, workdir)
+        draft = attach_inputs(draft, check, selected.env, selected.target, self.b_common_inputs, workdir,
             prepared=selected.prepared, owner=selected.native_target['kubernetes']['engine'], generation=selected.key)
+        return attach_cpu_support(draft, check, self.b_cpu_support_input, workdir)

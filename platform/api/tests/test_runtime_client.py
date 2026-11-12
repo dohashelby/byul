@@ -352,13 +352,16 @@ def test_observation_windows_preserve_full_count_and_returned_slice(live_client,
         payload = fake.endpoints[f"observations?source={source}"]
         sample = payload["observations"][0]
         payload["observations"] = [copy.deepcopy(sample) for _ in range(50)]
+        if source == "tetragon":
+            for n, record in enumerate(payload["observations"]):
+                record["event_key"] = f"{n:064x}"
         payload["counts"]["total"] = total
     response = live_client.get("/api/runtime/events")
     assert response.status_code == 200
     body = response.json()
     assert body["truncated"] is True
     assert body["source_windows"]["hubble"] == {"total": 120, "returned": 50, "limit": 50, "truncated": True}
-    assert body["source_windows"]["tetragon"] == {"total": 51, "returned": 50, "limit": 50, "truncated": True}
+    assert body["source_windows"]["tetragon"] == {"total": 51, "returned": 50, "limit": 100, "truncated": True}
     assert body["source_windows"]["gateway"]["total"] is None
     # Observation truncation does not claim the Gateway request list was cut.
     assert live_client.get("/api/runtime/requests").json()["truncated"] is False

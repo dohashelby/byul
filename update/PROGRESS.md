@@ -1,3 +1,8 @@
+## 2026-11-12 — update CI 문서 제외 범위 확대
+
+- 한 일: update CI가 `update/docs/**/*.md`만 건너뛰어 `CLAUDE.md`·`AGENTS.md`·`PROGRESS.md`처럼 `update/` 바로 아래 문서만 바꾼 PR도 전체 시험을 돌렸다. `.github/workflows/update.yml` push 경로와 `.github/update-ci-paths.txt`에 `!update/*.md`를 더했다. 하위 폴더의 `.md`(fixture·reference)는 그대로 시험 대상이다. runtime·platform CI는 바꾸지 않았다.
+- 테스트 결과: `tests/test_workflow_paths.py` 16개 통과. 최상위 문서를 코드가 경로로 읽으면 실패하는 시험과 경로 판정 사례 5개를 더했다. #248 변경 파일은 이제 시험 대상이 아니다.
+
 ## 2026-11-12 — PR #246 검토 수정
 
 - 한 일: 0.7.0·0.30.0 지원표 행(`native_input`)이 같은 실행기를 쓰는 REQ-08·REQ-09까지 여는 문제를 고쳤다. 0.31.0 행에 `request_input_checks` 기능을 더하고, Kubernetes 입력 검증 실행기는 코드 선택(SUP-08)이 아닌 점검에 이 기능을 지원표로 요구한다. 0.31.0 동작은 그대로다. 끝난 인계 지시서 `docs/WORK_ORDER_SUP08_HANDOFF.md`는 지우고(원문은 git 이력) 같은 날 진행 기록 6개를 아래 두 개로 줄였다. 결과 문서에 U1 범위 한계를 적었다.

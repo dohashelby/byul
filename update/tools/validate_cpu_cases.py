@@ -267,6 +267,7 @@ def main(argv=None) -> int:
     parser.add_argument("--env", type=Path, help="removed: CPU execution is no longer supported")
     parser.add_argument("--analyze-existing", type=Path, help="read-only matrix/1 or matrix/2 analysis; no engine or subprocess")
     parser.add_argument("--output", type=Path, required=True, help="new directory only; three engines maximum, sequential")
+    parser.add_argument("--pack", type=Path, help="accepted for compatibility; analysis uses the saved pack only")
     args = parser.parse_args(argv)
     if args.analyze_existing is not None:
         if args.config is not None or args.env is not None:

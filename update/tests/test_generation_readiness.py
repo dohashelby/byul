@@ -18,7 +18,8 @@ from tests.test_managed_gpu_launch import setup_inputs
 
 
 def settings(**updates):
-    return {"model": "EXAMPLE-model", "launch_profile": "cpu-bounded", "gpu": False,
+    # 2026-11-12 (M-A9): startup generation is bounded-GPU-only.
+    return {"model": "EXAMPLE-model", "launch_profile": "gpu-bounded", "gpu": True,
             readiness.SETTING: 120, **updates}
 
 
@@ -49,7 +50,7 @@ def test_readiness_rejects_invalid_limits_before_any_operation(value):
         readiness.profile(settings(**{readiness.SETTING: value}))
 
 
-@pytest.mark.parametrize("change", [{"gpu": True}, {"launch_profile": "legacy"}, {"model": ""}])
+@pytest.mark.parametrize("change", [{"gpu": False}, {"launch_profile": "legacy"}, {"launch_profile": "cpu-bounded"}, {"model": ""}])
 def test_readiness_rejects_other_profiles_or_absent_model(change):
     with pytest.raises(ValueError):
         readiness.profile(settings(**change))
@@ -152,7 +153,7 @@ def test_existing_readiness_record_is_never_overwritten_or_retried(tmp_path):
     assert path.read_bytes() == b"EXAMPLE retained failed preparation\r\n"
 
 
-def test_managed_cpu_accepts_explicit_option_without_changing_engine_launch(tmp_path):
+def test_managed_gpu_accepts_explicit_option_without_changing_engine_launch(tmp_path):
     _, env, _, cfg = setup_inputs(tmp_path)
     legacy = application._managed_config(env, cfg)
     cfg["vllm"][readiness.SETTING] = 120

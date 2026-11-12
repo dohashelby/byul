@@ -99,7 +99,9 @@ def model_cache(tmp_path, *, gpu_count, digest_only=False):
 
 
 def test_digest_identity_and_launch_locator_are_bound_without_editing_env(tmp_path):
-    env, cfg = model_cache(tmp_path, gpu_count=0, digest_only=True)
+    # 2026-11-12 (M-A9): managed vLLM is GPU-only; the locator binding is unchanged.
+    env, cfg = model_cache(tmp_path, gpu_count=1, digest_only=True)
+    cfg['vllm'].update(gpu_devices=['0'], resources={'cpus': 4, 'memory_bytes': 17179869184, 'pids_limit': 512})
     ref = env.ref(); options = get_provider('vllm').prepare_managed(env, cfg)
     assert options['image'] == cfg['vllm']['image'] and env.ref() == ref
     cfg['vllm']['image'] = 'example/engine@sha256:' + 'c' * 64

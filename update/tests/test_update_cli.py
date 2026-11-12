@@ -179,11 +179,13 @@ def test_managed_preflight_checks_real_model_inventory(tmp_path):
     snapshot.mkdir(parents=True)
     (snapshot / "config.json").write_text('{"vocab_size":100}', encoding="utf-8")
     env = environment(engine={"name":"vllm","version":"test","image_digest":"test/image@sha256:"+"a"*64},
-                      runtime={"gpu_count":0},
+                      runtime={"gpu_count":1, "gpu_model":"EXAMPLE-GPU", "driver":"EXAMPLE-DRIVER"},
                       model={"id":"test","revision":"rev","inventory_sha256":"wrong"})
-    cfg = {"vllm":{"models_dir":str(tmp_path)}}
+    # 2026-11-12 (M-A9): managed vLLM is GPU-only; inventory pinning is unchanged.
+    cfg = {"vllm":{"models_dir":str(tmp_path), "gpu_devices":["0"],
+                   "resources":{"cpus":4, "memory_bytes":17179869184, "pids_limit":512}}}
     with pytest.raises(ValueError, match="inventory differs"):
         orchestration._managed_config(env, cfg)
     env = env.model_copy(update={"model":env.model.model_copy(update={"inventory_sha256":inventory(snapshot)["inventory_sha256"]})}).seal()
     result = orchestration._managed_config(env, cfg)
-    assert result["image"] == env.engine.image_digest and result["gpu"] is False
+    assert result["image"] == env.engine.image_digest and result["gpu"] is True

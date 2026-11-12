@@ -26,7 +26,7 @@ def _inputs(tmp_path, profiles):
     candidate = baseline.model_copy(update={
         "id": "ENV-SENTINEL-CANDIDATE",
         "engine": baseline.engine.model_copy(update={
-            "version": "0.32.0", "image_digest": "cpu@sha256:" + "b" * 64}),
+            "version": "0.32.0", "image_digest": "gpu@sha256:" + "b" * 64}),
     }).seal()
     cfg = deepcopy(cfg)
     cfg.pop("validation")

@@ -38,7 +38,7 @@ def assess(case, **kw):
     return assess_update(*case, **kw)
 
 
-def test_concrete_pass_pass_accepts_but_remains_nonofficial_and_cpu_only(tmp_path):
+def test_concrete_pass_pass_accepts_but_remains_nonofficial_gpu_only(tmp_path):
     case = build_update_case(tmp_path)
     before = deepcopy(case[:2])
     result = assess(case)
@@ -209,7 +209,9 @@ def test_confirmed_fail_never_hides_incomplete_subtrials(tmp_path, gap):
     (lambda raw: raw["execution"]["executor"].update(name="fake"), "automated original measurement"),
     (lambda raw: raw["execution"]["executor"].update(default_judge="declared"), "automated original measurement"),
     (lambda raw: raw["execution"].update(finished_at=None), "execution timestamps"),
-    (lambda raw: raw["comparability"].update(model_inventory_sha256="d" * 64), "CPU/model/fixture/config"),
+    (lambda raw: raw["comparability"].update(model_inventory_sha256="d" * 64), "GPU/model/fixture/config"),
+    (lambda raw: raw["comparability"].update(gpu="OTHER GPU"), "GPU/model/fixture/config"),
+    (lambda raw: raw["comparability"].update(driver=None), "GPU/model/fixture/config"),
     (lambda raw: raw.update(artifacts=[]), "probe log attachment"),
     (lambda raw: raw["challenges"].append(deepcopy(raw["challenges"][0])), "duplicate or unrecognized challenge"),
 ])

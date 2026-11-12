@@ -21,6 +21,7 @@ import { DOC_STATUS } from "../lib/labels";
 import { EnvironmentForm, PolicyForm, factWarnings, newEnvironment, newPolicy, nextPolicyVersion } from "./forms";
 import p from "./pages.module.css";
 import { BundleExport } from "./BundleExport";
+import { EditorIntro, EditorSaveBar, InputIssueSummary, useEditorStatus } from "../components/InputEditor";
 
 const TITLE: Record<DocKind, string> = { environments: "환경", policies: "정책" };
 
@@ -69,23 +70,6 @@ function rejected(error: unknown): FieldIssue[] {
   return [{ path: "/", message: String(error) }];
 }
 
-function SaveBar({ onSave, pending, issues, savedRev }: { onSave: () => void; pending: boolean; issues: FieldIssue[]; savedRev: number | null }) {
-  return (
-    <div className="card card-pad row wrap" style={{ position: "sticky", top: 0, zIndex: 2 }}>
-      <button className="btn btn-primary" type="button" onClick={onSave} disabled={pending}>
-        {pending ? "저장 중" : "새 판본으로 저장 (DRAFT)"}
-      </button>
-      {issues.length > 0 && (
-        <span className={p.fieldError} role="alert">
-          스키마 검증 오류 {issues.length}건 — 각 필드 옆을 확인하세요.
-        </span>
-      )}
-      {savedRev != null && issues.length === 0 && <span className="small">판본 {savedRev}로 저장했습니다.</span>}
-      {issues.some((i) => i.path === "/") && <span className={p.fieldError}>{issues.find((i) => i.path === "/")!.message}</span>}
-    </div>
-  );
-}
-
 export function EnvironmentEditorPage() {
   const { id } = useRouteParams();
   const isNew = id === undefined;
@@ -95,35 +79,45 @@ export function EnvironmentEditorPage() {
   const save = useSaveEnvironment();
   const navigate = useNavigate();
   const [doc, setDoc] = useState<EnvironmentDoc | null>(isNew ? newEnvironment() : null);
+  const editor = useEditorStatus(doc, isNew);
   const [issues, setIssues] = useState<FieldIssue[]>([]);
   const [serverWarnings, setServerWarnings] = useState<FieldIssue[]>([]);
   const [savedRev, setSavedRev] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!isNew && current.data && !doc) setDoc(current.data.document);
+    if (!isNew && current.data && !doc) {
+      setDoc(current.data.document);
+      setSavedRev(current.data.meta.revision);
+    }
   }, [current.data, doc, isNew]);
 
   const onSave = () => {
-    if (!doc) return;
+    if (!doc || editor.localIssues.length) return;
     save.mutate(doc, {
       onSuccess: (res) => {
         setIssues([]);
         setServerWarnings(res.warnings);
         setSavedRev(res.saved.meta.revision);
         setDoc(res.saved.document);
+        editor.markSaved(res.saved.document);
         if (isNew) navigate(`/environments/${encodeURIComponent(res.saved.meta.doc_id)}`, { replace: true });
       },
       onError: (e) => setIssues(rejected(e)),
     });
   };
 
-  if (!isNew && revs.isError) return <StateView kind="not_found" />;
+  if (!isNew && (revs.isError || current.isError)) return <InputLoadError retry={() => { void revs.refetch(); void current.refetch(); }} />;
+  if (!isNew && revs.isSuccess && latest === null) return <StateView kind="empty" detail="저장된 환경 판본이 없습니다." />;
   if (!doc) return <StateView kind="loading" />;
   const warnings = [...factWarnings(doc), ...serverWarnings.filter((w) => !factWarnings(doc).some((x) => x.path === w.path))];
   return (
-    <div className="page">
-      <SaveBar onSave={onSave} pending={save.isPending} issues={issues} savedRev={savedRev} />
-      <EnvironmentForm doc={doc} setDoc={setDoc} issues={issues} warnings={warnings} isNew={isNew} />
+    <div className={`page ${p.inputPage}`}>
+      <EditorIntro kind="환경" isNew={isNew} origin={doc.data_origin} context={[doc.target.engine.name || "엔진 미선택", doc.target.engine.version || "판본 미확인", doc.target.model.id || "모델 미입력"]} />
+      <EditorSaveBar onSave={onSave} pending={save.isPending} failed={save.isError} dirty={editor.dirty} issues={[...issues, ...editor.localIssues]} localError={editor.localIssues.length > 0} savedRev={savedRev} />
+      <InputIssueSummary issues={[...issues, ...editor.localIssues]} />
+      <fieldset className={p.editorFields} disabled={save.isPending} aria-label="환경 입력">
+        <EnvironmentForm doc={doc} setDoc={(d) => { setDoc(d); setIssues([]); }} issues={[...issues, ...editor.localIssues]} warnings={warnings} isNew={isNew} onLocalIssue={editor.reportIssue} />
+      </fieldset>
       {!isNew && id && <History kind="environments" id={id} />}
     </div>
   );
@@ -138,6 +132,7 @@ export function PolicyEditorPage() {
   const save = useSavePolicy();
   const navigate = useNavigate();
   const [doc, setDoc] = useState<PolicyDoc | null>(isNew ? newPolicy() : null);
+  const editor = useEditorStatus(doc, isNew);
   const [issues, setIssues] = useState<FieldIssue[]>([]);
   const [savedRev, setSavedRev] = useState<number | null>(null);
   const [serverWarnings, setServerWarnings] = useState<FieldIssue[]>([]);
@@ -146,30 +141,37 @@ export function PolicyEditorPage() {
     if (!isNew && current.data && !doc) {
       // 확정·예시 판본을 고쳐도 새 판본은 DRAFT로 저장된다.
       setDoc({ ...current.data.document, status: "DRAFT" });
+      setSavedRev(current.data.meta.revision);
     }
   }, [current.data, doc, isNew]);
 
   const onSave = () => {
-    if (!doc) return;
+    if (!doc || editor.localIssues.length) return;
     save.mutate(isNew ? doc : { ...doc, policy_version: nextPolicyVersion(doc.policy_version) }, {
       onSuccess: (res) => {
         setIssues([]);
         setServerWarnings(res.warnings);
         setSavedRev(res.saved.meta.revision);
         setDoc(res.saved.document);
+        editor.markSaved(res.saved.document);
         if (isNew) navigate(`/policies/${encodeURIComponent(res.saved.meta.doc_id)}`, { replace: true });
       },
       onError: (e) => setIssues(rejected(e)),
     });
   };
 
-  if (!isNew && revs.isError) return <StateView kind="not_found" />;
+  if (!isNew && (revs.isError || current.isError)) return <InputLoadError retry={() => { void revs.refetch(); void current.refetch(); }} />;
+  if (!isNew && revs.isSuccess && latest === null) return <StateView kind="empty" detail="저장된 정책 판본이 없습니다." />;
   if (!doc) return <StateView kind="loading" />;
   return (
-    <div className="page">
-      <SaveBar onSave={onSave} pending={save.isPending} issues={issues} savedRev={savedRev} />
+    <div className={`page ${p.inputPage}`}>
+      <EditorIntro kind="정책" isNew={isNew} origin={doc.data_origin} context={[doc.policy_id || "새 정책", doc.environment_ref ? `${doc.environment_ref.id} · 판본 ${doc.environment_ref.revision}` : "기준 환경 미선택"]} />
+      <EditorSaveBar onSave={onSave} pending={save.isPending} failed={save.isError} dirty={editor.dirty} issues={[...issues, ...editor.localIssues]} localError={editor.localIssues.length > 0} savedRev={savedRev} />
+      <InputIssueSummary issues={[...issues, ...editor.localIssues]} />
       {serverWarnings.length > 0 && <div className="notice">저장했지만 실행 준비는 완료되지 않았습니다. 입력 연결·준비 상태에서 부족한 값을 확인하세요.</div>}
-      <PolicyForm doc={doc} setDoc={setDoc} issues={issues} warnings={serverWarnings} isNew={isNew} />
+      <fieldset className={p.editorFields} disabled={save.isPending} aria-label="정책 입력">
+        <PolicyForm doc={doc} setDoc={(d) => { setDoc(d); setIssues([]); }} issues={[...issues, ...editor.localIssues]} warnings={serverWarnings} isNew={isNew} onLocalIssue={editor.reportIssue} />
+      </fieldset>
       {!isNew && id && latest !== null && current.data && (
         <ConfirmPolicy id={id} revision={latest} stored={current.data.document} edited={doc} onConfirmed={(d) => setDoc({ ...d, status: "DRAFT" })} />
       )}
@@ -177,6 +179,10 @@ export function PolicyEditorPage() {
       {!isNew && id && <BundleExport policyId={id} revisions={revs.data?.items ?? []} />}
     </div>
   );
+}
+
+function InputLoadError({ retry }: { retry: () => void }) {
+  return <div className={`page ${p.inputPage}`}><StateView kind="error" detail="저장된 입력을 불러오지 못했습니다. 연결 상태와 문서 접근 권한을 확인하세요." /><button type="button" className="btn" onClick={retry}>다시 불러오기</button></div>;
 }
 
 /** 저장된 최신 DRAFT 판본을 승인한다. 승인은 그 내용 그대로 새 CONFIRMED 판본을 만든다. */

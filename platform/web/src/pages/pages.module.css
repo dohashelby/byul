@@ -111,6 +111,61 @@
   color: var(--warn);
   font-size: 12px;
 }
+.inputPage { min-width: 0; padding-bottom: 36px; }
+.editorFields { border: 0; margin: 0; padding: 0; min-width: 0; }
+.editorFields:disabled { opacity: .72; }
+.inputForm { min-width: 0; }
+.inputForm > section, .inputForm > details { scroll-margin-top: 140px; }
+.inputForm .formGrid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 18px 20px; }
+.inputForm .qGrid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 20px; }
+.inputForm .field, .inputForm .qField { min-width: 0; font-size: 13px; gap: 7px; }
+.inputForm input, .inputForm select, .inputForm textarea { min-width: 0; max-width: 100%; }
+.inputForm .field > input, .inputForm .field > select, .inputForm .field > textarea { min-height: 36px; }
+.inputForm .field > textarea { min-height: 110px; }
+.inputForm .foldHead { padding: 16px; align-items: center; }
+.inputForm .foldBody { padding: 20px; gap: 20px; }
+.inputForm .fold { scroll-margin-top: 150px; }
+.inputForm .foldTitle { min-width: 0; font-size: 14px; }
+.inputForm .foldNo { color: var(--accent-ink); }
+.inputForm .foldSummary { display: block; margin-top: 5px; font-size: 12px; line-height: 1.6; font-weight: 400; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.inputForm .segBtn { min-height: 34px; }
+.inputForm .qLabel { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.inputForm .fieldError, .inputForm .fieldWarn, .inputForm .noteBox { overflow-wrap: anywhere; line-height: 1.7; }
+.fieldMessages { display: flex; flex-direction: column; gap: 4px; }
+.readOnly input { background: var(--surface-2); border-style: dashed; color: var(--text-2); }
+.readOnlyLabel { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.readOnlyLabel small { font-size: 10px; color: var(--muted); }
+.formOverview { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 0 3px; }
+.formOverview > strong { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+.formOverview > span { font-size: 12px; color: var(--muted); }
+.inlineHelp { min-width: 0; }
+.inlineHelp > summary { cursor: pointer; color: var(--text-2); font-size: 12px; }
+.inlineHelp[open] > summary { margin-bottom: 8px; }
+.inlineHelp code, .priorReference code { overflow-wrap: anywhere; }
+.priorReference { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border: 1px solid var(--border); border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: var(--radius); font-size: 12px; }
+.priorReference > span { color: var(--text-2); }
+.priorReference summary { cursor: pointer; color: var(--muted); font-size: 11px; }
+.stateGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.preparationHeading { display: flex; gap: 12px; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+.preparationStatus { font-size: 11px; font-weight: 500; border-radius: 999px; padding: 4px 9px; background: var(--warn-soft); color: var(--warn); }
+.inputToolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.inputForm .toc { padding: 10px 14px; flex-wrap: wrap; gap: 10px 20px; }
+@media (max-width: 600px) {
+  .inputForm .foldHead { gap: 8px; padding: 14px 12px; flex-wrap: wrap; }
+  .inputForm .foldTitle { flex-basis: calc(100% - 58px); }
+  .inputForm .foldHead > .progress, .inputForm .foldHead > .decision { margin-left: 36px; }
+  .inputForm .foldHead > .decision + .progress { margin-left: auto; }
+  .inputForm .foldBody { padding: 16px 12px; }
+  .inputForm .foldSummary { white-space: normal; overflow-wrap: anywhere; }
+  .inputForm .kvRow { grid-template-columns: minmax(0, 1fr) auto; }
+  .inputForm .kvRow > :first-child { grid-column: 1 / -1; }
+  .inputForm .numInputs { grid-template-columns: minmax(0, 1fr); }
+  .inputForm .numInputs > input:last-child { grid-column: auto; }
+  .inputForm .noteBox, .inputForm .claimBox { min-width: 0; padding: 10px; }
+  .inputForm .check { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+  .stateGrid { grid-template-columns: minmax(0, 1fr); }
+  .inputForm .toc { gap: 10px 14px; font-size: 12px; }
+}
 .invalidInput {
   border-color: var(--error) !important;
 }

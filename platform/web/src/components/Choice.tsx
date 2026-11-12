@@ -2,6 +2,7 @@
 import { useId, useState } from "react";
 import type { Choice, InputField, NumberDef } from "../lib/frameworkCatalog";
 import p from "../pages/pages.module.css";
+import { fieldMessageId } from "../lib/inputUx";
 
 type Opt = { value: unknown; label: string };
 
@@ -9,7 +10,7 @@ type Opt = { value: unknown; label: string };
 export function Segmented({ value, options, onChange, label }: { value: unknown; options: Opt[]; onChange: (v: unknown) => void; label: string }) {
   return (
     <div className={p.segmented} role="radiogroup" aria-label={label}>
-      {options.map((o) => {
+      {options.map((o, index) => {
         const on = value !== undefined && Object.is(value, o.value);
         return (
           <button
@@ -17,8 +18,17 @@ export function Segmented({ value, options, onChange, label }: { value: unknown;
             type="button"
             role="radio"
             aria-checked={on}
+            tabIndex={on || (!options.some((item) => Object.is(item.value, value)) && index === 0) ? 0 : -1}
             className={`${p.segBtn} ${on ? p.segOn : ""} ${o.value === null ? p.segUnknown : ""}`}
             onClick={() => onChange(on ? undefined : o.value)}
+            onKeyDown={(event) => {
+              const delta = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+              if (!delta && event.key !== "Home" && event.key !== "End") return;
+              event.preventDefault();
+              const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (index + delta + options.length) % options.length;
+              onChange(options[next].value);
+              event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
+            }}
           >
             {o.label}
           </button>
@@ -71,7 +81,7 @@ function EmptyAnswer({ label, none, empty, value, onChange }: { label: string; n
   );
 }
 
-function ListInput({ value, onChange, placeholder }: { value: unknown; onChange: (v: unknown) => void; placeholder?: string }) {
+function ListInput({ value, onChange, placeholder, label }: { value: unknown; onChange: (v: unknown) => void; placeholder?: string; label: string }) {
   const list = Array.isArray(value) ? (value as string[]) : [];
   const [draft, setDraft] = useState("");
   const add = () => {
@@ -95,6 +105,7 @@ function ListInput({ value, onChange, placeholder }: { value: unknown; onChange:
         <input
           className="input grow"
           value={draft}
+          aria-label={`${label} 항목`}
           placeholder={placeholder}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -142,14 +153,14 @@ export function KvInput({
       {Object.entries(map).map(([k, v]) => (
         <div key={k} className={p.kvRow}>
           <span className="mono">{k}</span>
-          <input className="input" value={v ?? ""} placeholder={blank === null ? `${valueLabel} (모르면 비워 둠)` : valueLabel} onChange={(e) => put(k, e.target.value === "" ? blank : e.target.value)} />
+          <input className="input" aria-label={`${keyLabel} ${k} ${valueLabel}`} value={v ?? ""} placeholder={blank === null ? `${valueLabel} (모르면 비워 둠)` : valueLabel} onChange={(e) => put(k, e.target.value === "" ? blank : e.target.value)} />
           <button type="button" className="btn btn-small btn-ghost" onClick={() => put(k, undefined)} aria-label={`${k} 지우기`}>
             삭제
           </button>
         </div>
       ))}
       <div className={p.kvRow}>
-        <input className="input" list={listId} value={name} placeholder={`${keyLabel} 이름`} onChange={(e) => setName(e.target.value)} />
+        <input className="input" aria-label={`${keyLabel} 이름`} list={listId} value={name} placeholder={`${keyLabel} 이름`} onChange={(e) => setName(e.target.value)} />
         <datalist id={listId}>
           {(suggestions ?? []).filter((s) => !(s in map)).map((s) => (
             <option key={s} value={s} />
@@ -172,7 +183,8 @@ export function KvInput({
 }
 
 /** 카탈로그 항목 하나를 그린다. */
-export function InputFieldView({ field, value, onChange, error, required }: { field: InputField; value: unknown; onChange: (v: unknown) => void; error?: string; required?: boolean }) {
+export function InputFieldView({ field, value, onChange, error, required, path }: { field: InputField; value: unknown; onChange: (v: unknown) => void; error?: string; required?: boolean; path?: string }) {
+  const fieldId = useId();
   const wide = field.kind === "multi" || field.kind === "kv" || field.kind === "list";
   let control;
   switch (field.kind) {
@@ -207,6 +219,8 @@ export function InputFieldView({ field, value, onChange, error, required }: { fi
           <input
             className="input"
             type="number"
+            aria-label={field.label}
+            aria-invalid={Boolean(error)}
             min={0}
             step={1}
             style={{ maxWidth: 140 }}
@@ -221,7 +235,7 @@ export function InputFieldView({ field, value, onChange, error, required }: { fi
     case "text":
       control = (
         <div className="stack" style={{ gap: 6 }}>
-          <input className="input" value={typeof value === "string" ? value : ""} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value)} />
+          <input className="input" aria-label={field.label} aria-invalid={Boolean(error)} value={typeof value === "string" ? value : ""} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value)} />
           <EmptyAnswer label={field.label} none={field.none} empty="" value={value} onChange={onChange} />
         </div>
       );
@@ -229,7 +243,7 @@ export function InputFieldView({ field, value, onChange, error, required }: { fi
     case "list":
       control = (
         <div className="stack" style={{ gap: 6 }}>
-          <ListInput value={value} onChange={onChange} placeholder={field.placeholder} />
+          <ListInput value={value} onChange={onChange} placeholder={field.placeholder} label={field.label} />
           <EmptyAnswer label={field.label} none={field.none} empty={[]} value={value} onChange={onChange} />
         </div>
       );
@@ -244,14 +258,15 @@ export function InputFieldView({ field, value, onChange, error, required }: { fi
       break;
   }
   return (
-    <div className={`${p.qField} ${wide ? p.qWide : ""}`}>
-      <div className={p.qLabel}>
+    <div className={`${p.qField} ${wide ? p.qWide : ""}`} role="group" aria-labelledby={`${fieldId}-label`} aria-invalid={Boolean(error)} aria-describedby={error ? `${fieldId}-error` : undefined} data-field-path={path}>
+      <div className={p.qLabel} id={`${fieldId}-label`}>
         <span className={required ? p.req : undefined}>{field.label}</span>
         {value === undefined && <span className={p.qMissing}>미입력</span>}
+        {value === null && <span className={p.measureTag}>확인 필요</span>}
       </div>
       {control}
       {field.hint && <span className="muted small">{field.hint}</span>}
-      {error && <span className={p.fieldError}>{error}</span>}
+      {error && <span id={`${fieldId}-error`} className={p.fieldError} role="alert">{error}</span>}
     </div>
   );
 }
@@ -265,11 +280,11 @@ const STATUS: Opt[] = [
 ];
 
 /** 정책 수치 한 줄: 상태 → 값·단위 → 적용 범위 → 측정 조건. 확정이 아니면 값 칸을 막는다. */
-export function NumberEntry({ def, value, onChange }: { def: NumberDef; value: PolicyNumber | undefined; onChange: (v: PolicyNumber | undefined) => void }) {
+export function NumberEntry({ def, value, onChange, path, error }: { def: NumberDef; value: PolicyNumber | undefined; onChange: (v: PolicyNumber | undefined) => void; path?: string; error?: string }) {
   const cur: PolicyNumber = value ?? { value: null, unit: def.units[0] ?? null, scope: def.scopes[0] ?? null, condition: null, status: def.measure ? "after_measurement" : "undecided" };
   const set = (patch: Partial<PolicyNumber>) => onChange({ ...cur, ...patch });
   return (
-    <div className={p.numRow}>
+    <div className={p.numRow} data-field-path={path} role="group" aria-label={def.label}>
       <div className={p.qLabel}>
         <span className={value?.status === "confirmed" ? p.req : undefined}>{def.label}</span>
         {value === undefined && <span className={p.qMissing}>미입력</span>}
@@ -287,6 +302,8 @@ export function NumberEntry({ def, value, onChange }: { def: NumberDef; value: P
           type="number"
           min={0}
           aria-label={`${def.label} 값`}
+          aria-invalid={Boolean(error)}
+          aria-describedby={path && error ? fieldMessageId(path) : undefined}
           disabled={value?.status !== "confirmed"}
           placeholder={value?.status === "confirmed" ? "값" : "확정 시 입력"}
           value={typeof cur.value === "number" ? cur.value : ""}
@@ -323,6 +340,7 @@ export function NumberEntry({ def, value, onChange }: { def: NumberDef; value: P
           onChange={(e) => set({ condition: e.target.value || null })}
         />
       </div>
+      {error && <span id={path ? fieldMessageId(path) : undefined} className={p.fieldError} role="alert">{error}</span>}
     </div>
   );
 }

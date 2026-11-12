@@ -35,6 +35,8 @@ import {
 import { DEPLOYMENT_KIND, ENGINE_NAME, FACT_LABEL } from "../lib/labels";
 import { packFields, versionFieldVisible, versionProfile } from "../lib/inputPreparation";
 import p from "./pages.module.css";
+import { InputNavigation, PreparationGroup, StateCard } from "../components/InputEditor";
+import { formatAnswer, hasConfirmedAnswer, inputIssueGroup, openInputSection } from "../lib/inputUx";
 
 export const REGISTERED_FACTS = Object.keys(FACT_LABEL);
 
@@ -101,14 +103,15 @@ export function factWarnings(doc: EnvironmentDoc): FieldIssue[] {
   return out;
 }
 
-type FormProps<T> = { doc: T; setDoc: (d: T) => void; issues: FieldIssue[]; warnings: FieldIssue[]; isNew: boolean };
+type FormProps<T> = { doc: T; setDoc: (d: T) => void; issues: FieldIssue[]; warnings: FieldIssue[]; isNew: boolean; onLocalIssue?: (path: string, message: string | null) => void };
 
-function useCtx<T>({ doc, setDoc, issues, warnings }: FormProps<T>): FormCtx {
+function useCtx<T>({ doc, setDoc, issues, warnings, onLocalIssue }: FormProps<T>): FormCtx {
   return {
     doc: doc as unknown as Doc,
     set: (path, value) => setDoc((value === undefined ? deleteIn(doc, path) : setIn(doc, path, value)) as T),
     issues,
     warnings,
+    reportIssue: onLocalIssue,
   };
 }
 
@@ -124,13 +127,13 @@ function putKey(obj: Values, key: string, value: unknown): Values {
 
 function filled(fields: InputField[], values: Values, others?: Record<string, Values | undefined>): [number, number] {
   const shown = fields.filter((f) => visible(f, values, others));
-  return [shown.filter((f) => values[f.key] !== undefined).length, shown.length];
+  return [shown.filter((f) => hasConfirmedAnswer(values[f.key])).length, shown.length];
 }
 
 function Progress({ done, total }: { done: number; total: number }) {
   if (total === 0) return null;
   return (
-    <span className={`${p.progress} ${done === total ? p.progressDone : ""}`}>
+    <span className={`${p.progress} ${done === total ? p.progressDone : ""}`} aria-label={`입력 ${done}/${total}`}>
       {done}/{total}
     </span>
   );
@@ -155,9 +158,9 @@ function Note({ children }: { children: ReactNode }) {
 
 function ReadOnly({ label, value }: { label: string; value: string }) {
   return (
-    <label className={p.field}>
-      {label}
-      <input className="input" value={value} readOnly />
+    <label className={`${p.field} ${p.readOnly}`}>
+      <span className={p.readOnlyLabel}>{label}<small aria-hidden="true">읽기 전용</small></span>
+      <input className="input" aria-label={label} value={value} readOnly />
     </label>
   );
 }
@@ -340,7 +343,11 @@ function normalizeEnv(d: EnvironmentDoc): EnvironmentDoc {
 function cardProgress(cond: EnvCondition, doc: EnvironmentDoc, profile: Profile | null, hidden: string[] = []): [number, number] {
   const [d, t] = filled(cond.fields.filter((f) => f.key !== "echo_logprobs" && versionFieldVisible(hidden, cond.key, f.key)), profile?.conditions[cond.key]?.values ?? {}, conditionValues(profile));
   const asked = (CONDITION_FACTS[cond.key] ?? []).filter((n) => !DERIVED_FACTS[n] && !FIXED_FACTS[n]);
-  return [d + asked.filter((n) => doc.facts?.[n] !== undefined).length, t + asked.length];
+  const contract = cond.key === "engine" ? [doc.target.engine.name || null, doc.target.engine.version, doc.target.engine.image_digest]
+    : cond.key === "supply" ? [doc.target.model.id, doc.target.model.revision]
+    : cond.key === "placement" ? [doc.target.runtime?.gpu_count, doc.target.runtime?.gpu_model]
+    : cond.key === "host" ? [doc.deployment?.kind] : [];
+  return [d + asked.filter((n) => doc.facts?.[n]?.value != null).length + contract.filter((v) => v != null).length, t + asked.length + contract.length];
 }
 
 type EnvEdit = { ctx: FormCtx; doc: EnvironmentDoc; profile: Profile | null; apply: (fn: (d: EnvironmentDoc) => EnvironmentDoc) => void; snapshot: string | null; hiddenFields: string[]; catalog?: InputCatalog };
@@ -373,13 +380,15 @@ export function EnvironmentForm(props: FormProps<EnvironmentDoc>) {
   const edit: EnvEdit = { ctx, doc, profile, apply, snapshot, hiddenFields: selectedProfile?.hidden_fields ?? [], catalog };
 
   return (
-    <div className="stack">
+    <div className={`${p.inputForm} stack`}>
       <nav className={p.toc} aria-label="입력 구역">
         <a href="#env-basic">기본·프로필</a>
         <a href="#env-conditions">
           12개 환경 조건 <Progress done={condDone[0]} total={condDone[1]} />
         </a>
       </nav>
+
+      <div className={p.formOverview}><strong>확정한 세부 입력 <Progress done={condDone[0]} total={condDone[1]} /></strong><span>확인 필요는 미완료 · 실행 준비와 별도</span></div>
 
       <section id="env-basic" className="card card-pad stack">
         <h2>기본 정보·프로필</h2>
@@ -400,6 +409,10 @@ export function EnvironmentForm(props: FormProps<EnvironmentDoc>) {
         <FieldMessages ctx={ctx} path="/framework_profile" exact />
       </section>
 
+      <InputNavigation label="환경 구역 바로가기" items={ENV_CONDITIONS.map((c) => {
+        const [done, total] = cardProgress(c, doc, profile, selectedProfile?.hidden_fields ?? []);
+        return { id: `env-${c.key}`, title: c.title, state: `${done}/${total}` };
+      })} />
       <ConditionsSection edit={edit} />
     </div>
   );
@@ -685,6 +698,7 @@ function ConditionsSection({ edit }: { edit: EnvEdit }) {
     <section id="env-conditions" className="card card-pad stack">
       <div className="row wrap" style={{ justifyContent: "space-between" }}>
         <h2>12개 환경 조건</h2>
+        <div className={p.inputToolbar}>{[false, true].map((open) => <button key={String(open)} type="button" className="btn btn-small" onClick={(e) => e.currentTarget.closest("section")?.querySelectorAll<HTMLDetailsElement>("details[data-editor-card]").forEach((node) => { node.open = open; })}>{open ? "전체 펼치기" : "전체 접기"}</button>)}</div>
         <label className="row small" style={{ gap: 6 }}>
           <input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} />
           미입력이 남은 조건만
@@ -720,18 +734,18 @@ function ConditionCard({ cond, done, total, edit }: { cond: EnvCondition; done: 
     if (hasError) setOpen(true);
   }, [hasError]);
   return (
-    <details className={p.fold} open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+    <details id={`env-${cond.key}`} data-editor-card data-field-path={path} className={p.fold} open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary className={p.foldHead}>
         <span className={p.foldNo}>{cond.no}</span>
-        <span className={p.foldTitle}>{cond.title}</span>
+        <span className={p.foldTitle}>{cond.title}<small className={p.foldSummary}>{cond.key === "engine" ? `${doc.target.engine.name || "엔진 미선택"} · ${doc.target.engine.version || "판본 미확인"}` : cond.key === "supply" ? doc.target.model.id || "모델 미입력" : cond.fields.filter((f) => values[f.key] !== undefined && f.key !== "echo_logprobs").slice(0, 2).map((f) => `${f.label}: ${formatAnswer(values[f.key])}`).join(" · ") || "아직 작성한 세부 입력이 없습니다"}</small></span>
         <Progress done={done} total={total} />
       </summary>
       <div className={p.foldBody}>
         {(cond.elsewhere || cond.runtime) && (
-          <Note>
+          <details className={p.inlineHelp}><summary>기존 설정·확인 자료 안내</summary><Note>
             {cond.elsewhere && <div>{cond.elsewhere}</div>}
             {cond.runtime && <div>byul runtime: {cond.runtime}</div>}
-          </Note>
+          </Note></details>
         )}
         <ContractFields cond={cond.key} ctx={ctx} doc={doc} catalog={edit.catalog} />
         {cond.key === "features" && values.echo_logprobs !== undefined && <Note>이전 입력 반환·logprobs 통합 답변: {FACT_VALUE_LABEL(values.echo_logprobs)}. 원본만 보존하며 세 기능의 개별 답변으로 추정하지 않습니다.</Note>}
@@ -742,6 +756,7 @@ function ConditionCard({ cond, done, total, edit }: { cond: EnvCondition; done: 
               <InputFieldView
                 key={f.key}
                 field={f}
+                path={`${path}/values/${f.key}`}
                 value={values[f.key]}
                 required={isRequired(f, values, others)}
                 error={issuesAt(ctx.issues, `${path}/values/${f.key}`)[0]?.message}
@@ -794,24 +809,26 @@ function valuesOf(doc: PolicyDoc): FrameworkValues | null {
   return v && typeof v === "object" ? (v as FrameworkValues) : null;
 }
 
-function PolicyPreparation({ catalog, preview, failed, pending }: { catalog?: InputCatalog; preview?: PolicyInputPreview; failed: boolean; pending: boolean }) {
+function PolicyPreparation({ catalog, preview, failed, pending, onRetry }: { catalog?: InputCatalog; preview?: PolicyInputPreview; failed: boolean; pending: boolean; onRetry: () => void }) {
   const issues = [...(preview?.errors ?? []), ...(preview?.gaps ?? []), ...(preview?.warnings ?? [])];
-  return <section className="card card-pad stack" aria-label="입력 연결·준비 상태">
-    <h2>입력 연결·준비 상태</h2>
-    <div role="status">{!catalog?.available ? catalog?.reason ?? "Pack 준비 상태 미확인" : pending ? "현재 입력 확인 중" : "Pack 정의 확인됨 — 실제 대상·수집 준비와 시험 결과는 별도입니다."}</div>
-    {failed && <div className={p.fieldWarn}>입력 연결 정보를 불러오지 못했습니다. 준비 완료로 처리하지 않습니다.</div>}
-    {(catalog?.limitations ?? []).map((message) => <div key={message} className="small muted">{message}</div>)}
-    <table className={p.blockedTable}><tbody>
-      <tr><th>정책에서 요구한 값</th><td>{preview ? `${preview.connected.length}개 카드 연결 확인` : "입력 형식 확인 후 연결값을 표시합니다."}
-        {preview && <details><summary>실행에 전달할 정책값</summary><pre>{JSON.stringify(preview.document.verification.values, null, 2)}</pre></details>}
-      </td></tr>
-      <tr><th>현재 설정에서 확인한 값</th><td>이 화면에서 실제 적용 설정을 확인하지 않았습니다.</td></tr>
-      <tr><th>시험으로 확인한 결과</th><td>이 입력에 연결된 시험 결과가 없습니다.</td></tr>
-    </tbody></table>
-    {issues.length > 0 && <details><summary>부족한 값·충돌·미연결 항목 {issues.length}건</summary>
-      <div className="small muted">해시·세션 등 준비·수집 단계에서 생성할 값도 포함합니다. 고객이 직접 만들어 입력하지 않습니다.</div>
-      {issues.map((issue, i) => <div key={i} className="small">{issue.path}: {issue.message}</div>)}
-    </details>}
+  const customer = issues.filter((issue) => inputIssueGroup(issue) === "customer");
+  const system = issues.filter((issue) => inputIssueGroup(issue) === "system");
+  const connection = issues.filter((issue) => inputIssueGroup(issue) === "connection");
+  return <section id="pol-preparation" className="card card-pad stack" aria-label="입력 연결·준비 상태" data-field-path="/verification/pack">
+    <div className={p.preparationHeading}><h2>입력 연결·준비 상태</h2><span className={p.preparationStatus}>{failed ? "조회 실패" : catalog?.available ? "실행 준비는 별도 확인" : "Pack 준비 확인 필요"}</span></div>
+    <div className="small muted" role="status">{!catalog?.available ? catalog?.reason ?? "Pack 준비 상태 미확인" : pending ? "현재 입력 확인 중" : "Pack 정의를 확인했습니다. 입력 완료와 실제 시험 준비·판정은 별도입니다."}</div>
+    {failed && <div className="row wrap"><span className={p.fieldWarn}>입력 연결 정보를 불러오지 못했습니다. 작성한 값은 유지됩니다.</span><button type="button" className="btn btn-small" onClick={onRetry}>연결 정보 다시 확인</button></div>}
+    <div className={p.stateGrid}>
+      <StateCard label="01 · 정책 요구값" title={preview ? `${preview.connected.length}개 카드값 연결` : "입력값 확인 중"}>
+        {preview ? <details className={p.inlineHelp}><summary>실행에 전달할 기준 보기</summary><pre>{JSON.stringify(preview.document.verification.values, null, 2)}</pre></details> : "입력 형식 확인 후 연결값을 표시합니다."}
+      </StateCard>
+      <StateCard label="02 · 현재 적용 설정" title="실제 설정 미확인">이 화면에서 실제 적용 설정을 확인하지 않았습니다.</StateCard>
+      <StateCard label="03 · 시험 결과" title="연결된 결과 없음">이 입력에 연결된 시험 결과가 없습니다.</StateCard>
+    </div>
+    <PreparationGroup title="입력에서 확인할 내용" note="정책 기준이나 연결할 환경을 확인하세요. 저장 가능한 초안과 실행 준비 상태는 구분됩니다." issues={customer} catalog={catalog} />
+    <PreparationGroup title="시스템 준비·수집에서 확보할 내용" note="해시·세션·prepared 등은 시험 준비 과정에서 확보합니다. 고객이 직접 만들어 입력할 항목이 아닙니다." issues={system} catalog={catalog} />
+    <PreparationGroup title="지원 범위·미연결 답변" note="지원되지 않거나 아직 연결되지 않은 답변은 원본을 보존합니다. 비사용·통과로 바꾸지 않습니다." issues={connection} catalog={catalog} />
+    {!!catalog?.limitations.length && <details className={p.inlineHelp}><summary>현재 준비 범위와 남은 의존성</summary>{catalog.limitations.map((message) => <p key={message} className="small muted">{message}</p>)}</details>}
   </section>;
 }
 
@@ -830,12 +847,13 @@ export function decisionComplete(entry: ReqEntry | undefined): boolean {
   return entry?.decision === "keep" && (Object.values(entry.values).some((v) => v != null) || Object.values(entry.numbers).some((n) => n.status === "confirmed" && n.value != null));
 }
 
-function reqProgress(req: Requirement, entry: ReqEntry | undefined, others: Record<string, Values | undefined>): [number, number] {
+function reqProgress(req: Requirement, entry: ReqEntry | undefined, others: Record<string, Values | undefined>, catalog?: InputCatalog, doc?: PolicyDoc): [number, number] {
   if (!showDetail(entry)) return [decisionComplete(entry) ? 1 : 0, 1];
-  const [d, t] = filled(req.fields, entry?.values ?? {}, others);
+  const [d, t] = filled([...req.fields, ...packFields(catalog, req.id, req.fields)], entry?.values ?? {}, others);
   const shown = shownNumbers(req, entry?.values ?? {}, entry?.numbers ?? {}, others);
-  const nums = shown.filter((x) => entry?.numbers[x.key]).length;
-  return [d + nums + (decisionComplete(entry) ? 1 : 0), t + shown.length + 1];
+  const nums = shown.filter((x) => entry?.numbers[x.key]?.status === "confirmed" && entry?.numbers[x.key]?.value != null).length;
+  const gateway = doc && req.id === "1.2" ? [doc.runtime.gateway.allowed_models.length > 0] : doc && req.id === "3.1" ? [doc.runtime.gateway.output_max_tokens != null] : [];
+  return [d + nums + (decisionComplete(entry) ? 1 : 0) + gateway.filter(Boolean).length, t + shown.length + 1 + gateway.length];
 }
 
 /** 저장할 때마다 정책 판본을 올린다. 끝의 숫자를 올리고, 숫자가 없으면 붙인다. */
@@ -1001,6 +1019,7 @@ function ExtraFieldsEditor({ ctx }: { ctx: FormCtx }) {
 }
 
 export function PolicyForm(props: FormProps<PolicyDoc>) {
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const setDoc = (d: PolicyDoc) => props.setDoc(normalizePolicy(d));
   const ctx = useCtx({ ...props, setDoc });
   const { doc } = props;
@@ -1012,6 +1031,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
   const catalogQuery = useInputCatalog();
   const catalog = catalogQuery.data;
   const preview = usePolicyInputPreview(doc);
+  ctx.issues = [...ctx.issues, ...(preview.data?.errors ?? []).filter((e) => !ctx.issues.some((old) => old.path === e.path))];
   const policyRevs = useDocRevisions("policies", props.isNew ? null : doc.policy_id);
   const confirmedRev = policyRevs.data?.items.filter((r) => r.status === "CONFIRMED").at(-1)?.revision ?? null;
   const previous = usePolicyRevision(props.isNew ? null : doc.policy_id, confirmedRev).data?.document;
@@ -1045,11 +1065,12 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
       active.reduce(
         (acc, r) => {
           const e = fv?.requirements[r.id];
-          return { decided: acc.decided + (decisionComplete(e) ? 1 : 0), measure: acc.measure + Object.values(e?.numbers ?? {}).filter((x) => x.status === "after_measurement").length };
+          const [done, total] = reqProgress(r, e, envAnswers, catalog, doc);
+          return { decided: acc.decided + (done === total && decisionComplete(e) ? 1 : 0), measure: acc.measure + Object.values(e?.numbers ?? {}).filter((x) => x.status === "after_measurement").length };
         },
         { decided: 0, measure: 0 },
       ),
-    [active, fv],
+    [active, fv, catalog, doc, baseEnv],
   );
   // 근거 칸은 문서에 하나다. 계약의 요구별 basis에 같은 값을 넣어 저장한다.
   const entries = Object.values(fv?.requirements ?? {});
@@ -1058,15 +1079,17 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
   const changed = entries.some((e) => e.decision === "change");
 
   return (
-    <div className="stack">
+    <div className={`${p.inputForm} stack`}>
       <nav className={p.toc} aria-label="입력 구역">
         <a href="#pol-basic">기본·유효 기간</a>
         <a href="#pol-approval">승인 조건</a>
         <a href="#pol-reqs">
           보호 요구 <Progress done={totals.decided} total={active.length} />
         </a>
-        <a href="#pol-advanced">고급(JSON)</a>
+        <a href="#pol-advanced" onClick={(event) => { event.preventDefault(); setAdvancedOpen(true); openInputSection("pol-advanced"); }}>고급(JSON)</a>
       </nav>
+
+      <div className={p.formOverview}><strong>입력 확정 {totals.decided}/{active.length}</strong><span>확인 필요·측정 후 결정은 미완료 · 승인·시험과 별도</span></div>
 
       <section id="pol-basic" className="card card-pad stack">
         <h2>기본 정보·유효 기간</h2>
@@ -1121,7 +1144,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
         </div>
       </section>
 
-      <PolicyPreparation catalog={catalog} preview={preview.data} failed={catalogQuery.isError || preview.isError} pending={preview.isFetching} />
+      <PolicyPreparation catalog={catalog} preview={preview.data} failed={catalogQuery.isError || preview.isError} pending={preview.isFetching} onRetry={() => { void catalogQuery.refetch(); void preview.refetch(); }} />
 
       <section id="pol-approval" className="card card-pad stack">
         <h2>승인 조건</h2>
@@ -1183,16 +1206,19 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
         <FieldMessages ctx={ctx} path="/framework_values/approval_terms" />
       </section>
 
+      <InputNavigation label="정책 구역 바로가기" items={SECURITY_FUNCTIONS.map((fn) => ({ id: `pol-function-${fn.no}`, title: fn.title }))} />
+
       <section id="pol-reqs" className="card card-pad stack">
         <div className="row wrap" style={{ justifyContent: "space-between" }}>
           <h2>보호 요구별 승인 기준</h2>
+          <div className={p.inputToolbar}>{[false, true].map((open) => <button key={String(open)} type="button" className="btn btn-small" onClick={(e) => e.currentTarget.closest("section")?.querySelectorAll<HTMLDetailsElement>("details[data-editor-card]").forEach((node) => { node.open = open; })}>{open ? "전체 펼치기" : "전체 접기"}</button>)}</div>
           <Segmented
             label="보기"
             value={filter}
             onChange={(v) => setFilter((v ?? "all") as typeof filter)}
             options={[
               { value: "all", label: "전체" },
-              { value: "undecided", label: "결정 안 한 요구" },
+              { value: "undecided", label: "보완 필요한 요구" },
               { value: "measure", label: "측정 후 결정 수치" },
             ]}
           />
@@ -1206,20 +1232,20 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
             <>
               요구마다 기존 승인 정책을 <b>유지</b>·<b>변경</b>·<b>확인 필요</b> 중에서 고릅니다. 구체적인 값은 변경을 고르면 나타납니다.
             </>
-          )} 수치는 확정·측정 후 결정·미정 상태로 남기고, 근거 없는 숫자를 채우지 않습니다. 결정 {totals.decided}/{active.length} · 측정 후 결정 수치 {totals.measure}개
+          )} 수치는 확정·측정 후 결정·미정 상태로 남기고, 근거 없는 숫자를 채우지 않습니다. 입력 확정 {totals.decided}/{active.length} · 측정 후 결정 수치 {totals.measure}개
         </div>
         {SECURITY_FUNCTIONS.map((fn) => {
           const reqs = fn.requirements.filter((r) => {
             const e = fv?.requirements[r.id];
-            if (filter === "undecided") return !r.fixed && !decisionComplete(e);
+            if (filter === "undecided") { const [done, total] = reqProgress(r, e, envAnswers, catalog, doc); return !r.fixed && (!decisionComplete(e) || done !== total); }
             if (filter === "measure") return Object.values(e?.numbers ?? {}).some((x) => x.status === "after_measurement");
             return true;
           });
           if (!reqs.length) return null;
           const countable = fn.requirements.filter((r) => !r.fixed);
-          const decided = countable.filter((r) => decisionComplete(fv?.requirements[r.id])).length;
+          const decided = countable.filter((r) => { const [done, total] = reqProgress(r, fv?.requirements[r.id], envAnswers, catalog, doc); return decisionComplete(fv?.requirements[r.id]) && done === total; }).length;
           return (
-            <div key={fn.no} className="stack" style={{ gap: 8 }}>
+            <div key={fn.no} id={`pol-function-${fn.no}`} className="stack" style={{ gap: 8 }}>
               <div className={p.fnHead}>
                 <span>
                   {fn.no}. {fn.title}
@@ -1236,6 +1262,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
                   emptyModels={!doc.runtime.gateway.allowed_models.length}
                   envAnswers={envAnswers}
                   catalog={catalog}
+                  priorRef={previous && confirmedRev ? { id: previous.policy_id, revision: confirmedRev, sha256: policyRevs.data?.items.find((r) => r.revision === confirmedRev)?.sha256 ?? "" } : undefined}
                   onChange={(next) => setFv((x) => ({ ...x, requirements: putKey(x.requirements, r.id, next && next.basis === null ? { ...next, basis } : next) as FrameworkValues["requirements"] }))}
                 />
               ))}
@@ -1244,7 +1271,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
         })}
       </section>
 
-      <details id="pol-advanced" className={`card card-pad ${p.fold}`}>
+      <details id="pol-advanced" open={advancedOpen} onToggle={(event) => setAdvancedOpen(event.currentTarget.open)} className={`card card-pad ${p.fold}`}>
         <summary className={p.foldHead}>
           <span className={p.foldTitle}>고급 — 검증 팩·집행 의도·exec 예외 (JSON)</span>
         </summary>
@@ -1266,7 +1293,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
   );
 }
 
-function RequirementCard({ req, entry, ctx, isNew, emptyModels, envAnswers, catalog, onChange }: { req: Requirement; entry: ReqEntry | undefined; ctx: FormCtx; isNew: boolean; emptyModels: boolean; envAnswers: Record<string, Values | undefined>; catalog?: InputCatalog; onChange: (e: ReqEntry | undefined) => void }) {
+function RequirementCard({ req, entry, ctx, isNew, emptyModels, envAnswers, catalog, priorRef, onChange }: { req: Requirement; entry: ReqEntry | undefined; ctx: FormCtx; isNew: boolean; emptyModels: boolean; envAnswers: Record<string, Values | undefined>; catalog?: InputCatalog; priorRef?: { id: string; revision: number; sha256: string }; onChange: (e: ReqEntry | undefined) => void }) {
   const cur = entry ?? emptyReq();
   const connectedFields = packFields(catalog, req.id, req.fields);
   const update = (patch: Partial<ReqEntry>) => {
@@ -1274,7 +1301,7 @@ function RequirementCard({ req, entry, ctx, isNew, emptyModels, envAnswers, cata
     const empty = next.decision === null && !Object.keys(next.values).length && !Object.keys(next.numbers).length && next.note === null;
     onChange(empty ? undefined : next);
   };
-  const [done, total] = reqProgress(req, entry, envAnswers);
+  const [done, total] = reqProgress(req, entry, envAnswers, catalog, ctx.doc as PolicyDoc);
   const numbers = shownNumbers(req, cur.values, cur.numbers, envAnswers);
   const path = `/framework_values/requirements/${req.id}`;
   const errs = issuesAt(ctx.issues, path);
@@ -1285,20 +1312,20 @@ function RequirementCard({ req, entry, ctx, isNew, emptyModels, envAnswers, cata
     if (hasError) setOpen(true);
   }, [hasError]);
   return (
-    <details className={p.fold} open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+    <details id={`req-${req.id}`} data-editor-card data-field-path={path} className={p.fold} open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary className={p.foldHead}>
         <span className={p.foldNo}>{req.id}</span>
-        <span className={p.foldTitle}>{req.title}</span>
+        <span className={p.foldTitle}>{req.title}<small className={p.foldSummary}>{req.fixed ? "기존 runtime 기준을 확인하세요" : cur.decision === "needs_confirmation" ? "확인 필요 · 입력 확정에 포함하지 않음" : Object.values(cur.numbers).some((n) => n.status === "after_measurement") ? "측정 후 결정할 수치가 있습니다" : done === total && decisionComplete(cur) ? "표시된 입력을 작성했습니다 · 승인·시험 결과는 별도" : "필요한 기준을 확인하고 작성하세요"}</small></span>
         {req.fixed ? <span className={p.decision}>runtime이 정함</span> : entry?.decision && <span className={p.decision}>{DECISION_LABEL[entry.decision]}</span>}
         {!req.fixed && <Progress done={done} total={total} />}
       </summary>
       <div className={p.foldBody}>
         {(req.fixed || req.see || req.gateway) && (
-          <Note>
+          <details className={p.inlineHelp}><summary>기준·적용 범위 안내</summary><Note>
             {req.fixed && <div>{req.fixed}</div>}
             {req.see && <div>{req.see}</div>}
             {req.gateway && <div>{req.gateway}</div>}
-          </Note>
+          </Note></details>
         )}
         <GatewayFields req={req.id} ctx={ctx} />
         {!req.fixed && (
@@ -1326,6 +1353,7 @@ function RequirementCard({ req, entry, ctx, isNew, emptyModels, envAnswers, cata
                 <InputFieldView
                   key={f.key}
                   field={f}
+                  path={`${path}/values/${f.key}`}
                   value={cur.values[f.key]}
                   required={isRequired(f, cur.values, envAnswers)}
                   error={issuesAt(ctx.issues, `${path}/values/${f.key}`)[0]?.message}
@@ -1334,12 +1362,13 @@ function RequirementCard({ req, entry, ctx, isNew, emptyModels, envAnswers, cata
               ))}
           </div>
         )}
+        {cur.decision === "keep" && priorRef && <div className={p.priorReference}><strong>유지할 이전 값</strong><span>{priorRef.id} · 저장 판본 {priorRef.revision}</span><details><summary>출처 해시 확인</summary><code>{priorRef.sha256}</code></details></div>}
         {cur.decision === "keep" && !decisionComplete(cur) && <Note>유지할 이전 승인 정책값이 없습니다. 미정으로 남깁니다.</Note>}
         {showDetail(entry) && connectedFields.length > 0 && (
           <div className="stack">
             <div className={p.qLabel}>Pack 실행 기준</div>
             <div className={p.qGrid}>
-              {connectedFields.map((field) => <InputFieldView key={field.key} field={field} value={cur.values[field.key]} onChange={(v) => update({ values: putKey(cur.values, field.key, v) })} />)}
+              {connectedFields.map((field) => <InputFieldView key={field.key} field={field} path={`${path}/values/${field.key}`} error={issuesAt(ctx.issues, `${path}/values/${field.key}`)[0]?.message} value={cur.values[field.key]} onChange={(v) => update({ values: putKey(cur.values, field.key, v) })} />)}
             </div>
           </div>
         )}
@@ -1350,6 +1379,8 @@ function RequirementCard({ req, entry, ctx, isNew, emptyModels, envAnswers, cata
               <NumberEntry
                 key={d.key}
                 def={d}
+                path={`${path}/numbers/${d.key}`}
+                error={issuesAt(ctx.issues, `${path}/numbers/${d.key}`)[0]?.message}
                 value={cur.numbers[d.key]}
                 onChange={(v) => update({ numbers: putKey(cur.numbers, d.key, v) as Record<string, PolicyNumber> })}
               />

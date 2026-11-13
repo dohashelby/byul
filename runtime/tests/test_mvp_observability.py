@@ -533,8 +533,10 @@ class CiliumCollectorTests(unittest.TestCase):
             calls.append(argv)
             return subprocess.CompletedProcess(argv, 0, json.dumps(response), "")
 
-        value, origin = CiliumPolicyCollector(timeout_s=1, context=EXPECTED_CONTEXT, runner=runner).collect()
-        self.assertEqual(calls, [policy_command(EXPECTED_CONTEXT)])
+        value, origin = CiliumPolicyCollector(
+            timeout_s=1, context=EXPECTED_CONTEXT, namespace="serving-lab", runner=runner
+        ).collect()
+        self.assertEqual(calls, [policy_command(EXPECTED_CONTEXT, "serving-lab")])
         self.assertEqual(origin, "kubernetes_api")
         self.assertTrue(value["configured"])
         self.assertEqual(value["policies"][0]["name"], "runtime-engine-ingress")
@@ -545,7 +547,9 @@ class CiliumCollectorTests(unittest.TestCase):
         def runner(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
             return subprocess.CompletedProcess(argv, 0, '{"items": []}', "")
 
-        value, _ = CiliumPolicyCollector(timeout_s=1, context="formal-cluster", runner=runner).collect()
+        value, _ = CiliumPolicyCollector(
+            timeout_s=1, context="formal-cluster", namespace="serving-lab", runner=runner
+        ).collect()
         self.assertEqual(value["context"], "formal-cluster")
 
 

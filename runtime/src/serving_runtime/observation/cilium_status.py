@@ -8,16 +8,22 @@ from typing import Any, Callable
 
 from serving_runtime.common.kube_context import validate_kube_context
 
-NAMESPACE = "serving-lab"
+from serving_runtime.target.target import validate_kubernetes_name
 
 
-def policy_command(context: str | None = None) -> list[str]:
+def _namespace(value):
+    if value is None or value == "":
+        raise ValueError("Cilium namespace is required; set target kubernetes.namespace")
+    return validate_kubernetes_name(value, "Cilium namespace")
+
+
+def policy_command(context: str | None = None, namespace: str | None = None) -> list[str]:
     return [
         "kubectl",
         "--context",
         validate_kube_context(context),
         "--namespace",
-        NAMESPACE,
+        _namespace(namespace),
         "get",
         "ciliumnetworkpolicies",
         "-o",
@@ -31,10 +37,12 @@ class CiliumPolicyCollector:
         *,
         timeout_s: float,
         context: str | None = None,
+        namespace: str | None = None,
         runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     ) -> None:
         self.timeout_s = timeout_s
         self.context = validate_kube_context(context)
+        self.namespace = _namespace(namespace)
         self.runner = runner
 
     def _run(self, argv: list[str]) -> subprocess.CompletedProcess[str]:
@@ -49,7 +57,7 @@ class CiliumPolicyCollector:
         )
 
     def collect(self) -> tuple[dict[str, Any], str]:
-        result = self._run(policy_command(self.context))
+        result = self._run(policy_command(self.context, self.namespace))
         if result.returncode != 0:
             raise OSError("CiliumNetworkPolicy query failed")
         try:
@@ -108,7 +116,7 @@ class CiliumPolicyCollector:
         return (
             {
                 "context": self.context,
-                "namespace": NAMESPACE,
+                "namespace": self.namespace,
                 "object_count": len(policies),
                 "configured": bool(policies),
                 "policies": policies,

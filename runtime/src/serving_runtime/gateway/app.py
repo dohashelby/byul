@@ -387,6 +387,7 @@ class GatewayApp:
             self._cilium_policy_collector = CiliumPolicyCollector(
                 timeout_s=config.cilium_timeout_s,
                 context=kube_context,
+                namespace=registration.kubernetes.namespace if registration.kubernetes is not None else None,
             )
             collectors.append(
                 Collector(

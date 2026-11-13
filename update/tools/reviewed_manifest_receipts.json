@@ -30,6 +30,11 @@
       "manifest_sha256": "a75f81a1b85ce674aed7dea277eed8b5525c85038b60484be5f8e46d0970e4c9",
       "reviewed_by": "Claude / BYUL UPDATE A / M-A6 판본별 고정값 행 self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-12T19:46:36+09:00"
+    },
+    {
+      "manifest_sha256": "e7775f279915412203288e4bfac78b6ee82f5c8fb04d77e8bb90c9d62c0c0caf",
+      "reviewed_by": "Claude / BYUL UPDATE / #254 main·#256 병합 후 self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-13T13:20:00+09:00"
     }
   ]
 }

@@ -68,6 +68,15 @@ def test_real_rpc_catches_intentional_exception_raised_inside_its_try(world):
 
 @pytest.mark.parametrize('kind',['death','delay'])
 def test_released_source_barrier_preserves_real_rpc_output_without_signal(world,kind):
+ # 출력 보존 대조는 제어기의 주입 시계로 잰다. READY 파일 fsync의 벽시계
+ # 지연을 30ms 만료로 오인하지 않는다. wait가 호출되면 같은 30ms 한도까지
+ # 진행하므로 release를 무시하는 결함은 여전히 EXPIRED로 검출된다.
+ now=[None]
+ def clock():
+  if now[0]is None:now[0]=time.monotonic_ns()
+  return now[0]
+ world.observer.fault_runtime.clock=clock
+ world.observer.fault_runtime.wait=lambda seconds:now.__setitem__(0,now[0]+int(seconds*1_000_000_000))
  assigned(world,kind);action(world.path,'release');assert invoke(world)is None
  status,value=world.proc.worker_response_mq.items[0]
  assert status is world.mp.WorkerProc.ResponseStatus.SUCCESS and value is world.output

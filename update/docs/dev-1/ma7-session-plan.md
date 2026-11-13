@@ -67,7 +67,7 @@ EBS·스냅샷 보존, 전송·공인 IPv4, 세금·환율은 위 EC2 합계에 
 
 ## M-A7 로컬 입력 파일 준비 결과
 
-2026-11-13 후속으로 실제 파일을 만들었다. [준비 기록](ma7-local-materialization-20261113.json)과 입력 계획의 포인터/SHA에 연결했다. 출력은 작업 폴더의 `inputs/ma7-materialized-20261113`이다.
+2026-11-13 후속으로 실제 파일을 만들었다. [준비 기록](ma7-local-materialization-20261113.json)과 입력 계획의 포인터/SHA에 연결했다. 출력은 작업 폴더의 `inputs/ma7-materialized-20261113-v2`이다.
 
 - REQ-14·16·17·18·19·20·21·LIF-13의 양쪽 prepared manifest16개를 각각 다른 세션으로 만들고 현재 guard 소스 bytes와 대조했다. 노드에는 설치하지 않았고 런타임 자격도 미확인이다. `settings.json`의 로컬 HMAC 값은 Git/보고서에 넣지 않고 파일 SHA만 기록했다.
 - 기존 preset을 사용해 REQ-14·16·18의 사례 파일6개·총62사례를 만들고 기존 계약 검사를 통과했다. REQ-16의 실제 모델/LoRA/가중치 세대와 노드 준비는 아직 필요하다.

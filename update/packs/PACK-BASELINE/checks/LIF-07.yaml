@@ -2,7 +2,7 @@ id: LIF-07
 framework_id: CHK-LIF-007
 mechanism_ids:
 - mechanism-10
-revision: 6
+revision: 7
 retired: false
 area: LIF
 purpose: 기동 준비 확인
@@ -12,7 +12,7 @@ scope: 기본 TP; 선택 graph/backend는 실제 설정
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: 승인 확인을 우회한 운영자나 준비 상태 오류 때문에 미준비·비승인 모델이 요청을 받아 잘못된 응답·서비스 중단을 일으킬 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 기본 TP의 필수 rank·모델 준비와 접수 gate를 확인한다. 선택 graph/backend의 준비 항목은 실제 설정에 맞춰 추가한다.
 policy_params:

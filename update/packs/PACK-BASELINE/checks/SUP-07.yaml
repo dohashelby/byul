@@ -2,7 +2,7 @@ id: SUP-07
 framework_id: CHK-SUP-007
 mechanism_ids:
 - mechanism-09
-revision: 5
+revision: 6
 retired: false
 area: SUP
 purpose: 실제 사용의 무결성
@@ -12,7 +12,7 @@ scope: null
 risk_category: 보안 위협 점검
 risk_summary: 캐시 쓰기 권한자가 파생 코드·파일을 교체해 다른 worker의 비승인 코드 실행이나 잘못된 계산을 유도할 수 있음. 실제 reader·소비 경로 확인 필요.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   prose: 실제 compile/AOT·파생 cache의 생성·읽기 경로를 먼저 확인한다. 명시적 활성 옵션이 없다는 이유로 기본 cache를 제외하지 않는다.
 policy_params:

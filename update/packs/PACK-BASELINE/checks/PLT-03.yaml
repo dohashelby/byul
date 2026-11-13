@@ -2,7 +2,7 @@ id: PLT-03
 framework_id: CHK-PLT-003
 mechanism_ids:
 - mechanism-11
-revision: 5
+revision: 6
 retired: false
 area: PLT
 purpose: 자격 제공·사용 제한
@@ -12,7 +12,7 @@ scope: 기본+선정 SDK; 로컬 마운트 자격은 마운트 주체 확인
 risk_category: 보안 위협 점검
 risk_summary: 공급원·객체 참조 변경권자가 서버의 대리 취득 자격을 이용해 허용 밖 저장소 객체를 읽고 자료를 노출시킬 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 실제 취득·마운트 주체의 자격과 접근 범위를 확인한다. 원격 취득 비사용 시 로컬 반입/마운트 주체를 확인한다.
 policy_params:

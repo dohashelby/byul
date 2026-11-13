@@ -54,3 +54,5 @@ limitations:
   - "구현 분기: probe HTTP/1.1 keep-alive 한 연결의 재사용과 별도 새 연결을 구분하고, 명시 잔존 정책을 넘긴 기존 연결의 수락은 기능 축 독립 FAIL이다."
   - "미구현 분기: issuer 사건·전파·애플리케이션 session/handle·서빙 영수증의 독립 근거가 없어 보안 PASS와 보안 FAIL은 현재 도달하지 않는다."
   - "kubernetes 구현만 있다. lab=true/vLLM 0.31 고정 GET /v1/models 범위이며 스트리밍·Gateway·공유 자원 접근권 전체는 미시험이다. 자격 원문은 저장하지 않는다."
+
+impact: MEDIUM

@@ -2,7 +2,7 @@ id: SUP-15
 framework_id: CHK-SUP-015
 mechanism_ids:
 - mechanism-04
-revision: 5
+revision: 6
 retired: false
 area: SUP
 purpose: 재사용 문맥의 호환성
@@ -12,7 +12,7 @@ scope: null
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: 파생물 변경권자의 교체 또는 잘못된 재사용으로 다른 모델·설정의 캐시가 적용되어 승인 조건이나 계산 결과가 달라질 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 다운로드·변환·compile/npcache 등 파생 결과의 재사용 여부를 확인한다. 활성 cache를 조사하지 않은 채 제외하지 않는다.
 policy_params:

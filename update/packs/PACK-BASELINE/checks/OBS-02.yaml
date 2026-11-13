@@ -3,7 +3,7 @@ framework_id: CHK-OBS-002
 mechanism_ids:
 - mechanism-17
 - mechanism-13
-revision: 5
+revision: 6
 retired: false
 area: OBS
 purpose: 실행 상태 관측·수집 건전성
@@ -13,7 +13,7 @@ scope: 기본; 선택 profiler 별도
 risk_category: 증거·판정 신뢰성 점검
 risk_summary: 운영자·평가자가 health·HTTP 응답만 믿으면 실제 실패·수집 지속을 놓쳐 잘못된 서비스 재개나 보안 판정을 내릴 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 준비·실패·종료 기록과 실제 상태를 기본 대조한다. profiler 종료는 해당 기능이 있을 때 추가한다.
 policy_params:

@@ -80,3 +80,5 @@ limitations:
   - 두 요청의 실제 송신 이후 수집 구간 중첩과 서로 다른 connection_id를 확인한다. 한쪽의 최대250ms 느린 읽기는 클라이언트 연결 수집 조건이다. CPU max_num_seqs=1에서 worker 내부 동시 실행·입력 소비 순서·서버 내부 ID 체인을 확인했다는 뜻이 아니다.
   - 바이트·프레임·시간·요청·출력 상한, UTF-8·JSON/SSE 완전성, 모델·choice·종료·DONE·소비/출력 token 수가 모두 충족돼야 해당 표본을 검증했다고 기록한다. 일반 오류·누락·잘림·비UTF8·timeout은 UNKNOWN이며 앞서 수집한 독립 위반을 지우지 않는다. 새 요청 dispatch는 전체 시간 예산으로 제한하고 별도의 Docker 기동·읽기 전용 inspect·정리 시간은 보고한다.
   - enterprise principal·권한·Gateway·SDK·child·내부 ID randomization on/off·취소/abort·재시도·지연된 저장 결과는 미시험이다. 상태 변경 요청은 보내지 않는다. 고정 소비 입력과 연결 귀속을 확인해도 생성 품질·성능·GPU·여러 실제 이미지의 업데이트 비교·보편적인 다중 사용자 격리를 인증하지 않는다.
+
+impact: HIGH

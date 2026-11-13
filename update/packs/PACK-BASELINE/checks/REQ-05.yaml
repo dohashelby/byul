@@ -3,7 +3,7 @@ framework_id: CHK-REQ-005
 mechanism_ids:
 - mechanism-01
 - mechanism-08
-revision: 5
+revision: 6
 retired: false
 area: REQ
 purpose: 작업·대상 인가
@@ -13,7 +13,7 @@ scope: 기본+선택 기능
 risk_category: 보안 위협 점검
 risk_summary: 호출자가 모델 이름·alias·adapter 등 선택 경로를 바꿔 허용받지 않은 모델을 사용하거나 비승인 실물을 실행시킬 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   prose: 모델 1개에서도 허용 대상을 확인한다. alias·adapter·공유 모델 소비는 실제 선택 시 추가한다. 모델을 사용 종료하거나 alias를 변경한 경우에는 이전 경로가 선택하는 최종 모델도 확인한다.
 policy_params:

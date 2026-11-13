@@ -2,7 +2,7 @@ id: REQ-20
 framework_id: CHK-REQ-020
 mechanism_ids:
 - mechanism-05
-revision: 4
+revision: 5
 retired: false
 area: REQ
 purpose: 실행 상태·버퍼 수명
@@ -12,7 +12,7 @@ scope: 조건부
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: 호출자가 graph 재사용·동시 실행 조건을 유발할 때 입력 갱신·출력 수명 결함이 있다면 이전 요청 자료가 반환되거나 계산이 잘못될 수 있음.
 review_order: implementation_path_first
-impact: null
+impact: HIGH
 applies_when:
   prose: CUDA Graph의 실제 활성 여부와 runner/mode를 먼저 확인한다. 명시 활성 옵션 부재만으로 비사용을 판단하지 않는다.
 policy_params:

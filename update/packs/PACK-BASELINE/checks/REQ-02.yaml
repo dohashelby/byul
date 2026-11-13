@@ -2,7 +2,7 @@ id: REQ-02
 framework_id: CHK-REQ-002
 mechanism_ids:
 - mechanism-01
-revision: 3
+revision: 4
 retired: false
 area: REQ
 purpose: 작업·대상 인가
@@ -12,7 +12,7 @@ scope: 조건부
 risk_category: 보안 위협 점검
 risk_summary: 호출자가 경로 재작성·인증 대상 차이를 이용해 필요한 인증·인가를 거치지 않고 실제 handler를 실행할 수 있음.
 review_order: conditional_when_selected
-impact: null
+impact: HIGH
 applies_when:
   prose: root_path·경로 prefix·Gateway/프록시 재작성이 있을 때 적용한다. 재작성 비사용은 기본 route 인증 점검의 제외 사유가 아니다.
 policy_params:

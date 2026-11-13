@@ -2,7 +2,7 @@ id: LIF-03
 framework_id: CHK-LIF-003
 mechanism_ids:
 - mechanism-07
-revision: 5
+revision: 6
 retired: false
 area: LIF
 purpose: 자원 예산·공정성
@@ -12,7 +12,7 @@ scope: 기본 요청·동시성·공정성; 미디어·metadata·child는 실제
 risk_category: 보안 위협 점검
 risk_summary: 일반 호출자가 비싼 요청·많은 child·우선순위·동시 요청을 이용해 GPU·KV·대기열을 독점하고 다른 사용자의 처리를 막을 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 기본 요청 길이·출력·동시성·대기열·공정성과 요청별/전체 예산을 확인한다. metadata·child 옵션은 수용할 때 추가한다. 이미지·오디오 등 미디어를 실제 수용하면 다운로드·base64 해제·decode·전처리 중 사용 단계의 비용과, 같은 요청의 복수 미디어·실제 재시도를 포함한 누적 비용을 추가 확인한다.
 policy_params:

@@ -2,7 +2,7 @@ id: OBS-05
 framework_id: CHK-OBS-005
 mechanism_ids:
 - mechanism-15
-revision: 5
+revision: 6
 retired: false
 area: OBS
 purpose: 부가정보 수집·송신 통제
@@ -12,7 +12,7 @@ scope: 조건부; usage 허용
 risk_category: 보안 위협 점검
 risk_summary: 보고 설정·자료에 영향을 줄 수 있는 주체가 허용 밖 필드·목적지로 보고를 확장해 조직이 금지한 정보를 외부에 보낼 수 있음.
 review_order: conditional_when_selected
-impact: null
+impact: LOW
 applies_when:
   prose: usage 보고 허용 정책을 먼저 확인하고 일부 또는 전체 보고가 허용된 환경에 적용한다. 금지 정책의 비활성·거부 확인은 CHK-OBS-004에 남긴다. 허용 여부가 미정이면 적용을 미정으로 두고, 허용 분기가 확인된 뒤 필드·목적지·주기 값이 미정이면 적용을 유지하며 결과를 미확인으로 둔다.
 policy_params:

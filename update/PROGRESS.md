@@ -1,5 +1,12 @@
 ## 2026-11-13 — 작업지시서 3차 현황 최신화
 
+## 2026-11-13 — M-A4 정본 팩 @34·확정 정책 값·REQ-12 반환
+
+- 한 일: 77개 impact를 HIGH 33·MEDIUM 38·LOW 6으로 반영했다. SUP-08은 PoC의 실행 코드 선택 정의(revision 5)를 정본화했고 SUP-11에 -OO 지원 밖을 표시했다. `examples/mvp-confirmed-values.yaml`의 `verification.values`에 사용자 확정 정책 5개를 저장했다. LIF-13의 제어기 역할·승인 세대·fallback 정책은 저장하되 실제 역할 결합 근거가 없는 분기는 UNKNOWN이다. request-attempt에 REQ-12 소비 선언과 `collectors/request_attempt_projection.py`의 검증된 투영을 반환했다. 후보·공백과 전체 질문 미완료를 구분하며 판정 연결은 M-B1에 남는다. 팩 검토와 소스 검토 기록은 결정 5 방식이다. 과거 시드와 결과는 바꾸지 않았다.
+- 테스트 결과: 직접·인접 118개 통과(61.30초), 현황 정합성 통과. 수정된 73개 일반 정의는 revision·impact만 바뀌었음을 정적으로 확인했다. 팩 검토 상태 반영 뒤 import 재생성·경로·정합성을 추가 확인한다. 전체 pytest는 실행하지 않았으며 PR CI는 미실행이다.
+- 다음 단계: push 승인 뒤 main 대상 PR을 열고 CI를 확인한다. 나중에 병합하는 PR은 소스 목록·검토 기록을 다시 만든다. M-A8의 두 판본 정본 입력, M-A7 입력 결합, M-B1 소비 연결을 잇는다.
+- 막힌 것: push 승인 대기. GPU·이미지 다운로드·공식 재판정은 실행하지 않았다.
+
 - 한 일: [작업지시서 3차](docs/WORK_ORDER_VLLM_MVP.md)에 1.1절 진행 현황(작업별 상태·PR), 3.1절 이틀 목표(A 트랙, J02 선행 조건), M-A6·M-A9 현황, 결정 9~16 상태를 넣었다. 결정 5(MVP 동안 B 검토 면제) 기록 방식을 `CLAUDE.md`·`AGENTS.md` 6절에 반영했다. #255의 CI 실패(새 적용표 문서가 CI 경로 목록에 없음)를 고쳤다.
 - 테스트 결과: 문서만 변경. 판본 번호는 0.1절 표에만 있다. `tools.checklist_status --check`, `tests/test_workflow_paths.py` 통과.
 - 다음 단계: #255 → #254 병합(결정 13 승인 뒤), 3.1절 순서대로 M-A5·M-A4·M-A6 나머지.

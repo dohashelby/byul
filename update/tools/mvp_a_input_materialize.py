@@ -154,8 +154,15 @@ def materialize(output, *, plan_file=PLAN, audit_file=SUP08_AUDIT):
         'deferred_policy_bindings': deferred,
         'req17_timing_requirements': timing, 'ready_for_execution': False,
         'input_preflight_passed': False, 'engine_executed': False, 'actual_results': None}
-    _write(output / 'session-input-plan.json', plan)
     _write(output / 'manifest.json', manifest)
+    plan['input_materialization']['local_materialization'] = {
+        'manifest_file': str(output / 'manifest.json'),
+        'manifest_sha256': sha256_hex((output / 'manifest.json').read_bytes()),
+        'prepared_files': len(prepared_rows), 'case_files': len(case_rows),
+        'case_count': sum(row['count'] for row in case_rows),
+        'node_installed': False, 'runtime_qualified': False,
+    }
+    _write(output / 'session-input-plan.json', plan)
     return manifest, plan
 
 

@@ -54,6 +54,9 @@ def test_materialized_files_are_valid_without_invented_binding_or_results(tmp_pa
             assert not set(fields) & {'sensor_environment_sha256', 'sensor_target_sha256',
                                       'sensor_prepared_sha256', 'sensor_manifest_sha256'}
     assert not plan['ready_for_execution'] and not plan['input_preflight_passed']
+    materialized = plan['input_materialization']['local_materialization']
+    assert materialized['manifest_file'] == str(out / 'manifest.json')
+    assert materialized['manifest_sha256'] == sha256_hex((out / 'manifest.json').read_bytes())
     assert not any(path.name in {'environment.json', 'target.json'} for path in out.rglob('*'))
     for check in tool.NATIVE_CHECKS:
         row = next(r for r in plan['checks'] if r['check_id'] == check)

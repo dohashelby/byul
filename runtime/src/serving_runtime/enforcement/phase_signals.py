@@ -25,6 +25,8 @@ from typing import Any, BinaryIO, Callable
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
+from serving_runtime.common.atomic_file import AtomicWriteOptions, write_atomic
+
 
 TIMELINE_SCHEMA = "runtime-phase-timeline/1.0"
 
@@ -586,28 +588,16 @@ def extract_phase_timeline(
 def _atomic_write(path: Path, document: dict[str, Any]) -> None:
     encoded = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     path.parent.mkdir(parents=False, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
-    temporary = Path(temporary_name)
-    try:
-        os.fchmod(descriptor, 0o600)
-        with os.fdopen(descriptor, "wb") as stream:
-            descriptor = -1
-            stream.write(encoded)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-        directory_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-        try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
-    finally:
-        if descriptor >= 0:
-            os.close(descriptor)
-        try:
-            temporary.unlink()
-        except FileNotFoundError:
-            pass
+    write_atomic(
+        path,
+        encoded,
+        options=AtomicWriteOptions(
+            mkstemp=True,
+            final_mode=0o600,
+            fsync_dir=True,
+            directory_flags=os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+        ),
+    )
 
 
 def _load_resume(path: Path) -> dict[str, Any]:

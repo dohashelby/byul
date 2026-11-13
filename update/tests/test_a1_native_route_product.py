@@ -130,6 +130,28 @@ def test_registered_product_keeps_observations_unknown_and_exact_refs(tmp_path,g
     cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),'--store',tmp_path/'restored','--config',cfg]);assert [r.ref() for r in Store.read_only(tmp_path/'restored').iter_kind('RES')]==[res.ref()]
     cli(['verify','--store',tmp_path/'restored','--config',cfg])
 
+@pytest.mark.parametrize('feature', ['native_route', 'sglang-native-lifecycle-metadata/1'])
+def test_route_transport_support_comes_from_catalog(feature, monkeypatch):
+    from guard.adapters import engine_profiles as profiles
+    from tests.test_model_preparation_integration import full_inputs
+    environment, selected = full_inputs()
+    engine = environment.engine.model_copy(update={'name': 'fixture-engine', 'version': '9.8.7'})
+    environment = environment.model_copy(update={'engine': engine}).seal()
+    selected['environment_ref'] = environment.ref().model_dump(mode='json')
+    selected['engine_kind'] = engine.name
+    selected['model_mapping']['environment_ref'] = environment.ref().model_dump(mode='json')
+    calls = []
+    profile = (http.ROUTE_AUTHENTICATION_PROFILE if feature == 'native_route'
+               else http.SGLANG_TERMINATION_PROFILE)
+    with pytest.raises(http.KubernetesBindingError):
+        http.KubernetesHTTP(selected, environment, duration=30, runner=lambda *a, **kw: calls.append(a), profile=profile)
+    monkeypatch.setattr(profiles, 'PROFILES', (*profiles.PROFILES, profiles.EngineProfile(
+        'fixture-route/1', engine.name, (engine.version,), frozenset({feature}))))
+    transport = http.KubernetesHTTP(selected, environment, duration=30, runner=lambda *a, **kw: calls.append(a), profile=profile)
+    assert transport.engine_name == engine.name
+    assert calls == []
+
+
 def test_pack_retains_question_criteria_and_seventy_six_exact_definitions(tmp_path):
     seed=baseline_pack();receipt=derive(seed.path,tmp_path/'pack');pack=load_pack(tmp_path/'pack');assert receipt['unchanged_definition_bytes']==76
     for name in ('question','normal_control','challenge_steps','satisfied_if','fail_criteria','unknown_criteria','legacy','method_and_evidence'):

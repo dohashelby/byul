@@ -2247,3 +2247,11 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - Replaced the current static packet's historical ordering dependency with a separately reviewed current-generation helper. Retained historical normal-boot snapshot stays byte-identical and accepts historical sensor e32c only; the new helper accepts current sensor 554206 only. Pair/helper/preparer SHA chain stays exact and closed.
 - Tests: SUP16 20 passed; combined serialized native17 scope preparation/load and SUP16 37 passed (0.46s), external temporary paths. Broader host diagnostic: 85 passed, 55 failed (unsupported CPython3.12.13 observer runtime); supported Linux rerun remains required.
 - No SUP16 registry/packs/contracts or sensor changes, actual engine/GPU/AWS execution, remote writes, or support-status promotion. Integration owner regenerates shared source manifest and runs final Linux validation.
+
+
+## 2026-11-13 M-A2 — 공통 입력 /4 구현
+
+- 한 일: 승인된 반복 행 요약(첫·끝 원 행/원 순번/시각·개수·최대값, 상한4,096 유지), KV 고유 수치·단위·단위당 token 수, 한도 집행 방식, 관측된 V2 sampler logit_bias 비교를 구현했다. /1~3 읽기·/1 재생과 현재 /3 actor 실수집 경로는 유지하고 단순 생산자/공급 읽기 수집은 /4를 명시한다. 공통 감싸기 기반·변환·직렬화 bytes를 생산자 신원에 묶었다. 과거8개 등록을 그대로 두고 /4의 별도 등록표는 비워 두어 과거 wire 자격을 이월하지 않는다.
+- 테스트 결과: CPython3.12.3 관련 직접276개 통과(pytest29.32초/부모29.881초), 최종 소비자 연결 assert를 추가한 /4·경로60개 통과(1.96초), 현황 검사 통과. 소스 검토 관문은 python -m tools.verify_req10_consumption으로530파일 통과했다. 소스 목록 SHA84e946ebd12c54bc5f7043f0e1548813dbd03d1d54a2f1bf9e5c3160f2082f4a에 결정5 검토 행을 하나 넣었다. 첫 시험의 과거 등록 가정 실패는 #260과 동일한 명시 EXAMPLE 모의 등록/과거8행 보존·새 의존성 미등록 시험으로 분리했고 판정 assert·기대값·skip은 완화하지 않았다. 새 V2 시험 입력은 관측기가 읽는 인스턴스 필드로 고쳤다. 직접 경로 실행의 tools import 실패는 -m 모듈 실행으로 해결했으며 제품 코드는 바꾸지 않았다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 새 브랜치 push·main PR 생성 승인을 받은 뒤 CI를 확인한다. 다른 제품 PR 뒤 맞출 때 목록·정확 단일 검토 행을 재생성한다. GPU 확인/등록은 J01 후속이다.
+- 막힌 것: 새 브랜치 push 승인·CI·병합 승인과 실제 GPU 자격이 없다. 요약할 수 없는4,096행 초과는 계속 거부하며 원 질문 전체 완료나 실제 측정으로 표시하지 않는다. ../runtime·../contracts 변경, 이미지/GPU/클라우드 실행은 없다.

@@ -17,6 +17,8 @@ from pathlib import Path
 
 from guard.adapters import vllm_attempt_callback as attempt_callback
 from . import gpu_common_inputs as contract
+from . import gpu_common_input_v4 as v4
+from guard.adapters import vllm_common_input_metadata as common_metadata
 
 ATTEMPT_PRODUCER_NAME = 'guard-engine-callback-request-attempt'
 ATTEMPT_PRODUCER_VERSION = '1'
@@ -25,10 +27,8 @@ _FREE_ABORT = {'FINISHED_ABORTED'}
 
 def attempt_producer():
     """생산자 신원: 관측기와 이 변환의 소스 bytes 해시를 함께 묶는다."""
-    digest = hashlib.sha256()
-    for path in (Path(attempt_callback.__file__), Path(__file__)):
-        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
-    return {'name': ATTEMPT_PRODUCER_NAME, 'version': ATTEMPT_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
+    digest = v4.source_digest((Path(attempt_callback.__file__), Path(__file__)) + common_metadata.SOURCE_PATHS)
+    return {'name': ATTEMPT_PRODUCER_NAME, 'version': ATTEMPT_PRODUCER_VERSION, 'source_sha256': digest}
 
 
 def _qualified(row):
@@ -43,7 +43,7 @@ def _row(seq, event, binding, request, attempt, at_ms, **values):
             **base, **values}
 
 
-def request_attempt_events(processes, *, requests=None):
+def request_attempt_events(processes, *, requests=None, wire_schema=contract.SCHEMA):
     """프로세스별 attempt 콜백 행 → 계약 행. requests가 있으면 그 요청 지문만 남긴다."""
     events, bindings, codes = [], [], set()
     rows = []
@@ -89,10 +89,13 @@ def request_attempt_events(processes, *, requests=None):
             if fields.get('allocated') is True:
                 add('kv_owned', request, kv_blocks=fields.get('new_blocks'), consumed_by_attempt=attempts.get(request, 1))
             elif fields.get('allocated') is False:
-                add('limit_enforced', request, cost=fields.get('num_new_tokens'))
+                add('limit_enforced', request, cost=fields.get('num_new_tokens'),
+                    **({'enforcement_method': 'alloc_refused'} if wire_schema == v4.SCHEMA else {}))
         elif point == 'Scheduler._preempt_request' and phase == 'RETURN':
             if keep(request):
                 current = attempts.setdefault(request, 1)
+                if wire_schema == v4.SCHEMA:
+                    add('limit_enforced', request, enforcement_method='preempted')
                 add('retry', request, retry_cause='preempted', next_attempt=current + 1)
                 attempts[request] = current + 1
         elif point == 'Scheduler.update_from_output' and phase == 'RETURN':
@@ -105,9 +108,9 @@ def request_attempt_events(processes, *, requests=None):
     return events, bindings, sorted(codes)
 
 
-def request_attempt_record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False, requests=None):
+def request_attempt_record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False, requests=None, wire_schema=contract.SCHEMA):
     """계약 봉투를 만들고 계약 검증까지 거친 결과를 함께 돌려준다."""
-    events, processes_used, codes = request_attempt_events(processes, requests=requests)
+    events, processes_used, codes = request_attempt_events(processes, requests=requests, wire_schema=wire_schema)
     if truncated:
         codes = sorted(set(codes) | {'ATTEMPT_READ_TRUNCATED'})
     bindings = [{'pod_uid': pod['pod_uid'], 'container_id': pod['container_id'].removeprefix('containerd://')[:128],
@@ -122,6 +125,8 @@ def request_attempt_record(processes, *, pod, environment_ref, target_sha256, pr
               'session': session, 'bindings': bindings or [], 'events': events,
               'completeness': {'source_ended': closed and not truncated, 'dropped': 0,
                                'diagnostic_codes': [c for c in codes if contract._ID.fullmatch(c)]}}
+    record = v4.encode(record, wire_schema=wire_schema, kv_unit=common_metadata.KV_UNIT,
+                       kv_unit_tokens=common_metadata.KV_UNIT_TOKENS)
     return record, contract.validate(record, kind='request-attempt', environment_ref=environment_ref,
                                      target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)
 
@@ -140,10 +145,8 @@ _GATE_OPEN = {'EngineCore.resume_scheduler', 'EngineCore.wake_up'}
 
 
 def transition_producer():
-    digest = hashlib.sha256()
-    for path in (Path(transition_callback.__file__), Path(attempt_callback.__file__), Path(__file__)):
-        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
-    return {'name': TRANSITION_PRODUCER_NAME, 'version': TRANSITION_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
+    digest = v4.source_digest((Path(transition_callback.__file__), Path(attempt_callback.__file__), Path(__file__)) + common_metadata.SOURCE_PATHS)
+    return {'name': TRANSITION_PRODUCER_NAME, 'version': TRANSITION_PRODUCER_VERSION, 'source_sha256': digest}
 
 
 def _transition_qualified(row):
@@ -231,7 +234,7 @@ def generation_transition_events(processes, *, requests=None):
     return events, bindings, sorted(codes)
 
 
-def generation_transition_record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False, requests=None):
+def generation_transition_record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False, requests=None, wire_schema=contract.SCHEMA):
     events, processes_used, codes = generation_transition_events(processes, requests=requests)
     if truncated:
         codes = sorted(set(codes) | {'TRANSITION_READ_TRUNCATED'})
@@ -245,6 +248,8 @@ def generation_transition_record(processes, *, pod, environment_ref, target_sha2
               'session': session, 'bindings': bindings, 'events': events,
               'completeness': {'source_ended': closed and not truncated, 'dropped': 0,
                                'diagnostic_codes': [c for c in codes if contract._ID.fullmatch(c)]}}
+    record = v4.encode(record, wire_schema=wire_schema, kv_unit=common_metadata.KV_UNIT,
+                       kv_unit_tokens=common_metadata.KV_UNIT_TOKENS)
     return record, contract.validate(record, kind='generation-transition', environment_ref=environment_ref,
                                      target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)
 
@@ -259,10 +264,8 @@ HEALTH_PRODUCER_VERSION = '1'
 
 
 def health_producer():
-    digest = hashlib.sha256()
-    for path in (Path(health_callback.__file__), Path(attempt_callback.__file__), Path(__file__)):
-        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
-    return {'name': HEALTH_PRODUCER_NAME, 'version': HEALTH_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
+    digest = v4.source_digest((Path(health_callback.__file__), Path(attempt_callback.__file__), Path(__file__)) + common_metadata.SOURCE_PATHS)
+    return {'name': HEALTH_PRODUCER_NAME, 'version': HEALTH_PRODUCER_VERSION, 'source_sha256': digest}
 
 
 def health_worker_events(processes):
@@ -314,7 +317,7 @@ def health_worker_events(processes):
     return events, bindings, sorted(codes)
 
 
-def health_worker_record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False):
+def health_worker_record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False, wire_schema=contract.SCHEMA):
     events, processes_used, codes = health_worker_events(processes)
     if truncated:
         codes = sorted(set(codes) | {'HEALTH_READ_TRUNCATED'})
@@ -329,6 +332,8 @@ def health_worker_record(processes, *, pod, environment_ref, target_sha256, prep
               'completeness': {'source_ended': not truncated and any(e['event'] == 'api_health' for e in events)
                                and any(e['event'] == 'worker_state' for e in events), 'dropped': 0,
                                'diagnostic_codes': [c for c in codes if contract._ID.fullmatch(c)]}}
+    record = v4.encode(record, wire_schema=wire_schema, kv_unit=common_metadata.KV_UNIT,
+                       kv_unit_tokens=common_metadata.KV_UNIT_TOKENS)
     return record, contract.validate(record, kind='health-worker-causal', environment_ref=environment_ref,
                                      target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)
 
@@ -343,10 +348,8 @@ PROFILER_PRODUCER_VERSION = '1'
 
 
 def profiler_producer():
-    digest = hashlib.sha256()
-    for path in (Path(profiler_callback.__file__), Path(__file__)):
-        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
-    return {'name': PROFILER_PRODUCER_NAME, 'version': PROFILER_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
+    digest = v4.source_digest((Path(profiler_callback.__file__), Path(__file__)) + common_metadata.SOURCE_PATHS)
+    return {'name': PROFILER_PRODUCER_NAME, 'version': PROFILER_PRODUCER_VERSION, 'source_sha256': digest}
 
 
 def profiler_control_events(processes):
@@ -414,7 +417,7 @@ def profiler_control_events(processes):
     return events, bindings, sorted(codes)
 
 
-def profiler_control_record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False):
+def profiler_control_record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False, wire_schema=contract.SCHEMA):
     events, processes_used, codes = profiler_control_events(processes)
     codes = set(codes) | {'PROFILER_CAUSAL_ID_ABSENT_IN_ENGINE'} | ({'PROFILER_READ_TRUNCATED'} if truncated else set())
     bindings = [{'pod_uid': pod['pod_uid'], 'container_id': pod['container_id'].removeprefix('containerd://')[:128],
@@ -427,6 +430,8 @@ def profiler_control_record(processes, *, pod, environment_ref, target_sha256, p
               'session': session, 'bindings': bindings, 'events': events,
               'completeness': {'source_ended': closed and not truncated, 'dropped': 0,
                                'diagnostic_codes': sorted(c for c in codes if contract._ID.fullmatch(c))}}
+    record = v4.encode(record, wire_schema=wire_schema, kv_unit=common_metadata.KV_UNIT,
+                       kv_unit_tokens=common_metadata.KV_UNIT_TOKENS)
     return record, contract.validate(record, kind='profiler-control', environment_ref=environment_ref,
                                      target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)
 
@@ -442,10 +447,8 @@ _CONSUMPTION_FIELDS = ('prompt_tokens', 'max_token_id') + consumption_callback.F
 
 
 def consumption_producer():
-    digest = hashlib.sha256()
-    for path in (Path(consumption_callback.__file__), Path(__file__)):
-        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
-    return {'name': CONSUMPTION_PRODUCER_NAME, 'version': CONSUMPTION_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
+    digest = v4.source_digest((Path(consumption_callback.__file__), Path(__file__)) + common_metadata.SOURCE_PATHS)
+    return {'name': CONSUMPTION_PRODUCER_NAME, 'version': CONSUMPTION_PRODUCER_VERSION, 'source_sha256': digest}
 
 
 def runner_consumption_events(processes, *, requests=None):
@@ -535,7 +538,7 @@ def runner_consumption_events(processes, *, requests=None):
     return events, bindings, sorted(codes)
 
 
-def runner_consumption_record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False, requests=None):
+def runner_consumption_record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False, requests=None, wire_schema=contract.SCHEMA):
     events, processes_used, codes = runner_consumption_events(processes, requests=requests)
     if truncated:
         codes = sorted(set(codes) | {'CONSUMPTION_READ_TRUNCATED'})
@@ -550,6 +553,8 @@ def runner_consumption_record(processes, *, pod, environment_ref, target_sha256,
               'session': session, 'bindings': bindings, 'events': events,
               'completeness': {'source_ended': closed and not truncated, 'dropped': 0,
                                'diagnostic_codes': [c for c in codes if contract._ID.fullmatch(c)]}}
+    record = v4.encode(record, wire_schema=wire_schema, kv_unit=common_metadata.KV_UNIT,
+                       kv_unit_tokens=common_metadata.KV_UNIT_TOKENS)
     return record, contract.validate(record, kind='runner-consumption', environment_ref=environment_ref,
                                      target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)
 
@@ -564,10 +569,8 @@ SUPPLY_PRODUCER_VERSION = '1'
 
 
 def supply_producer():
-    digest = hashlib.sha256()
-    for path in (Path(supply_callback.__file__), Path(__file__)):
-        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
-    return {'name': SUPPLY_PRODUCER_NAME, 'version': SUPPLY_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
+    digest = v4.source_digest((Path(supply_callback.__file__), Path(__file__)) + common_metadata.SOURCE_PATHS)
+    return {'name': SUPPLY_PRODUCER_NAME, 'version': SUPPLY_PRODUCER_VERSION, 'source_sha256': digest}
 
 
 def path_sha256(relative):
@@ -642,7 +645,7 @@ def mount_scope_codes(before, after):
 
 
 def supply_read_record(processes, hashes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False,
-                       mount_before=None, mount_after=None):
+                       mount_before=None, mount_after=None, wire_schema=contract.SCHEMA):
     """기록된 연 파일마다 해시 행이 있어야 닫힌다. 너무 큰 파일(가중치 등)은 해시하지 않고 상태로 남긴다.
 
     - inotify 감시가 없으면 native 읽기를 못 보므로 `SUPPLY_NATIVE_READS_UNOBSERVED` 진단이 붙는다.
@@ -678,5 +681,7 @@ def supply_read_record(processes, hashes, *, pod, environment_ref, target_sha256
               'session': session, 'bindings': bindings, 'events': events,
               'completeness': {'source_ended': bool(opened) and opened <= covered and not truncated, 'dropped': 0,
                                'diagnostic_codes': [c for c in codes if contract._ID.fullmatch(c)]}}
+    record = v4.encode(record, wire_schema=wire_schema, kv_unit=common_metadata.KV_UNIT,
+                       kv_unit_tokens=common_metadata.KV_UNIT_TOKENS)
     return record, contract.validate(record, kind='supply-reads', environment_ref=environment_ref,
                                      target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)

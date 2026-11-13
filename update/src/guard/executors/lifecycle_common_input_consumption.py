@@ -11,6 +11,7 @@ from pathlib import Path
 import stat
 
 from guard.collectors import gpu_common_inputs as contract
+from guard.collectors.gpu_common_input_v4 import event_count
 from guard.collectors import ipc_ownership_producer, group_resource_producer
 from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, Observation, canonical_json, sha256_hex
 from guard.runtime.bounded import strict_json
@@ -63,7 +64,7 @@ def consume_record(check_id, record, *, environment_ref, target_sha256, prepared
             else:
                 raise ValueError("B_COMMON_INPUT_CURRENT_OWNER_MISMATCH")
     events = record["events"]
-    facts = {"event_counts": {name: sum(e["event"] == name for e in events)
+    facts = {"event_counts": {name: sum(event_count(e) for e in events if e["event"] == name)
                              for name in sorted({e["event"] for e in events})}}
     if kind == "ipc-ownership":
         facts.update(ipc_ownership_producer.summarize(record))
@@ -84,6 +85,11 @@ def consume_record(check_id, record, *, environment_ref, target_sha256, prepared
         facts["actual_weights_cache_consumption_verified"] = False
         gaps.append("B_GENERATION_LABELS_NOT_ACTUAL_WEIGHTS_CACHE_CONSUMPTION")
     elif kind == "request-attempt":
+        if record['schema'] == 'guard-gpu-common-input/4':
+            facts['kv_observations'] = [{k: e[k] for k in ('seq', 'kv_units', 'kv_unit', 'kv_unit_tokens')}
+                                       for e in events if e['event'] == 'kv_owned']
+            facts['limit_enforcement_methods'] = sorted({e['enforcement_method'] for e in events
+                if e['event'] == 'limit_enforced' and e['enforcement_method'] is not None})
         facts["automatic_retry_and_final_output_binding_verified"] = False
         gaps.append("B_ATTEMPT_EVENTS_NOT_FULL_BUDGET_DISCONNECT_OR_RETRY_SCOPE")
     elif kind == "process-device-provider":

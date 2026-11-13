@@ -42,7 +42,6 @@ from serving_runtime.enforcement.phase_signals import (
 )
 
 
-LAB_NAMESPACE = "serving-lab"
 PHASE_LOG_LIMIT_BYTES = 8 * 1024 * 1024
 
 
@@ -68,7 +67,15 @@ def _restore_signal_handlers(previous: dict[int, object]) -> None:
         signal.signal(signum, handler)
 
 
-def hubble_command(*, since: str | None = None, include_forwarded: bool = False) -> list[str]:
+def _target_namespace(value):
+    if value is None or value == "":
+        raise ValueError("target namespace is required; set --target-namespace")
+    return validate_kubernetes_name(value, "target namespace")
+
+
+def hubble_command(
+    *, namespace: str | None = None, since: str | None = None, include_forwarded: bool = False
+) -> list[str]:
     command = [
         "hubble",
         "observe",
@@ -78,7 +85,7 @@ def hubble_command(*, since: str | None = None, include_forwarded: bool = False)
         "--server",
         "127.0.0.1:4245",
         "--namespace",
-        LAB_NAMESPACE,
+        _target_namespace(namespace),
     ]
     if since is not None:
         command.extend(["--since", since])
@@ -1292,7 +1299,7 @@ def run(
     max_ticks: int | None = None,
     reader_gid: int | None = None,
     target_selector: tuple[tuple[str, str], ...] | None = None,
-    target_namespace: str = LAB_NAMESPACE,
+    target_namespace: str | None = None,
     target_container: str = "engine",
     target_interval_s: float = DEFAULT_TARGET_INTERVAL_S,
     phase_timeline: bool = False,
@@ -1303,6 +1310,7 @@ def run(
         raise ValueError("--phase-timeline requires --target-selector")
     validate_kubernetes_name(target_container, "target container")
     assert_safe_context(context)
+    target_namespace = _target_namespace(target_namespace)
     check_reader_group(reader_gid)
     _reader_gid = reader_gid
     output_dir = output_dir.absolute()
@@ -1349,6 +1357,7 @@ def run(
                 _Child(
                     "hubble",
                     lambda since: hubble_command(
+                        namespace=target_namespace,
                         since=since or hubble_group.started_at,
                         include_forwarded=include_forwarded,
                     ),
@@ -1474,9 +1483,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--phase-engine", choices=("vllm", "sglang"), default="vllm", help="단계 시간표의 엔진 종류")
     parser.add_argument(
         "--target-namespace",
-        default=LAB_NAMESPACE,
+        required=True,
         metavar="NAME",
-        help="대상 Pod namespace (기본: serving-lab)",
+        help="Hubble·대상 Pod namespace (필수)",
     )
     parser.add_argument(
         "--target-container",

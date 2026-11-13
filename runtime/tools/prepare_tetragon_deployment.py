@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import re
 
+from serving_runtime.common.kube_context import validate_kube_context
 from serving_runtime.enforcement.intent import parse_intent
 from serving_runtime.enforcement.tetragon import render_manifests
 from tools.tetragon_trial import atomic_json
@@ -17,15 +18,13 @@ ROOT = Path(__file__).resolve().parents[1]
 SELECTOR = "app in (serving-engine,byul-tetragon-sentinel)"
 
 
-def prepare(intent_path: Path, image: str, output: Path):
+def prepare(intent_path: Path, image: str, output: Path, *, context=None):
     if not re.fullmatch(r"[^\s@]+@sha256:[a-f0-9]{64}", image):
         raise ValueError("sentinel image requires a reviewed sha256 digest")
+    context = validate_kube_context(context)
     document = json.loads(intent_path.read_text())
-    if (
-        document.get("namespace") != "serving-lab"
-        or document.get("engine", {}).get("labels", {}).get("app") != "serving-engine"
-    ):
-        raise ValueError("AWS service templates require serving-lab and the app=serving-engine role label")
+    if document.get("engine", {}).get("labels", {}).get("app") != "serving-engine":
+        raise ValueError("service templates require the app=serving-engine role label")
     document["tetragon_kernel_identity"] = True
     intent = parse_intent(document)
     policies = render_manifests(intent)
@@ -41,6 +40,7 @@ def prepare(intent_path: Path, image: str, output: Path):
     health["metadata"]["annotations"]["serving-runtime.local/rule-id"] = "TG-HEALTH-01"
     policies["tetragon-tg-health-01.json"] = health
     sentinel = json.loads((ROOT / "deploy/lab/tetragon-sentinel.json").read_text())
+    sentinel["metadata"]["namespace"] = intent.namespace
     for container in (
         sentinel["spec"]["template"]["spec"]["initContainers"] + sentinel["spec"]["template"]["spec"]["containers"]
     ):
@@ -50,6 +50,8 @@ def prepare(intent_path: Path, image: str, output: Path):
     stream_service = re.sub(
         r"(?: --policy [a-z0-9.-]+)+", "".join(" --policy " + name for name in names), stream_service
     )
+    stream_service = re.sub(r"(?<= --context )\S+", lambda match: context, stream_service)
+    stream_service = re.sub(r"(?<= --namespace )\S+", lambda match: intent.namespace, stream_service)
     files = {"intent.json": document, "sentinel.json": sentinel, **policies}
     output.mkdir(parents=True, exist_ok=True)
     if any((output / name).exists() for name in [*files, "byul-tetragon-stream.service", "prepared.json"]):
@@ -59,7 +61,7 @@ def prepare(intent_path: Path, image: str, output: Path):
     (output / "byul-tetragon-stream.service").write_text(stream_service)
     record = {
         "state": "prepared-unapplied",
-        "context": "byul-aws-lab",
+        "context": context,
         "namespace": intent.namespace,
         "identity_selector": SELECTOR,
         "policies": names,
@@ -77,12 +79,13 @@ def prepare(intent_path: Path, image: str, output: Path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--context", required=True)
     parser.add_argument("--intent", type=Path, required=True)
     parser.add_argument("--sentinel-image", required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        record = prepare(args.intent, args.sentinel_image, args.output)
+        record = prepare(args.intent, args.sentinel_image, args.output, context=args.context)
     except (OSError, ValueError) as error:
         parser.error(str(error))
     print(json.dumps(record, ensure_ascii=False))

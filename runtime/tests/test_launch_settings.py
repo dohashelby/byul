@@ -240,6 +240,8 @@ def test_observation_feed_main_writes_launch_settings(tmp_path, monkeypatch, tar
     monkeypatch.setattr(feed, "_share_fd", Mock())
     monkeypatch.setattr(feed, "_reader_gid", None)
     argv = [
+        "--target-namespace",
+        "serving-lab",
         "--kube-context",
         "byul-aws-lab",
         "--output-dir",
@@ -292,6 +294,8 @@ def test_observation_feed_main_rejects_invalid_target_container(tmp_path, capsys
     assert (
         feed.main(
             [
+                "--target-namespace",
+                "serving-lab",
                 "--kube-context",
                 "kind-runtime-lab",
                 "--output-dir",

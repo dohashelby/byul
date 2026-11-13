@@ -246,7 +246,7 @@ def main(argv=None) -> int:
     r = commands.add_parser("render", help="최소 권한 Role/ClusterRole JSON 출력")
     c = commands.add_parser("check", help="kubectl auth can-i로 필요한 권한·과한 권한 점검")
     for p in (r, c):
-        p.add_argument("--namespace", default="serving-lab")
+        p.add_argument("--namespace", required=True)
         p.add_argument("--tetragon-namespace", default="kube-system")
     r.add_argument("--account", default="runtime-agent")
     c.add_argument("--context", required=True)
@@ -254,7 +254,7 @@ def main(argv=None) -> int:
     c.add_argument(
         "--as",
         dest="as_user",
-        help="관리자 kubeconfig로 대상 계정 흉내(예: system:serviceaccount:serving-lab:runtime-agent)",
+        help="관리자 kubeconfig로 대상 계정 흉내(예: system:serviceaccount:<namespace>:runtime-agent)",
     )
     args = parser.parse_args(argv)
     if not NAME.fullmatch(args.namespace) or not NAME.fullmatch(args.tetragon_namespace):

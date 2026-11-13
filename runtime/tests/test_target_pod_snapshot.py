@@ -397,7 +397,9 @@ class TargetSnapshotTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 2)
 
     def test_default_snapshot_timing_stays_inside_gateway_stale_window(self) -> None:
-        parsed = feed.build_parser().parse_args(["--kube-context", "kind-runtime-lab", "--output-dir", str(self.root)])
+        parsed = feed.build_parser().parse_args(
+            ["--target-namespace", "serving-lab", "--kube-context", "kind-runtime-lab", "--output-dir", str(self.root)]
+        )
         self.assertEqual(parsed.target_interval, feed.DEFAULT_TARGET_INTERVAL_S)
         worst_case_age_s = feed.DEFAULT_TARGET_INTERVAL_S + feed.TARGET_QUERY_TIMEOUT_S + DEFAULT_COLLECTOR_INTERVAL_S
         self.assertLess(worst_case_age_s, DEFAULT_COLLECTOR_STALE_AFTER_S)
@@ -406,7 +408,16 @@ class TargetSnapshotTests(unittest.TestCase):
         error = io.StringIO()
         with redirect_stderr(error), self.assertRaises(SystemExit) as raised:
             feed.build_parser().parse_args(
-                ["--kube-context", "kind-runtime-lab", "--output-dir", str(self.root), "--target-interval", "5.1"]
+                [
+                    "--target-namespace",
+                    "serving-lab",
+                    "--kube-context",
+                    "kind-runtime-lab",
+                    "--output-dir",
+                    str(self.root),
+                    "--target-interval",
+                    "5.1",
+                ]
             )
         self.assertEqual(raised.exception.code, 2)
         self.assertIn("at most 5 seconds", error.getvalue())

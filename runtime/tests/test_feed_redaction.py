@@ -330,6 +330,8 @@ class ReaderGroupSharingTests(unittest.TestCase):
         feed.check_reader_group(None)
         code = feed.main(
             [
+                "--target-namespace",
+                "serving-lab",
                 "--kube-context",
                 "kind-runtime-lab",
                 "--output-dir",
@@ -344,6 +346,8 @@ class ReaderGroupSharingTests(unittest.TestCase):
     def test_cli_accepts_reader_group(self) -> None:
         args = feed.build_parser().parse_args(
             [
+                "--target-namespace",
+                "serving-lab",
                 "--kube-context",
                 "kind-runtime-lab",
                 "--output-dir",

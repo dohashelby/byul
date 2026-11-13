@@ -21,7 +21,9 @@ class DeploymentTests(unittest.TestCase):
     def test_scopes_identity_policy_image_and_gateway_paths(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
-            record = prepare(ROOT / "deploy/gpu-lab/intent.aws-lab.json", "python@sha256:" + "a" * 64, output)
+            record = prepare(
+                ROOT / "deploy/gpu-lab/intent.aws-lab.json", "python@sha256:" + "a" * 64, output, context="byul-aws-lab"
+            )
             self.assertEqual(record["status_service"], "serving-runtime-tetragon-status.service")
             self.assertFalse((ROOT / "deploy/gpu-lab/host/byul-tetragon-status.service").exists())
             self.assertNotIn("--hubble-only", (ROOT / "deploy/gpu-lab/host/byul-observation-feed.service").read_text())
@@ -48,7 +50,12 @@ class DeploymentTests(unittest.TestCase):
                 )
             )
             with self.assertRaises(ValueError):
-                prepare(ROOT / "deploy/gpu-lab/intent.aws-lab.json", record["sentinel_image"], output)
+                prepare(
+                    ROOT / "deploy/gpu-lab/intent.aws-lab.json",
+                    record["sentinel_image"],
+                    output,
+                    context="byul-aws-lab",
+                )
 
     def test_discovery_gap_heartbeat_is_group_readable(self):
         from tools.tetragon_stream import discovery_pending
@@ -67,18 +74,23 @@ class DeploymentTests(unittest.TestCase):
             path = root / "intent.json"
             path.write_text(json.dumps(document))
             output = root / "out"
-            prepare(path, "python@sha256:" + "a" * 64, output)
+            prepare(path, "python@sha256:" + "a" * 64, output, context="byul-aws-lab")
             engine = json.loads((output / "tetragon-tg-secret-01.json").read_text())
             self.assertEqual(engine["spec"]["podSelector"]["matchLabels"], document["engine"]["labels"])
             document["engine"]["labels"]["app"] = "unrelated"
             path.write_text(json.dumps(document))
             with self.assertRaises(ValueError):
-                prepare(path, "python@sha256:" + "a" * 64, root / "rejected")
+                prepare(path, "python@sha256:" + "a" * 64, root / "rejected", context="byul-aws-lab")
 
     def test_mutable_sentinel_tag_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             with self.assertRaises(ValueError):
-                prepare(ROOT / "deploy/gpu-lab/intent.aws-lab.json", "python:latest", Path(temporary))
+                prepare(
+                    ROOT / "deploy/gpu-lab/intent.aws-lab.json",
+                    "python:latest",
+                    Path(temporary),
+                    context="byul-aws-lab",
+                )
             self.assertEqual(list(Path(temporary).iterdir()), [])
 
     def test_atomic_snapshot_reader_group_survives_replacement(self):
@@ -116,7 +128,9 @@ class DeploymentTests(unittest.TestCase):
             patch.object(feed, "_start", side_effect=processes) as start,
         ):
             root = Path(temporary)
-            self.assertEqual(feed.run(root, "byul-aws-lab", hubble_only=True, max_ticks=0), 0)
+            self.assertEqual(
+                feed.run(root, "byul-aws-lab", target_namespace="serving-lab", hubble_only=True, max_ticks=0), 0
+            )
             self.assertEqual(start.call_count, 2)
             self.assertFalse(list(root.glob("tetragon*")))
             self.assertTrue((root / "hubble.heartbeat.json").exists())

@@ -555,11 +555,11 @@ class CiliumCollectorTests(unittest.TestCase):
 
 class FeedHelperTests(unittest.TestCase):
     def test_helper_commands_use_explicit_validated_context(self) -> None:
-        hubble = hubble_command(since="2026-10-24T00:00:00+00:00")
+        hubble = hubble_command(namespace="serving-lab", since="2026-10-24T00:00:00+00:00")
         self.assertEqual(hubble[:4], ["hubble", "observe", "--follow", "-o"])
         self.assertIn("--since", hubble)
         self.assertEqual(hubble[-2:], ["--verdict", "DROPPED"])
-        self.assertNotIn("--verdict", hubble_command(include_forwarded=True))
+        self.assertNotIn("--verdict", hubble_command(namespace="serving-lab", include_forwarded=True))
         self.assertEqual(
             hubble_port_forward_command(EXPECTED_CONTEXT),
             ["cilium", "hubble", "port-forward", "--context", EXPECTED_CONTEXT],
@@ -586,7 +586,9 @@ class FeedHelperTests(unittest.TestCase):
             patch.object(helper, "run", side_effect=timeout),
             patch.object(helper.sys, "stderr", new_callable=io.StringIO) as stderr,
         ):
-            result = helper.main(["--output-dir", "unused", "--kube-context", EXPECTED_CONTEXT])
+            result = helper.main(
+                ["--target-namespace", "serving-lab", "--output-dir", "unused", "--kube-context", EXPECTED_CONTEXT]
+            )
 
         self.assertEqual(result, 1)
         self.assertIn("timed out after 10 seconds", stderr.getvalue())
@@ -641,7 +643,9 @@ class FeedHelperTests(unittest.TestCase):
                     patch("tools.k8s_observation_feed.signal.signal", side_effect=fake_signal),
                     patch("tools.k8s_observation_feed._Supervisor.tick", tick_then_signal),
                 ):
-                    result = run_observation_feed(Path(temporary), EXPECTED_CONTEXT, max_ticks=3)
+                    result = run_observation_feed(
+                        Path(temporary), EXPECTED_CONTEXT, target_namespace="serving-lab", max_ticks=3
+                    )
                     heartbeat = json.loads((Path(temporary) / "tetragon.heartbeat.json").read_text())
 
                 self.assertEqual(result, 0)
@@ -664,7 +668,12 @@ class FeedHelperTests(unittest.TestCase):
         ):
             root = Path(temporary)
             result = run_observation_feed(
-                root, EXPECTED_CONTEXT, max_ticks=1, target_selector=(("app", "serving-engine"),), phase_timeline=True
+                root,
+                EXPECTED_CONTEXT,
+                target_namespace="serving-lab",
+                max_ticks=1,
+                target_selector=(("app", "serving-engine"),),
+                phase_timeline=True,
             )
             self.assertEqual(result, 0)
             self.assertTrue(phase.called)

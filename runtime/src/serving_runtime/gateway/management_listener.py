@@ -19,6 +19,8 @@ from typing import TextIO
 from serving_runtime.gateway.backend import URLTarget, _parse_origin, _read_credential
 from serving_runtime.observation.store import JsonlStore
 
+from serving_runtime.common.atomic_file import AtomicWriteOptions, write_atomic
+
 
 DEFAULT_ALLOWED_PATHS = ("/metrics", "/health", "/v1/models", "/version")
 ACCESS_SCHEMA = "runtime-management-access/1.0"
@@ -210,12 +212,12 @@ class AccessRecorder:
         }
         temporary = self._heartbeat_path.with_name("." + self._heartbeat_path.name + "." + uuid4().hex + ".tmp")
         try:
-            fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-            with os.fdopen(fd, "w") as output:
-                output.write(json.dumps(document) + "\n")
-                output.flush()
-                os.fsync(output.fileno())
-            os.replace(temporary, self._heartbeat_path)
+            write_atomic(
+                self._heartbeat_path,
+                temporary=temporary,
+                options=AtomicWriteOptions(text=True, cleanup=False, close_unowned_descriptor=False),
+                writer=lambda output: output.write(json.dumps(document) + "\n"),
+            )
         except OSError:
             # A missing/stale heartbeat exposes a writer failure to its collector.
             pass

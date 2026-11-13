@@ -57,6 +57,7 @@ def measure(root: Path) -> dict:
     long_fn, very_long_fn, many_args, big_files = [], [], [], []
     private_imports, dual_imports, bad_names = [], [], []
     forbidden = {k: [] for k in FORBIDDEN}
+    forbidden_product = {k: [] for k in FORBIDDEN}
     atomic = []
     cli_args = 0
     total_lines = 0
@@ -93,6 +94,10 @@ def measure(root: Path) -> dict:
         for key, pattern in FORBIDDEN.items():
             if re.search(pattern, text):
                 forbidden[key].append(rel)
+                if rel.startswith("tools/") or (
+                    rel.startswith("src/") and not rel.startswith("src/serving_runtime/devtools/")
+                ):
+                    forbidden_product[key].append(rel)
         if any(h in text for h in ATOMIC_WRITE_HINTS):
             atomic.append(rel)
         stem = path.stem
@@ -111,6 +116,7 @@ def measure(root: Path) -> dict:
         "files_with_atomic_write_hints": len(set(atomic)),
         "bad_name_files": len(set(bad_names)),
         **{f"forbidden_{k}_files": len(set(v)) for k, v in forbidden.items()},
+        **{f"forbidden_{k}_product_files": len(set(v)) for k, v in forbidden_product.items()},
         "_details": {
             "very_long_functions": sorted(very_long_fn, key=lambda x: -x[1])[:15],
             "big_files": sorted(big_files, key=lambda x: -x[1])[:10],

@@ -7,13 +7,11 @@ import json
 from pathlib import Path
 import tempfile
 import tomllib
-from typing import get_args
 import unittest
 from unittest.mock import patch
 
 from serving_runtime.cli import main
 from serving_runtime.config.config import MVPConfig
-from serving_runtime.config.node_config import load_node_defaults
 
 DATA = Path(__file__).resolve().parent / "data"
 

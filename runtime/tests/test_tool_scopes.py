@@ -2,7 +2,6 @@
 
 import json
 from pathlib import Path
-import subprocess
 from unittest.mock import patch
 import pytest
 
@@ -13,16 +12,13 @@ IMAGE = "python@sha256:" + "a" * 64
 
 
 def test_prepared_lab_output_is_byte_identical_with_explicit_scope(tmp_path):
-    old_source = subprocess.check_output(
-        ["git", "show", "b96e6d42:runtime/tools/prepare_tetragon_deployment.py"], cwd=ROOT, text=True
-    )
-    namespace = {"__file__": str(ROOT / "tools/prepare_tetragon_deployment.py"), "__name__": "_old_prepare"}
-    exec(compile(old_source, "<old-prepare>", "exec"), namespace)
-    old, new = tmp_path / "old", tmp_path / "new"
+    import hashlib
+
+    expected = json.loads((Path(__file__).resolve().parent / "data/prepared_lab_sha256.json").read_text())
+    output = tmp_path / "new"
     intent = ROOT / "deploy/gpu-lab/intent.aws-lab.json"
-    namespace["prepare"](intent, IMAGE, old)
-    prepare_tool.prepare(intent, IMAGE, new, context="byul-aws-lab")
-    assert {p.name: p.read_bytes() for p in old.iterdir()} == {p.name: p.read_bytes() for p in new.iterdir()}
+    prepare_tool.prepare(intent, IMAGE, output, context="byul-aws-lab")
+    assert {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in output.iterdir()} == expected
 
 
 def test_prepare_uses_intent_namespace_and_explicit_context(tmp_path):

@@ -164,7 +164,7 @@ def _abort_incomplete(draft):
 
 def _qualified_runner_fact(record, projection):
     """Current /2-/3 scope qualification is separate from source registration."""
-    return projection["supported"] and (record["schema"] == "guard-gpu-common-input/1" or (
+    return projection["supported"] and (record["schema"] in {"guard-gpu-common-input/1", "guard-gpu-common-input/4"} or (
         record["schema"] in {"guard-gpu-common-input/2", "guard-gpu-common-input/3"}
         and projection.get("runtime_qualified") is True))
 

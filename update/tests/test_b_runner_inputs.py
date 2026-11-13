@@ -64,6 +64,17 @@ def run(case, output):
     return tool.prepare(case["path"], sha256_hex(case["path"].read_bytes()), output)
 
 
+def test_current_unregistered_source_cannot_be_upgraded_by_preparation(tmp_path, prepared):
+    """모의 등록 없는 실제 현재 변환은 준비 도구를 거쳐도 미지원이다."""
+    case = inputs(tmp_path, prepared)
+    assert not case['original']['supported']
+    receipt = run(case, tmp_path/'unregistered')
+    result = receipt['consumer_projection']
+    assert not result['supported'] and not result['complete']
+    assert 'GPU_INPUT_PRODUCER_UNSUPPORTED' in result['gaps']
+    assert not receipt['gpu_ready'] and not result['producer_authenticated']
+
+
 @pytest.mark.parametrize("check", tool.CHECKS)
 @pytest.mark.usefixtures("example_registered_callback_producers")
 def test_producer_output_exact_bytes_independent_scope_and_existing_consumer(tmp_path, prepared, check):

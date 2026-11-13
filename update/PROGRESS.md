@@ -1,3 +1,10 @@
+## 2026-11-13 — /4와 후보 관측 고정값 통합
+
+- 한 일: #260까지의 통합 내용을 #262에 보존했다. 생산자7개의 신원에는 /4 직렬화·공통 감싸기·후보 고정값 helper/데이터를 함께 결합했다. @34의 REQ-12 선언·과거8개 GPU 등록 행·비어 있는 /4 자격표·후보 상태를 유지했다. 소스 목록을 다시 만들고 새 SHA 검토 행을 추가했다.
+- 테스트 결과: /4·후보 고정값·생산자·REQ-12·경로 직접 시험240개 통과(13.87초), 현황·소스 고정 관문·diff --check 통과. 고정값 helper/JSON 변조 시 생산자7개 전부 SHA가 바뀌고 미등록임을 검증했다. staged 공백 검사에서 기준 소스 fixture의 원본 공백1행을 확인했고 #260 bytes와 일치하므로 보존했다. 그 fixture 외 diff 검사는 통과했다. 전체 시험은 새 PR CI에서 확인한다.
+- 다음 단계: 통합 CI 뒤 승인된 순서로 병합하고 세션 계획을 통합한다.
+- 막힌 것: 새 /4 생산자의 GPU 자격과 실제 ENV/target·입력 사전 점검은 미완료다. #263은 draft다.
+
 ## 2026-11-13 — 후보 고정값과 정본 팩 통합
 
 - 한 일: #257·#259·#258 통합 내용을 #260에 보존했다. 후보 고정값·기동/HTTP 데이터·36개 함수 검토와 @34·REQ-12·판본 중립 경로를 합쳤다. CI 경로 두 목록과 결정9·14·15·17~20을 보존하고 소스 목록 및 새 SHA 검토 행을 만들었다.
@@ -2410,6 +2417,20 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - No SUP16 registry/packs/contracts or sensor changes, actual engine/GPU/AWS execution, remote writes, or support-status promotion. Integration owner regenerates shared source manifest and runs final Linux validation.
 
 
+## 2026-11-13 M-A2 — 공통 입력 /4 구현
+
+- 한 일: 승인된 반복 행 요약(첫·끝 원 행/원 순번/시각·개수·최대값, 상한4,096 유지), KV 고유 수치·단위·단위당 token 수, 한도 집행 방식, 관측된 V2 sampler logit_bias 비교를 구현했다. /1~3 읽기·/1 재생과 현재 /3 actor 실수집 경로는 유지하고 단순 생산자/공급 읽기 수집은 /4를 명시한다. 공통 감싸기 기반·변환·직렬화 bytes를 생산자 신원에 묶었다. 과거8개 등록을 그대로 두고 /4의 별도 등록표는 비워 두어 과거 wire 자격을 이월하지 않는다.
+- 테스트 결과: CPython3.12.3 관련 직접276개 통과(pytest29.32초/부모29.881초), 최종 소비자 연결 assert를 추가한 /4·경로60개 통과(1.96초), 현황 검사 통과. 소스 검토 관문은 python -m tools.verify_req10_consumption으로530파일 통과했다. 소스 목록 SHA84e946ebd12c54bc5f7043f0e1548813dbd03d1d54a2f1bf9e5c3160f2082f4a에 결정5 검토 행을 하나 넣었다. 첫 시험의 과거 등록 가정 실패는 #260과 동일한 명시 EXAMPLE 모의 등록/과거8행 보존·새 의존성 미등록 시험으로 분리했고 판정 assert·기대값·skip은 완화하지 않았다. 새 V2 시험 입력은 관측기가 읽는 인스턴스 필드로 고쳤다. 직접 경로 실행의 tools import 실패는 -m 모듈 실행으로 해결했으며 제품 코드는 바꾸지 않았다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 새 브랜치 push·main PR 생성 승인을 받은 뒤 CI를 확인한다. 다른 제품 PR 뒤 맞출 때 목록·정확 단일 검토 행을 재생성한다. GPU 확인/등록은 J01 후속이다.
+- 막힌 것: 새 브랜치 push 승인·CI·병합 승인과 실제 GPU 자격이 없다. 요약할 수 없는4,096행 초과는 계속 거부하며 원 질문 전체 완료나 실제 측정으로 표시하지 않는다. ../runtime·../contracts 변경, 이미지/GPU/클라우드 실행은 없다.
+
+
+### M-A2 PR#262 첫 CI 후속
+
+- 한 일: 첫 PR CI의 실패6건은 test_b_runner_inputs·test_b12_canonical_pipeline의 등록 후 소비 경로가 변경 소스를 과거 GPU 등록으로 가정한 데서 발생했다. #260과 동일한 명시 EXAMPLE 모의 등록을 해당 사례에 적용하고, 모의 등록 없는 실제 현재 소스는 준비 도구 뒤에도 미지원/미완료임을 별도로 확인했다. 판정 assert·PASS/FAIL/UNKNOWN 기대값·기한·skip은 그대로다. 제품 소스와 manifest SHA84e946eb…는 바꾸지 않았다.
+- 테스트 결과: 첫 CI6실패·12,960통과·기존skip34(pytest761.48초/부모763.149초), runtime 양쪽 통과. 수정 후 직접98개 통과(pytest5.91초/부모6.303초). 전체 CI 통과는 새 head 결과를 기다린다.
+- 다음 단계: 승인된 기존 브랜치에 후속 커밋을 push하고 CI를 끝까지 확인한다.
+- 막힌 것: 최종 CI·병합 승인과 J01 GPU 재확인/등록은 미완료다.
 ## 2026-11-13 결정19 — #257 공통 runtime CI 시험 동기화
 
 - 한 일: 사용자에게 runtime 시험 두 파일만 예외 승인받았다. test_mvp_gateway는 body 수신과 final 저장 완료를 Event로 분리한 뒤 기존 assert를 실행하며 실제 저장 지연 순서를 강제하는 회귀 사례를 추가했다. test_mvp_stream의 해당 사례는 실제 HTTP 클라이언트·gateway·relay를 유지하고 유계 상류/시계/Timer를 제어해59ms 첫 chunk·61ms 기한 초과를 검증한다. 요청 기한60ms·idle1초·STREAM_DEADLINE 기대값은 그대로이며 watchdog의 실제 검사/callback을 실행한다. runtime 제품 소스·다른 runtime 파일은 바꾸지 않았다.

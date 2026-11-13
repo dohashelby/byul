@@ -23,6 +23,7 @@ from guard.collectors import process_device_observer as device_observer
 from guard.collectors import process_device_producer as device_producer
 from guard.collectors import scoped_consumption
 from guard.collectors.gpu_common_inputs import GpuInputError
+from guard.collectors.gpu_common_input_v4 import event_count
 from guard.models import canonical_json, sha256_hex
 from guard.runtime.engine_http import ENGINE_CALLBACK_PROFILE, KubernetesHTTP
 
@@ -38,7 +39,7 @@ def _summary(record, result):
     events = record['events']
     counts = {}
     for event in events:
-        counts[event['event']] = counts.get(event['event'], 0) + 1
+        counts[event['event']] = counts.get(event['event'], 0) + event_count(event)
     return {'kind': record['kind'], 'producer': record['producer'], 'bindings': len(record['bindings']), 'events': len(events),
             'event_counts': dict(sorted(counts.items())), 'source_ended': record['completeness']['source_ended'],
             'diagnostic_codes': record['completeness']['diagnostic_codes'],
@@ -129,7 +130,7 @@ def collect(*, env_path, target_path, prepared_dir, duration=240, node_view_mode
         if not settings.get(flag):
             continue
         try:
-            record, result = make(processes, truncated=truncated, **scope)
+            record, result = make(processes, truncated=truncated, wire_schema='guard-gpu-common-input/4', **scope)
         except GpuInputError as error:
             # 이 세션에서 그 경로를 일으키지 않았으면(예: 바인딩 0개) 계약이 형식 오류로 거부한다. 결과로만 남긴다.
             records[kind] = {'contract_error': str(error)}
@@ -142,7 +143,7 @@ def collect(*, env_path, target_path, prepared_dir, duration=240, node_view_mode
         hashes = transport.engine_supply_hashes(roots, files)
         mount_after = transport.supply_mount_exclusivity(roots)
         record, result = producers.supply_read_record(processes, hashes, truncated=truncated, mount_before=mount_before,
-                                                      mount_after=mount_after, **scope)
+                                                      mount_after=mount_after, wire_schema='guard-gpu-common-input/4', **scope)
         records['supply-reads'] = {'record': record, 'validation': result, 'mount_before': mount_before, 'mount_after': mount_after}
         summaries.append(_summary(record, result))
     if node_view_mode:

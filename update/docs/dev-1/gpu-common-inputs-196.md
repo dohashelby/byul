@@ -46,16 +46,19 @@ GPU 실증 담당이 #196에서 요청한 공통 입력의 형식을 공통 계�
 3. GPU 담당 소비자가 `validate()` 결과를 읽어 기존 판정에 연결한다(GPU 담당 파일).
 4. 행 형식을 실제 생산자에 맞춰 바꿔야 하면 schema 판본을 올리고 이 문서를 고친다.
 
-## `/4` 확정 사항 (2026-11-08·11-09 사용자 결정, 미구현)
+## `/4` 구현 (2026-11-08·11-09 사용자 결정, M-A2)
 
-`guard-gpu-common-input/4`는 아래 다섯 가지를 한 번에 담는다. `/1`·`/2`·`/3` 기록은 계속 읽는다. `/2`·`/3`은 다른 확장에 이미 사용 중이므로 새 확장은 `/4`로 구분한다(작업지시서 결정 4). 생산자 소스가 바뀌어 등록이 풀리므로 TP2 GPU 세션에서 한 번에 다시 확인·등록한다. 근거: [11-08 결정 3절](user-decisions-20261108.md), [11-09 결정 2절](user-decisions-20261109.md).
+`guard-gpu-common-input/4`는 아래 다섯 가지를 함께 담는다. `/1`·`/2`·`/3` 기록은 계속 읽는다. `/2`·`/3`은 범위·actor 확장에 이미 쓰므로 새 형식은 `/4`다(작업지시서 결정4). 실제 GPU 확인 전까지 새 생산자를 등록하지 않는다. 근거: [11-08 결정3절](user-decisions-20261108.md), [11-09 결정2절](user-decisions-20261109.md).
 
-| 항목 | 내용 | 엔진 중립 이유 |
-|---|---|---|
-| 반복 행 요약 | 같은 요청·attempt·단계의 연속 `stage`·`gpu_fence`·`kv_owned`(transition `consumed`, health `worker_state`)를 묶는다. 값이 바뀔 때마다 끊고, 첫·끝 행은 원 행으로 남긴다. 요약 행은 첫·끝 시각, 개수, 최대값을 가진다. 상한 4,096은 그대로다. | 출력 길이에 비례하는 행 수를 엔진과 무관하게 줄인다 |
-| V2 logit bias 비교 | sampler 행 `logit_bias`가 null이 아니면 API 값과 비교한다(다르면 `value_changed_before_consumption` 후보). null이면 지금처럼 gap. | 관측이 있을 때만 비교를 더한다 |
-| KV 단위 | KV 값은 엔진 고유 단위 그대로 두고 단위 필드(예: `kv_unit`: `block`·`token_slot`)와 알면 단위당 token 수(예: `kv_unit_tokens`)를 함께 적는다. 단위를 모르면 값도 null이다. | vLLM은 블록, SGLang은 token slot(page) 단위다 |
-| 한도 집행 | `limit_enforced`는 모든 한도 집행이다. 집행 방식 필드(예: `alloc_refused`·`preempted`·`rejected`)를 둔다. SGLang retraction은 이 사건(`preempted`)과 `retry`를 함께 낸다. | vLLM은 할당 거부, SGLang은 retraction으로 집행한다 |
-| 생산자 신원 | `source_sha256`에 관측기·변환 파일과 함께 공통 감싸기 기반 파일(예: `adapters/vllm_cache_callback.py`)을 넣는다. | 기반이 바뀌면 자동으로 미지원이 된다 |
+| 항목 | 실제 필드와 동작 |
+|---|---|
+| 반복 요약 | 모든 행에 `source_seq`(변환 전 순번)와 `repeat`(원 행은 null)를 둔다. 같은 binding·요청·attempt·단계·값의 연속 stage/gpu_fence/kv_owned, transition consumed, health worker_state 네 행 이상을 첫 원 행·중간 요약·끝 원 행으로 묶는다. 값·세대·인과 키가 바뀌면 끊는다. 요약의 `first_seq`·`last_seq`·`first_at_ms`·`last_at_ms`·`count`·`max_values`로 원 행 범위를 남긴다. `seq`는 전송 행 순번이다 |
+| 상한 | 요약 후에도 최대4,096행이다. 요약 불가능한 초과 기록은 그대로 거부하며, 소비자는 요약을 count만큼 펼치지 않는다. 전송 순서·원 순번·양 끝 원 행·값·최대값을 검증한다 |
+| V2 logit bias | `/4`의 sampler `logit_bias`가 null이 아니면 API 개수와 비교해 차이를 `value_changed_before_consumption` 후보로 낸다. null이면 미관측 gap이다. `/1`의 기존 gap/비교 의미는 보존한다 |
+| KV 단위 | `/4`는 과거 `kv_blocks` 대신 엔진 고유 수치 `kv_units`, 단위 `kv_unit`(block/token_slot), 알 때만 양수 `kv_unit_tokens`를 쓴다. 단위를 모르면 수치와 단위당 token 수는 null이며, 버린 수치가 있으면 KV_UNIT_UNOBSERVED를 남긴다. 수치를 token이나 다른 엔진 단위로 환산하지 않는다 |
+| 한도 집행 | `limit_enforced` 행에 `enforcement_method`(alloc_refused/preempted/rejected)를 둔다. 미관측 null은 완료를 막는 gap이다. 다른 사건은 null이어야 한다. 관측된 할당 거부와 preemption을 각각 내며 preemption은 기존 retry도 남긴다 |
+| 생산자 신원 | 관측기·변환과 공통 감싸기 기반·엔진 단위 데이터·계약/직렬화 파일의 정확 bytes를 SHA에 포함한다. 예전8개 GPU 등록 행은 보존한다. `/4`는 별도 `SUPPORTED_V4_PRODUCERS` 표로 정확 wire 자격을 확인하며 J01 전에는 비어 있다. 예전 등록 SHA를 주장해도 `/4` 자격으로 이월하지 않는다 |
 
-필드 이름은 구현 때 정하고 이 표를 고친다. 소비자(GPU 담당)는 `/1`~`/4`를 모두 읽고, `/4` 요약 행을 원 행처럼 존재·순서·마지막 값 판단에 쓸 수 있어야 한다.
+이 구현은 `collectors/gpu_common_input_v4.py`다. 기존 record 함수는 역사 재생을 위해 기본 `/1`을 유지하고 `wire_schema="guard-gpu-common-input/4"`로 새 형식을 만든다. `tools.gpu_a_producers_collect`의 단순 생산자와 공급 읽기 수집은 `/4`를 명시한다. 현재 runner 실수집의 `/3` actor 범위/자격 경로는 보존하며 `/4`로 낮추지 않는다. V2 변환은 명시한 `/4` 호출에서 새 비교를 제공한다.
+
+소비자는 원 행 수를 반영한 event_counts와 KV 단위·집행 방식을 반환한다. 첫·끝 행과 요약의 마지막 시점/값으로 존재·순서·마지막 값을 읽을 수 있다. 요약은 등록·완전성·독립 worker 신원·실제 소비 검증을 대신하지 않는다. 생산자 인증은 항상 false이고 공통 입력만으로 원 질문 전체 완료를 만들지 않는다. GPU 재확인/등록은 J01 후속이다.

@@ -17,6 +17,8 @@ from guard.adapters import vllm_consumption_callback as v1
 from guard.adapters import vllm_consumption_v2_callback as v2
 from . import gpu_common_inputs as contract
 from . import gpu_input_producers as producers
+from . import gpu_common_input_v4 as v4
+from guard.adapters import vllm_common_input_metadata as common_metadata
 
 NAME = 'guard-engine-callback-runner-consumption-v2'
 VERSION = '1'
@@ -25,10 +27,11 @@ _V1_RUNNER = frozenset(_STAGE.values())
 
 
 def producer():
-    digest = hashlib.sha256()
-    for path in (Path(v1.__file__), Path(v2.__file__), Path(producers.__file__), Path(__file__)):
-        digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
-    return {'name': NAME, 'version': VERSION, 'source_sha256': digest.hexdigest()}
+    digest = v4.source_digest(producers._source_dependencies(
+        (Path(v1.__file__), Path(v2.__file__), Path(producers.__file__), Path(__file__)))
+        + common_metadata.SOURCE_PATHS)
+    return {'name': NAME, 'version': VERSION, 'source_sha256': digest}
+
 
 
 def translate(processes):
@@ -49,7 +52,7 @@ def translate(processes):
 
 
 def runner_consumption_v2_record(processes, *, pod, environment_ref, target_sha256, prepared_sha256, session, truncated=False,
-                                 requests=None):
+                                 requests=None, wire_schema=contract.SCHEMA):
     translated, extra = translate(processes)
     if not any(r.get('schema') == v2.SCHEMA for p in processes for r in p['events']):
         extra.add('CONSUMPTION_V2_RUNNER_UNOBSERVED')
@@ -66,5 +69,6 @@ def runner_consumption_v2_record(processes, *, pod, environment_ref, target_sha2
               'session': session, 'bindings': bindings, 'events': events,
               'completeness': {'source_ended': closed and not truncated and 'CONSUMPTION_V1_RUNNER_ROWS_PRESENT' not in codes,
                                'dropped': 0, 'diagnostic_codes': [c for c in codes if contract._ID.fullmatch(c)]}}
+    record = v4.encode(record, wire_schema=wire_schema)
     return record, contract.validate(record, kind='runner-consumption', environment_ref=environment_ref,
                                      target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)

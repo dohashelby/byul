@@ -50,7 +50,7 @@
   - 생산자 이름·판본·소스 SHA로 지원 여부를 정한다(`SUPPORTED_PRODUCERS`).
   - `supported`·`complete`·`gaps`·`violation_candidates`를 따로 내고, `producer_authenticated`는 항상 False다.
   - 등록은 그 엔진·판본의 실제 이미지 대조와 GPU 확인을 마친 생산자만 한다.
-- **공통 입력 계약 `/4`**(확정, 미구현. [설계 "/4 확정 사항"](docs/dev-1/gpu-common-inputs-196.md)): 아래를 한 번의 판본 변경으로 넣는다. 생산자 SHA가 바뀌므로 TP2 GPU 세션에서 한 번에 다시 확인·등록한다.
+- **공통 입력 계약 `/4`**(확정, M-A2 구현. [설계 "/4 구현"](docs/dev-1/gpu-common-inputs-196.md)): 아래를 한 번의 판본 변경으로 넣는다. 생산자 SHA가 바뀌므로 TP2 GPU 세션에서 한 번에 다시 확인·등록한다.
   - 반복 행 요약과 V2 logit bias 비교(2026-11-08 결정)
   - KV 값은 엔진 고유 단위 그대로 두고 단위 필드(와 알면 단위당 token 수)를 함께 적는다.
   - `limit_enforced`는 모든 한도 집행이며 집행 방식 필드를 둔다(할당 거부·retraction 등).

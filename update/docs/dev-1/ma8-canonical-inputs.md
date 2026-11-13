@@ -48,3 +48,7 @@ uv run python -m tools.mvp_sup08_local_audit \
 이 도구는 모델 파일을 스트림으로 읽고 검증 중 파일 신원·크기 변경을 거부한다. 코드 캐시의 승인/미승인 bytes와 기본 ref, 기동 파일 SHA, 정확 이미지·명령·모델·코드·GPU 설정을 확인한다. 미입력은 보고서에 남기고 종료 코드2를 반환한다. ENV/target을 제공하면 기존 조립기를 임시 폴더에서 실행해 계약만 대조하고 임시 복사본을 정리한다. EXAMPLE ENV는 실제 입력으로 승격하지 않는다. 기존 보고서는 덮어쓰지 않는다.
 
 기존 WSL minikube와 Windows kind의 API는 읽기 전용 조회에서 모두 연결 거부였다. 실제 ENV/target 네 파일은 확보하지 못했고 최종 입력 계약은 미검증이다. `local_assets_valid=true`와 `model_bytes_rechecked=true`는 로컬 파일 검증 결과이며 `input_preflight_passed=false`·`cluster_observed=false`·`engine_executed=false`·`normal_request_verified=false`를 유지한다. 노드 배치/권한·GPU/드라이버·실제 Pod 신원·정상 요청 관측 뒤에만 최종 조립·실행 사전 점검을 진행한다.
+
+## 2026-11-14 실제 파일 재확인
+
+동일 fixture·기동 자산을 새로 다운로드하지 않고 다시 읽었다. 모델14개(8,295,393,861 bytes)·코드 캐시5개·기동 파일12개의 SHA와 기동/정책 조건을 source fc77399e에서 재확인했다(34.018초). 갱신한 ma8-local-preflight-20261113.json은 확인 시각·도구 SHA·정확한 소스 커밋을 기록한다. 실제 ENV/target4개가 없어 최종 입력 계약은null, input_preflight_passed/engine_executed/cluster_observed는false다. 기존 API 연결 거부 이후 새 접근 근거가 없어 클러스터 조회를 반복하지 않았다.

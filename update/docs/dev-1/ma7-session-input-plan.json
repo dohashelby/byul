@@ -57,9 +57,9 @@
       "candidate_load_verified": false
     },
     "SUP08_local_audit": {
-      "path": "/home/youngjo/byul-ma7-inputs-20261113/update/docs/dev-1/ma8-local-preflight-20261113.json",
-      "sha256": "095b4c635375df4c010440a3c0ad5fca461ec88502d3374132f98def6edda269",
-      "model_bytes_checked_at": "2026-11-13T23:13:32.287326+09:00",
+      "path": "/home/youngjo/byul-req17-20261114/update/docs/dev-1/ma8-local-preflight-20261113.json",
+      "sha256": "9387a7b60e3f954c185bc6752091954abfb8805d2b70a9916ef8d7c3e177fc31",
+      "model_bytes_checked_at": "2026-11-14T01:28:53+09:00",
       "launch_manifest_sha256": "f51b7486b02cc89e849d9c3353441b693c3ad1fd6441a98dc2914b697f055453",
       "input_preflight_passed": false
     },
@@ -69,20 +69,25 @@
       "minimum_scored_cases": 800,
       "single_manifest_max_cases": 512,
       "fits_single_manifest": false,
-      "collection_or_judgment_changed": false
+      "collection_or_judgment_changed": false,
+      "unchanged_scope": "기존 단일 수집 계약·판정 계산식",
+      "split_collection_added": true,
+      "split_parts": 2,
+      "split_cases_per_part": 504,
+      "split_scored_samples_per_role": 200
     },
     "local_materialization": {
-      "manifest_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/manifest.json",
-      "manifest_sha256": "5c886877383badd102bc2c26daa8272dedbc6d350a420c6c407409b10ce61532",
+      "manifest_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/manifest.json",
+      "manifest_sha256": "5ede4f5cb606071129b60eeb7de96d0b6cdf51c4ec7567c78075a7c3fb556680",
       "prepared_files": 16,
-      "case_files": 6,
-      "case_count": 62,
+      "case_files": 10,
+      "case_count": 2078,
       "node_installed": false,
       "runtime_qualified": false
     },
     "repository_recorded_materialization": {
       "report_file": "docs/dev-1/ma7-local-materialization-20261113.json",
-      "report_sha256": "68fee4bbafe1c1454f4244f3d47e2a6022df5055ffb0a9cbc1d12a7af2f6474e"
+      "report_sha256": "08f1ec470af109a5fcd5b9f401e9e8d42cf0af4f6de28027138a9c398335ca38"
     }
   },
   "checks": [
@@ -1211,29 +1216,29 @@
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/LIF-13/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/LIF-13/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
-          "prepared_file_sha256": "1467efb91db3c9c82ac70ba69ff9e86db842c651d9897d121afcaa145c32da92",
-          "prepared_settings_file_sha256": "0ec416993af73a39a477942a6ebcee38982b8512ae332df9a26ec0b9db46fc70",
+          "prepared_file_sha256": "d38ed49d92d175c5b748d8b7def2ce3a8e2b27990c08bcf49855499528cc7792",
+          "prepared_settings_file_sha256": "d33270d7845a5f9f8212bd27040f7e3ba925bf6dcca4198c4abefef38aa10c46",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "3e9089fcf93a23f81468cd43e0ae683f"
+          "prepared_session": "948fa9fc07cdc955387cd9bbe08ab9a6"
         },
         "candidate": {
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/LIF-13/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/LIF-13/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
-          "prepared_file_sha256": "e24a0930f7c2b27666592ac6288466f776f208f163f16c55e8e319d13279cceb",
-          "prepared_settings_file_sha256": "621e577fd8a7821c1c05e0f418f1469fb057f72c1e323714f56c61ed49c05d20",
+          "prepared_file_sha256": "5985b7b566f49cc2df5300e166817b991b133d945c7e48feaa073bee01d324d4",
+          "prepared_settings_file_sha256": "014a3aa4cd723102418618aa9cdd6ccda453d8e1e750deba12c5e203e0e462d9",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "48ad611d8bfa19ce4d64ff63fbfe2d31"
+          "prepared_session": "9897d20c6162e64c8c8b0abc283a433a"
         }
       },
       "confirmed_policy_values": {
@@ -3552,16 +3557,16 @@
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-14/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-14/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
-          "prepared_file_sha256": "decb0500514a1e17129ce1314bb701043e403b5e2d612090212006d7f7952646",
-          "prepared_settings_file_sha256": "6b2b95930b38d4fad2f1737ac4839d57c0f648871bead9c09910e4986167d40f",
+          "prepared_file_sha256": "4f63537bc42db8fbd7a61552baee94929faa1ea9b3c3e1aef70f0947c96208b9",
+          "prepared_settings_file_sha256": "161c3b6ba516346a52bb74232ca889757efc90cbae01c2c71adeddc3604ca289",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "c1c562440747c0c80daf86f286dc48d8",
-          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-14/cases.json",
+          "prepared_session": "d0696a39fdb2e9378b46d8ecbb03f80b",
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-14/cases.json",
           "cases_file_sha256": "feab7942c9a48bfbb5cc150d519ae1e7aa97873ba8af87b2b3b20645ec977652",
           "cases_preset": "req14-normal"
         },
@@ -3569,16 +3574,16 @@
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-14/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-14/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
-          "prepared_file_sha256": "f93ec730125e5d85ea8938ecada3238e43ac2b130b226cee71462deedfe8aa02",
-          "prepared_settings_file_sha256": "6c2383d7780b41d7dcb2cb83909f3fa6570096d49da75e795c12524179931fbc",
+          "prepared_file_sha256": "d8c11b49fcb25378a1a304890e9048cb00923104476d2a0c13b4a4005b76c4db",
+          "prepared_settings_file_sha256": "5cb79601f11d38f49d5b65e7001bff558b764a3dd0be0a24a88e1487f9fada52",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "661bb1819732cae221e72ece6eadccca",
-          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-14/cases.json",
+          "prepared_session": "0658c1c8de14ec00c77e0e4827c63a79",
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-14/cases.json",
           "cases_file_sha256": "feab7942c9a48bfbb5cc150d519ae1e7aa97873ba8af87b2b3b20645ec977652",
           "cases_preset": "req14-normal"
         }
@@ -3689,7 +3694,7 @@
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-16/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-16/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "explicit_launch_args": [
@@ -3703,13 +3708,13 @@
             "weights_downloaded": false,
             "load_verified": false
           },
-          "prepared_file_sha256": "0a79d59d8f796caf86c5cfc9af182cfc77cd6dd48ea22e43749b4ee6c1427821",
-          "prepared_settings_file_sha256": "84be533a3e6cf76c6db1d8d4c3ab5b244fef1cdd0d747cdc923e16444b23fc8f",
+          "prepared_file_sha256": "f27a089125e8eaa1c295ab75eb91f96e6d51088bfc156fbf3f0c8a6143d7e709",
+          "prepared_settings_file_sha256": "9f5b6dcb3bef9af2d3c0441403b761917aa919c5717dbd8014b8eedb637e1a31",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "31fa1cd192c20e9b1ec6c5305953d2b9",
-          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-16/cases.json",
+          "prepared_session": "0ad2ff68f1826608f9649782a524b36d",
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-16/cases.json",
           "cases_file_sha256": "4ed374d03e74db8bc7824174969f890ce7411b1faf23e6e11a35a455c0535c37",
           "cases_preset": "req16-full"
         },
@@ -3717,7 +3722,7 @@
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-16/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-16/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "explicit_launch_args": [
@@ -3731,13 +3736,13 @@
             "weights_downloaded": false,
             "load_verified": false
           },
-          "prepared_file_sha256": "515a5e1a9396ed8dcb316a56e8a41e569ef438affc92065382a2a0d062e4f3ed",
-          "prepared_settings_file_sha256": "0a8b042df490c8f6abcafeb8feffdbd9122680a99300f54bbf4c68baf4df2f97",
+          "prepared_file_sha256": "3417f9b090d8762bf36ff7de459c52af368371cc1eb65c791b8b0c4b5491f89c",
+          "prepared_settings_file_sha256": "ba20c19dcb92cea1f0ee751a345a29d1f80d02f7305311bf15a6eacd57d517a2",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "c88447dcccde10c806f08aa7c4a948b8",
-          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-16/cases.json",
+          "prepared_session": "dc8bfe7ca74b1ab4b94fcc920f2e17d8",
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-16/cases.json",
           "cases_file_sha256": "4ed374d03e74db8bc7824174969f890ce7411b1faf23e6e11a35a455c0535c37",
           "cases_preset": "req16-full"
         }
@@ -3787,35 +3792,43 @@
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-17/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-17/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "explicit_launch_args": [
             "--enable-prefix-caching"
           ],
-          "prepared_file_sha256": "9cc50d6b94061a699654b740d39cb4648e92626bd5210e28e2277a41160bfc0d",
-          "prepared_settings_file_sha256": "9bb7b647b99997fbbc68cb4941eb6293ec528840a7c5aca870fe1a3cc30d4269",
+          "prepared_file_sha256": "7eef846f635d8fd90ac70de18fbb625d4e75925677792fdde714e9ddf2208668",
+          "prepared_settings_file_sha256": "abfb05991b8ddeb0f57604c31c5ba04681a5553c8db190dac0172e6ff2237476",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "be2c2db24561d33fff6da81c7fa892d0"
+          "prepared_session": "c7b1ee92ef6db7ed189ebf1564a3453a",
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-17/cohorts/group.json",
+          "cases_preset": "req17-split-100",
+          "cases_file_sha256": "82b6213fee53aa2c016f6c67bf153b02d39f13bfbfdaed48166c9747ea309c72",
+          "split_group_contract": true
         },
         "candidate": {
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-17/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-17/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "explicit_launch_args": [
             "--enable-prefix-caching"
           ],
-          "prepared_file_sha256": "8aafaca05890fd77711e9f8c99964c46d18761cd5320beb81066534fac61d26c",
-          "prepared_settings_file_sha256": "51c606cd3ba2e28acd310a598b7414e5c681198c4c45904b0980c1f8b5173b38",
+          "prepared_file_sha256": "9d9cdffea8062cf5d49a6742890e6bba91aab3606dd6235b710e99b64cca95d7",
+          "prepared_settings_file_sha256": "0a34e916241d6b91d4d316ad204d3804f90a5dd209f85a8d9225b9380acbc398",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "126b7db859a32f70f437b55a6475257b"
+          "prepared_session": "feb82ed83f28946bdab9683b15c7fe7e",
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-17/cohorts/group.json",
+          "cases_preset": "req17-split-100",
+          "cases_file_sha256": "82b6213fee53aa2c016f6c67bf153b02d39f13bfbfdaed48166c9747ea309c72",
+          "split_group_contract": true
         }
       },
       "confirmed_policy_values": {
@@ -3859,9 +3872,9 @@
         "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
       ],
       "actual_results": null,
-      "case_generation_deferred": true,
+      "case_generation_deferred": false,
       "collection_plan_blockers": [
-        "REQ17_MINIMUM_PER_ROLE_EXCEEDS_SINGLE_MANIFEST_BOUND"
+        "ACTUAL_ENV_TARGET_AND_RUNTIME_QUALIFICATION_REQUIRED"
       ]
     },
     {
@@ -3875,16 +3888,16 @@
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-18/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-18/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
-          "prepared_file_sha256": "7f1431985d043d4f9d7d68d36d8c41be00bad31a2eac4753aacf1b9d410f775d",
-          "prepared_settings_file_sha256": "37fba5a63ce6c96740a75e3a3a66263f1851437c1e3650fb333f6f17bdfd1c1b",
+          "prepared_file_sha256": "281b532ab4bff940aba81de9711aeb053ad0a2aebed3837ad798d4bd0c53e92d",
+          "prepared_settings_file_sha256": "6fb9729dc8fab7d281cd86ab3f88484a4da41e3236557ce213c73a63ca250240",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "d4345b9e1fabbe0f959f8655e5142b02",
-          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-18/cases.json",
+          "prepared_session": "ff0873da8230bfeb19fdbcaacad4ab51",
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-18/cases.json",
           "cases_file_sha256": "d51cefa389523df3e90cd9a288d6217b965b8271ccfda49511426d253ea16798",
           "cases_preset": "req18-slot"
         },
@@ -3892,16 +3905,16 @@
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-18/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-18/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
-          "prepared_file_sha256": "bcf0ff157abd3cfdbd62eabcb569aa2350612e3ae40a20100f576709c6d53062",
-          "prepared_settings_file_sha256": "3e6870e1b5eff6f757a30affd47f3f12ffcb5a11c4dd55cd8900da8229da74fe",
+          "prepared_file_sha256": "ab80e51b7ea04e8b571a8f2d521c128a5723a43fdb78b70d14c1bb7b164a81da",
+          "prepared_settings_file_sha256": "6a714a6eb8e5437602ee60d6348c172638211b49a1bb9d78abfd927a88c39f79",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "db9c6e5ab64821b9baef64a274c70134",
-          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-18/cases.json",
+          "prepared_session": "a6e2fbe1e9ec1c4844eea8e711df4daa",
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-18/cases.json",
           "cases_file_sha256": "d51cefa389523df3e90cd9a288d6217b965b8271ccfda49511426d253ea16798",
           "cases_preset": "req18-slot"
         }
@@ -3945,29 +3958,29 @@
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-19/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-19/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
-          "prepared_file_sha256": "a8509c406fd606effcbe0037d1cc73edabd0abc117f2368e4383401fd0dd0baf",
-          "prepared_settings_file_sha256": "dda5aa653bfa3a29ccb9d02f7f6ce299f1c29f1dd1434c96d6b1e1fb5f455214",
+          "prepared_file_sha256": "586e670aaf428be3028c9dc75e3359cba5a66a6a310e2591af4dbf5829e51ee8",
+          "prepared_settings_file_sha256": "e2ad46e909ea6f15c543684c26b434be5958935d810a30381d8c4888db3e01a7",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "a9be70b54340eb3f6f0636307bdafb7b"
+          "prepared_session": "9a50d1505b445ae294feaee93ddbf71b"
         },
         "candidate": {
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-19/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-19/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
-          "prepared_file_sha256": "16caecb47fc963e9d383ac0dc01395b7b1df9f9c4e3de095394b42af7071d031",
-          "prepared_settings_file_sha256": "11d40d617e40f7e66fdd2be49951fe5918255d70e265d25c5cf297f3ef36815a",
+          "prepared_file_sha256": "0840d673d35c910c037d93421616f01803e0f78e20d9968954dd6237920d0183",
+          "prepared_settings_file_sha256": "3caefc7bf495d27b001557ded524c364cef53b67f3d8d19a0e3220a2ca51e3d6",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "b7c0ab5318efa69ef0e2d6e6d44e064c"
+          "prepared_session": "a1ababad552b5f44e18dd91033df9ebc"
         }
       },
       "confirmed_policy_values": null,
@@ -4009,29 +4022,29 @@
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-20/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-20/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
-          "prepared_file_sha256": "95c7cd9ff56b21ff35839bde60b820c27541c289ecfee45a61b3ed9be4a5f578",
-          "prepared_settings_file_sha256": "837e14506597e6dee9cc2517ba39ac9f954e5d522680ca87380ed5d798df81f9",
+          "prepared_file_sha256": "3ce8fc6d7d48c83978c9d8d4daecb29c8f73c46e875b250de3b221798c42c378",
+          "prepared_settings_file_sha256": "ea93bb7e2e51c5bfa345cca771dd5c055b6d0bea5e4d92e29262507121e8f2e6",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "34313e2b5a5b3543ec14794882dcc661"
+          "prepared_session": "d0cb1e52fc170940fa5530bf0cfbbd6f"
         },
         "candidate": {
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-20/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-20/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
-          "prepared_file_sha256": "36d9e59288335347d5f3f541d435d9762dc24e6e67842dcab3793551c6728a3f",
-          "prepared_settings_file_sha256": "0ad98f47e995492d0ba3f56e966957a542aa5be797575bb132c0275f6ff3fb6c",
+          "prepared_file_sha256": "02a47408b0e4d8e350ce7b8998185d6c2453638113dd6f228a7f361bfe9fffa8",
+          "prepared_settings_file_sha256": "204e11bb84ed1ccffe52eeb5ca0839865c81f4c7b38d370f7aeaae6eabe45707",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "8c01d226af5523bef193c3242d949295"
+          "prepared_session": "c6985b4a8b8171d3e70827d2b447eaec"
         }
       },
       "confirmed_policy_values": null,
@@ -4073,29 +4086,29 @@
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-21/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-21/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
-          "prepared_file_sha256": "8eb99bb93679d5eb7b17cc1bd151d5571a47742e01cc68710f93b9c1a4c793d7",
-          "prepared_settings_file_sha256": "7a9169e18bb69fe53ae0b7eada4d8c467f9b394287bf1240ee74cf51a45fc2cc",
+          "prepared_file_sha256": "b13e8a2ec798fb12de603ab35e8c9fa3bba699b5f60e03b285babbcb034f00cd",
+          "prepared_settings_file_sha256": "080c3324865264f12f75a801cf52e25d318375d4b55822ffc4100f91d23d1357",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "691d1dc3a85e8890ebc193fe63e3ab10"
+          "prepared_session": "419817b0ed9b3cba68ad161de5c22e5f"
         },
         "candidate": {
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-21/prepared/manifest.json",
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-21/prepared/manifest.json",
           "policy_file": null,
           "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
-          "prepared_file_sha256": "11de17bc4d5684405f91d9a9f99add4fd2c1c508d4f4c6b787ed817a6dcbf17c",
-          "prepared_settings_file_sha256": "34cb4523a6fcc532495979e1d00c88ebba06aecf02f60f1346fe5d08e3d60679",
+          "prepared_file_sha256": "90f022486edaa1b6c3a5a745807765d4f02addff746be1f2016ee95bfdd260c9",
+          "prepared_settings_file_sha256": "519a4d806af0c7519f3dcb53cc81c081dbafe84c83e29ac738066f1a8a6f513d",
           "prepared_source_bytes_verified": true,
           "prepared_node_installed": false,
           "prepared_runtime_qualified": false,
-          "prepared_session": "4adde2b228347530671a45be01c4a846"
+          "prepared_session": "64a0a1e4b518bfa691fbcafb8105f56a"
         }
       },
       "confirmed_policy_values": null,
@@ -4428,8 +4441,8 @@
           "fixture_manifest_path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/fixture-manifest.json",
           "fixture_manifest_sha256": "d5121b80dd3237fe63d6e646806d414d464ffc78efa6ef5fbaa436715bf67765",
           "prepared_required": false,
-          "local_audit_file": "/home/youngjo/byul-ma7-inputs-20261113/update/docs/dev-1/ma8-local-preflight-20261113.json",
-          "local_audit_sha256": "095b4c635375df4c010440a3c0ad5fca461ec88502d3374132f98def6edda269",
+          "local_audit_file": "/home/youngjo/byul-req17-20261114/update/docs/dev-1/ma8-local-preflight-20261113.json",
+          "local_audit_sha256": "9387a7b60e3f954c185bc6752091954abfb8805d2b70a9916ef8d7c3e177fc31",
           "local_assets_verified": true
         },
         "candidate": {
@@ -4447,8 +4460,8 @@
           "fixture_manifest_path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/fixture-manifest.json",
           "fixture_manifest_sha256": "d5121b80dd3237fe63d6e646806d414d464ffc78efa6ef5fbaa436715bf67765",
           "prepared_required": false,
-          "local_audit_file": "/home/youngjo/byul-ma7-inputs-20261113/update/docs/dev-1/ma8-local-preflight-20261113.json",
-          "local_audit_sha256": "095b4c635375df4c010440a3c0ad5fca461ec88502d3374132f98def6edda269",
+          "local_audit_file": "/home/youngjo/byul-req17-20261114/update/docs/dev-1/ma8-local-preflight-20261113.json",
+          "local_audit_sha256": "9387a7b60e3f954c185bc6752091954abfb8805d2b70a9916ef8d7c3e177fc31",
           "local_assets_verified": true
         }
       },
@@ -4984,7 +4997,19 @@
       "세금·환율",
       "승인 범위 밖 재시도"
     ],
-    "budget_approved": false
+    "budget_approved": false,
+    "REQ17_split_collection": {
+      "parts_per_side": 2,
+      "cases_per_part": 504,
+      "scored_samples_per_role_per_side": 200,
+      "http_requests_per_side": 1010,
+      "http_requests_both_sides": 2020,
+      "max_configured_seconds_per_part": 300,
+      "configured_seconds_per_side": 600,
+      "measured_duration": null,
+      "measured_cost": null,
+      "budget_approved": false
+    }
   },
   "decision_9": {
     "status": "항목별 승인",

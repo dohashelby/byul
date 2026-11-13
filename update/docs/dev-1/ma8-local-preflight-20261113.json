@@ -282,11 +282,11 @@
   "normal_request_verified": false,
   "actual_comparison": null,
   "official": false,
-  "checked_at": "2026-11-13T23:13:32.287326+09:00",
+  "checked_at": "2026-11-14T01:28:53+09:00",
   "fixture_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/fixture-manifest.json",
   "launch_manifest_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/manifest.json",
   "launch_manifest_sha256": "f51b7486b02cc89e849d9c3353441b693c3ad1fd6441a98dc2914b697f055453",
-  "audit_source_commit": "fbf1b2d343f8e4fb81a1a890151c508e13c00993",
-  "elapsed_seconds": 19.575,
+  "audit_source_commit": "fc77399e81ed96c0996bc3c12be94fea31b16675",
+  "elapsed_seconds": 34.018,
   "audit_tool_sha256": "ff765977a64561d60e7d9c4a8b3463223ddf70b4e03675918889a433bbbb1877"
 }

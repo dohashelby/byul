@@ -30,6 +30,8 @@ class Settings:
     runtime_base_url: str | None = None
     runtime_viewer_token: str | None = field(default=None, repr=False)
     update_reports_dir: Path | None = None
+    update_dir: Path = REPO_ROOT / "update"
+    mvp_policy_file: Path | None = None
     platform_data_dir: Path | None = None
     evidence_index_paths: tuple[Path, ...] = ()
     bundle_runtime_dir: Path = REPO_ROOT / "runtime"
@@ -67,6 +69,7 @@ class Settings:
             runtime_base_url=os.environ.get("RUNTIME_BASE_URL", "").strip() or None,
             runtime_viewer_token=os.environ.get("RUNTIME_VIEWER_TOKEN", "").strip() or None,
             update_reports_dir=_path("UPDATE_REPORTS_DIR"),
+            mvp_policy_file=_path("BYUL_MVP_POLICY_FILE"),
             platform_data_dir=_path("PLATFORM_DATA_DIR"),
             evidence_index_paths=tuple(_paths("EVIDENCE_INDEX_PATHS")),
             bundle_runtime_dir=_path("BYUL_BUNDLE_RUNTIME_DIR") or REPO_ROOT / "runtime",

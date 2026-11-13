@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getJson, postJson } from "./client";
 import type {
   EnvironmentDoc,
+  InputCatalog,
+  PolicyInputPreview,
   EnvironmentRevision,
   EnvironmentSaved,
   EvidenceList,
@@ -28,6 +30,14 @@ import type {
 } from "./types";
 
 const enc = encodeURIComponent;
+
+export const useInputCatalog = () => useQuery({ queryKey: ["inputs", "catalog"], queryFn: () => getJson<InputCatalog>("/api/inputs/catalog") });
+
+export const usePolicyInputPreview = (document: PolicyDoc) => useQuery({
+  queryKey: ["inputs", "policy-preview", document],
+  queryFn: () => postJson<PolicyInputPreview>("/api/inputs/policy-preview", { document }),
+  placeholderData: undefined,
+});
 
 export const useMeta = () => useQuery({ queryKey: ["meta"], queryFn: () => getJson<Meta>("/api/meta"), refetchInterval: 30_000 });
 export const useOverview = () => useQuery({ queryKey: ["overview"], queryFn: () => getJson<Overview>("/api/overview") });

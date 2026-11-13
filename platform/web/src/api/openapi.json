@@ -447,6 +447,68 @@
         }
       }
     },
+    "/api/inputs/catalog": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Get Input Catalog",
+        "operationId": "get_input_catalog_api_inputs_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InputCatalog"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inputs/policy-preview": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Preview Policy Inputs",
+        "operationId": "preview_policy_inputs_api_inputs_policy_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyInputRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyInputPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/environments": {
       "get": {
         "tags": [
@@ -2345,6 +2407,176 @@
         ],
         "title": "Heartbeat"
       },
+      "InputBinding": {
+        "properties": {
+          "requirement": {
+            "type": "string",
+            "title": "Requirement"
+          },
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "check_id": {
+            "type": "string",
+            "title": "Check Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": ""
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requirement",
+          "field",
+          "check_id",
+          "key"
+        ],
+        "title": "InputBinding"
+      },
+      "InputCatalog": {
+        "properties": {
+          "pack": {
+            "$ref": "#/components/schemas/InputPack"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/InputVersion"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
+          "bindings": {
+            "items": {
+              "$ref": "#/components/schemas/InputBinding"
+            },
+            "type": "array",
+            "title": "Bindings"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Parameters"
+          },
+          "fixed_values": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Fixed Values"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pack",
+          "available",
+          "versions",
+          "bindings",
+          "parameters",
+          "fixed_values",
+          "limitations"
+        ],
+        "title": "InputCatalog"
+      },
+      "InputPack": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "revision"
+        ],
+        "title": "InputPack"
+      },
+      "InputVersion": {
+        "properties": {
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "profiles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Profiles"
+          },
+          "features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Features"
+          },
+          "hidden_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Hidden Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "engine",
+          "version",
+          "profiles",
+          "features"
+        ],
+        "title": "InputVersion"
+      },
       "InvalidItem": {
         "properties": {
           "index": {
@@ -3065,6 +3297,84 @@
           "approved_by"
         ],
         "title": "PolicyConfirm"
+      },
+      "PolicyInputPreview": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Policy"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/FieldIssue"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/FieldIssue"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/FieldIssue"
+            },
+            "type": "array",
+            "title": "Gaps"
+          },
+          "connected": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Connected"
+          },
+          "pack_available": {
+            "type": "boolean",
+            "title": "Pack Available"
+          },
+          "previous_policy": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Policy"
+          },
+          "engine_executed": {
+            "type": "boolean",
+            "title": "Engine Executed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "document",
+          "errors",
+          "warnings",
+          "gaps",
+          "connected",
+          "pack_available"
+        ],
+        "title": "PolicyInputPreview"
+      },
+      "PolicyInputRequest": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Policy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document"
+        ],
+        "title": "PolicyInputRequest"
       },
       "PolicyReadiness": {
         "properties": {

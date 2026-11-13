@@ -1,7 +1,8 @@
 // 계약 문서를 JSON 그대로 편집하는 폼 부품. 경로는 JSON Pointer(서버 검증 오류와 같은 형식)다.
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { Children, cloneElement, isValidElement, useEffect, useId, useState, type ReactNode, type ReactElement } from "react";
 import type { FieldIssue } from "../api/types";
 import p from "../pages/pages.module.css";
+import { fieldMessageId } from "../lib/inputUx";
 
 export type Doc = Record<string, unknown>;
 
@@ -40,6 +41,7 @@ export type FormCtx = {
   set: (path: string, value: unknown) => void;
   issues: FieldIssue[];
   warnings: FieldIssue[];
+  reportIssue?: (path: string, message: string | null) => void;
 };
 
 /** 이 경로(또는 그 아래)의 서버 검증 오류. */
@@ -51,8 +53,9 @@ export function FieldMessages({ ctx, path, exact }: { ctx: FormCtx; path: string
   const pick = (list: FieldIssue[]) => (exact ? list.filter((i) => i.path === path) : issuesAt(list, path));
   const errs = pick(ctx.issues);
   const warns = pick(ctx.warnings);
+  if (!errs.length && !warns.length) return null;
   return (
-    <>
+    <span id={fieldMessageId(path)} className={p.fieldMessages}>
       {errs.map((e, i) => (
         <span key={`e${i}`} className={p.fieldError} role="alert">
           {e.path !== path ? `${e.path}: ` : ""}
@@ -64,15 +67,16 @@ export function FieldMessages({ ctx, path, exact }: { ctx: FormCtx; path: string
           {e.message}
         </span>
       ))}
-    </>
+    </span>
   );
 }
 
 function Field({ label, ctx, path, children, hint, required }: { label: string; ctx: FormCtx; path: string; children: ReactNode; hint?: string; required?: boolean }) {
   return (
-    <label className={p.field}>
+    <label className={p.field} data-field-path={path}>
       <span className={required ? p.req : undefined}>{label}</span>
-      {children}
+      {Children.map(children, (child) => isValidElement(child) && typeof child.type === "string" && ["input", "select", "textarea"].includes(child.type)
+        ? cloneElement(child as ReactElement<Record<string, unknown>>, { "aria-label": label, "aria-invalid": ctx.issues.some((issue) => issue.path === path || issue.path.startsWith(`${path}/`)) || undefined, "aria-describedby": fieldMessageId(path) }) : child)}
       {hint && <span className="muted">{hint}</span>}
       <FieldMessages ctx={ctx} path={path} exact />
     </label>
@@ -237,6 +241,7 @@ export function JsonField({ ctx, path, label, rows = 8, hint }: { ctx: FormCtx; 
   const v = getIn(ctx.doc, path);
   const [text, setText] = useState(() => JSON.stringify(v ?? null, null, 2));
   const [parseError, setParseError] = useState<string | null>(null);
+  useEffect(() => () => ctx.reportIssue?.(path, null), [ctx.reportIssue, path]);
   useEffect(() => {
     try {
       if (JSON.stringify(JSON.parse(text)) === JSON.stringify(v ?? null)) return;
@@ -246,25 +251,31 @@ export function JsonField({ ctx, path, label, rows = 8, hint }: { ctx: FormCtx; 
     setText(JSON.stringify(v ?? null, null, 2));
   }, [JSON.stringify(v)]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <label className={p.field} style={{ gridColumn: "1 / -1" }}>
+    <label className={p.field} data-field-path={path} style={{ gridColumn: "1 / -1" }}>
       {label}
       <textarea
         className={`input ${parseError || ctx.issues.some((i) => i.path === path) ? p.invalidInput : ""}`}
         rows={rows}
         spellCheck={false}
+        aria-label={label}
+        aria-invalid={Boolean(parseError || ctx.issues.some((i) => i.path.startsWith(path)))}
+        aria-describedby={fieldMessageId(path)}
         value={text}
         onChange={(e) => {
           setText(e.target.value);
           try {
             ctx.set(path, JSON.parse(e.target.value));
             setParseError(null);
+            ctx.reportIssue?.(path, null);
           } catch (err) {
-            setParseError(`JSON 형식 오류: ${(err as Error).message}`);
+            const message = `JSON 형식 오류: ${(err as Error).message}`;
+            setParseError(message);
+            ctx.reportIssue?.(path, message);
           }
         }}
       />
       {hint && <span className="muted">{hint}</span>}
-      {parseError && <span className={p.fieldError}>{parseError}</span>}
+      {parseError && !ctx.issues.some((i) => i.path === path) && <span className={p.fieldError}>{parseError}</span>}
       <FieldMessages ctx={ctx} path={path} />
     </label>
   );

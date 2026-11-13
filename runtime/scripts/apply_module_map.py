@@ -306,6 +306,8 @@ def main() -> int:
         if not path.is_file() or path.suffix not in TEXT_SUFFIXES:
             continue
         rel_parts = path.relative_to(runtime).parts
+        if path.resolve() == args.map.resolve():
+            continue
         if SKIP_PARTS & set(rel_parts) or any(part.endswith(".egg-info") for part in rel_parts):
             continue
         try:

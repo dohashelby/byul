@@ -571,11 +571,10 @@ class GatewayApp:
         )
 
     def tetragon_status(self) -> dict[str, Any]:
-        if Path(self.config.tetragon_state_path or Path(self.config.data_dir) / "tetragon-state.json").exists():
-            validate_kube_context(self._tetragon_context)
         return read_tetragon_state(
             self.config.tetragon_state_path or Path(self.config.data_dir) / "tetragon-state.json",
             context=self._tetragon_context,
+            require_context=True,
         )
 
     def gpu_status(self) -> dict[str, Any]:

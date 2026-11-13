@@ -13,7 +13,12 @@ SCHEMA = "runtime-tetragon-state/1.0"
 
 
 def read_tetragon_state(
-    path: str | Path, *, context: str | None = None, now: datetime | None = None, stale_after_s: float = 20
+    path: str | Path,
+    *,
+    context: str | None = None,
+    now: datetime | None = None,
+    stale_after_s: float = 20,
+    require_context: bool = False,
 ) -> dict[str, Any]:
     result = {
         "schema_version": SCHEMA,
@@ -33,6 +38,9 @@ def read_tetragon_state(
     try:
         target = Path(path)
         if not target.exists():
+            return result
+        if require_context and context is None:
+            result.update(state="error", error="kube_context_missing")
             return result
         if target.stat().st_size > 2 * 1024 * 1024:
             raise ValueError("Tetragon state exceeds size limit")

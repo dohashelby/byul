@@ -1,5 +1,7 @@
 # DECISIONS
 
+- 2026-11-14 · 사용자 결정25("runtime 시험 세 파일만 예외 승인"): #266의 CI 차단을 고치기 위해 runtime/tests/test_downstream_deadline.py·test_mvp_auth.py·test_mvp_backend.py 세 시험 파일만 한정 예외 승인했다. final 저장 완료/요청 ID 결합을 기다리고 buffered slow-write의 시험 시계를 실제 쓰기부터 진행한다. 기존 assert·50ms 요청 기한·250ms 전체 상한·실제 소켓/Timer/저장·skip 호출을 보존한다. 저장소 밖 직접3개·준비 지연/final 저장 경합 재현 및 거부 진단9건을 확인한 구체 수정안에 대한 승인이다. runtime 제품 소스·정책·의존성·다른 파일·기한/기대값 완화·새 skip·GPU/클라우드·병합은 승인하지 않는다. CLAUDE.md11절의 일반 경계와 결정19의 기존 두 파일 예외는 유지한다.
+
 - 2026-11-13 · 사용자 결정24("두 브랜치 push·PR 생성 승인"): M-A8 `codex/ma8-input-preflight-20261113`와 M-A7 `codex/ma7-materialized-inputs-20261113` 후속을 push하고 main 대상 PR 두 개를 생성하는 것을 승인했다. 병합·GPU/클라우드·추가 다운로드는 포함하지 않는다. M-B4는 로컬 보관하고 REQ-17 상한/정책 충돌은 미결로 유지한다.
 
 - 2026-11-13 · 사용자 결정22("M-B4는 보관하고, M-A8 실제 입력·사전 점검과 M-A7 남은 입력 준비부터 진행"): M-B4 준비 브랜치는 로컬 보관하고 publish하지 않는다. M-A8의 실제 입력/사전 점검과 M-A7의 남은 입력 준비를 우선한다. 기존 단독 개발 결정은 바꾸지 않으며 GPU/클라우드·추가 다운로드·새 브랜치 push·병합 승인은 포함하지 않는다.

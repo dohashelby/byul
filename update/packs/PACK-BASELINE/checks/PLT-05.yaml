@@ -2,7 +2,7 @@ id: PLT-05
 framework_id: CHK-PLT-005
 mechanism_ids:
 - mechanism-11
-revision: 3
+revision: 4
 retired: false
 area: PLT
 purpose: 자격 제공·사용 제한
@@ -12,7 +12,7 @@ scope: 조건부; 선정 SDK의 실제 fallback 조사
 risk_category: 일반 장애·복구 점검
 risk_summary: 자격 만료·누락 뒤 익명·다른 계정으로 전환되면 승인하지 않은 공급물을 가져오거나 접근 제한이 달라질 수 있음. 공격자의 유발 능력은 별도 조건.
 review_order: conditional_when_selected
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 선정 SDK·취득 주체가 만료·누락 자격을 처리하는 경로를 확인한다. 익명/대체 접근을 지원하면 해당 분기를 추가한다.
 policy_params:

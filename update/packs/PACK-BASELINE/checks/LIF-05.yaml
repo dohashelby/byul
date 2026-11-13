@@ -2,7 +2,7 @@ id: LIF-05
 framework_id: CHK-LIF-005
 mechanism_ids:
 - mechanism-10
-revision: 5
+revision: 6
 retired: false
 area: LIF
 purpose: 변경 중 일관성
@@ -12,7 +12,7 @@ scope: 기본; 재시작·재배포
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: 배포 담당자의 승인 대조 우회 또는 재배포 오류로 이전 요청이 다른 세대의 모델·설정과 섞여 비승인·잘못된 결과가 제공될 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 재시작·재배포의 접수 중단·진행 요청·그룹 종료·새 모델 준비를 확인한다.
 policy_params:

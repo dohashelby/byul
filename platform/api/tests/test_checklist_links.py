@@ -66,7 +66,7 @@ def test_endpoint_reports_every_row_even_without_events(example_client):
     assert response.status_code == 200
     result = response.json()
     assert result["selected_count"] == len(result["items"]) == 37
-    assert result["excluded_count"] == 40 and result["pack_revision"] == 33
+    assert result["excluded_count"] == 40 and result["pack_revision"] == 34
     assert all("condition" in r and "limitation" in r and "observation_state" in r for r in result["items"])
 
 

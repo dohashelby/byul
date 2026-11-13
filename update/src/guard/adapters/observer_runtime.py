@@ -38,13 +38,17 @@ class QualifiedObserver:
                 after = _stamp(path)
                 if before != after:
                     raise ValueError('OBSERVER_SOURCE_REPLACED')
-                current = self._qualified_files[key] = after, codes
+                pin = cache.source_pin(module, sources)
+                if _stamp(path) != after:
+                    raise ValueError('OBSERVER_SOURCE_REPLACED')
+                self.__dict__.setdefault('_source_pins', {})[name] = pin
+                current = self._qualified_files[key] = after, codes, pin
             if _stamp(path) != current[0]:
                 raise ValueError('OBSERVER_SOURCE_REPLACED')
             return dict(current[1])
 
     def verify_sources(self):
-        for (_, path, digest), (stamp, _) in getattr(self, '_qualified_files', {}).items():
+        for (_, path, _), (stamp, _, digest) in getattr(self, '_qualified_files', {}).items():
             if _stamp(path) != stamp or hashlib.sha256(Path(path).read_bytes()).hexdigest() != digest:
                 self.gaps.add('OBSERVER_SOURCE_POSTCHECK_FAILED')
 
@@ -93,7 +97,7 @@ class QualifiedObserver:
             try:
                 common = {'schema': self.schema, 'session_sha256': cache.base.sha(self.session.encode()), 'process_sha256': self.process_sha256,
                     'call_sha256': call, 'parent_call_sha256': parent['call'] if parent else None, 'point': point,
-                    'source_file_sha256': self.sources[name], 'entry_code_sha256': expected,
+                    'source_file_sha256': self._source_pins[name], 'entry_code_sha256': expected,
                     'entry_qualified_before': before, 'runtime_context_injected': self.injected_context,
                     'authenticated_identity_verified': False, 'actual_tensor_consumption_verified': False,
                     'transitive_dependencies_verified': False, 'native_profile_installed': False}

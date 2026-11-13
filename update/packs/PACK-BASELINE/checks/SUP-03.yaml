@@ -2,7 +2,7 @@ id: SUP-03
 framework_id: CHK-SUP-003
 mechanism_ids:
 - mechanism-08
-revision: 5
+revision: 6
 retired: false
 area: SUP
 purpose: 승인 대상·출처 식별
@@ -12,7 +12,7 @@ scope: null
 risk_category: 보안 위협 점검
 risk_summary: 공급자가 승인 목록 밖 하위 모델·tokenizer·설정을 끼워 넣어 실제 처리 내용이나 실행 코드를 바꿀 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   always: true
   prose: 모델을 로딩하는 환경. 기본 config·tokenizer·template를 포함하고, secondary source·redirect·adapter는 실제 사용 시 추가한다.

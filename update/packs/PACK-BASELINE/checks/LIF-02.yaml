@@ -2,7 +2,7 @@ id: LIF-02
 framework_id: CHK-LIF-002
 mechanism_ids:
 - mechanism-07
-revision: 3
+revision: 4
 retired: false
 area: LIF
 purpose: 재시도 비용 제한
@@ -12,7 +12,7 @@ scope: 조건부; 원격 취득·retry
 risk_category: 일반 장애·복구 점검
 risk_summary: 공급원 장애 뒤 무제한 재시도·부분 자료가 누적되면 비용·저장공간이 고갈되고 서비스 준비가 지연될 수 있음. 공급자의 악의적 유발은 별도 조건.
 review_order: conditional_when_selected
-impact: null
+impact: LOW
 applies_when:
   prose: 원격 취득 또는 SDK/도구의 재시도가 사용될 때 적용한다. 추론 retry와 취득 retry를 구분한다.
 policy_params:

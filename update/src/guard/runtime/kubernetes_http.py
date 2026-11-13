@@ -420,13 +420,12 @@ class KubernetesHTTP:
         if profile not in {PROFILE, *_BINDING_PROFILES}:
             raise KubernetesBindingError()
         self.profile = profile
-        if profile==ROUTE_AUTHENTICATION_PROFILE and (target.get('lab') is not True or env.engine.name!='vllm' or env.engine.version!='0.31.0'):
+        if profile==ROUTE_AUTHENTICATION_PROFILE and target.get('lab') is not True:
             raise KubernetesBindingError()
-        if profile==SGLANG_TERMINATION_PROFILE and (env.engine.name!="sglang"or env.engine.version!="0.5.22"):raise KubernetesBindingError()
         self.lab = target.get('lab')
         self.engine_name = env.engine.name
         self.engine_version = env.engine.version
-        if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE}:
+        if profile in {ROUTE_AUTHENTICATION_PROFILE, SGLANG_TERMINATION_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE}:
             # Release availability lives in the engine profile catalog, not here.
             from guard.adapters.engine_profiles import require_transport
             try:

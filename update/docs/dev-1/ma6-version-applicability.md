@@ -196,7 +196,7 @@ git clone --depth 1 --branch <0.1절 후보 태그> https://github.com/vllm-proj
 
 ## 11. 결정 9 — 한 판본에 기능이 없을 때 (점검별 승인 요청)
 
-판정 의미 변경이라 점검별로 묻는다. 승인 전 기본은 UNKNOWN이다.
+2026-11-13 사용자에게 항목별로 검토받아 아래 여섯 제안을 각각 승인받았다. 데이터·계획 반영과 실제 소비 연결·GPU 검증을 구분한다.
 
 | 점검 | 기준 판본에 없는 것 (근거) | 제안 |
 |---|---|---|
@@ -255,9 +255,43 @@ git clone --depth 1 --branch <0.1절 후보 태그> https://github.com/vllm-proj
 - `PIN_ROWS`의 `candidate`는 태그 소스 bytes라는 뜻이다. 이미지 설치 파일과 대조하면(13절) `reviewed`로 올린다.
 - 기준 판본 쪽은 엔진 안 설치 경로(sitecustomize → `vllm_engine_callback_sensor.install`)가 V0 기본 기동에서 이 모듈을 실제로 감싸는지 GPU에서 확인해야 한다. 설치 경로의 다른 V1 전제는 확인하지 않았다.
 
-**알려진 영향 — 소스 검토 관문.** 제품 소스를 바꿔 `release/reviewed-source.json`을 다시 만들었다. 그 결과 `verify_req10_consumption`이 `SOURCE_REVIEW_RECEIPT_REQUIRED`를 낸다. 이 관문을 쓰는 LIF-07 수집 시험(`test_b_lif07_readiness::test_actual_native_helper_default_public_entrypoint_store_restore_preserved`)도 실패한다. 결정 5(검토 기록 규칙)가 미결이라 검토 기록을 만들지 않았다.
+**알려진 영향 — 소스 검토 관문.** 제품 소스를 바꿔 `release/reviewed-source.json`을 다시 만들었다. 그 결과 `verify_req10_consumption`이 `SOURCE_REVIEW_RECEIPT_REQUIRED`를 낸다. 이 관문을 쓰는 LIF-07 수집 시험(`test_b_lif07_readiness::test_actual_native_helper_default_public_entrypoint_store_restore_preserved`)도 실패한다. 당시에는 결정 5(검토 기록 규칙)가 미결이라 기록을 만들지 않았다. 이후 사용자 결정 5로 면제가 확정돼 새 SHA마다 검토 기록을 넣는다.
 
-**남은 3단계 (승인 범위 안, 미착수):**
+**#255 시점의 잔여 이력 (현행 상태는 15·16절):**
 - A 담당 엔진 내부 관측기의 후보 판본 (a) 행: REQ-14 `vllm_distributed_callback`, REQ-15~17 `vllm_cache_callback`·`vllm_scoped_consumption_callback`, REQ-18~20 slot·graph·kernel, LIF-13 `vllm_weights_lifetime_callback`. 이 관측기들은 `base.SOURCE_SHA` 등 공유 표를 써서, 같은 tuple 행 구조를 공유 표에 들이는 작업이 먼저다.
 - 판본 문자열 키 표(`adapters/vllm.py` SAFE_PROBES·길이 오류 형식, `kubernetes_response_error`, `engine_provider`, `vllm_runner_capture`)를 판본 행 조회로 바꾸는 일. `adapters/vllm.py`는 M-A9와 같은 파일이라 이 세션에서 고치지 않았다.
 - 기준 판본 쪽 D1~D3은 "(c) 후속, 미구현"이다.
+
+## 15. 단독 개발 후속 — 후보 행·함수 의미 대조 (2026-11-13)
+
+- 관측기 후보 파일 13개(763,545 bytes)를 태그 원본 SHA와 대조해 fixture와 adapter 데이터에 추가했다. 캐시·분산·scoped consumption·slot·kernel·graph·공유 가중치 계열이다. 이미지 bytes 대조 전이므로 모두 candidate_pin이며 등록 생산자 목록은 바꾸지 않는다.
+- V2 sampler의 상태 속성·sampling_params 인자 위치와 공유 가중치 조회의 반환 tuple 위치를 adapter 데이터로 처리한다. 공통 감싸기·최종 소스 확인은 여러 후보 중 실제로 일치한 SHA를 사용한다. 알 수 없는 bytes는 거부한다.
+- 함수 36개의 대조는 [기계 판독 검토 기록](ma6-candidate-function-review.json)에 남겼다. scheduler 대기열·전환·출력·profiler·공급 반환의 차이는 M-B4 후속이며 같은 관측 의미로 무조건 이월하지 않는다.
+- 직접 시험: 관측기·고정값·준비 자산·scoped 소비 등 175개 통과. 추가로 생산자 신원·정확 크기·후보 자격 89개 통과. 새 데이터 의존성이 바뀐 생산자는 과거 GPU 등록을 상속하지 않는지 확인했다. 양성 소비 시험은 모의 등록을 명시하고 기존 assert를 유지했다.
+- 남은 M-A6: 두 판본 HTTP 경로·길이 오류·기동 provider 데이터, 변경 경로표 대조. 기준 쪽 D1~D3 및 실제 이미지·GPU 확인은 원래 후속 범위다. 이 절은 M-A6 전체 완료 기록이 아니다.
+
+## 16. 승인된 Python 레이어 확인 (2026-11-13)
+
+결정 15의 부분 승인 범위 안에서 Python 설치 레이어 두 개만 받았다. 매니페스트 원 bytes와 레이어 SHA·크기를 각각 확인했고, tar 전체를 풀지 않고 patchlevel.h와 dpkg status를 읽었다. [원 메타데이터 요약](ma6-python-layer-check.json).
+
+| 쪽 | Python 설치 레이어의 CPython | 확인 근거 |
+|---|---|---|
+| 기준 | 3.12.8 | patchlevel.h, python3.12·python3.12-dev 패키지 3.12.8-1+jammy1 |
+| 후보 | 3.12.3 | patchlevel.h, python3.12·python3.12-dev·python3.12-minimal 패키지 3.12.3-1ubuntu0.17 |
+
+- 문서 13절의 "7번"은 0부터 센 인덱스다(매니페스트상 여덟 번째 레이어). 압축 bytes 합계는 661,014,960이다. 다른 이미지 레이어는 받지 않았다.
+- 설치 레이어의 Python 판본을 확인한 것이며 최종 엔진 프로세스의 interpreter 경로·패치 판본 확인은 실행하지 않았다. 이후 레이어의 덮어쓰기 가능성을 실제 파일 대조나 기동 확인 없이 제거하지 않는다.
+- 기준 쪽 관측기 15종에 CPython 3.12.8의 자기 코드 지문 행이 있는지는 M-B4에서 확인·추가해야 한다. 기존 패치 판본의 지문을 그대로 승인하거나 자격 검사를 넓히지 않는다.
+- 결정 14는 V0 유지로 확정했고 결정 9의 6행은 항목별 검토 대기다. vLLM·의존성 설치 레이어는 아직 미승인이므로 태그 소스 핀은 후보를 유지한다.
+
+## 17. 기동·HTTP 데이터와 이동 경로 검토
+
+provider의 기동 profile에 두 판본의 명령·모델 인자·기본 엔진·로그/profiler 데이터를 넣었다. HTTP 데이터는 오류 envelope·길이 형식·정확 이미지 쌍과 안전 프로브 후보를 담는다. 기존 판본 비교 분기는 형식 행 조회로 바꿨다. 후보 데이터는 이미지 bytes 검토 전 안전 프로브 실행이나 거부 원인 증명에 사용하지 않으며, 해당 원인은 미검증으로 돌려준다. 후보 관측 profile은 정확 소스·함수·CPython·준비 자산 검사를 거치고 새 생산자의 GPU 등록을 상속하지 않는다. 기준 V0 내부 관측 공백은 여전히 남는다.
+
+공식 두 commit의 전체 Git tree(blob) 비교는 변경 경로 8,002개다. 검토한 정확 경로 17개만 변경 영역 표에 더했다. 제외는 늘리지 않았고 미분류 332개 중 315개를 그대로 남긴다. 관련 후보 경로는 책임 비교이며 git rename이나 동일 관측 의미의 증명이 아니다. 상세 SHA·근거·미분류 목록은 `ma6-change-path-review.json`에 있다. 정식 릴리스 전체 점검 계약은 유지한다.
+
+M-A6 이틀 범위의 후보 행·36개 함수 검토·기동/HTTP 데이터·경로표는 PR 검증 대상으로 준비했다. 이미지 설치 파일 대조·기준 CPython 패치 자격·D1~D3 V0 관측 설계·실제 GPU 등록·M-B4와 결정 9는 별도 미완료다. 이를 전체 M-A6 또는 MVP 완료로 세지 않는다.
+
+## 18. 결정 9 항목별 승인 반영
+
+사용자가 9-1~9-6을 각각 승인했다. 11절 표의 UNKNOWN 분기 범위를 유지하고 REQ-06은 기존 비적용 근거만 추가한다. 기준의 guided_json 필드 대응과 기능 부재 분기는 adapter 데이터에 기록했으며 M-B2·M-B4에서 실제 소비를 연결한다. REQ-16·17의 양쪽 prefix caching 명시는 판본 profile 데이터와 렌더 도구의 `--check-id`로 적용한다. 다른 점검 기동의 기본값을 바꾸지 않는다.

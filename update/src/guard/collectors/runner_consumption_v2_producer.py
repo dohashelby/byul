@@ -27,8 +27,9 @@ _V1_RUNNER = frozenset(_STAGE.values())
 
 
 def producer():
-    digest = v4.source_digest((Path(v1.__file__), Path(v2.__file__), Path(producers.__file__), Path(__file__))
-                              + common_metadata.SOURCE_PATHS)
+    digest = v4.source_digest(producers._source_dependencies(
+        (Path(v1.__file__), Path(v2.__file__), Path(producers.__file__), Path(__file__)))
+        + common_metadata.SOURCE_PATHS)
     return {'name': NAME, 'version': VERSION, 'source_sha256': digest}
 
 

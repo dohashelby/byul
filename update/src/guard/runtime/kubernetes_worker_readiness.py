@@ -8,6 +8,7 @@ import math
 import time
 
 from guard.models import canonical_json, sha256_hex, utcnow
+from guard.adapters.engine_profiles import supports
 from .bounded import strict_json
 from .kubernetes_http import KubernetesHTTP, KubernetesBindingError, REQUEST_BINDING_PROFILE
 from .kubernetes_startup_binding import read_startup_binding
@@ -98,8 +99,8 @@ class KubernetesWorkerReadinessHTTP:
     profile = PROFILE
 
     def __init__(self, target, env, *, runner=None, duration=120, binary='kubectl', clock=None):
-        if (type(target) is not dict or target.get('lab') is not True or env.engine.name != 'vllm'
-                or env.engine.version != '0.31.0' or not _digest(env.model.inventory_sha256)
+        if (type(target) is not dict or target.get('lab') is not True
+                or not supports(env.engine.name, env.engine.version, 'worker_readiness') or not _digest(env.model.inventory_sha256)
                 or type(target.get('model_mapping')) is not dict
                 or target['model_mapping'].get('schema') != 'guard.model-request-mapping/1'):
             raise KubernetesBindingError()

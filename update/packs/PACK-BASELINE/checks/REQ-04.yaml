@@ -2,7 +2,7 @@ id: REQ-04
 framework_id: CHK-REQ-004
 mechanism_ids:
 - mechanism-01
-revision: 4
+revision: 5
 retired: false
 area: REQ
 purpose: 신원 인증·전달
@@ -12,7 +12,7 @@ scope: 조건부
 risk_category: 보안 위협 점검
 risk_summary: 호출자가 외부 신원 header를 사칭해 실제 인가 집행점에서 타인의 모델·작업 권한을 얻을 수 있음. 동작 제어 header 자체를 신원으로 간주하지 않음.
 review_order: conditional_when_selected
-impact: null
+impact: HIGH
 applies_when:
   prose: 앱·Gateway·서비스 계정이 전달한 신원을 인가에 사용할 때 적용한다. 최종 사용자와 연결 주체를 구분한다.
 policy_params:

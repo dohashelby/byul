@@ -2,7 +2,7 @@ id: LIF-12
 framework_id: CHK-LIF-012
 mechanism_ids:
 - mechanism-13
-revision: 4
+revision: 5
 retired: false
 area: LIF
 purpose: 재시도 비용 제한
@@ -12,7 +12,7 @@ scope: 조건부; 자동 retry
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: 실패·timeout을 유발할 수 있는 호출자가 재시도를 겹치게 하거나 일반 장애 후 중복 실행이 남아 비용을 증폭시키고 결과를 중복 전달할 수 있음.
 review_order: conditional_when_selected
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 앱·SDK·Gateway·엔진의 추론 자동 retry 주체·발동 조건과 허용 정책을 먼저 확인한다. 금지 구성은 자동 retry의 거부와 실제 미발생 근거를 확인하고, 허용·사용 구성은 원·새 attempt의 중복·잔존·비용을 대조한다. 실제 비사용 근거가 있으면 자동 retry 실행 분기만 비적용 후보로 남기며, 기능·정책 미정은 적용 미정으로 둔다. 취득 SDK retry는 LIF-002에서 확인한다.
 policy_params:

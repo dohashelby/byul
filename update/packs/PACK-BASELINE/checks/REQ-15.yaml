@@ -2,7 +2,7 @@ id: REQ-15
 framework_id: CHK-REQ-015
 mechanism_ids:
 - mechanism-01
-revision: 4
+revision: 5
 retired: false
 area: REQ
 purpose: 공유 권한·범위
@@ -12,7 +12,7 @@ scope: 기본+정책 조건
 risk_category: 보안 위협 점검
 risk_summary: 호출자가 cache 공유 집단 식별자를 사칭해 허용되지 않은 집단과 상태를 공유하거나 그 사용 여부를 추론할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   prose: KV/prefix 등 재사용 cache를 사용할 때 공유 집단과 신원 연결을 확인한다. 실제 집단·공유 정책 미정은 제외 사유가 아니다.
 policy_params:

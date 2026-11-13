@@ -51,7 +51,7 @@ _BINDING = ("pod_uid", "container_id", "restart_count", "worker_pid", "start_tic
 # 형식: sha | id | int | bool | ms(0 이상 정수 밀리초) | opt_sha | opt_id | opt_int | enum:<a|b>
 KINDS = {
     "request-attempt": {
-        "checks": ("LIF-03", "LIF-10", "LIF-12"),
+        "checks": ("LIF-03", "LIF-10", "LIF-12", "REQ-12"),
         "events": ("admitted", "queued", "dequeued", "stage", "kv_owned", "budget", "limit_enforced", "abort", "finished",
                    "gpu_fence", "buffer_released", "kv_released", "retry"),
         "fields": {"request_sha256": "sha", "attempt": "int", "at_ms": "ms", "stage": "opt_id", "cost": "opt_int",

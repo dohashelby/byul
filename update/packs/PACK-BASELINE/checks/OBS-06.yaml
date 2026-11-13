@@ -2,7 +2,7 @@ id: OBS-06
 framework_id: CHK-OBS-006
 mechanism_ids:
 - mechanism-14
-revision: 5
+revision: 6
 retired: false
 area: OBS
 purpose: 저장 자료 보호
@@ -12,7 +12,7 @@ scope: 기본 저장 기록; 진단 기능별 선택
 risk_category: 보안 위협 점검
 risk_summary: 기록 저장소·사본에 접근 가능한 비허용 주체가 진단 본문·식별정보·자격을 조회·반출할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 저장 로그·기록의 독자와 반출 권한을 기본 확인한다. 선택 진단·usage 사본은 실제 생성·보존 경로별로 추가한다. 저장 위치·자료 등급별 암호화 요구와 복호화 권한을 확인한다. 요구나 실제 설정이 미정이면 해당 결과를 미확인으로 남긴다.
 policy_params:

@@ -1,7 +1,28 @@
 {
- "repository": "https://github.com/vllm-project/vllm",
- "tag_commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8",
- "license": "Apache-2.0 (LICENSE.txt)",
- "files": {"custom_all_reduce.py.txt": {"source": "vllm/distributed/device_communicators/custom_all_reduce.py", "sha256": "f3e7b346e31eeab398c62c9a4e94a5aeab8a6936460b365ba60ceed91f0ecbf2"}},
- "pin_status": "candidate: tag source bytes, not yet compared with the image install file"
+  "repository": "https://github.com/vllm-project/vllm",
+  "tag_commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8",
+  "license": "Apache-2.0 (LICENSE.txt)",
+  "files": {
+    "custom_all_reduce.py.txt": {
+      "source": "vllm/distributed/device_communicators/custom_all_reduce.py",
+      "sha256": "f3e7b346e31eeab398c62c9a4e94a5aeab8a6936460b365ba60ceed91f0ecbf2"
+    },
+    "vllm/entrypoints/openai/serving_engine.py.txt": {
+      "source": "vllm/entrypoints/openai/serving_engine.py",
+      "sha256": "ac5e16bc8bc63b6f16a6f78509f0e773056be57dcfdc5f810c91dc3bbbd7282b"
+    },
+    "vllm/entrypoints/openai/protocol.py.txt": {
+      "source": "vllm/entrypoints/openai/protocol.py",
+      "sha256": "b8a81e70c50024af350432b1bf83d08aa8a2ada84291d6e5bcc0551f4918eb0e"
+    },
+    "vllm/entrypoints/openai/api_server.py.txt": {
+      "source": "vllm/entrypoints/openai/api_server.py",
+      "sha256": "23e5b9b81d6657653fcd5646bb4034d5a4ba5c31ebd419c2e67e1f2ba1f73240"
+    },
+    "vllm/entrypoints/openai/serving_chat.py.txt": {
+      "source": "vllm/entrypoints/openai/serving_chat.py",
+      "sha256": "baa46e8d60504ff05e6a9e7b6d9c8ed64c4adf04ee5dc7ff9e6e7895397f48bf"
+    }
+  },
+  "pin_status": "candidate: tag source bytes, not yet compared with the image install file"
 }

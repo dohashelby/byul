@@ -2,7 +2,7 @@ id: REQ-11
 framework_id: CHK-REQ-011
 mechanism_ids:
 - mechanism-04
-revision: 7
+revision: 8
 retired: false
 area: REQ
 purpose: 요청·결과 귀속
@@ -12,7 +12,7 @@ scope: 기본
 risk_category: 보안 위협 점검
 risk_summary: 호출자가 요청 ID 충돌·동시 실행 조건을 유발할 수 있을 때 다른 사용자의 출력이 자기 연결로 전달되어 정보가 유출될 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   always: true
   prose: 일반·스트리밍 요청의 결과 귀속을 확인한다. 외부 ID·child·별도 시도는 실제 사용 시 추가한다.

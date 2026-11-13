@@ -16,6 +16,8 @@ V1과 다른 점:
 """
 from __future__ import annotations
 
+from .vllm_observer_pin_rows import candidate_sources, layout
+
 from . import vllm_cache_callback as cache
 from . import vllm_consumption_callback as consumption
 
@@ -85,8 +87,11 @@ class ConsumptionV2Observer(cache.CacheCallbackObserver):
         if states is None or type(mapping) is not dict or slots is None or len(slots) > consumption.MAX_BATCH:
             self.gaps.add('CONSUMPTION_CALLBACK_BATCH_SHAPE_UNAVAILABLE'); return None
         processors = sampler.get('logits_processors') or ()
-        bias = next((p for p in processors if hasattr(p, 'num_allowed_token_ids')), None)
-        bad = next((p for p in processors if hasattr(p, 'num_bad_words')), None)
+        profile = layout(self, RUNNER)
+        bias = (sampler.get(profile['bias_attribute']) if 'bias_attribute' in profile else
+                next((p for p in processors if hasattr(p, 'num_allowed_token_ids')), None))
+        bad = (sampler.get(profile['bad_words_attribute']) if 'bad_words_attribute' in profile else
+               next((p for p in processors if hasattr(p, 'num_bad_words')), None))
         vocab = getattr(states, 'vocab_size', None)
         memory = self.__dict__.get('_allowed', {})
         rows = []

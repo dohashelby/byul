@@ -4,7 +4,7 @@ mechanism_ids:
 - mechanism-11
 - mechanism-15
 - mechanism-16
-revision: 5
+revision: 6
 retired: false
 area: PLT
 purpose: 통신 접근·송신 제한
@@ -14,7 +14,7 @@ scope: 기본; 취득·runtime·관측 각각 확인
 risk_category: 보안 위협 점검
 risk_summary: 실행 코드·취득 입력·송신 설정을 조작할 수 있는 주체가 엔진의 통신 권한을 이용해 비허용 목적지로 자료를 보내거나 금지 대상에 접근할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   always: true
   prose: 취득·엔진 실행·관측의 외부 송신을 기본 확인한다. 외부 연결이 불필요한 구성도 금지 송신의 집행을 확인한다.

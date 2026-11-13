@@ -1,0 +1,36 @@
+# 사용자 확정값(2026-11-08 결정 6-1). 예시 값이 아니다. 실행별 결합값과 미입력 기업 정책은 생성하지 않는다.
+# REQ-03의 모델 목록 경로는 adapter 경로표에서 inference로 분류된다. 관리·진단은 허용 종류에 넣지 않는다.
+# REQ-17 캐시 공유 단위 tenant·공개 prefix 허용 기준은 REQ-15의 정책 입력과 별도로 결합한다.
+verification:
+  values:
+    REQ-03:
+      general_allowed_kinds:
+      - inference
+    REQ-13:
+      allowed_response_fields:
+      - id
+      - object
+      - created
+      - model
+      - choices
+      - usage
+      allowed_error_fields:
+      - message
+      - type
+      - code
+      forbidden_return_options:
+      - echo
+      - prompt_logprobs
+      - logprobs
+      required_targets:
+      - gateway
+    REQ-17:
+      cache_timing_max_auc_percent: 55
+      cache_timing_min_samples: 200
+    OBS-05:
+      usage_allowed: false
+    LIF-13:
+      release_allowed_roles:
+      - runtime_controller
+      reacquire_same_approved_generation_only: true
+      disk_fallback_allowed: false

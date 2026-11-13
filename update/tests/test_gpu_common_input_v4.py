@@ -164,6 +164,21 @@ def test_registering_a_receipt_does_not_recursively_change_the_producer_digest(m
     assert producers.attempt_producer() == before
 
 
+@pytest.mark.parametrize('filename', ['vllm_observer_pin_rows.py', 'vllm_observer_pin_rows.json'])
+def test_candidate_pin_dependency_changes_invalidate_all_producer_identities(monkeypatch, filename):
+    functions = [producers.attempt_producer, producers.transition_producer, producers.health_producer,
+                 producers.profiler_producer, producers.consumption_producer, producers.supply_producer, v2.producer]
+    before = [make() for make in functions]
+    original = Path.read_bytes
+    monkeypatch.setattr(Path, 'read_bytes', lambda p: original(p) + (b'\n' if p.name == filename else b''))
+    for make, previous in zip(functions, before):
+        current = make()
+        assert current['source_sha256'] != previous['source_sha256']
+        key = (current['name'], current['version'])
+        assert common.SUPPORTED_PRODUCERS.get(key) != current['source_sha256']
+        assert common.SUPPORTED_V4_PRODUCERS.get(key) != current['source_sha256']
+
+
 def test_legacy_record_and_new_record_have_the_same_complete_scope_only_with_mock_registration(monkeypatch):
     old = record(COMPLETE)
     producer = old['producer']

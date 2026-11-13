@@ -157,10 +157,15 @@ def test_file_input_cannot_upgrade_to_measured(tmp_path, origin):
     if origin == 'MEASURED':assert not value.observations['activation_steps'].value[-1]['records']
 
 
-def test_req12_not_declared_and_existing_closed_dispatch_preserved(tmp_path):
+def test_req12_declaration_retains_unverified_facts_and_closed_dispatch(tmp_path):
     _, _, _, record, scope, descriptor = inputs(tmp_path)
-    with pytest.raises(ValueError, match='B_COMMON_INPUT_CHECK_UNDECLARED:REQ-12'):
-        consume_record('REQ-12', record, owner=POD, **scope)
+    result = consume_record('REQ-12', record, owner=POD, **scope)
+    assert result['facts']['event_counts'] == {name: sum(e['event'] == name for e in record['events'])
+        for name in sorted({e['event'] for e in record['events']})}
+    assert result['facts']['automatic_retry_and_final_output_binding_verified'] is False
+    assert result['gaps'] and not result['producer_authenticated'] and not result['whole_question_complete']
+    with pytest.raises(ValueError, match='B_COMMON_INPUT_CHECK_UNDECLARED:PLT-02'):
+        consume_record('PLT-02', record, owner=POD, **scope)
     from guard.executors.kubernetes_request_attempts import KubernetesRequestAttemptsExecutor, PROFILE
     executor = registry.build_executor('request_termination', 'kubernetes', {'request_termination': {'common_inputs': descriptor}})
     child = executor._consumer(SimpleNamespace(id='REQ-12', collection_profile=PROFILE))

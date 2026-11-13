@@ -100,7 +100,7 @@ def demo(tmp_path_factory, no_external_execution):
 
     # import 시점의 전역 변경도 검출한다. 원본 팩은 읽기 전용으로 대조한다.
     registry_before = _snapshot_registries()
-    pack_dir = Path(guard.__file__).resolve().parents[2] / "packs" / "PACK-BASELINE"
+    pack_dir = Path(guard.__file__).resolve().parents[2] / "reference" / "pack-seeds" / "PACK-BASELINE-33"
     original_pack = _file_hashes(pack_dir)
     runner = importlib.import_module("guard.gpu18_prototype.runner")
     output = tmp_path_factory.mktemp("gpu18-review") / "empty-output"

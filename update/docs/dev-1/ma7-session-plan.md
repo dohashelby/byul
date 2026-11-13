@@ -2,7 +2,7 @@
 
 2026-11-13 작성. 단독 개발자의 M-A7 계획이며 실행 승인이나 실측 결과가 아니다. 판본·GPU 이미지는 작업지시서 0.1절만 따른다. 기준은 사용자 결정 14에 따라 V0 기본을 유지한다. 계획의 정본 팩은 #257의 @34이며 main 병합은 별도 승인 대상이다.
 
-69개 점검별 두 쪽의 ENV·target·prepared·정책 포인터, 필요한 정책 키와 예상 공백은 [입력 계획 JSON](ma7-session-input-plan.json)에 있다. 69개 = M-A 27개 + M-B 42개, J01 6개 + J02 63개다. 퇴역 점검 8개는 포함하지 않는다. 실제 클러스터 입력이 없어 현재 138쪽의 포인터는 모두 `null`이고 사유를 적었다. 구조 검증과 실제 입력 사전 점검을 구분하며 `ready_for_execution=false`, `input_preflight_passed=false`다.
+69개 점검별 두 쪽의 ENV·target·prepared·정책 포인터, 필요한 정책 키와 예상 공백은 [입력 계획 JSON](ma7-session-input-plan.json)에 있다. 69개 = M-A 27개 + M-B 42개, J01 6개 + J02 63개다. 퇴역 점검 8개는 포함하지 않는다. 실제 클러스터 입력이 없어 138쪽의 ENV/target은 `null`이며 사유를 적었다. SUP-08 두 쪽에는 실제 로컬 fixture·기동 계획·EXAMPLE/DRAFT 정책·target 결합 대기 설정을 연결했다. 구조/로컬 자산 검증과 실제 입력 사전 점검을 구분하며 `ready_for_execution=false`, `input_preflight_passed=false`다.
 
 ## 입력 조립과 남은 것
 
@@ -13,7 +13,7 @@
 | 1차 제외 8개 | REQ-02, OBS-01·06·11, PLT-07·10·11·12 | 정본 경로를 실행한 뒤 입력 부재·제외 범위와 UNKNOWN을 기록한다. 실행 전 예상 상태를 RES로 만들지 않는다. |
 | TP2 3개 | REQ-14·16·21 | `gpu_a_run_inputs`의 사례 생성·`gpu_a_aws_lab` 렌더를 쓴다. 새 두 판본 설치 파일 자격·실제 GPU/Pod·rank/세션 결합은 남았다. REQ-16의 Qwen2-VL-2B-Instruct snapshot은 아직 미고정이다. |
 | 대상 비적용 2개 | REQ-04·06 | 기존 사용자 결정과 실제 Gateway 설정의 비적용 근거를 정본 선정에 남긴다. 기능 부재 판정의 새 승인이 아니다. |
-| SUP-08 1개 | SUP-08 | #257의 `tools.mvp_sup08_inputs`를 사용한다. 고정 Phi-3 Vision 파생 fixture와 실제 ENV/target이 없어 최종 조립은 남았다. 과거 ignored→consumed는 예상 회귀 근거이며 새 비교 RPT는 J02에서 만든다. |
+| SUP-08 1개 | SUP-08 | #257의 `tools.mvp_sup08_inputs`를 사용한다. 고정 가중치 두 파일의 SHA와 14개 inventory·snapshot·코드 식별값을 대조한 새 로컬 fixture를 확보했다. 두 판본 기동 계획·정책·target 대기 설정과 코드 캐시도 준비했다. 실제 ENV/target·노드 배치/권한·정상 요청 확인 뒤 최종 조립한다. 과거 ignored→consumed는 예상 회귀 근거이며 새 비교 RPT는 J02에서 만든다. |
 
 M-B 입력 42개는 빈 포인터와 원인을 남겼다. J01의 LIF-08·11·SUP-06은 `tools.b12_tp2_inputs`의 정상→장애→복구 순서와 정책 기한을 사용한다. 기존 도구가 만든 선언 포인터를 실제 파일 검증 완료로 해석하지 않는다. 이틀 범위 뒤 M-B1·M-B4부터 연결한다.
 
@@ -58,3 +58,5 @@ EBS·스냅샷 보존, 전송·공인 IPv4, 세금·환율은 위 EC2 합계에 
 기준 V0의 내부 관측(D1~D3), 기준 Python 패치 자격, 후보의 이미지 설치 bytes 대조·GPU 생산자 등록, M-B4 고정값이 남았다. 결정 9 여섯 항목은 사용자에게 각각 승인받았다(#260 기록). REQ-16·17은 양쪽 `--enable-prefix-caching`을 명시하며 렌더 도구의 `--check-id`를 사용한다. REQ-10은 기준의 guided_json 대응과 required 사례 UNKNOWN을 분리하고, REQ-06은 기존 비적용에 부재 근거만 추가한다. D4·D5는 기존 결정 10 범위의 공백을 유지한다. 관측 공백 수를 실측 성공 수로 세지 않으며 현재 자료만으로 최종 비교 가능 점검 수를 확정하지 않는다.
 
 계획·69행 구조 검증은 끝났고 실제 입력 사전 점검은 미완료다. M-A7 전체 완료를 선언하지 않는다. 승인 없이 GPU·클라우드·이미지/모델 다운로드·공식 재판정은 실행하지 않았다.
+
+2026-11-13 후속: 사용자의 공간 확인·나머지 진행 지시에 따라 고정 모델 가중치 8,293,330,888 bytes를 로컬에서 받고 SHA를 검증했다. 가중치는 원본과 파생 모델 사이에 하드링크로 재사용한다. [로컬 준비 기록](https://github.com/dohashelby/byul/blob/03541c853eddcf4a444b68e8abd4fae53bf472dc/update/docs/dev-1/ma8-local-preparation-20261113.json)의 기동 비교 조건·정책/설정·PNG/출력 해시 확인은 통과했고, 실제 ENV가 없으면 최종 조립이 중단됨도 확인했다. 이는 GPU 실행 승인이 아니며 이전 문단의 미완료 상태를 바꾸지 않는다.

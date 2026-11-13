@@ -31,7 +31,20 @@
     "M-A_render": "tools/gpu_a_aws_lab.py",
     "M-B_TP2_plan": "tools/b12_tp2_inputs.py",
     "model_revision_for_REQ16": null,
-    "reason": "REQ-16 모델 snapshot 미고정·실제 fixture 부재. 다운로드·GPU 승인 전 임의 선택하지 않는다."
+    "reason": "REQ-16 모델 snapshot은 미고정이다. SUP-08 실제 로컬 fixture와 두 판본 기동/정책은 준비했으나 실제 ENV/target과 노드 배치는 남았다.",
+    "SUP08_local_fixture": {
+      "source_pr": "https://github.com/dohashelby/byul/pull/257",
+      "preparation_receipt_url": "https://github.com/dohashelby/byul/blob/03541c853eddcf4a444b68e8abd4fae53bf472dc/update/docs/dev-1/ma8-local-preparation-20261113.json",
+      "fixture_manifest_path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/manifest.json",
+      "fixture_manifest_sha256": "d5121b80dd3237fe63d6e646806d414d464ffc78efa6ef5fbaa436715bf67765",
+      "model_inventory_sha256": "c2dd67477c1899b775e5fa0d0585861e62166ff94c7b94a7c8ba531c2756ac52",
+      "model_snapshot_id": "57f2f7423e74d97203b79372390c8f84efb81b93",
+      "weight_bytes_rechecked": true,
+      "fixture_files_ready": true,
+      "engine_start_verified": false,
+      "environment_target_files_ready": false,
+      "input_preflight_passed": false
+    }
   },
   "checks": [
     {
@@ -4225,23 +4238,39 @@
       "work_group": "M-A",
       "session": "J02",
       "question": "요청에 넣은 값으로 허용받지 않은 코드 버전을 선택할 수 없는가?",
-      "input_state": "미입력",
+      "input_state": "부분 준비(로컬 fixture·정책·기동 계획)",
       "sides": {
         "baseline": {
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
           "prepared": null,
-          "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "policy_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs/baseline/policy.yaml",
+          "reason": "로컬 fixture·기동 계획·EXAMPLE/DRAFT 정책·target 대기 설정은 준비됐다. 실제 ENV/Pod target·노드 파일 배치/권한·정상 요청 확인이 남았다. HTTP 코드 선택 경로에는 prepared 관측기 자산이 필요하지 않다.",
+          "policy_file_sha256": "1559de87dde22d3f4f3191f913bd4bf204f8925f7aa180a92e8649ef19ba3e7f",
+          "render_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs/baseline/render.json",
+          "render_file_sha256": "8e59ce4afa5beace1a04555a7afeb24e3538bf7eb8a7a6801097f48fae421066",
+          "configuration_pending_target_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs/baseline/guard.pending-target.toml",
+          "configuration_pending_target_file_sha256": "657136a43f2d37bc678d80771b16d2eeb50f17569f17111d84ad5e0cb46d4305",
+          "fixture_manifest_path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/manifest.json",
+          "fixture_manifest_sha256": "d5121b80dd3237fe63d6e646806d414d464ffc78efa6ef5fbaa436715bf67765",
+          "prepared_required": false
         },
         "candidate": {
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
           "prepared": null,
-          "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "policy_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs/candidate/policy.yaml",
+          "reason": "로컬 fixture·기동 계획·EXAMPLE/DRAFT 정책·target 대기 설정은 준비됐다. 실제 ENV/Pod target·노드 파일 배치/권한·정상 요청 확인이 남았다. HTTP 코드 선택 경로에는 prepared 관측기 자산이 필요하지 않다.",
+          "policy_file_sha256": "1559de87dde22d3f4f3191f913bd4bf204f8925f7aa180a92e8649ef19ba3e7f",
+          "render_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs/candidate/render.json",
+          "render_file_sha256": "dabe11708d6c8dc780fa670f1e2bc6a826966d3f8f5470ac8e6eb2686c6b86ab",
+          "configuration_pending_target_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs/candidate/guard.pending-target.toml",
+          "configuration_pending_target_file_sha256": "87476211269fd0ba396af4a045348d01fd99cbd5010b902671661946bca12886",
+          "fixture_manifest_path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/manifest.json",
+          "fixture_manifest_sha256": "d5121b80dd3237fe63d6e646806d414d464ffc78efa6ef5fbaa436715bf67765",
+          "prepared_required": false
         }
       },
       "confirmed_policy_values": null,

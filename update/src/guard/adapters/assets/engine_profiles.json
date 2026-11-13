@@ -61,6 +61,19 @@
       ]
     },
     {
+      "id": "vllm-callback-candidate-source/1",
+      "engine": "vllm",
+      "versions": [
+        "0.30.0"
+      ],
+      "features": [
+        "native_lifecycle",
+        "scoped_consumption"
+      ],
+      "pin_status": "candidate_pin",
+      "qualification": "정확한 설치 bytes·함수·CPython·준비 자산 대조와 새 생산자 GPU 등록은 별도다."
+    },
+    {
       "id": "sglang-runtime-request-lifecycle/1",
       "engine": "sglang",
       "versions": [

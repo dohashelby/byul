@@ -2,7 +2,7 @@ id: LIF-06
 framework_id: CHK-LIF-006
 mechanism_ids:
 - mechanism-04
-revision: 5
+revision: 6
 retired: false
 area: LIF
 purpose: 변경 중 일관성
@@ -12,7 +12,7 @@ scope: 조건부; live weights·LoRA·다중 replica
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: 변경 권한자의 부적절한 조작이나 동시성 오류로 live·rolling 중 요청이 서로 다른 weights·KV 세대를 사용해 잘못된 결과가 나올 수 있음.
 review_order: conditional_when_selected
-impact: null
+impact: MEDIUM
 applies_when:
   prose: live weights·LoRA 변경·rolling·다중 replica 전환을 실제 사용할 때 적용한다. 기본 중단 재배포와 구분한다.
 policy_params:

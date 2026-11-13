@@ -2,7 +2,7 @@ id: REQ-12
 framework_id: CHK-REQ-012
 mechanism_ids:
 - mechanism-13
-revision: 5
+revision: 6
 retired: false
 area: REQ
 purpose: 요청·결과 귀속
@@ -12,7 +12,7 @@ scope: 기본+선택 기능
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: 취소·재시도 상태 처리 오류를 유발·이용하는 호출자에게 이전 작업의 늦은 결과가 잘못 전달되거나 다른 사용자의 결과·작업과 섞일 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   prose: 취소·연결 종료 뒤 늦은 결과를 기본 확인한다. 자동 retry가 있으면 이전 시도와 새 시도를 추가 대조한다.
 policy_params:
@@ -79,3 +79,7 @@ legacy:
 source:
   array: request_state_assessment_draft
 collection_profile: kubernetes-request-attempt-observation-v1
+observation_notes:
+  activation_steps: 공통 request-attempt 계약의 admitted·abort·finished·retry·stage·kv_owned 사건을 투영한다. 외부 요청 ID 일치만으로 실제 출력 수신자를 확정하지 않는다.
+limitations:
+- request-attempt의 관측은 시도·취소·종료·재시도 및 소비 시도 후보에 한정한다. 실제 늦은 출력의 수신자·취소 확정 시점·Gateway/SDK 자동 재시도 근거가 없으면 전체 질문은 UNKNOWN이다.

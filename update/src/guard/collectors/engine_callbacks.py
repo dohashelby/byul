@@ -13,7 +13,7 @@ PACKAGE = 'guard_engine_callbacks'
 MODULES = ('vllm_attempt_callback', 'vllm_consumption_callback', 'vllm_consumption_v2_callback', 'vllm_supply_read_callback', 'vllm_health_callback', 'vllm_profiler_callback', 'vllm_profiler_sensor', 'vllm_transition_callback', 'vllm_cache_callback', 'vllm_comm_buffer_callback', 'vllm_distributed_callback', 'vllm_engine_callback_sensor', 'vllm_graph_replay_callback', 'vllm_kernel_bounds_callback',
     'vllm_lifecycle_sensor', 'vllm_rank_failure_sensor', 'vllm_weights_lifetime_callback', 'vllm_worker_generation_contract',
     'vllm_worker_startup_contract', 'vllm_worker_shard_callback', 'vllm_transition_dispatch_callback', 'vllm_execution_link_callback',
-    'vllm_auxiliary_read', 'vllm_auxiliary_link_callback', 'vllm_scoped_consumption_callback', 'observer_runtime')
+    'vllm_auxiliary_read', 'vllm_auxiliary_link_callback', 'vllm_scoped_consumption_callback', 'observer_runtime', 'vllm_observer_pin_rows')
 SITECUSTOMIZE = (f'from {PACKAGE} import vllm_engine_callback_sensor\n'
     'vllm_engine_callback_sensor.install()\n')
 
@@ -21,6 +21,7 @@ SITECUSTOMIZE = (f'from {PACKAGE} import vllm_engine_callback_sensor\n'
 def _sources():
     root = Path(sensor.__file__).parent
     values = {f'{PACKAGE}/{name}.py': (root / f'{name}.py').read_bytes() for name in MODULES}
+    values[f'{PACKAGE}/assets/vllm_observer_pin_rows.json'] = (root / 'assets/vllm_observer_pin_rows.json').read_bytes()
     values[f'{PACKAGE}/__init__.py'] = b''
     values['sitecustomize.py'] = SITECUSTOMIZE.encode()
     return values
@@ -49,6 +50,7 @@ def prepare_assets(output, *, lab_faults=False, lab_kernel_checks=False, request
     (output / PACKAGE).mkdir(parents=True)
     values = _sources(); session = secrets.token_hex(16)
     for name, data in values.items():
+        (output / name).parent.mkdir(parents=True, exist_ok=True)
         (output / name).write_bytes(data)
     (output / 'settings.json').write_text(json.dumps({'session': session, 'secret': secrets.token_hex(32), 'lab_faults': lab_faults, 'lab_kernel_checks': lab_kernel_checks,
         # #196 request-attempt 관측(P1). 켜면 매 단계 scheduler를 감싼다.

@@ -1,7 +1,7 @@
 id: PLT-06
 framework_id: CHK-PLT-006
 mechanism_ids: []
-revision: 4
+revision: 5
 retired: false
 area: PLT
 purpose: 실행 최소 권한
@@ -11,7 +11,7 @@ scope: 기본 TP; 실제 protocol과 공격자 시작 권한 확인
 risk_category: 보안 위협 점검
 risk_summary: worker를 장악한 주체가 공유 신뢰 범위의 내부 명령을 이용해 다른 요청·모델에 영향을 줄 수 있음. 프로세스 분리만으로 인가 경계를 가정하지 않음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 실제 core·worker protocol·UID·실행 신뢰 범위를 확인한다. 동일 신뢰 그룹 내부를 독립된 사용자 권한 경계로 가정하지 않는다.
 policy_params:

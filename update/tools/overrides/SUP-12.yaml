@@ -75,3 +75,5 @@ limitations:
 - '미구현 분기: fallback의 실제 경로와 파일·통신 부수 동작의 독립 센서가 없어 PASS에 도달하지 않는다.'
 - kubernetes 구현만 있다. 실행기는 엔진을 만들거나 바꾸지 않는다. 정상·변경 기동은 준비 절차가 만들고 target·prepared로
   받으며, 두 세션을 각각 수집해 합치지 않는다.
+
+impact: HIGH

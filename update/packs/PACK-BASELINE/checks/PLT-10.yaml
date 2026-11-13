@@ -2,7 +2,7 @@ id: PLT-10
 framework_id: CHK-PLT-010
 mechanism_ids:
 - mechanism-12
-revision: 3
+revision: 4
 retired: false
 area: PLT
 purpose: 권한 철회
@@ -12,7 +12,7 @@ scope: 기본; 선정 issuer·정책 캐시
 risk_category: 보안 위협 점검
 risk_summary: 권한이 철회된 주체가 남은 자격·정책 반영 지연을 이용해 새 작업이나 자료 접근을 계속할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   prose: 사용 중인 자격·권한의 철회 계약과 신규 접근 처리를 확인한다. 철회 정책·발급 주체 미정은 미확인이다.
 policy_params:

@@ -2,7 +2,7 @@ id: OBS-01
 framework_id: CHK-OBS-001
 mechanism_ids:
 - mechanism-17
-revision: 4
+revision: 5
 retired: false
 area: OBS
 purpose: 필수 사건 기록
@@ -12,7 +12,7 @@ scope: 기본 접근·관리·공급물·배포; 필수 사건은 정책으로 �
 risk_category: 증거·판정 신뢰성 점검
 risk_summary: 기록 누락·귀속 오류가 있으면 누가 승인·변경했는지 확인하지 못해 비승인 사용·권한 남용을 발견하거나 책임을 추적하기 어려움.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   prose: 필수 접근·관리·승인·소비 사건과 기록의 연결을 기본 확인한다. 필수 사건 정책이 미정이면 미확인이다.
 policy_params:

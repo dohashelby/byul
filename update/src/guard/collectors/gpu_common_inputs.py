@@ -42,13 +42,16 @@ SUPPORTED_PRODUCERS: dict[tuple[str, str], str] = {
     ("guard-engine-callback-runner-consumption-v2", "1"): "041353842e9c8a12e50ca6515cc21ba9b09fa389a8bee3842926b565c6eb8c66",
 }
 
+# 새 wire 형식은 과거 /1 GPU 등록을 상속하지 않는다. J01 재확인 전에는 비어 있다.
+SUPPORTED_V4_PRODUCERS: dict[tuple[str, str], str] = {}
+
 _BINDING = ("pod_uid", "container_id", "restart_count", "worker_pid", "start_ticks", "rank")
 
 # 종류별: 소비 점검, 행 필드(이름 -> 형식), 행 종류 값, 완료 주장에 필요한 행 종류.
 # 형식: sha | id | int | bool | ms(0 이상 정수 밀리초) | opt_sha | opt_id | opt_int | enum:<a|b>
 KINDS = {
     "request-attempt": {
-        "checks": ("LIF-03", "LIF-10", "LIF-12"),
+        "checks": ("LIF-03", "LIF-10", "LIF-12", "REQ-12"),
         "events": ("admitted", "queued", "dequeued", "stage", "kv_owned", "budget", "limit_enforced", "abort", "finished",
                    "gpu_fence", "buffer_released", "kv_released", "retry"),
         "fields": {"request_sha256": "sha", "attempt": "int", "at_ms": "ms", "stage": "opt_id", "cost": "opt_int",
@@ -193,6 +196,15 @@ def validate(record, *, kind, environment_ref, target_sha256, prepared_sha256, s
         from .scoped_consumption import validate as validate_scoped
         return validate_scoped(record, kind=kind, environment_ref=environment_ref, target_sha256=target_sha256,
                                prepared_sha256=prepared_sha256, session=session)
+    if type(record) is dict and record.get('schema') == 'guard-gpu-common-input/4':
+        from .gpu_common_input_v4 import validate as validate_v4
+        return validate_v4(record, kind=kind, environment_ref=environment_ref,
+            target_sha256=target_sha256, prepared_sha256=prepared_sha256, session=session)
+    return _validate_v1(record, kind=kind, environment_ref=environment_ref, target_sha256=target_sha256,
+                        prepared_sha256=prepared_sha256, session=session)
+
+
+def _validate_v1(record, *, kind, environment_ref, target_sha256, prepared_sha256, session, sampler_logit_bias=False, registered_producers=None):
     spec = KINDS.get(kind)
     if spec is None:
         raise GpuInputError("GPU_INPUT_KIND_UNSUPPORTED")
@@ -230,7 +242,8 @@ def validate(record, *, kind, environment_ref, target_sha256, prepared_sha256, s
                 or type(row["binding"]) is not int or not 0 <= row["binding"] < len(generations)
                 or not all(_check(row[name], form) for name, form in spec["fields"].items())):
             raise GpuInputError("GPU_INPUT_EVENT_INVALID")
-    supported = SUPPORTED_PRODUCERS.get((producer["name"], producer["version"])) == producer["source_sha256"]
+    registered = SUPPORTED_PRODUCERS if registered_producers is None else registered_producers
+    supported = registered.get((producer["name"], producer["version"])) == producer["source_sha256"]
     seen = {row["event"] for row in events}
     gaps = []
     if not supported:
@@ -240,7 +253,7 @@ def validate(record, *, kind, environment_ref, target_sha256, prepared_sha256, s
     gaps += [f"GPU_INPUT_REQUIRED_EVENT_MISSING:{name}" for name in spec["complete_requires"] if name not in seen]
     gaps += [f"GPU_INPUT_PRODUCER_DIAGNOSTIC:{code}" for code in completeness["diagnostic_codes"]]
     if kind == 'runner-consumption':
-        gaps += _consumption_gaps(events)
+        gaps += _consumption_gaps(events, sampler_logit_bias=sampler_logit_bias)
     if kind == 'transition-dispatch':
         calls = {}
         for row in events:
@@ -257,10 +270,10 @@ def validate(record, *, kind, environment_ref, target_sha256, prepared_sha256, s
                 break
     return {"kind": kind, "checks": list(spec["checks"]), "supported": supported, "producer_authenticated": False,
             "complete": supported and not gaps, "gaps": gaps, "generations": len(generations), "events": len(events),
-            "violation_candidates": violation_candidates(kind, events)}
+            "violation_candidates": violation_candidates(kind, events, sampler_logit_bias=sampler_logit_bias)}
 
 
-def violation_candidates(kind, events):
+def violation_candidates(kind, events, *, sampler_logit_bias=False):
     """형식만으로 보이는 위반 후보. 확정 위반이 아니며 소비자가 정책과 지원 여부로 판정한다. 뒤의 오류가 지우지 않는다."""
     out = []
     if kind == "request-attempt":
@@ -306,7 +319,7 @@ def violation_candidates(kind, events):
             if later is not None and row["size"] is not None and later["size"] is not None and row["size"] != later["size"]:
                 out.append({"seq": row["seq"], "path_sha256": row["path_sha256"], "reason": "supply_file_changed_after_open"})
     elif kind == "runner-consumption":
-        out += _consumption_candidates(events)
+        out += _consumption_candidates(events, sampler_logit_bias=sampler_logit_bias)
     elif kind == "ipc-ownership":
         roles = {r["binding"]: r["role"] for r in events if r["event"] == "process"}
         for row in events:
@@ -335,18 +348,18 @@ def violation_candidates(kind, events):
 _COMPARED = ("temperature_milli", "top_p_milli", "top_k", "logprobs", "allowed_tokens")
 
 
-def _consumption_gaps(events):
+def _consumption_gaps(events, *, sampler_logit_bias=False):
     gaps = set()
     for request in {r['request_sha256'] for r in events if r['event'] == 'api_validated'}:
         rows = [r for r in events if r['request_sha256'] == request]
         api = next(r for r in rows if r['event'] == 'api_validated')
-        if api['logit_bias']:
+        if api['logit_bias'] and not sampler_logit_bias:
             gaps.add('GPU_INPUT_CONSUMPTION_FIELD_UNOBSERVED:sampler_applied:logit_bias')
         for stage in ('runner_received', 'sampler_applied'):
             stage_rows = [r for r in rows if r['event'] == stage]
             if not stage_rows:
                 gaps.add(f'GPU_INPUT_CONSUMPTION_STAGE_MISSING:{stage}')
-            fields = _COMPARED + ('bad_words',) + (('max_tokens', 'prompt_tokens', 'max_token_id', 'logit_bias')
+            fields = _COMPARED + ('bad_words',) + (('logit_bias',) if sampler_logit_bias and stage == 'sampler_applied' else ()) + (('max_tokens', 'prompt_tokens', 'max_token_id', 'logit_bias')
                                                    if stage == 'runner_received' else ())
             for field in fields:
                 if api[field] is None or any(r[field] is None for r in stage_rows):
@@ -354,7 +367,7 @@ def _consumption_gaps(events):
     return sorted(gaps)
 
 
-def _consumption_candidates(events):
+def _consumption_candidates(events, *, sampler_logit_bias=False):
     """API에서 받은 값과 runner·sampler 값의 차이. bad_words는 단어와 토큰 변형 수가 달라 있음/없음만 본다."""
     out = []
     by = {}
@@ -370,6 +383,8 @@ def _consumption_candidates(events):
             if row["event"] not in ("runner_received", "sampler_applied"):
                 continue
             fields = _COMPARED + (("max_tokens", "prompt_tokens", "max_token_id") if row["event"] == "runner_received" else ())
+            if sampler_logit_bias and row['event'] == 'sampler_applied':
+                fields += ('logit_bias',)
             changed = sorted(f for f in fields if api[f] is not None and row[f] is not None and api[f] != row[f])
             if api["bad_words"] is not None and row["bad_words"] is not None and bool(api["bad_words"]) != bool(row["bad_words"]):
                 changed.append("bad_words")

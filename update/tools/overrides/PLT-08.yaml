@@ -34,3 +34,5 @@ limitations:
   - "LIF-04의 bounded slow read·close·병행 정상 요청도 같은 수집 절차에서 실행한다. 이 부가 수집의 누락이 확인된 초기 정상 HTTP 응답을 지우지 않는다. 스트림 시간 측정·LIF-04 판정 의미는 변경하지 않는다."
   - "평문 허용·거부·timeout·인증 실패·미수집은 전체 PASS가 아니라 UNKNOWN이다. 암호학적 peer 인증·TLS handshake/종료·재암호화·인증서·IPC/TP·무결성 변조·전체 배포 경로는 미검증이다."
   - "출처는 기존 수집의 DECLARED 상한과 EXAMPLE을 유지한다. 실제 엔진 기동·모델 다운로드는 수행하지 않으며 과거 EVD·팩에 소급하지 않는다."
+
+impact: HIGH

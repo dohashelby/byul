@@ -7,7 +7,9 @@ from pathlib import Path
 import tempfile
 import threading
 import time
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -17,6 +19,47 @@ from serving_runtime.mvp.mock_engine import MockEngine
 from serving_runtime.mvp.policy import load_policy
 from serving_runtime.mvp.relay import sse_done
 from serving_runtime.mvp.store import JsonlStore
+
+
+class _StreamDeadlineClock:
+    """실제 준비/저장 지연과 무관하게 같은60ms 요청 기한을 통과시킨다."""
+    def __init__(self):
+        self.value = time.monotonic()
+        self.elapsed = 0.0
+        self.timers = []
+        self.lock = threading.RLock()
+
+    def monotonic(self):
+        with self.lock:
+            return self.value
+
+    def advance(self, seconds):
+        with self.lock:
+            self.value += seconds
+            self.elapsed += seconds
+            due = [timer for timer in self.timers if not timer.cancelled and timer.deadline <= self.value]
+            for timer in due:
+                timer.cancelled = True
+        for timer in due:
+            timer.callback()
+
+    def timer(self, interval, callback):
+        clock = self
+
+        class Timer:
+            def __init__(self):
+                self.deadline = clock.monotonic() + interval
+                self.callback = callback
+                self.cancelled = False
+
+            def start(self):
+                with clock.lock:
+                    clock.timers.append(self)
+
+            def cancel(self):
+                self.cancelled = True
+
+        return Timer()
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -268,10 +311,37 @@ class StreamingHttpTests(unittest.TestCase):
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with closing(urlopen(request, timeout=2)) as response:
-            request_id = response.headers["X-Request-ID"]
-            response.read()
-        final = self.final(data_dir, request_id)
+        from serving_runtime.mvp import relay, request_flow, response_timeout
+        from serving_runtime.mvp.backend import BackendConfig
+        from test_mvp_request_boundaries import BackendConnection, BackendResponse
+
+        clock = _StreamDeadlineClock()
+
+        class TimedResponse(BackendResponse):
+            def read1(self, size):
+                # 첫 stream chunk는59ms, 다음 읽기는61ms다. idle1초는 지나지 않는다.
+                clock.advance(0.059 if self.reads == 0 else 0.002)
+                return super().read1(size)
+
+        upstream = BackendConnection(TimedResponse([
+            b'data: {"id":"stream-test","object":"chat.completion.chunk","model":"test-model",'
+            b'"choices":[{"index":0,"delta":{"content":"hello"},"finish_reason":null}]}\n\n',
+            b'data: [DONE]\n\n',
+        ], stream=True))
+        controlled_time = SimpleNamespace(**{**vars(time), "monotonic": clock.monotonic})
+        controlled_threads = SimpleNamespace(**{**vars(threading), "Timer": clock.timer})
+        # 제품의 deadline 검사·watchdog callback은 그대로 실행한다. 시계와 유계 상류만 제어한다.
+        with patch.object(relay, "time", controlled_time), patch.object(request_flow, "time", controlled_time), \
+                patch.object(response_timeout, "time", controlled_time), \
+                patch.object(response_timeout, "threading", controlled_threads), \
+                patch.object(BackendConfig, "connection", return_value=(upstream, "/engine")):
+            with closing(urlopen(request, timeout=2)) as response:
+                request_id = response.headers["X-Request-ID"]
+                response.read()
+            final = self.final(data_dir, request_id)
+        self.assertEqual(upstream.response.reads, 2)
+        self.assertTrue(upstream.closed)
+        self.assertLess(clock.elapsed, 1.0)
         self.assertEqual(final["final_outcome"], "deadline_exceeded")
         self.assertEqual(final["decision"]["reason_code"], "STREAM_DEADLINE")
 

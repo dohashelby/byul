@@ -39,3 +39,5 @@ limitations:
   - "원문의 실제 읽기 inventory·승인 제외 시험 묶음·새 기동 선택/소비/차단 challenge는 미실행이다. 정상 chat 표본 관측이 pass여도 전체 기능 PASS는 만들지 않는다. 독립적인 loader/worker 소비 수집원 연결은 후속 과제다."
   - "기존 REQ-07 수동 bounded 정책 계약은 SUP-03 수동 PASS를 지원하지 않는다. 수동 PASS는 보류되고 AUTOMATION_MANUAL_POLICY_UNRESOLVED 사유가 남으며 신고 FAIL/UNKNOWN은 보존한다. 불필요한 REQ-07 정책키를 SUP-03에 추가하지 않는다."
   - "검토된 fixed text-chat profile과 full pinned ENV/target 이미지·일치한 모델만 지원한다. bare SHA ENV나 미지원 template·image/model 충돌·identity 변화·token 개수만 일치·수집 실패는 UNKNOWN이다. 응답·토큰 원문과 host mount 경로는 증거 artifact에 저장하지 않는다."
+
+impact: HIGH

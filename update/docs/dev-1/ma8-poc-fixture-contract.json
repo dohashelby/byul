@@ -1,0 +1,22 @@
+{
+  "schema": "guard-mvp-sup08-fixture-contract/1",
+  "provenance": {
+    "source_document": "docs/gpu-a/RESULTS-20261111-SUP08.md",
+    "source_document_sha256": "0b0f7d50ca853d80d18ac358d61a5805103adbb19859edf1dc0da779aa625313",
+    "poc_source_commit": "94a31486",
+    "note": "PoC 결과 문서의 고정 입력 신원이다. 원본 fixture manifest의 복원본이나 새 실행 결과가 아니다."
+  },
+  "fixture": {
+    "schema": "byul-sup08-phi3v-fixture/1",
+    "source_model": "microsoft/Phi-3-vision-128k-instruct",
+    "source_revision": "ed2772fabe9dc9acd0caad54b62761d92520cc44",
+    "model_id": "local-byul/sup08-phi3v-derived",
+    "model_snapshot_id": "57f2f7423e74d97203b79372390c8f84efb81b93",
+    "model_inventory_sha256": "c2dd67477c1899b775e5fa0d0585861e62166ff94c7b94a7c8ba531c2756ac52",
+    "code_repository": "local-byul/sup08-phi3v-processor",
+    "code_revisions": {
+      "approved": "a239c75031d0d32a44f2a89135f574c2318244de",
+      "unapproved": "bd80f9e25ed91e97f4da47172241bbe008d77e99"
+    }
+  }
+}

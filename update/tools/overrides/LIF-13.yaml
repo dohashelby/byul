@@ -13,6 +13,15 @@ policy_params:
 - key: sensor_manifest_sha256
   type: str
   required: true
+- key: release_allowed_roles
+  type: list[str]
+  required: true
+- key: reacquire_same_approved_generation_only
+  type: bool
+  required: true
+- key: disk_fallback_allowed
+  type: bool
+  required: true
 required_observations:
 - key: engine_sensor_violation
   type: bool
@@ -32,3 +41,7 @@ judge:
     - obs: engine_sensor_violation
       op: eq
       value: true
+impact: MEDIUM
+limitations:
+- 정책은 runtime 제어기만 release, release 뒤 승인된 같은 세대만 재취득, 디스크 fallback 금지다. PID·UID 지문만으로
+  역할 인가나 세대 승인을 확정하지 않는다. 역할·승인 결합 근거가 없는 분기는 UNKNOWN을 유지한다.

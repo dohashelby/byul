@@ -2,7 +2,7 @@ id: PLT-12
 framework_id: CHK-PLT-012
 mechanism_ids:
 - mechanism-12
-revision: 4
+revision: 5
 retired: false
 area: PLT
 purpose: 권한 철회
@@ -12,7 +12,7 @@ scope: 자격 전달·저장·교체 시
 risk_category: 보안 위협 점검
 risk_summary: 폐기된 secret·이미지·설정 사본에 접근한 주체가 남은 자격을 재사용해 서비스에 다시 접근할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 실제 사용 자격의 전달·저장·교체 과정에서 남는 사본과 재사용 경로를 확인한다.
 policy_params:

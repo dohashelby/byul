@@ -2,7 +2,7 @@ id: LIF-04
 framework_id: CHK-LIF-004
 mechanism_ids:
 - mechanism-07
-revision: 4
+revision: 5
 retired: false
 area: LIF
 purpose: 자원 예산·공정성
@@ -12,7 +12,7 @@ scope: SSE 기본; response debug는 활성 시
 risk_category: 보안 위협 점검
 risk_summary: 느리게 응답을 읽거나 큰 응답을 유도하는 호출자가 연결·buffer를 오래 점유해 메모리와 다른 요청의 처리 기회를 소모할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: LOW
 applies_when:
   prose: 스트리밍 수신 지연·연결 종료를 확인한다. response debug buffering은 실제 활성 route에서 추가한다.
 policy_params:

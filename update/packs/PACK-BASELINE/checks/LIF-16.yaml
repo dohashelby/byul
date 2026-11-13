@@ -3,7 +3,7 @@ framework_id: CHK-LIF-016
 mechanism_ids:
 - mechanism-08
 - mechanism-10
-revision: 3
+revision: 4
 retired: false
 area: LIF
 purpose: 복구 정책·상태 검증
@@ -13,7 +13,7 @@ scope: 백업 사용 시; 특수 snapshot은 선택
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: backup 변경권자가 복원 자료를 변조해 비승인 모델·코드·설정을 적용시킬 수 있음. 선택 snapshot은 승인 밖 모델 재사용·검증 전 요청 수용을 점검하며, 정상 생성의 API key 복원을 전제하지 않음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 사용하는 backup·복원 자료를 확인한다. 특수 snapshot은 지원 조건·실제 선택을 따로 확인한다.
 policy_params:

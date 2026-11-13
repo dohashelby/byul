@@ -9,6 +9,8 @@ release 주체의 허용 여부(기업 정책)는 판단하지 않는다. 주체
 """
 from __future__ import annotations
 
+from .vllm_observer_pin_rows import candidate_sources, layout
+
 import socket
 import struct
 
@@ -19,8 +21,8 @@ LOADER_MODULE = 'vllm.model_executor.model_loader.weight_cache.ipc_loader'
 TARGETS = {DAEMON_MODULE: ('WeightCacheDaemon._handle_get_state', 'WeightCacheDaemon._handle_release'),
            # load_model은 tracing 장식자로 감싸여 있어 원 코드 자격을 얻지 못한다. 그 아래 두 지점만 감싼다.
            LOADER_MODULE: ('IpcModelLoader._request_state', 'IpcModelLoader._fallback_load')}
-SOURCES = {DAEMON_MODULE: 'f4fc42549b0cce117cc006506d80b0d493f095f58825f89494a8d6ce43849e63',
-           LOADER_MODULE: '45c3a633a1556deab41404b5f5a4fb049f5f9a4dd1a21fb3a61bea16eea9f2da'}
+SOURCES = ({DAEMON_MODULE: 'f4fc42549b0cce117cc006506d80b0d493f095f58825f89494a8d6ce43849e63',
+           LOADER_MODULE: '45c3a633a1556deab41404b5f5a4fb049f5f9a4dd1a21fb3a61bea16eea9f2da'})
 SCHEMA = 'guard-vllm-weights-lifetime-callback/1'
 _CRED = struct.Struct('3i')
 
@@ -36,7 +38,7 @@ def peer(conn):
 
 class WeightsLifetimeObserver(cache.CacheCallbackObserver):
     targets = TARGETS
-    sources = SOURCES
+    sources = candidate_sources(SOURCES, TARGETS)
     schema = SCHEMA
     profile = 'source-bound-weights-lifetime-callback-candidate-v1'
     peer_reader = staticmethod(peer)
@@ -70,7 +72,9 @@ class WeightsLifetimeObserver(cache.CacheCallbackObserver):
             row = {'mode': fields.get('mode') if fields.get('mode') in ('zero_copy', 'copy') else None,
                    'fallback_enabled': fields.get('fallback') if type(fields.get('fallback')) is bool else None}
             if returned:
-                entries = cache.base.attrs(result).get('entries')
+                profile = layout(self, LOADER_MODULE)
+                entries = (result[profile['entries_index']] if 'entries_index' in profile and type(result) is tuple
+                           and len(result) == 2 else cache.base.attrs(result).get('entries'))
                 row.update(entries=len(entries) if type(entries) in (list, dict) else None, served=True)
             return row
         # IpcModelLoader._fallback_load

@@ -1,0 +1,335 @@
+{
+  "schema": "guard-candidate-function-review/1",
+  "basis": "태그 소스 함수 단위 대조. 이미지 설치 bytes 대조·GPU 실측·생산자 등록 전 후보다.",
+  "changed_functions": [
+    {
+      "module": "vllm.distributed.device_communicators.custom_all_reduce",
+      "point": "CustomAllreduce.__init__",
+      "signature_equal": false,
+      "reference_file_sha256": "50adb01de32bb910fd3c86e13125e36c9d7f3eb5efb36fba99f15c3675760cb9",
+      "candidate_file_sha256": "a048c1327c23580805600c0c951831bec333b1ffc4eb26a0e3d34119c4f0c445",
+      "candidate_code_sha256": "85455745c1d608de93b94d777af3e24c8de70089065cbc60ca93d490632f3409",
+      "review": "MNNVL multimem 전용 분기가 후보에는 없다. _ptr·buffer_ptrs·disabled·rank·world_size와 해제 순서를 보존한다. 기존 후보 행 사용."
+    },
+    {
+      "module": "vllm.distributed.device_communicators.custom_all_reduce",
+      "point": "CustomAllreduce.close",
+      "signature_equal": true,
+      "reference_file_sha256": "50adb01de32bb910fd3c86e13125e36c9d7f3eb5efb36fba99f15c3675760cb9",
+      "candidate_file_sha256": "a048c1327c23580805600c0c951831bec333b1ffc4eb26a0e3d34119c4f0c445",
+      "candidate_code_sha256": "f7077455e5fb5327dff5382513f301304c77e4ad5bd402edf243a8586bfe98f9",
+      "review": "MNNVL multimem 전용 분기가 후보에는 없다. _ptr·buffer_ptrs·disabled·rank·world_size와 해제 순서를 보존한다. 기존 후보 행 사용."
+    },
+    {
+      "module": "vllm.model_executor.model_loader.default_loader",
+      "point": "DefaultModelLoader._get_weights_iterator",
+      "signature_equal": false,
+      "reference_file_sha256": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+      "candidate_file_sha256": "9c9d54b1b650bf5affc924ebb8b8c73711e187ae7486cadd9f737bb1279cc7b8",
+      "candidate_code_sha256": "640674f54e9f7bb0c0192ebc1b825e855f26cbb879bb6277441aef8187a4b592",
+      "review": "후보의 _prepare_weights 반환은 3원소이며 이전 태그는 index_file을 포함한 4원소다. encoder-only shard 필터도 다르다. B4에서 공급 관측의 반환 배치를 별도로 반영한다."
+    },
+    {
+      "module": "vllm.model_executor.model_loader.default_loader",
+      "point": "DefaultModelLoader._prepare_weights",
+      "signature_equal": true,
+      "reference_file_sha256": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+      "candidate_file_sha256": "9c9d54b1b650bf5affc924ebb8b8c73711e187ae7486cadd9f737bb1279cc7b8",
+      "candidate_code_sha256": "c2d34ca980fc944e7c8008ae4073ff36cbd9c5827b0b3ddf40e63a7427e5f56e",
+      "review": "후보의 _prepare_weights 반환은 3원소이며 이전 태그는 index_file을 포함한 4원소다. encoder-only shard 필터도 다르다. B4에서 공급 관측의 반환 배치를 별도로 반영한다."
+    },
+    {
+      "module": "vllm.model_executor.model_loader.default_loader",
+      "point": "DefaultModelLoader.load_weights",
+      "signature_equal": true,
+      "reference_file_sha256": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+      "candidate_file_sha256": "9c9d54b1b650bf5affc924ebb8b8c73711e187ae7486cadd9f737bb1279cc7b8",
+      "candidate_code_sha256": "5566ab29530b2ca1b6ffa87f0fca650c126dc1195f1f3e1fe9d3bfa36f54b35d",
+      "review": "후보의 _prepare_weights 반환은 3원소이며 이전 태그는 index_file을 포함한 4원소다. encoder-only shard 필터도 다르다. B4에서 공급 관측의 반환 배치를 별도로 반영한다."
+    },
+    {
+      "module": "vllm.model_executor.model_loader.weight_cache.daemon",
+      "point": "WeightCacheDaemon._handle_get_state",
+      "signature_equal": true,
+      "reference_file_sha256": "f4fc42549b0cce117cc006506d80b0d493f095f58825f89494a8d6ce43849e63",
+      "candidate_file_sha256": "01e4dd5ebcc9353073ac335f74aa9cc43da46385d0616937a222c97652b0dc16",
+      "candidate_code_sha256": "f2fbfee879d682a20c2260e671ac5f9166ebfad17a31ed8e66d426a715324df0",
+      "review": "반환 메시지 attrs와 로그 rank 필드가 다르지만 model None 전환·cache_config 대조·SO_PEERCRED 관측은 같다. LIF-13 후보 행을 추가한다."
+    },
+    {
+      "module": "vllm.model_executor.model_loader.weight_cache.daemon",
+      "point": "WeightCacheDaemon._handle_release",
+      "signature_equal": true,
+      "reference_file_sha256": "f4fc42549b0cce117cc006506d80b0d493f095f58825f89494a8d6ce43849e63",
+      "candidate_file_sha256": "01e4dd5ebcc9353073ac335f74aa9cc43da46385d0616937a222c97652b0dc16",
+      "candidate_code_sha256": "136aa6f76e943cc7194621808c8c160868d50fad3384e684a65582f1b9031d9b",
+      "review": "반환 메시지 attrs와 로그 rank 필드가 다르지만 model None 전환·cache_config 대조·SO_PEERCRED 관측은 같다. LIF-13 후보 행을 추가한다."
+    },
+    {
+      "module": "vllm.model_executor.model_loader.weight_cache.ipc_loader",
+      "point": "IpcModelLoader._request_state",
+      "signature_equal": true,
+      "reference_file_sha256": "45c3a633a1556deab41404b5f5a4fb049f5f9a4dd1a21fb3a61bea16eea9f2da",
+      "candidate_file_sha256": "efbf798e317ddc0389f4241c8b48f3aa2b98fbd397b287569152d14ea90a7e8a",
+      "candidate_code_sha256": "4fad8129ac37bb9f85aff5fba106095fc56d28a32fec99ccb2850a687e5b9826",
+      "review": "후보는 entries·aliases tuple, 이전은 상태 객체다. adapter 데이터 entries_index=0으로 개수 관측을 유지한다."
+    },
+    {
+      "module": "vllm.profiler.wrapper",
+      "point": "TorchProfilerWrapper._start",
+      "signature_equal": true,
+      "reference_file_sha256": "ba71c0accf29b2a987f7afc4dbf5cbe95cb16b72f7a5b67bb95c4b2e7f255fe8",
+      "candidate_file_sha256": "b1d3fff5035031d86ead1925d541cd07f084b6711875b592401b5528e3f730f4",
+      "candidate_code_sha256": "9fd76ad719807be3323264ae4672fe770781bc790e8f2905070c19b6980dee16",
+      "review": "후보는 기존 profiler.start/stop을 호출하고 이전은 _start에서 profiler를 다시 만든다. B4에서 profiler 세대·출력 구간 관측을 확인하며 이 PR에서는 핀을 추가하지 않는다."
+    },
+    {
+      "module": "vllm.profiler.wrapper",
+      "point": "TorchProfilerWrapper._stop",
+      "signature_equal": true,
+      "reference_file_sha256": "ba71c0accf29b2a987f7afc4dbf5cbe95cb16b72f7a5b67bb95c4b2e7f255fe8",
+      "candidate_file_sha256": "b1d3fff5035031d86ead1925d541cd07f084b6711875b592401b5528e3f730f4",
+      "candidate_code_sha256": "33f2ae12f5ad5baa107ceca97f0c0795c0a6dfdc8ba119667844c196a7b0e2a3",
+      "review": "후보는 기존 profiler.start/stop을 호출하고 이전은 _start에서 profiler를 다시 만든다. B4에서 profiler 세대·출력 구간 관측을 확인하며 이 PR에서는 핀을 추가하지 않는다."
+    },
+    {
+      "module": "vllm.renderers.online_renderer",
+      "point": "OnlineRenderer.preprocess_chat",
+      "signature_equal": true,
+      "reference_file_sha256": "1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e",
+      "candidate_file_sha256": "147ac64103d7ffa842cc6b91e916c5de8aaab35f79762451e2c0ee8cb5513c0e",
+      "candidate_code_sha256": "60441ad5084cbf6a20828f21c4340abfbcb86acc5e165bd6fe8fd924ead586b2",
+      "review": "후보 preprocess_chat에는 요청 mm kwargs 사전 검증이 없다. render_chat의 Harmony 경로도 다르다. SUP-08 회귀 근거와 일치하며 이전의 거부 의미를 이월하지 않는다."
+    },
+    {
+      "module": "vllm.renderers.online_renderer",
+      "point": "OnlineRenderer.render_chat",
+      "signature_equal": true,
+      "reference_file_sha256": "1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e",
+      "candidate_file_sha256": "147ac64103d7ffa842cc6b91e916c5de8aaab35f79762451e2c0ee8cb5513c0e",
+      "candidate_code_sha256": "b7e2beec999c11679c24435e12e9e25ebf12c977cd901b0e74996e3d084393bd",
+      "review": "후보 preprocess_chat에는 요청 mm kwargs 사전 검증이 없다. render_chat의 Harmony 경로도 다르다. SUP-08 회귀 근거와 일치하며 이전의 거부 의미를 이월하지 않는다."
+    },
+    {
+      "module": "vllm.v1.core.kv_cache_manager",
+      "point": "KVCacheManager.allocate_slots",
+      "signature_equal": true,
+      "reference_file_sha256": "bd9bf46a2101f9368d4941867415a239d18d95e0b956f82f885ce25e10e69f3b",
+      "candidate_file_sha256": "58800535eda854580d84e1025bf32fe01b2a43ce0bba501b4f3d125e4f2c8afa",
+      "candidate_code_sha256": "03f28c6843dc3ca670668fec30f13b2adbac8c270bab893772eb7ae9626e9276",
+      "review": "allocate_slots의 0 token·prefix replay·prefill_end 처리 차이. 캐시 조회 대상 get_computed_blocks의 계약과 구분한다. allocator 반환은 실제 할당 사실로만 읽으며 같은 토큰 비용이라고 추정하지 않는다."
+    },
+    {
+      "module": "vllm.v1.core.sched.scheduler",
+      "point": "Scheduler._free_request",
+      "signature_equal": true,
+      "reference_file_sha256": "f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a",
+      "candidate_file_sha256": "c1db45f3bbad3a875dd8638331b8870c4380ac1ab4734265ba5c863833a82884",
+      "candidate_code_sha256": "321d185b7b072d90df5bd228044cbded0af64c803c680c6dfd03232cbb95b183",
+      "review": "waiting·skipped_waiting과 kv_holding_waiting·deferred_waiting 구성이 다르며 prefix replay·routed experts·connector·logprob 처리도 다르다. B4의 request-attempt 대상표/속성 검토 대상으로 남기며 scheduler 후보 핀은 추가하지 않는다."
+    },
+    {
+      "module": "vllm.v1.core.sched.scheduler",
+      "point": "Scheduler._preempt_request",
+      "signature_equal": true,
+      "reference_file_sha256": "f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a",
+      "candidate_file_sha256": "c1db45f3bbad3a875dd8638331b8870c4380ac1ab4734265ba5c863833a82884",
+      "candidate_code_sha256": "6050fe9306181fa5bc0f1cded2e5ef91b6e71f0b3158d12cf42b8448b88e2a88",
+      "review": "waiting·skipped_waiting과 kv_holding_waiting·deferred_waiting 구성이 다르며 prefix replay·routed experts·connector·logprob 처리도 다르다. B4의 request-attempt 대상표/속성 검토 대상으로 남기며 scheduler 후보 핀은 추가하지 않는다."
+    },
+    {
+      "module": "vllm.v1.core.sched.scheduler",
+      "point": "Scheduler.finish_requests",
+      "signature_equal": true,
+      "reference_file_sha256": "f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a",
+      "candidate_file_sha256": "c1db45f3bbad3a875dd8638331b8870c4380ac1ab4734265ba5c863833a82884",
+      "candidate_code_sha256": "2019a0763a3f36db31dcb284e6a393dfa24b3e1eea7fa49ba50ceeef1624f91d",
+      "review": "waiting·skipped_waiting과 kv_holding_waiting·deferred_waiting 구성이 다르며 prefix replay·routed experts·connector·logprob 처리도 다르다. B4의 request-attempt 대상표/속성 검토 대상으로 남기며 scheduler 후보 핀은 추가하지 않는다."
+    },
+    {
+      "module": "vllm.v1.core.sched.scheduler",
+      "point": "Scheduler.schedule",
+      "signature_equal": true,
+      "reference_file_sha256": "f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a",
+      "candidate_file_sha256": "c1db45f3bbad3a875dd8638331b8870c4380ac1ab4734265ba5c863833a82884",
+      "candidate_code_sha256": "2dff729aa910fe406756929123847cb2ba959f810c567119d34cc75c0e945600",
+      "review": "waiting·skipped_waiting과 kv_holding_waiting·deferred_waiting 구성이 다르며 prefix replay·routed experts·connector·logprob 처리도 다르다. B4의 request-attempt 대상표/속성 검토 대상으로 남기며 scheduler 후보 핀은 추가하지 않는다."
+    },
+    {
+      "module": "vllm.v1.core.sched.scheduler",
+      "point": "Scheduler.update_from_output",
+      "signature_equal": true,
+      "reference_file_sha256": "f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a",
+      "candidate_file_sha256": "c1db45f3bbad3a875dd8638331b8870c4380ac1ab4734265ba5c863833a82884",
+      "candidate_code_sha256": "3be579c9dcb2ff025c5029128466019ce247c298b52533b0bbdb04634f888ffe",
+      "review": "waiting·skipped_waiting과 kv_holding_waiting·deferred_waiting 구성이 다르며 prefix replay·routed experts·connector·logprob 처리도 다르다. B4의 request-attempt 대상표/속성 검토 대상으로 남기며 scheduler 후보 핀은 추가하지 않는다."
+    },
+    {
+      "module": "vllm.v1.engine.core",
+      "point": "EngineCore.wake_up",
+      "signature_equal": true,
+      "reference_file_sha256": "f116962c35d9d312b20b0b76c34a8cdaa6d3f1d31f2036db4e123957d2d1555b",
+      "candidate_file_sha256": "268bf40534a853812867ae8e80040f190983cb364b41182b55969aace20c93f5",
+      "candidate_code_sha256": "40c93a7280747815db98b6b49392523761796a78f50277fd0b2fa400df929f06",
+      "review": "wake_up 반환 bool과 pause callback의 예외 전달이 다르다. 전환 완료·실패는 실제 CALL/RETURN/RAISE로 구분해야 한다. B4 대상으로 남기며 후보 핀은 추가하지 않는다."
+    },
+    {
+      "module": "vllm.v1.engine.core",
+      "point": "EngineCoreProc.pause_scheduler",
+      "signature_equal": true,
+      "reference_file_sha256": "f116962c35d9d312b20b0b76c34a8cdaa6d3f1d31f2036db4e123957d2d1555b",
+      "candidate_file_sha256": "268bf40534a853812867ae8e80040f190983cb364b41182b55969aace20c93f5",
+      "candidate_code_sha256": "4e6a0b948bea76ea3e63149cbbcd08072568d7e224765bafb8c8391637dd8a08",
+      "review": "wake_up 반환 bool과 pause callback의 예외 전달이 다르다. 전환 완료·실패는 실제 CALL/RETURN/RAISE로 구분해야 한다. B4 대상으로 남기며 후보 핀은 추가하지 않는다."
+    },
+    {
+      "module": "vllm.v1.engine.input_processor",
+      "point": "InputProcessor._validate_model_input",
+      "signature_equal": true,
+      "reference_file_sha256": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
+      "candidate_file_sha256": "c8abd8e4e14d99929d45a7ff3b2a74898269c5e2a7fa30b826623ee85e4ce813",
+      "candidate_code_sha256": "3deebfa7c8563d3ba50e5174f71aa0402178fbcecd878901207d92526fea4510",
+      "review": "embeds 길이·sampling 추가 검증과 kv_hints 인자가 다르다. 관측한 prompt·옵션·거부 예외만 기록하고 검증 규칙이 같다고 주장하지 않는다. scoped V1은 고정 대상의 위치·필드를 그대로 읽는다."
+    },
+    {
+      "module": "vllm.v1.engine.input_processor",
+      "point": "InputProcessor._validate_params",
+      "signature_equal": true,
+      "reference_file_sha256": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
+      "candidate_file_sha256": "c8abd8e4e14d99929d45a7ff3b2a74898269c5e2a7fa30b826623ee85e4ce813",
+      "candidate_code_sha256": "b6005052d4fe79475be8d3b918635fc8484855ca1d500570ee1a57be451e15aa",
+      "review": "embeds 길이·sampling 추가 검증과 kv_hints 인자가 다르다. 관측한 prompt·옵션·거부 예외만 기록하고 검증 규칙이 같다고 주장하지 않는다. scoped V1은 고정 대상의 위치·필드를 그대로 읽는다."
+    },
+    {
+      "module": "vllm.v1.engine.input_processor",
+      "point": "InputProcessor.process_inputs",
+      "signature_equal": false,
+      "reference_file_sha256": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
+      "candidate_file_sha256": "c8abd8e4e14d99929d45a7ff3b2a74898269c5e2a7fa30b826623ee85e4ce813",
+      "candidate_code_sha256": "eaf57574aca3565ca67b9b94da3604992b085f33a4cf278820f21ff071169d52",
+      "review": "embeds 길이·sampling 추가 검증과 kv_hints 인자가 다르다. 관측한 prompt·옵션·거부 예외만 기록하고 검증 규칙이 같다고 주장하지 않는다. scoped V1은 고정 대상의 위치·필드를 그대로 읽는다."
+    },
+    {
+      "module": "vllm.v1.worker.gpu.async_utils",
+      "point": "AsyncOutput.__init__",
+      "signature_equal": false,
+      "reference_file_sha256": "10875f3e7ab28fea5b6ec0dfa1a840ae69675882468cb90f9f3ca0a66db1598f",
+      "candidate_file_sha256": "77e17a4570ead2be30ae9b00888cf077a3b873018c12ca0549b853bfda02c1ba",
+      "candidate_code_sha256": "4e828d0a8a04f45c032eb39f46cbc69af9974c10d88ec13216914c96362e9f66",
+      "review": "pending_aux_output 대신 routed_experts를 보관한다. model_runner_output·sampler_output의 수신자와 복사 완료를 분리해야 한다. B4의 출력 귀속 대상으로 남긴다."
+    },
+    {
+      "module": "vllm.v1.worker.gpu.async_utils",
+      "point": "AsyncOutput.get_output",
+      "signature_equal": true,
+      "reference_file_sha256": "10875f3e7ab28fea5b6ec0dfa1a840ae69675882468cb90f9f3ca0a66db1598f",
+      "candidate_file_sha256": "77e17a4570ead2be30ae9b00888cf077a3b873018c12ca0549b853bfda02c1ba",
+      "candidate_code_sha256": "c081063af553c3968a73b827b993cec9c3ce2224376dfbeecc93d671ad35fd4d",
+      "review": "pending_aux_output 대신 routed_experts를 보관한다. model_runner_output·sampler_output의 수신자와 복사 완료를 분리해야 한다. B4의 출력 귀속 대상으로 남긴다."
+    },
+    {
+      "module": "vllm.v1.worker.gpu.model_runner",
+      "point": "GPUModelRunner.add_requests",
+      "signature_equal": true,
+      "reference_file_sha256": "725c47114e148ade3a26b4cc9c5f7295588fdd387afc3cb5fdb2d16513a1bb5c",
+      "candidate_file_sha256": "174c93db921c23cf0396eee4764be25b2bd2d4b6a06e9fa41ce3598b884ce8ce",
+      "candidate_code_sha256": "0b231a708e826360fba87cbd411f54a746bf4ddf9a6b79a401304c639d19292e",
+      "review": "add_requests의 sampler 인자에 prompt_len이 추가되고 execute_model의 padding·PCP·routed experts와 sample grammar 분기가 다르다. add/sample의 요청/CPU 상태 위치는 adapter 데이터로 고르고 GPU 소비 완료로 승격하지 않는다."
+    },
+    {
+      "module": "vllm.v1.worker.gpu.model_runner",
+      "point": "GPUModelRunner.execute_model",
+      "signature_equal": false,
+      "reference_file_sha256": "725c47114e148ade3a26b4cc9c5f7295588fdd387afc3cb5fdb2d16513a1bb5c",
+      "candidate_file_sha256": "174c93db921c23cf0396eee4764be25b2bd2d4b6a06e9fa41ce3598b884ce8ce",
+      "candidate_code_sha256": "dc7b2ac688c109dd390098a80128c3e19fd647270fc33e3afd4129a3cf83b4a5",
+      "review": "add_requests의 sampler 인자에 prompt_len이 추가되고 execute_model의 padding·PCP·routed experts와 sample grammar 분기가 다르다. add/sample의 요청/CPU 상태 위치는 adapter 데이터로 고르고 GPU 소비 완료로 승격하지 않는다."
+    },
+    {
+      "module": "vllm.v1.worker.gpu.model_runner",
+      "point": "GPUModelRunner.sample",
+      "signature_equal": true,
+      "reference_file_sha256": "725c47114e148ade3a26b4cc9c5f7295588fdd387afc3cb5fdb2d16513a1bb5c",
+      "candidate_file_sha256": "174c93db921c23cf0396eee4764be25b2bd2d4b6a06e9fa41ce3598b884ce8ce",
+      "candidate_code_sha256": "12628706c12b3bbdc9060c50d8d507c7da14b1a8085cd60f5b3d6f83a49d5e41",
+      "review": "add_requests의 sampler 인자에 prompt_len이 추가되고 execute_model의 padding·PCP·routed experts와 sample grammar 분기가 다르다. add/sample의 요청/CPU 상태 위치는 adapter 데이터로 고르고 GPU 소비 완료로 승격하지 않는다."
+    },
+    {
+      "module": "vllm.v1.worker.gpu.model_runner",
+      "point": "GPUModelRunner.sample_tokens",
+      "signature_equal": true,
+      "reference_file_sha256": "725c47114e148ade3a26b4cc9c5f7295588fdd387afc3cb5fdb2d16513a1bb5c",
+      "candidate_file_sha256": "174c93db921c23cf0396eee4764be25b2bd2d4b6a06e9fa41ce3598b884ce8ce",
+      "candidate_code_sha256": "34110a3040fdfb077589cc1a0f0cedeb70dc908a5bb70838d7a60fcb1c8609d2",
+      "review": "add_requests의 sampler 인자에 prompt_len이 추가되고 execute_model의 padding·PCP·routed experts와 sample grammar 분기가 다르다. add/sample의 요청/CPU 상태 위치는 adapter 데이터로 고르고 GPU 소비 완료로 승격하지 않는다."
+    },
+    {
+      "module": "vllm.v1.worker.gpu.sample.sampler",
+      "point": "Sampler.__call__",
+      "signature_equal": true,
+      "reference_file_sha256": "ddbcdab46010bf38a5fab9b9b6a2deed2ec5e883ebfe81e83f6d22f41e546771",
+      "candidate_file_sha256": "832c9945d201a1e730ff9b4b52076aa83bd4a5064e1e4cfea952cf84d4a8d1f0",
+      "candidate_code_sha256": "5850ac681da994d3e61011c0843e2074d415aa8bf4b07707511a2a50ae9dc683",
+      "review": "후보는 logit_bias_state·bad_words_state를 직접 보관하며 add_request의 sampling_params 위치는 3이다. 판본별 상태 위치·인자를 adapter 데이터로 반영한다. 계산된 needs flag는 관측값 그대로다."
+    },
+    {
+      "module": "vllm.v1.worker.gpu.sample.sampler",
+      "point": "Sampler.add_request",
+      "signature_equal": false,
+      "reference_file_sha256": "ddbcdab46010bf38a5fab9b9b6a2deed2ec5e883ebfe81e83f6d22f41e546771",
+      "candidate_file_sha256": "832c9945d201a1e730ff9b4b52076aa83bd4a5064e1e4cfea952cf84d4a8d1f0",
+      "candidate_code_sha256": "5e2f42702206442680e7aa0790e101b90b57f25a1458000f2a90abf8a3d2d391",
+      "review": "후보는 logit_bias_state·bad_words_state를 직접 보관하며 add_request의 sampling_params 위치는 3이다. 판본별 상태 위치·인자를 adapter 데이터로 반영한다. 계산된 needs flag는 관측값 그대로다."
+    },
+    {
+      "module": "vllm.v1.worker.gpu_input_batch",
+      "point": "InputBatch.remove_request",
+      "signature_equal": true,
+      "reference_file_sha256": "e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d",
+      "candidate_file_sha256": "18cf455c9d0eea61cc581c7932f2e6cd09786914e82dd35eef1c1430da359a0f",
+      "candidate_code_sha256": "e800ef316b3cf17ac72668914d5e84c697fa5d4dcbe7c6ee0c1a0ffafd13d50e",
+      "review": "remove_request에서 prompt embeds 사전 정리만 다르다. req_id_to_index·해제 slot과 허용 token 마스크 관측 의미를 유지한다."
+    },
+    {
+      "module": "vllm.v1.worker.gpu_model_runner",
+      "point": "AsyncGPUModelRunnerOutput.get_output",
+      "signature_equal": true,
+      "reference_file_sha256": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a",
+      "candidate_file_sha256": "87c29d08c0bbf66993d8b984811e7325e35e6436242a773feb55ec88f16b2c51",
+      "candidate_code_sha256": "a58b1c36262af0d601d1222509c906537332b540bf6885e1fe172b2abbe6122d",
+      "review": "padding mask·routed experts 처리가 다르지만 scoped 대상 _update_states·_sample의 관측 필드는 보존된다. 출력/forward 변경 의미는 B4 검토로 남기며 결과 내용을 읽지 않는다."
+    },
+    {
+      "module": "vllm.v1.worker.gpu_model_runner",
+      "point": "GPUModelRunner.execute_model",
+      "signature_equal": true,
+      "reference_file_sha256": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a",
+      "candidate_file_sha256": "87c29d08c0bbf66993d8b984811e7325e35e6436242a773feb55ec88f16b2c51",
+      "candidate_code_sha256": "8b8cddf59d1b6c3c666ee34713fd410372c794b5d800bf79afeace3ff2de43c9",
+      "review": "padding mask·routed experts 처리가 다르지만 scoped 대상 _update_states·_sample의 관측 필드는 보존된다. 출력/forward 변경 의미는 B4 검토로 남기며 결과 내용을 읽지 않는다."
+    },
+    {
+      "module": "vllm.v1.worker.gpu_model_runner",
+      "point": "GPUModelRunner.sample_tokens",
+      "signature_equal": true,
+      "reference_file_sha256": "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a",
+      "candidate_file_sha256": "87c29d08c0bbf66993d8b984811e7325e35e6436242a773feb55ec88f16b2c51",
+      "candidate_code_sha256": "de9e9d07c6eefbddf63ec1a93eec2bd195976ba88f412c984d004f1c5735c40a",
+      "review": "padding mask·routed experts 처리가 다르지만 scoped 대상 _update_states·_sample의 관측 필드는 보존된다. 출력/forward 변경 의미는 B4 검토로 남기며 결과 내용을 읽지 않는다."
+    },
+    {
+      "module": "vllm.v1.worker.gpu_worker",
+      "point": "Worker.profile",
+      "signature_equal": true,
+      "reference_file_sha256": "43bd01925cd84f7d8a1d4a2ec30e289014a485fe4492a5343cbc893e8ed2f518",
+      "candidate_file_sha256": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+      "candidate_code_sha256": "a4a7a4a9e4b2896dae633ef8e1f3607855782f71180d27f9328c311e12ef62b5",
+      "review": "profile의 backend 생성이 factory 호출과 분기 생성으로 다르다. B4에서 실제 profiler 종류·출력 구간을 확인하며 이 PR에서는 후보 핀을 추가하지 않는다."
+    }
+  ],
+  "absent_function": {
+    "module": "vllm.renderers.online_renderer",
+    "point": "validate_request_mm_kwargs",
+    "review": "후보에 없는 사전 검증 함수. SUP-08의 실제 코드 선택과 구분해 기록한다."
+  }
+}

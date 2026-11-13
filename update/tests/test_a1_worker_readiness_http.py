@@ -25,6 +25,8 @@ def test_worker_readiness_uses_catalog_without_release_literal(monkeypatch):
     environment, world, values = inputs()
     engine = environment.engine.model_copy(update={'name': 'fixture-engine', 'version': '9.8.7'})
     environment = environment.model_copy(update={'engine': engine}).seal()
+    world.target['environment_ref'] = environment.ref().model_dump(mode='json')
+    world.target['engine_kind'] = engine.name
     world.target['model_mapping']['environment_ref'] = environment.ref().model_dump(mode='json')
     values['readiness_environment_sha256'] = environment.ref().sha256
     values['readiness_target_sha256'] = sha256_hex(canonical_json(world.target))

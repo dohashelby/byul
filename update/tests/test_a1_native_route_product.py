@@ -137,6 +137,8 @@ def test_route_transport_support_comes_from_catalog(feature, monkeypatch):
     environment, selected = full_inputs()
     engine = environment.engine.model_copy(update={'name': 'fixture-engine', 'version': '9.8.7'})
     environment = environment.model_copy(update={'engine': engine}).seal()
+    selected['environment_ref'] = environment.ref().model_dump(mode='json')
+    selected['engine_kind'] = engine.name
     selected['model_mapping']['environment_ref'] = environment.ref().model_dump(mode='json')
     calls = []
     profile = (http.ROUTE_AUTHENTICATION_PROFILE if feature == 'native_route'

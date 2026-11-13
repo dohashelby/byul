@@ -20,7 +20,7 @@ def test_no_engine_names_in_core():
 
 
 COMMON_LAYERS = ('core', 'models', 'store', 'executors', 'runtime', 'collectors', 'judges')
-RELEASE = re.compile(r'v?\d+\.\d+\.\d+(?:[a-zA-Z0-9.+-]*)?')
+RELEASE = re.compile(r'v?\d+\.\d+\.\d+(?:(?:a|b|rc|\.post|\.dev)\d+|[-+][a-zA-Z0-9.-]+)?')
 
 
 def release_comparisons(source):
@@ -52,6 +52,8 @@ def test_release_comparison_detection_preserves_contracts_and_comments():
 # version != '1.2.3'
 version == selected.version
 schema == 'guard-gpu-common-input/4'
+host == '127.0.0.1'
+address != '255.255.255.255'
 text = "version == '1.2.3'"
 '''
     assert release_comparisons(source) == []

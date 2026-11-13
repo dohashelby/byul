@@ -15,7 +15,7 @@ from tools.selected_runtime_check import request, document, header, json_body, o
 from tools.selected_request_checks import record_for
 from tools.selected_response_checks import generated_text
 from tools.selected_acceptance_run import bounded
-from serving_runtime.mvp.update_engine_link import select_request
+from serving_runtime.bridge_update.update_engine_link import select_request
 
 
 def status_scope(value):

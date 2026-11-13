@@ -53,7 +53,7 @@ def _check(name: str, status: str, reason: str) -> Check:
 
 def lab_management_scope(bundle_dir: str | Path, *, run_id: str, environment: str) -> dict[str, str]:
     """Derive audit references from the same verified immutable bundle as Gateway."""
-    from serving_runtime.mvp.policy_bundle import verify_policy_bundle
+    from serving_runtime.policy.policy_bundle import verify_policy_bundle
 
     bundle = verify_policy_bundle(bundle_dir)
     result = {
@@ -121,7 +121,7 @@ def bind_lab_report(
     The full source remains immutable; Runtime's existing LabReportSource
     controls the API projection. No report result is synthesized here.
     """
-    from serving_runtime.mvp.lab_report import LabReportSource
+    from serving_runtime.devtools.lab_report import LabReportSource
 
     directory = Path(host_directory)
     if (

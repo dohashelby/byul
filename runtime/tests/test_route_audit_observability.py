@@ -6,9 +6,9 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from serving_runtime.mvp.http_handler import Handler
-from serving_runtime.mvp.management_listener import AccessRecorder, ManagementListenerConfig
-from serving_runtime.mvp.route_rejections import RouteRejections, QUERY_MAX_BYTES
+from serving_runtime.gateway.http_handler import Handler
+from serving_runtime.gateway.management_listener import AccessRecorder, ManagementListenerConfig
+from serving_runtime.gateway.route_rejections import RouteRejections, QUERY_MAX_BYTES
 
 
 class RouteAuditObservabilityTest(unittest.TestCase):

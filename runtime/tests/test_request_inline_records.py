@@ -2,8 +2,8 @@
 
 from unittest.mock import patch
 import pytest
-from serving_runtime.mvp.query import QueryService, QueryError
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.observation.query import QueryService, QueryError
+from serving_runtime.observation.store import JsonlStore
 
 
 def row(rid, phase="final", at="2026-11-09T12:00:00Z"):

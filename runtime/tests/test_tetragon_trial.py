@@ -18,7 +18,7 @@ from tools.tetragon_trial import KindTrial, PROBE_PATH
 from tools.tetragon_status import StatusCollector
 from serving_runtime.enforcement.intent import parse_intent
 from serving_runtime.enforcement.tetragon import comparable_spec
-from serving_runtime.mvp.tetragon_state import read_tetragon_state
+from serving_runtime.observation.tetragon_state import read_tetragon_state
 from serving_runtime.operations.safety import evaluate
 
 AT = "2026-11-06T01:00:00+00:00"

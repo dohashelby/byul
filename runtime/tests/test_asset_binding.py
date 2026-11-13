@@ -7,8 +7,8 @@ from pathlib import Path
 import unittest
 
 from serving_runtime.enforcement.intent import parse_intent
-from serving_runtime.mvp.asset_binding import manifest_from_update_inventory, check_execution_binding, _canonical
-from serving_runtime.mvp.assets import check, load_manifest
+from serving_runtime.target.asset_binding import manifest_from_update_inventory, check_execution_binding, _canonical
+from serving_runtime.target.assets import check, load_manifest
 
 try:
     from guard.adapters.model_inventory import inventory

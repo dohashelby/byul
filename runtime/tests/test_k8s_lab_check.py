@@ -12,7 +12,7 @@ from serving_runtime.enforcement.cilium import render_manifests as render_cilium
 from serving_runtime.enforcement.cilium import write_manifests
 from serving_runtime.enforcement.intent import load_intent
 from serving_runtime.enforcement.tetragon import render_manifests as render_tetragon
-from serving_runtime.mvp.fake_backend import FakeBackend
+from serving_runtime.devtools.fake_backend import FakeBackend
 from tools.k8s_lab_check import (
     ContextSafetyError,
     DNS_SCRIPT,

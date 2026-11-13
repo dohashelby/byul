@@ -10,14 +10,14 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.backend import BackendConfig, load_backend_config
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.fake_backend import FakeBackend
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.relay import relay_payload
-from serving_runtime.mvp.store import JsonlStore
-from serving_runtime.mvp.validator import validate_request
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.gateway.backend import BackendConfig, load_backend_config
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.fake_backend import FakeBackend
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.gateway.relay import relay_payload
+from serving_runtime.observation.store import JsonlStore
+from serving_runtime.gateway.validator import validate_request
 
 
 def backend_document(base_url: str) -> dict[str, object]:

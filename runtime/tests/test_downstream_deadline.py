@@ -8,15 +8,15 @@ from unittest.mock import patch
 
 import pytest
 
-from serving_runtime.mvp.auth import CHAT_ROUTE, COMPLETIONS_ROUTE
-from serving_runtime.mvp.backend import BackendConfig
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.policy_state import load_revocations
-from serving_runtime.mvp.relay import Relay
-from serving_runtime.mvp.request_flow import RequestFlow, ConcurrencyLimiter
-from serving_runtime.mvp.request_records import RequestRecords
-from serving_runtime.mvp.response_timeout import write_response_before
-from serving_runtime.mvp.validator import validate_request
+from serving_runtime.gateway.auth import CHAT_ROUTE, COMPLETIONS_ROUTE
+from serving_runtime.gateway.backend import BackendConfig
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.policy.policy_state import load_revocations
+from serving_runtime.gateway.relay import Relay
+from serving_runtime.gateway.request_flow import RequestFlow, ConcurrencyLimiter
+from serving_runtime.gateway.request_records import RequestRecords
+from serving_runtime.gateway.response_timeout import write_response_before
+from serving_runtime.gateway.validator import validate_request
 from test_mvp_request_boundaries import BackendResponse, BackendConnection, POLICY, body, RequestIO
 
 

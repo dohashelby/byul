@@ -15,7 +15,7 @@ import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
 
-from serving_runtime.bundle_tools import (
+from serving_runtime.operations.bundle_tools import (
     build_bundle,
     apply_bundle,
     _canonical,
@@ -28,10 +28,10 @@ from serving_runtime.bundle_tools import (
 from serving_runtime.cli import main
 from serving_runtime.enforcement.intent import load_intent
 from serving_runtime.enforcement.tetragon import comparable_spec, render_monitor_manifests
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.policy_bundle import verify_policy_bundle
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.policy.policy_bundle import verify_policy_bundle
 
 ROOT = Path(__file__).resolve().parents[1]
 LAB = ROOT / "deploy/gpu-lab"
@@ -246,9 +246,11 @@ class BundleToolsTest(unittest.TestCase):
             calls.append(command)
 
         with (
-            patch("serving_runtime.bundle_tools.os.chown"),
-            patch("serving_runtime.bundle_tools._run", side_effect=fake_run),
-            patch("serving_runtime.bundle_tools._checked_status", side_effect=StatusMismatch("bundle_id=wrong")),
+            patch("serving_runtime.operations.bundle_tools.os.chown"),
+            patch("serving_runtime.operations.bundle_tools._run", side_effect=fake_run),
+            patch(
+                "serving_runtime.operations.bundle_tools._checked_status", side_effect=StatusMismatch("bundle_id=wrong")
+            ),
         ):
             with self.assertRaisesRegex(RuntimeError, "이전 링크 복원"):
                 apply_bundle(*args)
@@ -259,7 +261,7 @@ class BundleToolsTest(unittest.TestCase):
         for item in (root / "vllm").iterdir():
             item.unlink()
         (root / "vllm").rmdir()
-        with patch("serving_runtime.bundle_tools.os.chown", side_effect=PermissionError("denied")):
+        with patch("serving_runtime.operations.bundle_tools.os.chown", side_effect=PermissionError("denied")):
             with self.assertRaisesRegex(PermissionError, "sudo"):
                 apply_bundle(*args)
         self.assertEqual(os.readlink(root / "current"), "previous")
@@ -285,8 +287,8 @@ class BundleToolsTest(unittest.TestCase):
             )
 
         with (
-            patch("serving_runtime.bundle_tools.os.chown"),
-            patch("serving_runtime.bundle_tools.urlopen", side_effect=fake_http),
+            patch("serving_runtime.operations.bundle_tools.os.chown"),
+            patch("serving_runtime.operations.bundle_tools.urlopen", side_effect=fake_http),
             patch.dict(
                 os.environ, {"PATH": str(self.root) + os.pathsep + os.environ["PATH"], "FAKE_KUBECTL_LOG": str(log)}
             ),
@@ -314,9 +316,11 @@ class BundleToolsTest(unittest.TestCase):
         (old / "bundle.json").write_text(json.dumps(manifest))
         (root / "current").symlink_to("previous")
         with (
-            patch("serving_runtime.bundle_tools.os.chown"),
-            patch("serving_runtime.bundle_tools._run") as kubectl,
-            patch("serving_runtime.bundle_tools._checked_status", side_effect=StatusUnavailable("연결 실패")),
+            patch("serving_runtime.operations.bundle_tools.os.chown"),
+            patch("serving_runtime.operations.bundle_tools._run") as kubectl,
+            patch(
+                "serving_runtime.operations.bundle_tools._checked_status", side_effect=StatusUnavailable("연결 실패")
+            ),
         ):
             with self.assertRaisesRegex(StatusUnavailable, "연결 실패"):
                 apply_bundle(str(self.out / "vllm"), str(root), "ctx", "ns", "http://127.0.0.1:8080", None)
@@ -342,13 +346,13 @@ class BundleToolsTest(unittest.TestCase):
         script = textwrap.dedent("""\
             import sys
             from unittest.mock import patch
-            from serving_runtime.bundle_tools import StatusMismatch, StatusUnavailable
+            from serving_runtime.operations.bundle_tools import StatusMismatch, StatusUnavailable
             from serving_runtime.cli import main
 
             error = {"rollback": StatusMismatch("wrong bundle"),
                      "unknown": StatusUnavailable("status unavailable")}.get(sys.argv[1])
-            with patch("serving_runtime.bundle_tools.os.chown"), \\
-                 patch("serving_runtime.bundle_tools._checked_status", side_effect=error):
+            with patch("serving_runtime.operations.bundle_tools.os.chown"), \\
+                 patch("serving_runtime.operations.bundle_tools._checked_status", side_effect=error):
                 sys.exit(main(sys.argv[2:]))
             """)
         cases = [
@@ -413,9 +417,14 @@ class BundleToolsTest(unittest.TestCase):
     def test_status_retry_and_unprotected_lookup(self):
         status = {"policy_bundle": {"bundle_id": "new"}, "policy": {"approval": {"state": "verified"}}}
         with (
-            patch("serving_runtime.bundle_tools._port_forward", return_value=nullcontext("http://127.0.0.1:9090")),
-            patch("serving_runtime.bundle_tools._status", side_effect=[URLError("old Pod"), status]) as lookup,
-            patch("serving_runtime.bundle_tools.time.sleep"),
+            patch(
+                "serving_runtime.operations.bundle_tools._port_forward",
+                return_value=nullcontext("http://127.0.0.1:9090"),
+            ),
+            patch(
+                "serving_runtime.operations.bundle_tools._status", side_effect=[URLError("old Pod"), status]
+            ) as lookup,
+            patch("serving_runtime.operations.bundle_tools.time.sleep"),
         ):
             _checked_status("ctx", "ns", None, 8080, None, "new", timeout=1)
         self.assertEqual(lookup.call_count, 2)
@@ -424,17 +433,20 @@ class BundleToolsTest(unittest.TestCase):
             self.assertIsNone(request.get_header("Authorization"))
             return io.BytesIO(json.dumps(status).encode())
 
-        with patch("serving_runtime.bundle_tools.urlopen", side_effect=no_auth_http):
+        with patch("serving_runtime.operations.bundle_tools.urlopen", side_effect=no_auth_http):
             self.assertEqual(_status("http://127.0.0.1:9090", None), status)
         with patch(
-            "serving_runtime.bundle_tools.urlopen",
+            "serving_runtime.operations.bundle_tools.urlopen",
             side_effect=HTTPError("http://127.0.0.1:9090/api/status", 401, "Unauthorized", {}, None),
         ):
             with self.assertRaisesRegex(StatusUnavailable, "RUNTIME_VIEWER_TOKEN 없음"):
                 _status("http://127.0.0.1:9090", None)
         with (
-            patch("serving_runtime.bundle_tools._port_forward", return_value=nullcontext("http://127.0.0.1:9090")),
-            patch("serving_runtime.bundle_tools._status", side_effect=URLError("disconnected")),
+            patch(
+                "serving_runtime.operations.bundle_tools._port_forward",
+                return_value=nullcontext("http://127.0.0.1:9090"),
+            ),
+            patch("serving_runtime.operations.bundle_tools._status", side_effect=URLError("disconnected")),
         ):
             with self.assertRaisesRegex(StatusUnavailable, "조회 불가.*URLError"):
                 _checked_status("ctx", "ns", None, 8080, None, "new", timeout=0)
@@ -455,8 +467,8 @@ class BundleToolsTest(unittest.TestCase):
             patch.dict(
                 os.environ, {"PATH": str(self.root) + os.pathsep + os.environ["PATH"], "FAKE_KUBECTL_LOG": str(log)}
             ),
-            patch("serving_runtime.bundle_tools._status", return_value=status) as lookup,
-            patch("serving_runtime.bundle_tools.time.sleep"),
+            patch("serving_runtime.operations.bundle_tools._status", return_value=status) as lookup,
+            patch("serving_runtime.operations.bundle_tools.time.sleep"),
         ):
             _checked_status("ctx", "ns", None, 8080, None, "new", timeout=5)
         self.assertEqual(len(log.read_text().splitlines()), 2)
@@ -480,7 +492,7 @@ class BundleToolsTest(unittest.TestCase):
         args = (None, str(root), "ctx", "ns", "http://127.0.0.1:8080", None)
         with self.assertRaisesRegex(ValueError, "소유권·권한"):
             apply_bundle(*args, existing="vllm", dry_run=True)
-        with patch("serving_runtime.bundle_tools._check_deployed_permissions") as permissions:
+        with patch("serving_runtime.operations.bundle_tools._check_deployed_permissions") as permissions:
             result = apply_bundle(*args, existing="vllm", dry_run=True)
             self.assertEqual(result["bundle_id"], "vllm")
             with redirect_stdout(io.StringIO()):
@@ -506,19 +518,19 @@ class BundleToolsTest(unittest.TestCase):
                 apply_bundle(str(self.out / "vllm"), *args[1:], dry_run=True)
             with (
                 patch(
-                    "serving_runtime.bundle_tools.tempfile.TemporaryDirectory",
+                    "serving_runtime.operations.bundle_tools.tempfile.TemporaryDirectory",
                     side_effect=AssertionError("복사 경로에 들어감"),
                 ),
-                patch("serving_runtime.bundle_tools._run") as rollout,
-                patch("serving_runtime.bundle_tools._checked_status", side_effect=StatusMismatch("wrong")),
+                patch("serving_runtime.operations.bundle_tools._run") as rollout,
+                patch("serving_runtime.operations.bundle_tools._checked_status", side_effect=StatusMismatch("wrong")),
             ):
                 with self.assertRaisesRegex(RuntimeError, "이전 링크 복원"):
                     apply_bundle(*args, existing="vllm")
             self.assertEqual(os.readlink(root / "current"), "previous")
             self.assertEqual(rollout.call_count, 4)
             with (
-                patch("serving_runtime.bundle_tools._run") as rollout,
-                patch("serving_runtime.bundle_tools._checked_status") as checked,
+                patch("serving_runtime.operations.bundle_tools._run") as rollout,
+                patch("serving_runtime.operations.bundle_tools._checked_status") as checked,
             ):
                 result = apply_bundle(*args, existing="vllm")
             self.assertEqual(os.readlink(root / "current"), "vllm")
@@ -553,7 +565,7 @@ class BundleToolsTest(unittest.TestCase):
             values[4:6] = [0, 10000]
             return os.stat_result(values)
 
-        with patch("serving_runtime.bundle_tools.Path.lstat", root_owned):
+        with patch("serving_runtime.operations.bundle_tools.Path.lstat", root_owned):
             _check_deployed_permissions(directory)
             file.chmod(0o600)
             with self.assertRaisesRegex(ValueError, "소유권·권한"):

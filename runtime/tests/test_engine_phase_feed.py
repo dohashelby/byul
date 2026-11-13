@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from tools.k8s_observation_feed import EnginePhaseTimelineWriter
-from serving_runtime.mvp.target import KubernetesSelector
+from serving_runtime.target.target import KubernetesSelector
 from serving_runtime.enforcement.execpolicy import ExecPolicy, parse_timeline
 from serving_runtime.enforcement.events import parse_tetragon
 from serving_runtime.enforcement.intent import load_intent

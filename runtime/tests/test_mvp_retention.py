@@ -10,9 +10,9 @@ import threading
 import unittest
 from unittest.mock import patch
 
-from serving_runtime.mvp.retention import HOLD_SCHEMA, RecordRetention, load_holds
-from serving_runtime.mvp import store as store_module
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.observation.retention import HOLD_SCHEMA, RecordRetention, load_holds
+from serving_runtime.observation import store as store_module
+from serving_runtime.observation.store import JsonlStore
 
 
 NOW = datetime(2026, 10, 24, 12, 0, tzinfo=timezone.utc)
@@ -274,7 +274,7 @@ class RetentionTests(unittest.TestCase):
                 return original_open(path, flags, *args, **kwargs)
 
             with patch(
-                "serving_runtime.mvp.store.os.open",
+                "serving_runtime.observation.store.os.open",
                 side_effect=fail_directory_open,
             ):
                 summary = RecordRetention(data, enforce=True).run(now=NOW)

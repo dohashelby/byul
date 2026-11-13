@@ -11,10 +11,10 @@ import stat
 import sys
 import tempfile
 
-from serving_runtime.mvp.assets import snapshot, _walk, load_manifest
-from serving_runtime.mvp.collectors import load_declaration
-from serving_runtime.mvp.policy import _object_without_duplicates, _reject_json_constant
-from serving_runtime.mvp.policy_state import load_revocations
+from serving_runtime.target.assets import snapshot, _walk, load_manifest
+from serving_runtime.observation.collectors import load_declaration
+from serving_runtime.policy.policy import _object_without_duplicates, _reject_json_constant
+from serving_runtime.policy.policy_state import load_revocations
 
 try:
     from tools.candidate_errors import CandidateError, CandidateArgumentParser, operation

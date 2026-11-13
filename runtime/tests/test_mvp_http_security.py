@@ -14,23 +14,23 @@ import unittest
 from unittest.mock import Mock
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.auth import AuthResult, Principal
-from serving_runtime.mvp.backend import BackendConfig
-from serving_runtime.mvp.config import MVPConfig
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.gateway.auth import AuthResult, Principal
+from serving_runtime.gateway.backend import BackendConfig
+from serving_runtime.config.config import MVPConfig
 from serving_runtime.enforcement.events import ObservationQuery
-from serving_runtime.mvp.http_handler import (
+from serving_runtime.gateway.http_handler import (
     HandlerDependencies,
     LimitedThreadingHTTPServer,
     _DeadlineReader,
     create_handler,
 )
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.policy_state import load_revocations
-from serving_runtime.mvp.request_flow import ConcurrencyLimiter, RequestFlow
-from serving_runtime.mvp.request_records import RequestRecords
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.policy.policy_state import load_revocations
+from serving_runtime.gateway.request_flow import ConcurrencyLimiter, RequestFlow
+from serving_runtime.gateway.request_records import RequestRecords
+from serving_runtime.observation.store import JsonlStore
 
 
 ROOT = Path(__file__).resolve().parents[1]

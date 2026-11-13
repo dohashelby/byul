@@ -31,10 +31,10 @@ from uuid import uuid4
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from serving_runtime.mvp.lab_report import LabReportSource, AWS_REPORT_SCHEMA
-from serving_runtime.mvp.backend import is_valid_credential_value
-from serving_runtime.mvp.kube_context import validate_kube_context
-from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA
+from serving_runtime.devtools.lab_report import LabReportSource, AWS_REPORT_SCHEMA
+from serving_runtime.gateway.backend import is_valid_credential_value
+from serving_runtime.target.kube_context import validate_kube_context
+from serving_runtime.observation.observation_feed import HEARTBEAT_SCHEMA
 from serving_runtime.enforcement.execpolicy import ExecPolicy
 
 try:

@@ -23,11 +23,11 @@ import time
 from urllib.parse import urlencode, urlparse
 from urllib.request import Request, build_opener, HTTPRedirectHandler, HTTPSHandler
 
-from .. import bundle_tools
+from serving_runtime.operations import bundle_tools
 from ..enforcement.intent import load_intent, TETRAGON_RULE_MODES
 from ..enforcement.tetragon import comparable_spec
-from ..mvp.policy_bundle import verify_policy_bundle
-from ..mvp.tetragon_state import read_tetragon_state
+from serving_runtime.policy.policy_bundle import verify_policy_bundle
+from serving_runtime.observation.tetragon_state import read_tetragon_state
 from .safety import evaluate, is_mode_switch_target, recent, requires_restart_confirmation
 
 ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")

@@ -12,7 +12,7 @@ import pytest
 from guard.models import DataOrigin, Environment, canonical_json, sha256_hex
 from guard.collectors import lifecycle
 from guard.executors import kubernetes_lifecycle_capture, lifecycle_session
-from serving_runtime.mvp import native_receipts
+from serving_runtime.observation import native_receipts
 
 
 def tool():

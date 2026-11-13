@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from serving_runtime.mvp.observation_feed import ObservationFeed
+from serving_runtime.observation.observation_feed import ObservationFeed
 
 
 def feed(root):
@@ -43,7 +43,7 @@ def test_receipt_temporary_is_private_from_creation_with_permissive_umask(tmp_pa
 
     previous = os.umask(0)
     try:
-        with patch("serving_runtime.mvp.observation_feed.os.open", side_effect=checked):
+        with patch("serving_runtime.observation.observation_feed.os.open", side_effect=checked):
             feed(tmp_path)._save_health_receipt(item())
     finally:
         os.umask(previous)
@@ -55,7 +55,7 @@ def test_failed_replace_preserves_prior_receipt_and_cleans_temporary(tmp_path):
     source._save_health_receipt(item())
     receipt = tmp_path / "tetragon-health-receipts.json"
     original = receipt.read_bytes()
-    with patch("serving_runtime.mvp.observation_feed.os.replace", side_effect=OSError("disk")):
+    with patch("serving_runtime.observation.observation_feed.os.replace", side_effect=OSError("disk")):
         with pytest.raises(OSError):
             source._save_health_receipt({**item(), "observed_at": "2026-11-08T00:01:00+00:00"})
     assert receipt.read_bytes() == original
@@ -77,9 +77,9 @@ def test_health_receipt_mode_rejects_unapproved_permissions(tmp_path, mode):
 
 
 def test_gateway_shares_only_tetragon_health_receipts_with_configured_status_reader(tmp_path):
-    from serving_runtime.mvp.app import GatewayApp
-    from serving_runtime.mvp.config import MVPConfig
-    from serving_runtime.mvp.policy import load_policy
+    from serving_runtime.gateway.app import GatewayApp
+    from serving_runtime.config.config import MVPConfig
+    from serving_runtime.policy.policy import load_policy
 
     policy = Path(__file__).resolve().parents[1] / "examples/mvp/policy.json"
     for configured in (False, True):

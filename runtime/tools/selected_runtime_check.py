@@ -61,7 +61,7 @@ def origin(value):
 
 def request(method, url, *, token=None, body=None, timeout=15, extra_headers=None):
     """Bound connect, headers and body by one absolute runtime watchdog."""
-    from serving_runtime.mvp.response_timeout import DeadlineWatchdog, set_response_timeout
+    from serving_runtime.gateway.response_timeout import DeadlineWatchdog, set_response_timeout
 
     if not math.isfinite(timeout) or timeout <= 0 or timeout > 60:
         raise ValueError("selected HTTP timeout must be finite and within (0,60]")
@@ -524,14 +524,14 @@ def isolated(
     retention_max_bytes=4096,
 ):
     """Own the entire directory; caller must supply a new, explicit path."""
-    from serving_runtime.mvp.app import GatewayApp
-    from serving_runtime.mvp.auth import token_digest
-    from serving_runtime.mvp.backend import load_backend_config
-    from serving_runtime.mvp.config import MVPConfig
-    from serving_runtime.mvp.mock_engine import MockEngine
-    from serving_runtime.mvp.policy import load_policy
-    from serving_runtime.mvp.retention import HOLD_SCHEMA, MANAGED_FILES, RecordRetention
-    from serving_runtime.mvp.store import JsonlStore
+    from serving_runtime.gateway.app import GatewayApp
+    from serving_runtime.gateway.auth import token_digest
+    from serving_runtime.gateway.backend import load_backend_config
+    from serving_runtime.config.config import MVPConfig
+    from serving_runtime.devtools.mock_engine import MockEngine
+    from serving_runtime.policy.policy import load_policy
+    from serving_runtime.observation.retention import HOLD_SCHEMA, MANAGED_FILES, RecordRetention
+    from serving_runtime.observation.store import JsonlStore
 
     if type(fixture_count) is not int or not 2 <= fixture_count <= 200:
         raise ValueError("fixture count must be within 2..200")
@@ -1138,10 +1138,10 @@ def main(argv=None):
         "tools.selected_observation_checks",
         "byul_platform.sources.checklist_data",
         "guard.executors.stream_probe",
-        "serving_runtime.mvp.validator",
-        "serving_runtime.mvp.retention",
+        "serving_runtime.gateway.validator",
+        "serving_runtime.observation.retention",
         "byul_platform.sources.runtime",
-        "serving_runtime.mvp.response_timeout",
+        "serving_runtime.gateway.response_timeout",
     ]
     local_sources = {}
     for name in modules:

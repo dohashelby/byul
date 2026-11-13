@@ -43,10 +43,7 @@ DEFAULT_STATE = Path.home() / ".local/state/serving-runtime/s3b-cpu"
 PROMPT = "Say hello in one short sentence."
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from serving_runtime.mvp.backend import (
-    is_valid_credential_value,
-    normalize_credential_value,
-)
+from serving_runtime.gateway.backend import is_valid_credential_value, normalize_credential_value
 
 
 class PrecheckConfigurationError(ValueError):
@@ -693,7 +690,7 @@ class Precheck:
 
     def s3_06(self, earlier_vllm_id: str) -> None:
         sys.path.insert(0, str(REPO_ROOT / "src"))
-        from serving_runtime.mvp.store import JsonlStore
+        from serving_runtime.observation.store import JsonlStore
 
         records, _ = JsonlStore(self.state / "data/gateway_records.jsonl").read_all()
         current_request_ids = {

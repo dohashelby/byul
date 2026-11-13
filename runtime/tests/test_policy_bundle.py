@@ -16,10 +16,10 @@ from unittest.mock import patch
 import pytest
 
 from serving_runtime.cli import main
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.policy_bundle import PolicyBundleError, verify_policy_bundle
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.policy.policy_bundle import PolicyBundleError, verify_policy_bundle
 from serving_runtime.enforcement.intent import load_intent
 
 
@@ -44,7 +44,9 @@ def test_materialized_body_oserror_is_propagated_and_snapshot_cleaned(error):
 
 def test_materialized_snapshot_creation_oserror_has_bundle_context():
     bundle = verify_policy_bundle(SOURCE_BUNDLE, now=NOW)
-    with patch("serving_runtime.mvp.policy_bundle.tempfile.TemporaryDirectory", side_effect=PermissionError("private")):
+    with patch(
+        "serving_runtime.policy.policy_bundle.tempfile.TemporaryDirectory", side_effect=PermissionError("private")
+    ):
         with pytest.raises(PolicyBundleError, match=r"bundle.json: .*스냅샷.*PermissionError"):
             with bundle.materialized_files():
                 pytest.fail("snapshot creation must fail")
@@ -265,7 +267,7 @@ class PolicyBundleIntegrationTests(unittest.TestCase):
             _write_manifest(directory, document)
             expected_policy = (directory / "runtime-policy.json").read_bytes()
             expected_approvals = (directory / "policy-approvals.json").read_bytes()
-            with patch("serving_runtime.mvp.app.run", side_effect=inspect_config):
+            with patch("serving_runtime.gateway.app.run", side_effect=inspect_config):
                 result = main(["mvp", "--policy-bundle", str(directory)])
         self.assertEqual(result, 0)
         self.assertEqual(captured["policy"], expected_policy)
@@ -308,7 +310,7 @@ class PolicyBundleIntegrationTests(unittest.TestCase):
                 }
             )
             _write_manifest(directory, document)
-            with patch("serving_runtime.mvp.app.run", side_effect=inspect_config):
+            with patch("serving_runtime.gateway.app.run", side_effect=inspect_config):
                 result = main(
                     [
                         "mvp",

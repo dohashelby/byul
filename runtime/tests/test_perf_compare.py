@@ -498,10 +498,10 @@ class PerfRealGatewayTests(unittest.TestCase):
     """
 
     def test_default_policy_gateway_accepts_plan_requests(self) -> None:
-        from serving_runtime.mvp.app import GatewayApp
-        from serving_runtime.mvp.config import MVPConfig
-        from serving_runtime.mvp.mock_engine import MockEngine
-        from serving_runtime.mvp.policy import load_policy
+        from serving_runtime.gateway.app import GatewayApp
+        from serving_runtime.config.config import MVPConfig
+        from serving_runtime.devtools.mock_engine import MockEngine
+        from serving_runtime.policy.policy import load_policy
 
         root_dir = Path(__file__).resolve().parents[1]
         policy = root_dir / "examples/mvp/policy.json"

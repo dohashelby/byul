@@ -13,7 +13,7 @@ from serving_runtime.enforcement.attribution import SCHEMA, KERNEL_DATA, bind_ev
 from serving_runtime.enforcement.events import parse_tetragon
 from serving_runtime.enforcement.intent import parse_intent, IntentError
 from serving_runtime.enforcement.tetragon import render_manifests
-from serving_runtime.mvp.observation_feed import ObservationFeed
+from serving_runtime.observation.observation_feed import ObservationFeed
 from tools.tetragon_identities import IdentityCollector, PROC_SCAN
 
 ROOT = Path(__file__).resolve().parents[1]

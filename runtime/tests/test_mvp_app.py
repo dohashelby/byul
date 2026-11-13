@@ -10,11 +10,11 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.app import GatewayApp
+from serving_runtime.gateway.app import GatewayApp
 from serving_runtime.cli import main
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
 from serving_runtime.enforcement.execpolicy import ExecPolicy
 from serving_runtime.enforcement.intent import load_intent
 
@@ -160,7 +160,7 @@ class MVPCommandTests(unittest.TestCase):
             )
 
     def test_cli_forwards_mvp_options(self) -> None:
-        with patch("serving_runtime.mvp.app.run") as run:
+        with patch("serving_runtime.gateway.app.run") as run:
             result = main(
                 [
                     "mvp",

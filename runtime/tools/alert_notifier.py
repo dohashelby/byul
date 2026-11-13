@@ -648,7 +648,7 @@ def main(argv=None) -> int:
         if args.gateway_url:
             connection = nullcontext(args.gateway_url)
         else:
-            from serving_runtime.bundle_tools import _port_forward
+            from serving_runtime.operations.bundle_tools import _port_forward
 
             connection = _port_forward(args.context, args.namespace, args.kubeconfig, 8080)
         try:

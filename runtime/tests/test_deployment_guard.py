@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from dataclasses import replace
-from serving_runtime.bundle_tools import StatusMismatch, StatusUnavailable, _checked_status, _normal_canary
+from serving_runtime.operations.bundle_tools import StatusMismatch, StatusUnavailable, _checked_status, _normal_canary
 from contextlib import nullcontext
 
 try:
@@ -17,9 +17,9 @@ try:
 except ImportError:
     Verdict = None
 
-from serving_runtime.mvp.deployment_guard import verify_deployment_guard
-from serving_runtime.mvp.policy_bundle import VerifiedPolicyBundle, VerifiedBundleFile
-from serving_runtime.bundle_tools import apply_bundle
+from serving_runtime.bridge_update.deployment_guard import verify_deployment_guard
+from serving_runtime.policy.policy_bundle import VerifiedPolicyBundle, VerifiedBundleFile
+from serving_runtime.operations.bundle_tools import apply_bundle
 
 NOW = datetime(2026, 11, 6, tzinfo=timezone.utc)
 SHA = "a" * 64
@@ -268,10 +268,13 @@ class DeploymentGuardTest(unittest.TestCase):
     def test_apply_fails_before_switch_when_current_evidence_unavailable(self):
         previous, verified = self.apply_fixture()
         with (
-            patch("serving_runtime.bundle_tools.verify_policy_bundle", side_effect=verified),
-            patch("serving_runtime.bundle_tools._check_deployed_permissions"),
-            patch("serving_runtime.mvp.deployment_guard.verify_deployment_guard", side_effect=ValueError("revoked")),
-            patch("serving_runtime.bundle_tools._run") as run,
+            patch("serving_runtime.operations.bundle_tools.verify_policy_bundle", side_effect=verified),
+            patch("serving_runtime.operations.bundle_tools._check_deployed_permissions"),
+            patch(
+                "serving_runtime.bridge_update.deployment_guard.verify_deployment_guard",
+                side_effect=ValueError("revoked"),
+            ),
+            patch("serving_runtime.operations.bundle_tools._run") as run,
         ):
             with self.assertRaisesRegex(ValueError, "revoked"):
                 self.apply()
@@ -289,11 +292,11 @@ class DeploymentGuardTest(unittest.TestCase):
             return {"state": "verified"}
 
         with (
-            patch("serving_runtime.bundle_tools.verify_policy_bundle", side_effect=verified),
-            patch("serving_runtime.bundle_tools._check_deployed_permissions"),
-            patch("serving_runtime.mvp.deployment_guard.verify_deployment_guard", side_effect=authority),
-            patch("serving_runtime.bundle_tools._run") as run,
-            patch("serving_runtime.bundle_tools._checked_status", side_effect=StatusMismatch("wrong")),
+            patch("serving_runtime.operations.bundle_tools.verify_policy_bundle", side_effect=verified),
+            patch("serving_runtime.operations.bundle_tools._check_deployed_permissions"),
+            patch("serving_runtime.bridge_update.deployment_guard.verify_deployment_guard", side_effect=authority),
+            patch("serving_runtime.operations.bundle_tools._run") as run,
+            patch("serving_runtime.operations.bundle_tools._checked_status", side_effect=StatusMismatch("wrong")),
         ):
             with self.assertRaisesRegex(RuntimeError, "previous now revoked"):
                 self.apply()
@@ -304,12 +307,15 @@ class DeploymentGuardTest(unittest.TestCase):
     def test_approved_rollback_checks_final_bundle_status(self):
         previous, verified = self.apply_fixture()
         with (
-            patch("serving_runtime.bundle_tools.verify_policy_bundle", side_effect=verified),
-            patch("serving_runtime.bundle_tools._check_deployed_permissions"),
-            patch("serving_runtime.mvp.deployment_guard.verify_deployment_guard", return_value={"state": "verified"}),
-            patch("serving_runtime.bundle_tools._run") as run,
+            patch("serving_runtime.operations.bundle_tools.verify_policy_bundle", side_effect=verified),
+            patch("serving_runtime.operations.bundle_tools._check_deployed_permissions"),
             patch(
-                "serving_runtime.bundle_tools._checked_status", side_effect=[StatusMismatch("wrong"), None]
+                "serving_runtime.bridge_update.deployment_guard.verify_deployment_guard",
+                return_value={"state": "verified"},
+            ),
+            patch("serving_runtime.operations.bundle_tools._run") as run,
+            patch(
+                "serving_runtime.operations.bundle_tools._checked_status", side_effect=[StatusMismatch("wrong"), None]
             ) as status,
         ):
             with self.assertRaisesRegex(RuntimeError, "이전 링크 복원 및 재시작 완료"):
@@ -374,9 +380,9 @@ class DeploymentGuardTest(unittest.TestCase):
         previous, verified = self.apply_fixture()
         for context, namespace in (("other-context", "namespace"), ("context", "other-namespace")):
             with (
-                patch("serving_runtime.bundle_tools.verify_policy_bundle", side_effect=verified),
-                patch("serving_runtime.bundle_tools._check_deployed_permissions"),
-                patch("serving_runtime.bundle_tools._run") as run,
+                patch("serving_runtime.operations.bundle_tools.verify_policy_bundle", side_effect=verified),
+                patch("serving_runtime.operations.bundle_tools._check_deployed_permissions"),
+                patch("serving_runtime.operations.bundle_tools._run") as run,
             ):
                 with self.assertRaisesRegex(ValueError, "context/namespace"):
                     apply_bundle(
@@ -407,8 +413,11 @@ class DeploymentGuardTest(unittest.TestCase):
 
         def checked(document):
             with (
-                patch("serving_runtime.bundle_tools._port_forward", return_value=nullcontext("http://127.0.0.1:9000")),
-                patch("serving_runtime.bundle_tools._status", return_value=document),
+                patch(
+                    "serving_runtime.operations.bundle_tools._port_forward",
+                    return_value=nullcontext("http://127.0.0.1:9000"),
+                ),
+                patch("serving_runtime.operations.bundle_tools._status", return_value=document),
             ):
                 _checked_status(
                     "context", "namespace", None, 9000, None, "test", timeout=0, expected_target_id="engine"
@@ -438,7 +447,7 @@ class DeploymentGuardTest(unittest.TestCase):
             self.assertEqual(json.loads(request.data)["max_tokens"], 8)
             return Response(normal)
 
-        with patch("serving_runtime.bundle_tools.urlopen", side_effect=serve):
+        with patch("serving_runtime.operations.bundle_tools.urlopen", side_effect=serve):
             result = _normal_canary("http://127.0.0.1:9000", "inference-secret", "m", 8)
         self.assertEqual(result["request_id"], "request-123")
         self.assertNotIn("inference-secret", json.dumps(result))
@@ -447,7 +456,7 @@ class DeploymentGuardTest(unittest.TestCase):
             b"x" * (1024 * 1024 + 1),
             json.dumps({"choices": [{"message": {"content": ""}, "finish_reason": "stop"}]}).encode(),
         ):
-            with patch("serving_runtime.bundle_tools.urlopen", return_value=Response(bad)):
+            with patch("serving_runtime.operations.bundle_tools.urlopen", return_value=Response(bad)):
                 with self.assertRaises(StatusMismatch):
                     _normal_canary("http://127.0.0.1:9000", None, "m", 8)
 
@@ -464,9 +473,14 @@ class DeploymentGuardTest(unittest.TestCase):
             "backend": {"healthy": True},
         }
         with (
-            patch("serving_runtime.bundle_tools._port_forward", return_value=nullcontext("http://127.0.0.1:9000")),
-            patch("serving_runtime.bundle_tools._status", return_value=document),
-            patch("serving_runtime.bundle_tools._normal_canary", return_value={"state": "verified"}) as canary,
+            patch(
+                "serving_runtime.operations.bundle_tools._port_forward",
+                return_value=nullcontext("http://127.0.0.1:9000"),
+            ),
+            patch("serving_runtime.operations.bundle_tools._status", return_value=document),
+            patch(
+                "serving_runtime.operations.bundle_tools._normal_canary", return_value={"state": "verified"}
+            ) as canary,
         ):
             result = _checked_status(
                 "context",
@@ -501,10 +515,10 @@ class DeploymentGuardTest(unittest.TestCase):
 
 class NormalCanaryGatewayTest(unittest.TestCase):
     def test_canary_runs_through_real_gateway_and_mock_engine_http(self):
-        from serving_runtime.mvp.app import GatewayApp
-        from serving_runtime.mvp.config import MVPConfig
-        from serving_runtime.mvp.mock_engine import MockEngine
-        from serving_runtime.mvp.policy import load_policy
+        from serving_runtime.gateway.app import GatewayApp
+        from serving_runtime.config.config import MVPConfig
+        from serving_runtime.devtools.mock_engine import MockEngine
+        from serving_runtime.policy.policy import load_policy
 
         root = Path(__file__).resolve().parents[1]
         temporary = tempfile.TemporaryDirectory()

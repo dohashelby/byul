@@ -266,7 +266,7 @@ def test_aws_04_keeps_original_required_facts_and_default_selection():
 
 
 def test_all_aws_case_ids_match_platform_contract_pattern():
-    from serving_runtime.mvp.lab_report import AWS_CASE_IDS
+    from serving_runtime.devtools.lab_report import AWS_CASE_IDS
 
     root = Path(__file__).resolve().parents[2]
     schema = json.loads((root / "contracts/schemas/runtime-lab-report.schema.json").read_text())
@@ -287,7 +287,7 @@ def test_all_aws_case_ids_match_platform_contract_pattern():
 def test_aws_report_with_tokenize_evidence_passes_platform_contract(
     tmp_path, monkeypatch, marker, number, name, expected
 ):
-    from serving_runtime.mvp.lab_report import LabReportSource
+    from serving_runtime.devtools.lab_report import LabReportSource
 
     pytest.importorskip("jsonschema")
     pytest.importorskip("httpx")

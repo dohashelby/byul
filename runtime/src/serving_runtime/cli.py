@@ -11,7 +11,7 @@ import signal
 import sys
 import threading
 
-from .file_info import inspect_file
+from serving_runtime.common.file_info import inspect_file
 
 
 def _observation_feed(value: str) -> tuple[str, str]:
@@ -312,7 +312,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"SHA-256: {info.sha256}")
         return 0
     if args.command == "bundle" and args.bundle_command == "verify":
-        from .mvp.policy_bundle import verify_policy_bundle
+        from serving_runtime.policy.policy_bundle import verify_policy_bundle
 
         try:
             bundle = verify_policy_bundle(args.bundle_dir)
@@ -324,7 +324,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"파일 수: {len(bundle.files)}")
         return 0
     if args.command == "bundle" and args.bundle_command == "build":
-        from .bundle_tools import build_bundle
+        from serving_runtime.operations.bundle_tools import build_bundle
 
         try:
             bundle = build_bundle(
@@ -338,7 +338,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("승인 목록은 플랫폼 승인 기록의 자기 신고 사본이며 승인 검증이 아닙니다.")
         return 0
     if args.command == "bundle" and args.bundle_command == "apply":
-        from .bundle_tools import apply_bundle
+        from serving_runtime.operations.bundle_tools import apply_bundle
 
         try:
             result = apply_bundle(
@@ -389,9 +389,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     if args.command == "mvp":
-        from .mvp.app import run
-        from .mvp.config import MVPConfig
-        from .mvp.policy_bundle import verify_policy_bundle
+        from serving_runtime.gateway.app import run
+        from serving_runtime.config.config import MVPConfig
+        from serving_runtime.policy.policy_bundle import verify_policy_bundle
 
         if args.policy_bundle is not None:
             conflicts = [
@@ -483,7 +483,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
         return 0
     if args.command == "management-listener":
-        from .mvp.management_listener import ManagementListenerConfig, run
+        from serving_runtime.gateway.management_listener import ManagementListenerConfig, run
 
         try:
             options = {
@@ -508,11 +508,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
         return 0
     if args.command == "mvp-demo":
-        from .mvp.demo import run_cli
+        from serving_runtime.devtools.demo import run_cli
 
         return run_cli(args.gateway, args.data_dir)
     if args.command == "mvp-acceptance":
-        from .mvp.acceptance import run_cli
+        from serving_runtime.devtools.acceptance import run_cli
 
         return run_cli(args.report_dir)
     if args.command == "enforce" and args.enforce_command == "sync":
@@ -681,7 +681,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         enforce_parser.print_help()
         return 0
     if args.command == "assets" and args.assets_command == "snapshot":
-        from .mvp.assets import snapshot
+        from serving_runtime.target.assets import snapshot
 
         out = Path(args.out)
         try:
@@ -709,7 +709,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         assets_parser.print_help()
         return 0
     if args.command == "revalidation" and args.revalidation_command == "export":
-        from .mvp.revalidation import export_requests
+        from serving_runtime.policy.revalidation import export_requests
 
         try:
             document = export_requests(args.data_dir, args.out)
@@ -725,7 +725,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "auth" and args.auth_command == "hash-token":
         from getpass import getpass
 
-        from .mvp.auth import token_digest
+        from serving_runtime.gateway.auth import token_digest
 
         try:
             token = getpass("token: ") if sys.stdin.isatty() else sys.stdin.readline()
@@ -738,7 +738,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         auth_parser.print_help()
         return 0
     if args.command == "metrics-check":
-        from .mvp.backend import (
+        from serving_runtime.gateway.backend import (
             load_backend_config,
             parse_prometheus_metrics,
             unmapped_metric_families,

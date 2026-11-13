@@ -6,7 +6,7 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.mock_engine import MockEngine
+from serving_runtime.devtools.mock_engine import MockEngine
 
 
 class MockEngineTests(unittest.TestCase):

@@ -15,11 +15,11 @@ from unittest.mock import patch
 from urllib.request import urlopen
 
 from serving_runtime.cli import main
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.assets import check, load_manifest, snapshot
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.target.assets import check, load_manifest, snapshot
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "examples/mvp/policy.json"
@@ -244,7 +244,7 @@ class AssetIntegrityTests(unittest.TestCase):
             collector_interval_s=0.05,
             collector_stale_after_s=1,
         )
-        with patch("serving_runtime.mvp.app.check_assets", side_effect=delayed_check):
+        with patch("serving_runtime.gateway.app.check_assets", side_effect=delayed_check):
             start_time = time.monotonic()
             gateway = GatewayApp(config, load_policy(POLICY), engine.address).start()
             self.addCleanup(gateway.stop)

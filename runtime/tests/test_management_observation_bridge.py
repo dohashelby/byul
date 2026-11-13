@@ -12,13 +12,13 @@ from fastapi.testclient import TestClient
 from byul_platform.config import Settings
 from byul_platform.main import create_app
 from serving_runtime.enforcement.events import parse_management_access, EventError
-from serving_runtime.mvp.management_listener import ManagementListener, ManagementListenerConfig, AccessRecorder
-from serving_runtime.mvp.observation_feed import ObservationFeed
-from serving_runtime.mvp.collectors import Collector
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.policy import load_policy
+from serving_runtime.gateway.management_listener import ManagementListener, ManagementListenerConfig, AccessRecorder
+from serving_runtime.observation.observation_feed import ObservationFeed
+from serving_runtime.observation.collectors import Collector
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.policy.policy import load_policy
 from byul_platform.sources.runtime import RuntimeClient, LiveRuntimeSource, observation_event
 from byul_platform.contracts import Contracts
 

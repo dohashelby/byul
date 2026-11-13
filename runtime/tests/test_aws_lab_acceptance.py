@@ -36,8 +36,8 @@ from tools.aws_lab_acceptance import (
     _timeline_reset,
     _fixed_request_hash,
 )
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.observation.observation_feed import HEARTBEAT_SCHEMA
 
 
 INFERENCE = "unit-inference-token-never-report"
@@ -1960,7 +1960,7 @@ class EvidenceTests(unittest.TestCase):
         }
 
     def test_public_report_preserves_real_run_and_excludes_raw_details(self):
-        from serving_runtime.mvp.lab_report import LabReportSource, AWS_REPORT_SCHEMA
+        from serving_runtime.devtools.lab_report import LabReportSource, AWS_REPORT_SCHEMA
         from tools import verification_material
         import os
 
@@ -2014,7 +2014,7 @@ class EvidenceTests(unittest.TestCase):
 
     def test_public_report_preserves_all_result_states_and_schema_case_families(self):
         from tools.aws_lab_acceptance import publish_report
-        from serving_runtime.mvp.lab_report import LabReportSource, REPORT_SCHEMA
+        from serving_runtime.devtools.lab_report import LabReportSource, REPORT_SCHEMA
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -2052,7 +2052,7 @@ class EvidenceTests(unittest.TestCase):
                 LabReportSource._validate(value)
 
     def test_run_publication_keeps_failure_and_unknown_exit_codes(self):
-        from serving_runtime.mvp.lab_report import LabReportSource
+        from serving_runtime.devtools.lab_report import LabReportSource
 
         for status, expected in (("failed", 1), ("unknown", 3), ("not_run", 3), ("passed", 0)):
             with self.subTest(status=status), tempfile.TemporaryDirectory() as temporary:

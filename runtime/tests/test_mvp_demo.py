@@ -9,13 +9,7 @@ from contextlib import redirect_stderr
 from unittest.mock import patch
 
 from serving_runtime.cli import main
-from serving_runtime.mvp.demo import (
-    demo_cases,
-    run_demo_cases,
-    evaluate_case,
-    print_results,
-    write_demo_report,
-)
+from serving_runtime.devtools.demo import demo_cases, run_demo_cases, evaluate_case, print_results, write_demo_report
 
 
 def detail(
@@ -37,10 +31,10 @@ class DemoJudgementTests(unittest.TestCase):
     def test_demo_waits_for_post_write_final_record_before_judgement(self):
         case = demo_cases()[0]
         with (
-            patch("serving_runtime.mvp.demo.demo_cases", return_value=(case,)),
-            patch("serving_runtime.mvp.demo._post_case", return_value=(200, "a" * 32, None)),
+            patch("serving_runtime.devtools.demo.demo_cases", return_value=(case,)),
+            patch("serving_runtime.devtools.demo._post_case", return_value=(200, "a" * 32, None)),
             patch(
-                "serving_runtime.mvp.demo._get_detail",
+                "serving_runtime.devtools.demo._get_detail",
                 side_effect=[{"final_state": {"result": "INCOMPLETE"}, "gateway_records": []}, detail()],
             ) as get,
         ):

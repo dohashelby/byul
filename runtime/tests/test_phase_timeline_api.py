@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from serving_runtime.mvp.phase_timeline import read_phase_timeline
+from serving_runtime.observation.phase_timeline import read_phase_timeline
 
 
 class TimelineReadTests(unittest.TestCase):

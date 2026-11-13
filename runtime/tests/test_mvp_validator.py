@@ -5,9 +5,9 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from serving_runtime.mvp.policy import PolicyState, load_policy
-from serving_runtime.mvp.selected_profile import UNSUPPORTED_ENTRY_GROUPS
-from serving_runtime.mvp.validator import validate_request
+from serving_runtime.policy.policy import PolicyState, load_policy
+from serving_runtime.config.selected_profile import UNSUPPORTED_ENTRY_GROUPS
+from serving_runtime.gateway.validator import validate_request
 
 
 EXAMPLE_POLICY = Path(__file__).resolve().parents[1] / "examples/mvp/policy.json"

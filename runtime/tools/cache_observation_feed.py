@@ -4,7 +4,7 @@ import argparse
 import math
 import time
 
-from serving_runtime.mvp.cache_observation import CacheObservationProducer, atomic_snapshot
+from serving_runtime.observation.cache_observation import CacheObservationProducer, atomic_snapshot
 
 
 def main(argv=None):

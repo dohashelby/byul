@@ -14,11 +14,11 @@ from serving_runtime.enforcement.verification import (
     task_matches_identity,
 )
 from serving_runtime.enforcement.tetragon import comparable_spec
-from serving_runtime.mvp.tetragon_state import read_tetragon_state, SCHEMA
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
+from serving_runtime.observation.tetragon_state import read_tetragon_state, SCHEMA
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
 from tools.tetragon_mode import switch_mode
 from tools.tetragon_capability import classify_capabilities
 

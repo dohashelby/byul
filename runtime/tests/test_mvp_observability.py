@@ -22,21 +22,14 @@ from serving_runtime.enforcement.events import (
     transform_lines,
     transform_lines_with_loss,
 )
-from serving_runtime.mvp.cilium_status import (
-    CiliumPolicyCollector,
-    policy_command,
-)
-from serving_runtime.mvp.collectors import Collector
-from serving_runtime.mvp.lab_report import LabReportSource
-from serving_runtime.mvp.observation_feed import (
-    HEARTBEAT_SCHEMA,
-    ObservationFeed,
-    ObservationFeedIdle,
-)
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.request_records import RequestRecords
-from serving_runtime.mvp.store import JsonlStore
-from serving_runtime.mvp.validator import Decision
+from serving_runtime.observation.cilium_status import CiliumPolicyCollector, policy_command
+from serving_runtime.observation.collectors import Collector
+from serving_runtime.devtools.lab_report import LabReportSource
+from serving_runtime.observation.observation_feed import HEARTBEAT_SCHEMA, ObservationFeed, ObservationFeedIdle
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.gateway.request_records import RequestRecords
+from serving_runtime.observation.store import JsonlStore
+from serving_runtime.gateway.validator import Decision
 from tools.k8s_observation_feed import (
     EXPECTED_CONTEXT,
     assert_safe_context,

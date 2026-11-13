@@ -21,8 +21,8 @@ import sys
 
 from serving_runtime.enforcement.cache import check_cache
 from serving_runtime.enforcement.intent import parse_intent
-from serving_runtime.mvp.assets import snapshot, check, _safe_relative
-from serving_runtime.mvp.policy_bundle import _strict_json
+from serving_runtime.target.assets import snapshot, check, _safe_relative
+from serving_runtime.policy.policy_bundle import _strict_json
 
 SCHEMA = "selected-asset-boundaries/1.0"
 FIXTURE = b"BYUL_PUBLIC_INNOCUOUS_CACHE_FIXTURE_V1\n"

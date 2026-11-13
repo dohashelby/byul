@@ -11,18 +11,15 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.auth import token_digest
-from serving_runtime.mvp.backend import load_backend_config
-from serving_runtime.mvp.cache_isolation import (
-    CACHE_SALT_KEY_ENV,
-    CacheSaltKey,
-)
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.fake_backend import FakeBackend
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.gateway.auth import token_digest
+from serving_runtime.gateway.backend import load_backend_config
+from serving_runtime.policy.cache_isolation import CACHE_SALT_KEY_ENV, CacheSaltKey
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.fake_backend import FakeBackend
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.observation.store import JsonlStore
 
 
 KEY = "cache-isolation-key-material-32-bytes-minimum"

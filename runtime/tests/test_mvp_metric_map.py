@@ -10,12 +10,8 @@ import tempfile
 import unittest
 
 from serving_runtime.cli import main
-from serving_runtime.mvp.backend import (
-    BackendConfig,
-    parse_prometheus_metrics,
-    unmapped_metric_families,
-)
-from serving_runtime.mvp.engine_client import EngineClient
+from serving_runtime.gateway.backend import BackendConfig, parse_prometheus_metrics, unmapped_metric_families
+from serving_runtime.gateway.engine_client import EngineClient
 
 
 ROOT = Path(__file__).resolve().parents[1]

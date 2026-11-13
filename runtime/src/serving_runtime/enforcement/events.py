@@ -8,8 +8,8 @@ from pathlib import Path
 import re
 from typing import Any, Iterable
 
-from serving_runtime.mvp.mock_engine import _utc_now
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.devtools.mock_engine import _utc_now
+from serving_runtime.observation.store import JsonlStore
 
 
 SCHEMA = "runtime-observation/1.0"

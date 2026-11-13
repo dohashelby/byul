@@ -264,10 +264,10 @@ def test_retention_report_never_substitutes_for_actual_held_rows(corruption):
 
 
 def test_live_reuses_real_gateway_and_existing_stream_collector(tmp_path):
-    from serving_runtime.mvp.app import GatewayApp
-    from serving_runtime.mvp.config import MVPConfig
-    from serving_runtime.mvp.mock_engine import MockEngine
-    from serving_runtime.mvp.policy import load_policy
+    from serving_runtime.gateway.app import GatewayApp
+    from serving_runtime.config.config import MVPConfig
+    from serving_runtime.devtools.mock_engine import MockEngine
+    from serving_runtime.policy.policy import load_policy
 
     path = Path(__file__).parents[1] / "examples/mvp/policy.json"
     engine = MockEngine(port=0).start()
@@ -299,10 +299,10 @@ def test_live_reuses_real_gateway_and_existing_stream_collector(tmp_path):
 
 def test_live_waits_for_post_response_finalization_before_pair(tmp_path, monkeypatch):
     import threading
-    from serving_runtime.mvp.app import GatewayApp
-    from serving_runtime.mvp.config import MVPConfig
-    from serving_runtime.mvp.mock_engine import MockEngine
-    from serving_runtime.mvp.policy import load_policy
+    from serving_runtime.gateway.app import GatewayApp
+    from serving_runtime.config.config import MVPConfig
+    from serving_runtime.devtools.mock_engine import MockEngine
+    from serving_runtime.policy.policy import load_policy
 
     path = Path(__file__).parents[1] / "examples/mvp/policy.json"
     engine = MockEngine(port=0).start()

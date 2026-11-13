@@ -11,8 +11,8 @@ from pathlib import Path
 import re
 import sys
 
-from serving_runtime.mvp.native_receipts import read_protected
-from serving_runtime.mvp.policy import _object_without_duplicates, _reject_json_constant
+from serving_runtime.observation.native_receipts import read_protected
+from serving_runtime.policy.policy import _object_without_duplicates, _reject_json_constant
 
 SCHEMA = "byul-native-observer-service/1"
 SCOPES = {

@@ -17,7 +17,7 @@ from urllib.request import HTTPSHandler
 
 from serving_runtime.operations.agent import Agent, Config, PlatformClient, Rejected, locked, now
 from serving_runtime.operations.safety import evaluate
-from serving_runtime.bundle_tools import StatusUnavailable
+from serving_runtime.operations.bundle_tools import StatusUnavailable
 from serving_runtime.enforcement.intent import IntentError, parse_intent
 from serving_runtime.enforcement.tetragon import render_manifests
 from tests.test_tetragon_rule_modes import document
@@ -387,15 +387,15 @@ class CurrentGatewayTest(unittest.TestCase):
 
         with (
             patch(
-                "serving_runtime.bundle_tools._port_forward",
+                "serving_runtime.operations.bundle_tools._port_forward",
                 side_effect=[
                     nullcontext("http://127.0.0.1:19001"),
                     nullcontext("http://127.0.0.1:19002"),
                     nullcontext("http://127.0.0.1:19003"),
                 ],
             ) as forward,
-            patch("serving_runtime.bundle_tools._status", side_effect=status) as lookup,
-            patch("serving_runtime.bundle_tools.time.sleep"),
+            patch("serving_runtime.operations.bundle_tools._status", side_effect=status) as lookup,
+            patch("serving_runtime.operations.bundle_tools.time.sleep"),
         ):
             self.assertEqual(self.agent.current()[0]["bundle_id"], "vllm")
             self.assertEqual(self.agent.current()[0]["bundle_id"], "vllm")
@@ -406,8 +406,8 @@ class CurrentGatewayTest(unittest.TestCase):
     def test_explicit_local_url_is_opt_in(self):
         agent = Agent(Mock(), replace(self.agent.config, status_url="http://127.0.0.1:19099"))
         with (
-            patch("serving_runtime.bundle_tools._port_forward") as forward,
-            patch("serving_runtime.bundle_tools._status", return_value=self.status) as lookup,
+            patch("serving_runtime.operations.bundle_tools._port_forward") as forward,
+            patch("serving_runtime.operations.bundle_tools._status", return_value=self.status) as lookup,
         ):
             agent.current()
         forward.assert_not_called()
@@ -415,14 +415,15 @@ class CurrentGatewayTest(unittest.TestCase):
 
     def test_reason_codes_and_sanitized_report(self):
         with patch(
-            "serving_runtime.bundle_tools._gateway_status", side_effect=StatusUnavailable("private token /secret/path")
+            "serving_runtime.operations.bundle_tools._gateway_status",
+            side_effect=StatusUnavailable("private token /secret/path"),
         ):
             report = self.agent.process(operation())
         self.assertEqual(report["code"], "VALIDATION_FAILED")
         self.assertEqual(report["reason_code"], "STATUS_UNREACHABLE")
         self.assertNotIn("/secret/path", json.dumps(report))
         with patch(
-            "serving_runtime.bundle_tools._gateway_status",
+            "serving_runtime.operations.bundle_tools._gateway_status",
             return_value={**self.status, "policy_bundle": {"bundle_id": "other"}},
         ):
             report = self.agent.process(operation())
@@ -466,7 +467,7 @@ class CurrentGatewayTest(unittest.TestCase):
             patch.object(agent, "verified_bundle", return_value=self.bundle),
             patch.object(agent, "check_target"),
             patch.object(agent, "execute_bundle"),
-            patch("serving_runtime.bundle_tools.apply_bundle"),
+            patch("serving_runtime.operations.bundle_tools.apply_bundle"),
         ):
             report = agent.process(operation())
         self.assertEqual(
@@ -475,12 +476,12 @@ class CurrentGatewayTest(unittest.TestCase):
         )
 
     def test_unreachable_retries_have_finite_timeout(self):
-        from serving_runtime.bundle_tools import _gateway_status, StatusUnavailable
+        from serving_runtime.operations.bundle_tools import _gateway_status, StatusUnavailable
 
         with (
-            patch("serving_runtime.bundle_tools._port_forward", side_effect=OSError("private")) as forward,
-            patch("serving_runtime.bundle_tools.time.monotonic", side_effect=[0, 0, 0, 1]),
-            patch("serving_runtime.bundle_tools.time.sleep"),
+            patch("serving_runtime.operations.bundle_tools._port_forward", side_effect=OSError("private")) as forward,
+            patch("serving_runtime.operations.bundle_tools.time.monotonic", side_effect=[0, 0, 0, 1]),
+            patch("serving_runtime.operations.bundle_tools.time.sleep"),
         ):
             with self.assertRaises(StatusUnavailable):
                 _gateway_status("ctx", "ns", None, 8080, None, timeout=1)
@@ -733,7 +734,7 @@ class TransportFailureTest(unittest.TestCase):
 class PrivilegedApplyTest(unittest.TestCase):
     def test_privileged_restore_is_reverified_and_output_bounded(self):
         from serving_runtime.operations.agent import RestoreReported
-        from serving_runtime.bundle_tools import BundleApplyError
+        from serving_runtime.operations.bundle_tools import BundleApplyError
         from serving_runtime.cli import main
         from contextlib import redirect_stdout
 
@@ -748,7 +749,7 @@ class PrivilegedApplyTest(unittest.TestCase):
         output = io.StringIO()
         with (
             patch(
-                "serving_runtime.bundle_tools.apply_bundle",
+                "serving_runtime.operations.bundle_tools.apply_bundle",
                 side_effect=BundleApplyError(
                     "이전 링크 복원 및 재시작 완료: private diagnostic", {"state": "rolled_back"}
                 ),
@@ -779,7 +780,7 @@ class PrivilegedApplyTest(unittest.TestCase):
         output = io.StringIO()
         with (
             patch(
-                "serving_runtime.bundle_tools.apply_bundle",
+                "serving_runtime.operations.bundle_tools.apply_bundle",
                 side_effect=RuntimeError("이전 링크 복원 및 재시작 완료: private diagnostic"),
             ),
             redirect_stdout(output),

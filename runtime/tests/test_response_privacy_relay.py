@@ -7,11 +7,11 @@ from unittest.mock import patch
 
 import pytest
 
-from serving_runtime.mvp.auth import CHAT_ROUTE, COMPLETIONS_ROUTE
-from serving_runtime.mvp.backend import BackendConfig
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.relay import Relay
-from serving_runtime.mvp.validator import validate_request
+from serving_runtime.gateway.auth import CHAT_ROUTE, COMPLETIONS_ROUTE
+from serving_runtime.gateway.backend import BackendConfig
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.gateway.relay import Relay
+from serving_runtime.gateway.validator import validate_request
 from test_mvp_request_boundaries import BackendResponse, BackendConnection, RequestIO, POLICY, body
 
 
@@ -168,10 +168,10 @@ def test_reserialized_metadata_obeys_existing_output_byte_budget(route, stream):
     client = RequestIO(body(stream=True))
     with (
         patch.object(BackendConfig, "connection", return_value=(upstream, "/engine")),
-        patch("serving_runtime.mvp.relay._COMPLETION_BODY_LIMIT", len(raw)),
-        patch("serving_runtime.mvp.relay._COMPLETION_STREAM_BODY_LIMIT", len(wire)),
-        patch("serving_runtime.mvp.relay._CHAT_SSE_LINE_LIMIT", len(raw) + 6),
-        patch("serving_runtime.mvp.relay._CHAT_SSE_EVENT_LIMIT", len(raw) + 8),
+        patch("serving_runtime.gateway.relay._COMPLETION_BODY_LIMIT", len(raw)),
+        patch("serving_runtime.gateway.relay._COMPLETION_STREAM_BODY_LIMIT", len(wire)),
+        patch("serving_runtime.gateway.relay._CHAT_SSE_LINE_LIMIT", len(raw) + 6),
+        patch("serving_runtime.gateway.relay._CHAT_SSE_EVENT_LIMIT", len(raw) + 8),
     ):
         relay = Relay(BackendConfig.mock(("127.0.0.1", 1)), 1, 1, 1)
         if stream:
@@ -258,9 +258,9 @@ def test_upstream_sse_error_envelope_never_becomes_completed_or_public_detail(ro
 
 def test_upstream_sse_error_is_final_error_record_and_releases_slot(tmp_path, caplog):
     from types import SimpleNamespace
-    from serving_runtime.mvp.request_records import RequestRecords
-    from serving_runtime.mvp.request_flow import RequestFlow, ConcurrencyLimiter
-    from serving_runtime.mvp.policy_state import load_revocations
+    from serving_runtime.gateway.request_records import RequestRecords
+    from serving_runtime.gateway.request_flow import RequestFlow, ConcurrencyLimiter
+    from serving_runtime.policy.policy_state import load_revocations
 
     policy = load_policy(POLICY)
     backend = BackendConfig.mock(("127.0.0.1", 1))

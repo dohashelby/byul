@@ -3,9 +3,9 @@
 from copy import deepcopy
 import json
 import pytest
-from serving_runtime.mvp.collectors import Collector
-from serving_runtime.mvp.engine_health_events import EngineHealthEvents
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.observation.collectors import Collector
+from serving_runtime.observation.engine_health_events import EngineHealthEvents
+from serving_runtime.observation.store import JsonlStore
 
 
 def context():
@@ -119,9 +119,9 @@ def test_collector_notifies_failure_and_success_after_lock_and_exposes_sink_erro
 
 def test_gateway_health_collector_hook_reaches_existing_observation_query_without_requests(tmp_path, monkeypatch):
     from pathlib import Path
-    from serving_runtime.mvp.app import GatewayApp
-    from serving_runtime.mvp.config import MVPConfig
-    from serving_runtime.mvp.policy import load_policy
+    from serving_runtime.gateway.app import GatewayApp
+    from serving_runtime.config.config import MVPConfig
+    from serving_runtime.policy.policy import load_policy
 
     policy = load_policy(Path(__file__).resolve().parents[1] / "examples/mvp/policy.json")
     app = GatewayApp(

@@ -8,7 +8,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.observation.store import JsonlStore
 
 
 class JsonlStoreTests(unittest.TestCase):
@@ -132,7 +132,7 @@ def test_unsafe_record_directory_is_rejected_without_changing_it(tmp_path, kind)
 
 
 def test_request_admission_preflight_uses_same_private_store_boundary(tmp_path):
-    from serving_runtime.mvp.request_records import RequestRecords
+    from serving_runtime.gateway.request_records import RequestRecords
 
     path = tmp_path / "gateway_records.jsonl"
     path.write_bytes(b"EXAMPLE")

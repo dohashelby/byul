@@ -85,7 +85,7 @@ spec:
             - --native-receipt-reader-gid
             - "10010"
             - --native-receipt-producer-sha256
-            - 3ae03683a0c5e8ae81ce74ad08e0ca8e8933289d2aecb83e312a9e961c4ad6d0
+            - a6c812a64d21afe6cd37635559f0bb5ea306729dbd2cb57672314fb4db46a709
             - --observation-feed
             - management_listener=/srv/serving/runtime/management-access/access.jsonl
             - --observation-feed

@@ -5,10 +5,10 @@ from dataclasses import replace
 from pathlib import Path
 import threading
 
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.request_records import RequestRecords
-from serving_runtime.mvp.validator import Decision
-from serving_runtime.mvp.backend import BackendConfig
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.gateway.request_records import RequestRecords
+from serving_runtime.gateway.validator import Decision
+from serving_runtime.gateway.backend import BackendConfig
 
 POLICY = Path(__file__).resolve().parents[1] / "examples/mvp/policy.json"
 DECISION = Decision("ALLOWED", 200, "ALLOWED", None, "ok", "test-model", 1)

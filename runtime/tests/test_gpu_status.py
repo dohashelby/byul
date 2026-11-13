@@ -12,8 +12,8 @@ import threading
 import unittest
 
 from serving_runtime.enforcement.events import ObservationQuery
-from serving_runtime.mvp.gpu_state import read_gpu_state
-from serving_runtime.mvp.http_handler import HandlerDependencies, create_handler
+from serving_runtime.observation.gpu_state import read_gpu_state
+from serving_runtime.gateway.http_handler import HandlerDependencies, create_handler
 from tools import gpu_status
 
 L4 = "0, NVIDIA L4, 37, 18120, 23034, 54, 71.52\n"

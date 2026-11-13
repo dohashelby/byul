@@ -10,7 +10,7 @@ from unittest.mock import patch
 from tools import tetragon_status
 from tools.tetragon_status import StatusCollector
 from serving_runtime.enforcement.recovery import RecoveryTracker
-from serving_runtime.mvp.tetragon_state import read_tetragon_state
+from serving_runtime.observation.tetragon_state import read_tetragon_state
 
 
 class CollectorTests(unittest.TestCase):

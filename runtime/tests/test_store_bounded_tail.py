@@ -1,5 +1,5 @@
 import pytest
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.observation.store import JsonlStore
 
 
 def test_bounded_tail_drops_partial_boundary_and_limits_rows(tmp_path):

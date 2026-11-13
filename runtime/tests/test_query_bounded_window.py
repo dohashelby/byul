@@ -5,9 +5,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from serving_runtime.mvp.query import QueryService, QueryWindowIncompleteError
-from serving_runtime.mvp.store import JsonlStore
-from serving_runtime.mvp.http_handler import Handler as MVPRequestHandler
+from serving_runtime.observation.query import QueryService, QueryWindowIncompleteError
+from serving_runtime.observation.store import JsonlStore
+from serving_runtime.gateway.http_handler import Handler as MVPRequestHandler
 
 
 def row(request_id, *, backend="vllm"):

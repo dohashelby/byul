@@ -7,8 +7,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.selected_profile import validate_selected_profile
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.config.selected_profile import validate_selected_profile
 
 ROOT = Path(__file__).resolve().parents[1]
 

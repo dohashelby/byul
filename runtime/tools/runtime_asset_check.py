@@ -15,10 +15,10 @@ import tempfile
 from pathlib import Path
 
 from serving_runtime.enforcement.intent import parse_intent
-from serving_runtime.mvp.asset_binding import manifest_from_update_inventory, check_execution_binding
-from serving_runtime.mvp.assets import load_manifest, check
-from serving_runtime.mvp.policy_bundle import _strict_json
-from serving_runtime.mvp.target import load_target
+from serving_runtime.target.asset_binding import manifest_from_update_inventory, check_execution_binding
+from serving_runtime.target.assets import load_manifest, check
+from serving_runtime.policy.policy_bundle import _strict_json
+from serving_runtime.target.target import load_target
 
 
 def _read(path: str) -> dict:

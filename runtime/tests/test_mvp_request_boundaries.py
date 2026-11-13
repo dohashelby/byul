@@ -9,15 +9,15 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
-from serving_runtime.mvp.backend import BackendConfig
-from serving_runtime.mvp.engine_client import EngineClient
-from serving_runtime.mvp.http_handler import Handler
-from serving_runtime.mvp.policy import ExtraFieldRule, load_policy
-from serving_runtime.mvp.policy_state import load_revocations
-from serving_runtime.mvp.relay import Relay, engine_rejection
-from serving_runtime.mvp.request_flow import ConcurrencyLimiter, RequestFlow
-from serving_runtime.mvp.request_records import RequestRecords
-from serving_runtime.mvp.validator import validate_request
+from serving_runtime.gateway.backend import BackendConfig
+from serving_runtime.gateway.engine_client import EngineClient
+from serving_runtime.gateway.http_handler import Handler
+from serving_runtime.policy.policy import ExtraFieldRule, load_policy
+from serving_runtime.policy.policy_state import load_revocations
+from serving_runtime.gateway.relay import Relay, engine_rejection
+from serving_runtime.gateway.request_flow import ConcurrencyLimiter, RequestFlow
+from serving_runtime.gateway.request_records import RequestRecords
+from serving_runtime.gateway.validator import validate_request
 
 
 POLICY = Path(__file__).resolve().parents[1] / "examples/mvp/policy.json"
@@ -261,15 +261,15 @@ class AuxiliaryResponseBoundTests(unittest.TestCase):
                 self.assertTrue(connection.closed)
 
     def test_auxiliary_response_boundary_and_chunked_overflow(self):
-        with patch("serving_runtime.mvp.engine_client._AUX_RESPONSE_BODY_LIMIT", 8, create=True):
+        with patch("serving_runtime.gateway.engine_client._AUX_RESPONSE_BODY_LIMIT", 8, create=True):
             self.assertEqual(self.request([b"1234", b"5678"])[2], b"12345678")
             with self.assertRaisesRegex(OSError, "byte limit"):
                 self.request([b"1234", b"5678", b"9", b"must-not-be-read"])
 
     def test_metrics_has_a_separate_larger_bound(self):
         with (
-            patch("serving_runtime.mvp.engine_client._AUX_RESPONSE_BODY_LIMIT", 4, create=True),
-            patch("serving_runtime.mvp.engine_client._METRICS_RESPONSE_BODY_LIMIT", 8, create=True),
+            patch("serving_runtime.gateway.engine_client._AUX_RESPONSE_BODY_LIMIT", 4, create=True),
+            patch("serving_runtime.gateway.engine_client._METRICS_RESPONSE_BODY_LIMIT", 8, create=True),
         ):
             self.assertEqual(self.request([b"12345678"], metrics=True)[2], b"12345678")
             with self.assertRaisesRegex(OSError, "byte limit"):
@@ -285,7 +285,7 @@ class AuxiliaryResponseBoundTests(unittest.TestCase):
         with (
             tempfile.TemporaryDirectory() as directory,
             patch.object(BackendConfig, "connection", return_value=(connection, "/tokenize")),
-            patch("serving_runtime.mvp.engine_client._AUX_RESPONSE_BODY_LIMIT", 8),
+            patch("serving_runtime.gateway.engine_client._AUX_RESPONSE_BODY_LIMIT", 8),
         ):
             records = RequestRecords(directory, "session", lambda: policy, "mock")
             flow = RequestFlow(
@@ -324,7 +324,7 @@ class ChatStreamBoundTests(unittest.TestCase):
         return result, client
 
     def test_unterminated_line_is_rejected_before_forwarding_the_overflow_chunk(self):
-        with patch("serving_runtime.mvp.relay._CHAT_SSE_LINE_LIMIT", 8, create=True):
+        with patch("serving_runtime.gateway.relay._CHAT_SSE_LINE_LIMIT", 8, create=True):
             (decision, outcome, started), client = self.relay([b"1234", b"5678", b"9"])
         self.assertEqual(
             (decision.reason_code, outcome, started), ("ENGINE_BAD_RESPONSE", "oversized_chat_stream", True)
@@ -333,8 +333,8 @@ class ChatStreamBoundTests(unittest.TestCase):
 
     def test_event_size_is_bounded_even_when_individual_lines_are_small(self):
         with (
-            patch("serving_runtime.mvp.relay._CHAT_SSE_LINE_LIMIT", 8, create=True),
-            patch("serving_runtime.mvp.relay._CHAT_SSE_EVENT_LIMIT", 12, create=True),
+            patch("serving_runtime.gateway.relay._CHAT_SSE_LINE_LIMIT", 8, create=True),
+            patch("serving_runtime.gateway.relay._CHAT_SSE_EVENT_LIMIT", 12, create=True),
         ):
             (decision, outcome, _), client = self.relay([b": aa\n", b": bb\n", b"xyz"])
         self.assertEqual((decision.reason_code, outcome), ("ENGINE_BAD_RESPONSE", "oversized_chat_stream"))
@@ -343,8 +343,8 @@ class ChatStreamBoundTests(unittest.TestCase):
     def test_blank_lines_reset_event_budget_and_normal_chunks_remain_unchanged(self):
         chunks = [b": aa\r\n", b"\r\n", b": bb\n\n", b"data: [DO", b"NE]\n\n"]
         with (
-            patch("serving_runtime.mvp.relay._CHAT_SSE_LINE_LIMIT", 16, create=True),
-            patch("serving_runtime.mvp.relay._CHAT_SSE_EVENT_LIMIT", 16, create=True),
+            patch("serving_runtime.gateway.relay._CHAT_SSE_LINE_LIMIT", 16, create=True),
+            patch("serving_runtime.gateway.relay._CHAT_SSE_EVENT_LIMIT", 16, create=True),
         ):
             (decision, outcome, started), client = self.relay(chunks)
         self.assertEqual((decision.result, outcome, started), ("ALLOWED", "completed", True))
@@ -363,7 +363,7 @@ class ChatStreamBoundTests(unittest.TestCase):
         with (
             tempfile.TemporaryDirectory() as directory,
             patch.object(BackendConfig, "connection", return_value=(connection, "/v1/chat/completions")),
-            patch("serving_runtime.mvp.relay._CHAT_SSE_LINE_LIMIT", 8),
+            patch("serving_runtime.gateway.relay._CHAT_SSE_LINE_LIMIT", 8),
         ):
             records = RequestRecords(directory, "session", lambda: policy, "mock")
             flow = RequestFlow(

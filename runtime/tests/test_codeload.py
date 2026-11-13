@@ -15,8 +15,8 @@ from serving_runtime.enforcement.intent import IntentError, parse_intent
 from serving_runtime.enforcement.tetragon import render_manifests, render_monitor_manifests
 from serving_runtime.enforcement.attribution import KERNEL_DATA
 from tools.tetragon_identities import IdentityCollector
-from serving_runtime.mvp.collectors import Collector
-from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA, ObservationFeed
+from serving_runtime.observation.collectors import Collector
+from serving_runtime.observation.observation_feed import HEARTBEAT_SCHEMA, ObservationFeed
 from byul_platform.config import DEFAULT_CONTRACTS_DIR
 from byul_platform.contracts import Contracts
 from byul_platform.sources.checklist_links import checks_for_record, coverage

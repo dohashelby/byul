@@ -10,9 +10,9 @@ import threading
 import unittest
 from unittest.mock import Mock
 
-from serving_runtime.mvp.http_handler import Handler, create_handler
-from serving_runtime.mvp.store import JsonlStore
-from serving_runtime.mvp.route_rejections import RouteRejections
+from serving_runtime.gateway.http_handler import Handler, create_handler
+from serving_runtime.observation.store import JsonlStore
+from serving_runtime.gateway.route_rejections import RouteRejections
 
 
 class RouteRejectionTests(unittest.TestCase):

@@ -10,10 +10,10 @@ import types
 
 import pytest
 
-from serving_runtime.mvp import cache_observation as module
-from serving_runtime.mvp.collectors import CollectionFailure
-from serving_runtime.mvp.revalidation import RevalidationRequests
-from serving_runtime.mvp.target import instance_id
+from serving_runtime.observation import cache_observation as module
+from serving_runtime.observation.collectors import CollectionFailure
+from serving_runtime.policy.revalidation import RevalidationRequests
+from serving_runtime.target.target import instance_id
 from serving_runtime.enforcement.cache import check_cache
 from serving_runtime.enforcement.intent import parse_intent
 
@@ -179,7 +179,7 @@ def test_cache_metadata_entry_bound_is_explicit_incomplete(tmp_path):
 
 
 def test_cache_configuration_requires_all_pins_and_registered_target(tmp_path):
-    from serving_runtime.mvp.config import MVPConfig
+    from serving_runtime.config.config import MVPConfig
 
     with pytest.raises(ValueError):
         MVPConfig(cache_observation_path="snapshot")
@@ -210,8 +210,8 @@ def test_raw_pod_environment_and_approved_secret_arg_never_enter_public_snapshot
 
 
 def test_gateway_adds_cache_collector_with_separate_revalidation_callback(tmp_path):
-    from serving_runtime.mvp.app import GatewayApp
-    from serving_runtime.mvp.config import MVPConfig
+    from serving_runtime.gateway.app import GatewayApp
+    from serving_runtime.config.config import MVPConfig
 
     config = MVPConfig(
         data_dir=str(tmp_path / "data"),
@@ -222,7 +222,7 @@ def test_gateway_adds_cache_collector_with_separate_revalidation_callback(tmp_pa
         cache_observation_producer_sha256="a" * 64,
         cache_observation_binding_sha256="b" * 64,
     )
-    from serving_runtime.mvp.policy import load_policy
+    from serving_runtime.policy.policy import load_policy
 
     app = GatewayApp(config, load_policy(config.policy_path), engine_address=("127.0.0.1", 1))
     collectors = app._collectors.collectors
@@ -277,13 +277,13 @@ def test_cache_scan_never_follows_directory_replaced_after_enumeration(tmp_path,
 def test_producer_source_pin_covers_critical_helper_modules_and_entrypoint():
     modules = module.source_bundle_modules()
     assert set(modules) == {
-        "serving_runtime.mvp.cache_observation",
+        "serving_runtime.observation.cache_observation",
         "serving_runtime.enforcement.cache",
-        "serving_runtime.mvp.asset_binding",
+        "serving_runtime.target.asset_binding",
         "serving_runtime.enforcement.intent",
-        "serving_runtime.mvp.target",
-        "serving_runtime.mvp.native_receipts",
-        "serving_runtime.mvp.policy",
+        "serving_runtime.target.target",
+        "serving_runtime.observation.native_receipts",
+        "serving_runtime.policy.policy",
         "serving_runtime.tools.cache_observation_feed",
     }
     assert module.source_bundle_sha256() == module.digest({"schema": module.SOURCE_SCHEMA, "modules": modules})

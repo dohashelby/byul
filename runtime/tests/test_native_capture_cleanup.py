@@ -51,7 +51,7 @@ def test_archive_publish_preserves_original_inode_and_only_removes_temporary(tmp
 
 def test_archive_creation_race_preserves_concurrent_original(tmp_path, monkeypatch):
     tool = load_tool()
-    from serving_runtime.mvp import native_receipts
+    from serving_runtime.observation import native_receipts
 
     archived = tmp_path / "sealed-original.json"
     link = tool.os.link

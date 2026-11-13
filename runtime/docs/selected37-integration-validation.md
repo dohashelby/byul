@@ -20,8 +20,8 @@ The following files have identical bytes at the measured Gateway revision `db093
 
 | File | SHA-256 |
 | --- | --- |
-| `runtime/src/serving_runtime/mvp/response_privacy.py` | `7119f8c544b353e878c9a859e3f8b350fbc08f82c85305ec28c180c38c8f7353` |
-| `runtime/src/serving_runtime/mvp/relay.py` | `29fb13899c5ce6db2fd415a36f28f8a1159a8dad497fd13d8037ca81a02692c7` |
+| `runtime/src/serving_runtime/gateway/response_privacy.py` | `7119f8c544b353e878c9a859e3f8b350fbc08f82c85305ec28c180c38c8f7353` |
+| `runtime/src/serving_runtime/gateway/relay.py` | `29fb13899c5ce6db2fd415a36f28f8a1159a8dad497fd13d8037ca81a02692c7` |
 
 Existing vLLM and SGLang JSON/SSE observations apply to those exact response-path bytes and their recorded profiles. Specific keep-alive and final usage-event cases need explicit records before claiming those cases were exercised.
 

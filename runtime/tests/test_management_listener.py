@@ -14,7 +14,7 @@ import threading
 import time
 import unittest
 
-from serving_runtime.mvp.management_listener import (
+from serving_runtime.gateway.management_listener import (
     DEFAULT_ALLOWED_PATHS,
     ManagementListener,
     ManagementListenerConfig,

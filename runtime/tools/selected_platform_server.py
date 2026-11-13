@@ -14,10 +14,10 @@ IMPORTS = {
     "byul_platform.main": "platform/api/src/byul_platform/main.py",
     "byul_platform.config": "platform/api/src/byul_platform/config.py",
     "byul_platform.sources.runtime": "platform/api/src/byul_platform/sources/runtime.py",
-    "serving_runtime.mvp.lab_report": "runtime/src/serving_runtime/mvp/lab_report.py",
-    "serving_runtime.mvp.app": "runtime/src/serving_runtime/mvp/app.py",
-    "serving_runtime.mvp.http_handler": "runtime/src/serving_runtime/mvp/http_handler.py",
-    "serving_runtime.mvp.request_flow": "runtime/src/serving_runtime/mvp/request_flow.py",
+    "serving_runtime.devtools.lab_report": "runtime/src/serving_runtime/devtools/lab_report.py",
+    "serving_runtime.gateway.app": "runtime/src/serving_runtime/gateway/app.py",
+    "serving_runtime.gateway.http_handler": "runtime/src/serving_runtime/gateway/http_handler.py",
+    "serving_runtime.gateway.request_flow": "runtime/src/serving_runtime/gateway/request_flow.py",
 }
 
 
@@ -47,7 +47,7 @@ def build(args):
     for name, relative in IMPORTS.items():
         if Path(modules[name].__file__).resolve() != source / relative:
             raise ValueError("foreign Platform/runtime import")
-    from serving_runtime.mvp.lab_report import LabReportSource
+    from serving_runtime.devtools.lab_report import LabReportSource
 
     # Same validated public report is supplied to Gateway by root; the live API
     # still reads Gateway /api/lab-report and is never replaced by this input.

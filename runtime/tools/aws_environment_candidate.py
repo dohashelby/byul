@@ -13,9 +13,9 @@ from pathlib import Path
 import re
 import sys
 
-from serving_runtime.mvp.assets import snapshot, _walk
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.target import load_target, summarize_pods
+from serving_runtime.target.assets import snapshot, _walk
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.target.target import load_target, summarize_pods
 
 try:
     from tools.aws_lab_preflight import Runner

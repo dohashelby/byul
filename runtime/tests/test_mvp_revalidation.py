@@ -11,11 +11,11 @@ import unittest
 from urllib.request import Request, urlopen
 
 from serving_runtime.cli import main
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.revalidation import (
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.policy.revalidation import (
     EXPORT_FORMAT_STATUS,
     RevalidationRequests,
     evaluate_asset_integrity,

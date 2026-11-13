@@ -13,7 +13,7 @@ import time
 from serving_runtime.enforcement.intent import parse_intent
 from serving_runtime.enforcement.tetragon import render_manifests
 from serving_runtime.enforcement.recovery import RecoveryTracker
-from serving_runtime.mvp.observation_feed import ObservationFeed
+from serving_runtime.observation.observation_feed import ObservationFeed
 from tools.tetragon_trial import KindTrial, ROOT, PROBE_PATH, SERVER, CLIENT, atomic_json, now
 from tools.tetragon_identities import IdentityCollector
 from tools.tetragon_stream import TetragonStream

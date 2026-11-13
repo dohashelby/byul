@@ -5,7 +5,7 @@ import threading
 from types import SimpleNamespace
 import unittest
 
-from serving_runtime.mvp.engine_client import EngineClient, RequestDeadlineExceeded
+from serving_runtime.gateway.engine_client import EngineClient, RequestDeadlineExceeded
 
 
 class ClosedSocket:

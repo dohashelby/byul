@@ -13,9 +13,9 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from serving_runtime.mvp.lab_report import LabReportSource, REPORT_SCHEMA
-from serving_runtime.mvp.management_listener import ManagementListenerConfig
-from serving_runtime.mvp.policy_bundle import verify_policy_bundle
+from serving_runtime.devtools.lab_report import LabReportSource, REPORT_SCHEMA
+from serving_runtime.gateway.management_listener import ManagementListenerConfig
+from serving_runtime.policy.policy_bundle import verify_policy_bundle
 from tools.aws_lab_preflight import bind_lab_management, bind_lab_report, lab_management_scope
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -72,7 +72,7 @@ def test_scope_is_derived_from_existing_bundle_verifier_not_live_actual_copy():
     path = ROOT.parent / "contracts/examples/bundle"
     now = datetime(2026, 10, 26, tzinfo=timezone.utc)
     original = verify_policy_bundle
-    with patch("serving_runtime.mvp.policy_bundle.verify_policy_bundle", side_effect=lambda p: original(p, now=now)):
+    with patch("serving_runtime.policy.policy_bundle.verify_policy_bundle", side_effect=lambda p: original(p, now=now)):
         value = lab_management_scope(path, run_id="byul-run", environment="aws-lab")
     approved = original(path, now=now)
     assert value["target_ref"] == approved.target_ref and value["policy_ref"] == approved.policy_ref["sha256"]

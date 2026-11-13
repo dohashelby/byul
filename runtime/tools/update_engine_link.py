@@ -15,8 +15,8 @@ from pathlib import Path
 
 from guard.models.objects import Evidence
 from guard.runtime.bounded import strict_json
-from serving_runtime.mvp.update_engine_link import link_evidence, project_termination
-from serving_runtime.mvp.target import _image_digest
+from serving_runtime.bridge_update.update_engine_link import link_evidence, project_termination
+from serving_runtime.target.target import _image_digest
 
 ROLLING_CAPTURE_LIMIT = 64 * 1024 * 1024
 
@@ -241,7 +241,7 @@ def _temporary_capture(archive):
 
 def _archive_capture(temporary, saved, raw, reader_gid, limit):
     """Publish immutable capture bytes without replacing a concurrent original."""
-    from serving_runtime.mvp.native_receipts import read_protected
+    from serving_runtime.observation.native_receipts import read_protected
 
     try:
         os.link(temporary, saved, follow_symlinks=False)
@@ -395,8 +395,8 @@ def watch_native_receipts(args):
     from datetime import datetime, timezone
     from guard.models import Environment, canonical_json, sha256_hex
     from guard.collectors.lifecycle import load_prepared
-    from serving_runtime.mvp.native_receipts import SCHEMA, canonical, read_protected
-    from serving_runtime.mvp.update_engine_link import select_request
+    from serving_runtime.observation.native_receipts import SCHEMA, canonical, read_protected
+    from serving_runtime.bridge_update.update_engine_link import select_request
 
     if (
         os.geteuid() != 0

@@ -6,10 +6,10 @@ from unittest.mock import Mock
 
 import pytest
 
-from serving_runtime.mvp.launch_settings import observe, comparison_rows
-from serving_runtime.mvp.target import summarize_pods
-from serving_runtime.mvp.revalidation import RevalidationRequests, evaluate_config_drift
-from serving_runtime.mvp.app import GatewayApp
+from serving_runtime.target.launch_settings import observe, comparison_rows
+from serving_runtime.target.target import summarize_pods
+from serving_runtime.policy.revalidation import RevalidationRequests, evaluate_config_drift
+from serving_runtime.gateway.app import GatewayApp
 
 
 def pod(args=None, command=None):
@@ -309,7 +309,7 @@ def test_gateway_pod_callback_runs_existing_revalidation_flow(tmp_path):
     app._collectors.get.side_effect = lambda source: (
         collected(["--trust-remote-code"]) if source == "target_pods" else None
     )
-    from serving_runtime.mvp.collectors import load_declaration
+    from serving_runtime.observation.collectors import load_declaration
 
     app._baseline = load_declaration(None, kind="baseline")
     app._manifest = load_declaration(None, kind="manifest")

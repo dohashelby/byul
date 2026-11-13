@@ -16,12 +16,12 @@ from unittest.mock import PropertyMock, patch
 from serving_runtime.enforcement.intent import load_intent
 from serving_runtime.enforcement.tetragon import comparable_spec, render_monitor_manifests
 from serving_runtime.enforcement.verification import KERNEL_IDENTITY_DATA, reassess_record
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.lab_report import LabReportSource
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.policy_state import external_enforcement
-from serving_runtime.mvp.tetragon_state import read_tetragon_state
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.lab_report import LabReportSource
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.policy.policy_state import external_enforcement
+from serving_runtime.observation.tetragon_state import read_tetragon_state
 from tools.k8s_lab_check import main as lab_main, publish_report
 from tools.tetragon_public import public_snapshot
 from tools.tetragon_status import StatusCollector

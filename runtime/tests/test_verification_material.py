@@ -12,11 +12,11 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.assets import check, load_manifest
-from serving_runtime.mvp.collectors import load_declaration, compare_baseline, CollectorManager
-from serving_runtime.mvp.policy_state import load_revocations, evaluate_policy
-from serving_runtime.mvp.policy import load_policy
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.target.assets import check, load_manifest
+from serving_runtime.observation.collectors import load_declaration, compare_baseline, CollectorManager
+from serving_runtime.policy.policy_state import load_revocations, evaluate_policy
+from serving_runtime.policy.policy import load_policy
 from tools import verification_material as material
 from tools import aws_environment_candidate as environment
 from tools.aws_lab_preflight import CommandResult

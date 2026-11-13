@@ -1,7 +1,11 @@
 import copy
 import unittest
 
-from serving_runtime.mvp.response_privacy import sanitize_response_metadata, ResponsePrivacyError, MAX_METADATA_DEPTH
+from serving_runtime.gateway.response_privacy import (
+    sanitize_response_metadata,
+    ResponsePrivacyError,
+    MAX_METADATA_DEPTH,
+)
 
 
 class ResponsePrivacyTest(unittest.TestCase):

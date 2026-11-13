@@ -11,15 +11,15 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from serving_runtime.mvp.collectors import Collector, CollectorManager
-from serving_runtime.mvp.auth import CHAT_ROUTE, COMPLETIONS_ROUTE
-from serving_runtime.mvp.backend import BackendConfig
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.policy_state import load_revocations
-from serving_runtime.mvp.relay import Relay
-from serving_runtime.mvp.request_flow import ConcurrencyLimiter, RequestFlow
-from serving_runtime.mvp.request_records import RequestRecords
-from serving_runtime.mvp.validator import Decision
+from serving_runtime.observation.collectors import Collector, CollectorManager
+from serving_runtime.gateway.auth import CHAT_ROUTE, COMPLETIONS_ROUTE
+from serving_runtime.gateway.backend import BackendConfig
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.policy.policy_state import load_revocations
+from serving_runtime.gateway.relay import Relay
+from serving_runtime.gateway.request_flow import ConcurrencyLimiter, RequestFlow
+from serving_runtime.gateway.request_records import RequestRecords
+from serving_runtime.gateway.validator import Decision
 
 
 ALLOWED = Decision("ALLOWED", 200, "REQUEST_ALLOWED", None, "allowed", "model", 8)
@@ -347,7 +347,7 @@ class RelayDeadlineTests(unittest.TestCase):
 
     def test_nonstream_body_limit(self):
         backend, _, engine = relay(False, [b"12345", b"67890"])
-        with patch("serving_runtime.mvp.relay._COMPLETION_BODY_LIMIT", 8):
+        with patch("serving_runtime.gateway.relay._COMPLETION_BODY_LIMIT", 8):
             decision, body = engine.relay("id", {"messages": []}, ALLOWED)
         self.assertEqual((decision.http_status, decision.reason_code, body), (502, "ENGINE_BAD_RESPONSE", None))
         self.assertTrue(backend.conn.closed)

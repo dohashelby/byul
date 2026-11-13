@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from serving_runtime.mvp.assets import snapshot
+from serving_runtime.target.assets import snapshot
 from tools import aws_environment_candidate as tool
 from tools.aws_lab_preflight import CommandResult
 

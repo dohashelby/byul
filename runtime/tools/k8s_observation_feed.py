@@ -24,16 +24,10 @@ import time
 from typing import BinaryIO, Callable, Sequence
 from uuid import uuid4
 
-from serving_runtime.mvp.config import (
-    DEFAULT_COLLECTOR_INTERVAL_S,
-    DEFAULT_COLLECTOR_STALE_AFTER_S,
-)
-from serving_runtime.mvp.kube_context import (
-    DEFAULT_KUBE_CONTEXT,
-    validate_kube_context,
-)
-from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA
-from serving_runtime.mvp.target import (
+from serving_runtime.config.config import DEFAULT_COLLECTOR_INTERVAL_S, DEFAULT_COLLECTOR_STALE_AFTER_S
+from serving_runtime.target.kube_context import DEFAULT_KUBE_CONTEXT, validate_kube_context
+from serving_runtime.observation.observation_feed import HEARTBEAT_SCHEMA
+from serving_runtime.target.target import (
     POD_SNAPSHOT_SCHEMA,
     KubernetesSelector,
     parse_label_selector,
@@ -638,7 +632,7 @@ def _reduce_pod(item: object, engine_container: str | None = None) -> dict[str, 
     spec: dict[str, object] = {}
     if isinstance(source_spec.get("nodeName"), str):
         spec["nodeName"] = source_spec["nodeName"]
-    from serving_runtime.mvp.launch_settings import observe
+    from serving_runtime.target.launch_settings import observe
 
     containers = source_spec.get("containers")
     if isinstance(containers, list):

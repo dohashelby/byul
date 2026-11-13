@@ -10,11 +10,11 @@ from tools import selected_request_checks as checks
 
 @contextmanager
 def owned_stack(tmp_path, *, allowed_model="test-model"):
-    from serving_runtime.mvp.app import GatewayApp
-    from serving_runtime.mvp.auth import token_digest
-    from serving_runtime.mvp.config import MVPConfig
-    from serving_runtime.mvp.mock_engine import MockEngine
-    from serving_runtime.mvp.policy import load_policy
+    from serving_runtime.gateway.app import GatewayApp
+    from serving_runtime.gateway.auth import token_digest
+    from serving_runtime.config.config import MVPConfig
+    from serving_runtime.devtools.mock_engine import MockEngine
+    from serving_runtime.policy.policy import load_policy
 
     inference, viewer = "synthetic-inference-for-local-test", "synthetic-viewer-for-local-test"
     auth = {

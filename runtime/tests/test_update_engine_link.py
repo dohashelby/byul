@@ -8,8 +8,8 @@ import json
 import pytest
 
 from guard.models.objects import Evidence
-from serving_runtime.mvp.update_engine_link import link_evidence
-from serving_runtime.mvp.update_engine_link import project_termination
+from serving_runtime.bridge_update.update_engine_link import link_evidence
+from serving_runtime.bridge_update.update_engine_link import project_termination
 
 RID = "a" * 32
 AT = "2026-11-06T01:00:00+00:00"

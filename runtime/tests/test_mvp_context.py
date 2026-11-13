@@ -13,13 +13,13 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.backend import load_backend_config
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.fake_backend import FakeBackend
-from serving_runtime.mvp.mock_engine import MockEngine, simulated_token_count
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.gateway.backend import load_backend_config
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.fake_backend import FakeBackend
+from serving_runtime.devtools.mock_engine import MockEngine, simulated_token_count
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.observation.store import JsonlStore
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTEXT_POLICY = ROOT / "examples/mvp/policy-v1.1-context.json"

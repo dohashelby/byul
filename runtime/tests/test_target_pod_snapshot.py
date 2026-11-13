@@ -14,16 +14,12 @@ import unittest
 from unittest.mock import patch
 
 from serving_runtime.cli import main
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.collectors import Collector
-from serving_runtime.mvp.config import (
-    DEFAULT_COLLECTOR_INTERVAL_S,
-    DEFAULT_COLLECTOR_STALE_AFTER_S,
-    MVPConfig,
-)
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.store import JsonlStore
-from serving_runtime.mvp.target import (
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.observation.collectors import Collector
+from serving_runtime.config.config import DEFAULT_COLLECTOR_INTERVAL_S, DEFAULT_COLLECTOR_STALE_AFTER_S, MVPConfig
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.observation.store import JsonlStore
+from serving_runtime.target.target import (
     POD_SNAPSHOT_MAX_BYTES,
     POD_SNAPSHOT_SCHEMA,
     TargetPodSnapshotCollector,

@@ -9,11 +9,11 @@ import time
 import unittest
 from unittest.mock import Mock, patch
 
-from serving_runtime.mvp.engine_receipts import EngineReceipts
-from serving_runtime.mvp.query import QueryService
-from serving_runtime.mvp.relay import Relay, _ResponseIds, _StreamResponseId, response_id_receipt
-from serving_runtime.mvp.validator import Decision
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.observation.engine_receipts import EngineReceipts
+from serving_runtime.observation.query import QueryService
+from serving_runtime.gateway.relay import Relay, _ResponseIds, _StreamResponseId, response_id_receipt
+from serving_runtime.gateway.validator import Decision
+from serving_runtime.observation.store import JsonlStore
 from tools import engine_receipts as collector
 
 RID = "0123456789abcdef0123456789abcdef"
@@ -36,8 +36,8 @@ class ResponseIdTests(unittest.TestCase):
         downstream = Mock()
         allowed = Decision("ALLOWED", 200, "REQUEST_ALLOWED", None, "allowed", "model", 10)
         with (
-            patch("serving_runtime.mvp.relay.DeadlineWatchdog") as watcher,
-            patch("serving_runtime.mvp.relay.relay_payload", return_value=b"{}"),
+            patch("serving_runtime.gateway.relay.DeadlineWatchdog") as watcher,
+            patch("serving_runtime.gateway.relay.relay_payload", return_value=b"{}"),
         ):
             watcher.return_value.expired.return_value = False
             watcher.return_value.finish.return_value = False

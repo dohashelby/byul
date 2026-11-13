@@ -3,8 +3,8 @@
 from datetime import datetime, timedelta, timezone
 import json
 import pytest
-from serving_runtime.mvp.retention import HOLD_SCHEMA, RecordRetention
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.observation.retention import HOLD_SCHEMA, RecordRetention
+from serving_runtime.observation.store import JsonlStore
 
 NOW = datetime(2026, 11, 6, tzinfo=timezone.utc)
 OLD = (NOW - timedelta(days=8)).isoformat()

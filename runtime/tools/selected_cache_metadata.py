@@ -17,8 +17,8 @@ import re
 import stat
 import time
 
-from serving_runtime.mvp.assets import _safe_relative
-from serving_runtime.mvp.policy_bundle import _strict_json
+from serving_runtime.target.assets import _safe_relative
+from serving_runtime.policy.policy_bundle import _strict_json
 
 SCHEMA = "selected-cache-metadata/1.0"
 SUFFIXES = {".so", ".cubin", ".ptx", ".o", ".a", ".bin", ".json", ".py", ".pkl"}

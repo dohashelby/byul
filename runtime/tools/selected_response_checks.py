@@ -154,7 +154,7 @@ def buffered_close(spec, timeout):
     Buffered generation may already have completed before headers. Preserve
     that detection delay instead of asserting a cancellation inside the engine.
     """
-    from serving_runtime.mvp.response_timeout import DeadlineWatchdog, set_response_timeout
+    from serving_runtime.gateway.response_timeout import DeadlineWatchdog, set_response_timeout
 
     parts = urlsplit(spec["url"])
     start = time.monotonic()

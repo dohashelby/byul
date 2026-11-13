@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import stat
 
-from serving_runtime.mvp.policy_state import load_revocations
+from serving_runtime.policy.policy_state import load_revocations
 
 
 @dataclass(frozen=True)

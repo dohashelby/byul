@@ -5,7 +5,7 @@ from __future__ import annotations
 import signal
 import threading
 
-from serving_runtime.mvp.fake_backend import FakeBackend
+from serving_runtime.devtools.fake_backend import FakeBackend
 
 
 def main() -> int:

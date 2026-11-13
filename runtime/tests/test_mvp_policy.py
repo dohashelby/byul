@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from serving_runtime.mvp.policy import load_policy
+from serving_runtime.policy.policy import load_policy
 
 
 ROOT = Path(__file__).resolve().parents[1]

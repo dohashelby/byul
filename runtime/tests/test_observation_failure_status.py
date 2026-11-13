@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from serving_runtime.mvp.collectors import Collector
-from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA, ObservationFeed
+from serving_runtime.observation.collectors import Collector
+from serving_runtime.observation.observation_feed import HEARTBEAT_SCHEMA, ObservationFeed
 
 
 def setup_feed(tmp_path):

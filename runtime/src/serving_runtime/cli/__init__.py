@@ -1,6 +1,7 @@
 """Runtime command registration and dispatch."""
 
 import argparse
+import sys
 from collections.abc import Sequence
 from importlib.metadata import version
 
@@ -58,8 +59,27 @@ def build_parser():
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
     parser = build_parser()
-    args = parser.parse_args(argv)
+    config_file = None
+    if arguments and arguments[0] == "mvp":
+        from ..config.node_config import apply_node_defaults
+
+        try:
+            config_file = apply_node_defaults(parser._command_parsers["mvp"], arguments[1:])
+        except OSError as error:
+            print(f"MVP 실행 실패: {error}", file=sys.stderr)
+            return 1
+        except ValueError as error:
+            parser.error(str(error))
+    args = parser.parse_args(arguments)
+    if args.command == "mvp" and args.config is not None and config_file is None:
+        # The new option uses the exact spelling required by its preliminary parser.
+        token = next(
+            token for token in arguments[1:] if token.startswith("--") and "--config".startswith(token.split("=", 1)[0])
+        )
+        detail = token if "=" in token else f"{token} {args.config}"
+        parser.error("unrecognized arguments: " + detail)
     command = _COMMANDS.get(args.command)
     if command is not None:
         context = (

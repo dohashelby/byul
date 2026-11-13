@@ -18,6 +18,7 @@ def add_parser(subparsers):
     mvp_parser = commands.add_parser("mvp", help="로컬 Gateway와 선택한 backend 실행")
     _add_arguments_1(mvp_parser)
     _add_arguments_2(mvp_parser)
+    mvp_parser.add_argument("--config", metavar="FILE.toml", help="MVPConfig TOML 설정(명시한 CLI 인자가 우선)")
     return mvp_parser
 
 
@@ -219,6 +220,8 @@ def _options_from_args(args):
         "target_pod_snapshot": args.target_pod_snapshot,
         "kube_context": args.kube_context,
     }
+    if hasattr(args, "cilium_timeout_s"):
+        options["cilium_timeout_s"] = args.cilium_timeout_s
     return options
 
 

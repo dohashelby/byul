@@ -29,12 +29,14 @@ class CliSurfaceContractTests(unittest.TestCase):
                 actual = surface.dump(ROOT / "src")
         finally:
             sys.path[:] = original_path
-        self.assertEqual(surface.summary(actual)["arguments_total"], 154)
+        self.assertEqual(surface.summary(actual)["arguments_total"], 155)
         # Approved environment-dependent default: preserve the checkout/tools rule.
         tools = next(a for a in before["parsers"]["agent"]["actions"] if a.get("dest") == "tools_dir")
         self.assertEqual(Path(tools["default"]).name, "tools")
         tools["default"] = str(ROOT / "tools")
-        self.assertEqual(actual, before)
+        problems, allowed = surface.compare(before, actual, set(), {"mvp --config"})
+        self.assertEqual(problems, [])
+        self.assertEqual(len(allowed), 1)
 
     def test_unapproved_argument_and_help_changes_are_rejected(self):
         before = json.loads(BASELINE.read_text(encoding="utf-8"))

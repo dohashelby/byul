@@ -1,0 +1,64 @@
+# Every configurable MVPConfig field; host/policy_bundle are deliberately forbidden.
+gateway_port = 18080
+engine_port = 18088
+backend = "vllm"
+backend_config_path = "fixtures/backend_config_path.json"
+policy_path = "fixtures/policy_path.json"
+relay_timeout_s = 2.5
+stream_idle_timeout_s = 2.5
+request_deadline_s = 2.5
+max_concurrent_requests = 4
+max_connections = 32
+request_header_timeout_s = 2.5
+request_body_timeout_s = 2.5
+data_dir = "fixtures/data_dir.json"
+environment = "config-env"
+run_id = "config-run"
+revocations_path = "fixtures/revocations_path.json"
+policy_approvals_path = "fixtures/policy_approvals_path.json"
+baseline_path = "fixtures/baseline_path.json"
+manifest_path = "fixtures/manifest_path.json"
+collector_interval_s = 2.5
+collector_stale_after_s = 2.5
+asset_manifest_path = "fixtures/asset_manifest_path.json"
+asset_interval_s = 2.5
+retention_max_age_days = 2.5
+retention_max_bytes = 4096
+retention_interval_s = 2.5
+retention_enforce = true
+retention_hold_path = "fixtures/retention_hold_path.json"
+lab_report_path = "fixtures/lab_report_path.json"
+native_receipt_feed_path = "fixtures/native_receipt_feed_path.json"
+native_receipt_reader_gid = 10010
+native_receipt_producer_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+cache_observation_path = "fixtures/cache_observation_path.json"
+cache_observation_reader_gid = 10010
+cache_observation_producer_sha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+cache_observation_binding_sha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+tetragon_state_path = "fixtures/tetragon_state_path.json"
+gpu_state_path = "fixtures/gpu_state_path.json"
+engine_receipts_path = "fixtures/engine_receipts_path.json"
+tetragon_identities_path = "fixtures/tetragon_identities_path.json"
+observation_origin = "synthetic"
+observation_environment = "feed-env"
+observation_run_id = "feed-run"
+observation_intent_path = "fixtures/observation_intent_path.json"
+cilium_policy_status = true
+auth_config_path = "fixtures/auth_config_path.json"
+target_path = "fixtures/target_path.json"
+target_pod_status = false
+target_pod_snapshot = "fixtures/target_pod_snapshot.json"
+kube_context = "formal-cluster"
+observation_exceptions_path = "fixtures/observation_exceptions_path.json"
+observation_timeline_path = "fixtures/observation_timeline_path.json"
+cilium_timeout_s = 10.0
+
+[observation_feeds]
+hubble = "fixtures/hubble.jsonl"
+tetragon = "fixtures/tetragon.jsonl"
+management_listener = "fixtures/management_listener.jsonl"
+
+[observation_heartbeats]
+hubble = "fixtures/hubble.heartbeat.json"
+tetragon = "fixtures/tetragon.heartbeat.json"
+management_listener = "fixtures/management_listener.heartbeat.json"

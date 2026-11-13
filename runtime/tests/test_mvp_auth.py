@@ -7,6 +7,7 @@ from email.message import Message
 import json
 from pathlib import Path
 import tempfile
+import time
 import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -231,9 +232,15 @@ class AuthHttpBase(TempFiles, unittest.TestCase):
             return json.loads(response.read())
 
     def final_record(self, request_id: str) -> dict[str, object]:
-        records, corrupt = JsonlStore(self.data_dir / "gateway_records.jsonl").read_all()
-        self.assertEqual(corrupt, [])
-        return [r for r in records if r["request_id"] == request_id and r["phase"] == "final"][-1]
+        stop_at = time.monotonic() + 2
+        while True:
+            records, corrupt = JsonlStore(self.data_dir / "gateway_records.jsonl").read_all()
+            self.assertEqual(corrupt, [])
+            final = [r for r in records if r["request_id"] == request_id and r["phase"] == "final"]
+            if final:
+                return final[-1]
+            self.assertLess(time.monotonic(), stop_at, "요청의 final 기록이 저장되지 않았습니다.")
+            time.sleep(0.01)
 
     def receipts(self) -> int:
         records, _ = JsonlStore(self.data_dir / "engine_receipts.jsonl").read_all()

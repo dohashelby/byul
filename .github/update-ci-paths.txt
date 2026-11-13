@@ -28,5 +28,9 @@ update/docs/dev-1/ma8-local-fixture-manifest.json
 update/docs/dev-1/ma8-local-preparation-20261113.json
 update/docs/dev-1/ma8-local-preflight-20261113.json
 update/docs/gpu-a/RESULTS-20261111-SUP08.md
+update/docs/dev-1/ma7-session-input-plan.json
+update/examples/mvp-confirmed-values.yaml
+update/docs/gpu-a/policy-a-draft.yaml
+update/docs/dev-1/ma7-local-materialization-20261113.json
 contracts/**
 platform/api/**

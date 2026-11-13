@@ -14,9 +14,9 @@
     "sha256": "cf95f6709b635a6b14cc4a8ceaef5843bd0eb1bd4294c63e29d815626b8c1b0b"
   },
   "planned_pack_source": {
-    "branch": "codex/ma4-baseline34-20261113",
-    "commit": "f696f107",
-    "available_on_main": false
+    "branch": "main",
+    "commit": "b1d209fc3aa99441755adc3e7b71657c33a287c9",
+    "available_on_main": true
   },
   "counts": {
     "active_checks": 69,
@@ -26,12 +26,12 @@
     "J02": 63
   },
   "input_materialization": {
-    "M-A8_generator": "tools/mvp_sup08_inputs.py (#257 브랜치)",
+    "M-A8_generator": "tools/mvp_sup08_inputs.py (main 및 M-A8 후속 8540232d)",
     "M-A_generator": "tools/gpu_a_run_inputs.py",
     "M-A_render": "tools/gpu_a_aws_lab.py",
     "M-B_TP2_plan": "tools/b12_tp2_inputs.py",
     "model_revision_for_REQ16": null,
-    "reason": "REQ-16 모델 snapshot은 미고정이다. SUP-08 실제 로컬 fixture와 두 판본 기동/정책은 준비했으나 실제 ENV/target과 노드 배치는 남았다.",
+    "reason": "REQ-16 revision 후보만 고정됐으며 가중치·실제 첫 기동·ENV/target은 미확인이다. SUP-08 실제 파일 재검증과 수정한 기동 자산을 후속 입력 준비에 연결한다.",
     "SUP08_local_fixture": {
       "source_pr": "https://github.com/dohashelby/byul/pull/257",
       "preparation_receipt_url": "https://github.com/dohashelby/byul/blob/03541c853eddcf4a444b68e8abd4fae53bf472dc/update/docs/dev-1/ma8-local-preparation-20261113.json",
@@ -55,6 +55,34 @@
       "full_model_snapshot_present": false,
       "baseline_load_verified": false,
       "candidate_load_verified": false
+    },
+    "SUP08_local_audit": {
+      "path": "/home/youngjo/byul-ma7-inputs-20261113/update/docs/dev-1/ma8-local-preflight-20261113.json",
+      "sha256": "095b4c635375df4c010440a3c0ad5fca461ec88502d3374132f98def6edda269",
+      "model_bytes_checked_at": "2026-11-13T23:13:32.287326+09:00",
+      "launch_manifest_sha256": "f51b7486b02cc89e849d9c3353441b693c3ad1fd6441a98dc2914b697f055453",
+      "input_preflight_passed": false
+    },
+    "REQ17_timing_requirements": {
+      "minimum_per_scored_role": 200,
+      "scored_roles": 4,
+      "minimum_scored_cases": 800,
+      "single_manifest_max_cases": 512,
+      "fits_single_manifest": false,
+      "collection_or_judgment_changed": false
+    },
+    "local_materialization": {
+      "manifest_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/manifest.json",
+      "manifest_sha256": "5c886877383badd102bc2c26daa8272dedbc6d350a420c6c407409b10ce61532",
+      "prepared_files": 16,
+      "case_files": 6,
+      "case_count": 62,
+      "node_installed": false,
+      "runtime_qualified": false
+    },
+    "repository_recorded_materialization": {
+      "report_file": "docs/dev-1/ma7-local-materialization-20261113.json",
+      "report_sha256": "68fee4bbafe1c1454f4244f3d47e2a6022df5055ffb0a9cbc1d12a7af2f6474e"
     }
   },
   "checks": [
@@ -1177,23 +1205,35 @@
       "work_group": "M-A",
       "session": "J02",
       "question": "공유 가중치 전체 해제 후 재취득·대체 공급과 기존 참조의 사용이 승인·접근·수명 기준을 지키는가?",
-      "input_state": "미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/LIF-13/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "prepared_file_sha256": "1467efb91db3c9c82ac70ba69ff9e86db842c651d9897d121afcaa145c32da92",
+          "prepared_settings_file_sha256": "0ec416993af73a39a477942a6ebcee38982b8512ae332df9a26ec0b9db46fc70",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "3e9089fcf93a23f81468cd43e0ae683f"
         },
         "candidate": {
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/LIF-13/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "prepared_file_sha256": "e24a0930f7c2b27666592ac6288466f776f208f163f16c55e8e319d13279cceb",
+          "prepared_settings_file_sha256": "621e577fd8a7821c1c05e0f418f1469fb057f72c1e323714f56c61ed49c05d20",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "48ad611d8bfa19ce4d64ff63fbfe2d31"
         }
       },
       "confirmed_policy_values": {
@@ -3506,23 +3546,41 @@
       "work_group": "M-A",
       "session": "J01",
       "question": "여러 실행 프로세스가 주고받는 중간 자료와 최종 출력이 원래 요청에 맞게 처리·반환되는가?",
-      "input_state": "미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-14/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "prepared_file_sha256": "decb0500514a1e17129ce1314bb701043e403b5e2d612090212006d7f7952646",
+          "prepared_settings_file_sha256": "6b2b95930b38d4fad2f1737ac4839d57c0f648871bead9c09910e4986167d40f",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "c1c562440747c0c80daf86f286dc48d8",
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-14/cases.json",
+          "cases_file_sha256": "feab7942c9a48bfbb5cc150d519ae1e7aa97873ba8af87b2b3b20645ec977652",
+          "cases_preset": "req14-normal"
         },
         "candidate": {
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-14/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "prepared_file_sha256": "f93ec730125e5d85ea8938ecada3238e43ac2b130b226cee71462deedfe8aa02",
+          "prepared_settings_file_sha256": "6c2383d7780b41d7dcb2cb83909f3fa6570096d49da75e795c12524179931fbc",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "661bb1819732cae221e72ece6eadccca",
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-14/cases.json",
+          "cases_file_sha256": "feab7942c9a48bfbb5cc150d519ae1e7aa97873ba8af87b2b3b20645ec977652",
+          "cases_preset": "req14-normal"
         }
       },
       "confirmed_policy_values": null,
@@ -3625,15 +3683,15 @@
       "work_group": "M-A",
       "session": "J01",
       "question": "캐시 식별값이 재사용에 필요한 모델·설정·자료의 차이를 구분하는가?",
-      "input_state": "revision 후보 고정·실제 입력 미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-16/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "explicit_launch_args": [
             "--enable-prefix-caching"
           ],
@@ -3644,15 +3702,24 @@
             "metadata_sha256": "8820a5b4330c0bbd7740356bcd946316a59310edad38838bb9acff0d1777f10e",
             "weights_downloaded": false,
             "load_verified": false
-          }
+          },
+          "prepared_file_sha256": "0a79d59d8f796caf86c5cfc9af182cfc77cd6dd48ea22e43749b4ee6c1427821",
+          "prepared_settings_file_sha256": "84be533a3e6cf76c6db1d8d4c3ab5b244fef1cdd0d747cdc923e16444b23fc8f",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "31fa1cd192c20e9b1ec6c5305953d2b9",
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-16/cases.json",
+          "cases_file_sha256": "4ed374d03e74db8bc7824174969f890ce7411b1faf23e6e11a35a455c0535c37",
+          "cases_preset": "req16-full"
         },
         "candidate": {
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-16/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "explicit_launch_args": [
             "--enable-prefix-caching"
           ],
@@ -3663,7 +3730,16 @@
             "metadata_sha256": "8820a5b4330c0bbd7740356bcd946316a59310edad38838bb9acff0d1777f10e",
             "weights_downloaded": false,
             "load_verified": false
-          }
+          },
+          "prepared_file_sha256": "515a5e1a9396ed8dcb316a56e8a41e569ef438affc92065382a2a0d062e4f3ed",
+          "prepared_settings_file_sha256": "0a8b042df490c8f6abcafeb8feffdbd9122680a99300f54bbf4c68baf4df2f97",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "c88447dcccde10c806f08aa7c4a948b8",
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-16/cases.json",
+          "cases_file_sha256": "4ed374d03e74db8bc7824174969f890ce7411b1faf23e6e11a35a455c0535c37",
+          "cases_preset": "req16-full"
         }
       },
       "confirmed_policy_values": null,
@@ -3705,29 +3781,41 @@
       "work_group": "M-A",
       "session": "J02",
       "question": "캐시 적중에 따른 시간 차이로 비공개 정보가 허용 범위 밖에 드러나지 않는가?",
-      "input_state": "미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-17/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "explicit_launch_args": [
             "--enable-prefix-caching"
-          ]
+          ],
+          "prepared_file_sha256": "9cc50d6b94061a699654b740d39cb4648e92626bd5210e28e2277a41160bfc0d",
+          "prepared_settings_file_sha256": "9bb7b647b99997fbbc68cb4941eb6293ec528840a7c5aca870fe1a3cc30d4269",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "be2c2db24561d33fff6da81c7fa892d0"
         },
         "candidate": {
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-17/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "explicit_launch_args": [
             "--enable-prefix-caching"
-          ]
+          ],
+          "prepared_file_sha256": "8aafaca05890fd77711e9f8c99964c46d18761cd5320beb81066534fac61d26c",
+          "prepared_settings_file_sha256": "51c606cd3ba2e28acd310a598b7414e5c681198c4c45904b0980c1f8b5173b38",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "126b7db859a32f70f437b55a6475257b"
         }
       },
       "confirmed_policy_values": {
@@ -3770,30 +3858,52 @@
         "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다.",
         "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
       ],
-      "actual_results": null
+      "actual_results": null,
+      "case_generation_deferred": true,
+      "collection_plan_blockers": [
+        "REQ17_MINIMUM_PER_ROLE_EXCEEDS_SINGLE_MANIFEST_BOUND"
+      ]
     },
     {
       "check_id": "REQ-18",
       "work_group": "M-A",
       "session": "J02",
       "question": "batch slot을 옮기거나 재사용할 때 이전 요청의 제한 상태가 남지 않는가?",
-      "input_state": "미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-18/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "prepared_file_sha256": "7f1431985d043d4f9d7d68d36d8c41be00bad31a2eac4753aacf1b9d410f775d",
+          "prepared_settings_file_sha256": "37fba5a63ce6c96740a75e3a3a66263f1851437c1e3650fb333f6f17bdfd1c1b",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "d4345b9e1fabbe0f959f8655e5142b02",
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-18/cases.json",
+          "cases_file_sha256": "d51cefa389523df3e90cd9a288d6217b965b8271ccfda49511426d253ea16798",
+          "cases_preset": "req18-slot"
         },
         "candidate": {
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-18/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "prepared_file_sha256": "bcf0ff157abd3cfdbd62eabcb569aa2350612e3ae40a20100f576709c6d53062",
+          "prepared_settings_file_sha256": "3e6870e1b5eff6f757a30affd47f3f12ffcb5a11c4dd55cd8900da8229da74fe",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "db9c6e5ab64821b9baef64a274c70134",
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-18/cases.json",
+          "cases_file_sha256": "d51cefa389523df3e90cd9a288d6217b965b8271ccfda49511426d253ea16798",
+          "cases_preset": "req18-slot"
         }
       },
       "confirmed_policy_values": null,
@@ -3829,23 +3939,35 @@
       "work_group": "M-A",
       "session": "J02",
       "question": "실제 사용하는 GPU 연산 코드가 입력·버퍼 경계를 지키고 필요한 영역을 초기화하는가?",
-      "input_state": "미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-19/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "prepared_file_sha256": "a8509c406fd606effcbe0037d1cc73edabd0abc117f2368e4383401fd0dd0baf",
+          "prepared_settings_file_sha256": "dda5aa653bfa3a29ccb9d02f7f6ce299f1c29f1dd1434c96d6b1e1fb5f455214",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "a9be70b54340eb3f6f0636307bdafb7b"
         },
         "candidate": {
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-19/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "prepared_file_sha256": "16caecb47fc963e9d383ac0dc01395b7b1df9f9c4e3de095394b42af7071d031",
+          "prepared_settings_file_sha256": "11d40d617e40f7e66fdd2be49951fe5918255d70e265d25c5cf297f3ef36815a",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "b7c0ab5318efa69ef0e2d6e6d44e064c"
         }
       },
       "confirmed_policy_values": null,
@@ -3881,23 +4003,35 @@
       "work_group": "M-A",
       "session": "J02",
       "question": "CUDA Graph 재실행이 현재 입력을 쓰고 아직 읽는 출력 버퍼를 덮어쓰지 않는가?",
-      "input_state": "미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-20/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "prepared_file_sha256": "95c7cd9ff56b21ff35839bde60b820c27541c289ecfee45a61b3ed9be4a5f578",
+          "prepared_settings_file_sha256": "837e14506597e6dee9cc2517ba39ac9f954e5d522680ca87380ed5d798df81f9",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "34313e2b5a5b3543ec14794882dcc661"
         },
         "candidate": {
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-20/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "prepared_file_sha256": "36d9e59288335347d5f3f541d435d9762dc24e6e67842dcab3793551c6728a3f",
+          "prepared_settings_file_sha256": "0ad98f47e995492d0ba3f56e966957a542aa5be797575bb132c0275f6ff3fb6c",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "8c01d226af5523bef193c3242d949295"
         }
       },
       "confirmed_policy_values": null,
@@ -3933,23 +4067,35 @@
       "work_group": "M-A",
       "session": "J01",
       "question": "TP의 GPU 작업 재실행에 사용하는 통신 버퍼가 등록·종료·재기동 후에도 현재 실행의 유효한 버퍼를 참조하는가?",
-      "input_state": "미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/baseline/REQ-21/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "prepared_file_sha256": "8eb99bb93679d5eb7b17cc1bd151d5571a47742e01cc68710f93b9c1a4c793d7",
+          "prepared_settings_file_sha256": "7a9169e18bb69fe53ae0b7eada4d8c467f9b394287bf1240ee74cf51a45fc2cc",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "691d1dc3a85e8890ebc193fe63e3ab10"
         },
         "candidate": {
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
-          "prepared": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v3/candidate/REQ-21/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "prepared_file_sha256": "11de17bc4d5684405f91d9a9f99add4fd2c1c508d4f4c6b787ed817a6dcbf17c",
+          "prepared_settings_file_sha256": "34cb4523a6fcc532495979e1d00c88ebba06aecf02f60f1346fe5d08e3d60679",
+          "prepared_source_bytes_verified": true,
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "4adde2b228347530671a45be01c4a846"
         }
       },
       "confirmed_policy_values": null,
@@ -4265,39 +4411,45 @@
       "work_group": "M-A",
       "session": "J02",
       "question": "요청에 넣은 값으로 허용받지 않은 코드 버전을 선택할 수 없는가?",
-      "input_state": "부분 준비(로컬 fixture·정책·기동 계획)",
+      "input_state": "실제 로컬 파일 SHA 재확인·최종 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
           "environment_ref": null,
           "target": null,
           "prepared": null,
-          "policy_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs/baseline/policy.yaml",
+          "policy_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/baseline/policy.yaml",
           "reason": "로컬 fixture·기동 계획·EXAMPLE/DRAFT 정책·target 대기 설정은 준비됐다. 실제 ENV/Pod target·노드 파일 배치/권한·정상 요청 확인이 남았다. HTTP 코드 선택 경로에는 prepared 관측기 자산이 필요하지 않다.",
           "policy_file_sha256": "1559de87dde22d3f4f3191f913bd4bf204f8925f7aa180a92e8649ef19ba3e7f",
-          "render_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs/baseline/render.json",
+          "render_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/baseline/render.json",
           "render_file_sha256": "8e59ce4afa5beace1a04555a7afeb24e3538bf7eb8a7a6801097f48fae421066",
-          "configuration_pending_target_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs/baseline/guard.pending-target.toml",
-          "configuration_pending_target_file_sha256": "657136a43f2d37bc678d80771b16d2eeb50f17569f17111d84ad5e0cb46d4305",
-          "fixture_manifest_path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/manifest.json",
+          "configuration_pending_target_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/baseline/guard.pending-target.toml",
+          "configuration_pending_target_file_sha256": "e563adeee16a7b2eb3f7b6d143b1810a0837e2976679a508c76e0ce1ab4f5dc4",
+          "fixture_manifest_path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/fixture-manifest.json",
           "fixture_manifest_sha256": "d5121b80dd3237fe63d6e646806d414d464ffc78efa6ef5fbaa436715bf67765",
-          "prepared_required": false
+          "prepared_required": false,
+          "local_audit_file": "/home/youngjo/byul-ma7-inputs-20261113/update/docs/dev-1/ma8-local-preflight-20261113.json",
+          "local_audit_sha256": "095b4c635375df4c010440a3c0ad5fca461ec88502d3374132f98def6edda269",
+          "local_assets_verified": true
         },
         "candidate": {
           "role": "후보 판본",
           "environment_ref": null,
           "target": null,
           "prepared": null,
-          "policy_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs/candidate/policy.yaml",
+          "policy_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/candidate/policy.yaml",
           "reason": "로컬 fixture·기동 계획·EXAMPLE/DRAFT 정책·target 대기 설정은 준비됐다. 실제 ENV/Pod target·노드 파일 배치/권한·정상 요청 확인이 남았다. HTTP 코드 선택 경로에는 prepared 관측기 자산이 필요하지 않다.",
           "policy_file_sha256": "1559de87dde22d3f4f3191f913bd4bf204f8925f7aa180a92e8649ef19ba3e7f",
-          "render_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs/candidate/render.json",
-          "render_file_sha256": "dabe11708d6c8dc780fa670f1e2bc6a826966d3f8f5470ac8e6eb2686c6b86ab",
-          "configuration_pending_target_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs/candidate/guard.pending-target.toml",
-          "configuration_pending_target_file_sha256": "87476211269fd0ba396af4a045348d01fd99cbd5010b902671661946bca12886",
-          "fixture_manifest_path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/manifest.json",
+          "render_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/candidate/render.json",
+          "render_file_sha256": "14a4fb68a6e483418068bbe3d2288085864d5f681ad1fda9013bca3ae093c651",
+          "configuration_pending_target_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/candidate/guard.pending-target.toml",
+          "configuration_pending_target_file_sha256": "23a044a9db9dfab2db2671320e1a0875e56cd64a8b05a33c0e3bf9a949a36d11",
+          "fixture_manifest_path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/fixture-manifest.json",
           "fixture_manifest_sha256": "d5121b80dd3237fe63d6e646806d414d464ffc78efa6ef5fbaa436715bf67765",
-          "prepared_required": false
+          "prepared_required": false,
+          "local_audit_file": "/home/youngjo/byul-ma7-inputs-20261113/update/docs/dev-1/ma8-local-preflight-20261113.json",
+          "local_audit_sha256": "095b4c635375df4c010440a3c0ad5fca461ec88502d3374132f98def6edda269",
+          "local_assets_verified": true
         }
       },
       "confirmed_policy_values": null,

@@ -18,6 +18,8 @@ from serving_runtime.enforcement.events import transform_lines_with_loss
 from serving_runtime.observation.collectors import CollectionFailure, NoCollectionUpdate
 from serving_runtime.observation.store import JsonlStore
 
+from serving_runtime.common.atomic_file import AtomicWriteOptions, write_atomic
+
 
 HEARTBEAT_SCHEMA = "runtime-observation-feed-heartbeat/1.0"
 
@@ -251,27 +253,7 @@ class ObservationFeed:
         encoded = (json.dumps(document, ensure_ascii=False) + "\n").encode("utf-8")
         self.state_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         temporary = self.state_path.with_name(f".{self.state_path.name}.{os.getpid()}.{uuid4().hex}.tmp")
-        try:
-            descriptor = os.open(
-                temporary,
-                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-                0o600,
-            )
-            try:
-                with os.fdopen(descriptor, "wb") as output:
-                    descriptor = -1
-                    output.write(encoded)
-                    output.flush()
-                    os.fsync(output.fileno())
-                os.replace(temporary, self.state_path)
-            finally:
-                if descriptor >= 0:
-                    os.close(descriptor)
-        finally:
-            try:
-                temporary.unlink()
-            except FileNotFoundError:
-                pass
+        write_atomic(self.state_path, encoded, temporary=temporary)
 
     @staticmethod
     def _parse_time(value: Any, field: str) -> datetime:
@@ -625,24 +607,12 @@ class ObservationFeed:
             + "\n"
         ).encode("utf-8")
         temporary = path.with_name(f".{path.name}.{os.getpid()}.{uuid4().hex}.tmp")
-        try:
-            descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-            try:
-                with os.fdopen(descriptor, "wb") as output:
-                    descriptor = -1
-                    output.write(encoded)
-                    os.fchmod(output.fileno(), self.health_receipt_mode)
-                    output.flush()
-                    os.fsync(output.fileno())
-                os.replace(temporary, path)
-            finally:
-                if descriptor >= 0:
-                    os.close(descriptor)
-        finally:
-            try:
-                temporary.unlink()
-            except FileNotFoundError:
-                pass
+        write_atomic(
+            path,
+            encoded,
+            temporary=temporary,
+            options=AtomicWriteOptions(final_mode=self.health_receipt_mode, chmod_after_write=True),
+        )
 
     def collect(self) -> tuple[dict[str, Any], str]:
         heartbeat, writer_started_at = self._read_heartbeat()

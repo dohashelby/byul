@@ -4,6 +4,8 @@
 
 기존 PoC의 `product_update`는 예상 동작의 근거다. 새 실행의 EVD·RES·RPT로 복사하지 않는다. Python 설치 레이어 확인과 엔진 설치 bytes 검토, GPU 실행은 서로 다른 단계다.
 
+[고정 입력 신원](ma8-poc-fixture-contract.json)은 PoC 문서에서 옮긴 모델 ID·snapshot·inventory·코드 저장소·승인/비승인 commit이다. 입력끼리 일치하더라도 이 신원과 다르면 조립 전에 거부한다. 이 파일은 원본 fixture manifest의 복원본이 아니다.
+
 1. 기존 `tools.prepare_sup08_phi3v_fixture`로 고정 모델의 실제 파일을 검증하고 새 fixture를 만든다. 큰 모델 다운로드는 별도 승인 대상이다.
 2. `tools.gpu_a_aws_lab`의 코드 선택 세대로 각 판본을 렌더링한다. 같은 fixture의 모델·승인 코드·trust 설정을 넣고 실행별 marker 경로를 분리한다. 실제 기동은 GPU 세션 승인 뒤 진행한다.
 3. 실제 설치 판본·GPU·드라이버·모델 inventory를 확인한 ENV와 실제 namespace/Pod에서 조립한 target을 준비한다. 예제 Pod를 실제 입력으로 표시하지 않는다.
@@ -20,3 +22,5 @@ uv run python -m tools.mvp_sup08_inputs \
 출력은 쪽별 environment.json·target.json·policy.yaml·guard.toml과 전체 manifest.json이다. 기존 Kubernetes 입력 검증과 정책·관측 설정 계약을 적용한다. prepared 관측기 자산은 이 HTTP 코드 선택 경로에서 요구하지 않는다. 모델 bytes를 다시 읽었다거나 클러스터를 관측했다고 주장하지 않는다. 정책은 DECLARED/DRAFT이며 확정자·실제 결과·비교 결과는 비어 있다.
 
 단위 시험은 모의 ENV·Pod와 작은 EXAMPLE inventory로 정상 조립, 모델/코드/이미지/GPU/trust 불일치 거부, 과거 예상의 새 판본 상속 금지를 검증한다. 실제 모델 fixture·클러스터 입력이 이 작업 공간에 없어 정본 실행 입력의 최종 조립은 아직 하지 않았다. J02에서 새 입력을 조립하고 정본 팩으로 새 EVD→RES→RPT를 생성해야 한다.
+
+2026-11-13 원자료 탐색: 저장소·관련 worktree·프로젝트 산출물·Windows 문서/다운로드/첨부/임시 폴더·WSL 사용자/캐시/임시 경로와 이전 작업 기록을 확인했다. 원본 `SUP08-evidence-20261111.zip`(998,017 bytes, SHA-256 `719ccd77b9daf34d711e5c9691545b12e17e2644968c4e3bdedc97b73fc6b84a`)이나 실제 fixture manifest·두 ENV/target은 찾지 못했다. 임시/첨부 폴더 ZIP 98개에도 원본 및 내부 Store export 세 개와 같은 크기의 파일이 없었다. 저장소 밖 전달물이라는 PoC 요약과 보존 EBS 기록만 확인했으며, EC2 기동·GPU 실행·모델 다운로드는 하지 않았다. 최종 조립과 실제 입력 사전 점검은 미완료다.

@@ -18,6 +18,7 @@ from tools.prepare_sup08_phi3v_fixture import SOURCE_MODEL, SOURCE_REVISION
 
 ROOT = Path(__file__).resolve().parents[1]
 POC = ROOT / 'docs/evidence/sup08-code-selection-20261111.json'
+FIXTURE_CONTRACT = ROOT / 'docs/dev-1/ma8-poc-fixture-contract.json'
 
 
 def prepare(fixture_file, environments, targets, output, *, control_image, pack=ROOT / 'packs/PACK-BASELINE'):
@@ -26,11 +27,13 @@ def prepare(fixture_file, environments, targets, output, *, control_image, pack=
         raise ValueError('새 입력 디렉터리를 지정해야 합니다.')
     fixture_raw = Path(fixture_file).read_bytes(); fixture = json.loads(fixture_raw)
     historical = json.loads(POC.read_bytes())['product_update']
+    contract = json.loads(FIXTURE_CONTRACT.read_bytes())['fixture']
     inventory = fixture['model_inventory']
     inventory_hash = sha256_hex(json.dumps(inventory, sort_keys=True, separators=(',', ':')).encode())
     code = fixture['code_revisions']
     if (fixture['schema'] != 'byul-sup08-phi3v-fixture/1'
             or fixture['source_model'] != SOURCE_MODEL or fixture['source_revision'] != SOURCE_REVISION
+            or any(fixture.get(key) != value for key, value in contract.items())
             or inventory_hash != fixture['model_inventory_sha256'] or inventory_hash != historical['model_inventory_sha256']
             or any(not re.fullmatch('[0-9a-f]{40}', code[k]) for k in ('approved', 'unapproved'))
             or code['approved'] == code['unapproved']):

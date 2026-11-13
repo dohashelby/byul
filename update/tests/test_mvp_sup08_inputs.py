@@ -25,7 +25,12 @@ def source(tmp_path, monkeypatch):
         'code_revisions': {'approved': 'b' * 40, 'unapproved': 'c' * 40},
         'code_repository': CODE_REPOSITORY, 'code_marker_root': '/cache/hf/byul-code-markers/fixture-source'}
     fixture_file = tmp_path / 'fixture.json'; fixture_file.write_bytes(canonical_json(fixture))
-    historical = {'model_inventory_sha256': digest, 'security_comparison': 'REGRESSION'}
+    historical = {'model_inventory_sha256': digest, 'security_comparison': 'REGRESSED'}
+    contract = tmp_path / 'fixture-contract.json'
+    contract.write_bytes(canonical_json({'fixture': {key: fixture[key] for key in (
+        'schema', 'source_model', 'source_revision', 'model_id', 'model_snapshot_id',
+        'model_inventory_sha256', 'code_repository', 'code_revisions')}}))
+    monkeypatch.setattr(tool, 'FIXTURE_CONTRACT', contract)
     envs, targets = {}, {}
     for side, row in versions().items():
         folder = tmp_path / side; folder.mkdir()
@@ -48,7 +53,7 @@ def test_pair_is_current_canonical_inputs_without_fabricated_results(tmp_path, m
     fixture, envs, targets = source(tmp_path, monkeypatch)
     out = tmp_path / 'prepared'
     manifest = tool.prepare(fixture, envs, targets, out, control_image=IMAGE)
-    assert manifest['pack_ref']['revision'] == 34 and manifest['expected_comparison'] == 'REGRESSION'
+    assert manifest['pack_ref']['revision'] == 34 and manifest['expected_comparison'] == 'REGRESSED'
     assert manifest['actual_comparison'] is None and manifest['official'] is False
     assert manifest['data_origin'] == 'DECLARED'
     assert manifest['preflight'] == {'input_contracts_valid': True, 'comparison_conditions_equal': True,
@@ -106,3 +111,29 @@ def test_changed_pair_does_not_inherit_historical_expectations(tmp_path, monkeyp
     result = tool.prepare(fixture, envs, targets, tmp_path / 'new', control_image=IMAGE)
     assert result['expected_comparison'] is None
     assert all(row['expected_state'] is None for row in result['sides'].values())
+
+
+@pytest.mark.parametrize('damage', ['approved', 'unapproved', 'code_repository', 'model_id', 'model_snapshot_id'])
+def test_valid_shaped_but_different_poc_identity_rejected(tmp_path, monkeypatch, damage):
+    fixture, envs, targets = source(tmp_path, monkeypatch)
+    value = json.loads(fixture.read_bytes())
+    if damage in {'approved', 'unapproved'}:
+        value['code_revisions'][damage] = 'd' * 40
+    elif damage == 'model_snapshot_id':
+        value[damage] = 'e' * 40
+    else:
+        value[damage] += '-different'
+    fixture.write_bytes(canonical_json(value))
+    out = tmp_path / 'rejected-identity'
+    with pytest.raises(ValueError, match='PoC와 같은'):
+        tool.prepare(fixture, envs, targets, out, control_image=IMAGE)
+    assert not out.exists()
+
+
+def test_fixed_fixture_identity_has_unchanged_poc_source_document():
+    contract = json.loads(tool.FIXTURE_CONTRACT.read_bytes())
+    source_document = tool.ROOT / contract['provenance']['source_document']
+    assert sha256_hex(source_document.read_bytes()) == contract['provenance']['source_document_sha256']
+    assert contract['fixture']['source_model'] == SOURCE_MODEL
+    assert contract['fixture']['source_revision'] == SOURCE_REVISION
+    assert contract['fixture']['code_repository'] == CODE_REPOSITORY

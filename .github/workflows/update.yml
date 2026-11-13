@@ -25,6 +25,7 @@ on:
       - "update/docs/b-lif07/WORKER_READINESS.md"
       - "update/docs/b-lif13/WEIGHTS_LIFETIME.md"
       - "update/docs/dev-1/ma6-version-applicability.md"
+      - "update/docs/dev-1/ma3-rank-fault-producer.md"
       - "contracts/**"
       - "platform/api/**"
   # PR은 항상 실행하고 job 단위에서 건너뛴다. 경로 필터로 workflow 자체를 건너뛰면 필수 검사가 Pending에 남는다.

@@ -35,6 +35,11 @@
       "manifest_sha256": "e7775f279915412203288e4bfac78b6ee82f5c8fb04d77e8bb90c9d62c0c0caf",
       "reviewed_by": "Claude / BYUL UPDATE / #254 main·#256 병합 후 self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-13T13:20:00+09:00"
+    },
+    {
+      "manifest_sha256": "b36e2dc5bf609583d360e2886fde97388f72a73effeaef588d980ac0c75af696",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-13T18:54:33.170986+09:00"
     }
   ]
 }

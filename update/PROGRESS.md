@@ -2247,3 +2247,11 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - Replaced the current static packet's historical ordering dependency with a separately reviewed current-generation helper. Retained historical normal-boot snapshot stays byte-identical and accepts historical sensor e32c only; the new helper accepts current sensor 554206 only. Pair/helper/preparer SHA chain stays exact and closed.
 - Tests: SUP16 20 passed; combined serialized native17 scope preparation/load and SUP16 37 passed (0.46s), external temporary paths. Broader host diagnostic: 85 passed, 55 failed (unsupported CPython3.12.13 observer runtime); supported Linux rerun remains required.
 - No SUP16 registry/packs/contracts or sensor changes, actual engine/GPU/AWS execution, remote writes, or support-status promotion. Integration owner regenerates shared source manifest and runs final Linux validation.
+
+
+## 2026-11-13 M-A3 — rank-fault 후보 변환과 무실행 입력 도구
+
+- 한 일: 기존 native24 엔진 안 관측/엄격 원 기록 투영을 재사용해 fault_applied·fault_released·detected·client_delivered·recovered를 공통 rank-fault로 변환하는 후보를 만들었다. READY 파일·EXPIRED·정상 HTTP 성공만으로 적용/해제/복구를 만들지 않고, 과거 등록표에 새 생산자를 넣지 않는다. 탐지/전달 관측자의 PID와 장애 대상 worker를 분리하고, 원 시간 구간·기한 위반·공백·원 참조를 함께 보존한다. 유계 JSON 무실행 조립 도구·현행 문서와 두 CI 경로 목록을 추가했다. 단일 rank·같은 소유 범위 후보이며 TP2/기준V0·death/delay 신호 해제·새 세대 복구 연결은 미완료다.
+- 테스트 결과: CPython3.12.3 직접190개 통과(pytest8.76초/부모9.433초), 현황·530파일 소스 검토 통과. 첫 실행189통과/1실패는 저장소 내부 pytest 임시 디렉터리를 기존 자산 준비 관문이 거부한 것으로, 외부 임시 디렉터리로 다시 실행했다. 관문·assert·기대값·skip 변경은 없다. 소스 목록 SHA b36e2dc5bf609583d360e2886fde97388f72a73effeaef588d980ac0c75af696에 결정5의 정확 단일 검토 행을 넣었다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 후보 범위가 드러나는 main 대상 draft PR로 검토한다. push 승인 뒤 CI를 확인하고, TP2·신호 해제/새 세대 lineage를 별도 source profile/실제 영수증으로 연결한다. 실제 GPU 확인·등록은 J01이다.
+- 막힌 것: 현재 source profile은 단일 rank 범위라 J01 TP2 수락 자격이 없다. death/delay는 물리 해제·복구 근거가 없으면 누락 gap이다. M-A3 전체 완료·GPU 실측·원 질문 전체 완료로 세지 않는다. ../runtime·../contracts·기존 소스/CPython 고정값·판정 규칙은 바꾸지 않았고 엔진/GPU/클라우드·주입 실행은 없다.

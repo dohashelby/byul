@@ -30,7 +30,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {version('serving-runtime')}")
     commands = parser.add_subparsers(dest="command")
-    from .operations.agent import add_arguments
+    from ..operations.agent import add_arguments
 
     agent_parser = commands.add_parser("agent", help="플랫폼 운영 요청 조회·검증·실행")
     add_arguments(agent_parser)
@@ -298,7 +298,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     existing_group.add_argument("--resume", action="store_true", help="기존 timeline 상태와 입력 위치에서 이어가기")
     args = parser.parse_args(argv)
     if args.command == "agent":
-        from .operations.agent import main as agent_main
+        from ..operations.agent import main as agent_main
 
         return agent_main(args)
     if args.command == "file-info":
@@ -516,15 +516,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         return run_cli(args.report_dir)
     if args.command == "enforce" and args.enforce_command == "sync":
-        from .enforcement.sync_cli import main as sync_main
+        from ..enforcement.sync_cli import main as sync_main
 
         return sync_main(args)
     if args.command == "enforce" and args.enforce_command == "render":
-        from .enforcement.cilium import render_manifests as render_cilium
-        from .enforcement.cilium import write_manifests
-        from .enforcement.intent import IntentError, load_intent
-        from .enforcement.security import render_pod_security
-        from .enforcement.tetragon import render_manifests as render_tetragon
+        from ..enforcement.cilium import render_manifests as render_cilium
+        from ..enforcement.cilium import write_manifests
+        from ..enforcement.intent import IntentError, load_intent
+        from ..enforcement.security import render_pod_security
+        from ..enforcement.tetragon import render_manifests as render_tetragon
 
         try:
             intent = load_intent(args.intent)
@@ -548,9 +548,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     if args.command == "enforce" and args.enforce_command == "ingest":
-        from .enforcement.events import ingest_file
-        from .enforcement.execpolicy import ExecPolicy
-        from .enforcement.intent import IntentError, load_intent
+        from ..enforcement.events import ingest_file
+        from ..enforcement.execpolicy import ExecPolicy
+        from ..enforcement.intent import IntentError, load_intent
 
         try:
             binaries = None
@@ -595,8 +595,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         return 0
     if args.command == "enforce" and args.enforce_command == "cache-check":
-        from .enforcement.cache import check_cache
-        from .enforcement.intent import IntentError, load_intent
+        from ..enforcement.cache import check_cache
+        from ..enforcement.intent import IntentError, load_intent
 
         try:
             report = check_cache(load_intent(args.intent), root_override=args.root)
@@ -606,7 +606,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0 if report["state"] in {"ok", "other_generations_present"} else 3
     if args.command == "enforce" and args.enforce_command == "phase-signals":
-        from .enforcement.phase_signals import extract_phase_timeline, follow_phase_timeline
+        from ..enforcement.phase_signals import extract_phase_timeline, follow_phase_timeline
 
         output = Path(args.out)
         if not args.follow and (args.log == "-" or args.health_url is not None or args.overwrite or args.resume):

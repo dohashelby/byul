@@ -59,16 +59,12 @@ def test_sensor_readiness_uses_the_same_profile_resolver_as_execution():
         assert state['code_available'] and not state['runtime_qualified']
 
 
-def test_reviewed_length_profile_selects_exact_model_artifact_and_rejects_ambiguity(monkeypatch):
-    from guard.adapters import vllm_length_cause as length
-    env = environment(engine={'name': 'vllm', 'version': length.ENGINE_VERSION, 'image_digest': length.IMAGE},
-        model={'id': length.MODEL, 'revision': length.MODEL_REVISION, 'inventory_sha256': length.MODEL_INVENTORY})
-    selected = engine_profiles.implementation('length_cause', env, backend='cpu')
-    assert selected['profile'] == length.PROFILE
-    changed = env.model_copy(deep=True)
-    changed.engine.version = '0.33.0'
-    assert engine_profiles.implementation('length_cause', changed, backend='cpu') is None
-    assert engine_profiles.implementation('length_cause', env, backend='gpu') is None
+def test_cpu_image_length_cause_implementation_was_removed():
+    # 2026-11-12 GPU-only decision: the CPU-image REQ-09 length-cause profile is gone.
+    env = environment(engine={'name': 'vllm', 'version': '0.32.0',
+        'image_digest': 'vllm/vllm-openai-cpu@sha256:827ef38187f9b52f2bb838695ef815ec5b65f4bf3e4c061b002b2b0a19cb0701'})
+    for backend in ('cpu', 'gpu'):
+        assert engine_profiles.implementation('length_cause', env, backend=backend) is None
 
 
 def test_version_provenance_can_change_while_effective_conditions_stay_equal():

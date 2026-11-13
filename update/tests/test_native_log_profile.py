@@ -9,7 +9,7 @@ from guard import application
 from guard.adapters import vllm
 from guard.adapters.base import LaunchSpec
 from guard.runtime import sandbox
-from tests.test_windows_cpu_launch import launch, setup_inputs
+from tests.test_managed_gpu_launch import launch, setup_inputs
 
 
 PROFILE_ENV = {"VLLM_CONFIGURE_LOGGING": "1", "VLLM_LOGGING_LEVEL": "INFO",
@@ -54,8 +54,8 @@ def test_native_logging_cannot_accept_custom_code_paths_or_implicit_profiles(pro
 @pytest.mark.parametrize("profile", ["request-info-v1", None, "", "/tmp/logging.json"])
 def test_legacy_launch_rejects_native_logging_options_even_if_the_value_is_empty(profile):
     spec = LaunchSpec("model", 8000, image="cpu", options={"revision": "rev", "models_dir": Path("/snapshot"),
-                                                            "device": "cpu", "logging_profile": profile})
-    with pytest.raises(ValueError, match="cpu-bounded"):
+                                                            "device": "gpu", "logging_profile": profile})
+    with pytest.raises(ValueError, match="gpu-bounded"):
         vllm.VllmAdapter().launch_plan(spec)
 
 
@@ -136,7 +136,7 @@ def test_comparison_conditions_capture_actual_fixed_log_flags_and_env_without_ho
         sandbox.NGINX_IMAGE: "nginx@sha256:fixed", sandbox.PYTHON_IMAGE: "python@sha256:fixed"})
     monkeypatch.setattr(sandbox, "probe", lambda *args, **kwargs: {"outcome": 401})
     config = {"model": "test", "revision": "rev", "image": IMAGE, "models_dir": "C:/private/model",
-              "gpu": False, "launch_profile": "cpu-bounded", "model_layout": "snapshot",
+              "gpu": True, "gpu_devices": ["0"], "resources": {"cpus": 4, "memory_bytes": 17179869184, "shm_bytes": 2147483648, "pids_limit": 512}, "launch_profile": "gpu-bounded", "model_layout": "snapshot",
               "logging_profile": "request-info-v1"}
     first = sandbox.up(Recording(), "isolated", tmp_path / "one", "private-gateway-key", engine="vllm",
                        vllm=config, wait_ready=False, engine_profile="hardened")

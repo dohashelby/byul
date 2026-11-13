@@ -1,16 +1,15 @@
-# Explicit native INFO and JSON/SSE binding fixtures; not enterprise defaults.
-# Explicit fixed chat fixture; model snapshot and default CPU configuration are unchanged.
-# Windows + Docker Desktop Linux/WSL2, bounded CPU diagnostic example.
+# GPU host + Docker with the NVIDIA runtime, bounded GPU launch example.
+# 2026-11-12: CPU images are out of scope (M-A9); this replaces the former CPU example.
 # This is launch configuration, not enterprise policy. Use real ENV inventory,
-# kernel/architecture/CPU information and a DRAFT policy scoped to these checks.
-# ENV image: official v0.31.0 Linux amd64 CPU repository@sha256 digest.
-# Known diagnostic image: vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b
+# GPU model, driver, gpu_count and tp_size, and a DRAFT policy scoped to these checks.
+# ENV image: an official vLLM GPU repository@sha256 digest from the MVP version table.
 # ENV model: facebook/opt-125m, revision 27dcfa74d334bc871f3234de431e71c6eeba5dd6.
 # Compute inventory of the exact snapshot directory; do not copy an old hash.
-# ENV runtime: gpu_count=0 and explicit Linux CPU profile, threads=2.
-# One engine at a time. RAM/swap/shm values are ceilings, not fit guarantees.
-# Existing unrelated containers are preserved. Intel GPU passthrough is unused.
-store = '.guard-windows-cpu-binding-logs'
+# ENV runtime: gpu_count>=1, gpu_model, driver, tp_size; no CPU profile.
+# One engine at a time. RAM/shm values are ceilings, not fit guarantees.
+# Existing unrelated containers are preserved.
+# Explicit native INFO and JSON/SSE binding fixtures; not enterprise defaults.
+store = '.guard-gpu-bounded-binding-logs'
 
 [adapter]
 name = 'vllm'
@@ -49,35 +48,36 @@ credential_canary = false
 [vllm]
 logging_profile = 'request-info-v1'
 chat_template_profile = 'guard-text-chat-v1'
-launch_profile = 'cpu-bounded'
+launch_profile = 'gpu-bounded'
 model_layout = 'snapshot'
-# Literal TOML strings preserve Windows backslashes; replace with your path.
+# Replace with your absolute snapshot path.
 # Directory contains config.json, tokenizer files and real weights directly.
-models_dir = 'C:\guard-models\opt-125m-snapshot'
-dtype = 'float32'
+models_dir = '/srv/guard-models/opt-125m-snapshot'
+dtype = 'auto'
 max_model_len = 128
 max_num_seqs = 1
 max_num_batched_tokens = 128
-kv_cache_memory_bytes = 67108864
+gpu_memory_utilization = 0.5
 enforce_eager = true
-cpu_threads = 2
+# tensor_parallel_size must equal ENV runtime.tp_size and gpu_count (pp/dp 1).
+tensor_parallel_size = 1
+# Device IDs or GPU-/MIG- UUIDs; the count must equal ENV runtime.gpu_count.
+gpu_devices = ['0']
 ready_timeout = 600
-# Do not set cpu_kv_cache_gib with this byte-sized profile.
 
 [vllm.resources]
-cpus = 2
-memory_bytes = 3221225472
-memory_swap_bytes = 5368709120
-shm_bytes = 536870912
-pids_limit = 256
+cpus = 4
+memory_bytes = 17179869184
+shm_bytes = 2147483648
+pids_limit = 512
 
 [direct_route]
-roles = { allowed = 'GUARD_CPU_GENERAL' }
+roles = { allowed = 'GUARD_GPU_GENERAL' }
 request_timeout = 30.0
 allow_mutating_routes = false
 
 [role_route]
-roles = { general = 'GUARD_CPU_GENERAL', admin = 'GUARD_CPU_ADMIN' }
+roles = { general = 'GUARD_GPU_GENERAL', admin = 'GUARD_GPU_ADMIN' }
 admin_role = 'admin'
 request_timeout = 30.0
 allow_mutating_routes = false
@@ -108,7 +108,7 @@ request_timeout = 30.0
 
 [response_content]
 endpoint = '/v1/chat/completions'
-roles = { allowed = 'GUARD_CPU_GENERAL' }
+roles = { allowed = 'GUARD_GPU_GENERAL' }
 request_timeout = 30.0
 # Fixed formatting enables a synthetic private system branch; model instruction quality is unverified.
 

@@ -17,8 +17,13 @@ gateway_profile = "role_enforced"
 engine_profile = "hardened"
 [vllm]
 models_dir = "~/guard-models"
-cpu_kv_cache_gib = 1
+# GPU images only (2026-11-12). The device count must equal ENV runtime.gpu_count.
+gpu_devices = ["0"]
 ready_timeout = 600
+[vllm.resources]
+cpus = 4
+memory_bytes = 17179869184
+pids_limit = 512
 [direct_route]
 roles = { allowed = "GUARD_UPDATE_GENERAL" }
 [role_route]

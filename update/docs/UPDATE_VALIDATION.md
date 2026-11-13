@@ -214,7 +214,7 @@ PR #29 통합 당시 기록: PR #28에서 pinned CPU 이미지 0.31.0/0.32.0의 
 
 1. 서로 다른 두 **로컬** Linux CPU 이미지의 실제 pinned digest와 실제 엔진 버전. 같은 digest의 다른 태그는 두 이미지가 아니다. 같은 버전의 다른 digest는 `image-comparison`, 다른 버전은 `version-upgrade`로 구분한다. 이름만 바꿔 후보 ENV를 만들지 않는다.
 2. 동일한 모델 ID·revision·전체 snapshot inventory와 실제 CPU 프로파일(gpu_count=0, Linux/architecture/model/kernel/threads). 모델 경로의 config·tokenizer·weights를 사전에 준비한다. 지원 여부는 실제 버전/구성의 prepare 결과로 확인한다.
-3. 동일한 모델·fixture·실행 자원·엔진·게이트웨이·보안 프로파일. Windows 예시는 [windows-cpu-update.toml](../examples/windows-cpu-update.toml)이며 `models_dir`를 실제 절대 경로로 바꿔 별도 파일로 저장한다.
+3. 동일한 모델·fixture·실행 자원·엔진·게이트웨이·보안 프로파일. Windows 예시는 [gpu-bounded-update.toml](../examples/gpu-bounded-update.toml)이며 `models_dir`를 실제 절대 경로로 바꿔 별도 파일로 저장한다.
 4. 다섯 점검만 선택한 정책. [update-validation-policy.yaml](../examples/update-validation-policy.yaml)은 기존 EXAMPLE 값의 범위 분리 예시이며 기업 정책이 아니다. 실제 승인 목록을 지원 범위에 맞춰 임의로 줄이지 않는다. 추가 점검은 별도 실행으로 분리한다.
 5. 실행에 충분한 Docker Desktop Linux/WSL2 메모리·swap·디스크. 예시의 메모리 제한은 가용 메모리나 기동 성공의 보장이 아니다. 기존 서비스와 자원 충돌을 먼저 확인한다.
 

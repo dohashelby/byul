@@ -6,7 +6,7 @@ import re
 
 from .base import LaunchSpec
 from .model_inventory import inventory
-from .vllm import VllmAdapter, CPU_LAUNCH_KEYS, CpuLaunchOptions, CONTAINER_PORT
+from .vllm import VllmAdapter, BOUNDED_LAUNCH_KEYS, BOUNDED_LAUNCH_PROFILE, GpuLaunchOptions, CONTAINER_PORT
 from .openai_engine import SGLangAdapter, TensorRTAdapter
 from guard.runtime import generation_readiness
 
@@ -99,7 +99,7 @@ class EngineProvider:
     def template_rejection_supported(self, image, version):
         return False
 
-    def bounded_cpu_evidence(self, options, env):
+    def bounded_launch_evidence(self, options, env):
         return False
 
     def expected_image_entrypoint(self, options):
@@ -147,11 +147,14 @@ class VllmProvider(EngineProvider):
         from .vllm import CHAT_REVIEWED_IMAGE
         return image == CHAT_REVIEWED_IMAGE and version == '0.31.0'
 
-    def bounded_cpu_evidence(self, options, env):
-        return options.get('launch_profile') == 'cpu-bounded' and env.runtime.gpu_count == 0
+    def bounded_launch_evidence(self, options, env):
+        devices = options.get('gpu_devices')
+        return (options.get('launch_profile') == BOUNDED_LAUNCH_PROFILE and type(env.runtime.gpu_count) is int
+                and env.runtime.gpu_count >= 1 and type(devices) is list and len(devices) == env.runtime.gpu_count)
 
     def expected_image_entrypoint(self, options):
-        return ['vllm', 'serve'] if options.get('launch_profile') == 'cpu-bounded' else None
+        # GPU launches keep the image's own entrypoint.
+        return None
 
     def generation_profile(self, options):
         return generation_readiness.profile(options)
@@ -177,15 +180,17 @@ class VllmProvider(EngineProvider):
             raise ValueError('ENGINE_ARTIFACT_CONFIGURATION_UNSUPPORTED')
         if env.runtime.gpu_count is None:
             raise ValueError("managed update needs an explicit gpu_count")
-        if env.runtime.gpu_count > 0:
-            devices = base.get('gpu_devices')
-            if (type(devices) is not list or len(devices) != env.runtime.gpu_count or len(set(devices)) != len(devices)
-                    or any(type(v) is not str or re.fullmatch(r'(?:[0-9]+|GPU-[A-Za-z0-9-]+|MIG-[A-Za-z0-9/-]+)', v) is None for v in devices)):
-                raise ValueError('GPU_ASSIGNMENT_REQUIRED_OR_COUNT_MISMATCHED')
-            from guard.runtime.docker import ContainerLimits
-            limits = ContainerLimits.from_mapping(base.get('resources', {}))
-            if any(getattr(limits, k) is None for k in ('cpus', 'memory_bytes', 'pids_limit')):
-                raise ValueError('GPU_CONTAINER_RESOURCE_LIMITS_REQUIRED')
+        if env.runtime.gpu_count < 1:
+            # 2026-11-12: CPU images are outside the product scope.
+            raise ValueError("VLLM_GPU_REQUIRED: managed vLLM needs gpu_count>=1; the CPU image path was removed")
+        devices = base.get('gpu_devices')
+        if (type(devices) is not list or len(devices) != env.runtime.gpu_count or len(set(devices)) != len(devices)
+                or any(type(v) is not str or re.fullmatch(r'(?:[0-9]+|GPU-[A-Za-z0-9-]+|MIG-[A-Za-z0-9/-]+)', v) is None for v in devices)):
+            raise ValueError('GPU_ASSIGNMENT_REQUIRED_OR_COUNT_MISMATCHED')
+        from guard.runtime.docker import ContainerLimits
+        limits = ContainerLimits.from_mapping(base.get('resources', {}))
+        if any(getattr(limits, k) is None for k in ('cpus', 'memory_bytes', 'pids_limit')):
+            raise ValueError('GPU_CONTAINER_RESOURCE_LIMITS_REQUIRED')
         model_dir = Path(base.get("models_dir", "")).expanduser()
         layout = base.get("model_layout", "hf-cache")
         if type(layout) is not str or layout not in {"hf-cache", "snapshot"}:
@@ -203,30 +208,34 @@ class VllmProvider(EngineProvider):
             base["cpu"] = env.runtime.cpu.model_dump(mode="json")
         if env.runtime.platform:
             base["platform"] = env.runtime.platform
-        generation_readiness.profile(base)  # Explicit startup generation is opt-in and CPU-only.
+        generation_readiness.profile(base)  # Explicit startup generation is opt-in and bounded-GPU-only.
         launch = self.launch_plan(base)  # Pure option validation before any engine resources are created.
-        if base.get("launch_profile") == "cpu-bounded":
-            from guard.adapters.vllm import CPU_LAUNCH_KEYS, CpuLaunchOptions
+        if base.get("launch_profile") == BOUNDED_LAUNCH_PROFILE:
+            if env.runtime.cpu is not None:
+                raise ValueError("GPU_ENV_CPU_PROFILE_UNSUPPORTED: a GPU ENV must not declare a CPU comparison profile")
             allowed = {"models_dir", "model_layout", "launch_profile", "ready_timeout", "image", "model", "revision",
-                       "expected_version", "inventory_sha256", "gpu", "cpu_kv_cache_gib", "cpu", "gpu_model", "driver",
+                       "expected_version", "inventory_sha256", "gpu", "gpu_devices", "gpu_model", "driver",
                        "platform", "expected_source_commit", "source_commit_observed", "source_commit_status",
                        "generation_readiness_timeout",
-                       "files_read_by_engine_sha256", "files_read_by_engine_count", *CPU_LAUNCH_KEYS}
+                       "files_read_by_engine_sha256", "files_read_by_engine_count", *BOUNDED_LAUNCH_KEYS}
             if set(base) - allowed:
-                raise ValueError(f"unknown bounded CPU settings: {sorted(set(base) - allowed)}")
-            cpu = CpuLaunchOptions.from_options(base)
-            if env.runtime.gpu_count != 0 or env.runtime.cpu is None or env.runtime.cpu.threads != cpu.cpu_threads:
-                raise ValueError("cpu-bounded requires gpu_count=0 and a CPU profile with matching cpu_threads")
+                raise ValueError(f"unknown bounded GPU settings: {sorted(set(base) - allowed)}")
+            bounded = GpuLaunchOptions.from_options(base)
+            runtime = env.runtime
+            if bounded.tensor_parallel_size != (runtime.tp_size or 1) or (runtime.pp_size or 1) != 1 or (runtime.dp_size or 1) != 1:
+                raise ValueError("GPU_PARALLEL_LAYOUT_MISMATCH: gpu-bounded needs tensor_parallel_size equal to ENV tp_size and pp/dp of 1")
+            if bounded.tensor_parallel_size != runtime.gpu_count:
+                raise ValueError("GPU_PARALLEL_LAYOUT_MISMATCH: tensor_parallel_size must use every assigned GPU")
+            if launch.limits.shm_bytes is None:
+                raise ValueError("GPU_CONTAINER_RESOURCE_LIMITS_REQUIRED: gpu-bounded needs resources.shm_bytes")
             ready_timeout = base.get("ready_timeout", 600)
             if type(ready_timeout) not in (int, float) or not 0 < ready_timeout <= 3600:
-                raise ValueError("bounded CPU ready_timeout must be positive and at most 3600 seconds")
+                raise ValueError("bounded GPU ready_timeout must be positive and at most 3600 seconds")
             # Retain the host path only as launch input; its contents are identified
             # by inventory, while argv uses a stable container path.
             base["models_dir"] = str(model_dir.resolve())
-            if launch.gpus:
-                raise ValueError("cpu-bounded cannot request GPU passthrough")
         elif base.get("launch_profile", "legacy") != "legacy" or layout != "hf-cache":
-            raise ValueError("snapshot models require launch_profile=cpu-bounded")
+            raise ValueError("snapshot models require launch_profile=gpu-bounded")
         return base
 
     def launch_plan(self, vllm: dict):
@@ -236,8 +245,7 @@ class VllmProvider(EngineProvider):
             model=vllm["model"], port=ENGINE_PORT, image=vllm["image"],
             options={"revision": vllm["revision"], "models_dir": Path(vllm["models_dir"]).expanduser(),
                      "device": "gpu" if vllm.get("gpu") else "cpu",
-                     **{key: vllm[key] for key in ("launch_profile", "model_layout", *CPU_LAUNCH_KEYS) if key in vllm and (key != 'resources' or not vllm.get('gpu'))},
-                     **({"cpu_kv_cache_gib": vllm["cpu_kv_cache_gib"]} if "cpu_kv_cache_gib" in vllm else {})},
+                     **{key: vllm[key] for key in ("launch_profile", "model_layout", *BOUNDED_LAUNCH_KEYS) if key in vllm and key != 'resources'}},
         )
         # Resource and device allocation is a launch concern, not model CLI.
         from dataclasses import replace
@@ -252,7 +260,7 @@ class VllmProvider(EngineProvider):
         profile = deepcopy(profile)
         if profile_name == 'hardened':
             profile['env'] = {**profile.get('env', {}), **CACHE_ENV}
-        if options.get('launch_profile') == 'cpu-bounded' and profile_name == 'hardened':
+        if options.get('launch_profile') == BOUNDED_LAUNCH_PROFILE and profile_name == 'hardened':
             profile['env'].update(TRITON_CACHE_DIR='/guard-cache/triton', TMPDIR='/guard-cache')
         return profile
 
@@ -260,12 +268,12 @@ class VllmProvider(EngineProvider):
         conditions = super().launch_conditions(options, profile_name, credential_canary)
         if options.get('gpu_devices') is not None:
             conditions.update(gpu_count=len(options['gpu_devices']), resources=self.launch_plan(options).limits.to_dict())
-        if options.get('launch_profile') == 'cpu-bounded':
+        if options.get('launch_profile') == BOUNDED_LAUNCH_PROFILE:
             from guard.runtime.sandbox import ENGINE_PROFILES
             plan = self.launch_plan(options)
             profile = self.runtime_profile(options, profile_name, ENGINE_PROFILES[profile_name])
-            conditions.update(profile='cpu-bounded-v1', model_layout=options.get('model_layout', 'hf-cache'),
-                **CpuLaunchOptions.from_options(options).to_dict(),
+            conditions.update(profile='gpu-bounded-v1', model_layout=options.get('model_layout', 'hf-cache'),
+                **GpuLaunchOptions.from_options(options).to_dict(),
                 resources=plan.limits.to_dict(), entrypoint=plan.entrypoint,
                 argv=plan.argv, environment={**plan.env, **profile.get('env', {}),
                     **({'GUARD_TEST_CREDENTIAL': 'EXAMPLE_NOT_A_SECRET'} if credential_canary else {})},

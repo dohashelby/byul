@@ -14,7 +14,7 @@
 
 ## 고정 chat 시험 프로파일
 
-기존 `examples/windows-cpu.toml`은 바꾸지 않는다. 별도 [windows-cpu-chat.toml](../examples/windows-cpu-chat.toml)은 `[vllm] chat_template_profile='guard-text-chat-v1'`을 명시하고 REQ-13 실행 endpoint를 `/v1/chat/completions`로 선택한다. REQ-09와 기존 completion 점검은 기존 endpoint를 유지한다. CPU2·threads2·RAM3GiB·RAM+swap5GiB·shm512MiB·PID256·context128·FP32·KV64MiB 상한도 유지한다.
+기존 `examples/gpu-bounded.toml`은 바꾸지 않는다. 별도 [gpu-bounded-chat.toml](../examples/gpu-bounded-chat.toml)은 `[vllm] chat_template_profile='guard-text-chat-v1'`을 명시하고 REQ-13 실행 endpoint를 `/v1/chat/completions`로 선택한다. REQ-09와 기존 completion 점검은 기존 endpoint를 유지한다. CPU2·threads2·RAM3GiB·RAM+swap5GiB·shm512MiB·PID256·context128·FP32·KV64MiB 상한도 유지한다.
 
 자산은 [고정 template](../src/guard/adapters/assets/chat/guard-text-chat-v1.jinja)이고 SHA-256은 `e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e`다. 모델 snapshot 밖 `/guard-assets/chat/guard-text-chat-v1.jinja`에 읽기 전용 마운트한다. 패키지의 정해진 자산만 허용하고 누락·변조·임의 Jinja·다른 경로·요청 template trust 활성화는 이 프로파일에서 허용하지 않는다. 해시 보호 자산은 `.gitattributes`에서 줄바꿈 변환을 막는다.
 
@@ -61,8 +61,8 @@ REQ-07의 요청 timeout은 120초 이내의 유한 양수로 제한하며 별�
 실제 CPU ENV·repository@digest·원래 model revision/inventory와 snapshot 경로를 준비한다. 별도 TOML의 models_dir를 실제 절대 경로로 바꾸고 다음 명령을 사용한다. 준비 검사는 기동/이미지 수신을 하지 않는다.
 
 ```text
-guard prepare-validation --pack packs/PACK-BASELINE --env env.yaml --policy automation-chat-policy.yaml --config windows-cpu-chat.toml
-guard validate --pack packs/PACK-BASELINE --env env.yaml --policy automation-chat-policy.yaml --config windows-cpu-chat.toml --store out/test-runs/chat-unique/store --output out/test-runs/chat-unique/run
+guard prepare-validation --pack packs/PACK-BASELINE --env env.yaml --policy automation-chat-policy.yaml --config gpu-bounded-chat.toml
+guard validate --pack packs/PACK-BASELINE --env env.yaml --policy automation-chat-policy.yaml --config gpu-bounded-chat.toml --store out/test-runs/chat-unique/store --output out/test-runs/chat-unique/run
 ```
 
 한 번에 엔진 하나와 필요한 Gateway/일시 probe만 사용하고 기존 kind 등 다른 컨테이너는 유지한다. 각 실행은 새 출력 폴더에 저장한다. REQ-07의 진단 token 반환 요청과 REQ-13의 반환 금지 시험은 서로 다른 검증 질문이며 실제 비밀 입력을 쓰지 않는다. 실행 성공 exit0은 보안 전체 PASS라는 뜻이 아니다. 모든 예시/실증은 EXAMPLE/DRAFT·official=false다.

@@ -199,8 +199,8 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                     row["limitations"].append("Kubernetes direct Pod JSON/SSE only; no Service/Gateway/TLS or GPU-release proof")
                 continue
             launch = cfg.get(env.engine.name, {})
-            if not provider.bounded_cpu_evidence(launch, env):
-                unsupported("this inspected collection profile requires an explicit bounded CPU launch")
+            if not provider.bounded_launch_evidence(launch, env):
+                unsupported("this inspected collection profile requires an explicit bounded GPU launch (gpu-bounded with assigned GPUs)")
             image, version = env.engine.image_digest, env.engine.version
             if not image or not version:
                 if row["status"] != "UNSUPPORTED":

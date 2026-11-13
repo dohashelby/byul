@@ -1,10 +1,15 @@
-# Windows + Docker Desktop Linux/WSL2, two local prepared CPU images.
-# Replace models_dir with the existing pinned snapshot. Do not download here.
-# Both real ENV inputs must declare their actual versions and distinct digests.
-# No candidate digest/version is fabricated by this example.
-# Keep CPU/model/security/resource/probe profiles identical across both sides.
-# Resource limits are ceilings, not proof of available memory or fit.
-store = '.guard-windows-cpu-update'
+# GPU host + Docker with the NVIDIA runtime, bounded GPU launch example.
+# 2026-11-12: CPU images are out of scope (M-A9); this replaces the former CPU example.
+# This is launch configuration, not enterprise policy. Use real ENV inventory,
+# GPU model, driver, gpu_count and tp_size, and a DRAFT policy scoped to these checks.
+# ENV image: an official vLLM GPU repository@sha256 digest from the MVP version table.
+# ENV model: facebook/opt-125m, revision 27dcfa74d334bc871f3234de431e71c6eeba5dd6.
+# Compute inventory of the exact snapshot directory; do not copy an old hash.
+# ENV runtime: gpu_count>=1, gpu_model, driver, tp_size; no CPU profile.
+# One engine at a time. RAM/shm values are ceilings, not fit guarantees.
+# Existing unrelated containers are preserved.
+# Two local prepared GPU images; keep model/GPU/security/resource/probe profiles identical.
+store = '.guard-gpu-bounded-update'
 
 [adapter]
 name = 'vllm'
@@ -24,26 +29,28 @@ engine_profile = 'hardened'
 credential_canary = false
 
 [vllm]
-launch_profile = 'cpu-bounded'
+launch_profile = 'gpu-bounded'
 model_layout = 'snapshot'
-models_dir = 'C:\guard-models\opt-125m-snapshot'
-dtype = 'float32'
+models_dir = '/srv/guard-models/opt-125m-snapshot'
+dtype = 'auto'
 max_model_len = 128
 max_num_seqs = 1
 max_num_batched_tokens = 128
-kv_cache_memory_bytes = 67108864
+gpu_memory_utilization = 0.5
 enforce_eager = true
-cpu_threads = 2
+# tensor_parallel_size must equal ENV runtime.tp_size and gpu_count (pp/dp 1).
+tensor_parallel_size = 1
+# Device IDs or GPU-/MIG- UUIDs; the count must equal ENV runtime.gpu_count.
+gpu_devices = ['0']
 ready_timeout = 600
 # One startup generation, never a retry of a failed check or its normal control.
 generation_readiness_timeout = 180
 
 [vllm.resources]
-cpus = 2
-memory_bytes = 4294967296
-memory_swap_bytes = 5368709120
-shm_bytes = 536870912
-pids_limit = 256
+cpus = 4
+memory_bytes = 17179869184
+shm_bytes = 2147483648
+pids_limit = 512
 
 [direct_route]
 # Reviewed pair's full route union. A newly discovered route outside it aborts.
@@ -66,7 +73,7 @@ comparison_routes = [
   'POST /v1/responses/{response_id}/cancel',
   'POST /v1/systemone',
 ]
-roles = { allowed = 'GUARD_CPU_GENERAL' }
+roles = { allowed = 'GUARD_GPU_GENERAL' }
 request_timeout = 30.0
 allow_mutating_routes = false
 
@@ -78,7 +85,7 @@ comparison_routes = [
   'POST /is_scaling_elastic_ep',
   'POST /scale_elastic_ep',
 ]
-roles = { general = 'GUARD_CPU_GENERAL', admin = 'GUARD_CPU_ADMIN' }
+roles = { general = 'GUARD_GPU_GENERAL', admin = 'GUARD_GPU_ADMIN' }
 admin_role = 'admin'
 request_timeout = 30.0
 allow_mutating_routes = false

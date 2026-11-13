@@ -19,8 +19,8 @@ from guard.store.packs import put_pack
 from guard.update_acceptance import CHECKS
 from tests.builders import PACK_DIR, T0, baseline_pack, environment, policy
 
-CPU = {"architecture": "amd64", "model": "SYNTHETIC TEST CPU", "system": "Linux",
-       "kernel": "SYNTHETIC TEST KERNEL", "threads": 2}
+# 2026-11-12 (M-A9): update acceptance compares GPU images only.
+GPU_RUNTIME = {"gpu_count": 1, "gpu_model": "SYNTHETIC TEST GPU", "driver": "SYNTHETIC TEST DRIVER", "tp_size": 1}
 VALUES = {
     "REQ-01": {"allowed_callers": ["allowed"]},
     "REQ-03": {"general_allowed_kinds": ["inference"]},
@@ -119,10 +119,10 @@ def build_update_case(tmp_path, *, candidate_fail=False, baseline_fail=False, di
     envs = [
         environment(id=f"ENV-SYNTHETIC-{side.upper()}", origin="DECLARED",
                     engine={"name": "vllm", "version": "test-1" if side == "baseline" or same_version else "test-2",
-                            "image_digest": "example/synthetic-cpu@sha256:" + (
+                            "image_digest": "example/synthetic-gpu@sha256:" + (
                                 "a" if side == "baseline" or same_image else "b") * 64},
                     adapter={"name": "vllm", "version": "SYNTHETIC"},
-                    runtime={"gpu_count": 0, "cpu": CPU},
+                    runtime=dict(GPU_RUNTIME),
                     model={"id": "SYNTHETIC", "revision": "SYNTHETIC", "inventory_sha256": "c" * 64},
                     facts={"gateway": {"value": True, "origin": "DECLARED", "source": "synthetic test input"}})
         for side in ("baseline", "candidate")
@@ -156,7 +156,7 @@ def build_update_case(tmp_path, *, candidate_fail=False, baseline_fail=False, di
                                   "fixture_sha256": sha256_hex(b"synthetic fixture"),
                                   "config_sha256": sha256_hex(b"changed synthetic config"
                                       if different_config and side == "candidate" else b"synthetic config"),
-                                  "cpu": CPU},
+                                  "gpu": GPU_RUNTIME["gpu_model"], "driver": GPU_RUNTIME["driver"]},
             }
             if mutate_evidence:
                 mutate_evidence(cid, side, raw)

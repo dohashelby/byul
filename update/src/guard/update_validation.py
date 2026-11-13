@@ -1,4 +1,4 @@
-"""Explicit CPU update acceptance harness; product CLI owns engine lifecycle.
+"""Explicit GPU update acceptance harness; product CLI owns engine lifecycle.
 
 Preparation and existing-run analysis never start an engine. Execution needs
 --execute and uses only local prepared resources; this module never pulls an
@@ -77,8 +77,8 @@ def _conditions(cfg: dict, side: str, *, profile="execution-v1") -> dict:
     value.pop("sides", None)
     value.pop("store", None)
     launch = value.get("vllm", {})
-    # ENV pins image/version independently; model bytes and CPU are checked
-    # separately. Other launch/probe/security options remain meaningful.
+    # ENV pins image/version independently; model bytes and GPU runtime are
+    # checked separately. Other launch/probe/security options remain meaningful.
     for key in ("image", "expected_version", "models_dir", "source_commit_observed",
                 "source_commit_status", "expected_source_commit", "files_read_by_engine_sha256",
                 "files_read_by_engine_count"):
@@ -96,8 +96,8 @@ def validate_inputs(pack, envs, policy, cfg: dict, *, profile="legacy-five/1") -
         raise ValueError("the harness requires update.mode=managed")
     for side in ("baseline", "candidate"):
         settings = merge_config(cfg, cfg.get("sides", {}).get(side, {}))
-        if settings.get("vllm", {}).get("launch_profile") != "cpu-bounded":
-            raise ValueError("both sides require the explicit cpu-bounded launch profile")
+        if settings.get("vllm", {}).get("launch_profile") != "gpu-bounded":
+            raise ValueError("both sides require the explicit gpu-bounded launch profile")
     selected = {item.check_id for item in select(pack, envs, policy, mode=Mode.update).items if item.selected}
     if profile not in {'legacy-five/1', 'plan-scope/2'}:
         raise ValueError('ACCEPTANCE_PROFILE_UNSUPPORTED')
@@ -106,15 +106,24 @@ def validate_inputs(pack, envs, policy, cfg: dict, *, profile="legacy-five/1") -
     if not selected:
         raise ValueError('scope must select at least one check')
     digests = []
-    for env in envs:
+    for side, env in zip(("baseline", "candidate"), envs):
         if env.data_origin.value == "EXAMPLE":
-            raise ValueError("real CPU ENV inputs are required; EXAMPLE identities cannot be executed")
+            raise ValueError("real GPU ENV inputs are required; EXAMPLE identities cannot be executed")
         image = env.engine.image_digest or ""
         if env.engine.name != "vllm" or not env.engine.version or not re.fullmatch(r".+@sha256:[0-9a-f]{64}", image):
             raise ValueError("each ENV needs its actual engine version and repository@sha256 image")
         digests.append(image.rsplit("@", 1)[1])
-        if env.runtime.gpu_count != 0 or env.runtime.cpu is None or env.runtime.cpu.system != "Linux":
-            raise ValueError("both ENVs need an explicit Linux CPU profile and gpu_count=0")
+        # 2026-11-12 decision 13: compare only declared, equal GPU execution conditions.
+        runtime = env.runtime
+        if (type(runtime.gpu_count) is not int or runtime.gpu_count < 1 or not runtime.gpu_model
+                or not runtime.driver or runtime.cpu is not None or runtime.tp_size is None):
+            raise ValueError("both ENVs need an explicit GPU profile: gpu_count>=1, gpu_model, driver, tp_size and no CPU profile")
+        if runtime.tp_size * (runtime.pp_size or 1) * (runtime.dp_size or 1) != runtime.gpu_count:
+            raise ValueError("GPU parallel layout tp_size*pp_size*dp_size must equal gpu_count")
+        launch = merge_config(cfg, cfg.get("sides", {}).get(side, {})).get("vllm", {})
+        devices = launch.get("gpu_devices")
+        if type(devices) is not list or len(devices) != runtime.gpu_count:
+            raise ValueError("each side needs gpu_devices matching its ENV gpu_count")
         if (not env.model.id or not env.model.revision
                 or not re.fullmatch(r"[0-9a-f]{64}", env.model.inventory_sha256 or "")):
             raise ValueError("actual model ID, revision and full inventory are required")
@@ -123,14 +132,15 @@ def validate_inputs(pack, envs, policy, cfg: dict, *, profile="legacy-five/1") -
     if envs[0].model.model_dump() != envs[1].model.model_dump():
         raise ValueError("model identity and inventory must match")
     if envs[0].runtime.model_dump() != envs[1].runtime.model_dump():
-        raise ValueError("declared CPU/runtime conditions must match; performance remains UNKNOWN")
+        raise ValueError("declared GPU/runtime conditions must match (GPU model, driver, GPU count, TP/PP/DP)")
     if _conditions(cfg, 'baseline', profile='execution-v2' if profile == 'plan-scope/2' else 'execution-v1') != _conditions(cfg, 'candidate', profile='execution-v2' if profile == 'plan-scope/2' else 'execution-v1'):
         raise ValueError("meaningful side execution conditions differ; profile diagnostics are not image-update acceptance")
     return {"selected_checks": sorted(selected), "comparison_kind": "image-comparison" if envs[0].engine.version == envs[1].engine.version else "version-upgrade",
             "declared_images": [env.engine.image_digest for env in envs],
             "declared_versions": [env.engine.version for env in envs],
             "limitations": ["Declared inputs are not observed identities or engine results.",
-                            "CPU security/functional comparison only; performance remains UNKNOWN."]}
+                            "Declared GPU conditions are not observed device identities.",
+                            "Acceptance covers security/function; performance is not accepted here."]}
 
 
 def _support_ready(readiness: dict, expected_checks=None) -> bool:
@@ -391,7 +401,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--previous-store", type=Path, help="read-only source for previous PLAN/CHG; copied before execution")
     parser.add_argument("--output", type=Path, required=True, help="new directory outside all source inputs")
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--execute", action="store_true", help="opt in to product CLI sequential local CPU engines")
+    mode.add_argument("--execute", action="store_true", help="opt in to product CLI sequential local GPU engines")
     mode.add_argument("--analyze-existing", type=Path, help="read existing run only; never start an engine or subprocess")
     parser.add_argument("--diagnostic", action="store_true", help="classify profile differences without accepting them as image-update proof")
     parser.add_argument("--command-timeout", type=int, default=3600)

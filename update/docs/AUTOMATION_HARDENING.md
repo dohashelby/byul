@@ -419,7 +419,7 @@ U1의 잔여 32경로(복합 책임15·제외 제안17)와 23개 부분 정답�
 
 PACK-BASELINE 20/DRAFT, 활성 점검 77개, 자동 실행기와 판정 연결 11개, 정책 선언 21점검·46경로를 유지한다. REQ-11만 정의 revision 3으로 바뀐다. 어댑터 0.4.0·declared 0.12.0, 카탈로그 322행·614점검 연결(a43/b3/c161/d115)은 그대로다. a/b/c/d는 정책 소비 분류이며 인프라 자동화 가능 등급 A/B/C와 다르다. 등록 수·실행 완료 수·실제 챌린지 완료 수·보안 PASS 수를 합산하지 않는다.
 
-기본 `guard.toml`은 fake 시연 설정이다. 실제 CPU 경로는 `examples/windows-cpu*.toml`의 명시적 real 설정, 실제 ENV와 로컬 모델 snapshot을 별도로 준비해야 한다. 예시 정책의 EXAMPLE/DRAFT와 기업 값·승인 공란을 유지한다. 공식 여부는 보고서의 `official`을 확인하며 이번 보강으로 팩·정책을 승인하지 않는다.
+기본 `guard.toml`은 fake 시연 설정이다. 실제 GPU 경로는 `examples/gpu-bounded*.toml`의(2026-11-12 CPU 이미지 제외) 명시적 real 설정, 실제 ENV와 로컬 모델 snapshot을 별도로 준비해야 한다. 예시 정책의 EXAMPLE/DRAFT와 기업 값·승인 공란을 유지한다. 공식 여부는 보고서의 `official`을 확인하며 이번 보강으로 팩·정책을 승인하지 않는다.
 
 ## REQ-11 새 판정 계약
 

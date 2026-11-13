@@ -2283,3 +2283,11 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - Replaced the current static packet's historical ordering dependency with a separately reviewed current-generation helper. Retained historical normal-boot snapshot stays byte-identical and accepts historical sensor e32c only; the new helper accepts current sensor 554206 only. Pair/helper/preparer SHA chain stays exact and closed.
 - Tests: SUP16 20 passed; combined serialized native17 scope preparation/load and SUP16 37 passed (0.46s), external temporary paths. Broader host diagnostic: 85 passed, 55 failed (unsupported CPython3.12.13 observer runtime); supported Linux rerun remains required.
 - No SUP16 registry/packs/contracts or sensor changes, actual engine/GPU/AWS execution, remote writes, or support-status promotion. Integration owner regenerates shared source manifest and runs final Linux validation.
+
+
+## 2026-11-13 결정19 — #257 공통 runtime CI 시험 동기화
+
+- 한 일: 사용자에게 runtime 시험 두 파일만 예외 승인받았다. test_mvp_gateway는 body 수신과 final 저장 완료를 Event로 분리한 뒤 기존 assert를 실행하며 실제 저장 지연 순서를 강제하는 회귀 사례를 추가했다. test_mvp_stream의 해당 사례는 실제 HTTP 클라이언트·gateway·relay를 유지하고 유계 상류/시계/Timer를 제어해59ms 첫 chunk·61ms 기한 초과를 검증한다. 요청 기한60ms·idle1초·STREAM_DEADLINE 기대값은 그대로이며 watchdog의 실제 검사/callback을 실행한다. runtime 제품 소스·다른 runtime 파일은 바꾸지 않았다.
+- 테스트 결과: CPython3.12.3 두 파일20개·하위 시험6개 통과(pytest17.29초/부모18.867초). AST로 기존 assert 호출 전부와 skip 수가 보존됐음을 대조했다. 별도 작업 트리에서 검증한 두 파일 bytes를 #257에 그대로 반영했고 runtime/src·examples는 같은 기준 tree임을 확인했다. 원 통과/실패 의미·기한·수락 기준은 바꾸지 않았으며 전체 로컬 pytest는 실행하지 않았다. update 제품 소스와 목록 SHA7cdbaac5…도 그대로다.
+- 다음 단계: 승인된 기존 #257 브랜치로 push하고 새 전체 CI 결과를 확인한다. 결정19는 DECISIONS·작업지시서7절에 기록했다.
+- 막힌 것: 새 head CI가 나오기 전에는 #257 전체 통과로 세지 않는다. GPU/클라우드·이미지 레이어·다른 runtime 파일·병합 승인은 없으며 실행하지 않았다. 수정은 두 시험 파일에 한정한다.

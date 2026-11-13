@@ -5,7 +5,9 @@ import http.client
 import json
 from pathlib import Path
 import tempfile
+import threading
 import unittest
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -13,6 +15,7 @@ from serving_runtime.mvp.app import GatewayApp
 from serving_runtime.mvp.config import MVPConfig
 from serving_runtime.mvp.mock_engine import MockEngine
 from serving_runtime.mvp.policy import load_policy
+from serving_runtime.mvp.request_records import RequestRecords
 from serving_runtime.mvp.store import JsonlStore
 
 
@@ -109,7 +112,19 @@ class GatewayRelayTests(unittest.TestCase):
         return records
 
     def test_mvp_01_allowed_is_relayed_and_confirmed(self) -> None:
-        status, headers, body = self.post()
+        # body 전송 뒤 final이 저장된다. 저장 완료를 기다린 다음 같은 assert를 실행한다.
+        final_saved = threading.Event()
+        append = RequestRecords.append
+
+        def observe_final(records, record):
+            saved = append(records, record)
+            if saved and record.get("phase") == "final":
+                final_saved.set()
+            return saved
+
+        with patch.object(RequestRecords, "append", observe_final):
+            status, headers, body = self.post()
+            self.assertTrue(final_saved.wait(2), "final 기록 저장이 완료되지 않음")
         request_id = headers.get("X-Request-ID")
 
         self.assertEqual(status, 200)
@@ -128,6 +143,46 @@ class GatewayRelayTests(unittest.TestCase):
         ).read_all()
         self.assertEqual(corrupt, [])
         self.assertEqual(receipts[0]["request_id"], request_id)
+
+    def test_mvp_01_waits_for_final_persistence_after_body_receipt(self) -> None:
+        """final 저장이 실제로 늦어지는 순서에서도 원래 허용/전달 assert를 검증한다."""
+        append_ready, body_received, release, completed = (threading.Event() for _ in range(4))
+        append, post = RequestRecords.append, self.post
+        errors = []
+
+        def gated_append(records, record):
+            if record.get("phase") == "final":
+                append_ready.set()
+                if not release.wait(2):
+                    raise AssertionError("진단용 final 저장 해제가 오지 않음")
+            return append(records, record)
+
+        def observe_body(*args, **kwargs):
+            result = post(*args, **kwargs)
+            body_received.set()
+            return result
+
+        def check_original():
+            try:
+                self.test_mvp_01_allowed_is_relayed_and_confirmed()
+            except Exception as error:
+                errors.append(error)
+            finally:
+                completed.set()
+
+        with patch.object(RequestRecords, "append", gated_append), patch.object(self, "post", observe_body):
+            worker = threading.Thread(target=check_original, daemon=True)
+            worker.start()
+            try:
+                self.assertTrue(body_received.wait(2))
+                self.assertTrue(append_ready.wait(2))
+                self.assertFalse(completed.is_set())
+                release.set()
+                self.assertTrue(completed.wait(2))
+                self.assertEqual(errors, [])
+            finally:
+                release.set()
+                worker.join(timeout=2)
 
     def test_mvp_02_limit_boundary_and_no_denied_delivery(self) -> None:
         allowed_status, _, _ = self.post(request_body(max_tokens=128))

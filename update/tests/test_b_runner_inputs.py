@@ -64,7 +64,19 @@ def run(case, output):
     return tool.prepare(case["path"], sha256_hex(case["path"].read_bytes()), output)
 
 
+def test_current_unregistered_source_cannot_be_upgraded_by_preparation(tmp_path, prepared):
+    """모의 등록 없는 실제 현재 변환은 준비 도구를 거쳐도 미지원이다."""
+    case = inputs(tmp_path, prepared)
+    assert not case['original']['supported']
+    receipt = run(case, tmp_path/'unregistered')
+    result = receipt['consumer_projection']
+    assert not result['supported'] and not result['complete']
+    assert 'GPU_INPUT_PRODUCER_UNSUPPORTED' in result['gaps']
+    assert not receipt['gpu_ready'] and not result['producer_authenticated']
+
+
 @pytest.mark.parametrize("check", tool.CHECKS)
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_producer_output_exact_bytes_independent_scope_and_existing_consumer(tmp_path, prepared, check):
     case = inputs(tmp_path, prepared, check=check)
     output = tmp_path / "fixed"
@@ -91,6 +103,7 @@ def test_producer_output_exact_bytes_independent_scope_and_existing_consumer(tmp
 
 @pytest.mark.parametrize("damage,gap", [("unsupported", "GPU_INPUT_PRODUCER_UNSUPPORTED"),
     ("generation", "B_RUNNER_PROCESS_GENERATION_MISMATCH"), ("incomplete", "GPU_INPUT_SOURCE_INCOMPLETE")])
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_cached_positive_summary_cannot_hide_original_gaps(tmp_path, prepared, damage, gap):
     case = inputs(tmp_path, prepared, damage=damage)
     receipt = run(case, tmp_path / "fixed")
@@ -129,6 +142,7 @@ def test_source_file_sha_is_checked_before_publish(tmp_path, prepared, name):
 
 
 @pytest.mark.parametrize("mode", ["missing-case", "unobserved-sha", "duplicate-sha", "swapped-existing"])
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_mapping_coverage_is_checked_but_semantic_identity_is_not_invented(tmp_path, prepared, mode):
     case = inputs(tmp_path, prepared)
     requests = deepcopy(case["spec"]["required_cases"])
@@ -199,6 +213,7 @@ def test_fixed_output_is_not_overwritten_and_extracted_bytes_are_rechecked_by_co
 
 @pytest.mark.parametrize("damage,consumed,expected", [(None, False, "PASS"), ("unsupported", False, "UNKNOWN"),
                                                     ("unsupported", True, "FAIL")])
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_prepared_config_enters_registered_factory_and_stored_evidence(tmp_path, prepared, damage, consumed, expected):
     case = inputs(tmp_path, prepared, damage=damage, consumed=consumed)
     receipt = run(case, tmp_path / "fixed")

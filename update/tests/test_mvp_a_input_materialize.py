@@ -74,6 +74,24 @@ def test_req17_conflict_keeps_confirmed_minimum_and_existing_case_bound():
         timing_cohort(20261113, quartets=200)
 
 
+def test_preparing_again_refreshes_sessions_and_preserves_accurate_pending_reasons(tmp_path, monkeypatch):
+    audit = example_audit(tmp_path, monkeypatch)
+    first, first_plan = tool.materialize(tmp_path / 'first', audit_file=audit)
+    second, second_plan = tool.materialize(tmp_path / 'second',
+        plan_file=tmp_path / 'first/session-input-plan.json', audit_file=audit)
+    assert not {r['session'] for r in first['prepared']} & {r['session'] for r in second['prepared']}
+    for original, refreshed in zip(first_plan['checks'], second_plan['checks'], strict=True):
+        if original['work_group'] == 'M-B':
+            assert refreshed == original
+        if original['check_id'] in tool.NATIVE_CHECKS:
+            assert refreshed['input_state'] == original['input_state']
+            for side in tool.SIDES:
+                assert refreshed['sides'][side]['reason'] == original['sides'][side]['reason']
+                assert 'prepared를 만들지 않았다' not in refreshed['sides'][side]['reason']
+                assert refreshed['sides'][side]['target'] is None
+                assert refreshed['sides'][side]['environment_ref'] is None
+
+
 @pytest.mark.parametrize('damage', ['observed_environment', 'result', 'ready'])
 def test_bound_or_completed_source_is_not_overwritten_as_pending(tmp_path, monkeypatch, damage):
     audit = example_audit(tmp_path, monkeypatch)

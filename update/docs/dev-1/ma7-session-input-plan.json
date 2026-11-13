@@ -1205,7 +1205,7 @@
       "work_group": "M-A",
       "session": "J02",
       "question": "공유 가중치 전체 해제 후 재취득·대체 공급과 기존 참조의 사용이 승인·접근·수명 기준을 지키는가?",
-      "input_state": "미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
@@ -1213,7 +1213,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/baseline/LIF-13/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "prepared_file_sha256": "c618f615d784e399c3a3a1a34c3726e62b95f984cb5e3ff08da0399ff8be7775",
           "prepared_settings_file_sha256": "808a08356b44e929f4a541f9e14d6db7d9fc2cc6ee600e27a158a049e86828ef",
           "prepared_source_bytes_verified": true,
@@ -1227,7 +1227,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/candidate/LIF-13/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "prepared_file_sha256": "06bd6af8f42b841c86eec4088fd6299236ab3544d63cc041a9fb138e45a95eda",
           "prepared_settings_file_sha256": "362e197ada18c38cd5598b7622f24aa25ce1f6c3c1ddac7ef56781c916c34958",
           "prepared_source_bytes_verified": true,
@@ -3546,7 +3546,7 @@
       "work_group": "M-A",
       "session": "J01",
       "question": "여러 실행 프로세스가 주고받는 중간 자료와 최종 출력이 원래 요청에 맞게 처리·반환되는가?",
-      "input_state": "미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
@@ -3554,7 +3554,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/baseline/REQ-14/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "prepared_file_sha256": "7873bd019e1b8368acbc3822cea964f545923a548efd6f52719c4bf4d36656d3",
           "prepared_settings_file_sha256": "97938b25341ed4dbc1bd73ff0106ddb05df327499d6ba8be467686baa2a327aa",
           "prepared_source_bytes_verified": true,
@@ -3571,7 +3571,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/candidate/REQ-14/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "prepared_file_sha256": "402b43bdb177d99f8b2d0618c756491ce152e21dd436151e490023ddefe42074",
           "prepared_settings_file_sha256": "3352b5603f9bf71d79789691f3cd239b435500f5f1e857d3288722edf16998b8",
           "prepared_source_bytes_verified": true,
@@ -3683,7 +3683,7 @@
       "work_group": "M-A",
       "session": "J01",
       "question": "캐시 식별값이 재사용에 필요한 모델·설정·자료의 차이를 구분하는가?",
-      "input_state": "revision 후보 고정·실제 입력 미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
@@ -3691,7 +3691,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/baseline/REQ-16/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "explicit_launch_args": [
             "--enable-prefix-caching"
           ],
@@ -3719,7 +3719,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/candidate/REQ-16/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "explicit_launch_args": [
             "--enable-prefix-caching"
           ],
@@ -3781,7 +3781,7 @@
       "work_group": "M-A",
       "session": "J02",
       "question": "캐시 적중에 따른 시간 차이로 비공개 정보가 허용 범위 밖에 드러나지 않는가?",
-      "input_state": "미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
@@ -3789,7 +3789,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/baseline/REQ-17/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "explicit_launch_args": [
             "--enable-prefix-caching"
           ],
@@ -3806,7 +3806,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/candidate/REQ-17/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "explicit_launch_args": [
             "--enable-prefix-caching"
           ],
@@ -3869,7 +3869,7 @@
       "work_group": "M-A",
       "session": "J02",
       "question": "batch slot을 옮기거나 재사용할 때 이전 요청의 제한 상태가 남지 않는가?",
-      "input_state": "미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
@@ -3877,7 +3877,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/baseline/REQ-18/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "prepared_file_sha256": "79d0976135f747153f3416a5cdad3ab2ee26655be8d131f110042594f859262a",
           "prepared_settings_file_sha256": "4872e4d821121fece07c6de5f270b4e98eab307fd8c366a282d616cd9d7b7956",
           "prepared_source_bytes_verified": true,
@@ -3894,7 +3894,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/candidate/REQ-18/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "prepared_file_sha256": "125ff955b82af45a86db9b7a3ebed28a8187e41d680f2a7b02246b4ab282ba6f",
           "prepared_settings_file_sha256": "c805463b5211debaa849fd1cae7930a785349329e1191548e91be5f6277642e1",
           "prepared_source_bytes_verified": true,
@@ -3939,7 +3939,7 @@
       "work_group": "M-A",
       "session": "J02",
       "question": "실제 사용하는 GPU 연산 코드가 입력·버퍼 경계를 지키고 필요한 영역을 초기화하는가?",
-      "input_state": "미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
@@ -3947,7 +3947,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/baseline/REQ-19/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "prepared_file_sha256": "b3662329b29013d9d1899185737581ad17158f6737cc46a43baee1105f565be1",
           "prepared_settings_file_sha256": "87c1acdcdec2cb21dd78a0c32b54b2156e3f143948febdf7869cfb7173db5cc0",
           "prepared_source_bytes_verified": true,
@@ -3961,7 +3961,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/candidate/REQ-19/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "prepared_file_sha256": "7519f7ee5a303cd18c5d81b6f15dd641a46deaab066772262a6a307686c2e2e0",
           "prepared_settings_file_sha256": "206d5ef3977781668a6b245da85a9e648068bfc0f3d9a2025fb2fa30962bd7ee",
           "prepared_source_bytes_verified": true,
@@ -4003,7 +4003,7 @@
       "work_group": "M-A",
       "session": "J02",
       "question": "CUDA Graph 재실행이 현재 입력을 쓰고 아직 읽는 출력 버퍼를 덮어쓰지 않는가?",
-      "input_state": "미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
@@ -4011,7 +4011,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/baseline/REQ-20/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "prepared_file_sha256": "df8e4b1a5d103818393377133e5ef3e74881689bb8ef7357bcaa0ed4c16a82fd",
           "prepared_settings_file_sha256": "733b1a03c101f2b4ab5221f111488ee34cd2f7d3f54d35519e78a7ccbf8a6e63",
           "prepared_source_bytes_verified": true,
@@ -4025,7 +4025,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/candidate/REQ-20/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "prepared_file_sha256": "d7db65b5bcf4d5f2ed0ba110cfc5ee84ad6642debebf904bc660f851fc602a44",
           "prepared_settings_file_sha256": "9482fdf4a5455317e47d132a928fe4d89ed632e843331199e0258a37e29141f7",
           "prepared_source_bytes_verified": true,
@@ -4067,7 +4067,7 @@
       "work_group": "M-A",
       "session": "J01",
       "question": "TP의 GPU 작업 재실행에 사용하는 통신 버퍼가 등록·종료·재기동 후에도 현재 실행의 유효한 버퍼를 참조하는가?",
-      "input_state": "미입력",
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
@@ -4075,7 +4075,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/baseline/REQ-21/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "prepared_file_sha256": "dfd34c19911a0ae80b58a8fdf6f0ed7f8f7cd8758cfdba84a4dd547f563a62f1",
           "prepared_settings_file_sha256": "0ef26d7479d34706ec1a4487a97412a2949b3ab36ecfb79d2836ead5e125ff26",
           "prepared_source_bytes_verified": true,
@@ -4089,7 +4089,7 @@
           "target": null,
           "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261113-v2/candidate/REQ-21/prepared/manifest.json",
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다. 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.",
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
           "prepared_file_sha256": "6670cbbec9fd019ee963d7db330e7239c3579aaa8eb5e1c43915f316187bae81",
           "prepared_settings_file_sha256": "d05bbcc92987a18851bf97925a8f2017ce4519e42301684f6822e0f1fab81cd4",
           "prepared_source_bytes_verified": true,

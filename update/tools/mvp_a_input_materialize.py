@@ -125,7 +125,8 @@ def materialize(output, *, plan_file=PLAN, audit_file=SUP08_AUDIT):
                                 cases_preset=PRESETS[check])
                     case_rows.append({'check_id': check, 'side': side, 'count': len(cases),
                         'path': str(path), 'sha256': item['cases_file_sha256']})
-                item['reason'] += ' 로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·ENV/target 결합은 미완료다.'
+                item['reason'] = '로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.'
+                row['input_state'] = '로컬 prepared 준비·실제 ENV/target 미입력'
             if check == 'SUP-08':
                 base = launch_path.parent / side
                 for key, name in [('policy_file', 'policy.yaml'), ('render_file', 'render.json'),

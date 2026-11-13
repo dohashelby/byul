@@ -117,6 +117,7 @@
 - 의존성은 pydantic v2, typer, pyyaml, httpx, pytest다. 그 외 의존성은 추가 전에 사람에게 묻는다. 엔진 패키지(vllm·sglang·tensorrt_llm)를 update의 의존성으로 넣지 않는다.
 - 모든 객체는 append-only다. 해시 규칙은 SPEC §2.3을 따른다.
 - 소스 고정 목록: 제품 소스(`src/guard`·`packs`·`uv.lock`·`pyproject.toml`·`reference/framework`)를 바꾸면 `uv run python tools/verify_req10_consumption.py --write`로 `release/reviewed-source.json`을 다시 만들고 diff를 검토한다. 나중에 머지하는 쪽이 다시 만든다.
+  - 검토 기록(결정 5, 2026-11-12 사용자): MVP 동안 B 검토를 면제한다. 새 소스 목록 SHA마다 A가 `tools/reviewed_manifest_receipts.json`에 기록 행을 넣고 `reviewed_by`에 "B 검토 면제(사용자 결정 5, 2026-11-12)"를 밝힌다. 검사를 끄거나 넓히지 않는다.
 
 ## 7. 작업 방식
 

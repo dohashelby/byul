@@ -1,3 +1,10 @@
+## 2026-11-13 — 작업지시서 3차 현황 최신화
+
+- 한 일: [작업지시서 3차](docs/WORK_ORDER_VLLM_MVP.md)에 1.1절 진행 현황(작업별 상태·PR), 3.1절 이틀 목표(A 트랙, J02 선행 조건), M-A6·M-A9 현황, 결정 9~16 상태를 넣었다. 결정 5(MVP 동안 B 검토 면제) 기록 방식을 `CLAUDE.md`·`AGENTS.md` 6절에 반영했다. #255의 CI 실패(새 적용표 문서가 CI 경로 목록에 없음)를 고쳤다.
+- 테스트 결과: 문서만 변경. 판본 번호는 0.1절 표에만 있다. `tools.checklist_status --check`, `tests/test_workflow_paths.py` 통과.
+- 다음 단계: #255 → #254 병합(결정 13 승인 뒤), 3.1절 순서대로 M-A5·M-A4·M-A6 나머지.
+- 막힌 것: 결정 9·13·14·15.
+
 ## 2026-11-12 — M-A6 판본 적용표·판본별 고정값 구조 (1차)
 
 - 한 일: [M-A6 문서](docs/dev-1/ma6-version-applicability.md)에 선행 확인(두 GPU 이미지 엔진 Python 3.12, 기준 V0 기본·후보 V1만, 기능·모델 표)과 판본 적용표(관측 계열 19행, 점검 69개 묶음, 결정 9·10 요청)를 썼다. 함수 단위 비교 도구 `tools/engine_pin_compare.py`를 만들었다. 결정 10(D4·D5 UNKNOWN 승인, D1~D3는 (c) 후속·미구현)을 DECISIONS·적용표 12절에 기록했다. 3단계 첫 구현으로 공통 감싸기 기반(`vllm_cache_callback._codes`)이 모듈당 검토 고정값 여러 개(판본별 정확 bytes 행)를 받게 하고, REQ-21 `vllm_comm_buffer_callback`에 두 판본 후보 고정값 행(`PIN_ROWS`)과 태그 소스 고정 자료(`tests/fixtures/vllm-<판본>/`)를 더했다. 고정값 검사는 넓히지 않았다(파일 bytes와 함수 지문이 같은 행에 정확히 맞아야 감싼다).

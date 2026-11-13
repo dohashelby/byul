@@ -129,7 +129,11 @@ class VllmProvider(EngineProvider):
         from .engine_profiles import resolve
         if executor == 'input_validation' and resolve(self.name, version, 'native_input').profile == 'vllm-input-validation-http/1':
             return True
-        return resolve(self.name, version, 'native_lifecycle').profile == 'vllm-native-source/1'
+        selected = resolve(self.name, version, 'native_lifecycle')
+        if selected.profile == 'vllm-native-source/1':
+            return True
+        release = self.release_profile(version)
+        return bool(selected.available and release and executor in release.get('native_executors', []))
 
     def resource_lease_keys(self, options):
         if not options.get('gpu_devices'): return []

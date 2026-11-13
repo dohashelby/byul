@@ -12,6 +12,7 @@ from guard.adapters.engine_provider import get_provider
 from guard.adapters.git_diff import RULES_PATH, classify_path
 from guard.adapters.vllm import VllmAdapter
 from guard.adapters.vllm_release_profiles import release_profile, http_profile
+from guard.executors.registry import resolve_executor
 from tools import gpu_a_aws_lab as lab
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +36,11 @@ def test_both_launch_profiles_follow_the_work_order_without_runtime_qualificatio
         assert row['launch']['default_engine'] == ('V0' if role == '기준 판본' else 'V1')
         support = engine_profiles.resolve('vllm', version, 'native_input')
         assert support.available and not support.runtime_qualified
+        if role == '후보 판본':
+            assert resolve_executor('engine_sensor', 'kubernetes', engine='vllm', version=version) is not None
+            assert resolve_executor('request_termination', 'kubernetes', engine='vllm', version=version) is None
+        else:
+            assert resolve_executor('engine_sensor', 'kubernetes', engine='vllm', version=version) is None
         row['launch']['command'].clear()
         assert provider.release_profile(version)['launch']['command']
     assert provider.release_profile('EXAMPLE-future') is None

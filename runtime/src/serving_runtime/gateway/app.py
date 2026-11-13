@@ -32,12 +32,10 @@ from serving_runtime.common.kube_context import DEFAULT_KUBE_CONTEXT
 from serving_runtime.config.config import MVPConfig
 from serving_runtime.gateway.engine_client import EngineClient
 from serving_runtime.gateway.http_handler import HandlerDependencies, LimitedThreadingHTTPServer, create_handler
-from serving_runtime.devtools.lab_report import LabReportSource
 from serving_runtime.observation.tetragon_state import read_tetragon_state
 from serving_runtime.observation.gpu_state import read_gpu_state
 from serving_runtime.observation.engine_receipts import EngineReceipts
 from serving_runtime.common.clock import utc_now as _utc_now
-from serving_runtime.devtools.mock_engine import MockEngine
 from serving_runtime.observation.observation_feed import ObservationFeed
 from serving_runtime.observation.phase_timeline import read_phase_timeline
 from serving_runtime.enforcement.execpolicy import ExecPolicy
@@ -199,6 +197,8 @@ class GatewayApp:
         )
         self._engine_store = JsonlStore(Path(config.data_dir) / "engine_receipts.jsonl")
         self._observations = ObservationQuery(Path(config.data_dir) / "observations.jsonl")
+        from serving_runtime.devtools.lab_report import LabReportSource
+
         self._lab_report = LabReportSource(config.lab_report_path)
         self._engine_receipts = EngineReceipts(config.engine_receipts_path)
         from serving_runtime.observation.native_receipts import NativeReceiptFeed
@@ -891,6 +891,8 @@ def run(config: MVPConfig) -> None:
     gateway: GatewayApp | None = None
     try:
         if config.backend == "mock":
+            from serving_runtime.devtools.mock_engine import MockEngine
+
             engine = MockEngine(
                 port=config.engine_port,
                 receipts_path=data_dir / "engine_receipts.jsonl",

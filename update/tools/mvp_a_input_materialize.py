@@ -156,6 +156,7 @@ def materialize(output, *, plan_file=PLAN, audit_file=SUP08_AUDIT):
         'req17_timing_requirements': timing, 'ready_for_execution': False,
         'input_preflight_passed': False, 'engine_executed': False, 'actual_results': None}
     _write(output / 'manifest.json', manifest)
+    plan['input_materialization'].pop('repository_recorded_materialization', None)
     plan['input_materialization']['local_materialization'] = {
         'manifest_file': str(output / 'manifest.json'),
         'manifest_sha256': sha256_hex((output / 'manifest.json').read_bytes()),

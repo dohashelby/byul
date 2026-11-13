@@ -3,15 +3,12 @@
 import argparse
 from collections.abc import Sequence
 from importlib.metadata import version
-import hashlib
 import json
 import os
 from pathlib import Path
 import signal
 import sys
 import threading
-
-from serving_runtime.common.file_info import inspect_file
 
 
 def _observation_feed(value: str) -> tuple[str, str]:
@@ -30,12 +27,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {version('serving-runtime')}")
     commands = parser.add_subparsers(dest="command")
-    from ..operations.agent import add_arguments
+    from . import agent as _agent_command
 
-    agent_parser = commands.add_parser("agent", help="플랫폼 운영 요청 조회·검증·실행")
-    add_arguments(agent_parser)
-    file_parser = commands.add_parser("file-info", help="파일 크기와 SHA-256 확인")
-    file_parser.add_argument("path", type=Path, help="확인할 일반 파일 경로")
+    agent_parser = _agent_command.add_parser(commands)
+    from . import file_info as _file_info_command
+
+    file_parser = _file_info_command.add_parser(commands)
     bundle_parser = commands.add_parser("bundle", help="LAB 정책 묶음 확인")
     bundle_commands = bundle_parser.add_subparsers(dest="bundle_command")
     bundle_verify_parser = bundle_commands.add_parser("verify", help="정책 묶음의 구조·파일·유효성을 확인")
@@ -222,28 +219,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="격리된 MVP·S1·S2·S3A·가짜 SGLang·S4 수용 시험 실행",
     )
     acceptance_parser.add_argument("--report-dir", metavar="PATH")
-    assets_parser = commands.add_parser("assets", help="모델 파일 승인 목록 도구")
-    assets_commands = assets_parser.add_subparsers(dest="assets_command")
-    snapshot_parser = assets_commands.add_parser("snapshot", help="현재 파일로 목록 초안 생성(관측값, 승인은 사람이)")
-    snapshot_parser.add_argument("--root", required=True, metavar="DIR")
-    snapshot_parser.add_argument("--out", required=True, metavar="PATH")
-    revalidation_parser = commands.add_parser("revalidation", help="재검증 요청 조회 연동 도구")
-    revalidation_commands = revalidation_parser.add_subparsers(dest="revalidation_command")
-    revalidation_export_parser = revalidation_commands.add_parser(
-        "export", help="열린 재검증 요청을 새 JSON 파일로 내보내기"
-    )
-    revalidation_export_parser.add_argument("--data-dir", required=True, metavar="DIR")
-    revalidation_export_parser.add_argument("--out", required=True, metavar="FILE")
-    auth_parser = commands.add_parser("auth", help="시험용 인증 설정 도구")
-    auth_commands = auth_parser.add_subparsers(dest="auth_command")
-    auth_commands.add_parser(
-        "hash-token",
-        help="표준 입력의 토큰을 인증 설정용 SHA-256으로 변환(토큰은 출력하지 않음)",
-    )
-    metrics_parser = commands.add_parser("metrics-check", help="저장한 /metrics 응답과 backend 지표 대응표 대조")
-    metrics_parser.add_argument("--backend-config", required=True, metavar="PATH")
-    metrics_parser.add_argument("--input", required=True, metavar="FILE")
-    metrics_parser.add_argument("--json", action="store_true", help="JSON으로 출력")
+    from . import assets as _assets_command
+
+    assets_parser = _assets_command.add_parser(commands)
+    from . import revalidation as _revalidation_command
+
+    revalidation_parser = _revalidation_command.add_parser(commands)
+    from . import auth as _auth_command
+
+    auth_parser = _auth_command.add_parser(commands)
+    from . import metrics_check as _metrics_check_command
+
+    metrics_parser = _metrics_check_command.add_parser(commands)
     enforce_parser = commands.add_parser("enforce", help="Cilium·Tetragon 후보 생성과 관측 이벤트 변환")
     enforce_commands = enforce_parser.add_subparsers(dest="enforce_command")
     sync_parser = enforce_commands.add_parser("sync", help="현재 검증 묶음의 외부 정책 동기화(기본 dry-run)")
@@ -298,19 +285,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     existing_group.add_argument("--resume", action="store_true", help="기존 timeline 상태와 입력 위치에서 이어가기")
     args = parser.parse_args(argv)
     if args.command == "agent":
-        from ..operations.agent import main as agent_main
-
-        return agent_main(args)
+        return _agent_command.run(args, parser)
     if args.command == "file-info":
-        try:
-            info = inspect_file(args.path)
-        except (OSError, ValueError) as error:
-            print(f"파일 확인 실패: {error}", file=sys.stderr)
-            return 1
-        print(f"파일: {str(args.path)!r}")
-        print(f"크기(bytes): {info.size_bytes}")
-        print(f"SHA-256: {info.sha256}")
-        return 0
+        return _file_info_command.run(args, parser)
     if args.command == "bundle" and args.bundle_command == "verify":
         from serving_runtime.policy.policy_bundle import verify_policy_bundle
 
@@ -680,114 +657,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "enforce":
         enforce_parser.print_help()
         return 0
-    if args.command == "assets" and args.assets_command == "snapshot":
-        from serving_runtime.target.assets import snapshot
-
-        out = Path(args.out)
-        try:
-            document = snapshot(args.root)
-            encoded = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
-            descriptor = os.open(
-                out,
-                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-                0o600,
-            )
-            try:
-                with os.fdopen(descriptor, "wb") as output:
-                    descriptor = -1
-                    output.write(encoded)
-            finally:
-                if descriptor >= 0:
-                    os.close(descriptor)
-        except (OSError, ValueError) as error:
-            print(f"목록 생성 실패: {error}", file=sys.stderr)
-            return 1
-        print(f"{len(document['files'])}개 파일 목록을 {out}에 썼습니다.")
-        print("이 목록은 현재 파일의 관측값입니다. 승인 목록으로 쓰기 전에 사람이 검토해야 합니다.")
-        return 0
     if args.command == "assets":
-        assets_parser.print_help()
-        return 0
-    if args.command == "revalidation" and args.revalidation_command == "export":
-        from serving_runtime.policy.revalidation import export_requests
-
-        try:
-            document = export_requests(args.data_dir, args.out)
-        except (OSError, ValueError) as error:
-            print(f"재검증 요청 내보내기 실패: {error}", file=sys.stderr)
-            return 1
-        print(f"열린 재검증 요청 {document['open_count']}건을 {args.out}에 썼습니다.")
-        print(document["format_status"])
-        return 0
+        return _assets_command.run(args, assets_parser)
     if args.command == "revalidation":
-        revalidation_parser.print_help()
-        return 0
-    if args.command == "auth" and args.auth_command == "hash-token":
-        from getpass import getpass
-
-        from serving_runtime.gateway.auth import token_digest
-
-        try:
-            token = getpass("token: ") if sys.stdin.isatty() else sys.stdin.readline()
-            print(token_digest(token.rstrip("\r\n")))
-        except (EOFError, ValueError) as error:
-            print(f"토큰 변환 실패: {error}", file=sys.stderr)
-            return 1
-        return 0
+        return _revalidation_command.run(args, revalidation_parser)
     if args.command == "auth":
-        auth_parser.print_help()
-        return 0
+        return _auth_command.run(args, auth_parser)
     if args.command == "metrics-check":
-        from serving_runtime.gateway.backend import (
-            load_backend_config,
-            parse_prometheus_metrics,
-            unmapped_metric_families,
-        )
-
-        try:
-            backend = load_backend_config(args.backend_config, environ={})
-            payload = Path(args.input).read_bytes()
-            fields = parse_prometheus_metrics(payload, backend.metrics_map)
-        except (OSError, ValueError) as error:
-            print(f"지표 대응표 대조 실패: {error}", file=sys.stderr)
-            return 1
-        unmapped = unmapped_metric_families(payload, backend.metrics_map)
-        report = {
-            "schema": "runtime-metric-map-check/1.0",
-            "backend_kind": backend.kind,
-            "input": str(args.input),
-            "input_sha256": hashlib.sha256(payload).hexdigest(),
-            "fields": {
-                name: {
-                    key: item[key]
-                    for key in (
-                        "metric",
-                        "type",
-                        "unit",
-                        "state",
-                        "declared_type",
-                        "type_check",
-                        "help",
-                        "label_keys",
-                    )
-                }
-                | {"sample_count": len(item["samples"])}
-                for name, item in fields.items()
-            },
-            "unmapped_families": unmapped,
-            "note": "verified stays false in the backend config; this report is review evidence only",
-        }
-        if args.json:
-            print(json.dumps(report, ensure_ascii=False, indent=2))
-        else:
-            print(f"backend: {backend.kind} · 입력 SHA-256 {report['input_sha256'][:12]}…")
-            for name, item in report["fields"].items():
-                print(
-                    f"- {name}: {item['metric']} · {item['state']} · 선언 형식 "
-                    f"{item['declared_type'] or '없음'}({item['type_check']}) · 표본 {item['sample_count']}"
-                )
-            print(f"대응표에 없는 지표 {len(unmapped)}개")
-        ok = all(item["state"] == "ok" for item in report["fields"].values())
-        return 0 if ok else 3
+        return _metrics_check_command.run(args, parser)
     parser.print_help()
     return 0

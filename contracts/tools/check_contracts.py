@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -66,6 +67,22 @@ def main() -> int:
 
     # 문서끼리의 해시 참조
     environment = json.loads((EXAMPLES / "environment.json").read_text(encoding="utf-8"))
+    validator = Draft202012Validator(schemas["environment"], registry=registry)
+    legacy = copy.deepcopy(environment)
+    legacy["schema_version"] = "byul-environment/0.1"
+    legacy["deployment"].pop("launch_settings", None)
+    if not validator.is_valid(legacy):
+        errors.append("environment 0.1 compatibility failed")
+    for settings in (None, {}, {"revision": None}, {"trust_remote_code": False}, {"revision": "a" * 128}):
+        candidate = copy.deepcopy(environment)
+        candidate["deployment"]["launch_settings"] = settings
+        if not validator.is_valid(candidate):
+            errors.append("environment 0.2 launch_settings compatibility failed")
+    for settings in ({"other": False}, {"revision": "a" * 129}, {"trust_remote_code": "false"}):
+        candidate = copy.deepcopy(environment)
+        candidate["deployment"]["launch_settings"] = settings
+        if validator.is_valid(candidate):
+            errors.append("environment invalid launch_settings accepted")
     policy = json.loads((EXAMPLES / "policy.json").read_text(encoding="utf-8"))
     bundle = json.loads((EXAMPLES / "bundle/bundle.json").read_text(encoding="utf-8"))
     if policy["environment_ref"]["sha256"] != canonical_sha256(environment):

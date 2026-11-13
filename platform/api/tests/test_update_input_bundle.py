@@ -489,3 +489,22 @@ def test_verified_byul_inputs_reach_example_guard_report_and_platform_get(
         assert response.json()["item"]["report_ref"] == report.ref().model_dump(mode="json")
         assert response.json()["item"]["official"] is False
     assert path.read_bytes() == raw and _tree(bundle) == original
+
+
+@pytest.mark.parametrize('version', ['0.1', '0.2'])
+def test_launch_settings_environment_versions_preserve_source_only(tmp_path, current_pack, version):
+    def mutate(env, policy):
+        env['schema_version'] = 'byul-environment/' + version
+        if version == '0.1':
+            env['deployment'].pop('launch_settings', None)
+        else:
+            env['deployment']['launch_settings'] = {'trust_remote_code': False, 'revision': None}
+    output = _bundle(tmp_path, current_pack, mutation=mutate)
+    source = _json(output / 'source-environment.json')
+    assert source['schema_version'] == 'byul-environment/' + version
+    if version == '0.2':
+        assert source['deployment']['launch_settings'] == {'trust_remote_code': False, 'revision': None}
+    converted = _json(output / 'environment.json')
+    assert 'launch_settings' not in converted
+    from guard.collectors.file import load_environment
+    assert load_environment(output / 'environment.json').hash_ok()

@@ -82,7 +82,10 @@ export function RuntimeTargetPage() {
                 {s.comparisons.target.rows.length === 0 && <p className={rt.empty}>대상 비교 행이 없습니다.</p>}
                 <p className="notice" style={{ padding: "8px 16px 12px" }}>{instance}</p>
               </TableCard>
-              <TableCard title="기준 비교">
+              <TableCard title="기준·엔진 실행 설정 비교">
+                {s.comparisons.baseline.rows.some((row) => row.source === "kubernetes_spec") && (
+                  <p className="notice">엔진 실행 설정은 Pod 선언값(kubernetes_spec)입니다. 관측 불가는 unknown이며, 차이가 나면 재검증을 요청합니다.</p>
+                )}
                 <table className={rt.statusTable}>
                   <thead>
                     <tr><th>필드</th><th>기준</th><th>현재</th><th>출처</th><th>관측 시각</th><th>상태</th></tr>

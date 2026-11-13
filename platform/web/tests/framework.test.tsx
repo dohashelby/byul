@@ -312,3 +312,32 @@ describe("프레임워크·솔루션 기준 입력 항목", () => {
     expect(answers).toEqual([[], null]);
   });
 });
+
+
+describe("approved launch settings", () => {
+  it("creates 0.2 and preserves false, null and absent separately", () => {
+    let doc = newEnvironment();
+    expect(doc.schema_version).toBe("byul-environment/0.2");
+    doc.schema_version = "byul-environment/0.1";
+    doc.deployment = { kind: "kubernetes" };
+    const Harness = () => {
+      const [d, setD] = useState(doc);
+      doc = d;
+      return <EnvironmentForm doc={d} setDoc={setD} issues={[]} warnings={[]} isNew={false} />;
+    };
+    renderAt("/", "/", <Harness />);
+    const select = screen.getByRole("combobox", { name: "trust_remote_code 승인 상태" });
+    fireEvent.change(select, { target: { value: "false" } });
+    expect(doc.schema_version).toBe("byul-environment/0.2");
+    expect(doc.deployment?.launch_settings?.trust_remote_code).toBe(false);
+    fireEvent.change(select, { target: { value: "unknown" } });
+    expect(doc.deployment?.launch_settings?.trust_remote_code).toBeNull();
+    fireEvent.change(select, { target: { value: "absent" } });
+    expect(doc.deployment?.launch_settings).not.toHaveProperty("trust_remote_code");
+    fireEvent.change(screen.getByRole("combobox", { name: "revision 승인 상태" }), { target: { value: "value" } });
+    const revision = screen.getByRole("textbox", { name: "revision 승인 판본" });
+    fireEvent.change(revision, { target: { value: "approved" } });
+    expect(doc.deployment?.launch_settings?.revision).toBe("approved");
+    expect((revision as HTMLInputElement).maxLength).toBe(128);
+  });
+});

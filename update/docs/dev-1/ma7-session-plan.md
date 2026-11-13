@@ -1,6 +1,6 @@
 # 두 판본 J01·J02 입력·시간·비용 계획
 
-2026-11-13 작성. 단독 개발자의 M-A7 계획이며 실행 승인이나 실측 결과가 아니다. 판본·GPU 이미지는 작업지시서 0.1절만 따른다. 기준은 사용자 결정 14에 따라 V0 기본을 유지한다. 계획의 정본 팩은 #257의 @34이며 main 병합은 별도 승인 대상이다.
+2026-11-13 작성. 단독 개발자의 M-A7 계획이며 실행 승인이나 실측 결과가 아니다. 판본·GPU 이미지는 작업지시서 0.1절만 따른다. 기준은 사용자 결정 14에 따라 V0 기본을 유지한다. 계획의 정본 팩 @34는 #257로 main에 병합됐다. 현재 계획은 main b1d209fc와 M-A8 후속 입력 준비를 기준으로 한다.
 
 69개 점검별 두 쪽의 ENV·target·prepared·정책 포인터, 필요한 정책 키와 예상 공백은 [입력 계획 JSON](ma7-session-input-plan.json)에 있다. 69개 = M-A 27개 + M-B 42개, J01 6개 + J02 63개다. 퇴역 점검 8개는 포함하지 않는다. 실제 클러스터 입력이 없어 138쪽의 ENV/target은 `null`이며 사유를 적었다. SUP-08 두 쪽에는 실제 로컬 fixture·기동 계획·EXAMPLE/DRAFT 정책·target 결합 대기 설정을 연결했다. 구조/로컬 자산 검증과 실제 입력 사전 점검을 구분하며 `ready_for_execution=false`, `input_preflight_passed=false`다.
 
@@ -63,3 +63,22 @@ EBS·스냅샷 보존, 전송·공인 IPv4, 세금·환율은 위 EC2 합계에 
 
 
 2026-11-13 REQ-16 후속: [공식 지정 모델의 고정 revision](https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct/tree/895c3a49bc3fa70a340399125c650a463535e71c)을 계획 후보로 선택했다. [검토 기록](ma7-req16-model-candidate.json)에 공식 API·config/preprocessor/index의 실제 bytes SHA와 두 가중치 파일의 LFS 크기/해시 메타데이터를 남겼다. 조회한 고정 메타데이터 합계66,030 bytes이며 가중치4,418,050,768 bytes는 받지 않았다. config의 transformers_version은 선언값이고 두 판본의 설치/호환 증명이 아니다. 양쪽 planned_model에 같은 revision 후보를 연결했으며 실제 ENV/target138쪽·실행/사전 점검 false·결과 null은 유지한다.
+
+
+## M-A7 로컬 입력 파일 준비 결과
+
+2026-11-13 후속으로 실제 파일을 만들었다. [준비 기록](ma7-local-materialization-20261113.json)과 입력 계획의 포인터/SHA에 연결했다. 출력은 작업 폴더의 `inputs/ma7-materialized-20261113`이다.
+
+- REQ-14·16·17·18·19·20·21·LIF-13의 양쪽 prepared manifest16개를 각각 다른 세션으로 만들고 현재 guard 소스 bytes와 대조했다. 노드에는 설치하지 않았고 런타임 자격도 미확인이다. `settings.json`의 로컬 HMAC 값은 Git/보고서에 넣지 않고 파일 SHA만 기록했다.
+- 기존 preset을 사용해 REQ-14·16·18의 사례 파일6개·총62사례를 만들고 기존 계약 검사를 통과했다. REQ-16의 실제 모델/LoRA/가중치 세대와 노드 준비는 아직 필요하다.
+- 기존 정책 초안에 사용자 확정5개 값을 반영했다. 실행 시 계산해야 하는 ENV/target/prepared/사례 hash 자리표시자는 빼고 미결합 항목으로 기록했다. 실제 값은 기존 입력 조립기가 결합할 때 계산한다. 정책은 EXAMPLE/DRAFT이며 새 CONFIRMED나 실제 승인자를 만들지 않았다.
+- SUP-08 양쪽 포인터는 M-A8의 수정한 profile 명령·실제 파일 재검증 자산으로 옮겼다. 모델 bytes 재검증 시각은 M-A8 보고서를 참조하며 M-A7에서 가중치를 다시 받거나 재복사하지 않았다.
+- M-B42개 입력 행은 변경하지 않았다. 전체69개·138쪽 ENV/target은 계속 미입력이고 실행/사전 점검 false·결과 null이다.
+
+재준비는 `uv run python -m tools.mvp_a_input_materialize --output <새-폴더>`를 사용한다. 매번 새 세션과 로컬 HMAC 값이 생기므로 이전 실행의 관측 자료와 섞지 않는다. 이 도구는 엔진·kubectl·클라우드를 실행하지 않는다. 실제 ENV/target을 관측한 뒤 기존 `gpu_a_run_inputs`·`mvp_sup08_inputs`로 실행별 hash와 정책/설정을 결합한다.
+
+### REQ-17 입력 상한 충돌 (M-A7-Q1 / 결정 요청23)
+
+확정 `cache_timing_min_samples=200`은 현행 판정에서 네 역할 각각에 적용된다. 점수 표본만800개로 한 manifest의512개 상한을 넘는다. 기존 cohort 생성기로는 prime·warmup을 합쳐1,004개가 되어 실제 검증에서 거부된다. 정책을 낮추거나 상한을 늘리지 않았고 REQ-17 사례 생성을 미완료로 표시했다.
+
+권장은 역할별200개·묶음당512개를 유지하는 분할 수집/동일 scope 집계 계약안을 별도로 검토하는 것이다. 수집 구간의 ENV/target/모델·세대·정책·원자료 완전성, 전체 요청/시간 상한과 기존 독립 FAIL 보존을 먼저 설계해야 한다. 여러 EVD를 조건 확인 없이 합쳐 PASS를 만들지 않는다. 승인 전 판정·SPEC·수락 기준은 바꾸지 않는다. 현행 J02 시간/비용은 이 제약 해결 전 가정이며 요청수와 수집 방식 확정 뒤 재산정해야 한다.

@@ -1,4 +1,5 @@
 """Parse deployment examples and guard collector permissions/start ordering."""
+
 import configparser
 from pathlib import Path
 import shlex
@@ -18,8 +19,10 @@ def unit(name):
 
 class AgentServicesTest(unittest.TestCase):
     def test_collectors_are_unprivileged_with_read_only_inputs(self):
-        for name, module in (("tetragon-status", "tools.tetragon_status"),
-                             ("monitor-window", "tools.tetragon_monitor_window")):
+        for name, module in (
+            ("tetragon-status", "tools.tetragon_status"),
+            ("monitor-window", "tools.tetragon_monitor_window"),
+        ):
             with self.subTest(name=name):
                 service = unit(name)["Service"]
                 self.assertEqual(service["User"], "runtime-agent")
@@ -40,8 +43,10 @@ class AgentServicesTest(unittest.TestCase):
                 self.assertIn("--watch", command)
                 self.assertNotIn("--capture-baseline", command)
                 if name == "tetragon-status":
-                    self.assertEqual(command[command.index("--public-output") + 1],
-                                     "/srv/serving/observation/tetragon-status/tetragon-state.json")
+                    self.assertEqual(
+                        command[command.index("--public-output") + 1],
+                        "/srv/serving/observation/tetragon-status/tetragon-state.json",
+                    )
         command = shlex.split(unit("monitor-window")["Service"]["ExecStart"])
         self.assertEqual(command[command.index("--trusted-owner-uid") + 1], "10000")
 

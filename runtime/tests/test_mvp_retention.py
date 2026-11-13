@@ -67,8 +67,9 @@ class RetentionTests(unittest.TestCase):
             result = RecordRetention(data, enforce=True).run(now=NOW)
             expected = {"from": iso(12), "to": iso(10)}
             self.assertEqual(result["files"]["gateway_records.jsonl"]["removable_range"], expected)
-            self.assertEqual(result["files"]["engine_receipts.jsonl"]["removable_range"],
-                             {"from": iso(9), "to": iso(9)})
+            self.assertEqual(
+                result["files"]["engine_receipts.jsonl"]["removable_range"], {"from": iso(9), "to": iso(9)}
+            )
             self.assertEqual(gateway.read_all()[0], [])
             restarted = RecordRetention(data).run(now=NOW)
             self.assertEqual(restarted["last_deletion"]["files"]["gateway_records.jsonl"]["removable_range"], expected)
@@ -103,11 +104,11 @@ class RetentionTests(unittest.TestCase):
         self.assertIsNotNone(summary["last_deletion"])
 
     def test_size_limit_removes_oldest_first(self) -> None:
-        total = sum((self.data / name).stat().st_size for name in (
-            "gateway_records.jsonl", "engine_receipts.jsonl", "observations.jsonl"))
-        summary = RecordRetention(
-            self.data, max_age_days=365, max_bytes=total - 50, enforce=True
-        ).run(now=NOW)
+        total = sum(
+            (self.data / name).stat().st_size
+            for name in ("gateway_records.jsonl", "engine_receipts.jsonl", "observations.jsonl")
+        )
+        summary = RecordRetention(self.data, max_age_days=365, max_bytes=total - 50, enforce=True).run(now=NOW)
         self.assertTrue(summary["over_size_limit"])
         removed = sum(entry["removable_by_size"] for entry in summary["files"].values())
         self.assertGreaterEqual(removed, 1)
@@ -128,15 +129,9 @@ class RetentionTests(unittest.TestCase):
 
             gateway_records, _ = gateway.read_all()
             receipt_records, _ = receipts.read_all()
-            self.assertEqual(
-                [item["request_id"] for item in gateway_records], ["joined"]
-            )
-            self.assertEqual(
-                [item["request_id"] for item in receipt_records], ["joined"]
-            )
-            self.assertEqual(
-                summary["files"]["engine_receipts.jsonl"]["removed_lines"], 1
-            )
+            self.assertEqual([item["request_id"] for item in gateway_records], ["joined"])
+            self.assertEqual([item["request_id"] for item in receipt_records], ["joined"])
+            self.assertEqual(summary["files"]["engine_receipts.jsonl"]["removed_lines"], 1)
 
     def test_route_rejections_share_request_hold_and_retention_unit(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -170,10 +165,7 @@ class RetentionTests(unittest.TestCase):
             receipts.append({"request_id": "old", "received_at": iso(10)})
             gateway.append({"request_id": "new", "recorded_at": iso(0)})
 
-            total = sum(
-                (data / name).stat().st_size
-                for name in ("gateway_records.jsonl", "engine_receipts.jsonl")
-            )
+            total = sum((data / name).stat().st_size for name in ("gateway_records.jsonl", "engine_receipts.jsonl"))
             old_size = sum(
                 len(line) + 1
                 for name in ("gateway_records.jsonl", "engine_receipts.jsonl")
@@ -198,9 +190,7 @@ class RetentionTests(unittest.TestCase):
             gateway = JsonlStore(data / "gateway_records.jsonl")
             receipts = JsonlStore(data / "engine_receipts.jsonl")
             gateway.append({"request_id": "held-undated", "run_id": "evidence"})
-            receipts.append(
-                {"request_id": "held-undated", "received_at": iso(20)}
-            )
+            receipts.append({"request_id": "held-undated", "received_at": iso(20)})
             receipts.append({"request_id": "remove", "received_at": iso(20)})
             hold = data / "hold.json"
             hold.write_text(
@@ -208,9 +198,7 @@ class RetentionTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            summary = RecordRetention(
-                data, enforce=True, hold_path=hold
-            ).run(now=NOW)
+            summary = RecordRetention(data, enforce=True, hold_path=hold).run(now=NOW)
 
             self.assertEqual(
                 [item["request_id"] for item in gateway.read_all()[0]],
@@ -224,9 +212,7 @@ class RetentionTests(unittest.TestCase):
                 summary["files"]["gateway_records.jsonl"]["unclassified_lines"],
                 1,
             )
-            self.assertEqual(
-                summary["files"]["engine_receipts.jsonl"]["held_units"], 1
-            )
+            self.assertEqual(summary["files"]["engine_receipts.jsonl"]["held_units"], 1)
 
     def test_broken_hold_file_blocks_deletion(self) -> None:
         before = (self.data / "gateway_records.jsonl").read_bytes()
@@ -248,9 +234,7 @@ class RetentionTests(unittest.TestCase):
         ):
             with self.subTest(document=document):
                 self.assertEqual(load_holds(self.hold(document))[2]["state"], "error")
-        runs, requests, state = load_holds(
-            self.hold({"schema": HOLD_SCHEMA, "run_ids": ["a"], "request_ids": ["b"]})
-        )
+        runs, requests, state = load_holds(self.hold({"schema": HOLD_SCHEMA, "run_ids": ["a"], "request_ids": ["b"]}))
         self.assertEqual((runs, requests, state["state"]), ({"a"}, {"b"}, "ok"))
 
     def test_invalid_limits_are_rejected(self) -> None:
@@ -302,17 +286,13 @@ class RetentionTests(unittest.TestCase):
             self.assertIn("gateway_records.jsonl", summary["errors"])
             self.assertEqual(gateway.read_all()[0], [])
             logged = JsonlStore(data / "retention_log.jsonl").read_all()[0][0]
-            self.assertEqual(
-                logged["files"]["gateway_records.jsonl"]["removed_lines"], 1
-            )
+            self.assertEqual(logged["files"]["gateway_records.jsonl"]["removed_lines"], 1)
             self.assertEqual(
                 logged["files"]["gateway_records.jsonl"]["durability"],
                 "uncertain",
             )
             self.assertEqual(
-                summary["last_deletion"]["files"]["gateway_records.jsonl"][
-                    "durability"
-                ],
+                summary["last_deletion"]["files"]["gateway_records.jsonl"]["durability"],
                 "uncertain",
             )
 

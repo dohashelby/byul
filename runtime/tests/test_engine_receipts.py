@@ -24,7 +24,7 @@ PROMPT = "my secret prompt: the launch code is 7777"
 
 class ResponseIdTests(unittest.TestCase):
     def test_chat_relay_records_id_preserving_sse_bytes_and_event_boundaries(self):
-        chunks = [b'data: {"id":"chat', f'cmpl-{RID}","choices":[]}}\n\n'.encode(), b'data: [DONE]\n\n']
+        chunks = [b'data: {"id":"chat', f'cmpl-{RID}","choices":[]}}\n\n'.encode(), b"data: [DONE]\n\n"]
         upstream = Mock(status=200)
         upstream.getheader.return_value = "text/event-stream"
         upstream.read1.side_effect = chunks + [b""]
@@ -35,8 +35,10 @@ class ResponseIdTests(unittest.TestCase):
         relay = Relay(backend, relay_timeout_s=2, stream_idle_timeout_s=2, request_deadline_s=5)
         downstream = Mock()
         allowed = Decision("ALLOWED", 200, "REQUEST_ALLOWED", None, "allowed", "model", 10)
-        with patch("serving_runtime.mvp.relay.DeadlineWatchdog") as watcher, \
-                patch("serving_runtime.mvp.relay.relay_payload", return_value=b"{}"):
+        with (
+            patch("serving_runtime.mvp.relay.DeadlineWatchdog") as watcher,
+            patch("serving_runtime.mvp.relay.relay_payload", return_value=b"{}"),
+        ):
             watcher.return_value.expired.return_value = False
             watcher.return_value.finish.return_value = False
             result, outcome, started = relay.relay_stream(downstream, RID, {}, allowed, time.monotonic(), lambda: None)
@@ -50,8 +52,12 @@ class ResponseIdTests(unittest.TestCase):
     def test_chat_stream_id_across_chunks_and_first_event_only(self):
         stream = _StreamResponseId()
         ids = _ResponseIds()
-        chunks = [b": keepalive\n\n", b'data: {"i', f'd":"chatcmpl-{RID}","choices":[]}}\n\n'.encode(),
-                  b'data: {"id":"other"}\n\ndata: [DONE]\n\n']
+        chunks = [
+            b": keepalive\n\n",
+            b'data: {"i',
+            f'd":"chatcmpl-{RID}","choices":[]}}\n\n'.encode(),
+            b'data: {"id":"other"}\n\ndata: [DONE]\n\n',
+        ]
         for chunk in chunks:
             found, value = stream.feed(chunk)
             if found:
@@ -60,16 +66,26 @@ class ResponseIdTests(unittest.TestCase):
         self.assertEqual(stream.pending, b"")
 
     def test_chat_stream_without_id_and_oversized_line_are_bounded(self):
-        for chunk, expected in ((b'data: {"choices":[]}\n', (True, None)),
-                                (b"data: " + b"x" * _StreamResponseId.LIMIT, (False, None))):
+        for chunk, expected in (
+            (b'data: {"choices":[]}\n', (True, None)),
+            (b"data: " + b"x" * _StreamResponseId.LIMIT, (False, None)),
+        ):
             stream = _StreamResponseId()
             self.assertEqual(stream.feed(chunk), expected)
             self.assertEqual(stream.pending, b"")
 
     def test_only_exact_engine_echo_forms_match(self):
-        for value, expected in ((f"chatcmpl-{RID}", "matched"), (f"cmpl-{RID}", "matched"), (RID, "matched"),
-                                (f"chatcmpl-{OTHER}", "mismatch"), (f"chatcmpl-{RID}-0", "mismatch"),
-                                (f"fake-{RID}", "mismatch"), (None, "absent"), ("", "absent"), (7, "absent")):
+        for value, expected in (
+            (f"chatcmpl-{RID}", "matched"),
+            (f"cmpl-{RID}", "matched"),
+            (RID, "matched"),
+            (f"chatcmpl-{OTHER}", "mismatch"),
+            (f"chatcmpl-{RID}-0", "mismatch"),
+            (f"fake-{RID}", "mismatch"),
+            (None, "absent"),
+            ("", "absent"),
+            (7, "absent"),
+        ):
             with self.subTest(value=value):
                 self.assertEqual(response_id_receipt(RID, value), f"engine_response_id_{expected}")
 
@@ -86,13 +102,15 @@ class ResponseIdTests(unittest.TestCase):
 
 class ExtractTests(unittest.TestCase):
     def test_keeps_ids_only_never_log_text(self):
-        output = "\n".join([
-            f"2026-11-09T03:00:01.123456789Z INFO Received request chatcmpl-{RID}: prompt: '{PROMPT}'",
-            f"2026-11-09T03:00:02Z INFO Finished request chatcmpl-{RID}.",
-            f"2026-11-09T03:00:03+00:00 [sglang] rid={OTHER} {PROMPT}",
-            f"no timestamp chatcmpl-{'a' * 32}",
-            f"2026-11-09T03:00:04Z chatcmpl-{'b' * 33}",
-        ]).encode()
+        output = "\n".join(
+            [
+                f"2026-11-09T03:00:01.123456789Z INFO Received request chatcmpl-{RID}: prompt: '{PROMPT}'",
+                f"2026-11-09T03:00:02Z INFO Finished request chatcmpl-{RID}.",
+                f"2026-11-09T03:00:03+00:00 [sglang] rid={OTHER} {PROMPT}",
+                f"no timestamp chatcmpl-{'a' * 32}",
+                f"2026-11-09T03:00:04Z chatcmpl-{'b' * 33}",
+            ]
+        ).encode()
         found = collector.extract(output)
         self.assertEqual(found, {RID: "2026-11-09T03:00:01.123456Z", OTHER: "2026-11-09T03:00:03Z"})
         self.assertNotIn("secret", json.dumps(found))
@@ -116,8 +134,9 @@ class CollectorTests(unittest.TestCase):
         clock = iter([NOW, NOW + timedelta(seconds=10), NOW + timedelta(seconds=20), NOW + timedelta(seconds=30)])
         line = f"2026-11-09T02:59:59Z Received request chatcmpl-{RID}: prompt: {PROMPT}\n".encode()
         run = Run((0, line), (1, b""), subprocess.TimeoutExpired("kubectl", 20), (0, b""))
-        c = collector.Collector("ctx", "serving", "app=serving-engine", Path("unused"), since_s=60,
-                                runner=run, clock=lambda: next(clock))
+        c = collector.Collector(
+            "ctx", "serving", "app=serving-engine", Path("unused"), since_s=60, runner=run, clock=lambda: next(clock)
+        )
         first = c.collect()
         self.assertEqual((first["state"], first["window_started_at"]), ("ok", "2026-11-09T02:59:00Z"))
         self.assertEqual(first["receipts"], [{"request_id": RID, "observed_at": "2026-11-09T02:59:59Z"}])
@@ -142,9 +161,15 @@ class LookupTests(unittest.TestCase):
         self.path = Path(self.temporary.name) / "engine-receipts.json"
 
     def publish(self, **changes):
-        value = {"schema_version": "runtime-engine-receipts/1.0", "context": "ctx", "collected_at": "2026-11-09T03:00:00Z",
-                 "state": "ok", "reason": None, "window_started_at": "2026-11-09T02:50:00Z",
-                 "receipts": [{"request_id": RID, "observed_at": "2026-11-09T02:55:01Z"}]}
+        value = {
+            "schema_version": "runtime-engine-receipts/1.0",
+            "context": "ctx",
+            "collected_at": "2026-11-09T03:00:00Z",
+            "state": "ok",
+            "reason": None,
+            "window_started_at": "2026-11-09T02:50:00Z",
+            "receipts": [{"request_id": RID, "observed_at": "2026-11-09T02:55:01Z"}],
+        }
         value.update(changes)
         self.path.write_text(json.dumps(value))
 
@@ -158,29 +183,47 @@ class LookupTests(unittest.TestCase):
         # Before the window, too recent to have been collected, or stale: cannot say.
         self.assertEqual(receipts.lookup(OTHER, "2026-11-09T02:40:00Z", now=NOW)["status"], "unavailable")
         self.assertEqual(receipts.lookup(OTHER, "2026-11-09T02:59:58Z", now=NOW)["status"], "unavailable")
-        self.assertEqual(receipts.lookup(OTHER, "2026-11-09T02:55:00Z", now=NOW + timedelta(minutes=5))["status"], "unavailable")
+        self.assertEqual(
+            receipts.lookup(OTHER, "2026-11-09T02:55:00Z", now=NOW + timedelta(minutes=5))["status"], "unavailable"
+        )
 
     def test_error_state_and_invalid_files_never_claim_absence(self):
         receipts = EngineReceipts(self.path)
         self.publish(state="error", reason="TIMEOUT")
         self.assertEqual(receipts.lookup(OTHER, "2026-11-09T02:55:00Z", now=NOW)["status"], "unavailable")
         self.assertEqual(receipts.lookup(RID, "2026-11-09T02:55:00Z", now=NOW)["status"], "observed")
-        for change in ({"schema_version": "x"}, {"receipts": [{"request_id": "not-an-id", "observed_at": "2026-11-09T02:55:01Z"}]}):
+        for change in (
+            {"schema_version": "x"},
+            {"receipts": [{"request_id": "not-an-id", "observed_at": "2026-11-09T02:55:01Z"}]},
+        ):
             self.publish(**change)
-            self.assertEqual(EngineReceipts(self.path).lookup(RID, "2026-11-09T02:55:00Z", now=NOW)["status"], "unavailable")
+            self.assertEqual(
+                EngineReceipts(self.path).lookup(RID, "2026-11-09T02:55:00Z", now=NOW)["status"], "unavailable"
+            )
 
 
 def final(at="2026-11-09T02:55:00+00:00", receipt="engine_response_id_matched"):
-    return {"phase": "final", "request_id": RID, "observation_session_id": "s", "recorded_at": at,
-            "backend_kind": "vllm", "decision": {"result": "ALLOWED", "reason_code": "OK", "http_status": 200},
-            "request": {}, "delivery": {"attempted": True, "backend_receipt": receipt, "response": "completed"}}
+    return {
+        "phase": "final",
+        "request_id": RID,
+        "observation_session_id": "s",
+        "recorded_at": at,
+        "backend_kind": "vllm",
+        "decision": {"result": "ALLOWED", "reason_code": "OK", "http_status": 200},
+        "request": {},
+        "delivery": {"attempted": True, "backend_receipt": receipt, "response": "completed"},
+    }
 
 
 class QueryDetailTests(unittest.TestCase):
     def service(self, lookup):
         directory = Path(self.temporary.name)
-        service = QueryService(JsonlStore(directory / "g.jsonl"), JsonlStore(directory / "e.jsonl"),
-                               lambda: {"ok": True}, engine_log_lookup=lookup)
+        service = QueryService(
+            JsonlStore(directory / "g.jsonl"),
+            JsonlStore(directory / "e.jsonl"),
+            lambda: {"ok": True},
+            engine_log_lookup=lookup,
+        )
         service._gateway_store.append(final())
         return service
 
@@ -189,15 +232,21 @@ class QueryDetailTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
 
     def test_engine_log_observed_is_received(self):
-        detail = self.service(lambda _r, _a: {"status": "observed", "observed_at": "2026-11-09T02:55:01Z",
-                                              "collected_at": "2026-11-09T03:00:00Z"}).detail(RID, lambda _r: {}, "s")
+        detail = self.service(
+            lambda _r, _a: {
+                "status": "observed",
+                "observed_at": "2026-11-09T02:55:01Z",
+                "collected_at": "2026-11-09T03:00:00Z",
+            }
+        ).detail(RID, lambda _r: {}, "s")
         self.assertEqual(detail["evidence_state"], "received")
         self.assertEqual(detail["engine_receipts"][0]["received_at"], "2026-11-09T02:55:01Z")
         self.assertEqual(detail["engine_live"]["status"], "engine_log_observed")
 
     def test_not_observed_is_never_not_received(self):
-        detail = self.service(lambda _r, _a: {"status": "not_observed", "observed_at": None,
-                                              "collected_at": "2026-11-09T03:00:00Z"}).detail(RID, lambda _r: {}, "s")
+        detail = self.service(
+            lambda _r, _a: {"status": "not_observed", "observed_at": None, "collected_at": "2026-11-09T03:00:00Z"}
+        ).detail(RID, lambda _r: {}, "s")
         self.assertEqual(detail["evidence_state"], "gateway_only")
         self.assertIn("미수신 단정 불가", detail["evidence_summary"])
         self.assertEqual(detail["engine_receipts"], [])

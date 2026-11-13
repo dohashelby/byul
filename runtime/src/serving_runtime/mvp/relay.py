@@ -74,39 +74,44 @@ class _RelayBadEvent(ValueError):
 
 
 def _requested_response_fields(document: dict, allowed: Decision) -> frozenset[str]:
-    return frozenset(name for name, _mode in allowed.extra_fields
-                     if name in document and document[name] is not None and document[name] is not False)
+    return frozenset(
+        name
+        for name, _mode in allowed.extra_fields
+        if name in document and document[name] is not None and document[name] is not False
+    )
 
 
 def _sanitize_response_json(body: bytes, requested: frozenset[str], *, reject_error: bool = False) -> bytes:
-    value = json.loads(body.decode('utf-8'), object_pairs_hook=_object_without_duplicates,
-                       parse_constant=_reject_json_constant)
+    value = json.loads(
+        body.decode("utf-8"), object_pairs_hook=_object_without_duplicates, parse_constant=_reject_json_constant
+    )
     if not isinstance(value, dict):
-        raise ValueError('successful response must be an object')
-    if reject_error and 'error' in value:
+        raise ValueError("successful response must be an object")
+    if reject_error and "error" in value:
         # HTTP 200 does not make an upstream SSE error a successful chunk.
         # Keep raw engine error contents out of client output and records.
-        raise ValueError('upstream stream error envelope')
+        raise ValueError("upstream stream error envelope")
     safe = sanitize_response_metadata(value, requested_fields=requested)
-    encoded = body if safe == value else json.dumps(safe, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+    encoded = body if safe == value else json.dumps(safe, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     if len(encoded) > _COMPLETION_BODY_LIMIT:
-        raise ValueError('sanitized response exceeds byte limit')
+        raise ValueError("sanitized response exceeds byte limit")
     return encoded
 
 
-def _sanitize_sse_event(event: bytes, requested: frozenset[str], *, chat: bool = False,
-                        allow_initial_bom: bool = False) -> tuple[bytes, bool]:
+def _sanitize_sse_event(
+    event: bytes, requested: frozenset[str], *, chat: bool = False, allow_initial_bom: bool = False
+) -> tuple[bytes, bool]:
     # EventSource discards a leading UTF-8 BOM before interpreting field names.
     if allow_initial_bom:
-        event = event.removeprefix(b'\xef\xbb\xbf')
-    if event.startswith(b'\xef\xbb\xbf'):
+        event = event.removeprefix(b"\xef\xbb\xbf")
+    if event.startswith(b"\xef\xbb\xbf"):
         raise _RelayBadEvent()
     lines = event.splitlines(keepends=True)
-    data = [line[5:].strip() for line in lines if line.startswith(b'data:')]
+    data = [line[5:].strip() for line in lines if line.startswith(b"data:")]
     if not data:
         return event, False
-    joined = b'\n'.join(data)
-    if joined == b'[DONE]':
+    joined = b"\n".join(data)
+    if joined == b"[DONE]":
         return event, True
     try:
         safe = _sanitize_response_json(joined, requested, reject_error=True)
@@ -117,17 +122,17 @@ def _sanitize_sse_event(event: bytes, requested: frozenset[str], *, chat: bool =
     output = []
     replaced = False
     for line in lines:
-        if line.startswith(b'data:'):
+        if line.startswith(b"data:"):
             if not replaced:
-                ending = b'\r\n' if line.endswith(b'\r\n') else b'\r' if line.endswith(b'\r') else b'\n'
-                output.append(b'data: ' + safe + ending)
+                ending = b"\r\n" if line.endswith(b"\r\n") else b"\r" if line.endswith(b"\r") else b"\n"
+                output.append(b"data: " + safe + ending)
                 replaced = True
         else:
             output.append(line)
-    encoded = b''.join(output)
+    encoded = b"".join(output)
     if chat:
         try:
-            _advance_chat_sse(b'', encoded, 0)
+            _advance_chat_sse(b"", encoded, 0)
         except _RelayOversize as error:
             raise _RelayBadEvent() from error
     return encoded, False
@@ -137,10 +142,7 @@ def _completion_choices(value: object) -> bool:
     return (
         isinstance(value, list)
         and bool(value)
-        and all(
-            isinstance(choice, dict) and isinstance(choice.get("text"), str)
-            for choice in value
-        )
+        and all(isinstance(choice, dict) and isinstance(choice.get("text"), str) for choice in value)
     )
 
 
@@ -185,9 +187,7 @@ def validate_completion_stream(body: bytes) -> bool:
             document = json.loads(data.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RecursionError):
             return False
-        if not isinstance(document, dict) or not _completion_choices(
-            document.get("choices")
-        ):
+        if not isinstance(document, dict) or not _completion_choices(document.get("choices")):
             return False
         saw_chunk = True
     return saw_chunk and saw_done
@@ -302,9 +302,7 @@ def relay_payload(
     return json.dumps(relay_document, ensure_ascii=False).encode("utf-8")
 
 
-def _advance_chat_sse(
-    buffer: bytes, chunk: bytes, event_bytes: int
-) -> tuple[bytes, bool, int]:
+def _advance_chat_sse(buffer: bytes, chunk: bytes, event_bytes: int) -> tuple[bytes, bool, int]:
     """Bound physical lines and events while retaining only a partial line.
 
     event_bytes counts completed lines, including LF. A partial line is
@@ -324,8 +322,7 @@ def _advance_chat_sse(
             event_bytes = 0
         elif normalized.startswith(b"data:") and normalized[5:].strip() == b"[DONE]":
             done = True
-    if (len(remainder) > _CHAT_SSE_LINE_LIMIT
-            or event_bytes + len(remainder) > _CHAT_SSE_EVENT_LIMIT):
+    if len(remainder) > _CHAT_SSE_LINE_LIMIT or event_bytes + len(remainder) > _CHAT_SSE_EVENT_LIMIT:
         raise _RelayOversize()
     return remainder, done, event_bytes
 
@@ -447,9 +444,7 @@ class Relay:
         if remaining <= 0:
             return engine_error(504, "ENGINE_DEADLINE", "deadline exceeded", allowed), None
         path = "/v1/chat/completions" if route == CHAT_ROUTE else "/v1/completions"
-        connection, request_path = self._backend.connection(
-            path, min(self._relay_timeout_s, remaining)
-        )
+        connection, request_path = self._backend.connection(path, min(self._relay_timeout_s, remaining))
         watchdog = DeadlineWatchdog(connection, deadline_at)
         watchdog.start()
         try:
@@ -465,9 +460,7 @@ class Relay:
                     route=route,
                     cache_salt=cache_salt,
                 ),
-                headers=self._backend.request_headers(
-                    request_id=request_id, content_type="application/json"
-                ),
+                headers=self._backend.request_headers(request_id=request_id, content_type="application/json"),
             )
             engine_response = connection.getresponse()
             watchdog.watch_response(engine_response)
@@ -485,9 +478,7 @@ class Relay:
                     remaining = deadline_at - time.monotonic()
                     if remaining <= 0 or watchdog.expired():
                         raise _RelayDeadline()
-                    response_socket = set_response_timeout(
-                        response_socket, min(self._relay_timeout_s, remaining)
-                    )
+                    response_socket = set_response_timeout(response_socket, min(self._relay_timeout_s, remaining))
                     try:
                         chunk = engine_response.read1(min(4096, limit + 1 - size))
                     except (socket.timeout, TimeoutError, OSError) as error:
@@ -557,7 +548,9 @@ class Relay:
             try:
                 body = _sanitize_response_json(body, _requested_response_fields(document, allowed))
             except (UnicodeError, ValueError, RecursionError):
-                return engine_error(502, "ENGINE_BAD_RESPONSE", "backend returned invalid response metadata", allowed), None
+                return engine_error(
+                    502, "ENGINE_BAD_RESPONSE", "backend returned invalid response metadata", allowed
+                ), None
             if watchdog.finish():
                 raise _RelayDeadline()
             self._response_ids.note(request_id, parsed.get("id") if isinstance(parsed, dict) else None)
@@ -619,6 +612,7 @@ class Relay:
         watchdog = DeadlineWatchdog(connection, deadline_at)
         watchdog.start()
         response_started = False
+
         def start_response() -> None:
             nonlocal response_started
             if watchdog.expired():
@@ -630,6 +624,7 @@ class Relay:
             response_started = True
             response.start_stream_response(request_id)
             on_response_started()
+
         try:
             watchdog.connect()
             connection.request(
@@ -643,20 +638,26 @@ class Relay:
                     route=route,
                     cache_salt=cache_salt,
                 ),
-                headers=self._backend.request_headers(
-                    request_id=request_id, content_type="application/json"
-                ),
+                headers=self._backend.request_headers(request_id=request_id, content_type="application/json"),
             )
             engine_response = connection.getresponse()
             watchdog.watch_response(engine_response)
             if watchdog.expired():
-                return engine_error(504, "ENGINE_TIMEOUT", f"{self._backend_label()} request timed out", allowed), "ENGINE_TIMEOUT", False
+                return (
+                    engine_error(504, "ENGINE_TIMEOUT", f"{self._backend_label()} request timed out", allowed),
+                    "ENGINE_TIMEOUT",
+                    False,
+                )
             content_type = engine_response.getheader("Content-Type", "")
             media_type = content_type.split(";", 1)[0].strip().lower()
             if 400 <= engine_response.status < 500:
                 body = engine_response.read(_ENGINE_ERROR_BODY_LIMIT + 1)
                 if watchdog.expired():
-                    return engine_error(504, "ENGINE_TIMEOUT", f"{self._backend_label()} request timed out", allowed), "ENGINE_TIMEOUT", False
+                    return (
+                        engine_error(504, "ENGINE_TIMEOUT", f"{self._backend_label()} request timed out", allowed),
+                        "ENGINE_TIMEOUT",
+                        False,
+                    )
                 rejected = engine_rejection(
                     engine_response.status,
                     body[:_ENGINE_ERROR_BODY_LIMIT],
@@ -698,9 +699,7 @@ class Relay:
                     if idle_remaining <= 0:
                         code, outcome = "STREAM_IDLE_TIMEOUT", "idle_timeout"
                         break
-                    response_socket = set_response_timeout(
-                        response_socket, min(deadline_remaining, idle_remaining)
-                    )
+                    response_socket = set_response_timeout(response_socket, min(deadline_remaining, idle_remaining))
                     try:
                         chunk = engine_response.read1(1024)
                     except (socket.timeout, TimeoutError):
@@ -710,8 +709,11 @@ class Relay:
                             code, outcome = "STREAM_IDLE_TIMEOUT", "idle_timeout"
                         break
                     except (OSError, HTTPException):
-                        code, outcome = (("STREAM_DEADLINE", "deadline_exceeded") if watchdog.expired()
-                                         else ("STREAM_RELAY_ERROR", "relay_error"))
+                        code, outcome = (
+                            ("STREAM_DEADLINE", "deadline_exceeded")
+                            if watchdog.expired()
+                            else ("STREAM_RELAY_ERROR", "relay_error")
+                        )
                         break
                     if watchdog.expired():
                         code, outcome = "STREAM_DEADLINE", "deadline_exceeded"
@@ -737,16 +739,15 @@ class Relay:
                         match = re.search(rb"\r\n\r\n|\r\n\n|\n\r\n|\n\n|\r\r", pending)
                         if match is None:
                             break
-                        event, pending = pending[:match.end()], pending[match.end():]
+                        event, pending = pending[: match.end()], pending[match.end() :]
                         if first_sse_event:
-                            event = event.removeprefix(b'\xef\xbb\xbf')
+                            event = event.removeprefix(b"\xef\xbb\xbf")
                             first_sse_event = False
-                        if event.startswith(b'\xef\xbb\xbf'):
+                        if event.startswith(b"\xef\xbb\xbf"):
                             code, outcome = "ENGINE_BAD_RESPONSE", "invalid_completion_stream"
                             stop_stream = True
                             break
-                        data_lines = [line[5:].strip() for line in event.splitlines()
-                                      if line.startswith(b"data:")]
+                        data_lines = [line[5:].strip() for line in event.splitlines() if line.startswith(b"data:")]
                         if not data_lines:
                             if response_started:
                                 try:
@@ -759,8 +760,11 @@ class Relay:
                                     stop_stream = True
                                     break
                                 except (BrokenPipeError, ConnectionResetError):
-                                    code, outcome = (("STREAM_DEADLINE", "deadline_exceeded") if watchdog.expired()
-                                                     else ("CLIENT_DISCONNECTED", "client_disconnected"))
+                                    code, outcome = (
+                                        ("STREAM_DEADLINE", "deadline_exceeded")
+                                        if watchdog.expired()
+                                        else ("CLIENT_DISCONNECTED", "client_disconnected")
+                                    )
                                     stop_stream = True
                                     break
                             continue
@@ -802,22 +806,28 @@ class Relay:
                             stop_stream = True
                             break
                         except (BrokenPipeError, ConnectionResetError):
-                            code, outcome = (("STREAM_DEADLINE", "deadline_exceeded") if watchdog.expired()
-                                                     else ("CLIENT_DISCONNECTED", "client_disconnected"))
+                            code, outcome = (
+                                ("STREAM_DEADLINE", "deadline_exceeded")
+                                if watchdog.expired()
+                                else ("CLIENT_DISCONNECTED", "client_disconnected")
+                            )
                             stop_stream = True
                             break
                     if stop_stream:
                         break
                 if not response_started:
                     if code == "CLIENT_DISCONNECTED":
-                        return engine_error(200, code, "client disconnected", allowed,
-                                            source="client"), outcome, False
+                        return engine_error(200, code, "client disconnected", allowed, source="client"), outcome, False
                     status = 504 if code in {"STREAM_DEADLINE", "STREAM_IDLE_TIMEOUT"} else 502
                     return engine_error(status, code, outcome.replace("_", " "), allowed), outcome, False
                 return (
-                    engine_error(200,
-                                 code, outcome.replace("_", " "), allowed,
-                                 source="client" if code == "CLIENT_DISCONNECTED" else "engine"),
+                    engine_error(
+                        200,
+                        code,
+                        outcome.replace("_", " "),
+                        allowed,
+                        source="client" if code == "CLIENT_DISCONNECTED" else "engine",
+                    ),
                     outcome,
                     True,
                 )
@@ -860,9 +870,7 @@ class Relay:
                 if idle_remaining <= 0:
                     code, outcome = "STREAM_IDLE_TIMEOUT", "idle_timeout"
                     break
-                response_socket = set_response_timeout(
-                    response_socket, min(deadline_remaining, idle_remaining)
-                )
+                response_socket = set_response_timeout(response_socket, min(deadline_remaining, idle_remaining))
                 try:
                     chunk = engine_response.read1(1024)
                 except (socket.timeout, TimeoutError):
@@ -872,8 +880,11 @@ class Relay:
                         code, outcome = "STREAM_IDLE_TIMEOUT", "idle_timeout"
                     break
                 except (OSError, HTTPException):
-                    code, outcome = (("STREAM_DEADLINE", "deadline_exceeded") if watchdog.expired()
-                                     else ("STREAM_RELAY_ERROR", "relay_error"))
+                    code, outcome = (
+                        ("STREAM_DEADLINE", "deadline_exceeded")
+                        if watchdog.expired()
+                        else ("STREAM_RELAY_ERROR", "relay_error")
+                    )
                     break
                 if watchdog.expired():
                     code, outcome = "STREAM_DEADLINE", "deadline_exceeded"
@@ -891,9 +902,7 @@ class Relay:
                 if found_id:
                     self._response_ids.note(request_id, value)
                 try:
-                    line_buffer, found_done, event_bytes = _advance_chat_sse(
-                        line_buffer, chunk, event_bytes
-                    )
+                    line_buffer, found_done, event_bytes = _advance_chat_sse(line_buffer, chunk, event_bytes)
                 except _RelayOversize:
                     code, outcome = "ENGINE_BAD_RESPONSE", "oversized_chat_stream"
                     break
@@ -903,9 +912,13 @@ class Relay:
                         boundary = re.search(rb"\r\n\r\n|\r\n\n|\n\r\n|\n\n|\r\r", pending_event)
                         if boundary is None:
                             break
-                        event, pending_event = pending_event[:boundary.end()], pending_event[boundary.end():]
-                        safe_event, terminal = _sanitize_sse_event(event, _requested_response_fields(document, allowed),
-                            chat=True, allow_initial_bom=first_sse_event)
+                        event, pending_event = pending_event[: boundary.end()], pending_event[boundary.end() :]
+                        safe_event, terminal = _sanitize_sse_event(
+                            event,
+                            _requested_response_fields(document, allowed),
+                            chat=True,
+                            allow_initial_bom=first_sse_event,
+                        )
                         first_sse_event = False
                         response.write_stream_chunk(safe_event)
                         saw_done = saw_done or terminal
@@ -913,8 +926,11 @@ class Relay:
                     code, outcome = "ENGINE_BAD_RESPONSE", "invalid_chat_stream"
                     break
                 except (BrokenPipeError, ConnectionResetError):
-                    code, outcome = (("STREAM_DEADLINE", "deadline_exceeded") if watchdog.expired()
-                                                     else ("CLIENT_DISCONNECTED", "client_disconnected"))
+                    code, outcome = (
+                        ("STREAM_DEADLINE", "deadline_exceeded")
+                        if watchdog.expired()
+                        else ("CLIENT_DISCONNECTED", "client_disconnected")
+                    )
                     break
 
             return (
@@ -931,9 +947,12 @@ class Relay:
         except (TimeoutError, OSError, HTTPException) as error:
             if watchdog.expired():
                 return (
-                    engine_error(200 if response_started else 504,
-                                 "STREAM_DEADLINE" if response_started else "ENGINE_TIMEOUT",
-                                 "deadline exceeded", allowed),
+                    engine_error(
+                        200 if response_started else 504,
+                        "STREAM_DEADLINE" if response_started else "ENGINE_TIMEOUT",
+                        "deadline exceeded",
+                        allowed,
+                    ),
                     "deadline_exceeded" if response_started else "ENGINE_TIMEOUT",
                     response_started,
                 )
@@ -952,7 +971,9 @@ class Relay:
                 engine_error(
                     200 if response_started else 502,
                     "CLIENT_DISCONNECTED" if response_started else "ENGINE_UNREACHABLE",
-                    "client disconnected during streaming" if response_started else f"{self._backend_label()} is unreachable",
+                    "client disconnected during streaming"
+                    if response_started
+                    else f"{self._backend_label()} is unreachable",
                     allowed,
                     source="client" if response_started else "engine",
                 ),

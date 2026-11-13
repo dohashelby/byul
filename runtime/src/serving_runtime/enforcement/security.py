@@ -35,9 +35,7 @@ def render_pod_security(intent: EnforcementIntent) -> dict[str, Any] | None:
         {"name": "serving-model", "mountPath": paths.model_dir, "readOnly": True},
     ]
     if assets.tokenizer_dir is not None:
-        engine_mounts.append(
-            {"name": "serving-tokenizer", "mountPath": assets.tokenizer_dir, "readOnly": True}
-        )
+        engine_mounts.append({"name": "serving-tokenizer", "mountPath": assets.tokenizer_dir, "readOnly": True})
     engine_mounts.append(
         {
             "name": "serving-approved-manifest",
@@ -85,9 +83,7 @@ def render_pod_security(intent: EnforcementIntent) -> dict[str, Any] | None:
     if intent.acquire is not None:
         document["acquire"] = {
             "podLabels": dict(intent.acquire.labels),
-            "securityContext": (
-                _security_context(assets.acquire_uid) if assets.acquire_uid is not None else None
-            ),
+            "securityContext": (_security_context(assets.acquire_uid) if assets.acquire_uid is not None else None),
             "volumeMounts": [
                 {"name": "serving-model", "mountPath": paths.model_dir, "readOnly": False},
                 *(

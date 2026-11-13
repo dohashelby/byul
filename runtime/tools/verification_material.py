@@ -1,4 +1,5 @@
 """Offline candidate generation and explicit human publication; never auto-approve."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -21,8 +22,12 @@ except ModuleNotFoundError:
     from candidate_errors import CandidateError, CandidateArgumentParser, operation
 
 SCHEMA = "runtime-verification-candidate/1.0"
-FILENAMES = {"assets": "asset-manifest.json", "baseline": "baseline.json",
-             "manifest": "manifest.json", "revocations": "revocations.json"}
+FILENAMES = {
+    "assets": "asset-manifest.json",
+    "baseline": "baseline.json",
+    "manifest": "manifest.json",
+    "revocations": "revocations.json",
+}
 
 
 def now():
@@ -35,8 +40,9 @@ def encode(document):
 
 def decode_json(raw, label):
     try:
-        return json.loads(raw.decode("utf-8"), object_pairs_hook=_object_without_duplicates,
-                          parse_constant=_reject_json_constant)
+        return json.loads(
+            raw.decode("utf-8"), object_pairs_hook=_object_without_duplicates, parse_constant=_reject_json_constant
+        )
     except (ValueError, UnicodeError, RecursionError):
         raise CandidateError("INVALID_JSON", label) from None
 
@@ -81,9 +87,14 @@ def atomic_write(path, raw, *, replace=False):
 
 
 def candidate(kind, document, *, unconfirmed=None):
-    return {"schema_version": SCHEMA, "state": "candidate", "kind": kind,
-            "collected_at": now(), "document": document,
-            "unconfirmed": unconfirmed or {}}
+    return {
+        "schema_version": SCHEMA,
+        "state": "candidate",
+        "kind": kind,
+        "collected_at": now(),
+        "document": document,
+        "unconfirmed": unconfirmed or {},
+    }
 
 
 def assets_candidate(root, gateway_root="/models"):
@@ -101,13 +112,19 @@ def assets_candidate(root, gateway_root="/models"):
 def declaration_candidate(environment_candidate, kind):
     if kind not in {"baseline", "manifest"}:
         raise ValueError("INVALID_DECLARATION_KIND")
-    if not isinstance(environment_candidate, dict) or environment_candidate.get("schema_version") != "runtime-environment-candidate/1.0":
+    if (
+        not isinstance(environment_candidate, dict)
+        or environment_candidate.get("schema_version") != "runtime-environment-candidate/1.0"
+    ):
         raise ValueError("INVALID_ENVIRONMENT_CANDIDATE")
     fields = environment_candidate.get("declaration_fields", {})
     if not fields:
         raise ValueError("NO_OBSERVED_DECLARATION_FIELDS")
-    return candidate(kind, {"schema_version": "runtime-mvp-baseline/1.0", "fields": fields},
-                     unconfirmed=environment_candidate.get("unconfirmed", {}))
+    return candidate(
+        kind,
+        {"schema_version": "runtime-mvp-baseline/1.0", "fields": fields},
+        unconfirmed=environment_candidate.get("unconfirmed", {}),
+    )
 
 
 def validate_document(kind, document):
@@ -148,9 +165,15 @@ def approve(path, approved_dir, expected_sha256, reviewer, reason, *, replace=Fa
     if target.exists() and not replace:
         raise ValueError("APPROVAL_EXISTS_REVIEW_REPLACEMENT")
     payload = encode(document)
-    receipt = {"schema_version": "runtime-verification-approval/1.0", "kind": kind,
-               "approved_at": now(), "reviewer": reviewer, "reason": reason,
-               "candidate_sha256": digest, "document_sha256": hashlib.sha256(payload).hexdigest()}
+    receipt = {
+        "schema_version": "runtime-verification-approval/1.0",
+        "kind": kind,
+        "approved_at": now(),
+        "reviewer": reviewer,
+        "reason": reason,
+        "candidate_sha256": digest,
+        "document_sha256": hashlib.sha256(payload).hexdigest(),
+    }
     # A hash-addressed receipt may be left after a crash; the document is published last.
     # An orphan receipt is not an active approval. Compare its document hash to the active file.
     receipt_path = approved_dir / (kind + "-" + digest + ".approval.json")
@@ -189,8 +212,14 @@ def main(argv=None):
         args = build_parser().parse_args(argv)
         if args.command == "approve":
             with operation("approval"):
-                digest = approve(args.candidate, args.approved_dir, args.expect_sha256,
-                                 args.reviewer, args.reason, replace=args.replace)
+                digest = approve(
+                    args.candidate,
+                    args.approved_dir,
+                    args.expect_sha256,
+                    args.reviewer,
+                    args.reason,
+                    replace=args.replace,
+                )
             print("APPROVED candidate_sha256=" + digest + "; Gateway 재시작 필요(기준/선언/폐기 목록)")
             return 0
         if args.command == "assets":
@@ -200,8 +229,11 @@ def main(argv=None):
             with operation("environment_candidate"):
                 value = declaration_candidate(read_json(args.environment_candidate, "environment_candidate"), args.kind)
         else:
-            document = read_json(args.source, "source") if args.source else {
-                "schema_version": "runtime-mvp-revocations/1.0", "revoked": []}
+            document = (
+                read_json(args.source, "source")
+                if args.source
+                else {"schema_version": "runtime-mvp-revocations/1.0", "revoked": []}
+            )
             value = candidate("revocations", document)
         with operation("document"):
             validate_document(value["kind"], value["document"])

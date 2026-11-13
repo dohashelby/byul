@@ -162,16 +162,17 @@ class RecordRetention:
                 # Preserve existing records and their cross-file request units
                 # when either declared run is held, including conflicting data.
                 route_scope_run = None
-                if (managed.name == "gateway_route_rejections.jsonl" and isinstance(record, dict)
-                        and record.get("schema_version") == "runtime-route-rejection/1.0"):
+                if (
+                    managed.name == "gateway_route_rejections.jsonl"
+                    and isinstance(record, dict)
+                    and record.get("schema_version") == "runtime-route-rejection/1.0"
+                ):
                     scope = record.get("scope")
                     route_scope_run = scope.get("run_id") if isinstance(scope, dict) else None
                 held = (
-                    isinstance(run_id, str) and run_id in hold_runs
-                ) or (
-                    isinstance(route_scope_run, str) and route_scope_run in hold_runs
-                ) or (
-                    isinstance(request_id, str) and request_id in hold_requests
+                    (isinstance(run_id, str) and run_id in hold_runs)
+                    or (isinstance(route_scope_run, str) and route_scope_run in hold_runs)
+                    or (isinstance(request_id, str) and request_id in hold_requests)
                 )
                 if timestamp is None:
                     # An undated request line still joins its cross-file unit:
@@ -197,9 +198,7 @@ class RecordRetention:
                     unit.size += len(raw_line)
                     unit.held = unit.held or held
                     unit.classified = unit.classified and timestamp is not None
-                    if timestamp is not None and (
-                        unit.newest is None or timestamp > unit.newest
-                    ):
+                    if timestamp is not None and (unit.newest is None or timestamp > unit.newest):
                         unit.newest = timestamp
                 file_units.add(key)
         return unclassified, path.stat().st_size, file_units
@@ -214,18 +213,11 @@ class RecordRetention:
         units: dict[str, _Unit] = {}
         scanned: dict[str, tuple[int, int, set[str]]] = {}
         for managed in MANAGED_FILES:
-            scanned[managed.name] = self._scan_file(
-                managed, hold_runs, hold_requests, units
-            )
+            scanned[managed.name] = self._scan_file(managed, hold_runs, hold_requests, units)
 
         removal: dict[str, str] = {}
         for key, unit in units.items():
-            if (
-                not unit.held
-                and unit.classified
-                and unit.newest is not None
-                and unit.newest < cutoff
-            ):
+            if not unit.held and unit.classified and unit.newest is not None and unit.newest < cutoff:
                 removal[key] = "age"
 
         total_bytes = sum(size for _unclassified, size, _keys in scanned.values())
@@ -235,10 +227,7 @@ class RecordRetention:
                 (
                     (unit.newest, key)
                     for key, unit in units.items()
-                    if not unit.held
-                    and unit.classified
-                    and unit.newest is not None
-                    and key not in removal
+                    if not unit.held and unit.classified and unit.newest is not None and key not in removal
                 ),
                 key=lambda item: item[0],
             )
@@ -253,16 +242,8 @@ class RecordRetention:
         files: dict[str, Any] = {}
         for name, (unclassified, size, file_units) in scanned.items():
             chosen = {key: removal[key] for key in file_units if key in removal}
-            removed_times = [
-                timestamp
-                for key in chosen
-                for timestamp in units[key].times.get(name, [])
-            ]
-            lines = sorted(
-                line
-                for key in chosen
-                for line in units[key].lines.get(name, [])
-            )
+            removed_times = [timestamp for key in chosen for timestamp in units[key].times.get(name, [])]
+            lines = sorted(line for key in chosen for line in units[key].lines.get(name, []))
             entry: dict[str, Any] = {
                 "bytes": size,
                 "units": len(file_units),

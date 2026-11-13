@@ -62,16 +62,8 @@ class CiliumPolicyCollector:
         for raw_item in document["items"]:
             if not isinstance(raw_item, dict):
                 continue
-            metadata = (
-                raw_item.get("metadata")
-                if isinstance(raw_item.get("metadata"), dict)
-                else {}
-            )
-            status = (
-                raw_item.get("status")
-                if isinstance(raw_item.get("status"), dict)
-                else {}
-            )
+            metadata = raw_item.get("metadata") if isinstance(raw_item.get("metadata"), dict) else {}
+            status = raw_item.get("status") if isinstance(raw_item.get("status"), dict) else {}
             name = metadata.get("name")
             if not isinstance(name, str) or not name:
                 continue
@@ -83,18 +75,10 @@ class CiliumPolicyCollector:
                         continue
                     conditions.append(
                         {
-                            "type": condition.get("type")
-                            if isinstance(condition.get("type"), str)
-                            else None,
-                            "status": condition.get("status")
-                            if isinstance(condition.get("status"), str)
-                            else None,
-                            "reason": condition.get("reason")
-                            if isinstance(condition.get("reason"), str)
-                            else None,
-                            "message": condition.get("message")
-                            if isinstance(condition.get("message"), str)
-                            else None,
+                            "type": condition.get("type") if isinstance(condition.get("type"), str) else None,
+                            "status": condition.get("status") if isinstance(condition.get("status"), str) else None,
+                            "reason": condition.get("reason") if isinstance(condition.get("reason"), str) else None,
+                            "message": condition.get("message") if isinstance(condition.get("message"), str) else None,
                             "last_transition_time": condition.get("lastTransitionTime")
                             if isinstance(condition.get("lastTransitionTime"), str)
                             else None,
@@ -106,16 +90,9 @@ class CiliumPolicyCollector:
             node_status = {
                 "total": len(node_values),
                 "enforcing": sum(value.get("enforcing") is True for value in node_values),
-                "errors": sum(
-                    isinstance(value.get("error"), str) and bool(value["error"])
-                    for value in node_values
-                ),
+                "errors": sum(isinstance(value.get("error"), str) and bool(value["error"]) for value in node_values),
                 "last_updated": max(
-                    (
-                        value["lastUpdated"]
-                        for value in node_values
-                        if isinstance(value.get("lastUpdated"), str)
-                    ),
+                    (value["lastUpdated"] for value in node_values if isinstance(value.get("lastUpdated"), str)),
                     default=None,
                 ),
             }
@@ -135,10 +112,7 @@ class CiliumPolicyCollector:
                 "object_count": len(policies),
                 "configured": bool(policies),
                 "policies": policies,
-                "meaning": (
-                    "policy object presence is configuration state, not proof of "
-                    "packet blocking"
-                ),
+                "meaning": ("policy object presence is configuration state, not proof of packet blocking"),
             },
             "kubernetes_api",
         )

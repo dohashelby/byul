@@ -121,12 +121,8 @@ class LabReportSource:
                     "status": status,
                     "summary": summary,
                     "evidence": evidence,
-                    "limitation": raw_case.get("limitation")
-                    if isinstance(raw_case.get("limitation"), str)
-                    else None,
-                    "note": raw_case.get("note")
-                    if isinstance(raw_case.get("note"), str)
-                    else None,
+                    "limitation": raw_case.get("limitation") if isinstance(raw_case.get("limitation"), str) else None,
+                    "note": raw_case.get("note") if isinstance(raw_case.get("note"), str) else None,
                 }
             )
         if aws and not seen:
@@ -145,4 +141,3 @@ class LabReportSource:
             "overall": document["overall"],
             "cases": cases,
         }
-

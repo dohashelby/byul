@@ -126,18 +126,12 @@ def _gateway_url(value: object, field: str) -> str:
         or parsed.query
         or parsed.fragment
     ):
-        raise PlanError(
-            f"{field} must be an http(s) base URL without credentials, query, or fragment"
-        )
+        raise PlanError(f"{field} must be an http(s) base URL without credentials, query, or fragment")
     return value.rstrip("/")
 
 
 def _prompts(value: object, field: str) -> tuple[str, ...]:
-    if (
-        not isinstance(value, list)
-        or not value
-        or any(not isinstance(item, str) or not item for item in value)
-    ):
+    if not isinstance(value, list) or not value or any(not isinstance(item, str) or not item for item in value):
         raise PlanError(f"{field} must be a non-empty array of non-empty strings")
     return tuple(value)
 
@@ -211,9 +205,7 @@ def load_plan(path: str | Path) -> PerfPlan:
         try:
             prompt_raw = prompt_path.read_bytes()
         except OSError as error:
-            raise PlanError(
-                f"prompt_file could not be read: {type(error).__name__}"
-            ) from error
+            raise PlanError(f"prompt_file could not be read: {type(error).__name__}") from error
         prompts = _prompts(_load_json(prompt_raw, "prompt_file"), "prompt_file")
         prompt_source = "file"
 
@@ -224,9 +216,7 @@ def load_plan(path: str | Path) -> PerfPlan:
         or not math.isfinite(float(temperature))
     ):
         raise PlanError("temperature must be a finite number or null")
-    prompt_encoding = json.dumps(
-        list(prompts), ensure_ascii=False, separators=(",", ":")
-    ).encode("utf-8")
+    prompt_encoding = json.dumps(list(prompts), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     return PerfPlan(
         source_sha256=hashlib.sha256(raw).hexdigest(),
         modes=modes,
@@ -238,9 +228,7 @@ def load_plan(path: str | Path) -> PerfPlan:
         temperature=None if temperature is None else float(temperature),
         n=_positive_integer(document["n"], "n"),
         concurrency=_positive_integer(document.get("concurrency", 2), "concurrency"),
-        request_timeout_s=_positive_number(
-            document.get("request_timeout_s", 300), "request_timeout_s"
-        ),
+        request_timeout_s=_positive_number(document.get("request_timeout_s", 300), "request_timeout_s"),
     )
 
 
@@ -325,9 +313,7 @@ def _request_once(
     """Issue one request and return measurements without returning body text."""
 
     scheme, host, port, path = _endpoint(gateway_url)
-    connection_type = (
-        http.client.HTTPSConnection if scheme == "https" else http.client.HTTPConnection
-    )
+    connection_type = http.client.HTTPSConnection if scheme == "https" else http.client.HTTPConnection
     connection = connection_type(host, port, timeout=timeout_s)
     started = time.monotonic_ns()
     ttft_ms: float | None = None
@@ -338,9 +324,7 @@ def _request_once(
     success = False
     finished_ns: int | None = None
     try:
-        body = json.dumps(
-            payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False
-        ).encode("utf-8")
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
         headers = {
             "Content-Type": "application/json",
             "Accept": "text/event-stream" if stream else "application/json",
@@ -457,9 +441,7 @@ def _latency_stats(values: list[float]) -> dict[str, Any]:
     }
 
 
-def _summarize_phase(
-    rows: list[dict[str, Any]], elapsed_s: float, *, included: bool
-) -> dict[str, Any]:
+def _summarize_phase(rows: list[dict[str, Any]], elapsed_s: float, *, included: bool) -> dict[str, Any]:
     successful = [row for row in rows if row["success"]]
     error_codes: dict[str, int] = {}
     http_statuses: dict[str, int] = {}
@@ -470,11 +452,7 @@ def _summarize_phase(
         if not row["success"]:
             key = row["error_code"] or "UNKNOWN_ERROR"
             error_codes[key] = error_codes.get(key, 0) + 1
-    token_values = [
-        row["output_tokens"]
-        for row in successful
-        if isinstance(row["output_tokens"], int)
-    ]
+    token_values = [row["output_tokens"] for row in successful if isinstance(row["output_tokens"], int)]
     return {
         "included_in_metrics": included,
         "attempted": len(rows),
@@ -483,13 +461,9 @@ def _summarize_phase(
         "error_codes": dict(sorted(error_codes.items())),
         "http_statuses": dict(sorted(http_statuses.items())),
         "wall_duration_s": round(elapsed_s, 6),
-        "completed_requests_per_second": round(len(successful) / elapsed_s, 6)
-        if elapsed_s > 0
-        else None,
+        "completed_requests_per_second": round(len(successful) / elapsed_s, 6) if elapsed_s > 0 else None,
         "e2e": _latency_stats([float(row["e2e_ms"]) for row in successful]),
-        "ttft": _latency_stats(
-            [float(row["ttft_ms"]) for row in successful if row["ttft_ms"] is not None]
-        ),
+        "ttft": _latency_stats([float(row["ttft_ms"]) for row in successful if row["ttft_ms"] is not None]),
         "output_tokens": {
             "denominator": len(token_values),
             "total": sum(token_values),
@@ -565,9 +539,7 @@ def _change(candidate: float | None, baseline: float | None, *, decrease: bool) 
     return round(value * 100, 6)
 
 
-def _phase_comparison(
-    baseline: dict[str, Any], candidate: dict[str, Any], *, stream: bool
-) -> dict[str, Any]:
+def _phase_comparison(baseline: dict[str, Any], candidate: dict[str, Any], *, stream: bool) -> dict[str, Any]:
     latency = {
         name: _change(candidate["e2e"][name], baseline["e2e"][name], decrease=False)
         for name in ("mean_ms", "p50_ms", "p95_ms")
@@ -586,9 +558,7 @@ def _phase_comparison(
     }
     if stream:
         result["ttft_increase_pct"] = {
-            name: _change(
-                candidate["ttft"][name], baseline["ttft"][name], decrease=False
-            )
+            name: _change(candidate["ttft"][name], baseline["ttft"][name], decrease=False)
             for name in ("mean_ms", "p50_ms", "p95_ms")
         }
     unavailable = []
@@ -653,9 +623,7 @@ def execute_plan(
     if not isinstance(block_count, int) or isinstance(block_count, bool) or not 1 <= block_count <= 3:
         raise ValueError("block_count must be 1, 2, or 3")
 
-    actual_run_id = run_id or (
-        datetime.now(timezone.utc).strftime("perf-%Y%m%dT%H%M%S.%fZ-") + uuid4().hex[:8]
-    )
+    actual_run_id = run_id or (datetime.now(timezone.utc).strftime("perf-%Y%m%dT%H%M%S.%fZ-") + uuid4().hex[:8])
     started_at = _utc_now()
     overall_started = time.monotonic_ns()
     blocks: list[dict[str, Any]] = []
@@ -867,14 +835,10 @@ def report_markdown(report: dict[str, Any]) -> str:
 
 
 def _encoded_json(document: dict[str, Any]) -> bytes:
-    return (json.dumps(document, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode(
-        "utf-8"
-    )
+    return (json.dumps(document, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode("utf-8")
 
 
-def write_outputs(
-    report: dict[str, Any], raw: dict[str, Any], output_dir: str | Path
-) -> dict[str, Path]:
+def write_outputs(report: dict[str, Any], raw: dict[str, Any], output_dir: str | Path) -> dict[str, Path]:
     """Write all three artifacts with O_EXCL; never replace existing evidence."""
 
     directory = Path(output_dir)
@@ -948,11 +912,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         plan = load_plan(args.plan)
-        bearer_token = (
-            _read_inference_token(Path(args.token_env_file).expanduser())
-            if args.token_env_file
-            else None
-        )
+        bearer_token = _read_inference_token(Path(args.token_env_file).expanduser()) if args.token_env_file else None
         report, raw = execute_plan(
             plan,
             warmup_count=args.warmup_count,

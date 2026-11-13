@@ -87,9 +87,7 @@ class GatewayRelayTests(unittest.TestCase):
         with closing(response):
             return response.status, response.headers, response.read()
 
-    def raw_post(
-        self, headers: dict[str, str], body: bytes = b""
-    ) -> tuple[int, object, bytes]:
+    def raw_post(self, headers: dict[str, str], body: bytes = b"") -> tuple[int, object, bytes]:
         connection = http.client.HTTPConnection(self.host, self.port, timeout=2)
         self.addCleanup(connection.close)
         connection.putrequest(
@@ -123,17 +121,13 @@ class GatewayRelayTests(unittest.TestCase):
         self.assertEqual(final["delivery"]["backend_receipt"], "confirmed")
         self.assertEqual(final["delivery"]["response"], "completed")
 
-        receipts, corrupt = JsonlStore(
-            self.data_dir / "engine_receipts.jsonl"
-        ).read_all()
+        receipts, corrupt = JsonlStore(self.data_dir / "engine_receipts.jsonl").read_all()
         self.assertEqual(corrupt, [])
         self.assertEqual(receipts[0]["request_id"], request_id)
 
     def test_mvp_02_limit_boundary_and_no_denied_delivery(self) -> None:
         allowed_status, _, _ = self.post(request_body(max_tokens=128))
-        denied_status, denied_headers, denied_body = self.post(
-            request_body(max_tokens=129)
-        )
+        denied_status, denied_headers, denied_body = self.post(request_body(max_tokens=129))
         denied_id = denied_headers.get("X-Request-ID")
 
         self.assertEqual(allowed_status, 200)
@@ -184,9 +178,7 @@ class GatewayRelayTests(unittest.TestCase):
             large_headers.get("X-Request-ID"),
             chunked_headers.get("X-Request-ID"),
         }
-        self.assertTrue(request_ids.isdisjoint(
-            {receipt["request_id"] for receipt in self.engine.receipts}
-        ))
+        self.assertTrue(request_ids.isdisjoint({receipt["request_id"] for receipt in self.engine.receipts}))
 
     def test_mvp_07_stopped_engine_is_unreachable_and_receipt_unknown(self) -> None:
         self.engine.stop()
@@ -254,9 +246,7 @@ class GatewayRelayTests(unittest.TestCase):
 
     def test_prompt_content_is_not_stored(self) -> None:
         secret = "PROMPT-MUST-NOT-BE-STORED"
-        status, _, _ = self.post(
-            request_body(messages=[{"role": "user", "content": secret}])
-        )
+        status, _, _ = self.post(request_body(messages=[{"role": "user", "content": secret}]))
         self.assertEqual(status, 200)
         self.assertNotIn(
             secret,
@@ -278,15 +268,22 @@ class GatewayRelayTests(unittest.TestCase):
                         document["prompt"] = "\udfff"
                     before = len(self.engine.receipts)
                     with closing(http.client.HTTPConnection(self.host, self.port, timeout=2)) as connection:
-                        connection.request("POST", route, body=json.dumps(document).encode(),
-                                           headers={"Content-Type": "application/json"})
+                        connection.request(
+                            "POST",
+                            route,
+                            body=json.dumps(document).encode(),
+                            headers={"Content-Type": "application/json"},
+                        )
                         response = connection.getresponse()
                         request_id = response.getheader("X-Request-ID")
                         self.assertEqual(response.status, 400)
                         self.assertEqual(json.loads(response.read())["error"]["code"], "INVALID_UNICODE")
                     self.assertEqual(len(self.engine.receipts), before)
-                    final = next(record for record in reversed(self.gateway_records())
-                                 if record["request_id"] == request_id and record["phase"] == "final")
+                    final = next(
+                        record
+                        for record in reversed(self.gateway_records())
+                        if record["request_id"] == request_id and record["phase"] == "final"
+                    )
                     self.assertFalse(final["delivery"]["attempted"])
                     self.assertEqual(final["decision"]["reason_code"], "INVALID_UNICODE")
                     self.assertEqual(self.post()[0], 200)

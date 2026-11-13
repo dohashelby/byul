@@ -115,9 +115,7 @@ class DefaultExtraFieldPolicyTests(PolicyFileMixin, unittest.TestCase):
         )
 
     def test_default_profile_rejects_passthrough_and_names_the_field(self) -> None:
-        state = self.load(
-            default_document(extra_fields={"unsafe_option": {"mode": "passthrough"}})
-        )
+        state = self.load(default_document(extra_fields={"unsafe_option": {"mode": "passthrough"}}))
         self.assertFalse(state.ok)
         self.assertEqual(state.error_code, "INVALID_POLICY")
         self.assertIn("unsafe_option", state.error_message)
@@ -177,11 +175,7 @@ class DefaultExtraFieldPolicyTests(PolicyFileMixin, unittest.TestCase):
         self.assertIn("object", state.error_message)
 
     def test_boolean_rules_remain_allowed_in_default_profile(self) -> None:
-        state = self.load(
-            default_document(
-                extra_fields={"flag": {"mode": "validate", "type": "boolean"}}
-            )
-        )
+        state = self.load(default_document(extra_fields={"flag": {"mode": "validate", "type": "boolean"}}))
         self.assertTrue(state.ok, state.error_message)
 
     def test_default_and_existing_zeroday_examples_load(self) -> None:
@@ -238,9 +232,7 @@ class DefaultExtraFieldValidatorTests(unittest.TestCase):
         self.assert_invalid_extra({"seed": INT64_MAX + 1}, str(INT64_MAX + 1))
 
     def test_completions_rejects_declared_temperature(self) -> None:
-        body = json.dumps(
-            {"model": "test-model", "prompt": "hello", "temperature": 0.5}
-        ).encode("utf-8")
+        body = json.dumps({"model": "test-model", "prompt": "hello", "temperature": 0.5}).encode("utf-8")
         decision = self.decide(body, request_kind="completions")
         self.assertEqual((decision.http_status, decision.reason_code), (400, "UNSUPPORTED_FIELD"))
 
@@ -264,9 +256,7 @@ class DefaultExtraFieldGatewayHttpTests(unittest.TestCase):
         self.addCleanup(self.fake.stop)
 
         backend_path = self.directory / "backend.json"
-        backend_path.write_text(
-            json.dumps(backend_document(self.fake.base_url)), encoding="utf-8"
-        )
+        backend_path.write_text(json.dumps(backend_document(self.fake.base_url)), encoding="utf-8")
         config = MVPConfig(
             gateway_port=0,
             backend="vllm",
@@ -311,9 +301,7 @@ class DefaultExtraFieldGatewayHttpTests(unittest.TestCase):
         self.assertEqual(self.fake.request_count, before)
 
         marker = "record-secret-stop"
-        status, headers, _ = self.post(
-            chat(temperature=0.7, top_p=0.9, seed=INT64_MIN, stop=[marker])
-        )
+        status, headers, _ = self.post(chat(temperature=0.7, top_p=0.9, seed=INT64_MIN, stop=[marker]))
         self.assertEqual(status, 200)
         request_id = headers["X-Request-ID"]
         received = [item for item in self.fake.requests if item["request_id"] == "byul-cb-" + request_id]
@@ -333,11 +321,7 @@ class DefaultExtraFieldGatewayHttpTests(unittest.TestCase):
                 self.fail("Gateway final record was not persisted after the response")
             time.sleep(0.01)
         self.assertEqual(corrupt, [])
-        final = [
-            record
-            for record in records
-            if record["request_id"] == request_id and record["phase"] == "final"
-        ][-1]
+        final = [record for record in records if record["request_id"] == request_id and record["phase"] == "final"][-1]
         self.assertEqual(final["policy"]["profile"], "default")
         self.assertEqual(
             final["request"]["extra_fields"],
@@ -348,9 +332,7 @@ class DefaultExtraFieldGatewayHttpTests(unittest.TestCase):
                 {"name": "top_p", "mode": "validate"},
             ],
         )
-        stored = (self.directory / "data" / "gateway_records.jsonl").read_text(
-            encoding="utf-8"
-        )
+        stored = (self.directory / "data" / "gateway_records.jsonl").read_text(encoding="utf-8")
         self.assertNotIn(marker, stored)
         self.assertNotIn(str(INT64_MIN), stored)
 

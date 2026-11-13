@@ -3,6 +3,7 @@
 Pod API declarations bind a check to a deployment instance. They do not attest
 which bytes a worker loaded or the effective mount flags inside its namespace.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -43,18 +44,27 @@ def manifest_from_update_inventory(document: dict[str, Any], root: str) -> dict[
         converted.append({"path": relative, "size": size, "sha256": digest})
     if paths != sorted(set(paths)):
         raise ValueError("inventory paths must be unique and sorted")
-    if (type(document["file_count"]) is not int or document["file_count"] != len(files)
-            or type(document["total_bytes"]) is not int
-            or document["total_bytes"] != sum(item["size"] for item in converted)):
+    if (
+        type(document["file_count"]) is not int
+        or document["file_count"] != len(files)
+        or type(document["total_bytes"]) is not int
+        or document["total_bytes"] != sum(item["size"] for item in converted)
+    ):
         raise ValueError("inventory count/total does not match files")
     if hashlib.sha256(_canonical(files)).hexdigest() != document["inventory_sha256"]:
         raise ValueError("UPDATE inventory_sha256 does not match original file set")
     return {"schema_version": SCHEMA_VERSION, "root": root, "files": converted}
 
 
-def check_execution_binding(pod: dict[str, Any], target: dict[str, Any],
-                            intent: EnforcementIntent, *, model_host_path: str,
-                            expected_command: list[str], expected_args: list[str]) -> dict[str, Any]:
+def check_execution_binding(
+    pod: dict[str, Any],
+    target: dict[str, Any],
+    intent: EnforcementIntent,
+    *,
+    model_host_path: str,
+    expected_command: list[str],
+    expected_args: list[str],
+) -> dict[str, Any]:
     """Compare a raw Kubernetes Pod with approved launch inputs and cache intent."""
     for values in (expected_command, expected_args):
         if not isinstance(values, list) or any(not isinstance(v, str) for v in values):
@@ -72,8 +82,9 @@ def check_execution_binding(pod: dict[str, Any], target: dict[str, Any],
         issues.append("pod_not_running")
     if metadata.get("namespace") != kube["namespace"] or intent.namespace != kube["namespace"]:
         issues.append("namespace_mismatch")
-    if (intent.engine.container_name != kube["container"]
-            or any(metadata.get("labels", {}).get(k) != v for k, v in intent.engine.labels.items())):
+    if intent.engine.container_name != kube["container"] or any(
+        metadata.get("labels", {}).get(k) != v for k, v in intent.engine.labels.items()
+    ):
         issues.append("intent_engine_target_mismatch")
     if any(metadata.get("labels", {}).get(k) != v for k, v in kube["selector"].items()):
         issues.append("selector_mismatch")
@@ -86,13 +97,19 @@ def check_execution_binding(pod: dict[str, Any], target: dict[str, Any],
     digest = target["engine"]["image_digest"]
     # imageID may contain registry/repository and a transport prefix.
     actual_image = state.get("imageID", "")
-    if not isinstance(actual_image, str) or actual_image.rsplit("@", 1)[-1].removeprefix("docker-pullable://") != digest:
+    if (
+        not isinstance(actual_image, str)
+        or actual_image.rsplit("@", 1)[-1].removeprefix("docker-pullable://") != digest
+    ):
         issues.append("running_image_mismatch")
     if container.get("command", []) != expected_command or container.get("args", []) != expected_args:
         issues.append("launch_mismatch")
     generation = assets.cache_generation
-    if (generation.engine != target["engine"]["kind"] or generation.image_id != digest.removeprefix("sha256:")
-            or target["model"].get("revision") != generation.model_revision):
+    if (
+        generation.engine != target["engine"]["kind"]
+        or generation.image_id != digest.removeprefix("sha256:")
+        or target["model"].get("revision") != generation.model_revision
+    ):
         issues.append("cache_generation_target_mismatch")
     volumes = {v.get("name"): v for v in spec.get("volumes", [])}
     mounts = container.get("volumeMounts", [])
@@ -103,26 +120,47 @@ def check_execution_binding(pod: dict[str, Any], target: dict[str, Any],
             return False
         mount = matching[0]
         volume = volumes.get(mount.get("name"), {})
-        return (not mount.get("subPath") and not mount.get("subPathExpr")
-                and mount.get("readOnly", False) is read_only
-                and volume.get("hostPath", {}).get("path") == source
-                and not any(m is not mount and (Path(destination).is_relative_to(str(m.get("mountPath", "/")))
-                    or Path(str(m.get("mountPath", "/"))).is_relative_to(destination)) for m in mounts))
+        return (
+            not mount.get("subPath")
+            and not mount.get("subPathExpr")
+            and mount.get("readOnly", False) is read_only
+            and volume.get("hostPath", {}).get("path") == source
+            and not any(
+                m is not mount
+                and (
+                    Path(destination).is_relative_to(str(m.get("mountPath", "/")))
+                    or Path(str(m.get("mountPath", "/"))).is_relative_to(destination)
+                )
+                for m in mounts
+            )
+        )
 
     if not mount_matches(intent.protected_paths.model_dir, model_host_path, True):
         issues.append("model_mount_mismatch")
     if not mount_matches(assets.engine_cache_path, assets.generation_path, False):
         issues.append("cache_mount_mismatch")
-    if not metadata.get("uid") or not state.get("containerID") or not state.get("state", {}).get("running", {}).get("startedAt"):
+    if (
+        not metadata.get("uid")
+        or not state.get("containerID")
+        or not state.get("state", {}).get("running", {}).get("startedAt")
+    ):
         issues.append("instance_identity_incomplete")
     return {
-        "state": "match" if not issues else "mismatch", "issues": issues,
-        "target_id": target["target_id"], "pod_uid": metadata.get("uid"),
-        "container_id": state.get("containerID"), "restart_count": state.get("restartCount"),
+        "state": "match" if not issues else "mismatch",
+        "issues": issues,
+        "target_id": target["target_id"],
+        "pod_uid": metadata.get("uid"),
+        "container_id": state.get("containerID"),
+        "restart_count": state.get("restartCount"),
         "started_at": state.get("state", {}).get("running", {}).get("startedAt"),
-        "image_digest": digest, "launch_sha256": hashlib.sha256(_canonical({"command": expected_command, "args": expected_args})).hexdigest(),
-        "model_host_path": model_host_path, "model_container_path": intent.protected_paths.model_dir,
-        "cache_host_path": assets.generation_path, "cache_container_path": assets.engine_cache_path,
-        "limits": ["Pod API declarations; effective mount flags and worker consumption require runtime evidence.",
-                   "Visible filesystem root to host path mapping is supplied by the operator."],
+        "image_digest": digest,
+        "launch_sha256": hashlib.sha256(_canonical({"command": expected_command, "args": expected_args})).hexdigest(),
+        "model_host_path": model_host_path,
+        "model_container_path": intent.protected_paths.model_dir,
+        "cache_host_path": assets.generation_path,
+        "cache_container_path": assets.engine_cache_path,
+        "limits": [
+            "Pod API declarations; effective mount flags and worker consumption require runtime evidence.",
+            "Visible filesystem root to host path mapping is supplied by the operator.",
+        ],
     }

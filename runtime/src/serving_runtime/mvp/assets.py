@@ -132,14 +132,10 @@ def _walk(
                 relative_path = "."
         else:
             relative_path = relative
-        walk_errors.append(
-            {"path": relative_path or ".", "error": type(error).__name__}
-        )
+        walk_errors.append({"path": relative_path or ".", "error": type(error).__name__})
 
     _root_lstat(root)
-    for directory, dirnames, filenames in os.walk(
-        root, followlinks=False, onerror=record_error
-    ):
+    for directory, dirnames, filenames in os.walk(root, followlinks=False, onerror=record_error):
         base = Path(directory)
         dirnames.sort()
         filenames.sort()
@@ -238,17 +234,14 @@ def snapshot(root: str | Path) -> dict[str, Any]:
     if walk_error_count:
         first = walk_errors[0]
         raise ValueError(
-            "root traversal was incomplete: "
-            f"{walk_error_count} error(s), first={first['path']}:{first['error']}"
+            f"root traversal was incomplete: {walk_error_count} error(s), first={first['path']}:{first['error']}"
         )
     files = []
     root_descriptor = _open_root(root_path)
     try:
         for relative in regular:
             info = _inspect_relative(root_descriptor, relative)
-            files.append(
-                {"path": relative, "sha256": info.sha256, "size": info.size_bytes}
-            )
+            files.append({"path": relative, "sha256": info.sha256, "size": info.size_bytes})
     finally:
         os.close(root_descriptor)
     if not files:
@@ -319,12 +312,7 @@ def check(manifest: dict[str, Any]) -> dict[str, Any]:
         "extra_symlink_count": extra_symlink_count,
         "walk_errors": walk_errors,
         "walk_error_count": walk_error_count,
-        "intact": (
-            counts["match"] == len(items)
-            and not extra
-            and not extra_links
-            and not walk_errors
-        ),
+        "intact": (counts["match"] == len(items) and not extra and not extra_links and not walk_errors),
         "items": items,
         "limit": "디스크 파일 해시 비교이며 쓰기 차단이나 엔진 메모리 로딩 증명이 아님",
     }

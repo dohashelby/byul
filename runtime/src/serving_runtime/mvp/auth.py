@@ -268,7 +268,9 @@ def load_auth(path: str | Path | None) -> AuthState:
     except FileNotFoundError:
         return _error(path_text, loaded_at, "AUTH_CONFIG_NOT_FOUND", "auth config not found")
     except OSError as error:
-        return _error(path_text, loaded_at, "AUTH_CONFIG_READ_ERROR", f"could not read auth config: {type(error).__name__}")
+        return _error(
+            path_text, loaded_at, "AUTH_CONFIG_READ_ERROR", f"could not read auth config: {type(error).__name__}"
+        )
     digest = hashlib.sha256(raw).hexdigest()
     try:
         document = json.loads(

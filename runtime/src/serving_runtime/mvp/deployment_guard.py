@@ -3,6 +3,7 @@
 The guard file is a protected operator-owned input. It supplies the current
 required CHK mapping and approved bundle/target, never a bundle-owned assertion.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -27,8 +28,7 @@ def _read(path):
     return _strict_json(Path(path).read_bytes(), path)
 
 
-def verify_deployment_guard(bundle: VerifiedPolicyBundle, guard_path: str,
-                            *, now: datetime | None = None) -> dict:
+def verify_deployment_guard(bundle: VerifiedPolicyBundle, guard_path: str, *, now: datetime | None = None) -> dict:
     # Reuse UPDATE object validation and canonical Ref/hash semantics only in
     # this opt-in adapter; the dependency-free LAB runtime stays available.
     try:
@@ -39,15 +39,25 @@ def verify_deployment_guard(bundle: VerifiedPolicyBundle, guard_path: str,
     checked = now or datetime.now(timezone.utc)
     if checked.tzinfo is None or checked.utcoffset() is None:
         raise ValueError("guard now must include timezone")
-    guard = _fields(_read(guard_path), {"schema_version", "approvals_path", "pack_ref", "required_checks", "max_evidence_age_s", "records"}, "guard")
+    guard = _fields(
+        _read(guard_path),
+        {"schema_version", "approvals_path", "pack_ref", "required_checks", "max_evidence_age_s", "records"},
+        "guard",
+    )
     if guard["schema_version"] != "runtime-deployment-guard/1.0":
         raise ValueError("unsupported deployment guard schema")
     age = guard["max_evidence_age_s"]
     if type(age) is not int or age <= 0:
         raise ValueError("max_evidence_age_s must be a positive integer")
     requirements = guard["required_checks"]
-    if not isinstance(requirements, dict) or not requirements or any(
-            not isinstance(k, str) or not k.startswith("CHK-") or not isinstance(v, str) or not v for k, v in requirements.items()):
+    if (
+        not isinstance(requirements, dict)
+        or not requirements
+        or any(
+            not isinstance(k, str) or not k.startswith("CHK-") or not isinstance(v, str) or not v
+            for k, v in requirements.items()
+        )
+    ):
         raise ValueError("required_checks must map non-empty CHK IDs to pinned pack check IDs")
     if len(set(requirements.values())) != len(requirements):
         raise ValueError("required pack check IDs must be unique")
@@ -67,7 +77,8 @@ def verify_deployment_guard(bundle: VerifiedPolicyBundle, guard_path: str,
     if not isinstance(approvals_path, str) or not Path(approvals_path).is_absolute():
         raise ValueError("approvals_path must be absolute")
     approval = HashListApprovalVerifier(approvals_path).verify(
-        policy_file.content, policy["policy_id"], policy["policy_version"], policy.get("approval_ref"), now=checked)
+        policy_file.content, policy["policy_id"], policy["policy_version"], policy.get("approval_ref"), now=checked
+    )
     if approval.state != "verified":
         raise ValueError(f"current external policy approval failed: {approval.reason_code}")
     with bundle.materialized_files() as paths:
@@ -81,14 +92,30 @@ def verify_deployment_guard(bundle: VerifiedPolicyBundle, guard_path: str,
     matches = [r for r in records if isinstance(r, dict) and r.get("bundle_sha256") == bundle.sha256]
     if len(matches) != 1:
         raise ValueError("approved bundle evidence missing or ambiguous")
-    record = _fields(matches[0], {"bundle_sha256", "target_sha256", "model_inventory_sha256", "valid_from", "valid_until", "revoked", "checks", "artifact_root"}, "record")
+    record = _fields(
+        matches[0],
+        {
+            "bundle_sha256",
+            "target_sha256",
+            "model_inventory_sha256",
+            "valid_from",
+            "valid_until",
+            "revoked",
+            "checks",
+            "artifact_root",
+        },
+        "record",
+    )
     if record["revoked"] is not False:
         raise ValueError("bundle approval revoked")
     if any(not isinstance(record[k], str) for k in ("valid_from", "valid_until")):
         raise ValueError("bundle evidence validity must contain timezone-aware strings")
     inventory_sha = record["model_inventory_sha256"]
-    if (not isinstance(inventory_sha, str) or len(inventory_sha) != 64
-            or any(character not in "0123456789abcdef" for character in inventory_sha)):
+    if (
+        not isinstance(inventory_sha, str)
+        or len(inventory_sha) != 64
+        or any(character not in "0123456789abcdef" for character in inventory_sha)
+    ):
         raise ValueError("model inventory must be a lowercase SHA-256")
     start, expiry = (parse_policy_time(record[k]) for k in ("valid_from", "valid_until"))
     if not start <= checked < expiry:
@@ -113,40 +140,70 @@ def verify_deployment_guard(bundle: VerifiedPolicyBundle, guard_path: str,
         return value
 
     for framework_id, internal_id in requirements.items():
-        source = _fields(checks[framework_id], {"result_path", "result_ref", "evidence_path", "environment_path", "plan_path"}, framework_id)
+        source = _fields(
+            checks[framework_id],
+            {"result_path", "result_ref", "evidence_path", "environment_path", "plan_path"},
+            framework_id,
+        )
         result = load_object(source["result_path"], Result)
         evidence = load_object(source["evidence_path"], Evidence)
         environment = load_object(source["environment_path"], Environment)
         plan = load_object(source["plan_path"], Plan)
-        if (result.ref() != Ref.model_validate(source["result_ref"]) or result.evidence != evidence.ref()
-                or evidence.environment != environment.ref() or evidence.plan != plan.ref()
-                or evidence.environment not in plan.inputs.environments or plan.inputs.pack != pack_ref):
+        if (
+            result.ref() != Ref.model_validate(source["result_ref"])
+            or result.evidence != evidence.ref()
+            or evidence.environment != environment.ref()
+            or evidence.plan != plan.ref()
+            or evidence.environment not in plan.inputs.environments
+            or plan.inputs.pack != pack_ref
+        ):
             raise ValueError(f"{framework_id}: exact UPDATE Ref/pack mismatch")
         if result.check_id != internal_id or evidence.check_id != internal_id or result.side != evidence.side:
             raise ValueError(f"{framework_id}: check/side mismatch")
         items = [item for item in plan.items if item.check_id == internal_id]
-        if (len(items) != 1 or not items[0].selected or items[0].gaps
-                or str(items[0].applicability) != "APPLICABLE"
-                or not isinstance(items[0].executor, str) or not items[0].executor.strip()
-                or evidence.execution.executor is None
-                or evidence.execution.executor.name != items[0].executor):
+        if (
+            len(items) != 1
+            or not items[0].selected
+            or items[0].gaps
+            or str(items[0].applicability) != "APPLICABLE"
+            or not isinstance(items[0].executor, str)
+            or not items[0].executor.strip()
+            or evidence.execution.executor is None
+            or evidence.execution.executor.name != items[0].executor
+        ):
             raise ValueError(f"{framework_id}: selected executable plan item missing")
-        if (str(result.verdicts.security) != "PASS" or result.missing_observations or result.exception is not None
-                or str(result.verification_level) != "MEASURED" or str(result.data_origin) != "MEASURED"
-                or str(evidence.data_origin) != "MEASURED" or str(evidence.execution.status) != "COMPLETED"
-                or evidence.execution.operator is not None or evidence.execution.cleanup_errors
-                or not evidence.normal_control.attempted or evidence.normal_control.succeeded is not True):
+        if (
+            str(result.verdicts.security) != "PASS"
+            or result.missing_observations
+            or result.exception is not None
+            or str(result.verification_level) != "MEASURED"
+            or str(result.data_origin) != "MEASURED"
+            or str(evidence.data_origin) != "MEASURED"
+            or str(evidence.execution.status) != "COMPLETED"
+            or evidence.execution.operator is not None
+            or evidence.execution.cleanup_errors
+            or not evidence.normal_control.attempted
+            or evidence.normal_control.succeeded is not True
+        ):
             raise ValueError(f"{framework_id}: required measured security PASS unavailable")
         started, finished = evidence.execution.started_at, evidence.execution.finished_at
-        if (started is None or finished is None or not started <= finished <= result.created_at <= checked
-                or (checked - finished).total_seconds() > age):
+        if (
+            started is None
+            or finished is None
+            or not started <= finished <= result.created_at <= checked
+            or (checked - finished).total_seconds() > age
+        ):
             raise ValueError(f"{framework_id}: evidence stale or invalid execution interval")
         engine, model = target.get("engine", {}), target.get("model", {})
-        if (environment.engine.name != engine.get("kind") or environment.engine.version != engine.get("version")
-                or environment.engine.image_digest != engine.get("image_digest")
-                or environment.model.id != model.get("id") or environment.model.revision != model.get("revision")
-                or not record["model_inventory_sha256"]
-                or environment.model.inventory_sha256 != record["model_inventory_sha256"]):
+        if (
+            environment.engine.name != engine.get("kind")
+            or environment.engine.version != engine.get("version")
+            or environment.engine.image_digest != engine.get("image_digest")
+            or environment.model.id != model.get("id")
+            or environment.model.revision != model.get("revision")
+            or not record["model_inventory_sha256"]
+            or environment.model.inventory_sha256 != record["model_inventory_sha256"]
+        ):
             raise ValueError(f"{framework_id}: tested engine/model/version mismatch")
         for artifact in evidence.artifacts:
             relative = Path(artifact.path)
@@ -159,6 +216,12 @@ def verify_deployment_guard(bundle: VerifiedPolicyBundle, guard_path: str,
             if len(raw) != artifact.bytes or hashlib.sha256(raw).hexdigest() != artifact.sha256:
                 raise ValueError("required evidence artifact missing or changed")
         checked_refs[framework_id] = result.ref().model_dump(mode="json")
-    return {"state": "verified", "checked_at": checked.isoformat(), "bundle_sha256": bundle.sha256,
-            "target_sha256": target_file.sha256, "pack_ref": pack_ref.model_dump(mode="json"),
-            "results": checked_refs, "approval": approval.status()}
+    return {
+        "state": "verified",
+        "checked_at": checked.isoformat(),
+        "bundle_sha256": bundle.sha256,
+        "target_sha256": target_file.sha256,
+        "pack_ref": pack_ref.model_dump(mode="json"),
+        "results": checked_refs,
+        "approval": approval.status(),
+    }

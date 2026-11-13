@@ -1,4 +1,5 @@
 """Bounded, separate route audit over the existing retention-managed JSONL."""
+
 from __future__ import annotations
 
 import json
@@ -30,7 +31,9 @@ class RouteRejections:
         self._lock = threading.Lock()
         self._window_start = time.monotonic()
         self._window_started_at = _utc_now()
-        self._window_count = self._overflow_count = self._attempted_count = self._recorded_count = self._write_failure_count = 0
+        self._window_count = self._overflow_count = self._attempted_count = self._recorded_count = (
+            self._write_failure_count
+        ) = 0
         self._last_write_error_class = self._last_write_failure_at = self._last_recorded_at = None
 
     @property
@@ -39,13 +42,21 @@ class RouteRejections:
 
     def status(self) -> dict:
         with self._lock:
-            return {"state": "error" if self._write_failure_count else "partial" if self._overflow_count else "ok",
-                    "scope": "process_lifetime", "attempted_count": self._attempted_count,
-                    "recorded_count": self._recorded_count, "overflow_count": self._overflow_count,
-                    "write_failure_count": self._write_failure_count, "last_write_error_class": self._last_write_error_class,
-                    "last_write_failure_at": self._last_write_failure_at, "last_recorded_at": self._last_recorded_at,
-                    "window_count": self._window_count, "window_limit": self._limit,
-                    "window_seconds": 3600, "window_started_at": self._window_started_at}
+            return {
+                "state": "error" if self._write_failure_count else "partial" if self._overflow_count else "ok",
+                "scope": "process_lifetime",
+                "attempted_count": self._attempted_count,
+                "recorded_count": self._recorded_count,
+                "overflow_count": self._overflow_count,
+                "write_failure_count": self._write_failure_count,
+                "last_write_error_class": self._last_write_error_class,
+                "last_write_failure_at": self._last_write_failure_at,
+                "last_recorded_at": self._last_recorded_at,
+                "window_count": self._window_count,
+                "window_limit": self._limit,
+                "window_seconds": 3600,
+                "window_started_at": self._window_started_at,
+            }
 
     def record(self, request_id: str, method: str, path: str, status: int, reason: str) -> None:
         with self._lock:
@@ -58,15 +69,23 @@ class RouteRejections:
                 self._overflow_count += 1
                 return
             self._window_count += 1
-            record = {"schema_version": "runtime-route-rejection/1.0", "event_id": uuid4().hex,
-                      "request_id": request_id, "recorded_at": _utc_now(),
-                      "method": method if re.fullmatch(r"[A-Z]{1,32}", method) else "OTHER",
-                      "path": _CONTROL.sub("?", path.split("?", 1)[0].split("#", 1)[0])[:_PATH_LIMIT],
-                      "response_code": status, "reason": reason, "forwarded_to_engine": False,
-                      # Retention reads these established top-level fields;
-                      # preserve the richer original scope without inferring identities.
-                      "run_id": self._scope.get("run_id"), "environment": self._scope.get("environment"),
-                      "scope": self._scope, "actor": {"state": "unattributed", "principal_id": None}}
+            record = {
+                "schema_version": "runtime-route-rejection/1.0",
+                "event_id": uuid4().hex,
+                "request_id": request_id,
+                "recorded_at": _utc_now(),
+                "method": method if re.fullmatch(r"[A-Z]{1,32}", method) else "OTHER",
+                "path": _CONTROL.sub("?", path.split("?", 1)[0].split("#", 1)[0])[:_PATH_LIMIT],
+                "response_code": status,
+                "reason": reason,
+                "forwarded_to_engine": False,
+                # Retention reads these established top-level fields;
+                # preserve the richer original scope without inferring identities.
+                "run_id": self._scope.get("run_id"),
+                "environment": self._scope.get("environment"),
+                "scope": self._scope,
+                "actor": {"state": "unattributed", "principal_id": None},
+            }
             try:
                 self.store.append(record)
             except OSError as error:
@@ -109,7 +128,19 @@ class RouteRejections:
             except OSError as error:
                 read_error = type(error).__name__
         truncated = truncated or len(rows) > limit
-        return {"items": list(reversed(rows[-limit:])), "status": self.status(), "generated_at": _utc_now(),
-                "window": {"scope": "journal_tail_bytes", "total": None, "returned": min(len(rows), limit),
-                           "truncated": truncated, "scanned_bytes": scanned_bytes, "max_bytes": QUERY_MAX_BYTES,
-                           "limit": limit, "corrupt_lines": corrupt, "read_error_class": read_error}}
+        return {
+            "items": list(reversed(rows[-limit:])),
+            "status": self.status(),
+            "generated_at": _utc_now(),
+            "window": {
+                "scope": "journal_tail_bytes",
+                "total": None,
+                "returned": min(len(rows), limit),
+                "truncated": truncated,
+                "scanned_bytes": scanned_bytes,
+                "max_bytes": QUERY_MAX_BYTES,
+                "limit": limit,
+                "corrupt_lines": corrupt,
+                "read_error_class": read_error,
+            },
+        }

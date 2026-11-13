@@ -25,12 +25,23 @@ INTENT = ROOT / "examples/enforcement/intent-v1.1.example.json"
 
 
 def stale_timeline(path: Path) -> None:
-    path.write_text(json.dumps({
-        "schema_version": "runtime-phase-timeline/1.0", "entries": [],
-        "collector": {"state": "running", "pod_uid": "old", "pod_name": "old-engine",
-                      "written_at": "2026-01-01T00:00:00Z", "last_log_at": None,
-                      "log_delivery_lag_seconds": None},
-    }), encoding="utf-8")
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "runtime-phase-timeline/1.0",
+                "entries": [],
+                "collector": {
+                    "state": "running",
+                    "pod_uid": "old",
+                    "pod_name": "old-engine",
+                    "written_at": "2026-01-01T00:00:00Z",
+                    "last_log_at": None,
+                    "log_delivery_lag_seconds": None,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 class StaleTimelineDecisionTests(unittest.TestCase):
@@ -39,7 +50,9 @@ class StaleTimelineDecisionTests(unittest.TestCase):
             timeline = Path(directory) / "phase-timeline.json"
             stale_timeline(timeline)
             verdict = ExecPolicy(load_intent(INTENT), timeline_path=timeline).classify_exec(
-                binary="/usr/bin/uname", parent=None, image=None,
+                binary="/usr/bin/uname",
+                parent=None,
+                image=None,
                 observed_at="2026-11-02T10:00:00Z",
             )
             self.assertEqual(verdict["exec_verdict"], "phase_unknown")
@@ -90,7 +103,9 @@ class GatewayAppTests(unittest.TestCase):
         feed = Path(self.temporary.name) / "tetragon.jsonl"
         feed.touch()
         config = MVPConfig(
-            gateway_port=0, engine_port=0, policy_path=str(EXAMPLE_POLICY),
+            gateway_port=0,
+            engine_port=0,
+            policy_path=str(EXAMPLE_POLICY),
             data_dir=str(Path(self.temporary.name) / "with-timeline"),
             observation_feeds=(("tetragon", str(feed)),),
             observation_intent_path=str(INTENT),
@@ -99,10 +114,14 @@ class GatewayAppTests(unittest.TestCase):
         gateway = GatewayApp(config, load_policy(EXAMPLE_POLICY), self.engine.address).start()
         self.addCleanup(gateway.stop)
         host, port = gateway.address
-        request = Request(f"http://{host}:{port}/v1/chat/completions",
-                          data=json.dumps({"model": "test-model", "messages": [{"role": "user", "content": "hello"}],
-                                           "max_tokens": 4}).encode(),
-                          headers={"Content-Type": "application/json"}, method="POST")
+        request = Request(
+            f"http://{host}:{port}/v1/chat/completions",
+            data=json.dumps(
+                {"model": "test-model", "messages": [{"role": "user", "content": "hello"}], "max_tokens": 4}
+            ).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
         with closing(urlopen(request, timeout=3)) as response:
             self.assertEqual(response.status, 200)
 
@@ -130,6 +149,7 @@ class GatewayAppTests(unittest.TestCase):
         self.assertEqual(body["error"]["code"], "INVALID_MODEL")
         self.assertEqual(body["error"]["request_id"], caught.exception.headers["X-Request-ID"])
 
+
 class MVPCommandTests(unittest.TestCase):
     def test_non_loopback_binding_is_rejected(self) -> None:
         with self.assertRaises(ValueError):
@@ -141,38 +161,68 @@ class MVPCommandTests(unittest.TestCase):
 
     def test_cli_forwards_mvp_options(self) -> None:
         with patch("serving_runtime.mvp.app.run") as run:
-            result = main([
-                "mvp",
-                "--policy", "custom-policy.json",
-                "--gateway-port", "18080",
-                "--engine-port", "18088",
-                "--data-dir", "/tmp/runtime-state",
-                "--relay-timeout", "0.25",
-                "--stream-idle-timeout", "1.5",
-                "--request-deadline", "9",
-                "--max-concurrency", "4",
-                "--max-connections", "12",
-                "--request-header-timeout", "0.75",
-                "--request-body-timeout", "3",
-                "--environment", "docker-cpu",
-                "--run-id", "gateway-run",
-                "--revocations", "revocations.json",
-                "--policy-approvals", "policy-approvals.json",
-                "--baseline", "baseline.json",
-                "--manifest", "manifest.json",
-                "--collector-interval", "0.5",
-                "--collector-stale-after", "2",
-                "--lab-report", "reports",
-                "--observation-feed", "hubble=hubble.jsonl",
-                "--observation-feed", "tetragon=tetragon.jsonl",
-                "--observation-heartbeat", "hubble=hubble.heartbeat.json",
-                "--observation-heartbeat", "tetragon=tetragon.heartbeat.json",
-                "--observation-environment", "kind-lab-wsl",
-                "--observation-run-id", "lab-run",
-                "--observation-intent", "intent.json",
-                "--cilium-policy-status",
-                "--kube-context", "formal-cluster",
-            ])
+            result = main(
+                [
+                    "mvp",
+                    "--policy",
+                    "custom-policy.json",
+                    "--gateway-port",
+                    "18080",
+                    "--engine-port",
+                    "18088",
+                    "--data-dir",
+                    "/tmp/runtime-state",
+                    "--relay-timeout",
+                    "0.25",
+                    "--stream-idle-timeout",
+                    "1.5",
+                    "--request-deadline",
+                    "9",
+                    "--max-concurrency",
+                    "4",
+                    "--max-connections",
+                    "12",
+                    "--request-header-timeout",
+                    "0.75",
+                    "--request-body-timeout",
+                    "3",
+                    "--environment",
+                    "docker-cpu",
+                    "--run-id",
+                    "gateway-run",
+                    "--revocations",
+                    "revocations.json",
+                    "--policy-approvals",
+                    "policy-approvals.json",
+                    "--baseline",
+                    "baseline.json",
+                    "--manifest",
+                    "manifest.json",
+                    "--collector-interval",
+                    "0.5",
+                    "--collector-stale-after",
+                    "2",
+                    "--lab-report",
+                    "reports",
+                    "--observation-feed",
+                    "hubble=hubble.jsonl",
+                    "--observation-feed",
+                    "tetragon=tetragon.jsonl",
+                    "--observation-heartbeat",
+                    "hubble=hubble.heartbeat.json",
+                    "--observation-heartbeat",
+                    "tetragon=tetragon.heartbeat.json",
+                    "--observation-environment",
+                    "kind-lab-wsl",
+                    "--observation-run-id",
+                    "lab-run",
+                    "--observation-intent",
+                    "intent.json",
+                    "--cilium-policy-status",
+                    "--kube-context",
+                    "formal-cluster",
+                ]
+            )
         self.assertEqual(result, 0)
         config = run.call_args.args[0]
         self.assertEqual(config.policy_path, "custom-policy.json")

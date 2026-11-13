@@ -1,4 +1,5 @@
 """Installer boundaries with temporary files and fake host state; no host mutation."""
+
 from contextlib import ExitStack, nullcontext, redirect_stderr, redirect_stdout
 import errno
 import importlib.util
@@ -39,19 +40,23 @@ class InstallRuntimeNodeTests(unittest.TestCase):
             path.chmod(0o600)
             self.inputs[name] = path
         self.config = self.root / "install.env"
-        self.text = ("CONTEXT=cluster.test\nNAMESPACE=serving-test\nSERVER_ID=node-test\n"
-                     "PLATFORM_URL=https://private-platform.invalid\n"
-                     f"AGENT_TOKEN_FILE={self.inputs['token']}\n"
-                     f"VIEWER_ENV_FILE={self.inputs['viewer']}\n"
-                     f"KUBECONFIG_FILE={self.inputs['kubeconfig']}\n")
+        self.text = (
+            "CONTEXT=cluster.test\nNAMESPACE=serving-test\nSERVER_ID=node-test\n"
+            "PLATFORM_URL=https://private-platform.invalid\n"
+            f"AGENT_TOKEN_FILE={self.inputs['token']}\n"
+            f"VIEWER_ENV_FILE={self.inputs['viewer']}\n"
+            f"KUBECONFIG_FILE={self.inputs['kubeconfig']}\n"
+        )
         self.write_config(self.text)
-
 
     def test_cache_observer_is_opt_in_and_uses_installed_root_paths(self):
         config = installer.load_config(self.config)
         self.assertNotIn("byul-cache-observer.service", installer.selected_units(config))
-        config.update(CACHE_SETTINGS_FILE="/approved/settings.json", CACHE_SETTINGS_SHA256="a"*64,
-                      CACHE_KUBECONFIG_FILE="/approved/readonly-kubeconfig")
+        config.update(
+            CACHE_SETTINGS_FILE="/approved/settings.json",
+            CACHE_SETTINGS_SHA256="a" * 64,
+            CACHE_KUBECONFIG_FILE="/approved/readonly-kubeconfig",
+        )
         artifacts = installer.render(config)
         unit = artifacts["byul-cache-observer.service"].decode()
         self.assertIn("/opt/byul/runtime/.venv/bin/python", unit)
@@ -59,7 +64,9 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         self.assertIn("CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_CHOWN", unit)
         self.assertIn("ProtectSystem=strict", unit)
         self.assertNotIn("/etc/byul", unit)
-        self.assertIn("CACHE_KUBECONFIG=/etc/serving-runtime/cache-kubeconfig", artifacts["cache-observer.env"].decode())
+        self.assertIn(
+            "CACHE_KUBECONFIG=/etc/serving-runtime/cache-kubeconfig", artifacts["cache-observer.env"].decode()
+        )
         self.assertIn("byul-cache-observer.service", installer.selected_units(config))
 
     def test_partial_cache_configuration_is_rejected(self):
@@ -79,8 +86,9 @@ class InstallRuntimeNodeTests(unittest.TestCase):
             self.assertNotIn(value, output.getvalue())
         return code, output.getvalue()
 
-    @unittest.skipUnless(sys.platform == "linux" and os.geteuid() == 0,
-                         "fresh installer ownership/venv path requires Linux root")
+    @unittest.skipUnless(
+        sys.platform == "linux" and os.geteuid() == 0, "fresh installer ownership/venv path requires Linux root"
+    )
     def test_fresh_install_code_has_distribution_metadata_and_working_agent_cli(self):
         # Use the actual installer writes, root ownership checks and fresh venv.
         # A wheel in the runner must not mask missing metadata in the install.
@@ -93,16 +101,15 @@ class InstallRuntimeNodeTests(unittest.TestCase):
             installer.install_code()
         python = destination / ".venv/bin/python"
         command = [str(python), "-I", "-B", "-m", "serving_runtime", "agent", "--help"]
-        result = subprocess.run(command, capture_output=True, text=True, timeout=30,
-                                env={"PATH": installer.PATH, "LANG": "C.UTF-8"})
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=30, env={"PATH": installer.PATH, "LANG": "C.UTF-8"}
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--platform-url", result.stdout)
-        metadata = list(destination.glob(
-            ".venv/lib/python*/site-packages/serving_runtime-*.dist-info/METADATA"))
+        metadata = list(destination.glob(".venv/lib/python*/site-packages/serving_runtime-*.dist-info/METADATA"))
         self.assertEqual(len(metadata), 1)
         self.assertIn("Name: serving-runtime\n", metadata[0].read_text())
-        for path in (metadata[0].parent, metadata[0],
-                     metadata[0].parent.parent / "byul-runtime.pth"):
+        for path in (metadata[0].parent, metadata[0], metadata[0].parent.parent / "byul-runtime.pth"):
             self.assertEqual(path.stat().st_uid, 0)
             self.assertEqual(path.stat().st_mode & 0o022, 0)
         # Reinstall stays idempotent and still never starts a service.
@@ -112,18 +119,22 @@ class InstallRuntimeNodeTests(unittest.TestCase):
     def test_wrapper_dry_run_rejects_shell_config_without_executing_it(self):
         marker = self.root / "executed"
         self.write_config(self.text.replace("cluster.test", f"$(touch {marker})"))
-        result = subprocess.run(["bash", str(SCRIPT), "--config", str(self.config), "--dry-run"],
-                                capture_output=True, text=True)
+        result = subprocess.run(
+            ["bash", str(SCRIPT), "--config", str(self.config), "--dry-run"], capture_output=True, text=True
+        )
         self.assertEqual(result.returncode, 1)
         self.assertFalse(marker.exists())
         self.assertNotIn(str(marker), result.stdout + result.stderr)
         self.assertNotIn("private-value", result.stdout + result.stderr)
 
     def test_config_rejects_duplicate_unknown_injection_and_remote_http(self):
-        for text in (self.text + "SERVER_ID=duplicate\n", self.text + "UNEXPECTED=bad\n",
-                     self.text.replace("cluster.test", "x;id"),
-                     self.text.replace("https://", "http://"),
-                     self.text.replace("cluster.test", "%h")):
+        for text in (
+            self.text + "SERVER_ID=duplicate\n",
+            self.text + "UNEXPECTED=bad\n",
+            self.text.replace("cluster.test", "x;id"),
+            self.text.replace("https://", "http://"),
+            self.text.replace("cluster.test", "%h"),
+        ):
             with self.subTest(text=text):
                 self.write_config(text)
                 self.assertEqual(self.invoke("--dry-run")[0], 1)
@@ -139,9 +150,11 @@ class InstallRuntimeNodeTests(unittest.TestCase):
 
     def test_sudo_accepts_operator_owned_inputs_but_not_another_owner(self):
         operator = os.getuid()
-        with patch.object(installer.os, "getuid", return_value=0), \
-                patch.object(installer.os, "geteuid", return_value=0), \
-                patch.dict(installer.os.environ, {"SUDO_UID": str(operator)}):
+        with (
+            patch.object(installer.os, "getuid", return_value=0),
+            patch.object(installer.os, "geteuid", return_value=0),
+            patch.dict(installer.os.environ, {"SUDO_UID": str(operator)}),
+        ):
             self.assertEqual(installer.load_config(self.config)["SERVER_ID"], "node-test")
             if operator != 0:  # root-owned inputs are always trusted
                 with patch.dict(installer.os.environ, {"SUDO_UID": str(operator + 1)}):
@@ -187,38 +200,48 @@ class InstallRuntimeNodeTests(unittest.TestCase):
             with self.subTest(context=context):
                 config["CONTEXT"] = context
                 rendered = installer.render(config)["sudoers"].decode()
-                self.assertEqual(rendered, template.replace("--context lab-context",
-                                 "--context " + context.replace(".", r"\."))
-                                 .replace("--namespace serving", "--namespace serving-test"))
+                self.assertEqual(
+                    rendered,
+                    template.replace("--context lab-context", "--context " + context.replace(".", r"\.")).replace(
+                        "--namespace serving", "--namespace serving-test"
+                    ),
+                )
                 line = next(line for line in rendered.splitlines() if line.startswith("Cmnd_Alias"))
                 # This template uses the common Python re / POSIX ERE subset.
-                regex = line[line.index(" ^") + 1:]
+                regex = line[line.index(" ^") + 1 :]
                 for bundle in ("--existing bundle-1", "--bundle-dir /tmp/runtime-agent-abc/bundle-1"):
-                    command = ("-B -m serving_runtime bundle apply --bundle-root /srv/serving/bundles "
-                               f"--context {context} --namespace serving-test "
-                               "--status-url http://127.0.0.1:8080 " + bundle +
-                               " --kubeconfig /etc/serving-runtime/kubeconfig "
-                               "--token-env-file /etc/serving-runtime/viewer.env --operation-result")
+                    command = (
+                        "-B -m serving_runtime bundle apply --bundle-root /srv/serving/bundles "
+                        f"--context {context} --namespace serving-test "
+                        "--status-url http://127.0.0.1:8080 "
+                        + bundle
+                        + " --kubeconfig /etc/serving-runtime/kubeconfig "
+                        "--token-env-file /etc/serving-runtime/viewer.env --operation-result"
+                    )
                     self.assertIsNotNone(re.fullmatch(regex, command))
-                    for wrong in (command + " --execute",
-                                  command.replace(context, context + "-other"),
-                                  command.replace("serving-test", "other-namespace"),
-                                  command.replace("127.0.0.1", "127x0x0x1")):
+                    for wrong in (
+                        command + " --execute",
+                        command.replace(context, context + "-other"),
+                        command.replace("serving-test", "other-namespace"),
+                        command.replace("127.0.0.1", "127x0x0x1"),
+                    ):
                         self.assertIsNone(re.fullmatch(regex, wrong))
                     if "." in context:
                         self.assertIsNone(re.fullmatch(regex, command.replace(context, context.replace(".", "x"))))
 
     def test_sudoers_conflicts_stop_before_install_and_report_only_names(self):
         for content, reason in (
-                ("Cmnd_Alias OTHER = /bin/true : BYUL_BUNDLE_APPLY = /private-input\n",
-                 "SUDOERS_ALIAS_CONFLICT"),
-                ("runtime-agent ALL=(root) NOPASSWD: /private-input\n", "SUDOERS_RULE_CONFLICT"),
-                ("User_Alias OLD_AGENT = runtime-agent\n", "SUDOERS_RULE_CONFLICT")):
+            ("Cmnd_Alias OTHER = /bin/true : BYUL_BUNDLE_APPLY = /private-input\n", "SUDOERS_ALIAS_CONFLICT"),
+            ("runtime-agent ALL=(root) NOPASSWD: /private-input\n", "SUDOERS_RULE_CONFLICT"),
+            ("User_Alias OLD_AGENT = runtime-agent\n", "SUDOERS_RULE_CONFLICT"),
+        ):
             with self.subTest(reason=reason):
                 conflict = self.sudoers / "old-agent"
                 conflict.write_text(content)
-                with patch.object(installer, "install") as install, \
-                        patch.object(installer.subprocess, "run") as external:
+                with (
+                    patch.object(installer, "install") as install,
+                    patch.object(installer.subprocess, "run") as external,
+                ):
                     code, output = self.invoke()
                 self.assertEqual(code, 1)
                 self.assertIn("단계 4/9; 점검 SUDOERS_CONFLICTS", output)
@@ -233,7 +256,8 @@ class InstallRuntimeNodeTests(unittest.TestCase):
     def test_sudoers_scan_keeps_managed_file_and_ignores_comments_and_other_users(self):
         (self.sudoers / installer.SUDOERS_NAME).write_text("BYUL_BUNDLE_APPLY runtime-agent\n")
         (self.sudoers / "unrelated").write_text(
-            "# BYUL_BUNDLE_APPLY runtime-agent\nruntime-agent-other ALL=(root) /bin/true\n")
+            "# BYUL_BUNDLE_APPLY runtime-agent\nruntime-agent-other ALL=(root) /bin/true\n"
+        )
         installer.check_sudoers_conflicts()
 
     def test_sudoers_scan_reports_all_conflict_filenames_including_backups(self):
@@ -245,13 +269,19 @@ class InstallRuntimeNodeTests(unittest.TestCase):
             self.assertIn('"' + name + '"', output)
 
     def test_dry_run_permission_error_has_safe_path_and_check_without_traceback(self):
-        for path, expected in (("/var/lib/serving-runtime/baseline.json",
-                                "PERMISSION_DENIED:/var/lib/serving-runtime"),
-                               (str(self.inputs["token"]), "PERMISSION_DENIED")):
+        for path, expected in (
+            ("/var/lib/serving-runtime/baseline.json", "PERMISSION_DENIED:/var/lib/serving-runtime"),
+            (str(self.inputs["token"]), "PERMISSION_DENIED"),
+        ):
             with self.subTest(path=path):
-                with patch.object(installer, "preflight", side_effect=PermissionError(
-                        errno.EACCES, "private-value-never-print", path)), \
-                        patch.object(installer, "install") as install:
+                with (
+                    patch.object(
+                        installer,
+                        "preflight",
+                        side_effect=PermissionError(errno.EACCES, "private-value-never-print", path),
+                    ),
+                    patch.object(installer, "install") as install,
+                ):
                     code, output = self.invoke("--dry-run")
                 self.assertEqual(code, 1)
                 self.assertIn("단계 0/9; 점검 PREFLIGHT; 이유 " + expected + ";", output)
@@ -259,8 +289,10 @@ class InstallRuntimeNodeTests(unittest.TestCase):
                 self.assertNotIn("Traceback", output)
                 install.assert_not_called()
 
-    @unittest.skipUnless(shutil.which("visudo", path=installer.PATH) and
-                         shutil.which("systemd-analyze", path=installer.PATH), "local validators unavailable")
+    @unittest.skipUnless(
+        shutil.which("visudo", path=installer.PATH) and shutil.which("systemd-analyze", path=installer.PATH),
+        "local validators unavailable",
+    )
     def test_rendered_sudoers_and_units_pass_local_syntax_validation(self):
         config = installer.load_config(self.config)
         config["PLATFORM_CA_FILE"] = "/private/ca.pem"
@@ -270,17 +302,23 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         result = subprocess.run(["visudo", "-cf", str(sudoers)], capture_output=True, env={"PATH": installer.PATH})
         self.assertEqual(result.returncode, 0, "rendered sudoers validation failed")
         for name in installer.UNITS:
-            (self.root / name).write_bytes(artifacts[name].replace(
-                b"ExecStart=/opt/byul/runtime/.venv/bin/python", b"ExecStart=/usr/bin/python3"))
-        result = subprocess.run(["systemd-analyze", "verify", *[str(self.root / n) for n in installer.UNITS]],
-                                capture_output=True, env={"PATH": installer.PATH})
+            (self.root / name).write_bytes(
+                artifacts[name].replace(b"ExecStart=/opt/byul/runtime/.venv/bin/python", b"ExecStart=/usr/bin/python3")
+            )
+        result = subprocess.run(
+            ["systemd-analyze", "verify", *[str(self.root / n) for n in installer.UNITS]],
+            capture_output=True,
+            env={"PATH": installer.PATH},
+        )
         self.assertEqual(result.returncode, 0, "rendered unit validation failed")
 
     def test_dry_run_never_calls_install_or_external_commands(self):
         before = {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
-        with patch.object(installer, "preflight", return_value=None) as preflight, \
-                patch.object(installer, "install") as install, \
-                patch.object(installer.subprocess, "run") as external:
+        with (
+            patch.object(installer, "preflight", return_value=None) as preflight,
+            patch.object(installer, "install") as install,
+            patch.object(installer.subprocess, "run") as external,
+        ):
             code, output = self.invoke("--dry-run", "--execute", "--capture-baseline")
         self.assertEqual(code, 0)
         self.assertIn("무변경", output)
@@ -288,12 +326,17 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         preflight.assert_called_once()
         install.assert_not_called()
         external.assert_not_called()
-        self.assertEqual(before, {p.relative_to(self.root): p.read_bytes()
-                                  for p in self.root.rglob("*") if p.is_file()})
+        self.assertEqual(
+            before, {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        )
 
     def test_missing_crictl_stops_before_mutation(self):
-        with patch.object(installer.shutil, "which", side_effect=lambda name, **kw: None if name == "crictl" else "/tool"), \
-                patch.object(installer, "install") as install:
+        with (
+            patch.object(
+                installer.shutil, "which", side_effect=lambda name, **kw: None if name == "crictl" else "/tool"
+            ),
+            patch.object(installer, "install") as install,
+        ):
             code, output = self.invoke("--dry-run")
         self.assertEqual(code, 1)
         self.assertIn("crictl", output)
@@ -303,35 +346,41 @@ class InstallRuntimeNodeTests(unittest.TestCase):
     def test_complete_dry_run_preflight_has_no_commands_or_writes(self):
         # Exercise the real preflight while supplying a hypothetical prepared host.
         account = SimpleNamespace(pw_uid=999, pw_gid=999)
-        with patch.object(installer.shutil, "which", return_value="/tool"), \
-                patch.object(installer, "group_check"), \
-                patch.object(installer.pwd, "getpwnam", return_value=account), \
-                patch.object(installer.grp, "getgrgid", return_value=SimpleNamespace(gr_name="runtime-agent")), \
-                patch.object(installer, "secure_target"), \
-                patch.object(installer, "BASELINE", self.root / "missing-baseline"), \
-                patch.object(installer, "bpf_plan", return_value=None), \
-                patch.object(installer.subprocess, "run") as external, \
-                patch.object(installer, "write_file") as write:
+        with (
+            patch.object(installer.shutil, "which", return_value="/tool"),
+            patch.object(installer, "group_check"),
+            patch.object(installer.pwd, "getpwnam", return_value=account),
+            patch.object(installer.grp, "getgrgid", return_value=SimpleNamespace(gr_name="runtime-agent")),
+            patch.object(installer, "secure_target"),
+            patch.object(installer, "BASELINE", self.root / "missing-baseline"),
+            patch.object(installer, "bpf_plan", return_value=None),
+            patch.object(installer.subprocess, "run") as external,
+            patch.object(installer, "write_file") as write,
+        ):
             self.assertEqual(self.invoke("--dry-run", "--capture-baseline")[0], 0)
         external.assert_not_called()
         write.assert_not_called()
 
     def test_real_preflight_reports_baseline_permission_error(self):
         exists = Path.exists
+
         def denied_baseline(path):
             if path == installer.BASELINE:
                 raise PermissionError(errno.EACCES, "private-value-never-print", str(path))
             return exists(path)
+
         account = SimpleNamespace(pw_uid=999, pw_gid=999)
-        with patch.object(installer.shutil, "which", return_value="/tool"), \
-                patch.object(installer, "group_check"), \
-                patch.object(installer.pwd, "getpwnam", return_value=account), \
-                patch.object(installer.grp, "getgrgid", return_value=SimpleNamespace(gr_name="runtime-agent")), \
-                patch.object(installer, "secure_target"), \
-                patch.object(installer, "bpf_plan", return_value=None), \
-                patch.object(Path, "exists", new=denied_baseline), \
-                patch.object(installer, "install") as install, \
-                patch.object(installer.subprocess, "run") as external:
+        with (
+            patch.object(installer.shutil, "which", return_value="/tool"),
+            patch.object(installer, "group_check"),
+            patch.object(installer.pwd, "getpwnam", return_value=account),
+            patch.object(installer.grp, "getgrgid", return_value=SimpleNamespace(gr_name="runtime-agent")),
+            patch.object(installer, "secure_target"),
+            patch.object(installer, "bpf_plan", return_value=None),
+            patch.object(Path, "exists", new=denied_baseline),
+            patch.object(installer, "install") as install,
+            patch.object(installer.subprocess, "run") as external,
+        ):
             code, output = self.invoke("--dry-run")
         self.assertEqual(code, 1)
         self.assertIn("단계 9/9; 점검 BASELINE_PREFLIGHT; 이유 PERMISSION_DENIED:/var/lib/serving-runtime", output)
@@ -348,8 +397,7 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         grub.parent.mkdir()
         defaults = self.root / "grub"
         defaults.write_text('GRUB_CMDLINE_LINUX=""\n')
-        for key, value in (("LSM_FILE", lsm), ("KERNEL_CONFIG", kernel),
-                           ("GRUB", grub), ("GRUB_DEFAULT", defaults)):
+        for key, value in (("LSM_FILE", lsm), ("KERNEL_CONFIG", kernel), ("GRUB", grub), ("GRUB_DEFAULT", defaults)):
             patcher = patch.object(installer, key, value)
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -381,19 +429,35 @@ class InstallRuntimeNodeTests(unittest.TestCase):
 
     def baseline(self, mode="monitor"):
         path = self.root / "baseline.json"
-        path.write_text(json.dumps({"schema_version": "runtime-tetragon-baseline/1.0",
-                                   "context": "cluster.test",
-                                   "policies": [{"node": "test-node", "namespace": "serving-test",
-                                                 "name": "test-policy", "mode": mode, "spec_sha256": "a" * 64}]}))
+        path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "runtime-tetragon-baseline/1.0",
+                    "context": "cluster.test",
+                    "policies": [
+                        {
+                            "node": "test-node",
+                            "namespace": "serving-test",
+                            "name": "test-policy",
+                            "mode": mode,
+                            "spec_sha256": "a" * 64,
+                        }
+                    ],
+                }
+            )
+        )
         path.chmod(0o644)
         return path
 
     def test_existing_baseline_preserved_and_wrong_mode_rejected(self):
         path = self.baseline()
         config = installer.load_config(self.config)
-        with patch.object(installer, "BASELINE", path), \
-                patch.object(installer.pwd, "getpwnam", return_value=SimpleNamespace(pw_uid=os.getuid())), \
-                patch.object(installer, "run") as run, redirect_stdout(io.StringIO()):
+        with (
+            patch.object(installer, "BASELINE", path),
+            patch.object(installer.pwd, "getpwnam", return_value=SimpleNamespace(pw_uid=os.getuid())),
+            patch.object(installer, "run") as run,
+            redirect_stdout(io.StringIO()),
+        ):
             before = path.stat().st_mtime_ns
             installer.capture_baseline(config, True)
             self.assertEqual(path.stat().st_mtime_ns, before)
@@ -406,31 +470,43 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         config = installer.load_config(self.config)
         baseline = self.root / "new-baseline.json"
         calls = []
+
         def run(command):
             calls.append(command)
             if "--capture-baseline" in command:
                 candidate = command[-1]
                 candidate.write_bytes(self.baseline("monitor_only").read_bytes())
                 candidate.chmod(0o644)
-        with patch.object(installer, "STATE", self.root), patch.object(installer, "BASELINE", baseline), \
-                patch.object(installer.pwd, "getpwnam", return_value=SimpleNamespace(pw_uid=os.getuid())), \
-                patch.object(installer, "run", side_effect=run):
+
+        with (
+            patch.object(installer, "STATE", self.root),
+            patch.object(installer, "BASELINE", baseline),
+            patch.object(installer.pwd, "getpwnam", return_value=SimpleNamespace(pw_uid=os.getuid())),
+            patch.object(installer, "run", side_effect=run),
+        ):
             installer.capture_baseline(config, True)
         self.assertTrue(baseline.exists())
         self.assertIn("runtime-agent", calls[0])
         self.assertTrue(any("umask 022" in str(v) for v in calls[0]))
-        self.assertEqual(calls[0][calls[0].index("--public-output") + 1],
-                         installer.OBSERVATION / "tetragon-status/tetragon-state.json")
+        self.assertEqual(
+            calls[0][calls[0].index("--public-output") + 1],
+            installer.OBSERVATION / "tetragon-status/tetragon-state.json",
+        )
         self.assertFalse((self.root / "baseline.capture.json").exists())
 
     def test_failed_capture_never_installs_a_baseline(self):
         config = installer.load_config(self.config)
         baseline = self.root / "new-baseline.json"
+
         def run(command):
             command[-1].write_bytes(self.baseline("enforce").read_bytes())
-        with patch.object(installer, "STATE", self.root), patch.object(installer, "BASELINE", baseline), \
-                patch.object(installer.pwd, "getpwnam", return_value=SimpleNamespace(pw_uid=os.getuid())), \
-                patch.object(installer, "run", side_effect=run):
+
+        with (
+            patch.object(installer, "STATE", self.root),
+            patch.object(installer, "BASELINE", baseline),
+            patch.object(installer.pwd, "getpwnam", return_value=SimpleNamespace(pw_uid=os.getuid())),
+            patch.object(installer, "run", side_effect=run),
+        ):
             with self.assertRaises(installer.InstallError):
                 installer.capture_baseline(config, True)
         self.assertFalse(baseline.exists())
@@ -443,8 +519,10 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         self.assertEqual(external.call_args.kwargs["stdout"], subprocess.DEVNULL)
 
     def test_command_start_and_timeout_failures_have_safe_reason_codes(self):
-        for error in (FileNotFoundError("private-value-never-print"),
-                      subprocess.TimeoutExpired(["systemctl", "private-value-never-print"], 120)):
+        for error in (
+            FileNotFoundError("private-value-never-print"),
+            subprocess.TimeoutExpired(["systemctl", "private-value-never-print"], 120),
+        ):
             with self.subTest(error=type(error).__name__):
                 with patch.object(installer.subprocess, "run", side_effect=error):
                     with self.assertRaises(installer.InstallError) as raised:
@@ -455,27 +533,30 @@ class InstallRuntimeNodeTests(unittest.TestCase):
     def test_full_visudo_failure_or_warning_stops_before_units_and_services(self):
         for returncode in (0, 1):
             with self.subTest(returncode=returncode):
-                results = [SimpleNamespace(returncode=0, stderr=b""),
-                           SimpleNamespace(returncode=returncode, stderr=b"private-value-never-print")]
-                with patch.object(installer, "preflight", return_value=None), \
-                        patch.object(installer.os, "geteuid", return_value=0), \
-                        patch.object(installer.os, "umask"), \
-                        patch.object(installer, "install_lock", return_value=nullcontext()), \
-                        patch.object(installer, "active", return_value=False), \
-                        patch.object(installer, "install_accounts", return_value=SimpleNamespace(pw_uid=999, pw_gid=999)), \
-                        patch.object(installer, "install_code"), \
-                        patch.object(installer, "directory"), \
-                        patch.object(installer, "write_file") as write, \
-                        patch.object(installer, "capture_baseline") as baseline, \
-                        patch.object(installer.subprocess, "run", side_effect=results) as external:
+                results = [
+                    SimpleNamespace(returncode=0, stderr=b""),
+                    SimpleNamespace(returncode=returncode, stderr=b"private-value-never-print"),
+                ]
+                with (
+                    patch.object(installer, "preflight", return_value=None),
+                    patch.object(installer.os, "geteuid", return_value=0),
+                    patch.object(installer.os, "umask"),
+                    patch.object(installer, "install_lock", return_value=nullcontext()),
+                    patch.object(installer, "active", return_value=False),
+                    patch.object(installer, "install_accounts", return_value=SimpleNamespace(pw_uid=999, pw_gid=999)),
+                    patch.object(installer, "install_code"),
+                    patch.object(installer, "directory"),
+                    patch.object(installer, "write_file") as write,
+                    patch.object(installer, "capture_baseline") as baseline,
+                    patch.object(installer.subprocess, "run", side_effect=results) as external,
+                ):
                     code, output = self.invoke()
                 self.assertEqual(code, 1)
                 self.assertIn("단계 4/9; 점검 SUDOERS_VALIDATE; 이유 VISUDO_FAILED", output)
                 commands = [call.args[0] for call in external.call_args_list]
                 self.assertEqual(commands[0][0:2], ["visudo", "-cf"])
                 self.assertEqual(commands[1], ["visudo", "-c"])
-                self.assertTrue(all(call.kwargs["stderr"] == subprocess.PIPE
-                                    for call in external.call_args_list))
+                self.assertTrue(all(call.kwargs["stderr"] == subprocess.PIPE for call in external.call_args_list))
                 targets = [call.args[0] for call in write.call_args_list]
                 self.assertIn(self.sudoers / installer.SUDOERS_NAME, targets)
                 self.assertFalse(any(p.parent == Path("/etc/systemd/system") for p in targets))
@@ -483,29 +564,39 @@ class InstallRuntimeNodeTests(unittest.TestCase):
 
     def test_clean_full_visudo_precedes_systemd_install(self):
         events = []
+
         def write(path, *args, **kwargs):
             events.append(path)
+
         def run(command, **kwargs):
             events.append(command)
+
         config = installer.load_config(self.config)
-        with patch.object(installer, "directory"), patch.object(installer, "write_file", side_effect=write), \
-                patch.object(installer, "run", side_effect=run):
+        with (
+            patch.object(installer, "directory"),
+            patch.object(installer, "write_file", side_effect=write),
+            patch.object(installer, "run", side_effect=run),
+        ):
             installer.install_files(config, SimpleNamespace(pw_uid=999, pw_gid=999), installer.render(config))
         full_check = events.index(["visudo", "-c"])
         self.assertLess(events.index(self.sudoers / installer.SUDOERS_NAME), full_check)
-        self.assertTrue(all(events.index(Path("/etc/systemd/system") / name) > full_check
-                            for name in installer.UNITS))
+        self.assertTrue(all(events.index(Path("/etc/systemd/system") / name) > full_check for name in installer.UNITS))
 
     def test_install_failure_reports_actual_stage_and_check(self):
-        with patch.object(installer, "preflight", return_value=None), \
-                patch.object(installer.os, "geteuid", return_value=0), \
-                patch.object(installer.os, "umask"), \
-                patch.object(installer, "install_lock", return_value=nullcontext()), \
-                patch.object(installer, "active", return_value=False), \
-                patch.object(installer, "install_accounts"), \
-                patch.object(installer, "install_code", side_effect=PermissionError(
-                    errno.EACCES, "private-value-never-print", "/opt/byul/runtime/src")), \
-                patch.object(installer, "install_files") as files:
+        with (
+            patch.object(installer, "preflight", return_value=None),
+            patch.object(installer.os, "geteuid", return_value=0),
+            patch.object(installer.os, "umask"),
+            patch.object(installer, "install_lock", return_value=nullcontext()),
+            patch.object(installer, "active", return_value=False),
+            patch.object(installer, "install_accounts"),
+            patch.object(
+                installer,
+                "install_code",
+                side_effect=PermissionError(errno.EACCES, "private-value-never-print", "/opt/byul/runtime/src"),
+            ),
+            patch.object(installer, "install_files") as files,
+        ):
             code, output = self.invoke()
         self.assertEqual(code, 1)
         self.assertIn("단계 2/9; 점검 CODE_VENV; 이유 PERMISSION_DENIED:/opt/byul/runtime", output)
@@ -529,8 +620,11 @@ class InstallRuntimeNodeTests(unittest.TestCase):
     def test_visudo_failure_does_not_install_sudoers_or_units(self):
         config = installer.load_config(self.config)
         account = SimpleNamespace(pw_uid=999, pw_gid=999)
-        with patch.object(installer, "directory"), patch.object(installer, "write_file") as write, \
-                patch.object(installer, "run", side_effect=installer.InstallError("검증 실패")) as run:
+        with (
+            patch.object(installer, "directory"),
+            patch.object(installer, "write_file") as write,
+            patch.object(installer, "run", side_effect=installer.InstallError("검증 실패")) as run,
+        ):
             with self.assertRaises(installer.InstallError):
                 installer.install_files(config, account, installer.render(config))
         self.assertEqual(run.call_args.args[0][0:2], ["visudo", "-cf"])
@@ -540,8 +634,16 @@ class InstallRuntimeNodeTests(unittest.TestCase):
 
     def install_mocks(self, stack):
         mocks = {}
-        for name in ("install_accounts", "install_code", "install_files", "directory", "run",
-                     "write_file", "capture_baseline", "summary"):
+        for name in (
+            "install_accounts",
+            "install_code",
+            "install_files",
+            "directory",
+            "run",
+            "write_file",
+            "capture_baseline",
+            "summary",
+        ):
             mocks[name] = stack.enter_context(patch.object(installer, name))
         mocks["install_accounts"].return_value = SimpleNamespace(pw_uid=999, pw_gid=999)
         stack.enter_context(patch.object(installer, "install_lock", return_value=nullcontext()))
@@ -553,17 +655,24 @@ class InstallRuntimeNodeTests(unittest.TestCase):
     def test_observation_group_membership_is_added_once_without_gateway_data_group(self):
         config = installer.load_config(self.config)
         observer_name = config["OBSERVATION_USER"]
-        accounts = {"runtime-agent": SimpleNamespace(pw_uid=999, pw_gid=999),
-                    observer_name: SimpleNamespace(pw_uid=1000, pw_gid=1000)}
+        accounts = {
+            "runtime-agent": SimpleNamespace(pw_uid=999, pw_gid=999),
+            observer_name: SimpleNamespace(pw_uid=1000, pw_gid=1000),
+        }
         groups = {"runtime-agent": {999, 10000, 10010}, observer_name: {1000}}
+
         def run(command):
             self.assertEqual(command[:3], ["usermod", "--append", "--groups"])
             groups[command[-1]].update(map(int, command[3].split(",")))
-        with patch.object(installer.grp, "getgrgid"), patch.object(installer.grp, "getgrnam"), \
-                patch.object(installer, "group_check"), \
-                patch.object(installer.pwd, "getpwnam", side_effect=accounts.__getitem__), \
-                patch.object(installer.os, "getgrouplist", side_effect=lambda name, gid: list(groups[name])), \
-                patch.object(installer, "run", side_effect=run) as runner:
+
+        with (
+            patch.object(installer.grp, "getgrgid"),
+            patch.object(installer.grp, "getgrnam"),
+            patch.object(installer, "group_check"),
+            patch.object(installer.pwd, "getpwnam", side_effect=accounts.__getitem__),
+            patch.object(installer.os, "getgrouplist", side_effect=lambda name, gid: list(groups[name])),
+            patch.object(installer, "run", side_effect=run) as runner,
+        ):
             installer.install_accounts(config)
             installer.install_accounts(config)
         runner.assert_called_once_with(["usermod", "--append", "--groups", "10010", observer_name])
@@ -601,22 +710,34 @@ class InstallRuntimeNodeTests(unittest.TestCase):
                 mocks["install_code"].side_effect = install_code
                 if fails:
                     with self.assertRaises(installer.InstallError):
-                        installer.install(config, SimpleNamespace(capture_baseline=True), installer.render(config), None)
+                        installer.install(
+                            config, SimpleNamespace(capture_baseline=True), installer.render(config), None
+                        )
                 else:
-                    result = installer.install(config, SimpleNamespace(capture_baseline=True), installer.render(config), b"grub")
+                    result = installer.install(
+                        config, SimpleNamespace(capture_baseline=True), installer.render(config), b"grub"
+                    )
                     self.assertEqual(result, 2)
                 self.assertLess(events.index(["systemctl", "disable", installer.AGENT_UNIT]), events.index("code"))
-                self.assertFalse(any(isinstance(c, list) and c[:2] in
-                                     (["systemctl", "enable"], ["systemctl", "start"]) for c in events))
+                self.assertFalse(
+                    any(
+                        isinstance(c, list) and c[:2] in (["systemctl", "enable"], ["systemctl", "start"])
+                        for c in events
+                    )
+                )
 
     def test_existing_cache_writer_must_stop_before_replacing_same_unit(self):
         config = installer.load_config(self.config)
-        config.update(CACHE_SETTINGS_FILE="/approved/settings.json", CACHE_SETTINGS_SHA256="a"*64,
-                      CACHE_KUBECONFIG_FILE="/approved/kubeconfig")
+        config.update(
+            CACHE_SETTINGS_FILE="/approved/settings.json",
+            CACHE_SETTINGS_SHA256="a" * 64,
+            CACHE_KUBECONFIG_FILE="/approved/kubeconfig",
+        )
         with ExitStack() as stack:
             mocks = self.install_mocks(stack)
-            stack.enter_context(patch.object(installer, "active", side_effect=lambda name:
-                name == "byul-cache-observer.service"))
+            stack.enter_context(
+                patch.object(installer, "active", side_effect=lambda name: name == "byul-cache-observer.service")
+            )
             with self.assertRaises(installer.InstallError):
                 installer.install(config, SimpleNamespace(capture_baseline=False), installer.render(config), None)
         mocks["run"].assert_called_once_with(["systemctl", "stop", "byul-cache-observer.service"])
@@ -630,16 +751,25 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         legacy_states = iter([True, False])
         with ExitStack() as stack:
             mocks = self.install_mocks(stack)
-            stack.enter_context(patch.object(installer, "active", side_effect=lambda name:
-                next(legacy_states) if name == "byul-tetragon-status.service" else False))
+            stack.enter_context(
+                patch.object(
+                    installer,
+                    "active",
+                    side_effect=lambda name: next(legacy_states) if name == "byul-tetragon-status.service" else False,
+                )
+            )
             mocks["run"].side_effect = lambda command: events.append(command)
+
             def fail_code():
                 events.append("code")
                 raise installer.InstallError("test failure")
+
             mocks["install_code"].side_effect = fail_code
             with self.assertRaises(installer.InstallError):
                 installer.install(config, SimpleNamespace(capture_baseline=False), installer.render(config), None)
-        self.assertLess(events.index(["systemctl", "disable", "--now", "byul-tetragon-status.service"]), events.index("code"))
+        self.assertLess(
+            events.index(["systemctl", "disable", "--now", "byul-tetragon-status.service"]), events.index("code")
+        )
         mocks["capture_baseline"].assert_not_called()
         mocks["install_files"].assert_not_called()
 
@@ -659,7 +789,13 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         with ExitStack() as stack:
             mocks = self.install_mocks(stack)
             stack.enter_context(patch.object(installer.time, "sleep"))
-            stack.enter_context(patch.object(installer, "active", side_effect=[False] * (1 + 2 * len(installer.UNITS)) + [True] * len(installer.AUTO_UNITS) + [True]))
+            stack.enter_context(
+                patch.object(
+                    installer,
+                    "active",
+                    side_effect=[False] * (1 + 2 * len(installer.UNITS)) + [True] * len(installer.AUTO_UNITS) + [True],
+                )
+            )
             with self.assertRaises(installer.InstallError):
                 installer.install(config, SimpleNamespace(capture_baseline=False), installer.render(config), None)
         mocks["summary"].assert_not_called()
@@ -670,21 +806,38 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         with ExitStack() as stack:
             mocks = self.install_mocks(stack)
             stack.enter_context(patch.object(installer.time, "sleep"))
-            stack.enter_context(patch.object(installer, "active", side_effect=[False] * (1 + 2 * len(installer.UNITS)) + [True] * len(installer.AUTO_UNITS) + [False]))
+            stack.enter_context(
+                patch.object(
+                    installer,
+                    "active",
+                    side_effect=[False] * (1 + 2 * len(installer.UNITS)) + [True] * len(installer.AUTO_UNITS) + [False],
+                )
+            )
             mocks["capture_baseline"].side_effect = lambda *args: events.append("baseline-verified")
             mocks["run"].side_effect = lambda cmd: events.append(cmd)
             result = installer.install(config, SimpleNamespace(capture_baseline=True), installer.render(config), None)
         self.assertEqual(result, 0)
         expected = ["baseline-verified"]
-        expected += [command for unit in installer.AUTO_UNITS for command in
-                     (["systemctl", "enable", unit], ["systemctl", "is-enabled", "--quiet", unit],
-                      ["systemctl", "start", unit])]
+        expected += [
+            command
+            for unit in installer.AUTO_UNITS
+            for command in (
+                ["systemctl", "enable", unit],
+                ["systemctl", "is-enabled", "--quiet", unit],
+                ["systemctl", "start", unit],
+            )
+        ]
         expected += [["systemctl", "disable", installer.AGENT_UNIT]]
-        self.assertEqual(events[events.index("baseline-verified"):], expected)
+        self.assertEqual(events[events.index("baseline-verified") :], expected)
         # The agent can change the server, so the installer never enables or starts it.
         self.assertNotIn(installer.AGENT_UNIT, installer.AUTO_UNITS)
-        self.assertFalse(any(c[:2] in (["systemctl", "enable"], ["systemctl", "start"]) and c[-1] == installer.AGENT_UNIT
-                             for c in events if isinstance(c, list)))
+        self.assertFalse(
+            any(
+                c[:2] in (["systemctl", "enable"], ["systemctl", "start"]) and c[-1] == installer.AGENT_UNIT
+                for c in events
+                if isinstance(c, list)
+            )
+        )
         mocks["summary"].assert_called_once()
         mocks["directory"].assert_any_call(installer.OBSERVATION / "tetragon-status", 999, 10010, 0o2750)
         mocks["directory"].assert_any_call(installer.OBSERVATION / "lab-reports", 1000, 10010, 0o2750)
@@ -694,8 +847,9 @@ class InstallRuntimeNodeTests(unittest.TestCase):
         mocks["directory"].assert_any_call(installer.VERIFICATION / "approved", 0, 10000, 0o2750)
         mocks["directory"].assert_any_call(installer.VERIFICATION / "candidates", 1000, 10010, 0o2750)
         # Installation must never write an approval or silently seed empty revocations.
-        self.assertFalse(any(installer.VERIFICATION in call.args[0].parents
-                             for call in mocks["write_file"].call_args_list))
+        self.assertFalse(
+            any(installer.VERIFICATION in call.args[0].parents for call in mocks["write_file"].call_args_list)
+        )
 
 
 if __name__ == "__main__":

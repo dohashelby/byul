@@ -1,4 +1,5 @@
 """Candidate/approval separation and deploy wiring, without a cluster or approval of live values."""
+
 from contextlib import redirect_stderr, redirect_stdout
 import hashlib
 import io
@@ -39,7 +40,11 @@ class VerificationMaterialTests(unittest.TestCase):
         (self.models / "weights.bin").write_bytes(b"weights-v1")
 
     def save_candidate(self, kind="assets", document=None):
-        value = material.assets_candidate(self.models, str(self.models)) if document is None else material.candidate(kind, document)
+        value = (
+            material.assets_candidate(self.models, str(self.models))
+            if document is None
+            else material.candidate(kind, document)
+        )
         path = self.candidates / (kind + ".json")
         material.atomic_write(path, material.encode(value))
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -105,17 +110,24 @@ class VerificationMaterialTests(unittest.TestCase):
         self.assertEqual(list(self.candidates.glob(".verification-*")), [])
 
     def test_baseline_and_manifest_require_separate_explicit_approval(self):
-        observed = {"schema_version": environment.SCHEMA, "declaration_fields": {"model.id": "test-model", "option.max_model_len": 2048}}
+        observed = {
+            "schema_version": environment.SCHEMA,
+            "declaration_fields": {"model.id": "test-model", "option.max_model_len": 2048},
+        }
         for kind in ("baseline", "manifest"):
             value = material.declaration_candidate(observed, kind)
             path = self.candidates / (kind + ".json")
             material.atomic_write(path, material.encode(value))
             self.assertEqual(load_declaration(path, kind=kind).state, "error")
-            material.approve(path, self.approved, hashlib.sha256(path.read_bytes()).hexdigest(), "reviewer", "scope reviewed")
+            material.approve(
+                path, self.approved, hashlib.sha256(path.read_bytes()).hexdigest(), "reviewer", "scope reviewed"
+            )
         baseline = load_declaration(self.approved / "baseline.json", kind="baseline")
         manifest = load_declaration(self.approved / "manifest.json", kind="manifest")
         comparison = compare_baseline(baseline, manifest, CollectorManager([]))
-        self.assertEqual([r["state"] for r in comparison["rows"] if r["source"] == "declared_manifest"], ["match", "match"])
+        self.assertEqual(
+            [r["state"] for r in comparison["rows"] if r["source"] == "declared_manifest"], ["match", "match"]
+        )
         self.assertTrue(all(r["state"] == "not_collected" for r in comparison["rows"] if r["source"] == "engine_api"))
 
     def test_missing_approved_baseline_is_unconfigured_but_read_error_is_error(self):
@@ -147,31 +159,53 @@ class VerificationMaterialTests(unittest.TestCase):
         self.assertEqual(evaluate_policy(policy, empty)["validity"][1]["result"], "not_revoked")
 
     def test_invalid_candidate_approval_does_not_change_active_file(self):
-        path, digest = self.save_candidate("revocations", {"schema_version": "runtime-mvp-revocations/1.0", "revoked": []})
+        path, digest = self.save_candidate(
+            "revocations", {"schema_version": "runtime-mvp-revocations/1.0", "revoked": []}
+        )
         material.approve(path, self.approved, digest, "reviewer", "reviewed")
         target = self.approved / "revocations.json"
         old = target.read_bytes()
         path.write_bytes(material.encode(material.candidate("revocations", {"revoked": []})))
         with self.assertRaises(ValueError):
-            material.approve(path, self.approved, hashlib.sha256(path.read_bytes()).hexdigest(), "reviewer", "reviewed", replace=True)
+            material.approve(
+                path, self.approved, hashlib.sha256(path.read_bytes()).hexdigest(), "reviewer", "reviewed", replace=True
+            )
         self.assertEqual(target.read_bytes(), old)
         path.write_text("[]")
         with self.assertRaisesRegex(ValueError, "NOT_A_CANDIDATE"):
-            material.approve(path, self.approved, hashlib.sha256(path.read_bytes()).hexdigest(), "reviewer", "reviewed", replace=True)
+            material.approve(
+                path, self.approved, hashlib.sha256(path.read_bytes()).hexdigest(), "reviewer", "reviewed", replace=True
+            )
         self.assertEqual(target.read_bytes(), old)
 
     def test_cli_does_not_echo_failed_input_or_subprocess_output(self):
         out = io.StringIO()
         with redirect_stdout(out), redirect_stderr(out):
-            result = material.main(["approve", "--candidate", str(self.root / "private-input"), "--expect-sha256", "bad", "--reviewer", "x", "--reason", "x"])
+            result = material.main(
+                [
+                    "approve",
+                    "--candidate",
+                    str(self.root / "private-input"),
+                    "--expect-sha256",
+                    "bad",
+                    "--reviewer",
+                    "x",
+                    "--reason",
+                    "x",
+                ]
+            )
         self.assertEqual(result, 1)
         self.assertNotIn("private-input", out.getvalue())
 
     def test_gpu_lab_wires_approved_files_and_same_model_snapshot_read_only(self):
         gateway = (ROOT / "deploy/gpu-lab/gateway.yaml").read_text()
         engine = (ROOT / "deploy/gpu-lab-sglang/engine.yaml").read_text()
-        for option, filename in (("asset-manifest", "asset-manifest.json"), ("baseline", "baseline.json"),
-                                 ("manifest", "manifest.json"), ("revocations", "revocations.json")):
+        for option, filename in (
+            ("asset-manifest", "asset-manifest.json"),
+            ("baseline", "baseline.json"),
+            ("manifest", "manifest.json"),
+            ("revocations", "revocations.json"),
+        ):
             self.assertIn("- --" + option + "\n            - /etc/serving/verification/" + filename, gateway)
         self.assertIn("mountPath: /etc/serving/verification, readOnly: true", gateway)
         self.assertIn("mountPath: /models, readOnly: true", gateway)
@@ -182,13 +216,24 @@ class VerificationMaterialTests(unittest.TestCase):
         self.assertIn("runAsUser: 10000", gateway)
         self.assertNotIn("/verification/candidates", gateway)
 
-
     def test_declaration_input_diagnostics_are_bounded(self):
         source = self.root / "private-token-path"
-        argv = ["declaration", "--kind", "baseline", "--environment-candidate", str(source), "--out", str(self.candidates / "new.json")]
-        for code, raw in (("NOT_FOUND", None), ("INVALID_JSON", b'{"private-token":'),
-                          ("INVALID_JSON", b'{"x":1,"x":2}'), ("INVALID_JSON", bytes([255])),
-                          ("INVALID_INPUT", b'{}')):
+        argv = [
+            "declaration",
+            "--kind",
+            "baseline",
+            "--environment-candidate",
+            str(source),
+            "--out",
+            str(self.candidates / "new.json"),
+        ]
+        for code, raw in (
+            ("NOT_FOUND", None),
+            ("INVALID_JSON", b'{"private-token":'),
+            ("INVALID_JSON", b'{"x":1,"x":2}'),
+            ("INVALID_JSON", bytes([255])),
+            ("INVALID_INPUT", b"{}"),
+        ):
             if raw is not None:
                 source.write_bytes(raw)
             stderr = io.StringIO()
@@ -196,9 +241,14 @@ class VerificationMaterialTests(unittest.TestCase):
                 self.assertEqual(material.main(argv), 1)
             self.assertEqual(stderr.getvalue().strip(), f"VERIFICATION_MATERIAL_FAILED: {code}:environment_candidate")
         stderr = io.StringIO()
-        with patch.object(Path, "read_bytes", side_effect=PermissionError("private-token-path")), redirect_stderr(stderr):
+        with (
+            patch.object(Path, "read_bytes", side_effect=PermissionError("private-token-path")),
+            redirect_stderr(stderr),
+        ):
             self.assertEqual(material.main(argv), 1)
-        self.assertEqual(stderr.getvalue().strip(), "VERIFICATION_MATERIAL_FAILED: PERMISSION_DENIED:environment_candidate")
+        self.assertEqual(
+            stderr.getvalue().strip(), "VERIFICATION_MATERIAL_FAILED: PERMISSION_DENIED:environment_candidate"
+        )
 
     def test_bad_arguments_do_not_echo_values(self):
         stderr = io.StringIO()

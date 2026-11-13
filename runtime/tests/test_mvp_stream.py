@@ -38,7 +38,7 @@ class SSEParserUnitTests(unittest.TestCase):
     def test_done_marker_is_found_across_arbitrary_reads(self) -> None:
         pending = b""
         found = False
-        for chunk in (b"data: {\"x\":1}\n", b"\ndata: [DO", b"NE]\r", b"\n\r\n"):
+        for chunk in (b'data: {"x":1}\n', b"\ndata: [DO", b"NE]\r", b"\n\r\n"):
             pending, current = sse_done(pending, chunk)
             found = found or current
         self.assertTrue(found)
@@ -103,9 +103,7 @@ class StreamingHttpTests(unittest.TestCase):
         return None
 
     def test_split_utf8_stream_is_forwarded_byte_for_byte(self) -> None:
-        engine, gateway, data_dir = self.start_pair(
-            engine_options={"split_writes": True, "stream_interval_s": 0.03}
-        )
+        engine, gateway, data_dir = self.start_pair(engine_options={"split_writes": True, "stream_interval_s": 0.03})
         connection = http.client.HTTPConnection(*gateway.address, timeout=2)
         self.addCleanup(connection.close)
         connection.request(
@@ -193,9 +191,7 @@ class StreamingHttpTests(unittest.TestCase):
         gateway.stop()
         engine.stop()
 
-        engine, gateway, data_dir = self.start_pair(
-            engine_options={"truncate_after_events": 1, "stream_interval_s": 0}
-        )
+        engine, gateway, data_dir = self.start_pair(engine_options={"truncate_after_events": 1, "stream_interval_s": 0})
         with closing(urlopen(stream_request(gateway), timeout=2)) as response:
             request_id = response.headers["X-Request-ID"]
             response.read()

@@ -18,13 +18,18 @@ class SGLangDeploymentTests(unittest.TestCase):
     def test_rendered_engine_starts_without_shell_or_key_argument(self) -> None:
         if shutil.which("kubectl") is None:
             self.skipTest("kubectl kustomize unavailable")
-        result = subprocess.run(["kubectl", "kustomize", str(ROOT / "deploy/gpu-lab-sglang")],
-                                capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            ["kubectl", "kustomize", str(ROOT / "deploy/gpu-lab-sglang")], capture_output=True, text=True, check=True
+        )
         documents = list(yaml.safe_load_all(result.stdout))
-        engine = next(document for document in documents if document.get("kind") == "Deployment"
-                      and document.get("metadata", {}).get("name") == "serving-engine")
-        spec = next(container for container in engine["spec"]["template"]["spec"]["containers"]
-                    if container["name"] == "engine")
+        engine = next(
+            document
+            for document in documents
+            if document.get("kind") == "Deployment" and document.get("metadata", {}).get("name") == "serving-engine"
+        )
+        spec = next(
+            container for container in engine["spec"]["template"]["spec"]["containers"] if container["name"] == "engine"
+        )
         self.assertEqual(spec["command"], ["python3", "-m", "sglang.launch_server"])
         self.assertEqual(spec["args"][:2], ["--config", "/run/sglang-admin/config.yaml"])
         self.assertEqual(spec["args"][spec["args"].index("--context-length") + 1], "2112")
@@ -32,26 +37,40 @@ class SGLangDeploymentTests(unittest.TestCase):
         self.assertNotIn("admin-api-key", str(spec["command"] + spec["args"]))
         self.assertNotIn("/bin/sh", yaml.safe_dump(engine))
         self.assertNotIn("admin-api-key", yaml.safe_dump(engine))
-        self.assertEqual(next(volume for volume in engine["spec"]["template"]["spec"]["volumes"]
-                              if volume["name"] == "admin-key")["secret"]["secretName"],
-                         "serving-sglang-admin")
-        gateway = next(document for document in documents if document.get("kind") == "Deployment"
-                       and document.get("metadata", {}).get("name") == "serving-gateway")
+        self.assertEqual(
+            next(volume for volume in engine["spec"]["template"]["spec"]["volumes"] if volume["name"] == "admin-key")[
+                "secret"
+            ]["secretName"],
+            "serving-sglang-admin",
+        )
+        gateway = next(
+            document
+            for document in documents
+            if document.get("kind") == "Deployment" and document.get("metadata", {}).get("name") == "serving-gateway"
+        )
         self.assertIn("--observation-timeline", gateway["spec"]["template"]["spec"]["containers"][0]["args"])
         args = gateway["spec"]["template"]["spec"]["containers"][0]["args"]
-        self.assertEqual(args[args.index("--tetragon-identities") + 1],
-                         "/srv/serving/observation/tetragon-identities.json")
-        sentinel = next(document for document in documents if document.get("kind") == "DaemonSet"
-                        and document["metadata"]["name"] == "byul-tetragon-sentinel")
+        self.assertEqual(
+            args[args.index("--tetragon-identities") + 1], "/srv/serving/observation/tetragon-identities.json"
+        )
+        sentinel = next(
+            document
+            for document in documents
+            if document.get("kind") == "DaemonSet" and document["metadata"]["name"] == "byul-tetragon-sentinel"
+        )
         pod = sentinel["spec"]["template"]["spec"]
         for container in pod["initContainers"] + pod["containers"]:
             self.assertEqual(container["image"], "serving-gateway:REPLACE_GATEWAY_TAG")
             self.assertEqual(container["imagePullPolicy"], "Never")
             self.assertEqual(container["command"][0], "/usr/local/bin/python3.12")
-        policy = next(document for document in documents if document.get("kind") == "TracingPolicyNamespaced"
-                      and document["metadata"]["name"] == "runtime-tg-health-01-sentinel-v2")
+        policy = next(
+            document
+            for document in documents
+            if document.get("kind") == "TracingPolicyNamespaced"
+            and document["metadata"]["name"] == "runtime-tg-health-01-sentinel-v2"
+        )
         self.assertEqual(policy["spec"]["podSelector"]["matchLabels"], {"app": "byul-tetragon-sentinel"})
-        probe, = policy["spec"]["kprobes"]
+        (probe,) = policy["spec"]["kprobes"]
         self.assertEqual(probe["data"], KERNEL_DATA)
         self.assertEqual(probe["selectors"][0]["matchActions"], [{"action": "Post"}])
 

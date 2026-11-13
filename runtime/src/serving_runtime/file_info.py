@@ -25,11 +25,11 @@ def inspect_open_file(descriptor: int) -> FileInfo:
         digest.update(chunk)
         size += len(chunk)
     after = os.fstat(descriptor)
-    if (
-        (before.st_size, before.st_mtime_ns, before.st_ctime_ns)
-        != (after.st_size, after.st_mtime_ns, after.st_ctime_ns)
-        or size != after.st_size
-    ):
+    if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    ) or size != after.st_size:
         raise OSError("읽는 동안 파일이 변경됐습니다. 파일을 고정한 뒤 다시 확인하세요.")
     return FileInfo(size_bytes=size, sha256=digest.hexdigest())
 

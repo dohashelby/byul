@@ -1,4 +1,5 @@
 """Offline evidence import: hostile archives, provenance, redaction, atomicity."""
+
 from contextlib import redirect_stderr, redirect_stdout
 import gzip
 import hashlib
@@ -57,22 +58,38 @@ class EvidenceIndexTests(unittest.TestCase):
         self.assertEqual(report["runs"][0]["basis"], ["none"])
         self.assertIsNone(report["runs"][0]["origin_assertion"])
         self.assertEqual(report["runs"][0]["files"], 1)
-        files = {str(p.relative_to(self.output)): (p.read_bytes(), p.stat().st_mtime_ns) for p in self.output.rglob("*") if p.is_file()}
+        files = {
+            str(p.relative_to(self.output)): (p.read_bytes(), p.stat().st_mtime_ns)
+            for p in self.output.rglob("*")
+            if p.is_file()
+        }
         self.assertEqual(self.generate(item), report)
-        self.assertEqual(files, {str(p.relative_to(self.output)): (p.read_bytes(), p.stat().st_mtime_ns) for p in self.output.rglob("*") if p.is_file()})
+        self.assertEqual(
+            files,
+            {
+                str(p.relative_to(self.output)): (p.read_bytes(), p.stat().st_mtime_ns)
+                for p in self.output.rglob("*")
+                if p.is_file()
+            },
+        )
         self.assertEqual(self.path.read_bytes(), original)
 
     def test_document_hash_measured_window_and_refs(self):
         self.archive()
         digest = hashlib.sha256(self.path.read_bytes()).hexdigest()
         doc = self.root / "result.md"
-        doc.write_text(f"# AWS GPU dev 서버 1회차 결과 (2026-11-08)\n- 환경·시간: **23:55:00 KST 기동 요청 → 00:20:00 stopped 확인**\n- 증거: `capture.tgz`(SHA-256 `{digest}`).\n")
+        doc.write_text(
+            f"# AWS GPU dev 서버 1회차 결과 (2026-11-08)\n- 환경·시간: **23:55:00 KST 기동 요청 → 00:20:00 stopped 확인**\n- 증거: `capture.tgz`(SHA-256 `{digest}`).\n"
+        )
         self.generate(ev.Input("lab1", self.path, result_doc=doc))
         entry = self.index()["items"][0]
         self.assertEqual(entry["data_origin"], "MEASURED")
         self.assertEqual(entry["window"], {"from": "2026-11-08T23:55:00+09:00", "until": "2026-11-09T00:20:00+09:00"})
         self.assertEqual(entry["source"], "aws-lab lab1")
-        self.assertEqual(entry["refs"], [f"archive-sha256:{digest}", "result-document-sha256:" + hashlib.sha256(doc.read_bytes()).hexdigest()])
+        self.assertEqual(
+            entry["refs"],
+            [f"archive-sha256:{digest}", "result-document-sha256:" + hashlib.sha256(doc.read_bytes()).hexdigest()],
+        )
 
     def test_hash_mismatch_publishes_nothing(self):
         self.archive()
@@ -90,7 +107,9 @@ class EvidenceIndexTests(unittest.TestCase):
 
     def test_synthetic_overrides_measured_assertion(self):
         self.archive([("log.json", b'{"data_origin":"synthetic"}', tarfile.REGTYPE)])
-        self.generate(ev.Input("lab1", self.path, sha256=hashlib.sha256(self.path.read_bytes()).hexdigest(), origin="MEASURED"))
+        self.generate(
+            ev.Input("lab1", self.path, sha256=hashlib.sha256(self.path.read_bytes()).hexdigest(), origin="MEASURED")
+        )
         self.assertEqual(self.index()["items"][0]["data_origin"], "EXAMPLE")
 
     def result_doc(self, body):
@@ -119,7 +138,10 @@ class EvidenceIndexTests(unittest.TestCase):
         digest = hashlib.sha256(self.path.read_bytes()).hexdigest()
         for body in (digest, f"capture.tgz\n{digest}"):
             doc = self.result_doc(body)
-            with self.subTest(archive_mentioned="capture.tgz" in body), self.assertRaisesRegex(ev.ImportFailure, "DOCUMENT_RUN_MISMATCH"):
+            with (
+                self.subTest(archive_mentioned="capture.tgz" in body),
+                self.assertRaisesRegex(ev.ImportFailure, "DOCUMENT_RUN_MISMATCH"),
+            ):
                 self.generate(ev.Input("run2", self.path, result_doc=doc))
         self.assertFalse(self.output.exists())
 
@@ -147,7 +169,10 @@ class EvidenceIndexTests(unittest.TestCase):
         digest = hashlib.sha256(self.path.read_bytes()).hexdigest()
         doc = self.result_doc(f"capture.tgz SHA-256 {'0' * 8}")
         for explicit in (None, digest):
-            with self.subTest(explicit=explicit is not None), self.assertRaisesRegex(ev.ImportFailure, "SHA256_MISMATCH"):
+            with (
+                self.subTest(explicit=explicit is not None),
+                self.assertRaisesRegex(ev.ImportFailure, "SHA256_MISMATCH"),
+            ):
                 self.generate(ev.Input("lab1", self.path, sha256=explicit, result_doc=doc))
         self.assertFalse(self.output.exists())
 
@@ -193,7 +218,10 @@ class EvidenceIndexTests(unittest.TestCase):
         self.assertEqual(report["basis"], ["document_full", "explicit"])
         for explicit, documented in (("a" * 64, digest), (digest, "a" * 64)):
             doc = self.result_doc(f"capture.tgz\nSHA-256 {documented}\n")
-            with self.subTest(explicit_matches=explicit == digest), self.assertRaisesRegex(ev.ImportFailure, "SHA256_MISMATCH"):
+            with (
+                self.subTest(explicit_matches=explicit == digest),
+                self.assertRaisesRegex(ev.ImportFailure, "SHA256_MISMATCH"),
+            ):
                 ev.generate([ev.Input("lab1", self.path, sha256=explicit, result_doc=doc)], self.root / "other")
 
     def test_no_hash_document_still_requires_explicit_evidence(self):
@@ -208,8 +236,20 @@ class EvidenceIndexTests(unittest.TestCase):
         doc = self.result_doc("capture.tgz 해시 미기재")
         stdout, stderr = io.StringIO(), io.StringIO()
         with redirect_stdout(stdout), redirect_stderr(stderr):
-            code = ev.main(["--input", f"lab1={self.path}", "--output", str(self.output),
-                            "--result-doc", f"lab1={doc}", "--sha256", f"lab1={digest}", "--origin", "lab1=MEASURED"])
+            code = ev.main(
+                [
+                    "--input",
+                    f"lab1={self.path}",
+                    "--output",
+                    str(self.output),
+                    "--result-doc",
+                    f"lab1={doc}",
+                    "--sha256",
+                    f"lab1={digest}",
+                    "--origin",
+                    "lab1=MEASURED",
+                ]
+            )
         self.assertEqual(code, 0)
         report = json.loads(stdout.getvalue())["runs"][0]
         self.assertEqual(report["basis"], ["explicit"])
@@ -224,7 +264,7 @@ class EvidenceIndexTests(unittest.TestCase):
             "INSTANCE_ID": b"instance i-0123456789abcdef0",
             "ACCESS_KEY": b"AKIA" + b"A" * 16,
             "TOKEN": b'{"viewer_token": "do-not-include-this"}',
-            "TOKEN_ARGUMENT": b'curl --token cli-do-not-include-this',
+            "TOKEN_ARGUMENT": b"curl --token cli-do-not-include-this",
             "JWT": b"eyJabc.eyJdef.signature",
             "SERVICE_TOKEN": b"ghp_" + b"a" * 24,
         }
@@ -249,7 +289,17 @@ class EvidenceIndexTests(unittest.TestCase):
 
     def test_unsafe_archive_members_rejected(self):
         cases = [(name, tarfile.REGTYPE) for name in ("../escape", "/absolute", "a/../../escape", "a//b", "C:\\escape")]
-        cases += [("link", kind) for kind in (tarfile.SYMTYPE, tarfile.LNKTYPE, tarfile.FIFOTYPE, tarfile.CHRTYPE, tarfile.BLKTYPE, tarfile.GNUTYPE_SPARSE)]
+        cases += [
+            ("link", kind)
+            for kind in (
+                tarfile.SYMTYPE,
+                tarfile.LNKTYPE,
+                tarfile.FIFOTYPE,
+                tarfile.CHRTYPE,
+                tarfile.BLKTYPE,
+                tarfile.GNUTYPE_SPARSE,
+            )
+        ]
         for name, kind in cases:
             with self.subTest(kind=kind, name=name):
                 self.archive([(name, b"x", kind)])
@@ -264,7 +314,12 @@ class EvidenceIndexTests(unittest.TestCase):
 
     def test_file_total_member_and_archive_limits(self):
         item = self.archive([("a", b"1234", tarfile.REGTYPE), ("b", b"1234", tarfile.REGTYPE)])
-        for limits in (ev.Limits(file_bytes=3), ev.Limits(total_bytes=7), ev.Limits(members=1), ev.Limits(archive_bytes=1)):
+        for limits in (
+            ev.Limits(file_bytes=3),
+            ev.Limits(total_bytes=7),
+            ev.Limits(members=1),
+            ev.Limits(archive_bytes=1),
+        ):
             with self.subTest(limits=limits), self.assertRaisesRegex(ev.ImportFailure, "SIZE_LIMIT"):
                 self.generate(item, limits=limits)
             self.assertFalse(self.output.exists())
@@ -350,7 +405,10 @@ class EvidenceIndexTests(unittest.TestCase):
         self.assertEqual(self.generate(item, limits=limits), report)
 
     def test_cli_errors_do_not_echo_input(self):
-        for args in (["--private-input=do-not-leak"], ["--input", "lab1=/private/do-not-leak", "--output", str(self.output)]):
+        for args in (
+            ["--private-input=do-not-leak"],
+            ["--input", "lab1=/private/do-not-leak", "--output", str(self.output)],
+        ):
             stdout, stderr = io.StringIO(), io.StringIO()
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 self.assertEqual(ev.main(args), 1)

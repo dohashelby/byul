@@ -35,15 +35,23 @@ def compare_names(names: list[str], config: dict) -> dict:
     if not names or any(not isinstance(name, str) or NAME.fullmatch(name) is None for name in names):
         raise ValueError("지표 이름 목록 형식 오류")
     mapping = config.get("metrics_map")
-    if not isinstance(mapping, dict) or not mapping or any(
-        not isinstance(item, dict) or item.get("verified") is not False or
-        not isinstance(item.get("metric"), str) or NAME.fullmatch(item["metric"]) is None
-        for item in mapping.values()
+    if (
+        not isinstance(mapping, dict)
+        or not mapping
+        or any(
+            not isinstance(item, dict)
+            or item.get("verified") is not False
+            or not isinstance(item.get("metric"), str)
+            or NAME.fullmatch(item["metric"]) is None
+            for item in mapping.values()
+        )
     ):
         raise ValueError("verified: false 후보 대응표가 아님")
     available = set(names)
-    return {field: {"candidate": item["metric"], "found": item["metric"] in available}
-            for field, item in sorted(mapping.items())}
+    return {
+        field: {"candidate": item["metric"], "found": item["metric"] in available}
+        for field, item in sorted(mapping.items())
+    }
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -53,11 +61,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--namespace", default="serving-lab")
     parser.add_argument("--output", required=True, help="server-local name-only JSON output")
     args = parser.parse_args(argv)
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+", args.context) or not re.fullmatch(r"[a-z0-9]([-a-z0-9]*[a-z0-9])?", args.namespace):
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", args.context) or not re.fullmatch(
+        r"[a-z0-9]([-a-z0-9]*[a-z0-9])?", args.namespace
+    ):
         parser.error("context or namespace format invalid")
     config_path = ROOT / "examples" / "mvp" / f"backend-{args.engine}.example.json"
     config = json.loads(config_path.read_text(encoding="utf-8"))
-    command = ["kubectl", "--context", args.context, "-n", args.namespace, "exec", "deploy/serving-engine", "-c", "engine", "--", "python3", "-c", REMOTE]
+    command = [
+        "kubectl",
+        "--context",
+        args.context,
+        "-n",
+        args.namespace,
+        "exec",
+        "deploy/serving-engine",
+        "-c",
+        "engine",
+        "--",
+        "python3",
+        "-c",
+        REMOTE,
+    ]
     try:
         result = subprocess.run(command, capture_output=True, timeout=20, check=False)
         if result.returncode:
@@ -66,9 +90,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not isinstance(names, list):
             raise ValueError("지표 이름 목록 형식 오류")
         comparison = compare_names(names, config)
-        output = {"schema": "runtime-aws-metric-names/1.0", "engine": args.engine,
-                  "names": sorted(set(names)), "candidate_comparison": comparison,
-                  "note": "값·라벨 값·원문은 저장하지 않음; verified는 false 유지"}
+        output = {
+            "schema": "runtime-aws-metric-names/1.0",
+            "engine": args.engine,
+            "names": sorted(set(names)),
+            "candidate_comparison": comparison,
+            "note": "값·라벨 값·원문은 저장하지 않음; verified는 false 유지",
+        }
         path = Path(args.output)
         path.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)

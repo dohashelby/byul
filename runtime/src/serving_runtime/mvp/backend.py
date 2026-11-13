@@ -38,9 +38,7 @@ _TOP_LEVEL_FIELDS = frozenset(
 # External serving engines this Gateway can relay to. Each keeps its own
 # request field names; see BackendConfig.output_tokens_field.
 EXTERNAL_BACKEND_KINDS = frozenset({"vllm", "sglang"})
-_TIMEOUT_FIELDS = frozenset(
-    {"relay_timeout_s", "status_timeout_s", "stream_idle_timeout_s", "request_deadline_s"}
-)
+_TIMEOUT_FIELDS = frozenset({"relay_timeout_s", "status_timeout_s", "stream_idle_timeout_s", "request_deadline_s"})
 _METRIC_FIELDS = frozenset({"metric", "type", "unit", "source_doc", "verified"})
 _ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _METRIC_NAME = re.compile(r"^[A-Za-z_:][A-Za-z0-9_:]*$")
@@ -148,11 +146,7 @@ class BackendConfig:
     def output_tokens_field(self, route: str) -> str:
         """The engine and request route determine the output-token field."""
 
-        return (
-            "max_completion_tokens"
-            if self.kind == "sglang" and route == CHAT_ROUTE
-            else "max_tokens"
-        )
+        return "max_completion_tokens" if self.kind == "sglang" and route == CHAT_ROUTE else "max_tokens"
 
     @property
     def authorization(self) -> str | None:
@@ -244,9 +238,7 @@ def _parse_origin(value: Any, *, field_name: str) -> URLTarget:
         or parsed.query
         or parsed.fragment
     ):
-        raise ValueError(
-            f"{field_name} must be an http/https URL without credentials, query, or fragment"
-        )
+        raise ValueError(f"{field_name} must be an http/https URL without credentials, query, or fragment")
     if any(ord(character) < 0x20 for character in value):
         raise ValueError(f"{field_name} must not contain control characters")
     path_prefix = parsed.path.rstrip("/")
@@ -376,12 +368,8 @@ def load_backend_config(
     # SGLang v0.5.22 has no /version route; its version is only inside
     # /server_info, which also returns the resolved server arguments. The
     # default therefore skips version collection for sglang (null = disabled).
-    raw_version_path = document.get(
-        "version_path", "/version" if kind == "vllm" else None
-    )
-    version_path = (
-        None if raw_version_path is None else _route(raw_version_path, "version_path")
-    )
+    raw_version_path = document.get("version_path", "/version" if kind == "vllm" else None)
+    version_path = None if raw_version_path is None else _route(raw_version_path, "version_path")
 
     raw_timeouts = document.get("timeouts", {})
     timeouts_document = _require_object(raw_timeouts, "timeouts")
@@ -406,9 +394,7 @@ def load_backend_config(
         mapping = _require_object(raw_mapping, f"metrics_map.{field_name}")
         _unknown_fields(mapping, _METRIC_FIELDS, f"metrics_map.{field_name}")
         if set(mapping) != _METRIC_FIELDS:
-            raise ValueError(
-                f"metrics_map.{field_name} must contain metric, type, unit, source_doc, verified"
-            )
+            raise ValueError(f"metrics_map.{field_name} must contain metric, type, unit, source_doc, verified")
         metric = mapping["metric"]
         if not isinstance(metric, str) or _METRIC_NAME.fullmatch(metric) is None:
             raise ValueError(f"metrics_map.{field_name}.metric is invalid")
@@ -491,9 +477,7 @@ def _declared(table: dict[str, str], metric: str, metric_type: str) -> str | Non
     return None
 
 
-def parse_prometheus_metrics(
-    payload: bytes, metrics_map: Mapping[str, Mapping[str, Any]]
-) -> dict[str, Any]:
+def parse_prometheus_metrics(payload: bytes, metrics_map: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     """Extract only explicitly mapped metric families from Prometheus text.
 
     Each mapped field also reports the engine's own TYPE declaration and HELP

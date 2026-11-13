@@ -151,13 +151,24 @@ class ArgumentTests(unittest.TestCase):
     def test_request_case_checks_usage_and_both_stream_endings(self) -> None:
         class LogRunner(FakeRunner):
             def run(self, argv, *, timeout=30):
-                return CommandResult(0, "\n".join(
-                    f'Received request {prefix}{rid}' for prefix, rid in
-                    (("chatcmpl-", "chat-n"), ("chatcmpl-", "chat-s"),
-                     ("cmpl-", "comp-n-0"), ("cmpl-", "comp-s-0"))))
+                return CommandResult(
+                    0,
+                    "\n".join(
+                        f"Received request {prefix}{rid}"
+                        for prefix, rid in (
+                            ("chatcmpl-", "chat-n"),
+                            ("chatcmpl-", "chat-s"),
+                            ("cmpl-", "comp-n-0"),
+                            ("cmpl-", "comp-s-0"),
+                        )
+                    ),
+                )
+
         with tempfile.TemporaryDirectory() as directory:
             responses = [
-                response(200, {"choices": [{"message": {"content": "ok"}}], "usage": {"completion_tokens": 8}}, "chat-n"),
+                response(
+                    200, {"choices": [{"message": {"content": "ok"}}], "usage": {"completion_tokens": 8}}, "chat-n"
+                ),
                 sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\n', "chat-s"),
                 response(200, detail("ALLOWED", attempted=True, outcome="completed")),
                 response(200, {"choices": [{"text": "ok"}], "usage": {"completion_tokens": 8}}, "comp-n"),
@@ -167,47 +178,52 @@ class ArgumentTests(unittest.TestCase):
             checker = AWSAcceptance(arguments(Path(directory)), runner=LogRunner(), http=FakeHTTP(responses))
             checker._context_limits = lambda: (2048, 256)
             checker._context_probe = lambda route, token, limit, output: (True, True, {"route": route})
-            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
+            checker._engine_pod = lambda: (
+                {"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"},
+                CommandResult(0),
+            )
             facts, evidence = checker.aws_18()
             self.assertEqual(evaluate_case("AWS-18", facts)[0], "passed")
             self.assertEqual(len(evidence["requests"]), 4)
             self.assertTrue(all(row["truncated"] is False for row in evidence["requests"] if row["stream"]))
-            checker.http.responses = responses = [response(200, {"choices": [{"message": {"content": "ok"}}]}, "chat-n"),
-                                                  sse_response(b'data: {"choices":[{}]}\n\n', "chat-s"),
-                                                  response(200, detail("ALLOWED", attempted=True, outcome="completed")),
-                                                  response(200, {"choices": [{"text": "ok"}]}, "comp-n"),
-                                                  sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\n', "comp-s"),
-                                                  response(200, detail("ALLOWED", attempted=True, outcome="completed"))]
-            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
+            checker.http.responses = responses = [
+                response(200, {"choices": [{"message": {"content": "ok"}}]}, "chat-n"),
+                sse_response(b'data: {"choices":[{}]}\n\n', "chat-s"),
+                response(200, detail("ALLOWED", attempted=True, outcome="completed")),
+                response(200, {"choices": [{"text": "ok"}]}, "comp-n"),
+                sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\n', "comp-s"),
+                response(200, detail("ALLOWED", attempted=True, outcome="completed")),
+            ]
+            checker._engine_pod = lambda: (
+                {"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"},
+                CommandResult(0),
+            )
             facts, evidence = checker.aws_18()
             self.assertIsNone(facts["usage"])
             self.assertFalse(facts["stream"])
             self.assertTrue(evidence["requests"][1]["truncated"])
 
     def test_aws_18_done_with_failed_gateway_record_is_not_stream_success(self) -> None:
-        failed = detail("ERROR", reason="ENGINE_BAD_RESPONSE", attempted=True,
-                        outcome="invalid_completion_stream")
-        failed["final_state"]["delivery"].update(
-            response="failed", error_code="ENGINE_BAD_RESPONSE")
+        failed = detail("ERROR", reason="ENGINE_BAD_RESPONSE", attempted=True, outcome="invalid_completion_stream")
+        failed["final_state"]["delivery"].update(response="failed", error_code="ENGINE_BAD_RESPONSE")
         responses = [
-            response(200, {"choices": [{"message": {"content": "ok"}}],
-                           "usage": {"completion_tokens": 1}}, "chat-n"),
+            response(200, {"choices": [{"message": {"content": "ok"}}], "usage": {"completion_tokens": 1}}, "chat-n"),
             sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\n', "chat-s"),
             response(200, detail("ALLOWED", attempted=True, outcome="completed")),
-            response(200, {"choices": [{"text": "ok"}],
-                           "usage": {"completion_tokens": 1}}, "comp-n"),
+            response(200, {"choices": [{"text": "ok"}], "usage": {"completion_tokens": 1}}, "comp-n"),
             sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\ndata: {bad}\n\n', "comp-s"),
             response(200, failed),
         ]
         with tempfile.TemporaryDirectory() as directory:
-            checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(),
-                                    http=FakeHTTP(responses))
+            checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(), http=FakeHTTP(responses))
             checker._context_limits = lambda: None
-            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
+            checker._engine_pod = lambda: (
+                {"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"},
+                CommandResult(0),
+            )
             facts, evidence = checker.aws_18()
         self.assertFalse(facts["stream"])
-        self.assertEqual(evidence["requests"][3]["record"]["delivery"]["error_code"],
-                         "ENGINE_BAD_RESPONSE")
+        self.assertEqual(evidence["requests"][3]["record"]["delivery"]["error_code"], "ENGINE_BAD_RESPONSE")
 
     def test_aws_18_missing_gateway_record_is_unknown(self) -> None:
         responses = [
@@ -219,8 +235,7 @@ class ArgumentTests(unittest.TestCase):
             response(200, detail("ALLOWED", attempted=True, outcome="completed")),
         ]
         with tempfile.TemporaryDirectory() as directory:
-            checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(),
-                                    http=FakeHTTP(responses))
+            checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(), http=FakeHTTP(responses))
             checker._context_limits = lambda: None
             facts, _ = checker.aws_18()
         self.assertIsNone(facts["stream"])
@@ -230,18 +245,27 @@ class ArgumentTests(unittest.TestCase):
             def __init__(self, logs):
                 super().__init__()
                 self.logs = logs
+
             def run(self, argv, *, timeout=30):
                 return CommandResult(0, self.logs)
+
         with tempfile.TemporaryDirectory() as directory:
             replies = [response(200, {"choices": [{"message": {"content": "ok"}}]}, "normal")]
             replies += [response(404, {"error": {"code": "NOT_FOUND"}}, f"path-{i}") for i in range(12)]
             replies += [response(400, {"error": {"code": "UNSUPPORTED_FIELD"}}, f"field-{i}") for i in range(4)]
             runner = LogRunner('{"event":"request.received","headers":{"x-request-id":"normal"}}')
             checker = AWSAcceptance(arguments(Path(directory), engine="sglang"), runner=runner, http=FakeHTTP(replies))
-            checker._route_rejection_record = lambda _id: {"found": True, "reason": "NOT_FOUND",
-                                                            "response_code": 404, "forwarded_to_engine": False}
+            checker._route_rejection_record = lambda _id: {
+                "found": True,
+                "reason": "NOT_FOUND",
+                "response_code": 404,
+                "forwarded_to_engine": False,
+            }
             checker._detail = lambda _id: detail("INVALID", reason="UNSUPPORTED_FIELD", attempted=False, status=400)
-            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
+            checker._engine_pod = lambda: (
+                {"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"},
+                CommandResult(0),
+            )
             facts, evidence = checker.aws_19()
             self.assertEqual(evaluate_case("AWS-19", facts)[0], "passed")
             self.assertEqual(len(evidence["attempts"]), 16)
@@ -280,7 +304,10 @@ class ArgumentTests(unittest.TestCase):
             self.assertEqual(evaluate_case("AWS-19", facts)[0], "unknown")
             checker.http.responses = list(replies)
             checker._route_rejection_record = lambda _id: {"found": False}
-            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
+            checker._engine_pod = lambda: (
+                {"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"},
+                CommandResult(0),
+            )
             facts, evidence = checker.aws_19()
             self.assertFalse(facts["records"])
             self.assertEqual(evaluate_case("AWS-19", facts)[0], "failed")
@@ -289,13 +316,15 @@ class ArgumentTests(unittest.TestCase):
 
     def test_context_probe_exact_boundary_and_over_request(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            http = FakeHTTP([response(200, {"choices": [{"text": "ok"}],
-                                             "usage": {"completion_tokens": 8}}, "boundary"),
-                             response(403, {"error": {"code": "CONTEXT_LIMIT_EXCEEDED"}}, "over")])
+            http = FakeHTTP(
+                [
+                    response(200, {"choices": [{"text": "ok"}], "usage": {"completion_tokens": 8}}, "boundary"),
+                    response(403, {"error": {"code": "CONTEXT_LIMIT_EXCEEDED"}}, "over"),
+                ]
+            )
             checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(), http=http)
             checker._engine_token_count = lambda route, prompt: len(prompt.split())
-            checker._detail = lambda _id: detail("DENIED", reason="CONTEXT_LIMIT_EXCEEDED",
-                                                  attempted=False, status=403)
+            checker._detail = lambda _id: detail("DENIED", reason="CONTEXT_LIMIT_EXCEEDED", attempted=False, status=403)
             boundary, exceeded, evidence = checker._context_probe("/v1/completions", INFERENCE, 128, 128)
             self.assertTrue(boundary)
             self.assertTrue(exceeded)
@@ -304,8 +333,14 @@ class ArgumentTests(unittest.TestCase):
 
     def test_context_probe_marks_engine_length_truncation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            http = FakeHTTP([response(200, {"choices": [{"finish_reason": "length"}], "usage": {"completion_tokens": 3}}, "boundary"),
-                             response(403, {"error": {"code": "CONTEXT_LIMIT_EXCEEDED"}}, "over")])
+            http = FakeHTTP(
+                [
+                    response(
+                        200, {"choices": [{"finish_reason": "length"}], "usage": {"completion_tokens": 3}}, "boundary"
+                    ),
+                    response(403, {"error": {"code": "CONTEXT_LIMIT_EXCEEDED"}}, "over"),
+                ]
+            )
             checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(), http=http)
             checker._engine_token_count = lambda route, prompt: len(prompt.split())
             checker._detail = lambda _id: detail("DENIED", reason="CONTEXT_LIMIT_EXCEEDED", attempted=False, status=403)
@@ -319,6 +354,7 @@ class ArgumentTests(unittest.TestCase):
                 self.history.append({"argv": list(argv), "returncode": 0})
                 self.input = input
                 return CommandResult(0, "12\n")
+
         with tempfile.TemporaryDirectory() as directory:
             runner = CountingRunner()
             checker = AWSAcceptance(arguments(Path(directory), engine="sglang"), runner=runner, http=FakeHTTP([]))
@@ -330,21 +366,37 @@ class ArgumentTests(unittest.TestCase):
 
     def test_context_limits_come_from_gateway_policy_status(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            http = FakeHTTP([response(200, {"current": {"max_context_tokens": 2048,
-                                                         "output_max_tokens": 256}})])
+            http = FakeHTTP([response(200, {"current": {"max_context_tokens": 2048, "output_max_tokens": 256}})])
             checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(), http=http)
             self.assertEqual(checker._context_limits(), (2048, 256))
             self.assertEqual(http.calls[0]["path"], "/api/policy")
 
     def test_pod_configuration_keeps_names_and_redacts_admin_arg(self) -> None:
-        pod = {"items": [{"spec": {"containers": [{"name": "engine", "image": "image@sha256:abc",
-                  "command": ["/bin/sh"], "args": ["exec python3 -m sglang.launch_server --admin-api-key \"private-key\""],
-                  "env": [{"name": "SGLANG_LOG_REQUEST_HEADERS", "value": "x-request-id"},
-                          {"name": "SECRET", "value": "private-env"}]}]},
-                  "status": {"containerStatuses": [{"name": "engine", "imageID": "sha256:abc"}]}}]}
+        pod = {
+            "items": [
+                {
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": "engine",
+                                "image": "image@sha256:abc",
+                                "command": ["/bin/sh"],
+                                "args": ['exec python3 -m sglang.launch_server --admin-api-key "private-key"'],
+                                "env": [
+                                    {"name": "SGLANG_LOG_REQUEST_HEADERS", "value": "x-request-id"},
+                                    {"name": "SECRET", "value": "private-env"},
+                                ],
+                            }
+                        ]
+                    },
+                    "status": {"containerStatuses": [{"name": "engine", "imageID": "sha256:abc"}]},
+                }
+            ]
+        }
         with tempfile.TemporaryDirectory() as directory:
-            checker = AWSAcceptance(arguments(Path(directory)),
-                                    runner=FakeRunner([CommandResult(0, json.dumps(pod))]), http=FakeHTTP([]))
+            checker = AWSAcceptance(
+                arguments(Path(directory)), runner=FakeRunner([CommandResult(0, json.dumps(pod))]), http=FakeHTTP([])
+            )
             evidence = checker._pod_configuration()
             self.assertEqual(evidence["env_names"], ["SGLANG_LOG_REQUEST_HEADERS", "SECRET"])
             self.assertEqual(evidence["image_id"], "sha256:abc")
@@ -352,14 +404,42 @@ class ArgumentTests(unittest.TestCase):
             self.assertNotIn("private-env", str(evidence))
 
     def test_request_and_rejection_cases_are_explicit(self) -> None:
-        self.assertEqual(parse_args(["--kube-context", "byul-aws-lab", "--token-env-file", "unused.env"]).cases[-1], "AWS-11")
-        selected = parse_args(["--kube-context", "byul-aws-lab", "--token-env-file", "unused.env", "--cases", "AWS-18,AWS-19"])
+        self.assertEqual(
+            parse_args(["--kube-context", "byul-aws-lab", "--token-env-file", "unused.env"]).cases[-1], "AWS-11"
+        )
+        selected = parse_args(
+            ["--kube-context", "byul-aws-lab", "--token-env-file", "unused.env", "--cases", "AWS-18,AWS-19"]
+        )
         self.assertEqual(selected.cases, ("AWS-18", "AWS-19"))
         self.assertEqual(evaluate_case("AWS-18", {"normal": True, "stream": True, "usage": None})[0], "unknown")
-        self.assertEqual(evaluate_case("AWS-18", {"normal": True, "stream": True, "usage": True,
-                                                   "log_match": True, "context_boundary": None,
-                                                   "context_exceeded": None})[0], "unknown")
-        self.assertEqual(evaluate_case("AWS-19", {"codes": True, "reasons": True, "records": True, "not_delivered": True, "engine_log_absent": True, "positive_control": None})[0], "unknown")
+        self.assertEqual(
+            evaluate_case(
+                "AWS-18",
+                {
+                    "normal": True,
+                    "stream": True,
+                    "usage": True,
+                    "log_match": True,
+                    "context_boundary": None,
+                    "context_exceeded": None,
+                },
+            )[0],
+            "unknown",
+        )
+        self.assertEqual(
+            evaluate_case(
+                "AWS-19",
+                {
+                    "codes": True,
+                    "reasons": True,
+                    "records": True,
+                    "not_delivered": True,
+                    "engine_log_absent": True,
+                    "positive_control": None,
+                },
+            )[0],
+            "unknown",
+        )
 
     def test_usage_and_fixed_request_hash(self) -> None:
         self.assertEqual(_completion_usage(response(200, {"usage": {"completion_tokens": 8}})), 8)
@@ -376,37 +456,81 @@ class ArgumentTests(unittest.TestCase):
     def test_sglang_json_log_matches_only_header_and_event(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             checker = AWSAcceptance(arguments(Path(directory), engine="sglang"), runner=FakeRunner(), http=FakeHTTP([]))
-            sample = ('INFO: {"event":"request.received","headers":{"x-request-id":"normal-1"}}\n'
-                      '{"event":"request.finished","headers":{"x-request-id":"normal-1"}}')
+            sample = (
+                'INFO: {"event":"request.received","headers":{"x-request-id":"normal-1"}}\n'
+                '{"event":"request.finished","headers":{"x-request-id":"normal-1"}}'
+            )
             self.assertTrue(checker._log_received(sample, "normal-1", "/v1/chat/completions"))
             self.assertFalse(checker._log_received(sample, "denied-1", "/v1/chat/completions"))
-            self.assertFalse(checker._log_received('{"event":"other","headers":{"x-request-id":"normal-1"}}',
-                                                   "normal-1", "/v1/completions"))
-            self.assertFalse(checker._log_received('Received request chatcmpl-normal-1',
-                                                   "normal-1", "/v1/chat/completions"))
+            self.assertFalse(
+                checker._log_received(
+                    '{"event":"other","headers":{"x-request-id":"normal-1"}}', "normal-1", "/v1/completions"
+                )
+            )
+            self.assertFalse(
+                checker._log_received("Received request chatcmpl-normal-1", "normal-1", "/v1/chat/completions")
+            )
             self.assertEqual(checker._sglang_prompt_fields(sample), [])
-            self.assertEqual(checker._sglang_prompt_fields('{"event":"request.received","obj":{"text":"secret"}}'), ["text"])
+            self.assertEqual(
+                checker._sglang_prompt_fields('{"event":"request.received","obj":{"text":"secret"}}'), ["text"]
+            )
 
     def test_phase_inventory_groups_without_verdicts(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             timeline = root / "timeline.json"
-            timeline.write_text(json.dumps({"schema_version": "runtime-phase-timeline/1.0",
-                "entries": [{"phase": "inferring", "from": "2026-11-02T10:00:00Z",
-                             "until": None, "basis": "engine_signal"}],
-                "collector": {"state": "running", "pod_uid": "uid-a", "pod_name": "engine-a",
-                              "written_at": "2026-11-02T10:00:02Z", "last_log_at": None,
-                              "log_delivery_lag_seconds": None}}), encoding="utf-8")
+            timeline.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "runtime-phase-timeline/1.0",
+                        "entries": [
+                            {
+                                "phase": "inferring",
+                                "from": "2026-11-02T10:00:00Z",
+                                "until": None,
+                                "basis": "engine_signal",
+                            }
+                        ],
+                        "collector": {
+                            "state": "running",
+                            "pod_uid": "uid-a",
+                            "pod_name": "engine-a",
+                            "written_at": "2026-11-02T10:00:02Z",
+                            "last_log_at": None,
+                            "log_delivery_lag_seconds": None,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
             source = root / "tetragon.jsonl"
-            source.write_text(json.dumps({"time": "2026-11-02T10:00:01Z", "process_exec": {
-                "process": {"binary": "/usr/bin/python3", "pod": {"namespace": "serving-lab",
-                    "pod_name": "engine-a", "uid": "uid-a", "pod_labels": {"app": "serving-engine"}}}}}) + "\n", encoding="utf-8")
+            source.write_text(
+                json.dumps(
+                    {
+                        "time": "2026-11-02T10:00:01Z",
+                        "process_exec": {
+                            "process": {
+                                "binary": "/usr/bin/python3",
+                                "pod": {
+                                    "namespace": "serving-lab",
+                                    "pod_name": "engine-a",
+                                    "uid": "uid-a",
+                                    "pod_labels": {"app": "serving-engine"},
+                                },
+                            }
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             output = io.StringIO()
             with redirect_stdout(output):
                 self.assertEqual(phase_exec_inventory(["--tetragon", str(source), "--timeline", str(timeline)]), 0)
             report = json.loads(output.getvalue())
-            self.assertEqual(report["counts"], [{"phase": "inferring", "pod": "engine-a",
-                                                  "path": "/usr/bin/python3", "count": 1}])
+            self.assertEqual(
+                report["counts"], [{"phase": "inferring", "pod": "engine-a", "path": "/usr/bin/python3", "count": 1}]
+            )
             self.assertNotIn("verdict", output.getvalue())
             old = json.loads(timeline.read_text(encoding="utf-8"))
             old["collector"]["written_at"] = "2026-11-02T09:59:00Z"
@@ -480,24 +604,47 @@ class DecisionTests(unittest.TestCase):
             checker.normal_before = {"normal_ok": True, "stream_ok": True, "cache_ok": True}
             checker.detection_started_at = "2026-11-02T10:00:00Z"
             checker._normal_control = lambda: {"normal_ok": True, "stream_ok": True, "cache_ok": True}
-            checker._tetragon_observations = lambda _since: (True, [{
-                "kind": "process_exec", "phase": ["inferring"], "exec_verdict": "allowed_in_phase",
-                "phase_timeline_fresh": True, "observed_at": "2026-11-02T10:00:02Z"}])
-            checker._collectors = lambda: (response(200, {}), {
-                "observation_feed_tetragon": {"state": "ok"}})
+            checker._tetragon_observations = lambda _since: (
+                True,
+                [
+                    {
+                        "kind": "process_exec",
+                        "phase": ["inferring"],
+                        "exec_verdict": "allowed_in_phase",
+                        "phase_timeline_fresh": True,
+                        "observed_at": "2026-11-02T10:00:02Z",
+                    }
+                ],
+            )
+            checker._collectors = lambda: (response(200, {}), {"observation_feed_tetragon": {"state": "ok"}})
             gap = observation / "tetragon.gaps.jsonl"
-            gap.write_text(json.dumps({"event": "gap_opened", "kind": "tetragon", "gap_id": "gap-1",
-                                       "opened_at": "2026-11-02T10:00:01Z"}) + "\n", encoding="utf-8")
+            gap.write_text(
+                json.dumps(
+                    {"event": "gap_opened", "kind": "tetragon", "gap_id": "gap-1", "opened_at": "2026-11-02T10:00:01Z"}
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             facts, evidence = checker.aws_11()
             self.assertIsNone(facts["false_warnings_zero"])
             self.assertFalse(evidence["warning_list_complete"])
             checker._run_case("AWS-11", checker.aws_11)
             self.assertEqual(checker.cases[-1]["result"], "unknown")
             with gap.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps({"event": "gap_closed", "kind": "tetragon", "gap_id": "gap-1",
-                                         "opened_at": "2026-11-02T10:00:01Z",
-                                         "closed_at": "2026-11-02T10:00:03Z",
-                                         "closed_by": "collector_restart", "backfill": "not_requested"}) + "\n")
+                handle.write(
+                    json.dumps(
+                        {
+                            "event": "gap_closed",
+                            "kind": "tetragon",
+                            "gap_id": "gap-1",
+                            "opened_at": "2026-11-02T10:00:01Z",
+                            "closed_at": "2026-11-02T10:00:03Z",
+                            "closed_by": "collector_restart",
+                            "backfill": "not_requested",
+                        }
+                    )
+                    + "\n"
+                )
             self.assertFalse(checker._tetragon_gaps_clear("2026-11-02T10:00:02Z"))
             self.assertTrue(checker._tetragon_gaps_clear("2026-11-02T10:00:04Z"))
 
@@ -507,11 +654,19 @@ class DecisionTests(unittest.TestCase):
             checker.normal_before = {"normal_ok": True, "stream_ok": True, "cache_ok": True}
             checker.detection_started_at = "2026-11-02T10:00:00Z"
             checker._normal_control = lambda: {"normal_ok": True, "stream_ok": True, "cache_ok": True}
-            checker._tetragon_observations = lambda _since: (True, [{
-                "kind": "process_exec", "phase": ["inferring"], "exec_verdict": "allowed_in_phase",
-                "phase_timeline_fresh": True, "observed_at": "2026-11-02T10:00:02Z"}])
-            checker._collectors = lambda: (response(200, {}), {
-                "observation_feed_tetragon": {"state": "error"}})
+            checker._tetragon_observations = lambda _since: (
+                True,
+                [
+                    {
+                        "kind": "process_exec",
+                        "phase": ["inferring"],
+                        "exec_verdict": "allowed_in_phase",
+                        "phase_timeline_fresh": True,
+                        "observed_at": "2026-11-02T10:00:02Z",
+                    }
+                ],
+            )
+            checker._collectors = lambda: (response(200, {}), {"observation_feed_tetragon": {"state": "error"}})
             facts, evidence = checker.aws_11()
             self.assertIsNone(facts["false_warnings_zero"])
             self.assertFalse(evidence["warning_list_complete"])
@@ -522,11 +677,19 @@ class DecisionTests(unittest.TestCase):
             checker.normal_before = {"normal_ok": True, "stream_ok": True, "cache_ok": True}
             checker.detection_started_at = "2026-11-02T10:00:00Z"
             checker._normal_control = lambda: {"normal_ok": True, "stream_ok": True, "cache_ok": True}
-            checker._tetragon_observations = lambda _since: (True, [{
-                "kind": "process_exec", "phase": ["inferring"], "exec_verdict": "allowed_in_phase",
-                "phase_timeline_fresh": True, "observed_at": "2026-11-02T10:00:02Z"}])
-            checker._collectors = lambda: (response(200, {}), {
-                "observation_feed_tetragon": {"state": "ok"}})
+            checker._tetragon_observations = lambda _since: (
+                True,
+                [
+                    {
+                        "kind": "process_exec",
+                        "phase": ["inferring"],
+                        "exec_verdict": "allowed_in_phase",
+                        "phase_timeline_fresh": True,
+                        "observed_at": "2026-11-02T10:00:02Z",
+                    }
+                ],
+            )
+            checker._collectors = lambda: (response(200, {}), {"observation_feed_tetragon": {"state": "ok"}})
             facts, evidence = checker.aws_11()
             self.assertIsNone(facts["false_warnings_zero"])
             self.assertFalse(evidence["warning_list_complete"])
@@ -538,17 +701,26 @@ class DecisionTests(unittest.TestCase):
             checker.normal_before = {"normal_ok": True, "stream_ok": True, "cache_ok": True}
             checker.detection_started_at = "2026-11-02T10:00:00Z"
             checker._normal_control = lambda: {"normal_ok": True, "stream_ok": True, "cache_ok": True}
-            rows = [{"kind": "process_exec", "phase": ["unknown"], "exec_verdict": "phase_unknown",
-                     "observed_at": "2026-11-02T10:00:01Z"}]
+            rows = [
+                {
+                    "kind": "process_exec",
+                    "phase": ["unknown"],
+                    "exec_verdict": "phase_unknown",
+                    "observed_at": "2026-11-02T10:00:01Z",
+                }
+            ]
             checker._tetragon_observations = lambda _since: (True, rows)
-            checker._collectors = lambda: (response(200, {}), {
-                "observation_feed_tetragon": {"state": "ok"}})
+            checker._collectors = lambda: (response(200, {}), {"observation_feed_tetragon": {"state": "ok"}})
             facts, evidence = checker.aws_11()
             self.assertIsNone(facts["false_warnings_zero"])
             self.assertEqual(evidence["phase_evidence"]["unknown_exec_count"], 1)
-            rows[0].update(phase=["inferring"], exec_verdict="allowed_in_phase",
-                           phase_basis=["engine_signal"], phase_timeline_fresh=True,
-                           phase_timeline_written_at="2026-11-02T10:00:01Z")
+            rows[0].update(
+                phase=["inferring"],
+                exec_verdict="allowed_in_phase",
+                phase_basis=["engine_signal"],
+                phase_timeline_fresh=True,
+                phase_timeline_written_at="2026-11-02T10:00:01Z",
+            )
             facts, evidence = checker.aws_11()
             self.assertTrue(facts["false_warnings_zero"])
             self.assertEqual(evidence["phase_evidence"]["bases"], ["engine_signal"])
@@ -561,17 +733,32 @@ class DecisionTests(unittest.TestCase):
             root = Path(directory)
             observation = root / "observation"
             observation.mkdir()
-            (observation / "phase-timeline.json").write_text(json.dumps({
-                "schema_version": "runtime-phase-timeline/1.0",
-                "collector": {"state": "running", "pod_uid": "old-vllm", "written_at": "2026-11-02T00:00:00Z"},
-                "entries": [{"phase": "inferring"}],
-            }), encoding="utf-8")
+            (observation / "phase-timeline.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "runtime-phase-timeline/1.0",
+                        "collector": {"state": "running", "pod_uid": "old-vllm", "written_at": "2026-11-02T00:00:00Z"},
+                        "entries": [{"phase": "inferring"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
             checker = AWSAcceptance(arguments(root, engine="sglang"), runner=FakeRunner(), http=FakeHTTP([]))
             checker.normal_before = {"normal_ok": True, "stream_ok": True, "cache_ok": True}
             checker.detection_started_at = "2026-11-02T10:00:00Z"
             checker._normal_control = lambda: {"normal_ok": True, "stream_ok": True, "cache_ok": True}
-            checker._tetragon_observations = lambda _since: (True, [{"kind": "process_exec", "pod": {"pod": "engine-current"}, "phase": ["inferring"],
-                "exec_verdict": "allowed_in_phase", "phase_timeline_fresh": True}])
+            checker._tetragon_observations = lambda _since: (
+                True,
+                [
+                    {
+                        "kind": "process_exec",
+                        "pod": {"pod": "engine-current"},
+                        "phase": ["inferring"],
+                        "exec_verdict": "allowed_in_phase",
+                        "phase_timeline_fresh": True,
+                    }
+                ],
+            )
             checker._collectors = lambda: (response(200, {}), {"observation_feed_tetragon": {"state": "ok"}})
             facts, _evidence = checker.aws_11()
             self.assertIsNone(facts["false_warnings_zero"])
@@ -584,17 +771,43 @@ class DecisionTests(unittest.TestCase):
             checker.normal_before = {"normal_ok": True, "stream_ok": True, "cache_ok": True}
             checker.detection_started_at = "2026-11-03T00:00:00Z"
             checker._normal_control = lambda: {"normal_ok": True, "stream_ok": True, "cache_ok": True}
-            checker._tetragon_observations = lambda _since: (True, [{"kind": "process_exec", "pod": {"pod": "engine-current"}, "phase": ["inferring"],
-                "exec_verdict": "allowed_in_phase", "phase_timeline_fresh": True}])
+            checker._tetragon_observations = lambda _since: (
+                True,
+                [
+                    {
+                        "kind": "process_exec",
+                        "pod": {"pod": "engine-current"},
+                        "phase": ["inferring"],
+                        "exec_verdict": "allowed_in_phase",
+                        "phase_timeline_fresh": True,
+                    }
+                ],
+            )
             checker._collectors = lambda: (response(200, {}), {"observation_feed_tetragon": {"state": "ok"}})
             checker._engine_pod = lambda: ({"uid": "sglang-pod", "name": "engine-current"}, CommandResult(0))
-            checker._timeline = lambda: {"extraction": {"engine": "sglang"},
-                "collector": {"state": "running", "pod_uid": "sglang-pod", "written_at": datetime.now(timezone.utc).isoformat()}}
+            checker._timeline = lambda: {
+                "extraction": {"engine": "sglang"},
+                "collector": {
+                    "state": "running",
+                    "pod_uid": "sglang-pod",
+                    "written_at": datetime.now(timezone.utc).isoformat(),
+                },
+            }
             facts, _ = checker.aws_11()
             self.assertTrue(facts["false_warnings_zero"])
             self.assertEqual(evaluate_case("AWS-11", facts)[0], "passed")
-            checker._tetragon_observations = lambda _since: (True, [{"kind": "process_exec", "pod": {"pod": "old-engine"},
-                "phase": ["inferring"], "exec_verdict": "allowed_in_phase", "phase_timeline_fresh": True}])
+            checker._tetragon_observations = lambda _since: (
+                True,
+                [
+                    {
+                        "kind": "process_exec",
+                        "pod": {"pod": "old-engine"},
+                        "phase": ["inferring"],
+                        "exec_verdict": "allowed_in_phase",
+                        "phase_timeline_fresh": True,
+                    }
+                ],
+            )
             self.assertIsNone(checker.aws_11()[0]["false_warnings_zero"])
 
     def test_aws11_variable_paths_before_phase_do_not_count_as_false_warnings(self) -> None:
@@ -604,10 +817,19 @@ class DecisionTests(unittest.TestCase):
             checker.normal_before = {"normal_ok": True, "stream_ok": True, "cache_ok": True}
             checker.detection_started_at = "2026-11-03T00:00:00Z"
             checker._normal_control = lambda: {"normal_ok": True, "stream_ok": True, "cache_ok": True}
-            rows = [{"kind": "process_exec", "binary": binary, "phase": ["unknown"],
-                     "exec_verdict": "phase_unknown"} for binary in ("/proc/self/exe", "/dev/fd/11")]
-            rows.append({"kind": "process_exec", "binary": "/usr/bin/nvidia-ctk", "phase": ["loading"],
-                         "exec_verdict": "allowed_in_phase", "phase_timeline_fresh": True})
+            rows = [
+                {"kind": "process_exec", "binary": binary, "phase": ["unknown"], "exec_verdict": "phase_unknown"}
+                for binary in ("/proc/self/exe", "/dev/fd/11")
+            ]
+            rows.append(
+                {
+                    "kind": "process_exec",
+                    "binary": "/usr/bin/nvidia-ctk",
+                    "phase": ["loading"],
+                    "exec_verdict": "allowed_in_phase",
+                    "phase_timeline_fresh": True,
+                }
+            )
             checker._tetragon_observations = lambda _since: (True, rows)
             checker._collectors = lambda: (response(200, {}), {"observation_feed_tetragon": {"state": "ok"}})
             facts, evidence = checker.aws_11()
@@ -617,7 +839,8 @@ class DecisionTests(unittest.TestCase):
 
     PASS_FACTS = {
         "AWS-01": dict.fromkeys(
-            ("http_200", "valid_completion", "record_allowed", "delivery_attempted", "engine_log_match", "stream_ok"), True
+            ("http_200", "valid_completion", "record_allowed", "delivery_attempted", "engine_log_match", "stream_ok"),
+            True,
         ),
         "AWS-02": dict.fromkeys(
             ("auth_codes", "records_denied", "not_delivered", "engine_log_absent", "engine_log_format_confirmed"), True
@@ -644,7 +867,17 @@ class DecisionTests(unittest.TestCase):
             ("model_write_denied", "cache_write_succeeded", "cache_harmless_removed", "cache_tetragon"), True
         ),
         "AWS-07": dict.fromkeys(
-            ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "stopped_request_200_unverified", "start_ok", "collectors_recovered", "target_recovered", "inference_recovered"), True
+            (
+                "stop_ok",
+                "heartbeat_stopped_seen",
+                "collectors_unavailable",
+                "stopped_request_200_unverified",
+                "start_ok",
+                "collectors_recovered",
+                "target_recovered",
+                "inference_recovered",
+            ),
+            True,
         ),
         "AWS-08": dict.fromkeys(
             (
@@ -656,20 +889,51 @@ class DecisionTests(unittest.TestCase):
             ),
             True,
         ),
-        "AWS-09": dict.fromkeys(("absolute_exec_ok", "path_exec_ok", "path_observed", "engine_pod_match", "suspect_verdict"), True),
+        "AWS-09": dict.fromkeys(
+            ("absolute_exec_ok", "path_exec_ok", "path_observed", "engine_pod_match", "suspect_verdict"), True
+        ),
         "AWS-10": dict.fromkeys(("read_ok", "path_match", "engine_pod_match", "read_access", "monitor_detected"), True),
-        "AWS-11": dict.fromkeys(("normal_before", "normal_after", "stream_before", "stream_after", "cache_current_before", "cache_current_after", "false_warnings_zero"), True),
-        "AWS-12": dict.fromkeys(("baseline_connected", "policy_timeout", "hubble_dropped", "restored_connected", "cleanup_ok"), True),
+        "AWS-11": dict.fromkeys(
+            (
+                "normal_before",
+                "normal_after",
+                "stream_before",
+                "stream_after",
+                "cache_current_before",
+                "cache_current_after",
+                "false_warnings_zero",
+            ),
+            True,
+        ),
+        "AWS-12": dict.fromkeys(
+            ("baseline_connected", "policy_timeout", "hubble_dropped", "restored_connected", "cleanup_ok"), True
+        ),
         "AWS-13": dict.fromkeys(("bad_bundle_rejected", "recovered_200", "recovered_denied", "cleanup_ok"), True),
         "AWS-14": dict.fromkeys(("restart_ok", "initial_503", "recovered_200", "within_10s"), True),
         "AWS-15": dict.fromkeys(("stop_ok", "restart_ok", "observed_503", "recovered_200", "cleanup_ok"), True),
         "AWS-16": dict.fromkeys(("stop_ok", "expired_unknown", "request_200", "cleanup_ok"), True),
         "AWS-17": dict.fromkeys(("pod_changed", "timeline_new_uid", "timeline_reset", "old_phase_absent"), True),
-        "AWS-18": dict.fromkeys(("normal", "stream", "usage", "log_match", "context_boundary", "context_exceeded"), True),
-        "AWS-19": dict.fromkeys(("codes", "reasons", "records", "not_delivered", "engine_log_absent", "positive_control"), True),
-        "AWS-20": {"enforce_method": "override_lsm", **dict.fromkeys(
-            ("enforce_active", "monitor_read_ok", "read_eperm", "raw_override", "normal_200", "cleanup_ok", "restore_read_ok"), True
-        )},
+        "AWS-18": dict.fromkeys(
+            ("normal", "stream", "usage", "log_match", "context_boundary", "context_exceeded"), True
+        ),
+        "AWS-19": dict.fromkeys(
+            ("codes", "reasons", "records", "not_delivered", "engine_log_absent", "positive_control"), True
+        ),
+        "AWS-20": {
+            "enforce_method": "override_lsm",
+            **dict.fromkeys(
+                (
+                    "enforce_active",
+                    "monitor_read_ok",
+                    "read_eperm",
+                    "raw_override",
+                    "normal_200",
+                    "cleanup_ok",
+                    "restore_read_ok",
+                ),
+                True,
+            ),
+        },
     }
 
     def test_every_case_passes_only_with_all_required_facts(self) -> None:
@@ -854,8 +1118,12 @@ class FakeExecutionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(), http=FakeHTTP([]))
             checker._engine_log_generation = generation
-            final = {"target": {"pod_uid": "pod-1", "container_id": "containerd://1"},
-                     "upstream_request_id": "byul-cb-" + rid, "phase": "final", "request_id": rid}
+            final = {
+                "target": {"pod_uid": "pod-1", "container_id": "containerd://1"},
+                "upstream_request_id": "byul-cb-" + rid,
+                "phase": "final",
+                "request_id": rid,
+            }
             checker._detail = lambda _: {"final_state": {"result": "ALLOWED"}, "gateway_records": [final]}
             log = "Received request chatcmpl-byul-cb-" + rid + ": prompt omitted"
             self.assertTrue(checker._log_received(log, rid, "/v1/chat/completions"))
@@ -877,11 +1145,22 @@ class FakeExecutionTests(unittest.TestCase):
         final = next(row for row in document["gateway_records"] if row["phase"] == "final")
         with tempfile.TemporaryDirectory() as directory:
             checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(), http=FakeHTTP([]))
-            checker._engine_log_generation = {"uid": final["target"]["pod_uid"], "container_id": final["target"]["container_id"]}
+            checker._engine_log_generation = {
+                "uid": final["target"]["pod_uid"],
+                "container_id": final["target"]["container_id"],
+            }
             checker._detail = lambda _: document
             log = "Received request chatcmpl-" + final["upstream_request_id"] + ":"
             self.assertTrue(checker._log_received(log, rid, "/v1/chat/completions"))
-            for malformed in [None, {}, "invalid", [], [final, final], [{**final, "request_id": "other"}], [{**final, "phase": "started"}]]:
+            for malformed in [
+                None,
+                {},
+                "invalid",
+                [],
+                [final, final],
+                [{**final, "request_id": "other"}],
+                [{**final, "phase": "started"}],
+            ]:
                 with self.subTest(rows=type(malformed).__name__):
                     # Even a context-looking projection cannot bypass canonical rows.
                     checker._detail = lambda _, rows=malformed: {"final_state": final, "gateway_records": rows}
@@ -926,16 +1205,17 @@ class FakeExecutionTests(unittest.TestCase):
                 response(200, detail("ALLOWED", attempted=True, outcome="completed")),
             ]
         )
-        fake_runner = FakeRunner(
-            [CommandResult(0, f"INFO Received request chatcmpl-{request_id}.\n")]
-        )
+        fake_runner = FakeRunner([CommandResult(0, f"INFO Received request chatcmpl-{request_id}.\n")])
         with tempfile.TemporaryDirectory() as temporary:
             checker = AWSAcceptance(
                 arguments(Path(temporary), cases=("AWS-01",)),
                 runner=fake_runner,
                 http=fake_http,
             )
-            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
+            checker._engine_pod = lambda: (
+                {"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"},
+                CommandResult(0),
+            )
             checker._run_case("AWS-01", checker.aws_01)
             self.assertEqual(checker.cases[0]["result"], "passed")
             self.assertTrue(checker.engine_log_format_confirmed)
@@ -961,7 +1241,10 @@ class FakeExecutionTests(unittest.TestCase):
                 runner=FakeRunner([CommandResult(0, "Received request chatcmpl-normal-1\n")]),
                 http=fake_http,
             )
-            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
+            checker._engine_pod = lambda: (
+                {"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"},
+                CommandResult(0),
+            )
             checker._run_case("AWS-01", checker.aws_01)
             self.assertEqual(checker.cases[0]["result"], "failed")
             self.assertFalse(checker.cases[0]["facts"]["stream_ok"])
@@ -984,7 +1267,10 @@ class FakeExecutionTests(unittest.TestCase):
                 runner=FakeRunner([CommandResult(0, "Received request chatcmpl-normal-1\n")]),
                 http=fake_http,
             )
-            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
+            checker._engine_pod = lambda: (
+                {"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"},
+                CommandResult(0),
+            )
             checker._run_case("AWS-01", checker.aws_01)
             case = checker.cases[0]
             self.assertEqual(case["result"], "unknown")
@@ -992,19 +1278,18 @@ class FakeExecutionTests(unittest.TestCase):
             self.assertEqual(case["reason"], "판정 근거 부족: stream_ok")
 
     def test_aws_01_done_with_failed_final_record_is_not_stream_success(self) -> None:
-        failed = detail("ERROR", reason="ENGINE_BAD_RESPONSE", attempted=True,
-                        outcome="invalid_completion_stream")
-        failed["final_state"]["delivery"].update(
-            response="failed", error_code="ENGINE_BAD_RESPONSE")
-        fake_http = FakeHTTP([
-            response(200, {"choices": [{"message": {"content": "hello"}}]}, "normal-1"),
-            response(200, detail("ALLOWED", attempted=True, outcome="completed")),
-            sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\n', "stream-1"),
-            response(200, failed),
-        ])
+        failed = detail("ERROR", reason="ENGINE_BAD_RESPONSE", attempted=True, outcome="invalid_completion_stream")
+        failed["final_state"]["delivery"].update(response="failed", error_code="ENGINE_BAD_RESPONSE")
+        fake_http = FakeHTTP(
+            [
+                response(200, {"choices": [{"message": {"content": "hello"}}]}, "normal-1"),
+                response(200, detail("ALLOWED", attempted=True, outcome="completed")),
+                sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\n', "stream-1"),
+                response(200, failed),
+            ]
+        )
         with tempfile.TemporaryDirectory() as temporary:
-            checker = AWSAcceptance(arguments(Path(temporary), cases=("AWS-01",)),
-                                    runner=FakeRunner(), http=fake_http)
+            checker = AWSAcceptance(arguments(Path(temporary), cases=("AWS-01",)), runner=FakeRunner(), http=fake_http)
             facts, _ = checker.aws_01()
         self.assertFalse(facts["stream_ok"])
 
@@ -1024,7 +1309,10 @@ class FakeExecutionTests(unittest.TestCase):
                 http=fake_http,
             )
             checker.engine_log_format_confirmed = True
-            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
+            checker._engine_pod = lambda: (
+                {"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"},
+                CommandResult(0),
+            )
             checker._run_case("AWS-02", checker.aws_02)
             self.assertEqual(checker.cases[0]["result"], "passed")
             serialized = json.dumps(checker.cases)
@@ -1059,7 +1347,10 @@ class FakeExecutionTests(unittest.TestCase):
                 http=fake_http,
             )
             checker.engine_log_format_confirmed = True
-            checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
+            checker._engine_pod = lambda: (
+                {"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"},
+                CommandResult(0),
+            )
             checker._run_case("AWS-03", checker.aws_03)
             self.assertEqual(checker.cases[0]["result"], "passed")
             self.assertEqual(checker.cases[0]["evidence"]["policy_limit"], 128)
@@ -1086,7 +1377,10 @@ class FakeExecutionTests(unittest.TestCase):
                     http=http,
                 )
                 checker.engine_log_format_confirmed = confirmed
-                checker._engine_pod = lambda: ({"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"}, CommandResult(0))
+                checker._engine_pod = lambda: (
+                    {"name": "engine-1", "uid": "pod-1", "container_id": "containerd://1", "started_at": "now"},
+                    CommandResult(0),
+                )
                 checker._run_case("AWS-03", checker.aws_03)
                 return checker.cases[0]["result"]
 
@@ -1127,12 +1421,11 @@ class FakeExecutionTests(unittest.TestCase):
                             "l4": {"TCP": {"destination_port": 8000}},
                         }
                     }
-                ) + "\n",
+                )
+                + "\n",
                 encoding="utf-8",
             )
-            checker = AWSAcceptance(
-                arguments(root, cases=("AWS-04",)), runner=runner, http=http
-            )
+            checker = AWSAcceptance(arguments(root, cases=("AWS-04",)), runner=runner, http=http)
             checker._run_case("AWS-04", checker.aws_04)
             case = checker.cases[0]
             self.assertEqual(case["result"], "passed")
@@ -1169,9 +1462,7 @@ class FakeExecutionTests(unittest.TestCase):
                 {
                     "metadata": {"name": "serving-engine-abc", "uid": "engine-uid"},
                     "status": {
-                        "containerStatuses": [
-                            {"name": "engine", "containerID": "containerd://engine"}
-                        ],
+                        "containerStatuses": [{"name": "engine", "containerID": "containerd://engine"}],
                         "conditions": [{"type": "Ready", "status": "True"}],
                     },
                 }
@@ -1221,9 +1512,7 @@ class FakeExecutionTests(unittest.TestCase):
                         }
                     )
                 )
-            (observation / "hubble.jsonl").write_text(
-                "\n".join(flows) + "\n", encoding="utf-8"
-            )
+            (observation / "hubble.jsonl").write_text("\n".join(flows) + "\n", encoding="utf-8")
             checker = AWSAcceptance(
                 arguments(root, cases=("AWS-05",)),
                 runner=runner,
@@ -1237,13 +1526,15 @@ class FakeExecutionTests(unittest.TestCase):
 
     def test_aws_05_refused_is_unknown_not_policy_block(self) -> None:
         engine = {
-            "items": [{
-                "metadata": {"name": "serving-engine-abc", "uid": "uid"},
-                "status": {
-                    "containerStatuses": [{"name": "engine", "containerID": "containerd://id"}],
-                    "conditions": [{"type": "Ready", "status": "True"}],
-                },
-            }]
+            "items": [
+                {
+                    "metadata": {"name": "serving-engine-abc", "uid": "uid"},
+                    "status": {
+                        "containerStatuses": [{"name": "engine", "containerID": "containerd://id"}],
+                        "conditions": [{"type": "Ready", "status": "True"}],
+                    },
+                }
+            ]
         }
         receiver = {
             "metadata": {"name": "test-receiver", "labels": {"app": "test-receiver"}},
@@ -1288,13 +1579,15 @@ class FakeExecutionTests(unittest.TestCase):
     def test_aws_06_only_erofs_proves_read_only_mount(self) -> None:
         engine = json.dumps(
             {
-                "items": [{
-                    "metadata": {"name": "serving-engine-abc", "uid": "uid"},
-                    "status": {
-                        "containerStatuses": [{"name": "engine", "containerID": "containerd://id"}],
-                        "conditions": [{"type": "Ready", "status": "True"}],
-                    },
-                }]
+                "items": [
+                    {
+                        "metadata": {"name": "serving-engine-abc", "uid": "uid"},
+                        "status": {
+                            "containerStatuses": [{"name": "engine", "containerID": "containerd://id"}],
+                            "conditions": [{"type": "Ready", "status": "True"}],
+                        },
+                    }
+                ]
             }
         )
         for error_number, error_name, expected in (
@@ -1329,7 +1622,8 @@ class FakeExecutionTests(unittest.TestCase):
             "collectors": [
                 {"source": source, "state": "ok", "stale_after_s": 2.0}
                 for source in ("observation_feed_hubble", "observation_feed_tetragon")
-            ] + [{"source": "target_pods", "state": "ok", "stale_after_s": 15.0}]
+            ]
+            + [{"source": "target_pods", "state": "ok", "stale_after_s": 15.0}]
         }
         unavailable = {
             "collectors": [
@@ -1371,16 +1665,42 @@ class FakeExecutionTests(unittest.TestCase):
                     [
                         response(200, before),
                         response(200, unavailable),
-                        response(200, {"verification": {"state": "unavailable", "last_confirmed_at": "2026-10-26T00:00:00+00:00"}, "gateway_hold": None}),
+                        response(
+                            200,
+                            {
+                                "verification": {
+                                    "state": "unavailable",
+                                    "last_confirmed_at": "2026-10-26T00:00:00+00:00",
+                                },
+                                "gateway_hold": None,
+                            },
+                        ),
                         response(200, {"choices": [{"message": {"content": "during stop"}}]}, "stopped-request"),
                         response(200, detail("ALLOWED", attempted=True)),
-                        response(200, {"verification": {"state": "unavailable", "last_confirmed_at": "2026-10-26T00:00:00+00:00"}, "gateway_hold": None}),
+                        response(
+                            200,
+                            {
+                                "verification": {
+                                    "state": "unavailable",
+                                    "last_confirmed_at": "2026-10-26T00:00:00+00:00",
+                                },
+                                "gateway_hold": None,
+                            },
+                        ),
                         response(200, recovered),
-                        response(200, {"verification": {"state": "ok", "last_confirmed_at": "2026-10-26T00:00:20+00:00"}, "gateway_hold": None}),
+                        response(
+                            200,
+                            {
+                                "verification": {"state": "ok", "last_confirmed_at": "2026-10-26T00:00:20+00:00"},
+                                "gateway_hold": None,
+                            },
+                        ),
                         response(200, {"choices": [{"message": {"content": "recovered"}}]}, "recovered-request"),
                         response(200, detail("ALLOWED", attempted=True)),
                     ]
-                ), sleeper=clock.sleep, monotonic=clock.monotonic,
+                ),
+                sleeper=clock.sleep,
+                monotonic=clock.monotonic,
             )
             checker._run_case("AWS-07", checker.aws_07)
             case = checker.cases[0]
@@ -1400,17 +1720,31 @@ class FakeExecutionTests(unittest.TestCase):
 
             failed_clock = FakeClock()
             failed = AWSAcceptance(
-                arguments(root, cases=("AWS-07",), allow_collector_stop=True,
-                    evidence_dir=str(root / "failed-evidence")),
+                arguments(
+                    root, cases=("AWS-07",), allow_collector_stop=True, evidence_dir=str(root / "failed-evidence")
+                ),
                 runner=FakeRunner([CommandResult(0), CommandResult(0)]),
-                http=FakeHTTP([
-                    response(200, before), response(200, unavailable),
-                    response(200, {"verification": {"state": "blocked", "last_confirmed_at": None}, "gateway_hold": {"reason_code": "TARGET_UNAVAILABLE"}}),
-                    response(200, recovered),
-                    response(200, {"verification": {"state": "ok", "last_confirmed_at": None}, "gateway_hold": None}),
-                    response(200, {"choices": [{"message": {"content": "recovered"}}]}, "recovered-request"),
-                    response(200, detail("ALLOWED", attempted=True)),
-                ]), sleeper=failed_clock.sleep, monotonic=failed_clock.monotonic,
+                http=FakeHTTP(
+                    [
+                        response(200, before),
+                        response(200, unavailable),
+                        response(
+                            200,
+                            {
+                                "verification": {"state": "blocked", "last_confirmed_at": None},
+                                "gateway_hold": {"reason_code": "TARGET_UNAVAILABLE"},
+                            },
+                        ),
+                        response(200, recovered),
+                        response(
+                            200, {"verification": {"state": "ok", "last_confirmed_at": None}, "gateway_hold": None}
+                        ),
+                        response(200, {"choices": [{"message": {"content": "recovered"}}]}, "recovered-request"),
+                        response(200, detail("ALLOWED", attempted=True)),
+                    ]
+                ),
+                sleeper=failed_clock.sleep,
+                monotonic=failed_clock.monotonic,
             )
             failed._run_case("AWS-07", failed.aws_07)
             self.assertEqual(failed.cases[0]["result"], "failed")
@@ -1426,9 +1760,7 @@ class FakeExecutionTests(unittest.TestCase):
                         {
                             "metadata": {"name": f"engine-{uid}", "uid": uid},
                             "status": {
-                                "containerStatuses": [
-                                    {"name": "engine", "containerID": container_id}
-                                ],
+                                "containerStatuses": [{"name": "engine", "containerID": container_id}],
                                 "conditions": [{"type": "Ready", "status": "True"}],
                             },
                         }
@@ -1513,13 +1845,15 @@ class FakeExecutionTests(unittest.TestCase):
         def engine_pod(uid: str) -> str:
             return json.dumps(
                 {
-                    "items": [{
-                        "metadata": {"name": f"engine-{uid}", "uid": uid},
-                        "status": {
-                            "containerStatuses": [{"name": "engine", "containerID": f"containerd://{uid}"}],
-                            "conditions": [{"type": "Ready", "status": "True"}],
-                        },
-                    }]
+                    "items": [
+                        {
+                            "metadata": {"name": f"engine-{uid}", "uid": uid},
+                            "status": {
+                                "containerStatuses": [{"name": "engine", "containerID": f"containerd://{uid}"}],
+                                "conditions": [{"type": "Ready", "status": "True"}],
+                            },
+                        }
+                    ]
                 }
             )
 
@@ -1530,20 +1864,24 @@ class FakeExecutionTests(unittest.TestCase):
         }
         after_target = {
             "instance": {"state": "ok", "current": {"instance_id": "new"}},
-            "history": [{
-                "event": "instance_changed",
-                "reason": "pod_replaced",
-                "previous_instance_id": "old",
-                "instance": {"instance_id": "new"},
-            }],
+            "history": [
+                {
+                    "event": "instance_changed",
+                    "reason": "pod_replaced",
+                    "previous_instance_id": "old",
+                    "instance": {"instance_id": "new"},
+                }
+            ],
             "kubernetes": {"state": "ok"},
         }
         collectors = {
-            "collectors": [{
-                "source": "engine_info",
-                "state": "ok",
-                "last_success_at": "9999-01-01T00:00:00+00:00",
-            }]
+            "collectors": [
+                {
+                    "source": "engine_info",
+                    "state": "ok",
+                    "last_success_at": "9999-01-01T00:00:00+00:00",
+                }
+            ]
         }
 
         def run(recovery_responses: list[HTTPResponse], clock: FakeClock) -> dict[str, object]:
@@ -1556,7 +1894,12 @@ class FakeExecutionTests(unittest.TestCase):
                 ]
             )
             http = FakeHTTP(
-                [response(200, before_target), response(200, after_target), response(200, collectors), *recovery_responses]
+                [
+                    response(200, before_target),
+                    response(200, after_target),
+                    response(200, collectors),
+                    *recovery_responses,
+                ]
             )
             with tempfile.TemporaryDirectory() as temporary:
                 checker = AWSAcceptance(
@@ -1607,27 +1950,37 @@ class EvidenceTests(unittest.TestCase):
         facts = dict(DecisionTests.PASS_FACTS[case_id] if facts is None else facts)
         result, reason = evaluate_case(case_id, facts)
         return {
-            "case_id": case_id, "title": case_id, "rt_ids": [],
-            "result": result, "reason": reason, "facts": facts, "evidence": evidence,
+            "case_id": case_id,
+            "title": case_id,
+            "rt_ids": [],
+            "result": result,
+            "reason": reason,
+            "facts": facts,
+            "evidence": evidence,
         }
 
     def test_public_report_preserves_real_run_and_excludes_raw_details(self):
         from serving_runtime.mvp.lab_report import LabReportSource, AWS_REPORT_SCHEMA
         from tools import verification_material
         import os
+
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             public = root / "public"
             public.mkdir(mode=0o2750)
             public.chmod(0o2750)
-            checker = AWSAcceptance(arguments(root, cases=("AWS-06",), public_report_dir=public), runner=FakeRunner(), http=FakeHTTP([]))
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-06",), public_report_dir=public), runner=FakeRunner(), http=FakeHTTP([])
+            )
             checker.run_started_at = "2020-01-01T00:00:00Z"
             checker.cases.append(self._case("AWS-06", {"raw": "private-command-output"}))
             link = os.link
+
             def observed_link(source, target):
                 self.assertEqual(LabReportSource(public).read()["state"], "missing")
                 self.assertEqual(stat.S_IMODE(Path(source).stat().st_mode), 0o640)
                 return link(source, target)
+
             with patch.object(verification_material.os, "link", side_effect=observed_link):
                 private, markdown = checker.write_report()
             raw = json.loads(private.read_text())
@@ -1642,7 +1995,15 @@ class EvidenceTests(unittest.TestCase):
             self.assertEqual([c["id"] for c in view["cases"]], ["AWS-06"])
             self.assertIn("private-command-output", private.read_text())
             published = Path(result["path"])
-            for secret in (INFERENCE, VIEWER, "private-command-output", "gateway_url", "observation_dir", "facts", "commands"):
+            for secret in (
+                INFERENCE,
+                VIEWER,
+                "private-command-output",
+                "gateway_url",
+                "observation_dir",
+                "facts",
+                "commands",
+            ):
                 self.assertNotIn(secret, published.read_text())
             self.assertEqual(stat.S_IMODE(published.stat().st_mode), 0o640)
             self.assertEqual(published.stat().st_gid, public.stat().st_gid)
@@ -1654,19 +2015,33 @@ class EvidenceTests(unittest.TestCase):
     def test_public_report_preserves_all_result_states_and_schema_case_families(self):
         from tools.aws_lab_acceptance import publish_report
         from serving_runtime.mvp.lab_report import LabReportSource, REPORT_SCHEMA
+
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            report = {"run_id": "aws-acceptance-20200101T000000Z-1", "started_at": "2020-01-01T00:00:00Z",
-                      "ended_at": "2020-01-01T00:01:00Z", "kube_context": "private-192.0.2.99", "namespace": "serving-lab", "engine": "vllm",
-                      "cases": [{"case_id": f"AWS-{i:02d}", "result": result, "reason": INFERENCE}
-                                for i, result in enumerate(("passed", "failed", "unknown", "not_run"), 1)]}
+            report = {
+                "run_id": "aws-acceptance-20200101T000000Z-1",
+                "started_at": "2020-01-01T00:00:00Z",
+                "ended_at": "2020-01-01T00:01:00Z",
+                "kube_context": "private-192.0.2.99",
+                "namespace": "serving-lab",
+                "engine": "vllm",
+                "cases": [
+                    {"case_id": f"AWS-{i:02d}", "result": result, "reason": INFERENCE}
+                    for i, result in enumerate(("passed", "failed", "unknown", "not_run"), 1)
+                ],
+            }
             path = publish_report(report, root, (INFERENCE,))
             value = LabReportSource(root).read()["report"]
             self.assertEqual(value["overall"], "failed")
             self.assertEqual([c["status"] for c in value["cases"]], ["passed", "failed", "unknown", "not_run"])
             self.assertTrue(value["context"].startswith("environment-"))
             self.assertNotIn("192.0.2.99", path.read_text())
-            for malformed in (dict(value, schema=REPORT_SCHEMA), dict(value, cases=value["cases"] * 2), dict(value, cases=[]), dict(value, schema=[])):
+            for malformed in (
+                dict(value, schema=REPORT_SCHEMA),
+                dict(value, cases=value["cases"] * 2),
+                dict(value, cases=[]),
+                dict(value, schema=[]),
+            ):
                 with self.assertRaises(ValueError):
                     LabReportSource._validate(malformed)
             invalid_status = dict(value, cases=[dict(value["cases"][0], status=[])])
@@ -1678,6 +2053,7 @@ class EvidenceTests(unittest.TestCase):
 
     def test_run_publication_keeps_failure_and_unknown_exit_codes(self):
         from serving_runtime.mvp.lab_report import LabReportSource
+
         for status, expected in (("failed", 1), ("unknown", 3), ("not_run", 3), ("passed", 0)):
             with self.subTest(status=status), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
@@ -1687,15 +2063,23 @@ class EvidenceTests(unittest.TestCase):
                 checker = AWSAcceptance(args, runner=FakeRunner(), http=FakeHTTP([]))
                 case = self._case("AWS-06", {})
                 case["result"] = status
-                with patch.object(checker, "_run_case", side_effect=lambda *args: checker.cases.append(case)), redirect_stdout(io.StringIO()):
+                with (
+                    patch.object(checker, "_run_case", side_effect=lambda *args: checker.cases.append(case)),
+                    redirect_stdout(io.StringIO()),
+                ):
                     self.assertEqual(checker.run(), expected)
                 self.assertEqual(LabReportSource(public).read()["report"]["cases"][0]["status"], status)
 
     def test_publication_refuses_unsafe_destination_and_keeps_private_evidence_on_failure(self):
         from tools.aws_lab_acceptance import ConfigurationError
+
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            checker = AWSAcceptance(arguments(root, cases=("AWS-06",), public_report_dir=root / "missing"), runner=FakeRunner(), http=FakeHTTP([]))
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-06",), public_report_dir=root / "missing"),
+                runner=FakeRunner(),
+                http=FakeHTTP([]),
+            )
             checker.cases.append(self._case("AWS-06", {}))
             with self.assertRaisesRegex(ConfigurationError, "PUBLIC_REPORT_WRITE_FAILED"):
                 checker.write_report()
@@ -1722,11 +2106,18 @@ class EvidenceTests(unittest.TestCase):
 
     def test_markdown_uses_korean_sections_and_only_selected_case_notes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            checker = AWSAcceptance(arguments(Path(temporary), cases=("AWS-06",)), runner=FakeRunner(), http=FakeHTTP([]))
-            checker.cases.append(self._case("AWS-06", {
-                "model_probe": {"errno_name": "EROFS"},
-                "cache_probe": {"marker": "CACHE_WRITE_REMOVED"},
-            }))
+            checker = AWSAcceptance(
+                arguments(Path(temporary), cases=("AWS-06",)), runner=FakeRunner(), http=FakeHTTP([])
+            )
+            checker.cases.append(
+                self._case(
+                    "AWS-06",
+                    {
+                        "model_probe": {"errno_name": "EROFS"},
+                        "cache_probe": {"marker": "CACHE_WRITE_REMOVED"},
+                    },
+                )
+            )
             json_path, md_path = checker.write_report()
             md = md_path.read_text(encoding="utf-8")
             report = json.loads(json_path.read_text(encoding="utf-8"))
@@ -1745,14 +2136,39 @@ class EvidenceTests(unittest.TestCase):
 
     def test_each_case_displays_collected_values_without_copying_sensitive_text(self) -> None:
         examples = {
-            "AWS-01": ({"http_codes": [200], "stream": {"http_status": 200, "sse_data_received": True, "done_received": True}}, "일반 HTTP 200, stream HTTP 200"),
-            "AWS-02": ({"attempts": [{"kind": "missing", "status": 401, "error_code": "AUTH_REQUIRED"}, {"kind": "invalid", "status": 401, "error_code": "AUTH_INVALID"}]}, "missing HTTP 401/AUTH_REQUIRED, invalid HTTP 401/AUTH_INVALID"),
+            "AWS-01": (
+                {"http_codes": [200], "stream": {"http_status": 200, "sse_data_received": True, "done_received": True}},
+                "일반 HTTP 200, stream HTTP 200",
+            ),
+            "AWS-02": (
+                {
+                    "attempts": [
+                        {"kind": "missing", "status": 401, "error_code": "AUTH_REQUIRED"},
+                        {"kind": "invalid", "status": 401, "error_code": "AUTH_INVALID"},
+                    ]
+                },
+                "missing HTTP 401/AUTH_REQUIRED, invalid HTTP 401/AUTH_INVALID",
+            ),
             "AWS-03": ({"policy_limit": 256, "boundary": {"http_status": 200}}, "상한 256토큰, 상한 요청 HTTP 200"),
             "AWS-04": ({"direct_probe": {"errno_name": "EAGAIN"}}, "직통 연결 EAGAIN"),
             "AWS-05": ({"engine_receiver_probe": {"errno_name": "ETIMEDOUT"}}, "engine→receiver 연결 ETIMEDOUT"),
-            "AWS-06": ({"model_probe": {"errno_name": "EROFS"}, "cache_probe": {"marker": "CACHE_WRITE_REMOVED"}}, "/models 쓰기 EROFS"),
-            "AWS-07": ({"stopped_interval_request": {"http_status": 200}, "stopped_target_verification": {"state": "unavailable"}, "recovered_target_verification": {"state": "ok"}, "recovery_request": {"last_status": 200}}, "중단 중 요청 HTTP 200, 대상 상태 unavailable; 복구 대상 ok, 요청 HTTP 200"),
-            "AWS-08": ({"engine_info": {"state": "ok"}, "recovery_request": {"last_status": 200}}, "engine_info ok, 복구 요청 HTTP 200"),
+            "AWS-06": (
+                {"model_probe": {"errno_name": "EROFS"}, "cache_probe": {"marker": "CACHE_WRITE_REMOVED"}},
+                "/models 쓰기 EROFS",
+            ),
+            "AWS-07": (
+                {
+                    "stopped_interval_request": {"http_status": 200},
+                    "stopped_target_verification": {"state": "unavailable"},
+                    "recovered_target_verification": {"state": "ok"},
+                    "recovery_request": {"last_status": 200},
+                },
+                "중단 중 요청 HTTP 200, 대상 상태 unavailable; 복구 대상 ok, 요청 HTTP 200",
+            ),
+            "AWS-08": (
+                {"engine_info": {"state": "ok"}, "recovery_request": {"last_status": 200}},
+                "engine_info ok, 복구 요청 HTTP 200",
+            ),
         }
         with tempfile.TemporaryDirectory() as temporary:
             checker = AWSAcceptance(arguments(Path(temporary)), runner=FakeRunner(), http=FakeHTTP([]))
@@ -1776,12 +2192,18 @@ class EvidenceTests(unittest.TestCase):
             unknown["cache_tetragon"] = None
             auth_failed = dict(DecisionTests.PASS_FACTS["AWS-02"])
             auth_failed["auth_codes"] = False
-            checker.cases.extend((
-                self._case("AWS-07", {"stopped_interval_request": {"http_status": 503}}, failed),
-                self._case("AWS-06", {}, unknown),
-                self._case("AWS-08", {}, {"not_run_reason": "--allow-engine-restart 없음"}),
-                self._case("AWS-02", {"attempts": [{"kind": "missing", "status": 403, "error_code": "OTHER_CODE"}]}, auth_failed),
-            ))
+            checker.cases.extend(
+                (
+                    self._case("AWS-07", {"stopped_interval_request": {"http_status": 503}}, failed),
+                    self._case("AWS-06", {}, unknown),
+                    self._case("AWS-08", {}, {"not_run_reason": "--allow-engine-restart 없음"}),
+                    self._case(
+                        "AWS-02",
+                        {"attempts": [{"kind": "missing", "status": 403, "error_code": "OTHER_CODE"}]},
+                        auth_failed,
+                    ),
+                )
+            )
             md = checker.write_report()[1].read_text(encoding="utf-8")
             self.assertIn("중단 중 요청 HTTP 503, 대상 상태 확인 못 함", md)
             self.assertIn("stopped_request_200_unverified=아니요", md)
@@ -1844,14 +2266,21 @@ class NewCaseExecutionTests(unittest.TestCase):
     def test_delayed_forward_is_kept_alive_until_ready(self) -> None:
         class Forward:
             closed = False
-            def poll(self): return 1 if self.closed else None
-            def terminate(self): self.closed = True
-            def wait(self, timeout=None): return 0
+
+            def poll(self):
+                return 1 if self.closed else None
+
+            def terminate(self):
+                self.closed = True
+
+            def wait(self, timeout=None):
+                return 0
 
         class DelayedRunner(FakeRunner):
             def __init__(self):
                 super().__init__()
                 self.forwards = []
+
             def start_port_forward(self, argv):
                 forward = Forward()
                 self.forwards.append(forward)
@@ -1861,6 +2290,7 @@ class NewCaseExecutionTests(unittest.TestCase):
             def __init__(self, runner, clock):
                 self.runner, self.clock = runner, clock
                 self.fail = False
+
             def request(self, method, url, **kwargs):
                 if self.fail or not self.runner.forwards or self.clock.value < 0.3:
                     raise URLError("forward is starting")
@@ -1870,9 +2300,9 @@ class NewCaseExecutionTests(unittest.TestCase):
             clock = FakeClock()
             runner = DelayedRunner()
             http = DelayedHTTP(runner, clock)
-            checker = AWSAcceptance(arguments(Path(directory)), runner=runner,
-                                    http=http,
-                                    sleeper=clock.sleep, monotonic=clock.monotonic)
+            checker = AWSAcceptance(
+                arguments(Path(directory)), runner=runner, http=http, sleeper=clock.sleep, monotonic=clock.monotonic
+            )
             checker._restart_pending = True
             checker._port_accepting = lambda: clock.value >= 0.3
             self.assertEqual(checker._request("GET", "/health", token=None).status, 200)
@@ -1887,24 +2317,38 @@ class NewCaseExecutionTests(unittest.TestCase):
 
     def test_forward_readiness_wait_has_upper_bound(self) -> None:
         class Forward:
-            def poll(self): return None
-            def terminate(self): pass
-            def wait(self, timeout=None): return 0
+            def poll(self):
+                return None
+
+            def terminate(self):
+                pass
+
+            def wait(self, timeout=None):
+                return 0
+
         class ForwardRunner(FakeRunner):
             def __init__(self):
                 super().__init__()
                 self.opens = 0
+
             def start_port_forward(self, argv):
                 self.opens += 1
                 return Forward()
+
         class UnreadyHTTP:
             def request(self, method, url, **kwargs):
                 raise URLError("not ready")
+
         with tempfile.TemporaryDirectory() as directory:
             clock = FakeClock()
             runner = ForwardRunner()
-            checker = AWSAcceptance(arguments(Path(directory)), runner=runner, http=UnreadyHTTP(),
-                                    sleeper=clock.sleep, monotonic=clock.monotonic)
+            checker = AWSAcceptance(
+                arguments(Path(directory)),
+                runner=runner,
+                http=UnreadyHTTP(),
+                sleeper=clock.sleep,
+                monotonic=clock.monotonic,
+            )
             checker._restart_pending = True
             checker._port_accepting = lambda: False
             with self.assertRaises(URLError):
@@ -1914,16 +2358,23 @@ class NewCaseExecutionTests(unittest.TestCase):
 
     def test_restart_reconnect_misses_503_is_unknown(self) -> None:
         class Forward:
-            def poll(self): return None
-            def terminate(self): pass
-            def wait(self, timeout=None): return 0
+            def poll(self):
+                return None
+
+            def terminate(self):
+                pass
+
+            def wait(self, timeout=None):
+                return 0
 
         class ForwardRunner(FakeRunner):
             def start_port_forward(self, argv):
                 return Forward()
 
         class HTTP:
-            def __init__(self): self.calls = 0
+            def __init__(self):
+                self.calls = 0
+
             def request(self, method, url, **kwargs):
                 self.calls += 1
                 if self.calls == 1:
@@ -1933,13 +2384,23 @@ class NewCaseExecutionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             clock = FakeClock()
-            checker = AWSAcceptance(arguments(root, cases=("AWS-14",), allow_gateway_restart=True), runner=ForwardRunner(), http=HTTP(), sleeper=clock.sleep, monotonic=clock.monotonic)
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-14",), allow_gateway_restart=True),
+                runner=ForwardRunner(),
+                http=HTTP(),
+                sleeper=clock.sleep,
+                monotonic=clock.monotonic,
+            )
             count = []
+
             def kubectl(*argv, **kwargs):
                 if "get" in argv:
                     count.append(1)
-                    return CommandResult(0, json.dumps({"items": [{"metadata": {"uid": "old" if len(count) == 1 else "new"}}]}))
+                    return CommandResult(
+                        0, json.dumps({"items": [{"metadata": {"uid": "old" if len(count) == 1 else "new"}}]})
+                    )
                 return CommandResult(0)
+
             checker._kubectl = kubectl
             facts, evidence = checker.aws_14()
             self.assertEqual(evaluate_case("AWS-14", facts)[0], "unknown")
@@ -1954,7 +2415,11 @@ class NewCaseExecutionTests(unittest.TestCase):
                 raise AssertionError("remote gateway must not open a local forward")
 
         with tempfile.TemporaryDirectory() as directory:
-            checker = AWSAcceptance(arguments(Path(directory), gateway_url="http://gateway.example:8080"), runner=RemoteRunner(), http=FakeHTTP([]))
+            checker = AWSAcceptance(
+                arguments(Path(directory), gateway_url="http://gateway.example:8080"),
+                runner=RemoteRunner(),
+                http=FakeHTTP([]),
+            )
             checker._gateway_restart_started()
             self.assertFalse(checker._restart_pending)
             with self.assertRaises(AssertionError):
@@ -1980,10 +2445,17 @@ class NewCaseExecutionTests(unittest.TestCase):
 
             def start_port_forward(self, argv):
                 self.forwards += 1
+
                 class Forward:
-                    def poll(self): return None
-                    def terminate(self): pass
-                    def wait(self, timeout=None): return 0
+                    def poll(self):
+                        return None
+
+                    def terminate(self):
+                        pass
+
+                    def wait(self, timeout=None):
+                        return 0
+
                 return Forward()
 
         class HTTP:
@@ -2002,13 +2474,26 @@ class NewCaseExecutionTests(unittest.TestCase):
             previous = bundles / "previous"
             previous.mkdir(parents=True)
             (previous / "policy.json").write_bytes(b"{}")
-            (previous / "bundle.json").write_text(json.dumps({"files": [{"role": "gateway_policy", "path": "policy.json"}]}))
+            (previous / "bundle.json").write_text(
+                json.dumps({"files": [{"role": "gateway_policy", "path": "policy.json"}]})
+            )
             (bundles / "current").symlink_to("previous")
             runner = RestartRunner()
-            checker = AWSAcceptance(arguments(root, cases=("AWS-13",), allow_bundle_switch=True, bundle_root=str(bundles)), runner=runner, http=HTTP(runner))
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-13",), allow_bundle_switch=True, bundle_root=str(bundles)),
+                runner=runner,
+                http=HTTP(runner),
+            )
             checker._gateway_pods = lambda: [{"metadata": {"uid": "old"}}]
-            checker._gateway_crashed = lambda _window, _uids: (True, {"restart_count": 1, "pod_name": "gateway-new", "pod_uid": "new"})
-            checker._retry_inference = lambda _timeout: (checker._completion(token=INFERENCE)[0].status == 200, {"result": "ALLOWED"}, {"last_status": 200})
+            checker._gateway_crashed = lambda _window, _uids: (
+                True,
+                {"restart_count": 1, "pod_name": "gateway-new", "pod_uid": "new"},
+            )
+            checker._retry_inference = lambda _timeout: (
+                checker._completion(token=INFERENCE)[0].status == 200,
+                {"result": "ALLOWED"},
+                {"last_status": 200},
+            )
             checker._detail = lambda _id: detail("DENIED", reason="AUTH_REQUIRED", attempted=False, status=401)
             self.assertEqual(checker.run(), 0)
             self.assertEqual(runner.restarts, 2)
@@ -2029,16 +2514,26 @@ class NewCaseExecutionTests(unittest.TestCase):
             def start_port_forward(self, argv):
                 class Forward:
                     closed = False
-                    def poll(self): return 1 if self.closed else None
-                    def terminate(self): self.closed = True
-                    def wait(self, timeout=None): return 0
+
+                    def poll(self):
+                        return 1 if self.closed else None
+
+                    def terminate(self):
+                        self.closed = True
+
+                    def wait(self, timeout=None):
+                        return 0
+
                 self.forward = Forward()
                 return self.forward
 
         class HTTP:
             def __init__(self, runner):
                 self.runner = runner
-                self.responses = [response(503, {"error": {"code": "TARGET_UNAVAILABLE"}}), response(200, {"choices": [{"message": {"content": "ok"}}]})]
+                self.responses = [
+                    response(503, {"error": {"code": "TARGET_UNAVAILABLE"}}),
+                    response(200, {"choices": [{"message": {"content": "ok"}}]}),
+                ]
 
             def request(self, method, url, **kwargs):
                 if self.runner.restarted and (self.runner.forward is None or self.runner.forward.closed):
@@ -2048,9 +2543,17 @@ class NewCaseExecutionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             runner = RunnerWithForward()
-            checker = AWSAcceptance(arguments(root, cases=("AWS-15",), allow_collector_stop=True, allow_gateway_restart=True), runner=runner, http=HTTP(runner))
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-15",), allow_collector_stop=True, allow_gateway_restart=True),
+                runner=runner,
+                http=HTTP(runner),
+            )
             checker._wait_collectors_ok = lambda _timeout: (True, {"observation_feed_hubble": {"state": "ok"}})
-            checker._retry_inference = lambda _timeout: (checker._completion(token=INFERENCE)[0].status == 200, None, {"last_status": 200})
+            checker._retry_inference = lambda _timeout: (
+                checker._completion(token=INFERENCE)[0].status == 200,
+                None,
+                {"last_status": 200},
+            )
             self.assertEqual(checker.run(), 0)
             self.assertEqual(checker.cases[0]["evidence"]["stopped_request_statuses"], [503])
             self.assertTrue(checker.cases[0]["evidence"]["reconnect_at"])
@@ -2093,7 +2596,10 @@ class NewCaseExecutionTests(unittest.TestCase):
         class RestartHTTP:
             def __init__(self, runner):
                 self.runner = runner
-                self.responses = [response(503, {"error": {"code": "TARGET_UNAVAILABLE"}}), response(200, {"choices": [{"message": {"content": "ok"}}]})]
+                self.responses = [
+                    response(503, {"error": {"code": "TARGET_UNAVAILABLE"}}),
+                    response(200, {"choices": [{"message": {"content": "ok"}}]}),
+                ]
 
             def request(self, method, url, **kwargs):
                 if not self.runner.user_forward_live and not any(not item.closed for item in self.runner.owned):
@@ -2105,14 +2611,22 @@ class NewCaseExecutionTests(unittest.TestCase):
             (root / "observation").mkdir()
             runner = RestartRunner()
             clock = FakeClock()
-            checker = AWSAcceptance(arguments(root, cases=("AWS-14",), allow_gateway_restart=True), runner=runner, http=RestartHTTP(runner), sleeper=clock.sleep, monotonic=clock.monotonic)
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-14",), allow_gateway_restart=True),
+                runner=runner,
+                http=RestartHTTP(runner),
+                sleeper=clock.sleep,
+                monotonic=clock.monotonic,
+            )
             pod_calls = []
+
             def kubectl(*argv, **kwargs):
                 if "get" in argv:
                     pod_calls.append(1)
                     uid = "old" if len(pod_calls) == 1 else "new"
                     return CommandResult(0, json.dumps({"items": [{"metadata": {"uid": uid}}]}))
                 return runner.run(["kubectl", "--context", checker.context, "-n", checker.namespace, *argv])
+
             checker._kubectl = kubectl
             self.assertEqual(checker.run(), 0)
             self.assertEqual(checker.cases[0]["result"], "passed")
@@ -2135,7 +2649,22 @@ class NewCaseExecutionTests(unittest.TestCase):
                 if command[-5:] == ["get", "pod", "other-client", "-o", "json"]:
                     if self.image is None:
                         return CommandResult(1)
-                    return CommandResult(0, json.dumps({"spec": {"containers": [{"name": "client", "image": self.image, "imagePullPolicy": "IfNotPresent"}]}, "status": {"phase": "Running", "containerStatuses": [{"name": "client", "ready": True}]}}))
+                    return CommandResult(
+                        0,
+                        json.dumps(
+                            {
+                                "spec": {
+                                    "containers": [
+                                        {"name": "client", "image": self.image, "imagePullPolicy": "IfNotPresent"}
+                                    ]
+                                },
+                                "status": {
+                                    "phase": "Running",
+                                    "containerStatuses": [{"name": "client", "ready": True}],
+                                },
+                            }
+                        ),
+                    )
                 if "apply" in command and "-f" in command and "-" in command:
                     self.manifest = input
                     return CommandResult(1)
@@ -2144,7 +2673,11 @@ class NewCaseExecutionTests(unittest.TestCase):
         for image in ("registry.local/serving-tools@sha256:" + "a" * 64, None):
             with self.subTest(image=image), tempfile.TemporaryDirectory() as directory:
                 runner = ImageRunner(image)
-                checker = AWSAcceptance(arguments(Path(directory), cases=("AWS-12",), allow_compare_policy=True), runner=runner, http=FakeHTTP([]))
+                checker = AWSAcceptance(
+                    arguments(Path(directory), cases=("AWS-12",), allow_compare_policy=True),
+                    runner=runner,
+                    http=FakeHTTP([]),
+                )
                 facts, evidence = checker.aws_12()
                 self.assertEqual(evaluate_case("AWS-12", facts)[0], "unknown")
                 if image is None:
@@ -2161,16 +2694,45 @@ class NewCaseExecutionTests(unittest.TestCase):
             observation.mkdir()
             (observation / "target-pods.json").write_text(json.dumps({"collected_at": "2026-11-03T00:00:00Z"}))
             clock = FakeClock()
-            checker = AWSAcceptance(arguments(root, cases=("AWS-14",), allow_gateway_restart=True), runner=FakeRunner(), http=FakeHTTP([]), sleeper=clock.sleep, monotonic=clock.monotonic)
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-14",), allow_gateway_restart=True),
+                runner=FakeRunner(),
+                http=FakeHTTP([]),
+                sleeper=clock.sleep,
+                monotonic=clock.monotonic,
+            )
             pod_calls = []
+
             def kubectl(*argv, **_kwargs):
                 if "get" in argv:
                     pod_calls.append(1)
                     uid = "old" if len(pod_calls) == 1 else "new"
-                    return CommandResult(0, json.dumps({"items": [{"metadata": {"uid": uid}, "status": {"containerStatuses": [{"state": {"running": {"startedAt": "2026-11-03T00:00:00Z"}}}]}}]}))
+                    return CommandResult(
+                        0,
+                        json.dumps(
+                            {
+                                "items": [
+                                    {
+                                        "metadata": {"uid": uid},
+                                        "status": {
+                                            "containerStatuses": [
+                                                {"state": {"running": {"startedAt": "2026-11-03T00:00:00Z"}}}
+                                            ]
+                                        },
+                                    }
+                                ]
+                            }
+                        ),
+                    )
                 return CommandResult(0)
+
             checker._kubectl = kubectl
-            completions = iter(((response(503, {"error": {"code": "TARGET_UNAVAILABLE"}}), None, False), (response(200, {"choices": [{"message": {"content": "ok"}}]}), None, True)))
+            completions = iter(
+                (
+                    (response(503, {"error": {"code": "TARGET_UNAVAILABLE"}}), None, False),
+                    (response(200, {"choices": [{"message": {"content": "ok"}}]}), None, True),
+                )
+            )
             checker._completion = lambda **_kwargs: next(completions)
             facts, evidence = checker.aws_14()
             self.assertEqual(evaluate_case("AWS-14", facts)[0], "passed")
@@ -2180,8 +2742,17 @@ class NewCaseExecutionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             runner = FakeRunner([CommandResult(0), CommandResult(0), CommandResult(0), CommandResult(1)])
-            checker = AWSAcceptance(arguments(root, cases=("AWS-15",), allow_collector_stop=True, allow_gateway_restart=True), runner=runner, http=FakeHTTP([]), sleeper=lambda _s: None)
-            checker._completion = lambda **_kwargs: (response(503, {"error": {"code": "TARGET_UNAVAILABLE"}}), None, False)
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-15",), allow_collector_stop=True, allow_gateway_restart=True),
+                runner=runner,
+                http=FakeHTTP([]),
+                sleeper=lambda _s: None,
+            )
+            checker._completion = lambda **_kwargs: (
+                response(503, {"error": {"code": "TARGET_UNAVAILABLE"}}),
+                None,
+                False,
+            )
             facts, evidence = checker.aws_15()
             self.assertEqual(evaluate_case("AWS-15", facts)[0], "failed")
             self.assertEqual(evidence["collector_start_rc"], 1)
@@ -2189,13 +2760,30 @@ class NewCaseExecutionTests(unittest.TestCase):
     def test_stage_expires_during_collector_stop_and_request_stays_200(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            checker = AWSAcceptance(arguments(root, cases=("AWS-16",), engine="sglang", allow_collector_stop=True), runner=FakeRunner(), http=FakeHTTP([]), sleeper=lambda _s: None)
-            timeline = {"schema_version": "runtime-phase-timeline/1.0", "extraction": {"engine": "sglang"}, "collector": {"state": "running", "pod_uid": "old", "written_at": datetime.now(timezone.utc).isoformat()}, "entries": [{"phase": "inferring"}]}
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-16",), engine="sglang", allow_collector_stop=True),
+                runner=FakeRunner(),
+                http=FakeHTTP([]),
+                sleeper=lambda _s: None,
+            )
+            timeline = {
+                "schema_version": "runtime-phase-timeline/1.0",
+                "extraction": {"engine": "sglang"},
+                "collector": {
+                    "state": "running",
+                    "pod_uid": "old",
+                    "written_at": datetime.now(timezone.utc).isoformat(),
+                },
+                "entries": [{"phase": "inferring"}],
+            }
             checker._timeline = lambda: timeline
             checker._engine_pod = lambda: ({"name": "engine", "uid": "old"}, CommandResult(0))
             checker._wait_tetragon = lambda *_args: (True, {"kind": "process_exec", "phase": ["unknown"]})
             checker._completion = lambda **_kwargs: (response(200, {}), None, True)
-            checker._wait_collectors_ok = lambda _s: (True, {"observation_feed_hubble": {"state": "ok"}, "observation_feed_tetragon": {"state": "ok"}})
+            checker._wait_collectors_ok = lambda _s: (
+                True,
+                {"observation_feed_hubble": {"state": "ok"}, "observation_feed_tetragon": {"state": "ok"}},
+            )
             with patch("tools.aws_lab_acceptance.ExecPolicy._collector_stale", side_effect=(False, True)):
                 facts, _evidence = checker.aws_16()
             self.assertEqual(evaluate_case("AWS-16", facts)[0], "passed")
@@ -2204,14 +2792,21 @@ class NewCaseExecutionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             runner = FakeRunner()
-            checker = AWSAcceptance(arguments(root, cases=("AWS-16",), allow_collector_stop=True), runner=runner, http=FakeHTTP([]))
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-16",), allow_collector_stop=True), runner=runner, http=FakeHTTP([])
+            )
             checker._engine_pod = lambda: ({"name": "engine", "uid": "current"}, CommandResult(0))
-            timeline = {"schema_version": "runtime-phase-timeline/1.0", "extraction": {"engine": "vllm"}, "collector": {
-                "state": "running", "pod_uid": "current", "written_at": "2026-11-02T00:00:00Z"},
-                "entries": [{"phase": "inferring"}]}
+            timeline = {
+                "schema_version": "runtime-phase-timeline/1.0",
+                "extraction": {"engine": "vllm"},
+                "collector": {"state": "running", "pod_uid": "current", "written_at": "2026-11-02T00:00:00Z"},
+                "entries": [{"phase": "inferring"}],
+            }
             checker._timeline = lambda: timeline
-            for written_at, pod_uid in (("2026-11-02T00:00:00Z", "current"),
-                                        (datetime.now(timezone.utc).isoformat(), "other")):
+            for written_at, pod_uid in (
+                ("2026-11-02T00:00:00Z", "current"),
+                (datetime.now(timezone.utc).isoformat(), "other"),
+            ):
                 timeline["collector"].update(written_at=written_at, pod_uid=pod_uid)
                 facts, _evidence = checker.aws_16()
                 self.assertEqual(evaluate_case("AWS-16", facts)[0], "unknown")
@@ -2221,20 +2816,37 @@ class NewCaseExecutionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             runner = FakeRunner()
-            checker = AWSAcceptance(arguments(root, cases=("AWS-16",), engine="sglang", allow_collector_stop=True), runner=runner, http=FakeHTTP([]))
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-16",), engine="sglang", allow_collector_stop=True),
+                runner=runner,
+                http=FakeHTTP([]),
+            )
             observation = root / "observation"
             observation.mkdir()
             for has_timeline in (True, False):
                 timeline = observation / "phase-timeline.json"
                 if has_timeline:
-                    timeline.write_text(json.dumps({"schema_version": "runtime-phase-timeline/1.0",
-                        "collector": {"state": "running", "pod_uid": "old-vllm", "written_at": "2026-11-02T00:00:00Z"},
-                        "entries": [{"phase": "inferring"}]}), encoding="utf-8")
+                    timeline.write_text(
+                        json.dumps(
+                            {
+                                "schema_version": "runtime-phase-timeline/1.0",
+                                "collector": {
+                                    "state": "running",
+                                    "pod_uid": "old-vllm",
+                                    "written_at": "2026-11-02T00:00:00Z",
+                                },
+                                "entries": [{"phase": "inferring"}],
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
                 else:
                     timeline.unlink()
                 facts, _evidence = checker.aws_16()
-                self.assertIn(facts["unknown_reason"],
-                              {"현재 엔진 Pod의 신선한 단계 시간표 미확인", "단계 시간표 비활성 또는 읽기 실패"})
+                self.assertIn(
+                    facts["unknown_reason"],
+                    {"현재 엔진 Pod의 신선한 단계 시간표 미확인", "단계 시간표 비활성 또는 읽기 실패"},
+                )
                 self.assertEqual(evaluate_case("AWS-16", facts)[0], "unknown")
                 self.assertFalse(any(row["argv"][:3] == ["systemctl", "--user", "stop"] for row in runner.history))
 
@@ -2243,13 +2855,27 @@ class NewCaseExecutionTests(unittest.TestCase):
             for case_id in ("AWS-16", "AWS-17"):
                 with self.subTest(engine=engine, case=case_id), tempfile.TemporaryDirectory() as directory:
                     runner = FakeRunner()
-                    checker = AWSAcceptance(arguments(Path(directory), cases=(case_id,), engine=engine,
-                        allow_collector_stop=True, allow_engine_restart=True), runner=runner, http=FakeHTTP([]))
+                    checker = AWSAcceptance(
+                        arguments(
+                            Path(directory),
+                            cases=(case_id,),
+                            engine=engine,
+                            allow_collector_stop=True,
+                            allow_engine_restart=True,
+                        ),
+                        runner=runner,
+                        http=FakeHTTP([]),
+                    )
                     checker._engine_pod = lambda: ({"name": "engine", "uid": "current"}, CommandResult(0))
-                    checker._timeline = lambda: {"extraction": {"engine": other},
-                        "collector": {"state": "running", "pod_uid": "current",
-                                      "written_at": datetime.now(timezone.utc).isoformat()},
-                        "entries": [{"phase": "inferring"}]}
+                    checker._timeline = lambda: {
+                        "extraction": {"engine": other},
+                        "collector": {
+                            "state": "running",
+                            "pod_uid": "current",
+                            "written_at": datetime.now(timezone.utc).isoformat(),
+                        },
+                        "entries": [{"phase": "inferring"}],
+                    }
                     facts, _evidence = checker.aws_16() if case_id == "AWS-16" else checker.aws_17()
                     self.assertEqual(evaluate_case(case_id, facts)[0], "unknown")
                     self.assertFalse(runner.history)
@@ -2261,21 +2887,74 @@ class NewCaseExecutionTests(unittest.TestCase):
             observations.mkdir()
             event_time = "2026-11-03T00:00:01Z"
             (observations / "tetragon.jsonl").write_text(
-                json.dumps({"time": event_time, "process_exec": {"process": {"binary": "/bin/sh", "pod": {"uid": "new-uid"}}}}) + "\n"
-                + json.dumps({"time": event_time, "process_exit": {"process": {"pod": {"uid": "new-uid"}}}}) + "\n"
+                json.dumps(
+                    {"time": event_time, "process_exec": {"process": {"binary": "/bin/sh", "pod": {"uid": "new-uid"}}}}
+                )
+                + "\n"
+                + json.dumps({"time": event_time, "process_exit": {"process": {"pod": {"uid": "new-uid"}}}})
+                + "\n"
             )
             runner = FakeRunner()
-            checker = AWSAcceptance(arguments(root, cases=("AWS-17",), engine="sglang", allow_engine_restart=True), runner=runner, http=FakeHTTP([]), sleeper=lambda _s: None)
-            pods = iter(({"name": "engine-old", "uid": "old-uid"}, {"name": "engine-new", "uid": "new-uid", "started_at": "2026-11-03T00:00:00Z"}))
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-17",), engine="sglang", allow_engine_restart=True),
+                runner=runner,
+                http=FakeHTTP([]),
+                sleeper=lambda _s: None,
+            )
+            pods = iter(
+                (
+                    {"name": "engine-old", "uid": "old-uid"},
+                    {"name": "engine-new", "uid": "new-uid", "started_at": "2026-11-03T00:00:00Z"},
+                )
+            )
             checker._engine_pod = lambda: (next(pods), CommandResult(0))
-            timelines = iter((
-                {"schema_version": "runtime-phase-timeline/1.0", "extraction": {"engine": "sglang"}, "collector": {"pod_uid": "old-uid", "state": "running", "written_at": datetime.now(timezone.utc).isoformat()}, "entries": [{"phase": "inferring", "from": "2026-11-02T23:59:00Z"}]},
-                {"schema_version": "runtime-phase-timeline/1.0", "extraction": {"engine": "sglang"}, "collector": {"pod_uid": "new-uid", "state": "running"}, "entries": [{"phase": "ready", "from": "2026-11-03T00:00:00Z"}]},
-                {"schema_version": "runtime-phase-timeline/1.0", "extraction": {"engine": "sglang"}, "collector": {"pod_uid": "new-uid", "state": "running"}, "entries": [{"phase": "ready", "from": "2026-11-03T00:00:00Z"}]},
-            ))
+            timelines = iter(
+                (
+                    {
+                        "schema_version": "runtime-phase-timeline/1.0",
+                        "extraction": {"engine": "sglang"},
+                        "collector": {
+                            "pod_uid": "old-uid",
+                            "state": "running",
+                            "written_at": datetime.now(timezone.utc).isoformat(),
+                        },
+                        "entries": [{"phase": "inferring", "from": "2026-11-02T23:59:00Z"}],
+                    },
+                    {
+                        "schema_version": "runtime-phase-timeline/1.0",
+                        "extraction": {"engine": "sglang"},
+                        "collector": {"pod_uid": "new-uid", "state": "running"},
+                        "entries": [{"phase": "ready", "from": "2026-11-03T00:00:00Z"}],
+                    },
+                    {
+                        "schema_version": "runtime-phase-timeline/1.0",
+                        "extraction": {"engine": "sglang"},
+                        "collector": {"pod_uid": "new-uid", "state": "running"},
+                        "entries": [{"phase": "ready", "from": "2026-11-03T00:00:00Z"}],
+                    },
+                )
+            )
             checker._timeline = lambda: next(timelines)
-            checker._tetragon_observations = lambda _since: (True, [{"kind": "process_exec", "binary": "/bin/sh", "observed_at": event_time, "pod": {"namespace": "serving-lab", "pod": "engine-new"}, "phase": ["ready"], "phase_timeline_fresh": True, "phase_timeline_written_at": (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat()}])
-            counts = iter(({"skipped_unsupported_total": 0, "corrupt_lines_total": 0}, {"skipped_unsupported_total": 1, "corrupt_lines_total": 0}))
+            checker._tetragon_observations = lambda _since: (
+                True,
+                [
+                    {
+                        "kind": "process_exec",
+                        "binary": "/bin/sh",
+                        "observed_at": event_time,
+                        "pod": {"namespace": "serving-lab", "pod": "engine-new"},
+                        "phase": ["ready"],
+                        "phase_timeline_fresh": True,
+                        "phase_timeline_written_at": (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat(),
+                    }
+                ],
+            )
+            counts = iter(
+                (
+                    {"skipped_unsupported_total": 0, "corrupt_lines_total": 0},
+                    {"skipped_unsupported_total": 1, "corrupt_lines_total": 0},
+                )
+            )
             checker._tetragon_counts = lambda: next(counts)
             with patch("tools.aws_lab_acceptance._now", return_value="2026-11-03T00:00:00Z"):
                 facts, evidence = checker.aws_17()
@@ -2288,11 +2967,16 @@ class NewCaseExecutionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             runner = FakeRunner()
-            checker = AWSAcceptance(arguments(root, cases=("AWS-17",), allow_engine_restart=True), runner=runner, http=FakeHTTP([]))
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-17",), allow_engine_restart=True), runner=runner, http=FakeHTTP([])
+            )
             checker._engine_pod = lambda: ({"name": "engine", "uid": "current"}, CommandResult(0))
-            timeline = {"schema_version": "runtime-phase-timeline/1.0", "extraction": {"engine": "vllm"},
+            timeline = {
+                "schema_version": "runtime-phase-timeline/1.0",
+                "extraction": {"engine": "vllm"},
                 "collector": {"state": "running", "pod_uid": "current", "written_at": "2026-11-02T00:00:00Z"},
-                "entries": [{"phase": "inferring"}]}
+                "entries": [{"phase": "inferring"}],
+            }
             checker._timeline = lambda: timeline
             facts, _evidence = checker.aws_17()
             self.assertEqual(evaluate_case("AWS-17", facts)[0], "unknown")
@@ -2310,9 +2994,18 @@ class NewCaseExecutionTests(unittest.TestCase):
         reset = {"entries": [{"phase": "ready", "from": "2026-11-03T00:01:01Z"}]}
         self.assertFalse(_timeline_reset(previous, carried, new_start))
         self.assertTrue(_timeline_reset(previous, reset, new_start))
-        self.assertEqual(evaluate_case("AWS-17", {"pod_changed": True, "timeline_new_uid": True,
-                                                   "timeline_reset": _timeline_reset(previous, carried, new_start),
-                                                   "old_phase_absent": True})[0], "failed")
+        self.assertEqual(
+            evaluate_case(
+                "AWS-17",
+                {
+                    "pod_changed": True,
+                    "timeline_new_uid": True,
+                    "timeline_reset": _timeline_reset(previous, carried, new_start),
+                    "old_phase_absent": True,
+                },
+            )[0],
+            "failed",
+        )
 
     def test_compare_policy_uses_only_fixture_and_records_cleanup_failure(self) -> None:
         class CompareRunner(FakeRunner):
@@ -2332,7 +3025,26 @@ class NewCaseExecutionTests(unittest.TestCase):
                 if "get" in command and "runtime-compare-receiver" in command and "json" in command:
                     return CommandResult(0, json.dumps({"status": {"podIP": "10.0.0.12"}}))
                 if "get" in command and "other-client" in command and "json" in command:
-                    return CommandResult(0, json.dumps({"spec": {"containers": [{"name": "client", "image": "python@sha256:" + "a" * 64, "imagePullPolicy": "IfNotPresent"}]}, "status": {"phase": "Running", "containerStatuses": [{"name": "client", "ready": True}]}}))
+                    return CommandResult(
+                        0,
+                        json.dumps(
+                            {
+                                "spec": {
+                                    "containers": [
+                                        {
+                                            "name": "client",
+                                            "image": "python@sha256:" + "a" * 64,
+                                            "imagePullPolicy": "IfNotPresent",
+                                        }
+                                    ]
+                                },
+                                "status": {
+                                    "phase": "Running",
+                                    "containerStatuses": [{"name": "client", "ready": True}],
+                                },
+                            }
+                        ),
+                    )
                 if "delete" in command and self.fail_cleanup and "runtime-compare-client" in command:
                     return CommandResult(1)
                 return CommandResult(0)
@@ -2341,7 +3053,12 @@ class NewCaseExecutionTests(unittest.TestCase):
             with self.subTest(fail_cleanup=fail_cleanup), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 runner = CompareRunner(fail_cleanup)
-                checker = AWSAcceptance(arguments(root, cases=("AWS-12",), allow_compare_policy=True), runner=runner, http=FakeHTTP([]), sleeper=lambda _s: None)
+                checker = AWSAcceptance(
+                    arguments(root, cases=("AWS-12",), allow_compare_policy=True),
+                    runner=runner,
+                    http=FakeHTTP([]),
+                    sleeper=lambda _s: None,
+                )
                 checker._wait_observation_refs = lambda *_args: (True, [{"verdict": "dropped"}])
                 facts, evidence = checker.aws_12()
                 self.assertEqual(evaluate_case("AWS-12", facts)[0], "failed" if fail_cleanup else "passed")
@@ -2353,23 +3070,55 @@ class NewCaseExecutionTests(unittest.TestCase):
     def test_gateway_crash_detection_reads_newest_pod_state(self) -> None:
         def pods(restart_count, waiting=None):
             state = {"waiting": {"reason": waiting}} if waiting else {"running": {}}
-            return json.dumps({"items": [
-                {"metadata": {"name": "old", "uid": "old", "creationTimestamp": "2026-11-03T00:00:00Z"}, "status": {"containerStatuses": [{"name": "gateway", "restartCount": 5, "state": {"running": {}}}]}},
-                {"metadata": {"name": "new", "uid": "new", "creationTimestamp": "2026-11-03T00:01:00Z"}, "status": {"containerStatuses": [{"name": "gateway", "restartCount": restart_count, "state": state}]}},
-            ]})
+            return json.dumps(
+                {
+                    "items": [
+                        {
+                            "metadata": {"name": "old", "uid": "old", "creationTimestamp": "2026-11-03T00:00:00Z"},
+                            "status": {
+                                "containerStatuses": [{"name": "gateway", "restartCount": 5, "state": {"running": {}}}]
+                            },
+                        },
+                        {
+                            "metadata": {"name": "new", "uid": "new", "creationTimestamp": "2026-11-03T00:01:00Z"},
+                            "status": {
+                                "containerStatuses": [
+                                    {"name": "gateway", "restartCount": restart_count, "state": state}
+                                ]
+                            },
+                        },
+                    ]
+                }
+            )
+
         clock = FakeClock()
         with tempfile.TemporaryDirectory() as directory:
             for name in ("crashed", "steady", "unreadable"):
                 (Path(directory) / name).mkdir()
-            crashed = AWSAcceptance(arguments(Path(directory) / "crashed"), runner=FakeRunner([CommandResult(0, pods(1, "CrashLoopBackOff"))]),
-                                    http=FakeHTTP([]), sleeper=clock.sleep, monotonic=clock.monotonic)
+            crashed = AWSAcceptance(
+                arguments(Path(directory) / "crashed"),
+                runner=FakeRunner([CommandResult(0, pods(1, "CrashLoopBackOff"))]),
+                http=FakeHTTP([]),
+                sleeper=clock.sleep,
+                monotonic=clock.monotonic,
+            )
             self.assertIs(crashed._gateway_crashed(10.0, set())[0], True)
             self.assertIsNone(crashed._gateway_crashed(0.0, {"old", "new"})[0])
-            steady = AWSAcceptance(arguments(Path(directory) / "steady"), runner=FakeRunner([CommandResult(0, pods(0))] * 20),
-                                   http=FakeHTTP([]), sleeper=clock.sleep, monotonic=clock.monotonic)
+            steady = AWSAcceptance(
+                arguments(Path(directory) / "steady"),
+                runner=FakeRunner([CommandResult(0, pods(0))] * 20),
+                http=FakeHTTP([]),
+                sleeper=clock.sleep,
+                monotonic=clock.monotonic,
+            )
             self.assertIs(steady._gateway_crashed(10.0, {"old"})[0], False)
-            unreadable = AWSAcceptance(arguments(Path(directory) / "unreadable"), runner=FakeRunner([CommandResult(1)] * 20),
-                                       http=FakeHTTP([]), sleeper=clock.sleep, monotonic=clock.monotonic)
+            unreadable = AWSAcceptance(
+                arguments(Path(directory) / "unreadable"),
+                runner=FakeRunner([CommandResult(1)] * 20),
+                http=FakeHTTP([]),
+                sleeper=clock.sleep,
+                monotonic=clock.monotonic,
+            )
             self.assertIsNone(unreadable._gateway_crashed(10.0, set())[0])
 
     def test_bad_bundle_is_restored_even_when_gateway_recovery_fails(self) -> None:
@@ -2380,18 +3129,33 @@ class NewCaseExecutionTests(unittest.TestCase):
                 previous = bundles / "previous"
                 previous.mkdir(parents=True)
                 (previous / "policy.json").write_bytes(b"{}")
-                (previous / "bundle.json").write_text(json.dumps({"files": [{"role": "gateway_policy", "path": "policy.json"}]}))
+                (previous / "bundle.json").write_text(
+                    json.dumps({"files": [{"role": "gateway_policy", "path": "policy.json"}]})
+                )
                 (bundles / "current").symlink_to("previous")
                 runner = FakeRunner([CommandResult(0, "SHA-256 mismatch")])
-                checker = AWSAcceptance(arguments(root, cases=("AWS-13",), allow_bundle_switch=True, bundle_root=str(bundles)), runner=runner, http=FakeHTTP([]))
+                checker = AWSAcceptance(
+                    arguments(root, cases=("AWS-13",), allow_bundle_switch=True, bundle_root=str(bundles)),
+                    runner=runner,
+                    http=FakeHTTP([]),
+                )
                 calls = []
+
                 def restart(_deployment, _timeout=90):
                     calls.append(1)
                     return (len(calls) == 2 and not fail_recovery), {"attempt": len(calls)}
+
                 checker._restart = restart
                 checker._gateway_pods = lambda: [{"metadata": {"uid": "old"}}]
-                checker._gateway_crashed = lambda _window, _uids: (True, {"restart_count": 1, "pod_name": "gateway-new", "pod_uid": "new"})
-                checker._retry_inference = lambda _timeout: (True, {"result": "ALLOWED"}, {"attempts": 1, "last_status": 200})
+                checker._gateway_crashed = lambda _window, _uids: (
+                    True,
+                    {"restart_count": 1, "pod_name": "gateway-new", "pod_uid": "new"},
+                )
+                checker._retry_inference = lambda _timeout: (
+                    True,
+                    {"result": "ALLOWED"},
+                    {"attempts": 1, "last_status": 200},
+                )
                 checker._completion = lambda **_kwargs: (response(401, {}, "denied-1"), "denied-1", False)
                 checker._detail = lambda _id: detail("DENIED", reason="AUTH_REQUIRED", attempted=False, status=401)
                 facts, _evidence = checker.aws_13()
@@ -2414,26 +3178,59 @@ class NewCaseExecutionTests(unittest.TestCase):
                 return super().run(argv, timeout=timeout)
 
         scenarios = (
-            ([CommandResult(0, "starting\n"), CommandResult(0, "still starting\n"),
-              CommandResult(1, "", "container waiting"), CommandResult(0, "MVP 실행 실패: runtime-policy.json: SHA-256이 bundle.json과 다릅니다\n")], True, 4, "hash_error"),
-            ([CommandResult(1, "") if index % 2 else CommandResult(0, "token=" + INFERENCE + "\n")
-              for index in range(8)], None, 8, "known_token"),
-            ([CommandResult(0, line + "\n") for line in (
-                "RUNTIME_ADMIN_KEY=fake-admin-key OPENAI_API_KEY: fake-openai-key",
-                "MiXeD_CrEdEnTiAl=FakeCredential custom_AUTH: FakeAuth",
-                "service_secret=FakeSecret user_password: FakePassword",
-                "api.token=FakeToken Bearer FakeBearer",
-            )] + [CommandResult(1, "") for _ in range(4)], None, 8, "assignments"),
-            ([CommandResult(0, line + "\n") for line in (
-                '{"api_key": "sk-json-double"}',
-                "{'api_key': 'sk-json-single'}",
-                '"RUNTIME_ADMIN_KEY":"sk-runtime-json"',
-                "--api-key sk-cli-api --admin-key 'sk-cli-admin'",
-                "RUNTIME_ADMIN_KEY=sk-existing-equals OPENAI_API_KEY: sk-existing-colon",
-                "x-api-key: sk-existing-header Authorization: Bearer sk-existing-bearer",
-                "gateway startup failed: policy file unavailable",
-                "container waiting",
-            )], None, 8, "quoted_and_options"),
+            (
+                [
+                    CommandResult(0, "starting\n"),
+                    CommandResult(0, "still starting\n"),
+                    CommandResult(1, "", "container waiting"),
+                    CommandResult(0, "MVP 실행 실패: runtime-policy.json: SHA-256이 bundle.json과 다릅니다\n"),
+                ],
+                True,
+                4,
+                "hash_error",
+            ),
+            (
+                [
+                    CommandResult(1, "") if index % 2 else CommandResult(0, "token=" + INFERENCE + "\n")
+                    for index in range(8)
+                ],
+                None,
+                8,
+                "known_token",
+            ),
+            (
+                [
+                    CommandResult(0, line + "\n")
+                    for line in (
+                        "RUNTIME_ADMIN_KEY=fake-admin-key OPENAI_API_KEY: fake-openai-key",
+                        "MiXeD_CrEdEnTiAl=FakeCredential custom_AUTH: FakeAuth",
+                        "service_secret=FakeSecret user_password: FakePassword",
+                        "api.token=FakeToken Bearer FakeBearer",
+                    )
+                ]
+                + [CommandResult(1, "") for _ in range(4)],
+                None,
+                8,
+                "assignments",
+            ),
+            (
+                [
+                    CommandResult(0, line + "\n")
+                    for line in (
+                        '{"api_key": "sk-json-double"}',
+                        "{'api_key': 'sk-json-single'}",
+                        '"RUNTIME_ADMIN_KEY":"sk-runtime-json"',
+                        "--api-key sk-cli-api --admin-key 'sk-cli-admin'",
+                        "RUNTIME_ADMIN_KEY=sk-existing-equals OPENAI_API_KEY: sk-existing-colon",
+                        "x-api-key: sk-existing-header Authorization: Bearer sk-existing-bearer",
+                        "gateway startup failed: policy file unavailable",
+                        "container waiting",
+                    )
+                ],
+                None,
+                8,
+                "quoted_and_options",
+            ),
         )
         for log_results, expected, expected_reads, scenario_name in scenarios:
             with self.subTest(scenario=scenario_name), tempfile.TemporaryDirectory() as directory:
@@ -2442,13 +3239,19 @@ class NewCaseExecutionTests(unittest.TestCase):
                 previous = bundles / "previous"
                 previous.mkdir(parents=True)
                 (previous / "policy.json").write_bytes(b"{}")
-                (previous / "bundle.json").write_text(json.dumps({"files": [{"role": "gateway_policy", "path": "policy.json"}]}))
+                (previous / "bundle.json").write_text(
+                    json.dumps({"files": [{"role": "gateway_policy", "path": "policy.json"}]})
+                )
                 (bundles / "current").symlink_to("previous")
                 runner = LogRunner(log_results)
                 clock = FakeClock()
-                checker = AWSAcceptance(arguments(root, cases=("AWS-13",), allow_bundle_switch=True,
-                                                  bundle_root=str(bundles)), runner=runner,
-                                        http=FakeHTTP([]), sleeper=clock.sleep, monotonic=clock.monotonic)
+                checker = AWSAcceptance(
+                    arguments(root, cases=("AWS-13",), allow_bundle_switch=True, bundle_root=str(bundles)),
+                    runner=runner,
+                    http=FakeHTTP([]),
+                    sleeper=clock.sleep,
+                    monotonic=clock.monotonic,
+                )
                 checker._gateway_pods = lambda: [{"metadata": {"uid": "old"}}]
                 checker._gateway_crashed = lambda _window, _uids: (True, {"pod_name": "gateway-new"})
                 checker._restart = lambda _deployment, _timeout=90: (False, {})
@@ -2457,27 +3260,48 @@ class NewCaseExecutionTests(unittest.TestCase):
                 reads = evidence["bad_gateway_log_reads"]
                 self.assertEqual(len(reads), expected_reads)
                 self.assertEqual([row["source"] for row in reads], ["previous", "current"] * (expected_reads // 2))
-                self.assertTrue(all("returncode" in row and "stdout_length" in row and
-                                    "stderr_length" in row and len(row["first_line_prefix"]) <= 120 for row in reads))
+                self.assertTrue(
+                    all(
+                        "returncode" in row
+                        and "stdout_length" in row
+                        and "stderr_length" in row
+                        and len(row["first_line_prefix"]) <= 120
+                        for row in reads
+                    )
+                )
                 if expected:
                     self.assertEqual(reads[2]["first_line_prefix"], "container waiting")
-                    self.assertEqual(reads[3]["first_line_prefix"],
-                                     "MVP 실행 실패: runtime-policy.json: SHA-256이 bundle.json과 다릅니다")
+                    self.assertEqual(
+                        reads[3]["first_line_prefix"],
+                        "MVP 실행 실패: runtime-policy.json: SHA-256이 bundle.json과 다릅니다",
+                    )
                 self.assertNotIn(INFERENCE, json.dumps(reads))
-                for secret in ("fake-admin-key", "fake-openai-key", "FakeCredential", "FakeAuth",
-                               "FakeSecret", "FakePassword", "FakeToken", "FakeBearer",
-                               "sk-json-double", "sk-json-single", "sk-runtime-json", "sk-cli-api",
-                               "sk-cli-admin", "sk-existing-equals", "sk-existing-colon",
-                               "sk-existing-header", "sk-existing-bearer"):
+                for secret in (
+                    "fake-admin-key",
+                    "fake-openai-key",
+                    "FakeCredential",
+                    "FakeAuth",
+                    "FakeSecret",
+                    "FakePassword",
+                    "FakeToken",
+                    "FakeBearer",
+                    "sk-json-double",
+                    "sk-json-single",
+                    "sk-runtime-json",
+                    "sk-cli-api",
+                    "sk-cli-admin",
+                    "sk-existing-equals",
+                    "sk-existing-colon",
+                    "sk-existing-header",
+                    "sk-existing-bearer",
+                ):
                     self.assertNotIn(secret, json.dumps(reads))
                 if scenario_name == "quoted_and_options":
                     self.assertEqual(reads[0]["first_line_prefix"], '{"api_key": [REDACTED]}')
                     self.assertEqual(reads[1]["first_line_prefix"], "{'api_key': [REDACTED]}")
                     self.assertEqual(reads[2]["first_line_prefix"], '"RUNTIME_ADMIN_KEY":[REDACTED]')
-                    self.assertEqual(reads[3]["first_line_prefix"],
-                                     "--api-key [REDACTED] --admin-key [REDACTED]")
-                    self.assertEqual(reads[6]["first_line_prefix"],
-                                     "gateway startup failed: policy file unavailable")
+                    self.assertEqual(reads[3]["first_line_prefix"], "--api-key [REDACTED] --admin-key [REDACTED]")
+                    self.assertEqual(reads[6]["first_line_prefix"], "gateway startup failed: policy file unavailable")
                 self.assertEqual((bundles / "current").readlink(), Path("previous"))
 
     def test_bad_bundle_log_reads_stop_at_eight_second_deadline(self) -> None:
@@ -2500,14 +3324,19 @@ class NewCaseExecutionTests(unittest.TestCase):
             previous = bundles / "previous"
             previous.mkdir(parents=True)
             (previous / "policy.json").write_bytes(b"{}")
-            (previous / "bundle.json").write_text(json.dumps({
-                "files": [{"role": "gateway_policy", "path": "policy.json"}]}))
+            (previous / "bundle.json").write_text(
+                json.dumps({"files": [{"role": "gateway_policy", "path": "policy.json"}]})
+            )
             (bundles / "current").symlink_to("previous")
             clock = FakeClock()
             runner = TimedLogRunner(clock)
-            checker = AWSAcceptance(arguments(root, cases=("AWS-13",), allow_bundle_switch=True,
-                                              bundle_root=str(bundles)), runner=runner,
-                                    http=FakeHTTP([]), sleeper=clock.sleep, monotonic=clock.monotonic)
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-13",), allow_bundle_switch=True, bundle_root=str(bundles)),
+                runner=runner,
+                http=FakeHTTP([]),
+                sleeper=clock.sleep,
+                monotonic=clock.monotonic,
+            )
             checker._gateway_pods = lambda: [{"metadata": {"uid": "old"}}]
             checker._gateway_crashed = lambda _window, _uids: (True, {"pod_name": "gateway-new"})
             checker._restart = lambda _deployment, _timeout=90: (False, {})

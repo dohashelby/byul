@@ -1,4 +1,5 @@
 """Live environment draft collection with a fake kubectl runner; no AWS access."""
+
 import copy
 import hashlib
 import json
@@ -16,22 +17,51 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def pod(name, container, node="node-private", digest="a", args=None, volumes=None):
-    return {"metadata": {"name": name, "uid": "private-uid"},
-            "spec": {"nodeName": node, "containers": [{"name": container, "args": args or [],
-                 "volumeMounts": [{"name": "model", "mountPath": "/models", "readOnly": True}, {"name": "cache", "mountPath": "/cache"}]}], "volumes": volumes or []},
-            "status": {"phase": "Running", "containerStatuses": [{"name": container, "ready": True,
-                       "state": {"running": {}}, "imageID": "containerd://sha256:" + digest * 64,
-                       "containerID": "private-container"}]}}
+    return {
+        "metadata": {"name": name, "uid": "private-uid"},
+        "spec": {
+            "nodeName": node,
+            "containers": [
+                {
+                    "name": container,
+                    "args": args or [],
+                    "volumeMounts": [
+                        {"name": "model", "mountPath": "/models", "readOnly": True},
+                        {"name": "cache", "mountPath": "/cache"},
+                    ],
+                }
+            ],
+            "volumes": volumes or [],
+        },
+        "status": {
+            "phase": "Running",
+            "containerStatuses": [
+                {
+                    "name": container,
+                    "ready": True,
+                    "state": {"running": {}},
+                    "imageID": "containerd://sha256:" + digest * 64,
+                    "containerID": "private-container",
+                }
+            ],
+        },
+    }
 
 
 class FakeRunner:
     def __init__(self, model_root):
         self.calls = []
-        engine = pod("engine-private", "engine", args=["--max-model-len", "2048"],
-                     volumes=[{"name": "model", "hostPath": {"path": str(model_root)}}])
-        self.pods = {"app=serving-engine": {"items": [engine]},
-                     "app.kubernetes.io/name=tetragon": {"items": [pod("tetra-private", "tetragon")]},
-                     "k8s-app=cilium": {"items": [pod("cilium-private", "cilium-agent")]}}
+        engine = pod(
+            "engine-private",
+            "engine",
+            args=["--max-model-len", "2048"],
+            volumes=[{"name": "model", "hostPath": {"path": str(model_root)}}],
+        )
+        self.pods = {
+            "app=serving-engine": {"items": [engine]},
+            "app.kubernetes.io/name=tetragon": {"items": [pod("tetra-private", "tetragon")]},
+            "k8s-app=cilium": {"items": [pod("cilium-private", "cilium-agent")]},
+        }
         self.fail = False
 
     def run(self, argv, *, timeout=8):
@@ -42,8 +72,19 @@ class FakeRunner:
             selector = argv[argv.index("-l") + 1]
             return CommandResult(0, json.dumps(self.pods[selector]))
         if "nodes" in argv:
-            return CommandResult(0, json.dumps({"items": [{"metadata": {"name": "node-private"},
-                                     "status": {"nodeInfo": {"kernelVersion": "6.8.0-lab"}}}]}))
+            return CommandResult(
+                0,
+                json.dumps(
+                    {
+                        "items": [
+                            {
+                                "metadata": {"name": "node-private"},
+                                "status": {"nodeInfo": {"kernelVersion": "6.8.0-lab"}},
+                            }
+                        ]
+                    }
+                ),
+            )
         if "nvidia-smi" in argv:
             return CommandResult(0, "NVIDIA Test GPU, 570.1\n")
         if "python3" in argv:
@@ -68,8 +109,12 @@ class EnvironmentCandidateTests(unittest.TestCase):
         target = json.loads((ROOT / "deploy/gpu-lab/target.aws-lab.json").read_text())
         target["engine"]["image_digest"] = "sha256:" + "b" * 64  # declared; never used as observed
         self.target.write_text(json.dumps(target))
-        self.args = SimpleNamespace(target_registration=self.target, environment_id="lab-env", revision=2,
-                                    gateway_policy=ROOT / "examples/mvp/policy.json")
+        self.args = SimpleNamespace(
+            target_registration=self.target,
+            environment_id="lab-env",
+            revision=2,
+            gateway_policy=ROOT / "examples/mvp/policy.json",
+        )
         self.runner = FakeRunner(self.model)
 
     def test_live_digest_kernel_gpu_and_versions_are_observed_without_null_or_approval(self):
@@ -84,17 +129,32 @@ class EnvironmentCandidateTests(unittest.TestCase):
         self.assertFalse(value["import_ready"])
         self.assertEqual(value["approval"], "not_approved")
         raw = json.dumps(value)
-        for forbidden in (": null", "node-private", "engine-private", "private-uid", "private-container", "not-a-proven-model-revision"):
+        for forbidden in (
+            ": null",
+            "node-private",
+            "engine-private",
+            "private-uid",
+            "private-container",
+            "not-a-proven-model-revision",
+        ):
             self.assertNotIn(forbidden, raw)
         self.assertIn("/target/model/revision", value["unconfirmed"])
         self.assertNotIn("revision", value["environment"]["target"]["model"])
         self.assertTrue(all(c[0] == "kubectl" for c in self.runner.calls))
-        self.assertFalse(any(word in c for c in self.runner.calls for word in ("apply", "patch", "delete", "create", "restart", "secret", "secrets")))
+        self.assertFalse(
+            any(
+                word in c
+                for c in self.runner.calls
+                for word in ("apply", "patch", "delete", "create", "restart", "secret", "secrets")
+            )
+        )
 
     def test_inventory_hash_uses_existing_update_all_scope_contract(self):
         value = tool.collect(self.args, self.runner)
         files = [{"path": f["path"], "bytes": f["size"], "sha256": f["sha256"]} for f in snapshot(self.model)["files"]]
-        expected = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+        expected = hashlib.sha256(
+            json.dumps(files, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        ).hexdigest()
         self.assertEqual(value["environment"]["target"]["model"]["inventory_sha256"], expected)
 
     def test_failed_queries_do_not_reuse_declared_digest_or_claim_absence(self):
@@ -141,29 +201,45 @@ class EnvironmentCandidateTests(unittest.TestCase):
         # textual markers in digest/integer fields. The draft is NOT importable.
         value = tool.collect(self.args, self.runner)
         environment = value["environment"]
-        self.assertEqual(set(environment), {"schema_version", "environment_id", "revision", "created_at", "data_origin", "target", "deployment", "facts"})
+        self.assertEqual(
+            set(environment),
+            {
+                "schema_version",
+                "environment_id",
+                "revision",
+                "created_at",
+                "data_origin",
+                "target",
+                "deployment",
+                "facts",
+            },
+        )
         self.assertNotIn("kernel", environment)
         self.assertNotIn("tetragon_version", environment["facts"])
         self.assertNotIn("source_commit", environment["target"]["engine"])
 
-
     def test_cli_bounded_input_diagnostics(self):
         from contextlib import redirect_stderr
         import io
+
         base = ["--environment-id", "lab", "--revision", "1", "--out", str(self.root / "out.json")]
         for label, option in (("target_registration", "--target-registration"), ("gateway_policy", "--gateway-policy")):
-            for code, error in (("PERMISSION_DENIED", PermissionError("private-token-path")),
-                                ("NOT_FOUND", FileNotFoundError("private-token-path"))):
+            for code, error in (
+                ("PERMISSION_DENIED", PermissionError("private-token-path")),
+                ("NOT_FOUND", FileNotFoundError("private-token-path")),
+            ):
                 stderr = io.StringIO()
                 argv = base + ["--target-registration", str(self.target)]
                 if option == "--gateway-policy":
                     argv += [option, "private-token-path"]
                 original = Path.read_bytes
                 failed_path = self.target if label == "target_registration" else Path("private-token-path")
+
                 def read(path):
                     if path == failed_path:
                         raise error
                     return original(path)
+
                 with patch.object(Path, "read_bytes", autospec=True, side_effect=read), redirect_stderr(stderr):
                     self.assertEqual(tool.main(argv), 1)
                 self.assertEqual(stderr.getvalue().strip(), f"ENVIRONMENT_CANDIDATE_FAILED: {code}:{label}")
@@ -176,24 +252,56 @@ class EnvironmentCandidateTests(unittest.TestCase):
     def test_cli_argument_and_gateway_json_errors_do_not_echo_values(self):
         from contextlib import redirect_stderr
         import io
-        for argv in (["--revision", "private-token"], ["--private-token"],
-                     ["--target-registration", str(self.target), "--gateway-policy", str(self.root / "bad.json"),
-                      "--environment-id", "lab", "--revision", "1", "--out", str(self.root / "out.json")]):
+
+        for argv in (
+            ["--revision", "private-token"],
+            ["--private-token"],
+            [
+                "--target-registration",
+                str(self.target),
+                "--gateway-policy",
+                str(self.root / "bad.json"),
+                "--environment-id",
+                "lab",
+                "--revision",
+                "1",
+                "--out",
+                str(self.root / "out.json"),
+            ],
+        ):
             (self.root / "bad.json").write_text('{"private-token":')
             stderr = io.StringIO()
             with redirect_stderr(stderr):
                 self.assertEqual(tool.main(argv), 1)
             self.assertNotIn("private-token", stderr.getvalue())
-            self.assertIn("INVALID_JSON:gateway_policy" if "--gateway-policy" in argv else "INVALID_INPUT:arguments", stderr.getvalue())
+            self.assertIn(
+                "INVALID_JSON:gateway_policy" if "--gateway-policy" in argv else "INVALID_INPUT:arguments",
+                stderr.getvalue(),
+            )
 
     def test_cli_kubectl_failure_retains_partial_candidate_and_reports_code(self):
         from contextlib import redirect_stderr, redirect_stdout
         import io
+
         self.runner.fail = True
         stderr = io.StringIO()
-        with patch.object(tool, "Runner", return_value=self.runner), redirect_stderr(stderr), redirect_stdout(io.StringIO()):
-            result = tool.main(["--target-registration", str(self.target), "--environment-id", "lab", "--revision", "1",
-                                "--out", str(self.root / "partial.json")])
+        with (
+            patch.object(tool, "Runner", return_value=self.runner),
+            redirect_stderr(stderr),
+            redirect_stdout(io.StringIO()),
+        ):
+            result = tool.main(
+                [
+                    "--target-registration",
+                    str(self.target),
+                    "--environment-id",
+                    "lab",
+                    "--revision",
+                    "1",
+                    "--out",
+                    str(self.root / "partial.json"),
+                ]
+            )
         self.assertEqual(result, 0)
         self.assertEqual(stderr.getvalue().strip(), "ENVIRONMENT_CANDIDATE_UNCONFIRMED: KUBECTL_FAILED:kubectl")
         self.assertFalse(json.loads((self.root / "partial.json").read_text())["import_ready"])

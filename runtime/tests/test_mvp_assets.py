@@ -261,11 +261,7 @@ class AssetIntegrityTests(unittest.TestCase):
             def engine_attempt() -> str | None:
                 with urlopen(f"http://{host}:{port}/api/collectors", timeout=2) as response:
                     payload = json.loads(response.read())
-                item = next(
-                    value
-                    for value in payload["collectors"]
-                    if value["source"] == "engine_health"
-                )
+                item = next(value for value in payload["collectors"] if value["source"] == "engine_health")
                 return item["last_attempt_at"]
 
             first_attempt = engine_attempt()
@@ -279,11 +275,7 @@ class AssetIntegrityTests(unittest.TestCase):
             while time.monotonic() < deadline:
                 with urlopen(f"http://{host}:{port}/api/collectors", timeout=2) as response:
                     payload = json.loads(response.read())
-                asset = next(
-                    value
-                    for value in payload["collectors"]
-                    if value["source"] == "asset_integrity"
-                )
+                asset = next(value for value in payload["collectors"] if value["source"] == "asset_integrity")
                 if asset["state"] == "ok":
                     break
                 time.sleep(0.02)

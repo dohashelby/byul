@@ -20,7 +20,6 @@ from serving_runtime.mvp.store import JsonlStore
 from serving_runtime.mvp.validator import validate_request
 
 
-
 def backend_document(base_url: str) -> dict[str, object]:
     return {
         "schema_version": "runtime-backend/1.0",
@@ -158,12 +157,8 @@ class ZerodayPolicyTests(PolicyFileMixin, unittest.TestCase):
         cases = {
             "profile_list": v12_document(profile=[]),
             "profile_object": v12_document(profile={}),
-            "field_type_list": v12_document(
-                extra_fields={"field_x": {"mode": "validate", "type": []}}
-            ),
-            "field_type_object": v12_document(
-                extra_fields={"field_x": {"mode": "validate", "type": {}}}
-            ),
+            "field_type_list": v12_document(extra_fields={"field_x": {"mode": "validate", "type": []}}),
+            "field_type_object": v12_document(extra_fields={"field_x": {"mode": "validate", "type": {}}}),
             "item_type_list": v12_document(
                 extra_fields={
                     "field_x": {
@@ -193,9 +188,7 @@ class ZerodayPolicyTests(PolicyFileMixin, unittest.TestCase):
     def test_reserved_field_names_are_rejected(self) -> None:
         for name in ("model", "messages", "max_tokens", "stream", "n", "max_completion_tokens"):
             with self.subTest(name=name):
-                state = self.load(
-                    v12_document(extra_fields={name: {"mode": "passthrough"}})
-                )
+                state = self.load(v12_document(extra_fields={name: {"mode": "passthrough"}}))
                 self.assertFalse(state.ok)
                 self.assertIn("reserved", state.error_message)
 
@@ -228,9 +221,7 @@ class ZerodayPolicyTests(PolicyFileMixin, unittest.TestCase):
                 self.assertFalse(state.ok)
                 self.assertEqual(state.error_code, "INVALID_POLICY")
         self.assertFalse(self.load(v12_document(extra_fields=[])).ok)
-        self.assertFalse(
-            self.load(v12_document(extra_fields={" spaced ": {"mode": "passthrough"}})).ok
-        )
+        self.assertFalse(self.load(v12_document(extra_fields={" spaced ": {"mode": "passthrough"}})).ok)
 
 
 class ZerodayValidatorTests(PolicyFileMixin, unittest.TestCase):
@@ -296,15 +287,21 @@ class ZerodayValidatorTests(PolicyFileMixin, unittest.TestCase):
         self.assertEqual(number_for_boolean.reason_code, "INVALID_EXTRA_FIELD")
 
     def test_huge_integer_is_compared_without_overflow(self) -> None:
-        decision = self.decide(b'{"model":"test-model","messages":[{"role":"user","content":"x"}],"temperature":' + b"9" * 400 + b"}")
+        decision = self.decide(
+            b'{"model":"test-model","messages":[{"role":"user","content":"x"}],"temperature":' + b"9" * 400 + b"}"
+        )
         self.assertEqual(decision.message, "extra field temperature violates max")
-        seed = self.decide(b'{"model":"test-model","messages":[{"role":"user","content":"x"}],"seed":' + b"9" * 400 + b"}")
+        seed = self.decide(
+            b'{"model":"test-model","messages":[{"role":"user","content":"x"}],"seed":' + b"9" * 400 + b"}"
+        )
         self.assertEqual(seed.result, "ALLOWED")
 
     def test_non_finite_numbers_are_rejected_before_rules(self) -> None:
         for literal in (b"NaN", b"Infinity", b"-Infinity"):
             with self.subTest(literal=literal):
-                body = b'{"model":"test-model","messages":[{"role":"user","content":"x"}],"temperature":' + literal + b"}"
+                body = (
+                    b'{"model":"test-model","messages":[{"role":"user","content":"x"}],"temperature":' + literal + b"}"
+                )
                 self.assertEqual(self.decide(body).reason_code, "MALFORMED_JSON")
 
     def test_unregistered_fields_and_alias_stay_rejected(self) -> None:
@@ -333,11 +330,13 @@ class ZerodayValidatorTests(PolicyFileMixin, unittest.TestCase):
     def test_completions_never_accept_zeroday_extra_fields(self) -> None:
         state = self.load(v12_document())
         decision = validate_request(
-            json.dumps({
-                "model": "test-model",
-                "prompt": "hello",
-                "temperature": 0.5,
-            }).encode("utf-8"),
+            json.dumps(
+                {
+                    "model": "test-model",
+                    "prompt": "hello",
+                    "temperature": 0.5,
+                }
+            ).encode("utf-8"),
             "application/json",
             state,
             request_kind="completions",
@@ -475,10 +474,7 @@ class ZerodayGatewayHttpTests(unittest.TestCase):
         status, headers, _ = self.post(chat(temperature=0.3, cache_salt=SECRET_VALUE))
         self.assertGreaterEqual(status, 500)
         records, _ = JsonlStore(self.directory / "data" / "gateway_records.jsonl").read_all()
-        final = [
-            r for r in records
-            if r["request_id"] == headers["X-Request-ID"] and r["phase"] == "final"
-        ][-1]
+        final = [r for r in records if r["request_id"] == headers["X-Request-ID"] and r["phase"] == "final"][-1]
         self.assertTrue(final["delivery"]["attempted"])
         self.assertEqual(
             final["request"]["extra_fields"],

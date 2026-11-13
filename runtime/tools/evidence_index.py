@@ -3,6 +3,7 @@
 CLI diagnostics contain counts and fixed codes only. Originals are read only;
 output is an immutable snapshot (identical reruns succeed without rewriting).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -39,7 +40,9 @@ PATTERNS = {
 }
 COMPILED = {k: re.compile(v) for k, v in PATTERNS.items()}
 PLACEHOLDERS = {b"null", b"none", b"false", b"true", b"redacted", b"<redacted>", b"[redacted]", b"***"}
-SYNTHETIC = re.compile(rb'''(?i)(?:["']?\b(?:data_origin|origin_detail|origin|evidence_kind)["']?\s*[:=]\s*["']?(?:EXAMPLE|synthetic|mock|fake_backend_test|actual_test)\b|\bsynthetic\b)''')
+SYNTHETIC = re.compile(
+    rb"""(?i)(?:["']?\b(?:data_origin|origin_detail|origin|evidence_kind)["']?\s*[:=]\s*["']?(?:EXAMPLE|synthetic|mock|fake_backend_test|actual_test)\b|\bsynthetic\b)"""
+)
 
 
 class ImportFailure(ValueError):
@@ -71,9 +74,14 @@ def safe_name(name: str) -> str:
     while name.startswith("./"):
         name = name[2:]
     name = name.rstrip("/")
-    if not name or not re.fullmatch(r"[A-Za-z0-9._/-]+", name) or any(
-        p in ("", ".", "..") for p in name.split("/")
-    ) or name.startswith("/") or len(name) > 1024 or len(name.split("/")) > 40:
+    if (
+        not name
+        or not re.fullmatch(r"[A-Za-z0-9._/-]+", name)
+        or any(p in ("", ".", "..") for p in name.split("/"))
+        or name.startswith("/")
+        or len(name) > 1024
+        or len(name.split("/")) > 40
+    ):
         raise ImportFailure("UNSAFE_PATH")
     return name
 
@@ -118,12 +126,18 @@ class Budget:
     def add(self, size):
         self.members += 1
         self.bytes += size
-        if size < 0 or size > self.limits.file_bytes or self.bytes > self.limits.total_bytes or self.members > self.limits.members:
+        if (
+            size < 0
+            or size > self.limits.file_bytes
+            or self.bytes > self.limits.total_bytes
+            or self.members > self.limits.members
+        ):
             raise ImportFailure("SIZE_LIMIT")
 
 
 class BoundedReader:
     """Also cap decompressed tar headers/padding/PAX before tarfile reads them."""
+
     def __init__(self, stream, limit):
         self.stream, self.remaining = stream, limit
 
@@ -160,11 +174,16 @@ def folder_files(path: Path, budget: Budget):
                         raise ImportFailure("INPUT_CHANGED")
                     data = stream.read(budget.limits.file_bytes + 1)
                     after = os.fstat(stream.fileno())
-                    if len(data) != info.st_size or (after.st_ino, after.st_size, after.st_mtime_ns) != (current.st_ino, current.st_size, current.st_mtime_ns):
+                    if len(data) != info.st_size or (after.st_ino, after.st_size, after.st_mtime_ns) != (
+                        current.st_ino,
+                        current.st_size,
+                        current.st_mtime_ns,
+                    ):
                         raise ImportFailure("INPUT_CHANGED")
                     yield relative, info.st_mtime, data
             else:
                 raise ImportFailure("SYMLINK" if stat.S_ISLNK(info.st_mode) else "SPECIAL_FILE")
+
     fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     try:
         yield from walk(fd)
@@ -230,7 +249,7 @@ def document_info(item: Input):
     # Old reports also contain commit and bundle prefixes. Prefer SHA-labelled
     # values on the archive line or its continuation, rather than those values.
     archive_lines = [i for i, line in enumerate(lines) if item.path.name in line]
-    prefix_context = "\n".join("\n".join(lines[i:i + 2]) for i in archive_lines)
+    prefix_context = "\n".join("\n".join(lines[i : i + 2]) for i in archive_lines)
     prefixes = {m[1].lower() for m in prefix_pattern.finditer(prefix_context)}
     if not prefixes:
         prefixes = {m[1].lower() for m in prefix_pattern.finditer(text)}
@@ -247,7 +266,11 @@ def document_info(item: Input):
             ending += timedelta(days=1)
         window = {"from": beginning.isoformat(), "until": ending.isoformat()}
     real_report = bool(re.search(r"^# AWS GPU .*서버 .*회차 결과", text))
-    return hashes, window, {"sha256": hashlib.sha256(raw).hexdigest(), "real_report": real_report, "hash_prefixes": prefixes}
+    return (
+        hashes,
+        window,
+        {"sha256": hashlib.sha256(raw).hexdigest(), "real_report": real_report, "hash_prefixes": prefixes},
+    )
 
 
 def verify_hash(item: Input, digest: str, doc_hashes, doc):
@@ -279,19 +302,27 @@ def validate(document, schemas_dir: Path):
         from jsonschema import Draft202012Validator, FormatChecker
     except ImportError:
         raise ImportFailure("SCHEMA_DEPENDENCY_MISSING") from None
-    schemas = [json.loads((schemas_dir / name).read_text()) for name in ("common.schema.json", "evidence-index.schema.json")]
+    schemas = [
+        json.loads((schemas_dir / name).read_text()) for name in ("common.schema.json", "evidence-index.schema.json")
+    ]
+
     # Bundle the only external reference locally. No resolver/network access,
     # including on hosts with jsonschema predating the referencing package.
     def local_refs(value):
         if isinstance(value, dict):
-            return {k: (v.replace("common.schema.json#", "#") if k == "$ref" and isinstance(v, str) else local_refs(v)) for k, v in value.items()}
+            return {
+                k: (v.replace("common.schema.json#", "#") if k == "$ref" and isinstance(v, str) else local_refs(v))
+                for k, v in value.items()
+            }
         if isinstance(value, list):
             return [local_refs(v) for v in value]
         return value
+
     bundled = local_refs(schemas[1])
     bundled["$defs"] = schemas[0]["$defs"]
     checker = FormatChecker()
     if "date-time" not in checker.checkers:
+
         @checker.checks("date-time", raises=(ValueError, OverflowError))
         def date_time(value):
             if not isinstance(value, str):
@@ -299,6 +330,7 @@ def validate(document, schemas_dir: Path):
             if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})", value):
                 return False
             return datetime.fromisoformat(value).tzinfo is not None
+
     validator = Draft202012Validator(bundled, format_checker=checker)
     if not validator.is_valid(document):
         raise ImportFailure("SCHEMA_INVALID")
@@ -314,11 +346,17 @@ def generate(inputs: list[Input], output: Path, *, limits=Limits(), schemas_dir=
     if not inputs or min(limits.file_bytes, limits.total_bytes, limits.members, limits.archive_bytes) <= 0:
         raise ImportFailure("INVALID_INPUT")
     runs = [i.run for i in inputs]
-    if len(set(runs)) != len(runs) or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", run) or secret_codes(run.encode()) for run in runs):
+    if len(set(runs)) != len(runs) or any(
+        not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", run) or secret_codes(run.encode()) for run in runs
+    ):
         raise ImportFailure("INVALID_RUN")
     for item in inputs:
         no_links(item.path.absolute())
-        if output.resolve() == item.path.resolve() or (item.path.is_dir() and output.resolve().is_relative_to(item.path.resolve())) or item.path.resolve().is_relative_to(output.resolve()):
+        if (
+            output.resolve() == item.path.resolve()
+            or (item.path.is_dir() and output.resolve().is_relative_to(item.path.resolve()))
+            or item.path.resolve().is_relative_to(output.resolve())
+        ):
             raise ImportFailure("OUTPUT_OVERLAPS_INPUT")
         if item.origin not in (None, "MEASURED", "DECLARED", "EXAMPLE"):
             raise ImportFailure("INVALID_ORIGIN")
@@ -382,11 +420,21 @@ def generate(inputs: list[Input], output: Path, *, limits=Limits(), schemas_dir=
                     media = mimetypes.guess_type(name)[0] or "application/octet-stream"
                     if not re.fullmatch(r"[a-z]+/[a-z0-9.+-]+", media):
                         media = "application/octet-stream"
-                    accepted.append({"evidence_id": "ev-" + hashlib.sha256(f"{item.run}/{name}".encode()).hexdigest(),
-                                     "path": f"{item.run}/{name}", "bytes": len(data), "sha256": digest_file,
-                                     "media_type": media, "collector": {"name": "runtime-evidence-index", "version": VERSION},
-                                     "collected_at": collected, "window": window, "source": f"aws-lab {item.run}" if doc and doc["real_report"] else item.run,
-                                     "data_origin": origin, "refs": []})
+                    accepted.append(
+                        {
+                            "evidence_id": "ev-" + hashlib.sha256(f"{item.run}/{name}".encode()).hexdigest(),
+                            "path": f"{item.run}/{name}",
+                            "bytes": len(data),
+                            "sha256": digest_file,
+                            "media_type": media,
+                            "collector": {"name": "runtime-evidence-index", "version": VERSION},
+                            "collected_at": collected,
+                            "window": window,
+                            "source": f"aws-lab {item.run}" if doc and doc["real_report"] else item.run,
+                            "data_origin": origin,
+                            "refs": [],
+                        }
+                    )
             finally:
                 if stream:
                     after = os.fstat(stream.fileno())
@@ -403,22 +451,43 @@ def generate(inputs: list[Input], output: Path, *, limits=Limits(), schemas_dir=
                 if doc:
                     entry["refs"].append(f"result-document-sha256:{doc['sha256']}")
             entries.extend(accepted)
-            summaries.append({"run": item.run, "sha256": digest, "hash_verified": verified,
-                              "basis": basis, "origin_assertion": item.origin,
-                              "files": len(accepted), "excluded": excluded.pop("FILES", 0), "reason_codes": dict(sorted(excluded.items())),
-                              "origins": dict(sorted(Counter(e["data_origin"] for e in accepted).items()))})
+            summaries.append(
+                {
+                    "run": item.run,
+                    "sha256": digest,
+                    "hash_verified": verified,
+                    "basis": basis,
+                    "origin_assertion": item.origin,
+                    "files": len(accepted),
+                    "excluded": excluded.pop("FILES", 0),
+                    "reason_codes": dict(sorted(excluded.items())),
+                    "origins": dict(sorted(Counter(e["data_origin"] for e in accepted).items())),
+                }
+            )
         entries.sort(key=lambda e: e["path"])
         if not times:
             raise ImportFailure("NO_FILES")
-        document = {"schema_version": "byul-evidence-index/0.1", "producer": "runtime", "created_at": max(times), "items": entries}
+        document = {
+            "schema_version": "byul-evidence-index/0.1",
+            "producer": "runtime",
+            "created_at": max(times),
+            "items": entries,
+        }
         validate(document, schemas_dir)
         (stage / "evidence-index.json").write_bytes(canonical(document))
         (stage / "import-report.json").write_bytes(canonical({"runs": summaries, "schema_valid": True}))
         for file in stage.rglob("*"):
             os.chmod(file, 0o700 if file.is_dir() else 0o600)
         if output.exists():
-            metadata_bytes = sum((stage / name).stat().st_size for name in ("evidence-index.json", "import-report.json"))
-            compare_limits = Limits(max(limits.file_bytes, metadata_bytes), limits.total_bytes + metadata_bytes, limits.members * 41 + 10, limits.archive_bytes)
+            metadata_bytes = sum(
+                (stage / name).stat().st_size for name in ("evidence-index.json", "import-report.json")
+            )
+            compare_limits = Limits(
+                max(limits.file_bytes, metadata_bytes),
+                limits.total_bytes + metadata_bytes,
+                limits.members * 41 + 10,
+                limits.archive_bytes,
+            )
             if not output.is_dir() or tree_manifest(output, compare_limits) != tree_manifest(stage, compare_limits):
                 raise ImportFailure("OUTPUT_EXISTS_DIFFERENT")
         else:
@@ -458,17 +527,37 @@ def main(argv=None):
     parser.add_argument("--max-archive-bytes", type=int, default=Limits.archive_bytes)
     try:
         args = parser.parse_args(argv)
-        paths, hashes, docs, origins, windows = [mapping(v) for v in (args.input, args.sha256, args.result_doc, args.origin, args.window)]
+        paths, hashes, docs, origins, windows = [
+            mapping(v) for v in (args.input, args.sha256, args.result_doc, args.origin, args.window)
+        ]
         if any(set(group) - paths.keys() for group in (hashes, docs, origins, windows)):
             raise ImportFailure("UNKNOWN_RUN")
         parsed_windows = {}
         for run, value in windows.items():
             start, end = value.split(",")
-            if datetime.fromisoformat(start).tzinfo is None or datetime.fromisoformat(end).tzinfo is None or datetime.fromisoformat(end) < datetime.fromisoformat(start):
+            if (
+                datetime.fromisoformat(start).tzinfo is None
+                or datetime.fromisoformat(end).tzinfo is None
+                or datetime.fromisoformat(end) < datetime.fromisoformat(start)
+            ):
                 raise ImportFailure("INVALID_WINDOW")
             parsed_windows[run] = {"from": start, "until": end}
-        inputs = [Input(run, Path(path).expanduser(), hashes.get(run), Path(docs[run]).expanduser() if run in docs else None, origins.get(run), parsed_windows.get(run)) for run, path in paths.items()]
-        report = generate(inputs, args.output, limits=Limits(args.max_file_bytes, args.max_total_bytes, args.max_members, args.max_archive_bytes))
+        inputs = [
+            Input(
+                run,
+                Path(path).expanduser(),
+                hashes.get(run),
+                Path(docs[run]).expanduser() if run in docs else None,
+                origins.get(run),
+                parsed_windows.get(run),
+            )
+            for run, path in paths.items()
+        ]
+        report = generate(
+            inputs,
+            args.output,
+            limits=Limits(args.max_file_bytes, args.max_total_bytes, args.max_members, args.max_archive_bytes),
+        )
         print(json.dumps(report, sort_keys=True))
         return 0
     except ImportFailure as error:

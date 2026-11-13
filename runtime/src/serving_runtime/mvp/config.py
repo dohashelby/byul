@@ -85,12 +85,8 @@ class MVPConfig:
     def __post_init__(self) -> None:
         if self.backend not in {"mock", "vllm", "sglang"}:
             raise ValueError("backend must be mock, vllm, or sglang")
-        if self.backend != "mock" and (
-            self.backend_config_path is None or not str(self.backend_config_path).strip()
-        ):
-            raise ValueError(
-                f"backend_config_path is required for the {self.backend} backend"
-            )
+        if self.backend != "mock" and (self.backend_config_path is None or not str(self.backend_config_path).strip()):
+            raise ValueError(f"backend_config_path is required for the {self.backend} backend")
         if self.backend == "mock" and self.backend_config_path is not None:
             raise ValueError("backend_config_path is only valid for an external backend")
         if self.relay_timeout_s <= 0:
@@ -148,10 +144,7 @@ class MVPConfig:
                     "run_id",
                     "observation_environment",
                     "observation_run_id",
-                } and (
-                    len(value) > 128
-                    or any(ord(character) < 0x20 for character in value)
-                ):
+                } and (len(value) > 128 or any(ord(character) < 0x20 for character in value)):
                     raise ValueError(f"{name} must be printable and at most 128 characters")
         if self.collector_interval_s <= 0:
             raise ValueError("collector_interval_s must be positive")
@@ -173,20 +166,40 @@ class MVPConfig:
             raise ValueError("observation_origin must be synthetic or real")
         if self.native_receipt_feed_path is not None:
             import re
-            if (not self.native_receipt_feed_path.strip() or type(self.native_receipt_reader_gid) is not int or self.native_receipt_reader_gid < 0
-                    or not isinstance(self.native_receipt_producer_sha256,str) or re.fullmatch(r"[0-9a-f]{64}",self.native_receipt_producer_sha256) is None):
+
+            if (
+                not self.native_receipt_feed_path.strip()
+                or type(self.native_receipt_reader_gid) is not int
+                or self.native_receipt_reader_gid < 0
+                or not isinstance(self.native_receipt_producer_sha256, str)
+                or re.fullmatch(r"[0-9a-f]{64}", self.native_receipt_producer_sha256) is None
+            ):
                 raise ValueError("native receipt feed requires explicit reader GID and producer source pin")
         elif self.native_receipt_reader_gid is not None or self.native_receipt_producer_sha256 is not None:
             raise ValueError("native receipt feed path required")
         if self.cache_observation_path is not None:
             import re
-            if (not self.cache_observation_path.strip() or type(self.cache_observation_reader_gid) is not int or self.cache_observation_reader_gid < 0
-                    or any(not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None
-                           for value in (self.cache_observation_producer_sha256, self.cache_observation_binding_sha256))):
+
+            if (
+                not self.cache_observation_path.strip()
+                or type(self.cache_observation_reader_gid) is not int
+                or self.cache_observation_reader_gid < 0
+                or any(
+                    not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None
+                    for value in (self.cache_observation_producer_sha256, self.cache_observation_binding_sha256)
+                )
+            ):
                 raise ValueError("cache observation requires reader GID, producer and binding pins")
             if self.target_path is None:
                 raise ValueError("cache observation requires target registration")
-        elif any(value is not None for value in (self.cache_observation_reader_gid, self.cache_observation_producer_sha256, self.cache_observation_binding_sha256)):
+        elif any(
+            value is not None
+            for value in (
+                self.cache_observation_reader_gid,
+                self.cache_observation_producer_sha256,
+                self.cache_observation_binding_sha256,
+            )
+        ):
             raise ValueError("cache observation path required")
         kinds = [kind for kind, _path in self.observation_feeds]
         if any(kind not in {"hubble", "tetragon", "management_listener"} for kind in kinds):

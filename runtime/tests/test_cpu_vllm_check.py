@@ -34,12 +34,14 @@ class FakeRunner:
 
     def run(self, argv, *, timeout=30):
         result = self.results.pop(0) if self.results else CommandResult(0)
-        self.history.append({
-            "argv": list(argv),
-            "started_at": "2026-10-27T00:00:00+00:00",
-            "ended_at": "2026-10-27T00:00:01+00:00",
-            "returncode": result.returncode,
-        })
+        self.history.append(
+            {
+                "argv": list(argv),
+                "started_at": "2026-10-27T00:00:00+00:00",
+                "ended_at": "2026-10-27T00:00:01+00:00",
+                "returncode": result.returncode,
+            }
+        )
         return result
 
 
@@ -60,10 +62,13 @@ class FakeHTTP:
         return self.responses.pop(0)
 
     def stream(self, url, *, headers, body, timeout, abort_after_first=False):
-        self.calls.append({
-            "kind": "stream", "url": url,
-            "abort_after_first": abort_after_first,
-        })
+        self.calls.append(
+            {
+                "kind": "stream",
+                "url": url,
+                "abort_after_first": abort_after_first,
+            }
+        )
         if not self.streams:
             raise AssertionError("unexpected fake HTTP stream")
         return self.streams.pop(0)
@@ -89,10 +94,16 @@ def arguments(root: Path, *, include_logprobs: bool = False) -> Namespace:
 
 class RuleTests(unittest.TestCase):
     def test_rules_distinguish_pass_fail_unknown_and_not_run(self) -> None:
-        passed = {name: True for name in (
-            "http_200", "valid_response", "record_allowed",
-            "delivery_attempted", "engine_log_match",
-        )}
+        passed = {
+            name: True
+            for name in (
+                "http_200",
+                "valid_response",
+                "record_allowed",
+                "delivery_attempted",
+                "engine_log_match",
+            )
+        }
         self.assertEqual(evaluate_case("CPU-01", passed)[0], "passed")
         self.assertEqual(evaluate_case("CPU-01", {**passed, "http_200": False})[0], "failed")
         self.assertEqual(evaluate_case("CPU-01", {**passed, "engine_log_match": None})[0], "unknown")
@@ -122,9 +133,7 @@ class SafetyAndOptInTests(unittest.TestCase):
     def test_report_redacts_tokens_and_keeps_logprobs_not_requested(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            checker = CPUVLLMCheck(
-                arguments(root), runner=FakeRunner(), http=FakeHTTP()
-            )
+            checker = CPUVLLMCheck(arguments(root), runner=FakeRunner(), http=FakeHTTP())
             checker.cases = [
                 {
                     "case_id": case_id,
@@ -154,9 +163,7 @@ class SafetyAndOptInTests(unittest.TestCase):
         self.assertIn("CPU-15", requested_case_ids(True))
         with tempfile.TemporaryDirectory() as temporary:
             fake_http = FakeHTTP()
-            checker = CPUVLLMCheck(
-                arguments(Path(temporary)), runner=FakeRunner(), http=fake_http
-            )
+            checker = CPUVLLMCheck(arguments(Path(temporary)), runner=FakeRunner(), http=fake_http)
             checker._add_logprobs_not_run()
             self.assertEqual(checker.cases[-1]["result"], "not_run")
             self.assertEqual(fake_http.calls, [])
@@ -164,17 +171,11 @@ class SafetyAndOptInTests(unittest.TestCase):
     def test_fake_runner_supplies_engine_logs_without_docker(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             runner = FakeRunner([CommandResult(0, "Received request chatcmpl-request-1")])
-            checker = CPUVLLMCheck(
-                arguments(Path(temporary)), runner=runner, http=FakeHTTP()
-            )
+            checker = CPUVLLMCheck(arguments(Path(temporary)), runner=runner, http=FakeHTTP())
             ok, logs = checker._engine_logs("2026-10-27T00:00:00+00:00")
             self.assertTrue(ok)
-            self.assertTrue(
-                checker._received(logs, "request-1", "/v1/chat/completions")
-            )
-            self.assertFalse(
-                checker._received(logs, "request-1", "/v1/completions")
-            )
+            self.assertTrue(checker._received(logs, "request-1", "/v1/chat/completions"))
+            self.assertFalse(checker._received(logs, "request-1", "/v1/completions"))
             self.assertTrue(
                 checker._received(
                     "Received request cmpl-request-1-0",
@@ -189,12 +190,14 @@ class HoldDetectionTests(unittest.TestCase):
     def test_hold_reason_is_reported_exactly(self) -> None:
         self.assertIsNone(target_hold_reason({"gateway_hold": None}))
         self.assertEqual(
-            target_hold_reason({
-                "gateway_hold": {
-                    "reason_code": "TARGET_UNVERIFIED",
-                    "message": "engine info is not ready",
+            target_hold_reason(
+                {
+                    "gateway_hold": {
+                        "reason_code": "TARGET_UNVERIFIED",
+                        "message": "engine info is not ready",
+                    }
                 }
-            }),
+            ),
             "TARGET_UNVERIFIED",
         )
         self.assertEqual(target_hold_reason(None), "TARGET_STATUS_UNAVAILABLE")
@@ -209,13 +212,9 @@ class HoldDetectionTests(unittest.TestCase):
             },
             "gateway_hold": None,
         }
-        fake_http = FakeHTTP([
-            HTTPResponse(200, {}, json.dumps(target).encode("utf-8"))
-        ])
+        fake_http = FakeHTTP([HTTPResponse(200, {}, json.dumps(target).encode("utf-8"))])
         with tempfile.TemporaryDirectory() as temporary:
-            checker = CPUVLLMCheck(
-                arguments(Path(temporary)), runner=FakeRunner(), http=fake_http
-            )
+            checker = CPUVLLMCheck(arguments(Path(temporary)), runner=FakeRunner(), http=fake_http)
             checker.normal_status = 200
             checker.normal_error_code = None
             checker.normal_request_id = "normal-request"

@@ -103,8 +103,7 @@ class EngineClientDeadlineTests(unittest.TestCase):
         connection = DrippingHeaderConnection()
         deadline_at = time.monotonic() + 0.03
         with self.assertRaises(RequestDeadlineExceeded):
-            EngineClient(Backend(connection), 0.5).request(
-                "GET", "/health", deadline_at=deadline_at)
+            EngineClient(Backend(connection), 0.5).request("GET", "/health", deadline_at=deadline_at)
         self.assertGreater(connection.parts, 0)
         self.assertTrue(connection.sock.closed.is_set())
 
@@ -112,8 +111,7 @@ class EngineClientDeadlineTests(unittest.TestCase):
         connection = SlowConnectConnection()
         started = time.monotonic()
         with self.assertRaises(RequestDeadlineExceeded):
-            EngineClient(Backend(connection), 0.5).request(
-                "GET", "/health", deadline_at=started + 0.02)
+            EngineClient(Backend(connection), 0.5).request("GET", "/health", deadline_at=started + 0.02)
         self.assertLess(time.monotonic() - started, 0.06)
         self.assertTrue(connection.finished.wait(0.2))
         self.assertTrue(connection.closed)
@@ -122,8 +120,7 @@ class EngineClientDeadlineTests(unittest.TestCase):
         socket = HeaderSocket()
         connection = Connection(Response([b"ok", b""], socket))
         connection.sock = socket
-        status, _, body = EngineClient(Backend(connection), 0.03).request(
-            "GET", "/health")
+        status, _, body = EngineClient(Backend(connection), 0.03).request("GET", "/health")
         time.sleep(0.05)
         self.assertEqual((status, body), (200, b"ok"))
         self.assertFalse(socket.closed.is_set())
@@ -139,8 +136,7 @@ class EngineClientDeadlineTests(unittest.TestCase):
         connection = Connection(Response([blocked_chunk], socket))
         connection.sock = socket
         with self.assertRaises(RequestDeadlineExceeded):
-            EngineClient(Backend(connection), 0.5).request(
-                "GET", "/health", deadline_at=time.monotonic() + 0.03)
+            EngineClient(Backend(connection), 0.5).request("GET", "/health", deadline_at=time.monotonic() + 0.03)
         self.assertTrue(socket.closed.is_set())
 
     def test_closed_response_socket_does_not_hide_buffered_body(self):
@@ -149,8 +145,7 @@ class EngineClientDeadlineTests(unittest.TestCase):
 
         status, headers, body = EngineClient(Backend(connection), 1).request("GET", "/health")
 
-        self.assertEqual((status, headers["Content-Type"], body),
-                         (200, "application/json", b'{"status":"ok"}'))
+        self.assertEqual((status, headers["Content-Type"], body), (200, "application/json", b'{"status":"ok"}'))
         self.assertEqual(socket.timeout_attempts, 1)
         self.assertTrue(connection.closed)
 

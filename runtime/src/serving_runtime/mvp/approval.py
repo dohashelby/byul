@@ -125,10 +125,7 @@ def _parse_entries(raw: bytes) -> tuple[dict[str, str], ...]:
             raise ValueError(f"entries[{index}] must be an object")
         if set(entry) - allowed or _REQUIRED_ENTRY_FIELDS - set(entry):
             raise ValueError(f"entries[{index}] has invalid fields")
-        if any(
-            not isinstance(entry[name], str) or not entry[name].strip()
-            for name in _REQUIRED_ENTRY_FIELDS
-        ):
+        if any(not isinstance(entry[name], str) or not entry[name].strip() for name in _REQUIRED_ENTRY_FIELDS):
             raise ValueError(f"entries[{index}] required fields must be non-empty strings")
         digest = entry["sha256"]
         if len(digest) != 64 or any(character not in "0123456789abcdefABCDEF" for character in digest):
@@ -286,10 +283,7 @@ class HashListApprovalVerifier:
                 evidence=base_evidence,
             )
         same_policy = [
-            entry
-            for entry in entries
-            if entry["policy_id"] == policy_id
-            and entry["policy_version"] == policy_version
+            entry for entry in entries if entry["policy_id"] == policy_id and entry["policy_version"] == policy_version
         ]
         if not same_policy:
             return _result(

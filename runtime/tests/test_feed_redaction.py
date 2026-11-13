@@ -24,21 +24,36 @@ FIXTURE = ROOT / "tests" / "fixtures" / "enforcement" / "tetragon_events.synthet
 class RedactTetragonLineTests(unittest.TestCase):
     def test_only_single_synthetic_probe_token_is_preserved(self):
         tag = "byul-read-probe-" + "a" * 32
-        for argv in (tag + "-secret", "prefix" + tag, tag + " " + tag, "'" + tag,
-                     "ordinary-private-command", None):
-            raw = {"process_kprobe": {"policy_name": "runtime-tg-secret-01", "runtime_probe_id": tag,
-                                      "process": {"arguments": argv}}}
+        for argv in (tag + "-secret", "prefix" + tag, tag + " " + tag, "'" + tag, "ordinary-private-command", None):
+            raw = {
+                "process_kprobe": {
+                    "policy_name": "runtime-tg-secret-01",
+                    "runtime_probe_id": tag,
+                    "process": {"arguments": argv},
+                }
+            }
             clean = json.loads(feed.redact_tetragon_line(json.dumps(raw).encode()))
             self.assertNotIn("runtime_probe_id", clean["process_kprobe"])
         raw = {"process_kprobe": {"policy_name": "unrelated", "process": {"arguments": tag}}}
-        self.assertNotIn("runtime_probe_id", json.loads(feed.redact_tetragon_line(json.dumps(raw).encode()))["process_kprobe"])
+        self.assertNotIn(
+            "runtime_probe_id", json.loads(feed.redact_tetragon_line(json.dumps(raw).encode()))["process_kprobe"]
+        )
 
     def test_environment_variables_are_removed_from_every_actor(self) -> None:
-        private={"arguments":"example-private-args","environment_variables":[{"key":"EXAMPLE","value":"example-private-env"}]}
-        raw={"process_exec":{"process":{"binary":"/bin/a",**private},"parent":dict(private),"ancestors":[dict(private)]}}
-        cleaned=feed.redact_tetragon_line(json.dumps(raw).encode())
-        self.assertNotIn(b"example-private",cleaned)
-        self.assertIn(b"/bin/a",cleaned)
+        private = {
+            "arguments": "example-private-args",
+            "environment_variables": [{"key": "EXAMPLE", "value": "example-private-env"}],
+        }
+        raw = {
+            "process_exec": {
+                "process": {"binary": "/bin/a", **private},
+                "parent": dict(private),
+                "ancestors": [dict(private)],
+            }
+        }
+        cleaned = feed.redact_tetragon_line(json.dumps(raw).encode())
+        self.assertNotIn(b"example-private", cleaned)
+        self.assertIn(b"/bin/a", cleaned)
 
     def test_arguments_are_removed_and_other_fields_kept(self) -> None:
         for raw in FIXTURE.read_bytes().splitlines(keepends=True):
@@ -108,8 +123,8 @@ class RedactTetragonLineTests(unittest.TestCase):
         output = io.BytesIO()
         script = (
             "import sys;"
-            "sys.stdout.write('{\"time\":\"t\",\"process_exec\":{\"process\":"
-            "{\"binary\":\"/bin/x\",\"arguments\":\"do-not-store\"}}}\\n')"
+            'sys.stdout.write(\'{"time":"t","process_exec":{"process":'
+            '{"binary":"/bin/x","arguments":"do-not-store"}}}\\n\')'
         )
         child = feed._Child(
             "tetragon",
@@ -133,21 +148,29 @@ class RedactTetragonLineTests(unittest.TestCase):
 
 class RedactionDropReceiptTests(unittest.TestCase):
     def child_group(self):
-        child = feed._Child("tetragon", lambda _since: [], io.BytesIO(), io.BytesIO(),
-                            transform=feed.redact_tetragon_line)
-        group = feed._FeedGroup("tetragon", feed_path=Path("unused"),
-                                heartbeat_path=Path("unused"), gap_path=Path("unused"),
-                                children=[child])
+        child = feed._Child(
+            "tetragon", lambda _since: [], io.BytesIO(), io.BytesIO(), transform=feed.redact_tetragon_line
+        )
+        group = feed._FeedGroup(
+            "tetragon",
+            feed_path=Path("unused"),
+            heartbeat_path=Path("unused"),
+            gap_path=Path("unused"),
+            children=[child],
+        )
         return child, group
 
     def pump(self, child, raw):
-        feed._pump(io.BytesIO(raw), child.output, child.transform,
-                   child.dropped_lines, child.pump_error, child.redaction_drops)
+        feed._pump(
+            io.BytesIO(raw), child.output, child.transform, child.dropped_lines, child.pump_error, child.redaction_drops
+        )
 
     def test_drop_codes_and_actual_pump_time_without_input(self):
-        samples = [(b"\xff\n", "INVALID_UTF8"),
-                   (b"EXAMPLE_PRIVATE_NOT_JSON\n", "INVALID_JSON"),
-                   (b"[1,2]\n", "OBJECT_REQUIRED")]
+        samples = [
+            (b"\xff\n", "INVALID_UTF8"),
+            (b"EXAMPLE_PRIVATE_NOT_JSON\n", "INVALID_JSON"),
+            (b"[1,2]\n", "OBJECT_REQUIRED"),
+        ]
         for raw, reason in samples:
             with self.subTest(reason=reason):
                 child, group = self.child_group()
@@ -217,8 +240,11 @@ class RedactionDropReceiptTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "tetragon.heartbeat.json"
             with patch.object(feed, "_utc_now", return_value="2026-11-08T07:05:00+00:00"):
-                feed.write_heartbeats({"tetragon": (path, Path(directory)/"raw.jsonl", group.started_at, [])},
-                                      state="running", extra={"tetragon": group.heartbeat_extra()})
+                feed.write_heartbeats(
+                    {"tetragon": (path, Path(directory) / "raw.jsonl", group.started_at, [])},
+                    state="running",
+                    extra={"tetragon": group.heartbeat_extra()},
+                )
             value = json.loads(path.read_text())
         self.assertEqual(value["last_redaction_drop_at"], "2026-11-08T07:00:00+00:00")
         self.assertEqual(value["updated_at"], "2026-11-08T07:05:00+00:00")
@@ -228,9 +254,11 @@ class RedactionDropReceiptTests(unittest.TestCase):
 
     def test_pump_failure_does_not_invent_filter_drop(self):
         child, group = self.child_group()
+
         class BrokenOutput(io.BytesIO):
             def write(self, value):
                 raise OSError("EXAMPLE_PRIVATE_ERROR")
+
         child.output = BrokenOutput()
         self.pump(child, b"{}\n")
         self.assertEqual(child.pump_error[0], "OSError")
@@ -300,9 +328,7 @@ class ReaderGroupSharingTests(unittest.TestCase):
             feed.check_reader_group(missing)
         feed.check_reader_group(os.getgid())  # a held group is accepted
         feed.check_reader_group(None)
-        code = feed.main(
-            ["--output-dir", str(self.directory / "out"), "--reader-group", str(missing)]
-        )
+        code = feed.main(["--output-dir", str(self.directory / "out"), "--reader-group", str(missing)])
         self.assertEqual(code, 2)
         self.assertFalse((self.directory / "out").exists())
 

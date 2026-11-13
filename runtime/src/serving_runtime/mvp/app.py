@@ -94,13 +94,9 @@ class GatewayApp:
                 raise ValueError("engine_address is required in mock mode")
             self.backend = BackendConfig.mock(engine_address)
         else:
-            self.backend = backend_config or load_backend_config(
-                str(config.backend_config_path)
-            )
+            self.backend = backend_config or load_backend_config(str(config.backend_config_path))
             if self.backend.kind != config.backend:
-                raise ValueError(
-                    f"{config.backend} mode requires a {config.backend} backend config"
-                )
+                raise ValueError(f"{config.backend} mode requires a {config.backend} backend config")
         allowed_binaries: tuple[str, ...] = ()
         self._exec_policy: ExecPolicy | None = None
         self._expected_tetragon_policies = None
@@ -109,18 +105,25 @@ class GatewayApp:
             bundle = self._policy_bundle or {}
             ref = bundle.get("policy_ref", {})
             policy = policy_state.policy
-            if (policy_state.ok and policy is not None
-                    and ref.get("policy_id") == policy.policy_id
-                    and ref.get("policy_version") == policy.policy_version
-                    # policy_ref.sha256 hashes the platform source, not the Gateway file.
-                    and any(f.get("role") == "gateway_policy" and f.get("sha256") == policy_state.sha256
-                            for f in bundle.get("files", []))
-                    and any(f.get("role") == "enforcement_intent" and f.get("applied") is True
-                            for f in bundle.get("files", []))):
+            if (
+                policy_state.ok
+                and policy is not None
+                and ref.get("policy_id") == policy.policy_id
+                and ref.get("policy_version") == policy.policy_version
+                # policy_ref.sha256 hashes the platform source, not the Gateway file.
+                and any(
+                    f.get("role") == "gateway_policy" and f.get("sha256") == policy_state.sha256
+                    for f in bundle.get("files", [])
+                )
+                and any(
+                    f.get("role") == "enforcement_intent" and f.get("applied") is True for f in bundle.get("files", [])
+                )
+            ):
                 self._expected_tetragon_policies = {
                     (m["metadata"]["namespace"], m["metadata"]["name"]): hashlib.sha256(
                         json.dumps(comparable_spec(m["spec"]), sort_keys=True, separators=(",", ":")).encode()
-                    ).hexdigest() for m in render_monitor_manifests(intent).values()
+                    ).hexdigest()
+                    for m in render_monitor_manifests(intent).values()
                 }
             allowed_binaries = intent.allowed_engine_binaries
             if intent.schema != "runtime-enforcement-intent/1.0":
@@ -133,15 +136,9 @@ class GatewayApp:
             raise ValueError("observation exceptions/timeline need an observation intent")
 
         self.engine_address = (self.backend.target.host, self.backend.target.port)
-        self.relay_timeout_s = self.backend.timeouts.get(
-            "relay_timeout_s", config.relay_timeout_s
-        )
-        self.stream_idle_timeout_s = self.backend.timeouts.get(
-            "stream_idle_timeout_s", config.stream_idle_timeout_s
-        )
-        self.request_deadline_s = self.backend.timeouts.get(
-            "request_deadline_s", config.request_deadline_s
-        )
+        self.relay_timeout_s = self.backend.timeouts.get("relay_timeout_s", config.relay_timeout_s)
+        self.stream_idle_timeout_s = self.backend.timeouts.get("stream_idle_timeout_s", config.stream_idle_timeout_s)
+        self.request_deadline_s = self.backend.timeouts.get("request_deadline_s", config.request_deadline_s)
         self._engine_client = EngineClient(self.backend, self.relay_timeout_s)
         self.status_timeout_s = self.backend.timeouts.get("status_timeout_s", 5.0)
         self._status_engine_client = EngineClient(self.backend, self.status_timeout_s)
@@ -157,16 +154,12 @@ class GatewayApp:
         self.revocation_state = load_revocations(config.revocations_path)
         self._approval_verifier: ApprovalVerifier | None = approval_verifier
         if self._approval_verifier is None and config.policy_approvals_path is not None:
-            self._approval_verifier = HashListApprovalVerifier(
-                config.policy_approvals_path
-            )
+            self._approval_verifier = HashListApprovalVerifier(config.policy_approvals_path)
         self.auth_state = load_auth(config.auth_config_path)
         self._cache_salt_key = CacheSaltKey.from_environ(cache_salt_environ)
         self._baseline = load_declaration(config.baseline_path, kind="baseline")
         self._manifest = load_declaration(config.manifest_path, kind="manifest")
-        self._policy_history = PolicyHistory(
-            Path(config.data_dir) / "policy_history.jsonl"
-        )
+        self._policy_history = PolicyHistory(Path(config.data_dir) / "policy_history.jsonl")
         self._revalidation = RevalidationRequests(config.data_dir)
         startup_approval = self._approval_result()
         policy_history_record = self._policy_history.append_startup(
@@ -177,9 +170,7 @@ class GatewayApp:
                 "policy_history", RuntimeError("startup policy history was not stored")
             )
         else:
-            self._revalidation.observe_policy_history(
-                policy_history_record, **self._revalidation_context()
-            )
+            self._revalidation.observe_policy_history(policy_history_record, **self._revalidation_context())
 
         self._target = TargetRegistry(
             load_target(config.target_path),
@@ -196,25 +187,36 @@ class GatewayApp:
             target_context=self._target_record_context,
             policy_bundle=self._policy_bundle,
         )
-        self._route_rejections = RouteRejections(config.data_dir, scope={
-            "environment": config.environment, "run_id": config.run_id,
-            "observation_session_id": self.observation_session_id,
-            "target_id": self.policy_state.policy.target_id if self.policy_state.policy else None,
-            "policy_id": self.policy_state.policy.policy_id if self.policy_state.policy else None,
-            "policy_version": self.policy_state.policy.policy_version if self.policy_state.policy else None,
-            "policy_sha256": self.policy_state.sha256,
-            "bundle_id": (self._policy_bundle or {}).get("bundle_id"),
-        })
-        self._engine_store = JsonlStore(
-            Path(config.data_dir) / "engine_receipts.jsonl"
+        self._route_rejections = RouteRejections(
+            config.data_dir,
+            scope={
+                "environment": config.environment,
+                "run_id": config.run_id,
+                "observation_session_id": self.observation_session_id,
+                "target_id": self.policy_state.policy.target_id if self.policy_state.policy else None,
+                "policy_id": self.policy_state.policy.policy_id if self.policy_state.policy else None,
+                "policy_version": self.policy_state.policy.policy_version if self.policy_state.policy else None,
+                "policy_sha256": self.policy_state.sha256,
+                "bundle_id": (self._policy_bundle or {}).get("bundle_id"),
+            },
         )
-        self._observations = ObservationQuery(
-            Path(config.data_dir) / "observations.jsonl"
-        )
+        self._engine_store = JsonlStore(Path(config.data_dir) / "engine_receipts.jsonl")
+        self._observations = ObservationQuery(Path(config.data_dir) / "observations.jsonl")
         self._lab_report = LabReportSource(config.lab_report_path)
         self._engine_receipts = EngineReceipts(config.engine_receipts_path)
         from .native_receipts import NativeReceiptFeed
-        self._native_receipts = (NativeReceiptFeed(config.native_receipt_feed_path, reader_gid=config.native_receipt_reader_gid, producer_source_sha256=config.native_receipt_producer_sha256, stale_after_s=config.collector_stale_after_s, receipt_store=self._engine_store) if config.native_receipt_feed_path else None)
+
+        self._native_receipts = (
+            NativeReceiptFeed(
+                config.native_receipt_feed_path,
+                reader_gid=config.native_receipt_reader_gid,
+                producer_source_sha256=config.native_receipt_producer_sha256,
+                stale_after_s=config.collector_stale_after_s,
+                receipt_store=self._engine_store,
+            )
+            if config.native_receipt_feed_path
+            else None
+        )
         self._queries = QueryService(
             self._records.store,
             self._engine_store,
@@ -249,10 +251,18 @@ class GatewayApp:
             hold_path=config.retention_hold_path,
         )
         from .engine_health_events import EngineHealthEvents
-        self._engine_health_events=EngineHealthEvents(self._observations.store,
-            lambda:{**self._revalidation_context(),'environment':self.config.environment,
-                    'run_id':self.config.run_id,'backend_kind':self.backend.kind,
-                    'target':self._target_record_context(),'policy_bundle':copy.deepcopy(self._policy_bundle)})
+
+        self._engine_health_events = EngineHealthEvents(
+            self._observations.store,
+            lambda: {
+                **self._revalidation_context(),
+                "environment": self.config.environment,
+                "run_id": self.config.run_id,
+                "backend_kind": self.backend.kind,
+                "target": self._target_record_context(),
+                "policy_bundle": copy.deepcopy(self._policy_bundle),
+            },
+        )
         collectors = [
             Collector(
                 "engine_health",
@@ -272,11 +282,7 @@ class GatewayApp:
             ),
             Collector(
                 "metrics",
-                (
-                    self._status_engine_client.collect_metrics
-                    if self.backend.metrics_target is not None
-                    else None
-                ),
+                (self._status_engine_client.collect_metrics if self.backend.metrics_target is not None else None),
                 config.collector_interval_s,
                 config.collector_stale_after_s,
                 engine_group=True,
@@ -290,11 +296,7 @@ class GatewayApp:
             ),
             Collector(
                 "asset_integrity",
-                (
-                    self._collect_asset_integrity
-                    if config.asset_manifest_path
-                    else None
-                ),
+                (self._collect_asset_integrity if config.asset_manifest_path else None),
                 config.asset_interval_s,
                 config.asset_interval_s * 3,
                 dedicated_thread=True,
@@ -302,7 +304,14 @@ class GatewayApp:
             ),
         ]
         if self._native_receipts is not None:
-            collectors.append(Collector("native_receipt_observer", self._native_receipts.collect, config.collector_interval_s, config.collector_stale_after_s))
+            collectors.append(
+                Collector(
+                    "native_receipt_observer",
+                    self._native_receipts.collect,
+                    config.collector_interval_s,
+                    config.collector_stale_after_s,
+                )
+            )
         self._observation_feeds: list[ObservationFeed] = []
         observation_heartbeats = dict(config.observation_heartbeats)
         for kind, path in config.observation_feeds:
@@ -331,29 +340,33 @@ class GatewayApp:
             )
         if config.cache_observation_path is not None:
             from .cache_observation import CacheObservationReader
-            self._cache_observation = CacheObservationReader(config.cache_observation_path,
+
+            self._cache_observation = CacheObservationReader(
+                config.cache_observation_path,
                 reader_gid=config.cache_observation_reader_gid,
                 producer_sha256=config.cache_observation_producer_sha256,
                 binding_sha256=config.cache_observation_binding_sha256,
                 stale_after_s=config.collector_stale_after_s,
-                current_binding=lambda: {"target_sha256": self._target.registration.sha256,
+                current_binding=lambda: {
+                    "target_sha256": self._target.registration.sha256,
                     "policy_sha256": self.policy_state.sha256,
                     "bundle_id": (self._policy_bundle or {}).get("bundle_id"),
-                    "instance_id": (self._target.current_instance() or {}).get("instance_id")})
-            collectors.append(Collector("cache_integrity", self._cache_observation.collect,
-                config.collector_interval_s, config.collector_stale_after_s,
-                on_collected=self._evaluate_cache_revalidation))
-        registration = self._target.registration
-        if config.target_pod_snapshot is not None and (
-            registration.state != "ok" or registration.kubernetes is None
-        ):
-            raise ValueError(
-                "--target-pod-snapshot requires an available target registration "
-                "with a kubernetes block"
+                    "instance_id": (self._target.current_instance() or {}).get("instance_id"),
+                },
             )
-        registered_context = (
-            registration.kubernetes.context if registration.kubernetes is not None else None
-        )
+            collectors.append(
+                Collector(
+                    "cache_integrity",
+                    self._cache_observation.collect,
+                    config.collector_interval_s,
+                    config.collector_stale_after_s,
+                    on_collected=self._evaluate_cache_revalidation,
+                )
+            )
+        registration = self._target.registration
+        if config.target_pod_snapshot is not None and (registration.state != "ok" or registration.kubernetes is None):
+            raise ValueError("--target-pod-snapshot requires an available target registration with a kubernetes block")
+        registered_context = registration.kubernetes.context if registration.kubernetes is not None else None
         # The target registration names the cluster it was approved for. An
         # explicit --kube-context must agree with it instead of silently
         # pointing the collectors at another cluster.
@@ -414,9 +427,7 @@ class GatewayApp:
                     on_collected=self._observe_target_pods,
                 )
             )
-        self._collectors = CollectorManager(
-            collectors, startup_timeout_s=self.status_timeout_s
-        )
+        self._collectors = CollectorManager(collectors, startup_timeout_s=self.status_timeout_s)
 
     def _approval_result(self) -> ApprovalResult | None:
         if self._approval_verifier is None:
@@ -444,32 +455,24 @@ class GatewayApp:
             },
         }
 
-    def _evaluate_asset_revalidation(
-        self, result: Any, data_origin: str | None
-    ) -> None:
+    def _evaluate_asset_revalidation(self, result: Any, data_origin: str | None) -> None:
         if not isinstance(result, dict):
             self._revalidation.record_evaluation_error(
                 "asset_integrity", ValueError("asset collector result is not an object")
             )
             return
-        self._revalidation.observe_asset(
-            result, data_origin=data_origin, **self._revalidation_context()
-        )
+        self._revalidation.observe_asset(result, data_origin=data_origin, **self._revalidation_context())
 
     def _evaluate_cache_revalidation(self, result, data_origin):
         self._revalidation.observe_cache(result, data_origin=data_origin, **self._revalidation_context())
 
-    def _evaluate_baseline_revalidation(
-        self, _result: Any, _data_origin: str | None
-    ) -> None:
+    def _evaluate_baseline_revalidation(self, _result: Any, _data_origin: str | None) -> None:
         try:
             comparison = self.baseline_status()
         except Exception as error:
             self._revalidation.record_evaluation_error("baseline", error)
             return
-        self._revalidation.observe_baseline(
-            comparison, **self._revalidation_context()
-        )
+        self._revalidation.observe_baseline(comparison, **self._revalidation_context())
 
     def _collect_asset_integrity(self) -> tuple[dict[str, Any], str]:
         # Keep the module-level name so serving_runtime.mvp.app.check_assets remains
@@ -533,7 +536,9 @@ class GatewayApp:
                     "last_value": pods.get("last_value"),
                     "last_success_at": pod_confirmed_at,
                     "last_error_kind": pods.get("last_error_kind"),
-                } if pods else None
+                }
+                if pods
+                else None
             ),
         }
 
@@ -637,7 +642,9 @@ class GatewayApp:
         comparison = compare_baseline(self._baseline, self._manifest, self._collectors)
         registration = self._target.registration
         if registration.state == "ok" and registration.engine_kind in {"vllm", "sglang"}:
-            comparison["rows"].extend(comparison_rows(registration.launch_settings, self._collectors.get("target_pods")))
+            comparison["rows"].extend(
+                comparison_rows(registration.launch_settings, self._collectors.get("target_pods"))
+            )
         return comparison
 
     def _observe_target_pods(self, result: Any, data_origin: str | None) -> None:
@@ -656,12 +663,17 @@ class GatewayApp:
     @staticmethod
     def _engine_context_capacity(policy: Any, backend: BackendConfig, collectors: dict[str, Any]) -> dict[str, Any]:
         engine_info = next((item for item in collectors["collectors"] if item["source"] == "engine_info"), None)
-        observed = (engine_info.get("last_value") or {}).get("option.max_model_len") if engine_info and engine_info.get("state") == "ok" and isinstance(engine_info.get("last_value"), dict) else None
+        observed = (
+            (engine_info.get("last_value") or {}).get("option.max_model_len")
+            if engine_info and engine_info.get("state") == "ok" and isinstance(engine_info.get("last_value"), dict)
+            else None
+        )
         observed = observed if isinstance(observed, int) and not isinstance(observed, bool) and observed > 0 else None
         limit = policy.max_context_tokens if policy else None
         required = limit + backend.context_headroom_tokens if limit is not None else None
-        capacity_state = ("unknown" if required is None or observed is None else
-                          "ok" if observed >= required else "insufficient")
+        capacity_state = (
+            "unknown" if required is None or observed is None else "ok" if observed >= required else "insufficient"
+        )
         return {
             "state": capacity_state,
             "max_model_len": observed,
@@ -708,11 +720,7 @@ class GatewayApp:
                 "counts": target["counts"],
                 "instance": target["instance"],
             },
-            "mode": (
-                "mock_engine"
-                if self.backend.kind == "mock"
-                else f"external_{self.backend.kind}_backend"
-            ),
+            "mode": ("mock_engine" if self.backend.kind == "mock" else f"external_{self.backend.kind}_backend"),
             "backend_kind": self.backend.kind,
             "engine_context_capacity": context_capacity,
             "cache_isolation": cache_isolation,
@@ -778,9 +786,7 @@ class GatewayApp:
             "baseline": {
                 "configured": baseline["baseline"]["state"] != "not_configured",
                 "states": {
-                    name: sum(
-                        1 for row in baseline["rows"] if row["state"] == name
-                    )
+                    name: sum(1 for row in baseline["rows"] if row["state"] == name)
                     for name in (
                         "match",
                         "drift",
@@ -792,10 +798,7 @@ class GatewayApp:
                 },
                 "model_id_limit": MODEL_ID_LIMIT_NOTE,
             },
-            "collectors": {
-                item["source"]: item["state"]
-                for item in collectors["collectors"]
-            },
+            "collectors": {item["source"]: item["state"] for item in collectors["collectors"]},
             "revalidation": {
                 "open_count": revalidation["open_count"],
                 "current_condition_count": revalidation["current_condition_count"],
@@ -832,8 +835,12 @@ class GatewayApp:
                     demo=os.environ.get("RUNTIME_DEMO") == "1",
                     observed_times=(
                         item.get("observed_at")
-                        for item in self._observations.query({"source": "tetragon", "data_origin": "synthetic"})["observations"]
-                    ) if os.environ.get("RUNTIME_DEMO") == "1" else (),
+                        for item in self._observations.query({"source": "tetragon", "data_origin": "synthetic"})[
+                            "observations"
+                        ]
+                    )
+                    if os.environ.get("RUNTIME_DEMO") == "1"
+                    else (),
                 ),
                 authorize_read=lambda header: self.auth_state.authorize_read(header),
                 record_rejected=self._route_rejections.record,

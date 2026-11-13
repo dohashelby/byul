@@ -9,6 +9,7 @@
 "지금보다 나빠지지 않게" 막는 방식이다. 목표값이 아니라 현재값을 기준으로 삼는다.
 측정 대상: <root>/src/**/*.py 와 <root>/tools/**/*.py (제품 코드). tests 는 제외한다.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,10 +19,10 @@ import re
 import sys
 from pathlib import Path
 
-LONG_FN = 80          # 긴 함수 기준(줄)
-VERY_LONG_FN = 150    # 매우 긴 함수 기준(줄)
-MANY_ARGS = 8         # 인자 과다 기준
-BIG_FILE = 800        # 큰 파일 기준(줄)
+LONG_FN = 80  # 긴 함수 기준(줄)
+VERY_LONG_FN = 150  # 매우 긴 함수 기준(줄)
+MANY_ARGS = 8  # 인자 과다 기준
+BIG_FILE = 800  # 큰 파일 기준(줄)
 # 제품 코드(src, tools)에 있으면 안 되는 랩 값·개인 경로 패턴
 FORBIDDEN = {
     "personal_path": r"/Users/[A-Za-z0-9_.-]+",
@@ -136,11 +137,7 @@ def main() -> int:
         print(f"\n기준선 저장: {args.write}")
     if args.check:
         base = json.loads(Path(args.check).read_text(encoding="utf-8"))
-        worse = {
-            k: (base[k], now[k])
-            for k in base
-            if k in now and k not in ("files", "lines") and now[k] > base[k]
-        }
+        worse = {k: (base[k], now[k]) for k in base if k in now and k not in ("files", "lines") and now[k] > base[k]}
         if worse:
             print("\n기준선보다 나빠진 항목:")
             for k, (b, n) in sorted(worse.items()):

@@ -1,4 +1,5 @@
 """Transactional, monitor-first reconciliation. Only allowlisted summaries escape."""
+
 from __future__ import annotations
 
 import copy
@@ -35,22 +36,42 @@ def restorable_in_monitor(spec):
         return modes == ["monitor"]
     if set(spec) - {"podSelector", "containerSelector", "kprobes", "lsmhooks", "tracepoints", "uprobes", "options"}:
         return False
-    return all(action.get("action") == "Post"
-               for kind in ("kprobes", "lsmhooks", "tracepoints", "uprobes")
-               for probe in spec.get(kind, []) for selector in probe.get("selectors", [])
-               for action in selector.get("matchActions", []))
+    return all(
+        action.get("action") == "Post"
+        for kind in ("kprobes", "lsmhooks", "tracepoints", "uprobes")
+        for probe in spec.get(kind, [])
+        for selector in probe.get("selectors", [])
+        for action in selector.get("matchActions", [])
+    )
 
 
-def sync(intent, *, context, namespace, run, read_mode, verify_gateway,
-         components=("tetragon",), cilium_apply=False, execute=False, before_apply=lambda: None):
+def sync(
+    intent,
+    *,
+    context,
+    namespace,
+    run,
+    read_mode,
+    verify_gateway,
+    components=("tetragon",),
+    cilium_apply=False,
+    execute=False,
+    before_apply=lambda: None,
+):
     """Dry-run every desired object before any mutation; never replay mutations.
 
     read_mode verifies all scheduled Tetragon daemons, not a cached snapshot.
     Rollback uses optimistic resource versions and verifies spec and live mode.
     An ambiguous write is restored only when its live spec matches our candidate.
     """
-    report = {"state": "failed", "code": "VALIDATION_FAILED", "dry_run": not execute,
-              "steps": [], "policies": [], "components": []}
+    report = {
+        "state": "failed",
+        "code": "VALIDATION_FAILED",
+        "dry_run": not execute,
+        "steps": [],
+        "policies": [],
+        "components": [],
+    }
     changed = []
     transaction = uuid4().hex
     marker = "serving-runtime.local/sync-transaction"
@@ -98,9 +119,12 @@ def sync(intent, *, context, namespace, run, read_mode, verify_gateway,
     with tempfile.TemporaryDirectory(prefix="runtime-enforcement-") as temporary:
         root = Path(temporary)
         try:
-            if (list(components) not in [["tetragon"], ["tetragon", "cilium"]]
-                    or type(cilium_apply) is not bool or (cilium_apply and "cilium" not in components)
-                    or intent.namespace != namespace):
+            if (
+                list(components) not in [["tetragon"], ["tetragon", "cilium"]]
+                or type(cilium_apply) is not bool
+                or (cilium_apply and "cilium" not in components)
+                or intent.namespace != namespace
+            ):
                 raise SyncFailure("VALIDATION_FAILED")
             passed()
             stage = "render"
@@ -112,14 +136,28 @@ def sync(intent, *, context, namespace, run, read_mode, verify_gateway,
             plan = []
             for component in components:
                 if component == "cilium":
-                    crd = command(["get", "crd", "ciliumnetworkpolicies.cilium.io", "--ignore-not-found=true", "-o", "json"])
+                    crd = command(
+                        ["get", "crd", "ciliumnetworkpolicies.cilium.io", "--ignore-not-found=true", "-o", "json"]
+                    )
                     if not crd.stdout.strip():
                         report["components"].append({"component": component, "state": "not_installed"})
                         for obj in desired[component].values():
-                            report["policies"].append({"name": obj["metadata"]["name"], "component": component,
-                                "action": "skipped", "mode": None, "spec_sha256": digest(obj["spec"], component)})
+                            report["policies"].append(
+                                {
+                                    "name": obj["metadata"]["name"],
+                                    "component": component,
+                                    "action": "skipped",
+                                    "mode": None,
+                                    "spec_sha256": digest(obj["spec"], component),
+                                }
+                            )
                         continue
-                report["components"].append({"component": component, "state": "apply" if execute and (component == "tetragon" or cilium_apply) else "dry_run"})
+                report["components"].append(
+                    {
+                        "component": component,
+                        "state": "apply" if execute and (component == "tetragon" or cilium_apply) else "dry_run",
+                    }
+                )
                 previous = objects(component)
                 names = set()
                 for obj in desired[component].values():
@@ -129,9 +167,18 @@ def sync(intent, *, context, namespace, run, read_mode, verify_gateway,
                     names.add(name)
                     old = previous.get(name)
                     action = "unchanged" if same(old, obj, component) else "replaced" if old else "created"
-                    mode = check_loaded(name, None) if component == "tetragon" and old else "monitor" if component == "tetragon" else None
-                    if (action == "replaced" and component == "tetragon"
-                            and (mode == "enforce" or not restorable_in_monitor(old["spec"]))):
+                    mode = (
+                        check_loaded(name, None)
+                        if component == "tetragon" and old
+                        else "monitor"
+                        if component == "tetragon"
+                        else None
+                    )
+                    if (
+                        action == "replaced"
+                        and component == "tetragon"
+                        and (mode == "enforce" or not restorable_in_monitor(old["spec"]))
+                    ):
                         raise SyncFailure("SAFETY_REJECTED")
                     candidate = copy.deepcopy(obj)
                     if action != "unchanged":
@@ -146,19 +193,45 @@ def sync(intent, *, context, namespace, run, read_mode, verify_gateway,
                     verb = "replace" if old else "create"
                     # Server validates admission/schema even for unchanged objects.
                     if component == "cilium":
-                        command(["apply", "--server-side=true", "--field-manager=runtime-enforcement", "--dry-run=server", "-f", str(path), "-o", "json"])
-                        diff = run(base + ["diff", "--server-side=true", "--field-manager=runtime-enforcement", "-f", str(path)])
+                        command(
+                            [
+                                "apply",
+                                "--server-side=true",
+                                "--field-manager=runtime-enforcement",
+                                "--dry-run=server",
+                                "-f",
+                                str(path),
+                                "-o",
+                                "json",
+                            ]
+                        )
+                        diff = run(
+                            base
+                            + ["diff", "--server-side=true", "--field-manager=runtime-enforcement", "-f", str(path)]
+                        )
                         if diff.returncode not in {0, 1}:
                             raise SyncFailure("EXECUTION_FAILED")
                     command([verb, "--dry-run=server", "-f", str(path), "-o", "json"])
-                    row = {"name": name, "component": component, "action": action, "mode": mode,
-                           "spec_sha256": digest(obj["spec"], component)}
+                    row = {
+                        "name": name,
+                        "component": component,
+                        "action": action,
+                        "mode": mode,
+                        "spec_sha256": digest(obj["spec"], component),
+                    }
                     report["policies"].append(row)
                     plan.append((component, name, obj, old, mode, path, backup, row))
                 for name, obj in sorted(previous.items()):
                     if name not in names and NAME.fullmatch(name):
-                        report["policies"].append({"name": name, "component": component, "action": "extra",
-                            "mode": None, "spec_sha256": digest(obj["spec"], component)})
+                        report["policies"].append(
+                            {
+                                "name": name,
+                                "component": component,
+                                "action": "extra",
+                                "mode": None,
+                                "spec_sha256": digest(obj["spec"], component),
+                            }
+                        )
             if len(report["policies"]) > 512:
                 report["policies"] = report["policies"][:512]
                 raise SyncFailure("VALIDATION_FAILED")
@@ -170,7 +243,11 @@ def sync(intent, *, context, namespace, run, read_mode, verify_gateway,
                     continue
                 before_apply()
                 live = objects(component).get(name)
-                if (live is None) != (old is None) or (old and (live["metadata"].get("uid"), live["metadata"]["resourceVersion"]) != (old["metadata"].get("uid"), old["metadata"]["resourceVersion"])):
+                if (live is None) != (old is None) or (
+                    old
+                    and (live["metadata"].get("uid"), live["metadata"]["resourceVersion"])
+                    != (old["metadata"].get("uid"), old["metadata"]["resourceVersion"])
+                ):
                     raise SyncFailure("STATE_CHANGED")
                 if component == "tetragon" and old:
                     check_loaded(name, mode)
@@ -204,11 +281,18 @@ def sync(intent, *, context, namespace, run, read_mode, verify_gateway,
                 for component, name, obj, old, mode, path, backup, row in reversed(changed):
                     try:
                         live = objects(component).get(name)
-                        if (same(live, old, component) and live["metadata"].get("uid") == old["metadata"].get("uid") if old else live is None):
+                        if (
+                            same(live, old, component) and live["metadata"].get("uid") == old["metadata"].get("uid")
+                            if old
+                            else live is None
+                        ):
                             if component == "tetragon" and old:
                                 check_loaded(name, mode)
                             continue
-                        if (not same(live, obj, component) or live["metadata"].get("annotations", {}).get(marker) != transaction):
+                        if (
+                            not same(live, obj, component)
+                            or live["metadata"].get("annotations", {}).get(marker) != transaction
+                        ):
                             raise SyncFailure("STATE_CHANGED")
                         if component == "tetragon":
                             if check_loaded(name, None) not in {"monitor", "monitor_only"}:
@@ -222,13 +306,34 @@ def sync(intent, *, context, namespace, run, read_mode, verify_gateway,
                         else:
                             # Raw DELETE carries atomic UID/resourceVersion preconditions.
                             deletion = root / f"delete-{len(list(root.glob('delete-*')))}.json"
-                            write(deletion, {"apiVersion": "v1", "kind": "DeleteOptions", "preconditions": {
-                                "uid": live["metadata"]["uid"], "resourceVersion": live["metadata"]["resourceVersion"]}})
+                            write(
+                                deletion,
+                                {
+                                    "apiVersion": "v1",
+                                    "kind": "DeleteOptions",
+                                    "preconditions": {
+                                        "uid": live["metadata"]["uid"],
+                                        "resourceVersion": live["metadata"]["resourceVersion"],
+                                    },
+                                },
+                            )
                             version = "v1alpha1" if component == "tetragon" else "v2"
                             resource = "tracingpoliciesnamespaced" if component == "tetragon" else RESOURCES[component]
-                            command(["delete", "--raw", f"/apis/cilium.io/{version}/namespaces/{namespace}/{resource}/{name}", "-f", str(deletion)])
+                            command(
+                                [
+                                    "delete",
+                                    "--raw",
+                                    f"/apis/cilium.io/{version}/namespaces/{namespace}/{resource}/{name}",
+                                    "-f",
+                                    str(deletion),
+                                ]
+                            )
                         actual = objects(component).get(name)
-                        if not (same(actual, old, component) and actual["metadata"].get("uid") == old["metadata"].get("uid") if old else actual is None):
+                        if not (
+                            same(actual, old, component) and actual["metadata"].get("uid") == old["metadata"].get("uid")
+                            if old
+                            else actual is None
+                        ):
                             raise SyncFailure("EXECUTION_FAILED")
                         if component == "tetragon" and old:
                             check_loaded(name, mode)
@@ -238,7 +343,9 @@ def sync(intent, *, context, namespace, run, read_mode, verify_gateway,
                     verify_gateway(any(e[0] == "cilium" for e in changed))
                 except Exception:
                     restored = False
-                report.update(state="rolled_back" if restored else "unknown", code="ROLLED_BACK" if restored else "STATUS_UNKNOWN")
+                report.update(
+                    state="rolled_back" if restored else "unknown", code="ROLLED_BACK" if restored else "STATUS_UNKNOWN"
+                )
                 report["steps"].append({"stage": "rollback", "state": "passed" if restored else "unknown"})
     for name in ("validation", "render", "dry-run", "apply", "verify"):
         if not any(s["stage"] == name for s in report["steps"]):

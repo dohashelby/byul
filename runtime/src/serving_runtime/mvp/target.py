@@ -212,9 +212,7 @@ def _parse(document: object) -> dict[str, Any]:
         if not isinstance(selector, dict) or not selector:
             raise ValueError("kubernetes.selector must be a non-empty label object")
         normalized_selector = validate_label_selector(selector)
-        kubernetes = KubernetesSelector(
-            context, namespace, normalized_selector, container
-        )
+        kubernetes = KubernetesSelector(context, namespace, normalized_selector, container)
     return {
         "target_id": target_id,
         "target_ref": _optional_string(document, "target_ref", "target"),
@@ -236,9 +234,7 @@ def load_target(path: str | Path | None) -> TargetRegistration:
     path_text = str(path)
 
     def error(code: str, message: str, digest: str | None = None) -> TargetRegistration:
-        return TargetRegistration(
-            "error", path_text, digest, loaded_at, error_code=code, error_message=message
-        )
+        return TargetRegistration("error", path_text, digest, loaded_at, error_code=code, error_message=message)
 
     try:
         raw = Path(path).read_bytes()
@@ -264,9 +260,7 @@ def load_target(path: str | Path | None) -> TargetRegistration:
     return TargetRegistration("ok", path_text, digest, loaded_at, **fields)
 
 
-def pods_command(
-    selector: KubernetesSelector, context: str | None = None
-) -> list[str]:
+def pods_command(selector: KubernetesSelector, context: str | None = None) -> list[str]:
     return [
         "kubectl",
         "--context",
@@ -309,18 +303,17 @@ def summarize_pods(document: object, container: str, engine_kind: str | None = N
         metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
         spec = item.get("spec") if isinstance(item.get("spec"), dict) else {}
         containers = spec.get("containers")
-        engine_spec = next((entry for entry in containers
-                           if isinstance(entry, dict) and entry.get("name") == container), None) if isinstance(containers, list) else None
+        engine_spec = (
+            next((entry for entry in containers if isinstance(entry, dict) and entry.get("name") == container), None)
+            if isinstance(containers, list)
+            else None
+        )
         status = item.get("status") if isinstance(item.get("status"), dict) else {}
         statuses = status.get("containerStatuses")
         matched = None
         if isinstance(statuses, list):
             matched = next(
-                (
-                    entry
-                    for entry in statuses
-                    if isinstance(entry, dict) and entry.get("name") == container
-                ),
+                (entry for entry in statuses if isinstance(entry, dict) and entry.get("name") == container),
                 None,
             )
         container_view = None
@@ -331,7 +324,9 @@ def summarize_pods(document: object, container: str, engine_kind: str | None = N
                 "image": _text(matched.get("image")),
                 "image_digest": _image_digest(_text(matched.get("imageID"))),
                 "container_id": _text(matched.get("containerID")),
-                "restart_count": restart_count if isinstance(restart_count, int) and not isinstance(restart_count, bool) else None,
+                "restart_count": restart_count
+                if isinstance(restart_count, int) and not isinstance(restart_count, bool)
+                else None,
                 "ready": matched.get("ready") is True,
                 "running": isinstance(matched.get("state"), dict) and "running" in matched["state"],
             }
@@ -349,10 +344,7 @@ def summarize_pods(document: object, container: str, engine_kind: str | None = N
         )
     pods.sort(key=lambda pod: pod["name"] or "")
     # Keep finished Pods in the observation, but never treat them as current targets.
-    live = [
-        pod for pod in pods
-        if not pod["deleting"] and pod["phase"] not in {"Failed", "Succeeded"}
-    ]
+    live = [pod for pod in pods if not pod["deleting"] and pod["phase"] not in {"Failed", "Succeeded"}]
     if not live:
         state, current = "not_found", None
     elif len(live) > 1:
@@ -376,8 +368,12 @@ def summarize_pods(document: object, container: str, engine_kind: str | None = N
             "image": pod["container"]["image"],
             "image_digest": pod["container"]["image_digest"],
         }
-    return {"state": state, "pods": pods, "instance": current,
-            "launch_settings": live[0]["launch_settings"] if state == "ok" else observe_launch_settings(None, engine_kind)}
+    return {
+        "state": state,
+        "pods": pods,
+        "instance": current,
+        "launch_settings": live[0]["launch_settings"] if state == "ok" else observe_launch_settings(None, engine_kind),
+    }
 
 
 class KubernetesTargetCollector:
@@ -448,7 +444,8 @@ class TargetPodSnapshotCollector:
     def _read(self) -> bytes:
         try:
             descriptor = os.open(
-                self.path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW,
+                self.path,
+                os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW,
             )
         except OSError as error:
             if error.errno == errno.ELOOP:
@@ -538,16 +535,13 @@ class TargetPodSnapshotCollector:
                 not isinstance(error_value, dict)
                 or set(error_value) != {"class", "code"}
                 or not all(
-                    isinstance(error_value.get(name), str)
-                    and _ERROR_TOKEN.fullmatch(error_value[name]) is not None
+                    isinstance(error_value.get(name), str) and _ERROR_TOKEN.fullmatch(error_value[name]) is not None
                     for name in ("class", "code")
                 )
                 or "items" in document
             ):
                 raise ValueError("target Pod snapshot error fields are invalid")
-            raise OSError(
-                f"target Pod snapshot writer error ({error_value['code']})"
-            )
+            raise OSError(f"target Pod snapshot writer error ({error_value['code']})")
         if document.get("error") is not None or not isinstance(document.get("items"), list):
             raise ValueError("target Pod snapshot ok fields are invalid")
         age_s = (self.now().astimezone(timezone.utc) - collected_at).total_seconds()
@@ -644,11 +638,7 @@ class TargetRegistry:
                 "target_id": self.registration.target_id,
                 "instance": instance,
                 "previous_instance_id": old_id,
-                "reason": (
-                    _change_reason(previous, instance)
-                    if event == "instance_changed"
-                    else None
-                ),
+                "reason": (_change_reason(previous, instance) if event == "instance_changed" else None),
             }
             try:
                 self.store.append(record)
@@ -693,14 +683,18 @@ class TargetRegistry:
             "registration": self.registration.state,
             "target_id": self.registration.target_id,
             "instance_id": current["instance_id"] if current else None,
-            "instance_state": (
-                k8s_state if self.registration.kubernetes is not None else "not_configured"
-            ),
+            "instance_state": (k8s_state if self.registration.kubernetes is not None else "not_configured"),
             "verification_state": verification["state"] if verification else None,
             "last_confirmed_at": verification["last_confirmed_at"] if verification else None,
-            **{key: current.get(key) if current else None for key in (
-                "pod_uid", "container_id", "restart_count", "image_digest",
-            )},
+            **{
+                key: current.get(key) if current else None
+                for key in (
+                    "pod_uid",
+                    "container_id",
+                    "restart_count",
+                    "image_digest",
+                )
+            },
         }
 
     def hold(
@@ -743,8 +737,10 @@ class TargetRegistry:
         if isinstance(kubernetes, dict) and kubernetes.get("state") != "ok":
             previous_pods = kubernetes.get("last_value")
         return self._comparison_rows(
-            policy_target_id=policy_target_id, backend_kind=backend_kind,
-            engine_info=previous_engine, kubernetes=previous_pods,
+            policy_target_id=policy_target_id,
+            backend_kind=backend_kind,
+            engine_info=previous_engine,
+            kubernetes=previous_pods,
         )
 
     def _comparison_rows(
@@ -780,9 +776,7 @@ class TargetRegistry:
                 )
             else:
                 model_ids = value.get("model.ids")
-                if isinstance(model_ids, list) and all(
-                    isinstance(item, str) for item in model_ids
-                ):
+                if isinstance(model_ids, list) and all(isinstance(item, str) for item in model_ids):
                     rows.append(
                         _membership_row(
                             "model.id",
@@ -821,8 +815,7 @@ class TargetRegistry:
             if registration.kubernetes is not None:
                 snapshot_instance = (
                     kubernetes.get("instance")
-                    if isinstance(kubernetes, dict)
-                    and isinstance(kubernetes.get("instance"), dict)
+                    if isinstance(kubernetes, dict) and isinstance(kubernetes.get("instance"), dict)
                     else None
                 )
                 instance = snapshot_instance or (
@@ -832,9 +825,24 @@ class TargetRegistry:
                 )
                 k8s_state = kubernetes.get("state") if kubernetes else "disconnected"
                 if instance is None:
-                    rows.append(_unknown("engine.image_digest", registration.image_digest, "kubernetes_api", f"pod snapshot {k8s_state}"))
+                    rows.append(
+                        _unknown(
+                            "engine.image_digest",
+                            registration.image_digest,
+                            "kubernetes_api",
+                            f"pod snapshot {k8s_state}",
+                        )
+                    )
                 else:
-                    rows.append(_row("engine.image_digest", registration.image_digest, instance.get("image_digest"), "kubernetes_api", True))
+                    rows.append(
+                        _row(
+                            "engine.image_digest",
+                            registration.image_digest,
+                            instance.get("image_digest"),
+                            "kubernetes_api",
+                            True,
+                        )
+                    )
         return rows
 
     def status(
@@ -857,9 +865,7 @@ class TargetRegistry:
             records, corrupt = self.store.read_all()
         except OSError:
             records, corrupt = [], []
-        history = [
-            record for record in records if record.get("target_id") == registration.target_id
-        ][-history_limit:]
+        history = [record for record in records if record.get("target_id") == registration.target_id][-history_limit:]
         counts = {"match": 0, "mismatch": 0, "unknown": 0, "not_declared": 0}
         for row in rows:
             counts[row["state"]] = counts.get(row["state"], 0) + 1
@@ -903,10 +909,9 @@ class TargetRegistry:
         )
         with self._lock:
             tracker = {
-                "state": (
-                    kubernetes.get("state", "unknown") if isinstance(kubernetes, dict)
-                    else self._k8s_state
-                ) if registration.kubernetes else "not_configured",
+                "state": (kubernetes.get("state", "unknown") if isinstance(kubernetes, dict) else self._k8s_state)
+                if registration.kubernetes
+                else "not_configured",
                 "observed_at": self._observed_at,
                 "current": dict(self._current) if self._current else None,
                 "events_this_session": self._events_this_session,
@@ -921,10 +926,13 @@ class TargetRegistry:
             )
         unavailable = registration.state == "ok" and (
             (isinstance(engine_info, dict) and engine_info.get("state") != "ok")
-            or (registration.kubernetes is not None and isinstance(kubernetes, dict) and kubernetes.get("state") != "ok")
+            or (
+                registration.kubernetes is not None and isinstance(kubernetes, dict) and kubernetes.get("state") != "ok"
+            )
         )
         confirmed_times = [
-            source.get("last_success_at") for source in (engine_info, kubernetes)
+            source.get("last_success_at")
+            for source in (engine_info, kubernetes)
             if isinstance(source, dict) and isinstance(source.get("last_success_at"), str)
         ]
         verification = {
@@ -934,7 +942,8 @@ class TargetRegistry:
                     confirmed_times,
                     key=lambda value: datetime.fromisoformat(value.replace("Z", "+00:00")),
                 )
-                if confirmed_times and hold is None else None
+                if confirmed_times and hold is None
+                else None
             ),
         }
         return rows, hold, verification, tracker
@@ -994,9 +1003,7 @@ def _row(name: str, expected: Any, observed: Any, source: str, observed_ok: bool
     return {"field": name, "expected": expected, "observed": observed, "source": source, "state": state, "note": None}
 
 
-def _membership_row(
-    name: str, expected: Any, observed: list[str], source: str
-) -> dict[str, Any]:
+def _membership_row(name: str, expected: Any, observed: list[str], source: str) -> dict[str, Any]:
     if expected is None:
         state = "not_declared"
     else:

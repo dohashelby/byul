@@ -3,6 +3,7 @@
 "not_observed" is reported only when a fresh, healthy collection window fully
 covers the request; it means "not seen in engine logs", never "not received".
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -25,8 +26,9 @@ def _time(value: object) -> datetime:
 
 
 class EngineReceipts:
-    def __init__(self, path: str | Path | None, *, context: str | None = None,
-                 stale_after_s: float = 60, settle_s: float = 5) -> None:
+    def __init__(
+        self, path: str | Path | None, *, context: str | None = None, stale_after_s: float = 60, settle_s: float = 5
+    ) -> None:
         self.path = Path(path) if path else None
         self.context = context
         self.stale_after_s = stale_after_s
@@ -54,9 +56,12 @@ class EngineReceipts:
             if not isinstance(item, dict) or not REQUEST_ID.fullmatch(str(item.get("request_id"))):
                 raise ValueError("receipt")
             receipts[item["request_id"]] = _time(item["observed_at"])
-        loaded = {"state": value["state"], "collected_at": _time(value["collected_at"]),
-                  "window_started_at": _time(value["window_started_at"]) if value.get("window_started_at") else None,
-                  "receipts": receipts}
+        loaded = {
+            "state": value["state"],
+            "collected_at": _time(value["collected_at"]),
+            "window_started_at": _time(value["window_started_at"]) if value.get("window_started_at") else None,
+            "receipts": receipts,
+        }
         with self._lock:
             self._cache = (key, loaded)
         return loaded
@@ -73,8 +78,10 @@ class EngineReceipts:
             return {"status": "unavailable", "observed_at": None, "collected_at": None}
         collected = data["collected_at"]
         observed = data["receipts"].get(request_id)
-        result = {"observed_at": observed.isoformat().replace("+00:00", "Z") if observed else None,
-                  "collected_at": collected.isoformat().replace("+00:00", "Z")}
+        result = {
+            "observed_at": observed.isoformat().replace("+00:00", "Z") if observed else None,
+            "collected_at": collected.isoformat().replace("+00:00", "Z"),
+        }
         if observed:
             return {"status": "observed", **result}
         current = now or datetime.now(timezone.utc)
@@ -83,6 +90,9 @@ class EngineReceipts:
         except (ValueError, TypeError):
             return {"status": "unavailable", **result}
         fresh = data["state"] == "ok" and -5 <= (current - collected).total_seconds() <= self.stale_after_s
-        covered = (data["window_started_at"] is not None and data["window_started_at"] <= at
-                   and collected >= at + timedelta(seconds=self.settle_s))
+        covered = (
+            data["window_started_at"] is not None
+            and data["window_started_at"] <= at
+            and collected >= at + timedelta(seconds=self.settle_s)
+        )
         return {"status": "not_observed" if fresh and covered else "unavailable", **result}

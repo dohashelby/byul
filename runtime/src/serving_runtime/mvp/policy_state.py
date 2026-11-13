@@ -37,9 +37,7 @@ def _utc_now() -> str:
     return _utc_now_datetime().isoformat()
 
 
-def _revocation_error(
-    path: str, loaded_at: str, code: str, message: str, sha256: str | None = None
-) -> RevocationState:
+def _revocation_error(path: str, loaded_at: str, code: str, message: str, sha256: str | None = None) -> RevocationState:
     return RevocationState("unknown", path, loaded_at, (), sha256, code, message)
 
 
@@ -53,9 +51,7 @@ def load_revocations(path: str | Path | None) -> RevocationState:
     try:
         raw = Path(path).read_bytes()
     except FileNotFoundError:
-        return _revocation_error(
-            path_text, loaded_at, "REVOCATIONS_NOT_FOUND", "revocations file not found"
-        )
+        return _revocation_error(path_text, loaded_at, "REVOCATIONS_NOT_FOUND", "revocations file not found")
     except (OSError, ValueError) as error:
         return _revocation_error(
             path_text,
@@ -72,9 +68,7 @@ def load_revocations(path: str | Path | None) -> RevocationState:
             parse_constant=_reject_json_constant,
         )
     except UnicodeDecodeError:
-        return _revocation_error(
-            path_text, loaded_at, "MALFORMED_REVOCATIONS", "revocations are not UTF-8", digest
-        )
+        return _revocation_error(path_text, loaded_at, "MALFORMED_REVOCATIONS", "revocations are not UTF-8", digest)
     except (DuplicateKeyError, json.JSONDecodeError, ValueError, RecursionError) as error:
         return _revocation_error(
             path_text,
@@ -102,9 +96,7 @@ def load_revocations(path: str | Path | None) -> RevocationState:
         )
     entries = document["revoked"]
     if not isinstance(entries, list):
-        return _revocation_error(
-            path_text, loaded_at, "INVALID_REVOCATIONS", "revoked must be a list", digest
-        )
+        return _revocation_error(path_text, loaded_at, "INVALID_REVOCATIONS", "revoked must be a list", digest)
     required = {"policy_id", "policy_version", "sha256", "revoked_at", "reason"}
     normalized: list[dict[str, str]] = []
     for index, entry in enumerate(entries):
@@ -287,13 +279,20 @@ def external_enforcement(snapshot, expected):
     modes = set()
     for node in nodes:
         for (namespace, name), digest in expected.items():
-            matches = [p for p in snapshot.get("policies", []) if isinstance(p, dict)
-                       and (p.get("node"), p.get("namespace"), p.get("name")) == (node, namespace, name)]
+            matches = [
+                p
+                for p in snapshot.get("policies", [])
+                if isinstance(p, dict) and (p.get("node"), p.get("namespace"), p.get("name")) == (node, namespace, name)
+            ]
             if len(matches) != 1:
                 return "unknown"
             policy = matches[0]
-            if (policy.get("state") != "enabled" or policy.get("spec_sha256") != digest
-                    or policy.get("load_error") or policy.get("mode") not in {"monitor", "monitor_only", "enforce"}):
+            if (
+                policy.get("state") != "enabled"
+                or policy.get("spec_sha256") != digest
+                or policy.get("load_error")
+                or policy.get("mode") not in {"monitor", "monitor_only", "enforce"}
+            ):
                 return "unknown"
             modes.add(policy["mode"])
     return next(iter(modes)) if len(modes) == 1 else "mixed"

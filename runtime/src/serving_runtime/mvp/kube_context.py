@@ -14,7 +14,6 @@ def validate_kube_context(value: str) -> str:
 
     if not isinstance(value, str) or _KUBE_CONTEXT.fullmatch(value) is None:
         raise ValueError(
-            "kube context must be 1-253 characters using letters, digits, ._:@/+- "
-            "and must not start with '-'"
+            "kube context must be 1-253 characters using letters, digits, ._:@/+- and must not start with '-'"
         )
     return value

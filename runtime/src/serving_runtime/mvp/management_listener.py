@@ -108,11 +108,7 @@ class ManagementListenerConfig:
             or float(timeout_s) <= 0
         ):
             raise ValueError("timeout must be a positive finite number")
-        if (
-            not isinstance(max_response_bytes, int)
-            or isinstance(max_response_bytes, bool)
-            or max_response_bytes <= 0
-        ):
+        if not isinstance(max_response_bytes, int) or isinstance(max_response_bytes, bool) or max_response_bytes <= 0:
             raise ValueError("max response bytes must be a positive integer")
         validated_paths = frozenset(_validate_allowed_path(path) for path in allowed_paths)
         if not validated_paths:
@@ -124,14 +120,25 @@ class ManagementListenerConfig:
         credential_status = "not_configured"
         if credential_file is not None:
             credential_status, authorization = _load_credential_file(credential_file)
-        for label, value in (("target_ref", target_ref), ("run_id", run_id), ("environment", environment), ("policy_ref", policy_ref)):
+        for label, value in (
+            ("target_ref", target_ref),
+            ("run_id", run_id),
+            ("environment", environment),
+            ("policy_ref", policy_ref),
+        ):
             if value is not None and (not isinstance(value, str) or re.fullmatch(r"[\w.:-]{1,128}", value) is None):
                 raise ValueError(f"{label} must be a safe configured reference")
-        if heartbeat_path is not None and (record_path is None or Path(heartbeat_path).expanduser().absolute() == Path(record_path).expanduser().absolute()):
+        if heartbeat_path is not None and (
+            record_path is None
+            or Path(heartbeat_path).expanduser().absolute() == Path(record_path).expanduser().absolute()
+        ):
             raise ValueError("heartbeat requires a distinct record file")
         return cls(
             heartbeat_path=None if heartbeat_path is None else Path(heartbeat_path).expanduser(),
-            target_ref=target_ref, run_id=run_id, environment=environment, policy_ref=policy_ref,
+            target_ref=target_ref,
+            run_id=run_id,
+            environment=environment,
+            policy_ref=policy_ref,
             listen_host=listen_host,
             listen_port=listen_port,
             engine_target=target,
@@ -179,9 +186,11 @@ class AccessRecorder:
         if self._heartbeat_path is None:
             return
         self._write_heartbeat("running")
+
         def pulse():
             while not self._heartbeat_stop.wait(1.0):
                 self._write_heartbeat("running")
+
         self._heartbeat_thread = threading.Thread(target=pulse, daemon=True)
         self._heartbeat_thread.start()
 
@@ -189,23 +198,32 @@ class AccessRecorder:
         if self._heartbeat_path is None:
             return
         status = self.status()
-        document = {"schema":"runtime-observation-feed-heartbeat/1.0", "kind":"management_listener",
-            "feed_path":str(self._feed_path.absolute()), "started_at":self._started_at,
-            "updated_at":datetime.now(timezone.utc).isoformat(), "state":state,
-            "processes":[{"name":"management_listener", "running":state=="running", "returncode":None}],
-            "recording":status}
-        temporary = self._heartbeat_path.with_name("."+self._heartbeat_path.name+"."+uuid4().hex+".tmp")
+        document = {
+            "schema": "runtime-observation-feed-heartbeat/1.0",
+            "kind": "management_listener",
+            "feed_path": str(self._feed_path.absolute()),
+            "started_at": self._started_at,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "state": state,
+            "processes": [{"name": "management_listener", "running": state == "running", "returncode": None}],
+            "recording": status,
+        }
+        temporary = self._heartbeat_path.with_name("." + self._heartbeat_path.name + "." + uuid4().hex + ".tmp")
         try:
-            fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
-            with os.fdopen(fd,"w") as output:
-                output.write(json.dumps(document)+"\n");output.flush();os.fsync(output.fileno())
-            os.replace(temporary,self._heartbeat_path)
+            fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "w") as output:
+                output.write(json.dumps(document) + "\n")
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, self._heartbeat_path)
         except OSError:
             # A missing/stale heartbeat exposes a writer failure to its collector.
             pass
         finally:
-            try:temporary.unlink()
-            except FileNotFoundError:pass
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
 
     def record(self, *, allowed: bool, path: str, status_code: int, method: str = "UNKNOWN") -> None:
         safe_path = re.sub(r"[\x00-\x1f\x7f]", "?", path.split("?", 1)[0].split("#", 1)[0])
@@ -229,7 +247,10 @@ class AccessRecorder:
                 "method": safe_method,
                 "scope": self._scope,
                 "actor": {"state": "unattributed", "principal_id": None},
-                "recording": {"write_failure_count": self._write_failure_count, "last_write_error_class": self._last_write_error_class},
+                "recording": {
+                    "write_failure_count": self._write_failure_count,
+                    "last_write_error_class": self._last_write_error_class,
+                },
                 "allowed_count": self._allowed_count,
                 "denied_count": self._denied_count,
                 "path": safe_path,
@@ -255,10 +276,14 @@ class AccessRecorder:
 
     def status(self) -> dict:
         with self._lock:
-            return {"write_failed": self._write_failed, "allowed_count": self._allowed_count, "denied_count": self._denied_count,
-                    "write_failure_count": self._write_failure_count,
-                    "last_write_error_class": self._last_write_error_class,
-                    "last_write_error_at": self._last_write_error_at}
+            return {
+                "write_failed": self._write_failed,
+                "allowed_count": self._allowed_count,
+                "denied_count": self._denied_count,
+                "write_failure_count": self._write_failure_count,
+                "last_write_error_class": self._last_write_error_class,
+                "last_write_error_at": self._last_write_error_at,
+            }
 
     def close(self) -> None:
         self._heartbeat_stop.set()
@@ -482,8 +507,12 @@ class ManagementRequestHandler(BaseHTTPRequestHandler):
 
 
 def _configured_scope(config: ManagementListenerConfig) -> dict:
-    return {"target_ref": config.target_ref, "run_id": config.run_id,
-            "environment": config.environment, "policy_ref": config.policy_ref}
+    return {
+        "target_ref": config.target_ref,
+        "run_id": config.run_id,
+        "environment": config.environment,
+        "policy_ref": config.policy_ref,
+    }
 
 
 class ManagementListener:
@@ -496,7 +525,12 @@ class ManagementListener:
         record_stream: TextIO | None = None,
     ) -> None:
         self.config = config
-        self.recorder = AccessRecorder(config.record_path, stream=record_stream, scope=_configured_scope(config), heartbeat_path=config.heartbeat_path)
+        self.recorder = AccessRecorder(
+            config.record_path,
+            stream=record_stream,
+            scope=_configured_scope(config),
+            heartbeat_path=config.heartbeat_path,
+        )
         try:
             self.server = ManagementHTTPServer(config, self.recorder)
         except Exception:
@@ -528,7 +562,9 @@ class ManagementListener:
 def run(config: ManagementListenerConfig) -> None:
     """Run the listener until interrupted; emit access JSONL to stdout."""
 
-    recorder = AccessRecorder(config.record_path, stream=sys.stdout, scope=_configured_scope(config), heartbeat_path=config.heartbeat_path)
+    recorder = AccessRecorder(
+        config.record_path, stream=sys.stdout, scope=_configured_scope(config), heartbeat_path=config.heartbeat_path
+    )
     try:
         server = ManagementHTTPServer(config, recorder)
     except Exception:

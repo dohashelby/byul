@@ -114,9 +114,7 @@ class VerifiedPolicyBundle:
                         target.chmod(0o600)
                         written[item.relative_path] = item.content
                     elif previous != item.content:
-                        raise PolicyBundleError(
-                            f"{item.relative_path}: 같은 경로에 서로 다른 검증 바이트가 있습니다"
-                        )
+                        raise PolicyBundleError(f"{item.relative_path}: 같은 경로에 서로 다른 검증 바이트가 있습니다")
                     paths[item.role] = str(target)
             except OSError as error:
                 raise PolicyBundleError(
@@ -134,11 +132,7 @@ class VerifiedPolicyBundle:
         """Map verified roles to existing MVP inputs and record applicability."""
 
         by_role = {item.role: item for item in self.files}
-        paths = (
-            role_paths
-            if role_paths is not None
-            else {role: item.path for role, item in by_role.items()}
-        )
+        paths = role_paths if role_paths is not None else {role: item.path for role, item in by_role.items()}
         if set(paths) != set(by_role):
             raise ValueError("role_paths must contain every verified bundle role")
         options = {"policy_path": paths["gateway_policy"]}
@@ -158,8 +152,7 @@ class VerifiedPolicyBundle:
             applied.add("enforcement_intent")
         if (
             "enforcement_intent" in applied
-            and by_role["enforcement_intent"].schema_version
-            != "runtime-enforcement-intent/1.0"
+            and by_role["enforcement_intent"].schema_version != "runtime-enforcement-intent/1.0"
             and "exec_exceptions" in paths
         ):
             options["observation_exceptions_path"] = paths["exec_exceptions"]
@@ -234,9 +227,7 @@ def _read_file(path: Path, display_name: str) -> bytes:
         raise _error(display_name, f"파일을 읽을 수 없습니다({type(error).__name__})") from error
 
 
-def verify_policy_bundle(
-    bundle_dir: str | Path, *, now: datetime | None = None
-) -> VerifiedPolicyBundle:
+def verify_policy_bundle(bundle_dir: str | Path, *, now: datetime | None = None) -> VerifiedPolicyBundle:
     """Validate one immutable-at-startup directory against policy-bundle 0.1."""
 
     directory_text = str(bundle_dir)
@@ -284,9 +275,7 @@ def verify_policy_bundle(
     _timestamp(approval["approved_at"], manifest_name, "approval.approved_at")
     _local_id(approval["approval_ref"], manifest_name, "approval.approval_ref")
 
-    validity = _exact_object(
-        bundle["validity"], {"valid_from", "valid_until"}, manifest_name, "validity"
-    )
+    validity = _exact_object(bundle["validity"], {"valid_from", "valid_until"}, manifest_name, "validity")
     valid_from = _nullable_timestamp(validity["valid_from"], manifest_name, "validity.valid_from")
     valid_until = _nullable_timestamp(validity["valid_until"], manifest_name, "validity.valid_until")
     if valid_from is not None and valid_until is not None and valid_from > valid_until:
@@ -373,18 +362,11 @@ def verify_policy_bundle(
         )
 
     assert gateway_document is not None
-    if (
-        gateway_document.get("policy_id") != policy_id
-        or gateway_document.get("policy_version") != policy_version
-    ):
-        gateway_path = next(
-            item.relative_path for item in verified_files if item.role == "gateway_policy"
-        )
+    if gateway_document.get("policy_id") != policy_id or gateway_document.get("policy_version") != policy_version:
+        gateway_path = next(item.relative_path for item in verified_files if item.role == "gateway_policy")
         raise _error(gateway_path, "policy_id 또는 policy_version이 bundle.json의 policy_ref와 다릅니다")
     if gateway_document.get("target_id") != target_ref:
-        gateway_path = next(
-            item.relative_path for item in verified_files if item.role == "gateway_policy"
-        )
+        gateway_path = next(item.relative_path for item in verified_files if item.role == "gateway_policy")
         raise _error(gateway_path, "target_id가 bundle.json의 target_ref와 다릅니다")
 
     return VerifiedPolicyBundle(

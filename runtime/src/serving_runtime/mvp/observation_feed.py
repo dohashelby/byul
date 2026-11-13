@@ -68,9 +68,7 @@ class ObservationFeed:
         self.environment = environment
         self.run_id = run_id
         self.allowed_engine_binaries = tuple(allowed_engine_binaries or ())
-        self.heartbeat_path = (
-            None if heartbeat_path is None else Path(heartbeat_path).expanduser()
-        )
+        self.heartbeat_path = None if heartbeat_path is None else Path(heartbeat_path).expanduser()
         if heartbeat_stale_after_s <= 0:
             raise ValueError("heartbeat_stale_after_s must be positive")
         self.heartbeat_stale_after_s = float(heartbeat_stale_after_s)
@@ -181,16 +179,9 @@ class ObservationFeed:
                 or (last_lost_at is not None and not isinstance(last_lost_at, str))
                 or (
                     writer_dropped is not None
-                    and (
-                        not isinstance(writer_dropped, int)
-                        or isinstance(writer_dropped, bool)
-                        or writer_dropped < 0
-                    )
+                    and (not isinstance(writer_dropped, int) or isinstance(writer_dropped, bool) or writer_dropped < 0)
                 )
-                or (
-                    last_writer_drop_at is not None
-                    and not isinstance(last_writer_drop_at, str)
-                )
+                or (last_writer_drop_at is not None and not isinstance(last_writer_drop_at, str))
                 or not isinstance(keys, list)
                 or any(not isinstance(key, str) or not key for key in keys)
             ):
@@ -259,9 +250,7 @@ class ObservationFeed:
         }
         encoded = (json.dumps(document, ensure_ascii=False) + "\n").encode("utf-8")
         self.state_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        temporary = self.state_path.with_name(
-            f".{self.state_path.name}.{os.getpid()}.{uuid4().hex}.tmp"
-        )
+        temporary = self.state_path.with_name(f".{self.state_path.name}.{os.getpid()}.{uuid4().hex}.tmp")
         try:
             descriptor = os.open(
                 temporary,
@@ -311,7 +300,12 @@ class ObservationFeed:
                 descriptor = os.open(self.heartbeat_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
                 with os.fdopen(descriptor, "rb") as source:
                     info = os.fstat(source.fileno())
-                    if not stat.S_ISREG(info.st_mode) or info.st_uid not in {0, os.geteuid()} or info.st_mode & 0o022 or info.st_size > self._MAX_LINE_BYTES:
+                    if (
+                        not stat.S_ISREG(info.st_mode)
+                        or info.st_uid not in {0, os.geteuid()}
+                        or info.st_mode & 0o022
+                        or info.st_size > self._MAX_LINE_BYTES
+                    ):
                         raise PermissionError("management heartbeat requires an owned regular file")
                     raw = source.read(self._MAX_LINE_BYTES + 1)
                 if len(raw) > self._MAX_LINE_BYTES:
@@ -344,9 +338,7 @@ class ObservationFeed:
         if age_s < -60:
             raise ValueError("observation writer heartbeat is too far in the future")
         if age_s > self.heartbeat_stale_after_s:
-            raise OSError(
-                f"observation writer heartbeat expired ({age_s:.1f}s old)"
-            )
+            raise OSError(f"observation writer heartbeat expired ({age_s:.1f}s old)")
         state = document.get("state")
         raw_processes = document.get("processes")
         if not isinstance(raw_processes, list) or not raw_processes:
@@ -362,34 +354,28 @@ class ObservationFeed:
                 not isinstance(name, str)
                 or not name
                 or not isinstance(running, bool)
-                or (
-                    returncode is not None
-                    and (not isinstance(returncode, int) or isinstance(returncode, bool))
-                )
+                or (returncode is not None and (not isinstance(returncode, int) or isinstance(returncode, bool)))
             ):
                 raise ValueError("observation writer process fields are invalid")
-            processes.append(
-                {"name": name, "running": running, "returncode": returncode}
-            )
+            processes.append({"name": name, "running": running, "returncode": returncode})
         open_gap = document.get("open_gap") if isinstance(document.get("open_gap"), dict) else None
         reconnect_count = document.get("reconnect_count")
         last_gap = document.get("last_gap") if isinstance(document.get("last_gap"), dict) else None
         dropped_lines_total = document.get("dropped_lines_total")
         if dropped_lines_total is not None and (
-            not isinstance(dropped_lines_total, int)
-            or isinstance(dropped_lines_total, bool)
-            or dropped_lines_total < 0
+            not isinstance(dropped_lines_total, int) or isinstance(dropped_lines_total, bool) or dropped_lines_total < 0
         ):
             raise ValueError("observation writer dropped_lines_total is invalid")
         redaction_error = document.get("last_redaction_error_class")
-        if redaction_error is not None and (
-            not isinstance(redaction_error, str) or not redaction_error
-        ):
-            raise ValueError(
-                "observation writer last_redaction_error_class is invalid"
-            )
+        if redaction_error is not None and (not isinstance(redaction_error, str) or not redaction_error):
+            raise ValueError("observation writer last_redaction_error_class is invalid")
         recording = document.get("recording") if self.kind == "management_listener" else None
-        if self.kind == "management_listener" and (not isinstance(recording, dict) or type(recording.get("write_failure_count")) is not int or recording["write_failure_count"] < 0 or type(recording.get("write_failed")) is not bool):
+        if self.kind == "management_listener" and (
+            not isinstance(recording, dict)
+            or type(recording.get("write_failure_count")) is not int
+            or recording["write_failure_count"] < 0
+            or type(recording.get("write_failed")) is not bool
+        ):
             raise ValueError("management writer recording status is invalid")
         if recording is not None:
             error_class = recording.get("last_write_error_class")
@@ -398,14 +384,23 @@ class ObservationFeed:
                 if recording["write_failed"] or error_class is not None or error_at is not None:
                     raise ValueError("management writer failure receipt is inconsistent")
             else:
-                if not isinstance(error_class, str) or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", error_class) is None:
+                if (
+                    not isinstance(error_class, str)
+                    or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", error_class) is None
+                ):
                     raise ValueError("management writer error class is invalid")
                 when = self._parse_time(error_at, "writer.last_write_error_at")
                 if when < started_at or when > updated_at:
                     raise ValueError("management writer failure timestamp is outside its generation")
         drop_reason = document.get("last_redaction_drop_reason")
         drop_at = document.get("last_redaction_drop_at")
-        if drop_reason is not None and drop_reason not in {"INVALID_UTF8", "INVALID_JSON", "JSON_TOO_DEEP", "OBJECT_REQUIRED", "FILTER_REJECTED"}:
+        if drop_reason is not None and drop_reason not in {
+            "INVALID_UTF8",
+            "INVALID_JSON",
+            "JSON_TOO_DEEP",
+            "OBJECT_REQUIRED",
+            "FILTER_REJECTED",
+        }:
             raise ValueError("observation writer drop reason is invalid")
         if drop_at is not None:
             parsed_drop = self._parse_time(drop_at, "writer.last_redaction_drop_at")
@@ -424,26 +419,26 @@ class ObservationFeed:
             "age_s": max(0.0, round(age_s, 3)),
             "processes": processes,
             "reconnect_count": (
-                reconnect_count
-                if isinstance(reconnect_count, int) and not isinstance(reconnect_count, bool)
-                else None
+                reconnect_count if isinstance(reconnect_count, int) and not isinstance(reconnect_count, bool) else None
             ),
             "last_gap": (
-                {
-                    key: last_gap.get(key)
-                    for key in ("gap_id", "opened_at", "closed_at", "backfill", "attempts")
-                }
+                {key: last_gap.get(key) for key in ("gap_id", "opened_at", "closed_at", "backfill", "attempts")}
                 if last_gap
                 else None
             ),
             "open_gap": (
                 {key: open_gap.get(key) for key in ("gap_id", "opened_at", "closed_at", "backfill", "attempts")}
-                if open_gap else None
+                if open_gap
+                else None
             ),
             "dropped_lines_total": dropped_lines_total,
             "last_redaction_error_class": redaction_error,
         }
-        if state != "running" or not all(item["running"] for item in processes) or (recording is not None and recording["write_failed"]):
+        if (
+            state != "running"
+            or not all(item["running"] for item in processes)
+            or (recording is not None and recording["write_failed"])
+        ):
             loss_changed = self._update_writer_loss(heartbeat)
             if loss_changed or self._checkpoint_pending:
                 if self._device is None or self._inode is None:
@@ -451,11 +446,26 @@ class ObservationFeed:
                     self._device, self._inode = identity.st_dev, identity.st_ino
                 self._save_checkpoint(heartbeat)
             since = open_gap.get("opened_at") if open_gap else None
-            message = (f"observation writer is reconnecting (gap open since {since or 'unknown'})"
-                       if state == "reconnecting" else f"observation writer is not running (state={state})")
-            raise ObservationFeedFailure(message, last_value=self._status(
-                mode="unavailable", processed=0, accepted=0, duplicates=0, rejected=[],
-                out_of_window=0, first_line=None, heartbeat=heartbeat, idle=False), data_origin=self.data_origin)
+            message = (
+                f"observation writer is reconnecting (gap open since {since or 'unknown'})"
+                if state == "reconnecting"
+                else f"observation writer is not running (state={state})"
+            )
+            raise ObservationFeedFailure(
+                message,
+                last_value=self._status(
+                    mode="unavailable",
+                    processed=0,
+                    accepted=0,
+                    duplicates=0,
+                    rejected=[],
+                    out_of_window=0,
+                    first_line=None,
+                    heartbeat=heartbeat,
+                    idle=False,
+                ),
+                data_origin=self.data_origin,
+            )
         return heartbeat, started_at
 
     def _update_writer_loss(self, heartbeat: dict[str, Any]) -> bool:
@@ -466,13 +476,17 @@ class ObservationFeed:
             return False
         previous = self._writer_dropped_lines_total
         started = heartbeat.get("started_at")
-        restarted = isinstance(started, str) and self._writer_started_at is not None and started != self._writer_started_at
+        restarted = (
+            isinstance(started, str) and self._writer_started_at is not None and started != self._writer_started_at
+        )
         changed = current != previous or restarted
         reset = previous is None or restarted or current < previous
         added = current if reset else current - previous
         self._redaction_dropped_lines_total += added
         if added > 0:
-            self._last_writer_drop_at = heartbeat.get("last_redaction_drop_at") or datetime.now(timezone.utc).isoformat()
+            self._last_writer_drop_at = (
+                heartbeat.get("last_redaction_drop_at") or datetime.now(timezone.utc).isoformat()
+            )
             self._last_redaction_drop_reason = heartbeat.get("last_redaction_drop_reason")
         self._writer_dropped_lines_total = current
         if isinstance(started, str):
@@ -512,9 +526,7 @@ class ObservationFeed:
             redaction_loss_detected = False
             if self._last_writer_drop_at is not None:
                 try:
-                    last_drop = self._parse_time(
-                        self._last_writer_drop_at, "last_writer_drop_at"
-                    )
+                    last_drop = self._parse_time(self._last_writer_drop_at, "last_writer_drop_at")
                     redaction_loss_detected = (
                         datetime.now(timezone.utc) - last_drop
                     ).total_seconds() <= self.heartbeat_stale_after_s
@@ -551,20 +563,12 @@ class ObservationFeed:
             "lost_events_by_source": lost_by_source,
             "last_lost_at": self._last_lost_at if self.kind == "hubble" else None,
             "loss_detected": loss_detected,
-            "dropped_lines_total": (
-                self._writer_dropped_lines_total
-                if self.kind == "tetragon"
-                else None
-            ),
+            "dropped_lines_total": (self._writer_dropped_lines_total if self.kind == "tetragon" else None),
             "last_redaction_error_class": (
-                heartbeat.get("last_redaction_error_class")
-                if self.kind == "tetragon"
-                else None
+                heartbeat.get("last_redaction_error_class") if self.kind == "tetragon" else None
             ),
             "last_redaction_drop_reason": self._last_redaction_drop_reason if self.kind == "tetragon" else None,
-            "last_redaction_drop_at": (
-                self._last_writer_drop_at if self.kind == "tetragon" else None
-            ),
+            "last_redaction_drop_at": (self._last_writer_drop_at if self.kind == "tetragon" else None),
             "redaction_loss_detected": redaction_loss_detected,
             "redaction_dropped_lines_total": self._redaction_dropped_lines_total if self.kind == "tetragon" else None,
         }
@@ -574,10 +578,20 @@ class ObservationFeed:
         self._last_storage_error_class = type(error).__name__
         self._last_storage_error_at = datetime.now(timezone.utc).isoformat()
         self._last_storage_operation = operation
-        value = self._status(mode="save_failed", processed=0, accepted=0, duplicates=0,
-                             rejected=[], out_of_window=0, first_line=None, heartbeat=heartbeat, idle=False)
-        return ObservationFeedFailure(f"observation {operation} failed ({type(error).__name__})",
-                                      last_value=value, data_origin=self.data_origin)
+        value = self._status(
+            mode="save_failed",
+            processed=0,
+            accepted=0,
+            duplicates=0,
+            rejected=[],
+            out_of_window=0,
+            first_line=None,
+            heartbeat=heartbeat,
+            idle=False,
+        )
+        return ObservationFeedFailure(
+            f"observation {operation} failed ({type(error).__name__})", last_value=value, data_origin=self.data_origin
+        )
 
     def _save_checkpoint(self, heartbeat: dict[str, Any]) -> None:
         self._checkpoint_pending = True
@@ -599,8 +613,17 @@ class ObservationFeed:
         node = item["identity"]["node"]
         if node not in nodes or nodes[node].get("observed_at", "") <= item["observed_at"]:
             nodes[node] = item
-        encoded = (json.dumps({"schema_version":"runtime-tetragon-health-receipts/1.0",
-            "context":self.kube_context,"nodes":nodes}, ensure_ascii=False)+"\n").encode("utf-8")
+        encoded = (
+            json.dumps(
+                {
+                    "schema_version": "runtime-tetragon-health-receipts/1.0",
+                    "context": self.kube_context,
+                    "nodes": nodes,
+                },
+                ensure_ascii=False,
+            )
+            + "\n"
+        ).encode("utf-8")
         temporary = path.with_name(f".{path.name}.{os.getpid()}.{uuid4().hex}.tmp")
         try:
             descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
@@ -626,6 +649,7 @@ class ObservationFeed:
         identity_index = None
         if self.kind == "tetragon" and self.identity_path is not None:
             from serving_runtime.enforcement.attribution import read_identities
+
             identity_index = read_identities(self.identity_path, context=self.kube_context)
         writer_loss_changed = self._update_writer_loss(heartbeat)
         mode = "append"
@@ -718,9 +742,7 @@ class ObservationFeed:
                 identity_index=identity_index,
             )
             if line_rejected:
-                rejected.append(
-                    {"line": line_number, "reason": line_rejected[0]["reason"]}
-                )
+                rejected.append({"line": line_number, "reason": line_rejected[0]["reason"]})
                 corrupt_count += 1
                 continue
             if not accepted and not losses:
@@ -729,12 +751,11 @@ class ObservationFeed:
             item = accepted[0] if accepted else losses[0]
             if self.kind == "tetragon":
                 from serving_runtime.enforcement.codeload import apply_collection_evidence
+
                 apply_collection_evidence(item, heartbeat)
             if writer_started_at is not None:
                 try:
-                    observed_at = self._parse_time(
-                        item.get("observed_at"), "event.observed_at"
-                    )
+                    observed_at = self._parse_time(item.get("observed_at"), "event.observed_at")
                 except ValueError as error:
                     rejected.append({"line": line_number, "reason": str(error)})
                     corrupt_count += 1
@@ -767,9 +788,7 @@ class ObservationFeed:
             if losses:
                 loss = losses[0]
                 self._lost_events_total += loss["num_events_lost"]
-                self._lost_events_by_source[loss["source"]] += loss[
-                    "num_events_lost"
-                ]
+                self._lost_events_by_source[loss["source"]] += loss["num_events_lost"]
                 self._last_lost_at = loss["observed_at"]
                 self._remember(event_key)
                 continue

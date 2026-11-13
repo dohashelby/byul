@@ -3,6 +3,7 @@
 Run with the agent's UID (or root). No Kubernetes mutation or human approval.
 Continuity is intentionally not resumed across generator restarts.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -38,8 +39,12 @@ def read_bytes(path, limit, *, trusted_owner_uids=()):
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     with os.fdopen(fd, "rb") as source:
         info = os.fstat(source.fileno())
-        if (not stat.S_ISREG(info.st_mode) or info.st_uid not in {0, os.getuid(), *trusted_owner_uids}
-                or info.st_mode & 0o022 or info.st_size > limit):
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_uid not in {0, os.getuid(), *trusted_owner_uids}
+            or info.st_mode & 0o022
+            or info.st_size > limit
+        ):
             raise ValueError("untrusted or oversized input")
         raw = source.read(limit + 1)
         if len(raw) > limit:
@@ -90,8 +95,12 @@ def human_reviews(path, *, trusted_owner_uids=()):
         result = {}
         for row in rows:
             key, verdict = row["event_sha256"], row["verdict"]
-            if (not isinstance(key, str) or not SHA.fullmatch(key) or key in result
-                    or verdict not in {"not_false_positive", "false_positive"}):
+            if (
+                not isinstance(key, str)
+                or not SHA.fullmatch(key)
+                or key in result
+                or verdict not in {"not_false_positive", "false_positive"}
+            ):
                 raise ValueError("invalid or duplicate review")
             result[key] = verdict
         return result, reviewer
@@ -100,8 +109,19 @@ def human_reviews(path, *, trusted_owner_uids=()):
 
 
 class MonitorWindowGenerator:
-    def __init__(self, *, context, namespace, policies, status, observations, output,
-                 reviews=None, catalog=None, trusted_owner_uids=()):
+    def __init__(
+        self,
+        *,
+        context,
+        namespace,
+        policies,
+        status,
+        observations,
+        output,
+        reviews=None,
+        catalog=None,
+        trusted_owner_uids=(),
+    ):
         self.context, self.namespace, self.policies = context, namespace, set(policies)
         self.status, self.observations = Path(status), Path(observations)
         self.output, self.reviews = Path(output), reviews
@@ -113,33 +133,47 @@ class MonitorWindowGenerator:
 
     def collect(self, *, now=None):
         now = now or datetime.now(timezone.utc)
-        result = {"schema_version": SCHEMA, "generated_at": now.isoformat(),
-                  "context": self.context, "windows": [], "state": "unavailable"}
+        result = {
+            "schema_version": SCHEMA,
+            "generated_at": now.isoformat(),
+            "context": self.context,
+            "windows": [],
+            "state": "unavailable",
+        }
         catalog = []
         try:
             snapshot = read_object(self.status, trusted_owner_uids=self.trusted_owner_uids)
             monitoring = snapshot.get("monitoring") or {}
-            if (snapshot.get("schema_version") != "runtime-tetragon-state/1.0"
-                    or snapshot.get("context") != self.context or snapshot.get("state") != "ok"
-                    or not recent(snapshot.get("generated_at"), 20, now)
-                    or monitoring.get("state") != "healthy" or monitoring.get("open_gap")
-                    or not all(monitoring.get(k) is True for k in HEALTH_CHECKS)):
+            if (
+                snapshot.get("schema_version") != "runtime-tetragon-state/1.0"
+                or snapshot.get("context") != self.context
+                or snapshot.get("state") != "ok"
+                or not recent(snapshot.get("generated_at"), 20, now)
+                or monitoring.get("state") != "healthy"
+                or monitoring.get("open_gap")
+                or not all(monitoring.get(k) is True for k in HEALTH_CHECKS)
+            ):
                 raise ValueError("status unavailable")
             end = timestamp(snapshot["generated_at"])
             raw, inode = read_bytes(self.observations, 64 * 1024 * 1024, trusted_owner_uids=self.trusted_owner_uids)
             # A retention rewrite, truncate or replacement cannot prove completeness.
             source_changed = self.source is not None and (
-                inode != self.source[0] or len(raw) < self.source[1]
-                or hashlib.sha256(raw[:self.source[1]]).hexdigest() != self.source[2])
-            if (source_changed or (self.last_at is not None and
-                    not 0 <= (end - self.last_at).total_seconds() <= 20)):
+                inode != self.source[0]
+                or len(raw) < self.source[1]
+                or hashlib.sha256(raw[: self.source[1]]).hexdigest() != self.source[2]
+            )
+            if source_changed or (self.last_at is not None and not 0 <= (end - self.last_at).total_seconds() <= 20):
                 self.windows.clear()
             self.source = inode, len(raw), hashlib.sha256(raw).hexdigest()
             if raw and not raw.endswith(b"\n"):
                 raise ValueError("incomplete observation record")
             events = [json.loads(line) for line in raw.splitlines() if line.strip()]
-            if any(not isinstance(event, dict) or event.get("schema") != "runtime-observation/1.0"
-                   or timestamp(event.get("observed_at")) is None for event in events):
+            if any(
+                not isinstance(event, dict)
+                or event.get("schema") != "runtime-observation/1.0"
+                or timestamp(event.get("observed_at")) is None
+                for event in events
+            ):
                 raise ValueError("invalid observation record")
             reviews, reviewer = human_reviews(self.reviews, trusted_owner_uids=self.trusted_owner_uids)
             active = {}
@@ -153,18 +187,42 @@ class MonitorWindowGenerator:
                     raise ValueError("ambiguous policy node")
                 seen.add(key)
                 caps = [c for c in snapshot["capabilities"] if c.get("node") == node]
-                if (policy.get("mode") != "monitor" or policy.get("state") != "enabled"
-                        or not node or not policy.get("id") or len(caps) != 1 or not caps[0].get("kernel")
-                        or not SHA.fullmatch(policy.get("spec_sha256", ""))
-                        or policy.get("method") not in {"lsm_file_open", "override_lsm", "sigkill_fd_install", "override_syscall"}):
+                if (
+                    policy.get("mode") != "monitor"
+                    or policy.get("state") != "enabled"
+                    or not node
+                    or not policy.get("id")
+                    or len(caps) != 1
+                    or not caps[0].get("kernel")
+                    or not SHA.fullmatch(policy.get("spec_sha256", ""))
+                    or policy.get("method")
+                    not in {"lsm_file_open", "override_lsm", "sigkill_fd_install", "override_syscall"}
+                ):
                     continue
-                binding = {"policy": policy["name"], "namespace": self.namespace, "node": node,
-                           "policy_id": policy["id"], "spec_sha256": policy["spec_sha256"],
-                           "method": policy["method"], "mode": "monitor", "kernel": caps[0]["kernel"]}
-                epoch = digest([binding, monitoring.get("history", []), monitoring.get("verification_since"),
-                                monitoring.get("epochs"), snapshot.get("agents", []),
-                                [t for t in snapshot.get("transitions", []) if t.get("policy") == policy["name"]
-                                 and t.get("namespace") == self.namespace]])
+                binding = {
+                    "policy": policy["name"],
+                    "namespace": self.namespace,
+                    "node": node,
+                    "policy_id": policy["id"],
+                    "spec_sha256": policy["spec_sha256"],
+                    "method": policy["method"],
+                    "mode": "monitor",
+                    "kernel": caps[0]["kernel"],
+                }
+                epoch = digest(
+                    [
+                        binding,
+                        monitoring.get("history", []),
+                        monitoring.get("verification_since"),
+                        monitoring.get("epochs"),
+                        snapshot.get("agents", []),
+                        [
+                            t
+                            for t in snapshot.get("transitions", [])
+                            if t.get("policy") == policy["name"] and t.get("namespace") == self.namespace
+                        ],
+                    ]
+                )
                 old = self.windows.get(key, {})
                 since = old["since"] if old.get("epoch") == epoch else end.isoformat()
                 active[key] = {"epoch": epoch, "since": since}
@@ -172,13 +230,17 @@ class MonitorWindowGenerator:
                 selected = []
                 for event in events:
                     identity = event.get("identity") or {}
-                    if (event.get("source") != "tetragon" or event.get("data_origin") != "real"
-                            or event.get("policy_name") != policy["name"]
-                            or identity.get("state") != "confirmed" or identity.get("node") != node
-                            or identity.get("context") != self.context
-                            or (event.get("pod") or {}).get("namespace") != self.namespace
-                            or event.get("observation_purpose") == "health_check"
-                            or identity.get("container_name") == "sentinel"):
+                    if (
+                        event.get("source") != "tetragon"
+                        or event.get("data_origin") != "real"
+                        or event.get("policy_name") != policy["name"]
+                        or identity.get("state") != "confirmed"
+                        or identity.get("node") != node
+                        or identity.get("context") != self.context
+                        or (event.get("pod") or {}).get("namespace") != self.namespace
+                        or event.get("observation_purpose") == "health_check"
+                        or identity.get("container_name") == "sentinel"
+                    ):
                         continue
                     at = timestamp(event.get("observed_at"))
                     if at is None:
@@ -186,14 +248,22 @@ class MonitorWindowGenerator:
                     if start <= at <= end:
                         selected.append(event)
                 selected.sort(key=canonical)
-                entries = [{"event_sha256": digest([self.context, binding, since, event]), "event": event}
-                           for event in selected]
+                entries = [
+                    {"event_sha256": digest([self.context, binding, since, event]), "event": event}
+                    for event in selected
+                ]
                 verdicts = [reviews.get(entry["event_sha256"]) for entry in entries]
-                window = {**binding, "since": since, "until": end.isoformat(), "continuous": True,
-                          "event_count": len(entries), "events_sha256": digest(selected),
-                          "reviewed_event_count": sum(v is not None for v in verdicts),
-                          "false_positive_count": verdicts.count("false_positive"),
-                          "reviewer_token_id": reviewer}
+                window = {
+                    **binding,
+                    "since": since,
+                    "until": end.isoformat(),
+                    "continuous": True,
+                    "event_count": len(entries),
+                    "events_sha256": digest(selected),
+                    "reviewed_event_count": sum(v is not None for v in verdicts),
+                    "false_positive_count": verdicts.count("false_positive"),
+                    "reviewer_token_id": reviewer,
+                }
                 result["windows"].append(window)
                 catalog.append({**binding, "since": since, "until": end.isoformat(), "events": entries})
             self.windows, self.last_at = active, end
@@ -205,8 +275,9 @@ class MonitorWindowGenerator:
             catalog = []
         # Write the review catalog first; windows are independently usable by the agent.
         try:
-            atomic_json(self.catalog, {"schema_version": SCHEMA, "generated_at": result["generated_at"],
-                                       "windows": catalog})
+            atomic_json(
+                self.catalog, {"schema_version": SCHEMA, "generated_at": result["generated_at"], "windows": catalog}
+            )
         except OSError:
             self.windows.clear()
             self.last_at, self.source = None, None
@@ -222,8 +293,13 @@ def main():
     parser.add_argument("--policy", action="append", required=True)
     parser.add_argument("--reviews", help="Human-authored event verdicts; never generated automatically")
     parser.add_argument("--catalog", help="Review catalog (default: OUTPUT.events.json)")
-    parser.add_argument("--trusted-owner-uid", type=int, action="append", default=[],
-                        help="Additionally trust this input file owner UID (repeatable; no group/other writes)")
+    parser.add_argument(
+        "--trusted-owner-uid",
+        type=int,
+        action="append",
+        default=[],
+        help="Additionally trust this input file owner UID (repeatable; no group/other writes)",
+    )
     parser.add_argument("--watch", action="store_true")
     parser.add_argument("--interval", type=float, default=5)
     args = parser.parse_args()
@@ -231,13 +307,29 @@ def main():
         parser.error("trusted owner UIDs must be nonnegative")
     if not 1 <= args.interval <= 20:
         parser.error("interval must be between 1 and 20 seconds")
-    paths = [Path(p).resolve() for p in (args.status, args.observations, args.output,
-             args.catalog or args.output + ".events.json", *([args.reviews] if args.reviews else []))]
+    paths = [
+        Path(p).resolve()
+        for p in (
+            args.status,
+            args.observations,
+            args.output,
+            args.catalog or args.output + ".events.json",
+            *([args.reviews] if args.reviews else []),
+        )
+    ]
     if len(paths) != len(set(paths)):
         parser.error("input and output paths must be distinct")
-    generator = MonitorWindowGenerator(context=args.context, namespace=args.namespace, policies=args.policy,
-        status=args.status, observations=args.observations, output=args.output, reviews=args.reviews, catalog=args.catalog,
-        trusted_owner_uids=args.trusted_owner_uid)
+    generator = MonitorWindowGenerator(
+        context=args.context,
+        namespace=args.namespace,
+        policies=args.policy,
+        status=args.status,
+        observations=args.observations,
+        output=args.output,
+        reviews=args.reviews,
+        catalog=args.catalog,
+        trusted_owner_uids=args.trusted_owner_uid,
+    )
     generator.output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     fd = os.open(str(generator.output) + ".lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, "w") as lock:

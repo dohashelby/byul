@@ -18,9 +18,7 @@ TETRAGON_RULE_MODES = frozenset({"TG-SECRET-01", "TG-ASSET-01", "TG-ASSET-02", "
 PHASES = ("loading", "compiling", "inferring")
 _SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _KUBERNETES_NAME = re.compile(r"[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?")
-_LABEL_NAME = re.compile(
-    r"(?:[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?)?"
-)
+_LABEL_NAME = re.compile(r"(?:[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?)?")
 _FQDN = re.compile(
     r"^(?=.{1,253}\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*"
     r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.?$"
@@ -102,13 +100,7 @@ class CacheGeneration:
     compile_profile: str
 
     def path(self, cache_root: str) -> str:
-        return str(
-            Path(cache_root)
-            / self.engine
-            / self.image_id
-            / self.model_revision
-            / self.compile_profile
-        )
+        return str(Path(cache_root) / self.engine / self.image_id / self.model_revision / self.compile_profile)
 
 
 @dataclass(frozen=True)
@@ -223,9 +215,7 @@ def _labels(value: Any, path: str) -> dict[str, str]:
         raise IntentError(f"{path} must contain at least one label")
     normalized: dict[str, str] = {}
     for key, item in labels.items():
-        normalized[_nonempty_string(key, f"{path} key")] = _nonempty_string(
-            item, f"{path}.{key}"
-        )
+        normalized[_nonempty_string(key, f"{path} key")] = _nonempty_string(item, f"{path}.{key}")
     return normalized
 
 
@@ -245,9 +235,7 @@ def _absolute_path(value: Any, path: str) -> str:
     return text
 
 
-def _workload(
-    value: Any, path: str, *, engine: bool = False, v11: bool = False
-) -> Workload:
+def _workload(value: Any, path: str, *, engine: bool = False, v11: bool = False) -> Workload:
     allowed = {"labels", "port"} if engine else {"labels"}
     if engine and v11:
         allowed = allowed | {"management_port", "container_name"}
@@ -305,9 +293,7 @@ def _egress_list(raw: Any, path: str, *, allow_endpoint: bool) -> tuple[EgressAl
                 cidr = str(ipaddress.ip_network(cidr, strict=True))
             except ValueError as error:
                 raise IntentError(f"{item_path}.cidr is not a canonical network") from error
-        endpoint = (
-            _labels(item["endpoint"], f"{item_path}.endpoint") if "endpoint" in item else None
-        )
+        endpoint = _labels(item["endpoint"], f"{item_path}.endpoint") if "endpoint" in item else None
         protocol = _nonempty_string(_required(item, "protocol", item_path), f"{item_path}.protocol")
         if protocol not in {"TCP", "UDP"}:
             raise IntentError(f"{item_path}.protocol must be TCP or UDP")
@@ -351,9 +337,7 @@ def _validate_distinct_roles(
     for index, (left_name, left) in enumerate(roles):
         for right_name, right in roles[index + 1 :]:
             if _selectors_overlap(left, right):
-                raise IntentError(
-                    f"{left_name} and {right_name} labels can select the same Pod"
-                )
+                raise IntentError(f"{left_name} and {right_name} labels can select the same Pod")
 
 
 def _validate_kubernetes_selector(labels: dict[str, str], path: str) -> None:
@@ -361,19 +345,10 @@ def _validate_kubernetes_selector(labels: dict[str, str], path: str) -> None:
         prefix, separator, name = key.rpartition("/")
         if not separator:
             prefix, name = "", key
-        prefix_ok = (
-            not prefix
-            or (
-                len(prefix) <= 253
-                and all(_KUBERNETES_NAME.fullmatch(part) for part in prefix.split("."))
-            )
+        prefix_ok = not prefix or (
+            len(prefix) <= 253 and all(_KUBERNETES_NAME.fullmatch(part) for part in prefix.split("."))
         )
-        if (
-            not name
-            or _LABEL_NAME.fullmatch(name) is None
-            or _LABEL_NAME.fullmatch(value) is None
-            or not prefix_ok
-        ):
+        if not name or _LABEL_NAME.fullmatch(name) is None or _LABEL_NAME.fullmatch(value) is None or not prefix_ok:
             raise IntentError(f"{path}.labels must contain valid Kubernetes labels")
 
 
@@ -447,10 +422,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
     raw_collectors = _required(root, "metrics_collectors", "$")
     if not isinstance(raw_collectors, list):
         raise IntentError("$.metrics_collectors must be an array")
-    collectors = tuple(
-        _workload(item, f"$.metrics_collectors[{index}]")
-        for index, item in enumerate(raw_collectors)
-    )
+    collectors = tuple(_workload(item, f"$.metrics_collectors[{index}]") for index, item in enumerate(raw_collectors))
 
     dns_raw = _object(root.get("dns", {}), "$.dns", {"namespace", "labels", "port"})
     dns = DNSIntent(
@@ -459,9 +431,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
         _port(dns_raw.get("port", 53), "$.dns.port"),
     )
 
-    egress = _egress_list(
-        root.get("engine_egress_allow", []), "$.engine_egress_allow", allow_endpoint=False
-    )
+    egress = _egress_list(root.get("engine_egress_allow", []), "$.engine_egress_allow", allow_endpoint=False)
 
     protected_raw = _object(
         _required(root, "protected_paths", "$"),
@@ -481,13 +451,14 @@ def parse_intent(document: Any) -> EnforcementIntent:
             "$.protected_paths.cache_dir",
         ),
         tuple(
-            _absolute_path(item, f"$.protected_paths.secret_paths[{index}]")
-            for index, item in enumerate(raw_secrets)
+            _absolute_path(item, f"$.protected_paths.secret_paths[{index}]") for index, item in enumerate(raw_secrets)
         ),
         tuple(
             _absolute_path(item, f"$.protected_paths.enforce_exact_files[{index}]")
             for index, item in enumerate(protected_raw.get("enforce_exact_files", []))
-        ) if isinstance(protected_raw.get("enforce_exact_files", []), list) else (),
+        )
+        if isinstance(protected_raw.get("enforce_exact_files", []), list)
+        else (),
     )
     if "enforce_exact_files" in protected_raw and not isinstance(protected_raw["enforce_exact_files"], list):
         raise IntentError("$.protected_paths.enforce_exact_files must be an array")
@@ -502,8 +473,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
     if not isinstance(raw_binaries, list):
         raise IntentError("$.allowed_engine_binaries must be an array")
     binaries = tuple(
-        _absolute_path(item, f"$.allowed_engine_binaries[{index}]")
-        for index, item in enumerate(raw_binaries)
+        _absolute_path(item, f"$.allowed_engine_binaries[{index}]") for index, item in enumerate(raw_binaries)
     )
     mode = _nonempty_string(root.get("tetragon_mode", "monitor"), "$.tetragon_mode")
     if mode not in {"monitor", "enforce_probe"}:
@@ -525,22 +495,35 @@ def parse_intent(document: Any) -> EnforcementIntent:
             rule_modes.append((rule_id, rule_mode))
     allowed_modes = []
     if "tetragon_allowed_modes" in root:
-        for rule_id, modes in _object(root["tetragon_allowed_modes"], "$.tetragon_allowed_modes", set(TETRAGON_RULE_MODES)).items():
-            if (not isinstance(modes, list) or not modes or any(m not in ("monitor", "enforce") for m in modes)
-                    or len(set(modes)) != len(modes) or "monitor" not in modes):
+        for rule_id, modes in _object(
+            root["tetragon_allowed_modes"], "$.tetragon_allowed_modes", set(TETRAGON_RULE_MODES)
+        ).items():
+            if (
+                not isinstance(modes, list)
+                or not modes
+                or any(m not in ("monitor", "enforce") for m in modes)
+                or len(set(modes)) != len(modes)
+                or "monitor" not in modes
+            ):
                 raise IntentError("allowed modes require unique monitor/enforce values including monitor")
             if "enforce" in modes and rule_id != "TG-SECRET-01":
                 raise IntentError("only TG-SECRET-01 supports enforce")
             if rule_id in dict(rule_modes) and ((dict(rule_modes)[rule_id] == "enforce") != ("enforce" in modes)):
                 raise IntentError("tetragon_rule_modes conflicts with tetragon_allowed_modes")
             allowed_modes.append((rule_id, tuple(modes)))
-    secret_capable = ("enforce" in dict(allowed_modes).get("TG-SECRET-01", ())
-                      or dict(rule_modes).get("TG-SECRET-01") == "enforce")
+    secret_capable = (
+        "enforce" in dict(allowed_modes).get("TG-SECRET-01", ()) or dict(rule_modes).get("TG-SECRET-01") == "enforce"
+    )
     if "enforce" in dict(allowed_modes).get("TG-SECRET-01", ()) and not root.get("tetragon_enforce_method"):
         raise IntentError("new allowed enforce mode requires an explicit enforcement method")
     if secret_capable:
         method = root.get("tetragon_enforce_method")
-        if method is not None and method not in {"lsm_file_open", "override_lsm", "sigkill_fd_install", "override_syscall"}:
+        if method is not None and method not in {
+            "lsm_file_open",
+            "override_lsm",
+            "sigkill_fd_install",
+            "override_syscall",
+        }:
             raise IntentError("$.tetragon_enforce_method is unsupported")
         secrets = protected.enforce_exact_files if method is not None else protected.secret_paths
         if not secrets:
@@ -548,12 +531,16 @@ def parse_intent(document: Any) -> EnforcementIntent:
         for path in secrets:
             # Legacy path-only intents retain their old extension check. New
             # methods require an explicit file declaration, including token files.
-            if path.endswith("/") or (method is None and not Path(path).suffix) or any(
-                other != path and Path(other).is_relative_to(path) for other in secrets
+            if (
+                path.endswith("/")
+                or (method is None and not Path(path).suffix)
+                or any(other != path and Path(other).is_relative_to(path) for other in secrets)
             ):
                 raise IntentError("TG-SECRET-01 enforce requires exact files, not directories or prefixes")
         symbol = root.get("tetragon_openat_symbol")
-        if method == "override_syscall" and (not isinstance(symbol, str) or not re.fullmatch(r"(?:__x64_|__arm64_)?sys_openat", symbol)):
+        if method == "override_syscall" and (
+            not isinstance(symbol, str) or not re.fullmatch(r"(?:__x64_|__arm64_)?sys_openat", symbol)
+        ):
             raise IntentError("$.tetragon_openat_symbol must name a checked openat symbol")
         if method != "override_syscall" and symbol is not None:
             raise IntentError("$.tetragon_openat_symbol requires override_syscall")
@@ -606,8 +593,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
             ]
             if shared:
                 raise IntentError(
-                    "$.engine_egress_allow must not include acquisition destinations: "
-                    + ", ".join(sorted(shared))
+                    "$.engine_egress_allow must not include acquisition destinations: " + ", ".join(sorted(shared))
                 )
         raw_receivers = root.get("test_receivers", [])
         if not isinstance(raw_receivers, list):
@@ -707,8 +693,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
                 raise IntentError("$.assets engine/acquire/probe UIDs must be different accounts")
             if protected.cache_dir != assets.engine_cache_path:
                 raise IntentError(
-                    "$.protected_paths.cache_dir must equal the engine-side cache path "
-                    f"{assets.engine_cache_path}"
+                    f"$.protected_paths.cache_dir must equal the engine-side cache path {assets.engine_cache_path}"
                 )
             if assets.cache_mount_path is not None:
                 mount = Path(assets.cache_mount_path)
@@ -723,25 +708,20 @@ def parse_intent(document: Any) -> EnforcementIntent:
             # mount check above guards the container side instead.
             if assets.cache_mount_path is None:
                 for supply in filter(None, (protected.model_dir, assets.tokenizer_dir)):
-                    if Path(supply).is_relative_to(assets.cache_root) or Path(
-                        assets.cache_root
-                    ).is_relative_to(supply):
+                    if Path(supply).is_relative_to(assets.cache_root) or Path(assets.cache_root).is_relative_to(supply):
                         raise IntentError("$.assets.cache_root must be separate from supply paths")
                 manifest = Path(assets.manifest_path)
                 manifest_parent = manifest.parent
-                if manifest.is_relative_to(assets.cache_root) or Path(
-                    assets.cache_root
-                ).is_relative_to(manifest_parent):
-                    raise IntentError(
-                        "$.assets.cache_root must be separate from the approved manifest mount"
-                    )
+                if manifest.is_relative_to(assets.cache_root) or Path(assets.cache_root).is_relative_to(
+                    manifest_parent
+                ):
+                    raise IntentError("$.assets.cache_root must be separate from the approved manifest mount")
         if "phase_binaries" in root:
             phases_raw = _object(root["phase_binaries"], "$.phase_binaries", set(PHASES))
             for phase in PHASES:
                 if phase in phases_raw:
                     phase_binaries.append(
-                        (phase, _binary_list(phases_raw[phase], f"$.phase_binaries.{phase}",
-                                             allow_literal_parent=True))
+                        (phase, _binary_list(phases_raw[phase], f"$.phase_binaries.{phase}", allow_literal_parent=True))
                     )
         allowed_any = set(binaries).union(*(set(items) for _, items in phase_binaries))
         if "suspect_binaries" in root:
@@ -750,8 +730,11 @@ def parse_intent(document: Any) -> EnforcementIntent:
             if overlap:
                 raise IntentError(f"$.suspect_binaries overlaps allowed binaries: {', '.join(overlap)}")
         if "parent_constraints" in root:
-            raw = _object(root["parent_constraints"], "$.parent_constraints",
-                          set(root["parent_constraints"]) if isinstance(root["parent_constraints"], dict) else set())
+            raw = _object(
+                root["parent_constraints"],
+                "$.parent_constraints",
+                set(root["parent_constraints"]) if isinstance(root["parent_constraints"], dict) else set(),
+            )
             for binary, parents in raw.items():
                 if binary not in allowed_any:
                     raise IntentError(f"$.parent_constraints key is not an allowed binary: {binary}")
@@ -760,8 +743,11 @@ def parse_intent(document: Any) -> EnforcementIntent:
                     raise IntentError(f"$.parent_constraints.{binary} must not be empty")
                 parent_constraints.append((binary, values))
         if "suspect_parent_contexts" in root:
-            raw = _object(root["suspect_parent_contexts"], "$.suspect_parent_contexts",
-                          set(root["suspect_parent_contexts"]) if isinstance(root["suspect_parent_contexts"], dict) else set())
+            raw = _object(
+                root["suspect_parent_contexts"],
+                "$.suspect_parent_contexts",
+                set(root["suspect_parent_contexts"]) if isinstance(root["suspect_parent_contexts"], dict) else set(),
+            )
             for binary, context_spec in raw.items():
                 if binary not in suspect:
                     raise IntentError(f"$.suspect_parent_contexts key is not a suspect binary: {binary}")
@@ -769,24 +755,22 @@ def parse_intent(document: Any) -> EnforcementIntent:
                 item = _object(context_spec, path, {"parents", "phases"})
                 parents = _binary_list(_required(item, "parents", path), f"{path}.parents")
                 phases = item.get("phases")
-                if (not parents or not isinstance(phases, list) or not phases
-                        or any(phase not in PHASES for phase in phases)
-                        or len(set(phases)) != len(phases)):
+                if (
+                    not parents
+                    or not isinstance(phases, list)
+                    or not phases
+                    or any(phase not in PHASES for phase in phases)
+                    or len(set(phases)) != len(phases)
+                ):
                     raise IntentError(f"{path} must have nonempty unique parents and phases")
                 suspect_parent_contexts.append((binary, parents, tuple(phases)))
 
         roles: list[tuple[str, dict[str, str]]] = [
             ("$.gateway", gateway.labels),
             ("$.engine", engine.labels),
-            *(
-                (f"$.metrics_collectors[{index}]", collector.labels)
-                for index, collector in enumerate(collectors)
-            ),
+            *((f"$.metrics_collectors[{index}]", collector.labels) for index, collector in enumerate(collectors)),
             *([("$.acquire", acquire.labels)] if acquire is not None else []),
-            *(
-                (f"$.test_receivers[{index}]", receiver.labels)
-                for index, receiver in enumerate(receivers)
-            ),
+            *((f"$.test_receivers[{index}]", receiver.labels) for index, receiver in enumerate(receivers)),
         ]
         if _KUBERNETES_NAME.fullmatch(namespace) is None:
             raise IntentError("$.namespace must be a Kubernetes DNS label for schema 1.1")
@@ -796,10 +780,11 @@ def parse_intent(document: Any) -> EnforcementIntent:
 
     code_paths = _binary_list(root.get("code_load_watch_paths", []), "$.code_load_watch_paths")
     if len(code_paths) > 8 or any(
-        len(path.encode("utf-8")) > 255 or path == "/" or not path.isprintable()
-        for path in code_paths
+        len(path.encode("utf-8")) > 255 or path == "/" or not path.isprintable() for path in code_paths
     ):
-        raise IntentError("code_load_watch_paths requires at most 8 printable directory paths (max 255 characters, not /)")
+        raise IntentError(
+            "code_load_watch_paths requires at most 8 printable directory paths (max 255 characters, not /)"
+        )
 
     return EnforcementIntent(
         namespace,

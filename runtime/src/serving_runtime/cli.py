@@ -28,9 +28,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         prog="serving-runtime",
         description="Serving Runtime 개발 도구: 로컬 파일 확인과 런타임 통제 MVP 실행·시험.",
     )
-    parser.add_argument(
-        "--version", action="version", version=f"%(prog)s {version('serving-runtime')}"
-    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {version('serving-runtime')}")
     commands = parser.add_subparsers(dest="command")
     from .operations.agent import add_arguments
 
@@ -40,9 +38,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     file_parser.add_argument("path", type=Path, help="확인할 일반 파일 경로")
     bundle_parser = commands.add_parser("bundle", help="LAB 정책 묶음 확인")
     bundle_commands = bundle_parser.add_subparsers(dest="bundle_command")
-    bundle_verify_parser = bundle_commands.add_parser(
-        "verify", help="정책 묶음의 구조·파일·유효성을 확인"
-    )
+    bundle_verify_parser = bundle_commands.add_parser("verify", help="정책 묶음의 구조·파일·유효성을 확인")
     bundle_verify_parser.add_argument("--bundle-dir", required=True, metavar="DIR")
     bundle_build_parser = bundle_commands.add_parser("build", help="CONFIRMED 플랫폼 정책에서 묶음 생성")
     bundle_build_parser.add_argument("--policy", required=True, metavar="FILE")
@@ -59,11 +55,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     bundle_apply_parser.add_argument("--context", required=True)
     bundle_apply_parser.add_argument("--namespace", required=True)
     bundle_apply_parser.add_argument("--kubeconfig", metavar="FILE", help="모든 kubectl 호출에 명시할 kubeconfig")
-    bundle_apply_parser.add_argument("--status-url", required=True, help="Gateway 내부 포트를 담은 로컬 URL; 새 임시 port-forward를 엽니다")
-    bundle_apply_parser.add_argument("--token-env-file", metavar="FILE", help="RUNTIME_VIEWER_TOKEN을 읽을 env 파일(조회가 비보호면 생략 가능)")
+    bundle_apply_parser.add_argument(
+        "--status-url", required=True, help="Gateway 내부 포트를 담은 로컬 URL; 새 임시 port-forward를 엽니다"
+    )
+    bundle_apply_parser.add_argument(
+        "--token-env-file", metavar="FILE", help="RUNTIME_VIEWER_TOKEN을 읽을 env 파일(조회가 비보호면 생략 가능)"
+    )
     bundle_apply_parser.add_argument("--dry-run", action="store_true")
     bundle_apply_parser.add_argument("--operation-result", action="store_true", help="에이전트용 제한된 JSON 결과")
-    bundle_apply_parser.add_argument("--deployment-guard", metavar="FILE", help="현재 외부 승인·필수 UPDATE 근거를 적용/복귀 전에 검증")
+    bundle_apply_parser.add_argument(
+        "--deployment-guard", metavar="FILE", help="현재 외부 승인·필수 UPDATE 근거를 적용/복귀 전에 검증"
+    )
     mvp_parser = commands.add_parser("mvp", help="로컬 Gateway와 선택한 backend 실행")
     mvp_parser.add_argument("--policy", metavar="PATH")
     mvp_parser.add_argument(
@@ -77,20 +79,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     mvp_parser.add_argument("--backend-config", metavar="PATH")
     mvp_parser.add_argument("--data-dir", metavar="PATH")
     mvp_parser.add_argument("--relay-timeout", type=float, default=5.0, metavar="SECONDS")
-    mvp_parser.add_argument(
-        "--stream-idle-timeout", type=float, default=30.0, metavar="SECONDS"
-    )
-    mvp_parser.add_argument(
-        "--request-deadline", type=float, default=300.0, metavar="SECONDS"
-    )
+    mvp_parser.add_argument("--stream-idle-timeout", type=float, default=30.0, metavar="SECONDS")
+    mvp_parser.add_argument("--request-deadline", type=float, default=300.0, metavar="SECONDS")
     mvp_parser.add_argument("--max-concurrency", type=int, default=2, metavar="N")
     mvp_parser.add_argument("--max-connections", type=int, default=64, metavar="N")
-    mvp_parser.add_argument(
-        "--request-header-timeout", type=float, default=5.0, metavar="SECONDS"
-    )
-    mvp_parser.add_argument(
-        "--request-body-timeout", type=float, default=10.0, metavar="SECONDS"
-    )
+    mvp_parser.add_argument("--request-header-timeout", type=float, default=5.0, metavar="SECONDS")
+    mvp_parser.add_argument("--request-body-timeout", type=float, default=10.0, metavar="SECONDS")
     mvp_parser.add_argument("--environment", metavar="NAME")
     mvp_parser.add_argument("--run-id", metavar="ID")
     mvp_parser.add_argument("--revocations", metavar="PATH")
@@ -123,9 +117,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     target_pod_group.add_argument(
         "--target-pod-snapshot",
         metavar="PATH",
-        help=(
-            "호스트가 쓴 runtime-target-pods-snapshot/1.0 파일로 대상 Pod를 관측"
-        ),
+        help=("호스트가 쓴 runtime-target-pods-snapshot/1.0 파일로 대상 Pod를 관측"),
     )
     mvp_parser.add_argument(
         "--kube-context",
@@ -163,9 +155,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     mvp_parser.add_argument("--native-receipt-reader-gid", type=int)
     mvp_parser.add_argument("--native-receipt-producer-sha256")
     mvp_parser.add_argument("--tetragon-state", metavar="PATH", help="호스트에서 수집한 Tetragon 정책·시험 상태 JSON")
-    mvp_parser.add_argument("--gpu-state", metavar="PATH", help="호스트 수집기가 쓴 GPU 사용률·메모리·온도 공개 상태 JSON")
-    mvp_parser.add_argument("--engine-receipts", metavar="PATH", help="선택: 엔진 로그에서 요청 ID만 추출한 공개 JSON(tools.engine_receipts)")
-    mvp_parser.add_argument("--tetragon-identities", metavar="PATH", help="노드에서 확인한 Tetragon 프로세스·컨테이너 식별 자료")
+    mvp_parser.add_argument(
+        "--gpu-state", metavar="PATH", help="호스트 수집기가 쓴 GPU 사용률·메모리·온도 공개 상태 JSON"
+    )
+    mvp_parser.add_argument(
+        "--engine-receipts",
+        metavar="PATH",
+        help="선택: 엔진 로그에서 요청 ID만 추출한 공개 JSON(tools.engine_receipts)",
+    )
+    mvp_parser.add_argument(
+        "--tetragon-identities", metavar="PATH", help="노드에서 확인한 Tetragon 프로세스·컨테이너 식별 자료"
+    )
     mvp_parser.add_argument(
         "--observation-feed",
         action="append",
@@ -180,16 +180,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         type=_observation_feed,
         metavar="KIND=PATH",
     )
-    mvp_parser.add_argument(
-        "--observation-origin", choices=("synthetic", "real"), default="real"
-    )
+    mvp_parser.add_argument("--observation-origin", choices=("synthetic", "real"), default="real")
     mvp_parser.add_argument("--observation-environment", metavar="NAME")
     mvp_parser.add_argument("--observation-run-id", metavar="ID")
     mvp_parser.add_argument("--observation-intent", metavar="PATH")
     mvp_parser.add_argument("--cilium-policy-status", action="store_true")
-    mvp_parser.add_argument(
-        "--collector-stale-after", type=float, default=15.0, metavar="SECONDS"
-    )
+    mvp_parser.add_argument("--collector-stale-after", type=float, default=15.0, metavar="SECONDS")
     management_parser = commands.add_parser(
         "management-listener",
         help="엔진의 허용된 읽기 전용 관리 경로만 중계",
@@ -204,9 +200,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="정확히 허용할 경로(반복 가능; 생략 시 /metrics,/health,/v1/models,/version)",
     )
     management_parser.add_argument("--timeout", type=float, default=5.0, metavar="SECONDS")
-    management_parser.add_argument(
-        "--max-response-bytes", type=int, default=1024 * 1024, metavar="BYTES"
-    )
+    management_parser.add_argument("--max-response-bytes", type=int, default=1024 * 1024, metavar="BYTES")
     management_parser.add_argument(
         "--credential-file",
         metavar="PATH",
@@ -230,17 +224,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     acceptance_parser.add_argument("--report-dir", metavar="PATH")
     assets_parser = commands.add_parser("assets", help="모델 파일 승인 목록 도구")
     assets_commands = assets_parser.add_subparsers(dest="assets_command")
-    snapshot_parser = assets_commands.add_parser(
-        "snapshot", help="현재 파일로 목록 초안 생성(관측값, 승인은 사람이)"
-    )
+    snapshot_parser = assets_commands.add_parser("snapshot", help="현재 파일로 목록 초안 생성(관측값, 승인은 사람이)")
     snapshot_parser.add_argument("--root", required=True, metavar="DIR")
     snapshot_parser.add_argument("--out", required=True, metavar="PATH")
-    revalidation_parser = commands.add_parser(
-        "revalidation", help="재검증 요청 조회 연동 도구"
-    )
-    revalidation_commands = revalidation_parser.add_subparsers(
-        dest="revalidation_command"
-    )
+    revalidation_parser = commands.add_parser("revalidation", help="재검증 요청 조회 연동 도구")
+    revalidation_commands = revalidation_parser.add_subparsers(dest="revalidation_command")
     revalidation_export_parser = revalidation_commands.add_parser(
         "export", help="열린 재검증 요청을 새 JSON 파일로 내보내기"
     )
@@ -252,15 +240,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         "hash-token",
         help="표준 입력의 토큰을 인증 설정용 SHA-256으로 변환(토큰은 출력하지 않음)",
     )
-    metrics_parser = commands.add_parser(
-        "metrics-check", help="저장한 /metrics 응답과 backend 지표 대응표 대조"
-    )
+    metrics_parser = commands.add_parser("metrics-check", help="저장한 /metrics 응답과 backend 지표 대응표 대조")
     metrics_parser.add_argument("--backend-config", required=True, metavar="PATH")
     metrics_parser.add_argument("--input", required=True, metavar="FILE")
     metrics_parser.add_argument("--json", action="store_true", help="JSON으로 출력")
-    enforce_parser = commands.add_parser(
-        "enforce", help="Cilium·Tetragon 후보 생성과 관측 이벤트 변환"
-    )
+    enforce_parser = commands.add_parser("enforce", help="Cilium·Tetragon 후보 생성과 관측 이벤트 변환")
     enforce_commands = enforce_parser.add_subparsers(dest="enforce_command")
     sync_parser = enforce_commands.add_parser("sync", help="현재 검증 묶음의 외부 정책 동기화(기본 dry-run)")
     source = sync_parser.add_mutually_exclusive_group(required=True)
@@ -275,14 +259,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     sync_parser.add_argument("--cilium-apply", action="store_true")
     sync_parser.add_argument("--execute", action="store_true")
     sync_parser.add_argument("--lock-file", default="/tmp/serving-runtime-enforcement.lock")
-    render_parser = enforce_commands.add_parser(
-        "render", help="통제 의도에서 클러스터 미검증 JSON 후보 생성"
-    )
+    render_parser = enforce_commands.add_parser("render", help="통제 의도에서 클러스터 미검증 JSON 후보 생성")
     render_parser.add_argument("--intent", required=True, metavar="PATH")
     render_parser.add_argument("--out", required=True, metavar="DIR")
-    ingest_parser = enforce_commands.add_parser(
-        "ingest", help="Hubble·Tetragon JSON Lines를 관측 기록으로 변환"
-    )
+    ingest_parser = enforce_commands.add_parser("ingest", help="Hubble·Tetragon JSON Lines를 관측 기록으로 변환")
     ingest_parser.add_argument("--kind", required=True, choices=("hubble", "tetragon"))
     ingest_parser.add_argument("--input", required=True, metavar="FILE")
     ingest_parser.add_argument("--origin", required=True, choices=("synthetic", "real"))
@@ -290,31 +270,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     ingest_parser.add_argument("--intent", metavar="PATH")
     ingest_parser.add_argument("--environment", metavar="NAME")
     ingest_parser.add_argument("--run-id", metavar="ID")
-    ingest_parser.add_argument(
-        "--exceptions", metavar="PATH", help="승인 실행 예외(runtime-exec-exceptions/1.0)"
-    )
-    ingest_parser.add_argument(
-        "--timeline", metavar="PATH", help="단계 시간표(runtime-phase-timeline/1.0)"
-    )
+    ingest_parser.add_argument("--exceptions", metavar="PATH", help="승인 실행 예외(runtime-exec-exceptions/1.0)")
+    ingest_parser.add_argument("--timeline", metavar="PATH", help="단계 시간표(runtime-phase-timeline/1.0)")
     cache_check_parser = enforce_commands.add_parser(
         "cache-check", help="캐시 세대 디렉터리의 소유자·권한·다른 세대를 점검(읽기 전용)"
     )
     cache_check_parser.add_argument("--intent", required=True, metavar="PATH")
-    cache_check_parser.add_argument(
-        "--root", metavar="DIR", help="cache_root 대신 점검할 디렉터리(사본 점검용)"
-    )
+    cache_check_parser.add_argument("--root", metavar="DIR", help="cache_root 대신 점검할 디렉터리(사본 점검용)")
     phase_signals_parser = enforce_commands.add_parser(
         "phase-signals",
         help="엔진 로그의 확인된 표지를 단계 시간표로 변환",
     )
-    phase_signals_parser.add_argument(
-        "--engine", required=True, choices=("vllm", "sglang")
-    )
+    phase_signals_parser.add_argument("--engine", required=True, choices=("vllm", "sglang"))
     phase_signals_parser.add_argument("--log", required=True, metavar="PATH")
     phase_signals_parser.add_argument("--year", required=True, type=int, metavar="YYYY")
-    phase_signals_parser.add_argument(
-        "--tz", required=True, metavar="OFFSET", help="명시적 UTC offset(예: +00:00)"
-    )
+    phase_signals_parser.add_argument("--tz", required=True, metavar="OFFSET", help="명시적 UTC offset(예: +00:00)")
     phase_signals_parser.add_argument("--out", required=True, metavar="PATH")
     phase_signals_parser.add_argument(
         "--follow", action="store_true", help="파일 교체·잘림을 따라가거나 --log - 표준입력을 계속 읽기"
@@ -322,19 +292,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     phase_signals_parser.add_argument(
         "--health-url", metavar="URL", help="follow 중 init/compile 뒤 200을 추론 시작 근거로 사용"
     )
-    phase_signals_parser.add_argument(
-        "--health-interval", type=float, default=2.0, metavar="SECONDS"
-    )
+    phase_signals_parser.add_argument("--health-interval", type=float, default=2.0, metavar="SECONDS")
     existing_group = phase_signals_parser.add_mutually_exclusive_group()
-    existing_group.add_argument(
-        "--overwrite", action="store_true", help="기존 timeline을 버리고 새 follow 상태로 교체"
-    )
-    existing_group.add_argument(
-        "--resume", action="store_true", help="기존 timeline 상태와 입력 위치에서 이어가기"
-    )
+    existing_group.add_argument("--overwrite", action="store_true", help="기존 timeline을 버리고 새 follow 상태로 교체")
+    existing_group.add_argument("--resume", action="store_true", help="기존 timeline 상태와 입력 위치에서 이어가기")
     args = parser.parse_args(argv)
     if args.command == "agent":
         from .operations.agent import main as agent_main
+
         return agent_main(args)
     if args.command == "file-info":
         try:
@@ -362,8 +327,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         from .bundle_tools import build_bundle
 
         try:
-            bundle = build_bundle(args.policy, args.policy_sha256, args.server_values,
-                                  args.intent, args.output_parent, args.bundle_id)
+            bundle = build_bundle(
+                args.policy, args.policy_sha256, args.server_values, args.intent, args.output_parent, args.bundle_id
+            )
         except (OSError, ValueError) as error:
             print(f"정책 묶음 생성 실패: {error}", file=sys.stderr)
             return 1
@@ -375,16 +341,29 @@ def main(argv: Sequence[str] | None = None) -> int:
         from .bundle_tools import apply_bundle
 
         try:
-            result = apply_bundle(args.bundle_dir, args.bundle_root, args.context,
-                                  args.namespace, args.status_url, args.token_env_file,
-                                  kubeconfig=args.kubeconfig,
-                                  dry_run=args.dry_run, existing=args.existing,
-                                  deployment_guard_path=args.deployment_guard)
+            result = apply_bundle(
+                args.bundle_dir,
+                args.bundle_root,
+                args.context,
+                args.namespace,
+                args.status_url,
+                args.token_env_file,
+                kubeconfig=args.kubeconfig,
+                dry_run=args.dry_run,
+                existing=args.existing,
+                deployment_guard_path=args.deployment_guard,
+            )
         except (OSError, ValueError, RuntimeError) as error:
             if args.operation_result:
                 restored = getattr(error, "outcome", {}).get("state") == "rolled_back"
-                print(json.dumps({"state": "rolled_back" if restored else "unknown",
-                                  "code": "ROLLED_BACK" if restored else "STATUS_UNKNOWN"}))
+                print(
+                    json.dumps(
+                        {
+                            "state": "rolled_back" if restored else "unknown",
+                            "code": "ROLLED_BACK" if restored else "STATUS_UNKNOWN",
+                        }
+                    )
+                )
             else:
                 print(f"정책 묶음 적용 실패: {error}", file=sys.stderr)
                 if getattr(error, "outcome", None) is not None:
@@ -395,10 +374,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if result.get("deployment_guard") is not None:
             print("현재 외부 승인·필수 UPDATE 근거 확인 완료")
-            print(json.dumps({"deployment_guard": result["deployment_guard"],
-                              "final_verification": result.get("final_verification")}, ensure_ascii=False))
-        print(f"묶음 {'적용 계획' if result['dry_run'] else '적용·상태 확인'} 성공: "
-              f"{result['previous']} -> {result['bundle_id']}")
+            print(
+                json.dumps(
+                    {
+                        "deployment_guard": result["deployment_guard"],
+                        "final_verification": result.get("final_verification"),
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        print(
+            f"묶음 {'적용 계획' if result['dry_run'] else '적용·상태 확인'} 성공: "
+            f"{result['previous']} -> {result['bundle_id']}"
+        )
         return 0
     if args.command == "mvp":
         from .mvp.app import run
@@ -418,10 +406,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if value is not None
             ]
             if conflicts:
-                parser.error(
-                    "--policy-bundle은 다음 명시 옵션과 함께 쓸 수 없습니다: "
-                    + ", ".join(conflicts)
-                )
+                parser.error("--policy-bundle은 다음 명시 옵션과 함께 쓸 수 없습니다: " + ", ".join(conflicts))
 
         try:
             options = {
@@ -510,8 +495,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "credential_file": args.credential_file,
                 "record_path": args.record_file,
                 "heartbeat_path": args.heartbeat_file,
-                "target_ref": args.target_ref, "run_id": args.run_id,
-                "environment": args.environment, "policy_ref": args.policy_ref,
+                "target_ref": args.target_ref,
+                "run_id": args.run_id,
+                "environment": args.environment,
+                "policy_ref": args.policy_ref,
             }
             if args.allow_path:
                 options["allowed_paths"] = tuple(args.allow_path)
@@ -530,6 +517,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_cli(args.report_dir)
     if args.command == "enforce" and args.enforce_command == "sync":
         from .enforcement.sync_cli import main as sync_main
+
         return sync_main(args)
     if args.command == "enforce" and args.enforce_command == "render":
         from .enforcement.cilium import render_manifests as render_cilium
@@ -549,8 +537,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         except (OSError, ValueError, IntentError) as error:
             print(f"통제 후보 생성 실패: {error}", file=sys.stderr)
             return 1
-        blocked_rules = len({rule for rule, mode in intent.tetragon_rule_modes if mode == "enforce"}
-                            | {rule for rule, modes in intent.tetragon_allowed_modes if "enforce" in modes})
+        blocked_rules = len(
+            {rule for rule, mode in intent.tetragon_rule_modes if mode == "enforce"}
+            | {rule for rule, modes in intent.tetragon_allowed_modes if "enforce" in modes}
+        )
         blocked_summary = f", 차단 규칙 {blocked_rules}개(미검증)" if blocked_rules else ""
         print(
             f"{len(written)}개 생성: Cilium 1.20.3 / Tetragon 1.7.1 문법 기준 후보, "
@@ -589,10 +579,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         except (OSError, UnicodeError, ValueError, IntentError) as error:
             print(f"관측 변환 실패: {error}", file=sys.stderr)
             return 1
-        print(
-            f"처리 {result['processed']}건 · 저장 {result['accepted']}건 · "
-            f"거부 {len(result['rejected'])}건"
-        )
+        print(f"처리 {result['processed']}건 · 저장 {result['accepted']}건 · 거부 {len(result['rejected'])}건")
         if args.kind == "hubble":
             print(
                 "Hubble 손실 레코드 "
@@ -622,9 +609,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         from .enforcement.phase_signals import extract_phase_timeline, follow_phase_timeline
 
         output = Path(args.out)
-        if not args.follow and (
-            args.log == "-" or args.health_url is not None or args.overwrite or args.resume
-        ):
+        if not args.follow and (args.log == "-" or args.health_url is not None or args.overwrite or args.resume):
             print(
                 "단계 신호 변환 실패: --log -, --health-url, --overwrite, --resume는 --follow와 함께 사용해야 합니다",
                 file=sys.stderr,
@@ -668,9 +653,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 year=args.year,
                 timezone_offset=args.tz,
             )
-            encoded = (
-                json.dumps(timeline, ensure_ascii=False, indent=2) + "\n"
-            ).encode("utf-8")
+            encoded = (json.dumps(timeline, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
             descriptor = os.open(
                 output,
                 os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
@@ -690,7 +673,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"해석 안 함 {extraction['unparsed_lines']}줄 · 생략 경계 "
             f"{len(extraction['omitted_boundaries'])}개"
         )
-        print(f"마지막 위치: line {extraction['last_position']['line']}, byte {extraction['last_position']['byte_offset']}")
+        print(
+            f"마지막 위치: line {extraction['last_position']['line']}, byte {extraction['last_position']['byte_offset']}"
+        )
         return 0
     if args.command == "enforce":
         enforce_parser.print_help()
@@ -701,9 +686,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         out = Path(args.out)
         try:
             document = snapshot(args.root)
-            encoded = (
-                json.dumps(document, ensure_ascii=False, indent=2) + "\n"
-            ).encode("utf-8")
+            encoded = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
             descriptor = os.open(
                 out,
                 os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,

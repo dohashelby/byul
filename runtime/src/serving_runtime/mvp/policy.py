@@ -87,12 +87,8 @@ _SCHEMA_FIELDS = {
 _PROFILES = {"default", "zeroday-lab"}
 # Fields the Gateway always validates or normalizes itself; a policy may not
 # reopen them as extra fields.
-RESERVED_REQUEST_FIELDS = frozenset(
-    {"model", "messages", "max_tokens", "stream", "n", "max_completion_tokens"}
-)
-EXTRA_FIELD_TYPES = frozenset(
-    {"integer", "number", "string", "boolean", "array", "object"}
-)
+RESERVED_REQUEST_FIELDS = frozenset({"model", "messages", "max_tokens", "stream", "n", "max_completion_tokens"})
+EXTRA_FIELD_TYPES = frozenset({"integer", "number", "string", "boolean", "array", "object"})
 _ITEM_TYPES = frozenset({"integer", "number", "string", "boolean"})
 _CONSTRAINTS_BY_TYPE = {
     "integer": {"min", "max"},
@@ -229,18 +225,14 @@ def _validate_default_extra_fields(rules: tuple[ExtraFieldRule, ...]) -> None:
         if kind in {"integer", "number"}:
             missing = [name for name in ("min", "max") if name not in constraints]
             if missing:
-                raise ValueError(
-                    f"{where} requires min and max in profile default; "
-                    f"missing: {', '.join(missing)}"
-                )
+                raise ValueError(f"{where} requires min and max in profile default; missing: {', '.join(missing)}")
         elif kind == "string" and "max_length" not in constraints:
             raise ValueError(f"{where} requires max_length in profile default")
         elif kind == "array":
             missing = [name for name in ("max_items", "items") if name not in constraints]
             if missing:
                 raise ValueError(
-                    f"{where} requires max_items and items in profile default; "
-                    f"missing: {', '.join(missing)}"
+                    f"{where} requires max_items and items in profile default; missing: {', '.join(missing)}"
                 )
             item_rule = constraints["items"]
             item_kind = item_rule["type"]
@@ -249,8 +241,7 @@ def _validate_default_extra_fields(rules: tuple[ExtraFieldRule, ...]) -> None:
                 item_missing = [name for name in ("min", "max") if name not in item_rule]
                 if item_missing:
                     raise ValueError(
-                        f"{item_where} requires min and max in profile default; "
-                        f"missing: {', '.join(item_missing)}"
+                        f"{item_where} requires min and max in profile default; missing: {', '.join(item_missing)}"
                     )
             elif item_kind == "string" and "max_length" not in item_rule:
                 raise ValueError(f"{item_where} requires max_length in profile default")
@@ -265,9 +256,7 @@ def parse_policy_time(value: str) -> datetime:
     return parsed
 
 
-def _error(
-    path: str, loaded_at: str, code: str, message: str, sha256: str | None = None
-) -> PolicyState:
+def _error(path: str, loaded_at: str, code: str, message: str, sha256: str | None = None) -> PolicyState:
     return PolicyState(False, None, path, sha256, loaded_at, code, message)
 
 
@@ -312,9 +301,7 @@ def load_policy(path: str | Path) -> PolicyState:
         )
     schema_version = document.get("schema_version")
     if not isinstance(schema_version, str) or schema_version not in _SCHEMA_FIELDS:
-        return _error(
-            path_text, loaded_at, "INVALID_POLICY", "unsupported schema_version", digest
-        )
+        return _error(path_text, loaded_at, "INVALID_POLICY", "unsupported schema_version", digest)
     allowed_fields = _SCHEMA_FIELDS[schema_version]
     unknown = sorted(document.keys() - allowed_fields)
     if unknown:
@@ -335,11 +322,7 @@ def load_policy(path: str | Path) -> PolicyState:
                 digest,
             )
     models = document["allowed_models"]
-    if (
-        not isinstance(models, list)
-        or not models
-        or any(not _is_nonempty_string(model) for model in models)
-    ):
+    if not isinstance(models, list) or not models or any(not _is_nonempty_string(model) for model in models):
         return _error(
             path_text,
             loaded_at,
@@ -431,10 +414,7 @@ def load_policy(path: str | Path) -> PolicyState:
                 digest,
             )
         cache_isolation = document.get("cache_isolation", "off")
-        if (
-            not isinstance(cache_isolation, str)
-            or cache_isolation not in {"off", "per_principal"}
-        ):
+        if not isinstance(cache_isolation, str) or cache_isolation not in {"off", "per_principal"}:
             return _error(
                 path_text,
                 loaded_at,
@@ -445,13 +425,8 @@ def load_policy(path: str | Path) -> PolicyState:
         if "extra_fields" in document:
             try:
                 extra_fields = _parse_extra_fields(document["extra_fields"])
-                if cache_isolation == "per_principal" and any(
-                    rule.name == "cache_salt" for rule in extra_fields
-                ):
-                    raise ValueError(
-                        "extra_fields.cache_salt conflicts with per_principal "
-                        "cache isolation"
-                    )
+                if cache_isolation == "per_principal" and any(rule.name == "cache_salt" for rule in extra_fields):
+                    raise ValueError("extra_fields.cache_salt conflicts with per_principal cache isolation")
                 if profile == "default":
                     _validate_default_extra_fields(extra_fields)
             except ValueError as error:

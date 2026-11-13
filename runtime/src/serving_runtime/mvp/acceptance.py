@@ -47,10 +47,7 @@ class AcceptanceResult:
 
 
 def _demo_group(case_id: str, results: list[DemoResult]) -> AcceptanceResult:
-    selected = [
-        result for result in results
-        if result.case_id == case_id or result.case_id.startswith(case_id)
-    ]
+    selected = [result for result in results if result.case_id == case_id or result.case_id.startswith(case_id)]
     return AcceptanceResult(
         case_id,
         "POST /v1/chat/completions; GET /api/requests/{request_id}",
@@ -85,11 +82,7 @@ class _Runner:
             raise RuntimeError("fake backend is not running")
         if flavor not in {"vllm", "sglang"}:
             raise ValueError("acceptance backend flavor must be vllm or sglang")
-        metric = (
-            "vllm:num_requests_running"
-            if flavor == "vllm"
-            else "sglang:num_running_reqs"
-        )
+        metric = "vllm:num_requests_running" if flavor == "vllm" else "sglang:num_running_reqs"
         source_doc = (
             _VLLM_METRICS_DOC
             if flavor == "vllm"
@@ -103,10 +96,7 @@ class _Runner:
             "health_path": "/health" if flavor == "vllm" else "/ready",
             "models_path": "/v1/models",
             "version_path": "/version" if flavor == "vllm" else None,
-            "metrics_url": (
-                f"http://{self.fake_backend.address[0]}:"
-                f"{self.fake_backend.address[1]}/metrics"
-            ),
+            "metrics_url": (f"http://{self.fake_backend.address[0]}:{self.fake_backend.address[1]}/metrics"),
             "timeouts": {
                 "relay_timeout_s": 0.2,
                 "stream_idle_timeout_s": 0.3,
@@ -357,9 +347,7 @@ class _Runner:
             },
             ensure_ascii=False,
         ).encode("utf-8")
-        status, headers, document = self.json_request(
-            "POST", "/v1/chat/completions", body=body, headers=headers
-        )
+        status, headers, document = self.json_request("POST", "/v1/chat/completions", body=body, headers=headers)
         return status, headers.get("X-Request-ID"), document
 
     def get_json(self, path: str) -> tuple[int, dict[str, Any]]:
@@ -549,9 +537,7 @@ def _run_11(runner: _Runner) -> AcceptanceResult:
     post_status, request_id, _ = runner.post_chat(prompt=prompt)
     list_status, listed = runner.get_json("/api/requests?result=ALLOWED")
     detail_status, detail = runner.get_json(f"/api/requests/{request_id}")
-    evidence_status, _, evidence_body = runner.request(
-        "GET", f"/api/requests/{request_id}/evidence"
-    )
+    evidence_status, _, evidence_body = runner.request("GET", f"/api/requests/{request_id}/evidence")
     try:
         evidence = json.loads(evidence_body.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
@@ -561,8 +547,7 @@ def _run_11(runner: _Runner) -> AcceptanceResult:
         {},
     )
     final_record = next(
-        (record for record in reversed(detail.get("gateway_records", []))
-         if record.get("phase") == "final"),
+        (record for record in reversed(detail.get("gateway_records", [])) if record.get("phase") == "final"),
         {},
     )
     raw_records = b""
@@ -648,9 +633,7 @@ def _final_record(runner: _Runner, request_id: str) -> dict[str, Any] | None:
 
 
 def _run_s1_01(runner: _Runner) -> AcceptanceResult:
-    runner.start(
-        engine_options={"stream_events": 3, "stream_interval_s": 0.12, "split_writes": True}
-    )
+    runner.start(engine_options={"stream_events": 3, "stream_interval_s": 0.12, "split_writes": True})
     if runner.gateway is None or runner.engine is None:
         raise RuntimeError("servers are not running")
     connection = http.client.HTTPConnection(*runner.gateway.address, timeout=3)
@@ -738,9 +721,7 @@ def _run_s1_02(runner: _Runner) -> AcceptanceResult:
 
 
 def _run_s1_03(runner: _Runner) -> AcceptanceResult:
-    runner.start(
-        engine_options={"stream_events": 50, "stream_interval_s": 0.03, "split_writes": True}
-    )
+    runner.start(engine_options={"stream_events": 50, "stream_interval_s": 0.03, "split_writes": True})
     if runner.gateway is None:
         raise RuntimeError("gateway is not running")
     client = socket.create_connection(runner.gateway.address, timeout=3)
@@ -890,8 +871,7 @@ def _run_s1_05(runner: _Runner) -> AcceptanceResult:
     for thread in threads:
         thread.join(timeout=4)
     finals = [
-        _wait_for(lambda request_id=item.get("request_id"): _final_record(runner, request_id))
-        for item in results
+        _wait_for(lambda request_id=item.get("request_id"): _final_record(runner, request_id)) for item in results
     ]
     _, runtime = runner.get_json("/api/status")
     passed = (
@@ -919,11 +899,7 @@ def _run_s1_05(runner: _Runner) -> AcceptanceResult:
             "in_flight": runtime.get("concurrency", {}).get("in_flight"),
         },
         passed,
-        [
-            item
-            for item in [*(result.get("request_id") for result in results), third_id]
-            if item
-        ],
+        [item for item in [*(result.get("request_id") for result in results), third_id] if item],
     )
 
 
@@ -950,12 +926,14 @@ def _run_s1_06(runner: _Runner) -> AcceptanceResult:
 
     runner.start_gateway(_EXAMPLE_POLICY, data_dir=runner.data_dir)
     regular_status, regular_id, _ = runner.post_chat()
+
     # As in the other S1 cases, receiving the HTTP body can precede final
     # append. Wait for both exact IDs before asserting journal uniqueness.
     def completed_records():
         rows, _ = JsonlStore(runner.data_dir / "gateway_records.jsonl").read_all()
         ids = {row.get("request_id") for row in rows if row.get("phase") == "final"}
         return rows if first_id and regular_id and {first_id, regular_id} <= ids else None
+
     records = _wait_for(completed_records)
     final_records_ready = records is not None
     records = records or []
@@ -1035,8 +1013,7 @@ def _run_s2_01(runner: _Runner) -> AcceptanceResult:
         and previous_sha == (a_record or {}).get("policy", {}).get("sha256")
         and (a_record or {}).get("policy", {}).get("policy_id") == "policy-a"
         and (b_record or {}).get("policy", {}).get("policy_id") == "policy-b"
-        and (a_record or {}).get("policy", {}).get("sha256")
-        != (b_record or {}).get("policy", {}).get("sha256")
+        and (a_record or {}).get("policy", {}).get("sha256") != (b_record or {}).get("policy", {}).get("sha256")
         and a_detail.get("final_state", {}).get("result") == "ALLOWED"
     )
     return AcceptanceResult(
@@ -1118,9 +1095,9 @@ def _run_s2_02(runner: _Runner) -> AcceptanceResult:
             "gateway_active": policy.get("gateway_active"),
             "engine_receipts_before_after": [before, after],
         }
-        passed = passed and status == 503 and reason == expected and not policy.get(
-            "gateway_active"
-        ) and before == after
+        passed = (
+            passed and status == 503 and reason == expected and not policy.get("gateway_active") and before == after
+        )
         if request_id:
             request_ids.append(request_id)
     return AcceptanceResult(
@@ -1197,10 +1174,7 @@ def _run_s2_04(runner: _Runner) -> AcceptanceResult:
         collector_stale_after_s=0.2,
     )
     _, compared = runner.get_json("/api/baseline")
-    states = {
-        f"{row.get('field')}:{row.get('source')}": row.get("state")
-        for row in compared.get("rows", [])
-    }
+    states = {f"{row.get('field')}:{row.get('source')}": row.get("state") for row in compared.get("rows", [])}
     passed = {
         "match",
         "drift",
@@ -1259,13 +1233,8 @@ def _run_s2_05(runner: _Runner) -> AcceptanceResult:
         "짧은 수집 주기에서 정상→엔진 중지→stale→같은 포트 재시작",
         "ok→error(마지막 성공 유지)→stale→ok",
         {
-            "states": [
-                item.get("state") if item else None
-                for item in (ok, error, stale, recovered)
-            ],
-            "success_retained": bool(
-                ok and error and error.get("last_success_at") == ok.get("last_success_at")
-            ),
+            "states": [item.get("state") if item else None for item in (ok, error, stale, recovered)],
+            "success_retained": bool(ok and error and error.get("last_success_at") == ok.get("last_success_at")),
             "value_retained": bool(ok and error and error.get("last_value") == ok.get("last_value")),
         },
         passed,
@@ -1288,9 +1257,7 @@ def _run_s2_06(runner: _Runner) -> AcceptanceResult:
         }
     )
     _, old_detail = runner.get_json(f"/api/requests/{old_id}")
-    old_schema = old_detail.get("gateway_records", [{}])[0].get("policy", {}).get(
-        "schema_version"
-    )
+    old_schema = old_detail.get("gateway_records", [{}])[0].get("policy", {}).get("schema_version")
     blocker = runner.data_dir / "s2-history-blocker"
     blocker.write_text("x", encoding="utf-8")
     runner.start_gateway(_EXAMPLE_POLICY, data_dir=blocker / "sub")
@@ -1327,9 +1294,7 @@ def _s3a_final(runner: _Runner, request_id: str | None) -> dict[str, Any] | None
     )
 
 
-def _collector_source(
-    runner: _Runner, source: str, expected: str
-) -> dict[str, Any] | None:
+def _collector_source(runner: _Runner, source: str, expected: str) -> dict[str, Any] | None:
     _, payload = runner.get_json("/api/collectors")
     return next(
         (
@@ -1356,8 +1321,7 @@ def _run_s3a_01(runner: _Runner) -> AcceptanceResult:
         and final.get("backend_kind") == "vllm"
         # The fake backend answers "fake-<id>", not vLLM's chatcmpl-<id>: never a match.
         and final.get("delivery", {}).get("backend_receipt") == "engine_response_id_mismatch"
-        and detail.get("evidence_summary")
-        == "Gateway 전달·응답 수신, backend 측 수신 기록 미연결"
+        and detail.get("evidence_summary") == "Gateway 전달·응답 수신, backend 측 수신 기록 미연결"
         and not detail.get("engine_receipts")
     )
     return AcceptanceResult(
@@ -1451,8 +1415,7 @@ def _run_s3a_03(runner: _Runner) -> AcceptanceResult:
         and codes == ["MODEL_NOT_ALLOWED", "MAX_TOKENS_EXCEEDED"]
         and runner.fake_backend.request_count == 0
         and all(
-            "Gateway 미전달 확인, backend 미수신은 미확인(증거원 미연결)"
-            == detail.get("evidence_summary")
+            "Gateway 미전달 확인, backend 미수신은 미확인(증거원 미연결)" == detail.get("evidence_summary")
             for detail in details
         )
     )
@@ -1516,11 +1479,7 @@ def _run_s3a_04(runner: _Runner) -> AcceptanceResult:
         request_ids.append(truncated_id)
     truncated_final = _wait_for(lambda: _s3a_final(runner, truncated_id))
     passed = (
-        all(
-            item["http"] == item["expected"][0]
-            and item["code"] == item["expected"][1]
-            for item in observed.values()
-        )
+        all(item["http"] == item["expected"][0] and item["code"] == item["expected"][1] for item in observed.values())
         and observed["http_400"]["result"] == "ENGINE_REJECTED"
         and observed["http_400"]["source"] == "engine"
         and observed["http_401"]["result"] == "ERROR"
@@ -1540,9 +1499,7 @@ def _run_s3a_04(runner: _Runner) -> AcceptanceResult:
             "nonstream": observed,
             "redirect_not_followed": redirect_not_followed,
             "truncated_http": truncated_status,
-            "truncated_final": (
-                truncated_final.get("final_outcome") if truncated_final else None
-            ),
+            "truncated_final": (truncated_final.get("final_outcome") if truncated_final else None),
             "data_origin": "fake_backend_test",
         },
         passed,
@@ -1570,13 +1527,11 @@ def _run_s3a_05(runner: _Runner) -> AcceptanceResult:
         raise RuntimeError("fake backend is not running")
     configured_status, configured_id, _ = runner.post_chat()
     authorization_present = bool(
-        runner.fake_backend.requests
-        and runner.fake_backend.requests[-1].get("authorization_present")
+        runner.fake_backend.requests and runner.fake_backend.requests[-1].get("authorization_present")
     )
     passed = (
         missing_status == 503
-        and missing_body.get("error", {}).get("code")
-        == "BACKEND_CREDENTIAL_MISSING"
+        and missing_body.get("error", {}).get("code") == "BACKEND_CREDENTIAL_MISSING"
         and missing_count == 0
         and configured_status == 200
         and authorization_present
@@ -1614,8 +1569,7 @@ def _run_s3a_06(runner: _Runner) -> AcceptanceResult:
         and info.get("last_value", {}).get("engine.kind") == "vllm"
         and info.get("last_value", {}).get("model.id") == "backend-test-model"
         and metrics is not None
-        and metrics.get("last_value", {}).get("requests.absent", {}).get("state")
-        == "unsupported_or_absent"
+        and metrics.get("last_value", {}).get("requests.absent", {}).get("state") == "unsupported_or_absent"
         and metrics_error is not None
         and inference_status == 200
     )
@@ -1625,15 +1579,11 @@ def _run_s3a_06(runner: _Runner) -> AcceptanceResult:
         "외부 출처 수집 성공→metrics error, 추론 200 유지",
         {
             "health": health.get("state") if health else None,
-            "engine_kind": (
-                info.get("last_value", {}).get("engine.kind") if info else None
-            ),
+            "engine_kind": (info.get("last_value", {}).get("engine.kind") if info else None),
             "model_id": info.get("last_value", {}).get("model.id") if info else None,
             "metrics_before": metrics.get("state") if metrics else None,
             "absent_metric": (
-                metrics.get("last_value", {}).get("requests.absent", {}).get("state")
-                if metrics
-                else None
+                metrics.get("last_value", {}).get("requests.absent", {}).get("state") if metrics else None
             ),
             "metrics_after": metrics_error.get("state") if metrics_error else None,
             "inference_http": inference_status,
@@ -1729,9 +1679,7 @@ def _run_s3a_08(runner: _Runner) -> AcceptanceResult:
             "base_url": "http://127.0.0.1:1",
         }
     ).encode("utf-8")
-    invalid_status, _, invalid_document = runner.json_request(
-        "POST", "/v1/chat/completions", body=invalid_body
-    )
+    invalid_status, _, invalid_document = runner.json_request("POST", "/v1/chat/completions", body=invalid_body)
     runner.start(data_dir=mixed_dir)
     mock_status, mock_id, _ = runner.post_chat()
     _, old_detail = runner.get_json(f"/api/requests/{vllm_id}")
@@ -1813,8 +1761,7 @@ def _run_sgl_01(runner: _Runner) -> AcceptanceResult:
             (
                 item
                 for item in payload.get("requests", [])
-                if item.get("trigger") == "config_drift"
-                and item.get("current_evidence_present") is True
+                if item.get("trigger") == "config_drift" and item.get("current_evidence_present") is True
             ),
             None,
         )
@@ -1825,8 +1772,7 @@ def _run_sgl_01(runner: _Runner) -> AcceptanceResult:
         (
             item
             for item in comparison.get("rows", [])
-            if item.get("source") == "engine_api"
-            and item.get("field") == "engine.kind"
+            if item.get("source") == "engine_api" and item.get("field") == "engine.kind"
         ),
         {},
     )
@@ -1834,8 +1780,7 @@ def _run_sgl_01(runner: _Runner) -> AcceptanceResult:
         (
             item
             for item in comparison.get("rows", [])
-            if item.get("source") == "engine_api"
-            and item.get("field") == "option.max_model_len"
+            if item.get("source") == "engine_api" and item.get("field") == "option.max_model_len"
         ),
         {},
     )
@@ -1905,8 +1850,7 @@ def _run_sgl_02(runner: _Runner) -> AcceptanceResult:
             (
                 item
                 for item in payload.get("requests", [])
-                if item.get("trigger") == "asset_changed"
-                and item.get("current_evidence_present") is True
+                if item.get("trigger") == "asset_changed" and item.get("current_evidence_present") is True
             ),
             None,
         )
@@ -1925,11 +1869,7 @@ def _run_sgl_02(runner: _Runner) -> AcceptanceResult:
         "공통 해시 비교가 변경을 찾고 재검증 요청",
         {
             "initial_intact": intact is not None,
-            "changed_count": (
-                changed.get("last_value", {}).get("counts", {}).get("changed")
-                if changed
-                else None
-            ),
+            "changed_count": (changed.get("last_value", {}).get("counts", {}).get("changed") if changed else None),
             "revalidation": revalidation is not None,
             "verification_level": "fake_sglang_test_only",
         },
@@ -2041,9 +1981,7 @@ def _run_s4_01(runner: _Runner) -> AcceptanceResult:
         actual[label] = {
             "http": status,
             "code": code,
-            "www_authenticate": response_headers.get(
-                "WWW-Authenticate", ""
-            ).startswith("Bearer"),
+            "www_authenticate": response_headers.get("WWW-Authenticate", "").startswith("Bearer"),
             "auth_state": auth.get("state"),
             "principal_id": auth.get("principal_id"),
             "delivery_attempted": delivery_attempted,
@@ -2058,11 +1996,7 @@ def _run_s4_01(runner: _Runner) -> AcceptanceResult:
 
     finals = _finals_in(data_dir)
     allowed = next(
-        (
-            record
-            for record in reversed(finals)
-            if record.get("decision", {}).get("reason_code") == "REQUEST_ALLOWED"
-        ),
+        (record for record in reversed(finals) if record.get("decision", {}).get("reason_code") == "REQUEST_ALLOWED"),
         {},
     )
     stored = (data_dir / "gateway_records.jsonl").read_text(encoding="utf-8")
@@ -2077,9 +2011,7 @@ def _run_s4_01(runner: _Runner) -> AcceptanceResult:
     )
     sensitive_found = any(value in stored or value in status_text for value in sensitive)
     backend_receipts = len(runner.engine.receipts)
-    non_delivery_count = sum(
-        record.get("delivery", {}).get("attempted") is False for record in finals
-    )
+    non_delivery_count = sum(record.get("delivery", {}).get("attempted") is False for record in finals)
     passed = (
         passed
         and actual["missing"]["www_authenticate"]
@@ -2112,17 +2044,11 @@ def _run_s4_02(runner: _Runner) -> AcceptanceResult:
     runner.start(data_dir=data_dir, auth_config_path=auth_path)
     if runner.engine is None:
         raise RuntimeError("backend fixture is not running")
-    inference_status, request_id, body = runner.post_chat(
-        headers={"Authorization": f"Bearer {_S4_INFERENCE_TOKEN}"}
-    )
+    inference_status, request_id, body = runner.post_chat(headers={"Authorization": f"Bearer {_S4_INFERENCE_TOKEN}"})
     status_status, _, status_body = runner.json_request("GET", "/api/status")
     list_status, _, list_body = runner.json_request("GET", "/api/requests")
     final = next(
-        (
-            record
-            for record in reversed(_finals_in(data_dir))
-            if record.get("request_id") == request_id
-        ),
+        (record for record in reversed(_finals_in(data_dir)) if record.get("request_id") == request_id),
         {},
     )
     backend_receipts = len(runner.engine.receipts)
@@ -2196,9 +2122,7 @@ def _run_s4_03(runner: _Runner) -> AcceptanceResult:
     runner.start(data_dir=data_dir, auth_config_path=auth_path)
     if runner.engine is None:
         raise RuntimeError("backend fixture is not running")
-    missing_status, missing_headers, missing_body = runner.json_request(
-        "GET", "/api/status"
-    )
+    missing_status, missing_headers, missing_body = runner.json_request("GET", "/api/status")
     viewer_status, _, viewer_body = runner.json_request(
         "GET",
         "/api/status",
@@ -2240,9 +2164,7 @@ def _run_s4_03(runner: _Runner) -> AcceptanceResult:
     )
 
 
-def _headers_only_chat(
-    runner: _Runner, *, authorization: str | None
-) -> tuple[int, dict[str, str], dict[str, Any]]:
+def _headers_only_chat(runner: _Runner, *, authorization: str | None) -> tuple[int, dict[str, str], dict[str, Any]]:
     if runner.gateway is None:
         raise RuntimeError("gateway is not running")
     connection = http.client.HTTPConnection(*runner.gateway.address, timeout=3)
@@ -2291,9 +2213,7 @@ def _run_s4_04(runner: _Runner) -> AcceptanceResult:
     target_status, target_headers, target_body = _headers_only_chat(
         runner, authorization=f"Bearer {_S4_INFERENCE_TOKEN}"
     )
-    auth_status, auth_headers, auth_body = _headers_only_chat(
-        runner, authorization=None
-    )
+    auth_status, auth_headers, auth_body = _headers_only_chat(runner, authorization=None)
     target_id = target_headers.get("X-Request-ID")
     auth_id = auth_headers.get("X-Request-ID")
     finals = {record.get("request_id"): record for record in _finals_in(data_dir)}
@@ -2416,22 +2336,16 @@ def _run_s4_05(runner: _Runner) -> AcceptanceResult:
                 observation_origin="synthetic",
             )
             running = _wait_for(
-                lambda: _collector_source(
-                    runner, "observation_feed_tetragon", "ok"
-                ),
+                lambda: _collector_source(runner, "observation_feed_tetragon", "ok"),
                 timeout=10.0,
             )
             if running is None:
-                raise RuntimeError(
-                    "S4-05 initial observation collector did not reach ok"
-                )
+                raise RuntimeError("S4-05 initial observation collector did not reach ok")
             started[0].returncode = 0
             supervisor.tick()
             supervisor.write()
             reconnecting = _wait_for(
-                lambda: _collector_source(
-                    runner, "observation_feed_tetragon", "error"
-                ),
+                lambda: _collector_source(runner, "observation_feed_tetragon", "error"),
                 timeout=10.0,
             )
             status_http, status_body = runner.get_json("/api/status")
@@ -2439,18 +2353,13 @@ def _run_s4_05(runner: _Runner) -> AcceptanceResult:
             supervisor.tick()
             supervisor.write()
             recovered = _wait_for(
-                lambda: _collector_source(
-                    runner, "observation_feed_tetragon", "ok"
-                ),
+                lambda: _collector_source(runner, "observation_feed_tetragon", "ok"),
                 timeout=10.0,
             )
             context_calls = context_check.call_count
         helper._stop_children(group)
 
-    gaps = [
-        json.loads(line)
-        for line in gap_path.read_text(encoding="utf-8").splitlines()
-    ]
+    gaps = [json.loads(line) for line in gap_path.read_text(encoding="utf-8").splitlines()]
     backend_receipts = len(runner.engine.receipts) if runner.engine else -1
     gateway_records = len(_records_in(data_dir))
     writer = (recovered or {}).get("last_value", {}).get("writer", {})
@@ -2459,10 +2368,8 @@ def _run_s4_05(runner: _Runner) -> AcceptanceResult:
         and reconnecting is not None
         and "reconnecting" in str(reconnecting.get("last_error"))
         and status_http == 200
-        and status_body.get("collectors", {}).get("observation_feed_tetragon")
-        == "error"
-        and [item.get("schema") for item in gaps]
-        == [helper.GAP_SCHEMA, helper.GAP_SCHEMA]
+        and status_body.get("collectors", {}).get("observation_feed_tetragon") == "error"
+        and [item.get("schema") for item in gaps] == [helper.GAP_SCHEMA, helper.GAP_SCHEMA]
         and [item.get("event") for item in gaps] == ["gap_opened", "gap_closed"]
         and recovered is not None
         and writer.get("reconnect_count") == 1
@@ -2480,16 +2387,14 @@ def _run_s4_05(runner: _Runner) -> AcceptanceResult:
         {
             "initial_collector": (running or {}).get("state"),
             "reconnecting_collector": (reconnecting or {}).get("state"),
-            "gateway_observation_state": status_body.get("collectors", {}).get(
-                "observation_feed_tetragon"
-            ),
+            "gateway_observation_state": status_body.get("collectors", {}).get("observation_feed_tetragon"),
             "gap_events": [item.get("event") for item in gaps],
             "gap_schemas": [item.get("schema") for item in gaps],
             "recovered_collector": (recovered or {}).get("state"),
             "reconnect_count": writer.get("reconnect_count"),
-            "backfill_requested": any(
-                part.startswith("--since-time=") for part in commands[1]
-            ) if len(commands) > 1 else False,
+            "backfill_requested": any(part.startswith("--since-time=") for part in commands[1])
+            if len(commands) > 1
+            else False,
             "backend_receipts": backend_receipts,
             "gateway_request_records": gateway_records,
             "real_kubectl_executed": False,
@@ -2502,11 +2407,7 @@ def _run_s4_05(runner: _Runner) -> AcceptanceResult:
 def _run_s4_06(runner: _Runner) -> AcceptanceResult:
     data_dir = runner.data_dir / "s4-06"
     policy_path = runner.data_dir / "s4-06-policy.json"
-    document = json.loads(
-        (_ROOT / "examples" / "mvp" / "policy-v1.2-zeroday-lab.json").read_text(
-            encoding="utf-8"
-        )
-    )
+    document = json.loads((_ROOT / "examples" / "mvp" / "policy-v1.2-zeroday-lab.json").read_text(encoding="utf-8"))
     document["max_n"] = 2
     policy_path.write_text(json.dumps(document), encoding="utf-8")
     runner.start_vllm(policy_path=policy_path, data_dir=data_dir)
@@ -2523,9 +2424,7 @@ def _run_s4_06(runner: _Runner) -> AcceptanceResult:
             "cache_salt": marker,
         }
     ).encode("utf-8")
-    normal_status, normal_headers, _ = runner.json_request(
-        "POST", "/v1/chat/completions", body=normal_body
-    )
+    normal_status, normal_headers, _ = runner.json_request("POST", "/v1/chat/completions", body=normal_body)
     normal_id = normal_headers.get("X-Request-ID")
     rejected_body = json.dumps(
         {
@@ -2544,8 +2443,11 @@ def _run_s4_06(runner: _Runner) -> AcceptanceResult:
     normal_final = _final_record(runner, normal_id) if normal_id else {}
     rejected_final = _final_record(runner, rejected_id) if rejected_id else {}
     upstream_id = normal_final.get("upstream_request_id") if normal_final else None
-    normal_matches = [item for item in runner.fake_backend.requests
-                      if upstream_id is not None and item.get("request_id") == upstream_id]
+    normal_matches = [
+        item
+        for item in runner.fake_backend.requests
+        if upstream_id is not None and item.get("request_id") == upstream_id
+    ]
     normal_received = normal_matches[0] if len(normal_matches) == 1 else {}
     stored = (data_dir / "gateway_records.jsonl").read_text(encoding="utf-8")
     backend_count = runner.fake_backend.request_count
@@ -2582,18 +2484,14 @@ def _run_s4_06(runner: _Runner) -> AcceptanceResult:
                 and values.get("cache_salt") == marker
                 and normal_received.get("n") == 2
             ),
-            "recorded_extra_fields": normal_final.get("request", {}).get(
-                "extra_fields"
-            ),
+            "recorded_extra_fields": normal_final.get("request", {}).get("extra_fields"),
             "recorded_n": normal_final.get("request", {}).get("n"),
             "value_found_in_gateway_records": marker in stored,
             "rejected": [
                 rejected_status,
                 rejected_document.get("error", {}).get("code"),
             ],
-            "rejected_delivery_attempted": rejected_final.get("delivery", {}).get(
-                "attempted"
-            ),
+            "rejected_delivery_attempted": rejected_final.get("delivery", {}).get("attempted"),
             "backend_chat_count": backend_count,
         },
         passed,
@@ -2609,9 +2507,10 @@ def execute_acceptance(data_dir: Path) -> list[AcceptanceResult]:
     try:
         runner.start()
         demo_results = run_demo_cases(runner.base_url)
-        results.extend(_demo_group(case_id, demo_results) for case_id in (
-            "MVP-01", "MVP-02", "MVP-03", "MVP-04", "MVP-05", "MVP-06"
-        ))
+        results.extend(
+            _demo_group(case_id, demo_results)
+            for case_id in ("MVP-01", "MVP-02", "MVP-03", "MVP-04", "MVP-05", "MVP-06")
+        )
         results.append(_run_07(runner))
         results.append(_run_08(runner))
         results.append(_run_09(runner))
@@ -2673,15 +2572,9 @@ def write_reports(
         "python_version": platform.python_version(),
         "os": platform.platform(),
         "data_dir": str(data_dir),
-        "s3a_backend_fixture": (
-            "fake_backend_test; this report does not contain a real vLLM execution"
-        ),
-        "s4_06_backend_fixture": (
-            "fake_backend_test; this report does not contain a real vLLM execution"
-        ),
-        "sglang_backend_fixture": (
-            "fake_sglang_test_only; this report does not contain a real SGLang execution"
-        ),
+        "s3a_backend_fixture": ("fake_backend_test; this report does not contain a real vLLM execution"),
+        "s4_06_backend_fixture": ("fake_backend_test; this report does not contain a real vLLM execution"),
+        "sglang_backend_fixture": ("fake_sglang_test_only; this report does not contain a real SGLang execution"),
         "passed": all(result.passed for result in results),
         "cases": [asdict(result) for result in results],
     }
@@ -2705,14 +2598,18 @@ def write_reports(
     ]
     for result in results:
         lines.append(
-            "| " + " | ".join((
-                result.case_id,
-                _md(result.command),
-                _md(result.expected),
-                _md(result.actual),
-                "통과" if result.passed else "실패",
-                "<br>".join(result.evidence_request_ids) or "–",
-            )) + " |"
+            "| "
+            + " | ".join(
+                (
+                    result.case_id,
+                    _md(result.command),
+                    _md(result.expected),
+                    _md(result.actual),
+                    "통과" if result.passed else "실패",
+                    "<br>".join(result.evidence_request_ids) or "–",
+                )
+            )
+            + " |"
         )
     md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return json_path, md_path

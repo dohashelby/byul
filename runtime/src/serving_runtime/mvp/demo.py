@@ -78,16 +78,33 @@ def demo_cases() -> list[DemoCase]:
         "messages": [{"role": "user", "content": "demo"}],
     }
     return [
-        DemoCase("MVP-01", "정상 요청", 200, "ALLOWED", _json_body(),
-                 expected_evidence_state="received"),
+        DemoCase("MVP-01", "정상 요청", 200, "ALLOWED", _json_body(), expected_evidence_state="received"),
         DemoCase("MVP-02a", "상한값 128 허용", 200, "ALLOWED", _json_body(max_tokens=128)),
-        DemoCase("MVP-02b", "상한 초과 129 거부", 403, "DENIED", _json_body(max_tokens=129),
-                 expected_evidence_state="not_received"),
+        DemoCase(
+            "MVP-02b",
+            "상한 초과 129 거부",
+            403,
+            "DENIED",
+            _json_body(max_tokens=129),
+            expected_evidence_state="not_received",
+        ),
         DemoCase("MVP-03", "거부 직후 정상 요청", 200, "ALLOWED", _json_body()),
-        DemoCase("MVP-04", "미허용 모델 거부", 403, "DENIED",
-                 _json_body(model="other-model"), expected_rule_id="allowed_models"),
-        DemoCase("MVP-05a", "max_tokens 생략 시 기본값", 200, "ALLOWED",
-                 json.dumps(without_max_tokens).encode("utf-8"), expected_max_tokens=128),
+        DemoCase(
+            "MVP-04",
+            "미허용 모델 거부",
+            403,
+            "DENIED",
+            _json_body(model="other-model"),
+            expected_rule_id="allowed_models",
+        ),
+        DemoCase(
+            "MVP-05a",
+            "max_tokens 생략 시 기본값",
+            200,
+            "ALLOWED",
+            json.dumps(without_max_tokens).encode("utf-8"),
+            expected_max_tokens=128,
+        ),
         DemoCase("MVP-05b", "max_tokens 0 거부", 400, "INVALID", _json_body(max_tokens=0)),
         DemoCase("MVP-05c", "max_tokens -1 거부", 400, "INVALID", _json_body(max_tokens=-1)),
         DemoCase("MVP-05d", "max_tokens 문자열 거부", 400, "INVALID", _json_body(max_tokens="64")),
@@ -95,10 +112,8 @@ def demo_cases() -> list[DemoCase]:
         DemoCase("MVP-06a", "stream 타입 오류", 400, "INVALID", _json_body(stream="true")),
         DemoCase("MVP-06b", "미지원 필드 거부", 400, "INVALID", _json_body(unsupported="x")),
         DemoCase("MVP-06c", "70,000바이트 본문 거부", 413, "INVALID", b"x" * 70000),
-        DemoCase("MVP-06d", "text/plain 거부", 415, "INVALID", _json_body(),
-                 content_type="text/plain"),
-        DemoCase("S1-DEMO", "stream 정상 완료", 200, "ALLOWED", _json_body(stream=True),
-                 expected_done=True),
+        DemoCase("MVP-06d", "text/plain 거부", 415, "INVALID", _json_body(), content_type="text/plain"),
+        DemoCase("S1-DEMO", "stream 정상 완료", 200, "ALLOWED", _json_body(stream=True), expected_done=True),
     ]
 
 
@@ -123,8 +138,7 @@ def evaluate_case(
     final_record = None
     if isinstance(records, list):
         final_record = next(
-            (item for item in reversed(records)
-             if isinstance(item, dict) and item.get("phase") == "final"),
+            (item for item in reversed(records) if isinstance(item, dict) and item.get("phase") == "final"),
             None,
         )
     decision = final_record.get("decision") if isinstance(final_record, dict) else None
@@ -139,15 +153,11 @@ def evaluate_case(
     if actual_result != case.expected_result:
         failures.append(f"결과 {case.expected_result} 기대, 실제 {actual_result or '없음'}")
     if case.expected_evidence_state and evidence_state != case.expected_evidence_state:
-        failures.append(
-            f"증거 {case.expected_evidence_state} 기대, 실제 {evidence_state or '없음'}"
-        )
+        failures.append(f"증거 {case.expected_evidence_state} 기대, 실제 {evidence_state or '없음'}")
     if case.expected_rule_id and rule_id != case.expected_rule_id:
         failures.append(f"규칙 {case.expected_rule_id} 기대, 실제 {rule_id or '없음'}")
     if case.expected_max_tokens is not None and max_tokens != case.expected_max_tokens:
-        failures.append(
-            f"max_tokens {case.expected_max_tokens} 기대, 실제 {max_tokens!r}"
-        )
+        failures.append(f"max_tokens {case.expected_max_tokens} 기대, 실제 {max_tokens!r}")
     if case.expected_done and saw_done is not True:
         failures.append("SSE [DONE] 종료 표식 없음")
     return DemoResult(
@@ -174,9 +184,7 @@ def _read_json(response: Any) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-def _post_case(
-    gateway: str, case: DemoCase, timeout: float
-) -> tuple[int, str | None, bool | None]:
+def _post_case(gateway: str, case: DemoCase, timeout: float) -> tuple[int, str | None, bool | None]:
     try:
         request = Request(
             f"{gateway}/v1/chat/completions",
@@ -240,9 +248,7 @@ def _timestamp() -> tuple[str, str]:
     return now.isoformat(), now.strftime("%Y%m%dT%H%M%S.%fZ")
 
 
-def write_demo_report(
-    data_dir: str | Path, gateway: str, results: list[DemoResult]
-) -> Path:
+def write_demo_report(data_dir: str | Path, gateway: str, results: list[DemoResult]) -> Path:
     executed_at, filename = _timestamp()
     output_dir = Path(data_dir).expanduser() / "demo-runs"
     output_dir.mkdir(mode=0o700, parents=True, exist_ok=True)

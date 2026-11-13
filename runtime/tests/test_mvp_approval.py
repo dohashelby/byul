@@ -235,9 +235,7 @@ class ApprovalGatewayTests(unittest.TestCase):
             data_dir=str(self.directory / "data"),
         )
         try:
-            self.gateway = GatewayApp(
-                config, load_policy(self.policy_path), self.engine.address
-            ).start()
+            self.gateway = GatewayApp(config, load_policy(self.policy_path), self.engine.address).start()
         except PermissionError as error:
             self.skipTest(f"local sockets are unavailable: {error}")
         self.addCleanup(self.gateway.stop)

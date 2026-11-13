@@ -65,9 +65,7 @@ class CompletionRouteTests(unittest.TestCase):
             auth_config_path=str(auth_path) if auth_path else None,
         )
         try:
-            self.gateway = GatewayApp(
-                config, load_policy(POLICY), self.engine.address
-            ).start()
+            self.gateway = GatewayApp(config, load_policy(POLICY), self.engine.address).start()
         except PermissionError as error:
             self.skipTest(f"local sockets are unavailable: {error}")
         self.addCleanup(self.gateway.stop)
@@ -146,16 +144,14 @@ class CompletionRouteTests(unittest.TestCase):
         )
         for document in invalid:
             with self.subTest(document=document):
-                self.assertFalse(
-                    validate_completion_response(json.dumps(document).encode())
-                )
+                self.assertFalse(validate_completion_response(json.dumps(document).encode()))
 
     def test_completion_stream_validation_requires_text_chunks_and_final_done(self) -> None:
         chunk = b'data: {"choices":[{"text":"ok"}]}\n\ndata: [DONE]\n\n'
         self.assertTrue(validate_completion_stream(chunk))
         for payload in (
             b'data: {"choices":[{"text":1}]}\n\ndata: [DONE]\n\n',
-            b'data: {broken}\n\ndata: [DONE]\n\n',
+            b"data: {broken}\n\ndata: [DONE]\n\n",
             b'data: {"choices":[{"text":"ok"}]}\n\n',
             b'data: [DONE]\n\ndata: {"choices":[{"text":"late"}]}\n\n',
         ):

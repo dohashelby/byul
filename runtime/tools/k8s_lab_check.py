@@ -18,7 +18,8 @@ import time
 from typing import Any, BinaryIO, Callable, Sequence
 
 from serving_runtime.enforcement.cilium import (
-    render_manifests as render_cilium_manifests, write_manifests,
+    render_manifests as render_cilium_manifests,
+    write_manifests,
 )
 from serving_runtime.enforcement.events import transform_lines
 from serving_runtime.enforcement.intent import load_intent, parse_intent
@@ -30,6 +31,7 @@ from serving_runtime.mvp.kube_context import (
     validate_kube_context,
 )
 from serving_runtime.mvp.lab_report import LabReportSource
+
 try:
     from tools.tetragon_mode import switch_mode
     from tools.tetragon_trial import atomic_json
@@ -43,9 +45,7 @@ REPORT_SCHEMA = "serving-runtime-k8s-lab-report/1.0"
 PROBE_ATTEMPTS = 5
 DEFAULT_TETRAGON_WAIT = 90.0
 TETRAGON_POLL_INTERVAL = 5.0
-L05_MEASUREMENT_NOTE = (
-    "적용 직후 측정; 이전 관측에서 시간 경과 후 불일치 사례 있음"
-)
+L05_MEASUREMENT_NOTE = "적용 직후 측정; 이전 관측에서 시간 경과 후 불일치 사례 있음"
 TETRAGON_EXPORT_REMEDIATION = (
     "helm upgrade tetragon cilium/tetragon --version 1.7.1 -n kube-system "
     "--reuse-values -f deploy/lab/tetragon-values.yaml"
@@ -290,9 +290,7 @@ def sanitize_text(value: str, *, limit: int = 2000) -> str:
     """Redact common credential shapes and bound report output size."""
 
     cleaned = _BEARER.sub("Bearer [REDACTED]", value)
-    cleaned = _SENSITIVE_VALUE.sub(
-        lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]", cleaned
-    )
+    cleaned = _SENSITIVE_VALUE.sub(lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]", cleaned)
     if len(cleaned) > limit:
         return cleaned[:limit] + f"\n...[{len(cleaned) - limit} characters omitted]"
     return cleaned
@@ -310,9 +308,7 @@ def sanitize_value(value: Any) -> Any:
     return value
 
 
-def kubectl_command(
-    context: str, namespace: str | None, *arguments: str
-) -> list[str]:
+def kubectl_command(context: str, namespace: str | None, *arguments: str) -> list[str]:
     command = ["kubectl", "--context", context]
     if namespace is not None:
         command.extend(["--namespace", namespace])
@@ -356,11 +352,7 @@ def parse_running_pod(output: str) -> str:
         if not isinstance(metadata, dict) or not isinstance(status, dict):
             continue
         name = metadata.get("name")
-        if (
-            isinstance(name, str)
-            and status.get("phase") == "Running"
-            and metadata.get("deletionTimestamp") is None
-        ):
+        if isinstance(name, str) and status.get("phase") == "Running" and metadata.get("deletionTimestamp") is None:
             names.append(name)
     if not names:
         raise ValueError("no Running pod matched the requested label")
@@ -411,9 +403,7 @@ def export_denylist_blocks_empty_namespace(output: str) -> bool:
         try:
             rule = json.loads(line)
         except json.JSONDecodeError as error:
-            raise ValueError(
-                f"tetragon-config export-denylist line {line_number} is not JSON"
-            ) from error
+            raise ValueError(f"tetragon-config export-denylist line {line_number} is not JSON") from error
         namespaces = rule.get("namespace") if isinstance(rule, dict) else None
         if isinstance(namespaces, list) and "" in namespaces:
             return True
@@ -437,9 +427,7 @@ def parse_tracingpolicy_nenforce(output: str, policy_name: str) -> int:
             try:
                 return int(raw_value)
             except ValueError as error:
-                raise ValueError(
-                    f"NENFORCE for {policy_name} is not an integer"
-                ) from error
+                raise ValueError(f"NENFORCE for {policy_name} is not an integer") from error
         break
     raise ValueError(f"NENFORCE for {policy_name} was not found")
 
@@ -512,7 +500,12 @@ def matches_tetragon_file_observation(
 
 
 def evaluate_l05b_phase(
-    raw_lines: Sequence[str], *, since: str, pod_uid: str, namespace: str, action: str,
+    raw_lines: Sequence[str],
+    *,
+    since: str,
+    pod_uid: str,
+    namespace: str,
+    action: str,
     policy_name: str = "runtime-tg-secret-01",
     mask: int | None = 4,
 ) -> bool:
@@ -528,7 +521,9 @@ def evaluate_l05b_phase(
             args = event["args"]
             observed = _parse_observed_at(root.get("time"))
             if (
-                start is not None and observed is not None and observed >= start
+                start is not None
+                and observed is not None
+                and observed >= start
                 and event.get("policy_name") == policy_name
                 and event.get("action", "").upper() == action
                 and pod.get("uid") == pod_uid
@@ -615,19 +610,14 @@ def evaluate_l04_observations(
         "asset": bool(asset_matches),
         "secret": bool(secret_matches),
         "exec": bool(exec_matches),
-        "pod_attribution_unavailable": any(
-            item.get("pod_attribution") == "unavailable" for item in file_matches
-        ),
+        "pod_attribution_unavailable": any(item.get("pod_attribution") == "unavailable" for item in file_matches),
         "process_attribution_unavailable": any(
-            item.get("process_attribution") == "unavailable"
-            for item in file_matches
+            item.get("process_attribution") == "unavailable" for item in file_matches
         ),
     }
 
 
-def wait_for_local_port(
-    host: str, port: int, process: subprocess.Popen[bytes], timeout: float
-) -> bool:
+def wait_for_local_port(host: str, port: int, process: subprocess.Popen[bytes], timeout: float) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if process.poll() is not None:
@@ -725,10 +715,7 @@ class LabChecker:
 
     def assert_safe_context(self) -> None:
         if self.context != EXPECTED_CONTEXT and not self.allow_non_kind_context:
-            raise ContextSafetyError(
-                "kind-runtime-lab 이외 context는 "
-                "--allow-non-kind-context를 함께 지정해야 합니다"
-            )
+            raise ContextSafetyError("kind-runtime-lab 이외 context는 --allow-non-kind-context를 함께 지정해야 합니다")
         self.current_context = self.context
 
     def _record_run(
@@ -773,9 +760,7 @@ class LabChecker:
             summarize_output=summarize_output,
         )
 
-    def _runtime(
-        self, case: dict[str, Any], *arguments: str, timeout: float = 30
-    ) -> ProcessResult:
+    def _runtime(self, case: dict[str, Any], *arguments: str, timeout: float = 30) -> ProcessResult:
         return self._record_run(
             case,
             [sys.executable, "-m", "serving_runtime", *arguments],
@@ -783,9 +768,7 @@ class LabChecker:
         )
 
     def _pod(self, case: dict[str, Any], label: str) -> str:
-        result = self._kubectl(
-            case, "get", "pods", "--selector", f"app={label}", "-o", "json"
-        )
+        result = self._kubectl(case, "get", "pods", "--selector", f"app={label}", "-o", "json")
         if result.returncode != 0:
             raise RuntimeError(f"could not list pod for app={label}")
         return parse_running_pod(result.stdout)
@@ -797,9 +780,7 @@ class LabChecker:
         *arguments: str,
         timeout: float = 15,
     ) -> ProcessResult:
-        return self._kubectl(
-            case, "exec", pod, "--", *arguments, timeout=timeout
-        )
+        return self._kubectl(case, "exec", pod, "--", *arguments, timeout=timeout)
 
     def _apply(self, case: dict[str, Any], path: Path) -> ProcessResult:
         result = self._kubectl(case, "apply", "-f", str(path), timeout=30)
@@ -825,9 +806,7 @@ class LabChecker:
             if not isinstance(kind, str) or not isinstance(name, str):
                 raise RuntimeError(f"관리 정책 식별자 오류: {filename}")
             if namespace != self.namespace:
-                raise RuntimeError(
-                    f"관리 정책 namespace 불일치: {filename} ({namespace!r})"
-                )
+                raise RuntimeError(f"관리 정책 namespace 불일치: {filename} ({namespace!r})")
             reference = (kind, name)
             if reference not in references:
                 references.append(reference)
@@ -859,9 +838,7 @@ class LabChecker:
         evidence = self.pre_run_cleanup
         try:
             managed = self._managed_policy_refs()
-            evidence["managed_policies"] = [
-                f"{kind}/{name}" for kind, name in managed
-            ]
+            evidence["managed_policies"] = [f"{kind}/{name}" for kind, name in managed]
             managed_by_kind: dict[str, set[str]] = {}
             for kind, name in managed:
                 managed_by_kind.setdefault(kind, set()).add(name)
@@ -872,22 +849,15 @@ class LabChecker:
                 result = self._kubectl(evidence, "get", kind, "-o", "json")
                 if result.returncode != 0:
                     raise RuntimeError(f"실행 전 {kind} 조회 실패 (rc={result.returncode})")
-                for name in self._listed_policy_names(
-                    result.stdout, kind, self.namespace
-                ):
+                for name in self._listed_policy_names(result.stdout, kind, self.namespace):
                     target = (kind, name)
                     if name in managed_names:
                         found.append(target)
                     else:
                         unmanaged.append(target)
 
-            evidence["found_policies"] = [
-                f"{kind}/{name}" for kind, name in found
-            ]
-            evidence["warnings"] = [
-                f"관리 대상 외 정책은 삭제하지 않음: {kind}/{name}"
-                for kind, name in unmanaged
-            ]
+            evidence["found_policies"] = [f"{kind}/{name}" for kind, name in found]
+            evidence["warnings"] = [f"관리 대상 외 정책은 삭제하지 않음: {kind}/{name}" for kind, name in unmanaged]
             for kind, name in found:
                 result = self._kubectl(
                     evidence,
@@ -900,17 +870,12 @@ class LabChecker:
                     timeout=70,
                 )
                 if result.returncode != 0:
-                    raise RuntimeError(
-                        f"실행 전 정책 삭제 실패: {kind}/{name} "
-                        f"(rc={result.returncode})"
-                    )
+                    raise RuntimeError(f"실행 전 정책 삭제 실패: {kind}/{name} (rc={result.returncode})")
                 evidence["deleted_policies"].append(f"{kind}/{name}")
 
             evidence["status"] = "passed"
             if found:
-                evidence["summary"] = (
-                    f"이전 실행의 관리 정책 {len(found)}개 삭제 완료"
-                )
+                evidence["summary"] = f"이전 실행의 관리 정책 {len(found)}개 삭제 완료"
             else:
                 evidence["summary"] = "이전 실행의 관리 정책 잔여 없음"
         except Exception as error:
@@ -975,8 +940,7 @@ class LabChecker:
         )
         if result.returncode != 0:
             case["limitation"] = (
-                "tetragon-config export-denylist를 읽지 못해 빈 namespace 제외 여부를 "
-                "사전 확인하지 못함"
+                "tetragon-config export-denylist를 읽지 못해 빈 namespace 제외 여부를 사전 확인하지 못함"
             )
             return False
         try:
@@ -991,9 +955,7 @@ class LabChecker:
                 "Tetragon pod_info 연결 실패 시 namespace가 빈 이벤트가 현재 "
                 "export-denylist에 의해 내보내지지 않아 L-04를 실행할 수 없음",
             )
-            case["limitation"] = (
-                "tetragon-config export-denylist가 빈 namespace(\"\")를 제외함"
-            )
+            case["limitation"] = 'tetragon-config export-denylist가 빈 namespace("")를 제외함'
             case["remediation"] = TETRAGON_EXPORT_REMEDIATION
         return blocked
 
@@ -1051,9 +1013,7 @@ class LabChecker:
             "gateway": self._pod(case, "serving-gateway"),
             "other": self._pod(case, "other-client"),
         }
-        direct = self._retry(
-            lambda: self._direct_engine_request(case), self._is_http_200
-        )
+        direct = self._retry(lambda: self._direct_engine_request(case), self._is_http_200)
         gateway = self._retry(lambda: self._gateway_request(case), self._is_http_200)
         if self._is_http_200(direct) and self._is_http_200(gateway):
             self._set(case, "passed", "정책 전 엔진 직통과 Gateway 요청이 모두 HTTP 200")
@@ -1093,15 +1053,11 @@ class LabChecker:
             lambda result: result.returncode != 0,
         )
         engine_dns = self._retry(
-            lambda: self._exec(
-                case, self.pods["engine"], "python", "-c", DNS_SCRIPT
-            ),
+            lambda: self._exec(case, self.pods["engine"], "python", "-c", DNS_SCRIPT),
             lambda result: result.returncode != 0,
         )
         gateway_dns = self._retry(
-            lambda: self._exec(
-                case, self.pods["gateway"], "python", "-c", DNS_SCRIPT
-            ),
+            lambda: self._exec(case, self.pods["gateway"], "python", "-c", DNS_SCRIPT),
             lambda result: result.returncode == 0,
         )
         gateway_ok = self._is_http_200(gateway)
@@ -1183,9 +1139,7 @@ class LabChecker:
         dropped = [
             item
             for item in load_observations(self.observations_path)
-            if item.get("source") == "hubble"
-            and item.get("verdict") == "dropped"
-            and item.get("data_origin") == "real"
+            if item.get("source") == "hubble" and item.get("verdict") == "dropped" and item.get("data_origin") == "real"
         ]
         if ingest.returncode == 0 and dropped:
             self._set(
@@ -1222,9 +1176,7 @@ class LabChecker:
             MODEL_WRITE_SCRIPT,
             asset_path,
         )
-        read = self._exec(
-            case, self.pods["engine"], "python", "-c", SECRET_READ_SCRIPT
-        )
+        read = self._exec(case, self.pods["engine"], "python", "-c", SECRET_READ_SCRIPT)
         exec_prep = self._exec(
             case,
             self.pods["engine"],
@@ -1234,9 +1186,7 @@ class LabChecker:
             exec_path,
         )
         outside_exec = self._exec(case, self.pods["engine"], exec_path)
-        if any(
-            item.returncode != 0 for item in (write, read, exec_prep, outside_exec)
-        ):
+        if any(item.returncode != 0 for item in (write, read, exec_prep, outside_exec)):
             raise RuntimeError("Tetragon monitor-mode probe operation failed")
         tetragon_path = self.raw_dir / "tetragon-monitor.jsonl"
 
@@ -1295,8 +1245,7 @@ class LabChecker:
             unavailable.append("process")
         if unavailable:
             case["limitation"] = (
-                f"Tetragon {'·'.join(unavailable)} 귀속 불가 — "
-                "kprobe는 policy_name·경로·접근 종류·시각으로 판정"
+                f"Tetragon {'·'.join(unavailable)} 귀속 불가 — kprobe는 policy_name·경로·접근 종류·시각으로 판정"
             )
         asset = result["asset"]
         secret = result["secret"]
@@ -1331,18 +1280,14 @@ class LabChecker:
         *,
         path: Path,
         since: str,
-        expected_events: Callable[
-            [Sequence[dict[str, Any]]], dict[str, bool]
-        ] | None = None,
+        expected_events: Callable[[Sequence[dict[str, Any]]], dict[str, bool]] | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """Collect deduplicated export logs until expected events appear or timeout."""
 
         unique_lines: list[str] = []
         seen_lines: set[str] = set()
         elapsed = 0.0
-        first_seen: dict[str, float | None] = {
-            name: None for name in (expected_events([]) if expected_events else {})
-        }
+        first_seen: dict[str, float | None] = {name: None for name in (expected_events([]) if expected_events else {})}
         observations: list[dict[str, Any]] = []
         collected = False
         while True:
@@ -1407,9 +1352,7 @@ class LabChecker:
         attempts: list[dict[str, Any]] = []
         for attempt_number in range(1, PROBE_ATTEMPTS + 1):
             before = self._tracingpolicy_nenforce(case, policy_name)
-            probe = self._exec(
-                case, self.pods["engine"], "python", "-c", PROBE_WRITE_SCRIPT
-            )
+            probe = self._exec(case, self.pods["engine"], "python", "-c", PROBE_WRITE_SCRIPT)
             probes.append(probe)
             self.sleep(1)
             after = self._tracingpolicy_nenforce(case, policy_name)
@@ -1430,9 +1373,7 @@ class LabChecker:
                 }
             )
         case["attempts"] = attempts
-        normal = self._exec(
-            case, self.pods["engine"], "python", "-c", NORMAL_WRITE_SCRIPT
-        )
+        normal = self._exec(case, self.pods["engine"], "python", "-c", NORMAL_WRITE_SCRIPT)
         self.sleep(1)
         probe_log = self.raw_dir / "tetragon-deny-probe.jsonl"
         logs = self._kubectl(
@@ -1452,17 +1393,11 @@ class LabChecker:
         evidence = [probe_log]
         classification = classify_probe_results(probes)
         counts = ", ".join(
-            f"#{item['attempt']} {item['result']} "
-            f"NENFORCE {item['nenforce_before']}→{item['nenforce_after']}"
+            f"#{item['attempt']} {item['result']} NENFORCE {item['nenforce_before']}→{item['nenforce_after']}"
             for item in attempts
         )
-        if any(
-            item["nenforce_before"] is None or item["nenforce_after"] is None
-            for item in attempts
-        ):
-            case["limitation"] = (
-                "일부 시도의 tetra tracingpolicy list NENFORCE 값을 읽지 못함"
-            )
+        if any(item["nenforce_before"] is None or item["nenforce_after"] is None for item in attempts):
+            case["limitation"] = "일부 시도의 tetra tracingpolicy list NENFORCE 값을 읽지 못함"
         if logs.returncode != 0:
             self._set(
                 case,
@@ -1517,9 +1452,7 @@ class LabChecker:
         manifest["metadata"]["name"] = policy_name
         trial_path = trial_dir / "tetragon-tg-secret-01.json"
         write_manifests({"tetragon-tg-secret-01.json": manifest}, trial_dir)
-        uid_result = self._kubectl(
-            case, "get", "pod", self.pods["engine"], "-o", "jsonpath={.metadata.uid}"
-        )
+        uid_result = self._kubectl(case, "get", "pod", self.pods["engine"], "-o", "jsonpath={.metadata.uid}")
         pod_uid = uid_result.stdout.strip() if uid_result.returncode == 0 else ""
         if not pod_uid:
             self._set(case, "unknown", "엔진 Pod UID를 확인하지 못함")
@@ -1543,28 +1476,41 @@ class LabChecker:
                 ("enforce", "enforce", "KPROBE_ACTION_OVERRIDE"),
                 ("restored", "monitor", "KPROBE_ACTION_POST"),
             ):
-                switched = switch_mode(self.context, self.namespace, policy_name, mode, run=run_mode, history_path=self.state_dir / "transitions.jsonl")
+                switched = switch_mode(
+                    self.context,
+                    self.namespace,
+                    policy_name,
+                    mode,
+                    run=run_mode,
+                    history_path=self.state_dir / "transitions.jsonl",
+                )
                 if not switched["ok"]:
-                    self._set(case, "failed" if switched.get("rollback_ok") is False else "unknown",
-                              f"{label} 정책 모드 전환·되돌림 미확인", evidence)
+                    self._set(
+                        case,
+                        "failed" if switched.get("rollback_ok") is False else "unknown",
+                        f"{label} 정책 모드 전환·되돌림 미확인",
+                        evidence,
+                    )
                     break
                 if label == "restored":
                     restored = True
                 since = utc_now()
-                read = self._exec(
-                    case, self.pods["engine"], "python", "-c", SECRET_READ_ERRNO_SCRIPT
-                )
+                read = self._exec(case, self.pods["engine"], "python", "-c", SECRET_READ_ERRNO_SCRIPT)
                 normal = self._gateway_request(case) if label == "enforce" else None
                 raw_path = self.raw_dir / f"l05b-{label}.jsonl"
                 try:
                     _observations, wait = self._collect_tetragon_logs(
-                        case, path=raw_path, since=since,
-                        expected_events=lambda items: {"rule_action": any(
-                            item.get("rule_id") == "TG-SECRET-01"
-                            and item.get("path") == SECRET_PROBE_PATH
-                            and item.get("action_raw", "").upper() == action
-                            for item in items
-                        )},
+                        case,
+                        path=raw_path,
+                        since=since,
+                        expected_events=lambda items: {
+                            "rule_action": any(
+                                item.get("rule_id") == "TG-SECRET-01"
+                                and item.get("path") == SECRET_PROBE_PATH
+                                and item.get("action_raw", "").upper() == action
+                                for item in items
+                            )
+                        },
                     )
                 except RuntimeError:
                     self._set(case, "unknown", f"{label} 구간 Tetragon 로그 수집 불가", evidence)
@@ -1572,7 +1518,10 @@ class LabChecker:
                 evidence.append(raw_path)
                 event_found = evaluate_l05b_phase(
                     raw_path.read_text(encoding="utf-8").splitlines(),
-                    since=since, pod_uid=pod_uid, namespace=self.namespace, action=action,
+                    since=since,
+                    pod_uid=pod_uid,
+                    namespace=self.namespace,
+                    action=action,
                     policy_name=policy_name,
                 )
                 try:
@@ -1581,13 +1530,17 @@ class LabChecker:
                     outcome = {}
                 read_ok = read.returncode == 0 and outcome.get("read") == "ok"
                 denied = read.returncode == 13 and outcome.get("errno") == 1 and outcome.get("name") == "EPERM"
-                steps.append({
-                    "phase": label, "read_returncode": read.returncode,
-                    "read_result": outcome, "event_matched": event_found,
-                    "tetragon_wait": wait,
-                    "policy_id": switched["after"]["id"],
-                    "normal_request_200": self._is_http_200(normal) if normal is not None else None,
-                })
+                steps.append(
+                    {
+                        "phase": label,
+                        "read_returncode": read.returncode,
+                        "read_result": outcome,
+                        "event_matched": event_found,
+                        "tetragon_wait": wait,
+                        "policy_id": switched["after"]["id"],
+                        "normal_request_200": self._is_http_200(normal) if normal is not None else None,
+                    }
+                )
                 if label == "enforce" and not self._is_http_200(normal):
                     self._set(case, "failed", "차단 구간의 정상 Gateway 요청이 HTTP 200이 아님", evidence)
                     break
@@ -1598,17 +1551,31 @@ class LabChecker:
                     self._set(case, "failed", f"{label} 구간에서 예상과 다른 읽기 errno가 관측됨", evidence)
                     break
                 if not (denied if label == "enforce" else read_ok) or not event_found:
-                    self._set(case, "unknown", f"{label} 구간의 errno/읽기 또는 동일 Pod UID 원시 이벤트가 부족함", evidence)
+                    self._set(
+                        case, "unknown", f"{label} 구간의 errno/읽기 또는 동일 Pod UID 원시 이벤트가 부족함", evidence
+                    )
                     break
             else:
                 if len({step["policy_id"] for step in steps}) != 1:
                     self._set(case, "failed", "모드 전환 중 정책 ID 변경", evidence)
                 else:
-                    self._set(case, "passed", "동일 정책 ID monitor→EPERM Override→monitor, 이벤트 연속·정상 요청 200 대조", evidence)
+                    self._set(
+                        case,
+                        "passed",
+                        "동일 정책 ID monitor→EPERM Override→monitor, 이벤트 연속·정상 요청 200 대조",
+                        evidence,
+                    )
         finally:
             if not restored:
                 try:
-                    recovery = switch_mode(self.context, self.namespace, policy_name, "monitor", run=run_mode, history_path=self.state_dir / "transitions.jsonl")
+                    recovery = switch_mode(
+                        self.context,
+                        self.namespace,
+                        policy_name,
+                        "monitor",
+                        run=run_mode,
+                        history_path=self.state_dir / "transitions.jsonl",
+                    )
                     case["rollback"] = "동일 정책 monitor 복귀" if recovery["ok"] else "monitor 복귀 미확인"
                     if not recovery["ok"]:
                         self._set(case, "failed", "monitor 복귀 실패", evidence)
@@ -1618,8 +1585,9 @@ class LabChecker:
             # temporary trial once the baseline still exists.
             baseline = self._kubectl(case, "get", "tracingpolicynamespaced", "runtime-tg-secret-01")
             if baseline.returncode == 0:
-                removed = self._kubectl(case, "delete", "tracingpolicynamespaced", policy_name,
-                                        "--ignore-not-found=true", timeout=70)
+                removed = self._kubectl(
+                    case, "delete", "tracingpolicynamespaced", policy_name, "--ignore-not-found=true", timeout=70
+                )
                 if removed.returncode != 0:
                     self._set(case, "failed", "L-05b 시험 정책 정리 실패", evidence)
             else:
@@ -1635,18 +1603,40 @@ class LabChecker:
         config_path = trial_dir / "config.json"
         pod_path = trial_dir / "pod.json"
         policy_path = trial_dir / "policy.json"
-        config_path.write_text(json.dumps({
-            "apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": probe_name, "namespace": self.namespace},
-            "data": {"read-probe.txt": "FAKE\n"},
-        }))
-        pod_path.write_text(json.dumps({
-            "apiVersion": "v1", "kind": "Pod", "metadata": {"name": probe_name, "namespace": self.namespace,
-                                                     "labels": {"app": probe_name}},
-            "spec": {"restartPolicy": "Never", "containers": [{"name": "probe", "image": "serving-runtime-lab:dev",
-                     "imagePullPolicy": "IfNotPresent", "command": ["python", "-c", "import time;time.sleep(600)"],
-                     "volumeMounts": [{"name": "probe-file", "mountPath": "/opt/serving/secret", "readOnly": True}]}],
-                     "volumes": [{"name": "probe-file", "configMap": {"name": probe_name}}]},
-        }))
+        config_path.write_text(
+            json.dumps(
+                {
+                    "apiVersion": "v1",
+                    "kind": "ConfigMap",
+                    "metadata": {"name": probe_name, "namespace": self.namespace},
+                    "data": {"read-probe.txt": "FAKE\n"},
+                }
+            )
+        )
+        pod_path.write_text(
+            json.dumps(
+                {
+                    "apiVersion": "v1",
+                    "kind": "Pod",
+                    "metadata": {"name": probe_name, "namespace": self.namespace, "labels": {"app": probe_name}},
+                    "spec": {
+                        "restartPolicy": "Never",
+                        "containers": [
+                            {
+                                "name": "probe",
+                                "image": "serving-runtime-lab:dev",
+                                "imagePullPolicy": "IfNotPresent",
+                                "command": ["python", "-c", "import time;time.sleep(600)"],
+                                "volumeMounts": [
+                                    {"name": "probe-file", "mountPath": "/opt/serving/secret", "readOnly": True}
+                                ],
+                            }
+                        ],
+                        "volumes": [{"name": "probe-file", "configMap": {"name": probe_name}}],
+                    },
+                }
+            )
+        )
         source = json.loads(self.intent_v11.read_text(encoding="utf-8"))
         source["engine"]["labels"] = {"app": probe_name}
         source["protected_paths"]["secret_paths"] = [SECRET_PROBE_PATH]
@@ -1668,41 +1658,73 @@ class LabChecker:
                     self._set(case, "unknown", "L-05c 시험용 리소스 로드 실패", evidence)
                     return
             created = True
-            ready = self._kubectl(case, "wait", f"pod/{probe_name}", "--for=condition=Ready", "--timeout=60s", timeout=70)
+            ready = self._kubectl(
+                case, "wait", f"pod/{probe_name}", "--for=condition=Ready", "--timeout=60s", timeout=70
+            )
             uid_result = self._kubectl(case, "get", "pod", probe_name, "-o", "jsonpath={.metadata.uid}")
             pod_uid = uid_result.stdout.strip() if uid_result.returncode == 0 else ""
             if ready.returncode or not pod_uid:
                 self._set(case, "unknown", "L-05c 시험용 Pod 준비 또는 UID 확인 실패", evidence)
                 return
-            enabled = switch_mode(self.context, self.namespace, policy_name, "enforce", run=run_mode, history_path=self.state_dir / "transitions.jsonl")
+            enabled = switch_mode(
+                self.context,
+                self.namespace,
+                policy_name,
+                "enforce",
+                run=run_mode,
+                history_path=self.state_dir / "transitions.jsonl",
+            )
             if not enabled["ok"]:
                 self._set(case, "unknown", "L-05c enforce 전환 실패", evidence)
                 return
             started = utc_now()
-            read = self._exec(case, probe_name, "python", "-c",
-                              f"open({SECRET_PROBE_PATH!r}).read();print('read-ok')")
+            read = self._exec(case, probe_name, "python", "-c", f"open({SECRET_PROBE_PATH!r}).read();print('read-ok')")
             raw_path = self.raw_dir / "l05c-sigkill.jsonl"
             try:
-                self._collect_tetragon_logs(case, path=raw_path, since=started,
-                                            expected_events=lambda items: {"sigkill": any(
-                                                item.get("rule_id") == "TG-SECRET-01" and item.get("action_raw") == "KPROBE_ACTION_SIGKILL"
-                                                for item in items)})
+                self._collect_tetragon_logs(
+                    case,
+                    path=raw_path,
+                    since=started,
+                    expected_events=lambda items: {
+                        "sigkill": any(
+                            item.get("rule_id") == "TG-SECRET-01" and item.get("action_raw") == "KPROBE_ACTION_SIGKILL"
+                            for item in items
+                        )
+                    },
+                )
                 evidence.append(raw_path)
-                matched = evaluate_l05b_phase(raw_path.read_text(encoding="utf-8").splitlines(),
-                                               since=started, pod_uid=pod_uid, namespace=self.namespace,
-                                               action="KPROBE_ACTION_SIGKILL", policy_name=policy_name, mask=None)
+                matched = evaluate_l05b_phase(
+                    raw_path.read_text(encoding="utf-8").splitlines(),
+                    since=started,
+                    pod_uid=pod_uid,
+                    namespace=self.namespace,
+                    action="KPROBE_ACTION_SIGKILL",
+                    policy_name=policy_name,
+                    mask=None,
+                )
             except (RuntimeError, OSError):
                 matched = False
-            restored = switch_mode(self.context, self.namespace, policy_name, "monitor", run=run_mode, history_path=self.state_dir / "transitions.jsonl")
+            restored = switch_mode(
+                self.context,
+                self.namespace,
+                policy_name,
+                "monitor",
+                run=run_mode,
+                history_path=self.state_dir / "transitions.jsonl",
+            )
             if not restored["ok"]:
                 self._set(case, "failed", "L-05c monitor 복귀 실패", evidence)
                 return
-            after = self._exec(case, probe_name, "python", "-c",
-                               f"open({SECRET_PROBE_PATH!r}).read();print('read-ok')")
-            case["steps"] = [{"phase": "enforce", "returncode": read.returncode, "event_matched": matched,
-                              "policy_id": enabled["after"]["id"]},
-                             {"phase": "restored", "returncode": after.returncode,
-                              "policy_id": restored["after"]["id"]}]
+            after = self._exec(case, probe_name, "python", "-c", f"open({SECRET_PROBE_PATH!r}).read();print('read-ok')")
+            case["steps"] = [
+                {
+                    "phase": "enforce",
+                    "returncode": read.returncode,
+                    "event_matched": matched,
+                    "policy_id": enabled["after"]["id"],
+                },
+                {"phase": "restored", "returncode": after.returncode, "policy_id": restored["after"]["id"]},
+            ]
             if read.returncode not in {137, -9} or after.returncode != 0 or "read-ok" not in after.stdout:
                 self._set(case, "failed", "Sigkill 종료 코드 또는 monitor 복귀 뒤 읽기 불일치", evidence)
             elif not matched or enabled["after"]["id"] != restored["after"]["id"]:
@@ -1711,20 +1733,29 @@ class LabChecker:
                 self._set(case, "passed", "시험용 Pod Sigkill 종료·원시 이벤트·동일 정책 monitor 복귀 확인", evidence)
         finally:
             if created:
-                recovery = switch_mode(self.context, self.namespace, policy_name, "monitor", run=run_mode, history_path=self.state_dir / "transitions.jsonl")
+                recovery = switch_mode(
+                    self.context,
+                    self.namespace,
+                    policy_name,
+                    "monitor",
+                    run=run_mode,
+                    history_path=self.state_dir / "transitions.jsonl",
+                )
                 if not recovery["ok"]:
                     self._set(case, "failed", "L-05c 정리 중 monitor 복귀 실패", evidence)
             cleanup_failed = []
-            for kind, name in (("tracingpolicynamespaced", policy_name), ("pod", probe_name), ("configmap", probe_name)):
+            for kind, name in (
+                ("tracingpolicynamespaced", policy_name),
+                ("pod", probe_name),
+                ("configmap", probe_name),
+            ):
                 removed = self._kubectl(case, "delete", kind, name, "--ignore-not-found=true", timeout=70)
                 if removed.returncode != 0:
                     cleanup_failed.append(kind)
             if cleanup_failed:
                 self._set(case, "failed", "L-05c 시험 리소스 정리 실패: " + ", ".join(cleanup_failed), evidence)
 
-    def _tracingpolicy_nenforce(
-        self, case: dict[str, Any], policy_name: str
-    ) -> int | None:
+    def _tracingpolicy_nenforce(self, case: dict[str, Any], policy_name: str) -> int | None:
         result = self._kubectl(
             case,
             "exec",
@@ -1787,26 +1818,23 @@ class LabChecker:
                     raise RuntimeError(f"could not apply {name}")
                 applied.append(path)
             self.sleep(3)
-            acquire = self._retry(
-                lambda: self._exec(case, "artifact-acquire", "python", "-c", TCP_CONNECT_SCRIPT, receiver, "8080"),
-                lambda result: result.returncode == 0,
-            ).returncode == 0
+            acquire = (
+                self._retry(
+                    lambda: self._exec(case, "artifact-acquire", "python", "-c", TCP_CONNECT_SCRIPT, receiver, "8080"),
+                    lambda result: result.returncode == 0,
+                ).returncode
+                == 0
+            )
             engine = self._connect(case, self.pods["engine"], receiver, 8080)
             other = self._connect(case, self.pods["other"], receiver, 8080)
-            to_engine = self._connect(
-                case, "artifact-acquire", "serving-engine.serving-lab.svc.cluster.local", 8000
-            )
+            to_engine = self._connect(case, "artifact-acquire", "serving-engine.serving-lab.svc.cluster.local", 8000)
         finally:
             for path in reversed(applied):
-                deleted = self._kubectl(
-                    case, "delete", "-f", str(path), "--ignore-not-found=true"
-                )
+                deleted = self._kubectl(case, "delete", "-f", str(path), "--ignore-not-found=true")
                 if deleted.returncode != 0:
                     cleanup_failures.append(path.name)
             if cleanup_failures:
-                raise RuntimeError(
-                    f"task-check policy cleanup failed: {', '.join(cleanup_failures)}"
-                )
+                raise RuntimeError(f"task-check policy cleanup failed: {', '.join(cleanup_failures)}")
         results = {
             "baseline acquire→receiver": baseline_acquire,
             "baseline other→receiver": baseline_other,
@@ -1823,7 +1851,12 @@ class LabChecker:
         if not (baseline_acquire and baseline_other):
             self._set(case, "failed", "정책 적용 전 receiver 기준선 연결 실패", evidence)
         elif acquire and not engine and not other and not to_engine:
-            self._set(case, "passed", "같은 receiver에 acquire만 연결, engine·other-client·acquire→engine API는 차단", evidence)
+            self._set(
+                case,
+                "passed",
+                "같은 receiver에 acquire만 연결, engine·other-client·acquire→engine API는 차단",
+                evidence,
+            )
         else:
             self._set(case, "failed", "SP4 허용/차단 결과가 기대와 다름", evidence)
 
@@ -1834,20 +1867,11 @@ class LabChecker:
             try:
                 document = json.loads(spec.stdout)
                 pod_spec = document.get("spec", {})
-                engine = next(
-                    item
-                    for item in pod_spec.get("containers", [])
-                    if item.get("name") == "engine"
-                )
-                mounts = {
-                    item.get("mountPath"): item
-                    for item in engine.get("volumeMounts", [])
-                }
+                engine = next(item for item in pod_spec.get("containers", []) if item.get("name") == "engine")
+                mounts = {item.get("mountPath"): item for item in engine.get("volumeMounts", [])}
                 engine_security = engine.get("securityContext", {})
                 acquire = next(
-                    item
-                    for item in pod_spec.get("initContainers", [])
-                    if item.get("name") == "acquire-step"
+                    item for item in pod_spec.get("initContainers", []) if item.get("name") == "acquire-step"
                 )
                 configured = (
                     pod_spec.get("automountServiceAccountToken") is False
@@ -1883,7 +1907,9 @@ class LabChecker:
             and observed.get("write_erofs") is True
             and observed.get("cache_write_ok") is True
         ):
-            self._set(case, "passed", "엔진 계정(10001)이 공급물을 읽고, 쓰기는 EROFS로 거부, 캐시 세대 쓰기는 성공", evidence)
+            self._set(
+                case, "passed", "엔진 계정(10001)이 공급물을 읽고, 쓰기는 EROFS로 거부, 캐시 세대 쓰기는 성공", evidence
+            )
         else:
             self._set(case, "failed", "SP1 읽기 전용·계정·캐시 결과가 기대와 다름", evidence)
 
@@ -2048,9 +2074,7 @@ def report_markdown(report: dict[str, Any]) -> str:
         )
         if cleanup.get("deleted_policies"):
             lines.append("- 삭제한 관리 정책:")
-            lines.extend(
-                f"  - `{item}`" for item in cleanup["deleted_policies"]
-            )
+            lines.extend(f"  - `{item}`" for item in cleanup["deleted_policies"])
         if cleanup.get("warnings"):
             lines.append("- 경고:")
             lines.extend(f"  - {item}" for item in cleanup["warnings"])
@@ -2058,18 +2082,11 @@ def report_markdown(report: dict[str, Any]) -> str:
             lines.extend(["", "명령 요약:", ""])
             for command in cleanup["commands"]:
                 rendered = shlex.join(str(item) for item in command["argv"])
-                lines.append(
-                    f"- `{sanitize_text(rendered, limit=500)}` "
-                    f"→ rc={command['returncode']}"
-                )
+                lines.append(f"- `{sanitize_text(rendered, limit=500)}` → rc={command['returncode']}")
                 if command.get("stdout"):
-                    lines.append(
-                        f"  - stdout: `{sanitize_text(str(command['stdout']), limit=300)}`"
-                    )
+                    lines.append(f"  - stdout: `{sanitize_text(str(command['stdout']), limit=300)}`")
                 if command.get("stderr"):
-                    lines.append(
-                        f"  - stderr: `{sanitize_text(str(command['stderr']), limit=300)}`"
-                    )
+                    lines.append(f"  - stderr: `{sanitize_text(str(command['stderr']), limit=300)}`")
         lines.append("")
     for case in report["cases"]:
         lines.extend(
@@ -2098,10 +2115,7 @@ def report_markdown(report: dict[str, Any]) -> str:
                 )
         if case.get("tetragon_wait"):
             wait = case["tetragon_wait"]
-            lines.append(
-                f"- Tetragon 최종 대기: {wait['elapsed_seconds']:g}초 "
-                f"(최대 {wait['configured_seconds']:g}초)"
-            )
+            lines.append(f"- Tetragon 최종 대기: {wait['elapsed_seconds']:g}초 (최대 {wait['configured_seconds']:g}초)")
             first_seen = wait.get("first_seen_seconds", {})
             for name, seconds in first_seen.items():
                 rendered = "미관측" if seconds is None else f"{seconds:g}초"
@@ -2171,8 +2185,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--namespace", default="serving-lab")
     parser.add_argument("--state-dir", required=True, type=Path)
-    parser.add_argument("--public-report-dir", type=Path,
-                        help="기존 setgid 관측 폴더에 이번 실행의 최소 JSON을 0640으로 원자 게시")
+    parser.add_argument(
+        "--public-report-dir", type=Path, help="기존 setgid 관측 폴더에 이번 실행의 최소 JSON을 0640으로 원자 게시"
+    )
     parser.add_argument(
         "--tetragon-wait",
         type=float,
@@ -2194,8 +2209,9 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="L-05b 가짜 보호 파일 monitor→enforce→monitor 시험을 추가 실행",
     )
-    parser.add_argument("--sigkill-probe-check", action="store_true",
-                        help="L-05c 시험용 Pod에서 fd_install Sigkill을 확인")
+    parser.add_argument(
+        "--sigkill-probe-check", action="store_true", help="L-05c 시험용 Pod에서 fd_install Sigkill을 확인"
+    )
     return parser
 
 

@@ -1,4 +1,5 @@
 """Prepare the AWS lab's existing Tetragon renderer and sentinel without cluster access."""
+
 from __future__ import annotations
 
 import argparse
@@ -20,7 +21,10 @@ def prepare(intent_path: Path, image: str, output: Path):
     if not re.fullmatch(r"[^\s@]+@sha256:[a-f0-9]{64}", image):
         raise ValueError("sentinel image requires a reviewed sha256 digest")
     document = json.loads(intent_path.read_text())
-    if document.get("namespace") != "serving-lab" or document.get("engine", {}).get("labels", {}).get("app") != "serving-engine":
+    if (
+        document.get("namespace") != "serving-lab"
+        or document.get("engine", {}).get("labels", {}).get("app") != "serving-engine"
+    ):
         raise ValueError("AWS service templates require serving-lab and the app=serving-engine role label")
     document["tetragon_kernel_identity"] = True
     intent = parse_intent(document)
@@ -37,11 +41,15 @@ def prepare(intent_path: Path, image: str, output: Path):
     health["metadata"]["annotations"]["serving-runtime.local/rule-id"] = "TG-HEALTH-01"
     policies["tetragon-tg-health-01.json"] = health
     sentinel = json.loads((ROOT / "deploy/lab/tetragon-sentinel.json").read_text())
-    for container in sentinel["spec"]["template"]["spec"]["initContainers"] + sentinel["spec"]["template"]["spec"]["containers"]:
+    for container in (
+        sentinel["spec"]["template"]["spec"]["initContainers"] + sentinel["spec"]["template"]["spec"]["containers"]
+    ):
         container["image"] = image
     names = sorted(policy["metadata"]["name"] for policy in policies.values())
     stream_service = (ROOT / "deploy/gpu-lab/host/byul-tetragon-stream.service").read_text()
-    stream_service = re.sub(r"(?: --policy [a-z0-9.-]+)+", "".join(" --policy " + name for name in names), stream_service)
+    stream_service = re.sub(
+        r"(?: --policy [a-z0-9.-]+)+", "".join(" --policy " + name for name in names), stream_service
+    )
     files = {"intent.json": document, "sentinel.json": sentinel, **policies}
     output.mkdir(parents=True, exist_ok=True)
     if any((output / name).exists() for name in [*files, "byul-tetragon-stream.service", "prepared.json"]):
@@ -49,12 +57,20 @@ def prepare(intent_path: Path, image: str, output: Path):
     for name, value in files.items():
         atomic_json(output / name, value)
     (output / "byul-tetragon-stream.service").write_text(stream_service)
-    record = {"state": "prepared-unapplied", "context": "byul-aws-lab", "namespace": intent.namespace,
-              "identity_selector": SELECTOR, "policies": names,
-              "status_service": "serving-runtime-tetragon-status.service",
-              "rollout_script": "/opt/byul/runtime/deploy/install/rollout_tetragon_stream.py",
-              "sentinel_image": image,
-              "sha256": {name: hashlib.sha256((output/name).read_bytes()).hexdigest() for name in [*files, "byul-tetragon-stream.service"]}}
+    record = {
+        "state": "prepared-unapplied",
+        "context": "byul-aws-lab",
+        "namespace": intent.namespace,
+        "identity_selector": SELECTOR,
+        "policies": names,
+        "status_service": "serving-runtime-tetragon-status.service",
+        "rollout_script": "/opt/byul/runtime/deploy/install/rollout_tetragon_stream.py",
+        "sentinel_image": image,
+        "sha256": {
+            name: hashlib.sha256((output / name).read_bytes()).hexdigest()
+            for name in [*files, "byul-tetragon-stream.service"]
+        },
+    }
     atomic_json(output / "prepared.json", record)
     return record
 

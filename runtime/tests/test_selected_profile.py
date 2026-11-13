@@ -34,11 +34,28 @@ class SelectedProfileTest(unittest.TestCase):
             self.assertEqual(report["response_privacy"]["allowed_return_options"], [])
 
     def test_bounded_extra_rules_cannot_reopen_selected_unsupported_inputs(self):
-        forbidden = ("prompt_token_ids", "kv_transfer_params", "code_revision", "processor", "mm_processor_kwargs",
-                     "response_format", "structured_outputs", "tools", "tool_choice", "native", "extra_body",
-                     "return_token_ids", "return_prompt_text", "prompt_logprobs", "private_debug", "some_future_option")
+        forbidden = (
+            "prompt_token_ids",
+            "kv_transfer_params",
+            "code_revision",
+            "processor",
+            "mm_processor_kwargs",
+            "response_format",
+            "structured_outputs",
+            "tools",
+            "tool_choice",
+            "native",
+            "extra_body",
+            "return_token_ids",
+            "return_prompt_text",
+            "prompt_logprobs",
+            "private_debug",
+            "some_future_option",
+        )
         for name in forbidden:
-            state, report = self.check({**self.base, "extra_fields": {name: {"mode": "validate", "type": "string", "max_length": 128}}})
+            state, report = self.check(
+                {**self.base, "extra_fields": {name: {"mode": "validate", "type": "string", "max_length": 128}}}
+            )
             self.assertTrue(state.ok, name)
             self.assertFalse(report["supported"], name)
             self.assertIn(name, report["violations"][0]["fields"])
@@ -49,12 +66,16 @@ class SelectedProfileTest(unittest.TestCase):
         self.assertTrue(state.ok)
         self.assertFalse(report["supported"])
         self.assertEqual(report["violations"][0]["code"], "SELECTED_PROFILE_MISMATCH")
-        state, report = self.check({**self.base, "extra_fields": {"temperature": {"mode": "validate", "type": "string", "max_length": 12}}})
+        state, report = self.check(
+            {**self.base, "extra_fields": {"temperature": {"mode": "validate", "type": "string", "max_length": 12}}}
+        )
         self.assertTrue(state.ok)
         self.assertEqual(report["violations"][0]["code"], "UNSUPPORTED_SELECTED_SAMPLING_RULE")
 
     def test_cli_exit_and_report_are_preflight_consumable(self):
-        spec = importlib.util.spec_from_file_location("check_selected_profile", ROOT / "tools/check_selected_profile.py")
+        spec = importlib.util.spec_from_file_location(
+            "check_selected_profile", ROOT / "tools/check_selected_profile.py"
+        )
         tool = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(tool)
         self.check({**self.base, "extra_fields": {}})

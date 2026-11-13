@@ -3,6 +3,7 @@
 Generated content, reasoning, tool arguments and arbitrary vendor payloads are
 opaque. This is an exact metadata-field policy, with no keyword filtering.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -33,8 +34,9 @@ class ResponsePrivacyError(ValueError):
     """Metadata cannot be safely projected within the relay's limits."""
 
 
-def sanitize_response_metadata(value: dict[str, Any], *,
-                               requested_fields: frozenset[str] = frozenset()) -> dict[str, Any]:
+def sanitize_response_metadata(
+    value: dict[str, Any], *, requested_fields: frozenset[str] = frozenset()
+) -> dict[str, Any]:
     """Copy metadata recursively; keep actual generated fields opaque.
 
     The relay bounds input bytes and handles this ValueError as a safe backend
@@ -57,8 +59,9 @@ def sanitize_response_metadata(value: dict[str, Any], *,
         for key, child in item.items():
             if key in _METADATA_OPTIONS and not (_METADATA_OPTIONS[key] & requested_fields):
                 continue
-            if ((context in {"choice", "message", "delta"} and key in _CONTENT_FIELDS)
-                    or (context == "function" and key == "arguments")):
+            if (context in {"choice", "message", "delta"} and key in _CONTENT_FIELDS) or (
+                context == "function" and key == "arguments"
+            ):
                 result[key] = child
                 continue
             child_context = "metadata"
@@ -68,8 +71,9 @@ def sanitize_response_metadata(value: dict[str, Any], *,
                 child_context = key
             elif context in {"message", "delta"} and key == "tool_calls":
                 child_context = "tool_calls"
-            elif ((context == "tool_call" and key == "function")
-                  or (context in {"message", "delta"} and key == "function_call")):
+            elif (context == "tool_call" and key == "function") or (
+                context in {"message", "delta"} and key == "function_call"
+            ):
                 child_context = "function"
             result[key] = visit(child, child_context, depth + 1)
         return result

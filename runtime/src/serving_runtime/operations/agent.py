@@ -1,4 +1,5 @@
 """Pull one operation at a time. No remote command strings and no secret output."""
+
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -60,13 +61,25 @@ class NoRedirect(HTTPRedirectHandler):
 class PlatformClient:
     def __init__(self, url: str, token_file: str, ca_file: str | None = None):
         parsed = urlparse(url)
-        if (parsed.scheme not in {"https", "http"} or not parsed.hostname or parsed.username or parsed.password
-                or parsed.query or parsed.fragment or parsed.path not in {"", "/"}
-                or (parsed.scheme == "http" and parsed.hostname not in {"127.0.0.1", "localhost", "::1"})):
+        if (
+            parsed.scheme not in {"https", "http"}
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+            or parsed.path not in {"", "/"}
+            or (parsed.scheme == "http" and parsed.hostname not in {"127.0.0.1", "localhost", "::1"})
+        ):
             raise ValueError("platform URL requires HTTPS (HTTP only for loopback)")
         path = Path(token_file)
         info = path.stat()
-        if path.is_symlink() or not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077 or info.st_uid not in {0, os.getuid()}:
+        if (
+            path.is_symlink()
+            or not stat.S_ISREG(info.st_mode)
+            or info.st_mode & 0o077
+            or info.st_uid not in {0, os.getuid()}
+        ):
             raise ValueError("agent token file requires private permissions and trusted ownership")
         self._token = path.read_text().strip()
         if not self._token or "\n" in self._token or "\r" in self._token:
@@ -79,8 +92,11 @@ class PlatformClient:
         self.opener = build_opener(NoRedirect(), HTTPSHandler(context=context))
 
     def request(self, path="", body=None, *, binary=False):
-        req = Request(self.base + path, data=None if body is None else json.dumps(body).encode(),
-                      headers={"Authorization": "Bearer " + self._token, "Content-Type": "application/json"})
+        req = Request(
+            self.base + path,
+            data=None if body is None else json.dumps(body).encode(),
+            headers={"Authorization": "Bearer " + self._token, "Content-Type": "application/json"},
+        )
         with self.opener.open(req, timeout=30) as response:
             raw = response.read(16 * 1024 * 1024 + 1)
         if len(raw) > 16 * 1024 * 1024:
@@ -126,7 +142,16 @@ class Agent:
             raise ValueError("invalid agent configuration")
         if config.status_url is not None:
             parsed = urlparse(config.status_url)
-            if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost"} or not parsed.port or parsed.path not in {"", "/"} or parsed.query or parsed.fragment or parsed.username or parsed.password:
+            if (
+                parsed.scheme != "http"
+                or parsed.hostname not in {"127.0.0.1", "localhost"}
+                or not parsed.port
+                or parsed.path not in {"", "/"}
+                or parsed.query
+                or parsed.fragment
+                or parsed.username
+                or parsed.password
+            ):
                 raise ValueError("Gateway status URL must be local")
 
     def tool(self, name):
@@ -167,20 +192,34 @@ class Agent:
             reject("VALIDATION_FAILED", reason_code="BUNDLE_INVALID")
         token = bundle_tools._token(cfg.token_env_file)
         try:
-            state = bundle_tools._gateway_status(cfg.context, cfg.namespace, cfg.kubeconfig, 8080, token,
-                                                 status_url=cfg.status_url)
+            state = bundle_tools._gateway_status(
+                cfg.context, cfg.namespace, cfg.kubeconfig, 8080, token, status_url=cfg.status_url
+            )
         except bundle_tools.StatusUnavailable:
             reject("VALIDATION_FAILED", reason_code="STATUS_UNREACHABLE")
         policy = state.get("policy")
         active_bundle = state.get("policy_bundle")
-        if (not isinstance(policy, dict) or not isinstance(active_bundle, dict)
-                or not isinstance(policy.get("approval"), dict)):
+        if (
+            not isinstance(policy, dict)
+            or not isinstance(active_bundle, dict)
+            or not isinstance(policy.get("approval"), dict)
+        ):
             reject("VALIDATION_FAILED", reason_code="STATUS_MISMATCH")
-        if (active_bundle.get("bundle_id") != bundle.bundle_id or active_bundle.get("sha256") != bundle.sha256
-                or policy["approval"].get("state") != "verified" or policy.get("gateway_active") is not True):
+        if (
+            active_bundle.get("bundle_id") != bundle.bundle_id
+            or active_bundle.get("sha256") != bundle.sha256
+            or policy["approval"].get("state") != "verified"
+            or policy.get("gateway_active") is not True
+        ):
             reject("STATE_CHANGED", reason_code="STATUS_MISMATCH")
         self.target_ref = bundle.target_ref
-        return {"bundle_id": bundle.bundle_id, "approval": "verified", "policy_id": None, "mode": None, "spec_sha256": None}, intent
+        return {
+            "bundle_id": bundle.bundle_id,
+            "approval": "verified",
+            "policy_id": None,
+            "mode": None,
+            "spec_sha256": None,
+        }, intent
 
     def verified_bundle(self, directory):
         try:
@@ -208,8 +247,11 @@ class Agent:
                 reject("VALIDATION_FAILED", reason_code="BUNDLE_INVALID")
         except (OSError, ValueError):
             reject("VALIDATION_FAILED", reason_code="BUNDLE_INVALID")
-        if (kube.get("context") != self.config.context or kube.get("namespace") != self.config.namespace
-                or (self.target_ref is not None and bundle.target_ref != self.target_ref)):
+        if (
+            kube.get("context") != self.config.context
+            or kube.get("namespace") != self.config.namespace
+            or (self.target_ref is not None and bundle.target_ref != self.target_ref)
+        ):
             reject("TARGET_MISMATCH")
 
     def snapshot(self):
@@ -218,7 +260,12 @@ class Agent:
         path = Path(self.config.state_file)
         try:
             info = path.stat()
-            if path.is_symlink() or not stat.S_ISREG(info.st_mode) or info.st_mode & 0o022 or info.st_uid not in {0, os.getuid()}:
+            if (
+                path.is_symlink()
+                or not stat.S_ISREG(info.st_mode)
+                or info.st_mode & 0o022
+                or info.st_uid not in {0, os.getuid()}
+            ):
                 return {}
         except OSError:
             return {}
@@ -232,8 +279,12 @@ class Agent:
             fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
             with os.fdopen(fd, "rb") as source:
                 info = os.fstat(source.fileno())
-                if (not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o600
-                        or info.st_uid not in {0, os.getuid()} or info.st_size > 2 * 1024 * 1024):
+                if (
+                    not stat.S_ISREG(info.st_mode)
+                    or stat.S_IMODE(info.st_mode) != 0o600
+                    or info.st_uid not in {0, os.getuid()}
+                    or info.st_size > 2 * 1024 * 1024
+                ):
                     return {}
                 raw = source.read(2 * 1024 * 1024 + 1)
                 if len(raw) > 2 * 1024 * 1024:
@@ -248,9 +299,14 @@ class Agent:
         snapshot = self.snapshot()
         rows = []
         review = self.review()
-        for name in sorted({p["name"] for p in snapshot.get("policies", []) if p.get("namespace") == self.config.namespace}):
-            policies = [p for p in snapshot.get("policies", [])
-                        if p.get("name") == name and p.get("namespace") == self.config.namespace]
+        for name in sorted(
+            {p["name"] for p in snapshot.get("policies", []) if p.get("namespace") == self.config.namespace}
+        ):
+            policies = [
+                p
+                for p in snapshot.get("policies", [])
+                if p.get("name") == name and p.get("namespace") == self.config.namespace
+            ]
             if not all(is_mode_switch_target(p) for p in policies):
                 continue
             ready = evaluate(snapshot, name, intent, review, self.monitor_seconds)
@@ -266,8 +322,20 @@ class Agent:
         policy = tool._read_policy(self.run, self.config.context, "kube-system", name, self.config.namespace)
         if not policy:
             reject("STATE_CHANGED")
-        result = self.run(["kubectl", "--context", self.config.context, "-n", self.config.namespace,
-                           "get", "tracingpolicynamespaced", name, "-o", "json"])
+        result = self.run(
+            [
+                "kubectl",
+                "--context",
+                self.config.context,
+                "-n",
+                self.config.namespace,
+                "get",
+                "tracingpolicynamespaced",
+                name,
+                "-o",
+                "json",
+            ]
+        )
         if result.returncode:
             reject("STATE_CHANGED")
         spec = comparable_spec(json.loads(result.stdout)["spec"])
@@ -278,25 +346,59 @@ class Agent:
         snapshot = self.snapshot()
         # The existing set-mode helper executes on one Tetragon daemon. Until
         # per-node set-mode exists, require exactly one node and one ready pod.
-        result = self.run(["kubectl", "--context", self.config.context, "-n", "kube-system",
-                           "get", "pods", "-l", "app.kubernetes.io/name=tetragon", "-o", "json"])
+        result = self.run(
+            [
+                "kubectl",
+                "--context",
+                self.config.context,
+                "-n",
+                "kube-system",
+                "get",
+                "pods",
+                "-l",
+                "app.kubernetes.io/name=tetragon",
+                "-o",
+                "json",
+            ]
+        )
         pods = json.loads(result.stdout).get("items", []) if not result.returncode else []
         if len(pods) != 1:
             reject("SAFETY_REJECTED")
         pod = pods[0]
         node = pod.get("spec", {}).get("nodeName")
-        if not any(s.get("name") == "tetragon" and s.get("ready") is True for s in pod.get("status", {}).get("containerStatuses", [])):
+        if not any(
+            s.get("name") == "tetragon" and s.get("ready") is True
+            for s in pod.get("status", {}).get("containerStatuses", [])
+        ):
             reject("SAFETY_REJECTED")
+
         def read(*args):
-            value = self.run(["kubectl", "--context", self.config.context, "-n", "kube-system", "exec",
-                              pod["metadata"]["name"], "-c", "tetragon", "--", *args])
+            value = self.run(
+                [
+                    "kubectl",
+                    "--context",
+                    self.config.context,
+                    "-n",
+                    "kube-system",
+                    "exec",
+                    pod["metadata"]["name"],
+                    "-c",
+                    "tetragon",
+                    "--",
+                    *args,
+                ]
+            )
             return value.stdout if value.returncode == 0 else None
+
         kernel = (read("uname", "-r") or "").strip()
         classifier = self.tool("tetragon_capability")
-        cap = classifier.classify_capabilities(kernel=kernel,
-              config=read("cat", f"/boot/config-{kernel}") or read("zcat", "/proc/config.gz"),
-              lsm=read("cat", "/sys/kernel/security/lsm"),
-              injection_list=read("cat", "/sys/kernel/debug/error_injection/list"), probe=read("tetra", "probe"))
+        cap = classifier.classify_capabilities(
+            kernel=kernel,
+            config=read("cat", f"/boot/config-{kernel}") or read("zcat", "/proc/config.gz"),
+            lsm=read("cat", "/sys/kernel/security/lsm"),
+            injection_list=read("cat", "/sys/kernel/debug/error_injection/list"),
+            probe=read("tetra", "probe"),
+        )
         cap["node"] = node
         snapshot["capabilities"] = [cap]
         if any(p.get("node") != node for p in snapshot.get("policies", []) if p.get("name") == name):
@@ -318,23 +420,35 @@ class Agent:
             reject("VALIDATION_FAILED")
         if expired:
             reject("LEASE_EXPIRED")
-        needs = kind in {"bundle.apply", "enforcement.apply"} or (kind == "tetragon.mode" and payload.get("mode") == "enforce")
+        needs = kind in {"bundle.apply", "enforcement.apply"} or (
+            kind == "tetragon.mode" and payload.get("mode") == "enforce"
+        )
         if op.get("approval_required") is not needs:
             reject("APPROVAL_REQUIRED")
         if needs:
             approvals = op.get("approvals", [])
-            approved = any((a.get("role") == "approver" and a.get("token_id") != op.get("requested_by"))
-                           or (kind != "enforcement.apply" and self.config.lab_self_approval and op.get("lab_self_approval") is True
-                               and a.get("self_approval") is True and a.get("token_id") == op.get("requested_by")
-                               and a.get("role") in {"runtime_operator", "approver"}) for a in approvals)
+            approved = any(
+                (a.get("role") == "approver" and a.get("token_id") != op.get("requested_by"))
+                or (
+                    kind != "enforcement.apply"
+                    and self.config.lab_self_approval
+                    and op.get("lab_self_approval") is True
+                    and a.get("self_approval") is True
+                    and a.get("token_id") == op.get("requested_by")
+                    and a.get("role") in {"runtime_operator", "approver"}
+                )
+                for a in approvals
+            )
             if not approved:
                 reject("APPROVAL_REQUIRED")
         if op.get("requested_role") != "runtime_operator":
             reject("APPROVAL_REQUIRED")
         if kind == "enforcement.apply":
-            if (payload.get("components") not in [["tetragon"], ["tetragon", "cilium"]]
-                    or type(payload.get("cilium_apply", False)) is not bool
-                    or (payload.get("cilium_apply") and "cilium" not in payload["components"])):
+            if (
+                payload.get("components") not in [["tetragon"], ["tetragon", "cilium"]]
+                or type(payload.get("cilium_apply", False)) is not bool
+                or (payload.get("cilium_apply") and "cilium" not in payload["components"])
+            ):
                 reject("VALIDATION_FAILED")
             bundle = self.verified_bundle(Path(self.config.bundle_root) / before["bundle_id"])
             self.check_target(bundle)
@@ -346,7 +460,11 @@ class Agent:
                 reject("VALIDATION_FAILED")
             # Safety-direction monitor remains available for a known allowed rule.
             rule = name.removeprefix("runtime-").upper()
-            if rule not in TETRAGON_RULE_MODES or mode not in intent.allowed_modes(rule) or name != "runtime-" + rule.lower():
+            if (
+                rule not in TETRAGON_RULE_MODES
+                or mode not in intent.allowed_modes(rule)
+                or name != "runtime-" + rule.lower()
+            ):
                 reject("SAFETY_REJECTED")
             before = self.mode_state(name, before)
             expected = {k: v for k, v in op.get("expected", {}).items() if v is not None}
@@ -354,8 +472,11 @@ class Agent:
                 reject("STATE_CHANGED", before)
             if mode == "enforce":
                 ready = evaluate(self.live_safety(name), name, intent, self.review(), self.monitor_seconds)
-                if (not all(ready["checks"].values()) or ready["expected"] != {k: before[k] for k in ("policy_id", "mode", "spec_sha256")}
-                        or (requires_restart_confirmation(ready) and payload.get("confirmation") != "ENGINE_RESTART")):
+                if (
+                    not all(ready["checks"].values())
+                    or ready["expected"] != {k: before[k] for k in ("policy_id", "mode", "spec_sha256")}
+                    or (requires_restart_confirmation(ready) and payload.get("confirmation") != "ENGINE_RESTART")
+                ):
                     reject("SAFETY_REJECTED")
         expected = {k: v for k, v in op.get("expected", {}).items() if v is not None}
         if not expected or any(before.get(k) != v for k, v in expected.items()):
@@ -375,8 +496,13 @@ class Agent:
         with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as archive:
             for item in archive.getmembers():
                 name = Path(item.name).name
-                if (not item.isfile() or item.name != f"{bundle_id}/{name}" or name not in allowed
-                        or name in seen or item.size > 2 * 1024 * 1024):
+                if (
+                    not item.isfile()
+                    or item.name != f"{bundle_id}/{name}"
+                    or name not in allowed
+                    or name in seen
+                    or item.size > 2 * 1024 * 1024
+                ):
                     reject("VALIDATION_FAILED")
                 seen.add(name)
                 (destination / name).write_bytes(archive.extractfile(item).read())
@@ -391,9 +517,24 @@ class Agent:
     def execute_bundle(self, source, existing):
         cfg = self.config
         if cfg.sudo_bundle_apply:
-            command = ["sudo", "-n", sys.executable, "-B", "-m", "serving_runtime", "bundle", "apply",
-                       "--bundle-root", cfg.bundle_root, "--context", cfg.context, "--namespace", cfg.namespace,
-                       "--status-url", cfg.status_url or "http://127.0.0.1:8080"]
+            command = [
+                "sudo",
+                "-n",
+                sys.executable,
+                "-B",
+                "-m",
+                "serving_runtime",
+                "bundle",
+                "apply",
+                "--bundle-root",
+                cfg.bundle_root,
+                "--context",
+                cfg.context,
+                "--namespace",
+                cfg.namespace,
+                "--status-url",
+                cfg.status_url or "http://127.0.0.1:8080",
+            ]
             command += ["--existing", existing] if existing else ["--bundle-dir", str(source)]
             if cfg.kubeconfig:
                 command += ["--kubeconfig", cfg.kubeconfig]
@@ -413,19 +554,52 @@ class Agent:
             if outcome != {"state": "succeeded", "code": "OK"}:
                 reject("STATUS_UNKNOWN")
             return
-        bundle_tools.apply_bundle(str(source) if source else None, cfg.bundle_root, cfg.context, cfg.namespace,
-                                  cfg.status_url or "http://127.0.0.1:8080", cfg.token_env_file, kubeconfig=cfg.kubeconfig, existing=existing)
+        bundle_tools.apply_bundle(
+            str(source) if source else None,
+            cfg.bundle_root,
+            cfg.context,
+            cfg.namespace,
+            cfg.status_url or "http://127.0.0.1:8080",
+            cfg.token_env_file,
+            kubeconfig=cfg.kubeconfig,
+            existing=existing,
+        )
 
     def sync_mode(self, name):
         """Read every scheduled daemon; partial or mixed observations fail closed."""
-        result = self.run(["kubectl", "--context", self.config.context, "-n", "kube-system",
-                           "get", "daemonset", "tetragon", "-o", "json"])
+        result = self.run(
+            [
+                "kubectl",
+                "--context",
+                self.config.context,
+                "-n",
+                "kube-system",
+                "get",
+                "daemonset",
+                "tetragon",
+                "-o",
+                "json",
+            ]
+        )
         if result.returncode:
             return None
         status = json.loads(result.stdout).get("status", {})
         desired = status.get("desiredNumberScheduled", 0)
-        pods = self.run(["kubectl", "--context", self.config.context, "-n", "kube-system", "get", "pods",
-                         "-l", "app.kubernetes.io/name=tetragon", "-o", "json"])
+        pods = self.run(
+            [
+                "kubectl",
+                "--context",
+                self.config.context,
+                "-n",
+                "kube-system",
+                "get",
+                "pods",
+                "-l",
+                "app.kubernetes.io/name=tetragon",
+                "-o",
+                "json",
+            ]
+        )
         if pods.returncode:
             return None
         items = json.loads(pods.stdout).get("items", [])
@@ -435,13 +609,34 @@ class Agent:
         tool = self.tool("tetragon_mode")
         for pod in items:
             node = pod.get("spec", {}).get("nodeName")
-            if (not node or node in nodes or pod.get("metadata", {}).get("deletionTimestamp")
-                    or not any(c.get("name") == "tetragon" and c.get("ready") is True
-                               for c in pod.get("status", {}).get("containerStatuses", []))):
+            if (
+                not node
+                or node in nodes
+                or pod.get("metadata", {}).get("deletionTimestamp")
+                or not any(
+                    c.get("name") == "tetragon" and c.get("ready") is True
+                    for c in pod.get("status", {}).get("containerStatuses", [])
+                )
+            ):
                 return None
             nodes.add(node)
-            result = self.run(["kubectl", "--context", self.config.context, "-n", "kube-system", "exec",
-                               pod["metadata"]["name"], "-c", "tetragon", "--", "tetra", "tracingpolicy", "list"])
+            result = self.run(
+                [
+                    "kubectl",
+                    "--context",
+                    self.config.context,
+                    "-n",
+                    "kube-system",
+                    "exec",
+                    pod["metadata"]["name"],
+                    "-c",
+                    "tetragon",
+                    "--",
+                    "tetra",
+                    "tracingpolicy",
+                    "list",
+                ]
+            )
             row = tool.parse_policy_row(result.stdout, name, self.config.namespace) if not result.returncode else None
             if not row or row.get("state") != "enabled":
                 return None
@@ -454,6 +649,7 @@ class Agent:
             return
         # One bounded inference request; credentials and response text never escape.
         from contextlib import nullcontext
+
         cfg = self.config
         bundle = self.verified_bundle(Path(cfg.bundle_root) / os.readlink(Path(cfg.bundle_root) / "current"))
         policy = json.loads(Path(bundle.role_paths()["gateway_policy"]).read_text())
@@ -462,20 +658,28 @@ class Agent:
             reject("VALIDATION_FAILED")
         token = None
         if cfg.token_env_file:
-            values = [line.partition("=")[2].strip().strip("\"'")
-                      for line in Path(cfg.token_env_file).read_text().splitlines()
-                      if line.startswith("RUNTIME_INFERENCE_TOKEN=")]
+            values = [
+                line.partition("=")[2].strip().strip("\"'")
+                for line in Path(cfg.token_env_file).read_text().splitlines()
+                if line.startswith("RUNTIME_INFERENCE_TOKEN=")
+            ]
             if len(values) != 1 or not values[0]:
                 reject("VALIDATION_FAILED")
             token = values[0]
-        connection = (nullcontext(cfg.status_url) if cfg.status_url else
-                      bundle_tools._port_forward(cfg.context, cfg.namespace, cfg.kubeconfig, 8080))
+        connection = (
+            nullcontext(cfg.status_url)
+            if cfg.status_url
+            else bundle_tools._port_forward(cfg.context, cfg.namespace, cfg.kubeconfig, 8080)
+        )
         with connection as url:
             headers = {"Content-Type": "application/json"}
             if token:
                 headers["Authorization"] = "Bearer " + token
-            request = Request(url + "/v1/completions", headers=headers, data=json.dumps({
-                "model": models[0], "prompt": "ping", "max_tokens": 1, "stream": False}).encode())
+            request = Request(
+                url + "/v1/completions",
+                headers=headers,
+                data=json.dumps({"model": models[0], "prompt": "ping", "max_tokens": 1, "stream": False}).encode(),
+            )
             with build_opener(NoRedirect()).open(request, timeout=15) as response:
                 body = response.read(1024 * 1024 + 1)
             value = json.loads(body)
@@ -484,14 +688,24 @@ class Agent:
 
     def process_sync(self, op):
         from ..enforcement.sync import SyncFailure, sync
-        report = {"lease_id": op["lease_id"], "started_at": now(), "before": None, "after": None,
-                  "state": "failed", "code": "VALIDATION_FAILED", "steps": [], "evidence_sha256": [],
-                  "dry_run": not self.config.execute}
+
+        report = {
+            "lease_id": op["lease_id"],
+            "started_at": now(),
+            "before": None,
+            "after": None,
+            "state": "failed",
+            "code": "VALIDATION_FAILED",
+            "steps": [],
+            "evidence_sha256": [],
+            "dry_run": not self.config.execute,
+        }
         try:
             before, intent = self.current()
             report["before"] = self.validate(op, before, intent)
             payload = op["payload"]
             running = False
+
             def guard():
                 nonlocal running
                 if not running:
@@ -502,16 +716,26 @@ class Agent:
                     self.validate(op, current, current_intent)
                 except Rejected as error:
                     raise SyncFailure(str(error)) from None
+
             def verify(inference):
                 self.sync_gateway(inference)
                 observed, observed_intent = self.current()
                 bundle = self.verified_bundle(Path(self.config.bundle_root) / observed["bundle_id"])
                 if observed["bundle_id"] != payload["bundle_id"] or bundle.sha256 != payload["bundle_sha256"]:
                     raise SyncFailure("STATE_CHANGED")
-            result = sync(intent, context=self.config.context, namespace=self.config.namespace, run=self.run,
-                          read_mode=self.sync_mode, verify_gateway=verify,
-                          components=payload["components"], cilium_apply=payload.get("cilium_apply", False),
-                          execute=self.config.execute, before_apply=guard)
+
+            result = sync(
+                intent,
+                context=self.config.context,
+                namespace=self.config.namespace,
+                run=self.run,
+                read_mode=self.sync_mode,
+                verify_gateway=verify,
+                components=payload["components"],
+                cilium_apply=payload.get("cilium_apply", False),
+                execute=self.config.execute,
+                before_apply=guard,
+            )
             report.update(result)
             report["evidence_sha256"] = [payload["bundle_sha256"]]
             try:
@@ -527,7 +751,8 @@ class Agent:
             pass
         if not report["steps"]:
             report["steps"] = [{"stage": "validation", "state": "failed"}] + [
-                {"stage": stage, "state": "skipped"} for stage in ("render", "dry-run", "apply", "verify")]
+                {"stage": stage, "state": "skipped"} for stage in ("render", "dry-run", "apply", "verify")
+            ]
         report["finished_at"] = now()
         self.client.request(f"/{op['id']}/result", report)
         return report
@@ -536,8 +761,17 @@ class Agent:
         if op.get("kind") == "enforcement.apply":
             return self.process_sync(op)
         started = now()
-        report = {"lease_id": op["lease_id"], "state": "failed", "code": "VALIDATION_FAILED", "started_at": started,
-                  "dry_run": not self.config.execute, "before": None, "after": None, "steps": [], "evidence_sha256": []}
+        report = {
+            "lease_id": op["lease_id"],
+            "state": "failed",
+            "code": "VALIDATION_FAILED",
+            "started_at": started,
+            "dry_run": not self.config.execute,
+            "before": None,
+            "after": None,
+            "steps": [],
+            "evidence_sha256": [],
+        }
         executing = False
         try:
             before, intent = self.current()
@@ -560,13 +794,25 @@ class Agent:
                 before, intent = self.current()
                 before = self.validate(op, before, intent)
                 if op["kind"] in {"bundle.apply", "bundle.switch"}:
-                    bundle_tools.apply_bundle(str(source) if source else None, self.config.bundle_root,
-                        self.config.context, self.config.namespace, self.config.status_url or "http://127.0.0.1:8080", self.config.token_env_file,
-                        kubeconfig=self.config.kubeconfig, existing=existing, dry_run=True)
+                    bundle_tools.apply_bundle(
+                        str(source) if source else None,
+                        self.config.bundle_root,
+                        self.config.context,
+                        self.config.namespace,
+                        self.config.status_url or "http://127.0.0.1:8080",
+                        self.config.token_env_file,
+                        kubeconfig=self.config.kubeconfig,
+                        existing=existing,
+                        dry_run=True,
+                    )
                 report["before"] = before
                 report["steps"].append({"stage": "validation", "state": "passed"})
                 if op["kind"] == "tetragon.mode" and payload["mode"] == "enforce":
-                    report["evidence_sha256"].extend(evaluate(self.snapshot(), payload["policy_name"], intent, self.review(), self.monitor_seconds)["evidence_sha256"])
+                    report["evidence_sha256"].extend(
+                        evaluate(self.snapshot(), payload["policy_name"], intent, self.review(), self.monitor_seconds)[
+                            "evidence_sha256"
+                        ]
+                    )
                 if not self.config.execute:
                     report.update(state="checked", code="DRY_RUN", after=before)
                 else:
@@ -576,9 +822,14 @@ class Agent:
                     self.validate(op, before2, intent2)
                     executing = True
                     if op["kind"] == "tetragon.mode":
-                        result = self.tool("tetragon_mode").switch_mode(self.config.context, self.config.namespace,
-                                  payload["policy_name"], payload["mode"], run=self.run,
-                                  history_path=self.config.history_file)
+                        result = self.tool("tetragon_mode").switch_mode(
+                            self.config.context,
+                            self.config.namespace,
+                            payload["policy_name"],
+                            payload["mode"],
+                            run=self.run,
+                            history_path=self.config.history_file,
+                        )
                         report["steps"].append({"stage": "set-mode", "state": "passed" if result["ok"] else "failed"})
                         if result["ok"]:
                             report.update(state="succeeded", code="OK")
@@ -592,11 +843,15 @@ class Agent:
                         self.execute_bundle(source, existing)
                         report["after"], _ = self.current()
                         report.update(state="succeeded", code="OK")
-                        report["steps"].extend({"stage": stage, "state": "passed"} for stage in ("link", "restart", "status"))
+                        report["steps"].extend(
+                            {"stage": stage, "state": "passed"} for stage in ("link", "restart", "status")
+                        )
         except Rejected as error:
             if error.observed is not None:
                 report["before"] = error.observed
-            report.update(state="unknown" if executing else "failed", code="STATUS_UNKNOWN" if executing else str(error))
+            report.update(
+                state="unknown" if executing else "failed", code="STATUS_UNKNOWN" if executing else str(error)
+            )
             if error.reason_code:
                 report["reason_code"] = error.reason_code
         except bundle_tools.StatusUnavailable:
@@ -612,10 +867,14 @@ class Agent:
                     report["after"] = after
                 except Exception:
                     restored = False
-            report.update(state="rolled_back" if restored else "unknown", code="ROLLED_BACK" if restored else "STATUS_UNKNOWN")
+            report.update(
+                state="rolled_back" if restored else "unknown", code="ROLLED_BACK" if restored else "STATUS_UNKNOWN"
+            )
             report["steps"].append({"stage": "rollback", "state": "passed" if restored else "unknown"})
         except Exception:
-            report.update(state="unknown" if executing else "failed", code="STATUS_UNKNOWN" if executing else "VALIDATION_FAILED")
+            report.update(
+                state="unknown" if executing else "failed", code="STATUS_UNKNOWN" if executing else "VALIDATION_FAILED"
+            )
         if not any(s["stage"] == "validation" for s in report["steps"]):
             report["steps"].append({"stage": "validation", "state": "failed"})
         stages = ("set-mode",) if op.get("kind") == "tetragon.mode" else ("link", "restart", "status")
@@ -656,8 +915,15 @@ class Agent:
             policies = self.readiness(current, intent)
         except Exception:
             pass
-        self.client.request("/agent-state", {"server": self.config.server, "current": current, "policies": policies,
-                                             "bundles": self.available_bundles() if current else []})
+        self.client.request(
+            "/agent-state",
+            {
+                "server": self.config.server,
+                "current": current,
+                "policies": policies,
+                "bundles": self.available_bundles() if current else [],
+            },
+        )
         for candidate in listing["items"]:
             if candidate["state"] == "approved":
                 op = self.client.request(f"/{candidate['id']}/claim", {})
@@ -671,8 +937,11 @@ def add_arguments(parser):
     for flag in ("kubeconfig", "token-env-file", "state-file", "review-file", "history-file", "ca-file"):
         parser.add_argument("--" + flag)
     parser.add_argument("--tools-dir", default=Config.tools_dir)
-    parser.add_argument("--status-url", default=Config.status_url,
-                        help="로컬 Gateway 직접 조회(명시할 때만); 기본은 deployment 새 port-forward")
+    parser.add_argument(
+        "--status-url",
+        default=Config.status_url,
+        help="로컬 Gateway 직접 조회(명시할 때만); 기본은 deployment 새 port-forward",
+    )
     parser.add_argument("--monitor-seconds", type=int, default=86400)
     parser.add_argument("--interval", type=float, default=10)
     group = parser.add_mutually_exclusive_group()

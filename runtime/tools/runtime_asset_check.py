@@ -4,6 +4,7 @@
 The approved launch file has command/args string arrays. Raw Pod input is read
 locally; no kubectl, deployment or approval creation is performed by this tool.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -36,7 +37,17 @@ def _write_new(path: str, document: dict) -> None:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("inventory", "root", "intent", "target", "pod", "approved-launch", "model-host-path", "manifest-out", "report-out"):
+    for name in (
+        "inventory",
+        "root",
+        "intent",
+        "target",
+        "pod",
+        "approved-launch",
+        "model-host-path",
+        "manifest-out",
+        "report-out",
+    ):
         parser.add_argument("--" + name, required=True)
     args = parser.parse_args(argv)
     # Freeze each external input once. All parsing and provenance hashes use
@@ -58,19 +69,29 @@ def main(argv=None) -> int:
     launch = inputs["approved_launch"][1]
     if set(launch) != {"command", "args"}:
         raise ValueError("approved launch must contain only command and args")
-    binding = check_execution_binding(inputs["pod"][1], inputs["target"][1], intent,
-                                      model_host_path=args.model_host_path,
-                                      expected_command=launch["command"], expected_args=launch["args"])
+    binding = check_execution_binding(
+        inputs["pod"][1],
+        inputs["target"][1],
+        intent,
+        model_host_path=args.model_host_path,
+        expected_command=launch["command"],
+        expected_args=launch["args"],
+    )
     _write_new(args.manifest_out, manifest)
     result = check(load_manifest(args.manifest_out))
-    report = {"schema_version": "runtime-update-asset-check/1.0", "source_inventory_sha256": inventory["inventory_sha256"],
-              "target_sha256": hashlib.sha256(inputs["target"][0]).hexdigest(),
-              "intent_sha256": hashlib.sha256(inputs["intent"][0]).hexdigest(),
-              "pod_sha256": hashlib.sha256(inputs["pod"][0]).hexdigest(),
-              "approved_launch_sha256": hashlib.sha256(inputs["approved_launch"][0]).hexdigest(),
-              "asset_check": result, "execution_binding": binding,
-              "ready_for_operator_review": result["intact"] and binding["state"] == "match",
-              "approval_state": "not_created", "worker_consumption": "unverified"}
+    report = {
+        "schema_version": "runtime-update-asset-check/1.0",
+        "source_inventory_sha256": inventory["inventory_sha256"],
+        "target_sha256": hashlib.sha256(inputs["target"][0]).hexdigest(),
+        "intent_sha256": hashlib.sha256(inputs["intent"][0]).hexdigest(),
+        "pod_sha256": hashlib.sha256(inputs["pod"][0]).hexdigest(),
+        "approved_launch_sha256": hashlib.sha256(inputs["approved_launch"][0]).hexdigest(),
+        "asset_check": result,
+        "execution_binding": binding,
+        "ready_for_operator_review": result["intact"] and binding["state"] == "match",
+        "approval_state": "not_created",
+        "worker_consumption": "unverified",
+    }
     _write_new(args.report_out, report)
     return 0 if report["ready_for_operator_review"] else 1
 

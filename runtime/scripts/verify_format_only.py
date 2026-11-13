@@ -12,6 +12,7 @@ import 순서가 바뀌거나 코드가 추가/삭제되면 AST 가 달라져서
 
 종료 코드: 0 = 모든 .py 가 AST 동일, 1 = 차이 있음, 2 = 사용 오류
 """
+
 from __future__ import annotations
 
 import ast
@@ -23,11 +24,7 @@ SKIP_DIRS = {"__pycache__", ".git", "node_modules", ".venv"}
 
 
 def py_files(root: Path) -> dict[str, Path]:
-    return {
-        str(p.relative_to(root)): p
-        for p in root.rglob("*.py")
-        if not (SKIP_DIRS & set(p.parts))
-    }
+    return {str(p.relative_to(root)): p for p in root.rglob("*.py") if not (SKIP_DIRS & set(p.parts))}
 
 
 def normalize(tree: ast.AST) -> ast.AST:

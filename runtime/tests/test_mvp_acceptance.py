@@ -33,15 +33,17 @@ class M4UnitTests(unittest.TestCase):
             gateway = JsonlStore(directory / "gateway.jsonl")
             engine = JsonlStore(directory / "engine.jsonl")
             current = "a" * 32
-            gateway.append({
-                "phase": "final",
-                "request_id": "1" * 32,
-                "observation_session_id": current,
-                "recorded_at": "2026-10-21T00:00:00+00:00",
-                "decision": {"result": "DENIED"},
-                "request": {},
-                "delivery": {},
-            })
+            gateway.append(
+                {
+                    "phase": "final",
+                    "request_id": "1" * 32,
+                    "observation_session_id": current,
+                    "recorded_at": "2026-10-21T00:00:00+00:00",
+                    "decision": {"result": "DENIED"},
+                    "request": {},
+                    "delivery": {},
+                }
+            )
             with gateway.path.open("ab") as output:
                 for _ in range(25):
                     output.write(b"{bad\n")
@@ -73,30 +75,40 @@ class FullAcceptanceTests(unittest.TestCase):
     def test_s1_06_waits_for_regular_final_after_http_body(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             pending, release = threading.Event(), threading.Event()
+
             class DelayedRunner(_Runner):
                 def start_gateway(self, *args, **kwargs):
                     super().start_gateway(*args, **kwargs)
                     if kwargs.get("data_dir") != self.data_dir:
                         return
                     append = self.gateway._records.append
+
                     def delayed_final(record):
                         if record.get("phase") == "final":
                             pending.set()
                             if not release.wait(3):
                                 raise AssertionError("test final append not released")
                         return append(record)
+
                     self.gateway._records.append = delayed_final
+
             runner = DelayedRunner(Path(temporary))
             read_all = JsonlStore.read_all
             main_thread = threading.get_ident()
             observed = []
+
             def release_after_missing_regular_final(store):
                 rows, corrupt = read_all(store)
-                if (pending.is_set() and not release.is_set() and threading.get_ident() == main_thread
-                        and store.path == runner.data_dir / "gateway_records.jsonl"):
+                if (
+                    pending.is_set()
+                    and not release.is_set()
+                    and threading.get_ident() == main_thread
+                    and store.path == runner.data_dir / "gateway_records.jsonl"
+                ):
                     observed.append(True)
                     release.set()
                 return rows, corrupt
+
             try:
                 with patch.object(JsonlStore, "read_all", release_after_missing_regular_final):
                     result = _run_s1_06(runner)
@@ -127,9 +139,10 @@ class FullAcceptanceTests(unittest.TestCase):
                 + [f"SGL-{index:02d}" for index in range(1, 3)]
                 + [f"S4-{index:02d}" for index in range(1, 7)],
             )
-            self.assertTrue(all(result.passed for result in results), [
-                (result.case_id, result.actual) for result in results if not result.passed
-            ])
+            self.assertTrue(
+                all(result.passed for result in results),
+                [(result.case_id, result.actual) for result in results if not result.passed],
+            )
             report_dir = Path(temporary) / "reports"
             json_path, md_path = write_reports(report_dir, data_dir, results)
             report = json.loads(json_path.read_text(encoding="utf-8"))

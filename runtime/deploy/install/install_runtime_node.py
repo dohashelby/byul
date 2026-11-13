@@ -1,4 +1,5 @@
 """Offline host installer. Configuration and subprocess output are never printed."""
+
 from __future__ import annotations
 
 import argparse
@@ -35,8 +36,9 @@ KERNEL_CONFIG = Path("/boot/config-" + os.uname().release)
 GRUB_DEFAULT = Path("/etc/default/grub")
 SUDOERS_DIR = Path("/etc/sudoers.d")
 SUDOERS_NAME = "serving-runtime-agent"
-UNITS = tuple(f"serving-runtime-{name}.service" for name in
-              ("tetragon-status", "gpu-status", "monitor-window", "agent"))
+UNITS = tuple(
+    f"serving-runtime-{name}.service" for name in ("tetragon-status", "gpu-status", "monitor-window", "agent")
+)
 # The agent can change the server on approved requests, so the installer installs
 # its unit but never enables or starts it. A person starts it explicitly.
 AGENT_UNIT = "serving-runtime-agent.service"
@@ -44,12 +46,25 @@ AGENT_UNIT_FILE = Path("/etc/systemd/system") / AGENT_UNIT
 AUTO_UNITS = tuple(unit for unit in UNITS if unit != AGENT_UNIT)
 COPY = ("src", "tools", "deploy", "pyproject.toml", "README.md")
 PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-DEFAULTS = {"PLATFORM_CA_FILE": "", "GATEWAY_DATA_GID": "10000",
-            "OBSERVE_GID": "10010", "OBSERVATION_USER": "ubuntu",
-            "CACHE_SETTINGS_FILE": "", "CACHE_SETTINGS_SHA256": "",
-            "CACHE_KUBECONFIG_FILE": "", "CACHE_KUBECTL": "/usr/local/bin/kubectl"}
-REQUIRED = {"CONTEXT", "NAMESPACE", "SERVER_ID", "PLATFORM_URL",
-            "AGENT_TOKEN_FILE", "VIEWER_ENV_FILE", "KUBECONFIG_FILE"}
+DEFAULTS = {
+    "PLATFORM_CA_FILE": "",
+    "GATEWAY_DATA_GID": "10000",
+    "OBSERVE_GID": "10010",
+    "OBSERVATION_USER": "ubuntu",
+    "CACHE_SETTINGS_FILE": "",
+    "CACHE_SETTINGS_SHA256": "",
+    "CACHE_KUBECONFIG_FILE": "",
+    "CACHE_KUBECTL": "/usr/local/bin/kubectl",
+}
+REQUIRED = {
+    "CONTEXT",
+    "NAMESPACE",
+    "SERVER_ID",
+    "PLATFORM_URL",
+    "AGENT_TOKEN_FILE",
+    "VIEWER_ENV_FILE",
+    "KUBECONFIG_FILE",
+}
 
 
 class InstallError(Exception):
@@ -68,11 +83,21 @@ def require(condition, message, code="CHECK_FAILED"):
 def permission_code(error):
     # Never echo arbitrary input paths or exception text, even on permission errors.
     filename = str(error.filename or "")
-    for path in ("/var/lib/serving-runtime", "/etc/serving-runtime", "/etc/sudoers.d",
-                 "/opt/byul/runtime", "/etc/systemd/system", "/srv/serving/observation",
-                 "/srv/serving/runtime/data", "/srv/serving/bundles", "/srv/serving/verification",
-                 "/etc/default/grub.d", "/etc/default/grub", "/sys/kernel/security/lsm",
-                 "/run/byul-runtime-install.lock"):
+    for path in (
+        "/var/lib/serving-runtime",
+        "/etc/serving-runtime",
+        "/etc/sudoers.d",
+        "/opt/byul/runtime",
+        "/etc/systemd/system",
+        "/srv/serving/observation",
+        "/srv/serving/runtime/data",
+        "/srv/serving/bundles",
+        "/srv/serving/verification",
+        "/etc/default/grub.d",
+        "/etc/default/grub",
+        "/sys/kernel/security/lsm",
+        "/run/byul-runtime-install.lock",
+    ):
         if filename == path or filename.startswith(path + "/"):
             return "PERMISSION_DENIED:" + path
     return "PERMISSION_DENIED"
@@ -82,15 +107,16 @@ def permission_code(error):
 def checking(stage, name):
     try:
         yield
-    except (InstallError, OSError, ValueError, KeyError, TypeError,
-            subprocess.SubprocessError) as error:
+    except (InstallError, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
         if isinstance(error, PermissionError):
             failure = InstallError("읽기·실행·쓰기 권한을 확인하세요.", permission_code(error))
         elif isinstance(error, InstallError):
             failure = error
         else:
-            failure = InstallError("입력·호스트 검증 또는 설치 실패(상세 값 비노출).",
-                                   "HOST_IO_FAILED" if isinstance(error, OSError) else "VALIDATION_FAILED")
+            failure = InstallError(
+                "입력·호스트 검증 또는 설치 실패(상세 값 비노출).",
+                "HOST_IO_FAILED" if isinstance(error, OSError) else "VALIDATION_FAILED",
+            )
         if failure.stage is None:
             failure.stage, failure.check = stage, name
         raise failure from None
@@ -108,15 +134,16 @@ def plain_path(path):
 def input_bytes(path, *, private=False):
     path = plain_path(path)
     info = path.stat()
-    require(stat.S_ISREG(info.st_mode) and 0 < info.st_size <= 1024 * 1024,
-            "입력은 크기가 제한된 비어 있지 않은 일반 파일이어야 합니다.")
+    require(
+        stat.S_ISREG(info.st_mode) and 0 < info.st_size <= 1024 * 1024,
+        "입력은 크기가 제한된 비어 있지 않은 일반 파일이어야 합니다.",
+    )
     owners = {0, os.getuid()}
     # sudo changes uid to root, but inputs may still belong to its invoking operator.
     sudo_uid = os.environ.get("SUDO_UID", "")
     if os.geteuid() == 0 and re.fullmatch(r"[0-9]+", sudo_uid):
         owners.add(int(sudo_uid))
-    require(info.st_uid in owners and not info.st_mode & 0o022,
-            "입력 소유자 또는 쓰기 권한이 안전하지 않습니다.")
+    require(info.st_uid in owners and not info.st_mode & 0o022, "입력 소유자 또는 쓰기 권한이 안전하지 않습니다.")
     require(not private or not info.st_mode & 0o077, "비밀 입력은 0600이어야 합니다.")
     return path.read_bytes()
 
@@ -128,29 +155,29 @@ def load_config(path):
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         key, sep, value = line.partition("=")
-        require(sep and key in REQUIRED | DEFAULTS.keys() and key not in seen,
-                "설정 키가 잘못되었거나 중복됐습니다.")
-        require(value == value.strip() and not any(ord(c) < 32 for c in value),
-                "설정 값 형식이 잘못됐습니다.")
+        require(sep and key in REQUIRED | DEFAULTS.keys() and key not in seen, "설정 키가 잘못되었거나 중복됐습니다.")
+        require(value == value.strip() and not any(ord(c) < 32 for c in value), "설정 값 형식이 잘못됐습니다.")
         config[key] = value
         seen.add(key)
     require(all(config.get(key) for key in REQUIRED), "필수 설정이 누락됐습니다.")
     for key in ("CONTEXT", "SERVER_ID", "OBSERVATION_USER"):
-        require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", config[key]),
-                "식별자 형식이 잘못됐습니다.")
-    require(re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", config["NAMESPACE"]),
-            "namespace 형식이 잘못됐습니다.")
+        require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", config[key]), "식별자 형식이 잘못됐습니다.")
+    require(
+        re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", config["NAMESPACE"]), "namespace 형식이 잘못됐습니다."
+    )
     for key in ("GATEWAY_DATA_GID", "OBSERVE_GID"):
-        require(re.fullmatch(r"[1-9][0-9]{0,8}", config[key]) and int(config[key]) < 2**31,
-                "그룹 번호가 잘못됐습니다.")
+        require(re.fullmatch(r"[1-9][0-9]{0,8}", config[key]) and int(config[key]) < 2**31, "그룹 번호가 잘못됐습니다.")
     require(config["GATEWAY_DATA_GID"] != config["OBSERVE_GID"], "공유 그룹은 달라야 합니다.")
     url = config["PLATFORM_URL"]
     require(re.fullmatch(r"[A-Za-z0-9:/._-]+", url), "플랫폼 URL 형식이 잘못됐습니다.")
     parsed = urlsplit(url)
-    require(parsed.hostname and not parsed.username and not parsed.password
-            and (parsed.scheme == "https" or
-                 (parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1"})),
-            "플랫폼은 HTTPS 또는 loopback HTTP만 허용합니다.")
+    require(
+        parsed.hostname
+        and not parsed.username
+        and not parsed.password
+        and (parsed.scheme == "https" or (parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1"})),
+        "플랫폼은 HTTPS 또는 loopback HTTP만 허용합니다.",
+    )
     # Also validate port without exposing ValueError's input value.
     parsed.port
     for key in ("AGENT_TOKEN_FILE", "VIEWER_ENV_FILE", "KUBECONFIG_FILE", "PLATFORM_CA_FILE"):
@@ -183,30 +210,46 @@ def render(config, execute=False):
         text = text.replace("lab-context", config["CONTEXT"])
         text = text.replace("--namespace serving", "--namespace " + config["NAMESPACE"])
         text = text.replace("--server server-01", "--server " + config["SERVER_ID"])
-        text = re.sub(r"^SupplementaryGroups=.*$",
-                      "SupplementaryGroups=" + config["GATEWAY_DATA_GID"] + " " + config["OBSERVE_GID"],
-                      text, flags=re.M)
+        text = re.sub(
+            r"^SupplementaryGroups=.*$",
+            "SupplementaryGroups=" + config["GATEWAY_DATA_GID"] + " " + config["OBSERVE_GID"],
+            text,
+            flags=re.M,
+        )
         if name == "serving-runtime-agent.service":
             if execute:
                 text = text.replace(" --dry-run", " --execute")
             if config["PLATFORM_CA_FILE"]:
-                text = text.replace(" --sudo-bundle-apply", " --ca-file /etc/serving-runtime/platform-ca.pem --sudo-bundle-apply")
+                text = text.replace(
+                    " --sudo-bundle-apply", " --ca-file /etc/serving-runtime/platform-ca.pem --sudo-bundle-apply"
+                )
         result[name] = text.encode()
     if config["CACHE_SETTINGS_FILE"]:
         text = (SOURCE / "deploy/byul-cache-observer.service").read_text()
         text = text.replace("Group=10000", "Group=" + config["GATEWAY_DATA_GID"])
         result["byul-cache-observer.service"] = text.encode()
-        result["cache-observer.env"] = ("CACHE_SETTINGS=/etc/serving-runtime/cache-observer.json\n"
-            + "CACHE_SETTINGS_SHA256=" + config["CACHE_SETTINGS_SHA256"] + "\n"
-            + "CACHE_READER_GID=" + config["GATEWAY_DATA_GID"] + "\n"
+        result["cache-observer.env"] = (
+            "CACHE_SETTINGS=/etc/serving-runtime/cache-observer.json\n"
+            + "CACHE_SETTINGS_SHA256="
+            + config["CACHE_SETTINGS_SHA256"]
+            + "\n"
+            + "CACHE_READER_GID="
+            + config["GATEWAY_DATA_GID"]
+            + "\n"
             + "CACHE_KUBECONFIG=/etc/serving-runtime/cache-kubeconfig\n"
-            + "CACHE_KUBECTL=" + config["CACHE_KUBECTL"] + "\n").encode()
+            + "CACHE_KUBECTL="
+            + config["CACHE_KUBECTL"]
+            + "\n"
+        ).encode()
     text = (SOURCE / "deploy/agent/sudoers.example").read_text()
     # Validated identifiers contain only letters/digits/_.-; only '.' is an ERE
     # metacharacter here. sudoers argument regexes need no extra backslash layer.
     context = config["CONTEXT"].replace(".", r"\.")
-    result["sudoers"] = text.replace("--context lab-context", "--context " + context).replace(
-        "--namespace serving", "--namespace " + config["NAMESPACE"]).encode()
+    result["sudoers"] = (
+        text.replace("--context lab-context", "--context " + context)
+        .replace("--namespace serving", "--namespace " + config["NAMESPACE"])
+        .encode()
+    )
     result["agent.env"] = ("PLATFORM_URL=" + config["PLATFORM_URL"] + "\n").encode()
     return result
 
@@ -214,22 +257,40 @@ def render(config, execute=False):
 def run(command, *, capture=False, reject_stderr=False):
     name = Path(command[0]).name
     # Executable names may also come from a path; emit only known tool labels.
-    if name not in {"visudo", "systemctl", "systemd-analyze", "sudo", "groupadd",
-                    "useradd", "usermod", "update-grub", "python", "python3", "python3.12"}:
+    if name not in {
+        "visudo",
+        "systemctl",
+        "systemd-analyze",
+        "sudo",
+        "groupadd",
+        "useradd",
+        "usermod",
+        "update-grub",
+        "python",
+        "python3",
+        "python3.12",
+    }:
         name = "external"
     code = "VISUDO_FAILED" if name == "visudo" else "COMMAND_FAILED:" + name
     try:
-        result = subprocess.run([str(v) for v in command], stdin=subprocess.DEVNULL,
-                                stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
-                                stderr=subprocess.PIPE if reject_stderr else subprocess.DEVNULL,
-                                check=False, timeout=120,
-                                env={"PATH": PATH, "LANG": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1"})
+        result = subprocess.run(
+            [str(v) for v in command],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
+            stderr=subprocess.PIPE if reject_stderr else subprocess.DEVNULL,
+            check=False,
+            timeout=120,
+            env={"PATH": PATH, "LANG": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1"},
+        )
     except (OSError, subprocess.SubprocessError) as error:
         if isinstance(error, PermissionError):
             raise InstallError("명령 실행 권한이 없습니다(출력 생략).", permission_code(error)) from None
         raise InstallError("외부 명령 실행 실패(출력 생략).", code) from None
-    require(result.returncode == 0 and not (reject_stderr and result.stderr),
-            "외부 명령 검증에 실패했습니다(출력 생략).", code)
+    require(
+        result.returncode == 0 and not (reject_stderr and result.stderr),
+        "외부 명령 검증에 실패했습니다(출력 생략).",
+        code,
+    )
     return result.stdout if capture else None
 
 
@@ -250,15 +311,22 @@ def check_sudoers_conflicts():
         if alias or rule:
             conflicts.append(json.dumps(path.name, ensure_ascii=True))
             alias_conflict |= bool(alias)
-    require(not conflicts, "충돌 파일: " + ", ".join(conflicts),
-            "SUDOERS_ALIAS_CONFLICT" if alias_conflict else "SUDOERS_RULE_CONFLICT")
+    require(
+        not conflicts,
+        "충돌 파일: " + ", ".join(conflicts),
+        "SUDOERS_ALIAS_CONFLICT" if alias_conflict else "SUDOERS_RULE_CONFLICT",
+    )
 
 
 def active(unit):
     try:
-        result = subprocess.run(["systemctl", "is-active", "--quiet", unit],
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                timeout=15, env={"PATH": PATH})
+        result = subprocess.run(
+            ["systemctl", "is-active", "--quiet", unit],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=15,
+            env={"PATH": PATH},
+        )
     except (OSError, subprocess.SubprocessError) as error:
         if isinstance(error, PermissionError):
             raise InstallError("명령 실행 권한이 없습니다(출력 생략).", permission_code(error)) from None
@@ -270,8 +338,10 @@ def secure_target(path):
     for parent in (plain_path(path), *Path(path).parents):
         if parent.exists():
             info = parent.stat()
-            require(info.st_uid == 0 and not info.st_mode & 0o022,
-                    "설치 경로는 root 소유이며 그룹/기타 쓰기가 없어야 합니다.")
+            require(
+                info.st_uid == 0 and not info.st_mode & 0o022,
+                "설치 경로는 root 소유이며 그룹/기타 쓰기가 없어야 합니다.",
+            )
 
 
 def metadata(path, uid, gid, mode):
@@ -281,8 +351,9 @@ def metadata(path, uid, gid, mode):
     if stat.S_IMODE(path.stat().st_mode) != mode:
         path.chmod(mode)
     info = path.stat()
-    require((info.st_uid, info.st_gid, stat.S_IMODE(info.st_mode)) == (uid, gid, mode),
-            "파일 권한 검증에 실패했습니다.")
+    require(
+        (info.st_uid, info.st_gid, stat.S_IMODE(info.st_mode)) == (uid, gid, mode), "파일 권한 검증에 실패했습니다."
+    )
 
 
 def directory(path, uid=0, gid=0, mode=0o755):
@@ -317,18 +388,33 @@ def check_baseline(config):
 
 def validate_baseline(path, config):
     info = plain_path(path).stat()
-    require(info.st_uid in {0, pwd.getpwnam("runtime-agent").pw_uid} and not info.st_mode & 0o022
-            and stat.S_ISREG(info.st_mode) and 0 < info.st_size <= 1024 * 1024,
-            "baseline 권한·크기를 검수해야 합니다.")
+    require(
+        info.st_uid in {0, pwd.getpwnam("runtime-agent").pw_uid}
+        and not info.st_mode & 0o022
+        and stat.S_ISREG(info.st_mode)
+        and 0 < info.st_size <= 1024 * 1024,
+        "baseline 권한·크기를 검수해야 합니다.",
+    )
     value = json.loads(path.read_bytes())
-    require(isinstance(value, dict) and value.get("schema_version") == "runtime-tetragon-baseline/1.0"
-            and value.get("context") == config["CONTEXT"] and isinstance(value.get("policies"), list)
-            and value["policies"],
-            "baseline context·정책 범위를 검수해야 합니다.")
-    require(all(isinstance(p, dict) and p.get("mode") in {"monitor", "monitor_only"}
-                and all(isinstance(p.get(k), str) and p[k] for k in ("node", "namespace", "name"))
-                and isinstance(p.get("spec_sha256"), str) and re.fullmatch(r"[a-f0-9]{64}", p["spec_sha256"])
-                for p in value["policies"]), "baseline은 monitor 정책만 허용합니다.")
+    require(
+        isinstance(value, dict)
+        and value.get("schema_version") == "runtime-tetragon-baseline/1.0"
+        and value.get("context") == config["CONTEXT"]
+        and isinstance(value.get("policies"), list)
+        and value["policies"],
+        "baseline context·정책 범위를 검수해야 합니다.",
+    )
+    require(
+        all(
+            isinstance(p, dict)
+            and p.get("mode") in {"monitor", "monitor_only"}
+            and all(isinstance(p.get(k), str) and p[k] for k in ("node", "namespace", "name"))
+            and isinstance(p.get("spec_sha256"), str)
+            and re.fullmatch(r"[a-f0-9]{64}", p["spec_sha256"])
+            for p in value["policies"]
+        ),
+        "baseline은 monitor 정책만 허용합니다.",
+    )
 
 
 def group_check(name, gid):
@@ -348,20 +434,25 @@ def bpf_plan(enable):
     if "bpf" in lsms.split(","):
         return None
     require(enable, "BPF LSM이 없습니다. 유지보수 시 --enable-bpf-lsm을 명시하세요.")
-    require("CONFIG_BPF_LSM=y" in KERNEL_CONFIG.read_text().splitlines(),
-            "커널 CONFIG_BPF_LSM=y가 필요합니다.")
+    require("CONFIG_BPF_LSM=y" in KERNEL_CONFIG.read_text().splitlines(), "커널 CONFIG_BPF_LSM=y가 필요합니다.")
     require(shutil.which("update-grub", path=PATH), "update-grub 설치가 필요합니다.")
-    content = ('# Managed by byul runtime installer\nGRUB_CMDLINE_LINUX="$GRUB_CMDLINE_LINUX lsm='
-               + lsms + ',bpf"\n').encode()
+    content = (
+        '# Managed by byul runtime installer\nGRUB_CMDLINE_LINUX="$GRUB_CMDLINE_LINUX lsm=' + lsms + ',bpf"\n'
+    ).encode()
     # Do not source arbitrary GRUB shell or silently override an existing lsm=.
     for path in [GRUB_DEFAULT, *GRUB.parent.glob("*.cfg")]:
         plain_path(path)
         if path == GRUB:
             require(path.read_bytes() == content, "기존 BPF LSM 설정을 수동으로 통합해야 합니다.")
         elif path.exists():
-            require(not any(re.search(r"\blsm\s*=", line) for line in path.read_text().splitlines()
-                            if not line.lstrip().startswith("#")),
-                    "기존 GRUB lsm= 설정을 수동으로 통합해야 합니다.")
+            require(
+                not any(
+                    re.search(r"\blsm\s*=", line)
+                    for line in path.read_text().splitlines()
+                    if not line.lstrip().startswith("#")
+                ),
+                "기존 GRUB lsm= 설정을 수동으로 통합해야 합니다.",
+            )
     return content
 
 
@@ -371,9 +462,11 @@ def preflight(config, args):
     require(sys.version_info >= (3, 12), "Python 3.12 이상이 필요합니다.")
     for name in ("systemctl", "systemd-analyze", "visudo", "sudo", "kubectl", "groupadd", "useradd", "usermod"):
         require(shutil.which(name, path=PATH), "필수 호스트 도구가 없습니다. 설치 문서를 확인하세요.")
-    require(shutil.which("crictl", path=PATH),
-            "crictl이 없습니다. 버전·체크섬·CRI endpoint를 검수해 수동 설치 후 재실행하세요. 자동 다운로드하지 않습니다.",
-            "MISSING_TOOL:crictl")
+    require(
+        shutil.which("crictl", path=PATH),
+        "crictl이 없습니다. 버전·체크섬·CRI endpoint를 검수해 수동 설치 후 재실행하세요. 자동 다운로드하지 않습니다.",
+        "MISSING_TOOL:crictl",
+    )
     for name, key in (("serving-bundles", "GATEWAY_DATA_GID"), ("serving-observe", "OBSERVE_GID")):
         group_check(name, int(config[key]))
     observer = pwd.getpwnam(config["OBSERVATION_USER"])
@@ -383,11 +476,20 @@ def preflight(config, args):
     except KeyError:
         account = None
     if account is not None:
-        require(account.pw_uid != 0 and account.pw_gid != 0
-                and grp.getgrgid(account.pw_gid).gr_name == "runtime-agent",
-                "기존 runtime-agent 계정을 검수해야 합니다.")
-    for target in (DEST, ETC, Path("/etc/systemd/system"), SUDOERS_DIR, STATE,
-                   OBSERVATION.parent, DATA.parent, Path("/srv/serving/bundles")):
+        require(
+            account.pw_uid != 0 and account.pw_gid != 0 and grp.getgrgid(account.pw_gid).gr_name == "runtime-agent",
+            "기존 runtime-agent 계정을 검수해야 합니다.",
+        )
+    for target in (
+        DEST,
+        ETC,
+        Path("/etc/systemd/system"),
+        SUDOERS_DIR,
+        STATE,
+        OBSERVATION.parent,
+        DATA.parent,
+        Path("/srv/serving/bundles"),
+    ):
         # STATE may already be owned by runtime-agent; validate its parent only.
         secure_target(target.parent if target == STATE else target)
     for target in (STATE, OBSERVATION, DATA):
@@ -395,11 +497,14 @@ def preflight(config, args):
     for name in COPY:
         source = SOURCE / name
         paths = [source, *source.rglob("*")] if source.is_dir() else [source]
-        require(all(not p.is_symlink() and (p.is_file() or p.is_dir()) for p in paths),
-                "코드 원본의 링크·특수 파일을 거부합니다.")
+        require(
+            all(not p.is_symlink() and (p.is_file() or p.is_dir()) for p in paths),
+            "코드 원본의 링크·특수 파일을 거부합니다.",
+        )
     require(DEST != SOURCE and DEST not in SOURCE.parents, "설치본 내부에서 재설치하지 마세요.")
     if config["PLATFORM_CA_FILE"]:
         import ssl
+
         ssl.create_default_context(cafile=config["PLATFORM_CA_FILE"])
     grub = bpf_plan(args.enable_bpf_lsm)
     if grub is not None:
@@ -408,8 +513,10 @@ def preflight(config, args):
         if BASELINE.exists():
             check_baseline(config)
         else:
-            require(args.capture_baseline or grub is not None,
-                    "baseline이 없습니다. 정상 monitor 정책 확인 후 --capture-baseline을 명시하세요.")
+            require(
+                args.capture_baseline or grub is not None,
+                "baseline이 없습니다. 정상 monitor 정책 확인 후 --capture-baseline을 명시하세요.",
+            )
     return grub
 
 
@@ -428,8 +535,19 @@ def install_accounts(config):
     try:
         pwd.getpwnam("runtime-agent")
     except KeyError:
-        run(["useradd", "--system", "--gid", "runtime-agent", "--home-dir", STATE,
-             "--shell", "/usr/sbin/nologin", "runtime-agent"])
+        run(
+            [
+                "useradd",
+                "--system",
+                "--gid",
+                "runtime-agent",
+                "--home-dir",
+                STATE,
+                "--shell",
+                "/usr/sbin/nologin",
+                "runtime-agent",
+            ]
+        )
     required = {int(config[k]) for k in ("GATEWAY_DATA_GID", "OBSERVE_GID")}
     account = pwd.getpwnam("runtime-agent")
     if not required <= set(os.getgrouplist("runtime-agent", account.pw_gid)):
@@ -439,8 +557,9 @@ def install_accounts(config):
     observe_gid = int(config["OBSERVE_GID"])
     if observe_gid not in os.getgrouplist(config["OBSERVATION_USER"], observer.pw_gid):
         run(["usermod", "--append", "--groups", str(observe_gid), config["OBSERVATION_USER"]])
-    require(observe_gid in os.getgrouplist(config["OBSERVATION_USER"], observer.pw_gid),
-            "관측 사용자 보조 그룹 검증 실패.")
+    require(
+        observe_gid in os.getgrouplist(config["OBSERVATION_USER"], observer.pw_gid), "관측 사용자 보조 그룹 검증 실패."
+    )
     return account
 
 
@@ -463,8 +582,10 @@ def install_code():
     # Existing environments must also be root-owned and go-w, including symlinks.
     for path in [DEST, *DEST.rglob("*")]:
         info = path.lstat()
-        require(info.st_uid == 0 and not (not path.is_symlink() and info.st_mode & 0o022),
-                "코드·venv의 root 소유/go-w 검증에 실패했습니다.")
+        require(
+            info.st_uid == 0 and not (not path.is_symlink() and info.st_mode & 0o022),
+            "코드·venv의 root 소유/go-w 검증에 실패했습니다.",
+        )
         if path.is_symlink():
             secure_target(path.resolve())
     sites = list(venv.glob("lib/python3.*/site-packages"))
@@ -476,31 +597,45 @@ def install_code():
     require(re.fullmatch(r"[A-Za-z0-9_.+-]+", version), "패키지 판본 형식이 잘못됐습니다.")
     dist_info = sites[0] / f"serving_runtime-{version}.dist-info"
     directory(dist_info)
-    write_file(dist_info / "METADATA",
-               f"Metadata-Version: 2.1\nName: serving-runtime\nVersion: {version}\n".encode())
+    write_file(dist_info / "METADATA", f"Metadata-Version: 2.1\nName: serving-runtime\nVersion: {version}\n".encode())
     run([venv / "bin/python", "-I", "-B", "-m", "serving_runtime", "--help"])
-    run([venv / "bin/python", "-I", "-B", "-c",
-         "import serving_runtime, tools.tetragon_status, tools.tetragon_monitor_window, tools.gpu_status; "
-         "import sys; assert sys.version_info >= (3,12)"])
+    run(
+        [
+            venv / "bin/python",
+            "-I",
+            "-B",
+            "-c",
+            "import serving_runtime, tools.tetragon_status, tools.tetragon_monitor_window, tools.gpu_status; "
+            "import sys; assert sys.version_info >= (3,12)",
+        ]
+    )
 
 
 def install_files(config, account, artifacts):
     with checking("3", "CONFIG_FILES"):
         directory(ETC, mode=0o750, gid=account.pw_gid)
-        for key, name, uid, mode in (("AGENT_TOKEN_FILE", "agent.token", account.pw_uid, 0o600),
-                                    ("VIEWER_ENV_FILE", "viewer.env", 0, 0o640),
-                                    ("KUBECONFIG_FILE", "kubeconfig", 0, 0o640)):
-            write_file(ETC / name, input_bytes(config[key], private=key != "KUBECONFIG_FILE"),
-                       uid=uid, gid=account.pw_gid, mode=mode)
+        for key, name, uid, mode in (
+            ("AGENT_TOKEN_FILE", "agent.token", account.pw_uid, 0o600),
+            ("VIEWER_ENV_FILE", "viewer.env", 0, 0o640),
+            ("KUBECONFIG_FILE", "kubeconfig", 0, 0o640),
+        ):
+            write_file(
+                ETC / name,
+                input_bytes(config[key], private=key != "KUBECONFIG_FILE"),
+                uid=uid,
+                gid=account.pw_gid,
+                mode=mode,
+            )
         write_file(ETC / "agent.env", artifacts["agent.env"], gid=account.pw_gid, mode=0o640)
         if config["CACHE_SETTINGS_FILE"]:
-            for key, name in (("CACHE_SETTINGS_FILE", "cache-observer.json"),
-                              ("CACHE_KUBECONFIG_FILE", "cache-kubeconfig")):
+            for key, name in (
+                ("CACHE_SETTINGS_FILE", "cache-observer.json"),
+                ("CACHE_KUBECONFIG_FILE", "cache-kubeconfig"),
+            ):
                 write_file(ETC / name, input_bytes(config[key], private=True), mode=0o600)
             write_file(ETC / "cache-observer.env", artifacts["cache-observer.env"], mode=0o600)
         if config["PLATFORM_CA_FILE"]:
-            write_file(ETC / "platform-ca.pem", input_bytes(config["PLATFORM_CA_FILE"]),
-                       gid=account.pw_gid, mode=0o640)
+            write_file(ETC / "platform-ca.pem", input_bytes(config["PLATFORM_CA_FILE"]), gid=account.pw_gid, mode=0o640)
     with tempfile.TemporaryDirectory(prefix="byul-install-") as temporary:
         temporary = Path(temporary)
         with checking("4", "SUDOERS_VALIDATE"):
@@ -531,13 +666,34 @@ def capture_baseline(config, capture):
         candidate = STATE / "baseline.capture.json"
         require(not plain_path(candidate).exists(), "미완료 baseline 후보를 검수·제거 후 재실행하세요.")
         # shell arguments are positional; neither config nor secrets become shell code.
-        run(["sudo", "-u", "runtime-agent", "--", "env", f"KUBECONFIG={ETC}/kubeconfig",
-             "/bin/sh", "-c", 'umask 022; cd /opt/byul/runtime || exit; exec "$@"', "byul-baseline",
-             DEST / ".venv/bin/python", "-B", "-m", "tools.tetragon_status",
-             "--context", config["CONTEXT"], "--evidence-dir", STATE / "evidence",
-             "--output", STATE / "tetragon-state.json",
-             "--public-output", OBSERVATION / "tetragon-status/tetragon-state.json",
-             "--capture-baseline", candidate])
+        run(
+            [
+                "sudo",
+                "-u",
+                "runtime-agent",
+                "--",
+                "env",
+                f"KUBECONFIG={ETC}/kubeconfig",
+                "/bin/sh",
+                "-c",
+                'umask 022; cd /opt/byul/runtime || exit; exec "$@"',
+                "byul-baseline",
+                DEST / ".venv/bin/python",
+                "-B",
+                "-m",
+                "tools.tetragon_status",
+                "--context",
+                config["CONTEXT"],
+                "--evidence-dir",
+                STATE / "evidence",
+                "--output",
+                STATE / "tetragon-state.json",
+                "--public-output",
+                OBSERVATION / "tetragon-status/tetragon-state.json",
+                "--capture-baseline",
+                candidate,
+            ]
+        )
         # Reject enforce/unknown policies before atomically accepting the candidate.
         validate_baseline(candidate, config)
         # link fails if a concurrent writer has created BASELINE; never overwrite it.
@@ -619,25 +775,29 @@ def install(config, args, artifacts, grub):
             directory(STATE, account.pw_uid, account.pw_gid, 0o750)
             directory(STATE / "evidence", account.pw_uid, account.pw_gid, 0o750)
             directory(Path("/srv/serving/bundles"), 0, int(config["GATEWAY_DATA_GID"]), 0o2750)
-            directory(OBSERVATION, pwd.getpwnam(config["OBSERVATION_USER"]).pw_uid,
-                      int(config["OBSERVE_GID"]), 0o2750)
+            directory(OBSERVATION, pwd.getpwnam(config["OBSERVATION_USER"]).pw_uid, int(config["OBSERVE_GID"]), 0o2750)
             # Give the status writer its own directory; the shared parent stays go-w.
-            directory(OBSERVATION / "tetragon-status", account.pw_uid,
-                      int(config["OBSERVE_GID"]), 0o2750)
-            directory(OBSERVATION / "gpu-status", account.pw_uid,
-                      int(config["OBSERVE_GID"]), 0o2750)
+            directory(OBSERVATION / "tetragon-status", account.pw_uid, int(config["OBSERVE_GID"]), 0o2750)
+            directory(OBSERVATION / "gpu-status", account.pw_uid, int(config["OBSERVE_GID"]), 0o2750)
             # Optional engine-log receipt collector output (service not enabled by default).
-            directory(OBSERVATION / "engine-receipts", account.pw_uid,
-                      int(config["OBSERVE_GID"]), 0o2750)
-            directory(OBSERVATION / "lab-reports", pwd.getpwnam(config["OBSERVATION_USER"]).pw_uid,
-                      int(config["OBSERVE_GID"]), 0o2750)
+            directory(OBSERVATION / "engine-receipts", account.pw_uid, int(config["OBSERVE_GID"]), 0o2750)
+            directory(
+                OBSERVATION / "lab-reports",
+                pwd.getpwnam(config["OBSERVATION_USER"]).pw_uid,
+                int(config["OBSERVE_GID"]),
+                0o2750,
+            )
             # Only an administrator publishes reviewed inputs. Never seed approvals,
             # including an empty revocation list, from the server's current state.
             with checking("6–7", "VERIFICATION_PERMISSIONS"):
                 directory(VERIFICATION, 0, int(config["OBSERVE_GID"]), 0o2750)
                 directory(VERIFICATION / "approved", 0, int(config["GATEWAY_DATA_GID"]), 0o2750)
-                directory(VERIFICATION / "candidates", pwd.getpwnam(config["OBSERVATION_USER"]).pw_uid,
-                          int(config["OBSERVE_GID"]), 0o2750)
+                directory(
+                    VERIFICATION / "candidates",
+                    pwd.getpwnam(config["OBSERVATION_USER"]).pw_uid,
+                    int(config["OBSERVE_GID"]),
+                    0o2750,
+                )
             # The Gateway UID is 10000, independently of its configured data GID.
             directory(DATA, 10000, int(config["GATEWAY_DATA_GID"]), 0o750)
             for path in (ETC / "kubeconfig", ETC / "viewer.env", OBSERVATION, DATA):
@@ -675,7 +835,11 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="런타임 노드 설치(설정 값·자식 명령 출력 비노출)")
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true", help="무변경 로컬 사전 점검; 클러스터 조회 없음")
-    parser.add_argument("--execute", action="store_true", help="설치될 agent만 실제 운영 실행 모드로 설정(설치기는 agent를 시작하지 않음)")
+    parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="설치될 agent만 실제 운영 실행 모드로 설정(설치기는 agent를 시작하지 않음)",
+    )
     parser.add_argument("--enable-bpf-lsm", action="store_true", help="필요할 때만 GRUB 설정; 자동 재부팅 없음")
     parser.add_argument("--capture-baseline", action="store_true", help="검수된 monitor 정책의 최초 baseline만 캡처")
     args = parser.parse_args(argv)

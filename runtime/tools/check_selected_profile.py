@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Validate a policy for the selected default text deployment; no deployment occurs."""
+
 from __future__ import annotations
 
 import argparse

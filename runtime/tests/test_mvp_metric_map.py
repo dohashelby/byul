@@ -134,9 +134,7 @@ class MetricsCheckCliTests(unittest.TestCase):
         path.write_bytes(payload)
         output = io.StringIO()
         with redirect_stdout(output):
-            code = main(
-                ["metrics-check", "--backend-config", str(SGLANG_EXAMPLE), "--input", str(path), *extra]
-            )
+            code = main(["metrics-check", "--backend-config", str(SGLANG_EXAMPLE), "--input", str(path), *extra])
         return code, output.getvalue()
 
     def test_all_ok_returns_zero_and_json_report(self) -> None:

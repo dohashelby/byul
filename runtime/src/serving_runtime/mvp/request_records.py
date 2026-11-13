@@ -60,9 +60,13 @@ class RequestRecords:
         """
         self._request_local.policy_snapshot = deepcopy(policy_state)
         self._request_local.target_snapshot = deepcopy(
-            self._target_context() if self._target_context is not None else {
-                "registration": "not_configured", "target_id": None,
-                "instance_id": None, "instance_state": "not_configured",
+            self._target_context()
+            if self._target_context is not None
+            else {
+                "registration": "not_configured",
+                "target_id": None,
+                "instance_id": None,
+                "instance_state": "not_configured",
             }
         )
 
@@ -143,8 +147,14 @@ class RequestRecords:
             "target": (
                 deepcopy(self._request_local.target_snapshot)
                 if getattr(self._request_local, "target_snapshot", None) is not None
-                else self._target_context() if self._target_context is not None
-                else {"registration": "not_configured", "target_id": None, "instance_id": None, "instance_state": "not_configured"}
+                else self._target_context()
+                if self._target_context is not None
+                else {
+                    "registration": "not_configured",
+                    "target_id": None,
+                    "instance_id": None,
+                    "instance_state": "not_configured",
+                }
             ),
             "recorded_at": _utc_now(),
             "policy": {
@@ -164,8 +174,7 @@ class RequestRecords:
                 "rule_id": decision.rule_id,
                 "message": (
                     "engine rejected request"
-                    if decision.result == "ENGINE_REJECTED"
-                    and decision.source == "engine"
+                    if decision.result == "ENGINE_REJECTED" and decision.source == "engine"
                     else decision.message
                 ),
                 "http_status": decision.http_status,
@@ -177,10 +186,7 @@ class RequestRecords:
                 "max_tokens": decision.max_tokens,
                 "n": decision.n,
                 # Policy-approved extra fields: names and modes only, never values.
-                "extra_fields": [
-                    {"name": name, "mode": mode}
-                    for name, mode in decision.extra_fields
-                ],
+                "extra_fields": [{"name": name, "mode": mode} for name, mode in decision.extra_fields],
                 "cache_isolation": {
                     "mode": policy.cache_isolation if policy else None,
                     "applied": bool(
@@ -206,16 +212,8 @@ class RequestRecords:
             "backend_cancel": (
                 backend_cancel
                 if backend_cancel is not None
-                else (
-                    "not_applicable"
-                    if self._backend_kind == "mock"
-                    else "not_observed"
-                )
+                else ("not_applicable" if self._backend_kind == "mock" else "not_observed")
             ),
             "backend_kind": self._backend_kind,
-            "data_origin": (
-                "actual_test"
-                if self._backend_kind == "mock"
-                else "external_backend"
-            ),
+            "data_origin": ("actual_test" if self._backend_kind == "mock" else "external_backend"),
         }

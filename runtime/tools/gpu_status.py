@@ -3,6 +3,7 @@
 Only fixed numeric fields and the product name are kept. GPU UUIDs, serial
 numbers, bus IDs, processes and raw command output are never written.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -62,20 +63,34 @@ def parse(output: str) -> list[dict[str, Any]]:
             raise ValueError("PARSE_ERROR")
         if used is not None and total is not None and used > total:
             raise ValueError("PARSE_ERROR")
-        gpus.append({"index": int(index), "name": name, "utilization_percent": util,
-                     "memory_used_mib": used, "memory_total_mib": total,
-                     "temperature_c": temp, "power_w": power})
+        gpus.append(
+            {
+                "index": int(index),
+                "name": name,
+                "utilization_percent": util,
+                "memory_used_mib": used,
+                "memory_total_mib": total,
+                "temperature_c": temp,
+                "power_w": power,
+            }
+        )
     return gpus
 
 
-def query(runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
-          binary: str | None = None) -> list[dict[str, Any]]:
+def query(
+    runner: Callable[..., subprocess.CompletedProcess] = subprocess.run, binary: str | None = None
+) -> list[dict[str, Any]]:
     path = binary or shutil.which("nvidia-smi")
     if not path:
         raise ValueError("NVIDIA_SMI_MISSING")
     try:
-        result = runner([path, "--query-gpu=" + ",".join(FIELDS), "--format=csv,noheader,nounits"],
-                        capture_output=True, text=True, timeout=TIMEOUT_S, check=False)
+        result = runner(
+            [path, "--query-gpu=" + ",".join(FIELDS), "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=TIMEOUT_S,
+            check=False,
+        )
     except subprocess.TimeoutExpired:
         raise ValueError("TIMEOUT") from None
     except OSError:
@@ -118,7 +133,9 @@ def main(argv=None) -> int:
     while True:
         result = collect()
         write(args.output, result)
-        print(json.dumps({"state": result["state"], "reason": result["reason"], "gpus": len(result["gpus"])}), flush=True)
+        print(
+            json.dumps({"state": result["state"], "reason": result["reason"], "gpus": len(result["gpus"])}), flush=True
+        )
         if not args.watch:
             return 0 if result["state"] == "ok" else 1
         time.sleep(args.interval)

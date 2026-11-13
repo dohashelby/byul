@@ -72,9 +72,7 @@ class MockEngine:
             ("stall_after_events", stall_after_events),
             ("truncate_after_events", truncate_after_events),
         ):
-            if value is not None and (
-                not isinstance(value, int) or isinstance(value, bool) or value < 0
-            ):
+            if value is not None and (not isinstance(value, int) or isinstance(value, bool) or value < 0):
                 raise ValueError(f"{name} must be a non-negative integer or None")
         self.port = port
         self.response_delay_s = response_delay_s
@@ -117,10 +115,7 @@ class MockEngine:
         """Return ephemeral bytes written by each stream; these are never persisted."""
 
         with self._receipts_lock:
-            return {
-                request_id: bytes(payload)
-                for request_id, payload in self._stream_transmissions.items()
-            }
+            return {request_id: bytes(payload) for request_id, payload in self._stream_transmissions.items()}
 
     def release_stalled_streams(self) -> None:
         """Release every test stream waiting at ``stall_after_events``."""
@@ -160,9 +155,7 @@ class MockEngine:
                     with owner._receipts_lock:
                         owner._receipts_store_error = str(error)
 
-            def _finish_stream(
-                self, receipt: dict[str, Any], stream_end: str
-            ) -> None:
+            def _finish_stream(self, receipt: dict[str, Any], stream_end: str) -> None:
                 with owner._receipts_lock:
                     receipt["stream_end"] = stream_end
                     receipt["evidence_kind"] = "mock"
@@ -192,9 +185,7 @@ class MockEngine:
                         written = self.wfile.write(part)
                         self.wfile.flush()
                         with owner._receipts_lock:
-                            owner._stream_transmissions[request_id].extend(
-                                part if written is None else part[:written]
-                            )
+                            owner._stream_transmissions[request_id].extend(part if written is None else part[:written])
                     return True
                 except (BrokenPipeError, ConnectionResetError):
                     return False
@@ -255,22 +246,15 @@ class MockEngine:
                         }
                     )
                     chunk = {
-                        "id": (
-                            f"cmpl-{request_id}"
-                            if completion
-                            else f"mock-{request_id}"
-                        ),
-                        "object": (
-                            "text_completion" if completion else "chat.completion.chunk"
-                        ),
+                        "id": (f"cmpl-{request_id}" if completion else f"mock-{request_id}"),
+                        "object": ("text_completion" if completion else "chat.completion.chunk"),
                         "created": int(time.time()),
                         "model": model,
                         "choices": [choice],
                     }
-                    event = (
-                        "data: " + json.dumps(chunk, ensure_ascii=False, separators=(",", ":"))
-                        + "\n\n"
-                    ).encode("utf-8")
+                    event = ("data: " + json.dumps(chunk, ensure_ascii=False, separators=(",", ":")) + "\n\n").encode(
+                        "utf-8"
+                    )
                     if not self._write_stream_event(request_id, event):
                         self._finish_stream(receipt, "client_disconnected")
                         return
@@ -349,16 +333,10 @@ class MockEngine:
                     )
                     return
                 if parsed.path == "/_mock/receipts":
-                    request_ids = parse_qs(parsed.query, keep_blank_values=True).get(
-                        "request_id", [""]
-                    )
+                    request_ids = parse_qs(parsed.query, keep_blank_values=True).get("request_id", [""])
                     request_id = request_ids[0]
                     with owner._receipts_lock:
-                        matches = [
-                            dict(receipt)
-                            for receipt in owner._receipts
-                            if receipt["request_id"] == request_id
-                        ]
+                        matches = [dict(receipt) for receipt in owner._receipts if receipt["request_id"] == request_id]
                     self._send_json(
                         200,
                         {
@@ -443,9 +421,7 @@ class MockEngine:
                 if owner.header_delay_s and owner._stop_event.wait(owner.header_delay_s):
                     return
                 if parsed.path == "/v1/completions":
-                    prompt_tokens = simulated_prompt_token_count(
-                        document.get("prompt")
-                    )
+                    prompt_tokens = simulated_prompt_token_count(document.get("prompt"))
                     completion_tokens = 2
                     response = {
                         "id": f"cmpl-{request_id}",
@@ -490,9 +466,7 @@ class MockEngine:
             do_TRACE = _unsupported_method
 
         self._server = ThreadingHTTPServer(("127.0.0.1", self.port), Handler)
-        self._thread = threading.Thread(
-            target=self._server.serve_forever, name="mvp-mock-engine", daemon=True
-        )
+        self._thread = threading.Thread(target=self._server.serve_forever, name="mvp-mock-engine", daemon=True)
         self._thread.start()
         return self
 

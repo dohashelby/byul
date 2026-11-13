@@ -34,9 +34,7 @@ def write_policy(directory: Path, **updates: object) -> Path:
     return path
 
 
-def chat_body(
-    content: str = "hello there", max_tokens: int = 64, *, stream: bool = False
-) -> bytes:
+def chat_body(content: str = "hello there", max_tokens: int = 64, *, stream: bool = False) -> bytes:
     document = {
         "model": "test-model",
         "messages": [{"role": "user", "content": content}],
@@ -93,9 +91,7 @@ class ContextCheckHttpTests(unittest.TestCase):
         except PermissionError as error:
             self.skipTest(f"local sockets are unavailable: {error}")
         self.addCleanup(engine.stop)
-        config = MVPConfig(
-            gateway_port=0, engine_port=0, policy_path=str(policy_path), data_dir=str(self.data_dir)
-        )
+        config = MVPConfig(gateway_port=0, engine_port=0, policy_path=str(policy_path), data_dir=str(self.data_dir))
         gateway = GatewayApp(config, load_policy(policy_path), engine.address).start()
         self.addCleanup(gateway.stop)
         return engine, gateway
@@ -134,11 +130,13 @@ class ContextCheckHttpTests(unittest.TestCase):
         pending, release = threading.Event(), threading.Event()
         self.addCleanup(release.set)
         append = gateway._records.append
+
         def delayed_final(record):
             if record.get("phase") == "final":
                 pending.set()
                 self.assertTrue(release.wait(3), "test final append was not released")
             return append(record)
+
         with patch.object(gateway._records, "append", delayed_final):
             status, request_id, _body = self.post(gateway, chat_body("one two three"))
             self.assertEqual(status, 200)
@@ -146,6 +144,7 @@ class ContextCheckHttpTests(unittest.TestCase):
             read_all = JsonlStore.read_all
             reader_thread = threading.get_ident()
             empty_observed = []
+
             def release_after_empty_read(store):
                 rows, corrupt = read_all(store)
                 if store.path == self.data_dir / "gateway_records.jsonl" and threading.get_ident() == reader_thread:
@@ -154,6 +153,7 @@ class ContextCheckHttpTests(unittest.TestCase):
                         empty_observed.append(True)
                         release.set()
                 return rows, corrupt
+
             try:
                 with patch.object(JsonlStore, "read_all", release_after_empty_read):
                     final = self.final_record(request_id)
@@ -193,9 +193,7 @@ class ContextCheckHttpTests(unittest.TestCase):
         policy = write_policy(self.directory, max_context_tokens=200)
         engine, gateway = self.start_mock(policy)
         long_prompt = " ".join(["word"] * 150)
-        status, request_id, body = self.post(
-            gateway, chat_body(long_prompt, max_tokens=64, stream=True)
-        )
+        status, request_id, body = self.post(gateway, chat_body(long_prompt, max_tokens=64, stream=True))
         self.assertEqual(status, 403)
         self.assertEqual(body["error"]["code"], "CONTEXT_LIMIT_EXCEEDED")
         self.assertEqual(engine.receipts, [])
@@ -207,17 +205,13 @@ class ContextCheckHttpTests(unittest.TestCase):
         policy = write_policy(self.directory, max_context_tokens=200)
         engine, gateway = self.start_mock(policy)
         long_prompt = " ".join(["word"] * 150)
-        first_status, first_id, _ = self.post(
-            gateway, chat_body(long_prompt, max_tokens=64)
-        )
+        first_status, first_id, _ = self.post(gateway, chat_body(long_prompt, max_tokens=64))
         self.assertEqual(first_status, 403)
 
         gateway.policy_state = load_policy(BASE_POLICY)
         second_status, second_id, _ = self.post(gateway, chat_body())
         self.assertEqual(second_status, 200)
-        self.assertEqual(
-            self.final_record(first_id)["request"]["context"]["result"], "exceeded"
-        )
+        self.assertEqual(self.final_record(first_id)["request"]["context"]["result"], "exceeded")
         self.assertIsNone(self.final_record(second_id)["request"]["context"])
         self.assertEqual(engine.tokenize_calls, 1)
 
@@ -312,9 +306,7 @@ class ContextCheckHttpTests(unittest.TestCase):
         gateway = GatewayApp(
             config,
             load_policy(policy),
-            backend_config=load_backend_config(
-                backend_path, environ={"TOKENIZER_KEY": "tokenizer-secret"}
-            ),
+            backend_config=load_backend_config(backend_path, environ={"TOKENIZER_KEY": "tokenizer-secret"}),
         ).start()
         self.addCleanup(gateway.stop)
         long_prompt = " ".join(["word"] * 150)

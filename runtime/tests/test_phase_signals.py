@@ -60,9 +60,7 @@ def _wait_for(predicate, timeout: float = 3.0) -> None:
 
 class PhaseSignalExtractionTests(unittest.TestCase):
     def test_observed_cpu_excerpt_uses_only_certain_boundaries(self) -> None:
-        timeline = extract_phase_timeline(
-            FIXTURE, engine="vllm", year=2026, timezone_offset="+00:00"
-        )
+        timeline = extract_phase_timeline(FIXTURE, engine="vllm", year=2026, timezone_offset="+00:00")
         self.assertEqual(
             timeline["entries"],
             [
@@ -98,22 +96,23 @@ class PhaseSignalExtractionTests(unittest.TestCase):
         self.assertEqual(len(parse_timeline(timeline)), 2)
 
     def test_two_timestamped_restarts_close_each_inferring_interval(self) -> None:
-        log = b"\n".join(
-            (
-                b"INFO 10-23 01:00:00 Loading model from scratch...",
-                b"INFO 10-23 01:00:05 Model loading took 1 GiB memory and 5 seconds",
-                b"INFO 10-23 01:00:06 Application startup complete.",
-                b"INFO 10-23 02:00:00 Loading model from scratch...",
-                b"INFO 10-23 02:00:05 Model loading took 1 GiB memory and 5 seconds",
-                b"INFO 10-23 02:00:06 Application startup complete.",
+        log = (
+            b"\n".join(
+                (
+                    b"INFO 10-23 01:00:00 Loading model from scratch...",
+                    b"INFO 10-23 01:00:05 Model loading took 1 GiB memory and 5 seconds",
+                    b"INFO 10-23 01:00:06 Application startup complete.",
+                    b"INFO 10-23 02:00:00 Loading model from scratch...",
+                    b"INFO 10-23 02:00:05 Model loading took 1 GiB memory and 5 seconds",
+                    b"INFO 10-23 02:00:06 Application startup complete.",
+                )
             )
-        ) + b"\n"
+            + b"\n"
+        )
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "restart.log"
             path.write_bytes(log)
-            timeline = extract_phase_timeline(
-                path, engine="vllm", year=2026, timezone_offset="+09:00"
-            )
+            timeline = extract_phase_timeline(path, engine="vllm", year=2026, timezone_offset="+09:00")
         inferring = [item for item in timeline["entries"] if item["phase"] == "inferring"]
         self.assertEqual(len(inferring), 2)
         self.assertEqual(timeline["extraction"]["runs_observed"], 2)
@@ -123,20 +122,22 @@ class PhaseSignalExtractionTests(unittest.TestCase):
 
     def test_sglang_cached_start_and_timestamp_precedence(self) -> None:
         self.assertEqual(len(ENGINE_PATTERN_SETS["sglang"].patterns), 5)
-        timeline = extract_phase_timeline(SGLANG_FIXTURE, engine="sglang", year=2025,
-                                          timezone_offset="+09:00")
-        self.assertEqual([(entry["phase"], entry["from"], entry["until"]) for entry in timeline["entries"]], [
-            ("loading", "2026-11-03T07:31:55+09:00", "2026-11-03T07:31:56+09:00"),
-            ("compiling", "2026-11-03T07:31:57+09:00", "2026-11-03T07:32:05+09:00"),
-            ("inferring", "2026-11-03T07:32:05+09:00", None),
-        ])
-        self.assertEqual(timeline["extraction"]["matched_signals"], {
-            "loading_start": 1, "loading_end": 1, "compiling_start": 1,
-            "capture_end": 1, "inferring_start": 1})
+        timeline = extract_phase_timeline(SGLANG_FIXTURE, engine="sglang", year=2025, timezone_offset="+09:00")
+        self.assertEqual(
+            [(entry["phase"], entry["from"], entry["until"]) for entry in timeline["entries"]],
+            [
+                ("loading", "2026-11-03T07:31:55+09:00", "2026-11-03T07:31:56+09:00"),
+                ("compiling", "2026-11-03T07:31:57+09:00", "2026-11-03T07:32:05+09:00"),
+                ("inferring", "2026-11-03T07:32:05+09:00", None),
+            ],
+        )
+        self.assertEqual(
+            timeline["extraction"]["matched_signals"],
+            {"loading_start": 1, "loading_end": 1, "compiling_start": 1, "capture_end": 1, "inferring_start": 1},
+        )
         self.assertIn("첫 기동 1회", timeline["extraction"]["limitations"][0])
         line = b"2026-11-02T22:31:55Z [2026-11-03 07:31:55] Load weight begin.\n"
-        outer = extract_phase_timeline(io.BytesIO(line), engine="sglang", year=2025,
-                                       timezone_offset="+09:00")
+        outer = extract_phase_timeline(io.BytesIO(line), engine="sglang", year=2025, timezone_offset="+09:00")
         self.assertEqual(outer["entries"][0]["from"], "2026-11-02T22:31:55+00:00")
 
     def test_sglang_cold_start_tail_is_compiling_then_inferring_and_bounded_without_ready(self) -> None:
@@ -146,27 +147,41 @@ class PhaseSignalExtractionTests(unittest.TestCase):
         )
         ready = b"[2026-11-03 15:57:38] The server is fired up and ready to roll!\n"
         intent = parse_intent(json.loads((ROOT / "deploy/gpu-lab-sglang/intent.aws-lab.json").read_text()))
-        for source, expected_end in ((lines + ready, "2026-11-03T15:57:38+00:00"),
-                                     (lines, "2026-11-03T15:57:42+00:00")):
+        for source, expected_end in (
+            (lines + ready, "2026-11-03T15:57:38+00:00"),
+            (lines, "2026-11-03T15:57:42+00:00"),
+        ):
             with self.subTest(ready=source.endswith(ready)), tempfile.TemporaryDirectory() as directory:
-                timeline = extract_phase_timeline(io.BytesIO(source), engine="sglang", year=2026,
-                                                  timezone_offset="+00:00")
+                timeline = extract_phase_timeline(
+                    io.BytesIO(source), engine="sglang", year=2026, timezone_offset="+00:00"
+                )
                 compiling = next(row for row in timeline["entries"] if row["phase"] == "compiling")
                 self.assertEqual(compiling["until"], expected_end)
                 path = Path(directory) / "timeline.json"
                 path.write_text(json.dumps(timeline))
                 policy = ExecPolicy(intent, timeline_path=path)
-                during = policy.classify_exec(binary="/bin/sh", parent="/usr/local/cuda/bin/nvcc",
-                    image=None, observed_at="2026-11-03T15:57:33+00:00")
-                self.assertEqual((during["phase"], during["exec_verdict"], during["suspect_context"]),
-                                 (["compiling"], "suspect_binary", "compile_toolchain_parent"))
-                after = policy.classify_exec(binary="/bin/sh", parent="/usr/local/cuda/bin/nvcc",
-                    image=None, observed_at="2026-11-03T15:57:44+00:00")
+                during = policy.classify_exec(
+                    binary="/bin/sh",
+                    parent="/usr/local/cuda/bin/nvcc",
+                    image=None,
+                    observed_at="2026-11-03T15:57:33+00:00",
+                )
+                self.assertEqual(
+                    (during["phase"], during["exec_verdict"], during["suspect_context"]),
+                    (["compiling"], "suspect_binary", "compile_toolchain_parent"),
+                )
+                after = policy.classify_exec(
+                    binary="/bin/sh",
+                    parent="/usr/local/cuda/bin/nvcc",
+                    image=None,
+                    observed_at="2026-11-03T15:57:44+00:00",
+                )
                 self.assertEqual(after["phase"], ["inferring"] if source.endswith(ready) else ["unknown"])
                 self.assertEqual(after["exec_verdict"], "suspect_binary")
                 self.assertIsNone(after["suspect_context"])
-        no_capture = extract_phase_timeline(io.BytesIO(lines.splitlines(keepends=True)[0]),
-            engine="sglang", year=2026, timezone_offset="+00:00")
+        no_capture = extract_phase_timeline(
+            io.BytesIO(lines.splitlines(keepends=True)[0]), engine="sglang", year=2026, timezone_offset="+00:00"
+        )
         self.assertEqual(no_capture["entries"][0]["until"], "2026-11-03T16:14:00+00:00")
 
     def test_sglang_resume_and_reversed_capture_keep_bounded_order(self) -> None:
@@ -175,29 +190,40 @@ class PhaseSignalExtractionTests(unittest.TestCase):
         state.process_line(b"[2026-11-03 15:57:27] Capture target decode CUDA graph end.\n")
         saved = state.snapshot(follow={})
         self.assertEqual(saved["entries"][0]["until"], "2026-11-03T15:57:42+00:00")
-        resumed = _TimelineState(engine="sglang", year=2026, timezone_offset="+00:00",
-                                 resume_document=saved)
+        resumed = _TimelineState(engine="sglang", year=2026, timezone_offset="+00:00", resume_document=saved)
         resumed.process_line(b"[2026-11-03 15:57:38] The server is fired up and ready to roll!\n")
-        self.assertEqual([(row["phase"], row["until"]) for row in resumed.snapshot()["entries"]], [
-            ("compiling", "2026-11-03T15:57:38+00:00"), ("inferring", None)])
+        self.assertEqual(
+            [(row["phase"], row["until"]) for row in resumed.snapshot()["entries"]],
+            [("compiling", "2026-11-03T15:57:38+00:00"), ("inferring", None)],
+        )
         reversed_log = (
             b"[2026-11-03 15:54:00] Capture target prefill CUDA graph begin.\n"
             b"[2026-11-03 15:57:50] The server is fired up and ready to roll!\n"
             b"[2026-11-03 15:57:27] Capture target decode CUDA graph end.\n"
         )
-        timeline = extract_phase_timeline(io.BytesIO(reversed_log), engine="sglang", year=2026,
-                                          timezone_offset="+00:00")
+        timeline = extract_phase_timeline(
+            io.BytesIO(reversed_log), engine="sglang", year=2026, timezone_offset="+00:00"
+        )
         self.assertEqual(timeline["entries"][0]["until"], "2026-11-03T15:57:42+00:00")
         self.assertEqual(timeline["entries"][1]["from"], "2026-11-03T15:57:50+00:00")
-        invalid_order = extract_phase_timeline(io.BytesIO(
-            b"[2026-11-03 15:54:00] Capture target prefill CUDA graph begin.\n"
-            b"[2026-11-03 15:57:27] Capture target decode CUDA graph end.\n"
-            b"[2026-11-03 15:57:26] The server is fired up and ready to roll!\n"
-        ), engine="sglang", year=2026, timezone_offset="+00:00")
-        self.assertEqual([(row["phase"], row["until"]) for row in invalid_order["entries"]], [
-            ("compiling", "2026-11-03T15:57:27+00:00")])
-        self.assertIn({"line": 3, "signal": "inferring_start", "reason": "ready_before_capture_end"},
-                      invalid_order["extraction"]["omitted_boundaries"])
+        invalid_order = extract_phase_timeline(
+            io.BytesIO(
+                b"[2026-11-03 15:54:00] Capture target prefill CUDA graph begin.\n"
+                b"[2026-11-03 15:57:27] Capture target decode CUDA graph end.\n"
+                b"[2026-11-03 15:57:26] The server is fired up and ready to roll!\n"
+            ),
+            engine="sglang",
+            year=2026,
+            timezone_offset="+00:00",
+        )
+        self.assertEqual(
+            [(row["phase"], row["until"]) for row in invalid_order["entries"]],
+            [("compiling", "2026-11-03T15:57:27+00:00")],
+        )
+        self.assertIn(
+            {"line": 3, "signal": "inferring_start", "reason": "ready_before_capture_end"},
+            invalid_order["extraction"]["omitted_boundaries"],
+        )
 
     def test_invalid_time_inputs_fail_without_guessing(self) -> None:
         for value in ("UTC", "local", "+24:00", "+00:60"):
@@ -209,9 +235,18 @@ class PhaseSignalExtractionTests(unittest.TestCase):
             output = Path(directory) / "timeline.json"
             code = main(
                 [
-                    "enforce", "phase-signals", "--engine", "vllm",
-                    "--log", str(FIXTURE), "--year", "2026", "--tz", "+00:00",
-                    "--out", str(output),
+                    "enforce",
+                    "phase-signals",
+                    "--engine",
+                    "vllm",
+                    "--log",
+                    str(FIXTURE),
+                    "--year",
+                    "2026",
+                    "--tz",
+                    "+00:00",
+                    "--out",
+                    str(output),
                 ]
             )
             self.assertEqual(code, 0)
@@ -286,20 +321,31 @@ class PhaseSignalExtractionTests(unittest.TestCase):
             self.assertEqual(result["exec_verdict"], "allowed_in_phase")
             with self.assertRaisesRegex(ValueError, "choose --overwrite or --resume"):
                 follow_phase_timeline(
-                    "-", output, engine="vllm", year=2026, timezone_offset="+00:00",
+                    "-",
+                    output,
+                    engine="vllm",
+                    year=2026,
+                    timezone_offset="+00:00",
                     stdin=io.BytesIO(),
                 )
             with self.assertRaisesRegex(ValueError, "must match"):
                 follow_phase_timeline(
-                    "-", output, engine="vllm", year=2025, timezone_offset="+00:00",
-                    existing="resume", stdin=io.BytesIO(),
+                    "-",
+                    output,
+                    engine="vllm",
+                    year=2025,
+                    timezone_offset="+00:00",
+                    existing="resume",
+                    stdin=io.BytesIO(),
                 )
             follow_phase_timeline(
-                "-", output, engine="vllm", year=2026, timezone_offset="+00:00",
+                "-",
+                output,
+                engine="vllm",
+                year=2026,
+                timezone_offset="+00:00",
                 existing="resume",
-                stdin=io.BytesIO(
-                    b"INFO 10-23 03:00:00 Loading model from scratch...\n"
-                ),
+                stdin=io.BytesIO(b"INFO 10-23 03:00:00 Loading model from scratch...\n"),
                 clock=lambda: datetime(2026, 10, 23, 3, 1, tzinfo=timezone.utc),
             )
             reloaded = policy.classify_exec(
@@ -365,8 +411,13 @@ class PhaseSignalExtractionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "timeline.json"
             timeline = follow_phase_timeline(
-                "-", output, engine="vllm", year=2026, timezone_offset="+00:00",
-                existing="overwrite", stdin=io.BytesIO(b"\xff\n"),
+                "-",
+                output,
+                engine="vllm",
+                year=2026,
+                timezone_offset="+00:00",
+                existing="overwrite",
+                stdin=io.BytesIO(b"\xff\n"),
                 clock=lambda: datetime(2026, 10, 23, 2, 0, tzinfo=timezone.utc),
             )
             self.assertEqual(timeline["extraction"]["follow"]["state"], "read_error")
@@ -382,15 +433,24 @@ class PhaseSignalExtractionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "timeline.json"
             fake_stdin = mock.Mock()
-            fake_stdin.buffer = io.BytesIO(
-                b"INFO 10-23 01:00:00 Loading model from scratch...\n"
-            )
+            fake_stdin.buffer = io.BytesIO(b"INFO 10-23 01:00:00 Loading model from scratch...\n")
             with mock.patch("sys.stdin", fake_stdin):
                 code = main(
                     [
-                        "enforce", "phase-signals", "--engine", "vllm", "--log", "-",
-                        "--year", "2026", "--tz", "+00:00", "--out", str(output),
-                        "--follow", "--overwrite",
+                        "enforce",
+                        "phase-signals",
+                        "--engine",
+                        "vllm",
+                        "--log",
+                        "-",
+                        "--year",
+                        "2026",
+                        "--tz",
+                        "+00:00",
+                        "--out",
+                        str(output),
+                        "--follow",
+                        "--overwrite",
                     ]
                 )
             self.assertEqual(code, 0)
@@ -439,18 +499,22 @@ class PhaseSignalExtractionTests(unittest.TestCase):
             os.replace(log, rotated)
             log.write_bytes(b"INFO 10-23 02:00:00 Loading model from scratch...\n")
             _wait_for(
-                lambda: "file_replaced"
-                in [item["kind"] for item in document().get("extraction", {}).get("follow", {}).get("events", [])]
-                and document().get("extraction", {}).get("lines_read", 0) >= 3
+                lambda: (
+                    "file_replaced"
+                    in [item["kind"] for item in document().get("extraction", {}).get("follow", {}).get("events", [])]
+                    and document().get("extraction", {}).get("lines_read", 0) >= 3
+                )
             )
             with log.open("ab") as stream:
                 stream.write(b"unparsed padding " + b"x" * 300 + b"\n")
             _wait_for(lambda: document().get("extraction", {}).get("lines_read", 0) >= 4)
             log.write_bytes(b"INFO 10-23 03:00:00 Loading model from scratch...\n")
             _wait_for(
-                lambda: "file_truncated"
-                in [item["kind"] for item in document().get("extraction", {}).get("follow", {}).get("events", [])]
-                and document().get("extraction", {}).get("lines_read", 0) >= 5
+                lambda: (
+                    "file_truncated"
+                    in [item["kind"] for item in document().get("extraction", {}).get("follow", {}).get("events", [])]
+                    and document().get("extraction", {}).get("lines_read", 0) >= 5
+                )
             )
             stop.set()
             thread.join(3)
@@ -478,27 +542,41 @@ class PhaseSignalExtractionTests(unittest.TestCase):
                     b"INFO 10-23 01:00:06 init engine (profile, create kv cache, warmup model) took 6 seconds\n"
                 )
                 follow_phase_timeline(
-                    "-", output, engine="vllm", year=2026, timezone_offset="+00:00",
-                    existing="overwrite", stdin=first,
+                    "-",
+                    output,
+                    engine="vllm",
+                    year=2026,
+                    timezone_offset="+00:00",
+                    existing="overwrite",
+                    stdin=first,
                     clock=lambda: datetime(2026, 10, 23, 1, 30, tzinfo=timezone.utc),
                 )
                 intent = parse_intent(json.loads(INTENT.read_text(encoding="utf-8")))
                 policy = ExecPolicy(intent, timeline_path=output)
                 before = policy.classify_exec(
-                    binary="/usr/bin/python3", parent=None, image=None,
+                    binary="/usr/bin/python3",
+                    parent=None,
+                    image=None,
                     observed_at="2026-10-23T01:30:01+00:00",
                 )
                 self.assertEqual(before["exec_verdict"], "phase_unknown")
 
                 follow_phase_timeline(
-                    "-", output, engine="vllm", year=2026, timezone_offset="+00:00",
-                    existing="resume", stdin=io.BytesIO(b"request prompt=NEVER-SAVE\n"),
+                    "-",
+                    output,
+                    engine="vllm",
+                    year=2026,
+                    timezone_offset="+00:00",
+                    existing="resume",
+                    stdin=io.BytesIO(b"request prompt=NEVER-SAVE\n"),
                     health_url=f"http://127.0.0.1:{server.server_port}/health",
                     health_interval=0.01,
                     clock=lambda: datetime(2026, 10, 23, 2, 0, tzinfo=timezone.utc),
                 )
                 after = policy.classify_exec(
-                    binary="/usr/bin/python3", parent=None, image=None,
+                    binary="/usr/bin/python3",
+                    parent=None,
+                    image=None,
                     observed_at="2026-10-23T02:00:01+00:00",
                 )
                 self.assertEqual(after["phase"], ["inferring"])
@@ -506,7 +584,11 @@ class PhaseSignalExtractionTests(unittest.TestCase):
                 self.assertNotIn("NEVER-SAVE", output.read_text(encoding="utf-8"))
 
                 timeline = follow_phase_timeline(
-                    "-", output, engine="vllm", year=2026, timezone_offset="+00:00",
+                    "-",
+                    output,
+                    engine="vllm",
+                    year=2026,
+                    timezone_offset="+00:00",
                     existing="resume",
                     stdin=io.BytesIO(b"INFO 10-23 03:00:00 Loading model from scratch...\n"),
                     clock=lambda: datetime(2026, 10, 23, 3, 1, tzinfo=timezone.utc),

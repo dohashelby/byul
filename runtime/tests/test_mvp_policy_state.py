@@ -75,9 +75,7 @@ class PolicySchemaAndValidityTests(unittest.TestCase):
         self.assertFalse(v10.ok)
         self.assertEqual(v10.error_code, "UNKNOWN_FIELD")
 
-        no_timezone = load_policy(
-            self.write("naive.json", policy_document(valid_until="2027-01-01T00:00:00"))
-        )
+        no_timezone = load_policy(self.write("naive.json", policy_document(valid_until="2027-01-01T00:00:00")))
         self.assertFalse(no_timezone.ok)
         self.assertEqual(no_timezone.error_code, "INVALID_POLICY")
 
@@ -126,9 +124,7 @@ class PolicySchemaAndValidityTests(unittest.TestCase):
             "POLICY_REVOKED",
         )
         self.assertEqual(
-            evaluate_policy(active, load_revocations(self.directory / "missing.json"))[
-                "reason_code"
-            ],
+            evaluate_policy(active, load_revocations(self.directory / "missing.json"))["reason_code"],
             "POLICY_REVOCATION_UNKNOWN",
         )
 
@@ -315,10 +311,7 @@ class CollectorAndBaselineTests(unittest.TestCase):
                 load_declaration(manifest_path, kind="manifest"),
                 manager,
             )
-            states = {
-                (row["field"], row["source"]): row["state"]
-                for row in compared["rows"]
-            }
+            states = {(row["field"], row["source"]): row["state"] for row in compared["rows"]}
             self.assertEqual(states[("engine.kind", "declared_manifest")], "match")
             self.assertEqual(states[("option.max_model_len", "declared_manifest")], "drift")
             self.assertEqual(states[("engine.version", "engine_api")], "match")
@@ -354,11 +347,7 @@ class PolicyHttpTests(unittest.TestCase):
         self.base_url = f"http://{self.gateway.address[0]}:{self.gateway.address[1]}"
 
     def test_expired_policy_is_503_final_without_engine_call(self) -> None:
-        self.start_gateway(
-            policy_document(
-                valid_until=(datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
-            )
-        )
+        self.start_gateway(policy_document(valid_until=(datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()))
         request = Request(
             self.base_url + "/v1/chat/completions",
             data=json.dumps(
@@ -386,9 +375,7 @@ class PolicyHttpTests(unittest.TestCase):
         self.engine = MockEngine(port=0, stream_events=10, stream_interval_s=0.2).start()
         self.addCleanup(self.engine.stop)
         expires = datetime.now(timezone.utc) + timedelta(seconds=1.5)
-        self.start_gateway(
-            policy_document(valid_until=expires.isoformat())
-        )
+        self.start_gateway(policy_document(valid_until=expires.isoformat()))
         request = Request(
             self.base_url + "/v1/chat/completions",
             data=json.dumps(

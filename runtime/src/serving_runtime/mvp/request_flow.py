@@ -178,11 +178,7 @@ class RequestFlow:
         request_kind: str,
         deadline_at: float | None = None,
     ) -> Decision | None:
-        context_limit = (
-            policy_snapshot.policy.max_context_tokens
-            if policy_snapshot.policy is not None
-            else None
-        )
+        context_limit = policy_snapshot.policy.max_context_tokens if policy_snapshot.policy is not None else None
         if context_limit is None:
             return None
         try:
@@ -197,9 +193,7 @@ class RequestFlow:
                 raise ValueError("validated prompt is unavailable")
             # The relay forwards approved extra fields to the engine; the token
             # count must see the same prompt-shaping inputs.
-            extra_fields = {
-                name: document[name] for name, _mode in decision.extra_fields if name in document
-            }
+            extra_fields = {name: document[name] for name, _mode in decision.extra_fields if name in document}
             input_tokens = self._engine_client.count_input_tokens(
                 request_id,
                 input_value,
@@ -213,8 +207,11 @@ class RequestFlow:
         except RequestDeadlineExceeded:
             return engine_error(504, "ENGINE_DEADLINE", "deadline exceeded", decision)
         except Exception as error:
-            if (deadline_at is not None and time.monotonic() >= deadline_at
-                    and isinstance(error, (TimeoutError, OSError))):
+            if (
+                deadline_at is not None
+                and time.monotonic() >= deadline_at
+                and isinstance(error, (TimeoutError, OSError))
+            ):
                 return engine_error(504, "ENGINE_DEADLINE", "deadline exceeded", decision)
             # Store only the exception class; backend messages may contain secrets.
             context_error = {
@@ -261,9 +258,7 @@ class RequestFlow:
         )
 
     @staticmethod
-    def _auth_rejection(
-        auth_state: AuthState, auth, route: str
-    ) -> tuple[Decision, dict[str, str] | None] | None:
+    def _auth_rejection(auth_state: AuthState, auth, route: str) -> tuple[Decision, dict[str, str] | None] | None:
         """Map an authentication outcome to a pre-body rejection, if any."""
 
         if auth.state == "not_configured":
@@ -284,11 +279,7 @@ class RequestFlow:
             )
         if auth.state in {"missing", "invalid"}:
             code = "AUTH_REQUIRED" if auth.state == "missing" else "AUTH_INVALID"
-            message = (
-                "authentication is required"
-                if auth.state == "missing"
-                else "authentication failed"
-            )
+            message = "authentication is required" if auth.state == "missing" else "authentication failed"
             return (
                 Decision(
                     result="DENIED",
@@ -358,9 +349,7 @@ class RequestFlow:
             return
 
         raw_length = response.request_header("Content-Length")
-        if raw_length is None or not raw_length or any(
-            character not in "0123456789" for character in raw_length
-        ):
+        if raw_length is None or not raw_length or any(character not in "0123456789" for character in raw_length):
             self.finish_without_relay(
                 response,
                 request_id,
@@ -388,11 +377,7 @@ class RequestFlow:
             return
 
         policy = policy_snapshot.policy
-        body_limit = (
-            policy.max_body_bytes
-            if policy_snapshot.ok and policy is not None
-            else _INVALID_POLICY_BODY_LIMIT
-        )
+        body_limit = policy.max_body_bytes if policy_snapshot.ok and policy is not None else _INVALID_POLICY_BODY_LIMIT
         if content_length > body_limit:
             self.finish_without_relay(
                 response,
@@ -416,9 +401,7 @@ class RequestFlow:
                 model=None,
                 max_tokens=None,
             )
-            self.finish_without_relay(
-                response, request_id, unavailable, close_connection=True
-            )
+            self.finish_without_relay(response, request_id, unavailable, close_connection=True)
             return
 
         auth_state = self._auth_state()
@@ -699,6 +682,7 @@ class RequestFlow:
                 return
 
             if stream:
+
                 def record_response_started() -> None:
                     self._records.append(
                         self._records.build(
@@ -706,9 +690,7 @@ class RequestFlow:
                             request_id,
                             decision,
                             attempted=True,
-                            backend_receipt=(
-                                self._engine_client.receipt_not_queried()
-                            ),
+                            backend_receipt=(self._engine_client.receipt_not_queried()),
                             response="streaming",
                             error_code=None,
                             stream=True,
@@ -717,17 +699,15 @@ class RequestFlow:
                         )
                     )
 
-                final_decision, final_outcome, response_started = (
-                    self._relay.relay_stream(
-                        response,
-                        request_id,
-                        document,
-                        decision,
-                        acquired_at,
-                        record_response_started,
-                        route=route,
-                        cache_salt=cache_salt,
-                    )
+                final_decision, final_outcome, response_started = self._relay.relay_stream(
+                    response,
+                    request_id,
+                    document,
+                    decision,
+                    acquired_at,
+                    record_response_started,
+                    route=route,
+                    cache_salt=cache_salt,
                 )
                 backend_receipt = (
                     self._engine_client.receipt_not_queried()
@@ -762,13 +742,9 @@ class RequestFlow:
                         attempted=True,
                         backend_receipt=backend_receipt,
                         response="completed" if completed else "failed",
-                        error_code=(
-                            None if completed else final_decision.reason_code
-                        ),
+                        error_code=(None if completed else final_decision.reason_code),
                         stream=True,
-                        http_start_status=(
-                            200 if response_started else final_decision.http_status
-                        ),
+                        http_start_status=(200 if response_started else final_decision.http_status),
                         final_outcome=final_outcome,
                         response_started=response_started,
                         backend_cancel=backend_cancel,
@@ -803,21 +779,24 @@ class RequestFlow:
             )
             if final_decision.reason_code == "ENGINE_DEADLINE":
                 self._relay.response_id_receipt(request_id)
-            completed = (
-                final_decision.result == "ALLOWED" and engine_body is not None
-            )
+            completed = final_decision.result == "ALLOWED" and engine_body is not None
             delivery_attempted = False
             if completed:
+
                 def deliver_body() -> None:
                     nonlocal delivery_attempted
                     delivery_attempted = True
                     response.send_response_body(
-                        200, "application/json; charset=utf-8", engine_body,
+                        200,
+                        "application/json; charset=utf-8",
+                        engine_body,
                         request_id=request_id,
                     )
+
                 try:
                     write_response_before(
-                        response, acquired_at + self._relay.request_deadline_s,
+                        response,
+                        acquired_at + self._relay.request_deadline_s,
                         deliver_body,
                     )
                 except OSError:
@@ -826,7 +805,8 @@ class RequestFlow:
                         200 if delivery_attempted else 504,
                         "ENGINE_DEADLINE" if expired else "CLIENT_DISCONNECTED",
                         "response deadline exceeded" if expired else "client disconnected",
-                        decision, source="gateway" if expired else "client",
+                        decision,
+                        source="gateway" if expired else "client",
                     )
                     completed = False
             self._records.append(
@@ -840,9 +820,7 @@ class RequestFlow:
                     error_code=None if completed else final_decision.reason_code,
                     stream=False,
                     http_start_status=final_decision.http_status,
-                    final_outcome=(
-                        "completed" if completed else final_decision.reason_code
-                    ),
+                    final_outcome=("completed" if completed else final_decision.reason_code),
                     response_started=delivery_attempted,
                 )
             )
@@ -852,9 +830,7 @@ class RequestFlow:
                     request_id,
                     close_connection=final_decision.reason_code == "ENGINE_DEADLINE",
                     extra_headers=(
-                        {"Retry-After": final_decision.retry_after}
-                        if final_decision.retry_after is not None
-                        else None
+                        {"Retry-After": final_decision.retry_after} if final_decision.retry_after is not None else None
                     ),
                 )
         finally:

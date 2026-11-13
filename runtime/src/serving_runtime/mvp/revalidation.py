@@ -23,9 +23,7 @@ from .store import JsonlStore
 SCHEMA_VERSION = "runtime-revalidation-request/1.0"
 EXPORT_SCHEMA_VERSION = "runtime-revalidation-export/0.1"
 EXPORT_FORMAT_STATUS = "검증 도구 연동 형식 초안(D-03 미합의)"
-_EVENTS = frozenset(
-    {"opened", "condition_cleared", "condition_reappeared", "superseded"}
-)
+_EVENTS = frozenset({"opened", "condition_cleared", "condition_reappeared", "superseded"})
 _INACTIVE_EVENTS = frozenset({"condition_cleared", "superseded"})
 _ASSET_STATES = ("changed", "missing", "unreadable", "symlink")
 _MAX_PATHS = 50
@@ -100,11 +98,7 @@ def evaluate_asset_integrity(
     walk_errors = result.get("walk_errors")
     paths["walk_error"] = (
         sorted(
-            {
-                item.get("path")
-                for item in walk_errors
-                if isinstance(item, dict) and isinstance(item.get("path"), str)
-            }
+            {item.get("path") for item in walk_errors if isinstance(item, dict) and isinstance(item.get("path"), str)}
         )[:_MAX_PATHS]
         if isinstance(walk_errors, list)
         else []
@@ -124,9 +118,7 @@ def evaluate_asset_integrity(
     counts.update(
         {
             "unlisted_file": result.get("extra_file_count", len(paths["unlisted_file"])),
-            "unlisted_symlink": result.get(
-                "extra_symlink_count", len(paths["unlisted_symlink"])
-            ),
+            "unlisted_symlink": result.get("extra_symlink_count", len(paths["unlisted_symlink"])),
             "walk_error": result.get("walk_error_count", len(paths["walk_error"])),
         }
     )
@@ -189,10 +181,7 @@ def evaluate_config_drift(comparison: dict[str, Any]) -> Evaluation:
             "source": source,
             "observed_at": row.get("observed_at"),
         }
-        identity = {
-            name: evidence[name]
-            for name in ("field", "expected", "observed", "source")
-        }
+        identity = {name: evidence[name] for name in ("field", "expected", "observed", "source")}
         conditions.append(
             Condition(
                 "config_drift",
@@ -288,10 +277,7 @@ def _evidence_summary(trigger: str, evidence: dict[str, Any]) -> str:
         )
         return " · ".join(f"{label} {counts.get(name, 0)}" for name, label in labels)
     if trigger == "config_drift":
-        return (
-            f"{evidence.get('field', '–')}: "
-            f"{evidence.get('expected', '–')} → {evidence.get('observed', '–')}"
-        )
+        return f"{evidence.get('field', '–')}: {evidence.get('expected', '–')} → {evidence.get('observed', '–')}"
     if trigger == "policy_content_changed":
         previous = _policy_ref(evidence.get("previous"))
         current = _policy_ref(evidence.get("current"))
@@ -369,8 +355,13 @@ class RevalidationRequests:
         )
 
     def observe_cache(self, result, *, data_origin, observation_session_id, target_id, policy):
-        self._safe_observe("cache_integrity", lambda: evaluate_asset_integrity(result, data_origin, scope="cache_integrity"),
-                           observation_session_id, target_id, policy)
+        self._safe_observe(
+            "cache_integrity",
+            lambda: evaluate_asset_integrity(result, data_origin, scope="cache_integrity"),
+            observation_session_id,
+            target_id,
+            policy,
+        )
 
     def observe_baseline(
         self,
@@ -491,18 +482,10 @@ class RevalidationRequests:
                 if event.get("trigger") == evaluation.trigger:
                     by_fingerprint[event["fingerprint"]] = (request_id, event)
 
-            current = {
-                condition.fingerprint: condition for condition in evaluation.conditions
-            }
-            current_by_scope = {
-                condition.scope: condition for condition in evaluation.conditions
-            }
+            current = {condition.fingerprint: condition for condition in evaluation.conditions}
+            current_by_scope = {condition.scope: condition for condition in evaluation.conditions}
             current_request_ids = {
-                fingerprint: (
-                    by_fingerprint[fingerprint][0]
-                    if fingerprint in by_fingerprint
-                    else uuid4().hex
-                )
+                fingerprint: (by_fingerprint[fingerprint][0] if fingerprint in by_fingerprint else uuid4().hex)
                 for fingerprint in current
             }
             observed_scopes = set(evaluation.observed_origins)
@@ -616,18 +599,12 @@ class RevalidationRequests:
                 )
             requests.sort(key=lambda item: item["opened_at"], reverse=True)
             source_status = {name: dict(value) for name, value in self._source_status.items()}
-            evaluation_state = (
-                "error"
-                if any(item.get("state") == "error" for item in source_status.values())
-                else "ok"
-            )
+            evaluation_state = "error" if any(item.get("state") == "error" for item in source_status.values()) else "ok"
             return {
                 "schema_version": SCHEMA_VERSION,
                 "requests": requests,
                 "open_count": len(requests),
-                "current_condition_count": sum(
-                    1 for item in requests if item["current_evidence_present"]
-                ),
+                "current_condition_count": sum(1 for item in requests if item["current_evidence_present"]),
                 "corrupt_lines": corrupt[:20],
                 "evaluation_errors": list(self._errors),
                 "evaluation_status": {

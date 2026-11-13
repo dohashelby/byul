@@ -21,11 +21,7 @@ def _utc_now() -> str:
 def effective_output_limit(flavor: str, route: str | None, document: dict[str, Any]) -> Any:
     """Imitate the one limit field read by each fake engine route."""
 
-    field = (
-        "max_completion_tokens"
-        if flavor == "sglang" and route == "/v1/chat/completions"
-        else "max_tokens"
-    )
+    field = "max_completion_tokens" if flavor == "sglang" and route == "/v1/chat/completions" else "max_tokens"
     return document.get(field, 16)
 
 
@@ -197,7 +193,7 @@ class FakeBackend:
                 if owner.path_prefix:
                     if not path.startswith(owner.path_prefix + "/"):
                         return None
-                    return path[len(owner.path_prefix):]
+                    return path[len(owner.path_prefix) :]
                 return path
 
             def _authorized(self) -> bool:
@@ -213,9 +209,7 @@ class FakeBackend:
                     "model": document.get("model"),
                     "max_tokens": document.get("max_tokens"),
                     "max_completion_tokens": document.get("max_completion_tokens"),
-                    "effective_max_tokens": effective_output_limit(
-                        owner.flavor, self._route(), document
-                    ),
+                    "effective_max_tokens": effective_output_limit(owner.flavor, self._route(), document),
                     "stream": document.get("stream") is True,
                     "n": document.get("n"),
                     # Test-only visibility into which request fields reached
@@ -271,9 +265,7 @@ class FakeBackend:
                         "data_origin": "fake_backend_test",
                         "test_only": True,
                     }
-                    encoded = (
-                        "data: " + json.dumps(event, separators=(",", ":")) + "\n\n"
-                    ).encode("utf-8")
+                    encoded = ("data: " + json.dumps(event, separators=(",", ":")) + "\n\n").encode("utf-8")
                     try:
                         self.wfile.write(encoded)
                         self.wfile.flush()
@@ -313,8 +305,7 @@ class FakeBackend:
                 if route == "/v1/models":
                     self._send_json(
                         200,
-                        {"object": "list", "data": [{"id": owner.model_id,
-                                                     "max_model_len": owner.max_model_len}]},
+                        {"object": "list", "data": [{"id": owner.model_id, "max_model_len": owner.max_model_len}]},
                     )
                     return
                 if route == "/version" and owner.flavor == "vllm":
@@ -332,13 +323,13 @@ class FakeBackend:
                         # Names from SGLang v0.5.22 metrics_collector.py.
                         families = (
                             "# TYPE sglang:num_running_reqs gauge\n"
-                            "sglang:num_running_reqs{model_name=\"m\"} 1\n"
+                            'sglang:num_running_reqs{model_name="m"} 1\n'
                             "# TYPE sglang:num_queue_reqs gauge\n"
-                            "sglang:num_queue_reqs{model_name=\"m\"} 0\n"
+                            'sglang:num_queue_reqs{model_name="m"} 0\n'
                             "# TYPE sglang:token_usage gauge\n"
-                            "sglang:token_usage{model_name=\"m\"} 0.25\n"
+                            'sglang:token_usage{model_name="m"} 0.25\n'
                             "# TYPE sglang:generation_tokens_total counter\n"
-                            "sglang:generation_tokens_total{model_name=\"m\"} 42\n"
+                            'sglang:generation_tokens_total{model_name="m"} 42\n'
                         )
                     else:
                         families = (
@@ -412,9 +403,7 @@ class FakeBackend:
                 route = self._route()
                 with owner._lock:
                     owner._arrivals.append({"method": "POST", "path": route})
-                if route == "/tokenize" or (
-                    owner.flavor == "sglang" and route == "/v1/tokenize"
-                ):
+                if route == "/tokenize" or (owner.flavor == "sglang" and route == "/v1/tokenize"):
                     self._tokenize()
                     return
                 if route not in {"/v1/chat/completions", "/v1/completions"}:
@@ -431,9 +420,7 @@ class FakeBackend:
                         return
                 if owner.mode == "redirect":
                     self.send_response(302)
-                    self.send_header(
-                        "Location", f"{owner.path_prefix}/redirect-target"
-                    )
+                    self.send_header("Location", f"{owner.path_prefix}/redirect-target")
                     self.send_header("Content-Length", "0")
                     self.end_headers()
                     return
@@ -450,11 +437,7 @@ class FakeBackend:
                     self._send_json(
                         rejected[0],
                         {"error": {"message": rejected[1]}},
-                        extra_headers=(
-                            {"Retry-After": "3"}
-                            if owner.mode == "http_429"
-                            else None
-                        ),
+                        extra_headers=({"Retry-After": "3"} if owner.mode == "http_429" else None),
                     )
                     return
                 try:
@@ -488,9 +471,7 @@ class FakeBackend:
                             "id": f"cmpl-{record['request_id']}",
                             "object": "text_completion",
                             "model": owner.model_id,
-                            "choices": [
-                                {"index": 0, "text": "fake response", "finish_reason": "stop"}
-                            ],
+                            "choices": [{"index": 0, "text": "fake response", "finish_reason": "stop"}],
                             "usage": {
                                 "prompt_tokens": 3,
                                 "completion_tokens": 2,

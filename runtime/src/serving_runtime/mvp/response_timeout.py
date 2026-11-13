@@ -90,9 +90,7 @@ class DeadlineWatchdog:
             self._expired = True
             response = self.response
             connection = self.connection
-            response_socket = getattr(
-                getattr(getattr(response, "fp", None), "raw", None), "_sock", None
-            )
+            response_socket = getattr(getattr(getattr(response, "fp", None), "raw", None), "_sock", None)
             sockets = (getattr(connection, "sock", None), response_socket, *self._sockets)
             unique_sockets: list[Any] = []
             for sock in sockets:

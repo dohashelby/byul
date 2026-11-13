@@ -14,6 +14,7 @@ Who needs what (runtime-agent host services, not the Gateway):
   engine_receipts (optional)       : engine pod logs
 Nothing here reads Secrets, ConfigMaps, nodes, or changes RBAC.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -62,8 +63,8 @@ FORBIDDEN: tuple[tuple[str, str, str, str], ...] = (
     ("ns", "get", "secrets", ""),
     ("tetragon", "get", "secrets", ""),
     ("ns", "get", "configmaps", ""),
-    ("ns", "create", "pods/exec", ""),          # no shell into the engine or Gateway
-    ("ns", "get", "pods/exec", ""),             # WebSocket exec must also be forbidden
+    ("ns", "create", "pods/exec", ""),  # no shell into the engine or Gateway
+    ("ns", "get", "pods/exec", ""),  # WebSocket exec must also be forbidden
     ("ns", "delete", "pods", ""),
     ("ns", "create", "deployments", "apps"),
     ("ns", "delete", "deployments", "apps"),
@@ -77,8 +78,11 @@ FORBIDDEN: tuple[tuple[str, str, str, str], ...] = (
 )
 
 CRD_NAMES = ["ciliumnetworkpolicies.cilium.io"]
-RESOURCE_NAMES = {"customresourcedefinitions": CRD_NAMES,
-                  "deployments": ["serving-gateway"], "daemonsets": ["tetragon"]}
+RESOURCE_NAMES = {
+    "customresourcedefinitions": CRD_NAMES,
+    "deployments": ["serving-gateway"],
+    "daemonsets": ["tetragon"],
+}
 
 
 def _split(resource: str) -> tuple[str, str | None]:
@@ -117,24 +121,55 @@ def render(namespace: str, tetragon_namespace: str, account: str = "runtime-agen
             out["namespace"] = ns
         return out
 
-    objects = [{"apiVersion": "v1", "kind": "ServiceAccount", "metadata": {**meta(namespace), "name": account},
-                "automountServiceAccountToken": False}]
+    objects = [
+        {
+            "apiVersion": "v1",
+            "kind": "ServiceAccount",
+            "metadata": {**meta(namespace), "name": account},
+            "automountServiceAccountToken": False,
+        }
+    ]
     for ns, scope in ((namespace, "ns"), (tetragon_namespace, "tetragon")):
-        objects.append({"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "Role", "metadata": meta(ns),
-                        "rules": _rules(by_scope[scope])})
-        objects.append({"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "RoleBinding", "metadata": meta(ns),
-                        "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": name},
-                        "subjects": subject})
-    objects.append({"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRole", "metadata": meta(),
-                    "rules": _rules(by_scope["cluster"])})
-    objects.append({"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRoleBinding", "metadata": meta(),
-                    "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": name},
-                    "subjects": subject})
+        objects.append(
+            {
+                "apiVersion": "rbac.authorization.k8s.io/v1",
+                "kind": "Role",
+                "metadata": meta(ns),
+                "rules": _rules(by_scope[scope]),
+            }
+        )
+        objects.append(
+            {
+                "apiVersion": "rbac.authorization.k8s.io/v1",
+                "kind": "RoleBinding",
+                "metadata": meta(ns),
+                "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": name},
+                "subjects": subject,
+            }
+        )
+    objects.append(
+        {
+            "apiVersion": "rbac.authorization.k8s.io/v1",
+            "kind": "ClusterRole",
+            "metadata": meta(),
+            "rules": _rules(by_scope["cluster"]),
+        }
+    )
+    objects.append(
+        {
+            "apiVersion": "rbac.authorization.k8s.io/v1",
+            "kind": "ClusterRoleBinding",
+            "metadata": meta(),
+            "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": name},
+            "subjects": subject,
+        }
+    )
     return objects
 
 
-def _can_i(base: list[str], scope: str, verb: str, resource: str, group: str,
-           namespace: str, tetragon_namespace: str) -> list[str]:
+def _can_i(
+    base: list[str], scope: str, verb: str, resource: str, group: str, namespace: str, tetragon_namespace: str
+) -> list[str]:
     base_resource, sub = _split(resource)
     target = f"{base_resource}.{group}" if group else base_resource
     if base_resource in RESOURCE_NAMES and (scope, verb, resource, group) in {r[:4] for r in REQUIRED}:
@@ -149,8 +184,15 @@ def _can_i(base: list[str], scope: str, verb: str, resource: str, group: str,
     return command
 
 
-def check(context: str, namespace: str, tetragon_namespace: str, *, kubeconfig: str | None = None,
-          as_user: str | None = None, runner: Callable[..., Any] = subprocess.run) -> dict[str, Any]:
+def check(
+    context: str,
+    namespace: str,
+    tetragon_namespace: str,
+    *,
+    kubeconfig: str | None = None,
+    as_user: str | None = None,
+    runner: Callable[..., Any] = subprocess.run,
+) -> dict[str, Any]:
     base = ["kubectl"] + (["--kubeconfig", kubeconfig] if kubeconfig else []) + ["--context", context]
     if as_user:  # an administrator checks the ServiceAccount before handing its kubeconfig to the agent
         base += ["--as", as_user]
@@ -184,9 +226,15 @@ def check(context: str, namespace: str, tetragon_namespace: str, *, kubeconfig: 
         elif answer == "error":
             unknown.append(item)
     state = "missing" if missing else "unknown" if unknown else "too_broad" if too_broad else "ok"
-    return {"schema_version": "runtime-agent-rbac-check/1.0", "state": state,
-            "required": len(REQUIRED), "forbidden_probes": len(FORBIDDEN),
-            "missing": missing, "too_broad": too_broad, "unknown": unknown}
+    return {
+        "schema_version": "runtime-agent-rbac-check/1.0",
+        "state": state,
+        "required": len(REQUIRED),
+        "forbidden_probes": len(FORBIDDEN),
+        "missing": missing,
+        "too_broad": too_broad,
+        "unknown": unknown,
+    }
 
 
 EXIT = {"ok": 0, "missing": 1, "unknown": 1, "too_broad": 2}
@@ -203,16 +251,30 @@ def main(argv=None) -> int:
     r.add_argument("--account", default="runtime-agent")
     c.add_argument("--context", required=True)
     c.add_argument("--kubeconfig")
-    c.add_argument("--as", dest="as_user", help="관리자 kubeconfig로 대상 계정 흉내(예: system:serviceaccount:serving-lab:runtime-agent)")
+    c.add_argument(
+        "--as",
+        dest="as_user",
+        help="관리자 kubeconfig로 대상 계정 흉내(예: system:serviceaccount:serving-lab:runtime-agent)",
+    )
     args = parser.parse_args(argv)
     if not NAME.fullmatch(args.namespace) or not NAME.fullmatch(args.tetragon_namespace):
         parser.error("invalid namespace")
     if args.command == "render":
-        print(json.dumps({"apiVersion": "v1", "kind": "List",
-                          "items": render(args.namespace, args.tetragon_namespace, args.account)},
-                         ensure_ascii=False, indent=1))
+        print(
+            json.dumps(
+                {
+                    "apiVersion": "v1",
+                    "kind": "List",
+                    "items": render(args.namespace, args.tetragon_namespace, args.account),
+                },
+                ensure_ascii=False,
+                indent=1,
+            )
+        )
         return 0
-    result = check(args.context, args.namespace, args.tetragon_namespace, kubeconfig=args.kubeconfig, as_user=args.as_user)
+    result = check(
+        args.context, args.namespace, args.tetragon_namespace, kubeconfig=args.kubeconfig, as_user=args.as_user
+    )
     print(json.dumps(result, ensure_ascii=False, indent=1))
     return EXIT[result["state"]]
 

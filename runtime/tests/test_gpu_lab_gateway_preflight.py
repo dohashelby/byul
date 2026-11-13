@@ -1,4 +1,5 @@
 """Gateway host prerequisites with temporary files only; no AWS or Kubernetes."""
+
 from contextlib import redirect_stdout, redirect_stderr
 import io
 import json
@@ -42,8 +43,9 @@ class GatewayPreflightTests(unittest.TestCase):
         before = self.revocations.stat()
         self.assertTrue(all(c.ok for c in self.checks().values()))
         after = self.revocations.stat()
-        self.assertEqual((before.st_ino, before.st_mtime_ns, before.st_mode),
-                         (after.st_ino, after.st_mtime_ns, after.st_mode))
+        self.assertEqual(
+            (before.st_ino, before.st_mtime_ns, before.st_mode), (after.st_ino, after.st_mtime_ns, after.st_mode)
+        )
         self.assertEqual(list(self.approved.iterdir()), [self.revocations])
 
     def test_both_missing_host_directories_are_reported_and_not_created(self):
@@ -65,10 +67,15 @@ class GatewayPreflightTests(unittest.TestCase):
                 directory.mkdir()
 
     def test_invalid_json_schema_and_candidate_envelope_are_rejected(self):
-        for raw, code in (("{", "MALFORMED_REVOCATIONS"),
-                          ('{"schema_version":"runtime-mvp-revocations/1.0","revoked":[],"revoked":[]}', "MALFORMED_REVOCATIONS"),
-                          (json.dumps({"revoked": []}), "INVALID_REVOCATIONS"),
-                          (json.dumps({"schema_version": "runtime-verification-candidate/1.0", "document": self.empty}), "INVALID_REVOCATIONS")):
+        for raw, code in (
+            ("{", "MALFORMED_REVOCATIONS"),
+            ('{"schema_version":"runtime-mvp-revocations/1.0","revoked":[],"revoked":[]}', "MALFORMED_REVOCATIONS"),
+            (json.dumps({"revoked": []}), "INVALID_REVOCATIONS"),
+            (
+                json.dumps({"schema_version": "runtime-verification-candidate/1.0", "document": self.empty}),
+                "INVALID_REVOCATIONS",
+            ),
+        ):
             with self.subTest(code=code):
                 self.revocations.write_text(raw)
                 check = self.checks()["revocations"]
@@ -114,9 +121,14 @@ class GatewayPreflightTests(unittest.TestCase):
 
     def test_missing_optional_verification_files_do_not_deactivate_inference(self):
         self.revocations.write_text(json.dumps(self.empty))
-        config = MVPConfig(policy_path=str(ROOT / "examples/mvp/policy.json"), data_dir=str(self.root / "data"),
-                           revocations_path=str(self.revocations), asset_manifest_path=str(self.approved / "asset-manifest.json"),
-                           baseline_path=str(self.approved / "baseline.json"), manifest_path=str(self.approved / "manifest.json"))
+        config = MVPConfig(
+            policy_path=str(ROOT / "examples/mvp/policy.json"),
+            data_dir=str(self.root / "data"),
+            revocations_path=str(self.revocations),
+            asset_manifest_path=str(self.approved / "asset-manifest.json"),
+            baseline_path=str(self.approved / "baseline.json"),
+            manifest_path=str(self.approved / "manifest.json"),
+        )
         app = GatewayApp(config, load_policy(config.policy_path), engine_address=("127.0.0.1", 8088))
         self.assertEqual(app.baseline_status()["baseline"]["state"], "not_configured")
         self.assertEqual(app.baseline_status()["manifest"]["state"], "not_configured")

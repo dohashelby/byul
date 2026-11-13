@@ -5,6 +5,7 @@ must be the hostPath values in the final Gateway manifest on its target node.
 This checks local prerequisites, not agreement with the live engine or a Pod's
 UID permissions. It neither contacts Kubernetes/AWS nor applies manifests.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -76,8 +77,11 @@ def collect(approved_dir, model_root):
 def build_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--approved-dir", default="/srv/serving/verification/approved")
-    parser.add_argument("--model-root", required=True,
-                        help="exact model hostPath in the final Gateway manifest; confirm live engine separately")
+    parser.add_argument(
+        "--model-root",
+        required=True,
+        help="exact model hostPath in the final Gateway manifest; confirm live engine separately",
+    )
     return parser
 
 

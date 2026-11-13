@@ -1,4 +1,5 @@
 """D3 command generation and fake execution; never contacts a cluster."""
+
 import errno
 import json
 from pathlib import Path
@@ -9,8 +10,18 @@ from types import SimpleNamespace
 import pytest
 
 from tools.aws_lab_acceptance import (
-    AWSAcceptance, CASE_IDS, CASE_TITLES, CASE_RT_IDS, REPORT_CASES, CommandResult,
-    TOKENIZE_PROBE_CODE, TCP_PROBE_CODE, _parse_cases, _report_summary, evaluate_case, publish_report,
+    AWSAcceptance,
+    CASE_IDS,
+    CASE_TITLES,
+    CASE_RT_IDS,
+    REPORT_CASES,
+    CommandResult,
+    TOKENIZE_PROBE_CODE,
+    TCP_PROBE_CODE,
+    _parse_cases,
+    _report_summary,
+    evaluate_case,
+    publish_report,
 )
 from test_aws_lab_acceptance import FakeHTTP, FakeRunner, arguments, detail, response
 
@@ -52,18 +63,32 @@ def test_tokenize_probe_renders_http_body_without_real_socket(monkeypatch, capsy
         assert payload["model"] == "test-model" and payload["max_tokens"] == 8
 
 
-@pytest.mark.parametrize("fault,expected", [
-    (None, "passed"), ("refused", "unknown"), ("connected", "failed"),
-    ("exec_error", "unknown"), ("exec_raise", "unknown"), ("missing_python", "unknown"),
-    ("hubble_missing", "unknown"), ("collection_gap", "unknown"),
-    ("gateway_http", "failed"), ("gateway_tcp", "unknown"),
-    ("primary_refused", "unknown"), ("primary_exec", "unknown"),
-    ("primary_connected", "failed"), ("primary_connected+refused", "failed"),
-    ("primary_connected+exec_raise", "failed"), ("primary_connected+missing_python", "failed"),
-    ("connected+primary_refused", "failed"), ("connected+primary_missing_python", "failed"),
-    ("connected+gateway_missing_python", "failed"), ("connected+collection_gap", "failed"),
-    ("connected_send_error", "failed"),
-])
+@pytest.mark.parametrize(
+    "fault,expected",
+    [
+        (None, "passed"),
+        ("refused", "unknown"),
+        ("connected", "failed"),
+        ("exec_error", "unknown"),
+        ("exec_raise", "unknown"),
+        ("missing_python", "unknown"),
+        ("hubble_missing", "unknown"),
+        ("collection_gap", "unknown"),
+        ("gateway_http", "failed"),
+        ("gateway_tcp", "unknown"),
+        ("primary_refused", "unknown"),
+        ("primary_exec", "unknown"),
+        ("primary_connected", "failed"),
+        ("primary_connected+refused", "failed"),
+        ("primary_connected+exec_raise", "failed"),
+        ("primary_connected+missing_python", "failed"),
+        ("connected+primary_refused", "failed"),
+        ("connected+primary_missing_python", "failed"),
+        ("connected+gateway_missing_python", "failed"),
+        ("connected+collection_gap", "failed"),
+        ("connected_send_error", "failed"),
+    ],
+)
 def test_aws_04_runs_tokenize_as_auxiliary_with_shared_flow_controls(tmp_path, fault, expected):
     events = []
     faults = set(fault.split("+")) if fault else set()
@@ -71,15 +96,30 @@ def test_aws_04_runs_tokenize_as_auxiliary_with_shared_flow_controls(tmp_path, f
     timeout = CommandResult(0, "CONNECT_FAILED errno=110 name=ETIMEDOUT\n")
     refused = CommandResult(0, "CONNECT_FAILED errno=111 name=ECONNREFUSED\n")
     missing_python = CommandResult(127, stderr="python3: not found")
-    primary = (connected if "primary_connected" in faults else
-               refused if "primary_refused" in faults else
-               missing_python if "primary_missing_python" in faults else
-               CommandResult(124) if "primary_exec" in faults else timeout)
-    auxiliary = (connected if "connected" in faults else
-                 CommandResult(2, "CONNECTED\n", "sendall error") if "connected_send_error" in faults else
-                 refused if "refused" in faults else
-                 missing_python if "missing_python" in faults else
-                 CommandResult(124) if "exec_error" in faults else timeout)
+    primary = (
+        connected
+        if "primary_connected" in faults
+        else refused
+        if "primary_refused" in faults
+        else missing_python
+        if "primary_missing_python" in faults
+        else CommandResult(124)
+        if "primary_exec" in faults
+        else timeout
+    )
+    auxiliary = (
+        connected
+        if "connected" in faults
+        else CommandResult(2, "CONNECTED\n", "sendall error")
+        if "connected_send_error" in faults
+        else refused
+        if "refused" in faults
+        else missing_python
+        if "missing_python" in faults
+        else CommandResult(124)
+        if "exec_error" in faults
+        else timeout
+    )
 
     class Runner(FakeRunner):
         def run(self, argv, **kwargs):
@@ -96,19 +136,29 @@ def test_aws_04_runs_tokenize_as_auxiliary_with_shared_flow_controls(tmp_path, f
     results = [connected, primary]
     if "exec_raise" not in faults:
         results.append(auxiliary)
-    results.append(missing_python if "gateway_missing_python" in faults else
-                   timeout if "gateway_tcp" in faults else connected)
+    results.append(
+        missing_python if "gateway_missing_python" in faults else timeout if "gateway_tcp" in faults else connected
+    )
     runner = Runner(results)
-    http = HTTP([response(500 if "gateway_http" in faults else 200,
-                          {"choices": [{"message": {"content": "ok"}}]}, "control"),
-                 response(200, detail("ALLOWED", attempted=True))])
+    http = HTTP(
+        [
+            response(
+                500 if "gateway_http" in faults else 200, {"choices": [{"message": {"content": "ok"}}]}, "control"
+            ),
+            response(200, detail("ALLOWED", attempted=True)),
+        ]
+    )
     checker = AWSAcceptance(arguments(tmp_path, cases=("AWS-04",)), runner=runner, http=http)
     observation_calls = []
 
     def observations(kind, since, predicate):
         observation_calls.append((kind, since))
         assert kind == "hubble" and since
-        flow = {"src": {"pod": "other-client"}, "dst": {"pod": "serving-engine-abc", "port": 8000}, "verdict": "dropped"}
+        flow = {
+            "src": {"pod": "other-client"},
+            "dst": {"pod": "serving-engine-abc", "port": 8000},
+            "verdict": "dropped",
+        }
         assert predicate(flow)
         assert not predicate({**flow, "verdict": "forwarded"})
         assert not predicate({**flow, "dst": {"pod": "serving-engine-abc", "port": 8080}})
@@ -146,11 +196,20 @@ def test_aws_04_runs_tokenize_as_auxiliary_with_shared_flow_controls(tmp_path, f
 
 
 @pytest.mark.parametrize("fault", ["gateway_exec", "gateway_request", "hubble"])
-@pytest.mark.parametrize("primary_connected,tokenize_connected,expected", [
-    (False, False, "unknown"), (True, False, "failed"), (False, True, "failed"),
-])
+@pytest.mark.parametrize(
+    "primary_connected,tokenize_connected,expected",
+    [
+        (False, False, "unknown"),
+        (True, False, "failed"),
+        (False, True, "failed"),
+    ],
+)
 def test_aws_04_preserves_direct_success_when_later_control_raises(
-    tmp_path, fault, primary_connected, tokenize_connected, expected,
+    tmp_path,
+    fault,
+    primary_connected,
+    tokenize_connected,
+    expected,
 ):
     connected = CommandResult(1, "CONNECTED\n")
     timeout = CommandResult(0, "CONNECT_FAILED errno=110 name=ETIMEDOUT\n")
@@ -167,10 +226,20 @@ def test_aws_04_preserves_direct_success_when_later_control_raises(
                 raise OSError("synthetic Gateway request error")
             return super().request(method, url, **kwargs)
 
-    runner = Runner([connected, connected if primary_connected else timeout,
-                     connected if tokenize_connected else timeout, connected])
-    http = HTTP([response(200, {"choices": [{"message": {"content": "ok"}}]}, "control"),
-                 response(200, detail("ALLOWED", attempted=True))])
+    runner = Runner(
+        [
+            connected,
+            connected if primary_connected else timeout,
+            connected if tokenize_connected else timeout,
+            connected,
+        ]
+    )
+    http = HTTP(
+        [
+            response(200, {"choices": [{"message": {"content": "ok"}}]}, "control"),
+            response(200, detail("ALLOWED", attempted=True)),
+        ]
+    )
     checker = AWSAcceptance(arguments(tmp_path, cases=("AWS-04",)), runner=runner, http=http)
 
     def observations(*args):
@@ -207,12 +276,17 @@ def test_all_aws_case_ids_match_platform_contract_pattern():
     assert all(re.fullmatch(pattern, case_id) for case_id in CASE_IDS)
 
 
-@pytest.mark.parametrize("marker,number,name,expected", [
-    ("CONNECT_FAILED", 110, "ETIMEDOUT", "110 (ETIMEDOUT)"),
-    ("CONNECTED", None, None, "0 (CONNECTED)"),
-    (None, None, None, "확인 못 함 (확인 못 함)"),
-])
-def test_aws_report_with_tokenize_evidence_passes_platform_contract(tmp_path, monkeypatch, marker, number, name, expected):
+@pytest.mark.parametrize(
+    "marker,number,name,expected",
+    [
+        ("CONNECT_FAILED", 110, "ETIMEDOUT", "110 (ETIMEDOUT)"),
+        ("CONNECTED", None, None, "0 (CONNECTED)"),
+        (None, None, None, "확인 못 함 (확인 못 함)"),
+    ],
+)
+def test_aws_report_with_tokenize_evidence_passes_platform_contract(
+    tmp_path, monkeypatch, marker, number, name, expected
+):
     from serving_runtime.mvp.lab_report import LabReportSource
 
     pytest.importorskip("jsonschema")
@@ -223,14 +297,33 @@ def test_aws_report_with_tokenize_evidence_passes_platform_contract(tmp_path, mo
     from byul_platform.sources.runtime import lab_report_doc
 
     required = REPORT_CASES["AWS-04"].required
-    report = {"run_id": "aws-acceptance-20261111T000000Z-1", "started_at": "2026-11-11T00:00:00Z",
-              "ended_at": "2026-11-11T00:01:00Z", "kube_context": "byul-aws-lab", "namespace": "serving-lab", "engine": "vllm",
-              "cases": [{"case_id": case_id, "result": "passed", "reason": "synthetic unit test",
-                         "facts": dict.fromkeys(required, True)} for case_id in CASE_IDS]}
+    report = {
+        "run_id": "aws-acceptance-20261111T000000Z-1",
+        "started_at": "2026-11-11T00:00:00Z",
+        "ended_at": "2026-11-11T00:01:00Z",
+        "kube_context": "byul-aws-lab",
+        "namespace": "serving-lab",
+        "engine": "vllm",
+        "cases": [
+            {
+                "case_id": case_id,
+                "result": "passed",
+                "reason": "synthetic unit test",
+                "facts": dict.fromkeys(required, True),
+            }
+            for case_id in CASE_IDS
+        ],
+    }
     case = report["cases"][3]
     case["result"] = "failed" if marker == "CONNECTED" else "passed" if number else "unknown"
-    case["evidence"] = {"tokenize_direct_probe": {"marker": marker, "errno": number, "errno_name": name,
-                                               "unrelated_text": "private-prompt-and-response-body"}}
+    case["evidence"] = {
+        "tokenize_direct_probe": {
+            "marker": marker,
+            "errno": number,
+            "errno_name": name,
+            "unrelated_text": "private-prompt-and-response-body",
+        }
+    }
     publish_report(report, tmp_path, ())
     result = LabReportSource(tmp_path).read()
     assert result["state"] == "ok"

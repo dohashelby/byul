@@ -65,16 +65,13 @@ def _overall(results: list[dict[str, Any]]) -> str:
     return "passed"
 
 
-def _backend_kinds_for_request_ids(
-    records: list[dict[str, Any]], request_ids: set[str]
-) -> set[str]:
+def _backend_kinds_for_request_ids(records: list[dict[str, Any]], request_ids: set[str]) -> set[str]:
     """Return backend kinds only for requests issued by this tool run."""
 
     return {
         item["backend_kind"]
         for item in records
-        if item.get("request_id") in request_ids
-        and isinstance(item.get("backend_kind"), str)
+        if item.get("request_id") in request_ids and isinstance(item.get("backend_kind"), str)
     }
 
 
@@ -101,9 +98,7 @@ class Precheck:
         self.gateway_port = gateway.port or 80
         self.vllm = args.vllm_url.rstrip("/")
         try:
-            with (self.state / "vllm-api-key").open(
-                "r", encoding="utf-8", newline=""
-            ) as key_file:
+            with (self.state / "vllm-api-key").open("r", encoding="utf-8", newline="") as key_file:
                 key = key_file.read()
         except (OSError, UnicodeError) as error:
             raise PrecheckConfigurationError(
@@ -189,8 +184,9 @@ class Precheck:
     def _aborted_log_present(logs: str, request_id: str | None) -> bool:
         return bool(request_id and f"Request chatcmpl-{request_id} aborted." in logs)
 
-    def stream(self, payload: bytes, *, stop_after_first: bool = False,
-               hold: threading.Event | None = None) -> tuple[int, str | None, bytes, float | None, float | None]:
+    def stream(
+        self, payload: bytes, *, stop_after_first: bool = False, hold: threading.Event | None = None
+    ) -> tuple[int, str | None, bytes, float | None, float | None]:
         connection = http.client.HTTPConnection(self.gateway_host, self.gateway_port, timeout=300)
         connection.request("POST", "/v1/chat/completions", body=payload, headers={"Content-Type": "application/json"})
         response = connection.getresponse()
@@ -252,11 +248,7 @@ class Precheck:
         *,
         additional_ports: tuple[int, ...] = (),
     ) -> subprocess.Popen[bytes]:
-        unavailable = [
-            candidate
-            for candidate in (port, *additional_ports)
-            if not self._port_available(candidate)
-        ]
+        unavailable = [candidate for candidate in (port, *additional_ports) if not self._port_available(candidate)]
         if unavailable:
             joined = ", ".join(str(candidate) for candidate in unavailable)
             raise TemporaryGatewayError(f"target port(s) already in use: {joined}")
@@ -270,8 +262,7 @@ class Precheck:
         if not ready:
             cleanup = self.stop_gateway(process)
             raise TemporaryGatewayError(
-                f"temporary Gateway did not become ready on port {port}; "
-                f"cleanup={cleanup['result']}"
+                f"temporary Gateway did not become ready on port {port}; cleanup={cleanup['result']}"
             )
         return process
 
@@ -282,16 +273,25 @@ class Precheck:
         except (OSError, ValueError):
             return False
 
-    def record(self, case_id: str, description: str, passed: bool | None,
-               actual: dict[str, Any], request_ids: list[str | None], note: str = "") -> None:
-        self.results.append({
-            "case_id": case_id,
-            "description": description,
-            "passed": passed,
-            "actual": actual,
-            "evidence_request_ids": [item for item in request_ids if item],
-            "note": note,
-        })
+    def record(
+        self,
+        case_id: str,
+        description: str,
+        passed: bool | None,
+        actual: dict[str, Any],
+        request_ids: list[str | None],
+        note: str = "",
+    ) -> None:
+        self.results.append(
+            {
+                "case_id": case_id,
+                "description": description,
+                "passed": passed,
+                "actual": actual,
+                "evidence_request_ids": [item for item in request_ids if item],
+                "note": note,
+            }
+        )
         label = "통과" if passed else ("미실행" if passed is None else "실패")
         print(f"{case_id}: {label} — {description}")
 
@@ -311,27 +311,43 @@ class Precheck:
         }
         request_log_ok = all(request_logs.values())
         passed = bool(
-            status == 200 and content and final and final["final_outcome"] == "completed"
-            and final["backend_kind"] == "vllm" and s_status == 200 and ends_done
-            and first_at is not None and total is not None and first_at < total
-            and s_final and s_final["final_outcome"] == "completed"
+            status == 200
+            and content
+            and final
+            and final["final_outcome"] == "completed"
+            and final["backend_kind"] == "vllm"
+            and s_status == 200
+            and ends_done
+            and first_at is not None
+            and total is not None
+            and first_at < total
+            and s_final
+            and s_final["final_outcome"] == "completed"
             and (not self.args.require_backend_request_log or request_log_ok)
         )
-        self.record("S3-01", "같은 고정 모델 일반·stream 실제 추론과 종료", passed, {
-            "general_http": status,
-            "general_content_len": len(content or ""),
-            "general_final": final and final["final_outcome"],
-            "stream_http": s_status,
-            "stream_first_event_s": round(first_at or -1, 3),
-            "stream_total_s": round(total or -1, 3),
-            "stream_ends_with_done": ends_done,
-            "stream_final": s_final and s_final["final_outcome"],
-            "evidence_summary": detail["evidence_summary"],
-            "vllm_log_contains_received_request": request_logs,
-        }, [request_id, s_id],
-            ("backend 요청 로그 요구: 허용 요청마다 vLLM Received request 로그가 있어야 통과."
-             if self.args.require_backend_request_log else
-             "backend 요청 로그 미요구: vLLM Received request 로그는 보조 관측으로만 기록."))
+        self.record(
+            "S3-01",
+            "같은 고정 모델 일반·stream 실제 추론과 종료",
+            passed,
+            {
+                "general_http": status,
+                "general_content_len": len(content or ""),
+                "general_final": final and final["final_outcome"],
+                "stream_http": s_status,
+                "stream_first_event_s": round(first_at or -1, 3),
+                "stream_total_s": round(total or -1, 3),
+                "stream_ends_with_done": ends_done,
+                "stream_final": s_final and s_final["final_outcome"],
+                "evidence_summary": detail["evidence_summary"],
+                "vllm_log_contains_received_request": request_logs,
+            },
+            [request_id, s_id],
+            (
+                "backend 요청 로그 요구: 허용 요청마다 vLLM Received request 로그가 있어야 통과."
+                if self.args.require_backend_request_log
+                else "backend 요청 로그 미요구: vLLM Received request 로그는 보조 관측으로만 기록."
+            ),
+        )
         return request_id
 
     def s3_02(self) -> None:
@@ -349,23 +365,36 @@ class Precheck:
             bool(denied_tokens[1] and denied_tokens[1] in logs),
         ]
         passed = bool(
-            denied_model[0] == 403 and denied_tokens[0] == 403
-            and final_model and final_model["delivery"]["attempted"] is False
-            and final_tokens and final_tokens["delivery"]["attempted"] is False
+            denied_model[0] == 403
+            and denied_tokens[0] == 403
+            and final_model
+            and final_model["delivery"]["attempted"] is False
+            and final_tokens
+            and final_tokens["delivery"]["attempted"] is False
             and before == after
             and (not self.args.require_backend_request_log or not any(denied_log_presence))
         )
-        self.record("S3-02", "금지 모델·출력 초과 사전 거부 + backend 미전달 근거", passed, {
-            "http": [denied_model[0], denied_tokens[0]],
-            "reason": [final_model and final_model["decision"]["reason_code"],
-                       final_tokens and final_tokens["decision"]["reason_code"]],
-            "vllm_counters_before_after": [before, after],
-            "request_ids_in_vllm_logs": denied_log_presence,
-            "evidence_summary": detail_tokens["evidence_summary"],
-        }, [denied_model[1], denied_tokens[1]],
-            ("backend 요청 로그 요구: 거부 요청 ID가 vLLM 로그 어디에도 없어야 통과."
-             if self.args.require_backend_request_log else
-             "backend 요청 로그 미요구: 격리 구간 카운터와 거부 요청 ID 부재는 보조 관측."))
+        self.record(
+            "S3-02",
+            "금지 모델·출력 초과 사전 거부 + backend 미전달 근거",
+            passed,
+            {
+                "http": [denied_model[0], denied_tokens[0]],
+                "reason": [
+                    final_model and final_model["decision"]["reason_code"],
+                    final_tokens and final_tokens["decision"]["reason_code"],
+                ],
+                "vllm_counters_before_after": [before, after],
+                "request_ids_in_vllm_logs": denied_log_presence,
+                "evidence_summary": detail_tokens["evidence_summary"],
+            },
+            [denied_model[1], denied_tokens[1]],
+            (
+                "backend 요청 로그 요구: 거부 요청 ID가 vLLM 로그 어디에도 없어야 통과."
+                if self.args.require_backend_request_log
+                else "backend 요청 로그 미요구: 격리 구간 카운터와 거부 요청 ID 부재는 보조 관측."
+            ),
+        )
 
     def s3_03(self) -> None:
         since = _now()
@@ -378,9 +407,7 @@ class Precheck:
         )
         cancel_logs = self.vllm_logs_since(since)
         aborted_log_present = self._aborted_log_present(cancel_logs, cancel_id)
-        abort_lines = [
-            line for line in cancel_logs.splitlines() if re.search(r"[Aa]bort", line)
-        ][:3]
+        abort_lines = [line for line in cancel_logs.splitlines() if re.search(r"[Aa]bort", line)][:3]
 
         hold = threading.Event()
         outputs: dict[int, tuple[Any, ...]] = {}
@@ -397,8 +424,7 @@ class Precheck:
         for thread in threads:
             thread.join(300)
         held_ok = all(
-            index in outputs and outputs[index][0] == 200
-            and outputs[index][2].rstrip().endswith(b"data: [DONE]")
+            index in outputs and outputs[index][0] == 200 and outputs[index][2].rstrip().endswith(b"data: [DONE]")
             for index in range(2)
         )
 
@@ -410,9 +436,7 @@ class Precheck:
         }
         timeout_id: str | None = None
         timeout_process: subprocess.Popen[bytes] | None = None
-        timeout_config = copy.deepcopy(
-            json.loads((self.state / "backend.json").read_text(encoding="utf-8"))
-        )
+        timeout_config = copy.deepcopy(json.loads((self.state / "backend.json").read_text(encoding="utf-8")))
         timeout_config.setdefault("timeouts", {})["relay_timeout_s"] = 0.5
         timeout_config_path = self.state / "backend-timeout.json"
         timeout_config_path.write_text(json.dumps(timeout_config), encoding="utf-8")
@@ -421,22 +445,21 @@ class Precheck:
             timeout_process = self.spawn_gateway(
                 self.args.timeout_gateway_port,
                 [
-                    "--backend", "vllm",
-                    "--backend-config", str(timeout_config_path),
-                    "--data-dir", str(self.state / "data-timeout"),
+                    "--backend",
+                    "vllm",
+                    "--backend-config",
+                    str(timeout_config_path),
+                    "--data-dir",
+                    str(self.state / "data-timeout"),
                 ],
             )
-            timeout_status, timeout_id, timeout_body = self.post(
-                self.body(), port=self.args.timeout_gateway_port
-            )
+            timeout_status, timeout_id, timeout_body = self.post(self.body(), port=self.args.timeout_gateway_port)
             try:
                 timeout_code = json.loads(timeout_body)["error"]["code"]
             except (KeyError, TypeError, json.JSONDecodeError, UnicodeDecodeError):
                 timeout_code = None
             timeout_released = _wait(
-                lambda: self.get(
-                    "/api/status", self.args.timeout_gateway_port
-                )["concurrency"]["in_flight"] == 0,
+                lambda: self.get("/api/status", self.args.timeout_gateway_port)["concurrency"]["in_flight"] == 0,
                 30,
             )
             timeout_actual.update(
@@ -449,9 +472,7 @@ class Precheck:
         except TemporaryGatewayError as error:
             timeout_actual["error"] = str(error)
         except Exception as error:
-            timeout_actual["error"] = (
-                f"{type(error).__name__}: timeout Gateway check failed"
-            )
+            timeout_actual["error"] = f"{type(error).__name__}: timeout Gateway check failed"
         finally:
             if timeout_process is not None:
                 timeout_actual["gateway_cleanup"] = self.stop_gateway(timeout_process)
@@ -462,26 +483,37 @@ class Precheck:
             and timeout_actual["slot_released"]
         )
         passed = bool(
-            status == 200 and released and cancel_final
+            status == 200
+            and released
+            and cancel_final
             and cancel_final["final_outcome"] == "client_disconnected"
-            and third[0] == 429 and held_ok
+            and third[0] == 429
+            and held_ok
             and self.get("/api/status")["concurrency"]["in_flight"] == 0
             and timeout_ok
             and (not self.args.require_backend_request_log or aborted_log_present)
         )
-        self.record("S3-03", "client 취소·timeout·동시성 초과 — Gateway 정리/slot 회수", passed, {
-            "cancel_final": cancel_final and cancel_final["final_outcome"],
-            "slot_released": bool(released),
-            "gateway_backend_cancel_field": cancel_final and cancel_final.get("backend_cancel"),
-            "vllm_cancel_aborted_log_present": aborted_log_present,
-            "vllm_log_abort_lines": abort_lines,
-            "third_request_http": third[0],
-            "held_streams_completed": held_ok,
-            "timeout_gateway": timeout_actual,
-        }, [cancel_id, third[1], timeout_id] + [outputs[index][1] for index in outputs],
-            ("backend 요청 로그 요구: 취소 요청의 vLLM aborted 로그가 있어야 통과."
-             if self.args.require_backend_request_log else
-             "backend 요청 로그 미요구: 취소 요청의 vLLM aborted 로그는 보조 관측."))
+        self.record(
+            "S3-03",
+            "client 취소·timeout·동시성 초과 — Gateway 정리/slot 회수",
+            passed,
+            {
+                "cancel_final": cancel_final and cancel_final["final_outcome"],
+                "slot_released": bool(released),
+                "gateway_backend_cancel_field": cancel_final and cancel_final.get("backend_cancel"),
+                "vllm_cancel_aborted_log_present": aborted_log_present,
+                "vllm_log_abort_lines": abort_lines,
+                "third_request_http": third[0],
+                "held_streams_completed": held_ok,
+                "timeout_gateway": timeout_actual,
+            },
+            [cancel_id, third[1], timeout_id] + [outputs[index][1] for index in outputs],
+            (
+                "backend 요청 로그 요구: 취소 요청의 vLLM aborted 로그가 있어야 통과."
+                if self.args.require_backend_request_log
+                else "backend 요청 로그 미요구: 취소 요청의 vLLM aborted 로그는 보조 관측."
+            ),
+        )
 
     def s3_04(self) -> None:
         info = self.collector("engine_info")
@@ -489,28 +521,29 @@ class Precheck:
         info_value = info.get("last_value") or {}
         model_map = info_value.get("model.map") or {}
         mapped_models_available = bool(model_map) and all(
-            isinstance(value, dict) and value.get("available") is True
-            for value in model_map.values()
+            isinstance(value, dict) and value.get("available") is True for value in model_map.values()
         )
         states = {name: value.get("state") for name, value in (metrics.get("last_value") or {}).items()}
         metrics_ok = sorted(name for name, state in states.items() if state == "ok")
         metrics_not_ok = sorted(name for name, state in states.items() if state != "ok")
-        passed = bool(
-            info["state"] == "ok"
-            and mapped_models_available
-            and metrics["state"] == "ok"
-            and metrics_ok
+        passed = bool(info["state"] == "ok" and mapped_models_available and metrics["state"] == "ok" and metrics_ok)
+        self.record(
+            "S3-04",
+            "모델·상태·선정 지표 출처/시각/단위 매핑",
+            passed,
+            {
+                "engine_info": info_value,
+                "engine_info_origin": info["data_origin"],
+                "engine_info_last_success": info["last_success_at"],
+                "mapped_models_available": mapped_models_available,
+                "metrics_states": states,
+                "metrics_ok": metrics_ok,
+                "metrics_not_ok": metrics_not_ok,
+                "metrics_origin": metrics["data_origin"],
+            },
+            [],
+            "지표 이름은 연결한 vLLM의 실제 /metrics 응답 기준. 선정 GPU 버전과 다를 수 있다.",
         )
-        self.record("S3-04", "모델·상태·선정 지표 출처/시각/단위 매핑", passed, {
-            "engine_info": info_value,
-            "engine_info_origin": info["data_origin"],
-            "engine_info_last_success": info["last_success_at"],
-            "mapped_models_available": mapped_models_available,
-            "metrics_states": states,
-            "metrics_ok": metrics_ok,
-            "metrics_not_ok": metrics_not_ok,
-            "metrics_origin": metrics["data_origin"],
-        }, [], "지표 이름은 연결한 vLLM의 실제 /metrics 응답 기준. 선정 GPU 버전과 다를 수 있다.")
 
     def s3_05(self) -> None:
         config = json.loads((self.state / "backend.json").read_text(encoding="utf-8"))
@@ -527,16 +560,25 @@ class Precheck:
         }
         process: subprocess.Popen[bytes] | None = None
         try:
-            process = self.spawn_gateway(port, [
-                "--backend", "vllm", "--backend-config", str(broken_path),
-                "--data-dir", str(self.state / "data-badmetrics"),
-            ])
+            process = self.spawn_gateway(
+                port,
+                [
+                    "--backend",
+                    "vllm",
+                    "--backend-config",
+                    str(broken_path),
+                    "--data-dir",
+                    str(self.state / "data-badmetrics"),
+                ],
+            )
             metrics_state = _wait(lambda: self.collector("metrics", port)["state"] == "error" and "error", 30)
             inference_status = self.post(self.body(), port=port)[0]
-            actual.update({
-                "metrics_only_failure_collector": metrics_state,
-                "inference_during_metrics_failure": inference_status,
-            })
+            actual.update(
+                {
+                    "metrics_only_failure_collector": metrics_state,
+                    "inference_during_metrics_failure": inference_status,
+                }
+            )
         except TemporaryGatewayError as error:
             actual["temporary_gateway_error"] = str(error)
             self.record(
@@ -549,9 +591,7 @@ class Precheck:
             )
             return
         except Exception as error:
-            actual["metrics_check_error"] = (
-                f"{type(error).__name__}: metrics-only failure check failed"
-            )
+            actual["metrics_check_error"] = f"{type(error).__name__}: metrics-only failure check failed"
             self.record(
                 "S3-05",
                 "수집만 중단 / 엔진 중단 / 복구가 독립 표시",
@@ -565,8 +605,14 @@ class Precheck:
                 actual["temporary_gateway_cleanup"] = self.stop_gateway(process)
         if not self.args.allow_engine_restart:
             actual["engine_restart"] = "미실행 (--allow-engine-restart 없음)"
-            self.record("S3-05", "수집만 중단 / 엔진 중단 / 복구가 독립 표시", None, actual, [],
-                        "수집 장애 부분만 실행했다. 엔진 중단·복구는 미실행.")
+            self.record(
+                "S3-05",
+                "수집만 중단 / 엔진 중단 / 복구가 독립 표시",
+                None,
+                actual,
+                [],
+                "수집 장애 부분만 실행했다. 엔진 중단·복구는 미실행.",
+            )
             return
         down_status: int | None = None
         health_error = False
@@ -588,15 +634,12 @@ class Precheck:
             down_status = self.post(self.body())[0]
             health_error = bool(
                 _wait(
-                    lambda: self.collector("engine_health")["state"]
-                    in ("error", "stale"),
+                    lambda: self.collector("engine_health")["state"] in ("error", "stale"),
                     30,
                 )
             )
         except Exception as error:
-            actual["engine_stopped_check_error"] = (
-                f"{type(error).__name__}: engine interruption check failed"
-            )
+            actual["engine_stopped_check_error"] = f"{type(error).__name__}: engine interruption check failed"
         finally:
             actual["docker_start_attempted"] = True
             try:
@@ -609,9 +652,7 @@ class Precheck:
                 actual["docker_start_returncode"] = start_completed.returncode
             except Exception as error:
                 actual["docker_start_returncode"] = None
-                actual["docker_start_error"] = (
-                    f"{type(error).__name__}: docker start failed"
-                )
+                actual["docker_start_error"] = f"{type(error).__name__}: docker start failed"
 
         if start_completed is not None and start_completed.returncode == 0:
             try:
@@ -624,22 +665,29 @@ class Precheck:
                 )
                 up_status = self.post(self.body())[0]
             except Exception as error:
-                actual["engine_recovery_check_error"] = (
-                    f"{type(error).__name__}: engine recovery check failed"
-                )
+                actual["engine_recovery_check_error"] = f"{type(error).__name__}: engine recovery check failed"
 
-        actual.update({
-            "inference_while_engine_stopped": down_status,
-            "health_collector_while_stopped": health_error,
-            "engine_recovered": recovered,
-            "health_collector_recovered": health_ok,
-            "inference_after_recovery": up_status,
-        })
+        actual.update(
+            {
+                "inference_while_engine_stopped": down_status,
+                "health_collector_while_stopped": health_error,
+                "engine_recovered": recovered,
+                "health_collector_recovered": health_ok,
+                "inference_after_recovery": up_status,
+            }
+        )
         passed = bool(
-            metrics_state == "error" and inference_status == 200 and down_status in (502, 504)
-            and health_error and recovered and health_ok and up_status == 200
-            and stop_completed is not None and stop_completed.returncode == 0
-            and start_completed is not None and start_completed.returncode == 0
+            metrics_state == "error"
+            and inference_status == 200
+            and down_status in (502, 504)
+            and health_error
+            and recovered
+            and health_ok
+            and up_status == 200
+            and stop_completed is not None
+            and stop_completed.returncode == 0
+            and start_completed is not None
+            and start_completed.returncode == 0
         )
         self.record("S3-05", "수집만 중단 / 엔진 중단 / 복구가 독립 표시", passed, actual, [])
 
@@ -663,8 +711,10 @@ class Precheck:
             process = self.spawn_gateway(
                 port,
                 [
-                    "--engine-port", str(self.args.mock_engine_port),
-                    "--data-dir", str(self.state / "data"),
+                    "--engine-port",
+                    str(self.args.mock_engine_port),
+                    "--data-dir",
+                    str(self.state / "data"),
                 ],
                 additional_ports=(self.args.mock_engine_port,),
             )
@@ -696,29 +746,43 @@ class Precheck:
             if process is not None:
                 actual["temporary_gateway_cleanup"] = self.stop_gateway(process)
         passed = bool(
-            kinds == {"vllm"} and mock_status == 200
-            and mock_detail["backend_kind"] == "mock" and mock_detail["evidence_state"] == "received"
-            and earlier["backend_kind"] == "vllm" and earlier["engine_receipts"] == []
+            kinds == {"vllm"}
+            and mock_status == 200
+            and mock_detail["backend_kind"] == "mock"
+            and mock_detail["evidence_state"] == "received"
+            and earlier["backend_kind"] == "vllm"
+            and earlier["engine_receipts"] == []
         )
-        actual.update({
-            "vllm_mode_record_kinds": sorted(kinds),
-            "mock_request": [mock_status, mock_detail["evidence_state"]],
-            "earlier_vllm_request_seen_from_mock_gateway": [
-                earlier["backend_kind"], earlier["evidence_state"], len(earlier["engine_receipts"]),
-            ],
-        })
-        self.record("S3-06", "mock/실제 모드 전환·이전 기록 혼용 없음", passed, actual, [mock_id, earlier_vllm_id],
-            "같은 data_dir를 쓰는 mock Gateway가 이 data_dir에 mock 기록을 1건 추가한다.")
+        actual.update(
+            {
+                "vllm_mode_record_kinds": sorted(kinds),
+                "mock_request": [mock_status, mock_detail["evidence_state"]],
+                "earlier_vllm_request_seen_from_mock_gateway": [
+                    earlier["backend_kind"],
+                    earlier["evidence_state"],
+                    len(earlier["engine_receipts"]),
+                ],
+            }
+        )
+        self.record(
+            "S3-06",
+            "mock/실제 모드 전환·이전 기록 혼용 없음",
+            passed,
+            actual,
+            [mock_id, earlier_vllm_id],
+            "같은 data_dir를 쓰는 mock Gateway가 이 data_dir에 mock 기록을 1건 추가한다.",
+        )
 
     # ---- report -------------------------------------------------------
     def write_report(self) -> Path:
         leaked = any(
-            self.key in path.read_text(encoding="utf-8", errors="ignore")
-            for path in self.state.glob("data*/*.jsonl")
+            self.key in path.read_text(encoding="utf-8", errors="ignore") for path in self.state.glob("data*/*.jsonl")
         )
         image = subprocess.run(
             ["docker", "inspect", "-f", "{{.Config.Image}} {{.Image}}", self.args.container],
-            capture_output=True, text=True, check=False,
+            capture_output=True,
+            text=True,
+            check=False,
         ).stdout.strip()
         revision_file = self.state / "model-revision"
         overall = _overall(self.results)
@@ -768,22 +832,36 @@ class Precheck:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="S3B CPU pre-check against a running vLLM (not the GPU S3B).")
-    parser.add_argument("--state-dir", default=str(DEFAULT_STATE),
-                        help="folder with vllm-api-key, backend.json, data/ (default: %(default)s)")
+    parser.add_argument(
+        "--state-dir",
+        default=str(DEFAULT_STATE),
+        help="folder with vllm-api-key, backend.json, data/ (default: %(default)s)",
+    )
     parser.add_argument("--gateway", default="http://127.0.0.1:18080", help="vLLM-mode Gateway URL")
     parser.add_argument("--vllm-url", default="http://127.0.0.1:8000", help="vLLM server URL")
     parser.add_argument("--container", default="s3b-vllm-cpu", help="vLLM Docker container name")
     parser.add_argument("--model-alias", default="test-model", help="policy model name mapped to vLLM")
-    parser.add_argument("--metrics-failure-port", type=int, default=18081,
-                        help="port for the temporary Gateway with a broken metrics URL (S3-05)")
+    parser.add_argument(
+        "--metrics-failure-port",
+        type=int,
+        default=18081,
+        help="port for the temporary Gateway with a broken metrics URL (S3-05)",
+    )
     parser.add_argument("--mock-gateway-port", type=int, default=18082, help="temporary mock Gateway port (S3-06)")
     parser.add_argument("--mock-engine-port", type=int, default=18088, help="temporary mock engine port (S3-06)")
-    parser.add_argument("--timeout-gateway-port", type=int, default=18083,
-                        help="temporary short-timeout vLLM Gateway port (S3-03)")
-    parser.add_argument("--allow-engine-restart", action="store_true",
-                        help="let S3-05 stop and restart the vLLM container (takes a few minutes)")
-    parser.add_argument("--require-backend-request-log", action="store_true",
-                        help="require vLLM request/abort log evidence for S3-01~03")
+    parser.add_argument(
+        "--timeout-gateway-port", type=int, default=18083, help="temporary short-timeout vLLM Gateway port (S3-03)"
+    )
+    parser.add_argument(
+        "--allow-engine-restart",
+        action="store_true",
+        help="let S3-05 stop and restart the vLLM container (takes a few minutes)",
+    )
+    parser.add_argument(
+        "--require-backend-request-log",
+        action="store_true",
+        help="require vLLM request/abort log evidence for S3-01~03",
+    )
     args = parser.parse_args(argv)
     try:
         return Precheck(args).run()

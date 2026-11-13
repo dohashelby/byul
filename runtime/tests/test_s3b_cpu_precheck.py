@@ -57,12 +57,8 @@ class PrecheckCredentialTests(unittest.TestCase):
 class PrecheckOverallTests(unittest.TestCase):
     def test_overall_distinguishes_passed_failed_and_partial(self) -> None:
         self.assertEqual(_overall([{"passed": True}]), "passed")
-        self.assertEqual(
-            _overall([{"passed": True}, {"passed": None}]), "partial"
-        )
-        self.assertEqual(
-            _overall([{"passed": None}, {"passed": False}]), "failed"
-        )
+        self.assertEqual(_overall([{"passed": True}, {"passed": None}]), "partial")
+        self.assertEqual(_overall([{"passed": None}, {"passed": False}]), "failed")
 
     def test_s3_06_backend_kinds_ignore_records_from_earlier_runs(self) -> None:
         records = [
@@ -137,11 +133,7 @@ class PrecheckCleanupAndCriteriaTests(unittest.TestCase):
                 side_effect=[
                     {
                         "state": "ok",
-                        "last_value": {
-                            "model.map": {
-                                "test-model": {"id": "backend-model", "available": True}
-                            }
-                        },
+                        "last_value": {"model.map": {"test-model": {"id": "backend-model", "available": True}}},
                         "data_origin": "external_backend",
                         "last_success_at": "now",
                     },

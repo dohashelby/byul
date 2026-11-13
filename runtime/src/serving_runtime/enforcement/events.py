@@ -127,9 +127,7 @@ def parse_hubble(
     )
     normalized.update(
         {
-            "verdict": {"FORWARDED": "allowed", "DROPPED": "dropped"}.get(
-                verdict, verdict
-            ),
+            "verdict": {"FORWARDED": "allowed", "DROPPED": "dropped"}.get(verdict, verdict),
             "src": {
                 "namespace": source.get("namespace") if isinstance(source.get("namespace"), str) else None,
                 "pod": source.get("pod_name") if isinstance(source.get("pod_name"), str) else None,
@@ -162,9 +160,7 @@ def parse_hubble_loss(document: Any) -> dict[str, Any] | None:
     try:
         count = int(raw_count)
     except (TypeError, ValueError) as error:
-        raise EventError(
-            "$.lost_events.num_events_lost must be a non-negative integer"
-        ) from error
+        raise EventError("$.lost_events.num_events_lost must be a non-negative integer") from error
     if count < 0 or (isinstance(raw_count, str) and str(count) != raw_count):
         raise EventError("$.lost_events.num_events_lost must be a non-negative integer")
     observed_at = _string(root.get("time"), "$.time")
@@ -195,9 +191,7 @@ def _event_time(root: dict[str, Any]) -> str:
     return _string(root.get("time"), "$.time")
 
 
-def _process(
-    event: dict[str, Any], path: str, *, require_binary: bool
-) -> tuple[str | None, dict[str, str] | None]:
+def _process(event: dict[str, Any], path: str, *, require_binary: bool) -> tuple[str | None, dict[str, str] | None]:
     process = _object(event.get("process"), f"{path}.process")
     raw_binary = process.get("binary")
     if require_binary:
@@ -235,8 +229,12 @@ def _matches_engine(event: dict[str, Any], intent: Any) -> bool:
         and pod.get("namespace") == intent.namespace
         and isinstance(labels, dict)
         and all(labels.get(key) == value for key, value in intent.engine.labels.items())
-        and (intent.engine.container_name is None or not isinstance(container_name, str)
-             or not container_name or container_name == intent.engine.container_name)
+        and (
+            intent.engine.container_name is None
+            or not isinstance(container_name, str)
+            or not container_name
+            or container_name == intent.engine.container_name
+        )
     )
 
 
@@ -253,10 +251,11 @@ def parse_tetragon(
     identity = None
     if identity_index is not None:
         from .attribution import bind_event
+
         try:
             document, identity = bind_event(_object(document, "$"), identity_index)
         except (TypeError, AttributeError, KeyError, ValueError):
-            identity = {"state":"unavailable","source":None,"reason":"identity_evidence_invalid"}
+            identity = {"state": "unavailable", "source": None, "reason": "identity_evidence_invalid"}
     root = _object(document, "$")
     observed_at = _event_time(root)
     event_names = [name for name in root if name.startswith("process_")]
@@ -269,16 +268,29 @@ def parse_tetragon(
     if event_name == "process_exec":
         raw_process = event.get("process")
         if not isinstance(raw_process, dict) and (exec_policy is not None or identity_index is not None):
-            normalized = _base(observed_at, "tetragon", "process_exec", data_origin,
-                               environment=environment, run_id=run_id)
-            normalized.update({"binary": None, "process_attribution": "unavailable",
-                               "pod": None, "pod_attribution": "unavailable",
-                               "container_attribution": "unavailable", "path": None,
-                               "access": None, "rule_id": "TG-EXEC-01", "action": "observed",
-                               "action_raw": "observed", "action_mode": "monitor", "allowed_binary": None})
+            normalized = _base(
+                observed_at, "tetragon", "process_exec", data_origin, environment=environment, run_id=run_id
+            )
+            normalized.update(
+                {
+                    "binary": None,
+                    "process_attribution": "unavailable",
+                    "pod": None,
+                    "pod_attribution": "unavailable",
+                    "container_attribution": "unavailable",
+                    "path": None,
+                    "access": None,
+                    "rule_id": "TG-EXEC-01",
+                    "action": "observed",
+                    "action_raw": "observed",
+                    "action_mode": "monitor",
+                    "allowed_binary": None,
+                }
+            )
             if exec_policy is not None:
-                normalized.update(exec_policy.classify_exec(
-                    binary="", parent=None, image=None, observed_at=observed_at, pod_uid=None))
+                normalized.update(
+                    exec_policy.classify_exec(binary="", parent=None, image=None, observed_at=observed_at, pod_uid=None)
+                )
             if identity is not None:
                 normalized["identity"] = identity
             return normalized
@@ -299,10 +311,12 @@ def parse_tetragon(
                 "pod": pod,
                 "pod_attribution": "available" if pod is not None else "unavailable",
                 "container_attribution": (
-                    "available" if isinstance(raw_process.get("pod"), dict)
+                    "available"
+                    if isinstance(raw_process.get("pod"), dict)
                     and isinstance(raw_process["pod"].get("container"), dict)
                     and isinstance(raw_process["pod"]["container"].get("name"), str)
-                    and raw_process["pod"]["container"]["name"] else "unavailable"
+                    and raw_process["pod"]["container"]["name"]
+                    else "unavailable"
                 ),
                 "path": None,
                 "access": None,
@@ -312,7 +326,9 @@ def parse_tetragon(
                 "action_mode": "monitor",
                 "allowed_binary": (
                     binary in allowlist
-                    if binary is not None and allowlist and (exec_policy is None or _matches_engine(event, exec_policy.intent))
+                    if binary is not None
+                    and allowlist
+                    and (exec_policy is None or _matches_engine(event, exec_policy.intent))
                     else None
                 ),
             }
@@ -332,28 +348,43 @@ def parse_tetragon(
                     parent=parent_binary,
                     image=_image_digest(event.get("process")),
                     observed_at=observed_at,
-                    pod_uid=(raw_process["pod"].get("uid")
-                             if isinstance(raw_process.get("pod"), dict) else None),
+                    pod_uid=(raw_process["pod"].get("uid") if isinstance(raw_process.get("pod"), dict) else None),
                 )
             )
         elif exec_policy is not None and "pod" in raw_process and not isinstance(raw_process["pod"], dict):
-            normalized.update(exec_policy.classify_exec(
-                binary=binary, parent=None, image=_image_digest(raw_process),
-                observed_at=observed_at, pod_uid=None))
+            normalized.update(
+                exec_policy.classify_exec(
+                    binary=binary, parent=None, image=_image_digest(raw_process), observed_at=observed_at, pod_uid=None
+                )
+            )
         elif exec_policy is not None and binary in exec_policy.intent.suspect_binaries:
             parent = event.get("parent")
             parent_binary = parent.get("binary") if isinstance(parent, dict) else None
-            normalized.update(exec_policy.classify_suspect(
-                binary, parent=parent_binary if isinstance(parent_binary, str) and parent_binary else None,
-                image=_image_digest(event.get("process")),
-            ))
+            normalized.update(
+                exec_policy.classify_suspect(
+                    binary,
+                    parent=parent_binary if isinstance(parent_binary, str) and parent_binary else None,
+                    image=_image_digest(event.get("process")),
+                )
+            )
         if identity is not None:
             normalized["identity"] = identity
         return normalized
 
     binary, pod = _process(event, "$.process_kprobe", require_binary=False)
     function_name = _string(event.get("function_name"), "$.process_kprobe.function_name")
-    if (event_name == "process_lsm" and function_name != "file_open") or (event_name == "process_kprobe" and function_name not in {"security_file_permission", "security_file_open", "fd_install", "sys_openat", "__x64_sys_openat", "__arm64_sys_openat"}):
+    if (event_name == "process_lsm" and function_name != "file_open") or (
+        event_name == "process_kprobe"
+        and function_name
+        not in {
+            "security_file_permission",
+            "security_file_open",
+            "fd_install",
+            "sys_openat",
+            "__x64_sys_openat",
+            "__arm64_sys_openat",
+        }
+    ):
         raise UnsupportedTetragonEvent(f"unsupported kprobe function: {function_name}")
     policy_name = _string(event.get("policy_name"), "$.process_kprobe.policy_name")
     match = _RULE_ID.search(policy_name)
@@ -382,7 +413,11 @@ def parse_tetragon(
         raise EventError("process_kprobe has no file_arg.path")
     if mask is None and function_name == "security_file_permission":
         raise EventError("process_kprobe has no int_arg")
-    access = ("write" if mask & 2 else "read" if mask & 4 else "other") if function_name == "security_file_permission" else "open"
+    access = (
+        ("write" if mask & 2 else "read" if mask & 4 else "other")
+        if function_name == "security_file_permission"
+        else "open"
+    )
     action = _string(event.get("action"), "$.process_kprobe.action")
     action_mode = {
         "KPROBE_ACTION_OVERRIDE": "enforce",
@@ -400,9 +435,7 @@ def parse_tetragon(
     normalized.update(
         {
             "binary": binary,
-            "process_attribution": (
-                "available" if binary is not None else "unavailable"
-            ),
+            "process_attribution": ("available" if binary is not None else "unavailable"),
             "pod": pod,
             "pod_attribution": "available" if pod is not None else "unavailable",
             "path": file_path,
@@ -418,12 +451,18 @@ def parse_tetragon(
         normalized.update(exec_policy.classify_cache_write(file_path))
     if code_rule:
         from .codeload import classify_code_open
+
         classify_code_open(normalized, event, exec_policy, identity)
     if identity is not None:
         normalized["identity"] = identity
-    if (normalized["rule_id"] == "TG-HEALTH-01" and file_path == "/run/byul-runtime-sentinel/read.txt"
-        and identity is not None and identity.get("state") == "confirmed"
-        and identity.get("container_name") == "sentinel" and action.upper() == "KPROBE_ACTION_POST"):
+    if (
+        normalized["rule_id"] == "TG-HEALTH-01"
+        and file_path == "/run/byul-runtime-sentinel/read.txt"
+        and identity is not None
+        and identity.get("state") == "confirmed"
+        and identity.get("container_name") == "sentinel"
+        and action.upper() == "KPROBE_ACTION_POST"
+    ):
         normalized["observation_purpose"] = "health_check"
     return normalized
 
@@ -431,6 +470,7 @@ def parse_tetragon(
 def parse_management_access(document: Any, *, data_origin: str, environment=None, run_id=None) -> dict[str, Any]:
     """Consume the local listener journal; actor identity remains unattributed."""
     from datetime import datetime, timezone
+
     document = _object(document, "management access")
     if document.get("schema") != "runtime-management-access/1.0":
         raise EventError("management access schema is invalid")
@@ -440,7 +480,10 @@ def parse_management_access(document: Any, *, data_origin: str, environment=None
     stamp = document.get("recorded_at")
     try:
         observed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
-        if observed.tzinfo is None or (observed.astimezone(timezone.utc)-datetime.now(timezone.utc)).total_seconds() > 60:
+        if (
+            observed.tzinfo is None
+            or (observed.astimezone(timezone.utc) - datetime.now(timezone.utc)).total_seconds() > 60
+        ):
             raise ValueError
     except (AttributeError, TypeError, ValueError, OverflowError):
         raise EventError("management recorded_at must be a timezone timestamp within clock tolerance") from None
@@ -455,13 +498,20 @@ def parse_management_access(document: Any, *, data_origin: str, environment=None
         if configured is not None and cleaned[name] != configured:
             raise EventError("management scope differs from configured feed")
     method, path, status = document.get("method"), document.get("path"), document.get("status_code")
-    if not isinstance(method,str) or re.fullmatch(r"[A-Z]{1,32}",method) is None:
+    if not isinstance(method, str) or re.fullmatch(r"[A-Z]{1,32}", method) is None:
         raise EventError("management method is invalid")
-    if not isinstance(path,str) or not path or len(path)>2048 or any(ord(c)<32 or ord(c)==127 for c in path) or "?" in path or "#" in path:
+    if (
+        not isinstance(path, str)
+        or not path
+        or len(path) > 2048
+        or any(ord(c) < 32 or ord(c) == 127 for c in path)
+        or "?" in path
+        or "#" in path
+    ):
         raise EventError("management path is invalid")
     # Journal paths are already redacted; reject external authorities to avoid
     # surfacing userinfo from an untrusted or older writer.
-    if "://" in path and "@" in path.split("://",1)[1].split("/",1)[0]:
+    if "://" in path and "@" in path.split("://", 1)[1].split("/", 1)[0]:
         raise EventError("management authority contains userinfo")
     if type(status) is not int or not 100 <= status <= 599:
         raise EventError("management status_code is invalid")
@@ -469,18 +519,35 @@ def parse_management_access(document: Any, *, data_origin: str, environment=None
     if allowed is not None and type(allowed) is not bool:
         raise EventError("management allowed is invalid")
     for field in ("allowed_count", "denied_count"):
-        if type(document.get(field)) is not int or document[field]<0:
+        if type(document.get(field)) is not int or document[field] < 0:
             raise EventError("management count is invalid")
     recording = _object(document.get("recording"), "management recording")
-    if type(recording.get("write_failure_count")) is not int or recording["write_failure_count"]<0:
+    if type(recording.get("write_failure_count")) is not int or recording["write_failure_count"] < 0:
         raise EventError("management write failure count is invalid")
-    item = _base(stamp, "management_listener", "management_access", data_origin,
-                 environment=cleaned["environment"], run_id=cleaned["run_id"])
-    item.update({"event_id":event_id,"target_ref":cleaned["target_ref"],"policy_ref":cleaned["policy_ref"],
-                 "actor":{"state":"unattributed","principal_id":None},"method":method,"path":path,
-                 "status_code":status,"allowed":allowed,"allowed_count":document["allowed_count"],
-                 "denied_count":document["denied_count"],"write_failure_count":recording["write_failure_count"],
-                 "verdict":"allowed" if allowed is True else "denied" if allowed is False else "unknown"})
+    item = _base(
+        stamp,
+        "management_listener",
+        "management_access",
+        data_origin,
+        environment=cleaned["environment"],
+        run_id=cleaned["run_id"],
+    )
+    item.update(
+        {
+            "event_id": event_id,
+            "target_ref": cleaned["target_ref"],
+            "policy_ref": cleaned["policy_ref"],
+            "actor": {"state": "unattributed", "principal_id": None},
+            "method": method,
+            "path": path,
+            "status_code": status,
+            "allowed": allowed,
+            "allowed_count": document["allowed_count"],
+            "denied_count": document["denied_count"],
+            "write_failure_count": recording["write_failure_count"],
+            "verdict": "allowed" if allowed is True else "denied" if allowed is False else "unknown",
+        }
+    )
     return item
 
 
@@ -530,7 +597,9 @@ def transform_lines_with_loss(
         try:
             document = json.loads(line)
             if kind == "management_listener":
-                item = parse_management_access(document, data_origin=data_origin, environment=environment, run_id=run_id)
+                item = parse_management_access(
+                    document, data_origin=data_origin, environment=environment, run_id=run_id
+                )
             elif kind == "hubble":
                 loss = parse_hubble_loss(document)
                 if loss is not None:
@@ -593,21 +662,9 @@ def ingest_file(
         "accepted": len(accepted),
         "rejected": rejected,
         "lost_events_records": len(losses),
-        "lost_events_total": (
-            sum(item["num_events_lost"] for item in losses)
-            if kind == "hubble"
-            else None
-        ),
-        "lost_events_by_source": (
-            dict(by_source)
-            if kind == "hubble"
-            else None
-        ),
-        "last_lost_at": (
-            max((item["observed_at"] for item in losses), default=None)
-            if kind == "hubble"
-            else None
-        ),
+        "lost_events_total": (sum(item["num_events_lost"] for item in losses) if kind == "hubble" else None),
+        "lost_events_by_source": (dict(by_source) if kind == "hubble" else None),
+        "last_lost_at": (max((item["observed_at"] for item in losses), default=None) if kind == "hubble" else None),
     }
 
 
@@ -637,10 +694,16 @@ class ObservationQuery:
         rules = None
         if rule_ids is not None:
             rules = rule_ids.split(",")
-            if (active.get("source") != "tetragon" or "rule_id" in active
-                    or not 1 <= len(rules) <= 5 or len(set(rules)) != len(rules)
-                    or any(not re.fullmatch(r"TG-[A-Z]+-[0-9]{2}", rule) for rule in rules)):
-                raise ValueError("rule_ids requires source=tetragon and 1 through 5 distinct TG rule IDs; cannot combine with rule_id")
+            if (
+                active.get("source") != "tetragon"
+                or "rule_id" in active
+                or not 1 <= len(rules) <= 5
+                or len(set(rules)) != len(rules)
+                or any(not re.fullmatch(r"TG-[A-Z]+-[0-9]{2}", rule) for rule in rules)
+            ):
+                raise ValueError(
+                    "rule_ids requires source=tetragon and 1 through 5 distinct TG rule IDs; cannot combine with rule_id"
+                )
         records, corrupt, history_truncated = self.store.read_recent()
         filtered = [
             item
@@ -674,20 +737,12 @@ class ObservationQuery:
         real_hubble_dropped = sum(
             1
             for item in filtered
-            if item.get("source") == "hubble"
-            and item.get("verdict") == "dropped"
-            and item.get("data_origin") == "real"
+            if item.get("source") == "hubble" and item.get("verdict") == "dropped" and item.get("data_origin") == "real"
         )
         hubble_items = [item for item in filtered if item.get("source") == "hubble"]
-        hubble_dropped = [
-            item for item in hubble_items if item.get("verdict") == "dropped"
-        ][:25]
-        hubble_other = [
-            item for item in hubble_items if item.get("verdict") != "dropped"
-        ]
-        hubble_observations = (
-            hubble_dropped + hubble_other[: 50 - len(hubble_dropped)]
-        )
+        hubble_dropped = [item for item in hubble_items if item.get("verdict") == "dropped"][:25]
+        hubble_other = [item for item in hubble_items if item.get("verdict") != "dropped"]
+        hubble_observations = hubble_dropped + hubble_other[: 50 - len(hubble_dropped)]
         observations = filtered[:50]
         if rules is not None:
             # One protected tail read for the whole group; reserve ten rows for
@@ -707,8 +762,13 @@ class ObservationQuery:
             "observations": observations,
             "corrupt_lines": len(corrupt),
             "corrupt_details": corrupt[:20],
-            "window":{"truncated":history_truncated,"counts_lower_bound":history_truncated,
-                      "max_bytes":4*1024*1024,"max_records":4096,"scope":"recent_journal_tail",
-                      "rule_groups":{"max_rules":5,"per_rule_limit":10}},
+            "window": {
+                "truncated": history_truncated,
+                "counts_lower_bound": history_truncated,
+                "max_bytes": 4 * 1024 * 1024,
+                "max_records": 4096,
+                "scope": "recent_journal_tail",
+                "rule_groups": {"max_rules": 5, "per_rule_limit": 10},
+            },
             "generated_at": _utc_now(),
         }

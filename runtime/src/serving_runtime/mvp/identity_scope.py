@@ -1,4 +1,5 @@
 """Opaque reference for an observed Kubernetes container generation."""
+
 import hashlib
 import json
 import re

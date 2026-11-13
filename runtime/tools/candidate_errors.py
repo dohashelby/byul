@@ -1,4 +1,5 @@
 """Bounded CLI diagnostics: labels are programmer constants, never input values."""
+
 from contextlib import contextmanager
 import argparse
 import json

@@ -36,6 +36,7 @@ from serving_runtime.mvp.backend import is_valid_credential_value
 from serving_runtime.mvp.kube_context import validate_kube_context
 from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA
 from serving_runtime.enforcement.execpolicy import ExecPolicy
+
 try:
     from tools.tetragon_mode import switch_mode
     from tools.verification_material import atomic_write, encode, plain_path
@@ -46,7 +47,14 @@ except ModuleNotFoundError:  # direct script execution
 
 CASE_IDS = tuple(f"AWS-{number:02d}" for number in range(1, 21))
 FIXED_REQUESTS = (
-    ("/v1/chat/completions", {"model": "test-model", "messages": [{"role": "user", "content": "Say hello in one short sentence."}], "max_tokens": 8}),
+    (
+        "/v1/chat/completions",
+        {
+            "model": "test-model",
+            "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+            "max_tokens": 8,
+        },
+    ),
     ("/v1/completions", {"model": "test-model", "prompt": "Say hello in one short sentence.", "max_tokens": 8}),
 )
 COUNT_TOKENS_CODE = (
@@ -67,6 +75,8 @@ def _completion_usage(response: HTTPResponse) -> int | None:
     usage = document.get("usage") if document else None
     value = usage.get("completion_tokens") if isinstance(usage, dict) else None
     return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+
 CASE_TITLES = {
     "AWS-01": "정상",
     "AWS-02": "인증 거부",
@@ -147,12 +157,9 @@ WRITE_DENY_CODE = (
     "else:\n os.unlink(p); print('WRITE_SUCCEEDED'); sys.exit(1)"
 )
 CACHE_WRITE_CODE = (
-    "import os,sys; p=sys.argv[1]; "
-    "f=open(p,'xb'); f.write(b'x'); f.close(); os.unlink(p); print('CACHE_WRITE_REMOVED')"
+    "import os,sys; p=sys.argv[1]; f=open(p,'xb'); f.write(b'x'); f.close(); os.unlink(p); print('CACHE_WRITE_REMOVED')"
 )
-PROBE_READ_CODE = (
-    "import pathlib,sys; pathlib.Path(sys.argv[1]).read_bytes(); print('READ_OK')"
-)
+PROBE_READ_CODE = "import pathlib,sys; pathlib.Path(sys.argv[1]).read_bytes(); print('READ_OK')"
 PROBE_READ_ERRNO_CODE = (
     "import errno,json,pathlib,sys\n"
     "try: pathlib.Path(sys.argv[1]).read_bytes()\n"
@@ -218,8 +225,9 @@ class Runner:
         return result
 
     def start_port_forward(self, argv: Sequence[str]) -> subprocess.Popen[bytes]:
-        return subprocess.Popen(list(argv), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL, shell=False)
+        return subprocess.Popen(
+            list(argv), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=False
+        )
 
 
 class HTTPClient:
@@ -237,9 +245,7 @@ class HTTPClient:
         request = Request(url, data=body, headers=dict(headers or {}), method=method)
         try:
             with urlopen(request, timeout=timeout) as response:
-                return HTTPResponse(
-                    response.status, dict(response.headers), response.read()
-                )
+                return HTTPResponse(response.status, dict(response.headers), response.read())
         except HTTPError as error:
             with error:
                 return HTTPResponse(error.code, dict(error.headers), error.read())
@@ -270,7 +276,13 @@ def _timeline_reset(before: dict[str, Any], probe: dict[str, Any] | None, starte
     started = _parse_time(started_at)
     previous = before.get("entries")
     current = probe.get("entries") if isinstance(probe, dict) else None
-    if started is None or not isinstance(previous, list) or not previous or not isinstance(current, list) or not current:
+    if (
+        started is None
+        or not isinstance(previous, list)
+        or not previous
+        or not isinstance(current, list)
+        or not current
+    ):
         return False
     old_times = [_parse_time(row.get("from")) if isinstance(row, dict) else None for row in previous]
     new_times = [_parse_time(row.get("from")) if isinstance(row, dict) else None for row in current]
@@ -294,17 +306,29 @@ def _aws20_method(document: object, *, namespace: str) -> str | None:
     spec = document.get("spec") or {}
     if not isinstance(metadata, dict) or not isinstance(spec, dict):
         return None
-    if metadata.get("name") != "runtime-tg-secret-01" or metadata.get("namespace") != namespace or spec.get("options") != [{"name": "policy-mode", "value": "monitor"}]:
+    if (
+        metadata.get("name") != "runtime-tg-secret-01"
+        or metadata.get("namespace") != namespace
+        or spec.get("options") != [{"name": "policy-mode", "value": "monitor"}]
+    ):
         return None
     pod_selector = spec.get("podSelector")
-    if not isinstance(pod_selector, dict) or not isinstance(pod_selector.get("matchLabels"), dict) or not pod_selector["matchLabels"]:
+    if (
+        not isinstance(pod_selector, dict)
+        or not isinstance(pod_selector.get("matchLabels"), dict)
+        or not pod_selector["matchLabels"]
+    ):
         return None
     annotations = metadata.get("annotations") or {}
     method = annotations.get("serving-runtime.local/enforce-method") if isinstance(annotations, dict) else None
     probes = spec.get("lsmhooks") if method == "lsm_file_open" else spec.get("kprobes")
     if (method == "lsm_file_open" and spec.get("kprobes")) or (method != "lsm_file_open" and spec.get("lsmhooks")):
         return None
-    if method not in {"lsm_file_open", "override_lsm", "sigkill_fd_install", "override_syscall"} or not isinstance(probes, list) or len(probes) != 1:
+    if (
+        method not in {"lsm_file_open", "override_lsm", "sigkill_fd_install", "override_syscall"}
+        or not isinstance(probes, list)
+        or len(probes) != 1
+    ):
         return None
     probe = probes[0]
     selectors = probe.get("selectors") if isinstance(probe, dict) else None
@@ -312,16 +336,26 @@ def _aws20_method(document: object, *, namespace: str) -> str | None:
         return None
     selector = selectors[0]
     actions = selector.get("matchActions") if isinstance(selector, dict) else None
-    expected = ([{"action": "Sigkill"}] if method == "sigkill_fd_install" else
-                [{"action": "Post"}, {"action": "Override", "argError": -1}, {"action": "Sigkill"}])
+    expected = (
+        [{"action": "Sigkill"}]
+        if method == "sigkill_fd_install"
+        else [{"action": "Post"}, {"action": "Override", "argError": -1}, {"action": "Sigkill"}]
+    )
     override_only = [{"action": "Post"}, {"action": "Override", "argError": -13}]
     if actions != expected and not (method in {"lsm_file_open", "override_syscall"} and actions == override_only):
         return None
     if method == "lsm_file_open" and actions != override_only:
         return None
     call = probe.get("hook") if method == "lsm_file_open" else probe.get("call")
-    if call != {"override_lsm": "security_file_permission", "sigkill_fd_install": "fd_install",
-                "override_syscall": "sys_openat", "lsm_file_open": "file_open"}[method]:
+    if (
+        call
+        != {
+            "override_lsm": "security_file_permission",
+            "sigkill_fd_install": "fd_install",
+            "override_syscall": "sys_openat",
+            "lsm_file_open": "file_open",
+        }[method]
+    ):
         return None
     args = selector.get("matchArgs")
     if not isinstance(args, list) or not args:
@@ -332,14 +366,16 @@ def _aws20_method(document: object, *, namespace: str) -> str | None:
         return None
     if method == "override_lsm" and (len(args) != 2 or args[1] != {"index": 1, "operator": "Equal", "values": ["4"]}):
         return None
-    if method == "lsm_file_open" and (len(args) != 1 or file_arg.get("index") != 0
-                                      or probe.get("args") != [{"index": 0, "type": "file"}]):
+    if method == "lsm_file_open" and (
+        len(args) != 1 or file_arg.get("index") != 0 or probe.get("args") != [{"index": 0, "type": "file"}]
+    ):
         return None
     return method
 
 
-def _aws20_raw_action(path: Path, *, since: str, pod_uid: str, namespace: str,
-                      action: str, method: str, probe_tag: str | None = None) -> bool:
+def _aws20_raw_action(
+    path: Path, *, since: str, pod_uid: str, namespace: str, action: str, method: str, probe_tag: str | None = None
+) -> bool:
     try:
         with path.open("r", encoding="utf-8") as handle:
             for line in handle:
@@ -348,14 +384,26 @@ def _aws20_raw_action(path: Path, *, since: str, pod_uid: str, namespace: str,
                     event = root.get("process_lsm" if method == "lsm_file_open" else "process_kprobe") or {}
                     pod = (event.get("process") or {}).get("pod") or {}
                     args = event.get("args") or []
-                    if (_after(root.get("time"), since)
+                    if (
+                        _after(root.get("time"), since)
                         and event.get("policy_name") == "runtime-tg-secret-01"
                         and event.get("action") == action
-                        and pod.get("uid") == pod_uid and pod.get("namespace") == namespace
+                        and pod.get("uid") == pod_uid
+                        and pod.get("namespace") == namespace
                         and (probe_tag is None or event.get("runtime_probe_id") == probe_tag)
-                        and any(isinstance(arg, dict) and ((arg.get("file_arg") or {}).get("path") == _SECRET_PROBE_PATH
-                                                           or str(arg.get("string_arg", "")).rstrip("\x00") == _SECRET_PROBE_PATH) for arg in args)
-                        and (method != "override_lsm" or any(isinstance(arg, dict) and str(arg.get("int_arg")) == "4" for arg in args))):
+                        and any(
+                            isinstance(arg, dict)
+                            and (
+                                (arg.get("file_arg") or {}).get("path") == _SECRET_PROBE_PATH
+                                or str(arg.get("string_arg", "")).rstrip("\x00") == _SECRET_PROBE_PATH
+                            )
+                            for arg in args
+                        )
+                        and (
+                            method != "override_lsm"
+                            or any(isinstance(arg, dict) and str(arg.get("int_arg")) == "4" for arg in args)
+                        )
+                    ):
                         return True
                 except (ValueError, TypeError, AttributeError):
                     continue
@@ -403,11 +451,13 @@ def _stream_final_success(record: dict[str, Any] | None) -> bool | None:
     if record is None:
         return None
     delivery = record["delivery"]
-    return (record["result"] == "ALLOWED"
-            and record["final_outcome"] == "completed"
-            and delivery["attempted"] is True
-            and delivery["response"] == "completed"
-            and delivery["error_code"] is None)
+    return (
+        record["result"] == "ALLOWED"
+        and record["final_outcome"] == "completed"
+        and delivery["attempted"] is True
+        and delivery["response"] == "completed"
+        and delivery["error_code"] is None
+    )
 
 
 def _extract_policy_limit(document: object) -> int | None:
@@ -431,9 +481,7 @@ def _target_snapshot_stale(document: object) -> bool:
     kubernetes = document.get("kubernetes")
     if not isinstance(kubernetes, dict):
         return False
-    return "stale" in " ".join(
-        str(kubernetes.get(name, "")) for name in ("state", "error")
-    ).lower()
+    return "stale" in " ".join(str(kubernetes.get(name, "")) for name in ("state", "error")).lower()
 
 
 def _overall(cases: Iterable[Mapping[str, Any]]) -> str:
@@ -452,9 +500,7 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
         raise ValueError("unknown AWS acceptance case")
     # Either direct connection disproves denial, even if controls are missing.
     # The tokenize fact is supplementary: its absence is not a pass requirement.
-    if case_id == "AWS-04" and (
-        facts.get("direct_connected") is True or facts.get("tokenize_direct_failed") is False
-    ):
+    if case_id == "AWS-04" and (facts.get("direct_connected") is True or facts.get("tokenize_direct_failed") is False):
         return "failed", "직통 연결 성공: TCP 또는 POST /tokenize(코드 선택 본문)"
     if case_id in {"AWS-12", "AWS-13", "AWS-15", "AWS-16", "AWS-20"} and facts.get("cleanup_ok") is False:
         return "failed", "시험 뒤 정리 또는 복구 실패"
@@ -467,20 +513,38 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
         if method not in {"lsm_file_open", "override_lsm", "override_syscall", "sigkill_fd_install"}:
             return "unknown", "차단 방식을 확인하지 못함"
         if method == "sigkill_fd_install":
-            required = ["enforce_active", "monitor_read_ok", "exit_sigkill", "raw_sigkill", "cleanup_ok", "restore_read_ok"]
+            required = [
+                "enforce_active",
+                "monitor_read_ok",
+                "exit_sigkill",
+                "raw_sigkill",
+                "cleanup_ok",
+                "restore_read_ok",
+            ]
             if facts.get("engine_target") is True:
                 required += ["gateway_503", "recovered_200", "engine_restarted"]
             else:
                 required += ["normal_200"]
         else:
-            required = ["enforce_active", "monitor_read_ok", "read_eperm", "raw_override", "normal_200", "cleanup_ok", "restore_read_ok"]
+            required = [
+                "enforce_active",
+                "monitor_read_ok",
+                "read_eperm",
+                "raw_override",
+                "normal_200",
+                "cleanup_ok",
+                "restore_read_ok",
+            ]
         if any(facts.get(name) is False for name in required):
             return "failed", "차단·정상 요청 또는 monitor 복귀 결과 불일치"
         missing = [name for name in required if facts.get(name) is not True]
         if missing:
             return "unknown", "판정 근거 부족: " + ", ".join(missing)
-        return "passed", ("Sigkill 종료·동일 Pod UID 이벤트·monitor 복귀 확인" if method == "sigkill_fd_install"
-                          else "가짜 파일 EPERM/EACCES·동일 Pod UID Override·정상 200·monitor 복귀 확인")
+        return "passed", (
+            "Sigkill 종료·동일 Pod UID 이벤트·monitor 복귀 확인"
+            if method == "sigkill_fd_install"
+            else "가짜 파일 EPERM/EACCES·동일 Pod UID Override·정상 200·monitor 복귀 확인"
+        )
     if case_id == "AWS-05" and facts.get("receiver_control_connected") is False:
         return "unknown", "대조 실패: receiver에 닿지 않음"
 
@@ -518,8 +582,26 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
             ("model_write_denied", "cache_write_succeeded", "cache_harmless_removed"),
         ),
         "AWS-07": (
-            ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "stopped_request_200_unverified", "start_ok", "collectors_recovered", "target_recovered", "inference_recovered"),
-            ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "stopped_request_200_unverified", "start_ok", "collectors_recovered", "target_recovered", "inference_recovered"),
+            (
+                "stop_ok",
+                "heartbeat_stopped_seen",
+                "collectors_unavailable",
+                "stopped_request_200_unverified",
+                "start_ok",
+                "collectors_recovered",
+                "target_recovered",
+                "inference_recovered",
+            ),
+            (
+                "stop_ok",
+                "heartbeat_stopped_seen",
+                "collectors_unavailable",
+                "stopped_request_200_unverified",
+                "start_ok",
+                "collectors_recovered",
+                "target_recovered",
+                "inference_recovered",
+            ),
         ),
         "AWS-08": (
             (
@@ -546,25 +628,57 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
             ("read_ok", "path_match", "engine_pod_match", "read_access", "monitor_detected"),
         ),
         "AWS-11": (
-            ("normal_before", "normal_after", "stream_before", "stream_after", "cache_current_before", "cache_current_after", "false_warnings_zero"),
-            ("normal_before", "normal_after", "stream_before", "stream_after", "cache_current_before", "cache_current_after", "false_warnings_zero"),
+            (
+                "normal_before",
+                "normal_after",
+                "stream_before",
+                "stream_after",
+                "cache_current_before",
+                "cache_current_after",
+                "false_warnings_zero",
+            ),
+            (
+                "normal_before",
+                "normal_after",
+                "stream_before",
+                "stream_after",
+                "cache_current_before",
+                "cache_current_after",
+                "false_warnings_zero",
+            ),
         ),
-        "AWS-12": (("baseline_connected", "policy_timeout", "hubble_dropped", "restored_connected", "cleanup_ok"),
-                   ("restored_connected", "cleanup_ok")),
-        "AWS-13": (("bad_bundle_rejected", "recovered_200", "recovered_denied", "cleanup_ok"),
-                   ("bad_bundle_rejected", "recovered_200", "recovered_denied", "cleanup_ok")),
-        "AWS-14": (("restart_ok", "initial_503", "recovered_200", "within_10s"),
-                   ("restart_ok", "recovered_200", "within_10s")),
-        "AWS-15": (("stop_ok", "restart_ok", "observed_503", "recovered_200", "cleanup_ok"),
-                   ("restart_ok", "observed_503", "recovered_200", "cleanup_ok")),
-        "AWS-16": (("stop_ok", "expired_unknown", "request_200", "cleanup_ok"),
-                   ("expired_unknown", "request_200", "cleanup_ok")),
-        "AWS-17": (("pod_changed", "timeline_new_uid", "timeline_reset", "old_phase_absent"),
-                   ("pod_changed", "timeline_new_uid", "timeline_reset", "old_phase_absent")),
-        "AWS-18": (("normal", "stream", "usage", "log_match", "context_boundary", "context_exceeded"),
-                   ("normal", "stream", "usage", "context_boundary", "context_exceeded")),
-        "AWS-19": (("codes", "reasons", "records", "not_delivered", "engine_log_absent", "positive_control"),
-                   ("codes", "reasons", "records", "not_delivered", "positive_control")),
+        "AWS-12": (
+            ("baseline_connected", "policy_timeout", "hubble_dropped", "restored_connected", "cleanup_ok"),
+            ("restored_connected", "cleanup_ok"),
+        ),
+        "AWS-13": (
+            ("bad_bundle_rejected", "recovered_200", "recovered_denied", "cleanup_ok"),
+            ("bad_bundle_rejected", "recovered_200", "recovered_denied", "cleanup_ok"),
+        ),
+        "AWS-14": (
+            ("restart_ok", "initial_503", "recovered_200", "within_10s"),
+            ("restart_ok", "recovered_200", "within_10s"),
+        ),
+        "AWS-15": (
+            ("stop_ok", "restart_ok", "observed_503", "recovered_200", "cleanup_ok"),
+            ("restart_ok", "observed_503", "recovered_200", "cleanup_ok"),
+        ),
+        "AWS-16": (
+            ("stop_ok", "expired_unknown", "request_200", "cleanup_ok"),
+            ("expired_unknown", "request_200", "cleanup_ok"),
+        ),
+        "AWS-17": (
+            ("pod_changed", "timeline_new_uid", "timeline_reset", "old_phase_absent"),
+            ("pod_changed", "timeline_new_uid", "timeline_reset", "old_phase_absent"),
+        ),
+        "AWS-18": (
+            ("normal", "stream", "usage", "log_match", "context_boundary", "context_exceeded"),
+            ("normal", "stream", "usage", "context_boundary", "context_exceeded"),
+        ),
+        "AWS-19": (
+            ("codes", "reasons", "records", "not_delivered", "engine_log_absent", "positive_control"),
+            ("codes", "reasons", "records", "not_delivered", "positive_control"),
+        ),
     }
     required, decisive = checks[case_id]
     if case_id == "AWS-12" and facts.get("baseline_connected") is False:
@@ -671,7 +785,10 @@ def _report_code(value: object) -> str:
 
 
 def _report_probe_value(value: object) -> str:
-    if isinstance(value, str) and (value in {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash", "suspect_binary"} or _parse_time(value) is not None):
+    if isinstance(value, str) and (
+        value in {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash", "suspect_binary"}
+        or _parse_time(value) is not None
+    ):
         return value
     if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
         return str(value)
@@ -688,8 +805,7 @@ def _tokenize_probe_summary(evidence: Mapping[str, Any]) -> str:
     marker = _report_at(evidence, "tokenize_direct_probe", "marker")
     number = 0 if marker == "CONNECTED" else _report_at(evidence, "tokenize_direct_probe", "errno")
     name = "CONNECTED" if marker == "CONNECTED" else _report_at(evidence, "tokenize_direct_probe", "errno_name")
-    return ("직통 POST /tokenize(코드 선택 본문) 연결 errno "
-            f"{_report_value(number)} ({_report_code(name)})")
+    return f"직통 POST /tokenize(코드 선택 본문) 연결 errno {_report_value(number)} ({_report_code(name)})"
 
 
 def _report_summary(case: Mapping[str, Any]) -> str:
@@ -703,62 +819,90 @@ def _report_summary(case: Mapping[str, Any]) -> str:
     if case_id == "AWS-01":
         codes = at("http_codes")
         chat_status = next((code for code in codes if isinstance(code, int)), None) if isinstance(codes, list) else None
-        return (f"일반 HTTP {status(chat_status)}, stream HTTP {status(at('stream', 'http_status'))}; "
-                f"SSE data {state(at('stream', 'sse_data_received'), ())}, [DONE] {state(at('stream', 'done_received'), ())}; "
-                f"record ALLOWED {fact('record_allowed')}, 엔진 로그 일치 {fact('engine_log_match')}")
+        return (
+            f"일반 HTTP {status(chat_status)}, stream HTTP {status(at('stream', 'http_status'))}; "
+            f"SSE data {state(at('stream', 'sse_data_received'), ())}, [DONE] {state(at('stream', 'done_received'), ())}; "
+            f"record ALLOWED {fact('record_allowed')}, 엔진 로그 일치 {fact('engine_log_match')}"
+        )
     if case_id == "AWS-02":
         attempts = at("attempts")
         parts = []
         for kind in ("missing", "invalid"):
-            item = next((entry for entry in attempts if isinstance(entry, Mapping) and entry.get("kind") == kind), {}) if isinstance(attempts, list) else {}
+            item = (
+                next((entry for entry in attempts if isinstance(entry, Mapping) and entry.get("kind") == kind), {})
+                if isinstance(attempts, list)
+                else {}
+            )
             parts.append(f"{kind} HTTP {status(item.get('status'))}/{_report_code(item.get('error_code'))}")
         return ", ".join(parts) + f"; 미전달 {fact('not_delivered')}, 엔진 로그 부재 {fact('engine_log_absent')}"
     if case_id == "AWS-03":
         limit = at("policy_limit")
-        limit_text = str(limit) if isinstance(limit, int) and not isinstance(limit, bool) and limit > 0 else "확인 못 함"
-        return (f"상한 {limit_text}토큰, 상한 요청 HTTP {status(at('boundary', 'http_status'))}, "
-                f"초과 요청 403 {fact('http_403')}; reason_code {_report_code(at('record_fields_used', 'reason_code'))}, "
-                f"MAX_TOKENS_EXCEEDED 일치 {fact('reason_code')}, 미전달 {fact('not_delivered')}")
+        limit_text = (
+            str(limit) if isinstance(limit, int) and not isinstance(limit, bool) and limit > 0 else "확인 못 함"
+        )
+        return (
+            f"상한 {limit_text}토큰, 상한 요청 HTTP {status(at('boundary', 'http_status'))}, "
+            f"초과 요청 403 {fact('http_403')}; reason_code {_report_code(at('record_fields_used', 'reason_code'))}, "
+            f"MAX_TOKENS_EXCEEDED 일치 {fact('reason_code')}, 미전달 {fact('not_delivered')}"
+        )
     if case_id == "AWS-04":
-        return (f"직통 연결 {_report_code(at('direct_probe', 'errno_name'))}, "
-                f"Gateway 앞/뒤 연결 {fact('gateway_tcp_control')}, 요청 200 {fact('gateway_control_200')}, "
-                f"Hubble dropped {fact('hubble_dropped')}; {_tokenize_probe_summary(evidence)}")
+        return (
+            f"직통 연결 {_report_code(at('direct_probe', 'errno_name'))}, "
+            f"Gateway 앞/뒤 연결 {fact('gateway_tcp_control')}, 요청 200 {fact('gateway_control_200')}, "
+            f"Hubble dropped {fact('hubble_dropped')}; {_tokenize_probe_summary(evidence)}"
+        )
     if case_id == "AWS-05":
-        return (f"engine→receiver 연결 {_report_code(at('engine_receiver_probe', 'errno_name'))}, "
-                f"other-client 대조 연결 {fact('receiver_control_connected')}, Hubble dropped {fact('receiver_hubble_dropped')}")
+        return (
+            f"engine→receiver 연결 {_report_code(at('engine_receiver_probe', 'errno_name'))}, "
+            f"other-client 대조 연결 {fact('receiver_control_connected')}, Hubble dropped {fact('receiver_hubble_dropped')}"
+        )
     if case_id == "AWS-06":
-        return (f"/models 쓰기 {_report_code(at('model_probe', 'errno_name'))}, "
-                f"/cache 쓰기·삭제 {state(at('cache_probe', 'marker'), ('CACHE_WRITE_REMOVED',))}, "
-                f"TG-CACHE-01 기록 {fact('cache_tetragon')}")
+        return (
+            f"/models 쓰기 {_report_code(at('model_probe', 'errno_name'))}, "
+            f"/cache 쓰기·삭제 {state(at('cache_probe', 'marker'), ('CACHE_WRITE_REMOVED',))}, "
+            f"TG-CACHE-01 기록 {fact('cache_tetragon')}"
+        )
     if case_id == "AWS-07":
-        return (f"중단 중 요청 HTTP {status(at('stopped_interval_request', 'http_status'))}, "
-                f"대상 상태 {state(at('stopped_target_verification', 'state'), ('ok', 'unavailable', 'blocked'))}; "
-                f"복구 대상 {state(at('recovered_target_verification', 'state'), ('ok', 'unavailable', 'blocked'))}, "
-                f"요청 HTTP {status(at('recovery_request', 'last_status'))}, 추론 회복 {fact('inference_recovered')}")
+        return (
+            f"중단 중 요청 HTTP {status(at('stopped_interval_request', 'http_status'))}, "
+            f"대상 상태 {state(at('stopped_target_verification', 'state'), ('ok', 'unavailable', 'blocked'))}; "
+            f"복구 대상 {state(at('recovered_target_verification', 'state'), ('ok', 'unavailable', 'blocked'))}, "
+            f"요청 HTTP {status(at('recovery_request', 'last_status'))}, 추론 회복 {fact('inference_recovered')}"
+        )
     if case_id == "AWS-08":
-        return (f"Pod 교체 {fact('pod_changed')}, Gateway instance 변경 {fact('gateway_instance_changed')}, "
-                f"engine_info {state(at('engine_info', 'state'), ('ok', 'error', 'stale'))}, "
-                f"복구 요청 HTTP {status(at('recovery_request', 'last_status'))}, 추론 회복 {fact('gateway_recovered')}")
+        return (
+            f"Pod 교체 {fact('pod_changed')}, Gateway instance 변경 {fact('gateway_instance_changed')}, "
+            f"engine_info {state(at('engine_info', 'state'), ('ok', 'error', 'stale'))}, "
+            f"복구 요청 HTTP {status(at('recovery_request', 'last_status'))}, 추론 회복 {fact('gateway_recovered')}"
+        )
     if case_id == "AWS-09":
-        return (f"절대 경로 /bin/sh 실행 {fact('absolute_exec_ok')}, PATH 탐색 실행 {fact('path_exec_ok')}; "
-                f"관측 경로 {_report_probe_value(at('absolute', 'binary'))}, Pod 귀속 {fact('engine_pod_match')}, "
-                f"판정 {_report_probe_value(at('absolute', 'exec_verdict'))}, 시각 {_report_probe_value(at('absolute', 'observed_at'))}, "
-                f"탐지 시간 {_report_probe_value(at('absolute', 'detection_delay_s'))}초; "
-                f"PATH 실행 기록 경로 {_report_probe_value(at('path_lookup', 'binary'))}, 판정 {_report_probe_value(at('path_lookup', 'exec_verdict'))}")
+        return (
+            f"절대 경로 /bin/sh 실행 {fact('absolute_exec_ok')}, PATH 탐색 실행 {fact('path_exec_ok')}; "
+            f"관측 경로 {_report_probe_value(at('absolute', 'binary'))}, Pod 귀속 {fact('engine_pod_match')}, "
+            f"판정 {_report_probe_value(at('absolute', 'exec_verdict'))}, 시각 {_report_probe_value(at('absolute', 'observed_at'))}, "
+            f"탐지 시간 {_report_probe_value(at('absolute', 'detection_delay_s'))}초; "
+            f"PATH 실행 기록 경로 {_report_probe_value(at('path_lookup', 'binary'))}, 판정 {_report_probe_value(at('path_lookup', 'exec_verdict'))}"
+        )
     if case_id == "AWS-10":
-        return (f"가짜 파일 읽기 {fact('read_ok')}, 경로 {fact('path_match')}, Pod 귀속 {fact('engine_pod_match')}, "
-                f"기록 경로 {_report_binary_path(at('observation', 'path'))}, 시각 {_report_probe_value(at('observation', 'observed_at'))}, "
-                f"read {fact('read_access')}, monitor 탐지 {fact('monitor_detected')}, "
-                f"탐지 시간 {_report_probe_value(at('observation', 'detection_delay_s'))}초")
+        return (
+            f"가짜 파일 읽기 {fact('read_ok')}, 경로 {fact('path_match')}, Pod 귀속 {fact('engine_pod_match')}, "
+            f"기록 경로 {_report_binary_path(at('observation', 'path'))}, 시각 {_report_probe_value(at('observation', 'observed_at'))}, "
+            f"read {fact('read_access')}, monitor 탐지 {fact('monitor_detected')}, "
+            f"탐지 시간 {_report_probe_value(at('observation', 'detection_delay_s'))}초"
+        )
     if case_id == "AWS-20":
-        return (f"enforce 적용 {fact('enforce_active')}, 가짜 파일 EPERM {fact('read_eperm')}, "
-                f"동일 Pod UID Override {fact('raw_override')}, 정상 요청 200 {fact('normal_200')}, "
-                f"monitor 복원 {fact('cleanup_ok')}, 복원 뒤 읽기 {fact('restore_read_ok')}")
+        return (
+            f"enforce 적용 {fact('enforce_active')}, 가짜 파일 EPERM {fact('read_eperm')}, "
+            f"동일 Pod UID Override {fact('raw_override')}, 정상 요청 200 {fact('normal_200')}, "
+            f"monitor 복원 {fact('cleanup_ok')}, 복원 뒤 읽기 {fact('restore_read_ok')}"
+        )
     if case_id == "AWS-11":
-        return (f"전후 정상 요청 {fact('normal_before')}/{fact('normal_after')}, stream {fact('stream_before')}/{fact('stream_after')}, "
-                f"현재 cache {fact('cache_current_before')}/{fact('cache_current_after')}, 잘못된 경고 {_report_probe_value(at('false_warning_count'))}건, "
-                f"일반 응답 시간 전/후 {_report_probe_value(at('before', 'response_time_ms', 'normal'))}/{_report_probe_value(at('after', 'response_time_ms', 'normal'))}ms, "
-                f"stream 전/후 {_report_probe_value(at('before', 'response_time_ms', 'stream'))}/{_report_probe_value(at('after', 'response_time_ms', 'stream'))}ms (참고값)")
+        return (
+            f"전후 정상 요청 {fact('normal_before')}/{fact('normal_after')}, stream {fact('stream_before')}/{fact('stream_after')}, "
+            f"현재 cache {fact('cache_current_before')}/{fact('cache_current_after')}, 잘못된 경고 {_report_probe_value(at('false_warning_count'))}건, "
+            f"일반 응답 시간 전/후 {_report_probe_value(at('before', 'response_time_ms', 'normal'))}/{_report_probe_value(at('after', 'response_time_ms', 'normal'))}ms, "
+            f"stream 전/후 {_report_probe_value(at('before', 'response_time_ms', 'stream'))}/{_report_probe_value(at('after', 'response_time_ms', 'stream'))}ms (참고값)"
+        )
     return "확인 못 함"
 
 
@@ -770,26 +914,131 @@ class _ReportCase:
 
 
 REPORT_CASES: dict[str, _ReportCase] = {
-    "AWS-01": _ReportCase("일반·stream 200과 유효 응답, ALLOWED·전달 시도, SSE 완료와 엔진 로그 일치를 확인한다.", "엔진 로그 형식이 다르면 수신 여부를 확인할 수 없다.", ("http_200", "valid_completion", "record_allowed", "delivery_attempted", "engine_log_match", "stream_ok")),
-    "AWS-02": _ReportCase("인증 없음·오류가 각각 401과 AUTH_REQUIRED·AUTH_INVALID이고, DENIED·미전달·엔진 로그 부재를 확인한다.", "엔진 로그 부재는 AWS-01에서 양성 로그 형식을 확인해야 해석할 수 있다.", ("auth_codes", "records_denied", "not_delivered", "engine_log_absent", "engine_log_format_confirmed")),
-    "AWS-03": _ReportCase("상한 요청은 허용되고 상한+1은 403 MAX_TOKENS_EXCEEDED·미전달·엔진 로그 부재여야 한다.", "엔진 로그 부재는 AWS-01에서 양성 로그 형식을 확인해야 해석할 수 있다.", ("policy_limit_read", "boundary_allowed", "http_403", "reason_code", "not_delivered", "engine_log_absent", "engine_log_format_confirmed")),
-    "AWS-04": _ReportCase("직통 연결은 시간 초과 errno, Gateway 경로는 앞뒤 연결과 요청이 성공하고 해당 Hubble 흐름은 dropped여야 한다.", "ECONNREFUSED 등 다른 errno나 Hubble 단독 기록은 정책 차단 증거가 아니다.", ("direct_failed", "gateway_tcp_control", "gateway_control_200", "hubble_dropped")),
-    "AWS-05": _ReportCase("engine→receiver는 시간 초과 errno와 Hubble dropped, other-client→receiver는 연결 성공이어야 한다.", "다른 errno나 허용 경로 대조 실패는 정책 차단 증거가 아니다.", ("engine_receiver_failed", "receiver_control_connected", "receiver_hubble_dropped")),
-    "AWS-06": _ReportCase("/models 쓰기는 EROFS, /cache 쓰기·삭제는 성공하고 TG-CACHE-01에 기록돼야 한다.", "EPERM·EACCES는 읽기 전용 mount 증거가 아니며 TG-ASSET-01은 선행 거부 시 안 보일 수 있다.", ("model_write_denied", "cache_write_succeeded", "cache_harmless_removed", "cache_tetragon")),
-    "AWS-07": _ReportCase("중단 heartbeat·collector 비정상, stale 이후 요청 200·대상 unavailable, 재시작 뒤 collector·대상·추론 회복을 확인한다.", "정상 종료의 gap 기록은 보조 증거이며 없어도 판정할 수 있다.", ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "stopped_request_200_unverified", "start_ok", "collectors_recovered", "target_recovered", "inference_recovered")),
-    "AWS-08": _ReportCase("재시작 뒤 Pod·Gateway instance 변경, engine_info ok와 유한 창 내 추론 회복을 확인한다.", "Pod snapshot stale은 별도 메모이며 통과 근거가 아니다.", ("restart_ok", "pod_changed", "gateway_recovered", "engine_info_recovered", "gateway_instance_changed")),
-    "AWS-09": _ReportCase("엔진 Pod의 /bin/sh -c true 실행이 해당 Pod·시각·경로의 관측 기록과 연결되고 suspect_binary여야 한다. PATH 탐색 sh -c true도 실행해 실제 기록 경로와 판정을 남긴다.", "인자를 수집하지 않으므로 동일 Pod·경로·시각은 강한 대조이나 단일 프로세스 ID 증명은 아니다.", ("absolute_exec_ok", "path_exec_ok", "path_observed", "engine_pod_match", "suspect_verdict")),
-    "AWS-10": _ReportCase("가짜 파일 읽기 성공과 TG-SECRET-01의 동일 경로·엔진 Pod·read·monitor 탐지를 확인한다.", "읽기 차단은 요구하지 않으며 파일 내용은 보고하지 않는다.", ("read_ok", "path_match", "engine_pod_match", "read_access", "monitor_detected")),
-    "AWS-11": _ReportCase("AWS-09·10 앞뒤의 일반 요청·stream·현재 cache 쓰기가 정상이고, 구간 실행에 유효한 단계 근거가 있으며, 잘못된 경고가 0건이어야 한다. 응답 시간은 참고값이다.", "탐지 시간은 측정만 하며 기준 없이 판정하지 않는다. 실제 GPU 단계 패턴과 정상 허용 목록은 미확인이다.", ("normal_before", "normal_after", "stream_before", "stream_after", "cache_current_before", "cache_current_after", "false_warnings_zero")),
-    "AWS-12": _ReportCase("비교 Pod 연결이 규칙 전 성공, 적용 중 timeout과 Hubble dropped, 제거 뒤 재성공해야 한다.", "기본 통제가 이미 막으면 비교 불가다. 정리 실패는 failed다.", ("baseline_connected", "policy_timeout", "hubble_dropped", "restored_connected", "cleanup_ok")),
-    "AWS-13": _ReportCase("해시 불일치 묶음 시작 거부 뒤 이전 묶음으로 복구하고 정상 200·거부 1건을 확인한다.", "SHA-256 바이트 대조이며 서명 검증이 아니다. 복구 실패는 failed다.", ("bad_bundle_rejected", "recovered_200", "recovered_denied", "cleanup_ok")),
-    "AWS-14": _ReportCase("Gateway 재시작 직후 503을 관측하고 준비 뒤 10초 안에 200으로 복귀한다.", "503은 스냅샷 not_before가 원인인지 상태와 함께 대조한다.", ("restart_ok", "initial_503", "recovered_200", "within_10s")),
-    "AWS-15": _ReportCase("수집기 정지 중 Gateway 재시작 후 503, 수집 재개 뒤 200을 확인한다.", "수집기 복구 실패는 failed다.", ("stop_ok", "restart_ok", "observed_503", "recovered_200", "cleanup_ok")),
-    "AWS-16": _ReportCase("수집기 정지 15초 초과 뒤 단계가 unknown이고 일반 요청은 200이어야 한다.", "단계 수집 비활성 시 unknown이다. 수집기 복구 실패는 failed다.", ("stop_ok", "expired_unknown", "request_200", "cleanup_ok")),
-    "AWS-17": _ReportCase("교체 후 시간표 collector.pod_uid가 새 Pod이고 새 실행에 이전 단계가 붙지 않아야 한다.", "Tetragon 원시 Pod UID는 process.pod.uid다.", ("pod_changed", "timeline_new_uid", "old_phase_absent")),
-    "AWS-18": _ReportCase("동일 고정 chat·completions 요청의 일반·stream 종료, 응답 usage의 답변 길이, 토큰화 경계·초과, 엔진 로그 수신을 대조한다.", "토큰 실패 주입은 서버 자동 사례에 포함되지 않아 별도 가짜 엔진 시험으로만 확인한다. 토큰화 결과를 못 얻으면 unknown이다.", ("normal", "stream", "usage", "log_match", "context_boundary", "context_exceeded")),
-    "AWS-19": _ReportCase("미지원 경로·필드는 거부되고 사유가 기록되며 엔진 로그에는 정상 대조 ID만 남아야 한다.", "정상 ID가 같은 구간의 로그에 없으면 거부 미전달은 unknown이다.", ("codes", "reasons", "records", "not_delivered", "engine_log_absent", "positive_control")),
-    "AWS-20": _ReportCase("가짜 보호 파일의 방식별 Override errno 또는 Sigkill 종료, 같은 Pod UID 원시 이벤트, monitor 복귀를 확인한다.", "시험용 Pod 먼저; 엔진 대상 Sigkill은 별도 opt-in. 근거 부족은 unknown, 복귀 실패는 failed다.", ("enforce_active", "cleanup_ok", "restore_read_ok")),
+    "AWS-01": _ReportCase(
+        "일반·stream 200과 유효 응답, ALLOWED·전달 시도, SSE 완료와 엔진 로그 일치를 확인한다.",
+        "엔진 로그 형식이 다르면 수신 여부를 확인할 수 없다.",
+        ("http_200", "valid_completion", "record_allowed", "delivery_attempted", "engine_log_match", "stream_ok"),
+    ),
+    "AWS-02": _ReportCase(
+        "인증 없음·오류가 각각 401과 AUTH_REQUIRED·AUTH_INVALID이고, DENIED·미전달·엔진 로그 부재를 확인한다.",
+        "엔진 로그 부재는 AWS-01에서 양성 로그 형식을 확인해야 해석할 수 있다.",
+        ("auth_codes", "records_denied", "not_delivered", "engine_log_absent", "engine_log_format_confirmed"),
+    ),
+    "AWS-03": _ReportCase(
+        "상한 요청은 허용되고 상한+1은 403 MAX_TOKENS_EXCEEDED·미전달·엔진 로그 부재여야 한다.",
+        "엔진 로그 부재는 AWS-01에서 양성 로그 형식을 확인해야 해석할 수 있다.",
+        (
+            "policy_limit_read",
+            "boundary_allowed",
+            "http_403",
+            "reason_code",
+            "not_delivered",
+            "engine_log_absent",
+            "engine_log_format_confirmed",
+        ),
+    ),
+    "AWS-04": _ReportCase(
+        "직통 연결은 시간 초과 errno, Gateway 경로는 앞뒤 연결과 요청이 성공하고 해당 Hubble 흐름은 dropped여야 한다.",
+        "ECONNREFUSED 등 다른 errno나 Hubble 단독 기록은 정책 차단 증거가 아니다.",
+        ("direct_failed", "gateway_tcp_control", "gateway_control_200", "hubble_dropped"),
+    ),
+    "AWS-05": _ReportCase(
+        "engine→receiver는 시간 초과 errno와 Hubble dropped, other-client→receiver는 연결 성공이어야 한다.",
+        "다른 errno나 허용 경로 대조 실패는 정책 차단 증거가 아니다.",
+        ("engine_receiver_failed", "receiver_control_connected", "receiver_hubble_dropped"),
+    ),
+    "AWS-06": _ReportCase(
+        "/models 쓰기는 EROFS, /cache 쓰기·삭제는 성공하고 TG-CACHE-01에 기록돼야 한다.",
+        "EPERM·EACCES는 읽기 전용 mount 증거가 아니며 TG-ASSET-01은 선행 거부 시 안 보일 수 있다.",
+        ("model_write_denied", "cache_write_succeeded", "cache_harmless_removed", "cache_tetragon"),
+    ),
+    "AWS-07": _ReportCase(
+        "중단 heartbeat·collector 비정상, stale 이후 요청 200·대상 unavailable, 재시작 뒤 collector·대상·추론 회복을 확인한다.",
+        "정상 종료의 gap 기록은 보조 증거이며 없어도 판정할 수 있다.",
+        (
+            "stop_ok",
+            "heartbeat_stopped_seen",
+            "collectors_unavailable",
+            "stopped_request_200_unverified",
+            "start_ok",
+            "collectors_recovered",
+            "target_recovered",
+            "inference_recovered",
+        ),
+    ),
+    "AWS-08": _ReportCase(
+        "재시작 뒤 Pod·Gateway instance 변경, engine_info ok와 유한 창 내 추론 회복을 확인한다.",
+        "Pod snapshot stale은 별도 메모이며 통과 근거가 아니다.",
+        ("restart_ok", "pod_changed", "gateway_recovered", "engine_info_recovered", "gateway_instance_changed"),
+    ),
+    "AWS-09": _ReportCase(
+        "엔진 Pod의 /bin/sh -c true 실행이 해당 Pod·시각·경로의 관측 기록과 연결되고 suspect_binary여야 한다. PATH 탐색 sh -c true도 실행해 실제 기록 경로와 판정을 남긴다.",
+        "인자를 수집하지 않으므로 동일 Pod·경로·시각은 강한 대조이나 단일 프로세스 ID 증명은 아니다.",
+        ("absolute_exec_ok", "path_exec_ok", "path_observed", "engine_pod_match", "suspect_verdict"),
+    ),
+    "AWS-10": _ReportCase(
+        "가짜 파일 읽기 성공과 TG-SECRET-01의 동일 경로·엔진 Pod·read·monitor 탐지를 확인한다.",
+        "읽기 차단은 요구하지 않으며 파일 내용은 보고하지 않는다.",
+        ("read_ok", "path_match", "engine_pod_match", "read_access", "monitor_detected"),
+    ),
+    "AWS-11": _ReportCase(
+        "AWS-09·10 앞뒤의 일반 요청·stream·현재 cache 쓰기가 정상이고, 구간 실행에 유효한 단계 근거가 있으며, 잘못된 경고가 0건이어야 한다. 응답 시간은 참고값이다.",
+        "탐지 시간은 측정만 하며 기준 없이 판정하지 않는다. 실제 GPU 단계 패턴과 정상 허용 목록은 미확인이다.",
+        (
+            "normal_before",
+            "normal_after",
+            "stream_before",
+            "stream_after",
+            "cache_current_before",
+            "cache_current_after",
+            "false_warnings_zero",
+        ),
+    ),
+    "AWS-12": _ReportCase(
+        "비교 Pod 연결이 규칙 전 성공, 적용 중 timeout과 Hubble dropped, 제거 뒤 재성공해야 한다.",
+        "기본 통제가 이미 막으면 비교 불가다. 정리 실패는 failed다.",
+        ("baseline_connected", "policy_timeout", "hubble_dropped", "restored_connected", "cleanup_ok"),
+    ),
+    "AWS-13": _ReportCase(
+        "해시 불일치 묶음 시작 거부 뒤 이전 묶음으로 복구하고 정상 200·거부 1건을 확인한다.",
+        "SHA-256 바이트 대조이며 서명 검증이 아니다. 복구 실패는 failed다.",
+        ("bad_bundle_rejected", "recovered_200", "recovered_denied", "cleanup_ok"),
+    ),
+    "AWS-14": _ReportCase(
+        "Gateway 재시작 직후 503을 관측하고 준비 뒤 10초 안에 200으로 복귀한다.",
+        "503은 스냅샷 not_before가 원인인지 상태와 함께 대조한다.",
+        ("restart_ok", "initial_503", "recovered_200", "within_10s"),
+    ),
+    "AWS-15": _ReportCase(
+        "수집기 정지 중 Gateway 재시작 후 503, 수집 재개 뒤 200을 확인한다.",
+        "수집기 복구 실패는 failed다.",
+        ("stop_ok", "restart_ok", "observed_503", "recovered_200", "cleanup_ok"),
+    ),
+    "AWS-16": _ReportCase(
+        "수집기 정지 15초 초과 뒤 단계가 unknown이고 일반 요청은 200이어야 한다.",
+        "단계 수집 비활성 시 unknown이다. 수집기 복구 실패는 failed다.",
+        ("stop_ok", "expired_unknown", "request_200", "cleanup_ok"),
+    ),
+    "AWS-17": _ReportCase(
+        "교체 후 시간표 collector.pod_uid가 새 Pod이고 새 실행에 이전 단계가 붙지 않아야 한다.",
+        "Tetragon 원시 Pod UID는 process.pod.uid다.",
+        ("pod_changed", "timeline_new_uid", "old_phase_absent"),
+    ),
+    "AWS-18": _ReportCase(
+        "동일 고정 chat·completions 요청의 일반·stream 종료, 응답 usage의 답변 길이, 토큰화 경계·초과, 엔진 로그 수신을 대조한다.",
+        "토큰 실패 주입은 서버 자동 사례에 포함되지 않아 별도 가짜 엔진 시험으로만 확인한다. 토큰화 결과를 못 얻으면 unknown이다.",
+        ("normal", "stream", "usage", "log_match", "context_boundary", "context_exceeded"),
+    ),
+    "AWS-19": _ReportCase(
+        "미지원 경로·필드는 거부되고 사유가 기록되며 엔진 로그에는 정상 대조 ID만 남아야 한다.",
+        "정상 ID가 같은 구간의 로그에 없으면 거부 미전달은 unknown이다.",
+        ("codes", "reasons", "records", "not_delivered", "engine_log_absent", "positive_control"),
+    ),
+    "AWS-20": _ReportCase(
+        "가짜 보호 파일의 방식별 Override errno 또는 Sigkill 종료, 같은 Pod UID 원시 이벤트, monitor 복귀를 확인한다.",
+        "시험용 Pod 먼저; 엔진 대상 Sigkill은 별도 opt-in. 근거 부족은 unknown, 복귀 실패는 failed다.",
+        ("enforce_active", "cleanup_ok", "restore_read_ok"),
+    ),
 }
 
 
@@ -800,7 +1049,8 @@ def _report_reason(case: Mapping[str, Any]) -> str:
         return "기준 충족: " + spec.criteria
     values = ", ".join(
         f"{name}={_report_value(_report_at(facts, name))}"
-        for name in spec.required if _report_at(facts, name) is not True
+        for name in spec.required
+        if _report_at(facts, name) is not True
     )
     return f"{case.get('reason') or '확인 못 함'}; 필수 항목: {values or '확인 못 함'}"
 
@@ -808,9 +1058,11 @@ def _report_reason(case: Mapping[str, Any]) -> str:
 def _public_label(value: str, secrets: Iterable[str]) -> str:
     # Retain safe environment labels. Addresses/cloud identifiers and credentials
     # become stable aliases, so distinct environments remain distinguishable.
-    if (re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", value)
-            and not re.search(r"(?:[0-9]{1,3}\.){3}[0-9]{1,3}", value)
-            and not any(secret and secret in value for secret in secrets)):
+    if (
+        re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", value)
+        and not re.search(r"(?:[0-9]{1,3}\.){3}[0-9]{1,3}", value)
+        and not any(secret and secret in value for secret in secrets)
+    ):
         return value
     return "environment-" + hashlib.sha256(value.encode()).hexdigest()[:16]
 
@@ -822,21 +1074,36 @@ def publish_report(report: Mapping[str, Any], directory: Path, secrets: Iterable
     if not re.fullmatch(r"aws-acceptance-[0-9]{8}T[0-9]{6}Z-[0-9]+", run_id):
         raise ConfigurationError("PUBLIC_REPORT_INVALID_RUN_ID")
     safe = {
-        "schema": AWS_REPORT_SCHEMA, "run_id": run_id,
-        "started_at": report["started_at"], "finished_at": report["ended_at"],
+        "schema": AWS_REPORT_SCHEMA,
+        "run_id": run_id,
+        "started_at": report["started_at"],
+        "finished_at": report["ended_at"],
         "context": _public_label(report["kube_context"], secrets),
         "namespace": _public_label(report["namespace"], secrets),
         "overall": _overall(report["cases"]),
-        "cases": [{
-            "id": case["case_id"], "title": CASE_TITLES[case["case_id"]],
-            "status": case["result"],
-            "summary": {"passed": "해당 사례 기준 충족", "failed": "해당 사례 기준 미충족",
-                        "unknown": "근거 부족·미확인", "not_run": "미실행"}[case["result"]],
-            "evidence": ([_tokenize_probe_summary(case["evidence"])]
-                         if case["case_id"] == "AWS-04" and "tokenize_direct_probe" in (case.get("evidence") or {}) else []),
-            "limitation": REPORT_CASES[case["case_id"]].gap,
-            "note": "AWS · " + report["engine"] + " · 선택 사례의 해당 회차 결과만 표시. 상세 근거는 비공개 evidence에 보존.",
-        } for case in report["cases"]],
+        "cases": [
+            {
+                "id": case["case_id"],
+                "title": CASE_TITLES[case["case_id"]],
+                "status": case["result"],
+                "summary": {
+                    "passed": "해당 사례 기준 충족",
+                    "failed": "해당 사례 기준 미충족",
+                    "unknown": "근거 부족·미확인",
+                    "not_run": "미실행",
+                }[case["result"]],
+                "evidence": (
+                    [_tokenize_probe_summary(case["evidence"])]
+                    if case["case_id"] == "AWS-04" and "tokenize_direct_probe" in (case.get("evidence") or {})
+                    else []
+                ),
+                "limitation": REPORT_CASES[case["case_id"]].gap,
+                "note": "AWS · "
+                + report["engine"]
+                + " · 선택 사례의 해당 회차 결과만 표시. 상세 근거는 비공개 evidence에 보존.",
+            }
+            for case in report["cases"]
+        ],
     }
     safe = LabReportSource._validate(safe)
     raw = encode(safe)
@@ -938,11 +1205,19 @@ class AWSAcceptance:
         if self._forward is not None and self._forward.poll() is None:
             return
         self._close_forward()
-        self._forward = self.runner.start_port_forward([
-            "kubectl", "--context", self.context, "-n", self.namespace,
-            "port-forward", "deploy/serving-gateway", f"{self.gateway_port}:8080",
-            "--address=::1" if self.gateway_host == "::1" else "--address=127.0.0.1",
-        ])
+        self._forward = self.runner.start_port_forward(
+            [
+                "kubectl",
+                "--context",
+                self.context,
+                "-n",
+                self.namespace,
+                "port-forward",
+                "deploy/serving-gateway",
+                f"{self.gateway_port}:8080",
+                "--address=::1" if self.gateway_host == "::1" else "--address=127.0.0.1",
+            ]
+        )
         self.reconnect_at = _now()
 
     def _port_accepting(self) -> bool:
@@ -978,7 +1253,11 @@ class AWSAcceptance:
         try:
             try:
                 response = self.http.request(
-                    method, self.gateway + path, headers=headers, body=body, timeout=timeout,
+                    method,
+                    self.gateway + path,
+                    headers=headers,
+                    body=body,
+                    timeout=timeout,
                 )
             except (OSError, URLError, TimeoutError):
                 if not self._restart_pending:
@@ -986,25 +1265,21 @@ class AWSAcceptance:
                 self._reopen_forward()
                 self._wait_forward_ready(timeout)
                 response = self.http.request(
-                    method, self.gateway + path, headers=headers, body=body, timeout=timeout,
+                    method,
+                    self.gateway + path,
+                    headers=headers,
+                    body=body,
+                    timeout=timeout,
                 )
         except (OSError, URLError, TimeoutError) as error:
-            self.http_events.append(
-                {"method": method, "path": path, "status": None, "error": _safe_exception(error)}
-            )
+            self.http_events.append({"method": method, "path": path, "status": None, "error": _safe_exception(error)})
             raise
         request_id = response.headers.get("X-Request-ID") or response.headers.get("x-request-id")
-        self.http_events.append(
-            {"method": method, "path": path, "status": response.status, "request_id": request_id}
-        )
+        self.http_events.append({"method": method, "path": path, "status": response.status, "request_id": request_id})
         return response
 
-    def _get_json(
-        self, path: str, *, timeout: float = 30
-    ) -> tuple[HTTPResponse, dict[str, Any] | None]:
-        response = self._request(
-            "GET", path, token=self.tokens["RUNTIME_VIEWER_TOKEN"], timeout=timeout
-        )
+    def _get_json(self, path: str, *, timeout: float = 30) -> tuple[HTTPResponse, dict[str, Any] | None]:
+        response = self._request("GET", path, token=self.tokens["RUNTIME_VIEWER_TOKEN"], timeout=timeout)
         return response, _json_object(response.body)
 
     def _completion(
@@ -1033,9 +1308,7 @@ class AWSAcceptance:
                 valid = isinstance(content, str) and bool(content.strip())
         return response, request_id if isinstance(request_id, str) else None, valid
 
-    def _stream_completion(
-        self, *, token: str
-    ) -> tuple[HTTPResponse, str | None, bool, bool]:
+    def _stream_completion(self, *, token: str) -> tuple[HTTPResponse, str | None, bool, bool]:
         response = self._request(
             "POST",
             "/v1/chat/completions",
@@ -1069,9 +1342,7 @@ class AWSAcceptance:
             done_seen,
         )
 
-    def _detail(
-        self, request_id: str | None, *, timeout: float = 30
-    ) -> dict[str, Any] | None:
+    def _detail(self, request_id: str | None, *, timeout: float = 30) -> dict[str, Any] | None:
         if request_id is None or _REQUEST_ID.fullmatch(request_id) is None:
             return None
         response, detail = self._get_json(f"/api/requests/{request_id}", timeout=timeout)
@@ -1086,8 +1357,12 @@ class AWSAcceptance:
         if not before or any(not before.get(key) for key in keys):
             return CommandResult(1, "", "engine log generation unavailable"), ""
         result = self._kubectl(
-            "logs", "pod/" + before["name"], "-c", "engine",
-            f"--since-time={since}", timeout=60,
+            "logs",
+            "pod/" + before["name"],
+            "-c",
+            "engine",
+            f"--since-time={since}",
+            timeout=60,
         )
         after, _ = self._engine_pod()
         if not after or any(before.get(key) != after.get(key) for key in keys):
@@ -1134,20 +1409,29 @@ class AWSAcceptance:
                 # Context comes only from the immutable full journal rows.
                 # final_state is an API verdict projection, never metadata.
                 records = detail.get("gateway_records") if isinstance(detail, dict) else None
-                rows = [row for row in records
-                        if isinstance(row, dict) and row.get("phase") == "final"
-                        and row.get("request_id") == request_id] if isinstance(records, list) else []
+                rows = (
+                    [
+                        row
+                        for row in records
+                        if isinstance(row, dict) and row.get("phase") == "final" and row.get("request_id") == request_id
+                    ]
+                    if isinstance(records, list)
+                    else []
+                )
                 final = rows[0] if len(rows) == 1 else None
                 target = final.get("target") if isinstance(final, dict) else None
-                bound = (isinstance(target, dict)
-                         and target.get("pod_uid") == generation.get("uid")
-                         and target.get("container_id") == generation.get("container_id")
-                         and final.get("upstream_request_id") == tag)
+                bound = (
+                    isinstance(target, dict)
+                    and target.get("pod_uid") == generation.get("uid")
+                    and target.get("container_id") == generation.get("container_id")
+                    and final.get("upstream_request_id") == tag
+                )
                 if bound:
                     expected.add("chatcmpl-" + tag if route == "/v1/chat/completions" else "cmpl-" + tag + "-0")
         # Parse a complete ID token, so a prefix/partial ID cannot match.
-        return any(match.group(1) in expected for match in re.finditer(
-            r"Received request ([A-Za-z0-9_-]+)(?=[:.\s]|$)", logs))
+        return any(
+            match.group(1) in expected for match in re.finditer(r"Received request ([A-Za-z0-9_-]+)(?=[:.\s]|$)", logs)
+        )
 
     @staticmethod
     def _sglang_prompt_fields(logs: str) -> list[str]:
@@ -1189,25 +1473,21 @@ class AWSAcceptance:
         status = pod.get("status") if isinstance(pod.get("status"), dict) else {}
         container_statuses = status.get("containerStatuses")
         engine = next(
-            (
-                item
-                for item in container_statuses or []
-                if isinstance(item, dict) and item.get("name") == "engine"
-            ),
+            (item for item in container_statuses or [] if isinstance(item, dict) and item.get("name") == "engine"),
             None,
         )
         conditions = status.get("conditions") or []
         ready = any(
-            isinstance(item, dict)
-            and item.get("type") == "Ready"
-            and item.get("status") == "True"
+            isinstance(item, dict) and item.get("type") == "Ready" and item.get("status") == "True"
             for item in conditions
         )
         return {
             "name": metadata.get("name"),
             "uid": metadata.get("uid"),
             "container_id": engine.get("containerID") if isinstance(engine, dict) else None,
-            "started_at": ((engine.get("state") or {}).get("running") or {}).get("startedAt") if isinstance(engine, dict) else None,
+            "started_at": ((engine.get("state") or {}).get("running") or {}).get("startedAt")
+            if isinstance(engine, dict)
+            else None,
             "ready": ready,
         }, result
 
@@ -1227,15 +1507,22 @@ class AWSAcceptance:
         if engine is None:
             return {"state": "unknown"}
         secret_arg = re.compile(r'(--(?:admin-)?api-key)\s+(?:"[^"]*"|\x27[^\x27]*\x27|\S+)')
+
         def redact_arg(value: Any) -> Any:
-            return secret_arg.sub(r'\1 [REDACTED]', value) if isinstance(value, str) else value
+            return secret_arg.sub(r"\1 [REDACTED]", value) if isinstance(value, str) else value
+
         args = [redact_arg(item) for item in (engine.get("args") or [])]
         for index, value in enumerate(args[:-1]):
             if value in {"--admin-api-key", "--api-key"}:
                 args[index + 1] = "[REDACTED]"
-        return {"state": "observed", "command": [redact_arg(item) for item in (engine.get("command") or [])], "args": args,
-                "env_names": [item.get("name") for item in engine.get("env", []) if isinstance(item, dict)],
-                "image": engine.get("image"), "image_id": engine_status.get("imageID")}
+        return {
+            "state": "observed",
+            "command": [redact_arg(item) for item in (engine.get("command") or [])],
+            "args": args,
+            "env_names": [item.get("name") for item in engine.get("env", []) if isinstance(item, dict)],
+            "image": engine.get("image"),
+            "image_id": engine_status.get("imageID"),
+        }
 
     def _test_receiver_pod(self) -> tuple[dict[str, Any] | None, CommandResult]:
         result = self._kubectl("get", "pod", "test-receiver", "-o", "json")
@@ -1247,9 +1534,7 @@ class AWSAcceptance:
         status = document.get("status") if isinstance(document.get("status"), dict) else {}
         conditions = status.get("conditions") or []
         ready = any(
-            isinstance(item, dict)
-            and item.get("type") == "Ready"
-            and item.get("status") == "True"
+            isinstance(item, dict) and item.get("type") == "Ready" and item.get("status") == "True"
             for item in conditions
         )
         pod_ip = status.get("podIP")
@@ -1270,12 +1555,16 @@ class AWSAcceptance:
             "ready": ready,
         }, result
 
-    def _tcp_probe(self, pod: str, container: str, host: str, port: int, *, probe_code: str = TCP_PROBE_CODE) -> dict[str, Any]:
+    def _tcp_probe(
+        self, pod: str, container: str, host: str, port: int, *, probe_code: str = TCP_PROBE_CODE
+    ) -> dict[str, Any]:
         result = self._kubectl(
             "exec", pod, "-c", container, "--", "python3", "-c", probe_code, host, str(port), timeout=15
         )
-        marker = "CONNECT_FAILED" if "CONNECT_FAILED" in result.stdout else (
-            "CONNECTED" if "CONNECTED" in result.stdout else None
+        marker = (
+            "CONNECT_FAILED"
+            if "CONNECT_FAILED" in result.stdout
+            else ("CONNECTED" if "CONNECTED" in result.stdout else None)
         )
         errno_match = re.search(r"CONNECT_FAILED errno=(\d+) name=([A-Z0-9_]+)", result.stdout)
         error_number = int(errno_match.group(1)) if errno_match else None
@@ -1295,9 +1584,7 @@ class AWSAcceptance:
             "connected": result.returncode == 1 and marker == "CONNECTED",
         }
 
-    def _retry_inference(
-        self, timeout: float
-    ) -> tuple[bool, dict[str, Any] | None, dict[str, Any]]:
+    def _retry_inference(self, timeout: float) -> tuple[bool, dict[str, Any] | None, dict[str, Any]]:
         started = self.monotonic()
         deadline = started + timeout
         attempts = 0
@@ -1307,14 +1594,18 @@ class AWSAcceptance:
         last_reason: str | None = None
         while True:
             if attempts and self.monotonic() >= deadline:
-                return False, last_record, {
-                    "attempts": attempts,
-                    "elapsed_s": round(self.monotonic() - started, 3),
-                    "window_s": timeout,
-                    "last_status": last_status,
-                    "response_count": response_count,
-                    "last_reason_code": last_reason,
-                }
+                return (
+                    False,
+                    last_record,
+                    {
+                        "attempts": attempts,
+                        "elapsed_s": round(self.monotonic() - started, 3),
+                        "window_s": timeout,
+                        "last_status": last_status,
+                        "response_count": response_count,
+                        "last_reason_code": last_reason,
+                    },
+                )
             attempts += 1
             last_status = None
             try:
@@ -1326,20 +1617,14 @@ class AWSAcceptance:
                 last_status = response.status
                 response_count += 1
                 detail_timeout = min(30.0, max(0.1, deadline - self.monotonic()))
-                last_record = _record_fields(
-                    self._detail(request_id, timeout=detail_timeout)
-                )
+                last_record = _record_fields(self._detail(request_id, timeout=detail_timeout))
                 response_document = _json_object(response.body)
                 response_error = (
                     response_document.get("error")
                     if response_document and isinstance(response_document.get("error"), dict)
                     else {}
                 )
-                last_reason = (
-                    last_record.get("reason_code")
-                    if last_record is not None
-                    else response_error.get("code")
-                )
+                last_reason = last_record.get("reason_code") if last_record is not None else response_error.get("code")
                 recovered = (
                     response.status == 200
                     and valid
@@ -1348,26 +1633,34 @@ class AWSAcceptance:
                     and last_record["delivery"]["attempted"] is True
                 )
                 if recovered:
-                    return True, last_record, {
+                    return (
+                        True,
+                        last_record,
+                        {
+                            "attempts": attempts,
+                            "elapsed_s": round(self.monotonic() - started, 3),
+                            "window_s": timeout,
+                            "last_status": last_status,
+                            "response_count": response_count,
+                            "last_reason_code": last_reason,
+                        },
+                    )
+            except (OSError, URLError, TimeoutError) as error:
+                last_reason = _safe_exception(error)
+                last_record = None
+            if self.monotonic() >= deadline:
+                return (
+                    False,
+                    last_record,
+                    {
                         "attempts": attempts,
                         "elapsed_s": round(self.monotonic() - started, 3),
                         "window_s": timeout,
                         "last_status": last_status,
                         "response_count": response_count,
                         "last_reason_code": last_reason,
-                    }
-            except (OSError, URLError, TimeoutError) as error:
-                last_reason = _safe_exception(error)
-                last_record = None
-            if self.monotonic() >= deadline:
-                return False, last_record, {
-                    "attempts": attempts,
-                    "elapsed_s": round(self.monotonic() - started, 3),
-                    "window_s": timeout,
-                    "last_status": last_status,
-                    "response_count": response_count,
-                    "last_reason_code": last_reason,
-                }
+                    },
+                )
             self.sleep(min(2.0, max(0.0, deadline - self.monotonic())))
 
     @staticmethod
@@ -1447,19 +1740,13 @@ class AWSAcceptance:
         if refs:
             return True, refs[:10]
         try:
-            response, document = self._get_json(
-                "/api/observations?" + urlencode({"source": source})
-            )
+            response, document = self._get_json("/api/observations?" + urlencode({"source": source}))
         except (OSError, URLError, TimeoutError):
             return local_read, []
         observations = document.get("observations") if document else None
         if response.status == 200 and isinstance(observations, list):
             for item in observations:
-                if (
-                    isinstance(item, dict)
-                    and _after(item.get("observed_at"), since)
-                    and predicate(item)
-                ):
+                if isinstance(item, dict) and _after(item.get("observed_at"), since) and predicate(item):
                     refs.append(
                         {
                             "reference": f"GET /api/observations?source={source}",
@@ -1490,9 +1777,7 @@ class AWSAcceptance:
     def _tetragon_observations(self, since: str) -> tuple[bool, list[dict[str, Any]]]:
         """Use Gateway-normalized observations for verdict and cache generation."""
         try:
-            response, document = self._get_json(
-                "/api/observations?" + urlencode({"source": "tetragon"})
-            )
+            response, document = self._get_json("/api/observations?" + urlencode({"source": "tetragon"}))
         except (OSError, URLError, TimeoutError):
             return False, []
         rows = document.get("observations") if document else None
@@ -1531,9 +1816,7 @@ class AWSAcceptance:
             if boundary is None:
                 return False
             return all(
-                _parse_time(opened) is not None
-                and _parse_time(closed) is not None
-                and _parse_time(closed) < boundary
+                _parse_time(opened) is not None and _parse_time(closed) is not None and _parse_time(closed) < boundary
                 for opened, closed in gaps.values()
             )
         except (OSError, UnicodeError, json.JSONDecodeError, RecursionError):
@@ -1546,7 +1829,9 @@ class AWSAcceptance:
             return False
         return response.status == 200 and collectors.get("observation_feed_tetragon", {}).get("state") == "ok"
 
-    def _wait_tetragon(self, since: str, predicate: Callable[[Mapping[str, Any]], bool]) -> tuple[bool, dict[str, Any] | None]:
+    def _wait_tetragon(
+        self, since: str, predicate: Callable[[Mapping[str, Any]], bool]
+    ) -> tuple[bool, dict[str, Any] | None]:
         available = False
         for attempt in range(8):
             readable, rows = self._tetragon_observations(since)
@@ -1593,11 +1878,7 @@ class AWSAcceptance:
         result, reason = evaluate_case(case_id, facts)
         case_http = self.http_events[http_start:]
         case_evidence: dict[str, Any] = {
-            "request_ids": [
-                event["request_id"]
-                for event in case_http
-                if isinstance(event.get("request_id"), str)
-            ],
+            "request_ids": [event["request_id"] for event in case_http if isinstance(event.get("request_id"), str)],
             "http_codes": [event.get("status") for event in case_http],
             "record_fields_used": None,
             "observation_references": [],
@@ -1633,27 +1914,27 @@ class AWSAcceptance:
 
     def aws_01(self) -> tuple[dict[str, Any], dict[str, Any]]:
         since = _now()
-        response, request_id, valid = self._completion(
-            token=self.tokens["RUNTIME_INFERENCE_TOKEN"]
-        )
+        response, request_id, valid = self._completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"])
         detail = self._detail(request_id)
         record = _record_fields(detail)
-        stream_response, stream_request_id, stream_data, stream_done = (
-            self._stream_completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"])
+        stream_response, stream_request_id, stream_data, stream_done = self._stream_completion(
+            token=self.tokens["RUNTIME_INFERENCE_TOKEN"]
         )
         stream_record = _record_fields(self._detail(stream_request_id))
         stream_final = _stream_final_success(stream_record)
-        stream_ok = None if stream_final is None else (
-            stream_response.status == 200
-            and stream_data
-            and stream_done
-            and stream_final
-            and stream_record["delivery"]["attempted"] is True
+        stream_ok = (
+            None
+            if stream_final is None
+            else (
+                stream_response.status == 200
+                and stream_data
+                and stream_done
+                and stream_final
+                and stream_record["delivery"]["attempted"] is True
+            )
         )
         logs_result, logs = self._engine_logs(since)
-        log_match = logs_result.returncode == 0 and self._log_received(
-            logs, request_id, "/v1/chat/completions"
-        )
+        log_match = logs_result.returncode == 0 and self._log_received(logs, request_id, "/v1/chat/completions")
         self.engine_log_format_confirmed = log_match
         facts = {
             "http_200": response.status == 200,
@@ -1674,8 +1955,11 @@ class AWSAcceptance:
             },
             "engine_evidence": {
                 "state": "observed" if log_match else "unknown",
-                "match": ("JSON request.received/request.finished headers.x-request-id"
-                          if self.engine == "sglang" else "generation-bound Received request exact UUID/callback tag"),
+                "match": (
+                    "JSON request.received/request.finished headers.x-request-id"
+                    if self.engine == "sglang"
+                    else "generation-bound Received request exact UUID/callback tag"
+                ),
                 "reference": "kubectl logs pod/<exact-generation> -c engine --since-time",
                 "prompt_fields": self._sglang_prompt_fields(logs) if self.engine == "sglang" else None,
             },
@@ -1691,9 +1975,13 @@ class AWSAcceptance:
                 continue
             context = policy.get("max_context_tokens")
             output = policy.get("output_max_tokens")
-            if (isinstance(context, int) and not isinstance(context, bool)
-                    and isinstance(output, int) and not isinstance(output, bool)
-                    and context > output > 1):
+            if (
+                isinstance(context, int)
+                and not isinstance(context, bool)
+                and isinstance(output, int)
+                and not isinstance(output, bool)
+                and context > output > 1
+            ):
                 return context, output
         return None
 
@@ -1709,10 +1997,24 @@ class AWSAcceptance:
         else:
             payload["prompt"] = text
         result = self.runner.run(
-            ["kubectl", "--context", self.context, "-n", self.namespace,
-             "exec", "-i", "pod/" + pod["name"], "-c", "engine", "--",
-             "python3", "-c", COUNT_TOKENS_CODE],
-            timeout=30, input=json.dumps(payload, ensure_ascii=False),
+            [
+                "kubectl",
+                "--context",
+                self.context,
+                "-n",
+                self.namespace,
+                "exec",
+                "-i",
+                "pod/" + pod["name"],
+                "-c",
+                "engine",
+                "--",
+                "python3",
+                "-c",
+                COUNT_TOKENS_CODE,
+            ],
+            timeout=30,
+            input=json.dumps(payload, ensure_ascii=False),
         )
         if result.returncode != 0:
             return None
@@ -1722,7 +2024,9 @@ class AWSAcceptance:
             return None
         return count if count >= 0 else None
 
-    def _context_probe(self, route: str, token: str, limit: int, output_max: int) -> tuple[bool | None, bool | None, dict[str, Any]]:
+    def _context_probe(
+        self, route: str, token: str, limit: int, output_max: int
+    ) -> tuple[bool | None, bool | None, dict[str, Any]]:
         low, high = 1, 4096
         selected: tuple[int, int] | None = None
         # A short output (1..8 tokens) keeps the exact-boundary generation cheap.
@@ -1753,11 +2057,20 @@ class AWSAcceptance:
         usage = _completion_usage(boundary)
         boundary_document = _json_object(boundary.body)
         choices = boundary_document.get("choices") if boundary_document else None
-        finish_reason = choices[0].get("finish_reason") if isinstance(choices, list) and choices and isinstance(choices[0], dict) else None
+        finish_reason = (
+            choices[0].get("finish_reason")
+            if isinstance(choices, list) and choices and isinstance(choices[0], dict)
+            else None
+        )
         engine_truncated = finish_reason == "length" and usage is not None and usage < output_tokens
-        boundary_ok = False if boundary.status != 200 or engine_truncated else (usage <= output_tokens if usage is not None else None)
-        exceeded = self._request("POST", route, token=token,
-                                 payload={**payload, "max_tokens": output_tokens + 1}, timeout=300)
+        boundary_ok = (
+            False
+            if boundary.status != 200 or engine_truncated
+            else (usage <= output_tokens if usage is not None else None)
+        )
+        exceeded = self._request(
+            "POST", route, token=token, payload={**payload, "max_tokens": output_tokens + 1}, timeout=300
+        )
         body = _json_object(exceeded.body)
         error = body.get("error") if body else None
         request_id = exceeded.headers.get("X-Request-ID") or exceeded.headers.get("x-request-id")
@@ -1769,16 +2082,25 @@ class AWSAcceptance:
             exceeded_ok = None
         else:
             exceeded_ok = record["delivery"]["attempted"] is False
-        return boundary_ok, exceeded_ok, {
-            "state": "tested", "input_tokens": input_tokens, "output_tokens": output_tokens,
-            "sum": input_tokens + output_tokens, "limit": limit,
-            "boundary_status": boundary.status, "boundary_usage_completion_tokens": usage,
-            "boundary_finish_reason": finish_reason, "engine_truncated": engine_truncated,
-            "boundary_result": "엔진 잘림" if engine_truncated else None,
-            "exceeded_status": exceeded.status,
-            "exceeded_reason": error.get("code") if isinstance(error, dict) else None,
-            "exceeded_record": record,
-        }
+        return (
+            boundary_ok,
+            exceeded_ok,
+            {
+                "state": "tested",
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "sum": input_tokens + output_tokens,
+                "limit": limit,
+                "boundary_status": boundary.status,
+                "boundary_usage_completion_tokens": usage,
+                "boundary_finish_reason": finish_reason,
+                "engine_truncated": engine_truncated,
+                "boundary_result": "엔진 잘림" if engine_truncated else None,
+                "exceeded_status": exceeded.status,
+                "exceeded_reason": error.get("code") if isinstance(error, dict) else None,
+                "exceeded_record": record,
+            },
+        )
 
     def aws_18(self) -> tuple[dict[str, Any], dict[str, Any]]:
         since = _now()
@@ -1786,42 +2108,68 @@ class AWSAcceptance:
         token = self.tokens["RUNTIME_INFERENCE_TOKEN"]
         for route, payload in FIXED_REQUESTS:
             for stream in (False, True):
-                response = self._request("POST", route, token=token,
-                                         payload={**payload, "stream": stream}, timeout=300)
+                response = self._request("POST", route, token=token, payload={**payload, "stream": stream}, timeout=300)
                 request_id = response.headers.get("X-Request-ID") or response.headers.get("x-request-id")
                 document = _json_object(response.body) if not stream else None
                 choices = document.get("choices") if document else None
                 valid = isinstance(choices, list) and bool(choices)
                 done = b"data: [DONE]" in response.body if stream else None
-                data_seen = any(line.strip().startswith(b"data: {") for line in response.body.splitlines()) if stream else None
+                data_seen = (
+                    any(line.strip().startswith(b"data: {") for line in response.body.splitlines()) if stream else None
+                )
                 record = _record_fields(self._detail(request_id)) if stream else None
                 stream_final = _stream_final_success(record) if stream else None
                 usage = _completion_usage(response) if not stream else None
-                rows.append({"route": route, "stream": stream, "status": response.status,
-                             "request_id": request_id, "valid": valid if not stream else data_seen,
-                             "done": done, "truncated": stream and not done,
-                             "record": record, "stream_final": stream_final,
-                             "completion_tokens": usage,
-                             "max_tokens": payload["max_tokens"]})
+                rows.append(
+                    {
+                        "route": route,
+                        "stream": stream,
+                        "status": response.status,
+                        "request_id": request_id,
+                        "valid": valid if not stream else data_seen,
+                        "done": done,
+                        "truncated": stream and not done,
+                        "record": record,
+                        "stream_final": stream_final,
+                        "completion_tokens": usage,
+                        "max_tokens": payload["max_tokens"],
+                    }
+                )
         logs_result, logs = self._engine_logs(since)
         normal = all(row["status"] == 200 and row["valid"] for row in rows if not row["stream"])
         stream_rows = [row for row in rows if row["stream"]]
-        stream_ok = (None if any(row["stream_final"] is None for row in stream_rows)
-                     else all(row["status"] == 200 and row["valid"] and row["done"]
-                              and row["stream_final"] for row in stream_rows))
+        stream_ok = (
+            None
+            if any(row["stream_final"] is None for row in stream_rows)
+            else all(
+                row["status"] == 200 and row["valid"] and row["done"] and row["stream_final"] for row in stream_rows
+            )
+        )
         usages = [row["completion_tokens"] for row in rows if not row["stream"]]
         usage_ok = None if any(value is None for value in usages) else all(value <= 8 for value in usages)
-        log_match = (all(self._log_received(logs, row["request_id"], row["route"])
-                         for row in rows if row["status"] == 200)
-                     if logs_result.returncode == 0 else None)
+        log_match = (
+            all(self._log_received(logs, row["request_id"], row["route"]) for row in rows if row["status"] == 200)
+            if logs_result.returncode == 0
+            else None
+        )
         limits = self._context_limits()
         probes = [self._context_probe(route, token, *limits) for route, _ in FIXED_REQUESTS] if limits else []
-        boundary_ok = all(item[0] is True for item in probes) if probes and all(item[0] is not None for item in probes) else None
-        exceeded_ok = all(item[1] is True for item in probes) if probes and all(item[1] is not None for item in probes) else None
-        return {"normal": normal, "stream": stream_ok, "usage": usage_ok,
-                "log_match": log_match, "context_boundary": boundary_ok,
-                "context_exceeded": exceeded_ok}, {
-            "requests": rows, "fixed_request_sha256": _fixed_request_hash(),
+        boundary_ok = (
+            all(item[0] is True for item in probes) if probes and all(item[0] is not None for item in probes) else None
+        )
+        exceeded_ok = (
+            all(item[1] is True for item in probes) if probes and all(item[1] is not None for item in probes) else None
+        )
+        return {
+            "normal": normal,
+            "stream": stream_ok,
+            "usage": usage_ok,
+            "log_match": log_match,
+            "context_boundary": boundary_ok,
+            "context_exceeded": exceeded_ok,
+        }, {
+            "requests": rows,
+            "fixed_request_sha256": _fixed_request_hash(),
             "usage_rule": "response.usage.completion_tokens <= requested max_tokens; missing usage is unknown",
             "context_limits": limits,
             "context_probes": [item[2] for item in probes],
@@ -1832,9 +2180,18 @@ class AWSAcceptance:
         if not isinstance(request_id, str) or not _REQUEST_ID.fullmatch(request_id):
             return None
         try:
-            result = self._kubectl("exec", "deployment/serving-gateway", "-c", "gateway", "--",
-                                   "python3", "-c", ROUTE_RECORD_PROBE_CODE,
-                                   "/srv/serving/runtime/data/gateway_route_rejections.jsonl", request_id)
+            result = self._kubectl(
+                "exec",
+                "deployment/serving-gateway",
+                "-c",
+                "gateway",
+                "--",
+                "python3",
+                "-c",
+                ROUTE_RECORD_PROBE_CODE,
+                "/srv/serving/runtime/data/gateway_route_rejections.jsonl",
+                request_id,
+            )
         except (OSError, TimeoutError):
             return None
         record = _json_object(result.stdout.encode()) if result.returncode == 0 else None
@@ -1844,16 +2201,34 @@ class AWSAcceptance:
         since = _now()
         token = self.tokens["RUNTIME_INFERENCE_TOKEN"]
         normal, normal_id, valid = self._completion(token=token)
-        paths = ("/generate", "/v1/responses", "/v1/messages", "/api/chat", "/api/generate",
-                 "/invocations", "/vertex_generate", "/v1/realtime", "/v1/score", "/encode",
-                 "/classify", "/v1/audio/transcriptions")
+        paths = (
+            "/generate",
+            "/v1/responses",
+            "/v1/messages",
+            "/api/chat",
+            "/api/generate",
+            "/invocations",
+            "/vertex_generate",
+            "/v1/realtime",
+            "/v1/score",
+            "/encode",
+            "/classify",
+            "/v1/audio/transcriptions",
+        )
         fields = ("input_ids", "custom_logit_processor", "cache_salt", "session")
         attempts: list[dict[str, Any]] = []
         for path in paths:
             response = self._request("POST", path, token=token, payload={"model": _MODEL})
             request_id = response.headers.get("X-Request-ID") or response.headers.get("x-request-id")
-            attempts.append({"path": path, "field": None, "status": response.status,
-                             "request_id": request_id, "record": self._route_rejection_record(request_id)})
+            attempts.append(
+                {
+                    "path": path,
+                    "field": None,
+                    "status": response.status,
+                    "request_id": request_id,
+                    "record": self._route_rejection_record(request_id),
+                }
+            )
         for field in fields:
             payload = dict(FIXED_REQUESTS[0][1])
             payload[field] = "test-only"
@@ -1862,47 +2237,75 @@ class AWSAcceptance:
             body = _json_object(response.body)
             error = body.get("error") if body else None
             record = _record_fields(self._detail(request_id))
-            attempts.append({"path": "/v1/chat/completions", "field": field,
-                             "status": response.status, "request_id": request_id,
-                             "reason": error.get("code") if isinstance(error, dict) else None,
-                             "record": record})
+            attempts.append(
+                {
+                    "path": "/v1/chat/completions",
+                    "field": field,
+                    "status": response.status,
+                    "request_id": request_id,
+                    "reason": error.get("code") if isinstance(error, dict) else None,
+                    "record": record,
+                }
+            )
         logs_result, logs = self._engine_logs(since)
-        positive = (self._log_received(logs, normal_id, "/v1/chat/completions")
-                    if logs_result.returncode == 0 and normal.status == 200 and valid else None)
-        absent = (all(not self._log_received(logs, row["request_id"], row["path"])
-                      for row in attempts) if positive else None)
+        positive = (
+            self._log_received(logs, normal_id, "/v1/chat/completions")
+            if logs_result.returncode == 0 and normal.status == 200 and valid
+            else None
+        )
+        absent = (
+            all(not self._log_received(logs, row["request_id"], row["path"]) for row in attempts) if positive else None
+        )
         records_available = all(isinstance(row["record"], dict) for row in attempts)
         route_records = [row for row in attempts if row["field"] is None]
-        missing_routes = [row["request_id"] for row in route_records
-                          if isinstance(row["record"], dict) and row["record"].get("found") is False]
+        missing_routes = [
+            row["request_id"]
+            for row in route_records
+            if isinstance(row["record"], dict) and row["record"].get("found") is False
+        ]
         return {
             "codes": all(row["status"] in {404, 405} for row in attempts if row["field"] is None)
-                     and all(row["status"] == 400 for row in attempts if row["field"] is not None),
-            "reasons": all(row["record"].get("found") is True
-                           and row["record"].get("reason") == "NOT_FOUND"
-                           and row["record"].get("response_code") == row["status"]
-                           for row in route_records)
-                       and all(row.get("reason") == "UNSUPPORTED_FIELD"
-                               and row["record"].get("reason_code") == "UNSUPPORTED_FIELD"
-                               for row in attempts if row["field"] is not None)
-                       if records_available else None,
-            "records": (all(row["record"].get("found") is True for row in route_records)
-                        if records_available else None),
-            "not_delivered": all((row["record"].get("found") is True
-                                  and row["record"].get("forwarded_to_engine") is False
-                                  if row["field"] is None else
-                                  isinstance(row["record"].get("delivery"), dict)
-                                  and row["record"]["delivery"].get("attempted") is False)
-                                 for row in attempts)
-                             if records_available else None,
+            and all(row["status"] == 400 for row in attempts if row["field"] is not None),
+            "reasons": all(
+                row["record"].get("found") is True
+                and row["record"].get("reason") == "NOT_FOUND"
+                and row["record"].get("response_code") == row["status"]
+                for row in route_records
+            )
+            and all(
+                row.get("reason") == "UNSUPPORTED_FIELD" and row["record"].get("reason_code") == "UNSUPPORTED_FIELD"
+                for row in attempts
+                if row["field"] is not None
+            )
+            if records_available
+            else None,
+            "records": (
+                all(row["record"].get("found") is True for row in route_records) if records_available else None
+            ),
+            "not_delivered": all(
+                (
+                    row["record"].get("found") is True and row["record"].get("forwarded_to_engine") is False
+                    if row["field"] is None
+                    else isinstance(row["record"].get("delivery"), dict)
+                    and row["record"]["delivery"].get("attempted") is False
+                )
+                for row in attempts
+            )
+            if records_available
+            else None,
             "engine_log_absent": absent,
             "positive_control": positive if positive else None,
-        }, {"normal_control": {"status": normal.status, "request_id": normal_id,
-                                "log_seen": positive}, "attempts": attempts,
+        }, {
+            "normal_control": {"status": normal.status, "request_id": normal_id, "log_seen": positive},
+            "attempts": attempts,
             "missing_route_record_ids": missing_routes,
-            "route_record_limit_note": ("Gateway가 한도 초과 수를 노출하지 않아 found:false를 기록 누락과 한도 초과로 구분할 수 없음"
-                                        if missing_routes else None),
-            "log_prompt_fields": self._sglang_prompt_fields(logs) if self.engine == "sglang" else None}
+            "route_record_limit_note": (
+                "Gateway가 한도 초과 수를 노출하지 않아 found:false를 기록 누락과 한도 초과로 구분할 수 없음"
+                if missing_routes
+                else None
+            ),
+            "log_prompt_fields": self._sglang_prompt_fields(logs) if self.engine == "sglang" else None,
+        }
 
     def aws_02(self) -> tuple[dict[str, Any], dict[str, Any]]:
         since = _now()
@@ -1923,10 +2326,7 @@ class AWSAcceptance:
             )
         logs_result, logs = self._engine_logs(since)
         expected = {"missing": "AUTH_REQUIRED", "invalid": "AUTH_INVALID"}
-        auth_codes = all(
-            item["status"] == 401 and item["error_code"] == expected[item["kind"]]
-            for item in attempts
-        )
+        auth_codes = all(item["status"] == 401 and item["error_code"] == expected[item["kind"]] for item in attempts)
         records_present = all(item["record_fields_used"] is not None for item in attempts)
         records_denied = (
             all(
@@ -1944,8 +2344,7 @@ class AWSAcceptance:
         )
         ids = [item["request_id"] for item in attempts if item["request_id"]]
         log_absent = logs_result.returncode == 0 and all(
-            not self._log_received(logs, request_id, "/v1/chat/completions")
-            for request_id in ids
+            not self._log_received(logs, request_id, "/v1/chat/completions") for request_id in ids
         )
         return {
             "auth_codes": auth_codes,
@@ -2001,8 +2400,7 @@ class AWSAcceptance:
             "reason_code": (
                 None
                 if record is None
-                else error.get("code") == "MAX_TOKENS_EXCEEDED"
-                and record["reason_code"] == "MAX_TOKENS_EXCEEDED"
+                else error.get("code") == "MAX_TOKENS_EXCEEDED" and record["reason_code"] == "MAX_TOKENS_EXCEEDED"
             ),
             "not_delivered": None if record is None else record["delivery"]["attempted"] is False,
             "engine_log_absent": log_absent,
@@ -2024,9 +2422,7 @@ class AWSAcceptance:
 
     def aws_04(self) -> tuple[dict[str, Any], dict[str, Any]]:
         since = _now()
-        gateway_before = self._tcp_probe(
-            "deployment/serving-gateway", "gateway", "serving-engine", 8000
-        )
+        gateway_before = self._tcp_probe("deployment/serving-gateway", "gateway", "serving-engine", 8000)
         probe = self._tcp_probe("pod/other-client", "client", "serving-engine", 8000)
         try:
             tokenize_probe = self._tcp_probe(
@@ -2034,20 +2430,21 @@ class AWSAcceptance:
             )
         except Exception as error:
             # Keep the primary probe and its evidence if this auxiliary exec fails.
-            tokenize_probe = {"marker": None, "errno": None, "errno_name": None,
-                              "connection_timed_out": False, "error": _safe_exception(error)}
+            tokenize_probe = {
+                "marker": None,
+                "errno": None,
+                "errno_name": None,
+                "connection_timed_out": False,
+                "error": _safe_exception(error),
+            }
         gateway_after = {"connected": False, "marker": None, "python_available": True}
         control = None
         control_record = None
         available, refs = False, []
         control_error = None
         try:
-            gateway_after = self._tcp_probe(
-                "deployment/serving-gateway", "gateway", "serving-engine", 8000
-            )
-            control, request_id, valid = self._completion(
-                token=self.tokens["RUNTIME_INFERENCE_TOKEN"]
-            )
+            gateway_after = self._tcp_probe("deployment/serving-gateway", "gateway", "serving-engine", 8000)
+            control, request_id, valid = self._completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"])
             control_record = _record_fields(self._detail(request_id))
             available, refs = self._wait_observation_refs(
                 "hubble",
@@ -2067,8 +2464,11 @@ class AWSAcceptance:
             "direct_failed": probe["connection_timed_out"] if probe["marker"] is not None else None,
             "direct_connected": probe["marker"] == "CONNECTED",
             "tokenize_direct_failed": (
-                False if tokenize_probe["marker"] == "CONNECTED"
-                else True if tokenize_probe["connection_timed_out"] else None
+                False
+                if tokenize_probe["marker"] == "CONNECTED"
+                else True
+                if tokenize_probe["connection_timed_out"]
+                else None
             ),
             "gateway_tcp_control": (
                 gateway_tcp_control
@@ -2093,8 +2493,7 @@ class AWSAcceptance:
             facts["unknown_reason"] = "Gateway 컨테이너에서 TCP 대조 probe를 실행하지 못함"
         elif probe["connection_failed"] and not probe["connection_timed_out"]:
             facts["unknown_reason"] = (
-                "other-client→engine 연결 실패가 시간 초과가 아님"
-                f"({probe['errno_name'] or 'errno 미확인'})"
+                f"other-client→engine 연결 실패가 시간 초과가 아님({probe['errno_name'] or 'errno 미확인'})"
             )
         elif facts["tokenize_direct_failed"] is None:
             facts["unknown_reason"] = (
@@ -2103,8 +2502,12 @@ class AWSAcceptance:
             )
         return facts, {
             "direct_probe": probe,
-            "tokenize_direct_probe": {**tokenize_probe, "method": "POST", "path": "/tokenize",
-                                      "note": "합성 mm_processor_kwargs.code_revision 본문; 연결 단계 차단이면 본문 미전송"},
+            "tokenize_direct_probe": {
+                **tokenize_probe,
+                "method": "POST",
+                "path": "/tokenize",
+                "note": "합성 mm_processor_kwargs.code_revision 본문; 연결 단계 차단이면 본문 미전송",
+            },
             "gateway_tcp_control": {"before": gateway_before, "after": gateway_after},
             "record_fields_used": control_record,
             "control_error": control_error,
@@ -2126,18 +2529,14 @@ class AWSAcceptance:
                 "engine_pod": pod,
             }
         since = _now()
-        engine_receiver = self._tcp_probe(
-            "pod/" + pod["name"], "engine", receiver["ip"], 8080
-        )
+        engine_receiver = self._tcp_probe("pod/" + pod["name"], "engine", receiver["ip"], 8080)
         if not engine_receiver["python_available"]:
             return {"not_run_reason": "engine 컨테이너에 python3가 없음"}, {
                 "engine_pod": pod,
                 "receiver_pod": receiver,
                 "engine_receiver_probe": engine_receiver,
             }
-        receiver_control = self._tcp_probe(
-            "pod/other-client", "client", receiver["ip"], 8080
-        )
+        receiver_control = self._tcp_probe("pod/other-client", "client", receiver["ip"], 8080)
         if not receiver_control["python_available"]:
             return {"not_run_reason": "other-client에 python3가 없음"}, {
                 "engine_pod": pod,
@@ -2177,32 +2576,23 @@ class AWSAcceptance:
         )
         facts: dict[str, Any] = {
             "engine_receiver_failed": (
-                engine_receiver["connection_timed_out"]
-                if engine_receiver["marker"] is not None
-                else None
+                engine_receiver["connection_timed_out"] if engine_receiver["marker"] is not None else None
             ),
             "receiver_control_connected": (
-                receiver_control["connected"]
-                if receiver_control["marker"] is not None
-                else None
+                receiver_control["connected"] if receiver_control["marker"] is not None else None
             ),
             "receiver_hubble_dropped": bool(refs_receiver) if available_receiver else None,
             "supplementary_external_failed": (
                 external["connection_failed"] if external["marker"] is not None else None
             ),
-            "supplementary_imds_failed": (
-                imds["connection_failed"] if imds["marker"] is not None else None
-            ),
-            "supplementary_external_hubble": (
-                bool(refs_external) if available_external else None
-            ),
+            "supplementary_imds_failed": (imds["connection_failed"] if imds["marker"] is not None else None),
+            "supplementary_external_hubble": (bool(refs_external) if available_external else None),
             "supplementary_imds_hubble": bool(refs_imds) if available_imds else None,
         }
         if engine_receiver["connection_failed"] and not engine_receiver["connection_timed_out"]:
             facts = {
                 "unknown_reason": (
-                    "engine→receiver 연결 실패가 시간 초과가 아님"
-                    f"({engine_receiver['errno_name'] or 'errno 미확인'})"
+                    f"engine→receiver 연결 실패가 시간 초과가 아님({engine_receiver['errno_name'] or 'errno 미확인'})"
                 )
             }
         return facts, {
@@ -2233,7 +2623,15 @@ class AWSAcceptance:
         cache_path = f"/cache/.byul-acceptance-{suffix}"
         since = _now()
         model_result = self._kubectl(
-            "exec", "pod/" + pod["name"], "-c", "engine", "--", "python3", "-c", WRITE_DENY_CODE, model_path,
+            "exec",
+            "pod/" + pod["name"],
+            "-c",
+            "engine",
+            "--",
+            "python3",
+            "-c",
+            WRITE_DENY_CODE,
+            model_path,
             timeout=15,
         )
         if model_result.returncode != 0 and (
@@ -2241,7 +2639,15 @@ class AWSAcceptance:
         ):
             return {"not_run_reason": "engine 컨테이너에 python3가 없음"}, {}
         cache_result = self._kubectl(
-            "exec", "pod/" + pod["name"], "-c", "engine", "--", "python3", "-c", CACHE_WRITE_CODE, cache_path,
+            "exec",
+            "pod/" + pod["name"],
+            "-c",
+            "engine",
+            "--",
+            "python3",
+            "-c",
+            CACHE_WRITE_CODE,
+            cache_path,
             timeout=15,
         )
         model_available, model_refs = self._wait_observation_refs(
@@ -2256,9 +2662,13 @@ class AWSAcceptance:
         )
         model_denied: bool | None = None
         model_marker = (
-            "WRITE_DENIED" if "WRITE_DENIED" in model_result.stdout else
-            "WRITE_SUCCEEDED" if "WRITE_SUCCEEDED" in model_result.stdout else
-            "WRITE_ERROR" if "WRITE_ERROR" in model_result.stdout else None
+            "WRITE_DENIED"
+            if "WRITE_DENIED" in model_result.stdout
+            else "WRITE_SUCCEEDED"
+            if "WRITE_SUCCEEDED" in model_result.stdout
+            else "WRITE_ERROR"
+            if "WRITE_ERROR" in model_result.stdout
+            else None
         )
         errno_match = re.search(
             r"(?:WRITE_DENIED|WRITE_ERROR) errno=(\d+) name=([A-Z0-9_]+)",
@@ -2272,11 +2682,7 @@ class AWSAcceptance:
             model_denied = False
         elif "WRITE_SUCCEEDED" in model_result.stdout:
             model_denied = False
-        cache_succeeded = (
-            cache_result.returncode == 0
-            if "CACHE_WRITE_REMOVED" in cache_result.stdout
-            else None
-        )
+        cache_succeeded = cache_result.returncode == 0 if "CACHE_WRITE_REMOVED" in cache_result.stdout else None
         facts: dict[str, Any] = {
             "model_write_denied": model_denied,
             "cache_write_succeeded": cache_succeeded,
@@ -2284,11 +2690,7 @@ class AWSAcceptance:
             "cache_tetragon": bool(cache_refs) if cache_available else None,
         }
         if model_marker == "WRITE_DENIED" and model_errno_name in {"EPERM", "EACCES"}:
-            facts = {
-                "unknown_reason": (
-                    f"모델 쓰기 거부 errno {model_errno_name}는 read-only mount 증거가 아님"
-                )
-            }
+            facts = {"unknown_reason": (f"모델 쓰기 거부 errno {model_errno_name}는 read-only mount 증거가 아님")}
         return facts, {
             "engine_pod": pod,
             "model_probe": {
@@ -2297,7 +2699,10 @@ class AWSAcceptance:
                 "errno": model_errno,
                 "errno_name": model_errno_name,
             },
-            "cache_probe": {"returncode": cache_result.returncode, "marker": "CACHE_WRITE_REMOVED" if "CACHE_WRITE_REMOVED" in cache_result.stdout else "other"},
+            "cache_probe": {
+                "returncode": cache_result.returncode,
+                "marker": "CACHE_WRITE_REMOVED" if "CACHE_WRITE_REMOVED" in cache_result.stdout else "other",
+            },
             "observation_references": [*model_refs, *cache_refs],
             "observations": {
                 "model": {"state": "observed" if model_refs else "not_observed", "references": model_refs},
@@ -2333,9 +2738,7 @@ class AWSAcceptance:
                 return False, latest
             self.sleep(min(2.0, max(0.0, deadline - self.monotonic())))
 
-    def _wait_collectors_not_ok(
-        self, timeout: float
-    ) -> tuple[bool, dict[str, dict[str, Any]], float]:
+    def _wait_collectors_not_ok(self, timeout: float) -> tuple[bool, dict[str, dict[str, Any]], float]:
         started = self.monotonic()
         deadline = started + timeout
         latest: dict[str, dict[str, Any]] = {}
@@ -2345,17 +2748,14 @@ class AWSAcceptance:
             except (OSError, URLError, TimeoutError):
                 response = HTTPResponse(0, {}, b"")
             if response.status == 200 and all(
-                source in latest and latest[source].get("state") != "ok"
-                for source in _OBSERVATION_SOURCES
+                source in latest and latest[source].get("state") != "ok" for source in _OBSERVATION_SOURCES
             ):
                 return True, latest, self.monotonic() - started
             if self.monotonic() >= deadline:
                 return False, latest, self.monotonic() - started
             self.sleep(min(2.0, max(0.0, deadline - self.monotonic())))
 
-    def _heartbeat_snapshot(
-        self, since: str
-    ) -> tuple[bool, bool, dict[str, dict[str, Any]]]:
+    def _heartbeat_snapshot(self, since: str) -> tuple[bool, bool, dict[str, dict[str, Any]]]:
         readable = True
         snapshots: dict[str, dict[str, Any]] = {}
         for kind in ("hubble", "tetragon"):
@@ -2389,8 +2789,7 @@ class AWSAcceptance:
                 "updated_after_stop_request": _after(updated_at, since),
             }
         stopped = readable and all(
-            snapshots[kind].get("state") == "stopped"
-            and snapshots[kind].get("updated_after_stop_request") is True
+            snapshots[kind].get("state") == "stopped" and snapshots[kind].get("updated_after_stop_request") is True
             for kind in ("hubble", "tetragon")
         )
         return readable, stopped, snapshots
@@ -2480,14 +2879,16 @@ class AWSAcceptance:
             return {"unknown_reason": "collector stale_after_s를 확인하지 못함"}, {}
         stale = max(float(value) for value in stale_values)
         target_stale = before.get("target_pods", {}).get("stale_after_s")
-        if isinstance(target_stale, (int, float)) and not isinstance(target_stale, bool) and math.isfinite(float(target_stale)):
+        if (
+            isinstance(target_stale, (int, float))
+            and not isinstance(target_stale, bool)
+            and math.isfinite(float(target_stale))
+        ):
             stale = max(stale, float(target_stale))
         gaps_readable, positions = self._gap_positions()
         stop_requested_at = _now()
         stop_started = self.monotonic()
-        stop = self.runner.run(
-            ["systemctl", "--user", "stop", "byul-observation-feed"], timeout=30
-        )
+        stop = self.runner.run(["systemctl", "--user", "stop", "byul-observation-feed"], timeout=30)
         stop_completed_at = _now()
         stop_elapsed = self.monotonic() - stop_started
         start: CommandResult | None = None
@@ -2529,10 +2930,8 @@ class AWSAcceptance:
         try:
             if stop.returncode == 0:
                 stopped_window_started = self.monotonic()
-                heartbeat_seen, heartbeat_snapshot, _heartbeat_wait = (
-                    self._wait_heartbeats_stopped(
-                        stop_requested_at, min(stale, 5.0)
-                    )
+                heartbeat_seen, heartbeat_snapshot, _heartbeat_wait = self._wait_heartbeats_stopped(
+                    stop_requested_at, min(stale, 5.0)
                 )
                 if heartbeat_seen is True:
                     heartbeat_elapsed = self.monotonic() - stopped_window_started
@@ -2540,9 +2939,7 @@ class AWSAcceptance:
                     0.0,
                     stale - (self.monotonic() - stopped_window_started),
                 )
-                unavailable, after, _unavailable_wait = self._wait_collectors_not_ok(
-                    remaining
-                )
+                unavailable, after, _unavailable_wait = self._wait_collectors_not_ok(remaining)
                 if unavailable:
                     unavailable_elapsed = self.monotonic() - stopped_window_started
                 # The Pod snapshot has its own freshness window. Exercise the
@@ -2561,7 +2958,11 @@ class AWSAcceptance:
                         probe_target = None
                         request_target_status = None
                         request_target_error = _safe_exception(error)
-                    request_target_state = ((probe_target or {}).get("verification") or {}).get("state") if request_target_status == 200 and isinstance(probe_target, dict) else None
+                    request_target_state = (
+                        ((probe_target or {}).get("verification") or {}).get("state")
+                        if request_target_status == 200 and isinstance(probe_target, dict)
+                        else None
+                    )
                     if request_target_state in {"unavailable", "blocked"} or self.monotonic() >= unavailable_deadline:
                         break
                     self.sleep(1.0)
@@ -2581,9 +2982,7 @@ class AWSAcceptance:
                         stopped_request = {
                             "http_status": stopped_response.status,
                             "reason_code": (
-                                stopped_record.get("reason_code")
-                                if stopped_record
-                                else stopped_error.get("code")
+                                stopped_record.get("reason_code") if stopped_record else stopped_error.get("code")
                             ),
                             "error": None,
                         }
@@ -2596,15 +2995,18 @@ class AWSAcceptance:
                             "error": _safe_exception(error),
                         }
                 else:
-                    stopped_request["error"] = ("target blocked" if request_target_state == "blocked" else
-                                                 "target 조회 실패" if request_target_error else "target unavailable 기한 초과")
+                    stopped_request["error"] = (
+                        "target blocked"
+                        if request_target_state == "blocked"
+                        else "target 조회 실패"
+                        if request_target_error
+                        else "target unavailable 기한 초과"
+                    )
         finally:
             phase_stopped = self._timeline()
             start_requested_at = _now()
             start_started = self.monotonic()
-            start = self.runner.run(
-                ["systemctl", "--user", "start", "byul-observation-feed"], timeout=30
-            )
+            start = self.runner.run(["systemctl", "--user", "start", "byul-observation-feed"], timeout=30)
             start_completed_at = _now()
             start_elapsed = self.monotonic() - start_started
             if start.returncode == 0:
@@ -2621,32 +3023,47 @@ class AWSAcceptance:
                         except (OSError, URLError, TimeoutError):
                             recovered_target = None
                         verification = recovered_target.get("verification") if recovered_target else None
-                        if recovered_target_status == 200 and isinstance(verification, dict) and verification.get("state") == "ok" and recovered_target.get("gateway_hold") is None:
+                        if (
+                            recovered_target_status == 200
+                            and isinstance(verification, dict)
+                            and verification.get("state") == "ok"
+                            and recovered_target.get("gateway_hold") is None
+                        ):
                             target_recovered = True
                             break
                         if self.monotonic() >= target_deadline:
                             break
                         self.sleep(min(2.0, max(0.0, target_deadline - self.monotonic())))
-                    inference_recovered, inference_record, inference_retry = (
-                        self._retry_inference(recovery_window)
-                    )
+                    inference_recovered, inference_record, inference_retry = self._retry_inference(recovery_window)
         gap_scan_ok, gap_refs = self._new_gap_refs(positions) if gaps_readable else (False, [])
         heartbeat_refs = list(heartbeat_snapshot.values())
         return {
-            **({"unknown_reason": "중단 중 /api/target 조회 실패 또는 unavailable 확인 기한 초과: " + (request_target_error or str(request_target_status))}
-               if stop.returncode == 0 and request_target_state not in {"unavailable", "blocked"} else {}),
+            **(
+                {
+                    "unknown_reason": "중단 중 /api/target 조회 실패 또는 unavailable 확인 기한 초과: "
+                    + (request_target_error or str(request_target_status))
+                }
+                if stop.returncode == 0 and request_target_state not in {"unavailable", "blocked"}
+                else {}
+            ),
             "stop_ok": stop.returncode == 0,
             "heartbeat_stopped_seen": heartbeat_seen,
             "collectors_unavailable": unavailable,
-            "stopped_request_200_unverified": (False if request_target_state == "blocked" else None if request_target_state != "unavailable" else (
-                stopped_request["http_status"] == 200
-                and stopped_valid
-                and stopped_target_status == 200
-                and isinstance(stopped_target, dict)
-                and isinstance(stopped_target.get("verification"), dict)
-                and stopped_target["verification"].get("state") == "unavailable"
-                and stopped_target.get("gateway_hold") is None
-            )),
+            "stopped_request_200_unverified": (
+                False
+                if request_target_state == "blocked"
+                else None
+                if request_target_state != "unavailable"
+                else (
+                    stopped_request["http_status"] == 200
+                    and stopped_valid
+                    and stopped_target_status == 200
+                    and isinstance(stopped_target, dict)
+                    and isinstance(stopped_target.get("verification"), dict)
+                    and stopped_target["verification"].get("state") == "unavailable"
+                    and stopped_target.get("gateway_hold") is None
+                )
+            ),
             "start_ok": bool(start and start.returncode == 0),
             "collectors_recovered": recovery_ok,
             "target_recovered": target_recovered,
@@ -2666,9 +3083,7 @@ class AWSAcceptance:
                 ),
                 "start_requested_at": start_requested_at,
                 "start_completed_at": start_completed_at,
-                "start_command_elapsed_s": (
-                    None if start_elapsed is None else round(start_elapsed, 3)
-                ),
+                "start_command_elapsed_s": (None if start_elapsed is None else round(start_elapsed, 3)),
                 "collectors_recovered_after_start_s": (
                     None if recovery_elapsed is None else round(recovery_elapsed, 3)
                 ),
@@ -2680,7 +3095,11 @@ class AWSAcceptance:
             },
             "heartbeat_stopped": heartbeat_snapshot,
             "stopped_interval_request": stopped_request,
-            "request_target_verification": {"http_status": request_target_status, "state": request_target_state, "error": request_target_error},
+            "request_target_verification": {
+                "http_status": request_target_status,
+                "state": request_target_state,
+                "error": request_target_error,
+            },
             "stopped_target_verification": stopped_target.get("verification") if stopped_target else None,
             "recovered_target_verification": recovered_target.get("verification") if recovered_target else None,
             "recovery_request": {
@@ -2705,14 +3124,8 @@ class AWSAcceptance:
         print("경고: AWS-08은 serving-engine GPU를 반납한 뒤 cold-start합니다.")
         _target_response, target_before = self._get_json("/api/target")
         before_tracker = target_before.get("instance") if target_before else None
-        before_current = (
-            before_tracker.get("current") if isinstance(before_tracker, dict) else None
-        )
-        before_instance_id = (
-            before_current.get("instance_id")
-            if isinstance(before_current, dict)
-            else None
-        )
+        before_current = before_tracker.get("current") if isinstance(before_tracker, dict) else None
+        before_instance_id = before_current.get("instance_id") if isinstance(before_current, dict) else None
         if not isinstance(before_instance_id, str) or not before_instance_id:
             return {"unknown_reason": "교체 전 Gateway target instance_id를 확인하지 못함"}, {
                 "target_before": {
@@ -2730,9 +3143,11 @@ class AWSAcceptance:
             return {"unknown_reason": "교체 전 엔진 Pod UID/containerID를 확인하지 못함"}, {}
         restarted_at = _now()
         restart = self._kubectl("rollout", "restart", "deployment/serving-engine", timeout=30)
-        rollout = self._kubectl(
-            "rollout", "status", "deployment/serving-engine", "--timeout=25m", timeout=1510
-        ) if restart.returncode == 0 else CommandResult(1)
+        rollout = (
+            self._kubectl("rollout", "status", "deployment/serving-engine", "--timeout=25m", timeout=1510)
+            if restart.returncode == 0
+            else CommandResult(1)
+        )
         after, _after_result = self._engine_pod()
         gateway_instance_changed = False
         target_after: dict[str, Any] | None = None
@@ -2746,9 +3161,7 @@ class AWSAcceptance:
                 except (OSError, URLError, TimeoutError):
                     target_after = None
                 if target_after:
-                    snapshot_stale_seen = snapshot_stale_seen or _target_snapshot_stale(
-                        target_after
-                    )
+                    snapshot_stale_seen = snapshot_stale_seen or _target_snapshot_stale(target_after)
                     tracker = target_after.get("instance")
                     current = tracker.get("current") if isinstance(tracker, dict) else None
                     current_id = current.get("instance_id") if isinstance(current, dict) else None
@@ -2841,11 +3254,7 @@ class AWSAcceptance:
                 ),
                 "history_event": matching_history,
             },
-            "snapshot_note": (
-                "Gateway target Pod snapshot이 stale인 상태를 관측함"
-                if snapshot_stale_seen
-                else None
-            ),
+            "snapshot_note": ("Gateway target Pod snapshot이 stale인 상태를 관측함" if snapshot_stale_seen else None),
             "phase_state_supplementary": {
                 "before": (phase_before or {}).get("collector"),
                 "after": (self._timeline() or {}).get("collector"),
@@ -2865,9 +3274,14 @@ class AWSAcceptance:
             )
             available, match = self._wait_tetragon(
                 started,
-                lambda item: item.get("kind") == "process_exec"
-                and self._engine_event(item, pod["name"])
-                and item.get("binary") in ({"/bin/sh"} if label == "absolute" else {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash"}),
+                lambda item: (
+                    item.get("kind") == "process_exec"
+                    and self._engine_event(item, pod["name"])
+                    and item.get("binary")
+                    in (
+                        {"/bin/sh"} if label == "absolute" else {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash"}
+                    )
+                ),
             )
             probes[label] = {
                 "started_at": started,
@@ -2880,9 +3294,16 @@ class AWSAcceptance:
         return {
             "absolute_exec_ok": probes["absolute"]["returncode"] == 0,
             "path_exec_ok": probes["path"]["returncode"] == 0,
-            "path_observed": None if not probes["path"]["observation_available"] else path is not None and path["exec_verdict"] is not None,
-            "engine_pod_match": None if absolute is None else absolute["pod"] == {"namespace": self.namespace, "pod": pod["name"]} and absolute["binary"] == "/bin/sh",
-            "suspect_verdict": None if absolute is None else absolute["exec_verdict"] == "suspect_binary" and absolute["binary"] == "/bin/sh",
+            "path_observed": None
+            if not probes["path"]["observation_available"]
+            else path is not None and path["exec_verdict"] is not None,
+            "engine_pod_match": None
+            if absolute is None
+            else absolute["pod"] == {"namespace": self.namespace, "pod": pod["name"]}
+            and absolute["binary"] == "/bin/sh",
+            "suspect_verdict": None
+            if absolute is None
+            else absolute["exec_verdict"] == "suspect_binary" and absolute["binary"] == "/bin/sh",
         }, {
             "engine_pod": {"name": pod["name"], "uid": pod.get("uid")},
             "absolute": absolute,
@@ -2902,17 +3323,23 @@ class AWSAcceptance:
         )
         available, match = self._wait_tetragon(
             started,
-            lambda item: item.get("rule_id") == "TG-SECRET-01"
-            and item.get("path") == path
-            and self._engine_event(item, pod["name"]),
+            lambda item: (
+                item.get("rule_id") == "TG-SECRET-01"
+                and item.get("path") == path
+                and self._engine_event(item, pod["name"])
+            ),
         )
         observation = self._event_summary(match, started)
         return {
             "read_ok": result.returncode == 0 and "READ_OK" in result.stdout,
             "path_match": None if observation is None else observation["path"] == path,
-            "engine_pod_match": None if observation is None else observation["pod"] == {"namespace": self.namespace, "pod": pod["name"]},
+            "engine_pod_match": None
+            if observation is None
+            else observation["pod"] == {"namespace": self.namespace, "pod": pod["name"]},
             "read_access": None if observation is None else observation["access"] == "read",
-            "monitor_detected": None if observation is None else observation["rule_id"] == "TG-SECRET-01" and observation["action_mode"] == "monitor",
+            "monitor_detected": None
+            if observation is None
+            else observation["rule_id"] == "TG-SECRET-01" and observation["action_mode"] == "monitor",
         }, {
             "engine_pod": {"name": pod["name"], "uid": pod.get("uid")},
             "started_at": started,
@@ -2936,15 +3363,25 @@ class AWSAcceptance:
         probe_name = getattr(self.args, "aws20_probe_pod", None)
         engine_target = not bool(probe_name)
         probes = monitor["spec"].get("kprobes", []) + monitor["spec"].get("lsmhooks", [])
-        contains_sigkill = any(a.get("action") == "Sigkill" for p in probes
-                              for s in p.get("selectors", []) for a in s.get("matchActions", []))
+        contains_sigkill = any(
+            a.get("action") == "Sigkill"
+            for p in probes
+            for s in p.get("selectors", [])
+            for a in s.get("matchActions", [])
+        )
         if engine_target and contains_sigkill and not getattr(self.args, "allow_engine_sigkill", False):
-            return {"not_run_reason": "Sigkill 포함 정책은 --aws20-probe-pod 우선; 엔진 대상은 --allow-engine-sigkill 필요"}, {}
+            return {
+                "not_run_reason": "Sigkill 포함 정책은 --aws20-probe-pod 우선; 엔진 대상은 --allow-engine-sigkill 필요"
+            }, {}
         if probe_name:
             pod_result = self._kubectl("get", "pod", probe_name, "-o", "json")
             pod_doc = _json_object(pod_result.stdout.encode()) if pod_result.returncode == 0 else None
             metadata = (pod_doc or {}).get("metadata") or {}
-            pod = {"name": probe_name, "uid": metadata.get("uid"), "ready": (pod_doc or {}).get("status", {}).get("phase") == "Running"}
+            pod = {
+                "name": probe_name,
+                "uid": metadata.get("uid"),
+                "ready": (pod_doc or {}).get("status", {}).get("phase") == "Running",
+            }
             container = "probe"
         else:
             pod, _ = self._engine_pod()
@@ -2956,55 +3393,125 @@ class AWSAcceptance:
         current_result = self._kubectl("get", "tracingpolicynamespaced", "runtime-tg-secret-01", "-o", "json")
         current = _json_object(current_result.stdout.encode()) if current_result.returncode == 0 else None
         from serving_runtime.enforcement.tetragon import comparable_spec
-        if (_aws20_method(current, namespace=self.namespace) != method or comparable_spec(current["spec"]) != comparable_spec(monitor["spec"])):
+
+        if _aws20_method(current, namespace=self.namespace) != method or comparable_spec(
+            current["spec"]
+        ) != comparable_spec(monitor["spec"]):
             return {"unknown_reason": "적용 규칙과 검토한 monitor manifest 불일치"}, {}
         labels = (pod_doc or {}).get("metadata", {}).get("labels", {})
         selector = current["spec"]["podSelector"]["matchLabels"]
-        if (not isinstance(labels, dict) or any(labels.get(key) != value for key, value in selector.items())
-            or (pod_doc or {}).get("metadata", {}).get("uid") != pod["uid"]):
+        if (
+            not isinstance(labels, dict)
+            or any(labels.get(key) != value for key, value in selector.items())
+            or (pod_doc or {}).get("metadata", {}).get("uid") != pod["uid"]
+        ):
             return {"unknown_reason": "현재 대상 Pod UID 또는 규칙 selector 불일치"}, {}
 
         def run_mode(command: list[str]) -> CommandResult:
             return self.runner.run(command, timeout=70)
+
         probe_tag = "byul-read-probe-" + uuid4().hex
-        monitor_read = self._kubectl("exec", "pod/" + pod["name"], "-c", container, "--",
-                                     "python3", "-c", PROBE_READ_ERRNO_CODE, _SECRET_PROBE_PATH,
-                                     probe_tag + "-monitor", timeout=15)
+        monitor_read = self._kubectl(
+            "exec",
+            "pod/" + pod["name"],
+            "-c",
+            container,
+            "--",
+            "python3",
+            "-c",
+            PROBE_READ_ERRNO_CODE,
+            _SECRET_PROBE_PATH,
+            probe_tag + "-monitor",
+            timeout=15,
+        )
         if monitor_read.returncode != 0 or _json_object(monitor_read.stdout.encode()) != {"read": "ok"}:
             return {"unknown_reason": "monitor 구간의 가짜 파일 읽기 대조 실패; 정책 모드 유지"}, {}
-        enabled = switch_mode(self.context, self.namespace, "runtime-tg-secret-01", "enforce", run=run_mode, history_path=self.evidence_dir / "transitions.jsonl")
+        enabled = switch_mode(
+            self.context,
+            self.namespace,
+            "runtime-tg-secret-01",
+            "enforce",
+            run=run_mode,
+            history_path=self.evidence_dir / "transitions.jsonl",
+        )
         if not enabled["ok"] or enabled["before"]["mode"] != "monitor":
             if enabled["ok"] and enabled["before"]["mode"] != "monitor":
-                switch_mode(self.context, self.namespace, "runtime-tg-secret-01", "monitor", run=run_mode, history_path=self.evidence_dir / "transitions.jsonl")
+                switch_mode(
+                    self.context,
+                    self.namespace,
+                    "runtime-tg-secret-01",
+                    "monitor",
+                    run=run_mode,
+                    history_path=self.evidence_dir / "transitions.jsonl",
+                )
             return {"unknown_reason": "정책 monitor→enforce 모드 전환 또는 동일 ID 확인 실패"}, {"mode_switch": enabled}
 
-        facts: dict[str, Any] = {"enforce_method": method, "engine_target": engine_target,
-                                  "monitor_read_ok": True,
-                                  "enforce_active": True, "read_eperm": None, "raw_override": None,
-                                  "exit_sigkill": None, "raw_sigkill": None,
-                                  "normal_200": None, "gateway_503": None, "engine_restarted": None,
-                                  "recovered_200": None, "cleanup_ok": False, "restore_read_ok": None}
-        evidence: dict[str, Any] = {"engine_pod_uid": pod["uid"], "rule_id": "TG-SECRET-01",
-                                    "path": _SECRET_PROBE_PATH, "reviewed_manifest_sha256": hashlib.sha256(monitor_path.read_bytes()).hexdigest(),
-                                    "enforce_method": method, "policy_id": enabled["after"]["id"]}
+        facts: dict[str, Any] = {
+            "enforce_method": method,
+            "engine_target": engine_target,
+            "monitor_read_ok": True,
+            "enforce_active": True,
+            "read_eperm": None,
+            "raw_override": None,
+            "exit_sigkill": None,
+            "raw_sigkill": None,
+            "normal_200": None,
+            "gateway_503": None,
+            "engine_restarted": None,
+            "recovered_200": None,
+            "cleanup_ok": False,
+            "restore_read_ok": None,
+        }
+        evidence: dict[str, Any] = {
+            "engine_pod_uid": pod["uid"],
+            "rule_id": "TG-SECRET-01",
+            "path": _SECRET_PROBE_PATH,
+            "reviewed_manifest_sha256": hashlib.sha256(monitor_path.read_bytes()).hexdigest(),
+            "enforce_method": method,
+            "policy_id": enabled["after"]["id"],
+        }
         evidence["probe_scope"] = "kubectl_exec_process"
         try:
             started = _now()
-            read = self._kubectl("exec", "pod/" + pod["name"], "-c", container, "--",
-                                 "python3", "-c", PROBE_READ_ERRNO_CODE, _SECRET_PROBE_PATH, probe_tag, timeout=15)
+            read = self._kubectl(
+                "exec",
+                "pod/" + pod["name"],
+                "-c",
+                container,
+                "--",
+                "python3",
+                "-c",
+                PROBE_READ_ERRNO_CODE,
+                _SECRET_PROBE_PATH,
+                probe_tag,
+                timeout=15,
+            )
             result = _json_object(read.stdout.encode())
-            facts["exit_sigkill"] = (True if read.returncode in {137, -9}
-                                     else False if read.returncode in {0, 13} and result else None)
+            facts["exit_sigkill"] = (
+                True if read.returncode in {137, -9} else False if read.returncode in {0, 13} and result else None
+            )
             if method != "sigkill_fd_install":
                 # Keep the legacy fact key for stored AWS-20 reports.
-                facts["read_eperm"] = (True if read.returncode == 13 and result in ({"errno": 1, "name": "EPERM"}, {"errno": 13, "name": "EACCES"})
-                                       else False if read.returncode == 0 and result == {"read": "ok"} else None)
+                facts["read_eperm"] = (
+                    True
+                    if read.returncode == 13
+                    and result in ({"errno": 1, "name": "EPERM"}, {"errno": 13, "name": "EACCES"})
+                    else False
+                    if read.returncode == 0 and result == {"read": "ok"}
+                    else None
+                )
             evidence["read_returncode"] = read.returncode
             action = "KPROBE_ACTION_SIGKILL" if method == "sigkill_fd_install" else "KPROBE_ACTION_OVERRIDE"
             for attempt in range(8):
-                if _aws20_raw_action(self.observation_dir / "tetragon.jsonl", since=started,
-                                     pod_uid=pod["uid"], namespace=self.namespace, action=action, method=method,
-                                     probe_tag=probe_tag):
+                if _aws20_raw_action(
+                    self.observation_dir / "tetragon.jsonl",
+                    since=started,
+                    pod_uid=pod["uid"],
+                    namespace=self.namespace,
+                    action=action,
+                    method=method,
+                    probe_tag=probe_tag,
+                ):
                     facts["raw_sigkill" if method == "sigkill_fd_install" else "raw_override"] = True
                     break
                 if attempt < 7:
@@ -3012,15 +3519,31 @@ class AWSAcceptance:
             key = "raw_sigkill" if method == "sigkill_fd_install" else "raw_override"
             facts[key] = facts[key] or None
             if method != "sigkill_fd_install":
-                facts["raw_sigkill"] = _aws20_raw_action(self.observation_dir / "tetragon.jsonl", since=started,
-                    pod_uid=pod["uid"], namespace=self.namespace, action="KPROBE_ACTION_SIGKILL", method=method,
-                    probe_tag=probe_tag) or None
+                facts["raw_sigkill"] = (
+                    _aws20_raw_action(
+                        self.observation_dir / "tetragon.jsonl",
+                        since=started,
+                        pod_uid=pod["uid"],
+                        namespace=self.namespace,
+                        action="KPROBE_ACTION_SIGKILL",
+                        method=method,
+                        probe_tag=probe_tag,
+                    )
+                    or None
+                )
             response, request_id, valid = self._completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"])
             record = _record_fields(self._detail(request_id))
-            facts["normal_200"] = (response.status == 200 and valid and record is not None
-                                   and record["result"] == "ALLOWED" and record["delivery"]["attempted"] is True)
+            facts["normal_200"] = (
+                response.status == 200
+                and valid
+                and record is not None
+                and record["result"] == "ALLOWED"
+                and record["delivery"]["attempted"] is True
+            )
             if engine_target:
-                evidence["engine_lifecycle_note"] = "exec 시험 프로세스의 종료는 엔진 주 프로세스 종료·503·재시작 근거가 아님"
+                evidence["engine_lifecycle_note"] = (
+                    "exec 시험 프로세스의 종료는 엔진 주 프로세스 종료·503·재시작 근거가 아님"
+                )
             evidence["normal_request_id"] = request_id
             evidence["normal_http_status"] = response.status
             evidence["collector_clear"] = self._tetragon_collector_ok() and self._tetragon_gaps_clear(started)
@@ -3029,28 +3552,60 @@ class AWSAcceptance:
                 facts["raw_sigkill"] = None
         finally:
             try:
-                restored = switch_mode(self.context, self.namespace, "runtime-tg-secret-01", "monitor", run=run_mode, history_path=self.evidence_dir / "transitions.jsonl")
-                facts["cleanup_ok"] = (restored["ok"] and restored["after"]["id"] == enabled["after"]["id"])
+                restored = switch_mode(
+                    self.context,
+                    self.namespace,
+                    "runtime-tg-secret-01",
+                    "monitor",
+                    run=run_mode,
+                    history_path=self.evidence_dir / "transitions.jsonl",
+                )
+                facts["cleanup_ok"] = restored["ok"] and restored["after"]["id"] == enabled["after"]["id"]
                 evidence["mode_restore"] = restored
                 if facts["cleanup_ok"]:
                     self.sleep(3.0)
-                    read_after = self._kubectl("exec", "pod/" + pod["name"], "-c", container, "--",
-                                               "python3", "-c", PROBE_READ_ERRNO_CODE, _SECRET_PROBE_PATH, timeout=15)
+                    read_after = self._kubectl(
+                        "exec",
+                        "pod/" + pod["name"],
+                        "-c",
+                        container,
+                        "--",
+                        "python3",
+                        "-c",
+                        PROBE_READ_ERRNO_CODE,
+                        _SECRET_PROBE_PATH,
+                        timeout=15,
+                    )
                     after = _json_object(read_after.stdout.encode())
-                    facts["restore_read_ok"] = (True if read_after.returncode == 0 and after == {"read": "ok"}
-                                                else False if after and "errno" in after else None)
+                    facts["restore_read_ok"] = (
+                        True
+                        if read_after.returncode == 0 and after == {"read": "ok"}
+                        else False
+                        if after and "errno" in after
+                        else None
+                    )
                     evidence["restore_read_returncode"] = read_after.returncode
             except Exception as error:
                 facts["cleanup_ok"] = False
                 evidence["restore_error"] = _safe_exception(error)
         from serving_runtime.enforcement.verification import assess_effects
-        evidence["verified_effects"] = assess_effects(method, {
-            "enforce_active": facts["enforce_active"], "event_bound": bool(facts.get("raw_override") or facts.get("raw_sigkill")),
-            "collector_complete": evidence.get("collector_clear"), "override_event": facts.get("raw_override"),
-            "sigkill_event": facts.get("raw_sigkill"), "read_denied": facts.get("read_eperm"),
-            "process_terminated": facts.get("exit_sigkill"), "monitor_read_ok": facts["monitor_read_ok"],
-            "restore_read_ok": facts["restore_read_ok"], "same_policy_id": facts["cleanup_ok"], "cleanup_ok": facts["cleanup_ok"],
-        })
+
+        evidence["verified_effects"] = assess_effects(
+            method,
+            {
+                "enforce_active": facts["enforce_active"],
+                "event_bound": bool(facts.get("raw_override") or facts.get("raw_sigkill")),
+                "collector_complete": evidence.get("collector_clear"),
+                "override_event": facts.get("raw_override"),
+                "sigkill_event": facts.get("raw_sigkill"),
+                "read_denied": facts.get("read_eperm"),
+                "process_terminated": facts.get("exit_sigkill"),
+                "monitor_read_ok": facts["monitor_read_ok"],
+                "restore_read_ok": facts["restore_read_ok"],
+                "same_policy_id": facts["cleanup_ok"],
+                "cleanup_ok": facts["cleanup_ok"],
+            },
+        )
         return facts, evidence
 
     def _normal_control(self) -> dict[str, Any]:
@@ -3062,25 +3617,53 @@ class AWSAcceptance:
         request_ms = round((self.monotonic() - request_start) * 1000, 3)
         record = _record_fields(self._detail(request_id))
         stream_start = self.monotonic()
-        streamed, stream_id, data_seen, done_seen = self._stream_completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"])
+        streamed, stream_id, data_seen, done_seen = self._stream_completion(
+            token=self.tokens["RUNTIME_INFERENCE_TOKEN"]
+        )
         stream_ms = round((self.monotonic() - stream_start) * 1000, 3)
         stream_record = _record_fields(self._detail(stream_id))
         cache_path = "/cache/.byul-acceptance-" + uuid4().hex[:12]
         cache_started = _now()
         cache = self._kubectl(
-            "exec", "pod/" + pod["name"], "-c", "engine", "--", "python3", "-c", CACHE_WRITE_CODE, cache_path, timeout=15
+            "exec",
+            "pod/" + pod["name"],
+            "-c",
+            "engine",
+            "--",
+            "python3",
+            "-c",
+            CACHE_WRITE_CODE,
+            cache_path,
+            timeout=15,
         )
         available, match = self._wait_tetragon(
             cache_started,
-            lambda item: item.get("rule_id") == "TG-CACHE-01"
-            and item.get("path") == cache_path
-            and self._engine_event(item, pod["name"]),
+            lambda item: (
+                item.get("rule_id") == "TG-CACHE-01"
+                and item.get("path") == cache_path
+                and self._engine_event(item, pod["name"])
+            ),
         )
         return {
             "pod": pod["name"],
-            "normal_ok": response.status == 200 and valid and record is not None and record["result"] == "ALLOWED" and record["delivery"]["attempted"] is True,
-            "stream_ok": streamed.status == 200 and data_seen and done_seen and stream_record is not None and stream_record["result"] == "ALLOWED" and stream_record["delivery"]["attempted"] is True,
-            "cache_ok": None if not available else cache.returncode == 0 and "CACHE_WRITE_REMOVED" in cache.stdout and match is not None and match.get("cache_generation") == "current" and match.get("exec_verdict") is None,
+            "normal_ok": response.status == 200
+            and valid
+            and record is not None
+            and record["result"] == "ALLOWED"
+            and record["delivery"]["attempted"] is True,
+            "stream_ok": streamed.status == 200
+            and data_seen
+            and done_seen
+            and stream_record is not None
+            and stream_record["result"] == "ALLOWED"
+            and stream_record["delivery"]["attempted"] is True,
+            "cache_ok": None
+            if not available
+            else cache.returncode == 0
+            and "CACHE_WRITE_REMOVED" in cache.stdout
+            and match is not None
+            and match.get("cache_generation") == "current"
+            and match.get("exec_verdict") is None,
             "cache_observation_available": available,
             "cache_observation": self._event_summary(match, cache_started),
             "response_time_ms": {"normal": request_ms, "stream": stream_ms},
@@ -3091,8 +3674,7 @@ class AWSAcceptance:
             return {"not_run_reason": "AWS-09·10을 함께 선택해야 전후 대조 가능"}, {}
         after = self._normal_control()
         available, rows = self._tetragon_observations(self.detection_started_at)
-        available = (available and self._tetragon_gaps_clear(self.detection_started_at)
-                     and self._tetragon_collector_ok())
+        available = available and self._tetragon_gaps_clear(self.detection_started_at) and self._tetragon_collector_ok()
         suspect_paths = {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash"}
         false_warnings = [
             self._event_summary(item, self.detection_started_at)
@@ -3100,10 +3682,14 @@ class AWSAcceptance:
             if item.get("exec_verdict") in {"outside_allowlist", "phase_signal_unverified", "exec_from_cache"}
             and item.get("binary") not in suspect_paths
         ]
-        phase_rows = [item for item in rows if item.get("kind") == "process_exec"
-                      and isinstance(item.get("phase"), list)
-                      and any(phase != "unknown" for phase in item["phase"])
-                      and item.get("phase_timeline_fresh") is not False]
+        phase_rows = [
+            item
+            for item in rows
+            if item.get("kind") == "process_exec"
+            and isinstance(item.get("phase"), list)
+            and any(phase != "unknown" for phase in item["phase"])
+            and item.get("phase_timeline_fresh") is not False
+        ]
         if self.engine == "sglang":
             timeline = self._timeline()
             pod, _ = self._engine_pod()
@@ -3111,9 +3697,12 @@ class AWSAcceptance:
             extraction = timeline.get("extraction") if isinstance(timeline, dict) else None
             try:
                 current_phase_source = (
-                    isinstance(extraction, dict) and extraction.get("engine") == "sglang"
-                    and isinstance(collector, dict) and collector.get("state") == "running"
-                    and isinstance(pod, dict) and bool(pod.get("uid"))
+                    isinstance(extraction, dict)
+                    and extraction.get("engine") == "sglang"
+                    and isinstance(collector, dict)
+                    and collector.get("state") == "running"
+                    and isinstance(pod, dict)
+                    and bool(pod.get("uid"))
                     and collector.get("pod_uid") == pod["uid"]
                     and not ExecPolicy._collector_stale(collector)
                 )
@@ -3122,18 +3711,29 @@ class AWSAcceptance:
             if not current_phase_source:
                 phase_rows = []
             else:
-                phase_rows = [item for item in phase_rows
-                              if isinstance(item.get("pod"), dict)
-                              and item["pod"].get("pod") == pod.get("name")]
+                phase_rows = [
+                    item
+                    for item in phase_rows
+                    if isinstance(item.get("pod"), dict) and item["pod"].get("pod") == pod.get("name")
+                ]
         phase_evidence = {
             "valid_exec_count": len(phase_rows),
             "unknown_exec_count": sum(item.get("exec_verdict") == "phase_unknown" for item in rows),
-            "bases": sorted({basis for item in phase_rows for basis in item.get("phase_basis", [])
-                             if isinstance(basis, str)}),
-            "timeline_written_at": sorted({item["phase_timeline_written_at"] for item in phase_rows
-                                           if isinstance(item.get("phase_timeline_written_at"), str)}),
-            "freshness": "fresh" if any(item.get("phase_timeline_fresh") is True for item in phase_rows)
-                         else "legacy_unbounded" if phase_rows else "unconfirmed",
+            "bases": sorted(
+                {basis for item in phase_rows for basis in item.get("phase_basis", []) if isinstance(basis, str)}
+            ),
+            "timeline_written_at": sorted(
+                {
+                    item["phase_timeline_written_at"]
+                    for item in phase_rows
+                    if isinstance(item.get("phase_timeline_written_at"), str)
+                }
+            ),
+            "freshness": "fresh"
+            if any(item.get("phase_timeline_fresh") is True for item in phase_rows)
+            else "legacy_unbounded"
+            if phase_rows
+            else "unconfirmed",
         }
         return {
             "normal_before": self.normal_before.get("normal_ok"),
@@ -3161,7 +3761,11 @@ class AWSAcceptance:
             document = json.loads((self.observation_dir / "phase-timeline.json").read_text(encoding="utf-8"))
         except (OSError, UnicodeError, json.JSONDecodeError, RecursionError):
             return None
-        return document if isinstance(document, dict) and document.get("schema_version") == "runtime-phase-timeline/1.0" else None
+        return (
+            document
+            if isinstance(document, dict) and document.get("schema_version") == "runtime-phase-timeline/1.0"
+            else None
+        )
 
     def _tetragon_counts(self) -> dict[str, int] | None:
         try:
@@ -3174,7 +3778,9 @@ class AWSAcceptance:
         if not isinstance(counts, dict):
             return None
         result = {key: counts.get(key) for key in ("skipped_unsupported_total", "corrupt_lines_total")}
-        return result if all(isinstance(value, int) and not isinstance(value, bool) for value in result.values()) else None
+        return (
+            result if all(isinstance(value, int) and not isinstance(value, bool) for value in result.values()) else None
+        )
 
     def _raw_process_exit_count(self, since: str) -> int | None:
         count = 0
@@ -3182,7 +3788,11 @@ class AWSAcceptance:
             with (self.observation_dir / "tetragon.jsonl").open("r", encoding="utf-8") as handle:
                 for line in handle:
                     item = json.loads(line)
-                    if isinstance(item, dict) and isinstance(item.get("process_exit"), dict) and _after(item.get("time"), since):
+                    if (
+                        isinstance(item, dict)
+                        and isinstance(item.get("process_exit"), dict)
+                        and _after(item.get("time"), since)
+                    ):
                         count += 1
         except (OSError, UnicodeError, json.JSONDecodeError, RecursionError):
             return None
@@ -3192,14 +3802,31 @@ class AWSAcceptance:
         restart = self._kubectl("rollout", "restart", f"deployment/{deployment}")
         if deployment == "serving-gateway" and restart.returncode == 0:
             self._gateway_restart_started()
-        status = self._kubectl("rollout", "status", f"deployment/{deployment}", f"--timeout={timeout_s}s", timeout=timeout_s + 10) if restart.returncode == 0 else CommandResult(1)
-        return restart.returncode == 0 and status.returncode == 0, {"restart_rc": restart.returncode, "rollout_rc": status.returncode}
+        status = (
+            self._kubectl(
+                "rollout", "status", f"deployment/{deployment}", f"--timeout={timeout_s}s", timeout=timeout_s + 10
+            )
+            if restart.returncode == 0
+            else CommandResult(1)
+        )
+        return restart.returncode == 0 and status.returncode == 0, {
+            "restart_rc": restart.returncode,
+            "rollout_rc": status.returncode,
+        }
 
     def _gateway_pods(self) -> list[dict[str, Any]] | None:
         result = self._kubectl("get", "pods", "-l", "app=serving-gateway", "-o", "json")
         document = _json_object(result.stdout.encode()) if result.returncode == 0 else None
         items = document.get("items") if isinstance(document, dict) else None
-        return [item for item in items if isinstance(item, dict) and not (item.get("metadata") or {}).get("deletionTimestamp")] if isinstance(items, list) else None
+        return (
+            [
+                item
+                for item in items
+                if isinstance(item, dict) and not (item.get("metadata") or {}).get("deletionTimestamp")
+            ]
+            if isinstance(items, list)
+            else None
+        )
 
     def _gateway_crashed(self, window_s: float, previous_uids: set[str]) -> tuple[bool | None, dict[str, Any]]:
         """True if the newest Gateway container exited after the restart.
@@ -3212,21 +3839,41 @@ class AWSAcceptance:
         seen = False
         while True:
             items = self._gateway_pods()
-            pods = [item for item in items if isinstance((item.get("metadata") or {}).get("uid"), str) and (item.get("metadata") or {}).get("uid") not in previous_uids] if items is not None else []
+            pods = (
+                [
+                    item
+                    for item in items
+                    if isinstance((item.get("metadata") or {}).get("uid"), str)
+                    and (item.get("metadata") or {}).get("uid") not in previous_uids
+                ]
+                if items is not None
+                else []
+            )
             if pods:
                 pod = max(pods, key=lambda item: str((item.get("metadata") or {}).get("creationTimestamp", "")))
                 metadata = pod.get("metadata") or {}
                 last.update({"pod_uid": metadata.get("uid"), "pod_name": metadata.get("name")})
                 statuses = (pod.get("status") or {}).get("containerStatuses") or []
-                status = next((item for item in statuses if isinstance(item, dict) and item.get("name") == "gateway"), None)
+                status = next(
+                    (item for item in statuses if isinstance(item, dict) and item.get("name") == "gateway"), None
+                )
                 if isinstance(status, dict):
                     seen = True
                     state = status.get("state") or {}
                     last_state = status.get("lastState") or {}
                     waiting = (state.get("waiting") or {}).get("reason")
-                    last.update({"restart_count": status.get("restartCount"), "waiting_reason": waiting,
-                            "terminated": bool(state.get("terminated") or last_state.get("terminated"))})
-                    if (isinstance(status.get("restartCount"), int) and status["restartCount"] > 0) or last["terminated"] or waiting in {"CrashLoopBackOff", "Error"}:
+                    last.update(
+                        {
+                            "restart_count": status.get("restartCount"),
+                            "waiting_reason": waiting,
+                            "terminated": bool(state.get("terminated") or last_state.get("terminated")),
+                        }
+                    )
+                    if (
+                        (isinstance(status.get("restartCount"), int) and status["restartCount"] > 0)
+                        or last["terminated"]
+                        or waiting in {"CrashLoopBackOff", "Error"}
+                    ):
                         return True, last
             if self.monotonic() >= deadline:
                 return (False if seen else None), last
@@ -3235,43 +3882,82 @@ class AWSAcceptance:
     def aws_12(self) -> tuple[dict[str, Any], dict[str, Any]]:
         if not getattr(self.args, "allow_compare_policy", False):
             return {"not_run_reason": "--allow-compare-policy 없음"}, {}
-        evidence: dict[str, Any] = {"manifests": [str(_DEPLOY / "policy-compare-pods.yaml"), str(_DEPLOY / "policy-compare-cilium.yaml")]}
+        evidence: dict[str, Any] = {
+            "manifests": [str(_DEPLOY / "policy-compare-pods.yaml"), str(_DEPLOY / "policy-compare-cilium.yaml")]
+        }
         source = self._kubectl("get", "pod", "other-client", "-o", "json")
         source_doc = _json_object(source.stdout.encode()) if source.returncode == 0 else None
         source_spec = source_doc.get("spec") if isinstance(source_doc, dict) else None
         source_status = source_doc.get("status") if isinstance(source_doc, dict) else None
         containers = source_spec.get("containers") if isinstance(source_spec, dict) else None
-        client = next((item for item in containers if isinstance(item, dict) and item.get("name") == "client"), None) if isinstance(containers, list) else None
+        client = (
+            next((item for item in containers if isinstance(item, dict) and item.get("name") == "client"), None)
+            if isinstance(containers, list)
+            else None
+        )
         image = client.get("image") if isinstance(client, dict) else None
         pull_policy = client.get("imagePullPolicy") if isinstance(client, dict) else None
         statuses = source_status.get("containerStatuses") if isinstance(source_status, dict) else None
-        client_status = next((item for item in statuses if isinstance(item, dict) and item.get("name") == "client"), None) if isinstance(statuses, list) else None
-        if (not isinstance(image, str) or not image or not isinstance(pull_policy, str)
-                or pull_policy not in {"Never", "IfNotPresent", "Always"}
-                or not isinstance(source_status, dict) or source_status.get("phase") != "Running"):
+        client_status = (
+            next((item for item in statuses if isinstance(item, dict) and item.get("name") == "client"), None)
+            if isinstance(statuses, list)
+            else None
+        )
+        if (
+            not isinstance(image, str)
+            or not image
+            or not isinstance(pull_policy, str)
+            or pull_policy not in {"Never", "IfNotPresent", "Always"}
+            or not isinstance(source_status, dict)
+            or source_status.get("phase") != "Running"
+        ):
             return {"unknown_reason": "실행 중인 other-client 이미지 또는 pull 정책 미확인"}, evidence
         if not isinstance(client_status, dict) or client_status.get("ready") is not True:
             return {"unknown_reason": "실행 중인 other-client 이미지 또는 pull 정책 미확인"}, evidence
         evidence["compare_image"] = image
         evidence["compare_image_pull_policy"] = pull_policy
         manifest = (_DEPLOY / "policy-compare-pods.yaml").read_text(encoding="utf-8")
-        if manifest.count("__COMPARE_IMAGE__") != 2 or manifest.count("__COMPARE_PULL_POLICY__") != 2 or re.fullmatch(r"[A-Za-z0-9._:/@-]+", image) is None:
+        if (
+            manifest.count("__COMPARE_IMAGE__") != 2
+            or manifest.count("__COMPARE_PULL_POLICY__") != 2
+            or re.fullmatch(r"[A-Za-z0-9._:/@-]+", image) is None
+        ):
             return {"unknown_reason": "비교 Pod 이미지 치환 불가"}, evidence
         manifest = manifest.replace("__COMPARE_IMAGE__", image).replace("__COMPARE_PULL_POLICY__", pull_policy)
-        for kind, name in (("pod", *_COMPARE_PODS[:1]), ("pod", *_COMPARE_PODS[1:]), ("ciliumnetworkpolicy", _COMPARE_POLICY)):
+        for kind, name in (
+            ("pod", *_COMPARE_PODS[:1]),
+            ("pod", *_COMPARE_PODS[1:]),
+            ("ciliumnetworkpolicy", _COMPARE_POLICY),
+        ):
             check = self._kubectl("get", kind, name, "--ignore-not-found", "-o", "name")
             if check.returncode != 0 or check.stdout.strip():
-                return {"unknown_reason": "비교 객체 존재 또는 사전 조회 실패"}, {**evidence, "preflight": {"kind": kind, "name": name, "rc": check.returncode, "existing": bool(check.stdout.strip())}}
+                return {"unknown_reason": "비교 객체 존재 또는 사전 조회 실패"}, {
+                    **evidence,
+                    "preflight": {
+                        "kind": kind,
+                        "name": name,
+                        "rc": check.returncode,
+                        "existing": bool(check.stdout.strip()),
+                    },
+                }
         facts: dict[str, Any] = {}
         pods_attempted = False
         policy_attempted = False
         try:
             pods_attempted = True
-            pods = self.runner.run(["kubectl", "--context", self.context, "-n", self.namespace, "apply", "-f", "-"], input=manifest)
+            pods = self.runner.run(
+                ["kubectl", "--context", self.context, "-n", self.namespace, "apply", "-f", "-"], input=manifest
+            )
             if pods.returncode != 0:
                 facts["unknown_reason"] = "비교 Pod 적용 실패"
             else:
-                ready = all(self._kubectl("wait", "--for=condition=Ready", f"pod/{name}", "--timeout=90s", timeout=100).returncode == 0 for name in _COMPARE_PODS)
+                ready = all(
+                    self._kubectl(
+                        "wait", "--for=condition=Ready", f"pod/{name}", "--timeout=90s", timeout=100
+                    ).returncode
+                    == 0
+                    for name in _COMPARE_PODS
+                )
                 if not ready:
                     facts["unknown_reason"] = "비교 Pod Ready 미확인"
                 else:
@@ -3297,18 +3983,27 @@ class AWSAcceptance:
                                 self.sleep(2.0)
                                 since = _now()
                                 blocked = self._tcp_probe("pod/" + _COMPARE_PODS[0], "client", address, 8080)
-                                available, refs = self._wait_observation_refs("hubble", since, lambda item:
-                                    (item.get("src") or {}).get("pod") == _COMPARE_PODS[0]
-                                    and (item.get("dst") or {}).get("ip") == address
-                                    and (item.get("dst") or {}).get("port") == 8080
-                                    and str(item.get("verdict", "")).lower() == "dropped")
+                                available, refs = self._wait_observation_refs(
+                                    "hubble",
+                                    since,
+                                    lambda item: (
+                                        (item.get("src") or {}).get("pod") == _COMPARE_PODS[0]
+                                        and (item.get("dst") or {}).get("ip") == address
+                                        and (item.get("dst") or {}).get("port") == 8080
+                                        and str(item.get("verdict", "")).lower() == "dropped"
+                                    ),
+                                )
                                 facts["policy_timeout"] = blocked["connection_timed_out"] if blocked["marker"] else None
-                                facts["policy_other_error"] = blocked["connection_failed"] and not blocked["connection_timed_out"]
+                                facts["policy_other_error"] = (
+                                    blocked["connection_failed"] and not blocked["connection_timed_out"]
+                                )
                                 facts["policy_connected"] = blocked["connected"]
                                 facts["hubble_dropped"] = bool(refs) if available else None
                                 evidence.update({"blocked_probe": blocked, "observation_references": refs})
                         if policy_attempted:
-                            removed = self._kubectl("delete", "-f", str(_DEPLOY / "policy-compare-cilium.yaml"), "--ignore-not-found")
+                            removed = self._kubectl(
+                                "delete", "-f", str(_DEPLOY / "policy-compare-cilium.yaml"), "--ignore-not-found"
+                            )
                             evidence["policy_remove_rc"] = removed.returncode
                             policy_attempted = removed.returncode != 0
                             if removed.returncode == 0:
@@ -3322,7 +4017,11 @@ class AWSAcceptance:
             cleanup: list[int | None] = []
             if policy_attempted:
                 try:
-                    cleanup.append(self._kubectl("delete", "-f", str(_DEPLOY / "policy-compare-cilium.yaml"), "--ignore-not-found").returncode)
+                    cleanup.append(
+                        self._kubectl(
+                            "delete", "-f", str(_DEPLOY / "policy-compare-cilium.yaml"), "--ignore-not-found"
+                        ).returncode
+                    )
                 except Exception:
                     cleanup.append(None)
             if pods_attempted:
@@ -3331,13 +4030,21 @@ class AWSAcceptance:
                 except Exception:
                     cleanup.append(None)
             remaining = []
-            for kind, name in (("pod", _COMPARE_PODS[0]), ("pod", _COMPARE_PODS[1]), ("ciliumnetworkpolicy", _COMPARE_POLICY)):
+            for kind, name in (
+                ("pod", _COMPARE_PODS[0]),
+                ("pod", _COMPARE_PODS[1]),
+                ("ciliumnetworkpolicy", _COMPARE_POLICY),
+            ):
                 try:
                     check = self._kubectl("get", kind, name, "--ignore-not-found", "-o", "name")
-                    remaining.append({"kind": kind, "name": name, "rc": check.returncode, "present": bool(check.stdout.strip())})
+                    remaining.append(
+                        {"kind": kind, "name": name, "rc": check.returncode, "present": bool(check.stdout.strip())}
+                    )
                 except Exception:
                     remaining.append({"kind": kind, "name": name, "rc": None, "present": None})
-            facts["cleanup_ok"] = all(code == 0 for code in cleanup) and all(item["rc"] == 0 and not item["present"] for item in remaining)
+            facts["cleanup_ok"] = all(code == 0 for code in cleanup) and all(
+                item["rc"] == 0 and not item["present"] for item in remaining
+            )
             evidence["cleanup_returncodes"] = cleanup
             evidence["cleanup_remaining"] = remaining
         return facts, evidence
@@ -3347,7 +4054,10 @@ class AWSAcceptance:
             return {"not_run_reason": "--allow-bundle-switch 없음"}, {}
         root = Path(getattr(self.args, "bundle_root", "/srv/serving/bundles"))
         current = root / "current"
-        evidence: dict[str, Any] = {"bundle_root": str(root), "integrity_check": "SHA-256 byte comparison; not a signature"}
+        evidence: dict[str, Any] = {
+            "bundle_root": str(root),
+            "integrity_check": "SHA-256 byte comparison; not a signature",
+        }
         if not current.is_symlink():
             return {"unknown_reason": "current가 상대 symlink가 아님"}, evidence
         previous = os.readlink(current)
@@ -3381,7 +4091,9 @@ class AWSAcceptance:
             target.write_bytes(bytes([data[0] ^ 1]) + data[1:])
             evidence["same_byte_length"] = target.stat().st_size == len(data)
             gateway_pods_before = self._gateway_pods()
-            if not gateway_pods_before or any(not (item.get("metadata") or {}).get("uid") for item in gateway_pods_before):
+            if not gateway_pods_before or any(
+                not (item.get("metadata") or {}).get("uid") for item in gateway_pods_before
+            ):
                 facts["unknown_reason"] = "재시작 전 Gateway Pod UID 조회 실패"
                 return facts, evidence
             previous_uids = {(item.get("metadata") or {})["uid"] for item in gateway_pods_before}
@@ -3404,24 +4116,44 @@ class AWSAcceptance:
                         remaining = deadline - self.monotonic()
                         if reads and remaining <= 0:
                             break
-                        logs = self._kubectl("logs", "pod/" + crash_state["pod_name"], "-c", "gateway", "--tail=100", *extra,
-                                             timeout=min(3.0, max(remaining, 0.0)))
+                        logs = self._kubectl(
+                            "logs",
+                            "pod/" + crash_state["pod_name"],
+                            "-c",
+                            "gateway",
+                            "--tail=100",
+                            *extra,
+                            timeout=min(3.0, max(remaining, 0.0)),
+                        )
                         first_line_source = "stdout" if logs.stdout else "stderr"
                         first_line_text = logs.stdout if logs.stdout else logs.stderr
                         first_line = first_line_text.splitlines()[0] if first_line_text else ""
                         first_line = _redact(first_line, (*self.tokens.values(), self.wrong_token))
                         first_line = re.sub(
-                            r'''(?i)(?<![\w.-])(["']?[a-z_][\w.-]*(?:key|token|secret|password|credential|auth)[\w.-]*["']?\s*[:=]\s*)(?:Bearer\s+\S+|"[^"]*"|'[^']*'|[^\s,;}\]]+)''',
-                            r"\1[REDACTED]", first_line)
+                            r"""(?i)(?<![\w.-])(["']?[a-z_][\w.-]*(?:key|token|secret|password|credential|auth)[\w.-]*["']?\s*[:=]\s*)(?:Bearer\s+\S+|"[^"]*"|'[^']*'|[^\s,;}\]]+)""",
+                            r"\1[REDACTED]",
+                            first_line,
+                        )
                         first_line = re.sub(
-                            r'''(?i)(?<![\w.-])(--[a-z0-9_.-]*key[a-z0-9_.-]*\s+)(?:"[^"]*"|'[^']*'|\S+)''',
-                            r"\1[REDACTED]", first_line)
-                        first_line = re.sub(r"(?i)\b(bearer|token|secret|password|credential|auth)\s+\S+", r"\1 [REDACTED]", first_line)
+                            r"""(?i)(?<![\w.-])(--[a-z0-9_.-]*key[a-z0-9_.-]*\s+)(?:"[^"]*"|'[^']*'|\S+)""",
+                            r"\1[REDACTED]",
+                            first_line,
+                        )
+                        first_line = re.sub(
+                            r"(?i)\b(bearer|token|secret|password|credential|auth)\s+\S+", r"\1 [REDACTED]", first_line
+                        )
                         first_line = first_line[:120]
-                        reads.append({"attempt": attempt + 1, "source": "previous" if extra else "current",
-                                      "returncode": logs.returncode, "stdout_length": len(logs.stdout),
-                                      "stderr_length": len(logs.stderr), "first_line_source": first_line_source,
-                                      "first_line_prefix": first_line})
+                        reads.append(
+                            {
+                                "attempt": attempt + 1,
+                                "source": "previous" if extra else "current",
+                                "returncode": logs.returncode,
+                                "stdout_length": len(logs.stdout),
+                                "stderr_length": len(logs.stderr),
+                                "first_line_source": first_line_source,
+                                "first_line_prefix": first_line,
+                            }
+                        )
                         if logs.returncode == 0 and ("sha256" in logs.stdout.lower() or "SHA-256" in logs.stdout):
                             hash_error = True
                             break
@@ -3429,7 +4161,9 @@ class AWSAcceptance:
                         break
                     self.sleep(min(2.0, max(0.0, deadline - self.monotonic())))
                 evidence["bad_gateway_log_reads"] = reads
-            facts["bad_bundle_rejected"] = (True if hash_error else None) if crashed else (False if crashed is False else None)
+            facts["bad_bundle_rejected"] = (
+                (True if hash_error else None) if crashed else (False if crashed is False else None)
+            )
             evidence["hash_error_seen"] = hash_error
         except (OSError, ValueError, KeyError, StopIteration, TypeError, json.JSONDecodeError) as error:
             facts["unknown_reason"] = "잘못된 묶음 준비 실패: " + _safe_exception(error)
@@ -3442,13 +4176,26 @@ class AWSAcceptance:
                     cleanup_ok, evidence["recovery_restart"] = self._restart("serving-gateway", 120)
                     if cleanup_ok:
                         recovered, record, retry = self._retry_inference(30.0)
-                        facts["recovered_200"] = recovered if retry.get("response_count", 1 if retry.get("last_status") is not None else 0) else None
+                        facts["recovered_200"] = (
+                            recovered
+                            if retry.get("response_count", 1 if retry.get("last_status") is not None else 0)
+                            else None
+                        )
                         evidence["recovered_request"] = {"record": record, "retry": retry}
                         if recovered:
                             try:
                                 denied, request_id, _valid = self._completion(token=None, timeout=30)
                                 denial = _record_fields(self._detail(request_id))
-                                facts["recovered_denied"] = (denied.status == 401 and denial.get("result") == "DENIED" and denial.get("reason_code") == "AUTH_REQUIRED" and denial["delivery"]["attempted"] is False) if denial is not None else None
+                                facts["recovered_denied"] = (
+                                    (
+                                        denied.status == 401
+                                        and denial.get("result") == "DENIED"
+                                        and denial.get("reason_code") == "AUTH_REQUIRED"
+                                        and denial["delivery"]["attempted"] is False
+                                    )
+                                    if denial is not None
+                                    else None
+                                )
                                 evidence["denied_request"] = {"http_status": denied.status, "record": denial}
                             except (OSError, URLError, TimeoutError) as error:
                                 evidence["denied_request_error"] = _safe_exception(error)
@@ -3468,7 +4215,11 @@ class AWSAcceptance:
         before_pods = self._kubectl("get", "pods", "-l", "app=serving-gateway", "-o", "json")
         before_doc = _json_object(before_pods.stdout.encode()) if before_pods.returncode == 0 else None
         before_items = before_doc.get("items") if before_doc else None
-        before_uid = (before_items[0].get("metadata") or {}).get("uid") if isinstance(before_items, list) and len(before_items) == 1 else None
+        before_uid = (
+            (before_items[0].get("metadata") or {}).get("uid")
+            if isinstance(before_items, list) and len(before_items) == 1
+            else None
+        )
         if not isinstance(before_uid, str):
             return {"unknown_reason": "재시작 전 Gateway Pod UID 미확인"}, {}
         restart = self._kubectl("rollout", "restart", "deployment/serving-gateway")
@@ -3483,7 +4234,11 @@ class AWSAcceptance:
             observed_pods = self._kubectl("get", "pods", "-l", "app=serving-gateway", "-o", "json")
             observed_doc = _json_object(observed_pods.stdout.encode()) if observed_pods.returncode == 0 else None
             items = observed_doc.get("items") if observed_doc else None
-            active = [item for item in items or [] if isinstance(item, dict) and not (item.get("metadata") or {}).get("deletionTimestamp")]
+            active = [
+                item
+                for item in items or []
+                if isinstance(item, dict) and not (item.get("metadata") or {}).get("deletionTimestamp")
+            ]
             if len(active) == 1:
                 new_uid = (active[0].get("metadata") or {}).get("uid")
                 if isinstance(new_uid, str) and new_uid != before_uid:
@@ -3499,7 +4254,9 @@ class AWSAcceptance:
         reasons: list[str | None] = []
         while True:
             try:
-                response, _request_id, valid = self._completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"], timeout=2.0)
+                response, _request_id, valid = self._completion(
+                    token=self.tokens["RUNTIME_INFERENCE_TOKEN"], timeout=2.0
+                )
                 statuses.append(response.status)
                 body = _json_object(response.body)
                 error = body.get("error") if isinstance(body, dict) else None
@@ -3512,12 +4269,23 @@ class AWSAcceptance:
                     break
             except (OSError, URLError, TimeoutError):
                 pass
-            if self.monotonic() >= startup_deadline or (first_503_at is not None and self.monotonic() - first_503_at > 10.0):
+            if self.monotonic() >= startup_deadline or (
+                first_503_at is not None and self.monotonic() - first_503_at > 10.0
+            ):
                 break
             self.sleep(0.5)
         elapsed = recovered_at - first_503_at if first_503_at is not None and recovered_at is not None else None
         rollout = self._kubectl("rollout", "status", "deployment/serving-gateway", "--timeout=120s", timeout=130)
-        facts.update({"restart_ok": rollout.returncode == 0, "initial_503": (first_503_at is not None and "TARGET_UNAVAILABLE" in reasons) if statuses else None, "recovered_200": recovered if statuses else None, "within_10s": elapsed <= 10.0 if elapsed is not None else (False if first_503_at is not None and self.monotonic() - first_503_at > 10.0 else None)})
+        facts.update(
+            {
+                "restart_ok": rollout.returncode == 0,
+                "initial_503": (first_503_at is not None and "TARGET_UNAVAILABLE" in reasons) if statuses else None,
+                "recovered_200": recovered if statuses else None,
+                "within_10s": elapsed <= 10.0
+                if elapsed is not None
+                else (False if first_503_at is not None and self.monotonic() - first_503_at > 10.0 else None),
+            }
+        )
         pod_result = self._kubectl("get", "pods", "-l", "app=serving-gateway", "-o", "json")
         pod_doc = _json_object(pod_result.stdout.encode()) if pod_result.returncode == 0 else None
         pods = pod_doc.get("items") if pod_doc else None
@@ -3531,7 +4299,19 @@ class AWSAcceptance:
             snapshot = json.loads((self.observation_dir / "target-pods.json").read_text(encoding="utf-8"))
         except (OSError, UnicodeError, json.JSONDecodeError):
             pass
-        evidence.update({"statuses": statuses, "reason_codes": reasons, "elapsed_from_first_503_s": round(elapsed, 3) if elapsed is not None else None, "gateway_started_at": started_at, "target_snapshot_collected_at": snapshot.get("collected_at") if isinstance(snapshot, dict) else None, "not_before_comparison": "target collected_at must be at or after Gateway startup", "rollout_rc": rollout.returncode, "reconnect_at": self.reconnect_at, "recovery_forward": "tool_owned" if self.reconnect_at else "none"})
+        evidence.update(
+            {
+                "statuses": statuses,
+                "reason_codes": reasons,
+                "elapsed_from_first_503_s": round(elapsed, 3) if elapsed is not None else None,
+                "gateway_started_at": started_at,
+                "target_snapshot_collected_at": snapshot.get("collected_at") if isinstance(snapshot, dict) else None,
+                "not_before_comparison": "target collected_at must be at or after Gateway startup",
+                "rollout_rc": rollout.returncode,
+                "reconnect_at": self.reconnect_at,
+                "recovery_forward": "tool_owned" if self.reconnect_at else "none",
+            }
+        )
         return facts, evidence
 
     def _collector_interruption(self, *, restart_gateway: bool) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -3541,10 +4321,14 @@ class AWSAcceptance:
             return {"not_run_reason": "--allow-gateway-restart 없음"}, {}
         before = self._timeline()
         if not restart_gateway:
-            if (before is None or not isinstance(before.get("extraction"), dict)
-                    or before["extraction"].get("engine") != self.engine
-                    or not isinstance(before.get("collector"), dict)
-                    or before["collector"].get("state") != "running" or not before.get("entries")):
+            if (
+                before is None
+                or not isinstance(before.get("extraction"), dict)
+                or before["extraction"].get("engine") != self.engine
+                or not isinstance(before.get("collector"), dict)
+                or before["collector"].get("state") != "running"
+                or not before.get("entries")
+            ):
                 return {"unknown_reason": "단계 시간표 비활성 또는 읽기 실패"}, {}
             pod, _pod_result = self._engine_pod()
             collector = before["collector"]
@@ -3552,10 +4336,12 @@ class AWSAcceptance:
                 fresh = not ExecPolicy._collector_stale(collector)
             except (KeyError, TypeError, ValueError, OverflowError):
                 fresh = False
-            if (not fresh or not pod or not pod.get("uid")
-                    or collector.get("pod_uid") != pod["uid"]):
+            if not fresh or not pod or not pod.get("uid") or collector.get("pod_uid") != pod["uid"]:
                 return {"unknown_reason": "현재 엔진 Pod의 신선한 단계 시간표 미확인"}, {
-                    "timeline_before": collector, "pod_before": pod, "timeline_fresh": fresh}
+                    "timeline_before": collector,
+                    "pod_before": pod,
+                    "timeline_fresh": fresh,
+                }
         evidence: dict[str, Any] = {"timeline_before": (before or {}).get("collector")}
         facts: dict[str, Any] = {}
         stop = self.runner.run(["systemctl", "--user", "stop", "byul-observation-feed"], timeout=30)
@@ -3567,13 +4353,17 @@ class AWSAcceptance:
                     facts["restart_ok"] = restart.returncode == 0
                     if restart.returncode == 0:
                         self._gateway_restart_started()
-                        rollout = self._kubectl("rollout", "status", "deployment/serving-gateway", "--timeout=120s", timeout=130)
+                        rollout = self._kubectl(
+                            "rollout", "status", "deployment/serving-gateway", "--timeout=120s", timeout=130
+                        )
                         facts["restart_ok"] = rollout.returncode == 0
                     statuses: list[int | None] = []
                     reasons: list[str | None] = []
                     for _ in range(30):
                         try:
-                            response, _id, _valid = self._completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"], timeout=3)
+                            response, _id, _valid = self._completion(
+                                token=self.tokens["RUNTIME_INFERENCE_TOKEN"], timeout=3
+                            )
                             statuses.append(response.status)
                             body = _json_object(response.body)
                             error = body.get("error") if isinstance(body, dict) else None
@@ -3583,7 +4373,11 @@ class AWSAcceptance:
                         if statuses and statuses[-1] == 503:
                             break
                         self.sleep(1.0)
-                    facts["observed_503"] = (503 in statuses and "TARGET_UNAVAILABLE" in reasons) if any(status is not None for status in statuses) else None
+                    facts["observed_503"] = (
+                        (503 in statuses and "TARGET_UNAVAILABLE" in reasons)
+                        if any(status is not None for status in statuses)
+                        else None
+                    )
                     evidence["stopped_request_statuses"] = statuses
                     evidence["stopped_request_reasons"] = reasons
                 else:
@@ -3596,11 +4390,16 @@ class AWSAcceptance:
                         self.sleep(max(0.0, remaining))
                         timeline = self._timeline()
                         evidence["timeline_stopped"] = (timeline or {}).get("collector")
-                        same_snapshot = timeline is not None and timeline.get("collector", {}).get("written_at") == before["collector"].get("written_at")
+                        same_snapshot = timeline is not None and timeline.get("collector", {}).get(
+                            "written_at"
+                        ) == before["collector"].get("written_at")
                         stale_by_code = ExecPolicy._collector_stale(timeline["collector"]) if same_snapshot else None
                         facts["expired_unknown"] = stale_by_code if same_snapshot else None
-                        evidence["phase_expiry"] = {"same_snapshot": same_snapshot, "stale_by_runtime_code": stale_by_code,
-                                                    "inference": "classify_exec clears timeline and returns phase unknown when _collector_stale is true; no fresh Tetragon event is available while feed is stopped"}
+                        evidence["phase_expiry"] = {
+                            "same_snapshot": same_snapshot,
+                            "stale_by_runtime_code": stale_by_code,
+                            "inference": "classify_exec clears timeline and returns phase unknown when _collector_stale is true; no fresh Tetragon event is available while feed is stopped",
+                        }
                         try:
                             response, _id, valid = self._completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"])
                             facts["request_200"] = response.status == 200 and valid
@@ -3619,7 +4418,9 @@ class AWSAcceptance:
             recovered = False
             if start.returncode == 0:
                 recovered, states = self._wait_collectors_ok(45.0)
-                evidence["collector_recovered_states"] = {key: value.get("state") for key, value in states.items() if key in _OBSERVATION_SOURCES}
+                evidence["collector_recovered_states"] = {
+                    key: value.get("state") for key, value in states.items() if key in _OBSERVATION_SOURCES
+                }
             facts["cleanup_ok"] = start.returncode == 0 and recovered
             evidence["collector_start_rc"] = start.returncode
             if restart_gateway and facts["cleanup_ok"]:
@@ -3645,29 +4446,49 @@ class AWSAcceptance:
         timeline_before = self._timeline()
         if not before or not before.get("uid") or timeline_before is None:
             return {"unknown_reason": "이전 Pod 또는 단계 시간표 미확인"}, {}
-        if (not isinstance(timeline_before.get("extraction"), dict)
-                or timeline_before["extraction"].get("engine") != self.engine):
+        if (
+            not isinstance(timeline_before.get("extraction"), dict)
+            or timeline_before["extraction"].get("engine") != self.engine
+        ):
             return {"unknown_reason": "현재 엔진의 단계 시간표 미확인"}, {}
         collector_before = timeline_before.get("collector") or {}
         try:
             fresh = not ExecPolicy._collector_stale(collector_before)
         except (KeyError, TypeError, ValueError, OverflowError):
             fresh = False
-        if (collector_before.get("pod_uid") != before["uid"] or collector_before.get("state") != "running"
-                or not timeline_before.get("entries") or not fresh):
+        if (
+            collector_before.get("pod_uid") != before["uid"]
+            or collector_before.get("state") != "running"
+            or not timeline_before.get("entries")
+            or not fresh
+        ):
             return {"unknown_reason": "이전 Pod의 활성 단계 수집 미확인"}, {"timeline_before": collector_before}
-        evidence: dict[str, Any] = {"pod_before": before, "timeline_before": collector_before, "tetragon_counts_before": self._tetragon_counts()}
+        evidence: dict[str, Any] = {
+            "pod_before": before,
+            "timeline_before": collector_before,
+            "tetragon_counts_before": self._tetragon_counts(),
+        }
         accounting_since = _now()
         restart = self._kubectl("rollout", "restart", "deployment/serving-engine")
-        rollout = self._kubectl("rollout", "status", "deployment/serving-engine", "--timeout=25m", timeout=1510) if restart.returncode == 0 else CommandResult(1)
+        rollout = (
+            self._kubectl("rollout", "status", "deployment/serving-engine", "--timeout=25m", timeout=1510)
+            if restart.returncode == 0
+            else CommandResult(1)
+        )
         after, _result = self._engine_pod()
-        facts: dict[str, Any] = {"pod_changed": bool(after and after.get("uid") and after["uid"] != before["uid"] and rollout.returncode == 0)}
+        facts: dict[str, Any] = {
+            "pod_changed": bool(
+                after and after.get("uid") and after["uid"] != before["uid"] and rollout.returncode == 0
+            )
+        }
         evidence["pod_after"] = after
         if not facts["pod_changed"]:
             return facts, evidence
         # The raw Tetragon identity is process_exec.process.pod.uid.
         started = _now()
-        executed = self._kubectl("exec", "pod/" + after["name"], "-c", "engine", "--", "/bin/sh", "-c", "true", timeout=15)
+        executed = self._kubectl(
+            "exec", "pod/" + after["name"], "-c", "engine", "--", "/bin/sh", "-c", "true", timeout=15
+        )
         evidence["probe_exec_rc"] = executed.returncode
         raw_uid = None
         raw_time = None
@@ -3679,7 +4500,11 @@ class AWSAcceptance:
                         item = json.loads(line)
                         process = (item.get("process_exec") or {}).get("process") or {}
                         pod = process.get("pod") or {}
-                        if _after(item.get("time"), started) and process.get("binary") in {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash"} and pod.get("uid") == after["uid"]:
+                        if (
+                            _after(item.get("time"), started)
+                            and process.get("binary") in {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash"}
+                            and pod.get("uid") == after["uid"]
+                        ):
                             raw_uid, raw_time = pod["uid"], item["time"]
                             break
             except (OSError, UnicodeError, json.JSONDecodeError, TypeError, AttributeError):
@@ -3688,38 +4513,77 @@ class AWSAcceptance:
                 break
             self.sleep(2.0)
         timeline_at_probe = self._timeline()
-        if (not isinstance(timeline_at_probe, dict)
-                or not isinstance(timeline_at_probe.get("extraction"), dict)
-                or timeline_at_probe["extraction"].get("engine") != self.engine):
+        if (
+            not isinstance(timeline_at_probe, dict)
+            or not isinstance(timeline_at_probe.get("extraction"), dict)
+            or timeline_at_probe["extraction"].get("engine") != self.engine
+        ):
             return {"unknown_reason": "새 Pod의 엔진별 단계 시간표 미확인"}, evidence
         # The Gateway ingests the feed a few seconds after the raw event.
         available, rows, matched = False, [], []
         for attempt in range(10):
             available, rows = self._tetragon_observations(started)
-            matched = [row for row in rows if row.get("kind") == "process_exec" and row.get("binary") in {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash"} and self._engine_event(row, after["name"]) and _parse_time(row.get("observed_at")) == _parse_time(raw_time)]
+            matched = [
+                row
+                for row in rows
+                if row.get("kind") == "process_exec"
+                and row.get("binary") in {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash"}
+                and self._engine_event(row, after["name"])
+                and _parse_time(row.get("observed_at")) == _parse_time(raw_time)
+            ]
             if matched or not raw_uid or attempt == 9:
                 break
             self.sleep(2.0)
         probe_collector = (timeline_at_probe or {}).get("collector") or {}
-        old_stale = (probe_collector.get("pod_uid") == before["uid"] and all(row.get("phase") in (None, [], ["unknown"]) for row in matched))
+        old_stale = probe_collector.get("pod_uid") == before["uid"] and all(
+            row.get("phase") in (None, [], ["unknown"]) for row in matched
+        )
         # A collector UID alone cannot prove that entries were reset. Compare
         # every entry start with the new container start and old last entry.
-        old_written = _parse_time((timeline_before.get("collector") or {}).get("written_at")) if isinstance(timeline_before, dict) else None
+        old_written = (
+            _parse_time((timeline_before.get("collector") or {}).get("written_at"))
+            if isinstance(timeline_before, dict)
+            else None
+        )
         previous_entries = timeline_before.get("entries") or []
         previous_starts = [_parse_time(row.get("from")) for row in previous_entries if isinstance(row, dict)]
         old_last_start = max((item for item in previous_starts if item is not None), default=None)
         probe_entries = (timeline_at_probe or {}).get("entries") or []
         fresh_entries = _timeline_reset(timeline_before, timeline_at_probe, after.get("started_at"))
         fresh_phases = {row.get("phase") for row in probe_entries if isinstance(row, dict)}
-        matched_phases = {phase for row in matched for phase in (row.get("phase") if isinstance(row.get("phase"), list) else [row.get("phase")]) if phase not in (None, "unknown")}
-        new_fresh = (probe_collector.get("pod_uid") == after["uid"] and old_written is not None and fresh_entries
-                     and matched_phases <= fresh_phases
-                     and all(row.get("phase_timeline_fresh") is True
-                             and (_parse_time(row.get("phase_timeline_written_at")) or old_written) > old_written
-                             for row in matched))
+        matched_phases = {
+            phase
+            for row in matched
+            for phase in (row.get("phase") if isinstance(row.get("phase"), list) else [row.get("phase")])
+            if phase not in (None, "unknown")
+        }
+        new_fresh = (
+            probe_collector.get("pod_uid") == after["uid"]
+            and old_written is not None
+            and fresh_entries
+            and matched_phases <= fresh_phases
+            and all(
+                row.get("phase_timeline_fresh") is True
+                and (_parse_time(row.get("phase_timeline_written_at")) or old_written) > old_written
+                for row in matched
+            )
+        )
         facts["old_phase_absent"] = (old_stale or new_fresh) if raw_uid and available and matched else None
-        evidence.update({"raw_process_pod_uid": raw_uid, "raw_event_time": raw_time, "timeline_at_probe": probe_collector, "probe_phase": [row.get("phase") for row in matched], "phase_source": "old_uid_rejected" if old_stale else "new_uid_timeline" if new_fresh else None,
-                         "timeline_reset": {"new_container_started_at": after.get("started_at"), "old_last_entry_start": old_last_start.isoformat() if old_last_start else None, "entries_after_new_start": fresh_entries, "matched_phases_in_new_timeline": matched_phases <= fresh_phases}})
+        evidence.update(
+            {
+                "raw_process_pod_uid": raw_uid,
+                "raw_event_time": raw_time,
+                "timeline_at_probe": probe_collector,
+                "probe_phase": [row.get("phase") for row in matched],
+                "phase_source": "old_uid_rejected" if old_stale else "new_uid_timeline" if new_fresh else None,
+                "timeline_reset": {
+                    "new_container_started_at": after.get("started_at"),
+                    "old_last_entry_start": old_last_start.isoformat() if old_last_start else None,
+                    "entries_after_new_start": fresh_entries,
+                    "matched_phases_in_new_timeline": matched_phases <= fresh_phases,
+                },
+            }
+        )
         timeline_new = None
         for attempt in range(20):
             timeline_new = self._timeline()
@@ -3727,13 +4591,18 @@ class AWSAcceptance:
                 break
             if attempt < 19:
                 self.sleep(1.0)
-        if (not isinstance(timeline_new, dict)
-                or not isinstance(timeline_new.get("extraction"), dict)
-                or timeline_new["extraction"].get("engine") != self.engine):
+        if (
+            not isinstance(timeline_new, dict)
+            or not isinstance(timeline_new.get("extraction"), dict)
+            or timeline_new["extraction"].get("engine") != self.engine
+        ):
             return {"unknown_reason": "새 Pod의 엔진별 단계 시간표 미확인"}, evidence
         facts["timeline_new_uid"] = (timeline_new or {}).get("collector", {}).get("pod_uid") == after["uid"]
-        facts["timeline_reset"] = (_timeline_reset(timeline_before, timeline_new, after.get("started_at"))
-                                   if facts["timeline_new_uid"] and (timeline_new or {}).get("entries") else None)
+        facts["timeline_reset"] = (
+            _timeline_reset(timeline_before, timeline_new, after.get("started_at"))
+            if facts["timeline_new_uid"] and (timeline_new or {}).get("entries")
+            else None
+        )
         evidence["timeline_after"] = (timeline_new or {}).get("collector")
         evidence["tetragon_counts_after"] = self._tetragon_counts()
         counts_before, counts_after = evidence["tetragon_counts_before"], evidence["tetragon_counts_after"]
@@ -3741,11 +4610,15 @@ class AWSAcceptance:
             raw_exit_count = self._raw_process_exit_count(accounting_since)
             evidence["process_exit_accounting"] = {
                 "raw_process_exit_count": raw_exit_count,
-                "skipped_unsupported_delta": counts_after["skipped_unsupported_total"] - counts_before["skipped_unsupported_total"],
+                "skipped_unsupported_delta": counts_after["skipped_unsupported_total"]
+                - counts_before["skipped_unsupported_total"],
                 "corrupt_lines_delta": counts_after["corrupt_lines_total"] - counts_before["corrupt_lines_total"],
-                "expected_pattern_seen": (raw_exit_count is not None and raw_exit_count > 0
-                                          and counts_after["skipped_unsupported_total"] > counts_before["skipped_unsupported_total"]
-                                          and counts_after["corrupt_lines_total"] == counts_before["corrupt_lines_total"]),
+                "expected_pattern_seen": (
+                    raw_exit_count is not None
+                    and raw_exit_count > 0
+                    and counts_after["skipped_unsupported_total"] > counts_before["skipped_unsupported_total"]
+                    and counts_after["corrupt_lines_total"] == counts_before["corrupt_lines_total"]
+                ),
                 "note": "process_exit 원시 행과 같은 구간에서 비교; 건너뜀 증가·손상 증가 없음은 보조 근거. 화면 확인은 사람 수행",
             }
         return facts, evidence
@@ -3760,15 +4633,29 @@ class AWSAcceptance:
             "namespace": self.namespace,
             "engine": self.engine,
             "fixed_request_sha256": _fixed_request_hash(),
-            "fixed_requests": [{"route": route, "max_tokens": payload["max_tokens"],
-                                "payload_sha256": hashlib.sha256(json.dumps(payload, sort_keys=True,
-                                  separators=(",", ":")).encode()).hexdigest()}
-                               for route, payload in FIXED_REQUESTS],
+            "fixed_requests": [
+                {
+                    "route": route,
+                    "max_tokens": payload["max_tokens"],
+                    "payload_sha256": hashlib.sha256(
+                        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+                    ).hexdigest(),
+                }
+                for route, payload in FIXED_REQUESTS
+            ],
             "engine_pod_configuration": self._pod_configuration(),
             "gateway_url": self.gateway,
-            "port_forward": {"recovery": "tool_owned_kubectl_port_forward" if self.reconnect_at else "external_url_untouched" if not self.gateway_loopback else "none_opened",
-                             "reconnect_at": self.reconnect_at,
-                             "after_exit": "tool_owned_forward_closed; user_forward_must_be_restarted_if_its_pod_died" if self.gateway_loopback else "unchanged"},
+            "port_forward": {
+                "recovery": "tool_owned_kubectl_port_forward"
+                if self.reconnect_at
+                else "external_url_untouched"
+                if not self.gateway_loopback
+                else "none_opened",
+                "reconnect_at": self.reconnect_at,
+                "after_exit": "tool_owned_forward_closed; user_forward_must_be_restarted_if_its_pod_died"
+                if self.gateway_loopback
+                else "unchanged",
+            },
             "observation_dir": str(self.observation_dir),
             "requested_cases": list(self.args.cases),
             "allow_collector_stop": self.args.allow_collector_stop,
@@ -3778,8 +4665,7 @@ class AWSAcceptance:
             "allow_gateway_restart": getattr(self.args, "allow_gateway_restart", False),
             "overall": _overall(self.cases),
             "result_counts": {
-                result: sum(case["result"] == result for case in self.cases)
-                for result in sorted(RESULTS)
+                result: sum(case["result"] == result for case in self.cases) for result in sorted(RESULTS)
             },
             "decision_notes": [
                 (
@@ -3858,15 +4744,23 @@ class AWSAcceptance:
             lines.extend(["## AWS-11 잘못된 경고 목록", ""])
             phase_evidence = evidence.get("phase_evidence")
             if isinstance(phase_evidence, Mapping):
-                lines.extend([
-                    f"단계 근거: 유효 실행 {_report_probe_value(phase_evidence.get('valid_exec_count'))}건, "
-                    f"미확인 실행 {_report_probe_value(phase_evidence.get('unknown_exec_count'))}건, "
-                    f"신선도 {_report_value(phase_evidence.get('freshness'), allowed={'fresh', 'legacy_unbounded', 'unconfirmed'})}, "
-                    f"출처 {', '.join(_report_value(item, allowed={'declared', 'engine_signal', 'test_controller'}) for item in phase_evidence.get('bases', [])) or '확인 못 함'}, "
-                    f"시간표 쓰기 시각 {_report_probe_value(phase_evidence.get('timeline_written_at', [None])[-1] if phase_evidence.get('timeline_written_at') else None)}", "",
-                ])
+                lines.extend(
+                    [
+                        f"단계 근거: 유효 실행 {_report_probe_value(phase_evidence.get('valid_exec_count'))}건, "
+                        f"미확인 실행 {_report_probe_value(phase_evidence.get('unknown_exec_count'))}건, "
+                        f"신선도 {_report_value(phase_evidence.get('freshness'), allowed={'fresh', 'legacy_unbounded', 'unconfirmed'})}, "
+                        f"출처 {', '.join(_report_value(item, allowed={'declared', 'engine_signal', 'test_controller'}) for item in phase_evidence.get('bases', [])) or '확인 못 함'}, "
+                        f"시간표 쓰기 시각 {_report_probe_value(phase_evidence.get('timeline_written_at', [None])[-1] if phase_evidence.get('timeline_written_at') else None)}",
+                        "",
+                    ]
+                )
             if evidence.get("warning_list_complete") is not True:
-                lines.extend(["관측 조회 실패·수집 공백·수집기 불가 또는 최근 50행 제한으로 전체 목록·건수 확인 못 함. 아래는 조회된 일부다.", ""])
+                lines.extend(
+                    [
+                        "관측 조회 실패·수집 공백·수집기 불가 또는 최근 50행 제한으로 전체 목록·건수 확인 못 함. 아래는 조회된 일부다.",
+                        "",
+                    ]
+                )
             if not isinstance(warnings, list):
                 lines.append("관측 목록 확인 못 함")
             elif not warnings:
@@ -3880,7 +4774,9 @@ class AWSAcceptance:
                         f"{_report_binary_path(item.get('binary'))} · "
                         f"{_report_value(item.get('exec_verdict'), allowed={'outside_allowlist', 'phase_signal_unverified', 'exec_from_cache'})}"
                     )
-            lines.extend(["", "응답 시간은 참고값이며 판정에 쓰지 않는다. 탐지 시간은 기준 없이 판정에 쓰지 않는다.", ""])
+            lines.extend(
+                ["", "응답 시간은 참고값이며 판정에 쓰지 않는다. 탐지 시간은 기준 없이 판정에 쓰지 않는다.", ""]
+            )
         markdown = "\n".join(lines)
         if any(secret and secret in markdown for secret in secrets):
             raise RuntimeError("secret redaction failed")
@@ -3957,8 +4853,11 @@ def build_parser() -> argparse.ArgumentParser:
         default="evidence",
         help="parent for a new mode-0700 aws-acceptance-<UTC>-<pid> directory",
     )
-    parser.add_argument("--public-report-dir", type=Path,
-                        help="publish the actual run's minimal AWS Lab view as atomic 0640 JSON in a prepared directory")
+    parser.add_argument(
+        "--public-report-dir",
+        type=Path,
+        help="publish the actual run's minimal AWS Lab view as atomic 0640 JSON in a prepared directory",
+    )
     parser.add_argument(
         "--cases",
         action="append",
@@ -3975,14 +4874,24 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="allow AWS-08 rollout restart (releases GPU and cold-starts)",
     )
-    parser.add_argument("--allow-compare-policy", action="store_true", help="allow AWS-12 temporary comparison Pods and Cilium policy")
-    parser.add_argument("--allow-bundle-switch", action="store_true", help="allow AWS-13 temporary bad bundle switch and recovery")
+    parser.add_argument(
+        "--allow-compare-policy", action="store_true", help="allow AWS-12 temporary comparison Pods and Cilium policy"
+    )
+    parser.add_argument(
+        "--allow-bundle-switch", action="store_true", help="allow AWS-13 temporary bad bundle switch and recovery"
+    )
     parser.add_argument("--bundle-root", default="/srv/serving/bundles", help="host bundle root mounted by Gateway")
     parser.add_argument("--allow-gateway-restart", action="store_true", help="allow AWS-14/15 Gateway rollout restart")
-    parser.add_argument("--allow-rule-switch", action="store_true", help="AWS-20에서 동일 Tetragon 정책의 monitor↔enforce 모드 전환 허용")
+    parser.add_argument(
+        "--allow-rule-switch",
+        action="store_true",
+        help="AWS-20에서 동일 Tetragon 정책의 monitor↔enforce 모드 전환 허용",
+    )
     parser.add_argument("--aws20-monitor-manifest", help="현재 정책과 대조할 1.7.1 monitor-mode 후보 manifest")
     parser.add_argument("--aws20-probe-pod", help="Sigkill 계열을 먼저 시험할 별도 Ready Pod 이름")
-    parser.add_argument("--allow-engine-sigkill", action="store_true", help="AWS-20 엔진 대상 Sigkill 계열 시험 명시 허용")
+    parser.add_argument(
+        "--allow-engine-sigkill", action="store_true", help="AWS-20 엔진 대상 Sigkill 계열 시험 명시 허용"
+    )
     return parser
 
 
@@ -4050,29 +4959,41 @@ def phase_exec_inventory(argv: Sequence[str]) -> int:
                     original_pod = {}
                 pod = item.get("pod") or {}
                 pod_name = pod.get("pod") or "unknown"
-                is_engine = (pod.get("namespace") == "serving-lab"
-                             and isinstance(original_pod.get("pod_labels"), dict)
-                             and original_pod["pod_labels"].get("app") == "serving-engine")
+                is_engine = (
+                    pod.get("namespace") == "serving-lab"
+                    and isinstance(original_pod.get("pod_labels"), dict)
+                    and original_pod["pod_labels"].get("app") == "serving-engine"
+                )
                 uid = original_pod.get("uid")
                 same_pod = is_engine and (
-                    isinstance(uid, str) and uid == target_uid
-                    or uid is None and isinstance(target_name, str) and pod_name == target_name
+                    isinstance(uid, str)
+                    and uid == target_uid
+                    or uid is None
+                    and isinstance(target_name, str)
+                    and pod_name == target_name
                 )
                 # A Pod name is unique for its lifetime. Use it when this
                 # Tetragon version omits UID; never assign a different Pod's phase.
                 at = _parse_time(item.get("observed_at"))
-                phase_fresh = (collector.get("state") == "running" and at is not None
-                               and collector_written is not None
-                               and at <= collector_written + timedelta(seconds=15))
-                phases = sorted({entry.phase for entry in entries
-                                 if same_pod and phase_fresh and entry.active(at)})
+                phase_fresh = (
+                    collector.get("state") == "running"
+                    and at is not None
+                    and collector_written is not None
+                    and at <= collector_written + timedelta(seconds=15)
+                )
+                phases = sorted({entry.phase for entry in entries if same_pod and phase_fresh and entry.active(at)})
                 counts[("+".join(phases) if phases else "unknown", pod_name, item["binary"])] += 1
-        report = {"schema": "runtime-phase-exec-inventory/1.0", "purpose": "observation_only",
-                  "timeline_pod_uid_available": isinstance(target_uid, str),
-                  "timeline_pod_name_available": isinstance(target_name, str),
-                  "skipped": skipped,
-                  "counts": [{"phase": phase, "pod": pod, "path": path, "count": count}
-                             for (phase, pod, path), count in sorted(counts.items())]}
+        report = {
+            "schema": "runtime-phase-exec-inventory/1.0",
+            "purpose": "observation_only",
+            "timeline_pod_uid_available": isinstance(target_uid, str),
+            "timeline_pod_name_available": isinstance(target_name, str),
+            "skipped": skipped,
+            "counts": [
+                {"phase": phase, "pod": pod, "path": path, "count": count}
+                for (phase, pod, path), count in sorted(counts.items())
+            ],
+        }
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
     except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as error:

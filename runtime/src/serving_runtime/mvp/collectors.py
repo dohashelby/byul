@@ -110,8 +110,15 @@ class Collector:
                 if isinstance(error, CollectionFailure):
                     self.last_value = error.last_value
                     self.data_origin = error.data_origin
-            self._notify_updated({'source':self.source,'success':False,'attempted_at':attempted_at,
-                                  'observed_at':_utc_now(),'error_kind':type(error).__name__})
+            self._notify_updated(
+                {
+                    "source": self.source,
+                    "success": False,
+                    "attempted_at": attempted_at,
+                    "observed_at": _utc_now(),
+                    "error_kind": type(error).__name__,
+                }
+            )
             return
         completed_at = _utc_now()
         completed_monotonic = time.monotonic()
@@ -132,17 +139,26 @@ class Collector:
                 # into a collector failure or stop its polling thread.
                 pass
 
-        self._notify_updated({'source':self.source,'success':True,'attempted_at':attempted_at,
-                              'observed_at':completed_at,'error_kind':None})
+        self._notify_updated(
+            {
+                "source": self.source,
+                "success": True,
+                "attempted_at": attempted_at,
+                "observed_at": completed_at,
+                "error_kind": None,
+            }
+        )
 
     def _notify_updated(self, sample: dict[str, Any]) -> None:
-        if self.on_updated is None:return
-        try:self.on_updated(sample)
+        if self.on_updated is None:
+            return
+        try:
+            self.on_updated(sample)
         except Exception:
             with self._lock:
-                cause='engine health event journal unavailable'
-                self.last_error=(self.last_error+'; '+cause) if self.last_error else cause
-                self.last_error_kind='ObservationPersistenceError'
+                cause = "engine health event journal unavailable"
+                self.last_error = (self.last_error + "; " + cause) if self.last_error else cause
+                self.last_error_kind = "ObservationPersistenceError"
 
     def due(self, now: float | None = None) -> bool:
         with self._lock:
@@ -180,15 +196,11 @@ class Collector:
         ):
             last_lost_at = last_value.get("last_lost_at")
             try:
-                last_lost = datetime.fromisoformat(
-                    str(last_lost_at).replace("Z", "+00:00")
-                ).astimezone(timezone.utc)
+                last_lost = datetime.fromisoformat(str(last_lost_at).replace("Z", "+00:00")).astimezone(timezone.utc)
             except (TypeError, ValueError):
                 state = "partial"
             else:
-                if (
-                    datetime.now(timezone.utc) - last_lost
-                ).total_seconds() <= self.stale_after_s:
+                if (datetime.now(timezone.utc) - last_lost).total_seconds() <= self.stale_after_s:
                     state = "partial"
         if (
             state == "ok"
@@ -198,15 +210,11 @@ class Collector:
         ):
             last_drop_at = last_value.get("last_redaction_drop_at")
             try:
-                last_drop = datetime.fromisoformat(
-                    str(last_drop_at).replace("Z", "+00:00")
-                ).astimezone(timezone.utc)
+                last_drop = datetime.fromisoformat(str(last_drop_at).replace("Z", "+00:00")).astimezone(timezone.utc)
             except (TypeError, ValueError):
                 state = "partial"
             else:
-                if (
-                    datetime.now(timezone.utc) - last_drop
-                ).total_seconds() <= self.stale_after_s:
+                if (datetime.now(timezone.utc) - last_drop).total_seconds() <= self.stale_after_s:
                     state = "partial"
         return {
             "source": self.source,
@@ -243,13 +251,10 @@ class CollectorManager:
             if collector.dedicated_thread or collector.engine_group:
                 continue
             collector.collect()
-        self._thread = threading.Thread(
-            target=self._run, name="mvp-collectors", daemon=True
-        )
+        self._thread = threading.Thread(target=self._run, name="mvp-collectors", daemon=True)
         self._thread.start()
         engine_collectors = [
-            collector for collector in self.collectors
-            if collector.engine_group and collector.fetch is not None
+            collector for collector in self.collectors if collector.engine_group and collector.fetch is not None
         ]
         if engine_collectors:
             first_collection_done = threading.Event()
@@ -281,9 +286,7 @@ class CollectorManager:
                 if not collector.dedicated_thread and not collector.engine_group and collector.due(now):
                     collector.collect()
 
-    def _run_engine(
-        self, collectors: list[Collector], first_collection_done: threading.Event
-    ) -> None:
+    def _run_engine(self, collectors: list[Collector], first_collection_done: threading.Event) -> None:
         for collector in collectors:
             collector.collect()
         first_collection_done.set()
@@ -346,13 +349,20 @@ def load_declaration(path: str | Path | None, *, kind: str) -> DeclarationState:
         raw = Path(path).read_bytes()
     except FileNotFoundError:
         return DeclarationState(
-            "not_configured", path_text, {}, loaded_at,
+            "not_configured",
+            path_text,
+            {},
+            loaded_at,
             error_code=f"{kind.upper()}_NOT_FOUND",
             error_message="기준/선언 승인본이 없습니다. 후보를 검토·승인해야 합니다.",
         )
     except (OSError, ValueError) as error:
         return DeclarationState(
-            "error", path_text, {}, loaded_at, error_code=f"{kind.upper()}_READ_ERROR",
+            "error",
+            path_text,
+            {},
+            loaded_at,
+            error_code=f"{kind.upper()}_READ_ERROR",
             error_message=str(error),
         )
     digest = hashlib.sha256(raw).hexdigest()
@@ -364,8 +374,13 @@ def load_declaration(path: str | Path | None, *, kind: str) -> DeclarationState:
         )
     except (UnicodeDecodeError, DuplicateKeyError, json.JSONDecodeError, ValueError, RecursionError) as error:
         return DeclarationState(
-            "error", path_text, {}, loaded_at, digest,
-            f"{kind.upper()}_MALFORMED", str(error),
+            "error",
+            path_text,
+            {},
+            loaded_at,
+            digest,
+            f"{kind.upper()}_MALFORMED",
+            str(error),
         )
     schemas = {"runtime-mvp-baseline/1.0"}
     if (
@@ -375,30 +390,33 @@ def load_declaration(path: str | Path | None, *, kind: str) -> DeclarationState:
         or not isinstance(document.get("fields"), dict)
     ):
         return DeclarationState(
-            "error", path_text, {}, loaded_at, digest,
-            f"INVALID_{kind.upper()}", f"invalid {kind} document",
+            "error",
+            path_text,
+            {},
+            loaded_at,
+            digest,
+            f"INVALID_{kind.upper()}",
+            f"invalid {kind} document",
         )
     fields = document["fields"]
     if any(
-        not isinstance(name, str)
-        or not name
-        or value is None
-        or isinstance(value, (dict, list))
+        not isinstance(name, str) or not name or value is None or isinstance(value, (dict, list))
         for name, value in fields.items()
     ):
         return DeclarationState(
-            "error", path_text, {}, loaded_at, digest,
-            f"INVALID_{kind.upper()}", f"{kind} fields must be flat scalar values",
+            "error",
+            path_text,
+            {},
+            loaded_at,
+            digest,
+            f"INVALID_{kind.upper()}",
+            f"{kind} fields must be flat scalar values",
         )
     return DeclarationState("ok", path_text, dict(fields), loaded_at, digest)
 
 
-_ENGINE_API_FIELDS = frozenset(
-    {"engine.kind", "engine.version", "model.id", "option.max_model_len"}
-)
-_MODEL_ID_NOTE = (
-    "model.id 일치는 weight 해시·revision·메모리 로딩을 증명하지 않음"
-)
+_ENGINE_API_FIELDS = frozenset({"engine.kind", "engine.version", "model.id", "option.max_model_len"})
+_MODEL_ID_NOTE = "model.id 일치는 weight 해시·revision·메모리 로딩을 증명하지 않음"
 
 
 def compare_baseline(

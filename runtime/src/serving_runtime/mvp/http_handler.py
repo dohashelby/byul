@@ -114,12 +114,26 @@ class HandlerDependencies:
     request_header_timeout_s: float
     request_body_timeout_s: float
     target_status: Callable[[], dict[str, Any]] = lambda: {"registration": {"state": "not_configured"}}
-    phase_timeline: Callable[[], dict[str, Any]] = lambda: {"entries": [], "collector": {"state": "missing", "written_at": None, "fresh": False}}
+    phase_timeline: Callable[[], dict[str, Any]] = lambda: {
+        "entries": [],
+        "collector": {"state": "missing", "written_at": None, "fresh": False},
+    }
     tetragon_status: Callable[[], dict[str, Any]] = lambda: {"state": "not_configured"}
-    gpu_status: Callable[[], dict[str, Any]] = lambda: {"schema_version": "runtime-gpu-status/1.0", "state": "not_configured", "fresh": False, "collected_at": None, "reason": None, "gpus": []}
+    gpu_status: Callable[[], dict[str, Any]] = lambda: {
+        "schema_version": "runtime-gpu-status/1.0",
+        "state": "not_configured",
+        "fresh": False,
+        "collected_at": None,
+        "reason": None,
+        "gpus": [],
+    }
     authorize_read: Callable[[str | None], tuple[int, str, str] | None] = lambda _header: None
     record_rejected: Callable[[str, str, str, int, str], None] = lambda *_args: None
-    route_rejections: Callable[..., dict[str, Any]] = lambda **_kwargs: {"items": [], "status": {"state": "not_configured"}, "window": {}}
+    route_rejections: Callable[..., dict[str, Any]] = lambda **_kwargs: {
+        "items": [],
+        "status": {"state": "not_configured"},
+        "window": {},
+    }
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -300,9 +314,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 self.rfile.clear_deadline()
                 self.connection.settimeout(self.dependencies.request_header_timeout_s)
-                self._send_error_decision(
-                    decision, request_id, close_connection=True
-                )
+                self._send_error_decision(decision, request_id, close_connection=True)
             except (BrokenPipeError, ConnectionResetError, OSError):
                 return
 
@@ -347,28 +359,24 @@ class Handler(BaseHTTPRequestHandler):
 
     def _known_path(self) -> bool:
         path = urlsplit(self.path).path
-        return (
-            path
-            in {
-                "/api/status",
-                "/api/summary",
-                "/api/requests",
-                "/api/policy",
-                "/api/baseline",
-                "/api/collectors",
-                "/api/revalidation",
-                "/api/observations",
-                "/api/lab-report",
-                "/api/target",
-                "/api/phase-timeline",
-                "/api/tetragon-status",
-                "/api/gpu-status",
-                "/api/route-rejections",
-                "/v1/chat/completions",
-                "/v1/completions",
-            }
-            or path.startswith("/api/requests/")
-        )
+        return path in {
+            "/api/status",
+            "/api/summary",
+            "/api/requests",
+            "/api/policy",
+            "/api/baseline",
+            "/api/collectors",
+            "/api/revalidation",
+            "/api/observations",
+            "/api/lab-report",
+            "/api/target",
+            "/api/phase-timeline",
+            "/api/tetragon-status",
+            "/api/gpu-status",
+            "/api/route-rejections",
+            "/v1/chat/completions",
+            "/v1/completions",
+        } or path.startswith("/api/requests/")
 
     def _unsupported_method(self) -> None:
         request_id = getattr(self, "_post_request_id", None)
@@ -386,9 +394,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _method_not_allowed(self, *, close_connection: bool = False) -> None:
         request_id = self._record_route_rejection(405, "METHOD_NOT_ALLOWED")
-        allowed = "POST" if urlsplit(self.path).path in {
-            "/v1/chat/completions", "/v1/completions"
-        } else "GET"
+        allowed = "POST" if urlsplit(self.path).path in {"/v1/chat/completions", "/v1/completions"} else "GET"
         self._send_json(
             405,
             {"error": {"code": "METHOD_NOT_ALLOWED"}},
@@ -437,15 +443,11 @@ class Handler(BaseHTTPRequestHandler):
     def _observation_list(self, query: str) -> None:
         params = parse_qs(query, keep_blank_values=True)
         if any(len(values) != 1 for values in params.values()):
-            self._send_query_error(
-                400, "INVALID_QUERY", "observation filters must not repeat"
-            )
+            self._send_query_error(400, "INVALID_QUERY", "observation filters must not repeat")
             return
         filters = {name: values[0] for name, values in params.items()}
         if any(not value for value in filters.values()):
-            self._send_query_error(
-                400, "INVALID_QUERY", "observation filters must not be empty"
-            )
+            self._send_query_error(400, "INVALID_QUERY", "observation filters must not be empty")
             return
         try:
             payload = self.dependencies.observations.query(filters)
@@ -467,7 +469,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.dependencies.observation_session_id,
             )
         except QueryWindowIncompleteError:
-            self._send_query_error(503, "REQUEST_WINDOW_INCOMPLETE", "request is outside the bounded live search window")
+            self._send_query_error(
+                503, "REQUEST_WINDOW_INCOMPLETE", "request is outside the bounded live search window"
+            )
             return
         except OSError:
             self._send_query_error(503, "QUERY_UNAVAILABLE", "request journal is unavailable")
@@ -481,9 +485,7 @@ class Handler(BaseHTTPRequestHandler):
         body = json.dumps(detail, ensure_ascii=False, indent=2).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header(
-            "Content-Disposition", f'attachment; filename="evidence-{request_id}.json"'
-        )
+        self.send_header("Content-Disposition", f'attachment; filename="evidence-{request_id}.json"')
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         try:

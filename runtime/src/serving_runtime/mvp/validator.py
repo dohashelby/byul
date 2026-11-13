@@ -16,9 +16,7 @@ from .selected_profile import UNSUPPORTED_ENTRY_GROUPS
 
 
 _CODE_SELECTION_GROUPS = {
-    name: group
-    for group in ("code_selection", "input_processors")
-    for name in UNSUPPORTED_ENTRY_GROUPS[group]
+    name: group for group in ("code_selection", "input_processors") for name in UNSUPPORTED_ENTRY_GROUPS[group]
 }
 _FIELD_PATH_LIMIT = 256  # Match the route audit's bounded path policy.
 
@@ -32,13 +30,11 @@ def _field_path(parent: str, key: str | int) -> str:
         part = "".join(char if char.isprintable() else "?" for char in key[:_FIELD_PATH_LIMIT])
         path = f"{parent}.{part}" if parent else part
     if len(path) > _FIELD_PATH_LIMIT:
-        path = "..." + path[-(_FIELD_PATH_LIMIT - 3):]
+        path = "..." + path[-(_FIELD_PATH_LIMIT - 3) :]
     return path
 
 
-def _code_selection_field(
-    document: dict[str, Any], ignored_roots: set[str]
-) -> tuple[str, str] | None:
+def _code_selection_field(document: dict[str, Any], ignored_roots: set[str]) -> tuple[str, str] | None:
     """Find a forbidden key without recursion or inspecting string values.
 
     Visit children before their container key so mm_processor_kwargs.code_revision
@@ -93,9 +89,7 @@ def _type_matches(kind: str, value: object) -> bool:
         if isinstance(value, bool):
             return False
         # Arbitrarily large JSON integers are finite; math.isfinite would overflow.
-        return isinstance(value, int) or (
-            isinstance(value, float) and math.isfinite(value)
-        )
+        return isinstance(value, int) or (isinstance(value, float) and math.isfinite(value))
     if kind == "string":
         return isinstance(value, str)
     if kind == "boolean":
@@ -186,9 +180,7 @@ def validate_request(
 
     media_type = content_type.split(";", 1)[0].strip().lower() if content_type else ""
     if media_type != "application/json":
-        return _decision(
-            "INVALID", 415, "UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json"
-        )
+        return _decision("INVALID", 415, "UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json")
     if len(body) > policy.max_body_bytes:
         return _decision("INVALID", 413, "BODY_TOO_LARGE", "request body exceeds the policy limit")
 
@@ -250,11 +242,7 @@ def validate_request(
     allowed_fields = {"model", input_field, "max_tokens", "stream", "n"}
     # Extra-field rules apply only to chat completions. Until each route has its
     # own rules, completions keeps its fixed schema for every policy profile.
-    extra_rules = (
-        {rule.name: rule for rule in policy.extra_fields}
-        if request_kind == "chat"
-        else {}
-    )
+    extra_rules = {rule.name: rule for rule in policy.extra_fields} if request_kind == "chat" else {}
     allowed_fields |= extra_rules.keys()
     unsupported = sorted(document.keys() - allowed_fields)
     if unsupported:
@@ -302,11 +290,7 @@ def validate_request(
         )
 
     max_tokens_value = document.get("max_tokens", policy.output_default_tokens)
-    if (
-        not isinstance(max_tokens_value, int)
-        or isinstance(max_tokens_value, bool)
-        or max_tokens_value <= 0
-    ):
+    if not isinstance(max_tokens_value, int) or isinstance(max_tokens_value, bool) or max_tokens_value <= 0:
         return _decision(
             "INVALID",
             400,
@@ -331,12 +315,7 @@ def validate_request(
     n: int | None = None
     if "n" in document:
         n = document["n"]
-        if (
-            not isinstance(n, int)
-            or isinstance(n, bool)
-            or n < 1
-            or n > policy.max_n
-        ):
+        if not isinstance(n, int) or isinstance(n, bool) or n < 1 or n > policy.max_n:
             return _decision(
                 "INVALID",
                 400,

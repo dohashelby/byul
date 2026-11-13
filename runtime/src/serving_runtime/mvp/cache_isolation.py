@@ -24,9 +24,7 @@ class CacheSaltKey:
     _value: bytes | None = field(default=None, repr=False, compare=False)
 
     @classmethod
-    def from_environ(
-        cls, environ: Mapping[str, str] | None = None
-    ) -> "CacheSaltKey":
+    def from_environ(cls, environ: Mapping[str, str] | None = None) -> "CacheSaltKey":
         source = os.environ if environ is None else environ
         candidate = source.get(CACHE_SALT_KEY_ENV)
         if candidate is None or candidate == "":
@@ -88,18 +86,10 @@ def unavailable_message(reason_code: str | None) -> str:
     """Map readiness codes to bounded messages that contain no key material."""
 
     return {
-        "CACHE_ISOLATION_AUTH_NOT_CONFIGURED": (
-            "cache isolation requires configured authentication"
-        ),
-        "CACHE_ISOLATION_AUTH_UNAVAILABLE": (
-            "cache isolation authentication is unavailable"
-        ),
+        "CACHE_ISOLATION_AUTH_NOT_CONFIGURED": ("cache isolation requires configured authentication"),
+        "CACHE_ISOLATION_AUTH_UNAVAILABLE": ("cache isolation authentication is unavailable"),
         "CACHE_ISOLATION_KEY_MISSING": "cache isolation key is unavailable",
-        "CACHE_ISOLATION_KEY_TOO_SHORT": (
-            "cache isolation key does not meet the minimum requirements"
-        ),
+        "CACHE_ISOLATION_KEY_TOO_SHORT": ("cache isolation key does not meet the minimum requirements"),
         "CACHE_ISOLATION_KEY_INVALID": "cache isolation key is invalid",
-        "CACHE_ISOLATION_BACKEND_UNSUPPORTED": (
-            "cache isolation requires a supported vllm backend"
-        ),
+        "CACHE_ISOLATION_BACKEND_UNSUPPORTED": ("cache isolation requires a supported vllm backend"),
     }.get(reason_code, "cache isolation is unavailable")

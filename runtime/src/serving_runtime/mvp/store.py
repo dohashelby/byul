@@ -83,7 +83,7 @@ class JsonlStore:
             try:
                 current = os.stat(self.path.name, dir_fd=directory, follow_symlinks=False)
             except FileNotFoundError:
-                raise OSError('record file disappeared after opening') from None
+                raise OSError("record file disappeared after opening") from None
             if (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino):
                 raise PermissionError(f"{self.path.name}: record file changed while opening")
             with os.fdopen(descriptor, "ab" if flags & os.O_APPEND else "rb") as stream:
@@ -131,46 +131,76 @@ class JsonlStore:
                 return [], []
         return records, corrupt
 
-    def read_recent(self, *, max_bytes: int = 4 * 1024 * 1024, max_records: int = 4096) -> tuple[list[dict[str, Any]], list[dict[str, Any]], bool]:
+    def read_recent(
+        self, *, max_bytes: int = 4 * 1024 * 1024, max_records: int = 4096
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], bool]:
         """Read only a protected stable tail; omitted history remains explicit."""
-        if (type(max_bytes) is not int or not 0<max_bytes<=4*1024*1024
-                or type(max_records) is not int or not 0<max_records<=4096):
-            raise ValueError('bounded journal tail limits required')
+        if (
+            type(max_bytes) is not int
+            or not 0 < max_bytes <= 4 * 1024 * 1024
+            or type(max_records) is not int
+            or not 0 < max_records <= 4096
+        ):
+            raise ValueError("bounded journal tail limits required")
         with self._lock:
             opened = False
             try:
                 with self._open(os.O_RDONLY) as source:
                     opened = True
-                    before=os.fstat(source.fileno());offset=max(0,before.st_size-max_bytes)
-                    source.seek(offset);raw=source.read(max_bytes+1)
-                    after=os.fstat(source.fileno());current=os.stat(self.path,follow_symlinks=False)
-                    identity=lambda v:(v.st_dev,v.st_ino,v.st_size,v.st_mtime_ns,v.st_ctime_ns,v.st_uid,v.st_gid,v.st_mode)
-                    if len(raw)>max_bytes or len(raw)!=before.st_size-offset or identity(before)!=identity(after) or identity(after)!=identity(current):
-                        raise OSError('record journal changed during bounded read')
+                    before = os.fstat(source.fileno())
+                    offset = max(0, before.st_size - max_bytes)
+                    source.seek(offset)
+                    raw = source.read(max_bytes + 1)
+                    after = os.fstat(source.fileno())
+                    current = os.stat(self.path, follow_symlinks=False)
+                    identity = lambda v: (
+                        v.st_dev,
+                        v.st_ino,
+                        v.st_size,
+                        v.st_mtime_ns,
+                        v.st_ctime_ns,
+                        v.st_uid,
+                        v.st_gid,
+                        v.st_mode,
+                    )
+                    if (
+                        len(raw) > max_bytes
+                        or len(raw) != before.st_size - offset
+                        or identity(before) != identity(after)
+                        or identity(after) != identity(current)
+                    ):
+                        raise OSError("record journal changed during bounded read")
             except FileNotFoundError:
                 if opened:
-                    raise OSError('record journal disappeared during bounded read') from None
-                return [],[],False
-        truncated=offset>0;corrupt=[]
+                    raise OSError("record journal disappeared during bounded read") from None
+                return [], [], False
+        truncated = offset > 0
+        corrupt = []
         if offset:
-            boundary=raw.find(b'\n');raw=raw[boundary+1:] if boundary>=0 else b''
-        if raw and not raw.endswith(b'\n'):
-            boundary=raw.rfind(b'\n');raw=raw[:boundary+1] if boundary>=0 else b''
-            truncated=True;corrupt.append({'line':None,'reason':'incomplete trailing JSONL record'})
+            boundary = raw.find(b"\n")
+            raw = raw[boundary + 1 :] if boundary >= 0 else b""
+        if raw and not raw.endswith(b"\n"):
+            boundary = raw.rfind(b"\n")
+            raw = raw[: boundary + 1] if boundary >= 0 else b""
+            truncated = True
+            corrupt.append({"line": None, "reason": "incomplete trailing JSONL record"})
         # Bound list allocation too: millions of tiny lines must not produce
         # millions of Python objects before the row ceiling is applied.
-        parts=raw.rsplit(b'\n',max_records+1)[:-1]
-        if len(parts)>max_records:parts=parts[-max_records:];truncated=True
-        lines=[part+b'\n' for part in parts]
-        rows=[]
-        for index,line in enumerate(lines):
+        parts = raw.rsplit(b"\n", max_records + 1)[:-1]
+        if len(parts) > max_records:
+            parts = parts[-max_records:]
+            truncated = True
+        lines = [part + b"\n" for part in parts]
+        rows = []
+        for index, line in enumerate(lines):
             try:
-                value=json.loads(line.decode('utf-8'))
-                if type(value) is not dict:raise ValueError('record is not a JSON object')
+                value = json.loads(line.decode("utf-8"))
+                if type(value) is not dict:
+                    raise ValueError("record is not a JSON object")
                 rows.append(value)
-            except (UnicodeDecodeError,ValueError,RecursionError) as error:
-                corrupt.append({'line':None if truncated else index+1,'reason':type(error).__name__})
-        return rows,corrupt,truncated
+            except (UnicodeDecodeError, ValueError, RecursionError) as error:
+                corrupt.append({"line": None if truncated else index + 1, "reason": type(error).__name__})
+        return rows, corrupt, truncated
 
     def read_matching_request(self, request_id: str):
         """Bounded-memory reverse search of retained original request rows.
@@ -181,7 +211,7 @@ class JsonlStore:
         """
         recent, corrupt, truncated = self.read_recent()
         if not truncated:
-            return [r for r in recent if r.get('request_id') == request_id], corrupt, False
+            return [r for r in recent if r.get("request_id") == request_id], corrupt, False
         rows, corrupt = [], []
         selected_bytes = 0
         scanned = 0
@@ -193,14 +223,14 @@ class JsonlStore:
             nonlocal scanned, selected_bytes, limited, stopped
             scanned += 1
             try:
-                value = json.loads(raw.decode('utf-8'))
+                value = json.loads(raw.decode("utf-8"))
                 if not isinstance(value, dict):
-                    raise ValueError('record is not an object')
+                    raise ValueError("record is not an object")
             except (UnicodeError, ValueError, RecursionError):
                 if len(corrupt) < 20:
-                    corrupt.append({'line': None, 'reason': 'invalid record in bounded request search'})
+                    corrupt.append({"line": None, "reason": "invalid record in bounded request search"})
             else:
-                if value.get('request_id') == request_id:
+                if value.get("request_id") == request_id:
                     if len(rows) >= 128 or selected_bytes + len(raw) > line_limit:
                         limited = True
                     else:
@@ -219,7 +249,7 @@ class JsonlStore:
                     cursor = before.st_size
                     earliest = max(0, cursor - 64 * 1024 * 1024)
                     limited = earliest > 0
-                    buffer = b''
+                    buffer = b""
                     end_pending = True
                     while cursor > earliest and not stopped:
                         length = min(65536, cursor - earliest)
@@ -227,20 +257,20 @@ class JsonlStore:
                         stream.seek(cursor)
                         block = stream.read(length)
                         if len(block) != length:
-                            raise OSError('short request journal read')
-                        parts = (block + buffer).split(b'\n')
+                            raise OSError("short request journal read")
+                        parts = (block + buffer).split(b"\n")
                         buffer = parts[0]
                         for raw in reversed(parts[1:]):
                             if end_pending:
                                 end_pending = False
                                 if raw:
                                     limited = True
-                                    corrupt.append({'line': None, 'reason': 'incomplete trailing record'})
+                                    corrupt.append({"line": None, "reason": "incomplete trailing record"})
                                 continue
                             if len(raw) > line_limit:
                                 limited = True
                                 if len(corrupt) < 20:
-                                    corrupt.append({'line': None, 'reason': 'oversized request record'})
+                                    corrupt.append({"line": None, "reason": "oversized request record"})
                             else:
                                 accept(raw)
                             if stopped:
@@ -251,18 +281,26 @@ class JsonlStore:
                     if not stopped and earliest == 0:
                         if end_pending and buffer:
                             limited = True
-                            corrupt.append({'line': None, 'reason': 'incomplete trailing record'})
+                            corrupt.append({"line": None, "reason": "incomplete trailing record"})
                         elif not end_pending:
                             accept(buffer)
                     after = os.fstat(stream.fileno())
                     current = os.stat(self.path, follow_symlinks=False)
-                    identity = lambda v: (v.st_dev, v.st_ino, v.st_size, v.st_mtime_ns,
-                                          v.st_ctime_ns, v.st_uid, v.st_gid, v.st_mode)
+                    identity = lambda v: (
+                        v.st_dev,
+                        v.st_ino,
+                        v.st_size,
+                        v.st_mtime_ns,
+                        v.st_ctime_ns,
+                        v.st_uid,
+                        v.st_gid,
+                        v.st_mode,
+                    )
                     if identity(before) != identity(after) or identity(after) != identity(current):
-                        raise OSError('journal changed during request search')
+                        raise OSError("journal changed during request search")
             except FileNotFoundError:
                 if opened:
-                    raise OSError('record journal disappeared during request search') from None
+                    raise OSError("record journal disappeared during request search") from None
                 return [], [], False
         rows.reverse()
         return rows, corrupt[:20], limited
@@ -280,9 +318,7 @@ class JsonlStore:
                 return -1, 0
             temporary = self.path.with_name(f".{self.path.name}.{os.getpid()}.{uuid4().hex}.tmp")
             kept = removed = 0
-            descriptor = os.open(
-                temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600
-            )
+            descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
             replaced = False
             try:
                 with os.fdopen(descriptor, "wb") as output, self._open(os.O_RDONLY) as source:
@@ -310,9 +346,7 @@ class JsonlStore:
                 except OSError as error:
                     # The visible file has already changed. Preserve the actual
                     # counts so callers do not report this as a zero-row delete.
-                    raise RewriteCommittedError(
-                        kept=kept, removed=removed, cause=error
-                    ) from error
+                    raise RewriteCommittedError(kept=kept, removed=removed, cause=error) from error
             finally:
                 if descriptor >= 0:
                     os.close(descriptor)

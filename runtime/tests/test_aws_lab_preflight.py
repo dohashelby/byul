@@ -12,7 +12,19 @@ from tools.aws_lab_preflight import CommandResult, build_parser, collect, main
 
 
 def pod(image: str, image_id: str, container: str) -> dict:
-    return {"items": [{"metadata": {}, "spec": {"containers": [{"name": container, "image": image}]}, "status": {"phase": "Running", "conditions": [{"type": "Ready", "status": "True"}], "containerStatuses": [{"name": container, "ready": True, "imageID": image_id}]}}]}
+    return {
+        "items": [
+            {
+                "metadata": {},
+                "spec": {"containers": [{"name": container, "image": image}]},
+                "status": {
+                    "phase": "Running",
+                    "conditions": [{"type": "Ready", "status": "True"}],
+                    "containerStatuses": [{"name": container, "ready": True, "imageID": image_id}],
+                },
+            }
+        ]
+    }
 
 
 class FakeRunner:
@@ -30,20 +42,48 @@ class FakeRunner:
             return CommandResult(self.verify_code, "secret output")
         if argv[0] == "systemctl":
             if "show" in argv:
-                return CommandResult(0, self.phase_output if self.phase_output is not None else "ExecStart=... " + ("--phase-timeline" if self.phase_enabled else ""))
+                return CommandResult(
+                    0,
+                    self.phase_output
+                    if self.phase_output is not None
+                    else "ExecStart=... " + ("--phase-timeline" if self.phase_enabled else ""),
+                )
             return CommandResult(0, "active\n")
         if argv[0] in {"uname", "cat", "zcat"} or ("exec" in argv and "tetra" in argv):
             return CommandResult(124)
         if "nodes" in argv:
-            return CommandResult(0, json.dumps({"items": [{"status": {"conditions": [{"type": "Ready", "status": "True"}], "allocatable": {"nvidia.com/gpu": "1"}}}]}))
+            return CommandResult(
+                0,
+                json.dumps(
+                    {
+                        "items": [
+                            {
+                                "status": {
+                                    "conditions": [{"type": "Ready", "status": "True"}],
+                                    "allocatable": {"nvidia.com/gpu": "1"},
+                                }
+                            }
+                        ]
+                    }
+                ),
+            )
         if "app=serving-engine" in argv:
-            return CommandResult(0, json.dumps(pod("engine@sha256:" + "a" * 64, "containerd://sha256:" + "a" * 64, "engine")))
+            return CommandResult(
+                0, json.dumps(pod("engine@sha256:" + "a" * 64, "containerd://sha256:" + "a" * 64, "engine"))
+            )
         if "app=serving-gateway" in argv:
-            return CommandResult(0, json.dumps(pod("serving-gateway:expected", "containerd://sha256:" + "b" * 64, "gateway")))
+            return CommandResult(
+                0, json.dumps(pod("serving-gateway:expected", "containerd://sha256:" + "b" * 64, "gateway"))
+            )
         if "tracingpoliciesnamespaced" in argv:
             names = ("runtime-tg-asset-01", "runtime-tg-cache-01", "runtime-tg-secret-01")
         elif "ciliumnetworkpolicies" in argv:
-            names = ("runtime-engine-egress", "runtime-engine-ingress", "runtime-gateway-egress", "runtime-observer-0-egress")
+            names = (
+                "runtime-engine-egress",
+                "runtime-engine-ingress",
+                "runtime-gateway-egress",
+                "runtime-observer-0-egress",
+            )
         else:
             raise AssertionError(argv)
         return CommandResult(0, json.dumps({"items": [{"metadata": {"name": name}} for name in names]}))
@@ -76,20 +116,54 @@ class PreflightTests(unittest.TestCase):
         for name in ("hubble.heartbeat.json", "tetragon.heartbeat.json", "target-pods.json", "phase-timeline.json"):
             (self.obs / name).write_text("{}")
         self.runner = FakeRunner()
-        self.args = build_parser().parse_args(["--engine", "vllm", "--bundle-root", str(self.bundle), "--observation-dir", str(self.obs), "--evidence-dir", str(root), "--expect-gateway-tag", "expected", "--expect-engine-digest", "sha256:" + "a" * 64])
+        self.args = build_parser().parse_args(
+            [
+                "--engine",
+                "vllm",
+                "--bundle-root",
+                str(self.bundle),
+                "--observation-dir",
+                str(self.obs),
+                "--evidence-dir",
+                str(root),
+                "--expect-gateway-tag",
+                "expected",
+                "--expect-engine-digest",
+                "sha256:" + "a" * 64,
+            ]
+        )
 
     def check(self):
         with patch("tools.aws_lab_preflight.shutil.disk_usage") as disk:
-            disk.side_effect = lambda path: SimpleNamespace(free=(70 if path == self.args.image_store else 10) * 1024**3)
+            disk.side_effect = lambda path: SimpleNamespace(
+                free=(70 if path == self.args.image_store else 10) * 1024**3
+            )
             return {c.name: c for c in collect(self.args, self.runner, opener=lambda request, timeout: FakeResponse())}
 
     def test_all_ready_and_read_only_commands(self):
         checks = self.check()
         self.assertTrue(all(c.status == "ok" for c in checks.values()), checks)
         self.assertEqual(self.runner.calls[-1][0], "kubectl")
-        self.assertIn(("kubectl", "--context", "byul-aws-lab", "-n", "serving-lab", "get", "tracingpoliciesnamespaced", "-o", "json"), self.runner.calls)
+        self.assertIn(
+            (
+                "kubectl",
+                "--context",
+                "byul-aws-lab",
+                "-n",
+                "serving-lab",
+                "get",
+                "tracingpoliciesnamespaced",
+                "-o",
+                "json",
+            ),
+            self.runner.calls,
+        )
         self.assertEqual(checks["tracingpoliciesnamespaced"].status, "ok")
-        self.assertFalse(any(word in call for call in self.runner.calls for word in ("apply", "patch", "delete", "restart", "create")))
+        self.assertFalse(
+            any(
+                word in call for call in self.runner.calls for word in ("apply", "patch", "delete", "restart", "create")
+            )
+        )
         self.assertNotIn("boundary_probe:chat", checks)
 
     def test_override_check_is_opt_in_and_never_claims_kernel_support(self):
@@ -103,22 +177,30 @@ class PreflightTests(unittest.TestCase):
     def test_boundary_probe_is_opt_in_and_reports_both_routes(self):
         self.args.boundary_probe = True
         original_run = self.runner.run
+
         def run(argv, *, timeout=8):
             if "exec" in argv:
                 self.runner.calls.append(tuple(argv))
                 state, reason = ("ok", "요청 답변 길이 생성") if argv[-1] == "chat" else ("fail", "답변 잘림")
                 return CommandResult(0, json.dumps({"state": state, "reason": reason, "completion_tokens": 2}))
             return original_run(argv, timeout=timeout)
+
         self.runner.run = run
+
         def opener(request, timeout):
             if request.full_url.endswith("/api/policy"):
+
                 class PolicyResponse(FakeResponse):
                     def read(self, *args):
                         return json.dumps({"current": {"max_context_tokens": 2048}}).encode()
+
                 return PolicyResponse()
             return FakeResponse()
+
         with patch("tools.aws_lab_preflight.shutil.disk_usage") as disk:
-            disk.side_effect = lambda path: SimpleNamespace(free=(70 if path == self.args.image_store else 10) * 1024**3)
+            disk.side_effect = lambda path: SimpleNamespace(
+                free=(70 if path == self.args.image_store else 10) * 1024**3
+            )
             checks = {c.name: c for c in collect(self.args, self.runner, opener=opener)}
         self.assertEqual(checks["boundary_probe:chat"].status, "ok")
         self.assertEqual(checks["boundary_probe:completions"].reason, "답변 잘림")
@@ -159,7 +241,9 @@ class PreflightTests(unittest.TestCase):
     def test_image_store_disk_threshold_is_separate(self):
         self.assertEqual(self.args.image_store, "/var/lib/containerd")
         self.assertEqual(self.args.min_image_free_gib, 60)
-        options = build_parser().parse_args(["--engine", "vllm", "--image-store", "/srv/custom-containerd", "--min-image-free-gib", "75"])
+        options = build_parser().parse_args(
+            ["--engine", "vllm", "--image-store", "/srv/custom-containerd", "--min-image-free-gib", "75"]
+        )
         self.args.image_store = options.image_store
         self.args.min_image_free_gib = options.min_image_free_gib
         checks = self.check()
@@ -168,12 +252,16 @@ class PreflightTests(unittest.TestCase):
 
     def test_image_store_disk_unavailable_is_unknown(self):
         with patch("tools.aws_lab_preflight.shutil.disk_usage") as disk:
+
             def usage(path):
                 if path == self.args.image_store:
                     raise OSError("unavailable")
                 return SimpleNamespace(free=10 * 1024**3)
+
             disk.side_effect = usage
-            checks = {c.name: c for c in collect(self.args, self.runner, opener=lambda request, timeout: FakeResponse())}
+            checks = {
+                c.name: c for c in collect(self.args, self.runner, opener=lambda request, timeout: FakeResponse())
+            }
         self.assertEqual(checks["disk"].status, "ok")
         self.assertEqual(checks["image_store_disk"].status, "unknown")
 
@@ -197,9 +285,20 @@ class PreflightTests(unittest.TestCase):
 
     def test_stale_observation_fails(self):
         with patch("tools.aws_lab_preflight.shutil.disk_usage") as disk:
-            disk.side_effect = lambda path: SimpleNamespace(free=(70 if path == self.args.image_store else 10) * 1024**3)
+            disk.side_effect = lambda path: SimpleNamespace(
+                free=(70 if path == self.args.image_store else 10) * 1024**3
+            )
             from datetime import datetime, timedelta, timezone
-            checks = {c.name: c for c in collect(self.args, self.runner, opener=lambda request, timeout: FakeResponse(), now=datetime.now(timezone.utc) + timedelta(minutes=1))}
+
+            checks = {
+                c.name: c
+                for c in collect(
+                    self.args,
+                    self.runner,
+                    opener=lambda request, timeout: FakeResponse(),
+                    now=datetime.now(timezone.utc) + timedelta(minutes=1),
+                )
+            }
         self.assertEqual(checks["observation:target-pods.json"].status, "fail")
 
     def test_authenticated_status_uses_token_without_reporting_it(self):
@@ -215,13 +314,18 @@ class PreflightTests(unittest.TestCase):
             return FakeResponse()
 
         with patch("tools.aws_lab_preflight.shutil.disk_usage") as disk:
-            disk.side_effect = lambda path: SimpleNamespace(free=(70 if path == self.args.image_store else 10) * 1024**3)
+            disk.side_effect = lambda path: SimpleNamespace(
+                free=(70 if path == self.args.image_store else 10) * 1024**3
+            )
             checks = collect(self.args, self.runner, opener=opener)
         self.assertEqual(calls, [None, "Bearer private-value"])
         self.assertNotIn("private-value", json.dumps([c.reason for c in checks]))
 
     def test_exit_code_on_failure(self):
-        with patch("tools.aws_lab_preflight.collect", return_value=[type("Check", (), {"name": "x", "status": "fail", "reason": "bad"})()]):
+        with patch(
+            "tools.aws_lab_preflight.collect",
+            return_value=[type("Check", (), {"name": "x", "status": "fail", "reason": "bad"})()],
+        ):
             with patch("builtins.print"):
                 self.assertEqual(main(["--engine", "vllm"]), 1)
 

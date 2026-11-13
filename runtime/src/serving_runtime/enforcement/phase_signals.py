@@ -163,9 +163,7 @@ def _line_time(line: str, *, year: int, zone: tzinfo) -> datetime | None:
     match = _LOG_TIME.search(line)
     if match is None:
         return None
-    values = {name: int(match.group(name)) for name in (
-        "month", "day", "hour", "minute", "second"
-    )}
+    values = {name: int(match.group(name)) for name in ("month", "day", "hour", "minute", "second")}
     try:
         return datetime(year=year, tzinfo=zone, **values)
     except ValueError as error:
@@ -184,9 +182,7 @@ def _configuration(engine: str, year: int, timezone_offset: str) -> tuple[Engine
     except KeyError as error:
         raise ValueError(f"unsupported engine: {engine}") from error
     if not pattern_set.patterns:
-        raise ValueError(
-            f"{engine} phase signals are unsupported: no source-backed patterns"
-        )
+        raise ValueError(f"{engine} phase signals are unsupported: no source-backed patterns")
     return pattern_set, parse_timezone(timezone_offset)
 
 
@@ -239,10 +235,16 @@ class _TimelineState:
         saved = extraction.get("collector_state", {})
         compile_open_from = saved.get("compile_open_from")
         source_entries = document.get("entries", [])
-        compile_open_index = next((index for index in range(len(source_entries) - 1, -1, -1)
-                                   if source_entries[index].get("phase") == "compiling"
-                                   and source_entries[index].get("from") == compile_open_from
-                                   and source_entries[index].get("until") == saved.get("compile_cap_at")), None)
+        compile_open_index = next(
+            (
+                index
+                for index in range(len(source_entries) - 1, -1, -1)
+                if source_entries[index].get("phase") == "compiling"
+                and source_entries[index].get("from") == compile_open_from
+                and source_entries[index].get("until") == saved.get("compile_cap_at")
+            ),
+            None,
+        )
         for index, item in enumerate(source_entries):
             copied = dict(item)
             if index == compile_open_index:
@@ -317,9 +319,7 @@ class _TimelineState:
             changed |= self.omit(line_number, "compiling", "compile_markers_not_observed")
         if self.run_init_ended and not self.inferring_seen:
             reason = (
-                "health_probe_not_successful"
-                if self.health_enabled
-                else "startup_marker_not_observed_with_timestamp"
+                "health_probe_not_successful" if self.health_enabled else "startup_marker_not_observed_with_timestamp"
             )
             changed |= self.omit(line_number, "inferring_start", reason)
         self.run_active = False
@@ -388,10 +388,13 @@ class _TimelineState:
                     changed |= self.close_phase("inferring", at, self.lines_read)
                 changed |= self.start_run(self.lines_read, at, signal)
             changed |= self.close_phase("loading", at, self.lines_read)
-            if "loading" not in self.open_phases and not any(
-                item["signal"] == "loading_start" and item["line"] == self.lines_read
-                for item in self.omissions
-            ) and self.matched["loading_start"] == 0:
+            if (
+                "loading" not in self.open_phases
+                and not any(
+                    item["signal"] == "loading_start" and item["line"] == self.lines_read for item in self.omissions
+                )
+                and self.matched["loading_start"] == 0
+            ):
                 changed |= self.omit(self.lines_read, "loading", "loading_start_not_observed")
         elif signal == "compiling_start":
             if self.engine == "sglang" and self.inferring_seen:
@@ -418,8 +421,9 @@ class _TimelineState:
                 inferring = self.open_phases.get("inferring")
                 compiling = next((item for item in reversed(self.entries) if item["phase"] == "compiling"), None)
                 if compiling is not None and at < datetime.fromisoformat(compiling["until"]):
-                    cap = min(datetime.fromisoformat(compiling["from"]) + SGLANG_STARTUP_LIMIT,
-                              at + SGLANG_CAPTURE_GRACE)
+                    cap = min(
+                        datetime.fromisoformat(compiling["from"]) + SGLANG_STARTUP_LIMIT, at + SGLANG_CAPTURE_GRACE
+                    )
                     if cap < datetime.fromisoformat(compiling["until"]):
                         compiling["until"] = _iso(cap)
                         changed = True
@@ -468,12 +472,7 @@ class _TimelineState:
         return changed
 
     def health_due(self) -> bool:
-        return (
-            self.health_enabled
-            and self.run_active
-            and self.health_ready_at is not None
-            and not self.inferring_seen
-        )
+        return self.health_enabled and self.run_active and self.health_ready_at is not None and not self.inferring_seen
 
     def health_result(self, *, checked_at: datetime, status: int | None, error: str | None) -> bool:
         if checked_at.tzinfo is None:
@@ -488,9 +487,7 @@ class _TimelineState:
         self.health["successes"] += 1
         if self.health_ready_at is None or checked_at <= self.health_ready_at:
             self.health["last_result"] = "clock_order_invalid"
-            return self.omit(
-                max(1, self.lines_read), "inferring_start", "health_and_log_clock_order_invalid"
-            )
+            return self.omit(max(1, self.lines_read), "inferring_start", "health_and_log_clock_order_invalid")
         self.health["last_result"] = "healthy_boundary_recorded"
         if self.engine == "sglang":
             self.close_phase("compiling", checked_at, max(1, self.lines_read))
@@ -538,11 +535,17 @@ class _TimelineState:
                 "compile_seen": self.compile_seen,
                 "inferring_seen": self.inferring_seen,
                 "health_ready_at": _iso(self.health_ready_at) if self.health_ready_at else None,
-                **({
-                    "compile_open_from": _iso(self.open_phases["compiling"][0]) if "compiling" in self.open_phases else None,
-                    "compile_cap_at": _iso(self.compile_cap_at) if self.compile_cap_at else None,
-                    "capture_end_at": _iso(self.capture_end_at) if self.capture_end_at else None,
-                } if self.engine == "sglang" else {}),
+                **(
+                    {
+                        "compile_open_from": _iso(self.open_phases["compiling"][0])
+                        if "compiling" in self.open_phases
+                        else None,
+                        "compile_cap_at": _iso(self.compile_cap_at) if self.compile_cap_at else None,
+                        "capture_end_at": _iso(self.capture_end_at) if self.capture_end_at else None,
+                    }
+                    if self.engine == "sglang"
+                    else {}
+                ),
             }
             extraction["clock_sources"] = {
                 "log_boundaries": "log_timestamp_with_explicit_year_and_timezone",
@@ -688,9 +691,7 @@ def follow_phase_timeline(
     follow: dict[str, Any] = {
         "mode": "stdin" if str(source) == "-" else "file",
         "existing": existing,
-        "state": previous_follow.get("state", "running")
-        if previous_follow.get("state") == "read_error"
-        else "running",
+        "state": previous_follow.get("state", "running") if previous_follow.get("state") == "read_error" else "running",
         "last_updated_at": None,
         "input_identity": None,
         "events": [dict(item) for item in previous_events],
@@ -786,10 +787,7 @@ def follow_phase_timeline(
                         identity = new_identity
                         follow["input_identity"] = {"device": info.st_dev, "inode": info.st_ino}
                         old_identity = previous_follow.get("input_identity")
-                        if (
-                            prior_identity == new_identity
-                            and info.st_size >= state.byte_offset
-                        ):
+                        if prior_identity == new_identity and info.st_size >= state.byte_offset:
                             stream.seek(state.byte_offset)
                         elif (
                             prior_identity is None

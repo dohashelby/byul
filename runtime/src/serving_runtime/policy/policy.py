@@ -106,8 +106,7 @@ _ITEM_CONSTRAINTS_BY_TYPE = {
 }
 
 
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from serving_runtime.common.clock import utc_now as _utc_now
 
 
 def _object_without_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:

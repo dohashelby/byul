@@ -7,7 +7,7 @@ from copy import deepcopy
 import threading
 from typing import Any, Callable
 
-from serving_runtime.devtools.mock_engine import _utc_now
+from serving_runtime.common.clock import utc_now as _utc_now
 from serving_runtime.gateway.backend import upstream_request_id
 from serving_runtime.policy.policy import PolicyState
 from serving_runtime.observation.store import JsonlStore

@@ -15,7 +15,7 @@ from uuid import uuid4
 
 from serving_runtime.enforcement.events import ObservationQuery
 
-from serving_runtime.devtools.mock_engine import _utc_now
+from serving_runtime.common.clock import utc_now as _utc_now
 from serving_runtime.observation.query import QueryError, QueryService, RequestNotFoundError, QueryWindowIncompleteError
 from serving_runtime.gateway.request_flow import ChatIO, transport_decision
 from serving_runtime.gateway.validator import Decision

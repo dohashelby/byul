@@ -28,8 +28,7 @@ class _SymlinkFound(ValueError):
     """A manifest entry or one of its root-relative parents is a symlink."""
 
 
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from serving_runtime.common.clock import utc_now as _utc_now
 
 
 def _safe_relative(value: object) -> str:

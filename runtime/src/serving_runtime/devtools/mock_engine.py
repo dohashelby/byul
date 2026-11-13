@@ -12,8 +12,7 @@ from urllib.parse import parse_qs, urlsplit
 from serving_runtime.observation.store import JsonlStore
 
 
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from serving_runtime.common.clock import utc_now as _utc_now
 
 
 def simulated_token_count(messages: object) -> int:

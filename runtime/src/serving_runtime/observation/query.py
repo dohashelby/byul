@@ -5,7 +5,7 @@ import json
 import os
 from typing import Any
 
-from serving_runtime.devtools.mock_engine import _utc_now
+from serving_runtime.common.clock import utc_now as _utc_now
 from serving_runtime.observation.store import JsonlStore
 
 

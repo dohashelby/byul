@@ -48,8 +48,7 @@ class TargetSnapshotInvalidError(ValueError):
     """A readable snapshot is unsafe or does not match its registration."""
 
 
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from serving_runtime.common.clock import utc_now as _utc_now
 
 
 @dataclass(frozen=True)

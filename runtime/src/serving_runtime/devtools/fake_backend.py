@@ -14,8 +14,7 @@ from urllib.parse import urlsplit
 from serving_runtime.devtools.mock_engine import simulated_prompt_token_count, simulated_token_count
 
 
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from serving_runtime.common.clock import utc_now as _utc_now
 
 
 def effective_output_limit(flavor: str, route: str | None, document: dict[str, Any]) -> Any:

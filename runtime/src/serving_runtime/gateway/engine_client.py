@@ -12,7 +12,7 @@ from urllib.parse import urlencode
 from urllib.request import urlopen
 
 from serving_runtime.gateway.backend import BackendConfig, parse_prometheus_metrics
-from serving_runtime.devtools.mock_engine import _utc_now
+from serving_runtime.common.clock import utc_now as _utc_now
 from serving_runtime.gateway.response_timeout import DeadlineWatchdog, set_response_timeout
 
 

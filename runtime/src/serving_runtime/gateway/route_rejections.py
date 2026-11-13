@@ -9,7 +9,7 @@ import threading
 import time
 from uuid import uuid4
 
-from serving_runtime.devtools.mock_engine import _utc_now
+from serving_runtime.common.clock import utc_now as _utc_now
 from serving_runtime.observation.store import JsonlStore
 
 ROUTE_REJECTION_LIMIT = 1000

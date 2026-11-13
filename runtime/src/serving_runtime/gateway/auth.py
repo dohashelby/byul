@@ -45,8 +45,7 @@ _DIGEST = re.compile(r"[0-9a-f]{64}")
 _TOKEN = re.compile(r"[\x21-\x7e]{16,512}")
 
 
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from serving_runtime.common.clock import utc_now as _utc_now
 
 
 def token_digest(token: str) -> str:

@@ -13,8 +13,7 @@ from typing import Any
 from serving_runtime.policy.policy import DuplicateKeyError, _object_without_duplicates, _reject_json_constant
 
 
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from serving_runtime.common.clock import utc_now as _utc_now
 
 
 class NoCollectionUpdate(RuntimeError):

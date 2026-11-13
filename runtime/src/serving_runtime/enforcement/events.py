@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 from typing import Any, Iterable
 
-from serving_runtime.devtools.mock_engine import _utc_now
+from serving_runtime.common.clock import utc_now as _utc_now
 from serving_runtime.observation.store import JsonlStore
 
 

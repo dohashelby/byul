@@ -29,8 +29,7 @@ _ASSET_STATES = ("changed", "missing", "unreadable", "symlink")
 _MAX_PATHS = 50
 
 
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from serving_runtime.common.clock import utc_now as _utc_now
 
 
 def _canonical_hash(trigger: str, evidence: dict[str, Any]) -> str:

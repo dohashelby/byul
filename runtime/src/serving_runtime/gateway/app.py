@@ -36,7 +36,8 @@ from serving_runtime.devtools.lab_report import LabReportSource
 from serving_runtime.observation.tetragon_state import read_tetragon_state
 from serving_runtime.observation.gpu_state import read_gpu_state
 from serving_runtime.observation.engine_receipts import EngineReceipts
-from serving_runtime.devtools.mock_engine import MockEngine, _utc_now
+from serving_runtime.common.clock import utc_now as _utc_now
+from serving_runtime.devtools.mock_engine import MockEngine
 from serving_runtime.observation.observation_feed import ObservationFeed
 from serving_runtime.observation.phase_timeline import read_phase_timeline
 from serving_runtime.enforcement.execpolicy import ExecPolicy

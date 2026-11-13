@@ -70,7 +70,7 @@ class LegacyImportShimTests(unittest.TestCase):
         shims = {RUNTIME / "src" / Path(*old.split(".")).with_suffix(".py") for old in MODULES}
         shims.add(RUNTIME / "src/serving_runtime/mvp/__init__.py")
         findings = []
-        for directory in ("src", "tools", "tests"):
+        for directory in ("src", "tools", "labtools", "tests"):
             for path in sorted((RUNTIME / directory).rglob("*.py")):
                 if path in shims or path == Path(__file__).resolve() or "__pycache__" in path.parts:
                     continue

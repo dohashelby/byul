@@ -44,7 +44,7 @@ UNITS = tuple(
 AGENT_UNIT = "serving-runtime-agent.service"
 AGENT_UNIT_FILE = Path("/etc/systemd/system") / AGENT_UNIT
 AUTO_UNITS = tuple(unit for unit in UNITS if unit != AGENT_UNIT)
-COPY = ("src", "tools", "deploy", "pyproject.toml", "README.md")
+COPY = ("src", "tools", "labtools", "deploy", "pyproject.toml", "README.md")
 PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 DEFAULTS = {
     "PLATFORM_CA_FILE": "",

@@ -7,7 +7,7 @@
   python quality_metrics.py --root runtime --check baseline.json   # 기준선보다 나빠지면 종료 코드 1
 
 "지금보다 나빠지지 않게" 막는 방식이다. 목표값이 아니라 현재값을 기준으로 삼는다.
-측정 대상: <root>/src/**/*.py 와 <root>/tools/**/*.py (제품 코드). tests 는 제외한다.
+측정 대상: <root>/src/**/*.py, <root>/tools/**/*.py, <root>/labtools/**/*.py (제품 코드). tests 는 제외한다.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ def is_legacy_shim(path: Path) -> bool:
 
 
 def py_files(root: Path):
-    for sub in ("src", "tools"):
+    for sub in ("src", "tools", "labtools"):
         base = root / sub
         if base.is_dir():
             yield from (p for p in sorted(base.rglob("*.py")) if "__pycache__" not in p.parts and not is_legacy_shim(p))

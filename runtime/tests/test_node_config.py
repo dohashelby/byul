@@ -1,6 +1,8 @@
 """TOML defaults use the existing MVPConfig and explicit CLI always wins."""
 
+import ast
 from contextlib import redirect_stderr, redirect_stdout
+import inspect
 from dataclasses import fields
 import io
 import json
@@ -11,6 +13,7 @@ import unittest
 from unittest.mock import patch
 
 from serving_runtime.cli import main
+from serving_runtime.config import node_config
 from serving_runtime.config.config import MVPConfig
 
 DATA = Path(__file__).resolve().parent / "data"
@@ -175,3 +178,26 @@ class NodeConfigTests(unittest.TestCase):
             run.assert_not_called()
         config = self.capture(["mvp", "--config", path, "--gateway-p", "19081"])
         self.assertEqual(config.gateway_port, 19081)
+
+    def test_loader_uses_only_public_argument_parser_methods(self):
+        tree = ast.parse(inspect.getsource(node_config))
+        private = [
+            node.func.attr
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id in {"parser", "probe", "explicit_parser"}
+            and node.func.attr.startswith("_")
+        ]
+        self.assertEqual(private, [])
+
+    def test_config_help_is_printed_once_by_the_real_parser(self):
+        path = self.write('[observation_feeds]\nhubble = "file.jsonl"\n')
+        for option in ("--help", "--he", "-h"):
+            with self.subTest(option=option):
+                code, run, out, err = self.invoke(["mvp", "--config", path, option])
+                self.assertEqual((code, err), (0, ""))
+                self.assertEqual(out.count("usage:"), 1)
+                self.assertIn("--config", out)
+                run.assert_not_called()

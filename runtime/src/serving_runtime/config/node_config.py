@@ -1,6 +1,9 @@
 """Typed, non-secret TOML defaults for the existing MVP argument parser."""
 
 import argparse
+from contextlib import redirect_stdout
+from copy import deepcopy
+import io
 from dataclasses import fields
 from pathlib import Path
 import tomllib
@@ -106,14 +109,21 @@ def apply_node_defaults(parser, arguments):
     if options.config is None:
         return None
     defaults = load_node_defaults(options.config)
-    explicit = set()
-    for token in arguments:
-        parsed = parser._parse_optional(token)
-        if parsed is not None and parsed[0] is not None:
-            explicit.add(parsed[0].dest)
+    explicit_parser = deepcopy(parser)
+    explicit_parser.set_defaults(observation_feed=None, observation_heartbeat=None)
+    # Parse with argparse itself so aliases, abbreviations and option values
+    # follow the real parser. Help is printed once by the real parse below.
+    with redirect_stdout(io.StringIO()):
+        try:
+            explicit, _unknown = explicit_parser.parse_known_args(arguments)
+        except SystemExit as error:
+            if error.code != 0:
+                raise
+            explicit = argparse.Namespace()
+    explicit = vars(explicit)
     # append actions copy defaults; an explicit CLI list replaces its TOML list.
     for destination in ("observation_feed", "observation_heartbeat"):
-        if destination in explicit:
+        if explicit.get(destination) is not None:
             defaults[destination] = []
     parser.set_defaults(**defaults)
     return options.config

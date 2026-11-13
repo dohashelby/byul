@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 
 import yaml
+import pytest
 
 from guard.adapters import engine_profiles
 from guard.adapters.base import Route
@@ -11,6 +12,7 @@ from guard.adapters.engine_provider import get_provider
 from guard.adapters.git_diff import RULES_PATH, classify_path
 from guard.adapters.vllm import VllmAdapter
 from guard.adapters.vllm_release_profiles import release_profile, http_profile
+from tools import gpu_a_aws_lab as lab
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -75,3 +77,20 @@ def test_moved_path_review_maps_exact_files_and_retains_unmapped_paths():
     for path in ['vllm/worker/unknown_future.py', 'vllm/core/new_block_allocator.py',
                  'vllm/v1/engine/core.py', 'vllm/config/vllm.py']:
         assert classify_path(path, rules) == ([], False)
+
+
+@pytest.mark.parametrize('check_id', ['REQ-16', 'REQ-17'])
+def test_approved_cache_comparison_enables_both_sides_explicitly(check_id):
+    handoff = ROOT / 'tests/fixtures/aws-handoff-20261026'
+    for role, version, image in pair():
+        raw, _, record = lab.render(handoff, generation='v2-default', profile='dev', run_id='cache-compare',
+            engine_image=image, engine_version=version, model_revision='a' * 40,
+            host_root='/srv/byul-a', check_id=check_id)
+        deployment, _ = yaml.safe_load_all(raw)
+        args = deployment['spec']['template']['spec']['containers'][0]['args']
+        assert args.count('--enable-prefix-caching') == 1
+        assert record['launch']['prefix_cache'] is True
+        with pytest.raises(ValueError, match='AWS_CHECK_LAUNCH_PROFILE_UNAVAILABLE'):
+            lab.render(handoff, generation='v2-default', profile='dev', run_id='cache-compare',
+                engine_image=image[:-64] + 'e' * 64, engine_version=version, model_revision='a' * 40,
+                host_root='/srv/byul-a', check_id=check_id)

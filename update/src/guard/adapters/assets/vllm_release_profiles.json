@@ -35,6 +35,39 @@
         "token_id_rejection_review": "V0 검증 경로 추가 검토 필요",
         "safe_probe_candidates": [],
         "safe_probe_review": "해당 elastic EP 경로 없음. 안전 프로브를 만들어내지 않는다."
+      },
+      "check_launch_args": {
+        "REQ-16": [
+          "--enable-prefix-caching"
+        ],
+        "REQ-17": [
+          "--enable-prefix-caching"
+        ]
+      },
+      "request_field_mapping": {
+        "REQ-10": {
+          "structured_outputs": "guided_json"
+        }
+      },
+      "unavailable_branches": {
+        "LIF-13": [
+          "shared-weight-cache"
+        ],
+        "LIF-05": [
+          "in-process-transition"
+        ],
+        "LIF-06": [
+          "in-process-transition"
+        ],
+        "LIF-16": [
+          "in-process-transition"
+        ],
+        "LIF-07": [
+          "ready-endpoint"
+        ],
+        "REQ-10": [
+          "tool_choice=required"
+        ]
       }
     },
     {
@@ -102,7 +135,17 @@
             "pin_status": "candidate_pin"
           }
         ]
-      }
+      },
+      "check_launch_args": {
+        "REQ-16": [
+          "--enable-prefix-caching"
+        ],
+        "REQ-17": [
+          "--enable-prefix-caching"
+        ]
+      },
+      "request_field_mapping": {},
+      "unavailable_branches": {}
     }
   ]
 }

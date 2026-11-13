@@ -116,7 +116,7 @@
   "update/src/guard/adapters/assets/unmapped_change_rules.yaml": "e687ce82186e92a8a13923d67bfb6ee94454ed251fa38f05bbdae3d0990542e4",
   "update/src/guard/adapters/assets/vllm_change_rules.yaml": "bf5dfb2d5f411866a829f86f0a2da33314a900931e5b31f653d56c07c93d5273",
   "update/src/guard/adapters/assets/vllm_observer_pin_rows.json": "74800e2230a24daad9fe103c3f35cf8e3be536742a4c77795aad5aa9d9c9bbdc",
-  "update/src/guard/adapters/assets/vllm_release_profiles.json": "696186e9605945a68243d51ca9927332a48c842d14c044e737f9a2cc53058579",
+  "update/src/guard/adapters/assets/vllm_release_profiles.json": "495d4b59d94aa2977ed1dea138fb9c567e12832cb87dae9f7634e9d752226dff",
   "update/src/guard/adapters/base.py": "e5487ba5da4e42e82a3ea3f6c39759a3d7e34da7fb4d48e30b086cc12dbc9a62",
   "update/src/guard/adapters/engine_profiles.py": "746a5ad88de10f0babebfc89321ce326efae30d02caa3b85bbd1939e0330c61a",
   "update/src/guard/adapters/engine_provider.py": "40b077ea8595bfed246c265c57b73fca88e1029eb84c7ceecf4fa84d8f2d876c",

@@ -280,7 +280,7 @@ MVP 밖(후속): 이전 판본 쌍의 정본 실측·비교, SGLang 생산자·�
 | 6 | TP2 할당량(G and VT vCPU 8→48)과 두 판본 J01 상한 | J01 전 | 승인 상태 확인. 늦어지면 J02를 먼저 하고 TP2 6개는 J01 뒤 합친다 |
 | 7 | SUP-08 정본 정의 | M-A4·M-A8 | #246의 코드 선택 정의(revision 5)를 @34 정본에 넣는다 |
 | 8 | ~~A의 M-A1~A7 담당~~ **불필요**(2026-11-13 단독 개발) | 단계 0 중 | A가 SUP-08(M-A8)에 묶여 M-A4·A5·A6이 늦어지면, M-A5·M-A6을 B 또는 다른 담당에 넘길지 정한다. 이 셋이 J02의 선행 조건이다 |
-| 9 | 한 판본에 기능이 없을 때 판정 (비적용 / UNKNOWN) | **항목별 검토 대기** (2026-11-13 사용자, 일괄 승인 안 함) | LIF-13(공유 가중치), LIF-05·06·16(실행 중 전환 분기), LIF-07(`/ready` 분기), REQ-10(`tool_choice=required` 사례)은 기준 쪽 UNKNOWN 제안. REQ-06은 비적용 근거 문장만 추가. REQ-16·17은 두 판본 모두 `--enable-prefix-caching` 명시 제안. 승인 전 기본은 UNKNOWN (DECISIONS G3) |
+| 9 | 한 판본에 기능이 없을 때 판정 (비적용 / UNKNOWN) | **항목별 승인(2026-11-13 사용자, 9-1~9-6)** | LIF-13 기준 UNKNOWN. LIF-05·06·16 실행 중 전환 분기만 기준 UNKNOWN·Pod 교체 양쪽 실행. LIF-07 준비 API 분기 기준 UNKNOWN. REQ-06 기존 비적용+부재 근거. REQ-10 guided_json 대응·required만 기준 UNKNOWN. REQ-16·17 양쪽 prefix caching 명시. 실제 소비·GPU 검증은 별도 |
 | 10 | UNKNOWN으로 남길 어려운 항목 목록 | M-A6 부분 결정됨, M-B4는 적용표 보고 뒤 | **M-A6 결정됨(2026-11-12 사용자):** D4(인증 middleware 내부)·D5(V0 profiler)는 기준 쪽 UNKNOWN 승인. D1(V0 scheduler·캐시)·D2(V0 model runner·CUDA Graph)·D3(V0 다중 프로세스·executor)는 미승인, (c) 후속으로 만든다. PASS·NOT_APPLICABLE로 바꾸지 않는다 |
 | 11 | 엔진 이미지 Python이 3.12가 아닐 때 | **불필요** | 두 이미지 모두 3.12(M-A6 선행 확인). 다만 sensor 15개가 요구하는 CPython 패치 판본은 미확인이라 결정 15에 달림 |
 | 12 | 시험 모델 교체 | **지금은 불필요** | 교체가 필요한 모델 없음. Qwen2-VL-2B-Instruct는 J01 전에 revision을 고정하고 첫 기동에서 기준 판본 Transformers로 읽히는지 확인. 실패하면 그때 올린다 |

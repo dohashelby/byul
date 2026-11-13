@@ -20,8 +20,8 @@ RANK = {
 }
 BRANCHES = {"devtools", "bridge_update"}
 KNOWN_VIOLATIONS = (
-    ("cli/demo.py", "serving_runtime.devtools.demo", "WP3에서 CLI 실행 경로 분리"),
-    ("cli/demo.py", "serving_runtime.devtools.acceptance", "WP3에서 CLI 실행 경로 분리"),
+    ("cli/demo.py", "serving_runtime.devtools.demo", "명령 자체가 devtools 실행(WP3 결정)"),
+    ("cli/demo.py", "serving_runtime.devtools.acceptance", "명령 자체가 devtools 실행(WP3 결정)"),
     (
         "gateway/app.py",
         "serving_runtime.devtools.mock_engine",

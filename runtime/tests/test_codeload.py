@@ -340,6 +340,7 @@ def test_collection_gap_is_unavailable_and_feed_keeps_status(tmp_path):
     }
     heartbeat_path.write_text(json.dumps(heartbeat))
     feed = ObservationFeed(
+        kube_context="kind-runtime-lab",
         kind="tetragon",
         path=feed_path,
         data_dir=tmp_path / "data",

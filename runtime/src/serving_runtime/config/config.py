@@ -75,7 +75,7 @@ class MVPConfig:
     target_path: str | None = None
     target_pod_status: bool = False
     target_pod_snapshot: str | None = None
-    # None means: use the target registration context, else DEFAULT_KUBE_CONTEXT.
+    # None means: use the target registration context; require a value when Kubernetes is used.
     kube_context: str | None = None
     observation_exceptions_path: str | None = None
     observation_timeline_path: str | None = None

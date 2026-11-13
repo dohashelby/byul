@@ -21,7 +21,7 @@ from tools.tetragon_status import StatusCollector
 
 
 def check(output: Path, *, restart_agent=False):
-    fixture = KindTrial(output, "sigkill_fd_install")
+    fixture = KindTrial(output, "sigkill_fd_install", context="kind-runtime-lab")
     report = {
         "schema_version": "runtime-tetragon-operations-check/1.0",
         "id": fixture.namespace,

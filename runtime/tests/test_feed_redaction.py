@@ -328,13 +328,31 @@ class ReaderGroupSharingTests(unittest.TestCase):
             feed.check_reader_group(missing)
         feed.check_reader_group(os.getgid())  # a held group is accepted
         feed.check_reader_group(None)
-        code = feed.main(["--output-dir", str(self.directory / "out"), "--reader-group", str(missing)])
+        code = feed.main(
+            [
+                "--kube-context",
+                "kind-runtime-lab",
+                "--output-dir",
+                str(self.directory / "out"),
+                "--reader-group",
+                str(missing),
+            ]
+        )
         self.assertEqual(code, 2)
         self.assertFalse((self.directory / "out").exists())
 
     def test_cli_accepts_reader_group(self) -> None:
         args = feed.build_parser().parse_args(
-            ["--output-dir", str(self.directory), "--reader-group", "10010", "--kube-context", "byul-aws-lab"]
+            [
+                "--kube-context",
+                "kind-runtime-lab",
+                "--output-dir",
+                str(self.directory),
+                "--reader-group",
+                "10010",
+                "--kube-context",
+                "byul-aws-lab",
+            ]
         )
         self.assertEqual((args.reader_group, args.kube_context), (10010, "byul-aws-lab"))
 

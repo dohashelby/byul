@@ -332,6 +332,7 @@ class ExternalEnforcementTests(unittest.TestCase):
                 data_dir=str(root / "data"),
                 observation_intent_path=str(intent_path),
                 policy_bundle=bundle,
+                kube_context="kind-runtime-lab",
                 tetragon_state_path=str(public),
                 observation_feeds=(("tetragon", str(root / "feed.jsonl")),),
             )
@@ -380,6 +381,7 @@ class ExternalEnforcementTests(unittest.TestCase):
                         data_dir=str(root / "unbound"),
                         observation_intent_path=str(intent_path),
                         policy_bundle=unbound,
+                        kube_context="kind-runtime-lab",
                         tetragon_state_path=str(public),
                         observation_feeds=(("tetragon", str(root / "feed.jsonl")),),
                     ),

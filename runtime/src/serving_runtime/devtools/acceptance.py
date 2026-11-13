@@ -211,6 +211,7 @@ class _Runner:
         target_path: Path | None = None,
         observation_feeds: tuple[tuple[str, str], ...] = (),
         observation_heartbeats: tuple[tuple[str, str], ...] = (),
+        kube_context: str | None = None,
         observation_origin: str = "real",
     ) -> None:
         self.stop()
@@ -240,6 +241,7 @@ class _Runner:
             target_path=str(target_path) if target_path else None,
             observation_feeds=observation_feeds,
             observation_heartbeats=observation_heartbeats,
+            kube_context=kube_context,
             observation_origin=observation_origin,
         )
         self.gateway = GatewayApp(config, load_policy(policy_path), self.engine.address).start()
@@ -2299,7 +2301,7 @@ def _run_s4_05(runner: _Runner) -> AcceptanceResult:
             children=[
                 helper._Child(
                     "tetragon",
-                    lambda since: helper.tetragon_command(since_time=since),
+                    lambda since: helper.tetragon_command(context="kind-runtime-lab", since_time=since),
                     sink,
                     sink,
                 )
@@ -2307,7 +2309,7 @@ def _run_s4_05(runner: _Runner) -> AcceptanceResult:
         )
         supervisor = helper._Supervisor(
             [group],
-            context=helper.EXPECTED_CONTEXT,
+            context="kind-runtime-lab",
             stop_requested=threading.Event(),
             clock=lambda: now[0],
         )
@@ -2333,6 +2335,7 @@ def _run_s4_05(runner: _Runner) -> AcceptanceResult:
                 collector_stale_after_s=30.0,
                 observation_feeds=(("tetragon", str(feed_path)),),
                 observation_heartbeats=(("tetragon", str(heartbeat_path)),),
+                kube_context="kind-runtime-lab",
                 observation_origin="synthetic",
             )
             running = _wait_for(

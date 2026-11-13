@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Iterable
 from uuid import uuid4
 
+from serving_runtime.common.kube_context import validate_kube_context
 from serving_runtime.enforcement.events import transform_lines_with_loss
 
 from serving_runtime.observation.collectors import CollectionFailure, NoCollectionUpdate
@@ -53,7 +54,7 @@ class ObservationFeed:
         heartbeat_stale_after_s: float = 15.0,
         exec_policy: Any = None,
         identity_path: str | Path | None = None,
-        kube_context: str = "kind-runtime-lab",
+        kube_context: str | None = None,
         health_receipt_mode: int = 0o600,
     ) -> None:
         if type(health_receipt_mode) is not int or health_receipt_mode not in {0o600, 0o640}:
@@ -307,6 +308,8 @@ class ObservationFeed:
             or document.get("kind") != self.kind
         ):
             raise ValueError("observation writer heartbeat schema or kind is invalid")
+        if document.get("kube_context") is not None:
+            validate_kube_context(self.kube_context)
         if document.get("kube_context") not in (None, self.kube_context):
             raise ValueError("observation writer belongs to a different Kubernetes context")
         feed_path = document.get("feed_path")
@@ -586,6 +589,7 @@ class ObservationFeed:
         self._checkpoint_pending = False
 
     def _save_health_receipt(self, item):
+        validate_kube_context(self.kube_context)
         path = self.state_path.parent / "tetragon-health-receipts.json"
         nodes = {}
         try:
@@ -624,6 +628,7 @@ class ObservationFeed:
         if self.kind == "tetragon" and self.identity_path is not None:
             from serving_runtime.enforcement.attribution import read_identities
 
+            validate_kube_context(self.kube_context)
             identity_index = read_identities(self.identity_path, context=self.kube_context)
         writer_loss_changed = self._update_writer_loss(heartbeat)
         mode = "append"

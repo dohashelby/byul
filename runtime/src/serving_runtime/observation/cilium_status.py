@@ -6,12 +6,12 @@ import json
 import subprocess
 from typing import Any, Callable
 
-from serving_runtime.common.kube_context import DEFAULT_KUBE_CONTEXT, validate_kube_context
+from serving_runtime.common.kube_context import validate_kube_context
 
 NAMESPACE = "serving-lab"
 
 
-def policy_command(context: str = DEFAULT_KUBE_CONTEXT) -> list[str]:
+def policy_command(context: str | None = None) -> list[str]:
     return [
         "kubectl",
         "--context",
@@ -30,7 +30,7 @@ class CiliumPolicyCollector:
         self,
         *,
         timeout_s: float,
-        context: str = DEFAULT_KUBE_CONTEXT,
+        context: str | None = None,
         runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     ) -> None:
         self.timeout_s = timeout_s

@@ -34,9 +34,9 @@ class CliSurfaceContractTests(unittest.TestCase):
         tools = next(a for a in before["parsers"]["agent"]["actions"] if a.get("dest") == "tools_dir")
         self.assertEqual(Path(tools["default"]).name, "tools")
         tools["default"] = str(ROOT / "tools")
-        problems, allowed = surface.compare(before, actual, set(), {"mvp --config"})
+        problems, allowed = surface.compare(before, actual, set(), {"mvp --config"}, {"mvp --kube-context"})
         self.assertEqual(problems, [])
-        self.assertEqual(len(allowed), 1)
+        self.assertEqual(len(allowed), 2)
 
     def test_unapproved_argument_and_help_changes_are_rejected(self):
         before = json.loads(BASELINE.read_text(encoding="utf-8"))

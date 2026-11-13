@@ -12,7 +12,13 @@ from serving_runtime.observation.observation_feed import ObservationFeed
 
 def feed(root):
     return ObservationFeed(
-        kind="tetragon", path=root / "feed", data_dir=root, data_origin="real", environment=None, run_id=None
+        kube_context="kind-runtime-lab",
+        kind="tetragon",
+        path=root / "feed",
+        data_dir=root,
+        data_origin="real",
+        environment=None,
+        run_id=None,
     )
 
 
@@ -66,6 +72,7 @@ def test_failed_replace_preserves_prior_receipt_and_cleans_temporary(tmp_path):
 def test_health_receipt_mode_rejects_unapproved_permissions(tmp_path, mode):
     with pytest.raises(ValueError, match="health_receipt_mode"):
         ObservationFeed(
+            kube_context="kind-runtime-lab",
             kind="tetragon",
             path=tmp_path / "feed",
             data_dir=tmp_path,
@@ -85,6 +92,7 @@ def test_gateway_shares_only_tetragon_health_receipts_with_configured_status_rea
     for configured in (False, True):
         root = tmp_path / str(configured)
         config = MVPConfig(
+            kube_context="kind-runtime-lab",
             policy_path=str(policy),
             data_dir=str(root),
             observation_feeds=(("tetragon", str(root / "feed")), ("hubble", str(root / "hubble"))),

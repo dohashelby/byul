@@ -31,7 +31,6 @@ from serving_runtime.gateway.request_records import RequestRecords
 from serving_runtime.observation.store import JsonlStore
 from serving_runtime.gateway.validator import Decision
 from tools.k8s_observation_feed import (
-    EXPECTED_CONTEXT,
     assert_safe_context,
     hubble_command,
     hubble_port_forward_command,
@@ -40,6 +39,8 @@ from tools.k8s_observation_feed import (
     write_heartbeats,
 )
 
+
+EXPECTED_CONTEXT = "kind-runtime-lab"
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests/fixtures/enforcement"
@@ -202,6 +203,7 @@ class ObservationFeedTests(unittest.TestCase):
         heartbeat_stale_after_s: float = 15,
     ) -> ObservationFeed:
         return ObservationFeed(
+            kube_context="kind-runtime-lab",
             kind="hubble",
             path=self.path,
             data_dir=self.data_dir,
@@ -531,8 +533,8 @@ class CiliumCollectorTests(unittest.TestCase):
             calls.append(argv)
             return subprocess.CompletedProcess(argv, 0, json.dumps(response), "")
 
-        value, origin = CiliumPolicyCollector(timeout_s=1, runner=runner).collect()
-        self.assertEqual(calls, [policy_command()])
+        value, origin = CiliumPolicyCollector(timeout_s=1, context=EXPECTED_CONTEXT, runner=runner).collect()
+        self.assertEqual(calls, [policy_command(EXPECTED_CONTEXT)])
         self.assertEqual(origin, "kubernetes_api")
         self.assertTrue(value["configured"])
         self.assertEqual(value["policies"][0]["name"], "runtime-engine-ingress")
@@ -555,11 +557,11 @@ class FeedHelperTests(unittest.TestCase):
         self.assertEqual(hubble[-2:], ["--verdict", "DROPPED"])
         self.assertNotIn("--verdict", hubble_command(include_forwarded=True))
         self.assertEqual(
-            hubble_port_forward_command(),
+            hubble_port_forward_command(EXPECTED_CONTEXT),
             ["cilium", "hubble", "port-forward", "--context", EXPECTED_CONTEXT],
         )
-        self.assertIn(EXPECTED_CONTEXT, tetragon_command())
-        self.assertIn("--tail=0", tetragon_command())
+        self.assertIn(EXPECTED_CONTEXT, tetragon_command(context=EXPECTED_CONTEXT))
+        self.assertIn("--tail=0", tetragon_command(context=EXPECTED_CONTEXT))
         called = False
 
         def runner(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
@@ -580,7 +582,7 @@ class FeedHelperTests(unittest.TestCase):
             patch.object(helper, "run", side_effect=timeout),
             patch.object(helper.sys, "stderr", new_callable=io.StringIO) as stderr,
         ):
-            result = helper.main(["--output-dir", "unused"])
+            result = helper.main(["--output-dir", "unused", "--kube-context", EXPECTED_CONTEXT])
 
         self.assertEqual(result, 1)
         self.assertIn("timed out after 10 seconds", stderr.getvalue())
@@ -666,8 +668,8 @@ class FeedHelperTests(unittest.TestCase):
             self.assertEqual(json.loads((root / "tetragon.heartbeat.json").read_text())["state"], "stopped")
 
     def test_tetragon_backfill_uses_since_time_on_reconnect(self) -> None:
-        self.assertIn("--tail=0", tetragon_command())
-        command = tetragon_command(since_time="2026-10-24T13:07:36Z")
+        self.assertIn("--tail=0", tetragon_command(context=EXPECTED_CONTEXT))
+        command = tetragon_command(context=EXPECTED_CONTEXT, since_time="2026-10-24T13:07:36Z")
         self.assertIn("--since-time=2026-10-24T13:07:36Z", command)
         self.assertNotIn("--tail=0", command)
 
@@ -716,11 +718,18 @@ class FeedReconnectTests(unittest.TestCase):
             feed_path=self.root / "tetragon.jsonl",
             heartbeat_path=self.root / "tetragon.heartbeat.json",
             gap_path=self.root / "tetragon.gaps.jsonl",
-            children=[helper._Child("tetragon", lambda since: helper.tetragon_command(since_time=since), sink, sink)],
+            children=[
+                helper._Child(
+                    "tetragon",
+                    lambda since: helper.tetragon_command(context=EXPECTED_CONTEXT, since_time=since),
+                    sink,
+                    sink,
+                )
+            ],
         )
         self.supervisor = helper._Supervisor(
             [self.group],
-            context=helper.EXPECTED_CONTEXT,
+            context=EXPECTED_CONTEXT,
             stop_requested=threading.Event(),
             clock=lambda: self.now,
         )
@@ -764,7 +773,7 @@ class FeedReconnectTests(unittest.TestCase):
                 )
                 self.supervisor = self.helper._Supervisor(
                     [self.group],
-                    context=self.helper.EXPECTED_CONTEXT,
+                    context=EXPECTED_CONTEXT,
                     stop_requested=self.supervisor.stop_requested,
                     clock=lambda: self.now,
                 )
@@ -808,7 +817,7 @@ class FeedReconnectTests(unittest.TestCase):
             )
         self.supervisor = self.helper._Supervisor(
             [self.group],
-            context=self.helper.EXPECTED_CONTEXT,
+            context=EXPECTED_CONTEXT,
             stop_requested=self.supervisor.stop_requested,
             clock=lambda: self.now,
         )
@@ -837,7 +846,7 @@ class FeedReconnectTests(unittest.TestCase):
         before = self.group.gap_path.read_bytes()
         self.supervisor = self.helper._Supervisor(
             [self.group],
-            context=self.helper.EXPECTED_CONTEXT,
+            context=EXPECTED_CONTEXT,
             stop_requested=self.supervisor.stop_requested,
             clock=lambda: self.now,
         )
@@ -861,7 +870,7 @@ class FeedReconnectTests(unittest.TestCase):
         )
         self.supervisor = self.helper._Supervisor(
             [self.group],
-            context=self.helper.EXPECTED_CONTEXT,
+            context=EXPECTED_CONTEXT,
             stop_requested=self.supervisor.stop_requested,
             clock=lambda: self.now,
         )
@@ -899,7 +908,7 @@ class FeedReconnectTests(unittest.TestCase):
         self.group.gap_path.write_text('{"event": "gap_opened"}\nnot-json\n', encoding="utf-8")
         self.supervisor = self.helper._Supervisor(
             [self.group],
-            context=self.helper.EXPECTED_CONTEXT,
+            context=EXPECTED_CONTEXT,
             stop_requested=self.supervisor.stop_requested,
             clock=lambda: self.now,
         )
@@ -921,12 +930,13 @@ class FeedReconnectTests(unittest.TestCase):
         )
         self.supervisor = self.helper._Supervisor(
             [self.group],
-            context=self.helper.EXPECTED_CONTEXT,
+            context=EXPECTED_CONTEXT,
             stop_requested=self.supervisor.stop_requested,
             clock=lambda: self.now,
         )
         self.group.feed_path.write_text("", encoding="utf-8")
         feed = ObservationFeed(
+            kube_context="kind-runtime-lab",
             kind="tetragon",
             path=self.group.feed_path,
             data_dir=self.root / "data",
@@ -982,7 +992,7 @@ class FeedReconnectTests(unittest.TestCase):
             self.assertEqual(len(self.argv), 2)
             since = self.gaps()[0]["backfill_since"]
             self.assertIn(f"--since-time={since}", self.argv[1])
-            context_check.assert_called_once_with(self.helper.EXPECTED_CONTEXT)
+            context_check.assert_called_once_with(EXPECTED_CONTEXT)
 
         heartbeat = self.heartbeat()
         self.assertEqual(heartbeat["state"], "running")
@@ -1076,6 +1086,7 @@ class FeedReconnectTests(unittest.TestCase):
             encoding="utf-8",
         )
         feed = ObservationFeed(
+            kube_context="kind-runtime-lab",
             kind="tetragon",
             path=feed_path,
             data_dir=self.root / "partial-data",
@@ -1100,6 +1111,7 @@ class FeedReconnectTests(unittest.TestCase):
         feed_path = self.root / "tetragon.jsonl"
         feed_path.write_text("", encoding="utf-8")
         feed = ObservationFeed(
+            kube_context="kind-runtime-lab",
             kind="tetragon",
             path=feed_path,
             data_dir=self.root / "data",

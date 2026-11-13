@@ -25,7 +25,7 @@ from typing import BinaryIO, Callable, Sequence
 from uuid import uuid4
 
 from serving_runtime.config.config import DEFAULT_COLLECTOR_INTERVAL_S, DEFAULT_COLLECTOR_STALE_AFTER_S
-from serving_runtime.common.kube_context import DEFAULT_KUBE_CONTEXT, validate_kube_context
+from serving_runtime.common.kube_context import validate_kube_context
 from serving_runtime.observation.observation_feed import HEARTBEAT_SCHEMA
 from serving_runtime.target.target import (
     POD_SNAPSHOT_SCHEMA,
@@ -42,7 +42,6 @@ from serving_runtime.enforcement.phase_signals import (
 )
 
 
-EXPECTED_CONTEXT = DEFAULT_KUBE_CONTEXT
 LAB_NAMESPACE = "serving-lab"
 PHASE_LOG_LIMIT_BYTES = 8 * 1024 * 1024
 
@@ -89,7 +88,7 @@ def hubble_command(*, since: str | None = None, include_forwarded: bool = False)
 
 
 def hubble_port_forward_command(
-    context: str = EXPECTED_CONTEXT,
+    context: str | None = None,
 ) -> list[str]:
     return [
         "cilium",
@@ -100,7 +99,7 @@ def hubble_port_forward_command(
     ]
 
 
-def tetragon_command(*, context: str = EXPECTED_CONTEXT, since_time: str | None = None) -> list[str]:
+def tetragon_command(*, context: str | None = None, since_time: str | None = None) -> list[str]:
     # A fresh start skips old lines; a restart with an open gap asks for older
     # lines so events during the gap can be recovered (duplicates are dropped
     # by the Gateway's event key).
@@ -1444,9 +1443,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--kube-context",
         "--context",
         dest="kube_context",
-        default=EXPECTED_CONTEXT,
+        required=True,
         metavar="NAME",
-        help="명시적으로 사용할 Kubernetes context (기본: kind-runtime-lab)",
+        help="명시적으로 사용할 Kubernetes context (필수)",
     )
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument(

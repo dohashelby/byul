@@ -353,7 +353,13 @@ class SnapshotTests(unittest.TestCase):
             engine = MockEngine(port=0, receipts_path=root / "receipts.jsonl").start()
             try:
                 gateway = GatewayApp(
-                    MVPConfig(gateway_port=0, engine_port=0, policy_path=str(policy), data_dir=directory),
+                    MVPConfig(
+                        gateway_port=0,
+                        engine_port=0,
+                        policy_path=str(policy),
+                        data_dir=directory,
+                        kube_context="kind-runtime-lab",
+                    ),
                     load_policy(policy),
                     engine.address,
                 ).start()

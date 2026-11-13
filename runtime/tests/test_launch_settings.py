@@ -291,7 +291,15 @@ def test_observation_feed_main_rejects_invalid_target_container(tmp_path, capsys
     output = tmp_path / "observation"
     assert (
         feed.main(
-            ["--output-dir", str(output), "--target-selector", "app=serving-engine", f"--target-container={container}"]
+            [
+                "--kube-context",
+                "kind-runtime-lab",
+                "--output-dir",
+                str(output),
+                "--target-selector",
+                "app=serving-engine",
+                f"--target-container={container}",
+            ]
         )
         == 1
     )

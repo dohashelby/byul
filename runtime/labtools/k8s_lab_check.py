@@ -26,7 +26,7 @@ from serving_runtime.enforcement.intent import load_intent, parse_intent
 from serving_runtime.enforcement.tetragon import (
     render_manifests as render_tetragon_manifests,
 )
-from serving_runtime.common.kube_context import DEFAULT_KUBE_CONTEXT, validate_kube_context
+from serving_runtime.common.kube_context import validate_kube_context
 from serving_runtime.devtools.lab_report import LabReportSource
 
 try:
@@ -37,7 +37,7 @@ except ModuleNotFoundError:  # direct script execution
     from tetragon_trial import atomic_json
 
 
-EXPECTED_CONTEXT = DEFAULT_KUBE_CONTEXT
+EXPECTED_CONTEXT = "kind-runtime-lab"
 REPORT_SCHEMA = "serving-runtime-k8s-lab-report/1.0"
 PROBE_ATTEMPTS = 5
 DEFAULT_TETRAGON_WAIT = 90.0

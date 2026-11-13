@@ -28,7 +28,7 @@ from serving_runtime.observation.collectors import (
     load_declaration,
 )
 from serving_runtime.observation.cilium_status import CiliumPolicyCollector
-from serving_runtime.common.kube_context import DEFAULT_KUBE_CONTEXT
+from serving_runtime.common.kube_context import validate_kube_context
 from serving_runtime.config.config import MVPConfig
 from serving_runtime.gateway.engine_client import EngineClient
 from serving_runtime.gateway.http_handler import HandlerDependencies, LimitedThreadingHTTPServer, create_handler
@@ -376,7 +376,9 @@ class GatewayApp:
                 f"--kube-context {config.kube_context!r}가 대상 등록의 "
                 f"kubernetes.context {registered_context!r}와 다릅니다"
             )
-        kube_context = config.kube_context or registered_context or DEFAULT_KUBE_CONTEXT
+        kube_context = config.kube_context or registered_context
+        if config.tetragon_state_path is not None or (Path(config.data_dir) / "tetragon-state.json").exists():
+            validate_kube_context(kube_context)
         self._tetragon_context = kube_context
         for feed in self._observation_feeds:
             feed.kube_context = kube_context
@@ -568,6 +570,8 @@ class GatewayApp:
         )
 
     def tetragon_status(self) -> dict[str, Any]:
+        if Path(self.config.tetragon_state_path or Path(self.config.data_dir) / "tetragon-state.json").exists():
+            validate_kube_context(self._tetragon_context)
         return read_tetragon_state(
             self.config.tetragon_state_path or Path(self.config.data_dir) / "tetragon-state.json",
             context=self._tetragon_context,

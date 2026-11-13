@@ -30,6 +30,7 @@ def setup_feed(tmp_path):
     )
     heartbeat.write_text(json.dumps(document))
     feed = ObservationFeed(
+        kube_context="kind-runtime-lab",
         kind="hubble",
         path=path,
         data_dir=tmp_path / "data",
@@ -88,6 +89,7 @@ def test_record_save_failure_retries_same_event_and_keeps_history(tmp_path):
     assert recovered["last_value"]["storage_errors_total"] == 1
     assert len(feed.store.read_all()[0]) == 1
     restored = ObservationFeed(
+        kube_context="kind-runtime-lab",
         kind="hubble",
         path=feed.path,
         data_dir=feed.state_path.parent,
@@ -142,6 +144,7 @@ def test_reconnecting_drop_survives_writer_counter_reset_and_gateway_restart(tmp
     assert value["redaction_loss_detected"] is True
     assert value["last_redaction_drop_at"]
     restored = ObservationFeed(
+        kube_context="kind-runtime-lab",
         kind="tetragon",
         path=feed.path,
         data_dir=feed.state_path.parent,
@@ -171,6 +174,7 @@ def test_drop_totals_separate_writer_instances_even_when_counter_increases(tmp_p
     assert collector.snapshot()["last_value"]["redaction_dropped_lines_total"] == 10
     # Save/load the Gateway to verify that writer identity survives checkpoints.
     restored = ObservationFeed(
+        kube_context="kind-runtime-lab",
         kind="tetragon",
         path=feed.path,
         data_dir=feed.state_path.parent,
@@ -200,6 +204,7 @@ def test_producer_drop_time_reason_survive_checkpoint_and_new_writer(tmp_path):
     value = collector.snapshot()["last_value"]
     assert value["last_redaction_drop_at"] == when and value["last_redaction_drop_reason"] == "INVALID_JSON"
     restored = ObservationFeed(
+        kube_context="kind-runtime-lab",
         kind="tetragon",
         path=feed.path,
         data_dir=feed.state_path.parent,

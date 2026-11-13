@@ -44,6 +44,7 @@ def make_feed(tmp_path):
     )
     recorder.start_heartbeat()
     feed = ObservationFeed(
+        kube_context="kind-runtime-lab",
         kind="management_listener",
         path=path,
         data_dir=tmp_path / "data",
@@ -167,6 +168,7 @@ def test_duplicate_restart_storage_failure_and_recovery(tmp_path):
             out.write(feed.path.read_bytes())
         assert feed.collect()[0]["duplicates"] == 1
         restored = ObservationFeed(
+            kube_context="kind-runtime-lab",
             kind="management_listener",
             path=feed.path,
             data_dir=feed.state_path.parent,

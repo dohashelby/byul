@@ -17,6 +17,7 @@ class ObservationAtomicContractTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.feed = module.ObservationFeed(
+            kube_context="kind-runtime-lab",
             kind="tetragon",
             path=self.root / "feed.jsonl",
             data_dir=self.root / "data",

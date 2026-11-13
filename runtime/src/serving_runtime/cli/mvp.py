@@ -80,7 +80,7 @@ def _add_arguments_1(mvp_parser):
         metavar="NAME",
         help=(
             "Cilium 정책·대상 Pod 조회에 명시할 Kubernetes context. 생략하면 대상 등록의 "
-            "kubernetes.context, 그것도 없으면 kind-runtime-lab. 대상 등록과 다르면 시작하지 않음"
+            "kubernetes.context. Kubernetes 기능 사용 시 필수. 대상 등록과 다르면 시작하지 않음"
         ),
     )
 

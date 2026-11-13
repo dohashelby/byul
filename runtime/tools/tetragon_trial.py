@@ -15,6 +15,7 @@ import subprocess
 import time
 from uuid import uuid4
 
+from serving_runtime.common.kube_context import validate_kube_context
 from serving_runtime.enforcement.intent import parse_intent
 from serving_runtime.enforcement.tetragon import render_manifests, comparable_spec
 from serving_runtime.enforcement.verification import KERNEL_IDENTITY_DATA, match_probe_events, reassess_record
@@ -184,7 +185,7 @@ class KindTrial:
         *,
         image="serving-runtime-lab:dev",
         override_only=False,
-        context="kind-runtime-lab",
+        context=None,
         node_access="kind-docker",
         image_pull_policy="IfNotPresent",
         runner=None,
@@ -193,6 +194,7 @@ class KindTrial:
             raise ValueError("unknown node access method")
         if image_pull_policy not in {"IfNotPresent", "Never"}:
             raise ValueError("unsupported image pull policy")
+        context = validate_kube_context(context)
         self.run = runner or run
         self.node_access = (
             KindDockerAccess(self.run) if node_access == "kind-docker" else LocalSudoAccess(self.run, context)
@@ -670,7 +672,7 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--methods", nargs="+", choices=METHODS, default=METHODS)
     parser.add_argument("--node-access", choices=("kind-docker", "local-sudo"), default="kind-docker")
-    parser.add_argument("--context", default="kind-runtime-lab")
+    parser.add_argument("--context", required=True)
     parser.add_argument("--image", default="serving-runtime-lab:dev", help="Python을 포함한 시험용 이미지")
     parser.add_argument("--image-pull-policy", choices=("IfNotPresent", "Never"), default="IfNotPresent")
     parser.add_argument(

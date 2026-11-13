@@ -162,6 +162,7 @@ class FakeRunner:
 
 
 def execute_fake(root, runner, module=trial_module, **kwargs):
+    kwargs.setdefault("context", "kind-runtime-lab")
     parse_row = tetragon_mode.parse_policy_row
 
     def stable_row(*args):
@@ -220,7 +221,9 @@ class AtomicJsonTests(unittest.TestCase):
 class TrialTests(unittest.TestCase):
     def test_local_sudo_exact_commands_and_identity(self):
         runner = FakeRunner()
-        trial = KindTrial(Path("/unused"), "sigkill_fd_install", node_access="local-sudo", runner=runner)
+        trial = KindTrial(
+            Path("/unused"), "sigkill_fd_install", context="kind-runtime-lab", node_access="local-sudo", runner=runner
+        )
         identity = trial.task_identity(runner.pod(), runner.node)
         kernel = trial.node_access.kernel(runner.node)
         self.assertEqual(
@@ -266,7 +269,9 @@ class TrialTests(unittest.TestCase):
 
     def test_local_machine_id_mismatch_refused_before_cri(self):
         runner = FakeRunner(local_machine_id="f" * 32)
-        trial = KindTrial(Path("/unused"), "sigkill_fd_install", node_access="local-sudo", runner=runner)
+        trial = KindTrial(
+            Path("/unused"), "sigkill_fd_install", context="kind-runtime-lab", node_access="local-sudo", runner=runner
+        )
         with self.assertRaisesRegex(RuntimeError, "does not match"):
             trial.task_identity(runner.pod(), runner.node)
         self.assertEqual(len(runner.calls), 2)
@@ -305,7 +310,13 @@ class TrialTests(unittest.TestCase):
             for value in ("", "a" * 31, "a" * 33, MACHINE_ID.upper(), "g" * 32, "PRIVATE"):
                 with self.subTest(side=side, value=value):
                     runner = FakeRunner(**{side: value})
-                    trial = KindTrial(Path("/unused"), "sigkill_fd_install", node_access="local-sudo", runner=runner)
+                    trial = KindTrial(
+                        Path("/unused"),
+                        "sigkill_fd_install",
+                        context="kind-runtime-lab",
+                        node_access="local-sudo",
+                        runner=runner,
+                    )
                     with self.assertRaises(RuntimeError) as raised:
                         trial.task_identity(runner.pod(), runner.node)
                     self.assertNotIn(MACHINE_ID, str(raised.exception))
@@ -314,7 +325,13 @@ class TrialTests(unittest.TestCase):
                     self.assertFalse(any("inspect" in cmd for cmd in runner.calls))
         for failure in ("machineID", "/etc/machine-id"):
             runner = FakeRunner(fail=failure)
-            trial = KindTrial(Path("/unused"), "sigkill_fd_install", node_access="local-sudo", runner=runner)
+            trial = KindTrial(
+                Path("/unused"),
+                "sigkill_fd_install",
+                context="kind-runtime-lab",
+                node_access="local-sudo",
+                runner=runner,
+            )
             with self.subTest(failure=failure), self.assertRaises(RuntimeError):
                 trial.task_identity(runner.pod(), runner.node)
             self.assertFalse(any("inspect" in cmd for cmd in runner.calls))
@@ -328,7 +345,9 @@ class TrialTests(unittest.TestCase):
                     raise OSError("PRIVATE")
                 return runner(command, **kwargs)
 
-            trial = KindTrial(Path("/unused"), "sigkill_fd_install", node_access="local-sudo", runner=fake)
+            trial = KindTrial(
+                Path("/unused"), "sigkill_fd_install", context="kind-runtime-lab", node_access="local-sudo", runner=fake
+            )
             with self.subTest(executable=executable), self.assertRaises(RuntimeError) as raised:
                 trial.task_identity(runner.pod(), runner.node)
             self.assertNotIn("PRIVATE", str(raised.exception))
@@ -364,7 +383,9 @@ class TrialTests(unittest.TestCase):
                     return result({"info": {"pid": pid}})
                 return runner(command, **kw)
 
-            trial = KindTrial(Path("/unused"), "sigkill_fd_install", node_access="local-sudo", runner=fake)
+            trial = KindTrial(
+                Path("/unused"), "sigkill_fd_install", context="kind-runtime-lab", node_access="local-sudo", runner=fake
+            )
             with self.subTest(pid=pid), self.assertRaisesRegex(RuntimeError, "invalid CRI init PID"):
                 trial.task_identity(runner.pod(), runner.node)
             self.assertFalse(any("/proc/" in arg for cmd in runner.calls for arg in cmd))
@@ -448,7 +469,16 @@ class TrialTests(unittest.TestCase):
         with (
             patch(
                 "sys.argv",
-                ["trial", "--output", "/unused", "--methods", "sigkill_fd_install", "--allow-isolated-kind-trials"],
+                [
+                    "trial",
+                    "--output",
+                    "/unused",
+                    "--context",
+                    "kind-runtime-lab",
+                    "--methods",
+                    "sigkill_fd_install",
+                    "--allow-isolated-kind-trials",
+                ],
             ),
             patch.object(trial_module, "KindTrial") as constructor,
             patch("sys.stdout", new_callable=io.StringIO),

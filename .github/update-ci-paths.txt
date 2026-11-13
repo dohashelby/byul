@@ -32,5 +32,6 @@ update/docs/dev-1/ma7-session-input-plan.json
 update/examples/mvp-confirmed-values.yaml
 update/docs/gpu-a/policy-a-draft.yaml
 update/docs/dev-1/ma7-local-materialization-20261113.json
+update/docs/dev-1/req17-split-collection.md
 contracts/**
 platform/api/**

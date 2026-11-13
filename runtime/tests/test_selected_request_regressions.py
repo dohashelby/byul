@@ -2,8 +2,8 @@
 
 import json
 
-from tools import selected_request_checks as checks
-from tools import selected_runtime_check as tool
+from labtools import selected_request_checks as checks
+from labtools import selected_runtime_check as tool
 
 
 def run_matrix(monkeypatch, *, drift_after=False, invalid_platform=False, anonymous=False):

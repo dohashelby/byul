@@ -1,7 +1,7 @@
 import json
 
-from tools import selected_response_checks as checks
-from tools import selected_runtime_check as tool
+from labtools import selected_response_checks as checks
+from labtools import selected_runtime_check as tool
 
 
 def row(marker, rid, *, closed=False):

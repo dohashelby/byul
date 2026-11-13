@@ -11,10 +11,10 @@ from pathlib import Path
 import time
 
 from guard.executors.stream_probe import collect
-from tools.selected_runtime_check import request, document, header, json_body, origin, fact
-from tools.selected_request_checks import record_for
-from tools.selected_response_checks import generated_text
-from tools.selected_acceptance_run import bounded
+from labtools.selected_runtime_check import request, document, header, json_body, origin, fact
+from labtools.selected_request_checks import record_for
+from labtools.selected_response_checks import generated_text
+from labtools.selected_acceptance_run import bounded
 from serving_runtime.bridge_update.update_engine_link import select_request
 
 

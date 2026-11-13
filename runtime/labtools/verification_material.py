@@ -17,7 +17,7 @@ from serving_runtime.policy.policy import _object_without_duplicates, _reject_js
 from serving_runtime.policy.policy_state import load_revocations
 
 try:
-    from tools.candidate_errors import CandidateError, CandidateArgumentParser, operation
+    from labtools.candidate_errors import CandidateError, CandidateArgumentParser, operation
 except ModuleNotFoundError:
     from candidate_errors import CandidateError, CandidateArgumentParser, operation
 

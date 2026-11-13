@@ -5,8 +5,8 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from tools import selected_request_checks as checks
-from tools.selected_runtime_check import HTTPResponse
+from labtools import selected_request_checks as checks
+from labtools.selected_runtime_check import HTTPResponse
 
 
 CODE_IDS = ("REQ-CODE-SELECT-chat-mm", "REQ-CODE-SELECT-messages", "REQ-CODE-SELECT-completions")

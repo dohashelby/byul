@@ -9,7 +9,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from tools.cpu_vllm_check import (
+from labtools.cpu_vllm_check import (
     BASE_CASE_IDS,
     CPUVLLMCheck,
     CommandResult,

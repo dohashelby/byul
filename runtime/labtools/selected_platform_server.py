@@ -24,7 +24,7 @@ IMPORTS = {
 def build(args):
     source = args.source.resolve()
     sys.path[:0] = [str(source / p) for p in ("runtime", "runtime/src", "update/src", "platform/api/src")]
-    from tools.selected_acceptance_run import source_pins, origin, digest, bounded, checked_document
+    from labtools.selected_acceptance_run import source_pins, origin, digest, bounded, checked_document
 
     pins = source_pins(source)
     if pins["sha"] != args.source_sha:
@@ -59,7 +59,7 @@ def build(args):
         raise FileExistsError("new owned Platform store required")
     data.mkdir(mode=0o700, parents=False, exist_ok=False)
     empty = data / "empty-evidence-index.json"
-    from tools.selected_runtime_check import now
+    from labtools.selected_runtime_check import now
 
     empty.write_text(
         __import__("json").dumps(
@@ -106,7 +106,7 @@ def serve(args):
     import uvicorn
 
     app, receipt, viewer = build(args)
-    from tools.selected_acceptance_run import write_public
+    from labtools.selected_acceptance_run import write_public
 
     listener = socket.socket()
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

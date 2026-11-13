@@ -6,8 +6,8 @@ import json
 import pytest
 
 from byul_platform.sources.checklist_data import CHECKS
-from tools import selected_runtime_check as tool
-from tools.selected_runtime_check import HTTPResponse
+from labtools import selected_runtime_check as tool
+from labtools.selected_runtime_check import HTTPResponse
 
 TETRAGON_LIMIT = 50 + 10 * len({rule for check in CHECKS for rule in check["rules"] if rule.startswith("TG-")})
 

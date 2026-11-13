@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import Mock, patch
 import subprocess
 
-from tools.s3b_cpu_precheck import (
+from labtools.s3b_cpu_precheck import (
     Precheck,
     _backend_kinds_for_request_ids,
     _overall,
@@ -114,8 +114,8 @@ class PrecheckCleanupAndCriteriaTests(unittest.TestCase):
                 subprocess.CompletedProcess(["docker", "start"], 0),
             ]
             with (
-                patch("tools.s3b_cpu_precheck._wait", side_effect=["error", True, True]),
-                patch("tools.s3b_cpu_precheck.subprocess.run", side_effect=completed) as run,
+                patch("labtools.s3b_cpu_precheck._wait", side_effect=["error", True, True]),
+                patch("labtools.s3b_cpu_precheck.subprocess.run", side_effect=completed) as run,
             ):
                 precheck.s3_05()
 

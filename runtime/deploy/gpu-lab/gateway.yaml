@@ -8,7 +8,7 @@
 #   /srv/serving/bundles        platform policy bundles, read-only here
 #   /srv/serving/observation    host collector output, group 10010 read-only
 # Before apply/restart: publish the reviewed revocations.json, then run
-# tools.gpu_lab_gateway_preflight on the target host with these final hostPaths.
+# labtools.gpu_lab_gateway_preflight on the target host with these final hostPaths.
 # See README.md; missing revocations fail closed, missing directories prevent startup.
 # The auth config is a Secret with token hashes only:
 #   kubectl -n serving-lab create secret generic serving-gateway-auth --from-file=auth.json

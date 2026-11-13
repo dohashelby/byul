@@ -1011,7 +1011,7 @@ def main(argv=None):
     started = now()
     try:
         if args.mode == "observe":
-            from tools.selected_observation_checks import observe
+            from labtools.selected_observation_checks import observe
 
             viewer = os.environ.get(args.viewer_token_env)
             result = observe(
@@ -1027,7 +1027,7 @@ def main(argv=None):
                 raise ValueError("SELECTED_CREDENTIAL_EXPORT_BLOCKED")
             result["gpu_execution_verified"] = False
         elif args.mode == "copies":
-            from tools.selected_copy_checks import copies
+            from labtools.selected_copy_checks import copies
 
             names = args.marker_env + args.credential_env
             if not names or any(
@@ -1053,7 +1053,7 @@ def main(argv=None):
                 parser.error("inference token environment value is missing")
             if args.mode in ("requests", "separation", "lifecycle"):
                 if args.mode == "requests":
-                    from tools.selected_request_checks import request_matrix
+                    from labtools.selected_request_checks import request_matrix
 
                     result = request_matrix(
                         args.gateway_url,
@@ -1064,13 +1064,13 @@ def main(argv=None):
                         timeout=args.timeout,
                     )
                 elif args.mode == "separation":
-                    from tools.selected_response_checks import separation
+                    from labtools.selected_response_checks import separation
 
                     result = separation(
                         args.gateway_url, args.model, token, os.environ.get(args.viewer_token_env), timeout=args.timeout
                     )
                 else:
-                    from tools.selected_model_checks import model_phase
+                    from labtools.selected_model_checks import model_phase
 
                     result = model_phase(
                         args.gateway_url,
@@ -1131,11 +1131,11 @@ def main(argv=None):
     import sys
 
     modules = [
-        "tools.selected_request_checks",
-        "tools.selected_response_checks",
-        "tools.selected_copy_checks",
-        "tools.selected_model_checks",
-        "tools.selected_observation_checks",
+        "labtools.selected_request_checks",
+        "labtools.selected_response_checks",
+        "labtools.selected_copy_checks",
+        "labtools.selected_model_checks",
+        "labtools.selected_observation_checks",
         "byul_platform.sources.checklist_data",
         "guard.executors.stream_probe",
         "serving_runtime.gateway.validator",

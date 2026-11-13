@@ -15,7 +15,7 @@ import stat
 import subprocess
 import pwd
 
-from tools.selected_runtime_check import fact
+from labtools.selected_runtime_check import fact
 
 MAX_FILES = 16
 MAX_FILE_BYTES = 8 * 1024 * 1024

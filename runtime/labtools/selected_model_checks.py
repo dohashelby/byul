@@ -10,9 +10,9 @@ import hashlib
 import json
 from pathlib import Path
 
-from tools.selected_runtime_check import concurrent_precondition, document, fact, header, json_body, origin, request
-from tools.selected_runtime_check import UUID
-from tools.selected_request_checks import record_for, platform_comparison
+from labtools.selected_runtime_check import concurrent_precondition, document, fact, header, json_body, origin, request
+from labtools.selected_runtime_check import UUID
+from labtools.selected_request_checks import record_for, platform_comparison
 
 
 def bounded_object(path):

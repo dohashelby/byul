@@ -14,7 +14,7 @@ container only when ``--allow-engine-restart`` is given; otherwise that part
 is reported as not run. The report is written to ``<state-dir>/reports/``.
 
 Usage:
-    .venv/bin/python tools/s3b_cpu_precheck.py [--allow-engine-restart]
+    .venv/bin/python labtools/s3b_cpu_precheck.py [--allow-engine-restart]
 """
 
 from __future__ import annotations

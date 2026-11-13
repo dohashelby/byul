@@ -39,7 +39,7 @@ from serving_runtime.enforcement.execpolicy import ExecPolicy
 
 try:
     from tools.tetragon_mode import switch_mode
-    from tools.verification_material import atomic_write, encode, plain_path
+    from labtools.verification_material import atomic_write, encode, plain_path
 except ModuleNotFoundError:  # direct script execution
     from tetragon_mode import switch_mode
     from verification_material import atomic_write, encode, plain_path

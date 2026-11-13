@@ -12,7 +12,7 @@ from unittest.mock import patch
 from serving_runtime.gateway.app import GatewayApp
 from serving_runtime.config.config import MVPConfig
 from serving_runtime.policy.policy import load_policy
-from tools import gpu_lab_gateway_preflight as preflight
+from labtools import gpu_lab_gateway_preflight as preflight
 
 ROOT = Path(__file__).resolve().parents[1]
 

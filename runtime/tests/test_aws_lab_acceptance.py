@@ -17,7 +17,7 @@ from unittest.mock import patch
 from urllib.error import URLError
 from urllib.parse import urlsplit
 
-from tools.aws_lab_acceptance import (
+from labtools.aws_lab_acceptance import (
     AWSAcceptance,
     CASE_IDS,
     CommandResult,
@@ -1961,7 +1961,7 @@ class EvidenceTests(unittest.TestCase):
 
     def test_public_report_preserves_real_run_and_excludes_raw_details(self):
         from serving_runtime.devtools.lab_report import LabReportSource, AWS_REPORT_SCHEMA
-        from tools import verification_material
+        from labtools import verification_material
         import os
 
         with tempfile.TemporaryDirectory() as temporary:
@@ -2013,7 +2013,7 @@ class EvidenceTests(unittest.TestCase):
             self.assertEqual(list(public.glob(".verification-*")), [])
 
     def test_public_report_preserves_all_result_states_and_schema_case_families(self):
-        from tools.aws_lab_acceptance import publish_report
+        from labtools.aws_lab_acceptance import publish_report
         from serving_runtime.devtools.lab_report import LabReportSource, REPORT_SCHEMA
 
         with tempfile.TemporaryDirectory() as temporary:
@@ -2071,7 +2071,7 @@ class EvidenceTests(unittest.TestCase):
                 self.assertEqual(LabReportSource(public).read()["report"]["cases"][0]["status"], status)
 
     def test_publication_refuses_unsafe_destination_and_keeps_private_evidence_on_failure(self):
-        from tools.aws_lab_acceptance import ConfigurationError
+        from labtools.aws_lab_acceptance import ConfigurationError
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -2784,7 +2784,7 @@ class NewCaseExecutionTests(unittest.TestCase):
                 True,
                 {"observation_feed_hubble": {"state": "ok"}, "observation_feed_tetragon": {"state": "ok"}},
             )
-            with patch("tools.aws_lab_acceptance.ExecPolicy._collector_stale", side_effect=(False, True)):
+            with patch("labtools.aws_lab_acceptance.ExecPolicy._collector_stale", side_effect=(False, True)):
                 facts, _evidence = checker.aws_16()
             self.assertEqual(evaluate_case("AWS-16", facts)[0], "passed")
 
@@ -2956,7 +2956,7 @@ class NewCaseExecutionTests(unittest.TestCase):
                 )
             )
             checker._tetragon_counts = lambda: next(counts)
-            with patch("tools.aws_lab_acceptance._now", return_value="2026-11-03T00:00:00Z"):
+            with patch("labtools.aws_lab_acceptance._now", return_value="2026-11-03T00:00:00Z"):
                 facts, evidence = checker.aws_17()
             self.assertEqual(evaluate_case("AWS-17", facts)[0], "passed")
             self.assertEqual(evidence["raw_process_pod_uid"], "new-uid")

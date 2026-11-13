@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from tools.aws_lab_acceptance import (
+from labtools.aws_lab_acceptance import (
     AWSAcceptance,
     CASE_IDS,
     CASE_TITLES,

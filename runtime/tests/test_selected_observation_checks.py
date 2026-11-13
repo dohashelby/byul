@@ -1,8 +1,8 @@
 import copy
 import json
 
-from tools import selected_observation_checks as checks
-from tools import selected_runtime_check as tool
+from labtools import selected_observation_checks as checks
+from labtools import selected_runtime_check as tool
 from byul_platform.sources.checklist_data import CHECKS, FIXED_SHA, PACK_REVISION
 
 

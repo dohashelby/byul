@@ -4,8 +4,8 @@ import copy
 
 import pytest
 
-from tools import selected_model_checks as checks
-from tools import selected_runtime_check as tool
+from labtools import selected_model_checks as checks
+from labtools import selected_runtime_check as tool
 from test_selected_request_checks import owned_stack
 
 

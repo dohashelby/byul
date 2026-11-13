@@ -95,7 +95,7 @@ Pod 표준 출력 JSON 로그의 `request.received`와 `request.finished`에서 
 Gateway 포워드와 토큰 파일이 준비된 시험 세션에서 다음을 vLLM과 SGLang에 같은 목록으로 실행한다. 기본 실행은 AWS-01~11이며 AWS-12~19는 `--cases`로 명시한다. AWS-07·08·12~17의 변경 사례는 각각 도구가 요구하는 `--allow-*` 옵션을 의도적으로 부여한다. SGLang AWS-11·16·17도 현재 Pod UID의 신선한 단계 시간표가 있으면 판정한다. 근거가 없으면 `unknown`이다. AWS-18은 `usage.completion_tokens`가 없으면 `unknown`, stream `[DONE]` 누락은 잘림으로 기록한다. 이 사례는 Pod 내부의 `/tokenize`를 stdin으로 호출해 입력+답변 경계를 찾으며 찾지 못하면 `unknown`이다. 토큰 계산 실패의 의도적 주입은 가짜 엔진 시험만 수행한다. AWS-19는 정상 요청 ID가 같은 로그 구간에 없으면 거부 미전달을 인정하지 않는다.
 
 ```bash
-.venv/bin/python -B tools/aws_lab_acceptance.py --kube-context byul-aws-lab --engine sglang --token-env-file <비공개-토큰-파일> --cases AWS-01,AWS-02,AWS-03,AWS-18,AWS-19
+.venv/bin/python -B labtools/aws_lab_acceptance.py --kube-context byul-aws-lab --engine sglang --token-env-file <비공개-토큰-파일> --cases AWS-01,AWS-02,AWS-03,AWS-18,AWS-19
 # 나머지 AWS-04~17은 ACCEPTANCE.md의 사전 조건과 허용 플래그를 확인한 뒤 선택
 ```
 
@@ -111,7 +111,7 @@ cp deploy/gpu-lab/host/byul-observation-feed.service ~/.config/systemd/user/byul
 systemctl --user daemon-reload && systemctl --user restart byul-observation-feed
 # 검증된 이전 vLLM 묶음으로 상대 링크를 되돌린 뒤 Gateway 재시작
 kubectl --context byul-aws-lab -n serving-lab rollout restart deployment/serving-gateway
-.venv/bin/python -B tools/aws_lab_acceptance.py --kube-context byul-aws-lab --engine vllm --token-env-file <비공개-토큰-파일> --cases AWS-01,AWS-02
+.venv/bin/python -B labtools/aws_lab_acceptance.py --kube-context byul-aws-lab --engine vllm --token-env-file <비공개-토큰-파일> --cases AWS-01,AWS-02
 ```
 
 복귀 뒤 정상 1건과 거부 1건, 대상 digest·포트·단계 수집 재개를 확인한다. `evidence/`의 보고서·Pod 설정·로그 필드 목록·요청 목록 해시·정책 묶음 해시와 각 판정 사유를 반출한다. 원시 Secret, 토큰, 서버 주소, 프롬프트 내용은 반출하지 않는다. 중단 시에도 이전 vLLM 묶음과 Deployment를 복구하고 정상·거부 각 1건을 확인한다.

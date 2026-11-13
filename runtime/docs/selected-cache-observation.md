@@ -2,7 +2,7 @@
 
 고정 source의 TG-CACHE는 `security_file_permission(mask=2)`만 선택한다(`enforcement/tetragon.py:149–159`). 기존 normalize는 `path/access/identity`를 보존하지만 syscall 성공 반환값·실제 write byte를 보존하지 않는다(`events.py:356–424`). 이 원자료는 permission check이며 실제 생성/읽기라고 판정하지 않는다. 기존 collector의 drop/gap/확인 시각도 보존한다.
 
-`tools/selected_cache_metadata.py`는 별도 tracing policy나 수집 서비스를 만들지 않는 stopped-file 후처리다. tracer/엔진/프로세스 신호를 실행하지 않는다.
+`labtools/selected_cache_metadata.py`는 별도 tracing policy나 수집 서비스를 만들지 않는 stopped-file 후처리다. tracer/엔진/프로세스 신호를 실행하지 않는다.
 
 - `inventory --root G1 --out NEW`: 기존 선언의 compiler 하위경로만 no-follow 순회·regular file hash/stat. 기본2000entry/256file/64MiB per-file/256MiB total/10초, bound·변경·symlink는 partial. 원내용은 출력하지 않는다.
 - `tetragon --root G1 --input EXISTING_NORMALIZED_JSONL --pod-uid UID --container-id CID --out NEW`: 기존 normalized TG-CACHE의 같은 confirmed PodUID/CID·compiler 경로만 permission check로 선택한다. PID가 없으면 누락, UID가 없으면 null이다.

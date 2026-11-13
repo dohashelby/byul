@@ -24,13 +24,13 @@ import time
 from urllib.parse import urlsplit
 
 MODULES = {
-    "tools.selected_acceptance_run": "runtime/tools/selected_acceptance_run.py",
-    "tools.selected_runtime_check": "runtime/tools/selected_runtime_check.py",
-    "tools.selected_request_checks": "runtime/tools/selected_request_checks.py",
-    "tools.selected_response_checks": "runtime/tools/selected_response_checks.py",
-    "tools.selected_copy_checks": "runtime/tools/selected_copy_checks.py",
-    "tools.selected_model_checks": "runtime/tools/selected_model_checks.py",
-    "tools.selected_observation_checks": "runtime/tools/selected_observation_checks.py",
+    "labtools.selected_acceptance_run": "runtime/labtools/selected_acceptance_run.py",
+    "labtools.selected_runtime_check": "runtime/labtools/selected_runtime_check.py",
+    "labtools.selected_request_checks": "runtime/labtools/selected_request_checks.py",
+    "labtools.selected_response_checks": "runtime/labtools/selected_response_checks.py",
+    "labtools.selected_copy_checks": "runtime/labtools/selected_copy_checks.py",
+    "labtools.selected_model_checks": "runtime/labtools/selected_model_checks.py",
+    "labtools.selected_observation_checks": "runtime/labtools/selected_observation_checks.py",
     "serving_runtime.gateway.validator": "runtime/src/serving_runtime/gateway/validator.py",
     "serving_runtime.observation.retention": "runtime/src/serving_runtime/observation/retention.py",
     "serving_runtime.gateway.response_timeout": "runtime/src/serving_runtime/gateway/response_timeout.py",
@@ -352,7 +352,7 @@ def command(config, output):
     mode = "lifecycle" if stage.startswith("model-") else "observe" if stage.startswith("observe-") else stage
     args = [
         sys.executable,
-        str(Path(config["source"]["path"]) / "runtime/tools/selected_runtime_check.py"),
+        str(Path(config["source"]["path"]) / "runtime/labtools/selected_runtime_check.py"),
         mode,
         "--output",
         str(output),
@@ -419,7 +419,7 @@ def status_scope(value):
 
 
 def capture(config, deadline):
-    from tools.selected_runtime_check import request, document
+    from labtools.selected_runtime_check import request, document
 
     remaining = deadline - time.monotonic()
     if remaining <= 0:
@@ -685,7 +685,7 @@ def run(config, output, *, prepare=False):
             )
             if (
                 result.get("mode") != expected_mode
-                or result.get("source_sha256") != config["source"]["files"][MODULES["tools.selected_runtime_check"]]
+                or result.get("source_sha256") != config["source"]["files"][MODULES["labtools.selected_runtime_check"]]
             ):
                 raise ValueError("helper source or mode mismatch")
             rows = result.get("cases")

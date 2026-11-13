@@ -34,7 +34,7 @@ Tetragon 보호 파일 읽기의 선택적 차단은 intent 1.1에서만 명시�
 로컬 kind에서 가짜 파일 monitor→enforce→monitor를 시험할 때만 다음 opt-in 명령을 실행합니다. 이 작업에서는 실제 kind를 실행하지 않았습니다.
 
 ```bash
-.venv/bin/python -B tools/k8s_lab_check.py --kube-context kind-runtime-lab --namespace serving-lab --state-dir ~/.local/state/serving-runtime/k8s-lab --secret-enforce-check
+.venv/bin/python -B labtools/k8s_lab_check.py --kube-context kind-runtime-lab --namespace serving-lab --state-dir ~/.local/state/serving-runtime/k8s-lab --secret-enforce-check
 ```
 
 L-05b는 마지막에 monitor 정책을 다시 적용하고 같은 파일 읽기 성공·`Post`를 확인합니다. 전체 lab 정책도 정리하려면 `--cleanup`을 추가합니다. 보고서의 L-05b 단계별 errno, 같은 Pod UID·경로·read mask·규칙 ID의 원시 `Post`/`Override` 이벤트, 차단 구간 정상 요청 200을 대조합니다. 이벤트나 errno가 빠지면 확인 불가, 예상과 다른 차단 또는 정상 요청 실패는 실패입니다.
@@ -63,7 +63,7 @@ L-05b는 마지막에 monitor 정책을 다시 적용하고 같은 파일 읽기
 
 **아직 안 한 것:** 정식 GPU 환경 시험(S3B·reference AWS-01~08)과 속도 측정, 실제 SGLang, logprobs, 운영 인증 연동(D-02)·계정/역할(D-03). 기능별 상세 확인 수준은 [`docs/지원_미지원_목록.md`](docs/지원_미지원_목록.md)에 있습니다.
 
-AWS-09~11 실행 옵션은 `tools/aws_lab_acceptance.py --cases AWS-09,AWS-10,AWS-11`이며, 순서와 판정은 [`deploy/gpu-lab/ACCEPTANCE.md`](deploy/gpu-lab/ACCEPTANCE.md)에 적었다. 단계 위험·재생 결과는 [`docs/AWS_GPU_단계_사전분석.md`](docs/AWS_GPU_단계_사전분석.md)에 있다.
+AWS-09~11 실행 옵션은 `labtools/aws_lab_acceptance.py --cases AWS-09,AWS-10,AWS-11`이며, 순서와 판정은 [`deploy/gpu-lab/ACCEPTANCE.md`](deploy/gpu-lab/ACCEPTANCE.md)에 적었다. 단계 위험·재생 결과는 [`docs/AWS_GPU_단계_사전분석.md`](docs/AWS_GPU_단계_사전분석.md)에 있다.
 
 호스트 수집기는 현재 엔진 Pod UID의 `kubectl logs --timestamps`만 단계 시간표로 바꾸며, Gateway는 관측 폴더의 시간표를 읽는다. 수집 시각이 15초 오래되면 단계는 `unknown`·`phase_unknown`으로 돌아가고 요청은 계속 처리한다. 다른 Pod의 의심 경로 실행은 단계와 무관하게 `suspect_binary` 탐지다. 캐시 경로·허용 목록·예외는 엔진 selector에만 적용한다. 서버에서는 1차 단계별 실행 관찰 → 허용 목록 검토 → 2차 AWS-09~11 판정 순서를 지킨다.
 
@@ -132,9 +132,9 @@ python3 -m venv .venv
 
 | 환경 | 위치 |
 | --- | --- |
-| 실제 vLLM v0.31.0 (CPU, 이 PC) 점검 | [`deploy/cpu-lab/README.md`](deploy/cpu-lab/README.md) · `tools/cpu_vllm_check.py` |
-| 로컬 kind lab (Cilium·Hubble·Tetragon) | [`docs/상세_안내.md`](docs/상세_안내.md) "통신·행위 통제 준비" · `tools/k8s_lab_check.py` |
-| AWS GPU lab 배포·인수 시험 | [`deploy/gpu-lab/README.md`](deploy/gpu-lab/README.md) · [`deploy/gpu-lab/ACCEPTANCE.md`](deploy/gpu-lab/ACCEPTANCE.md) · `tools/aws_lab_acceptance.py` |
+| 실제 vLLM v0.31.0 (CPU, 이 PC) 점검 | [`deploy/cpu-lab/README.md`](deploy/cpu-lab/README.md) · `labtools/cpu_vllm_check.py` |
+| 로컬 kind lab (Cilium·Hubble·Tetragon) | [`docs/상세_안내.md`](docs/상세_안내.md) "통신·행위 통제 준비" · `labtools/k8s_lab_check.py` |
+| AWS GPU lab 배포·인수 시험 | [`deploy/gpu-lab/README.md`](deploy/gpu-lab/README.md) · [`deploy/gpu-lab/ACCEPTANCE.md`](deploy/gpu-lab/ACCEPTANCE.md) · `labtools/aws_lab_acceptance.py` |
 
 ## 문서
 

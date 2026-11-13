@@ -12,7 +12,7 @@ import threading
 import unittest
 from unittest.mock import patch
 
-from tools.perf_compare import (
+from labtools.perf_compare import (
     BLOCK_ORDERS,
     PlanError,
     _error_code,
@@ -278,7 +278,7 @@ class PerfTokenFileTests(unittest.TestCase):
             def close(self) -> None:
                 return
 
-        with patch("tools.perf_compare.http.client.HTTPConnection", Connection):
+        with patch("labtools.perf_compare.http.client.HTTPConnection", Connection):
             result = _request_once(
                 "http://gateway.example:8080",
                 {"stream": False},

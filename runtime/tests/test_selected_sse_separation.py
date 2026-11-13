@@ -7,7 +7,7 @@ import threading
 import time
 from uuid import uuid4
 import pytest
-from tools import selected_sse_separation as tool
+from labtools import selected_sse_separation as tool
 
 
 @contextmanager

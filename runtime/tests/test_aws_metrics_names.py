@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from tools.aws_metrics_names import REMOTE, compare_names, main
+from labtools.aws_metrics_names import REMOTE, compare_names, main
 
 
 class MetricNamesTests(unittest.TestCase):
@@ -32,7 +32,7 @@ class MetricNamesTests(unittest.TestCase):
             fake = SimpleNamespace(
                 returncode=0, stdout=b'["vllm:num_requests_running", "other_metric"]', stderr=b"sensitive=secret"
             )
-            with patch("tools.aws_metrics_names.subprocess.run", return_value=fake):
+            with patch("labtools.aws_metrics_names.subprocess.run", return_value=fake):
                 with redirect_stdout(io.StringIO()):
                     code = main(["--engine", "vllm", "--context", "byul-aws-lab", "--output", str(output)])
             self.assertEqual(code, 0)

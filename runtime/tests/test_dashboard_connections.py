@@ -22,7 +22,7 @@ from serving_runtime.devtools.lab_report import LabReportSource
 from serving_runtime.policy.policy import load_policy
 from serving_runtime.policy.policy_state import external_enforcement
 from serving_runtime.observation.tetragon_state import read_tetragon_state
-from tools.k8s_lab_check import main as lab_main, publish_report
+from labtools.k8s_lab_check import main as lab_main, publish_report
 from tools.tetragon_public import public_snapshot
 from tools.tetragon_status import StatusCollector
 
@@ -409,7 +409,7 @@ class LabPublicationTests(unittest.TestCase):
             ):
                 with (
                     self.subTest(options=options),
-                    patch("tools.k8s_lab_check.LabChecker") as checker,
+                    patch("labtools.k8s_lab_check.LabChecker") as checker,
                     redirect_stderr(io.StringIO()),
                 ):
                     self.assertEqual(lab_main(["--state-dir", str(root / "private"), *options]), 2)
@@ -461,7 +461,7 @@ class LabPublicationTests(unittest.TestCase):
             self.assertEqual(path.stat().st_gid, root.stat().st_gid)
             self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o640)
             path.unlink()
-            with patch("tools.k8s_lab_check.LabChecker") as checker, redirect_stdout(io.StringIO()):
+            with patch("labtools.k8s_lab_check.LabChecker") as checker, redirect_stdout(io.StringIO()):
                 checker.return_value.run.return_value = (report, (root / "private.json", root / "private.md"))
                 self.assertEqual(lab_main(["--state-dir", str(root / "private"), "--public-report-dir", str(root)]), 1)
                 checker.return_value.run.assert_called_once()

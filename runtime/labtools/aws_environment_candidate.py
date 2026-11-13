@@ -18,9 +18,9 @@ from serving_runtime.policy.policy import load_policy
 from serving_runtime.target.target import load_target, summarize_pods
 
 try:
-    from tools.aws_lab_preflight import Runner
-    from tools.verification_material import atomic_write, encode, now, read_json
-    from tools.candidate_errors import CandidateError, CandidateArgumentParser, operation
+    from labtools.aws_lab_preflight import Runner
+    from labtools.verification_material import atomic_write, encode, now, read_json
+    from labtools.candidate_errors import CandidateError, CandidateArgumentParser, operation
 except ModuleNotFoundError:
     from aws_lab_preflight import Runner
     from verification_material import atomic_write, encode, now, read_json

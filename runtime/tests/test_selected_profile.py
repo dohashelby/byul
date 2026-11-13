@@ -74,7 +74,7 @@ class SelectedProfileTest(unittest.TestCase):
 
     def test_cli_exit_and_report_are_preflight_consumable(self):
         spec = importlib.util.spec_from_file_location(
-            "check_selected_profile", ROOT / "tools/check_selected_profile.py"
+            "check_selected_profile", ROOT / "labtools/check_selected_profile.py"
         )
         tool = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(tool)

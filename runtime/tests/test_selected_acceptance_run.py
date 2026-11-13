@@ -11,7 +11,7 @@ import sys
 import time
 
 import pytest
-from tools import selected_acceptance_run as runner
+from labtools import selected_acceptance_run as runner
 
 
 def save(path, value):
@@ -97,7 +97,7 @@ def mock_helper(monkeypatch, config, *, result="passed", code=0, mode="requests"
             output,
             {
                 "mode": mode,
-                "source_sha256": config["source"]["files"][runner.MODULES["tools.selected_runtime_check"]],
+                "source_sha256": config["source"]["files"][runner.MODULES["labtools.selected_runtime_check"]],
                 "cases": rows
                 if rows is not None
                 else [
@@ -116,7 +116,7 @@ def mock_helper(monkeypatch, config, *, result="passed", code=0, mode="requests"
 
 
 def test_scope_includes_actual_target_generation_and_protected_viewer(config, monkeypatch):
-    from tools import selected_runtime_check as tool
+    from labtools import selected_runtime_check as tool
 
     scope = config["expected_scope"]
     current = {k: v for k, v in scope.items() if k in ("pod_uid", "container_id", "restart_count", "image_digest")}
@@ -301,7 +301,7 @@ def test_all_seven_modes_use_fixed_helper_argv_without_shell(config, tmp_path):
         config.update(stage=stage, options=options)
         argv = runner.command(config, tmp_path / "helper.json")
         modes.add(argv[2])
-        assert argv[0] == sys.executable and argv[1].endswith("/runtime/tools/selected_runtime_check.py")
+        assert argv[0] == sys.executable and argv[1].endswith("/runtime/labtools/selected_runtime_check.py")
         assert not any(value in argv for value in (os.environ["BYUL_TEST_INFERENCE"], os.environ["BYUL_TEST_VIEWER"]))
     assert modes == {"live", "requests", "separation", "lifecycle", "observe", "isolated", "copies"}
 
@@ -327,7 +327,7 @@ def test_current_worktree_module_files_are_exactly_loaded(monkeypatch):
     source = Path(__file__).resolve().parents[2]
     pins = runner.source_pins(source)
     assert runner.verify_source({"source": pins}) == pins
-    pins["files"][runner.MODULES["tools.selected_request_checks"]] = "0" * 64
+    pins["files"][runner.MODULES["labtools.selected_request_checks"]] = "0" * 64
     with pytest.raises(ValueError):
         runner.verify_source({"source": pins})
 
@@ -367,7 +367,7 @@ def test_real_existing_helper_child_is_reused_without_cloud_or_socket(config, tm
     result = runner.run(config, tmp_path / "run")
     helper = read(tmp_path / "run/helper.json")
     assert result["execution"] == "completed" and helper["mode"] == "copies"
-    assert helper["source_sha256"] == config["source"]["files"][runner.MODULES["tools.selected_runtime_check"]]
+    assert helper["source_sha256"] == config["source"]["files"][runner.MODULES["labtools.selected_runtime_check"]]
     assert sample.read_text() == "safe synthetic metadata only\n"
     assert result["gpu_execution_verified"] is False
 

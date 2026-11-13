@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from tools import selected_copy_checks as checks
-from tools import selected_runtime_check as tool
+from labtools import selected_copy_checks as checks
+from labtools import selected_runtime_check as tool
 
 
 def test_complete_selected_file_absence_and_findings_do_not_export_values(tmp_path):

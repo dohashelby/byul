@@ -16,7 +16,7 @@ import yaml
 from serving_runtime.devtools.lab_report import LabReportSource, REPORT_SCHEMA
 from serving_runtime.gateway.management_listener import ManagementListenerConfig
 from serving_runtime.policy.policy_bundle import verify_policy_bundle
-from tools.aws_lab_preflight import bind_lab_management, bind_lab_report, lab_management_scope
+from labtools.aws_lab_preflight import bind_lab_management, bind_lab_report, lab_management_scope
 
 ROOT = Path(__file__).resolve().parents[1]
 SCOPE = {"target_ref": "target-approved", "policy_ref": "a" * 64, "run_id": "byul-run", "environment": "aws-lab"}

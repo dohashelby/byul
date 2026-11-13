@@ -17,9 +17,9 @@ from serving_runtime.target.assets import check, load_manifest
 from serving_runtime.observation.collectors import load_declaration, compare_baseline, CollectorManager
 from serving_runtime.policy.policy_state import load_revocations, evaluate_policy
 from serving_runtime.policy.policy import load_policy
-from tools import verification_material as material
-from tools import aws_environment_candidate as environment
-from tools.aws_lab_preflight import CommandResult
+from labtools import verification_material as material
+from labtools import aws_environment_candidate as environment
+from labtools.aws_lab_preflight import CommandResult
 
 ROOT = Path(__file__).resolve().parents[1]
 

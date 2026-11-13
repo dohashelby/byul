@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
 
-from tools.aws_lab_preflight import CommandResult, build_parser, collect, main
+from labtools.aws_lab_preflight import CommandResult, build_parser, collect, main
 
 
 def pod(image: str, image_id: str, container: str) -> dict:
@@ -134,7 +134,7 @@ class PreflightTests(unittest.TestCase):
         )
 
     def check(self):
-        with patch("tools.aws_lab_preflight.shutil.disk_usage") as disk:
+        with patch("labtools.aws_lab_preflight.shutil.disk_usage") as disk:
             disk.side_effect = lambda path: SimpleNamespace(
                 free=(70 if path == self.args.image_store else 10) * 1024**3
             )
@@ -197,7 +197,7 @@ class PreflightTests(unittest.TestCase):
                 return PolicyResponse()
             return FakeResponse()
 
-        with patch("tools.aws_lab_preflight.shutil.disk_usage") as disk:
+        with patch("labtools.aws_lab_preflight.shutil.disk_usage") as disk:
             disk.side_effect = lambda path: SimpleNamespace(
                 free=(70 if path == self.args.image_store else 10) * 1024**3
             )
@@ -251,7 +251,7 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(checks["image_store_disk"].status, "fail")
 
     def test_image_store_disk_unavailable_is_unknown(self):
-        with patch("tools.aws_lab_preflight.shutil.disk_usage") as disk:
+        with patch("labtools.aws_lab_preflight.shutil.disk_usage") as disk:
 
             def usage(path):
                 if path == self.args.image_store:
@@ -274,7 +274,7 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(checks["bundle"].status, "fail")
 
     def test_unreadable_bundle_root_is_unknown_not_crash(self):
-        with patch("tools.aws_lab_preflight.Path.is_symlink", side_effect=PermissionError(13, "denied")):
+        with patch("labtools.aws_lab_preflight.Path.is_symlink", side_effect=PermissionError(13, "denied")):
             checks = self.check()
         self.assertEqual(checks["bundle"].status, "unknown")
 
@@ -284,7 +284,7 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(checks["engine_digest"].status, "ok")
 
     def test_stale_observation_fails(self):
-        with patch("tools.aws_lab_preflight.shutil.disk_usage") as disk:
+        with patch("labtools.aws_lab_preflight.shutil.disk_usage") as disk:
             disk.side_effect = lambda path: SimpleNamespace(
                 free=(70 if path == self.args.image_store else 10) * 1024**3
             )
@@ -313,7 +313,7 @@ class PreflightTests(unittest.TestCase):
                 raise HTTPError(request.full_url, 401, "auth", {}, None)
             return FakeResponse()
 
-        with patch("tools.aws_lab_preflight.shutil.disk_usage") as disk:
+        with patch("labtools.aws_lab_preflight.shutil.disk_usage") as disk:
             disk.side_effect = lambda path: SimpleNamespace(
                 free=(70 if path == self.args.image_store else 10) * 1024**3
             )
@@ -323,7 +323,7 @@ class PreflightTests(unittest.TestCase):
 
     def test_exit_code_on_failure(self):
         with patch(
-            "tools.aws_lab_preflight.collect",
+            "labtools.aws_lab_preflight.collect",
             return_value=[type("Check", (), {"name": "x", "status": "fail", "reason": "bad"})()],
         ):
             with patch("builtins.print"):

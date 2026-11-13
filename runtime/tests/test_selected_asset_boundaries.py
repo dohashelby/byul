@@ -16,7 +16,9 @@ import pytest
 from serving_runtime.enforcement.intent import parse_intent
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location("selected_asset_boundaries", ROOT / "tools/selected_asset_boundaries.py")
+spec = importlib.util.spec_from_file_location(
+    "selected_asset_boundaries", ROOT / "labtools/selected_asset_boundaries.py"
+)
 tool = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tool)
 

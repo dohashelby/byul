@@ -12,7 +12,7 @@ import threading
 import time
 from uuid import uuid4
 import pytest
-from tools import selected_gateway_mixed_budget as tool
+from labtools import selected_gateway_mixed_budget as tool
 
 
 def config():
@@ -222,7 +222,7 @@ def test_reference_regular_file_boundary_before_any_post(tmp_path, monkeypatch, 
     cfg["caps_refs"] = [{"path": str(path), "sha256": "0" * 64, "scope": "existing cap result"}]
     if kind == "fifo":
         script = """import json,sys
-from tools import selected_gateway_mixed_budget as tool
+from labtools import selected_gateway_mixed_budget as tool
 tool.request=lambda *a,**k: (_ for _ in ()).throw(AssertionError('must not dispatch'))
 try:tool.run('http://127.0.0.1:1','m','a','b','v',json.load(sys.stdin))
 except (ValueError,OSError):sys.exit(0)
@@ -239,7 +239,7 @@ sys.exit(1)
 
 
 def test_reference_growth_after_fstat_keeps_bounded_read_and_rejects(tmp_path, monkeypatch):
-    from tools import selected_acceptance_run as source
+    from labtools import selected_acceptance_run as source
 
     path = tmp_path / "cap.json"
     path.write_text("{}")

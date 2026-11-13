@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from tools import selected_platform_server as server
-from tools import selected_acceptance_run as runner
+from labtools import selected_platform_server as server
+from labtools import selected_acceptance_run as runner
 
 
 @pytest.fixture

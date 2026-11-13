@@ -11,9 +11,9 @@ import time
 from uuid import uuid4
 
 from guard.executors.stream_probe import collect
-from tools.selected_response_checks import assess_separation
-from tools.selected_request_checks import record_for
-from tools.selected_runtime_check import concurrent_precondition, document, fact, origin, request
+from labtools.selected_response_checks import assess_separation
+from labtools.selected_request_checks import record_for
+from labtools.selected_runtime_check import concurrent_precondition, document, fact, origin, request
 
 
 def scope(status):

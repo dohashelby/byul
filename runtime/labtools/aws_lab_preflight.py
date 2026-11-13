@@ -20,7 +20,7 @@ from urllib.request import Request, urlopen
 
 try:
     from tools.tetragon_capability import collect_capabilities
-except ModuleNotFoundError:  # direct ``python tools/aws_lab_preflight.py``
+except ModuleNotFoundError:  # direct ``python labtools/aws_lab_preflight.py``
     from tetragon_capability import collect_capabilities
 
 

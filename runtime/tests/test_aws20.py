@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from tools.k8s_observation_feed import redact_tetragon_line
-from tools.aws_lab_acceptance import (
+from labtools.aws_lab_acceptance import (
     AWSAcceptance,
     CommandResult,
     HTTPResponse,
@@ -301,7 +301,7 @@ class AWS20Tests(unittest.TestCase):
     def test_live_case_switches_mode_without_delete(self):
         with tempfile.TemporaryDirectory() as directory:
             checker, runner = self._checker(Path(directory))
-            with patch("tools.aws_lab_acceptance._aws20_raw_action", return_value=True):
+            with patch("labtools.aws_lab_acceptance._aws20_raw_action", return_value=True):
                 facts, evidence = checker.aws_20()
             self.assertEqual(evaluate_case("AWS-20", facts)[0], "passed")
             self.assertEqual(runner.mode, "monitor")
@@ -312,7 +312,7 @@ class AWS20Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             checker, runner = self._checker(Path(directory))
             checker._completion = lambda **kwargs: (_ for _ in ()).throw(RuntimeError("request failed"))
-            with patch("tools.aws_lab_acceptance._aws20_raw_action", return_value=True):
+            with patch("labtools.aws_lab_acceptance._aws20_raw_action", return_value=True):
                 with self.assertRaises(RuntimeError):
                     checker.aws_20()
             self.assertEqual(runner.mode, "monitor")

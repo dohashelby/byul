@@ -8,9 +8,9 @@
 
 11/4 빈 캐시 첫 기동 뒤 첫 요청에서 나온 Triton `ptxas`는 개발계획서의 추론 중 지연 JIT(1248줄)와 부합한다. SGLang 배포의 `/models`는 읽기 전용이지만 엔진 컨테이너의 `readOnlyRootFilesystem`은 설정되지 않아 루트 파일 시스템 보호 근거로 삼지 않는다. 추론 허용은 관측된 정확한 경로와 `/opt/sglang/bin/python3` 부모에만 한정하며 셸은 계속 의심 경고로 남긴다. 이 좁은 조건이 `id`·`awk`·`cat` 관측만으로 추가하지 않는 원칙과 다른 근거다.
 
-11/4 서버 1회차는 [서버 실행순서표](서버_실행순서표.md)와 읽기 전용 [preflight 도구](../../tools/aws_lab_preflight.py)를 따른다.
+11/4 서버 1회차는 [서버 실행순서표](서버_실행순서표.md)와 읽기 전용 [preflight 도구](../../labtools/aws_lab_preflight.py)를 따른다.
 
-이 절차는 AWS 묶음 위에 runtime 배포를 올린 뒤 기존 “첫 완료 기준” 8가지와 추가 준비 사례 AWS-09~11을 확인한다. 기존 AWS-01~08 결과는 다시 판정하지 않는다. `tools/k8s_lab_check.py`는 fake engine과 시험 정책을 생성·삭제하는 kind 전용 도구이므로 이 환경에서 사용하지 않는다. AWS-12~17은 `--cases`로 명시 선택해야 하며, 배포 상태를 바꾸는 사례에는 별도 허용 플래그가 필요하다.
+이 절차는 AWS 묶음 위에 runtime 배포를 올린 뒤 기존 “첫 완료 기준” 8가지와 추가 준비 사례 AWS-09~11을 확인한다. 기존 AWS-01~08 결과는 다시 판정하지 않는다. `labtools/k8s_lab_check.py`는 fake engine과 시험 정책을 생성·삭제하는 kind 전용 도구이므로 이 환경에서 사용하지 않는다. AWS-12~17은 `--cases`로 명시 선택해야 하며, 배포 상태를 바꾸는 사례에는 별도 허용 플래그가 필요하다.
 
 ## 준비
 
@@ -52,7 +52,7 @@ AWS 묶음 `COST-PLAN.md`에 따라 먼저 dev(g6.2xlarge)에서 기능 연결�
 
 ```bash
 cd ~/byul/runtime
-.venv/bin/python -B tools/aws_lab_acceptance.py \
+.venv/bin/python -B labtools/aws_lab_acceptance.py \
   --kube-context byul-aws-lab \
   --namespace serving-lab \
   --gateway-url http://127.0.0.1:18080 \
@@ -64,7 +64,7 @@ cd ~/byul/runtime
 결과를 확인한 뒤 수집 중단과 엔진 교체까지 한 번에 실행한다. AWS-08은 GPU를 반납하고 엔진을 cold-start하므로 변경 사례 중 마지막이다.
 
 ```bash
-.venv/bin/python -B tools/aws_lab_acceptance.py \
+.venv/bin/python -B labtools/aws_lab_acceptance.py \
   --kube-context byul-aws-lab \
   --token-env-file ~/runtime-acceptance.env \
   --cases AWS-07,AWS-08 \
@@ -75,7 +75,7 @@ cd ~/byul/runtime
 AWS-08의 Pod 교체 뒤에도 네트워크 통제가 유지되는지 AWS-04·05를 다시 실행한다. 이 재실행은 AWS-01의 엔진 로그 형식 확인값이나 `engine_log`에 의존하지 않는다.
 
 ```bash
-.venv/bin/python -B tools/aws_lab_acceptance.py \
+.venv/bin/python -B labtools/aws_lab_acceptance.py \
   --kube-context byul-aws-lab \
   --token-env-file ~/runtime-acceptance.env \
   --cases AWS-04,AWS-05
@@ -84,7 +84,7 @@ AWS-08의 Pod 교체 뒤에도 네트워크 통제가 유지되는지 AWS-04·05
 dev 결과와 수정 사항을 확인한 뒤 AWS 묶음 `COST-PLAN.md` 절차로 reference 환경을 준비하고 정식 실행은 8건을 한 프로세스에 묶는다. 이 도구는 dev/reference를 추정하지 않으므로 실제 host profile은 묶음 증거와 함께 확인한다.
 
 ```bash
-.venv/bin/python -B tools/aws_lab_acceptance.py \
+.venv/bin/python -B labtools/aws_lab_acceptance.py \
   --kube-context byul-aws-lab \
   --token-env-file ~/runtime-acceptance.env \
   --evidence-dir evidence/reference \
@@ -100,29 +100,29 @@ dev 결과와 수정 사항을 확인한 뒤 AWS 묶음 `COST-PLAN.md` 절차로
 
 ```bash
 # AWS-12: 비교 Pod 두 개와 비교 CiliumNetworkPolicy만 임시 적용·제거
-.venv/bin/python -B tools/aws_lab_acceptance.py --kube-context byul-aws-lab \
+.venv/bin/python -B labtools/aws_lab_acceptance.py --kube-context byul-aws-lab \
   --token-env-file ~/runtime-acceptance.env --cases AWS-12 --allow-compare-policy
 
 # AWS-13: Gateway가 읽는 bundle root에 쓰기 권한이 있는 실행 주체에서만 실행
-.venv/bin/python -B tools/aws_lab_acceptance.py --kube-context byul-aws-lab \
+.venv/bin/python -B labtools/aws_lab_acceptance.py --kube-context byul-aws-lab \
   --token-env-file ~/runtime-acceptance.env --cases AWS-13 --allow-bundle-switch \
   --bundle-root /srv/serving/bundles
 
 # AWS-14: Gateway 재시작 뒤 503과 10초 안의 정상 200
-.venv/bin/python -B tools/aws_lab_acceptance.py --kube-context byul-aws-lab \
+.venv/bin/python -B labtools/aws_lab_acceptance.py --kube-context byul-aws-lab \
   --token-env-file ~/runtime-acceptance.env --cases AWS-14 --allow-gateway-restart
 
 # AWS-15: 수집기 정지 중 Gateway 재시작, 끝에 수집기 복구
-.venv/bin/python -B tools/aws_lab_acceptance.py --kube-context byul-aws-lab \
+.venv/bin/python -B labtools/aws_lab_acceptance.py --kube-context byul-aws-lab \
   --token-env-file ~/runtime-acceptance.env --cases AWS-15 \
   --allow-collector-stop --allow-gateway-restart
 
 # AWS-16: 수집기 정지 15초 초과 뒤 단계 unknown, 일반 요청 200
-.venv/bin/python -B tools/aws_lab_acceptance.py --kube-context byul-aws-lab \
+.venv/bin/python -B labtools/aws_lab_acceptance.py --kube-context byul-aws-lab \
   --token-env-file ~/runtime-acceptance.env --cases AWS-16 --allow-collector-stop
 
 # AWS-17: 엔진 Pod 교체 뒤 단계 시간표 UID와 새 실행 대조
-.venv/bin/python -B tools/aws_lab_acceptance.py --kube-context byul-aws-lab \
+.venv/bin/python -B labtools/aws_lab_acceptance.py --kube-context byul-aws-lab \
   --token-env-file ~/runtime-acceptance.env --cases AWS-17 --allow-engine-restart
 ```
 
@@ -138,14 +138,14 @@ Gateway 관측 조회는 최근 50행만 반환한다. AWS-11 구간이 이 범�
 
 ### 단계 연결 후 서버 시험 순서
 
-**1차 관찰 → 허용 목록 작성 → 2차 판정** 순서를 지킨다. 1차 관찰에서는 현재 엔진 Pod UID와 로그 시간표 상태·표지 일치 건수, 단계 경계, Tetragon 실행 경로를 수집한다. `tools/aws_lab_acceptance.py inventory --tetragon <tetragon.jsonl> --timeline <phase-timeline.json>`는 읽기 전용으로 단계·Pod·경로별 건수만 출력하고 판정에 쓰지 않는다. 시간표와 Tetragon의 Pod UID 또는 정확한 Pod 이름이 다르면 단계는 `unknown`이다. 단계 전용 실행과 반복 정상 경로의 출처를 검토한 뒤 `allowed_engine_binaries`·`phase_binaries` 변경안을 만든다. **11/3 관찰을 반영한 intent를 포함해 새 묶음을 작성한다.** 변경안을 서버에 적용하고 2차에서 AWS-09~11을 판정한다. 시간표만 먼저 활성화하면 기존 관측 재생 기준 정상 실행 다수가 `outside_allowlist`가 될 수 있다.
+**1차 관찰 → 허용 목록 작성 → 2차 판정** 순서를 지킨다. 1차 관찰에서는 현재 엔진 Pod UID와 로그 시간표 상태·표지 일치 건수, 단계 경계, Tetragon 실행 경로를 수집한다. `labtools/aws_lab_acceptance.py inventory --tetragon <tetragon.jsonl> --timeline <phase-timeline.json>`는 읽기 전용으로 단계·Pod·경로별 건수만 출력하고 판정에 쓰지 않는다. 시간표와 Tetragon의 Pod UID 또는 정확한 Pod 이름이 다르면 단계는 `unknown`이다. 단계 전용 실행과 반복 정상 경로의 출처를 검토한 뒤 `allowed_engine_binaries`·`phase_binaries` 변경안을 만든다. **11/3 관찰을 반영한 intent를 포함해 새 묶음을 작성한다.** 변경안을 서버에 적용하고 2차에서 AWS-09~11을 판정한다. 시간표만 먼저 활성화하면 기존 관측 재생 기준 정상 실행 다수가 `outside_allowlist`가 될 수 있다.
 
 `phase_binaries`는 각 단계에서 예상되는 특징적 실행 경로를 구분하는 목록이다. 로그 근거 `engine_signal`은 `TRUSTED_BASES`에 없으므로 컴파일 단계의 `nvcc` 같은 단계 전용 경로도 `allowed_in_phase`가 아닌 `phase_signal_unverified` 경고로 남는다. 이 목록만으로 AWS-11 경고가 제거되지는 않는다.
 
 현재 `phase_signals.py`는 vLLM CPU 로그 발췌의 표지를 사용한다. 저장된 GPU 관련 로그 파일 5개 중 2개에서 각각 5건이 일치했지만 GPU 전용 컴파일 경계와 전체 패턴은 서버에서 검증 전이다. 실제 단계가 잡히지 않으면 허용 목록을 추측하거나 AWS-11을 통과시키지 않는다. 시간표는 호스트 수집기의 별도 스레드가 현재 Pod 로그로 생성하고 Gateway는 읽기 전용 관측 마운트에서 읽는다. Pod가 없거나 여럿, 로그 실패·역순, 수집 중단 후 쓰기 시각 15초 만료는 단계 `unknown`이며 이것만으로 일반 요청을 막지 않는다. `engine_signal`은 신뢰 입력이 아니므로 단계 전용 예외·허용은 `phase_signal_unverified`가 될 수 있다.
 
 ```bash
-.venv/bin/python -B tools/aws_lab_acceptance.py \
+.venv/bin/python -B labtools/aws_lab_acceptance.py \
   --kube-context byul-aws-lab \
   --token-env-file ~/runtime-acceptance.env \
   --cases AWS-09,AWS-10,AWS-11
@@ -214,7 +214,7 @@ AWS-07은 stop/start 뒤 각각 약 4초에 feed error/ok, 복구 요청 200이�
 
 ## SGLang v0.5.22 선택 사례 (로컬 코드·가짜 시험, 서버 미실행)
 
-`tools/aws_lab_acceptance.py --engine {vllm,sglang}`의 기본값은 `vllm`이다. `--cases`를 생략하면 기존과 같이 AWS-01~11만 선택한다. AWS-12~19는 명시 선택한다. 두 엔진에 같은 고정 chat·completions 요청 목록과 SHA-256을 기록한다. AWS-18은 각 경로의 일반·stream 응답, `[DONE]`과 잘림, `usage.completion_tokens`에 따른 답변 길이, 엔진 로그 수신을 검사한다. `usage`가 없으면 단어 수로 보완하지 않고 `unknown`이다. AWS-19는 미지원 12개 경로와 4개 필드를 일부러 보내 HTTP 코드·기록·엔진 미전달을 검사한다. 같은 구간의 정상 ID가 엔진 로그에 없으면 거부 ID 부재만으로 통과시키지 않는다. 이 새 사례는 서버에서 실제 실행한 적이 없다.
+`labtools/aws_lab_acceptance.py --engine {vllm,sglang}`의 기본값은 `vllm`이다. `--cases`를 생략하면 기존과 같이 AWS-01~11만 선택한다. AWS-12~19는 명시 선택한다. 두 엔진에 같은 고정 chat·completions 요청 목록과 SHA-256을 기록한다. AWS-18은 각 경로의 일반·stream 응답, `[DONE]`과 잘림, `usage.completion_tokens`에 따른 답변 길이, 엔진 로그 수신을 검사한다. `usage`가 없으면 단어 수로 보완하지 않고 `unknown`이다. AWS-19는 미지원 12개 경로와 4개 필드를 일부러 보내 HTTP 코드·기록·엔진 미전달을 검사한다. 같은 구간의 정상 ID가 엔진 로그에 없으면 거부 ID 부재만으로 통과시키지 않는다. 이 새 사례는 서버에서 실제 실행한 적이 없다.
 
 SGLang 로그는 `request.received`/`request.finished` JSON의 `headers.x-request-id`로 대조한다. `--log-requests-level 0`이어도 프롬프트 관련 필드가 나오면 보고서에 필드 이름을 표시한다. 엔진 Pod의 실제 command·args·환경변수 **이름**·imageID를 기록하되 Secret 값은 기록하지 않는다. SGLang도 `--phase-timeline --phase-engine sglang`으로 단계 시간표를 수집한다. AWS-11·16·17은 현재 Pod UID의 신선한 시간표와 실행 근거로 판정하며, 근거가 없으면 `unknown`이다. 로그 근거는 v0.5.22 GPU 캐시 있는 기동이며 첫 기동 JIT 컴파일 위치는 미확인이다. `engine_signal`은 trusted 단계가 아니다. AWS-14·15의 대상 판단은 버전 미선언과 Pod image digest 수집에 의존한다. SGLang 전환 명령과 정책 묶음 순서는 [SGLANG_전환절차.md](SGLANG_전환절차.md)를 따른다.
 

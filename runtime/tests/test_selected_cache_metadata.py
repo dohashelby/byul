@@ -3,7 +3,7 @@ import importlib.util, json, os
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location("selected_cache_metadata", ROOT / "tools/selected_cache_metadata.py")
+spec = importlib.util.spec_from_file_location("selected_cache_metadata", ROOT / "labtools/selected_cache_metadata.py")
 t = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(t)
 

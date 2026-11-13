@@ -9,8 +9,16 @@ from uuid import uuid4
 from urllib.parse import urlsplit
 
 from guard.executors.stream_probe import collect
-from tools.selected_runtime_check import HTTPConnection, UUID, concurrent_precondition, document, fact, origin, request
-from tools.selected_request_checks import record_for
+from labtools.selected_runtime_check import (
+    HTTPConnection,
+    UUID,
+    concurrent_precondition,
+    document,
+    fact,
+    origin,
+    request,
+)
+from labtools.selected_request_checks import record_for
 
 
 def generated_text(row):

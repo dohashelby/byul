@@ -12,7 +12,7 @@ from serving_runtime.cli import main
 from serving_runtime.enforcement.events import parse_tetragon
 from serving_runtime.enforcement.intent import IntentError, parse_intent
 from serving_runtime.enforcement.tetragon import render_manifests
-from tools.k8s_lab_check import (
+from labtools.k8s_lab_check import (
     LabChecker,
     ProcessResult,
     SECRET_PROBE_PATH,

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from tools import selected_runtime_check as tool
-from tools import selected_request_checks as checks
+from labtools import selected_runtime_check as tool
+from labtools import selected_request_checks as checks
 
 
 @contextmanager

@@ -37,11 +37,20 @@ BAD_NAME_PARTS = ("mvp", "selected_", "aws_lab", "s3b", "aws20")
 ATOMIC_WRITE_HINTS = ("os.replace(", ".replace(tmp", "renameat2", "os.rename(")
 
 
+LEGACY_SHIM_MARKERS = ('"""Legacy import path.', '"""Legacy package.')
+
+
+def is_legacy_shim(path: Path) -> bool:
+    """WP1 이 만든 옛 import 경로 껍데기(로직 없음)는 지표에서 뺀다."""
+    with path.open(encoding="utf-8") as handle:
+        return handle.readline().startswith(LEGACY_SHIM_MARKERS)
+
+
 def py_files(root: Path):
     for sub in ("src", "tools"):
         base = root / sub
         if base.is_dir():
-            yield from (p for p in sorted(base.rglob("*.py")) if "__pycache__" not in p.parts)
+            yield from (p for p in sorted(base.rglob("*.py")) if "__pycache__" not in p.parts and not is_legacy_shim(p))
 
 
 def measure(root: Path) -> dict:

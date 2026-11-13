@@ -2,7 +2,7 @@ id: REQ-13
 framework_id: CHK-REQ-013
 mechanism_ids:
 - mechanism-14
-revision: 4
+revision: 5
 retired: false
 area: REQ
 purpose: 반환 정보 최소 공개
@@ -13,7 +13,7 @@ scope: 기본+지원 옵션
 risk_category: 보안 위협 점검
 risk_summary: 호출자가 반환 옵션·오류 경로를 이용해 볼 권한이 없는 서버 측 문맥·내부 정보까지 응답으로 받을 수 있음. 자신의 허용 입력 반환과 구분.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   always: true
   prose: 기본 응답·오류를 확인한다. 추가 반환 옵션이 금지돼 있어도 요청 수용·제거·거부를 확인하며, 허용 시 필드·독자별로 추가한다.

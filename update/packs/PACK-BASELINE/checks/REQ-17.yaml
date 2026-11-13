@@ -2,7 +2,7 @@ id: REQ-17
 framework_id: CHK-REQ-017
 mechanism_ids:
 - mechanism-06
-revision: 4
+revision: 5
 retired: false
 area: REQ
 purpose: 부채널 노출 제한
@@ -12,7 +12,7 @@ scope: 조건부
 risk_category: 보안 위협 점검
 risk_summary: 동일 cache에 반복 접근할 수 있는 호출자가 시간·hit 필드 등 관측 신호로 타인의 비공개 입력 사용 여부를 추론할 수 있음. 추론 가능성은 시험 필요.
 review_order: conditional_when_selected
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 공유 cache·비공개 prefix·시간/상태 관측 경로와 보호 요구가 관련된 환경에서 적용한다. 관측 가능성이나 정책 미확인은 조사 과제로 남긴다.
 policy_params:

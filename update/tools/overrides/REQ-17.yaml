@@ -38,3 +38,5 @@ judge:
     - obs: engine_sensor_violation
       op: eq
       value: true
+
+impact: MEDIUM

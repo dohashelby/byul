@@ -20,6 +20,33 @@ from tests.test_kubernetes_sampling import World as PodWorld
 PRIVATE = 'EXAMPLE_WORKER_HTTP_PRIVATE_NOT_SAVED'
 
 
+def test_worker_readiness_uses_catalog_without_release_literal(monkeypatch):
+    from guard.adapters import engine_profiles as profiles
+    environment, world, values = inputs()
+    engine = environment.engine.model_copy(update={'name': 'fixture-engine', 'version': '9.8.7'})
+    environment = environment.model_copy(update={'engine': engine}).seal()
+    world.target['environment_ref'] = environment.ref().model_dump(mode='json')
+    world.target['engine_kind'] = engine.name
+    world.target['model_mapping']['environment_ref'] = environment.ref().model_dump(mode='json')
+    values['readiness_environment_sha256'] = environment.ref().sha256
+    values['readiness_target_sha256'] = sha256_hex(canonical_json(world.target))
+    monkeypatch.setattr(profiles, 'PROFILES', (*profiles.PROFILES, profiles.EngineProfile(
+        'fixture-worker/1', engine.name, (engine.version,), frozenset({'worker_readiness'}))))
+    collector = KubernetesWorkerReadinessHTTP(world.target, environment, runner=world.runner)
+    packet = collector.sample(values, sample_id='d'*32)
+    assert packet['sampling_complete'] is True
+    assert len(world.execs) == 3
+
+
+def test_unregistered_worker_release_rejected_before_io():
+    environment, world, _ = inputs()
+    environment = environment.model_copy(update={
+        'engine': environment.engine.model_copy(update={'version': 'unreviewed'})}).seal()
+    with pytest.raises(KubernetesBindingError):
+        KubernetesWorkerReadinessHTTP(world.target, environment, runner=world.runner)
+    assert world.calls == []
+
+
 def inputs(mode='normal'):
     environment=env();environment=environment.model_copy(update={'model':environment.model.model_copy(update={
         'id':'EXAMPLE/model','revision':'a'*40,'inventory_sha256':'b'*64})}).seal()

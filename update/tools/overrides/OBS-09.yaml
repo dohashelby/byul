@@ -64,3 +64,5 @@ limitations:
   - 메시지는 비신뢰 opaque 값이며 외부 ID는 untrusted_correlation이다. 메시지의 actor·principal·status·level 유사 문자열을 신뢰 필드로 승격하지 않는다. 신뢰 필드는 실제 logger의 process·level·source에 한정하고 기업에서 요구한 다른 필드는 UNKNOWN으로 남긴다.
   - source SHA·실제 기동 argv와 logging env·container label/image/ID/StartedAt의 전후 일치와 정상 요청 로그 도달을 확인한다. LF와 CRLF를 구분하지만 경계가 모호한 CR·잘림·미지원 접두사·UTF-8 대체 문자는 UNKNOWN이다. 캡처 해시는 UTF-8로 해독된 Docker CLI 출력의 해시이며 daemon 원시 파일 바이트의 해시가 아니다.
   - raw 캡처→실제 parser→구조화 JSON→escaped HTML 대응을 별도 EVD artifact로 보존한다. 기존 RPT 본문이 세부 사건을 자동 표시하거나 외부 기업 화면까지 검증했다고 주장하지 않는다. 반복 사건·신뢰 메타데이터 변화가 명확하면 FAIL이며 다른 미확인 사항이 이를 지우지 않는다. 성능은 미검증이다.
+
+impact: MEDIUM

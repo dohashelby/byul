@@ -3,7 +3,7 @@ framework_id: CHK-LIF-011
 mechanism_ids:
 - mechanism-13
 - mechanism-10
-revision: 5
+revision: 6
 retired: false
 area: LIF
 purpose: 종결·자원 회수
@@ -13,7 +13,7 @@ scope: 기본 TP; Ray/PP는 별도 선택
 risk_category: 일반 장애·복구 점검
 risk_summary: 실패 worker·socket·공유 메모리가 남아 후속 기동을 막거나 자원을 계속 점유할 수 있음. 악의적 유발 가능성과 피해 범위는 별도 확인.
 review_order: reference_baseline_first
-impact: null
+impact: LOW
 applies_when:
   prose: 기본 TP worker·통신·자원 회수와 다음 기동을 확인한다. Ray·PP는 사용 시 추가한다.
 policy_params:

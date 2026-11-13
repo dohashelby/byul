@@ -2,7 +2,7 @@ id: OBS-03
 framework_id: CHK-OBS-003
 mechanism_ids:
 - mechanism-14
-revision: 5
+revision: 6
 retired: false
 area: OBS
 purpose: 수집 정보 최소화
@@ -12,7 +12,7 @@ scope: 기본 로그·엔진 예외 dump; 선택 debug/trace/profiler는 실제 
 risk_category: 보안 위협 점검
 risk_summary: 로그·진단 자료를 읽을 수 있는 주체가 과도하게 수집된 요청 본문·자격·내부 자료를 열람할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   always: true
   prose: 기본 로그·엔진 예외 dump의 필드·독자를 확인한다. debug·trace·profiler는 실제 활성 경로별로 추가한다.

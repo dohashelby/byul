@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 import re
 import shutil
+import importlib.util
+import subprocess
 
 import pytest
 import yaml
@@ -54,7 +56,21 @@ def configure(case, monkeypatch, mode='normal'):
     case['manifest']['request']['messages'] = [{'role': 'user', 'content': 'hello'}]
     case['args']['manifest'].write_text(json.dumps(case['manifest']))
     world = World(case['target'], mode)
-    original = public.KubernetesWorkerReadinessHTTP
+    # 과거 proof의 양성 대조는 그 proof가 고정한 실제 과거 bytes로 실행한다.
+    # 현행 수집기 bytes를 과거 신원으로 표시하지 않는다.
+    legacy_root = case['args']['output'].parent / 'historical-http-source'
+    legacy_root.mkdir(exist_ok=True)
+    repo = Path(__file__).resolve().parents[2]
+    for name, key in (('kubernetes_worker_readiness.py', 'collector'), ('kubernetes_startup_binding.py', 'binding')):
+        raw = subprocess.check_output(['git', 'show',
+            '4fd7ae37:update/src/guard/runtime/' + name], cwd=repo)
+        assert sha256_hex(raw) == SOURCES[key]
+        (legacy_root / name).write_bytes(raw)
+    spec = importlib.util.spec_from_file_location('guard.runtime._historical_worker_readiness',
+        legacy_root / 'kubernetes_worker_readiness.py')
+    legacy = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(legacy)
+    original = legacy.KubernetesWorkerReadinessHTTP
     created = []
     def collector(*args, **kwargs):
         value = original(*args, **kwargs, runner=world.runner)

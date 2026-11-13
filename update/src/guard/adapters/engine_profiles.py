@@ -47,6 +47,7 @@ PROFILES = _catalog()
 # Stable transport names describe a requested evidence feature, not an engine
 # version. The catalog owns that feature's reviewed release availability.
 TRANSPORT_FEATURES = {
+    'kubernetes-owned-sglang-termination-http-v1': 'sglang-native-lifecycle-metadata/1',
     'kubernetes-owned-native-route-http-v1': 'native_route',
     'kubernetes-owned-validation-error-http-v1': 'validation_error',
     'kubernetes-owned-model-authorization-http-v1': 'model_authorization',

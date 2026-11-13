@@ -2,7 +2,7 @@ id: PLT-01
 framework_id: CHK-PLT-001
 mechanism_ids:
 - mechanism-11
-revision: 6
+revision: 7
 retired: false
 area: PLT
 purpose: 실행 최소 권한
@@ -12,7 +12,7 @@ scope: 기본; 실제 계정·컨테이너·마운트·장치
 risk_category: 보안 위협 점검
 risk_summary: 허용 코드가 침해되거나 비승인 코드가 실행됐을 때 과도한 호스트·파일·장치 권한을 이용해 엔진 밖 자료와 서비스까지 침해할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   always: true
   prose: 실행 계정·호스트/컨테이너·mount·장치 접근을 기본 확인한다. 컨테이너 비사용도 제외 사유가 아니다.

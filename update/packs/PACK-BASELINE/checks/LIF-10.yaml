@@ -2,7 +2,7 @@ id: LIF-10
 framework_id: CHK-LIF-010
 mechanism_ids:
 - mechanism-13
-revision: 4
+revision: 5
 retired: false
 area: LIF
 purpose: 종결·자원 회수
@@ -12,7 +12,7 @@ scope: 일반·stream 기본
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: 일반 호출자가 요청 후 취소·연결 종료를 반복했을 때 잔존 계산·참조가 누적되고 한도도 피할 수 있으면 다른 사용자의 서비스가 중단될 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 일반·스트리밍 요청의 대기·계산·출력 단계에서 취소·연결 종료·timeout 처리를 확인한다.
 policy_params:

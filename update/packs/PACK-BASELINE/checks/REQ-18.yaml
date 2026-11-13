@@ -2,7 +2,7 @@ id: REQ-18
 framework_id: CHK-REQ-018
 mechanism_ids:
 - mechanism-04
-revision: 3
+revision: 4
 retired: false
 area: REQ
 purpose: 실행 상태·버퍼 수명
@@ -12,7 +12,7 @@ scope: 선택한 runner를 먼저 확인. V1 condense CPU mask 할당 분기에�
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: 호출자가 batch slot 재사용 조건을 유발할 때 이전 요청의 제한 상태가 남으면 자기 요청의 제한을 벗어나거나 타 요청 결과를 바꿀 수 있음.
 review_order: implementation_path_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 실제 runner의 batch 자리 이동·재사용 경로를 확인한다. V1 CPU mask 시험과 V2 상태/count 시험을 구분한다.
 policy_params:

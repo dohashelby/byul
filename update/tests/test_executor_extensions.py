@@ -38,27 +38,27 @@ def target(tmp_path):
     return value, path
 
 
-def pipeline(tmp_path, cid, factory, values, *, extra_cfg=None):
+def pipeline(tmp_path, cid, factory, values, *, extra_cfg=None, pack=PACK):
     _, path = target(tmp_path)
     store = Store(tmp_path / "store")
     env = environment(model={"id": "test"})
-    ref = put_pack(store, PACK.path)
+    ref = put_pack(store, pack.path)
     pol = policy(ref, scope={"include": [cid]}, values={cid: values})
     store.put(env); store.put(pol)
-    plan = select(PACK, [env], pol); store.put(plan)
-    name = PACK.checks[cid].executor
+    plan = select(pack, [env], pol); store.put(plan)
+    name = pack.checks[cid].executor
     key = name + ":sim"
     registry.EXECUTORS[key] = lambda cfg: factory({"target": str(path), **(extra_cfg or {})})
     try:
-        evd, = run_plan(store, PACK, plan, RunConfig(executors={name: "sim"}, adapter="vllm"))
+        evd, = run_plan(store, pack, plan, RunConfig(executors={name: "sim"}, adapter="vllm"))
     finally:
         registry.EXECUTORS.pop(key)
-    result, = judge_plan(store, PACK, plan, env.created_at)
-    report = build_report(store, PACK, plan, env.created_at)
+    result, = judge_plan(store, pack, plan, env.created_at)
+    report = build_report(store, pack, plan, env.created_at)
     assert cid in [row.check_id for row in report.by_check]
     saved = get_pack(store, ref)
     again, = judge_plan(store, saved, plan, env.created_at)
-    assert again.verdicts == result.verdicts and saved.ref() == PACK.ref()
+    assert again.verdicts == result.verdicts and saved.ref() == pack.ref()
     return evd, result
 
 
@@ -147,7 +147,8 @@ def selection_probe(status):
 @pytest.mark.parametrize("status,allowed,security", [(400, False, "PASS"), (200, False, "UNKNOWN"), (500, False, "UNKNOWN"), (400, True, "UNKNOWN")])
 def test_sup08_rejection_before_import_is_the_only_automatic_pass(tmp_path, status, allowed, security):
     evd, result = pipeline(tmp_path, "SUP-08", lambda c: InputValidationExecutor(c, container_probe=selection_probe(status)),
-                           {"code_selection_fields": ["code_revision"], "code_selection_allowed": allowed, "rejection_codes": ["400"]})
+                           {"code_selection_fields": ["code_revision"], "code_selection_allowed": allowed, "rejection_codes": ["400"]},
+                           pack=load_pack(ROOT / 'reference/pack-seeds/PACK-BASELINE-33'))
     assert result.verdicts.security.value == security
     assert evd.observations["code_selection_final_code_verified"].value is False
 

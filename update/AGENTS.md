@@ -105,10 +105,10 @@
   - 영향도(`impact`)는 2026-11-08 초안(HIGH 33·MEDIUM 38·LOW 6)으로 확정했다. 새 팩 판본에 반영한 뒤 공식(official) 재판정을 한다.
 - **CPU 이미지 제외**(2026-11-12 사용자 결정): CPU용 vLLM 이미지(`vllm/vllm-openai-cpu`, `launch_profile=cpu-bounded`) 대상 검사·실증은 하지 않는다. 실제 엔진 실증은 GPU 이미지로만 하고, GPU 없는 개발·CI는 모의 엔진과 고정 자료로 한다. CPU 이미지 전용 코드(기동 생성 확인, REQ-09 CPU 길이 원인 증거, 두 이미지 비교의 `cpu-bounded`·`gpu_count == 0` 수락 조건)는 새로 늘리지 않고 제거하거나 GPU 조건으로 바꾼다(작업지시서 M-A9). `_cpu` 이름의 vLLM 소스 분석 실행기는 CPU 이미지와 무관하므로 이 결정의 대상이 아니다.
 - 현황은 `uv run python -m tools.checklist_status`로 재생성한다(`docs/CHECKLIST_VALIDATION_STATUS.md`). 현황표의 DONE은 lab 단계 완료이고, 보안 PASS·기업 승인·원 질문 전체 완료가 아니다.
-- 1단계 분담(2026-11-04)은 실행기 파일 소유로 나눈다.
-  - 개발 담당 26개, GPU 실증 담당 43개다.
-  - core·models·judges·registry·cli·packs·공통 계층과 현황 도구는 개발 담당이 고친다.
-  - 담당별 상태 파일은 `docs/phase1/<담당>.yaml`이며, 각 담당은 자기 파일만 고친다.
+- **분담 없음**(2026-11-13 사용자 결정): A·B(개발 담당·GPU 실증 담당) 분담과 파일 소유 규칙을 없애고 한 사람이 모든 작업을 맡는다.
+  - 1단계 분담(2026-11-04, 개발 26개·GPU 실증 43개)과 작업지시서의 A·B 표기는 이력이다. 작업 번호 M-A*·M-B*는 작업 구분으로만 쓴다.
+  - 담당별 상태 파일 `docs/phase1/dev-1.yaml`·`gpu.yaml`은 현황 도구가 읽는 데이터라 그대로 두고, 상태 갱신은 두 파일 모두 직접 한다.
+  - 병렬 세션·worktree를 쓸 때는 같은 파일을 동시에 고치지 않도록 나눈다(작업지시서 2절).
 
 ## 6. 기술 기준
 
@@ -117,7 +117,7 @@
 - 의존성은 pydantic v2, typer, pyyaml, httpx, pytest다. 그 외 의존성은 추가 전에 사람에게 묻는다. 엔진 패키지(vllm·sglang·tensorrt_llm)를 update의 의존성으로 넣지 않는다.
 - 모든 객체는 append-only다. 해시 규칙은 SPEC §2.3을 따른다.
 - 소스 고정 목록: 제품 소스(`src/guard`·`packs`·`uv.lock`·`pyproject.toml`·`reference/framework`)를 바꾸면 `uv run python tools/verify_req10_consumption.py --write`로 `release/reviewed-source.json`을 다시 만들고 diff를 검토한다. 나중에 머지하는 쪽이 다시 만든다.
-  - 검토 기록(결정 5, 2026-11-12 사용자): MVP 동안 B 검토를 면제한다. 새 소스 목록 SHA마다 A가 `tools/reviewed_manifest_receipts.json`에 기록 행을 넣고 `reviewed_by`에 "B 검토 면제(사용자 결정 5, 2026-11-12)"를 밝힌다. 검사를 끄거나 넓히지 않는다.
+  - 검토 기록(결정 5, 2026-11-12 사용자): MVP 동안 B 검토를 면제한다. 새 소스 목록 SHA마다 작성자가 `tools/reviewed_manifest_receipts.json`에 기록 행을 넣고 `reviewed_by`에 "B 검토 면제(사용자 결정 5, 2026-11-12)"를 밝힌다. 검사를 끄거나 넓히지 않는다.
 
 ## 7. 작업 방식
 

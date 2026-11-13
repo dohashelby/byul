@@ -497,7 +497,7 @@
       ],
       "expected_gaps": [
         "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다.",
-        "결정 9 해당 분기는 항목별 검토 대기. 미승인을 완료·비적용·PASS로 바꾸지 않는다."
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
       ],
       "actual_results": null
     },
@@ -575,7 +575,7 @@
       ],
       "expected_gaps": [
         "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다.",
-        "결정 9 해당 분기는 항목별 검토 대기. 미승인을 완료·비적용·PASS로 바꾸지 않는다."
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
       ],
       "actual_results": null
     },
@@ -683,7 +683,7 @@
       ],
       "expected_gaps": [
         "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다.",
-        "결정 9 해당 분기는 항목별 검토 대기. 미승인을 완료·비적용·PASS로 바꾸지 않는다."
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
       ],
       "actual_results": null
     },
@@ -1218,7 +1218,7 @@
       ],
       "expected_gaps": [
         "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다.",
-        "결정 9 해당 분기는 항목별 검토 대기. 미승인을 완료·비적용·PASS로 바꾸지 않는다."
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
       ],
       "actual_results": null
     },
@@ -1378,7 +1378,7 @@
       ],
       "expected_gaps": [
         "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다.",
-        "결정 9 해당 분기는 항목별 검토 대기. 미승인을 완료·비적용·PASS로 바꾸지 않는다."
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
       ],
       "actual_results": null
     },
@@ -3116,10 +3116,11 @@
         }
       ],
       "expected_gaps": [
-        "결정 9 해당 분기는 항목별 검토 대기. 미승인을 완료·비적용·PASS로 바꾸지 않는다.",
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다.",
         "기존 사용자 결정의 대상 비적용 근거를 정본 선정에 남긴다. 새 비적용 승인이 아니다."
       ],
-      "actual_results": null
+      "actual_results": null,
+      "additional_selection_basis": "기존 Gateway 비노출 결정 유지. 기준 판본에도 /v1/responses 경로가 없다는 소스 부재 근거를 추가한다."
     },
     {
       "check_id": "REQ-07",
@@ -3278,7 +3279,13 @@
           "target": null,
           "prepared": null,
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다."
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "request_field_mapping": {
+            "structured_outputs": "guided_json"
+          },
+          "unsupported_cases": [
+            "tool_choice=required"
+          ]
         },
         "candidate": {
           "role": "후보 판본",
@@ -3304,7 +3311,7 @@
       ],
       "expected_gaps": [
         "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다.",
-        "결정 9 해당 분기는 항목별 검토 대기. 미승인을 완료·비적용·PASS로 바꾸지 않는다."
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
       ],
       "actual_results": null
     },
@@ -3602,7 +3609,10 @@
           "target": null,
           "prepared": null,
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "explicit_launch_args": [
+            "--enable-prefix-caching"
+          ]
         },
         "candidate": {
           "role": "후보 판본",
@@ -3610,7 +3620,10 @@
           "target": null,
           "prepared": null,
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "explicit_launch_args": [
+            "--enable-prefix-caching"
+          ]
         }
       },
       "confirmed_policy_values": null,
@@ -3643,7 +3656,7 @@
       ],
       "expected_gaps": [
         "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다.",
-        "결정 9 해당 분기는 항목별 검토 대기. 미승인을 완료·비적용·PASS로 바꾸지 않는다."
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
       ],
       "actual_results": null
     },
@@ -3660,7 +3673,10 @@
           "target": null,
           "prepared": null,
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "explicit_launch_args": [
+            "--enable-prefix-caching"
+          ]
         },
         "candidate": {
           "role": "후보 판본",
@@ -3668,7 +3684,10 @@
           "target": null,
           "prepared": null,
           "policy_file": null,
-          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다."
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "explicit_launch_args": [
+            "--enable-prefix-caching"
+          ]
         }
       },
       "confirmed_policy_values": {
@@ -3709,7 +3728,7 @@
       ],
       "expected_gaps": [
         "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다.",
-        "결정 9 해당 분기는 항목별 검토 대기. 미승인을 완료·비적용·PASS로 바꾸지 않는다."
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
       ],
       "actual_results": null
     },
@@ -4758,5 +4777,17 @@
       "승인 범위 밖 재시도"
     ],
     "budget_approved": false
+  },
+  "decision_9": {
+    "status": "항목별 승인",
+    "source": "사용자 답변, 2026-11-13; DECISIONS·작업지시서 7절은 #260에 기록",
+    "items": [
+      "LIF-13 기준 UNKNOWN",
+      "LIF-05·06·16 실행 중 전환만 기준 UNKNOWN·Pod 교체 양쪽 실행",
+      "LIF-07 준비 API 분기 기준 UNKNOWN",
+      "REQ-06 기존 비적용·부재 근거 추가",
+      "REQ-10 guided_json 대응·required 기준 UNKNOWN",
+      "REQ-16·17 양쪽 prefix caching 명시"
+    ]
   }
 }

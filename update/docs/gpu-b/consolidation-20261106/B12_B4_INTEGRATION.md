@@ -60,7 +60,7 @@ python update/tools/b12_tp2_inputs.py --output <다른-새-디렉터리> --input
 | A6·운영 담당 | 실제 하네스 bytes/argv, TP2 ENV/POL/target/prepared·rank/shard roster·normal/failure/recovery·원 시각/ack | 이번 준비는 GPU 실행·비용·할당량·기업 정책의 승인 아님. 시간·단가는 과거 계획 가정 |
 | B 실행·검증 담당 | 위 실제 입력을 현재 소비자에 결합하고 원 EVD/RES/RPT·반출·복원/재판정·소유 정리 확인 | 실제 GPU/TP2 결과는 아직 없음. 현재 기록의 독립 FAIL/UNKNOWN 유지 |
 
-새 지시서의 lab DONE **2개/잔여41개**, 기존 한정 마감 **25개/제품 증거 보완18개**, 이전 실제 로컬 추가 관측 **14 ID**는 서로 다른 축으로 유지한다. 이번 소비자 코드·CPU 시험·준비 파일로 lab DONE이나 전체 질문 완료 수를 늘리지 않는다. 기준 시점의 등록·반환 대조는 [B1/B2 수신 표](../b12-readiness-20261108.md), 소비자별 인터페이스는 [수명주기·관측·플랫폼 인계](../preparation/B12_COMMON_INPUT_CONSUMPTION.md)와 [요청·공급물 인계](../../b-work/B12_S5_CONSUMERS_20261108.md)를 따른다. 원 로그·DB는 각 세션의 로컬 고정 경로에 보존하며 PR에는 코드·결과·정확한 SHA/참조를 반영한다.
+새 지시서의 lab DONE **2개/잔여41개**, 기존 한정 마감 **25개/제품 증거 보완18개**, 이전 실제 로컬 추가 관측 **14 ID**는 서로 다른 축으로 유지한다. 이번 소비자 코드·CPU 시험·준비 파일로 lab DONE이나 전체 질문 완료 수를 늘리지 않는다. 기준 시점의 등록·반환 대조는 [B1/B2 수신 표](../b12-readiness-20261108.md), 소비자별 인터페이스는 [수명주기·관측·플랫폼 인계](../preparation/B12_COMMON_INPUT_CONSUMPTION.md)와 [요청·공급물 인계](https://github.com/dohashelby/byul/blob/3c611e214044460d5929e8fb0c3a615265425da0/update/docs/b-work/B12_S5_CONSUMERS_20261108.md)를 따른다. 원 로그·DB는 각 세션의 로컬 고정 경로에 보존하며 PR에는 코드·결과·정확한 SHA/참조를 반영한다.
 
 ## B4 로컬 입력 사전검증 보강 — 2026-11-09
 

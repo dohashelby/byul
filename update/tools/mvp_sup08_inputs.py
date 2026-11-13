@@ -21,10 +21,8 @@ POC = ROOT / 'docs/evidence/sup08-code-selection-20261111.json'
 FIXTURE_CONTRACT = ROOT / 'docs/dev-1/ma8-poc-fixture-contract.json'
 
 
-def prepare(fixture_file, environments, targets, output, *, control_image, pack=ROOT / 'packs/PACK-BASELINE'):
-    output = Path(output).resolve()
-    if output.exists() or "'" in str(output):
-        raise ValueError('새 입력 디렉터리를 지정해야 합니다.')
+def validate_fixture(fixture_file):
+    """조립과 로컬 사전 확인이 같은 PoC 신원 검사를 사용한다."""
     fixture_raw = Path(fixture_file).read_bytes(); fixture = json.loads(fixture_raw)
     historical = json.loads(POC.read_bytes())['product_update']
     contract = json.loads(FIXTURE_CONTRACT.read_bytes())['fixture']
@@ -38,6 +36,15 @@ def prepare(fixture_file, environments, targets, output, *, control_image, pack=
             or any(not re.fullmatch('[0-9a-f]{40}', code[k]) for k in ('approved', 'unapproved'))
             or code['approved'] == code['unapproved']):
         raise ValueError('PoC와 같은 고정 모델·코드 fixture가 필요합니다.')
+    return fixture_raw, fixture, historical, inventory_hash
+
+
+def prepare(fixture_file, environments, targets, output, *, control_image, pack=ROOT / 'packs/PACK-BASELINE'):
+    output = Path(output).resolve()
+    if output.exists() or "'" in str(output):
+        raise ValueError('새 입력 디렉터리를 지정해야 합니다.')
+    fixture_raw, fixture, historical, inventory_hash = validate_fixture(fixture_file)
+    code = fixture['code_revisions']
     baseline = load_pack(pack); check = baseline.checks['SUP-08']
     if baseline.manifest.revision != 34 or check.revision != 5:
         raise ValueError('정본 팩과 SUP-08 정의가 준비되지 않았습니다.')

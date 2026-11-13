@@ -1,0 +1,292 @@
+{
+  "schema": "guard-mvp-sup08-local-audit/1",
+  "scope": "로컬 파일 bytes·입력 계약 확인. 클러스터·엔진·정상 요청을 관측하지 않음.",
+  "fixture_manifest_sha256": "d5121b80dd3237fe63d6e646806d414d464ffc78efa6ef5fbaa436715bf67765",
+  "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 34,
+    "sha256": "cf95f6709b635a6b14cc4a8ceaef5843bd0eb1bd4294c63e29d815626b8c1b0b"
+  },
+  "local_assets_valid": true,
+  "model_bytes_rechecked": true,
+  "model_files": [
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/model-snapshot/config.json",
+      "expected_sha256": "e3fbad3779524ca7e4186f276cd0fd81e2c2b33aaed3331fcced7253d5f7d391",
+      "verified": true,
+      "bytes": 3664,
+      "sha256": "e3fbad3779524ca7e4186f276cd0fd81e2c2b33aaed3331fcced7253d5f7d391",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/model-snapshot/configuration_phi3_v.py",
+      "expected_sha256": "98087e2f3467072e8de80958f51019c0726da6bef418968949305de4cd170e26",
+      "verified": true,
+      "bytes": 10586,
+      "sha256": "98087e2f3467072e8de80958f51019c0726da6bef418968949305de4cd170e26",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/model-snapshot/image_embedding_phi3_v.py",
+      "expected_sha256": "a4a3ab2c86448b34e1402b7dac3ea17d074a7c5f86ad46c0047f2db6267808b2",
+      "verified": true,
+      "bytes": 14079,
+      "sha256": "a4a3ab2c86448b34e1402b7dac3ea17d074a7c5f86ad46c0047f2db6267808b2",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/model-snapshot/image_processing_phi3_v.py",
+      "expected_sha256": "8470db7ad9c2483f60ca14ed84e5eba99be0ff15b66ef9958754879b85d492bc",
+      "verified": true,
+      "bytes": 11409,
+      "sha256": "8470db7ad9c2483f60ca14ed84e5eba99be0ff15b66ef9958754879b85d492bc",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/model-snapshot/model-00001-of-00002.safetensors",
+      "expected_sha256": "175b2fe918dd8bd2549e3441615ee0c6d7b1f6d638c0104a614546f55c273482",
+      "verified": true,
+      "bytes": 4944122112,
+      "sha256": "175b2fe918dd8bd2549e3441615ee0c6d7b1f6d638c0104a614546f55c273482",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/model-snapshot/model-00002-of-00002.safetensors",
+      "expected_sha256": "e61ece5a8f0c9663afa06cc22799056f5cc084fb993518bf036dc8e268fd4c94",
+      "verified": true,
+      "bytes": 3349208776,
+      "sha256": "e61ece5a8f0c9663afa06cc22799056f5cc084fb993518bf036dc8e268fd4c94",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/model-snapshot/model.safetensors.index.json",
+      "expected_sha256": "72d628080d85b3a0e96eac71a47f7a04a666aabf8a91269100c99a8d543f345c",
+      "verified": true,
+      "bytes": 68901,
+      "sha256": "72d628080d85b3a0e96eac71a47f7a04a666aabf8a91269100c99a8d543f345c",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/model-snapshot/modeling_phi3_v.py",
+      "expected_sha256": "b9caa24798d15931241b4aeeaf0624ab8d11f78ccffe79a0d2821da96ffff06b",
+      "verified": true,
+      "bytes": 75366,
+      "sha256": "b9caa24798d15931241b4aeeaf0624ab8d11f78ccffe79a0d2821da96ffff06b",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/model-snapshot/preprocessor_config.json",
+      "expected_sha256": "5fb81b001ba480c245782d19645774461069b4330de87dc4bbe09a4add143b85",
+      "verified": true,
+      "bytes": 491,
+      "sha256": "5fb81b001ba480c245782d19645774461069b4330de87dc4bbe09a4add143b85",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/model-snapshot/processing_phi3_v.py",
+      "expected_sha256": "99d029093d9a99478fea4e6cea92b5ff47323903ca5e1af9cc441b0a64d126a8",
+      "verified": true,
+      "bytes": 11331,
+      "sha256": "99d029093d9a99478fea4e6cea92b5ff47323903ca5e1af9cc441b0a64d126a8",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/model-snapshot/sample_inference.py",
+      "expected_sha256": "78d748b915837b762856cb66e10b8536c5454bbff3c6af712005fc44751d87cd",
+      "verified": true,
+      "bytes": 5684,
+      "sha256": "78d748b915837b762856cb66e10b8536c5454bbff3c6af712005fc44751d87cd",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/model-snapshot/special_tokens_map.json",
+      "expected_sha256": "f9535fada19315e0d8eb89521cebe111c008fee98d16e7c6744acfb50505d8c3",
+      "verified": true,
+      "bytes": 670,
+      "sha256": "f9535fada19315e0d8eb89521cebe111c008fee98d16e7c6744acfb50505d8c3",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/model-snapshot/tokenizer.json",
+      "expected_sha256": "005df01af5e16e758ff74c1a31e7b8910eb75c7d5626689d6bdee40a779d44fe",
+      "verified": true,
+      "bytes": 1851389,
+      "sha256": "005df01af5e16e758ff74c1a31e7b8910eb75c7d5626689d6bdee40a779d44fe",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/model-snapshot/tokenizer_config.json",
+      "expected_sha256": "948a2ff1e1cf01d05e4a9880c8145818b3de2a2cb0492eb3eba6fa82fc4fd8ba",
+      "verified": true,
+      "bytes": 9403,
+      "sha256": "948a2ff1e1cf01d05e4a9880c8145818b3de2a2cb0492eb3eba6fa82fc4fd8ba",
+      "stable": true
+    }
+  ],
+  "code_cache_files": [
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/hf/hub/models--local-byul--sup08-phi3v-processor/snapshots/a239c75031d0d32a44f2a89135f574c2318244de/processing_phi3_v.py",
+      "expected_sha256": "33fb6d5cfd9d0413b30d59bf0c164c7121ed777832b766ac839f305056cc028e",
+      "verified": true,
+      "bytes": 12347,
+      "sha256": "33fb6d5cfd9d0413b30d59bf0c164c7121ed777832b766ac839f305056cc028e",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/hf/hub/models--local-byul--sup08-phi3v-processor/snapshots/a239c75031d0d32a44f2a89135f574c2318244de/image_processing_phi3_v.py",
+      "expected_sha256": "8470db7ad9c2483f60ca14ed84e5eba99be0ff15b66ef9958754879b85d492bc",
+      "verified": true,
+      "bytes": 11409,
+      "sha256": "8470db7ad9c2483f60ca14ed84e5eba99be0ff15b66ef9958754879b85d492bc",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/hf/hub/models--local-byul--sup08-phi3v-processor/snapshots/bd80f9e25ed91e97f4da47172241bbe008d77e99/processing_phi3_v.py",
+      "expected_sha256": "b81db80faec572aea7a2e37b406369eccc00d1f52f51292ecae6103e98352a6a",
+      "verified": true,
+      "bytes": 12396,
+      "sha256": "b81db80faec572aea7a2e37b406369eccc00d1f52f51292ecae6103e98352a6a",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/hf/hub/models--local-byul--sup08-phi3v-processor/snapshots/bd80f9e25ed91e97f4da47172241bbe008d77e99/image_processing_phi3_v.py",
+      "expected_sha256": "8470db7ad9c2483f60ca14ed84e5eba99be0ff15b66ef9958754879b85d492bc",
+      "verified": true,
+      "bytes": 11409,
+      "sha256": "8470db7ad9c2483f60ca14ed84e5eba99be0ff15b66ef9958754879b85d492bc",
+      "stable": true
+    },
+    {
+      "path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/hf/hub/models--local-byul--sup08-phi3v-processor/refs/main",
+      "expected_sha256": "489570a6b94a1128034d7a3ce1bf59e3b5de3e824a9a0cb2e2b23470a63d68bd",
+      "verified": true,
+      "bytes": 40,
+      "sha256": "489570a6b94a1128034d7a3ce1bf59e3b5de3e824a9a0cb2e2b23470a63d68bd",
+      "stable": true
+    }
+  ],
+  "launch_files": [
+    {
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/baseline/engine.yaml",
+      "expected_sha256": "96ed189958cd52901ecf723be2554607012bca339c0d68fdb2bb353be0fbd0f1",
+      "verified": true,
+      "bytes": 3841,
+      "sha256": "96ed189958cd52901ecf723be2554607012bca339c0d68fdb2bb353be0fbd0f1",
+      "stable": true
+    },
+    {
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/baseline/probe.yaml",
+      "expected_sha256": "5ddb619b9c4151c8c082239d31f5fdcba6793a0c1875d47b7044d6a98232842c",
+      "verified": true,
+      "bytes": 904,
+      "sha256": "5ddb619b9c4151c8c082239d31f5fdcba6793a0c1875d47b7044d6a98232842c",
+      "stable": true
+    },
+    {
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/baseline/render.json",
+      "expected_sha256": "8e59ce4afa5beace1a04555a7afeb24e3538bf7eb8a7a6801097f48fae421066",
+      "verified": true,
+      "bytes": 1951,
+      "sha256": "8e59ce4afa5beace1a04555a7afeb24e3538bf7eb8a7a6801097f48fae421066",
+      "stable": true
+    },
+    {
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/baseline/policy.yaml",
+      "expected_sha256": "1559de87dde22d3f4f3191f913bd4bf204f8925f7aa180a92e8649ef19ba3e7f",
+      "verified": true,
+      "bytes": 412,
+      "sha256": "1559de87dde22d3f4f3191f913bd4bf204f8925f7aa180a92e8649ef19ba3e7f",
+      "stable": true
+    },
+    {
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/baseline/guard.pending-target.toml",
+      "expected_sha256": "e563adeee16a7b2eb3f7b6d143b1810a0837e2976679a508c76e0ce1ab4f5dc4",
+      "verified": true,
+      "bytes": 1574,
+      "sha256": "e563adeee16a7b2eb3f7b6d143b1810a0837e2976679a508c76e0ce1ab4f5dc4",
+      "stable": true
+    },
+    {
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/candidate/engine.yaml",
+      "expected_sha256": "1e5183682a57863cfb34ad0371ef42a128f708a9061f78155dbca04ab9e88aad",
+      "verified": true,
+      "bytes": 3781,
+      "sha256": "1e5183682a57863cfb34ad0371ef42a128f708a9061f78155dbca04ab9e88aad",
+      "stable": true
+    },
+    {
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/candidate/probe.yaml",
+      "expected_sha256": "51ca5d63cb69c6003ba25e55de2b72f0e19598d12bf09166eee40eb327660664",
+      "verified": true,
+      "bytes": 906,
+      "sha256": "51ca5d63cb69c6003ba25e55de2b72f0e19598d12bf09166eee40eb327660664",
+      "stable": true
+    },
+    {
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/candidate/render.json",
+      "expected_sha256": "14a4fb68a6e483418068bbe3d2288085864d5f681ad1fda9013bca3ae093c651",
+      "verified": true,
+      "bytes": 1894,
+      "sha256": "14a4fb68a6e483418068bbe3d2288085864d5f681ad1fda9013bca3ae093c651",
+      "stable": true
+    },
+    {
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/candidate/policy.yaml",
+      "expected_sha256": "1559de87dde22d3f4f3191f913bd4bf204f8925f7aa180a92e8649ef19ba3e7f",
+      "verified": true,
+      "bytes": 412,
+      "sha256": "1559de87dde22d3f4f3191f913bd4bf204f8925f7aa180a92e8649ef19ba3e7f",
+      "stable": true
+    },
+    {
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/candidate/guard.pending-target.toml",
+      "expected_sha256": "23a044a9db9dfab2db2671320e1a0875e56cd64a8b05a33c0e3bf9a949a36d11",
+      "verified": true,
+      "bytes": 1577,
+      "sha256": "23a044a9db9dfab2db2671320e1a0875e56cd64a8b05a33c0e3bf9a949a36d11",
+      "stable": true
+    },
+    {
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/control.png",
+      "expected_sha256": "18bc07d5133e1a7cabfd4cd192e13bd1ee8e2643222136d95a4aa7180c4486db",
+      "verified": true,
+      "bytes": 623,
+      "sha256": "18bc07d5133e1a7cabfd4cd192e13bd1ee8e2643222136d95a4aa7180c4486db",
+      "stable": true
+    },
+    {
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/control-image.txt",
+      "expected_sha256": "9bbb4cf8268b9abc2c5e6b558ff4417e4ca9fb6e9a8ef4964c5a70ea553ecf0a",
+      "verified": true,
+      "bytes": 855,
+      "sha256": "9bbb4cf8268b9abc2c5e6b558ff4417e4ca9fb6e9a8ef4964c5a70ea553ecf0a",
+      "stable": true
+    }
+  ],
+  "code_cache_valid": true,
+  "launch_plan_valid": true,
+  "final_input_contracts_valid": null,
+  "missing_inputs": [
+    "baseline:environments",
+    "candidate:environments",
+    "baseline:targets",
+    "candidate:targets"
+  ],
+  "errors": [],
+  "ready_for_final_assembly": false,
+  "input_preflight_passed": false,
+  "cluster_observed": false,
+  "engine_executed": false,
+  "node_file_permissions_verified": false,
+  "normal_request_verified": false,
+  "actual_comparison": null,
+  "official": false,
+  "checked_at": "2026-11-13T23:13:32.287326+09:00",
+  "fixture_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/fixture-manifest.json",
+  "launch_manifest_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/launch-inputs-v2/manifest.json",
+  "launch_manifest_sha256": "f51b7486b02cc89e849d9c3353441b693c3ad1fd6441a98dc2914b697f055453",
+  "audit_source_commit": "fbf1b2d343f8e4fb81a1a890151c508e13c00993",
+  "elapsed_seconds": 19.575,
+  "audit_tool_sha256": "ff765977a64561d60e7d9c4a8b3463223ddf70b4e03675918889a433bbbb1877"
+}

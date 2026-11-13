@@ -253,7 +253,9 @@ class ObservationFeed:
         encoded = (json.dumps(document, ensure_ascii=False) + "\n").encode("utf-8")
         self.state_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         temporary = self.state_path.with_name(f".{self.state_path.name}.{os.getpid()}.{uuid4().hex}.tmp")
-        write_atomic(self.state_path, encoded, temporary=temporary)
+        write_atomic(
+            self.state_path, encoded, temporary=temporary, options=AtomicWriteOptions(cleanup_after_close_error=True)
+        )
 
     @staticmethod
     def _parse_time(value: Any, field: str) -> datetime:
@@ -611,7 +613,9 @@ class ObservationFeed:
             path,
             encoded,
             temporary=temporary,
-            options=AtomicWriteOptions(final_mode=self.health_receipt_mode, chmod_after_write=True),
+            options=AtomicWriteOptions(
+                final_mode=self.health_receipt_mode, chmod_after_write=True, cleanup_after_close_error=True
+            ),
         )
 
     def collect(self) -> tuple[dict[str, Any], str]:

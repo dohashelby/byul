@@ -133,3 +133,18 @@ class ObservationAtomicContractTests(unittest.TestCase):
         with self.assertRaises(OSError):
             os.fstat(opened[0])
         self.assertEqual(list(self.feed.state_path.parent.glob(".*.tmp")), [])
+
+    def test_close_error_still_runs_outer_temporary_cleanup(self):
+        close = os.close
+
+        def closed_then_failed(descriptor):
+            close(descriptor)
+            raise OSError("close blocked")
+
+        with (
+            patch.object(module.os, "fdopen", side_effect=OSError("fdopen blocked")),
+            patch.object(module.os, "close", side_effect=closed_then_failed),
+        ):
+            with self.assertRaisesRegex(OSError, "close blocked"):
+                self.feed._write_checkpoint()
+        self.assertEqual(list(self.feed.state_path.parent.glob(".*.tmp")), [])

@@ -18,6 +18,7 @@ class AtomicWriteOptions:
     text: bool = False
     cleanup: bool = True
     close_unowned_descriptor: bool = True
+    cleanup_after_close_error: bool = False
 
 
 def write_atomic(
@@ -60,10 +61,21 @@ def write_atomic(
             finally:
                 os.close(directory_fd)
     finally:
-        if descriptor >= 0 and options.close_unowned_descriptor:
-            os.close(descriptor)
-        if options.cleanup:
+        if options.cleanup_after_close_error:
             try:
-                temporary.unlink()
-            except FileNotFoundError:
-                pass
+                if descriptor >= 0 and options.close_unowned_descriptor:
+                    os.close(descriptor)
+            finally:
+                _cleanup_temporary(temporary, options.cleanup)
+        else:
+            if descriptor >= 0 and options.close_unowned_descriptor:
+                os.close(descriptor)
+            _cleanup_temporary(temporary, options.cleanup)
+
+
+def _cleanup_temporary(temporary: Path, enabled: bool) -> None:
+    if enabled:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass

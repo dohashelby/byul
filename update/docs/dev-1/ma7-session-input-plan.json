@@ -14,9 +14,9 @@
     "sha256": "cf95f6709b635a6b14cc4a8ceaef5843bd0eb1bd4294c63e29d815626b8c1b0b"
   },
   "planned_pack_source": {
-    "branch": "codex/ma4-baseline34-20261113",
-    "commit": "f696f107",
-    "available_on_main": false
+    "branch": "main",
+    "commit": "b1d209fc3aa99441755adc3e7b71657c33a287c9",
+    "available_on_main": true
   },
   "counts": {
     "active_checks": 69,
@@ -31,7 +31,7 @@
     "M-A_render": "tools/gpu_a_aws_lab.py",
     "M-B_TP2_plan": "tools/b12_tp2_inputs.py",
     "model_revision_for_REQ16": null,
-    "reason": "REQ-16 모델 snapshot은 미고정이다. SUP-08 실제 로컬 fixture와 두 판본 기동/정책은 준비했으나 실제 ENV/target과 노드 배치는 남았다.",
+    "reason": "REQ-16 revision 후보만 고정됐으며 가중치·실제 첫 기동·ENV/target은 미확인이다. SUP-08 실제 파일 재검증과 수정한 기동 자산을 후속 입력 준비에 연결한다.",
     "SUP08_local_fixture": {
       "source_pr": "https://github.com/dohashelby/byul/pull/257",
       "preparation_receipt_url": "https://github.com/dohashelby/byul/blob/03541c853eddcf4a444b68e8abd4fae53bf472dc/update/docs/dev-1/ma8-local-preparation-20261113.json",

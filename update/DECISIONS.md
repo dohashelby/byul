@@ -323,6 +323,12 @@
 - 2026-10-19 · 모델: `Execution.operator{by,at}`·`override_reason`, `ExecutorInfo.default_judge`, `CheckRow.evidence_source`·`replaced`, `Report.evidence_counts` — 모두 비어 있으면 직렬화에서 빠짐(기존 해시 유지). 사람이 입력한 증거(operator 있음)는 모델이 MEASURED를 거부.
 
 ## 열린 질문
+
+- **M-A7-Q1 / 결정 요청23 (2026-11-13, REQ-17):** 확정 `cache_timing_min_samples=200`은 현행 `project_cache_timing`에서 네 역할 각각에 적용된다(`src/guard/executors/engine_callback_projection.py:305`~310). 점수 표본만 최소800개지만 동일 파일의 `MAX_CASES=512`(22행)가 한 manifest를 제한한다. 기존 cohort 생성기는 prime·warmup까지 합치면1,004개라 현행 검증에서 거부된다(`tools/gpu_a_req17_cohort.py:31`~62). 값·상한·기존 UNKNOWN은 바꾸지 않았다.
+  - **권장:** 역할별200개와 각 수집 묶음512개 상한을 유지한 분할 수집·동일 scope 집계의 계약/설계안을 별도 검토·구현한다. 현재는 입력 준비를 미완료로 둔다. 기술 설계·검증은 개발자가 맡고 SPEC·판정 입력 계약과 실행 비용 영향만 사용자에게 승인 요청한다.
+  - 대안: 사용자 의도가 역할별200개가 아니었다면 의미·값을 새 결정으로 명시한다. 승인 전 현재200을 낮추거나 총합으로 재해석하지 않는다.
+  - 영향: REQ-17 양쪽 사례·EVD 완결성·J02 요청수/시간/비용 계획. 512를 임의로 늘리거나 여러 EVD를 조건 확인 없이 합치지 않는다.
+
 ### M-A9 GPU 수락 조건 (2026-11-12, 미승인 초안)
 - ~~M-A9-Q1~~ → 2026-11-13 승인(위 결정 13). 원문: G1의 결정 13 초안(양쪽 GPU 모델·드라이버·GPU 수·TP 구성 일치, `gpu-bounded` 기동, CPU 프로필 없음)을 구현했으나 사용자 승인 전이다. 초안과 다른 점: 성능은 UNKNOWN 강제 대신 수락 대상에서 제외(GPU RES는 성능 규칙을 그대로 적용), 결과 형식 `guard-update-acceptance/2`. 잠정: 구현 유지, 승인 시 확정.
 ### GPU 전용·두 판본 실제 비교 (2026-11-12)

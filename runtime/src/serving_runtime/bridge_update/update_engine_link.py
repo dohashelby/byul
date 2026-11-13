@@ -13,48 +13,10 @@ import re
 from typing import Any
 from serving_runtime.target.target import _image_digest
 
+from serving_runtime.observation.native_receipts import CONTEXT_KEYS, parse_request_time as _time, select_request
+
 
 CHECKS = frozenset({"REQ-12", "REQ-15", "LIF-03", "LIF-04", "LIF-07", "LIF-08", "LIF-09", "LIF-10"})
-CONTEXT_KEYS = (
-    "request_id",
-    "upstream_request_id",
-    "observation_session_id",
-    "run_id",
-    "environment",
-    "backend_kind",
-    "target_id",
-    "target",
-    "policy",
-    "policy_bundle",
-    "route",
-)
-
-
-def _time(value: str) -> datetime:
-    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    if parsed.tzinfo is None:
-        raise ValueError("ENGINE_LINK_CLOCK_UNQUALIFIED")
-    return parsed
-
-
-def select_request(records: list[dict], request_id: str) -> dict:
-    selected = [r for r in records if r.get("request_id") == request_id]
-    starts = [r for r in selected if r.get("phase") == "started"]
-    finals = [r for r in selected if r.get("phase") == "final"]
-    if len(starts) != 1 or len(finals) != 1:
-        raise ValueError("ENGINE_LINK_UNIQUE_REQUEST_INTERVAL_REQUIRED")
-    first, last = starts[0], finals[0]
-    if any(first.get(key) != last.get(key) for key in CONTEXT_KEYS):
-        raise ValueError("ENGINE_LINK_REQUEST_CONTEXT_CHANGED")
-    if _time(first["recorded_at"]) > _time(last["recorded_at"]):
-        raise ValueError("ENGINE_LINK_REQUEST_INTERVAL_INVALID")
-    return {
-        "context": {key: deepcopy(first.get(key)) for key in CONTEXT_KEYS},
-        "started_at": first["recorded_at"],
-        "finished_at": last["recorded_at"],
-        "final_outcome": last.get("final_outcome"),
-        "backend_cancel": last.get("backend_cancel"),
-    }
 
 
 def _transports(payload: dict) -> list[dict]:

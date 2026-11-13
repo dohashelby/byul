@@ -11,6 +11,8 @@ import time
 from typing import Any
 from urllib.parse import urlsplit
 
+from serving_runtime.devtools.demo_names import DEMO_BACKEND_MODEL_NAME
+
 from serving_runtime.devtools.mock_engine import simulated_prompt_token_count, simulated_token_count
 
 
@@ -49,7 +51,7 @@ class FakeBackend:
         *,
         host: str = "127.0.0.1",
         mode: str = "normal",
-        model_id: str = "backend-test-model",
+        model_id: str = DEMO_BACKEND_MODEL_NAME,
         version: str = "fake-vllm-test-0",
         required_authorization: str | None = None,
         path_prefix: str = "",

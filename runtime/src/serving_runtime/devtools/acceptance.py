@@ -19,6 +19,8 @@ from unittest.mock import patch
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from serving_runtime.devtools.demo_names import DEMO_MODEL_NAME, DEMO_BACKEND_MODEL_NAME
+
 from serving_runtime.gateway.app import GatewayApp
 from serving_runtime.target.assets import snapshot as snapshot_assets
 from serving_runtime.gateway.auth import CHAT_ROUTE, token_digest
@@ -92,7 +94,7 @@ class _Runner:
             "schema_version": "runtime-backend/1.0",
             "kind": flavor,
             "base_url": self.fake_backend.base_url,
-            "model_map": {"test-model": "backend-test-model"},
+            "model_map": {DEMO_MODEL_NAME: DEMO_BACKEND_MODEL_NAME},
             "health_path": "/health" if flavor == "vllm" else "/ready",
             "models_path": "/v1/models",
             "version_path": "/version" if flavor == "vllm" else None,
@@ -337,7 +339,7 @@ class _Runner:
         *,
         prompt: str = "acceptance",
         stream: bool = False,
-        model: str = "test-model",
+        model: str = DEMO_MODEL_NAME,
         headers: dict[str, str] | None = None,
     ) -> tuple[int, str | None, dict[str, Any]]:
         body = json.dumps(
@@ -482,7 +484,7 @@ def _run_10(runner: _Runner) -> AcceptanceResult:
             "observation_session_id": runner.gateway.observation_session_id,
             "recorded_at": datetime.now(timezone.utc).isoformat(),
             "decision": {"result": "ALLOWED", "reason_code": "REQUEST_ALLOWED", "http_status": 200},
-            "request": {"model": "test-model", "max_tokens": 64},
+            "request": {"model": DEMO_MODEL_NAME, "max_tokens": 64},
             "delivery": {"attempted": False, "backend_receipt": "not_queried"},
         }
     )
@@ -598,7 +600,7 @@ def _run_11(runner: _Runner) -> AcceptanceResult:
     )
 
 
-def _stream_body(*, max_tokens: int = 64, model: str = "test-model") -> bytes:
+def _stream_body(*, max_tokens: int = 64, model: str = DEMO_MODEL_NAME) -> bytes:
     return json.dumps(
         {
             "model": model,
@@ -983,7 +985,7 @@ def _write_s2_policy(path: Path, policy_id: str, version: str, **updates: Any) -
         "policy_id": policy_id,
         "policy_version": version,
         "target_id": "mock-engine-001",
-        "allowed_models": ["test-model"],
+        "allowed_models": [DEMO_MODEL_NAME],
         "output_default_tokens": 128,
         "output_max_tokens": 128,
         "max_body_bytes": 65536,
@@ -1114,10 +1116,10 @@ def _run_s2_02(runner: _Runner) -> AcceptanceResult:
 
 def _run_s2_03(runner: _Runner) -> AcceptanceResult:
     policy = runner.data_dir / "s2-same-version.json"
-    _write_s2_policy(policy, "same-policy", "7", allowed_models=["test-model"])
+    _write_s2_policy(policy, "same-policy", "7", allowed_models=[DEMO_MODEL_NAME])
     runner.start(policy_path=policy)
     first_sha = load_policy(policy).sha256
-    _write_s2_policy(policy, "same-policy", "7", allowed_models=["test-model", "other"])
+    _write_s2_policy(policy, "same-policy", "7", allowed_models=[DEMO_MODEL_NAME, "other"])
     second_sha = load_policy(policy).sha256
     runner.start_gateway(policy)
     _, current = runner.get_json("/api/policy")
@@ -1318,8 +1320,8 @@ def _run_s3a_01(runner: _Runner) -> AcceptanceResult:
     final = _s3a_final(runner, request_id) or {}
     passed = (
         status == 200
-        and body.get("model") == "backend-test-model"
-        and receipt.get("model") == "backend-test-model"
+        and body.get("model") == DEMO_BACKEND_MODEL_NAME
+        and receipt.get("model") == DEMO_BACKEND_MODEL_NAME
         and final.get("backend_kind") == "vllm"
         # The fake backend answers "fake-<id>", not vLLM's chatcmpl-<id>: never a match.
         and final.get("delivery", {}).get("backend_receipt") == "engine_response_id_mismatch"
@@ -1350,7 +1352,7 @@ def _run_s3a_02(runner: _Runner) -> AcceptanceResult:
         raise RuntimeError("gateway is not running")
     payload = json.dumps(
         {
-            "model": "test-model",
+            "model": DEMO_MODEL_NAME,
             "messages": [{"role": "user", "content": "stream"}],
             "max_tokens": 64,
             "stream": True,
@@ -1569,7 +1571,7 @@ def _run_s3a_06(runner: _Runner) -> AcceptanceResult:
         and health.get("data_origin") == "external_backend"
         and info is not None
         and info.get("last_value", {}).get("engine.kind") == "vllm"
-        and info.get("last_value", {}).get("model.id") == "backend-test-model"
+        and info.get("last_value", {}).get("model.id") == DEMO_BACKEND_MODEL_NAME
         and metrics is not None
         and metrics.get("last_value", {}).get("requests.absent", {}).get("state") == "unsupported_or_absent"
         and metrics_error is not None
@@ -1656,7 +1658,7 @@ def _run_s3a_08(runner: _Runner) -> AcceptanceResult:
         raise RuntimeError("fake backend is not running")
     body = json.dumps(
         {
-            "model": "test-model",
+            "model": DEMO_MODEL_NAME,
             "messages": [{"role": "user", "content": "fixed destination"}],
             "max_tokens": 64,
         }
@@ -1675,7 +1677,7 @@ def _run_s3a_08(runner: _Runner) -> AcceptanceResult:
     received = runner.fake_backend.requests[-1] if runner.fake_backend.requests else {}
     invalid_body = json.dumps(
         {
-            "model": "test-model",
+            "model": DEMO_MODEL_NAME,
             "messages": [{"role": "user", "content": "bad field"}],
             "max_tokens": 64,
             "base_url": "http://127.0.0.1:1",
@@ -1897,7 +1899,7 @@ def _write_s4_auth(path: Path, *, protect_reads: bool = False) -> None:
                 "principal_id": "s4-client",
                 "roles": ["inference"],
                 "token_sha256": token_digest(_S4_INFERENCE_TOKEN),
-                "allowed_models": ["test-model"],
+                "allowed_models": [DEMO_MODEL_NAME],
             },
             {
                 "principal_id": "s4-viewer",
@@ -1927,7 +1929,7 @@ def _run_s4_01(runner: _Runner) -> AcceptanceResult:
     policy_path = runner.data_dir / "s4-01-policy.json"
     _write_s4_auth(auth_path)
     policy_document = json.loads(_EXAMPLE_POLICY.read_text(encoding="utf-8"))
-    policy_document["allowed_models"] = ["test-model", "other-model"]
+    policy_document["allowed_models"] = [DEMO_MODEL_NAME, "other-model"]
     policy_path.write_text(json.dumps(policy_document), encoding="utf-8")
     runner.start(
         policy_path=policy_path,
@@ -1938,9 +1940,9 @@ def _run_s4_01(runner: _Runner) -> AcceptanceResult:
         raise RuntimeError("backend fixture is not running")
 
     cases = [
-        ("missing", None, "test-model", 401, "AUTH_REQUIRED"),
-        ("invalid", _S4_WRONG_TOKEN, "test-model", 401, "AUTH_INVALID"),
-        ("role", _S4_VIEWER_TOKEN, "test-model", 403, "ROLE_NOT_ALLOWED"),
+        ("missing", None, DEMO_MODEL_NAME, 401, "AUTH_REQUIRED"),
+        ("invalid", _S4_WRONG_TOKEN, DEMO_MODEL_NAME, 401, "AUTH_INVALID"),
+        ("role", _S4_VIEWER_TOKEN, DEMO_MODEL_NAME, 403, "ROLE_NOT_ALLOWED"),
         (
             "principal_model",
             _S4_INFERENCE_TOKEN,
@@ -1948,7 +1950,7 @@ def _run_s4_01(runner: _Runner) -> AcceptanceResult:
             403,
             "PRINCIPAL_MODEL_NOT_ALLOWED",
         ),
-        ("allowed", _S4_INFERENCE_TOKEN, "test-model", 200, None),
+        ("allowed", _S4_INFERENCE_TOKEN, DEMO_MODEL_NAME, 200, None),
     ]
     actual: dict[str, Any] = {}
     request_ids: list[str] = []
@@ -2199,7 +2201,7 @@ def _run_s4_04(runner: _Runner) -> AcceptanceResult:
                 "schema_version": "runtime-target/1.0",
                 "target_id": "other-target",
                 "engine": {"kind": "mock", "version": "mock-1.0"},
-                "model": {"id": "test-model"},
+                "model": {"id": DEMO_MODEL_NAME},
             }
         ),
         encoding="utf-8",
@@ -2419,7 +2421,7 @@ def _run_s4_06(runner: _Runner) -> AcceptanceResult:
     marker = "s4-value-must-not-be-recorded"
     normal_body = json.dumps(
         {
-            "model": "test-model",
+            "model": DEMO_MODEL_NAME,
             "messages": [{"role": "user", "content": "zeroday acceptance"}],
             "max_tokens": 16,
             "n": 2,
@@ -2431,7 +2433,7 @@ def _run_s4_06(runner: _Runner) -> AcceptanceResult:
     normal_id = normal_headers.get("X-Request-ID")
     rejected_body = json.dumps(
         {
-            "model": "test-model",
+            "model": DEMO_MODEL_NAME,
             "messages": [{"role": "user", "content": "zeroday acceptance"}],
             "max_tokens": 16,
             "n": 3,

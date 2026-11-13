@@ -9,6 +9,8 @@ import time
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
+from serving_runtime.devtools.demo_names import DEMO_MODEL_NAME
+
 from serving_runtime.observation.store import JsonlStore
 
 
@@ -326,7 +328,7 @@ class MockEngine:
                         200,
                         {
                             "object": "list",
-                            "data": [{"id": "test-model", "max_model_len": 2048}],
+                            "data": [{"id": DEMO_MODEL_NAME, "max_model_len": 2048}],
                             "data_origin": "mock",
                         },
                     )

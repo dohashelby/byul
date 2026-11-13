@@ -10,6 +10,8 @@ from typing import Any, TextIO
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from serving_runtime.devtools.demo_names import DEMO_MODEL_NAME
+
 from serving_runtime.config.config import MVPConfig
 
 
@@ -62,7 +64,7 @@ class DemoConnectionError(ConnectionError):
 
 def _json_body(**overrides: Any) -> bytes:
     document: dict[str, Any] = {
-        "model": "test-model",
+        "model": DEMO_MODEL_NAME,
         "messages": [{"role": "user", "content": "demo"}],
         "max_tokens": 64,
     }
@@ -74,7 +76,7 @@ def demo_cases() -> list[DemoCase]:
     """Return cases in the order required for the live demonstration."""
 
     without_max_tokens = {
-        "model": "test-model",
+        "model": DEMO_MODEL_NAME,
         "messages": [{"role": "user", "content": "demo"}],
     }
     return [

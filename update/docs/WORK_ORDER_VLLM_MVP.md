@@ -1,9 +1,11 @@
 # BYUL UPDATE 작업지시서 3차 — vLLM MVP(1차 완성)
 
-- 작성: 2026-11-12. 개정: 2026-11-12(MVP 판본을 데이터 표로 분리, SUP-08은 A·나머지는 B로 분담), 2026-11-12(CPU 이미지 제외, 69개 두 판본 실제 비교)
-- 기준: main `f1f3f301`(PR #240·#246·#248 병합 뒤)
-- 대체: [작업지시서 2차](WORK_ORDER_VLLM_1.md)의 남은 항목을 이 문서로 옮긴다.
+- 작성: 2026-11-12. 개정: 2026-11-12(MVP 판본을 데이터 표로 분리, SUP-08은 A·나머지는 B로 분담), 2026-11-12(CPU 이미지 제외, 69개 두 판본 실제 비교), 2026-11-13(진행 현황·결정 결과·이틀 목표 반영), 2026-11-13(A·B 분담 폐지, 단독 개발)
+- 기준: main `a5fd55be`(#253 병합 뒤) + 열린 PR #254(M-A9)·#255(M-A6). 1.1절 현황은 이 기준이다.
+- 대체: [작업지시서 2차](https://github.com/dohashelby/byul/blob/3c611e214044460d5929e8fb0c3a615265425da0/update/docs/WORK_ORDER_VLLM_1.md)(2026-11-13 정리, 고정 링크)의 남은 항목을 이 문서로 옮겼다.
 - 근거: `../CLAUDE.md`·`../AGENTS.md`, `../DECISIONS.md` 2026-11-12, [11-09 결정](dev-1/user-decisions-20261109.md), [11-08 결정](dev-1/user-decisions-20261108.md), [현황표](CHECKLIST_VALIDATION_STATUS.md)
+
+> **2026-11-13 사용자 결정: A·B 분담을 없애고 한 사람(단독 개발자)이 모든 작업을 맡는다.** 작업 번호 M-A*·M-B*는 작업 구분으로만 남긴다. 이 문서의 "A·B 담당", "A 전용·B 부분" 표기는 이력이며 소유 제한이 아니다(2절).
 
 ## 0. MVP 정의
 
@@ -66,40 +68,38 @@ MVP 밖(후속): 이전 판본 쌍의 정본 실측·비교, SGLang 생산자·�
 - `runtime/`에 판본 문자열 비교 3곳이 남았다(M-A5).
 - 2차 지시서 이후 main에 들어온 A 작업은 #246(SUP-08 PoC)뿐이다.
 
-## 2. 분담: A는 SUP-08, B는 SUP-08을 피한다
+### 1.1 진행 현황 (2026-11-13)
 
-**A는 SUP-08 PoC를 MVP 제품 경로까지 끌고 간다(M-A8). B는 SUP-08을 맡지 않고, SUP-08 전용 파일을 고치지 않는다.** A의 나머지 작업(M-A1~A7)은 B 작업의 선행 조건이라 A가 계속 맡되, A 인력이 SUP-08에 묶여 늦어지면 결정 8로 담당을 다시 정한다.
+| 작업 | 상태 | PR | 남은 것 |
+|---|---|---|---|
+| M-A1 규칙·문서 | 일부 | #256 | 결정 5를 `CLAUDE.md`·`AGENTS.md` 6절에 반영, 2차 지시서와 끝난 계획·감사·인계 문서 정리. `/2`→`/4` 번호 정리는 남음 |
+| M-A2 `/4` 계약 | 미착수 | - | 전부 |
+| M-A3 rank-fault 생산자 | 미착수 | - | 전부 |
+| M-A4 @34 팩 | 미착수 | - | 전부(최우선) |
+| M-A5 판본 문자열 비교 제거 | 미착수 | - | 전부 |
+| M-A6 판본 적용표·고정값 | 진행 중 | #255 (열림) | 아래 M-A6 "현황" |
+| M-A7 실행 입력·세션 계획 | 미착수 | - | 전부 |
+| M-A8 SUP-08 MVP | 미착수(PoC #246만) | - | 전부 |
+| M-A9 CPU 이미지 경로 정리 | 완료(결정 13 승인) | #254 | 병합 |
+| M-B1~B7 | 미착수 | - | 전부(단독 개발자가 맡는다) |
 
-### 2.1 A 전용 파일 (B는 고치지 않는다)
+- **#254와 #255는 서로 겹친다**(`DECISIONS.md`의 결정 5 기록, `release/reviewed-source.json`, `tools/reviewed_manifest_receipts.json`, `PROGRESS.md`). 먼저 병합된 쪽 위로 나중 쪽을 맞추고, 나중 쪽이 `verify_req10_consumption --write`로 소스 목록을 다시 만들고 검토 기록 행(결정 5 면제)을 새 SHA로 다시 넣는다. #254는 결정 13 승인 뒤 병합한다.
+- M-A6 1·2단계 결과는 [판본 적용표](dev-1/ma6-version-applicability.md)에 있다. 요점: 두 이미지 엔진 Python은 3.12(패치 판본 미확인), 기준 판본은 V0 기본·후보는 V1만, 관측 대상 함수 142개 중 후보 쪽 105개 고정값만 갱신·36개 의미 검토·1개 없음(SUP-08 회귀와 일치), 기준 쪽은 대상 모듈 46개 없음.
 
-| 파일 | 내용 |
-|---|---|
-| `packs/PACK-BASELINE/checks/SUP-08.yaml`과 @34의 SUP-08 정의 | 코드 선택 정의(revision 5) |
-| `tools/build_code_selection_pack.py`, `tools/prepare_sup08_phi3v_fixture.py` | 파생 팩·무해 fixture 준비 |
-| `docs/gpu-a/policy-code-selection-draft.yaml`, `docs/gpu-a/RESULTS-20261111-SUP08.md`, `docs/evidence/sup08-code-selection-20261111.json` | SUP-08 정책 초안·결과 |
-| `tests/test_code_selection_observation.py`, `tests/test_sup08_phi3v_fixture.py` | SUP-08 시험 |
-| `docs/phase1/gpu.yaml`의 SUP-08 항목 | MVP 동안 A가 고친다(DECISIONS 2026-11-12). 같은 파일의 다른 항목은 B가 고친다 |
+## 2. 분담 (2026-11-13: 폐지, 단독 개발)
 
-### 2.2 함께 쓰는 파일 (부분 소유)
+**A·B 분담과 파일 소유 규칙(구 2.1·2.2절)은 2026-11-13 사용자 결정으로 없앴다.** 한 사람이 M-A*·M-B* 모두를 맡는다. 현황표(`tools.checklist_status`)의 담당 열과 `docs/phase1/dev-1.yaml`·`gpu.yaml` 같은 담당별 상태 파일은 도구가 읽는 이력 데이터라 그대로 두고, 상태 갱신은 단독 개발자가 두 파일 모두에 한다.
 
-| 파일 | A 부분 (SUP-08) | B 부분 |
-|---|---|---|
-| `src/guard/executors/request_field_probe.py` | `CODE_SELECTION_PROFILE` 경로: `code_module_settings`·`challenge_revision`·`control_body`·`nested_fields`·`classify_modules`와 코드 선택 관측 항목 | `REUSED_TOKEN_PROFILE` 경로(REQ-08), 공통 `send` |
-| `src/guard/executors/kubernetes_input_validation.py` | 코드 선택 설정 키(`code_module_*`·`code_marker_root`·`unapproved_revision`·`control_image`)와 `_contract`의 코드 선택 분기 | REQ-08·09 분기, `runner_capture`, `request_input_checks` 확인 |
-| `src/guard/runtime/kubernetes_http.py` | `engine_code_modules`와 모듈 목록 스크립트 | 그 밖의 수집 경로 |
-| `src/guard/adapters/assets/engine_profiles.json` | `vllm-input-validation-http/1` 행 | 다른 판본 행·기능 |
-| `tools/gpu_a_run_inputs.py`, `tools/gpu_a_aws_lab.py` | A 실행 입력 하네스 | B는 자기 도구(`tools/gpu_b_*`, `tools/b_*`)를 쓴다 |
-
-함께 쓰는 파일 규칙:
-- 상대 부분의 함수·설정 키·profile 상수·관측 항목 이름은 바꾸지 않는다. 바꿔야 하면 PR 설명에 적고 상대에게 먼저 알린다.
-- 같은 파일을 두 PR이 고치면 먼저 병합된 쪽 위로 나중 PR을 맞추고, 나중에 병합하는 쪽이 `tools/verify_req10_consumption.py --write`로 소스 목록을 다시 만든다(#240·#246 충돌과 같은 방식).
-- 두 판본 실행 세션(J01·J02)의 입력은 A·B가 각자 만들고 M-A7에서 하나의 세션 계획으로 합친다.
+남겨 두는 규칙(소유가 아니라 충돌 방지용):
+- 같은 파일을 고치는 두 작업을 동시에 병렬로 돌리지 않는다. 병렬 세션·worktree를 쓸 때는 파일이 겹치지 않게 나눈다. 특히 `src/guard/executors/request_field_probe.py`·`kubernetes_input_validation.py`·`runtime/kubernetes_http.py`·`adapters/assets/engine_profiles.json`·`adapters/vllm.py`는 SUP-08·REQ-08·09·입력 수집이 함께 쓰는 파일이다.
+- 같은 파일을 두 PR이 고치면 먼저 병합된 쪽 위로 나중 PR을 맞추고, 나중에 병합하는 쪽이 `tools/verify_req10_consumption.py --write`로 소스 목록을 다시 만든다.
+- 두 판본 실행 세션(J01·J02)의 입력은 M-A7에서 하나의 세션 계획으로 합친다.
 
 ## 3. 단계와 순서
 
 | 단계 | 내용 | 시작 조건 |
 |---|---|---|
-| 0. GPU 없이 (지금) | A: M-A1~A9, B: M-B1~B6 | 바로 |
+| 0. GPU 없이 (지금) | M-A1~A9, M-B1~B6 (현황 1.1절, 이틀 목표 3.1절) | 바로 |
 | 1. TP2 세션 J01 | REQ-14·16·21, LIF-08·11, SUP-06을 두 판본에서 실행, 생산자 확인·등록 | M-A2·A3·A4·A5 병합, 해당 관측기의 두 판본 고정값, AWS 할당량(결정 6) |
 | 2. 두 판본 정본 세션 J02 | J01 외 63개를 `guard update`로 기준·후보 순차 실행 | M-A4·A5·A6·A7·A8·A9, M-B2~B6 입력, 결정 10 승인, 비용 승인(결정 1) |
 | 3. 공식 재판정 J03 | `official=true` RPT | J01·J02, 정책 CONFIRMED, 팩 검토 |
@@ -107,9 +107,27 @@ MVP 밖(후속): 이전 판본 쌍의 정본 실측·비교, SGLang 생산자·�
 - **가장 긴 경로는 M-A4(@34) → J02 → J03이다.** M-A6(판본 적용표·고정값)이 J02 범위를 정하므로 M-A4와 나란히 가장 먼저 시작한다.
 - `guard update` 한 번이 기준·후보를 순차로 실행하므로 2차 지시서의 "정본 실측"과 "두 판본 비교" 세션을 J02 하나로 합쳤다. 같은 이미지·모델·기동 설정의 점검은 상태 독립성을 확인한 뒤 한 번의 기동으로 묶는다.
 
-## 4. A 작업 (개발 담당)
+### 3.1 다음 이틀 목표 (2026-11-13~14, AI 개발 기준)
 
-### M-A8. SUP-08 코드 선택 MVP (A의 주 작업)
+이틀 목표는 **단계 0 중 J02의 선행 조건인 개발 작업(M-A*)을 PR로 올리는 것**이다. 실증·관측 작업(M-B*)도 단독 개발자의 일이지만 이틀 범위 밖이며, 이틀 목표가 끝나면 M-B1·M-B4부터 잇는다. GPU 세션(J01~J03), D1~D3 V0 관측기, 공식 재판정도 이틀 범위가 아니다.
+
+| 순서 | 작업 | 이틀 안 완료 기준 | 병렬 |
+|---|---|---|---|
+| 0 | #255 → #254 병합 정리 | 사용자 승인(결정 13) 뒤 병합, 나중 쪽 소스 목록·검토 기록 재생성 | - |
+| 1일차 1 | M-A5 판본 문자열 비교 제거 + 검사 시험 | PR, CI 통과 | M-A4와 병렬 |
+| 1일차 2 | M-A4 @34 팩 (`impact` 77개, 확정 정책 값 5개, SUP-11 표기, REQ-12 반환) | PR, 현황표 재생성, CI 통과. 팩 검토는 결정 5 방식 | M-A5와 병렬 |
+| 1일차 3 | M-A6 3단계 나머지 (a)·(b): A 관측기 후보 행(REQ-14~20 계열, LIF-13), `adapters/vllm.py` 판본 문자열 키 표(SAFE_PROBES·길이 오류 형식 등)와 기동 데이터(provider)의 두 판본 행, `vllm_change_rules.yaml` 확인, 후보 쪽 바뀐 함수 36개 의미 대조 | PR, CI 통과. 고정값은 "후보" 표시 유지 | M-A9 병합 뒤 `adapters/vllm.py` 시작 |
+| 2일차 1 | M-A8 SUP-08 MVP (@34 정의, 두 판본 정본 실행 입력, `REGRESSED` 근거 정리) | PR, 직접 시험·입력 사전 점검 통과 | M-A4 뒤 |
+| 2일차 2 | M-A1 나머지 (`/4` 번호 정리) | 문서 PR | 어느 때나 |
+| 2일차 3 | M-A7 A 실행 입력과 J01·J02 세션 계획(예상 시간·비용·예상 공백) | 계획 보고. B 입력이 없는 부분은 빈칸과 원인으로 표시 | M-A4·A6·A8 뒤 |
+| 여유 | M-A2 `/4` 계약, M-A3 rank-fault 생산자 | 시작하면 PR까지. 넘치면 다음으로 미루고 남은 범위를 적는다 | - |
+
+- 결정이 필요한 일은 기다리지 말고 다른 작업을 먼저 하고, 결정 요청은 한 번에 묶어서 낸다(7절).
+- 순서 0이 막혀도(결정 13 미승인) 1일차 1·2는 시작한다. `adapters/vllm.py`·`engine_provider.py`를 고치는 일만 #254 병합을 기다린다.
+
+## 4. 개발 작업 M-A* (구 A)
+
+### M-A8. SUP-08 코드 선택 MVP
 - #246 PoC(동적 모듈 목록 + import 표식, `approved_code_revisions`, 중첩 필드)를 @34 SUP-08 정의로 올린다(결정 7, M-A4와 같은 PR 또는 바로 뒤).
 - 두 판본에서 PoC와 같은 모델 snapshot·무해한 승인/비승인 processor fixture로 정본 실행 입력을 만든다. PoC 결과(DRAFT/EXAMPLE, `official=false`)를 정본 결과로 옮기지 않는다.
 - 완료 기준 4(`REGRESSED`)의 근거를 남긴다: 기준 쪽 `ignored`, 후보 쪽 `consumed`, 비교 조건 차이 없음.
@@ -118,7 +136,7 @@ MVP 밖(후속): 이전 판본 쌍의 정본 실측·비교, SGLang 생산자·�
 
 ### M-A1. 규칙·문서 정리 (작게, 먼저)
 - 공통 입력 "`/2`" 내용을 `/4`로 옮긴다(11-09 결정, `gpu-common-inputs-196.md`, `CLAUDE.md`·`AGENTS.md` 2절). 내용은 그대로, 번호만.
-- 2차 지시서는 요점을 PROGRESS에 남기고 지운다(7.6절).
+- 2차 지시서는 요점을 PROGRESS에 남기고 지운다(7.6절). **완료(2026-11-13, #256).**
 - 결정 5(검토 기록 규칙)를 6절 소스 고정 목록 규칙에 반영한다.
 - 완료: 문서 PR 병합.
 
@@ -166,6 +184,12 @@ MVP 밖(후속): 이전 판본 쌍의 정본 실측·비교, SGLang 생산자·�
 - `adapters/vllm.py`의 판본별 표(HTTP 경로표·길이 오류 형식 등)에 두 판본 행을 더한다. 판본 문자열로 분기하는 코드는 판본 행 조회로 바꾼다.
 - `adapters/assets/vllm_change_rules.yaml`로 기준 → 후보 소스 diff 보고를 확인한다. 두 판본 사이에 옮겨진 경로를 반영해 바뀐 영역 표시가 맞게 한다.
 - 완료: 선행 확인 보고, 도구 시험, 판본 적용표(분류 a~d) 보고와 결정 9·10 승인, (a)~(c) 직접 시험, 두 판본 지원 profile 조회 성공, PR 병합. (c)가 많으면 M-A6이 가장 긴 경로가 된다. 적용표 보고 뒤 담당·순서를 다시 잡는다(결정 8).
+- **현황(2026-11-13, #255):**
+  - 끝남: 선행 확인 보고, 비교 도구 `tools/engine_pin_compare.py`(직접 시험 11개)와 결과 `docs/dev-1/ma6-pin-compare.json`, 판본 적용표(관측 계열 19행·점검 69개 묶음 A~G), 결정 9·10 요청, 결정 10 기록.
+  - 3단계 첫 구현: 공통 감싸기 기반(`adapters/vllm_cache_callback.py`)이 모듈마다 판본별 정확 bytes 고정값 행을 받는다. REQ-21 통신 버퍼(`vllm_comm_buffer_callback`)에 두 판본 후보 행과 태그 소스 고정 자료(`tests/fixtures/vllm-<판본>/`)를 더했다.
+  - 남음(이틀 목표 3.1절): 나머지 A 관측기 후보 행(REQ-14~20 계열, LIF-13), 후보 쪽 바뀐 함수 36개 의미 대조, `adapters/vllm.py`의 판본 문자열 키 표와 기동 데이터 두 판본 행(M-A9 병합 뒤), `vllm_change_rules.yaml` 확인.
+  - 후속: D1~D3 V0 관측기(분류 (c), 결정 10). 미구현 동안 해당 점검의 기준 쪽은 `ENGINE_VERSION_UNSUPPORTED`이며 MVP 완료로 세지 않는다.
+  - 대기: 결정 9, 기준 판본 V0 유지(결정 14), 이미지 레이어 다운로드(결정 15). 다운로드 전 고정값은 모두 후보다. 기준 판본 V0 기동에서 통신 버퍼가 실제로 감싸지는지는 GPU 확인이 필요하다.
 
 ### M-A7. A 담당 점검 실행 입력과 J01·J02 세션 계획
 - 대상 A 27개: lab 완료 8개, 확정 값 5개, 1차 제외 8개 UNKNOWN 기록, TP2 3개(J01), 비적용 2개 근거 기록, SUP-08(M-A8).
@@ -181,8 +205,9 @@ MVP 밖(후속): 이전 판본 쌍의 정본 실측·비교, SGLang 생산자·�
 - 파일 이름만 보고 지우지 않는다. 시험·도구마다 제거 / GPU 전환 / 유지로 나눈 분류표를 먼저 낸다. 유지 대상: vLLM 소스 분석 실행기(`*_cpu.py` 중 소스만 읽는 것, 2차 A09 이동 대상), 모의 엔진·고정 자료 시험.
 - 과거 CPU 이미지 결과(2026-10-24 두 이미지 CPU 비교 등)는 기록으로 남기고 소급해서 지우지 않는다.
 - 완료: 분류표 보고, 기존 GPU 경로 동작 동일, 관련 직접 시험 통과, PR 병합. **J02 전에 필수다.**
+- **현황(2026-11-13, #254, CI 통과):** REQ-09 CPU 길이 원인 증거 제거(설정이 남아 있으면 `LENGTH_CAUSE_EVIDENCE_UNSUPPORTED`로 거부), `cpu-bounded`→`gpu-bounded`(`gpu_count >= 1`, TP = 할당 GPU 수, `shm_bytes` 필수), 준비 판단·기동 생성 확인·안내·두 이미지 비교 수락 조건을 GPU 조건으로 전환, 예시 `examples/gpu-bounded*.toml`. 결정 13은 초안과 두 가지가 다르다: 성능을 수락 대상에서 뺐고(GPU 결과에 UNKNOWN을 강제하면 정상 RES가 계약 위반이 됨), 수락 결과 형식을 `guard-update-acceptance/2`로 올렸다. 남은 것: GPU 이미지용 REQ-07 사전 거부 계약(M-A6·M-B4).
 
-## 5. B 작업 (GPU 실증 담당, SUP-08 제외)
+## 5. 실증·관측 작업 M-B* (구 B)
 
 ### M-B1. 공통 입력 판정 연결 마감
 - 대상: LIF-03·05·06·07·09·10·11·12·14, REQ-08·09·10·12, OBS-02·03, PLT-01·02·04, SUP-03·06.
@@ -251,19 +276,22 @@ MVP 밖(후속): 이전 판본 쌍의 정본 실측·비교, SGLang 생산자·�
 | 2 | MVP 판본 표의 이미지 digest 확정 | M-A6 전 | #246에서 고정한 두 digest를 그대로 쓴다 |
 | 3 | 완료 기준 4를 SUP-08 실제 회귀로 채우는 것 | M-A8 | 그대로 승인(일부러 넣는 회귀 사례는 만들지 않음) |
 | 4 | 공통 입력 번호 `/4` | M-A1 | `/2`·`/3`은 이미 사용 중이라 `/4`로 확정 |
-| 5 | 소스 검토 기록·팩 검토 담당 | M-A1, 모든 제품 소스 PR | 11-12 결정은 #240·#246만 B 검토를 면제했다. MVP까지 계속 면제할지, B 또는 대리 검토자를 둘지 정한다. 면제하면 `reviewed_by`에 면제를 밝히는 방식을 규칙으로 적는다 |
+| 5 | 소스 검토 기록·팩 검토 담당 | M-A1, 모든 제품 소스 PR | **결정됨(2026-11-12 사용자):** MVP 동안 B 검토를 면제한다. 작성자가 검토 기록을 직접 넣고 `reviewed_by`에 "B 검토 면제(사용자 결정 5, 2026-11-12)"를 밝힌다(`DECISIONS.md` 2026-11-12). 2026-11-13 단독 개발 결정 뒤에도 같은 방식을 쓴다(별도 검토자 없음) |
 | 6 | TP2 할당량(G and VT vCPU 8→48)과 두 판본 J01 상한 | J01 전 | 승인 상태 확인. 늦어지면 J02를 먼저 하고 TP2 6개는 J01 뒤 합친다 |
 | 7 | SUP-08 정본 정의 | M-A4·M-A8 | #246의 코드 선택 정의(revision 5)를 @34 정본에 넣는다 |
-| 8 | A의 M-A1~A7 담당 | 단계 0 중 | A가 SUP-08(M-A8)에 묶여 M-A4·A5·A6이 늦어지면, M-A5·M-A6을 B 또는 다른 담당에 넘길지 정한다. 이 셋이 J02의 선행 조건이다 |
-| 9 | 한 판본에 기능이 없을 때 판정 (비적용 / UNKNOWN) | M-A6·M-B4 적용표 보고 뒤 | 판정 의미 변경이라 점검별 승인. 승인 전 기본은 UNKNOWN (DECISIONS G3) |
-| 10 | UNKNOWN으로 남길 어려운 항목 목록 | M-A6·M-B4 적용표 보고 뒤, J02 전 | 분류 (d) 항목을 원인·영향 점검과 함께 보고받아 항목별 승인. PASS·NOT_APPLICABLE로 바꾸지 않는다 |
-| 11 | 엔진 이미지 Python이 3.12가 아닐 때 | M-A6 선행 확인 뒤(해당 시) | 관측기 공통 기반의 Python 판본 조건을 넓힐지, 그 판본 관측을 UNKNOWN으로 둘지 (DECISIONS G2) |
-| 12 | 시험 모델 교체 | M-A6 선행 확인 뒤(해당 시) | 두 판본에서 모두 뜨는 같은 revision 모델로 바꾸는 안 |
-| 13 | 두 이미지 비교의 GPU 수락 조건 | M-A9 | 양쪽 GPU 모델·드라이버·GPU 수·TP 구성이 같아야 비교. 기존 CPU 조건과 같은 원칙 (DECISIONS G1) |
+| 8 | ~~A의 M-A1~A7 담당~~ **불필요**(2026-11-13 단독 개발) | 단계 0 중 | A가 SUP-08(M-A8)에 묶여 M-A4·A5·A6이 늦어지면, M-A5·M-A6을 B 또는 다른 담당에 넘길지 정한다. 이 셋이 J02의 선행 조건이다 |
+| 9 | 한 판본에 기능이 없을 때 판정 (비적용 / UNKNOWN) | **대기** (적용표 11절에 6건 요청됨) | LIF-13(공유 가중치), LIF-05·06·16(실행 중 전환 분기), LIF-07(`/ready` 분기), REQ-10(`tool_choice=required` 사례)은 기준 쪽 UNKNOWN 제안. REQ-06은 비적용 근거 문장만 추가. REQ-16·17은 두 판본 모두 `--enable-prefix-caching` 명시 제안. 승인 전 기본은 UNKNOWN (DECISIONS G3) |
+| 10 | UNKNOWN으로 남길 어려운 항목 목록 | M-A6 부분 결정됨, M-B4는 적용표 보고 뒤 | **M-A6 결정됨(2026-11-12 사용자):** D4(인증 middleware 내부)·D5(V0 profiler)는 기준 쪽 UNKNOWN 승인. D1(V0 scheduler·캐시)·D2(V0 model runner·CUDA Graph)·D3(V0 다중 프로세스·executor)는 미승인, (c) 후속으로 만든다. PASS·NOT_APPLICABLE로 바꾸지 않는다 |
+| 11 | 엔진 이미지 Python이 3.12가 아닐 때 | **불필요** | 두 이미지 모두 3.12(M-A6 선행 확인). 다만 sensor 15개가 요구하는 CPython 패치 판본은 미확인이라 결정 15에 달림 |
+| 12 | 시험 모델 교체 | **지금은 불필요** | 교체가 필요한 모델 없음. Qwen2-VL-2B-Instruct는 J01 전에 revision을 고정하고 첫 기동에서 기준 판본 Transformers로 읽히는지 확인. 실패하면 그때 올린다 |
+| 13 | 두 이미지 비교의 GPU 수락 조건 | **결정됨(2026-11-13 사용자, #254 병합 지시)** — 아래 내용 그대로 승인 | 양쪽 GPU 모델·드라이버·GPU 수·TP 구성이 같아야 비교. 초안과 다른 점: 성능을 수락 대상에서 뺌, 결과 형식 `guard-update-acceptance/2` (DECISIONS G1, M-A9-Q1) |
+| 14 | 기준 판본 엔진 선택 (V0 기본 / `VLLM_USE_V1=1`) | M-A6 3단계·D1~D3 설계 전 | V0 기본 유지(기업 기본 구성). V1로 띄우면 D1~D3 일부가 줄 수 있으나 시험 조건 변경이다 |
+| 15 | 이미지 레이어 다운로드 (로컬, GPU 비용 없음) | 고정값 확정·J01 전 | Python 레이어 2개(약 660 MB)로 CPython 패치 판본 확인 → sensor 15개 기동 가능 여부. 설치 파일 bytes 대조(수 GB)로 고정값 "후보" 해제 |
+| 16 | #254·#255 병합 | **결정됨** | #255 병합(2026-11-13), #254는 결정 13 승인과 함께 main·#256에 맞춰 병합 |
 
 ## 8. 점검별 배정표 (69개)
 
-"MVP 담당"은 이 문서의 분담이다(SUP-08만 현황표 담당과 다르다). 현재 상태는 main `f1f3f301`의 현황표 기준이다.
+"MVP 담당" 열은 2026-11-12 분담의 이력이다. 2026-11-13부터 모든 점검을 단독 개발자가 맡는다(2절). 현재 상태는 main `f1f3f301`의 현황표 기준이다.
 
 | 점검 | MVP 담당 | 현재 상태 | MVP까지 할 일 | 세션 |
 |---|---|---|---|---|

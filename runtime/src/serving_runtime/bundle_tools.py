@@ -111,7 +111,7 @@ def build_bundle(policy_path: str, policy_sha256: str, server_values_path: str,
     if schema == "runtime-mvp/1.2" and server.get("gateway_cache_isolation") not in {"off", "per_principal"}:
         raise ValueError("1.2에는 서버 값 gateway_cache_isolation(off/per_principal)이 필요합니다")
     target = _fields(server["target"], {"schema_version", "target_id", "engine", "model", "kubernetes"},
-                     {"target_ref", "baseline_ref"}, "서버 target")
+                     {"target_ref", "baseline_ref", "launch_settings"}, "서버 target")
     if target["schema_version"] != "runtime-target/1.0" or target["target_id"] != policy["target_ref"]:
         raise ValueError("서버 target_id가 플랫폼 target_ref와 다릅니다")
     if not isinstance(target["engine"], dict) or not re.fullmatch(r"sha256:[0-9a-f]{64}", str(target["engine"].get("image_digest"))):

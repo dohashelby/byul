@@ -9,7 +9,7 @@
   "environment_ref": {
     "id": "lab-env-001",
     "revision": 1,
-    "sha256": "fbfda7b1129aaaf96c81479444d5f114068633681bbf0152837c2da254865839"
+    "sha256": "f9dc04fd0badc597fbd5a469670451e0108db89b836f59a8bdbc1f211ad7f9da"
   },
   "validity": {
     "valid_from": "2026-01-01T00:00:00+00:00",

@@ -185,3 +185,28 @@ def test_saved_confirmed_export_starts_temporary_gateway(store_client, tmp_path)
             process.kill()
             process.wait(timeout=3)
         process.stderr.close()
+
+
+def test_export_preserves_approved_launch_settings(store_client):
+    env, policy = _inputs()
+    env['deployment']['launch_settings'] = {'trust_remote_code': False, 'revision': None}
+    policy['environment_ref']['sha256'] = canonical_sha256(env)
+    _save(store_client, env, policy)
+    response = _request(store_client, policy)
+    assert response.status_code == 200, response.text
+    with tarfile.open(fileobj=io.BytesIO(response.content), mode='r:gz') as archive:
+        target = json.load(archive.extractfile('bundle-test/target.json'))
+    assert target['launch_settings'] == env['deployment']['launch_settings']
+    from serving_runtime.mvp.target import _parse
+    assert _parse(target)['launch_settings'] == env['deployment']['launch_settings']
+
+
+def test_export_cannot_override_environment_launch_settings(store_client):
+    env, policy = _inputs()
+    env['deployment']['launch_settings'] = {'trust_remote_code': False}
+    policy['environment_ref']['sha256'] = canonical_sha256(env)
+    _save(store_client, env, policy)
+    response = _request(store_client, policy, server_values_override={
+        'target': {'launch_settings': {'trust_remote_code': True}}})
+    assert response.status_code == 422
+    assert response.json()['code'] == 'LAUNCH_SETTINGS_OVERRIDE_FORBIDDEN'

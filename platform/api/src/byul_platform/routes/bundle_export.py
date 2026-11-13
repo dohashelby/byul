@@ -69,6 +69,8 @@ def _server_values(environment: dict[str, Any]) -> dict[str, Any]:
     }
     if placement.get("gateway_cache_isolation") is not None:
         server["gateway_cache_isolation"] = placement["gateway_cache_isolation"]
+    if environment.get("schema_version") == "byul-environment/0.2" and "launch_settings" in placement:
+        server["target"]["launch_settings"] = placement["launch_settings"]
     return server
 
 
@@ -116,6 +118,11 @@ def export_bundle(doc_id: str, revision: int, body: BundleExportRequest,
     override_paths: list[str] = []
     if body.server_values_override:
         server, override_paths = _merge(server, body.server_values_override)
+        if any(path.startswith("/target/launch_settings") for path in override_paths):
+            return _reject("LAUNCH_SETTINGS_OVERRIDE_FORBIDDEN", [{
+                "path": "/deployment/launch_settings",
+                "message": "승인 실행 설정은 환경 판본에서만 가져옵니다. 환경 판본을 먼저 갱신하세요",
+            }])
     enforcement = (policy.document.get("runtime") or {}).get("enforcement")
     intent = enforcement.get("intent") if isinstance(enforcement, dict) else None
     if intent is None:

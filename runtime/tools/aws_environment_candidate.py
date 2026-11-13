@@ -92,7 +92,7 @@ def collect(args, runner=None):
             raise CandidateError("INVALID_INPUT", "gateway_policy")
     kube = target.kubernetes
     observations, unconfirmed = {}, {}
-    environment = {"schema_version": "byul-environment/0.1",
+    environment = {"schema_version": "byul-environment/0.2",
                    "environment_id": args.environment_id, "revision": args.revision,
                    "created_at": now(), "data_origin": "MEASURED",
                    "target": {"target_ref": target.target_id, "engine": {}, "model": {}, "runtime": {}},

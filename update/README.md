@@ -44,7 +44,6 @@
 
 - EVD 10개의 `data_origin=MEASURED`는 실제 수집 출처다. REQ-01/REQ-03 Result의 `verification_level=DECLARED`와 구분한다. REQ-01 일부 상태 변경 경로에는 HTTP를 보내지 않고 TCP 차단 근거를 사용했으며 모든 handler의 실제 실행이나 기업 승인을 증명하지 않는다. 후보 미준비로 두 이미지 시험을 하지 못했던 앞선 단계는 [당시 기록](docs/UPDATE_VALIDATION.md#이번-검증-결과)에 남아 있다.
 
-- [재평가·구현 결과와 개발 계획](docs/REVIEW_AND_DEVELOPMENT_PLAN.md)
 - [설치·audit·update·실증 안내](docs/RUNBOOK.md)
 - [기업 정책 양식·필수 정책 입력 전제(M1/M2)](docs/POLICY_TEMPLATE.md)
 - [Managed 업데이트 설정](examples/update-managed.toml), [외부 대상 설정](examples/update-external.toml)

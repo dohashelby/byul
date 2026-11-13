@@ -136,8 +136,8 @@ def test_inferring_code_open_maps_to_sup_008_and_contract(tmp_path, engine, suff
     assert Contracts(DEFAULT_CONTRACTS_DIR).errors("runtime-event", event) == []
     row = next(r for r in coverage([event])["items"] if r["framework_id"] == "CHK-SUP-008")
     assert row["observed_events"] == 1 and row["observation_state"] == "observed"
-    assert row["rules"] == ["request_code_selection", "TG-CODE-01"]
-    assert row["sources"] == ["gateway", "tetragon"]
+    assert row["rules"] == ["request_code_selection", "TG-CODE-01", "launch_settings_drift"]
+    assert row["sources"] == ["gateway", "tetragon", "target", "revalidation"]
     assert checks_for_record({"rule_id": "TG-CODE-01"}, "gateway") == ["OBS-01"]
 
 

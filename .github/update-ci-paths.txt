@@ -18,5 +18,6 @@ update/docs/UPDATE_VALIDATION.md
 update/docs/b-lif07/PR171_SOURCE_CONSUMPTION.md
 update/docs/b-lif07/WORKER_READINESS.md
 update/docs/b-lif13/WEIGHTS_LIFETIME.md
+update/docs/dev-1/ma6-version-applicability.md
 contracts/**
 platform/api/**

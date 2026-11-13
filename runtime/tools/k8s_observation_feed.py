@@ -637,7 +637,7 @@ def _strings(document: object) -> dict[str, str]:
     }
 
 
-def _reduce_pod(item: object) -> dict[str, object] | None:
+def _reduce_pod(item: object, engine_container: str | None = None) -> dict[str, object] | None:
     """Keep only the non-secret Pod fields used by ``summarize_pods``."""
 
     if not isinstance(item, dict):
@@ -656,6 +656,13 @@ def _reduce_pod(item: object) -> dict[str, object] | None:
     spec: dict[str, object] = {}
     if isinstance(source_spec.get("nodeName"), str):
         spec["nodeName"] = source_spec["nodeName"]
+    from serving_runtime.mvp.launch_settings import observe
+    containers = source_spec.get("containers")
+    if isinstance(containers, list):
+        spec["containers"] = [
+            {"name": c["name"], "launch_settings": {engine: observe(c, engine) for engine in ("vllm", "sglang")}}
+            for c in containers if isinstance(c, dict) and c.get("name") == engine_container
+        ]
 
     source_status = item.get("status") if isinstance(item.get("status"), dict) else {}
     status: dict[str, object] = {}
@@ -763,7 +770,7 @@ class TargetPodSnapshotWriter:
                                 "items": [
                                     reduced
                                     for item in items
-                                    if (reduced := _reduce_pod(item)) is not None
+                                    if (reduced := _reduce_pod(item, self.selector.container)) is not None
                                 ],
                             }
                         )
@@ -1246,6 +1253,7 @@ def run(
     reader_gid: int | None = None,
     target_selector: tuple[tuple[str, str], ...] | None = None,
     target_namespace: str = LAB_NAMESPACE,
+    target_container: str = "engine",
     target_interval_s: float = DEFAULT_TARGET_INTERVAL_S,
     phase_timeline: bool = False,
     phase_engine: str = "vllm",
@@ -1253,6 +1261,7 @@ def run(
     global _reader_gid
     if phase_timeline and target_selector is None:
         raise ValueError("--phase-timeline requires --target-selector")
+    validate_kubernetes_name(target_container, "target container")
     assert_safe_context(context)
     check_reader_group(reader_gid)
     _reader_gid = reader_gid
@@ -1265,13 +1274,13 @@ def run(
         validate_kubernetes_name(target_namespace, "target namespace")
         target_writer = TargetPodSnapshotWriter(
             output_dir / "target-pods.json",
-            KubernetesSelector(context, target_namespace, target_selector, ""),
+            KubernetesSelector(context, target_namespace, target_selector, target_container),
             interval_s=target_interval_s,
         )
         if phase_timeline:
             phase_writer = EnginePhaseTimelineWriter(
                 output_dir / "phase-timeline.json",
-                KubernetesSelector(context, target_namespace, target_selector, "engine"),
+                KubernetesSelector(context, target_namespace, target_selector, target_container),
                 engine=phase_engine,
             )
     hubble_path = output_dir / "hubble.jsonl"
@@ -1438,6 +1447,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="대상 Pod namespace (기본: serving-lab)",
     )
     parser.add_argument(
+        "--target-container",
+        default="engine",
+        metavar="NAME",
+        help="실행 설정과 단계 시간표를 수집할 대상 컨테이너 (기본: engine)",
+    )
+    parser.add_argument(
         "--target-interval",
         type=_target_interval_argument,
         default=DEFAULT_TARGET_INTERVAL_S,
@@ -1466,6 +1481,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             reader_gid=args.reader_group,
             target_selector=target_selector,
             target_namespace=args.target_namespace,
+            target_container=args.target_container,
             target_interval_s=args.target_interval,
             phase_timeline=args.phase_timeline,
             phase_engine=args.phase_engine,

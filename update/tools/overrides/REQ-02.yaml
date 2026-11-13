@@ -98,3 +98,5 @@ limitations:
   후 handler 진입 주장은 후보로만 남는다.'
 - kubernetes 구현만 있다. lab=true/vLLM 0.31 범위이며 실제 Gateway 변환과 전체 handler 범위는 미시험이다.
   과거 파생 팩의 route_record·native_route 프로파일은 그대로 지원한다.
+
+impact: HIGH

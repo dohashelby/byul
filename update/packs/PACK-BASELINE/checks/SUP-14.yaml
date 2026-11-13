@@ -2,7 +2,7 @@ id: SUP-14
 framework_id: CHK-SUP-014
 mechanism_ids:
 - mechanism-10
-revision: 4
+revision: 5
 retired: true
 area: SUP
 purpose: 필수 검사 결과 집행
@@ -12,7 +12,7 @@ scope: null
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: 제출자가 검사 오류·미지원 상태를 유도·이용하거나 운영 오류로 필수 검사가 생략되어 비승인 공급물이 서비스에 들어갈 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   prose: 승인·사용 전 필수 검사를 정하고 결과가 집행되는지 확인한다. 검사 도구·정책 미정은 제외 사유가 아니다.
 policy_params:

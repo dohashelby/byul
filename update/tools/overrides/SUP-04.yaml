@@ -40,3 +40,5 @@ limitations:
   - "원문 package/entrypoint 변경·배포 검사 challenge는 미실행으로 보존한다. 정상 추론 관측이 pass여도 전체 challenge가 완결되지 않아 기능 PASS 관문이 보류될 수 있다."
   - "이미지 metadata 수집 전후의 identity 안정성은 해당 수집 구간의 근거다. 정상 추론은 그 뒤 별도 관측하며 패키지 import나 모든 worker의 공급물 소비를 증명하지 않는다."
   - "정책 승인값은 기업 신고이며 승인 주체·서명·증거 진위를 인증하지 않는다. tag-only·local image ID만 있거나 digest 연결·소유권·전후 identity가 불명확하면 UNKNOWN이다."
+
+impact: HIGH

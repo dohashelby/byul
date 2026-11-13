@@ -1,3 +1,48 @@
+## 2026-11-13 — @34와 판본 중립 수집 경로 통합
+
+- 한 일: 승인된 #259의 main 통합 후보를 #257에 반영했다. @34/SUP-08/REQ-12와 판본 중립 수집 경로·과거 지문 보존, 결정19·20, 검토 이력을 모두 유지했다. source 목록을 다시 만들고 새 SHA에 결정5 단일 검토 행을 넣었다.
+- 테스트 결과: 통합 직접·경로 시험 199개 통과(57.32초), 현황 --check·소스 고정 관문·diff --check 통과. 이전 각 PR의 CI는 통과했고 새 통합 head CI는 아직 결과가 없다.
+- 다음 단계: 새 CI를 확인하고 main에 #259 다음 #257을 병합한다.
+- 막힌 것: 통합 CI 확인 중이다. 실제 ENV/target·입력 사전 점검·GPU 자격과 비용 승인은 미완료다.
+
+## 2026-11-13 — M-A8 실제 로컬 fixture·두 판본 기동 입력 준비
+
+- 한 일: 후속 사용자 지시에 따라 디스크 여유를 확인하고 고정 가중치 두 개(8,293,330,888 bytes)를 다운로드해 SHA-256을 검증했다. 기존 도구로 새 fixture를 만들고 14개 inventory·snapshot·승인/비승인 코드 식별값이 PoC와 일치함을 확인했다. 가중치는 하드링크로 한 번만 저장한다. 두 판본 기동 YAML·정책·target 대기 설정과 코드 캐시 배치를 만들고 작은 manifest/준비 기록을 문서에 보존했다. 실제 fixture 부재는 해소됐으며 과거 원본 증거 복구와 구분한다.
+- 테스트 결과: 실제 파일 SHA·fixture 신원·하드링크 확인 통과. 기동 비교 조건 정규화·정책/설정·PNG CRC/압축 해제·출력 해시 대조 통과. 실제 fixture는 최종 조립기의 신원 검사를 통과하고, 실제 ENV 부재에서 중단돼 출력이 생기지 않음을 확인했다. 직접 fixture/입력/렌더·경로 시험 75개 통과(7.08초), 현황 --check·diff --check 통과. 이번 변경은 문서/입력 메타데이터이며 제품 소스·팩·소스 목록은 그대로다. 전체 시험은 새 PR CI에서 확인한다.
+- 다음 단계: 실제 GPU 세션에서 새 ENV·namespace/Pod target·노드 권한·정상 요청을 확인한 뒤 최종 입력을 조립한다. 관련 PR의 최신 CI를 확인한다.
+- 막힌 것: 실제 ENV/target과 노드 배치가 없어 입력 사전 점검은 미완료다. 엔진/GPU·클라우드 실행·원본 ZIP 회수는 하지 않았다. 병합 승인은 없다.
+
+## 2026-11-13 — M-A8 원자료 탐색·PoC 신원 대조 보완
+
+- 한 일: 사용자 지시에 따라 실제 fixture·두 ENV/target을 저장소 밖 첨부·임시 경로와 이전 기록까지 찾았으나 원본을 발견하지 못했다. PoC 문서의 고정 신원만 별도 데이터로 옮기고 모델 ID·snapshot·코드 저장소·두 commit이 다른 입력은 출력 전에 거부하도록 했다. 원본 fixture를 복원했다고 주장하지 않는다. 두 CI 경로 목록에 새 데이터와 직접 읽는 근거 문서를 추가했다.
+- 테스트 결과: 입력 조립·REQ-12 투영·CI 경로 33개 통과(2.79초), 현황표 --check·diff --check 통과. 기존 정상/비교/거부 assert를 유지하고 올바른 길이의 다른 commit 2건·다른 저장소/모델/snapshot 거부 3건과 근거 bytes 검사를 추가했다. EXAMPLE 비교 문자열은 실제 열거값 REGRESSED로 바로잡았다. 제품 소스·팩·소스 목록은 변경하지 않았다. 앞선 head 59e0319d의 CI는 통과했고 이 변경의 전체 시험은 PR CI에서 확인한다.
+- 다음 단계: 승인된 #257 브랜치에 push하고 최신 CI를 확인한다. 원본이 확보되면 무실행 입력 조립을 진행하고, 실제 기동 뒤 새 target 바인딩과 사전 점검을 확인한다.
+- 막힌 것: 원본 manifest·실제 두 ENV/target 부재로 M-A8 최종 조립·실제 사전 점검은 미완료다. EC2 기동·모델 다운로드·GPU 실행은 하지 않았다. 병합 승인은 없다.
+
+## 2026-11-13 — M-A4 CI 완료·M-A8 실제 입력은 후속
+
+- 한 일: #257의 정본 @34·확정 값·REQ-12 반환·SUP-08 입력 조립기를 push했다. 실제 모델 fixture와 클러스터 입력 부재는 그대로 미완료로 남겼다.
+- 테스트 결과: 제품 head f696f107의 PR CI 전체 통과. push update 전체 12,933 통과·기존 skip 34개, 부모 805.971초. 전체 로컬 pytest는 실행하지 않았다. CI 보수 중 시험 기대/기한을 완화하지 않았고 과거 시드를 원본 bytes로 보존했다.
+- 다음 단계: 병합 승인 뒤 main 기준 소스 목록·검토 기록을 다시 확인한다. M-A8 최종 입력 조립·실제 사전 점검·새 정본 결과는 J02 준비/실행에서 수행한다.
+- 막힌 것: 실제 fixture·ENV/target 부재. M-A8 전체 완료·GPU 결과·공식 판정을 선언하지 않는다.
+
+## 2026-11-13 — M-A4 CI 후속·M-A8 정본 입력 조립
+
+- 한 일: @34 전환으로 드러난 예제 정책 판본 불일치를 고쳤다. 과거 GPU18·Gateway·profiler 검토는 @33 원본 전체 bytes를 별도 시드로 보존해 같은 정확 Ref로 재현한다. 기존 판정 assert와 고정 SHA는 유지했다. REQ-12 선언 시험은 새 선언의 사실·미완료·잘못된 점검 거부를 확인한다. 현황 시험은 과거 실측을 @34 현행 결과로 올리지 않음을 검사한다. M-A8은 같은 모델·코드·GPU 조건의 두 ENV/target에서 정본 정책·설정과 무실행 manifest를 만드는 도구를 추가했다. SUP-08 상태는 미완료로 유지한다.
+- 테스트 결과: PR #257 두 번째 update 전체 CI는 38 실패·14 오류·12,873 통과·기존 skip 34개(부모 962.850초)였다. 위 원인 수정 뒤 해당 파일 직접 시험 220개 통과, 새 REQ-12 시험의 키 오류 1개를 고쳐 별도 통과했다. M-A8 8개·REQ-12 1개·경로 16개 총 25개 통과(1.70초). 전체 로컬 pytest는 실행하지 않았다. 플랫폼·runtime CI는 해당 head에서 통과했다. 소스 목록·새 SHA 검토 행을 다시 만들었다.
+- 다음 단계: PR #257 새 head 전체 CI를 확인하고 실제 fixture·ENV/target이 준비되면 M-A8 최종 조립을 수행한다. M-A7 세션 계획에 실제 입력 부재를 명시한다. 병합은 별도 승인 뒤다.
+- 막힌 것: 실제 모델 fixture와 클러스터 입력이 없어 정본 실행 입력 최종 사전 점검은 남았다. GPU 비용·모델 다운로드·공식 재판정은 승인 없이 실행하지 않는다.
+
+## 2026-11-13 — 작업지시서 3차 현황 최신화
+
+## 2026-11-13 — M-A4 정본 팩 @34·확정 정책 값·REQ-12 반환
+
+- 한 일: 77개 impact를 HIGH 33·MEDIUM 38·LOW 6으로 반영했다. SUP-08은 PoC의 실행 코드 선택 정의(revision 5)를 정본화했고 SUP-11에 -OO 지원 밖을 표시했다. `examples/mvp-confirmed-values.yaml`의 `verification.values`에 사용자 확정 정책 5개를 저장했다. LIF-13의 제어기 역할·승인 세대·fallback 정책은 저장하되 실제 역할 결합 근거가 없는 분기는 UNKNOWN이다. request-attempt에 REQ-12 소비 선언과 `collectors/request_attempt_projection.py`의 검증된 투영을 반환했다. 후보·공백과 전체 질문 미완료를 구분하며 판정 연결은 M-B1에 남는다. 팩 검토와 소스 검토 기록은 결정 5 방식이다. 과거 시드와 결과는 바꾸지 않았다.
+- 테스트 결과: 직접·인접 118개 통과(61.30초), 현황 정합성 통과. 수정된 73개 일반 정의는 revision·impact만 바뀌었음을 정적으로 확인했다. 팩 검토 상태 반영 뒤 import 재생성·경로·정합성을 추가 확인한다. 전체 pytest는 실행하지 않았으며 PR CI는 미실행이다.
+- CI 보수: PR #257에서 platform 연결표의 이전 CheckDef SHA와 "@34가 아직 없음"을 가정한 fixture가 실패했다. 선정 37개·범위를 보존해 현행 팩에서 연결 메타데이터를 재생성하는 도구를 추가했고, 누락 팩 시험은 빈 경로를 명시하도록 고쳤다. runtime 게이트웨이의 독립 504 실패는 코드 변경 없이 실패 job 1회 재실행으로 확인 중이다.
+- 다음 단계: PR #257의 새 CI 결과를 확인한다. 나중에 병합하는 PR은 소스 목록·검토 기록을 다시 만든다. M-A8의 두 판본 정본 입력, M-A7 입력 결합, M-B1 소비 연결을 잇는다.
+- 막힌 것: push·PR 생성은 승인받아 #257을 열었다. GPU·이미지 다운로드·공식 재판정은 이 브랜치에서 실행하지 않았다.
+
 ## 2026-11-13 — 승인된 runtime 시험 동기화 보수 적용
 
 - 한 일: 새 CI의 final 저장 경쟁을 확인하고 결정19에서 승인된 두 runtime 시험의 기존 보수본을 적용했다. final 완료 동기화와 제어 시계로 같은 assert·60ms·STREAM_DEADLINE을 검증한다. 제품 소스·의존성·정책은 바꾸지 않았다.
@@ -2292,3 +2337,11 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - Replaced the current static packet's historical ordering dependency with a separately reviewed current-generation helper. Retained historical normal-boot snapshot stays byte-identical and accepts historical sensor e32c only; the new helper accepts current sensor 554206 only. Pair/helper/preparer SHA chain stays exact and closed.
 - Tests: SUP16 20 passed; combined serialized native17 scope preparation/load and SUP16 37 passed (0.46s), external temporary paths. Broader host diagnostic: 85 passed, 55 failed (unsupported CPython3.12.13 observer runtime); supported Linux rerun remains required.
 - No SUP16 registry/packs/contracts or sensor changes, actual engine/GPU/AWS execution, remote writes, or support-status promotion. Integration owner regenerates shared source manifest and runs final Linux validation.
+
+
+## 2026-11-13 결정19 — #257 공통 runtime CI 시험 동기화
+
+- 한 일: 사용자에게 runtime 시험 두 파일만 예외 승인받았다. test_mvp_gateway는 body 수신과 final 저장 완료를 Event로 분리한 뒤 기존 assert를 실행하며 실제 저장 지연 순서를 강제하는 회귀 사례를 추가했다. test_mvp_stream의 해당 사례는 실제 HTTP 클라이언트·gateway·relay를 유지하고 유계 상류/시계/Timer를 제어해59ms 첫 chunk·61ms 기한 초과를 검증한다. 요청 기한60ms·idle1초·STREAM_DEADLINE 기대값은 그대로이며 watchdog의 실제 검사/callback을 실행한다. runtime 제품 소스·다른 runtime 파일은 바꾸지 않았다.
+- 테스트 결과: CPython3.12.3 두 파일20개·하위 시험6개 통과(pytest17.29초/부모18.867초). AST로 기존 assert 호출 전부와 skip 수가 보존됐음을 대조했다. 별도 작업 트리에서 검증한 두 파일 bytes를 #257에 그대로 반영했고 runtime/src·examples는 같은 기준 tree임을 확인했다. 원 통과/실패 의미·기한·수락 기준은 바꾸지 않았으며 전체 로컬 pytest는 실행하지 않았다. update 제품 소스와 목록 SHA7cdbaac5…도 그대로다.
+- 다음 단계: 승인된 기존 #257 브랜치로 push하고 새 전체 CI 결과를 확인한다. 결정19는 DECISIONS·작업지시서7절에 기록했다.
+- 막힌 것: 새 head CI가 나오기 전에는 #257 전체 통과로 세지 않는다. GPU/클라우드·이미지 레이어·다른 runtime 파일·병합 승인은 없으며 실행하지 않았다. 수정은 두 시험 파일에 한정한다.

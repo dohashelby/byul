@@ -2,7 +2,7 @@ id: OBS-11
 framework_id: CHK-OBS-011
 mechanism_ids:
 - mechanism-17
-revision: 4
+revision: 5
 retired: false
 area: OBS
 purpose: 실행 상태 관측·수집 건전성
@@ -12,7 +12,7 @@ scope: 필수 관측 경로
 risk_category: 증거·판정 신뢰성 점검
 risk_summary: 수집 장애·시간 불확실성이 숨겨지면 평가자가 증거 없는 상태를 정상으로 판단해 보호 실패를 놓칠 수 있음. 장애 자체를 공격 성공으로 보지 않음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 필수 수집 경로의 중단·누락·시간 불확실성과 종속 판정을 확인한다. 수집 도구 미정은 미확인이다.
 policy_params:

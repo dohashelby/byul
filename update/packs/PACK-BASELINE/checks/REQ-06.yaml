@@ -2,7 +2,7 @@ id: REQ-06
 framework_id: CHK-REQ-006
 mechanism_ids:
 - mechanism-01
-revision: 4
+revision: 5
 retired: false
 area: REQ
 purpose: 작업·대상 인가
@@ -12,7 +12,7 @@ scope: 조건부
 risk_category: 보안 위협 점검
 risk_summary: 호출자가 타인의 response ID를 이용해 결과를 읽거나 취소·덮어쓰기·대화 이어쓰기를 해 타인 정보와 작업을 침해할 수 있음.
 review_order: conditional_when_selected
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 조회·취소할 수 있는 저장 Responses/결과 객체를 지원·사용할 때 적용한다. 메모리 저장도 포함하며 일반 요청의 내부 collector와 구분한다.
 policy_params:

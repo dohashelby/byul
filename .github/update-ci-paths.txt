@@ -19,5 +19,11 @@ update/docs/b-lif07/PR171_SOURCE_CONSUMPTION.md
 update/docs/b-lif07/WORKER_READINESS.md
 update/docs/b-lif13/WEIGHTS_LIFETIME.md
 update/docs/dev-1/ma6-version-applicability.md
+update/docs/WORK_ORDER_VLLM_MVP.md
+update/docs/evidence/sup08-code-selection-20261111.json
+update/docs/dev-1/ma8-poc-fixture-contract.json
+update/docs/dev-1/ma8-local-fixture-manifest.json
+update/docs/dev-1/ma8-local-preparation-20261113.json
+update/docs/gpu-a/RESULTS-20261111-SUP08.md
 contracts/**
 platform/api/**

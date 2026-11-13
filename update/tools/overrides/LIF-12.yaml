@@ -52,3 +52,5 @@ judge:
     fail_when_any:
     - obs: activation_violations
       op: nonempty
+
+impact: MEDIUM

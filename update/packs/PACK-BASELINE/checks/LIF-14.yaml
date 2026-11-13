@@ -2,7 +2,7 @@ id: LIF-14
 framework_id: CHK-LIF-014
 mechanism_ids:
 - mechanism-13
-revision: 4
+revision: 5
 retired: false
 area: LIF
 purpose: 종결·자원 회수
@@ -12,7 +12,7 @@ scope: 조건부; 선정 profiler
 risk_category: 일반 장애·복구 점검
 risk_summary: profiler 종료 실패를 완료로 판단하면 수집·파일 기록·자원 사용이 계속될 수 있음. 비허용 호출·민감정보 수집 여부는 별도 보안 점검.
 review_order: conditional_when_selected
-impact: null
+impact: LOW
 applies_when:
   prose: profiler의 실제 활성·등록 route·backend 종료 경로가 있을 때 적용한다. 비사용 기능은 등록·도달성을 확인한 뒤 제외한다.
 policy_params:

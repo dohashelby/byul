@@ -2,7 +2,7 @@ id: PLT-11
 framework_id: CHK-PLT-011
 mechanism_ids:
 - mechanism-12
-revision: 3
+revision: 4
 retired: false
 area: PLT
 purpose: 권한 철회
@@ -12,7 +12,7 @@ scope: 조건부; 지속 연결·handle 존재
 risk_category: 보안 위협 점검
 risk_summary: 권한이 철회된 주체가 이미 열린 session·handle을 이용해 정한 철회 범위를 넘어 자료에 계속 접근할 수 있음.
 review_order: conditional_when_selected
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 철회 대상 자격으로 생성된 지속 연결·session·handle이 있을 때 적용한다. 신규 요청 차단으로 대신 판정하지 않는다.
 policy_params:

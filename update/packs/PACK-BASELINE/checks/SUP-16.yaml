@@ -2,7 +2,7 @@ id: SUP-16
 framework_id: CHK-SUP-016
 mechanism_ids:
 - mechanism-08
-revision: 3
+revision: 4
 retired: false
 area: SUP
 purpose: 생성물 완전성
@@ -12,7 +12,7 @@ scope: null
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: 부분 파일 변경권자가 미완료 자료를 바꿔 정상본처럼 소비시키거나 일반 다운로드·생성이 중단되어, 비승인 공급물 사용·잘못된 응답·로딩 장애가 생길 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 다운로드·변환·compile 등 파일 생성과 중단 경로를 확인한다. 사용 중인 생성 경로마다 부분 결과와 완료 상태를 대조한다.
 policy_params:

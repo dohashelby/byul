@@ -3,7 +3,7 @@ framework_id: CHK-REQ-014
 mechanism_ids:
 - mechanism-16
 - mechanism-04
-revision: 5
+revision: 6
 retired: false
 area: REQ
 purpose: 요청·결과 귀속
@@ -13,7 +13,7 @@ scope: 기본+선택 기능
 risk_category: 보안 위협 점검
 risk_summary: 전송 입력·peer에 영향을 줄 수 있는 주체가 요청·모델·buffer 연결을 바꿔 타 요청의 중간 자료를 읽거나 출력을 오염시킬 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   prose: 기본 TP 내부 전달을 확인한다. 다중 노드·PP·PD는 실제 구성에 포함될 때 별도 경로로 추가한다.
 policy_params:

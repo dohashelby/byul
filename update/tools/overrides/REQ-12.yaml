@@ -34,3 +34,10 @@ judge:
     fail_when_any:
     - obs: activation_violations
       op: nonempty
+impact: HIGH
+observation_notes:
+  activation_steps: 공통 request-attempt 계약의 admitted·abort·finished·retry·stage·kv_owned
+    사건을 투영한다. 외부 요청 ID 일치만으로 실제 출력 수신자를 확정하지 않는다.
+limitations:
+- request-attempt의 관측은 시도·취소·종료·재시도 및 소비 시도 후보에 한정한다. 실제 늦은 출력의 수신자·취소 확정 시점·Gateway/SDK
+  자동 재시도 근거가 없으면 전체 질문은 UNKNOWN이다.

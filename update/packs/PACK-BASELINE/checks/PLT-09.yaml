@@ -2,7 +2,7 @@ id: PLT-09
 framework_id: CHK-PLT-009
 mechanism_ids:
 - mechanism-16
-revision: 3
+revision: 4
 retired: false
 area: PLT
 purpose: 통신 상대·전송 보호
@@ -12,7 +12,7 @@ scope: 조건부; 외부 수집·저장 경로
 risk_category: 보안 위협 점검
 risk_summary: 전송 구간을 관찰·변경할 수 있는 주체가 평문·검증 없는 연결을 이용해 관측 자료를 읽거나 collector를 사칭해 기록을 바꿀 수 있음.
 review_order: conditional_when_selected
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 외부 collector 또는 별도 sink로 관측 자료를 보낼 때 적용한다. 엔진→collector와 collector→sink를 따로 확인한다.
 policy_params:

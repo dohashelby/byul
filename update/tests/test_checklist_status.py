@@ -182,7 +182,16 @@ def test_gpu_status_takes_strongest_record_and_never_claims_whole_question():
 
 
 def test_real_gpu_summaries_keep_exact_refs_and_separate_declared_components():
-    runs = gpu_runs(ROOT)
+    current = gpu_runs(ROOT)
+    assert not any(r['current_definition'] for rows in current.values() for r in rows)
+    assert {gpu_status(rows) for rows in current.values()} == {'DEFERRED_NOT_MEASURED'}
+    # 과거 Ref·부분 실측 표시는 원래 @33 정의에 대해 그대로 검사한다.
+    class HistoricalRoot(type(ROOT)):
+        def __truediv__(self, other):
+            if other == 'packs/PACK-BASELINE':
+                return ROOT / 'reference/pack-seeds/PACK-BASELINE-33'
+            return super().__truediv__(other)
+    runs = gpu_runs(HistoricalRoot(ROOT))
     assert {r["pack_revision"] for rows in runs.values() for r in rows} == {32, 33}
     old11 = [r for r in runs["REQ-11"] if r["pack_revision"] == 32]
     assert old11 and not any(r["current_definition"] for r in old11)  # rev6 기록은 이력만

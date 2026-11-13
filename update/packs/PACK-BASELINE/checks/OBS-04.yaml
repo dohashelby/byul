@@ -2,7 +2,7 @@ id: OBS-04
 framework_id: CHK-OBS-004
 mechanism_ids:
 - mechanism-15
-revision: 5
+revision: 6
 retired: false
 area: OBS
 purpose: 부가정보 수집·송신 통제
@@ -12,7 +12,7 @@ scope: 내장 usage 경로·금지 정책 시
 risk_category: 보안 위협 점검
 risk_summary: usage 설정 변경권자가 opt-out 우선순위·설정 차이를 이용해 금지된 수집·외부 송신을 다시 활성화할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 금지 정책에서는 내장 usage의 최초 판단·생성·송신이 중단되는지 확인한다. 허용 정책으로 바뀌면 허용 보고 점검과 연결한다.
 policy_params:

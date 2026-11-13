@@ -61,3 +61,5 @@ functional_probes:
 limitations:
   - "실행 가능한 쓰기 경로 {len:allowed_exec_writable_paths}개가 정책으로 허용됨 {allowed_exec_writable_paths} — 엔진 컴파일 캐시(torch inductor .so)를 위해 쓰기·실행이 모두 가능한 영역이 필요하다."
   - "이 점검은 컨테이너 설정(docker inspect)과 컨테이너 안 프로세스 권한만 본다. 호스트·VM 쪽 집행(LSM 정책, 호스트 파일 권한)은 보지 않으며, 실험실 결과는 Docker Desktop의 리눅스 VM 기준이다."
+
+impact: HIGH

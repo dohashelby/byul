@@ -2,7 +2,7 @@ id: LIF-01
 framework_id: CHK-LIF-001
 mechanism_ids:
 - mechanism-07
-revision: 4
+revision: 5
 retired: false
 area: LIF
 purpose: 자원 예산·공정성
@@ -12,7 +12,7 @@ scope: 기본; compile은 활성 시
 risk_category: 보안 위협 점검
 risk_summary: 공급자가 과도한 파일·metadata·변환 입력을 제공해 준비 단계의 CPU·메모리·디스크·GPU를 소모시키고 다른 작업을 방해할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 모델 취득·해석·변환·로딩 비용을 기본 확인한다. compile이 실제 사용되면 해당 단계·누적 비용을 포함한다.
 policy_params:

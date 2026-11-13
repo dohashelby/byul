@@ -33,3 +33,5 @@ limitations:
   - "실제 IPC 전체 inventory·SHM·TCP·추상 Unix 주소·동일 UID 비허용 프로세스·명령 소비·TP는 미시험이며 보안·기능 PASS 규칙은 없다. 연결 성공과 메시지 소비·임의 명령 실행은 다르다."
   - "symlink·소유권/namespace 변경·peer 연결 불일치·source 수집 실패·metadata 권한 부족은 UNKNOWN이다. 연결 거부·timeout만으로 전체 IPC 보호를 확정하지 않는다."
   - "컨테이너는 이번 guard.run의 명시된 pinned 대상이어야 한다. helper는 소유 컨테이너 내부에서만 실행하고 연결을 닫으며 payload·SHM 읽기·역직렬화를 수행하지 않는다."
+
+impact: MEDIUM

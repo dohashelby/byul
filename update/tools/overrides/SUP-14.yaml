@@ -3,3 +3,5 @@ policy_params:
   type: list[str]
   required: true
 retired: true
+
+impact: HIGH

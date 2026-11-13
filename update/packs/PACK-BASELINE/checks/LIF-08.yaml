@@ -2,7 +2,7 @@ id: LIF-08
 framework_id: CHK-LIF-008
 mechanism_ids:
 - mechanism-13
-revision: 5
+revision: 6
 retired: false
 area: LIF
 purpose: 실패 감지·상위 통지
@@ -12,7 +12,7 @@ scope: 기본 TP; 선정 executor
 risk_category: 일반 장애·복구 점검
 risk_summary: TP rank의 예외·사망·지연을 감지하지 못하면 요청이 멈춘 채 자원을 점유하거나 부분 처리를 성공으로 알릴 수 있음. 공격 입력으로 유발 가능한지는 별도 확인.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 선정 executor에서 rank 예외·사망·지연·통신 정지를 구분한다. 다른 executor의 장애 처리를 기본 근거로 쓰지 않는다.
 policy_params:

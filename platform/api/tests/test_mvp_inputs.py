@@ -61,7 +61,9 @@ def answer(values=None, *, decision="change", numbers=None):
     return {"decision": decision, "values": values or {}, "numbers": numbers or {}, "basis": "합성 시험 정책", "note": None}
 
 
-def test_missing_pack_preserves_draft_but_cannot_claim_readiness(store_client):
+def test_missing_pack_preserves_draft_but_cannot_claim_readiness(store_client, tmp_path):
+    state = store_client.app.state.byul
+    state.settings = replace(state.settings, update_dir=tmp_path / 'missing-update')
     doc = policy()
     doc["framework_values"]["requirements"]["1.4"] = answer({"allowed_devices": [], "require_non_root": False})
     res = store_client.post("/api/policies", json=doc)

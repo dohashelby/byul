@@ -79,6 +79,13 @@ def materialize(output, *, plan_file=PLAN, audit_file=SUP08_AUDIT):
     values = yaml.safe_load(CONFIRMED.read_bytes())['verification']['values']
     for check, row in values.items():
         draft['values'].setdefault(check, {}).update(deepcopy(row))
+    deferred = {}
+    for check, fields in draft['values'].items():
+        if type(fields) is dict:
+            for key in ('sensor_environment_sha256', 'sensor_target_sha256', 'sensor_prepared_sha256', 'sensor_manifest_sha256'):
+                if key in fields:
+                    fields.pop(key)
+                    deferred.setdefault(check, []).append(key)
     draft['pack'] = {'id': pack.ref().id, 'revision': pack.ref().revision}
     draft['status'] = 'DRAFT'
     draft['data_origin'] = 'EXAMPLE'
@@ -144,6 +151,7 @@ def materialize(output, *, plan_file=PLAN, audit_file=SUP08_AUDIT):
         'generator_source_sha256': sha256_hex(Path(__file__).read_bytes()),
         'prepared': prepared_rows, 'cases': case_rows, 'confirmed_policy_source_sha256': sha256_hex(CONFIRMED.read_bytes()),
         'policy_input_draft': str(draft_path), 'policy_input_draft_sha256': sha256_hex(draft_path.read_bytes()),
+        'deferred_policy_bindings': deferred,
         'req17_timing_requirements': timing, 'ready_for_execution': False,
         'input_preflight_passed': False, 'engine_executed': False, 'actual_results': None}
     _write(output / 'session-input-plan.json', plan)

@@ -49,6 +49,10 @@ def test_materialized_files_are_valid_without_invented_binding_or_results(tmp_pa
     for check, fields in values.items():
         assert {key: draft['values'][check][key] for key in fields} == fields
     assert draft['status'] == 'DRAFT' and draft['confirmed_by'] is None and draft['data_origin'] == 'EXAMPLE'
+    for fields in draft['values'].values():
+        if type(fields) is dict:
+            assert not set(fields) & {'sensor_environment_sha256', 'sensor_target_sha256',
+                                      'sensor_prepared_sha256', 'sensor_manifest_sha256'}
     assert not plan['ready_for_execution'] and not plan['input_preflight_passed']
     assert not any(path.name in {'environment.json', 'target.json'} for path in out.rglob('*'))
     for check in tool.NATIVE_CHECKS:

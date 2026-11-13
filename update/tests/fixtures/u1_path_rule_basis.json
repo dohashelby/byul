@@ -574,6 +574,118 @@
       "counterexample": "config/vllm.py·utils/torch_utils.py·snapshot/runtime.py 및 모든 신규 unreviewed.py는 미분류로 유지한다.",
       "limitation": "파일 책임의 보수적 합집합이며 모든 함수의 영향·호출 전파·런타임 도달·보안 판정의 정답은 아니다.",
       "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "mvp-reviewed-exact-files",
+      "scope": "기준 V0의 이동 계열 정확 17개 경로",
+      "reason": "KV·GPU worker·분산 실행·guided grammar·빌드 의존성 책임을 기준 태그 소스에서 확인했다.",
+      "source": [
+        {
+          "path": "vllm/worker/model_runner.py",
+          "sha256": "87c78f4294ca3f234f3c0b19dde82d0b5f843035ea4447a465a61fb9dd0246f7",
+          "anchor": "GPU 모델 로드·입력 준비·forward·그래프 실행",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "vllm/worker/worker.py",
+          "sha256": "2e5328acdc382e51c2b09173b88240b25a6e7911aa854d831bad7ec5abc5832a",
+          "anchor": "분산 초기화·GPU 실행·캐시 관리",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "vllm/worker/cache_engine.py",
+          "sha256": "861fb9f9c381f0cfcb8971c77f208f740da61fb00ee0122302142336732287ee",
+          "anchor": "GPU/CPU KV 할당·swap·copy",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "vllm/core/block_manager.py",
+          "sha256": "e24c6615380b374dbab6d363114fe04223e683f08bfd92d3c43a27ec9f8e691c",
+          "anchor": "sequence KV 블록 할당·free·prefix hit",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "vllm/core/block/block_table.py",
+          "sha256": "3a135cbd031d7628bd0f5c31a01c46b8d3ce7ebc3e06841c2afe242f19b9f715",
+          "anchor": "sequence별 토큰 블록 표·fork·free",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "vllm/core/block/cpu_gpu_block_allocator.py",
+          "sha256": "de189122bca326aa1babb5a04233c947f14ceb8c292e950d88c31230384c6093",
+          "anchor": "장치별 블록 풀·할당·swap",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "vllm/core/block/prefix_caching_block.py",
+          "sha256": "f755e43a3376153869bf0bf34d0d120328afd74f8d6bc4dc378728bd55fed28f",
+          "anchor": "prefix 캐시·참조 수·copy-on-write",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "vllm/core/evictor.py",
+          "sha256": "94d37d753820acf77ab7f65e1582ec3ed9a4a208d9ffe09c3ebcc38d55508a7f",
+          "anchor": "해시된 KV 블록 LRU 퇴출",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "vllm/executor/mp_distributed_executor.py",
+          "sha256": "c0b3aff190fb96d0a85e2e02874b172b84f0c59641e3ff7c46e0080e46290cd6",
+          "anchor": "TP worker 생성·분산 메서드 실행",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "vllm/executor/multiproc_worker_utils.py",
+          "sha256": "12812596559ac367c4842848225be187b052dc1311c5bb8c4a2b1b973a96b17b",
+          "anchor": "worker 큐·Future·감시·결과 전달",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "vllm/executor/executor_base.py",
+          "sha256": "9947ad9d4d8981a46c7057da6d55f7285e7546d33ddd53db112023acca16e32b",
+          "anchor": "장치 실행기 계약·worker 호출",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "vllm/attention/backends/flash_attn.py",
+          "sha256": "ac2979071c9ab9cdf26ea91aaf6cea9dbc9495fafe0a2f45f571f37de0aabb52",
+          "anchor": "KV copy·블록 표·attention kernel 호출",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "vllm/attention/layer.py",
+          "sha256": "d7cb00933aa0d3bf7bc4bfd19f82e4af7ed6e1bf09fd2b5a9f6c852489024a1f",
+          "anchor": "attention 계층·KV 결합·커널 호출",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "vllm/model_executor/guided_decoding/xgrammar_decoding.py",
+          "sha256": "e9f66bc76dcb0e3e407ef8f89bdfc3637f80f5cb17ba188a8a48c87d72dea124",
+          "anchor": "guided grammar를 logits 제약으로 변환",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "Dockerfile",
+          "sha256": "6e9f8abd6737d87623d98ef4bb18cd90f55aaeca0e409e602c94c45f3cde5585",
+          "anchor": "CUDA·Python·패키지 설치 이미지 빌드",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "requirements-common.txt",
+          "sha256": "d7f5b2f92cdfed0a03100ed50d41d6e0b10d1489436595e593c78fee7a32c67c",
+          "anchor": "공통 Python 의존성",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        },
+        {
+          "path": "requirements-cuda.txt",
+          "sha256": "761933b8ffc9a71d7af7f6b93e734109c2702fc7daa524397be4630f501f1827",
+          "anchor": "CUDA 실행 의존성",
+          "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8"
+        }
+      ],
+      "counterexample": "새 worker 파일과 미검토 engine/config 파일은 계속 미분류다.",
+      "limitation": "태그 소스의 부분 검토다. 설치 bytes·런타임 관측·동일 의미·인적 승인을 주장하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
     }
   ],
   "examples": [

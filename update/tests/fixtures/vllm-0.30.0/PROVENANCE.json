@@ -1,7 +1,88 @@
 {
- "repository": "https://github.com/vllm-project/vllm",
- "tag_commit": "ced6857afa0ea7b2e3f0846a62e1394e90f15607",
- "license": "Apache-2.0 (LICENSE.txt)",
- "files": {"custom_all_reduce.py.txt": {"source": "vllm/distributed/device_communicators/custom_all_reduce.py", "sha256": "a048c1327c23580805600c0c951831bec333b1ffc4eb26a0e3d34119c4f0c445"}},
- "pin_status": "candidate: tag source bytes, not yet compared with the image install file"
+  "repository": "https://github.com/vllm-project/vllm",
+  "tag_commit": "ced6857afa0ea7b2e3f0846a62e1394e90f15607",
+  "license": "Apache-2.0 (LICENSE.txt)",
+  "files": {
+    "custom_all_reduce.py.txt": {
+      "source": "vllm/distributed/device_communicators/custom_all_reduce.py",
+      "sha256": "a048c1327c23580805600c0c951831bec333b1ffc4eb26a0e3d34119c4f0c445"
+    },
+    "vllm/model_executor/model_loader/weight_cache/daemon.py.txt": {
+      "source": "vllm/model_executor/model_loader/weight_cache/daemon.py",
+      "sha256": "01e4dd5ebcc9353073ac335f74aa9cc43da46385d0616937a222c97652b0dc16"
+    },
+    "vllm/model_executor/model_loader/weight_cache/ipc_loader.py.txt": {
+      "source": "vllm/model_executor/model_loader/weight_cache/ipc_loader.py",
+      "sha256": "efbf798e317ddc0389f4241c8b48f3aa2b98fbd397b287569152d14ea90a7e8a"
+    },
+    "vllm/v1/core/block_pool.py.txt": {
+      "source": "vllm/v1/core/block_pool.py",
+      "sha256": "34c2fd67148cecb7763ff49ad694a57073759b0fa67572a4270dc995b4acf8fc"
+    },
+    "vllm/v1/core/kv_cache_manager.py.txt": {
+      "source": "vllm/v1/core/kv_cache_manager.py",
+      "sha256": "58800535eda854580d84e1025bf32fe01b2a43ce0bba501b4f3d125e4f2c8afa"
+    },
+    "vllm/v1/engine/input_processor.py.txt": {
+      "source": "vllm/v1/engine/input_processor.py",
+      "sha256": "c8abd8e4e14d99929d45a7ff3b2a74898269c5e2a7fa30b826623ee85e4ce813"
+    },
+    "vllm/v1/executor/multiproc_executor.py.txt": {
+      "source": "vllm/v1/executor/multiproc_executor.py",
+      "sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a"
+    },
+    "vllm/v1/worker/gpu/cudagraph_utils.py.txt": {
+      "source": "vllm/v1/worker/gpu/cudagraph_utils.py",
+      "sha256": "6e9c042890603535e300a40df8ee159dbed1058a64a83ae50ff0329e332e05ff"
+    },
+    "vllm/v1/worker/gpu/input_batch.py.txt": {
+      "source": "vllm/v1/worker/gpu/input_batch.py",
+      "sha256": "d5dd956eb319bd69dd9e762047833d81ad40b21fce619fcb2133759e73620694"
+    },
+    "vllm/v1/worker/gpu/model_runner.py.txt": {
+      "source": "vllm/v1/worker/gpu/model_runner.py",
+      "sha256": "174c93db921c23cf0396eee4764be25b2bd2d4b6a06e9fa41ce3598b884ce8ce"
+    },
+    "vllm/v1/worker/gpu/sample/sampler.py.txt": {
+      "source": "vllm/v1/worker/gpu/sample/sampler.py",
+      "sha256": "832c9945d201a1e730ff9b4b52076aa83bd4a5064e1e4cfea952cf84d4a8d1f0"
+    },
+    "vllm/v1/worker/gpu/states.py.txt": {
+      "source": "vllm/v1/worker/gpu/states.py",
+      "sha256": "99418f5df43ca612ded72609fee011620b065b2cab2f249ccb387096bf4ae71a"
+    },
+    "vllm/v1/worker/gpu_input_batch.py.txt": {
+      "source": "vllm/v1/worker/gpu_input_batch.py",
+      "sha256": "18cf455c9d0eea61cc581c7932f2e6cd09786914e82dd35eef1c1430da359a0f"
+    },
+    "vllm/v1/worker/gpu_model_runner.py.txt": {
+      "source": "vllm/v1/worker/gpu_model_runner.py",
+      "sha256": "87c29d08c0bbf66993d8b984811e7325e35e6436242a773feb55ec88f16b2c51"
+    },
+    "vllm/entrypoints/serve/elastic_ep/api_router.py.txt": {
+      "source": "vllm/entrypoints/serve/elastic_ep/api_router.py",
+      "sha256": "2d6805874a868eb63747903f5e10331855b7c277d46a4cef3dca7f20a2e631db"
+    },
+    "vllm/entrypoints/serve/exception_handling/error_response.py.txt": {
+      "source": "vllm/entrypoints/serve/exception_handling/error_response.py",
+      "sha256": "354a0581fbc29e2c3acbebe5e84ff3dbb132ba0af14ceba5363b6cf2fec6d54e"
+    },
+    "vllm/entrypoints/serve/exception_handling/handlers/http.py.txt": {
+      "source": "vllm/entrypoints/serve/exception_handling/handlers/http.py",
+      "sha256": "ae710c07f319f56e105a8d143300b0d1042ab4cdedc437da2c7dd88df21e5a18"
+    },
+    "vllm/exceptions.py.txt": {
+      "source": "vllm/exceptions.py",
+      "sha256": "06c77c8129ac024455ace7c89168cd8e2284d70e5d96b326782b5f110ff73e7a"
+    },
+    "vllm/renderers/params.py.txt": {
+      "source": "vllm/renderers/params.py",
+      "sha256": "6837717e82e4c322920de34bd6f3e26c9f7739dc49edf13e8c6a5c5050f87fc5"
+    },
+    "vllm/renderers/online_renderer.py.txt": {
+      "source": "vllm/renderers/online_renderer.py",
+      "sha256": "147ac64103d7ffa842cc6b91e916c5de8aaab35f79762451e2c0ee8cb5513c0e"
+    }
+  },
+  "pin_status": "candidate: tag source bytes, not yet compared with the image install file"
 }

@@ -1,0 +1,46 @@
+{
+  "source_commit": "4fd7ae37",
+  "role": "과거 GPU 등록표 보존본. 새 소스 승인 아님.",
+  "rows": [
+    {
+      "name": "guard-engine-callback-request-attempt",
+      "version": "1",
+      "source_sha256": "7927d551395f09945211ae83ad1135d8edf74a41a8306f0e6072ca0727e70610"
+    },
+    {
+      "name": "guard-engine-callback-generation-transition",
+      "version": "1",
+      "source_sha256": "64437f216798ebf1f85e62b9856b623d4b69570517e44c933be8017e42fb64da"
+    },
+    {
+      "name": "guard-engine-callback-health-worker",
+      "version": "1",
+      "source_sha256": "0cf549269305cecbfcb5c6ee9de609bf6c70cbb5f1993f53aa59c30e4873dd34"
+    },
+    {
+      "name": "guard-engine-callback-profiler-control",
+      "version": "1",
+      "source_sha256": "4da009ecc296f50357d1b559b9fce545ab7ae3a10f4544e0e248c7147ba00764"
+    },
+    {
+      "name": "guard-engine-callback-runner-consumption",
+      "version": "1",
+      "source_sha256": "5c9778f43e58465fd961ea223d966ca54b1320eb55267ce35a0a955eb1aa5095"
+    },
+    {
+      "name": "guard-engine-callback-supply-reads",
+      "version": "1",
+      "source_sha256": "533ec8c173222136a5d2ab61f66d30e8a82719753e8740f477a5f3cb7a6e5126"
+    },
+    {
+      "name": "guard-node-process-device-provider",
+      "version": "1",
+      "source_sha256": "442ea49bbc88e7497cda42b359de6ad2fb938d7819f6bcfbb868684406793451"
+    },
+    {
+      "name": "guard-engine-callback-runner-consumption-v2",
+      "version": "1",
+      "source_sha256": "041353842e9c8a12e50ca6515cc21ba9b09fa389a8bee3842926b565c6eb8c66"
+    }
+  ]
+}

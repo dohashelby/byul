@@ -98,12 +98,21 @@ def test_every_kind_names_its_consumers_and_required_events():
     assert all(set(spec['complete_requires']) <= set(spec['events']) for spec in contract.KINDS.values())
 
 
-def test_registered_producers_are_exactly_the_gpu_confirmed_current_sources():
-    """등록한 여덟 생산자 값은 GPU 확인한 현재 소스 SHA와 같아야 한다(변경 시 다시 확인)."""
+def test_historical_gpu_registration_is_preserved_and_changed_sources_remain_unregistered():
+    """과거 등록은 보존하고 의존성이 바뀐 일곱 생산자에게 이월하지 않는다."""
     from guard.collectors.process_device_producer import device_producer
     from guard.collectors.runner_consumption_v2_producer import producer as v2_producer
     from guard.collectors import gpu_input_producers as producers
     current = [f() for f in (producers.attempt_producer, producers.transition_producer, producers.health_producer,
                              producers.profiler_producer, producers.consumption_producer, producers.supply_producer)]
     current.extend([device_producer(), v2_producer()])
-    assert contract.SUPPORTED_PRODUCERS == {(p['name'], p['version']): p['source_sha256'] for p in current}
+    import json
+    from pathlib import Path
+    historical = json.loads((Path(__file__).parent / 'fixtures/gpu-registered-producers-20261105.json').read_bytes())
+    assert contract.SUPPORTED_PRODUCERS == {(p['name'], p['version']): p['source_sha256'] for p in historical['rows']}
+    assert len(current) == len(contract.SUPPORTED_PRODUCERS) == 8
+    unchanged = {p['name'] for p in current if contract.SUPPORTED_PRODUCERS[(p['name'], p['version'])] == p['source_sha256']}
+    assert unchanged == {'guard-node-process-device-provider'}
+    changed = [p for p in current if p['name'] not in unchanged]
+    assert len(changed) == 7
+    assert all(contract.SUPPORTED_PRODUCERS[(p['name'], p['version'])] != p['source_sha256'] for p in changed)

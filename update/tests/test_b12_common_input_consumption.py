@@ -287,6 +287,7 @@ from tests.test_lifecycle_capture import case, external, revised  # noqa: E402,F
 from tests.test_lifecycle_sensor import writer_factory  # noqa: E402,F401
 
 
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_lif10_actual_producer_to_current_pack_normalized_evidence_and_rejudge(tmp_path, group, native_target, monkeypatch):
     from tests.test_a1_kubernetes_request_termination_product import inputs as native_inputs
     from guard.runtime import kubernetes_http as http

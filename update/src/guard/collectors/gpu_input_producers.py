@@ -23,10 +23,17 @@ ATTEMPT_PRODUCER_VERSION = '1'
 _FREE_ABORT = {'FINISHED_ABORTED'}
 
 
+def _source_dependencies(paths):
+    # 관측기를 고르는 새 데이터도 생산자 신원에 포함한다. 등록은 GPU 확인 뒤에만 한다.
+    root = Path(attempt_callback.__file__).parent
+    return (*paths, root / 'vllm_cache_callback.py', root / 'vllm_observer_pin_rows.py',
+            root / 'assets/vllm_observer_pin_rows.json')
+
+
 def attempt_producer():
     """생산자 신원: 관측기와 이 변환의 소스 bytes 해시를 함께 묶는다."""
     digest = hashlib.sha256()
-    for path in (Path(attempt_callback.__file__), Path(__file__)):
+    for path in _source_dependencies((Path(attempt_callback.__file__), Path(__file__))):
         digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
     return {'name': ATTEMPT_PRODUCER_NAME, 'version': ATTEMPT_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
 
@@ -141,7 +148,7 @@ _GATE_OPEN = {'EngineCore.resume_scheduler', 'EngineCore.wake_up'}
 
 def transition_producer():
     digest = hashlib.sha256()
-    for path in (Path(transition_callback.__file__), Path(attempt_callback.__file__), Path(__file__)):
+    for path in _source_dependencies((Path(transition_callback.__file__), Path(attempt_callback.__file__), Path(__file__))):
         digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
     return {'name': TRANSITION_PRODUCER_NAME, 'version': TRANSITION_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
 
@@ -260,7 +267,7 @@ HEALTH_PRODUCER_VERSION = '1'
 
 def health_producer():
     digest = hashlib.sha256()
-    for path in (Path(health_callback.__file__), Path(attempt_callback.__file__), Path(__file__)):
+    for path in _source_dependencies((Path(health_callback.__file__), Path(attempt_callback.__file__), Path(__file__))):
         digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
     return {'name': HEALTH_PRODUCER_NAME, 'version': HEALTH_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
 
@@ -344,7 +351,7 @@ PROFILER_PRODUCER_VERSION = '1'
 
 def profiler_producer():
     digest = hashlib.sha256()
-    for path in (Path(profiler_callback.__file__), Path(__file__)):
+    for path in _source_dependencies((Path(profiler_callback.__file__), Path(__file__))):
         digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
     return {'name': PROFILER_PRODUCER_NAME, 'version': PROFILER_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
 
@@ -443,7 +450,7 @@ _CONSUMPTION_FIELDS = ('prompt_tokens', 'max_token_id') + consumption_callback.F
 
 def consumption_producer():
     digest = hashlib.sha256()
-    for path in (Path(consumption_callback.__file__), Path(__file__)):
+    for path in _source_dependencies((Path(consumption_callback.__file__), Path(__file__))):
         digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
     return {'name': CONSUMPTION_PRODUCER_NAME, 'version': CONSUMPTION_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
 
@@ -565,7 +572,7 @@ SUPPLY_PRODUCER_VERSION = '1'
 
 def supply_producer():
     digest = hashlib.sha256()
-    for path in (Path(supply_callback.__file__), Path(__file__)):
+    for path in _source_dependencies((Path(supply_callback.__file__), Path(__file__))):
         digest.update(path.name.encode() + b'\0' + path.read_bytes() + b'\0')
     return {'name': SUPPLY_PRODUCER_NAME, 'version': SUPPLY_PRODUCER_VERSION, 'source_sha256': digest.hexdigest()}
 

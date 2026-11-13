@@ -6,6 +6,8 @@ engine keeps its original behaviour. Rows hold keyed fingerprints only.
 """
 from __future__ import annotations
 
+from .vllm_observer_pin_rows import candidate_sources, layout
+
 import atexit
 import functools
 import hashlib
@@ -43,15 +45,15 @@ ROOT = '/guard-lifecycle/engine-callbacks'
 DATA_ROOT = '/guard-lifecycle/data'
 SLOT_MODULE = 'vllm.v1.worker.gpu_input_batch'
 SLOT_TARGETS = {SLOT_MODULE: ('InputBatch.add_request', 'InputBatch.remove_request')}
-SLOT_SOURCE = {SLOT_MODULE: 'e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d'}
+SLOT_SOURCE = candidate_sources({SLOT_MODULE: 'e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d'}, SLOT_TARGETS)
 # V2 model runner (vLLM 0.31.0 기본 GPU runner). 자리 배정·회수와 sampler가 실제로
 # 받은 요청별 상태를 CPU 쪽 배열에서만 읽는다. GPU tensor를 읽거나 동기화하지 않는다.
 SLOT_V2_STATES = 'vllm.v1.worker.gpu.states'
 SLOT_V2_SAMPLER = 'vllm.v1.worker.gpu.sample.sampler'
 SLOT_V2_TARGETS = {SLOT_V2_STATES: ('RequestState.add_request', 'RequestState.remove_request'),
                    SLOT_V2_SAMPLER: ('Sampler.add_request', 'Sampler.__call__')}
-SLOT_V2_SOURCE = {SLOT_V2_STATES: '8c899b8ef63d95f450876d3f01e56772f9534938a95383a46659fddf85573fa3',
-                  SLOT_V2_SAMPLER: 'ddbcdab46010bf38a5fab9b9b6a2deed2ec5e883ebfe81e83f6d22f41e546771'}
+SLOT_V2_SOURCE = candidate_sources({SLOT_V2_STATES: '8c899b8ef63d95f450876d3f01e56772f9534938a95383a46659fddf85573fa3',
+                  SLOT_V2_SAMPLER: 'ddbcdab46010bf38a5fab9b9b6a2deed2ec5e883ebfe81e83f6d22f41e546771'}, SLOT_V2_TARGETS)
 MAX_SAMPLED_SLOTS = 256
 # Block-level lookups feed no projection. Wrapping them made every cache hit
 # slower in proportion to its length and multiplied the session rows.
@@ -175,7 +177,9 @@ class SlotV2Observer(_Keyed, cache.CacheCallbackObserver):
     def _slot_state(self, sampler, slot):
         """Sampler의 logit-bias 상태에서 이 자리의 허용 token 개수와 사용 여부."""
         fields = cache.base.attrs(sampler)
-        bias = next((p for p in (fields.get('logits_processors') or ()) if hasattr(p, 'num_allowed_token_ids')), None)
+        profile = layout(self, SLOT_V2_SAMPLER)
+        bias = (fields.get(profile['bias_attribute']) if 'bias_attribute' in profile else
+                next((p for p in (fields.get('logits_processors') or ()) if hasattr(p, 'num_allowed_token_ids')), None))
         allowed = _array_at(getattr(getattr(bias, 'num_allowed_token_ids', None), 'np', None), slot)
         used = _array_at(getattr(bias, 'use_logit_bias', None), slot)
         needs = _array_at(fields.get('needs_logits_processing'), slot)
@@ -201,7 +205,8 @@ class SlotV2Observer(_Keyed, cache.CacheCallbackObserver):
         states = cache.base.attrs(receiver).get('req_states')
         if point == 'Sampler.add_request':
             slot = _slot_index(args[1] if len(args) > 1 else kwargs.get('req_idx'))
-            params = args[2] if len(args) > 2 else kwargs.get('sampling_params')
+            position = layout(self, SLOT_V2_SAMPLER).get('sampling_params_position', 2)
+            params = args[position] if len(args) > position else kwargs.get('sampling_params')
             allowed = cache.base.attrs(params).get('allowed_token_ids')
             row = {'slot': slot, 'request_sha256': self._request_at(states, slot),
                    'restricted': type(allowed) is list and bool(allowed)}

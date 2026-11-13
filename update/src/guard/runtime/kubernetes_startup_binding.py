@@ -5,6 +5,7 @@ generic KubernetesHTTP Ready gate is unchanged; callers cannot toggle it here.
 """
 from .kubernetes_binding import verify_owned_pod, project_owned_snapshot
 from .kubernetes_http import KubernetesBindingError, REQUEST_BINDING_PROFILE
+from guard.adapters.engine_profiles import supports
 
 
 def read_startup_binding(base):
@@ -15,7 +16,7 @@ def read_startup_binding(base):
     """
     try:
         if (base.profile != REQUEST_BINDING_PROFILE or base.lab is not True
-                or base.engine_name != 'vllm' or base.engine_version != '0.31.0'):
+                or not supports(base.engine_name, base.engine_version, 'worker_readiness')):
             raise ValueError
         namespaces = sorted({base.binding[role]['namespace'] for role in ('engine', 'probe')})
         result = base._call(['get', 'namespaces', *namespaces, '-o', 'json'])

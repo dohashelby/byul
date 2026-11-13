@@ -95,6 +95,9 @@ def inventory(package="guard.adapters", prefix="vllm"):
                 row = modules.setdefault(name, {"pins": {}, "points": {}})
                 if type(value) is str and HEX.fullmatch(value):
                     row["pins"].setdefault(value, set()).add(f"{info.name}.{var}")
+                elif type(value) is tuple and value and all(type(pin) is str and HEX.fullmatch(pin) for pin in value):
+                    for pin in value:
+                        row["pins"].setdefault(pin, set()).add(f"{info.name}.{var}")
                 for point in _points(value):
                     row["points"].setdefault(point, set()).add(f"{info.name}.{var}")
     def plain(d):

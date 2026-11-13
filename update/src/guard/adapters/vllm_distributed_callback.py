@@ -6,6 +6,8 @@ unimplemented. No source pin, common sensor, native profile or installer changes
 """
 from __future__ import annotations
 
+from .vllm_observer_pin_rows import candidate_sources, layout
+
 from copy import deepcopy
 import os
 import threading
@@ -34,7 +36,7 @@ def _output_ids(output):
 
 class DistributedCallbackObserver(shared.CacheCallbackObserver):
     targets = TARGETS
-    sources = rank.SOURCE_ADDITIONS
+    sources = candidate_sources(rank.SOURCE_ADDITIONS, TARGETS)
     schema = 'guard-vllm-distributed-callback/1'
     profile = PROFILE
 

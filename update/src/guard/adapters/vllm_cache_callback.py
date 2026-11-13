@@ -7,6 +7,8 @@ No caller-supplied verified flag or serialized observation can qualify a hook.
 """
 from __future__ import annotations
 
+from .vllm_observer_pin_rows import candidate_sources, layout
+
 import contextvars
 from copy import deepcopy
 import functools
@@ -32,6 +34,7 @@ TARGETS = {
     'vllm.v1.core.kv_cache_manager': ('KVCacheManager.get_computed_blocks',),
     'vllm.v1.core.block_pool': ('BlockPool.get_cached_block', 'BlockHashToBlockMap.get_one_block'),
 }
+SOURCES = candidate_sources(base.SOURCE_SHA, TARGETS)
 MAX_EVENTS = 1024
 MAX_OBJECTS = 256
 MAX_BLOCKS = 256
@@ -40,6 +43,7 @@ MAX_BLOCKS = 256
 SOURCE_BYTES = {'bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a': 335342,
                 # vllm.v1.core.sched.scheduler (#196 request-attempt P1)
                 'f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a': 159016}
+from .vllm_observer_pin_rows import SOURCE_BYTES as CANDIDATE_SOURCE_BYTES
 _ACTIVE = contextvars.ContextVar('guard_cache_callback_active', default=None)
 # Digests of bytes that already matched their pin. The bytes are re-read and
 # re-hashed on every call; only the compile of identical bytes is reused.
@@ -69,7 +73,8 @@ def _source(module, sources):
     error = None
     for pin in _pins(sources, name):
         try:
-            return pin, artifact(path, pin, **({'limit': SOURCE_BYTES[pin]} if pin in SOURCE_BYTES else {}))
+            limits = SOURCE_BYTES | CANDIDATE_SOURCE_BYTES
+            return pin, artifact(path, pin, **({'limit': limits[pin]} if pin in limits else {}))
         except ValueError as exc:
             error = exc
     raise error
@@ -80,7 +85,7 @@ def source_pin(module, sources):
     return _source(module, sources)[0]
 
 
-def _codes(module, targets=TARGETS, sources=base.SOURCE_SHA):
+def _codes(module, targets=TARGETS, sources=SOURCES):
     name = vars(module).get('__name__')
     if name not in targets or name not in sources or sys.version_info[:2] != (3, 12) or sys.flags.optimize:
         raise ValueError('CACHE_CALLBACK_SOURCE_UNSUPPORTED')
@@ -116,7 +121,7 @@ def _uint(value):
 
 class CacheCallbackObserver:
     targets = TARGETS
-    sources = base.SOURCE_SHA
+    sources = SOURCES
     schema = SCHEMA
     profile = PROFILE
     def __init__(self, session, *, sink=None, context_provider=None, clock=None):
@@ -263,6 +268,7 @@ class CacheCallbackObserver:
         if expected is None or _digest(original.__code__, name) != expected:
             raise ValueError('CACHE_CALLBACK_ENTRY_UNSUPPORTED')
         pin = source_pin(module, self.sources)
+        self.__dict__.setdefault('_source_pins', {})[name] = pin
 
         def qualified():
             current = vars(cls).get(method)

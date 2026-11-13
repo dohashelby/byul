@@ -261,3 +261,11 @@ git clone --depth 1 --branch <0.1절 후보 태그> https://github.com/vllm-proj
 - A 담당 엔진 내부 관측기의 후보 판본 (a) 행: REQ-14 `vllm_distributed_callback`, REQ-15~17 `vllm_cache_callback`·`vllm_scoped_consumption_callback`, REQ-18~20 slot·graph·kernel, LIF-13 `vllm_weights_lifetime_callback`. 이 관측기들은 `base.SOURCE_SHA` 등 공유 표를 써서, 같은 tuple 행 구조를 공유 표에 들이는 작업이 먼저다.
 - 판본 문자열 키 표(`adapters/vllm.py` SAFE_PROBES·길이 오류 형식, `kubernetes_response_error`, `engine_provider`, `vllm_runner_capture`)를 판본 행 조회로 바꾸는 일. `adapters/vllm.py`는 M-A9와 같은 파일이라 이 세션에서 고치지 않았다.
 - 기준 판본 쪽 D1~D3은 "(c) 후속, 미구현"이다.
+
+## 15. 단독 개발 후속 — 후보 행·함수 의미 대조 (2026-11-13)
+
+- 관측기 후보 파일 13개(763,545 bytes)를 태그 원본 SHA와 대조해 fixture와 adapter 데이터에 추가했다. 캐시·분산·scoped consumption·slot·kernel·graph·공유 가중치 계열이다. 이미지 bytes 대조 전이므로 모두 candidate_pin이며 등록 생산자 목록은 바꾸지 않는다.
+- V2 sampler의 상태 속성·sampling_params 인자 위치와 공유 가중치 조회의 반환 tuple 위치를 adapter 데이터로 처리한다. 공통 감싸기·최종 소스 확인은 여러 후보 중 실제로 일치한 SHA를 사용한다. 알 수 없는 bytes는 거부한다.
+- 함수 36개의 대조는 [기계 판독 검토 기록](ma6-candidate-function-review.json)에 남겼다. scheduler 대기열·전환·출력·profiler·공급 반환의 차이는 M-B4 후속이며 같은 관측 의미로 무조건 이월하지 않는다.
+- 직접 시험: 관측기·고정값·준비 자산·scoped 소비 등 175개 통과. 추가로 생산자 신원·정확 크기·후보 자격 89개 통과. 새 데이터 의존성이 바뀐 생산자는 과거 GPU 등록을 상속하지 않는지 확인했다. 양성 소비 시험은 모의 등록을 명시하고 기존 assert를 유지했다.
+- 남은 M-A6: 두 판본 HTTP 경로·길이 오류·기동 provider 데이터, 변경 경로표 대조. 기준 쪽 D1~D3 및 실제 이미지·GPU 확인은 원래 후속 범위다. 이 절은 M-A6 전체 완료 기록이 아니다.

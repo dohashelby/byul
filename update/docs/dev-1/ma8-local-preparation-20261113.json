@@ -1,0 +1,153 @@
+{
+  "schema": "guard-mvp-sup08-local-preparation/1",
+  "data_origin": "DECLARED",
+  "official": false,
+  "fixture_manifest_file": "ma8-local-fixture-manifest.json",
+  "fixture_manifest_sha256": "d5121b80dd3237fe63d6e646806d414d464ffc78efa6ef5fbaa436715bf67765",
+  "local_build": {
+    "schema": "guard-sup08-local-fixture-build/1",
+    "data_origin": "DECLARED",
+    "built_at_utc": "2026-11-13T08:33:13.864753+00:00",
+    "source_model": "microsoft/Phi-3-vision-128k-instruct",
+    "source_revision": "ed2772fabe9dc9acd0caad54b62761d92520cc44",
+    "fixture_manifest_path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/manifest.json",
+    "fixture_manifest_sha256": "d5121b80dd3237fe63d6e646806d414d464ffc78efa6ef5fbaa436715bf67765",
+    "model_id": "local-byul/sup08-phi3v-derived",
+    "model_snapshot_id": "57f2f7423e74d97203b79372390c8f84efb81b93",
+    "model_inventory_sha256": "c2dd67477c1899b775e5fa0d0585861e62166ff94c7b94a7c8ba531c2756ac52",
+    "model_inventory_files": 14,
+    "code_revisions": {
+      "approved": "a239c75031d0d32a44f2a89135f574c2318244de",
+      "unapproved": "bd80f9e25ed91e97f4da47172241bbe008d77e99"
+    },
+    "weights": [
+      {
+        "path": "model-00001-of-00002.safetensors",
+        "bytes": 4944122112,
+        "sha256": "175b2fe918dd8bd2549e3441615ee0c6d7b1f6d638c0104a614546f55c273482",
+        "present": true,
+        "verified": true,
+        "reused": false
+      },
+      {
+        "path": "model-00002-of-00002.safetensors",
+        "bytes": 3349208776,
+        "sha256": "e61ece5a8f0c9663afa06cc22799056f5cc084fb993518bf036dc8e268fd4c94",
+        "present": true,
+        "verified": true,
+        "reused": false
+      }
+    ],
+    "weights_hardlinked": {
+      "model-00001-of-00002.safetensors": true,
+      "model-00002-of-00002.safetensors": true
+    },
+    "weight_bytes_rechecked": true,
+    "historical_fixture_identity_matches": true,
+    "model_fixture_files_ready": true,
+    "engine_start_verified": false,
+    "environment_target_files_ready": false,
+    "engine_executed": false,
+    "gpu_used": false,
+    "original_evidence_archive_recovered": false,
+    "host_free_bytes_after": 4385341440,
+    "note": "동일 고정 신원의 새 로컬 fixture다. 과거 실측 원본 복구나 엔진/GPU 실행 결과가 아니다.",
+    "metadata_correction": {
+      "previous_receipt_sha256": "91aec78aa23d65e1b7f9759614048e53c80a14332bdb6f6a9c8204de9f58deb0",
+      "note": "다운로드 계획의 present=false가 남은 메타데이터를 실제 파일 존재 확인에 맞춰 바로잡았다. SHA 검증·fixture bytes·실행 여부는 그대로다."
+    }
+  },
+  "launch_inputs": {
+    "schema": "guard-sup08-local-launch-inputs/1",
+    "data_origin": "DECLARED",
+    "official": false,
+    "fixture_manifest_sha256": "d5121b80dd3237fe63d6e646806d414d464ffc78efa6ef5fbaa436715bf67765",
+    "fixture_receipt_sha256": "e54d587665a1d926859247f74bf273ae389fa9e2c8d8fbda1450511f79110c9f",
+    "pack_ref": {
+      "kind": "PACK",
+      "id": "PACK-BASELINE",
+      "revision": 34,
+      "sha256": "cf95f6709b635a6b14cc4a8ceaef5843bd0eb1bd4294c63e29d815626b8c1b0b"
+    },
+    "sides": {
+      "baseline": {
+        "render_file": "baseline/render.json",
+        "policy_file": "baseline/policy.yaml",
+        "pending_configuration_file": "baseline/guard.pending-target.toml",
+        "planned_default_engine": "V0",
+        "code_marker_root": "/cache/hf/byul-code-markers/mvp-sup08-baseline-20261113-1",
+        "planned_host_cache_path": "/srv/serving/cache/vllm/a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8/57f2f7423e74d97203b79372390c8f84efb81b93/dev-mvp-sup08-baseline-20261113-1",
+        "environment_ref": null,
+        "target_file": null,
+        "actual_result": null
+      },
+      "candidate": {
+        "render_file": "candidate/render.json",
+        "policy_file": "candidate/policy.yaml",
+        "pending_configuration_file": "candidate/guard.pending-target.toml",
+        "planned_default_engine": "V1",
+        "code_marker_root": "/cache/hf/byul-code-markers/mvp-sup08-candidate-20261113-1",
+        "planned_host_cache_path": "/srv/serving/cache/vllm/5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40/57f2f7423e74d97203b79372390c8f84efb81b93/dev-mvp-sup08-candidate-20261113-1",
+        "environment_ref": null,
+        "target_file": null,
+        "actual_result": null
+      }
+    },
+    "files_sha256": {
+      "baseline/engine.yaml": "96ed189958cd52901ecf723be2554607012bca339c0d68fdb2bb353be0fbd0f1",
+      "baseline/probe.yaml": "5ddb619b9c4151c8c082239d31f5fdcba6793a0c1875d47b7044d6a98232842c",
+      "baseline/render.json": "8e59ce4afa5beace1a04555a7afeb24e3538bf7eb8a7a6801097f48fae421066",
+      "baseline/policy.yaml": "1559de87dde22d3f4f3191f913bd4bf204f8925f7aa180a92e8649ef19ba3e7f",
+      "baseline/guard.pending-target.toml": "657136a43f2d37bc678d80771b16d2eeb50f17569f17111d84ad5e0cb46d4305",
+      "candidate/engine.yaml": "1f7c684d230a144284f094994e2ad03eb9c39c7f39b78ddca7f5cbbe06efc561",
+      "candidate/probe.yaml": "51ca5d63cb69c6003ba25e55de2b72f0e19598d12bf09166eee40eb327660664",
+      "candidate/render.json": "dabe11708d6c8dc780fa670f1e2bc6a826966d3f8f5470ac8e6eb2686c6b86ab",
+      "candidate/policy.yaml": "1559de87dde22d3f4f3191f913bd4bf204f8925f7aa180a92e8649ef19ba3e7f",
+      "candidate/guard.pending-target.toml": "87476211269fd0ba396af4a045348d01fd99cbd5010b902671661946bca12886",
+      "control.png": "18bc07d5133e1a7cabfd4cd192e13bd1ee8e2643222136d95a4aa7180c4486db",
+      "control-image.txt": "9bbb4cf8268b9abc2c5e6b558ff4417e4ca9fb6e9a8ef4964c5a70ea553ecf0a"
+    },
+    "control_image": {
+      "bytes": 623,
+      "width": 16,
+      "height": 16,
+      "original_poc_image_identity_verified": false,
+      "note": "새 실행에 양쪽 동일하게 사용할 무해한 PNG다. 정상 요청 수용은 실제 실행에서 확인해야 한다."
+    },
+    "checks": {
+      "fixture_identity_valid": true,
+      "policy_configuration_valid": true,
+      "launch_render_valid": true,
+      "normalized_launch_conditions_equal": true,
+      "input_preflight_passed": false,
+      "cluster_observed": false,
+      "engine_executed": false,
+      "node_file_permissions_verified": false
+    },
+    "pending": [
+      "actual_environment",
+      "actual_namespace_pod_target",
+      "node_model_and_cache_installation",
+      "node_file_permissions",
+      "control_request_accepted",
+      "mvp_sup08_inputs_final_assembly"
+    ],
+    "renderer_source_commit": "f2831fe1c2d9fd0c274d8027b7e8fba7ab93b0b2",
+    "actual_comparison": null
+  },
+  "validation": {
+    "schema": "guard-sup08-local-input-validation/1",
+    "data_origin": "DECLARED",
+    "artifact_hashes_match": true,
+    "png_structure_crc_and_inflate_valid": true,
+    "fixture_identity_gate_accepted": true,
+    "missing_actual_environment_blocks_final_assembly": true,
+    "final_output_created": false,
+    "input_preflight_passed": false,
+    "engine_executed": false,
+    "gpu_used": false
+  },
+  "actual_results": null,
+  "actual_comparison": null,
+  "note": "실제 가중치 파일을 확인한 새 로컬 fixture와 미배포 기동 계획이다. 실제 ENV/target·GPU 실행·과거 증거 회수는 미완료다."
+}

@@ -14,9 +14,9 @@ _LEGACY = {
     "probe": "96df266f30e713e43f13cc1a042896894cd061c5af7b7ffd286e8a13ae91e23d",
 }
 _CURRENT_RAW = {
-    "update/src/guard/runtime/kubernetes_worker_readiness.py": _LEGACY["collector"],
-    "update/src/guard/runtime/kubernetes_startup_binding.py": _LEGACY["binding"],
-    "update/src/guard/runtime/kubernetes_http.py": "03d159ed092a4eff69fe8dda698f1bc6d4d06b026531c5cf6670b80c251c9dd9",
+    "update/src/guard/runtime/kubernetes_worker_readiness.py": "027cef9042248850410a59df160b603502f4ba28996a0138f8e597cc8e6d4a74",
+    "update/src/guard/runtime/kubernetes_startup_binding.py": "39cd258e0108e73a5eeb4dcf91394a1a64f3b55724c0b1b6120b83d156a795e0",
+    "update/src/guard/runtime/kubernetes_http.py": "2372565016384967160b101e4ae9493ea7d61e5c718f6ba9301154e7e015ea13",
     "update/src/guard/executors/stream_probe.py": "b37e17fe543cb352887f8ac214091b6f4899e63a972c63e3eb6ded819ae6656f",
 }
 _CURRENT_WRAPPER = "a84a47605aa38cb36303acc2b6c5f90e19e217be21cf476445f1b535f455a62d"
@@ -40,4 +40,5 @@ def expected_http_sources(proof):
     files = json.loads((repo / gate.MANIFEST_PATH).read_text(encoding="utf-8"))["files"]
     if any(files.get(name) != value for name, value in _CURRENT_RAW.items()):
         raise ValueError("HTTP_REVIEWED_CONTRACT_UNAVAILABLE")
-    return {**_LEGACY, "probe": _CURRENT_WRAPPER}
+    return {"collector": _CURRENT_RAW["update/src/guard/runtime/kubernetes_worker_readiness.py"],
+            "binding": _CURRENT_RAW["update/src/guard/runtime/kubernetes_startup_binding.py"], "probe": _CURRENT_WRAPPER}

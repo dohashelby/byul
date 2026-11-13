@@ -5,6 +5,8 @@
 - 2026-11-12 · 사용자 결정: MVP 판본 쌍을 기준 vLLM 0.7.0·후보 vLLM 0.30.0으로 한다(#246 PoC에서 이미지 고정). 11-09 결정의 0.31.0 실측·0.32.0 비교 기준을 대체하고, 0.31.0 고정값·지원표 행·기록은 데이터와 이력으로 둔다. 판본은 작업지시서 MVP 판본 표에만 적는다. MVP 동안 SUP-08은 A가 맡고(`docs/phase1/gpu.yaml`의 SUP-08 항목 포함), B는 SUP-08 전용 파일을 고치지 않는다. · 실제 회귀(SUP-08)로 `REGRESSED`를 확인하고, 판본 추가가 데이터만으로 되는지 MVP에서 함께 확인하기 위함이다.
 
 - 2026-11-12 · 사용자 지시("B 배제하고 그냥 우리가 다해"): PR #240·#246은 B 검토 없이 A가 마무리한다. #246의 `reviewed_http_contract.py` B 고정값(`kubernetes_http.py`)과 최종 소스 목록 검토 기록은 A가 직접 넣고, 기록의 `reviewed_by`에 B 검토 면제를 밝힌다. 작업지시서의 일반 병합 규칙(B 검토 기록)은 바꾸지 않는다.
+- 2026-11-12 · 사용자 결정 10(M-A6 판본 적용표의 (d) 제안): 기준 판본 쪽 D4(인증 middleware 내부 관측, 영향 PLT-10·11)·D5(V0 profiler 관측, 영향 LIF-14)는 원인을 기록한 UNKNOWN으로 승인한다. PASS·NOT_APPLICABLE로 바꾸지 않는다. D1(V0 scheduler·캐시)·D2(V0 model runner·CUDA Graph)·D3(V0 다중 프로세스·executor)는 UNKNOWN을 승인하지 않고 "(c) 후속, 미구현"으로 둔다. 미구현 동안 해당 점검의 기준 쪽은 `ENGINE_VERSION_UNSUPPORTED`이며 MVP 완료로 세지 않는다([적용표](docs/dev-1/ma6-version-applicability.md) 12절). 결정 9·기준 판본 V0 유지·이미지 레이어 다운로드는 미결이다. · 오래 걸리는 V0 재설계를 MVP 공백으로 굳히지 않고 후속 구현 대상으로 남기기 위함이다.
+- 2026-11-12 · 사용자 결정 5(소스 검토 기록): MVP 동안 소스 검토 기록의 B 검토를 면제한다. 제품 소스를 바꾼 PR은 `tools/verify_req10_consumption.py --write`로 `release/reviewed-source.json`을 다시 만들고, A가 `tools/reviewed_manifest_receipts.json`에 검토 기록을 직접 넣으며 `reviewed_by`에 "B 검토 면제(사용자 결정 5, 2026-11-12)"를 밝힌다(#240·#246과 같은 방식). 나중에 병합하는 쪽이 목록과 기록을 다시 만든다. · B 검토 대기로 제품 소스 PR이 멈추지 않게 하면서, 면제 사실을 기록에 남기기 위함이다.
 
 - 2026-11-11 · PR #240의 종료 기록·원자료·검토 JSON·미통합 후보는 커밋 `451292db`에 보존하고 docs의 중복 사본 144개를 정리한다. 현행 상태·잔여·담당·정확 복원 명령은 `docs/gpu-b/CURRENT_HANDOFF.md`에 둔다. 원 FAIL/UNKNOWN·Ref·출처와 로컬/AWS 원본은 유지하며, 후보 복원은 실행 승인이나 제품 완료가 아니다.
 

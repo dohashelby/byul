@@ -1,0 +1,7 @@
+{
+ "repository": "https://github.com/vllm-project/vllm",
+ "tag_commit": "ced6857afa0ea7b2e3f0846a62e1394e90f15607",
+ "license": "Apache-2.0 (LICENSE.txt)",
+ "files": {"custom_all_reduce.py.txt": {"source": "vllm/distributed/device_communicators/custom_all_reduce.py", "sha256": "a048c1327c23580805600c0c951831bec333b1ffc4eb26a0e3d34119c4f0c445"}},
+ "pin_status": "candidate: tag source bytes, not yet compared with the image install file"
+}

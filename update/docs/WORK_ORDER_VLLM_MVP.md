@@ -294,6 +294,7 @@ MVP 밖(후속): 이전 판본 쌍의 정본 실측·비교, SGLang 생산자·�
 | 18 | 공간 확인 뒤 로컬 fixture 재구성 | **사용자 후속 지시에 따라 진행(2026-11-13)** | 실제 여유 확인 뒤 고정 모델 가중치 8,293,330,888 bytes를 다운로드·SHA 검증. 동일 14개 inventory·snapshot·코드 식별값으로 새 fixture 구성, 하드링크로 가중치 재사용. 기동 계획·정책/설정 준비만이며 실제 ENV/target·GPU/클라우드 실행·이미지 레이어 다운로드·병합 승인은 별도 |
 | 19 | #257 공통 runtime CI의 시험 동기화 | **승인(2026-11-13 사용자): runtime 시험 두 파일만 한정 예외** | test_mvp_gateway.py의 final 저장 완료 대기와 test_mvp_stream.py의 제어 시계. 기존 assert·60ms·STREAM_DEADLINE 유지, 제품 소스·다른 runtime 파일·정책/의존성·GPU/병합은 제외 |
 | 20 | #263 제외 여섯 PR main 통합 | **승인(2026-11-13 사용자)** | #258→#259→#257→#260→#262→#261, source/검토 행 재생성과 새 CI 확인. #263 draft 유지. GPU/클라우드·추가 다운로드·다른 runtime 파일은 제외 |
+| 21 | M-B1 소비·복원 후속 push·PR | **push·PR만 승인(2026-11-13 사용자)** | `codex/mb1-common-input-closure-20261113` 시험·문서 후속을 main PR로 생성. CI 후 병합은 별도 승인 |
 
 ## 8. 점검별 배정표 (69개)
 

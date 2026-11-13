@@ -2261,3 +2261,11 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - Replaced the current static packet's historical ordering dependency with a separately reviewed current-generation helper. Retained historical normal-boot snapshot stays byte-identical and accepts historical sensor e32c only; the new helper accepts current sensor 554206 only. Pair/helper/preparer SHA chain stays exact and closed.
 - Tests: SUP16 20 passed; combined serialized native17 scope preparation/load and SUP16 37 passed (0.46s), external temporary paths. Broader host diagnostic: 85 passed, 55 failed (unsupported CPython3.12.13 observer runtime); supported Linux rerun remains required.
 - No SUP16 registry/packs/contracts or sensor changes, actual engine/GPU/AWS execution, remote writes, or support-status promotion. Integration owner regenerates shared source manifest and runs final Linux validation.
+
+
+## 2026-11-13 M-A7 — REQ-16 공식 모델 revision 후보 고정
+
+- 한 일: 작업지시서 지정 Qwen 모델의 공식 API에서 revision895c3a49bc3fa70a340399125c650a463535e71c를 고정 후보로 선택했다. 고정 API·config/preprocessor/index66,030 bytes의 실제 SHA와 두 가중치의 LFS 크기·해시 메타데이터를 기록하고 두 판본 planned_model에 같은 후보를 연결했다. 새 검토 JSON을 두 CI 경로 목록에 넣었다. 모델 교체·기동·가중치 다운로드는 없다.
+- 테스트 결과: 메타데이터4개 bytes/SHA와 index의 두 shard 파일명 대응,69행/138쪽 ENV·target null·J01여섯·J02예순셋·실행/사전 점검false 구조를 직접 확인했다. 경로16개 통과(0.78초), 현황 검사 통과. CI 경로 목록 반영 뒤 같은 경로 시험을 다시 확인한다. 제품 소스·팩·소스 목록 SHA는 그대로다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 승인된 기존 #261 브랜치에 push해 CI를 확인하고, 저장소를 마련한 뒤 승인 범위에서 가중치 bytes와 두 판본 첫 기동을 검증한다.
+- 막힌 것: 가중치4,418,050,768 bytes는 메타데이터만 있으며 받지 않았다. config의 transformers_version은 선언값이고 실제 설치/호환 증명이 아니다. 실제 ENV/target·prepared·정책·GPU 비용 승인과 최종 입력 사전 점검은 남았다. 새 모델 전체나 실행 가능 상태로 표시하지 않는다.

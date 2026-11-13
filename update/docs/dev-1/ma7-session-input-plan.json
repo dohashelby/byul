@@ -44,6 +44,17 @@
       "engine_start_verified": false,
       "environment_target_files_ready": false,
       "input_preflight_passed": false
+    },
+    "REQ16_model_revision_candidate": {
+      "model_id": "Qwen/Qwen2-VL-2B-Instruct",
+      "revision": "895c3a49bc3fa70a340399125c650a463535e71c",
+      "metadata_file": "docs/dev-1/ma7-req16-model-candidate.json",
+      "metadata_sha256": "8820a5b4330c0bbd7740356bcd946316a59310edad38838bb9acff0d1777f10e",
+      "weights_metadata_only": true,
+      "weights_downloaded": false,
+      "full_model_snapshot_present": false,
+      "baseline_load_verified": false,
+      "candidate_load_verified": false
     }
   },
   "checks": [
@@ -3614,7 +3625,7 @@
       "work_group": "M-A",
       "session": "J01",
       "question": "캐시 식별값이 재사용에 필요한 모델·설정·자료의 차이를 구분하는가?",
-      "input_state": "미입력",
+      "input_state": "revision 후보 고정·실제 입력 미입력",
       "sides": {
         "baseline": {
           "role": "기준 판본",
@@ -3625,7 +3636,15 @@
           "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
           "explicit_launch_args": [
             "--enable-prefix-caching"
-          ]
+          ],
+          "planned_model": {
+            "repository": "Qwen/Qwen2-VL-2B-Instruct",
+            "revision_candidate": "895c3a49bc3fa70a340399125c650a463535e71c",
+            "metadata_file": "docs/dev-1/ma7-req16-model-candidate.json",
+            "metadata_sha256": "8820a5b4330c0bbd7740356bcd946316a59310edad38838bb9acff0d1777f10e",
+            "weights_downloaded": false,
+            "load_verified": false
+          }
         },
         "candidate": {
           "role": "후보 판본",
@@ -3636,7 +3655,15 @@
           "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
           "explicit_launch_args": [
             "--enable-prefix-caching"
-          ]
+          ],
+          "planned_model": {
+            "repository": "Qwen/Qwen2-VL-2B-Instruct",
+            "revision_candidate": "895c3a49bc3fa70a340399125c650a463535e71c",
+            "metadata_file": "docs/dev-1/ma7-req16-model-candidate.json",
+            "metadata_sha256": "8820a5b4330c0bbd7740356bcd946316a59310edad38838bb9acff0d1777f10e",
+            "weights_downloaded": false,
+            "load_verified": false
+          }
         }
       },
       "confirmed_policy_values": null,

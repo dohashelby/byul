@@ -14,7 +14,7 @@ from urllib.request import Request, urlopen
 from serving_runtime.gateway.app import GatewayApp
 from serving_runtime.gateway.auth import token_digest
 from serving_runtime.gateway.backend import load_backend_config
-from serving_runtime.policy.cache_isolation import CACHE_SALT_KEY_ENV, CacheSaltKey
+from serving_runtime.gateway.cache_isolation import CACHE_SALT_KEY_ENV, CacheSaltKey
 from serving_runtime.config.config import MVPConfig
 from serving_runtime.devtools.fake_backend import FakeBackend
 from serving_runtime.devtools.mock_engine import MockEngine

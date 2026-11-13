@@ -25,7 +25,7 @@ from typing import BinaryIO, Callable, Sequence
 from uuid import uuid4
 
 from serving_runtime.config.config import DEFAULT_COLLECTOR_INTERVAL_S, DEFAULT_COLLECTOR_STALE_AFTER_S
-from serving_runtime.target.kube_context import DEFAULT_KUBE_CONTEXT, validate_kube_context
+from serving_runtime.common.kube_context import DEFAULT_KUBE_CONTEXT, validate_kube_context
 from serving_runtime.observation.observation_feed import HEARTBEAT_SCHEMA
 from serving_runtime.target.target import (
     POD_SNAPSHOT_SCHEMA,

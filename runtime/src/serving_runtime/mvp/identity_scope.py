@@ -3,4 +3,4 @@
 import sys
 from importlib import import_module
 
-sys.modules[__name__] = import_module("serving_runtime.gateway.identity_scope")
+sys.modules[__name__] = import_module("serving_runtime.observation.identity_scope")

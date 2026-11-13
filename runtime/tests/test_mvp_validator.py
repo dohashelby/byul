@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 from serving_runtime.policy.policy import PolicyState, load_policy
-from serving_runtime.config.selected_profile import UNSUPPORTED_ENTRY_GROUPS
+from serving_runtime.policy.selected_profile import UNSUPPORTED_ENTRY_GROUPS
 from serving_runtime.gateway.validator import validate_request
 
 

@@ -12,7 +12,7 @@ from serving_runtime.policy.policy import (
     _object_without_duplicates,
     _reject_json_constant,
 )
-from serving_runtime.config.selected_profile import UNSUPPORTED_ENTRY_GROUPS
+from serving_runtime.policy.selected_profile import UNSUPPORTED_ENTRY_GROUPS
 
 
 _CODE_SELECTION_GROUPS = {

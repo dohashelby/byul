@@ -24,7 +24,7 @@ import threading
 from typing import Any, Callable
 
 from serving_runtime.policy.policy import DuplicateKeyError, _object_without_duplicates, _reject_json_constant
-from serving_runtime.target.kube_context import validate_kube_context
+from serving_runtime.common.kube_context import validate_kube_context
 from serving_runtime.observation.store import JsonlStore
 from serving_runtime.target.launch_settings import observe as observe_launch_settings, validate_settings
 

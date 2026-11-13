@@ -19,7 +19,7 @@ from serving_runtime.enforcement.tetragon import comparable_spec, render_monitor
 
 from serving_runtime.target.assets import check as check_assets, load_manifest as load_asset_manifest
 from serving_runtime.gateway.backend import BackendConfig, load_backend_config
-from serving_runtime.policy.cache_isolation import CacheSaltKey, isolation_status
+from serving_runtime.gateway.cache_isolation import CacheSaltKey, isolation_status
 from serving_runtime.observation.collectors import (
     Collector,
     CollectorManager,
@@ -28,7 +28,7 @@ from serving_runtime.observation.collectors import (
     load_declaration,
 )
 from serving_runtime.observation.cilium_status import CiliumPolicyCollector
-from serving_runtime.target.kube_context import DEFAULT_KUBE_CONTEXT
+from serving_runtime.common.kube_context import DEFAULT_KUBE_CONTEXT
 from serving_runtime.config.config import MVPConfig
 from serving_runtime.gateway.engine_client import EngineClient
 from serving_runtime.gateway.http_handler import HandlerDependencies, LimitedThreadingHTTPServer, create_handler

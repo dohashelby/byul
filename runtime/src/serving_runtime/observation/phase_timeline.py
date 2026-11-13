@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from serving_runtime.enforcement.execpolicy import parse_timeline
-from serving_runtime.gateway.identity_scope import identity_scope_ref
+from serving_runtime.observation.identity_scope import identity_scope_ref
 
 
 def read_phase_timeline(path: str | None, *, demo: bool = False, observed_times: Iterable[str] = ()) -> dict[str, Any]:

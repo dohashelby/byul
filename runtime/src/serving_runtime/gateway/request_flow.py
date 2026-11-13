@@ -9,7 +9,7 @@ from typing import Callable, Protocol
 
 from serving_runtime.policy.approval import ApprovalResult
 from serving_runtime.gateway.auth import CHAT_ROUTE, COMPLETIONS_ROUTE, AuthState, not_configured
-from serving_runtime.policy.cache_isolation import CacheSaltKey, isolation_status, unavailable_message
+from serving_runtime.gateway.cache_isolation import CacheSaltKey, isolation_status, unavailable_message
 from serving_runtime.gateway.backend import BackendConfig
 from serving_runtime.gateway.engine_client import EngineClient
 from serving_runtime.gateway.engine_client import RequestDeadlineExceeded, TokenizeHTTPError

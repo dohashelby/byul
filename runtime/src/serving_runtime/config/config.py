@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from serving_runtime.target.kube_context import validate_kube_context
+from serving_runtime.common.kube_context import validate_kube_context
 
 
 DEFAULT_COLLECTOR_INTERVAL_S = 5.0

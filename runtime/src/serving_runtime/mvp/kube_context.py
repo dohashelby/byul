@@ -3,4 +3,4 @@
 import sys
 from importlib import import_module
 
-sys.modules[__name__] = import_module("serving_runtime.target.kube_context")
+sys.modules[__name__] = import_module("serving_runtime.common.kube_context")

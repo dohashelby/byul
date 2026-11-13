@@ -3,4 +3,4 @@
 import sys
 from importlib import import_module
 
-sys.modules[__name__] = import_module("serving_runtime.config.selected_profile")
+sys.modules[__name__] = import_module("serving_runtime.policy.selected_profile")

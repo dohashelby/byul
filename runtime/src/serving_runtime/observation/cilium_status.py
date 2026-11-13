@@ -6,7 +6,7 @@ import json
 import subprocess
 from typing import Any, Callable
 
-from serving_runtime.target.kube_context import DEFAULT_KUBE_CONTEXT, validate_kube_context
+from serving_runtime.common.kube_context import DEFAULT_KUBE_CONTEXT, validate_kube_context
 
 NAMESPACE = "serving-lab"
 

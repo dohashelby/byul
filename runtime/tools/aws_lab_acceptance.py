@@ -33,7 +33,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from serving_runtime.devtools.lab_report import LabReportSource, AWS_REPORT_SCHEMA
 from serving_runtime.gateway.backend import is_valid_credential_value
-from serving_runtime.target.kube_context import validate_kube_context
+from serving_runtime.common.kube_context import validate_kube_context
 from serving_runtime.observation.observation_feed import HEARTBEAT_SCHEMA
 from serving_runtime.enforcement.execpolicy import ExecPolicy
 

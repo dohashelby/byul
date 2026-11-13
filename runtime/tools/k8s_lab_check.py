@@ -26,7 +26,7 @@ from serving_runtime.enforcement.intent import load_intent, parse_intent
 from serving_runtime.enforcement.tetragon import (
     render_manifests as render_tetragon_manifests,
 )
-from serving_runtime.target.kube_context import DEFAULT_KUBE_CONTEXT, validate_kube_context
+from serving_runtime.common.kube_context import DEFAULT_KUBE_CONTEXT, validate_kube_context
 from serving_runtime.devtools.lab_report import LabReportSource
 
 try:

@@ -1,4 +1,4 @@
-version: 3
+version: 4
 basis: docs/UPDATE_SELECTION.md §3.1; tests/fixtures/u1_path_rule_basis.json (agent review; human review pending)
 exclude:
   prefixes: [tests/, docs/, .buildkite/, benchmarks/, examples/, .github/, tools/, vllm/benchmarks/, rust/src/bench/]
@@ -188,3 +188,22 @@ rules:
   - {path: vllm/v1/engine/detokenizer.py, categories: [OUTPUT, SAMPLING], basis: review69-exact-files}
   - {path: vllm/v1/engine/input_processor.py, categories: [INPUT_PROCESSING, SAMPLING], basis: review69-exact-files}
   - {path: vllm/v1/engine/utils.py, categories: [DISTRIBUTED_IPC, FAILURE, STARTUP_HEALTH], basis: review69-exact-files}
+
+  # 기준 V0에서 후보 구조로 옮겨진 계열의 검토한 정확 경로만 연결한다.
+  - {path: vllm/worker/model_runner.py, categories: [MODEL_LOADING, RUNNER_KERNEL], basis: mvp-reviewed-exact-files}
+  - {path: vllm/worker/worker.py, categories: [DISTRIBUTED_IPC, RUNNER_KERNEL], basis: mvp-reviewed-exact-files}
+  - {path: vllm/worker/cache_engine.py, categories: [CACHE, RUNNER_KERNEL], basis: mvp-reviewed-exact-files}
+  - {path: vllm/core/block_manager.py, categories: [CACHE], basis: mvp-reviewed-exact-files}
+  - {path: vllm/core/block/block_table.py, categories: [CACHE], basis: mvp-reviewed-exact-files}
+  - {path: vllm/core/block/cpu_gpu_block_allocator.py, categories: [CACHE], basis: mvp-reviewed-exact-files}
+  - {path: vllm/core/block/prefix_caching_block.py, categories: [CACHE], basis: mvp-reviewed-exact-files}
+  - {path: vllm/core/evictor.py, categories: [CACHE], basis: mvp-reviewed-exact-files}
+  - {path: vllm/executor/mp_distributed_executor.py, categories: [DISTRIBUTED_IPC], basis: mvp-reviewed-exact-files}
+  - {path: vllm/executor/multiproc_worker_utils.py, categories: [DISTRIBUTED_IPC], basis: mvp-reviewed-exact-files}
+  - {path: vllm/executor/executor_base.py, categories: [DISTRIBUTED_IPC], basis: mvp-reviewed-exact-files}
+  - {path: vllm/attention/backends/flash_attn.py, categories: [CACHE, RUNNER_KERNEL], basis: mvp-reviewed-exact-files}
+  - {path: vllm/attention/layer.py, categories: [CACHE, RUNNER_KERNEL], basis: mvp-reviewed-exact-files}
+  - {path: vllm/model_executor/guided_decoding/xgrammar_decoding.py, categories: [OUTPUT_PARSING, SAMPLING], basis: mvp-reviewed-exact-files}
+  - {path: Dockerfile, categories: [IMAGE], basis: mvp-reviewed-exact-files}
+  - {path: requirements-common.txt, categories: [DEPENDENCY], basis: mvp-reviewed-exact-files}
+  - {path: requirements-cuda.txt, categories: [DEPENDENCY], basis: mvp-reviewed-exact-files}

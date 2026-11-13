@@ -117,6 +117,10 @@ class VllmProvider(EngineProvider):
     def __init__(self):
         super().__init__('vllm', VllmAdapter)
 
+    def release_profile(self, version):
+        from .vllm_release_profiles import release_profile
+        return release_profile(version)
+
     def sandbox_arguments(self, options):
         # Published callers/fixtures retain their legacy keyword contract.
         return {'vllm': options}

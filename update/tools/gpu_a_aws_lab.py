@@ -132,11 +132,11 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
     pod['metadata']['labels'].update(labels)
     pod['spec']['enableServiceLinks'] = False  # Service 링크 환경 변수가 MP worker 초기화를 깨뜨렸다(첫 실증).
     engine, = (c for c in pod['spec']['containers'] if c['name'] == 'engine')
-    # 0.7.0 이미지에는 인계 템플릿의 nonroot wrapper가 없고 API 서버가 --model을 받는다.
-    # 0.30.0과 0.31.0 이미지는 wrapper가 vllm serve의 위치 인자를 받는다.
-    if code_selection and engine_version == '0.7.0':
-        engine['command'] = ['python3', '-m', 'vllm.entrypoints.openai.api_server']
-        engine['args'] = ['--model', *engine['args']]
+    from guard.adapters.engine_provider import VllmProvider
+    release = VllmProvider().release_profile(engine_version)
+    if release and release['launch']['model_argument'] == '--model':
+        engine['command'] = list(release['launch']['command'])
+        engine['args'] = [release['launch']['model_argument'], *engine['args']]
     engine['args'][engine['args'].index('--max-model-len') + 1] = str(max_model_len)
     engine['args'] = [*engine['args'], *spec['args'], *(['--enforce-eager'] if enforce_eager else [])]
     engine['args'] += [*(['--code-revision', code_revision] if code_revision else []), *extra_engine_args]

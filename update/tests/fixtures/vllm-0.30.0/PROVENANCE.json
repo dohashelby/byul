@@ -58,6 +58,30 @@
     "vllm/v1/worker/gpu_model_runner.py.txt": {
       "source": "vllm/v1/worker/gpu_model_runner.py",
       "sha256": "87c29d08c0bbf66993d8b984811e7325e35e6436242a773feb55ec88f16b2c51"
+    },
+    "vllm/entrypoints/serve/elastic_ep/api_router.py.txt": {
+      "source": "vllm/entrypoints/serve/elastic_ep/api_router.py",
+      "sha256": "2d6805874a868eb63747903f5e10331855b7c277d46a4cef3dca7f20a2e631db"
+    },
+    "vllm/entrypoints/serve/exception_handling/error_response.py.txt": {
+      "source": "vllm/entrypoints/serve/exception_handling/error_response.py",
+      "sha256": "354a0581fbc29e2c3acbebe5e84ff3dbb132ba0af14ceba5363b6cf2fec6d54e"
+    },
+    "vllm/entrypoints/serve/exception_handling/handlers/http.py.txt": {
+      "source": "vllm/entrypoints/serve/exception_handling/handlers/http.py",
+      "sha256": "ae710c07f319f56e105a8d143300b0d1042ab4cdedc437da2c7dd88df21e5a18"
+    },
+    "vllm/exceptions.py.txt": {
+      "source": "vllm/exceptions.py",
+      "sha256": "06c77c8129ac024455ace7c89168cd8e2284d70e5d96b326782b5f110ff73e7a"
+    },
+    "vllm/renderers/params.py.txt": {
+      "source": "vllm/renderers/params.py",
+      "sha256": "6837717e82e4c322920de34bd6f3e26c9f7739dc49edf13e8c6a5c5050f87fc5"
+    },
+    "vllm/renderers/online_renderer.py.txt": {
+      "source": "vllm/renderers/online_renderer.py",
+      "sha256": "147ac64103d7ffa842cc6b91e916c5de8aaab35f79762451e2c0ee8cb5513c0e"
     }
   },
   "pin_status": "candidate: tag source bytes, not yet compared with the image install file"

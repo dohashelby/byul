@@ -1,0 +1,108 @@
+{
+  "schema": "guard-release-profiles/1",
+  "profiles": [
+    {
+      "role": "기준 판본",
+      "version": "0.7.0",
+      "images": [
+        "docker.io/vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8",
+        "vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8"
+      ],
+      "pin_status": "candidate_pin",
+      "launch": {
+        "command": [
+          "python3",
+          "-m",
+          "vllm.entrypoints.openai.api_server"
+        ],
+        "model_argument": "--model",
+        "default_engine": "V0",
+        "prefix_cache_default": false,
+        "request_logging_enable_args": [],
+        "profiler_option": null,
+        "profiler_directory_env": "VLLM_TORCH_PROFILER_DIR"
+      },
+      "qualification": "기동 명령은 레지스트리 config·태그 소스 근거다. 설치 파일 고정값·GPU 실측·생산자 등록을 대신하지 않는다.",
+      "http": {
+        "error_envelope": "flat-error-object",
+        "length_error_format": "messages-completion-total",
+        "length_source": {
+          "side": "base",
+          "path": "vllm/entrypoints/openai/serving_engine.py",
+          "size": 20568,
+          "sha256": "ac5e16bc8bc63b6f16a6f78509f0e773056be57dcfdc5f810c91dc3bbbd7282b"
+        },
+        "token_id_rejection_review": "V0 검증 경로 추가 검토 필요",
+        "safe_probe_candidates": [],
+        "safe_probe_review": "해당 elastic EP 경로 없음. 안전 프로브를 만들어내지 않는다."
+      }
+    },
+    {
+      "role": "후보 판본",
+      "version": "0.30.0",
+      "images": [
+        "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+        "vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40"
+      ],
+      "pin_status": "candidate_pin",
+      "launch": {
+        "command": [
+          "vllm",
+          "serve"
+        ],
+        "model_argument": "positional",
+        "default_engine": "V1",
+        "prefix_cache_default": true,
+        "request_logging_enable_args": [
+          "--enable-log-requests"
+        ],
+        "profiler_option": "--profiler-config",
+        "profiler_directory_env": null
+      },
+      "qualification": "기동 명령은 레지스트리 config·태그 소스 근거다. 설치 파일 고정값·GPU 실측·생산자 등록을 대신하지 않는다.",
+      "http": {
+        "error_envelope": "nested-error",
+        "length_error_format": "input-output-with-parameter",
+        "length_source": {
+          "side": "candidate",
+          "path": "vllm/renderers/params.py",
+          "size": 21340,
+          "sha256": "6837717e82e4c322920de34bd6f3e26c9f7739dc49edf13e8c6a5c5050f87fc5"
+        },
+        "token_id_rejection_review": "input_processor 고정값 후보, 이미지 설치 bytes 대조 전",
+        "safe_probe_candidates": [
+          {
+            "method": "POST",
+            "path": "/scale_elastic_ep",
+            "body": {},
+            "expected_status": 400,
+            "expected_message": "new_data_parallel_size is required",
+            "source": {
+              "side": "candidate",
+              "path": "vllm/entrypoints/serve/elastic_ep/api_router.py",
+              "size": 2981,
+              "sha256": "2d6805874a868eb63747903f5e10331855b7c277d46a4cef3dca7f20a2e631db"
+            },
+            "lines": "37-49",
+            "pin_status": "candidate_pin"
+          },
+          {
+            "method": "POST",
+            "path": "/is_scaling_elastic_ep",
+            "body": {},
+            "expected_status": 200,
+            "expected_field": "is_scaling_elastic_ep",
+            "source": {
+              "side": "candidate",
+              "path": "vllm/entrypoints/serve/elastic_ep/api_router.py",
+              "size": 2981,
+              "sha256": "2d6805874a868eb63747903f5e10331855b7c277d46a4cef3dca7f20a2e631db"
+            },
+            "lines": "83-85",
+            "pin_status": "candidate_pin"
+          }
+        ]
+      }
+    }
+  ]
+}

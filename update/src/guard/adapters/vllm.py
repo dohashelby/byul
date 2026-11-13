@@ -147,7 +147,7 @@ PINNED_SAFE_PROBES: dict[tuple[str, str, str, str], ProbeRequest] = {
 # establishes that the submitted invalid input was consumed or caused damage.
 _INPUT_REJECTION_REVIEWS = {
     "0.31.0": {
-        "image": SAFE_PROBE_REVIEWED_IMAGES["0.31.0"],
+        "image": SAFE_PROBE_REVIEWED_IMAGES["0.31.0"], "length_format": "input-output",
         "token": [("vllm/v1/engine/input_processor.py", "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b", "397-400,598-626")],
         "length": [("vllm/renderers/params.py", "ad38852674ebc5bbe69aa9df91602847d518382cc2ceb0a25aac1d07be66b504", "485-512,527-544"),
                    ("vllm/renderers/online_renderer.py", "1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e", "546-631,674-750")],
@@ -155,7 +155,7 @@ _INPUT_REJECTION_REVIEWS = {
         "exception": ("vllm/exceptions.py", "22fe819c7ef10438f740c251d81af204871a04c3aa3eb1fd0e68604dc4c2146f", "28-58"),
     },
     "0.32.0": {
-        "image": SAFE_PROBE_REVIEWED_IMAGES["0.32.0"],
+        "image": SAFE_PROBE_REVIEWED_IMAGES["0.32.0"], "length_format": "input-only",
         "token": [("vllm/v1/engine/input_processor.py", "97f66659814177d3f7b72b959f09201cbdd1794de21ec1542fe8970f18a1a2b6", "430-433,646-647"),
                   ("vllm/renderers/base.py", "ec2fe84538bb30ad7ed1e10833081c8c389e6a2f8fda1dcef50005b9db75a1a7", "420-455")],
         "length": [("vllm/renderers/params.py", "5113461cd308266727d9ced82900cbe65ae50245a2f3cb16224f6689574570a9", "515-540,555-572")],
@@ -178,11 +178,21 @@ _LENGTH_ERROR_032 = re.compile(
 )
 
 
+_LENGTH_ERROR_FORMATS = {
+    'input-output': {'pattern': _LENGTH_ERROR_031, 'includes_output': True},
+    'input-only': {'pattern': _LENGTH_ERROR_032, 'includes_output': False},
+}
+
+
 def _input_rejection_proof(*, engine_version, engine_image_digest, case, method, path,
                            request_body, response_status, response_body, context=None) -> dict:
     proof = {"state": "unverified", "reason": "REJECTION_CAUSE_UNVERIFIED", "sources": []}
     review = _INPUT_REJECTION_REVIEWS.get(engine_version)
     if review is None or engine_image_digest != review["image"]:
+        from .vllm_release_profiles import http_profile
+        candidate = http_profile(engine_version, engine_image_digest)
+        if candidate is not None and candidate['pin_status'] == 'candidate_pin':
+            return {**proof, 'reason': 'INPUT_REJECTION_CANDIDATE_PIN_NOT_IMAGE_VERIFIED'}
         return {**proof, "reason": "INPUT_REJECTION_IMAGE_UNREVIEWED"}
     if (method != "POST" or path != "/v1/completions" or type(request_body) is not dict
             or set(request_body) != {"model", "prompt", "max_tokens"}
@@ -204,16 +214,17 @@ def _input_rejection_proof(*, engine_version, engine_image_digest, case, method,
         matched = (len(prompt) == 1 and error["param"] is None
                    and error["message"] == f"Token id {prompt[0]} is out of vocabulary")
     elif case == "length" and all(token == 0 for token in prompt) and error["param"] == "input_tokens":
-        pattern = _LENGTH_ERROR_031 if engine_version == "0.31.0" else _LENGTH_ERROR_032
+        format_profile = _LENGTH_ERROR_FORMATS[review["length_format"]]
+        pattern = format_profile["pattern"]
         match = pattern.fullmatch(error["message"])
         if match:
             values = match.groupdict()
             limit, count, rejected = (int(values[key]) for key in ("limit", "count", "value"))
-            output = int(values["output"]) if engine_version == "0.31.0" else 0
+            output = int(values["output"]) if format_profile["includes_output"] else 0
             expected_qualifier = "at least " if count == limit - output + 1 else None
             matched = (count == rejected == len(prompt) and count > limit - output
                        and values["qualifier"] == expected_qualifier)
-            if engine_version == "0.31.0":
+            if format_profile["includes_output"]:
                 matched = (matched and output == request_body["max_tokens"]
                            and int(values["total"]) == count + output
                            and values["total_qualifier"] == expected_qualifier)
@@ -354,6 +365,10 @@ class VllmAdapter:
 
     def input_rejection_proof(self, **kwargs) -> dict:
         return _input_rejection_proof(**kwargs)
+
+    def http_profile(self, version, image):
+        from .vllm_release_profiles import http_profile
+        return http_profile(version, image)
 
     # --- 기동 ------------------------------------------------------------------
 

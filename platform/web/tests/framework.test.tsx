@@ -5,7 +5,7 @@ import type { EnvironmentDoc, PolicyDoc } from "../src/api/types";
 import { InputFieldView } from "../src/components/Choice";
 import { canonicalJson, environmentSnapshotSha256 } from "../src/lib/canonical";
 import { ALL_REQUIREMENTS, ENV_CONDITIONS, SECURITY_FUNCTIONS, isRequired, visible, type InputField } from "../src/lib/frameworkCatalog";
-import { CONDITION_FACTS, DERIVED_FACTS, EnvironmentForm, PolicyForm, REGISTERED_FACTS, claimSummary, deriveFact, newEnvironment, newPolicy, nextPolicyVersion } from "../src/pages/forms";
+import { CONDITION_FACTS, DERIVED_FACTS, EnvironmentForm, PolicyForm, REGISTERED_FACTS, claimSummary, newEnvironment, newPolicy, nextPolicyVersion } from "../src/pages/forms";
 import { mockApi, renderAt } from "./helpers";
 
 describe("environment snapshot", () => {
@@ -111,23 +111,8 @@ describe("environment form: one question per value", () => {
     for (const cond of Object.keys(CONDITION_FACTS)) expect(ENV_CONDITIONS.some((c) => c.key === cond)).toBe(true);
   });
 
-  it("derives facts from the matching condition answer", () => {
-    for (const [name, rule] of Object.entries(DERIVED_FACTS)) {
-      expect(CONDITION_FACTS[rule.cond]).toContain(name);
-      const field = ENV_CONDITIONS.find((c) => c.key === rule.cond)!.fields.find((f) => f.key === rule.key)!;
-      const options = field.kind === "choice" ? field.options.map((o) => o.value) : [];
-      // 선택지 하나하나가 사용·사용 안 함 중 하나로 정해져야 한다.
-      expect([...rule.yes, ...rule.no].sort()).toEqual([...options].sort());
-    }
-    const weights = DERIVED_FACTS.shared_or_remote_weights;
-    expect(deriveFact(weights, "remote_streaming")).toBe(true);
-    expect(deriveFact(weights, "local_file")).toBe(false);
-    expect(deriveFact(weights, null)).toBe(null);
-    expect(deriveFact(weights, "legacy_value")).toBe(null);
-    expect(deriveFact(weights, undefined)).toBe(undefined);
-  });
-
-  it("sets the weights fact from the delivery answer and drops it with the answer", () => {
+  it("does not infer absence of shared weights from a local model path", () => {
+    expect(DERIVED_FACTS.shared_or_remote_weights).toBeUndefined();
     let doc: EnvironmentDoc = newEnvironment();
     const Harness = () => {
       const [d, setD] = useState(doc);
@@ -137,14 +122,10 @@ describe("environment form: one question per value", () => {
     renderAt("/", "/", <Harness />);
     const pick = (label: string) => fireEvent.click(within(screen.getByRole("radiogroup", { name: "가중치 공급 방식" })).getByRole("radio", { name: label }));
     pick("로컬 파일");
-    // update는 source가 없는 사실을 모름으로 보므로 화면 입력에도 source를 남긴다.
-    expect(doc.facts?.shared_or_remote_weights).toMatchObject({ value: false, origin: "DECLARED", source: "byul platform 환경 입력 (가중치 공급 방식 답)" });
-    pick("공유 데몬(daemon)");
-    expect(doc.facts?.shared_or_remote_weights).toMatchObject({ value: true });
+    expect(doc.facts?.shared_or_remote_weights).toBeUndefined();
+    expect(screen.getByRole("radiogroup", { name: "공유·원격 가중치" })).toBeTruthy();
     pick("공유 데몬(daemon)");
     expect(doc.facts?.shared_or_remote_weights).toBeUndefined();
-    // 조건 답으로 정해지는 사실과 전제로 정해진 사실은 따로 묻지 않는다.
-    expect(screen.queryByRole("radiogroup", { name: "공유·원격 가중치" })).toBeNull();
     expect(screen.queryByRole("radiogroup", { name: "Gateway 사용" })).toBeNull();
   });
 
@@ -260,7 +241,8 @@ describe("프레임워크·솔루션 기준 입력 항목", () => {
   it("프레임워크가 지정한 질문만 필수로 표시한다", () => {
     const env = ENV_CONDITIONS.flatMap((c) => c.fields).filter((f) => f.required);
     const policy = ALL_REQUIREMENTS.flatMap((r) => r.fields).filter((f) => f.required);
-    expect(env).toHaveLength(33);
+    expect(env).toHaveLength(32);
+    expect(env.map((f) => f.key)).not.toContain("echo_logprobs");
     expect(policy.filter((f) => f.required === true)).toHaveLength(86);
     expect(policy.filter((f) => typeof f.required === "object")).toHaveLength(12);
     // 선정 구현 CHK에서만 쓰는 값은 필수가 아니다. 강제 종료는 기본 확인 LIF-010의 결정값이라 필수다.

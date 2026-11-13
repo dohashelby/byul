@@ -296,6 +296,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inputs/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Input Catalog */
+        get: operations["get_input_catalog_api_inputs_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inputs/policy-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Policy Inputs */
+        post: operations["preview_policy_inputs_api_inputs_policy_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/environments": {
         parameters: {
             query?: never;
@@ -908,6 +942,73 @@ export interface components {
             /** Bundles */
             bundles?: components["schemas"]["AvailableBundle"][];
         };
+        /** InputBinding */
+        InputBinding: {
+            /** Requirement */
+            requirement: string;
+            /** Field */
+            field: string;
+            /** Check Id */
+            check_id: string;
+            /** Key */
+            key: string;
+            /**
+             * Type
+             * @default
+             */
+            type: string;
+            /**
+             * Source
+             * @default values
+             */
+            source: string;
+        };
+        /** InputCatalog */
+        InputCatalog: {
+            pack: components["schemas"]["InputPack"];
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Versions */
+            versions: components["schemas"]["InputVersion"][];
+            /** Bindings */
+            bindings: components["schemas"]["InputBinding"][];
+            /** Parameters */
+            parameters: {
+                [key: string]: {
+                    [key: string]: unknown;
+                }[];
+            };
+            /** Fixed Values */
+            fixed_values: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+            /** Limitations */
+            limitations: string[];
+        };
+        /** InputPack */
+        InputPack: {
+            /** Id */
+            id: string;
+            /** Revision */
+            revision: number;
+        };
+        /** InputVersion */
+        InputVersion: {
+            /** Engine */
+            engine: string;
+            /** Version */
+            version: string;
+            /** Profiles */
+            profiles: string[];
+            /** Features */
+            features: string[];
+            /** Hidden Fields */
+            hidden_fields?: string[];
+        };
         /**
          * InvalidItem
          * @description 계약 검증에 실패한 항목. 버리지 않고 '형식 오류' 행으로 보여준다.
@@ -1100,6 +1201,33 @@ export interface components {
             revision: number;
             /** Approved By */
             approved_by: string;
+        };
+        /** PolicyInputPreview */
+        PolicyInputPreview: {
+            document: components["schemas"]["Policy"];
+            /** Errors */
+            errors: components["schemas"]["FieldIssue"][];
+            /** Warnings */
+            warnings: components["schemas"]["FieldIssue"][];
+            /** Gaps */
+            gaps: components["schemas"]["FieldIssue"][];
+            /** Connected */
+            connected: string[];
+            /** Pack Available */
+            pack_available: boolean;
+            /** Previous Policy */
+            previous_policy?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Engine Executed
+             * @default false
+             */
+            engine_executed: boolean;
+        };
+        /** PolicyInputRequest */
+        PolicyInputRequest: {
+            document: components["schemas"]["Policy"];
         };
         /** PolicyReadiness */
         PolicyReadiness: {
@@ -3841,6 +3969,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RevalidationList"];
+                };
+            };
+        };
+    };
+    get_input_catalog_api_inputs_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InputCatalog"];
+                };
+            };
+        };
+    };
+    preview_policy_inputs_api_inputs_policy_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyInputRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyInputPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -101,6 +101,7 @@ def _env() -> dict:
 def _policy() -> dict:
     pol = load_json(EXAMPLES / "policy.json")
     pol["policy_id"] = "corp-policy"
+    pol["verification"]["pack"] = {"id": "PACK-BASELINE", "revision": 34}
     pol["status"] = "DRAFT"
     pol["approval"] = None
     return pol

@@ -103,7 +103,7 @@ def materialize(output, *, plan_file=PLAN, audit_file=SUP08_AUDIT):
             if check in NATIVE_CHECKS:
                 prepared = folder / 'prepared'
                 manifest = engine_callbacks.prepare_assets(prepared,
-                    lab_faults=check == 'REQ-18', lab_kernel_checks=check == 'REQ-19')
+                    lab_faults=check == 'REQ-18', lab_kernel_checks=check in ('REQ-19', 'REQ-20'))
                 if engine_callbacks.load_prepared(prepared) != manifest:
                     raise ValueError('PREPARED_BYTES_MISMATCH')
                 item.update(prepared=str(prepared / 'manifest.json'),

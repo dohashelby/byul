@@ -39,7 +39,13 @@ def test_materialized_files_are_valid_without_invented_binding_or_results(tmp_pa
         for row in plan['checks'] for side in row['sides'].values())
     for row in manifest['prepared']:
         assert sha256_hex(Path(row['path']).read_bytes()) == row['sha256']
-        assert engine_callbacks.load_prepared(row['path'])['session'] == row['session']
+        prepared = engine_callbacks.load_prepared(row['path'])
+        assert prepared['session'] == row['session']
+        assert prepared['lab_kernel_checks'] is (row['check_id'] in ('REQ-19', 'REQ-20'))
+        assert prepared['lab_faults'] is (row['check_id'] == 'REQ-18')
+        settings = json.loads((Path(row['path']).parent / 'settings.json').read_bytes())
+        assert settings['lab_kernel_checks'] is prepared['lab_kernel_checks']
+        assert settings['lab_faults'] is prepared['lab_faults']
         assert sha256_hex((Path(row['path']).parent / 'settings.json').read_bytes()) == row['settings_file_sha256']
     for row in manifest['cases']:
         assert sha256_hex(Path(row['path']).read_bytes()) == row['sha256']

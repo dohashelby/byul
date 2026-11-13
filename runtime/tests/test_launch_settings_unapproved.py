@@ -1,6 +1,5 @@
 """D8: unapproved non-default boolean declarations request revalidation only."""
 
-import inspect
 import json
 from unittest.mock import Mock
 
@@ -17,12 +16,7 @@ from serving_runtime.target.target import TargetRegistry, load_target
 def comparison(approved=None, args=None, engine="vllm", state="ok"):
     pods = collected(args, engine=engine or "vllm")
     pods["state"] = state
-    # Reproduce the missing condition before the new optional engine argument exists.
-    rows = (
-        comparison_rows(approved, pods, engine=engine)
-        if "engine" in inspect.signature(comparison_rows).parameters
-        else comparison_rows(approved, pods)
-    )
+    rows = comparison_rows(approved, pods, engine=engine)
     return {"rows": rows}
 
 
@@ -34,7 +28,6 @@ def request_context():
     return dict(observation_session_id="session", target_id="target", policy={})
 
 
-@pytest.mark.xfail(strict=True, reason="D8")
 @pytest.mark.parametrize("engine", ["vllm", "sglang"])
 @pytest.mark.parametrize("approved", [None, {}, {"revision": None}, {"trust_remote_code": None}])
 def test_unapproved_or_null_non_default_bool_requests_revalidation(engine, approved):
@@ -68,7 +61,6 @@ def test_default_boolean_values_do_not_create_conditions(engine, approved):
     assert not evaluate_config_drift(comparison(approved, [], engine)).conditions
 
 
-@pytest.mark.xfail(strict=True, reason="D8")
 @pytest.mark.parametrize("approved", [None, {"trust_remote_code": None}])
 def test_default_observation_records_conclusive_scope(approved):
     evaluation = evaluate_config_drift(comparison(approved))
@@ -77,7 +69,6 @@ def test_default_observation_records_conclusive_scope(approved):
     assert evaluation.observed_origins["kubernetes_spec:launch_settings.revision"] == "kubernetes_api"
 
 
-@pytest.mark.xfail(strict=True, reason="D8")
 @pytest.mark.parametrize(
     "engine,args,keys",
     [
@@ -98,7 +89,6 @@ def test_unapproved_string_revision_does_not_create_conditions(engine):
     assert not evaluate_config_drift(result).conditions
 
 
-@pytest.mark.xfail(strict=True, reason="D8")
 @pytest.mark.parametrize("approved", [None, {"trust_remote_code": None}])
 @pytest.mark.parametrize("repair", ["approval", "default"])
 def test_previous_request_clears_when_approved_or_back_at_default(tmp_path, approved, repair):
@@ -135,7 +125,6 @@ def test_unknown_observation_never_creates_conditions(state, approved):
     assert not evaluation.conditions and not evaluation.observed_origins
 
 
-@pytest.mark.xfail(strict=True, reason="D8")
 @pytest.mark.parametrize("state", ["error", "stale", "disconnected"])
 def test_failed_observation_does_not_clear_previous_condition(tmp_path, state):
     requests = RevalidationRequests(tmp_path)
@@ -146,7 +135,6 @@ def test_failed_observation_does_not_clear_previous_condition(tmp_path, state):
     assert len(requests.store.read_all()[0]) == 1
 
 
-@pytest.mark.xfail(strict=True, reason="D8")
 def test_evidence_shape_and_identity_ignore_time_and_approval_presence():
     missing = comparison(None, ["--trust-remote-code"])
     explicit_null = comparison({"trust_remote_code": None}, ["--trust-remote-code"])
@@ -159,7 +147,6 @@ def test_evidence_shape_and_identity_ignore_time_and_approval_presence():
     assert a.evidence["observed_at"] != b.evidence["observed_at"]
 
 
-@pytest.mark.xfail(strict=True, reason="D8")
 @pytest.mark.parametrize("engine", [None, "vllm", "sglang"])
 def test_each_row_adds_only_default_metadata(engine):
     result = comparison(None, ["--trust-remote-code"], engine)
@@ -187,7 +174,6 @@ def test_each_row_adds_only_default_metadata(engine):
         assert row_named(result, inapplicable)["deviates_from_default"] is None
 
 
-@pytest.mark.xfail(strict=True, reason="D8")
 def test_notes_distinguish_missing_registration_and_missing_key():
     for approved, state, note in [
         (None, "unapproved", "승인값 없음 (launch_settings 미등록)"),
@@ -207,7 +193,6 @@ def test_missing_engine_cannot_classify_default_deviation():
     assert not evaluate_config_drift(result).conditions
 
 
-@pytest.mark.xfail(strict=True, reason="D8")
 @pytest.mark.parametrize("approved", [None, {"trust_remote_code": None}])
 def test_registered_target_snapshot_reaches_gateway_revalidation(tmp_path, approved):
     target = tmp_path / "target.json"

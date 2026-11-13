@@ -162,7 +162,10 @@ def evaluate_config_drift(comparison: dict[str, Any]) -> Evaluation:
         if not isinstance(field, str) or not field:
             raise ValueError("engine_api baseline row must contain field")
         state = row.get("state")
-        if state not in {"match", "drift"}:
+        unapproved_observed = state == "unapproved" or (
+            state == "unknown" and row.get("deviates_from_default") is not None
+        )
+        if state not in {"match", "drift"} and not unapproved_observed:
             # A missing, failed, stale, or never-collected observation does not
             # prove that an earlier drift has cleared.
             continue
@@ -171,7 +174,7 @@ def evaluate_config_drift(comparison: dict[str, Any]) -> Evaluation:
         origin = row.get("data_origin")
         origin = origin if isinstance(origin, str) else None
         observed[scope] = origin
-        if state == "match":
+        if state == "match" or (unapproved_observed and row.get("deviates_from_default") is not True):
             continue
         evidence = {
             "field": field,

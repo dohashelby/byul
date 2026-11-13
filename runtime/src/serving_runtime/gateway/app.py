@@ -644,7 +644,9 @@ class GatewayApp:
         registration = self._target.registration
         if registration.state == "ok" and registration.engine_kind in {"vllm", "sglang"}:
             comparison["rows"].extend(
-                comparison_rows(registration.launch_settings, self._collectors.get("target_pods"))
+                comparison_rows(
+                    registration.launch_settings, self._collectors.get("target_pods"), engine=registration.engine_kind
+                )
             )
         return comparison
 

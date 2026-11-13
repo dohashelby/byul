@@ -166,17 +166,20 @@ def observe(container_spec: Any, engine: str | None) -> dict[str, Any]:
     }
 
 
-def comparison_rows(approved: dict[str, Any] | None, pods: Any) -> list[dict[str, Any]]:
+def comparison_rows(approved: dict[str, Any] | None, pods: Any, engine: str | None = None) -> list[dict[str, Any]]:
     """Use only fresh, unambiguous observations. Null approval is unconfirmed."""
     snapshot = pods.get("last_value") if isinstance(pods, dict) and pods.get("state") == "ok" else None
     observation = snapshot.get("launch_settings") if isinstance(snapshot, dict) else None
     settings = observation.get("settings", {}) if isinstance(observation, dict) else {}
+    defaults = DEFAULTS.get(engine, {})
     rows = []
     for key in KEYS:
         current = settings.get(key, {})
         expected = (approved or {}).get(key)
         state = current.get("state", "unknown")
         observed = current.get("value") if state == "observed" else None
+        default = defaults.get(key)
+        deviates = (observed is True) if key in BOOL_KEYS and default is False and type(observed) is bool else None
         if state == "observed":
             state = (
                 "unapproved"
@@ -190,6 +193,8 @@ def comparison_rows(approved: dict[str, Any] | None, pods: Any) -> list[dict[str
         note = None
         if state == "unknown":
             note = "승인값 확인 안 됨" if current.get("state") == "observed" else "관측 불가 (unknown)"
+        elif state == "unapproved":
+            note = "승인값 없음 (launch_settings 미등록)" if approved is None else "승인값 없음"
         rows.append(
             {
                 "field": f"launch_settings.{key}",
@@ -198,6 +203,8 @@ def comparison_rows(approved: dict[str, Any] | None, pods: Any) -> list[dict[str
                 "source": "kubernetes_spec",
                 "state": state,
                 "note": note,
+                "default": default,
+                "deviates_from_default": deviates,
                 "observed_at": (snapshot.get("collected_at") or pods.get("last_success_at"))
                 if isinstance(snapshot, dict)
                 else None,

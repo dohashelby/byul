@@ -118,7 +118,7 @@ def test_null_and_absent_approvals_are_not_compared():
     rows = comparison_rows({"trust_remote_code": None}, collected(["--trust-remote-code"]))
     assert rows[0]["state"] == "unknown"
     assert rows[1]["state"] == "unapproved"
-    assert not evaluate_config_drift({"rows": rows}).conditions
+    assert [c.evidence["field"] for c in evaluate_config_drift({"rows": comparison_rows({"trust_remote_code": None}, collected(["--trust-remote-code"]), engine="vllm")}).conditions] == ["launch_settings.trust_remote_code"]
 
 
 @pytest.mark.parametrize("state", ["error", "stale", "disconnected"])

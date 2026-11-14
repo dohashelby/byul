@@ -77,6 +77,21 @@ class GatewayApp:
         approval_verifier: ApprovalVerifier | None = None,
         cache_salt_environ: Mapping[str, str] | None = None,
     ) -> None:
+        self._init_backend(config, policy_state, engine_address, backend_config)
+        allowed_binaries = self._init_intent(config, policy_state)
+        self._init_clients(config)
+        self._init_state_files(config, policy_state, approval_verifier, cache_salt_environ)
+        self._init_records(config, policy_state)
+        self._init_queries(config)
+        self._init_request_flow_and_retention(config)
+        collectors = self._init_collectors(config)
+        self._init_observation_feeds(config, allowed_binaries, collectors)
+        self._init_cache_observation(config, collectors)
+        registration, kube_context = self._init_kube_context(config)
+        self._init_target_collectors(config, registration, kube_context, collectors)
+        self._collectors = CollectorManager(collectors, startup_timeout_s=self.status_timeout_s)
+
+    def _init_backend(self, config, policy_state, engine_address, backend_config):
         if config.host != "127.0.0.1":
             raise ValueError("the MVP gateway must bind to 127.0.0.1")
         self.config = config
@@ -92,6 +107,8 @@ class GatewayApp:
             self.backend = backend_config or load_backend_config(str(config.backend_config_path))
             if self.backend.kind != config.backend:
                 raise ValueError(f"{config.backend} mode requires a {config.backend} backend config")
+
+    def _init_intent(self, config, policy_state):
         allowed_binaries: tuple[str, ...] = ()
         self._exec_policy: ExecPolicy | None = None
         self._expected_tetragon_policies = None
@@ -129,7 +146,9 @@ class GatewayApp:
                 )
         elif config.observation_exceptions_path or config.observation_timeline_path:
             raise ValueError("observation exceptions/timeline need an observation intent")
+        return allowed_binaries
 
+    def _init_clients(self, config):
         self.engine_address = (self.backend.target.host, self.backend.target.port)
         self.relay_timeout_s = self.backend.timeouts.get("relay_timeout_s", config.relay_timeout_s)
         self.stream_idle_timeout_s = self.backend.timeouts.get("stream_idle_timeout_s", config.stream_idle_timeout_s)
@@ -144,6 +163,7 @@ class GatewayApp:
             self.request_deadline_s,
         )
 
+    def _init_state_files(self, config, policy_state, approval_verifier, cache_salt_environ):
         # A restart in the same Python process is a distinct observation session.
         self.observation_session_id = uuid4().hex
         self.revocation_state = load_revocations(config.revocations_path)
@@ -167,6 +187,7 @@ class GatewayApp:
         else:
             self._revalidation.observe_policy_history(policy_history_record, **self._revalidation_context())
 
+    def _init_records(self, config, policy_state):
         self._target = TargetRegistry(
             load_target(config.target_path),
             data_dir=config.data_dir,
@@ -197,6 +218,8 @@ class GatewayApp:
         )
         self._engine_store = JsonlStore(Path(config.data_dir) / "engine_receipts.jsonl")
         self._observations = ObservationQuery(Path(config.data_dir) / "observations.jsonl")
+
+    def _init_queries(self, config):
         from serving_runtime.devtools.lab_report import LabReportSource
 
         self._lab_report = LabReportSource(config.lab_report_path)
@@ -223,6 +246,8 @@ class GatewayApp:
             native_receipt_lookup=self._native_receipts.lookup if self._native_receipts else None,
             native_receipt_restore=self._native_receipts.restore_matching if self._native_receipts else None,
         )
+
+    def _init_request_flow_and_retention(self, config):
         self._concurrency = ConcurrencyLimiter(config.max_concurrent_requests)
         self._request_flow = RequestFlow(
             self.backend,
@@ -260,6 +285,8 @@ class GatewayApp:
                 "policy_bundle": copy.deepcopy(self._policy_bundle),
             },
         )
+
+    def _init_collectors(self, config):
         collectors = [
             Collector(
                 "engine_health",
@@ -309,6 +336,9 @@ class GatewayApp:
                     config.collector_stale_after_s,
                 )
             )
+        return collectors
+
+    def _init_observation_feeds(self, config, allowed_binaries, collectors):
         self._observation_feeds: list[ObservationFeed] = []
         observation_heartbeats = dict(config.observation_heartbeats)
         for kind, path in config.observation_feeds:
@@ -335,6 +365,8 @@ class GatewayApp:
                     config.collector_stale_after_s,
                 )
             )
+
+    def _init_cache_observation(self, config, collectors):
         if config.cache_observation_path is not None:
             from serving_runtime.observation.cache_observation import CacheObservationReader
 
@@ -360,6 +392,8 @@ class GatewayApp:
                     on_collected=self._evaluate_cache_revalidation,
                 )
             )
+
+    def _init_kube_context(self, config):
         registration = self._target.registration
         if config.target_pod_snapshot is not None and (registration.state != "ok" or registration.kubernetes is None):
             raise ValueError("--target-pod-snapshot requires an available target registration with a kubernetes block")
@@ -382,6 +416,9 @@ class GatewayApp:
         self._tetragon_context = kube_context
         for feed in self._observation_feeds:
             feed.kube_context = kube_context
+        return registration, kube_context
+
+    def _init_target_collectors(self, config, registration, kube_context, collectors):
         self._cilium_policy_collector: CiliumPolicyCollector | None = None
         if config.cilium_policy_status:
             self._cilium_policy_collector = CiliumPolicyCollector(
@@ -427,7 +464,6 @@ class GatewayApp:
                     on_collected=self._observe_target_pods,
                 )
             )
-        self._collectors = CollectorManager(collectors, startup_timeout_s=self.status_timeout_s)
 
     def _approval_result(self) -> ApprovalResult | None:
         if self._approval_verifier is None:

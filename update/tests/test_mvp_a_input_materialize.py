@@ -28,11 +28,11 @@ def test_materialized_files_are_valid_without_invented_binding_or_results(tmp_pa
     original = json.loads(tool.PLAN.read_bytes())
     out = tmp_path / 'materialized'
     manifest, plan = tool.materialize(out, audit_file=audit)
-    assert len(manifest['prepared']) == 16 and len(manifest['cases']) == 10
+    assert len(manifest['prepared']) == 18 and len(manifest['cases']) == 10
     assert sum(r['count'] for r in manifest['cases']) == 2078
     timing_parts = [r for r in manifest['cases'] if r['check_id'] == 'REQ-17']
     assert len(timing_parts) == 4 and all(r['count'] == 504 for r in timing_parts)
-    assert len({row['session'] for row in manifest['prepared']}) == 16
+    assert len({row['session'] for row in manifest['prepared']}) == 18
     assert not manifest['ready_for_execution'] and not manifest['input_preflight_passed']
     assert not manifest['engine_executed'] and manifest['actual_results'] is None
     assert [row for row in original['checks'] if row['work_group'] == 'M-B'] == [
@@ -83,6 +83,26 @@ def test_req17_conflict_keeps_confirmed_minimum_and_existing_case_bound():
     assert not result['fits_single_manifest'] and not result['collection_or_judgment_changed']
     with pytest.raises(ValueError):
         timing_cohort(20261113, quartets=200)
+
+
+def test_req15_prepared_is_in_each_rebuilt_plan_without_gateway_or_policy_facts(tmp_path, monkeypatch):
+    audit = example_audit(tmp_path, monkeypatch)
+    original = json.loads(tool.PLAN.read_bytes())
+    original_req15 = next(r for r in original['checks'] if r['check_id'] == 'REQ-15')
+    manifest, plan = tool.materialize(tmp_path / 'req15-prepared', audit_file=audit)
+    records = [r for r in manifest['prepared'] if r['check_id'] == 'REQ-15']
+    assert len(records) == 2 and {r['side'] for r in records} == {'baseline', 'candidate'}
+    row = next(r for r in plan['checks'] if r['check_id'] == 'REQ-15')
+    for item in records:
+        side = row['sides'][item['side']]
+        assert side['prepared'] == item['path'] and side['prepared_file_sha256'] == item['sha256']
+        assert side['environment_ref'] is None and side['target'] is None
+        prepared = engine_callbacks.load_prepared(item['path'])
+        assert not prepared['engine_started'] and not prepared['lab_faults'] and not prepared['lab_kernel_checks']
+        assert not side['prepared_runtime_qualified'] and not side['prepared_node_installed']
+        for key in ('manifest', 'cases_file', 'policy_file'):
+            assert side.get(key) == original_req15['sides'][item['side']].get(key)
+    assert row['actual_results'] is None and not plan['input_preflight_passed']
 
 
 def test_preparing_again_refreshes_sessions_and_preserves_accurate_pending_reasons(tmp_path, monkeypatch):

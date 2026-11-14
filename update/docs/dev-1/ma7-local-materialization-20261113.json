@@ -1,227 +1,86 @@
 {
-  "schema": "guard-ma7-local-materialization/1",
-  "scope": "M-A 미결합 로컬 입력 준비",
-  "source_plan_sha256": "21a8d486caadf3f8101b12ed00fce9f9029e03797fd8bdec88755d33c6b69005",
-  "pack_ref": {
-    "kind": "PACK",
-    "id": "PACK-BASELINE",
-    "revision": 34,
-    "sha256": "cf95f6709b635a6b14cc4a8ceaef5843bd0eb1bd4294c63e29d815626b8c1b0b"
-  },
-  "generator_source_sha256": "5802c4f7df1bd1862ce9d000f1631ac31a5d50e231bd5d24a9cad5883c6e1f19",
-  "prepared": [
-    {
-      "check_id": "LIF-13",
-      "side": "baseline",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/LIF-13/prepared/manifest.json",
-      "sha256": "d38ed49d92d175c5b748d8b7def2ce3a8e2b27990c08bcf49855499528cc7792",
-      "session": "948fa9fc07cdc955387cd9bbe08ab9a6",
-      "settings_file_sha256": "d33270d7845a5f9f8212bd27040f7e3ba925bf6dcca4198c4abefef38aa10c46"
-    },
-    {
-      "check_id": "LIF-13",
-      "side": "candidate",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/LIF-13/prepared/manifest.json",
-      "sha256": "5985b7b566f49cc2df5300e166817b991b133d945c7e48feaa073bee01d324d4",
-      "session": "9897d20c6162e64c8c8b0abc283a433a",
-      "settings_file_sha256": "014a3aa4cd723102418618aa9cdd6ccda453d8e1e750deba12c5e203e0e462d9"
-    },
-    {
-      "check_id": "REQ-14",
-      "side": "baseline",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-14/prepared/manifest.json",
-      "sha256": "4f63537bc42db8fbd7a61552baee94929faa1ea9b3c3e1aef70f0947c96208b9",
-      "session": "d0696a39fdb2e9378b46d8ecbb03f80b",
-      "settings_file_sha256": "161c3b6ba516346a52bb74232ca889757efc90cbae01c2c71adeddc3604ca289"
-    },
-    {
-      "check_id": "REQ-14",
-      "side": "candidate",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-14/prepared/manifest.json",
-      "sha256": "d8c11b49fcb25378a1a304890e9048cb00923104476d2a0c13b4a4005b76c4db",
-      "session": "0658c1c8de14ec00c77e0e4827c63a79",
-      "settings_file_sha256": "5cb79601f11d38f49d5b65e7001bff558b764a3dd0be0a24a88e1487f9fada52"
-    },
-    {
-      "check_id": "REQ-16",
-      "side": "baseline",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-16/prepared/manifest.json",
-      "sha256": "f27a089125e8eaa1c295ab75eb91f96e6d51088bfc156fbf3f0c8a6143d7e709",
-      "session": "0ad2ff68f1826608f9649782a524b36d",
-      "settings_file_sha256": "9f5b6dcb3bef9af2d3c0441403b761917aa919c5717dbd8014b8eedb637e1a31"
-    },
-    {
-      "check_id": "REQ-16",
-      "side": "candidate",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-16/prepared/manifest.json",
-      "sha256": "3417f9b090d8762bf36ff7de459c52af368371cc1eb65c791b8b0c4b5491f89c",
-      "session": "dc8bfe7ca74b1ab4b94fcc920f2e17d8",
-      "settings_file_sha256": "ba20c19dcb92cea1f0ee751a345a29d1f80d02f7305311bf15a6eacd57d517a2"
-    },
-    {
-      "check_id": "REQ-17",
-      "side": "baseline",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-17/prepared/manifest.json",
-      "sha256": "7eef846f635d8fd90ac70de18fbb625d4e75925677792fdde714e9ddf2208668",
-      "session": "c7b1ee92ef6db7ed189ebf1564a3453a",
-      "settings_file_sha256": "abfb05991b8ddeb0f57604c31c5ba04681a5553c8db190dac0172e6ff2237476"
-    },
-    {
-      "check_id": "REQ-17",
-      "side": "candidate",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-17/prepared/manifest.json",
-      "sha256": "9d9cdffea8062cf5d49a6742890e6bba91aab3606dd6235b710e99b64cca95d7",
-      "session": "feb82ed83f28946bdab9683b15c7fe7e",
-      "settings_file_sha256": "0a34e916241d6b91d4d316ad204d3804f90a5dd209f85a8d9225b9380acbc398"
-    },
-    {
-      "check_id": "REQ-18",
-      "side": "baseline",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-18/prepared/manifest.json",
-      "sha256": "281b532ab4bff940aba81de9711aeb053ad0a2aebed3837ad798d4bd0c53e92d",
-      "session": "ff0873da8230bfeb19fdbcaacad4ab51",
-      "settings_file_sha256": "6fb9729dc8fab7d281cd86ab3f88484a4da41e3236557ce213c73a63ca250240"
-    },
-    {
-      "check_id": "REQ-18",
-      "side": "candidate",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-18/prepared/manifest.json",
-      "sha256": "ab80e51b7ea04e8b571a8f2d521c128a5723a43fdb78b70d14c1bb7b164a81da",
-      "session": "a6e2fbe1e9ec1c4844eea8e711df4daa",
-      "settings_file_sha256": "6a714a6eb8e5437602ee60d6348c172638211b49a1bb9d78abfd927a88c39f79"
-    },
-    {
-      "check_id": "REQ-19",
-      "side": "baseline",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-19/prepared/manifest.json",
-      "sha256": "586e670aaf428be3028c9dc75e3359cba5a66a6a310e2591af4dbf5829e51ee8",
-      "session": "9a50d1505b445ae294feaee93ddbf71b",
-      "settings_file_sha256": "e2ad46e909ea6f15c543684c26b434be5958935d810a30381d8c4888db3e01a7"
-    },
-    {
-      "check_id": "REQ-19",
-      "side": "candidate",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-19/prepared/manifest.json",
-      "sha256": "0840d673d35c910c037d93421616f01803e0f78e20d9968954dd6237920d0183",
-      "session": "a1ababad552b5f44e18dd91033df9ebc",
-      "settings_file_sha256": "3caefc7bf495d27b001557ded524c364cef53b67f3d8d19a0e3220a2ca51e3d6"
-    },
-    {
-      "check_id": "REQ-20",
-      "side": "baseline",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-20/prepared/manifest.json",
-      "sha256": "3ce8fc6d7d48c83978c9d8d4daecb29c8f73c46e875b250de3b221798c42c378",
-      "session": "d0cb1e52fc170940fa5530bf0cfbbd6f",
-      "settings_file_sha256": "ea93bb7e2e51c5bfa345cca771dd5c055b6d0bea5e4d92e29262507121e8f2e6"
-    },
-    {
-      "check_id": "REQ-20",
-      "side": "candidate",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-20/prepared/manifest.json",
-      "sha256": "02a47408b0e4d8e350ce7b8998185d6c2453638113dd6f228a7f361bfe9fffa8",
-      "session": "c6985b4a8b8171d3e70827d2b447eaec",
-      "settings_file_sha256": "204e11bb84ed1ccffe52eeb5ca0839865c81f4c7b38d370f7aeaae6eabe45707"
-    },
-    {
-      "check_id": "REQ-21",
-      "side": "baseline",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-21/prepared/manifest.json",
-      "sha256": "b13e8a2ec798fb12de603ab35e8c9fa3bba699b5f60e03b285babbcb034f00cd",
-      "session": "419817b0ed9b3cba68ad161de5c22e5f",
-      "settings_file_sha256": "080c3324865264f12f75a801cf52e25d318375d4b55822ffc4100f91d23d1357"
-    },
-    {
-      "check_id": "REQ-21",
-      "side": "candidate",
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-21/prepared/manifest.json",
-      "sha256": "90f022486edaa1b6c3a5a745807765d4f02addff746be1f2016ee95bfdd260c9",
-      "session": "64a0a1e4b518bfa691fbcafb8105f56a",
-      "settings_file_sha256": "519a4d806af0c7519f3dcb53cc81c081dbafe84c83e29ac738066f1a8a6f513d"
-    }
-  ],
+  "actual_results": null,
   "cases": [
     {
       "check_id": "REQ-14",
-      "side": "baseline",
       "count": 4,
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-14/cases.json",
-      "sha256": "feab7942c9a48bfbb5cc150d519ae1e7aa97873ba8af87b2b3b20645ec977652"
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/baseline/REQ-14/cases.json",
+      "sha256": "feab7942c9a48bfbb5cc150d519ae1e7aa97873ba8af87b2b3b20645ec977652",
+      "side": "baseline"
     },
     {
       "check_id": "REQ-14",
-      "side": "candidate",
       "count": 4,
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-14/cases.json",
-      "sha256": "feab7942c9a48bfbb5cc150d519ae1e7aa97873ba8af87b2b3b20645ec977652"
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/candidate/REQ-14/cases.json",
+      "sha256": "feab7942c9a48bfbb5cc150d519ae1e7aa97873ba8af87b2b3b20645ec977652",
+      "side": "candidate"
     },
     {
       "check_id": "REQ-16",
-      "side": "baseline",
       "count": 23,
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-16/cases.json",
-      "sha256": "4ed374d03e74db8bc7824174969f890ce7411b1faf23e6e11a35a455c0535c37"
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/baseline/REQ-16/cases.json",
+      "sha256": "4ed374d03e74db8bc7824174969f890ce7411b1faf23e6e11a35a455c0535c37",
+      "side": "baseline"
     },
     {
       "check_id": "REQ-16",
-      "side": "candidate",
       "count": 23,
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-16/cases.json",
-      "sha256": "4ed374d03e74db8bc7824174969f890ce7411b1faf23e6e11a35a455c0535c37"
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/candidate/REQ-16/cases.json",
+      "sha256": "4ed374d03e74db8bc7824174969f890ce7411b1faf23e6e11a35a455c0535c37",
+      "side": "candidate"
     },
     {
       "check_id": "REQ-17",
-      "side": "baseline",
+      "count": 504,
+      "format": "byul-gpu-a-req17-cohort/1",
       "part_index": 1,
-      "count": 504,
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-17/cohorts/cohort-1.json",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/baseline/REQ-17/cohorts/cohort-1.json",
       "sha256": "211264b143d9a02fe2ad3432a056c867310246fdec608e762ee208d157c47caa",
-      "format": "byul-gpu-a-req17-cohort/1"
+      "side": "baseline"
     },
     {
       "check_id": "REQ-17",
-      "side": "baseline",
-      "part_index": 2,
       "count": 504,
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-17/cohorts/cohort-2.json",
+      "format": "byul-gpu-a-req17-cohort/1",
+      "part_index": 2,
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/baseline/REQ-17/cohorts/cohort-2.json",
       "sha256": "6b470968bbf309a445c5e7235db54da9eca63d1dd6b7b6e2249117626d80f70d",
-      "format": "byul-gpu-a-req17-cohort/1"
+      "side": "baseline"
     },
     {
       "check_id": "REQ-17",
-      "side": "candidate",
+      "count": 504,
+      "format": "byul-gpu-a-req17-cohort/1",
       "part_index": 1,
-      "count": 504,
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-17/cohorts/cohort-1.json",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/candidate/REQ-17/cohorts/cohort-1.json",
       "sha256": "211264b143d9a02fe2ad3432a056c867310246fdec608e762ee208d157c47caa",
-      "format": "byul-gpu-a-req17-cohort/1"
+      "side": "candidate"
     },
     {
       "check_id": "REQ-17",
-      "side": "candidate",
-      "part_index": 2,
       "count": 504,
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-17/cohorts/cohort-2.json",
+      "format": "byul-gpu-a-req17-cohort/1",
+      "part_index": 2,
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/candidate/REQ-17/cohorts/cohort-2.json",
       "sha256": "6b470968bbf309a445c5e7235db54da9eca63d1dd6b7b6e2249117626d80f70d",
-      "format": "byul-gpu-a-req17-cohort/1"
+      "side": "candidate"
     },
     {
       "check_id": "REQ-18",
-      "side": "baseline",
       "count": 4,
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/baseline/REQ-18/cases.json",
-      "sha256": "d51cefa389523df3e90cd9a288d6217b965b8271ccfda49511426d253ea16798"
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/baseline/REQ-18/cases.json",
+      "sha256": "d51cefa389523df3e90cd9a288d6217b965b8271ccfda49511426d253ea16798",
+      "side": "baseline"
     },
     {
       "check_id": "REQ-18",
-      "side": "candidate",
       "count": 4,
-      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/candidate/REQ-18/cases.json",
-      "sha256": "d51cefa389523df3e90cd9a288d6217b965b8271ccfda49511426d253ea16798"
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/candidate/REQ-18/cases.json",
+      "sha256": "d51cefa389523df3e90cd9a288d6217b965b8271ccfda49511426d253ea16798",
+      "side": "candidate"
     }
   ],
   "confirmed_policy_source_sha256": "2f815afa6f51f378cc44257cc073b8f69e013fbccb430f7937b8ad5e7ad86e5c",
-  "policy_input_draft": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/policy-input-draft.yaml",
-  "policy_input_draft_sha256": "63c1d5dbfdce920834800f095b3930f672d794969b26d875459312b1ef8ead06",
   "deferred_policy_bindings": {
     "REQ-16": [
       "sensor_environment_sha256",
@@ -236,25 +95,182 @@
       "sensor_manifest_sha256"
     ]
   },
+  "engine_executed": false,
+  "generator_source_sha256": "2af704e27a2110608ee18bee619ff25e9741dc8b673b243a23404693da073d5a",
+  "input_preflight_passed": false,
+  "pack_ref": {
+    "id": "PACK-BASELINE",
+    "kind": "PACK",
+    "revision": 34,
+    "sha256": "cf95f6709b635a6b14cc4a8ceaef5843bd0eb1bd4294c63e29d815626b8c1b0b"
+  },
+  "policy_input_draft": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/policy-input-draft.yaml",
+  "policy_input_draft_sha256": "63c1d5dbfdce920834800f095b3930f672d794969b26d875459312b1ef8ead06",
+  "prepared": [
+    {
+      "check_id": "LIF-13",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/baseline/LIF-13/prepared/manifest.json",
+      "session": "0e90033b1aaaae4a50ee35286f9bfefe",
+      "settings_file_sha256": "4a9a9042e7474a6ad8dd7acc80550fde2e116f427b2ee99cf011c42bf43cf5b6",
+      "sha256": "f2e8c253dd962ca13cb0ff01df08f10a230ca93564a08949845ff3a7c71e6f4b",
+      "side": "baseline"
+    },
+    {
+      "check_id": "LIF-13",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/candidate/LIF-13/prepared/manifest.json",
+      "session": "3007629ff7553ab5a73a75104a8f38ca",
+      "settings_file_sha256": "52bb407c3b12fa9bfdf04dca27a75543a8a498ed2dd3f251de83e62380c360c5",
+      "sha256": "ad3fa829b18e93de0420f6d6a5a96f1577f268395756ffbfb5fa927b820c2b17",
+      "side": "candidate"
+    },
+    {
+      "check_id": "REQ-14",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/baseline/REQ-14/prepared/manifest.json",
+      "session": "96922e2ee109a0a366cec7b8ccbead7e",
+      "settings_file_sha256": "39227f94d4bebd8a7382ef2fcc26c168d857deaa9a915568bc72d82ff56cb755",
+      "sha256": "630fa5537f3d4c134487159c4f797e0562ec978dcd1da303ea9bc683353554d5",
+      "side": "baseline"
+    },
+    {
+      "check_id": "REQ-14",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/candidate/REQ-14/prepared/manifest.json",
+      "session": "60ac73dc5230d4e70a103a6901773a39",
+      "settings_file_sha256": "5ca34067c3d6e4284869ae5603bfdce27ca33dddfb62613af45fabfad88ab1be",
+      "sha256": "88b9408e7061bdac24373abe23d48a501792f1cbf75bcc696a26b5e810864389",
+      "side": "candidate"
+    },
+    {
+      "check_id": "REQ-15",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/baseline/REQ-15/prepared/manifest.json",
+      "session": "4867c523f7ced4c699354b35428bd67d",
+      "settings_file_sha256": "8bfce8630242693fc083d023b6c81a60c09d299e77746dce9d36ef331ecde345",
+      "sha256": "b94133f1bf4c5751c79fb084ea243c9d1a564ad49a268e1053cba8766374b0b5",
+      "side": "baseline"
+    },
+    {
+      "check_id": "REQ-15",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/candidate/REQ-15/prepared/manifest.json",
+      "session": "fd0af97aae6060e7dd3153875a58930a",
+      "settings_file_sha256": "4c65326cb6bfb30fae71036f014eb7d64d8256198d0a4914dfb0dc77d08fc4ec",
+      "sha256": "e55c3d4d5685c5d3d6f8c9c3979ad7d2cac933b68d0343b3bc56284f7435b1a0",
+      "side": "candidate"
+    },
+    {
+      "check_id": "REQ-16",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/baseline/REQ-16/prepared/manifest.json",
+      "session": "593c749adb17fe9dd92c79f7f1391537",
+      "settings_file_sha256": "7c91d054f201627bb5d6ec2920646f5ecab9c84d5c61f4933880ec117d39c619",
+      "sha256": "63d9971f21dc6734cd4a8c051e808628e187b1ae597234b2e53763727de5e965",
+      "side": "baseline"
+    },
+    {
+      "check_id": "REQ-16",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/candidate/REQ-16/prepared/manifest.json",
+      "session": "d362e6a9ca8f365c57e787b3f3c81549",
+      "settings_file_sha256": "c5b3762067cd3d01da4b608aca3d9eea25f0910909b82fd5d145e1ba2ff82645",
+      "sha256": "4fd707394af3841abcb62dcd2c51a18cbc1fde54e20f2434c1f36866a6c6ee3f",
+      "side": "candidate"
+    },
+    {
+      "check_id": "REQ-17",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/baseline/REQ-17/prepared/manifest.json",
+      "session": "9fe711ed371670700a6fabfd8af992a9",
+      "settings_file_sha256": "da056e1f980041b9bc2d2d974dc448c4aab553271860202b82ccf7f16763872c",
+      "sha256": "4c70e1e665e94d9dc74ef1389181a478c014752f2389cf6ff978982312d122a1",
+      "side": "baseline"
+    },
+    {
+      "check_id": "REQ-17",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/candidate/REQ-17/prepared/manifest.json",
+      "session": "7a95f689ab87d8f78c421a75ef936c48",
+      "settings_file_sha256": "3fc6150d879716f688b87d143b41a8eb2c62ed1a3f0636770ab532334885e30a",
+      "sha256": "a5024584ed7a1676843b733e259900ac429d508343788f63110c881d7fb9a542",
+      "side": "candidate"
+    },
+    {
+      "check_id": "REQ-18",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/baseline/REQ-18/prepared/manifest.json",
+      "session": "b02e3ef1bc0a25ccb3f0c9d7af4e8b6d",
+      "settings_file_sha256": "ad64586204bdbf225f843bef3bb7fbc7c4212062dfc807cc8a722d0adb7bf15b",
+      "sha256": "eb6bd64229401468dde0048eec02020ec93263b85b3f66e308f3bcb5d798ce09",
+      "side": "baseline"
+    },
+    {
+      "check_id": "REQ-18",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/candidate/REQ-18/prepared/manifest.json",
+      "session": "debd9579d82591db555fdda5c61a0d9f",
+      "settings_file_sha256": "48a3384703ad41c5fd6587fb4122c4fac8961d1fe1a68294121e2dbc43acd94f",
+      "sha256": "b4f8c47dc8797869bdd0e0b46048af0724815cc297278aa9b35d1bf819a17a7f",
+      "side": "candidate"
+    },
+    {
+      "check_id": "REQ-19",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/baseline/REQ-19/prepared/manifest.json",
+      "session": "ef27d0af087f3a8826d7e0471be30edf",
+      "settings_file_sha256": "d49e4a8844b0f64c8c20687cca2d554f1c79a9db045de6e0e81e718eb8f764bd",
+      "sha256": "82d331a9c529600d95afc64e70279fd231a35113fa7855505d3a695a1c95e427",
+      "side": "baseline"
+    },
+    {
+      "check_id": "REQ-19",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/candidate/REQ-19/prepared/manifest.json",
+      "session": "0c0f514a064adecfde6a321963d29ea3",
+      "settings_file_sha256": "3f7a70690526b21d2446dd5bde530d708bd17192abf1838bd3120d4f8ec330c3",
+      "sha256": "5ca7334654333bd8ab1676e000eb5fe000eaac401db248e35fb2205aed31bd9f",
+      "side": "candidate"
+    },
+    {
+      "check_id": "REQ-20",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/baseline/REQ-20/prepared/manifest.json",
+      "session": "a4a78924dc1191c18381d05d312f16ee",
+      "settings_file_sha256": "072007f6741714cbff0a567ca726d099a593fc5bb3bc5e6fab875e5b8a0438be",
+      "sha256": "71c7bdc64d3dcdec302e76406b125ca38985df6c3300cf5692727416593052dd",
+      "side": "baseline"
+    },
+    {
+      "check_id": "REQ-20",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/candidate/REQ-20/prepared/manifest.json",
+      "session": "dbf42c4d10790f15e28a4e32bb7a571f",
+      "settings_file_sha256": "167e541d17dc58ba838a4fa5a8e0c30ed95328572641ea20793dbaae332608cb",
+      "sha256": "2108d01d03860e12ced5581e10588dfbe31223cef227659b01c7344f60a9aa13",
+      "side": "candidate"
+    },
+    {
+      "check_id": "REQ-21",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/baseline/REQ-21/prepared/manifest.json",
+      "session": "a452cb462c31d526e922286b4a88c842",
+      "settings_file_sha256": "b412126f823bfdd58310ed86eccf68eccd074219d7a9cb9f3be084bd850158cd",
+      "sha256": "afe57cb55c3f7a972ad6017bf5387e84c40edf89327c93263a1a0856ba649215",
+      "side": "baseline"
+    },
+    {
+      "check_id": "REQ-21",
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/candidate/REQ-21/prepared/manifest.json",
+      "session": "3733232699880f3532eaa18a5597544e",
+      "settings_file_sha256": "8448e45d90578812b744ea8a47d79ebaeb18f750ccf46f50ebf5413a4d3525d5",
+      "sha256": "55db201fffbd0513bcbe707d38dacf3998dc63971319429b16c3726dd8a07da3",
+      "side": "candidate"
+    }
+  ],
+  "ready_for_execution": false,
   "req17_timing_requirements": {
-    "minimum_per_scored_role": 200,
-    "scored_roles": 4,
-    "minimum_scored_cases": 800,
-    "single_manifest_max_cases": 512,
-    "fits_single_manifest": false,
     "collection_or_judgment_changed": false,
-    "unchanged_scope": "기존 단일 수집 계약·판정 계산식",
+    "fits_single_manifest": false,
+    "minimum_per_scored_role": 200,
+    "minimum_scored_cases": 800,
+    "scored_roles": 4,
+    "single_manifest_max_cases": 512,
+    "split_cases_per_part": 504,
     "split_collection_added": true,
     "split_parts": 2,
-    "split_cases_per_part": 504,
-    "split_scored_samples_per_role": 200
+    "split_scored_samples_per_role": 200,
+    "unchanged_scope": "기존 단일 수집 계약·판정 계산식"
   },
-  "ready_for_execution": false,
-  "input_preflight_passed": false,
-  "engine_executed": false,
-  "actual_results": null,
-  "generator_source_commit": "fc77399e81ed96c0996bc3c12be94fea31b16675",
-  "source_plan_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-source-plan-fc77399e-20261114.json",
-  "local_manifest_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v5/manifest.json",
-  "local_manifest_sha256": "5ede4f5cb606071129b60eeb7de96d0b6cdf51c4ec7567c78075a7c3fb556680"
+  "schema": "guard-ma7-local-materialization/1",
+  "scope": "M-A 미결합 로컬 입력 준비",
+  "source_plan_sha256": "97c64cf86e2508f2d00f0db1f0e01b1554c289f2d89f48f8969eb9f2c5fe2883",
+  "generator_source_commit": "67f1a5bea4b512024629dff61663a108a0d73509",
+  "source_plan_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-source-plan-67f1a5be-20261114.json",
+  "local_manifest_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261114-v6/manifest.json",
+  "local_manifest_sha256": "4849e657574f2378c6d0c9584859aedd55bd082b870711a4371cae8fad710bf8"
 }

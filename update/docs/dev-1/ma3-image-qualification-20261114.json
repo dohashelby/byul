@@ -1,0 +1,100 @@
+{
+  "schema": "guard-image-installation-review/1",
+  "authorization": "사용자 결정31, 2026-11-14",
+  "new_layer_bytes": 13630448638,
+  "reused_python_layer_bytes": 661014960,
+  "unique_layers": 48,
+  "extracted_object_bytes": 660944108,
+  "engine_executed": false,
+  "gpu_executed": false,
+  "pins_changed": false,
+  "producer_registered": false,
+  "runtime_qualified": false,
+  "sides": {
+    "base": {
+      "image_manifest_sha256": "a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8",
+      "selected_files": 17541,
+      "extraction_gap_count": 2,
+      "extraction_gaps": [
+        {
+          "path": "usr/lib/python2.7/dist-packages/lsb_release.py",
+          "diagnostic": "선택 대상의 실제 파일 미확보"
+        },
+        {
+          "path": "usr/lib/python3/dist-packages/lsb_release.py",
+          "diagnostic": "선택 대상의 실제 파일 미확보"
+        }
+      ],
+      "installed_vllm_python_files": 577,
+      "exact_control_files": 41,
+      "exact_sha256_matches": 41,
+      "exact_sha256_mismatches": [],
+      "git_blob_matches_supplemental": 574,
+      "git_blob_mismatch_count": 0,
+      "installed_files_not_in_tag_tree": 3,
+      "interpreter_binary_version_literals": [
+        "3.12.8"
+      ],
+      "observer_runtime_key_count": 15,
+      "observer_runtime_key_matches": 0,
+      "comm_buffer_source_matches_existing_row": true,
+      "fault_mp_source_matches_existing_pin": false,
+      "library_metadata": {
+        "transformers": {
+          "version": "4.48.1",
+          "metadata_sha256": "0f27d70bc30f2678dfc469e29dc6ea111255d8f338b3d4d6fe16946d1b94db7a"
+        },
+        "uvicorn": {
+          "version": "0.34.0",
+          "metadata_sha256": "6d2f1a126d811ae114fb69fc98b4181d6979743d132c0537231b302c207841c5"
+        },
+        "safetensors": {
+          "version": "0.5.2",
+          "metadata_sha256": "d7326a3f23029e5c29b76065e1b2157622cb1387f7b2c55885933eb95f77f23a"
+        }
+      },
+      "source_inventory_sha256": "a7df56ee49221ad14a289941e09ac3c9959b63b4b614a3afd9b160697a9bf207",
+      "installation_comparison_sha256": "6f13849418c7890dafdf935cc42f194a86a1bda0c13d45de34e72045f91a0a34"
+    },
+    "candidate": {
+      "image_manifest_sha256": "5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "selected_files": 31346,
+      "extraction_gap_count": 0,
+      "extraction_gaps": [],
+      "installed_vllm_python_files": 2681,
+      "exact_control_files": 73,
+      "exact_sha256_matches": 73,
+      "exact_sha256_mismatches": [],
+      "git_blob_matches_supplemental": 2479,
+      "git_blob_mismatch_count": 0,
+      "installed_files_not_in_tag_tree": 202,
+      "interpreter_binary_version_literals": [
+        "3.12.3"
+      ],
+      "observer_runtime_key_count": 15,
+      "observer_runtime_key_matches": 15,
+      "comm_buffer_source_matches_existing_row": true,
+      "fault_mp_source_matches_existing_pin": false,
+      "library_metadata": {
+        "transformers": {
+          "version": "5.17.0",
+          "metadata_sha256": "cd295c5ad2c605e3c04456740df174e6a1bf5418eb2563788dc2163253f6d882"
+        },
+        "uvicorn": {
+          "version": "0.53.0",
+          "metadata_sha256": "bcfb3b631d31e3ff7c6992428b0480a09d407ec829905aa9301f736bd854cb45"
+        },
+        "safetensors": {
+          "version": "0.8.0",
+          "metadata_sha256": "645be7b8d55e91534f991d144dc9e279581ea8dbea1a8c5b0be14e529d01e345"
+        }
+      },
+      "source_inventory_sha256": "010994d52de0eb51feef7ee24cb77be0fb12423bd2c66810f6a89a1d6e0bdb20",
+      "installation_comparison_sha256": "cf02345c8f10533bcc16742734353c65273b77699f640ec0b4cbcc73ddb39f7a",
+      "candidate_exact_module_rows": 13,
+      "candidate_exact_module_matches": 13,
+      "candidate_function_points": 53,
+      "candidate_function_matches": 53
+    }
+  }
+}

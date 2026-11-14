@@ -502,6 +502,8 @@ class EngineAdapter(Protocol):
 
 ### 7.2 나머지
 
+REQ-17은 기존 단일 입력 외에 [분할 수집·원 표본 집계 계약](docs/dev-1/req17-split-collection.md)을 지원한다(2026-11-14 사용자 결정23). 묶음별512개·기존 판정 기준을 유지하며 두 묶음의 동일 scope/세대·원 표본 완결성을 검증한다.
+
 ```python
 class EnvCollector(Protocol):      # X2: 환경 사실 수집
     def collect(self, target: TargetSpec) -> dict[str, FactValue]: ...

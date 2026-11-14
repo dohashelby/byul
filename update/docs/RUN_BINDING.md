@@ -297,8 +297,33 @@ api_binding = "/path/api.json"          # api_container_id·network_id·endpoint
 ## 9. J02(63개 `guard update`)까지 남은 공백 (2026-11-14)
 
 - **점검별 실행 설정 조립**: 실제 ENV·target·prepared·정책·실행 설정을 점검별로 만드는 도구가 REQ-10·17·18·SUP-03·08(`tools/gpu_a_run_inputs.py`, `mvp_a_input_materialize.py`, `mvp_sup08_inputs.py`)만 지원한다. 나머지 점검의 실행 설정 조립, 특히 새 `[run_binding.<점검>]` 표(세션·세대·offset·시나리오·PLT 결합 파일)를 만드는 도구가 없다.
-- **공유 실행기 칸**: 실행기 설정은 실행기 이름별이라, 한 번의 `guard update`에서 같은 실행기를 쓰는 점검은 target·prepared·`generations` 같은 칸을 공유한다(LIF-05·06·16의 `generations`, OBS-01·PLT-12의 target, LIF-07·09의 target·prepared). 점검마다 대상이 다르면 한 실행으로 묶을 수 없다. 점검별 실행기 설정 덮어쓰기가 필요하다(이번 범위 밖, 별도 결정).
+- ~~**공유 실행기 칸**~~ → 사용자 결정 RB2-S로 `[check_config.<점검>]`을 두었다(10절).
 - **E 키 4개**: `retry_scope_sha256`·`copy_inventory_sha256`·`record_subject_plan_sha256`·`recovery_selection_sha256`은 아직 정책 값이라 실행마다 정책을 다시 써야 한다(7.6 분리안, 점검별 승인 대기).
 - **C·D·E 분류**: 생산자 소스 SHA(C), 시험 주체(D), 외부 사건 시각(E)은 정책에 남아 있다.
 - **MA7·MA8 기록 정합**: `docs/dev-1/ma8-local-preflight-20261113.json`의 `pack_ref`가 34라, MA7 계획(36)과 맞지 않아 `mvp_a_input_materialize`가 그 감사 파일을 받지 않는다(이번 변경 전 35에서도 같았다). SUP-08 실제 파일 재검증을 팩 36으로 다시 해야 한다.
 - 실제 ENV/target·GPU 자격·비용 승인 등 기존 공백은 PROGRESS의 M-A3·M-A7 기록을 따른다.
+
+## 10. 점검별 실행기 설정 `[check_config.<점검>]` (RB2-S, 2026-11-14 사용자 결정 "점검별 설정 둔다")
+
+실행기 설정은 실행기 이름별 한 칸이다. 같은 실행기를 쓰는 점검이 한 번의 `guard update`에서 서로 다른 대상을 쓰려면 점검별 값이 필요하다.
+
+```toml
+[lifecycle_transition]          # 공유 기본값
+kubectl_binary = "kubectl"
+max_duration_seconds = 300
+
+[check_config.LIF-05]           # LIF-05만 받는 값
+generations = [ { id = "old", target = "...", prepared = "...", environment = "..." }, ... ]
+
+[check_config.LIF-16]
+generations = [ ... ]
+
+[sides.candidate.check_config.LIF-05]   # 쪽별 값은 기존 sides 병합 규칙 그대로
+generations = [ ... ]
+```
+
+- `configuration.for_check(raw, executor, check_id)`가 그 점검의 실행기 칸 위에 항목을 병합한다(`merge_config`와 같은 규칙: 표는 재귀 병합, 목록·문자열은 대체). 다른 실행기 칸과 다른 점검에는 영향이 없다. 원 설정은 바꾸지 않는다.
+- 적용 지점: 실행(`core/run.py`의 실행기 생성과 실행 결합 계산), 사전 준비 점검(`application.update_readiness`), 지원 평가(`readiness_support`의 engine_sensor), 이월 미리보기(`executors/reuse.preview_inputs`). 실행기·판정·팩은 바뀌지 않는다.
+- 실행 준비값 `[run_binding.<점검>]`(8절)과는 다르다. `check_config`는 실행기가 직접 받는 설정(대상 파일 등)이고 EVD 실행기 설정 해시에 들어간다. `run_binding`은 정책 키 이름으로 넘기는 결합 값이고 실행기 설정 해시에 들어가지 않는다.
+- 형식 오류(표가 아님, 항목이 표가 아님, 실행기 칸이 표가 아님)는 그 점검을 `NOT_RUN`(`CHECK_CONFIG_INVALID`)→UNKNOWN으로 둔다. 이월 미리보기에서는 이월 불가다.
+- 한계: Docker 관리형(`real`) 갱신 실행의 양쪽 target 경로 비교(`validate_update_run_config`)는 실행기 기본 칸만 본다. 관리형은 guard가 target을 직접 써 넣는 경로라 J02(외부 Kubernetes)에는 해당하지 않는다.

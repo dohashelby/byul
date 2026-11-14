@@ -135,6 +135,11 @@
       "manifest_sha256": "01e1e15f6b79219e9f55b7644b443a7ec1a6b3a1aa2bf7cd1ed8c6848556ecfd",
       "reviewed_by": "Claude / BYUL UPDATE / RB2 실행 준비값 분리(팩 36) self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-14T21:43:40+09:00"
+    },
+    {
+      "manifest_sha256": "bf79ff11570f12023334c19593b8321c4d4186443a42f4dee2533e54e46c2f0a",
+      "reviewed_by": "Claude / BYUL UPDATE / RB2-S 점검별 실행기 설정 self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T21:55:20+09:00"
     }
   ]
 }

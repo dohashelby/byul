@@ -3,7 +3,7 @@ framework_id: CHK-REQ-021
 mechanism_ids:
 - mechanism-05
 - mechanism-16
-revision: 5
+revision: 6
 retired: false
 area: REQ
 purpose: 실행 상태·버퍼 수명
@@ -16,19 +16,7 @@ review_order: implementation_path_first
 impact: MEDIUM
 applies_when:
   prose: TP의 실제 graph/communicator buffer 등록·참조 경로가 선택될 때 적용한다. 일반 TP 통신 점검은 별도로 유지한다.
-policy_params:
-- key: sensor_environment_sha256
-  type: str
-  required: true
-- key: sensor_target_sha256
-  type: str
-  required: true
-- key: sensor_prepared_sha256
-  type: str
-  required: true
-- key: sensor_manifest_sha256
-  type: str
-  required: true
+policy_params: []
 policy_prose:
   policy_to_decide: 허용 peer·참조 수명·종료 조건
   enterprise_decisions: 지원 GPU·runner·mode·shape/입력 범위, 정상 대조 방식·수치 오차·성능·장애 처리 기준과 실제 peer. 범위 밖 접근·타 요청 혼입·유출은 정책이나 허용 수치 오차로 완화할 수 없다.

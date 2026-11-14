@@ -2,7 +2,7 @@ id: LIF-01
 framework_id: CHK-LIF-001
 mechanism_ids:
 - mechanism-07
-revision: 5
+revision: 6
 retired: false
 area: LIF
 purpose: 자원 예산·공정성
@@ -16,28 +16,7 @@ impact: MEDIUM
 applies_when:
   prose: 모델 취득·해석·변환·로딩 비용을 기본 확인한다. compile이 실제 사용되면 해당 단계·누적 비용을 포함한다.
 policy_params:
-- key: supply_environment_sha256
-  type: str
-  required: true
-- key: supply_normal_target_sha256
-  type: str
-  required: true
-- key: supply_challenge_target_sha256
-  type: str
-  required: true
-- key: supply_normal_prepared_sha256
-  type: str
-  required: true
-- key: supply_challenge_prepared_sha256
-  type: str
-  required: true
 - key: supply_record_source_sha256
-  type: str
-  required: true
-- key: supply_validity_start
-  type: str
-  required: true
-- key: supply_validity_end
   type: str
   required: true
 - key: supply_stage_budget_ms

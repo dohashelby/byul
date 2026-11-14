@@ -2,7 +2,7 @@ id: LIF-08
 framework_id: CHK-LIF-008
 mechanism_ids:
 - mechanism-13
-revision: 6
+revision: 7
 retired: false
 area: LIF
 purpose: 실패 감지·상위 통지
@@ -16,21 +16,6 @@ impact: MEDIUM
 applies_when:
   prose: 선정 executor에서 rank 예외·사망·지연·통신 정지를 구분한다. 다른 executor의 장애 처리를 기본 근거로 쓰지 않는다.
 policy_params:
-- key: rank_environment_sha256
-  type: str
-  required: true
-- key: rank_target_sha256
-  type: str
-  required: true
-- key: rank_prepared_sha256
-  type: str
-  required: true
-- key: rank_validity_start
-  type: str
-  required: true
-- key: rank_validity_end
-  type: str
-  required: true
 - key: rank_executor_backend
   type: str
   required: true

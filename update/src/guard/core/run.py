@@ -169,7 +169,8 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
                 refs=[plan_ref, env.ref()],
             )
             side_cfg.attempt_id = cfg.attempt_id
-            evd = _run_one(store, check, item, env, policy.values.get(check.id, {}), side_cfg, adapter, adapter_info, plan, common)
+            evd = _run_one(store, check, item, env, policy.values.get(check.id, {}), side_cfg, adapter, adapter_info, plan, common,
+                           policy_validity=(policy.valid_from, policy.valid_until))
             try:
                 store.put(evd)
             except Exception:
@@ -186,12 +187,16 @@ def _run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side
     return out
 
 
-def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info, plan, common) -> Evidence:
+def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info, plan, common,
+             policy_validity=(None, None)) -> Evidence:
+    binding = None
+
     def stopped(status: ExecStatus, reason: str, executor_info: ExecutorInfo | None = None) -> Evidence:
         return Evidence(
             **common,
             data_origin=_not_run_origin(plan),
-            execution=Execution(status=status, executor=executor_info, adapter=adapter_info, abort_reason=reason, attempt_id=cfg.attempt_id),
+            execution=Execution(status=status, executor=executor_info, adapter=adapter_info, abort_reason=reason,
+                                attempt_id=cfg.attempt_id, run_binding=binding),
             **_empty_evidence_parts(check),
         ).seal()
 
@@ -200,6 +205,16 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         return stopped(ExecStatus.NOT_RUN, reason)
     if cfg.abort_reason:
         return stopped(ExecStatus.ABORTED, cfg.abort_reason)
+    from guard.executors import run_binding
+    if run_binding.keys_for(check):
+        # Per-run technical binding (guard-run-binding/1): computed by guard, never a policy value.
+        try:
+            binding, policy_values = run_binding.effective_values(
+                check, cfg.raw.get(item.executor, {}), env, policy_values, side=str(common["side"].value),
+                attempt_id=cfg.attempt_id, issued_at=utcnow(), valid_from=policy_validity[0], valid_until=policy_validity[1])
+        except ValueError as exc:
+            code = str(exc) if str(exc).startswith("RUN_BINDING_") else "RUN_BINDING_UNAVAILABLE"
+            return stopped(ExecStatus.NOT_RUN, code)
 
     impl_name = cfg.executors[item.executor]
     started = utcnow()
@@ -257,6 +272,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                 abort_reason=abort_reason,
                 cleanup_errors=draft.cleanup_errors,
                 attempt_id=cfg.attempt_id,
+                run_binding=binding,
             ),
             artifacts=artifacts,
             comparability=draft.comparability,

@@ -1,14 +1,10 @@
 executor: model_authorization
 collection_profile: kubernetes-model-authorization-observation-v1
 policy_params:
-  - { key: model_environment_sha256, type: str, required: true }
-  - { key: model_target_sha256, type: str, required: true }
   - { key: allowed_principal_sha256, type: str, required: true }
   - { key: denied_principal_sha256, type: str, required: true }
   - { key: selected_model_grants, type: "list[str]", required: true }
   - { key: retired_model_revisions, type: "list[str]", required: true }
-  - { key: model_validity_start, type: str, required: true }
-  - { key: model_validity_end, type: str, required: true }
 required_observations:
   - { key: model_use_trials, type: list }
   - { key: configured_model_policy_conflicts, type: list }

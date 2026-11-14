@@ -53,7 +53,7 @@ def test_pair_is_current_canonical_inputs_without_fabricated_results(tmp_path, m
     fixture, envs, targets = source(tmp_path, monkeypatch)
     out = tmp_path / 'prepared'
     manifest = tool.prepare(fixture, envs, targets, out, control_image=IMAGE)
-    assert manifest['pack_ref']['revision'] == 34 and manifest['expected_comparison'] == 'REGRESSED'
+    assert manifest['pack_ref']['revision'] == 35 and manifest['expected_comparison'] == 'REGRESSED'
     assert manifest['actual_comparison'] is None and manifest['official'] is False
     assert manifest['data_origin'] == 'DECLARED'
     assert manifest['preflight'] == {'input_contracts_valid': True, 'comparison_conditions_equal': True,

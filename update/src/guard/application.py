@@ -17,7 +17,7 @@ from guard.core.run import RunConfig, run_plan, validate_update_run_config
 from guard.core.select import select
 from guard.collectors.change import read_change, resolve_plan, save_change
 from guard.core.change_selection import build_context
-from guard.models import ExecStatus, Mode, Side
+from guard.models import ExecStatus, Mode, Side, utcnow
 from guard.store.packs import put_pack
 from guard.runtime.docker import Docker
 from guard.runtime import generation_readiness, sandbox
@@ -459,7 +459,14 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                         and hasattr(executor, "validate_configuration")):
                     executor.validate_configuration(pack.checks[item.check_id])
                 else:
-                    executor.validate_policy(pack.checks[item.check_id], policy.values.get(item.check_id, {}))
+                    from guard.executors import run_binding
+                    check_def, values = pack.checks[item.check_id], policy.values.get(item.check_id, {})
+                    if run_binding.keys_for(check_def):
+                        # Static preparation computes the same per-run binding guard run will compute.
+                        _, values = run_binding.effective_values(
+                            check_def, c.get(item.executor, {}), selected_env, values, side=side, attempt_id=None,
+                            issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until)
+                    executor.validate_policy(check_def, values)
                 executor.keys()
         record("inputs", True, "pack, selection, real executors, policy settings and model inventory checked")
     except Exception as exc:

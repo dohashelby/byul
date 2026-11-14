@@ -1,18 +1,6 @@
 executor: engine_sensor
 collection_profile: engine-sensor-kernel-bounds-v1
-policy_params:
-- key: sensor_environment_sha256
-  type: str
-  required: true
-- key: sensor_target_sha256
-  type: str
-  required: true
-- key: sensor_prepared_sha256
-  type: str
-  required: true
-- key: sensor_manifest_sha256
-  type: str
-  required: true
+policy_params: []
 required_observations:
 - key: engine_sensor_violation
   type: bool

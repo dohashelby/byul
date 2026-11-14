@@ -3,7 +3,7 @@ framework_id: CHK-REQ-005
 mechanism_ids:
 - mechanism-01
 - mechanism-08
-revision: 6
+revision: 7
 retired: false
 area: REQ
 purpose: 작업·대상 인가
@@ -17,12 +17,6 @@ impact: HIGH
 applies_when:
   prose: 모델 1개에서도 허용 대상을 확인한다. alias·adapter·공유 모델 소비는 실제 선택 시 추가한다. 모델을 사용 종료하거나 alias를 변경한 경우에는 이전 경로가 선택하는 최종 모델도 확인한다.
 policy_params:
-- key: model_environment_sha256
-  type: str
-  required: true
-- key: model_target_sha256
-  type: str
-  required: true
 - key: allowed_principal_sha256
   type: str
   required: true
@@ -34,12 +28,6 @@ policy_params:
   required: true
 - key: retired_model_revisions
   type: list[str]
-  required: true
-- key: model_validity_start
-  type: str
-  required: true
-- key: model_validity_end
-  type: str
   required: true
 policy_prose:
   policy_to_decide: 호출자별 모델·adapter 허용 관계

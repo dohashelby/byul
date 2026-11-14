@@ -12,6 +12,7 @@ from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.models import canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
 from guard.store import Store
+from tests.run_binding_support import for_pack
 from tests.builders import baseline_pack,policy,T0
 from tests.test_a1_credential_copy_contract import example
 from tests.test_a1_required_event_product import World as OriginalWorld,PRIVATE
@@ -92,7 +93,7 @@ def test_existing_registry_cli_copy_records_and_exact_refs(tmp_path,monkeypatch,
             if path.name=='probe_log.jsonl' and args and args[0]=='w':raise OSError(PRIVATE)
             return original(path,*args,**kwargs)
         monkeypatch.setattr(Path,'open',open_file)
-    pol=policy(pack.ref(),scope={'include':['PLT-12']},values={'PLT-12':values})
+    pol=policy(pack.ref(),scope={'include':['PLT-12']},values={'PLT-12':for_pack(pack,'PLT-12',values)})
     for name,value in [('environment',environment.to_dict()),('policy',pol.to_dict()),('target',world.target)]:
         (tmp_path/(name+'.json')).write_bytes(canonical_json(value))
     cfg=tmp_path/'guard.toml';cfg.write_text('[executors]\nrequired_event_record="kubernetes"\n[adapter]\nname="vllm"\n[required_event_record]\ntarget='

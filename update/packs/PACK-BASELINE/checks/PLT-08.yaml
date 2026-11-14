@@ -3,7 +3,7 @@ framework_id: CHK-PLT-008
 mechanism_ids:
 - mechanism-01
 - mechanism-16
-revision: 6
+revision: 7
 retired: false
 area: PLT
 purpose: 통신 상대·전송 보호
@@ -38,12 +38,6 @@ policy_params:
   required: true
 - key: plaintext_forbidden
   type: bool
-  required: true
-- key: validity_start
-  type: str
-  required: true
-- key: validity_end
-  type: str
   required: true
 policy_prose:
   policy_to_decide: 구간별 위협 주체·자료 민감도·보호 수준

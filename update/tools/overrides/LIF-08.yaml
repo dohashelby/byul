@@ -1,21 +1,6 @@
 executor: rank_failure
 collection_profile: kubernetes-mp-rank-failure-observation-v1
 policy_params:
-- key: rank_environment_sha256
-  type: str
-  required: true
-- key: rank_target_sha256
-  type: str
-  required: true
-- key: rank_prepared_sha256
-  type: str
-  required: true
-- key: rank_validity_start
-  type: str
-  required: true
-- key: rank_validity_end
-  type: str
-  required: true
 - key: rank_executor_backend
   type: str
   required: true

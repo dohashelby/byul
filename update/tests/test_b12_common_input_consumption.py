@@ -241,6 +241,9 @@ def test_without_common_inputs_primary_artifact_error_keeps_original_exception_b
 
 
 def pipeline(folder, pack, env, check_id, values, cfg, *, activation=None):
+    from tests.run_binding_support import split
+    # @35: guard run computes ENV/target/prepared/validity from these real files (guard-run-binding/1).
+    values, _ = split(pack.checks[check_id], values)
     pol = policy(pack.ref(), scope={'include':[check_id]}, values={check_id:values})
     store = Store(folder/'store'); put_pack(store, pack.path); store.put_many([env,pol])
     plan = select(pack,[env],pol); store.put(plan)

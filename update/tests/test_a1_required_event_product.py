@@ -18,6 +18,7 @@ from guard.executors.observation_contract import EVENTS,FIELDS,SCHEMA,normalize_
 from guard.executors.owned_capture import _FILE_READER
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.store import Store
+from tests.run_binding_support import for_pack
 from tests.builders import baseline_pack,policy,T0
 from tests.test_kubernetes_request_binding import env,target
 from tests.test_kubernetes_sampling import World as PodWorld
@@ -124,7 +125,7 @@ def test_existing_cli_records_and_exact_refs_preserve_unknown_and_followup_facts
             if path.name=='probe_log.jsonl' and a and a[0]=='w':raise OSError(PRIVATE)
             return original(path,*a,**kw)
         monkeypatch.setattr(Path,'open',open_file)
-    pol=policy(pack.ref(),scope={'include':['OBS-01']},values={'OBS-01':values})
+    pol=policy(pack.ref(),scope={'include':['OBS-01']},values={'OBS-01':for_pack(pack,'OBS-01',values)})
     for name,value in [('environment',environment.to_dict()),('policy',pol.to_dict()),('target',world.target)]:
         (tmp_path/(name+'.json')).write_bytes(canonical_json(value))
     cfg=tmp_path/'guard.toml';cfg.write_text('[executors]\nrequired_event_record="kubernetes"\n[adapter]\nname="vllm"\n[required_event_record]\ntarget='

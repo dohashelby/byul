@@ -2,7 +2,7 @@ id: REQ-17
 framework_id: CHK-REQ-017
 mechanism_ids:
 - mechanism-06
-revision: 5
+revision: 6
 retired: false
 area: REQ
 purpose: 부채널 노출 제한
@@ -16,18 +16,6 @@ impact: MEDIUM
 applies_when:
   prose: 공유 cache·비공개 prefix·시간/상태 관측 경로와 보호 요구가 관련된 환경에서 적용한다. 관측 가능성이나 정책 미확인은 조사 과제로 남긴다.
 policy_params:
-- key: sensor_environment_sha256
-  type: str
-  required: true
-- key: sensor_target_sha256
-  type: str
-  required: true
-- key: sensor_prepared_sha256
-  type: str
-  required: true
-- key: sensor_manifest_sha256
-  type: str
-  required: true
 - key: cache_timing_max_auc_percent
   type: int
   required: true

@@ -1,18 +1,6 @@
 executor: request_termination
 collection_profile: kubernetes-request-attempt-observation-v1
-policy_params:
-- key: attempt_environment_sha256
-  type: str
-  required: true
-- key: attempt_target_sha256
-  type: str
-  required: true
-- key: attempt_validity_start
-  type: str
-  required: true
-- key: attempt_validity_end
-  type: str
-  required: true
+policy_params: []
 required_observations:
 - key: activation_steps
   type: list

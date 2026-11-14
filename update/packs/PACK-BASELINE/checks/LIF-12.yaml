@@ -2,7 +2,7 @@ id: LIF-12
 framework_id: CHK-LIF-012
 mechanism_ids:
 - mechanism-13
-revision: 5
+revision: 6
 retired: false
 area: LIF
 purpose: 재시도 비용 제한
@@ -16,12 +16,6 @@ impact: MEDIUM
 applies_when:
   prose: 앱·SDK·Gateway·엔진의 추론 자동 retry 주체·발동 조건과 허용 정책을 먼저 확인한다. 금지 구성은 자동 retry의 거부와 실제 미발생 근거를 확인하고, 허용·사용 구성은 원·새 attempt의 중복·잔존·비용을 대조한다. 실제 비사용 근거가 있으면 자동 retry 실행 분기만 비적용 후보로 남기며, 기능·정책 미정은 적용 미정으로 둔다. 취득 SDK retry는 LIF-002에서 확인한다.
 policy_params:
-- key: retry_environment_sha256
-  type: str
-  required: true
-- key: retry_target_sha256
-  type: str
-  required: true
 - key: retry_scope_sha256
   type: str
   required: true
@@ -32,12 +26,6 @@ policy_params:
   type: str
   required: true
 - key: retry_session
-  type: str
-  required: true
-- key: retry_validity_start
-  type: str
-  required: true
-- key: retry_validity_end
   type: str
   required: true
 - key: retry_policy_mode

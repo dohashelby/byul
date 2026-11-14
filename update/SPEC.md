@@ -318,6 +318,7 @@ execution:
   finished_at: RFC3339|null
   abort_reason: str|null
   cleanup_errors: [str]                        # 실행 후 정리 실패. 비어 있으면 직렬화 생략(과거 해시 유지)
+  run_binding: object|null                     # guard-run-binding/1: guard run이 계산한 실행별 기술 결합(ENV·설정 파일 해시·유효 창). 없으면 직렬화 생략. docs/RUN_BINDING.md
 normal_control: { attempted: bool, succeeded: bool|null, detail: str }
 challenges:
   - step: str                                  # CheckDef.challenge_steps 중 하나
@@ -343,6 +344,7 @@ comparability:                                 # update 모드 비교 조건 (IN
   cpu: { architecture: str, model: str, system: str, kernel: str, threads: int } | null  # 명시적 CPU 비교만, 없으면 직렬화 생략
 ```
 
+- **실행 결합(2026-11-14 RB, 팩 35)**: 실행마다 바뀌는 ENV 해시·실행기 설정 파일(target·prepared·manifest) 해시·관측 유효 창은 정책 값이 아니다. `guard run`이 실행 직전에 같은 ENV와 같은 설정 파일에서 계산해 실행기에 넘기고 `execution.run_binding`에 남긴다. 실행기의 대조식은 그대로이므로 계산 뒤 파일이 바뀌면 기존과 같이 실행기 불일치(ABORTED→UNKNOWN)다. 계산할 수 없으면 `NOT_RUN`(`RUN_BINDING_*`)→UNKNOWN이다. 결합 키를 정책에 넣으면 거부한다(`RUN_BINDING_BELONGS_TO_EXECUTION`). 판정 규칙·필수 관측은 바뀌지 않는다.
 - 수집 실패는 `collected: false`로 남긴다. 값을 비우거나 추정하지 않는다.
 - 직통 결과 값은 HTTP 상태코드(int) 또는 `refused`(연결 거부) · `timeout` · `unreachable`(ENETUNREACH/EHOSTUNREACH) · `dns_error` · `error`. 응답 미수신 종류를 서로 구별한다.
 - **직통 결과의 근거(basis)**: 실행기는 (출발점·대상, 키) 조합마다 먼저 TCP 연결만 시도한다(바이트 미전송). 연결 자체가 `timeout`·`refused`·`unreachable`이면 HTTP를 보내지 않고 그 조합의 **모든 등록 경로(상태 변경 경로 포함)** 결과를 그 값으로 기록하고 증거 파일에 `basis: tcp_connect (inferred)`로 표시한다. 연결되면 비상태변경 경로에만 HTTP를 보내고(`basis: http`) 상태 변경 경로는 보내지 않는다(미시험). `routes_tested`는 모든 (대상, 비허용 키) 조합의 직통 결과가 있는 경로다.

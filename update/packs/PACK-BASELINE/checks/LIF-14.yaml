@@ -2,7 +2,7 @@ id: LIF-14
 framework_id: CHK-LIF-014
 mechanism_ids:
 - mechanism-13
-revision: 5
+revision: 6
 retired: false
 area: LIF
 purpose: 종결·자원 회수
@@ -16,21 +16,6 @@ impact: LOW
 applies_when:
   prose: profiler의 실제 활성·등록 route·backend 종료 경로가 있을 때 적용한다. 비사용 기능은 등록·도달성을 확인한 뒤 제외한다.
 policy_params:
-- key: profiler_environment_sha256
-  type: str
-  required: true
-- key: profiler_target_sha256
-  type: str
-  required: true
-- key: profiler_prepared_sha256
-  type: str
-  required: true
-- key: profiler_validity_start
-  type: str
-  required: true
-- key: profiler_validity_end
-  type: str
-  required: true
 - key: profiler_backend_kind
   type: str
   required: true

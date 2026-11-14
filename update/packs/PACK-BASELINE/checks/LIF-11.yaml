@@ -3,7 +3,7 @@ framework_id: CHK-LIF-011
 mechanism_ids:
 - mechanism-13
 - mechanism-10
-revision: 6
+revision: 7
 retired: false
 area: LIF
 purpose: 종결·자원 회수
@@ -17,15 +17,6 @@ impact: LOW
 applies_when:
   prose: 기본 TP worker·통신·자원 회수와 다음 기동을 확인한다. Ray·PP는 사용 시 추가한다.
 policy_params:
-- key: recovery_environment_sha256
-  type: str
-  required: true
-- key: recovery_target_sha256
-  type: str
-  required: true
-- key: recovery_prepared_sha256
-  type: str
-  required: true
 - key: recovery_selection_sha256
   type: str
   required: true

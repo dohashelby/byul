@@ -450,6 +450,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     raise ValueError(f"{side}/{item.check_id}: real executor is required")
                 if prepared[0] == "managed":
                     c, _ = _credentials(c, c.get("validation" if single else "update", {}).get("gateway_profile", "single"))
+                from guard.configuration import for_check
+                c = for_check(c, item.executor, item.check_id)  # [check_config.<CHECK>] (RB2-S)
                 executor = factory(c)
                 support = support_by_key[side, item.check_id]
                 # These collectors distinguish a valid policy outside their

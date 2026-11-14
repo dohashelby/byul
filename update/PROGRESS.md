@@ -3,8 +3,9 @@
 - 한 일: 사용자 결정 "점검별 설정 둔다"로 `[check_config.<점검>]`을 그 점검의 실행기 칸 위에 병합하게 했다(`configuration.for_check`; core 실행·결합 계산, 사전 준비 점검, 지원 평가, 이월 미리보기). 실행기·판정·팩 무변경. DECISIONS RB2-S, RUN_BINDING 10절, SPEC §4.5.
 - 테스트 결과: 직접 시험 `test_check_config.py` 3개와 결합 시험 포함 35개 통과. 준비·이월·지원 평가 관련 시험 묶음은 아래 PR 기록 참고. 전체 pytest는 PR CI로 확인한다.
 - J02 조립: `tools/j02_run_config.py`(운영자 선언 → guard.toml, 63×2 정적 보고)와 직접 시험 4개를 더했다. 빈 선언 보고에서 OBS-03은 Kubernetes 구현 미등록으로 나왔다.
-- 다음 단계: RB2-J 결정(정책 값 출처, 준비값 출처, 1차 UNKNOWN 점검 포함, OBS-03) 뒤 실제 선언 작성.
-- 막힌 것: RB2-J 결정 대기.
+- RB2-J 반영: 사용자 결정(J1 웹 초안 값, J2 kubectl get 자동, J3 포함, J4 원인 기록 UNKNOWN)으로 `--web-values`(팩 36 DRAFT 정책 변환)·`--discover`(읽기 전용 get으로 쪽별 target)·OBS-03 원인 기록을 더했다. 직접 시험 11개 통과. 실제 웹 값으로 본 공백은 RUN_BINDING 12.1.
+- 다음 단계: 실제 lab에서 `--discover` 실행, 정책 값 없는 24개 점검과 `[run_binding]` 16개의 값 출처 정리, SUP-08 @36 재검증(고정 자료가 있는 기기에서).
+- 막힌 것: 기록 생산자 미배포(세션), PLT-07·08·09·SUP-13 프로필 불일치, SUP-08 고정 자료 위치.
 
 ## 2026-11-14 — RB2 실행 준비값 분리 구현(팩 36)
 

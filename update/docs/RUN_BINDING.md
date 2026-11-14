@@ -350,9 +350,33 @@ J02는 MA7 계획의 63개 점검을 한 번의 `guard update`로 기준·후보
 - 빈 선언(모든 실행기 `kubernetes`, 정책 값 없음)으로 돌리면 기준 쪽 63개 중 62개가 MISSING_INPUT이다(겹침 포함: 정책 값 없음 54, 준비값 표 없음·형식 오류 16, 결합 계산 파일 없음 26). **OBS-03 1개는 UNSUPPORTED**(`log_analysis`에 vLLM용 `kubernetes` 구현 없음)로 나온다.
 - 기존 점검별 도구(`gpu_a_run_inputs`·`mvp_a_input_materialize`·`mvp_sup08_inputs`·`b03_input_materialize`·`b12_tp2_inputs`)가 만드는 target·prepared·사례 manifest는 이 선언의 파일 경로로 그대로 쓴다. 도구를 대체하지 않는다.
 
-### 11.3 사람 결정이 필요한 것 (DECISIONS RB2-J)
+### 11.3 사람 결정 (DECISIONS RB2-J, 2026-11-14 결정됨 — 12절)
 
 1. **정책 값의 출처**: 63개의 A·A′·C·D·E 키는 기업 값이다. J02 lab 실행에 EXAMPLE 초안 값을 쓸지(2026-11-03 결정은 REQ-08·09·10, SUP-03·08 다섯 개만 허용), 실제 기업 값을 기다릴지.
 2. **실행 준비값·신원의 출처**: 기록 세션, PLT-07·08 실행 신원, 세대별 target·prepared, 복구 자원 선택(LIF-11은 J01)을 운영자가 선언 파일로 쓸지, 조립 도구가 읽기 전용 `kubectl get`으로 cluster에서 읽어 채울지. 지금 도구는 선언만 받는다.
 3. **1차 UNKNOWN 범위 점검의 포함**: REQ-02, OBS-01·06·11, PLT-07·12(J02 안)는 1차 완성 기준이 "실행 경로 준비 + UNKNOWN"이다. J02 실행 설정에 넣어 UNKNOWN 증거를 남길지, J02 범위에서 뺄지.
 4. **OBS-03 구현**: `log_analysis`에 Kubernetes 구현이 없다. 새 실행기 구현(M-B1 범위)을 할지, J02에서 원인 기록 UNKNOWN으로 둘지.
+
+## 12. RB2-J 결정 반영 (2026-11-14)
+
+| 결정 | 반영 |
+|---|---|
+| J1 "웹 초안 값 사용" | `--web-values FILE`: 웹 DRAFT 값(`j02-web-input/verification-values.json`)을 팩 36 정책 입력(`policy.yaml`)으로 바꾼다. 상태 DRAFT·확인자 없음, `data_origin: DECLARED`(웹 입력값), 결과는 official=false다. 팩 36이 결합으로 가져간 키와 선언하지 않는 키는 빼고 `web_values_dropped`에 적는다(실제 파일: PLT-07 `subject_scope`, PLT-08 `api_hop_scope`·`api_port`). 값을 더하지 않는다. |
+| J2 "kubectl get으로 자동" | `--discover`: 쪽마다 `kubectl --context C get namespace NS -o json`과 `kubectl --context C -n NS get pods -l guard.run=<run_id>,byul.a/generation=<generation> -o json`만 실행한다(argv 검사로 get 외 동사·exec·`--raw` 거부). 엔진·probe Pod가 하나씩이어야 하고, 기존 target 생성기(`gpu_a_run_inputs.target`)로 그 쪽 target을 만든 뒤 스냅샷과 함께 `cluster/<side>/`에 남긴다. target 경로는 단일 `target`을 받는 선택 실행기 칸에 넣는다(`supply_boot`·`lifecycle_transition`·`observation_state`는 역할별·세대별 칸이라 제외, 명시 값은 덮어쓰지 않음). ENV·target·prepared 해시는 1단계 결합이 실행 때 계산한다. |
+| J3 "넣는다" | REQ-02, OBS-01·06·11, PLT-07·12를 J02 범위에 그대로 두고 보고한다. 입력이 없으면 실행에서 UNKNOWN 증거가 남는다. |
+| J4 "원인 적고 UNKNOWN" | OBS-03은 실행기 구현을 고르지 않는다(`log_analysis`는 target을 받지 않게 제외). 보고서 상태 `UNKNOWN_RECORDED`, 원인 `KUBERNETES_LOG_ANALYSIS_IMPLEMENTATION_ABSENT`. `guard run`에서는 "executor not configured" `NOT_RUN`→UNKNOWN이다. |
+
+### 12.1 실제 웹 값으로 본 J02 공백 (테스트용 ENV, `--discover` 없이)
+
+기준 쪽 63개 중 READY_STATIC 9(OBS-04·05·09, PLT-01·04, REQ-03·11·13, SUP-08). 나머지 원인(겹침 포함):
+
+- **target 파일 없음 → `--discover`로 채울 것(26)**: supply_boot 계열·stream_buffer·request_termination·engine_sensor·profiler·credential/session revocation·model_authorization. 단 supply_boot은 역할별(normal·challenge) target·prepared가 필요해 단일 target 자동 채움 대상이 아니다.
+- **`[run_binding.<점검>]` 표 없음(16)**: kubectl get으로 채울 수 없는 값이다.
+  - 기록 세션 9개(OBS-01·02·06·11, PLT-12, REQ-02·04·06, LIF-12): lab에 Gateway·기록 생산자가 배포돼 있지 않다(입력안내 1절 "lab에 Gateway 없음"). 생산자가 없으면 세션도 없다. J3대로 UNKNOWN 증거가 남는다.
+  - LIF-05·06·16 세대·offset: 한 판본 안의 세대 전환(재배포)을 실행 중에 해야 한다. 세대별 target은 `--discover`와 같은 방식으로 만들 수 있지만 prepared는 로컬 준비 자산이고, 세대 전환을 누가 일으키는지(lab_activation) 정해져 있지 않다.
+  - LIF-07·09 시나리오 파일: 개발 도구(`b12_tp2_inputs`)의 시나리오 순서 파일을 쓰면 된다.
+  - PLT-07·08: 팩의 프로필이 Docker용이라(`explicit-*`) Kubernetes 구현과 맞지 않는다. Docker 네트워크 신원은 Kubernetes에 없다. Kubernetes 프로필 파생 팩 없이는 UNKNOWN이다.
+- **정책 값 없음(24개 점검)**: 웹 값 파일에 없는 C(생산자 소스 SHA)·A′(정책 문서 해시)·D(시험 주체)·E(사건 시각·E 키) 값과, 파일에 아예 없는 점검(SUP-05·07·09·10·11·15·16, PLT-03·05, REQ-04·05, OBS-06, SUP-03 등)이다. 입력안내 3절이 "실행 때 채움"으로 둔 값 중 결합으로 옮겨지지 않은 것들이라 지금 자동으로 채울 곳이 없다.
+- **프로필 미지원**: PLT-09(api_transport), SUP-13(template_validation)은 팩 프로필이 Kubernetes 구현과 다르다.
+- **설정 형식**: PLT-02·06(unix_ipc), REQ-01(direct_route 역할 키), REQ-08·09·10·SUP-04는 실행기 칸의 설정(역할·설정 파일)이 있어야 한다.
+- **SUP-08 @36 사전 확인**: `ma8-local-preflight-20261113.json`의 팩 Ref가 34다. 고정 자료(`fixture-manifest.json`, 모델 snapshot)가 다른 기기(WSL `/mnt/c/...`, `/home/youngjo/...`)에 있어 이 기기에서는 다시 돌릴 수 없다. 그 기기에서 `tools/mvp_sup08_inputs.py`(팩 관문 36)로 launch manifest를 다시 만들고 `tools/mvp_sup08_local_audit.py`로 재검증해야 MA7 계획(36)과 맞는다.

@@ -21,13 +21,17 @@ def snippet(marker):
 
 
 def test_new_authentication_instructions_create_private_distinct_tokens(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    monkeypatch.chdir(checkout)
+    monkeypatch.setenv("HOME", str(tmp_path))
     before = os.umask(0o077)
     try:
         exec(compile(snippet("TOKEN_SETUP"), str(DOC), "exec"), {})
     finally:
         os.umask(before)
-    folder = tmp_path / "private-install"
+    folder = tmp_path / ".byul-install-inputs"
+    assert not folder.is_relative_to(checkout)
     assert folder.stat().st_mode & 0o777 == 0o700
     assert all(path.stat().st_mode & 0o777 == 0o600 for path in folder.iterdir())
     auth = load_auth(folder / "auth.json")

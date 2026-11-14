@@ -1,3 +1,10 @@
+## 2026-11-14 — B2 실행 준비물 결합값 점검별 확인·승인안 (RB2)
+
+- 한 일: @35에 남은 B2 키 57개(17개 점검)를 실행기 코드로 하나씩 확인해 G 20·E 4·P 33으로 나눴다. 기록 세션 9개는 lifecycle prepared의 `session`이 아닌 다른 생산자 폴더 열쇠라 prepared에서 읽을 수 없음을 확인했다. `retry_scope`·`copy_inventory`는 bytes 해시, OBS-06 계획 파일은 정책 참조를 스스로 내는 구조, LIF-11 `require_absent`는 판정 기준임을 확인했다. 1단계 `keys_for`를 그대로 넓히면 @35 재생이 깨지는 점을 찾아 단계별 판별로 설계했다. `docs/RUN_BINDING.md` 7절과 DECISIONS RB2-Q1~Q7에 올렸다.
+- 테스트 결과: 문서만 바뀌어 시험 없음. 판정기·core·보고서·models·store가 B2 키를 읽지 않음을 grep으로 확인했다.
+- 다음 단계: RB2 승인 범위에 따라 2단계 구현(run_binding 단계 표·값 출처, 실행기 설정 칸, 팩 @36, 정책 이전 `--stage 2`, 직접 시험, 소스 목록·검토 행)과 PR.
+- 막힌 것: 팩 판본 상향·실행기 설정 형식 변경·E 키 분리는 사용자 승인 전이라 하지 않았다.
+
 ## 2026-11-14 — RB 실행 결합값 분리 구현(팩 35)
 
 - 한 일: 사용자 승인으로 `guard-run-binding/1`을 구현했다(`executors/run_binding.py`, `core/run.py`·`application.py` 연결, `Execution.run_binding`). 44개 점검의 결합 키 222개를 `tools/overrides`와 팩에서 빼 PACK-BASELINE@35를 만들었다. 정책 이전 도구, 예시·GPU 초안 정책·MA7 계획의 @35 이전, GPU·TP2·SUP-08 입력 도구 조정, SPEC §4.5·설계 문서 6절 갱신을 했다. 소스 목록 bdc9eeec와 검토 행(결정 5)을 추가했다.

@@ -204,3 +204,26 @@ def test_rpc_scope_does_not_change_default_ipc_scope(setup):
     with pytest.raises(ValueError, match='RANK_IPC_SOURCE_UNAVAILABLE'):
         sources.qualify(module, image='fixture-image')
     assert len(observer.functions[module.__name__]) == 4
+
+
+def test_missing_scheduled_ids_keep_gap_and_original_call_with_fixed_diagnostic(setup):
+    module, _, rows, inner, outer, scheduled, _ = setup
+    scheduled.num_scheduled_tokens = {}
+    assert outer.execute(scheduled) is inner.result
+    assert module.calls == [('outer', scheduled), ('inner', scheduled)]
+    assert len(rows) == 2
+    assert all(r['gaps'] == ['RANK_RPC_CAPTURE_UNAVAILABLE'] for r in rows)
+    assert all(r['diagnostic_code'] == 'RANK_REQUEST_IDS_UNAVAILABLE' for r in rows)
+    assert all(r['diagnostic_stage'] == 'before-original' for r in rows)
+
+
+def test_gap_diagnostic_never_formats_user_exception_or_copies_private_message(setup):
+    _, observer, rows, _, _, _, _ = setup
+    class PrivateError(ValueError):
+        def __str__(self):
+            raise AssertionError('사용자 예외 문자열 변환 금지')
+    for error in (PrivateError('비밀'), ValueError('비밀'), ValueError('RANK_BAD\n비밀')):
+        observer._gap('EXAMPLE', error, 'before-original')
+    assert len(rows) == 3
+    assert all(r['diagnostic_code'] == 'RANK_RPC_OBSERVATION_ERROR' for r in rows)
+    assert '비밀' not in json.dumps(rows, ensure_ascii=False)

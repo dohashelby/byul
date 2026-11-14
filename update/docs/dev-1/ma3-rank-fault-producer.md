@@ -106,3 +106,12 @@ source control은 private ARM의 HMAC·세션/설정/자산·정확 대상 세�
 Pod 안 actor는 정상 요청과 실제 초기 IPC/객체 연결을 먼저 확인하고 pidfd_open 전후 같은 프로세스 문맥을 대조한다. 실제 SIGSTOP/SIGCONT·SIGKILL의 전후 상태/시각을 별도 영수증에 남기며 death에는 SIGCONT를 보내지 않는다. delay는 finally 정리 외에도 별도 fork lease가 actor 사망/만료 때 같은 pidfd만 재개한다. 새 자원/이미지/모델을 만들지 않고 실제 대상 Pod UID/모델 영수증을 실행별 scope로 받는다. 전체 수락/등록은 여전히 false다.
 
 직접 영향/경로130개, 새66개의 기준 이미지 Python ABI 대조가 통과했다. 시험의 HTTP는 대역이며 원 RPC/barrier·시험이 만든 Python 자식의 실제 신호/해제·actor의 finally 없는 사망/lease 만료 정리는 실제 OS에서 검증했다. GPU 실행·실제 엔진 장애로 올리지 않는다. Source548파일/목록 자체SHA70f2607a의 정확 검토 행을 추가했다. 다음 GPU에서 먼저 정상 source/ID/IPC 자격을 대조하고 자격 실패 시 주입하지 않는다. 새 세대 복구와 원 판정/상위 오류 전파 전체 수락은 별도다.
+
+
+## 실제 GPU RPC 사례의 부분 대조 (2026-11-14)
+
+소스 `789817e3`·목록 자체 SHA `30f4ea1d`의 별도 비밀 준비물을 실제 기준 TP2 GPU에서 실행했다. 지연은 원 RPC/요청 연결, 같은 pidfd의 STOP/CONT 물리 영수증, 해당 요청 HTTP200과 새 Pod 정상 HTTP200을 확인했다. 예외는 원 RPC 안 CONTROL_RAISE와 HTTP500, 종료는 pidfd SIGKILL/EXITED와 HTTP500을 확인했고 두 경우 모두 새 Pod 정상 HTTP200을 확인했다. 원 snapshot/HMAC/정확 자산 대조의 gap은 세 사례 모두 0이다. 정상 응답을 오류 전달로 바꾸지 않고, 전체 그룹·상위 전파 기한·기존 TP1 수락·등록은 미확인으로 유지한다.
+
+후보 지연 v2는 물리 STOP/CONT·HTTP200·새 Pod 정상 HTTP200이 기록됐으나 추가 RPC 호출에서 fault16개·복구8개 gap이 있어 전체 원자료 대조를 통과하지 않았다. 원본을 보존하며 gap을 제거하거나 성공으로 바꾸지 않는다. 후속 구현은 gap을 유지하면서 허용된 고정 진단 코드/실패 단계만 더한다. 사용자 예외의 원문·본문·토큰은 기록하지 않는다. 새 확정 소스의 읽기 전용 요청으로 원인을 확인하기 전에는 후보 추가 장애를 실행하지 않는다.
+
+기준 원본 ZIP: 지연100,012 bytes/SHA `d80fe50621457a673d0c876d37faada6d033f65c3a5242c4e75f8fd82aef15f1`, 예외91,148 bytes/SHA `427b52fdc58152a3c69cea73c63cbdc0661e1e29502e29afe983f6847505e3e1`, 종료83,584 bytes/SHA `53273a063bf2825e5d38c5cf08af1ca8dd6c9bc69466c051be9b54882ba483be`. 실제 원본/검토 자료는 작업 폴더에 보존한다. 제품 EVD/RES 생성이나 M-A3 전체 완료·생산자 인증을 주장하지 않는다.

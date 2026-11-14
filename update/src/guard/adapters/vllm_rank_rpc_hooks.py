@@ -139,11 +139,19 @@ class RPCObserver:
         self.emit(value)
         return value
 
-    def _gap(self, point):
+    def _gap(self, point, error, stage):
+        # 관측 실패의 원문/사용자 예외를 직렬화하지 않고 고정 진단 코드만 남긴다.
+        code = 'RANK_RPC_OBSERVATION_ERROR'
+        if type(error) is ValueError and len(error.args) == 1:
+            value = error.args[0]
+            if (type(value) is str and value.startswith('RANK_') and len(value) <= 80
+                    and all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789' for c in value)):
+                code = value
         try:
             self.emit({'schema': 'guard-rank-rpc-hook-candidate/1', 'point': point,
                        'source_authenticated': False, 'engine_group_verified': False,
-                       'producer_registered': False, 'gaps': ['RANK_RPC_CAPTURE_UNAVAILABLE']})
+                       'producer_registered': False, 'gaps': ['RANK_RPC_CAPTURE_UNAVAILABLE'],
+                       'diagnostic_code': code, 'diagnostic_stage': stage})
         except BaseException:
             pass
 
@@ -165,16 +173,16 @@ class RPCObserver:
                         armed = True
                 else:
                     call, armed = self._call(context), True
-            except BaseException:
-                self._gap(point)
+            except BaseException as error:
+                self._gap(point, error, 'before-original')
             try:
                 if armed and self.control is not None and spec.get('fault_eligible') is True:
                     try:
                         self.control.maybe_hold(proof)
                     except control_code.NativeLabFault:
                         raise
-                    except BaseException:
-                        self._gap(point)
+                    except BaseException as error:
+                        self._gap(point, error, 'control')
                 original_invoked = True
                 result = original(*args, **kwargs)
             except BaseException as error:
@@ -183,8 +191,8 @@ class RPCObserver:
                         event = 'CONTROL_RAISE' if not original_invoked and type(error) is control_code.NativeLabFault else 'RAISE'
                         self._metadata(module_name, point, spec, context, owner, ids, call, event, started,
                                        parent=parent, original_invoked=original_invoked)
-                    except BaseException:
-                        self._gap(point)
+                    except BaseException as observation_error:
+                        self._gap(point, observation_error, 'after-exception')
                 raise
             else:
                 if armed:
@@ -194,8 +202,8 @@ class RPCObserver:
                             selected = self._root(original, args, kwargs, spec['assignment'])
                         self._metadata(module_name, point, spec, context, owner, ids, call, 'RETURN', started,
                                        parent=parent, result=selected, original_invoked=True)
-                    except BaseException:
-                        self._gap(point)
+                    except BaseException as error:
+                        self._gap(point, error, 'after-return')
                 return result
             finally:
                 if token is not None:

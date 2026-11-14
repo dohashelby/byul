@@ -165,6 +165,11 @@
       "manifest_sha256": "357054316883da77b6cd8b928ff33d5e1c4ee5e45a00ed566552f62cc010ee92",
       "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-14T21:43:58.124183+09:00"
+    },
+    {
+      "manifest_sha256": "1c5f8b2b2af075ba75ebe8af79e342b9d0c6d4f1b0efcfa23bb413a168414402",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T12:46:45.931892+00:00"
     }
   ]
 }

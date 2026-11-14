@@ -185,7 +185,7 @@
   "update/src/guard/adapters/vllm_rank_request_identity.py": "dccdc3de0fadda607792ca1c1bf3f08331c435619d2951f2dc78ac3290f40318",
   "update/src/guard/adapters/vllm_rank_rpc_actor.py": "20ec4905dba256cfb9069570e79c1dc9d290202c910e97892d961d26a0b8d79c",
   "update/src/guard/adapters/vllm_rank_rpc_control.py": "a6a993a65b048cedfa2991f9153660014094b0176a97a847c3b9cf61b3578005",
-  "update/src/guard/adapters/vllm_rank_rpc_hooks.py": "2f0e8cc85ea0fd0eda92b89e5f3ef668e5033626ed93e0caee240428fe4d43c4",
+  "update/src/guard/adapters/vllm_rank_rpc_hooks.py": "ddde9e891a6b719e72ddfd28f601d0f7215a5bc42f787610b6f01bc3d74f81cd",
   "update/src/guard/adapters/vllm_ready_endpoint_contract.py": "ddae1078d9807910c9f79a815f2abeab6b1c340e8122eb4c3bca9a7b71ef3d7d",
   "update/src/guard/adapters/vllm_ready_endpoint_metadata.py": "c722aec3fa4a5eafee9ed478d970f5b82e26335b2788ec4cbb2d714128007c8e",
   "update/src/guard/adapters/vllm_ready_endpoint_sensor.py": "55753bfcaa3838cb3fdcd20429dbfbf50f037f3fee6d00466223870b854f4fe0",

@@ -3,13 +3,16 @@
 기존 native24 고정값·등록·판정 경로는 바꾸지 않는다. 이 대조는 엔진 호출,
 감싸기 설치, 장애 주입 또는 프로세스 그룹 인증을 수행하지 않는다.
 """
+from abc import ABCMeta
 import json
 import os
 from pathlib import Path
 import stat
+import sys
 import types
 
 from .vllm_lifecycle_sensor import code_digest
+from .vllm_worker_generation_contract import relative_code
 
 PROFILES = Path(__file__).with_name('assets') / 'vllm_rank_ipc_profiles.json'
 
@@ -58,7 +61,7 @@ def _function(module, name):
     for part in parts:
         if type(owner) is types.ModuleType:
             owner = vars(owner).get(part)
-        elif type(owner) is type:
+        elif type(owner) in (type, ABCMeta):
             owner = type.__getattribute__(owner, '__dict__').get(part)
         else:
             raise ValueError
@@ -81,7 +84,10 @@ def qualify(module, *, image):
         if len(matches) != 1:
             raise ValueError
         profile, = matches
-        expected = profile['sources'][module.__name__]
+        runtime = sys.implementation.name + '-' + '.'.join(map(str, sys.version_info[:3]))
+        if profile['runtime'] != runtime or sys.flags.optimize != 0:
+            raise ValueError
+        expected = profile['sources'][vars(module).get('__name__')]
         path = vars(module).get('__file__')
         if type(path) is not str:
             raise ValueError
@@ -90,8 +96,9 @@ def qualify(module, *, image):
         functions, digests = {}, {}
         for name in expected['functions']:
             actual = _function(module, name)
-            digest = code_digest(compiled[name])
-            if actual.__qualname__ != name or code_digest(actual.__code__) != digest:
+            digest = code_digest(relative_code(compiled[name], expected['path']))
+            if (actual.__qualname__ != name or digest != expected['body_code_sha256'][name]
+                    or code_digest(relative_code(actual.__code__, expected['path'])) != digest):
                 raise ValueError
             functions[name] = actual
             digests[name] = digest

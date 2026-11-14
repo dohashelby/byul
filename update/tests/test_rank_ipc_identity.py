@@ -24,6 +24,14 @@ def _child(connection, memory_name, output):
         connection.close()
 
 
+def _context_child(control):
+    try:
+        control.send(ipc.process_context(os.getpid()))
+        control.recv_bytes()
+    finally:
+        control.close()
+
+
 def test_same_pipe_keeps_payload_and_distinguishes_another_pipe():
     reader, writer = Pipe(duplex=False)
     other_reader, other_writer = Pipe(duplex=False)
@@ -153,3 +161,31 @@ def test_fd_replacement_during_capture_is_rejected(monkeypatch):
     finally:
         reader.close()
         writer.close()
+
+
+def test_actual_child_process_generation_matches_its_own_context():
+    context = multiprocessing.get_context('spawn')
+    parent, child = context.Pipe()
+    process = context.Process(target=_context_child, args=(child,))
+    try:
+        process.start()
+        child.close()
+        assert parent.poll(15)
+        observed = parent.recv()
+        assert ipc.process_context(process.pid) == observed
+        parent.send_bytes(b'done')
+        process.join(15)
+        assert process.exitcode == 0
+    finally:
+        if process.is_alive():
+            process.terminate()
+        if process.pid is not None:
+            process.join(15)
+        parent.close()
+        child.close()
+
+
+@pytest.mark.parametrize('pid', [False, 0, -1, 2**31, 2**30])
+def test_invalid_or_missing_process_is_not_replaced_with_current_process(pid):
+    with pytest.raises(ValueError, match='RANK_IPC_PROCESS_UNAVAILABLE'):
+        ipc.process_context(pid)

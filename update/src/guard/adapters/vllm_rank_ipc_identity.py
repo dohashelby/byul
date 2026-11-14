@@ -67,3 +67,43 @@ def pipe_endpoint(connection, *, key):
 def shared_memory_endpoint(memory, *, key):
     """SharedMemory의 payload·name property를 읽지 않고 실제 FD만 지문화한다."""
     return _capture(memory, SharedMemory, '_fd', 'shared-memory', key)
+
+
+def process_context(pid):
+    """동일 UID·PID/time namespace의 실제 시작 세대를 읽는다. PID만으로 결합하지 않는다."""
+    if type(pid) is not int or not 0 < pid < 2**31 or os.name != 'posix':
+        raise ValueError('RANK_IPC_PROCESS_UNAVAILABLE')
+    fd = None
+    try:
+        root = Path('/proc') / str(pid)
+        fd = os.open(root / 'stat', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode) or before.st_uid != os.geteuid():
+            raise ValueError
+        def start():
+            raw = os.read(fd, 8193)
+            if not 1 <= len(raw) <= 8192 or int(raw.split(b' ', 1)[0]) != pid:
+                raise ValueError
+            return int(raw[raw.rfind(b')') + 2:].split()[19])
+        ticks = start()
+        namespaces = tuple(os.stat(root / 'ns' / name).st_ino for name in ('pid', 'time'))
+        if namespaces != tuple(os.stat(Path('/proc/self/ns') / name).st_ino for name in ('pid', 'time')):
+            raise ValueError
+        offsets = (root / 'timens_offsets').read_bytes()
+        if len(offsets) > 4096:
+            raise ValueError
+        os.lseek(fd, 0, os.SEEK_SET)
+        if (start() != ticks or ticks < 0 or ticks >= 2**63
+                or namespaces != tuple(os.stat(root / 'ns' / name).st_ino for name in ('pid', 'time'))
+                or offsets != (root / 'timens_offsets').read_bytes()
+                or os.fstat(fd).st_uid != before.st_uid):
+            raise ValueError
+        return {'pid': pid, 'start_ticks': ticks, 'uid': before.st_uid,
+                'boot_sha256': sha256(Path('/proc/sys/kernel/random/boot_id').read_bytes()).hexdigest(),
+                'pid_namespace': namespaces[0], 'time_namespace': namespaces[1],
+                'time_offsets_sha256': sha256(offsets).hexdigest()}
+    except (OSError, ValueError, IndexError):
+        raise ValueError('RANK_IPC_PROCESS_UNAVAILABLE') from None
+    finally:
+        if fd is not None:
+            os.close(fd)

@@ -23,6 +23,96 @@
               54,
               127
             ]
+          },
+          "body_code_sha256": {
+            "MultiprocessingDistributedExecutor._init_executor": "28be96fc63ed4e5f3bb638538ac8909a9b434e29fd003b790c33e2a9b7c649c9"
+          },
+          "hooks": {
+            "MultiprocessingDistributedExecutor._init_executor": {
+              "phase": "after-original",
+              "role": "parent-executor",
+              "scalars": {
+                "configured_tp_size": {
+                  "root": "self",
+                  "path": [
+                    "vllm_config",
+                    "parallel_config",
+                    "tensor_parallel_size"
+                  ]
+                },
+                "driver_rpc_rank": {
+                  "root": "self",
+                  "path": [
+                    "driver_worker",
+                    "rpc_rank"
+                  ]
+                }
+              },
+              "members": {
+                "root": "self",
+                "path": [
+                  "workers"
+                ],
+                "scalars": {
+                  "worker_pid": {
+                    "root": "item",
+                    "path": [
+                      "process",
+                      "_popen",
+                      "pid"
+                    ]
+                  }
+                },
+                "endpoints": {
+                  "task_read": {
+                    "root": "item",
+                    "path": [
+                      "_task_queue",
+                      "_reader"
+                    ],
+                    "kind": "pipe"
+                  },
+                  "task_write": {
+                    "root": "item",
+                    "path": [
+                      "_task_queue",
+                      "_writer"
+                    ],
+                    "kind": "pipe"
+                  },
+                  "result_read": {
+                    "root": "item",
+                    "path": [
+                      "result_queue",
+                      "_reader"
+                    ],
+                    "kind": "pipe"
+                  },
+                  "result_write": {
+                    "root": "item",
+                    "path": [
+                      "result_queue",
+                      "_writer"
+                    ],
+                    "kind": "pipe"
+                  }
+                },
+                "processes": {
+                  "worker": {
+                    "root": "item",
+                    "path": [
+                      "process",
+                      "_popen",
+                      "pid"
+                    ]
+                  }
+                }
+              },
+              "source_modules": [
+                "vllm.executor.mp_distributed_executor",
+                "vllm.executor.multiproc_worker_utils"
+              ]
+            }
           }
         },
         "vllm.executor.multiproc_worker_utils": {
@@ -42,10 +132,125 @@
               206,
               251
             ]
+          },
+          "body_code_sha256": {
+            "ProcessWorkerWrapper.__init__": "bdee1eb1b7f3c30afbb419ba29f3380fe745285b394fbc27f828fdf7712f41ac",
+            "_run_worker_process": "02b1605d295570944a13e4e93f1e7effb1238b2b559569c9b1eb9c10366b514a"
+          },
+          "hooks": {
+            "ProcessWorkerWrapper.__init__": {
+              "phase": "after-original",
+              "role": "parent-worker",
+              "scalars": {
+                "rank": {
+                  "root": "rank",
+                  "path": []
+                },
+                "worker_pid": {
+                  "root": "self",
+                  "path": [
+                    "process",
+                    "_popen",
+                    "pid"
+                  ]
+                }
+              },
+              "endpoints": {
+                "task_read": {
+                  "root": "self",
+                  "path": [
+                    "_task_queue",
+                    "_reader"
+                  ],
+                  "kind": "pipe"
+                },
+                "task_write": {
+                  "root": "self",
+                  "path": [
+                    "_task_queue",
+                    "_writer"
+                  ],
+                  "kind": "pipe"
+                },
+                "result_read": {
+                  "root": "self",
+                  "path": [
+                    "result_queue",
+                    "_reader"
+                  ],
+                  "kind": "pipe"
+                },
+                "result_write": {
+                  "root": "self",
+                  "path": [
+                    "result_queue",
+                    "_writer"
+                  ],
+                  "kind": "pipe"
+                }
+              },
+              "source_modules": [
+                "vllm.executor.multiproc_worker_utils"
+              ],
+              "processes": {
+                "worker": {
+                  "root": "self",
+                  "path": [
+                    "process",
+                    "_popen",
+                    "pid"
+                  ]
+                }
+              }
+            },
+            "_run_worker_process": {
+              "phase": "before-original",
+              "role": "worker-admission",
+              "scalars": {
+                "rank": {
+                  "root": "rank",
+                  "path": []
+                }
+              },
+              "endpoints": {
+                "task_read": {
+                  "root": "task_queue",
+                  "path": [
+                    "_reader"
+                  ],
+                  "kind": "pipe"
+                },
+                "task_write": {
+                  "root": "task_queue",
+                  "path": [
+                    "_writer"
+                  ],
+                  "kind": "pipe"
+                },
+                "result_read": {
+                  "root": "result_queue",
+                  "path": [
+                    "_reader"
+                  ],
+                  "kind": "pipe"
+                },
+                "result_write": {
+                  "root": "result_queue",
+                  "path": [
+                    "_writer"
+                  ],
+                  "kind": "pipe"
+                }
+              },
+              "source_modules": [
+                "vllm.executor.multiproc_worker_utils"
+              ]
+            }
           }
         }
       },
-      "review": "rank0 driver와 executor는 같은 프로세스다. 부모 ProcessWorkerWrapper의 task/result queue와 _run_worker_process 인자의 실제 pipe를 대응한다. rank1의 장기 execute_model 루프·요청별 TP 방송 귀속은 별도 관측이 필요하다."
+      "review": "rank0 driver와 executor는 같은 프로세스다. 부모 ProcessWorkerWrapper의 task/result queue와 _run_worker_process 인자의 실제 pipe를 대응한다. rank1의 장기 execute_model 루프·요청별 TP 방송 귀속은 별도 관측이 필요하다.",
+      "runtime": "cpython-3.12.8"
     },
     {
       "id": "v1-shm-broadcast",
@@ -73,6 +278,134 @@
               607,
               637
             ]
+          },
+          "body_code_sha256": {
+            "MultiprocExecutor._init_executor": "93a599d21ac171a0d49abba4f5b8b1e50e4c2ac706e6fe9dbd55a140d674fcf6",
+            "WorkerProc._init_message_queues": "2b506b6b07838c851f1819da973c1ea5de2761c0be23e5a3c8b2f7e59573c18d"
+          },
+          "hooks": {
+            "MultiprocExecutor._init_executor": {
+              "phase": "after-original",
+              "role": "parent-executor",
+              "scalars": {
+                "configured_tp_size": {
+                  "root": "self",
+                  "path": [
+                    "vllm_config",
+                    "parallel_config",
+                    "tensor_parallel_size"
+                  ]
+                }
+              },
+              "endpoints": {
+                "broadcast": {
+                  "root": "self",
+                  "path": [
+                    "rpc_broadcast_mq",
+                    "buffer",
+                    "shared_memory"
+                  ],
+                  "kind": "shared-memory"
+                }
+              },
+              "members": {
+                "root": "self",
+                "path": [
+                  "workers"
+                ],
+                "scalars": {
+                  "rank": {
+                    "root": "item",
+                    "path": [
+                      "rank"
+                    ]
+                  },
+                  "worker_pid": {
+                    "root": "item",
+                    "path": [
+                      "proc",
+                      "_popen",
+                      "pid"
+                    ]
+                  }
+                },
+                "endpoints": {
+                  "response": {
+                    "root": "item",
+                    "path": [
+                      "worker_response_mq",
+                      "buffer",
+                      "shared_memory"
+                    ],
+                    "kind": "shared-memory"
+                  }
+                },
+                "processes": {
+                  "worker": {
+                    "root": "item",
+                    "path": [
+                      "proc",
+                      "_popen",
+                      "pid"
+                    ]
+                  }
+                }
+              },
+              "source_modules": [
+                "vllm.v1.executor.multiproc_executor",
+                "vllm.distributed.device_communicators.shm_broadcast"
+              ]
+            },
+            "WorkerProc._init_message_queues": {
+              "phase": "after-original",
+              "role": "worker-initialization",
+              "scalars": {
+                "rank": {
+                  "root": "self",
+                  "path": [
+                    "rank"
+                  ]
+                },
+                "reader_rank": {
+                  "root": "self",
+                  "path": [
+                    "rpc_broadcast_mq",
+                    "local_reader_rank"
+                  ]
+                },
+                "configured_tp_size": {
+                  "root": "vllm_config",
+                  "path": [
+                    "parallel_config",
+                    "tensor_parallel_size"
+                  ]
+                }
+              },
+              "endpoints": {
+                "broadcast": {
+                  "root": "self",
+                  "path": [
+                    "rpc_broadcast_mq",
+                    "buffer",
+                    "shared_memory"
+                  ],
+                  "kind": "shared-memory"
+                },
+                "response": {
+                  "root": "self",
+                  "path": [
+                    "worker_response_mq",
+                    "buffer",
+                    "shared_memory"
+                  ],
+                  "kind": "shared-memory"
+                }
+              },
+              "source_modules": [
+                "vllm.v1.executor.multiproc_executor",
+                "vllm.distributed.device_communicators.shm_broadcast"
+              ]
+            }
           }
         },
         "vllm.distributed.device_communicators.shm_broadcast": {
@@ -92,10 +425,15 @@
               560,
               605
             ]
+          },
+          "body_code_sha256": {
+            "MessageQueue.export_handle": "1cb56ca634fbde33f99c8c1efcdf5caca0fb41e789711388b67555efa6ebdc20",
+            "MessageQueue.create_from_handle": "c6940c6eb74a41737b4e4c62f1791fdbea2cb2340b7a6b2d4a0f35b4449f2589"
           }
         }
       },
-      "review": "부모 rpc_broadcast_mq.buffer.shared_memory와 worker _init_message_queues의 동일 FD 커널 객체를 대응한다. response queue와 workers[rank].proc 세대도 별도로 확인해야 하며 같은 요청/공유 메모리만으로 그룹 전체를 인증하지 않는다."
+      "review": "부모 rpc_broadcast_mq.buffer.shared_memory와 worker _init_message_queues의 동일 FD 커널 객체를 대응한다. response queue와 workers[rank].proc 세대도 별도로 확인해야 하며 같은 요청/공유 메모리만으로 그룹 전체를 인증하지 않는다.",
+      "runtime": "cpython-3.12.3"
     }
   ]
 }

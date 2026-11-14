@@ -6,6 +6,16 @@
 
 `vllm_rank_ipc_sources`는 고정 이미지 행과 정확 파일 bytes/SHA·원 함수 본문·정의 namespace를 대조한다. 함수 실행·관측기 설치는 하지 않는다. 새 adapter 데이터의 기준 쪽은 rank0 driver/executor가 같은 프로세스인 task/result queue 구조, 후보 쪽은 executor/worker의 broadcast/response 공유 메모리 구조로 나눴다. 실제 설치4파일·함수7개를 대상으로 하며 기존 native24 고정값/관문을 넓히지 않는다.
 
+### 읽기 전용 hook과 준비 자산
+
+`vllm_rank_ipc_hooks`는 같은 구현에 adapter 데이터의 경계/안전한 필드 경로를 넣는다. 일반 인스턴스 dict만 읽고 property·사용자 getter·stale dict 값을 actual 속성으로 쓰지 않는다. 부모의 각 worker 객체와 실제 PID/시작 세대를 따로 기록하며 RPC rank와 GPU TP rank를 같은 것으로 가정하지 않는다. 기준 worker 프로세스가 부모 executor 모듈을 import하지 않은 경우에는 자기 호출에 필요한 정확 source만 요구하고, 부모 쪽 원 기록을 별도로 결합해야 한다.
+
+`tools.rank_ipc_candidates prepare --image <고정 이미지> --output <새 디렉터리>`는 현재 검토 소스 관문을 확인한 뒤 준비한다. settings의 키는 비밀 파일에만 있으며 반환 manifest에는 해시만 있다. `/guard-rank-ipc`의 읽기 전용 코드/설정과 별도 private data 디렉터리로 배치한다. 준비 경로를 원 import 탐색에서 제거하고 기존 sitecustomize를 먼저 실행한다. helper는 _byul_rank_ipc 전용 namespace로 로드해 원 guard 패키지와 finder/loader 선택을 보존한다. 설치 source/ABI가 맞지 않으면 원 엔진을 바꾸지 않고 관측 공백으로 둔다.
+
+`tools.rank_ipc_candidates verify --prepared <로컬 원 준비물> --capture <반출 snapshot 폴더>`는 파일/설정·개별 snapshot HMAC·정확 source/본문과 snapshot 안의 context·세션 일치를 대조한다. 결과는 후보 원자료의 무결성 대조이며 producer 인증·그룹 전체 수락·LIF-08 PASS가 아니다. 파일/키/본문을 바꾼 원자료는 거부한다. 실제 엔진 확인 전까지 설치/그룹/등록 완료를 주장하지 않는다.
+
+추가48개 시험은 CPython3.12.3/3.12.8에서 각각 통과했다. 직접 영향/경로305개·현황/544파일 관문이 통과했으며, 기존 native24 고정값·생산자 지원표와 패치 판본별15개 관측기 지원은 그대로다.
+
 두 구성요소의18개 직접 시험이 CPython3.12.3과 승인된 기준 이미지 Python 바이너리3.12.8에서 각각 통과했다. 이는 CPU 구성요소 시험이다. 반환된 source_authenticated/engine_group_verified/observer_installed/producer_registered는 false이며 공통 입력·생산자 지원표에 등록하지 않았다. 기준 관측기15개 전체의 패치 판본 지원을 추가하거나 M-B4를 재개하지 않았다.
 
 남은 연결: 정확 source hook의 원 호출 경계→부모/worker의 물리 PID/시작세대→task/broadcast와 개별 response IPC의 닫힌 원 기록→같은 요청의 실행/오류 전달·기한→실제 신호 해제·새 소유자 복구다. 같은 요청 ID·같은 IPC 지문 하나를 전체 그룹 인증으로 바꾸지 않는다. 기존 cross_process_group_verified/scope_complete=false와 독립 FAIL은 보존한다.

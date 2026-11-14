@@ -1,3 +1,10 @@
+## 2026-11-14 — M-A3 읽기 전용 source hook·비밀 준비 자산·닫힌 snapshot 후보
+
+- 한 일: 같은 hook 구현에서 adapter 데이터로 기준 queue·후보 shared-memory 관측 위치를 고른다. 정확 Python ABI/이미지·설치 파일/SHA·함수7개 본문·namespace를 먼저 대조하고, 원 함수의 인자/반환/예외를 보존한 앞뒤 경계에서만 읽는다. 커널 IPC 지문과 동일 UID·PID/time namespace의 실제 자식 시작 세대, source graph·원 관측 구간을 남긴다. 기존 sitecustomize/loader 선택과 원래 guard 패키지를 보존한다. 준비 경로는 import 경로에서 제거하고 _byul_rank_ipc 전용 namespace로만 로드한다. 비밀 키는 준비 디렉터리에만 두며 snapshot은 HMAC·O_EXCL로 봉인한다. 기존 native24·판정·등록표·M-B4는 변경하지 않는다.
+- 테스트 결과: 독립 Python 프로세스 설치/원 호출·payload 보존과 HMAC/본문/자산 변조 거부 등을 포함한48개가 CPython3.12.3/3.12.8에서 각각 통과했다. 직접 영향/경로305개 통과(pytest73.71초·벽시계74.412초), 현황 --check·544파일 소스 관문 통과. 60초를 넘겨도 중단/실패 gate를 추가하지 않았다. 목록 자체SHA7c225d4e의 결정5 정확 검토 행을 추가했고 기존 기록을 보존했다. 앞선 #271 head407640c2 CI18개도 모두 성공했다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 이 묶음을 고정해 같은 승인 브랜치/PR로 올리고 새 CI를 확인한다. 동일 신규 GPU 노드의 설치본을 재개해 실제 두 이미지에서 읽기 전용 hook·물리 IPC/프로세스 세대와 정상 요청을 확인한다. CPU 예제와 실제 source/GPU 확인을 구분하고 raw 원자료를 보존한다.
+- 막힌 것: 아직 실제 엔진에 새 hook을 설치하지 않았으며 source_authenticated/engine_group_verified/producer_registered=false다. 초기 IPC 연결은 요청별 TP 계산·장애 탐지/상위 전달/기한·해제·새 소유자 복구 전체를 증명하지 않는다. 기존 fault source 불일치와 미등록 관문을 유지해 장애 주입은0회다. runtime 무변경·기존 경합/추가504 문제 기록·#263 draft·M-B4 보관을 유지한다.
+
 ## 2026-11-14 — M-A3 물리 IPC 식별·정확 source 후보와 원격 병합 상태 정정
 
 - 한 일: 부모/worker IPC의 실제 커널 객체를 세션 HMAC으로 지문화하는 읽기 전용 구성요소와 정확 이미지/파일/SHA·함수 본문/정의 namespace 대조를 추가했다. 기준 task/result queue와 후보 shared-memory broadcast/response를 adapter 데이터로 분리해4파일/7함수를 후보로 검토했다. 기존 native24·TP1 자격/고정값·판정/등록표는 유지한다. #264/#269가 사용자 계정으로 이미 main512915e1에 병합돼 있음을 재확인해 실제 GPU 후속31ec6884와 구분했고 양쪽 변경을 정상 통합했다.

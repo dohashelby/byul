@@ -126,6 +126,27 @@ def requests(value, *, layout, key):
             'source_authenticated': False, 'rpc_active_verified': False, 'producer_registered': False}
 
 
+def no_scheduled_work(value, *, layout, total_field):
+    """adapter가 명시한 빈 일정만 구분한다. 빈 일정을 요청 결합으로 만들지 않는다."""
+    if (type(layout) is not dict or set(layout) != {'kind', 'type', 'field', 'item_types'}
+            or layout['kind'] != 'positive-dict-keys' or layout['item_types'] != []
+            or type(total_field) is not str):
+        raise ValueError('RANK_REQUEST_LAYOUT_INVALID')
+    selected = member(value, layout['field'], layout['type'])
+    if type(selected) is not dict:
+        raise ValueError('RANK_REQUEST_IDS_UNAVAILABLE')
+    if selected:
+        return False
+    total = member(value, total_field, layout['type'])
+    if type(total) is not int or total != 0:
+        raise ValueError('RANK_REQUEST_IDS_UNAVAILABLE')
+    after = member(value, total_field, layout['type'])
+    if (member(value, layout['field'], layout['type']) is not selected or selected
+            or type(after) is not int or after != 0):
+        raise ValueError('RANK_REQUEST_IDS_CHANGED')
+    return True
+
+
 def assignment(value, *, expected_type, key):
     """정확 재배정 함수의 호출자가 넘긴 현재 external/internal ID 쌍만 읽는다."""
     external = member(value, 'external_req_id', expected_type)

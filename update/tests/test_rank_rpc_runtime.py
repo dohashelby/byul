@@ -13,7 +13,7 @@ from tests.test_rank_ipc_runtime import _prepared
 from tests.test_rank_rpc_hooks import RAW
 
 
-def _rpc_prepared(tmp_path):
+def _rpc_prepared(tmp_path, *, idle=False):
     root, settings, manifest = _prepared(tmp_path)
     (root / 'rank_rpc_fixture.py').write_bytes(RAW)
     profile_path = root / 'guard/adapters/assets/vllm_rank_ipc_profiles.json'
@@ -33,6 +33,10 @@ def _rpc_prepared(tmp_path):
     profile['request_layouts'] = {'scheduled': {'kind': 'positive-dict-keys',
         'type': {'module': name, 'name': 'Scheduled'}, 'field': 'num_scheduled_tokens', 'item_types': []}}
     profile['assignment_type'] = {'module': name, 'name': 'Request'}
+    if idle:
+        for hook in source['hooks'].values():
+            if hook['kind'] == 'rpc':
+                hook['no_scheduled_work'] = {'total_field': 'total_num_scheduled_tokens'}
     raw = tool.canonical(profiles); profile_path.write_bytes(raw)
     settings['assets']['guard/adapters/assets/vllm_rank_ipc_profiles.json'] = {'bytes': len(raw), 'sha256': sha256(raw).hexdigest()}
     raw = tool.canonical(settings); (root / 'settings.json').write_bytes(raw)
@@ -41,7 +45,7 @@ def _rpc_prepared(tmp_path):
     return root, settings
 
 
-def _run_rpc(root):
+def _run_rpc(root, *, idle=False):
     code = '''import sys,importlib.util,importlib
 from pathlib import Path
 root=Path(sys.argv[1]);sys.path.insert(0,str(root))
@@ -61,6 +65,9 @@ assert fixture.Assignment.assign(request)is None
 assert request.request_id=='EXAMPLE-header-internal'
 print('EXAMPLE RPC 완료')
 '''
+    if idle:
+        code = code.replace("scheduler.num_scheduled_tokens={'EXAMPLE-private-request':1}",
+                            'scheduler.num_scheduled_tokens={};scheduler.total_num_scheduled_tokens=0')
     result = subprocess.run([sys.executable, '-I', '-S', '-c', code, str(root)], text=True, capture_output=True, timeout=30)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == 'EXAMPLE RPC 완료'
@@ -77,6 +84,34 @@ def test_isolated_rpc_parent_frame_and_assignment_are_sealed(tmp_path):
     assert header['external_request_hmac_sha256'] == assignment['assignment']['external_hmac_sha256']
     assert 'EXAMPLE-private-request' not in json.dumps(result) and settings['key'] not in json.dumps(result)
     assert result['engine_group_verified'] is result['producer_registered'] is False
+
+
+@pytest.mark.parametrize('change', [None, 'active', 'request', 'total', 'fault', 'parent'])
+def test_idle_capture_cannot_become_request_or_fault_proof(tmp_path, change):
+    root, settings = _rpc_prepared(tmp_path, idle=True); _run_rpc(root, idle=True)
+    capture = root / 'data' / settings['session']
+    result = tool.verify_capture(root, capture)
+    idle = [r for r in result['rows'] if r['event'].startswith('IDLE_')]
+    assert len(idle) == 4 and result['gaps'] == []
+    assert all(r['request_hmac_sha256'] == [] and not r['rpc_parent_frame_verified'] for r in idle)
+    if change is None:
+        return
+    for path in capture.glob('pid-*.json'):
+        record = json.loads(path.read_bytes()); payload = record['snapshot']['payload']
+        if payload.get('event') != 'IDLE_CALL':
+            continue
+        if change == 'active': payload['event'] = 'CALL'
+        elif change == 'request': payload['request_hmac_sha256'] = ['a' * 64]
+        elif change == 'total': payload['idle_basis']['total_scheduled_tokens'] = 1
+        elif change == 'fault': payload['idle_basis']['fault_eligible'] = True
+        elif change == 'parent': payload['rpc_parent_frame_verified'] = payload['rpc_parent_worker_verified'] = True
+        record['hmac_sha256'] = hmac.new(bytes.fromhex(settings['key']), tool.canonical(record['snapshot']), sha256).hexdigest()
+        path.write_bytes(tool.canonical(record))
+        break
+    else:
+        raise AssertionError('빈 일정 원 행이 필요함')
+    with pytest.raises(ValueError, match='RANK_RPC_SOURCE_RECORD_INVALID'):
+        tool.verify_capture(root, capture)
 
 
 @pytest.mark.parametrize('change', ['frame', 'event', 'request', 'body', 'time'])

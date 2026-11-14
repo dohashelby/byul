@@ -227,3 +227,36 @@ def test_gap_diagnostic_never_formats_user_exception_or_copies_private_message(s
     assert len(rows) == 3
     assert all(r['diagnostic_code'] == 'RANK_RPC_OBSERVATION_ERROR' for r in rows)
     assert '비밀' not in json.dumps(rows, ensure_ascii=False)
+
+
+def test_explicit_zero_work_is_observed_without_request_binding_or_control(setup):
+    module, observer, rows, inner, outer, scheduled, _ = setup
+    for hook in observer.sources[module.__name__]['hooks'].values():
+        if hook['kind'] == 'rpc':
+            hook['no_scheduled_work'] = {'total_field': 'total_num_scheduled_tokens'}
+    class Forbidden:
+        def maybe_hold(self, _):
+            raise AssertionError('빈 일정에 장애 적용 금지')
+    observer.control = Forbidden()
+    observer.sources[module.__name__]['hooks']['Inner.execute']['fault_eligible'] = True
+    scheduled.num_scheduled_tokens, scheduled.total_num_scheduled_tokens = {}, 0
+    assert outer.execute(scheduled) is inner.result
+    assert module.calls == [('outer', scheduled), ('inner', scheduled)]
+    assert [r['event'] for r in rows] == ['IDLE_CALL', 'IDLE_CALL', 'IDLE_RETURN', 'IDLE_RETURN']
+    assert all(r['gaps'] == [] and r['request_hmac_sha256'] == [] for r in rows)
+    assert all(r['rpc_parent_frame_verified'] is r['rpc_parent_worker_verified'] is False for r in rows)
+    assert all(r['idle_basis'] == {'empty_scheduled_requests': True, 'total_scheduled_tokens': 0,
+                                 'request_bound': False, 'fault_eligible': False} for r in rows)
+    assert observer.current.get() is None
+
+
+@pytest.mark.parametrize('total', [None, True, 1, -1, '0'])
+def test_empty_schedule_with_invalid_total_keeps_gap_and_original(setup, total):
+    module, observer, rows, inner, outer, scheduled, _ = setup
+    for hook in observer.sources[module.__name__]['hooks'].values():
+        if hook['kind'] == 'rpc':
+            hook['no_scheduled_work'] = {'total_field': 'total_num_scheduled_tokens'}
+    scheduled.num_scheduled_tokens, scheduled.total_num_scheduled_tokens = {}, total
+    assert outer.execute(scheduled) is inner.result
+    assert module.calls == [('outer', scheduled), ('inner', scheduled)]
+    assert len(rows) == 2 and all(r['gaps'] for r in rows)

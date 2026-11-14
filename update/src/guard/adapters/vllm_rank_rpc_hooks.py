@@ -82,6 +82,12 @@ class RPCObserver:
         if value is None:
             return None
         layout = self.profile['request_layouts'][spec['requests']['layout']]
+        no_work = spec.get('no_scheduled_work')
+        if no_work is not None:
+            if type(no_work) is not dict or set(no_work) != {'total_field'}:
+                raise ValueError('RANK_RPC_HOOK_SETTINGS_INVALID')
+            if request_identity.no_scheduled_work(value, layout=layout, total_field=no_work['total_field']):
+                return ipc.MISSING
         return request_identity.requests(value, layout=layout, key=self.key)['request_hmac_sha256']
 
     @staticmethod
@@ -101,7 +107,7 @@ class RPCObserver:
             frame = None
 
     def _metadata(self, module_name, point, spec, context, owner, ids, call, event, started,
-                  *, parent=None, result=ipc.MISSING, original_invoked=False):
+                  *, parent=None, result=ipc.MISSING, original_invoked=False, idle=False):
         self._fresh(spec['source_modules'])
         expected = self.sources[module_name]
         value = {'schema': 'guard-rank-rpc-hook-candidate/1', 'image': self.image,
@@ -117,7 +123,10 @@ class RPCObserver:
                  'rpc_parent_worker_verified': False, 'source_authenticated': False,
                  'engine_group_verified': False, 'producer_registered': False, 'gaps': []}
         parent_spec = spec.get('parent')
-        if parent_spec is not None:
+        if idle:
+            value['idle_basis'] = {'empty_scheduled_requests': True, 'total_scheduled_tokens': 0,
+                                   'request_bound': False, 'fault_eligible': False}
+        if parent_spec is not None and not idle:
             valid = (type(parent) is dict and parent['point'] == parent_spec['point']
                      and parent['context'] == context and parent['ids'] == ids
                      and ipc._path(parent['owner'], parent_spec['worker_path']) is owner
@@ -160,17 +169,22 @@ class RPCObserver:
         def observed(*args, **kwargs):
             owner = ipc.IPCObserver._argument(original, args, kwargs, 'self')
             context, call, ids, token, parent, started = None, None, [], None, None, time.monotonic_ns()
-            armed, proof, original_invoked = False, None, False
+            armed, proof, original_invoked, idle = False, None, False, False
             try:
                 context = ipc.base._context()
                 if spec['kind'] == 'rpc':
                     ids = self._requests(original, args, kwargs, spec)
+                    if ids is ipc.MISSING:
+                        ids, idle, call = [], True, self._call(context)
+                        self._metadata(module_name, point, spec, context, owner, ids, call,
+                                       'IDLE_CALL', started, idle=True)
                     if ids is not None:
-                        call, parent = self._call(context), self.current.get()
-                        proof = self._metadata(module_name, point, spec, context, owner, ids, call, 'CALL', started, parent=parent)
-                        token = self.current.set({'point': point, 'original': original, 'owner': owner,
-                            'context': context, 'ids': ids, 'call': call, 'source_modules': spec['source_modules']})
-                        armed = True
+                        if not idle:
+                            call, parent = self._call(context), self.current.get()
+                            proof = self._metadata(module_name, point, spec, context, owner, ids, call, 'CALL', started, parent=parent)
+                            token = self.current.set({'point': point, 'original': original, 'owner': owner,
+                                'context': context, 'ids': ids, 'call': call, 'source_modules': spec['source_modules']})
+                            armed = True
                 else:
                     call, armed = self._call(context), True
             except BaseException as error:
@@ -186,22 +200,22 @@ class RPCObserver:
                 original_invoked = True
                 result = original(*args, **kwargs)
             except BaseException as error:
-                if armed:
+                if armed or idle:
                     try:
-                        event = 'CONTROL_RAISE' if not original_invoked and type(error) is control_code.NativeLabFault else 'RAISE'
+                        event = 'IDLE_RAISE' if idle else 'CONTROL_RAISE' if not original_invoked and type(error) is control_code.NativeLabFault else 'RAISE'
                         self._metadata(module_name, point, spec, context, owner, ids, call, event, started,
-                                       parent=parent, original_invoked=original_invoked)
+                                       parent=parent, original_invoked=original_invoked, idle=idle)
                     except BaseException as observation_error:
                         self._gap(point, observation_error, 'after-exception')
                 raise
             else:
-                if armed:
+                if armed or idle:
                     try:
                         selected = result
                         if spec['kind'] == 'assignment':
                             selected = self._root(original, args, kwargs, spec['assignment'])
-                        self._metadata(module_name, point, spec, context, owner, ids, call, 'RETURN', started,
-                                       parent=parent, result=selected, original_invoked=True)
+                        self._metadata(module_name, point, spec, context, owner, ids, call, 'IDLE_RETURN' if idle else 'RETURN', started,
+                                       parent=parent, result=selected, original_invoked=True, idle=idle)
                     except BaseException as error:
                         self._gap(point, error, 'after-return')
                 return result

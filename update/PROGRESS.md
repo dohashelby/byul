@@ -1,3 +1,10 @@
+## 2026-11-14 — M-A3 물리 IPC 식별·정확 source 후보와 원격 병합 상태 정정
+
+- 한 일: 부모/worker IPC의 실제 커널 객체를 세션 HMAC으로 지문화하는 읽기 전용 구성요소와 정확 이미지/파일/SHA·함수 본문/정의 namespace 대조를 추가했다. 기준 task/result queue와 후보 shared-memory broadcast/response를 adapter 데이터로 분리해4파일/7함수를 후보로 검토했다. 기존 native24·TP1 자격/고정값·판정/등록표는 유지한다. #264/#269가 사용자 계정으로 이미 main512915e1에 병합돼 있음을 재확인해 실제 GPU 후속31ec6884와 구분했고 양쪽 변경을 정상 통합했다.
+- 테스트 결과: 신규18개 직접 시험이 CPython3.12.3/3.12.8에서 각각 통과했다. 실제 자식의 동일 IPC·payload 보존과 다른 객체/키·FD 교체·변경 source/body/namespace·property·symlink 거부를 확인했다. 최신 main 통합 뒤 직접 영향/경로275개 통과(pytest35.13초·벽시계35.369초), 현황 --check·542파일 소스 관문 통과. 새 소스 목록은 기존539파일에3파일만 더했으며 목록 자체SHA c04480e5의 결정5 정확 검토 행을 추가했다. 전체 로컬 pytest는 실행하지 않는다.
+- 다음 단계: 최신 main 통합 뒤 직접 영향/경로·소스 관문을 검증하고 같은 승인 브랜치의 별도 후속 PR/CI로 넘긴다. 실제 source hook과 세대/양방향 IPC 원 기록을 연결한 뒤 같은 신규 GPU 노드에서 자격을 확인한다. 노드는 stopped로 확인했고 EBS/설치본을 임시 보존해 CPU 보완 중 EC2 비용을 줄인다. 발생분 포함 총100달러·예산 감시와 최종 신규자원 정리를 유지한다.
+- 막힌 것: 구성요소는 관측기 설치/그룹 인증/등록이 아니며 source_authenticated/engine_group_verified/observer_installed/producer_registered=false다. TP2 인과 그룹·탐지/상위 전달/기한·해제/새 소유자 복구의 제품 연결은 미완료다. 31ec6884의 update CI는 성공했으나 runtime test_mvp_03_denial_does_not_poison_next_request가 기대(403,200) 대신(403,504)로 실패했다(1실패/1,809통과·기존skip4·subtest1,012·208.36초). 원 로그/문제 기록을 보존하고 runtime 무변경 방침을 따른다. 원 S2-05와 같은 원인으로 단정하지 않는다. #263 draft·M-B4 보관을 유지한다.
+
 ## 2026-11-14 — SUP-08 정본 GPU REGRESSED·양쪽 TP2 모델 기동·결정33
 
 - 한 일: 결정32의 신규 단일 GPU 노드에 실제 설치·모델 파일을 검증하고 SUP-08의 실제 ENV/target을 연결했다. @34/revision5의 guard update에서 기준 ignored/PASS·후보 비승인 코드 consumed/FAIL·REGRESSED, 기능 양쪽PASS·성능UNKNOWN을 확인했다. EVD2/RES2/RPT1을 새로 생성·반출하고 공개 요약/정확 Ref·원자료 SHA와 현황을 연결했다. verification_level=MEASURED, EVD origin=MEASURED·RES origin=EXAMPLE·official=false를 원본대로 보존했다. REQ16 고정11파일4,429,592,647 bytes를 SHA 검증했고 두 판본 모두 같은 모델의 TP2 기동·GPU2개·정상 HTTP200을 확인했다.

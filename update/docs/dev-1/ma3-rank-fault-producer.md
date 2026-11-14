@@ -1,5 +1,15 @@
 # M-A3 rank-fault 후보 생산자
 
+## IPC 소속 근거의 후속 구성요소 (2026-11-14)
+
+기존 원 기록 변환과 별도로 읽기 전용 후보 두 개를 추가했다. `vllm_rank_ipc_identity`는 정확한 표준 라이브러리 Connection/SharedMemory 형식의 FD를 잠깐 복제해 전후 fstat을 대조하고, 실제 커널 객체/boot/IPC namespace를 세션 HMAC으로만 기록한다. 원 FD·payload·공유 메모리 이름·property·fileno를 읽거나 바꾸지 않는다. 실제 자식 프로세스의 동일 pipe/공유 메모리 대조와 payload 보존, 다른 IPC·키·FD 교체/폐쇄·속성 실행 거부를 시험했다.
+
+`vllm_rank_ipc_sources`는 고정 이미지 행과 정확 파일 bytes/SHA·원 함수 본문·정의 namespace를 대조한다. 함수 실행·관측기 설치는 하지 않는다. 새 adapter 데이터의 기준 쪽은 rank0 driver/executor가 같은 프로세스인 task/result queue 구조, 후보 쪽은 executor/worker의 broadcast/response 공유 메모리 구조로 나눴다. 실제 설치4파일·함수7개를 대상으로 하며 기존 native24 고정값/관문을 넓히지 않는다.
+
+두 구성요소의18개 직접 시험이 CPython3.12.3과 승인된 기준 이미지 Python 바이너리3.12.8에서 각각 통과했다. 이는 CPU 구성요소 시험이다. 반환된 source_authenticated/engine_group_verified/observer_installed/producer_registered는 false이며 공통 입력·생산자 지원표에 등록하지 않았다. 기준 관측기15개 전체의 패치 판본 지원을 추가하거나 M-B4를 재개하지 않았다.
+
+남은 연결: 정확 source hook의 원 호출 경계→부모/worker의 물리 PID/시작세대→task/broadcast와 개별 response IPC의 닫힌 원 기록→같은 요청의 실행/오류 전달·기한→실제 신호 해제·새 소유자 복구다. 같은 요청 ID·같은 IPC 지문 하나를 전체 그룹 인증으로 바꾸지 않는다. 기존 cross_process_group_verified/scope_complete=false와 독립 FAIL은 보존한다.
+
 기존 엔진 안 native24 fault·rank 관측을 재사용하고 `adapters/vllm_rank_fault_input.py`와 `collectors/rank_fault_producer.py`가 공통 입력으로 변환한다. 관측기 복사·새 주입·기존 소스 고정값 완화는 없다. 과거 닫힌 입력은 `/1` 재생을 유지하고, 새 명시적 입력은 구현된 `/4` 봉투를 사용한다. 기존 #263은 단일 rank 후보 draft로 그대로 두며 후속은 새 main 브랜치에서 개발한다.
 
 | 사건 | 필요한 원 근거 |

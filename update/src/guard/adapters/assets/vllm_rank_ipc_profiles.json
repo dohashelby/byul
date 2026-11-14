@@ -1,0 +1,101 @@
+{
+  "schema": "guard-rank-ipc-source-candidates/1",
+  "scope": "M-A3의 설치 bytes/원 함수 대조 후보. 기존 native24 source gate·공통 입력 지원표·등록표에 연결하지 않는다.",
+  "profiles": [
+    {
+      "id": "v0-task-queue",
+      "role": "기준 판본",
+      "image": "docker.io/vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8",
+      "pin_status": "candidate_pin",
+      "engine_group_verified": false,
+      "observer_installed": false,
+      "producer_registered": false,
+      "sources": {
+        "vllm.executor.mp_distributed_executor": {
+          "path": "vllm/executor/mp_distributed_executor.py",
+          "bytes": 9815,
+          "sha256": "c0b3aff190fb96d0a85e2e02874b172b84f0c59641e3ff7c46e0080e46290cd6",
+          "functions": [
+            "MultiprocessingDistributedExecutor._init_executor"
+          ],
+          "function_lines": {
+            "MultiprocessingDistributedExecutor._init_executor": [
+              54,
+              127
+            ]
+          }
+        },
+        "vllm.executor.multiproc_worker_utils": {
+          "path": "vllm/executor/multiproc_worker_utils.py",
+          "bytes": 10551,
+          "sha256": "12812596559ac367c4842848225be187b052dc1311c5bb8c4a2b1b973a96b17b",
+          "functions": [
+            "ProcessWorkerWrapper.__init__",
+            "_run_worker_process"
+          ],
+          "function_lines": {
+            "ProcessWorkerWrapper.__init__": [
+              150,
+              169
+            ],
+            "_run_worker_process": [
+              206,
+              251
+            ]
+          }
+        }
+      },
+      "review": "rank0 driver와 executor는 같은 프로세스다. 부모 ProcessWorkerWrapper의 task/result queue와 _run_worker_process 인자의 실제 pipe를 대응한다. rank1의 장기 execute_model 루프·요청별 TP 방송 귀속은 별도 관측이 필요하다."
+    },
+    {
+      "id": "v1-shm-broadcast",
+      "role": "후보 판본",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "pin_status": "candidate_pin",
+      "engine_group_verified": false,
+      "observer_installed": false,
+      "producer_registered": false,
+      "sources": {
+        "vllm.v1.executor.multiproc_executor": {
+          "path": "vllm/v1/executor/multiproc_executor.py",
+          "bytes": 45225,
+          "sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+          "functions": [
+            "MultiprocExecutor._init_executor",
+            "WorkerProc._init_message_queues"
+          ],
+          "function_lines": {
+            "MultiprocExecutor._init_executor": [
+              118,
+              266
+            ],
+            "WorkerProc._init_message_queues": [
+              607,
+              637
+            ]
+          }
+        },
+        "vllm.distributed.device_communicators.shm_broadcast": {
+          "path": "vllm/distributed/device_communicators/shm_broadcast.py",
+          "bytes": 45067,
+          "sha256": "f3e7a3f3ff713fccbd535e0d41650ee05bdf8677e83d4b90519910645022c30b",
+          "functions": [
+            "MessageQueue.export_handle",
+            "MessageQueue.create_from_handle"
+          ],
+          "function_lines": {
+            "MessageQueue.export_handle": [
+              556,
+              557
+            ],
+            "MessageQueue.create_from_handle": [
+              560,
+              605
+            ]
+          }
+        }
+      },
+      "review": "부모 rpc_broadcast_mq.buffer.shared_memory와 worker _init_message_queues의 동일 FD 커널 객체를 대응한다. response queue와 workers[rank].proc 세대도 별도로 확인해야 하며 같은 요청/공유 메모리만으로 그룹 전체를 인증하지 않는다."
+    }
+  ]
+}

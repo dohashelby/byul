@@ -1,0 +1,225 @@
+{
+  "기록": "고정 모델의 실제 두 판본 TP2 기동 자격",
+  "실행_소스_커밋": "765def72d8fa831d30b5e77aad0175e89f6b5649",
+  "모델": {
+    "source_model": "Qwen/Qwen2-VL-2B-Instruct",
+    "source_revision": "895c3a49bc3fa70a340399125c650a463535e71c",
+    "files": {
+      "chat_template.json": {
+        "sha256": "ad60d90252ed0b0705ba14e2d0ad0fec0beac1ea955642b54059b36052d8bc96",
+        "size": 1050
+      },
+      "config.json": {
+        "sha256": "422adefa19e62dd175961cec85bc0400344fe5bf9b22bd1182e05aaae78556e0",
+        "size": 1196
+      },
+      "generation_config.json": {
+        "sha256": "d2864bf1edea5863d331edfff48106b586a366f5a2c41aa77731fadc53aa25d2",
+        "size": 272
+      },
+      "merges.txt": {
+        "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+        "size": 1671839
+      },
+      "model-00001-of-00002.safetensors": {
+        "sha256": "994ac2b03f97de8bc647d0fe5eba2e4b632b3e28dc03574c29bdfc36cf47e1b9",
+        "size": 3988609112
+      },
+      "model-00002-of-00002.safetensors": {
+        "sha256": "92540d8353c8d226a589a3b179bdb33851c970ee2cc2ac7ba035f79425e7b833",
+        "size": 429441656
+      },
+      "model.safetensors.index.json": {
+        "sha256": "260ab9fa1418d6d6ab79daa1d9da2c47264f3b72edb4630fc799077ac67d27c6",
+        "size": 56411
+      },
+      "preprocessor_config.json": {
+        "sha256": "b5eaad0c2815f07631535dcc58f3c462b0d73693638ad21d19f3c50820eae1cc",
+        "size": 347
+      },
+      "tokenizer.json": {
+        "sha256": "cb63a0a23eef3d5b01063a9880a1925a65aaf4d1591d519910ee3527852950a0",
+        "size": 7029741
+      },
+      "tokenizer_config.json": {
+        "sha256": "ff5c4fd898fe8c39591eb70e5d39d2782802d4204d6ae9ba1223252f354842a0",
+        "size": 4190
+      },
+      "vocab.json": {
+        "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+        "size": 2776833
+      }
+    },
+    "engine_loaded": false
+  },
+  "쪽별_실제_기동": {
+    "baseline": {
+      "captured_at": "2026-11-14T07:36:52.915049+00:00",
+      "image": "docker.io/vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8",
+      "namespace": "serving-lab-tp2-baseline",
+      "pod_uid": "f1892e90-9793-436b-9ee3-bee1eb0957bd",
+      "container_id": "containerd://bf591bc338c841aaadc956c77932de79d7f722d5fb0b7d990a5cf6b42db7c484",
+      "container_image_id": "docker.io/vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8",
+      "argv": [
+        "--model",
+        "/models",
+        "--served-model-name",
+        "test-model",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--tensor-parallel-size",
+        "2",
+        "--distributed-executor-backend",
+        "mp",
+        "--max-model-len",
+        "4096",
+        "--max-num-seqs",
+        "2",
+        "--gpu-memory-utilization",
+        "0.70",
+        "--enable-prefix-caching",
+        "--limit-mm-per-prompt",
+        "image=1,video=0"
+      ],
+      "normal_request": {
+        "normal_status": 200,
+        "response_sha256": "48eaf2e5de6cc09dfd6c43381476c56642273298173c0026872cadb680b7b694",
+        "gpu_count": 2,
+        "gpus": [
+          "NVIDIA L4, 595.112.07",
+          "NVIDIA L4, 595.112.07"
+        ]
+      },
+      "model_loaded": true,
+      "gpu_count": 2,
+      "tp_size": 2,
+      "prefix_caching_explicit": true,
+      "fault_observer_qualified": false,
+      "fault_executed": false,
+      "cross_process_group_verified": false,
+      "producer_registered": false
+    },
+    "candidate": {
+      "captured_at": "2026-11-14T07:39:20.970054+00:00",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "namespace": "serving-lab-tp2-candidate",
+      "pod_uid": "64ad9d12-793f-44b8-a260-f92901656d26",
+      "container_id": "containerd://b1c0716a7e552f7d3d528de33e9114ed94e25d773b6c6e60ac4f92e56d7db388",
+      "container_image_id": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "argv": [
+        "/models",
+        "--served-model-name",
+        "test-model",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--tensor-parallel-size",
+        "2",
+        "--distributed-executor-backend",
+        "mp",
+        "--max-model-len",
+        "4096",
+        "--max-num-seqs",
+        "2",
+        "--gpu-memory-utilization",
+        "0.70",
+        "--enable-prefix-caching",
+        "--limit-mm-per-prompt",
+        "{\"image\":1,\"video\":0}"
+      ],
+      "normal_request": {
+        "normal_status": 200,
+        "response_sha256": "c0f25f546d46a5733d702b3465a3a9bb263bcabc4f93f8bca611b9d56e73d8fc",
+        "gpu_count": 2,
+        "gpus": [
+          "NVIDIA L4, 595.112.07",
+          "NVIDIA L4, 595.112.07"
+        ]
+      },
+      "model_loaded": true,
+      "gpu_count": 2,
+      "tp_size": 2,
+      "prefix_caching_explicit": true,
+      "fault_observer_qualified": false,
+      "fault_executed": false,
+      "cross_process_group_verified": false,
+      "producer_registered": false
+    }
+  },
+  "원자료": {
+    "파일": "gpu-qualification-20261114-v1.zip",
+    "bytes": 58704,
+    "sha256": "42c2019f0628e4d029bbab9cd82a8bec80e225a374b7e90a7eddbc9ad7307d76"
+  },
+  "원자료_검증": "ZIP 경로/정규파일과 manifest16개 파일의 크기/SHA256 모두 일치",
+  "기동_보완": [
+    "첫 기동은 기준 CLI의 KEY=VALUE 형식을 지원하지 않는 JSON 인자로 실패했다. 원 실패를 보존하고 같은 한도를 쪽별 지원 형식으로 보냈다.",
+    "두 번째는 기준 이미지의 UID2000 passwd 부재로 기본 Torch 캐시 경로 생성에서 실패했다. 원 실패를 보존하고 양쪽 TORCHINDUCTOR_CACHE_DIR=/cache/torchinductor를 명시했다."
+  ],
+  "한계": [
+    "모델 영수증의 engine_loaded=false는 다운로드 당시 사실로 원본에 유지했고 이후 모델 로드는 별도 실측 기동 자료로 결합했다.",
+    "정상 요청·TP2 기동은 REQ-16 전체 캐시/LoRA/가중치 세대 검증이나 LIF-08 장애 자격이 아니다.",
+    "actual ENV/target은 SUP-08 양쪽만 확보했고 다른136쪽은 실행 세대별 결합이 남았다.",
+    "후속 실제 기동에서 기준 V0가 멀티모달 prefix caching을 자동으로 껐다. 명시 인자와 실제 활성은 다르며 REQ-16의 캐시 분기는 수락되지 않았다."
+  ],
+  "후속_실제_IPC_기동": {
+    "실행_소스_커밋": "7e49f6082397328a8f2876db82736e84cfbf2783",
+    "검토_소스_SHA256": "7c225d4eb755d80f554938159056b5a038e1a0a7b48a1fc6eeac06ca0a1f2232",
+    "원자료": {
+      "파일": "rank-ipc-qualification-20261114-v1.zip",
+      "bytes": 28565,
+      "sha256": "220d8d649963f28bbfb8e34aa385594e83c381a6ff45569593cb569d54b5460f"
+    },
+    "양쪽_TP2_정상_HTTP200": true,
+    "추가_ENV_target_봉인": false,
+    "기능_설정_실측": {
+      "baseline": {
+        "log_sha256": "470fc76026f6b45d8807644e0ed98e6bd68aae95bbc10f8ebb44f11dbcd9c11c",
+        "observed": [
+          {
+            "line": 3,
+            "fact": "requested_prefix_cache_true"
+          },
+          {
+            "line": 7,
+            "fact": "multimodal_prefix_cache_disabled"
+          },
+          {
+            "line": 9,
+            "fact": "multimodal_prefix_cache_disabled"
+          },
+          {
+            "line": 10,
+            "fact": "effective_prefix_cache_false"
+          }
+        ]
+      },
+      "candidate": {
+        "log_sha256": "dbb70985145d962da500905641eabc19bb812135dbc8b8c680edbfe255c663ab",
+        "observed": [
+          {
+            "line": 7,
+            "fact": "requested_prefix_cache_true"
+          },
+          {
+            "line": 14,
+            "fact": "effective_prefix_cache_true"
+          }
+        ]
+      }
+    },
+    "기준_멀티모달_prefix_cache_실제_활성": false,
+    "REQ16_캐시_검증_완료": false,
+    "판정_변경": false,
+    "REQ16_기준_캐시_분기_사용자_결정": {
+      "결정": 34,
+      "승인": "V0 유지·해당 기준 캐시 분기만 원인 있는 UNKNOWN 예외",
+      "실제_결과_객체_생성": false,
+      "기준_V1_보조_실행_승인": false,
+      "전체_완료_승격": false
+    }
+  }
+}

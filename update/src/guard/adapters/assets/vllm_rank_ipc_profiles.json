@@ -1,0 +1,881 @@
+{
+  "schema": "guard-rank-ipc-source-candidates/1",
+  "scope": "M-A3의 설치 bytes/원 함수 대조 후보. 기존 native24 source gate·공통 입력 지원표·등록표에 연결하지 않는다.",
+  "profiles": [
+    {
+      "id": "v0-task-queue",
+      "role": "기준 판본",
+      "image": "docker.io/vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8",
+      "pin_status": "candidate_pin",
+      "engine_group_verified": false,
+      "observer_installed": false,
+      "producer_registered": false,
+      "sources": {
+        "vllm.executor.mp_distributed_executor": {
+          "path": "vllm/executor/mp_distributed_executor.py",
+          "bytes": 9815,
+          "sha256": "c0b3aff190fb96d0a85e2e02874b172b84f0c59641e3ff7c46e0080e46290cd6",
+          "functions": [
+            "MultiprocessingDistributedExecutor._init_executor"
+          ],
+          "function_lines": {
+            "MultiprocessingDistributedExecutor._init_executor": [
+              54,
+              127
+            ]
+          },
+          "body_code_sha256": {
+            "MultiprocessingDistributedExecutor._init_executor": "28be96fc63ed4e5f3bb638538ac8909a9b434e29fd003b790c33e2a9b7c649c9"
+          },
+          "hooks": {
+            "MultiprocessingDistributedExecutor._init_executor": {
+              "phase": "after-original",
+              "role": "parent-executor",
+              "scalars": {
+                "configured_tp_size": {
+                  "root": "self",
+                  "path": [
+                    "vllm_config",
+                    "parallel_config",
+                    "tensor_parallel_size"
+                  ]
+                },
+                "driver_rpc_rank": {
+                  "root": "self",
+                  "path": [
+                    "driver_worker",
+                    "rpc_rank"
+                  ]
+                }
+              },
+              "members": {
+                "root": "self",
+                "path": [
+                  "workers"
+                ],
+                "scalars": {
+                  "worker_pid": {
+                    "root": "item",
+                    "path": [
+                      "process",
+                      "_popen",
+                      "pid"
+                    ]
+                  }
+                },
+                "endpoints": {
+                  "task_read": {
+                    "root": "item",
+                    "path": [
+                      "_task_queue",
+                      "_reader"
+                    ],
+                    "kind": "pipe"
+                  },
+                  "task_write": {
+                    "root": "item",
+                    "path": [
+                      "_task_queue",
+                      "_writer"
+                    ],
+                    "kind": "pipe"
+                  },
+                  "result_read": {
+                    "root": "item",
+                    "path": [
+                      "result_queue",
+                      "_reader"
+                    ],
+                    "kind": "pipe"
+                  },
+                  "result_write": {
+                    "root": "item",
+                    "path": [
+                      "result_queue",
+                      "_writer"
+                    ],
+                    "kind": "pipe"
+                  }
+                },
+                "processes": {
+                  "worker": {
+                    "root": "item",
+                    "path": [
+                      "process",
+                      "_popen",
+                      "pid"
+                    ]
+                  }
+                }
+              },
+              "source_modules": [
+                "vllm.executor.mp_distributed_executor",
+                "vllm.executor.multiproc_worker_utils"
+              ]
+            }
+          }
+        },
+        "vllm.executor.multiproc_worker_utils": {
+          "path": "vllm/executor/multiproc_worker_utils.py",
+          "bytes": 10551,
+          "sha256": "12812596559ac367c4842848225be187b052dc1311c5bb8c4a2b1b973a96b17b",
+          "functions": [
+            "ProcessWorkerWrapper.__init__",
+            "_run_worker_process"
+          ],
+          "function_lines": {
+            "ProcessWorkerWrapper.__init__": [
+              150,
+              169
+            ],
+            "_run_worker_process": [
+              206,
+              251
+            ]
+          },
+          "body_code_sha256": {
+            "ProcessWorkerWrapper.__init__": "bdee1eb1b7f3c30afbb419ba29f3380fe745285b394fbc27f828fdf7712f41ac",
+            "_run_worker_process": "02b1605d295570944a13e4e93f1e7effb1238b2b559569c9b1eb9c10366b514a"
+          },
+          "hooks": {
+            "ProcessWorkerWrapper.__init__": {
+              "phase": "after-original",
+              "role": "parent-worker",
+              "scalars": {
+                "rank": {
+                  "root": "rank",
+                  "path": []
+                },
+                "worker_pid": {
+                  "root": "self",
+                  "path": [
+                    "process",
+                    "_popen",
+                    "pid"
+                  ]
+                }
+              },
+              "endpoints": {
+                "task_read": {
+                  "root": "self",
+                  "path": [
+                    "_task_queue",
+                    "_reader"
+                  ],
+                  "kind": "pipe"
+                },
+                "task_write": {
+                  "root": "self",
+                  "path": [
+                    "_task_queue",
+                    "_writer"
+                  ],
+                  "kind": "pipe"
+                },
+                "result_read": {
+                  "root": "self",
+                  "path": [
+                    "result_queue",
+                    "_reader"
+                  ],
+                  "kind": "pipe"
+                },
+                "result_write": {
+                  "root": "self",
+                  "path": [
+                    "result_queue",
+                    "_writer"
+                  ],
+                  "kind": "pipe"
+                }
+              },
+              "source_modules": [
+                "vllm.executor.multiproc_worker_utils"
+              ],
+              "processes": {
+                "worker": {
+                  "root": "self",
+                  "path": [
+                    "process",
+                    "_popen",
+                    "pid"
+                  ]
+                }
+              }
+            },
+            "_run_worker_process": {
+              "phase": "before-original",
+              "role": "worker-admission",
+              "scalars": {
+                "rank": {
+                  "root": "rank",
+                  "path": []
+                }
+              },
+              "endpoints": {
+                "task_read": {
+                  "root": "task_queue",
+                  "path": [
+                    "_reader"
+                  ],
+                  "kind": "pipe"
+                },
+                "task_write": {
+                  "root": "task_queue",
+                  "path": [
+                    "_writer"
+                  ],
+                  "kind": "pipe"
+                },
+                "result_read": {
+                  "root": "result_queue",
+                  "path": [
+                    "_reader"
+                  ],
+                  "kind": "pipe"
+                },
+                "result_write": {
+                  "root": "result_queue",
+                  "path": [
+                    "_writer"
+                  ],
+                  "kind": "pipe"
+                }
+              },
+              "source_modules": [
+                "vllm.executor.multiproc_worker_utils"
+              ]
+            }
+          }
+        }
+      },
+      "review": "rank0 driver와 executor는 같은 프로세스다. 부모 ProcessWorkerWrapper의 task/result queue와 _run_worker_process 인자의 실제 pipe를 대응한다. rank1의 장기 execute_model 루프·요청별 TP 방송 귀속은 별도 관측이 필요하다.",
+      "runtime": "cpython-3.12.8",
+      "request_layouts": {
+        "scheduled": {
+          "kind": "struct-list",
+          "type": {
+            "module": "vllm.sequence",
+            "name": "ExecuteModelRequest"
+          },
+          "field": "seq_group_metadata_list",
+          "item_types": [
+            {
+              "module": "vllm.sequence",
+              "name": "SequenceGroupMetadata"
+            },
+            {
+              "module": "vllm.sequence",
+              "name": "SequenceGroupMetadataDelta"
+            }
+          ]
+        }
+      },
+      "rpc_sources": {
+        "vllm.executor.mp_distributed_executor": {
+          "functions": [
+            "MultiprocessingDistributedExecutor._driver_execute_model"
+          ],
+          "hooks": {
+            "MultiprocessingDistributedExecutor._driver_execute_model": {
+              "kind": "rpc",
+              "phase": "around-original",
+              "role": "driver-executor-rpc",
+              "source_modules": [
+                "vllm.executor.mp_distributed_executor",
+                "vllm.worker.worker_base",
+                "vllm.worker.worker",
+                "vllm.sequence"
+              ],
+              "requests": {
+                "root": "execute_model_req",
+                "layout": "scheduled"
+              }
+            }
+          },
+          "path": "vllm/executor/mp_distributed_executor.py",
+          "bytes": 9815,
+          "sha256": "c0b3aff190fb96d0a85e2e02874b172b84f0c59641e3ff7c46e0080e46290cd6",
+          "body_code_sha256": {
+            "MultiprocessingDistributedExecutor._driver_execute_model": "22378d9b2325ec01c28d6230115befea49f61aea3aa616890606e3b07cba6019"
+          },
+          "pin_status": "candidate_pin"
+        },
+        "vllm.worker.worker_base": {
+          "functions": [
+            "LocalOrDistributedWorkerBase.execute_model"
+          ],
+          "hooks": {
+            "LocalOrDistributedWorkerBase.execute_model": {
+              "kind": "rpc",
+              "phase": "around-original",
+              "role": "driver-gpu-worker",
+              "source_modules": [
+                "vllm.worker.worker_base",
+                "vllm.worker.worker",
+                "vllm.sequence",
+                "vllm.executor.mp_distributed_executor"
+              ],
+              "requests": {
+                "root": "execute_model_req",
+                "layout": "scheduled"
+              },
+              "parent": {
+                "point": "MultiprocessingDistributedExecutor._driver_execute_model",
+                "worker_path": [
+                  "driver_worker",
+                  "worker"
+                ]
+              },
+              "scalars": {
+                "gpu_rank": {
+                  "root": "self",
+                  "path": [
+                    "rank"
+                  ]
+                },
+                "configured_tp_size": {
+                  "root": "self",
+                  "path": [
+                    "parallel_config",
+                    "tensor_parallel_size"
+                  ]
+                }
+              },
+              "fault_eligible": true
+            }
+          },
+          "path": "vllm/worker/worker_base.py",
+          "bytes": 22807,
+          "sha256": "df67b3073f7ea1fb1a929c2ab7b807b60b087d824e90972f151c4c57e008938a",
+          "body_code_sha256": {
+            "LocalOrDistributedWorkerBase.execute_model": "377418310eef806b5cb8db24957c2795bf17f9226457785d6b2bcda1b1948c9e"
+          },
+          "pin_status": "candidate_pin"
+        },
+        "vllm.worker.worker": {
+          "functions": [
+            "Worker.__init__"
+          ],
+          "hooks": {},
+          "path": "vllm/worker/worker.py",
+          "bytes": 24456,
+          "sha256": "2e5328acdc382e51c2b09173b88240b25a6e7911aa854d831bad7ec5abc5832a",
+          "body_code_sha256": {
+            "Worker.__init__": "0d5117eec038a610b38a32342b6cf03948b4aad1af83fae4ae30403ee538b905"
+          },
+          "pin_status": "candidate_pin"
+        },
+        "vllm.sequence": {
+          "functions": [],
+          "hooks": {},
+          "path": "vllm/sequence.py",
+          "bytes": 57909,
+          "sha256": "591389bb569fdead06e4d1f0792cd021b6e7bb37ae5a5ecb4ab3c670b827bc39",
+          "body_code_sha256": {},
+          "pin_status": "candidate_pin"
+        },
+        "vllm.entrypoints.openai.serving_engine": {
+          "functions": [
+            "OpenAIServing._base_request_id"
+          ],
+          "hooks": {
+            "OpenAIServing._base_request_id": {
+              "kind": "external-id",
+              "phase": "around-original",
+              "role": "http-request-id",
+              "source_modules": [
+                "vllm.entrypoints.openai.serving_engine",
+                "vllm.entrypoints.openai.serving_completion"
+              ]
+            }
+          },
+          "path": "vllm/entrypoints/openai/serving_engine.py",
+          "bytes": 20568,
+          "sha256": "ac5e16bc8bc63b6f16a6f78509f0e773056be57dcfdc5f810c91dc3bbbd7282b",
+          "body_code_sha256": {
+            "OpenAIServing._base_request_id": "27bb8d7a79435a6890e42933e4b9bcd359b79522c7c5653133ac81db7ade3b69"
+          },
+          "pin_status": "candidate_pin"
+        },
+        "vllm.entrypoints.openai.serving_completion": {
+          "functions": [],
+          "hooks": {},
+          "path": "vllm/entrypoints/openai/serving_completion.py",
+          "bytes": 22662,
+          "sha256": "95184b6b6ceaa3642e6ab86526536ab890728155a929d9dfb3b2f16adc372018",
+          "body_code_sha256": {},
+          "pin_status": "candidate_pin"
+        }
+      },
+      "request_binding": {
+        "kind": "direct",
+        "external_prefix": "cmpl-",
+        "external_suffix": "-0"
+      },
+      "ipc_topology": {
+        "kind": "task-pipe-driver",
+        "parent_point": "MultiprocessingDistributedExecutor._init_executor",
+        "worker_point": "_run_worker_process",
+        "child_ranks": [
+          1
+        ],
+        "target_parent_kind": "executor"
+      }
+    },
+    {
+      "id": "v1-shm-broadcast",
+      "role": "후보 판본",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "pin_status": "candidate_pin",
+      "engine_group_verified": false,
+      "observer_installed": false,
+      "producer_registered": false,
+      "sources": {
+        "vllm.v1.executor.multiproc_executor": {
+          "path": "vllm/v1/executor/multiproc_executor.py",
+          "bytes": 45225,
+          "sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+          "functions": [
+            "MultiprocExecutor._init_executor",
+            "WorkerProc._init_message_queues"
+          ],
+          "function_lines": {
+            "MultiprocExecutor._init_executor": [
+              118,
+              266
+            ],
+            "WorkerProc._init_message_queues": [
+              607,
+              637
+            ]
+          },
+          "body_code_sha256": {
+            "MultiprocExecutor._init_executor": "93a599d21ac171a0d49abba4f5b8b1e50e4c2ac706e6fe9dbd55a140d674fcf6",
+            "WorkerProc._init_message_queues": "2b506b6b07838c851f1819da973c1ea5de2761c0be23e5a3c8b2f7e59573c18d"
+          },
+          "hooks": {
+            "MultiprocExecutor._init_executor": {
+              "phase": "after-original",
+              "role": "parent-executor",
+              "scalars": {
+                "configured_tp_size": {
+                  "root": "self",
+                  "path": [
+                    "vllm_config",
+                    "parallel_config",
+                    "tensor_parallel_size"
+                  ]
+                }
+              },
+              "endpoints": {
+                "broadcast": {
+                  "root": "self",
+                  "path": [
+                    "rpc_broadcast_mq",
+                    "buffer",
+                    "shared_memory"
+                  ],
+                  "kind": "shared-memory"
+                }
+              },
+              "members": {
+                "root": "self",
+                "path": [
+                  "workers"
+                ],
+                "scalars": {
+                  "rank": {
+                    "root": "item",
+                    "path": [
+                      "rank"
+                    ]
+                  },
+                  "worker_pid": {
+                    "root": "item",
+                    "path": [
+                      "proc",
+                      "_popen",
+                      "pid"
+                    ]
+                  }
+                },
+                "endpoints": {
+                  "response": {
+                    "root": "item",
+                    "path": [
+                      "worker_response_mq",
+                      "buffer",
+                      "shared_memory"
+                    ],
+                    "kind": "shared-memory"
+                  }
+                },
+                "processes": {
+                  "worker": {
+                    "root": "item",
+                    "path": [
+                      "proc",
+                      "_popen",
+                      "pid"
+                    ]
+                  }
+                }
+              },
+              "source_modules": [
+                "vllm.v1.executor.multiproc_executor",
+                "vllm.distributed.device_communicators.shm_broadcast"
+              ]
+            },
+            "WorkerProc._init_message_queues": {
+              "phase": "after-original",
+              "role": "worker-initialization",
+              "scalars": {
+                "rank": {
+                  "root": "self",
+                  "path": [
+                    "rank"
+                  ]
+                },
+                "reader_rank": {
+                  "root": "self",
+                  "path": [
+                    "rpc_broadcast_mq",
+                    "local_reader_rank"
+                  ]
+                },
+                "configured_tp_size": {
+                  "root": "vllm_config",
+                  "path": [
+                    "parallel_config",
+                    "tensor_parallel_size"
+                  ]
+                }
+              },
+              "endpoints": {
+                "broadcast": {
+                  "root": "self",
+                  "path": [
+                    "rpc_broadcast_mq",
+                    "buffer",
+                    "shared_memory"
+                  ],
+                  "kind": "shared-memory"
+                },
+                "response": {
+                  "root": "self",
+                  "path": [
+                    "worker_response_mq",
+                    "buffer",
+                    "shared_memory"
+                  ],
+                  "kind": "shared-memory"
+                }
+              },
+              "source_modules": [
+                "vllm.v1.executor.multiproc_executor",
+                "vllm.distributed.device_communicators.shm_broadcast"
+              ]
+            }
+          }
+        },
+        "vllm.distributed.device_communicators.shm_broadcast": {
+          "path": "vllm/distributed/device_communicators/shm_broadcast.py",
+          "bytes": 45067,
+          "sha256": "f3e7a3f3ff713fccbd535e0d41650ee05bdf8677e83d4b90519910645022c30b",
+          "functions": [
+            "MessageQueue.export_handle",
+            "MessageQueue.create_from_handle"
+          ],
+          "function_lines": {
+            "MessageQueue.export_handle": [
+              556,
+              557
+            ],
+            "MessageQueue.create_from_handle": [
+              560,
+              605
+            ]
+          },
+          "body_code_sha256": {
+            "MessageQueue.export_handle": "1cb56ca634fbde33f99c8c1efcdf5caca0fb41e789711388b67555efa6ebdc20",
+            "MessageQueue.create_from_handle": "c6940c6eb74a41737b4e4c62f1791fdbea2cb2340b7a6b2d4a0f35b4449f2589"
+          }
+        }
+      },
+      "review": "부모 rpc_broadcast_mq.buffer.shared_memory와 worker _init_message_queues의 동일 FD 커널 객체를 대응한다. response queue와 workers[rank].proc 세대도 별도로 확인해야 하며 같은 요청/공유 메모리만으로 그룹 전체를 인증하지 않는다.",
+      "runtime": "cpython-3.12.3",
+      "request_layouts": {
+        "scheduled": {
+          "kind": "positive-dict-keys",
+          "type": {
+            "module": "vllm.v1.core.sched.output",
+            "name": "SchedulerOutput"
+          },
+          "field": "num_scheduled_tokens",
+          "item_types": []
+        }
+      },
+      "assignment_type": {
+        "module": "vllm.v1.engine",
+        "name": "EngineCoreRequest"
+      },
+      "rpc_sources": {
+        "vllm.v1.executor.multiproc_executor": {
+          "functions": [
+            "WorkerProc._execute_worker_rpc"
+          ],
+          "hooks": {
+            "WorkerProc._execute_worker_rpc": {
+              "kind": "rpc",
+              "phase": "around-original",
+              "role": "gpu-worker-rpc",
+              "source_modules": [
+                "vllm.v1.executor.multiproc_executor",
+                "vllm.v1.worker.worker_base",
+                "vllm.v1.worker.gpu_worker",
+                "vllm.v1.core.sched.output"
+              ],
+              "rpc_envelope": {
+                "root": "rpc_request"
+              },
+              "rpc_method": "execute_model",
+              "requests": {
+                "root": "rpc_request",
+                "indexes": [
+                  1,
+                  0
+                ],
+                "layout": "scheduled"
+              },
+              "scalars": {
+                "rpc_rank": {
+                  "root": "self",
+                  "path": [
+                    "rank"
+                  ]
+                }
+              },
+              "no_scheduled_work": {
+                "total_field": "total_num_scheduled_tokens"
+              }
+            }
+          },
+          "path": "vllm/v1/executor/multiproc_executor.py",
+          "bytes": 45225,
+          "sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+          "body_code_sha256": {
+            "WorkerProc._execute_worker_rpc": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a"
+          },
+          "pin_status": "candidate_pin"
+        },
+        "vllm.v1.worker.worker_base": {
+          "functions": [
+            "WorkerBase.__init__",
+            "WorkerWrapperBase.execute_model"
+          ],
+          "hooks": {
+            "WorkerWrapperBase.execute_model": {
+              "kind": "rpc",
+              "phase": "around-original",
+              "role": "gpu-worker-wrapper",
+              "source_modules": [
+                "vllm.v1.worker.worker_base",
+                "vllm.v1.worker.gpu_worker",
+                "vllm.v1.core.sched.output",
+                "vllm.v1.executor.multiproc_executor"
+              ],
+              "requests": {
+                "root": "scheduler_output",
+                "layout": "scheduled"
+              },
+              "parent": {
+                "point": "WorkerProc._execute_worker_rpc",
+                "worker_path": [
+                  "worker"
+                ]
+              },
+              "scalars": {
+                "gpu_rank": {
+                  "root": "self",
+                  "path": [
+                    "worker",
+                    "rank"
+                  ]
+                },
+                "configured_tp_size": {
+                  "root": "self",
+                  "path": [
+                    "worker",
+                    "vllm_config",
+                    "parallel_config",
+                    "tensor_parallel_size"
+                  ]
+                }
+              },
+              "fault_eligible": true,
+              "no_scheduled_work": {
+                "total_field": "total_num_scheduled_tokens"
+              }
+            }
+          },
+          "path": "vllm/v1/worker/worker_base.py",
+          "bytes": 14284,
+          "sha256": "4a1a5266b912fe97991d8dc89d92b923990da9f6cb4b817d00d52e9c0d26dd7c",
+          "body_code_sha256": {
+            "WorkerBase.__init__": "53f4f9db758bb64c2bb2c1fab36df4aa5a792de5390cac523eb71d241d19be1a",
+            "WorkerWrapperBase.execute_model": "9b2ea068f1e37bbf524609caddf94a2d0d5bad66c20815234fe1e1320f7966b7"
+          },
+          "pin_status": "candidate_pin"
+        },
+        "vllm.v1.worker.gpu_worker": {
+          "functions": [],
+          "hooks": {},
+          "path": "vllm/v1/worker/gpu_worker.py",
+          "bytes": 65620,
+          "sha256": "6994436e4547c0996ab555b3e814e8ccea26b650dfc1b378b97d640745309347",
+          "body_code_sha256": {},
+          "pin_status": "candidate_pin"
+        },
+        "vllm.v1.core.sched.output": {
+          "functions": [],
+          "hooks": {},
+          "path": "vllm/v1/core/sched/output.py",
+          "bytes": 12558,
+          "sha256": "3a66c8efaefe10c572f6f33cf1f8aa4610758c945130cad62eb9f7331005677c",
+          "body_code_sha256": {},
+          "pin_status": "candidate_pin"
+        },
+        "vllm.v1.engine.input_processor": {
+          "functions": [
+            "InputProcessor.assign_request_id"
+          ],
+          "hooks": {
+            "InputProcessor.assign_request_id": {
+              "kind": "assignment",
+              "phase": "around-original",
+              "role": "internal-request-id-assignment",
+              "source_modules": [
+                "vllm.v1.engine.input_processor",
+                "vllm.v1.engine"
+              ],
+              "assignment": {
+                "root": "request"
+              }
+            }
+          },
+          "path": "vllm/v1/engine/input_processor.py",
+          "bytes": 23935,
+          "sha256": "c8abd8e4e14d99929d45a7ff3b2a74898269c5e2a7fa30b826623ee85e4ce813",
+          "body_code_sha256": {
+            "InputProcessor.assign_request_id": "3a32ac83f2dfc1f1d6f9a59b8cb8f8bfb2ff264cfcea683bdc60174291b33a3f"
+          },
+          "pin_status": "candidate_pin"
+        },
+        "vllm.v1.engine": {
+          "functions": [],
+          "hooks": {},
+          "path": "vllm/v1/engine/__init__.py",
+          "bytes": 10351,
+          "sha256": "4e59828787634123026a6b424f48c21d691913dd338b59dd13f25fa260f2284b",
+          "body_code_sha256": {},
+          "pin_status": "candidate_pin"
+        },
+        "vllm.entrypoints.serve.engine.serving": {
+          "functions": [
+            "BaseServing._base_request_id"
+          ],
+          "hooks": {
+            "BaseServing._base_request_id": {
+              "kind": "external-id",
+              "phase": "around-original",
+              "role": "http-request-id",
+              "source_modules": [
+                "vllm.entrypoints.serve.engine.serving",
+                "vllm.entrypoints.openai.completion.serving"
+              ]
+            }
+          },
+          "path": "vllm/entrypoints/serve/engine/serving.py",
+          "bytes": 7253,
+          "sha256": "70143311acc2230b925e7f3603b8b9314f029ff5e98d5af990b3bdca691331f1",
+          "body_code_sha256": {
+            "BaseServing._base_request_id": "037b8bdbb11aef969ef30cc42e0f49566790af02b93f4a7a22d12b5ab56664be"
+          },
+          "pin_status": "candidate_pin"
+        },
+        "vllm.entrypoints.openai.completion.serving": {
+          "functions": [],
+          "hooks": {},
+          "path": "vllm/entrypoints/openai/completion/serving.py",
+          "bytes": 30431,
+          "sha256": "75d05ddddf303734a078a3e42fcb173fef58ea56da09bc0b5c7525cb9bbbf527",
+          "body_code_sha256": {},
+          "pin_status": "candidate_pin"
+        }
+      },
+      "request_binding": {
+        "kind": "assigned",
+        "external_prefix": "cmpl-",
+        "external_suffix": "-0"
+      },
+      "ipc_topology": {
+        "kind": "broadcast-workers",
+        "parent_point": "MultiprocExecutor._init_executor",
+        "worker_point": "WorkerProc._init_message_queues",
+        "child_ranks": [
+          0,
+          1
+        ],
+        "target_parent_kind": "worker"
+      }
+    }
+  ],
+  "prepared_history": [
+    {
+      "source_manifest_sha256": "7c225d4eb755d80f554938159056b5a038e1a0a7b48a1fc6eeac06ca0a1f2232",
+      "assets": {
+        "guard/__init__.py": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "guard/adapters/__init__.py": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "guard/adapters/assets/vllm_rank_ipc_profiles.json": {
+          "bytes": 14447,
+          "sha256": "77f2bc57c54de8daae006d02087a5dd2e044163cd043e393ead0d67d27d39fa8"
+        },
+        "guard/adapters/vllm_lifecycle_sensor.py": {
+          "bytes": 57586,
+          "sha256": "e537d1d1b19813f171aa30b9344c1dbb49139eed3dea60bfa6dc71744d0d4f39"
+        },
+        "guard/adapters/vllm_rank_ipc_hooks.py": {
+          "bytes": 9964,
+          "sha256": "8cc51c530fcda852bbad5a008a92b62733f0d93845d4a5b4c7173c9a844744d5"
+        },
+        "guard/adapters/vllm_rank_ipc_identity.py": {
+          "bytes": 5125,
+          "sha256": "d1c138564b5f1a606d95c020b38846ce6826ba7c35ac1e3df31a23c0635022dc"
+        },
+        "guard/adapters/vllm_rank_ipc_runtime.py": {
+          "bytes": 11058,
+          "sha256": "1343c3fc6b07dfb6b8c89a10e7f67d80b40c7d146f92d51008f259d970d910ff"
+        },
+        "guard/adapters/vllm_rank_ipc_sources.py": {
+          "bytes": 4463,
+          "sha256": "73bb5bd8aad4e2c1c7cfe14f6890a7dbd81fc04c41b326236b6110f3dcf342ad"
+        },
+        "guard/adapters/vllm_worker_generation_contract.py": {
+          "bytes": 8881,
+          "sha256": "f0c37215577292ce7b89b535cf147553ac22f5ae6ef6a08708cf055f4d4eb27a"
+        },
+        "sitecustomize.py": {
+          "bytes": 1712,
+          "sha256": "c5484c8f64206528ff50a32ca6585cfddbb922d27c8100cfc3c8ff837df857af"
+        }
+      }
+    }
+  ]
+}

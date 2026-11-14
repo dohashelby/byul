@@ -127,9 +127,54 @@
       "reviewed_at": "2026-11-14T11:57:44.240356+09:00"
     },
     {
+      "manifest_sha256": "c04480e5754ae0ed6df798069b46e7bcf9e0f886627c64fc4bf2fee6414cc8cf",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T17:10:57.549228+09:00"
+    },
+    {
+      "manifest_sha256": "7c225d4eb755d80f554938159056b5a038e1a0a7b48a1fc6eeac06ca0a1f2232",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T18:27:11.755620+09:00"
+    },
+    {
+      "manifest_sha256": "bdb24d0225de8f86397bff48d7475e9ec440ae38715fd61c81c126051d22638e",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T19:44:52.699731+09:00"
+    },
+    {
+      "manifest_sha256": "a65e78f3536d18113b49d620b97465b6aff9d03e8c0d588d24d949fe10e0d5fb",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T20:13:47.854431+09:00"
+    },
+    {
+      "manifest_sha256": "70f2607a7b02c25fcf5a3c6765c475c4a9385add73e9d9619c48643b2ffb3072",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T21:10:29.548190+09:00"
+    },
+    {
+      "manifest_sha256": "30f4ea1d308ab9f8baaa396f4fbfaf6b514af29b12c2e5ce2ed9c7eb3aa680e4",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T21:29:00.610146+09:00"
+    },
+    {
       "manifest_sha256": "bdc9eeec242435a56bfba1a74a7b30e0ef9824d1d6112e9eb89b80ce098bc9be",
       "reviewed_by": "Claude / BYUL UPDATE / RB 실행 결합값 분리(팩 35) self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-14T17:42:17+09:00"
+    },
+    {
+      "manifest_sha256": "357054316883da77b6cd8b928ff33d5e1c4ee5e45a00ed566552f62cc010ee92",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T21:43:58.124183+09:00"
+    },
+    {
+      "manifest_sha256": "1c5f8b2b2af075ba75ebe8af79e342b9d0c6d4f1b0efcfa23bb413a168414402",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T12:46:45.931892+00:00"
+    },
+    {
+      "manifest_sha256": "564e73b1be6abe10dad627ae1d7ab090e454ac65fc228a1f049fd4ea22685f34",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T12:53:51.580329+00:00"
     }
   ]
 }

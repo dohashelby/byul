@@ -1,3 +1,10 @@
+## 2026-11-14 — 두 판본 실제 IPC/TP2 기동과 REQ-16 결정34
+
+- 한 일: head7e49f608/source7c225d4e의 읽기 전용 hook을 동일 승인 GPU 노드의 두 이미지에 실제 설치했다. 두 쪽 TP2 모델 로드·GPU2개·정상 HTTP200, 각각3개의 닫힌 source/IPC snapshot을 확인했다. 기준 부모/실제 rank1의 시작세대·task/result pipe와 후보 부모/rank0·1의 시작세대·broadcast/개별 response HMAC이 일치했다. 원 ZIP28,565 bytes/SHA220d8d64와10파일 해시를 반출하고 정확 자산/본문/세션/HMAC을 재검증했다. 기준 모델 로드의 실제 디스크 대기와 가중치2개 순차 읽기/SHA 재대조를 기록했으며 새 다운로드/설정 변경은 없다. 기준 V0가 지정 멀티모달 prefix caching을 꺼 비교 측정력이 없음을 확인했고 사용자 결정34로 V0 유지·해당 기준 캐시 분기만 원인 있는 UNKNOWN 예외를 기록했다.
+- 테스트 결과: 제품 코드가 같은 head7e49f608의 PR #271 CI18개 모두 SUCCESS. 실제 두 쪽 정상 HTTP200과 source_rows_verified=3씩/gaps0, 부모-자식 세대/IPC 원 기록 대조가 통과했다. 문서 연결 뒤 경로16개 통과(pytest1.70초·벽시계2.234초), 현황 --check·544파일 소스 관문 통과. 실제 상태를 요약한 문서만 수정했고 src/packs/검토 목록·기존 고정값/등록표·판정·runtime/contracts는 바꾸지 않았다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 같은 승인 브랜치의 draft #271에 실측/결정 기록을 반영하고 새 CI를 확인한다. 초기 IPC 근거와 활성 요청/RPC·nonce·대상 세대의 결합, 정확 주입 경계·물리 해제·새 소유자 복구의 필수 경로를 설치 source에서 확정해 구현한다. 코드 준비 동안 동일 신규 노드는 일시 정지를 요청했고 반출본/설치본을 보존한다. 최종 종료 시 이번 신규 EBS/SG까지 정리한다.
+- 막힌 것: 이번 hook은 초기 메타데이터 관측이며 활성 요청·장애 전파·기한·물리 해제·새 세대 복구 전체를 검증하지 않는다. source_authenticated/engine_group_verified/producer_registered=false, 장애 주입0회를 보존한다. 기준 V0 요청 전달/작업자 실행 구조는 후보와 다르며 기존 native24 source 불일치와 TP1 거부 조건을 유지한다. 실제 ENV/target은 SUP-08 두 쪽만 봉인했고 A27개 기준52쪽/전체69개 기준136쪽이 남는다. 결정34로 해당 캐시 예외만 닫았으며 나머지 입력·관측 완료나 새 결과 객체를 만들지 않았다. #263 draft·M-B4 보관·runtime 경합 미해결/무변경을 유지한다.
+
 ## 2026-11-14 — M-A3 읽기 전용 source hook·비밀 준비 자산·닫힌 snapshot 후보
 
 - 한 일: 같은 hook 구현에서 adapter 데이터로 기준 queue·후보 shared-memory 관측 위치를 고른다. 정확 Python ABI/이미지·설치 파일/SHA·함수7개 본문·namespace를 먼저 대조하고, 원 함수의 인자/반환/예외를 보존한 앞뒤 경계에서만 읽는다. 커널 IPC 지문과 동일 UID·PID/time namespace의 실제 자식 시작 세대, source graph·원 관측 구간을 남긴다. 기존 sitecustomize/loader 선택과 원래 guard 패키지를 보존한다. 준비 경로는 import 경로에서 제거하고 _byul_rank_ipc 전용 namespace로만 로드한다. 비밀 키는 준비 디렉터리에만 두며 snapshot은 HMAC·O_EXCL로 봉인한다. 기존 native24·판정·등록표·M-B4는 변경하지 않는다.

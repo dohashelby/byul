@@ -1,5 +1,15 @@
 # M-A3 rank-fault 후보 생산자
 
+## 두 이미지의 실제 IPC 기동 관측 (2026-11-14)
+
+후속 PR #271의7e49f608/source7c225d4e 준비 자산을 동일 승인 GPU 노드에 설치했다. 두 판본 모두 TP2 모델 로드·GPU2개·정상 HTTP200을 확인했다. 기준/후보 각3개의 닫힌 snapshot을 회수했고 정확 준비 자산·ABI/설치 파일/원 함수 본문·HMAC 대조에서 공백0개였다. [원자료 요약](ma3-image-qualification-20261114.json)의 후속_GPU_IPC_관측에28,565 bytes ZIP과10개 파일의 크기/SHA를 기록했다. 비밀 settings/키는 공개 요약에 넣지 않았다.
+
+기준 쪽은 동일 부모의 executor/worker wrapper와 실제 rank1 프로세스의 PID·시작세대가 일치하고, 서로 다른 task/result pipe의 양끝 커널 HMAC 지문이 모두 일치했다. 부모가 기록한 wrapper 객체 지문도 executor 멤버와 같았다. driver RPC rank0를 GPU TP rank 증명으로 바꾸지 않았다. 후보 쪽은 부모가 기록한 rank0/1 프로세스 세대가 각 worker 자신의 문맥과 일치하며 broadcast 지문은 세 프로세스에서 같고, 개별 response 지문은 부모-해당 worker끼리 일치하며 두 rank 사이에는 다르다.
+
+이는 초기 IPC 소속 메타데이터의 실제 대조다. 활성 요청/RPC·nonce와 주입·탐지·상위 전달·기한·해제·새 세대 복구를 연결한 전체 수락은 아니다. 기존 source_authenticated/engine_group_verified/producer_registered=false, native24 고정값과 TP1 거부 조건을 유지하며 장애 주입은0회다. 정상 요청의 응답을 장애 전달/복구 사건으로 변환하지 않는다. 현재 main의 기존 fault 소스 불일치가 해소됐다고 주장하지 않는다.
+
+기준 모델 로드 중 두 프로세스가 실제 디스크 읽기 대기 상태였다. 기존 가중치를 순차 읽으며 두 SHA를 재확인한 뒤 기동이 완료됐고, 새 다운로드·모델/판정 설정 변경은 없었다. 지연과 정상 HTTP를 성능 판정으로 쓰지 않는다. 다음 구현은 정확 RPC/요청 관측 경계와 IPC/프로세스 세대를 결합한 제어, 물리 신호 해제 영수증 및 새 세대 복구 연결이다. 준비된 경로만 다시 GPU에서 확인한다.
+
 ## IPC 소속 근거의 후속 구성요소 (2026-11-14)
 
 기존 원 기록 변환과 별도로 읽기 전용 후보 두 개를 추가했다. `vllm_rank_ipc_identity`는 정확한 표준 라이브러리 Connection/SharedMemory 형식의 FD를 잠깐 복제해 전후 fstat을 대조하고, 실제 커널 객체/boot/IPC namespace를 세션 HMAC으로만 기록한다. 원 FD·payload·공유 메모리 이름·property·fileno를 읽거나 바꾸지 않는다. 실제 자식 프로세스의 동일 pipe/공유 메모리 대조와 payload 보존, 다른 IPC·키·FD 교체/폐쇄·속성 실행 거부를 시험했다.

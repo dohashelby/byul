@@ -162,6 +162,64 @@
   "한계": [
     "모델 영수증의 engine_loaded=false는 다운로드 당시 사실로 원본에 유지했고 이후 모델 로드는 별도 실측 기동 자료로 결합했다.",
     "정상 요청·TP2 기동은 REQ-16 전체 캐시/LoRA/가중치 세대 검증이나 LIF-08 장애 자격이 아니다.",
-    "actual ENV/target은 SUP-08 양쪽만 확보했고 다른136쪽은 실행 세대별 결합이 남았다."
-  ]
+    "actual ENV/target은 SUP-08 양쪽만 확보했고 다른136쪽은 실행 세대별 결합이 남았다.",
+    "후속 실제 기동에서 기준 V0가 멀티모달 prefix caching을 자동으로 껐다. 명시 인자와 실제 활성은 다르며 REQ-16의 캐시 분기는 수락되지 않았다."
+  ],
+  "후속_실제_IPC_기동": {
+    "실행_소스_커밋": "7e49f6082397328a8f2876db82736e84cfbf2783",
+    "검토_소스_SHA256": "7c225d4eb755d80f554938159056b5a038e1a0a7b48a1fc6eeac06ca0a1f2232",
+    "원자료": {
+      "파일": "rank-ipc-qualification-20261114-v1.zip",
+      "bytes": 28565,
+      "sha256": "220d8d649963f28bbfb8e34aa385594e83c381a6ff45569593cb569d54b5460f"
+    },
+    "양쪽_TP2_정상_HTTP200": true,
+    "추가_ENV_target_봉인": false,
+    "기능_설정_실측": {
+      "baseline": {
+        "log_sha256": "470fc76026f6b45d8807644e0ed98e6bd68aae95bbc10f8ebb44f11dbcd9c11c",
+        "observed": [
+          {
+            "line": 3,
+            "fact": "requested_prefix_cache_true"
+          },
+          {
+            "line": 7,
+            "fact": "multimodal_prefix_cache_disabled"
+          },
+          {
+            "line": 9,
+            "fact": "multimodal_prefix_cache_disabled"
+          },
+          {
+            "line": 10,
+            "fact": "effective_prefix_cache_false"
+          }
+        ]
+      },
+      "candidate": {
+        "log_sha256": "dbb70985145d962da500905641eabc19bb812135dbc8b8c680edbfe255c663ab",
+        "observed": [
+          {
+            "line": 7,
+            "fact": "requested_prefix_cache_true"
+          },
+          {
+            "line": 14,
+            "fact": "effective_prefix_cache_true"
+          }
+        ]
+      }
+    },
+    "기준_멀티모달_prefix_cache_실제_활성": false,
+    "REQ16_캐시_검증_완료": false,
+    "판정_변경": false,
+    "REQ16_기준_캐시_분기_사용자_결정": {
+      "결정": 34,
+      "승인": "V0 유지·해당 기준 캐시 분기만 원인 있는 UNKNOWN 예외",
+      "실제_결과_객체_생성": false,
+      "기준_V1_보조_실행_승인": false,
+      "전체_완료_승격": false
+    }
+  }
 }

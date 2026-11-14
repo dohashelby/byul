@@ -96,5 +96,125 @@
       "candidate_function_points": 53,
       "candidate_function_matches": 53
     }
+  },
+  "후속_GPU_IPC_관측": {
+    "실행_소스_커밋": "7e49f6082397328a8f2876db82736e84cfbf2783",
+    "검토_소스_SHA256": "7c225d4eb755d80f554938159056b5a038e1a0a7b48a1fc6eeac06ca0a1f2232",
+    "원자료": {
+      "파일": "rank-ipc-qualification-20261114-v1.zip",
+      "bytes": 28565,
+      "sha256": "220d8d649963f28bbfb8e34aa385594e83c381a6ff45569593cb569d54b5460f",
+      "파일_목록": [
+        {
+          "file": "baseline/engine-log.txt",
+          "bytes": 14690,
+          "sha256": "470fc76026f6b45d8807644e0ed98e6bd68aae95bbc10f8ebb44f11dbcd9c11c"
+        },
+        {
+          "file": "baseline/qualification.json",
+          "bytes": 14326,
+          "sha256": "af68e93be444503573dbd0c8bb9ba0b1f4629e358d2bc5de7975a031b096d7ba"
+        },
+        {
+          "file": "baseline/snapshots/pid-106-32835-1.json",
+          "bytes": 4765,
+          "sha256": "ecec453259f17369f1f5dad8d80ef3ea7deaabc1b82ad238b4cbd45d59485464"
+        },
+        {
+          "file": "baseline/snapshots/pid-106-32835-2.json",
+          "bytes": 4966,
+          "sha256": "b4109bf78151035322e460658ad2f70b54f34d9ca16657512f790d8a88c588e7"
+        },
+        {
+          "file": "baseline/snapshots/pid-318-33795-1.json",
+          "bytes": 4404,
+          "sha256": "1857882ef3ad31a05bf7de28c416d79e3080f7d519f8d44a3edee43ea6198942"
+        },
+        {
+          "file": "candidate/engine-log.txt",
+          "bytes": 21160,
+          "sha256": "dbb70985145d962da500905641eabc19bb812135dbc8b8c680edbfe255c663ab"
+        },
+        {
+          "file": "candidate/qualification.json",
+          "bytes": 14241,
+          "sha256": "41f2ea95f45020de84ec0d089a85f44cc4557ef93144815a0fe5ba9b81db5c20"
+        },
+        {
+          "file": "candidate/snapshots/pid-157-71430-1.json",
+          "bytes": 5112,
+          "sha256": "d00f944b416478aaececdb575cf1861183e9d71dfb1492926f035e7434fd31c6"
+        },
+        {
+          "file": "candidate/snapshots/pid-279-73040-1.json",
+          "bytes": 3965,
+          "sha256": "6857ec9d4414c57f20d61c9bdd5b338c9203548897f3945ab4bafe47ecbb3d1c"
+        },
+        {
+          "file": "candidate/snapshots/pid-280-73040-1.json",
+          "bytes": 3965,
+          "sha256": "c6d66c2b222224325ab8353c6d8332b523907c3b1120c157d27be199048da349"
+        }
+      ]
+    },
+    "쪽별_실제_관측": {
+      "baseline": {
+        "image": "docker.io/vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8",
+        "session": "cb60c7e8f947cf3e89e320c7d093f9f3",
+        "captured_at": "2026-11-14T10:14:37.475580+00:00",
+        "snapshots": 3,
+        "source_rows_verified": 3,
+        "gaps": [],
+        "pod_uid": "226a4539-e4ef-495d-81bd-7824bfb254cf",
+        "normal_request": {
+          "normal_status": 200,
+          "response_sha256": "b3662a94cbeb2548408732f233fcb1fcdc889c709067e8e05e860bc40b10cb8b",
+          "gpu_count": 2,
+          "gpus": [
+            "NVIDIA L4, 595.112.07",
+            "NVIDIA L4, 595.112.07"
+          ]
+        },
+        "tp_size": 2,
+        "model_loaded": true,
+        "fault_executed": false,
+        "source_authenticated": false,
+        "engine_group_verified": false,
+        "producer_registered": false,
+        "startup_ipc_metadata_correlated": true,
+        "observed_roles": "같은 부모 프로세스의 driver/executor와 rank1 작업자의 task/result pipe. driver RPC rank를 GPU TP rank로 승격하지 않음."
+      },
+      "candidate": {
+        "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+        "session": "b3beeb4cbbe5bea601adc24a3851baa8",
+        "captured_at": "2026-11-14T10:16:55.603363+00:00",
+        "snapshots": 3,
+        "source_rows_verified": 3,
+        "gaps": [],
+        "pod_uid": "29380639-c561-4816-aef3-4ba68b3c9908",
+        "normal_request": {
+          "normal_status": 200,
+          "response_sha256": "52a4e0f735937373dae8136d2b8ebd2ba1ca1a0afcc625b1021632acfeae6964",
+          "gpu_count": 2,
+          "gpus": [
+            "NVIDIA L4, 595.112.07",
+            "NVIDIA L4, 595.112.07"
+          ]
+        },
+        "tp_size": 2,
+        "model_loaded": true,
+        "fault_executed": false,
+        "source_authenticated": false,
+        "engine_group_verified": false,
+        "producer_registered": false,
+        "startup_ipc_metadata_correlated": true,
+        "observed_roles": "부모 executor와 rank0/1 작업자의 공통 broadcast 및 서로 다른 개별 response 공유 메모리"
+      }
+    },
+    "한계": [
+      "초기 IPC/프로세스 세대의 메타데이터 대조이며 활성 요청/RPC·장애 전파·해제·새 세대 복구 전체 수락이 아니다.",
+      "기존 native24 고정값/TP1 자격·판정·등록표·M-B4를 바꾸지 않는다.",
+      "fault_executed/source_authenticated/engine_group_verified/producer_registered=false를 보존한다."
+    ]
   }
 }

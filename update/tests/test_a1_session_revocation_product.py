@@ -11,6 +11,7 @@ from guard.runtime import kubernetes_http as http
 from guard.executors.persistent_session_probe import SCHEMA,SLOTS
 from guard.executors.session_revocation_contract import normalize_policy,epoch_ns
 from guard.store import Store
+from tests.run_binding_support import for_pack
 from tests.builders import baseline_pack,policy,T0
 from tests.test_a1_credential_revocation_product import World as AuthWorld,RETIRED,CONTROL,PRIVATE,serving_loop
 from tests.test_kubernetes_lifecycle import group,target as native_target
@@ -86,7 +87,7 @@ def test_registered_cli_existing_connection_constraints_and_exact_refs(tmp_path,
             if path.name=='probe_log.jsonl' and a and a[0]=='w':raise OSError(PRIVATE)
             return original(path,*a,**kw)
         monkeypatch.setattr(Path,'open',open_file)
-    pol=policy(pack.ref(),scope={'include':['PLT-11']},values={'PLT-11':values})
+    pol=policy(pack.ref(),scope={'include':['PLT-11']},values={'PLT-11':for_pack(pack,'PLT-11',values)})
     for name,value in [('environment',group.env.to_dict()),('policy',pol.to_dict()),('target',world.target)]:
         (tmp_path/(name+'.json')).write_bytes(canonical_json(value))
     cfg=tmp_path/'guard.toml';cfg.write_text('[executors]\nsession_revocation="kubernetes"\n[adapter]\nname="vllm"\n[session_revocation]\ntarget='

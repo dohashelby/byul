@@ -17,13 +17,14 @@ from guard.core.select import select
 from guard.executors import kubernetes_record_access_product as record_product
 from guard.executors import kubernetes_route_record as route
 from guard.executors import kubernetes_supply_boot as boot
-from guard.executors import composite_collection, registry
+from guard.executors import composite_collection, registry, run_binding
 from guard.executors import supply_boot_contract as contract
 from guard.executors.base import EvidenceDraft
 from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex, utcnow
 from guard.store import Store
 from guard.store.packs import get_pack, put_pack
 from tests.builders import environment, policy
+from tests.run_binding_support import fixed_file_hashes, split
 from tests.test_native_model_file_reads import fixture as read_fixture
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -82,13 +83,16 @@ def pipeline(tmp_path, check_id, values, make):
     env = environment(model={"id": "test"})
     ref = put_pack(store, PACK.path)
     resolved = values(env) if callable(values) else values
-    pol = policy(ref, scope={"include": [check_id]}, values={check_id: resolved})
+    # @35: run-binding keys are computed by guard run, not given as policy values.
+    policy_values, file_hashes = split(PACK.checks[check_id], resolved)
+    pol = policy(ref, scope={"include": [check_id]}, values={check_id: policy_values})
     store.put(env); store.put(pol)
     plan = select(PACK, [env], pol); store.put(plan)
     name = PACK.checks[check_id].executor
     registry.EXECUTORS[name + ":sim"] = lambda cfg: make(env, resolved)
     try:
-        evd, = run_plan(store, PACK, plan, RunConfig(executors={name: "sim"}, adapter="vllm"))
+        with fixed_file_hashes(file_hashes):
+            evd, = run_plan(store, PACK, plan, RunConfig(executors={name: "sim"}, adapter="vllm"))
     finally:
         registry.EXECUTORS.pop(name + ":sim")
     result, = judge_plan(store, PACK, plan, env.created_at)
@@ -279,7 +283,9 @@ def test_supply_boot_definition_and_policy_shape(check_id):
     check = PACK.checks[check_id]
     executor = registry.resolve_executor("supply_boot", "kubernetes")({"supply_boot": {}})
     assert isinstance(executor, boot.KubernetesSupplyBootExecutor) and check.collection_profile == contract.CHECK_PROFILES[check_id]
-    assert {p.key for p in check.policy_params} == set(contract.policy_types(check_id))
+    # @35: the run-binding keys left the pack; the executor contract still receives them from guard run.
+    assert {p.key for p in check.policy_params} | set(run_binding.keys_for(check)) == set(contract.policy_types(check_id))
+    assert not {p.key for p in check.policy_params} & set(run_binding.keys_for(check))
     with pytest.raises(ValueError, match="SUPPLY_BOOT_POLICY_INVALID"):
         executor.validate_policy(check, {})
 

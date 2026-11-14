@@ -210,7 +210,7 @@ def test_derived_pack_judges_observed_module_selection(code_pack, state, verdict
 
 def test_baseline_pack_is_untouched(code_pack):
     base = load_pack(ROOT / "packs/PACK-BASELINE")
-    assert base.checks["SUP-08"].revision == 5 and base.manifest.revision == 34
+    assert base.checks["SUP-08"].revision == 5 and base.manifest.revision == 35
     assert {k: deepcopy(v.model_dump()) for k, v in base.checks.items() if k != "SUP-08"} == \
            {k: deepcopy(v.model_dump()) for k, v in code_pack.checks.items() if k != "SUP-08"}
 

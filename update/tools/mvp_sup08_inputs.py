@@ -46,7 +46,7 @@ def prepare(fixture_file, environments, targets, output, *, control_image, pack=
     fixture_raw, fixture, historical, inventory_hash = validate_fixture(fixture_file)
     code = fixture['code_revisions']
     baseline = load_pack(pack); check = baseline.checks['SUP-08']
-    if baseline.manifest.revision != 34 or check.revision != 5:
+    if baseline.manifest.revision != 35 or check.revision != 5:
         raise ValueError('정본 팩과 SUP-08 정의가 준비되지 않았습니다.')
     pair = versions(); results = {}; files = {}; conditions = []
     same_pair = all(pair[side]['image'] == historical[side]['image_digest'] for side in pair)

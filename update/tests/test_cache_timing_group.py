@@ -238,7 +238,12 @@ def run_group(tmp_path, *, hit=False, changed_actor=False, fail_second=False, fa
     executor.transport = transport
     check = baseline_pack().checks['REQ-17'].model_copy(deep=True)
     check.executor = 'engine_sensor'; check.collection_profile = engine_sensor.PROFILES['REQ-17']
-    result = executor.run(check, env, policy['values']['REQ-17'], None, tmp_path / 'work')
+    # @35: guard run binds ENV/target/prepared/manifest; the policy carries none of them.
+    from guard.executors import run_binding
+    from guard.models import load_pack, utcnow
+    _, values = run_binding.effective_values(load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks['REQ-17'],
+        executor.cfg, env, policy['values']['REQ-17'], side='single', attempt_id=None, issued_at=utcnow())
+    result = executor.run(check, env, values, None, tmp_path / 'work')
     return result, transport
 
 

@@ -2,7 +2,7 @@ id: REQ-19
 framework_id: CHK-REQ-019
 mechanism_ids:
 - mechanism-05
-revision: 5
+revision: 6
 retired: false
 area: REQ
 purpose: GPU 메모리 안전성
@@ -15,19 +15,7 @@ review_order: implementation_path_first
 impact: HIGH
 applies_when:
   prose: 실제 GPU/backend/dtype/shape·의존성에 도달하는 kernel 분기를 확인한다. 다른 kernel의 결과를 전용하지 않는다.
-policy_params:
-- key: sensor_environment_sha256
-  type: str
-  required: true
-- key: sensor_target_sha256
-  type: str
-  required: true
-- key: sensor_prepared_sha256
-  type: str
-  required: true
-- key: sensor_manifest_sha256
-  type: str
-  required: true
+policy_params: []
 policy_prose:
   policy_to_decide: 서비스 입력 제한; 메모리 유효성은 구현 요구
   enterprise_decisions: 지원 GPU·runner·mode·shape/입력 범위, 정상 대조 방식·수치 오차·성능·장애 처리 기준과 실제 peer. 범위 밖 접근·타 요청 혼입·유출은 정책이나 허용 수치 오차로 완화할 수 없다.

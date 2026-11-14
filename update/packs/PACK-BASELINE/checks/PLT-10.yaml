@@ -2,7 +2,7 @@ id: PLT-10
 framework_id: CHK-PLT-010
 mechanism_ids:
 - mechanism-12
-revision: 4
+revision: 5
 retired: false
 area: PLT
 purpose: 권한 철회
@@ -16,15 +16,6 @@ impact: HIGH
 applies_when:
   prose: 사용 중인 자격·권한의 철회 계약과 신규 접근 처리를 확인한다. 철회 정책·발급 주체 미정은 미확인이다.
 policy_params:
-- key: revocation_environment_sha256
-  type: str
-  required: true
-- key: revocation_target_sha256
-  type: str
-  required: true
-- key: revocation_prepared_sha256
-  type: str
-  required: true
 - key: revocation_validity_start
   type: str
   required: true

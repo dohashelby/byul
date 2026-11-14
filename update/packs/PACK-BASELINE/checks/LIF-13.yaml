@@ -2,7 +2,7 @@ id: LIF-13
 framework_id: CHK-LIF-013
 mechanism_ids:
 - mechanism-13
-revision: 6
+revision: 7
 retired: false
 area: LIF
 purpose: 실행 상태·버퍼 수명
@@ -16,18 +16,6 @@ impact: MEDIUM
 applies_when:
   prose: ipc_cache/preload 등 별도 weights daemon을 선택할 때 적용한다. 기본 TP 자체를 daemon 사용으로 간주하지 않는다.
 policy_params:
-- key: sensor_environment_sha256
-  type: str
-  required: true
-- key: sensor_target_sha256
-  type: str
-  required: true
-- key: sensor_prepared_sha256
-  type: str
-  required: true
-- key: sensor_manifest_sha256
-  type: str
-  required: true
 - key: release_allowed_roles
   type: list[str]
   required: true

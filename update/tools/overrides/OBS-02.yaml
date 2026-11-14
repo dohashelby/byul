@@ -1,20 +1,8 @@
 executor: observation_state
 collection_profile: kubernetes-observation-state-composite-v1
 policy_params:
-- key: observation_state_environment_sha256
-  type: str
-  required: true
-- key: observation_state_validity_start
-  type: str
-  required: true
-- key: observation_state_validity_end
-  type: str
-  required: true
 - key: observation_state_required_components
   type: list[str]
-  required: true
-- key: identity_prepared_sha256
-  type: str
   required: true
 - key: identity_record_session
   type: str
@@ -22,20 +10,11 @@ policy_params:
 - key: identity_record_source_sha256
   type: str
   required: true
-- key: profiler_prepared_sha256
-  type: str
-  required: true
 - key: profiler_backend_kind
   type: str
   required: true
 - key: profiler_required_ranks
   type: list[str]
-  required: true
-- key: identity_target_sha256
-  type: str
-  required: true
-- key: profiler_target_sha256
-  type: str
   required: true
 required_observations:
 - key: activation_steps

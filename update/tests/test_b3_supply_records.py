@@ -136,8 +136,11 @@ def test_cpu_record_replay_factory_contract_refs_and_saved_pack(tmp_path,monkeyp
     for role in contract.ROLES:
         values['supply_'+role+'_target_sha256']=data['roles'][role]['binding']['target_sha256']
         values['supply_'+role+'_prepared_sha256']=hashlib.sha256(canonical_json(data['roles'][role]['prepared'])).hexdigest()
+    from tests.run_binding_support import fixed_file_hashes,split
+    # @35: run-binding keys are computed by guard run; only the double's file hashes are fixed.
+    policy_values,file_hashes=split(pack.checks[check_id],values)
     pol=Policy(id=new_id('POL'),data_origin='EXAMPLE',status='DRAFT',pack=pack.ref(),
-        scope={'include':[check_id]},values={check_id:values}).seal()
+        scope={'include':[check_id]},values={check_id:policy_values}).seal()
     store=Store(tmp_path/'store');put_pack(store,pack.path);store.put_many([env,pol])
     plan=select(pack,[env],pol);store.put(plan)
     # 작업 폴더는 실행 시도마다 따로다(work/<plan>/<attempt>/<check>/<side>).
@@ -145,8 +148,9 @@ def test_cpu_record_replay_factory_contract_refs_and_saved_pack(tmp_path,monkeyp
     if mode=='record-collision':
         path=store.root/'work'/plan.id/attempt/check_id/'single'/'supply_boot_normal_record.json'
         path.parent.mkdir(parents=True);path.write_bytes(b'ORIGINAL-PRESERVED')
-    evd,=run_plan(store,pack,plan,RunConfig(executors={'supply_boot':'kubernetes'},adapter='vllm',attempt_id=attempt,
-        raw={'supply_boot':{'normal':{},'challenge':{}}}))
+    with fixed_file_hashes(file_hashes):
+        evd,=run_plan(store,pack,plan,RunConfig(executors={'supply_boot':'kubernetes'},adapter='vllm',attempt_id=attempt,
+            raw={'supply_boot':{'normal':{},'challenge':{}}}))
     asof=utcnow();res,=judge_plan(store,pack,plan,as_of=asof)
     rpt=build_report(store,pack,plan,as_of=asof);store.put(rpt)
     export_bundle(store.root,tmp_path/'bundle.zip');restore_bundle(tmp_path/'bundle.zip',tmp_path/'restored')

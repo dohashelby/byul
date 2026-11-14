@@ -2,7 +2,7 @@ id: LIF-03
 framework_id: CHK-LIF-003
 mechanism_ids:
 - mechanism-07
-revision: 6
+revision: 7
 retired: false
 area: LIF
 purpose: 자원 예산·공정성
@@ -16,21 +16,6 @@ impact: MEDIUM
 applies_when:
   prose: 기본 요청 길이·출력·동시성·대기열·공정성과 요청별/전체 예산을 확인한다. metadata·child 옵션은 수용할 때 추가한다. 이미지·오디오 등 미디어를 실제 수용하면 다운로드·base64 해제·decode·전처리 중 사용 단계의 비용과, 같은 요청의 복수 미디어·실제 재시도를 포함한 누적 비용을 추가 확인한다.
 policy_params:
-- key: buffer_environment_sha256
-  type: str
-  required: true
-- key: buffer_target_sha256
-  type: str
-  required: true
-- key: buffer_prepared_sha256
-  type: str
-  required: true
-- key: buffer_validity_start
-  type: str
-  required: true
-- key: buffer_validity_end
-  type: str
-  required: true
 - key: buffer_max_write_bytes
   type: int
   required: true

@@ -1,18 +1,6 @@
 executor: request_termination
 collection_profile: kubernetes-request-termination-observation-v1
 policy_params:
-- key: termination_environment_sha256
-  type: str
-  required: true
-- key: termination_target_sha256
-  type: str
-  required: true
-- key: termination_validity_start
-  type: str
-  required: true
-- key: termination_validity_end
-  type: str
-  required: true
 - key: termination_max_delay_ms
   type: int
   required: true

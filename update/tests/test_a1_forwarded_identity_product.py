@@ -16,6 +16,7 @@ from guard.executors.forwarded_identity_contract import FIELDS,SCHEMA,normalize_
 from guard.executors.owned_capture import _FILE_READER
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.store import Store
+from tests.run_binding_support import for_pack
 from tests.builders import baseline_pack,policy,T0
 from tests.test_kubernetes_routes import inputs as route_inputs,World as RouteWorld
 from tests.test_stream_probe import _server
@@ -111,7 +112,7 @@ def inputs(tmp_path,mode='normal',header=None,normal=NORMAL,alternate=ALTERNATE)
 def test_registered_cli_issuer_claims_errors_and_exact_ref_roundtrip(tmp_path,monkeypatch,mode):
     env,world,values,pack,_=inputs(tmp_path,mode)
     for key,value in {'REQ04_KEY':CREDENTIAL,'REQ04_NORMAL':NORMAL,'REQ04_ALTERNATE':ALTERNATE}.items():monkeypatch.setenv(key,value)
-    for name,value in [('environment',env.to_dict()),('target',world.t),('policy',policy(pack.ref(),scope={'include':['REQ-04']},values={'REQ-04':values}).to_dict())]:
+    for name,value in [('environment',env.to_dict()),('target',world.t),('policy',policy(pack.ref(),scope={'include':['REQ-04']},values={'REQ-04':for_pack(pack,'REQ-04',values)}).to_dict())]:
         (tmp_path/(name+'.json')).write_bytes(canonical_json(value))
     cfg=tmp_path/'guard.toml';cfg.write_text('[executors]\nforwarded_identity="kubernetes"\n[adapter]\nname="vllm"\n[forwarded_identity]\ntarget='
         +json.dumps(str(tmp_path/'target.json'))+'\nroles={allowed="REQ04_KEY"}\n[forwarded_identity.header]\n'

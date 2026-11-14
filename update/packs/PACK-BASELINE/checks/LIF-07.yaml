@@ -2,7 +2,7 @@ id: LIF-07
 framework_id: CHK-LIF-007
 mechanism_ids:
 - mechanism-10
-revision: 7
+revision: 8
 retired: false
 area: LIF
 purpose: 기동 준비 확인
@@ -16,21 +16,6 @@ impact: MEDIUM
 applies_when:
   prose: 기본 TP의 필수 rank·모델 준비와 접수 gate를 확인한다. 선택 graph/backend의 준비 항목은 실제 설정에 맞춰 추가한다.
 policy_params:
-- key: init_environment_sha256
-  type: str
-  required: true
-- key: init_target_sha256
-  type: str
-  required: true
-- key: init_prepared_sha256
-  type: str
-  required: true
-- key: init_validity_start
-  type: str
-  required: true
-- key: init_validity_end
-  type: str
-  required: true
 - key: init_executor_backend
   type: str
   required: true

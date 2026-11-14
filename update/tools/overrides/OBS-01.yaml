@@ -1,10 +1,6 @@
 executor: required_event_record
 collection_profile: kubernetes-required-event-record-observation-v1
 policy_params:
-  - { key: observation_environment_sha256, type: str, required: true }
-  - { key: observation_target_sha256, type: str, required: true }
-  - { key: observation_validity_start, type: str, required: true }
-  - { key: observation_validity_end, type: str, required: true }
   - { key: observation_max_delay_ms, type: int, required: true }
   - { key: observation_required_events, type: "list[str]", required: true }
   - { key: observation_required_fields, type: "list[str]", required: true }

@@ -313,7 +313,12 @@ def test_real_factory_core_run_serializes_write_failure_with_same_config_hash_an
         'init_expected_ranks': ['0'], 'init_scenario_sha256': 'c' * 64, 'init_phase': 'partial-failure',
         'init_required_stages': ['model-load'], 'init_failure_rank': 0, 'init_failure_stage': 'model-load',
         'init_preparation_deadline_ms': 10000, 'init_recovery_deadline_ms': 10000}
-    pol = policy(pack.ref(), scope={'include': [check.id], 'exclude': []}, values={check.id: values})
+    from guard.executors import run_binding
+    from tests.run_binding_support import split
+    # @35: the run-binding keys are computed by guard run; only the double's file hashes are fixed.
+    policy_values, file_hashes = split(check, values)
+    pol = policy(pack.ref(), scope={'include': [check.id], 'exclude': []}, values={check.id: policy_values})
+    monkeypatch.setattr(run_binding, 'file_hash', lambda check_id, key, cfg: file_hashes[key])
     # Real registered factory/core/store/judge; only native transport/scenario are EXAMPLE.
     original_build = registry.build_executor
     built = []

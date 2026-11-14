@@ -2,7 +2,7 @@ id: SUP-15
 framework_id: CHK-SUP-015
 mechanism_ids:
 - mechanism-04
-revision: 6
+revision: 7
 retired: false
 area: SUP
 purpose: 재사용 문맥의 호환성
@@ -16,28 +16,7 @@ impact: MEDIUM
 applies_when:
   prose: 다운로드·변환·compile/npcache 등 파생 결과의 재사용 여부를 확인한다. 활성 cache를 조사하지 않은 채 제외하지 않는다.
 policy_params:
-- key: supply_environment_sha256
-  type: str
-  required: true
-- key: supply_normal_target_sha256
-  type: str
-  required: true
-- key: supply_challenge_target_sha256
-  type: str
-  required: true
-- key: supply_normal_prepared_sha256
-  type: str
-  required: true
-- key: supply_challenge_prepared_sha256
-  type: str
-  required: true
 - key: supply_record_source_sha256
-  type: str
-  required: true
-- key: supply_validity_start
-  type: str
-  required: true
-- key: supply_validity_end
   type: str
   required: true
 policy_prose:

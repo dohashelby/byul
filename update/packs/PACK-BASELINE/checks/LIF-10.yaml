@@ -2,7 +2,7 @@ id: LIF-10
 framework_id: CHK-LIF-010
 mechanism_ids:
 - mechanism-13
-revision: 5
+revision: 6
 retired: false
 area: LIF
 purpose: 종결·자원 회수
@@ -16,18 +16,6 @@ impact: MEDIUM
 applies_when:
   prose: 일반·스트리밍 요청의 대기·계산·출력 단계에서 취소·연결 종료·timeout 처리를 확인한다.
 policy_params:
-- key: termination_environment_sha256
-  type: str
-  required: true
-- key: termination_target_sha256
-  type: str
-  required: true
-- key: termination_validity_start
-  type: str
-  required: true
-- key: termination_validity_end
-  type: str
-  required: true
 - key: termination_max_delay_ms
   type: int
   required: true

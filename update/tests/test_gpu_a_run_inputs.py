@@ -9,8 +9,8 @@ from typer.testing import CliRunner
 from guard.cli import app
 from guard.collectors import engine_callbacks
 from guard.collectors.file import load_environment
-from guard.executors import engine_sensor
-from guard.models import canonical_json, sha256_hex
+from guard.executors import engine_sensor, run_binding
+from guard.models import canonical_json, load_pack, sha256_hex, utcnow
 from guard.runtime.comparison import execution_conditions
 from tests.builders import baseline_pack
 from tests.test_req16_lab_contexts import CohortTransport
@@ -158,7 +158,8 @@ def test_check_inputs_pass_the_executor_binding_and_selection(tmp_path, check_id
     manifest = json.loads((out / 'manifest.json').read_text())
     values = policy['values'][check_id]
     assert policy['status'] == 'DRAFT' and policy['confirmed_by'] is None and policy['scope']['include'] == [check_id]
-    assert policy['data_origin'] == 'DECLARED' and values['sensor_manifest_sha256'] == sha256_hex(canonical_json(manifest))
+    # @35: the policy carries no run-binding key; guard run computes it from the files below.
+    assert policy['data_origin'] == 'DECLARED' and not set(values) & set(run_binding.KEYS_BY_CHECK[check_id])
     assert ('lab_contexts' in manifest) is (preset in ('req16-lab', 'req16-full'))
     if check_id == 'REQ-16':
         assert values['required_cache_contexts'] == ['cache_salt', 'adapter_content', 'media_identity', 'model_generation']
@@ -166,8 +167,12 @@ def test_check_inputs_pass_the_executor_binding_and_selection(tmp_path, check_id
         assert values['cache_timing_min_samples'] == 24 and len(manifest['cases']) == 124
     config = yaml.safe_load('\n'.join(line.replace(' = ', ': ', 1) for line in (out / 'guard.toml').read_text().splitlines()
         if ' = ' in line and not line.startswith('store')))
-    executor = engine_sensor.EngineSensorExecutor({'target': config['target'].strip("'"), 'prepared': config['prepared'].strip("'"),
-        'manifest': config['manifest'].strip("'"), 'max_duration_seconds': 300})
+    sensor_cfg = {'target': config['target'].strip("'"), 'prepared': config['prepared'].strip("'"),
+        'manifest': config['manifest'].strip("'"), 'max_duration_seconds': 300}
+    binding, values = run_binding.effective_values(load_pack(UPDATE / 'packs/PACK-BASELINE').checks[check_id], sensor_cfg, env, values,
+        side='single', attempt_id=None, issued_at=utcnow())
+    assert binding['files']['sensor_manifest_sha256'] == sha256_hex(canonical_json(manifest))
+    executor = engine_sensor.EngineSensorExecutor(sensor_cfg)
     sent = sum(c['role'] != 'switch' for c in manifest['cases'])
     executor.transport = CohortTransport(engine_callbacks.load_secret(tmp_path / 'prepared'), [0] * sent)
     check_def = baseline_pack().checks[check_id].model_copy(deep=True)
@@ -197,15 +202,21 @@ def test_trailing_media_text_is_bound_to_the_manifest_and_sent_after_the_image(t
     assert len(manifest['cases']) == 23
     media_cases = [c for c in manifest['cases'] if 'media' in c]
     assert len(media_cases) == 8 and all(c['media']['text_after'] == suffix for c in media_cases)
-    assert policy['values']['REQ-16']['sensor_manifest_sha256'] == sha256_hex(canonical_json(manifest))
-    assert policy['values']['REQ-16']['sensor_manifest_sha256'] != original_policy['values']['REQ-16']['sensor_manifest_sha256']
+    bound = run_binding.file_hash('REQ-16', 'sensor_manifest_sha256', {'manifest': str(out / 'manifest.json')})
+    assert bound == sha256_hex(canonical_json(manifest))
+    assert bound != run_binding.file_hash('REQ-16', 'sensor_manifest_sha256', {'manifest': str(original / 'manifest.json')})
+    assert 'sensor_manifest_sha256' not in policy['values']['REQ-16'] | original_policy['values']['REQ-16']
     assert all('text_after' not in c.get('media', {}) for c in json.loads((original / 'manifest.json').read_text())['cases'])
-    executor = engine_sensor.EngineSensorExecutor({'target': str(out / 'target.json'),
-        'prepared': str(tmp_path / 'prepared/manifest.json'), 'manifest': str(out / 'manifest.json')})
+    sensor_cfg = {'target': str(out / 'target.json'), 'prepared': str(tmp_path / 'prepared/manifest.json'),
+                  'manifest': str(out / 'manifest.json')}
+    executor = engine_sensor.EngineSensorExecutor(sensor_cfg)
     executor.transport = CohortTransport(engine_callbacks.load_secret(tmp_path / 'prepared'), [0] * 20)
     check_def = baseline_pack().checks['REQ-16'].model_copy(deep=True)
     check_def.executor = 'engine_sensor'; check_def.collection_profile = engine_sensor.PROFILES['REQ-16']
-    draft = executor.run(check_def, load_environment(tmp_path / 'env.json'), policy['values']['REQ-16'], None, tmp_path / 'work-after')
+    env = load_environment(tmp_path / 'env.json')
+    _, values = run_binding.effective_values(load_pack(UPDATE / 'packs/PACK-BASELINE').checks['REQ-16'], sensor_cfg, env, policy['values']['REQ-16'],
+        side='single', attempt_id=None, issued_at=utcnow())
+    draft = executor.run(check_def, env, values, None, tmp_path / 'work-after')
     parts = [b['messages'][0]['content'] for b in executor.transport.bodies if isinstance(b['messages'][0]['content'], list)]
     assert len(parts) == 8 and all(p[2] == {'type': 'text', 'text': suffix} for p in parts)
     assert draft.data_origin.value == 'EXAMPLE' and draft.observations['engine_sensor_full_scope'].value is False

@@ -8,42 +8,7 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "supply_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_end",
           "required": true,
           "type": "str"
         },
@@ -93,42 +58,7 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "supply_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_end",
           "required": true,
           "type": "str"
         },
@@ -174,31 +104,6 @@
       ],
       "input_state": "미입력",
       "policy_requirements": [
-        {
-          "key": "buffer_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "buffer_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "buffer_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "buffer_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "buffer_validity_end",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "buffer_max_write_bytes",
           "required": true,
@@ -286,31 +191,6 @@
       ],
       "input_state": "미입력",
       "policy_requirements": [
-        {
-          "key": "buffer_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "buffer_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "buffer_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "buffer_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "buffer_validity_end",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "buffer_max_write_bytes",
           "required": true,
@@ -556,31 +436,6 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "init_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "init_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "init_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "init_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "init_validity_end",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "init_executor_backend",
           "required": true,
           "type": "str"
@@ -660,31 +515,6 @@
       "expected_gaps": [],
       "input_state": "미입력",
       "policy_requirements": [
-        {
-          "key": "rank_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "rank_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "rank_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "rank_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "rank_validity_end",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "rank_executor_backend",
           "required": true,
@@ -773,31 +603,6 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "init_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "init_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "init_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "init_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "init_validity_end",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "init_executor_backend",
           "required": true,
           "type": "str"
@@ -875,26 +680,6 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "termination_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "termination_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "termination_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "termination_validity_end",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "termination_max_delay_ms",
           "required": true,
           "type": "int"
@@ -934,21 +719,6 @@
       "expected_gaps": [],
       "input_state": "미입력",
       "policy_requirements": [
-        {
-          "key": "recovery_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "recovery_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "recovery_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "recovery_selection_sha256",
           "required": true,
@@ -1042,16 +812,6 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "retry_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "retry_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "retry_scope_sha256",
           "required": true,
           "type": "str"
@@ -1068,16 +828,6 @@
         },
         {
           "key": "retry_session",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "retry_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "retry_validity_end",
           "required": true,
           "type": "str"
         },
@@ -1130,26 +880,6 @@
       ],
       "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "policy_requirements": [
-        {
-          "key": "sensor_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_manifest_sha256",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "release_allowed_roles",
           "required": true,
@@ -1209,31 +939,6 @@
       ],
       "input_state": "미입력",
       "policy_requirements": [
-        {
-          "key": "profiler_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "profiler_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "profiler_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "profiler_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "profiler_validity_end",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "profiler_backend_kind",
           "required": true,
@@ -1370,26 +1075,6 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "observation_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "observation_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "observation_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "observation_validity_end",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "observation_max_delay_ms",
           "required": true,
           "type": "int"
@@ -1462,29 +1147,9 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "observation_state_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "observation_state_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "observation_state_validity_end",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "observation_state_required_components",
           "required": true,
           "type": "list[str]"
-        },
-        {
-          "key": "identity_prepared_sha256",
-          "required": true,
-          "type": "str"
         },
         {
           "key": "identity_record_session",
@@ -1497,11 +1162,6 @@
           "type": "str"
         },
         {
-          "key": "profiler_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "profiler_backend_kind",
           "required": true,
           "type": "str"
@@ -1510,16 +1170,6 @@
           "key": "profiler_required_ranks",
           "required": true,
           "type": "list[str]"
-        },
-        {
-          "key": "identity_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "profiler_target_sha256",
-          "required": true,
-          "type": "str"
         }
       ],
       "question": "준비·실패·종료 기록이 실제 실행 상태와 일치하는가?",
@@ -1713,16 +1363,6 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "record_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "record_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "record_subject_plan_sha256",
           "required": true,
           "type": "str"
@@ -1734,16 +1374,6 @@
         },
         {
           "key": "record_inventory_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "record_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "record_validity_end",
           "required": true,
           "type": "str"
         }
@@ -1984,42 +1614,7 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "supply_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_end",
           "required": true,
           "type": "str"
         },
@@ -2104,42 +1699,7 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "supply_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_end",
           "required": true,
           "type": "str"
         },
@@ -2266,16 +1826,6 @@
           "key": "forbidden_operation",
           "required": true,
           "type": "str"
-        },
-        {
-          "key": "validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "validity_end",
-          "required": true,
-          "type": "str"
         }
       ],
       "question": "엔진의 외부 송신이 허용된 목적지와 작업에 한정되는가?",
@@ -2343,16 +1893,6 @@
           "key": "plaintext_forbidden",
           "required": true,
           "type": "bool"
-        },
-        {
-          "key": "validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "validity_end",
-          "required": true,
-          "type": "str"
         }
       ],
       "question": "API·내부 통신의 각 구간에서 통신 상대 인증과 기밀성·무결성 기준을 지키는가?",
@@ -2426,21 +1966,6 @@
       ],
       "input_state": "미입력",
       "policy_requirements": [
-        {
-          "key": "revocation_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "revocation_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "revocation_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "revocation_validity_start",
           "required": true,
@@ -2528,21 +2053,6 @@
       ],
       "input_state": "미입력",
       "policy_requirements": [
-        {
-          "key": "session_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "session_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "session_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "session_validity_start",
           "required": true,
@@ -2636,16 +2146,6 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "copy_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "copy_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "copy_inventory_sha256",
           "required": true,
           "type": "str"
@@ -2662,16 +2162,6 @@
         },
         {
           "key": "copy_record_session",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "copy_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "copy_validity_end",
           "required": true,
           "type": "str"
         },
@@ -2748,57 +2238,12 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "route_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "route_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "route_session",
           "required": true,
           "type": "str"
         },
         {
           "key": "route_file_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "route_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "route_validity_end",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "route_native_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "route_native_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "route_native_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "route_native_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "route_native_validity_end",
           "required": true,
           "type": "str"
         }
@@ -2874,16 +2319,6 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "forwarded_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "forwarded_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "forwarded_session",
           "required": true,
           "type": "str"
@@ -2900,16 +2335,6 @@
         },
         {
           "key": "forwarded_identity_policy_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "forwarded_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "forwarded_validity_end",
           "required": true,
           "type": "str"
         }
@@ -2944,16 +2369,6 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "model_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "model_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "allowed_principal_sha256",
           "required": true,
           "type": "str"
@@ -2972,16 +2387,6 @@
           "key": "retired_model_revisions",
           "required": true,
           "type": "list[str]"
-        },
-        {
-          "key": "model_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "model_validity_end",
-          "required": true,
-          "type": "str"
         }
       ],
       "question": "최종 선택된 모델에 호출자의 사용 권한이 적용되고, 사용 종료한 모델의 실행이 차단되는가?",
@@ -3018,16 +2423,6 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "stored_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "stored_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "stored_session",
           "required": true,
           "type": "str"
@@ -3049,16 +2444,6 @@
         },
         {
           "key": "stored_protocol_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "stored_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "stored_validity_end",
           "required": true,
           "type": "str"
         },
@@ -3339,28 +2724,7 @@
       "confirmed_policy_values": null,
       "expected_gaps": [],
       "input_state": "미입력",
-      "policy_requirements": [
-        {
-          "key": "attempt_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "attempt_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "attempt_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "attempt_validity_end",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "취소하거나 연결을 끊은 요청의 늦은 결과가 다른 요청이나 새 시도에 섞이지 않는가?",
       "session": "J02",
       "sides": {
@@ -3463,28 +2827,7 @@
         "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다."
       ],
       "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
-      "policy_requirements": [
-        {
-          "key": "sensor_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_manifest_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "여러 실행 프로세스가 주고받는 중간 자료와 최종 출력이 원래 요청에 맞게 처리·반환되는가?",
       "session": "J01",
       "sides": {
@@ -3534,26 +2877,6 @@
       ],
       "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "policy_requirements": [
-        {
-          "key": "sensor_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_manifest_sha256",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "public_prefix_sharing_allowed",
           "required": true,
@@ -3614,26 +2937,6 @@
       ],
       "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "policy_requirements": [
-        {
-          "key": "sensor_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_manifest_sha256",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "required_cache_contexts",
           "required": true,
@@ -3720,26 +3023,6 @@
       "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
       "policy_requirements": [
         {
-          "key": "sensor_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_manifest_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "cache_timing_max_auc_percent",
           "required": true,
           "type": "int"
@@ -3806,28 +3089,7 @@
         "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다."
       ],
       "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
-      "policy_requirements": [
-        {
-          "key": "sensor_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_manifest_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "batch slot을 옮기거나 재사용할 때 이전 요청의 제한 상태가 남지 않는가?",
       "session": "J02",
       "sides": {
@@ -3876,28 +3138,7 @@
         "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다."
       ],
       "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
-      "policy_requirements": [
-        {
-          "key": "sensor_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_manifest_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "실제 사용하는 GPU 연산 코드가 입력·버퍼 경계를 지키고 필요한 영역을 초기화하는가?",
       "session": "J02",
       "sides": {
@@ -3940,28 +3181,7 @@
         "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다."
       ],
       "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
-      "policy_requirements": [
-        {
-          "key": "sensor_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_manifest_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "CUDA Graph 재실행이 현재 입력을 쓰고 아직 읽는 출력 버퍼를 덮어쓰지 않는가?",
       "session": "J02",
       "sides": {
@@ -4004,28 +3224,7 @@
         "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다."
       ],
       "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
-      "policy_requirements": [
-        {
-          "key": "sensor_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "sensor_manifest_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "TP의 GPU 작업 재실행에 사용하는 통신 버퍼가 등록·종료·재기동 후에도 현재 실행의 유효한 버퍼를 참조하는가?",
       "session": "J01",
       "sides": {
@@ -4138,42 +3337,7 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "supply_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_end",
           "required": true,
           "type": "str"
         }
@@ -4208,42 +3372,7 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "supply_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_end",
           "required": true,
           "type": "str"
         }
@@ -4278,42 +3407,7 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "supply_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_end",
           "required": true,
           "type": "str"
         }
@@ -4422,42 +3516,7 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "supply_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_end",
           "required": true,
           "type": "str"
         }
@@ -4492,42 +3551,7 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "supply_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_end",
           "required": true,
           "type": "str"
         }
@@ -4562,42 +3586,7 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "supply_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_end",
           "required": true,
           "type": "str"
         }
@@ -4632,42 +3621,7 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "supply_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_end",
           "required": true,
           "type": "str"
         },
@@ -4742,42 +3696,7 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "supply_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_end",
           "required": true,
           "type": "str"
         }
@@ -4812,42 +3731,7 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "supply_environment_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_target_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_normal_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_challenge_prepared_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "supply_validity_end",
           "required": true,
           "type": "str"
         }
@@ -4967,13 +3851,14 @@
   "planned_pack_ref": {
     "id": "PACK-BASELINE",
     "kind": "PACK",
-    "revision": 34,
-    "sha256": "cf95f6709b635a6b14cc4a8ceaef5843bd0eb1bd4294c63e29d815626b8c1b0b"
+    "revision": 35,
+    "sha256": "dfdbe573883589a441c4361d38e382d0867b7bcb0244d93e7a2461b8959dedd7"
   },
   "planned_pack_source": {
-    "available_on_main": true,
-    "branch": "main",
-    "commit": "b1d209fc3aa99441755adc3e7b71657c33a287c9"
+    "available_on_main": false,
+    "branch": "claude/run-binding-design",
+    "commit": null,
+    "note": "2026-11-14 RB: 실행 결합값을 정책에서 분리한 팩 35. 결합 키는 guard run이 계산한다(docs/RUN_BINDING.md)."
   },
   "ready_for_execution": false,
   "schema": "guard-mvp-session-input-plan/1",

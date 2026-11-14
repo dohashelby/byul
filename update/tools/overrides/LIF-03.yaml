@@ -1,21 +1,6 @@
 executor: stream_buffer
 collection_profile: kubernetes-stream-buffer-budget-observation-v1
 policy_params:
-- key: buffer_environment_sha256
-  type: str
-  required: true
-- key: buffer_target_sha256
-  type: str
-  required: true
-- key: buffer_prepared_sha256
-  type: str
-  required: true
-- key: buffer_validity_start
-  type: str
-  required: true
-- key: buffer_validity_end
-  type: str
-  required: true
 - key: buffer_max_write_bytes
   type: int
   required: true

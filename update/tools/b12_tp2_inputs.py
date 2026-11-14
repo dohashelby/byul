@@ -68,10 +68,19 @@ def _dump(path, value):
         stream.write("\n")
 
 
+def _fields(check):
+    """Declared policy fields, plus the @35 run-binding keys guard run computes.
+
+    This file is a local pre-check of the same hashes guard run binds; it is not a POL.
+    """
+    from guard.executors import run_binding
+    return [(p.key, p.type) for p in check.policy_params] + [(key, "str") for key in run_binding.keys_for(check)]
+
+
 def _template(pack):
     return {"schema": INPUT_SCHEMA, "checks": {
         cid: {"runtime_refs": {key: None for key in REFERENCE_KEYS},
-              "policy_values": {p.key: None for p in pack.checks[cid].policy_params},
+              "policy_values": {key: None for key, _ in _fields(pack.checks[cid])},
               "controls": {key: None for key in CONTROL_KEYS}, "planned_upper_seconds": None}
         for cid in CHECK_IDS}}
 
@@ -109,13 +118,13 @@ def validate_inputs(value, pack):
             values = section["policy_values"]
             if type(values) is not dict or not set(values) <= set(target["policy_values"]):
                 raise ValueError("B_TP2_POLICY_FIELDS_INVALID")
-            for param in pack.checks[cid].policy_params:
-                if param.key in values:
-                    if values[param.key] is not None:
-                        check_policy_value(cid, param.key, param.type, values[param.key])
-                        if param.key.endswith("_sha256") and not _SHA.fullmatch(values[param.key]):
+            for key, kind in _fields(pack.checks[cid]):
+                if key in values:
+                    if values[key] is not None:
+                        check_policy_value(cid, key, kind, values[key])
+                        if key.endswith("_sha256") and not _SHA.fullmatch(values[key]):
                             raise ValueError("B_TP2_POLICY_FINGERPRINT_INVALID")
-                    target["policy_values"][param.key] = deepcopy(values[param.key])
+                    target["policy_values"][key] = deepcopy(values[key])
         if "planned_upper_seconds" in section:
             seconds = section["planned_upper_seconds"]
             if seconds is not None and (type(seconds) is not int or seconds <= 0):

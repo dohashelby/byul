@@ -1,3 +1,10 @@
+## 2026-11-14 — RB 실행 결합값 분리 구현(팩 35)
+
+- 한 일: 사용자 승인으로 `guard-run-binding/1`을 구현했다(`executors/run_binding.py`, `core/run.py`·`application.py` 연결, `Execution.run_binding`). 44개 점검의 결합 키 222개를 `tools/overrides`와 팩에서 빼 PACK-BASELINE@35를 만들었다. 정책 이전 도구, 예시·GPU 초안 정책·MA7 계획의 @35 이전, GPU·TP2·SUP-08 입력 도구 조정, SPEC §4.5·설계 문서 6절 갱신을 했다. 소스 목록 bdc9eeec와 검토 행(결정 5)을 추가했다.
+- 테스트 결과: 직접 시험 `test_run_binding.py` 13개가 통과했다. 실제 팩을 읽는 시험 파일 37개와 영향 제품 시험을 돌렸고, 남은 실패는 변경 전 기준에서도 실패하는 로컬 환경 시험뿐이다. 해당 시험은 `.pytest_tmp` 저장소 내부 경로 거부 2종, 관측기 코드 미가용 3건, Linux 소켓 1건, macOS 임시 경로 링크 1건이다. 변환기 재현 시험이 통과했고 현황 --check도 통과했다. 전체 pytest는 PR CI로 확인한다.
+- 다음 단계: PR CI 결과를 보고 실패를 고친다. 플랫폼 정책 양식에서 B1 칸이 빠졌는지 확인한다. B2 키(세션·준비 파일·PLT-07/08 실행 신원)를 점검별로 확인한 뒤 별도 승인안을 만든다.
+- 막힌 것: 없음. 실제 GPU 실행에서 결합 계산을 확인하는 일은 다음 GPU 세션 범위다.
+
 ## 2026-11-14 — 실행 결합값 분리 설계안·승인 요청 (RB)
 
 - 한 일: @34 정책 키를 A(기업 결정)·A′(정책 문서 참조)·B1(guard가 계산하는 실행 결합)·B2(준비물 결합)·C(생산자 소스 SHA)·D(시험 주체)·E(외부 사건)로 분류했다. B1은 44개 점검·키228개다. sensor /2를 일반화한 `guard-run-binding/1` 설계(run 단계 계산, EVD 증거 파일+`Execution.run_binding`, config 해시 제외, 대조식·UNKNOWN/ABORTED 의미 유지, @34 재생 호환)를 `docs/RUN_BINDING.md`에 쓰고 DECISIONS 열린 질문 RB-Q1~Q5로 올렸다.

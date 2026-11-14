@@ -1,6 +1,6 @@
-# 실행 결합값을 정책에서 분리 — 설계안 (2026-11-14, 미승인)
+# 실행 결합값을 정책에서 분리 (RB, 2026-11-14 승인·구현)
 
-상태: **승인 대기**. 이 문서는 설계안과 영향 목록이다. 팩 판본 상향(@35)과 정책 키 제거는 판정 계약 변경이라 `DECISIONS.md` 열린 질문 RB-Q1~Q5의 사용자 결정 전에는 구현하지 않는다.
+상태: **구현됨**(사용자 승인 2026-11-14, `DECISIONS.md` RB). PACK-BASELINE@35부터 아래 B1 키는 정책 값이 아니고 `guard run`이 계산한다. 구현은 `src/guard/executors/run_binding.py`, 시험은 `tests/test_run_binding.py`. 설계안과 달라진 점은 6절에 모았다.
 
 ## 1. 문제
 
@@ -16,7 +16,7 @@ PACK-BASELINE@34의 69개 점검 중 44개가 실행마다 바뀌는 기술 값(
 |---|---|---|---|---|
 | **A 기업 결정값** | 허용 기준·한도·마감·허용 목록·모드 | `*_budget_*`, `*_max_*`, `*_deadline_*`, `*_allowed_*`, `approved_*`, `*_mode`, `*_required_*`, `selected_model_grants`, `stored_retention` 등 | 전 점검 | 유지 |
 | **A′ 기업 정책 문서 참조** | 기업이 승인한 정책 문서·소유자의 해시·참조 | `forwarded_identity_policy_sha256`, `stored_identity_policy_sha256`, `retry_policy_sha256`, `copy_policy_sha256`, `observation_event_policy_sha256`, `cache_identity_policy_ref`, `profiler_control_owner_ref` | REQ-04·06·15, LIF-12·14, PLT-12, OBS-01 | 유지 |
-| **B1 실행 결합값 (guard가 직접 계산)** | 같은 실행의 ENV·실행기 설정 파일·실행 창에서 계산되는 값 | `*_environment_sha256`, `*_target_sha256`, `*_prepared_sha256`, `sensor_manifest_sha256`, `*_validity_start`·`*_validity_end` (REQ-02의 `route_native_*`, OBS-02의 `identity_*`·`profiler_*` 포함) | LIF-01·02·03·04·07·08·09·10·11·12·13·14, OBS-01·02·06, PLT-03·05·07·08·10·11·12, REQ-02·04·05·06·12·14~21, SUP-05·06·07·09·10·11·12·15·16 (44개, 키 228개) | **1단계: 정책에서 빼고 실행 결합으로 옮김** |
+| **B1 실행 결합값 (guard가 직접 계산)** | 같은 실행의 ENV·실행기 설정 파일·실행 창에서 계산되는 값 | `*_environment_sha256`, `*_target_sha256`, `*_prepared_sha256`, `sensor_manifest_sha256`, `*_validity_start`·`*_validity_end` (REQ-02의 `route_native_*`, OBS-02의 `identity_*`·`profiler_*` 포함). 단 PLT-10·11·LIF-11의 유효 기간은 정책에 남김(6절) | LIF-01·02·03·04·07·08·09·10·11·12·13·14, OBS-01·02·06, PLT-03·05·07·08·10·11·12, REQ-02·04·05·06·12·14~21, SUP-05·06·07·09·10·11·12·15·16 (44개, 키 222개) | **구현: 정책에서 빼고 실행 결합으로 옮김** |
 | **B2 실행 준비물 결합값** | 실행 전에 준비된 파일·세션의 해시·식별자. guard가 계산할 수 있지만 파일 안에 기업 결정이 섞였는지 점검별 확인이 필요 | `*_session`, `record_inventory_session`, `collection_session`, `identity_record_session`; `init_scenario_sha256`, `recovery_selection_sha256`, `recovery_scenario_sha256`, `retry_scope_sha256`, `copy_inventory_sha256`, `record_subject_plan_sha256`, `route_file_sha256`, `transition_inputs_sha256`; LIF-05·06·16 `transition_*_at`·`transition_*_generation`; PLT-07 `subject_container_id`·`subject_uid`·`subject_net_namespace_inode`·`forbidden_receiver_*`; PLT-08 `api_container_id`·`api_network_id`·`api_endpoint_id`·`api_ip`·`api_port` | LIF-05·06·07·09·11·12·16, OBS-01·02·06·11, PLT-07·08·12, REQ-02·04·06 | 2단계(점검별 확인 뒤 별도 승인) |
 | **C 생산자·수집기 소스 신원** | 기록을 만드는 코드의 SHA. 판본별로 고정이고 실행마다 바뀌지 않음 | `*_record_source_sha256`, `observation_expected_source_sha256`, `record_inventory_source_sha256`, `forwarded_gateway_source_sha256`·`forwarded_engine_source_sha256`, `stored_*_source_sha256` | LIF-01·02·12, OBS-01·02·06, PLT-03·05·12, REQ-04·06, SUP-05~16 | 후속: adapter·생산자 등록표 데이터로 이동 제안(별도) |
 | **D 환경 시험 신원** | 환경에 준비된 시험용 주체 | `allowed_principal_sha256`·`denied_principal_sha256`, `observation_allowed_actor_sha256`·`observation_denied_actor_sha256` | REQ-05, OBS-01 | 후속: ENV 쪽 이동 검토(별도) |
@@ -107,3 +107,17 @@ issued_at: RFC3339
 | 소스 목록 | `tools/verify_req10_consumption.py --write`, `tools/reviewed_manifest_receipts.json` 행(결정 5) |
 
 `core/`·`models/` 변경과 팩 판본 상향이 포함되므로 CLAUDE.md 9절에 따라 승인 뒤에만 한다.
+
+## 6. 구현 결과와 설계안과 달라진 점 (2026-11-14)
+
+- **팩 선택 규칙**: `collection_profile` 접미어를 붙이지 않았다. 점검이 @34의 수집 프로필을 쓰고 정의에 결합 키가 없으면(@35) 결합을 쓰고, 정의에 키가 있으면(@34) 예전처럼 정책 값을 쓴다. 다른 프로필(소스 CPU, 센서 /2 접미어 팩)은 영향이 없다(`run_binding.keys_for`). 프로필 문자열을 바꾸면 실행기 37개 파일의 지원 판별을 모두 고쳐야 해서, 실행기 코드는 바꾸지 않는 쪽을 택했다. 실행기는 같은 키 이름으로 값을 받고 대조식도 그대로다.
+- **유효 기간을 정책에 남긴 점검**: PLT-10·PLT-11·LIF-11. 이 점검의 정책은 발급자 사건 시각·마감·재접속 시각처럼 유효 창 안에 있어야 하는 시각을 함께 선언한다. 창을 guard가 정하면 그 시각들과 맞출 수 없다. ENV·target·prepared 해시는 이 점검들도 옮겼다. 그래서 이동한 키는 228개가 아니라 222개다.
+- **유효 창 길이**: 실행기 정책 계약이 받는 최대치로 정했다. supply_boot 3600초, 나머지 600초다. POL `valid_from`·`valid_until`이 있으면 교집합을 쓰고, 비면 `NOT_RUN`(`RUN_BINDING_OUTSIDE_POLICY_VALIDITY`)이다. 창은 점검마다 실행 직전에 새로 연다.
+- **저장**: 별도 증거 파일 없이 결합 문서 전체를 `Execution.run_binding`에 넣었다. EVD 해시에 봉인되고, 비어 있으면 직렬화에서 빠진다. 재생 대조는 `run_binding.verify(document, evidence)`로 한다.
+- **설정 해시**: core는 결합을 `executor.config_sha256`에 넣지 않는다. 다만 engine_sensor처럼 실행기가 원래 정책 값을 자기 `draft.config`에 적는 경우는 @34와 똑같이 그 값이 들어간다. 그래서 "INV-19 이월이 쉬워진다"는 설계안의 주장은 철회한다. 이월 조건은 @34와 같다.
+- **파일 해시 계산**: 실행기가 쓰는 로더를 그대로 쓴다. 엄격 JSON, `collectors.lifecycle.load_prepared`, `collectors.engine_callbacks.load_prepared` 중 하나로 읽은 뒤 정규 JSON SHA-256을 낸다. 키별 파일 위치는 `_FILE_OVERRIDES`·`_CHECK_FILE_OVERRIDES`에 둔다(supply 역할별, REQ-02 native, OBS-02 identity/profiler). 실제 파일로 끝까지 실행한 시험이 있다. engine_sensor(REQ-14·16·17·18), LIF-10·REQ-12 공통 입력 소비, PLT-10·11·12, OBS-01, REQ-04·05·06 제품 왕복이 이에 해당한다.
+- **사전 점검**: `prepare`/준비 확인의 `validate_policy`도 같은 결합을 계산해 대조한다(`application.py`).
+- **팩 생성**: 팩은 `tools/import_checklist.py`의 산출물이라 `tools/overrides/*.yaml`에서 키를 빼고, 변환기가 커밋된 @35와 바이트 단위로 같음을 확인했다(`test_committed_pack_matches_importer`). 검토 표기는 @34와 같은 방식이다(B 검토 면제, 사용자 결정 5).
+- **정책 이전**: `tools/migrate_policy_run_binding.py`. 결합 키만 빼고 팩 참조를 옮긴다. 문서가 바뀌므로 DRAFT로 두고 확인은 사람이 다시 한다. 봉인된 POL 객체는 고치지 않는다.
+- **저장소 입력 갱신**: `examples/policy.yaml`과 `docs/gpu-a/policy-a-draft.yaml`을 @35로 옮겼다(초안의 `sensor_*` 자리표시 삭제). `docs/dev-1/ma7-session-input-plan.json`의 팩 참조와 정책 요구 키도 옮겼다. `tools/gpu_a_run_inputs.py`는 정책에 결합 키를 쓰지 않는다. `tools/b12_tp2_inputs.py`의 로컬 선언 파일은 같은 해시를 사전 대조하므로 결합 키 칸을 유지한다(POL 아님). `tools/mvp_sup08_inputs.py`의 팩 판본 관문은 35로 올렸다(SUP-08 정의 rev 5는 그대로).
+- **과거 결과**: @34로 만든 PLAN·EVD·RES는 저장소의 팩 보존본으로 그대로 재판정된다. 상태표에서는 팩·점검 판본과 정책 키 열만 바뀌었고, 과거 GPU 결과의 현재 정의 판정은 바뀌지 않았다.

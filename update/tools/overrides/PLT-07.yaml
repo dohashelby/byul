@@ -12,8 +12,6 @@ policy_params:
   - { key: forbidden_receiver_port, type: int, required: true }
   - { key: forbidden_protocol, type: str, required: true }
   - { key: forbidden_operation, type: str, required: true }
-  - { key: validity_start, type: str, required: true }
-  - { key: validity_end, type: str, required: true }
 required_observations:
   - { key: forbidden_egress_successes, type: "list[str]" }
   - { key: egress_trials, type: "list[dict]" }

@@ -139,6 +139,16 @@ def test_ipc_ready_requires_actual_fixed_async_queue_body_and_preserves_output(w
  import sys
  from pathlib import Path
  from tests.test_a1_rank_failure_sensor import codes
+ # 실제 파일 fsync·스레드 준비 시간과 30ms 제어 기한을 분리한다.
+ # wait는 release를 쓰고 같은 시계를 전진시켜 무시된 해제는 여전히 만료된다.
+ now=[None]
+ def clock():
+  if now[0]is None:now[0]=time.monotonic_ns()
+  return now[0]
+ def release_wait(seconds):
+  action(world.path,'release');now[0]+=int(seconds*1_000_000_000)
+ world.observer.fault_runtime.clock=clock
+ world.observer.fault_runtime.wait=release_wait
  assigned(world,'communication-stall');action(world.path,'activate')
  world.proc.use_async_scheduling=True
  class EndExampleLoop(BaseException):pass
@@ -166,7 +176,6 @@ def test_ipc_ready_requires_actual_fixed_async_queue_body_and_preserves_output(w
   try:world.proc.worker_busy_loop()
   except EndExampleLoop:pass
  thread=threading.Thread(target=worker_loop);thread.start();assert entered.wait(1)
- world.observer.fault_runtime.wait=lambda _:action(world.path,'release')
  try:
   with pytest.raises(EndExampleLoop):world.proc.async_output_busy_loop()
  finally:stop.set();thread.join(1)

@@ -55,7 +55,16 @@ def assigned(world,kind):
 def invoke(world):return world.proc._execute_worker_rpc(('execute_model',(world.scheduler,),{},0))
 
 
-def test_real_rpc_catches_intentional_exception_raised_inside_its_try(world):
+def test_real_rpc_catches_intentional_exception_raised_inside_its_try(world,monkeypatch):
+ # 예외 전달 대조에서도 READY 게시 벽시계와 30ms 제어 기한을 구분한다.
+ # 활성화를 무시하면 wait가 같은 기한까지 전진해 EXPIRED를 검출한다.
+ now=[None]
+ def clock():
+  if now[0]is None:now[0]=time.monotonic_ns()
+  return now[0]
+ world.observer.fault_runtime.clock=clock
+ world.observer.fault_runtime.wait=lambda seconds:now.__setitem__(0,now[0]+int(seconds*1_000_000_000))
+ monkeypatch.setattr(sensor,'time',SimpleNamespace(monotonic_ns=clock))
  assigned(world,'exception');action(world.path,'activate');assert invoke(world)is None
  status,error,=world.proc.worker_response_mq.items[0]
  assert status is world.mp.WorkerProc.ResponseStatus.FAILURE and 'BYUL_LAB_WORKER_RPC_EXCEPTION'in error

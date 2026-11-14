@@ -13,7 +13,7 @@ import time
 from typing import Any, Callable, Protocol
 from urllib.error import URLError
 
-from serving_runtime.gateway.backend import BackendConfig
+from serving_runtime.gateway.backend import BackendConfig, upstream_request_id
 from serving_runtime.gateway.auth import CHAT_ROUTE, COMPLETIONS_ROUTE
 from serving_runtime.gateway.response_timeout import DeadlineWatchdog, set_response_timeout
 from serving_runtime.gateway.validator import Decision
@@ -342,8 +342,11 @@ def response_id_receipt(request_id: str, value: object) -> str:
     """
     if not isinstance(value, str) or not value:
         return "engine_response_id_absent"
-    if value in {request_id, f"chatcmpl-{request_id}", f"cmpl-{request_id}"}:
-        return "engine_response_id_matched"
+    # Keep exact untagged echo forms for existing engines and recognize the
+    # canonical vLLM callback ID actually forwarded by BackendConfig.
+    for forwarded in (request_id, upstream_request_id("vllm", request_id)):
+        if value in {forwarded, f"chatcmpl-{forwarded}", f"cmpl-{forwarded}"}:
+            return "engine_response_id_matched"
     return "engine_response_id_mismatch"
 
 

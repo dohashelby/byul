@@ -8,7 +8,7 @@ from pathlib import Path
 from .input_models import InputBinding, InputCatalog, InputVersion, PolicyInputPreview
 from .store import InvalidDocId
 
-MVP_PACK = {"id": "PACK-BASELINE", "revision": 35}  # 2026-11-14 RB: 실행 결합값은 정책이 아니라 guard run이 계산한다
+MVP_PACK = {"id": "PACK-BASELINE", "revision": 36}  # 2026-11-14 RB·RB2: 실행 결합값·실행 준비값은 정책이 아니라 guard run이 계산한다
 # 의미가 같은 필드만 연결한다. 역할표→호출자 목록, 응답 옵션→응답 필드는 추정하지 않는다.
 _GROUPS = {
     "1.2": {"REQ-01": ["allowed_callers"], "REQ-03": ["general_allowed_kinds"]},
@@ -136,13 +136,13 @@ def resolve_policy(state, document, catalog=None):
         previous = state.policies.revisions(doc.get("policy_id", ""))
     except InvalidDocId:
         previous = []
-    # 과거 정책의 Pack은 변경하지 않는다. 새 MVP 정책에는 34를 강제한다.
+    # 과거 정책의 Pack은 변경하지 않는다. 새 MVP 정책에는 MVP_PACK 판본을 강제한다.
     legacy = bool(previous and wanted != MVP_PACK and previous[-1].document.get("verification", {}).get("pack") == wanted)
     if legacy:
         warnings.append(_issue("/verification/pack", "과거 Pack 정책을 보존합니다. MVP는 새 정책 ID로 등록하세요."))
         return PolicyInputPreview(document=doc, errors=[], warnings=warnings, gaps=[], connected=[], pack_available=False)
     if wanted and wanted.get("id") and wanted != MVP_PACK:
-        errors.append(_issue("/verification/pack", "새 MVP 정책은 백엔드에서 지정한 PACK-BASELINE@34만 사용합니다."))
+        errors.append(_issue("/verification/pack", f"새 MVP 정책은 백엔드에서 지정한 {MVP_PACK['id']}@{MVP_PACK['revision']}만 사용합니다."))
     verification["pack"] = dict(MVP_PACK)
     values = verification.setdefault("values", {})
     if not isinstance(values, dict):

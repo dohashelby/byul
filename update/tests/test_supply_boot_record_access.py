@@ -24,7 +24,7 @@ from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha2
 from guard.store import Store
 from guard.store.packs import get_pack, put_pack
 from tests.builders import environment, policy
-from tests.run_binding_support import fixed_file_hashes, split
+from tests.run_binding_support import fixed_file_hashes, run_table, split
 from tests.test_native_model_file_reads import fixture as read_fixture
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -83,7 +83,7 @@ def pipeline(tmp_path, check_id, values, make):
     env = environment(model={"id": "test"})
     ref = put_pack(store, PACK.path)
     resolved = values(env) if callable(values) else values
-    # @35: run-binding keys are computed by guard run, not given as policy values.
+    # @35/@36: run-binding keys are computed by guard run, not given as policy values.
     policy_values, file_hashes = split(PACK.checks[check_id], resolved)
     pol = policy(ref, scope={"include": [check_id]}, values={check_id: policy_values})
     store.put(env); store.put(pol)
@@ -92,7 +92,8 @@ def pipeline(tmp_path, check_id, values, make):
     registry.EXECUTORS[name + ":sim"] = lambda cfg: make(env, resolved)
     try:
         with fixed_file_hashes(file_hashes):
-            evd, = run_plan(store, PACK, plan, RunConfig(executors={name: "sim"}, adapter="vllm"))
+            evd, = run_plan(store, PACK, plan, RunConfig(executors={name: "sim"}, adapter="vllm",
+                                                         raw=run_table(PACK.checks[check_id], resolved)))
     finally:
         registry.EXECUTORS.pop(name + ":sim")
     result, = judge_plan(store, PACK, plan, env.created_at)
@@ -398,7 +399,7 @@ def test_merge_keeps_each_session_and_reports_the_failed_one():
 def route_values():
     now = utcnow()
     start, end = (now - timedelta(minutes=1)).isoformat(), (now + timedelta(minutes=1)).isoformat()
-    return {"route_environment_sha256": "a" * 64, "route_target_sha256": "b" * 64, "route_session": "c" * 32, "route_file_sha256": "d" * 64,
+    return {"route_environment_sha256": "a" * 64, "route_target_sha256": "b" * 64, "route_session": "c" * 32,
             "route_validity_start": start, "route_validity_end": end, "route_native_environment_sha256": "a" * 64,
             "route_native_target_sha256": "b" * 64, "route_native_prepared_sha256": "e" * 64,
             "route_native_validity_start": start, "route_native_validity_end": end}

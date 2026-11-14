@@ -1,3 +1,10 @@
+## 2026-11-14 — RB2 실행 준비값 분리 구현(팩 36)
+
+- 한 일: 사용자 결정 RB2-Q1~Q7로 B2 53개 키를 정책에서 빼고 `guard run`이 점검별 설정 표 `[run_binding.<점검>]`에서 읽게 했다(`run_binding` 단계별 판별·값 출처·`guard-run-binding/2`, `lifecycle_transition.inputs_manifest`, REQ-02 선언 파일 대조 생략·해시 기록, core·준비 점검 연결). 팩 36(17개 점검 revision+1), 정책 이전 도구 `--stage 2`, 예시·GPU 초안·MA7 계획·SUP-08 관문, SPEC §4.5, platform `MVP_PACK`·연결표·34 하드코딩 문구를 맞췄다. E 4개는 정책에 남겼다.
+- 테스트 결과: 직접 시험 `test_run_binding.py` 13개·`test_run_binding_stage2.py` 11개 통과. 실제 팩을 쓰는 영향 시험 파일을 돌렸고, 남은 로컬 실패는 main 기준에서도 같은 원인으로 실패하는 macOS 환경 시험(initialization 제품 16, owner2 6, 기록 접근 native 2)뿐이다. 변환기 재현·현황 --check 통과. 전체 pytest는 PR CI로 확인한다.
+- 다음 단계: PR CI 결과 확인. J02 공백(RUN_BINDING 9절): 점검별 실행 설정 조립 도구 확대, 공유 실행기 칸 문제(RB2-S), E 키 분리(RB2-E), MA8 감사의 팩 Ref 재검증.
+- 막힌 것: 없음. 실제 GPU 실행에서 /2 결합을 확인하는 일은 다음 GPU 세션 범위다.
+
 ## 2026-11-14 — B2 실행 준비물 결합값 점검별 확인·승인안 (RB2)
 
 - 한 일: @35에 남은 B2 키 57개(17개 점검)를 실행기 코드로 하나씩 확인해 G 20·E 4·P 33으로 나눴다. 기록 세션 9개는 lifecycle prepared의 `session`이 아닌 다른 생산자 폴더 열쇠라 prepared에서 읽을 수 없음을 확인했다. `retry_scope`·`copy_inventory`는 bytes 해시, OBS-06 계획 파일은 정책 참조를 스스로 내는 구조, LIF-11 `require_absent`는 판정 기준임을 확인했다. 1단계 `keys_for`를 그대로 넓히면 @35 재생이 깨지는 점을 찾아 단계별 판별로 설계했다. `docs/RUN_BINDING.md` 7절과 DECISIONS RB2-Q1~Q7에 올렸다.

@@ -130,6 +130,11 @@
       "manifest_sha256": "bdc9eeec242435a56bfba1a74a7b30e0ef9824d1d6112e9eb89b80ce098bc9be",
       "reviewed_by": "Claude / BYUL UPDATE / RB 실행 결합값 분리(팩 35) self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-14T17:42:17+09:00"
+    },
+    {
+      "manifest_sha256": "01e1e15f6b79219e9f55b7644b443a7ec1a6b3a1aa2bf7cd1ed8c6848556ecfd",
+      "reviewed_by": "Claude / BYUL UPDATE / RB2 실행 준비값 분리(팩 36) self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T21:43:40+09:00"
     }
   ]
 }

@@ -465,7 +465,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                         # Static preparation computes the same per-run binding guard run will compute.
                         _, values = run_binding.effective_values(
                             check_def, c.get(item.executor, {}), selected_env, values, side=side, attempt_id=None,
-                            issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until)
+                            issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until,
+                            run_cfg=run_binding.run_config(c, item.check_id))
                     executor.validate_policy(check_def, values)
                 executor.keys()
         record("inputs", True, "pack, selection, real executors, policy settings and model inventory checked")

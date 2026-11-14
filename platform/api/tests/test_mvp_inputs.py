@@ -1,4 +1,4 @@
-"""입력→저장→기존 guard 변환 경계. 합성 Pack은 GPU 실측·정본 Pack 35가 아니다."""
+"""입력→저장→기존 guard 변환 경계. 합성 Pack은 GPU 실측·정본 Pack 36이 아니다."""
 from copy import deepcopy
 from datetime import datetime, timezone
 from dataclasses import replace
@@ -28,7 +28,7 @@ def prepared_client(tmp_path):
     shutil.copytree(ROOT / "update/packs/PACK-BASELINE", pack)
     path = pack / "pack.yaml"
     manifest = yaml.safe_load(path.read_text())
-    manifest["revision"] = 35  # 이 시험 안에서만 사용하는 합성 정의
+    manifest["revision"] = 36  # 이 시험 안에서만 사용하는 합성 정의
     sup = pack / "checks/SUP-08.yaml"
     check = yaml.safe_load(sup.read_text())
     check["policy_params"].append({"key": "approved_code_revisions", "type": "list[str]", "required": True})

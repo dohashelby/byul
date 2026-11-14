@@ -15,7 +15,7 @@ from guard.runtime.kubernetes_stored_response_scope import OwnedResponseScope,no
 from guard.runtime.kubernetes_stored_responses import KubernetesStoredResponsesHTTP
 from guard.adapters.vllm_stored_responses import REVIEWED_SOURCES
 from guard.executors import kubernetes_stored_responses as product
-from tests.run_binding_support import for_pack
+from tests.run_binding_support import for_pack, run_table_toml
 from tests.builders import baseline_pack,policy,T0
 from tests.test_kubernetes_routes import inputs as route_inputs,World as RouteWorld
 from tests.test_stream_probe import _server
@@ -109,7 +109,7 @@ def test_existing_registry_cli_all_operations_exact_refs_and_no_raw_objects(tmp_
     for key,value in {'REQ06_A':KEY_A,'REQ06_B':KEY_B}.items():monkeypatch.setenv(key,value)
     pol=policy(pack.ref(),scope={'include':['REQ-06']},values={'REQ-06':for_pack(pack,'REQ-06',values)})
     for name,value in [('environment',env.to_dict()),('policy',pol.to_dict()),('target',world.t)]:(tmp_path/(name+'.json')).write_bytes(canonical_json(value))
-    cfg=tmp_path/'guard.toml';cfg.write_text('[executors]\nstored_responses="kubernetes"\n[adapter]\nname="vllm"\n[stored_responses]\ntarget='+json.dumps(str(tmp_path/'target.json'))+'\nroles={A="REQ06_A",B="REQ06_B"}\n',encoding='utf-8')
+    cfg=tmp_path/'guard.toml';cfg.write_text('[executors]\nstored_responses="kubernetes"\n[adapter]\nname="vllm"\n[stored_responses]\ntarget='+json.dumps(str(tmp_path/'target.json'))+'\nroles={A="REQ06_A",B="REQ06_B"}\n'+run_table_toml(pack,'REQ-06',values),encoding='utf-8')
     monkeypatch.setattr(http,'capture_pipes',world.runner)
     def forbidden(*a,**kw):raise AssertionError('unexpected runtime')
     monkeypatch.setattr(subprocess,'Popen',forbidden);monkeypatch.setattr(socket,'socket',forbidden)

@@ -346,15 +346,10 @@
 
 ## 열린 질문
 
-### RB2 실행 준비물 결합값(B2) 분리 (2026-11-14, 미승인)
-B2 57개 키(17개 점검)를 실행기 코드로 확인해 G(guard 계산 20)·E(기업 결정 포함 4)·P(실행 준비·실행 중 값 33)로 나눴다. 분류표·설계·영향은 [docs/RUN_BINDING.md](docs/RUN_BINDING.md) 7절. 승인 전에는 구현·팩 판본 상향을 하지 않는다.
-- **RB2-Q1** G 20개(`transition_inputs_sha256`, `transition_*_generation`, `init_scenario_sha256`·`recovery_scenario_sha256`, `subject_scope`·`api_hop_scope`)를 결합 계산으로 옮기나? 시나리오는 실행기 설정 `scenario` 파일을 새로 받아 해시하고, 세대는 설정 `phase_generation`에서 읽는다. 잠정: 옮긴다.
-- **RB2-Q2** 기록 세션 9개(`retry_session`·`observation_session`·`identity_record_session`·`record_inventory_session`·`collection_session`·`copy_record_session`·`route_session`·`forwarded_session`·`stored_session`)를 실행기 설정 `record_session`으로 옮기나? lifecycle prepared의 `session`은 다른 생산자 폴더 열쇠라 쓰지 않는다. 잠정: 옮긴다(기록 생산자 준비물 매니페스트는 후속).
-- **RB2-Q3** LIF-05·06·16 표본 시각 12개를 설정 `sample_offsets_ms`(실행 시작 기준)로 바꾸나, 절대 시각을 설정에 두나? 잠정: offset. 실행기의 순서·240초 검사는 그대로.
-- **RB2-Q4** E 4개(`retry_scope_sha256`·`copy_inventory_sha256`·`record_subject_plan_sha256`·`recovery_selection_sha256`)는 파일 안 기업 결정(재시도 한도, 복사본 조치·마감·예외, 접근 허용 주체·정책 참조, 행별 `require_absent`)을 먼저 분리해야 한다. 이번에는 정책에 남기고 분리안(7.6)을 점검별로 따로 승인받나? 잠정: 남긴다.
-- **RB2-Q5** REQ-02 `route_file_sha256`은 실행 중 생산자가 쓰는 파일 bytes 해시라 실행 전 값이 없다. 옮기면 "선언 파일=읽은 파일" 대조가 빠지고 읽은 해시를 기록만 한다(수락 기준 축소). 잠정: 정책에 유지(REQ-02는 1차 UNKNOWN 범위).
-- **RB2-Q6** PLT-07·08 실행 신원 11개를 실행 전 결합 파일(`egress_binding`·`api_binding`)로 옮기나? 실행기는 실행 중 Docker로 찾은 값과 계속 대조한다. 잠정: 옮긴다(1차 UNKNOWN 범위라 순서는 뒤).
-- **RB2-Q7** 호환: 팩 @36, `keys_for` 단계별 판별(@35 재생에서 B1 유지), B2 값이 있는 결합 문서만 `guard-run-binding/2`(`verify`는 /1·/2 수용), 정책 이전 도구 `--stage 2`가 빠진 값을 설정 후보로 출력. 잠정: 이 방식.
+### RB2 실행 준비물 결합값(B2) 분리 (2026-11-14) — 사용자 결정·구현됨
+- ~~RB2-Q1~Q7~~ → 2026-11-14 사용자 결정(상단 세션 전달, 원문 "2번으로 가자. 열린질문 여기에 물어봐 내가 결정할게"). Q1·Q2·Q3(offset)·Q6 옮김, Q4 E 4개 정책 유지, **Q5는 잠정안과 달리 옮김**(REQ-02 선언 파일 대조 대신 읽은 해시 기록, 수락 기준 축소 승인), Q7 제안 방식. 결정 요약은 아래 "2026-11-14 — RB2" 절, 구현은 [docs/RUN_BINDING.md](docs/RUN_BINDING.md) 8절.
+- **RB2-E 열린 질문**: E 4개(`retry_scope_sha256`·`copy_inventory_sha256`·`record_subject_plan_sha256`·`recovery_selection_sha256`)의 분리안(RUN_BINDING 7.6)은 점검별로 따로 승인한다. 잠정: 정책 유지.
+- **RB2-S 열린 질문**: 같은 실행기를 쓰는 점검이 실행기 설정 칸(target·prepared·`generations`)을 공유해 한 번의 `guard update`로 묶을 수 없는 경우가 있다(RUN_BINDING 9절). 점검별 실행기 설정 덮어쓰기를 둘지 결정이 필요하다. 잠정: 미구현.
 
 ### RB 실행 결합값 분리 (2026-11-14) — 사용자 승인·구현됨
 - ~~RB-Q1~Q5~~ → 2026-11-14 사용자 "승인, 구현 시작"으로 다섯 질문의 잠정안을 승인했다. 구현과 설계안과 다른 점은 [docs/RUN_BINDING.md](docs/RUN_BINDING.md) 6절에 있다. 결정 요약은 아래 "2026-11-14 — RB" 절.
@@ -402,6 +397,13 @@ B2 57개 키(17개 점검)를 실행기 코드로 확인해 G(guard 계산 20)·
 - D2 `impact` 값(HIGH/MEDIUM/LOW) — 지금은 전부 null.
 - 2026-10-23: HTML 보고서를 담당자용 요약 우선 구조로 개편(`report/html.py`만 변경). 상단에 종합 판정·건수·"먼저 볼 것"(미충족·미확인·후퇴), 전체 표·수동 시험·미선정·입력 목록은 접기(JS 없음). JSON·판정·집계 규칙은 그대로.
 
+
+## 2026-11-14 — RB2 실행 준비값 분리, PACK-BASELINE@36 (사용자 결정 RB2-Q1~Q7)
+- 기록 생산자 세션 9개, LIF-05·06·16 단계별 세대·표본 시각, LIF-07·09·11 시나리오 해시, PLT-07·08 실행 신원·계약 상수는 정책 값이 아니다. 점검별 설정 표 `[run_binding.<점검>]`에서 읽어 같은 키 이름으로 실행기에 넘기고 `guard-run-binding/2`의 `values`에 남긴다. 실행기 설정 칸이 아니라서 같은 실행기를 쓰는 점검끼리 값을 공유하지 않고 실행기 설정 해시도 바뀌지 않는다.
+- 표본 시각은 실행 시작 기준 offset이며 실행기의 순서·240초·시작 전 검사는 그대로다.
+- REQ-02는 사전 선언한 기록 파일 해시와 읽은 파일을 대조하지 않고 읽은 해시를 기록만 한다(사용자가 받아들인 수락 기준 축소, 잠정안과 다름). 선언하는 옛 정의에서는 예전처럼 대조한다.
+- 기업 결정이 섞인 E 4개는 정책에 남는다. 단계는 정의별로 판별해 @35 정의는 B1만 계산하고 준비값은 정책 값을 쓴다. 두 출처를 섞으면 `RUN_BINDING_BELONGS_TO_POLICY`·`RUN_BINDING_BELONGS_TO_EXECUTION`으로 거부한다.
+- 팩 36은 변환기로 재현되고 17개 점검 revision만 오른다(판정 규칙·필수 관측 무변경, 검토 표기는 결정 5). platform `MVP_PACK`·연결표도 36이며 판본 문구는 `MVP_PACK`을 따른다.
 
 ## 2026-11-14 — RB 실행 결합값 분리, PACK-BASELINE@35 (사용자 승인)
 - 실행마다 바뀌는 ENV·target·prepared·manifest 해시와 관측 유효 창(44개 점검, 222키)은 기업 정책 값이 아니다. `guard run`이 실행 직전에 같은 ENV와 실행기 설정 파일에서 계산하고(`guard-run-binding/1`, `executors/run_binding.py`), 실행기에는 같은 키 이름으로 넘긴다. EVD에는 `execution.run_binding`으로 남긴다(비면 직렬화 생략).

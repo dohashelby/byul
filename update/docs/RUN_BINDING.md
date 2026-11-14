@@ -1,6 +1,6 @@
 # 실행 결합값을 정책에서 분리 (RB, 2026-11-14 승인·구현)
 
-상태: **B1 구현됨**(사용자 승인 2026-11-14, `DECISIONS.md` RB). **B2는 승인 요청**(7절, RB2). PACK-BASELINE@35부터 아래 B1 키는 정책 값이 아니고 `guard run`이 계산한다. 구현은 `src/guard/executors/run_binding.py`, 시험은 `tests/test_run_binding.py`. 설계안과 달라진 점은 6절에 모았다.
+상태: **B1 구현됨**(사용자 승인 2026-11-14, `DECISIONS.md` RB, 팩 35). **B2 구현됨**(사용자 결정 RB2-Q1~Q7, 2026-11-14, 팩 36, 7절·8절). PACK-BASELINE@35부터 아래 B1 키는 정책 값이 아니고 `guard run`이 계산한다. 구현은 `src/guard/executors/run_binding.py`, 시험은 `tests/test_run_binding.py`. 설계안과 달라진 점은 6절에 모았다.
 
 ## 1. 문제
 
@@ -17,7 +17,7 @@ PACK-BASELINE@34의 69개 점검 중 44개가 실행마다 바뀌는 기술 값(
 | **A 기업 결정값** | 허용 기준·한도·마감·허용 목록·모드 | `*_budget_*`, `*_max_*`, `*_deadline_*`, `*_allowed_*`, `approved_*`, `*_mode`, `*_required_*`, `selected_model_grants`, `stored_retention` 등 | 전 점검 | 유지 |
 | **A′ 기업 정책 문서 참조** | 기업이 승인한 정책 문서·소유자의 해시·참조 | `forwarded_identity_policy_sha256`, `stored_identity_policy_sha256`, `retry_policy_sha256`, `copy_policy_sha256`, `observation_event_policy_sha256`, `cache_identity_policy_ref`, `profiler_control_owner_ref` | REQ-04·06·15, LIF-12·14, PLT-12, OBS-01 | 유지 |
 | **B1 실행 결합값 (guard가 직접 계산)** | 같은 실행의 ENV·실행기 설정 파일·실행 창에서 계산되는 값 | `*_environment_sha256`, `*_target_sha256`, `*_prepared_sha256`, `sensor_manifest_sha256`, `*_validity_start`·`*_validity_end` (REQ-02의 `route_native_*`, OBS-02의 `identity_*`·`profiler_*` 포함). 단 PLT-10·11·LIF-11의 유효 기간은 정책에 남김(6절) | LIF-01·02·03·04·07·08·09·10·11·12·13·14, OBS-01·02·06, PLT-03·05·07·08·10·11·12, REQ-02·04·05·06·12·14~21, SUP-05·06·07·09·10·11·12·15·16 (44개, 키 222개) | **구현: 정책에서 빼고 실행 결합으로 옮김** |
-| **B2 실행 준비물 결합값** | 실행 전에 준비된 파일·세션의 해시·식별자. guard가 계산할 수 있지만 파일 안에 기업 결정이 섞였는지 점검별 확인이 필요 | `*_session`, `record_inventory_session`, `collection_session`, `identity_record_session`; `init_scenario_sha256`, `recovery_selection_sha256`, `recovery_scenario_sha256`, `retry_scope_sha256`, `copy_inventory_sha256`, `record_subject_plan_sha256`, `route_file_sha256`, `transition_inputs_sha256`; LIF-05·06·16 `transition_*_at`·`transition_*_generation`; PLT-07 `subject_container_id`·`subject_uid`·`subject_net_namespace_inode`·`forbidden_receiver_*`; PLT-08 `api_container_id`·`api_network_id`·`api_endpoint_id`·`api_ip`·`api_port` | LIF-05·06·07·09·11·12·16, OBS-01·02·06·11, PLT-07·08·12, REQ-02·04·06 | 2단계 승인 요청(7절, RB2-Q1~Q7) |
+| **B2 실행 준비물 결합값** | 실행 전에 준비된 파일·세션의 해시·식별자. guard가 계산할 수 있지만 파일 안에 기업 결정이 섞였는지 점검별 확인이 필요 | `*_session`, `record_inventory_session`, `collection_session`, `identity_record_session`; `init_scenario_sha256`, `recovery_selection_sha256`, `recovery_scenario_sha256`, `retry_scope_sha256`, `copy_inventory_sha256`, `record_subject_plan_sha256`, `route_file_sha256`, `transition_inputs_sha256`; LIF-05·06·16 `transition_*_at`·`transition_*_generation`; PLT-07 `subject_container_id`·`subject_uid`·`subject_net_namespace_inode`·`forbidden_receiver_*`; PLT-08 `api_container_id`·`api_network_id`·`api_endpoint_id`·`api_ip`·`api_port` | LIF-05·06·07·09·11·12·16, OBS-01·02·06·11, PLT-07·08·12, REQ-02·04·06 | **구현(팩 36)**: G·P 53개 이동, E 4개는 정책 유지(7·8절) |
 | **C 생산자·수집기 소스 신원** | 기록을 만드는 코드의 SHA. 판본별로 고정이고 실행마다 바뀌지 않음 | `*_record_source_sha256`, `observation_expected_source_sha256`, `record_inventory_source_sha256`, `forwarded_gateway_source_sha256`·`forwarded_engine_source_sha256`, `stored_*_source_sha256` | LIF-01·02·12, OBS-01·02·06, PLT-03·05·12, REQ-04·06, SUP-05~16 | 후속: adapter·생산자 등록표 데이터로 이동 제안(별도) |
 | **D 환경 시험 신원** | 환경에 준비된 시험용 주체 | `allowed_principal_sha256`·`denied_principal_sha256`, `observation_allowed_actor_sha256`·`observation_denied_actor_sha256` | REQ-05, OBS-01 | 후속: ENV 쪽 이동 검토(별도) |
 | **E 외부 사건 신고값** | 외부 발급자가 낸 사건 | PLT-10 `revocation_issuer_id`·`event_id`·`event_at`·`deny_after`, PLT-11 `session_issuer_id`·`event_id`·`event_at`·`open_before`·`deny_after` | PLT-10·11 | 유지(발급자 기록 수집은 후속) |
@@ -124,7 +124,7 @@ issued_at: RFC3339
 
 ## 7. B2 실행 준비물 결합값 — 점검별 확인과 승인안 (2026-11-14, 미승인)
 
-상태: **설계·승인 요청**(`DECISIONS.md` 열린 질문 RB2-Q1~Q7). 구현·팩 판본 상향은 하지 않았다. 아래 확인은 PACK-BASELINE@35 정의와 실행기 소스를 읽어 한 것이다.
+상태: **사용자 결정·구현됨**(RB2-Q1~Q7, 2026-11-14, 팩 36). 이 절은 승인 전 설계안이고, 구현에서 달라진 점과 결정은 8절에 있다. 아래 확인은 PACK-BASELINE@35 정의와 실행기 소스를 읽어 한 것이다.
 
 ### 7.1 대상과 분류 기준
 
@@ -237,3 +237,68 @@ issued_at: RFC3339
 | `tools/migrate_policy_run_binding.py` | 단계 2와 설정 후보 출력 |
 | 시험 | 단계별 판별(@35 재생에서 B1 유지·B2 정책 값), 세션 불일치·세대 교체·offset 위반·bytes 해시·문서 /1·/2 재생, 실행기별 직접 시험 |
 | 소스 목록 | `tools/verify_req10_consumption.py --write`, 검토 행(결정 5) |
+
+## 8. B2 결정과 구현 (2026-11-14, 팩 36)
+
+### 8.1 사용자 결정 (RB2-Q1~Q7)
+
+사용자 원문 "2번으로 가자. 열린질문 여기에 물어봐 내가 결정할게" 뒤 질문별로 정했다(상단 세션 전달).
+
+| 질문 | 결정 |
+|---|---|
+| Q1 G 20개 | 옮긴다. 시나리오는 설정 scenario 파일 해시, 세대는 phase_generation |
+| Q2 기록 세션 9개 | 옮긴다(설정 record_session) |
+| Q3 표본 시각 12개 | 실행 시작 기준 offset(`sample_offsets_ms`). 실행기의 순서·240초 검사 유지 |
+| Q4 E 4개 | 정책에 남긴다. 분리안(7.6)은 점검별로 따로 승인 |
+| Q5 REQ-02 `route_file_sha256` | **실행 설정으로 옮김(잠정안과 다름).** 아래 8.3의 수락 기준 축소를 사용자가 받아들였다 |
+| Q6 PLT-07·08 실행 신원 11개 | 옮긴다(`egress_binding`·`api_binding`). 실행 중 대조 유지 |
+| Q7 호환 | 팩 36, @35 재생은 B1 유지, B2 값이 있는 결합 문서만 /2, `verify`는 /1·/2, 이전 도구 `--stage 2` |
+
+### 8.2 구현에서 설계안과 달라진 점
+
+- **값을 두는 곳: 점검별 설정 표 `[run_binding.<점검>]`.** 설계안(7.4-3)은 실행기 설정 칸(`record_session` 등)을 더하는 안이었다. 하지만 실행기 설정은 실행기 이름별 한 칸이라 같은 실행기를 쓰는 점검이 값을 공유한다(OBS-01과 PLT-12는 `required_event_record`, LIF-05·06·16은 `lifecycle_transition`, LIF-07·09는 `initialization`). 세션·세대·시각은 점검마다 달라야 하므로 최상위 표에 점검별로 둔다. 양쪽(baseline·candidate) 값은 기존 `[sides.<side>]` 병합 규칙으로 따로 준다. 실행기는 이 표를 보지 않으므로 실행기 설정 허용 키와 실행기 설정 해시가 바뀌지 않는다(세션이 실행마다 바뀌어도 INV-19 이월 조건이 흔들리지 않는다). 표는 실행 설정 전체 해시(`execution_recipe_sha256`)에는 들어가 PLAN에 고정된다.
+
+```toml
+[run_binding.OBS-01]
+record_session = "<32 hex>"
+[run_binding.LIF-05]
+phase_generation = { before = "old", during = "old", after = "new", recovered = "new" }
+sample_offsets_ms = { before = 5000, during = 60000, after = 120000, recovered = 200000 }
+[run_binding.LIF-07]
+scenario = "/path/scenario.json"        # 정규 JSON SHA-256이 init_scenario_sha256
+[run_binding.PLT-07]
+egress_binding = "/path/egress.json"    # subject_* 3개·forbidden_receiver_* 3개, 정확히 이 칸만
+[run_binding.PLT-08]
+api_binding = "/path/api.json"          # api_container_id·network_id·endpoint_id·ip·port
+```
+
+- 허용 칸은 점검별로 닫혀 있다(`run_binding.CONFIG_KEYS`). 칸이 없거나 남거나 형식이 틀리면 `NOT_RUN`(`RUN_BINDING_CONFIG_INVALID`)→UNKNOWN이다. 아직 준비값을 선언하는 @35 정의에 표를 주면 `RUN_BINDING_BELONGS_TO_POLICY`로 거부한다. @36 정의의 정책에 준비값이나 REQ-02 파일 해시가 있으면 `RUN_BINDING_BELONGS_TO_EXECUTION`이다.
+- **단계 판별**: `stages_for`가 단계별로 "정의가 그 단계 키를 하나도 선언하지 않음"을 본다. @35 정의는 단계 1만, @34 정의는 둘 다 정책 값이다. 수집 프로필 문자열은 바꾸지 않았다(1단계와 같음). LIF-05·06·16, OBS-11을 프로필 표에 더했다.
+- **표본 시각**: `transition_<단계>_at = 결합 발급 시각 + offset`(밀리초, ISO 문자열). 실행기는 지금처럼 순서·240초 이내·`started <= before`를 검사하므로, `before` offset은 세대 로드 시간보다 커야 한다(작으면 `TRANSITION_MUST_START_BEFORE_SCHEDULE`→ABORTED). guard는 순서가 틀린 일정을 고치지 않는다.
+- **세대 목록 해시**: `lifecycle_transition.inputs_manifest`(설정 `generations`의 ENV Ref·target·prepared 해시)를 실행기와 같은 행 함수로 계산한다. 실행기는 읽을 때 다시 대조한다. 단, `generations`는 지금도 실행기 설정 칸이라 LIF-05·06·16이 공유한다(9절 공백).
+- **결합 문서 /2**: 준비값이 있으면 `guard-run-binding/2`이고 `values`에 준비값(세션·세대·시각·상수·PLT 신원)을, `files`에 시나리오·결합 파일 해시를 둔다. 단계 1만 쓰는 점검은 /1 그대로라 기존 EVD 해시 형식이 바뀌지 않는다. `verify`는 /1·/2를 받고 /2에 `values`가 없으면 `RUN_BINDING_SCHEMA_INVALID`다.
+- **bytes 해시 출처**는 E 키(`retry_scope`·`copy_inventory`)를 옮기지 않아 이번에는 넣지 않았다.
+
+### 8.3 REQ-02 수락 기준 축소 (RB2-Q5, 사용자 승인)
+
+- @35까지: 정책의 `route_file_sha256`(운영자가 미리 선언한 기록 파일 bytes 해시)와 실행 중 Pod에서 읽은 `route-observations.json`의 bytes 해시가 같아야 했다. 다르면 기록 수집 실패→UNKNOWN.
+- @36부터: 선언값이 없다. 실행기는 이 대조를 **하지 않고**, 읽은 파일의 bytes 해시를 증거 `record.file_bytes_sha256`에 기록만 한다(`declared_file_sha256: null`로 기록만 했음을 남긴다). 다른 결합(ENV Ref·run_id·이미지·소유 파일 신원·`owner_binding_verified`·세션·유효 창)은 그대로 검사한다.
+- 잃는 것: "읽은 기록 파일이 실행 전에 기업·운영자가 지목한 바로 그 파일"이라는 확인. 같은 세션 폴더의 다른 내용 파일이 읽혀도 형식·결합이 맞으면 수집된다. 생산자 주장은 원래도 미인증(`producer_authenticated: False`)이며, 판정 규칙·필수 관측은 바뀌지 않았다.
+- 정의가 키를 선언하면(@35 이전 팩) 실행기는 예전처럼 대조한다(`kubernetes_route_record.file_declared`).
+
+### 8.4 호환
+
+- 팩 36: `tools/overrides`에서 53개 키를 빼고 변환기로 재현(`test_committed_pack_matches_importer`). 17개 점검 revision+1, 판정 규칙·필수 관측 무변경. 검토 표기는 @35와 같다(결정 5).
+- @34·@35 PLAN·EVD·RES는 보존본으로 그대로 재판정된다. @35 결과를 @36으로 옮기지 않는다(INV-19: CheckDef revision이 달라 첫 실행은 전체 시험).
+- 정책 이전: `tools/migrate_policy_run_binding.py --pack <팩36> --stage 2 --run-config-out FILE`. 정책에서 키를 빼고 표 후보(세션·세대·offset·PLT 결합 파일 내용)를 DRAFT로 쓴다. 시나리오 파일과 PLT 결합 파일은 사람이 만들어야 한다(`needs`).
+- 저장소 입력: 예시 정책·GPU 초안 정책·MA7 입력 계획을 @36으로 옮겼다(준비값이 들어 있던 행 없음, 계획은 17개 점검의 정책 요구 키만 바뀜). SUP-08 입력 도구의 팩 관문을 36으로 올렸다(SUP-08 정의 rev 5 그대로).
+- platform: `MVP_PACK`·선정 37 연결표(`refresh_platform_checklist_links.py --write`)·관련 시험을 36으로. 오류 문구·주석·`platform/docs/MVP_INPUTS.md`는 판본을 하드코딩하지 않고 `MVP_PACK`을 따른다.
+
+## 9. J02(63개 `guard update`)까지 남은 공백 (2026-11-14)
+
+- **점검별 실행 설정 조립**: 실제 ENV·target·prepared·정책·실행 설정을 점검별로 만드는 도구가 REQ-10·17·18·SUP-03·08(`tools/gpu_a_run_inputs.py`, `mvp_a_input_materialize.py`, `mvp_sup08_inputs.py`)만 지원한다. 나머지 점검의 실행 설정 조립, 특히 새 `[run_binding.<점검>]` 표(세션·세대·offset·시나리오·PLT 결합 파일)를 만드는 도구가 없다.
+- **공유 실행기 칸**: 실행기 설정은 실행기 이름별이라, 한 번의 `guard update`에서 같은 실행기를 쓰는 점검은 target·prepared·`generations` 같은 칸을 공유한다(LIF-05·06·16의 `generations`, OBS-01·PLT-12의 target, LIF-07·09의 target·prepared). 점검마다 대상이 다르면 한 실행으로 묶을 수 없다. 점검별 실행기 설정 덮어쓰기가 필요하다(이번 범위 밖, 별도 결정).
+- **E 키 4개**: `retry_scope_sha256`·`copy_inventory_sha256`·`record_subject_plan_sha256`·`recovery_selection_sha256`은 아직 정책 값이라 실행마다 정책을 다시 써야 한다(7.6 분리안, 점검별 승인 대기).
+- **C·D·E 분류**: 생산자 소스 SHA(C), 시험 주체(D), 외부 사건 시각(E)은 정책에 남아 있다.
+- **MA7·MA8 기록 정합**: `docs/dev-1/ma8-local-preflight-20261113.json`의 `pack_ref`가 34라, MA7 계획(36)과 맞지 않아 `mvp_a_input_materialize`가 그 감사 파일을 받지 않는다(이번 변경 전 35에서도 같았다). SUP-08 실제 파일 재검증을 팩 36으로 다시 해야 한다.
+- 실제 ENV/target·GPU 자격·비용 승인 등 기존 공백은 PROGRESS의 M-A3·M-A7 기록을 따른다.

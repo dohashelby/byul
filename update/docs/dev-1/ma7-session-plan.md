@@ -67,9 +67,9 @@ EBS·스냅샷 보존, 전송·공인 IPv4, 세금·환율은 위 EC2 합계에 
 
 ## M-A7 로컬 입력 파일 준비 결과
 
-2026-11-14 사용자 결정23의 분할 수집 계약에 맞춰 source fc77399e에서 실제 입력 v5를 만들었다. 현재 폴더는 작업 폴더 `inputs/ma7-materialized-20261114-v5`이고 [준비 기록](ma7-local-materialization-20261113.json)·입력 계획 JSON의 포인터/SHA에 연결했다. 이전 v3·v4와 초기 묶음은 보관용이다.
+2026-11-14 사용자 결정23의 분할 수집 계약에 맞춰 source67f1a5be에서 REQ-15까지 포함한 실제 입력 v6를 만들었다. 현재 폴더는 작업 폴더 `inputs/ma7-materialized-20261114-v6`이고 [준비 기록](ma7-local-materialization-20261113.json)·입력 계획 JSON의 포인터/SHA에 연결했다. 이전 v5·REQ-15 별도 추가 묶음과 초기 묶음은 보관용이다.
 
-- 양쪽 prepared16개·서로 다른16세션을 현재 guard 소스 bytes와 대조했다. REQ-19·20은 lab_kernel_checks, REQ-18만 lab_faults를 켠다. 노드 설치·런타임 자격은 미확인이다. 로컬 HMAC 값은 Git에 넣지 않고 SHA만 기록했다.
+- 양쪽 prepared18개·서로 다른18세션(REQ-15 포함)을 현재 guard 소스 bytes와 대조했다. REQ-19·20은 lab_kernel_checks, REQ-18만 lab_faults를 켠다. 노드 설치·런타임 자격은 미확인이다. 로컬 HMAC 값은 Git에 넣지 않고 SHA만 기록했다.
 - 기존 REQ-14·16·18 사례6개/62사례를 유지하고 REQ-17에 양쪽 각504개씩 두 파일을 추가했다. 사례 파일10개·총2,078사례이며 별도 그룹 목록2개가 있다. 두 판본의 REQ-17 사례 bytes는 같고 ENV/target·세션은 실제 실행별로 결합한다.
 - REQ-17은 역할별200·AUC55·묶음별512개 상한을 유지한다. 그룹 계약과 원 표본·시계·동일 scope/세대 검증을 구현했으며 AUC 평균을 사용하지 않는다. 새 입력과 기존 단일 입력은 구분한다. 상세는 [분할 수집 계약](req17-split-collection.md)이다.
 - SUP-08 실제 모델14개·코드 캐시5개·기동 파일12개 bytes를 2026-11-14에 다시 읽어 검증했다(34.018초). 원자료·가중치를 다시 다운로드하지 않았다. 실제 ENV/target4개·최종 사전 점검은 미완료다.

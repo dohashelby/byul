@@ -5,8 +5,8 @@
 ## 준비된 것
 
 - SUP-08 실제 fixture: 모델14개8,295,393,861 bytes·코드 캐시5개·기동 파일12개. 2026-11-14 재검증34.018초. 경로는 작업 폴더 inputs/sup08-rebuild-20261113이며 v2 기동 자산을 유지한다.
-- 입력 v5: prepared16개·서로 다른16세션·사례10파일/2078개·REQ17 그룹목록2개. source plan bytes와 모든 파일 SHA를 보존한다. source fc77399e에서 생성했으며 실제 ENV/target은 비어 있다.
-- 추가 준비: REQ-15 기준/후보 prepared2개를 inputs/ma7-req15-supplement-20261114에 만들었다. [추가 기록](ma7-req15-prepared-20261114.json)에 파일/설정 SHA·세션을 남겼다. 관측 자산/생성기 bytes가 main과 같고 기존16개와 총18세션이 겹치지 않음을 확인했다. HMAC 비밀은 Git에 넣지 않았다. 노드 설치·실행 자격은미확인이다.
+- 현재 입력 v6: prepared18개·서로 다른18세션·사례10파일/2,078개·REQ17 그룹목록2개. source plan bytes와 모든 파일 SHA를 보존한다. source67f1a5be에서 생성했으며 REQ-15도 같은 계획에 직접 연결했다. 실제 ENV/target은 비어 있다.
+- 보존한 이전 준비: REQ-15 별도2개는 inputs/ma7-req15-supplement-20261114와 [추가 기록](ma7-req15-prepared-20261114.json)에 남아 있다. 재생성 때 다시 누락되지 않도록 도구를 고쳤으며 v6에는18개를 새 독립 세션으로 준비했다. 이전 묶음을 덮어쓰지 않았고 HMAC 비밀은 Git에 넣지 않았다. 노드 설치·실행 자격은 미확인이다.
 - 확정5값을 반영한 정책 초안은 존재하지만 실행별 ENV/target/prepared/manifest hash 결합과 운영 확인은 미완료다. DRAFT를 실제 승인으로 바꾸지 않는다.
 
 ## 실제로 비어 있는 것

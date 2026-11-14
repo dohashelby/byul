@@ -1,5 +1,9 @@
 # DECISIONS
 
+- 2026-11-14 · 사용자 결정29("runtime 변경 없이 문제 기록"): #268 초기 headb086b195의 S2-05 수집 시계 경합은 재현 자료와 미적용 수정안을 보관하고 미해결 문제로 기록한다. `runtime/tests/test_mvp_acceptance.py`를 포함한 runtime 파일은 바꾸지 않는다. 시험 한 파일 예외 요청은 종료하며 기존 결정19/25의 승인 범위를 넓히지 않는다. 최신 head4d3192e4의 CI18개 통과는 이 경합의 해결 근거가 아니다. 실제 ENV/target·GPU 사전 점검의 미완료 상태도 유지한다.
+
+- 2026-11-14 · 사용자 결정28(메인 세션으로 전달된 승인): CI를 재확인해 REQ-17 #267을 main에 병합하고 M-A7 `codex/ma7-input-readiness-20261114`(719ae2ca)의 push·main PR, M-A3 `codex/ma3-rank-fault-closure-20261114`(7997187b)의 push·main draft PR 생성을 승인한다. 최신 main 충돌은 변경을 보존해 정리하고 제품 소스 목록·결정5의 정확 SHA 검토 행을 다시 만든다. #267은 검증 head26f46c8e·CI18개 통과 뒤 main7181e57a에 병합했고 tree가 일치했다. 새 두 PR의 병합·GPU/클라우드 비용·추가 대용량 다운로드·runtime 예외 확대는 승인하지 않았다. #263 draft·#264 미병합·M-B4 보관은 유지한다.
+
 - 2026-11-14 · 사용자 결정27("REQ-17 push·PR 생성 승인"): codex/req17-split-aggregation-20261114의53593d77 구현/입력 묶음을 push하고 main PR을 생성하도록 승인했다. 결정23의 기준200·AUC55·묶음512를 유지하며 병합·GPU/클라우드 실행·추가 다운로드는 포함하지 않는다. 필요한 CI 보수는 이 범위 안에서 진행한다.
 
 - 2026-11-14 · 사용자 결정23("REQ-17도 설명한 분할 수집·집계 방식으로 구현, 기존 판정 기준과 묶음당512개 유지"): 504개씩 두 묶음의 원 표본을 동일 ENV/target·모델/정책/엔진 세대·요청 귀속에 결합해 집계한다. 역할별 최소200·AUC55·기존 단일 입력/512개 검사를 유지한다. 원 지연값에 기존 계산식을 적용하고 AUC 평균·기존 UNKNOWN 재작성·독립 FAIL 누락을 허용하지 않는다. 제한된 그룹 입력/원 표본 계약과 SPEC 반영을 승인하며 GPU/클라우드 실행·비용·추가 다운로드·새 브랜치 push/병합은 포함하지 않는다. 상세는 docs/dev-1/req17-split-collection.md. M-A7-Q1을 닫는다.
@@ -333,6 +337,9 @@
 - 2026-10-19 · 모델: `Execution.operator{by,at}`·`override_reason`, `ExecutorInfo.default_judge`, `CheckRow.evidence_source`·`replaced`, `Report.evidence_counts` — 모두 비어 있으면 직렬화에서 빠짐(기존 해시 유지). 사람이 입력한 증거(operator 있음)는 모델이 MEASURED를 거부.
 
 ## 열린 질문
+
+- ~~M-A7-Q2 / 요청29(runtime CI S2-05 시험 예외)~~ → 사용자 결정29로 "runtime 변경 없이 문제 기록" 확정. 예외 승인 대기는 종료했다. 원 경합은 미해결 문제로 유지한다: #268 headb086b195에서 [ok,null,stale,ok]로 실패했고 모의 엔진 종료 뒤 지연으로 재현됐다. 저장소 밖 수정안의 직접7개·음성subtest2개 결과와 정확 패치는 보관하며 실제 runtime에는 적용하지 않았다. 최신 head4d3192e4의 CI18개 통과와 원 문제의 해결 여부는 별개다. 상세: 작업 폴더 RUNTIME_CI_268_REVIEW_20261114.md.
+
 
 - ~~M-A7-Q1 / 결정 요청23~~ → 2026-11-14 사용자 결정23으로 분할 수집·집계 구현 승인. 역할별200·AUC55·묶음별512개 상한을 유지한다. 실제 ENV/target·GPU 자격/실행은 미완료다.
 

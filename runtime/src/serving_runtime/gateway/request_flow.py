@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 import threading
 import time
@@ -86,6 +87,23 @@ class ConcurrencyLimiter:
     def status(self) -> dict[str, int]:
         with self._lock:
             return {"in_flight": self._in_flight, "limit": self._limit}
+
+
+@dataclass(frozen=True)
+class _RequestCall:
+    response: ChatIO
+    request_id: str
+    route: str
+    request_kind: str
+
+
+@dataclass(frozen=True)
+class _PreparedRequest:
+    policy_snapshot: PolicyState
+    decision: Decision
+    document: dict[str, object]
+    stream: bool
+    cache_salt: str | None
 
 
 class RequestFlow:
@@ -323,14 +341,27 @@ class RequestFlow:
         route: str,
         request_kind: str,
     ) -> None:
-        self._records.clear_context(route)
-        policy_snapshot = self._policy_state()
-        self._records.bind_context(policy_snapshot)
-        policy_runtime = evaluate_policy(
-            policy_snapshot,
-            self._revocation_state(),
-            approval=self._approval_result(),
-        )
+        call = _RequestCall(response, request_id, route, request_kind)
+        prepared = self._prepare_request(call)
+        if prepared is None:
+            return
+        decision, stream = prepared.decision, prepared.stream
+        if not self._concurrency.try_acquire():
+            self._reject_concurrency(response, request_id, decision, stream)
+            return
+
+        acquired_at = time.monotonic()
+        try:
+            if self._start_request(call, prepared, acquired_at) is None:
+                return
+            if stream:
+                self._relay_stream_and_record(call, prepared, acquired_at)
+                return
+            self._relay_buffered_and_record(call, prepared, acquired_at)
+        finally:
+            self._concurrency.release()
+
+    def _read_content_length(self, response, request_id):
         if response.request_header("Transfer-Encoding") is not None:
             self.finish_without_relay(
                 response,
@@ -371,7 +402,9 @@ class RequestFlow:
                 close_connection=True,
             )
             return
+        return content_length
 
+    def _check_size_and_policy(self, response, request_id, content_length, policy_snapshot, policy_runtime):
         policy = policy_snapshot.policy
         body_limit = policy.max_body_bytes if policy_snapshot.ok and policy is not None else _INVALID_POLICY_BODY_LIMIT
         if content_length > body_limit:
@@ -399,7 +432,9 @@ class RequestFlow:
             )
             self.finish_without_relay(response, request_id, unavailable, close_connection=True)
             return
+        return (policy,)
 
+    def _authenticate_request(self, response, request_id, route):
         auth_state = self._auth_state()
         auth = auth_state.authenticate(response.request_header("Authorization"))
         self._records.set_auth(auth.record())
@@ -414,7 +449,9 @@ class RequestFlow:
                 extra_headers=headers,
             )
             return
+        return auth_state, auth
 
+    def _check_target_and_cache(self, response, request_id, policy, auth_state):
         hold = self._target_hold(policy.target_id if policy is not None else None)
         if hold is not None:
             # Declared target conflicts hold the request; this is not a block result.
@@ -457,7 +494,9 @@ class RequestFlow:
                 close_connection=True,
             )
             return
+        return True
 
+    def _read_validated_request(self, response, request_id, content_length, policy_snapshot, request_kind):
         body = response.read_request_body(content_length)
         incomplete = len(body) != content_length
         if incomplete:
@@ -503,6 +542,9 @@ class RequestFlow:
                 transport_decision(400, "MALFORMED_JSON", "invalid JSON"),
             )
             return
+        return decision, document, stream
+
+    def _check_principal_model(self, response, request_id, auth, decision, stream):
         principal = auth.principal
         if (
             principal is not None
@@ -524,7 +566,9 @@ class RequestFlow:
                 stream=stream,
             )
             return
+        return (principal,)
 
+    def _check_backend(self, response, request_id, decision, stream):
         if self._backend.external:
             if self._backend.credential_status == "missing":
                 self.finish_without_relay(
@@ -568,7 +612,9 @@ class RequestFlow:
                     stream=stream,
                 )
                 return
+        return True
 
+    def _derive_request_cache_salt(self, response, request_id, policy, principal, decision, stream):
         cache_salt: str | None = None
         if policy is not None and policy.cache_isolation == "per_principal":
             if principal is None:
@@ -601,233 +647,308 @@ class RequestFlow:
                     stream=stream,
                 )
                 return
+        return (cache_salt,)
 
-        if not self._concurrency.try_acquire():
-            limited = Decision(
-                result="DENIED",
-                http_status=429,
-                reason_code="CONCURRENCY_LIMIT",
-                rule_id="max_concurrent_requests",
-                message="maximum concurrent requests reached",
-                model=decision.model,
-                max_tokens=decision.max_tokens,
-            )
+    def _prepare_request(self, call):
+        response, request_id, route, request_kind = call.response, call.request_id, call.route, call.request_kind
+        self._records.clear_context(route)
+        policy_snapshot = self._policy_state()
+        self._records.bind_context(policy_snapshot)
+        policy_runtime = evaluate_policy(
+            policy_snapshot,
+            self._revocation_state(),
+            approval=self._approval_result(),
+        )
+        content_length = self._read_content_length(response, request_id)
+        if content_length is None:
+            return
+        checked_policy = self._check_size_and_policy(
+            response, request_id, content_length, policy_snapshot, policy_runtime
+        )
+        if checked_policy is None:
+            return
+        (policy,) = checked_policy
+        authenticated = self._authenticate_request(response, request_id, route)
+        if authenticated is None:
+            return
+        auth_state, auth = authenticated
+        if self._check_target_and_cache(response, request_id, policy, auth_state) is None:
+            return
+        validated = self._read_validated_request(response, request_id, content_length, policy_snapshot, request_kind)
+        if validated is None:
+            return
+        decision, document, stream = validated
+        checked_principal = self._check_principal_model(response, request_id, auth, decision, stream)
+        if checked_principal is None:
+            return
+        (principal,) = checked_principal
+        if self._check_backend(response, request_id, decision, stream) is None:
+            return
+        derived = self._derive_request_cache_salt(response, request_id, policy, principal, decision, stream)
+        if derived is None:
+            return
+        (cache_salt,) = derived
+        return _PreparedRequest(policy_snapshot, decision, document, stream, cache_salt)
+
+    def _reject_concurrency(self, response, request_id, decision, stream):
+        limited = Decision(
+            result="DENIED",
+            http_status=429,
+            reason_code="CONCURRENCY_LIMIT",
+            rule_id="max_concurrent_requests",
+            message="maximum concurrent requests reached",
+            model=decision.model,
+            max_tokens=decision.max_tokens,
+        )
+        self.finish_without_relay(
+            response,
+            request_id,
+            limited,
+            stream=stream,
+            extra_headers={"Retry-After": "1"},
+        )
+
+    def _start_request(self, call, prepared, acquired_at):
+        response, request_id, request_kind = call.response, call.request_id, call.request_kind
+        policy_snapshot, decision, document, stream, cache_salt = (
+            prepared.policy_snapshot,
+            prepared.decision,
+            prepared.document,
+            prepared.stream,
+            prepared.cache_salt,
+        )
+        context_decision = self._context_decision(
+            request_id,
+            document,
+            decision,
+            policy_snapshot,
+            request_kind,
+            acquired_at + self._relay.request_deadline_s,
+        )
+        if context_decision is not None:
             self.finish_without_relay(
                 response,
                 request_id,
-                limited,
+                context_decision,
+                close_connection=context_decision.reason_code == "ENGINE_DEADLINE",
                 stream=stream,
-                extra_headers={"Retry-After": "1"},
             )
             return
-
-        acquired_at = time.monotonic()
-        try:
-            context_decision = self._context_decision(
-                request_id,
-                document,
+        if cache_salt is not None:
+            self._records.mark_cache_isolation_applied()
+        started = self._records.build(
+            "started",
+            request_id,
+            decision,
+            attempted=False,
+            backend_receipt=self._engine_client.receipt_not_queried(),
+            response="none",
+            error_code=None,
+            stream=stream,
+        )
+        if not self._records.append(started):
+            unavailable = engine_error(
+                503,
+                "STORE_UNAVAILABLE",
+                "request record store is unavailable",
                 decision,
-                policy_snapshot,
-                request_kind,
-                acquired_at + self._relay.request_deadline_s,
+                source="gateway",
             )
-            if context_decision is not None:
-                self.finish_without_relay(
-                    response,
-                    request_id,
-                    context_decision,
-                    close_connection=context_decision.reason_code == "ENGINE_DEADLINE",
-                    stream=stream,
-                )
-                return
-            if cache_salt is not None:
-                self._records.mark_cache_isolation_applied()
-            started = self._records.build(
-                "started",
-                request_id,
-                decision,
-                attempted=False,
-                backend_receipt=self._engine_client.receipt_not_queried(),
-                response="none",
-                error_code=None,
-                stream=stream,
-            )
-            if not self._records.append(started):
-                unavailable = engine_error(
-                    503,
-                    "STORE_UNAVAILABLE",
-                    "request record store is unavailable",
-                    decision,
-                    source="gateway",
-                )
-                self._records.append(
-                    self._records.build(
-                        "final",
-                        request_id,
-                        unavailable,
-                        attempted=False,
-                        backend_receipt=self._engine_client.receipt_not_queried(),
-                        response="failed",
-                        error_code="STORE_UNAVAILABLE",
-                        stream=stream,
-                        http_start_status=503,
-                        final_outcome="STORE_UNAVAILABLE",
-                    )
-                )
-                response.send_error_decision(unavailable, request_id)
-                return
-
-            if stream:
-
-                def record_response_started() -> None:
-                    self._records.append(
-                        self._records.build(
-                            "response_started",
-                            request_id,
-                            decision,
-                            attempted=True,
-                            backend_receipt=(self._engine_client.receipt_not_queried()),
-                            response="streaming",
-                            error_code=None,
-                            stream=True,
-                            http_start_status=200,
-                            response_started=True,
-                        )
-                    )
-
-                final_decision, final_outcome, response_started = self._relay.relay_stream(
-                    response,
-                    request_id,
-                    document,
-                    decision,
-                    acquired_at,
-                    record_response_started,
-                    route=route,
-                    cache_salt=cache_salt,
-                )
-                backend_receipt = (
-                    self._engine_client.receipt_not_queried()
-                    if final_outcome == "deadline_exceeded"
-                    else self._relay.response_id_receipt(request_id)
-                    if self._backend.external
-                    else self._engine_client.backend_receipt(request_id)
-                )
-                if final_outcome == "deadline_exceeded":
-                    self._relay.response_id_receipt(request_id)
-                abnormal_started = response_started and final_outcome not in {
-                    "completed",
-                    "backend_truncated",
-                }
-                if self._backend.external:
-                    backend_cancel = "not_observed"
-                else:
-                    backend_cancel = (
-                        self._engine_client.mock_cancel_evidence(
-                            request_id,
-                            wait=final_outcome == "client_disconnected",
-                        )
-                        if abnormal_started and final_outcome != "deadline_exceeded"
-                        else "not_applicable"
-                    )
-                completed = final_outcome == "completed"
-                self._records.append(
-                    self._records.build(
-                        "final",
-                        request_id,
-                        final_decision,
-                        attempted=True,
-                        backend_receipt=backend_receipt,
-                        response="completed" if completed else "failed",
-                        error_code=(None if completed else final_decision.reason_code),
-                        stream=True,
-                        http_start_status=(200 if response_started else final_decision.http_status),
-                        final_outcome=final_outcome,
-                        response_started=response_started,
-                        backend_cancel=backend_cancel,
-                    )
-                )
-                if not response_started:
-                    response.send_error_decision(
-                        final_decision,
-                        request_id,
-                        extra_headers=(
-                            {"Retry-After": final_decision.retry_after}
-                            if final_decision.retry_after is not None
-                            else None
-                        ),
-                    )
-                return
-
-            final_decision, engine_body = self._relay.relay(
-                request_id,
-                document,
-                decision,
-                route=route,
-                cache_salt=cache_salt,
-                started_at=acquired_at,
-            )
-            backend_receipt = (
-                self._engine_client.receipt_not_queried()
-                if final_decision.reason_code == "ENGINE_DEADLINE"
-                else self._relay.response_id_receipt(request_id)
-                if self._backend.external
-                else self._engine_client.backend_receipt(request_id)
-            )
-            if final_decision.reason_code == "ENGINE_DEADLINE":
-                self._relay.response_id_receipt(request_id)
-            completed = final_decision.result == "ALLOWED" and engine_body is not None
-            delivery_attempted = False
-            if completed:
-
-                def deliver_body() -> None:
-                    nonlocal delivery_attempted
-                    delivery_attempted = True
-                    response.send_response_body(
-                        200,
-                        "application/json; charset=utf-8",
-                        engine_body,
-                        request_id=request_id,
-                    )
-
-                try:
-                    write_response_before(
-                        response,
-                        acquired_at + self._relay.request_deadline_s,
-                        deliver_body,
-                    )
-                except OSError:
-                    expired = time.monotonic() >= acquired_at + self._relay.request_deadline_s
-                    final_decision = engine_error(
-                        200 if delivery_attempted else 504,
-                        "ENGINE_DEADLINE" if expired else "CLIENT_DISCONNECTED",
-                        "response deadline exceeded" if expired else "client disconnected",
-                        decision,
-                        source="gateway" if expired else "client",
-                    )
-                    completed = False
             self._records.append(
                 self._records.build(
                     "final",
                     request_id,
-                    final_decision,
-                    attempted=True,
-                    backend_receipt=backend_receipt,
-                    response="completed" if completed else "failed",
-                    error_code=None if completed else final_decision.reason_code,
-                    stream=False,
-                    http_start_status=final_decision.http_status,
-                    final_outcome=("completed" if completed else final_decision.reason_code),
-                    response_started=delivery_attempted,
+                    unavailable,
+                    attempted=False,
+                    backend_receipt=self._engine_client.receipt_not_queried(),
+                    response="failed",
+                    error_code="STORE_UNAVAILABLE",
+                    stream=stream,
+                    http_start_status=503,
+                    final_outcome="STORE_UNAVAILABLE",
                 )
             )
-            if not delivery_attempted:
-                response.send_error_decision(
-                    final_decision,
+            response.send_error_decision(unavailable, request_id)
+            return
+        return True
+
+    def _stream_receipts_and_cancel(self, request_id, final_outcome, response_started):
+        backend_receipt = (
+            self._engine_client.receipt_not_queried()
+            if final_outcome == "deadline_exceeded"
+            else self._relay.response_id_receipt(request_id)
+            if self._backend.external
+            else self._engine_client.backend_receipt(request_id)
+        )
+        if final_outcome == "deadline_exceeded":
+            self._relay.response_id_receipt(request_id)
+        abnormal_started = response_started and final_outcome not in {
+            "completed",
+            "backend_truncated",
+        }
+        if self._backend.external:
+            backend_cancel = "not_observed"
+        else:
+            backend_cancel = (
+                self._engine_client.mock_cancel_evidence(
                     request_id,
-                    close_connection=final_decision.reason_code == "ENGINE_DEADLINE",
-                    extra_headers=(
-                        {"Retry-After": final_decision.retry_after} if final_decision.retry_after is not None else None
-                    ),
+                    wait=final_outcome == "client_disconnected",
                 )
-        finally:
-            self._concurrency.release()
+                if abnormal_started and final_outcome != "deadline_exceeded"
+                else "not_applicable"
+            )
+        return backend_receipt, backend_cancel
+
+    def _finish_stream_record(
+        self, call, final_decision, final_outcome, response_started, backend_receipt, backend_cancel
+    ):
+        response, request_id = call.response, call.request_id
+        completed = final_outcome == "completed"
+        self._records.append(
+            self._records.build(
+                "final",
+                request_id,
+                final_decision,
+                attempted=True,
+                backend_receipt=backend_receipt,
+                response="completed" if completed else "failed",
+                error_code=(None if completed else final_decision.reason_code),
+                stream=True,
+                http_start_status=(200 if response_started else final_decision.http_status),
+                final_outcome=final_outcome,
+                response_started=response_started,
+                backend_cancel=backend_cancel,
+            )
+        )
+        if not response_started:
+            response.send_error_decision(
+                final_decision,
+                request_id,
+                extra_headers=(
+                    {"Retry-After": final_decision.retry_after}
+                    if final_decision.retry_after is not None
+                    else None
+                ),
+            )
+
+    def _relay_stream_and_record(self, call, prepared, acquired_at):
+        response, request_id, route = call.response, call.request_id, call.route
+        document, decision, cache_salt = prepared.document, prepared.decision, prepared.cache_salt
+
+        def record_response_started() -> None:
+            self._records.append(
+                self._records.build(
+                    "response_started",
+                    request_id,
+                    decision,
+                    attempted=True,
+                    backend_receipt=(self._engine_client.receipt_not_queried()),
+                    response="streaming",
+                    error_code=None,
+                    stream=True,
+                    http_start_status=200,
+                    response_started=True,
+                )
+            )
+
+        final_decision, final_outcome, response_started = self._relay.relay_stream(
+            response,
+            request_id,
+            document,
+            decision,
+            acquired_at,
+            record_response_started,
+            route=route,
+            cache_salt=cache_salt,
+        )
+        backend_receipt, backend_cancel = self._stream_receipts_and_cancel(request_id, final_outcome, response_started)
+        self._finish_stream_record(
+            call, final_decision, final_outcome, response_started, backend_receipt, backend_cancel
+        )
+
+    def _deliver_buffered_body(
+        self, response, request_id, decision, engine_body, acquired_at, final_decision, completed
+    ):
+        delivery_attempted = False
+        if completed:
+
+            def deliver_body() -> None:
+                nonlocal delivery_attempted
+                delivery_attempted = True
+                response.send_response_body(
+                    200,
+                    "application/json; charset=utf-8",
+                    engine_body,
+                    request_id=request_id,
+                )
+
+            try:
+                write_response_before(
+                    response,
+                    acquired_at + self._relay.request_deadline_s,
+                    deliver_body,
+                )
+            except OSError:
+                expired = time.monotonic() >= acquired_at + self._relay.request_deadline_s
+                final_decision = engine_error(
+                    200 if delivery_attempted else 504,
+                    "ENGINE_DEADLINE" if expired else "CLIENT_DISCONNECTED",
+                    "response deadline exceeded" if expired else "client disconnected",
+                    decision,
+                    source="gateway" if expired else "client",
+                )
+                completed = False
+        return final_decision, completed, delivery_attempted
+
+    def _finish_buffered_record(self, call, final_decision, backend_receipt, completed, delivery_attempted):
+        response, request_id = call.response, call.request_id
+        self._records.append(
+            self._records.build(
+                "final",
+                request_id,
+                final_decision,
+                attempted=True,
+                backend_receipt=backend_receipt,
+                response="completed" if completed else "failed",
+                error_code=None if completed else final_decision.reason_code,
+                stream=False,
+                http_start_status=final_decision.http_status,
+                final_outcome=("completed" if completed else final_decision.reason_code),
+                response_started=delivery_attempted,
+            )
+        )
+        if not delivery_attempted:
+            response.send_error_decision(
+                final_decision,
+                request_id,
+                close_connection=final_decision.reason_code == "ENGINE_DEADLINE",
+                extra_headers=(
+                    {"Retry-After": final_decision.retry_after} if final_decision.retry_after is not None else None
+                ),
+            )
+
+    def _relay_buffered_and_record(self, call, prepared, acquired_at):
+        response, request_id, route = call.response, call.request_id, call.route
+        document, decision, cache_salt = prepared.document, prepared.decision, prepared.cache_salt
+        final_decision, engine_body = self._relay.relay(
+            request_id,
+            document,
+            decision,
+            route=route,
+            cache_salt=cache_salt,
+            started_at=acquired_at,
+        )
+        backend_receipt = (
+            self._engine_client.receipt_not_queried()
+            if final_decision.reason_code == "ENGINE_DEADLINE"
+            else self._relay.response_id_receipt(request_id)
+            if self._backend.external
+            else self._engine_client.backend_receipt(request_id)
+        )
+        if final_decision.reason_code == "ENGINE_DEADLINE":
+            self._relay.response_id_receipt(request_id)
+        completed = final_decision.result == "ALLOWED" and engine_body is not None
+        final_decision, completed, delivery_attempted = self._deliver_buffered_body(
+            response, request_id, decision, engine_body, acquired_at, final_decision, completed
+        )
+        self._finish_buffered_record(call, final_decision, backend_receipt, completed, delivery_attempted)

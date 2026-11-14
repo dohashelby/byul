@@ -118,6 +118,24 @@ def test_ready_and_release_are_one_call_barrier_not_physical_signal(configured):
         time.sleep(0.005)
     assert second == [('returned', inner.result)]
     assert control.read_raw('control-ready.json') == original
+    assert not any(p.get('schema') == 'guard-rank-rpc-control-gap/1' for p in rows)
+    claim, _ = control.read('control-claimed-' + arm['nonce'] + '.json')
+    assert claim['arm_sha256'] == arm_sha and claim['context'] == receipt['context']
+    assert claim['call_hmac_sha256'] == receipt['call_hmac_sha256']
+
+
+def test_wrong_claim_is_not_a_consumed_nonce_or_a_second_ready(configured):
+    _, _, rows, inner, _, _, control, initial = configured
+    arm, arm_sha = arm_request(configured)
+    control.write('control-claimed-' + arm['nonce'] + '.json', {
+        'schema': 'guard-rank-rpc-claim/1', 'nonce': arm['nonce'], 'arm_sha256': '0' * 64,
+        'context': initial['context'], 'parent_object_hmac_sha256': initial['rpc_parent_object_hmac_sha256'],
+        'call_hmac_sha256': 'a' * 64})
+    thread, outcome = begin(configured); thread.join(3)
+    assert not thread.is_alive() and outcome == [('returned', inner.result)]
+    assert any(p.get('schema') == 'guard-rank-rpc-control-gap/1' for p in rows)
+    with pytest.raises(FileNotFoundError):
+        control.read('control-ready.json')
 
 
 def test_exception_is_explicit_instrumented_boundary_not_original_execution(configured):

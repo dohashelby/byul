@@ -271,6 +271,20 @@ class Control:
         except BaseException:
             pass
 
+    def _consumed(self, name, arm, arm_sha, proof):
+        try:
+            claim, _ = self.read(name)
+        except FileNotFoundError:
+            return False
+        if (type(claim) is not dict or set(claim) != {'schema', 'nonce', 'arm_sha256', 'context',
+                'parent_object_hmac_sha256', 'call_hmac_sha256'}
+                or claim['schema'] != 'guard-rank-rpc-claim/1' or claim['nonce'] != arm['nonce']
+                or claim['arm_sha256'] != arm_sha or claim['context'] != proof['context']
+                or claim['parent_object_hmac_sha256'] != proof['rpc_parent_object_hmac_sha256']
+                or not fingerprint(claim['call_hmac_sha256'])):
+            raise ValueError('RANK_RPC_CONTROL_CLAIM')
+        return True
+
     def maybe_hold(self, proof):
         try:
             arm, arm_sha = self.read('control-arm.json')
@@ -282,12 +296,23 @@ class Control:
         try:
             if not self._arm(arm, proof, time.monotonic_ns()):
                 return
+            claim = 'control-claimed-' + arm['nonce'] + '.json'
+            if self._consumed(claim, arm, arm_sha, proof):
+                # 같은 요청의 다음 모델 단계는 이미 소비한 제어를 다시 적용하지 않는다.
+                return
             refs = self._selection(arm, proof, self._records())
             if refs is None:
                 return
             self.recheck()
-            claim = 'control-claimed-' + arm['nonce'] + '.json'
-            self.write(claim, {'nonce': arm['nonce'], 'call_hmac_sha256': proof['call_hmac_sha256']})
+            try:
+                self.write(claim, {'schema': 'guard-rank-rpc-claim/1', 'nonce': arm['nonce'],
+                    'arm_sha256': arm_sha, 'context': proof['context'],
+                    'parent_object_hmac_sha256': proof['rpc_parent_object_hmac_sha256'],
+                    'call_hmac_sha256': proof['call_hmac_sha256']})
+            except FileExistsError:
+                if self._consumed(claim, arm, arm_sha, proof):
+                    return
+                raise
             ready = {'schema': 'guard-rank-rpc-ready/1', 'nonce': arm['nonce'], 'fault_kind': arm['fault_kind'],
                 'arm_sha256': arm_sha, 'context': proof['context'], 'call_hmac_sha256': proof['call_hmac_sha256'],
                 'parent_call_hmac_sha256': proof['rpc_parent_call_hmac_sha256'],

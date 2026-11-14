@@ -1,3 +1,10 @@
+## 2026-11-14 — 실제 기준 TP2 지연/재개·새 세대 정상과 후속 단계 진단 보수
+
+- 한 일: source70f2607a/8761acb0를 실제 기준 GPU 이미지에 설치해 정상 source/RPC/ID/초기IPC 자격 뒤 rank0에 pidfd SIGSTOP을 보냈다. 실제 S→T, 같은 전체 문맥의 SIGCONT/T→S와 시각 순서를 별도 HMAC 영수증으로 확인했고 해당 요청HTTP200·새 Pod/프로세스 세대 정상HTTP200을 확인했다. 원 ZIP101,251 bytes/SHAafce6cca와 fault24/복구12 snapshot을 반출했다. 원 실행의 후속 모델 단계에서 이미 사용한 nonce claim을 재확인하며 진단1개가 나와 전체 자격 통과로 세지 않는다.
+- 테스트 결과: 물리 적용/재개·클라이언트·새 세대 정상 사실과 모든 control HMAC은 확인했다. fault source23행/진단1개, recovery12행/진단0개를 원본대로 보존한다. 보수 뒤 직접 영향/경로131개 통과(pytest4.78초·벽시계4.983초), 기준Python 새67개 통과(pytest2.35초). 같은 ARM SHA/문맥/부모 객체에 결합된 정확 claim만 소비 완료로 인식해 후속 호출에 재적용하지 않으며, 잘못된 claim은 진단/무주입으로 거부하는 회귀를 추가했다. 기존 READY/파일/nonce/물리 적용 검사를 완화하지 않았다. 새 목록 자체SHA30f4ea1d/548파일에 결정5 정확 행을 추가한다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 수정 묶음과 원 실패를 같은 draft PR에 반영하고 새 준비물/세션으로 기준 지연을 다시 검증한다. 원 진단을 지우거나 PASS/완료로 바꾸지 않는다. 통과한 자격에서만 나머지 두 판본 사례와 새 세대 정상/입력 정합성 검토를 계속한다.
+- 막힌 것: 첫 실행의 물리 사실은 유효하지만 source 진단1개 때문에 전체 자격은 미완료다. 독립 클라이언트200을 장애 오류 전달로 만들지 않고 scope_complete/인증/등록=false를 유지한다. 나머지5개 실제 사례·A 입력52쪽/전체136쪽·전체69개 실증은 남았다. 동일 신규 노드는 재개 상태이며 예산 감시를 유지한다. M-B4 보관/runtime/contracts 무변경을 유지한다.
+
 ## 2026-11-14 — 일회용 nonce·pidfd 신호·독립 해제 감시의 CPU 묶음
 
 - 한 일: private ARM/READY/action의 HMAC·정확 세대/설정/자산·원 CALL/API ID·rank0/TP2를 결합하고 일회용 claim/만료/취소를 분리했다. 예외 주입 경계는 CONTROL_RAISE/original_invoked=false로 원 함수 실행과 구분한다. 실제 초기 IPC/정상 nonce 관측 후 같은 UID/PID namespace의 pidfd만 대상으로 하는 actor와 별도 resume lease를 구현했다. 신호 전 잠재 stop 의도를 전달해 actor 사망/lease 만료에도 pending SIGSTOP를 지우며 death에는 CONT를 보내지 않는다. 새 자원/이미지/의존성/판정/등록은 추가하지 않았다.

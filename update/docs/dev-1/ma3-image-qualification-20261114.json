@@ -273,5 +273,49 @@
     "producer_registered": false,
     "기존_IPC_소스_행": "원4파일/7함수 행 그대로",
     "과거_실제_원_기록_재검증": "각3개·gaps0"
+  },
+  "실제_기준_TP2_지연_첫_실행": {
+    "실행_소스": "8761acb0865a7a83273b9a9b7a8452e68a1674f4",
+    "검토_소스_SHA256": "70f2607a7b02c25fcf5a3c6765c475c4a9385add73e9d9619c48643b2ffb3072",
+    "로컬_대조": {
+      "archive": "rpc-baseline-delay-v1.zip",
+      "bytes": 101251,
+      "sha256": "afce6cca551cba7acb7d31c86fedb088d8bdba9e049a58b468316f323d845856",
+      "stages": {
+        "fault": {
+          "snapshots": 24,
+          "source_rows_verified": 23,
+          "gaps": [
+            "RANK_RPC_CONTROL_UNAVAILABLE"
+          ],
+          "controls_hmac_verified": 9,
+          "physical_stop_verified": true,
+          "physical_resume_verified": true,
+          "client_status": 200,
+          "scope_complete": false
+        },
+        "recovery": {
+          "snapshots": 12,
+          "source_rows_verified": 12,
+          "gaps": [],
+          "controls_hmac_verified": 1,
+          "new_generation_normal_request_observed": true,
+          "client_status": 200
+        }
+      },
+      "overall_qualified": false,
+      "reason": "동일 요청의 후속 모델 단계에서 이미 claim한 nonce의 진단1건. 원본 보존·수정 뒤 재실행 필요.",
+      "fault_context": {
+        "boot_sha256": "71e7366d577f600ec34dc6f0475579ca756a4cf8339908f2031ac83512c25ddc",
+        "pid": 107,
+        "pid_namespace": 4026534619,
+        "start_ticks": 23976,
+        "time_namespace": 4026531834,
+        "time_offsets_sha256": "bd9f74ac5eaa3df538867b32ee7d9240020020a199963645d7ab92f008209ac5",
+        "uid": 2000
+      }
+    },
+    "registered": false,
+    "official": false
   }
 }

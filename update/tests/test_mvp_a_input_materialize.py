@@ -28,7 +28,10 @@ def test_materialized_files_are_valid_without_invented_binding_or_results(tmp_pa
     original = json.loads(tool.PLAN.read_bytes())
     out = tmp_path / 'materialized'
     manifest, plan = tool.materialize(out, audit_file=audit)
-    assert len(manifest['prepared']) == 16 and len(manifest['cases']) == 6
+    assert len(manifest['prepared']) == 16 and len(manifest['cases']) == 10
+    assert sum(r['count'] for r in manifest['cases']) == 2078
+    timing_parts = [r for r in manifest['cases'] if r['check_id'] == 'REQ-17']
+    assert len(timing_parts) == 4 and all(r['count'] == 504 for r in timing_parts)
     assert len({row['session'] for row in manifest['prepared']}) == 16
     assert not manifest['ready_for_execution'] and not manifest['input_preflight_passed']
     assert not manifest['engine_executed'] and manifest['actual_results'] is None
@@ -49,7 +52,8 @@ def test_materialized_files_are_valid_without_invented_binding_or_results(tmp_pa
         assert sha256_hex((Path(row['path']).parent / 'settings.json').read_bytes()) == row['settings_file_sha256']
     for row in manifest['cases']:
         assert sha256_hex(Path(row['path']).read_bytes()) == row['sha256']
-        projection.validate_cases(row['check_id'], json.loads(Path(row['path']).read_bytes()))
+        value = json.loads(Path(row['path']).read_bytes())
+        projection.validate_cases(row['check_id'], value['cases'] if row.get('format') else value)
     values = yaml.safe_load(tool.CONFIRMED.read_bytes())['verification']['values']
     draft = yaml.safe_load(Path(manifest['policy_input_draft']).read_bytes())
     for check, fields in values.items():

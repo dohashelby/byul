@@ -12,6 +12,7 @@ from guard.collectors import engine_callbacks
 from guard.executors import engine_callback_projection as projection
 from guard.models import canonical_json, load_pack, sha256_hex
 from tools import gpu_a_run_inputs
+from tools import gpu_a_req17_cohort
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAN = ROOT / 'docs/dev-1/ma7-session-input-plan.json'
@@ -37,7 +38,9 @@ def _timing_requirements(values):
     return {'minimum_per_scored_role': minimum, 'scored_roles': 4,
         'minimum_scored_cases': 4 * minimum, 'single_manifest_max_cases': projection.MAX_CASES,
         'fits_single_manifest': 4 * minimum <= projection.MAX_CASES,
-        'collection_or_judgment_changed': False}
+        'collection_or_judgment_changed': False, 'unchanged_scope': '기존 단일 수집 계약·판정 계산식',
+        'split_collection_added': True, 'split_parts': 2, 'split_cases_per_part': 504,
+        'split_scored_samples_per_role': 200}
 
 
 def materialize(output, *, plan_file=PLAN, audit_file=SUP08_AUDIT):
@@ -125,6 +128,17 @@ def materialize(output, *, plan_file=PLAN, audit_file=SUP08_AUDIT):
                                 cases_preset=PRESETS[check])
                     case_rows.append({'check_id': check, 'side': side, 'count': len(cases),
                         'path': str(path), 'sha256': item['cases_file_sha256']})
+                if check == 'REQ-17':
+                    group_path = folder / 'cohorts'
+                    group, cohorts = gpu_a_req17_cohort.write_split(group_path, 26111401)
+                    gpu_a_req17_cohort.load_split(group_path / 'group.json')
+                    item.update(cases_file=str(group_path / 'group.json'), cases_preset='req17-split-100',
+                        cases_file_sha256=sha256_hex((group_path / 'group.json').read_bytes()),
+                        split_group_contract=True)
+                    for entry, cohort in zip(group['parts'], cohorts, strict=True):
+                        case_rows.append({'check_id': check, 'side': side, 'part_index': entry['index'],
+                            'count': len(cohort['cases']), 'path': str(group_path / entry['file']),
+                            'sha256': entry['file_sha256'], 'format': gpu_a_req17_cohort.SCHEMA})
                 item['reason'] = '로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.'
                 row['input_state'] = '로컬 prepared 준비·실제 ENV/target 미입력'
             if check == 'SUP-08':
@@ -144,9 +158,9 @@ def materialize(output, *, plan_file=PLAN, audit_file=SUP08_AUDIT):
         'input_preflight_passed': False}
     plan['input_materialization']['REQ17_timing_requirements'] = timing
     for row in a_rows:
-        if row['check_id'] == 'REQ-17' and not timing['fits_single_manifest']:
-            row['case_generation_deferred'] = True
-            row['collection_plan_blockers'] = ['REQ17_MINIMUM_PER_ROLE_EXCEEDS_SINGLE_MANIFEST_BOUND']
+        if row['check_id'] == 'REQ-17':
+            row['case_generation_deferred'] = False
+            row['collection_plan_blockers'] = ['ACTUAL_ENV_TARGET_AND_RUNTIME_QUALIFICATION_REQUIRED']
     manifest = {'schema': 'guard-ma7-local-materialization/1', 'scope': 'M-A 미결합 로컬 입력 준비',
         'source_plan_sha256': sha256_hex(source_raw), 'pack_ref': pack.ref().model_dump(mode='json'),
         'generator_source_sha256': sha256_hex(Path(__file__).read_bytes()),

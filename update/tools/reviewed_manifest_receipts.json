@@ -97,9 +97,34 @@
       "reviewed_at": "2026-11-13T22:05:03.663253+09:00"
     },
     {
+      "manifest_sha256": "d44e81cb2b656a1535f34c7ab451ccaf4d4979748495f5b4d9ea3990a9d31dc0",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T01:11:06+09:00"
+    },
+    {
+      "manifest_sha256": "79c6ba9e6ec81f233035e30c282c56bcde8a43d73b9e2c619034c93f25e48678",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T01:14:27+09:00"
+    },
+    {
+      "manifest_sha256": "1f38a671b55adddca5e3d26333c970d0a0ce7ae57cf10069b64db513230c2d2d",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T01:18:39+09:00"
+    },
+    {
+      "manifest_sha256": "32733555edc8280e109ed2339e33a7d4f613641d1252d34d96f6b158dda186da",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T01:22:39+09:00"
+    },
+    {
       "manifest_sha256": "5e37c01a1a86aa353a2991383598d2d57f7ce5c82ab2cab1c5ca8792e3b4c657",
       "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-14T02:51:09.613137+09:00"
+    },
+    {
+      "manifest_sha256": "1946073c54a7165920e855820d36d02405d81bf18aa3bdb1bd88d1d08f72b1ae",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T11:57:44.240356+09:00"
     }
   ]
 }

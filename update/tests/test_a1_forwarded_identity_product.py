@@ -16,7 +16,7 @@ from guard.executors.forwarded_identity_contract import FIELDS,SCHEMA,normalize_
 from guard.executors.owned_capture import _FILE_READER
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.store import Store
-from tests.run_binding_support import for_pack
+from tests.run_binding_support import for_pack, run_table_toml
 from tests.builders import baseline_pack,policy,T0
 from tests.test_kubernetes_routes import inputs as route_inputs,World as RouteWorld
 from tests.test_stream_probe import _server
@@ -116,7 +116,7 @@ def test_registered_cli_issuer_claims_errors_and_exact_ref_roundtrip(tmp_path,mo
         (tmp_path/(name+'.json')).write_bytes(canonical_json(value))
     cfg=tmp_path/'guard.toml';cfg.write_text('[executors]\nforwarded_identity="kubernetes"\n[adapter]\nname="vllm"\n[forwarded_identity]\ntarget='
         +json.dumps(str(tmp_path/'target.json'))+'\nroles={allowed="REQ04_KEY"}\n[forwarded_identity.header]\n'
-        +''.join(k+'='+json.dumps(v)+'\n' for k,v in HEADER.items()),encoding='utf-8')
+        +''.join(k+'='+json.dumps(v)+'\n' for k,v in HEADER.items())+run_table_toml(pack,'REQ-04',values),encoding='utf-8')
     monkeypatch.setattr(http,'capture_pipes',world.runner);monkeypatch.setattr(product,'capture_pipes',world.runner)
     def forbidden(*a,**kw):raise AssertionError('unexpected runtime')
     monkeypatch.setattr(subprocess,'Popen',forbidden);monkeypatch.setattr(socket,'socket',forbidden)

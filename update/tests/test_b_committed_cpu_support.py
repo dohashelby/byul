@@ -17,6 +17,7 @@ from guard.judges.rule_table import RuleTableJudge
 from guard.models import DataOrigin, ExecStatus, canonical_json, load_pack, sha256_hex
 from guard.store import Store
 from guard.store.packs import put_pack
+from tests.run_binding_support import fixed_transition, transition_table
 from tests.builders import evidence, policy
 from tests import test_lifecycle_transition as lif
 from tests import test_kubernetes_template_supply as sup
@@ -155,14 +156,16 @@ def test_existing_two_registry_factories_to_exact_A_artifacts_EVD_RES_RPT(tmp_pa
     values={'transition_inputs_sha256':nested['transition_inputs_sha256'],
         **{f'transition_{p}_at':nested['transition_sample_at'][p] for p in lif.subject.PHASES},
         **{f'transition_{p}_generation':nested['transition_phase_generation'][p] for p in lif.subject.PHASES}}
+    # @36: LIF-06 transition values are run-preparation values, not policy values (RB2).
     pol=policy(PACK.ref(),scope={'include':['LIF-06','SUP-03']},values={
-        'LIF-06':values,'SUP-03':deepcopy(sup.VALUES)})
+        'LIF-06':{},'SUP-03':deepcopy(sup.VALUES)})
     store=Store(tmp_path/'store');put_pack(store,ROOT/'packs/PACK-BASELINE');store.put_many([env,pol])
     plan=select(PACK,[env],pol);store.put(plan)
     raw={'lifecycle_transition':{'cpu_support_input':descriptor()},
-         'template_validation':{**sup_cfg,'cpu_support_input':descriptor()}}
+         'template_validation':{**sup_cfg,'cpu_support_input':descriptor()},**transition_table('LIF-06',values)}
     original=deepcopy(raw)
-    evds=run_plan(store,PACK,plan,RunConfig(executors={'lifecycle_transition':'kubernetes','template_validation':'kubernetes'},adapter='vllm',raw=raw))
+    with fixed_transition(values):
+        evds=run_plan(store,PACK,plan,RunConfig(executors={'lifecycle_transition':'kubernetes','template_validation':'kubernetes'},adapter='vllm',raw=raw))
     assert raw==original and len(evds)==2
     for evd in evds:
         by_name={a.name:a for a in evd.artifacts}

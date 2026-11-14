@@ -2,7 +2,7 @@ id: OBS-06
 framework_id: CHK-OBS-006
 mechanism_ids:
 - mechanism-14
-revision: 7
+revision: 8
 retired: false
 area: OBS
 purpose: 저장 자료 보호
@@ -17,9 +17,6 @@ applies_when:
   prose: 저장 로그·기록의 독자와 반출 권한을 기본 확인한다. 선택 진단·usage 사본은 실제 생성·보존 경로별로 추가한다. 저장 위치·자료 등급별 암호화 요구와 복호화 권한을 확인한다. 요구나 실제 설정이 미정이면 해당 결과를 미확인으로 남긴다.
 policy_params:
 - key: record_subject_plan_sha256
-  type: str
-  required: true
-- key: record_inventory_session
   type: str
   required: true
 - key: record_inventory_source_sha256

@@ -2,7 +2,7 @@ id: REQ-06
 framework_id: CHK-REQ-006
 mechanism_ids:
 - mechanism-01
-revision: 6
+revision: 7
 retired: false
 area: REQ
 purpose: 작업·대상 인가
@@ -16,9 +16,6 @@ impact: MEDIUM
 applies_when:
   prose: 조회·취소할 수 있는 저장 Responses/결과 객체를 지원·사용할 때 적용한다. 메모리 저장도 포함하며 일반 요청의 내부 collector와 구분한다.
 policy_params:
-- key: stored_session
-  type: str
-  required: true
 - key: stored_identity_policy_sha256
   type: str
   required: true

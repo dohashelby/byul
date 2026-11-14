@@ -207,11 +207,12 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         return stopped(ExecStatus.ABORTED, cfg.abort_reason)
     from guard.executors import run_binding
     if run_binding.keys_for(check):
-        # Per-run technical binding (guard-run-binding/1): computed by guard, never a policy value.
+        # Per-run technical binding (guard-run-binding/1, /2): computed by guard, never a policy value.
         try:
             binding, policy_values = run_binding.effective_values(
                 check, cfg.raw.get(item.executor, {}), env, policy_values, side=str(common["side"].value),
-                attempt_id=cfg.attempt_id, issued_at=utcnow(), valid_from=policy_validity[0], valid_until=policy_validity[1])
+                attempt_id=cfg.attempt_id, issued_at=utcnow(), valid_from=policy_validity[0], valid_until=policy_validity[1],
+                run_cfg=run_binding.run_config(cfg.raw, check.id))
         except ValueError as exc:
             code = str(exc) if str(exc).startswith("RUN_BINDING_") else "RUN_BINDING_UNAVAILABLE"
             return stopped(ExecStatus.NOT_RUN, code)

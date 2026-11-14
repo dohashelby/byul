@@ -4,9 +4,6 @@ policy_params:
 - key: observation_state_required_components
   type: list[str]
   required: true
-- key: identity_record_session
-  type: str
-  required: true
 - key: identity_record_source_sha256
   type: str
   required: true

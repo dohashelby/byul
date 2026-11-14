@@ -2,7 +2,7 @@ id: LIF-09
 framework_id: CHK-LIF-009
 mechanism_ids:
 - mechanism-10
-revision: 7
+revision: 8
 retired: false
 area: LIF
 purpose: 기동 준비 확인
@@ -21,9 +21,6 @@ policy_params:
   required: true
 - key: init_expected_ranks
   type: list[str]
-  required: true
-- key: init_scenario_sha256
-  type: str
   required: true
 - key: init_phase
   type: str

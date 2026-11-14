@@ -3,13 +3,6 @@
 applies_when: { always: true }
 collection_profile: explicit-forbidden-egress-v1
 policy_params:
-  - { key: subject_scope, type: str, required: true }
-  - { key: subject_container_id, type: str, required: true }
-  - { key: subject_uid, type: int, required: true }
-  - { key: subject_net_namespace_inode, type: int, required: true }
-  - { key: forbidden_receiver_container_id, type: str, required: true }
-  - { key: forbidden_receiver_ip, type: str, required: true }
-  - { key: forbidden_receiver_port, type: int, required: true }
   - { key: forbidden_protocol, type: str, required: true }
   - { key: forbidden_operation, type: str, required: true }
 required_observations:

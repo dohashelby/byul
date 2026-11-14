@@ -4,7 +4,7 @@ mechanism_ids:
 - mechanism-11
 - mechanism-15
 - mechanism-16
-revision: 7
+revision: 8
 retired: false
 area: PLT
 purpose: 통신 접근·송신 제한
@@ -19,27 +19,6 @@ applies_when:
   always: true
   prose: 취득·엔진 실행·관측의 외부 송신을 기본 확인한다. 외부 연결이 불필요한 구성도 금지 송신의 집행을 확인한다.
 policy_params:
-- key: subject_scope
-  type: str
-  required: true
-- key: subject_container_id
-  type: str
-  required: true
-- key: subject_uid
-  type: int
-  required: true
-- key: subject_net_namespace_inode
-  type: int
-  required: true
-- key: forbidden_receiver_container_id
-  type: str
-  required: true
-- key: forbidden_receiver_ip
-  type: str
-  required: true
-- key: forbidden_receiver_port
-  type: int
-  required: true
 - key: forbidden_protocol
   type: str
   required: true

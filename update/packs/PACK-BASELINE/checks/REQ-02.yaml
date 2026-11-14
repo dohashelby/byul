@@ -2,7 +2,7 @@ id: REQ-02
 framework_id: CHK-REQ-002
 mechanism_ids:
 - mechanism-01
-revision: 5
+revision: 6
 retired: false
 area: REQ
 purpose: 작업·대상 인가
@@ -15,13 +15,7 @@ review_order: conditional_when_selected
 impact: HIGH
 applies_when:
   prose: root_path·경로 prefix·Gateway/프록시 재작성이 있을 때 적용한다. 재작성 비사용은 기본 route 인증 점검의 제외 사유가 아니다.
-policy_params:
-- key: route_session
-  type: str
-  required: true
-- key: route_file_sha256
-  type: str
-  required: true
+policy_params: []
 policy_prose:
   policy_to_decide: 허용 경로·프록시 재작성 규칙
   enterprise_decisions: 인증 방식·실제 계정, 사용자/조직별 모델·작업 허용표, 직통 허용 주체·목적, 관리 역할, Gateway의 신원 전달·경로 변환과 선택 API. 저장 결과 기능을 쓰면 객체 소유자·조회·취소 권한도 결정한다.

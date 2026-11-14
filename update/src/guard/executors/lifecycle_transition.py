@@ -109,6 +109,35 @@ class Generation:
     reader: object = None
 
 
+def _manifest_row(key, env, target, prepared):
+    return {'id': key, 'environment_ref': env.ref().model_dump(mode='json'),
+        'target_sha256': sha256_hex(canonical_json(target)), 'prepared_sha256': sha256_hex(canonical_json(prepared))}
+
+
+def inputs_manifest(cfg):
+    """`transition_inputs_sha256` source for guard-run-binding/2: the same rows load_generations hashes.
+
+    Only loads the configured files; load_generations still validates them and
+    compares this hash again when the executor actually reads them.
+    """
+    from guard.collectors.lifecycle import load_prepared
+    try:
+        rows = cfg['generations']
+        if type(rows) is not list or not 1 <= len(rows) <= 4:
+            raise ValueError
+        manifest = []
+        for row in rows:
+            if type(row) is not dict or set(row) != {'id', 'target', 'prepared', 'environment'}:
+                raise ValueError
+            with Path(row['target']).open('rb') as stream:
+                target = strict_json(stream.read(65537), limit=65536)
+            manifest.append(_manifest_row(row['id'], load_environment(Path(row['environment'])), target,
+                                          load_prepared(row['prepared'])))
+        return manifest
+    except (KeyError, TypeError, ValueError, OSError, RuntimeError):
+        raise ValueError('TRANSITION_CONFIGURATION_INVALID') from None
+
+
 def load_generations(cfg, env, values):
     """Load only already prepared targets. No discovery or replacement fallback."""
     from guard.collectors.lifecycle import load_prepared
@@ -142,8 +171,7 @@ def load_generations(cfg, env, values):
             from guard.collectors.model_read_scope import validate_binding
             validate_binding(prepared, selected_env, native)
             generations[row['id']] = Generation(row['id'], selected_env, target, native, prepared)
-            manifest.append({'id': row['id'], 'environment_ref': selected_env.ref().model_dump(mode='json'),
-                'target_sha256': sha256_hex(canonical_json(target)), 'prepared_sha256': sha256_hex(canonical_json(prepared))})
+            manifest.append(_manifest_row(row['id'], selected_env, target, prepared))
         if sha256_hex(canonical_json(manifest)) != values['transition_inputs_sha256']:
             raise ValueError
         if set(values['transition_phase_generation'].values()) - set(generations):

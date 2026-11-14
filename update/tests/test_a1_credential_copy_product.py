@@ -12,7 +12,7 @@ from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.models import canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
 from guard.store import Store
-from tests.run_binding_support import for_pack
+from tests.run_binding_support import for_pack, run_table_toml
 from tests.builders import baseline_pack,policy,T0
 from tests.test_a1_credential_copy_contract import example
 from tests.test_a1_required_event_product import World as OriginalWorld,PRIVATE
@@ -97,7 +97,7 @@ def test_existing_registry_cli_copy_records_and_exact_refs(tmp_path,monkeypatch,
     for name,value in [('environment',environment.to_dict()),('policy',pol.to_dict()),('target',world.target)]:
         (tmp_path/(name+'.json')).write_bytes(canonical_json(value))
     cfg=tmp_path/'guard.toml';cfg.write_text('[executors]\nrequired_event_record="kubernetes"\n[adapter]\nname="vllm"\n[required_event_record]\ntarget='
-        +json.dumps(str(tmp_path/'target.json'))+'\ncopy_inventory='+json.dumps(str(inventory_path))+'\n',encoding='utf-8')
+        +json.dumps(str(tmp_path/'target.json'))+'\ncopy_inventory='+json.dumps(str(inventory_path))+'\n'+run_table_toml(pack,'PLT-12',values),encoding='utf-8')
     runner=CliRunner();common=['--store',tmp_path/'store','--config',cfg]
     def cli(args,code=0):
         result=runner.invoke(app,list(map(str,args)));assert result.exit_code==code,(args,result.output,result.exception)

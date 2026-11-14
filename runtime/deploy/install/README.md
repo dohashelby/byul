@@ -1,5 +1,7 @@
 # 런타임 노드 설치
 
+새 서버의 토큰·첫 LAB 묶음·update 의존성·모델/digest·GID 연결은 [첫 설치 준비](첫_설치_준비.md)를 먼저 따른다.
+
 AWS 5–8회차의 계정·권한·baseline·systemd 수동 절차를 묶은 **호스트 설치기**다. 클러스터, 엔진, Gateway, sentinel, CRI 도구를 배포하지 않는다. 플랫폼·에이전트는 같은 판을 사용한다. 실제 서버 설치·재부팅 검증은 별도다.
 
 1. Python 3.12 이상과 venv 모듈, sudo(인자 정규식 지원 1.9.10 이상), systemd/systemd-analyze, visudo, kubectl, 계정 관리 도구를 준비한다. `crictl`이 없으면 설치기는 중단한다. 운영자가 버전·체크섬을 확인해 별도 설치하고 `/etc/crictl.yaml`의 CRI endpoint를 검수한다. 설치기는 자동 다운로드하지 않는다.

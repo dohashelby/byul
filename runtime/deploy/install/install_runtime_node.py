@@ -418,12 +418,14 @@ def validate_baseline(path, config):
 
 
 def group_check(name, gid):
+    setting = {"serving-bundles": "GATEWAY_DATA_GID", "serving-observe": "OBSERVE_GID"}[name]
+    guidance = f" {setting}에 사용하지 않는 양수 GID를 지정하고 Gateway·수집기의 그룹도 맞추세요."
     try:
-        require(grp.getgrgid(gid).gr_name == name, "공유 GID가 다른 그룹과 충돌합니다.")
+        require(grp.getgrgid(gid).gr_name == name, "공유 GID가 다른 그룹과 충돌합니다." + guidance)
     except KeyError:
         pass
     try:
-        require(grp.getgrnam(name).gr_gid == gid, "공유 그룹 이름이 다른 GID와 충돌합니다.")
+        require(grp.getgrnam(name).gr_gid == gid, "공유 그룹 이름이 다른 GID와 충돌합니다. 기존 그룹의 GID를 " + setting + "에 지정하세요.")
     except KeyError:
         pass
 

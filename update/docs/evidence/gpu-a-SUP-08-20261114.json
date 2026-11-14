@@ -1,0 +1,534 @@
+{
+  "schema": "byul-gpu-a-check-summary/1",
+  "date_kst": "2026-11-14",
+  "check_id": "SUP-08",
+  "scope": "정본 @34·revision5, 두 고정 GPU 이미지의 코드 선택 한 점검",
+  "enterprise_approval_claimed": false,
+  "judge_and_policy_rules_weakened": false,
+  "notes": [
+    "원본 EVD/RES를 저장소에서 읽어 그대로 보존했다.",
+    "공식 재판정·전체69개 완료가 아니다."
+  ],
+  "runs": [
+    {
+      "run": "sup08-canonical-20261114/baseline",
+      "evidence_kind": "automated",
+      "official": false,
+      "pack_ref": {
+        "kind": "PACK",
+        "id": "PACK-BASELINE",
+        "revision": 34,
+        "sha256": "cf95f6709b635a6b14cc4a8ceaef5843bd0eb1bd4294c63e29d815626b8c1b0b"
+      },
+      "results": [
+        {
+          "kind": "RES",
+          "id": "RES-01M7CE9786481FWFGNTKW8F6QJ",
+          "revision": 1,
+          "created_at": "2026-11-14T07:10:23Z",
+          "data_origin": "EXAMPLE",
+          "content_sha256": "f01f213733ab078cabb90a488a495bc1aff34c9076f0307f61f9521aa27d4520",
+          "refs": [
+            {
+              "kind": "EVD",
+              "id": "EVD-01M7CE8NAEJR8D0SS4AQVKV2HV",
+              "revision": 1,
+              "sha256": "eead284c58b01003d0cd027543504bc1c32556dab41be890724b30dae352043c"
+            },
+            {
+              "kind": "POL",
+              "id": "POL-01M7CE8MEK7AX6H9MZ7F7W1GVC",
+              "revision": 1,
+              "sha256": "ad8678e4152452ea8973e8e4e7ad55ce6dd83877008ade41c7e1c6a9dbb94684"
+            }
+          ],
+          "evidence": {
+            "kind": "EVD",
+            "id": "EVD-01M7CE8NAEJR8D0SS4AQVKV2HV",
+            "revision": 1,
+            "sha256": "eead284c58b01003d0cd027543504bc1c32556dab41be890724b30dae352043c"
+          },
+          "check_id": "SUP-08",
+          "side": "baseline",
+          "judge": {
+            "name": "rule_table",
+            "version": "0.5.0",
+            "params_sha256": "8ba00142c9bfcfeac7c3d8651eaf4008a9c1a3acf92c0d213fe5032c4048e1c0"
+          },
+          "verdicts": {
+            "security": "PASS",
+            "functional": "PASS",
+            "performance": "UNKNOWN"
+          },
+          "reasons": [
+            "security: all pass rules met: code_selection_forbidden eq True; code_selection_resolved_fields superset_of <code_selection_fields_planned>; code_selection_unverified_fields empty; code_selection_confirmed_violations empty",
+            "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+            "performance: no rule for this axis"
+          ],
+          "missing_observations": [],
+          "exception": null,
+          "verification_level": "MEASURED"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "EVD",
+          "id": "EVD-01M7CE8NAEJR8D0SS4AQVKV2HV",
+          "revision": 1,
+          "created_at": "2026-11-14T07:10:11Z",
+          "data_origin": "MEASURED",
+          "content_sha256": "eead284c58b01003d0cd027543504bc1c32556dab41be890724b30dae352043c",
+          "refs": [
+            {
+              "kind": "PLAN",
+              "id": "PLAN-01M7CE8MV571R4YDAV4AB2H3JQ",
+              "revision": 1,
+              "sha256": "065bde22dec37af50d23432bba22ebe68129c7b47035989ca176b5d5d04f15b9"
+            },
+            {
+              "kind": "ENV",
+              "id": "ENV-01M7CDX1TFH3N8SJ09442AEEQT",
+              "revision": 1,
+              "sha256": "3e9c870a0e67d8b6d66b0b6c8fa3712af45296d673832b5cb997fb1086921017"
+            }
+          ],
+          "plan": {
+            "kind": "PLAN",
+            "id": "PLAN-01M7CE8MV571R4YDAV4AB2H3JQ",
+            "revision": 1,
+            "sha256": "065bde22dec37af50d23432bba22ebe68129c7b47035989ca176b5d5d04f15b9"
+          },
+          "check_id": "SUP-08",
+          "side": "baseline",
+          "environment": {
+            "kind": "ENV",
+            "id": "ENV-01M7CDX1TFH3N8SJ09442AEEQT",
+            "revision": 1,
+            "sha256": "3e9c870a0e67d8b6d66b0b6c8fa3712af45296d673832b5cb997fb1086921017"
+          },
+          "execution": {
+            "status": "COMPLETED",
+            "executor": {
+              "name": "input_validation",
+              "version": "0.10.0",
+              "config_sha256": "37d8a4d511c3ce66c881afb7ce3adb22d941ba33d07f909607c44dedbc853c2d"
+            },
+            "adapter": {
+              "name": "vllm",
+              "version": "0.5.0"
+            },
+            "started_at": "2026-11-14T07:10:05Z",
+            "finished_at": "2026-11-14T07:10:11Z",
+            "abort_reason": null,
+            "attempt_id": "ATTEMPT-01M7CE8N92SW6QC768RVBF5M51"
+          },
+          "normal_control": {
+            "attempted": true,
+            "succeeded": true,
+            "detail": "challenge 전후 같은 정상 요청을 대조"
+          },
+          "challenges": [
+            {
+              "step": "선정 엔진의 요청→코드 선택→소비 경로와 실제 지원 필드 확인",
+              "attempted": true,
+              "observations": {}
+            },
+            {
+              "step": "금지 구성에서 무해한 비허용 판본 선택의 거부·제거와 정상 요청 대조",
+              "attempted": true,
+              "observations": {}
+            },
+            {
+              "step": "허용 구성에서는 승인 안/밖 판본을 대조하고 최종 소비 코드 확인",
+              "attempted": true,
+              "observations": {}
+            }
+          ],
+          "observations": {
+            "code_selection_confirmed_violations": {
+              "value": [],
+              "collected": true
+            },
+            "code_selection_fields_planned": {
+              "value": [
+                "mm_processor_kwargs.code_revision"
+              ],
+              "collected": true
+            },
+            "code_selection_final_code_verified": {
+              "value": true,
+              "collected": true
+            },
+            "code_selection_forbidden": {
+              "value": true,
+              "collected": true
+            },
+            "code_selection_ignored_fields": {
+              "value": [
+                "mm_processor_kwargs.code_revision"
+              ],
+              "collected": true
+            },
+            "code_selection_rejected_fields": {
+              "value": [],
+              "collected": true
+            },
+            "code_selection_resolved_fields": {
+              "value": [
+                "mm_processor_kwargs.code_revision"
+              ],
+              "collected": true
+            },
+            "code_selection_trials": {
+              "value": [
+                {
+                  "field": "mm_processor_kwargs.code_revision",
+                  "module_evidence": {
+                    "approved_revisions_present": [
+                      "a239c75031d0d32a44f2a89135f574c2318244de"
+                    ]
+                  },
+                  "outcome": "200",
+                  "request_fixture_sha256": "f97648147a9d79d47eb4270e09da7c6c0d225f2bc2129f8bdc24cd949f6ee78c",
+                  "state": "ignored"
+                }
+              ],
+              "collected": true
+            },
+            "code_selection_unverified_fields": {
+              "value": [],
+              "collected": true
+            },
+            "functional_probe_results": {
+              "value": {
+                "after-0": "pass",
+                "before": "pass"
+              },
+              "collected": true
+            },
+            "functional_probes_planned": {
+              "value": [
+                "before",
+                "after-0"
+              ],
+              "collected": true
+            }
+          },
+          "artifacts": [
+            {
+              "name": "probe_log.jsonl",
+              "path": "artifacts/ef96d8e867bd878da3ab3246806ab375add2c54428419d4b3a4e5182bb2e53ff",
+              "sha256": "ef96d8e867bd878da3ab3246806ab375add2c54428419d4b3a4e5182bb2e53ff",
+              "bytes": 3197,
+              "collected_at": "2026-11-14T07:10:11Z",
+              "collector": "input_validation/0.10.0"
+            }
+          ],
+          "comparability": {
+            "model_inventory_sha256": "c2dd67477c1899b775e5fa0d0585861e62166ff94c7b94a7c8ba531c2756ac52",
+            "fixture_sha256": "92050000a09280d1d36f440b099b02a18c7ffe9970711c102a99b846959165ca",
+            "config_sha256": "37d8a4d511c3ce66c881afb7ce3adb22d941ba33d07f909607c44dedbc853c2d",
+            "gpu": "NVIDIA L4",
+            "driver": "595.112.07"
+          }
+        }
+      ]
+    },
+    {
+      "run": "sup08-canonical-20261114/candidate",
+      "evidence_kind": "automated",
+      "official": false,
+      "pack_ref": {
+        "kind": "PACK",
+        "id": "PACK-BASELINE",
+        "revision": 34,
+        "sha256": "cf95f6709b635a6b14cc4a8ceaef5843bd0eb1bd4294c63e29d815626b8c1b0b"
+      },
+      "results": [
+        {
+          "kind": "RES",
+          "id": "RES-01M7CE978C9M2XF5A3HC1EMFEJ",
+          "revision": 1,
+          "created_at": "2026-11-14T07:10:23Z",
+          "data_origin": "EXAMPLE",
+          "content_sha256": "a17ecf52da372ee606c80f7f43306dcef1a18f1c2b5cb33ba9f6dda19a7f6a7a",
+          "refs": [
+            {
+              "kind": "EVD",
+              "id": "EVD-01M7CE8ZMT3N17Z7M7GH1KS6CN",
+              "revision": 1,
+              "sha256": "e9d8c40cf90fa95a2822aa6ac6ba4a8c473212bb19171182f4ae093b650e0d55"
+            },
+            {
+              "kind": "POL",
+              "id": "POL-01M7CE8MEK7AX6H9MZ7F7W1GVC",
+              "revision": 1,
+              "sha256": "ad8678e4152452ea8973e8e4e7ad55ce6dd83877008ade41c7e1c6a9dbb94684"
+            }
+          ],
+          "evidence": {
+            "kind": "EVD",
+            "id": "EVD-01M7CE8ZMT3N17Z7M7GH1KS6CN",
+            "revision": 1,
+            "sha256": "e9d8c40cf90fa95a2822aa6ac6ba4a8c473212bb19171182f4ae093b650e0d55"
+          },
+          "check_id": "SUP-08",
+          "side": "candidate",
+          "judge": {
+            "name": "rule_table",
+            "version": "0.5.0",
+            "params_sha256": "8ba00142c9bfcfeac7c3d8651eaf4008a9c1a3acf92c0d213fe5032c4048e1c0"
+          },
+          "verdicts": {
+            "security": "FAIL",
+            "functional": "PASS",
+            "performance": "UNKNOWN"
+          },
+          "reasons": [
+            "security: FAIL because code_selection_confirmed_violations nonempty (observed code_selection_confirmed_violations=[{'basis': 'new import marker matches the cached module SHA-256 and was absent before the challenge', 'execution_markers': {'bd80f9e25ed91e97f4da47172241bbe008d77e99': {'bytes': 222, 'file_sha256': '3ecc792b44cb65e9f12ad66e2c29639b20806acd1e6b26a7160c332b9499f5b7', 'module_sha256': 'b81db80faec572aea7a2e37b406369eccc00d1f52f51292ecae6103e98352a6a', 'monotonic_ns': 3507377485183, 'pid': 1, 'revision': 'bd80f9e25ed91e97f4da47172241bbe008d77e99', 'schema': 'guard-code-import-marker/1'}}, 'field': 'mm_processor_kwargs.code_revision', 'module_files': {'bd80f9e25ed91e97f4da47172241bbe008d77e99': {'__init__.py': {'bytes': 0, 'sha256': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'}, 'image_processing_phi3_v.py': {'bytes': 11409, 'sha256': '8470db7ad9c2483f60ca14ed84e5eba99be0ff15b66ef9958754879b85d492bc'}, 'processing_phi3_v.py': {'bytes': 12396, 'sha256': 'b81db80faec572aea7a2e37b406369eccc00d1f52f51292ecae6103e98352a6a'}}}, 'selected_revisions': ['bd80f9e25ed91e97f4da47172241bbe008d77e99'], 'submitted_revision': 'bd80f9e25ed91e97f4da47172241bbe008d77e99'}])",
+            "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+            "performance: no rule for this axis"
+          ],
+          "missing_observations": [],
+          "exception": null,
+          "verification_level": "MEASURED"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "EVD",
+          "id": "EVD-01M7CE8ZMT3N17Z7M7GH1KS6CN",
+          "revision": 1,
+          "created_at": "2026-11-14T07:10:23Z",
+          "data_origin": "MEASURED",
+          "content_sha256": "e9d8c40cf90fa95a2822aa6ac6ba4a8c473212bb19171182f4ae093b650e0d55",
+          "refs": [
+            {
+              "kind": "PLAN",
+              "id": "PLAN-01M7CE8MV571R4YDAV4AB2H3JQ",
+              "revision": 1,
+              "sha256": "065bde22dec37af50d23432bba22ebe68129c7b47035989ca176b5d5d04f15b9"
+            },
+            {
+              "kind": "ENV",
+              "id": "ENV-01M7CDX2SM176T89P5BGHPBRHS",
+              "revision": 1,
+              "sha256": "2232a2d13061fb628454102e2233fa2d23eee2e3603af37aeb731a10c0fe236a"
+            }
+          ],
+          "plan": {
+            "kind": "PLAN",
+            "id": "PLAN-01M7CE8MV571R4YDAV4AB2H3JQ",
+            "revision": 1,
+            "sha256": "065bde22dec37af50d23432bba22ebe68129c7b47035989ca176b5d5d04f15b9"
+          },
+          "check_id": "SUP-08",
+          "side": "candidate",
+          "environment": {
+            "kind": "ENV",
+            "id": "ENV-01M7CDX2SM176T89P5BGHPBRHS",
+            "revision": 1,
+            "sha256": "2232a2d13061fb628454102e2233fa2d23eee2e3603af37aeb731a10c0fe236a"
+          },
+          "execution": {
+            "status": "COMPLETED",
+            "executor": {
+              "name": "input_validation",
+              "version": "0.10.0",
+              "config_sha256": "37d8a4d511c3ce66c881afb7ce3adb22d941ba33d07f909607c44dedbc853c2d"
+            },
+            "adapter": {
+              "name": "vllm",
+              "version": "0.5.0"
+            },
+            "started_at": "2026-11-14T07:10:15Z",
+            "finished_at": "2026-11-14T07:10:23Z",
+            "abort_reason": null,
+            "attempt_id": "ATTEMPT-01M7CE8N92SW6QC768RVBF5M51"
+          },
+          "normal_control": {
+            "attempted": true,
+            "succeeded": true,
+            "detail": "challenge 전후 같은 정상 요청을 대조"
+          },
+          "challenges": [
+            {
+              "step": "선정 엔진의 요청→코드 선택→소비 경로와 실제 지원 필드 확인",
+              "attempted": true,
+              "observations": {}
+            },
+            {
+              "step": "금지 구성에서 무해한 비허용 판본 선택의 거부·제거와 정상 요청 대조",
+              "attempted": true,
+              "observations": {}
+            },
+            {
+              "step": "허용 구성에서는 승인 안/밖 판본을 대조하고 최종 소비 코드 확인",
+              "attempted": true,
+              "observations": {}
+            }
+          ],
+          "observations": {
+            "code_selection_confirmed_violations": {
+              "value": [
+                {
+                  "basis": "new import marker matches the cached module SHA-256 and was absent before the challenge",
+                  "execution_markers": {
+                    "bd80f9e25ed91e97f4da47172241bbe008d77e99": {
+                      "bytes": 222,
+                      "file_sha256": "3ecc792b44cb65e9f12ad66e2c29639b20806acd1e6b26a7160c332b9499f5b7",
+                      "module_sha256": "b81db80faec572aea7a2e37b406369eccc00d1f52f51292ecae6103e98352a6a",
+                      "monotonic_ns": 3507377485183,
+                      "pid": 1,
+                      "revision": "bd80f9e25ed91e97f4da47172241bbe008d77e99",
+                      "schema": "guard-code-import-marker/1"
+                    }
+                  },
+                  "field": "mm_processor_kwargs.code_revision",
+                  "module_files": {
+                    "bd80f9e25ed91e97f4da47172241bbe008d77e99": {
+                      "__init__.py": {
+                        "bytes": 0,
+                        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                      },
+                      "image_processing_phi3_v.py": {
+                        "bytes": 11409,
+                        "sha256": "8470db7ad9c2483f60ca14ed84e5eba99be0ff15b66ef9958754879b85d492bc"
+                      },
+                      "processing_phi3_v.py": {
+                        "bytes": 12396,
+                        "sha256": "b81db80faec572aea7a2e37b406369eccc00d1f52f51292ecae6103e98352a6a"
+                      }
+                    }
+                  },
+                  "selected_revisions": [
+                    "bd80f9e25ed91e97f4da47172241bbe008d77e99"
+                  ],
+                  "submitted_revision": "bd80f9e25ed91e97f4da47172241bbe008d77e99"
+                }
+              ],
+              "collected": true
+            },
+            "code_selection_fields_planned": {
+              "value": [
+                "mm_processor_kwargs.code_revision"
+              ],
+              "collected": true
+            },
+            "code_selection_final_code_verified": {
+              "value": true,
+              "collected": true
+            },
+            "code_selection_forbidden": {
+              "value": true,
+              "collected": true
+            },
+            "code_selection_ignored_fields": {
+              "value": [],
+              "collected": true
+            },
+            "code_selection_rejected_fields": {
+              "value": [],
+              "collected": true
+            },
+            "code_selection_resolved_fields": {
+              "value": [
+                "mm_processor_kwargs.code_revision"
+              ],
+              "collected": true
+            },
+            "code_selection_trials": {
+              "value": [
+                {
+                  "field": "mm_processor_kwargs.code_revision",
+                  "module_evidence": {
+                    "execution_markers": {
+                      "bd80f9e25ed91e97f4da47172241bbe008d77e99": {
+                        "bytes": 222,
+                        "file_sha256": "3ecc792b44cb65e9f12ad66e2c29639b20806acd1e6b26a7160c332b9499f5b7",
+                        "module_sha256": "b81db80faec572aea7a2e37b406369eccc00d1f52f51292ecae6103e98352a6a",
+                        "monotonic_ns": 3507377485183,
+                        "pid": 1,
+                        "revision": "bd80f9e25ed91e97f4da47172241bbe008d77e99",
+                        "schema": "guard-code-import-marker/1"
+                      }
+                    },
+                    "module_files": {
+                      "bd80f9e25ed91e97f4da47172241bbe008d77e99": {
+                        "__init__.py": {
+                          "bytes": 0,
+                          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                        },
+                        "image_processing_phi3_v.py": {
+                          "bytes": 11409,
+                          "sha256": "8470db7ad9c2483f60ca14ed84e5eba99be0ff15b66ef9958754879b85d492bc"
+                        },
+                        "processing_phi3_v.py": {
+                          "bytes": 12396,
+                          "sha256": "b81db80faec572aea7a2e37b406369eccc00d1f52f51292ecae6103e98352a6a"
+                        }
+                      }
+                    },
+                    "selected_revisions": [
+                      "bd80f9e25ed91e97f4da47172241bbe008d77e99"
+                    ]
+                  },
+                  "outcome": "200",
+                  "request_fixture_sha256": "f97648147a9d79d47eb4270e09da7c6c0d225f2bc2129f8bdc24cd949f6ee78c",
+                  "state": "consumed"
+                }
+              ],
+              "collected": true
+            },
+            "code_selection_unverified_fields": {
+              "value": [],
+              "collected": true
+            },
+            "functional_probe_results": {
+              "value": {
+                "after-0": "pass",
+                "before": "pass"
+              },
+              "collected": true
+            },
+            "functional_probes_planned": {
+              "value": [
+                "before",
+                "after-0"
+              ],
+              "collected": true
+            }
+          },
+          "artifacts": [
+            {
+              "name": "probe_log.jsonl",
+              "path": "artifacts/a699186f4c4bbdd967bc26d305c3089d0b8abb8be593b67abf5c035f2a009a5e",
+              "sha256": "a699186f4c4bbdd967bc26d305c3089d0b8abb8be593b67abf5c035f2a009a5e",
+              "bytes": 4755,
+              "collected_at": "2026-11-14T07:10:23Z",
+              "collector": "input_validation/0.10.0"
+            }
+          ],
+          "comparability": {
+            "model_inventory_sha256": "c2dd67477c1899b775e5fa0d0585861e62166ff94c7b94a7c8ba531c2756ac52",
+            "fixture_sha256": "92050000a09280d1d36f440b099b02a18c7ffe9970711c102a99b846959165ca",
+            "config_sha256": "37d8a4d511c3ce66c881afb7ce3adb22d941ba33d07f909607c44dedbc853c2d",
+            "gpu": "NVIDIA L4",
+            "driver": "595.112.07"
+          }
+        }
+      ]
+    }
+  ],
+  "raw_export": {
+    "파일": "sup08-product-run-20261114-v1.zip",
+    "bytes": 263657,
+    "sha256": "34cf72b9441fffd9d570cb61efb9a66a625ba9bd9b1564115bd965a77a477808"
+  },
+  "report_ref": {
+    "kind": "RPT",
+    "id": "RPT-01M7CE978R7TQGQFSX6G3H2X3S",
+    "revision": 1,
+    "sha256": "8c9f57b75578c7fcc5d122dd242f6dffee86fcf5e9cf4d3263651d2a9d4d8317"
+  }
+}

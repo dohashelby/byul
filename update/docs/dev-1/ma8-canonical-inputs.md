@@ -1,4 +1,21 @@
-# SUP-08 정본 입력 준비
+# SUP-08 정본 입력·GPU 실측
+
+2026-11-14의 현행 결과다. 정본 PACK-BASELINE@34·SUP-08 revision5를 두 고정 GPU 이미지에서 `guard update`로 새로 실행했다. 새 실제 ENV/target과 입력 계약·비교 조건 검사를 거쳐 EVD2·RES2·RPT1을 생성했다. 원자료를 로컬로 반출한 뒤 제품 Store의 읽기 전용 검증으로 객체/Ref/첨부 해시 오류0을 확인했다.
+
+| 쪽 | 보안 | 기능 | 성능 | 코드 선택 관측 |
+|---|---|---|---|---|
+| 기준 판본 | PASS | PASS | UNKNOWN | 요청의 비승인 코드 선택을 ignored로 관측 |
+| 후보 판본 | FAIL | PASS | UNKNOWN | 비승인 코드의 새 import 표식·모듈 SHA가 일치하는 consumed 위반 관측 |
+
+비교는 **REGRESSED**, 기능 비교는 NO_CHANGE, 비교 공백은 없다. 두 RES의 verification_level은 MEASURED다. EVD의 data_origin은 MEASURED이고 RES의 data_origin은 정책 입력을 따라 EXAMPLE로 보존했다. 실제 관측과 DRAFT 정책의 출처를 구분한다. `official=false`인 단일 점검 DRAFT 실행이며 전체69개/J02/J03 완료나 기업 승인은 아니다. [원본 객체 공개 요약](../evidence/gpu-a-SUP-08-20261114.json)과 [비교·정확 Ref·원자료 SHA](../evidence/sup08-canonical-gpu-20261114.json)를 참고한다. 과거 PoC 결과를 복사하거나 재판정한 결과가 아니다.
+
+실제 K3s 환경을 ENV에 기록했다. 공통 준비 도구의 kubeadm 고정 표기를 실제로 사용하지 않았다. 기준/후보의 namespace는 분리했고 이미지·모델 inventory·GPU/driver·TP·승인 코드·정책/자극 조건은 기존 비교 규칙으로 같음을 확인했다. 입력 조립기는 외부 IO를 하지 않으므로 원 manifest의 `cluster_observed=false`·`engine_executed=false`·`model_bytes_rechecked=false`를 유지한다. 실제 기동·정상 HTTP200·모델 재검증 사실은 별도 observed-context와 이번 EVD/RES/RPT에 둔다. read-only 전환 gate의 GPU 반환 미검증 한계도 유지한다.
+
+보조 오케스트레이터가 완료 EVD 목록을 단일 객체로 취급해 전환 기록 작성에서 중단됐으나, 자식 제품 실행은 끝까지 완료됐다. 원 저장소/로그를 먼저 보존하고 목록 처리만 고쳤으며 결과를 만들기 위한 재실행은 하지 않았다. 기준 Deployment의 실제 scale0과 제품의 후보 대기/실행을 확인했다.
+
+## 입력 조립 사용법과 이전 로컬 준비 이력
+
+아래의 미실행/부족 상태는 2026-11-13 로컬 준비 당시의 기록이다. 최신 실제 실행 상태는 위의 2026-11-14 결과를 따른다.
 
 정본 팩 @34의 SUP-08 revision 5를 사용한다. 판본·이미지는 작업지시서 0.1절에서 읽는다. 기준·후보는 같은 Phi-3 Vision 파생 모델 inventory, 승인/미승인 코드 commit, GPU·드라이버·TP/PP/DP와 비교 조건을 사용한다. 기동 명령과 실행별 import 표식 경로 차이만 정규화한다.
 

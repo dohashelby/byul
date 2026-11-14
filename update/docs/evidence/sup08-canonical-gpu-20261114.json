@@ -1,0 +1,407 @@
+{
+  "기록": "SUP-08 정본 팩 GPU 실측",
+  "실행_소스_커밋": "765def72d8fa831d30b5e77aad0175e89f6b5649",
+  "검토_소스_목록_SHA256": "1946073c54a7165920e855820d36d02405d81bf18aa3bdb1bd88d1d08f72b1ae",
+  "팩_Ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 34,
+    "sha256": "cf95f6709b635a6b14cc4a8ceaef5843bd0eb1bd4294c63e29d815626b8c1b0b"
+  },
+  "점검_판본": 5,
+  "공식_재판정": false,
+  "선정_점검_수": 1,
+  "비교": {
+    "check_id": "SUP-08",
+    "purpose": "추가 코드 실행 허용",
+    "area": "SUP",
+    "question": "요청에 넣은 값으로 허용받지 않은 코드 버전을 선택할 수 없는가?",
+    "review_order": "reference_baseline_first",
+    "impact": "HIGH",
+    "applicability": "UNDETERMINED",
+    "selected": true,
+    "tested_while_undetermined": true,
+    "single": null,
+    "baseline": {
+      "result": {
+        "kind": "RES",
+        "id": "RES-01M7CE9786481FWFGNTKW8F6QJ",
+        "revision": 1,
+        "sha256": "f01f213733ab078cabb90a488a495bc1aff34c9076f0307f61f9521aa27d4520"
+      },
+      "security": "PASS",
+      "functional": "PASS",
+      "performance": "UNKNOWN",
+      "verification_level": "MEASURED"
+    },
+    "candidate": {
+      "result": {
+        "kind": "RES",
+        "id": "RES-01M7CE978C9M2XF5A3HC1EMFEJ",
+        "revision": 1,
+        "sha256": "a17ecf52da372ee606c80f7f43306dcef1a18f1c2b5cb33ba9f6dda19a7f6a7a"
+      },
+      "security": "FAIL",
+      "functional": "PASS",
+      "performance": "UNKNOWN",
+      "verification_level": "MEASURED"
+    },
+    "comparison": "REGRESSED",
+    "functional_comparison": "NO_CHANGE",
+    "comparison_reasons": [],
+    "gaps": [],
+    "exception": null,
+    "evidence_source": "automated"
+  },
+  "객체": {
+    "ENV": [
+      {
+        "Ref": {
+          "kind": "ENV",
+          "id": "ENV-01M7CDX1TFH3N8SJ09442AEEQT",
+          "revision": 1,
+          "sha256": "3e9c870a0e67d8b6d66b0b6c8fa3712af45296d673832b5cb997fb1086921017"
+        },
+        "data_origin": "MEASURED"
+      },
+      {
+        "Ref": {
+          "kind": "ENV",
+          "id": "ENV-01M7CDX2SM176T89P5BGHPBRHS",
+          "revision": 1,
+          "sha256": "2232a2d13061fb628454102e2233fa2d23eee2e3603af37aeb731a10c0fe236a"
+        },
+        "data_origin": "MEASURED"
+      }
+    ],
+    "EVD": [
+      {
+        "Ref": {
+          "kind": "EVD",
+          "id": "EVD-01M7CE8NAEJR8D0SS4AQVKV2HV",
+          "revision": 1,
+          "sha256": "eead284c58b01003d0cd027543504bc1c32556dab41be890724b30dae352043c"
+        },
+        "side": "baseline",
+        "data_origin": "MEASURED",
+        "check_id": "SUP-08",
+        "execution": {
+          "status": "COMPLETED",
+          "executor": {
+            "name": "input_validation",
+            "version": "0.10.0",
+            "config_sha256": "37d8a4d511c3ce66c881afb7ce3adb22d941ba33d07f909607c44dedbc853c2d"
+          },
+          "adapter": {
+            "name": "vllm",
+            "version": "0.5.0"
+          },
+          "started_at": "2026-11-14T07:10:05Z",
+          "finished_at": "2026-11-14T07:10:11Z",
+          "abort_reason": null,
+          "attempt_id": "ATTEMPT-01M7CE8N92SW6QC768RVBF5M51"
+        },
+        "observations": {
+          "code_selection_confirmed_violations": {
+            "value": [],
+            "collected": true
+          },
+          "code_selection_fields_planned": {
+            "value": [
+              "mm_processor_kwargs.code_revision"
+            ],
+            "collected": true
+          },
+          "code_selection_final_code_verified": {
+            "value": true,
+            "collected": true
+          },
+          "code_selection_forbidden": {
+            "value": true,
+            "collected": true
+          },
+          "code_selection_ignored_fields": {
+            "value": [
+              "mm_processor_kwargs.code_revision"
+            ],
+            "collected": true
+          },
+          "code_selection_rejected_fields": {
+            "value": [],
+            "collected": true
+          },
+          "code_selection_resolved_fields": {
+            "value": [
+              "mm_processor_kwargs.code_revision"
+            ],
+            "collected": true
+          },
+          "code_selection_trials": {
+            "value": [
+              {
+                "field": "mm_processor_kwargs.code_revision",
+                "module_evidence": {
+                  "approved_revisions_present": [
+                    "a239c75031d0d32a44f2a89135f574c2318244de"
+                  ]
+                },
+                "outcome": "200",
+                "request_fixture_sha256": "f97648147a9d79d47eb4270e09da7c6c0d225f2bc2129f8bdc24cd949f6ee78c",
+                "state": "ignored"
+              }
+            ],
+            "collected": true
+          },
+          "code_selection_unverified_fields": {
+            "value": [],
+            "collected": true
+          },
+          "functional_probe_results": {
+            "value": {
+              "after-0": "pass",
+              "before": "pass"
+            },
+            "collected": true
+          },
+          "functional_probes_planned": {
+            "value": [
+              "before",
+              "after-0"
+            ],
+            "collected": true
+          }
+        },
+        "comparability": {
+          "model_inventory_sha256": "c2dd67477c1899b775e5fa0d0585861e62166ff94c7b94a7c8ba531c2756ac52",
+          "fixture_sha256": "92050000a09280d1d36f440b099b02a18c7ffe9970711c102a99b846959165ca",
+          "config_sha256": "37d8a4d511c3ce66c881afb7ce3adb22d941ba33d07f909607c44dedbc853c2d",
+          "gpu": "NVIDIA L4",
+          "driver": "595.112.07"
+        }
+      },
+      {
+        "Ref": {
+          "kind": "EVD",
+          "id": "EVD-01M7CE8ZMT3N17Z7M7GH1KS6CN",
+          "revision": 1,
+          "sha256": "e9d8c40cf90fa95a2822aa6ac6ba4a8c473212bb19171182f4ae093b650e0d55"
+        },
+        "side": "candidate",
+        "data_origin": "MEASURED",
+        "check_id": "SUP-08",
+        "execution": {
+          "status": "COMPLETED",
+          "executor": {
+            "name": "input_validation",
+            "version": "0.10.0",
+            "config_sha256": "37d8a4d511c3ce66c881afb7ce3adb22d941ba33d07f909607c44dedbc853c2d"
+          },
+          "adapter": {
+            "name": "vllm",
+            "version": "0.5.0"
+          },
+          "started_at": "2026-11-14T07:10:15Z",
+          "finished_at": "2026-11-14T07:10:23Z",
+          "abort_reason": null,
+          "attempt_id": "ATTEMPT-01M7CE8N92SW6QC768RVBF5M51"
+        },
+        "observations": {
+          "code_selection_confirmed_violations": {
+            "value": [
+              {
+                "basis": "new import marker matches the cached module SHA-256 and was absent before the challenge",
+                "execution_markers": {
+                  "bd80f9e25ed91e97f4da47172241bbe008d77e99": {
+                    "bytes": 222,
+                    "file_sha256": "3ecc792b44cb65e9f12ad66e2c29639b20806acd1e6b26a7160c332b9499f5b7",
+                    "module_sha256": "b81db80faec572aea7a2e37b406369eccc00d1f52f51292ecae6103e98352a6a",
+                    "monotonic_ns": 3507377485183,
+                    "pid": 1,
+                    "revision": "bd80f9e25ed91e97f4da47172241bbe008d77e99",
+                    "schema": "guard-code-import-marker/1"
+                  }
+                },
+                "field": "mm_processor_kwargs.code_revision",
+                "module_files": {
+                  "bd80f9e25ed91e97f4da47172241bbe008d77e99": {
+                    "__init__.py": {
+                      "bytes": 0,
+                      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "image_processing_phi3_v.py": {
+                      "bytes": 11409,
+                      "sha256": "8470db7ad9c2483f60ca14ed84e5eba99be0ff15b66ef9958754879b85d492bc"
+                    },
+                    "processing_phi3_v.py": {
+                      "bytes": 12396,
+                      "sha256": "b81db80faec572aea7a2e37b406369eccc00d1f52f51292ecae6103e98352a6a"
+                    }
+                  }
+                },
+                "selected_revisions": [
+                  "bd80f9e25ed91e97f4da47172241bbe008d77e99"
+                ],
+                "submitted_revision": "bd80f9e25ed91e97f4da47172241bbe008d77e99"
+              }
+            ],
+            "collected": true
+          },
+          "code_selection_fields_planned": {
+            "value": [
+              "mm_processor_kwargs.code_revision"
+            ],
+            "collected": true
+          },
+          "code_selection_final_code_verified": {
+            "value": true,
+            "collected": true
+          },
+          "code_selection_forbidden": {
+            "value": true,
+            "collected": true
+          },
+          "code_selection_ignored_fields": {
+            "value": [],
+            "collected": true
+          },
+          "code_selection_rejected_fields": {
+            "value": [],
+            "collected": true
+          },
+          "code_selection_resolved_fields": {
+            "value": [
+              "mm_processor_kwargs.code_revision"
+            ],
+            "collected": true
+          },
+          "code_selection_trials": {
+            "value": [
+              {
+                "field": "mm_processor_kwargs.code_revision",
+                "module_evidence": {
+                  "execution_markers": {
+                    "bd80f9e25ed91e97f4da47172241bbe008d77e99": {
+                      "bytes": 222,
+                      "file_sha256": "3ecc792b44cb65e9f12ad66e2c29639b20806acd1e6b26a7160c332b9499f5b7",
+                      "module_sha256": "b81db80faec572aea7a2e37b406369eccc00d1f52f51292ecae6103e98352a6a",
+                      "monotonic_ns": 3507377485183,
+                      "pid": 1,
+                      "revision": "bd80f9e25ed91e97f4da47172241bbe008d77e99",
+                      "schema": "guard-code-import-marker/1"
+                    }
+                  },
+                  "module_files": {
+                    "bd80f9e25ed91e97f4da47172241bbe008d77e99": {
+                      "__init__.py": {
+                        "bytes": 0,
+                        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                      },
+                      "image_processing_phi3_v.py": {
+                        "bytes": 11409,
+                        "sha256": "8470db7ad9c2483f60ca14ed84e5eba99be0ff15b66ef9958754879b85d492bc"
+                      },
+                      "processing_phi3_v.py": {
+                        "bytes": 12396,
+                        "sha256": "b81db80faec572aea7a2e37b406369eccc00d1f52f51292ecae6103e98352a6a"
+                      }
+                    }
+                  },
+                  "selected_revisions": [
+                    "bd80f9e25ed91e97f4da47172241bbe008d77e99"
+                  ]
+                },
+                "outcome": "200",
+                "request_fixture_sha256": "f97648147a9d79d47eb4270e09da7c6c0d225f2bc2129f8bdc24cd949f6ee78c",
+                "state": "consumed"
+              }
+            ],
+            "collected": true
+          },
+          "code_selection_unverified_fields": {
+            "value": [],
+            "collected": true
+          },
+          "functional_probe_results": {
+            "value": {
+              "after-0": "pass",
+              "before": "pass"
+            },
+            "collected": true
+          },
+          "functional_probes_planned": {
+            "value": [
+              "before",
+              "after-0"
+            ],
+            "collected": true
+          }
+        },
+        "comparability": {
+          "model_inventory_sha256": "c2dd67477c1899b775e5fa0d0585861e62166ff94c7b94a7c8ba531c2756ac52",
+          "fixture_sha256": "92050000a09280d1d36f440b099b02a18c7ffe9970711c102a99b846959165ca",
+          "config_sha256": "37d8a4d511c3ce66c881afb7ce3adb22d941ba33d07f909607c44dedbc853c2d",
+          "gpu": "NVIDIA L4",
+          "driver": "595.112.07"
+        }
+      }
+    ],
+    "RES": [
+      {
+        "Ref": {
+          "kind": "RES",
+          "id": "RES-01M7CE9786481FWFGNTKW8F6QJ",
+          "revision": 1,
+          "sha256": "f01f213733ab078cabb90a488a495bc1aff34c9076f0307f61f9521aa27d4520"
+        },
+        "side": "baseline",
+        "data_origin": "EXAMPLE",
+        "check_id": "SUP-08",
+        "verification_level": "MEASURED",
+        "verdicts": {
+          "security": "PASS",
+          "functional": "PASS",
+          "performance": "UNKNOWN"
+        }
+      },
+      {
+        "Ref": {
+          "kind": "RES",
+          "id": "RES-01M7CE978C9M2XF5A3HC1EMFEJ",
+          "revision": 1,
+          "sha256": "a17ecf52da372ee606c80f7f43306dcef1a18f1c2b5cb33ba9f6dda19a7f6a7a"
+        },
+        "side": "candidate",
+        "data_origin": "EXAMPLE",
+        "check_id": "SUP-08",
+        "verification_level": "MEASURED",
+        "verdicts": {
+          "security": "FAIL",
+          "functional": "PASS",
+          "performance": "UNKNOWN"
+        }
+      }
+    ],
+    "RPT": [
+      {
+        "Ref": {
+          "kind": "RPT",
+          "id": "RPT-01M7CE978R7TQGQFSX6G3H2X3S",
+          "revision": 1,
+          "sha256": "8c9f57b75578c7fcc5d122dd242f6dffee86fcf5e9cf4d3263651d2a9d4d8317"
+        },
+        "data_origin": "EXAMPLE"
+      }
+    ]
+  },
+  "저장소_검증_오류": [],
+  "원자료": {
+    "파일": "sup08-product-run-20261114-v1.zip",
+    "bytes": 263657,
+    "sha256": "34cf72b9441fffd9d570cb61efb9a66a625ba9bd9b1564115bd965a77a477808"
+  },
+  "한계": [
+    "SUP-08 한 점검만 선정한 DRAFT 실행이며 전체69개/J01/J02/J03 완료가 아니다.",
+    "GPU 반환은 별도 미검증이며 read-only 전환 gate의 한계를 유지한다.",
+    "입력 조립기의 무실행 preflight false를 원본에서 바꾸지 않았고 실제 관측은 별도 자료다."
+  ]
+}

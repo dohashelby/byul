@@ -237,5 +237,42 @@
     "실제 원 기록의 공통 rank-fault 판정 입력 연결과 생산자 등록",
     "A 실제 ENV/target 52쪽 및 전체 136쪽의 남은 결합",
     "다른 생산자·전체69개 실증. M-B4는 보관 유지"
-  ]
+  ],
+  "resource_cleanup": {
+    "instance_id": "i-0d8ba843a6d08bc14",
+    "state": "terminated",
+    "volume_id": "vol-016669bf773273e37",
+    "new_volume_deleted": true,
+    "security_group_id": "sg-0f875c18f781bb417",
+    "new_security_group_deleted": true,
+    "existing_resources_modified": false,
+    "confirmed_at": "2026-11-14T13:18:06.369753+00:00",
+    "billing_intervals": [
+      {
+        "started_at": "2026-11-14T06:11:29.432058+00:00",
+        "ended_at": "2026-11-14T07:55:39.977941+00:00"
+      },
+      {
+        "started_at": "2026-11-14T10:03:16.701917+00:00",
+        "ended_at": "2026-11-14T10:28:01.891487+00:00"
+      },
+      {
+        "started_at": "2026-11-14T12:16:14.439321+00:00",
+        "ended_at": "2026-11-14T13:18:06.369753+00:00"
+      }
+    ],
+    "total_cap_usd": 100
+  },
+  "budget_estimate": {
+    "checked_at": "2026-11-14T13:19:30.859353+00:00",
+    "active_hours_upper_bound": 3.179907,
+    "ebs_hours": 7.13373,
+    "total_cap_usd": 100,
+    "fixed_duration_limit": null,
+    "estimated_ec2_ebs_ipv4_with_margin_usd": 21.8271,
+    "transfer_and_other_reserve_usd": 15,
+    "conservative_total_with_reserve_usd": 36.8271,
+    "cleanup_trigger_usd": 95,
+    "scope": "상태 지연까지 포함한 보수 추산. 실제 청구 금액이 아님."
+  }
 }

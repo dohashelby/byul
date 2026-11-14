@@ -97,3 +97,12 @@ CPU 시험은 고정 자료의 잘못된 소스·rank·world/output·그룹·clo
 원 함수의 인자/반환/예외를 보존하고 관측 sink의 SystemExit/KeyboardInterrupt도 원 호출을 바꾸지 않도록 처리한다. 정상/예외 호출 앞뒤에 같은 call 지문을 남기며 source·본문·설치 hook이 바뀌면 연결을 만들지 않는다. 기존 IPC scope는 그대로 두고 RPC scope를 명시적으로 선택한다. 실제 반출한 이전10파일 준비물은 정확 소스 SHA/자산 전체 해시 행으로만 재검증하며 현재 준비물의 자산 누락과 바꿔치기는 거부한다.
 
 추가39개(요청 ID17·RPC hook15·독립 설치/변조 거부7)가 두 Python ABI에서 각각 통과했고 직접 영향/경로103개가 통과했다. 설치 소스6/8파일·함수4/5개는 각 ABI의 컴파일/소비 대조이며 엔진을 import/실행한 GPU 자격이 아니다. 과거 실제 GPU 원 기록6개도 현재 도구로 재검증했다. 기존 native24 고정값·등록표·TP1 거부 조건을 보존한다. 아직 이 RPC 후보를 실제 엔진에서 관측하지 않았고 nonce 제어·주입·해제·새 세대 복구는 미연결이다. source_authenticated/engine_group_verified/producer_registered=false이며 실제 장애0회다.
+
+
+## 일회용 nonce 제어와 pidfd actor의 CPU 검증
+
+source control은 private ARM의 HMAC·세션/설정/자산·정확 대상 세대/원 CALL/API ID 근거·rank0/TP2를 대조하고 일회용 claim 뒤 READY를 만든다. 후보 내부 ID는 실제 재배정 쌍으로 연결한다. READY/RELEASE는 barrier 사건이고 신호 적용/해제와 다르며 만료를 RELEASE로 쓰지 않는다. 의도적인 경계 예외는 CONTROL_RAISE와 original_invoked=false로 구분해 원 함수가 실행됐다고 기록하지 않는다.
+
+Pod 안 actor는 정상 요청과 실제 초기 IPC/객체 연결을 먼저 확인하고 pidfd_open 전후 같은 프로세스 문맥을 대조한다. 실제 SIGSTOP/SIGCONT·SIGKILL의 전후 상태/시각을 별도 영수증에 남기며 death에는 SIGCONT를 보내지 않는다. delay는 finally 정리 외에도 별도 fork lease가 actor 사망/만료 때 같은 pidfd만 재개한다. 새 자원/이미지/모델을 만들지 않고 실제 대상 Pod UID/모델 영수증을 실행별 scope로 받는다. 전체 수락/등록은 여전히 false다.
+
+직접 영향/경로130개, 새66개의 기준 이미지 Python ABI 대조가 통과했다. 시험의 HTTP는 대역이며 원 RPC/barrier·시험이 만든 Python 자식의 실제 신호/해제·actor의 finally 없는 사망/lease 만료 정리는 실제 OS에서 검증했다. GPU 실행·실제 엔진 장애로 올리지 않는다. Source548파일/목록 자체SHA70f2607a의 정확 검토 행을 추가했다. 다음 GPU에서 먼저 정상 source/ID/IPC 자격을 대조하고 자격 실패 시 주입하지 않는다. 새 세대 복구와 원 판정/상위 오류 전파 전체 수락은 별도다.

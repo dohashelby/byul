@@ -341,7 +341,8 @@
                     "tensor_parallel_size"
                   ]
                 }
-              }
+              },
+              "fault_eligible": true
             }
           },
           "path": "vllm/worker/worker_base.py",
@@ -406,6 +407,20 @@
           "body_code_sha256": {},
           "pin_status": "candidate_pin"
         }
+      },
+      "request_binding": {
+        "kind": "direct",
+        "external_prefix": "cmpl-",
+        "external_suffix": "-0"
+      },
+      "ipc_topology": {
+        "kind": "task-pipe-driver",
+        "parent_point": "MultiprocessingDistributedExecutor._init_executor",
+        "worker_point": "_run_worker_process",
+        "child_ranks": [
+          1
+        ],
+        "target_parent_kind": "executor"
       }
     },
     {
@@ -694,7 +709,8 @@
                     "tensor_parallel_size"
                   ]
                 }
-              }
+              },
+              "fault_eligible": true
             }
           },
           "path": "vllm/v1/worker/worker_base.py",
@@ -791,6 +807,21 @@
           "body_code_sha256": {},
           "pin_status": "candidate_pin"
         }
+      },
+      "request_binding": {
+        "kind": "assigned",
+        "external_prefix": "cmpl-",
+        "external_suffix": "-0"
+      },
+      "ipc_topology": {
+        "kind": "broadcast-workers",
+        "parent_point": "MultiprocExecutor._init_executor",
+        "worker_point": "WorkerProc._init_message_queues",
+        "child_ranks": [
+          0,
+          1
+        ],
+        "target_parent_kind": "worker"
       }
     }
   ],

@@ -1,3 +1,10 @@
+## 2026-11-14 — 일회용 nonce·pidfd 신호·독립 해제 감시의 CPU 묶음
+
+- 한 일: private ARM/READY/action의 HMAC·정확 세대/설정/자산·원 CALL/API ID·rank0/TP2를 결합하고 일회용 claim/만료/취소를 분리했다. 예외 주입 경계는 CONTROL_RAISE/original_invoked=false로 원 함수 실행과 구분한다. 실제 초기 IPC/정상 nonce 관측 후 같은 UID/PID namespace의 pidfd만 대상으로 하는 actor와 별도 resume lease를 구현했다. 신호 전 잠재 stop 의도를 전달해 actor 사망/lease 만료에도 pending SIGSTOP를 지우며 death에는 CONT를 보내지 않는다. 새 자원/이미지/의존성/판정/등록은 추가하지 않았다.
+- 테스트 결과: 직접 영향/경로130개 통과(pytest4.90초·벽시계5.079초). 새66개는 기준 이미지 Python에서도 통과(pytest2.28초·벽시계2.508초). HTTP 대역과 실제 원 RPC/barrier·소유 Python 자식에 대한 SIGSTOP/SIGCONT/SIGKILL·finally 없는 actor 사망/lease 만료의 재개를 확인했다. 제품 소스548파일/목록 자체SHA70f2607a의 결정5 정확 행을 추가했다. head0e5cf695 CI9개 모두 SUCCESS이며 새 묶음 CI는 별도 확인한다. 전체 로컬 pytest·GPU 장애는 실행하지 않았다.
+- 다음 단계: 묶음을 고정해 새 prepare/비밀 자산으로 만들고 동일 승인 GPU 노드를 재개한다. 실제 정상 요청의 source/ID/IPC/프로세스 자격을 먼저 검증한 뒤 맞는 경로만 주입한다. 물리 영수증·독립 클라이언트 결과·새 세대 복구/실행 입력을 별도로 반출·검토한다. 전체 그룹/상위 전파/기한·등록 여부를 실제 근거 범위 밖으로 올리지 않는다.
+- 막힌 것: 새 nonce/actor 경로는 아직 실제 두 엔진에서 자격을 확인하지 않았다. 실제 GPU 장애0회, scope_complete/source_authenticated/engine_group_verified/producer_registered=false를 유지한다. 새 세대 복구의 실제 결과·A 입력52쪽/전체136쪽·다른 관측기/전체69개 실증은 미완료다. 동일 신규 노드는 stopped로 설치본 임시 보존 중이며 #263 draft·M-B4 보관·runtime/contracts 무변경을 유지한다.
+
 ## 2026-11-14 — 정확 상위 RPC 프레임·동일 worker/요청의 CPU 연결
 
 - 한 일: 같은 구현에 판본별 RPC source 데이터를 더해 기준 driver 안 worker 호출과 후보 worker RPC 안 wrapper 호출, API 반환 ID/후보 내부 재배정을 관측한다. 같은 요청 HMAC·문맥·실제 원 함수 code/globals/self 프레임·worker 객체 경로를 모두 대조하며 토큰/ID/시각만으로 연결하지 않는다. 앞뒤 call 지문·원 호출/예외를 보존하고 관측 sink의 BaseException도 원 호출을 바꾸지 않는다. 기존 IPC scope와 source 행은 그대로다. 실제 과거 준비물은 정확 소스 SHA/전체 자산 해시로만 재검증하며 현재 자산 누락을 거부한다.

@@ -196,25 +196,44 @@ def verify_capture(prepared, capture):
         if rpc:
             fingerprint = lambda v: type(v) is str and re.fullmatch('[0-9a-f]{64}', v) is not None
             ids = payload.get('request_hmac_sha256')
-            if (payload.get('event') not in {'CALL', 'RETURN', 'RAISE'}
+            phases = {'CONTROL_READY', 'CONTROL_RELEASE', 'CONTROL_EXPIRED', 'CONTROL_EXCEPTION', 'CONTROL_CANCELLED'}
+            if (payload.get('event') not in {'CALL', 'RETURN', 'RAISE', 'CONTROL_RAISE', *phases}
                     or not fingerprint(payload.get('call_hmac_sha256'))
                     or type(ids) is not list or len(ids) > 8 or any(not fingerprint(v) for v in ids)
                     or len(set(ids)) != len(ids)
                     or any(type(payload.get(k)) is not bool for k in
                            ('rpc_parent_frame_verified', 'rpc_parent_worker_verified'))
-                    or payload['rpc_parent_frame_verified'] != payload['rpc_parent_worker_verified']):
+                    or payload['rpc_parent_frame_verified'] != payload['rpc_parent_worker_verified']
+                    or type(payload.get('original_invoked')) is not bool):
                 raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
             parent = payload.get('rpc_parent_call_hmac_sha256')
             if payload['rpc_parent_frame_verified']:
                 if (not hook.get('parent') or not ids or not fingerprint(parent)
+                        or not fingerprint(payload.get('rpc_parent_object_hmac_sha256'))
                         or parent == payload['call_hmac_sha256']):
                     raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
-            elif parent is not None:
+            elif parent is not None or payload.get('rpc_parent_object_hmac_sha256') is not None:
                 raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
             if hook.get('parent') and not payload['rpc_parent_frame_verified']:
                 raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
             if hook['kind'] == 'rpc' and not ids:
                 raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+            if payload['original_invoked'] != (payload['event'] in {'RETURN', 'RAISE'}):
+                raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+            if payload['event'] in phases or payload['event'] == 'CONTROL_RAISE':
+                if hook.get('fault_eligible') is not True or not payload['rpc_parent_frame_verified']:
+                    raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+            if payload['event'] in phases:
+                control = payload.get('control')
+                if (type(control) is not dict or set(control) != {'nonce', 'fault_kind', 'arm_sha256',
+                        'ready_sha256', 'action_sha256', 'target_sha256', 'control_code_sha256', 'barrier_only'}
+                        or type(control['nonce']) is not str or re.fullmatch('[0-9a-f]{32}', control['nonce']) is None
+                        or control['fault_kind'] not in {'delay', 'death', 'exception'}
+                        or not all(fingerprint(control[k]) for k in ('arm_sha256', 'ready_sha256', 'target_sha256', 'control_code_sha256'))
+                        or control['control_code_sha256'] != manifest['assets']['guard/adapters/vllm_rank_rpc_control.py']['sha256']
+                        or control['barrier_only'] is not (payload['event'] != 'CONTROL_EXCEPTION')
+                        or (control['action_sha256'] is not None and not fingerprint(control['action_sha256']))):
+                    raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
             if any(type(payload.get(k)) is not int or not 0 <= payload[k] < 2**63
                    for k in ('operation_started_ns', 'observation_ns')) or payload['operation_started_ns'] > payload['observation_ns']:
                 raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')

@@ -22,13 +22,16 @@ from . import vllm_rank_ipc_sources as sources
 from . import vllm_rank_ipc_hooks as hooks
 from . import vllm_rank_request_identity as request_identity
 from . import vllm_rank_rpc_hooks as rpc_hooks
+from . import vllm_rank_rpc_control as rpc_control
+from . import vllm_rank_rpc_actor as rpc_actor
 from . import vllm_worker_generation_contract as relative
 
 ROOT = Path('/guard-rank-ipc')
 MODULES = {'vllm_lifecycle_sensor': base, 'vllm_rank_ipc_identity': identity,
            'vllm_rank_ipc_sources': sources, 'vllm_rank_ipc_hooks': hooks,
            'vllm_worker_generation_contract': relative,
-           'vllm_rank_request_identity': request_identity, 'vllm_rank_rpc_hooks': rpc_hooks}
+           'vllm_rank_request_identity': request_identity, 'vllm_rank_rpc_hooks': rpc_hooks,
+           'vllm_rank_rpc_control': rpc_control, 'vllm_rank_rpc_actor': rpc_actor}
 ASSETS = frozenset({'guard/__init__.py', 'guard/adapters/__init__.py', 'sitecustomize.py',
     'guard/adapters/vllm_rank_ipc_runtime.py', 'guard/adapters/assets/vllm_rank_ipc_profiles.json',
     *('guard/adapters/' + name + '.py' for name in MODULES)})
@@ -129,7 +132,8 @@ def _freeze(value):
     if (sources.code_digest is not base.code_digest or sources.relative_code is not relative.relative_code
             or hooks.base is not base or hooks.identity is not identity or hooks.sources is not sources
             or rpc_hooks.ipc is not hooks or rpc_hooks.sources is not sources
-            or rpc_hooks.request_identity is not request_identity):
+            or rpc_hooks.request_identity is not request_identity or rpc_hooks.control_code is not rpc_control
+            or rpc_actor.control_code is not rpc_control or rpc_actor.identity is not identity):
         raise ValueError('RANK_IPC_OBSERVER_ALIAS_UNAVAILABLE')
 
 
@@ -254,6 +258,7 @@ def install():
     _freeze(value)
     writer = SnapshotWriter(value, digest)
     observer = CombinedObserver(image=value['image'], key=bytes.fromhex(value['key']), emit=writer)
+    observer.rpc.control = rpc_control.Control(value, digest, observer.ipc.profile, writer, lambda: _freeze(value))
     runtime = sys.implementation.name + '-' + '.'.join(map(str, sys.version_info[:3]))
     if observer.profile['runtime'] != runtime or sys.flags.optimize != 0:
         raise ValueError('RANK_IPC_RUNTIME_UNAVAILABLE')

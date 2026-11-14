@@ -17,6 +17,7 @@ import types
 from . import vllm_rank_ipc_hooks as ipc
 from . import vllm_rank_ipc_sources as sources
 from . import vllm_rank_request_identity as request_identity
+from . import vllm_rank_rpc_control as control_code
 
 
 class RPCObserver:
@@ -26,6 +27,7 @@ class RPCObserver:
         self.profile = identity_observer.profile
         self.sources = self.profile.get('rpc_sources', {})
         self.modules, self.functions, self.installed = {}, {}, {}
+        self.control = None
         self.current = ContextVar('guard_rank_rpc_candidate', default=None)
         self.pid, self.serial, self.lock = os.getpid(), 0, threading.RLock()
 
@@ -99,7 +101,7 @@ class RPCObserver:
             frame = None
 
     def _metadata(self, module_name, point, spec, context, owner, ids, call, event, started,
-                  *, parent=None, result=ipc.MISSING):
+                  *, parent=None, result=ipc.MISSING, original_invoked=False):
         self._fresh(spec['source_modules'])
         expected = self.sources[module_name]
         value = {'schema': 'guard-rank-rpc-hook-candidate/1', 'image': self.image,
@@ -111,6 +113,7 @@ class RPCObserver:
                  'request_hmac_sha256': ids, 'object_hmac_sha256': self.identity_observer._name(owner, context),
                  'source_graph': {name: self.sources[name]['sha256'] for name in spec['source_modules']},
                  'rpc_parent_call_hmac_sha256': None, 'rpc_parent_frame_verified': False,
+                 'rpc_parent_object_hmac_sha256': None, 'original_invoked': original_invoked,
                  'rpc_parent_worker_verified': False, 'source_authenticated': False,
                  'engine_group_verified': False, 'producer_registered': False, 'gaps': []}
         parent_spec = spec.get('parent')
@@ -122,6 +125,7 @@ class RPCObserver:
             if valid:
                 self._fresh(parent['source_modules'])
                 value.update(rpc_parent_call_hmac_sha256=parent['call'],
+                             rpc_parent_object_hmac_sha256=self.identity_observer._name(parent['owner'], context),
                              rpc_parent_frame_verified=True, rpc_parent_worker_verified=True)
             else:
                 value['gaps'].append('RANK_RPC_ACTIVE_PARENT_UNVERIFIED')
@@ -148,14 +152,14 @@ class RPCObserver:
         def observed(*args, **kwargs):
             owner = ipc.IPCObserver._argument(original, args, kwargs, 'self')
             context, call, ids, token, parent, started = None, None, [], None, None, time.monotonic_ns()
-            armed = False
+            armed, proof, original_invoked = False, None, False
             try:
                 context = ipc.base._context()
                 if spec['kind'] == 'rpc':
                     ids = self._requests(original, args, kwargs, spec)
                     if ids is not None:
                         call, parent = self._call(context), self.current.get()
-                        self._metadata(module_name, point, spec, context, owner, ids, call, 'CALL', started, parent=parent)
+                        proof = self._metadata(module_name, point, spec, context, owner, ids, call, 'CALL', started, parent=parent)
                         token = self.current.set({'point': point, 'original': original, 'owner': owner,
                             'context': context, 'ids': ids, 'call': call, 'source_modules': spec['source_modules']})
                         armed = True
@@ -164,11 +168,21 @@ class RPCObserver:
             except BaseException:
                 self._gap(point)
             try:
+                if armed and self.control is not None and spec.get('fault_eligible') is True:
+                    try:
+                        self.control.maybe_hold(proof)
+                    except control_code.NativeLabFault:
+                        raise
+                    except BaseException:
+                        self._gap(point)
+                original_invoked = True
                 result = original(*args, **kwargs)
-            except BaseException:
+            except BaseException as error:
                 if armed:
                     try:
-                        self._metadata(module_name, point, spec, context, owner, ids, call, 'RAISE', started, parent=parent)
+                        event = 'CONTROL_RAISE' if not original_invoked and type(error) is control_code.NativeLabFault else 'RAISE'
+                        self._metadata(module_name, point, spec, context, owner, ids, call, event, started,
+                                       parent=parent, original_invoked=original_invoked)
                     except BaseException:
                         self._gap(point)
                 raise
@@ -179,7 +193,7 @@ class RPCObserver:
                         if spec['kind'] == 'assignment':
                             selected = self._root(original, args, kwargs, spec['assignment'])
                         self._metadata(module_name, point, spec, context, owner, ids, call, 'RETURN', started,
-                                       parent=parent, result=selected)
+                                       parent=parent, result=selected, original_invoked=True)
                     except BaseException:
                         self._gap(point)
                 return result

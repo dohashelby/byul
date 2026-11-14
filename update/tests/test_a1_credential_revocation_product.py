@@ -13,6 +13,7 @@ from guard.runtime import kubernetes_http as http
 from guard.runtime.kubernetes_credential_revocation import KubernetesCredentialRevocationHTTP
 from guard.runtime.bounded import capture_pipes
 from guard.store import Store
+from tests.run_binding_support import for_pack
 from tests.builders import baseline_pack,policy,T0
 from tests.test_a1_kubernetes_model_authorization_product import World as BaseWorld
 from tests.test_kubernetes_lifecycle import group,target as native_target
@@ -127,7 +128,7 @@ def test_registered_cli_auth_samples_absolute_constraint_and_exact_refs(tmp_path
             if path.name=='probe_log.jsonl' and a and a[0]=='w':raise OSError(PRIVATE)
             return original(path,*a,**kw)
         monkeypatch.setattr(Path,'open',open_file)
-    pol=policy(pack.ref(),scope={'include':['PLT-10']},values={'PLT-10':values})
+    pol=policy(pack.ref(),scope={'include':['PLT-10']},values={'PLT-10':for_pack(pack,'PLT-10',values)})
     for name,value in [('environment',group.env.to_dict()),('policy',pol.to_dict()),('target',world.target)]:
         (tmp_path/(name+'.json')).write_bytes(canonical_json(value))
     cfg=tmp_path/'guard.toml';cfg.write_text('[executors]\ncredential_revocation="kubernetes"\n[adapter]\nname="vllm"\n[credential_revocation]\ntarget='

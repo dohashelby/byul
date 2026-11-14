@@ -2,7 +2,7 @@ id: REQ-02
 framework_id: CHK-REQ-002
 mechanism_ids:
 - mechanism-01
-revision: 4
+revision: 5
 retired: false
 area: REQ
 purpose: 작업·대상 인가
@@ -16,37 +16,10 @@ impact: HIGH
 applies_when:
   prose: root_path·경로 prefix·Gateway/프록시 재작성이 있을 때 적용한다. 재작성 비사용은 기본 route 인증 점검의 제외 사유가 아니다.
 policy_params:
-- key: route_environment_sha256
-  type: str
-  required: true
-- key: route_target_sha256
-  type: str
-  required: true
 - key: route_session
   type: str
   required: true
 - key: route_file_sha256
-  type: str
-  required: true
-- key: route_validity_start
-  type: str
-  required: true
-- key: route_validity_end
-  type: str
-  required: true
-- key: route_native_environment_sha256
-  type: str
-  required: true
-- key: route_native_target_sha256
-  type: str
-  required: true
-- key: route_native_prepared_sha256
-  type: str
-  required: true
-- key: route_native_validity_start
-  type: str
-  required: true
-- key: route_native_validity_end
   type: str
   required: true
 policy_prose:

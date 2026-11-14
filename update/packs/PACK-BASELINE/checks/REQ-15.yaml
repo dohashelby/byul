@@ -2,7 +2,7 @@ id: REQ-15
 framework_id: CHK-REQ-015
 mechanism_ids:
 - mechanism-01
-revision: 5
+revision: 6
 retired: false
 area: REQ
 purpose: 공유 권한·범위
@@ -16,18 +16,6 @@ impact: HIGH
 applies_when:
   prose: KV/prefix 등 재사용 cache를 사용할 때 공유 집단과 신원 연결을 확인한다. 실제 집단·공유 정책 미정은 제외 사유가 아니다.
 policy_params:
-- key: sensor_environment_sha256
-  type: str
-  required: true
-- key: sensor_target_sha256
-  type: str
-  required: true
-- key: sensor_prepared_sha256
-  type: str
-  required: true
-- key: sensor_manifest_sha256
-  type: str
-  required: true
 - key: public_prefix_sharing_allowed
   type: bool
   required: true

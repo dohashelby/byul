@@ -133,7 +133,7 @@ def test_export_rejects_draft_hash_and_missing_fields(store_client):
 
 def test_saved_confirmed_export_starts_temporary_gateway(store_client, tmp_path):
     env, policy = _inputs()
-    policy["verification"]["pack"] = {"id": "PACK-BASELINE", "revision": 34}
+    policy["verification"]["pack"] = {"id": "PACK-BASELINE", "revision": 35}
     saved_env = store_client.post("/api/environments", json=env)
     assert saved_env.status_code == 201, saved_env.text
     policy["status"] = "DRAFT"

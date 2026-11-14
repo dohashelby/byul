@@ -49,7 +49,7 @@ def test_req12_common_input_keeps_unknown_or_independent_fail_through_restore(
             cleanup_errors=[], diagnostic_write_errors=[], write_diagnostics=lambda _: [])
         monkeypatch.setattr(lab_activation, 'run_scenario', lambda *a, **kw: (deepcopy(active), lab))
     pack = load_pack(Path(__file__).parents[1] / 'packs/PACK-BASELINE')
-    assert pack.manifest.revision == 34
+    assert pack.manifest.revision == 35
     store, evd, result = common.pipeline(tmp_path / 'product', pack, group.env, 'REQ-12', values,
         {'target': str(target_file), 'prepared': str(group.manifest_path), 'common_inputs': descriptor},
         activation={'namespace': 'EXAMPLE'} if independent_fail else None)

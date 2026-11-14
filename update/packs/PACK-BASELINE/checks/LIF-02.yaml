@@ -2,7 +2,7 @@ id: LIF-02
 framework_id: CHK-LIF-002
 mechanism_ids:
 - mechanism-07
-revision: 4
+revision: 5
 retired: false
 area: LIF
 purpose: 재시도 비용 제한
@@ -16,28 +16,7 @@ impact: LOW
 applies_when:
   prose: 원격 취득 또는 SDK/도구의 재시도가 사용될 때 적용한다. 추론 retry와 취득 retry를 구분한다.
 policy_params:
-- key: supply_environment_sha256
-  type: str
-  required: true
-- key: supply_normal_target_sha256
-  type: str
-  required: true
-- key: supply_challenge_target_sha256
-  type: str
-  required: true
-- key: supply_normal_prepared_sha256
-  type: str
-  required: true
-- key: supply_challenge_prepared_sha256
-  type: str
-  required: true
 - key: supply_record_source_sha256
-  type: str
-  required: true
-- key: supply_validity_start
-  type: str
-  required: true
-- key: supply_validity_end
   type: str
   required: true
 - key: supply_max_attempts

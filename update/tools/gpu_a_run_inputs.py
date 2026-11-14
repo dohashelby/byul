@@ -192,6 +192,13 @@ def _no_kubectl(*args, **kwargs):
     raise AssertionError('RUN_INPUTS_NO_KUBECTL')
 
 
+def _run_bound(check_id):
+    """Keys the current pack leaves to the per-run binding instead of the policy."""
+    from guard.executors import run_binding
+    from guard.models import load_pack
+    return run_binding.keys_for(load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks[check_id])
+
+
 def check_inputs(check_id, env, target_value, prepared_dir, case_list, draft, *, root):
     if check_id not in projection.ROLES or check_id == 'REQ-15':
         raise ValueError('RUN_INPUTS_CHECK_UNSUPPORTED')
@@ -208,6 +215,9 @@ def check_inputs(check_id, env, target_value, prepared_dir, case_list, draft, *,
     values = {key: value for key, value in (draft['values'].get(check_id) or {}).items() if not key.startswith('sensor_')}
     values.update(sensor_environment_sha256=env.ref().sha256, sensor_target_sha256=target_sha,
         sensor_prepared_sha256=sha256_hex(canonical_json(prepared)), sensor_manifest_sha256=sha256_hex(canonical_json(manifest)))
+    # PACK-BASELINE@35: guard run computes these from the same files (guard-run-binding/1); a policy must not carry them.
+    for key in _run_bound(check_id):
+        values.pop(key, None)
     policy = {'data_origin': 'EXAMPLE' if check_id in EXAMPLE_POLICY_CHECKS else 'DECLARED', 'status': 'DRAFT',
         'pack': deepcopy(draft['pack']), 'values': {check_id: values}, 'scope': {'include': [check_id], 'exclude': []},
         'exceptions': [], 'confirmed_by': None, 'confirmed_at': None}
@@ -231,7 +241,8 @@ def timing_group_inputs(env, target_value, prepared_dir, cohorts, draft, *, root
         'file_sha256': sha256_hex(raw_files[f'part-{i}.json']),
         'manifest_sha256': sha256_hex(canonical_json(part))} for i, part in enumerate(parts, 1)])
     group.validate_parts(manifest, parts)
-    policy['values']['REQ-17']['sensor_manifest_sha256'] = sha256_hex(canonical_json(manifest))
+    if 'sensor_manifest_sha256' not in _run_bound('REQ-17'):
+        policy['values']['REQ-17']['sensor_manifest_sha256'] = sha256_hex(canonical_json(manifest))
     return manifest, policy, config, raw_files
 
 
@@ -369,7 +380,7 @@ def main(argv=None):
             f'uv run guard report --plan <PLAN> --config {args.out.absolute() / "guard.toml"} --json {args.out.absolute() / "report.json"}']
         _write(args.out / 'commands.txt', '\n'.join(commands) + '\n')
         print(json.dumps({'schema': SCHEMA, 'check': args.check, 'cases': len(case_list), 'lab': 'lab_contexts' in manifest,
-            'manifest_sha256': policy['values'][args.check]['sensor_manifest_sha256']}))
+            'manifest_sha256': sha256_hex(canonical_json(manifest))}))
 
 
 if __name__ == '__main__':

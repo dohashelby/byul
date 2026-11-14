@@ -1,21 +1,6 @@
 executor: profiler_observation
 collection_profile: kubernetes-profiler-control-v1
 policy_params:
-- key: profiler_environment_sha256
-  type: str
-  required: true
-- key: profiler_target_sha256
-  type: str
-  required: true
-- key: profiler_prepared_sha256
-  type: str
-  required: true
-- key: profiler_validity_start
-  type: str
-  required: true
-- key: profiler_validity_end
-  type: str
-  required: true
 - key: profiler_backend_kind
   type: str
   required: true

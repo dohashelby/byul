@@ -2,7 +2,7 @@ id: REQ-18
 framework_id: CHK-REQ-018
 mechanism_ids:
 - mechanism-04
-revision: 4
+revision: 5
 retired: false
 area: REQ
 purpose: 실행 상태·버퍼 수명
@@ -15,19 +15,7 @@ review_order: implementation_path_first
 impact: MEDIUM
 applies_when:
   prose: 실제 runner의 batch 자리 이동·재사용 경로를 확인한다. V1 CPU mask 시험과 V2 상태/count 시험을 구분한다.
-policy_params:
-- key: sensor_environment_sha256
-  type: str
-  required: true
-- key: sensor_target_sha256
-  type: str
-  required: true
-- key: sensor_prepared_sha256
-  type: str
-  required: true
-- key: sensor_manifest_sha256
-  type: str
-  required: true
+policy_params: []
 policy_prose:
   policy_to_decide: 요청별 제한 의미·정상 대조
   enterprise_decisions: 지원 GPU·runner·mode·shape/입력 범위, 정상 대조 방식·수치 오차·성능·장애 처리 기준과 실제 peer. 범위 밖 접근·타 요청 혼입·유출은 정책이나 허용 수치 오차로 완화할 수 없다.

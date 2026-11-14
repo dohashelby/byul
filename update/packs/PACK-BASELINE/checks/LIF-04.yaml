@@ -2,7 +2,7 @@ id: LIF-04
 framework_id: CHK-LIF-004
 mechanism_ids:
 - mechanism-07
-revision: 5
+revision: 6
 retired: false
 area: LIF
 purpose: 자원 예산·공정성
@@ -16,21 +16,6 @@ impact: LOW
 applies_when:
   prose: 스트리밍 수신 지연·연결 종료를 확인한다. response debug buffering은 실제 활성 route에서 추가한다.
 policy_params:
-- key: buffer_environment_sha256
-  type: str
-  required: true
-- key: buffer_target_sha256
-  type: str
-  required: true
-- key: buffer_prepared_sha256
-  type: str
-  required: true
-- key: buffer_validity_start
-  type: str
-  required: true
-- key: buffer_validity_end
-  type: str
-  required: true
 - key: buffer_max_write_bytes
   type: int
   required: true

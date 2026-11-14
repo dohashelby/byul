@@ -1,9 +1,6 @@
 executor: credential_revocation
 collection_profile: kubernetes-credential-revocation-observation-v1
 policy_params:
-  - { key: revocation_environment_sha256, type: str, required: true }
-  - { key: revocation_target_sha256, type: str, required: true }
-  - { key: revocation_prepared_sha256, type: str, required: true }
   - { key: revocation_validity_start, type: str, required: true }
   - { key: revocation_validity_end, type: str, required: true }
   - { key: revocation_issuer_id, type: str, required: true }

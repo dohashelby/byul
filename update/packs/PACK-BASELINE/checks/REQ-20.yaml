@@ -2,7 +2,7 @@ id: REQ-20
 framework_id: CHK-REQ-020
 mechanism_ids:
 - mechanism-05
-revision: 5
+revision: 6
 retired: false
 area: REQ
 purpose: 실행 상태·버퍼 수명
@@ -15,19 +15,7 @@ review_order: implementation_path_first
 impact: HIGH
 applies_when:
   prose: CUDA Graph의 실제 활성 여부와 runner/mode를 먼저 확인한다. 명시 활성 옵션 부재만으로 비사용을 판단하지 않는다.
-policy_params:
-- key: sensor_environment_sha256
-  type: str
-  required: true
-- key: sensor_target_sha256
-  type: str
-  required: true
-- key: sensor_prepared_sha256
-  type: str
-  required: true
-- key: sensor_manifest_sha256
-  type: str
-  required: true
+policy_params: []
 policy_prose:
   policy_to_decide: 지원 mode·정상 대조·출력 허용 차이
   enterprise_decisions: 지원 GPU·runner·mode·shape/입력 범위, 정상 대조 방식·수치 오차·성능·장애 처리 기준과 실제 peer. 범위 밖 접근·타 요청 혼입·유출은 정책이나 허용 수치 오차로 완화할 수 없다.

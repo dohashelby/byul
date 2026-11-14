@@ -9,8 +9,6 @@ policy_params:
   - { key: api_ip, type: str, required: true }
   - { key: api_port, type: int, required: true }
   - { key: plaintext_forbidden, type: bool, required: true }
-  - { key: validity_start, type: str, required: true }
-  - { key: validity_end, type: str, required: true }
 required_observations:
   - { key: forbidden_plaintext_successes, type: "list[str]" }
   - { key: api_transport_trials, type: "list[dict]" }

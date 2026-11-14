@@ -1,18 +1,6 @@
 executor: engine_sensor
 collection_profile: engine-sensor-cache-timing-v1
 policy_params:
-- key: sensor_environment_sha256
-  type: str
-  required: true
-- key: sensor_target_sha256
-  type: str
-  required: true
-- key: sensor_prepared_sha256
-  type: str
-  required: true
-- key: sensor_manifest_sha256
-  type: str
-  required: true
 - key: cache_timing_max_auc_percent
   type: int
   required: true

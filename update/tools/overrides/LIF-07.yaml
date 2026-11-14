@@ -1,19 +1,4 @@
 policy_params:
-- key: init_environment_sha256
-  type: str
-  required: true
-- key: init_target_sha256
-  type: str
-  required: true
-- key: init_prepared_sha256
-  type: str
-  required: true
-- key: init_validity_start
-  type: str
-  required: true
-- key: init_validity_end
-  type: str
-  required: true
 - key: init_executor_backend
   type: str
   required: true

@@ -1,9 +1,6 @@
 executor: session_revocation
 collection_profile: kubernetes-existing-http-session-observation-v1
 policy_params:
-  - { key: session_environment_sha256, type: str, required: true }
-  - { key: session_target_sha256, type: str, required: true }
-  - { key: session_prepared_sha256, type: str, required: true }
   - { key: session_validity_start, type: str, required: true }
   - { key: session_validity_end, type: str, required: true }
   - { key: session_issuer_id, type: str, required: true }

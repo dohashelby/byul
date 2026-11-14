@@ -2,7 +2,7 @@ id: PLT-05
 framework_id: CHK-PLT-005
 mechanism_ids:
 - mechanism-11
-revision: 4
+revision: 5
 retired: false
 area: PLT
 purpose: 자격 제공·사용 제한
@@ -16,28 +16,7 @@ impact: MEDIUM
 applies_when:
   prose: 선정 SDK·취득 주체가 만료·누락 자격을 처리하는 경로를 확인한다. 익명/대체 접근을 지원하면 해당 분기를 추가한다.
 policy_params:
-- key: supply_environment_sha256
-  type: str
-  required: true
-- key: supply_normal_target_sha256
-  type: str
-  required: true
-- key: supply_challenge_target_sha256
-  type: str
-  required: true
-- key: supply_normal_prepared_sha256
-  type: str
-  required: true
-- key: supply_challenge_prepared_sha256
-  type: str
-  required: true
 - key: supply_record_source_sha256
-  type: str
-  required: true
-- key: supply_validity_start
-  type: str
-  required: true
-- key: supply_validity_end
   type: str
   required: true
 - key: supply_allowed_identities

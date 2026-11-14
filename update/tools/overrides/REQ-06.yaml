@@ -1,15 +1,11 @@
 executor: stored_responses
 collection_profile: kubernetes-stored-response-ownership-v1
 policy_params:
-  - { key: stored_environment_sha256, type: str, required: true }
-  - { key: stored_target_sha256, type: str, required: true }
   - { key: stored_session, type: str, required: true }
   - { key: stored_identity_policy_sha256, type: str, required: true }
   - { key: stored_api_router_source_sha256, type: str, required: true }
   - { key: stored_serving_source_sha256, type: str, required: true }
   - { key: stored_protocol_source_sha256, type: str, required: true }
-  - { key: stored_validity_start, type: str, required: true }
-  - { key: stored_validity_end, type: str, required: true }
   - { key: stored_origins, type: "list[str]", required: true }
   - { key: stored_operations, type: "list[str]", required: true }
   - { key: stored_retention, type: str, required: true }

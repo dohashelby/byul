@@ -135,7 +135,11 @@ def test_registered_collection_draft_evd_and_judge_keep_fail(tmp_path, monkeypat
     parts = collected(env, cid, values)
     calls = []
     def read_role(self, check, selected_env, selected_values, role):
-        assert selected_env.ref() == env.ref() and selected_values == values
+        # @35: guard run opens the validity window; every other value is the policy/binding value given.
+        window = ("supply_validity_start", "supply_validity_end")
+        assert selected_env.ref() == env.ref()
+        assert {k: v for k, v in selected_values.items() if k not in window} == {k: v for k, v in values.items() if k not in window}
+        assert all(selected_values[k] != values[k] for k in window)
         item = deepcopy(parts[role])
         contract.validate_record(item["packet"], check_id=cid, role=role,
             environment_ref=selected_env.ref().model_dump(mode="json"),
@@ -145,14 +149,18 @@ def test_registered_collection_draft_evd_and_judge_keep_fail(tmp_path, monkeypat
         return item
     monkeypatch.setattr(boot.KubernetesSupplyBootExecutor, "_collect_role", read_role)
     store = Store(tmp_path / "store"); put_pack(store, PACK.path)
-    pol = policy(PACK.ref(), scope={"include": [cid]}, values={cid: values})
+    from tests.run_binding_support import fixed_file_hashes, split
+    # @35: guard run computes the binding; only the double's file hashes are fixed.
+    policy_values, file_hashes = split(PACK.checks[cid], values)
+    pol = policy(PACK.ref(), scope={"include": [cid]}, values={cid: policy_values})
     store.put_many([env, pol]); plan = select(PACK, [env], pol); store.put(plan)
     # 작업 폴더는 실행 시도마다 따로다(work/<plan>/<attempt>/<check>/<side>). 시도 ID를 정해 같은 경로에 장애를 둔다.
     attempt = new_id("ATTEMPT")
     workdir = store.root / "work" / plan.id / attempt / cid / "single"
     original = storage_fault(monkeypatch, workdir, fault)
-    evd, = run_plan(store, PACK, plan, RunConfig(executors={"supply_boot": "kubernetes"}, adapter="vllm", attempt_id=attempt,
-        raw={"supply_boot": {"normal": {}, "challenge": {}}}))
+    with fixed_file_hashes(file_hashes):
+        evd, = run_plan(store, PACK, plan, RunConfig(executors={"supply_boot": "kubernetes"}, adapter="vllm", attempt_id=attempt,
+            raw={"supply_boot": {"normal": {}, "challenge": {}}}))
     result, = judge_plan(store, PACK, plan, as_of=utcnow())
     assert result.verdicts.security.value == "FAIL"
     assert calls == list(contract.ROLES)

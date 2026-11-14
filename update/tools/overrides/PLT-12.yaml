@@ -1,14 +1,10 @@
 executor: required_event_record
 collection_profile: kubernetes-credential-copy-record-observation-v1
 policy_params:
-  - { key: copy_environment_sha256, type: str, required: true }
-  - { key: copy_target_sha256, type: str, required: true }
   - { key: copy_inventory_sha256, type: str, required: true }
   - { key: copy_policy_sha256, type: str, required: true }
   - { key: copy_record_source_sha256, type: str, required: true }
   - { key: copy_record_session, type: str, required: true }
-  - { key: copy_validity_start, type: str, required: true }
-  - { key: copy_validity_end, type: str, required: true }
   - { key: copy_max_record_delay_ms, type: int, required: true }
 required_observations:
   - { key: copy_inventory_declarations, type: list }

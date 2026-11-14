@@ -120,9 +120,16 @@ def verify_capture(prepared, capture):
     manifest = json.loads(_read(prepared / 'manifest.json', 32768), object_pairs_hook=runtime._pairs)
     raw_settings = _read(prepared / 'settings.json', 32768)
     settings = json.loads(raw_settings, object_pairs_hook=runtime._pairs)
+    assets_current = set(manifest['assets']) == runtime.ASSETS
+    if not assets_current:
+        # 실제 반출한 과거 준비물은 정확 소스 SHA/전체 자산 해시 행으로만 재검증한다.
+        # 현재 준비물의 필수 자산을 누락시킨 것으로 대신할 수 없다.
+        history = json.loads(runtime.sources.PROFILES.read_bytes()).get('prepared_history', [])
+        if not any(manifest.get('source_manifest_sha256') == row['source_manifest_sha256']
+                   and manifest['assets'] == row['assets'] for row in history):
+            raise ValueError('RANK_IPC_PREPARED_MISMATCH')
     if (manifest['schema'] != 'guard-rank-ipc-prepared-candidate/1'
             or settings['schema'] != 'guard-rank-ipc-settings/1'
-            or set(manifest['assets']) != runtime.ASSETS
             or any(manifest.get(k) is not False for k in ('observer_installed', 'engine_group_verified', 'producer_registered'))
             or sha256(raw_settings).hexdigest() != manifest['settings_sha256']
             or settings['assets'] != manifest['assets'] or settings['image'] != manifest['image']
@@ -169,19 +176,58 @@ def verify_capture(prepared, capture):
         if payload.get('gaps'):
             gaps.extend(payload['gaps'])
             continue
-        expected = profile['sources'][payload['source_module']]
+        rpc = payload.get('schema') == 'guard-rank-rpc-hook-candidate/1'
+        table = profile.get('rpc_sources', {}) if rpc else profile['sources']
+        if payload.get('source_module') not in table:
+            raise ValueError('RANK_IPC_SOURCE_RECORD_INVALID')
+        expected = table[payload['source_module']]
         hook = expected['hooks'][payload['point']]
         graph = payload['source_graph']
-        required = hook.get('source_modules', list(profile['sources']))
-        if (payload['schema'] != 'guard-rank-ipc-hook-candidate/1' or payload['context'] != context
+        required = hook.get('source_modules', list(table))
+        if (payload['schema'] != ('guard-rank-rpc-hook-candidate/1' if rpc else 'guard-rank-ipc-hook-candidate/1') or payload['context'] != context
                 or payload['image'] != manifest['image'] or payload['profile'] != profile['id']
                 or payload['source_sha256'] != expected['sha256']
                 or payload['body_code_sha256'] != expected['body_code_sha256'][payload['point']]
                 or payload['phase'] != hook['phase'] or payload['role'] != hook['role']
                 or any(payload.get(k) is not False for k in ('source_authenticated', 'engine_group_verified', 'producer_registered'))
-                or not set(required) <= set(graph) or not set(graph) <= set(profile['sources'])
-                or any(digest != profile['sources'][name]['sha256'] for name, digest in graph.items())):
+                or not set(required) <= set(graph) or not set(graph) <= set(table)
+                or any(digest != table[name]['sha256'] for name, digest in graph.items())):
             raise ValueError('RANK_IPC_SOURCE_RECORD_INVALID')
+        if rpc:
+            fingerprint = lambda v: type(v) is str and re.fullmatch('[0-9a-f]{64}', v) is not None
+            ids = payload.get('request_hmac_sha256')
+            if (payload.get('event') not in {'CALL', 'RETURN', 'RAISE'}
+                    or not fingerprint(payload.get('call_hmac_sha256'))
+                    or type(ids) is not list or len(ids) > 8 or any(not fingerprint(v) for v in ids)
+                    or len(set(ids)) != len(ids)
+                    or any(type(payload.get(k)) is not bool for k in
+                           ('rpc_parent_frame_verified', 'rpc_parent_worker_verified'))
+                    or payload['rpc_parent_frame_verified'] != payload['rpc_parent_worker_verified']):
+                raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+            parent = payload.get('rpc_parent_call_hmac_sha256')
+            if payload['rpc_parent_frame_verified']:
+                if (not hook.get('parent') or not ids or not fingerprint(parent)
+                        or parent == payload['call_hmac_sha256']):
+                    raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+            elif parent is not None:
+                raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+            if hook.get('parent') and not payload['rpc_parent_frame_verified']:
+                raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+            if hook['kind'] == 'rpc' and not ids:
+                raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+            if any(type(payload.get(k)) is not int or not 0 <= payload[k] < 2**63
+                   for k in ('operation_started_ns', 'observation_ns')) or payload['operation_started_ns'] > payload['observation_ns']:
+                raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+            if hook['kind'] == 'external-id' and payload['event'] == 'RETURN':
+                if not fingerprint(payload.get('external_request_hmac_sha256')):
+                    raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
+            if hook['kind'] == 'assignment' and payload['event'] == 'RETURN':
+                assignment = payload.get('assignment', {})
+                if (assignment.get('schema') != 'guard-rank-request-assignment-candidate/1'
+                        or not all(fingerprint(assignment.get(k)) for k in ('external_hmac_sha256', 'internal_hmac_sha256'))
+                        or any(assignment.get(k) is not False for k in
+                               ('source_authenticated', 'rpc_active_verified', 'producer_registered'))):
+                    raise ValueError('RANK_RPC_SOURCE_RECORD_INVALID')
         rows.append(payload)
     return {'schema': 'guard-rank-ipc-capture-review/1', 'session': manifest['session'],
             'image': manifest['image'], 'snapshots': len(paths), 'source_rows_verified': len(rows),

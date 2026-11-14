@@ -252,5 +252,26 @@
         "project_dependencies_changed": false
       }
     }
+  },
+  "후속_RPC_관측_구성요소_CPU": {
+    "설치_소스_파일": {
+      "기준": 6,
+      "후보": 8
+    },
+    "원_함수_본문": {
+      "기준": 4,
+      "후보": 5
+    },
+    "관측_지점_고정값": "후보 유지",
+    "컴파일_소비_대조": "각 이미지 Python ABI로 설치 bytes/본문을 대조. namespace 대역이며 실제 엔진 import/실행은 아님",
+    "새_시험_각_ABI": 39,
+    "직접_영향_경로_시험": 103,
+    "RPC_실제_엔진_관측": false,
+    "nonce_주입_제어": false,
+    "source_authenticated": false,
+    "engine_group_verified": false,
+    "producer_registered": false,
+    "기존_IPC_소스_행": "원4파일/7함수 행 그대로",
+    "과거_실제_원_기록_재검증": "각3개·gaps0"
   }
 }

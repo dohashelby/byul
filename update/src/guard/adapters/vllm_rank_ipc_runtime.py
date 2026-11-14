@@ -20,12 +20,15 @@ from . import vllm_lifecycle_sensor as base
 from . import vllm_rank_ipc_identity as identity
 from . import vllm_rank_ipc_sources as sources
 from . import vllm_rank_ipc_hooks as hooks
+from . import vllm_rank_request_identity as request_identity
+from . import vllm_rank_rpc_hooks as rpc_hooks
 from . import vllm_worker_generation_contract as relative
 
 ROOT = Path('/guard-rank-ipc')
 MODULES = {'vllm_lifecycle_sensor': base, 'vllm_rank_ipc_identity': identity,
            'vllm_rank_ipc_sources': sources, 'vllm_rank_ipc_hooks': hooks,
-           'vllm_worker_generation_contract': relative}
+           'vllm_worker_generation_contract': relative,
+           'vllm_rank_request_identity': request_identity, 'vllm_rank_rpc_hooks': rpc_hooks}
 ASSETS = frozenset({'guard/__init__.py', 'guard/adapters/__init__.py', 'sitecustomize.py',
     'guard/adapters/vllm_rank_ipc_runtime.py', 'guard/adapters/assets/vllm_rank_ipc_profiles.json',
     *('guard/adapters/' + name + '.py' for name in MODULES)})
@@ -124,7 +127,9 @@ def _freeze(value):
         selected = {'sha', 'code_digest', '_context', '_open_directory'} if name == 'vllm_lifecycle_sensor' else None
         _freeze_module(module, value['assets']['guard/adapters/' + name + '.py'], selected)
     if (sources.code_digest is not base.code_digest or sources.relative_code is not relative.relative_code
-            or hooks.base is not base or hooks.identity is not identity or hooks.sources is not sources):
+            or hooks.base is not base or hooks.identity is not identity or hooks.sources is not sources
+            or rpc_hooks.ipc is not hooks or rpc_hooks.sources is not sources
+            or rpc_hooks.request_identity is not request_identity):
         raise ValueError('RANK_IPC_OBSERVER_ALIAS_UNAVAILABLE')
 
 
@@ -227,6 +232,20 @@ class IPCSourceFinder:
         return spec
 
 
+class CombinedObserver:
+    def __init__(self, *, image, key, emit):
+        self.ipc = hooks.IPCObserver(image=image, key=key, emit=emit)
+        self.rpc = rpc_hooks.RPCObserver(image=image, key=key, emit=emit, identity_observer=self.ipc)
+        self.profile = {**self.ipc.profile, 'sources': {**self.ipc.profile['sources'], **self.rpc.sources}}
+
+    def attach(self, module):
+        name = vars(module)['__name__']
+        if name in self.ipc.profile['sources']:
+            self.ipc.attach(module)
+        if name in self.rpc.sources:
+            self.rpc.attach(module)
+
+
 def install():
     global _INSTALLED
     if _INSTALLED is not None:
@@ -234,7 +253,7 @@ def install():
     value, digest = _settings()
     _freeze(value)
     writer = SnapshotWriter(value, digest)
-    observer = hooks.IPCObserver(image=value['image'], key=bytes.fromhex(value['key']), emit=writer)
+    observer = CombinedObserver(image=value['image'], key=bytes.fromhex(value['key']), emit=writer)
     runtime = sys.implementation.name + '-' + '.'.join(map(str, sys.version_info[:3]))
     if observer.profile['runtime'] != runtime or sys.flags.optimize != 0:
         raise ValueError('RANK_IPC_RUNTIME_UNAVAILABLE')

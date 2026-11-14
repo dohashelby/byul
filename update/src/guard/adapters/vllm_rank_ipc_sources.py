@@ -72,10 +72,11 @@ def _function(module, name):
     return owner
 
 
-def qualify(module, *, image):
+def qualify(module, *, image, scope='sources'):
     """고정 이미지 행·정확 파일·현재 원 함수가 모두 맞을 때 후보 자료만 반환한다."""
     try:
-        if type(module) is not types.ModuleType or type(image) is not str:
+        if (type(module) is not types.ModuleType or type(image) is not str
+                or type(scope) is not str or scope not in {'sources', 'rpc_sources'}):
             raise ValueError
         profiles = json.loads(PROFILES.read_bytes())
         if profiles['schema'] != 'guard-rank-ipc-source-candidates/1':
@@ -87,7 +88,7 @@ def qualify(module, *, image):
         runtime = sys.implementation.name + '-' + '.'.join(map(str, sys.version_info[:3]))
         if profile['runtime'] != runtime or sys.flags.optimize != 0:
             raise ValueError
-        expected = profile['sources'][vars(module).get('__name__')]
+        expected = profile[scope][vars(module).get('__name__')]
         path = vars(module).get('__file__')
         if type(path) is not str:
             raise ValueError

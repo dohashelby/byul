@@ -88,3 +88,12 @@ CPU 시험은 고정 자료의 잘못된 소스·rank·world/output·그룹·clo
 `vllm_rank_request_identity`는 정확 source hook이 고른 클래스/필드의 요청 ID만 세션 HMAC으로 바꾸는 미등록 후보다. 기준의 구조체 목록과 후보의 스케줄러 양수 작업 dict, external/internal ID 쌍을 구분한다. 일반 dict가 없는 구조체는 정확 클래스 namespace와 표준 member descriptor 소유자를 확인하며 property·사용자 getter/descriptor를 실행하지 않는다. ID 중복/상한·잘못된 형식·변경 중인 필드·클래스 교체를 거부하고 원 ID/본문/토큰을 반환하지 않는다.
 
 직접17개가 CPython3.12.3/3.12.8에서 각각 통과했다. 승인된 기존 이미지 레이어에서 추가 다운로드 없이 msgspec C 모듈844,672 bytes를 제한 추출해, 각 이미지 Python/해당 구조체 구현에서도 같은 표준 슬롯 읽기와 요청 ID 변경 구분을 확인했다. 프로젝트·venv 의존성은 바꾸지 않았고 엔진/CPU 이미지 실증은 아니다. 이 구성요소만으로 활성 RPC·nonce·실제 주입·해제·새 세대 복구를 증명하지 않으며 rpc_active_verified/source_authenticated/producer_registered=false다. 아직 실제 source hook/제어에 연결하지 않았다.
+
+
+## 정확 RPC 프레임·worker·요청의 CPU 연결 후보
+
+`vllm_rank_rpc_hooks`를 비밀 준비 자산/독립 namespace의 설치 경로에 연결했다. 기준은 실제 driver 실행 안의 worker 호출, 후보는 실제 worker RPC 안의 wrapper 호출을 adapter 데이터로 고른다. 같은 요청 HMAC·같은 프로세스 문맥·실제 상위 원 함수의 code/globals/self 프레임과 worker 객체 경로가 모두 맞아야 rpc_parent_frame_verified/rpc_parent_worker_verified가 true다. ContextVar 토큰·같은 요청 ID·시각만으로 대체하지 않는다. 해당 true는 원 프레임/worker 연결의 한 사실이며 전체 그룹/생산자 인증은 아니다. API 반환 ID와 후보 external/internal 재배정도 원 ID 없이 HMAC으로만 기록한다.
+
+원 함수의 인자/반환/예외를 보존하고 관측 sink의 SystemExit/KeyboardInterrupt도 원 호출을 바꾸지 않도록 처리한다. 정상/예외 호출 앞뒤에 같은 call 지문을 남기며 source·본문·설치 hook이 바뀌면 연결을 만들지 않는다. 기존 IPC scope는 그대로 두고 RPC scope를 명시적으로 선택한다. 실제 반출한 이전10파일 준비물은 정확 소스 SHA/자산 전체 해시 행으로만 재검증하며 현재 준비물의 자산 누락과 바꿔치기는 거부한다.
+
+추가39개(요청 ID17·RPC hook15·독립 설치/변조 거부7)가 두 Python ABI에서 각각 통과했고 직접 영향/경로103개가 통과했다. 설치 소스6/8파일·함수4/5개는 각 ABI의 컴파일/소비 대조이며 엔진을 import/실행한 GPU 자격이 아니다. 과거 실제 GPU 원 기록6개도 현재 도구로 재검증했다. 기존 native24 고정값·등록표·TP1 거부 조건을 보존한다. 아직 이 RPC 후보를 실제 엔진에서 관측하지 않았고 nonce 제어·주입·해제·새 세대 복구는 미연결이다. source_authenticated/engine_group_verified/producer_registered=false이며 실제 장애0회다.

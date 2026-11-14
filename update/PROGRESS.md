@@ -1,3 +1,10 @@
+## 2026-11-14 — 정확 상위 RPC 프레임·동일 worker/요청의 CPU 연결
+
+- 한 일: 같은 구현에 판본별 RPC source 데이터를 더해 기준 driver 안 worker 호출과 후보 worker RPC 안 wrapper 호출, API 반환 ID/후보 내부 재배정을 관측한다. 같은 요청 HMAC·문맥·실제 원 함수 code/globals/self 프레임·worker 객체 경로를 모두 대조하며 토큰/ID/시각만으로 연결하지 않는다. 앞뒤 call 지문·원 호출/예외를 보존하고 관측 sink의 BaseException도 원 호출을 바꾸지 않는다. 기존 IPC scope와 source 행은 그대로다. 실제 과거 준비물은 정확 소스 SHA/전체 자산 해시로만 재검증하며 현재 자산 누락을 거부한다.
+- 테스트 결과: 직접 영향/경로103개 통과(pytest8.14초·벽시계8.541초). 새39개가 두 Python ABI에서 각각 통과했다(기준3.08초·후보2.94초). 설치6/8파일·4/5함수의 정확 bytes/ABI 컴파일 소비를 확인했지만 모듈 namespace 대역이며 실제 엔진 실행은 아니다. 과거 실제 GPU 원 기록은 각3개/gaps0로 다시 대조했다. 현황 --check·546파일 소스 관문·diff --check 통과. 소스 목록 자체SHAa65e78f3의 결정5 행을 추가했고 기존 native24·등록표·TP1 조건은 무변경이다. 앞선 head998a5d20 CI9개 모두 SUCCESS이며 새 코드 CI는 별도 확인한다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 이 묶음을 고정해 같은 draft PR에 반영하고 nonce 제어·실제 PID/세대·물리 주입/해제·새 소유자 복구를 연결한다. source/CPU 거부 시험을 충족한 경로만 동일 승인 GPU에서 실행한다. 현재 원 RPC 프레임 연결 true를 전체 그룹 수락/생산자 인증으로 쓰지 않는다.
+- 막힌 것: 새 RPC 연결은 CPU EXAMPLE 검증이고 실제 엔진 관측·nonce/주입/해제/복구 제어는 미완료다. 실제 장애0회·source_authenticated/engine_group_verified/producer_registered=false, 동일 노드 stopped/설치본 임시 보존을 유지한다. A 실제 입력52쪽/전체136쪽과 다른 관측기 등록·전체69개 실증은 별도다. #263 draft·M-B4 보관·runtime/contracts 무변경을 유지한다.
+
 ## 2026-11-14 — 활성 요청 연결의 구조체 ID 읽기 구성요소
 
 - 한 일: 정확 source hook이 넘길 요청 metadata에서 ID만 세션 HMAC으로 바꾸는 adapter 구성요소를 구현했다. 구조체 목록·양수 스케줄 dict·external/internal 재배정 쌍을 구분하고 실제 클래스 namespace/표준 슬롯 또는 일반 dict만 읽는다. property·사용자 getter/descriptor·원문 본문/토큰을 읽지 않으며 다른 클래스·중복/상한·형식·읽는 도중 교체를 거부한다. 기준/후보의 헤더 ID와 후보 내부 ID 재배정, 기준 비-driver worker broadcast 구조 및 정확 실행 지점을 설치 소스에서 확인했다. 현행 모델 표의 미고정/미기동 설명을 실제 기동 사실과 결정34에 맞췄다.

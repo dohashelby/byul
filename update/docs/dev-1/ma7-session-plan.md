@@ -1,6 +1,6 @@
 # 두 판본 J01·J02 입력·시간·비용 계획
 
-2026-11-13 작성. 단독 개발자의 M-A7 계획이며 실행 승인이나 실측 결과가 아니다. 판본·GPU 이미지는 작업지시서 0.1절만 따른다. 기준은 사용자 결정 14에 따라 V0 기본을 유지한다. 계획의 정본 팩은 #257의 @34이며 main 병합은 별도 승인 대상이다.
+2026-11-13 작성. 단독 개발자의 M-A7 계획이며 실행 승인이나 실측 결과가 아니다. 판본·GPU 이미지는 작업지시서 0.1절만 따른다. 기준은 사용자 결정 14에 따라 V0 기본을 유지한다. 계획의 정본 팩 @34는 #257로 main에 병합됐다. 현재 계획은 main b1d209fc와 M-A8 후속 입력 준비를 기준으로 한다.
 
 69개 점검별 두 쪽의 ENV·target·prepared·정책 포인터, 필요한 정책 키와 예상 공백은 [입력 계획 JSON](ma7-session-input-plan.json)에 있다. 69개 = M-A 27개 + M-B 42개, J01 6개 + J02 63개다. 퇴역 점검 8개는 포함하지 않는다. 실제 클러스터 입력이 없어 138쪽의 ENV/target은 `null`이며 사유를 적었다. SUP-08 두 쪽에는 실제 로컬 fixture·기동 계획·EXAMPLE/DRAFT 정책·target 결합 대기 설정을 연결했다. 구조/로컬 자산 검증과 실제 입력 사전 점검을 구분하며 `ready_for_execution=false`, `input_preflight_passed=false`다.
 
@@ -63,3 +63,18 @@ EBS·스냅샷 보존, 전송·공인 IPv4, 세금·환율은 위 EC2 합계에 
 
 
 2026-11-13 REQ-16 후속: [공식 지정 모델의 고정 revision](https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct/tree/895c3a49bc3fa70a340399125c650a463535e71c)을 계획 후보로 선택했다. [검토 기록](ma7-req16-model-candidate.json)에 공식 API·config/preprocessor/index의 실제 bytes SHA와 두 가중치 파일의 LFS 크기/해시 메타데이터를 남겼다. 조회한 고정 메타데이터 합계66,030 bytes이며 가중치4,418,050,768 bytes는 받지 않았다. config의 transformers_version은 선언값이고 두 판본의 설치/호환 증명이 아니다. 양쪽 planned_model에 같은 revision 후보를 연결했으며 실제 ENV/target138쪽·실행/사전 점검 false·결과 null은 유지한다.
+
+
+## M-A7 로컬 입력 파일 준비 결과
+
+2026-11-14 사용자 결정23의 분할 수집 계약에 맞춰 source67f1a5be에서 REQ-15까지 포함한 실제 입력 v6를 만들었다. 현재 폴더는 작업 폴더 `inputs/ma7-materialized-20261114-v6`이고 [준비 기록](ma7-local-materialization-20261113.json)·입력 계획 JSON의 포인터/SHA에 연결했다. 이전 v5·REQ-15 별도 추가 묶음과 초기 묶음은 보관용이다.
+
+- 양쪽 prepared18개·서로 다른18세션(REQ-15 포함)을 현재 guard 소스 bytes와 대조했다. REQ-19·20은 lab_kernel_checks, REQ-18만 lab_faults를 켠다. 노드 설치·런타임 자격은 미확인이다. 로컬 HMAC 값은 Git에 넣지 않고 SHA만 기록했다.
+- 기존 REQ-14·16·18 사례6개/62사례를 유지하고 REQ-17에 양쪽 각504개씩 두 파일을 추가했다. 사례 파일10개·총2,078사례이며 별도 그룹 목록2개가 있다. 두 판본의 REQ-17 사례 bytes는 같고 ENV/target·세션은 실제 실행별로 결합한다.
+- REQ-17은 역할별200·AUC55·묶음별512개 상한을 유지한다. 그룹 계약과 원 표본·시계·동일 scope/세대 검증을 구현했으며 AUC 평균을 사용하지 않는다. 새 입력과 기존 단일 입력은 구분한다. 상세는 [분할 수집 계약](req17-split-collection.md)이다.
+- SUP-08 실제 모델14개·코드 캐시5개·기동 파일12개 bytes를 2026-11-14에 다시 읽어 검증했다(34.018초). 원자료·가중치를 다시 다운로드하지 않았다. 실제 ENV/target4개·최종 사전 점검은 미완료다.
+- 확정5값을 반영한 정책 초안은 DRAFT/EXAMPLE이며 실행별 hash는 ENV/target이 확보된 뒤 조립한다. M-B42행·전체69개/138쪽 ENV/target null·실제 결과null·ready/input_preflight=false를 유지한다.
+
+재준비는 `uv run python -m tools.mvp_a_input_materialize --output <새-폴더>`를 사용한다. 매번 새 세션/HMAC이 생기므로 과거 관측 자료와 섞지 않는다. 도구는 엔진·kubectl·클라우드를 실행하지 않는다. 실제 ENV/target을 관측한 뒤 gpu_a_run_inputs·mvp_sup08_inputs로 실행별 정책/설정을 결합한다.
+
+REQ-17의 설정 예산은 묶음당 최대300초·한쪽 두 묶음 합계600초다. 경계 요청을 포함해 한쪽1,010요청·양쪽2,020요청이며 실제 시간/비용은 미측정이다. J01/J02 시간표·과거 단가 기반 비용은 여전히 가정이고 실제 대상·최신 단가 확인과 비용 승인이 필요하다. 실제 GPU 입력 사전 점검을 완료한 것으로 세지 않는다.

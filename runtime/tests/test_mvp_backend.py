@@ -528,6 +528,15 @@ class ExternalBackendHttpTests(unittest.TestCase):
         self.assertEqual(corrupt, [])
         return records
 
+    def final_record(self, request_id: str) -> dict[str, object]:
+        stop_at = time.monotonic() + 2
+        while True:
+            final = [r for r in self.records() if r.get("request_id") == request_id and r.get("phase") == "final"]
+            if final:
+                return final[-1]
+            self.assertLess(time.monotonic(), stop_at, "요청의 final 기록이 저장되지 않았습니다.")
+            time.sleep(0.01)
+
     def wait_collector(self, gateway: GatewayApp, source: str, state: str) -> dict[str, object]:
         stop_at = time.monotonic() + 2
         while time.monotonic() < stop_at:
@@ -552,7 +561,7 @@ class ExternalBackendHttpTests(unittest.TestCase):
         self.assertEqual(json.loads(body)["model"], "backend-test-model")
         self.assertEqual(self.fake.requests[-1]["model"], "backend-test-model")
         request_id = headers["X-Request-ID"]
-        final = self.records()[-1]
+        final = self.final_record(request_id)
         self.assertEqual(final["backend_kind"], "vllm")
         # fake backend id "fake-<id>" is not an engine echo of X-Request-ID.
         self.assertEqual(final["delivery"]["backend_receipt"], "engine_response_id_mismatch")

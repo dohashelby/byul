@@ -89,7 +89,7 @@ def _fill(template, values):
 
 def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revision, host_root, enforce_eager=False,
            engine_version=None, model_id=None, model_host_snapshot=None,
-           code_revision=None, extra_engine_args=(), max_model_len=2048, check_id=None):
+           code_revision=None, extra_engine_args=(), max_model_len=2048, check_id=None, release_launch=False):
     if (generation not in GENERATIONS or profile not in PROFILES or not _RUN_ID.fullmatch(run_id or '')
             or not _IMAGE.fullmatch(engine_image or '') or not re.fullmatch(r'[0-9a-f]{40}', model_revision or '')
             or not _HOST_PATH.fullmatch(host_root or '')):
@@ -134,15 +134,18 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
     engine, = (c for c in pod['spec']['containers'] if c['name'] == 'engine')
     from guard.adapters.engine_provider import VllmProvider
     release = VllmProvider().release_profile(engine_version)
+    if type(release_launch) is not bool or release_launch and (release is None or engine_image not in release['images']):
+        raise ValueError('AWS_RELEASE_LAUNCH_PROFILE_UNAVAILABLE')
     check_args = []
     if check_id is not None:
         if (release is None or engine_image not in release['images']
                 or check_id not in release['check_launch_args']):
             raise ValueError('AWS_CHECK_LAUNCH_PROFILE_UNAVAILABLE')
         check_args = release['check_launch_args'][check_id]
-    if release and release['launch']['model_argument'] == '--model':
+    if release and (release_launch or release['launch']['model_argument'] == '--model'):
         engine['command'] = list(release['launch']['command'])
-        engine['args'] = [release['launch']['model_argument'], *engine['args']]
+        if release['launch']['model_argument'] == '--model':
+            engine['args'] = [release['launch']['model_argument'], *engine['args']]
     engine['args'][engine['args'].index('--max-model-len') + 1] = str(max_model_len)
     engine['args'] = [*engine['args'], *spec['args'], *(['--enforce-eager'] if enforce_eager else [])]
     engine['args'] += [*(['--code-revision', code_revision] if code_revision else []), *extra_engine_args]
@@ -217,6 +220,7 @@ def main(argv=None):
     parser.add_argument('--model-host-snapshot')
     parser.add_argument('--max-model-len', type=int, default=2048)
     parser.add_argument('--check-id', choices=['REQ-16', 'REQ-17'], help='승인된 두 판본 캐시 비교 기동 조건')
+    parser.add_argument('--release-launch', action='store_true', help='정확한 이미지 쌍의 판본 profile 기동 명령 사용')
     parser.add_argument('--code-revision')
     parser.add_argument('--extra-engine-args-json', default='[]', help='추가 기동 인자의 JSON 배열')
     parser.add_argument('--host-root', default='/srv/byul-a')
@@ -227,7 +231,8 @@ def main(argv=None):
         run_id=args.run_id, engine_image=args.engine_image, model_revision=args.model_revision,
         host_root=args.host_root, enforce_eager=args.enforce_eager, engine_version=args.engine_version,
         model_id=args.model_id, model_host_snapshot=args.model_host_snapshot, code_revision=args.code_revision,
-        extra_engine_args=json.loads(args.extra_engine_args_json), max_model_len=args.max_model_len, check_id=args.check_id)
+        extra_engine_args=json.loads(args.extra_engine_args_json), max_model_len=args.max_model_len, check_id=args.check_id,
+        release_launch=args.release_launch)
     args.out.mkdir(parents=True)
     (args.out / 'engine.yaml').write_bytes(engine_yaml); (args.out / 'probe.yaml').write_bytes(probe_yaml)
     (args.out / 'render.json').write_text(json.dumps(record, indent=1, sort_keys=True) + '\n', encoding='utf-8')

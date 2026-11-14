@@ -220,6 +220,21 @@ def check_inputs(check_id, env, target_value, prepared_dir, case_list, draft, *,
     return manifest, policy, config
 
 
+def timing_group_inputs(env, target_value, prepared_dir, cohorts, draft, *, root):
+    from guard.executors import cache_timing_group as group
+    group.validate_case_parts(cohorts)
+    first, policy, config = check_inputs('REQ-17', env, target_value, prepared_dir, cohorts[0], draft, root=root)
+    parts = [{**first, 'cases': deepcopy(cases)} for cases in cohorts]
+    raw_files = {f'part-{i}.json': canonical_json(part) for i, part in enumerate(parts, 1)}
+    manifest = {k: v for k, v in first.items() if k != 'cases'}
+    manifest.update(schema=group.SCHEMA, parts=[{'index': i, 'file': f'part-{i}.json',
+        'file_sha256': sha256_hex(raw_files[f'part-{i}.json']),
+        'manifest_sha256': sha256_hex(canonical_json(part))} for i, part in enumerate(parts, 1)])
+    group.validate_parts(manifest, parts)
+    policy['values']['REQ-17']['sensor_manifest_sha256'] = sha256_hex(canonical_json(manifest))
+    return manifest, policy, config, raw_files
+
+
 # HTTP 점검(G-A3)의 Kubernetes 실행 설정. 기업 정책값이 아니라 요청·시간 상한과 선언 맥락이다.
 HTTP_CHECKS = {'REQ-10': ('sampling_validation', {
     'constraint_source': 'vLLM 0.31.0 SamplingParams in the ENV engine image digest',
@@ -327,10 +342,25 @@ def main(argv=None):
         _write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True)); _write(args.out / 'guard.toml', config)
         print(json.dumps({'schema': SCHEMA, 'check': args.check, 'executor': HTTP_CHECKS[args.check][0]}))
     else:
-        case_list = (cases(args.cases, media_text_after=args.media_text_after) if args.media_text_after is not None
-            else load(args.cases)['cases'] if Path(args.cases).is_file() else cases(args.cases))
-        manifest, policy, config = check_inputs(args.check, load_environment(args.env), load(args.target), args.prepared, case_list,
-            yaml.safe_load(args.policy_draft.read_text(encoding='utf-8')), root=args.out)
+        from tools import gpu_a_req17_cohort
+        source = load(args.cases) if Path(args.cases).is_file() else None
+        split = type(source) is dict and source.get('schema') == gpu_a_req17_cohort.GROUP_SCHEMA
+        draft = yaml.safe_load(args.policy_draft.read_text(encoding='utf-8'))
+        if split:
+            if args.check != 'REQ-17' or args.out.exists():
+                raise ValueError('REQ17_SPLIT_NEW_OUTPUT_REQUIRED')
+            cohorts = gpu_a_req17_cohort.load_split(args.cases)
+            manifest, policy, config, raw_files = timing_group_inputs(load_environment(args.env), load(args.target),
+                args.prepared, cohorts, draft, root=args.out)
+            args.out.mkdir(parents=True)
+            for name, raw in raw_files.items():
+                (args.out / name).write_bytes(raw)
+            case_list = [c for part in cohorts for c in part]
+        else:
+            case_list = (cases(args.cases, media_text_after=args.media_text_after) if args.media_text_after is not None
+                else source if type(source) is list else source['cases'] if source is not None else cases(args.cases))
+            manifest, policy, config = check_inputs(args.check, load_environment(args.env), load(args.target), args.prepared, case_list,
+                draft, root=args.out)
         _write(args.out / 'target.json', load(args.target)); _write(args.out / 'manifest.json', manifest)
         _write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True)); _write(args.out / 'guard.toml', config)
         commands = [f'uv run guard select --pack packs/PACK-BASELINE --env {args.env.absolute()} --policy {args.out.absolute() / "policy.yaml"} --config {args.out.absolute() / "guard.toml"}',

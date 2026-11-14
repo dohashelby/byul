@@ -78,6 +78,13 @@ def inputs(tmp_path,mode='normal'):
     'wrong-recipient','wrong-source','raw-field','trust-claim','partial','empty','after-invalid','producer-changed','missing','recovered',
     'final-missing','restart','pod-replaced','record-cleanup','owner-unbound','attachment'])
 def test_existing_registry_cli_copy_records_and_exact_refs(tmp_path,monkeypatch,mode):
+    # 모의 사건 생성과 실제 run-binding 계산이 같은 시계에서 시작하도록 고정한다.
+    # fixture 준비가 초 경계를 넘더라도 정상 사건을 실행 창 이전으로 만들지 않는다.
+    clock=utcnow()
+    for path in ('tests.test_a1_credential_copy_contract.utcnow',
+                 'tests.test_a1_credential_copy_product.utcnow',
+                 'guard.application.utcnow','guard.core.run.utcnow'):
+        monkeypatch.setattr(path,lambda:clock)
     environment,world,values,pack,receipt,inventory_path=inputs(tmp_path,mode)
     monkeypatch.setattr(http,'capture_pipes',world.runner);monkeypatch.setattr(copy_executor,'capture_pipes',world.runner)
     if mode=='owner-unbound':

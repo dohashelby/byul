@@ -115,3 +115,15 @@ Pod 안 actor는 정상 요청과 실제 초기 IPC/객체 연결을 먼저 확�
 후보 지연 v2는 물리 STOP/CONT·HTTP200·새 Pod 정상 HTTP200이 기록됐으나 추가 RPC 호출에서 fault16개·복구8개 gap이 있어 전체 원자료 대조를 통과하지 않았다. 원본을 보존하며 gap을 제거하거나 성공으로 바꾸지 않는다. 후속 구현은 gap을 유지하면서 허용된 고정 진단 코드/실패 단계만 더한다. 사용자 예외의 원문·본문·토큰은 기록하지 않는다. 새 확정 소스의 읽기 전용 요청으로 원인을 확인하기 전에는 후보 추가 장애를 실행하지 않는다.
 
 기준 원본 ZIP: 지연100,012 bytes/SHA `d80fe50621457a673d0c876d37faada6d033f65c3a5242c4e75f8fd82aef15f1`, 예외91,148 bytes/SHA `427b52fdc58152a3c69cea73c63cbdc0661e1e29502e29afe983f6847505e3e1`, 종료83,584 bytes/SHA `53273a063bf2825e5d38c5cf08af1ca8dd6c9bc69466c051be9b54882ba483be`. 실제 원본/검토 자료는 작업 폴더에 보존한다. 제품 EVD/RES 생성이나 M-A3 전체 완료·생산자 인증을 주장하지 않는다.
+
+
+## 두 판본의 RPC 구성요소 실제 사례 대조 완료 (2026-11-14)
+
+[원 ZIP·소스 귀속·분기별 대조 기록](ma3-rpc-gpu-observations-20261114.json)의 여섯 사례에서 329개 snapshot의 HMAC·정확 자산·설치 소스/함수·상위 원 프레임·요청 연결과 별도 제어 영수증을 대조했다. 기준은 소스789817e3/목록30f4ea1d, 후보는 소스5a39cb4e/목록564e73b1에 귀속한다. 후보의 빈 일정은 요청/장애 자격이 없는 별도 IDLE 기록이며 기존 진단 실행을 소급 성공으로 바꾸지 않는다.
+
+| 쪽 | 지연 | 예외 | 종료 | 각 사례의 새 Pod |
+|---|---|---|---|---|
+| 기준 | STOP/CONT·HTTP200 | 원 RPC 경계 예외·HTTP500 | pidfd SIGKILL/EXITED·HTTP500 | 정상 요청200·새 Pod/세대 |
+| 후보 | STOP/CONT·HTTP200 | 원 RPC 경계 예외·HTTP500 | pidfd SIGKILL/EXITED·HTTP500 | 정상 요청200·새 Pod/세대 |
+
+여섯 사례의 원자료 대조 gap은 0이다. 전체 TP2 그룹 수락·탐지/상위 전달 기한·공통 판정 입력 연결·생산자 등록·M-A3 전체 완료는 남아 있으며 scope_complete/source_authenticated/engine_group_verified/producer_registered=false다. 같은 PID namespace inode 숫자가 재사용된 경우도 있으므로 Pod UID·PID/start ticks·전체 namespace/boot 문맥을 함께 대조한다.

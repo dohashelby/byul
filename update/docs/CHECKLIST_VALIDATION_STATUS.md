@@ -28,7 +28,8 @@
 
 | 현행 팩 GPU 실행 상태 | 점검 수 |
 |---|---:|
-| DEFERRED_NOT_MEASURED | 77 |
+| GPU_PARTIAL_MEASURED | 1 |
+| DEFERRED_NOT_MEASURED | 76 |
 
 | 1단계 담당 | 1단계 상태 | 점검 수 |
 |---|---|---:|

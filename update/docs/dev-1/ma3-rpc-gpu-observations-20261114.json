@@ -1,0 +1,241 @@
+{
+  "schema": "guard-ma3-rpc-component-observations/1",
+  "scope": "실제 GPU의 미등록 RPC 구성요소 사례와 새 Pod 정상 요청. 공통 판정 입력·전체 그룹 수락·생산자 인증이 아님.",
+  "actual_gpu_execution": true,
+  "raw_snapshots_verified": 329,
+  "cases": [
+    {
+      "side": "baseline",
+      "kind": "delay",
+      "source_commit": "789817e3e54685665574dd2691bdb5c3b8467db1",
+      "source_manifest_sha256": "30f4ea1d308ab9f8baaa396f4fbfaf6b514af29b12c2e5ce2ed9c7eb3aa680e4",
+      "archive": "rpc-baseline-delay-v2.zip",
+      "bytes": 100012,
+      "sha256": "d80fe50621457a673d0c876d37faada6d033f65c3a5242c4e75f8fd82aef15f1",
+      "started_at": "2026-11-14T12:30:55.144155+00:00",
+      "finished_at": "2026-11-14T12:32:10.237281+00:00",
+      "fault_pod_uid": "9eb98b96-e5d8-45ec-b60c-829eaa711311",
+      "recovery_pod_uid": "7796807d-d6a0-42e2-926e-c9e129eb59af",
+      "stages": {
+        "fault": {
+          "snapshots": 23,
+          "source_rows_verified": 23,
+          "gaps": [],
+          "control_hmac_verified": 9,
+          "physical_stop_verified": true,
+          "physical_resume_verified": true,
+          "client_status": 200
+        },
+        "recovery": {
+          "snapshots": 12,
+          "source_rows_verified": 12,
+          "gaps": [],
+          "control_hmac_verified": 1,
+          "new_generation_normal_request_observed": true,
+          "client_status": 200
+        }
+      },
+      "raw_validation_passed": true
+    },
+    {
+      "side": "baseline",
+      "kind": "exception",
+      "source_commit": "789817e3e54685665574dd2691bdb5c3b8467db1",
+      "source_manifest_sha256": "30f4ea1d308ab9f8baaa396f4fbfaf6b514af29b12c2e5ce2ed9c7eb3aa680e4",
+      "archive": "rpc-baseline-exception-v2.zip",
+      "bytes": 91148,
+      "sha256": "427b52fdc58152a3c69cea73c63cbdc0661e1e29502e29afe983f6847505e3e1",
+      "started_at": "2026-11-14T12:42:46.821323+00:00",
+      "finished_at": "2026-11-14T12:44:03.632354+00:00",
+      "fault_pod_uid": "ae67018a-d806-4c39-863c-be1ad3f7bd27",
+      "recovery_pod_uid": "dfe9b518-12eb-40d6-80cf-ef7bd05e28c8",
+      "stages": {
+        "fault": {
+          "snapshots": 19,
+          "source_rows_verified": 19,
+          "gaps": [],
+          "control_hmac_verified": 7,
+          "source_exception_verified": true,
+          "client_status": 500
+        },
+        "recovery": {
+          "snapshots": 12,
+          "source_rows_verified": 12,
+          "gaps": [],
+          "control_hmac_verified": 1,
+          "new_generation_normal_request_observed": true,
+          "client_status": 200
+        }
+      },
+      "raw_validation_passed": true
+    },
+    {
+      "side": "baseline",
+      "kind": "death",
+      "source_commit": "789817e3e54685665574dd2691bdb5c3b8467db1",
+      "source_manifest_sha256": "30f4ea1d308ab9f8baaa396f4fbfaf6b514af29b12c2e5ce2ed9c7eb3aa680e4",
+      "archive": "rpc-baseline-death-v2.zip",
+      "bytes": 83584,
+      "sha256": "53273a063bf2825e5d38c5cf08af1ca8dd6c9bc69466c051be9b54882ba483be",
+      "started_at": "2026-11-14T12:45:13.932642+00:00",
+      "finished_at": "2026-11-14T12:46:44.957181+00:00",
+      "fault_pod_uid": "f0cfc476-7270-4df8-bb80-6d854e618b37",
+      "recovery_pod_uid": "9ed6c5b5-4e6d-485d-9328-90e7a4e97b19",
+      "stages": {
+        "fault": {
+          "snapshots": 16,
+          "source_rows_verified": 16,
+          "gaps": [],
+          "control_hmac_verified": 6,
+          "physical_exit_verified": true,
+          "client_status": 500
+        },
+        "recovery": {
+          "snapshots": 12,
+          "source_rows_verified": 12,
+          "gaps": [],
+          "control_hmac_verified": 1,
+          "new_generation_normal_request_observed": true,
+          "client_status": 200
+        }
+      },
+      "raw_validation_passed": true
+    },
+    {
+      "side": "candidate",
+      "kind": "delay",
+      "source_commit": "5a39cb4e40fa8d77bd868719e0b92586e0d3a03f",
+      "source_manifest_sha256": "564e73b1be6abe10dad627ae1d7ab090e454ac65fc228a1f049fd4ea22685f34",
+      "archive": "rpc-candidate-delay-v4.zip",
+      "bytes": 209715,
+      "sha256": "28e27f96ff25e77574ebcab2919706f3f91a47fef72c77c305b4f6f2bd4c6049",
+      "started_at": "2026-11-14T12:57:25.327647+00:00",
+      "finished_at": "2026-11-14T13:00:48.598671+00:00",
+      "fault_pod_uid": "5bb53b95-abe9-421c-8252-e86a0141df33",
+      "recovery_pod_uid": "a3a53218-79e3-4775-aac2-76d7de9609f7",
+      "stages": {
+        "fault": {
+          "snapshots": 57,
+          "source_rows_verified": 57,
+          "gaps": [],
+          "control_hmac_verified": 9,
+          "physical_stop_verified": true,
+          "physical_resume_verified": true,
+          "client_status": 200
+        },
+        "recovery": {
+          "snapshots": 29,
+          "source_rows_verified": 29,
+          "gaps": [],
+          "control_hmac_verified": 1,
+          "new_generation_normal_request_observed": true,
+          "client_status": 200
+        }
+      },
+      "raw_validation_passed": true
+    },
+    {
+      "side": "candidate",
+      "kind": "exception",
+      "source_commit": "5a39cb4e40fa8d77bd868719e0b92586e0d3a03f",
+      "source_manifest_sha256": "564e73b1be6abe10dad627ae1d7ab090e454ac65fc228a1f049fd4ea22685f34",
+      "archive": "rpc-candidate-exception-v4.zip",
+      "bytes": 193521,
+      "sha256": "179d4d614c6591449154543902769c58c4c611d49c7cd577a7e9032a5d142905",
+      "started_at": "2026-11-14T13:01:45.807646+00:00",
+      "finished_at": "2026-11-14T13:05:08.091624+00:00",
+      "fault_pod_uid": "c0bbc484-7381-4d36-9f94-478538b8d77d",
+      "recovery_pod_uid": "f5f32da3-f52f-425e-b65e-293c8bfbc16e",
+      "stages": {
+        "fault": {
+          "snapshots": 49,
+          "source_rows_verified": 49,
+          "gaps": [],
+          "control_hmac_verified": 7,
+          "source_exception_verified": true,
+          "client_status": 500
+        },
+        "recovery": {
+          "snapshots": 29,
+          "source_rows_verified": 29,
+          "gaps": [],
+          "control_hmac_verified": 1,
+          "new_generation_normal_request_observed": true,
+          "client_status": 200
+        }
+      },
+      "raw_validation_passed": true
+    },
+    {
+      "side": "candidate",
+      "kind": "death",
+      "source_commit": "5a39cb4e40fa8d77bd868719e0b92586e0d3a03f",
+      "source_manifest_sha256": "564e73b1be6abe10dad627ae1d7ab090e454ac65fc228a1f049fd4ea22685f34",
+      "archive": "rpc-candidate-death-v4.zip",
+      "bytes": 178203,
+      "sha256": "0088c77aa33a3c9c264ffcea42e6b1a0e5948f10325454395775cab550ab15cc",
+      "started_at": "2026-11-14T13:05:29.857256+00:00",
+      "finished_at": "2026-11-14T13:09:01.538541+00:00",
+      "fault_pod_uid": "309ac7b4-30dc-4de6-98d2-81d8dbc80bea",
+      "recovery_pod_uid": "82857edf-cab8-4a5b-a867-dcdf40534bd5",
+      "stages": {
+        "fault": {
+          "snapshots": 42,
+          "source_rows_verified": 42,
+          "gaps": [],
+          "control_hmac_verified": 6,
+          "physical_exit_verified": true,
+          "client_status": 500
+        },
+        "recovery": {
+          "snapshots": 29,
+          "source_rows_verified": 29,
+          "gaps": [],
+          "control_hmac_verified": 1,
+          "new_generation_normal_request_observed": true,
+          "client_status": 200
+        }
+      },
+      "raw_validation_passed": true
+    }
+  ],
+  "preserved_diagnostic_runs": [
+    {
+      "archive": "rpc-baseline-delay-v1.zip",
+      "fault_gaps": 1,
+      "recovery_gaps": 0,
+      "raw_validation_passed": false
+    },
+    {
+      "archive": "rpc-candidate-delay-v2.zip",
+      "fault_gaps": 16,
+      "recovery_gaps": 8,
+      "raw_validation_passed": false
+    },
+    {
+      "archive": "rpc-candidate-observe-v3.zip",
+      "recovery_gaps": 16,
+      "raw_validation_passed": false
+    }
+  ],
+  "idle_observation": {
+    "normal_probe_archive": "rpc-candidate-observe-v4.zip",
+    "normal_probe_snapshots": 29,
+    "normal_probe_gaps": 0,
+    "normal_client_status": 200,
+    "idle_rows_request_bound": false,
+    "idle_rows_fault_eligible": false
+  },
+  "source_authenticated": false,
+  "engine_group_verified": false,
+  "scope_complete": false,
+  "producer_registered": false,
+  "product_evd_res_generated_for_these_cases": false,
+  "official": false,
+  "remaining": [
+    "TP2 전체 그룹 인과 결합·탐지·상위 전달 기한의 수락",
+    "실제 원 기록의 공통 rank-fault 판정 입력 연결과 생산자 등록",
+    "A 실제 ENV/target 52쪽 및 전체 136쪽의 남은 결합",
+    "다른 생산자·전체69개 실증. M-B4는 보관 유지"
+  ]
+}

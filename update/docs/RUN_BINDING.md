@@ -296,7 +296,7 @@ api_binding = "/path/api.json"          # api_container_id·network_id·endpoint
 
 ## 9. J02(63개 `guard update`)까지 남은 공백 (2026-11-14)
 
-- **점검별 실행 설정 조립**: 실제 ENV·target·prepared·정책·실행 설정을 점검별로 만드는 도구가 REQ-10·17·18·SUP-03·08(`tools/gpu_a_run_inputs.py`, `mvp_a_input_materialize.py`, `mvp_sup08_inputs.py`)만 지원한다. 나머지 점검의 실행 설정 조립, 특히 새 `[run_binding.<점검>]` 표(세션·세대·offset·시나리오·PLT 결합 파일)를 만드는 도구가 없다.
+- **점검별 실행 설정 조립**: 실제 ENV·target·prepared·정책·실행 설정을 점검별로 만드는 도구가 REQ-10·17·18·SUP-03·08(`tools/gpu_a_run_inputs.py`, `mvp_a_input_materialize.py`, `mvp_sup08_inputs.py`)만 지원한다. 나머지 점검의 실행 설정 조립, 특히 새 `[run_binding.<점검>]` 표(세션·세대·offset·시나리오·PLT 결합 파일)를 만드는 도구가 없다. → 공통 조립·정적 보고 도구 `tools/j02_run_config.py`를 두었다(11절). 값 출처는 11.3의 질문으로 남는다.
 - ~~**공유 실행기 칸**~~ → 사용자 결정 RB2-S로 `[check_config.<점검>]`을 두었다(10절).
 - **E 키 4개**: `retry_scope_sha256`·`copy_inventory_sha256`·`record_subject_plan_sha256`·`recovery_selection_sha256`은 아직 정책 값이라 실행마다 정책을 다시 써야 한다(7.6 분리안, 점검별 승인 대기).
 - **C·D·E 분류**: 생산자 소스 SHA(C), 시험 주체(D), 외부 사건 시각(E)은 정책에 남아 있다.
@@ -327,3 +327,32 @@ generations = [ ... ]
 - 실행 준비값 `[run_binding.<점검>]`(8절)과는 다르다. `check_config`는 실행기가 직접 받는 설정(대상 파일 등)이고 EVD 실행기 설정 해시에 들어간다. `run_binding`은 정책 키 이름으로 넘기는 결합 값이고 실행기 설정 해시에 들어가지 않는다.
 - 형식 오류(표가 아님, 항목이 표가 아님, 실행기 칸이 표가 아님)는 그 점검을 `NOT_RUN`(`CHECK_CONFIG_INVALID`)→UNKNOWN으로 둔다. 이월 미리보기에서는 이월 불가다.
 - 한계: Docker 관리형(`real`) 갱신 실행의 양쪽 target 경로 비교(`validate_update_run_config`)는 실행기 기본 칸만 본다. 관리형은 guard가 target을 직접 써 넣는 경로라 J02(외부 Kubernetes)에는 해당하지 않는다.
+
+## 11. J02 실행 설정 조립 (`tools/j02_run_config.py`, 2026-11-14)
+
+### 11.1 목표와 구조
+
+J02는 MA7 계획의 63개 점검을 한 번의 `guard update`로 기준·후보 순서로 돌린다. 63개는 30개 실행기에 걸쳐 있고 여러 점검이 실행기를 공유한다(`supply_boot` 12, `engine_sensor` 6, `lifecycle_transition`·`request_termination`·`boundary_egress`·`template_validation`·`input_validation` 각 3 등). 한 실행 설정은 다음으로 이뤄진다.
+
+| 층 | 설정 위치 | 내용 | 누가 정하나 |
+|---|---|---|---|
+| 공통 | `[executors]`, `[<실행기>]` | 구현 선택(`kubernetes` 등), 실행기 공통 상한·바이너리 | 운영자(기술 설정) |
+| 쪽별 | `[sides.<side>.<실행기>]` | 그 판본의 target 등 | 운영자·실행 준비 |
+| 점검별 실행기 설정 | `[sides.<side>.check_config.<점검>]` (10절) | 그 점검만의 target·prepared·generations·selection 등 | 운영자·실행 준비 |
+| 점검별 준비값 | `[sides.<side>.run_binding.<점검>]` (8절) | 세션·세대·offset·시나리오·PLT 결합 파일 | 운영자·생산자 설치 |
+| 정책 | POL 문서 | A·A′·C·D·E 키 | 기업 |
+
+### 11.2 지금 구현한 것 (결정 불필요 부분)
+
+- 운영자 선언(YAML)을 받아 위 층을 `guard.toml`로 쓴다. 쓰기 전에 `tomllib`로 다시 읽어 같은지 확인한다.
+- 63개 점검 × 2쪽마다 제품 코드의 같은 호출로 정적 상태를 보고한다: 구현 선택·등록 여부(`resolve_executor`), 실행 결합 계산(`run_binding.effective_values`), 정책 계약(`validate_policy`). 결과는 `READY_STATIC`·`MISSING_INPUT`·`UNSUPPORTED`와 고정 진단 코드다. 빠진 정책 키 목록도 낸다.
+- kubectl·Docker·엔진을 실행하지 않고, 빠진 값을 채우지 않으며, 정책 파일은 읽기만 한다. `READY_STATIC`은 판정·승인·사전 점검 통과가 아니다.
+- 빈 선언(모든 실행기 `kubernetes`, 정책 값 없음)으로 돌리면 기준 쪽 63개는 정책 값 없음 42, 준비값 표 없음 16(그중 정책 값도 없음 12), 결합 파일 없음 26(겹침 포함), **OBS-03 미등록 1**(`log_analysis`에 vLLM용 `kubernetes` 구현 없음)로 나온다.
+- 기존 점검별 도구(`gpu_a_run_inputs`·`mvp_a_input_materialize`·`mvp_sup08_inputs`·`b03_input_materialize`·`b12_tp2_inputs`)가 만드는 target·prepared·사례 manifest는 이 선언의 파일 경로로 그대로 쓴다. 도구를 대체하지 않는다.
+
+### 11.3 사람 결정이 필요한 것 (DECISIONS RB2-J)
+
+1. **정책 값의 출처**: 63개의 A·A′·C·D·E 키는 기업 값이다. J02 lab 실행에 EXAMPLE 초안 값을 쓸지(2026-11-03 결정은 REQ-08·09·10, SUP-03·08 다섯 개만 허용), 실제 기업 값을 기다릴지.
+2. **실행 준비값·신원의 출처**: 기록 세션, PLT-07·08 실행 신원, 세대별 target·prepared, 복구 자원 선택(LIF-11은 J01)을 운영자가 선언 파일로 쓸지, 조립 도구가 읽기 전용 `kubectl get`으로 cluster에서 읽어 채울지. 지금 도구는 선언만 받는다.
+3. **1차 UNKNOWN 범위 점검의 포함**: REQ-02, OBS-01·06·11, PLT-07·12(J02 안)는 1차 완성 기준이 "실행 경로 준비 + UNKNOWN"이다. J02 실행 설정에 넣어 UNKNOWN 증거를 남길지, J02 범위에서 뺄지.
+4. **OBS-03 구현**: `log_analysis`에 Kubernetes 구현이 없다. 새 실행기 구현(M-B1 범위)을 할지, J02에서 원인 기록 UNKNOWN으로 둘지.

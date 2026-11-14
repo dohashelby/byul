@@ -346,6 +346,14 @@
 
 ## 열린 질문
 
+### RB 실행 결합값 분리 (2026-11-14, 미승인 — 승인 전 구현하지 않음)
+설계·분류표·영향 목록: [docs/RUN_BINDING.md](docs/RUN_BINDING.md). 문제: @34 44개 점검이 실행마다 바뀌는 ENV·target·prepared·manifest 해시와 유효 기간(키 228개)을 required 정책 값으로 요구해, 웹 입력으로는 실행할 수 없고 판본마다 정책을 다시 써야 한다.
+- RB-Q1 — 1단계 범위: B1 키(`*_environment_sha256`·`*_target_sha256`·`*_prepared_sha256`·`sensor_manifest_sha256`·`*_validity_start/end`)를 PACK-BASELINE@35에서 빼고 `guard run`이 계산하는 `guard-run-binding/1`로 옮길 것인가? 판정 규칙·`required_observations`는 그대로다. 잠정: 승인 권고. B2(세션·준비 파일 해시·PLT-07/08 실행 신원)·C(생산자 소스 SHA)·D(시험 주체)·E(외부 사건)는 이번 범위 밖.
+- RB-Q2 — 결합 저장: EVD 증거 파일 `run-binding.json` + `Execution.run_binding{schema,sha256}`(빈 값 직렬화 생략)으로 두고 `executor.config_sha256`에서 제외할 것인가? `models/`·`core/run.py` 변경이다. 잠정: 승인 권고(현재 센서 /2는 결합이 config에 들어가 INV-19 이월이 늘 불가).
+- RB-Q3 — 유효 기간 의미: 정책 키 대신 `[실행 시작, 실행 시작+실행기 최대 시간] ∩ [POL.valid_from, POL.valid_until]`로 할 것인가? POL 유효 기간이 없으면(import `/1` 등) 실행 창만 쓰고 limitation에 표시. 교집합이 비면 NOT_RUN→UNKNOWN. 잠정: 이 안.
+- RB-Q4 — 호환: @34 팩·정책·EVD/RES는 그대로 재생하고, @35 프로필(`-run-binding-v1`)에 B1 정책 키가 있으면 `RUN_BINDING_BELONGS_TO_EXECUTION`으로 거부(혼용 금지), 정책은 새 도구로 B1 키만 뺀 새 POL revision을 만든다. @34 결과는 @35로 이월하지 않는다(CheckDef revision 다름). 잠정: 이 안.
+- RB-Q5 — `guard-sensor-run-binding/2`는 과거 재생용으로만 남기고 새로 만들지 않을 것인가? 잠정: 예.
+
 - ~~M-A7-Q2 / 요청29(runtime CI S2-05 시험 예외)~~ → 사용자 결정29로 "runtime 변경 없이 문제 기록" 확정. 예외 승인 대기는 종료했다. 원 경합은 미해결 문제로 유지한다: #268 headb086b195에서 [ok,null,stale,ok]로 실패했고 모의 엔진 종료 뒤 지연으로 재현됐다. 저장소 밖 수정안의 직접7개·음성subtest2개 결과와 정확 패치는 보관하며 실제 runtime에는 적용하지 않았다. 최신 head4d3192e4의 CI18개 통과와 원 문제의 해결 여부는 별개다. 상세: 작업 폴더 RUNTIME_CI_268_REVIEW_20261114.md.
 
 

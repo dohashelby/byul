@@ -182,6 +182,7 @@
   "update/src/guard/adapters/vllm_rank_ipc_identity.py": "d1c138564b5f1a606d95c020b38846ce6826ba7c35ac1e3df31a23c0635022dc",
   "update/src/guard/adapters/vllm_rank_ipc_runtime.py": "1343c3fc6b07dfb6b8c89a10e7f67d80b40c7d146f92d51008f259d970d910ff",
   "update/src/guard/adapters/vllm_rank_ipc_sources.py": "73bb5bd8aad4e2c1c7cfe14f6890a7dbd81fc04c41b326236b6110f3dcf342ad",
+  "update/src/guard/adapters/vllm_rank_request_identity.py": "dccdc3de0fadda607792ca1c1bf3f08331c435619d2951f2dc78ac3290f40318",
   "update/src/guard/adapters/vllm_ready_endpoint_contract.py": "ddae1078d9807910c9f79a815f2abeab6b1c340e8122eb4c3bca9a7b71ef3d7d",
   "update/src/guard/adapters/vllm_ready_endpoint_metadata.py": "c722aec3fa4a5eafee9ed478d970f5b82e26335b2788ec4cbb2d714128007c8e",
   "update/src/guard/adapters/vllm_ready_endpoint_sensor.py": "55753bfcaa3838cb3fdcd20429dbfbf50f037f3fee6d00466223870b854f4fe0",

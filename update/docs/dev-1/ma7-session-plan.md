@@ -11,7 +11,7 @@
 | 이전 lab 경로 8개 | REQ-01·11·15·18·19·20, OBS-04·09 | 기존 실행기·정책 틀을 재사용하되 새 ENV/target/prepared·세션·판본별 소스 자격을 다시 결합한다. 과거 EVD/RES를 새 결과로 옮기지 않는다. OBS-09 기업 수집기 범위는 제외 사유를 남긴다. |
 | 확정 값 5개 | REQ-03·13·17, OBS-05, LIF-13 | #257의 확정 값은 JSON에도 복사해 출처를 명시했다. 정책 CONFIRMED·정식 승인자를 만들어내지 않는다. LIF-13 역할·승인 세대·fallback은 실제 집행 근거가 없으면 UNKNOWN이다. |
 | 1차 제외 8개 | REQ-02, OBS-01·06·11, PLT-07·10·11·12 | 정본 경로를 실행한 뒤 입력 부재·제외 범위와 UNKNOWN을 기록한다. 실행 전 예상 상태를 RES로 만들지 않는다. |
-| TP2 3개 | REQ-14·16·21 | `gpu_a_run_inputs`의 사례 생성·`gpu_a_aws_lab` 렌더를 쓴다. 새 두 판본 설치 파일 자격·실제 GPU/Pod·rank/세션 결합은 남았다. REQ-16 지정 모델의 공식 revision 후보는 고정했다. 가중치 bytes·두 판본 첫 기동은 미검증이다. |
+| TP2 3개 | REQ-14·16·21 | `gpu_a_run_inputs`의 사례 생성·`gpu_a_aws_lab` 렌더를 쓴다. 새 두 판본 설치 파일 자격·실제 GPU/Pod·rank/세션 결합은 남았다. REQ-16 지정 모델의 revision/가중치 SHA와 두 판본 TP2 로드·정상 HTTP200을 확인했다. 해당 기준 캐시 분기는 결정34의 UNKNOWN 예외이며 다른 내부 관측/등록은 미완료다. |
 | 대상 비적용 2개 | REQ-04·06 | 기존 사용자 결정과 실제 Gateway 설정의 비적용 근거를 정본 선정에 남긴다. 기능 부재 판정의 새 승인이 아니다. |
 | SUP-08 1개 | SUP-08 | #257의 `tools.mvp_sup08_inputs`를 사용한다. 고정 가중치 두 파일의 SHA와 14개 inventory·snapshot·코드 식별값을 대조한 새 로컬 fixture를 확보했다. 두 판본 기동 계획·정책·target 대기 설정과 코드 캐시도 준비했다. 실제 ENV/target·노드 배치/권한·정상 요청 확인 뒤 최종 조립한다. 과거 ignored→consumed는 예상 회귀 근거이며 새 비교 RPT는 J02에서 만든다. |
 

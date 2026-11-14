@@ -92,11 +92,11 @@
 | 모델 | 구조 | 기준 판본 registry | 후보 판본 registry | 두 판본 같은 revision으로 기동 |
 |---|---|---|---|---|
 | SUP-08 PoC snapshot (Phi-3-vision 파생, inventory `c2dd6747…`) | `Phi3VForCausalLM` | 있음 | 있음 | **실측으로 확인됨**: 같은 snapshot·inventory로 두 판본 모두 기동하고 정상 요청 전후 200([SUP-08 결과](../gpu-a/RESULTS-20261111-SUP08.md)) |
-| REQ-16 Qwen2-VL-2B-Instruct | `Qwen2VLForConditionalGeneration` | 있음 | 있음 | 소스 근거로 가능, **revision 미고정·미실측**. 기준 판본 요구 Transformers `>= 4.45.2`(이 구조 지원 시작 판본), 후보 판본 `>= 5.10.4`. 이미지 안 실제 Transformers 판본은 레이어를 받아야 안다 |
+| REQ-16 Qwen2-VL-2B-Instruct | `Qwen2VLForConditionalGeneration` | 있음 | 있음 | revision895c3a49로 고정하고 실제 두 이미지 TP2 모델 로드·정상 HTTP200을 확인했다. 기준 V0의 멀티모달 prefix cache는 실제 내부 비활성: 결정34로 해당 기준 캐시 분기만 원인 있는 UNKNOWN 예외. [기동 원자료](ma7-gpu-preflight-20261114.json) |
 | 기본 GPU 모델 Qwen2.5-0.5B-Instruct `7ae55760…` ([환경](../gpu-a/ENVIRONMENT.md)) | `Qwen2ForCausalLM` | 있음 | 있음 | 소스 근거로 가능, 두 판본 미실측 |
 | 기본 소형 모델 facebook/opt-125m `27dcfa74…` | `OPTForCausalLM` | 있음 | 있음 | 소스 근거로 가능, 두 판본 GPU 미실측. chat template이 없어 SUP-03 고정 템플릿이 필요 |
 
-- 지금 근거로는 **결정 12(모델 교체)가 필요한 모델이 없다.** 다만 Qwen2-VL-2B-Instruct는 revision을 아직 고정하지 않았다. J01 전에 revision을 고정하고, 기준 판본 이미지의 Transformers로 그 revision의 processor·config가 읽히는지 첫 기동에서 확인해야 한다. 실패하면 그때 결정 12로 올린다.
+- 지정 모델은 revision을 고정해 두 이미지에서 실제 로드·정상 HTTP200을 확인했으며 결정12의 모델 교체는 하지 않았다. 기준 V0의 멀티모달 prefix cache는 기동 옵션을 명시해도 내부에서 꺼지므로 결정34의 해당 기준 분기 UNKNOWN 예외를 적용한다. 모델 로드 성공을 캐시 검증 성공으로 바꾸지 않는다.
 
 ## 7. 2단계로 넘기는 것
 

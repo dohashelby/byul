@@ -81,3 +81,10 @@ CPU 시험은 고정 자료의 잘못된 소스·rank·world/output·그룹·clo
 ## 실제 이미지 대조 후속
 
 [설치 bytes 대조와 남은 자격](ma3-image-qualification-20261114.md)을 확인했다. 후보13개 원본/53함수는 기존 후보와 같지만 fault sensor의 MP 원본은 두 이미지 모두 기존 고정값과 다르다. 표 키 존재·파일 일치만으로 runtime/GPU 자격을 만들지 않으며 기존 고정값과 scope_complete=false를 보존한다.
+
+
+## 활성 요청 연결의 ID 읽기 구성요소 (구현 중)
+
+`vllm_rank_request_identity`는 정확 source hook이 고른 클래스/필드의 요청 ID만 세션 HMAC으로 바꾸는 미등록 후보다. 기준의 구조체 목록과 후보의 스케줄러 양수 작업 dict, external/internal ID 쌍을 구분한다. 일반 dict가 없는 구조체는 정확 클래스 namespace와 표준 member descriptor 소유자를 확인하며 property·사용자 getter/descriptor를 실행하지 않는다. ID 중복/상한·잘못된 형식·변경 중인 필드·클래스 교체를 거부하고 원 ID/본문/토큰을 반환하지 않는다.
+
+직접17개가 CPython3.12.3/3.12.8에서 각각 통과했다. 승인된 기존 이미지 레이어에서 추가 다운로드 없이 msgspec C 모듈844,672 bytes를 제한 추출해, 각 이미지 Python/해당 구조체 구현에서도 같은 표준 슬롯 읽기와 요청 ID 변경 구분을 확인했다. 프로젝트·venv 의존성은 바꾸지 않았고 엔진/CPU 이미지 실증은 아니다. 이 구성요소만으로 활성 RPC·nonce·실제 주입·해제·새 세대 복구를 증명하지 않으며 rpc_active_verified/source_authenticated/producer_registered=false다. 아직 실제 source hook/제어에 연결하지 않았다.

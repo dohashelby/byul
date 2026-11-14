@@ -1,3 +1,10 @@
+## 2026-11-14 — 활성 요청 연결의 구조체 ID 읽기 구성요소
+
+- 한 일: 정확 source hook이 넘길 요청 metadata에서 ID만 세션 HMAC으로 바꾸는 adapter 구성요소를 구현했다. 구조체 목록·양수 스케줄 dict·external/internal 재배정 쌍을 구분하고 실제 클래스 namespace/표준 슬롯 또는 일반 dict만 읽는다. property·사용자 getter/descriptor·원문 본문/토큰을 읽지 않으며 다른 클래스·중복/상한·형식·읽는 도중 교체를 거부한다. 기준/후보의 헤더 ID와 후보 내부 ID 재배정, 기준 비-driver worker broadcast 구조 및 정확 실행 지점을 설치 소스에서 확인했다. 현행 모델 표의 미고정/미기동 설명을 실제 기동 사실과 결정34에 맞췄다.
+- 테스트 결과: 새17개가 CPython3.12.3/3.12.8에서 각각 통과했다. 기존 승인 레이어의 msgspec C 모듈844,672 bytes를 추가 다운로드 없이 제한 추출해 두 이미지의 실제 C 슬롯에서도 ID 읽기/변경 구분을 확인했다. 프로젝트/venv 의존성은 무변경이다. 직접 영향/경로81개 통과(pytest5.16초·벽시계5.649초), 현황 --check·545파일 소스 관문·diff --check 통과. 기존544파일 bytes는 모두 같고 새 reader 한 파일만 목록에 추가했다. 목록 자체SHAbdb24d02에 결정5 정확 검토 행을 추가했다. 문서 커밋a3bcf197의 CI9개 모두 SUCCESS이며 이 새 코드 CI는 별도 확인한다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 요청 ID와 정확 RPC 진입/반환, 실제 worker 객체·PID/시작세대/IPC를 같은 nonce의 제어에 결합한다. 기준 driver 실행 안 worker 호출과 후보 내부 ID 재배정/worker RPC 안 호출을 각각 고정 source 데이터로 고르고 원 호출/예외를 보존한다. 물리 주입·해제 보장·새 세대 복구의 CPU 거부 시험 뒤에만 같은 승인 노드에서 실제 장애를 검증한다.
+- 막힌 것: 이 구성요소는 아직 실제 source hook/제어에 연결하지 않았고 rpc_active_verified/source_authenticated/producer_registered=false다. 주입·해제·새 세대 복구는 미완료이며 실제 장애0회다. 기존 native24 고정값/TP1 자격·판정/등록표·runtime/contracts·M-B4는 무변경이다. 동일 GPU 노드는10:28:01 UTC stopped이며 설치본을 임시 보존한다. 실제 A 입력52쪽/전체136쪽은 이 구성요소로 채워지지 않는다.
+
 ## 2026-11-14 — 두 판본 실제 IPC/TP2 기동과 REQ-16 결정34
 
 - 한 일: head7e49f608/source7c225d4e의 읽기 전용 hook을 동일 승인 GPU 노드의 두 이미지에 실제 설치했다. 두 쪽 TP2 모델 로드·GPU2개·정상 HTTP200, 각각3개의 닫힌 source/IPC snapshot을 확인했다. 기준 부모/실제 rank1의 시작세대·task/result pipe와 후보 부모/rank0·1의 시작세대·broadcast/개별 response HMAC이 일치했다. 원 ZIP28,565 bytes/SHA220d8d64와10파일 해시를 반출하고 정확 자산/본문/세션/HMAC을 재검증했다. 기준 모델 로드의 실제 디스크 대기와 가중치2개 순차 읽기/SHA 재대조를 기록했으며 새 다운로드/설정 변경은 없다. 기준 V0가 지정 멀티모달 prefix caching을 꺼 비교 측정력이 없음을 확인했고 사용자 결정34로 V0 유지·해당 기준 캐시 분기만 원인 있는 UNKNOWN 예외를 기록했다.

@@ -216,5 +216,41 @@
       "기존 native24 고정값/TP1 자격·판정·등록표·M-B4를 바꾸지 않는다.",
       "fault_executed/source_authenticated/engine_group_verified/producer_registered=false를 보존한다."
     ]
+  },
+  "후속_요청_구조체_대조": {
+    "추가_다운로드_bytes": 0,
+    "추가_C_모듈_bytes": 844672,
+    "프로젝트_의존성_변경": false,
+    "엔진_실행": false,
+    "활성_RPC_검증": false,
+    "구성요소_시험": "17개, 두 Python ABI에서 각각 통과",
+    "쪽별_원본": {
+      "base": {
+        "side": "base",
+        "objects": [
+          {
+            "layer": "7ea682f8c8a66aee10d2199d818e0e6080a70b6ecc3d7ba3691618fa08772832",
+            "bytes": 414176,
+            "sha256": "7b7c66fd1ad2c6086816ff48aa6a6acba6709c1bf12db94242e38d0edc5da739"
+          }
+        ],
+        "seconds": 164.16252291699857,
+        "additional_download_bytes": 0,
+        "project_dependencies_changed": false
+      },
+      "candidate": {
+        "side": "candidate",
+        "objects": [
+          {
+            "layer": "d4819562c6f5bf63bd3f6360b7e811a2e3684500666cb52fac944845fad44450",
+            "bytes": 430496,
+            "sha256": "8839f71d9d29c8eea22b2e8026967024f27bf667275fa80b03d97745c1fa5645"
+          }
+        ],
+        "seconds": 203.3681463940011,
+        "additional_download_bytes": 0,
+        "project_dependencies_changed": false
+      }
+    }
   }
 }

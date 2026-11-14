@@ -347,7 +347,7 @@ J02는 MA7 계획의 63개 점검을 한 번의 `guard update`로 기준·후보
 - 운영자 선언(YAML)을 받아 위 층을 `guard.toml`로 쓴다. 쓰기 전에 `tomllib`로 다시 읽어 같은지 확인한다.
 - 63개 점검 × 2쪽마다 제품 코드의 같은 호출로 정적 상태를 보고한다: 구현 선택·등록 여부(`resolve_executor`), 실행 결합 계산(`run_binding.effective_values`), 정책 계약(`validate_policy`). 결과는 `READY_STATIC`·`MISSING_INPUT`·`UNSUPPORTED`와 고정 진단 코드다. 빠진 정책 키 목록도 낸다.
 - kubectl·Docker·엔진을 실행하지 않고, 빠진 값을 채우지 않으며, 정책 파일은 읽기만 한다. `READY_STATIC`은 판정·승인·사전 점검 통과가 아니다.
-- 빈 선언(모든 실행기 `kubernetes`, 정책 값 없음)으로 돌리면 기준 쪽 63개는 정책 값 없음 42, 준비값 표 없음 16(그중 정책 값도 없음 12), 결합 파일 없음 26(겹침 포함), **OBS-03 미등록 1**(`log_analysis`에 vLLM용 `kubernetes` 구현 없음)로 나온다.
+- 빈 선언(모든 실행기 `kubernetes`, 정책 값 없음)으로 돌리면 기준 쪽 63개 중 62개가 MISSING_INPUT이다(겹침 포함: 정책 값 없음 54, 준비값 표 없음·형식 오류 16, 결합 계산 파일 없음 26). **OBS-03 1개는 UNSUPPORTED**(`log_analysis`에 vLLM용 `kubernetes` 구현 없음)로 나온다.
 - 기존 점검별 도구(`gpu_a_run_inputs`·`mvp_a_input_materialize`·`mvp_sup08_inputs`·`b03_input_materialize`·`b12_tp2_inputs`)가 만드는 target·prepared·사례 manifest는 이 선언의 파일 경로로 그대로 쓴다. 도구를 대체하지 않는다.
 
 ### 11.3 사람 결정이 필요한 것 (DECISIONS RB2-J)

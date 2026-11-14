@@ -46,3 +46,8 @@
 CPU 시험은 고정 자료의 잘못된 소스·rank·world/output·그룹·clock·세대·정지 상태·시각·영수증 재사용을 거부한다. 실제 OS 신호 시험은 시험이 만든 Python 자식 하나만 SIGSTOP/SIGCONT하고 finally에서 회수한다. 엔진·GPU·Kubernetes 실증 결과가 아니다. 도구는 신호를 보내지 않고 기존 8MiB 입력 한도와 새 출력만 쓰는 조건을 유지한다.
 
 이 작업의 완료 범위는 미등록 후보 변환·입력 도구와 세 사실의 CPU 검증이다. TP2 인과적 그룹/장애 전파·death의 새 소유자 복구·실제 이미지 자격·GPU 재확인/등록은 남아 있으며 M-A3 전체와 J01 준비 완료로 세지 않는다.
+
+
+## 실제 이미지 대조 후속
+
+[설치 bytes 대조와 남은 자격](ma3-image-qualification-20261114.md)을 확인했다. 후보13개 원본/53함수는 기존 후보와 같지만 fault sensor의 MP 원본은 두 이미지 모두 기존 고정값과 다르다. 표 키 존재·파일 일치만으로 runtime/GPU 자격을 만들지 않으며 기존 고정값과 scope_complete=false를 보존한다.

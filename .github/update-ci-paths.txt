@@ -20,6 +20,8 @@ update/docs/b-lif07/WORKER_READINESS.md
 update/docs/b-lif13/WEIGHTS_LIFETIME.md
 update/docs/dev-1/ma6-version-applicability.md
 update/docs/dev-1/ma3-rank-fault-producer.md
+update/docs/dev-1/ma3-image-qualification-20261114.md
+update/docs/dev-1/ma3-image-qualification-20261114.json
 update/docs/dev-1/ma7-req16-model-candidate.json
 update/docs/WORK_ORDER_VLLM_MVP.md
 update/docs/dev-1/ma6-change-path-review.json

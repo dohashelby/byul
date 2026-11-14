@@ -8,7 +8,7 @@ from pathlib import Path
 from .input_models import InputBinding, InputCatalog, InputVersion, PolicyInputPreview
 from .store import InvalidDocId
 
-MVP_PACK = {"id": "PACK-BASELINE", "revision": 34}
+MVP_PACK = {"id": "PACK-BASELINE", "revision": 35}  # 2026-11-14 RB: 실행 결합값은 정책이 아니라 guard run이 계산한다
 # 의미가 같은 필드만 연결한다. 역할표→호출자 목록, 응답 옵션→응답 필드는 추정하지 않는다.
 _GROUPS = {
     "1.2": {"REQ-01": ["allowed_callers"], "REQ-03": ["general_allowed_kinds"]},
@@ -72,12 +72,12 @@ def input_catalog(state) -> InputCatalog:
         from guard.models import load_pack
         pack = load_pack(state.settings.update_dir / "packs/PACK-BASELINE")
         if {"id": pack.ref().id, "revision": pack.ref().revision} != MVP_PACK:
-            reason = f"정본 Pack {pack.ref().revision}이 등록되어 있습니다. MVP Pack 34 준비가 필요합니다."
+            reason = f"정본 Pack {pack.ref().revision}이 등록되어 있습니다. MVP Pack {MVP_PACK['revision']} 준비가 필요합니다."
             pack = None
     except ImportError:
-        reason = "update 입력 연동 모듈을 불러오지 못했습니다. Pack 34 준비 상태를 확인할 수 없습니다."
+        reason = f"update 입력 연동 모듈을 불러오지 못했습니다. Pack {MVP_PACK['revision']} 준비 상태를 확인할 수 없습니다."
     except (OSError, ValueError) as exc:
-        reason = f"Pack 34를 불러오지 못했습니다 ({type(exc).__name__})."
+        reason = f"Pack {MVP_PACK['revision']}를 불러오지 못했습니다 ({type(exc).__name__})."
     parameters = {c.id: [{"key": p.key, "type": p.type, "required": p.required} for p in c.policy_params]
                   for c in pack.active_checks()} if pack else {}
     bindings = [b.model_copy(update={"type": p["type"]}) for b in BINDINGS
@@ -189,7 +189,7 @@ def resolve_policy(state, document, catalog=None):
         if entry.get("decision") == "needs_confirmation":
             gaps.append(_issue(path, "정책 확인이 필요합니다. 결정 완료·실행 준비 완료로 처리하지 않습니다."))
     if not catalog.available:
-        gaps.append(_issue("/verification/pack", catalog.reason or "Pack 34 준비 미완료"))
+        gaps.append(_issue("/verification/pack", catalog.reason or f"Pack {MVP_PACK['revision']} 준비 미완료"))
     for b in catalog.bindings:
         entry = reqs.get(b.requirement, {})
         if b.requirement in unresolved_keep:
@@ -254,7 +254,7 @@ def resolve_policy(state, document, catalog=None):
         params = {p["key"]: p for p in catalog.parameters.get(cid, [])}
         for key, value in data.items():
             if catalog.available and key not in params:
-                errors.append(_issue(f"/verification/values/{cid}/{key}", "Pack 34에 없는 정책 키입니다."))
+                errors.append(_issue(f"/verification/values/{cid}/{key}", f"Pack {MVP_PACK['revision']}에 없는 정책 키입니다."))
             elif key in params and not _valid(value, params[key]["type"]):
                 errors.append(_issue(f"/verification/values/{cid}/{key}", f"{params[key]['type']} 형식이어야 합니다."))
     for cid, params in catalog.parameters.items():

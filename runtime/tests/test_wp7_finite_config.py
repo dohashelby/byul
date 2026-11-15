@@ -103,7 +103,6 @@ def test_finite_positive_values_keep_toml_and_cli_precedence(tmp_path, field):
     assert getattr(run.call_args.args[0], field) == (0.25 if OPTIONS[field] else 0.5)
 
 
-@pytest.mark.xfail(strict=True, reason="B-1")
 def test_b1_positive_finite_is_public_shared_and_keeps_numeric_boundary():
     from serving_runtime.config import config, node_config
 

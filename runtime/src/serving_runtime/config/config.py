@@ -19,7 +19,7 @@ def _default_data_dir() -> str:
     return str(base / "serving-runtime" / "mvp")
 
 
-def _positive_finite(value):
+def positive_finite(value):
     if type(value) not in (int, float):
         return False
     try:
@@ -99,11 +99,11 @@ class MVPConfig:
             raise ValueError(f"backend_config_path is required for the {self.backend} backend")
         if self.backend == "mock" and self.backend_config_path is not None:
             raise ValueError("backend_config_path is only valid for an external backend")
-        if not _positive_finite(self.relay_timeout_s):
+        if not positive_finite(self.relay_timeout_s):
             raise ValueError("relay_timeout_s must be positive")
-        if not _positive_finite(self.stream_idle_timeout_s):
+        if not positive_finite(self.stream_idle_timeout_s):
             raise ValueError("stream_idle_timeout_s must be positive")
-        if not _positive_finite(self.request_deadline_s):
+        if not positive_finite(self.request_deadline_s):
             raise ValueError("request_deadline_s must be positive")
         if (
             not isinstance(self.max_concurrent_requests, int)
@@ -117,9 +117,9 @@ class MVPConfig:
             or self.max_connections <= 0
         ):
             raise ValueError("max_connections must be a positive integer")
-        if not _positive_finite(self.request_header_timeout_s):
+        if not positive_finite(self.request_header_timeout_s):
             raise ValueError("request_header_timeout_s must be positive")
-        if not _positive_finite(self.request_body_timeout_s):
+        if not positive_finite(self.request_body_timeout_s):
             raise ValueError("request_body_timeout_s must be positive")
         if not str(self.data_dir).strip():
             raise ValueError("data_dir must not be empty")
@@ -156,13 +156,13 @@ class MVPConfig:
                     "observation_run_id",
                 } and (len(value) > 128 or any(ord(character) < 0x20 for character in value)):
                     raise ValueError(f"{name} must be printable and at most 128 characters")
-        if not _positive_finite(self.collector_interval_s):
+        if not positive_finite(self.collector_interval_s):
             raise ValueError("collector_interval_s must be positive")
-        if not _positive_finite(self.collector_stale_after_s):
+        if not positive_finite(self.collector_stale_after_s):
             raise ValueError("collector_stale_after_s must be positive")
-        if not _positive_finite(self.asset_interval_s):
+        if not positive_finite(self.asset_interval_s):
             raise ValueError("asset_interval_s must be positive")
-        if not _positive_finite(self.retention_max_age_days):
+        if not positive_finite(self.retention_max_age_days):
             raise ValueError("retention_max_age_days must be positive")
         if (
             not isinstance(self.retention_max_bytes, int)
@@ -170,7 +170,7 @@ class MVPConfig:
             or self.retention_max_bytes <= 0
         ):
             raise ValueError("retention_max_bytes must be a positive integer")
-        if not _positive_finite(self.retention_interval_s):
+        if not positive_finite(self.retention_interval_s):
             raise ValueError("retention_interval_s must be positive")
         if self.observation_origin not in {"synthetic", "real"}:
             raise ValueError("observation_origin must be synthetic or real")
@@ -239,7 +239,7 @@ class MVPConfig:
             validate_kube_context(self.kube_context)
         if self.policy_bundle is not None and not isinstance(self.policy_bundle, dict):
             raise ValueError("policy_bundle must be an object when configured")
-        if not _positive_finite(self.cilium_timeout_s):
+        if not positive_finite(self.cilium_timeout_s):
             raise ValueError("cilium_timeout_s must be positive")
 
 

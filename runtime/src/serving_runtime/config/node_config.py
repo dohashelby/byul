@@ -9,7 +9,7 @@ from pathlib import Path
 import tomllib
 from typing import get_args, get_type_hints
 
-from .config import MVPConfig, _positive_finite
+from .config import MVPConfig, positive_finite
 
 ALIASES = {
     "policy_path": "policy",
@@ -73,7 +73,7 @@ def _typed_value(name, value, annotation):
             raise ValueError(f"node config: {name} must be float")
         try:
             converted = float(value)
-            if not _positive_finite(converted):
+            if not positive_finite(converted):
                 raise ValueError(f"node config: {name} must be finite and positive")
             return converted
         except OverflowError as error:

@@ -7,6 +7,7 @@ from email.message import Message
 import json
 from pathlib import Path
 import tempfile
+import time
 import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -226,6 +227,14 @@ class AuthHttpBase(TempFiles, unittest.TestCase):
             return json.loads(response.read())
 
     def final_record(self, request_id: str) -> dict[str, object]:
+        # The response body can reach the client before the handler persists final.
+        # Synchronize the fixture; missing or corrupt records still fail below.
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            pending, invalid = JsonlStore(self.data_dir / "gateway_records.jsonl").read_all()
+            if invalid or any(row.get("request_id") == request_id and row.get("phase") == "final" for row in pending):
+                break
+            time.sleep(0.005)
         records, corrupt = JsonlStore(self.data_dir / "gateway_records.jsonl").read_all()
         self.assertEqual(corrupt, [])
         return [r for r in records if r["request_id"] == request_id and r["phase"] == "final"][-1]

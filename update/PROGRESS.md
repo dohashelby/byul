@@ -3086,3 +3086,12 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 다음 단계: 집중 소스 검토 후 CI에서 실제 반환 형태·보수적 투영·기존 프로필 회귀를 확인한다.
 - 집중 검토 후속: REQ-17에서 cache 비활성화의 정확 원 생산자 0-token 행을 기존 timing 소비자에 전달해 빠른 대조만으로 정상/전체 범위가 되는 공백을 막았다. control-present의 native 적중이 확인되지 않으면 UNKNOWN으로 남긴다. CI 실행 전이다.
 - 독립 후속: 기준 V1 `InputBatch.condense`·`clear`를 정확 소스에서만 설치하고 전후 요청/자리 mapping을 세션 키 지문으로 기록한다. 실제 이동과 회수 자리를 REQ-18의 재사용 후보에 반영하지만 sampler 최종 상태·소비가 없어 verdict/full_scope는 UNKNOWN으로 유지한다. 원 0.31.0 설치 지점은 늘리지 않았다. 실제 소스 몸체의 이동/초기화 기록을 소비자에 전달하는 회귀는 CI 대상이며 로컬 Python/pytest는 실행하지 않았다.
+
+## 2026-11-15 — M-A6 기준 V1 `/33` stream 구성 (로컬 준비)
+
+- 한 일: 사용자 승인으로 받은 단일 Uvicorn 0.34.0 wheel의 세 Python 원본을 검증된 SHA로 fixture에 보존하고, 기존 `/28` HMAC composition 뒤에 원본 `/12` stream 확장을 비공개 정확 bytes로 읽는 새 구성 코드를 추가했다. 새 구성은 0.34.0 Uvicorn 세 소스 행과 검토된 CPython 3.12.8 stream 코드 지문만 선택한다. 기존 `/12`·`/29` 코드/정책은 유지한다.
+- 경계: wheel metadata는 기준 이미지 dist metadata와 일치하지만 이미지 Python 세 파일은 아직 미대조라 source 후보이다. 개인 키/확장 실패는 hook 전에 중단한다. stream 요청 식별은 `/28`과 같은 세션 HMAC이며 raw SHA를 새 stream 행에 넣지 않는다. buffer 전체 목록·client close release epoch·실제 이미지/GPU 자격은 미검증이다.
+- 테스트 결과: 로컬 Python/pytest는 사용자 지시로 실행하지 않았다. 실제 0.34.0 h11 함수 몸체의 stream 생산자·기존 소비자, 엄격한 header HMAC, private key 선행 실패와 소스 변조 거부 회귀는 CI 대상이다. 로컬 shell SHA·diff/JSON 검증만 한다.
+- 후속 연결: profiler `/32` 고정 source를 병합한 뒤 lifecycle catalog·준비 자산·recording parser·stream 소비자·Kubernetes 실행기의 명시적 `/33` 경로를 연결했다. 기존 `/12`·`/29`의 source/runtime 기본값은 유지하고 `/33`에서만 새 행·3.12.8 ABI·HMAC 준비 키를 선택한다. 실제 함수 body→parser→기존 소비자와 파일/키 변조 회귀는 새 head CI 대상이다. WORK_ORDER 7절의 후속 승인 경계에 따라 기준 0.7.0 기본 stream 실행기 gate는 닫혀 있다.
+- 다음 단계: 고정 source 집중 검토와 CI 뒤 `/33` 기본 gate 활성화 여부를 사용자에게 별도 결정받는다. 실제 이미지 Python 파일 대조/생산자 등록/GPU 실측도 별개다.
+- 집중 검토 보수: `/33`의 runtime 계약은 CPython 3.12.3·3.12.8 두 행만 받도록 독립 표로 고정했다. 원 `/12`의 3.12.14·3.12.15 행은 새 parser·소비자에도 상속하지 않으며 실제 생산 record의 runtime 변조 재체인 거부를 CI에 넣었다. 로컬 Python/pytest는 실행하지 않았다.

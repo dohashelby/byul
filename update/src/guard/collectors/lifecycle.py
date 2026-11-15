@@ -162,7 +162,7 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None,fa
         if hashlib.sha256(base_raw).hexdigest() != configured.runtime_spec(profile)['base_sha256']:
             raise ValueError('CONFIGURED_LIFECYCLE_BASE_UNAVAILABLE')
         values['guard_lifecycle_base.py'] = base_raw
-        for filename, (logical, digest) in configured.startup_assets(profile).items():
+        for filename, (logical, digest) in (configured.startup_assets(profile) | configured.stream_assets(profile)).items():
             raw = Path(sensor.__file__).with_name(logical + '.py').read_bytes()
             if hashlib.sha256(raw).hexdigest() != digest:
                 raise ValueError('BASELINE_STARTUP_DEPENDENCY_UNAVAILABLE')
@@ -278,10 +278,10 @@ def load_prepared(path):
             identity = lambda s: (s.st_dev, s.st_ino, s.st_mode, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
             if (len(raw) != before.st_size or len({identity(s) for s in (before, opened, after, key_path.lstat())}) != 1):
                 raise ValueError('REQUEST_BINDING_KEY_INVALID')
-        elif name in configured.startup_assets(manifest['profile']):
+        elif name in (configured.startup_assets(manifest['profile']) | configured.stream_assets(manifest['profile'])):
             try:
                 raw = configured.startup._startup_read(name,
-                    configured.startup_assets(manifest['profile'])[name][1], directory_path=str(path.parent))
+                    (configured.startup_assets(manifest['profile']) | configured.stream_assets(manifest['profile']))[name][1], directory_path=str(path.parent))
             except OSError:
                 raise ValueError('BASELINE_STARTUP_DEPENDENCY_UNAVAILABLE') from None
         else:
@@ -317,8 +317,8 @@ def load_prepared(path):
         if configured.contains(manifest['profile']) and name == 'guard_lifecycle_base.py':
             if hashlib.sha256(raw).hexdigest() != configured.runtime_spec(manifest['profile'])['base_sha256']:
                 raise ValueError('CONFIGURED_LIFECYCLE_BASE_UNAVAILABLE')
-        if name in configured.startup_assets(manifest['profile']):
-            logical, digest = configured.startup_assets(manifest['profile'])[name]
+        if name in (configured.startup_assets(manifest['profile']) | configured.stream_assets(manifest['profile'])):
+            logical, digest = (configured.startup_assets(manifest['profile']) | configured.stream_assets(manifest['profile']))[name]
             if (hashlib.sha256(raw).hexdigest() != digest
                     or raw != Path(sensor.__file__).with_name(logical + '.py').read_bytes()):
                 raise ValueError('BASELINE_STARTUP_DEPENDENCY_UNAVAILABLE')

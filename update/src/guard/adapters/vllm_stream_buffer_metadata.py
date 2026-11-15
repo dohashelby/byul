@@ -11,13 +11,13 @@ FIELDS=frozenset({'schema','phase','source_module','source_sha256','source_verif
 def fingerprint(v):return type(v) is str and re.fullmatch('[0-9a-f]{64}',v) is not None
 
 
-def validate_sample(v, *, sources=None):
+def validate_sample(v, *, sources=None, runtime_codes=None):
     try:
         if (type(v) is not dict or set(v)!=FIELDS or v['schema']!=sensor.STREAM_SCHEMA or type(v['phase']) is not str
                 or v['phase'] not in sensor.PHASES or type(v['source_module']) is not str or v['source_module'] not in (sources or sensor.SOURCE_ADDITIONS)
                 or v['source_sha256']!=(sources or sensor.SOURCE_ADDITIONS)[v['source_module']]
-                or type(v['observer_runtime']) is not str or v['observer_runtime'] not in sensor.RUNTIME_CODE_CONTRACTS
-                or v['observer_code_sha256']!=sensor.RUNTIME_CODE_CONTRACTS[v['observer_runtime']]):raise ValueError
+                or type(v['observer_runtime']) is not str or v['observer_runtime'] not in (runtime_codes or sensor.RUNTIME_CODE_CONTRACTS)
+                or v['observer_code_sha256']!=(runtime_codes or sensor.RUNTIME_CODE_CONTRACTS)[v['observer_runtime']]):raise ValueError
         for key in ('source_verified','asgi_context_live','socket_identity_stable'):
             if type(v[key]) is not bool:raise ValueError
         for key in ('flow_write_paused','cycle_disconnected','transport_closing'):
@@ -51,7 +51,7 @@ def validate_sample(v, *, sources=None):
     except (TypeError,KeyError,ValueError):raise ValueError('STREAM_BUFFER_SAMPLE_INVALID') from None
 
 
-def project(packet,trials,limits):
+def project(packet,trials,limits,*,sources=None,runtime_codes=None,require_live_context=False):
     result={'samples':[],'cases':[],'missing':[],'conflict_candidates':[],'producer_authenticated':False,'buffer_scope_complete':False}
     recordings=[] if not packet else packet.get('recordings',[])
     for index,recording in enumerate(recordings):
@@ -60,7 +60,7 @@ def project(packet,trials,limits):
         rows=capture['records'];context=rows[0]['payload']['context']
         for row in rows:
             if row['event']!='STREAM_BUFFER':continue
-            payload=row['payload'];validate_sample(payload)
+            payload=row['payload'];validate_sample(payload,sources=sources,runtime_codes=runtime_codes)
             result['samples'].append({'recording':index,'seq':row['seq'],'monotonic_ns':row['monotonic_ns'],
                 'pid':context['pid'],'start_ticks':context['start_ticks'],'time_namespace_inode':context['time_namespace'],
                 'process_binding_verified':bool(capture.get('process_context_verified') and recording.get('session_owner_match') and recording.get('listed_file_identity_match')),
@@ -69,9 +69,13 @@ def project(packet,trials,limits):
         if not trial['attempted']:continue
         request=trial['request_id_sha256'];rows=[s for s in result['samples'] if s['request_sha256']==request or request in s['associated_requests']]
         identities={(r['recording'],r['pid'],r['start_ticks'],r['connection_sha256']) for r in rows if r['request_sha256']==request}
-        unique=len(identities)==1
+        unique=(len(identities)==1 and (not require_live_context or any(
+            r['asgi_context_live'] and r['asgi_invocation_sha256'] is not None
+            for r in rows if r['request_sha256']==request and r['phase'].startswith(('SEND', 'DRAIN')))))
         selected=[r for r in rows if unique and (r['recording'],r['pid'],r['start_ticks'],r['connection_sha256']) in identities]
-        verified=[r for r in selected if r['source_verified'] and r['process_binding_verified']]
+        verified=[r for r in selected if r['source_verified'] and r['process_binding_verified']
+            and (not require_live_context or r['phase'].startswith('CONNECTION_LOST')
+                 or r['asgi_context_live'] and r['asgi_invocation_sha256'] is not None)]
         writes=[r['write_buffer_bytes'] for r in verified if r['write_buffer_bytes'] is not None]
         rss=[r['process_rss_bytes'] for r in verified if r['process_rss_bytes'] is not None]
         drains={};sends={}
@@ -89,6 +93,9 @@ def project(packet,trials,limits):
         missing=[]
         if not unique:missing.append('unique_request_connection_unavailable')
         if not verified:missing.append('source_or_physical_process_binding_unavailable')
+        if require_live_context and not any(r['asgi_context_live'] and r['asgi_invocation_sha256'] is not None
+                for r in rows if r['request_sha256']==request and r['phase'].startswith(('SEND', 'DRAIN'))):
+            missing.append('live_asgi_request_context_unavailable')
         if not writes:missing.append('selected_transport_buffer_unavailable')
         if not closes:missing.append('connection_close_sample_unavailable')
         missing.append('full_buffer_inventory_and_client_close_release_epoch_unverified')

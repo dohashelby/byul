@@ -214,7 +214,7 @@
           "next": null
         },
         "stream_buffer": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "cause": "BASELINE_STREAM_DEFAULT_GATE_PENDING_APPROVAL",
           "observers": [
             "vllm_lifecycle_sensor",
             "vllm_stream_buffer_sensor"
@@ -223,8 +223,8 @@
             "LIF-03",
             "LIF-04"
           ],
-          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 V1 HTTP 경로·uvicorn 설치 행이 현재 sensor와 다름",
-          "next": "기준 uvicorn 정확 설치 행과 V1 HTTP 대상표"
+          "basis": "WORK_ORDER 1.2와 7절: /33은 wheel-source 후보와 준비 자산·HMAC·실제 함수 관측/소비 회귀까지 구성했으나, 새 기본 실행기 활성화는 별도 사용자 승인 전이다. 이미지 설치 Python 세 파일도 아직 미대조다.",
+          "next": "집중 검토·CI 뒤 /33 기본 gate 활성화와 정확 이미지 파일 대조 범위를 사용자에게 제시"
         }
       }
     },

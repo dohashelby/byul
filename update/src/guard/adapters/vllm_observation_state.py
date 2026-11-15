@@ -23,7 +23,7 @@ def project(packet,trials,required,*,binding_hashes=None):
                 capture=recording.get('capture')
                 if not capture:continue
                 rows=capture['records'];ctx=rows[0]['payload']['context']
-                if rows[0]['payload']['profile']=='vllm-native-lifecycle-metadata/28':
+                if rows[0]['payload'].get('profile')=='vllm-native-lifecycle-metadata/28':
                     selected_hash=(binding_hashes or {}).get(trial['case_id'])
                     for row,meta in fresh_assignment(rows,selected_hash):
                         matches.append({'case_id':trial['case_id'],'recording':index,'seq':row['seq'],'pid':ctx['pid'],

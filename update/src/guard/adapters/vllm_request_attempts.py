@@ -16,7 +16,7 @@ def project_attempts(packet,trials,*,binding_hashes=None):
         "automatic_retry_verified":False,"whole_scope_complete":False,"asgi_invocation_binding_observed":False}
     if not packet:
         result["diagnostic_codes"].append("REQUEST_ATTEMPT_NATIVE_UNAVAILABLE");return result
-    fresh_profile=any(r['capture']['records'][0]['payload']['profile']=='vllm-native-lifecycle-metadata/28'
+    fresh_profile=any(r['capture']['records'][0]['payload'].get('profile')=='vllm-native-lifecycle-metadata/28'
         for r in packet.get('recordings',[]) if r.get('capture'))
     for trial in trials:
         if not trial.get("attempted"):continue
@@ -25,7 +25,7 @@ def project_attempts(packet,trials,*,binding_hashes=None):
             capture=recording.get("capture")
             if not capture:continue
             rows=capture["records"];context=rows[0]["payload"]["context"]
-            if rows[0]['payload']['profile']=='vllm-native-lifecycle-metadata/28':
+            if rows[0]['payload'].get('profile')=='vllm-native-lifecycle-metadata/28':
                 selected_hash=(binding_hashes or {}).get(trial['case_id'])
                 for row,meta in fresh_assignment(rows,selected_hash):
                     matches.append({'case_id':trial['case_id'],'recording':index,'seq':row['seq'],

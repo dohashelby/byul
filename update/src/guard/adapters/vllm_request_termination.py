@@ -46,7 +46,7 @@ def project_native(packet, request_sha256, max_delay_ms, required_scopes, *, req
         capture=recording.get("capture")
         if not capture:continue
         rows=capture["records"];context=rows[0]["payload"]["context"]
-        if rows[0]['payload']['profile']=='vllm-native-lifecycle-metadata/28':
+        if rows[0]['payload'].get('profile')=='vllm-native-lifecycle-metadata/28':
             if request_hmac is None:
                 result['diagnostic_codes'].append('TERMINATION_REQUEST_BINDING_KEY_UNAVAILABLE')
                 continue
@@ -88,7 +88,7 @@ def project_native(packet, request_sha256, max_delay_ms, required_scopes, *, req
     if len(matches)!=1:
         result["diagnostic_codes"].append("TERMINATION_UNIQUE_NATIVE_DISCONNECT_BINDING_UNAVAILABLE");return result
     index,recording,capture,context,native_id,invocation,anchor=matches[0]
-    asgi_request = request_hmac if capture['records'][0]['payload']['profile']=='vllm-native-lifecycle-metadata/28' else request_sha256
+    asgi_request = request_hmac if capture['records'][0]['payload'].get('profile')=='vllm-native-lifecycle-metadata/28' else request_sha256
     physical=bool(recording.get("session_owner_match") and recording.get("listed_file_identity_match")
         and capture.get("process_context_verified"))
     result["binding_observed"]=True

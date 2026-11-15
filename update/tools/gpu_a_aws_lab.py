@@ -146,14 +146,26 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
         engine['command'] = list(release['launch']['command'])
         if release['launch']['model_argument'] == '--model':
             engine['args'] = [release['launch']['model_argument'], *engine['args']]
+    # Engine selection belongs to the exact image/release profile, not generation names.
+    launch_profile = release['launch'] if release and engine_image in release['images'] else {}
+    release_env = dict(launch_profile.get('env') or {})
     engine['args'][engine['args'].index('--max-model-len') + 1] = str(max_model_len)
     engine['args'] = [*engine['args'], *spec['args'], *(['--enforce-eager'] if enforce_eager else [])]
     engine['args'] += [*(['--code-revision', code_revision] if code_revision else []), *extra_engine_args]
     engine['args'] += [arg for arg in check_args if arg not in engine['args']]
+    unsupported = set(launch_profile.get('unsupported_args', []))
+    if any(arg.split('=', 1)[0] in unsupported for arg in engine['args']):
+        raise ValueError('AWS_RELEASE_LAUNCH_ARGUMENT_UNSUPPORTED')
     if model_host_snapshot is not None:
         model_volume, = (v for v in pod['spec']['volumes'] if v['name'] == 'model')
         model_volume['hostPath']['path'] = model_host_snapshot
     engine['env'] = [*engine['env'], *({'name': k, 'value': v} for k, v in spec['env'].items())]
+    if set(release_env) & {e['name'] for e in engine['env']}:
+        raise ValueError('AWS_RELEASE_ENGINE_ENV_CONFLICT')
+    engine['env'] += [{'name': k, 'value': v} for k, v in sorted(release_env.items())]
+    unsupported_env = launch_profile.get('unsupported_env_values', {})
+    if any(item.get('value') in unsupported_env.get(item['name'], []) for item in engine['env']):
+        raise ValueError('AWS_RELEASE_LAUNCH_ENV_UNSUPPORTED')
     if marker_root is not None:
         engine['env'].append({'name': 'BYUL_CODE_MARKER_ROOT', 'value': marker_root})
     run_root = f'{host_root}/{run_id}'
@@ -195,6 +207,7 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
         'model_host_snapshot': model_host_snapshot or f'/srv/serving/models/{model_revision}',
         'code_revision': code_revision, 'code_marker_root': marker_root,
         'launch': {'command': list(engine['command']), 'argv': list(engine['args']),
+            'engine': launch_profile.get('engine'), 'env': release_env,
             'runner': {'0': 'v1', '1': 'v2'}.get(spec['env'].get('VLLM_USE_V2_MODEL_RUNNER'), 'engine-default'),
             'async_requested': False if '--no-async-scheduling' in engine['args'] else None,
             'prefix_cache': True if '--enable-prefix-caching' in engine['args'] else None},

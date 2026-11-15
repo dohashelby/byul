@@ -25,8 +25,9 @@ NS_UID = '11111111-2222-3333-4444-555555555555'
 
 
 def deployed(tmp_path, generation, **render_options):
+    image = render_options.pop('engine_image', IMAGE)
     engine_yaml, probe_yaml, record = lab.render(HANDOFF, generation=generation, profile='dev', run_id='a-run-1',
-        engine_image=IMAGE, model_revision='7ae557604adf67be50417f59c2c2f167def9a775', host_root='/srv/byul-a',
+        engine_image=image, model_revision='7ae557604adf67be50417f59c2c2f167def9a775', host_root='/srv/byul-a',
         **render_options)
     deployment, _ = yaml.safe_load_all(engine_yaml)
     pods = {'engine': {'metadata': {**deployment['spec']['template']['metadata'], 'name': 'serving-engine-7d9f-x2k',
@@ -37,7 +38,7 @@ def deployed(tmp_path, generation, **render_options):
         pod['spec']['nodeName'] = 'byul-gpu-01'
         pod['status'] = {'phase': 'Running', 'podIP': f'10.244.0.{10 + index}', 'conditions': [{'type': 'Ready', 'status': 'True'}],
             'containerStatuses': [{'name': container['name'], 'containerID': 'containerd://' + str(index) * 64,
-                'imageID': IMAGE, 'restartCount': 0, 'ready': True, 'state': {'running': {'startedAt': '2026-11-04T01:00:00Z'}}}]}
+                'imageID': image, 'restartCount': 0, 'ready': True, 'state': {'running': {'startedAt': '2026-11-04T01:00:00Z'}}}]}
     files = {'render': record, 'namespace': {'kind': 'Namespace', 'metadata': {'name': 'serving-lab', 'uid': NS_UID}},
         'engine-pod': pods['engine'], 'probe-pod': pods['probe']}
     for name, value in files.items():

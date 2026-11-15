@@ -108,6 +108,92 @@ def test_example_environment_contracts_are_not_actual_environment_proof(tmp_path
     assert not result['ready_for_final_assembly'] and not result['input_preflight_passed']
 
 
+@pytest.mark.parametrize('damage',['missing','wrong-value','duplicate','value-from','render-selection','undeclared-env'])
+def test_rehashed_launch_cannot_normalize_a_wrong_engine_selection(tmp_path,monkeypatch,damage):
+    fixture,launch,_,_=local_assets(tmp_path,monkeypatch)
+    path=launch.parent/'baseline/engine.yaml'
+    deployment,service=list(yaml.safe_load_all(path.read_bytes()))
+    entries=deployment['spec']['template']['spec']['containers'][0]['env']
+    selected,=(row for row in entries if row['name']=='VLLM_USE_V1')
+    if damage=='missing':entries.remove(selected)
+    elif damage=='wrong-value':selected['value']='0'
+    elif damage=='duplicate':entries.append(dict(selected))
+    elif damage=='value-from':
+        selected.pop('value');selected['valueFrom']={'fieldRef':{'fieldPath':'metadata.name'}}
+    elif damage=='undeclared-env':entries.append({'name':'EXAMPLE_OTHER_MODE','value':'changed'})
+    else:
+        render=launch.parent/'baseline/render.json';document=json.loads(render.read_bytes())
+        document['launch'].pop('engine');document['launch'].pop('env')
+        render.write_bytes(canonical_json(document))
+    path.write_text(yaml.safe_dump_all([deployment,service]))
+    manifest=json.loads(launch.read_bytes())
+    for name in ('baseline/engine.yaml','baseline/render.json'):
+        manifest['files_sha256'][name]=sha256_hex((launch.parent/name).read_bytes())
+    launch.write_bytes(canonical_json(manifest))
+    result=tool.audit(fixture,launch)
+    assert not result['launch_plan_valid'] and not result['local_assets_valid']
+    assert not result['ready_for_final_assembly'] and result['actual_comparison'] is None
+
+
+def test_engine_selection_comparison_uses_provider_data_for_other_variable_names(tmp_path, monkeypatch):
+    from guard.adapters.engine_provider import VllmProvider
+    original = VllmProvider.release_profile
+    baseline = versions()['baseline']['version']
+
+    def changed(self, version):
+        row = original(self, version)
+        if row is not None and version == baseline:
+            row['launch']['env'] = {'EXAMPLE_FUTURE_ENGINE_MODE': 'selected'}
+        return row
+
+    monkeypatch.setattr(VllmProvider, 'release_profile', changed)
+    fixture, launch, _, _ = local_assets(tmp_path, monkeypatch)
+    result = tool.audit(fixture, launch)
+    assert result['local_assets_valid'] and result['launch_plan_valid']
+    assert not result['input_preflight_passed'] and result['actual_comparison'] is None
+
+
+@pytest.mark.parametrize('damage', ['missing-selection', 'wrong-env', 'rewritten-env', 'duplicate-env',
+                                  'changed-engine', 'unrelated-env'])
+def test_self_rehashed_engine_selection_changes_or_other_env_differences_remain_invalid(tmp_path, monkeypatch, damage):
+    fixture, launch, _, _ = local_assets(tmp_path, monkeypatch)
+    side = 'candidate' if damage == 'unrelated-env' else 'baseline'
+    folder = launch.parent / side
+    render_file = folder / 'render.json'
+    render = json.loads(render_file.read_bytes())
+    engine_file = folder / 'engine.yaml'
+    deployment, service = list(yaml.safe_load_all(engine_file.read_bytes()))
+    engine, = deployment['spec']['template']['spec']['containers']
+    if damage == 'unrelated-env':
+        engine['env'].append({'name': 'EXAMPLE_UNRELATED_SECURITY_SETTING', 'value': 'changed'})
+    elif damage == 'changed-engine':
+        render['launch']['engine'] = 'EXAMPLE-other-engine'
+    else:
+        name, = render['launch']['env']
+        selected, = (row for row in engine['env'] if row['name'] == name)
+        if damage == 'missing-selection':
+            render['launch'].pop('engine')
+            render['launch'].pop('env')
+            engine['env'].remove(selected)
+        elif damage == 'duplicate-env':
+            engine['env'].append(dict(selected))
+        else:
+            selected['value'] = 'EXAMPLE-other-value'
+            if damage == 'rewritten-env':
+                render['launch']['env'][name] = selected['value']
+    engine_file.write_text(yaml.safe_dump_all([deployment, service]))
+    render_file.write_bytes(canonical_json(render))
+    manifest = json.loads(launch.read_bytes())
+    for name in ['engine.yaml', 'render.json']:
+        manifest['files_sha256'][side + '/' + name] = sha256_hex((folder / name).read_bytes())
+    launch.write_bytes(canonical_json(manifest))
+    result = tool.audit(fixture, launch)
+    assert not result['local_assets_valid'] and not result['launch_plan_valid']
+    assert not result['input_preflight_passed'] and result['actual_comparison'] is None
+    expected = 'LAUNCH_COMPARISON_CONDITIONS_MISMATCH' if damage == 'unrelated-env' else 'LAUNCH_ENGINE_SELECTION_MISMATCH:' + side
+    assert expected in result['errors']
+
+
 @pytest.mark.parametrize('damage', ['model', 'missing_model', 'processor', 'ref', 'launch', 'image_with_new_file_hash'])
 def test_changed_actual_files_or_self_rehashed_wrong_launch_are_not_valid(tmp_path, monkeypatch, damage):
     fixture, launch, _, _ = local_assets(tmp_path, monkeypatch)

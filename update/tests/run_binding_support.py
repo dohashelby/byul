@@ -78,3 +78,21 @@ def run_table_toml(pack, check_id, values):
     if not table:
         return ''
     return f'\n[run_binding.{check_id}]\n' + ''.join(f'{k}={json.dumps(v)}\n' for k, v in table.items())
+
+
+@contextmanager
+def window_opened_before(seconds=60):
+    """Open the computed run window `seconds` before guard run starts, keeping the executor limit.
+
+    Doubles that write their records while the test is being set up (before
+    `guard run`) would otherwise fall outside a window that starts at the run's
+    own second, depending only on whether the clock ticked in between.  Only
+    the window start moves; the window length, the policy intersection and the
+    executors' own window checks stay the product code's.
+    """
+    from datetime import timedelta
+    real = run_binding.window
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(run_binding, 'window', lambda executor, issued_at, *args, **kwargs:
+                      real(executor, issued_at - timedelta(seconds=seconds), *args, **kwargs))
+        yield

@@ -96,6 +96,7 @@ def environment(render, *, model_id=None, inventory=None, gpu_model, driver, obs
     # facts는 등록된 키만 받는다. 세대 구분은 서술 필드에 남기고 결과를 세대끼리 섞지 않는다.
     platform = ('GPU, amd64, AWS g6 kubeadm serving-lab; ' + '; '.join(f'{k}={v}' for k, v in (
         ('generation', generation), ('run', render['run_id']), ('profile', render['profile']),
+        ('engine_requested', launch.get('engine')),
         ('runner', launch['runner']), ('async_requested', launch['async_requested']),
         ('engine_version_observed', observed_engine_version is not None),
         ('eager', render['enforce_eager']), ('render_engine_sha256', render['outputs_sha256']['engine.yaml']))))
@@ -144,6 +145,16 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
                 or spec.get('args') != render['launch']['argv']
                 or model_volume['hostPath']['path'] != render['model_host_snapshot']):
             raise ValueError('RUN_INPUTS_RENDERED_LAUNCH_MISMATCH')
+        # New records bind the declared engine-selection variables. Historical
+        # records without this field keep their original replay meaning.
+        launch_env = render['launch'].get('env', {})
+        if type(launch_env) is not dict or any(type(k) is not str or type(v) is not str
+                                              for k, v in launch_env.items()):
+            raise ValueError('RUN_INPUTS_RENDERED_ENGINE_ENV_INVALID')
+        for name, expected in launch_env.items():
+            actual = [item for item in spec.get('env', []) if item.get('name') == name]
+            if actual != [{'name': name, 'value': expected}]:
+                raise ValueError('RUN_INPUTS_RENDERED_ENGINE_ENV_MISMATCH')
         marker_root = render.get('code_marker_root')
         if marker_root is not None and not any(
                 item.get('name') == 'BYUL_CODE_MARKER_ROOT' and item.get('value') == marker_root
@@ -181,6 +192,10 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
         value['observed_version'] = env.engine.version
         value['comparison_config'] = {'launch': {'argv': list(container['args']), 'chat_template': identity,
             'max_model_len': int(container['args'][container['args'].index('--max-model-len') + 1])}}
+    if (render.get('launch') or {}).get('engine') is not None:
+        # Compare the requested engine semantics, not version-specific env names.
+        # This is a declaration checked against the Pod spec, not runtime proof.
+        value.setdefault('comparison_config', {})['engine_selection'] = render['launch']['engine']
     # 전송 계층 생성자는 kubectl을 부르지 않고 target 형식과 신원 결합만 검사한다.
     from guard.runtime.kubernetes_http import INPUT_VALIDATION_PROFILE
     profile = INPUT_VALIDATION_PROFILE if 'code-selection' in render['generation'] else ENGINE_CALLBACK_PROFILE

@@ -189,7 +189,7 @@ def capture(transport,policy_values,*,actor_specs,connect_timeout,total_timeout)
     # This is a separate explicit lab capability. Native0.32 and production
     # worker/enterprise trust are not enabled by the HTTP sampling profile.
     require(transport.profile==REQUEST_BINDING_PROFILE and transport.lab is True
-        and supports(transport.engine_name, transport.engine_version))
+        and supports(transport.engine_name, transport.engine_version, 'unix_ipc'))
     program=source()
     record={'schema':RESULT_SCHEMA,'profile':PROFILE,'started_at':utcnow().isoformat(),'finished_at':None,
         'environment_ref':deepcopy(transport.environment_ref),'target_sha256':transport.target_sha256,

@@ -52,7 +52,7 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
     requires_roles=False;requires_route_scope=False;functional_via="engine"
     check_id="LIF-10";collection_profile=PROFILE;policy_prefix="termination"
     policy_normalizer=staticmethod(normalize_policy);transport_profile=TERMINATION_PROFILE
-    supported_native_profiles=frozenset({"vllm-native-lifecycle-metadata/8","vllm-native-lifecycle-metadata/9","vllm-native-lifecycle-metadata/23","sglang-native-lifecycle-metadata/1"})
+    supported_native_profiles=frozenset({"vllm-native-lifecycle-metadata/8","vllm-native-lifecycle-metadata/9","vllm-native-lifecycle-metadata/23","vllm-native-lifecycle-metadata/25","sglang-native-lifecycle-metadata/1"})
     configuration_keys=frozenset({'target','prepared','retry_scope','kubectl_binary','max_duration_seconds','node_image_verification'})
 
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):

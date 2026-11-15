@@ -1,5 +1,18 @@
 # M-A3 rank-fault 후보 생산자
 
+## 최신 main 통합과 PR 작성자의 다음 작업 (2026-11-15)
+
+#276은 #275·#277이 병합된 main `77bc05a3`에 맞춰 통합했다. 현재 범위는 ARM/2 사전 결합과 미등록 공통 부분 입력의 생성/검증이다. LIF-08의 제품 소비·전체 TP2 수락·새 V1 GPU 자격·등록 완료를 뜻하지 않는다. 원 준비 보고서와 여섯 ARM/1 GPU 사례는 당시 source에 귀속한 채 보존한다.
+
+작성자가 이어갈 순서는 다음과 같다.
+
+1. **LIF-08 제품 소비 연결:** `KubernetesRankFailureExecutor`가 새 공통 rank-fault 파일을 읽고 공통 `validate()` 결과를 기존 판정 입력에 연결하도록 구현한다. 정확 ENV/target/prepared/session/Pod 범위, 미등록 생산자와 부분 사건의 UNKNOWN, 기존 독립 FAIL을 보존하는 직접 시험과 `guard update`의 EVD→RES→RPT 왕복을 먼저 확인한다. 지원표·등록 관문을 우회해 실행기를 열지 않는다.
+2. **기준 V1의 RPC 관측 자격:** main은 기준·후보 모두 V1 선택이다. 기존 `v0-task-queue` 행과 기준 V0 GPU 기록을 초기 V1의 자격으로 넘기지 않는다. 기준 V1의 정확 RPC/worker 경계·요청 연결·소스 bytes/함수 본문·Python ABI를 대조하고 필요한 adapter 데이터를 검토한다. 후보의 자격도 해당 정확 소스에 한정한다.
+3. **남은 사건의 원 근거 연결:** TP2 전체 인과 그룹, 탐지·같은 영향 요청의 상위 전달·정책 기한, 같은 소유 범위의 해제/복구 근거를 연결한다. 현재 `fault_applied`/일부 `fault_released`만으로 `detected`/`client_delivered`/`recovered`나 complete를 채우지 않는다. 별도 communication-stall 분기와 death의 복구 의미도 각각 검증한다.
+4. **새 입력과 J01 검증:** 병합 후 확정 source의 새 prepared/독립 세션과 현재 V1 ENV·target을 만들고 ARM 전에 제품 입력을 결합한다. 승인된 실제 GPU 범위에서 기동 전 자격·정상 요청을 확인한 뒤 새 ARM/2 원 기록을 수집해 공통 입력과 제품 결과를 대조한다. 정확 이미지/판본/producer source의 검증을 마친 뒤에만 등록을 검토한다. 과거 ARM/1을 새 제품 입력으로 사후 귀속하지 않는다.
+
+이번 통합은 새 GPU/클라우드 실행이나 M-B4 재개를 수행하지 않는다. SDK14개 자산은 통합 전 #276과 동일하며, 새 소스 고정 목록은 기존 준비물의 실행 자격을 갱신하지 않는다. 실제 실행용 준비물은 최종 병합 소스로 다시 만들어야 한다.
+
 ## 두 이미지의 실제 IPC 기동 관측 (2026-11-14)
 
 후속 PR #271의7e49f608/source7c225d4e 준비 자산을 동일 승인 GPU 노드에 설치했다. 두 판본 모두 TP2 모델 로드·GPU2개·정상 HTTP200을 확인했다. 기준/후보 각3개의 닫힌 snapshot을 회수했고 정확 준비 자산·ABI/설치 파일/원 함수 본문·HMAC 대조에서 공백0개였다. [원자료 요약](ma3-image-qualification-20261114.json)의 후속_GPU_IPC_관측에28,565 bytes ZIP과10개 파일의 크기/SHA를 기록했다. 비밀 settings/키는 공개 요약에 넣지 않았다.

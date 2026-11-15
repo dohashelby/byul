@@ -8,11 +8,6 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "supply_stage_budget_ms",
           "required": true,
           "type": "dict[str,int]"
@@ -57,11 +52,6 @@
       "expected_gaps": [],
       "input_state": "미입력",
       "policy_requirements": [
-        {
-          "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "supply_max_attempts",
           "required": true,
@@ -715,11 +705,6 @@
           "type": "str"
         },
         {
-          "key": "retry_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "retry_policy_mode",
           "required": true,
           "type": "str"
@@ -932,22 +917,7 @@
           "type": "list[str]"
         },
         {
-          "key": "observation_expected_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "observation_event_policy_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "observation_allowed_actor_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "observation_denied_actor_sha256",
           "required": true,
           "type": "str"
         }
@@ -987,11 +957,6 @@
           "key": "observation_state_required_components",
           "required": true,
           "type": "list[str]"
-        },
-        {
-          "key": "identity_record_source_sha256",
-          "required": true,
-          "type": "str"
         },
         {
           "key": "profiler_backend_kind",
@@ -1196,11 +1161,6 @@
       "policy_requirements": [
         {
           "key": "record_subject_plan_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "record_inventory_source_sha256",
           "required": true,
           "type": "str"
         }
@@ -1436,11 +1396,6 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "supply_allowed_objects",
           "required": true,
           "type": "list[str]"
@@ -1520,11 +1475,6 @@
       "expected_gaps": [],
       "input_state": "미입력",
       "policy_requirements": [
-        {
-          "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "supply_allowed_identities",
           "required": true,
@@ -1724,36 +1674,6 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "revocation_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "revocation_validity_end",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "revocation_issuer_id",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "revocation_event_id",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "revocation_event_at",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "revocation_deny_after",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "revocation_deadline_basis",
           "required": true,
           "type": "str"
@@ -1810,41 +1730,6 @@
       ],
       "input_state": "미입력",
       "policy_requirements": [
-        {
-          "key": "session_validity_start",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "session_validity_end",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "session_issuer_id",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "session_event_id",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "session_event_at",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "session_open_before",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "session_deny_after",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "session_deadline_basis",
           "required": true,
@@ -1909,11 +1794,6 @@
         },
         {
           "key": "copy_policy_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "copy_record_source_sha256",
           "required": true,
           "type": "str"
         },
@@ -2060,16 +1940,6 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "forwarded_gateway_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "forwarded_engine_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "forwarded_identity_policy_sha256",
           "required": true,
           "type": "str"
@@ -2160,21 +2030,6 @@
       "policy_requirements": [
         {
           "key": "stored_identity_policy_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "stored_api_router_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "stored_serving_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "stored_protocol_source_sha256",
           "required": true,
           "type": "str"
         },
@@ -3066,13 +2921,7 @@
       "confirmed_policy_values": null,
       "expected_gaps": [],
       "input_state": "미입력",
-      "policy_requirements": [
-        {
-          "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "승인 뒤 파일·symlink·마운트가 바뀌어도 승인하지 않은 자료의 사용을 막는가?",
       "session": "J02",
       "sides": {
@@ -3101,13 +2950,7 @@
       "confirmed_policy_values": null,
       "expected_gaps": [],
       "input_state": "미입력",
-      "policy_requirements": [
-        {
-          "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "각 worker가 배정받은 승인 모델 파일·shard를 실제로 메모리에 올리는가?",
       "session": "J01",
       "sides": {
@@ -3136,13 +2979,7 @@
       "confirmed_policy_values": null,
       "expected_gaps": [],
       "input_state": "미입력",
-      "policy_requirements": [
-        {
-          "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "생성된 코드·파일이나 공유 컴파일 캐시를 권한 없이 바꿀 수 없는가?",
       "session": "J02",
       "sides": {
@@ -3245,13 +3082,7 @@
       "confirmed_policy_values": null,
       "expected_gaps": [],
       "input_state": "미입력",
-      "policy_requirements": [
-        {
-          "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "모델에 포함된 추가 코드가 허용된 조건에서만 실행되는가?",
       "session": "J02",
       "sides": {
@@ -3280,13 +3111,7 @@
       "confirmed_policy_values": null,
       "expected_gaps": [],
       "input_state": "미입력",
-      "policy_requirements": [
-        {
-          "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "승인하지 않은 플러그인을 실행하기 전에 허용 여부를 검사하는가?",
       "session": "J02",
       "sides": {
@@ -3315,13 +3140,7 @@
       "confirmed_policy_values": null,
       "expected_gaps": [],
       "input_state": "미입력",
-      "policy_requirements": [
-        {
-          "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "지원하는 Python 실행 모드가 달라져도 같은 동적 import 허용 검사가 유지되는가?",
       "session": "J02",
       "sides": {
@@ -3351,11 +3170,6 @@
       "expected_gaps": [],
       "input_state": "미입력",
       "policy_requirements": [
-        {
-          "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "supply_allowed_readers",
           "required": true,
@@ -3425,13 +3239,7 @@
       "confirmed_policy_values": null,
       "expected_gaps": [],
       "input_state": "미입력",
-      "policy_requirements": [
-        {
-          "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "모델·도구·설정이 바뀌면 더 이상 맞지 않는 생성물이나 캐시를 재사용하지 않는가?",
       "session": "J02",
       "sides": {
@@ -3460,13 +3268,7 @@
       "confirmed_policy_values": null,
       "expected_gaps": [],
       "input_state": "미입력",
-      "policy_requirements": [
-        {
-          "key": "supply_record_source_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "중단되거나 실패한 생성물·부분 파일을 완성된 자료로 사용하지 않는가?",
       "session": "J02",
       "sides": {
@@ -3582,8 +3384,8 @@
   "planned_pack_ref": {
     "id": "PACK-BASELINE",
     "kind": "PACK",
-    "revision": 36,
-    "sha256": "0f21244afca59829551744aea04612b9f034fd062ca390214f378a8feaa9f5c6"
+    "revision": 37,
+    "sha256": "c85b347a8b64856ecd61b1018a5f9b569bbe4475913ec537986d49d55efda1b3"
   },
   "planned_pack_source": {
     "available_on_main": false,

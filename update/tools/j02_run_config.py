@@ -178,6 +178,36 @@ def policy_from_web_values(values, pack, *, data_origin='DECLARED'):
     return document, dropped
 
 
+# RB3-D1 (2026-11-15 user decision): "허용 호출자에게 test-model 현재 판본만, 퇴역 판본 없음, 승인 자격 하나".
+# The principals are the REQ-05 executor's two test roles; their fingerprints are labels, never a verified identity
+# (the executor keeps principal_identity_verified false).
+REQ05_PRINCIPALS = {'allowed': 'byul-j02-req05-allowed', 'denied': 'byul-j02-req05-denied'}
+REQ05_DECISION = 'RB3-D1 사용자 결정(2026-11-15): 허용 호출자에게 현재 모델 판본만, 퇴역 판본 없음, 승인 자격 하나'
+
+
+def _sha(text):
+    from guard.models import sha256_hex
+    return sha256_hex(text.encode())
+
+
+def decided_values(document, environments):
+    """Fill REQ-05 from the RB3-D1 decision where the document has no value; returns what was filled.
+
+    The grant names the model of the given environments, which must agree; web values are never overwritten.
+    """
+    models = {(env.model.id, env.model.revision) for env in environments}
+    if len(models) != 1 or not all(type(v) is str and v for v in next(iter(models))):
+        raise ValueError('J02_REQ05_MODEL_NOT_UNIQUE')
+    (model, revision), = models
+    allowed, denied = (_sha('principal:' + REQ05_PRINCIPALS[r]) for r in ('allowed', 'denied'))
+    decided = {'allowed_principal_sha256': allowed, 'denied_principal_sha256': denied,
+               'selected_model_grants': [f'{allowed}:{_sha(model)}:{_sha(revision)}'], 'retired_model_revisions': []}
+    row = document['values'].setdefault('REQ-05', {})
+    filled = sorted(k for k in decided if k not in row)
+    row.update({k: decided[k] for k in filled})
+    return {'REQ-05': {'keys': filled, 'basis': REQ05_DECISION}} if filled else {}
+
+
 # --- J2: read-only kubectl get ---------------------------------------------------------------
 
 def _kubectl(argv, runner=None):
@@ -243,7 +273,7 @@ def _row(pack, check_id, side, cfg, env, values):
     check = pack.checks[check_id]
     row = {'check_id': check_id, 'side': side, 'executor': check.executor,
            'implementation': cfg.get('executors', {}).get(check.executor), 'status': None, 'reasons': [],
-           'run_binding_entries': sorted(run_binding.CONFIG_KEYS.get(check_id, ())) if 2 in run_binding.stages_for(check) else [],
+           'run_binding_entries': sorted(run_binding.config_keys(check)),
            'policy_keys_missing': sorted(p.key for p in check.policy_params if p.required and p.key not in values)}
     gap = _version_gap(check.executor, env)
     if row['implementation'] is None:
@@ -330,10 +360,14 @@ def main(argv=None):
     spec = yaml.safe_load(args.spec.read_text(encoding='utf-8'))
     base = args.spec.parent
     args.out.mkdir(parents=True)
-    policy_document, dropped = None, {}
+    policy_document, dropped, decided = None, {}, {}
     if args.web_values is not None:
         pack = load_pack(base / spec.get('pack', ROOT / 'packs/PACK-BASELINE'))
         policy_document, dropped = policy_from_web_values(json.loads(args.web_values.read_text(encoding='utf-8')), pack)
+        if 'REQ-05' in pack.checks and {'selected_model_grants'} <= {q.key for q in pack.checks['REQ-05'].policy_params}:
+            environments = [load_environment(base / ((spec.get('sides') or {}).get(side) or {})['env'])
+                            for side in SIDES if ((spec.get('sides') or {}).get(side) or {}).get('env')]
+            decided = decided_values(policy_document, environments)
         (args.out / 'policy.yaml').write_text(yaml.safe_dump(policy_document, allow_unicode=True, sort_keys=False),
                                               encoding='utf-8')
     targets, discovered = {}, {}
@@ -351,6 +385,7 @@ def main(argv=None):
     config = build_config(spec, targets)
     result = report(spec, config, plan_file=args.plan, base=base, policy_document=policy_document)
     result['web_values_dropped'] = dropped
+    result['decided_values'] = decided
     result['discovered'] = discovered
     write_config(config, args.out / 'guard.toml')
     (args.out / 'report.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')

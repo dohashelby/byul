@@ -149,7 +149,7 @@ def test_registered_collection_draft_evd_and_judge_keep_fail(tmp_path, monkeypat
         return item
     monkeypatch.setattr(boot.KubernetesSupplyBootExecutor, "_collect_role", read_role)
     store = Store(tmp_path / "store"); put_pack(store, PACK.path)
-    from tests.run_binding_support import fixed_file_hashes, split
+    from tests.run_binding_support import fixed_file_hashes, run_table, split
     # @35: guard run computes the binding; only the double's file hashes are fixed.
     policy_values, file_hashes = split(PACK.checks[cid], values)
     pol = policy(PACK.ref(), scope={"include": [cid]}, values={cid: policy_values})
@@ -160,7 +160,7 @@ def test_registered_collection_draft_evd_and_judge_keep_fail(tmp_path, monkeypat
     original = storage_fault(monkeypatch, workdir, fault)
     with fixed_file_hashes(file_hashes):
         evd, = run_plan(store, PACK, plan, RunConfig(executors={"supply_boot": "kubernetes"}, adapter="vllm", attempt_id=attempt,
-            raw={"supply_boot": {"normal": {}, "challenge": {}}}))
+            raw={"supply_boot": {"normal": {}, "challenge": {}}, **run_table(PACK.checks[cid], values)}))
     result, = judge_plan(store, PACK, plan, as_of=utcnow())
     assert result.verdicts.security.value == "FAIL"
     assert calls == list(contract.ROLES)

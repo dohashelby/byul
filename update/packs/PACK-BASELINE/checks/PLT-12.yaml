@@ -2,7 +2,7 @@ id: PLT-12
 framework_id: CHK-PLT-012
 mechanism_ids:
 - mechanism-12
-revision: 7
+revision: 8
 retired: false
 area: PLT
 purpose: 권한 철회
@@ -20,9 +20,6 @@ policy_params:
   type: str
   required: true
 - key: copy_policy_sha256
-  type: str
-  required: true
-- key: copy_record_source_sha256
   type: str
   required: true
 - key: copy_max_record_delay_ms

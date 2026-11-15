@@ -50,7 +50,7 @@ def test_report_states_what_is_missing_and_never_claims_more(tmp_path):
     for side in tool.SIDES:
         env = environment(engine={'name': 'vllm', 'version': '0.31.0'}, model={'id': 'm', 'revision': 'r'})
         (tmp_path / (side + '-env.json')).write_text(json.dumps(env.to_dict()))
-    (tmp_path / 'policy.yaml').write_text(yaml.safe_dump({'pack': {'id': 'PACK-BASELINE', 'revision': 36}, 'values': {}}))
+    (tmp_path / 'policy.yaml').write_text(yaml.safe_dump({'pack': {'id': 'PACK-BASELINE', 'revision': 37}, 'values': {}}))
     declared = {**spec(), 'policy': 'policy.yaml'}
     (tmp_path / 'spec.yaml').write_text(yaml.safe_dump(declared))
     tool.main([str(tmp_path / 'spec.yaml'), '--out', str(tmp_path / 'out')])
@@ -77,7 +77,7 @@ def test_policy_for_another_pack_is_refused(tmp_path):
         tool.report({'policy': 'policy.yaml', 'sides': {}}, tool.build_config({}), base=tmp_path)
 
 
-def test_web_draft_values_become_a_pack_36_draft_without_run_owned_keys():
+def test_web_draft_values_become_a_pack_37_draft_without_run_owned_keys():
     from guard.models import load_pack
     pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
     web = {'PLT-07': {'subject_scope': 'all_processes_in_container_uid_netns', 'forbidden_protocol': 'tcp',
@@ -86,7 +86,7 @@ def test_web_draft_values_become_a_pack_36_draft_without_run_owned_keys():
            'SUP-08': {'approved_code_revisions': ['a' * 40]}, 'NOT-A-CHECK': {'x': 1}}
     document, dropped = tool.policy_from_web_values(web, pack)
     assert document['status'] == 'DRAFT' and document['confirmed_by'] is None
-    assert document['pack'] == {'id': 'PACK-BASELINE', 'revision': 36}
+    assert document['pack'] == {'id': 'PACK-BASELINE', 'revision': 37}
     assert document['values']['PLT-07'] == {'forbidden_protocol': 'tcp', 'forbidden_operation': 'tcp_connect'}
     assert document['values']['PLT-08'] == {'plaintext_forbidden': False}
     assert dropped == {'PLT-07': ['subject_scope'], 'PLT-08': ['api_hop_scope', 'api_port'], 'NOT-A-CHECK': ['x']}
@@ -139,3 +139,24 @@ def test_obs03_keeps_no_executor_and_records_the_cause(tmp_path):
     assert row['status'] == 'UNKNOWN_RECORDED' and row['reasons'] == ['KUBERNETES_LOG_ANALYSIS_IMPLEMENTATION_ABSENT']
     config = tool.build_config({'executors': {'log_analysis': 'kubernetes'}}, {'baseline': tmp_path / 't.json'})
     assert 'log_analysis' not in config['sides']['baseline']
+
+
+def test_req05_decision_fills_only_missing_values_from_the_one_model():
+    from guard.models import sha256_hex
+    env = environment(engine={'name': 'vllm', 'version': '0.31.0'}, model={'id': 'test-model', 'revision': 'r1'})
+    document = {'values': {'REQ-05': {'model_validity_note': 'kept'}}}
+    filled = tool.decided_values(document, [env, env])
+    row = document['values']['REQ-05']
+    allowed = sha256_hex(b'principal:byul-j02-req05-allowed')
+    assert row['allowed_principal_sha256'] == allowed != row['denied_principal_sha256']
+    assert row['selected_model_grants'] == [f"{allowed}:{sha256_hex(b'test-model')}:{sha256_hex(b'r1')}"]
+    assert row['retired_model_revisions'] == [] and row['model_validity_note'] == 'kept'
+    assert filled['REQ-05']['keys'] == sorted(['allowed_principal_sha256', 'denied_principal_sha256',
+                                               'retired_model_revisions', 'selected_model_grants'])
+    # A value already given (web) is never overwritten.
+    document = {'values': {'REQ-05': {'retired_model_revisions': ['x']}}}
+    tool.decided_values(document, [env])
+    assert document['values']['REQ-05']['retired_model_revisions'] == ['x']
+    other = environment(engine={'name': 'vllm', 'version': '0.31.0'}, model={'id': 'test-model', 'revision': 'r2'})
+    with pytest.raises(ValueError, match='REQ05_MODEL_NOT_UNIQUE'):
+        tool.decided_values({'values': {}}, [env, other])

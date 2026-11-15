@@ -431,6 +431,18 @@
 - **M-A6-V6 후보 0.30.0 lifecycle 센서 계열 행**: 센서 원본이 0.31.0 SHA 한 행만 받는다. 0.30.0 행(대상 20모듈 중 16개 (a), 4개 검토)을 넣으려면 `vllm_lifecycle_sensor`가 여러 정확 행을 받게 바꿔야 한다. 그러면 센서 SHA·15개 센서의 CPython 자기 코드 지문(3.12.3 포함)·그 위 생산자 신원을 다시 만들고, 0.31.0 기존 등록은 상속하지 않는다. 0.31.0은 MVP 비교 쌍이 아니다(결정 2026-11-12). 이 범위로 진행할지 묻는다. 잠정: 진행하지 않음(원인 기록 유지).
 
 - ~~M-A7-Q3 / 기준 V0의 지정 멀티모달 prefix cache 부재~~ → 사용자 결정34로 V0 유지·해당 기준 캐시 분기만 원인 있는 UNKNOWN 예외를 승인했다. 실제 EVD/RES 생성·나머지 입력/관측 완료는 별도이며 기준 V1 변경은 승인하지 않았다.
+### RB3 정책에 남은 실행 결합값 자동 채움 (2026-11-15) — 결정 필요한 것만
+사용자 지시(상단 세션 전달, 원문 "그거 자동으로 채우게 3단계 진행해")로 C(생산자 소스)·D(시험 주체)·E(사건)는 결정 없이 옮겼다(아래 "2026-11-15 — RB3" 절, 팩 37). 아래는 **기록이나 실행 값으로 채우면 점검이 스스로를 승인하게 되는** 키다. 출처를 정하는 것이 기업 결정이라 묻는다. 분류표: [docs/RUN_BINDING.md](docs/RUN_BINDING.md) 13절.
+- **RB3-Q1 템플릿 허용 목록** `allowed_template_sha256`(REQ-07·SUP-03): 실행기는 기동이 고른 템플릿 digest가 이 목록 밖이면 위반으로 본다. 기동에 쓴 템플릿에서 채우면 위반이 나올 수 없다. ① 모델 판본에 든 기본 chat template 하나를 승인 대상으로 하고, 조립 도구가 그 bytes 해시를 DRAFT로 채운다(J02 lab 한정, 공식은 사람 확인) ② 사람이 웹에서 고른다. 잠정: ①(J02 lab DRAFT 한정).
+- **RB3-Q2 공급 허용 목록** `supply_allowed_objects`(PLT-03)·`supply_allowed_identities`(PLT-05): 실행 기록에 나온 객체·신원으로 채우면 위반이 없어진다. ① 허용 객체 = ENV 모델 inventory의 파일 SHA-256 목록, 허용 신원 = 승인 자격 하나(REQ-05와 같은 "승인 자격 하나" 결정을 적용)로 조립 도구가 DRAFT를 채운다 ② 사람이 웹에서 넣는다. 잠정: ①.
+- **RB3-Q3 정책 문서 참조 해시**(A′) `retry_policy_sha256`(LIF-12)·`copy_policy_sha256`(PLT-12)·`observation_event_policy_sha256`(OBS-01)·`forwarded_identity_policy_sha256`(REQ-04)·`stored_identity_policy_sha256`(REQ-06): 생산자 기록이 "어떤 정책 문서로 동작했는지"를 이 값과 대조한다. 생산자가 실제로 읽은 문서에서 채우면 대조가 의미를 잃는다. ① 정책 문서 = 이 POL 문서의 그 점검 값(정규 JSON, 이 키 자신 제외)으로 정의하고 guard가 계산한다(새 정의라 팩 판본 상향) ② 기업이 승인한 별도 문서 파일의 bytes 해시를 사람이 넣는다(지금 의미 유지). 잠정: ①. 어느 쪽이든 lab에는 이 기록을 쓰는 생산자가 없어 J02 결과는 UNKNOWN이다.
+- **RB3-Q4 E 4개 분리**(RB2-E를 이어서): 분리안은 RUN_BINDING 7.6 그대로다. 점검별로 묻는다.
+  - (a) LIF-12 `retry_scope_sha256`: `limits`(최대 시도·겹침·남은 시간·반환·비용)를 정책 키로 꺼내고, `subjects`·생산자·이미지·모델 결합은 실행 결합 파일(bytes 해시)로 옮기나? 잠정: 옮긴다(웹 정책에 한도 칸 5개가 생긴다).
+  - (b) PLT-12 `copy_inventory_sha256`: 복사본별 `required_action`·`deadline_at`·`retention_exception`은 정책에, 복사본 위치·수신자·세대는 실행 결합으로? 잠정: 옮긴다.
+  - (c) OBS-06 `record_subject_plan_sha256`: `policy_ref`를 새 A′ 키로, 시험 주체 `username`·`groups`는 실행 결합으로? 잠정: 옮긴다.
+  - (d) LIF-11 `recovery_selection_sha256`: 행별 `require_absent`를 정책 규칙 `recovery_require_absent_kinds`로, pid·rank·fd·device·inode는 실행 결합으로? 잠정: 옮긴다.
+  - 넷 다 실행기 입력 형식과 정책 키가 바뀌어 팩 판본이 다시 오른다. 판정 규칙·필수 관측은 바뀌지 않는다.
+
 ### RB2 실행 준비물 결합값(B2) 분리 (2026-11-14, 미승인)
 B2 57개 키(17개 점검)를 실행기 코드로 확인해 G(guard 계산 20)·E(기업 결정 포함 4)·P(실행 준비·실행 중 값 33)로 나눴다. 분류표·설계·영향은 [docs/RUN_BINDING.md](docs/RUN_BINDING.md) 7절. 승인 전에는 구현·팩 판본 상향을 하지 않는다.
 - **RB2-Q1** G 20개(`transition_inputs_sha256`, `transition_*_generation`, `init_scenario_sha256`·`recovery_scenario_sha256`, `subject_scope`·`api_hop_scope`)를 결합 계산으로 옮기나? 시나리오는 실행기 설정 `scenario` 파일을 새로 받아 해시하고, 세대는 설정 `phase_generation`에서 읽는다. 잠정: 옮긴다.
@@ -442,7 +454,7 @@ B2 57개 키(17개 점검)를 실행기 코드로 확인해 G(guard 계산 20)·
 - **RB2-Q7** 호환: 팩 @36, `keys_for` 단계별 판별(@35 재생에서 B1 유지), B2 값이 있는 결합 문서만 `guard-run-binding/2`(`verify`는 /1·/2 수용), 정책 이전 도구 `--stage 2`가 빠진 값을 설정 후보로 출력. 잠정: 이 방식.
 ### RB2 실행 준비물 결합값(B2) 분리 (2026-11-14) — 사용자 결정·구현됨
 - ~~RB2-Q1~Q7~~ → 2026-11-14 사용자 결정(상단 세션 전달, 원문 "2번으로 가자. 열린질문 여기에 물어봐 내가 결정할게"). Q1·Q2·Q3(offset)·Q6 옮김, Q4 E 4개 정책 유지, **Q5는 잠정안과 달리 옮김**(REQ-02 선언 파일 대조 대신 읽은 해시 기록, 수락 기준 축소 승인), Q7 제안 방식. 결정 요약은 아래 "2026-11-14 — RB2" 절, 구현은 [docs/RUN_BINDING.md](docs/RUN_BINDING.md) 8절.
-- **RB2-E 열린 질문**: E 4개(`retry_scope_sha256`·`copy_inventory_sha256`·`record_subject_plan_sha256`·`recovery_selection_sha256`)의 분리안(RUN_BINDING 7.6)은 점검별로 따로 승인한다. 잠정: 정책 유지.
+- **RB2-E 열린 질문**(→ RB3-Q4로 이어짐): E 4개(`retry_scope_sha256`·`copy_inventory_sha256`·`record_subject_plan_sha256`·`recovery_selection_sha256`)의 분리안(RUN_BINDING 7.6)은 점검별로 따로 승인한다. 잠정: 정책 유지.
 - ~~RB2-S~~ → 2026-11-14 사용자 결정 "점검별 설정 둔다"(상단 세션 전달). `[check_config.<점검>]`을 그 점검의 실행기 설정 칸 위에 병합한다(아래 "2026-11-14 — RB2-S" 절, RUN_BINDING 10절).
 - ~~RB2-J J02 실행 설정 조립~~ → 2026-11-14 사용자 결정(상단 세션 전달). **J1·J2는 잠정안과 다르다.**
   - J1 정책 값: **"웹 초안 값 사용"**. J02 lab 실행에 한해 2026-11-03 결정(EXAMPLE은 다섯 점검만)을 넓혀, 플랫폼 웹에 DRAFT로 저장된 초안 값(`j02-policy-v070`·`v030`, 원본 `j02-web-input/verification-values.json` 45개 점검)을 쓴다. 정책은 DRAFT, 결과는 official=false다.
@@ -496,6 +508,13 @@ B2 57개 키(17개 점검)를 실행기 코드로 확인해 G(guard 계산 20)·
 - D2 `impact` 값(HIGH/MEDIUM/LOW) — 지금은 전부 null.
 - 2026-10-23: HTML 보고서를 담당자용 요약 우선 구조로 개편(`report/html.py`만 변경). 상단에 종합 판정·건수·"먼저 볼 것"(미충족·미확인·후퇴), 전체 표·수동 시험·미선정·입력 목록은 접기(JS 없음). JSON·판정·집계 규칙은 그대로.
 
+
+## 2026-11-15 — RB3 정책에 남은 실행 결합값 자동 채움, PACK-BASELINE@37 (사용자 지시 "그거 자동으로 채우게 3단계 진행해")
+- 사람이 정하는 기준값이 아닌 정책 키 38개(22개 점검)를 `guard run`이 채운다. 생산자 소스 SHA(C)는 `[run_binding.<점검>]`의 `record_producer`(REQ-04는 `gateway_producer`·`engine_producer`)가 가리키는 생산자 파일 **bytes** SHA-256이다. REQ-06은 실행기가 이미 요구하는 검토된 adapter 소스 값이다. OBS-01 시험 주체(D)는 `test_actors`로 그대로 옮긴다. PLT-10·11 발급자 사건(E)은 `issuer_event` 파일(닫힌 JSON)에서 읽고 유효 기간은 실행 창이다.
+- 판정 의미는 그대로다. 실행기 대조식·판정 규칙·필수 관측은 바뀌지 않는다. 생산자는 원래 인증되지 않는다(`producer_authenticated` false). 정책의 소스 SHA는 승인 근거가 아니라 "이 기록을 이 생산자가 썼다"는 대조값이었고, 그 대조는 실행기에 남는다. 잃는 것: "정책 확인자가 이 생산자 SHA를 적었다"는 기록. 대신 결합 문서 `files`에 생산자 파일 해시가 남는다.
+- 생산자 파일이 없으면 `NOT_RUN`(`RUN_BINDING_FILE_UNAVAILABLE`·`RUN_BINDING_CONFIG_INVALID`)→UNKNOWN이다. 값을 지어내지 않는다.
+- 사람 결정이 필요한 허용 목록·템플릿·정책 문서 해시·E 4개는 정책에 남기고 열린 질문 RB3-Q1~Q4로 올렸다. REQ-05 주체·허가·퇴역 판본은 사용자 결정 RB3-D1("허용 호출자에게 test-model 현재 판본만, 퇴역 판본 없음, 승인 자격 하나")을 J02 조립 도구가 DRAFT 정책 값으로 채운다(기업 결정이라 정책에 남긴다). 주체 지문은 실행기의 두 시험 역할 이름표이고 신원 확인이 아니다.
+- 팩 37은 변환기로 재현되고 22개 점검 revision만 오른다(검토 표기 결정 5). @36 정의는 3단계 키를 정책 값으로 읽고(재생 호환), 두 출처를 섞으면 거부한다. 정책 이전은 `migrate_policy_run_binding --stage 3`. platform `MVP_PACK`도 37이다.
 
 ## 2026-11-14 — RB2-S 점검별 실행기 설정 (사용자 결정 "점검별 설정 둔다")
 - 같은 실행기를 쓰는 점검(LIF-05·06·16, OBS-01·PLT-12, LIF-07·09 등)이 한 번의 `guard update`에서 서로 다른 target·prepared·`generations`를 쓸 수 있게, `[check_config.<점검>]`을 그 점검의 실행기 설정 칸 위에 병합한다(`configuration.for_check`, 양쪽 병합과 같은 규칙: 표는 병합, 나머지 값은 대체).

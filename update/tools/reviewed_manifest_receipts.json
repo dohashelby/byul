@@ -280,6 +280,11 @@
       "manifest_sha256": "a98a34360d9766ce22519c67edc6603efabc9e6ef58b4ecde9ad41e49ae67ec0",
       "reviewed_by": "Codex / PR278-279 integrated source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T18:05:42.726982+09:00"
+    },
+    {
+      "manifest_sha256": "b7e02c68ef1ecc0c022adb8389aaee4de45075d8920bd3ee89fab6106651cd1a",
+      "reviewed_by": "Claude / RB3 run-binding stage 3 (PACK-BASELINE@37) source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T21:30:00+09:00"
     }
   ]
 }

@@ -14,6 +14,10 @@ more but per-check `[run_binding.<CHECK>]` config entries.  `--stage 2
 --run-config-out FILE` writes them as an operator DRAFT to review; nothing is
 applied automatically and the REQ-02 declared record-file hash is dropped
 (RB2-Q5: the read file's hash is recorded instead).
+
+Stage 3 (@37, RB3): producer source SHAs, OBS-01 test actors and the PLT-10/11
+issuer event leave the policy.  `--stage 3 --run-config-out FILE` writes the
+entries that can move as they are and lists the files still to be written.
 """
 from __future__ import annotations
 
@@ -49,11 +53,11 @@ def main(argv=None):
     parser.add_argument('policy', type=Path)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--pack', type=Path, default=ROOT / 'packs/PACK-BASELINE')
-    parser.add_argument('--stage', type=int, choices=(1, 2), default=1)
+    parser.add_argument('--stage', type=int, choices=(1, 2, 3), default=1)
     parser.add_argument('--run-config-out', type=Path)
     args = parser.parse_args(argv)
-    if (args.stage == 2) != (args.run_config_out is not None):
-        raise SystemExit('--stage 2 needs --run-config-out (and only stage 2 writes it)')
+    if (args.stage in (2, 3)) != (args.run_config_out is not None):
+        raise SystemExit('--stage 2/3 needs --run-config-out (and only stages 2 and 3 write it)')
     for path in (args.out, args.run_config_out):
         if path is not None and path.exists():
             raise SystemExit('output exists; choose a new path')
@@ -61,7 +65,7 @@ def main(argv=None):
     out, removed = migrate(document, load_pack(args.pack))
     args.out.write_text(yaml.safe_dump(out, allow_unicode=True, sort_keys=False), encoding='utf-8')
     if args.run_config_out is not None:
-        candidates = run_binding.run_config_candidates(
+        candidates = (run_binding.run_config_candidates if args.stage == 2 else run_binding.run_config_candidates_3)(
             {cid: {k: v for k, v in (row or {}).items() if k in removed.get(cid, ())}
              for cid, row in (document.get('values') or {}).items()})
         args.run_config_out.write_text(yaml.safe_dump(

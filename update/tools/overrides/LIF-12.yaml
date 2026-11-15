@@ -7,9 +7,6 @@ policy_params:
 - key: retry_policy_sha256
   type: str
   required: true
-- key: retry_record_source_sha256
-  type: str
-  required: true
 - key: retry_policy_mode
   type: str
   required: true

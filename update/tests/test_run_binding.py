@@ -28,18 +28,20 @@ def target_file(tmp_path, value=None):
     return path
 
 
-def test_pack_36_moves_exactly_the_listed_keys_and_keeps_rules():
-    assert PACK.manifest.revision == 36
-    for cid in set(run_binding.KEYS_BY_CHECK) | set(run_binding.KEYS_BY_CHECK_2):
+def test_pack_37_moves_exactly_the_listed_keys_and_keeps_rules():
+    assert PACK.manifest.revision == 37
+    for cid in set(run_binding.KEYS_BY_CHECK) | set(run_binding.KEYS_BY_CHECK_2) | set(run_binding.KEYS_BY_CHECK_3):
         check = PACK.checks[cid]
-        keys = run_binding.KEYS_BY_CHECK.get(cid, ()) + run_binding.KEYS_BY_CHECK_2.get(cid, ())
+        keys = (run_binding.KEYS_BY_CHECK.get(cid, ()) + run_binding.KEYS_BY_CHECK_2.get(cid, ())
+                + run_binding.KEYS_BY_CHECK_3.get(cid, ()))
         assert check.collection_profile == run_binding.PROFILE_BY_CHECK[cid]
         assert run_binding.keys_for(check) == keys
         assert not {p.key for p in check.policy_params} & run_binding.owned_keys(check)
-    # Validity stays in policy where the policy also declares event/deadline times inside it.
-    for cid in ('PLT-10', 'PLT-11', 'LIF-11'):
+    # LIF-11 keeps its validity in policy (its policy declares times inside it); PLT-10/11 take the
+    # run window together with the issuer event from stage 3 (RB3).
+    for cid, count in (('PLT-10', 0), ('PLT-11', 0), ('LIF-11', 2)):
         declared = {p.key for p in PACK.checks[cid].policy_params}
-        assert sum(k.endswith(('validity_start', 'validity_end')) for k in declared) == 2
+        assert sum(k.endswith(('validity_start', 'validity_end')) for k in declared) == count
 
 
 def test_definitions_that_still_declare_the_keys_or_use_another_profile_are_untouched():
@@ -208,7 +210,7 @@ def test_pack_migration_is_a_minimal_text_change(tmp_path):
                       lambda m: m.group(1) + sha256(path.read_bytes()).hexdigest(), manifest)
     (seed / 'pack.yaml').write_text(manifest, encoding='utf-8')
     migrated = run_binding.migrate_pack(seed, tmp_path / 'pack36')
-    assert migrated.manifest.revision == 37 and not migrated.reviewed
+    assert migrated.manifest.revision == PACK.manifest.revision + 1 == 38 and not migrated.reviewed
     assert migrated.checks['REQ-12'].revision == PACK.checks['REQ-12'].revision + 1
     assert (tmp_path / 'pack36/checks/REQ-12.yaml').read_text(encoding='utf-8').replace(
         f"revision: {PACK.checks['REQ-12'].revision + 1}\n", f"revision: {PACK.checks['REQ-12'].revision}\n", 1) == \
@@ -227,7 +229,7 @@ def test_policy_migration_tool_keeps_enterprise_values_and_never_overwrites(tmp_
     out, removed = migrate(source, PACK)
     assert removed == {'REQ-12': ['attempt_environment_sha256', 'attempt_target_sha256'], 'LIF-11': ['recovery_target_sha256']}
     assert out['values'] == {'REQ-12': {}, 'LIF-11': {'recovery_validity_start': 'S', 'recovery_branch': 'runtime-failure'}}
-    assert out['pack'] == {'id': 'PACK-BASELINE', 'revision': 36}
+    assert out['pack'] == {'id': 'PACK-BASELINE', 'revision': 37}
     assert out['status'] == 'DRAFT' and out['confirmed_by'] is None and source['status'] == 'CONFIRMED'
     path = tmp_path / 'policy.yaml'
     path.write_text(yaml.safe_dump(source))

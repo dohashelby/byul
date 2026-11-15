@@ -1,6 +1,6 @@
 # 실행 결합값을 정책에서 분리 (RB, 2026-11-14 승인·구현)
 
-상태: **B1 구현됨**(사용자 승인 2026-11-14, `DECISIONS.md` RB, 팩 35). **B2 구현됨**(사용자 결정 RB2-Q1~Q7, 2026-11-14, 팩 36, 7절·8절). PACK-BASELINE@35부터 아래 B1 키는 정책 값이 아니고 `guard run`이 계산한다. 구현은 `src/guard/executors/run_binding.py`, 시험은 `tests/test_run_binding.py`. 설계안과 달라진 점은 6절에 모았다.
+상태: **3단계 구현됨**(RB3, 2026-11-15 사용자 지시, 팩 37, 13절). **B1 구현됨**(사용자 승인 2026-11-14, `DECISIONS.md` RB, 팩 35). **B2 구현됨**(사용자 결정 RB2-Q1~Q7, 2026-11-14, 팩 36, 7절·8절). PACK-BASELINE@35부터 아래 B1 키는 정책 값이 아니고 `guard run`이 계산한다. 구현은 `src/guard/executors/run_binding.py`, 시험은 `tests/test_run_binding.py`. 설계안과 달라진 점은 6절에 모았다.
 
 ## 1. 문제
 
@@ -389,3 +389,39 @@ M-A 파일 사전 점검도 공통·쪽별 설정 뒤 `for_check()`를 적용해
 - **프로필 미지원**: PLT-09(api_transport), SUP-13(template_validation)은 팩 프로필이 Kubernetes 구현과 다르다.
 - **설정 형식**: PLT-02·06(unix_ipc), REQ-01(direct_route 역할 키), REQ-08·09·10·SUP-04는 실행기 칸의 설정(역할·설정 파일)이 있어야 한다.
 - **SUP-08 @36 사전 확인**: `ma8-local-preflight-20261113.json`의 팩 Ref가 34다. 고정 자료(`fixture-manifest.json`, 모델 snapshot)가 다른 기기(WSL `/mnt/c/...`, `/home/youngjo/...`)에 있어 이 기기에서는 다시 돌릴 수 없다. 그 기기에서 `tools/mvp_sup08_inputs.py`(팩 관문 36)로 launch manifest를 다시 만들고 `tools/mvp_sup08_local_audit.py`로 재검증해야 MA7 계획(36)과 맞는다.
+
+## 13. RB3 정책에 남은 실행 결합값 (2026-11-15, 팩 37)
+
+사용자 지시(상단 세션 전달): "그거 자동으로 채우게 3단계 진행해". 사람이 정하는 기준값은 웹 값 파일(45개 점검)에 다 있고, 남은 `POLICY_VALUES_MISSING`은 사람 입력 대상이 아니라고 했다. 아래는 실행기 소스로 키마다 출처를 확인한 결과다.
+
+### 13.1 키별 출처
+
+| 묶음 | 키(점검) | 실행기가 하는 일 | 출처 | 처리 |
+|---|---|---|---|---|
+| C 생산자 소스 | `supply_record_source_sha256`(공급 13개), `retry_record_source_sha256`(LIF-12), `copy_record_source_sha256`(PLT-12), `identity_record_source_sha256`(OBS-02), `record_inventory_source_sha256`(OBS-06), `observation_expected_source_sha256`(OBS-01), `forwarded_gateway/engine_source_sha256`(REQ-04) | 기록의 `source_sha256`·`producer_source_sha256`이 이 값과 같아야 기록을 받는다. 생산자는 인증되지 않는다 | **준비 자산 파일 bytes**: 생산자 파일 SHA-256(예: `gpu_b_sup16_pair_writer.py`의 `own=digest(__file__)`) | 3단계: `[run_binding.<점검>] record_producer`(REQ-04는 `gateway_producer`·`engine_producer`) |
+| C 검토 소스 | `stored_api_router/serving/protocol_source_sha256`(REQ-06) | 정책 값이 `REVIEWED_SOURCES`와 다르면 정책 오류 | **guard 파일(adapter 데이터)** | 3단계: 입력 없이 `stored_response_contract.REVIEWED_SOURCES` |
+| D 시험 주체 | `observation_allowed/denied_actor_sha256`(OBS-01) | 생산자가 쓴 `actor_sha256`(Gateway는 `principal:`+주체 ID 해시)과 대조 | **실행 때 생성**(시험 호출자 신원) | 3단계: `test_actors = {allowed, denied}` 그대로(세션과 같은 방식) |
+| D 시험 주체 | `allowed/denied_principal_sha256`(REQ-05) | 허가 목록의 주체와만 대조, 관측 신원과는 대조하지 않음 | 허가 목록과 한 묶음 | 정책 유지. J02 도구가 RB3-D1로 채움 |
+| E 발급자 사건 | PLT-10 `revocation_issuer_id/event_id/event_at/deny_after`, PLT-11 `session_issuer_id/event_id/event_at/open_before/deny_after`, 두 점검의 `*_validity_*` | 선언된 사건(검증하지 않음, `issuer_event_verified` false)과 실행 창 안의 시도 | **실행 때 생성**(자격을 철회한 쪽이 남긴 사건) | 3단계: `issuer_event` 파일(닫힌 JSON). 유효 기간은 실행 창 ∩ 정책 유효 기간 |
+| E 허가 | `selected_model_grants`·`retired_model_revisions`(REQ-05) | 허가 목록 | 사람 결정(RB3-D1) | 정책 유지. J02 도구가 DRAFT로 채움 |
+| E 허용 목록 | `supply_allowed_objects`(PLT-03), `supply_allowed_identities`(PLT-05) | 기록에 나온 객체·신원이 목록 밖이면 위반 | **사람 결정**: 실행 기록으로 채우면 위반이 없어진다 | RB3-Q2 |
+| A′ 템플릿 | `allowed_template_sha256`(REQ-07, SUP-03) | 기동이 고른 템플릿이 목록 밖이면 위반 | **사람 결정**: 기동 템플릿으로 채우면 위반이 없어진다 | RB3-Q1 |
+| A′ 정책 문서 | `retry_policy_sha256`, `copy_policy_sha256`, `observation_event_policy_sha256`, `forwarded_identity_policy_sha256`, `stored_identity_policy_sha256` | 생산자 기록의 `policy_sha256`과 대조 | **사람 결정**: 문서 정의가 필요 | RB3-Q3 |
+| E 4개 | `retry_scope_sha256`, `copy_inventory_sha256`, `record_subject_plan_sha256`, `recovery_selection_sha256` | 파일 안에 한도·조치·정책 참조·회수 규칙이 섞임 | 분리 뒤 일부는 결합 | RB3-Q4(7.6 분리안) |
+
+kubectl이나 준비 자산 조회로 채우는 키는 3단계에 없다. 생산자 파일과 사건 파일은 운영자가 이름만 적고, guard가 읽어 해시한다.
+
+### 13.2 구현
+
+- 단계 판별은 1·2단계와 같다. `KEYS_BY_CHECK_3`(22개 점검 38키)를 정의가 선언하지 않으면 계산한다. @36 정의는 3단계 키를 정책 값으로 읽는다. 섞으면 `RUN_BINDING_BELONGS_TO_POLICY`·`RUN_BINDING_BELONGS_TO_EXECUTION`.
+- `[run_binding.<점검>]`이 받는 칸은 정의가 넘긴 단계의 칸을 합친 것이다(`config_keys`). 예: LIF-12 @37은 `record_session`·`record_producer`, 공급 점검은 `record_producer`만, REQ-06은 `record_session`만이다. 칸이 다르면 `RUN_BINDING_CONFIG_INVALID`.
+- 생산자 해시(`producer_sha256`)는 정규 JSON이 아니라 파일 bytes 그대로다. 심볼릭 링크·디렉터리·16 MiB 초과는 `RUN_BINDING_FILE_UNAVAILABLE`.
+- 결합 문서는 값이 있으면 `/2`다. `files`에 `record_producer_sha256`·`issuer_event_sha256`, `values`에 실행기에 넘긴 값, PLT-10·11은 `validity`에 실행 창이 남는다.
+- 정책 이전은 `migrate_policy_run_binding --stage 3 --run-config-out FILE`. 시험 주체·사건 내용은 그대로 옮기고 생산자 파일·사건 파일은 `needs`에 다시 만들어야 할 해시와 함께 적는다.
+- J02 도구: `run_binding_entries`에 3단계 칸이 나오고, `--web-values`로 정책을 만들 때 REQ-05 네 키를 RB3-D1로 채운다(`decided_values`, 웹 값을 덮어쓰지 않음, 보고서 `decided_values`).
+
+### 13.3 한계
+
+- lab에는 이 기록을 쓰는 생산자가 없다(12.1). 생산자 파일이 없으면 `RUN_BINDING_FILE_UNAVAILABLE`로 NOT_RUN→UNKNOWN이다. `POLICY_VALUES_MISSING`은 줄지만 그 점검이 실행되는 것은 아니다.
+- PLT-10·11 사건은 실행 창 안에 있어야 한다(`start <= deny_after <= end`). 창은 `guard run` 시작 초부터 열리므로(9절 공백) 철회는 실행 직전에 해야 한다.
+- SUP-08 사전 확인 기록(`ma8-local-preflight-pack36-20261115.json`)의 팩 Ref는 36이다. SUP-08 정의는 바뀌지 않았지만 팩 해시가 바뀌어 `mvp_a_input_materialize`는 @37 재확인 전까지 실제 파일로는 거부한다(`SUP08_LOCAL_AUDIT_REQUIRED`).

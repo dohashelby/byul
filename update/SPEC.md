@@ -318,7 +318,7 @@ execution:
   finished_at: RFC3339|null
   abort_reason: str|null
   cleanup_errors: [str]                        # 실행 후 정리 실패. 비어 있으면 직렬화 생략(과거 해시 유지)
-  run_binding: object|null                     # guard-run-binding/1·/2: guard run이 계산한 실행별 기술 결합(ENV·설정 파일 해시·유효 창, /2는 실행 준비값 values 포함). 없으면 직렬화 생략. docs/RUN_BINDING.md
+  run_binding: object|null                     # guard-run-binding/1·/2: guard run이 계산한 실행별 기술 결합(ENV·설정 파일 해시·유효 창, /2는 실행 준비값·생산자 소스·발급자 사건 values 포함). 없으면 직렬화 생략. docs/RUN_BINDING.md
 normal_control: { attempted: bool, succeeded: bool|null, detail: str }
 challenges:
   - step: str                                  # CheckDef.challenge_steps 중 하나
@@ -346,6 +346,7 @@ comparability:                                 # update 모드 비교 조건 (IN
 
 - **실행 결합(2026-11-14 RB, 팩 35)**: 실행마다 바뀌는 ENV 해시·실행기 설정 파일(target·prepared·manifest) 해시·관측 유효 창은 정책 값이 아니다. `guard run`이 실행 직전에 같은 ENV와 같은 설정 파일에서 계산해 실행기에 넘기고 `execution.run_binding`에 남긴다. 실행기의 대조식은 그대로이므로 계산 뒤 파일이 바뀌면 기존과 같이 실행기 불일치(ABORTED→UNKNOWN)다. 계산할 수 없으면 `NOT_RUN`(`RUN_BINDING_*`)→UNKNOWN이다. 결합 키를 정책에 넣으면 거부한다(`RUN_BINDING_BELONGS_TO_EXECUTION`). 판정 규칙·필수 관측은 바뀌지 않는다.
 - **실행 준비값(2026-11-14 RB2, 팩 36)**: 기록 생산자 세션, LIF-05·06·16 단계별 세대와 표본 시각(실행 시작 기준 offset), LIF-07·09·11 시나리오 파일 해시, PLT-07·08 실행 신원(실행 전 결합 파일)도 정책 값이 아니다. 점검별 설정 표 `[run_binding.<점검>]`에서 읽어 같은 키 이름으로 실행기에 넘기고 `guard-run-binding/2`의 `values`에 남긴다. 실행기 설정 칸이 아니므로 실행기 설정 해시는 바뀌지 않는다. 정의가 아직 선언한 단계(팩 35의 준비값)는 정책 값을 그대로 쓰며 두 출처를 섞지 않는다(`RUN_BINDING_BELONGS_TO_POLICY`). REQ-02는 사전 선언한 기록 파일 해시와의 대조를 하지 않고 읽은 파일 해시를 기록만 한다(사용자 승인 수락 기준 축소). 기업 결정이 섞인 E 키(재시도 scope·복사본 inventory·기록 접근 대상 계획·복구 자원 선택)는 정책에 남는다.
+- **생산자 소스·시험 주체·발급자 사건(2026-11-15 RB3, 팩 37)**: 기록 생산자 소스 SHA-256은 `[run_binding.<점검>]`의 생산자 파일(`record_producer`, REQ-04는 `gateway_producer`·`engine_producer`) bytes 해시이고, REQ-06은 실행기가 이미 요구하는 검토된 adapter 소스 값이다. OBS-01 시험 주체(`test_actors`)는 그대로 옮기고, PLT-10·11 발급자 사건은 `issuer_event` 파일에서 읽으며 유효 기간은 실행 창이다. 판정 의미·대조식은 그대로다. 허용 목록·템플릿·정책 문서 해시·E 4개는 기업 결정이라 정책에 남는다(DECISIONS RB3-Q).
 - **점검별 실행기 설정(2026-11-14 RB2-S)**: `[check_config.<점검>]`을 그 점검의 실행기 설정 칸 위에 병합한다. 같은 실행기를 쓰는 점검이 한 실행에서 서로 다른 target·prepared·세대 목록을 쓸 수 있다. 형식 오류는 `NOT_RUN`(`CHECK_CONFIG_INVALID`)이다.
 - 수집 실패는 `collected: false`로 남긴다. 값을 비우거나 추정하지 않는다.
 - 직통 결과 값은 HTTP 상태코드(int) 또는 `refused`(연결 거부) · `timeout` · `unreachable`(ENETUNREACH/EHOSTUNREACH) · `dns_error` · `error`. 응답 미수신 종류를 서로 구별한다.

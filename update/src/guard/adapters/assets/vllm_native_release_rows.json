@@ -290,6 +290,42 @@
       "engine_mode": "V1",
       "startup": "baseline-v1",
       "startup_image": "vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8"
+    },
+    {
+      "profile": "vllm-native-lifecycle-metadata/32",
+      "schema": "guard-native-lifecycle-events/32",
+      "engine": "vllm",
+      "version": "0.7.0",
+      "images": [
+        "docker.io/vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8",
+        "vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8"
+      ],
+      "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8",
+      "runtimes": {
+        "cpython-3.12.3": [
+          "posix"
+        ],
+        "cpython-3.12.8": [
+          "posix"
+        ]
+      },
+      "sources": {
+        "vllm.v1.worker.gpu_worker": {
+          "sha256": "7bc08a4e47bac5e1d68e68f540f014e3f9244c0f8d773f0dd7f5b959da5afb7a",
+          "bytes": 11991,
+          "classes": {
+          }
+        }
+      },
+      "void_return_argument_ids": [
+
+      ],
+      "review": "docs/dev-1/ma6-baseline-profiler-candidate.md",
+      "installation_review": "docs/dev-1/ma3-image-qualification-20261114.json",
+      "scope": "Direct Worker.profile backend start/stop and declared owned trace inventory only; no request IDs, wrapper state, callback path binding or cross-process RPC claim.",
+      "engine_mode": "V1",
+      "baseline_profiler": "worker-direct-torch",
+      "profiler_image": "vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8"
     }
   ]
 }

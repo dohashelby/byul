@@ -251,7 +251,7 @@ def calibrate(control, model):
         'topology': topology, 'initial_capture_sha256': control_code.digest(sorted(raw for _, raw, _ in records))}
 
 
-def exercise(control, calibration, model, kind, owner, hold_ms=1000):
+def exercise(control, calibration, model, kind, owner, hold_ms=1000, *, product_binding=None):
     if kind not in {'delay', 'death', 'exception'} or type(hold_ms) is not int or not 1 <= hold_ms <= 5000:
         raise ValueError('RANK_RPC_CASE_KIND')
     proof = calibration['proof']; header = 'byul-fault-' + uuid.uuid4().hex
@@ -260,6 +260,12 @@ def exercise(control, calibration, model, kind, owner, hold_ms=1000):
               'image': control.settings['image'], 'model': model, 'context': proof['context'],
               'parent_object_hmac_sha256': proof['rpc_parent_object_hmac_sha256'],
               'initial_capture_sha256': calibration['initial_capture_sha256']}
+    if product_binding is not None:
+        control_code.product_binding(product_binding, control.settings['session'])
+        if (product_binding != control.product_binding()
+                or owner.get('pod_uid') != product_binding['pod_uid']):
+            raise ValueError('RANK_RPC_PRODUCT_BINDING_MISMATCH')
+        target.update(schema='guard-rank-rpc-lab-target/2', product_binding=product_binding)
     arm = {'schema': 'guard-rank-rpc-arm/1', 'session': control.settings['session'],
         'image': control.settings['image'], 'settings_sha256': control.settings_sha256,
         'assets_sha256': control_code.digest(control.settings['assets']), 'target_sha256': control_code.digest(target),
@@ -270,6 +276,8 @@ def exercise(control, calibration, model, kind, owner, hold_ms=1000):
         'external_hmac_sha256': _id(binding['external_prefix'] + header + binding['external_suffix'], control.key),
         'header_context': calibration['header_context'], 'assignment_context': calibration['assignment_context'],
         'initial_capture_sha256': calibration['initial_capture_sha256']}
+    if product_binding is not None:
+        arm.update(schema='guard-rank-rpc-arm/2', product_binding=product_binding)
     target_fd = SignalTarget(proof['context']); lease = None; potential_stop = False
     client_result = []; receipt = None; ready = None; ready_sha = None; resumed = None
     try:
@@ -369,6 +377,8 @@ def main(argv=None):
     parser.add_argument('--kind', choices=['delay', 'death', 'exception'], required=True)
     parser.add_argument('--model', default='test-model')
     parser.add_argument('--model-receipt-sha256', required=True)
+    parser.add_argument('--for-common-input', action='store_true',
+        help='사전 공급된 제품 입력 결합을 요구한다. 생산자 등록·그룹 수락을 뜻하지 않는다.')
     args = parser.parse_args(argv)
     if not control_code.fingerprint(args.model_receipt_sha256):
         raise ValueError('RANK_RPC_MODEL_RECEIPT')
@@ -377,11 +387,12 @@ def main(argv=None):
     observer = runtime._INSTALLED.observer
     control = control_code.Control(settings, settings_sha, observer.ipc.profile, lambda value: None,
                                    lambda: runtime._freeze(settings))
+    product_binding = control.product_binding() if args.for_common_input else None
     calibration = calibrate(control, args.model)
     control.write('control-calibration.json', calibration)
     owner = {'pod_uid': os.environ.get('GUARD_POD_UID'), 'model_receipt_sha256': args.model_receipt_sha256}
     if type(owner['pod_uid']) is not str or not owner['pod_uid']:
         raise ValueError('RANK_RPC_POD_OWNER')
-    result = exercise(control, calibration, args.model, args.kind, owner)
+    result = exercise(control, calibration, args.model, args.kind, owner, product_binding=product_binding)
     print(json.dumps({'사례': args.kind, '클라이언트_HTTP': result['client']['status'],
                       '물리_신호': result['physical_action']['signal'], '전체_수락': False}, ensure_ascii=False))

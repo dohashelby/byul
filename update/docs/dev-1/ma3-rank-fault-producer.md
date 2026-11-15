@@ -127,3 +127,15 @@ Pod 안 actor는 정상 요청과 실제 초기 IPC/객체 연결을 먼저 확�
 | 후보 | STOP/CONT·HTTP200 | 원 RPC 경계 예외·HTTP500 | pidfd SIGKILL/EXITED·HTTP500 | 정상 요청200·새 Pod/세대 |
 
 여섯 사례의 원자료 대조 gap은 0이다. 전체 TP2 그룹 수락·탐지/상위 전달 기한·공통 판정 입력 연결·생산자 등록·M-A3 전체 완료는 남아 있으며 scope_complete/source_authenticated/engine_group_verified/producer_registered=false다. 같은 PID namespace inode 숫자가 재사용된 경우도 있으므로 Pod UID·PID/start ticks·전체 namespace/boot 문맥을 함께 대조한다.
+
+## 제품 입력 사전 결합 후속 (2026-11-15)
+
+`tools/rank_rpc_product_binding.py`는 현재 정확 검토 소스의 준비 자산과 sealed ENV·제품 target을 대조해 private `guard-rank-rpc-product-binding/1`을 새 디렉터리에 만든다. ENV의 정확 Ref·target 정규 JSON SHA·prepared manifest bytes SHA·세션·Pod UID·정규 container ID·restart count를 settings의 세션 키 HMAC에 묶는다. ENV는 MVP 표의 해당 이미지/엔진/판본, TP2/PP1/DP1·GPU 두 개 이상이어야 하며 target의 ENV Ref·이미지·실제 범위 필드가 일치해야 한다. 과거 SDK bytes·잘못된 hash·symlink·기존 출력 덮어쓰기는 거부한다. 비밀 키를 반환하거나 출력하지 않는다.
+
+actor의 `--for-common-input`은 정상 calibration 전에 별도로 공급한 `control-product-binding.json`을 요구한다. 기동 시 외부에서 제공하는 `GUARD_POD_UID`, 정규 `GUARD_CONTAINER_ID`, 십진 `GUARD_RESTART_COUNT`와 정확 대조하고 ARM/2·lab target/2 안에 같은 결합을 넣는다. source control은 원 CALL을 멈추기 전에 독립적으로 같은 서명 파일과 기동 범위를 재대조한다. 이는 외부 예상값의 결합이며 현재 Kubernetes 소유권·생산자 인증의 증명이 아니다. 실제 기동 전 현재 Pod 조회/자격 관문은 여전히 필요하다. 기존 ARM/1 lab 재생·nonce/원 프레임/요청/시계·물리 신호/lease 관문은 유지한다.
+
+후속 변환기의 선행 조건인 `require_case_binding()`은 ARM/2·target/2·외부 예상 결합·target 정규 해시를 요구한다. 이 함수만으로 HMAC/원 snapshot/물리 영수증/판정 자격이 검증된 것은 아니다. 기존 여섯 GPU 사례는 ARM/1이므로 제품 ENV/target을 사후 붙이지 않고 `RANK_RPC_PRODUCT_BINDING_REQUIRED`로 거부한다. 여섯 실제 기록과 기존 부분 대조는 원 소스에 그대로 귀속한다.
+
+이번 준비 도구는 네트워크·기동·장애 주입·공통 입력 생성·생산자 등록을 하지 않는다. 성공 시에도 live_target_verified/input_preflight_passed/engine_executed/scope_complete/producer_registered는 false다. CPU 시험은 EXAMPLE 입력과 시험 소유 자식만 사용한다. 새 SDK의 실제 GPU 실행·제품 rank-fault 사건 변환·TP2 인과 그룹·탐지/상위 전달 기한·새 소유자 복구 수락·등록은 미완료다. M-B4는 보관하고 기존 native24 TP1/같은 소유자 복구 고정값·판정 기준·등록표를 넓히지 않는다.
+
+새 미결합 준비물6개와 기존 원자료 재검증은 [현재 준비 보고서](ma3-product-binding-preparation-20261115.json)에 구분했다. 직접151개·기준 이미지 Python ABI95개가 통과했고 기존6사례/329개 원 기록의 gap0과 제품 사후 결합 거부를 확인했다. 새 소스의 실제 엔진 실행은 없다.

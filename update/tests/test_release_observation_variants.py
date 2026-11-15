@@ -65,10 +65,6 @@ def test_profiler_candidate_sources_and_generation_are_separate_from_old_profile
 def test_private_composition_selects_candidate_profile_and_exact_rows(
         external, monkeypatch, kind, profile, extension):
     runtime = 'cpython-' + '.'.join(map(str, sys.version_info[:3]))
-    if (runtime not in extension.RUNTIME_CODE_CONTRACTS or
-            runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix'
-                or os.uname().machine != 'x86_64')):
-        pytest.skip('Unregistered interpreter patch; the observer itself rejects this runtime')
     prepared = lifecycle.prepare_assets(external / 'assets', REPO, profile=profile)
     module = types.ModuleType('_candidate_observation_fixture')
     module.__file__ = str(external / 'assets/guard_lifecycle_sensor.py')
@@ -80,6 +76,13 @@ def test_private_composition_selects_candidate_profile_and_exact_rows(
         return raw
     monkeypatch.setattr(module, '_read', exact_dependency)
     monkeypatch.setattr(module, '_request_key', lambda binding: (prepared['session'], b'k' * 32))
+    if (runtime not in extension.RUNTIME_CODE_CONTRACTS or
+            runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix'
+                or os.uname().machine != 'x86_64')):
+        with pytest.raises(ValueError):
+            module._private_base()
+        assert module._BASE is None
+        return
     composed = module._private_base()
     assert composed.PROFILE == prepared['profile'] and composed.SCHEMA == profiles.SCHEMAS[profile]
     assert composed.COMMIT == release.COMMIT and composed.SOURCE_SHA == prepared['source_sha256']
@@ -102,6 +105,10 @@ def test_private_composition_selects_candidate_profile_and_exact_rows(
     assert native['metadata']['configured_model_sha256'] == raw
     observer.emit('ASGI', {'request_sha256': raw, 'phase': 'APP_RETURN', 'more_body': None})
     assert captured[-1][1]['request_sha256'] == 'a' * 64
+    observer.emit('SELECTION', {'requests': [], 'metadata': {'request_selection': {
+        'selected_request_id_sha256': raw, 'asgi_request_sha256': raw}}})
+    assert captured[-1][1]['metadata']['request_selection']['selected_request_id_sha256'] == native['requests'][0]['request_sha256']
+    assert captured[-1][1]['metadata']['request_selection']['asgi_request_sha256'] == 'a' * 64
     if kind == 'stream':
         request = b'byul-lif04-' + b'a' * 32 + b'-normal'
         scope = {'type': 'http', 'path': '/v1/completions', 'headers': [(b'x-request-id', request)]}

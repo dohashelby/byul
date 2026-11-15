@@ -160,7 +160,7 @@ def _private_base():
             if event == 'ASGI':
                 context = self.selection_context()
                 payload = {**payload, 'request_sha256': context.get('request') if context else None}
-            elif event == 'NATIVE':
+            elif event in {'NATIVE', 'SELECTION'}:
                 try: payload = relay(payload, self.selection_context())
                 except (TypeError, ValueError):
                     self.disabled_pid = os.getpid()

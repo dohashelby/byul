@@ -265,6 +265,11 @@
       "manifest_sha256": "ea734eb57a98626f599725ac9d11e5f6483a9fc83439e4abcd0b4bfae88a70be",
       "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T07:38:55.385055+00:00"
+    },
+    {
+      "manifest_sha256": "e8be89b903031631806fde51cf873d84ccb75779665479cd0ff7526f733ba287",
+      "reviewed_by": "Codex / PR276 READY snapshot race review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T17:17:24.504933+09:00"
     }
   ]
 }

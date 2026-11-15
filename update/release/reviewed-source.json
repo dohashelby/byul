@@ -186,7 +186,7 @@
   "update/src/guard/adapters/vllm_rank_ipc_runtime.py": "0f5f63cebcb1df7b88dd670c2fc81bed023023b99ba51be33c6856a143c8b206",
   "update/src/guard/adapters/vllm_rank_ipc_sources.py": "bfa843defab00d0cf5a44077fd3729edb6d7aed0611d558d23317331da1a2a59",
   "update/src/guard/adapters/vllm_rank_request_identity.py": "fa5844902c2d49b77ad9dd3e76a96c530c675f781d90bc5f55bd2b7d9142d09d",
-  "update/src/guard/adapters/vllm_rank_rpc_actor.py": "4a893171401a8c755578e0e08fefbffa4156093d16d54a47be9300166700d3ba",
+  "update/src/guard/adapters/vllm_rank_rpc_actor.py": "06093d6d355869023ab947464d9f4414b0233860137eaed46c108c00fa552460",
   "update/src/guard/adapters/vllm_rank_rpc_control.py": "14f9faaf32398c744ea654cf457d011eb5fdce78123278b02c5d754c0222bc26",
   "update/src/guard/adapters/vllm_rank_rpc_hooks.py": "6829892eaf1b8751260e0a8f41d85ff28c179b9002a7eb7dec2f2e9d375904d2",
   "update/src/guard/adapters/vllm_rank_rpc_input.py": "6a3ea6cc20fee9c9f0941f82c88d84afacf9f8d19e8a55adae361e20d478557c",

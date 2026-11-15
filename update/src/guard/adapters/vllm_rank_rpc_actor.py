@@ -251,6 +251,32 @@ def calibrate(control, model):
         'topology': topology, 'initial_capture_sha256': control_code.digest(sorted(raw for _, raw, _ in records))}
 
 
+def _ready_recorded(control, ready, arm, arm_sha, ready_sha):
+    """READY 파일보다 늦게 닫히는 원 snapshot까지 확인한 뒤에만 장애를 적용한다."""
+    matches = [p for p, _, _ in control._records() if p.get('event') == 'CONTROL_READY'
+        and p.get('call_hmac_sha256') == ready['call_hmac_sha256']]
+    if not matches:
+        return False
+    if len(matches) != 1:
+        raise ValueError('RANK_RPC_READY_UNVERIFIED')
+    phase, = matches
+    expected = {'nonce': arm['nonce'], 'fault_kind': arm['fault_kind'], 'arm_sha256': arm_sha,
+        'ready_sha256': ready_sha, 'action_sha256': None, 'target_sha256': arm['target_sha256'],
+        'control_code_sha256': control.settings['assets']['guard/adapters/vllm_rank_rpc_control.py']['sha256'],
+        'barrier_only': True}
+    if (phase.get('control') != expected or phase.get('context') != arm['target_context']
+            or phase.get('rpc_parent_call_hmac_sha256') != ready['parent_call_hmac_sha256']
+            or phase.get('rpc_parent_object_hmac_sha256') != arm['parent_object_hmac_sha256']
+            or phase.get('point') != arm['target_point'] or phase.get('source_sha256') != arm['source_sha256']
+            or phase.get('body_code_sha256') != arm['body_code_sha256']
+            or phase.get('original_invoked') is not False or phase.get('rpc_parent_frame_verified') is not True
+            or phase.get('rpc_parent_worker_verified') is not True
+            or type(phase.get('observation_ns')) is not int
+            or not ready['ready_ns'] <= phase['observation_ns'] < arm['expires_ns']):
+        raise ValueError('RANK_RPC_READY_UNVERIFIED')
+    return True
+
+
 def exercise(control, calibration, model, kind, owner, hold_ms=1000, *, product_binding=None):
     if kind not in {'delay', 'death', 'exception'} or type(hold_ms) is not int or not 1 <= hold_ms <= 5000:
         raise ValueError('RANK_RPC_CASE_KIND')
@@ -298,6 +324,16 @@ def exercise(control, calibration, model, kind, owner, hold_ms=1000, *, product_
                 or ready.get('arm_sha256') != arm_sha or ready.get('nonce') != arm['nonce']
                 or ready.get('context') != proof['context'] or ready.get('rpc_active') is not True
                 or ready.get('prepared_assets_sha256') != arm['assets_sha256']):
+            raise ValueError('RANK_RPC_READY_UNVERIFIED')
+        # 원 제어는 READY 파일을 쓴 뒤 snapshot을 저장한다. 파일만 보고 STOP/KILL하면
+        # snapshot 저장 자체를 막을 수 있으므로 같은 호출의 닫힌 원 기록을 기다린다.
+        while time.monotonic_ns() < arm['expires_ns']:
+            if _ready_recorded(control, ready, arm, arm_sha, ready_sha):
+                break
+            time.sleep(0.01)
+        else:
+            raise ValueError('RANK_RPC_READY_UNVERIFIED')
+        if time.monotonic_ns() >= arm['expires_ns']:
             raise ValueError('RANK_RPC_READY_UNVERIFIED')
         receipt = {'schema': 'guard-rank-rpc-action-receipt/1', 'arm_sha256': arm_sha,
             'ready_sha256': ready_sha, 'context': proof['context'], 'fault_kind': kind,

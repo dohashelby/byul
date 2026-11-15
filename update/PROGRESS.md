@@ -1,3 +1,10 @@
+## 2026-11-15 — #276 READY 원 기록 저장 경쟁 수정
+
+- 한 일: 최신 원격 bb14f094까지 보존했다. PR 전체 시험에서 candidate/death의 CONTROL_READY 원 snapshot 누락1건을 확인했다. source가 READY 파일을 쓰고 snapshot을 닫기 전에 actor가 SIGKILL할 수 있어, actor가 같은 CALL/상위 프레임·대상 세대·nonce·ARM/READY 해시·정확 source의 검증된 닫힌 snapshot을 확인한 뒤에만 동작하도록 고쳤다. 기존 ARM 기한 안에서 기다리며 누락·중복·불일치는 장애 적용 없이 거부한다. 제품 소비와 #278 파일 조립은 구현된 작업으로 인계 문서를 갱신했다.
+- 테스트 결과: 새9개 회귀는 수정 전 모두 snapshot 저장 전 동작으로 실패했고 수정 후 통과했다. CPython3.12.3 직접 영향/설정/공통 입력/소스/경로/불변식370개 통과(기존 engine 기본 제외1, pytest19.69초/부모19.893초). source555파일·목록 자체 SHA e8be89b903031631806fde51cf873d84ccb75779665479cd0ff7526f733ba287의 정확 검토 행, 현황 --check와 diff --check를 확인했다. 새 source의 전체 Linux CI는 push 후 확인한다. 전체 로컬 pytest는 실행하지 않았다.
+- 실패 이력: bb14f094 PR 기본 suite는1실패/13,511통과·기존skip34(pytest804.01초/부모805.430초)였다. 제품 소스가 같고 PROGRESS만 다른 a15f426b의 push suite13,512통과를 이 실패의 해결로 대신하지 않는다. bb14f094의 runtime 첫 실행은 각각 응답504와 벽시계0.270초<0.25초 주장 실패였고, 같은 head의 2회차는 양쪽1,810통과·기존skip4·하위시험1,012다. runtime 원인 해결로 세지 않으며 원 실패 로그를 보존한다.
+- 다음 단계/경계: 기존 #276 브랜치에 수정과 검토 목록을 push하고 정확 head CI를 끝까지 확인한다. actor bytes가 바뀌었으므로 실제 실행 준비물은 최종 확정 source로 새로 만들고 기존 준비물/ARM1 원 증거를 소급 갱신하지 않는다. 현재 V1 자격·새 ARM2 실제 입력·TP2 전체 수락/등록은 별도다. runtime/contracts·판정/기한·기존 assert/skip·고정값·등록표 변경, 병합·GPU/비용·다운로드는 없다.
+
 ## 2026-11-15 — M-A3 제품 경로 후속 원격 반영
 
 - 한 일: 결정39 승인 뒤 기존 [#276](https://github.com/dohashelby/byul/pull/276)을 갱신했고 draft를 유지했다. 기능 검토c7500bcc 및 승인 기록a15f426b를 일반 push했다. M-A7 후속 [#278](https://github.com/dohashelby/byul/pull/278)도 main 대상으로 열렸다.

@@ -320,17 +320,6 @@
           "basis": "ma6-version-applicability.md 19.2",
           "next": "M-B4"
         },
-        "profiler_observation": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_profiler_sensor"
-          ],
-          "checks": [
-            "LIF-14"
-          ],
-          "basis": "사용자 결정 M-A6-W3(2026-11-15): 세대를 start/stop 호출 순서로 정의한다. 기존 센서는 성공한 start마다 새 세대를 만든다. 후보 정확 모듈 행과 composition 연결은 후속이다. ma6-version-applicability.md 27.4",
-          "next": "기존 센서 bytes를 보존한 후보 profiler 변형 profile 검증"
-        },
         "rank_failure": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
           "observers": [
@@ -360,18 +349,6 @@
           ],
           "basis": "ma6-version-applicability.md 19.3. runner_capture 소비 관측이 0.31.0 고정값만 있다. tests/test_code_selection_observation.py가 구 판본 비노출을 고정한다",
           "next": "M-B4 및 결정 V0-5"
-        },
-        "stream_buffer": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_stream_buffer_sensor"
-          ],
-          "checks": [
-            "LIF-03",
-            "LIF-04"
-          ],
-          "basis": "uvicorn 0.53.0 wheel 대조로 기존 uvicorn 고정값이 후보 이미지 uvicorn과 같음(27.2). 기반 0.30.0 행을 겹치는 변형 profile이 필요하다(#281 병합 뒤)",
-          "next": "기반 /25 + stream 센서 변형 profile"
         }
       }
     }

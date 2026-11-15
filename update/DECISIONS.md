@@ -1048,3 +1048,9 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 ## 2026-11-15 — M-A6 W1 기준 V1 /28 연결 소비 범위
 
 사용자가 #281 병합 후 승인한 기준 0.7.0 LIF-10/12·REQ-12·OBS-02 개방은 `/28`의 실제 선택·원 입력 연결을 소비하는 범위다. 세션 비밀키의 정확 준비 자산을 다시 검증한 HMAC만 원/native 요청을 선택하고, `Processor.process_inputs`의 원 ID와 ASGI invocation을 연결한다. `/28` trial의 요청 식별값도 같은 세션 HMAC으로 기록하며 키 검증이 실패하면 요청을 보내지 않고 공백으로 둔다. REQ-12 시도/KV/worker/output은 관측되지 않았으므로 UNKNOWN으로 남긴다. OBS-02는 선택 성분만 부분 관측한다. 기존 판정·정책·GPU 등록·과거 프로필 의미는 바꾸지 않는다.
+
+## 2026-11-15 — M-A6 후보 /29·/30 관측 변형
+
+승인된 후보 0.30.0 LIF-03/04·14은 `/25` 정확 행과 원본 stream/profiler 센서 사본을 조합한다. `/29` Uvicorn 정확 설치 bytes는 기존 관측기 행과 일치한다. `/30` profiler wrapper·worker는 후보 정확 행으로 선택하고 router는 기존 행을 쓴다. 원본 profiler 코드는 qualified `_start` RETURN마다 새 generation을 만들므로 backend 객체 재사용만으로 세대를 합치지 않는다. 판정/수락/독립 backend·trace·RPC 검증은 유지하며 실제 GPU 생산자 등록은 미완료다.
+
+새 variant는 `/28`의 비공개 세션 키 검증 원본을 정확 SHA 자산으로 요구한다. 새 profile의 ASGI/stream/HTTP trial 요청 식별자는 header HMAC이고, 원본 native 센서가 생성한 요청-ID SHA는 저장 전에 별도 `legacy-request-sha` 도메인의 HMAC으로 바꾼다. 키 또는 확장 검증 실패는 관측 hook 미설치/요청 미전송으로 처리한다. 모델·코드·파일 해시는 해당 요청-ID 변환 대상이 아니다. 기존 `/12`·`/15` source 및 profile 결과는 그대로다.

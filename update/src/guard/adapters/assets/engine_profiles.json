@@ -114,12 +114,14 @@
         "model_authorization",
         "native_route",
         "observation_state",
+        "profiler_control",
         "request_attempts",
         "session_revocation",
+        "stream_buffer",
         "termination"
       ],
       "pin_status": "image_pin",
-      "qualification": "기반 /8 센서를 이 판본의 정확 설치 bytes 행으로 설정하는 /25 profile(사용자 결정 M-A6-V6). 행이 없는 모듈(default_loader 등)은 검증되지 않은 모듈로 남는다. GPU 생산자 등록은 별도다. 근거 docs/dev-1/ma6-version-applicability.md 22절."
+      "qualification": "기반 /8 센서를 이 판본의 정확 설치 bytes 행으로 설정하는 /25 profile(사용자 결정 M-A6-V6). /29 stream은 이미지 대조된 Uvicorn 원 bytes를, /30 profiler는 후보 wrapper/worker 정확 bytes와 별도 호출 세대를 사용한다. 행이 없는 모듈(default_loader 등)은 검증되지 않은 모듈로 남는다. GPU 생산자 등록은 별도다. 근거 docs/dev-1/ma6-version-applicability.md 22·23절."
     },
     {
       "id": "sglang-runtime-request-lifecycle/1",

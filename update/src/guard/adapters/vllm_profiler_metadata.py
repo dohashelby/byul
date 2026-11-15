@@ -58,12 +58,12 @@ def validate_state(value):
         if value[key] is not None and (type(value[key]) is not int or not 0<=value[key]<(64 if key in {'rank','local_rank'} else 2**63)):raise ValueError('PROFILER_STATE_INVALID')
 
 
-def validate_sample(value):
+def validate_sample(value, *, sources=None):
     try:
         if type(value) is not dict:raise ValueError
         legacy=value.get('schema')==sensor.LEGACY_EVENT_SCHEMA
         if set(value)!=(FIELDS if legacy else FIELDS|BACKEND_FIELDS) or value['schema'] not in {sensor.EVENT_SCHEMA,sensor.LEGACY_EVENT_SCHEMA} or value['point'] not in sensor.POINTS:raise ValueError
-        if value['phase'] not in {'CALL','RETURN','RAISE'} or value['source_module']!=sensor.POINT_SOURCES[value['point']] or value['source_sha256']!=sensor.SOURCE_ADDITIONS[value['source_module']]:raise ValueError
+        if value['phase'] not in {'CALL','RETURN','RAISE'} or value['source_module']!=sensor.POINT_SOURCES[value['point']] or value['source_sha256']!=(sources or sensor.SOURCE_ADDITIONS)[value['source_module']]:raise ValueError
         if type(value['source_verified']) is not bool or type(value['registered_handler_observed']) is not bool:raise ValueError
         contracts=sensor.LEGACY_RUNTIME_CODE_CONTRACTS if legacy else sensor.RUNTIME_CODE_CONTRACTS
         if value['observer_runtime'] not in contracts or value['observer_code_sha256']!=contracts[value['observer_runtime']]:raise ValueError
@@ -112,7 +112,10 @@ def project(packet,required_ranks=()):
         bound=bool(capture.get('process_context_verified') and recording.get('session_owner_match') and recording.get('listed_file_identity_match'))
         for row in records:
             if row['event']!='PROFILER':continue
-            payload=row['payload'];validate_sample(payload)
+            payload=row['payload']
+            from . import vllm_release_observation_sensor as release_observation
+            sources=(release_observation.PROFILER_ROWS if capture['records'][0]['payload']['profile']==release_observation.PROFILER_PROFILE else None)
+            validate_sample(payload,sources=sources)
             sample={'recording':number,'seq':row['seq'],'monotonic_ns':row['monotonic_ns'],'pid':context['pid'],'start_ticks':context['start_ticks'],
                 'physical_process_binding_verified':bound,'image_digest_verified':capture.get('image_digest_verified') is True,
                 'recording_closed':capture.get('summary',{}).get('recording_closed') is True,**payload}

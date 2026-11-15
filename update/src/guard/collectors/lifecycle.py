@@ -27,6 +27,8 @@ from guard.adapters import vllm_attempt_sensor as attempt
 from guard.adapters import vllm_lifecycle_release_sensor as release_sensor
 from guard.adapters import vllm_lifecycle_catalog as configured
 from guard.adapters import vllm_initialization_release_sensor as init_release
+from guard.adapters import vllm_release_observation_sensor as release_observation
+from guard.adapters import vllm_fresh_request_binding as fresh_binding
 from guard.adapters import vllm_request_output_sensor as output_sensor
 from guard.adapters import vllm_stream_buffer_sensor as stream_sensor
 from guard.adapters import vllm_rank_failure_sensor as rank_sensor
@@ -42,7 +44,7 @@ from guard.update_validation import reserve_output
 
 
 def prepare_assets(output, repository, *, profile=None, model_read_scope=None,fault_control_target_sha256=None):
-    selected = configured if configured.contains(profile) else fault_sensor if profile==fault_sensor.PROFILE else sglang_sensor if profile==sglang_sensor.PROFILE else termination_sensor if profile==termination_sensor.PROFILE else sensor if profile in (None, sensor.PROFILE) else online if profile == online.PROFILE else attempt if profile == attempt.PROFILE else output_sensor if profile == output_sensor.PROFILE else stream_sensor if profile == stream_sensor.PROFILE else rank_sensor if profile == rank_sensor.PROFILE else init_sensor if profile == init_sensor.PROFILE else profiler_sensor if profile == profiler_sensor.PROFILE else weight_sensor if profile == weight_sensor.PROFILE else read_sensor if profile == read_sensor.PROFILE else mapping_sensor if profile == mapping_sensor.PROFILE else startup_sensor if profile == startup_sensor.PROFILE else joint_sensor if profile == joint_sensor.PROFILE else generation_sensor if profile == generation_sensor.PROFILE else endpoint_sensor if profile == endpoint_sensor.PROFILE else release_sensor if profile == release_sensor.PROFILE else init_release if profile == init_release.PROFILE else None
+    selected = release_observation if profile in {v[0] for v in release_observation.PROFILES.values()} else configured if configured.contains(profile) else fault_sensor if profile==fault_sensor.PROFILE else sglang_sensor if profile==sglang_sensor.PROFILE else termination_sensor if profile==termination_sensor.PROFILE else sensor if profile in (None, sensor.PROFILE) else online if profile == online.PROFILE else attempt if profile == attempt.PROFILE else output_sensor if profile == output_sensor.PROFILE else stream_sensor if profile == stream_sensor.PROFILE else rank_sensor if profile == rank_sensor.PROFILE else init_sensor if profile == init_sensor.PROFILE else profiler_sensor if profile == profiler_sensor.PROFILE else weight_sensor if profile == weight_sensor.PROFILE else read_sensor if profile == read_sensor.PROFILE else mapping_sensor if profile == mapping_sensor.PROFILE else startup_sensor if profile == startup_sensor.PROFILE else joint_sensor if profile == joint_sensor.PROFILE else generation_sensor if profile == generation_sensor.PROFILE else endpoint_sensor if profile == endpoint_sensor.PROFILE else release_sensor if profile == release_sensor.PROFILE else init_release if profile == init_release.PROFILE else None
     if selected is None:
         raise ValueError("LIFECYCLE_PROFILE_UNAVAILABLE")
     if selected is fault_sensor:
@@ -57,14 +59,17 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None,fa
     if any(parent.is_symlink() or parent.is_junction() or (parent/".git").exists() for parent in output.parents):
         raise ValueError("LIFECYCLE_OUTPUT_IN_REPOSITORY")
     output = reserve_output(output, protected=[Path(repository)])
-    selected_profile = profile if selected is configured else selected.PROFILE
+    selected_profile = profile if selected in (configured,release_observation) else selected.PROFILE
     session = uuid.uuid4().hex
     key_raw = None
-    if configured.request_binding(selected_profile):
+    if configured.request_binding(selected_profile) or selected is release_observation:
         key_raw = json.dumps({'schema': 'guard-lifecycle-request-key/1', 'session': session,
             'key_hex': secrets.token_hex(32)}, sort_keys=True, separators=(',', ':')).encode()
     source = (configured.render_source(profile, **({'request_key_sha256': hashlib.sha256(key_raw).hexdigest()}
-        if key_raw is not None else {})) if selected is configured else Path(selected.__file__).read_bytes())
+        if key_raw is not None else {})) if selected is configured else
+        release_observation.render_source('stream' if profile==release_observation.STREAM_PROFILE else 'profiler',
+            request_key_sha256=hashlib.sha256(key_raw).hexdigest())
+        if selected is release_observation else Path(selected.__file__).read_bytes())
     digest = hashlib.sha256(source).hexdigest()
     config = {"schema":sensor.CONFIG_SCHEMA, "session":session,
         "output_dir":"/guard-lifecycle/data/"+session,
@@ -162,6 +167,19 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None,fa
             raw=Path(module.__file__).read_bytes()
             if hashlib.sha256(raw).hexdigest()!=init_release.ASSETS[filename]:raise ValueError('INITIALIZATION_RELEASE_DEPENDENCY_UNAVAILABLE')
             values[filename]=raw
+    elif selected is release_observation:
+        extension=stream_sensor if profile==release_observation.STREAM_PROFILE else profiler_sensor
+        for filename,module,digest in (('guard_lifecycle_base.py',sensor,release_observation.BASE_SHA256),
+            ('guard_lifecycle_release.py',release_sensor,release_observation.RELEASE_SHA256),
+            ('guard_lifecycle_extension.py',extension,
+             release_observation.STREAM_SHA256 if extension is stream_sensor else release_observation.PROFILER_SHA256)):
+            raw=Path(module.__file__).read_bytes()
+            if hashlib.sha256(raw).hexdigest()!=digest:raise ValueError('LIFECYCLE_OBSERVATION_DEPENDENCY_UNAVAILABLE')
+            values[filename]=raw
+        binding_raw=Path(fresh_binding.__file__).read_bytes()
+        if hashlib.sha256(binding_raw).hexdigest()!=release_observation.BINDING_SHA256:
+            raise ValueError('LIFECYCLE_OBSERVATION_KEY_READER_UNAVAILABLE')
+        values['guard_request_binding.py']=binding_raw
     if selected is sglang_sensor:
         launcher_raw=Path(sglang_launcher.__file__).read_bytes()
         if hashlib.sha256(launcher_raw).hexdigest()!='99856447cc643b4597851b6e330d6744e6ca11d3ff0c94493b6df07a8a5b7e4a'or hashlib.sha256(source).hexdigest()!=sglang_launcher.SENSOR_SHA256:
@@ -210,6 +228,10 @@ def load_prepared(path):
     with path.open("rb") as stream:
         raw_manifest=stream.read(262145)
         manifest = strict_json(raw_manifest,limit=262144)
+    release_variant = manifest.get('profile') in {v[0] for v in release_observation.PROFILES.values()} if type(manifest) is dict else False
+    variant_assets = {'guard_lifecycle_sensor.py','guard_lifecycle_base.py','guard_lifecycle_release.py',
+                      'guard_lifecycle_extension.py','guard_request_binding.py','request-binding-key.json',
+                      'sitecustomize.py','settings.json'}
     if (type(manifest) is not dict or type(manifest.get("profile")) is not str
             or set(manifest) != ({"schema","profile","session","public_commit",
             "assets","source_sha256","engine_started","image_contents_verified","product_connected"} | ({'fault_control_target_sha256'}if manifest.get('profile')==fault_sensor.PROFILE else set()) | ({'model_read_scope'} if manifest.get('profile') in {read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()))
@@ -222,7 +244,7 @@ def load_prepared(path):
             or manifest["engine_started"] is not False or manifest["image_contents_verified"] is not False
             or manifest["product_connected"] is not False
             or type(manifest["assets"]) is not dict
-            or set(manifest["assets"]) != (configured.asset_names(manifest["profile"]) if configured.contains(manifest["profile"]) else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json",*init_release.ASSETS} if manifest["profile"]==init_release.PROFILE else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py",*fault_sensor.ASSETS,"fault-control-settings.json"}if manifest["profile"]==fault_sensor.PROFILE else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py","guard_sglang_launcher.py"}if manifest["profile"]==sglang_sensor.PROFILE else (({'model-read-scope.json', 'guard_file_read_scope.py', 'guard_worker_readiness_callback.py', 'guard_worker_readiness_support.py', 'guard_lifecycle_base.py', 'guard_worker_startup_contract.py', 'settings.json', 'guard_weight_iteration.py', 'guard_lifecycle_sensor.py', 'guard_safe_open_mapping.py', 'sitecustomize.py'} | ({'guard_worker_startup.py','guard_initialization.py'} if manifest['profile'] in {joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()) | ({'guard_worker_initialization.py','guard_worker_generation_contract.py'} if manifest['profile'] in {generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()) | ({'guard_worker_generation.py','guard_ready_endpoint_contract.py'} if manifest['profile']==endpoint_sensor.PROFILE else set())) if manifest['profile'] in {startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else {'guard_lifecycle_sensor.py','sitecustomize.py','settings.json','guard_lifecycle_base.py','guard_weight_iteration.py','guard_file_read_scope.py','model-read-scope.json'} if manifest['profile']==mapping_sensor.PROFILE else {'guard_lifecycle_sensor.py','sitecustomize.py','settings.json','guard_lifecycle_base.py','guard_weight_iteration.py','model-read-scope.json'} if manifest['profile']==read_sensor.PROFILE else {"guard_lifecycle_sensor.py" ,"sitecustomize.py","settings.json",
+            or set(manifest["assets"]) != (variant_assets if release_variant else configured.asset_names(manifest["profile"]) if configured.contains(manifest["profile"]) else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json",*init_release.ASSETS} if manifest["profile"]==init_release.PROFILE else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py",*fault_sensor.ASSETS,"fault-control-settings.json"}if manifest["profile"]==fault_sensor.PROFILE else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py","guard_sglang_launcher.py"}if manifest["profile"]==sglang_sensor.PROFILE else (({'model-read-scope.json', 'guard_file_read_scope.py', 'guard_worker_readiness_callback.py', 'guard_worker_readiness_support.py', 'guard_lifecycle_base.py', 'guard_worker_startup_contract.py', 'settings.json', 'guard_weight_iteration.py', 'guard_lifecycle_sensor.py', 'guard_safe_open_mapping.py', 'sitecustomize.py'} | ({'guard_worker_startup.py','guard_initialization.py'} if manifest['profile'] in {joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()) | ({'guard_worker_initialization.py','guard_worker_generation_contract.py'} if manifest['profile'] in {generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()) | ({'guard_worker_generation.py','guard_ready_endpoint_contract.py'} if manifest['profile']==endpoint_sensor.PROFILE else set())) if manifest['profile'] in {startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else {'guard_lifecycle_sensor.py','sitecustomize.py','settings.json','guard_lifecycle_base.py','guard_weight_iteration.py','guard_file_read_scope.py','model-read-scope.json'} if manifest['profile']==mapping_sensor.PROFILE else {'guard_lifecycle_sensor.py','sitecustomize.py','settings.json','guard_lifecycle_base.py','guard_weight_iteration.py','model-read-scope.json'} if manifest['profile']==read_sensor.PROFILE else {"guard_lifecycle_sensor.py" ,"sitecustomize.py","settings.json",
                 "guard_lifecycle_base.py","guard_online_input_callback.py"} if manifest["profile"] == online.PROFILE
                 else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py","guard_attempt_invocation.py"}
                     if manifest["profile"]==output_sensor.PROFILE else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py"}
@@ -235,7 +257,7 @@ def load_prepared(path):
                 or type(expected["bytes"]) is not int or not 0 < expected["bytes"] <= 262144
                 or type(expected["sha256"]) is not str or re.fullmatch(r"[0-9a-f]{64}",expected["sha256"]) is None):
             raise ValueError("LIFECYCLE_ASSET_METADATA_INVALID")
-        private_key = configured.request_binding(manifest['profile']) and name == 'request-binding-key.json'
+        private_key = (configured.request_binding(manifest['profile']) or release_variant) and name == 'request-binding-key.json'
         if private_key:
             key_path = path.parent / name
             before = key_path.lstat()
@@ -255,7 +277,7 @@ def load_prepared(path):
                 raw = stream.read(262145)
         if len(raw) != expected["bytes"] or hashlib.sha256(raw).hexdigest() != expected["sha256"]:
             raise ValueError("LIFECYCLE_ASSET_BYTES_INVALID")
-        if configured.request_binding(manifest['profile']) and name == 'request-binding-key.json':
+        if (configured.request_binding(manifest['profile']) or release_variant) and name == 'request-binding-key.json':
             status = (path.parent / name).lstat()
             value = strict_json(raw, limit=256)
             if (not stat.S_ISREG(status.st_mode) or not hasattr(os, 'geteuid') or status.st_uid != os.geteuid()
@@ -285,6 +307,15 @@ def load_prepared(path):
                 raise ValueError('CONFIGURED_LIFECYCLE_BASE_UNAVAILABLE')
         if manifest["profile"]==release_sensor.PROFILE and name=="guard_lifecycle_base.py" and hashlib.sha256(raw).hexdigest()!=release_sensor.BASE_SHA256:
             raise ValueError("LIFECYCLE_RELEASE_DEPENDENCY_UNAVAILABLE")
+        if release_variant:
+            extension_sha=(release_observation.STREAM_SHA256 if manifest['profile']==release_observation.STREAM_PROFILE
+                           else release_observation.PROFILER_SHA256)
+            expected_variant={'guard_request_binding.py':release_observation.BINDING_SHA256,
+                'guard_lifecycle_base.py':release_observation.BASE_SHA256,
+                'guard_lifecycle_release.py':release_observation.RELEASE_SHA256,
+                'guard_lifecycle_extension.py':extension_sha}.get(name)
+            if expected_variant is not None and hashlib.sha256(raw).hexdigest()!=expected_variant:
+                raise ValueError('LIFECYCLE_OBSERVATION_DEPENDENCY_UNAVAILABLE')
         if manifest["profile"]==init_release.PROFILE and name in init_release.ASSETS and hashlib.sha256(raw).hexdigest()!=init_release.ASSETS[name]:
             raise ValueError("INITIALIZATION_RELEASE_DEPENDENCY_UNAVAILABLE")
         if manifest["profile"]==init_sensor.PROFILE and name=="guard_lifecycle_base.py" and hashlib.sha256(raw).hexdigest()!=init_sensor.BASE8_SHA256:
@@ -325,19 +356,20 @@ def load_prepared(path):
         if name == "guard_lifecycle_sensor.py":
             source_supported = profiles.asset_supported(manifest["profile"], raw,
                 **({'request_key_sha256': manifest['assets']['request-binding-key.json']['sha256']}
-                   if configured.request_binding(manifest['profile']) else {}))
+                   if configured.request_binding(manifest['profile']) or release_variant else {}))
     if not source_supported:
         raise ValueError("LIFECYCLE_ASSET_VERSION_UNAVAILABLE")
     return manifest
 
 
 def request_header_fingerprint(manifest_path, prepared, header):
-    """Derive the /28 ASGI header HMAC from the validated, private key asset.
+    """Derive a new-profile ASGI header HMAC from the validated private key.
 
     This reopens and verifies the exact key after `load_prepared`; no key bytes
     or raw header leave the caller. A changed or unreadable key is a gap.
     """
-    if (not configured.request_binding(prepared.get('profile')) or type(header) is not str
+    if (not (configured.request_binding(prepared.get('profile')) or prepared.get('profile') in
+            {v[0] for v in release_observation.PROFILES.values()}) or type(header) is not str
             or not 0 < len(header.encode('utf-8', 'surrogatepass')) <= 512):
         raise ValueError('REQUEST_BINDING_HEADER_UNAVAILABLE')
     path = Path(manifest_path).parent / 'request-binding-key.json'

@@ -25,6 +25,7 @@ from . import vllm_weight_iteration_sensor as weight_sensor
 from . import vllm_lifecycle_release_sensor as release_sensor
 from . import vllm_lifecycle_catalog as configured
 from . import vllm_initialization_release_sensor as init_release
+from . import vllm_release_observation_sensor as release_observation
 
 LEGACY_PROFILE = "vllm-native-lifecycle-metadata/1"
 LEGACY_SCHEMA = "guard-native-lifecycle-events/1"
@@ -42,6 +43,7 @@ V7_PROFILE = "vllm-native-lifecycle-metadata/7"
 V7_SCHEMA = "guard-native-lifecycle-events/7"
 SCHEMAS = {fault_sensor.PROFILE:fault_sensor.SCHEMA,sglang_sensor.PROFILE:sglang_sensor.SCHEMA,termination_sensor.PROFILE:termination_sensor.SCHEMA,endpoint_sensor.PROFILE:endpoint_sensor.SCHEMA,generation_sensor.PROFILE:generation_sensor.SCHEMA,joint_sensor.PROFILE:joint_sensor.SCHEMA,startup_sensor.PROFILE:startup_sensor.SCHEMA,mapping_sensor.PROFILE:mapping_sensor.SCHEMA,read_sensor.PROFILE:read_sensor.SCHEMA,weight_sensor.PROFILE:weight_sensor.SCHEMA,profiler_sensor.PROFILE:profiler_sensor.SCHEMA,init_sensor.PROFILE:init_sensor.SCHEMA,rank_sensor.PROFILE: rank_sensor.SCHEMA, stream_sensor.PROFILE: stream_sensor.SCHEMA, output_sensor.PROFILE: output_sensor.SCHEMA, sensor.PROFILE: sensor.SCHEMA, online.PROFILE: online.SCHEMA, attempt.PROFILE: attempt.SCHEMA, LEGACY_PROFILE: LEGACY_SCHEMA, V2_PROFILE: V2_SCHEMA, V3_PROFILE: V3_SCHEMA, V4_PROFILE: V4_SCHEMA, V5_PROFILE: V5_SCHEMA, V6_PROFILE: V6_SCHEMA, V7_PROFILE: V7_SCHEMA, release_sensor.PROFILE: release_sensor.SCHEMA, init_release.PROFILE: init_release.SCHEMA}
 SCHEMAS.update({profile: row['schema'] for profile, row in configured.ROWS.items()})
+SCHEMAS.update({profile: schema for profile, schema in release_observation.PROFILES.values()})
 # Exact previously shipped LF/CRLF source spellings; no normalization on input.
 LEGACY_ASSETS = {
     (31143, "50143b5cf54aa8f5bbcfef769c286f65c971e0acd2caa111c625583f4baec3de"),
@@ -399,12 +401,15 @@ V7_FUNCTION_POINTS = {'vllm.model_executor.model_loader.weight_utils': ('safeten
 
 def public_commit(profile):
     if configured.contains(profile):return configured.row(profile)['commit']
+    if profile in {v[0] for v in release_observation.PROFILES.values()}:return release_sensor.COMMIT
     if profile==sglang_sensor.PROFILE:return sglang_sensor.COMMIT
     if profile in {release_sensor.PROFILE,init_release.PROFILE}:return release_sensor.COMMIT
     return termination_sensor.COMMIT if profile==termination_sensor.PROFILE else sensor.COMMIT
 
 
 def asset_supported(profile, raw, *, request_key_sha256=None):
+    for variant, (selected, _) in release_observation.PROFILES.items():
+        if profile == selected:return raw == release_observation.render_source(variant, request_key_sha256=request_key_sha256)
     if configured.contains(profile):
         if configured.request_binding(profile) and request_key_sha256 is None:return False
         return raw == configured.render_source(profile, request_key_sha256=request_key_sha256)
@@ -455,6 +460,8 @@ def asset_supported(profile, raw, *, request_key_sha256=None):
 
 
 def source_hashes(profile):
+    if profile==release_observation.STREAM_PROFILE:return {**release_sensor.source_rows(sensor.SOURCE_SHA),**stream_sensor.SOURCE_ADDITIONS}
+    if profile==release_observation.PROFILER_PROFILE:return {**release_sensor.source_rows(sensor.SOURCE_SHA),**release_observation.PROFILER_ROWS}
     if configured.contains(profile):return {module: row['sha256'] for module, row in configured.row(profile)['sources'].items()}
     if profile==release_sensor.PROFILE:return release_sensor.source_rows(sensor.SOURCE_SHA)
     if profile==init_release.PROFILE:return {**release_sensor.source_rows(sensor.SOURCE_SHA),**init_release.SOURCE_ADDITIONS}
@@ -501,6 +508,7 @@ def source_hashes(profile):
 
 
 def points(profile):
+    if profile in {v[0] for v in release_observation.PROFILES.values()}:return sensor.POINTS
     if configured.contains(profile):return {module: row['classes'] for module, row in configured.row(profile)['sources'].items()}
     if profile==fault_sensor.PROFILE:return sensor.POINTS
     if profile==sglang_sensor.PROFILE:return sglang_sensor.POINTS
@@ -660,6 +668,7 @@ def request_selection_observation(row):
 
 
 def point_sources(profile):
+    if profile in {v[0] for v in release_observation.PROFILES.values()}:return point_sources(release_sensor.PROFILE)
     if profile==sglang_sensor.PROFILE:
         from .sglang_request_termination import POINT_MODULE
         return dict(POINT_MODULE)
@@ -676,6 +685,7 @@ def point_sources(profile):
 
 
 def valid_call_frame(frame,profile):
+    if profile in {v[0] for v in release_observation.PROFILES.values()}:return valid_call_frame(frame,release_sensor.PROFILE)
     if type(frame) is not dict:return False
     base={"point","request_sha256"}
     if set(frame)==base:return True

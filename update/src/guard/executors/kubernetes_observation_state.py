@@ -75,7 +75,8 @@ class KubernetesObservationStateExecutor(KubernetesRequestTerminationExecutor):
                 health=slot.startswith('health-');close=slot=='disconnect';rid='byul-obs02-'+token+'-'+slot
                 body=None if health else {'model':ctx.api_model,'prompt':'hello','max_tokens':8 if close else 1,'temperature':0,'stream':close}
                 try:
-                    if ctx._termination_prepared['profile']=='vllm-native-lifecycle-metadata/28':
+                    if ctx._termination_prepared['profile'] in {'vllm-native-lifecycle-metadata/28',
+                            'vllm-native-lifecycle-metadata/30'}:
                         from guard.collectors.lifecycle import request_header_fingerprint
                         request_identity=request_header_fingerprint(self.cfg['prepared'],ctx._termination_prepared,rid)
                     else:request_identity=sha256_hex(rid.encode())
@@ -92,7 +93,8 @@ class KubernetesObservationStateExecutor(KubernetesRequestTerminationExecutor):
                     if not start<=now<=end:raise ValueError
                     request={'id':row['case_id'],'method':row['method'],'mode':'sse' if close else 'json',
                         'url':ctx.engine_url+('/health' if health else '/v1/completions'),'headers':{'X-Request-Id':rid},'body':body}
-                    if not health and ctx._termination_prepared['profile']=='vllm-native-lifecycle-metadata/28':
+                    if not health and ctx._termination_prepared['profile'] in {'vllm-native-lifecycle-metadata/28',
+                            'vllm-native-lifecycle-metadata/30'}:
                         ctx._request_binding_hashes[row['case_id']]=request_identity
                     if close:request['read_profile']={'profile':'slow-reader-v1','chunk_bytes':1,'interval_ms':1,'close_after_reads':1}
                     row.update(attempted=True,started_at=now.isoformat())

@@ -2975,3 +2975,11 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 관측 경계: REQ-12에는 fresh 요청의 native 입력 연결만 생긴다. 시도/KV/worker/output 및 전체 범위는 계속 미관측·UNKNOWN이다. OBS-02도 선택 성분만 부분 관측하며 생산자 인증·GPU 자격·등록·실측 PASS를 뜻하지 않는다.
 - 테스트 결과: 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 정확 소스와 시험 변경은 CI에서 검증할 예정이다. `git diff --check`와 source SHA 목록은 로컬 shell로 확인한다.
 - 다음 단계: 이 커밋의 집중 검토와 CI를 거친 뒤 후보 0.30.0 stream_buffer/profiler 독립 변형을 잇는다. 실제 ENV/target·GPU 등록과 판정 수락은 미완료다.
+
+## 2026-11-15 — M-A6 후보 0.30.0 stream/profiler 변형 (로컬 검토)
+
+- 한 일: `/25` 정확 후보 행 위에 원본 `/12` stream 또는 `/15` profiler 센서를 private 정확 사본으로 조합하는 `/29`·`/30`을 추가했다. 후보 profiler wrapper·worker 파일 SHA만 정확 행으로 바꾸고 원본 센서/기반/공통 GPU 계약/판정은 보존했다. LIF-03/04와 LIF-14 실행기 판본 관문을 연결하고 파서가 선택한 소스 행을 검사하게 했다.
+- 개인정보 경계: 새 variant 준비 자산은 `/28` 검증기 원본 SHA와 0600 비공개 세션 키를 요구한다. 설치 전 키 검증이 실패하면 observer hook을 만들지 않는다. 새 profile ASGI/stream/trial 요청은 header HMAC으로, native의 명시적 요청-ID 필드는 legacy SHA 결과의 별도 도메인 HMAC으로 보존한다. 모델·소스·파일 해시는 그대로 두고 기존 `/12`·`/15` sensor/profile은 변경하지 않았다. 키 실패/권한 변경 및 저장 필드 회귀는 CI 대상이다.
+- 의미 경계: profiler generation은 원본 센서에서 각 qualified start/stop 호출 순서에 따라 이미 새로 부여된다. backend SHA 동일성을 세대 동일성으로 간주하지 않으며 backend 종료·trace·RPC·다음 정상 시작의 판정은 그대로다. 실제 ENV/target·GPU 생산자 등록과 실측은 미완료다.
+- 테스트 결과: 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 정확 bytes/준비 자산 변조/판본 노출 회귀는 CI에서 확인한다. 로컬에서는 shell SHA, JSON 구문, `git diff --check`만 확인했다.
+- 다음 단계: 집중 소스 검토와 CI에서 variant 준비·기록 파서·LIF-03/04·14 직접 경로를 확인한다. 실패하면 정확 head에서 보수한다.

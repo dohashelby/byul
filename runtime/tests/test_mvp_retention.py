@@ -373,3 +373,36 @@ def test_a5_final_appended_to_started_before_age_deletion_keeps_both(tmp_path, m
     RecordRetention(tmp_path, enforce=True).run(now=NOW)
     rows = store.read_all()[0]
     assert rows == [started, final]
+
+
+@pytest.mark.xfail(strict=True, reason="A-6")
+@pytest.mark.parametrize("failure", ["hold", "rewrite"])
+def test_a6_failed_or_blocked_deletion_reports_actual_bytes(tmp_path, monkeypatch, failure):
+    path = tmp_path / "gateway_records.jsonl"
+    raw = json.dumps({"request_id": "r", "recorded_at": iso(0)}, separators=(",", ":")).encode()
+    assert len(raw) <= 70
+    path.write_bytes(raw.ljust(70, b" ") + b"\n")
+    path.chmod(0o600)
+    hold = None
+    if failure == "hold":
+        hold = tmp_path / "hold.json"
+        hold.write_text("{}")
+    else:
+        def fail(*args, **kwargs):
+            raise OSError("A6 injected rewrite failure")
+        monkeypatch.setattr(JsonlStore, "remove_lines", fail)
+    result = RecordRetention(tmp_path, max_bytes=1, enforce=True, hold_path=hold).run(now=NOW)
+    assert path.stat().st_size == 71 and result["deleted"] is False
+    assert result["over_size_limit_after"] is True
+
+
+@pytest.mark.parametrize("enforce", [False, True])
+def test_a6_report_projects_and_enforce_measures_success(tmp_path, enforce):
+    path = tmp_path / "gateway_records.jsonl"
+    store = JsonlStore(path)
+    store.append({"request_id": "r", "recorded_at": iso(0)})
+    before = path.read_bytes()
+    result = RecordRetention(tmp_path, max_bytes=1, enforce=enforce).run(now=NOW)
+    assert result["over_size_limit_after"] is False
+    assert result["deleted"] is enforce
+    assert path.read_bytes() == (b"" if enforce else before)

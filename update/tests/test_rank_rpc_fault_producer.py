@@ -72,35 +72,37 @@ finally:
 '''
 
 
+def capture_example(parent, kind, *, binding_factory=None):
+    prepared, settings = _rpc_prepared(parent)
+    path = prepared / 'guard/adapters/assets/vllm_rank_ipc_profiles.json'
+    document = json.loads(path.read_bytes()); profile = document['profiles'][0]
+    profile['request_binding'] = {'kind': 'direct', 'external_prefix': 'cmpl-', 'external_suffix': '-0'}
+    hook = profile['rpc_sources']['rank_rpc_fixture']['hooks']['Inner.execute']
+    hook.update(fault_eligible=True, scalars={'gpu_rank': {'root': 'self', 'path': ['rank']},
+        'configured_tp_size': {'root': 'self', 'path': ['tp']}})
+    raw = control.canonical(document); path.write_bytes(raw)
+    settings['assets']['guard/adapters/assets/vllm_rank_ipc_profiles.json'] = {'bytes': len(raw), 'sha256': sha256(raw).hexdigest()}
+    (prepared / 'settings.json').write_bytes(control.canonical(settings))
+    manifest = json.loads((prepared / 'manifest.json').read_bytes())
+    manifest.update(assets=settings['assets'], settings_sha256=sha256(control.canonical(settings)).hexdigest())
+    (prepared / 'manifest.json').write_bytes(control.canonical(manifest))
+    binding = example(settings['session']); binding['prepared_sha256'] = sha256(control.canonical(manifest)).hexdigest()
+    if binding_factory is not None: binding = binding_factory(prepared, manifest)
+    (prepared / 'EXAMPLE-binding.json').write_bytes(control.canonical(binding))
+    run = subprocess.run([sys.executable, '-I', '-S', '-c', SCRIPT, str(prepared), kind],
+        text=True, capture_output=True)
+    assert run.returncode == 0, run.stderr
+    capture = parent / 'capture'
+    (capture / 'snapshots').mkdir(parents=True); (capture / 'controls').mkdir()
+    for path in (prepared / 'data' / settings['session']).iterdir():
+        shutil.copy2(path, capture / ('snapshots' if path.name.startswith('pid-') else 'controls') / path.name)
+    return prepared, capture, binding
+
+
 @pytest.fixture(scope='module')
 def examples(tmp_path_factory):
-    results = {}
-    for kind in ('delay', 'exception', 'death'):
-        parent = tmp_path_factory.mktemp('EXAMPLE-rpc-' + kind)
-        prepared, settings = _rpc_prepared(parent)
-        path = prepared / 'guard/adapters/assets/vllm_rank_ipc_profiles.json'
-        document = json.loads(path.read_bytes()); profile = document['profiles'][0]
-        profile['request_binding'] = {'kind': 'direct', 'external_prefix': 'cmpl-', 'external_suffix': '-0'}
-        hook = profile['rpc_sources']['rank_rpc_fixture']['hooks']['Inner.execute']
-        hook.update(fault_eligible=True, scalars={'gpu_rank': {'root': 'self', 'path': ['rank']},
-            'configured_tp_size': {'root': 'self', 'path': ['tp']}})
-        raw = control.canonical(document); path.write_bytes(raw)
-        settings['assets']['guard/adapters/assets/vllm_rank_ipc_profiles.json'] = {'bytes': len(raw), 'sha256': sha256(raw).hexdigest()}
-        (prepared / 'settings.json').write_bytes(control.canonical(settings))
-        manifest = json.loads((prepared / 'manifest.json').read_bytes())
-        manifest.update(assets=settings['assets'], settings_sha256=sha256(control.canonical(settings)).hexdigest())
-        (prepared / 'manifest.json').write_bytes(control.canonical(manifest))
-        binding = example(settings['session']); binding['prepared_sha256'] = sha256(control.canonical(manifest)).hexdigest()
-        (prepared / 'EXAMPLE-binding.json').write_bytes(control.canonical(binding))
-        run = subprocess.run([sys.executable, '-I', '-S', '-c', SCRIPT, str(prepared), kind],
-            text=True, capture_output=True)
-        assert run.returncode == 0, run.stderr
-        capture = parent / 'capture'
-        (capture / 'snapshots').mkdir(parents=True); (capture / 'controls').mkdir()
-        for path in (prepared / 'data' / settings['session']).iterdir():
-            shutil.copy2(path, capture / ('snapshots' if path.name.startswith('pid-') else 'controls') / path.name)
-        results[kind] = prepared, capture, binding
-    return results
+    return {kind: capture_example(tmp_path_factory.mktemp('EXAMPLE-rpc-' + kind), kind)
+        for kind in ('delay', 'exception', 'death')}
 
 
 def make(data, *, wire_schema='guard-gpu-common-input/4'):

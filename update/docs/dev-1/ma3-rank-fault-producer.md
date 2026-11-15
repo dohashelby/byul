@@ -151,3 +151,9 @@ HTTP200/500은 클라이언트 구성요소 관측으로만 기록한다. 현재
 `tools/rank_rpc_fault_inputs.py`는 현재 소스의 sealed ENV·target과 새 준비물을 먼저 검증한 뒤 새 디렉터리에 `common-input.json`·변환 요약을 만든다. 기본은 `/4`이며 예시 ENV는 EXAMPLE로 남긴다. 변환 자체를 새 엔진 실행/실환경 사전 점검/제품 EVD·RES·RPT 생성으로 세지 않는다. 기존 ARM/1 GPU 여섯 사례에는 실제 새 제품 입력을 사후 붙이지 않는다. 현재 실환경 수집·전체 TP2 인과 그룹/기한·같은 소유자 복구 수락·새 소스 GPU 대조·등록은 계속 미완료다.
 
 최종 host 변환은 직접187개·기준 이미지 Python ABI131개·현황/경로/소스552파일 관문을 통과했다. [후속 미결합 준비물](ma3-rpc-common-preparation-20261115.json)은 엔진 SDK14 bytes가 앞선 후보와 같으며 새 host 변환 신원과 미완료를 구분한다. 실제 ARM2 원 기록의 제품 부분 입력·전체 M-A3 완료는 아직 없다.
+
+## 제품 파일 소비 경로 후속 (2026-11-15)
+
+기존 rank_failure 실행기 구현에 `common-input` 파일 소비 경로를 연결한다. 설정의 `input_mode="common-records"`는 명시적으로 파일만 소비하며 lab_activation/record_attestation과 섞지 않는다. 기존 Kubernetes native 경로/소스 자격·현재 팩·판정 규칙은 그대로다. 실행 결합은 이 경로에서 선언 JSON 준비물의 정규 해시를 계산하고 기존 ENV/target/유효 기간/정책 검사를 유지한다.
+
+기존 공통 소비 기반에 LIF-08/rank-fault를 연결해 정확 공통 기록과 소스 지문·공백·위반 후보를 EVD artifact/activation_steps에 보존한다. 현재 owner·준비물 runtime·원 관측시각·모든 rank 정상/상위 전달은 미확인으로 남기며 `activation_scope_complete=false`다. 파일 소비 자체는 실제 엔진 요청이 아니고 출처는 EXAMPLE 또는 최대 DECLARED다. 새 기록의 위반 후보를 확인된 보안 FAIL로 바꾸지 않으며 기존 독립 FAIL은 보존한다. 이 경로의 EVD→RES→RPT는 UNKNOWN이며 실제 GPU 실행/수락/등록을 대신하지 않는다.

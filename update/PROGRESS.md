@@ -2777,3 +2777,10 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 테스트 결과: CPython3.12.3 두 파일20개·하위 시험6개 통과(pytest17.29초/부모18.867초). AST로 기존 assert 호출 전부와 skip 수가 보존됐음을 대조했다. 별도 작업 트리에서 검증한 두 파일 bytes를 #257에 그대로 반영했고 runtime/src·examples는 같은 기준 tree임을 확인했다. 원 통과/실패 의미·기한·수락 기준은 바꾸지 않았으며 전체 로컬 pytest는 실행하지 않았다. update 제품 소스와 목록 SHA7cdbaac5…도 그대로다.
 - 다음 단계: 승인된 기존 #257 브랜치로 push하고 새 전체 CI 결과를 확인한다. 결정19는 DECISIONS·작업지시서7절에 기록했다.
 - 막힌 것: 새 head CI가 나오기 전에는 #257 전체 통과로 세지 않는다. GPU/클라우드·이미지 레이어·다른 runtime 파일·병합 승인은 없으며 실행하지 않았다. 수정은 두 시험 파일에 한정한다.
+
+
+## 2026-11-15 — M-A3 제품 파일 소비 연결 검증 중
+- 한 일: 기존 rank_failure에 common-input 파일 소비 구현을 연결했다. ARM 전 결합된 공통 rank-fault 기록을 select/run/judge/report·정확 저장/복원으로 전달하며 native source 자격과 분리했다. 팩·판정·등록표는 바꾸지 않았다.
+- 테스트 결과: 직접 영향 197개 통과(pytest 45.25초, 벽시계 45.811초). 원자료 출처는 필수 activation_steps와 artifact에 남고 ABORTED·EXAMPLE·UNKNOWN 및 독립 FAIL 보존을 확인했다. 전체 CI는 새 변경에 대해 미실행이다.
+- 다음 단계: 새 main #277의 판본표·점검별 설정을 통합한 뒤 같은 계약 재검증과 M-A7 입력 연결·인계 기록을 마친다.
+- 막힌 것: 현재 실제 ENV/target·새 ARM2 엔진 원 기록·TP2 정상/탐지/상위 전달/새 세대 복구·등록은 없다. 새 GPU/비용과 후속 push는 미승인이다.

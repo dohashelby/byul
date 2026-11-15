@@ -240,6 +240,10 @@ def _load(path, loader):
 def file_hash(check_id, key, executor_cfg) -> str:
     """Canonical JSON hash of the configured file, loaded the way the executor loads it."""
     path, loader = _source(check_id, key)
+    if (check_id == 'LIF-08' and key == 'rank_prepared_sha256'
+            and executor_cfg.get('input_mode') == 'common-records'):
+        # 파일 소비 경로의 준비물은 선언 JSON이다. 기존 native 실행기는 이 모드를 받지 않는다.
+        loader = 'json'
     node = executor_cfg
     for part in path:
         node = node[part]

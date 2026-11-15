@@ -285,6 +285,11 @@
       "manifest_sha256": "bcc93f6d1f0074f2bf1b7b6e122e30900d232ae67a2574e3f65150139159cd8b",
       "reviewed_by": "Claude / BYUL UPDATE / M-A6 기준 V1 /27 선택 지점 연결 self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T22:30:00+09:00"
+    },
+    {
+      "manifest_sha256": "f6553e03836f6077148c8ff360ae2ef4134ee7469a0f2f434b752a70dbb86a44",
+      "reviewed_by": "Claude / BYUL UPDATE / M-A6-W1~W6 결정 반영(판본 프로필 원인 기록) self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T23:30:00+09:00"
     }
   ]
 }

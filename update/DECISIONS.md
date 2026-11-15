@@ -1,3 +1,13 @@
+## 2026-11-15 — 사용자 결정 M-A6-W1~W6: 기준 V1·후보 남은 점검
+
+메인 세션을 거쳐 전달된 사용자 답. 근거는 [판본 적용표 26·27절](docs/dev-1/ma6-version-applicability.md).
+- W1 "연다 (assert 변경 승인)": 기준 0.7.0 V1의 LIF-10·12, REQ-12, OBS-02 실행기를 연다. `tests/test_configured_lifecycle.py::test_snapshot_availability_does_not_open_unreviewed_executors_or_register_gpu_results`의 0.7.0 비노출 assert 변경을 승인했다. REQ-12의 시도 사건·KV 소유 미관측은 원인 있는 UNKNOWN으로 남긴다. 요청 연결은 PR #281의 `/28`(fresh 선택·세션 HMAC)과 겹치므로 그 연결 위에서 연다(27.1).
+- W2 "UNKNOWN": 기준 REQ-05의 최종 모델 연결(`_model_forward` 없음)은 원인 있는 UNKNOWN이다.
+- W3 "호출 순서로 세대 정의": 후보 LIF-14의 profiler 세대는 start/stop 호출 순서로 정의해 관측한다. profiler 객체 재사용은 관측 사실로 함께 남긴다. 판정 기준은 바꾸지 않는다.
+- W4 "승인 (이월)": LIF-13(태그에 `weight_cache` 없음)과 PLT-10·11(인증이 `build_app` 지역 함수)은 V1 기준에서도 원인 있는 UNKNOWN으로 마감한다. 원인은 엔진 모드가 아니라 태그 소스의 사실이다. PASS·비적용으로 바꾸지 않는다.
+- W5 "GPU 확인 후 기능 부재": 기준 REQ-10은 다음 GPU 실행 때 구조화 출력이 실제로 제약되지 않는지 확인한다. 맞으면 결정 9 형식의 기능 부재로 정리한다. 확인 절차와 판단 기준은 27.3절.
+- W6 "받는다": PyPI `uvicorn-0.53.0-py3-none-any.whl`(87,081 bytes)을 받아 대조했다(27.2). 로컬에서는 셸 도구(`curl`·`shasum`·`unzip`)만 썼고 파이썬 도구·pytest는 실행하지 않았다.
+
 ## 2026-11-15 — #278·#279 조건부 병합과 1차 완성 잔여 문서
 
 사용자 원문: “278, 279 문제 없으면 받고, 개발문서에 1차완성 기준으로 해야할 게 뭐가 남았는지 정리해줘”. 현재 main을 통합해 두 PR의 변경/자격 경계를 검토하고 정확 head의 CI가 통과하면 #278 뒤 #279를 병합한다. 작업지시서에 이미 구현된 항목과 남은 제품 관측·입력·GPU 실증·공식 보고서 기준을 구분해 반영한다. 기존의 새 GPU/비용·다운로드·M-B4 보관·runtime/contracts·판정/기한·정책 확정 경계는 유지하며 준비/CI 통과를 실측 완료로 기록하지 않는다.
@@ -416,7 +426,8 @@
 
 ## 열린 질문
 
-### M-A6-W 기준 V1·후보 남은 점검 (2026-11-15) — 사용자 결정 대기
+### M-A6-W 기준 V1·후보 남은 점검 (2026-11-15) — 사용자 결정됨
+- ~~M-A6-W1~W6~~ → 2026-11-15 사용자 결정(맨 위 "사용자 결정 M-A6-W1~W6" 절). 원 질문은 이력으로 남긴다.
 근거: [판본 적용표 26절](docs/dev-1/ma6-version-applicability.md). 답이 나오기 전에는 판정 기준·assert·고정값 검사를 바꾸지 않는다.
 - **M-A6-W1 기준 0.7.0 termination 계열 열기**: `/27` 선택 지점의 live ASGI 연결을 구현했다. LIF-10·12, REQ-12, OBS-02 실행기를 0.7.0에서 열려면 `tests/test_configured_lifecycle.py::test_snapshot_availability_does_not_open_unreviewed_executors_or_register_gpu_results`의 0.7.0 비노출 assert를 고쳐야 한다. 열어도 REQ-12의 시도 사건과 KV 블록 소유권은 미관측(원인 있는 UNKNOWN 범위)이다. 잠정: 열지 않음.
 - **M-A6-W2 기준 REQ-05 최종 모델 연결**: 0.7.0 V1 runner에는 `_model_forward`가 없고 `execute_model`이 모델을 직접 부른다. `execute_model`의 선택 ID와 `load_model`/`get_model`의 모델 객체를 같은 프로세스에서 잇는 새 연결로 볼지, UNKNOWN으로 둘지. 잠정: UNKNOWN.

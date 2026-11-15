@@ -86,15 +86,15 @@
       },
       "executor_gaps": {
         "credential_revocation": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "cause": "APPROVED_UNKNOWN_V1",
           "observers": [
             "vllm_lifecycle_sensor"
           ],
           "checks": [
             "PLT-10"
           ],
-          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 인증·입력 경로의 정확 행 미검토. 이전 V0 UNKNOWN 예외를 이월하지 않음",
-          "next": "기준 V1 인증/요청 연결 대상표"
+          "basis": "사용자 결정 M-A6-W4(2026-11-15): 0.7.0 api_server.build_app의 인증이 지역 함수라 감쌀 대상이 없다. V1 기준에도 원인 있는 UNKNOWN. ma6-version-applicability.md 27.4",
+          "next": null
         },
         "engine_sensor": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
@@ -129,15 +129,15 @@
           "next": "기준 V1 초기화 완료 사건과 rank/worker 세대 대응"
         },
         "model_authorization": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "cause": "APPROVED_UNKNOWN_V1",
           "observers": [
             "vllm_lifecycle_sensor"
           ],
           "checks": [
             "REQ-05"
           ],
-          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 models HTTP 경로와 입력 Processor 경로가 현 센서와 다름",
-          "next": "기준 V1 models·Processor 대상표"
+          "basis": "사용자 결정 M-A6-W2(2026-11-15): 0.7.0 V1 runner에 _model_forward가 없어 최종 모델 연결 지점이 없다. 원인 있는 UNKNOWN. ma6-version-applicability.md 27.4",
+          "next": null
         },
         "native_route": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
@@ -171,8 +171,8 @@
           "checks": [
             "OBS-02"
           ],
-          "basis": "ma6-version-applicability.md 26절. /27 선택 지점(Processor.process_inputs)의 live ASGI 연결은 구현했다. 실행기 열기는 tests/test_configured_lifecycle.py의 비노출 assert 변경 승인(M-A6-W1) 대기. REQ-12 시도 사건(/10)과 KV 소유권은 여전히 없다",
-          "next": "M-A6-W1 승인 뒤 /27을 지원 집합에 추가"
+          "basis": "사용자 결정 M-A6-W1(2026-11-15)로 열기 승인. PR #281의 /28 요청 연결 병합 뒤 지원 집합에 넣는다. ma6-version-applicability.md 27.1",
+          "next": "#281 병합 뒤 /28 연결로 열기"
         },
         "profiler_observation": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
@@ -208,8 +208,8 @@
             "LIF-12",
             "REQ-12"
           ],
-          "basis": "ma6-version-applicability.md 26절. /27 선택 지점(Processor.process_inputs)의 live ASGI 연결은 구현했다. 실행기 열기는 tests/test_configured_lifecycle.py의 비노출 assert 변경 승인(M-A6-W1) 대기. REQ-12 시도 사건(/10)과 KV 소유권은 여전히 없다",
-          "next": "M-A6-W1 승인 뒤 /27을 지원 집합에 추가"
+          "basis": "사용자 결정 M-A6-W1(2026-11-15)로 열기 승인. PR #281의 /28 요청 연결 병합 뒤 지원 집합에 넣는다. ma6-version-applicability.md 27.1",
+          "next": "#281 병합 뒤 /28 연결로 열기"
         },
         "resource_recovery": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
@@ -232,15 +232,15 @@
           "next": "기준 V1 요청 옵션과 실제 runner 소비 관측 검토(M-A6-V5)"
         },
         "session_revocation": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "cause": "APPROVED_UNKNOWN_V1",
           "observers": [
             "vllm_lifecycle_sensor"
           ],
           "checks": [
             "PLT-11"
           ],
-          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 인증·입력 경로의 정확 행 미검토. 이전 V0 UNKNOWN 예외를 이월하지 않음",
-          "next": "기준 V1 인증/세션 대상표"
+          "basis": "사용자 결정 M-A6-W4(2026-11-15): 0.7.0 api_server.build_app의 인증이 지역 함수라 감쌀 대상이 없다. V1 기준에도 원인 있는 UNKNOWN. ma6-version-applicability.md 27.4",
+          "next": null
         },
         "stream_buffer": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
@@ -357,7 +357,7 @@
           "checks": [
             "LIF-14"
           ],
-          "basis": "ma6-version-applicability.md 26절. 후보 TorchProfilerWrapper._start는 profiler 객체를 재사용해 다시 시작하고(0.31.0은 매번 새로 만든다) _stop의 dump 설정 이름이 다르다. WorkerProfiler.start/stop/step은 같다",
+          "basis": "사용자 결정 M-A6-W3(2026-11-15): 세대를 start/stop 호출 순서로 정의해 관측. 센서 지문 재계산 장소 결정 필요. ma6-version-applicability.md 27.4",
           "next": "M-A6-W3 결정 뒤 profiler 세대 의미 반영"
         },
         "rank_failure": {
@@ -399,8 +399,8 @@
             "LIF-03",
             "LIF-04"
           ],
-          "basis": "ma6-version-applicability.md 23절. uvicorn h11_impl·httptools_impl·flow_control 행이 기존 uvicorn 커밋 것뿐이다. 후보 이미지 uvicorn 0.53.0 설치 파일 bytes가 아직 없다",
-          "next": "uvicorn 0.53.0 설치 파일 확보·의미 검토"
+          "basis": "uvicorn 0.53.0 wheel 대조로 기존 uvicorn 고정값이 후보 이미지 uvicorn과 같음(27.2). 기반 0.30.0 행을 겹치는 변형 profile이 필요하다(#281 병합 뒤)",
+          "next": "기반 /25 + stream 센서 변형 profile"
         }
       }
     }

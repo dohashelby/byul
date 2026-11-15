@@ -1,3 +1,10 @@
+## 2026-11-15 — 사용자 결정 M-A6-W1~W6 반영(문서·원인 기록)
+
+- 한 일: W1~W6을 DECISIONS에 기록했다. W6으로 PyPI uvicorn 0.53.0 wheel(87,081 bytes)을 받아 셸 도구로만 대조했다. METADATA SHA가 M-A3 후보 이미지 메타데이터와 같고, stream_buffer가 고정한 uvicorn 세 파일 SHA가 wheel과 같다. W5 GPU 확인 절차를 판본 적용표 27.3절에 적었다. W2·W4는 0.7.0 원인 코드를 `APPROVED_UNKNOWN_V1`로 기록했다. PR #281(`/28` 요청 연결)이 #280의 `/27` 선택 지점과 같은 파일·목적이라 W1 열기와 stream 변형 profile은 #281 병합 뒤로 미뤘다.
+- 테스트 결과: 로컬 실행 금지 규칙에 따라 pytest·파이썬 도구를 실행하지 않았다. 소스 목록 SHA는 `shasum`으로 바꾼 파일 한 행만 고쳤다. 검증은 PR #280 CI 결과로만 확인한다.
+- 다음 단계: #281 병합 뒤 W1(`/28`을 termination 계열 지원 집합에), 후보 stream 변형 profile. W3은 profiler 센서 지문 재계산 장소(CI 또는 원격) 결정이 필요하다.
+- 막힌 것: #280의 `/27` 선택 지점 코드를 #281과 어떻게 정리할지 결정 필요.
+
 ## 2026-11-15 — M-A6 기준 V1 요청 연결(`/27` 선택 지점)과 남은 점검 정리
 
 - 한 일: 0.7.0 V1의 엔진 요청 ID가 호출자 ID(`cmpl-<X-Request-Id|uuid>`) 그대로임을 확인했다. `/27` 판본 데이터에 선택 지점 `Processor.process_inputs`를 더하고, live 선택 문맥에서만 SELECTION·ASGI 연결을 기록하게 했다. 기록 검증·연결 함수·termination projection이 판본 선택 지점을 받는다. 작업지시서 7절 결정 14 행을 V1 결정으로 고쳤다. 기준 19개·후보 4개의 상태와 원인, 결정 질문 M-A6-W1~W6을 판본 적용표 26절·DECISIONS에 적었다.

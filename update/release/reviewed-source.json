@@ -119,7 +119,7 @@
   "update/src/guard/adapters/assets/vllm_observer_abi.json": "d4e623a61c98427cf48923bea51049d285e05c56e1c6a9d980bccb04f884fd2d",
   "update/src/guard/adapters/assets/vllm_observer_pin_rows.json": "5a4d7f0c7c43cdc3f83480431881cba1d5fe971c4057038a149d4059c297ea5d",
   "update/src/guard/adapters/assets/vllm_rank_ipc_profiles.json": "e7b8186bad0048505d926c22b29692f0c3d940717fa37d4724c173e3f9fb3a15",
-  "update/src/guard/adapters/assets/vllm_release_profiles.json": "c423737f117fa1eef318479577eaa9e6581dc5cd1bd61aac9e602736764cb411",
+  "update/src/guard/adapters/assets/vllm_release_profiles.json": "d4f30480136685fb2c19dcc312cdaded99be1dc78ae936327448a131848055ee",
   "update/src/guard/adapters/base.py": "e5487ba5da4e42e82a3ea3f6c39759a3d7e34da7fb4d48e30b086cc12dbc9a62",
   "update/src/guard/adapters/engine_profiles.py": "13c9f38371a50a04fd6a473afc0a0b435923945127b7f2c3d9f48565ae2a19b7",
   "update/src/guard/adapters/engine_provider.py": "948aaa411be3c3802b85dbca301bdd5a51a8a3fb37b7296863de98b64d294319",

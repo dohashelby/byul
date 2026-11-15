@@ -540,3 +540,46 @@ J02 첫 실행(2026-11-15, L4 1장, 두 판본 동시 기동)에서 69개가 모
 | LIF-03·04 | 닫힘 | uvicorn 0.53.0 설치 파일 bytes 필요. PyPI wheel(87,081 bytes) 다운로드 승인 대기 |
 | LIF-14 | 닫힘 | `TorchProfilerWrapper._start`: 0.31.0은 start마다 새 profiler 객체를 만들고, 0.30.0은 같은 객체를 다시 시작한다. `_stop`은 dump 설정 이름이 다르다. `WorkerProfiler.start/stop/step`은 같다. profiler 세대를 객체로 볼지 호출 순서로 볼지(M-A6-W3) |
 | REQ-10 | 닫힘 | runner_capture 0.30.0 행이 없다. V5 조건(행 추가 뒤 assert 변경)은 유지 |
+
+## 27. 사용자 결정 M-A6-W1~W6 반영 (2026-11-15)
+
+### 27.1 W1과 PR #281의 겹침
+
+- PR #281(`codex/baseline-v1-request-binding-20261115`)은 같은 목적의 기준 V1 요청 연결을 새 profile `/28`로 구현한다. API의 요청 ID 선택, 원 `AsyncLLM`/`Processor` 입력 ID 대조, 세션 HMAC을 함께 쓰는 더 엄격한 연결이다. 26.2절의 `/27` 선택 지점과 같은 파일 네 개를 고친다: `vllm_native_release_rows.json`, `vllm_lifecycle_catalog.py`, `vllm_lifecycle_profiles.py`, `lifecycle_capture.py`.
+- 두 연결을 함께 두지 않는다. W1의 실행기 열기는 `/28` 기록을 지원 집합에 넣는 방식으로, #281 병합 뒤에 한다. #280의 `/27` 선택 지점 코드는 #281과 겹치므로 정리 방향을 메인 세션에 보고했다.
+- PR #283(M-A3 V1 RPC 원본 검토)은 `multiproc_executor` RPC 영역이라 이 작업과 파일이 겹치지 않는다.
+
+### 27.2 W6 — uvicorn 0.53.0 설치 파일 대조
+
+| 대상 | SHA-256 | 대조 |
+|---|---|---|
+| `uvicorn-0.53.0-py3-none-any.whl` (87,081 bytes, files.pythonhosted.org) | `e8dca71ec86dce5f04e333f0d56cdedf942446e6643b9cea1af0d6d3a02cb03e` | PyPI JSON의 배포 SHA와 같음 |
+| `uvicorn-0.53.0.dist-info/METADATA` | `bcfb3b631d31e3ff7c6992428b0480a09d407ec829905aa9301f736bd854cb45` | M-A3의 후보 이미지 uvicorn 메타데이터 SHA와 같음 |
+| `uvicorn/protocols/http/h11_impl.py` | `a3154a6c2cfaaaebe19ac7aa255dfe9b6b7b490de1da95274c033aa093e8c322` | stream_buffer 센서 `SOURCE_ADDITIONS`의 고정값과 같음 |
+| `uvicorn/protocols/http/httptools_impl.py` | `1d4e1c579df4168433a61a01f10c628b31c1790e72dd9769d2b8633b22214033` | 같음 |
+| `uvicorn/protocols/http/flow_control.py` | `d39d16560df512f3ce907c329c2a0c3f5cd7165fef3b753876eae5739bf2a785` | 같음 |
+
+- 결론: stream_buffer 센서가 이미 고정한 uvicorn 파일 세 개는 uvicorn 0.53.0의 bytes다. 후보 이미지의 uvicorn도 0.53.0이다(메타데이터 bytes 일치). **새 uvicorn 행은 필요 없다.** 다만 이미지 안 `.py` 파일 자체의 SHA는 M-A3에 기록돼 있지 않다. 이 대조는 wheel과 이미지 메타데이터 일치에 근거한다.
+- 남은 것: 후보 0.30.0에서 stream_buffer를 열려면, 센서가 기반 모듈(요청 연결에 쓰는 `input_processor` 등)을 0.30.0 행으로 설정해야 한다. 지금은 0.31.0 행이다. 23.2절의 `/26`처럼 기반 + `/25` + stream 센서를 겹치는 변형 profile이 필요하다. 이 변형은 #281이 함께 고치는 파일(`lifecycle_capture.py`·`lifecycle_profiles.py`·`collectors/lifecycle.py`)을 건드리므로 #281 병합 뒤에 한다.
+
+### 27.3 W5 — 기준 REQ-10 구조화 출력 GPU 확인 절차
+
+소스 근거: 0.7.0의 `SamplingParams`·OpenAI protocol은 `guided_decoding`·`guided_json`을 받는다. 하지만 V1 엔진 쪽(`v1/engine/processor.py`, `v1/sample/*`, `v1/worker/gpu_model_runner.py`)에는 guided decoding이나 logits processor를 적용하는 코드가 없다. 결론은 GPU 확인으로만 낸다.
+
+절차(J02 기준 0.7.0 V1 Pod, `VLLM_USE_V1=1`, 같은 모델·`--seed`·온도 0):
+1. 엔진 기동 로그를 보존한다. guided decoding 경고나 미지원 메시지가 있으면 원문 행의 SHA를 기록한다.
+2. `POST /v1/completions`, `temperature=0`, `max_tokens=32`, `prompt="EXAMPLE: say hello"`로 보낸다. 제약 필드는 `guided_json`으로, 스키마는 `{"type":"object","properties":{"answer":{"type":"string","enum":["EXAMPLE_A"]}},"required":["answer"],"additionalProperties":false}`로 한다. 같은 요청을 5회 반복한다.
+3. 대조군으로 같은 프롬프트를 제약 필드 없이 1회 보낸다.
+4. 후보 0.30.0에서도 같은 스키마를 `structured_outputs` 필드로 5회 보낸다. 제약이 실제로 걸리는 판본의 기준선이다.
+
+판단 기준:
+- **기능 부재(결정 9 형식으로 정리):** 0.7.0 V1의 5회 응답이 모두 HTTP 200인데, 하나라도 JSON으로 읽히지 않거나 스키마(`answer`=`"EXAMPLE_A"`, 추가 키 없음)를 어긴다. 그리고 응답 내용이 대조군과 같다(제약이 반영되지 않음).
+- **제약이 적용됨:** 5회 모두 스키마를 지킨다. 이 경우 기능 부재로 정리하지 않는다. V1 0.7.0의 실제 소비 지점을 찾아 관측 대상표를 새로 만든다(새 결정 질문).
+- **판단 불가(UNKNOWN 유지):** 요청이 4xx로 거부되거나, 기동이 실패하거나, 결과가 반복마다 다르다.
+- 기록: 요청 본문 SHA, 응답 본문 SHA·HTTP 상태·스키마 판정 결과, 엔진 로그 해당 행 SHA, 이미지 digest, ENV ref. 응답 원문은 개인정보 경계에 따라 공개 요약에 넣지 않는다.
+
+### 27.4 W2·W3·W4 반영 상태
+
+- W2: 기준 REQ-05는 `model_authorization` 원인을 "최종 모델 연결 지점 없음, 사용자 결정 W2로 원인 있는 UNKNOWN"으로 둔다.
+- W4: 기준 LIF-13·PLT-10·11은 원인 있는 UNKNOWN 마감이다. 0.7.0 `executor_gaps`의 원인 코드는 `APPROVED_UNKNOWN_V1`이다. V0 승인 예외(`APPROVED_UNKNOWN`)를 물려받지 않는다는 기존 시험(`test_release_engine_selection.py`)과 구분하려고 V1에서 새로 승인한 원인을 따로 표시한다. W2의 REQ-05도 같은 코드다.
+- W3: profiler 센서(`/15`)의 세대 정의를 바꾸려면 센서 코드와 CPython 판본별 자기 코드 지문을 다시 계산해야 한다. 지문 계산은 정확한 CPython 판본으로 파이썬을 실행해야 하는데, 현재 로컬 실행 금지 규칙과 충돌한다. 계산 장소(CI job 또는 원격 서버)를 정해야 진행할 수 있다.

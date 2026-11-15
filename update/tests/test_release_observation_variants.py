@@ -8,6 +8,8 @@ from copy import deepcopy
 from pathlib import Path
 import sys
 import types
+import json
+from types import SimpleNamespace as NS
 
 import pytest
 
@@ -23,7 +25,7 @@ from guard.executors import lifecycle_capture as capture_module
 from guard.executors.kubernetes_profiler_control import project_captures
 from guard.executors.registry import resolve_executor
 from tests.test_lifecycle_capture import external, case, revised  # noqa: F401
-from tests.test_a1_profiler_sensor import make_world, invoke, Router, Response
+from tests.test_a1_profiler_sensor import make_world, invoke, Router, Response, PRIVATE
 from tests.test_a1_rank_failure_sensor import codes, QuietLogger
 from tests.test_lifecycle_sensor import CONTEXT
 
@@ -295,3 +297,65 @@ def test_composed_profiler_api_producer_parses_and_joins_exact_hmac(case, monkey
     assert projection['backend_collection_stopped_verified'] is False
     assert projection['trace_output_completed_verified'] is False
     assert projection['cross_process_rpc_verified'] is False
+
+
+@pytest.mark.parametrize('mode', ['normal', 'backend-stop-failure',
+                                 'post-stop-output-failure', 'start-failure'])
+def test_exact_candidate_worker_and_wrapper_reuse_backend_without_certifying_it(
+        external, monkeypatch, mode):
+    prepared = lifecycle.prepare_assets(external / 'assets', REPO, profile=variant.PROFILER_PROFILE)
+    module = types.ModuleType('_candidate_profiler_worker_fixture')
+    module.__file__ = str(external / 'assets/guard_lifecycle_sensor.py')
+    exec(compile((external / 'assets/guard_lifecycle_sensor.py').read_bytes(), module.__file__,
+                 'exec', dont_inherit=True, optimize=0), module.__dict__)
+    monkeypatch.setattr(module, '_read', lambda name, digest: (external / 'assets' / name).read_bytes())
+    monkeypatch.setattr(module, '_request_key', lambda binding: (prepared['session'], b'k' * 32))
+    runtime = 'cpython-' + '.'.join(map(str, sys.version_info[:3]))
+    if (runtime not in profiler.RUNTIME_CODE_CONTRACTS or
+            runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix'
+                or os.uname().machine != 'x86_64')):
+        with pytest.raises(ValueError): module._private_base()
+        assert module._BASE is None
+        return
+    composed = module._private_base()
+    world = make_world(session=prepared['session'], mode=mode, patch=monkeypatch,
+        fixtures=Path(__file__).parent / 'fixtures/profiler-native-030',
+        source_rows=variant.PROFILER_ROWS, private_base=composed)
+    # Candidate Worker.profile retains its Torch wrapper and the wrapper retains
+    # its backend. Construction is an EXAMPLE precondition; calls below execute
+    # the complete, pinned candidate start/stop bodies through real observers.
+    world.actor.profiler = world.profile
+    world.profile.profiler = world.backend
+    world.profile.profiler_config = NS(torch_profiler_dump_cuda_time_total=False)
+    loop = asyncio.new_event_loop()
+    try:
+        invoke(world, loop)
+        invoke(world, loop)
+    finally:
+        loop.close()
+    assert world.actor.profiler is world.profile and world.profile.profiler is world.backend
+    assert world.backend.starts == 2
+    assert world.backend.stops == (0 if mode == 'start-failure' else 2)
+    assert world.backend.running == (mode == 'backend-stop-failure')
+    events = [row['payload'] for row in world.observer.recorded if row['event'] == 'PROFILER']
+    assert events and all(profiler_metadata.validate_sample(row,
+        sources=variant.PROFILER_ROWS) is None for row in events)
+    # The EXAMPLE backend cannot satisfy the independent Torch C probe.
+    assert all(row['backend_generation_sha256'] is None and not row['backend_probe_qualified']
+               for row in events)
+    assert all(not row['backend_collection_stopped_verified']
+        and not row['trace_output_completed_verified'] and not row['cross_process_rpc_verified']
+        for row in events)
+    packet = {'recordings': [{'session_owner_match': True, 'listed_file_identity_match': True,
+        'capture': {'records': [{'seq': 0, 'event': 'START',
+            'payload': {'context': dict(CONTEXT), 'profile': variant.PROFILER_PROFILE}}]
+            + [{'seq': index + 1, **row} for index, row in enumerate(world.observer.recorded)],
+            'summary': {'recording_closed': True}, 'process_context_verified': True,
+            'image_digest_verified': False}}]}
+    projected = profiler_metadata.project(packet, ['0'])
+    assert projected['complete_calls'] > 0 and len(projected['worker_calls']) == 4
+    assert projected['call_binding_failures'] == {}
+    expected_conflicts = 2 if mode in {'backend-stop-failure', 'post-stop-output-failure'} else 0
+    assert len(projected['conflict_candidates']) == expected_conflicts
+    assert not projected['scope_complete'] and not projected['producer_authenticated']
+    assert PRIVATE not in json.dumps(world.observer.recorded)

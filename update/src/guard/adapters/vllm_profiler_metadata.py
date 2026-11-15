@@ -114,7 +114,7 @@ def project(packet,required_ranks=()):
             if row['event']!='PROFILER':continue
             payload=row['payload']
             from . import vllm_release_observation_sensor as release_observation
-            sources=(release_observation.PROFILER_ROWS if capture['records'][0]['payload']['profile']==release_observation.PROFILER_PROFILE else None)
+            sources=(release_observation.PROFILER_ROWS if capture['records'][0]['payload'].get('profile')==release_observation.PROFILER_PROFILE else None)
             validate_sample(payload,sources=sources)
             sample={'recording':number,'seq':row['seq'],'monotonic_ns':row['monotonic_ns'],'pid':context['pid'],'start_ticks':context['start_ticks'],
                 'physical_process_binding_verified':bound,'image_digest_verified':capture.get('image_digest_verified') is True,

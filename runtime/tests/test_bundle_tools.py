@@ -592,3 +592,103 @@ class BundleToolsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# A-4 fixtures model the root-owned bundle directory prepared by the installer.
+import pytest
+
+
+@pytest.fixture
+def a4_bundle_fixture(monkeypatch):
+    def publish(source, destination):
+        assert not destination.exists()
+        source.rename(destination)
+
+    monkeypatch.setattr("serving_runtime.operations.bundle_tools._rename_new", publish)
+    case = BundleToolsTest()
+    case.setUp()
+    case._build("vllm")
+    original_lstat = Path.lstat
+
+    def prepare(gid, *, uid=0, existing=False):
+        root = case.root / "installed-bundles"
+        root.mkdir(mode=0o2750)
+        for name in (["previous", "vllm"] if existing else ["previous"]):
+            target = root / name
+            shutil.copytree(case.out / "vllm", target)
+            manifest = json.loads((target / "bundle.json").read_text())
+            manifest["bundle_id"] = name
+            (target / "bundle.json").write_text(json.dumps(manifest))
+            target.chmod(0o750)
+            for item in target.rglob("*"):
+                item.chmod(0o750 if item.is_dir() else 0o640)
+        (root / "current").symlink_to("previous")
+
+        def installed_owner(path, *args, **kwargs):
+            info = original_lstat(path, *args, **kwargs)
+            if path == root or root in path.parents:
+                values = list(info)
+                values[4:6] = [uid, gid]
+                return os.stat_result(values)
+            return info
+
+        monkeypatch.setattr(Path, "lstat", installed_owner)
+        chown = unittest.mock.Mock()
+        monkeypatch.setattr("serving_runtime.operations.bundle_tools.os.chown", chown)
+        monkeypatch.setattr("serving_runtime.operations.bundle_tools._run", lambda *a, **kw: None)
+        monkeypatch.setattr("serving_runtime.operations.bundle_tools._checked_status", lambda *a, **kw: None)
+        monkeypatch.setattr("serving_runtime.operations.bundle_tools._token", lambda *a, **kw: "synthetic-a4")
+        args = (None if existing else str(case.out / "vllm"), str(root), "ctx", "ns", "http://127.0.0.1:8080", None)
+        return args, root, chown
+
+    yield prepare
+    case.doCleanups()
+
+
+@pytest.mark.parametrize("existing", [False, True], ids=["new", "existing"])
+@pytest.mark.parametrize("gid", [10000, pytest.param(12000, marks=pytest.mark.xfail(strict=True, reason="A-4"))])
+def test_a4_installed_bundle_group_is_used_for_publish_and_reuse(a4_bundle_fixture, gid, existing):
+    args, root, chown = a4_bundle_fixture(gid, existing=existing)
+    result = apply_bundle(*args, existing="vllm" if existing else None)
+    assert result["bundle_id"] == "vllm" and os.readlink(root / "current") == "vllm"
+    if existing:
+        chown.assert_not_called()
+    else:
+        assert chown.call_count > 0
+        assert all(call.args[1:] == (0, gid) for call in chown.call_args_list)
+
+
+@pytest.mark.xfail(strict=True, reason="A-4")
+@pytest.mark.parametrize("uid,gid", [(0, 0), (123, 12000)], ids=["root-group", "non-root-owner"])
+def test_a4_untrusted_bundle_root_is_rejected_before_any_publish(a4_bundle_fixture, uid, gid):
+    args, root, chown = a4_bundle_fixture(gid, uid=uid)
+    with pytest.raises(ValueError, match="묶음 루트"):
+        apply_bundle(*args, dry_run=True)
+    assert os.readlink(root / "current") == "previous" and not (root / "vllm").exists()
+    chown.assert_not_called()
+
+
+@pytest.mark.xfail(strict=True, reason="A-4")
+def test_a4_installer_selected_group_reaches_bundle_apply(a4_bundle_fixture):
+    from contextlib import ExitStack
+    from types import SimpleNamespace
+    from test_install_runtime_node import InstallRuntimeNodeTests, installer
+
+    case = InstallRuntimeNodeTests()
+    case.setUp()
+    try:
+        config = installer.load_config(case.config.resolve())
+        config["GATEWAY_DATA_GID"] = "12000"
+        with ExitStack() as stack:
+            mocks = case.install_mocks(stack)
+            installer.install(config, SimpleNamespace(capture_baseline=False), installer.render(config), b"managed grub")
+        calls = [call for call in mocks["directory"].call_args_list if call.args[0] == Path("/srv/serving/bundles")]
+        assert len(calls) == 1 and calls[0].args[1:] == (0, 12000, 0o2750)
+        args, root, chown = a4_bundle_fixture(calls[0].args[2])
+        apply_bundle(*args)
+        assert all(call.args[2] == calls[0].args[2] for call in chown.call_args_list) and chown.call_count
+        assert os.readlink(root / "current") == "vllm"
+        artifacts = installer.render(config)
+        assert any(b"SupplementaryGroups=12000 " in value for value in artifacts.values())
+    finally:
+        case.doCleanups()

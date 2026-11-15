@@ -1,6 +1,7 @@
 """태그의 실제 함수 본문과 EXAMPLE 협력 객체만 실행한다. 엔진/GPU 실행은 아니다."""
 import asyncio
 from copy import deepcopy
+from datetime import timedelta
 import hashlib
 import hmac
 import json
@@ -21,6 +22,10 @@ from guard.adapters.vllm_request_attempts import project_attempts
 from guard.adapters.vllm_request_termination import project_native as project_termination
 from guard.collectors import lifecycle
 from guard.executors import lifecycle_capture as capture
+from guard.executors import kubernetes_request_termination as termination_executor
+from guard.executors import kubernetes_request_attempts as attempts_executor
+from guard.executors import kubernetes_observation_state as observation_executor
+from guard.models import utcnow
 from tests.test_configured_lifecycle import native_class
 from tests.test_lifecycle_capture import external  # noqa: F401
 from tests.test_lifecycle_sensor import CONTEXT, FakeOS, SilentThread
@@ -206,7 +211,7 @@ def test_actual_fresh_binding_requires_genuine_asgi_disconnect_for_termination_a
     packet = {'recorded_files_covered': True, 'recordings': [{'capture': {
         'records': rows, 'summary': summary, 'process_context_verified': True,
         'image_digest_verified': False}, 'session_owner_match': True, 'listed_file_identity_match': True}]}
-    projected = project_termination(packet, hashlib.sha256(SECRET.encode()).hexdigest(), 500,
+    projected = project_termination(packet, request, 500,
                                     ['asgi_transport'], request_hmac=request)
     assert projected['binding_observed'] is disconnect
     if disconnect:
@@ -219,6 +224,67 @@ def test_actual_fresh_binding_requires_genuine_asgi_disconnect_for_termination_a
     assert not projected['worker_gpu_release_verified'] and not projected['whole_scope_complete']
     assert all(not row['termination_verified'] for row in projected['scope_status'])
     assert hashlib.sha256(SECRET.encode()).hexdigest() not in json.dumps(projected)
+
+
+@pytest.mark.parametrize('module,executor,rows_field,identity_field,gap', [
+    (termination_executor, termination_executor.KubernetesRequestTerminationExecutor,
+     'attempts', 'request_id_sha256', 'TERMINATION_REQUEST_BINDING_KEY_UNAVAILABLE'),
+    (attempts_executor, attempts_executor.KubernetesRequestAttemptsExecutor,
+     'trials', 'external_request_sha256', 'REQUEST_ATTEMPT_BINDING_KEY_UNAVAILABLE'),
+    (observation_executor, observation_executor.KubernetesObservationStateExecutor,
+     'trials', 'request_id_sha256', 'OBSERVATION_STATE_REQUEST_BINDING_KEY_UNAVAILABLE'),
+])
+def test_invalid_private_key_leaves_trial_unidentified_and_never_dispatches_http(
+        world, monkeypatch, module, executor, rows_field, identity_field, gap):
+    key = world.folder / 'request-binding-key.json'
+    key.chmod(0o644)
+    with pytest.raises(ValueError, match='REQUEST_BINDING_KEY_UNAVAILABLE'):
+        lifecycle.request_header_fingerprint(world.folder / 'manifest.json', world.prepared, SECRET)
+    calls = []
+    engine = {'container': 'engine', 'image': 'example@sha256:' + 'a' * 64}
+    class Reader:
+        def __init__(self, *args, **kwargs):
+            self.binding = {'engine': engine}
+            self.owner_identity = self.read_file = self.image_check = None
+        def snapshot(self): pass
+        def seal_session(self): return {'sealed': True}
+        def report(self): return {}
+    class Transport:
+        binding = {'run_id': 'EXAMPLE-run', 'context': 'EXAMPLE-context', 'engine': engine}
+        def __call__(self, *args):
+            calls.append(args)
+            raise AssertionError('HTTP dispatch after invalid key')
+        def report(self): return {'requests': [], 'collection_gap': False, 'cleanup_errors': []}
+    monkeypatch.setattr(module, 'KubernetesLifecycleReader', Reader)
+    monkeypatch.setattr(module, 'capture_session', lambda *a, **kw: (_ for _ in ()).throw(OSError('EXAMPLE capture unavailable')))
+    now = utcnow(); start = (now - timedelta(minutes=1)).isoformat(); end = (now + timedelta(minutes=1)).isoformat()
+    if module is termination_executor:
+        values = {'termination_environment_sha256': 'a' * 64, 'termination_target_sha256': 'b' * 64,
+                  'termination_validity_start': start, 'termination_validity_end': end,
+                  'termination_max_delay_ms': 1, 'termination_required_scopes': ['asgi_transport']}
+    elif module is attempts_executor:
+        values = {'attempt_environment_sha256': 'a' * 64, 'attempt_target_sha256': 'b' * 64,
+                  'attempt_validity_start': start, 'attempt_validity_end': end}
+    else:
+        values = {'observation_state_environment_sha256': 'a' * 64,
+                  'observation_state_target_sha256': 'b' * 64,
+                  'observation_state_validity_start': start, 'observation_state_validity_end': end,
+                  'observation_state_required_components': ['request_selection']}
+    from tests.test_kubernetes_request_binding import env as sample_env
+    context = SimpleNamespace(policy_values=values, target={'lab': True}, cprobe=Transport(),
+        env=sample_env(), api_model='EXAMPLE-model', engine_url='http://engine:8000', timeout=10,
+        _termination_prepared=world.prepared)
+    _, _, _, summary = executor({'prepared': str(world.folder / 'manifest.json')}).collect(context)
+    assert not calls and gap in summary['diagnostic_codes']
+    assert summary[rows_field] and all(row[identity_field] is None and row['attempted'] is False
+                                       for row in summary[rows_field])
+    assert context._termination_gap is True
+    legacy_context = SimpleNamespace(**(vars(context) | {'_termination_prepared':
+        {**world.prepared, 'profile': legacy.PROFILE}}))
+    _, _, _, old_summary = executor({'prepared': str(world.folder / 'manifest.json')}).collect(legacy_context)
+    assert calls
+    legacy_header = calls[0][1][0]['headers']['X-Request-Id']
+    assert old_summary[rows_field][0][identity_field] == hashlib.sha256(legacy_header.encode()).hexdigest()
 
 
 def test_independent_sessions_do_not_publish_the_same_request_fingerprint(external):  # noqa: F811

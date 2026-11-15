@@ -37,6 +37,20 @@ ROOT = Path(__file__).resolve().parents[1]
 LAB = ROOT / "deploy/gpu-lab"
 
 
+def _a4_root_lstat(root):
+    original = Path.lstat
+
+    def metadata(path, *args, **kwargs):
+        info = original(path, *args, **kwargs)
+        if path == root:
+            values = list(info)
+            values[4:6] = [0, 10000]
+            return os.stat_result(values)
+        return info
+
+    return metadata
+
+
 class BundleToolsTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -226,6 +240,9 @@ class BundleToolsTest(unittest.TestCase):
         self._build("vllm")
         root = self.root / "server"
         root.mkdir()
+        owner = patch("serving_runtime.operations.bundle_tools.Path.lstat", _a4_root_lstat(root))
+        owner.start()
+        self.addCleanup(owner.stop)
         old = root / "previous"
         old.mkdir()
         for item in (self.out / "vllm").iterdir():
@@ -307,6 +324,9 @@ class BundleToolsTest(unittest.TestCase):
         self._build("vllm")
         root = self.root / "server"
         root.mkdir()
+        owner = patch("serving_runtime.operations.bundle_tools.Path.lstat", _a4_root_lstat(root))
+        owner.start()
+        self.addCleanup(owner.stop)
         old = root / "previous"
         old.mkdir()
         for item in (self.out / "vllm").iterdir():
@@ -345,13 +365,17 @@ class BundleToolsTest(unittest.TestCase):
         # captured too; redirect_stdout alone cannot detect this regression.
         script = textwrap.dedent("""\
             import sys
+            from pathlib import Path
+            from test_bundle_tools import _a4_root_lstat
             from unittest.mock import patch
             from serving_runtime.operations.bundle_tools import StatusMismatch, StatusUnavailable
             from serving_runtime.cli import main
 
+            root = Path(sys.argv[sys.argv.index("--bundle-root") + 1])
             error = {"rollback": StatusMismatch("wrong bundle"),
                      "unknown": StatusUnavailable("status unavailable")}.get(sys.argv[1])
-            with patch("serving_runtime.operations.bundle_tools.os.chown"), \\
+            with patch("serving_runtime.operations.bundle_tools.Path.lstat", _a4_root_lstat(root)), \\
+                 patch("serving_runtime.operations.bundle_tools.os.chown"), \\
                  patch("serving_runtime.operations.bundle_tools._checked_status", side_effect=error):
                 sys.exit(main(sys.argv[2:]))
             """)
@@ -479,6 +503,9 @@ class BundleToolsTest(unittest.TestCase):
         self._build("vllm")
         root = self.root / "server"
         root.mkdir()
+        owner = patch("serving_runtime.operations.bundle_tools.Path.lstat", _a4_root_lstat(root))
+        owner.start()
+        self.addCleanup(owner.stop)
         for name in ("previous", "vllm"):
             target = root / name
             target.mkdir()
@@ -646,7 +673,7 @@ def a4_bundle_fixture(monkeypatch):
 
 
 @pytest.mark.parametrize("existing", [False, True], ids=["new", "existing"])
-@pytest.mark.parametrize("gid", [10000, pytest.param(12000, marks=pytest.mark.xfail(strict=True, reason="A-4"))])
+@pytest.mark.parametrize("gid", [10000, 12000])
 def test_a4_installed_bundle_group_is_used_for_publish_and_reuse(a4_bundle_fixture, gid, existing):
     args, root, chown = a4_bundle_fixture(gid, existing=existing)
     result = apply_bundle(*args, existing="vllm" if existing else None)
@@ -658,7 +685,6 @@ def test_a4_installed_bundle_group_is_used_for_publish_and_reuse(a4_bundle_fixtu
         assert all(call.args[1:] == (0, gid) for call in chown.call_args_list)
 
 
-@pytest.mark.xfail(strict=True, reason="A-4")
 @pytest.mark.parametrize("uid,gid", [(0, 0), (123, 12000)], ids=["root-group", "non-root-owner"])
 def test_a4_untrusted_bundle_root_is_rejected_before_any_publish(a4_bundle_fixture, uid, gid):
     args, root, chown = a4_bundle_fixture(gid, uid=uid)
@@ -668,7 +694,6 @@ def test_a4_untrusted_bundle_root_is_rejected_before_any_publish(a4_bundle_fixtu
     chown.assert_not_called()
 
 
-@pytest.mark.xfail(strict=True, reason="A-4")
 def test_a4_installer_selected_group_reaches_bundle_apply(a4_bundle_fixture):
     from contextlib import ExitStack
     from types import SimpleNamespace
@@ -677,6 +702,7 @@ def test_a4_installer_selected_group_reaches_bundle_apply(a4_bundle_fixture):
     case = InstallRuntimeNodeTests()
     case.setUp()
     try:
+        case.write_config(case.text.replace(str(case.root), str(case.root.resolve())))
         config = installer.load_config(case.config.resolve())
         config["GATEWAY_DATA_GID"] = "12000"
         with ExitStack() as stack:

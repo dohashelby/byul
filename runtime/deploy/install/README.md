@@ -123,3 +123,8 @@ PYVERIFY
 ## 선택 캐시 관측
 
 [캐시 관측 설정](../../docs/cache-observer.md)의 root 승인 파일·전용 namespace 한정 read-only kubeconfig를 준비하고 `install.env.example`의 CACHE 세 필드를 함께 채운다. 비어 있으면 설치/시작하지 않는다. 기존 agent 수동 시작, baseline 보존, BPF 재부팅 필요 시 수집 서비스 중지 규칙은 그대로 적용한다.
+
+
+### 번들 읽기 그룹 전달
+
+`GATEWAY_DATA_GID=12000`처럼 그룹을 바꿔 설치하면 설치기가 번들 루트를 `root:12000`, 모드 `2750`으로 준비합니다. 번들 적용·기존 번들 검증은 이 루트의 그룹을 사용합니다. 기본값은 10000입니다. 루트가 root 소유가 아니거나 그룹이 0이면 적용을 거부합니다. 그룹을 바꿀 때는 Gateway와 서비스의 그룹 설정도 같은 설치 입력으로 준비하세요.

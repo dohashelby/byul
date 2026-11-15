@@ -504,7 +504,14 @@ def _checked_status(
         time.sleep(min(0.5, max(0, deadline - time.monotonic())))
 
 
-def _check_deployed_permissions(directory: Path) -> None:
+def _bundle_read_gid(root: Path) -> int:
+    info = root.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_gid == 0:
+        raise ValueError("묶음 루트는 root 소유이고 그룹이 0이 아닌 실제 폴더여야 합니다")
+    return info.st_gid
+
+
+def _check_deployed_permissions(directory: Path, gid: int = 10000) -> None:
     # 기존 묶음은 복사·chmod 없이 그대로 재사용하므로 Gateway 읽기 권한을 엄격히 확인한다.
     for path in [directory, *directory.rglob("*")]:
         info = path.lstat()
@@ -512,10 +519,10 @@ def _check_deployed_permissions(directory: Path) -> None:
         if (
             not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode))
             or info.st_uid != 0
-            or info.st_gid != 10000
+            or info.st_gid != gid
             or stat.S_IMODE(info.st_mode) != expected_mode
         ):
-            raise ValueError(f"기존 묶음 소유권·권한 불일치(root:10000, 폴더 0750, 파일 0640): {path}")
+            raise ValueError(f"기존 묶음 소유권·권한 불일치(root:{gid}, 폴더 0750, 파일 0640): {path}")
 
 
 def apply_bundle(
@@ -549,6 +556,7 @@ def apply_bundle(
     current = root / "current"
     if root.is_dir() and not os.access(root, os.R_OK | os.X_OK):
         raise PermissionError("묶음 루트 조회 권한이 없습니다: --dry-run도 sudo로 실행해야 합니다")
+    gid = _bundle_read_gid(root)
     try:
         if existing is not None:
             if not _ID.fullmatch(existing):
@@ -559,7 +567,7 @@ def apply_bundle(
             source = verify_policy_bundle(destination)
             if source.bundle_id != existing:
                 raise ValueError("--existing ID와 bundle.json의 bundle_id가 다릅니다")
-            _check_deployed_permissions(destination)
+            _check_deployed_permissions(destination, gid)
         else:
             source = verify_policy_bundle(bundle_dir)
         if not current.is_symlink():
@@ -611,13 +619,13 @@ def apply_bundle(
                     raise ValueError("원본 bundle.json이 검증 뒤 변경되었습니다")
                 (staging / "bundle.json").write_bytes(manifest_raw)
                 for folder in [staging, *(p for p in staging.rglob("*") if p.is_dir())]:
-                    os.chown(folder, 0, 10000)
+                    os.chown(folder, 0, gid)
                     folder.chmod(0o750)
                 for file in (p for p in staging.rglob("*") if p.is_file()):
-                    os.chown(file, 0, 10000)
+                    os.chown(file, 0, gid)
                     file.chmod(0o640)
             except PermissionError as error:
-                raise PermissionError("root:10000 소유권·권한 설정 실패: sudo로 실행해야 합니다") from error
+                raise PermissionError(f"root:{gid} 소유권·권한 설정 실패: sudo로 실행해야 합니다") from error
             _rename_new(staging, root / source.bundle_id)
         verify_policy_bundle(root / source.bundle_id)
 

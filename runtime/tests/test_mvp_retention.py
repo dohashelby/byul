@@ -522,3 +522,52 @@ def test_d1_new_request_row_in_previously_empty_journal_protects_receipt(tmp_pat
     result = retention.run(now=NOW)
     assert gateway.read_all()[0] == [started] and receipts.read_all()[0] == [receipt]
     assert not result["deleted"]
+
+
+@pytest.mark.xfail(strict=True, reason="D-2")
+@pytest.mark.parametrize("reason", ["age", "size"])
+def test_d2_sixty_day_started_only_request_expires_normally(tmp_path, reason):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    store.append({"request_id": "orphan", "phase": "started", "recorded_at": iso(60)})
+    result = RecordRetention(
+        tmp_path, enforce=True, max_age_days=7 if reason == "age" else 365,
+        max_bytes=5 * 1024**3 if reason == "age" else 1,
+    ).run(now=NOW)
+    assert store.read_all()[0] == [] and result["deleted"] is True
+    assert result["files"]["gateway_records.jsonl"]["removable_by_" + reason] == 1
+    assert result["over_size_limit_after"] is False
+
+
+@pytest.mark.parametrize(
+    "seconds,protected",
+    [(3599, True), (3600, True), pytest.param(3601, False, marks=pytest.mark.xfail(strict=True, reason="D-2"))],
+)
+def test_d2_inflight_protection_has_an_inclusive_one_hour_boundary(tmp_path, seconds, protected):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    row = {"request_id": "boundary", "phase": "started", "recorded_at": (NOW - timedelta(seconds=seconds)).isoformat()}
+    store.append(row)
+    result = RecordRetention(tmp_path, max_age_days=365, max_bytes=1, enforce=True).run(now=NOW)
+    assert store.read_all()[0] == ([row] if protected else [])
+    assert result["deleted"] is not protected
+
+
+@pytest.mark.parametrize("completed", [False, True])
+def test_d2_ten_minute_inflight_is_protected_but_complete_request_is_not(tmp_path, completed):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    started = {"request_id": "recent", "phase": "started", "recorded_at": (NOW - timedelta(minutes=10)).isoformat()}
+    store.append(started)
+    if completed:
+        store.append({**started, "phase": "final"})
+    result = RecordRetention(tmp_path, max_bytes=1, enforce=True).run(now=NOW)
+    assert store.read_all()[0] == ([] if completed else [started])
+    assert result["deleted"] is completed
+
+
+def test_d2_latest_started_timestamp_controls_the_grace_period(tmp_path):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    old = {"request_id": "retry", "phase": "started", "recorded_at": iso(60)}
+    recent = {**old, "recorded_at": (NOW - timedelta(minutes=10)).isoformat()}
+    store.append(recent)
+    store.append(old)
+    result = RecordRetention(tmp_path, max_bytes=1, enforce=True).run(now=NOW)
+    assert store.read_all()[0] == [recent, old] and not result["deleted"]

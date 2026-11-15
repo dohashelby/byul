@@ -42,7 +42,8 @@ def test_both_launch_profiles_follow_the_work_order_without_runtime_qualificatio
             assert resolve_executor('request_termination', 'kubernetes', engine='vllm', version=version) is not None
         else:
             assert resolve_executor('engine_sensor', 'kubernetes', engine='vllm', version=version) is None
-            assert resolve_executor('request_termination', 'kubernetes', engine='vllm', version=version) is None
+            assert resolve_executor('request_termination', 'kubernetes', engine='vllm', version=version) is not None
+            assert resolve_executor('observation_state', 'kubernetes', engine='vllm', version=version) is not None
         row['launch']['command'].clear()
         assert provider.release_profile(version)['launch']['command']
     assert provider.release_profile('EXAMPLE-future') is None

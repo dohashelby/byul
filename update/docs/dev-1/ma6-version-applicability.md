@@ -541,7 +541,7 @@ J02 첫 실행(2026-11-15, L4 1장, 두 판본 동시 기동)에서 69개가 모
 |---|---|---|
 | LIF-03·04 | 닫힘 | uvicorn 0.53.0 설치 파일 bytes 필요. PyPI wheel(87,081 bytes) 다운로드 승인 대기 |
 | LIF-14 | 닫힘 | `TorchProfilerWrapper._start`: 0.31.0은 start마다 새 profiler 객체를 만들고, 0.30.0은 같은 객체를 다시 시작한다. `_stop`은 dump 설정 이름이 다르다. `WorkerProfiler.start/stop/step`은 같다. profiler 세대를 객체로 볼지 호출 순서로 볼지(M-A6-W3) |
-| REQ-10 | 닫힘 | runner_capture 0.30.0 행이 없다. V5 조건(행 추가 뒤 assert 변경)은 유지 |
+| REQ-10 | 열림(29절 정확 runner_capture 행) | V5의 temperature/top_p API→runner→sampler 관측만 연결한다. structured_outputs·min_tokens 및 GPU 실측은 별도 공백 |
 
 ## 27. 사용자 결정 M-A6-W1~W6 반영 (2026-11-15)
 
@@ -597,3 +597,13 @@ J02 첫 실행(2026-11-15, L4 1장, 두 판본 동시 기동)에서 69개가 모
 - 현재 REQ-10은 기본 sampling+실제 지원 구조화/tool 선택의 최종 집행과 runner 소비를 요구한다. API 필드 대응·HTTP400·모의 sampler 실행만으로 runner_consumption_verified=true나 PASS·비적용을 만들지 않는다. 기본 sampling/다른 요청 독립 결과는 계속 확인하고 구조화 분기의 실제 조건/소비가 미확인인 범위는 UNKNOWN과 원인을 유지한다. 기존 결정9-5의 V0 기반 필드 대응을 새 V1 소비 근거로 쓰지 않는다.
 
 다음은 현재 V1의 실제 API/모델/설치 source·선택 backend를 고정하고, 허용/거부 지점·고비용 변환/모델 제출의 도달/미도달과 실제 sampler 소비를 관측하는 것이다. 확인 불가 분기를 MVP의 승인된 예외로 완료 처리하려면 별도 사용자 결정을 받는다. 판정·팩·정책·지원표/고정값·실행기 활성화·M-B4 보관은 바꾸지 않았다.
+
+## 29. 후보 0.30.0 transport/profiler 정확 변형 (2026-11-15)
+
+- REQ-10 후보 runner_capture는 별도 정확 0.30.0 행으로 연다. `ma6-pin-compare.json`의 후보 이미지와 일치하는 serving/input/worker 9개 파일 SHA를 runtime Pod에서 전후 다시 대조한다. 여기에 원본 callback 자산·session HMAC 키·`VLLM_DISABLE_REQUEST_ID_RANDOMIZATION=1`·`VLLM_USE_V2_MODEL_RUNNER=0`·읽기 전용 mount·동일 세대도 확인한다. 대상 요청은 `POST /v1/completions`, 비스트림 `n=1`, 짧은 prompt 하나다. 0.30.0의 `_base_request_id`는 header가 없으면 16-hex `random_uuid`를 사용하고, completion serving은 `cmpl-` 부모 ID에 `-0`을 붙여 V1 엔진에 보낸다. 후보 capture의 응답/요청 식별 기록은 session HMAC만 쓴다. 기준 0.7.0 관문과 0.31.0 기존 profile은 그대로다.
+- 실제 REQ-10 값 연결 범위는 `InputProcessor._validate_params`의 `SamplingParams`, `GPUModelRunner._update_states`의 `scheduled_new_reqs`, `GPUModelRunner._sample` 직전 `InputBatch.temperature_cpu`·`top_p_cpu`다. 후보 소스의 `InputBatch.add_request`는 그 배열을 `sampling_params`에서 채우고 `_sample`은 같은 batch의 `sampling_metadata`를 sampler에 넘긴다. 새 capture는 요청에 명시된 숫자 필드만 wire 값으로 고정한다. 생략 필드는 기본값을 발명하지 않고 API 관측의 정규화 값을 runner·sampler와 대조한다. 세 단계 중 누락·차이가 있으면 준비 receipt를 쓰기 전에 B projection에 공백을 더하고 최종 소비도 `runner_consumption_verified=false`로 둔다. 현재 유효 경계 probe는 temperature=0·top_p=1이고, 나머지 정상 probe의 실제 기본값은 API 관측으로만 결정한다. 비기본 유효값의 실측은 없다. 이 값 일치는 GPU tensor/kernel 적용, structured_outputs, min_tokens, 무응답 4xx 도전 사례의 native ID, producer 등록 또는 보안 PASS가 아니다. W5 기준 0.7.0 V1 구조화 출력 GPU 실험과 후보 GPU 확인은 남는다. 로컬 Python/pytest는 실행하지 않았고 PR CI 대상이다.
+- `/29`는 정확 `/8` 기반에 `/25`의 0.30.0 행을 적용한 뒤 원본 `/12` stream observer bytes를 붙인다. Uvicorn h11·httptools·flow_control의 설치 bytes SHA는 기존 `/12`의 세 행과 같다. HTTP 응답 크기와 실제 transport write buffer/kernel outq/RSS는 계속 서로 다른 사실이다. LIF-03/04의 버퍼 실측·GPU 자격은 현재 없다.
+- `/30`은 같은 `/25` 기반에 원본 `/15` profiler observer bytes를 붙이고 wrapper·gpu_worker는 후보 이미지의 정확 SHA 행으로 고른다. profile router는 원본과 정확 bytes가 같다. 원본 센서의 `profiler_emit`는 qualified `_start` RETURN마다 새 `profiler_nonce()`로 generation을 만든다. backend 객체 SHA가 같아도 세대는 start/stop 호출 순서로 구분하므로 이 센서의 소스·CPython 코드 지문을 바꾸지 않는다. backend 수집 종료·trace 출력·cross-process RPC·다음 정상 시작 검증은 기존 독립 관문을 유지한다.
+- 두 변형은 준비 자산의 기반·행·관측기 사본을 정확 bytes로 다시 확인한다. parser도 선택 profile의 소스 행만 허용한다. 0.31.0 원 profile과 과거 결과를 다시 쓰지 않고, 실제 ENV/target·GPU 생산자 등록·PASS를 주장하지 않는다. 로컬 Python/pytest는 사용자 지시로 실행하지 않았으며 CI에서 확인한다.
+- 새 `/29`·`/30`만 비공개 세션 키 자산과 `/28`의 고정 소스 키 검증기를 설치 전에 확인한다. 키·센서 코드 검증 실패 시 hook을 설치하지 않는다. ASGI header는 `/28`의 `asgi-header` 도메인 HMAC으로 기록한다. 원본 `/8`의 NATIVE·SELECTION 요청 ID SHA 결과가 들어가는 명시적 요청 식별 필드(`request_sha256`, `external_request_sha256`, `selected_request_id_sha256`, `observed_request_sha256`, `selected_scheduled_sha256`, `selected_finished_sha256`)는 저장 직전 `legacy-request-sha` 도메인 HMAC으로 재표현한다. ASGI context 요청 필드는 현재 scope의 header HMAC 또는 `null`이다. 모델·소스·파일·객체 SHA는 재표현하지 않는다. `/29` stream 경로는 원본의 요청 형식 검증 후 정확 header HMAC을 사용한다. 실행기 trial과 보존 report의 요청 식별자도 동일한 header HMAC이며 키 검증 실패 시 해당 요청을 보내지 않는다. 원본 `/12`·`/15` bytes와 기존 profile 동작은 유지한다.
+- `/29`의 ASGI header HMAC 경로는 `/v1/completions`이다. `/30`은 `/v1/completions`와 원본 profiler가 등록한 `/start_profile`·`/stop_profile`만 허용한다. header가 누락되거나 유효하지 않으면 요청·invocation 결합 필드는 함께 `null`이 되어 profiler 기록의 validator 조건을 지킨다. 실제 API handler 관측만 API→worker 결합 후보로 소비한다.

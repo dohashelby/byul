@@ -161,19 +161,6 @@
           "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 가중치 적재·worker startup 대상과 정확 행 미검토",
           "next": "기준 V1 가중치/worker 대상표"
         },
-        "observation_state": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_lifecycle_sensor",
-            "vllm_attempt_sensor",
-            "vllm_request_output_sensor"
-          ],
-          "checks": [
-            "OBS-02"
-          ],
-          "basis": "사용자 결정 M-A6-W1(2026-11-15)로 열기 승인. #281의 /28은 병합됐으며 후속에서 HMAC 요청 ID 소비와 상태 projection을 연결한다. ma6-version-applicability.md 27.1",
-          "next": "후속 /28 HMAC 요청 연결과 상태 projection 검증"
-        },
         "profiler_observation": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
           "observers": [
@@ -194,22 +181,6 @@
           "checks": [],
           "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 V1 MultiprocExecutor·WorkerProc 구조와 기존 fault 지점이 다름",
           "next": "기준 V1 RPC·worker·그룹 대응; M-A3 연계"
-        },
-        "request_termination": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_lifecycle_sensor",
-            "vllm_termination_sensor",
-            "vllm_attempt_sensor",
-            "vllm_request_output_sensor"
-          ],
-          "checks": [
-            "LIF-10",
-            "LIF-12",
-            "REQ-12"
-          ],
-          "basis": "사용자 결정 M-A6-W1(2026-11-15)로 열기 승인. #281의 /28은 병합됐으며 후속에서 HMAC 요청 ID 소비와 종료 projection을 연결한다. ma6-version-applicability.md 27.1",
-          "next": "후속 /28 HMAC 요청 연결과 종료 projection 검증"
         },
         "resource_recovery": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
@@ -349,17 +320,6 @@
           "basis": "ma6-version-applicability.md 19.2",
           "next": "M-B4"
         },
-        "profiler_observation": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_profiler_sensor"
-          ],
-          "checks": [
-            "LIF-14"
-          ],
-          "basis": "사용자 결정 M-A6-W3(2026-11-15): 세대를 start/stop 호출 순서로 정의한다. 기존 센서는 성공한 start마다 새 세대를 만든다. 후보 정확 모듈 행과 composition 연결은 후속이다. ma6-version-applicability.md 27.4",
-          "next": "기존 센서 bytes를 보존한 후보 profiler 변형 profile 검증"
-        },
         "rank_failure": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
           "observers": [
@@ -378,29 +338,6 @@
           "checks": [],
           "basis": "ma6-version-applicability.md 19.2",
           "next": "M-B4"
-        },
-        "sampling_validation": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_runner_capture"
-          ],
-          "checks": [
-            "REQ-10"
-          ],
-          "basis": "ma6-version-applicability.md 19.3. runner_capture 소비 관측이 0.31.0 고정값만 있다. tests/test_code_selection_observation.py가 구 판본 비노출을 고정한다",
-          "next": "M-B4 및 결정 V0-5"
-        },
-        "stream_buffer": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_stream_buffer_sensor"
-          ],
-          "checks": [
-            "LIF-03",
-            "LIF-04"
-          ],
-          "basis": "uvicorn 0.53.0 wheel 대조로 기존 uvicorn 고정값이 후보 이미지 uvicorn과 같음(27.2). 기반 0.30.0 행을 겹치는 변형 profile이 필요하다(#281 병합 뒤)",
-          "next": "기반 /25 + stream 센서 변형 profile"
         }
       }
     }

@@ -1,3 +1,10 @@
+## 2026-11-16 — PR #284 일괄 통합·기존 실패 두 건 보수
+
+- 한 일: main47bee7fc의 #283·#285·#286을 통합했다. 문서·검토 영수증·원 fixture 출처를 양쪽 보존하고 CPython 3.12.8 CI의 임시 pycache와 두 PR의 직접 시험 목록을 함께 유지했다. 캐시 시험의 kwargs 인자 누락과 SlotObserver의 스트리밍 sink 미수집만 고쳤다. 기존 assert·UNKNOWN·판정 조건과 제품 소스 범위는 유지했다. 별도 worktree의 미공개 슬롯 이동 후속 커밋은 이번 병합에 넣지 않았다.
+- 테스트 결과: 종전 head29e6d1d2의 기본 suite는 2 failed / 13709 passed / 기존34 skipped(pytest712.23초·부모713.397초)였다. 실패 원인 두 건을 정적 대조로 수정했고 합친 572개 제품 파일의 셸 SHA-256 목록·검토 행을 갱신했다. 새 통합 head CI는 미확인이고 로컬 Python/pytest는 실행하지 않았다.
+- 다음 단계: 사용자 “치명적인 문제 없으면 그냥 전부 병합해” 지시에 따라 같은 PR을 갱신하고 초안을 해제해 main에 병합한다. 새 CI 결과를 과거 결과와 구분한다.
+- 막힌 것: 실제 GPU 실측·생산자 등록·공식 RPT는 이번 병합으로 완료되지 않는다.
+
 ## 2026-11-16 — PR #283 일괄 병합 준비
 
 - 한 일: 초안을 포함한 일괄 병합 지시에 따라 main48d73e93을 통합했다. 양쪽 결정·진행·작업지시 기록과 과거 소스 검토 영수증을 보존했다. 제품 파일 충돌은 없었고 566개 파일의 셸 SHA-256으로 통합 목록과 검토 행을 맞췄다.
@@ -18,6 +25,41 @@
 - 테스트 결과: 저장소 밖 한정된 함수 실행2개가 제약 getter 미접근 대조를 통과했다. engine/torch import·실제 GPU/모델 실행은0이다. 이 수를 pytest/실측이나 기능 부재 인증으로 세지 않는다. 현황77/23/68·경로16개(pytest0.49초·부모0.662초)·검토 JSON 구조·diff 검사가 통과했다. 제품/도구/시험 소스 무변경을 확인했다. 새 PR CI와 실제 sampler/GPU는 미실행이다.
 - 다음 단계: 현재 V1 API/모델/설치 source/선택 backend를 실제 입력과 맞추고 허용/거부·후속 변환/모델 제출과 sampler 소비를 관측한다. 확인 불가 예외를 MVP 완료로 인정하려면 별도 결정을 요청한다. 공개 전 source/문서 검토와 push 승인이 필요하다.
 - 막힌 것: 실제 ENV/target·선택 V1·sampler/worker 원 관측이 아직 없다. 필드 대응/HTTP 오류/EXAMPLE 함수 실행만으로 runner_consumption_verified=true/PASS/비적용으로 바꾸지 않는다. 새 GPU/비용/다운로드·M-B4 재개·판정/계약 변경은 승인하지 않았다.
+
+## 2026-11-15 — 통합 CI 실패 보완·기준 profiler /32와 cache 연결
+
+- CI 원결과: head8d828e1a는 227 failed·13250 passed·기존34 skipped·89 errors·10 warnings(pytest1024.87초·부모1026.210초)였다. 새 REQ-10 조건식 줄바꿈의 문법 오류와 새 영수증 설명3개의 기존128자 제한 초과가 제품 실행기/소스 gate를 연쇄 차단했다. 조건식을 고치고 검토자 설명만 제한 안으로 줄였으며 원문은 Git과 별도 evidence `receipt-format-corrections.json`에 보존했다. 기존 gate·판정·기대값을 바꾸지 않았다. CI에는 전체 시험 전에 Python compileall을 추가했다. 새 profiler 회귀에서 모든 stop 후보와 실제 충돌 flag를 혼동한 기대를 실제 projector 의미에 맞췄다. 별도 RPC control-ready 파일 거부1건은 원 로그에 보존하고 재검증한다. 원 로그 SHA70617d0b342f5d757719063f4aba79e6d125806c4a1b50d46bb4d252a1391808.
+- 한 일: 집중 검토한 기준 cache/slot9843129f·4c22d4c2와 profiler8eae090b·용량 보완6b9ec8cc를 통합했다. 캐시는 실제 baseline의 flat2-tuple과 요청 metadata를 읽되, timing 대조군의 실제 native hit가 없으면 UNKNOWN이다. 슬롯 index는 최종 sampler 소비가 없어 후보/UNKNOWN을 유지한다. 후속 condense 역사·batch 결합 수정은 별도 분기이며 아직 통합하지 않았다.
+- profiler /32: 실제 Worker.profile의 direct Torch backend와 성공한 start 호출의 세대, stop 결과를 관측한다. 원 /15 bytes는 유지하며 wrapper ID로 backend ID를 대체하지 않는다. 새 profile은 request-free이고 trace directory는 선언한 소유 경로의 파일 사실만 남기며 실제 소비된 callback 경로·출력 완료·RPC를 주장하지 않는다. object 한도에서 신규 owner 기록을 건너뛰고 generation nonce가 없으면 qualified로 올리지 않도록 보완했다.
+- 다음 단계: 엄격한 source 목록·영수증을 고정해 새 통합 CI에서 확인한다. /32와 기존 startup/stream 변형은 CPython3.12.8 별도 CI에도 넣는다. 승인받아 받은 uvicorn0.34 wheel은 정확62,315bytes/SHA·이미지 distribution METADATA 일치를 확인했고, /33의 실제 함수/기록 소비 연결을 진행 중이다. 로컬 Python/pytest·GPU 실측·생산자 등록·공식 RPT는 수행/완료로 주장하지 않는다.
+
+## 2026-11-15 — 기준 startup 전용 /31의 소유 journal·capture 연결
+
+- 한 일: 집중 검토한 b5db8b92·23f2ea49를 통합했다. 정확 MP·Worker 두 source만 감싸고 기존 per-process Writer에 기본·미지원·로드/constructor 실패 기록을 남긴다. prepare/load의 고정 비공개 의존 파일 검사, fork 뒤 새 process binding, strict 파서와 capture summary까지 연결했다. READY는 transport handshake이며 전체 준비·상위 집계·외부 접수 gate는 여전히 미확인이다.
+- 개인정보 경계: 검토 중 발견한 /27 요청 관측 상속을 제거했다. /31은 startup 전용이고 HTTP 헤더를 읽지 않으며 ASGI·NATIVE·SELECTION 기록을 생성/수락하지 않는다. 원 /27 template·/14·/15 bytes와 기존 실행기 관문은 유지한다. 실제 middleware와 무관한 Processor 호출 뒤 원 ID/단순 SHA가 비어 있지 않은 journal에 없는지 검사하는 회귀를 추가했다.
+- 테스트 결과: 정확 head8d828e1a의 CPython3.12.8 CI는 93 passed(4.53초·부모5.106초)다. 전체 update CI는 진행 중이다. 이번 /31 통합은 그 뒤의 source 변경이어서 별도 CI가 필요하다. 로컬 Python/pytest는 실행하지 않았다.
+- 다음 단계: 통합 source 목록/결정5 검토 행을 고정한다. 기준 cache/slot 및 request-free baseline profiler 의미 연결을 별도 worktree에서 계속한다. 기준 uvicorn0.34 wheel 한 개 다운로드 승인은 별도 질문 중이며 그 분기에만 대기한다. 실제 GPU/생산자 등록/공식 결과는 미완료다.
+
+## 2026-11-15 — 후보 REQ-10 소스·값 소비·원 receipt 정합 통합
+
+- 한 일: 집중 검토한 a0353d87→a00c4780→0efde02의 후보 REQ-10을 통합했다. 이미지·serving/input/worker/batch 9개 정확 파일과 준비 자산·V1 환경을 전후 대조한다. 생략한 sampling 값을 추정하지 않고 실제 API 정규화 값→runner→sampler를 같은 요청 HMAC으로 대조한다. 값 누락/차이는 처음 쓰는 준비 receipt와 capture·최종 B projection에 같은 공백으로 남겨 소비 완료를 보류한다. 기존 0.31 동작·기준 W5 관문·판정·과거 source/영수증은 보존한다.
+- 테스트 결과: 이번 source의 CI 결과는 아직 없다. 앞선 76706626의 CPython3.12.8 추가 회귀는 startup 양성 자격 9개 실패·84 passed(5.32초·부모5.949초)였다. fixture의 AST 재구성을 제거하고 원본 전체 source에서 컴파일한 변경 없는 함수 code 객체를 써 엄격한 자격 비교를 유지했다. 기존 기대·고정값·ABI gate를 완화하지 않았다. 로컬 Python/pytest는 실행하지 않았다.
+- 다음 단계: 이 통합 source의 Linux CI를 확인하고 실패를 고친다. startup의 실제 소유 journal/profile31 연결과 기준 cache/slot의 판본 의미 연결은 독립 worktree에서 계속한다. 준비·EXAMPLE·CI는 GPU 실측·등록·공식 PASS가 아니다.
+
+## 2026-11-15 — M-A6 profiler 호환 보완·기준 startup 원관측 연결
+
+- 한 일: #284의 통합 head3afd4859에서 나온 기존 profiler packet 호환성, 형식이 잘못된 profile 조회, 회귀 writer fixture 연결을 보완했다. 기존 음성 기대/assert를 유지한다. 후보의 실제 wrapper·worker·API 정확 소스 bytes를 고정 자료로 넣고 두 번의 start/stop 객체 재사용과 시작/정지/출력 실패 기록을 실제 소비기에 넣는 회귀를 추가했다. 원 센서 /12·/15 bytes는 보존한다.
+- 기준 startup: 정확 태그 소스의 WorkerProc constructor와 Worker.load_model 본문을 읽기 전용 hook으로 연결해 같은 자식 구간의 로드 반환·예외를 소비한다. READY는 초기화·로드 이전의 transport 신호임을 실제 constructor 회귀로 구분했다. 원 /14·callback bytes·팩·판정과 initialization gate는 보존하며, 준비/journal/제품 capture 연결은 다음 독립 개발이다([범위](docs/dev-1/ma6-baseline-startup-candidate.md)).
+- 테스트 결과: head3afd4859 전체 CI는 16 failed·13636 passed·기존34 skipped·fixture 오류1개(pytest658.72초·부모660.053초)였다. 나머지 CI는 성공했다. 원 실패 로그 SHA는 851023cf01cd1a604729e2f2d4c80fd1b5bde9eeb821f0e9201bf546f2fb820f이다. 보완 source의 CI 결과는 아직 없다. 새 startup 시험과 후보 변형 거부 시험은 기존 CPython3.12.8 job에도 넣었다. 로컬 Python/pytest는 실행하지 않았다. 새 baseline 원본 fixture의 기존 trailing whitespace는 정확 bytes 보존을 위해 유지했다.
+- 검토·다음 단계: profiler 보완과 후보 실제 함수 회귀는 고정 변경 집중 검토를 마쳤고 startup 원관측은 주 세션이 검토했다. source 목록/결정5 영수증을 고정해 같은 #284에 올린다. 후보 REQ-10의 생략 옵션 기본값 추정·실제 소비 정합 관문을 보완하고, startup의 소유 journal/자산/파서 연결을 별도 worktree에서 계속한다. baseline cache/slot/graph·stream/profiler와 실제 GPU/등록·공식 RPT도 남아 있다.
+
+## 2026-11-15 — #282 병합과 M-A6 W1·후보 stream/profiler 통합
+
+- 한 일: 사용자 “#282 main 병합” 승인으로 정확 head1b07af80을 main7cbaa4e1에 병합했다. 병합 tree5d45624c가 검증 head와 같음을 확인했다. 이를 #284에 통합하고 기준 /28 HMAC 소비·전송 경로와 후보 /29 stream·/30 profiler의 정확 소스/비공개 키 경계를 묶었다. 기존 /12·/15 센서 bytes·이전 profile·승인 UNKNOWN_V1은 보존한다. 후보의 원 request SHA는 명시적 필드만 HMAC으로 재표현하고 키·의존 소스 검증 뒤에만 hook을 설치한다.
+- 테스트 결과: #282 CI는 13637 passed·기존34 skipped(pytest964.40초·부모965.939초), 플랫폼 계약477 passed와 나머지 확인까지 전부 성공했다. #284 초기05915be2의 CI는 8 failed·13597 passed·기존34 skipped(pytest854.70초·부모855.906초)였다. 오래된 판본표 기대 1개와 profile 없는 과거 부분 packet 7개의 KeyError를 고쳤다. 세 projector의 호환 조회를 보완했고 기존 음성 기대/assert를 바꾸지 않았다. 새 통합 source의 전체 CI는 아직 없다. 로컬 Python/pytest는 실행하지 않았다.
+- 집중 검토: 실제 /28 생산자의 기본/단절 기록→종료/상태/시도 소비, 키 오류의 세 실행기 미전송, 후보 SELECTION·native call_chain의 scalar/list HMAC, /30 정확 control route·요청/호출 Ref 쌍, 실제 후보 profiler API 생산→파서→API join을 회귀로 추가했다. 원 소스/모델/파일 해시는 바꾸지 않는다. backend·trace·RPC·worker·전체 범위·GPU 자격은 별도 미확인으로 보존한다.
+- 다음 단계: source 목록과 결정5 검토 행을 고정해 같은 #284의 새 head CI를 확인한다. 남은 승인 CPU 개발인 후보 REQ-10 runner capture/실제 제약 소비를 별도 브랜치에서 계속한다. 기준 startup·cache/slot·stream/profiler의 의미 대조도 남아 있어 전체 M-A6/69개 완료로 세지 않는다.
+- 막힌 것: 실제 ENV/target·기록 생산자·GPU/lab 수집·공식 보고서는 미완료다. baseline REQ-10 W5는 승인된 GPU 확인 절차를 기다리며, W2/W4의 승인 UNKNOWN을 다른 분기로 확대하지 않는다.
 
 ## 2026-11-15 — 팩38 전체 CI 실패 보완과 승인된 #280 통합
 
@@ -3013,3 +3055,33 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 막힌 것: 현재 V1 ENV/target·ARM2 새 원 기록·전체 TP2 그룹/기한/새 세대 복구·GPU 등록. 새 GPU/비용/다운로드와 후속 push/병합은 미승인이다.
 
 - 후속 직접 결합 결과: #276 제품 파일 소비 구현을 포함한 source에서 새 조립 도구의 실행 결합과 select/run/judge/report/verify를 두 쪽×/1·/4의 EXAMPLE4사례로 확인했다(벽시계25.989초). 결과는 EXAMPLE/ABORTED/UNKNOWN이며 실제 엔진/GPU/등록 자격이 아니다. 현황 --check와 최종 경로/기존 materialize25개도 통과(pytest5.86초·부모6.121초). 새 원격 CI는 미실행이다.
+## 2026-11-15 — M-A6 기준 V1 /28 요청 연결 소비 W1 (로컬 검토)
+
+- 한 일: 기준 0.7.0의 정확 `/28` native profile에서 준비된 private 세션 키로 ASGI 헤더 HMAC을 재계산하고, 검증된 `Processor.process_inputs` RETURN의 선택/원 요청 ID를 LIF-10/12, REQ-12, OBS-02 실행기 투영에 연결했다. `/28`의 trial 요청 식별값도 세션 HMAC이며 raw 헤더·키·기존 SHA 지문은 기록하지 않는다. 기존 profile의 연결 방식과 공통 판정은 유지한다.
+- 관측 경계: REQ-12에는 fresh 요청의 native 입력 연결만 생긴다. 시도/KV/worker/output 및 전체 범위는 계속 미관측·UNKNOWN이다. OBS-02도 선택 성분만 부분 관측하며 생산자 인증·GPU 자격·등록·실측 PASS를 뜻하지 않는다.
+- 테스트 결과: 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 정확 소스와 시험 변경은 CI에서 검증할 예정이다. `git diff --check`와 source SHA 목록은 로컬 shell로 확인한다.
+- 다음 단계: 이 커밋의 집중 검토와 CI를 거친 뒤 후보 0.30.0 stream_buffer/profiler 독립 변형을 잇는다. 실제 ENV/target·GPU 등록과 판정 수락은 미완료다.
+
+## 2026-11-15 — M-A6 후보 0.30.0 stream/profiler 변형 (로컬 검토)
+
+- 한 일: `/25` 정확 후보 행 위에 원본 `/12` stream 또는 `/15` profiler 센서를 private 정확 사본으로 조합하는 `/29`·`/30`을 추가했다. 후보 profiler wrapper·worker 파일 SHA만 정확 행으로 바꾸고 원본 센서/기반/공통 GPU 계약/판정은 보존했다. LIF-03/04와 LIF-14 실행기 판본 관문을 연결하고 파서가 선택한 소스 행을 검사하게 했다.
+- 개인정보 경계: 새 variant 준비 자산은 `/28` 검증기 원본 SHA와 0600 비공개 세션 키를 요구한다. 설치 전 키 검증이 실패하면 observer hook을 만들지 않는다. 새 profile ASGI/stream/trial 요청은 header HMAC으로, native의 명시적 요청-ID 필드는 legacy SHA 결과의 별도 도메인 HMAC으로 보존한다. 모델·소스·파일 해시는 그대로 두고 기존 `/12`·`/15` sensor/profile은 변경하지 않았다. 키 실패/권한 변경 및 저장 필드 회귀는 CI 대상이다.
+- 의미 경계: profiler generation은 원본 센서에서 각 qualified start/stop 호출 순서에 따라 이미 새로 부여된다. backend SHA 동일성을 세대 동일성으로 간주하지 않으며 backend 종료·trace·RPC·다음 정상 시작의 판정은 그대로다. 실제 ENV/target·GPU 생산자 등록과 실측은 미완료다.
+- 테스트 결과: 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 정확 bytes/준비 자산 변조/판본 노출 회귀는 CI에서 확인한다. 로컬에서는 shell SHA, JSON 구문, `git diff --check`만 확인했다.
+- 다음 단계: 집중 소스 검토와 CI에서 variant 준비·기록 파서·LIF-03/04·14 직접 경로를 확인한다. 실패하면 정확 head에서 보수한다.
+
+## 2026-11-15 — M-A6 후보 0.30.0 REQ-10 runner capture (로컬 검토)
+
+- 한 일: 후보 이미지의 serving/input 7개 정확 SHA와 V1 환경, 준비 자산/개인 키/세대를 검사하는 REQ-10 전용 capture profile을 추가했다. 기존 callback의 API 검증→runner 수신→sampler 진입 값 가운데 temperature/top_p만 case별 대조한다. 후보 응답 ID 기록은 세션 HMAC으로 보호하고 기준 0.7.0 관문과 기존 0.31.0 profile은 보존했다.
+- 테스트 결과: 실제 callback snapshot 기본값/배열 미지원 record를 producer→B 소비 경계에 전달하는 회귀와 후보 전체 mock 전송·소스/환경/mount 실패 회귀를 작성했다. 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 제품 소스 SHA와 manifest/receipt는 shell로 갱신하고 최종 확인한다.
+- 다음 단계: 집중 검토 후 Linux CI에서 정확 producer/consumer 결합과 후보 전송을 검증한다. W5 구조화 출력 GPU 실험, 후보 실제 GPU/생산자 등록은 남는다. 이 값 연결은 전체 REQ-10 PASS가 아니다.
+- 후속 검토 수정: 요청에 없는 temperature/top_p를 0/1로 가정하지 않는다. API가 실제로 정규화한 값을 runner·sampler와 대조하고, 값 누락/차이를 B 최종 projection 공백과 `runner_consumption_verified=false`로 연결했다. 후보 mock 기본값1·비기본값·sampler 반례와 이전 0.30.0 비노출 assert의 승인된 V5 변경을 추가했다. 로컬 Python/pytest는 계속 실행하지 않았다.
+- 고정값/receipt 검토 수정: 후보 worker `gpu_model_runner`·`gpu_input_batch`의 정확 설치 bytes SHA를 추가해 9개 파일을 Pod 전후 대조한다(깨끗한 ced6857 태그·원 fixture·ma6 후보표 일치). sampling 값 불일치 공백은 준비 receipt가 쓰이기 전에 projection에 반영하고, 최종 capture/B 소비와 같은 공백을 남긴다. 로컬 Python/pytest는 실행하지 않았다.
+
+## 2026-11-15 — M-A6 기준 0.7.0 V1 cache/slot 정확 소스 관측 (로컬 검토)
+
+- 한 일: 깨끗한 5204ff5c 소스와 기존 fixture의 bytes가 일치하는 KV cache manager·InputBatch 두 파일의 정확 SHA 행을 callback 소스 후보에 추가했다. 0.7.0의 평면 2원 cache 반환과 `None`을 반환하는 자리 배정을 실제 소스 형태로 읽어 기존 `computed_rows`/cache timing 및 `project_slot` 소비자에 연결했다. 요청·block 식별은 세션 키 지문만 남기고 token IDs는 읽지 않는다. 기존 0.31.0 소스/분기와 판정 기준은 유지했다.
+- 관측 경계: cache salt와 인증 주체 결합은 없으며 REQ-15 전체 의미가 미검증이다. 자리 이동 `condense`와 V1 sampler의 제한 실제 소비는 보지 못해 REQ-18 재사용과 제한 집행은 후보/UNKNOWN이다. REQ-19/20의 V2/graph 의미도 열지 않는다. GPU 생산자 등록·실측은 없다.
+- 테스트 결과: 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 정확 fixture 소스 몸체의 기본/소스 불일치 경로를 기존 소비자에 전달하는 새 회귀 시험은 CI에서 검증한다. 로컬에서는 shell SHA·diff 검사만 한다.
+- 다음 단계: 집중 소스 검토 후 CI에서 실제 반환 형태·보수적 투영·기존 프로필 회귀를 확인한다.
+- 집중 검토 후속: REQ-17에서 cache 비활성화의 정확 원 생산자 0-token 행을 기존 timing 소비자에 전달해 빠른 대조만으로 정상/전체 범위가 되는 공백을 막았다. control-present의 native 적중이 확인되지 않으면 UNKNOWN으로 남긴다. CI 실행 전이다.

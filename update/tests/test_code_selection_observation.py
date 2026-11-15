@@ -50,10 +50,11 @@ def test_transport_release_gate_reads_the_catalog():
     assert 'env.engine.version != "0.31.0"' not in source
 
 
-def test_only_input_validation_kubernetes_executor_is_exposed_on_old_releases():
+def test_input_validation_stays_on_both_old_releases_and_candidate_sampling_opens():
     for version in ('0.7.0', '0.30.0'):
         assert resolve_executor('input_validation', 'kubernetes', engine='vllm', version=version) is not None
-        assert resolve_executor('sampling_validation', 'kubernetes', engine='vllm', version=version) is None
+    assert resolve_executor('sampling_validation', 'kubernetes', engine='vllm', version='0.7.0') is None
+    assert resolve_executor('sampling_validation', 'kubernetes', engine='vllm', version='0.30.0') is not None
     assert resolve_executor('input_validation', 'kubernetes', engine='vllm', version='0.31.0') is not None
 
 

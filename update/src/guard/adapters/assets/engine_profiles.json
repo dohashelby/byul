@@ -96,10 +96,12 @@
       ],
       "features": [
         "native_lifecycle",
+        "runner_capture",
+        "sampling",
         "scoped_consumption"
       ],
       "pin_status": "image_pin",
-      "qualification": "후보 행 13개의 설치 bytes·함수 지문은 이미지와 일치했다(docs/dev-1/ma3-image-qualification-20261114.json). 준비 자산 대조와 새 생산자 GPU 등록은 별도다."
+      "qualification": "후보 행 13개의 설치 bytes·함수 지문은 이미지와 일치했다(docs/dev-1/ma3-image-qualification-20261114.json). runner_capture는 정확 9개 serving/input/worker 파일과 기존 callback 자산, 단일 n=1 요청, V1 CPU sampling 배열 temperature/top_p만 추가로 허용한다. 실행 시 이미지·파일·환경·개인 키를 재확인한다. 구조화 출력·min_tokens와 GPU 실측/생산자 등록은 별도다."
     },
     {
       "id": "vllm-lifecycle-release-rows/1",
@@ -114,12 +116,14 @@
         "model_authorization",
         "native_route",
         "observation_state",
+        "profiler_control",
         "request_attempts",
         "session_revocation",
+        "stream_buffer",
         "termination"
       ],
       "pin_status": "image_pin",
-      "qualification": "기반 /8 센서를 이 판본의 정확 설치 bytes 행으로 설정하는 /25 profile(사용자 결정 M-A6-V6). 행이 없는 모듈(default_loader 등)은 검증되지 않은 모듈로 남는다. GPU 생산자 등록은 별도다. 근거 docs/dev-1/ma6-version-applicability.md 22절."
+      "qualification": "기반 /8 센서를 이 판본의 정확 설치 bytes 행으로 설정하는 /25 profile(사용자 결정 M-A6-V6). /29 stream은 이미지 대조된 Uvicorn 원 bytes를, /30 profiler는 후보 wrapper/worker 정확 bytes와 별도 호출 세대를 사용한다. 행이 없는 모듈(default_loader 등)은 검증되지 않은 모듈로 남는다. GPU 생산자 등록은 별도다. 근거 docs/dev-1/ma6-version-applicability.md 22·23절."
     },
     {
       "id": "sglang-runtime-request-lifecycle/1",
@@ -138,10 +142,13 @@
         "0.7.0"
       ],
       "features": [
-        "configured_lifecycle_rows"
+        "configured_lifecycle_rows",
+        "termination",
+        "observation_state",
+        "request_attempts"
       ],
       "pin_status": "image_pin",
-      "qualification": "정확 설치 bytes 8개와 실제 대상 14개의 기반 snapshot 준비·파싱만 지원한다. 요청 선택·캐시 적중·전체 종료·GPU 등록·점검 실행기 지원은 별도 검증이다. ma6-version-applicability.md 25절."
+      "qualification": "정확 설치 bytes와 /28의 fresh ASGI→native 입력 HMAC 연결로 LIF-10·12, REQ-12, OBS-02의 제한된 제품 관측을 허용한다. request_attempts 전송은 기존 소유 HTTP 시도만 허용하며 /28은 native 시도/출력/KV를 증명하지 않는다. 전체 종료·GPU 등록도 미검증이다. ma6-version-applicability.md 25·28절."
     }
   ],
   "implementations": []

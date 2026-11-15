@@ -213,6 +213,10 @@ def attach(draft, ctx, cfg, *, kind):
                 projected["gaps"].extend("B_RUNNER_FIELD_UNSUPPORTED:" + field
                     for field in ctx.policy_values.get("allowed_sampling_options", [])
                     if field not in {"temperature", "top_p"})
+                capture = getattr(ctx, "_req_runner_capture", None)
+                if (capture is not None and capture.profile.private_response_identity
+                        and getattr(capture, "summary", {}).get("sampling_values_equal_in_record") is not True):
+                    projected["gaps"].append("B_RUNNER_SAMPLING_VALUES_UNVERIFIED")
             projected["complete"] = projected["complete"] and not projected["gaps"]
             if ctx.check.id == "REQ-10":
                 draft.observations["runner_consumption_verified"] = Observation(collected=True, value=projected["complete"])

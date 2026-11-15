@@ -75,6 +75,22 @@ def test_current_unregistered_source_cannot_be_upgraded_by_preparation(tmp_path,
     assert not receipt['gpu_ready'] and not result['producer_authenticated']
 
 
+@pytest.mark.usefixtures("example_registered_callback_producers")
+def test_optional_capture_sampling_mismatch_downgrades_immutable_receipt_only(tmp_path, prepared):
+    case = inputs(tmp_path, prepared, check="REQ-10")
+    original = run(case, tmp_path / "default")
+    assert original["consumer_projection"]["complete"] and "capture_sampling_match" not in original
+    negative = tool.prepare(case["path"], sha256_hex(case["path"].read_bytes()), tmp_path / "mismatch",
+                            capture_sampling_match=False)
+    saved = json.loads((tmp_path / "mismatch/receipt.json").read_bytes())
+    assert saved == negative and negative["capture_sampling_match"] is False
+    assert "B_RUNNER_SAMPLING_VALUES_UNVERIFIED" in negative["consumer_projection"]["gaps"]
+    assert negative["consumer_projection"]["complete"] is False
+    positive = tool.prepare(case["path"], sha256_hex(case["path"].read_bytes()), tmp_path / "matching",
+                            capture_sampling_match=True)
+    assert positive["consumer_projection"] == original["consumer_projection"]
+
+
 @pytest.mark.parametrize("check", tool.CHECKS)
 @pytest.mark.usefixtures("example_registered_callback_producers")
 def test_producer_output_exact_bytes_independent_scope_and_existing_consumer(tmp_path, prepared, check):

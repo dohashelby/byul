@@ -55,3 +55,33 @@ def asgi_assignment(row):
         return None
     value = row["payload"].get("asgi_request_sha256")if row["event"]=="SG_NATIVE"else row["payload"]["metadata"].get("asgi_request_sha256")
     return value if _fingerprint(value) else None
+
+
+def fresh_assignment(rows, request_sha256):
+    """The /28 Processor RETURN linked to one selected ASGI invocation.
+
+    `parse_recording` already validates the complete selection/native-call
+    journal. The supplied request fingerprint must come from the prepared
+    session key, never from an observed row or a raw SHA-256 header.
+    """
+    if not _fingerprint(request_sha256):
+        return []
+    selected = []
+    for row in rows:
+        if row['event'] != 'NATIVE':
+            continue
+        payload = row['payload']
+        if payload['point'] != 'Processor.process_inputs' or payload['phase'] != 'RETURN':
+            continue
+        binding = payload['metadata'].get('request_binding')
+        if (type(binding) is not dict or binding.get('scheme') != 'session-hmac-sha256'
+                or binding.get('asgi_request_sha256') != request_sha256
+                or not _fingerprint(binding.get('asgi_invocation_sha256'))
+                or not _fingerprint(binding.get('native_request_sha256'))
+                or not _fingerprint(binding.get('native_call_sha256'))
+                or binding.get('caller_frame_verified') is not True
+                or binding.get('native_owner_verified') is not True
+                or [state['request_sha256'] for state in payload['requests']] != [binding['native_request_sha256']]):
+            continue
+        selected.append((row, binding))
+    return selected

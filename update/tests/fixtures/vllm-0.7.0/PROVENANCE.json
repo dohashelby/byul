@@ -70,6 +70,10 @@
     "vllm/distributed/device_communicators/shm_broadcast.py.txt": {
       "source": "vllm/distributed/device_communicators/shm_broadcast.py",
       "sha256": "24a3990266dcbbdbb14f6a2a2c4dec1eecad54d9ea85622ddc8dc36774b87942"
+    },
+    "vllm/v1/worker/gpu_worker.py.txt": {
+      "source": "vllm/v1/worker/gpu_worker.py",
+      "sha256": "7bc08a4e47bac5e1d68e68f540f014e3f9244c0f8d773f0dd7f5b959da5afb7a"
     }
   },
   "pin_status": "candidate: tag source bytes, not yet compared with the image install file"

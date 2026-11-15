@@ -7,7 +7,7 @@ No caller-supplied verified flag or serialized observation can qualify a hook.
 """
 from __future__ import annotations
 
-from .vllm_observer_pin_rows import candidate_sources, layout
+from .vllm_observer_pin_rows import baseline_sources, candidate_sources, layout, BASELINE_ROWS
 
 import contextvars
 from copy import deepcopy
@@ -34,7 +34,7 @@ TARGETS = {
     'vllm.v1.core.kv_cache_manager': ('KVCacheManager.get_computed_blocks',),
     'vllm.v1.core.block_pool': ('BlockPool.get_cached_block', 'BlockHashToBlockMap.get_one_block'),
 }
-SOURCES = candidate_sources(base.SOURCE_SHA, TARGETS)
+SOURCES = baseline_sources(candidate_sources(base.SOURCE_SHA, TARGETS), TARGETS)
 MAX_EVENTS = 1024
 MAX_OBJECTS = 256
 MAX_BLOCKS = 256
@@ -198,6 +198,17 @@ class CacheCallbackObserver:
             out.append({'offset': offset, 'length': length, 'identifier_sha256': self.fingerprint(fields.get('identifier'))})
         return out
 
+    def _baseline_hashes(self, hashes):
+        # 0.7.0 Request stores a private list of BlockHashType tuples. Read
+        # only hash_value; token_ids/extra_keys are neither read nor persisted.
+        if (type(hashes) is not list or len(hashes) > MAX_BLOCKS
+                or any(type(value).__name__ != 'BlockHashType' or type(value).__bases__ != (tuple,)
+                       or tuple.__len__(value) != 3 or type(tuple.__getitem__(value, 0)) is not int
+                       for value in hashes)):
+            self.gaps.add('CACHE_CALLBACK_BASELINE_HASH_SHAPE_UNAVAILABLE')
+            return None
+        return [self.fingerprint(str(tuple.__getitem__(value, 0))) for value in hashes]
+
     def _snapshot(self, point, args, kwargs, result=None, returned=False):
         receiver = args[0] if args else None
         active = _ACTIVE.get()
@@ -206,6 +217,23 @@ class CacheCallbackObserver:
         if point == 'KVCacheManager.get_computed_blocks':
             request = args[1] if len(args) > 1 else kwargs.get('request')
             fields = base.attrs(request)
+            baseline = self.__dict__.get('_source_pins', {}).get('vllm.v1.core.kv_cache_manager') == BASELINE_ROWS['vllm.v1.core.kv_cache_manager']['sha256']
+            if baseline:
+                # The 0.7 V1 Request has no cache_salt or grouped block pool.
+                # _kv_block_hashes is a plain list; the public ConstantList
+                # property must not be invoked by an observer.
+                row.update(request_sha256=self.fingerprint(fields.get('request_id')),
+                    request_cache_salt_sha256=None,
+                    request_lora_name_sha256=self.fingerprint(base.attrs(fields.get('lora_request')).get('lora_name')),
+                    request_block_hashes_sha256=self._baseline_hashes(fields.get('_kv_block_hashes')),
+                    request_media_ranges=None, block_pool_token=None)
+                if returned:
+                    if type(result) is tuple and len(result) == 2 and type(result[0]) is list:
+                        row.update(num_computed_tokens=_uint(result[1]), shared_prefix_boundary=None,
+                            returned_group_blocks=None, returned_flat_blocks=self._blocks(result[0]))
+                    else:
+                        self.gaps.add('CACHE_CALLBACK_COMPUTED_RESULT_UNAVAILABLE')
+                return row
             hashes = fields.get('block_hashes')
             row.update(request_sha256=self.fingerprint(fields.get('request_id')),
                 request_cache_salt_sha256=self.fingerprint(fields.get('cache_salt')),

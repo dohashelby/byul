@@ -110,6 +110,8 @@ jobs:
           python-version: "3.12.3"
       - run: python -m pip install uv==0.12.11
       - run: uv sync --frozen
+      - name: Compile update sources before the full suite
+        run: uv run python -m compileall -q src/guard tools
       - name: Measure default suite parent wall clock
         run: |
           uv run --project ../platform/api --frozen --with-editable . --with-editable ../runtime --with pytest-xdist==3.8.0 python - <<'PY'
@@ -161,6 +163,8 @@ jobs:
               result = subprocess.run([sys.executable, "-X", "pycache_prefix=" + cache, "-m", "pytest", "-q",
                   "tests/test_observer_abi.py", "tests/test_configured_lifecycle.py",
                   "tests/test_fresh_request_binding.py", "tests/test_rank_v1_source_reviews.py", "tests/test_rank_v1_worker_binding.py",
+                  "tests/test_release_observation_variants.py", "tests/test_ma6_baseline_startup.py",
+                  "tests/test_ma6_baseline_profiler.py",
                   "--basetemp", os.path.join(os.environ["RUNNER_TEMP"], "byul-observer-3128")])
           print(f"Observer 3.12.8 parent wall clock: {time.perf_counter() - start:.3f}s", flush=True)
           raise SystemExit(result.returncode)

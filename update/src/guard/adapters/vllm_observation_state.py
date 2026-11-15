@@ -1,14 +1,14 @@
 """OBS02 source correlations; listener, requests and worker truth stay distinct."""
 from __future__ import annotations
 import hashlib
-from .vllm_lifecycle_links import assignment,asgi_assignment
+from .vllm_lifecycle_links import assignment,asgi_assignment,fresh_assignment
 from .vllm_request_outputs import project_outputs
 
 COMPONENTS=frozenset({'http_listener','request_selection','asgi_application','native_request_state','native_forward','output_collector'})
 MAX_EVENTS=4096
 
 
-def project(packet,trials,required):
+def project(packet,trials,required,*,binding_hashes=None):
     result={'bindings':[],'events':[],'asgi_events':[],'output_events':[],'output_links':[],
         'diagnostic_codes':[],'conflict_candidates':[],'component_status':[],
         'producer_authenticated':False,'worker_identity_verified':False,'state_semantics_verified':False,
@@ -23,6 +23,17 @@ def project(packet,trials,required):
                 capture=recording.get('capture')
                 if not capture:continue
                 rows=capture['records'];ctx=rows[0]['payload']['context']
+                if rows[0]['payload'].get('profile')=='vllm-native-lifecycle-metadata/28':
+                    selected_hash=(binding_hashes or {}).get(trial['case_id'])
+                    for row,meta in fresh_assignment(rows,selected_hash):
+                        matches.append({'case_id':trial['case_id'],'recording':index,'seq':row['seq'],'pid':ctx['pid'],
+                            'start_ticks':ctx['start_ticks'],'native_request_sha256':meta['native_request_sha256'],
+                            'external_request_sha256':selected_hash,'asgi_invocation_sha256':meta['asgi_invocation_sha256'],
+                            'entry_root_path_sha256':None,'source_sha256':row['payload']['source_sha256'],
+                            'image_digest_verified':capture.get('image_digest_verified') is True,
+                            'physical_process_binding_verified':bool(capture.get('process_context_verified') and recording.get('session_owner_match')
+                                and recording.get('listed_file_identity_match')),'producer_authenticated':False})
+                    continue
                 selected=[r for r in rows if r['event']=='SELECTION' and r['payload']['phase']=='RETURN'
                     and r['payload']['point']=='InputProcessor.assign_request_id'
                     and r['payload']['metadata']['request_selection'].get('asgi_request_sha256')==trial['request_id_sha256']]

@@ -6,7 +6,7 @@ engine keeps its original behaviour. Rows hold keyed fingerprints only.
 """
 from __future__ import annotations
 
-from .vllm_observer_pin_rows import candidate_sources, layout
+from .vllm_observer_pin_rows import baseline_sources, candidate_sources, layout, BASELINE_ROWS
 
 import atexit
 import functools
@@ -45,7 +45,7 @@ ROOT = '/guard-lifecycle/engine-callbacks'
 DATA_ROOT = '/guard-lifecycle/data'
 SLOT_MODULE = 'vllm.v1.worker.gpu_input_batch'
 SLOT_TARGETS = {SLOT_MODULE: ('InputBatch.add_request', 'InputBatch.remove_request')}
-SLOT_SOURCE = candidate_sources({SLOT_MODULE: 'e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d'}, SLOT_TARGETS)
+SLOT_SOURCE = baseline_sources(candidate_sources({SLOT_MODULE: 'e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d'}, SLOT_TARGETS), SLOT_TARGETS)
 # V2 model runner (vLLM 0.31.0 기본 GPU runner). 자리 배정·회수와 sampler가 실제로
 # 받은 요청별 상태를 CPU 쪽 배열에서만 읽는다. GPU tensor를 읽거나 동기화하지 않는다.
 SLOT_V2_STATES = 'vllm.v1.worker.gpu.states'
@@ -137,7 +137,21 @@ class SlotObserver(_Keyed, cache.CacheCallbackObserver):
         else:
             row = {'request_sha256': self.fingerprint(value)}
         if returned:
-            row['slot'] = cache._uint(result)
+            baseline = self.__dict__.get('_source_pins', {}).get(SLOT_MODULE) == BASELINE_ROWS[SLOT_MODULE]['sha256']
+            if baseline and point == 'InputBatch.add_request':
+                # 0.7 V1 returns None; the pinned method writes this mapping.
+                # Verify the mapped position against req_ids without emitting
+                # either raw request ID or the token array.
+                req_id = cache.base.attrs(value).get('req_id')
+                batch = cache.base.attrs(args[0] if args else None)
+                mapping, ids = batch.get('req_id_to_index'), batch.get('req_ids')
+                index = cache._uint(mapping.get(req_id)) if type(mapping) is dict else None
+                row['slot'] = index if type(ids) is list and index is not None and index < len(ids) and ids[index] == req_id else None
+                row['slot_lineage_complete'] = False  # condense/swap movement is not observed
+                if row['slot'] is None:
+                    self.gaps.add('SLOT_BASELINE_MAPPING_UNAVAILABLE')
+            else:
+                row['slot'] = cache._uint(result)
         return row
 
 

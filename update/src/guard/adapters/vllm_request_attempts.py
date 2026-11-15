@@ -1,7 +1,7 @@
 """Source-correlated request attempts; session tags never replace native IDs."""
 from __future__ import annotations
 import hashlib
-from .vllm_lifecycle_links import assignment, asgi_assignment
+from .vllm_lifecycle_links import assignment, asgi_assignment, fresh_assignment
 from . import vllm_attempt_sensor as attempt_sensor
 from . import vllm_request_output_sensor as output_sensor
 from .vllm_request_outputs import project_outputs
@@ -9,13 +9,15 @@ from .vllm_request_outputs import project_outputs
 MAX_EVENTS=4096
 
 
-def project_attempts(packet,trials):
+def project_attempts(packet,trials,*,binding_hashes=None):
     result={"bindings":[],"events":[],"conflict_candidates":[],"unbound_asgi_events":[],"asgi_events":[],
         "output_events":[],"output_links":[],"native_output_collector_binding_observed":False,
         "diagnostic_codes":[],"native_attempt_binding_observed":False,"late_delivery_verified":False,
         "automatic_retry_verified":False,"whole_scope_complete":False,"asgi_invocation_binding_observed":False}
     if not packet:
         result["diagnostic_codes"].append("REQUEST_ATTEMPT_NATIVE_UNAVAILABLE");return result
+    fresh_profile=any(r['capture']['records'][0]['payload'].get('profile')=='vllm-native-lifecycle-metadata/28'
+        for r in packet.get('recordings',[]) if r.get('capture'))
     for trial in trials:
         if not trial.get("attempted"):continue
         matches=[]
@@ -23,6 +25,20 @@ def project_attempts(packet,trials):
             capture=recording.get("capture")
             if not capture:continue
             rows=capture["records"];context=rows[0]["payload"]["context"]
+            if rows[0]['payload'].get('profile')=='vllm-native-lifecycle-metadata/28':
+                selected_hash=(binding_hashes or {}).get(trial['case_id'])
+                for row,meta in fresh_assignment(rows,selected_hash):
+                    matches.append({'case_id':trial['case_id'],'recording':index,'seq':row['seq'],
+                        'pid':context['pid'],'start_ticks':context['start_ticks'],
+                        'native_request_sha256':meta['native_request_sha256'],
+                        'external_request_sha256':selected_hash,
+                        'auxiliary_session_sha256':trial['auxiliary_session_sha256'],
+                        'asgi_invocation_sha256':meta['asgi_invocation_sha256'],'producer_authenticated':False,
+                        'entry_root_path_sha256':None,
+                        'physical_process_binding_verified':bool(capture.get('process_context_verified') and recording.get('session_owner_match')
+                            and recording.get('listed_file_identity_match')),
+                        'image_digest_verified':capture.get('image_digest_verified') is True})
+                continue
             selected=[r for r in rows if r["event"]=="SELECTION" and r["payload"]["phase"]=="RETURN"
                 and r["payload"]["point"]=="InputProcessor.assign_request_id"
                 and r["payload"]["metadata"]["request_selection"].get("asgi_request_sha256")==trial["external_request_sha256"]
@@ -49,7 +65,7 @@ def project_attempts(packet,trials):
         else:result["diagnostic_codes"].append("REQUEST_ATTEMPT_UNIQUE_SELECTION_UNAVAILABLE")
     bycase={b["case_id"]:b for b in result["bindings"]}
     a,b=(bycase.get("req12-"+s) for s in ("disconnect","replacement"))
-    if a and b:
+    if a and b and not fresh_profile:
         result["native_attempt_binding_observed"]=True
         same_process=(a["pid"],a["start_ticks"],a["recording"])==(b["pid"],b["start_ticks"],b["recording"])
         if same_process and (a["native_request_sha256"]==b["native_request_sha256"] or a["asgi_invocation_sha256"]==b["asgi_invocation_sha256"]):
@@ -106,5 +122,6 @@ def project_attempts(packet,trials):
             if trial.get("normal_shape_verified") and not any(e["case_id"]==trial["case_id"] and e["phase"]=="BODY_SEND_RETURN" for e in result["asgi_events"]):
                 result["diagnostic_codes"].append("REQUEST_ATTEMPT_BODY_CALLBACK_UNAVAILABLE")
     project_outputs(packet,result)
-    result["diagnostic_codes"]=sorted(set(result["diagnostic_codes"]+["REQUEST_ATTEMPT_LATE_DELIVERY_UNVERIFIED","REQUEST_ATTEMPT_AUTOMATIC_RETRY_UNVERIFIED"]))
+    result["diagnostic_codes"]=sorted(set(result["diagnostic_codes"]+["REQUEST_ATTEMPT_LATE_DELIVERY_UNVERIFIED","REQUEST_ATTEMPT_AUTOMATIC_RETRY_UNVERIFIED"]
+        + (['REQUEST_ATTEMPT_NATIVE_ATTEMPT_UNOBSERVED'] if fresh_profile else [])))
     return result

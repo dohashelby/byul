@@ -10,6 +10,10 @@
 
 사용자는 검토 커밋e3ac24fc의 “문서 push·PR 생성 승인”으로 답했다. codex/req10-v1-source-review-20261115의 문서·검토 JSON·CI 경로만 main 대상 PR로 공개한다. 실제 GPU 기능 부재나 보안 PASS/비적용·runner 소비를 주장하지 않으며 제품/판정/고정값/지원표를 바꾸지 않는다. 필요한 승인/CI 기록은 같은 범위로 잇고 병합·새 비용·M-B4 재개는 포함하지 않는다.
 
+## 2026-11-15 — #282 main 병합 승인과 다음 독립 개발
+
+사용자는 정확 head1b07af80의 CI10개 성공·실제 GPU/생산자 등록 미완료를 구분한 요청에 “#282 main 병합”으로 답했다. 정확 head 일치 조건으로 main7cbaa4e1에 병합했고 tree가 검증 head와 같다. 이 승인을 #284나 새 GPU/비용·정책 확정으로 확대하지 않는다. M-A6의 승인된 W1/후보 관측은 #284에서, 기존 V5의 후보 REQ-10 실제 runner 소비는 별도 개발 묶음으로 계속한다. 준비/CI와 실측을 구분한다.
+
 ## 2026-11-15 — #280 main 병합 승인
 
 사용자는 CI가 모두 성공한 구체 head008dc76f의 결정/원인 기록 PR #280에 대해 “#280 main 병합”으로 답했다. 정확 head 일치 조건으로 main7b8bf0af에 병합했다. 이 승인은 #282나 별도 M-A6 후속의 병합·새 비용/GPU·정책 확정으로 확대하지 않는다. 후속에서는 현재 main의 승인된 원인 기록과 /28의 실제 HMAC 소비·관측 연결을 함께 보존한다.
@@ -495,6 +499,11 @@ main9365a65b에서 새 브랜치를 만들고 승인된 #281 소스972783ea와 #
 - 2026-10-19 · 모델: `Execution.operator{by,at}`·`override_reason`, `ExecutorInfo.default_judge`, `CheckRow.evidence_source`·`replaced`, `Report.evidence_counts` — 모두 비어 있으면 직렬화에서 빠짐(기존 해시 유지). 사람이 입력한 증거(operator 있음)는 모델이 MEASURED를 거부.
 
 ## 열린 질문
+
+### 기준 uvicorn 설치 행 대조 (2026-11-15, 사용자 승인·대조됨)
+
+- 기준 LIF-03·04를 위한 `uvicorn-0.34.0-py3-none-any.whl` 한 개(62,315 bytes, SHA-256 `023dc038422502fa28a09c7a30bf2b6991512da7dcdb8fd35fe57cfc154126f4`) 다운로드를 사용자에게 별도로 물었고 “이 wheel만 받아 대조 진행”으로 승인받았다. 앞선 W6은 후보0.53.0 wheel 승인이다. [PyPI 원 메타데이터](https://pypi.org/pypi/uvicorn/0.34.0/json)의 wheel METADATA SHA `6d2f1a12…`는 M-A3 기준 이미지 distribution metadata와 같다. 정확 wheel bytes/SHA와 METADATA 일치를 확인했고 Python 파일 세 개를 소스만 읽어 대조했다. flow_control은 기존 핀과 같고 h11/httptools는 달라 /33 소스 검토로 잇는다. 실제 이미지 Python 파일·ABI·GPU 자격은 아직 승격하지 않는다. 다른 M-A6 독립 개발은 계속한다.
+
 
 ### M-A6-W 기준 V1·후보 남은 점검 (2026-11-15) — 사용자 결정됨
 - ~~M-A6-W1~W6~~ → 2026-11-15 사용자 결정(맨 위 "사용자 결정 M-A6-W1~W6" 절). 원 질문은 이력으로 남긴다.
@@ -1079,3 +1088,20 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
   - vLLM 소스를 직접 분석하는 CPU 실행기 6개(`engine_sensor.py` source slot, `profiler_lifecycle_cpu.py`, `structured_tools_cpu.py`, `template_source_cpu.py`, `sampling_consumption_cpu.py`, `multimodal_gather_cpu.py`)는 provider(`adapters/`)로 옮길 대상이다.
   - TensorRT-LLM은 기본 `EngineProvider`와 외부 HTTP 범위로 둔다. 정리 중 TensorRT-LLM 때문에 바뀌어야 할 중대한 설계 문제는 보지 못했다.
   - B 승인이 필요한 시험 11개(source gate 알고리즘 변경)는 B 검토를 먼저 요청한다(11-09 결정 (가)). 검토 전에는 CI에서 실패한다.
+## 2026-11-15 — M-A6 W1 기준 V1 /28 연결 소비 범위
+
+사용자가 #281 병합 후 승인한 기준 0.7.0 LIF-10/12·REQ-12·OBS-02 개방은 `/28`의 실제 선택·원 입력 연결을 소비하는 범위다. 세션 비밀키의 정확 준비 자산을 다시 검증한 HMAC만 원/native 요청을 선택하고, `Processor.process_inputs`의 원 ID와 ASGI invocation을 연결한다. `/28` trial의 요청 식별값도 같은 세션 HMAC으로 기록하며 키 검증이 실패하면 요청을 보내지 않고 공백으로 둔다. REQ-12 시도/KV/worker/output은 관측되지 않았으므로 UNKNOWN으로 남긴다. OBS-02는 선택 성분만 부분 관측한다. 기존 판정·정책·GPU 등록·과거 프로필 의미는 바꾸지 않는다.
+
+## 2026-11-15 — M-A6 후보 /29·/30 관측 변형
+
+승인된 후보 0.30.0 LIF-03/04·14은 `/25` 정확 행과 원본 stream/profiler 센서 사본을 조합한다. `/29` Uvicorn 정확 설치 bytes는 기존 관측기 행과 일치한다. `/30` profiler wrapper·worker는 후보 정확 행으로 선택하고 router는 기존 행을 쓴다. 원본 profiler 코드는 qualified `_start` RETURN마다 새 generation을 만들므로 backend 객체 재사용만으로 세대를 합치지 않는다. 판정/수락/독립 backend·trace·RPC 검증은 유지하며 실제 GPU 생산자 등록은 미완료다.
+
+새 variant는 `/28`의 비공개 세션 키 검증 원본을 정확 SHA 자산으로 요구한다. 새 profile의 ASGI/stream/HTTP trial 요청 식별자는 header HMAC이고, 원본 native 센서가 생성한 요청-ID SHA는 저장 전에 별도 `legacy-request-sha` 도메인의 HMAC으로 바꾼다. 키 또는 확장 검증 실패는 관측 hook 미설치/요청 미전송으로 처리한다. 모델·코드·파일 해시는 해당 요청-ID 변환 대상이 아니다. 기존 `/12`·`/15` source 및 profile 결과는 그대로다.
+
+## 2026-11-15 — M-A6 기준 V1 cache/slot 관측 범위
+
+0.7.0 V1의 정확 `KVCacheManager.get_computed_blocks` 소스는 평면 block 목록과 계산 token 수의 2원 반환을 쓴다. 요청의 비공개 `_kv_block_hashes` 평문 list에서 각 `BlockHashType.hash_value`만 유계로 읽어 기존 세션 키 지문으로 남긴다. 공개 `ConstantList` 속성, token IDs, 원 요청 ID는 관측기가 읽거나 저장하지 않는다. 기존 0.31.0의 3원/group 반환 처리는 유지한다.
+
+0.7.0 `InputBatch.add_request`는 `None`을 반환하므로 정확 소스의 호출 후 `req_id_to_index`와 `req_ids`가 일치하는 자리만 관측한다. `condense` 이동은 관측하지 않아 같은 번호는 재사용 후보이며 REQ-18 전체 범위/위반 근거가 아니다. cache salt·인증 주체 결합이 없으므로 REQ-15 전체 결합도 검증되지 않는다. V1 `allowed_token_ids`는 sampler 실제 소비 근거가 없어 제한 집행으로 간주하지 않는다. REQ-19/20 V2/graph 의미는 이 소스 행으로 개방하지 않는다. 새 행은 소스 선택 후보이며 GPU/생산자 등록이나 실측 PASS가 아니다.
+
+REQ-17의 빠른 control timing만으로 cache가 켜졌다고 추론하지 않는다. 모든 control-present 표본에 qualified native cache 적중이 있어야 정상 대조의 검출력이 검증되며, 기본 cache 비활성화에서 나온 정확 0원 반환은 전체 범위와 정상 판정을 열지 않는다.

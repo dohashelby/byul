@@ -1,6 +1,7 @@
 """태그의 실제 함수 본문과 EXAMPLE 협력 객체만 실행한다. 엔진/GPU 실행은 아니다."""
 import asyncio
 from copy import deepcopy
+from datetime import timedelta
 import hashlib
 import hmac
 import json
@@ -15,8 +16,16 @@ import pytest
 
 from guard.adapters import vllm_lifecycle_catalog as catalog
 from guard.adapters import vllm_lifecycle_sensor as legacy
+from guard.adapters.vllm_lifecycle_links import fresh_assignment
+from guard.adapters.vllm_observation_state import project as project_observation_state
+from guard.adapters.vllm_request_attempts import project_attempts
+from guard.adapters.vllm_request_termination import project_native as project_termination
 from guard.collectors import lifecycle
 from guard.executors import lifecycle_capture as capture
+from guard.executors import kubernetes_request_termination as termination_executor
+from guard.executors import kubernetes_request_attempts as attempts_executor
+from guard.executors import kubernetes_observation_state as observation_executor
+from guard.models import utcnow
 from tests.test_configured_lifecycle import native_class
 from tests.test_lifecycle_capture import external  # noqa: F401
 from tests.test_lifecycle_sensor import CONTEXT, FakeOS, SilentThread
@@ -114,11 +123,11 @@ def program(world):
     return SimpleNamespace(handler=handler, engine=engine, processor=processor, params=params, request=request, result=result)
 
 
-def run_request(world, app, *, header=True, method='POST'):
+def run_request(world, app, *, header=True, method='POST', receive=None):
     async def forbidden(*a): raise AssertionError('관측기가 추가 receive/send를 호출했다')
     scope = {'type': 'http', 'path': '/v1/completions', 'root_path': '', 'method': method,
              'headers': [(b'x-request-id', SECRET.encode())] if header else []}
-    return asyncio.run(world.base.Middleware(app)(scope, forbidden, forbidden))
+    return asyncio.run(world.base.Middleware(app)(scope, receive or forbidden, forbidden))
 
 
 def recording(world):
@@ -150,6 +159,132 @@ def test_actual_tag_handler_and_native_input_have_one_fresh_hmac_link(world, hea
         expected = hmac.new(key, ('guard-native-request-binding/1\0native-request\0cmpl-' + SECRET + '-0').encode(), hashlib.sha256).hexdigest()
         assert native[0]['native_request_sha256'] == expected
         assert hashlib.sha256(SECRET.encode()).hexdigest().encode() not in raw
+
+
+def test_actual_fresh_binding_feeds_limited_observation_and_attempt_projections(world):
+    state = program(world)
+    async def app(scope, receive, send):
+        raw = SimpleNamespace(scope=scope, headers={'X-Request-Id': SECRET}, state=SimpleNamespace())
+        return await state.handler.create_completion(state.request, raw)
+    assert run_request(world, app) is state.result
+    (rows, summary), _ = recording(world)
+    request = lifecycle.request_header_fingerprint(world.folder / 'manifest.json', world.prepared, SECRET)
+    selected = fresh_assignment(rows, request)
+    assert len(selected) == 1 and selected[0][1]['asgi_request_sha256'] == request
+    assert fresh_assignment(rows, hashlib.sha256(SECRET.encode()).hexdigest()) == []
+    packet = {'recorded_files_covered': True, 'recordings': [{'capture': {
+        'records': rows, 'summary': summary, 'process_context_verified': True,
+        'image_digest_verified': False}, 'session_owner_match': True, 'listed_file_identity_match': True}]}
+    trial = {'case_id': 'obs02-normal-before', 'attempted': True, 'method': 'POST',
+             'request_id_sha256': request}
+    observation = project_observation_state(packet, [trial], ['request_selection'],
+                                            binding_hashes={trial['case_id']: request})
+    assert len(observation['bindings']) == 1
+    assert observation['bindings'][0]['native_request_sha256'] == selected[0][1]['native_request_sha256']
+    selection = next(row for row in observation['component_status'] if row['component'] == 'request_selection')
+    assert selection['bound_events'] == 1
+    assert not observation['whole_scope_complete'] and not observation['producer_authenticated']
+    attempt = project_attempts(packet, [{'case_id': 'req12-disconnect', 'attempted': True,
+        'external_request_sha256': request, 'auxiliary_session_sha256': 'a' * 64}],
+        binding_hashes={'req12-disconnect': request})
+    assert len(attempt['bindings']) == 1 and not attempt['native_attempt_binding_observed']
+    assert 'REQUEST_ATTEMPT_NATIVE_ATTEMPT_UNOBSERVED' in attempt['diagnostic_codes']
+    assert not attempt['native_output_collector_binding_observed'] and not attempt['whole_scope_complete']
+    assert hashlib.sha256(SECRET.encode()).hexdigest() not in json.dumps(
+        {'trials': [trial], 'observation': observation, 'attempt': attempt})
+
+
+@pytest.mark.parametrize('disconnect', [True, False])
+def test_actual_fresh_binding_requires_genuine_asgi_disconnect_for_termination_anchor(world, disconnect):
+    state = program(world)
+    async def receive():
+        return {'type': 'http.disconnect'}
+    async def app(scope, receive_callback, send):
+        raw = SimpleNamespace(scope=scope, headers={'X-Request-Id': SECRET}, state=SimpleNamespace())
+        result = await state.handler.create_completion(state.request, raw)
+        if disconnect:
+            assert await receive_callback() == {'type': 'http.disconnect'}
+        return result
+    assert run_request(world, app, receive=receive if disconnect else None) is state.result
+    (rows, summary), _ = recording(world)
+    request = lifecycle.request_header_fingerprint(world.folder / 'manifest.json', world.prepared, SECRET)
+    packet = {'recorded_files_covered': True, 'recordings': [{'capture': {
+        'records': rows, 'summary': summary, 'process_context_verified': True,
+        'image_digest_verified': False}, 'session_owner_match': True, 'listed_file_identity_match': True}]}
+    projected = project_termination(packet, request, 500,
+                                    ['asgi_transport'], request_hmac=request)
+    assert projected['binding_observed'] is disconnect
+    if disconnect:
+        assert projected['anchor']['native_request_sha256'] == fresh_assignment(rows, request)[0][1]['native_request_sha256']
+        assert projected['anchor']['asgi_request_sha256'] == request
+        assert {event['scope'] for event in projected['events']} == {'asgi_transport'}
+        assert projected['scope_status'][0]['termination_verified'] is False
+    else:
+        assert projected['anchor'] is None and projected['events'] == []
+    assert not projected['worker_gpu_release_verified'] and not projected['whole_scope_complete']
+    assert all(not row['termination_verified'] for row in projected['scope_status'])
+    assert hashlib.sha256(SECRET.encode()).hexdigest() not in json.dumps(projected)
+
+
+@pytest.mark.parametrize('module,executor,rows_field,identity_field,gap', [
+    (termination_executor, termination_executor.KubernetesRequestTerminationExecutor,
+     'attempts', 'request_id_sha256', 'TERMINATION_REQUEST_BINDING_KEY_UNAVAILABLE'),
+    (attempts_executor, attempts_executor.KubernetesRequestAttemptsExecutor,
+     'trials', 'external_request_sha256', 'REQUEST_ATTEMPT_BINDING_KEY_UNAVAILABLE'),
+    (observation_executor, observation_executor.KubernetesObservationStateExecutor,
+     'trials', 'request_id_sha256', 'OBSERVATION_STATE_REQUEST_BINDING_KEY_UNAVAILABLE'),
+])
+def test_invalid_private_key_leaves_trial_unidentified_and_never_dispatches_http(
+        world, monkeypatch, module, executor, rows_field, identity_field, gap):
+    key = world.folder / 'request-binding-key.json'
+    key.chmod(0o644)
+    with pytest.raises(ValueError, match='REQUEST_BINDING_KEY_UNAVAILABLE'):
+        lifecycle.request_header_fingerprint(world.folder / 'manifest.json', world.prepared, SECRET)
+    calls = []
+    engine = {'container': 'engine', 'image': 'example@sha256:' + 'a' * 64}
+    class Reader:
+        def __init__(self, *args, **kwargs):
+            self.binding = {'engine': engine}
+            self.owner_identity = self.read_file = self.image_check = None
+        def snapshot(self): pass
+        def seal_session(self): return {'sealed': True}
+        def report(self): return {}
+    class Transport:
+        binding = {'run_id': 'EXAMPLE-run', 'context': 'EXAMPLE-context', 'engine': engine}
+        def __call__(self, *args):
+            calls.append(args)
+            raise AssertionError('HTTP dispatch after invalid key')
+        def report(self): return {'requests': [], 'collection_gap': False, 'cleanup_errors': []}
+    monkeypatch.setattr(module, 'KubernetesLifecycleReader', Reader)
+    monkeypatch.setattr(module, 'capture_session', lambda *a, **kw: (_ for _ in ()).throw(OSError('EXAMPLE capture unavailable')))
+    now = utcnow(); start = (now - timedelta(minutes=1)).isoformat(); end = (now + timedelta(minutes=1)).isoformat()
+    if module is termination_executor:
+        values = {'termination_environment_sha256': 'a' * 64, 'termination_target_sha256': 'b' * 64,
+                  'termination_validity_start': start, 'termination_validity_end': end,
+                  'termination_max_delay_ms': 1, 'termination_required_scopes': ['asgi_transport']}
+    elif module is attempts_executor:
+        values = {'attempt_environment_sha256': 'a' * 64, 'attempt_target_sha256': 'b' * 64,
+                  'attempt_validity_start': start, 'attempt_validity_end': end}
+    else:
+        values = {'observation_state_environment_sha256': 'a' * 64,
+                  'observation_state_target_sha256': 'b' * 64,
+                  'observation_state_validity_start': start, 'observation_state_validity_end': end,
+                  'observation_state_required_components': ['request_selection']}
+    from tests.test_kubernetes_request_binding import env as sample_env
+    context = SimpleNamespace(policy_values=values, target={'lab': True}, cprobe=Transport(),
+        env=sample_env(), api_model='EXAMPLE-model', engine_url='http://engine:8000', timeout=10,
+        _termination_prepared=world.prepared)
+    _, _, _, summary = executor({'prepared': str(world.folder / 'manifest.json')}).collect(context)
+    assert not calls and gap in summary['diagnostic_codes']
+    assert summary[rows_field] and all(row[identity_field] is None and row['attempted'] is False
+                                       for row in summary[rows_field])
+    assert context._termination_gap is True
+    legacy_context = SimpleNamespace(**(vars(context) | {'_termination_prepared':
+        {**world.prepared, 'profile': legacy.PROFILE}}))
+    _, _, _, old_summary = executor({'prepared': str(world.folder / 'manifest.json')}).collect(legacy_context)
+    assert calls
+    legacy_header = calls[0][1][0]['headers']['X-Request-Id']
+    assert old_summary[rows_field][0][identity_field] == hashlib.sha256(legacy_header.encode()).hexdigest()
 
 
 def test_independent_sessions_do_not_publish_the_same_request_fingerprint(external):  # noqa: F811

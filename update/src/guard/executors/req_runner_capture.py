@@ -41,6 +41,24 @@ def _label(check_id, value):
     return (match[1] if match[2] == "challenge" else match[1] + ":" + match[2]) if match else None
 
 
+def _sampling_values_equal(events, expected, joined):
+    """Compare explicit wire values and observed API-normalized runner values."""
+    if not joined or expected is None:
+        return False
+    stages = {name: [row for row in events if row["event"] == name]
+              for name in ("api_validated", "runner_received", "sampler_applied")}
+    if len(stages["api_validated"]) != 1 or not stages["runner_received"] or not stages["sampler_applied"]:
+        return False
+    api = stages["api_validated"][0]
+    for field in ("temperature_milli", "top_p_milli"):
+        normalized = api.get(field)
+        if (type(normalized) is not int or field in expected and normalized != expected[field]
+                or any(row.get(field) != normalized for name in ("runner_received", "sampler_applied")
+                       for row in stages[name])):
+            return False
+    return True
+
+
 class Capture:
     def __init__(self, ctx, cfg):
         self.ctx, self.cfg = ctx, cfg
@@ -49,7 +67,7 @@ class Capture:
         self.profile = _profile(ctx.env)
         spec = cfg["runner_capture"]
         if (type(spec) is not dict or set(spec) != {"environment", "prepared_dir", "prepared_sha256", self.profile.source_root_key}
-                or "runner_input" in cfg or ctx.check.id not in {"REQ-08", "REQ-09", "REQ-10"} or ctx.target.get("lab") is not True):
+                or "runner_input" in cfg or ctx.check.id not in self.profile.response_rules or ctx.target.get("lab") is not True):
             raise ValueError("B_REQ_CAPTURE_SCOPE_INVALID")
         if ctx.check.id == "REQ-10" and set(ctx.policy_values["allowed_sampling_options"]) - {"temperature", "top_p"}:
             raise ValueError("B_REQ_V1_SELECTED_OPTIONS_REQUIRED")
@@ -144,6 +162,12 @@ class Capture:
             row = {"case": case, "dispatch_index": len(self.calls), "method": request["method"],
                    "path": urlsplit(request["url"]).path, "request_fixture_sha256": sha256_hex(body),
                    "outcome": None, "response_id_sha256": None, "request_sha256": None, "diagnostic": None}
+            if self.ctx.check.id == "REQ-10" and self.profile.private_response_identity:
+                # Only the two selected numeric fields are represented by this
+                # callback schema. No prompt, raw request ID or body is stored.
+                row["expected_sampling"] = {
+                    name + "_milli": int(round(request["body"][name] * 1000))
+                    for name in ("temperature", "top_p") if name in request["body"]}
             self.calls.append(row)
         try:
             result = dispatch()  # 원 요청 객체·헤더·본문·전송 ID를 그대로 정확히 한 번 호출한다.
@@ -164,7 +188,11 @@ class Capture:
         rid = value.get("id") if type(value) is dict else None
         request_id = self.profile.request_id(self.ctx.check.id, rid)
         if request_id is not None and not response.get("body_truncated"):
-            row["response_id_sha256"] = sha256_hex(rid.encode())
+            # New profiles never persist an unkeyed digest of the response ID:
+            # it is also the internal request ID for chat or its parent for
+            # completions. Preserve the reviewed older profile's row format.
+            row["response_id_sha256"] = (self.fingerprinter.fingerprint(rid)
+                if self.profile.private_response_identity else sha256_hex(rid.encode()))
             row["request_sha256"] = self.fingerprinter.fingerprint(request_id)
         else:
             row["diagnostic"] = "B_REQ_HTTP_REJECTION_WITHOUT_ID" if type(outcome) is int and 400 <= outcome < 500 else "B_REQ_RESPONSE_ID_UNAVAILABLE"
@@ -217,9 +245,17 @@ class Capture:
             matched = unique and len(api) == 1
             if matched:
                 requests[row["case"]] = row["request_sha256"]
+            sampling = row.get("expected_sampling")
+            values_equal = _sampling_values_equal(selected, sampling, matched)
             proof.append({**row, "same_native_request_api_join": matched,
+                          "sampling_values_equal_in_record": values_equal if sampling is not None else None,
                           "event_sequences": [event["seq"] for event in selected],
                           "duplicate_response_id": row["response_id_sha256"] is not None and not unique})
+        sampling_equal = ((all(row["sampling_values_equal_in_record"] for row in proof
+            if row["case"] not in self.ctx.policy_values.get("allowed_sampling_options", []))
+            and {row["case"] for row in proof if row["sampling_values_equal_in_record"]} ==
+            set(self.required_cases) - set(self.ctx.policy_values.get("allowed_sampling_options", [])))
+            if self.ctx.check.id == "REQ-10" and self.profile.private_response_identity else None)
         raw_files = {"environment.json": self.environment_raw, "target.json": self.target_raw,
             "prepared.json": canonical_json(self.prepared), "requests.json": canonical_json(requests),
             "wrapper.json": canonical_json({"schema": self.tool.WRAPPER_SCHEMA, "session": self.prepared["session"],
@@ -235,10 +271,12 @@ class Capture:
             "required_cases": self.required_cases, "sources": sources, "data_origin": "EXAMPLE" if self.transport.injected or self.ctx.env.data_origin.value == "EXAMPLE" else "DECLARED"}
         manifest_path = output / "inputs.json"
         manifest_path.write_bytes(canonical_json(manifest))
-        result = self.tool.prepare(manifest_path, sha256_hex(manifest_path.read_bytes()), output / "fixed")
+        result = self.tool.prepare(manifest_path, sha256_hex(manifest_path.read_bytes()), output / "fixed",
+                                   capture_sampling_match=sampling_equal)
         summary = {"schema": "guard-b-native-req-runner-link/1", "check_id": self.ctx.check.id,
             "source_commit": self.profile.source_commit, "before": self.before, "after": after, "cases": proof,
             "request_id_join_complete": {row["case"] for row in proof} == set(self.required_cases) and all(row["same_native_request_api_join"] for row in proof),
+            "sampling_values_equal_in_record": sampling_equal,
             "native_request_mapping_verified": False,
             "consumer_projection": result["consumer_projection"], "runtime_link_complete": False, "gpu_ready": False,
             "capture_origin": "EXAMPLE" if self.transport.injected or self.ctx.env.data_origin.value == "EXAMPLE" else "LIVE_COMPONENT",

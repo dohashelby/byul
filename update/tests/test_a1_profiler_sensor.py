@@ -33,14 +33,15 @@ class Backend:
         self.running=False
 
 
-def make_world(session='a'*32,mode='normal',patch=None):
+def make_world(session='a'*32,mode='normal',patch=None,*,fixtures=FIXTURES,source_rows=None,private_base=None):
+    source_rows=sensor.SOURCE_ADDITIONS if source_rows is None else source_rows
     loaded={}
     for name,filename in ((sensor.WRAPPER,'wrapper.py.txt'),(sensor.WORKER,'gpu_worker.py.txt'),(sensor.ROUTER,'api_router.py.txt')):
-        path=FIXTURES/filename;raw=path.read_bytes();assert hashlib.sha256(raw).hexdigest()==sensor.SOURCE_ADDITIONS[name]
+        path=fixtures/filename;raw=path.read_bytes();assert hashlib.sha256(raw).hexdigest()==source_rows[name]
         loaded[name]=codes(compile(raw,str(path),'exec',dont_inherit=True,optimize=0))
-    wrapper=types.ModuleType(sensor.WRAPPER);wrapper.__file__=str(FIXTURES/'wrapper.py.txt');wrapper.logger=QuietLogger()
-    worker=types.ModuleType(sensor.WORKER);worker.__file__=str(FIXTURES/'gpu_worker.py.txt');worker.logger=QuietLogger()
-    router=types.ModuleType(sensor.ROUTER);router.__file__=str(FIXTURES/'api_router.py.txt');router.logger=QuietLogger();router.Response=Response
+    wrapper=types.ModuleType(sensor.WRAPPER);wrapper.__file__=str(fixtures/'wrapper.py.txt');wrapper.logger=QuietLogger()
+    worker=types.ModuleType(sensor.WORKER);worker.__file__=str(fixtures/'gpu_worker.py.txt');worker.logger=QuietLogger()
+    router=types.ModuleType(sensor.ROUTER);router.__file__=str(fixtures/'api_router.py.txt');router.logger=QuietLogger();router.Response=Response
     base_cls=type('WorkerProfiler',(),{'__module__':sensor.WRAPPER});torch_cls=type('TorchProfilerWrapper',(base_cls,),{'__module__':sensor.WRAPPER})
     worker_cls=type('Worker',(),{'__module__':sensor.WORKER});worker.Worker=worker_cls
     wrapper.WorkerProfiler=base_cls;wrapper.TorchProfilerWrapper=torch_cls
@@ -50,8 +51,10 @@ def make_world(session='a'*32,mode='normal',patch=None):
             for method in methods:setattr(vars(module)[cls_name],method,types.FunctionType(loaded[name][cls_name+'.'+method],module.__dict__,method))
     for point,name in sensor.API_POINTS.items():setattr(router,name,types.FunctionType(loaded[sensor.ROUTER][name],router.__dict__,name))
     router.router=Router(router.start_profile,router.stop_profile)
-    base=types.ModuleType('_profiler_private_base');base.__file__=base8.__file__
-    exec(compile(Path(base8.__file__).read_bytes(),base8.__file__,'exec',dont_inherit=True,optimize=0),base.__dict__);sensor.configure(base)
+    base=private_base
+    if base is None:
+        base=types.ModuleType('_profiler_private_base');base.__file__=base8.__file__
+        exec(compile(Path(base8.__file__).read_bytes(),base8.__file__,'exec',dont_inherit=True,optimize=0),base.__dict__);sensor.configure(base)
     class Observer(base.Observer):
         def __init__(self):super().__init__({'session':session},'b'*64);self.recorded=[]
         def _writer(self):return NS(context={**CONTEXT,'pid':os.getpid()})
@@ -63,11 +66,11 @@ def make_world(session='a'*32,mode='normal',patch=None):
         # MODULE journal in a real import. The EXAMPLE module executes selected
         # exact bodies, so supply that explicit fixture precondition from the
         # already pinned full-source code, never from an unchecked live module.
-        info={'source_sha256':sensor.SOURCE_ADDITIONS[module.__name__],
+        info={'source_sha256':source_rows[module.__name__],
             'code_sha256':base.code_digest(loaded[module.__name__]['<module>'])}
         observer.modules[module.__name__]=info
         observer.emit('MODULE',{'module':module.__name__,'verified':True,**info})
-        assert observer.modules[module.__name__]['source_sha256']==sensor.SOURCE_ADDITIONS[module.__name__]
+        assert observer.modules[module.__name__]['source_sha256']==source_rows[module.__name__]
     backend=Backend(mode);profile=torch_cls();profile.__dict__.update(_active=False,_running=False,_delay_iters=1 if mode=='delayed' else 0,
         _max_iters=1 if mode=='automatic-stop' else 0,_active_iteration_count=0,_profiling_for_iters=0,
         _profiler_kwargs={},_initial_warmup_steps_remaining=0,local_rank=0,dump_device_time_total=False,dump_cpu_time_total=mode=='post-stop-output-failure',_uses_schedule=False)

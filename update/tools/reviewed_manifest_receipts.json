@@ -355,6 +355,66 @@
       "manifest_sha256": "f5a29cad0ef0d10752bfe058a2b8ed4f04154d2b5a27a6ecab0ee9a9d63a752e",
       "reviewed_by": "Codex / PR283 main integration; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T16:18:38.452Z"
+    },
+    {
+      "manifest_sha256": "2c988a2169e25b23b507c59b1a3fdb577372cb5035022018ebe3a5e6ea72277b",
+      "reviewed_by": "Codex / MA6-W1 focused HMAC, transport and fail-closed review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T11:53:51Z"
+    },
+    {
+      "manifest_sha256": "2c89cf5a9004439aa9f9c9b857ece2338ddabd05c60a907e31084b61b5cbe6e8",
+      "reviewed_by": "Codex / MA6 W1 and candidate29-30 integrated exact-source/HMAC focused review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T12:27:40Z"
+    },
+    {
+      "manifest_sha256": "d9c39a387ed4b64a3af962b10c90533b871e788592221320a3d576b8b12ad0dc",
+      "reviewed_by": "Codex / MA6 focused source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T12:45:05Z"
+    },
+    {
+      "manifest_sha256": "ae14a0fe8302253789fb6976d5b984f0b9d4a54303d9e8daef5c3f2b6dffb2d3",
+      "reviewed_by": "Codex / MA6 candidate REQ10 exact runner capture and sampling value review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T12:34:19Z"
+    },
+    {
+      "manifest_sha256": "5edf75d2b0e9d9f25c9f63d8f6dfb40d16a88e4ca8840f3207c5fe09825a2d02",
+      "reviewed_by": "Codex / MA6 candidate REQ10 normalized default and consumer gap review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T12:43:41Z"
+    },
+    {
+      "manifest_sha256": "0e7250d534830e07fafd93d334e251776b9e3449be32739e7b246029ffc79fb1",
+      "reviewed_by": "Codex / MA6 candidate REQ10 worker file pins and immutable receipt review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T12:49:10Z"
+    },
+    {
+      "manifest_sha256": "892700fbe779d80dd65f3052cdafb8d65fc7a90b839493abbf2e32b124659ec0",
+      "reviewed_by": "Codex / MA6 focused source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T12:51:40Z"
+    },
+    {
+      "manifest_sha256": "22cef4042bf33d39c7e7096de405aaf52a0e4418d00f53189e58aac122f26618",
+      "reviewed_by": "Codex / MA6 focused source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T13:00:00Z"
+    },
+    {
+      "manifest_sha256": "bcf7d0f0b916d2cfa207a75322acab5d9bfe2a867c9ee24bc854ead8ca1c9aa4",
+      "reviewed_by": "Codex / MA6 baseline V1 exact cache and slot source-row self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T12:59:18Z"
+    },
+    {
+      "manifest_sha256": "d08c5feaa144078482e52f519a009dfac3908bed42dd48185e01ab66d436251c",
+      "reviewed_by": "Codex / MA6 REQ-17 native control-hit focused review fix; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T13:03:02Z"
+    },
+    {
+      "manifest_sha256": "b863540f91518162f4190092f917190d162b258db4a2fd975149a72f5cfc2470",
+      "reviewed_by": "Codex / MA6 integration review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T13:17:47Z"
+    },
+    {
+      "manifest_sha256": "94b8de497fbe4605ddff451b8de99bfc124aa5532acd6d11a7c4209de530b12d",
+      "reviewed_by": "Codex / PR284 integrated source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T16:21:07.483Z"
     }
   ]
 }

@@ -127,12 +127,14 @@ def source_files():
     return {name: _sha(path.read_bytes()) for name, path in paths.items()}
 
 
-def prepare(inputs, inputs_sha256, output):
+def prepare(inputs, inputs_sha256, output, *, capture_sampling_match=None):
     inputs = Path(inputs).absolute()
     input_raw, input_pin = _read_pin({"path": str(inputs), "file_sha256": inputs_sha256},
                                    base=inputs.parent, limit=65536)
     spec = strict_json(input_raw)
     _validate_spec(spec)
+    if capture_sampling_match is not None and (spec["check_id"] != "REQ-10" or type(capture_sampling_match) is not bool):
+        raise ValueError("B_RUNNER_CAPTURE_SAMPLING_CHECK_INVALID")
     sources, pins = {}, {"inputs": input_pin}
     for name in SOURCE_NAMES:
         sources[name], pins[name] = _read_pin(spec["sources"][name], base=inputs.parent,
@@ -158,6 +160,13 @@ def prepare(inputs, inputs_sha256, output):
         raise ValueError("B_RUNNER_WRAPPER_SESSION_MISMATCH")
     projection = common_consumption.runner(record, scope, check_id=spec["check_id"],
         requests=requests, required_cases=spec["required_cases"])
+    # Only the live capture caller can compare the exact dispatched numeric
+    # values with API/runner/sampler. An optional negative result can downgrade
+    # the immutable preparation receipt before publication; it cannot upgrade
+    # the independent record projection or grant producer authentication.
+    if capture_sampling_match is False:
+        projection["gaps"] = sorted(set((*projection["gaps"], "B_RUNNER_SAMPLING_VALUES_UNVERIFIED")))
+        projection["complete"] = False
     if wrapper["truncated"] and record["completeness"]["source_ended"]:
         raise ValueError("B_RUNNER_WRAPPER_COMPLETENESS_CONFLICT")
     # Cached wrapper validation/summary is deliberately ignored; preserve the original record and recompute.
@@ -172,6 +181,7 @@ def prepare(inputs, inputs_sha256, output):
     receipt = {"schema": OUTPUT_SCHEMA, "check_id": spec["check_id"], "kind": KIND,
         "sources": pins, "record_byte_span": span, "scope": scope, "required_cases": spec["required_cases"],
         "runner_input": config, "consumer_projection": projection,
+        **({"capture_sampling_match": capture_sampling_match} if capture_sampling_match is not None else {}),
         "files": {name: {"bytes": len(raw), "file_sha256": _sha(raw)} for name, raw in files.items()},
         "source_files": source_files(),
         "import_origins": {module.__name__: str(Path(module.__file__).absolute())

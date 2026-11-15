@@ -23,6 +23,7 @@ from . import vllm_worker_initialization_sensor as joint_sensor
 from . import vllm_worker_startup_sensor as startup_sensor,vllm_worker_startup_contract as startup_contract
 from . import vllm_weight_iteration_sensor as weight_sensor
 from . import vllm_lifecycle_release_sensor as release_sensor
+from . import vllm_initialization_release_sensor as init_release
 
 LEGACY_PROFILE = "vllm-native-lifecycle-metadata/1"
 LEGACY_SCHEMA = "guard-native-lifecycle-events/1"
@@ -38,7 +39,7 @@ V6_PROFILE = "vllm-native-lifecycle-metadata/6"
 V6_SCHEMA = "guard-native-lifecycle-events/6"
 V7_PROFILE = "vllm-native-lifecycle-metadata/7"
 V7_SCHEMA = "guard-native-lifecycle-events/7"
-SCHEMAS = {fault_sensor.PROFILE:fault_sensor.SCHEMA,sglang_sensor.PROFILE:sglang_sensor.SCHEMA,termination_sensor.PROFILE:termination_sensor.SCHEMA,endpoint_sensor.PROFILE:endpoint_sensor.SCHEMA,generation_sensor.PROFILE:generation_sensor.SCHEMA,joint_sensor.PROFILE:joint_sensor.SCHEMA,startup_sensor.PROFILE:startup_sensor.SCHEMA,mapping_sensor.PROFILE:mapping_sensor.SCHEMA,read_sensor.PROFILE:read_sensor.SCHEMA,weight_sensor.PROFILE:weight_sensor.SCHEMA,profiler_sensor.PROFILE:profiler_sensor.SCHEMA,init_sensor.PROFILE:init_sensor.SCHEMA,rank_sensor.PROFILE: rank_sensor.SCHEMA, stream_sensor.PROFILE: stream_sensor.SCHEMA, output_sensor.PROFILE: output_sensor.SCHEMA, sensor.PROFILE: sensor.SCHEMA, online.PROFILE: online.SCHEMA, attempt.PROFILE: attempt.SCHEMA, LEGACY_PROFILE: LEGACY_SCHEMA, V2_PROFILE: V2_SCHEMA, V3_PROFILE: V3_SCHEMA, V4_PROFILE: V4_SCHEMA, V5_PROFILE: V5_SCHEMA, V6_PROFILE: V6_SCHEMA, V7_PROFILE: V7_SCHEMA, release_sensor.PROFILE: release_sensor.SCHEMA}
+SCHEMAS = {fault_sensor.PROFILE:fault_sensor.SCHEMA,sglang_sensor.PROFILE:sglang_sensor.SCHEMA,termination_sensor.PROFILE:termination_sensor.SCHEMA,endpoint_sensor.PROFILE:endpoint_sensor.SCHEMA,generation_sensor.PROFILE:generation_sensor.SCHEMA,joint_sensor.PROFILE:joint_sensor.SCHEMA,startup_sensor.PROFILE:startup_sensor.SCHEMA,mapping_sensor.PROFILE:mapping_sensor.SCHEMA,read_sensor.PROFILE:read_sensor.SCHEMA,weight_sensor.PROFILE:weight_sensor.SCHEMA,profiler_sensor.PROFILE:profiler_sensor.SCHEMA,init_sensor.PROFILE:init_sensor.SCHEMA,rank_sensor.PROFILE: rank_sensor.SCHEMA, stream_sensor.PROFILE: stream_sensor.SCHEMA, output_sensor.PROFILE: output_sensor.SCHEMA, sensor.PROFILE: sensor.SCHEMA, online.PROFILE: online.SCHEMA, attempt.PROFILE: attempt.SCHEMA, LEGACY_PROFILE: LEGACY_SCHEMA, V2_PROFILE: V2_SCHEMA, V3_PROFILE: V3_SCHEMA, V4_PROFILE: V4_SCHEMA, V5_PROFILE: V5_SCHEMA, V6_PROFILE: V6_SCHEMA, V7_PROFILE: V7_SCHEMA, release_sensor.PROFILE: release_sensor.SCHEMA, init_release.PROFILE: init_release.SCHEMA}
 # Exact previously shipped LF/CRLF source spellings; no normalization on input.
 LEGACY_ASSETS = {
     (31143, "50143b5cf54aa8f5bbcfef769c286f65c971e0acd2caa111c625583f4baec3de"),
@@ -396,12 +397,13 @@ V7_FUNCTION_POINTS = {'vllm.model_executor.model_loader.weight_utils': ('safeten
 
 def public_commit(profile):
     if profile==sglang_sensor.PROFILE:return sglang_sensor.COMMIT
-    if profile==release_sensor.PROFILE:return release_sensor.COMMIT
+    if profile in {release_sensor.PROFILE,init_release.PROFILE}:return release_sensor.COMMIT
     return termination_sensor.COMMIT if profile==termination_sensor.PROFILE else sensor.COMMIT
 
 
 def asset_supported(profile, raw):
     if profile==release_sensor.PROFILE:return raw==Path(release_sensor.__file__).read_bytes()
+    if profile==init_release.PROFILE:return raw==Path(init_release.__file__).read_bytes()
     if profile==fault_sensor.PROFILE:return raw==Path(fault_sensor.__file__).read_bytes()
     if profile==sglang_sensor.PROFILE:return raw==Path(sglang_sensor.__file__).read_bytes()
     if profile==termination_sensor.PROFILE:return raw==Path(termination_sensor.__file__).read_bytes()
@@ -448,6 +450,7 @@ def asset_supported(profile, raw):
 
 def source_hashes(profile):
     if profile==release_sensor.PROFILE:return release_sensor.source_rows(sensor.SOURCE_SHA)
+    if profile==init_release.PROFILE:return {**release_sensor.source_rows(sensor.SOURCE_SHA),**init_release.SOURCE_ADDITIONS}
     if profile==fault_sensor.PROFILE:return {**source_hashes(termination_sensor.PROFILE),**fault_sensor.SOURCE_ADDITIONS}
     if profile==sglang_sensor.PROFILE:return dict(sglang_sensor.SOURCE_SHA)
     if profile==termination_sensor.PROFILE:return {**sensor.SOURCE_SHA,**termination_sensor.SOURCE_ADDITIONS}
@@ -515,7 +518,7 @@ def points(profile):
         return online.points(sensor)
     if profile == V7_PROFILE:
         return V7_POINTS
-    if profile in {sensor.PROFILE, release_sensor.PROFILE}:
+    if profile in {sensor.PROFILE, release_sensor.PROFILE, init_release.PROFILE}:
         return sensor.POINTS
     if profile == V3_PROFILE:
         return V3_POINTS
@@ -655,8 +658,8 @@ def point_sources(profile):
     result={cls+"."+method:module for module,classes in points(profile).items()
         for cls,methods in classes.items() for method in methods}
     expected=sum(len(methods) for classes in points(profile).values() for methods in classes.values())
-    if profile in {release_sensor.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,V4_PROFILE,V5_PROFILE,V6_PROFILE,V7_PROFILE}:
-        functions=online.functions(sensor) if profile==online.PROFILE else sensor.FUNCTION_POINTS if profile in {release_sensor.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else V7_FUNCTION_POINTS if profile==V7_PROFILE else V6_FUNCTION_POINTS if profile==V6_PROFILE else V5_FUNCTION_POINTS if profile==V5_PROFILE else V4_FUNCTION_POINTS
+    if profile in {release_sensor.PROFILE,init_release.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,V4_PROFILE,V5_PROFILE,V6_PROFILE,V7_PROFILE}:
+        functions=online.functions(sensor) if profile==online.PROFILE else sensor.FUNCTION_POINTS if profile in {release_sensor.PROFILE,init_release.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else V7_FUNCTION_POINTS if profile==V7_PROFILE else V6_FUNCTION_POINTS if profile==V6_PROFILE else V5_FUNCTION_POINTS if profile==V5_PROFILE else V4_FUNCTION_POINTS
         result.update({module.rsplit(".",1)[-1]+"."+method:module
             for module,methods in functions.items() for method in methods})
         expected+=sum(len(methods) for methods in functions.values())
@@ -669,7 +672,7 @@ def valid_call_frame(frame,profile):
     base={"point","request_sha256"}
     if set(frame)==base:return True
     extra={"weight_call_sha256","weight_model_sha256"}
-    if profile not in {release_sensor.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,V4_PROFILE,V5_PROFILE,V6_PROFILE,V7_PROFILE} or set(frame)!=base|extra or frame.get("point")!="DefaultModelLoader.load_weights":return False
+    if profile not in {release_sensor.PROFILE,init_release.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,V4_PROFILE,V5_PROFILE,V6_PROFILE,V7_PROFILE} or set(frame)!=base|extra or frame.get("point")!="DefaultModelLoader.load_weights":return False
     return (type(frame["weight_call_sha256"]) is str and re.fullmatch(r"[0-9a-f]{64}",frame["weight_call_sha256"]) is not None
         and (frame["weight_model_sha256"] is None or type(frame["weight_model_sha256"]) is str
             and re.fullmatch(r"[0-9a-f]{64}",frame["weight_model_sha256"]) is not None))

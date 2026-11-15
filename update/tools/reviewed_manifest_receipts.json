@@ -200,6 +200,11 @@
       "manifest_sha256": "226b4c94ccb7922e4318a17c29d2d660d95d68cb078239e753dc1f567262ac92",
       "reviewed_by": "Claude / BYUL UPDATE / M-A6-V6 0.30.0 lifecycle 정확 행 profile(/25) self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T18:00:00+09:00"
+    },
+    {
+      "manifest_sha256": "cde403406960701b1a9dd542019c02c9170315f7aa13c8402e6904150d503ed5",
+      "reviewed_by": "Claude / BYUL UPDATE / M-A6-V6 termination 계열 /25 연결·initialization /26 self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T19:30:00+09:00"
     }
   ]
 }

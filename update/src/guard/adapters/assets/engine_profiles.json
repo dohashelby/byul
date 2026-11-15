@@ -109,10 +109,14 @@
       ],
       "features": [
         "credential_revocation",
+        "initialization",
         "lifecycle_release_rows",
         "model_authorization",
         "native_route",
-        "session_revocation"
+        "observation_state",
+        "request_attempts",
+        "session_revocation",
+        "termination"
       ],
       "pin_status": "image_pin",
       "qualification": "기반 /8 센서를 이 판본의 정확 설치 bytes 행으로 설정하는 /25 profile(사용자 결정 M-A6-V6). 행이 없는 모듈(default_loader 등)은 검증되지 않은 모듈로 남는다. GPU 생산자 등록은 별도다. 근거 docs/dev-1/ma6-version-applicability.md 22절."

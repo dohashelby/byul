@@ -443,3 +443,26 @@ V0에는 V1과 같은 이름의 객체가 거의 없다. 계약 사건(시도·�
 - 열림: `model_authorization`(REQ-05), `session_revocation`(PLT-11), `credential_revocation`(PLT-10), `native_route`. 기반 지점만 쓰며 필요한 모듈(models·middleware·input_processor·base_loader·gpu_model_runner `_model_forward`)에 모두 행이 있다. PLT-10·11은 1차 제외 점검이라 실행 결과는 원래대로 UNKNOWN일 수 있다.
 - 닫힘 유지: `request_termination`·`stream_buffer`·`initialization`·`observation_state`·`profiler_observation`·`rank_failure`·`resource_recovery`·`observation_identity`. 이 센서들은 기반 위에 자기 추가 모듈(`SOURCE_ADDITIONS`: scheduler·request·runner 추가 지점, uvicorn, multiproc_executor, profiler wrapper 등)을 0.31.0 행으로만 갖는다. 파생 센서마다 같은 방식의 판본 행 검토가 다음 작업이다. multiproc_executor는 M-A3 기록에서 두 이미지 모두 기존 고정값과 다르다.
 - GPU 확인·생산자 등록은 하지 않았다. 판본이 열린 것은 실행 자격이나 PASS 근거가 아니다.
+
+## 23. 후보 0.30.0 파생 센서 행 (2026-11-15)
+
+### 23.1 기반 기록으로 도는 실행기 — `/25` 연결
+
+`request_termination`(LIF-10, LIF-12 재시도, REQ-12 시도)과 `observation_state`(OBS-02)는 처음부터 기반 `/8` 기록도 받도록 설계돼 있다(`supported_native_profiles`). projection은 profile별로 갈라지지 않고 기록의 사건만 읽는다. `/25`는 `/8`과 같은 기록 형식이라 지원 집합에 `/25`를 더해 0.30.0에서 열었다. 취소·해제·종료 지점(scheduler·output_processor·core·async_llm·gpu_model_runner·gpu_input_batch)은 22절에서 모두 0.30.0 행이 있다. 파생 termination 센서(`/9`)의 추가 지점은 쓰지 않으므로 `/8` 기록이 주는 범위의 관측이다. 사용자 승인(2026-11-15, "바꿔도 됨")으로 `test_ma6_release_profiles.py`의 "후보에서 request_termination 비노출" assert를 "후보 열림, 기준 닫힘"으로 바꿨다.
+
+### 23.2 initialization — `/26`
+
+- `vllm_initialization_release_sensor.py`(`vllm-native-lifecycle-metadata/26`)는 관측 코드를 더하지 않는다. 비공개 사본 세 개를 순서대로 겹친다: 기반 `/8`, 기반 0.30.0 행(`/25`), initialization 센서 `/14`. 그다음 `/14` 사본의 `SOURCE_ADDITIONS`만 0.30.0 `multiproc_executor` 행(`3ed0149a…`, 이미지 승격 행과 같음)으로 바꾼다. 설치 파일 세 개는 정확 SHA로 확인한다.
+- `/14` 자기 코드 지문은 원본 SHA를 모듈 전역에서 이름으로 읽기 때문에 행을 바꿔도 그대로다(직접 시험으로 고정). 따라서 기존 CPython 판본별 지문 행을 그대로 쓴다. 0.30.0 이미지 CPython 3.12.3 행이 있다.
+- 의미 검토: 관측 지점 `MultiprocExecutor._init_executor`·`WorkerProc.wait_for_ready`·`WorkerProc.wait_for_response_handle_ready`는 0.31.0과 0.30.0 소스가 한 줄도 다르지 않다(code 객체 비교 시험).
+- 기록 검증 `vllm_initialization_metadata.validate_sample`은 profile별 원본 행을 받게 했다. 기본값은 기존 0.31.0 행이다. `/26` 기록에 0.31.0 행이 나오거나 `/14` 기록에 0.30.0 행이 나오면 거부한다.
+- 열린 점검: LIF-09. LIF-07도 같은 실행기라 실행은 된다. 하지만 준비 상태 사슬(`/18`~`/22`: worker startup·generation·ready endpoint)은 0.31.0 행과 `default_loader`에 묶여 있어 0.30.0에서는 원인 있는 UNKNOWN이 된다.
+
+### 23.3 닫힌 채 남은 것
+
+| 실행기 | 점검 | 원인 |
+|---|---|---|
+| stream_buffer | LIF-03·04 | uvicorn `h11_impl`·`httptools_impl`·`flow_control` 행이 기존 uvicorn 커밋 것뿐이다. 후보 이미지의 uvicorn은 0.53.0이고(M-A3 메타데이터), 그 설치 파일 bytes가 아직 없다 |
+| profiler_observation | LIF-14 | 후보의 `TorchProfilerWrapper._start/_stop`·`Worker.profile` 동작이 다르다(함수 검토 기록). 의미 검토가 먼저다 |
+| rank_failure·resource_recovery | J02 밖 | `multiproc_executor` 다른 지점·fault 경로. M-A3 별도 작업 |
+| observation_identity | J02 밖 | `default_loader` 공백 |

@@ -2,6 +2,7 @@
 from pathlib import Path
 import uuid
 from guard.adapters import vllm_initialization_sensor as sensor,vllm_initialization_metadata as metadata
+from guard.adapters import vllm_initialization_release_sensor as init_release
 from guard.adapters import vllm_ready_endpoint_sensor as endpoint_sensor,vllm_ready_endpoint_contract as endpoint_contract,vllm_ready_endpoint_metadata as endpoint_metadata
 from guard.adapters import vllm_worker_generation_sensor as generation_sensor,vllm_worker_generation_metadata as generation_metadata
 from guard.adapters import vllm_worker_initialization_sensor as joint_sensor,vllm_worker_initialization_metadata as joint_metadata
@@ -57,7 +58,7 @@ class KubernetesInitializationExecutor(LifecycleCommonInputConsumer, HttpCheckEx
             if prepared['profile']==endpoint_sensor.PROFILE:
                 if not {'init_ready_endpoint_events','init_ready_endpoint_candidates'}<=required:raise ValueError
             if (target_hash!=policy_values['init_target_sha256'] or env.ref().sha256!=policy_values['init_environment_sha256']
-                    or self.expected_target is not None and target_hash!=self.expected_target or prepared['profile'] not in {sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
+                    or self.expected_target is not None and target_hash!=self.expected_target or prepared['profile'] not in {sensor.PROFILE,init_release.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
                     or sha256_hex(canonical_json(prepared))!=policy_values['init_prepared_sha256'] or not start<=utcnow()<=end or type(env.model.inventory_sha256) is not str or len(env.model.inventory_sha256)!=64):raise ValueError
         except (KeyError,ValueError,TypeError,RuntimeError,OSError):raise ValueError('INITIALIZATION_CONFIGURATION_INVALID') from None
         transport=KubernetesInitializationHTTP(target,env,runner=self.runner,duration=self.cfg.get('max_duration_seconds',120),binary=self.cfg.get('kubectl_binary','kubectl'))

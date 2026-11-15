@@ -128,13 +128,22 @@ def test_checked_loader_uses_only_the_release_row(world, tmp_path):
     assert emitted[0][1]['verified'] is True and emitted[0][1]['source_sha256'] == world.base.SOURCE_SHA[module]
 
 
+def test_termination_family_accepts_release_records_like_the_base():
+    from guard.executors.kubernetes_request_termination import KubernetesRequestTerminationExecutor as T
+    from guard.executors.kubernetes_request_attempts import KubernetesRequestAttemptsExecutor as A
+    from guard.executors.kubernetes_observation_state import KubernetesObservationStateExecutor as O
+    for executor in (T, A, O):
+        assert {legacy.PROFILE, release.PROFILE} <= executor.supported_native_profiles
+
+
 def test_release_profile_is_admitted_only_for_its_catalogued_release():
     assert engine_profiles.resolve('vllm', '0.30.0', 'lifecycle_release_rows').profile == 'vllm-lifecycle-release-rows/1'
     for version in ('0.7.0', '0.31.0', 'EXAMPLE-future'):
         assert not engine_profiles.supports('vllm', version, 'lifecycle_release_rows')
-    for executor in ('model_authorization', 'session_revocation', 'credential_revocation', 'native_route'):
+    for executor in ('model_authorization', 'session_revocation', 'credential_revocation', 'native_route',
+                     'request_termination', 'observation_state', 'initialization'):
         assert resolve_executor(executor, 'kubernetes', engine='vllm', version='0.30.0') is not None
         assert resolve_executor(executor, 'kubernetes', engine='vllm', version='0.7.0') is None
     # 행이 없는 모듈에 기대는 엔진 안 관측은 계속 닫혀 있다.
-    for executor in ('request_termination', 'stream_buffer', 'initialization', 'observation_state', 'profiler_observation'):
+    for executor in ('stream_buffer', 'profiler_observation'):
         assert resolve_executor(executor, 'kubernetes', engine='vllm', version='0.30.0') is None

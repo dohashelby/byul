@@ -1,3 +1,10 @@
+## 2026-11-15 — 0.30.0 파생 센서 행: termination 계열 `/25` 연결, initialization `/26`
+
+- 한 일: request_termination·observation_state(LIF-10·12, REQ-12, OBS-02)를 `/25` 기록으로 0.30.0에서 열었다(사용자 승인으로 판본표 assert 1개 변경). initialization 센서를 바꾸지 않고 0.30.0 `multiproc_executor` 행으로 겹치는 `/26`을 추가해 LIF-09를 열었다. 관측 세 함수는 두 판본 소스가 같다. stream_buffer(uvicorn 0.53.0 bytes 없음)·profiler(동작 차이)는 원인을 적고 닫아 두었다. ma6-version-applicability 23절.
+- 테스트 결과: CI와 같은 CPython 3.12.3 venv에서 새 직접 시험(`test_ma6_initialization_release.py`, release rows·판본표)과 initialization·lifecycle capture 관련 시험 162개 통과(`-n` 없이). 전체 pytest는 PR CI로 확인한다.
+- 다음 단계: uvicorn 0.53.0 설치 파일 확보 뒤 stream_buffer 행, profiler 의미 검토, V0 관측기 D1~D3.
+- 막힌 것: uvicorn 설치 bytes 확보 방법(이미지 레이어 또는 배포 wheel)은 다운로드 승인이 필요하다.
+
 ## 2026-11-15 — M-A6-V6 0.30.0 lifecycle 정확 행 profile `/25`
 
 - 한 일: 사용자 결정 M-A6-V6에 따라 기반 `/8`을 바꾸지 않고 0.30.0 정확 설치 행 18개로 기반을 설정하는 `vllm_lifecycle_release_sensor.py`(`/25`)를 추가했다. 검토 4개 모듈 중 scheduler·gpu_model_runner·gpu_input_batch는 기반 지점 의미가 같아 행을 넣었고 default_loader는 반환 tuple이 달라 공백으로 두었다. 준비 자산·기록 검증·세션 결합(카탈로그 `lifecycle_release_rows`, 0.30.0만)을 연결하고, 기반 지점만 쓰는 REQ-05·PLT-10·PLT-11·native_route를 0.30.0에서 열었다. 판본 혼합 bytes는 거부한다. ma6-version-applicability 22절.

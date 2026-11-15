@@ -171,8 +171,8 @@
           "checks": [
             "OBS-02"
           ],
-          "basis": "사용자 결정 M-A6-W1(2026-11-15)로 열기 승인. PR #281의 /28 요청 연결 병합 뒤 지원 집합에 넣는다. ma6-version-applicability.md 27.1",
-          "next": "#281 병합 뒤 /28 연결로 열기"
+          "basis": "사용자 결정 M-A6-W1(2026-11-15)로 열기 승인. #281의 /28은 병합됐으며 후속에서 HMAC 요청 ID 소비와 상태 projection을 연결한다. ma6-version-applicability.md 27.1",
+          "next": "후속 /28 HMAC 요청 연결과 상태 projection 검증"
         },
         "profiler_observation": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
@@ -208,8 +208,8 @@
             "LIF-12",
             "REQ-12"
           ],
-          "basis": "사용자 결정 M-A6-W1(2026-11-15)로 열기 승인. PR #281의 /28 요청 연결 병합 뒤 지원 집합에 넣는다. ma6-version-applicability.md 27.1",
-          "next": "#281 병합 뒤 /28 연결로 열기"
+          "basis": "사용자 결정 M-A6-W1(2026-11-15)로 열기 승인. #281의 /28은 병합됐으며 후속에서 HMAC 요청 ID 소비와 종료 projection을 연결한다. ma6-version-applicability.md 27.1",
+          "next": "후속 /28 HMAC 요청 연결과 종료 projection 검증"
         },
         "resource_recovery": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
@@ -357,8 +357,8 @@
           "checks": [
             "LIF-14"
           ],
-          "basis": "사용자 결정 M-A6-W3(2026-11-15): 세대를 start/stop 호출 순서로 정의해 관측. 센서 지문 재계산 장소 결정 필요. ma6-version-applicability.md 27.4",
-          "next": "M-A6-W3 결정 뒤 profiler 세대 의미 반영"
+          "basis": "사용자 결정 M-A6-W3(2026-11-15): 세대를 start/stop 호출 순서로 정의한다. 기존 센서는 성공한 start마다 새 세대를 만든다. 후보 정확 모듈 행과 composition 연결은 후속이다. ma6-version-applicability.md 27.4",
+          "next": "기존 센서 bytes를 보존한 후보 profiler 변형 profile 검증"
         },
         "rank_failure": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",

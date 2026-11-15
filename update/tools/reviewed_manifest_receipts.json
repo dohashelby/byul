@@ -310,6 +310,11 @@
       "manifest_sha256": "6796f881c7ef541d9b54cfe772d6354b1ab95f160fbb2c372e273a72a313d584",
       "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T10:36:40.206293+00:00"
+    },
+    {
+      "manifest_sha256": "12ef9dae1cb37b5a741ba0bc84bfe0a1c7e57b8712125e4ea60d5788f7502dee",
+      "reviewed_by": "Codex / PR280 main integration and accurate remaining gap records; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T11:36:55Z"
     }
   ]
 }

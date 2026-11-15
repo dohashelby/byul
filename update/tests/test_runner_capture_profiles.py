@@ -75,3 +75,36 @@ def test_capture_executor_contains_no_engine_names_or_release_pins():
     import re
     source = Path(capture.__file__).read_text(encoding="utf-8")
     assert not re.search(r"vllm|sglang|tensorrt|chatcmpl|cmpl-|0\.31\.0|db9527a", source, re.I)
+
+
+def test_candidate_exact_capture_is_req10_only_and_baseline_stays_closed():
+    candidate = profile("0.30.0")
+    assert candidate.source_commit == "ced6857afa0ea7b2e3f0846a62e1394e90f15607"
+    assert len(candidate.sources) == 9 and candidate.private_response_identity
+    assert set(candidate.response_rules) == {"REQ-10"}
+    assert capture._profile(env("vllm", "0.30.0", candidate.image)) is candidate
+    assert engine_profiles.supports("vllm", "0.30.0", "sampling")
+    assert engine_profiles.supports("vllm", "0.30.0", "runner_capture")
+    assert engine_profiles.require_transport("vllm", "0.30.0", "kubernetes-owned-sampling-http-v1").available
+    assert engine_profiles.require_transport("vllm", "0.30.0", "kubernetes-owned-engine-callback-http-v1").available
+    assert engine_provider.get_provider("vllm").executor_gap("0.30.0", "sampling_validation") is None
+    assert not engine_profiles.supports("vllm", "0.7.0", "sampling")
+    assert not engine_profiles.supports("vllm", "0.7.0", "runner_capture")
+    with pytest.raises(ValueError, match="B_REQ_CAPTURE_SCOPE_INVALID"):
+        capture._profile(env("vllm", "0.30.0", profile("0.31.0").image))
+    with pytest.raises(ValueError, match="B_REQ_CAPTURE_SCOPE_INVALID"):
+        capture._profile(env("vllm", "0.7.0", candidate.image))
+
+
+def test_candidate_capture_file_rows_match_reviewed_candidate_image_table():
+    import json
+    from pathlib import Path
+    root = Path(__file__).parents[1]
+    rows = json.loads((root / "docs/dev-1/ma6-pin-compare.json").read_bytes())["modules"]
+    table = {row["sides"]["candidate"]["file"]["path"].removeprefix("vllm/"):
+             row["sides"]["candidate"]["file"]["sha256"] for row in rows
+             if row["sides"]["candidate"]["file"] is not None}
+    assert dict(profile("0.30.0").sources) == {name: table[name] for name in profile("0.30.0").sources}
+    for name in ("v1/engine/input_processor.py", "v1/worker/gpu_model_runner.py", "v1/worker/gpu_input_batch.py"):
+        fixture = root / "tests/fixtures/vllm-0.30.0/vllm" / (name + ".txt")
+        assert sha256_hex(fixture.read_bytes()) == table[name]

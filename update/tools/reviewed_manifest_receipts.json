@@ -345,6 +345,21 @@
       "manifest_sha256": "d9c39a387ed4b64a3af962b10c90533b871e788592221320a3d576b8b12ad0dc",
       "reviewed_by": "Codex / MA6 profiler compatibility and exact native candidate regression focused review; baseline startup component source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T12:45:05Z"
+    },
+    {
+      "manifest_sha256": "ae14a0fe8302253789fb6976d5b984f0b9d4a54303d9e8daef5c3f2b6dffb2d3",
+      "reviewed_by": "Codex / MA6 candidate REQ10 exact runner capture and sampling value review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T12:34:19Z"
+    },
+    {
+      "manifest_sha256": "5edf75d2b0e9d9f25c9f63d8f6dfb40d16a88e4ca8840f3207c5fe09825a2d02",
+      "reviewed_by": "Codex / MA6 candidate REQ10 normalized default and consumer gap review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T12:43:41Z"
+    },
+    {
+      "manifest_sha256": "0e7250d534830e07fafd93d334e251776b9e3449be32739e7b246029ffc79fb1",
+      "reviewed_by": "Codex / MA6 candidate REQ10 worker file pins and immutable receipt review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T12:49:10Z"
     }
   ]
 }

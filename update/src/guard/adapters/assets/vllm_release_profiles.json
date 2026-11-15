@@ -338,17 +338,6 @@
           "checks": [],
           "basis": "ma6-version-applicability.md 19.2",
           "next": "M-B4"
-        },
-        "sampling_validation": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_runner_capture"
-          ],
-          "checks": [
-            "REQ-10"
-          ],
-          "basis": "ma6-version-applicability.md 19.3. runner_capture 소비 관측이 0.31.0 고정값만 있다. tests/test_code_selection_observation.py가 구 판본 비노출을 고정한다",
-          "next": "M-B4 및 결정 V0-5"
         }
       }
     }

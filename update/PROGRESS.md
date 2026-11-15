@@ -2998,3 +2998,11 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 의미 경계: profiler generation은 원본 센서에서 각 qualified start/stop 호출 순서에 따라 이미 새로 부여된다. backend SHA 동일성을 세대 동일성으로 간주하지 않으며 backend 종료·trace·RPC·다음 정상 시작의 판정은 그대로다. 실제 ENV/target·GPU 생산자 등록과 실측은 미완료다.
 - 테스트 결과: 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 정확 bytes/준비 자산 변조/판본 노출 회귀는 CI에서 확인한다. 로컬에서는 shell SHA, JSON 구문, `git diff --check`만 확인했다.
 - 다음 단계: 집중 소스 검토와 CI에서 variant 준비·기록 파서·LIF-03/04·14 직접 경로를 확인한다. 실패하면 정확 head에서 보수한다.
+
+## 2026-11-15 — M-A6 후보 0.30.0 REQ-10 runner capture (로컬 검토)
+
+- 한 일: 후보 이미지의 serving/input 7개 정확 SHA와 V1 환경, 준비 자산/개인 키/세대를 검사하는 REQ-10 전용 capture profile을 추가했다. 기존 callback의 API 검증→runner 수신→sampler 진입 값 가운데 temperature/top_p만 case별 대조한다. 후보 응답 ID 기록은 세션 HMAC으로 보호하고 기준 0.7.0 관문과 기존 0.31.0 profile은 보존했다.
+- 테스트 결과: 실제 callback snapshot 기본값/배열 미지원 record를 producer→B 소비 경계에 전달하는 회귀와 후보 전체 mock 전송·소스/환경/mount 실패 회귀를 작성했다. 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 제품 소스 SHA와 manifest/receipt는 shell로 갱신하고 최종 확인한다.
+- 다음 단계: 집중 검토 후 Linux CI에서 정확 producer/consumer 결합과 후보 전송을 검증한다. W5 구조화 출력 GPU 실험, 후보 실제 GPU/생산자 등록은 남는다. 이 값 연결은 전체 REQ-10 PASS가 아니다.
+- 후속 검토 수정: 요청에 없는 temperature/top_p를 0/1로 가정하지 않는다. API가 실제로 정규화한 값을 runner·sampler와 대조하고, 값 누락/차이를 B 최종 projection 공백과 `runner_consumption_verified=false`로 연결했다. 후보 mock 기본값1·비기본값·sampler 반례와 이전 0.30.0 비노출 assert의 승인된 V5 변경을 추가했다. 로컬 Python/pytest는 계속 실행하지 않았다.
+- 고정값/receipt 검토 수정: 후보 worker `gpu_model_runner`·`gpu_input_batch`의 정확 설치 bytes SHA를 추가해 9개 파일을 Pod 전후 대조한다(깨끗한 ced6857 태그·원 fixture·ma6 후보표 일치). sampling 값 불일치 공백은 준비 receipt가 쓰이기 전에 projection에 반영하고, 최종 capture/B 소비와 같은 공백을 남긴다. 로컬 Python/pytest는 실행하지 않았다.

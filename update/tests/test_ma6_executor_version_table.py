@@ -47,8 +47,8 @@ def test_engine_internal_observers_stay_closed_without_release_pins():
     # V1 선택은 실행 자격이 아니다. 기준은 정확 대상표/행이 없으므로 계속 닫혀 있다.
     assert resolve_executor('engine_sensor', 'kubernetes', engine='vllm', version='0.30.0') is not None
     assert resolve_executor('engine_sensor', 'kubernetes', engine='vllm', version='0.7.0') is None
-    for version in ('0.7.0', '0.30.0'):
-        assert resolve_executor('sampling_validation', 'kubernetes', engine='vllm', version=version) is None
+    assert resolve_executor('sampling_validation', 'kubernetes', engine='vllm', version='0.7.0') is None
+    assert resolve_executor('sampling_validation', 'kubernetes', engine='vllm', version='0.30.0') is not None
     for executor in ('stream_buffer', 'profiler_observation'):
         assert resolve_executor(executor, 'kubernetes', engine='vllm', version='0.30.0') is not None
         assert resolve_executor(executor, 'kubernetes', engine='vllm', version='0.7.0') is None

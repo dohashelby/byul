@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from guard.adapters.vllm import REQUEST_BINDING_GPU_IMAGE, VllmAdapter
+from guard.adapters.vllm import VllmAdapter
+from guard.adapters.vllm_runner_capture import profile as capture_profile
 from guard.collectors.engine_callbacks import prepare_assets, load_secret
 from guard.core.select import select
 from guard.executors import registry, req_runner_capture as link
@@ -29,14 +30,17 @@ def baseline_pack():
 
 
 class World(PodWorld):
-    def __init__(self, target, prepared, *, damage=None, consume_reused=False):
+    def __init__(self, target, prepared, *, damage=None, consume_reused=False, profile=CAPTURE_PROFILE,
+                 default_temperature=0.0):
         super().__init__(target)
+        self.profile = profile
+        self.default_temperature = default_temperature
         self.prepared, self.damage, self.consume_reused = prepared, damage, consume_reused
         self.api, self.worker, self.sent = [], [], []
         self.serial = 0
         self.duplicate_response_ids = {}
-        self.fingerprinter = CAPTURE_PROFILE.fingerprinter(load_secret(Path(prepared["_directory"])))
-        self.expected = {(0, name): digest for name, digest in CAPTURE_PROFILE.sources.items()}
+        self.fingerprinter = profile.fingerprinter(load_secret(Path(prepared["_directory"])))
+        self.expected = {(0, name): digest for name, digest in profile.sources.items()}
         self.expected.update({(1, name): digest for name, digest in prepared["assets"].items()})
 
     def runner(self, argv, **kwargs):
@@ -51,14 +55,22 @@ class World(PodWorld):
                 if value["metadata"]["name"] == self.target["kubernetes"]["engine"]["pod"]:
                     container = value["spec"]["containers"][0]
                     container["env"] += [{"name": "VLLM_DISABLE_REQUEST_ID_RANDOMIZATION", "value": "0" if self.damage == "flag" else "1"},
-                        {"name": "VLLM_USE_V2_MODEL_RUNNER", "value": "0"}, {"name": "PYTHONPATH", "value": CAPTURE_PROFILE.callback_root}]
-                    container["volumeMounts"] = [{"name": "callbacks", "mountPath": CAPTURE_PROFILE.callback_root, "readOnly": self.damage != "mount"}]
+                        {"name": "VLLM_USE_V2_MODEL_RUNNER", "value": "0"}, {"name": "PYTHONPATH", "value": self.profile.callback_root}]
+                    container["volumeMounts"] = [{"name": "callbacks", "mountPath": self.profile.callback_root, "readOnly": self.damage != "mount"}]
             return {**result, "stderr_bytes": b"", "stdout_bytes": canonical_json(value)}
         if "--container=engine" in argv:
             if "input_bytes" in kwargs:
                 spec = json.loads(kwargs["input_bytes"])
-                rows = [{**row, "sha256": "f"*64 if self.damage == "source" else self.expected[(row["root"], row["relative"])],
-                         "size": 100, "state": "hashed"} for row in spec["files"]]
+                rows = []
+                for row in spec["files"]:
+                    relative = row["relative"]
+                    old_worker = self.damage == "old-worker" and relative == "v1/worker/gpu_model_runner.py"
+                    missing_batch = self.damage == "missing-batch" and relative == "v1/worker/gpu_input_batch.py"
+                    digest = ("f" * 64 if self.damage == "source" else
+                        "bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a" if old_worker else
+                        None if missing_batch else self.expected[(row["root"], relative)])
+                    rows.append({**row, "sha256": digest, "size": 0 if missing_batch else 100,
+                                 "state": "missing" if missing_batch else "hashed"})
                 value = {"files": rows}
             else:
                 value = {"processes": [{"pid": 1, "start_ticks": 11, "events": deepcopy(self.api)},
@@ -81,7 +93,10 @@ class World(PodWorld):
                     reply = {"id": request["id"], "outcome": 400, "body": json.dumps({"error": {"message": "EXAMPLE bounded rejection", "type": "BadRequestError", "code": 400}})}
                 else:
                     chat = request["url"].endswith("/v1/chat/completions")
-                    rid = response_id(chat)
+                    # The 0.31 fixture executes its reviewed producer; the
+                    # candidate mock supplies a bounded ID of the pinned shape.
+                    rid = response_id(chat) if self.profile is CAPTURE_PROFILE else (
+                        ("chatcmpl-" if chat else "cmpl-") + format(serial, "016x"))
                     if self.damage == "duplicate":
                         rid = self.duplicate_response_ids.setdefault(chat, rid)
                     reply = completion_response(request)
@@ -90,32 +105,40 @@ class World(PodWorld):
                     reply.update(id=request["id"], body=json.dumps(payload))
                     internal = rid if chat else rid + "-0"
                     fingerprint = self.fingerprinter.fingerprint(internal)
+                    params = {**PARAMS,
+                        "temperature_milli": round(body.get("temperature", self.default_temperature) * 1000),
+                        "top_p_milli": round(body.get("top_p", 1.0) * 1000)}
                     for row in deepcopy(api_rows(fingerprint)):
+                        if row["point"] == "InputProcessor._validate_params" and row["phase"] == "CALL":
+                            row["fields"]["params"] = params
                         row["call_sha256"] = sha256_hex((str(serial) + row["call_sha256"]).encode())
                         row["operation_started_ns"] += serial*100
                         row["operation_finished_ns"] += serial*100
                         self.api.append(row)
                     worker_fp = self.fingerprinter.fingerprint(internal + "-deadbeef") if self.damage == "suffix" else fingerprint
                     self.worker += [crow(10000 + serial*100, "GPUModelRunner._update_states", "CALL", received=[{
-                        "request_sha256": worker_fp, "prompt_tokens": 5, "max_token_id": 99, "params": PARAMS}]),
+                        "request_sha256": worker_fp, "prompt_tokens": 5, "max_token_id": 99, "params": params}]),
                         crow(10001 + serial*100, "GPUModelRunner._sample", "CALL", applied=[{
-                            "request_sha256": worker_fp, "temperature_milli": 0, "top_p_milli": 1000, "top_k": 0,
+                            "request_sha256": worker_fp,
+                            "temperature_milli": 777 if self.damage == "sampler-value" and serial == 1 else params["temperature_milli"],
+                            "top_p_milli": params["top_p_milli"], "top_k": 0,
                             "logprobs": 0, "allowed_tokens": 3, "bad_words": 2}])]
             reply.update(method=request["method"], body_bytes=len(reply.get("body", "").encode()))
         return {"returncode": 0, "stdout_bytes": canonical_json([reply]), "stderr_bytes": b"", "capture": {"complete": True}}
 
 
-def case(tmp_path, *, damage=None, consume_reused=False, selected=("REQ-08", "REQ-09", "REQ-10")):
-    env = environment(engine={"name": "vllm", "version": "0.31.0", "image_digest": REQUEST_BINDING_GPU_IMAGE},
+def case(tmp_path, *, damage=None, consume_reused=False, selected=("REQ-08", "REQ-09", "REQ-10"), version="0.31.0"):
+    selected_profile = capture_profile(version)
+    env = environment(engine={"name": "vllm", "version": version, "image_digest": selected_profile.image},
                       model={"id": "EXAMPLE/model", "revision": "a"*40, "inventory_sha256": "b"*64},
                       runtime={"gpu_count": 1, "tp_groups": 1})
     target = target_inputs()
     target.update(schema="guard-kubernetes-request-binding-target/1", environment_ref=env.ref().model_dump(mode="json"),
-        observed_version="0.31.0", model_mapping={"schema": "guard.model-request-mapping/1", "environment_ref": env.ref().model_dump(mode="json"),
+        observed_version=version, model_mapping={"schema": "guard.model-request-mapping/1", "environment_ref": env.ref().model_dump(mode="json"),
             "repository_id": env.model.id, "revision": env.model.revision, "served_model_name": "fixture-model",
             "inventory_sha256": env.model.inventory_sha256, "host_snapshot": "/EXAMPLE/model", "container_mount": "/models/fixture"})
-    target["engine"]["image_digest"] = REQUEST_BINDING_GPU_IMAGE
-    target["kubernetes"]["engine"].update(image=REQUEST_BINDING_GPU_IMAGE, image_id=REQUEST_BINDING_GPU_IMAGE)
+    target["engine"]["image_digest"] = selected_profile.image
+    target["kubernetes"]["engine"].update(image=selected_profile.image, image_id=selected_profile.image)
     prepared_dir = tmp_path / "prepared"
     prepared = prepare_assets(prepared_dir, runner_consumption=True)
     env_path = tmp_path / "environment.json"; env_path.write_bytes(canonical_json(env.to_dict()))
@@ -128,14 +151,15 @@ def case(tmp_path, *, damage=None, consume_reused=False, selected=("REQ-08", "RE
     config = {"adapter": "vllm", "executors": {"input_validation": "kubernetes", "sampling_validation": "kubernetes"},
         "input_validation": {"target": str(target_path), "vocab_size": 100, "vocab_source": "EXAMPLE fixed vocabulary", "reused_token_ids": [11, 12, 13],
             "max_probe_tokens": 64, "max_duration_seconds": 120, "runner_capture": capture},
-        "sampling_validation": {"target": str(target_path), "constraint_source": "EXAMPLE source", "constraint_engine_version": "0.31.0",
+        "sampling_validation": {"target": str(target_path), "constraint_source": "EXAMPLE source", "constraint_engine_version": version,
             "max_output_tokens": 1, "max_total_requests": 11, "max_probe_tokens": 64, "max_duration_seconds": 120, "runner_capture": capture}}
     config_path = tmp_path / "config.json"; config_path.write_bytes(canonical_json(config))
     pack = baseline_pack()
     pol = policy(pack.ref(), values={cid: values[cid] for cid in selected}, scope={"include": list(selected)})
     source = Store(tmp_path / "source"); put_pack(source, PACK_DIR); source.put_many([env, pol])
     plan = select(pack, [env], pol); source.put(plan)
-    world = World(target, {**prepared, "_directory": str(prepared_dir)}, damage=damage, consume_reused=consume_reused)
+    world = World(target, {**prepared, "_directory": str(prepared_dir)}, damage=damage, consume_reused=consume_reused,
+                  profile=selected_profile, default_temperature=1.0 if version == "0.30.0" else 0.0)
     return {"env": env, "target": target, "config": config, "path": config_path, "source": source, "plan": plan, "values": values, "world": world}
 
 
@@ -162,6 +186,73 @@ def test_same_native_requests_reach_original_pipeline_and_exact_restored_report(
         for artifact in obj.artifacts:
             raw = (store.root / artifact.path).read_bytes()
             assert sha256_hex(raw) == artifact.sha256 and data["world"].fingerprinter.secret.hex().encode() not in raw
+
+
+def test_candidate_req10_exact_runner_path_keeps_values_and_response_ids_private(tmp_path, monkeypatch):
+    data = case(tmp_path, version="0.30.0", selected=("REQ-10",))
+    monkeypatch.setattr(kube, "capture_pipes", data["world"].runner)
+    summary = driver.run(data["source"].root, data["plan"].id, data["path"], tmp_path / "run", collect=True)
+    assert summary["selected"] == ["REQ-10"] and summary["exact_refs_restored"] and summary["saved_pack_rejudge_equal"]
+    store = Store.read_only(tmp_path / "run/restored")
+    evd, = store.iter_kind("EVD")
+    assert evd.data_origin == DataOrigin.EXAMPLE
+    artifact = next(a for a in evd.artifacts if a.name == "req_runner_capture.json")
+    raw = (store.root / artifact.path).read_bytes()
+    proof = json.loads(raw)
+    assert proof["source_commit"] == capture_profile("0.30.0").source_commit
+    assert proof["sampling_values_equal_in_record"] is True
+    receipt = json.loads((store.root / next(a.path for a in evd.artifacts
+                                    if a.name == "req_runner_prepare_receipt.json")).read_bytes())
+    assert receipt["capture_sampling_match"] is True
+    assert receipt["consumer_projection"] == proof["consumer_projection"]
+    before = next(row for row in proof["cases"] if row["case"] == "before")
+    assert before["expected_sampling"] == {} and before["sampling_values_equal_in_record"] is True
+    common = json.loads((store.root / next(a.path for a in evd.artifacts
+                                if a.name == "b_common_consumption.json")).read_bytes())
+    before_events = [row for row in common["record"]["events"]
+                     if row["request_sha256"] == before["request_sha256"]]
+    assert [row["event"] for row in before_events] == ["api_validated", "runner_received", "sampler_applied"]
+    assert all(row["temperature_milli"] == 1000 and row["top_p_milli"] == 1000 for row in before_events)
+    assert not proof["runtime_link_complete"] and not proof["gpu_ready"]
+    assert all(row["sampling_values_equal_in_record"] for row in proof["cases"]
+               if row["case"] not in {"temperature", "top_p"})
+    rid = "cmpl-0000000000000001"
+    assert sha256_hex(rid.encode()).encode() not in raw
+    assert any(row["response_id_sha256"] == data["world"].fingerprinter.fingerprint(rid)
+               for row in proof["cases"])
+    assert data["world"].fingerprinter.secret.hex().encode() not in raw
+
+
+def test_candidate_sampler_value_mismatch_reaches_common_consumer_gap(tmp_path, monkeypatch):
+    data = case(tmp_path, version="0.30.0", selected=("REQ-10",), damage="sampler-value")
+    monkeypatch.setattr(kube, "capture_pipes", data["world"].runner)
+    summary = driver.run(data["source"].root, data["plan"].id, data["path"], tmp_path / "run", collect=True)
+    store = Store.read_only(tmp_path / "run/restored")
+    evd, = store.iter_kind("EVD")
+    proof = json.loads((store.root / next(a.path for a in evd.artifacts
+                                  if a.name == "req_runner_capture.json")).read_bytes())
+    projection = json.loads((store.root / next(a.path for a in evd.artifacts
+                                       if a.name == "b_common_consumption.json")).read_bytes())["projection"]
+    receipt = json.loads((store.root / next(a.path for a in evd.artifacts
+                                    if a.name == "req_runner_prepare_receipt.json")).read_bytes())
+    assert proof["sampling_values_equal_in_record"] is False
+    assert receipt["capture_sampling_match"] is False
+    assert receipt["consumer_projection"] == proof["consumer_projection"]
+    assert set(receipt["consumer_projection"]["gaps"]) <= set(projection["gaps"])
+    assert "B_RUNNER_SAMPLING_VALUES_UNVERIFIED" in proof["consumer_projection"]["gaps"]
+    assert "B_RUNNER_SAMPLING_VALUES_UNVERIFIED" in projection["gaps"]
+    assert receipt["consumer_projection"]["complete"] is False and projection["complete"] is False
+    assert evd.observations["runner_consumption_verified"].value is False
+    assert evd.execution.status.value == "ABORTED" and summary["exact_refs_restored"]
+
+
+@pytest.mark.parametrize("damage", ["flag", "source", "mount", "old-worker", "missing-batch"])
+def test_candidate_preflight_failure_dispatches_no_req10_request(tmp_path, monkeypatch, damage):
+    data = case(tmp_path, version="0.30.0", selected=("REQ-10",), damage=damage)
+    monkeypatch.setattr(kube, "capture_pipes", data["world"].runner)
+    summary = driver.run(data["source"].root, data["plan"].id, data["path"], tmp_path / "run", collect=True)
+    assert data["world"].sent == []
+    assert summary["evidence"][0]["status"] == "ABORTED" and summary["exact_refs_restored"]
 
 
 @pytest.mark.parametrize("damage", ["flag", "source", "mount"])

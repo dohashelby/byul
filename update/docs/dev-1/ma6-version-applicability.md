@@ -541,7 +541,7 @@ J02 첫 실행(2026-11-15, L4 1장, 두 판본 동시 기동)에서 69개가 모
 |---|---|---|
 | LIF-03·04 | 닫힘 | uvicorn 0.53.0 설치 파일 bytes 필요. PyPI wheel(87,081 bytes) 다운로드 승인 대기 |
 | LIF-14 | 닫힘 | `TorchProfilerWrapper._start`: 0.31.0은 start마다 새 profiler 객체를 만들고, 0.30.0은 같은 객체를 다시 시작한다. `_stop`은 dump 설정 이름이 다르다. `WorkerProfiler.start/stop/step`은 같다. profiler 세대를 객체로 볼지 호출 순서로 볼지(M-A6-W3) |
-| REQ-10 | 닫힘 | runner_capture 0.30.0 행이 없다. V5 조건(행 추가 뒤 assert 변경)은 유지 |
+| REQ-10 | 열림(29절 정확 runner_capture 행) | V5의 temperature/top_p API→runner→sampler 관측만 연결한다. structured_outputs·min_tokens 및 GPU 실측은 별도 공백 |
 
 ## 27. 사용자 결정 M-A6-W1~W6 반영 (2026-11-15)
 
@@ -588,6 +588,8 @@ J02 첫 실행(2026-11-15, L4 1장, 두 판본 동시 기동)에서 69개가 모
   - 후보 LIF-14를 닫은 실제 원인은 센서 추가 모듈 세 개(`vllm.profiler.wrapper`·`vllm.v1.worker.gpu_worker`·`vllm.entrypoints.serve.profile.api_router`)의 고정값이 0.31.0 것뿐이라는 점이다. 23.2절 `/26`처럼 기반 + `/25` + profiler 센서에 0.30.0 행을 겹치는 변형 profile로 연다. 바뀐 함수 중 센서가 읽는 값(`Worker.profile`의 `profiler_config.profiler`, wrapper의 `_active`·`_running`·`local_rank`, `profiler` 객체)은 변형을 만들 때 다시 대조한다. 이 변형은 #281과 같은 파일을 건드리므로 #281 병합 뒤에 한다.
 ## 29. 후보 0.30.0 transport/profiler 정확 변형 (2026-11-15)
 
+- REQ-10 후보 runner_capture는 별도 정확 0.30.0 행으로 연다. `ma6-pin-compare.json`의 후보 이미지와 일치하는 serving/input/worker 9개 파일 SHA를 runtime Pod에서 전후 다시 대조한다. 여기에 원본 callback 자산·session HMAC 키·`VLLM_DISABLE_REQUEST_ID_RANDOMIZATION=1`·`VLLM_USE_V2_MODEL_RUNNER=0`·읽기 전용 mount·동일 세대도 확인한다. 대상 요청은 `POST /v1/completions`, 비스트림 `n=1`, 짧은 prompt 하나다. 0.30.0의 `_base_request_id`는 header가 없으면 16-hex `random_uuid`를 사용하고, completion serving은 `cmpl-` 부모 ID에 `-0`을 붙여 V1 엔진에 보낸다. 후보 capture의 응답/요청 식별 기록은 session HMAC만 쓴다. 기준 0.7.0 관문과 0.31.0 기존 profile은 그대로다.
+- 실제 REQ-10 값 연결 범위는 `InputProcessor._validate_params`의 `SamplingParams`, `GPUModelRunner._update_states`의 `scheduled_new_reqs`, `GPUModelRunner._sample` 직전 `InputBatch.temperature_cpu`·`top_p_cpu`다. 후보 소스의 `InputBatch.add_request`는 그 배열을 `sampling_params`에서 채우고 `_sample`은 같은 batch의 `sampling_metadata`를 sampler에 넘긴다. 새 capture는 요청에 명시된 숫자 필드만 wire 값으로 고정한다. 생략 필드는 기본값을 발명하지 않고 API 관측의 정규화 값을 runner·sampler와 대조한다. 세 단계 중 누락·차이가 있으면 준비 receipt를 쓰기 전에 B projection에 공백을 더하고 최종 소비도 `runner_consumption_verified=false`로 둔다. 현재 유효 경계 probe는 temperature=0·top_p=1이고, 나머지 정상 probe의 실제 기본값은 API 관측으로만 결정한다. 비기본 유효값의 실측은 없다. 이 값 일치는 GPU tensor/kernel 적용, structured_outputs, min_tokens, 무응답 4xx 도전 사례의 native ID, producer 등록 또는 보안 PASS가 아니다. W5 기준 0.7.0 V1 구조화 출력 GPU 실험과 후보 GPU 확인은 남는다. 로컬 Python/pytest는 실행하지 않았고 PR CI 대상이다.
 - `/29`는 정확 `/8` 기반에 `/25`의 0.30.0 행을 적용한 뒤 원본 `/12` stream observer bytes를 붙인다. Uvicorn h11·httptools·flow_control의 설치 bytes SHA는 기존 `/12`의 세 행과 같다. HTTP 응답 크기와 실제 transport write buffer/kernel outq/RSS는 계속 서로 다른 사실이다. LIF-03/04의 버퍼 실측·GPU 자격은 현재 없다.
 - `/30`은 같은 `/25` 기반에 원본 `/15` profiler observer bytes를 붙이고 wrapper·gpu_worker는 후보 이미지의 정확 SHA 행으로 고른다. profile router는 원본과 정확 bytes가 같다. 원본 센서의 `profiler_emit`는 qualified `_start` RETURN마다 새 `profiler_nonce()`로 generation을 만든다. backend 객체 SHA가 같아도 세대는 start/stop 호출 순서로 구분하므로 이 센서의 소스·CPython 코드 지문을 바꾸지 않는다. backend 수집 종료·trace 출력·cross-process RPC·다음 정상 시작 검증은 기존 독립 관문을 유지한다.
 - 두 변형은 준비 자산의 기반·행·관측기 사본을 정확 bytes로 다시 확인한다. parser도 선택 profile의 소스 행만 허용한다. 0.31.0 원 profile과 과거 결과를 다시 쓰지 않고, 실제 ENV/target·GPU 생산자 등록·PASS를 주장하지 않는다. 로컬 Python/pytest는 사용자 지시로 실행하지 않았으며 CI에서 확인한다.

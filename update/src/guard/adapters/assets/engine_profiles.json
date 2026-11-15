@@ -96,10 +96,12 @@
       ],
       "features": [
         "native_lifecycle",
+        "runner_capture",
+        "sampling",
         "scoped_consumption"
       ],
       "pin_status": "image_pin",
-      "qualification": "후보 행 13개의 설치 bytes·함수 지문은 이미지와 일치했다(docs/dev-1/ma3-image-qualification-20261114.json). 준비 자산 대조와 새 생산자 GPU 등록은 별도다."
+      "qualification": "후보 행 13개의 설치 bytes·함수 지문은 이미지와 일치했다(docs/dev-1/ma3-image-qualification-20261114.json). runner_capture는 정확 9개 serving/input/worker 파일과 기존 callback 자산, 단일 n=1 요청, V1 CPU sampling 배열 temperature/top_p만 추가로 허용한다. 실행 시 이미지·파일·환경·개인 키를 재확인한다. 구조화 출력·min_tokens와 GPU 실측/생산자 등록은 별도다."
     },
     {
       "id": "vllm-lifecycle-release-rows/1",

@@ -73,3 +73,55 @@ def test_real_backend_forwarded_id_matches_buffered_and_stream_receipts(route, s
             assert json.loads(returned)["id"] == prefix + forwarded
     assert connection.request.call_args.kwargs["headers"]["X-Request-ID"] == forwarded
     assert relay.response_id_receipt(RID) == "engine_response_id_matched"
+
+
+def b2_receipt_from_actual_relay(kind, route, stream, value):
+    backend = replace(BackendConfig.mock(("localhost", 1)), kind=kind)
+    choices = [{"delta": {"content": "ok"}}] if stream and route == CHAT_ROUTE else [{"text": "ok"}]
+    raw = json.dumps({"id": value, "object": "text_completion", "choices": choices,
+                      "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}).encode()
+    response = Mock(status=200)
+    response.getheader.return_value = "text/event-stream" if stream else "application/json"
+    response.read.side_effect = [raw, b""]
+    response.read1.side_effect = [(b"data: " + raw + b"\n\ndata: [DONE]\n\n") if stream else raw, b""]
+    connection = Mock(sock=None)
+    connection.getresponse.return_value = response
+    relay = Relay(backend, 2, 2, 5)
+    allowed = Decision("ALLOWED", 200, "REQUEST_ALLOWED", None, "allowed", "model", 10)
+    with (
+        patch.object(BackendConfig, "connection", return_value=(connection, route)),
+        patch("serving_runtime.gateway.relay.DeadlineWatchdog") as watcher,
+        patch("serving_runtime.gateway.relay.relay_payload", return_value=b"{}"),
+    ):
+        watcher.return_value.expired.return_value = False
+        watcher.return_value.finish.return_value = False
+        if stream:
+            result, outcome, started = relay.relay_stream(Mock(), RID, {}, allowed, time.monotonic(), lambda: None, route=route)
+            assert (result, outcome, started) == (allowed, "completed", True)
+        else:
+            result, delivered = relay.relay(RID, {}, allowed, route=route)
+            assert result == allowed and json.loads(delivered)["id"] == value
+    connection.close.assert_called_once()
+    return relay.response_id_receipt(RID)
+
+
+@pytest.mark.xfail(strict=True, reason="B-2")
+@pytest.mark.parametrize("kind", ["mock", "sglang"])
+@pytest.mark.parametrize("route", [CHAT_ROUTE, COMPLETIONS_ROUTE])
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize("prefix", ["", "chatcmpl-", "cmpl-"])
+def test_b2_non_vllm_relay_rejects_callback_id(kind, route, stream, prefix):
+    assert b2_receipt_from_actual_relay(kind, route, stream, prefix + "byul-cb-" + RID) == "engine_response_id_mismatch"
+
+
+@pytest.mark.parametrize("route", [CHAT_ROUTE, COMPLETIONS_ROUTE])
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize("prefix", ["", "chatcmpl-", "cmpl-"])
+def test_b2_vllm_relay_keeps_callback_id(route, stream, prefix):
+    assert b2_receipt_from_actual_relay("vllm", route, stream, prefix + "byul-cb-" + RID) == "engine_response_id_matched"
+
+
+@pytest.mark.parametrize("kind", ["mock", "sglang", "vllm"])
+@pytest.mark.parametrize("prefix", ["", "chatcmpl-", "cmpl-"])
+def test_b2_all_backends_keep_three_legacy_echo_forms(kind, prefix):
+    assert b2_receipt_from_actual_relay(kind, CHAT_ROUTE, False, prefix + RID) == "engine_response_id_matched"

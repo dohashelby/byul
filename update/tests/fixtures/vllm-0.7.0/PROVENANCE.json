@@ -54,6 +54,10 @@
     "vllm/v1/worker/gpu_model_runner.py.txt": {
       "source": "vllm/v1/worker/gpu_model_runner.py",
       "sha256": "1ac3fb18b2adad3609dcf58a1656d6fdd4a568eea6740258e00f6a43c7d4b813"
+    },
+    "vllm/entrypoints/openai/serving_completion.py.txt": {
+      "source": "vllm/entrypoints/openai/serving_completion.py",
+      "sha256": "95184b6b6ceaa3642e6ab86526536ab890728155a929d9dfb3b2f16adc372018"
     }
   },
   "pin_status": "candidate: tag source bytes, not yet compared with the image install file"

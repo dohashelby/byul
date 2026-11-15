@@ -6,6 +6,9 @@ import json
 from pathlib import Path
 import re
 import uuid
+import os
+import secrets
+import stat
 
 from guard.adapters import vllm_lifecycle_sensor as sensor
 from guard.adapters import vllm_termination_sensor as termination_sensor
@@ -54,9 +57,14 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None,fa
         raise ValueError("LIFECYCLE_OUTPUT_IN_REPOSITORY")
     output = reserve_output(output, protected=[Path(repository)])
     selected_profile = profile if selected is configured else selected.PROFILE
-    source = configured.render_source(profile) if selected is configured else Path(selected.__file__).read_bytes()
-    digest = hashlib.sha256(source).hexdigest()
     session = uuid.uuid4().hex
+    key_raw = None
+    if configured.request_binding(selected_profile):
+        key_raw = json.dumps({'schema': 'guard-lifecycle-request-key/1', 'session': session,
+            'key_hex': secrets.token_hex(32)}, sort_keys=True, separators=(',', ':')).encode()
+    source = (configured.render_source(profile, **({'request_key_sha256': hashlib.sha256(key_raw).hexdigest()}
+        if key_raw is not None else {})) if selected is configured else Path(selected.__file__).read_bytes())
+    digest = hashlib.sha256(source).hexdigest()
     config = {"schema":sensor.CONFIG_SCHEMA, "session":session,
         "output_dir":"/guard-lifecycle/data/"+session,
         "control_path":"/guard-lifecycle/data/"+session+"/SEALED"}
@@ -78,6 +86,8 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None,fa
     ).encode()
     values = {"guard_lifecycle_sensor.py":source, "sitecustomize.py":bootstrap,
               "settings.json":(json.dumps(config,sort_keys=True,indent=2)+"\n").encode()}
+    if key_raw is not None:
+        values['request-binding-key.json'] = key_raw
     if selected in (read_sensor,mapping_sensor,startup_sensor,joint_sensor,generation_sensor,endpoint_sensor):
         base_raw=Path(sensor.__file__).read_bytes();iteration_raw=Path(weight_sensor.__file__).read_bytes()
         if (hashlib.sha256(base_raw).hexdigest()!=read_sensor.BASE8_SHA256 or hashlib.sha256(iteration_raw).hexdigest()!=read_sensor.ITERATION16_SHA256):
@@ -174,8 +184,13 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None,fa
         values['sitecustomize.py']=privacy+values['sitecustomize.py']
     assets = {}
     for name, data in values.items():
-        with (output/name).open("xb") as stream:
-            stream.write(data)
+        if name == 'request-binding-key.json':
+            fd = os.open(output / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, 'wb') as stream:
+                stream.write(data)
+        else:
+            with (output/name).open("xb") as stream:
+                stream.write(data)
         assets[name] = {"sha256":hashlib.sha256(data).hexdigest(),"bytes":len(data)}
     manifest = {"schema":"guard-lifecycle-assets/1", "profile":selected_profile, "session":session,
         "public_commit":profiles.public_commit(selected_profile), "assets":assets,
@@ -206,7 +221,7 @@ def load_prepared(path):
             or manifest["engine_started"] is not False or manifest["image_contents_verified"] is not False
             or manifest["product_connected"] is not False
             or type(manifest["assets"]) is not dict
-            or set(manifest["assets"]) != ({"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py"} if configured.contains(manifest["profile"]) else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json",*init_release.ASSETS} if manifest["profile"]==init_release.PROFILE else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py",*fault_sensor.ASSETS,"fault-control-settings.json"}if manifest["profile"]==fault_sensor.PROFILE else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py","guard_sglang_launcher.py"}if manifest["profile"]==sglang_sensor.PROFILE else (({'model-read-scope.json', 'guard_file_read_scope.py', 'guard_worker_readiness_callback.py', 'guard_worker_readiness_support.py', 'guard_lifecycle_base.py', 'guard_worker_startup_contract.py', 'settings.json', 'guard_weight_iteration.py', 'guard_lifecycle_sensor.py', 'guard_safe_open_mapping.py', 'sitecustomize.py'} | ({'guard_worker_startup.py','guard_initialization.py'} if manifest['profile'] in {joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()) | ({'guard_worker_initialization.py','guard_worker_generation_contract.py'} if manifest['profile'] in {generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()) | ({'guard_worker_generation.py','guard_ready_endpoint_contract.py'} if manifest['profile']==endpoint_sensor.PROFILE else set())) if manifest['profile'] in {startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else {'guard_lifecycle_sensor.py','sitecustomize.py','settings.json','guard_lifecycle_base.py','guard_weight_iteration.py','guard_file_read_scope.py','model-read-scope.json'} if manifest['profile']==mapping_sensor.PROFILE else {'guard_lifecycle_sensor.py','sitecustomize.py','settings.json','guard_lifecycle_base.py','guard_weight_iteration.py','model-read-scope.json'} if manifest['profile']==read_sensor.PROFILE else {"guard_lifecycle_sensor.py" ,"sitecustomize.py","settings.json",
+            or set(manifest["assets"]) != (configured.asset_names(manifest["profile"]) if configured.contains(manifest["profile"]) else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json",*init_release.ASSETS} if manifest["profile"]==init_release.PROFILE else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py",*fault_sensor.ASSETS,"fault-control-settings.json"}if manifest["profile"]==fault_sensor.PROFILE else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py","guard_sglang_launcher.py"}if manifest["profile"]==sglang_sensor.PROFILE else (({'model-read-scope.json', 'guard_file_read_scope.py', 'guard_worker_readiness_callback.py', 'guard_worker_readiness_support.py', 'guard_lifecycle_base.py', 'guard_worker_startup_contract.py', 'settings.json', 'guard_weight_iteration.py', 'guard_lifecycle_sensor.py', 'guard_safe_open_mapping.py', 'sitecustomize.py'} | ({'guard_worker_startup.py','guard_initialization.py'} if manifest['profile'] in {joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()) | ({'guard_worker_initialization.py','guard_worker_generation_contract.py'} if manifest['profile'] in {generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()) | ({'guard_worker_generation.py','guard_ready_endpoint_contract.py'} if manifest['profile']==endpoint_sensor.PROFILE else set())) if manifest['profile'] in {startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else {'guard_lifecycle_sensor.py','sitecustomize.py','settings.json','guard_lifecycle_base.py','guard_weight_iteration.py','guard_file_read_scope.py','model-read-scope.json'} if manifest['profile']==mapping_sensor.PROFILE else {'guard_lifecycle_sensor.py','sitecustomize.py','settings.json','guard_lifecycle_base.py','guard_weight_iteration.py','model-read-scope.json'} if manifest['profile']==read_sensor.PROFILE else {"guard_lifecycle_sensor.py" ,"sitecustomize.py","settings.json",
                 "guard_lifecycle_base.py","guard_online_input_callback.py"} if manifest["profile"] == online.PROFILE
                 else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py","guard_attempt_invocation.py"}
                     if manifest["profile"]==output_sensor.PROFILE else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py"}
@@ -219,10 +234,35 @@ def load_prepared(path):
                 or type(expected["bytes"]) is not int or not 0 < expected["bytes"] <= 262144
                 or type(expected["sha256"]) is not str or re.fullmatch(r"[0-9a-f]{64}",expected["sha256"]) is None):
             raise ValueError("LIFECYCLE_ASSET_METADATA_INVALID")
-        with (path.parent/name).open("rb") as stream:
-            raw = stream.read(262145)
+        private_key = configured.request_binding(manifest['profile']) and name == 'request-binding-key.json'
+        if private_key:
+            key_path = path.parent / name
+            before = key_path.lstat()
+            if (not stat.S_ISREG(before.st_mode) or not hasattr(os, 'geteuid') or before.st_uid != os.geteuid()
+                    or stat.S_IMODE(before.st_mode) != 0o600 or not 0 < before.st_size <= 256):
+                raise ValueError('REQUEST_BINDING_KEY_INVALID')
+            fd = os.open(key_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            try:
+                opened = os.fstat(fd); raw = os.read(fd, 257); after = os.fstat(fd)
+            finally:
+                os.close(fd)
+            identity = lambda s: (s.st_dev, s.st_ino, s.st_mode, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
+            if (len(raw) != before.st_size or len({identity(s) for s in (before, opened, after, key_path.lstat())}) != 1):
+                raise ValueError('REQUEST_BINDING_KEY_INVALID')
+        else:
+            with (path.parent/name).open("rb") as stream:
+                raw = stream.read(262145)
         if len(raw) != expected["bytes"] or hashlib.sha256(raw).hexdigest() != expected["sha256"]:
             raise ValueError("LIFECYCLE_ASSET_BYTES_INVALID")
+        if configured.request_binding(manifest['profile']) and name == 'request-binding-key.json':
+            status = (path.parent / name).lstat()
+            value = strict_json(raw, limit=256)
+            if (not stat.S_ISREG(status.st_mode) or not hasattr(os, 'geteuid') or status.st_uid != os.geteuid()
+                    or stat.S_IMODE(status.st_mode) != 0o600 or type(value) is not dict
+                    or set(value) != {'schema', 'session', 'key_hex'}
+                    or value['schema'] != 'guard-lifecycle-request-key/1' or value['session'] != manifest['session']
+                    or type(value['key_hex']) is not str or re.fullmatch('[0-9a-f]{64}', value['key_hex']) is None):
+                raise ValueError('REQUEST_BINDING_KEY_INVALID')
         if manifest['profile']==fault_sensor.PROFILE:
             if name in fault_sensor.ASSETS and hashlib.sha256(raw).hexdigest()!=fault_sensor.ASSETS[name]:raise ValueError('FAULT_DEPENDENCY_UNAVAILABLE')
             if name=='guard_lifecycle_base.py'and hashlib.sha256(raw).hexdigest()!=fault_sensor.BASE8_SHA256:raise ValueError('FAULT_BASE_DEPENDENCY_UNAVAILABLE')
@@ -282,7 +322,9 @@ def load_prepared(path):
             expected_endpoint={'guard_worker_generation.py':endpoint_sensor.GENERATION21_SHA256,'guard_ready_endpoint_contract.py':endpoint_sensor.CONTRACT_SHA256}.get(name)
             if expected_endpoint is not None and hashlib.sha256(raw).hexdigest()!=expected_endpoint:raise ValueError('READY_ENDPOINT_DEPENDENCY_UNAVAILABLE')
         if name == "guard_lifecycle_sensor.py":
-            source_supported = profiles.asset_supported(manifest["profile"], raw)
+            source_supported = profiles.asset_supported(manifest["profile"], raw,
+                **({'request_key_sha256': manifest['assets']['request-binding-key.json']['sha256']}
+                   if configured.request_binding(manifest['profile']) else {}))
     if not source_supported:
         raise ValueError("LIFECYCLE_ASSET_VERSION_UNAVAILABLE")
     return manifest

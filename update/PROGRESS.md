@@ -5,6 +5,28 @@
 - 다음 단계: RB3-Q1~Q4 사용자 결정. SUP-08 @37 사전 확인 재실행(고정 자료가 다른 기기에 있음).
 - 막힌 것: lab에 기록 생산자가 없어 3단계 점검은 생산자 파일이 생길 때까지 UNKNOWN.
 
+## 2026-11-15 — 승인된 runtime final 저장 경합 시험 보수
+
+- 한 일: 사용자 “시험 한 파일만 예외 승인”에 따라 runtime/tests/test_mvp_zeroday_profile.py의 두 final 조회가 저장 완료를 먼저 확인하도록 보완했다. 기존 assert37개·상태/필드/비밀 비노출·실제 소켓·제품 기한은 유지했다. 다른 runtime 파일/제품 소스·정책·의존성과 M-B4는 바꾸지 않았다. 원 CI 실패 로그와 저장소 밖의 정확 제안/진단을 보존한다.
+- 테스트 결과: 적용한 시험 파일·경로 직접42개/60 subtest 통과(pytest6.54초·부모6.869초), 현황77/23/68·diff 통과. 적용 전 원 실패1개 확정 재현, 제안의 지연 조건1개·기존 실제 소켓7개 통과, final 미저장/손상 음성2개 거부를 확인했다. 기존 전체 assert/skip 호출 AST는 같다. guard source6796f881/561파일은 그대로다. 새 최종 head의 전체 CI는 대기한다.
+- 다음 단계: 같은 #281에 승인된 CI 보수를 반영하고 정확 head의 CI를 확인한다. 기존30974aaf의 update전체13,598통과와 runtime 원 실패는 당시 head 결과로 보존한다. 별도 #283은 draft로 현재 V1 RPC 소스 대조를 검증한다.
+- 막힌 것: fresh→worker/전체TP2 인과·파생 관측·현재 실제 ENV/target·GPU 자격/등록은 미완료다. 병합·새 GPU/비용·M-B4 재개는 승인하지 않았다.
+
+## 2026-11-15 — fresh 요청 연결 PR/CI 결과와 runtime 외부 경합
+
+- 한 일: 승인된 후속 profile/HMAC 구현을 #281(main 대상)로 공개했다. 검증 대상 head30974aaf, source6796f881을 보존한다. 코드/시험 원문·판정/고정값·M-B4 보관은 유지한다.
+- 테스트 결과: PR 실행 update-default 13,598통과·기존skip34(pytest608.14초·부모608.994초), 별도CPython3.12.8·Docker stub·공유/플랫폼 계약·wheel449파일 일치가 통과했다. 전체 시험은 CI에서만 실행했다. 같은 head의 runtime PR 실행은 성공했지만 push 실행은 test_mvp_zeroday_profile.py:447의 final 행 부재로1실패·1809통과·기존skip4였다. 전체 CI 통과로 세지 않는다.
+- 다음 단계: runtime의 HTTP 응답 완료 뒤 final 저장 순서와 시험의 즉시 read_all 사이 경합을 외부 검토 자료로 남긴다. 별도 예외 승인 없이 runtime을 고치거나 재실행으로 실패를 지우지 않는다. M-A3 현재 V1 exact 원 함수 대조는 별도 #283 draft에서 잇는다.
+- 막힌 것: runtime 실패 해결은 update/CLAUDE.md11절의 변경 금지 범위다. 실제 worker/그룹 연결·파생 관측·새 ENV/target·GPU 자격/등록과 전체 MVP는 미완료다. 병합은 승인하지 않았다.
+
+## 2026-11-15 — 재개: 기준 V1 fresh 선택/입력 연결 로컬 후속
+
+- 한 일: 최신 main9365a65b에서 새 브랜치를 만들었다. #276/#278/#279와 원격 READY 수정은 보존하고 이전932490de WIP는 재적용하지 않았다. 사용자 재개·후속 native /28/HMAC 키 자산 승인으로 fresh ASGI→기본 선택→API 전체 native ID 선택→원 AsyncLLM/Processor 입력의 code/globals/self/객체·ID를 대조한다. 비밀 키는 생성부터0600·owner/NOFOLLOW/256바이트/세션·정확 bytes로 검증한다. 원본 센서/ABI와 /27 행은 main 원 bytes 그대로다. M-B4 보관·실행기/판정/공통 GPU 계약·runtime/contracts 무변경.
+- 테스트 결과: 직접 영향/기존 lifecycle·파서·중립성/경로243개 통과(pytest3.71초·부모4.167초), 기존 승인으로 추출한 CPython3.12.8로 관련61개 통과(pytest1.48초·부모1.683초). EXAMPLE 협력 객체·태그 함수 본문만 실행했다. 최초 새 시험의 협력 객체 누락 수정 뒤 재검증했고 기존 assert/기한/skip은 바꾸지 않았다. 로컬 전체 pytest·새 PR CI는 미실행이다.
+- 최종 관문: 현황 --check·source 검토·경로16개(pytest0.59초)·diff 검사를 완료하고 정확 source 목록 SHA 6796f881c7ef541d9b54cfe772d6354b1ab95f160fbb2c372e273a72a313d584의 결정5 검토 행을 추가했다.
+- 다음 단계: 구체 커밋 push/main PR 승인을 요청한다. 승인 대기 중에는1.2절의 독립적인 source/관측 의미 대조를 계속한다.
+- 막힌 것: fresh worker/RPC·캐시/runner/기동/해제의 파생 의미·실제 V1 입력/실행/등록·GPU 비용/추가 다운로드·M-B4 재개·정책 확정/J03. 이 구현을 PASS/실측/1차 완성으로 세지 않는다.
+
 ## 2026-11-15 — #278·#279 통합 검토와 1차 완성 잔여 정리
 
 - 한 일: 사용자 요청에 따라 #276 병합 main7e8a0900·#278 통합373a360f를 #279에 합쳤다. DECISIONS/PROGRESS의 양쪽 원문·기존 검토 영수증55개를 보존하고, WORK_ORDER의 최신 M-A6/M-A7 행을 함께 유지했다. #279의 원본 센서 보존·정확 source/ABI/준비 bytes·snapshot만 지원·미검토 실행기 미개방 경계를 검토했다. 합쳐진560파일 목록 자체SHA a98a34360d9766ce22519c67edc6603efabc9e6ef58b4ecde9ad41e49ae67ec0을 재생성하고 결정5의 정확 검토 행1개를 더했다.

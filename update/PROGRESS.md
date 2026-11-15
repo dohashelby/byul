@@ -1,3 +1,10 @@
+## 2026-11-15 — 기준 V1 관측 행·CPython 3.12.8 후속
+
+- 한 일: 병합된 #277(main `77bc05a3`)의 기존 작업트리에서 `codex/baseline-v1-observers-20261115`로 이어갔다. 원본 센서 15개/의존 파일의 정확 bytes와 CPython 3.12.3·3.12.8 코드 지문 재현 표/도구, Linux 3.12.8 CI job을 추가했다. 3.12.8 Linux x86_64와 macOS ARM에서 15개 계약 및 기반 전체 코드 지문이 일치했다. 기존 센서 bytes/런타임·OS 정책은 유지한다.
+- 구현: 기준 V1 정확 설치 8파일·실제14함수의 adapter 데이터와 공통 snapshot `/27`을 추가했다. 기존 기반 사본을 사용하고 `None` 반환의 종료 함수만 입력 ID/현재 상태로 대응한다. 소스·실행 코드·런타임/OS·준비 bytes·기준 이미지/V1 선택을 대조한다. 다른 판본/미검토 함수는 섞지 않는다. fixture 원본/라이선스·미래 판본 데이터 시험·원문/iterator/property/예외·자체 재해시 거부 회귀를 추가했다.
+- 테스트 결과: CPython3.12.3 기반/수집/판본/경계/CI 경로 직접8파일144통과·기존 Linux 전용skip2(pytest2.28초/부모2.434초), 추가 판본·핀·소스 관문·INV-01/02/05 묶음124통과(pytest1.92초/부모2.086초). 신규 fixture의 센서 파일 경로 누락으로 생긴 최초7실패를 실제 준비 자산 경로로 바로잡았으며 기존 assert/skip을 바꾸지 않았다. CPython3.12.8 신규2파일39통과(pytest1.50초/부모1.904초), 정상 dependency 파일 읽기 사례를 더한 최종31개 구성 시험도3.12.3 통과(pytest0.43초/부모0.593초). 소스556파일/목록 `f302eaf2b5d4b2122b0ed9b0d147db5087fa8109f61768c057b2fa3afa1c5d37`과 결정5 검토 행, 현황 --check 및 원본 fixture를 제외한 staged diff --check 통과. fixture 원본의 trailing whitespace10곳은 정확 bytes 보존을 위해 유지했다. 전체 로컬 suite는 실행하지 않았으며 전체/3.12.8 최종 검증은 새 PR CI에서 확인한다.
+- 다음 단계/미확인: `/27`은 raw snapshot 준비/수집만 지원한다. fresh 요청 선택/ASGI 연결·캐시/runner/worker/rank/profiler/uvicorn 파생 의미와 실행기 개방은 별도다. GPU 실행·모델 다운로드·실측/생산자 등록·판정/팩·공용 계약은 바꾸지 않았다.
+
 ## 2026-11-15 — #275 병합·#277 J02 실행 및 점검별 사전 점검 수정
 
 - 한 일: 사용자 승인으로 #275를 main `b00e4126`에 merge했고 #277 기반 `858ac35e`에 main을 통합했다. J02의 여러 실행기가 함께 있어도 기존 Kubernetes 전환 관문을 사용하게 했다. 양쪽 HTTP 실행기 집합·각 쪽 모든 HTTP target의 같은 내용·ENV/Pod 신원·baseline 종료/candidate Ready·지연 결합 신규 파일 조건을 유지한다. 전환 target 해시는 검증한 HTTP 실행기에만 전달해 다른 수집기의 역할/세대별 target을 덮지 않는다. M-A 파일 사전 점검은 쪽별 설정 뒤 `for_check()`를 적용해 실제 점검별 파일을 검사한다.

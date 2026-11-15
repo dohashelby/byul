@@ -22,6 +22,38 @@
     "vllm/entrypoints/openai/serving_chat.py.txt": {
       "source": "vllm/entrypoints/openai/serving_chat.py",
       "sha256": "baa46e8d60504ff05e6a9e7b6d9c8ed64c4adf04ee5dc7ff9e6e7895397f48bf"
+    },
+    "vllm/v1/core/scheduler.py.txt": {
+      "source": "vllm/v1/core/scheduler.py",
+      "sha256": "24db292542369b94d00985b6860386909cf9ce559965263395188f613c4a4985"
+    },
+    "vllm/v1/core/kv_cache_manager.py.txt": {
+      "source": "vllm/v1/core/kv_cache_manager.py",
+      "sha256": "39f087609c2049d6383d45ae098d5b5a54749d32f14ab6d4cf779d3f54390355"
+    },
+    "vllm/v1/engine/processor.py.txt": {
+      "source": "vllm/v1/engine/processor.py",
+      "sha256": "b3b66559ce98fb31f89a1ca3a8b9b4d7bc942df090305ea5f765d8bcf21e5d43"
+    },
+    "vllm/v1/engine/async_llm.py.txt": {
+      "source": "vllm/v1/engine/async_llm.py",
+      "sha256": "c6386700282f55a46b1f103331020e5713d59acf06b12a3e64b0eca40a3aa9b7"
+    },
+    "vllm/v1/engine/core.py.txt": {
+      "source": "vllm/v1/engine/core.py",
+      "sha256": "091b574c562202ccc60139e3d1a9cdd29f0fd33cbffa286ca4ae76f460ee3a16"
+    },
+    "vllm/v1/engine/output_processor.py.txt": {
+      "source": "vllm/v1/engine/output_processor.py",
+      "sha256": "12baa6cb772527d52b0fe4e0b69b12d9365dec280f20395dadc7286593ce99ce"
+    },
+    "vllm/v1/worker/gpu_input_batch.py.txt": {
+      "source": "vllm/v1/worker/gpu_input_batch.py",
+      "sha256": "89770d22d9398a061d96e4aa547a8afbacaf0eeff589e1dcf3df45503a4ab40c"
+    },
+    "vllm/v1/worker/gpu_model_runner.py.txt": {
+      "source": "vllm/v1/worker/gpu_model_runner.py",
+      "sha256": "1ac3fb18b2adad3609dcf58a1656d6fdd4a568eea6740258e00f6a43c7d4b813"
     }
   },
   "pin_status": "candidate: tag source bytes, not yet compared with the image install file"

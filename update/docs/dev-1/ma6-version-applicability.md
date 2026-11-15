@@ -459,7 +459,43 @@ J02 첫 실행(2026-11-15, L4 1장, 두 판본 동시 기동)에서 69개가 모
 
 ### 24.3 현재 공백과 구현 순서
 
-1. 기준 V1 대상표·정확 행과 CPython 3.12.8 자기 코드 지문. 함수가 같거나 이름만 바뀌었으면 기존 관측 코드에 데이터를 추가한다. 의미가 다를 때만 adapter에서 대응한다.
+1. 기준 V1 대상표·정확 행과 CPython 3.12.8 자기 코드 지문은 25절부터 진행한다. 기반 snapshot 8파일·14함수와 지문 재현을 연결했다. 요청 선택·파생 관측기의 의미/대상표는 계속 별도 검토한다.
 2. 후보는 23절 도달점을 유지한다. uvicorn stream_buffer·profiler 의미 검토와 REQ-10 실제 소비 연결을 잇는다.
 3. ENV·target·prepared는 V1 구성으로 새로 만든다. V0 저장 실측·REQ-16 모델 기동·SUP-08 REGRESSED는 당시 구성의 근거로 보존하며 새 V1 실측으로 재사용하지 않는다.
 4. 직접 시험·소스 목록·현황 정합성을 확인하고 전체는 PR CI에서 확인한다. GPU 재실행과 생산자 등록은 별도 실제 확인이 필요하다.
+
+
+## 25. 기준 V1 관측 행과 CPython 3.12.8 (2026-11-15)
+
+### 25.1 지문 재현과 실행 허용은 구분한다
+
+- `adapters/assets/vllm_observer_abi.json`은 **원본 센서 15개**·기반 `/8`·계약 의존 파일의 정확 bytes를 고정하고, CPython 3.12.3·3.12.8에서 소스를 직접 컴파일한 코드 지문을 담는다. `tools/observer_abi.py --measure`는 측정값 출력만, 기본 실행은 저장된 행과의 정확 일치 검사만 한다. 자동으로 행을 만들거나 승인하지 않는다.
+- CPython 3.12.8은 macOS ARM과 Linux x86_64의 독립 인터프리터에서 15/15 계약 지문과 기반 모듈 지문이 일치했다. Linux는 기존 로컬 Python용 이미지에 별도 standalone 인터프리터만 읽기 전용으로 마운트해 네트워크 없이 실행했다. 엔진/모델을 import·기동하지 않았다. 실제 엔진 이미지 내부 실행이나 GPU 등록의 증거가 아니다.
+- `cpython-312` 캐시 태그는 패치 판본을 구분하지 않으므로 기존 `.pyc`를 쓰지 않는다. `compile(..., dont_inherit=True, optimize=0)`와 재귀 파일명 정규화 뒤 원본의 `code_digest`/`code_contract`로 계산한다. 정규화는 코드·줄 위치·예외표·상수를 지우지 않는다.
+- 이 표만으로 **기존 15개 센서를 활성화하지 않는다.** 원본의 `RUNTIME_CODE_CONTRACTS`와 별도 OS 정책은 그대로다. 특히 file-read·safe-open-mapping·worker-generation·worker-initialization·worker-startup은 `(runtime, os.name)` 표도 검사한다. 지문 표를 핑계로 패치 판본이나 OS를 가장하지 않는다.
+- CI의 별도 `observer-cpython-3128` job은 Linux CPython 3.12.8로 같은 지문을 재현하고 새 profile 시험을 실행한다. 전체 기본 suite는 기존 Linux 3.12.3 job이 맡는다.
+
+### 25.2 데이터로 선택하는 기반 snapshot `/27`
+
+`vllm_native_release_rows.json`의 판본 행을 공통 `vllm_configured_lifecycle_sensor.py`에 넘긴다. 새 판본마다 관측 코드를 복사하지 않는다. 기존 `/1`~`/26`과 원본 센서 bytes는 바꾸지 않았다. 준비 자산은 렌더된 센서·정확 `/8` 사본·bootstrap·설정 네 개다. 기존 자산 검사에 더해 선택한 행으로 다시 렌더한 bytes, 기반 SHA, 선언한 engine/version/image/V1 선택을 대조한다. 다른 판본 bytes·자체 재해시 변조·미선언/중복 엔진 모드는 거부한다.
+
+새 프로필은 CPython 3.12.3·3.12.8 **POSIX**에서만 기반 전체 모듈 코드 지문까지 확인한 뒤 비공개 사본을 설정한다. 허용하지 않은 런타임/OS/최적화/코드는 hook 설치 전에 거부한다. 소스 미일치 또는 대상 함수 부재는 원 동작을 유지하고 미검증 모듈로 남긴다. 이전 판본의 대상표·함수를 새 판본에 보충하지 않는다.
+
+| 정확 설치 행 | 실제 대상 | 관측 의미와 기존 코드 차이 |
+|---|---|---|
+| `v1/core/scheduler.py` | `Scheduler.add_request`, `finish_requests`, `_free_request` | 요청 ID와 현재 `requests` 포함 여부. 마지막 두 함수의 `None`은 해제 ID 목록이 아니다. `finish_requests` 반환 뒤에는 입력의 한정된 문자열 ID로 현재 상태를 읽는다. `_free_request_blocks`/deferred fence를 지어내지 않음 |
+| `v1/core/kv_cache_manager.py` | `KVCacheManager.free` | 요청 인자 ID만 연결. 실제 구현은 `req_to_blocks.pop`·참조 감소·free queue 추가다. 현 기반의 block-pool 기반 소유권 관측은 불완전으로 남으며 캐시 적중/전체 KV 또는 GPU 해제를 주장하지 않음 |
+| `v1/engine/processor.py` | `Processor.process_inputs` | 입력 `request_id`만 기록. `EngineCoreRequest` 반환을 새 ID 배정이나 ASGI 선택 사건으로 바꾸지 않음. 프롬프트/params/토큰/출력은 읽지 않음 |
+| `v1/engine/async_llm.py` | `AsyncLLM.abort` | 입력 ID와 호출/정상 반환/원 예외. 비동기 호출 의미 유지 |
+| `v1/engine/core.py` | `EngineCore.abort_requests` | scheduler의 `finish_requests` 호출, `None` 반환. 현재 scheduler 요청 포함 여부를 입력 ID로 읽음 |
+| `v1/engine/output_processor.py` | `OutputProcessor.add_request`, `abort_requests` | 현재 `request_states` 포함 여부. abort 반환 뒤 입력 ID로 상태를 읽음. 없는 `_finish_request`를 대신 만들지 않음 |
+| `v1/worker/gpu_input_batch.py` | `InputBatch.remove_request` | `req_id_to_index` 포함 여부. 반환 인덱스를 요청 ID나 GPU 해제 사건으로 바꾸지 않음 |
+| `v1/worker/gpu_model_runner.py` | `GPUModelRunner._update_states`, `execute_model`, `load_model`, `get_model` | 기존 bounded scheduler ID/모델 metadata snapshot. 없는 `sample_tokens`·`_model_forward`·sequence는 관측하지 않으며 runner 소비/최종 모델 연결을 입증하지 않음 |
+
+8개 원본은 `tests/fixtures/vllm-0.7.0/`에 태그 bytes와 라이선스/출처를 보존했다. 대상 함수는 AST로 확인하며, `finish_requests`·`abort_requests`는 실제 태그의 메서드 본문과 모의 상태로 반환 전후를 시험한다. 입력 iterator는 관측기가 소비하지 않고, property 실행·원문 노출·원 예외 변경을 금지한다.
+
+### 25.3 현재 지원 경계와 다음 작업
+
+- `configured_lifecycle_rows`는 준비·수집·기록 파싱만 허용한다. 기반 snapshot이 생겼다는 이유로 `native_lifecycle`·request-attempt·termination·initialization·모델 권한 실행기를 열지 않는다. `executor_gaps`와 GPU 등록표는 그대로다. 요청 ID 지문은 기존 `/8`의 SHA-256 계약을 유지하며 이 변경이 HMAC이나 인증을 새로 제공하지 않는다.
+- 후속은 초기 V1의 **fresh 요청 선택/ASGI 연결**, 캐시 단위/적중·소유권, runner 실제 소비, worker startup/rank·profiler/uvicorn 파생 관측이다. 각각의 실제 인자·반환·단위를 검토한 뒤 같은 판본 데이터 또는 필요한 adapter 의미를 추가한다. 기존 V0 UNKNOWN·후보 GPU 자격·과거 V0 측정 결과를 이월하지 않는다.
+- 직접 시험과 CI의 최종 결과/시간은 이번 `PROGRESS.md` 기록에 남긴다. 전체 suite는 로컬에서 실행하지 않는다.

@@ -130,6 +130,18 @@
       "features": [
         "sglang-native-lifecycle-metadata/1"
       ]
+    },
+    {
+      "id": "vllm-configured-lifecycle-rows/1",
+      "engine": "vllm",
+      "versions": [
+        "0.7.0"
+      ],
+      "features": [
+        "configured_lifecycle_rows"
+      ],
+      "pin_status": "image_pin",
+      "qualification": "정확 설치 bytes 8개와 실제 대상 14개의 기반 snapshot 준비·파싱만 지원한다. 요청 선택·캐시 적중·전체 종료·GPU 등록·점검 실행기 지원은 별도 검증이다. ma6-version-applicability.md 25절."
     }
   ],
   "implementations": []

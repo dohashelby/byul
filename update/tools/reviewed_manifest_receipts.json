@@ -220,6 +220,11 @@
       "manifest_sha256": "461087ef808a63c8c9784d9178c2406bca141237b46f0fef50393cf5895f5858",
       "reviewed_by": "Codex / PR277 J02 and preflight fixes; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T16:05:40.445204+09:00"
+    },
+    {
+      "manifest_sha256": "f302eaf2b5d4b2122b0ed9b0d147db5087fa8109f61768c057b2fa3afa1c5d37",
+      "reviewed_by": "Codex / baseline V1 snapshots and CPython ABI; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T08:09:31.259813+00:00"
     }
   ]
 }

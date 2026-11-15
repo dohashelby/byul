@@ -122,6 +122,41 @@ jobs:
       - name: Verify installed wheel outside checkout
         run: uv run python tools/verify_installed.py --wheel dist/guard-0.1.0-py3-none-any.whl --output "${{ runner.temp }}/byul-update-installed"
 
+  observer-cpython-3128:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: update
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12.8"
+      - run: python -m pip install uv==0.12.11
+      - run: uv sync --frozen
+      - name: Reproduce immutable observer contracts from source
+        run: python -B -I tools/observer_abi.py
+      - name: Verify configured lifecycle and exact interpreter refusal
+        run: |
+          uv run python - <<'PY'
+          import os
+          import subprocess
+          import sys
+          import time
+
+          start = time.perf_counter()
+          result = subprocess.run([sys.executable, "-m", "pytest", "-q",
+              "tests/test_observer_abi.py", "tests/test_configured_lifecycle.py",
+              "--basetemp", os.path.join(os.environ["RUNNER_TEMP"], "byul-observer-3128")])
+          print(f"Observer 3.12.8 parent wall clock: {time.perf_counter() - start:.3f}s", flush=True)
+          raise SystemExit(result.returncode)
+          PY
+
   update-docker-stub:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
@@ -213,7 +248,7 @@ jobs:
   # 필수 검사는 이 job 하나만 지정한다. 건너뛴 job은 통과로, 실패·취소는 실패로 본다.
   update-ci-ok:
     if: always()
-    needs: [changes, update-default, update-docker-stub, shared-contracts, platform-update-contracts]
+    needs: [changes, update-default, observer-cpython-3128, update-docker-stub, shared-contracts, platform-update-contracts]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

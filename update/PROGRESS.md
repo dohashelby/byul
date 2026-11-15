@@ -3085,3 +3085,4 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 테스트 결과: 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 정확 fixture 소스 몸체의 기본/소스 불일치 경로를 기존 소비자에 전달하는 새 회귀 시험은 CI에서 검증한다. 로컬에서는 shell SHA·diff 검사만 한다.
 - 다음 단계: 집중 소스 검토 후 CI에서 실제 반환 형태·보수적 투영·기존 프로필 회귀를 확인한다.
 - 집중 검토 후속: REQ-17에서 cache 비활성화의 정확 원 생산자 0-token 행을 기존 timing 소비자에 전달해 빠른 대조만으로 정상/전체 범위가 되는 공백을 막았다. control-present의 native 적중이 확인되지 않으면 UNKNOWN으로 남긴다. CI 실행 전이다.
+- 독립 후속: 기준 V1 `InputBatch.condense`·`clear`를 정확 소스에서만 설치하고 전후 요청/자리 mapping을 세션 키 지문으로 기록한다. 실제 이동과 회수 자리를 REQ-18의 재사용 후보에 반영하지만 sampler 최종 상태·소비가 없어 verdict/full_scope는 UNKNOWN으로 유지한다. 원 0.31.0 설치 지점은 늘리지 않았다. 실제 소스 몸체의 이동/초기화 기록을 소비자에 전달하는 회귀는 CI 대상이며 로컬 Python/pytest는 실행하지 않았다.

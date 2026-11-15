@@ -1102,6 +1102,6 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 
 0.7.0 V1의 정확 `KVCacheManager.get_computed_blocks` 소스는 평면 block 목록과 계산 token 수의 2원 반환을 쓴다. 요청의 비공개 `_kv_block_hashes` 평문 list에서 각 `BlockHashType.hash_value`만 유계로 읽어 기존 세션 키 지문으로 남긴다. 공개 `ConstantList` 속성, token IDs, 원 요청 ID는 관측기가 읽거나 저장하지 않는다. 기존 0.31.0의 3원/group 반환 처리는 유지한다.
 
-0.7.0 `InputBatch.add_request`는 `None`을 반환하므로 정확 소스의 호출 후 `req_id_to_index`와 `req_ids`가 일치하는 자리만 관측한다. `condense` 이동은 관측하지 않아 같은 번호는 재사용 후보이며 REQ-18 전체 범위/위반 근거가 아니다. cache salt·인증 주체 결합이 없으므로 REQ-15 전체 결합도 검증되지 않는다. V1 `allowed_token_ids`는 sampler 실제 소비 근거가 없어 제한 집행으로 간주하지 않는다. REQ-19/20 V2/graph 의미는 이 소스 행으로 개방하지 않는다. 새 행은 소스 선택 후보이며 GPU/생산자 등록이나 실측 PASS가 아니다.
+0.7.0 `InputBatch.add_request`는 `None`을 반환하므로 정확 소스의 호출 후 `req_id_to_index`와 `req_ids`가 일치하는 자리만 관측한다. 정확 `condense`의 전후 mapping·`remove_request`의 회수 자리·`clear`의 초기화도 같은 소스 행에서 관측한다. 실제 이동한 자리 수와 재사용 후보를 구분하지만 V1 sampler 최종 소비는 보지 못하므로 REQ-18 전체 범위/위반 근거가 아니다. cache salt·인증 주체 결합이 없으므로 REQ-15 전체 결합도 검증되지 않는다. V1 `allowed_token_ids`는 sampler 실제 소비 근거가 없어 제한 집행으로 간주하지 않는다. REQ-19/20 V2/graph 의미는 이 소스 행으로 개방하지 않는다. 새 행은 소스 선택 후보이며 GPU/생산자 등록이나 실측 PASS가 아니다.
 
 REQ-17의 빠른 control timing만으로 cache가 켜졌다고 추론하지 않는다. 모든 control-present 표본에 qualified native cache 적중이 있어야 정상 대조의 검출력이 검증되며, 기본 cache 비활성화에서 나온 정확 0원 반환은 전체 범위와 정상 판정을 열지 않는다.

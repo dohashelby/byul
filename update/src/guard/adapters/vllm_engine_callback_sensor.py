@@ -45,6 +45,7 @@ ROOT = '/guard-lifecycle/engine-callbacks'
 DATA_ROOT = '/guard-lifecycle/data'
 SLOT_MODULE = 'vllm.v1.worker.gpu_input_batch'
 SLOT_TARGETS = {SLOT_MODULE: ('InputBatch.add_request', 'InputBatch.remove_request')}
+BASELINE_SLOT_EXTRA = ('InputBatch.condense', 'InputBatch.clear')
 SLOT_SOURCE = baseline_sources(candidate_sources({SLOT_MODULE: 'e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d'}, SLOT_TARGETS), SLOT_TARGETS)
 # V2 model runner (vLLM 0.31.0 기본 GPU runner). 자리 배정·회수와 sampler가 실제로
 # 받은 요청별 상태를 CPU 쪽 배열에서만 읽는다. GPU tensor를 읽거나 동기화하지 않는다.
@@ -123,12 +124,44 @@ class DistributedObserver(_Keyed, distributed.DistributedCallbackObserver):
 
 class SlotObserver(_Keyed, cache.CacheCallbackObserver):
     """요청이 받은 batch 자리와 제한 여부만 남긴다. 값 자체는 남기지 않는다."""
-    targets = SLOT_TARGETS
+    targets = {SLOT_MODULE: SLOT_TARGETS[SLOT_MODULE] + BASELINE_SLOT_EXTRA}
     sources = SLOT_SOURCE
     schema = 'guard-vllm-slot-callback/1'
     profile = 'source-bound-slot-callback-candidate-v1'
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.slot_identity_namespace = os.urandom(32)
+
+    def _batch_identity(self, receiver):
+        token = self.token(receiver)
+        return self.fingerprint(self.slot_identity_namespace + token.encode()) if token is not None else None
+
+    def wrap(self, module, point):
+        if point in BASELINE_SLOT_EXTRA and cache.source_pin(module, self.sources) != BASELINE_ROWS[SLOT_MODULE]['sha256']:
+            raise ValueError('SLOT_BASELINE_SOURCE_UNSUPPORTED')
+        return super().wrap(module, point)
+
+    def _mapping(self, receiver):
+        fields = cache.base.attrs(receiver)
+        mapping, ids = fields.get('req_id_to_index'), fields.get('req_ids')
+        if type(mapping) is not dict or type(ids) is not list or len(mapping) > MAX_SAMPLED_SLOTS:
+            self.gaps.add('SLOT_BASELINE_MAPPING_UNAVAILABLE')
+            return None
+        rows = []
+        for req_id, index in mapping.items():
+            digest = self.fingerprint(req_id)
+            if digest is None or cache._uint(index) is None or index >= len(ids) or ids[index] != req_id:
+                self.gaps.add('SLOT_BASELINE_MAPPING_UNAVAILABLE')
+                return None
+            rows.append({'request_sha256': digest, 'slot': index})
+        return sorted(rows, key=lambda row: row['request_sha256'])
+
     def _snapshot(self, point, args, kwargs, result=None, returned=False):
+        baseline = self.__dict__.get('_source_pins', {}).get(SLOT_MODULE) == BASELINE_ROWS[SLOT_MODULE]['sha256']
+        binding = {'batch_sha256': self._batch_identity(args[0] if args else None)} if baseline else {}
+        if point in BASELINE_SLOT_EXTRA:
+            return {**binding, 'slot_mapping': self._mapping(args[0] if args else None)}
         value = args[1] if len(args) > 1 else kwargs.get('request', kwargs.get('req_id'))
         if point == 'InputBatch.add_request':
             fields = cache.base.attrs(value)
@@ -137,7 +170,6 @@ class SlotObserver(_Keyed, cache.CacheCallbackObserver):
         else:
             row = {'request_sha256': self.fingerprint(value)}
         if returned:
-            baseline = self.__dict__.get('_source_pins', {}).get(SLOT_MODULE) == BASELINE_ROWS[SLOT_MODULE]['sha256']
             if baseline and point == 'InputBatch.add_request':
                 # 0.7 V1 returns None; the pinned method writes this mapping.
                 # Verify the mapped position against req_ids without emitting
@@ -152,7 +184,7 @@ class SlotObserver(_Keyed, cache.CacheCallbackObserver):
                     self.gaps.add('SLOT_BASELINE_MAPPING_UNAVAILABLE')
             else:
                 row['slot'] = cache._uint(result)
-        return row
+        return {**binding, **row}
 
 
 def _slot_index(value):
@@ -403,7 +435,10 @@ class EngineCallbacks:
             return self._instrument_optional(module, name)
         observer = self._default_observer(name)
         try:
-            changes = [(cache._function(module, point), observer.wrap(module, point)) for point in MODULES[name]]
+            points = MODULES[name]
+            if name == SLOT_MODULE and cache.source_pin(module, SLOT_SOURCE) == BASELINE_ROWS[SLOT_MODULE]['sha256']:
+                points += BASELINE_SLOT_EXTRA
+            changes = [(cache._function(module, point), observer.wrap(module, point)) for point in points]
         except Exception:
             self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
             return False

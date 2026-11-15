@@ -1,9 +1,9 @@
 """Exact-source baseline startup candidates; engine/GPU never imported or started."""
-import ast
 from copy import deepcopy
 import hashlib
 import json
 import os
+import types
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
@@ -18,37 +18,26 @@ BINDING = {'pid': os.getpid(), 'session_id_sha256': 'a' * 64, 'process_start_sha
 
 
 def native_module(name, tmp_path):
-    """Compile exact function nodes, without native imports or startup side effects.
+    """Construct native functions from untouched full-source compiled code.
 
-    Annotation evaluation and unrelated class bases are omitted outside function
-    bodies; source qualification still compares every function's complete code.
+    No native module body or annotation expression is executed. The exact code
+    objects, including flags, locations and nested functions, remain unchanged.
     """
     row = sensor.ROWS[name]
-    raw = (FIXTURE / (row['path'] + '.txt')).read_bytes()
-    path = tmp_path / (name + '.py')
+    raw = (FIXTURE / (row["path"] + ".txt")).read_bytes()
+    path = tmp_path / (name + ".py")
     path.write_bytes(raw)
-    parsed = ast.parse(raw)
-    classes = []
-    for cls in parsed.body:
-        if not isinstance(cls, ast.ClassDef):
-            continue
-        methods = [fn for fn in cls.body if isinstance(fn, ast.FunctionDef)
-                   and cls.name + '.' + fn.name in row['functions']]
-        if not methods:
-            continue
-        for fn in methods:
-            fn.returns = None
-            for arg in (*fn.args.posonlyargs, *fn.args.args, *fn.args.kwonlyargs):
-                arg.annotation = None
-            if fn.args.vararg:
-                fn.args.vararg.annotation = None
-            if fn.args.kwarg:
-                fn.args.kwarg.annotation = None
-        cls.bases, cls.keywords, cls.decorator_list, cls.body = [], [], [], methods
-        classes.append(cls)
+    codes = sensor.sources._codes(compile(raw, str(path), "exec", dont_inherit=True, optimize=0))
     module = ModuleType(name)
     module.__file__ = str(path)
-    exec(compile(ast.Module(body=classes, type_ignores=[]), str(path), 'exec', dont_inherit=True, optimize=0), vars(module))
+    for point in row["functions"]:
+        cls_name, method = point.split(".")
+        if cls_name not in vars(module):
+            vars(module)[cls_name] = type(cls_name, (), {"__module__": name})
+        function = types.FunctionType(codes[point], vars(module))
+        assert function.__qualname__ == point
+        descriptor = staticmethod(function) if point in sensor.STATIC else function
+        setattr(vars(module)[cls_name], method, descriptor)
     return module
 
 

@@ -138,6 +138,10 @@ def _private_base():
         for name, item in value.items():
             if name == 'asgi_request_sha256':
                 result[name] = context.get('request') if context else None
+            elif name == 'request_sha256' and type(item) is list:
+                if len(item) > base.MAX_IDS:
+                    raise ValueError('LIFECYCLE_OBSERVATION_REQUEST_ID_INVALID')
+                result[name] = [legacy(entry) for entry in item]
             elif name in request_fields:
                 result[name] = legacy(item)
             elif name in request_lists:

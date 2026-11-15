@@ -111,6 +111,13 @@ def test_private_composition_selects_candidate_profile_and_exact_rows(
         'selected_request_id_sha256': raw, 'asgi_request_sha256': raw}}})
     assert captured[-1][1]['metadata']['request_selection']['selected_request_id_sha256'] == native['requests'][0]['request_sha256']
     assert captured[-1][1]['metadata']['request_selection']['asgi_request_sha256'] == 'a' * 64
+    token = composed._CHAIN.set(({'point': 'InputProcessor.assign_request_id',
+        'request_sha256': [raw], 'weight_model_sha256': raw, '_weight_pid': os.getpid()},))
+    try: chain = composed.Observer.chain_rows()
+    finally: composed._CHAIN.reset(token)
+    observer.emit('NATIVE', {'requests': [], 'metadata': {}, 'call_chain': chain})
+    assert captured[-1][1]['call_chain'][0]['request_sha256'] == [native['requests'][0]['request_sha256']]
+    assert captured[-1][1]['call_chain'][0]['weight_model_sha256'] == raw
     if kind == 'stream':
         request = b'byul-lif04-' + b'a' * 32 + b'-normal'
         scope = {'type': 'http', 'path': '/v1/completions', 'headers': [(b'x-request-id', request)]}

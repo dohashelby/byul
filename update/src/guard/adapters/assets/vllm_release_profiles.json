@@ -86,15 +86,15 @@
       },
       "executor_gaps": {
         "credential_revocation": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "cause": "APPROVED_UNKNOWN_V1",
           "observers": [
             "vllm_lifecycle_sensor"
           ],
           "checks": [
             "PLT-10"
           ],
-          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 인증·입력 경로의 정확 행 미검토. 이전 V0 UNKNOWN 예외를 이월하지 않음",
-          "next": "기준 V1 인증/요청 연결 대상표"
+          "basis": "사용자 결정 M-A6-W4(2026-11-15): 0.7.0 api_server.build_app의 인증이 지역 함수라 감쌀 대상이 없다. V1 기준에도 원인 있는 UNKNOWN. ma6-version-applicability.md 27.4",
+          "next": null
         },
         "engine_sensor": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
@@ -129,15 +129,15 @@
           "next": "기준 V1 초기화 완료 사건과 rank/worker 세대 대응"
         },
         "model_authorization": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "cause": "APPROVED_UNKNOWN_V1",
           "observers": [
             "vllm_lifecycle_sensor"
           ],
           "checks": [
             "REQ-05"
           ],
-          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 models HTTP 경로와 입력 Processor 경로가 현 센서와 다름",
-          "next": "기준 V1 models·Processor 대상표"
+          "basis": "사용자 결정 M-A6-W2(2026-11-15): 0.7.0 V1 runner에 _model_forward가 없어 최종 모델 연결 지점이 없다. 원인 있는 UNKNOWN. ma6-version-applicability.md 27.4",
+          "next": null
         },
         "native_route": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
@@ -203,15 +203,15 @@
           "next": "기준 V1 요청 옵션과 실제 runner 소비 관측 검토(M-A6-V5)"
         },
         "session_revocation": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "cause": "APPROVED_UNKNOWN_V1",
           "observers": [
             "vllm_lifecycle_sensor"
           ],
           "checks": [
             "PLT-11"
           ],
-          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 인증·입력 경로의 정확 행 미검토. 이전 V0 UNKNOWN 예외를 이월하지 않음",
-          "next": "기준 V1 인증/세션 대상표"
+          "basis": "사용자 결정 M-A6-W4(2026-11-15): 0.7.0 api_server.build_app의 인증이 지역 함수라 감쌀 대상이 없다. V1 기준에도 원인 있는 UNKNOWN. ma6-version-applicability.md 27.4",
+          "next": null
         },
         "stream_buffer": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
@@ -328,8 +328,8 @@
           "checks": [
             "LIF-14"
           ],
-          "basis": "ma6-version-applicability.md 23절, ma6-candidate-function-review.json. 후보 TorchProfilerWrapper._start/_stop와 Worker.profile의 동작이 다르다(profiler 재생성↔재사용, backend 생성)",
-          "next": "profiler 세대·출력 구간 의미 검토(M-B4)"
+          "basis": "사용자 결정 M-A6-W3(2026-11-15): 세대를 start/stop 호출 순서로 정의한다. 기존 센서는 성공한 start마다 새 세대를 만든다. 후보 정확 모듈 행과 composition 연결은 후속이다. ma6-version-applicability.md 27.4",
+          "next": "기존 센서 bytes를 보존한 후보 profiler 변형 profile 검증"
         },
         "rank_failure": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
@@ -370,8 +370,8 @@
             "LIF-03",
             "LIF-04"
           ],
-          "basis": "ma6-version-applicability.md 23절. uvicorn h11_impl·httptools_impl·flow_control 행이 기존 uvicorn 커밋 것뿐이다. 후보 이미지 uvicorn 0.53.0 설치 파일 bytes가 아직 없다",
-          "next": "uvicorn 0.53.0 설치 파일 확보·의미 검토"
+          "basis": "uvicorn 0.53.0 wheel 대조로 기존 uvicorn 고정값이 후보 이미지 uvicorn과 같음(27.2). 기반 0.30.0 행을 겹치는 변형 profile이 필요하다(#281 병합 뒤)",
+          "next": "기반 /25 + stream 센서 변형 profile"
         }
       }
     }

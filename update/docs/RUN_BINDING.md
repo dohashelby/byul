@@ -300,6 +300,7 @@ api_binding = "/path/api.json"          # api_container_id·network_id·endpoint
 - ~~**공유 실행기 칸**~~ → 사용자 결정 RB2-S로 `[check_config.<점검>]`을 두었다(10절).
 - **E 키 4개**: `retry_scope_sha256`·`copy_inventory_sha256`·`record_subject_plan_sha256`·`recovery_selection_sha256`은 아직 정책 값이라 실행마다 정책을 다시 써야 한다(7.6 분리안, 점검별 승인 대기).
 - **C·D·E 분류**: 생산자 소스 SHA(C), 시험 주체(D), 외부 사건 시각(E)은 정책에 남아 있다.
+- **실행 창과 실행 전 기록 (2026-11-15 확인)**: 1단계 결합의 유효 창은 `guard run` 시작 초부터 열린다. 그래서 생산자가 `guard run` **전에** 남긴 사건(예: PLT-12 사본 사건, OBS-01 접근 사건)은 창 밖(`*_event_outside_window`)으로 미검증이 된다. @34 정책은 운영자가 창 시작을 앞당겨 적을 수 있었다. PR #274 CI의 PLT-12 왕복 시험 실패가 이 경우였다(시험 대역이 설정 중에 기록을 만들고 초가 바뀌면 실패). 시험은 대역의 창 시작만 60초 앞당겨 고쳤고(`run_binding_support.window_opened_before`), 제품 동작은 바꾸지 않았다. 실제 J02에서 실행 전 사건을 받아야 하는 점검이 있으면 창 시작 규칙(예: 실행 시작 − 실행기 최대 지연)을 별도 결정으로 정해야 한다.
 - **MA7·MA8 기록 정합**: `docs/dev-1/ma8-local-preflight-20261113.json`의 `pack_ref`가 34라, MA7 계획(36)과 맞지 않아 `mvp_a_input_materialize`가 그 감사 파일을 받지 않는다(이번 변경 전 35에서도 같았다). SUP-08 실제 파일 재검증을 팩 36으로 다시 해야 한다.
 - 실제 ENV/target·GPU 자격·비용 승인 등 기존 공백은 PROGRESS의 M-A3·M-A7 기록을 따른다.
 

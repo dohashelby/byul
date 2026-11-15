@@ -1,3 +1,8 @@
+## 2026-11-15 — 제품 경로 후속 공개 승인
+
+- 한 일/다음 단계: 결정39로 M-A3 c7500bcc·M-A7 6167e30d의 push·PR 반영이 승인됐다. 기존 #276 draft를 갱신하고 M-A7 main PR을 열어 새 CI를 확인한다. 원격 head5dc166cc와 main77bc05a3는 승인 시점 재확인했다.
+- 테스트 결과/막힌 것: 승인 기록만 추가해 제품 source555파일/목록 SHA와 직접 시험 결과는 그대로다. 실제 입력·전체 TP2 수락/등록 미완료와 병합/새 비용 별도 경계를 유지한다.
+
 ## 2026-11-15 — M-A3 공통 rank 입력의 제품 실행 연결 후속
 
 - 한 일: #275가 사용자 계정으로 main b00e4126에 병합됐음을 확인하고 #276 draft·M-B4 보관을 유지했다. 최신 main #277 및 원격 #276의 main 통합 이력을 모두 보존했다. 기존 rank_failure의 common-input 파일 소비 구현으로 공통 rank-fault 파일을 guard select/run/judge/report·guard update의 양쪽 비교·정확 EVD/RES/RPT 저장/복원에 연결했다. native Kubernetes source 자격·팩/판정/기한·등록표는 그대로다.

@@ -356,6 +356,19 @@
 
 ## 열린 질문
 
+### M-A6 실행기 단위 판본표·V0 관측기 (2026-11-15) — 사용자 결정 대기
+근거: [ma6-version-applicability.md](docs/dev-1/ma6-version-applicability.md) 19~21절. 판본 관문을 실행기→카탈로그 기능 조회로 바꿨고, 외부 관측 실행기 10종을 두 판본에 열었다. 엔진 안 관측 실행기는 원인을 기록하고 닫아 두었다. 아래 답이 나오기 전에는 판정 기준·assert·고정값 검사를 바꾸지 않는다. 각 질문 끝의 "잠정"은 답이 없을 때 따르는 기본값이다.
+- **M-A6-V1 기준 V0 D1(요청 시도·캐시·종료)의 다른 의미 네 가지**
+  - (a) SWAP 선점: V0는 선점된 요청의 KV 블록을 CPU로 옮겨 살려 둔다. 제안: SWAP 선점은 "해제"가 아니라 별도 사건 `PREEMPT_SWAP`으로 기록하고, V1의 recompute 선점과 같은 판정 사실로 세지 않는다. 잠정: 별도 사건.
+  - (b) 캐시 적중: V0 `get_num_cached_tokens`는 같은 요청이 앞 단계에서 계산한 블록도 센다. 제안: 블록 소유(처음 계산한 요청 ID)를 추적해 "다른 요청이 만든 블록 재사용"만 적중으로 센다. 추적이 끊기면 그 요청은 UNKNOWN. 잠정: 소유 추적.
+  - (c) 캐시 식별값: V0 블록 해시에는 `cache_salt`가 없고 LoRA ID만 있다. 제안: REQ-15·16의 기준 쪽은 관측 공백이 아니라 "식별값에 신원·설정 구분이 없다"는 관측 사실로 둔다(판정은 기존 기준 그대로). 잠정: 관측 사실.
+  - (d) 재시도(LIF-12): V0는 같은 요청 ID 재제출을 거부한다. 제안: 거부를 "중복 실행 없음"의 관측으로 기록하되, 재시도 정책이 다른 ID를 쓰는 경우는 V1과 같은 시도 추적으로 본다. 잠정: 그렇게 기록.
+- **M-A6-V2 REQ-18 기준 쪽**: V0에는 지속 batch slot이 없다(단계마다 sampling tensor를 새로 만든다). "slot 재사용 뒤 이전 제한 상태 잔존"의 관측 대상이 없다. 선택지: ① 기능 부재 UNKNOWN(결정 9와 같은 형식), ② 비적용, ③ 단계 간 logits processor 상태 잔존을 대신 관측하는 새 의미(판정 의미 변경). 잠정: ① UNKNOWN.
+- **M-A6-V3 LIF-08 기준 쪽**: V0 `WorkerMonitor`는 worker 프로세스 종료만 감지한다. 실행 중 정지·통신 정지 감시는 없다. 정지를 주입했을 때 "감지 안 됨"을 ① 관측된 결과로 두고 기존 판정(FAIL 가능)에 넘길지, ② 기능 부재 UNKNOWN으로 둘지. 관측 공백이 아니라 실제 동작이므로 ①을 제안한다. 잠정: ①. 판정 기준은 바꾸지 않는다.
+- **M-A6-V4 REQ-05 기준 쪽**: V0 models 경로는 `entrypoints/openai/api_server.show_available_models`·`serving_models`로 옮겨져 있다(9절 3행 `MOVED_CHANGED`). 같은 의미의 lifecycle 대상표 행을 V0용으로 더하는 것을 제안한다. 잠정: 대상표 추가.
+- **M-A6-V5 REQ-10(`sampling_validation`) 열기**: 지금 닫아 두었다. 0.7.0은 `structured_outputs→guided_json` 대응과 `tool_choice=required` 분기(결정 9-5)를 실행기가 소비한 뒤에 연다. 0.30.0은 runner_capture 후보 행을 넣은 뒤에 연다. 열려면 `tests/test_code_selection_observation.py::test_only_input_validation_kubernetes_executor_is_exposed_on_old_releases`의 assert를 고쳐야 한다. 그 시점에 assert를 바꿔도 되는지 묻는다. 잠정: 바꾸지 않음(닫아 둠).
+- **M-A6-V6 후보 0.30.0 lifecycle 센서 계열 행**: 센서 원본이 0.31.0 SHA 한 행만 받는다. 0.30.0 행(대상 20모듈 중 16개 (a), 4개 검토)을 넣으려면 `vllm_lifecycle_sensor`가 여러 정확 행을 받게 바꿔야 한다. 그러면 센서 SHA·15개 센서의 CPython 자기 코드 지문(3.12.3 포함)·그 위 생산자 신원을 다시 만들고, 0.31.0 기존 등록은 상속하지 않는다. 0.31.0은 MVP 비교 쌍이 아니다(결정 2026-11-12). 이 범위로 진행할지 묻는다. 잠정: 진행하지 않음(원인 기록 유지).
+
 - ~~M-A7-Q3 / 기준 V0의 지정 멀티모달 prefix cache 부재~~ → 사용자 결정34로 V0 유지·해당 기준 캐시 분기만 원인 있는 UNKNOWN 예외를 승인했다. 실제 EVD/RES 생성·나머지 입력/관측 완료는 별도이며 기준 V1 변경은 승인하지 않았다.
 ### RB2 실행 준비물 결합값(B2) 분리 (2026-11-14, 미승인)
 B2 57개 키(17개 점검)를 실행기 코드로 확인해 G(guard 계산 20)·E(기업 결정 포함 4)·P(실행 준비·실행 중 값 33)로 나눴다. 분류표·설계·영향은 [docs/RUN_BINDING.md](docs/RUN_BINDING.md) 7절. 승인 전에는 구현·팩 판본 상향을 하지 않는다.

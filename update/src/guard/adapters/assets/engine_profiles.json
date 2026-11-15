@@ -98,8 +98,8 @@
         "native_lifecycle",
         "scoped_consumption"
       ],
-      "pin_status": "candidate_pin",
-      "qualification": "정확한 설치 bytes·함수·CPython·준비 자산 대조와 새 생산자 GPU 등록은 별도다."
+      "pin_status": "image_pin",
+      "qualification": "후보 행 13개의 설치 bytes·함수 지문은 이미지와 일치했다(docs/dev-1/ma3-image-qualification-20261114.json). 준비 자산 대조와 새 생산자 GPU 등록은 별도다."
     },
     {
       "id": "sglang-runtime-request-lifecycle/1",

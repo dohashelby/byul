@@ -10,18 +10,18 @@ from typing import Any, Collection
 from uuid import uuid4
 
 
-_PATH_LOCKS: dict[str, threading.Lock] = {}
+_PATH_LOCKS: dict[str, threading.RLock] = {}
 _PATH_LOCKS_GUARD = threading.Lock()
 
 
-def _lock_for(path: Path) -> threading.Lock:
+def _lock_for(path: Path) -> threading.RLock:
     # Several modules open their own JsonlStore on the same file. One lock per
     # path keeps a retention rewrite from racing their appends in this process.
     key = os.path.abspath(path)
     with _PATH_LOCKS_GUARD:
         lock = _PATH_LOCKS.get(key)
         if lock is None:
-            lock = _PATH_LOCKS[key] = threading.Lock()
+            lock = _PATH_LOCKS[key] = threading.RLock()
         return lock
 
 
@@ -93,6 +93,12 @@ class JsonlStore:
             if descriptor >= 0:
                 os.close(descriptor)
             os.close(directory)
+
+    @contextmanager
+    def locked(self):
+        """Serialize a multi-journal retention transaction with in-process appends."""
+        with self._lock:
+            yield
 
     def check_writable(self) -> None:
         """Use the append boundary even when preflighting an empty journal."""
@@ -305,7 +311,7 @@ class JsonlStore:
         rows.reverse()
         return rows, corrupt[:20], limited
 
-    def remove_lines(self, line_numbers: Collection[int]) -> tuple[int, int]:
+    def remove_lines(self, line_numbers: Collection[int], *, select=None) -> tuple[int, int]:
         """Rewrite the file without the given 1-based lines; return (kept, removed).
 
         Lines appended after the caller chose ``line_numbers`` are kept, because
@@ -314,6 +320,8 @@ class JsonlStore:
 
         drop = set(line_numbers)
         with self._lock:
+            if select is not None:
+                drop = set(select(drop))
             if not drop:
                 return -1, 0
             temporary = self.path.with_name(f".{self.path.name}.{os.getpid()}.{uuid4().hex}.tmp")

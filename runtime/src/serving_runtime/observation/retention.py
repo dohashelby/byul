@@ -8,6 +8,7 @@ gap stays visible instead of looking like normal operation.
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import json
@@ -99,6 +100,8 @@ class _Unit:
     size: int
     held: bool
     classified: bool
+    started: bool = False
+    final: bool = False
 
 
 class RecordRetention:
@@ -200,11 +203,17 @@ class RecordRetention:
                     unit.classified = unit.classified and timestamp is not None
                     if timestamp is not None and (unit.newest is None or timestamp > unit.newest):
                         unit.newest = timestamp
+                if managed.name == "gateway_records.jsonl" and isinstance(record, dict):
+                    unit = units[key]
+                    unit.started = unit.started or record.get("phase") == "started"
+                    unit.final = unit.final or record.get("phase") == "final"
                 file_units.add(key)
         return unclassified, path.stat().st_size, file_units
 
     def run(self, *, now: datetime | None = None) -> dict[str, Any]:
-        with self._run_lock:
+        with self._run_lock, ExitStack() as locks:
+            for managed in MANAGED_FILES:
+                locks.enter_context(JsonlStore(self.data_dir / managed.name).locked())
             return self._run(now or datetime.now(timezone.utc))
 
     def _run(self, now: datetime) -> dict[str, Any]:
@@ -217,7 +226,13 @@ class RecordRetention:
 
         removal: dict[str, str] = {}
         for key, unit in units.items():
-            if not unit.held and unit.classified and unit.newest is not None and unit.newest < cutoff:
+            if (
+                not unit.held
+                and unit.classified
+                and unit.newest is not None
+                and unit.newest < cutoff
+                and not (unit.started and not unit.final)
+            ):
                 removal[key] = "age"
 
         total_bytes = sum(size for _unclassified, size, _keys in scanned.values())
@@ -227,7 +242,11 @@ class RecordRetention:
                 (
                     (unit.newest, key)
                     for key, unit in units.items()
-                    if not unit.held and unit.classified and unit.newest is not None and key not in removal
+                    if not unit.held
+                    and unit.classified
+                    and unit.newest is not None
+                    and key not in removal
+                    and not (unit.started and not unit.final)
                 ),
                 key=lambda item: item[0],
             )
@@ -240,6 +259,28 @@ class RecordRetention:
         # A broken hold file must not lead to deleting what it meant to protect.
         can_delete = self.enforce and hold_state["state"] != "error"
         files: dict[str, Any] = {}
+        skipped = set()
+
+        def select_unchanged(name, drop):
+            runs, requests, state = load_holds(self.hold_path)
+            if state["state"] == "error":
+                return set()
+            live = {}
+            for managed in MANAGED_FILES:
+                self._scan_file(managed, runs, requests, live)
+            for key in removal:
+                current = live.get(key)
+                if current is not None and (
+                    current.held
+                    or any(
+                        len(lines) > len(units[key].lines.get(filename, []))
+                        for filename, lines in current.lines.items()
+                    )
+                ):
+                    skipped.add(key)
+            protected = {line for key in skipped for line in units[key].lines.get(name, [])}
+            return drop - protected
+
         for name, (unclassified, size, file_units) in scanned.items():
             chosen = {key: removal[key] for key in file_units if key in removal}
             removed_times = [timestamp for key in chosen for timestamp in units[key].times.get(name, [])]
@@ -262,7 +303,9 @@ class RecordRetention:
             }
             if can_delete and lines:
                 try:
-                    _kept, removed = JsonlStore(self.data_dir / name).remove_lines(lines)
+                    _kept, removed = JsonlStore(self.data_dir / name).remove_lines(
+                        lines, select=lambda drop: select_unchanged(name, drop)
+                    )
                     entry["removed_lines"] = removed
                     entry["durability"] = "confirmed"
                 except RewriteCommittedError as error:

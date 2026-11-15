@@ -325,7 +325,6 @@ if __name__ == "__main__":
 import pytest
 
 
-@pytest.mark.xfail(strict=True, reason="A-5")
 def test_a5_inflight_request_is_not_a_size_candidate(tmp_path):
     store = JsonlStore(tmp_path / "gateway_records.jsonl")
     started = {"phase": "started", "request_id": "active", "recorded_at": iso(0)}
@@ -335,7 +334,6 @@ def test_a5_inflight_request_is_not_a_size_candidate(tmp_path):
     assert result["deleted"] is False
 
 
-@pytest.mark.xfail(strict=True, reason="A-5")
 def test_a5_append_before_delete_preserves_the_whole_cross_file_request(tmp_path, monkeypatch):
     gateway = JsonlStore(tmp_path / "gateway_records.jsonl")
     receipts = JsonlStore(tmp_path / "engine_receipts.jsonl")
@@ -359,12 +357,12 @@ def test_a5_append_before_delete_preserves_the_whole_cross_file_request(tmp_path
     assert len(receipts.read_all()[0]) == 1 and not result["deleted"]
 
 
-@pytest.mark.xfail(strict=True, reason="A-5")
 def test_a5_final_appended_to_started_before_age_deletion_keeps_both(tmp_path, monkeypatch):
     store = JsonlStore(tmp_path / "gateway_records.jsonl")
     started = {"phase": "started", "request_id": "active", "recorded_at": iso(10)}
     final = {"phase": "final", "request_id": "active", "recorded_at": iso(0)}
     store.append(started)
+    JsonlStore(tmp_path / "observations.jsonl").append({"observed_at": iso(10)})
     original = JsonlStore.remove_lines
 
     def append_final(target, lines, **kwargs):
@@ -374,5 +372,4 @@ def test_a5_final_appended_to_started_before_age_deletion_keeps_both(tmp_path, m
     monkeypatch.setattr(JsonlStore, "remove_lines", append_final)
     RecordRetention(tmp_path, enforce=True).run(now=NOW)
     rows = store.read_all()[0]
-    assert started in rows
-    assert rows in ([started], [started, final])
+    assert rows == [started, final]

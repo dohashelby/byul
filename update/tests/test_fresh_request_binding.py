@@ -15,6 +15,9 @@ import pytest
 
 from guard.adapters import vllm_lifecycle_catalog as catalog
 from guard.adapters import vllm_lifecycle_sensor as legacy
+from guard.adapters.vllm_lifecycle_links import fresh_assignment
+from guard.adapters.vllm_observation_state import project as project_observation_state
+from guard.adapters.vllm_request_attempts import project_attempts
 from guard.collectors import lifecycle
 from guard.executors import lifecycle_capture as capture
 from tests.test_configured_lifecycle import native_class
@@ -150,6 +153,37 @@ def test_actual_tag_handler_and_native_input_have_one_fresh_hmac_link(world, hea
         expected = hmac.new(key, ('guard-native-request-binding/1\0native-request\0cmpl-' + SECRET + '-0').encode(), hashlib.sha256).hexdigest()
         assert native[0]['native_request_sha256'] == expected
         assert hashlib.sha256(SECRET.encode()).hexdigest().encode() not in raw
+
+
+def test_actual_fresh_binding_feeds_limited_observation_and_attempt_projections(world):
+    state = program(world)
+    async def app(scope, receive, send):
+        raw = SimpleNamespace(scope=scope, headers={'X-Request-Id': SECRET}, state=SimpleNamespace())
+        return await state.handler.create_completion(state.request, raw)
+    assert run_request(world, app) is state.result
+    (rows, summary), _ = recording(world)
+    request = lifecycle.request_header_fingerprint(world.folder / 'manifest.json', world.prepared, SECRET)
+    selected = fresh_assignment(rows, request)
+    assert len(selected) == 1 and selected[0][1]['asgi_request_sha256'] == request
+    assert fresh_assignment(rows, hashlib.sha256(SECRET.encode()).hexdigest()) == []
+    packet = {'recorded_files_covered': True, 'recordings': [{'capture': {
+        'records': rows, 'summary': summary, 'process_context_verified': True,
+        'image_digest_verified': False}, 'session_owner_match': True, 'listed_file_identity_match': True}]}
+    trial = {'case_id': 'obs02-normal-before', 'attempted': True, 'method': 'POST',
+             'request_id_sha256': hashlib.sha256(SECRET.encode()).hexdigest()}
+    observation = project_observation_state(packet, [trial], ['request_selection'],
+                                            binding_hashes={trial['case_id']: request})
+    assert len(observation['bindings']) == 1
+    assert observation['bindings'][0]['native_request_sha256'] == selected[0][1]['native_request_sha256']
+    selection = next(row for row in observation['component_status'] if row['component'] == 'request_selection')
+    assert selection['bound_events'] == 1
+    assert not observation['whole_scope_complete'] and not observation['producer_authenticated']
+    attempt = project_attempts(packet, [{'case_id': 'req12-disconnect', 'attempted': True,
+        'external_request_sha256': trial['request_id_sha256'], 'auxiliary_session_sha256': 'a' * 64}],
+        binding_hashes={'req12-disconnect': request})
+    assert len(attempt['bindings']) == 1 and not attempt['native_attempt_binding_observed']
+    assert 'REQUEST_ATTEMPT_NATIVE_ATTEMPT_UNOBSERVED' in attempt['diagnostic_codes']
+    assert not attempt['native_output_collector_binding_observed'] and not attempt['whole_scope_complete']
 
 
 def test_independent_sessions_do_not_publish_the_same_request_fingerprint(external):  # noqa: F811

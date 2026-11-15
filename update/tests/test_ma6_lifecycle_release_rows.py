@@ -141,9 +141,12 @@ def test_release_profile_is_admitted_only_for_its_catalogued_release():
     for version in ('0.7.0', '0.31.0', 'EXAMPLE-future'):
         assert not engine_profiles.supports('vllm', version, 'lifecycle_release_rows')
     for executor in ('model_authorization', 'session_revocation', 'credential_revocation', 'native_route',
-                     'request_termination', 'observation_state', 'initialization'):
+                     'initialization'):
         assert resolve_executor(executor, 'kubernetes', engine='vllm', version='0.30.0') is not None
         assert resolve_executor(executor, 'kubernetes', engine='vllm', version='0.7.0') is None
+    for executor in ('request_termination', 'observation_state'):
+        assert resolve_executor(executor, 'kubernetes', engine='vllm', version='0.30.0') is not None
+        assert resolve_executor(executor, 'kubernetes', engine='vllm', version='0.7.0') is not None
     # 행이 없는 모듈에 기대는 엔진 안 관측은 계속 닫혀 있다.
     for executor in ('stream_buffer', 'profiler_observation'):
         assert resolve_executor(executor, 'kubernetes', engine='vllm', version='0.30.0') is None

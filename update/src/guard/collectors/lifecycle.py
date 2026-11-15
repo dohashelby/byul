@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 from pathlib import Path
 import re
@@ -328,6 +329,45 @@ def load_prepared(path):
     if not source_supported:
         raise ValueError("LIFECYCLE_ASSET_VERSION_UNAVAILABLE")
     return manifest
+
+
+def request_header_fingerprint(manifest_path, prepared, header):
+    """Derive the /28 ASGI header HMAC from the validated, private key asset.
+
+    This reopens and verifies the exact key after `load_prepared`; no key bytes
+    or raw header leave the caller. A changed or unreadable key is a gap.
+    """
+    if (not configured.request_binding(prepared.get('profile')) or type(header) is not str
+            or not 0 < len(header.encode('utf-8', 'surrogatepass')) <= 512):
+        raise ValueError('REQUEST_BINDING_HEADER_UNAVAILABLE')
+    path = Path(manifest_path).parent / 'request-binding-key.json'
+    try:
+        before = path.lstat()
+        if (not stat.S_ISREG(before.st_mode) or before.st_uid != os.geteuid()
+                or stat.S_IMODE(before.st_mode) != 0o600 or not 0 < before.st_size <= 256):
+            raise ValueError
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            opened = os.fstat(fd)
+            raw = os.read(fd, 257)
+            after = os.fstat(fd)
+        finally:
+            os.close(fd)
+        identity = lambda s: (s.st_dev, s.st_ino, s.st_mode, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
+        expected = prepared['assets']['request-binding-key.json']
+        if (len(raw) != before.st_size or len({identity(s) for s in (before, opened, after, path.lstat())}) != 1
+                or len(raw) != expected['bytes'] or hashlib.sha256(raw).hexdigest() != expected['sha256']):
+            raise ValueError
+        key = strict_json(raw, limit=256)
+        if (type(key) is not dict or set(key) != {'schema', 'session', 'key_hex'}
+                or key['schema'] != 'guard-lifecycle-request-key/1' or key['session'] != prepared['session']
+                or type(key['key_hex']) is not str or re.fullmatch('[0-9a-f]{64}', key['key_hex']) is None):
+            raise ValueError
+        return hmac.new(bytes.fromhex(key['key_hex']),
+            b'guard-native-request-binding/1\0asgi-header\0' + header.encode('utf-8', 'surrogatepass'),
+            hashlib.sha256).hexdigest()
+    except (OSError, KeyError, TypeError, ValueError):
+        raise ValueError('REQUEST_BINDING_KEY_UNAVAILABLE') from None
 
 
 def load_inputs(env_path, target_path, source, manifest_path):

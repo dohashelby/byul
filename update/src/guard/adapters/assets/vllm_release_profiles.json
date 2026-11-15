@@ -161,19 +161,6 @@
           "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 가중치 적재·worker startup 대상과 정확 행 미검토",
           "next": "기준 V1 가중치/worker 대상표"
         },
-        "observation_state": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_lifecycle_sensor",
-            "vllm_attempt_sensor",
-            "vllm_request_output_sensor"
-          ],
-          "checks": [
-            "OBS-02"
-          ],
-          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 V1 AsyncLLM·OutputProcessor·scheduler의 인자/반환 구조가 다름",
-          "next": "기준 V1 사건 의미 대조와 정확 행"
-        },
         "profiler_observation": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
           "observers": [
@@ -194,22 +181,6 @@
           "checks": [],
           "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 V1 MultiprocExecutor·WorkerProc 구조와 기존 fault 지점이 다름",
           "next": "기준 V1 RPC·worker·그룹 대응; M-A3 연계"
-        },
-        "request_termination": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_lifecycle_sensor",
-            "vllm_termination_sensor",
-            "vllm_attempt_sensor",
-            "vllm_request_output_sensor"
-          ],
-          "checks": [
-            "LIF-10",
-            "LIF-12",
-            "REQ-12"
-          ],
-          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 V1 Scheduler._free_request와 KV manager의 사건 의미/인자 대조 미완료",
-          "next": "기준 V1 취소·해제·시도 대상표"
         },
         "resource_recovery": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",

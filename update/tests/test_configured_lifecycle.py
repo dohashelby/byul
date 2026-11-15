@@ -332,6 +332,8 @@ def test_release_and_engine_selection_are_not_inferred_from_a_similar_name(image
 
 def test_snapshot_availability_does_not_open_unreviewed_executors_or_register_gpu_results():
     assert engine_profiles.supports('vllm', '0.7.0', 'configured_lifecycle_rows')
-    for executor in ('engine_sensor', 'request_termination', 'observation_state', 'initialization',
+    assert resolve_executor('request_termination', 'kubernetes', engine='vllm', version='0.7.0') is not None
+    assert resolve_executor('observation_state', 'kubernetes', engine='vllm', version='0.7.0') is not None
+    for executor in ('engine_sensor', 'initialization',
                      'model_authorization', 'profiler_observation'):
         assert resolve_executor(executor, 'kubernetes', engine='vllm', version='0.7.0') is None

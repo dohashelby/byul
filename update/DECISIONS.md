@@ -987,3 +987,6 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
   - vLLM 소스를 직접 분석하는 CPU 실행기 6개(`engine_sensor.py` source slot, `profiler_lifecycle_cpu.py`, `structured_tools_cpu.py`, `template_source_cpu.py`, `sampling_consumption_cpu.py`, `multimodal_gather_cpu.py`)는 provider(`adapters/`)로 옮길 대상이다.
   - TensorRT-LLM은 기본 `EngineProvider`와 외부 HTTP 범위로 둔다. 정리 중 TensorRT-LLM 때문에 바뀌어야 할 중대한 설계 문제는 보지 못했다.
   - B 승인이 필요한 시험 11개(source gate 알고리즘 변경)는 B 검토를 먼저 요청한다(11-09 결정 (가)). 검토 전에는 CI에서 실패한다.
+## 2026-11-15 — M-A6 W1 기준 V1 /28 연결 소비 범위
+
+사용자가 #281 병합 후 승인한 기준 0.7.0 LIF-10/12·REQ-12·OBS-02 개방은 `/28`의 실제 선택·원 입력 연결을 소비하는 범위다. 세션 비밀키의 정확 준비 자산을 다시 검증한 HMAC만 요청을 선택하고, `Processor.process_inputs`의 원 ID와 ASGI invocation을 연결한다. REQ-12 시도/KV/worker/output은 관측되지 않았으므로 UNKNOWN으로 남긴다. OBS-02는 선택 성분만 부분 관측한다. 기존 판정·정책·GPU 등록·과거 프로필 의미는 바꾸지 않는다.

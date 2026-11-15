@@ -162,6 +162,7 @@ class Handler(BaseHTTPRequestHandler):
         request_id: str | None = None,
         close_connection: bool = False,
         extra_headers: dict[str, str] | None = None,
+        propagate_body_errors: bool = False,
     ) -> None:
         if close_connection:
             self.close_connection = True
@@ -178,6 +179,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError):
+            if propagate_body_errors:
+                raise
             return
 
     def _send_read_refusal(self, status: int, code: str, message: str) -> None:
@@ -341,7 +344,7 @@ class Handler(BaseHTTPRequestHandler):
         *,
         request_id: str | None = None,
     ) -> None:
-        self._send(status, content_type, body, request_id=request_id)
+        self._send(status, content_type, body, request_id=request_id, propagate_body_errors=True)
 
     def start_stream_response(self, request_id: str) -> None:
         self.close_connection = True

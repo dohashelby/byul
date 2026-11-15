@@ -428,7 +428,6 @@ def a2_deliver_and_record(tmp_path, failure=None):
     return handler, decision, completed, attempted, rows[0]
 
 
-@pytest.mark.xfail(strict=True, reason="A-2")
 @pytest.mark.parametrize("failure", [BrokenPipeError, ConnectionResetError])
 def test_a2_actual_handler_body_disconnect_is_failed_final_record(tmp_path, failure):
     handler, decision, completed, attempted, record = a2_deliver_and_record(tmp_path, failure)

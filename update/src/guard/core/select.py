@@ -29,7 +29,8 @@ if TYPE_CHECKING:
 ENV_COUNT = {Mode.audit: 1, Mode.update: 2}
 
 # 정책 값 타입: 지금 팩이 쓰는 것만. 범용 정책 언어는 만들지 않는다(DECISIONS Step 1-C)
-SUPPORTED_POLICY_TYPES = ("str", "int", "bool", "list[str]", "dict[str,int]")
+# "dict"(2026-11-15 RB3-Q4): 실행 파일에서 나눈 기업 결정 객체. 내부 형식은 그 실행기의 닫힌 계약이 검사한다.
+SUPPORTED_POLICY_TYPES = ("str", "int", "bool", "list[str]", "dict[str,int]", "dict")
 
 
 class PolicyValueError(ValueError):
@@ -45,6 +46,7 @@ def check_policy_value(check_id: str, key: str, type_: str, value: Any) -> None:
         "bool": lambda v: isinstance(v, bool),
         "list[str]": lambda v: isinstance(v, list) and all(isinstance(x, str) for x in v),
         "dict[str,int]": lambda v: isinstance(v, dict) and all(isinstance(k, str) and type(x) is int for k, x in v.items()),
+        "dict": lambda v: isinstance(v, dict) and all(isinstance(k, str) for k in v),
     }[type_](value)
     if not ok:
         got = "null" if value is None else f"{type(value).__name__} {value!r}"

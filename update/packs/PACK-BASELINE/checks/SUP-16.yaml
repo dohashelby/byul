@@ -2,7 +2,7 @@ id: SUP-16
 framework_id: CHK-SUP-016
 mechanism_ids:
 - mechanism-08
-revision: 5
+revision: 6
 retired: false
 area: SUP
 purpose: 생성물 완전성
@@ -15,10 +15,7 @@ review_order: reference_baseline_first
 impact: MEDIUM
 applies_when:
   prose: 다운로드·변환·compile 등 파일 생성과 중단 경로를 확인한다. 사용 중인 생성 경로마다 부분 결과와 완료 상태를 대조한다.
-policy_params:
-- key: supply_record_source_sha256
-  type: str
-  required: true
+policy_params: []
 policy_prose:
   policy_to_decide: null
   enterprise_decisions: 캐시 위치·writer·완료/원자적 공개 규칙·정리 방식, 모델 구조·weights 값·dtype·양자화·TP·도구/장치·설정 중 생성물에 영향을 주는 조건과 호환성 근거. 무관한 설정 변경까지 일괄 삭제하지 않는다.

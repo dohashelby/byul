@@ -1,7 +1,41 @@
+## 2026-11-16 — 병합 가능한 열린 PR 일괄 병합 승인
+
+사용자는 “지금 쌓여있는 pr 받을 수 있는 거 알아서 다 받아”라고 지시했다. 병합할 PR의 현재 head·충돌·CI·초안 상태를 확인하고 준비된 PR을 main에 병합한다. #285의 문서 충돌은 양쪽 기록을 보존하고 REQ-10 검토 절을 28절로 옮겨 해소한다. 초안·실패한 CI·실제 GPU 미관측을 완료나 PASS로 승격하지 않는다. 기존 문서 공개 당시의 병합 제외 기록은 이력으로 보존한다.
+
 ## 2026-11-15 — REQ-10 한정된 V1 소스 검토 문서 공개 승인
 
 사용자는 검토 커밋e3ac24fc의 “문서 push·PR 생성 승인”으로 답했다. codex/req10-v1-source-review-20261115의 문서·검토 JSON·CI 경로만 main 대상 PR로 공개한다. 실제 GPU 기능 부재나 보안 PASS/비적용·runner 소비를 주장하지 않으며 제품/판정/고정값/지원표를 바꾸지 않는다. 필요한 승인/CI 기록은 같은 범위로 잇고 병합·새 비용·M-B4 재개는 포함하지 않는다.
 
+## 2026-11-15 — #280 main 병합 승인
+
+사용자는 CI가 모두 성공한 구체 head008dc76f의 결정/원인 기록 PR #280에 대해 “#280 main 병합”으로 답했다. 정확 head 일치 조건으로 main7b8bf0af에 병합했다. 이 승인은 #282나 별도 M-A6 후속의 병합·새 비용/GPU·정책 확정으로 확대하지 않는다. 후속에서는 현재 main의 승인된 원인 기록과 /28의 실제 HMAC 소비·관측 연결을 함께 보존한다.
+
+## 2026-11-15 — RB3-Q1~Q4 승인·OBS-06 현재 정책 Ref 결합
+
+클로드가 전달받은 사용자 결정 “모델 기본 템플릿 자동”, “모델 파일 목록으로 자동”, “정책 값으로 guard가 계산”, “네 개 모두 분리”를 PR #282 후속에서 반영한다. 템플릿·공급 허용 목록 자동 채움은 J02 lab DRAFT에 한하고 기존 웹 값을 덮어쓰거나 공식 승인으로 올리지 않는다. 공급 자격의 비민감 신원 하나는 별도 선언을 받아 REQ-05 시험 역할 라벨과 구분한다. Q3의 해시 대상은 봉인된 POL의 해당 점검 값 전체(자기 해시 키 제외)로 정하며 팩38을 사용한다. retry/copy/recovery의 기업 기준은 새 정책 키로, 파일 해시는 실행 결합으로 나눈다. 수집·판정·필수 관측·생산자 미인증·과거 Ref는 유지한다.
+
+이 세션에서 사용자는 OBS-06 해시 순환 문제에 “실행할 때 확정된 현재 정책 Ref를 guard가 자동 결합 (권장)”을 선택했다. `plan.inputs.policy`를 실행기에 전달하고 subject 파일의 Ref와 대조한다. `record_access_policy_ref`는 POL 값에 넣지 않는다. 봉인되지 않은 초안에서 임의 Ref를 만들지 않는다. SUP-08 팩38 재확인은 기존 결정대로 AWS lab에서 J02 때 실행하며 원 팩36 보고서를 고치지 않는다. 상세·명령·남은 자산은 RUN_BINDING 14절.
+
+사용자의 2026-11-15 로컬 실행 금지 지시를 CLAUDE/AGENTS 7절에도 함께 반영했다. 로컬 pytest·파이썬 도구(편집 보조 포함)를 실행하지 않고 CI/승인된 원격으로 검증한다. 이번 인계 초기에 이 지시를 발견하기 전 대화 기록을 Python으로 읽은 두 명령은 파일 읽기였으며 제품 시험 결과로 사용하지 않는다.
+
+## 2026-11-15 — #281 병합 뒤 M-A6 후속의 실제 연결 경계
+
+#281은 main82831e36에 병합됐다. W1은 /28의 세션 HMAC 지문을 기존 raw SHA 요청 선택과 혼동하지 않고, private key 자산·정확 선택 사건·종료/상태 projection을 연결한 뒤 승인된 실행기 표를 연다. 단순 지원표 추가로 준비 완료를 만들지 않는다. W3의 기존 센서는 성공한 start마다 새 세대를 기록하므로 현재 검토 범위에서 센서 bytes나 자기 코드 지문을 바꿀 필요가 없다. 필요한 후보 정확 행/composition과 반복 start 회귀는 후속에서 확인하며, 코드 변경으로 지문 재계산이 생기면 기존 사용자 결정대로 CI에서 한다. #280은 원인/결정 기록 PR로 유지한다.
+
+## 2026-11-15 — 사용자 결정: #280의 `/27` 선택 지점 제거, W3 지문은 CI job에서
+
+- "#280에서 /27 빼고 #281 위로": PR #280에서 `/27` 선택 지점 코드를 제거하고 결정 기록·원인 코드만 남긴다. W1(기준 LIF-10·12, REQ-12, OBS-02 열기)과 후보 stream_buffer 변형 profile은 PR #281(`/28`) 병합 뒤 최신 main의 새 브랜치에서 한다. #281 브랜치에는 푸시하지 않는다.
+- W3 profiler 센서 CPython 지문 재계산은 "CI job에서": 기존 `observer-cpython-3128` job처럼 정확한 CPython으로 지문을 계산해 산출물로 내는 CI job을 두고, 그 결과로 W3을 구현한다. 로컬에서는 pytest·파이썬(편집 보조 스크립트 포함)을 쓰지 않는다.
+
+## 2026-11-15 — 사용자 결정 M-A6-W1~W6: 기준 V1·후보 남은 점검
+
+메인 세션을 거쳐 전달된 사용자 답. 근거는 [판본 적용표 26·27절](docs/dev-1/ma6-version-applicability.md).
+- W1 "연다 (assert 변경 승인)": 기준 0.7.0 V1의 LIF-10·12, REQ-12, OBS-02 실행기를 연다. `tests/test_configured_lifecycle.py::test_snapshot_availability_does_not_open_unreviewed_executors_or_register_gpu_results`의 0.7.0 비노출 assert 변경을 승인했다. REQ-12의 시도 사건·KV 소유 미관측은 원인 있는 UNKNOWN으로 남긴다. 요청 연결은 PR #281의 `/28`(fresh 선택·세션 HMAC)과 겹치므로 그 연결 위에서 연다(27.1).
+- W2 "UNKNOWN": 기준 REQ-05의 최종 모델 연결(`_model_forward` 없음)은 원인 있는 UNKNOWN이다.
+- W3 "호출 순서로 세대 정의": 후보 LIF-14의 profiler 세대는 start/stop 호출 순서로 정의해 관측한다. profiler 객체 재사용은 관측 사실로 함께 남긴다. 판정 기준은 바꾸지 않는다.
+- W4 "승인 (이월)": LIF-13(태그에 `weight_cache` 없음)과 PLT-10·11(인증이 `build_app` 지역 함수)은 V1 기준에서도 원인 있는 UNKNOWN으로 마감한다. 원인은 엔진 모드가 아니라 태그 소스의 사실이다. PASS·비적용으로 바꾸지 않는다.
+- W5 "GPU 확인 후 기능 부재": 기준 REQ-10은 다음 GPU 실행 때 구조화 출력이 실제로 제약되지 않는지 확인한다. 맞으면 결정 9 형식의 기능 부재로 정리한다. 확인 절차와 판단 기준은 27.3절.
+- W6 "받는다": PyPI `uvicorn-0.53.0-py3-none-any.whl`(87,081 bytes)을 받아 대조했다(27.2). 로컬에서는 셸 도구(`curl`·`shasum`·`unzip`)만 썼고 파이썬 도구·pytest는 실행하지 않았다.
 ## 2026-11-15 — PR281 runtime final 저장 경합의 시험 한 파일 예외 승인
 
 사용자는 “시험 한 파일만 예외 승인”으로 답했다. runtime/tests/test_mvp_zeroday_profile.py 두 시험에 해당 요청의 final 저장 완료 확인을 추가한다. 기존 assert37개·상태 코드·필드 값/비밀 비노출·실제 소켓·제품 기한과 runtime 제품 소스/정책/의존성을 보존한다. 구체 검토/미적용 제안 패치는 작업 폴더 PR281_RUNTIME_ZERODAY_REVIEW_20261115.md·PR281_RUNTIME_ZERODAY_PROPOSAL.patch다. 원 실패는 보존하고 runtime의 다른 파일/문서(STATUS 포함)는 이번 한 파일 예외로 확대하지 않는다. 기존 #281의 승인된 CI 원인 보수로 검증 뒤 반영하며 병합·새 비용·M-B4 재개는 제외한다.
@@ -436,6 +470,15 @@
 
 ## 열린 질문
 
+### M-A6-W 기준 V1·후보 남은 점검 (2026-11-15) — 사용자 결정됨
+- ~~M-A6-W1~W6~~ → 2026-11-15 사용자 결정(맨 위 "사용자 결정 M-A6-W1~W6" 절). 원 질문은 이력으로 남긴다.
+근거: [판본 적용표 26절](docs/dev-1/ma6-version-applicability.md). 답이 나오기 전에는 판정 기준·assert·고정값 검사를 바꾸지 않는다.
+- **M-A6-W1 기준 0.7.0 termination 계열 열기**: `/27` 선택 지점의 live ASGI 연결을 구현했다. LIF-10·12, REQ-12, OBS-02 실행기를 0.7.0에서 열려면 `tests/test_configured_lifecycle.py::test_snapshot_availability_does_not_open_unreviewed_executors_or_register_gpu_results`의 0.7.0 비노출 assert를 고쳐야 한다. 열어도 REQ-12의 시도 사건과 KV 블록 소유권은 미관측(원인 있는 UNKNOWN 범위)이다. 잠정: 열지 않음.
+- **M-A6-W2 기준 REQ-05 최종 모델 연결**: 0.7.0 V1 runner에는 `_model_forward`가 없고 `execute_model`이 모델을 직접 부른다. `execute_model`의 선택 ID와 `load_model`/`get_model`의 모델 객체를 같은 프로세스에서 잇는 새 연결로 볼지, UNKNOWN으로 둘지. 잠정: UNKNOWN.
+- **M-A6-W3 후보 LIF-14 profiler 세대**: 0.30.0은 같은 torch profiler 객체를 다시 시작한다(0.31.0은 start마다 새 객체). profiler 세대를 ① start/stop 호출 순서로 정의해 관측, ② 객체 재사용을 관측 사실로 기록하고 세대 판단은 UNKNOWN. 잠정: ②.
+- **M-A6-W4 V0 승인 예외의 V1 이월**: 결정14 변경으로 V0 예외는 과거 V0 구성에만 적용된다. 그런데 두 공백은 엔진 모드가 아니라 태그 소스의 사실이다: LIF-13(`weight_cache` 모듈 없음, 결정 9-1)과 PLT-10·11(인증이 `build_app` 지역 함수, D4). 같은 원인으로 V1 기준에도 원인 있는 UNKNOWN을 승인할지. 잠정: 승인 전 미구현으로 둠.
+- **M-A6-W5 기준 REQ-10**: 0.7.0 V1에는 `v1/structured_output`이 없다. 구조화 출력 요청이 V1 엔진에서 실제로 제약되지 않는다면 결정 9 형식의 기능 부재로 정리할지(실제 기동 확인 필요). 잠정: GPU 확인 전 닫아 둠.
+- **M-A6-W6 후보 uvicorn 0.53.0 설치 파일**: stream_buffer(LIF-03·04) 행을 위해 PyPI `uvicorn-0.53.0-py3-none-any.whl`(87,081 bytes)을 받아 M-A3 이미지 메타데이터 SHA와 대조할지. 잠정: 승인 전 받지 않음.
 ### 기준 V1 fresh 요청 연결 형식 — 승인됨(2026-11-15)
 기존 /1~ /27과 공통 GPU /1·/4·판정은 보존하고, 후속 native /28·세션 HMAC 키 자산을 추가하는 제한안을 제안한다. 실제 원 함수/객체·live ASGI invocation을 대조하고 ContextVar/문자열만으로 연결하지 않는다. 사용자가 “후속 profile·HMAC 키 자산 승인”으로 답했다. 기존 형식/판정·실행기 활성화/비용/공개 경계는 유지하고 이 제한된 새 관측 형식만 구현한다. 상세 검토 자료는 작업 폴더 MVP_FRESH_REQUEST_BINDING_DECISION_20261115.md다.
 
@@ -455,6 +498,18 @@
 - **M-A6-V6 후보 0.30.0 lifecycle 센서 계열 행**: 센서 원본이 0.31.0 SHA 한 행만 받는다. 0.30.0 행(대상 20모듈 중 16개 (a), 4개 검토)을 넣으려면 `vllm_lifecycle_sensor`가 여러 정확 행을 받게 바꿔야 한다. 그러면 센서 SHA·15개 센서의 CPython 자기 코드 지문(3.12.3 포함)·그 위 생산자 신원을 다시 만들고, 0.31.0 기존 등록은 상속하지 않는다. 0.31.0은 MVP 비교 쌍이 아니다(결정 2026-11-12). 이 범위로 진행할지 묻는다. 잠정: 진행하지 않음(원인 기록 유지).
 
 - ~~M-A7-Q3 / 기준 V0의 지정 멀티모달 prefix cache 부재~~ → 사용자 결정34로 V0 유지·해당 기준 캐시 분기만 원인 있는 UNKNOWN 예외를 승인했다. 실제 EVD/RES 생성·나머지 입력/관측 완료는 별도이며 기준 V1 변경은 승인하지 않았다.
+### RB3 정책에 남은 실행 결합값 자동 채움 (2026-11-15) — 결정 필요한 것만
+사용자 지시(상단 세션 전달, 원문 "그거 자동으로 채우게 3단계 진행해")로 C(생산자 소스)·D(시험 주체)·E(사건)는 결정 없이 옮겼다(아래 "2026-11-15 — RB3" 절, 팩 37). 아래는 **기록이나 실행 값으로 채우면 점검이 스스로를 승인하게 되는** 키다. 출처를 정하는 것이 기업 결정이라 묻는다. 분류표: [docs/RUN_BINDING.md](docs/RUN_BINDING.md) 13절.
+- **RB3-Q1 템플릿 허용 목록** `allowed_template_sha256`(REQ-07·SUP-03): 실행기는 기동이 고른 템플릿 digest가 이 목록 밖이면 위반으로 본다. 기동에 쓴 템플릿에서 채우면 위반이 나올 수 없다. ① 모델 판본에 든 기본 chat template 하나를 승인 대상으로 하고, 조립 도구가 그 bytes 해시를 DRAFT로 채운다(J02 lab 한정, 공식은 사람 확인) ② 사람이 웹에서 고른다. 잠정: ①(J02 lab DRAFT 한정).
+- **RB3-Q2 공급 허용 목록** `supply_allowed_objects`(PLT-03)·`supply_allowed_identities`(PLT-05): 실행 기록에 나온 객체·신원으로 채우면 위반이 없어진다. ① 허용 객체 = ENV 모델 inventory의 파일 SHA-256 목록, 허용 신원 = 승인 자격 하나(REQ-05와 같은 "승인 자격 하나" 결정을 적용)로 조립 도구가 DRAFT를 채운다 ② 사람이 웹에서 넣는다. 잠정: ①.
+- **RB3-Q3 정책 문서 참조 해시**(A′) `retry_policy_sha256`(LIF-12)·`copy_policy_sha256`(PLT-12)·`observation_event_policy_sha256`(OBS-01)·`forwarded_identity_policy_sha256`(REQ-04)·`stored_identity_policy_sha256`(REQ-06): 생산자 기록이 "어떤 정책 문서로 동작했는지"를 이 값과 대조한다. 생산자가 실제로 읽은 문서에서 채우면 대조가 의미를 잃는다. ① 정책 문서 = 이 POL 문서의 그 점검 값(정규 JSON, 이 키 자신 제외)으로 정의하고 guard가 계산한다(새 정의라 팩 판본 상향) ② 기업이 승인한 별도 문서 파일의 bytes 해시를 사람이 넣는다(지금 의미 유지). 잠정: ①. 어느 쪽이든 lab에는 이 기록을 쓰는 생산자가 없어 J02 결과는 UNKNOWN이다.
+- **RB3-Q4 E 4개 분리**(RB2-E를 이어서): 분리안은 RUN_BINDING 7.6 그대로다. 점검별로 묻는다.
+  - (a) LIF-12 `retry_scope_sha256`: `limits`(최대 시도·겹침·남은 시간·반환·비용)를 정책 키로 꺼내고, `subjects`·생산자·이미지·모델 결합은 실행 결합 파일(bytes 해시)로 옮기나? 잠정: 옮긴다(웹 정책에 한도 칸 5개가 생긴다).
+  - (b) PLT-12 `copy_inventory_sha256`: 복사본별 `required_action`·`deadline_at`·`retention_exception`은 정책에, 복사본 위치·수신자·세대는 실행 결합으로? 잠정: 옮긴다.
+  - (c) OBS-06 `record_subject_plan_sha256`: `policy_ref`를 새 A′ 키로, 시험 주체 `username`·`groups`는 실행 결합으로? 잠정: 옮긴다.
+  - (d) LIF-11 `recovery_selection_sha256`: 행별 `require_absent`를 정책 규칙 `recovery_require_absent_kinds`로, pid·rank·fd·device·inode는 실행 결합으로? 잠정: 옮긴다.
+  - 넷 다 실행기 입력 형식과 정책 키가 바뀌어 팩 판본이 다시 오른다. 판정 규칙·필수 관측은 바뀌지 않는다.
+
 ### RB2 실행 준비물 결합값(B2) 분리 (2026-11-14, 미승인)
 B2 57개 키(17개 점검)를 실행기 코드로 확인해 G(guard 계산 20)·E(기업 결정 포함 4)·P(실행 준비·실행 중 값 33)로 나눴다. 분류표·설계·영향은 [docs/RUN_BINDING.md](docs/RUN_BINDING.md) 7절. 승인 전에는 구현·팩 판본 상향을 하지 않는다.
 - **RB2-Q1** G 20개(`transition_inputs_sha256`, `transition_*_generation`, `init_scenario_sha256`·`recovery_scenario_sha256`, `subject_scope`·`api_hop_scope`)를 결합 계산으로 옮기나? 시나리오는 실행기 설정 `scenario` 파일을 새로 받아 해시하고, 세대는 설정 `phase_generation`에서 읽는다. 잠정: 옮긴다.
@@ -466,7 +521,7 @@ B2 57개 키(17개 점검)를 실행기 코드로 확인해 G(guard 계산 20)·
 - **RB2-Q7** 호환: 팩 @36, `keys_for` 단계별 판별(@35 재생에서 B1 유지), B2 값이 있는 결합 문서만 `guard-run-binding/2`(`verify`는 /1·/2 수용), 정책 이전 도구 `--stage 2`가 빠진 값을 설정 후보로 출력. 잠정: 이 방식.
 ### RB2 실행 준비물 결합값(B2) 분리 (2026-11-14) — 사용자 결정·구현됨
 - ~~RB2-Q1~Q7~~ → 2026-11-14 사용자 결정(상단 세션 전달, 원문 "2번으로 가자. 열린질문 여기에 물어봐 내가 결정할게"). Q1·Q2·Q3(offset)·Q6 옮김, Q4 E 4개 정책 유지, **Q5는 잠정안과 달리 옮김**(REQ-02 선언 파일 대조 대신 읽은 해시 기록, 수락 기준 축소 승인), Q7 제안 방식. 결정 요약은 아래 "2026-11-14 — RB2" 절, 구현은 [docs/RUN_BINDING.md](docs/RUN_BINDING.md) 8절.
-- **RB2-E 열린 질문**: E 4개(`retry_scope_sha256`·`copy_inventory_sha256`·`record_subject_plan_sha256`·`recovery_selection_sha256`)의 분리안(RUN_BINDING 7.6)은 점검별로 따로 승인한다. 잠정: 정책 유지.
+- **RB2-E 열린 질문**(→ RB3-Q4로 이어짐): E 4개(`retry_scope_sha256`·`copy_inventory_sha256`·`record_subject_plan_sha256`·`recovery_selection_sha256`)의 분리안(RUN_BINDING 7.6)은 점검별로 따로 승인한다. 잠정: 정책 유지.
 - ~~RB2-S~~ → 2026-11-14 사용자 결정 "점검별 설정 둔다"(상단 세션 전달). `[check_config.<점검>]`을 그 점검의 실행기 설정 칸 위에 병합한다(아래 "2026-11-14 — RB2-S" 절, RUN_BINDING 10절).
 - ~~RB2-J J02 실행 설정 조립~~ → 2026-11-14 사용자 결정(상단 세션 전달). **J1·J2는 잠정안과 다르다.**
   - J1 정책 값: **"웹 초안 값 사용"**. J02 lab 실행에 한해 2026-11-03 결정(EXAMPLE은 다섯 점검만)을 넓혀, 플랫폼 웹에 DRAFT로 저장된 초안 값(`j02-policy-v070`·`v030`, 원본 `j02-web-input/verification-values.json` 45개 점검)을 쓴다. 정책은 DRAFT, 결과는 official=false다.
@@ -520,6 +575,13 @@ B2 57개 키(17개 점검)를 실행기 코드로 확인해 G(guard 계산 20)·
 - D2 `impact` 값(HIGH/MEDIUM/LOW) — 지금은 전부 null.
 - 2026-10-23: HTML 보고서를 담당자용 요약 우선 구조로 개편(`report/html.py`만 변경). 상단에 종합 판정·건수·"먼저 볼 것"(미충족·미확인·후퇴), 전체 표·수동 시험·미선정·입력 목록은 접기(JS 없음). JSON·판정·집계 규칙은 그대로.
 
+
+## 2026-11-15 — RB3 정책에 남은 실행 결합값 자동 채움, PACK-BASELINE@37 (사용자 지시 "그거 자동으로 채우게 3단계 진행해")
+- 사람이 정하는 기준값이 아닌 정책 키 38개(22개 점검)를 `guard run`이 채운다. 생산자 소스 SHA(C)는 `[run_binding.<점검>]`의 `record_producer`(REQ-04는 `gateway_producer`·`engine_producer`)가 가리키는 생산자 파일 **bytes** SHA-256이다. REQ-06은 실행기가 이미 요구하는 검토된 adapter 소스 값이다. OBS-01 시험 주체(D)는 `test_actors`로 그대로 옮긴다. PLT-10·11 발급자 사건(E)은 `issuer_event` 파일(닫힌 JSON)에서 읽고 유효 기간은 실행 창이다.
+- 판정 의미는 그대로다. 실행기 대조식·판정 규칙·필수 관측은 바뀌지 않는다. 생산자는 원래 인증되지 않는다(`producer_authenticated` false). 정책의 소스 SHA는 승인 근거가 아니라 "이 기록을 이 생산자가 썼다"는 대조값이었고, 그 대조는 실행기에 남는다. 잃는 것: "정책 확인자가 이 생산자 SHA를 적었다"는 기록. 대신 결합 문서 `files`에 생산자 파일 해시가 남는다.
+- 생산자 파일이 없으면 `NOT_RUN`(`RUN_BINDING_FILE_UNAVAILABLE`·`RUN_BINDING_CONFIG_INVALID`)→UNKNOWN이다. 값을 지어내지 않는다.
+- 사람 결정이 필요한 허용 목록·템플릿·정책 문서 해시·E 4개는 정책에 남기고 열린 질문 RB3-Q1~Q4로 올렸다. REQ-05 주체·허가·퇴역 판본은 사용자 결정 RB3-D1("허용 호출자에게 test-model 현재 판본만, 퇴역 판본 없음, 승인 자격 하나")을 J02 조립 도구가 DRAFT 정책 값으로 채운다(기업 결정이라 정책에 남긴다). 주체 지문은 실행기의 두 시험 역할 이름표이고 신원 확인이 아니다.
+- 팩 37은 변환기로 재현되고 22개 점검 revision만 오른다(검토 표기 결정 5). @36 정의는 3단계 키를 정책 값으로 읽고(재생 호환), 두 출처를 섞으면 거부한다. 정책 이전은 `migrate_policy_run_binding --stage 3`. platform `MVP_PACK`도 37이다.
 
 ## 2026-11-14 — RB2-S 점검별 실행기 설정 (사용자 결정 "점검별 설정 둔다")
 - 같은 실행기를 쓰는 점검(LIF-05·06·16, OBS-01·PLT-12, LIF-07·09 등)이 한 번의 `guard update`에서 서로 다른 target·prepared·`generations`를 쓸 수 있게, `[check_config.<점검>]`을 그 점검의 실행기 설정 칸 위에 병합한다(`configuration.for_check`, 양쪽 병합과 같은 규칙: 표는 병합, 나머지 값은 대체).

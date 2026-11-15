@@ -19,6 +19,7 @@ D = {"origin": "DECLARED", "source": "env.yaml"}
         ("list[str]", ["a", 1], False), ("list[str]", None, False),
         ("dict[str,int]", {}, True), ("dict[str,int]", {"a": 0}, True),
         ("dict[str,int]", {"a": -1}, True),  # range semantics belong to the consumer
+        ("dict", {"a": {"b": None}}, True), ("dict", {}, True), ("dict", [], False), ("dict", None, False),
     ],
 )
 def test_check_policy_value(type_, value, ok):

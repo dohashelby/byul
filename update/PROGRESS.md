@@ -1,10 +1,58 @@
+## 2026-11-16 — PR #285의 최신 main 문서 통합
+
+- 한 일: 사용자 일괄 병합 요청에 따라 main7cbaa4e1을 #285에 통합했다. DECISIONS·PROGRESS의 양쪽 기록을 보존하고 겹친 판본 적용표 번호를 28절로 정리했다. REQ-10 검토 JSON과 제품 소스·팩·원 증거는 그대로다.
+- 테스트 결과: 종전 head72a1a2bf의 CI 10개가 모두 성공했다. 이번 문서 통합의 새 head CI는 아직 확인 전이다. 로컬 Python/pytest는 실행하지 않았다.
+- 다음 단계: 통합 head의 CI와 최종 diff를 확인한 뒤 main에 병합한다.
+- 막힌 것: 실제 ENV/target·sampler/GPU 관측은 이번 문서 병합의 결과가 아니며 미확인 상태를 유지한다.
+
 ## 2026-11-15 — REQ-10 초기 V1 제약 소비의 한정된 소스 검토
 
-- 한 일: 별도 main 기반 브랜치에서 기존 승인 설치 소스6파일/V1 Python42파일을 검토했다. API guided 필드 전달과 V1 sampler 소비를 구분하고 원 sampler 메서드+EXAMPLE 협력 객체로 greedy/random2개 경로를 확인했다. 후보의 grammar bitmask/logits processor 경로는 별도 후속으로 표시했다. 검토 JSON과 적용표26절을 추가하며 제품 소스/판정/고정값·지원표/팩·M-B4는 바꾸지 않았다.
+- 한 일: 별도 main 기반 브랜치에서 기존 승인 설치 소스6파일/V1 Python42파일을 검토했다. API guided 필드 전달과 V1 sampler 소비를 구분하고 원 sampler 메서드+EXAMPLE 협력 객체로 greedy/random2개 경로를 확인했다. 후보의 grammar bitmask/logits processor 경로는 별도 후속으로 표시했다. 검토 JSON과 적용표28절을 추가하며 제품 소스/판정/고정값·지원표/팩·M-B4는 바꾸지 않았다.
 - 테스트 결과: 저장소 밖 한정된 함수 실행2개가 제약 getter 미접근 대조를 통과했다. engine/torch import·실제 GPU/모델 실행은0이다. 이 수를 pytest/실측이나 기능 부재 인증으로 세지 않는다. 현황77/23/68·경로16개(pytest0.49초·부모0.662초)·검토 JSON 구조·diff 검사가 통과했다. 제품/도구/시험 소스 무변경을 확인했다. 새 PR CI와 실제 sampler/GPU는 미실행이다.
 - 다음 단계: 현재 V1 API/모델/설치 source/선택 backend를 실제 입력과 맞추고 허용/거부·후속 변환/모델 제출과 sampler 소비를 관측한다. 확인 불가 예외를 MVP 완료로 인정하려면 별도 결정을 요청한다. 공개 전 source/문서 검토와 push 승인이 필요하다.
 - 막힌 것: 실제 ENV/target·선택 V1·sampler/worker 원 관측이 아직 없다. 필드 대응/HTTP 오류/EXAMPLE 함수 실행만으로 runner_consumption_verified=true/PASS/비적용으로 바꾸지 않는다. 새 GPU/비용/다운로드·M-B4 재개·판정/계약 변경은 승인하지 않았다.
 
+## 2026-11-15 — 팩38 전체 CI 실패 보완과 승인된 #280 통합
+
+- 한 일: 6badc405 전체 CI의 20개 실패를 분류해 보완했다. 현행 팩으로 재사용하는 PLT-12·OBS-01·REQ-04 EXAMPLE 생산자가 실제 POL 행의 새 해시를 쓰고, copy 결정/원 inventory 해시를 고정하도록 입력을 맞췄다. OBS-06 시험 subjects는 현재 봉인된 POL Ref를 사용한다. 파일 변경 회귀의 설정 키를 실제 `input_validation`으로 고치고 CSV의 빈 필드를 생성기와 같은 표현으로 맞췄다. 원 assert·FAIL/UNKNOWN 기대·기존 파생 팩 입력은 보존했다.
+- 테스트 결과: 원 CI는 20 failed, 13617 passed, 기존34 skipped(pytest634.15초·부모635.035초)였다. 별도 ABI·Docker·공유·플랫폼·웹·runtime 검사는 성공했다. 실패 로그는 `/tmp/byul-pr282-6badc405-ci-failure.log`에 보존했고 로컬 Python/pytest는 실행하지 않았다. 이번 보완의 새 CI 결과는 아직 없다.
+- 다음 단계: 사용자 “#280 main 병합” 승인으로 정확 head008dc76f의 CI 전부 성공을 확인하고 main7b8bf0af에 병합했다. 이를 #282에 통합하고 합쳐진 source 목록/검토 행을 갱신해 새 head CI를 확인한다. 별도 M-A6 실제 연결·후보 변형 개발을 계속한다.
+- 막힌 것: 실제 lab 자산·생산자·GPU 관측/등록은 미완료다. 로컬/EXAMPLE/CI를 실측 PASS로 바꾸지 않는다.
+
+## 2026-11-15 — 클로드 인계: RB3 승인 후속·팩38
+
+- 한 일: PR #282의 미커밋 Q3/Q4 변경을 인계했다. PLT-12 사전 점검 시험에 생산자 파일이 빠진 CI 실패를 dc80c753으로 보완했다. Q1/Q2의 고정 모델 inventory·기본 템플릿·별도 승인 공급 신원 DRAFT 자동 채움, Q3 정책 행 해시, Q4 기업 기준/실행 파일 분리, OBS-06 현재 POL Ref 결합과 닫힌 입력 검사를 연결했다. 팩38/플랫폼 연결표/MA7 요구 목록·이전 도구·회귀를 맞췄다. #281 병합 main82831e36을 통합하며 원 결정·진행 기록·검토 영수증을 모두 보존했다.
+- 테스트 결과: 로컬 Python/pytest는 실행하지 않았다. 실패 보완 dc80c753의 PR CI에서 update-default는 아직 진행 중이고 다른 확인은 성공이다. 팩38 최종 변경의 CI 결과는 아직 없다. 정적 검토가 지적한 정책 자기 참조·결정 형식·회수 종류 누락·파일 변경 경합을 보완했으며 diff 검사는 통과했다. 원본 팩37 해시/정의와 새 입력의 원 bytes·정규 JSON·현재 POL Ref를 대조하는 회귀를 추가했다.
+- 다음 단계: 최종 source 목록/검토 영수증과 팩 Ref를 고정해 같은 #282에 올리고 정확 head의 CI를 확인한다. #281 병합 뒤 승인된 M-A6 종료 계열·후보 stream/profiler 후속은 별도 최신 main 브랜치에서 진행한다.
+- 막힌 것: SUP-08 고정 모델/캐시/기동 자산은 다른 기기에 있고 AWS lab에서 새 팩으로 재확인해야 한다. lab 기록 생산자·실제 ENV/target·GPU 관측/등록·기업 정책 확인은 미완료다. 원 경로의 session-checkpoint.json은 이 기기에 없어 실제 Git/클로드 기록에서 복구했다. 준비 상태를 PASS·실측 완료로 올리지 않았다.
+
+## 2026-11-15 — RB3 정책에 남은 실행 결합값 자동 채움(팩 37)
+
+- 한 일: 사용자 지시 "그거 자동으로 채우게 3단계 진행해"로 생산자 소스 SHA(C, 생산자 파일 bytes·REQ-06은 adapter 검토 소스), OBS-01 시험 주체(D), PLT-10·11 발급자 사건과 실행 창(E)을 `[run_binding.<점검>]`에서 계산하게 했다. 22개 점검 38키, PACK-BASELINE@37(revision+1만, 판정 규칙·필수 관측 무변경, 검토 표기 결정 5). 정책 이전 `--stage 3`, J02 도구 REQ-05 결정값(RB3-D1). platform `MVP_PACK` 37.
+- 테스트 결과: 직접 시험(결합 1·2·3단계, 변환기, J02 도구, 3단계 키 영향 시험 35개 파일)은 main에서도 실패하는 macOS 환경 의존 28개를 빼고 통과. 전체는 PR CI.
+- 다음 단계: RB3-Q1~Q4 사용자 결정. SUP-08 @37 사전 확인 재실행(고정 자료가 다른 기기에 있음).
+- 막힌 것: lab에 기록 생산자가 없어 3단계 점검은 생산자 파일이 생길 때까지 UNKNOWN.
+
+## 2026-11-15 — 클로드 인계: #280 main 통합·남은 관측 연결 구분
+
+- 한 일: #281 병합 main82831e36을 #280에 통합해 문서·검토 영수증의 충돌을 양쪽 원문 보존으로 정리했다. W1의 선행 병합은 끝났지만 /28 HMAC ID를 기존 상태/종료 소비기에 실제 연결하는 후속이 남아 있음을 공백 기록에 적었다. W3 센서의 성공한 start마다 새 세대가 생기는 원문 동작을 확인했으며 센서 bytes를 바꾸지 않는다. 후보 정확 모듈 행/composition은 별도 최신 main 브랜치에서 진행한다.
+- 테스트 결과: 종전 head27ca28e2의 PR CI 모든 확인이 성공했다. 새 통합 head의 CI는 아직 없고 로컬 Python/pytest는 실행하지 않았다. 셸 해시 도구로 합쳐진 source 목록과 결정5 검토 행을 갱신했다.
+- 다음 단계: 같은 #280을 갱신해 정확 head CI를 확인한다. 별도 후속의 실제 HMAC/관측 연결·직접 회귀를 완성하고 검토한다. #282의 팩38 입력 변경과 독립으로 유지한다.
+- 막힌 것: 새 실행기/생산자/GPU 자격은 이번 기록 PR에서 열지 않는다. 실제 ENV/target·GPU 실증/등록은 별도다.
+
+## 2026-11-15 — 사용자 결정 M-A6-W1~W6 반영(문서·원인 기록)
+
+- 한 일: W1~W6을 DECISIONS에 기록했다. W6으로 PyPI uvicorn 0.53.0 wheel(87,081 bytes)을 받아 셸 도구로만 대조했다. METADATA SHA가 M-A3 후보 이미지 메타데이터와 같고, stream_buffer가 고정한 uvicorn 세 파일 SHA가 wheel과 같다. W5 GPU 확인 절차를 판본 적용표 27.3절에 적었다. W2·W4는 0.7.0 원인 코드를 `APPROVED_UNKNOWN_V1`로 기록했다. PR #281(`/28` 요청 연결)이 #280의 `/27` 선택 지점과 같은 파일·목적이라 W1 열기와 stream 변형 profile은 #281 병합 뒤로 미뤘다.
+- 테스트 결과: 로컬 실행 금지 규칙에 따라 pytest·파이썬 도구를 실행하지 않았다. 소스 목록 SHA는 `shasum`으로 바꾼 파일 한 행만 고쳤다. 검증은 PR #280 CI 결과로만 확인한다.
+- 다음 단계: #281 병합 뒤 W1(`/28`을 termination 계열 지원 집합에), 후보 stream 변형 profile. W3은 profiler 센서 지문 재계산 장소(CI 또는 원격) 결정이 필요하다.
+- 막힌 것: #280의 `/27` 선택 지점 코드를 #281과 어떻게 정리할지 결정 필요.
+
+## 2026-11-15 — M-A6 기준 V1 요청 연결(`/27` 선택 지점)과 남은 점검 정리
+
+- 한 일: 0.7.0 V1의 엔진 요청 ID가 호출자 ID(`cmpl-<X-Request-Id|uuid>`) 그대로임을 확인했다. `/27` 판본 데이터에 선택 지점 `Processor.process_inputs`를 더하고, live 선택 문맥에서만 SELECTION·ASGI 연결을 기록하게 했다. 기록 검증·연결 함수·termination projection이 판본 선택 지점을 받는다. 작업지시서 7절 결정 14 행을 V1 결정으로 고쳤다. 기준 19개·후보 4개의 상태와 원인, 결정 질문 M-A6-W1~W6을 판본 적용표 26절·DECISIONS에 적었다.
+- 테스트 결과: `test_ma6_v1_selection_link.py`와 기존 `test_configured_lifecycle.py` 37개가 CPython 3.12.3·3.12.8에서 통과(`-n` 없이). 전체 pytest는 PR CI로 확인한다.
+- 다음 단계: W1 승인 시 0.7.0 termination 계열 열기, W2~W6 답에 따른 대상표·행.
+- 막힌 것: 실행기 열기는 기존 assert 변경 승인(W1)이 필요하다. 열린 점검 수는 이번 PR에서 늘지 않았다.
 ## 2026-11-15 — 승인된 runtime final 저장 경합 시험 보수
 
 - 한 일: 사용자 “시험 한 파일만 예외 승인”에 따라 runtime/tests/test_mvp_zeroday_profile.py의 두 final 조회가 저장 완료를 먼저 확인하도록 보완했다. 기존 assert37개·상태/필드/비밀 비노출·실제 소켓·제품 기한은 유지했다. 다른 runtime 파일/제품 소스·정책·의존성과 M-B4는 바꾸지 않았다. 원 CI 실패 로그와 저장소 밖의 정확 제안/진단을 보존한다.

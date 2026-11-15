@@ -14,7 +14,7 @@ from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utc
 from guard.runtime.bounded import strict_json
 from .base import DraftArtifact, EvidenceDraft
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
-from .kubernetes_record_access import capture_record_access
+from .kubernetes_record_access import capture_record_access, _policy_ref
 from .owned_capture import _FILE_READER, MAX_BYTES
 from .rank_failure_contract import stamp
 
@@ -24,6 +24,7 @@ INVENTORY_SCHEMA = "guard-record-copy-inventory/1"
 POLICY_TYPES = {"record_environment_sha256": "str", "record_target_sha256": "str", "record_subject_plan_sha256": "str",
                 "record_inventory_session": "str", "record_inventory_source_sha256": "str",
                 "record_validity_start": "str", "record_validity_end": "str"}
+DECISION_KEY = "record_access_policy_ref"
 OBSERVATIONS = {"record_access_rows": "list", "record_unauthorized_read_verified": "bool", "record_normal_read_verified": "bool",
                 "record_access_gaps": "list", "record_copy_inventory": "list", "record_copy_violations": "list",
                 "record_copy_missing": "list", "record_access_partial": "bool", "record_denial_verified": "bool",
@@ -40,8 +41,11 @@ def inventory_path(session):
 
 def normalize_policy(values):
     try:
-        if type(values) is not dict or set(values) != set(POLICY_TYPES):
+        # @38 (RB3-Q4): the record-access policy reference is the enterprise's policy key.
+        if type(values) is not dict or set(values) not in (set(POLICY_TYPES), set(POLICY_TYPES) | {DECISION_KEY}):
             raise ValueError
+        if DECISION_KEY in values:
+            _policy_ref(values[DECISION_KEY])
         for key in ("record_environment_sha256", "record_target_sha256", "record_subject_plan_sha256", "record_inventory_source_sha256"):
             if type(values[key]) is not str or _SHA.fullmatch(values[key]) is None:
                 raise ValueError
@@ -150,13 +154,17 @@ class KubernetesRecordAccessExecutor:
                     or sha256_hex(canonical_json(subjects)) != policy_values["record_subject_plan_sha256"]
                     or self.expected_target is not None and self.expected_target != digest or not begin <= started <= end):
                 raise ValueError
+            # @38 (RB3-Q4): compare with the policy's reference instead of the plan file's own claim.
+            expected_policy_ref = policy_values.get(DECISION_KEY, subjects["policy_ref"])
+            if expected_policy_ref != subjects["policy_ref"]:
+                raise ValueError
         except (KeyError, TypeError, ValueError, OSError):
             raise ValueError("RECORD_ACCESS_CONFIGURATION_INVALID") from None
         workdir = Path(workdir)
         workdir.mkdir(parents=True, exist_ok=True)
         diagnostics, capture, packet, evaluated = [], None, None, None
         try:
-            capture = capture_record_access(env, target, subjects, expected_policy_ref=subjects["policy_ref"], workdir=workdir,
+            capture = capture_record_access(env, target, subjects, expected_policy_ref=expected_policy_ref, workdir=workdir,
                 binary=self.cfg.get("kubectl_binary", "kubectl"), duration=self.cfg.get("max_duration_seconds", 60),
                 _runner=self.runner)
         except Exception:

@@ -19,6 +19,8 @@ OBSERVATIONS={'copy_inventory_declarations':'list','copy_record_snapshots':'list
  'copy_missing':'list','copy_conflicts':'list','copy_collection':'list','copy_records_collected':'bool',
  'copy_producer_authenticated':'bool','copy_membership_verified':'bool','copy_treatment_verified':'bool',
  'copy_reuse_enforcer_verified':'bool','copy_issuer_verified':'bool','copy_scope_complete':'bool'}
+DECISION_KEY='copy_treatments'
+DECISION_FIELDS=('required_action','deadline_at','retention_exception')
 INVENTORY_FIELDS=frozenset({'schema','credential_family_id','policy_sha256','copies'})
 COPY_FIELDS=frozenset({'copy_id','generation','location_id','location_kind','recipient_id','required_action','deadline_at','retention_exception'})
 EXCEPTION_FIELDS=frozenset({'exception_id','expires_at','restrictions_required'})
@@ -53,7 +55,9 @@ def restrictions(value):
 
 def normalize_policy(values):
     try:
-        if type(values) is not dict or set(values)!=set(POLICY_TYPES):raise ValueError
+        # @38 (RB3-Q4): per-copy treatment decisions are the enterprise's policy key; the inventory must repeat them.
+        if type(values) is not dict or set(values) not in (set(POLICY_TYPES),set(POLICY_TYPES)|{DECISION_KEY}):raise ValueError
+        if DECISION_KEY in values:validate_treatments(values[DECISION_KEY])
         for key in ('copy_environment_sha256','copy_target_sha256','copy_inventory_sha256','copy_policy_sha256','copy_record_source_sha256'):
             if not fingerprint(values[key]):raise ValueError
         if not opaque(values['copy_record_session']):raise ValueError
@@ -83,6 +87,24 @@ def validate_inventory(value,*,expected_policy_sha256):
                 stamp(exception['expires_at'])
         return value
     except (KeyError,TypeError,ValueError):raise ValueError('COPY_INVENTORY_INVALID') from None
+
+
+def treatments(inventory):
+    """The enterprise decisions inside a validated inventory, by copy (the `copy_treatments` policy shape)."""
+    return {row['copy_id']:{k:row[k] for k in DECISION_FIELDS} for row in inventory['copies']}
+
+
+def validate_treatments(value):
+    """Validate policy decisions using the inventory's unchanged treatment contract."""
+    if type(value) is not dict or len(value)>MAX_COPIES:raise ValueError('COPY_POLICY_INVALID')
+    copies=[]
+    for copy_id,row in value.items():
+        if type(row) is not dict or set(row)!=set(DECISION_FIELDS):raise ValueError('COPY_POLICY_INVALID')
+        copies.append({'copy_id':copy_id,'generation':0,'location_id':'0'*32,
+            'location_kind':'FILE','recipient_id':'0'*32,**row})
+    validate_inventory({'schema':INVENTORY_SCHEMA,'credential_family_id':'0'*32,
+        'policy_sha256':'0'*64,'copies':copies},expected_policy_sha256='0'*64)
+    return value
 
 
 def validate_record(value,*,environment_ref,target_sha256,session,source_sha256,inventory_sha256,policy_sha256):

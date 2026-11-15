@@ -2,7 +2,7 @@ id: OBS-01
 framework_id: CHK-OBS-001
 mechanism_ids:
 - mechanism-17
-revision: 7
+revision: 9
 retired: false
 area: OBS
 purpose: 필수 사건 기록
@@ -24,18 +24,6 @@ policy_params:
   required: true
 - key: observation_required_fields
   type: list[str]
-  required: true
-- key: observation_expected_source_sha256
-  type: str
-  required: true
-- key: observation_event_policy_sha256
-  type: str
-  required: true
-- key: observation_allowed_actor_sha256
-  type: str
-  required: true
-- key: observation_denied_actor_sha256
-  type: str
   required: true
 policy_prose:
   policy_to_decide: 필수 사건·식별값·책임 역할

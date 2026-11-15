@@ -1,8 +1,8 @@
 executor: resource_recovery
 collection_profile: kubernetes-selected-resource-recovery-v1
 policy_params:
-- key: recovery_selection_sha256
-  type: str
+- key: recovery_require_absent_kinds
+  type: list[str]
   required: true
 - key: recovery_validity_start
   type: str

@@ -6,7 +6,7 @@
 
 - 입력 색인의 팩 Ref·점검/쪽·중복과 파일 bytes SHA, 정규 파일·크기·읽는 동안 파일 신원.
 - 봉인된 ENV의 해시·판본 표의 해당 쪽·GPU 기본 사실, 정책의 팩·선정 범위·필수 값/타입.
-- 쪽별 설정 병합과 현재 `guard-run-binding/1`·`/2` 계산. `[run_binding.<점검>]` 누락과 정책에 남은 실행 결합 키는 기존 관문에서 거부한다.
+- 쪽별 설정과 `[check_config.<점검>]`을 제품 실행과 같은 `for_check()`로 병합한 뒤 현재 `guard-run-binding/1`·`/2`를 계산한다. `[run_binding.<점검>]` 누락과 정책에 남은 실행 결합 키는 기존 관문에서 거부한다.
 - target의 ENV Ref가 있으면 같은 ENV와 대조하고, 읽은 target/prepared/manifest·B2 결합 파일이 계산 중 바뀌지 않았는지 확인한다.
 
 `file_binding_valid`는 이 범위의 파일·형식·결합 확인이다. 실제 엔진/수집기 자격·현재 Pod·소유 범위·정상 요청은 별도다. 도구는 네트워크·kubectl·엔진·`guard run`을 실행하지 않고 모든 행의 `live_target_verified`, `input_preflight_passed`, `ready_for_execution`을 false, `actual_results`를 null로 유지한다. EXAMPLE ENV는 별도 차단 사유를 남긴다. 기업 기준값과 빈 입력을 채우지 않는다.
@@ -28,7 +28,7 @@ uv run python -m tools.mvp_a_input_preflight --index <실제-파일-색인.json>
 - 이 두 target은 삭제한 2026-11-14 Pod의 과거 입력이다. 현재 실환경 자격·새 실행으로 올리지 않는다. 나머지 M-A52쪽은 실제 입력이 없으며, 전체69개 기준으로는 SUP-08 외136쪽의 수집·결합이 남는다.
 - 새 관측기 등록·M-B4 재개·새 GPU/클라우드 실행은 하지 않았다. 현재 source/자격과 실제 ENV/target을 마련한 뒤 실행 직전 사전 점검을 다시 해야 한다.
 
-같은 실행기를 쓰는 점검이 다른 target/prepared를 요구하면 현재 제품은 별도 실행 설정으로 조립해야 한다. 점검별 실행기 설정 덮어쓰기(RB2-S)나 E 정책 키 네 개의 이동은 이번 도구가 구현하지 않는다.
+같은 실행기를 쓰는 점검의 다른 target/prepared는 RB2-S의 `[check_config.<점검>]`에 선언한다. 사전 점검은 공통 설정→쪽별 설정→점검별 설정 순으로 병합하며, 실제로 선택된 파일이 없거나 ENV Ref가 다르면 파일 결합 유효로 표시하지 않는다. E 정책 키 네 개의 이동은 이 도구의 범위가 아니다.
 
 ## M-A3 준비물의 J01 연결
 

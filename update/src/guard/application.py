@@ -189,7 +189,9 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
                         if not _baseline_ran_without_abort(previous_evidence):
                             raise ValueError("BASELINE_EXECUTION_FAILED")
                         kube_transition.candidate_ready()
-                    side_cfg.raw["_kubernetes_target_sha256"]=kube_transition.transports[side.value].target_sha256
+                    side_cfg.raw["_kubernetes_target_sha256_by_executor"]={
+                        name:kube_transition.transports[side.value].target_sha256
+                        for name in kube_transition.executors}
                 except Exception:
                     side_cfg.abort_reason="KUBERNETES_TRANSITION_UNVERIFIED"
                     lifecycle_errors.append(f"{side.value}: KUBERNETES_TRANSITION_UNVERIFIED; operator recovery required; GPU release unverified")

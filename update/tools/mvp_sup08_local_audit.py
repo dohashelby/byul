@@ -88,6 +88,18 @@ def _launch_conditions(folder, manifest, fixture, pack):
                 or str(engine['resources']['limits']['nvidia.com/gpu']) != '1'):
             raise ValueError('LAUNCH_GPU_OR_CODE_MISMATCH:' + side)
         env = {row['name']: row['value'] for row in engine['env']}
+        launch = release['launch']
+        selected_engine = launch.get('engine')
+        selected_env = launch.get('env', {})
+        if (len(env) != len(engine['env']) or render['launch'].get('engine') != selected_engine
+                or render['launch'].get('env', {}) != selected_env
+                or any(env.get(name) != value for name, value in selected_env.items())):
+            raise ValueError('LAUNCH_ENGINE_SELECTION_MISMATCH:' + side)
+        # The two releases can select the same engine with different variables.
+        # Normalize only those exact profile-declared, checked values; every
+        # other launch condition remains part of the comparison.
+        for name in selected_env:
+            del env[name]
         marker = env.pop('BYUL_CODE_MARKER_ROOT')
         settings = tomllib.loads((base / 'guard.pending-target.toml').read_text())['input_validation']
         policy = yaml.safe_load((base / 'policy.yaml').read_bytes())
@@ -102,7 +114,7 @@ def _launch_conditions(folder, manifest, fixture, pack):
             raise ValueError('LAUNCH_POLICY_OR_CACHE_MISMATCH:' + side)
         probe.validate_policy(pack.checks['SUP-08'], policy['values']['SUP-08'])
         probe.validate_configuration(pack.checks['SUP-08'], settings)
-        normalized.append({'args': args, 'env': env, 'resources': engine['resources']})
+        normalized.append({'args': args, 'env': env, 'resources': engine['resources'], 'engine': selected_engine})
     if normalized[0] != normalized[1]:
         raise ValueError('LAUNCH_COMPARISON_CONDITIONS_MISMATCH')
 

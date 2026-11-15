@@ -108,6 +108,33 @@ def test_example_environment_contracts_are_not_actual_environment_proof(tmp_path
     assert not result['ready_for_final_assembly'] and not result['input_preflight_passed']
 
 
+@pytest.mark.parametrize('damage',['missing','wrong-value','duplicate','value-from','render-selection','undeclared-env'])
+def test_rehashed_launch_cannot_normalize_a_wrong_engine_selection(tmp_path,monkeypatch,damage):
+    fixture,launch,_,_=local_assets(tmp_path,monkeypatch)
+    path=launch.parent/'baseline/engine.yaml'
+    deployment,service=list(yaml.safe_load_all(path.read_bytes()))
+    entries=deployment['spec']['template']['spec']['containers'][0]['env']
+    selected,=(row for row in entries if row['name']=='VLLM_USE_V1')
+    if damage=='missing':entries.remove(selected)
+    elif damage=='wrong-value':selected['value']='0'
+    elif damage=='duplicate':entries.append(dict(selected))
+    elif damage=='value-from':
+        selected.pop('value');selected['valueFrom']={'fieldRef':{'fieldPath':'metadata.name'}}
+    elif damage=='undeclared-env':entries.append({'name':'EXAMPLE_OTHER_MODE','value':'changed'})
+    else:
+        render=launch.parent/'baseline/render.json';document=json.loads(render.read_bytes())
+        document['launch'].pop('engine');document['launch'].pop('env')
+        render.write_bytes(canonical_json(document))
+    path.write_text(yaml.safe_dump_all([deployment,service]))
+    manifest=json.loads(launch.read_bytes())
+    for name in ('baseline/engine.yaml','baseline/render.json'):
+        manifest['files_sha256'][name]=sha256_hex((launch.parent/name).read_bytes())
+    launch.write_bytes(canonical_json(manifest))
+    result=tool.audit(fixture,launch)
+    assert not result['launch_plan_valid'] and not result['local_assets_valid']
+    assert not result['ready_for_final_assembly'] and result['actual_comparison'] is None
+
+
 @pytest.mark.parametrize('damage', ['model', 'missing_model', 'processor', 'ref', 'launch', 'image_with_new_file_hash'])
 def test_changed_actual_files_or_self_rehashed_wrong_launch_are_not_valid(tmp_path, monkeypatch, damage):
     fixture, launch, _, _ = local_assets(tmp_path, monkeypatch)

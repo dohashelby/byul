@@ -4,6 +4,7 @@ from hashlib import sha256
 import json
 import socket
 import subprocess
+from pathlib import Path
 
 import pytest
 import yaml
@@ -103,6 +104,41 @@ def test_policy_wildcard_scope_keeps_existing_selection_semantics(tmp_path, sour
     value = yaml.safe_load(p.read_bytes()); value['scope']['include'] = ['SUP-*']
     p.write_text(yaml.safe_dump(value)); entry['policy']['sha256'] = sha256(p.read_bytes()).hexdigest()
     assert run(tmp_path, data)['file_binding_valid_sides'] == 2
+
+
+@pytest.mark.parametrize('placement',['root','side','side-precedence'])
+@pytest.mark.parametrize('damage',['missing','foreign-env','valid-override'])
+def test_check_target_override_is_the_file_actually_preflighted(tmp_path,sources,placement,damage):
+    data=deepcopy(sources);entry=data['inputs'][0]
+    cfg_path=Path(entry['configuration']['path']);shared=cfg_path.parent/'target.json'
+    override=tmp_path/'check-target.json'
+    target=json.loads(shared.read_bytes())
+    if damage=='foreign-env':target['environment_ref']['sha256']='0'*64
+    if damage!='missing':override.write_text(json.dumps(target))
+    text=cfg_path.read_text()
+    if damage=='valid-override':
+        # A bad shared target must not hide a valid per-check replacement.
+        shared.unlink()
+    prefix='check_config' if placement=='root' else 'sides.baseline.check_config'
+    if placement=='side-precedence':
+        text+='\n[check_config.SUP-08]\ntarget='+json.dumps(str(tmp_path/'missing-root-target.json'))+'\n'
+    cfg_path.write_text(text+f'\n[{prefix}.SUP-08]\ntarget='+json.dumps(str(override))+'\n')
+    entry['configuration']['sha256']=sha256(cfg_path.read_bytes()).hexdigest()
+    result=run(tmp_path,data)
+    row=next(r for r in result['rows'] if (r['check_id'],r['side'])==('SUP-08','baseline'))
+    assert row['file_binding_valid'] is (damage=='valid-override')
+    assert result['file_binding_valid_sides']==(2 if damage=='valid-override' else 1)
+    if damage=='foreign-env':assert row['blocking_codes']==['MA7_TARGET_ENVIRONMENT_MISMATCH']
+    assert not row['ready_for_execution'] and row['actual_results'] is None
+
+
+def test_malformed_per_check_settings_are_reported_as_blocked(tmp_path,sources):
+    data=deepcopy(sources);entry=data['inputs'][0];path=Path(entry['configuration']['path'])
+    path.write_text('check_config = []\n'+path.read_text())
+    entry['configuration']['sha256']=sha256(path.read_bytes()).hexdigest()
+    result=run(tmp_path,data)
+    row=next(r for r in result['rows'] if (r['check_id'],r['side'])==('SUP-08','baseline'))
+    assert not row['file_binding_valid'] and row['blocking_codes']==['CHECK_CONFIG_INVALID']
 
 
 @pytest.mark.parametrize('record_session', ['5' * 32, None])

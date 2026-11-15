@@ -215,6 +215,11 @@
       "manifest_sha256": "a0706cf1549b216e9503839e7338a52b2cee48a60e4ddb2289b262243b53fa2e",
       "reviewed_by": "Codex / #277 V1 세대 옵션 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T15:44:02.295678+09:00"
+    },
+    {
+      "manifest_sha256": "461087ef808a63c8c9784d9178c2406bca141237b46f0fef50393cf5895f5858",
+      "reviewed_by": "Codex / PR277 J02 and preflight fixes; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T16:05:40.445204+09:00"
     }
   ]
 }

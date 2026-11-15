@@ -358,6 +358,14 @@ J02는 MA7 계획의 63개 점검을 한 번의 `guard update`로 기준·후보
 3. **1차 UNKNOWN 범위 점검의 포함**: REQ-02, OBS-01·06·11, PLT-07·12(J02 안)는 1차 완성 기준이 "실행 경로 준비 + UNKNOWN"이다. J02 실행 설정에 넣어 UNKNOWN 증거를 남길지, J02 범위에서 뺄지.
 4. **OBS-03 구현**: `log_analysis`에 Kubernetes 구현이 없다. 새 실행기 구현(M-B1 범위)을 할지, J02에서 원인 기록 UNKNOWN으로 둘지.
 
+### 11.4 J02 혼합 실행 설정과 전환 관문 (2026-11-15 수정)
+
+J02의 여러 실행기를 한 설정에 넣어도 기존 baseline 종료·candidate Ready 전환 관문을 사용한다. `request_binding`·`input_validation` 중 Kubernetes로 고른 실행기의 집합은 양쪽이 같아야 하며, 한쪽의 두 HTTP 실행기는 같은 target 내용을 참조해야 한다. 경로가 다른 사본은 허용하지만 다른 ENV·대상·내용은 실행 전에 거부한다. 다른 실행기의 존재만으로 설정 전체를 거부하지 않는다.
+
+전환이 확인한 target 해시는 이 두 HTTP 실행기에만 전달한다. supply_boot의 역할별 대상이나 lifecycle의 세대별 대상처럼 다른 실행기의 파일에 덮어씌우지 않는다. 실행 전 파일 교체 거부, `after_baseline`의 모든 후보 target 신규 파일 요구, baseline API 종료·candidate Ready 확인은 유지한다. API 종료는 GPU 해제나 실제 보안 PASS를 뜻하지 않는다.
+
+M-A 파일 사전 점검도 공통·쪽별 설정 뒤 `for_check()`를 적용해 제품이 실제로 읽는 점검별 target/prepared를 검사한다. 사전 점검의 결과를 실환경 자격이나 실행 완료로 올리지 않는다.
+
 ## 12. RB2-J 결정 반영 (2026-11-14)
 
 | 결정 | 반영 |

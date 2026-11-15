@@ -1,3 +1,10 @@
+## 2026-11-15 — M-A7 입력 조립 후속 PR 생성
+
+- 한 일: 결정39의 push·PR 승인 뒤 기능 검토6167e30d를 일반 push하고 main 대상 [#278](https://github.com/dohashelby/byul/pull/278)을 열었다. 소비 구현을 담은 [#276](https://github.com/dohashelby/byul/pull/276)은 draft 유지다.
+- 테스트 결과: 직접73개·후속25개·EXAMPLE4사례 제품 결합·현황/diff 관문은 통과했다. 새 head 전체 CI는 진행 중이다. 실제 입력/엔진 결과를 만들지 않았다.
+- 다음 단계: 정확 head CI를 확인한다. 소비 구현이 없는 main에서는 조립 도구의 implementation_available와 실행 결합 사전 대조 상태가 false로 남는 의존 관계를 유지한다.
+- 막힌 것: 현재 V1 ENV/target·선택 모드 함수/핀/기동 자격·ARM2 실제 원 기록과 전체 TP2 수락/등록. 새 비용·병합은 별도이며 M-B4 보관.
+
 ## 2026-11-15 — #275 병합·#277 J02 실행 및 점검별 사전 점검 수정
 
 - 한 일: 사용자 승인으로 #275를 main `b00e4126`에 merge했고 #277 기반 `858ac35e`에 main을 통합했다. J02의 여러 실행기가 함께 있어도 기존 Kubernetes 전환 관문을 사용하게 했다. 양쪽 HTTP 실행기 집합·각 쪽 모든 HTTP target의 같은 내용·ENV/Pod 신원·baseline 종료/candidate Ready·지연 결합 신규 파일 조건을 유지한다. 전환 target 해시는 검증한 HTTP 실행기에만 전달해 다른 수집기의 역할/세대별 target을 덮지 않는다. M-A 파일 사전 점검은 쪽별 설정 뒤 `for_check()`를 적용해 실제 점검별 파일을 검사한다.

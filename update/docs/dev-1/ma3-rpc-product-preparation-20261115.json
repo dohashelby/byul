@@ -1,0 +1,536 @@
+{
+  "schema": "guard-ma3-product-binding-preparation/1",
+  "data_origin": "DECLARED",
+  "scope": "현재 main의 두 쪽 V1 선택을 반영할 후속 입력용 미결합 준비물6개. 선택 모드의 원 함수/정확 핀 자격은 미검증이며 엔진 실행 결과가 아니다.",
+  "source_worktree_base_commit": "77bc05a3f35c3bb07bf07258d6b233d8280bd3dc",
+  "reviewed_source_manifest_sha256": "ea734eb57a98626f599725ac9d11e5f6483a9fc83439e4abcd0b4bfae88a70be",
+  "tool_sha256": "a2bed5f87ed3610badc9d3cad3c3d000030216e18ea0c1de58257feef82b07f1",
+  "prepared_candidates": [
+    {
+      "side": "baseline",
+      "fault_kind": "delay",
+      "session": "31e6ad1e91318833152a1a8630e4b086",
+      "prepared_directory": "/home/youngjo/.cache/byul-rank-rpc-prepared-20261115-product-v4/baseline-delay",
+      "prepared_manifest_sha256": "3dc29fec417de1a8063c92d4eb102b49263e802ba864e997b47202ab7d3d96cc",
+      "settings_sha256": "3a1d88cc927c7ecf58674d3142c5c8edb6cb5df7079d94b01196b1170fc73afa",
+      "assets": {
+        "guard/__init__.py": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "guard/adapters/__init__.py": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "guard/adapters/assets/vllm_rank_ipc_profiles.json": {
+          "bytes": 30092,
+          "sha256": "e7b8186bad0048505d926c22b29692f0c3d940717fa37d4724c173e3f9fb3a15"
+        },
+        "guard/adapters/vllm_lifecycle_sensor.py": {
+          "bytes": 57586,
+          "sha256": "e537d1d1b19813f171aa30b9344c1dbb49139eed3dea60bfa6dc71744d0d4f39"
+        },
+        "guard/adapters/vllm_rank_ipc_hooks.py": {
+          "bytes": 9964,
+          "sha256": "8cc51c530fcda852bbad5a008a92b62733f0d93845d4a5b4c7173c9a844744d5"
+        },
+        "guard/adapters/vllm_rank_ipc_identity.py": {
+          "bytes": 5125,
+          "sha256": "d1c138564b5f1a606d95c020b38846ce6826ba7c35ac1e3df31a23c0635022dc"
+        },
+        "guard/adapters/vllm_rank_ipc_runtime.py": {
+          "bytes": 12418,
+          "sha256": "0f5f63cebcb1df7b88dd670c2fc81bed023023b99ba51be33c6856a143c8b206"
+        },
+        "guard/adapters/vllm_rank_ipc_sources.py": {
+          "bytes": 4563,
+          "sha256": "bfa843defab00d0cf5a44077fd3729edb6d7aed0611d558d23317331da1a2a59"
+        },
+        "guard/adapters/vllm_rank_request_identity.py": {
+          "bytes": 7555,
+          "sha256": "fa5844902c2d49b77ad9dd3e76a96c530c675f781d90bc5f55bd2b7d9142d09d"
+        },
+        "guard/adapters/vllm_rank_rpc_actor.py": {
+          "bytes": 21459,
+          "sha256": "4a893171401a8c755578e0e08fefbffa4156093d16d54a47be9300166700d3ba"
+        },
+        "guard/adapters/vllm_rank_rpc_control.py": {
+          "bytes": 21296,
+          "sha256": "14f9faaf32398c744ea654cf457d011eb5fdce78123278b02c5d754c0222bc26"
+        },
+        "guard/adapters/vllm_rank_rpc_hooks.py": {
+          "bytes": 13892,
+          "sha256": "6829892eaf1b8751260e0a8f41d85ff28c179b9002a7eb7dec2f2e9d375904d2"
+        },
+        "guard/adapters/vllm_worker_generation_contract.py": {
+          "bytes": 8881,
+          "sha256": "f0c37215577292ce7b89b535cf147553ac22f5ae6ef6a08708cf055f4d4eb27a"
+        },
+        "sitecustomize.py": {
+          "bytes": 1712,
+          "sha256": "c5484c8f64206528ff50a32ca6585cfddbb922d27c8100cfc3c8ff837df857af"
+        }
+      },
+      "environment_ref": null,
+      "target_sha256": null,
+      "product_binding_file": null,
+      "live_target_verified": false,
+      "observer_installed": false,
+      "engine_executed": false,
+      "input_preflight_passed": false,
+      "scope_complete": false,
+      "producer_registered": false,
+      "actual_results": null,
+      "source_authenticated": false,
+      "engine_group_verified": false,
+      "selected_engine": "v1",
+      "actual_engine_mode_verified": false
+    },
+    {
+      "side": "baseline",
+      "fault_kind": "exception",
+      "session": "cfa1e9fb0995c2b6e5756ba872f7b74e",
+      "prepared_directory": "/home/youngjo/.cache/byul-rank-rpc-prepared-20261115-product-v4/baseline-exception",
+      "prepared_manifest_sha256": "a2175c2852bfeb0ec08946d497dfba49bb307fd54dea208cf8f78e51bd209b5c",
+      "settings_sha256": "bd9215cf9af5cc95b18cdc62f2775535223ab7388c0a8da1818741cc6b98f61c",
+      "assets": {
+        "guard/__init__.py": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "guard/adapters/__init__.py": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "guard/adapters/assets/vllm_rank_ipc_profiles.json": {
+          "bytes": 30092,
+          "sha256": "e7b8186bad0048505d926c22b29692f0c3d940717fa37d4724c173e3f9fb3a15"
+        },
+        "guard/adapters/vllm_lifecycle_sensor.py": {
+          "bytes": 57586,
+          "sha256": "e537d1d1b19813f171aa30b9344c1dbb49139eed3dea60bfa6dc71744d0d4f39"
+        },
+        "guard/adapters/vllm_rank_ipc_hooks.py": {
+          "bytes": 9964,
+          "sha256": "8cc51c530fcda852bbad5a008a92b62733f0d93845d4a5b4c7173c9a844744d5"
+        },
+        "guard/adapters/vllm_rank_ipc_identity.py": {
+          "bytes": 5125,
+          "sha256": "d1c138564b5f1a606d95c020b38846ce6826ba7c35ac1e3df31a23c0635022dc"
+        },
+        "guard/adapters/vllm_rank_ipc_runtime.py": {
+          "bytes": 12418,
+          "sha256": "0f5f63cebcb1df7b88dd670c2fc81bed023023b99ba51be33c6856a143c8b206"
+        },
+        "guard/adapters/vllm_rank_ipc_sources.py": {
+          "bytes": 4563,
+          "sha256": "bfa843defab00d0cf5a44077fd3729edb6d7aed0611d558d23317331da1a2a59"
+        },
+        "guard/adapters/vllm_rank_request_identity.py": {
+          "bytes": 7555,
+          "sha256": "fa5844902c2d49b77ad9dd3e76a96c530c675f781d90bc5f55bd2b7d9142d09d"
+        },
+        "guard/adapters/vllm_rank_rpc_actor.py": {
+          "bytes": 21459,
+          "sha256": "4a893171401a8c755578e0e08fefbffa4156093d16d54a47be9300166700d3ba"
+        },
+        "guard/adapters/vllm_rank_rpc_control.py": {
+          "bytes": 21296,
+          "sha256": "14f9faaf32398c744ea654cf457d011eb5fdce78123278b02c5d754c0222bc26"
+        },
+        "guard/adapters/vllm_rank_rpc_hooks.py": {
+          "bytes": 13892,
+          "sha256": "6829892eaf1b8751260e0a8f41d85ff28c179b9002a7eb7dec2f2e9d375904d2"
+        },
+        "guard/adapters/vllm_worker_generation_contract.py": {
+          "bytes": 8881,
+          "sha256": "f0c37215577292ce7b89b535cf147553ac22f5ae6ef6a08708cf055f4d4eb27a"
+        },
+        "sitecustomize.py": {
+          "bytes": 1712,
+          "sha256": "c5484c8f64206528ff50a32ca6585cfddbb922d27c8100cfc3c8ff837df857af"
+        }
+      },
+      "environment_ref": null,
+      "target_sha256": null,
+      "product_binding_file": null,
+      "live_target_verified": false,
+      "observer_installed": false,
+      "engine_executed": false,
+      "input_preflight_passed": false,
+      "scope_complete": false,
+      "producer_registered": false,
+      "actual_results": null,
+      "source_authenticated": false,
+      "engine_group_verified": false,
+      "selected_engine": "v1",
+      "actual_engine_mode_verified": false
+    },
+    {
+      "side": "baseline",
+      "fault_kind": "death",
+      "session": "c5f6e6e6200248cefbaf850d596079b7",
+      "prepared_directory": "/home/youngjo/.cache/byul-rank-rpc-prepared-20261115-product-v4/baseline-death",
+      "prepared_manifest_sha256": "bdec032b98478b73e394af55f3c3927f35f9e6eebd0b3651d046c245aefbd69e",
+      "settings_sha256": "54bd040f600c0ae2e2f6c03290564fd8a6b906d255991081f161a0ac29d4062c",
+      "assets": {
+        "guard/__init__.py": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "guard/adapters/__init__.py": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "guard/adapters/assets/vllm_rank_ipc_profiles.json": {
+          "bytes": 30092,
+          "sha256": "e7b8186bad0048505d926c22b29692f0c3d940717fa37d4724c173e3f9fb3a15"
+        },
+        "guard/adapters/vllm_lifecycle_sensor.py": {
+          "bytes": 57586,
+          "sha256": "e537d1d1b19813f171aa30b9344c1dbb49139eed3dea60bfa6dc71744d0d4f39"
+        },
+        "guard/adapters/vllm_rank_ipc_hooks.py": {
+          "bytes": 9964,
+          "sha256": "8cc51c530fcda852bbad5a008a92b62733f0d93845d4a5b4c7173c9a844744d5"
+        },
+        "guard/adapters/vllm_rank_ipc_identity.py": {
+          "bytes": 5125,
+          "sha256": "d1c138564b5f1a606d95c020b38846ce6826ba7c35ac1e3df31a23c0635022dc"
+        },
+        "guard/adapters/vllm_rank_ipc_runtime.py": {
+          "bytes": 12418,
+          "sha256": "0f5f63cebcb1df7b88dd670c2fc81bed023023b99ba51be33c6856a143c8b206"
+        },
+        "guard/adapters/vllm_rank_ipc_sources.py": {
+          "bytes": 4563,
+          "sha256": "bfa843defab00d0cf5a44077fd3729edb6d7aed0611d558d23317331da1a2a59"
+        },
+        "guard/adapters/vllm_rank_request_identity.py": {
+          "bytes": 7555,
+          "sha256": "fa5844902c2d49b77ad9dd3e76a96c530c675f781d90bc5f55bd2b7d9142d09d"
+        },
+        "guard/adapters/vllm_rank_rpc_actor.py": {
+          "bytes": 21459,
+          "sha256": "4a893171401a8c755578e0e08fefbffa4156093d16d54a47be9300166700d3ba"
+        },
+        "guard/adapters/vllm_rank_rpc_control.py": {
+          "bytes": 21296,
+          "sha256": "14f9faaf32398c744ea654cf457d011eb5fdce78123278b02c5d754c0222bc26"
+        },
+        "guard/adapters/vllm_rank_rpc_hooks.py": {
+          "bytes": 13892,
+          "sha256": "6829892eaf1b8751260e0a8f41d85ff28c179b9002a7eb7dec2f2e9d375904d2"
+        },
+        "guard/adapters/vllm_worker_generation_contract.py": {
+          "bytes": 8881,
+          "sha256": "f0c37215577292ce7b89b535cf147553ac22f5ae6ef6a08708cf055f4d4eb27a"
+        },
+        "sitecustomize.py": {
+          "bytes": 1712,
+          "sha256": "c5484c8f64206528ff50a32ca6585cfddbb922d27c8100cfc3c8ff837df857af"
+        }
+      },
+      "environment_ref": null,
+      "target_sha256": null,
+      "product_binding_file": null,
+      "live_target_verified": false,
+      "observer_installed": false,
+      "engine_executed": false,
+      "input_preflight_passed": false,
+      "scope_complete": false,
+      "producer_registered": false,
+      "actual_results": null,
+      "source_authenticated": false,
+      "engine_group_verified": false,
+      "selected_engine": "v1",
+      "actual_engine_mode_verified": false
+    },
+    {
+      "side": "candidate",
+      "fault_kind": "delay",
+      "session": "9fc65b70d07a1497b387b698adfc2308",
+      "prepared_directory": "/home/youngjo/.cache/byul-rank-rpc-prepared-20261115-product-v4/candidate-delay",
+      "prepared_manifest_sha256": "16f37331ea848f27438a9bee1e1e2a6d7ae200ad7b4d5e59752377768b98c25e",
+      "settings_sha256": "5dd27f0f33550d48e837e99a29105f4dd5718a13f263aa41a33e4b55cbfafd87",
+      "assets": {
+        "guard/__init__.py": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "guard/adapters/__init__.py": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "guard/adapters/assets/vllm_rank_ipc_profiles.json": {
+          "bytes": 30092,
+          "sha256": "e7b8186bad0048505d926c22b29692f0c3d940717fa37d4724c173e3f9fb3a15"
+        },
+        "guard/adapters/vllm_lifecycle_sensor.py": {
+          "bytes": 57586,
+          "sha256": "e537d1d1b19813f171aa30b9344c1dbb49139eed3dea60bfa6dc71744d0d4f39"
+        },
+        "guard/adapters/vllm_rank_ipc_hooks.py": {
+          "bytes": 9964,
+          "sha256": "8cc51c530fcda852bbad5a008a92b62733f0d93845d4a5b4c7173c9a844744d5"
+        },
+        "guard/adapters/vllm_rank_ipc_identity.py": {
+          "bytes": 5125,
+          "sha256": "d1c138564b5f1a606d95c020b38846ce6826ba7c35ac1e3df31a23c0635022dc"
+        },
+        "guard/adapters/vllm_rank_ipc_runtime.py": {
+          "bytes": 12418,
+          "sha256": "0f5f63cebcb1df7b88dd670c2fc81bed023023b99ba51be33c6856a143c8b206"
+        },
+        "guard/adapters/vllm_rank_ipc_sources.py": {
+          "bytes": 4563,
+          "sha256": "bfa843defab00d0cf5a44077fd3729edb6d7aed0611d558d23317331da1a2a59"
+        },
+        "guard/adapters/vllm_rank_request_identity.py": {
+          "bytes": 7555,
+          "sha256": "fa5844902c2d49b77ad9dd3e76a96c530c675f781d90bc5f55bd2b7d9142d09d"
+        },
+        "guard/adapters/vllm_rank_rpc_actor.py": {
+          "bytes": 21459,
+          "sha256": "4a893171401a8c755578e0e08fefbffa4156093d16d54a47be9300166700d3ba"
+        },
+        "guard/adapters/vllm_rank_rpc_control.py": {
+          "bytes": 21296,
+          "sha256": "14f9faaf32398c744ea654cf457d011eb5fdce78123278b02c5d754c0222bc26"
+        },
+        "guard/adapters/vllm_rank_rpc_hooks.py": {
+          "bytes": 13892,
+          "sha256": "6829892eaf1b8751260e0a8f41d85ff28c179b9002a7eb7dec2f2e9d375904d2"
+        },
+        "guard/adapters/vllm_worker_generation_contract.py": {
+          "bytes": 8881,
+          "sha256": "f0c37215577292ce7b89b535cf147553ac22f5ae6ef6a08708cf055f4d4eb27a"
+        },
+        "sitecustomize.py": {
+          "bytes": 1712,
+          "sha256": "c5484c8f64206528ff50a32ca6585cfddbb922d27c8100cfc3c8ff837df857af"
+        }
+      },
+      "environment_ref": null,
+      "target_sha256": null,
+      "product_binding_file": null,
+      "live_target_verified": false,
+      "observer_installed": false,
+      "engine_executed": false,
+      "input_preflight_passed": false,
+      "scope_complete": false,
+      "producer_registered": false,
+      "actual_results": null,
+      "source_authenticated": false,
+      "engine_group_verified": false,
+      "selected_engine": "v1",
+      "actual_engine_mode_verified": false
+    },
+    {
+      "side": "candidate",
+      "fault_kind": "exception",
+      "session": "d38bc3dc541b2d9ddb0ceb313f52a96a",
+      "prepared_directory": "/home/youngjo/.cache/byul-rank-rpc-prepared-20261115-product-v4/candidate-exception",
+      "prepared_manifest_sha256": "c7aaaadec40d1cf84ba07fc9429083e2f88acec7c1036b8482b843dfbc9905df",
+      "settings_sha256": "9cc9c46444fbd786748a9a4ce2e4f023cadacff99e5b0540062be36f9ccea500",
+      "assets": {
+        "guard/__init__.py": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "guard/adapters/__init__.py": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "guard/adapters/assets/vllm_rank_ipc_profiles.json": {
+          "bytes": 30092,
+          "sha256": "e7b8186bad0048505d926c22b29692f0c3d940717fa37d4724c173e3f9fb3a15"
+        },
+        "guard/adapters/vllm_lifecycle_sensor.py": {
+          "bytes": 57586,
+          "sha256": "e537d1d1b19813f171aa30b9344c1dbb49139eed3dea60bfa6dc71744d0d4f39"
+        },
+        "guard/adapters/vllm_rank_ipc_hooks.py": {
+          "bytes": 9964,
+          "sha256": "8cc51c530fcda852bbad5a008a92b62733f0d93845d4a5b4c7173c9a844744d5"
+        },
+        "guard/adapters/vllm_rank_ipc_identity.py": {
+          "bytes": 5125,
+          "sha256": "d1c138564b5f1a606d95c020b38846ce6826ba7c35ac1e3df31a23c0635022dc"
+        },
+        "guard/adapters/vllm_rank_ipc_runtime.py": {
+          "bytes": 12418,
+          "sha256": "0f5f63cebcb1df7b88dd670c2fc81bed023023b99ba51be33c6856a143c8b206"
+        },
+        "guard/adapters/vllm_rank_ipc_sources.py": {
+          "bytes": 4563,
+          "sha256": "bfa843defab00d0cf5a44077fd3729edb6d7aed0611d558d23317331da1a2a59"
+        },
+        "guard/adapters/vllm_rank_request_identity.py": {
+          "bytes": 7555,
+          "sha256": "fa5844902c2d49b77ad9dd3e76a96c530c675f781d90bc5f55bd2b7d9142d09d"
+        },
+        "guard/adapters/vllm_rank_rpc_actor.py": {
+          "bytes": 21459,
+          "sha256": "4a893171401a8c755578e0e08fefbffa4156093d16d54a47be9300166700d3ba"
+        },
+        "guard/adapters/vllm_rank_rpc_control.py": {
+          "bytes": 21296,
+          "sha256": "14f9faaf32398c744ea654cf457d011eb5fdce78123278b02c5d754c0222bc26"
+        },
+        "guard/adapters/vllm_rank_rpc_hooks.py": {
+          "bytes": 13892,
+          "sha256": "6829892eaf1b8751260e0a8f41d85ff28c179b9002a7eb7dec2f2e9d375904d2"
+        },
+        "guard/adapters/vllm_worker_generation_contract.py": {
+          "bytes": 8881,
+          "sha256": "f0c37215577292ce7b89b535cf147553ac22f5ae6ef6a08708cf055f4d4eb27a"
+        },
+        "sitecustomize.py": {
+          "bytes": 1712,
+          "sha256": "c5484c8f64206528ff50a32ca6585cfddbb922d27c8100cfc3c8ff837df857af"
+        }
+      },
+      "environment_ref": null,
+      "target_sha256": null,
+      "product_binding_file": null,
+      "live_target_verified": false,
+      "observer_installed": false,
+      "engine_executed": false,
+      "input_preflight_passed": false,
+      "scope_complete": false,
+      "producer_registered": false,
+      "actual_results": null,
+      "source_authenticated": false,
+      "engine_group_verified": false,
+      "selected_engine": "v1",
+      "actual_engine_mode_verified": false
+    },
+    {
+      "side": "candidate",
+      "fault_kind": "death",
+      "session": "ba369506d8f99d1192feb6c5fbf78bba",
+      "prepared_directory": "/home/youngjo/.cache/byul-rank-rpc-prepared-20261115-product-v4/candidate-death",
+      "prepared_manifest_sha256": "a8ba5c7f772c700f4cf2b4b09e60ca70cc21e0ce68862f49d192a83483a67166",
+      "settings_sha256": "91e79b869bf97bf7875eb3227dbc2a37e368e7299271939291bac40dfde2ed37",
+      "assets": {
+        "guard/__init__.py": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "guard/adapters/__init__.py": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "guard/adapters/assets/vllm_rank_ipc_profiles.json": {
+          "bytes": 30092,
+          "sha256": "e7b8186bad0048505d926c22b29692f0c3d940717fa37d4724c173e3f9fb3a15"
+        },
+        "guard/adapters/vllm_lifecycle_sensor.py": {
+          "bytes": 57586,
+          "sha256": "e537d1d1b19813f171aa30b9344c1dbb49139eed3dea60bfa6dc71744d0d4f39"
+        },
+        "guard/adapters/vllm_rank_ipc_hooks.py": {
+          "bytes": 9964,
+          "sha256": "8cc51c530fcda852bbad5a008a92b62733f0d93845d4a5b4c7173c9a844744d5"
+        },
+        "guard/adapters/vllm_rank_ipc_identity.py": {
+          "bytes": 5125,
+          "sha256": "d1c138564b5f1a606d95c020b38846ce6826ba7c35ac1e3df31a23c0635022dc"
+        },
+        "guard/adapters/vllm_rank_ipc_runtime.py": {
+          "bytes": 12418,
+          "sha256": "0f5f63cebcb1df7b88dd670c2fc81bed023023b99ba51be33c6856a143c8b206"
+        },
+        "guard/adapters/vllm_rank_ipc_sources.py": {
+          "bytes": 4563,
+          "sha256": "bfa843defab00d0cf5a44077fd3729edb6d7aed0611d558d23317331da1a2a59"
+        },
+        "guard/adapters/vllm_rank_request_identity.py": {
+          "bytes": 7555,
+          "sha256": "fa5844902c2d49b77ad9dd3e76a96c530c675f781d90bc5f55bd2b7d9142d09d"
+        },
+        "guard/adapters/vllm_rank_rpc_actor.py": {
+          "bytes": 21459,
+          "sha256": "4a893171401a8c755578e0e08fefbffa4156093d16d54a47be9300166700d3ba"
+        },
+        "guard/adapters/vllm_rank_rpc_control.py": {
+          "bytes": 21296,
+          "sha256": "14f9faaf32398c744ea654cf457d011eb5fdce78123278b02c5d754c0222bc26"
+        },
+        "guard/adapters/vllm_rank_rpc_hooks.py": {
+          "bytes": 13892,
+          "sha256": "6829892eaf1b8751260e0a8f41d85ff28c179b9002a7eb7dec2f2e9d375904d2"
+        },
+        "guard/adapters/vllm_worker_generation_contract.py": {
+          "bytes": 8881,
+          "sha256": "f0c37215577292ce7b89b535cf147553ac22f5ae6ef6a08708cf055f4d4eb27a"
+        },
+        "sitecustomize.py": {
+          "bytes": 1712,
+          "sha256": "c5484c8f64206528ff50a32ca6585cfddbb922d27c8100cfc3c8ff837df857af"
+        }
+      },
+      "environment_ref": null,
+      "target_sha256": null,
+      "product_binding_file": null,
+      "live_target_verified": false,
+      "observer_installed": false,
+      "engine_executed": false,
+      "input_preflight_passed": false,
+      "scope_complete": false,
+      "producer_registered": false,
+      "actual_results": null,
+      "source_authenticated": false,
+      "engine_group_verified": false,
+      "selected_engine": "v1",
+      "actual_engine_mode_verified": false
+    }
+  ],
+  "required_runtime": {
+    "tp_size": 2,
+    "pp_size": 1,
+    "dp_size": 1,
+    "minimum_gpu_count": 2
+  },
+  "legacy_replay": {
+    "actual_new_gpu_execution": false,
+    "source_snapshots_verified": 329,
+    "cases": 6,
+    "raw_validation_gaps": 0,
+    "product_binding_rejections": 6,
+    "diagnostic_code": "RANK_RPC_PRODUCT_BINDING_REQUIRED",
+    "original_source_attribution_preserved": true
+  },
+  "execution_authorized": false,
+  "live_target_verified": false,
+  "input_preflight_passed": false,
+  "engine_executed": false,
+  "scope_complete": false,
+  "producer_registered": false,
+  "actual_results": null,
+  "remaining": [
+    "현재 V1 대상 함수/정확 핀·모드 실제 기동 자격 확인",
+    "현재 TP2 ENV/target 수집과 ARM2 사전 결합",
+    "새 실제 원 기록의 공통 부분 입력 조립·제품 실행",
+    "TP2 전체 인과 그룹·탐지/상위 전달 기한·같은 소유자 복구 수락",
+    "새 소스 GPU 대조·생산자 등록"
+  ],
+  "source_authenticated": false,
+  "engine_group_verified": false,
+  "partial_converter_implemented": true,
+  "common_wire_schemas": [
+    "guard-gpu-common-input/1",
+    "guard-gpu-common-input/4"
+  ],
+  "common_producer": {
+    "name": "guard-engine-callback-vllm-rank-rpc-fault",
+    "version": "1",
+    "source_sha256": "5c8ce2bb5848ba4c7ca21ccf7b61107099ff293f0c4599505a05ffcc76028db1"
+  },
+  "required_arm_schema": "guard-rank-rpc-arm/2",
+  "engine_sdk_assets_unchanged": true,
+  "product_file_consumer_implemented": true,
+  "selected_engine": "v1",
+  "actual_engine_mode_verified": false
+}

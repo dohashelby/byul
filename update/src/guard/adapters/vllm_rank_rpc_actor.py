@@ -251,7 +251,33 @@ def calibrate(control, model):
         'topology': topology, 'initial_capture_sha256': control_code.digest(sorted(raw for _, raw, _ in records))}
 
 
-def exercise(control, calibration, model, kind, owner, hold_ms=1000):
+def _ready_recorded(control, ready, arm, arm_sha, ready_sha):
+    """READY 파일보다 늦게 닫히는 원 snapshot까지 확인한 뒤에만 장애를 적용한다."""
+    matches = [p for p, _, _ in control._records() if p.get('event') == 'CONTROL_READY'
+        and p.get('call_hmac_sha256') == ready['call_hmac_sha256']]
+    if not matches:
+        return False
+    if len(matches) != 1:
+        raise ValueError('RANK_RPC_READY_UNVERIFIED')
+    phase, = matches
+    expected = {'nonce': arm['nonce'], 'fault_kind': arm['fault_kind'], 'arm_sha256': arm_sha,
+        'ready_sha256': ready_sha, 'action_sha256': None, 'target_sha256': arm['target_sha256'],
+        'control_code_sha256': control.settings['assets']['guard/adapters/vllm_rank_rpc_control.py']['sha256'],
+        'barrier_only': True}
+    if (phase.get('control') != expected or phase.get('context') != arm['target_context']
+            or phase.get('rpc_parent_call_hmac_sha256') != ready['parent_call_hmac_sha256']
+            or phase.get('rpc_parent_object_hmac_sha256') != arm['parent_object_hmac_sha256']
+            or phase.get('point') != arm['target_point'] or phase.get('source_sha256') != arm['source_sha256']
+            or phase.get('body_code_sha256') != arm['body_code_sha256']
+            or phase.get('original_invoked') is not False or phase.get('rpc_parent_frame_verified') is not True
+            or phase.get('rpc_parent_worker_verified') is not True
+            or type(phase.get('observation_ns')) is not int
+            or not ready['ready_ns'] <= phase['observation_ns'] < arm['expires_ns']):
+        raise ValueError('RANK_RPC_READY_UNVERIFIED')
+    return True
+
+
+def exercise(control, calibration, model, kind, owner, hold_ms=1000, *, product_binding=None):
     if kind not in {'delay', 'death', 'exception'} or type(hold_ms) is not int or not 1 <= hold_ms <= 5000:
         raise ValueError('RANK_RPC_CASE_KIND')
     proof = calibration['proof']; header = 'byul-fault-' + uuid.uuid4().hex
@@ -260,6 +286,12 @@ def exercise(control, calibration, model, kind, owner, hold_ms=1000):
               'image': control.settings['image'], 'model': model, 'context': proof['context'],
               'parent_object_hmac_sha256': proof['rpc_parent_object_hmac_sha256'],
               'initial_capture_sha256': calibration['initial_capture_sha256']}
+    if product_binding is not None:
+        control_code.product_binding(product_binding, control.settings['session'])
+        if (product_binding != control.product_binding()
+                or owner.get('pod_uid') != product_binding['pod_uid']):
+            raise ValueError('RANK_RPC_PRODUCT_BINDING_MISMATCH')
+        target.update(schema='guard-rank-rpc-lab-target/2', product_binding=product_binding)
     arm = {'schema': 'guard-rank-rpc-arm/1', 'session': control.settings['session'],
         'image': control.settings['image'], 'settings_sha256': control.settings_sha256,
         'assets_sha256': control_code.digest(control.settings['assets']), 'target_sha256': control_code.digest(target),
@@ -270,6 +302,8 @@ def exercise(control, calibration, model, kind, owner, hold_ms=1000):
         'external_hmac_sha256': _id(binding['external_prefix'] + header + binding['external_suffix'], control.key),
         'header_context': calibration['header_context'], 'assignment_context': calibration['assignment_context'],
         'initial_capture_sha256': calibration['initial_capture_sha256']}
+    if product_binding is not None:
+        arm.update(schema='guard-rank-rpc-arm/2', product_binding=product_binding)
     target_fd = SignalTarget(proof['context']); lease = None; potential_stop = False
     client_result = []; receipt = None; ready = None; ready_sha = None; resumed = None
     try:
@@ -290,6 +324,16 @@ def exercise(control, calibration, model, kind, owner, hold_ms=1000):
                 or ready.get('arm_sha256') != arm_sha or ready.get('nonce') != arm['nonce']
                 or ready.get('context') != proof['context'] or ready.get('rpc_active') is not True
                 or ready.get('prepared_assets_sha256') != arm['assets_sha256']):
+            raise ValueError('RANK_RPC_READY_UNVERIFIED')
+        # 원 제어는 READY 파일을 쓴 뒤 snapshot을 저장한다. 파일만 보고 STOP/KILL하면
+        # snapshot 저장 자체를 막을 수 있으므로 같은 호출의 닫힌 원 기록을 기다린다.
+        while time.monotonic_ns() < arm['expires_ns']:
+            if _ready_recorded(control, ready, arm, arm_sha, ready_sha):
+                break
+            time.sleep(0.01)
+        else:
+            raise ValueError('RANK_RPC_READY_UNVERIFIED')
+        if time.monotonic_ns() >= arm['expires_ns']:
             raise ValueError('RANK_RPC_READY_UNVERIFIED')
         receipt = {'schema': 'guard-rank-rpc-action-receipt/1', 'arm_sha256': arm_sha,
             'ready_sha256': ready_sha, 'context': proof['context'], 'fault_kind': kind,
@@ -369,6 +413,8 @@ def main(argv=None):
     parser.add_argument('--kind', choices=['delay', 'death', 'exception'], required=True)
     parser.add_argument('--model', default='test-model')
     parser.add_argument('--model-receipt-sha256', required=True)
+    parser.add_argument('--for-common-input', action='store_true',
+        help='사전 공급된 제품 입력 결합을 요구한다. 생산자 등록·그룹 수락을 뜻하지 않는다.')
     args = parser.parse_args(argv)
     if not control_code.fingerprint(args.model_receipt_sha256):
         raise ValueError('RANK_RPC_MODEL_RECEIPT')
@@ -377,11 +423,12 @@ def main(argv=None):
     observer = runtime._INSTALLED.observer
     control = control_code.Control(settings, settings_sha, observer.ipc.profile, lambda value: None,
                                    lambda: runtime._freeze(settings))
+    product_binding = control.product_binding() if args.for_common_input else None
     calibration = calibrate(control, args.model)
     control.write('control-calibration.json', calibration)
     owner = {'pod_uid': os.environ.get('GUARD_POD_UID'), 'model_receipt_sha256': args.model_receipt_sha256}
     if type(owner['pod_uid']) is not str or not owner['pod_uid']:
         raise ValueError('RANK_RPC_POD_OWNER')
-    result = exercise(control, calibration, args.model, args.kind, owner)
+    result = exercise(control, calibration, args.model, args.kind, owner, product_binding=product_binding)
     print(json.dumps({'사례': args.kind, '클라이언트_HTTP': result['client']['status'],
                       '물리_신호': result['physical_action']['signal'], '전체_수락': False}, ensure_ascii=False))

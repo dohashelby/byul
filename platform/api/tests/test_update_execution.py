@@ -136,6 +136,9 @@ def settled(client, run_id):
         assert response.status_code == 200, response.text
         result = response.json()
         if result["status"] not in {"preparing", "running"}:
+            # The terminal record is saved before the worker releases its lease.
+            # Drain the single-worker queue before the next command or restart.
+            client.app.state.byul.update_execution._pool.submit(lambda: None).result()
             return result
         time.sleep(.01)
     pytest.fail("fixture command did not finish")
@@ -244,7 +247,8 @@ def test_exit_code_and_report_required_for_command_completion(execution, case, e
     client, update, _ = execution
     run = prepared(client)
     flags(update, **case)
-    client.post(f"/api/update/runs/{run['id']}/execute", json={})
+    response = client.post(f"/api/update/runs/{run['id']}/execute", json={})
+    assert response.status_code == 202, response.text
     done = settled(client, run["id"])
     assert done["status"] == "failed"
     assert bool(done["report_ids"]) is expected_reports
@@ -265,7 +269,8 @@ def test_secrets_split_across_reads_are_redacted_and_logs_are_bounded(execution,
     monkeypatch.setenv("GUARD_TEST_TOKEN", "never-expose-this-test-value")
     run = prepared(client)
     flags(update, split_secret=True, long_log=long_log)
-    client.post(f"/api/update/runs/{run['id']}/execute", json={})
+    response = client.post(f"/api/update/runs/{run['id']}/execute", json={})
+    assert response.status_code == 202, response.text
     done = settled(client, run["id"])
     assert done["status"] == "completed" and done["log_truncated"] is long_log
     assert len(done["log_tail"].encode()) <= 64 * 1024
@@ -277,7 +282,8 @@ def test_secrets_split_across_reads_are_redacted_and_logs_are_bounded(execution,
 def test_history_and_report_survive_a_platform_restart(execution):
     client, _, settings = execution
     run = prepared(client)
-    client.post(f"/api/update/runs/{run['id']}/execute", json={})
+    response = client.post(f"/api/update/runs/{run['id']}/execute", json={})
+    assert response.status_code == 202, response.text
     done = settled(client, run["id"])
     with TestClient(create_app(settings)) as restarted:
         assert restarted.get("/api/update/runs").json()["items"][0]["id"] == run["id"]
@@ -292,7 +298,8 @@ def test_relative_data_dir_keeps_subprocess_paths_absolute(execution, tmp_path, 
     seed_documents(relative_app)
     with TestClient(relative_app) as client:
         run = prepared(client)
-        client.post(f"/api/update/runs/{run['id']}/execute", json={})
+        response = client.post(f"/api/update/runs/{run['id']}/execute", json={})
+        assert response.status_code == 202, response.text
         assert settled(client, run["id"])["status"] == "completed"
         for argv in calls(update):
             assert Path(argv[argv.index("--pack") + 1]).is_absolute()

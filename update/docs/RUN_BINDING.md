@@ -1,6 +1,6 @@
 # 실행 결합값을 정책에서 분리 (RB, 2026-11-14 승인·구현)
 
-상태: **B1 구현됨**(사용자 승인 2026-11-14, `DECISIONS.md` RB, 팩 35). **B2 구현됨**(사용자 결정 RB2-Q1~Q7, 2026-11-14, 팩 36, 7절·8절). PACK-BASELINE@35부터 아래 B1 키는 정책 값이 아니고 `guard run`이 계산한다. 구현은 `src/guard/executors/run_binding.py`, 시험은 `tests/test_run_binding.py`. 설계안과 달라진 점은 6절에 모았다.
+상태: **3단계 구현됨**(RB3, 2026-11-15 사용자 지시, 팩 37, 13절). **B1 구현됨**(사용자 승인 2026-11-14, `DECISIONS.md` RB, 팩 35). **B2 구현됨**(사용자 결정 RB2-Q1~Q7, 2026-11-14, 팩 36, 7절·8절). PACK-BASELINE@35부터 아래 B1 키는 정책 값이 아니고 `guard run`이 계산한다. 구현은 `src/guard/executors/run_binding.py`, 시험은 `tests/test_run_binding.py`. 설계안과 달라진 점은 6절에 모았다.
 
 ## 1. 문제
 
@@ -389,3 +389,125 @@ M-A 파일 사전 점검도 공통·쪽별 설정 뒤 `for_check()`를 적용해
 - **프로필 미지원**: PLT-09(api_transport), SUP-13(template_validation)은 팩 프로필이 Kubernetes 구현과 다르다.
 - **설정 형식**: PLT-02·06(unix_ipc), REQ-01(direct_route 역할 키), REQ-08·09·10·SUP-04는 실행기 칸의 설정(역할·설정 파일)이 있어야 한다.
 - **SUP-08 @36 사전 확인**: `ma8-local-preflight-20261113.json`의 팩 Ref가 34다. 고정 자료(`fixture-manifest.json`, 모델 snapshot)가 다른 기기(WSL `/mnt/c/...`, `/home/youngjo/...`)에 있어 이 기기에서는 다시 돌릴 수 없다. 그 기기에서 `tools/mvp_sup08_inputs.py`(팩 관문 36)로 launch manifest를 다시 만들고 `tools/mvp_sup08_local_audit.py`로 재검증해야 MA7 계획(36)과 맞는다.
+
+## 13. RB3 정책에 남은 실행 결합값 (2026-11-15, 팩 37 이력)
+
+이 절의 RB3-Q1~Q4는 승인됐고, 후속 구현·현재 입력은 14절을 따른다.
+
+사용자 지시(상단 세션 전달): "그거 자동으로 채우게 3단계 진행해". 사람이 정하는 기준값은 웹 값 파일(45개 점검)에 다 있고, 남은 `POLICY_VALUES_MISSING`은 사람 입력 대상이 아니라고 했다. 아래는 실행기 소스로 키마다 출처를 확인한 결과다.
+
+### 13.1 키별 출처
+
+| 묶음 | 키(점검) | 실행기가 하는 일 | 출처 | 처리 |
+|---|---|---|---|---|
+| C 생산자 소스 | `supply_record_source_sha256`(공급 13개), `retry_record_source_sha256`(LIF-12), `copy_record_source_sha256`(PLT-12), `identity_record_source_sha256`(OBS-02), `record_inventory_source_sha256`(OBS-06), `observation_expected_source_sha256`(OBS-01), `forwarded_gateway/engine_source_sha256`(REQ-04) | 기록의 `source_sha256`·`producer_source_sha256`이 이 값과 같아야 기록을 받는다. 생산자는 인증되지 않는다 | **준비 자산 파일 bytes**: 생산자 파일 SHA-256(예: `gpu_b_sup16_pair_writer.py`의 `own=digest(__file__)`) | 3단계: `[run_binding.<점검>] record_producer`(REQ-04는 `gateway_producer`·`engine_producer`) |
+| C 검토 소스 | `stored_api_router/serving/protocol_source_sha256`(REQ-06) | 정책 값이 `REVIEWED_SOURCES`와 다르면 정책 오류 | **guard 파일(adapter 데이터)** | 3단계: 입력 없이 `stored_response_contract.REVIEWED_SOURCES` |
+| D 시험 주체 | `observation_allowed/denied_actor_sha256`(OBS-01) | 생산자가 쓴 `actor_sha256`(Gateway는 `principal:`+주체 ID 해시)과 대조 | **실행 때 생성**(시험 호출자 신원) | 3단계: `test_actors = {allowed, denied}` 그대로(세션과 같은 방식) |
+| D 시험 주체 | `allowed/denied_principal_sha256`(REQ-05) | 허가 목록의 주체와만 대조, 관측 신원과는 대조하지 않음 | 허가 목록과 한 묶음 | 정책 유지. J02 도구가 RB3-D1로 채움 |
+| E 발급자 사건 | PLT-10 `revocation_issuer_id/event_id/event_at/deny_after`, PLT-11 `session_issuer_id/event_id/event_at/open_before/deny_after`, 두 점검의 `*_validity_*` | 선언된 사건(검증하지 않음, `issuer_event_verified` false)과 실행 창 안의 시도 | **실행 때 생성**(자격을 철회한 쪽이 남긴 사건) | 3단계: `issuer_event` 파일(닫힌 JSON). 유효 기간은 실행 창 ∩ 정책 유효 기간 |
+| E 허가 | `selected_model_grants`·`retired_model_revisions`(REQ-05) | 허가 목록 | 사람 결정(RB3-D1) | 정책 유지. J02 도구가 DRAFT로 채움 |
+| E 허용 목록 | `supply_allowed_objects`(PLT-03), `supply_allowed_identities`(PLT-05) | 기록에 나온 객체·신원이 목록 밖이면 위반 | **사람 결정**: 실행 기록으로 채우면 위반이 없어진다 | RB3-Q2 |
+| A′ 템플릿 | `allowed_template_sha256`(REQ-07, SUP-03) | 기동이 고른 템플릿이 목록 밖이면 위반 | **사람 결정**: 기동 템플릿으로 채우면 위반이 없어진다 | RB3-Q1 |
+| A′ 정책 문서 | `retry_policy_sha256`, `copy_policy_sha256`, `observation_event_policy_sha256`, `forwarded_identity_policy_sha256`, `stored_identity_policy_sha256` | 생산자 기록의 `policy_sha256`과 대조 | **사람 결정**: 문서 정의가 필요 | RB3-Q3 |
+| E 4개 | `retry_scope_sha256`, `copy_inventory_sha256`, `record_subject_plan_sha256`, `recovery_selection_sha256` | 파일 안에 한도·조치·정책 참조·회수 규칙이 섞임 | 분리 뒤 일부는 결합 | RB3-Q4(7.6 분리안) |
+
+kubectl이나 준비 자산 조회로 채우는 키는 3단계에 없다. 생산자 파일과 사건 파일은 운영자가 이름만 적고, guard가 읽어 해시한다.
+
+### 13.2 구현
+
+- 단계 판별은 1·2단계와 같다. `KEYS_BY_CHECK_3`(22개 점검 38키)를 정의가 선언하지 않으면 계산한다. @36 정의는 3단계 키를 정책 값으로 읽는다. 섞으면 `RUN_BINDING_BELONGS_TO_POLICY`·`RUN_BINDING_BELONGS_TO_EXECUTION`.
+- `[run_binding.<점검>]`이 받는 칸은 정의가 넘긴 단계의 칸을 합친 것이다(`config_keys`). 예: LIF-12 @37은 `record_session`·`record_producer`, 공급 점검은 `record_producer`만, REQ-06은 `record_session`만이다. 칸이 다르면 `RUN_BINDING_CONFIG_INVALID`.
+- 생산자 해시(`producer_sha256`)는 정규 JSON이 아니라 파일 bytes 그대로다. 심볼릭 링크·디렉터리·16 MiB 초과는 `RUN_BINDING_FILE_UNAVAILABLE`.
+- 결합 문서는 값이 있으면 `/2`다. `files`에 `record_producer_sha256`·`issuer_event_sha256`, `values`에 실행기에 넘긴 값, PLT-10·11은 `validity`에 실행 창이 남는다.
+- 정책 이전은 `migrate_policy_run_binding --stage 3 --run-config-out FILE`. 시험 주체·사건 내용은 그대로 옮기고 생산자 파일·사건 파일은 `needs`에 다시 만들어야 할 해시와 함께 적는다.
+- J02 도구: `run_binding_entries`에 3단계 칸이 나오고, `--web-values`로 정책을 만들 때 REQ-05 네 키를 RB3-D1로 채운다(`decided_values`, 웹 값을 덮어쓰지 않음, 보고서 `decided_values`).
+
+### 13.3 한계
+
+- lab에는 이 기록을 쓰는 생산자가 없다(12.1). 생산자 파일이 없으면 `RUN_BINDING_FILE_UNAVAILABLE`로 NOT_RUN→UNKNOWN이다. `POLICY_VALUES_MISSING`은 줄지만 그 점검이 실행되는 것은 아니다.
+- PLT-10·11 사건은 실행 창 안에 있어야 한다(`start <= deny_after <= end`). 창은 `guard run` 시작 초부터 열리므로(9절 공백) 철회는 실행 직전에 해야 한다.
+- SUP-08 사전 확인 기록(`ma8-local-preflight-pack36-20261115.json`)의 팩 Ref는 36이다. SUP-08 정의는 바뀌지 않았지만 팩 해시가 바뀌어 `mvp_a_input_materialize`는 @37 재확인 전까지 실제 파일로는 거부한다(`SUP08_LOCAL_AUDIT_REQUIRED`).
+
+## 14. RB3-Q1~Q4 승인 반영 (2026-11-15, 팩 38)
+
+### 정책과 실행 입력
+
+| 점검 | 정책에 남는 결정 | guard가 실행 시 계산하는 값 |
+|---|---|---|
+| LIF-12 | `retry_limits`(기존 scope의 닫힌 `limits` 객체), 기존 mode·수집 지연 | scope 원 bytes SHA, 해당 POL 점검 값의 정규 JSON SHA |
+| PLT-12 | `copy_treatments`: copy ID → `required_action`, `deadline_at`, `retention_exception` | inventory 원 bytes SHA, 해당 POL 점검 값의 정규 JSON SHA |
+| OBS-06 | 추가 정책 값 없음 | subjects 정규 JSON SHA, 현재 봉인된 POL의 정확한 Ref |
+| LIF-11 | `recovery_require_absent_kinds`: 선정 자원 중 회수를 요구하는 종류 | selection 정규 JSON SHA |
+| OBS-01·REQ-04·REQ-06 | 기존 기업 기준 | 해당 POL 점검 값의 정규 JSON SHA |
+
+Q3의 해시 대상은 **봉인된 POL의 `values[check_id]` 전체**다. 해시 키 자신과 실행 결합값은 이 행에 들어가지 않는다. 생산자가 읽었다고 주장한 정책 파일에서 기대값을 가져오지 않는다. 기록 생산자가 같은 정의의 `policy_sha256`을 남겨야 하며, 생산자 미구현은 UNKNOWN이다.
+
+OBS-06은 사용자 후속 결정(“실행할 때 확정된 현재 정책 Ref를 guard가 자동 결합”)에 따라 `plan.inputs.policy`를 실행기에 전달한다. 이 Ref를 POL 값 안에 넣으면 자기 해시가 순환하므로 정책 입력으로 받지 않는다. subjects의 `policy_ref`가 현재 POL과 다르면 수집 전에 거부한다. 봉인되지 않은 DRAFT만 있는 J02 정적 보고서는 Ref를 만들어내지 않고 `RUN_BINDING_POLICY_REF_UNAVAILABLE`로 남긴다.
+
+LIF-12·PLT-12는 파일의 결정 부분과 정책 값을 정확히 대조한다. 결정 객체는 기존 scope/inventory의 닫힌 형식으로 준비 단계부터 검사한다. LIF-11은 선정 행별 `require_absent`와 정책 종류를 대조하고, 요구 종류가 선정 목록에서 빠진 경우도 거부한다. 기존 판정·필수 관측·생산자 미인증 상태는 유지한다. @37을 포함한 과거 정의는 해당 정의에 적힌 해시를 그대로 정책 값으로 읽으며, 원본 팩·POL·EVD·RES·RPT를 바꾸지 않는다.
+
+### J02 기본 템플릿·공급 허용 목록 초안
+
+`tools.j02_run_config --web-values FILE`은 양쪽 ENV의 동일 모델 ID·판본·inventory를 확인한 뒤 아래 **운영자가 지정한 고정 자산**을 읽는다. 실행 중 선택된 템플릿이나 생산자 기록은 허용 목록의 출처가 아니다.
+
+```yaml
+approved_supply_identity_sha256: <승인한 공급 자격의 비민감 신원 지문 64자리>
+sides:
+  baseline:
+    env: baseline-env.json
+    model_snapshot: /srv/byul/fixed-model
+    model_inventory: /srv/byul/fixed-model-inventory.json
+  candidate:
+    env: candidate-env.json
+    model_snapshot: /srv/byul/fixed-model
+    model_inventory: /srv/byul/fixed-model-inventory.json
+```
+
+inventory는 기존 `guard.adapters.model_inventory.inventory(snapshot, 'all')` 형식이며 파일 bytes와 ENV의 `model.inventory_sha256`을 함께 대조한다. 기본 템플릿은 고정 `tokenizer_config.json`의 문자열 `chat_template` 또는 `chat_template.jinja`다. 기본 문자열을 확정할 수 없으면 공백 원인을 남긴다. 파일 목록 해시는 PLT-03, 템플릿 해시는 REQ-07·SUP-03에 채운다. PLT-05는 별도로 선언한 승인 공급 자격 신원 하나만 사용하며 REQ-05 시험 역할 라벨로 대신하지 않는다.
+
+기존 웹 값은 덮어쓰지 않고 새 값은 DRAFT·`official=false`로만 남긴다. `decided_values`는 채운 키와 사용자 결정 근거를, `rb3_source_gaps`는 없는 자산·inventory 불일치·공급 자격 미지정을 보고한다. 공식 판정 전 사람 확인은 별도다.
+
+새 정책 값은 실제 실행 파일과 일치하도록 준비한다. LIF-12는 웹 초안의 `FORBID` 결정을 유지하고, `retry_limits`의 각 한도를 미확정 상태 `null`로 둘 수 있다(값을 정하면 원래 closed limits 계약으로 검사). PLT-12는 실제 copy ID별 조치·절대 마감·예외가 있어야 하므로 가짜 ID나 빈 목록으로 채우지 않는다. LIF-11의 회수 종류도 선정 자원·기존 기업 요구와 맞춰 확인하며 자동으로 줄이지 않는다.
+
+### 이전과 회귀 검증
+
+```sh
+# 승인된 원격 개발/CI에서 실행한다. 로컬 Mac에서는 실행하지 않는다.
+uv run python -m tools.migrate_policy_run_binding old-policy.yaml \
+  --out policy-pack38-draft.yaml --stage 4
+```
+
+원본을 덮어쓰지 않고 DRAFT를 만든다. 새 기업 결정은 관측 파일에서 추정하지 않으며, 누락된 `retry_limits`·`copy_treatments`·`recovery_require_absent_kinds`를 `required_policy_values`에 적고 `ready_for_execution=false`를 유지한다. 팩 변환 `run_binding.migrate_pack(..., stage=4)`은 이 정책 키들을 필수로 추가한다. 원본 @37의 매니페스트·변경 정의 7개를 시험 자료에 고정해 해시 검증·이전 재생·@38 정의 재현을 CI에서 대조한다.
+
+MA7 파일 사전 점검은 결합이 읽는 scope/inventory/subjects/selection·생산자·issuer 파일도 읽기 전후 bytes·파일 신원을 대조한다. 파일 검사 성공은 실제 target·엔진 관측이나 GPU 자격을 뜻하지 않는다.
+
+### SUP-08 팩 38 사전 확인 — AWS lab에서만
+
+기존 팩 36 확인 보고서는 원본 증거이므로 수정하지 않는다. 새 소스/팩이 병합되고 승인된 J02 lab 실행을 재개할 때 **lab 서버에서** 아래 순서로 새 보고서를 만든다. 현재 세션은 AWS Start·GPU 기동·다운로드를 수행하지 않았다.
+
+1. 기존 보유자에게 `ma8-local-fixture-manifest.json`이 가리키는 모델 snapshot(14개 파일, 8,295,393,861 bytes), 동일 fixture의 HF 코드 캐시·승인/비승인 코드, `inputs/sup08-rebuild-20261113/launch-inputs-v2` 전체를 받는다. 현재 manifest의 원래 위치는 `/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/`다. 저장소의 manifest/과거 보고서는 bytes 신원 자료이며 모델 본체가 아니다. Desktop의 작은 SUP-08 handoff ZIP도 모델을 담고 있지 않다.
+2. 서버 경로가 바뀌면 기존 `tools.prepare_sup08_phi3v_fixture`와 기동 입력 도구로 **새 경로의** manifest를 생성하고 고정 모델·snapshot·코드 신원을 유지한다. 다운로드가 필요하면 기존 승인 범위부터 확인한다. 단순 경로 문자열 치환으로 과거 증거를 고치지 않는다.
+3. 정확한 현재 source/팩 checkout에서 다음 명령을 실행한다. 경로는 1~2에서 확보한 실제 파일로 바꾼다.
+
+```sh
+cd /srv/byul/update
+uv sync --frozen
+uv run python -m tools.mvp_sup08_local_audit \
+  --fixture /srv/byul/inputs/sup08/fixture-manifest.json \
+  --launch-manifest /srv/byul/inputs/sup08/launch-inputs-v2/manifest.json \
+  --output /srv/byul/inputs/sup08/pack38-assets-audit.json
+# 실제 양쪽 ENV/target을 준비한 뒤 새 파일로 최종 입력 계약도 대조한다.
+uv run python -m tools.mvp_sup08_local_audit \
+  --fixture /srv/byul/inputs/sup08/fixture-manifest.json \
+  --launch-manifest /srv/byul/inputs/sup08/launch-inputs-v2/manifest.json \
+  --baseline-env /srv/byul/inputs/baseline/environment.json \
+  --baseline-target /srv/byul/inputs/baseline/target.json \
+  --candidate-env /srv/byul/inputs/candidate/environment.json \
+  --candidate-target /srv/byul/inputs/candidate/target.json \
+  --output /srv/byul/inputs/sup08/pack38-input-audit.json
+uv run python -m tools.mvp_a_input_materialize \
+  --sup08-audit /srv/byul/inputs/sup08/pack38-input-audit.json \
+  --output /srv/byul/inputs/ma7-pack38
+```
+
+첫 보고서의 ENV/target 미입력·종료 코드 2는 실제 실행 자격이 없다는 뜻이다. 두 번째 보고서와 materialize도 파일·입력 계약 검사이며 엔진 실측이 아니다. 최종 `guard prepare-update`의 정확 입력·실제 관측 자격·기존 비용/운영 승인을 만족한 뒤에만 `guard update`를 실행한다.

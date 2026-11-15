@@ -1,12 +1,6 @@
 executor: credential_revocation
 collection_profile: kubernetes-credential-revocation-observation-v1
 policy_params:
-  - { key: revocation_validity_start, type: str, required: true }
-  - { key: revocation_validity_end, type: str, required: true }
-  - { key: revocation_issuer_id, type: str, required: true }
-  - { key: revocation_event_id, type: str, required: true }
-  - { key: revocation_event_at, type: str, required: true }
-  - { key: revocation_deny_after, type: str, required: true }
   - { key: revocation_deadline_basis, type: str, required: true }
   - { key: revocation_propagation_limit_ms, type: int, required: true }
   - { key: revocation_max_clock_skew_ms, type: int, required: true }

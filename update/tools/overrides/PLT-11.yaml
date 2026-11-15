@@ -1,13 +1,6 @@
 executor: session_revocation
 collection_profile: kubernetes-existing-http-session-observation-v1
 policy_params:
-  - { key: session_validity_start, type: str, required: true }
-  - { key: session_validity_end, type: str, required: true }
-  - { key: session_issuer_id, type: str, required: true }
-  - { key: session_event_id, type: str, required: true }
-  - { key: session_event_at, type: str, required: true }
-  - { key: session_open_before, type: str, required: true }
-  - { key: session_deny_after, type: str, required: true }
   - { key: session_deadline_basis, type: str, required: true }
   - { key: session_propagation_limit_ms, type: int, required: true }
   - { key: session_max_clock_skew_ms, type: int, required: true }

@@ -1,9 +1,6 @@
 executor: supply_boot
 collection_profile: supply-boot-stage-budget-v1
 policy_params:
-- key: supply_record_source_sha256
-  type: str
-  required: true
 - key: supply_stage_budget_ms
   type: dict[str,int]
   required: true

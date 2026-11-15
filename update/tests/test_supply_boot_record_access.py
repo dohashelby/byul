@@ -86,6 +86,10 @@ def pipeline(tmp_path, check_id, values, make):
     # @35/@36: run-binding keys are computed by guard run, not given as policy values.
     policy_values, file_hashes = split(PACK.checks[check_id], resolved)
     pol = policy(ref, scope={"include": [check_id]}, values={check_id: policy_values})
+    if check_id == 'OBS-06':
+        subjects = {'policy_ref': pol.ref().model_dump(mode='json')}
+        (tmp_path / 'subjects.json').write_bytes(canonical_json(subjects))
+        resolved['record_subject_plan_sha256'] = file_hashes['record_subject_plan_sha256'] = sha256_hex(canonical_json(subjects))
     store.put(env); store.put(pol)
     plan = select(PACK, [env], pol); store.put(plan)
     name = PACK.checks[check_id].executor

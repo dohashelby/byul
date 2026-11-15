@@ -30,6 +30,8 @@ from guard.adapters import vllm_termination_sensor as termination_sensor,vllm_te
 from guard.adapters import vllm_fault_sensor as fault_sensor,vllm_fault_metadata as fault_metadata
 from guard.adapters import vllm_profiler_sensor as profiler_sensor,vllm_profiler_metadata as profiler_metadata
 from guard.adapters import vllm_release_observation_sensor as release_observation
+from guard.adapters import vllm_baseline_startup as baseline_startup
+from guard.collectors import baseline_startup as baseline_startup_input
 from guard.adapters import vllm_file_read_sensor as read_sensor,vllm_file_read_metadata as read_metadata
 from guard.adapters import vllm_weight_iteration_sensor as weight_sensor,vllm_weight_iteration_metadata as weight_metadata
 from guard.adapters import vllm_initialization_metadata as init_metadata, vllm_rank_failure_metadata as rank_metadata
@@ -112,6 +114,7 @@ def parse_recording(raw, prepared):
         from .sglang_lifecycle_capture import parse_recording as parse_sglang
         return parse_sglang(raw,prepared)
     is_fresh_binding = profiles.configured.request_binding(prepared['profile'])
+    is_baseline_startup = profiles.configured.startup_observation(prepared['profile'])
     is_fault=prepared["profile"]==fault_sensor.PROFILE
     is_termination=prepared["profile"]in {fault_sensor.PROFILE,termination_sensor.PROFILE}
     is_endpoint = prepared["profile"] == endpoint_sensor.PROFILE
@@ -147,6 +150,13 @@ def parse_recording(raw, prepared):
     if base_profile not in {release_sensor.PROFILE,init_release.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
     if base_profile not in {release_sensor.PROFILE,init_release.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
     words = WORDS
+    if is_baseline_startup:
+        keys = keys | baseline_startup_input.FIELDS | startup_contract.SNAPSHOT_FIELDS | startup_contract.BINDING_FIELDS | startup_contract.METADATA_FIELDS | startup_contract.TRANSITION_FIELDS
+        words = words | {'BASELINE_STARTUP', baseline_startup.SCHEMA, 'cpython-3.12.3', 'cpython-3.12.8',
+            *(point for source in baseline_startup.ROWS.values() for point in source['functions']),
+            startup_callback.SCHEMA, *startup_callback.POINTS, *startup_callback.PHASES,
+            *startup_callback.STATUSES, *startup_callback.GRAPH_MODES, *startup_callback.GAPS,
+            'unsupported', 'exception', 'base-exception'}
     if is_fresh_binding:
         keys = keys | fresh_binding.FIELDS | {'request_binding'}
         words = words | {'session-hmac-sha256'}
@@ -242,7 +252,7 @@ def parse_recording(raw, prepared):
                 or not _safe(safe_row, keys=keys, words=words) or type(row["seq"]) is not int or row["seq"] != seq
                 or type(row["monotonic_ns"]) is not int or row["monotonic_ns"] < clock
                 or row["previous_sha256"] != previous or canonical_row(row) != line
-                or row["event"] not in {"CHECKPOINT","SEGMENT"} and row["event"] not in ({"START","MODULE","NATIVE","ASGI","END","SELECTION","TERMINATION","RANK_FAILURE","FAULT_CONTROL"}if is_fault else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","SAFE_OPEN_MAPPING","WORKER_STARTUP","WORKER_STARTUP_LINK","WORKER_STARTUP_CLOSE","WORKER_STARTUP_LIMIT"} | ({"INITIALIZATION"} if prepared["profile"] in {joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()) | (set(generation_metadata.VALIDATORS) if is_generation else set()) | (set(endpoint_metadata.VALIDATORS) if is_endpoint else set()) if is_worker_startup else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","SAFE_OPEN_MAPPING"} if is_mapping else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","FILE_READ"} if is_read else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION"} if is_weight else {"START","MODULE","NATIVE","ASGI","END","SELECTION","PROFILER"} if is_profiler else {"START","MODULE","NATIVE","ASGI","END","SELECTION","INITIALIZATION"} if is_init else {"START","MODULE","NATIVE","ASGI","END","SELECTION","RANK_FAILURE"} if is_rank else {"START","MODULE","NATIVE","ASGI","END","SELECTION","STREAM_BUFFER"} if is_stream else {"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT","OUTPUT"} if is_output else {"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT"} if is_attempt else {"START","MODULE","NATIVE","ASGI","END","SELECTION","TERMINATION"}if is_termination else {"START","MODULE","NATIVE","ASGI","END","SELECTION"})
+                or row["event"] not in {"CHECKPOINT","SEGMENT"} and row["event"] not in ({"START","MODULE","NATIVE","ASGI","END","SELECTION","BASELINE_STARTUP"} if is_baseline_startup else {"START","MODULE","NATIVE","ASGI","END","SELECTION","TERMINATION","RANK_FAILURE","FAULT_CONTROL"}if is_fault else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","SAFE_OPEN_MAPPING","WORKER_STARTUP","WORKER_STARTUP_LINK","WORKER_STARTUP_CLOSE","WORKER_STARTUP_LIMIT"} | ({"INITIALIZATION"} if prepared["profile"] in {joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()) | (set(generation_metadata.VALIDATORS) if is_generation else set()) | (set(endpoint_metadata.VALIDATORS) if is_endpoint else set()) if is_worker_startup else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","SAFE_OPEN_MAPPING"} if is_mapping else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","FILE_READ"} if is_read else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION"} if is_weight else {"START","MODULE","NATIVE","ASGI","END","SELECTION","PROFILER"} if is_profiler else {"START","MODULE","NATIVE","ASGI","END","SELECTION","INITIALIZATION"} if is_init else {"START","MODULE","NATIVE","ASGI","END","SELECTION","RANK_FAILURE"} if is_rank else {"START","MODULE","NATIVE","ASGI","END","SELECTION","STREAM_BUFFER"} if is_stream else {"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT","OUTPUT"} if is_output else {"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT"} if is_attempt else {"START","MODULE","NATIVE","ASGI","END","SELECTION","TERMINATION"}if is_termination else {"START","MODULE","NATIVE","ASGI","END","SELECTION"})
                 or type(row["payload"]) is not dict):
             raise ValueError("LIFECYCLE_RECORDING_ROW_INVALID")
         previous, clock = hashlib.sha256(line).hexdigest(), row["monotonic_ns"]
@@ -309,8 +319,19 @@ def parse_recording(raw, prepared):
                 if "inherited" in payload and payload["inherited"] is not True:
                     raise ValueError("LIFECYCLE_RECORDING_INHERITANCE_INVALID")
                 ready.add(payload["module"])
-            elif is_termination or is_online or is_output or is_stream or is_rank or is_init or is_weight:
+            elif is_termination or is_online or is_output or is_stream or is_rank or is_init or is_weight or is_baseline_startup:
                 ready.discard(payload["module"])
+        if row['event'] == 'BASELINE_STARTUP':
+            if not is_baseline_startup:
+                raise ValueError('BASELINE_STARTUP_PROFILE_INVALID')
+            baseline_startup_input.validate_record(payload,
+                binding=baseline_startup.process_binding(prepared['session'], context))
+            module, = (name for name, source in baseline_startup.ROWS.items() if payload['point'] in source['functions'])
+            if module not in ready:
+                raise ValueError('BASELINE_STARTUP_SOURCE_PROVENANCE_UNAVAILABLE')
+            if (payload['started_ns'] > row['monotonic_ns']
+                    or payload['finished_ns'] is not None and payload['finished_ns'] > row['monotonic_ns']):
+                raise ValueError('BASELINE_STARTUP_CLOCK_INVALID')
         if row['event']=='TERMINATION':
             termination_metadata.validate_sample(payload)
             if termination_runtime is not None and termination_runtime!=payload['observer_runtime']:raise ValueError('TERMINATION_OBSERVER_RUNTIME_MISMATCH')
@@ -529,11 +550,13 @@ def parse_recording(raw, prepared):
         raise ValueError("LIFECYCLE_RECORDING_END_INVALID")
     weight_journal=weight_metadata.journal(weight_events) if is_weight else {}
     binding_journal = fresh_binding.journal(rows, profiles.configured.row(prepared['profile'])['request_binding']) if is_fresh_binding else None
+    startup_candidates = baseline_startup_input.journal(rows, prepared, context) if is_baseline_startup else None
     return rows, {"recording_closed": bool(end) and not incomplete_tail, "recording_end": end.get("reason"),
         "incomplete_final_row":incomplete_tail,"discarded_tail_bytes":len(tail),
         "discarded_tail_sha256":hashlib.sha256(tail).hexdigest() if tail else None,
         "source_profile_modules": sorted(ready), "whole_run_coverage_verified": False,
         **({'fresh_request_binding': binding_journal} if is_fresh_binding else {}),
+        **({'baseline_startup': startup_candidates} if is_baseline_startup else {}),
         **({'ready_endpoint_events':len(endpoint_journal['events']),'ready_endpoint_missing':endpoint_journal['missing']} if is_endpoint else {}),
         **({'worker_generation_events':len(generation_journal['events']),'worker_ready_send_events':len(generation_journal['pipe_events']),'worker_generation_missing':generation_journal['missing']} if is_generation else {}),
         **({'worker_startup_events':len(startup_journal['events']),'worker_startup_missing':startup_journal['missing']} if is_worker_startup else {}),

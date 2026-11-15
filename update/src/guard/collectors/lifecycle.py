@@ -162,6 +162,11 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None,fa
         if hashlib.sha256(base_raw).hexdigest() != configured.runtime_spec(profile)['base_sha256']:
             raise ValueError('CONFIGURED_LIFECYCLE_BASE_UNAVAILABLE')
         values['guard_lifecycle_base.py'] = base_raw
+        for filename, (logical, digest) in configured.startup_assets(profile).items():
+            raw = Path(sensor.__file__).with_name(logical + '.py').read_bytes()
+            if hashlib.sha256(raw).hexdigest() != digest:
+                raise ValueError('BASELINE_STARTUP_DEPENDENCY_UNAVAILABLE')
+            values[filename] = raw
     elif selected is init_release:
         for filename,module in (('guard_lifecycle_base.py',sensor),('guard_lifecycle_release.py',release_sensor),('guard_initialization.py',init_sensor)):
             raw=Path(module.__file__).read_bytes()
@@ -273,6 +278,12 @@ def load_prepared(path):
             identity = lambda s: (s.st_dev, s.st_ino, s.st_mode, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
             if (len(raw) != before.st_size or len({identity(s) for s in (before, opened, after, key_path.lstat())}) != 1):
                 raise ValueError('REQUEST_BINDING_KEY_INVALID')
+        elif name in configured.startup_assets(manifest['profile']):
+            try:
+                raw = configured.startup._startup_read(name,
+                    configured.startup_assets(manifest['profile'])[name][1], directory_path=str(path.parent))
+            except OSError:
+                raise ValueError('BASELINE_STARTUP_DEPENDENCY_UNAVAILABLE') from None
         else:
             with (path.parent/name).open("rb") as stream:
                 raw = stream.read(262145)
@@ -306,6 +317,11 @@ def load_prepared(path):
         if configured.contains(manifest['profile']) and name == 'guard_lifecycle_base.py':
             if hashlib.sha256(raw).hexdigest() != configured.runtime_spec(manifest['profile'])['base_sha256']:
                 raise ValueError('CONFIGURED_LIFECYCLE_BASE_UNAVAILABLE')
+        if name in configured.startup_assets(manifest['profile']):
+            logical, digest = configured.startup_assets(manifest['profile'])[name]
+            if (hashlib.sha256(raw).hexdigest() != digest
+                    or raw != Path(sensor.__file__).with_name(logical + '.py').read_bytes()):
+                raise ValueError('BASELINE_STARTUP_DEPENDENCY_UNAVAILABLE')
         if manifest["profile"]==release_sensor.PROFILE and name=="guard_lifecycle_base.py" and hashlib.sha256(raw).hexdigest()!=release_sensor.BASE_SHA256:
             raise ValueError("LIFECYCLE_RELEASE_DEPENDENCY_UNAVAILABLE")
         if release_variant:

@@ -80,6 +80,18 @@ def _validate(row, binding):
         raise ValueError
 
 
+def validate_record(row, *, binding):
+    try:
+        _validate(row, binding)
+    except (KeyError, ValueError, TypeError, AttributeError):
+        raise ValueError('BASELINE_STARTUP_RECORD_INVALID') from None
+
+
+def journal(rows, prepared, context):
+    return project([row['payload'] for row in rows if row['event'] == 'BASELINE_STARTUP'],
+                   binding=sensor.process_binding(prepared['session'], context))
+
+
 def project(records, *, binding):
     """Pair local calls and preserve readiness/model distinctions with exact scope."""
     try:
@@ -90,6 +102,8 @@ def project(records, *, binding):
             raise ValueError
         for row in records:
             _validate(row, binding)
+        if len({row['runtime'] for row in records}) > 1:
+            raise ValueError
         calls = {}
         for row in records:
             calls.setdefault(row['call_sha256'], []).append(row)

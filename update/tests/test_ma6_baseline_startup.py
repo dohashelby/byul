@@ -154,14 +154,10 @@ def test_tampered_scope_source_and_callback_are_rejected(tmp_path):
     observer.close()
 
 
-@pytest.mark.parametrize('fail', [False, True])
-def test_actual_child_constructor_load_failure_correspondence_and_ready_precedes_load(tmp_path, fail):
-    """Execute pinned constructor + load body with inert native I/O boundaries."""
+def inert_child_boundaries(mp, worker):
     import pickle
     import sys
     from contextlib import contextmanager
-    module, worker, observer, records, error = worker_world(tmp_path, fail=fail)
-    mp = native_module(sensor.MP, tmp_path)
     sent = []
     worker.init_device = lambda: None  # no GPU, and no init-device claim
     worker.parallel_config = SimpleNamespace(world_size=1)
@@ -181,7 +177,6 @@ def test_actual_child_constructor_load_failure_correspondence_and_ready_precedes
         _add_prefix=lambda *args: None, MessageQueue=Queue, zmq_socket_ctx=socket,
         zmq=SimpleNamespace(constants=SimpleNamespace(PUSH=1)))
     mp.WorkerProc.READY_STR = 'READY'
-    observer.install(mp, image=sensor.IMAGE)
     # Every actual load invocation must occur after the native constructor sent
     # transport READY; this is not a model-readiness observation.
     load = worker.model_runner.load_model
@@ -189,7 +184,16 @@ def test_actual_child_constructor_load_failure_correspondence_and_ready_precedes
         assert sent == ['READY']
         return load()
     worker.model_runner.load_model = checked_load
-    config = SimpleNamespace(parallel_config=worker.parallel_config)
+    return SimpleNamespace(parallel_config=worker.parallel_config)
+
+
+@pytest.mark.parametrize('fail', [False, True])
+def test_actual_child_constructor_load_failure_correspondence_and_ready_precedes_load(tmp_path, fail):
+    """Execute pinned constructor + load body with inert native I/O boundaries."""
+    module, worker, observer, records, error = worker_world(tmp_path, fail=fail)
+    mp = native_module(sensor.MP, tmp_path)
+    config = inert_child_boundaries(mp, worker)
+    observer.install(mp, image=sensor.IMAGE)
     if fail:
         with pytest.raises(type(error)) as raised:
             mp.WorkerProc(vllm_config=config, local_rank=0, rank=0,
@@ -255,3 +259,170 @@ def test_changed_original_code_is_not_observed_as_qualified(tmp_path):
     assert worker.load_model() == 'changed'
     assert records == [] and observer.disabled is True
     observer.close()
+
+
+# /31 reuses the prepared lifecycle assets, private original helpers, Writer and
+# capture parser. These remain synthetic process/native boundaries, never GPU.
+from guard.adapters import vllm_lifecycle_catalog as catalog
+from guard.adapters import vllm_lifecycle_sensor as legacy
+from guard.adapters import vllm_baseline_startup_composition as composition
+from guard.collectors import lifecycle
+from guard.executors import lifecycle_capture as capture
+from tests.test_lifecycle_capture import external  # noqa: F401
+from tests.test_lifecycle_sensor import CONTEXT, FakeOS, SilentThread
+import threading
+
+REPO = Path(__file__).resolve().parents[2]
+STARTUP_PROFILE = composition.STARTUP_PROFILE
+
+
+def composed_world(external):
+    prepared = lifecycle.prepare_assets(external / 'assets', REPO, profile=STARTUP_PROFILE)
+    module = ModuleType('_baseline_startup_composition_test')
+    module.__file__ = str(external / 'assets/guard_lifecycle_sensor.py')
+    exec(compile(catalog.render_source(STARTUP_PROFILE), module.__file__, 'exec', dont_inherit=True, optimize=0), vars(module))
+    module._dependency = lambda: Path(legacy.__file__).read_bytes()
+    module.STARTUP_DIRECTORY = str(external / 'assets')
+    base = module._private_base()  # verifies base ABI and every exact private dependency
+    fake = FakeOS()
+    fake.getpid = os.getpid
+    context = {**CONTEXT, 'pid': os.getpid()}
+    base.os = fake
+    base._context = lambda: dict(context)
+    base._open_directory = lambda path: 10
+    base.threading = SimpleNamespace(RLock=threading.RLock, Thread=SilentThread, Event=threading.Event)
+    settings = json.loads((external / 'assets/settings.json').read_bytes())
+    observer = base.Observer(settings, prepared['assets']['settings.json']['sha256'])
+    return SimpleNamespace(prepared=prepared, module=module, base=base, fake=fake,
+        context=context, observer=observer, root=external)
+
+
+def attach_native(world, module):
+    # Same post-source-load installation entry used by immutable CheckedLoader.
+    world.observer.instrument(module)
+    name = module.__name__
+    info = {'source_sha256': world.base.SOURCE_SHA[name], 'code_sha256': 'c' * 64}
+    world.observer.modules[name] = info
+    world.observer.emit('MODULE', {'module': name, 'verified': True, **info})
+
+
+def rechain(rows):
+    previous = '0' * 64
+    output = b''
+    for seq, row in enumerate(rows):
+        row['seq'], row['previous_sha256'] = seq, previous
+        line = capture.canonical_row(row)
+        output += line
+        previous = hashlib.sha256(line).hexdigest()
+    return output
+
+
+def test_startup_prepared_roundtrip_exact_private_dependencies_and_legacy_bytes(external):  # noqa: F811
+    world = composed_world(external)
+    assert lifecycle.load_prepared(external / 'assets/manifest.json') == world.prepared
+    assert set(world.prepared['assets']) == {'guard_lifecycle_sensor.py', 'guard_lifecycle_base.py',
+        'sitecustomize.py', 'settings.json', *catalog.startup_assets(STARTUP_PROFILE)}
+    assert len(world.base.SOURCE_SHA) == 10
+    assert legacy.PROFILE == 'vllm-native-lifecycle-metadata/8'
+    assert catalog.row('vllm-native-lifecycle-metadata/27')['sources'].keys() < world.base.SOURCE_SHA.keys()
+    for logical, (filename, digest) in composition.DEPENDENCIES.items():
+        assert world.prepared['assets'][filename]['sha256'] == digest
+    assert world.prepared['product_connected'] is False
+    # The old profile has no extension or newly inherited startup targets.
+    old = catalog.render_source('vllm-native-lifecycle-metadata/27')
+    assert b'BASELINE_STARTUP' not in old and b'guard_baseline_startup.py' not in old
+    world.observer.close()
+
+
+@pytest.mark.parametrize('damage', ['bytes', 'symlink', 'manifest-rehash'])
+def test_startup_prepared_rejects_changed_dependency_even_after_manifest_rehash(external, damage):  # noqa: F811
+    world = composed_world(external)
+    path = external / 'assets/guard_baseline_startup.py'
+    if damage == 'symlink':
+        path.unlink()
+        path.symlink_to(sensor.__file__)
+    else:
+        path.write_bytes(path.read_bytes() + b'\n')
+        if damage == 'manifest-rehash':
+            manifest_path = external / 'assets/manifest.json'
+            manifest = json.loads(manifest_path.read_bytes())
+            manifest['assets'][path.name] = {'bytes': path.stat().st_size, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+            manifest_path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError):
+        lifecycle.load_prepared(external / 'assets/manifest.json')
+    with pytest.raises((ValueError, OSError)):
+        world.module._private_base()
+    world.observer.close()
+
+
+def test_composed_worker_producer_writer_and_capture_consumer_keep_actual_failure(external, tmp_path):  # noqa: F811
+    world = composed_world(external)
+    module, worker, previous, unused, error = worker_world(tmp_path, fail=True)
+    previous.close()
+    attach_native(world, module)
+    with pytest.raises(type(error)) as raised:
+        worker.load_model()
+    assert raised.value is error
+    world.observer.close()
+    rows, summary = capture.parse_recording(bytes(world.fake.data), world.prepared)
+    projected = summary['baseline_startup']
+    assert projected['paired_calls'] == 1
+    fact, = projected['preparation_calls']
+    assert fact['point'] == 'Worker.load_model' and fact['returned'] is False
+    assert fact['paired'] is True and fact['constructor_interval_observed'] is False
+    assert projected['service_gate_verified'] is False and projected['whole_scope_complete'] is False
+    assert 'must never be recorded' not in bytes(world.fake.data).decode()
+    assert summary['recording_closed'] is True
+    startup_rows = [row for row in rows if row['event'] == 'BASELINE_STARTUP']
+    assert startup_rows[0]['payload']['binding'] == sensor.process_binding(world.prepared['session'], world.context)
+    for mutate in (lambda r: r['payload']['binding'].update(process_start_sha256='f' * 64),
+                   lambda r: r['payload'].update(source_sha256='0' * 64),
+                   lambda r: r['payload'].update(runtime='cpython-3.12.99')):
+        changed = deepcopy(rows)
+        mutate(next(row for row in changed if row['event'] == 'BASELINE_STARTUP'))
+        with pytest.raises(ValueError):
+            capture.parse_recording(rechain(changed), world.prepared)
+    changed = deepcopy(rows)
+    next(row for row in changed if row['event'] == 'MODULE')['payload']['verified'] = False
+    with pytest.raises(ValueError, match='BASELINE_STARTUP_SOURCE_PROVENANCE_UNAVAILABLE'):
+        capture.parse_recording(rechain(changed), world.prepared)
+
+
+def test_process_factory_uses_new_context_and_discards_inherited_parent_interval(tmp_path, monkeypatch):
+    module = native_module(sensor.WORKER, tmp_path)
+    parent_binding = dict(BINDING)
+    current = [os.getpid()]
+    next_binding = {**parent_binding, 'pid': os.getpid() + 1, 'process_start_sha256': 'c' * 64}
+    observer = sensor.StartupCandidate(lambda record: None, binding=parent_binding, binding_factory=lambda: next_binding)
+    observer.install(module, image=sensor.IMAGE)
+    old_callback = observer.callback
+    sensor._PARENT.set('d' * 64)
+    monkeypatch.setattr(sensor, 'os', SimpleNamespace(getpid=lambda: current[0], name='posix'))
+    current[0] = next_binding['pid']
+    assert observer._current_process() is True
+    assert observer.binding == next_binding and observer.callback is not old_callback
+    assert sensor._PARENT.get() is None
+    observer.close()
+
+
+def test_composed_constructor_failure_reaches_existing_capture_summary(external, tmp_path):  # noqa: F811
+    world = composed_world(external)
+    module, worker, previous, unused, error = worker_world(tmp_path, fail=True)
+    previous.close()
+    mp = native_module(sensor.MP, tmp_path)
+    config = inert_child_boundaries(mp, worker)
+    attach_native(world, mp)
+    attach_native(world, module)
+    with pytest.raises(type(error)) as raised:
+        mp.WorkerProc(vllm_config=config, local_rank=0, rank=0,
+            distributed_init_method='example', input_shm_handle=None, ready_path='example')
+    assert raised.value is error
+    world.observer.close()
+    rows, summary = capture.parse_recording(bytes(world.fake.data), world.prepared)
+    fact, = summary['baseline_startup']['local_failure_propagation']
+    assert fact['point'] == 'Worker.load_model' and fact['rank'] == 0
+    assert fact['component_failure_constructor_failure_observed'] is True
+    assert fact['parent_process_aggregate_verified'] is False
+    assert fact['confirmed_violation'] is False
+    assert summary['baseline_startup']['paired_calls'] == 2
+    assert summary['whole_run_coverage_verified'] is False

@@ -248,6 +248,128 @@
         "entry_method": "POST",
         "native_selection_point": "OpenAIServing._log_inputs"
       }
+    },
+    {
+      "profile": "vllm-native-lifecycle-metadata/31",
+      "schema": "guard-native-lifecycle-events/31",
+      "engine": "vllm",
+      "version": "0.7.0",
+      "images": [
+        "docker.io/vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8",
+        "vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8"
+      ],
+      "commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8",
+      "runtimes": {
+        "cpython-3.12.3": [
+          "posix"
+        ],
+        "cpython-3.12.8": [
+          "posix"
+        ]
+      },
+      "sources": {
+        "vllm.v1.core.scheduler": {
+          "sha256": "24db292542369b94d00985b6860386909cf9ce559965263395188f613c4a4985",
+          "bytes": 26643,
+          "classes": {
+            "Scheduler": [
+              "add_request",
+              "finish_requests",
+              "_free_request"
+            ]
+          }
+        },
+        "vllm.v1.core.kv_cache_manager": {
+          "sha256": "39f087609c2049d6383d45ae098d5b5a54749d32f14ab6d4cf779d3f54390355",
+          "bytes": 22785,
+          "classes": {
+            "KVCacheManager": [
+              "free"
+            ]
+          }
+        },
+        "vllm.v1.engine.processor": {
+          "sha256": "b3b66559ce98fb31f89a1ca3a8b9b4d7bc942df090305ea5f765d8bcf21e5d43",
+          "bytes": 9515,
+          "classes": {
+            "Processor": [
+              "process_inputs"
+            ]
+          }
+        },
+        "vllm.v1.engine.async_llm": {
+          "sha256": "c6386700282f55a46b1f103331020e5713d59acf06b12a3e64b0eca40a3aa9b7",
+          "bytes": 14054,
+          "classes": {
+            "AsyncLLM": [
+              "abort"
+            ]
+          }
+        },
+        "vllm.v1.engine.core": {
+          "sha256": "091b574c562202ccc60139e3d1a9cdd29f0fd33cbffa286ca4ae76f460ee3a16",
+          "bytes": 11486,
+          "classes": {
+            "EngineCore": [
+              "abort_requests"
+            ]
+          }
+        },
+        "vllm.v1.engine.output_processor": {
+          "sha256": "12baa6cb772527d52b0fe4e0b69b12d9365dec280f20395dadc7286593ce99ce",
+          "bytes": 7214,
+          "classes": {
+            "OutputProcessor": [
+              "add_request",
+              "abort_requests"
+            ]
+          }
+        },
+        "vllm.v1.worker.gpu_input_batch": {
+          "sha256": "89770d22d9398a061d96e4aa547a8afbacaf0eeff589e1dcf3df45503a4ab40c",
+          "bytes": 18246,
+          "classes": {
+            "InputBatch": [
+              "remove_request"
+            ]
+          }
+        },
+        "vllm.v1.worker.gpu_model_runner": {
+          "sha256": "1ac3fb18b2adad3609dcf58a1656d6fdd4a568eea6740258e00f6a43c7d4b813",
+          "bytes": 51313,
+          "classes": {
+            "GPUModelRunner": [
+              "_update_states",
+              "execute_model",
+              "load_model",
+              "get_model"
+            ]
+          }
+        },
+        "vllm.v1.executor.multiproc_executor": {
+          "sha256": "5db418332360f43e2a9718f62d8ec5d856d554b8d0d27d14f053fb3392d33239",
+          "bytes": 14086,
+          "classes": {
+          }
+        },
+        "vllm.v1.worker.gpu_worker": {
+          "sha256": "7bc08a4e47bac5e1d68e68f540f014e3f9244c0f8d773f0dd7f5b959da5afb7a",
+          "bytes": 11991,
+          "classes": {
+          }
+        }
+      },
+      "void_return_argument_ids": [
+        "Scheduler.finish_requests",
+        "OutputProcessor.abort_requests",
+        "EngineCore.abort_requests"
+      ],
+      "review": "docs/dev-1/ma6-baseline-startup-candidate.md",
+      "installation_review": "docs/dev-1/ma3-image-qualification-20261114.json",
+      "scope": "Native snapshots and same-process component body/constructor startup outcomes; IPC READY is transport only. No all-rank/GPU/admission/registered-producer claim.",
+      "engine_mode": "V1",
+      "startup": "baseline-v1",
+      "startup_image": "vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8"
     }
   ]
 }

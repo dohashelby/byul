@@ -7,6 +7,7 @@ import re
 
 from . import vllm_configured_lifecycle_sensor as template
 from . import vllm_observer_abi as abi
+from . import vllm_baseline_startup_composition as startup
 
 
 def _catalog():
@@ -31,6 +32,10 @@ def _catalog():
                     points[point] = module
         if not points or not set(row['void_return_argument_ids']) <= points.keys():
             raise ValueError('LIFECYCLE_CATALOG_INVALID')
+        if 'startup' in row and (row['startup'] != 'baseline-v1'
+                or row['profile'] != startup.STARTUP_PROFILE or row['schema'] != startup.STARTUP_SCHEMA
+                or row.get('startup_image') not in row['images'] or 'request_binding' in row):
+            raise ValueError('LIFECYCLE_STARTUP_CATALOG_INVALID')
         binding = row.get('request_binding')
         if binding is not None and (type(binding) is not dict or set(binding) != {
                 'handler_point', 'selection_point', 'caller_point', 'input_point',
@@ -63,6 +68,7 @@ def runtime_spec(profile):
         runtime_code[runtime] = {platform: digest for platform in platforms}
     return {key: selected[key] for key in ('profile', 'schema', 'commit', 'sources', 'void_return_argument_ids')} | {
         **({'request_binding': selected['request_binding']} if 'request_binding' in selected else {}),
+        **({'startup_image': selected['startup_image']} if 'startup' in selected else {}),
         'base_sha256': catalog['base']['sha256'], 'runtime_code': runtime_code}
 
 
@@ -70,9 +76,17 @@ def request_binding(profile):
     return contains(profile) and 'request_binding' in row(profile)
 
 
+def startup_observation(profile):
+    return contains(profile) and row(profile).get('startup') == 'baseline-v1'
+
+
+def startup_assets(profile):
+    return {filename: (logical, digest) for logical, (filename, digest) in startup.DEPENDENCIES.items()} if startup_observation(profile) else {}
+
+
 def asset_names(profile):
     return {'guard_lifecycle_sensor.py', 'guard_lifecycle_base.py', 'sitecustomize.py', 'settings.json'} | (
-        {'request-binding-key.json'} if request_binding(profile) else set())
+        {'request-binding-key.json'} if request_binding(profile) else set()) | set(startup_assets(profile))
 
 
 def render_source(profile, *, request_key_sha256=None):
@@ -87,6 +101,8 @@ def render_source(profile, *, request_key_sha256=None):
         extension = b'\n' + Path(__file__).with_name('vllm_fresh_request_binding.py').read_bytes()
     elif request_key_sha256 is not None:
         raise ValueError('REQUEST_BINDING_PROFILE_REQUIRED')
+    if startup_observation(profile):
+        extension += b'\n' + Path(startup.__file__).read_bytes()
     return Path(template.__file__).read_bytes() + extension + (
         '\nSPEC = ' + repr(spec) + "\nif __name__ == '__main__':\n    main()\n").encode()
 

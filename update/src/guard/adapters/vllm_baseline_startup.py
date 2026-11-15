@@ -9,6 +9,7 @@ from __future__ import annotations
 import contextvars
 import functools
 import hashlib
+import json
 import os
 import secrets
 import sys
@@ -38,6 +39,14 @@ ROWS = {
 }
 STATIC = frozenset({'WorkerProc.make_worker_process', 'WorkerProc.wait_for_startup'})
 _PARENT = contextvars.ContextVar('guard_baseline_startup_parent', default=None)
+
+
+def process_binding(session, context):
+    """Use the writer's full process context; no PID-only generation join."""
+    return {'pid': context['pid'],
+            'session_id_sha256': hashlib.sha256(session.encode()).hexdigest(),
+            'process_start_sha256': hashlib.sha256(json.dumps(context, sort_keys=True,
+                separators=(',', ':'), ensure_ascii=True).encode()).hexdigest()}
 
 
 def qualify(module, *, image):
@@ -78,17 +87,32 @@ class StartupCandidate:
     emit owns the bounded journal and its process context. No startup, import hook,
     fork/spawn installation, failure injection or lifecycle verdict is performed.
     """
-    def __init__(self, emit, *, binding):
+    def __init__(self, emit, *, binding, binding_factory=None):
         scope = support._binding(binding)
         if (not callable(emit) or scope.get('pid') != os.getpid()
                 or not all(scope.get(k) for k in ('session_id_sha256', 'process_start_sha256'))):
             raise ValueError('BASELINE_STARTUP_BINDING_UNAVAILABLE')
         contract.callback_code_contract(callback, support, base)
-        self.emit, self.binding = emit, scope
+        if binding_factory is not None and not callable(binding_factory):
+            raise ValueError('BASELINE_STARTUP_BINDING_UNAVAILABLE')
+        self.emit, self.binding, self.binding_factory = emit, scope, binding_factory
         self.pid = os.getpid()
         self.callback = callback.WorkerReadinessObserver()
         self.installed = []
         self.disabled = False
+
+    def _current_process(self):
+        if self.pid != os.getpid():
+            if self.binding_factory is None:
+                return False
+            scope = support._binding(self.binding_factory())
+            if (scope.get('pid') != os.getpid() or not all(scope.get(k) for k in
+                    ('session_id_sha256', 'process_start_sha256'))):
+                return False
+            self.binding, self.pid = scope, os.getpid()
+            self.callback = callback.WorkerReadinessObserver()
+            _PARENT.set(None)  # Fork inherits code, never a parent's call interval.
+        return True
 
     def _record(self, point, phase, args, kwargs, info, *, result=None, error=None):
         try:
@@ -121,7 +145,7 @@ class StartupCandidate:
         @functools.wraps(original)
         def wrapped(*args, **kwargs):
             try:
-                if observer.disabled or observer.pid != os.getpid():
+                if observer.disabled or not observer._current_process():
                     observe = False
                 else:
                     observe = base.code_digest(original.__code__) == expected
@@ -156,7 +180,7 @@ class StartupCandidate:
         return wrapped
 
     def install(self, module, *, image):
-        if self.disabled or self.pid != os.getpid():
+        if self.disabled or not self._current_process():
             raise ValueError('BASELINE_STARTUP_OBSERVER_UNAVAILABLE')
         qualified = qualify(module, image=image)
         changes = []

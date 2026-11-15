@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from .config import Settings
 from .sources.runtime import RuntimeNotFound, RuntimeUnauthorized, RuntimeUnavailable
 from .state import build_state
-from .routes import bundle_export, documents, evidence, operations, overview, runtime, verification
+from .routes import bundle_export, documents, evidence, operations, overview, runtime, update_execution, verification
 from . import auth as auth_module
 from .accounts import AccountStore
 
@@ -35,7 +35,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="byul platform API", version="0.1.0", lifespan=lifespan)
     app.state.byul = state
-    for module in (overview, runtime, verification, documents, bundle_export, operations, evidence):
+    for module in (overview, runtime, verification, update_execution, documents, bundle_export, operations, evidence):
         app.include_router(module.router)
     app.include_router(auth_module.router)
     if settings.login_enabled:

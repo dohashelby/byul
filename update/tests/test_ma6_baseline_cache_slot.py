@@ -82,7 +82,7 @@ def test_baseline_flat_kv_return_reaches_computed_rows_and_cache_timing(tmp_path
         @property
         def kv_block_hashes(self):
             raise AssertionError("observer must not invoke this property")
-    assert observer._snapshot(point, (manager, PropertyTrap()))["request_block_hashes_sha256"] == [observer.fingerprint("123")]
+    assert observer._snapshot(point, (manager, PropertyTrap()), {})["request_block_hashes_sha256"] == [observer.fingerprint("123")]
     rows = projection.computed_rows(events, SECRET, {"present": tag, "control-present": control_tag})
     expected = {"tokens": 4, "hashes": [observer.fingerprint("123")], "salt": None, "media": None}
     assert rows == {"present": [expected], "control-present": [expected]}
@@ -167,7 +167,9 @@ def test_baseline_none_return_uses_verified_mapping_but_slot_consumer_keeps_move
     name = sensor.SLOT_MODULE
     module = source_module(name, sensor.SLOT_TARGETS[name], sensor.SLOT_SOURCE, tmp_path)
     module.SamplingType = SimpleNamespace(GREEDY="greedy")
-    observer = sensor.SlotObserver("b" * 32, context_provider=lambda: {"pid": 1})
+    # The in-pod observer streams to its sink instead of keeping report events.
+    events = []
+    observer = sensor.SlotObserver("b" * 32, sink=events.append, context_provider=lambda: {"pid": 1})
     observer.secret = SECRET
     for point in sensor.SLOT_TARGETS[name]:
         owner, method = point.split(".")
@@ -179,7 +181,7 @@ def test_baseline_none_return_uses_verified_mapping_but_slot_consumer_keeps_move
     assert value.req_id_to_index[restricted] == 0
     assert value.remove_request(restricted) == 0
     assert value.add_request(request(reused, None), 0) is None
-    returns = [row for row in observer.report()["events"] if row["phase"] == "RETURN"]
+    returns = [row for row in events if row["phase"] == "RETURN"]
     assert [row["fields"]["slot"] for row in returns] == [0, 0, 0]
     assert returns[0]["fields"]["slot_lineage_complete"] is False
     assert returns[-1]["fields"]["slot_lineage_complete"] is False
@@ -196,4 +198,4 @@ def test_baseline_none_return_uses_verified_mapping_but_slot_consumer_keeps_move
     Path(module.__file__).write_bytes(b"# changed source")
     assert value.add_request(request("byul-cb-" + "4" * 32, None), 1) is None
     assert not any(row["phase"] == "RETURN" and row["entry_qualified_after"] is True
-                   for row in observer.report()["events"][len(observer.report()["events"]) - 2:])
+                   for row in events[-2:])

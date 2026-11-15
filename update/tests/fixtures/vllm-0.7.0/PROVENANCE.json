@@ -63,6 +63,14 @@
       "source": "vllm/v1/executor/multiproc_executor.py",
       "sha256": "5db418332360f43e2a9718f62d8ec5d856d554b8d0d27d14f053fb3392d33239"
     },
+    "vllm/v1/executor/abstract.py.txt": {
+      "source": "vllm/v1/executor/abstract.py",
+      "sha256": "6e0c838ef1e866b15f8176da0af117dc4661efe387fbcca20d521020c7b1970a"
+    },
+    "vllm/distributed/device_communicators/shm_broadcast.py.txt": {
+      "source": "vllm/distributed/device_communicators/shm_broadcast.py",
+      "sha256": "24a3990266dcbbdbb14f6a2a2c4dec1eecad54d9ea85622ddc8dc36774b87942"
+    },
     "vllm/v1/worker/gpu_worker.py.txt": {
       "source": "vllm/v1/worker/gpu_worker.py",
       "sha256": "7bc08a4e47bac5e1d68e68f540f014e3f9244c0f8d773f0dd7f5b959da5afb7a"

@@ -1,5 +1,7 @@
 # M-A6 판본 적용표 — 1단계 선행 확인
 
+> **현행 기준(2026-11-15):** 결정14를 변경해 기준·후보 모두 V1을 선택한다. V0 D1~D3 신규 설계는 중단한다. 아래 1~23절의 V0 분석·기동 결과·예외는 당시 구성의 이력이며 새 V1의 실행 자격이나 UNKNOWN 승인으로 이월하지 않는다. 현재 구현·재분류·남은 작업은 **24절**을 따른다.
+
 - 작성: 2026-11-12. 범위: [작업지시서 3차](../WORK_ORDER_VLLM_MVP.md) M-A6 "선행 확인".
 - 판본 번호와 이미지 digest는 작업지시서 0.1절 표에만 있다. 이 문서는 "기준 판본"·"후보 판본"·"이전 판본"(지금 고정값이 있는 판본, `engine_profiles.json`의 `vllm-native-source/1` 행)으로 쓴다.
 - 근거 종류를 구분한다. **[레지스트리]** = Docker Hub 레지스트리의 매니페스트·이미지 config(레이어는 받지 않음), **[소스]** = vLLM 저장소 태그 소스(얕은 clone), **[실측]** = 이미 저장된 GPU 실측 기록. 이미지 레이어·설치 파일 bytes는 받지 않았다. 그래서 아래의 소스 근거는 모두 실제 이미지 설치 파일과 대조하기 전까지 후보다.
@@ -350,57 +352,9 @@ J02 첫 실행(2026-11-15, L4 1장, 두 판본 동시 기동)에서 69개가 모
 - 이 세션은 위 기록을 찾기 전에 기준 이미지의 vLLM·의존성 설치 레이어 4개(10~13번, 5,043,451,516 bytes, 각 레이어 SHA-256 일치)를 로컬로 다시 받아 대조했다. 결과는 기준 vLLM `.py` 574/574가 태그 소스와 같았고(이미지 전용 빌드 파일 3개), 기준 HTTP 길이 원본(`serving_engine.py` `ac5e16bc…`)과 통신 버퍼 행(`f3e7b346…`)도 일치했다. 후보 레이어는 중복이라 받다가 멈췄다. AWS 서버는 켜지 않았고 클라우드 비용은 없다. 결정 31의 승인 바이트 수를 넘는 중복 다운로드였다는 점을 기록한다.
 - 통신 버퍼 행(`vllm_comm_buffer_callback.PIN_ROWS`의 `'candidate'`)과 판본 프로필의 HTTP 행 `pin_status`는 그대로 두었다. 둘 다 기존 시험이 `candidate`를 고정하고 REQ-21·HTTP 안전 프로브 의미와 묶여 있다.
 
-## 20. 기준 0.7.0 V0 관측기 설계 (D1~D3, 결정 14 "V0 유지")
+## 20. 기준 V0 관측기 설계 — 중단(2026-11-15)
 
-V0에는 V1과 같은 이름의 객체가 거의 없다. 계약 사건(시도·적중·해제·준비·장애)의 의미를 V0 객체로 다시 정의했다. 의미가 같은 것은 "대응", 다른 것은 결정 질문(`DECISIONS.md` M-A6-V1~V4)으로 올렸다. 아래 소스 위치는 기준 태그 `5204ff5c`이며 이미지 설치 파일과 같다(19.3).
-
-### 20.1 공통 전제
-
-- 새 V0 관측기는 기존 감싸기 기반(`vllm_lifecycle_sensor`의 정확 SHA 검사 loader)을 그대로 쓰고, V0 대상표(모듈·함수·정확 SHA 행)만 판본 데이터로 더한다. 판본마다 관측 코드를 복사하지 않는다.
-- 기준 CPython은 3.12.8이다(16절). 지금 센서 15개의 `RUNTIME_CODE_CONTRACTS`에는 3.12.8 행이 없어 모두 기동 시 거부한다(M-A3 기록: 0/15). V0 관측기를 만들기 전에 3.12.8 자기 코드 지문 행이 필요하다. 이것은 데이터 추가(a)다. 3.12.8 interpreter로 직접 계산해야 하며, 다른 패치 판본 값을 옮기지 않는다.
-- 기본 기동은 V0 `MQLLMEngine`(별도 엔진 프로세스, ZMQ ipc)이고 TP1은 `UniProcExecutor`다. TP2는 `MultiprocessingDistributedExecutor`다. 관측기는 엔진 프로세스와 worker 프로세스 양쪽에 설치돼야 한다(sitecustomize 경로는 V1과 같음).
-
-### 20.2 D1 — V0 scheduler·block manager (REQ-12·15·16·17, LIF-03·10·12, OBS-02)
-
-| 계약 사건(V1 대상) | V0 대상 | 의미 |
-|---|---|---|
-| 요청 수락 `Scheduler.add_request` | `core/scheduler.py` `Scheduler.add_seq_group`(435행), 요청 ID = `seq_group.request_id` | 대응 |
-| 일정 시도 `Scheduler.schedule` | `Scheduler.schedule`(1287행) 반환 `scheduled_seq_groups` | 대응 |
-| 선점 `Scheduler._preempt_request`(recompute만) | `Scheduler._preempt`(1533행) → `_preempt_by_recompute`/`_preempt_by_swap` | **다름**: V0에는 SWAP 선점이 있어 KV 블록이 CPU로 옮겨 살아 있다. "선점 = 블록 해제" 의미가 SWAP에는 맞지 않는다 → M-A6-V1(a) |
-| 취소·해제 `finish_requests`·`_free_request_blocks`·`KVCacheManager.free` | `Scheduler.abort_seq_group`(449행) → `free_seq`(1447행) → `BlockSpaceManager.free`(`core/block_manager.py` 252행), 끝난 묶음은 `free_finished_seq_groups`(1470행) | 대응(해제 주체가 Sequence 단위라 요청 ID로 묶어 기록) |
-| 캐시 적중 `KVCacheManager.get_computed_blocks`(수락 시 1회) | `BlockSpaceManager.allocate`(164행) 시 prefix 해시 일치 블록, `get_num_cached_tokens`(515행)는 일정 단계마다 호출 | **다름**: V0는 chunked prefill 단계마다 같은 요청이 앞 단계에 스스로 계산한 블록도 "cached"로 센다. 적중을 "다른 요청이 만든 블록 재사용"으로만 셀 수단이 블록 소유 추적뿐이다 → M-A6-V1(b) |
-| 캐시 식별 `cache_salt` | 없음. 블록 해시는 토큰·이전 해시·`extra_hash`(LoRA ID)만(`prefix_caching_block.py` 910행) | 기능 차이(관측 공백 아님). REQ-15·16의 기준 쪽은 "식별값에 신원·설정이 없다"가 관측 사실이 된다 → M-A6-V1(c) |
-| 늦은 결과 섞임(REQ-12) `OutputProcessor` | `LLMEngine._process_model_outputs`와 비동기 출력 처리(`allow_async_output_proc`), abort 뒤 같은 ID의 `RequestOutput` | 대응. 비동기 출력 큐가 한 단계 늦게 도착할 수 있어 관측 창을 "abort 뒤 다음 두 단계"까지로 정해야 한다(구현 세부, 결정 아님) |
-| 재시도 중복(LIF-12) 같은 ID 재제출 | `AsyncLLMEngine`/`MQLLMEngine`의 RequestTracker가 같은 ID를 `KeyError`로 거부 | **다름**: V1은 재시도 ID를 새 시도로 받는다. V0의 거부를 "중복 실행 없음"으로 읽을지 → M-A6-V1(d) |
-| 예산(LIF-03) 스트림 버퍼 | uvicorn 0.34.0 ASGI(이미지 확인) + V0 `serving_chat`/`serving_completion` | 대응. uvicorn 파일 고정값 행을 기준 이미지에서 더해야 한다(데이터) |
-
-### 20.3 D2 — V0 model runner·CUDA Graph (REQ-18·19·20, REQ-08·09·10 소비)
-
-| 계약 사건 | V0 대상 | 의미 |
-|---|---|---|
-| batch slot 이동·재사용(REQ-18) `InputBatch` slot·허용 토큰 mask | 없음. V0는 단계마다 `SamplingMetadata`·`SamplingTensors`를 새로 만들고 요청별 logits processor를 붙인다(`worker/model_runner.py` `ModelInputForGPUBuilder`) | **다름**: 지속 slot이 없어 "이전 요청 제한 상태가 slot에 남는가"의 관측 대상이 없다 → M-A6-V2(a) |
-| 커널 입력·버퍼 경계(REQ-19) V2 runner 커널 | attention backend metadata(`slot_mapping`·`block_tables`·`seq_lens`)와 paged attention 호출 | 대응 가능. 대상 커널·버퍼 목록을 V0로 새로 정한다. 같은 판정 사실("범위 밖 slot·미초기화 영역 없음")을 만들 수 있는지 GPU 확인 필요 |
-| CUDA Graph 재실행(REQ-20) | `CUDAGraphRunner.forward`(1962행): 고정 `input_buffers`에 복사 후 `graph.replay()`, `output_buffers` 반환 | 대응. 같은 단계 안에서 logits·sample로 출력을 소비하므로 "다음 replay 전 출력 읽기 완료"를 단계 경계로 관측한다 |
-| 구조화 출력 소비(REQ-10) | `model_executor/guided_decoding`의 logits processor 호출 | 대응. 단 요청 필드는 `guided_json`이다(결정 9-5, M-A6-V5) |
-
-### 20.4 D3 — V0 MQLLMEngine·mp_distributed_executor (LIF-07·08·09·11, PLT-02·06 엔진 근거)
-
-| 계약 사건 | V0 대상 | 의미 |
-|---|---|---|
-| worker 준비 뒤 요청 수락(LIF-07) | `MQLLMEngine.run_startup_loop`(160행)·HTTP 기동 순서, worker는 `_run_workers("init_device"/"load_model")` | 대응(`/ready` 분기는 결정 9-3 UNKNOWN) |
-| 일부 worker 초기화 실패(LIF-09) | `MultiprocessingDistributedExecutor._run_workers`(144행)가 어느 worker의 예외든 올린다 | 대응 |
-| 장애 감지·상위 전달(LIF-08) | `WorkerMonitor.run`(`multiproc_worker_utils.py` 110행)은 프로세스 **종료**만 감지한다. 실행 중 **정지·통신 정지** 감시는 없다. 프런트엔드↔엔진은 ZMQ heartbeat(`client.py` 146행) | **다름**: 기준에 정지 감지 장치가 없다. 정지 주입 시 "감지 안 됨"을 관측 결과(FAIL 근거)로 볼지, 기능 부재 UNKNOWN으로 볼지 → M-A6-V3 |
-| 회수(LIF-11) | `MQLLMEngine.cleanup`(144행), `WorkerMonitor` kill, ipc 소켓 파일 | 대응 |
-| 내부 통신 접점(PLT-02·06) | ZMQ ipc 소켓(입력·출력·health), worker 큐(mp pipe), TP2 shm broadcast | 대응. 역할 이름표를 V0로 새로 둔다(CLAUDE.md 2절) |
-
-### 20.5 구현 순서(결정 뒤)
-
-1. 3.12.8 자기 코드 지문 행(센서 15개), uvicorn 0.34.0 행 — 데이터.
-2. D2 REQ-20, D3 LIF-09·11·07, D1의 대응 행(수락·일정·abort/해제·늦은 결과) — V0 대상표와 모의 V0 엔진 시험 자료.
-3. M-A6-V1~V3 답에 따른 다른 의미 행.
-4. GPU: L4 1장에서 TP1 확인, LIF-08·11·PLT-06의 TP2 부분은 TP2 노드.
-
-이 절은 설계다. V0 관측기 코드는 아직 없다.
+사용자 결정14 변경으로 기준도 V1을 선택한다. V0 D1~D3와 전용 질문 M-A6-V1~V4는 더 구현하거나 묻지 않는다. [정리 전 설계](https://github.com/dohashelby/byul/blob/c60be056297599921de6271f4c8c2053e7996674/update/docs/dev-1/ma6-version-applicability.md)는 Git 이력에 보존한다. V5·V6 승인은 유지하며 V1 작업은 24절에서 다시 분류한다.
 
 ## 21. J02 재실행 전 남은 공백 (2026-11-15)
 
@@ -466,3 +420,46 @@ V0에는 V1과 같은 이름의 객체가 거의 없다. 계약 사건(시도·�
 | profiler_observation | LIF-14 | 후보의 `TorchProfilerWrapper._start/_stop`·`Worker.profile` 동작이 다르다(함수 검토 기록). 의미 검토가 먼저다 |
 | rank_failure·resource_recovery | J02 밖 | `multiproc_executor` 다른 지점·fault 경로. M-A3 별도 작업 |
 | observation_identity | J02 밖 | `default_loader` 공백 |
+
+## 24. 기준 판본 V1 전환 (2026-11-15)
+
+### 24.1 기동 선택과 증거 경계
+
+- `adapters/assets/vllm_release_profiles.json`의 `launch.default_engine`은 upstream 기본값, `launch.engine`·`launch.env`는 이번 MVP 선택이다. 기준은 V0 기본을 보존하면서 V1을 선택한다. 초기 V1에서는 `EngineArgs.__post_init__`가 `VLLM_USE_V1`에 따라 prefix cache 기본을 켠다. 이 설정도 해당 판본 데이터에 둔다.
+- `gpu_a_aws_lab.render`는 정확한 판본/이미지 쌍에서만 그 환경변수를 적용하고 `render.json#launch`에 남긴다. 세대 이름으로 엔진 모드를 추측하거나 다른 이미지에 V1을 강제하지 않는다. profile과 세대의 같은 변수 선언은 충돌로 거부한다. 새 판본·다른 변수도 같은 렌더 코드에 데이터만 더해 처리한다.
+- `gpu_a_run_inputs.environment`는 `runtime.platform`에 `engine_requested`로 선언을 남긴다. `target`은 실제 Pod spec에 profile 변수의 정확한 literal이 한 번만 있는지 검사한다. 누락·다른 값·중복·`valueFrom`은 거부한다. 렌더/ENV/Pod 일치는 실제 엔진 로그·기능·GPU 자격을 대신하지 않는다.
+- 비교 조건은 선택 엔진 의미를 남긴다. 기준의 opt-in 변수와 후보의 기본 선택이 모두 V1이면 변수 이름 차이 때문에 비교를 막지 않는다. 선택이 기록되지 않은 과거 V0 자료를 새 V1 조건과 같다고 정규화하지 않는다. 과거 `/1`·`/2` 기록은 현재 profile을 소급 적용하지 않고 기존 의미로 재생한다.
+- `Scheduler.__init__`의 `assert lora_config is None`과 `AsyncLLM.add_lora`의 `NotImplementedError`를 확인했다. 기존 LoRA 세대는 `launch.unsupported_args` 데이터로 렌더 단계에서 거부한다. REQ-16의 LoRA/adapter 분기는 새 기동·관측 방안이 필요하며, V0 예외를 새 V1의 승인된 UNKNOWN으로 바꾸지 않는다.
+
+### 24.2 기준 V1 소스 재분류
+
+이미 확보한 태그 소스(`5204ff5c…`)와 결정31의 기준 이미지 `.py` 574개 일치 기록을 사용했다. 엔진을 import하거나 새 이미지/모델을 받거나 GPU를 기동하지 않았다. 아래는 대상표 검토이며 실행 지원·고정값 등록은 아니다.
+
+| 관측 계열 | 기준 V1의 실제 대상 | 현재 관측기와의 차이 / 다음 작업 |
+|---|---|---|
+| 요청 시도·종료·캐시 | `v1/core/scheduler.py`: `add_request`·`finish_requests`·`_free_request`; `v1/core/kv_cache_manager.py`: `get_computed_blocks`·`allocate_slots`·`free` | scheduler가 단일 파일이고 `_free_request_blocks`·block_pool 경로가 없다. 같은 사건을 낼 수 있는 인자/반환·캐시 단위 검토 후 판본별 대상표/행 추가 |
+| 요청 입력·출력·관측 상태 | `v1/engine/processor.py`: `Processor.process_inputs`; `async_llm.py`; `output_processor.py`: `OutputProcessor.process_outputs` | 현 `input_processor.InputProcessor` 대상과 다르다. 요청 수락·runner 연결·완료의 의미와 source ID를 대조 |
+| 초기화·rank·자원 회수 | `v1/executor/multiproc_executor.py`: `MultiprocExecutor._init_executor`·`collective_rpc`·`shutdown`, `WorkerProc.wait_for_startup` | 현 `wait_for_ready`·`wait_for_response_handle_ready`가 없다. 준비 완료·rank/group·새 세대의 인과를 검토. M-A3 실제 RPC 후보와 결과를 합쳐 자격으로 간주하지 않음 |
+| runner·slot·graph·kernel | `v1/worker/gpu_model_runner.py`: `execute_model`·`capture_model`; `gpu_input_batch.py`: `InputBatch.add_request`·`remove_request`·`condense` | V2 runner는 없고 V1에는 지속 InputBatch가 있다. V0의 REQ-18 대상 부재 판단은 이월하지 않는다. sampler/slot 상태·소비 시점·buffer 단위 검토 필요 |
+| HTTP·모델 권한·인증 | 초기 `entrypoints/openai` 경로 + 위 `Processor` | HTTP 기능표와 엔진 내부 대상표를 구별한다. 외부 관측 10종의 지원은 유지하고 내부 모델/인증의 정확 대상표는 별도 추가 |
+| profiler | `AsyncLLM.start_profile`·`stop_profile`, `EngineCore.profile` | V0 worker-only 설계 대신 V1 호출 사슬을 검토. 현재 profiler wrapper 대상은 없어 기존 D5 예외를 이월하지 않음 |
+| 구조화 출력·요청 옵션 | protocol 필드는 있어도 `v1/structured_output`과 현 runner의 제약 소비 대상이 없다 | V0 `guided_json` 필드 대응만으로 REQ-10을 열지 않는다. 실제 초기 V1 sampler 소비를 검토해 같은 질문/다른 질문을 구분. V5의 조건부 assert 변경 승인은 유지 |
+| 스트림 버퍼 | 기준 HTTP ASGI + uvicorn 설치 판본 | V0 D1 신규 구현 대신 정확 uvicorn 행과 초기 V1 HTTP 대상표를 검토 |
+
+검토한 주요 파일 SHA-256:
+
+| 기준 소스 파일 | SHA-256 |
+|---|---|
+| `vllm/engine/arg_utils.py` | `791c1575ff8cf3be25006530f8db0f7eaf1539e0cbb7b7e9e49b874b3f76f7be` |
+| `vllm/v1/core/scheduler.py` | `24db292542369b94d00985b6860386909cf9ce559965263395188f613c4a4985` |
+| `vllm/v1/core/kv_cache_manager.py` | `39f087609c2049d6383d45ae098d5b5a54749d32f14ab6d4cf779d3f54390355` |
+| `vllm/v1/engine/processor.py` | `b3b66559ce98fb31f89a1ca3a8b9b4d7bc942df090305ea5f765d8bcf21e5d43` |
+| `vllm/v1/executor/multiproc_executor.py` | `5db418332360f43e2a9718f62d8ec5d856d554b8d0d27d14f053fb3392d33239` |
+| `vllm/v1/worker/gpu_model_runner.py` | `1ac3fb18b2adad3609dcf58a1656d6fdd4a568eea6740258e00f6a43c7d4b813` |
+
+### 24.3 현재 공백과 구현 순서
+
+1. 기준 V1 대상표·정확 행과 CPython 3.12.8 자기 코드 지문. 함수가 같거나 이름만 바뀌었으면 기존 관측 코드에 데이터를 추가한다. 의미가 다를 때만 adapter에서 대응한다.
+2. 후보는 23절 도달점을 유지한다. uvicorn stream_buffer·profiler 의미 검토와 REQ-10 실제 소비 연결을 잇는다.
+3. ENV·target·prepared는 V1 구성으로 새로 만든다. V0 저장 실측·REQ-16 모델 기동·SUP-08 REGRESSED는 당시 구성의 근거로 보존하며 새 V1 실측으로 재사용하지 않는다.
+4. 직접 시험·소스 목록·현황 정합성을 확인하고 전체는 PR CI에서 확인한다. GPU 재실행과 생산자 등록은 별도 실제 확인이 필요하다.

@@ -44,7 +44,7 @@ def test_each_closed_engine_bound_executor_records_its_cause(version):
 
 
 def test_engine_internal_observers_stay_closed_without_release_pins():
-    # 후보: engine_sensor(콜백 후보 행)만 엔진 안 관측으로 열린다. 기준(V0): 엔진 안 관측 없음.
+    # V1 선택은 실행 자격이 아니다. 기준은 정확 대상표/행이 없으므로 계속 닫혀 있다.
     assert resolve_executor('engine_sensor', 'kubernetes', engine='vllm', version='0.30.0') is not None
     assert resolve_executor('engine_sensor', 'kubernetes', engine='vllm', version='0.7.0') is None
     for version in ('0.7.0', '0.30.0'):
@@ -53,10 +53,11 @@ def test_engine_internal_observers_stay_closed_without_release_pins():
     for executor in ('request_termination', 'observation_state', 'initialization'):
         assert resolve_executor(executor, 'kubernetes', engine='vllm', version='0.30.0') is not None
         assert resolve_executor(executor, 'kubernetes', engine='vllm', version='0.7.0') is None
-    # M-A6-V6: 기반 /8만 쓰는 실행기는 0.30.0 정확 행 profile(/25)로 열린다. V0 기준은 닫혀 있다.
+    # M-A6-V6: 기반 /8만 쓰는 실행기는 후보의 정확 행 profile(/25)로 열린다.
     assert resolve_executor('model_authorization', 'kubernetes', engine='vllm', version='0.30.0') is not None
     assert resolve_executor('model_authorization', 'kubernetes', engine='vllm', version='0.7.0') is None
-    assert get_provider('vllm').executor_gap('0.7.0', 'profiler_observation')['cause'] == 'APPROVED_UNKNOWN'
+    # 이전 V0 profiler UNKNOWN 승인을 V1 기동에 이월하지 않는다.
+    assert get_provider('vllm').executor_gap('0.7.0', 'profiler_observation')['cause'] == 'OBSERVER_PIN_ROWS_ABSENT'
     assert get_provider('vllm').executor_gap('EXAMPLE-future', 'stream_buffer') is None
 
 

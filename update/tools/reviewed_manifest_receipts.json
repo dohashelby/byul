@@ -205,6 +205,11 @@
       "manifest_sha256": "cde403406960701b1a9dd542019c02c9170315f7aa13c8402e6904150d503ed5",
       "reviewed_by": "Claude / BYUL UPDATE / M-A6-V6 termination 계열 /25 연결·initialization /26 self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T19:30:00+09:00"
+    },
+    {
+      "manifest_sha256": "c3998cbd21b58c94075c8a6f3c09267806f86d11859945e4924699801693dfda",
+      "reviewed_by": "Codex / #277 V1 전환 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T15:37:18.623077+09:00"
     }
   ]
 }

@@ -124,7 +124,7 @@ class _Unit:
             self.started
             and not self.final
             and self.last_started is not None
-            and timedelta(0) <= now - self.last_started <= INFLIGHT_GRACE
+            and now - self.last_started <= INFLIGHT_GRACE
         )
 
 

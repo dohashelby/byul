@@ -199,7 +199,7 @@
   "update/src/guard/adapters/vllm_ready_endpoint_contract.py": "ddae1078d9807910c9f79a815f2abeab6b1c340e8122eb4c3bca9a7b71ef3d7d",
   "update/src/guard/adapters/vllm_ready_endpoint_metadata.py": "c722aec3fa4a5eafee9ed478d970f5b82e26335b2788ec4cbb2d714128007c8e",
   "update/src/guard/adapters/vllm_ready_endpoint_sensor.py": "55753bfcaa3838cb3fdcd20429dbfbf50f037f3fee6d00466223870b854f4fe0",
-  "update/src/guard/adapters/vllm_release_observation_sensor.py": "0d031c3e32597a157af5264bbf4127e572ea39e74357dfb8e3a26e19de6f1434",
+  "update/src/guard/adapters/vllm_release_observation_sensor.py": "7f23b668d0c1b0aee00d4c7980f99165dc2533e1b607a1d6acd0afad33143f59",
   "update/src/guard/adapters/vllm_release_profiles.py": "173d605b067f22097694beaf07b5aa126abe9b5a40449f88fefd3d5a896d5947",
   "update/src/guard/adapters/vllm_request_attempts.py": "ec39ac5be43c59ca36a1ae0f4e9c0179f82f91b05441fe9ef6af35e957df2705",
   "update/src/guard/adapters/vllm_request_output_metadata.py": "8a747b29847c6048f7e3776055d881a36ea9e4fce1797fb21215a713832d4b3f",

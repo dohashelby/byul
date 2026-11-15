@@ -218,4 +218,3 @@ class Middleware:
 
 def seal(path='/guard-lifecycle/settings.json'):
     return (_BASE if _BASE is not None else _private_base()).seal(path)
-

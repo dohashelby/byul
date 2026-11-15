@@ -92,11 +92,11 @@
 | 모델 | 구조 | 기준 판본 registry | 후보 판본 registry | 두 판본 같은 revision으로 기동 |
 |---|---|---|---|---|
 | SUP-08 PoC snapshot (Phi-3-vision 파생, inventory `c2dd6747…`) | `Phi3VForCausalLM` | 있음 | 있음 | **실측으로 확인됨**: 같은 snapshot·inventory로 두 판본 모두 기동하고 정상 요청 전후 200([SUP-08 결과](../gpu-a/RESULTS-20261111-SUP08.md)) |
-| REQ-16 Qwen2-VL-2B-Instruct | `Qwen2VLForConditionalGeneration` | 있음 | 있음 | 소스 근거로 가능, **revision 미고정·미실측**. 기준 판본 요구 Transformers `>= 4.45.2`(이 구조 지원 시작 판본), 후보 판본 `>= 5.10.4`. 이미지 안 실제 Transformers 판본은 레이어를 받아야 안다 |
+| REQ-16 Qwen2-VL-2B-Instruct | `Qwen2VLForConditionalGeneration` | 있음 | 있음 | revision895c3a49로 고정하고 실제 두 이미지 TP2 모델 로드·정상 HTTP200을 확인했다. 기준 V0의 멀티모달 prefix cache는 실제 내부 비활성: 결정34로 해당 기준 캐시 분기만 원인 있는 UNKNOWN 예외. [기동 원자료](ma7-gpu-preflight-20261114.json) |
 | 기본 GPU 모델 Qwen2.5-0.5B-Instruct `7ae55760…` ([환경](../gpu-a/ENVIRONMENT.md)) | `Qwen2ForCausalLM` | 있음 | 있음 | 소스 근거로 가능, 두 판본 미실측 |
 | 기본 소형 모델 facebook/opt-125m `27dcfa74…` | `OPTForCausalLM` | 있음 | 있음 | 소스 근거로 가능, 두 판본 GPU 미실측. chat template이 없어 SUP-03 고정 템플릿이 필요 |
 
-- 지금 근거로는 **결정 12(모델 교체)가 필요한 모델이 없다.** 다만 Qwen2-VL-2B-Instruct는 revision을 아직 고정하지 않았다. J01 전에 revision을 고정하고, 기준 판본 이미지의 Transformers로 그 revision의 processor·config가 읽히는지 첫 기동에서 확인해야 한다. 실패하면 그때 결정 12로 올린다.
+- 지정 모델은 revision을 고정해 두 이미지에서 실제 로드·정상 HTTP200을 확인했으며 결정12의 모델 교체는 하지 않았다. 기준 V0의 멀티모달 prefix cache는 기동 옵션을 명시해도 내부에서 꺼지므로 결정34의 해당 기준 분기 UNKNOWN 예외를 적용한다. 모델 로드 성공을 캐시 검증 성공으로 바꾸지 않는다.
 
 ## 7. 2단계로 넘기는 것
 
@@ -295,3 +295,8 @@ M-A6 이틀 범위의 후보 행·36개 함수 검토·기동/HTTP 데이터·�
 ## 18. 결정 9 항목별 승인 반영
 
 사용자가 9-1~9-6을 각각 승인했다. 11절 표의 UNKNOWN 분기 범위를 유지하고 REQ-06은 기존 비적용 근거만 추가한다. 기준의 guided_json 필드 대응과 기능 부재 분기는 adapter 데이터에 기록했으며 M-B2·M-B4에서 실제 소비를 연결한다. REQ-16·17의 양쪽 prefix caching 명시는 판본 profile 데이터와 렌더 도구의 `--check-id`로 적용한다. 다른 점검 기동의 기본값을 바꾸지 않는다.
+
+
+## 실제 기동 후속: 기준 V0 멀티모달 prefix cache 공백 (2026-11-14)
+
+앞의 prefix cache 기능표는 일반 기능의 유무와 기본값이다. 지정 REQ-16 멀티모달 모델을 실제 두 고정 이미지에서 기동한 결과, 기준 V0는 --enable-prefix-caching을 받더라도 내부에서 껐다. 정확 설치 engine/arg_utils.py1049~1054행 조건과 실제 로그의 enable_prefix_caching=False를 [GPU 사전 점검](ma7-gpu-preflight-20261114.json)에 남겼다. 모델 로드와 정상 HTTP200은 두 쪽 모두 확인했지만, 그 사실은 이미지 블록/문맥 캐시 격리의 측정력이 아니다. 결정9-6의 양쪽 옵션 명시는 유지하고 기능 부재를 PASS·비적용으로 바꾸지 않는다. 사용자 결정34로 기준 V0 유지와 해당 기준 캐시 분기의 원인 있는 UNKNOWN 예외를 승인받았다. 실제 결과 객체를 생성하거나 나머지 M-A6/7 전체 완료로 세지 않는다. 다른 텍스트 모델/점검의 cache 기능 부재로 일반화하지 않는다.

@@ -55,7 +55,16 @@ def assigned(world,kind):
 def invoke(world):return world.proc._execute_worker_rpc(('execute_model',(world.scheduler,),{},0))
 
 
-def test_real_rpc_catches_intentional_exception_raised_inside_its_try(world):
+def test_real_rpc_catches_intentional_exception_raised_inside_its_try(world,monkeypatch):
+ # 예외 전달 대조에서도 READY 게시 벽시계와 30ms 제어 기한을 구분한다.
+ # 활성화를 무시하면 wait가 같은 기한까지 전진해 EXPIRED를 검출한다.
+ now=[None]
+ def clock():
+  if now[0]is None:now[0]=time.monotonic_ns()
+  return now[0]
+ world.observer.fault_runtime.clock=clock
+ world.observer.fault_runtime.wait=lambda seconds:now.__setitem__(0,now[0]+int(seconds*1_000_000_000))
+ monkeypatch.setattr(sensor,'time',SimpleNamespace(monotonic_ns=clock))
  assigned(world,'exception');action(world.path,'activate');assert invoke(world)is None
  status,error,=world.proc.worker_response_mq.items[0]
  assert status is world.mp.WorkerProc.ResponseStatus.FAILURE and 'BYUL_LAB_WORKER_RPC_EXCEPTION'in error
@@ -139,6 +148,16 @@ def test_ipc_ready_requires_actual_fixed_async_queue_body_and_preserves_output(w
  import sys
  from pathlib import Path
  from tests.test_a1_rank_failure_sensor import codes
+ # 실제 파일 fsync·스레드 준비 시간과 30ms 제어 기한을 분리한다.
+ # wait는 release를 쓰고 같은 시계를 전진시켜 무시된 해제는 여전히 만료된다.
+ now=[None]
+ def clock():
+  if now[0]is None:now[0]=time.monotonic_ns()
+  return now[0]
+ def release_wait(seconds):
+  action(world.path,'release');now[0]+=int(seconds*1_000_000_000)
+ world.observer.fault_runtime.clock=clock
+ world.observer.fault_runtime.wait=release_wait
  assigned(world,'communication-stall');action(world.path,'activate')
  world.proc.use_async_scheduling=True
  class EndExampleLoop(BaseException):pass
@@ -166,7 +185,6 @@ def test_ipc_ready_requires_actual_fixed_async_queue_body_and_preserves_output(w
   try:world.proc.worker_busy_loop()
   except EndExampleLoop:pass
  thread=threading.Thread(target=worker_loop);thread.start();assert entered.wait(1)
- world.observer.fault_runtime.wait=lambda _:action(world.path,'release')
  try:
   with pytest.raises(EndExampleLoop):world.proc.async_output_busy_loop()
  finally:stop.set();thread.join(1)

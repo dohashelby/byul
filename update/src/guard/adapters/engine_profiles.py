@@ -59,7 +59,32 @@ TRANSPORT_FEATURES = {
     'kubernetes-owned-input-validation-http-v1': 'native_input',
 }
 
-TRANSPORT_FEATURES.update({'kubernetes-owned-sampling-http-v1': 'http_transport', 'kubernetes-owned-request-binding-http-v1': 'http_transport', 'kubernetes-owned-engine-callback-http-v1': 'native_lifecycle', 'kubernetes-owned-response-content-http-v1': 'http_transport', 'kubernetes-owned-log-integrity-http-v1': 'native_lifecycle', 'kubernetes-owned-usage-control-http-v1': 'native_lifecycle', 'kubernetes-owned-gateway-event-http-v1': 'http_transport'})
+TRANSPORT_FEATURES.update({'kubernetes-owned-sampling-http-v1': 'http_transport', 'kubernetes-owned-request-binding-http-v1': 'http_transport', 'kubernetes-owned-engine-callback-http-v1': 'native_lifecycle', 'kubernetes-owned-response-content-http-v1': 'http_transport', 'kubernetes-owned-log-integrity-http-v1': 'log_integrity', 'kubernetes-owned-usage-control-http-v1': 'native_lifecycle', 'kubernetes-owned-gateway-event-http-v1': 'http_transport'})
+
+# Engine-bound Kubernetes executors and the catalog feature that admits them
+# for one engine release (M-A6 executor-level version table, 2026-11-15).
+# Executor names are pack-level and engine-neutral; which releases offer a
+# feature lives only in the catalog data. Executors not listed keep the
+# engine's base observation feature.
+EXECUTOR_FEATURES = {
+    'engine_sensor': 'native_lifecycle', 'input_validation': 'native_input',
+    'boundary_egress': 'boundary_egress', 'credential_revocation': 'credential_revocation',
+    'forwarded_identity': 'forwarded_identity', 'initialization': 'initialization',
+    'log_integrity': 'log_integrity', 'model_authorization': 'model_authorization',
+    'native_route': 'native_route', 'observation_identity': 'observation_identity',
+    'observation_state': 'observation_state', 'profiler_observation': 'profiler_control',
+    'rank_failure': 'rank_failure', 'record_access': 'record_access',
+    'request_termination': 'termination', 'required_event_record': 'required_events',
+    'resource_recovery': 'resource_recovery', 'response_content': 'response_content',
+    'route_record': 'route_record', 'sampling_validation': 'sampling',
+    'session_revocation': 'session_revocation', 'stored_responses': 'stored_responses',
+    'stream_buffer': 'stream_buffer', 'template_validation': 'template_supply',
+    'unix_ipc': 'unix_ipc',
+}
+
+
+def executor_feature(executor):
+    return EXECUTOR_FEATURES.get(executor, 'native_lifecycle')
 
 
 def resolve(engine: str, version: str | None, feature: str) -> Support:

@@ -44,6 +44,11 @@ def _current(_seed, output):
 def current_pack(monkeypatch):
     for module in (copy_product, credential, forwarded, model_auth, required_event, session, stored):
         monkeypatch.setattr(module, "derive", _current)
+    # The current pack's run window starts at guard run; these doubles write their
+    # records while the test is set up, so open the window before it (run_binding_support).
+    from tests.run_binding_support import window_opened_before
+    with window_opened_before():
+        yield
 
 
 CONNECTED = {"PLT-10": "credential_revocation", "PLT-11": "session_revocation", "PLT-12": "required_event_record",

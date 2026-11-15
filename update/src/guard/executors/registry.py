@@ -184,5 +184,10 @@ def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None
     if factory is None:
         raise ValueError('EXECUTOR_UNAVAILABLE')
     if impl == "kubernetes":
+        if '_kubernetes_target_sha256_by_executor' in cfg:
+            # A mixed update also has collectors with their own targets and
+            # generations. Only the HTTP executors verified by the transition
+            # receive its selected target hash.
+            cfg = {**cfg, '_kubernetes_target_sha256': cfg['_kubernetes_target_sha256_by_executor'].get(executor)}
         factory = activated(factory) if executor in ACTIVATED else attested(factory)
     return factory(cfg)

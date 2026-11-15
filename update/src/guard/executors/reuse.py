@@ -26,6 +26,11 @@ class ExecutionPreview:
 
 def preview_inputs(check, env, values: dict, cfg: dict) -> ExecutionPreview | None:
     """기존 실행 골격과 같은 순수 fixture/config 계산을 쓴다. 실패는 이월 불가다."""
+    from guard.configuration import for_check
+    try:
+        cfg = for_check(cfg, check.executor, check.id)  # [check_config.<CHECK>] (RB2-S)
+    except ValueError:
+        return None
     impl = cfg.get("executors", {}).get(check.executor)
     factory = registry.resolve_executor(check.executor, impl, engine=env.engine.name, version=env.engine.version) if impl else None
     adapter_name = cfg.get("adapter", {}).get("name")

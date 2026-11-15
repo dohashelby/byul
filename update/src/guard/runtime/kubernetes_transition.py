@@ -19,29 +19,39 @@ class KubernetesTransition:
         self.duration=timeout;self.deadline=self.clock()+timeout;self.interval=poll_interval
         self.transports={};self.events=[];self.candidate_binding=candidate_binding
         self.envs=dict(zip(("baseline","candidate"),envs));self.side_configs=side_configs;self.runner=runner
-        executors={side:side_configs[side].get("executors") for side in ("baseline","candidate")}
         supported={"request_binding":REQUEST_BINDING_PROFILE,"input_validation":INPUT_VALIDATION_PROFILE}
-        if executors["baseline"]!=executors["candidate"] or executors["baseline"] not in (
-                {"request_binding":"kubernetes"},{"input_validation":"kubernetes"}):
+        selected={side:tuple(name for name in supported
+            if side_configs[side].get("executors",{}).get(name)=="kubernetes")
+            for side in ("baseline","candidate")}
+        if not selected["baseline"] or selected["baseline"]!=selected["candidate"]:
             raise ValueError("KUBERNETES_TRANSITION_SCOPE_UNSUPPORTED")
-        self.executor=next(iter(executors["baseline"]))
+        self.executors=selected["baseline"]
+        self.profiles=supported
+        self.executor=self.executors[0]
         self.profile=supported[self.executor]
         for side in ("baseline","candidate"):
             cfg=side_configs[side]
             if side=="candidate" and candidate_binding=="after_baseline":
-                if Path(cfg[self.executor]["target"]).exists():
+                if any(Path(cfg[name]["target"]).exists() for name in self.executors):
                     raise ValueError("KUBERNETES_CANDIDATE_BINDING_MUST_BE_FRESH")
                 continue
             self.transports[side]=self._load(side)
         if "candidate" in self.transports:self._verify_pair()
 
     def _load(self,side):
-        cfg=self.side_configs[side][self.executor]
-        with Path(cfg["target"]).open("rb") as stream:target=strict_json(stream.read(65537))
-        transport=KubernetesHTTP(target,self.envs[side],duration=self.duration,
-            binary=cfg.get("kubectl_binary","kubectl"),runner=self.runner,profile=self.profile,clock=self.clock)
-        transport.deadline=self.deadline
-        return transport
+        transports=[]
+        for name in self.executors:
+            cfg=self.side_configs[side][name]
+            with Path(cfg["target"]).open("rb") as stream:target=strict_json(stream.read(65537))
+            transport=KubernetesHTTP(target,self.envs[side],duration=self.duration,
+                binary=cfg.get("kubectl_binary","kubectl"),runner=self.runner,profile=self.profiles[name],clock=self.clock)
+            transport.deadline=self.deadline
+            transports.append(transport)
+        # One side has one selected HTTP workload. Check every participating
+        # executor's target before using one read-only gate for that workload.
+        if any(t.target_sha256!=transports[0].target_sha256 for t in transports[1:]):
+            raise ValueError("KUBERNETES_TRANSITION_TARGETS_UNVERIFIED")
+        return transports[0]
 
     def _verify_pair(self):
         a,b=[self.transports[s].binding for s in ("baseline","candidate")]

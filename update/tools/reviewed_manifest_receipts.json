@@ -182,9 +182,44 @@
       "reviewed_at": "2026-11-14T21:43:40+09:00"
     },
     {
+      "manifest_sha256": "bf79ff11570f12023334c19593b8321c4d4186443a42f4dee2533e54e46c2f0a",
+      "reviewed_by": "Claude / BYUL UPDATE / RB2-S 점검별 실행기 설정 self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T21:55:20+09:00"
+    },
+    {
       "manifest_sha256": "87b6e926b6e9cc667ad8d95bb4c27769824c639a9d320abf98eca1ee972ef6f6",
       "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T04:16:05.482673+00:00"
+    },
+    {
+      "manifest_sha256": "07cfcc1c62cdd638d84069631f1385fd1341804a1ad168f91d10a7db656ef04a",
+      "reviewed_by": "Claude / BYUL UPDATE / M-A6 실행기 단위 판본표(0.7.0·0.30.0) self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T15:40:00+09:00"
+    },
+    {
+      "manifest_sha256": "226b4c94ccb7922e4318a17c29d2d660d95d68cb078239e753dc1f567262ac92",
+      "reviewed_by": "Claude / BYUL UPDATE / M-A6-V6 0.30.0 lifecycle 정확 행 profile(/25) self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T18:00:00+09:00"
+    },
+    {
+      "manifest_sha256": "cde403406960701b1a9dd542019c02c9170315f7aa13c8402e6904150d503ed5",
+      "reviewed_by": "Claude / BYUL UPDATE / M-A6-V6 termination 계열 /25 연결·initialization /26 self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T19:30:00+09:00"
+    },
+    {
+      "manifest_sha256": "c3998cbd21b58c94075c8a6f3c09267806f86d11859945e4924699801693dfda",
+      "reviewed_by": "Codex / #277 V1 전환 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T15:37:18.623077+09:00"
+    },
+    {
+      "manifest_sha256": "a0706cf1549b216e9503839e7338a52b2cee48a60e4ddb2289b262243b53fa2e",
+      "reviewed_by": "Codex / #277 V1 세대 옵션 검토 / B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T15:44:02.295678+09:00"
+    },
+    {
+      "manifest_sha256": "461087ef808a63c8c9784d9178c2406bca141237b46f0fef50393cf5895f5858",
+      "reviewed_by": "Codex / PR277 J02 and preflight fixes; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T16:05:40.445204+09:00"
     }
   ]
 }

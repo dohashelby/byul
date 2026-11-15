@@ -12,10 +12,12 @@ from guard.cli import app
 from guard.executors import registry
 from guard.executors.kubernetes_request_binding import KubernetesRequestBindingExecutor
 from guard.models import canonical_json
+from guard.runtime.kubernetes_http import KubernetesBindingError
 from guard.runtime.kubernetes_transition import KubernetesTransition
 from guard.store import Store
 from tests.builders import baseline_pack, policy, T0
 from tests.test_kubernetes_request_binding import World, env, target, VALUES
+from tools.j02_run_config import build_config, dumps_toml, j02_checks
 
 
 class Clock:
@@ -90,6 +92,15 @@ def test_failed_stop_or_replacement_requires_operator_recovery(tmp_path,mode):
 
 @pytest.mark.parametrize("stop",[True,False])
 def test_update_cli_sides_evidence_report_and_failed_candidate_preserve_baseline(tmp_path,monkeypatch,stop):
+    _update_cli(tmp_path,monkeypatch,stop,mixed=False)
+
+
+@pytest.mark.parametrize("stop",[True,False])
+def test_full_j02_config_reaches_update_evidence_and_report(tmp_path,monkeypatch,stop):
+    _update_cli(tmp_path,monkeypatch,stop,mixed=True)
+
+
+def _update_cli(tmp_path,monkeypatch,stop,*,mixed):
     pair=Pair(stop=stop);clock=Clock();configs=pair.configs(tmp_path)
     original=application.KubernetesTransition
     monkeypatch.setattr(application,"KubernetesTransition",lambda envs,sides,**kwargs:original(envs,sides,**kwargs,runner=pair.runner,clock=clock,sleep=clock.sleep))
@@ -102,8 +113,14 @@ def test_update_cli_sides_evidence_report_and_failed_candidate_preserve_baseline
         path=tmp_path/(str(index)+"-env.json");path.write_bytes(canonical_json(environment_.to_dict()));env_paths.append(path)
     policy_path=tmp_path/"policy.json";policy_path.write_bytes(canonical_json(pol.to_dict()))
     config=tmp_path/"guard.toml"
-    config.write_text('[executors]\nrequest_binding="kubernetes"\n[adapter]\nname="vllm"\n[update]\nmode="external"\ntransition_timeout=0.03\ntransition_poll_interval=0.01\n'+
-        ''.join('[sides.'+side+'.request_binding]\ntarget='+json.dumps(configs[side]["request_binding"]["target"].replace('\\','/'))+'\n' for side in configs),encoding="utf-8")
+    implementations={"request_binding":"kubernetes"}
+    if mixed:
+        implementations.update({pack.checks[cid].executor:"kubernetes" for cid in j02_checks()
+                                if pack.checks[cid].executor is not None})
+    generated=build_config({'executors':implementations,
+        'shared':{'update':{'mode':'external','transition_timeout':0.03,'transition_poll_interval':0.01}}},
+        {side:row['request_binding']['target'] for side,row in configs.items()})
+    config.write_text(dumps_toml(generated),encoding="utf-8")
     store_path=tmp_path/"store";output=tmp_path/"updates"
     result=CliRunner().invoke(app,["update","--pack",str(pack.path),"--baseline",str(env_paths[0]),"--candidate",str(env_paths[1]),
         "--policy",str(policy_path),"--config",str(config),"--store",str(store_path),"--output",str(output),"--as-of",T0.isoformat()])
@@ -115,6 +132,49 @@ def test_update_cli_sides_evidence_report_and_failed_candidate_preserve_baseline
     assert candidate.execution.status.value==("COMPLETED" if stop else "ABORTED")
     if not stop:assert not pair.worlds[1].packets
     assert base.ref() in report.inputs_manifest and candidate.ref() in report.inputs_manifest
+
+
+@pytest.mark.parametrize('damage',['other-target','foreign-env','missing-target','different-http-scope'])
+def test_mixed_transition_checks_every_http_target_before_queries(tmp_path,damage):
+    pair=Pair();configs=pair.configs(tmp_path)
+    for side,cfg in configs.items():
+        cfg['executors'].update(input_validation='kubernetes',container_config='kubernetes')
+        cfg['input_validation']=dict(cfg['request_binding'])
+    other=deepcopy(pair.worlds[0].target)
+    if damage=='other-target':other['model_mapping']['api_model']='other-model-alias'
+    if damage=='foreign-env':other['environment_ref']['sha256']='0'*64
+    if damage=='different-http-scope':configs['candidate']['executors'].pop('input_validation')
+    else:
+        path=tmp_path/'input-validation.json'
+        if damage!='missing-target':path.write_bytes(canonical_json(other))
+        configs['baseline']['input_validation']['target']=str(path)
+    expected=KubernetesBindingError if damage=='foreign-env' else FileNotFoundError if damage=='missing-target' else ValueError
+    with pytest.raises(expected):
+        KubernetesTransition(pair.envs,configs,runner=pair.runner)
+    assert not pair.calls
+
+
+def test_mixed_transition_accepts_matching_targets_in_separate_files(tmp_path):
+    pair=Pair();clock=Clock();configs=pair.configs(tmp_path)
+    for side,cfg in configs.items():
+        cfg['executors'].update(input_validation='kubernetes',container_config='kubernetes')
+        path=tmp_path/(side+'-input.json')
+        path.write_bytes(canonical_json(pair.worlds[side=='candidate'].target))
+        cfg['input_validation']={'target':str(path)}
+    gate=KubernetesTransition(pair.envs,configs,runner=pair.runner,clock=clock,sleep=clock.sleep)
+    gate.prepare_baseline();gate.candidate_ready()
+    assert gate.report()['events'][-1]=='CANDIDATE_READY_OBSERVED'
+    assert all('get' in call and 'exec' not in call for call in pair.calls)
+    assert not gate.report()['gpu_release_verified']
+
+
+def test_transition_target_pin_does_not_replace_other_collectors_targets():
+    raw={'_kubernetes_target_sha256':'b'*64,
+         '_kubernetes_target_sha256_by_executor':{'request_binding':'a'*64,'input_validation':'a'*64}}
+    for name in ('request_binding','input_validation'):
+        assert registry.build_executor(name,'kubernetes',raw)._expected_target_sha256=='a'*64
+    assert registry.build_executor('container_config','kubernetes',raw)._expected_target_sha256 is None
+    assert raw['_kubernetes_target_sha256']=='b'*64
 
 
 def test_prepare_update_static_kube_path_does_not_require_docker_or_claim_actual_cluster(tmp_path,monkeypatch):

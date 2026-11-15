@@ -189,7 +189,9 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
                         if not _baseline_ran_without_abort(previous_evidence):
                             raise ValueError("BASELINE_EXECUTION_FAILED")
                         kube_transition.candidate_ready()
-                    side_cfg.raw["_kubernetes_target_sha256"]=kube_transition.transports[side.value].target_sha256
+                    side_cfg.raw["_kubernetes_target_sha256_by_executor"]={
+                        name:kube_transition.transports[side.value].target_sha256
+                        for name in kube_transition.executors}
                 except Exception:
                     side_cfg.abort_reason="KUBERNETES_TRANSITION_UNVERIFIED"
                     lifecycle_errors.append(f"{side.value}: KUBERNETES_TRANSITION_UNVERIFIED; operator recovery required; GPU release unverified")
@@ -450,6 +452,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     raise ValueError(f"{side}/{item.check_id}: real executor is required")
                 if prepared[0] == "managed":
                     c, _ = _credentials(c, c.get("validation" if single else "update", {}).get("gateway_profile", "single"))
+                from guard.configuration import for_check
+                c = for_check(c, item.executor, item.check_id)  # [check_config.<CHECK>] (RB2-S)
                 executor = factory(c)
                 support = support_by_key[side, item.check_id]
                 # These collectors distinguish a valid policy outside their

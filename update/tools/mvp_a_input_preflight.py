@@ -12,7 +12,7 @@ import stat
 import tomllib
 
 from guard.collectors.file import load_environment, load_policy
-from guard.configuration import merge_config
+from guard.configuration import for_check, merge_config
 from guard.core.select import check_policy_value, _in_scope
 from guard.executors import run_binding
 from guard.models import load_pack
@@ -105,6 +105,7 @@ def inspect_side(source, check, pack, *, issued_at):
             check_policy_value(check.id, field.key, field.type, values[field.key])
     config = tomllib.loads(files['configuration'].decode('utf-8'))
     config = merge_config(config, config.get('sides', {}).get(source['side'], {}))
+    config = for_check(config, check.executor, check.id)
     implementation = config.get('executors', {}).get(check.executor)
     if implementation != 'kubernetes':
         raise ValueError('MA7_KUBERNETES_EXECUTOR_REQUIRED')

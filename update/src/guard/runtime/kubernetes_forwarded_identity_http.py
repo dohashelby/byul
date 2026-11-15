@@ -21,7 +21,7 @@ class KubernetesForwardedIdentityHTTP(KubernetesRoutesHTTP):
     profile=HTTP_PROFILE
 
     def __init__(self,target,env,*,header_contract,credential,normal_claim,alternate_claim,duration=120,binary='kubectl',runner=None):
-        if (target.get('lab') is not True or not supports(env.engine.name, env.engine.version)
+        if (target.get('lab') is not True or not supports(env.engine.name, env.engine.version, 'forwarded_identity')
                 or any(type(v) is not str or not v for v in (env.model.id,env.model.revision))):raise KubernetesBindingError()
         self.header_contract=normalize_header_contract(header_contract)
         if (not all(header_value(v) for v in (credential,normal_claim,alternate_claim))

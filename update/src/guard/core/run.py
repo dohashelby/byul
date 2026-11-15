@@ -205,12 +205,17 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         return stopped(ExecStatus.NOT_RUN, reason)
     if cfg.abort_reason:
         return stopped(ExecStatus.ABORTED, cfg.abort_reason)
+    from guard.configuration import for_check
+    try:
+        raw = for_check(cfg.raw, item.executor, check.id)  # [check_config.<CHECK>] (RB2-S)
+    except ValueError:
+        return stopped(ExecStatus.NOT_RUN, "CHECK_CONFIG_INVALID")
     from guard.executors import run_binding
     if run_binding.keys_for(check):
         # Per-run technical binding (guard-run-binding/1, /2): computed by guard, never a policy value.
         try:
             binding, policy_values = run_binding.effective_values(
-                check, cfg.raw.get(item.executor, {}), env, policy_values, side=str(common["side"].value),
+                check, raw.get(item.executor, {}), env, policy_values, side=str(common["side"].value),
                 attempt_id=cfg.attempt_id, issued_at=utcnow(), valid_from=policy_validity[0], valid_until=policy_validity[1],
                 run_cfg=run_binding.run_config(cfg.raw, check.id))
         except ValueError as exc:
@@ -225,7 +230,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         provider = PROVIDERS.get(env.engine.name)
         if provider is not None: provider.validate_environment(env, item.executor, impl_name)
         with registry.environment_binding(env):
-            executor = registry.build_executor(item.executor, impl_name, cfg.raw)
+            executor = registry.build_executor(item.executor, impl_name, raw)
         info_stub = ExecutorInfo(name=executor.name, version=executor.version, config_sha256=sha256_hex(b""))
         workdir = Path(store.root) / "work" / plan.id / cfg.attempt_id / check.id / str(common["side"])
         draft = executor.run(check, env, policy_values, adapter, workdir)

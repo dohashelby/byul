@@ -38,9 +38,11 @@ def test_both_launch_profiles_follow_the_work_order_without_runtime_qualificatio
         assert support.available and not support.runtime_qualified
         if role == '후보 판본':
             assert resolve_executor('engine_sensor', 'kubernetes', engine='vllm', version=version) is not None
-            assert resolve_executor('request_termination', 'kubernetes', engine='vllm', version=version) is None
+            # 사용자 결정 M-A6-V6(2026-11-15): 0.30.0 정확 행 profile(/25)로 열린다.
+            assert resolve_executor('request_termination', 'kubernetes', engine='vllm', version=version) is not None
         else:
             assert resolve_executor('engine_sensor', 'kubernetes', engine='vllm', version=version) is None
+            assert resolve_executor('request_termination', 'kubernetes', engine='vllm', version=version) is None
         row['launch']['command'].clear()
         assert provider.release_profile(version)['launch']['command']
     assert provider.release_profile('EXAMPLE-future') is None

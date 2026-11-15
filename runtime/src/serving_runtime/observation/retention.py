@@ -267,6 +267,30 @@ class RecordRetention:
                 positions[name] = (source.tell(), current)
         return changed
 
+    @staticmethod
+    def _file_removal_plan(name, scanned, units, removal):
+        unclassified, size, file_units = scanned
+        chosen = {key: removal[key] for key in file_units if key in removal}
+        removed_times = [timestamp for key in chosen for timestamp in units[key].times.get(name, [])]
+        lines = sorted(line for key in chosen for line in units[key].lines.get(name, []))
+        entry: dict[str, Any] = {
+            "bytes": size,
+            "units": len(file_units),
+            "held_units": sum(1 for key in file_units if units[key].held),
+            "unclassified_lines": unclassified,
+            "removable_by_age": sum(1 for reason in chosen.values() if reason == "age"),
+            "removable_by_size": sum(1 for reason in chosen.values() if reason == "size"),
+            "removable_lines": len(lines),
+            "removable_range": (
+                {"from": min(removed_times).isoformat(), "to": max(removed_times).isoformat()}
+                if removed_times
+                else None
+            ),
+            "removed_lines": 0,
+            "durability": "not_applicable",
+        }
+        return lines, entry
+
     def _run(self, now: datetime) -> dict[str, Any]:
         hold_runs, hold_requests, hold_state = load_holds(self.hold_path)
         cutoff = now - self.max_age
@@ -326,30 +350,15 @@ class RecordRetention:
             protected = {line for key in skipped if key in units for line in units[key].lines.get(name, [])}
             return drop - protected
 
+        plans = {}
+        for name, snapshot in scanned.items():
+            plans[name], files[name] = self._file_removal_plan(name, snapshot, units, removal)
         with ExitStack() as locks:
             if can_delete and removal:
                 for managed in MANAGED_FILES:
                     locks.enter_context(JsonlStore(self.data_dir / managed.name).locked())
-            for name, (unclassified, size, file_units) in scanned.items():
-                chosen = {key: removal[key] for key in file_units if key in removal}
-                removed_times = [timestamp for key in chosen for timestamp in units[key].times.get(name, [])]
-                lines = sorted(line for key in chosen for line in units[key].lines.get(name, []))
-                entry: dict[str, Any] = {
-                    "bytes": size,
-                    "units": len(file_units),
-                    "held_units": sum(1 for key in file_units if units[key].held),
-                    "unclassified_lines": unclassified,
-                    "removable_by_age": sum(1 for reason in chosen.values() if reason == "age"),
-                    "removable_by_size": sum(1 for reason in chosen.values() if reason == "size"),
-                    "removable_lines": len(lines),
-                    "removable_range": (
-                        {"from": min(removed_times).isoformat(), "to": max(removed_times).isoformat()}
-                        if removed_times
-                        else None
-                    ),
-                    "removed_lines": 0,
-                    "durability": "not_applicable",
-                }
+            for name, lines in plans.items():
+                entry = files[name]
                 if can_delete and lines:
                     try:
                         _kept, removed = JsonlStore(self.data_dir / name).remove_lines(

@@ -572,7 +572,6 @@ def test_d2_latest_started_timestamp_controls_the_grace_period(tmp_path):
     assert store.read_all()[0] == [recent, old] and not result["deleted"]
 
 
-@pytest.mark.xfail(strict=True, reason="D-1")
 def test_d1_append_finishes_while_file_removal_plan_is_paused(tmp_path, monkeypatch):
     from serving_runtime.observation import retention as module
 

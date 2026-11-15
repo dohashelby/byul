@@ -13,11 +13,13 @@ from guard.adapters import vllm_lifecycle_profiles as profiles
 from guard.adapters import vllm_lifecycle_release_sensor as release
 from guard.adapters import vllm_lifecycle_sensor as base
 from guard.adapters import vllm_profiler_sensor as profiler
+from guard.adapters import vllm_profiler_metadata as profiler_metadata
 from guard.adapters import vllm_stream_buffer_sensor as stream
 from guard.adapters import vllm_release_observation_sensor as variant
 from guard.collectors import lifecycle
 from guard.executors.registry import resolve_executor
 from tests.test_lifecycle_capture import external  # noqa: F401
+from tests.test_a1_profiler_sensor import make_world, invoke
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -135,6 +137,49 @@ def test_candidate_key_failure_leaves_no_observer_installed(external, monkeypatc
     asyncio.run(module.Middleware(app)({'type': 'http', 'path': '/v1/completions'}, None, None))
     assert len(called) == 1
     assert prepared['assets']['request-binding-key.json']['bytes'] > 0
+
+
+def test_profiler_control_route_hmac_reaches_original_producer_and_validator(external, monkeypatch):
+    runtime = 'cpython-' + '.'.join(map(str, sys.version_info[:3]))
+    prepared = lifecycle.prepare_assets(external / 'assets', REPO, profile=variant.PROFILER_PROFILE)
+    module = types.ModuleType('_candidate_profiler_route_fixture')
+    module.__file__ = str(external / 'assets/guard_lifecycle_sensor.py')
+    exec(compile((external / 'assets/guard_lifecycle_sensor.py').read_bytes(), module.__file__, 'exec',
+                 dont_inherit=True, optimize=0), module.__dict__)
+    monkeypatch.setattr(module, '_read', lambda name, digest: (external / 'assets' / name).read_bytes())
+    monkeypatch.setattr(module, '_request_key', lambda binding: (prepared['session'], b'k' * 32))
+    if (runtime not in profiler.RUNTIME_CODE_CONTRACTS or
+            runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix'
+                or os.uname().machine != 'x86_64')):
+        with pytest.raises(ValueError):
+            module._private_base()
+        assert module._BASE is None
+        return
+    composed = module._private_base()
+    ancestor = next(cls for cls in composed.Observer.__mro__ if cls.__name__ == 'Observer')
+    monkeypatch.setattr(ancestor, 'route_scope', lambda self, scope: {
+        'pid': os.getpid(), 'closed': False, 'request': 'f' * 64, 'invocation': 'e' * 64})
+    route_observer = composed.Observer.__new__(composed.Observer)
+    request = b'byul-lif14-' + b'a' * 32 + b'-start'
+    def scope(path, headers):
+        return {'type': 'http', 'path': path, 'headers': headers}
+    context = route_observer.route_scope(scope('/start_profile', [(b'x-request-id', request)]))
+    assert context['request'] == hmac.new(b'k' * 32,
+        b'guard-native-request-binding/1\0asgi-header\0' + request, hashlib.sha256).hexdigest()
+    assert context['request'] != hashlib.sha256(request).hexdigest()
+    assert context['invocation'] is not None
+    missing = route_observer.route_scope(scope('/stop_profile', []))
+    assert missing['request'] is None and missing['invocation'] is None
+    world = make_world(patch=monkeypatch)
+    monkeypatch.setattr(world.observer, 'route_context', lambda: context)
+    loop = asyncio.new_event_loop()
+    try: invoke(world, loop)
+    finally: loop.close()
+    samples = [row['payload'] for row in world.observer.recorded if row['event'] == 'PROFILER']
+    assert samples and any(row['point'] == 'ProfilerAPI.start_profile' for row in samples)
+    assert all(profiler_metadata.validate_sample(row) is None for row in samples)
+    assert all(row['asgi_request_sha256'] == context['request']
+        and row['asgi_invocation_sha256'] == context['invocation'] for row in samples)
 
 
 def test_candidate_key_permissions_and_header_fingerprint(external):

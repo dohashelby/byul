@@ -107,7 +107,9 @@ def _private_base():
         return hmac.new(key, b'guard-native-request-binding/1\0' + domain.encode() + b'\0'
             + value.encode('utf-8', 'surrogatepass'), hashlib.sha256).hexdigest()
     def header(scope):
-        if type(scope) is not dict or scope.get('type') != 'http' or scope.get('path') != '/v1/completions':
+        allowed = {'/v1/completions'} if VARIANT == 'stream' else {
+            '/v1/completions', '/start_profile', '/stop_profile'}
+        if type(scope) is not dict or scope.get('type') != 'http' or scope.get('path') not in allowed:
             return None
         headers = scope.get('headers', ())
         values = [pair[1] for pair in headers if type(pair) in (tuple, list) and len(pair) == 2
@@ -154,7 +156,8 @@ def _private_base():
             context = super().route_scope(scope)
             if context is not None:
                 context['request'] = header(scope)
-                context['invocation'] = digest('asgi-invocation', context['invocation'])
+                context['invocation'] = (digest('asgi-invocation', context['invocation'])
+                    if context['request'] is not None else None)
             return context
         def emit(self, event, payload):
             if event == 'ASGI':

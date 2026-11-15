@@ -243,6 +243,11 @@ class DeploymentGuardTest(unittest.TestCase):
             self.verify()
 
     def apply_fixture(self):
+        from test_bundle_tools import _a4_root_lstat
+
+        owner = patch("serving_runtime.operations.bundle_tools.Path.lstat", _a4_root_lstat(self.root))
+        owner.start()
+        self.addCleanup(owner.stop)
         for name in ("test", "previous"):
             (self.root / name).mkdir()
         (self.root / "current").symlink_to("previous")

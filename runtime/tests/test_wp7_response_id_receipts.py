@@ -18,6 +18,10 @@ OTHER = "f" * 32
 
 @pytest.mark.parametrize("prefix", ["", "chatcmpl-", "cmpl-"])
 def test_receipt_matches_exact_forwarded_vllm_callback_id(prefix):
+    from functools import partial
+    from serving_runtime.gateway.relay import response_id_receipt as classify
+
+    response_id_receipt = partial(classify, backend_kind="vllm")
     forwarded = upstream_request_id("vllm", RID)
     assert response_id_receipt(RID, prefix + forwarded) == "engine_response_id_matched"
 
@@ -78,8 +82,14 @@ def test_real_backend_forwarded_id_matches_buffered_and_stream_receipts(route, s
 def b2_receipt_from_actual_relay(kind, route, stream, value):
     backend = replace(BackendConfig.mock(("localhost", 1)), kind=kind)
     choices = [{"delta": {"content": "ok"}}] if stream and route == CHAT_ROUTE else [{"text": "ok"}]
-    raw = json.dumps({"id": value, "object": "text_completion", "choices": choices,
-                      "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}).encode()
+    raw = json.dumps(
+        {
+            "id": value,
+            "object": "text_completion",
+            "choices": choices,
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        }
+    ).encode()
     response = Mock(status=200)
     response.getheader.return_value = "text/event-stream" if stream else "application/json"
     response.read.side_effect = [raw, b""]
@@ -96,7 +106,9 @@ def b2_receipt_from_actual_relay(kind, route, stream, value):
         watcher.return_value.expired.return_value = False
         watcher.return_value.finish.return_value = False
         if stream:
-            result, outcome, started = relay.relay_stream(Mock(), RID, {}, allowed, time.monotonic(), lambda: None, route=route)
+            result, outcome, started = relay.relay_stream(
+                Mock(), RID, {}, allowed, time.monotonic(), lambda: None, route=route
+            )
             assert (result, outcome, started) == (allowed, "completed", True)
         else:
             result, delivered = relay.relay(RID, {}, allowed, route=route)
@@ -105,7 +117,6 @@ def b2_receipt_from_actual_relay(kind, route, stream, value):
     return relay.response_id_receipt(RID)
 
 
-@pytest.mark.xfail(strict=True, reason="B-2")
 @pytest.mark.parametrize("kind", ["mock", "sglang"])
 @pytest.mark.parametrize("route", [CHAT_ROUTE, COMPLETIONS_ROUTE])
 @pytest.mark.parametrize("stream", [False, True])
@@ -118,7 +129,9 @@ def test_b2_non_vllm_relay_rejects_callback_id(kind, route, stream, prefix):
 @pytest.mark.parametrize("stream", [False, True])
 @pytest.mark.parametrize("prefix", ["", "chatcmpl-", "cmpl-"])
 def test_b2_vllm_relay_keeps_callback_id(route, stream, prefix):
-    assert b2_receipt_from_actual_relay("vllm", route, stream, prefix + "byul-cb-" + RID) == "engine_response_id_matched"
+    assert (
+        b2_receipt_from_actual_relay("vllm", route, stream, prefix + "byul-cb-" + RID) == "engine_response_id_matched"
+    )
 
 
 @pytest.mark.parametrize("kind", ["mock", "sglang", "vllm"])

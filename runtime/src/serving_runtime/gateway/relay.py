@@ -333,7 +333,7 @@ def sse_done(buffer: bytes, chunk: bytes) -> tuple[bytes, bool]:
     return remainder, done
 
 
-def response_id_receipt(request_id: str, value: object) -> str:
+def response_id_receipt(request_id: str, value: object, *, backend_kind: str = "unknown") -> str:
     """Classify the engine response ``id`` against the forwarded X-Request-ID.
 
     vLLM's OpenAI server names responses ``chatcmpl-<X-Request-Id>`` /
@@ -344,7 +344,10 @@ def response_id_receipt(request_id: str, value: object) -> str:
         return "engine_response_id_absent"
     # Keep exact untagged echo forms for existing engines and recognize the
     # canonical vLLM callback ID actually forwarded by BackendConfig.
-    for forwarded in (request_id, upstream_request_id("vllm", request_id)):
+    forwarded_ids = (request_id,)
+    if backend_kind == "vllm":
+        forwarded_ids += (upstream_request_id("vllm", request_id),)
+    for forwarded in forwarded_ids:
         if value in {forwarded, f"chatcmpl-{forwarded}", f"cmpl-{forwarded}"}:
             return "engine_response_id_matched"
     return "engine_response_id_mismatch"
@@ -353,7 +356,8 @@ def response_id_receipt(request_id: str, value: object) -> str:
 class _ResponseIds:
     """Bounded per-request classification; read once by the final record."""
 
-    def __init__(self, limit: int = 4096) -> None:
+    def __init__(self, limit: int = 4096, *, backend_kind: str = "unknown") -> None:
+        self._backend_kind = backend_kind
         self._items: OrderedDict[str, str] = OrderedDict()
         self._limit = limit
         self._lock = threading.Lock()
@@ -362,7 +366,7 @@ class _ResponseIds:
         with self._lock:
             if request_id in self._items:
                 return  # The first chunk decides for streams.
-            self._items[request_id] = response_id_receipt(request_id, value)
+            self._items[request_id] = response_id_receipt(request_id, value, backend_kind=self._backend_kind)
             while len(self._items) > self._limit:
                 self._items.popitem(last=False)
 
@@ -438,7 +442,7 @@ class Relay:
         self._relay_timeout_s = relay_timeout_s
         self._stream_idle_timeout_s = stream_idle_timeout_s
         self._request_deadline_s = request_deadline_s
-        self._response_ids = _ResponseIds()
+        self._response_ids = _ResponseIds(backend_kind=backend.kind)
 
     def response_id_receipt(self, request_id: str) -> str:
         """Return and forget the engine response ID classification (not_available if none)."""

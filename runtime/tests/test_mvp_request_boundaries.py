@@ -7,6 +7,8 @@ import tempfile
 import time
 from types import SimpleNamespace
 import unittest
+
+import pytest
 from unittest.mock import Mock, patch
 
 from serving_runtime.gateway.backend import BackendConfig
@@ -387,3 +389,69 @@ class ChatStreamBoundTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def a2_actual_handler(failure=None):
+    class BodyWriter:
+        def __init__(self):
+            self.writes = []
+
+        def write(self, value):
+            self.writes.append(value)
+            if failure is not None:
+                raise failure("synthetic body-only disconnect")
+            return len(value)
+
+    handler = Handler.__new__(Handler)
+    handler.wfile = BodyWriter()
+    handler.send_response = Mock()
+    handler.send_header = Mock()
+    handler.end_headers = Mock()
+    return handler
+
+
+def a2_deliver_and_record(tmp_path, failure=None):
+    policy = load_policy(POLICY)
+    allowed = validate_request(body(), "application/json", policy)
+    handler = a2_actual_handler(failure)
+    flow = RequestFlow.__new__(RequestFlow)
+    flow._relay = SimpleNamespace(request_deadline_s=5)
+    flow._records = RequestRecords(tmp_path, "A2", lambda: policy, "mock")
+    decision, completed, attempted = flow._deliver_buffered_body(
+        handler, "a" * 32, allowed, b'{"choices":[]}', time.monotonic(), allowed, True
+    )
+    flow._finish_buffered_record(
+        SimpleNamespace(response=handler, request_id="a" * 32), decision, "not_queried", completed, attempted
+    )
+    rows, corrupt = flow._records.store.read_all()
+    assert not corrupt and len(rows) == 1
+    return handler, decision, completed, attempted, rows[0]
+
+
+@pytest.mark.xfail(strict=True, reason="A-2")
+@pytest.mark.parametrize("failure", [BrokenPipeError, ConnectionResetError])
+def test_a2_actual_handler_body_disconnect_is_failed_final_record(tmp_path, failure):
+    handler, decision, completed, attempted, record = a2_deliver_and_record(tmp_path, failure)
+    assert (decision.reason_code, completed, attempted) == ("CLIENT_DISCONNECTED", False, True)
+    assert record["delivery"]["response"] == "failed"
+    assert record["final_outcome"] == "CLIENT_DISCONNECTED"
+    assert record["response_started"] is True and record["http_start_status"] == 200
+    handler.send_response.assert_called_once_with(200)
+    assert len(handler.wfile.writes) == 1
+
+
+@pytest.mark.parametrize("failure", [BrokenPipeError, ConnectionResetError])
+def test_a2_error_response_keeps_swallowing_body_disconnect(failure):
+    handler = a2_actual_handler(failure)
+    allowed = validate_request(body(), "application/json", load_policy(POLICY))
+    denied = replace(allowed, result="DENIED", http_status=403, reason_code="MODEL_NOT_ALLOWED")
+    handler.send_error_decision(denied, "a" * 32)
+    handler.send_response.assert_called_once_with(403)
+    assert len(handler.wfile.writes) == 1
+
+
+def test_a2_actual_handler_normal_body_remains_completed(tmp_path):
+    handler, decision, completed, attempted, record = a2_deliver_and_record(tmp_path)
+    assert (decision.reason_code, completed, attempted) == ("REQUEST_ALLOWED", True, True)
+    assert record["delivery"]["response"] == "completed" and record["final_outcome"] == "completed"
+    assert handler.wfile.writes == [b'{"choices":[]}']

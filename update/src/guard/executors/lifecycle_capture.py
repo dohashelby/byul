@@ -18,6 +18,7 @@ from guard.adapters import vllm_worker_initialization_sensor as joint_sensor
 from guard.adapters import vllm_worker_startup_sensor as startup_sensor,vllm_worker_startup_metadata as startup_metadata,vllm_worker_startup_contract as startup_contract
 from guard.adapters import vllm_worker_readiness as startup_callback
 from guard.adapters import vllm_lifecycle_profiles as profiles
+from guard.adapters import vllm_fresh_request_binding as fresh_binding
 from guard.adapters import vllm_online_sensor as online
 from guard.adapters import vllm_online_metadata as online_metadata
 from guard.adapters import vllm_attempt_sensor as attempt, vllm_attempt_metadata as attempt_metadata
@@ -109,6 +110,7 @@ def parse_recording(raw, prepared):
     if prepared.get("profile")==sglang_sensor.PROFILE:
         from .sglang_lifecycle_capture import parse_recording as parse_sglang
         return parse_sglang(raw,prepared)
+    is_fresh_binding = profiles.configured.request_binding(prepared['profile'])
     is_fault=prepared["profile"]==fault_sensor.PROFILE
     is_termination=prepared["profile"]in {fault_sensor.PROFILE,termination_sensor.PROFILE}
     is_endpoint = prepared["profile"] == endpoint_sensor.PROFILE
@@ -142,6 +144,9 @@ def parse_recording(raw, prepared):
     if prepared["profile"] not in {release_sensor.PROFILE,init_release.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
     if prepared["profile"] not in {release_sensor.PROFILE,init_release.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
     words = WORDS
+    if is_fresh_binding:
+        keys = keys | fresh_binding.FIELDS | {'request_binding'}
+        words = words | {'session-hmac-sha256'}
     if profiles.configured.contains(prepared['profile']):
         words = words | {profiles.public_commit(prepared['profile']),
             *profiles.source_hashes(prepared['profile']), *profiles.point_sources(prepared['profile'])}
@@ -382,6 +387,16 @@ def parse_recording(raw, prepared):
                 if row["event"]=="NATIVE" and payload["point"]=="InputProcessor.assign_request_id":
                     raise ValueError("LIFECYCLE_SELECTION_EVENT_REQUIRED")
                 profiles.validate_request_selection(payload)
+            if 'request_binding' in payload['metadata']:
+                if not is_fresh_binding:
+                    raise ValueError('REQUEST_BINDING_PROFILE_REQUIRED')
+                spec = profiles.configured.row(prepared['profile'])['request_binding']
+                required_sources = {point_sources[spec[k]] for k in (
+                    'handler_point', 'selection_point', 'native_selection_point', 'caller_point', 'input_point')}
+                if not required_sources <= set(ready):
+                    raise ValueError('REQUEST_BINDING_SOURCE_UNAVAILABLE')
+                fresh_binding.validate_sample(payload['metadata']['request_binding'],
+                    point=payload['point'], phase=payload['phase'], spec=spec)
             if is_online and payload["point"] in online.POINT_CONTRACTS:
                 if (set(payload["metadata"]) != {"online_input"} or payload["requests"] != []
                         or payload["selection_observed"] is not False or row["event"] != "NATIVE"
@@ -479,12 +494,16 @@ def parse_recording(raw, prepared):
             call["late"]+=not payload["context_live"]
             call["unhashed"]+=payload["phase"].startswith("BODY_SEND_") and not payload["body_hash_complete"]
         if row["event"] == "ASGI":
-            if (set(payload) != {"request_sha256","phase","more_body"}
+            if (set(payload) != {"request_sha256","phase","more_body"} | ({'asgi_invocation_sha256'} if is_fresh_binding else set())
                     or payload["request_sha256"] is not None and (type(payload["request_sha256"]) is not str
                         or re.fullmatch(r"[0-9a-f]{64}",payload["request_sha256"]) is None)
                     or payload["phase"] not in {"DISCONNECT_RECEIVED","BODY_SEND_RETURN","APP_RETURN","APP_RAISE"}
                     or payload["more_body"] is not None and type(payload["more_body"]) is not bool):
                 raise ValueError("LIFECYCLE_RECORDING_ASGI_INVALID")
+            if is_fresh_binding and payload['asgi_invocation_sha256'] is not None and (
+                    type(payload['asgi_invocation_sha256']) is not str
+                    or re.fullmatch('[0-9a-f]{64}', payload['asgi_invocation_sha256']) is None):
+                raise ValueError('REQUEST_BINDING_ASGI_INVALID')
         if row['event'] in endpoint_metadata.VALIDATORS:
             if not is_endpoint:raise ValueError('READY_ENDPOINT_PROFILE_UNSUPPORTED')
             endpoint_metadata.VALIDATORS[row['event']](payload)
@@ -504,10 +523,12 @@ def parse_recording(raw, prepared):
     if rows[-1]["event"] == "END" and (set(end) != {"reason"} or end["reason"] not in {"SEALED","PROCESS_EXIT","BOUND_REACHED","CONTROL_UNAVAILABLE","SEGMENT_ROLLOVER"}):
         raise ValueError("LIFECYCLE_RECORDING_END_INVALID")
     weight_journal=weight_metadata.journal(weight_events) if is_weight else {}
+    binding_journal = fresh_binding.journal(rows, profiles.configured.row(prepared['profile'])['request_binding']) if is_fresh_binding else None
     return rows, {"recording_closed": bool(end) and not incomplete_tail, "recording_end": end.get("reason"),
         "incomplete_final_row":incomplete_tail,"discarded_tail_bytes":len(tail),
         "discarded_tail_sha256":hashlib.sha256(tail).hexdigest() if tail else None,
         "source_profile_modules": sorted(ready), "whole_run_coverage_verified": False,
+        **({'fresh_request_binding': binding_journal} if is_fresh_binding else {}),
         **({'ready_endpoint_events':len(endpoint_journal['events']),'ready_endpoint_missing':endpoint_journal['missing']} if is_endpoint else {}),
         **({'worker_generation_events':len(generation_journal['events']),'worker_ready_send_events':len(generation_journal['pipe_events']),'worker_generation_missing':generation_journal['missing']} if is_generation else {}),
         **({'worker_startup_events':len(startup_journal['events']),'worker_startup_missing':startup_journal['missing']} if is_worker_startup else {}),

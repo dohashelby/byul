@@ -88,6 +88,64 @@
           "body_code_sha256": {
             "Executor.execute_model": "db89476d5723f26188b6b673e8858e0692b96ecb8b6e46e9577d7fcc9ca7dcfb"
           }
+        },
+        "vllm.distributed.device_communicators.shm_broadcast": {
+          "path": "vllm/distributed/device_communicators/shm_broadcast.py",
+          "bytes": 22741,
+          "sha256": "24a3990266dcbbdbb14f6a2a2c4dec1eecad54d9ea85622ddc8dc36774b87942",
+          "functions": [
+            "MessageQueue.enqueue",
+            "MessageQueue.dequeue"
+          ],
+          "function_lines": {
+            "MessageQueue.enqueue": [
+              437,
+              451
+            ],
+            "MessageQueue.dequeue": [
+              453,
+              471
+            ]
+          },
+          "body_code_sha256": {
+            "MessageQueue.enqueue": "2bfebdc679f1861729764052b44169e659bec9c639d98109e5966ea3ce9b7b89",
+            "MessageQueue.dequeue": "39d0dea9fbffa46ec364ca8518eb859e7fd9baf936b05030226dfa80871d24b0"
+          }
+        },
+        "vllm.v1.core.scheduler": {
+          "path": "vllm/v1/core/scheduler.py",
+          "bytes": 26643,
+          "sha256": "24db292542369b94d00985b6860386909cf9ce559965263395188f613c4a4985",
+          "functions": [
+            "Scheduler.schedule"
+          ],
+          "function_lines": {
+            "Scheduler.schedule": [
+              93,
+              314
+            ]
+          },
+          "body_code_sha256": {
+            "Scheduler.schedule": "cd2701d1b776877d142d49d291f4ea7ce961aa4abfffe0cc6a4493879b80dd2d"
+          }
+        }
+      },
+      "worker_binding": {
+        "loop_module": "vllm.v1.executor.multiproc_executor",
+        "loop_point": "WorkerProc.worker_busy_loop",
+        "queue_module": "vllm.distributed.device_communicators.shm_broadcast",
+        "receive_point": "MessageQueue.dequeue",
+        "publish_point": "MessageQueue.enqueue",
+        "rpc_method": "execute_model",
+        "fresh_profile": "vllm-native-lifecycle-metadata/28",
+        "request_layout": {
+          "kind": "positive-dict-keys",
+          "type": {
+            "module": "vllm.v1.core.scheduler",
+            "name": "SchedulerOutput"
+          },
+          "field": "num_scheduled_tokens",
+          "item_types": []
         }
       }
     },
@@ -219,6 +277,64 @@
           "body_code_sha256": {
             "Executor.execute_model": "db89476d5723f26188b6b673e8858e0692b96ecb8b6e46e9577d7fcc9ca7dcfb"
           }
+        },
+        "vllm.distributed.device_communicators.shm_broadcast": {
+          "path": "vllm/distributed/device_communicators/shm_broadcast.py",
+          "bytes": 22741,
+          "sha256": "24a3990266dcbbdbb14f6a2a2c4dec1eecad54d9ea85622ddc8dc36774b87942",
+          "functions": [
+            "MessageQueue.enqueue",
+            "MessageQueue.dequeue"
+          ],
+          "function_lines": {
+            "MessageQueue.enqueue": [
+              437,
+              451
+            ],
+            "MessageQueue.dequeue": [
+              453,
+              471
+            ]
+          },
+          "body_code_sha256": {
+            "MessageQueue.enqueue": "a95888ee9bc59b6faf884c095efb0634574d44ede03c571ed4256838bf79e9e1",
+            "MessageQueue.dequeue": "87064dca14250716689e12f0d34fb996e7d5e52e47f50c5ee43d897986011ae5"
+          }
+        },
+        "vllm.v1.core.scheduler": {
+          "path": "vllm/v1/core/scheduler.py",
+          "bytes": 26643,
+          "sha256": "24db292542369b94d00985b6860386909cf9ce559965263395188f613c4a4985",
+          "functions": [
+            "Scheduler.schedule"
+          ],
+          "function_lines": {
+            "Scheduler.schedule": [
+              93,
+              314
+            ]
+          },
+          "body_code_sha256": {
+            "Scheduler.schedule": "36aa73d41c748a1b0a702f364d490a4ecf88e72ea5655e06b30e28988e5b9f22"
+          }
+        }
+      },
+      "worker_binding": {
+        "loop_module": "vllm.v1.executor.multiproc_executor",
+        "loop_point": "WorkerProc.worker_busy_loop",
+        "queue_module": "vllm.distributed.device_communicators.shm_broadcast",
+        "receive_point": "MessageQueue.dequeue",
+        "publish_point": "MessageQueue.enqueue",
+        "rpc_method": "execute_model",
+        "fresh_profile": "vllm-native-lifecycle-metadata/28",
+        "request_layout": {
+          "kind": "positive-dict-keys",
+          "type": {
+            "module": "vllm.v1.core.scheduler",
+            "name": "SchedulerOutput"
+          },
+          "field": "num_scheduled_tokens",
+          "item_types": []
         }
       }
     },

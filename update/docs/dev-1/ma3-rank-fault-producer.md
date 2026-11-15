@@ -1,5 +1,16 @@
 # M-A3 rank-fault 후보 생산자
 
+## worker 요청 수신/응답과 fresh HMAC 연결 /2 (2026-11-15 로컬 검증)
+
+사용자가 승인한 후속 /2는 기준 V1의 정확 `WorkerProc.worker_busy_loop` 프레임 안에서 동일 queue·worker 객체를 대조한다. 원 `MessageQueue.dequeue`가 반환한 `execute_model` 배치의 한정된 ID와 원 response enqueue의 상태만 기록한다. 원 queue 함수를 한 번 호출하고 원 반환/예외를 보존한다. 예외/출력 본문·pickle bytes·프롬프트/토큰은 관측하지 않는다. 다른 RPC/빈 일정은 요청 결합으로 만들지 않는다. 소스/객체/SDK/프레임/입력이 달라지면 원 호출을 유지하고 진단으로 남긴다.
+
+- `tools.rank_v1_worker_inputs prepare --image <고정 이미지> --fresh-prepared <정확 /28 준비 폴더> --output <새 폴더>`는 현재 소스 검토 관문과 /28 전체 준비물·키의 owner/0600/NOFOLLOW·세션·정확 SHA를 대조한다. 같은 세션 키를 내부 재사용하되 공개 manifest/요약에는 키를 넣지 않는다. secret settings는 생성부터0600이다. 기존 `/guard-lifecycle` 준비물과 별도 `/guard-rank-ipc` 준비물을 함께 배치하며 기존 sitecustomize/import 선택을 보존한다.
+- 설정·준비물·snapshot `/2`와 payload `guard-rank-rpc-hook-candidate/2`는 기존 `/1`과 구분한다. 원 `/1`·native `/28` 기록/키/지문을 소급 재작성하지 않는다. 공통 snapshot writer·private bootstrap·객체 HMAC·정확 소스/코드 대조를 재사용한다. SDK 동결은 원문에 선언한 함수가 다른 namespace의 함수로 교체된 경우도 거부한다.
+- `verify`는 `--prepared`·`--fresh-prepared`·`--capture`·`--fresh-recording`의 원 파일 bytes·HMAC·현재 SDK/키/세션/소스·닫힌 필드를 검사한다. 실제 /28 parser/journal을 통과한 유일한 native 입력과 worker 수신 ID가 일치하고, 같은 boot/time 문맥의 ASGI 유효 구간 안에 수신됐을 때만 부분 연결 참조를 만든다. 원 수신/응답·fresh 기록의 SHA를 남기며 다른 객체/세션·중복/재생·변조·범위 확대 주장은 거부한다. 수신만 있고 응답이 없으면 부분 사실과 공백을 함께 보존한다.
+- 모델 함수/torch 장식자의 자격·실제 모델 소비·프로세스/IPC 전체 그룹·클라이언트 전달/정책 기한·물리 해제/새 세대 회복·별도 communication-stall의 증명은 아니다. `source_authenticated`·`engine_group_verified`·`scope_complete`·`producer_registered`는 항상 false다. 새 제어점/실행기/공통 GPU 계약/판정/수락/등록은 열지 않으며 M-B4는 보관한다. GPU/클라우드/추가 다운로드 없이 CPU 고정 자료/EXAMPLE 협력 객체로 검증한다.
+
+직접214개 중213개 통과와 격리 설치 fixture 보완 후 해당1개 재검증 통과, 승인 이미지 CPython3.12.8 직접82개 통과를 확인했다. 첫 ABI의 공유 pyc 혼용은 분리한 빈 pycache_prefix의 원문 컴파일로 검증했으며 고정값/검사는 유지했다. 소스566파일/정확 검토 기록·현황·경로16개가 통과했다. 새 전체 PR CI와 실제 엔진/GPU·ENV/target·제품 ARM2 결합은 미완료다. 아래 /1 및 source 검토의 과거 통과 수를 새 /2 결과로 세지 않는다.
+
 ## 현재 V1 RPC 원 함수 대조 (2026-11-15 로컬 후속)
 
 기존 이미지별 IPC/제어 profile은 과거 기준 V0·후보 V1의 자격 범위로 보존한다. `vllm_rank_v1_source_reviews.json`은 현재 두 V1의 설치 소스3파일·원 함수12개의 별도 검토 표다. `qualify_current_v1`은 고정 이미지·정확 파일 bytes/크기·현재 함수 code/globals·원문에서 다시 컴파일한 본문을 대조한다. 기존 exact 대조 구현을 재사용하며 hook을 설치하거나 장애 제어/수락·공통 입력/생산자 등록을 열지 않는다.

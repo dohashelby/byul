@@ -3,6 +3,7 @@
 닫힌 단일 snapshot마다 HMAC을 남기며 원 engine 함수/전송/장애를 바꾸지 않는다.
 관측 실패는 gap이고 이 기록을 공통 생산자 인증·그룹 전체 수락으로 쓰지 않는다.
 """
+import ast
 import hmac
 from hashlib import sha256
 import importlib.machinery
@@ -120,6 +121,24 @@ def _freeze_module(module, expected, selected=None):
         if (function.__globals__ is not vars(module) or function.__qualname__ not in codes
                 or base.code_digest(function.__code__) != base.code_digest(codes[function.__qualname__])):
             raise ValueError('RANK_IPC_OBSERVER_CODE_UNAVAILABLE')
+    # 다른 module의 함수로 교체하면 위 소유 module 필터에서 사라질 수 있다.
+    # 원 소스에 선언된 함수도 모두 실제 바인딩으로 확인한다.
+    declared = []
+    for node in ast.parse(raw).body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            declared.append(node.name)
+        elif isinstance(node, ast.ClassDef):
+            declared.extend(node.name + '.' + child.name for child in node.body
+                            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)))
+    for name in declared:
+        if selected is not None and name.split('.')[0] not in selected:
+            continue
+        try:
+            function = sources._function(module, name)
+        except ValueError:
+            raise ValueError('RANK_IPC_OBSERVER_CODE_UNAVAILABLE') from None
+        if (function.__qualname__ != name or base.code_digest(function.__code__) != base.code_digest(codes[name])):
+            raise ValueError('RANK_IPC_OBSERVER_CODE_UNAVAILABLE')
 
 
 def _freeze(value):
@@ -138,6 +157,8 @@ def _freeze(value):
 
 
 class SnapshotWriter:
+    schema = 'guard-rank-ipc-snapshot-candidate/1'
+
     def __init__(self, settings, settings_sha256):
         self.settings, self.settings_sha256 = settings, settings_sha256
         self.key = bytes.fromhex(settings['key'])
@@ -152,7 +173,7 @@ class SnapshotWriter:
                 raise ValueError('RANK_IPC_SNAPSHOT_BOUND')
             context = base._context()
             self.serial += 1
-            value = {'schema': 'guard-rank-ipc-snapshot-candidate/1', 'session': self.settings['session'],
+            value = {'schema': self.schema, 'session': self.settings['session'],
                      'image': self.settings['image'], 'settings_sha256': self.settings_sha256,
                      'observer_assets': self.settings['assets'], 'context': context,
                      'ordinal': self.serial, 'payload': payload}

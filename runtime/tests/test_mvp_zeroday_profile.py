@@ -6,6 +6,7 @@ from contextlib import closing
 import json
 from pathlib import Path
 import tempfile
+import time
 import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -422,6 +423,17 @@ class ZerodayGatewayHttpTests(unittest.TestCase):
         with urlopen(self.url(path), timeout=3) as response:
             return response.read()
 
+    def wait_for_final(self, request_id: str):
+        deadline = time.monotonic() + 3
+        while True:
+            records, corrupt = JsonlStore(self.directory / "data" / "gateway_records.jsonl").read_all()
+            self.assertEqual(corrupt, [])
+            if any(r["request_id"] == request_id and r["phase"] == "final" for r in records):
+                return records, corrupt
+            if time.monotonic() >= deadline:
+                self.fail("요청의 final 저장이 완료되지 않았다")
+            time.sleep(0.005)
+
     def test_extra_fields_reach_backend_and_only_names_are_recorded(self) -> None:
         status, headers, _ = self.post(
             chat(
@@ -442,7 +454,7 @@ class ZerodayGatewayHttpTests(unittest.TestCase):
         self.assertEqual(values["logit_bias"], {"50256": -100})
         self.assertEqual(received[0]["model"], "backend-test-model")
 
-        records, corrupt = JsonlStore(self.directory / "data" / "gateway_records.jsonl").read_all()
+        records, corrupt = self.wait_for_final(request_id)
         self.assertEqual(corrupt, [])
         final = [r for r in records if r["request_id"] == request_id and r["phase"] == "final"][-1]
         self.assertEqual(final["policy"]["profile"], "zeroday-lab")
@@ -474,7 +486,7 @@ class ZerodayGatewayHttpTests(unittest.TestCase):
         self.fake.set_mode("http_500")
         status, headers, _ = self.post(chat(temperature=0.3, cache_salt=SECRET_VALUE))
         self.assertGreaterEqual(status, 500)
-        records, _ = JsonlStore(self.directory / "data" / "gateway_records.jsonl").read_all()
+        records, _ = self.wait_for_final(headers["X-Request-ID"])
         final = [
             r for r in records
             if r["request_id"] == headers["X-Request-ID"] and r["phase"] == "final"

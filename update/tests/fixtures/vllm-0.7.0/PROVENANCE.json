@@ -55,6 +55,10 @@
       "source": "vllm/v1/worker/gpu_model_runner.py",
       "sha256": "1ac3fb18b2adad3609dcf58a1656d6fdd4a568eea6740258e00f6a43c7d4b813"
     },
+    "vllm/entrypoints/openai/serving_completion.py.txt": {
+      "source": "vllm/entrypoints/openai/serving_completion.py",
+      "sha256": "95184b6b6ceaa3642e6ab86526536ab890728155a929d9dfb3b2f16adc372018"
+    },
     "vllm/v1/executor/multiproc_executor.py.txt": {
       "source": "vllm/v1/executor/multiproc_executor.py",
       "sha256": "5db418332360f43e2a9718f62d8ec5d856d554b8d0d27d14f053fb3392d33239"
@@ -62,6 +66,10 @@
     "vllm/v1/executor/abstract.py.txt": {
       "source": "vllm/v1/executor/abstract.py",
       "sha256": "6e0c838ef1e866b15f8176da0af117dc4661efe387fbcca20d521020c7b1970a"
+    },
+    "vllm/distributed/device_communicators/shm_broadcast.py.txt": {
+      "source": "vllm/distributed/device_communicators/shm_broadcast.py",
+      "sha256": "24a3990266dcbbdbb14f6a2a2c4dec1eecad54d9ea85622ddc8dc36774b87942"
     }
   },
   "pin_status": "candidate: tag source bytes, not yet compared with the image install file"

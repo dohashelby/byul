@@ -318,3 +318,110 @@ def test_error_text_in_normal_request_and_generated_content_is_not_an_error_enve
         )
     assert decision.result == "ALLOWED" and outcome == "completed"
     assert b"[DONE]" in b"".join(client.chunks)
+
+
+@pytest.fixture(scope="module")
+def recorded_vllm_chat_wire():
+    """Use the recorded R-10 request IDs to select actual buffered/SSE replies."""
+    from pathlib import Path
+    import tarfile
+
+    archive = (
+        Path(__file__).resolve().parents[1]
+        / "project-context/refactor-2026-11/wp7/execution-085ebccd-20261115/R1-full.tgz"
+    )
+    with tarfile.open(archive) as saved:
+        values_member = next(m for m in saved.getmembers() if m.name.endswith("/R-10/response-values.json"))
+        values = json.load(saved.extractfile(values_member))
+        wanted = {values["normal_request_id"]: "buffered", values["stream_request_id"]: "stream"}
+        wires = {}
+        for member in saved.getmembers():
+            if not member.isfile() or "/R-10/http-" not in member.name:
+                continue
+            reply = json.load(saved.extractfile(member))
+            request_id = next((v for k, v in reply["headers"].items() if k.lower() == "x-request-id"), None)
+            if request_id in wanted:
+                assert reply["status"] == 200
+                wires[wanted[request_id]] = reply["body"].encode("utf-8")
+        assert set(wires) == {"buffered", "stream"}
+        return wires
+
+
+@pytest.mark.xfail(strict=True, reason="A-1")
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"error": {"message": "A1-SYNTHETIC-ENGINE-PRIVATE"}},
+        {"error": {"message": "A1-SYNTHETIC-ENGINE-PRIVATE"}, "choices": []},
+        {"error": None, "choices": []},
+        {},
+        {"choices": {}},
+        {"choices": [1]},
+    ],
+    ids=["error-only", "error-with-choices", "null-error", "missing-choices", "choices-object", "choice-not-object"],
+)
+def test_a1_buffered_chat_failure_envelope_or_shape_is_safe_502(payload, tmp_path, caplog):
+    from types import SimpleNamespace
+    from serving_runtime.gateway.request_flow import ConcurrencyLimiter, RequestFlow
+    from serving_runtime.gateway.request_records import RequestRecords
+    from serving_runtime.policy.policy_state import load_revocations
+
+    class CapturingClient(RequestIO):
+        output = b""
+
+        def send_response_body(self, status, content_type, response_body, **kwargs):
+            super().send_response_body(status, content_type, response_body, **kwargs)
+            self.output = response_body
+
+        def send_error_decision(self, decision, request_id, **kwargs):
+            super().send_error_decision(decision, request_id, **kwargs)
+            self.output = json.dumps({"error": {"message": decision.message}}).encode()
+
+    policy = load_policy(POLICY)
+    backend = BackendConfig.mock(("localhost", 1))
+    upstream = BackendConnection(BackendResponse([json.dumps(payload).encode()]))
+    client = CapturingClient(body())
+    records = RequestRecords(tmp_path, "A1", lambda: policy, "mock")
+    engine = SimpleNamespace(
+        receipt_not_queried=lambda: "not_queried",
+        backend_receipt=lambda _: "not_queried",
+        mock_cancel_evidence=lambda _, **kwargs: "not_observed",
+    )
+    limiter = ConcurrencyLimiter(1)
+    with patch.object(BackendConfig, "connection", return_value=(upstream, "/engine")):
+        RequestFlow(
+            backend, lambda: policy, lambda: load_revocations(None), records, engine, Relay(backend, 1, 1, 2), limiter
+        ).chat(client, "a" * 32)
+    rows, corrupt = records.store.read_all()
+    assert client.sent == (502, "ENGINE_BAD_RESPONSE")
+    assert rows[-1]["decision"]["reason_code"] == "ENGINE_BAD_RESPONSE"
+    assert rows[-1]["final_outcome"] == "ENGINE_BAD_RESPONSE" and not corrupt
+    assert "A1-SYNTHETIC-ENGINE-PRIVATE" not in client.output.decode() + json.dumps(rows) + caplog.text
+    assert limiter.status()["in_flight"] == 0 and upstream.closed
+
+
+def test_a1_actual_vllm_buffered_reply_preserves_content_and_usage(recorded_vllm_chat_wire):
+    wire = recorded_vllm_chat_wire["buffered"]
+    document, allowed = setup(CHAT_ROUTE)
+    upstream = BackendConnection(BackendResponse([wire]))
+    with patch.object(BackendConfig, "connection", return_value=(upstream, "/engine")):
+        decision, delivered = Relay(BackendConfig.mock(("localhost", 1)), 1, 1, 2).relay(
+            "a" * 32, document, allowed, route=CHAT_ROUTE
+        )
+    assert decision.result == "ALLOWED"
+    expected, actual = json.loads(wire), json.loads(delivered)
+    assert actual["choices"] == expected["choices"] and actual["usage"] == expected["usage"]
+    assert upstream.closed
+
+
+@pytest.mark.parametrize(
+    "payload", [{"choices": []}, {"choices": [{}]}, {"choices": [{"message": {"content": "error"}}]}]
+)
+def test_a1_narrow_minimum_chat_structure_keeps_valid_objects(payload):
+    document, allowed = setup(CHAT_ROUTE)
+    upstream = BackendConnection(BackendResponse([json.dumps(payload).encode()]))
+    with patch.object(BackendConfig, "connection", return_value=(upstream, "/engine")):
+        decision, delivered = Relay(BackendConfig.mock(("localhost", 1)), 1, 1, 2).relay(
+            "a" * 32, document, allowed, route=CHAT_ROUTE
+        )
+    assert decision.result == "ALLOWED" and json.loads(delivered) == payload

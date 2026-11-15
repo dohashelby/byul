@@ -718,3 +718,26 @@ def test_a4_installer_selected_group_reaches_bundle_apply(a4_bundle_fixture):
         assert any(b"SupplementaryGroups=12000 " in value for value in artifacts.values())
     finally:
         case.doCleanups()
+
+
+@pytest.mark.xfail(strict=True, reason="D-3")
+@pytest.mark.parametrize("kind", ["missing", "file", "parent-file"])
+def test_d3_missing_or_non_directory_bundle_root_has_korean_error(tmp_path, kind):
+    root = tmp_path / "bundles"
+    if kind != "missing":
+        root.write_text("not a directory")
+        if kind == "parent-file":
+            root = root / "child"
+    with pytest.raises(ValueError, match="묶음 루트를 찾을 수 없습니다"):
+        apply_bundle(str(tmp_path / "bundle"), str(root), "ctx", "ns", "http://127.0.0.1:8080", None, dry_run=True)
+
+
+def test_d3_permission_error_precedes_bundle_root_metadata_check(tmp_path):
+    root = tmp_path / "bundles"
+    root.mkdir()
+    with (
+        patch("serving_runtime.operations.bundle_tools.os.access", return_value=False),
+        patch("serving_runtime.operations.bundle_tools._bundle_read_gid", side_effect=AssertionError("checked too early")),
+        pytest.raises(PermissionError, match="--dry-run도 sudo"),
+    ):
+        apply_bundle(str(tmp_path / "bundle"), str(root), "ctx", "ns", "http://127.0.0.1:8080", None, dry_run=True)

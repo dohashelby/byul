@@ -1,5 +1,20 @@
 # M-A3 rank-fault 후보 생산자
 
+## 현재 V1 RPC 원 함수 대조 (2026-11-15 로컬 후속)
+
+기존 이미지별 IPC/제어 profile은 과거 기준 V0·후보 V1의 자격 범위로 보존한다. `vllm_rank_v1_source_reviews.json`은 현재 두 V1의 설치 소스3파일·원 함수12개의 별도 검토 표다. `qualify_current_v1`은 고정 이미지·정확 파일 bytes/크기·현재 함수 code/globals·원문에서 다시 컴파일한 본문을 대조한다. 기존 exact 대조 구현을 재사용하며 hook을 설치하거나 장애 제어/수락·공통 입력/생산자 등록을 열지 않는다.
+
+| 기준 V1 대상 | 실제 의미와 연결할 때의 제한 |
+|---|---|
+| `Executor.execute_model` → `MultiprocExecutor.collective_rpc` | parent는 모든 rank의 response를 순서대로 받은 뒤 목록을 반환하고 상위 execute_model이 rank0 결과를 고른다. 후보의 unique reply rank/future/non_block 계약으로 바꾸지 않음 |
+| `WorkerProc.worker_busy_loop` | 세 항목 `(method,args,kwargs)`를 dequeue한 뒤 직접 worker 함수를 호출한다. 별도 `_execute_worker_rpc` 프레임은 없다. 원 Exception은 failure response에 넣고 루프를 계속하므로 worker 메서드의 예외와 parent 탐지/클라이언트 오류를 구분해야 함 |
+| `WorkerProc.__init__`·`wait_for_startup`·`worker_main` | READY와 response handle을 먼저 전송한 뒤 `init_device`·`load_model`을 실행한다. wait_for_startup의 성공만으로 모델 로드/worker 실행 준비 완료를 만들지 않음. main의 queue 준비 완료와 실제 정상 요청을 추가로 연결해야 함 |
+| `MultiprocExecutor._init_executor`·`shutdown` | 시작 시 worker 멤버·queue 준비를 대조한다. shutdown의 실제 조건문/회수 경로는 원문 그대로 검토하며 호출/반환만으로 물리 자원 회수·새 세대 복구를 주장하지 않음 |
+
+후보는 실제 `collective_rpc`·`worker_busy_loop`·`_execute_worker_rpc`의 별도 원 본문을 고정한다. 같은 이름이 있어도 기준 행과 관측 의미를 이월하지 않는다. 두 CPython 패치 판본의 표는 **오프라인 소스/본문 대조**용이다. 반환의 `review_scope=offline_source_body_only`, `image_runtime_verified=false`를 유지하며 실제 이미지 런타임·ASGI/worker 결합·프로세스/IPC 소속·전체 TP2 인과/기한·실제 해제/새 세대 복구·별도 communication-stall은 아직 미완료다. 시험 namespace는 원 code와 EXAMPLE 협력 객체만 쓰며 엔진/모델/GPU는 기동하지 않는다. M-B4는 보관한다.
+
+직접159개(pytest7.41초·부모7.590초)와 승인 이미지 CPython3.12.8 직접69개(0.40/0.522초)가 통과했다. 현황·경로16개·소스561파일 검토 관문은 통과했으며 새 PR CI와 실제 엔진/GPU는 미실행이다.
+
 ## 최신 main 통합과 PR 작성자의 다음 작업 (2026-11-15)
 
 #276은 #275·#277이 병합된 main `77bc05a3`에 맞춰 통합했다. ARM/2 사전 결합과 미등록 공통 부분 입력의 생성/검증에 이어 `rank_failure:common-input`의 LIF-08 파일 소비·양쪽 제품 비교·정확 EVD→RES→RPT 왕복까지 구현했다. 파일 소비는 엔진 실행이 아니며 부분 입력의 ABORTED·UNKNOWN과 기존 독립 FAIL을 보존한다. #278에는 실제 파일 조립 도구가 별도로 있다. 전체 TP2 수락·새 V1 GPU 자격·등록 완료를 뜻하지 않으며, 원 준비 보고서와 여섯 ARM/1 GPU 사례는 당시 source에 귀속한 채 보존한다.

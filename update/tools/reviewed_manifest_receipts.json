@@ -280,6 +280,11 @@
       "manifest_sha256": "a98a34360d9766ce22519c67edc6603efabc9e6ef58b4ecde9ad41e49ae67ec0",
       "reviewed_by": "Codex / PR278-279 integrated source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T18:05:42.726982+09:00"
+    },
+    {
+      "manifest_sha256": "e1e3695cbbd023690ce5031dc9e57f84c2fc7f959e2cd4908b1ccd98d65fb044",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T10:51:11.884237+00:00"
     }
   ]
 }

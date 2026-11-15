@@ -3,6 +3,8 @@ import hashlib
 import hmac
 import asyncio
 import os
+import time
+from copy import deepcopy
 from pathlib import Path
 import sys
 import types
@@ -17,9 +19,13 @@ from guard.adapters import vllm_profiler_metadata as profiler_metadata
 from guard.adapters import vllm_stream_buffer_sensor as stream
 from guard.adapters import vllm_release_observation_sensor as variant
 from guard.collectors import lifecycle
+from guard.executors import lifecycle_capture as capture_module
+from guard.executors.kubernetes_profiler_control import project_captures
 from guard.executors.registry import resolve_executor
-from tests.test_lifecycle_capture import external  # noqa: F401
-from tests.test_a1_profiler_sensor import make_world, invoke
+from tests.test_lifecycle_capture import external, case, revised  # noqa: F401
+from tests.test_a1_profiler_sensor import make_world, invoke, Router, Response
+from tests.test_a1_rank_failure_sensor import codes, QuietLogger
+from tests.test_lifecycle_sensor import CONTEXT
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -200,3 +206,92 @@ def test_candidate_key_permissions_and_header_fingerprint(external):
         lifecycle.load_prepared(external / 'assets/manifest.json')
     with pytest.raises(ValueError):
         lifecycle.request_header_fingerprint(external / 'assets/manifest.json', prepared, header)
+
+
+def test_composed_profiler_api_producer_parses_and_joins_exact_hmac(case, monkeypatch):
+    root = case.root
+    prepared = lifecycle.prepare_assets(root / 'candidate-assets', REPO, profile=variant.PROFILER_PROFILE)
+    module = types.ModuleType('_candidate_profiler_producer_fixture')
+    module.__file__ = str(root / 'candidate-assets/guard_lifecycle_sensor.py')
+    exec(compile((root / 'candidate-assets/guard_lifecycle_sensor.py').read_bytes(), module.__file__, 'exec',
+                 dont_inherit=True, optimize=0), module.__dict__)
+    monkeypatch.setattr(module, '_read', lambda name, digest: (root / 'candidate-assets' / name).read_bytes())
+    monkeypatch.setattr(module, '_request_key', lambda binding: (prepared['session'], b'k' * 32))
+    runtime = 'cpython-' + '.'.join(map(str, sys.version_info[:3]))
+    if (runtime not in profiler.RUNTIME_CODE_CONTRACTS or
+            runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix'
+                or os.uname().machine != 'x86_64')):
+        with pytest.raises(ValueError): module._private_base()
+        assert module._BASE is None
+        return
+    composed = module._private_base()
+    source = Path(__file__).parent / 'fixtures/profiler-native/api_router.py.txt'
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == variant.PROFILER_ROWS[profiler.ROUTER]
+    compiled = codes(compile(source.read_bytes(), str(source), 'exec', dont_inherit=True, optimize=0))
+    router = types.ModuleType(profiler.ROUTER)
+    router.__file__ = str(source)
+    router.logger, router.Response = QuietLogger(), Response
+    router.start_profile = types.FunctionType(compiled['start_profile'], router.__dict__)
+    router.stop_profile = types.FunctionType(compiled['stop_profile'], router.__dict__)
+    router.router = Router(router.start_profile, router.stop_profile)
+    class Client:
+        async def start_profile(self): return None
+        async def stop_profile(self): return None
+    router.engine_client = lambda request: Client()
+    events = []
+    class Sink:
+        context = {**CONTEXT, 'pid': os.getpid()}
+        def write(self, event, payload):
+            events.append({'event': event, 'payload': deepcopy(payload),
+                'monotonic_ns': max(time.monotonic_ns(), events[-1]['monotonic_ns'] + 1 if events else 0)})
+    sink = Sink()
+    class Observer(composed.Observer):
+        def _writer(self): return sink
+    observer = Observer({'session': prepared['session']}, 'b' * 64)
+    observer.instrument(router)
+    info = {'module': profiler.ROUTER, 'verified': True,
+        'source_sha256': variant.PROFILER_ROWS[profiler.ROUTER],
+        'code_sha256': composed.code_digest(compiled['<module>'])}
+    observer.modules[profiler.ROUTER] = dict(info)
+    observer.emit('MODULE', info)
+    requests = {}
+    loop = asyncio.new_event_loop()
+    try:
+        for slot in ('start', 'stop'):
+            rid = ('byul-lif14-' + 'a' * 32 + '-' + slot).encode()
+            context = observer.route_scope({'type': 'http', 'path': '/' + slot + '_profile',
+                'headers': [(b'x-request-id', rid)]})
+            requests[slot] = context['request']
+            token = composed._ROUTE_REQUEST.set(context)
+            try:
+                assert loop.run_until_complete(router.router.dispatch('/' + slot + '_profile', object())).status_code == 200
+            finally:
+                context['closed'] = True
+                composed._ROUTE_REQUEST.reset(token)
+    finally: loop.close()
+    assert not observer.disabled_pid and len([row for row in events if row['event'] == 'PROFILER']) == 4
+    def insert(rows):
+        start, end = rows[0], rows[-1]
+        start['payload'].update(profile=prepared['profile'], schema=profiles.SCHEMAS[prepared['profile']],
+            commit=release.COMMIT, session=prepared['session'],
+            sensor_sha256=prepared['assets']['guard_lifecycle_sensor.py']['sha256'],
+            settings_sha256=prepared['assets']['settings.json']['sha256'])
+        end['monotonic_ns'] = events[-1]['monotonic_ns'] + 1
+        rows[:] = [start, *events, end]
+    rows, summary = capture_module.parse_recording(revised(case.raw, insert), prepared)
+    assert summary['recording_closed'] is True
+    assert len([row for row in rows if row['event'] == 'PROFILER']) == 4
+    packet = {'recordings': [{'capture': {'records': rows, 'summary': summary,
+        'process_context_verified': True, 'image_digest_verified': False},
+        'session_owner_match': True, 'listed_file_identity_match': True}]}
+    projection = profiler_metadata.project(packet, ['0'])
+    trials = [{'case_id': slot, 'request_id_sha256': requests[slot], 'attempted': True,
+        'binding_verified_before_after': True, 'capture_complete': True, 'outcome': 200}
+        for slot in ('start', 'stop')]
+    joined = project_captures([{'phase': 'final', 'session': prepared['session'],
+        'projection': projection}], trials, sealed=True)
+    assert {row['case_id'] for row in joined['api_links']} == {'start', 'stop'}
+    assert all(row['http_status_matches'] for row in joined['api_links'])
+    assert projection['backend_collection_stopped_verified'] is False
+    assert projection['trace_output_completed_verified'] is False
+    assert projection['cross_process_rpc_verified'] is False

@@ -1,3 +1,10 @@
+## 2026-11-15 — REQ-10 초기 V1 제약 소비의 한정된 소스 검토
+
+- 한 일: 별도 main 기반 브랜치에서 기존 승인 설치 소스6파일/V1 Python42파일을 검토했다. API guided 필드 전달과 V1 sampler 소비를 구분하고 원 sampler 메서드+EXAMPLE 협력 객체로 greedy/random2개 경로를 확인했다. 후보의 grammar bitmask/logits processor 경로는 별도 후속으로 표시했다. 검토 JSON과 적용표26절을 추가하며 제품 소스/판정/고정값·지원표/팩·M-B4는 바꾸지 않았다.
+- 테스트 결과: 저장소 밖 한정된 함수 실행2개가 제약 getter 미접근 대조를 통과했다. engine/torch import·실제 GPU/모델 실행은0이다. 이 수를 pytest/실측이나 기능 부재 인증으로 세지 않는다. 현황77/23/68·경로16개(pytest0.49초·부모0.662초)·검토 JSON 구조·diff 검사가 통과했다. 제품/도구/시험 소스 무변경을 확인했다. 새 PR CI와 실제 sampler/GPU는 미실행이다.
+- 다음 단계: 현재 V1 API/모델/설치 source/선택 backend를 실제 입력과 맞추고 허용/거부·후속 변환/모델 제출과 sampler 소비를 관측한다. 확인 불가 예외를 MVP 완료로 인정하려면 별도 결정을 요청한다. 공개 전 source/문서 검토와 push 승인이 필요하다.
+- 막힌 것: 실제 ENV/target·선택 V1·sampler/worker 원 관측이 아직 없다. 필드 대응/HTTP 오류/EXAMPLE 함수 실행만으로 runner_consumption_verified=true/PASS/비적용으로 바꾸지 않는다. 새 GPU/비용/다운로드·M-B4 재개·판정/계약 변경은 승인하지 않았다.
+
 ## 2026-11-15 — 승인된 runtime final 저장 경합 시험 보수
 
 - 한 일: 사용자 “시험 한 파일만 예외 승인”에 따라 runtime/tests/test_mvp_zeroday_profile.py의 두 final 조회가 저장 완료를 먼저 확인하도록 보완했다. 기존 assert37개·상태/필드/비밀 비노출·실제 소켓·제품 기한은 유지했다. 다른 runtime 파일/제품 소스·정책·의존성과 M-B4는 바꾸지 않았다. 원 CI 실패 로그와 저장소 밖의 정확 제안/진단을 보존한다.

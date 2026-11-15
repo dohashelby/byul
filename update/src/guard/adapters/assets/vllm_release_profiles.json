@@ -69,7 +69,178 @@
           "tool_choice=required"
         ]
       },
-      "native_executors": []
+      "executor_gaps": {
+        "credential_revocation": {
+          "cause": "APPROVED_UNKNOWN",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [
+            "PLT-10"
+          ],
+          "basis": "ma6-version-applicability.md 12절 D4(2026-11-12 승인)",
+          "next": null
+        },
+        "engine_sensor": {
+          "cause": "V0_OBSERVER_NOT_IMPLEMENTED",
+          "observers": [
+            "vllm_engine_callback_sensor"
+          ],
+          "checks": [
+            "REQ-15",
+            "REQ-17",
+            "REQ-18",
+            "REQ-19",
+            "REQ-20",
+            "LIF-13"
+          ],
+          "basis": "ma6-version-applicability.md 12절 D1·D2, 11절 LIF-13(결정 9), 20절",
+          "next": "D1·D2 V0 관측기(결정 V0-1·V0-2)"
+        },
+        "initialization": {
+          "cause": "V0_OBSERVER_NOT_IMPLEMENTED",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_initialization_sensor",
+            "vllm_ready_endpoint_sensor",
+            "vllm_worker_generation_sensor",
+            "vllm_worker_initialization_sensor"
+          ],
+          "checks": [
+            "LIF-07",
+            "LIF-09"
+          ],
+          "basis": "ma6-version-applicability.md 12절 D3, 11절 LIF-07(결정 9), 20절",
+          "next": "D3 V0 관측기(결정 V0-3)"
+        },
+        "model_authorization": {
+          "cause": "V0_TARGET_TABLE_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [
+            "REQ-05"
+          ],
+          "basis": "ma6-version-applicability.md 9절 3행(models 경로 MOVED_CHANGED), 20절",
+          "next": "lifecycle sensor V0 대상표(결정 V0-4)"
+        },
+        "native_route": {
+          "cause": "V0_TARGET_TABLE_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [],
+          "basis": "ma6-version-applicability.md 12절 D4",
+          "next": null
+        },
+        "observation_identity": {
+          "cause": "V0_TARGET_TABLE_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_weight_iteration_sensor",
+            "vllm_file_read_sensor",
+            "vllm_safe_open_mapping_sensor",
+            "vllm_worker_startup_sensor"
+          ],
+          "checks": [],
+          "basis": "ma6-version-applicability.md 9절 8행",
+          "next": "가중치 적재 V0 대상표"
+        },
+        "observation_state": {
+          "cause": "V0_OBSERVER_NOT_IMPLEMENTED",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_attempt_sensor",
+            "vllm_request_output_sensor"
+          ],
+          "checks": [
+            "OBS-02"
+          ],
+          "basis": "ma6-version-applicability.md 12절 D1·D3, 20절",
+          "next": "D1·D3 V0 관측기"
+        },
+        "profiler_observation": {
+          "cause": "APPROVED_UNKNOWN",
+          "observers": [
+            "vllm_profiler_sensor"
+          ],
+          "checks": [
+            "LIF-14"
+          ],
+          "basis": "ma6-version-applicability.md 12절 D5(2026-11-12 승인)",
+          "next": null
+        },
+        "rank_failure": {
+          "cause": "V0_OBSERVER_NOT_IMPLEMENTED",
+          "observers": [
+            "vllm_rank_failure_sensor",
+            "vllm_fault_sensor"
+          ],
+          "checks": [],
+          "basis": "ma6-version-applicability.md 12절 D3",
+          "next": "D3 V0 관측기(결정 V0-3)"
+        },
+        "request_termination": {
+          "cause": "V0_OBSERVER_NOT_IMPLEMENTED",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_termination_sensor",
+            "vllm_attempt_sensor",
+            "vllm_request_output_sensor"
+          ],
+          "checks": [
+            "LIF-10",
+            "LIF-12",
+            "REQ-12"
+          ],
+          "basis": "ma6-version-applicability.md 12절 D1, 20절",
+          "next": "D1 V0 관측기(결정 V0-1)"
+        },
+        "resource_recovery": {
+          "cause": "V0_OBSERVER_NOT_IMPLEMENTED",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [],
+          "basis": "ma6-version-applicability.md 12절 D3",
+          "next": "D3 V0 관측기(결정 V0-3)"
+        },
+        "sampling_validation": {
+          "cause": "REQUEST_FIELD_MAPPING_NOT_CONSUMED",
+          "observers": [
+            "vllm_runner_capture"
+          ],
+          "checks": [
+            "REQ-10"
+          ],
+          "basis": "ma6-version-applicability.md 11절 REQ-10(결정 9-5), 19.3. structured_outputs→guided_json 대응·tool_choice=required 분기가 데이터로만 있고 실행기가 읽지 않는다. tests/test_code_selection_observation.py가 구 판본 비노출을 고정한다",
+          "next": "M-B2 요청 필드 대응 소비(결정 V0-5)"
+        },
+        "session_revocation": {
+          "cause": "APPROVED_UNKNOWN",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [
+            "PLT-11"
+          ],
+          "basis": "ma6-version-applicability.md 12절 D4(2026-11-12 승인)",
+          "next": null
+        },
+        "stream_buffer": {
+          "cause": "V0_OBSERVER_NOT_IMPLEMENTED",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_stream_buffer_sensor"
+          ],
+          "checks": [
+            "LIF-03",
+            "LIF-04"
+          ],
+          "basis": "ma6-version-applicability.md 12절 D1, 9절 19행, 20절",
+          "next": "D1 V0 관측기와 uvicorn 이미지 행(결정 V0-1)"
+        }
+      }
     },
     {
       "role": "후보 판본",
@@ -147,9 +318,162 @@
       },
       "request_field_mapping": {},
       "unavailable_branches": {},
-      "native_executors": [
-        "engine_sensor"
-      ]
+      "executor_gaps": {
+        "credential_revocation": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [
+            "PLT-10"
+          ],
+          "basis": "ma6-version-applicability.md 19.2",
+          "next": "M-B4"
+        },
+        "initialization": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_initialization_sensor",
+            "vllm_ready_endpoint_sensor",
+            "vllm_worker_generation_sensor",
+            "vllm_worker_initialization_sensor"
+          ],
+          "checks": [
+            "LIF-07",
+            "LIF-09"
+          ],
+          "basis": "ma6-version-applicability.md 19.2",
+          "next": "M-B4"
+        },
+        "model_authorization": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [
+            "REQ-05"
+          ],
+          "basis": "ma6-version-applicability.md 19.2",
+          "next": "M-B4"
+        },
+        "native_route": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [],
+          "basis": "ma6-version-applicability.md 19.2",
+          "next": "M-B4"
+        },
+        "observation_identity": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_weight_iteration_sensor",
+            "vllm_file_read_sensor",
+            "vllm_safe_open_mapping_sensor",
+            "vllm_worker_startup_sensor"
+          ],
+          "checks": [],
+          "basis": "ma6-version-applicability.md 19.2",
+          "next": "M-B4"
+        },
+        "observation_state": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_attempt_sensor",
+            "vllm_request_output_sensor"
+          ],
+          "checks": [
+            "OBS-02"
+          ],
+          "basis": "ma6-version-applicability.md 19.2",
+          "next": "M-B4"
+        },
+        "profiler_observation": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_profiler_sensor"
+          ],
+          "checks": [
+            "LIF-14"
+          ],
+          "basis": "ma6-version-applicability.md 19.2",
+          "next": "M-B4"
+        },
+        "rank_failure": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_rank_failure_sensor",
+            "vllm_fault_sensor"
+          ],
+          "checks": [],
+          "basis": "ma6-version-applicability.md 19.2",
+          "next": "M-B4"
+        },
+        "request_termination": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_termination_sensor",
+            "vllm_attempt_sensor",
+            "vllm_request_output_sensor"
+          ],
+          "checks": [
+            "LIF-10",
+            "LIF-12",
+            "REQ-12"
+          ],
+          "basis": "ma6-version-applicability.md 19.2",
+          "next": "M-B4"
+        },
+        "resource_recovery": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [],
+          "basis": "ma6-version-applicability.md 19.2",
+          "next": "M-B4"
+        },
+        "sampling_validation": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_runner_capture"
+          ],
+          "checks": [
+            "REQ-10"
+          ],
+          "basis": "ma6-version-applicability.md 19.3. runner_capture 소비 관측이 0.31.0 고정값만 있다. tests/test_code_selection_observation.py가 구 판본 비노출을 고정한다",
+          "next": "M-B4 및 결정 V0-5"
+        },
+        "session_revocation": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [
+            "PLT-11"
+          ],
+          "basis": "ma6-version-applicability.md 19.2",
+          "next": "M-B4"
+        },
+        "stream_buffer": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_stream_buffer_sensor"
+          ],
+          "checks": [
+            "LIF-03",
+            "LIF-04"
+          ],
+          "basis": "ma6-version-applicability.md 19.2",
+          "next": "M-B4"
+        }
+      }
     }
   ]
 }

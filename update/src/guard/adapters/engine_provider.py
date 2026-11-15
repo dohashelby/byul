@@ -45,6 +45,9 @@ class EngineProvider:
     def allows_legacy_native(self, version, *, executor=None):
         return False
 
+    def executor_gap(self, version, executor):
+        return None
+
     def sandbox_arguments(self, options):
         return {'engine_options': options}
 
@@ -126,14 +129,18 @@ class VllmProvider(EngineProvider):
         return {'vllm': options}
 
     def allows_legacy_native(self, version, *, executor=None):
-        from .engine_profiles import resolve
-        if executor == 'input_validation' and resolve(self.name, version, 'native_input').profile == 'vllm-input-validation-http/1':
+        # Executor-level version table: the catalog decides per feature which
+        # releases admit this executor. Availability is not runtime evidence;
+        # observers still verify exact bytes and leave gaps on mismatch.
+        from .engine_profiles import executor_feature, resolve
+        if resolve(self.name, version, 'native_lifecycle').profile == 'vllm-native-source/1':
             return True
-        selected = resolve(self.name, version, 'native_lifecycle')
-        if selected.profile == 'vllm-native-source/1':
-            return True
+        return resolve(self.name, version, executor_feature(executor)).available
+
+    def executor_gap(self, version, executor):
+        """Recorded cause for an engine-bound executor this release does not admit."""
         release = self.release_profile(version)
-        return bool(selected.available and release and executor in release.get('native_executors', []))
+        return ((release or {}).get('executor_gaps') or {}).get(executor)
 
     def resource_lease_keys(self, options):
         if not options.get('gpu_devices'): return []

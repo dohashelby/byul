@@ -23,6 +23,7 @@
         "forwarded_identity",
         "initialization",
         "lifecycle_transition",
+        "log_integrity",
         "log_minimization",
         "model_authorization",
         "native_input",
@@ -33,16 +34,21 @@
         "online_input",
         "profiler_control",
         "rank_failure",
+        "record_access",
         "request_attempts",
         "request_input_checks",
         "required_events",
         "resource_recovery",
+        "response_content",
         "response_error",
+        "route_record",
         "runner_capture",
+        "sampling",
         "scoped_consumption",
         "session_revocation",
         "stored_responses",
         "stream_buffer",
+        "template_supply",
         "termination",
         "unix_ipc",
         "validation_error",
@@ -59,6 +65,28 @@
       "features": [
         "native_input"
       ]
+    },
+    {
+      "id": "vllm-external-observation/1",
+      "engine": "vllm",
+      "versions": [
+        "0.7.0",
+        "0.30.0"
+      ],
+      "features": [
+        "boundary_egress",
+        "forwarded_identity",
+        "log_integrity",
+        "record_access",
+        "required_events",
+        "response_content",
+        "route_record",
+        "stored_responses",
+        "template_supply",
+        "unix_ipc"
+      ],
+      "pin_status": "no_engine_pin",
+      "qualification": "소유 probe Pod·Kubernetes API·CRI 로그·/proc 관측만 쓰는 실행기다. 엔진 안 관측기를 설치하지 않으며 엔진 판본별 HTTP·로그 데이터가 없으면 실행기가 공백으로 남긴다. 판본 차이와 남은 공백은 docs/dev-1/ma6-version-applicability.md 19절."
     },
     {
       "id": "vllm-callback-candidate-source/1",

@@ -223,6 +223,20 @@ def discover_side(cluster, env, render, *, out_dir, runner=None):
 
 # --- static report ---------------------------------------------------------------------------
 
+def _version_gap(executor, env):
+    """Recorded cause (release data) for an engine-bound executor the release does not admit."""
+    from guard.adapters.engine_provider import PROVIDERS, load_installed_providers
+    from guard.executors import registry
+    if env is None:
+        return None
+    load_installed_providers()
+    provider = PROVIDERS.get(env.engine.name)
+    if provider is None or registry.resolve_executor(executor, 'kubernetes', engine=env.engine.name,
+                                                     version=env.engine.version) is not None:
+        return None
+    return provider.executor_gap(env.engine.version, executor)
+
+
 def _row(pack, check_id, side, cfg, env, values):
     from guard.configuration import for_check
     from guard.executors import registry, run_binding
@@ -231,16 +245,24 @@ def _row(pack, check_id, side, cfg, env, values):
            'implementation': cfg.get('executors', {}).get(check.executor), 'status': None, 'reasons': [],
            'run_binding_entries': sorted(run_binding.CONFIG_KEYS.get(check_id, ())) if 2 in run_binding.stages_for(check) else [],
            'policy_keys_missing': sorted(p.key for p in check.policy_params if p.required and p.key not in values)}
+    gap = _version_gap(check.executor, env)
     if row['implementation'] is None:
         if check_id in RECORDED_UNKNOWN:
             row['status'], row['reasons'] = 'UNKNOWN_RECORDED', [RECORDED_UNKNOWN[check_id]]
+        elif gap is not None:
+            # The release does not admit this executor; selecting one would not run it.
+            row['status'], row['reasons'], row['version_gap'] = 'UNSUPPORTED', ['EXECUTOR_NOT_REGISTERED_FOR_ENGINE_VERSION'], gap
         else:
             row['status'], row['reasons'] = 'MISSING_INPUT', ['EXECUTOR_IMPLEMENTATION_NOT_SELECTED']
+            row['kubernetes_registered'] = registry.resolve_executor(
+                check.executor, 'kubernetes', engine=env.engine.name, version=env.engine.version) is not None
         return row
     factory = registry.resolve_executor(check.executor, row['implementation'], engine=env.engine.name,
                                         version=env.engine.version) if env is not None else None
     if factory is None:
         row['status'], row['reasons'] = 'UNSUPPORTED', ['EXECUTOR_NOT_REGISTERED_FOR_ENGINE_VERSION']
+        if gap is not None:
+            row['version_gap'] = gap
         return row
     if row['policy_keys_missing']:
         row['reasons'].append('POLICY_VALUES_MISSING')

@@ -1,0 +1,3144 @@
+{
+ "parsers": {
+  "": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "version",
+     "exclusive_group": null,
+     "help": "show program's version number and exit",
+     "kind": "_VersionAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--version"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": [
+      "agent",
+      "assets",
+      "auth",
+      "bundle",
+      "enforce",
+      "file-info",
+      "management-listener",
+      "metrics-check",
+      "mvp",
+      "mvp-acceptance",
+      "mvp-demo",
+      "revalidation"
+     ],
+     "dest": "command",
+     "kind": "subparsers",
+     "required": false
+    }
+   ],
+   "description": "Serving Runtime 개발 도구: 로컬 파일 확인과 런타임 통제 MVP 실행·시험.",
+   "help_text": "usage: serving-runtime [-h] [--version]\n                       {agent,file-info,bundle,mvp,management-listener,mvp-demo,mvp-acceptance,assets,revalidation,auth,metrics-check,enforce}\n                       ...\n\nServing Runtime 개발 도구: 로컬 파일 확인과 런타임 통제 MVP 실행·시험.\n\npositional arguments:\n  {agent,file-info,bundle,mvp,management-listener,mvp-demo,mvp-acceptance,assets,revalidation,auth,metrics-check,enforce}\n    agent               플랫폼 운영 요청 조회·검증·실행\n    file-info           파일 크기와 SHA-256 확인\n    bundle              LAB 정책 묶음 확인\n    mvp                 로컬 Gateway와 선택한 backend 실행\n    management-listener\n                        엔진의 허용된 읽기 전용 관리 경로만 중계\n    mvp-demo            실행 중인 MVP 시연 사례 전송\n    mvp-acceptance      격리된 MVP·S1·S2·S3A·가짜 SGLang·S4 수용 시험 실행\n    assets              모델 파일 승인 목록 도구\n    revalidation        재검증 요청 조회 연동 도구\n    auth                시험용 인증 설정 도구\n    metrics-check       저장한 /metrics 응답과 backend 지표 대응표 대조\n    enforce             Cilium·Tetragon 후보 생성과 관측 이벤트 변환\n\noptions:\n  -h, --help            show this help message and exit\n  --version             show program's version number and exit\n",
+   "prog": "serving-runtime"
+  },
+  "agent": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "platform_url",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--platform-url"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "agent_token_file",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--agent-token-file"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "server",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--server"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "bundle_root",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--bundle-root"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "context",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--context"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "namespace",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--namespace"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "lock_file",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--lock-file"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "kubeconfig",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--kubeconfig"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "token_env_file",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--token-env-file"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "state_file",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--state-file"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "review_file",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--review-file"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "history_file",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--history-file"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "ca_file",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--ca-file"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": "<USER_HOME>/runtime/tools",
+     "dest": "tools_dir",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--tools-dir"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "status_url",
+     "exclusive_group": null,
+     "help": "로컬 Gateway 직접 조회(명시할 때만); 기본은 deployment 새 port-forward",
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--status-url"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 86400,
+     "dest": "monitor_seconds",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--monitor-seconds"
+     ],
+     "required": false,
+     "type": "int"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 10,
+     "dest": "interval",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--interval"
+     ],
+     "required": false,
+     "type": "float"
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "dry_run",
+     "exclusive_group": 0,
+     "help": "기본값: 실행 없이 검증 결과 보고",
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--dry-run"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "execute",
+     "exclusive_group": 0,
+     "help": "검증 후 실제 서버 변경",
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--execute"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "sudo_bundle_apply",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--sudo-bundle-apply"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "lab_self_approval",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--lab-self-approval"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "once",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--once"
+     ],
+     "required": false,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime agent [-h] --platform-url PLATFORM_URL --agent-token-file AGENT_TOKEN_FILE\n                             --server SERVER --bundle-root BUNDLE_ROOT --context CONTEXT\n                             --namespace NAMESPACE --lock-file LOCK_FILE [--kubeconfig KUBECONFIG]\n                             [--token-env-file TOKEN_ENV_FILE] [--state-file STATE_FILE]\n                             [--review-file REVIEW_FILE] [--history-file HISTORY_FILE]\n                             [--ca-file CA_FILE] [--tools-dir TOOLS_DIR] [--status-url STATUS_URL]\n                             [--monitor-seconds MONITOR_SECONDS] [--interval INTERVAL]\n                             [--dry-run | --execute] [--sudo-bundle-apply] [--lab-self-approval]\n                             [--once]\n\noptions:\n  -h, --help            show this help message and exit\n  --platform-url PLATFORM_URL\n  --agent-token-file AGENT_TOKEN_FILE\n  --server SERVER\n  --bundle-root BUNDLE_ROOT\n  --context CONTEXT\n  --namespace NAMESPACE\n  --lock-file LOCK_FILE\n  --kubeconfig KUBECONFIG\n  --token-env-file TOKEN_ENV_FILE\n  --state-file STATE_FILE\n  --review-file REVIEW_FILE\n  --history-file HISTORY_FILE\n  --ca-file CA_FILE\n  --tools-dir TOOLS_DIR\n  --status-url STATUS_URL\n                        로컬 Gateway 직접 조회(명시할 때만); 기본은 deployment 새 port-forward\n  --monitor-seconds MONITOR_SECONDS\n  --interval INTERVAL\n  --dry-run             기본값: 실행 없이 검증 결과 보고\n  --execute             검증 후 실제 서버 변경\n  --sudo-bundle-apply\n  --lab-self-approval\n  --once\n",
+   "prog": "serving-runtime agent"
+  },
+  "assets": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": [
+      "snapshot"
+     ],
+     "dest": "assets_command",
+     "kind": "subparsers",
+     "required": false
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime assets [-h] {snapshot} ...\n\npositional arguments:\n  {snapshot}\n    snapshot  현재 파일로 목록 초안 생성(관측값, 승인은 사람이)\n\noptions:\n  -h, --help  show this help message and exit\n",
+   "prog": "serving-runtime assets"
+  },
+  "assets snapshot": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "root",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "DIR",
+     "nargs": null,
+     "options": [
+      "--root"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "out",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--out"
+     ],
+     "required": true,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime assets snapshot [-h] --root DIR --out PATH\n\noptions:\n  -h, --help  show this help message and exit\n  --root DIR\n  --out PATH\n",
+   "prog": "serving-runtime assets snapshot"
+  },
+  "auth": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": [
+      "hash-token"
+     ],
+     "dest": "auth_command",
+     "kind": "subparsers",
+     "required": false
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime auth [-h] {hash-token} ...\n\npositional arguments:\n  {hash-token}\n    hash-token  표준 입력의 토큰을 인증 설정용 SHA-256으로 변환(토큰은 출력하지 않음)\n\noptions:\n  -h, --help    show this help message and exit\n",
+   "prog": "serving-runtime auth"
+  },
+  "auth hash-token": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime auth hash-token [-h]\n\noptions:\n  -h, --help  show this help message and exit\n",
+   "prog": "serving-runtime auth hash-token"
+  },
+  "bundle": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": [
+      "apply",
+      "build",
+      "verify"
+     ],
+     "dest": "bundle_command",
+     "kind": "subparsers",
+     "required": false
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime bundle [-h] {verify,build,apply} ...\n\npositional arguments:\n  {verify,build,apply}\n    verify              정책 묶음의 구조·파일·유효성을 확인\n    build               CONFIRMED 플랫폼 정책에서 묶음 생성\n    apply               서버 묶음 배치·재시작·상태 확인\n\noptions:\n  -h, --help            show this help message and exit\n",
+   "prog": "serving-runtime bundle"
+  },
+  "bundle apply": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "bundle_dir",
+     "exclusive_group": 0,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "DIR",
+     "nargs": null,
+     "options": [
+      "--bundle-dir"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "existing",
+     "exclusive_group": 0,
+     "help": "루트에 이미 배치된 묶음으로 전환",
+     "kind": "_StoreAction",
+     "metavar": "ID",
+     "nargs": null,
+     "options": [
+      "--existing"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "bundle_root",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "DIR",
+     "nargs": null,
+     "options": [
+      "--bundle-root"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "context",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--context"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "namespace",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--namespace"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "kubeconfig",
+     "exclusive_group": null,
+     "help": "모든 kubectl 호출에 명시할 kubeconfig",
+     "kind": "_StoreAction",
+     "metavar": "FILE",
+     "nargs": null,
+     "options": [
+      "--kubeconfig"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "status_url",
+     "exclusive_group": null,
+     "help": "Gateway 내부 포트를 담은 로컬 URL; 새 임시 port-forward를 엽니다",
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--status-url"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "token_env_file",
+     "exclusive_group": null,
+     "help": "RUNTIME_VIEWER_TOKEN을 읽을 env 파일(조회가 비보호면 생략 가능)",
+     "kind": "_StoreAction",
+     "metavar": "FILE",
+     "nargs": null,
+     "options": [
+      "--token-env-file"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "dry_run",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--dry-run"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "operation_result",
+     "exclusive_group": null,
+     "help": "에이전트용 제한된 JSON 결과",
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--operation-result"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "deployment_guard",
+     "exclusive_group": null,
+     "help": "현재 외부 승인·필수 UPDATE 근거를 적용/복귀 전에 검증",
+     "kind": "_StoreAction",
+     "metavar": "FILE",
+     "nargs": null,
+     "options": [
+      "--deployment-guard"
+     ],
+     "required": false,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime bundle apply [-h] (--bundle-dir DIR | --existing ID) --bundle-root DIR\n                                    --context CONTEXT --namespace NAMESPACE [--kubeconfig FILE]\n                                    --status-url STATUS_URL [--token-env-file FILE] [--dry-run]\n                                    [--operation-result] [--deployment-guard FILE]\n\noptions:\n  -h, --help            show this help message and exit\n  --bundle-dir DIR\n  --existing ID         루트에 이미 배치된 묶음으로 전환\n  --bundle-root DIR\n  --context CONTEXT\n  --namespace NAMESPACE\n  --kubeconfig FILE     모든 kubectl 호출에 명시할 kubeconfig\n  --status-url STATUS_URL\n                        Gateway 내부 포트를 담은 로컬 URL; 새 임시 port-forward를 엽니다\n  --token-env-file FILE\n                        RUNTIME_VIEWER_TOKEN을 읽을 env 파일(조회가 비보호면 생략 가능)\n  --dry-run\n  --operation-result    에이전트용 제한된 JSON 결과\n  --deployment-guard FILE\n                        현재 외부 승인·필수 UPDATE 근거를 적용/복귀 전에 검증\n",
+   "prog": "serving-runtime bundle apply"
+  },
+  "bundle build": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "policy",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "FILE",
+     "nargs": null,
+     "options": [
+      "--policy"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "policy_sha256",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "SHA256",
+     "nargs": null,
+     "options": [
+      "--policy-sha256"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "server_values",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "FILE",
+     "nargs": null,
+     "options": [
+      "--server-values"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "intent",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "FILE",
+     "nargs": null,
+     "options": [
+      "--intent"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "output_parent",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "DIR",
+     "nargs": null,
+     "options": [
+      "--output-parent"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "bundle_id",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--bundle-id"
+     ],
+     "required": true,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime bundle build [-h] --policy FILE --policy-sha256 SHA256 --server-values FILE\n                                    --intent FILE --output-parent DIR --bundle-id BUNDLE_ID\n\noptions:\n  -h, --help            show this help message and exit\n  --policy FILE\n  --policy-sha256 SHA256\n  --server-values FILE\n  --intent FILE\n  --output-parent DIR\n  --bundle-id BUNDLE_ID\n",
+   "prog": "serving-runtime bundle build"
+  },
+  "bundle verify": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "bundle_dir",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "DIR",
+     "nargs": null,
+     "options": [
+      "--bundle-dir"
+     ],
+     "required": true,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime bundle verify [-h] --bundle-dir DIR\n\noptions:\n  -h, --help        show this help message and exit\n  --bundle-dir DIR\n",
+   "prog": "serving-runtime bundle verify"
+  },
+  "enforce": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": [
+      "cache-check",
+      "ingest",
+      "phase-signals",
+      "render",
+      "sync"
+     ],
+     "dest": "enforce_command",
+     "kind": "subparsers",
+     "required": false
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime enforce [-h] {sync,render,ingest,cache-check,phase-signals} ...\n\npositional arguments:\n  {sync,render,ingest,cache-check,phase-signals}\n    sync                현재 검증 묶음의 외부 정책 동기화(기본 dry-run)\n    render              통제 의도에서 클러스터 미검증 JSON 후보 생성\n    ingest              Hubble·Tetragon JSON Lines를 관측 기록으로 변환\n    cache-check         캐시 세대 디렉터리의 소유자·권한·다른 세대를 점검(읽기 전용)\n    phase-signals       엔진 로그의 확인된 표지를 단계 시간표로 변환\n\noptions:\n  -h, --help            show this help message and exit\n",
+   "prog": "serving-runtime enforce"
+  },
+  "enforce cache-check": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "intent",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--intent"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "root",
+     "exclusive_group": null,
+     "help": "cache_root 대신 점검할 디렉터리(사본 점검용)",
+     "kind": "_StoreAction",
+     "metavar": "DIR",
+     "nargs": null,
+     "options": [
+      "--root"
+     ],
+     "required": false,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime enforce cache-check [-h] --intent PATH [--root DIR]\n\noptions:\n  -h, --help     show this help message and exit\n  --intent PATH\n  --root DIR     cache_root 대신 점검할 디렉터리(사본 점검용)\n",
+   "prog": "serving-runtime enforce cache-check"
+  },
+  "enforce ingest": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": [
+      "hubble",
+      "tetragon"
+     ],
+     "const": null,
+     "default": null,
+     "dest": "kind",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--kind"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "input",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "FILE",
+     "nargs": null,
+     "options": [
+      "--input"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": [
+      "synthetic",
+      "real"
+     ],
+     "const": null,
+     "default": null,
+     "dest": "origin",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--origin"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "data_dir",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "DIR",
+     "nargs": null,
+     "options": [
+      "--data-dir"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "intent",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--intent"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "environment",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "NAME",
+     "nargs": null,
+     "options": [
+      "--environment"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "run_id",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "ID",
+     "nargs": null,
+     "options": [
+      "--run-id"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "exceptions",
+     "exclusive_group": null,
+     "help": "승인 실행 예외(runtime-exec-exceptions/1.0)",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--exceptions"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "timeline",
+     "exclusive_group": null,
+     "help": "단계 시간표(runtime-phase-timeline/1.0)",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--timeline"
+     ],
+     "required": false,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime enforce ingest [-h] --kind {hubble,tetragon} --input FILE --origin\n                                      {synthetic,real} --data-dir DIR [--intent PATH]\n                                      [--environment NAME] [--run-id ID] [--exceptions PATH]\n                                      [--timeline PATH]\n\noptions:\n  -h, --help            show this help message and exit\n  --kind {hubble,tetragon}\n  --input FILE\n  --origin {synthetic,real}\n  --data-dir DIR\n  --intent PATH\n  --environment NAME\n  --run-id ID\n  --exceptions PATH     승인 실행 예외(runtime-exec-exceptions/1.0)\n  --timeline PATH       단계 시간표(runtime-phase-timeline/1.0)\n",
+   "prog": "serving-runtime enforce ingest"
+  },
+  "enforce phase-signals": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": [
+      "vllm",
+      "sglang"
+     ],
+     "const": null,
+     "default": null,
+     "dest": "engine",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--engine"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "log",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--log"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "year",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "YYYY",
+     "nargs": null,
+     "options": [
+      "--year"
+     ],
+     "required": true,
+     "type": "int"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "tz",
+     "exclusive_group": null,
+     "help": "명시적 UTC offset(예: +00:00)",
+     "kind": "_StoreAction",
+     "metavar": "OFFSET",
+     "nargs": null,
+     "options": [
+      "--tz"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "out",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--out"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "follow",
+     "exclusive_group": null,
+     "help": "파일 교체·잘림을 따라가거나 --log - 표준입력을 계속 읽기",
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--follow"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "health_url",
+     "exclusive_group": null,
+     "help": "follow 중 init/compile 뒤 200을 추론 시작 근거로 사용",
+     "kind": "_StoreAction",
+     "metavar": "URL",
+     "nargs": null,
+     "options": [
+      "--health-url"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 2.0,
+     "dest": "health_interval",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "SECONDS",
+     "nargs": null,
+     "options": [
+      "--health-interval"
+     ],
+     "required": false,
+     "type": "float"
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "overwrite",
+     "exclusive_group": 0,
+     "help": "기존 timeline을 버리고 새 follow 상태로 교체",
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--overwrite"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "resume",
+     "exclusive_group": 0,
+     "help": "기존 timeline 상태와 입력 위치에서 이어가기",
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--resume"
+     ],
+     "required": false,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime enforce phase-signals [-h] --engine {vllm,sglang} --log PATH --year YYYY\n                                             --tz OFFSET --out PATH [--follow] [--health-url URL]\n                                             [--health-interval SECONDS] [--overwrite | --resume]\n\noptions:\n  -h, --help            show this help message and exit\n  --engine {vllm,sglang}\n  --log PATH\n  --year YYYY\n  --tz OFFSET           명시적 UTC offset(예: +00:00)\n  --out PATH\n  --follow              파일 교체·잘림을 따라가거나 --log - 표준입력을 계속 읽기\n  --health-url URL      follow 중 init/compile 뒤 200을 추론 시작 근거로 사용\n  --health-interval SECONDS\n  --overwrite           기존 timeline을 버리고 새 follow 상태로 교체\n  --resume              기존 timeline 상태와 입력 위치에서 이어가기\n",
+   "prog": "serving-runtime enforce phase-signals"
+  },
+  "enforce render": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "intent",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--intent"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "out",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "DIR",
+     "nargs": null,
+     "options": [
+      "--out"
+     ],
+     "required": true,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime enforce render [-h] --intent PATH --out DIR\n\noptions:\n  -h, --help     show this help message and exit\n  --intent PATH\n  --out DIR\n",
+   "prog": "serving-runtime enforce render"
+  },
+  "enforce sync": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "bundle_dir",
+     "exclusive_group": 0,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--bundle-dir"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "existing",
+     "exclusive_group": 0,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--existing"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": "/srv/serving/bundles",
+     "dest": "bundle_root",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--bundle-root"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "context",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--context"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "namespace",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--namespace"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "kubeconfig",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--kubeconfig"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "token_env_file",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--token-env-file"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "status_url",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--status-url"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": [
+      "tetragon",
+      "cilium"
+     ],
+     "const": null,
+     "default": [
+      "tetragon"
+     ],
+     "dest": "components",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": "+",
+     "options": [
+      "--components"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "cilium_apply",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--cilium-apply"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "execute",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--execute"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": "/tmp/serving-runtime-enforcement.lock",
+     "dest": "lock_file",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--lock-file"
+     ],
+     "required": false,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime enforce sync [-h] (--bundle-dir BUNDLE_DIR | --existing EXISTING)\n                                    [--bundle-root BUNDLE_ROOT] --context CONTEXT --namespace\n                                    NAMESPACE [--kubeconfig KUBECONFIG]\n                                    [--token-env-file TOKEN_ENV_FILE] [--status-url STATUS_URL]\n                                    [--components {tetragon,cilium} [{tetragon,cilium} ...]]\n                                    [--cilium-apply] [--execute] [--lock-file LOCK_FILE]\n\noptions:\n  -h, --help            show this help message and exit\n  --bundle-dir BUNDLE_DIR\n  --existing EXISTING\n  --bundle-root BUNDLE_ROOT\n  --context CONTEXT\n  --namespace NAMESPACE\n  --kubeconfig KUBECONFIG\n  --token-env-file TOKEN_ENV_FILE\n  --status-url STATUS_URL\n  --components {tetragon,cilium} [{tetragon,cilium} ...]\n  --cilium-apply\n  --execute\n  --lock-file LOCK_FILE\n",
+   "prog": "serving-runtime enforce sync"
+  },
+  "file-info": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "path",
+     "exclusive_group": null,
+     "help": "확인할 일반 파일 경로",
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [],
+     "required": true,
+     "type": "Path"
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime file-info [-h] path\n\npositional arguments:\n  path        확인할 일반 파일 경로\n\noptions:\n  -h, --help  show this help message and exit\n",
+   "prog": "serving-runtime file-info"
+  },
+  "management-listener": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": "127.0.0.1",
+     "dest": "listen_host",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "HOST",
+     "nargs": null,
+     "options": [
+      "--listen-host"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 8081,
+     "dest": "listen_port",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "N",
+     "nargs": null,
+     "options": [
+      "--listen-port"
+     ],
+     "required": false,
+     "type": "int"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "engine_url",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "URL",
+     "nargs": null,
+     "options": [
+      "--engine-url"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "allow_path",
+     "exclusive_group": null,
+     "help": "정확히 허용할 경로(반복 가능; 생략 시 /metrics,/health,/v1/models,/version)",
+     "kind": "_AppendAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--allow-path"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 5.0,
+     "dest": "timeout",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "SECONDS",
+     "nargs": null,
+     "options": [
+      "--timeout"
+     ],
+     "required": false,
+     "type": "float"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 1048576,
+     "dest": "max_response_bytes",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "BYTES",
+     "nargs": null,
+     "options": [
+      "--max-response-bytes"
+     ],
+     "required": false,
+     "type": "int"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "credential_file",
+     "exclusive_group": null,
+     "help": "엔진 Bearer token 파일(backend credential.file과 같은 읽기 규칙)",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--credential-file"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "record_file",
+     "exclusive_group": null,
+     "help": "최소 접근 JSONL 추가 기록(접근 기록은 항상 stdout에도 출력)",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--record-file"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "heartbeat_file",
+     "exclusive_group": null,
+     "help": "연속 관리접근 수집기의 writer 상태 파일",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--heartbeat-file"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "target_ref",
+     "exclusive_group": null,
+     "help": "관리 접근 감사에 남길 설정 기반 참조",
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--target-ref"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "run_id",
+     "exclusive_group": null,
+     "help": "관리 접근 감사에 남길 설정 기반 참조",
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--run-id"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "environment",
+     "exclusive_group": null,
+     "help": "관리 접근 감사에 남길 설정 기반 참조",
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--environment"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "policy_ref",
+     "exclusive_group": null,
+     "help": "관리 접근 감사에 남길 설정 기반 참조",
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--policy-ref"
+     ],
+     "required": false,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime management-listener [-h] [--listen-host HOST] [--listen-port N]\n                                           --engine-url URL [--allow-path PATH]\n                                           [--timeout SECONDS] [--max-response-bytes BYTES]\n                                           [--credential-file PATH] [--record-file PATH]\n                                           [--heartbeat-file PATH] [--target-ref TARGET_REF]\n                                           [--run-id RUN_ID] [--environment ENVIRONMENT]\n                                           [--policy-ref POLICY_REF]\n\noptions:\n  -h, --help            show this help message and exit\n  --listen-host HOST\n  --listen-port N\n  --engine-url URL\n  --allow-path PATH     정확히 허용할 경로(반복 가능; 생략 시 /metrics,/health,/v1/models,/version)\n  --timeout SECONDS\n  --max-response-bytes BYTES\n  --credential-file PATH\n                        엔진 Bearer token 파일(backend credential.file과 같은 읽기 규칙)\n  --record-file PATH    최소 접근 JSONL 추가 기록(접근 기록은 항상 stdout에도 출력)\n  --heartbeat-file PATH\n                        연속 관리접근 수집기의 writer 상태 파일\n  --target-ref TARGET_REF\n                        관리 접근 감사에 남길 설정 기반 참조\n  --run-id RUN_ID       관리 접근 감사에 남길 설정 기반 참조\n  --environment ENVIRONMENT\n                        관리 접근 감사에 남길 설정 기반 참조\n  --policy-ref POLICY_REF\n                        관리 접근 감사에 남길 설정 기반 참조\n",
+   "prog": "serving-runtime management-listener"
+  },
+  "metrics-check": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "backend_config",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--backend-config"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "input",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "FILE",
+     "nargs": null,
+     "options": [
+      "--input"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "json",
+     "exclusive_group": null,
+     "help": "JSON으로 출력",
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--json"
+     ],
+     "required": false,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime metrics-check [-h] --backend-config PATH --input FILE [--json]\n\noptions:\n  -h, --help            show this help message and exit\n  --backend-config PATH\n  --input FILE\n  --json                JSON으로 출력\n",
+   "prog": "serving-runtime metrics-check"
+  },
+  "mvp": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "policy",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--policy"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "policy_bundle",
+     "exclusive_group": null,
+     "help": "시작할 때 한 번 검증해 적용할 LAB 정책 묶음 디렉터리",
+     "kind": "_StoreAction",
+     "metavar": "DIR",
+     "nargs": null,
+     "options": [
+      "--policy-bundle"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 8080,
+     "dest": "gateway_port",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "N",
+     "nargs": null,
+     "options": [
+      "--gateway-port"
+     ],
+     "required": false,
+     "type": "int"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 8088,
+     "dest": "engine_port",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "N",
+     "nargs": null,
+     "options": [
+      "--engine-port"
+     ],
+     "required": false,
+     "type": "int"
+    },
+    {
+     "choices": [
+      "mock",
+      "vllm",
+      "sglang"
+     ],
+     "const": null,
+     "default": "mock",
+     "dest": "backend",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--backend"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "backend_config",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--backend-config"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "data_dir",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--data-dir"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 5.0,
+     "dest": "relay_timeout",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "SECONDS",
+     "nargs": null,
+     "options": [
+      "--relay-timeout"
+     ],
+     "required": false,
+     "type": "float"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 30.0,
+     "dest": "stream_idle_timeout",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "SECONDS",
+     "nargs": null,
+     "options": [
+      "--stream-idle-timeout"
+     ],
+     "required": false,
+     "type": "float"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 300.0,
+     "dest": "request_deadline",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "SECONDS",
+     "nargs": null,
+     "options": [
+      "--request-deadline"
+     ],
+     "required": false,
+     "type": "float"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 2,
+     "dest": "max_concurrency",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "N",
+     "nargs": null,
+     "options": [
+      "--max-concurrency"
+     ],
+     "required": false,
+     "type": "int"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 64,
+     "dest": "max_connections",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "N",
+     "nargs": null,
+     "options": [
+      "--max-connections"
+     ],
+     "required": false,
+     "type": "int"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 5.0,
+     "dest": "request_header_timeout",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "SECONDS",
+     "nargs": null,
+     "options": [
+      "--request-header-timeout"
+     ],
+     "required": false,
+     "type": "float"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 10.0,
+     "dest": "request_body_timeout",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "SECONDS",
+     "nargs": null,
+     "options": [
+      "--request-body-timeout"
+     ],
+     "required": false,
+     "type": "float"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "environment",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "NAME",
+     "nargs": null,
+     "options": [
+      "--environment"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "run_id",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "ID",
+     "nargs": null,
+     "options": [
+      "--run-id"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "revocations",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--revocations"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "policy_approvals",
+     "exclusive_group": null,
+     "help": "LAB 정책 승인 목록(runtime-policy-approvals/1.0)",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--policy-approvals"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "observation_exceptions",
+     "exclusive_group": null,
+     "help": "실행 예외(runtime-exec-exceptions/1.0); intent 1.1 필요",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--observation-exceptions"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "observation_timeline",
+     "exclusive_group": null,
+     "help": "단계 시간표(runtime-phase-timeline/1.0); intent 1.1 필요",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--observation-timeline"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "target",
+     "exclusive_group": null,
+     "help": "대상 등록 파일(runtime-target/1.0). 없으면 대상 미등록",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--target"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "target_pod_status",
+     "exclusive_group": 0,
+     "help": "대상 등록의 kubernetes selector로 Pod를 읽기 전용 조회",
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--target-pod-status"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "target_pod_snapshot",
+     "exclusive_group": 0,
+     "help": "호스트가 쓴 runtime-target-pods-snapshot/1.0 파일로 대상 Pod를 관측",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--target-pod-snapshot"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "kube_context",
+     "exclusive_group": null,
+     "help": "Cilium 정책·대상 Pod 조회에 명시할 Kubernetes context. 생략하면 대상 등록의 kubernetes.context, 그것도 없으면 kind-runtime-lab. 대상 등록과 다르면 시작하지 않음",
+     "kind": "_StoreAction",
+     "metavar": "NAME",
+     "nargs": null,
+     "options": [
+      "--kube-context"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "auth_config",
+     "exclusive_group": null,
+     "help": "시험용 인증 설정(runtime-auth/1.0). 없으면 인증 미적용",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--auth-config"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "baseline",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--baseline"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "manifest",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--manifest"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 5.0,
+     "dest": "collector_interval",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "SECONDS",
+     "nargs": null,
+     "options": [
+      "--collector-interval"
+     ],
+     "required": false,
+     "type": "float"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "asset_manifest",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--asset-manifest"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 60.0,
+     "dest": "asset_interval",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "SECONDS",
+     "nargs": null,
+     "options": [
+      "--asset-interval"
+     ],
+     "required": false,
+     "type": "float"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 7.0,
+     "dest": "retention_max_age_days",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "DAYS",
+     "nargs": null,
+     "options": [
+      "--retention-max-age-days"
+     ],
+     "required": false,
+     "type": "float"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 5368709120,
+     "dest": "retention_max_bytes",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "BYTES",
+     "nargs": null,
+     "options": [
+      "--retention-max-bytes"
+     ],
+     "required": false,
+     "type": "int"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 3600.0,
+     "dest": "retention_interval",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "SECONDS",
+     "nargs": null,
+     "options": [
+      "--retention-interval"
+     ],
+     "required": false,
+     "type": "float"
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "retention_enforce",
+     "exclusive_group": null,
+     "help": "보존 한도를 넘은 기록을 실제로 삭제(기본은 보고만)",
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--retention-enforce"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "retention_hold",
+     "exclusive_group": null,
+     "help": "삭제하지 않을 실행·요청 ID 목록",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--retention-hold"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "lab_report",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--lab-report"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "cache_observation",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--cache-observation"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "cache_observation_reader_gid",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--cache-observation-reader-gid"
+     ],
+     "required": false,
+     "type": "int"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "cache_observation_producer_sha256",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--cache-observation-producer-sha256"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "cache_observation_binding_sha256",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--cache-observation-binding-sha256"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "native_receipt_feed",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--native-receipt-feed"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "native_receipt_reader_gid",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--native-receipt-reader-gid"
+     ],
+     "required": false,
+     "type": "int"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "native_receipt_producer_sha256",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--native-receipt-producer-sha256"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "tetragon_state",
+     "exclusive_group": null,
+     "help": "호스트에서 수집한 Tetragon 정책·시험 상태 JSON",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--tetragon-state"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "gpu_state",
+     "exclusive_group": null,
+     "help": "호스트 수집기가 쓴 GPU 사용률·메모리·온도 공개 상태 JSON",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--gpu-state"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "engine_receipts",
+     "exclusive_group": null,
+     "help": "선택: 엔진 로그에서 요청 ID만 추출한 공개 JSON(tools.engine_receipts)",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--engine-receipts"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "tetragon_identities",
+     "exclusive_group": null,
+     "help": "노드에서 확인한 Tetragon 프로세스·컨테이너 식별 자료",
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--tetragon-identities"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": [],
+     "dest": "observation_feed",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_AppendAction",
+     "metavar": "KIND=PATH",
+     "nargs": null,
+     "options": [
+      "--observation-feed"
+     ],
+     "required": false,
+     "type": "_observation_feed"
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": [],
+     "dest": "observation_heartbeat",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_AppendAction",
+     "metavar": "KIND=PATH",
+     "nargs": null,
+     "options": [
+      "--observation-heartbeat"
+     ],
+     "required": false,
+     "type": "_observation_feed"
+    },
+    {
+     "choices": [
+      "synthetic",
+      "real"
+     ],
+     "const": null,
+     "default": "real",
+     "dest": "observation_origin",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": null,
+     "nargs": null,
+     "options": [
+      "--observation-origin"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "observation_environment",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "NAME",
+     "nargs": null,
+     "options": [
+      "--observation-environment"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "observation_run_id",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "ID",
+     "nargs": null,
+     "options": [
+      "--observation-run-id"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "observation_intent",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--observation-intent"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": true,
+     "default": false,
+     "dest": "cilium_policy_status",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreTrueAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "--cilium-policy-status"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": 15.0,
+     "dest": "collector_stale_after",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "SECONDS",
+     "nargs": null,
+     "options": [
+      "--collector-stale-after"
+     ],
+     "required": false,
+     "type": "float"
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime mvp [-h] [--policy PATH] [--policy-bundle DIR] [--gateway-port N]\n                           [--engine-port N] [--backend {mock,vllm,sglang}]\n                           [--backend-config PATH] [--data-dir PATH] [--relay-timeout SECONDS]\n                           [--stream-idle-timeout SECONDS] [--request-deadline SECONDS]\n                           [--max-concurrency N] [--max-connections N]\n                           [--request-header-timeout SECONDS] [--request-body-timeout SECONDS]\n                           [--environment NAME] [--run-id ID] [--revocations PATH]\n                           [--policy-approvals PATH] [--observation-exceptions PATH]\n                           [--observation-timeline PATH] [--target PATH]\n                           [--target-pod-status | --target-pod-snapshot PATH]\n                           [--kube-context NAME] [--auth-config PATH] [--baseline PATH]\n                           [--manifest PATH] [--collector-interval SECONDS]\n                           [--asset-manifest PATH] [--asset-interval SECONDS]\n                           [--retention-max-age-days DAYS] [--retention-max-bytes BYTES]\n                           [--retention-interval SECONDS] [--retention-enforce]\n                           [--retention-hold PATH] [--lab-report PATH] [--cache-observation PATH]\n                           [--cache-observation-reader-gid CACHE_OBSERVATION_READER_GID]\n                           [--cache-observation-producer-sha256 CACHE_OBSERVATION_PRODUCER_SHA256]\n                           [--cache-observation-binding-sha256 CACHE_OBSERVATION_BINDING_SHA256]\n                           [--native-receipt-feed PATH]\n                           [--native-receipt-reader-gid NATIVE_RECEIPT_READER_GID]\n                           [--native-receipt-producer-sha256 NATIVE_RECEIPT_PRODUCER_SHA256]\n                           [--tetragon-state PATH] [--gpu-state PATH] [--engine-receipts PATH]\n                           [--tetragon-identities PATH] [--observation-feed KIND=PATH]\n                           [--observation-heartbeat KIND=PATH]\n                           [--observation-origin {synthetic,real}]\n                           [--observation-environment NAME] [--observation-run-id ID]\n                           [--observation-intent PATH] [--cilium-policy-status]\n                           [--collector-stale-after SECONDS]\n\noptions:\n  -h, --help            show this help message and exit\n  --policy PATH\n  --policy-bundle DIR   시작할 때 한 번 검증해 적용할 LAB 정책 묶음 디렉터리\n  --gateway-port N\n  --engine-port N\n  --backend {mock,vllm,sglang}\n  --backend-config PATH\n  --data-dir PATH\n  --relay-timeout SECONDS\n  --stream-idle-timeout SECONDS\n  --request-deadline SECONDS\n  --max-concurrency N\n  --max-connections N\n  --request-header-timeout SECONDS\n  --request-body-timeout SECONDS\n  --environment NAME\n  --run-id ID\n  --revocations PATH\n  --policy-approvals PATH\n                        LAB 정책 승인 목록(runtime-policy-approvals/1.0)\n  --observation-exceptions PATH\n                        실행 예외(runtime-exec-exceptions/1.0); intent 1.1 필요\n  --observation-timeline PATH\n                        단계 시간표(runtime-phase-timeline/1.0); intent 1.1 필요\n  --target PATH         대상 등록 파일(runtime-target/1.0). 없으면 대상 미등록\n  --target-pod-status   대상 등록의 kubernetes selector로 Pod를 읽기 전용 조회\n  --target-pod-snapshot PATH\n                        호스트가 쓴 runtime-target-pods-snapshot/1.0 파일로 대상 Pod를 관측\n  --kube-context NAME   Cilium 정책·대상 Pod 조회에 명시할 Kubernetes context. 생략하면 대상 등록의\n                        kubernetes.context, 그것도 없으면 kind-runtime-lab. 대상 등록과 다르면 시작하지 않음\n  --auth-config PATH    시험용 인증 설정(runtime-auth/1.0). 없으면 인증 미적용\n  --baseline PATH\n  --manifest PATH\n  --collector-interval SECONDS\n  --asset-manifest PATH\n  --asset-interval SECONDS\n  --retention-max-age-days DAYS\n  --retention-max-bytes BYTES\n  --retention-interval SECONDS\n  --retention-enforce   보존 한도를 넘은 기록을 실제로 삭제(기본은 보고만)\n  --retention-hold PATH\n                        삭제하지 않을 실행·요청 ID 목록\n  --lab-report PATH\n  --cache-observation PATH\n  --cache-observation-reader-gid CACHE_OBSERVATION_READER_GID\n  --cache-observation-producer-sha256 CACHE_OBSERVATION_PRODUCER_SHA256\n  --cache-observation-binding-sha256 CACHE_OBSERVATION_BINDING_SHA256\n  --native-receipt-feed PATH\n  --native-receipt-reader-gid NATIVE_RECEIPT_READER_GID\n  --native-receipt-producer-sha256 NATIVE_RECEIPT_PRODUCER_SHA256\n  --tetragon-state PATH\n                        호스트에서 수집한 Tetragon 정책·시험 상태 JSON\n  --gpu-state PATH      호스트 수집기가 쓴 GPU 사용률·메모리·온도 공개 상태 JSON\n  --engine-receipts PATH\n                        선택: 엔진 로그에서 요청 ID만 추출한 공개 JSON(tools.engine_receipts)\n  --tetragon-identities PATH\n                        노드에서 확인한 Tetragon 프로세스·컨테이너 식별 자료\n  --observation-feed KIND=PATH\n  --observation-heartbeat KIND=PATH\n  --observation-origin {synthetic,real}\n  --observation-environment NAME\n  --observation-run-id ID\n  --observation-intent PATH\n  --cilium-policy-status\n  --collector-stale-after SECONDS\n",
+   "prog": "serving-runtime mvp"
+  },
+  "mvp-acceptance": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "report_dir",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--report-dir"
+     ],
+     "required": false,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime mvp-acceptance [-h] [--report-dir PATH]\n\noptions:\n  -h, --help         show this help message and exit\n  --report-dir PATH\n",
+   "prog": "serving-runtime mvp-acceptance"
+  },
+  "mvp-demo": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": "http://127.0.0.1:8080",
+     "dest": "gateway",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "URL",
+     "nargs": null,
+     "options": [
+      "--gateway"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "data_dir",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "PATH",
+     "nargs": null,
+     "options": [
+      "--data-dir"
+     ],
+     "required": false,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime mvp-demo [-h] [--gateway URL] [--data-dir PATH]\n\noptions:\n  -h, --help       show this help message and exit\n  --gateway URL\n  --data-dir PATH\n",
+   "prog": "serving-runtime mvp-demo"
+  },
+  "revalidation": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": [
+      "export"
+     ],
+     "dest": "revalidation_command",
+     "kind": "subparsers",
+     "required": false
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime revalidation [-h] {export} ...\n\npositional arguments:\n  {export}\n    export    열린 재검증 요청을 새 JSON 파일로 내보내기\n\noptions:\n  -h, --help  show this help message and exit\n",
+   "prog": "serving-runtime revalidation"
+  },
+  "revalidation export": {
+   "actions": [
+    {
+     "choices": null,
+     "const": null,
+     "default": "==SUPPRESS==",
+     "dest": "help",
+     "exclusive_group": null,
+     "help": "show this help message and exit",
+     "kind": "_HelpAction",
+     "metavar": null,
+     "nargs": 0,
+     "options": [
+      "-h",
+      "--help"
+     ],
+     "required": false,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "data_dir",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "DIR",
+     "nargs": null,
+     "options": [
+      "--data-dir"
+     ],
+     "required": true,
+     "type": null
+    },
+    {
+     "choices": null,
+     "const": null,
+     "default": null,
+     "dest": "out",
+     "exclusive_group": null,
+     "help": null,
+     "kind": "_StoreAction",
+     "metavar": "FILE",
+     "nargs": null,
+     "options": [
+      "--out"
+     ],
+     "required": true,
+     "type": null
+    }
+   ],
+   "description": null,
+   "help_text": "usage: serving-runtime revalidation export [-h] --data-dir DIR --out FILE\n\noptions:\n  -h, --help      show this help message and exit\n  --data-dir DIR\n  --out FILE\n",
+   "prog": "serving-runtime revalidation export"
+  }
+ }
+}

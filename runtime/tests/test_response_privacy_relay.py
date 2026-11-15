@@ -467,3 +467,14 @@ def test_a3_actual_vllm_chat_stream_is_preserved(recorded_vllm_chat_wire, includ
         )
     assert (decision.result, outcome, started) == ("ALLOWED", "completed", True)
     assert b"".join(client.chunks) == wire and upstream.closed
+
+
+def test_pr_buffered_chat_empty_choices_is_rejected():
+    document, allowed = setup(CHAT_ROUTE)
+    upstream = BackendConnection(BackendResponse([b'{"choices":[]}']))
+    with patch.object(BackendConfig, "connection", return_value=(upstream, "/engine")):
+        decision, delivered = Relay(BackendConfig.mock(("127.0.0.1", 1)), 1, 1, 2).relay(
+            "a" * 32, document, allowed, route=CHAT_ROUTE
+        )
+    assert (decision.http_status, decision.reason_code) == (502, "ENGINE_BAD_RESPONSE")
+    assert delivered is None and upstream.closed

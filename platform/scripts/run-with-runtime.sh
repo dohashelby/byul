@@ -156,4 +156,4 @@ export EVIDENCE_INDEX_PATHS="${EVIDENCE_INDEX_PATHS:-}"
 echo "update 보고서: $UPDATE_REPORTS_DIR"
 echo "platform: http://127.0.0.1:${BYUL_PLATFORM_PORT:-8700}"
 cd "$ROOT/platform/api"
-RUNTIME_BASE_URL="http://127.0.0.1:$RUNTIME_PORT" uv run byul-platform
+RUNTIME_BASE_URL="http://127.0.0.1:$RUNTIME_PORT" uv run --with-editable "$ROOT/update" byul-platform

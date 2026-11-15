@@ -5,6 +5,7 @@ import http.client
 import json
 from pathlib import Path
 import tempfile
+import time
 import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -102,6 +103,12 @@ class GatewayRelayTests(unittest.TestCase):
         return response.status, response.headers, response.read()
 
     def gateway_records(self) -> list[dict[str, object]]:
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            pending, invalid = JsonlStore(self.data_dir / "gateway_records.jsonl").read_all()
+            if invalid or (pending and pending[-1].get("phase") == "final"):
+                break
+            time.sleep(0.005)
         records, corrupt = JsonlStore(self.data_dir / "gateway_records.jsonl").read_all()
         self.assertEqual(corrupt, [])
         return records

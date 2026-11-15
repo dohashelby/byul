@@ -514,6 +514,12 @@ class ExternalBackendHttpTests(unittest.TestCase):
         return result
 
     def records(self, data_dir: Path | None = None) -> list[dict[str, object]]:
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            pending, invalid = JsonlStore((data_dir or self.directory / "data") / "gateway_records.jsonl").read_all()
+            if invalid or (pending and pending[-1].get("phase") == "final"):
+                break
+            time.sleep(0.005)
         records, corrupt = JsonlStore((data_dir or self.directory / "data") / "gateway_records.jsonl").read_all()
         self.assertEqual(corrupt, [])
         return records

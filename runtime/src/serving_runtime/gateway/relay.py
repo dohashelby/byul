@@ -566,6 +566,7 @@ class Relay:
                 not isinstance(parsed, dict)
                 or "error" in parsed
                 or not isinstance(parsed.get("choices"), list)
+                or not parsed["choices"]
                 or not all(isinstance(choice, dict) for choice in parsed["choices"])
             ):
                 return engine_error(

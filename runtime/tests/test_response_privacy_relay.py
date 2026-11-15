@@ -414,7 +414,7 @@ def test_a1_actual_vllm_buffered_reply_preserves_content_and_usage(recorded_vllm
 
 
 @pytest.mark.parametrize(
-    "payload", [{"choices": []}, {"choices": [{}]}, {"choices": [{"message": {"content": "error"}}]}]
+    "payload", [{"choices": [{"index": 0}]}, {"choices": [{}]}, {"choices": [{"message": {"content": "error"}}]}]
 )
 def test_a1_narrow_minimum_chat_structure_keeps_valid_objects(payload):
     document, allowed = setup(CHAT_ROUTE)

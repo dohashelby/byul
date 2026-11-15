@@ -27,7 +27,7 @@ from guard.executors.registry import resolve_executor
 from tests.test_lifecycle_capture import external, case, revised  # noqa: F401
 from tests.test_a1_profiler_sensor import make_world, invoke, Router, Response, PRIVATE
 from tests.test_a1_rank_failure_sensor import codes, QuietLogger
-from tests.test_lifecycle_sensor import CONTEXT
+from tests.test_lifecycle_sensor import CONTEXT, writer_factory  # noqa: F401
 
 REPO = Path(__file__).resolve().parents[2]
 

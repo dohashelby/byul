@@ -228,7 +228,8 @@ def load_prepared(path):
     with path.open("rb") as stream:
         raw_manifest=stream.read(262145)
         manifest = strict_json(raw_manifest,limit=262144)
-    release_variant = manifest.get('profile') in {v[0] for v in release_observation.PROFILES.values()} if type(manifest) is dict else False
+    release_variant = (type(manifest) is dict and type(manifest.get('profile')) is str
+                       and manifest['profile'] in {v[0] for v in release_observation.PROFILES.values()})
     variant_assets = {'guard_lifecycle_sensor.py','guard_lifecycle_base.py','guard_lifecycle_release.py',
                       'guard_lifecycle_extension.py','guard_request_binding.py','request-binding-key.json',
                       'sitecustomize.py','settings.json'}

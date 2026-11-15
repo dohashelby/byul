@@ -404,8 +404,10 @@ def public_commit(profile):
     return termination_sensor.COMMIT if profile==termination_sensor.PROFILE else sensor.COMMIT
 
 
-def asset_supported(profile, raw):
-    if configured.contains(profile):return raw == configured.render_source(profile)
+def asset_supported(profile, raw, *, request_key_sha256=None):
+    if configured.contains(profile):
+        if configured.request_binding(profile) and request_key_sha256 is None:return False
+        return raw == configured.render_source(profile, request_key_sha256=request_key_sha256)
     if profile==release_sensor.PROFILE:return raw==Path(release_sensor.__file__).read_bytes()
     if profile==init_release.PROFILE:return raw==Path(init_release.__file__).read_bytes()
     if profile==fault_sensor.PROFILE:return raw==Path(fault_sensor.__file__).read_bytes()

@@ -280,6 +280,21 @@
       "manifest_sha256": "a98a34360d9766ce22519c67edc6603efabc9e6ef58b4ecde9ad41e49ae67ec0",
       "reviewed_by": "Codex / PR278-279 integrated source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T18:05:42.726982+09:00"
+    },
+    {
+      "manifest_sha256": "14e7145a3c6d0626470da8bec91b0a8c11f9363450f8581783d88bbb65fdebe8",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T10:17:21.728861+00:00"
+    },
+    {
+      "manifest_sha256": "7f3d5229f83a42906c4c30c79964cb34157a7f6325d09bdad8873697b27b422d",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T10:21:15.557226+00:00"
+    },
+    {
+      "manifest_sha256": "6796f881c7ef541d9b54cfe772d6354b1ab95f160fbb2c372e273a72a313d584",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T10:36:40.206293+00:00"
     }
   ]
 }

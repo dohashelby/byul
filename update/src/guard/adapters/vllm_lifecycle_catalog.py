@@ -31,6 +31,13 @@ def _catalog():
                     points[point] = module
         if not points or not set(row['void_return_argument_ids']) <= points.keys():
             raise ValueError('LIFECYCLE_CATALOG_INVALID')
+        binding = row.get('request_binding')
+        if binding is not None and (type(binding) is not dict or set(binding) != {
+                'handler_point', 'selection_point', 'caller_point', 'input_point',
+                'engine_attribute', 'processor_attribute', 'native_prefix', 'entry_path', 'entry_method', 'native_selection_point'}
+                or any(type(v) is not str or not v or len(v) > 128 for v in binding.values())
+                or not {binding.get(k) for k in ('handler_point', 'selection_point', 'native_selection_point', 'caller_point', 'input_point')} <= points.keys()):
+            raise ValueError('LIFECYCLE_CATALOG_INVALID')
     return {row['profile']: row for row in rows}
 
 
@@ -55,14 +62,32 @@ def runtime_spec(profile):
         digest = catalog['runtimes'][runtime]['base_code_sha256']
         runtime_code[runtime] = {platform: digest for platform in platforms}
     return {key: selected[key] for key in ('profile', 'schema', 'commit', 'sources', 'void_return_argument_ids')} | {
+        **({'request_binding': selected['request_binding']} if 'request_binding' in selected else {}),
         'base_sha256': catalog['base']['sha256'], 'runtime_code': runtime_code}
 
 
-def render_source(profile):
+def request_binding(profile):
+    return contains(profile) and 'request_binding' in row(profile)
+
+
+def asset_names(profile):
+    return {'guard_lifecycle_sensor.py', 'guard_lifecycle_base.py', 'sitecustomize.py', 'settings.json'} | (
+        {'request-binding-key.json'} if request_binding(profile) else set())
+
+
+def render_source(profile, *, request_key_sha256=None):
     # Canonical ordering keeps the same selected row byte-identical when unrelated
     # release rows are added. This literal is data, not executable input.
     spec = json.loads(json.dumps(runtime_spec(profile), sort_keys=True))
-    return Path(template.__file__).read_bytes() + (
+    extension = b''
+    if request_binding(profile):
+        if type(request_key_sha256) is not str or re.fullmatch('[0-9a-f]{64}', request_key_sha256) is None:
+            raise ValueError('REQUEST_BINDING_KEY_PIN_REQUIRED')
+        spec['request_key_sha256'] = request_key_sha256
+        extension = b'\n' + Path(__file__).with_name('vllm_fresh_request_binding.py').read_bytes()
+    elif request_key_sha256 is not None:
+        raise ValueError('REQUEST_BINDING_PROFILE_REQUIRED')
+    return Path(template.__file__).read_bytes() + extension + (
         '\nSPEC = ' + repr(spec) + "\nif __name__ == '__main__':\n    main()\n").encode()
 
 

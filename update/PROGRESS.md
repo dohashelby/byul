@@ -1,3 +1,10 @@
+## 2026-11-15 — fresh 요청 연결 PR/CI 결과와 runtime 외부 경합
+
+- 한 일: 승인된 후속 profile/HMAC 구현을 #281(main 대상)로 공개했다. 검증 대상 head30974aaf, source6796f881을 보존한다. 코드/시험 원문·판정/고정값·M-B4 보관은 유지한다.
+- 테스트 결과: PR 실행 update-default 13,598통과·기존skip34(pytest608.14초·부모608.994초), 별도CPython3.12.8·Docker stub·공유/플랫폼 계약·wheel449파일 일치가 통과했다. 전체 시험은 CI에서만 실행했다. 같은 head의 runtime PR 실행은 성공했지만 push 실행은 test_mvp_zeroday_profile.py:447의 final 행 부재로1실패·1809통과·기존skip4였다. 전체 CI 통과로 세지 않는다.
+- 다음 단계: runtime의 HTTP 응답 완료 뒤 final 저장 순서와 시험의 즉시 read_all 사이 경합을 외부 검토 자료로 남긴다. 별도 예외 승인 없이 runtime을 고치거나 재실행으로 실패를 지우지 않는다. M-A3 현재 V1 exact 원 함수 대조는 별도 #283 draft에서 잇는다.
+- 막힌 것: runtime 실패 해결은 update/CLAUDE.md11절의 변경 금지 범위다. 실제 worker/그룹 연결·파생 관측·새 ENV/target·GPU 자격/등록과 전체 MVP는 미완료다. 병합은 승인하지 않았다.
+
 ## 2026-11-15 — 재개: 기준 V1 fresh 선택/입력 연결 로컬 후속
 
 - 한 일: 최신 main9365a65b에서 새 브랜치를 만들었다. #276/#278/#279와 원격 READY 수정은 보존하고 이전932490de WIP는 재적용하지 않았다. 사용자 재개·후속 native /28/HMAC 키 자산 승인으로 fresh ASGI→기본 선택→API 전체 native ID 선택→원 AsyncLLM/Processor 입력의 code/globals/self/객체·ID를 대조한다. 비밀 키는 생성부터0600·owner/NOFOLLOW/256바이트/세션·정확 bytes로 검증한다. 원본 센서/ABI와 /27 행은 main 원 bytes 그대로다. M-B4 보관·실행기/판정/공통 GPU 계약·runtime/contracts 무변경.

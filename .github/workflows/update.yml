@@ -109,6 +109,8 @@ jobs:
           python-version: "3.12.3"
       - run: python -m pip install uv==0.12.11
       - run: uv sync --frozen
+      - name: Compile update sources before the full suite
+        run: uv run python -m compileall -q src/guard tools
       - name: Measure default suite parent wall clock
         run: |
           uv run --project ../platform/api --frozen --with-editable . --with-editable ../runtime --with pytest-xdist==3.8.0 python - <<'PY'

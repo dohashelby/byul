@@ -356,6 +356,7 @@ def test_exact_candidate_worker_and_wrapper_reuse_backend_without_certifying_it(
     assert projected['complete_calls'] > 0 and len(projected['worker_calls']) == 4
     assert projected['call_binding_failures'] == {}
     expected_conflicts = 2 if mode in {'backend-stop-failure', 'post-stop-output-failure'} else 0
-    assert len(projected['conflict_candidates']) == expected_conflicts
+    assert len(projected['conflict_candidates']) == (0 if mode == 'start-failure' else 2)
+    assert sum(row['flag_adapter_conflict_observed'] for row in projected['conflict_candidates']) == expected_conflicts
     assert not projected['scope_complete'] and not projected['producer_authenticated']
     assert PRIVATE not in json.dumps(world.observer.recorded)

@@ -251,11 +251,11 @@ class Capture:
                           "sampling_values_equal_in_record": values_equal if sampling is not None else None,
                           "event_sequences": [event["seq"] for event in selected],
                           "duplicate_response_id": row["response_id_sha256"] is not None and not unique})
-        sampling_equal = (all(row["sampling_values_equal_in_record"] for row in proof
+        sampling_equal = ((all(row["sampling_values_equal_in_record"] for row in proof
             if row["case"] not in self.ctx.policy_values.get("allowed_sampling_options", []))
             and {row["case"] for row in proof if row["sampling_values_equal_in_record"]} ==
             set(self.required_cases) - set(self.ctx.policy_values.get("allowed_sampling_options", [])))
-            if self.ctx.check.id == "REQ-10" and self.profile.private_response_identity else None
+            if self.ctx.check.id == "REQ-10" and self.profile.private_response_identity else None)
         raw_files = {"environment.json": self.environment_raw, "target.json": self.target_raw,
             "prepared.json": canonical_json(self.prepared), "requests.json": canonical_json(requests),
             "wrapper.json": canonical_json({"schema": self.tool.WRAPPER_SCHEMA, "session": self.prepared["session"],

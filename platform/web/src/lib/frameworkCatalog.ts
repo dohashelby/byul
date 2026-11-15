@@ -65,7 +65,7 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     fields: [
       {
         key: "direct_block",
-        label: "엔진 직통 차단 수단",
+        label: "Gateway를 거치지 않는 엔진 접근 제한 수단",
         kind: "multi",
         options: [c("network_policy", "Kubernetes NetworkPolicy·Cilium"), c("firewall", "보안 그룹·방화벽"), c("bind_localhost", "엔진을 localhost에만 바인드"), c("mesh_authz", "서비스 메시 인가"), c("none", "차단 없음")],
       },
@@ -143,6 +143,12 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     fields: [
       { key: "offset_params", label: "offset 파라미터(routed_experts_prompt_start 등)", kind: "tri", yes: "수용", no: "수용 안 함", hint: "정책의 추가 허용 필드로 열었는지" },
       { key: "echo_logprobs", label: "입력 반환·logprobs 옵션", kind: "tri", yes: "노출", no: "노출 안 함", hint: "정책의 추가 허용 필드로 열었는지" },
+      { key: "input_echo_engine", label: "입력 원문 반환 — 엔진 활성", kind: "tri" },
+      { key: "input_echo_gateway", label: "입력 원문 반환 — Gateway 노출", kind: "tri" },
+      { key: "output_logprobs_engine", label: "출력 logprobs — 엔진 활성", kind: "tri" },
+      { key: "output_logprobs_gateway", label: "출력 logprobs — Gateway 노출", kind: "tri" },
+      { key: "input_logprobs_engine", label: "입력 logprobs — 엔진 활성", kind: "tri" },
+      { key: "input_logprobs_gateway", label: "입력 logprobs — Gateway 노출", kind: "tri" },
       { key: "lora", label: "LoRA adapter 요청", kind: "tri", yes: "사용", no: "사용 안 함", hint: "정책의 허용 모델에 adapter 이름을 넣어 요청으로 고르게 하는지", required: true, when: { cond: "supply", key: "extra_files", is: ["lora", null] } },
     ],
   },
@@ -158,7 +164,7 @@ export const ENV_CONDITIONS: EnvCondition[] = [
       { key: "pp_size", label: "PP 크기", kind: "int" },
       { key: "replicas", label: "복제본 수", kind: "int" },
       { key: "executor", label: "실행기", kind: "choice", options: [c("mp", "multiprocessing"), c("ray", "Ray"), c("uni", "단일 프로세스"), c("external_launcher", "외부 launcher")] },
-      { key: "runner", label: "실행 runner", kind: "choice", options: [c("v1", "V1"), c("v2", "V2"), c("other", "기타")], hint: "실제 선택된 runner를 적습니다. 다른 runner의 시험 결과는 쓰지 않습니다." },
+      { key: "runner", label: "실행 runner", kind: "choice", options: [c("v0", "V0"), c("v1", "V1"), c("v2", "V2"), c("other", "기타")], hint: "실제 선택된 runner를 적습니다. 다른 runner의 시험 결과는 쓰지 않습니다." },
       { key: "pd_disaggregation", label: "Prefill·Decode 분리(KV 전송)", kind: "tri", yes: "사용", no: "사용 안 함" },
       { key: "ipc_transport", label: "내부 IPC 방식", kind: "multi", options: [c("unix_socket", "Unix socket"), c("shared_memory", "공유 메모리"), c("tcp_loopback", "loopback TCP"), c("tcp_network", "노드 간 TCP")] },
     ],
@@ -434,7 +440,7 @@ export const SECURITY_FUNCTIONS: SecurityFunction[] = [
           { key: "offset_params", label: "offset 파라미터", kind: "choice", options: [c("forbidden", "금지"), c("allowed", "허용")] },
         ],
         numbers: [
-          n("max_input_tokens", "입력 길이 한도", ["token"], ["모델별", "호출자별"]),
+          n("max_input_tokens", "입력 길이 한도", ["token"], ["요청별", "모델별", "호출자별"]),
         ],
       },
       {
@@ -749,7 +755,7 @@ const ENV_REQUIRED: Record<string, string[]> = {
   entry: ["direct_block", "active_routes"],
   users: ["tenancy", "shared_service_account", "ops_owner"],
   supply: ["model_source", "acquisition", "weight_formats", "loader"],
-  features: ["offset_params", "echo_logprobs"],
+  features: ["offset_params"],
   placement: ["tp_size", "executor", "ipc_transport"],
   host: ["network_zone", "user_network_zone", "host_sharing", "run_as_root", "model_mount_readonly", "credential_delivery", "egress_control", "tls"],
   deploy: ["deploy_tool"],

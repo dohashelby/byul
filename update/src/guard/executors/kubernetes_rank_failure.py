@@ -14,14 +14,20 @@ from .rank_failure_contract import PROFILE,normalize_policy,stamp
 class KubernetesRankFailureExecutor(HttpCheckExecutor):
     name='rank_failure';version='0.1.0';requires_roles=False;requires_route_scope=False;functional_via='engine'
 
-    def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
+    def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None,common_records=False):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target=expected_target_sha256
+        self.common_records=common_records
+        if common_records:self.version='0.1.0-common-input'
 
     def validate_policy(self,check,values):
         if check.id!='LIF-08' or getattr(check,'collection_profile',None)!=PROFILE:raise ValueError('RANK_FAILURE_PROFILE_UNSUPPORTED')
         normalize_policy(values)
 
     def run(self,check,env,policy_values,adapter,workdir):
+        if self.common_records:
+            from .rank_common_input import run_records
+            self.validate_policy(check,policy_values)
+            return run_records(check,env,policy_values,self.cfg,workdir,expected_target_sha256=self.expected_target)
         from guard.collectors.lifecycle import load_prepared
         self.validate_policy(check,policy_values)
         try:

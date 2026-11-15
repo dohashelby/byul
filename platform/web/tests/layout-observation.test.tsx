@@ -49,6 +49,7 @@ describe("관측 연결 경고", () => {
     expect(screen.getByText("Update · 격리 검증")).toBeTruthy();
     expect(screen.getByText("검증")).toBeTruthy();
     expect(screen.getByRole("link", { name: "검증 결과" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "검증 실행" })).toBeTruthy();
   });
   it("수집원이 없는 합성 자료 시연에서는 관측 불가 경고를 띄우지 않는다", async () => {
     const status = structuredClone(STATUS);

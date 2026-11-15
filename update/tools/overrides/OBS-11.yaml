@@ -6,7 +6,6 @@ policy_params:
 - {key: max_clock_uncertainty_ms, type: 'dict[str,int]', required: true}
 - {key: detection_deadline_ms, type: 'dict[str,int]', required: true}
 - {key: alert_deadline_ms, type: 'dict[str,int]', required: true}
-- { key: collection_session, type: str, required: true }
 required_observations:
   - { key: collection_gap_violations, type: list }
   - { key: collection_records_unverified, type: list }
@@ -30,3 +29,5 @@ limitations:
   - "미구현 분기: 사건 발생의 독립 근거와 상태 기록 생산자 인증이 없어 PASS에 도달하지 않는다. 시간 오차가 기준을 넘긴 행은 판단하지 않고 UNKNOWN에 남긴다."
   - "real 구현만 있다. 실행기는 수집기를 중단하지 않는다. OBS-09의 고정 fixture와 판정은 변경하지 않는다."
   - "사건별 수치는 기업이 제공해야 하며 실제 운영 대응과 모든 종속 RES 전파는 검증하지 않는다."
+
+impact: MEDIUM

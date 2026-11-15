@@ -20,6 +20,7 @@ from tests.test_gpu_input_producers import SCOPE
 @pytest.mark.parametrize("unsupported,consumed,expected", [
     (False, False, "PASS"), (True, False, "UNKNOWN"), (True, True, "FAIL"),
 ])
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_common_input_survives_registered_run_stored_pack_judge_and_report(
         tmp_path, monkeypatch, unsupported, consumed, expected):
     pack_dir = Path(__file__).parents[1] / "packs/PACK-BASELINE"

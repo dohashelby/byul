@@ -22,4 +22,4 @@
 
 전원: 전용 namespace의 engine replicas0, probe 종료, GPU 프로세스 없음·NVML0MiB 확인 후 증거를 반출했다. EC209:40:22UTC 종료 예약,09:41:22UTC poweroff. 정상 종료가 중지 중 상태로 지연되어 기존 인스턴스 강제 중지를 수행했다(OS 종료 건너뛰기는 선택하지 않음). AWS 콘솔에서 중지됨을 최종 확인했고 G33-power-state.png를 보존했다. 기존 총USD20/최초8시간 상한은 재설정하지 않았고 추가GPU·자원·권한은 만들지 않았다. EBS·키·SG는 중지 보관 선택대로 유지한다.
 
-다음 작업: METHOD_COMPARISON.md의 모드별 순서. 미실측·미구현·정책 미확정·다중GPU 필요를 분기별로 구분한다. 본 기록은 모든 GPU 시험 완료 보고가 아니다.
+다음 작업: [METHOD_COMPARISON.md](https://github.com/dohashelby/byul/blob/3c611e214044460d5929e8fb0c3a615265425da0/update/docs/gpu-completion/20261102/METHOD_COMPARISON.md)의 모드별 순서. 미실측·미구현·정책 미확정·다중GPU 필요를 분기별로 구분한다. 본 기록은 모든 GPU 시험 완료 보고가 아니다.

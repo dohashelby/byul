@@ -318,6 +318,7 @@ execution:
   finished_at: RFC3339|null
   abort_reason: str|null
   cleanup_errors: [str]                        # 실행 후 정리 실패. 비어 있으면 직렬화 생략(과거 해시 유지)
+  run_binding: object|null                     # guard-run-binding/1·/2: guard run이 계산한 실행별 기술 결합(ENV·설정 파일 해시·유효 창, /2는 실행 준비값·생산자 소스·발급자 사건 values 포함). 없으면 직렬화 생략. docs/RUN_BINDING.md
 normal_control: { attempted: bool, succeeded: bool|null, detail: str }
 challenges:
   - step: str                                  # CheckDef.challenge_steps 중 하나
@@ -343,6 +344,11 @@ comparability:                                 # update 모드 비교 조건 (IN
   cpu: { architecture: str, model: str, system: str, kernel: str, threads: int } | null  # 명시적 CPU 비교만, 없으면 직렬화 생략
 ```
 
+- **실행 결합(2026-11-14 RB, 팩 35)**: 실행마다 바뀌는 ENV 해시·실행기 설정 파일(target·prepared·manifest) 해시·관측 유효 창은 정책 값이 아니다. `guard run`이 실행 직전에 같은 ENV와 같은 설정 파일에서 계산해 실행기에 넘기고 `execution.run_binding`에 남긴다. 실행기의 대조식은 그대로이므로 계산 뒤 파일이 바뀌면 기존과 같이 실행기 불일치(ABORTED→UNKNOWN)다. 계산할 수 없으면 `NOT_RUN`(`RUN_BINDING_*`)→UNKNOWN이다. 결합 키를 정책에 넣으면 거부한다(`RUN_BINDING_BELONGS_TO_EXECUTION`). 판정 규칙·필수 관측은 바뀌지 않는다.
+- **실행 준비값(2026-11-14 RB2, 팩 36)**: 기록 생산자 세션, LIF-05·06·16 단계별 세대와 표본 시각(실행 시작 기준 offset), LIF-07·09·11 시나리오 파일 해시, PLT-07·08 실행 신원(실행 전 결합 파일)도 정책 값이 아니다. 점검별 설정 표 `[run_binding.<점검>]`에서 읽어 같은 키 이름으로 실행기에 넘기고 `guard-run-binding/2`의 `values`에 남긴다. 실행기 설정 칸이 아니므로 실행기 설정 해시는 바뀌지 않는다. 정의가 아직 선언한 단계(팩 35의 준비값)는 정책 값을 그대로 쓰며 두 출처를 섞지 않는다(`RUN_BINDING_BELONGS_TO_POLICY`). REQ-02는 사전 선언한 기록 파일 해시와의 대조를 하지 않고 읽은 파일 해시를 기록만 한다(사용자 승인 수락 기준 축소). 기업 결정이 섞인 E 키(재시도 scope·복사본 inventory·기록 접근 대상 계획·복구 자원 선택)는 정책에 남는다.
+- **생산자 소스·시험 주체·발급자 사건(2026-11-15 RB3, 팩 37)**: 기록 생산자 소스 SHA-256은 `[run_binding.<점검>]`의 생산자 파일(`record_producer`, REQ-04는 `gateway_producer`·`engine_producer`) bytes 해시이고, REQ-06은 실행기가 이미 요구하는 검토된 adapter 소스 값이다. OBS-01 시험 주체(`test_actors`)는 그대로 옮기고, PLT-10·11 발급자 사건은 `issuer_event` 파일에서 읽으며 유효 기간은 실행 창이다. 판정 의미·대조식은 그대로다. 당시 정책에 남긴 A′·E 값의 후속 분리는 아래 RB3-Q3/Q4를 따른다.
+- **정책 문서·혼합 입력 분리(2026-11-15 RB3-Q3/Q4, 팩 38)**: 정책 문서 참조 해시 5개는 봉인된 POL의 해당 `values[check_id]` 정규 JSON SHA-256으로 계산한다. 재시도 한도·복사본 조치/기한/예외·선정 자원 회수 종류는 정책 값으로 두고, scope/inventory 원 bytes 및 subjects/selection 정규 JSON 해시는 실행 설정 파일에서 계산한다. OBS-06의 현재 POL Ref는 `plan.inputs.policy`에서 실행 시 결합하며 자기 정책 값에 넣지 않는다. 파일의 결정 부분·정확 정책 Ref와 정책 기대값을 대조하고 닫힌 입력 검사·기존 판정/관측을 유지한다. 이전 정의는 기존 정책 입력으로 재생한다. 상세는 `docs/RUN_BINDING.md` 14절.
+- **점검별 실행기 설정(2026-11-14 RB2-S)**: `[check_config.<점검>]`을 그 점검의 실행기 설정 칸 위에 병합한다. 같은 실행기를 쓰는 점검이 한 실행에서 서로 다른 target·prepared·세대 목록을 쓸 수 있다. 형식 오류는 `NOT_RUN`(`CHECK_CONFIG_INVALID`)이다.
 - 수집 실패는 `collected: false`로 남긴다. 값을 비우거나 추정하지 않는다.
 - 직통 결과 값은 HTTP 상태코드(int) 또는 `refused`(연결 거부) · `timeout` · `unreachable`(ENETUNREACH/EHOSTUNREACH) · `dns_error` · `error`. 응답 미수신 종류를 서로 구별한다.
 - **직통 결과의 근거(basis)**: 실행기는 (출발점·대상, 키) 조합마다 먼저 TCP 연결만 시도한다(바이트 미전송). 연결 자체가 `timeout`·`refused`·`unreachable`이면 HTTP를 보내지 않고 그 조합의 **모든 등록 경로(상태 변경 경로 포함)** 결과를 그 값으로 기록하고 증거 파일에 `basis: tcp_connect (inferred)`로 표시한다. 연결되면 비상태변경 경로에만 HTTP를 보내고(`basis: http`) 상태 변경 경로는 보내지 않는다(미시험). `routes_tested`는 모든 (대상, 비허용 키) 조합의 직통 결과가 있는 경로다.
@@ -501,6 +507,8 @@ class EngineAdapter(Protocol):
 `CommonOption`은 엔진 중립 이름(예: `REMOTE_CODE_EXECUTION`, `API_KEY_REQUIRED`)이고, 어댑터가 엔진 고유 옵션(`--trust-remote-code` 등)으로 번역한다.
 
 ### 7.2 나머지
+
+REQ-17은 기존 단일 입력 외에 [분할 수집·원 표본 집계 계약](docs/dev-1/req17-split-collection.md)을 지원한다(2026-11-14 사용자 결정23). 묶음별512개·기존 판정 기준을 유지하며 두 묶음의 동일 scope/세대·원 표본 완결성을 검증한다.
 
 ```python
 class EnvCollector(Protocol):      # X2: 환경 사실 수집

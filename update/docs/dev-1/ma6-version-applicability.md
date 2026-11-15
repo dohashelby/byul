@@ -1,0 +1,609 @@
+# M-A6 판본 적용표 — 1단계 선행 확인
+
+> **현행 기준(2026-11-15):** 결정14를 변경해 기준·후보 모두 V1을 선택한다. V0 D1~D3 신규 설계는 중단한다. 아래 1~23절의 V0 분석·기동 결과·예외는 당시 구성의 이력이며 새 V1의 실행 자격이나 UNKNOWN 승인으로 이월하지 않는다. 현재 구현·재분류·남은 작업은 **24절**을 따른다.
+
+- 작성: 2026-11-12. 범위: [작업지시서 3차](../WORK_ORDER_VLLM_MVP.md) M-A6 "선행 확인".
+- 판본 번호와 이미지 digest는 작업지시서 0.1절 표에만 있다. 이 문서는 "기준 판본"·"후보 판본"·"이전 판본"(지금 고정값이 있는 판본, `engine_profiles.json`의 `vllm-native-source/1` 행)으로 쓴다.
+- 근거 종류를 구분한다. **[레지스트리]** = Docker Hub 레지스트리의 매니페스트·이미지 config(레이어는 받지 않음), **[소스]** = vLLM 저장소 태그 소스(얕은 clone), **[실측]** = 이미 저장된 GPU 실측 기록. 이미지 레이어·설치 파일 bytes는 받지 않았다. 그래서 아래의 소스 근거는 모두 실제 이미지 설치 파일과 대조하기 전까지 후보다.
+
+## 1. 확인한 원본
+
+| 쪽 | 매니페스트 | 이미지 config | 태그 소스 커밋 |
+|---|---|---|---|
+| 기준 | 0.1절 digest와 받은 매니페스트 bytes의 SHA-256 일치 [레지스트리] | `sha256:644d31f210b8e4d005fcbc6bc3ad13221993c0cd5ec627e9503d74dd53509b52` (12,308 bytes), 생성 2025-01-27, amd64 | `5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8` |
+| 후보 | 0.1절 digest와 받은 매니페스트 bytes의 SHA-256 일치 [레지스트리] | `sha256:d076d77d8dade699041dbcb6bb989a058e51b532e6367f13f80b5a4e63ee5c53` (42,367 bytes), 생성 2026-09-21, amd64 | `ced6857afa0ea7b2e3f0846a62e1394e90f15607` |
+
+- 두 매니페스트는 단일 플랫폼 manifest(v2)이며 index가 아니다.
+- 후보 이미지 config는 `VLLM_BUILD_COMMIT`·`org.opencontainers.image.revision` = `ced6857a…`로 태그 소스 커밋과 같다 [레지스트리].
+- 기준 이미지 config에는 빌드 커밋 표시가 없다. 기준 이미지가 태그 커밋 `5204ff5c…`로 빌드됐다는 것은 아직 추정이다. 실제 이미지의 `vllm/` 설치 파일 bytes를 태그 소스와 대조해야 확정된다(2단계 도구의 이미지 모드).
+
+## 2. 엔진 Python 판본 — 두 판본 모두 3.12
+
+| 쪽 | 근거 | Python |
+|---|---|---|
+| 기준 | 이미지 config history의 빌드 인자 `PYTHON_VERSION=3.12`(`vllm-base` 단계의 `apt-get install python3.12`, `update-alternatives python3 → python3.12`) [레지스트리]. 태그 소스 `Dockerfile` `ARG PYTHON_VERSION=3.12`, 설치 경로 `/usr/local/lib/python3.12/dist-packages` [소스] | 3.12 |
+| 후보 | 이미지 config history의 빌드 인자 `PYTHON_VERSION=3.12` [레지스트리]. 태그 소스 `docker/Dockerfile` `ARG PYTHON_VERSION=3.12` [소스] | 3.12 |
+
+- 관측기 공통 기반의 `sys.version_info[:2] != (3, 12)` 조건에 두 판본 모두 들어온다. **minor 판본 기준으로는 결정 11이 필요 없다.**
+- **패치 판본(3.12.x)은 아직 모른다.** 레지스트리 메타데이터에 없고, Python을 설치한 레이어 안에만 있다(기준 레이어 7번 427.6 MB, 후보 레이어 7번 233.4 MB. 이미지 전체는 기준 5.56 GB, 후보 8.73 GB).
+- 패치 판본이 중요한 관측기가 있다. 엔진 안 sensor 15개(`vllm_attempt_sensor`·`vllm_fault_sensor`·`vllm_file_read_sensor`·`vllm_initialization_sensor`·`vllm_profiler_sensor`·`vllm_ready_endpoint_sensor`·`vllm_rank_failure_sensor`·`vllm_request_output_sensor`·`vllm_safe_open_mapping_sensor`·`vllm_stream_buffer_sensor`·`vllm_termination_sensor`·`vllm_weight_iteration_sensor`·`vllm_worker_startup_sensor`·`vllm_worker_initialization_sensor`·`vllm_worker_generation_sensor`)는 `RUNTIME_CODE_CONTRACTS`에서 CPython **패치 판본별** 자기 코드 지문을 찾는다(지금 `cpython-3.12.3`·`.13`·`.14`·`.15`·`.16`). 이미지의 패치 판본이 이 목록에 없으면 그 sensor는 기동 시 거부(`*_RUNTIME_UNAVAILABLE`)한다.
+- 이것은 엔진 판본이 아니라 guard 관측기 코드 쪽 데이터다. 그 패치 판본 CPython으로 관측기 코드 지문을 계산해 행을 더하면 된다(분류 (a)와 같은 데이터 추가). 패치 판본을 알려면 위 Python 레이어를 받아야 한다(사용자 승인 필요, 2단계 보고에서 묻는다).
+- 바이트코드 code 객체 지문은 minor 판본(3.12)에 묶이므로, 2단계 vLLM 대상 함수 비교도 3.12로 한다.
+
+## 3. 기본 엔진과 실행 구조
+
+| 항목 | 기준 판본 | 후보 판본 | 근거 |
+|---|---|---|---|
+| 기본 엔진 | **V0** (`VLLM_USE_V1` 기본 `"0"`). V1은 `VLLM_USE_V1=1`로 켜는 초기 구현이 같이 들어 있다 | **V1만** (V0 경로 `vllm/worker`·`vllm/core`·`vllm/executor`·`vllm/engine/multiprocessing` 없음) | [소스] `vllm/envs.py`, 디렉터리 목록 |
+| V1 구성 | `vllm/v1/core/scheduler.py`(단일 파일), `v1/worker/gpu_model_runner.py`, `v1/structured_output` 없음 | `vllm/v1/core/sched/`, `v1/worker/gpu/`(새 model runner)와 `v1/worker/gpu_model_runner.py`, `v1/structured_output`, `v1/fault_tolerance` | [소스] |
+| 이미지 기동 명령 | `ENTRYPOINT python3 -m vllm.entrypoints.openai.api_server`, `--model` 인자 | `ENTRYPOINT vllm serve`, 모델은 위치 인자(`--model`도 받음), nonroot wrapper·UID 2000 사용자 있음 | [레지스트리] config, [실측] `tools/gpu_a_aws_lab.py`의 SUP-08 PoC 기동 분기 |
+| prefix cache 기본 | **꺼짐** (V0에서 `enable_prefix_caching=None → bool(VLLM_USE_V1)`) | **켜짐** (`CacheConfig.enable_prefix_caching = True`) | [소스] `engine/arg_utils.py`, `config/cache.py` |
+| 프런트엔드 | V0 `MQLLMEngine` 다중 프로세스(`--disable-frontend-multiprocessing`로 끔) | V1 `AsyncLLM` + `EngineCore` 프로세스 | [소스] |
+
+**영향:** 현재 엔진 내부 관측기는 거의 모두 V1 모듈(`vllm.v1.*`)이나 후보 판본에서 새로 생긴 경로(`vllm.entrypoints.serve.*`, `vllm.renderers.*`, `vllm.v1.worker.gpu.*`)를 감싼다. 기준 판본 기본 기동(V0)에서는 이 모듈들이 import되지 않거나 없다. 기준 판본은 대부분 (c) 이상 분류가 될 가능성이 크다. 분류는 2단계 도구로 함수 단위로 낸다.
+
+기준 판본을 `VLLM_USE_V1=1`로 띄우면 V1 관측기 일부를 공유할 수 있으나, 기업이 쓰는 기본 구성이 아니게 되고 그 시기 V1의 기능 공백(구조화 출력 없음 등)이 생긴다. 기본 구성을 바꾸는 것은 시험 조건 변경이라 이 문서는 제안하지 않는다(필요하면 2단계 보고에서 따로 묻는다).
+
+## 4. 기동 CLI 옵션 (guard가 쓰는 것)
+
+`vllm/engine/arg_utils.py`와 프런트엔드 인자 파일(기준 `entrypoints/openai/cli_args.py`, 후보 `entrypoints/launchers/cli_args.py`)의 문자열 옵션과 dataclass 필드에서 뽑았다 [소스]. 기준 126개, 후보 245개.
+
+| 옵션 | 기준 | 후보 | guard 사용처 |
+|---|---|---|---|
+| `--model`/위치 인자, `--revision`, `--served-model-name`, `--host`, `--port` | 있음 | 있음 | 기본 기동 |
+| `--max-model-len`, `--max-num-seqs`, `--gpu-memory-utilization`, `--enforce-eager`, `--seed`, `--tensor-parallel-size`, `--load-format`, `--tokenizer-revision` | 있음 | 있음 | 기동 profile, TP2 |
+| `--trust-remote-code`, `--code-revision` | 있음 | 있음 | SUP-08 [실측: 두 판본 PoC 기동] |
+| `--enable-prefix-caching` | 있음(기본 꺼짐) | 있음(기본 켜짐) | REQ-16·17 계열 |
+| `--chat-template`, `--chat-template-content-format` | 있음 | 있음 | SUP-03 고정 템플릿 |
+| `--enable-auto-tool-choice`, `--tool-call-parser` | 있음 | 있음 | REQ-10 |
+| `--api-key`, `--allowed-origins`, `--root-path`, `--middleware` | 있음 | 있음 | 인증·경로 점검 |
+| `--enable-log-requests` | **없음**(기본 요청 로그 켜짐, `--disable-log-requests`로 끔) | 있음(기본 꺼짐) | `adapters/vllm.py` 로그 profile — 판본별 기동 인자 데이터 필요 |
+| `--max-log-len` | 있음 | 있음 | 로그 profile |
+| `--profiler-config` | **없음**(`VLLM_TORCH_PROFILER_DIR` 환경 변수로 profiler 경로 열림) | 있음 | 프로파일러 점검 — 판본별 기동 데이터 필요 |
+| `--kv-cache-memory-bytes` | 없음 | 있음 | CPU 기동 전용(M-A9 대상, MVP 미사용) |
+| `--structured-outputs-config` | 없음(`--guided-decoding-backend`) | 있음 | 구조화 출력 백엔드 |
+| `--limit-mm-per-prompt`, `--mm-processor-kwargs`, `--allowed-local-media-path` | 있음 | 있음 | 멀티모달 |
+| `--enable-sleep-mode` | 있음(서버 경로 없음, 아래 5절) | 있음 | — |
+| `--enable-log-outputs`, `--enable-server-load-tracking` | 없음 | 있음 | — |
+
+## 5. 점검이 쓰는 기능 유무
+
+| 기능 | 기준 판본 | 후보 판본 | 근거 | 관련 점검(예) |
+|---|---|---|---|---|
+| OpenAI chat/completions, `/v1/models`, `/health`, `/ping`, `/version`, `/tokenize`, `/metrics` | 있음 | 있음 | [소스] 경로 정의 | 다수 |
+| `/ready`, `/readyz` | **없음** | 있음 | [소스] | LIF 준비 상태(`vllm_ready_endpoint_*`) |
+| `/v1/responses` 저장 응답 | **없음** | 있음 | [소스] | 저장 응답(`vllm_stored_responses`) |
+| `/sleep`·`/wake_up`·`/pause`·`/resume`·`/update_weights` 계열 | **없음** | 있음 | [소스] | 수명 주기·가중치 갱신 계열 |
+| `/start_profile`·`/stop_profile` | 있음(`VLLM_TORCH_PROFILER_DIR` 설정 시만) | 있음 | [소스] | 프로파일러 점검 |
+| `/reset_prefix_cache` | 있음 | 있음 | [소스] | |
+| 구조화 출력 요청 필드 | `guided_json`·`guided_regex`·`response_format` (V0 guided decoding) | `structured_outputs`·`response_format` (`guided_*` 제거) | [소스] protocol | REQ-10(`executors/structured_tools.py`는 `structured_outputs`를 보낸다 → 기준 판본에서는 무시되는 추가 필드) |
+| `tool_choice` | `none`·`auto`·named (**`required` 없음**) | `none`·`auto`·`required`·named | [소스] protocol | REQ-10 `required` 사례 |
+| 추가 요청 필드 처리 | `extra="allow"`, 경고 로그 후 무시 | 같음 | [소스] | SUP-08 `mm_processor_kwargs` 무시(기준 PoC `ignored`) |
+| `cache_salt`, `bad_words`, `return_token_ids`, `prompt_embeds`, `vllm_xargs` | **없음** | 있음 | [소스] protocol | 캐시 격리·입력 검증 계열 |
+| `logit_bias`, `allowed_token_ids`, `prompt_logprobs`, `priority`, `truncate_prompt_tokens`, `chat_template_kwargs` | 있음 | 있음 | [소스] | 샘플링·입력 점검 |
+| 멀티모달(Qwen2-VL, Phi-3-vision) | 있음 | 있음 | [소스] registry | REQ-16, SUP-08 |
+| prefix cache | 있음(기본 꺼짐) | 있음(기본 켜짐) | [소스] | REQ-16·17 |
+| 동적 import(`trust_remote_code`, `code_revision`) | 있음 | 있음 | [소스], [실측] SUP-08 PoC | SUP-08 |
+| tool parser·reasoning parser | 있음(`vllm/entrypoints/openai/tool_parsers`) | 있음(`vllm/tool_parsers`, `vllm/reasoning`) | [소스] 디렉터리 | REQ-10 |
+| fault tolerance 경로 | 없음 | 있음(`v1/fault_tolerance`, `/fault_tolerance/status`) | [소스] | LIF-08·11 |
+
+"없음"은 태그 소스에 그 경로·필드·옵션이 없다는 뜻이다. 그 점검을 비적용으로 볼지 UNKNOWN으로 둘지는 판정 의미 변경이라 결정 9로 점검별로 받는다(승인 전 기본 UNKNOWN). 점검별 묶음은 2단계 적용표에서 낸다.
+
+## 6. 정본 시험 모델
+
+| 모델 | 구조 | 기준 판본 registry | 후보 판본 registry | 두 판본 같은 revision으로 기동 |
+|---|---|---|---|---|
+| SUP-08 PoC snapshot (Phi-3-vision 파생, inventory `c2dd6747…`) | `Phi3VForCausalLM` | 있음 | 있음 | **실측으로 확인됨**: 같은 snapshot·inventory로 두 판본 모두 기동하고 정상 요청 전후 200([SUP-08 결과](../gpu-a/RESULTS-20261111-SUP08.md)) |
+| REQ-16 Qwen2-VL-2B-Instruct | `Qwen2VLForConditionalGeneration` | 있음 | 있음 | revision895c3a49로 고정하고 실제 두 이미지 TP2 모델 로드·정상 HTTP200을 확인했다. 기준 V0의 멀티모달 prefix cache는 실제 내부 비활성: 결정34로 해당 기준 캐시 분기만 원인 있는 UNKNOWN 예외. [기동 원자료](ma7-gpu-preflight-20261114.json) |
+| 기본 GPU 모델 Qwen2.5-0.5B-Instruct `7ae55760…` ([환경](../gpu-a/ENVIRONMENT.md)) | `Qwen2ForCausalLM` | 있음 | 있음 | 소스 근거로 가능, 두 판본 미실측 |
+| 기본 소형 모델 facebook/opt-125m `27dcfa74…` | `OPTForCausalLM` | 있음 | 있음 | 소스 근거로 가능, 두 판본 GPU 미실측. chat template이 없어 SUP-03 고정 템플릿이 필요 |
+
+- 지정 모델은 revision을 고정해 두 이미지에서 실제 로드·정상 HTTP200을 확인했으며 결정12의 모델 교체는 하지 않았다. 기준 V0의 멀티모달 prefix cache는 기동 옵션을 명시해도 내부에서 꺼지므로 결정34의 해당 기준 분기 UNKNOWN 예외를 적용한다. 모델 로드 성공을 캐시 검증 성공으로 바꾸지 않는다.
+
+## 7. 2단계로 넘기는 것
+
+1. 기준 판본은 V0 기본이라, V1 모듈을 감싸는 관측기는 대부분 기준 쪽에서 대상 모듈이 import되지 않는다. 함수 단위 비교 도구로 관측기·생산자·수집 경로를 (a)~(d)로 나눈다.
+2. 판본별 기동 데이터: 이미지 기동 명령(`api_server --model` / `vllm serve`), 로그 옵션(`--enable-log-requests` 유무), profiler(`--profiler-config` / 환경 변수), prefix cache 기본값 차이를 provider·판본 profile 데이터로 둔다.
+3. HTTP 경로표·요청 필드표의 판본 행(`/ready`·`/v1/responses` 없음, `structured_outputs`↔`guided_json`, `tool_choice=required` 없음).
+4. 기준 이미지의 빌드 커밋은 아직 추정이다. 고정값을 확정하려면 두 이미지의 설치 파일 bytes 대조가 필요하다(이미지 레이어 다운로드, 사용자 승인 필요).
+
+## 재현
+
+```bash
+git clone --depth 1 --branch <0.1절 기준 태그> https://github.com/vllm-project/vllm.git
+git clone --depth 1 --branch <0.1절 후보 태그> https://github.com/vllm-project/vllm.git
+```
+
+레지스트리 확인은 익명 pull 토큰으로 `GET /v2/vllm/vllm-openai/manifests/sha256:<digest>`와 그 config blob만 받았다(레이어 없음).
+
+---
+
+# M-A6 2단계 — 판본 고정값 비교 도구와 판본 적용표
+
+## 8. 비교 도구 `tools/engine_pin_compare.py`
+
+- `inventory`: `guard.adapters.vllm_*` 관측기 모듈을 import해 module-level 고정값 표를 모은다. 엔진 모듈별 고정 SHA-256, 대상 함수(`Class.method`·함수 이름), 그 값을 적은 관측기 표를 낸다. 지금 68개 엔진 모듈, 142개 대상 함수를 찾는다. 엔진 밖 라이브러리 고정값(`uvicorn.protocols.http.*`, `transformers.configuration_utils`·`tokenization_utils_base`, safetensors 파일)은 `other_pins`로 따로 낸다.
+- `compare --reference <현재 고정값 판본 소스> --side base=<기준> --side candidate=<후보> [--diff-dir]`: 대상 함수마다 code 객체 지문(관측기와 같은 `base.code_digest(relative_code(...))`)과 줄 위치를 뺀 지문, docstring을 뺀 AST, 인자 목록을 비교한다. 결과 상태:
+
+| 상태 | 뜻 | 제안 분류 |
+|---|---|---|
+| `FILE_IDENTICAL` | 파일 SHA-256까지 같음 | (a) |
+| `CODE_IDENTICAL` | 함수 지문까지 같음(파일은 다름) | (a) |
+| `CODE_EQUAL_LINES_SHIFTED` | 줄 위치만 다름(지문은 새로 계산) | (a) |
+| `DOCSTRING_ONLY` | docstring만 다름(지문은 새로 계산) | (a) |
+| `CHANGED` | 실행 코드가 다름. `signature_equal`로 인자·sync/async 유지 여부 표시 | 검토 |
+| `MOVED_EQUAL` / `MOVED_CHANGED` | 같은 qualname이 다른 모듈에 있음(같음/다름) | (b) / 검토 |
+| `ABSENT` / `MODULE_ABSENT` | 함수 / 모듈이 없음 | (c) 이상 |
+
+- 도구는 (d)를 정하지 않는다. (d)는 아래 10절에서 항목별 근거로 제안한다.
+- `--side name=ROOT:image`로 이미지에서 꺼낸 설치 파일 트리를 주면 고정값이 `image_pin`이 된다. 태그 소스는 `candidate_pin`이다. 이번 결과는 모두 `candidate_pin`이다.
+- 직접 시험: `tests/test_engine_pin_compare.py` 11개(합성 소스 트리, 실제 관측기 표 inventory).
+- 이번 실행: reference = 이전 판본 소스(`vllm-0.31.0-src`, 고정 SHA 대조로 확인), base = 기준 태그 `5204ff5c…`, candidate = 후보 태그 `ced6857a…`, CPython 3.12.13. 결과 전체는 [ma6-pin-compare.json](ma6-pin-compare.json)이다.
+
+| 대상 함수 142개 | FILE/CODE 같음 | 줄 이동 | docstring만 | 바뀜(인자 같음/다름) | 옮겨짐(같음/다름) | 함수 없음 | 모듈 없음 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 후보 판본 | 11 | 68 | 19 | 36 (30/6) | 0/0 | 1 | 0 |
+| 기준 판본 | 0 | 1 | 1 | 30 (10/20) | 2/11 | 32 | 58 |
+
+엔진 모듈 68개 중 기준 판본에 없는 모듈은 46개, 후보 판본에 없는 모듈은 0개다. 단, 기준 판본에 "있는" V1 모듈도 기본 기동(V0)에서는 import되지 않는다(3절).
+
+도구의 한계:
+- 관측기 고정값이 module-level 표가 아닌 형태(예: `vllm_stored_responses`의 짧은 키, `vllm_worker_generation_contract`의 중첩 표, `MODULE_CONTRACTS`)는 파일 단위만 잡히거나 빠진다. 해당 관측기는 11절 표에서 따로 적는다.
+- `RUNTIME_CODE_CONTRACTS`(관측기 자기 코드의 CPython 패치 판본별 지문)와 엔진 밖 라이브러리 고정값은 태그 소스로 비교할 수 없다. 이미지 bytes가 필요하다(12절).
+
+## 9. 관측 계열별 판본 적용표
+
+분류는 쪽(기준/후보)마다 따로 적는다. 후보 판본은 이전 판본과 한 단계 차이라 거의 (a)다. 기준 판본은 V0 기본이라 엔진 내부 관측이 대부분 (c) 이상이다.
+
+| # | 관측 계열(관측기·수집 경로) | 주 점검 | 후보 판본 | 기준 판본 | 근거 |
+|---|---|---|---|---|---|
+| 1 | HTTP·Kubernetes 외부 관측(경로표 `adapters/vllm.py` SAFE_PROBES, `kubernetes_*` 수집기, 프로세스 역할 이름) | REQ-01·02·03·13, PLT-01·04·07·08·09, SUP-04, OBS-04·05·06·09·11, OBS-01, PLT-10·11·12 | (b) 판본 행 추가 | (b) 판본 행 추가 | 엔진 내부 고정값이 없다. `SAFE_PROBES`·`SAFE_PROBE_REVIEWED_IMAGES`·길이 오류 형식(`_LENGTH_ERROR_031/032`)·`kubernetes_response_error.SUPPORTED_ENGINE_VERSION`·`engine_provider` 검토 이미지가 판본 문자열 키라 두 판본 행이 필요하다. 기준 판본은 `/ready`·`/v1/responses`·`/sleep` 계열이 없고(5절) 프런트엔드가 V0 `MQLLMEngine` 다중 프로세스라 역할 이름표가 다르다 |
+| 2 | 기동 데이터(provider·판본 profile) | 전체 | (b) | (b) | 이미지 명령(`vllm serve` / `api_server --model`), 로그 옵션, profiler 옵션, prefix cache 기본값(4절) |
+| 3 | 요청 입구 관측 `vllm_lifecycle_sensor`·`vllm_lifecycle_profiles` (serving·auth middleware·models router·input_processor·output_processor·async_llm) | PLT-10·11(1차 제외), REQ-05, OBS-02, LIF-05·06 계열 기반 | (a) 대부분 + 검토 8(인자 같음) | 모듈 17/26 없음. models 경로 `MOVED_CHANGED`(→`entrypoints/openai/api_server`·`serving_models`), 인증은 `build_app` 안 지역 함수 `authentication` → (c)/(d) | 기반 sensor라 다른 sensor 15개가 이 위에 선다 |
+| 4 | 요청 시도·캐시 조회 `vllm_attempt_callback`·`vllm_cache_callback`·`vllm_scoped_consumption_callback` | REQ-15·16·17, LIF-03·12 | (a) (cache는 docstring만) + attempt 검토 5 | V1 scheduler·block_pool 없음(V0는 `core/scheduler.py`·`core/block/prefix_caching_block.py`, 객체 모델이 다름) → (c)/(d) | 기준 판본은 prefix cache 기본 꺼짐 |
+| 5 | 실행 연결·소비 `vllm_execution_link_callback`·`vllm_consumption_callback`·`vllm_consumption_v2_callback`·`vllm_engine_callback_sensor`(slot) | REQ-08·09·10·12, LIF-05·06, REQ-18 | (a) + 검토(input_processor 3, gpu_model_runner 3, V2 runner 4) | V1 input_processor·structured_output·V2 runner 없음, V0 `worker/model_runner.py`로 구조가 다름 → (c)/(d) | |
+| 6 | TP 통신 버퍼 `vllm_comm_buffer_callback`·`vllm_distributed_callback` | REQ-14·21 | (a) + 검토 2(`CustomAllreduce.__init__` 인자 다름, `close`) | `custom_all_reduce` 모듈 있음, 대상 4개 중 바뀜 3·docstring만 1 → (b)/(c) 후보. distributed는 V1 `gpu_model_runner` 대상이라 (c) | 같은 기능이 두 판본에 있는 몇 안 되는 엔진 내부 대상 |
+| 7 | CUDA Graph·커널 경계 `vllm_graph_replay_callback`·`vllm_kernel_bounds_callback`·`vllm_graph_buffers`·`vllm_slot_mask` | REQ-18·19·20 | (a) + 검토 1 | V2 runner(`v1/worker/gpu/*`) 없음. V0는 `CUDAGraphRunner`(`worker/model_runner.py`) → (c)/(d) | |
+| 8 | 가중치 공급·적재 `vllm_weight_iteration_sensor`·`vllm_file_read_sensor`·`vllm_safe_open_mapping_sensor`·`vllm_worker_startup_*`·`vllm_worker_shard_callback`·`vllm_supply_read_callback` | SUP-05·06·07·15·16, LIF-01·02, PLT-03·05 | (a) + 검토(`_get_weights_iterator` 인자 다름 등 3) | `weight_utils` 있음(대상 7 중 바뀜 3·없음 4), loader는 `model_loader/loader.py`로 `MOVED_CHANGED` → (b)+(c) | safetensors 라이브러리 파일 고정값은 이미지 필요 |
+| 9 | 공유 가중치 수명 `vllm_weights_lifetime_callback` | LIF-13 | (a) + 검토 3 | `weight_cache` 모듈 없음 → 기능 부재(결정 9) | |
+| 10 | 동적 import·플러그인(`transformers` 고정값, `vllm.plugins`) | SUP-09·10·11·12 | 라이브러리 판본 확인 필요 | 같음. 기준 Transformers 계열이 다르다(4.x / 5.x) | `other_pins`의 `transformers.*`는 이미지 bytes로만 대조 가능 |
+| 11 | 템플릿·보조 공급 `vllm_auxiliary_read`·`vllm_auxiliary_link_callback`·`vllm_template_boundary` | SUP-03·13, REQ-07 | (a) | `entrypoints/chat_utils` 있음. 대상 표가 다른 형태라 도구는 파일 단위만 비교 → 수동 검토 | |
+| 12 | 온라인 입력 `vllm_online_sensor` (renderers·input_processor·`validate_request_mm_kwargs`) | REQ-08·09, SUP-08 내부 원인 | 대상 1개 **없음**(`validate_request_mm_kwargs`) + 검토 4 | 3개 모듈 모두 없음 → (c)/(d) | 없는 함수는 이전 판본이 SUP-08 요청을 import 전에 거부한 검증 지점이다. 후보 판본에 없는 것이 실측 회귀(`consumed`)와 맞는다 |
+| 13 | 수명 전환 `vllm_transition_callback`·`vllm_transition_dispatch_callback`·`vllm_ready_endpoint_*`·`vllm_worker_generation_*` | LIF-05·06·07·16, OBS-02 | (a) + 검토 2 | `EngineCore` sleep/wake/pause 등 9개 없음, `/ready` 없음 → 기능 부재(결정 9) 또는 (c) | |
+| 14 | 초기화·rank 장애 `vllm_initialization_sensor`·`vllm_rank_failure_sensor`·`vllm_fault_*`·`vllm_worker_initialization_sensor` | LIF-07·08·09·11 | (a) | V1 `multiproc_executor` 대상 18개 중 8개 없음, V0 기본은 `executor/mp_distributed_executor.py` → (c)/(d) | 후보는 `v1/fault_tolerance`도 있음 |
+| 15 | 요청 종료 `vllm_termination_sensor`·`vllm_request_output_sensor` | REQ-12, LIF-10·12, OBS-02 | (a) + 검토 5(`AsyncOutput.__init__` 인자 다름) | 모듈 8/10 없음 → (c)/(d) | |
+| 16 | 프로파일러 `vllm_profiler_sensor`·`vllm_profiler_callback` | LIF-14 | (a) + 검토 3 | `profiler/wrapper` 없음. V0 profiler는 `worker/worker.py`의 `VLLM_TORCH_PROFILER_DIR` 경로 → (c) | 기동 옵션도 다르다(4절) |
+| 17 | 저장 응답 `vllm_stored_responses` | REQ-06(대상 비적용) | 파일 3개 수동 확인 필요 | `/v1/responses` 없음 → 기능 부재 | 정본 선정에서 대상 비적용 근거만 남기는 점검 |
+| 18 | 실행기 소스 분석(`*_cpu.py`, `executors/engine_sensor.py` source slot) | REQ-10·SUP-13 등 | 소스 commit 행 추가 (b) | 같음, 분석 대상 모듈이 없으면 (c) | M-A9 대상이 아니다(CLAUDE.md 5절) |
+| 19 | 스트림 버퍼 `vllm_stream_buffer_sensor`(uvicorn 고정값) | LIF-03·04 | 이미지 필요 | 이미지 필요 | uvicorn 판본이 이미지마다 다르다. 태그 소스로 비교할 수 없음 |
+
+공통 입력 생산자(`SUPPORTED_PRODUCERS` 8종: request-attempt, generation-transition, health-worker, profiler-control, runner-consumption(/v2), supply-reads, node-process-device-provider)의 생산자 SHA는 guard 쪽 파일 bytes라 판본과 무관하다. 다만 생산자가 감싸는 엔진 관측기가 위 4·5·8·13·16행이라, 그 행의 분류를 따른다. 등록은 그 판본의 GPU 확인 뒤(J01·J02)다.
+
+## 10. 점검별 예상 결과 (69개)
+
+"외부" = 엔진 내부 고정값 없이 HTTP·Kubernetes로 관측한다. 분류는 [후보 / 기준] 순서.
+
+| 묶음 | 점검 | 후보 | 기준 | 예상 J02 결과 |
+|---|---|---|---|---|
+| A. 외부 관측, 판본 행만 추가 | REQ-01·03·13, PLT-01·04·08·09, SUP-04, OBS-04·05·09 | (b) | (b) | 두 판본 실행 가능 |
+| B. 1차 제외(UNKNOWN 완성) | REQ-02, OBS-01·06·11, PLT-07·10·11·12, (PLT-08 TLS 구성 분기) | (b) | (b) | 두 판본 정본 실행 → UNKNOWN+원인. PLT-10·11의 엔진 내부 근거는 기준 쪽 (d) 후보 |
+| C. 대상 비적용 | REQ-04·06 | - | - | 선정 기록. REQ-06은 기준 판본에 `/v1/responses` 자체가 없다는 근거를 더할 수 있다 |
+| D. SUP-08 | SUP-08 | 실행됨(PoC) | 실행됨(PoC) | `REGRESSED` (A, M-A8) |
+| E. 엔진 내부, 후보는 (a), 기준은 같은 기능 있음 | REQ-21(통신 버퍼), REQ-05(모델 목록·선택 경로: 기준은 `entrypoints/openai/api_server`·`serving_models`로 `MOVED_CHANGED`, (b) 대상표 후보), SUP-05·06·15·16·LIF-01·02·PLT-03·05의 가중치 적재 부분, SUP-03·13·REQ-07 템플릿 | (a)+검토 | (b)/(c) | 후보 실행 가능. 기준은 대상표·관측기 추가로 실행 가능 후보 |
+| F. 엔진 내부, 기준은 V0 구조라 새 설계 | REQ-14·15·16·17·18·19·20, REQ-08·09·10·11·12, LIF-03·04·07·08·09·10·11·12·14, OBS-02·03, PLT-02·06, SUP-07·09·10·11·12 | (a)+검토 | (c) 또는 (d) | 후보 실행 가능. 기준은 10절 결정 전까지 `ENGINE_VERSION_UNSUPPORTED` → 비교 `NOT_COMPARABLE` |
+| G. 기준 판본에 기능 자체가 없음 | LIF-13(공유 가중치 캐시), LIF-05·06·16의 실행 중 sleep/wake/pause·가중치 갱신 분기, LIF-07의 `/ready` 분기 | (a)+검토 | 기능 부재 | 결정 9 |
+
+- 위 묶음은 관측 계열(9절)에서 점검으로 옮긴 예상이다. 한 점검이 여러 계열을 쓰면 가장 어려운 계열을 따랐다. 점검별 실행기 입력을 만들 때(M-A7·M-B2) 다시 확인한다.
+- 후보 판본 "검토" 36개 함수(인자 다름 6개 포함)는 함수 단위 diff(`--diff-dir`)를 관측 의미와 대조해야 (a)로 확정된다. 3단계 구현 때 관측기별로 한다.
+
+## 11. 결정 9 — 한 판본에 기능이 없을 때 (점검별 승인 요청)
+
+2026-11-13 사용자에게 항목별로 검토받아 아래 여섯 제안을 각각 승인받았다. 데이터·계획 반영과 실제 소비 연결·GPU 검증을 구분한다.
+
+| 점검 | 기준 판본에 없는 것 (근거) | 제안 |
+|---|---|---|
+| LIF-13 | `model_executor/model_loader/weight_cache/*` 모듈 없음(공유 가중치 데몬·IPC loader) [소스] | 기준 쪽 UNKNOWN(원인: 기능 부재). 비적용으로 바꾸려면 "그 판본은 공유 가중치를 제공하지 않는다"를 선정 근거로 남겨야 해 사용자 판단 |
+| LIF-05·06·16 (실행 중 전환 분기) | 서버 `/sleep`·`/wake_up`·`/pause`·`/resume`·`/update_weights` 경로 없음, `EngineCore.sleep/wake_up/pause_scheduler` 없음 [소스] | 재배포(Pod 교체) 분기는 외부 관측으로 두 판본 실행. 실행 중 전환 분기만 기준 쪽 UNKNOWN |
+| LIF-07 (`/ready` 분기) | `/ready`·`/readyz` 없음 [소스] | 기준 쪽은 `/health`만으로 준비 상태를 판단할 근거가 없으므로 그 분기 UNKNOWN |
+| REQ-06 | `/v1/responses` 없음 [소스] | 이미 대상 비적용. 근거 문장만 더함 |
+| REQ-10 (`tool_choice=required`, `structured_outputs` 필드) | `tool_choice`에 `required` 없음, 구조화 출력 필드가 `guided_json` [소스] | `structured_outputs`→`guided_json` 대응은 (b) 요청 필드표로 실행. `required` 사례만 기준 쪽 UNKNOWN |
+| REQ-16·17 (prefix cache) | 기능은 있으나 기본 꺼짐 [소스] | 결정 9가 아니라 기동 조건 문제다. 두 판본 모두 `--enable-prefix-caching`을 명시하는 안(비교 조건 동일)을 제안 |
+
+## 12. 결정 10 — UNKNOWN으로 남길 어려운 항목 (항목별 승인 요청)
+
+**결정 결과 (2026-11-12 사용자):**
+- **D4·D5 승인** — 기준 판본 쪽 UNKNOWN으로 남긴다. 원인과 영향 점검(D4: PLT-10·11, D5: LIF-14)을 RES·문서에 남기고 PASS·NOT_APPLICABLE로 바꾸지 않는다.
+- **D1·D2·D3 미승인** — UNKNOWN으로 남기지 않고 **(c) 후속, 미구현**으로 둔다. 나중에 V0 관측기로 만들 대상이고 지금 구현 순서에서는 뒤로 미룬다. 미구현 동안 해당 점검(D1: REQ-12·15·16·17, LIF-03·10·12 / D2: REQ-18·19·20, REQ-08·09·10의 소비 부분 / D3: LIF-07·08·09·11, PLT-02·06의 엔진 내부 근거)의 기준 쪽은 `ENGINE_VERSION_UNSUPPORTED`이며 **MVP 완료로 세지 않는다**.
+- 결정 9, 기준 판본 V0 유지, 이미지 레이어 다운로드는 아직 결정 대기다. 다운로드 승인 전 고정값은 모두 후보(`candidate_pin`)다.
+
+아래는 승인 요청 당시의 표다.
+
+숫자 기준을 만들지 않고, 항목마다 원인과 영향 점검을 적는다. 모두 **기준 판본 쪽만**이다. 후보 판본 쪽은 (a)라 (d) 제안이 없다.
+
+| # | 항목 | 원인 | 영향 점검 | (c)로 하려면 필요한 것 |
+|---|---|---|---|---|
+| D1 | V0 scheduler·block manager 기반 요청 시도·캐시 조회·종료 관측 | V0 `core/scheduler.py`·`core/block_manager.py`·`prefix_caching_block.py`는 V1과 객체 모델이 다르다(SequenceGroup 단위, block allocator). 지금 계약 사건(시도·적중·해제)의 의미를 V0 객체로 다시 정의해야 한다 | REQ-12·15·16·17, LIF-03·10·12 | V0 관측기 신규 설계, V0 모의 엔진 시험 자료, GPU 확인 |
+| D2 | V0 model runner·CUDA Graph·slot·커널 경계 관측 | V0 `worker/model_runner.py`(`CUDAGraphRunner`)는 V2 runner(`v1/worker/gpu/*`)와 버퍼·slot 구조가 다르다 | REQ-18·19·20, REQ-08·09·10의 소비 부분 | 같은 의미의 버퍼·slot 식별 재설계 |
+| D3 | V0 다중 프로세스 프런트엔드·executor 기반 초기화·rank 장애·자원 회수 | V0 `MQLLMEngine`(ZMQ) + `executor/mp_distributed_executor.py`는 V1 `MultiprocExecutor`·`EngineCoreProc`와 프로세스 구성·장애 전달 경로가 다르다 | LIF-07·08·09·11, PLT-02·06(엔진 내부 근거) | 프로세스 역할·rank 의미 재확인(CLAUDE.md 2절), TP2 GPU |
+| D4 | 인증 middleware 내부 관측 | 기준 판본 인증은 `build_app` 안 지역 함수(`@app.middleware("http") authentication`)라 module 속성으로 감쌀 대상이 없다 | PLT-10·11(1차 제외라 원래 UNKNOWN) | 감싸기 방식 자체를 바꿔야 함 |
+| D5 | V0 profiler 관측 | profiler가 Worker 메서드와 환경 변수로만 열리고 `profiler/wrapper` 대상이 없다 | LIF-14 | V0 worker profiler 대상표 + 기동 데이터. 비교적 작을 수 있어 (c) 후보로도 둔다 |
+
+(c)로 진행을 제안하는 기준 쪽 항목: 9절 1·2행(판본 데이터), 6행 `custom_all_reduce`(REQ-21), 8행 가중치 적재(`weight_utils`·`loader.py`), 11행 템플릿, 16행 profiler(D5를 승인하지 않으면). 이 항목들은 같은 기능이 두 판본에 있어 대상표·고정값 데이터로 다루거나 관측기를 작게 더하는 범위다.
+
+**별도로 물을 것 — 기준 판본 엔진 선택.** 기준 판본을 기본(V0)으로 띄우면 D1~D3가 남는다. `VLLM_USE_V1=1`로 띄우면 V1 관측기 일부를 대상표로 공유할 여지가 있다. 하지만 기업 기본 구성이 아니고, 그 시기 V1 초기 구현의 기능 공백이 시험 조건 차이로 들어간다. 이 문서는 기본(V0) 유지를 권한다. 기준을 바꾸려면 결정이 필요하다.
+
+## 13. 이미지 bytes 대조 (승인 요청)
+
+태그 소스 고정값을 확정하고 아래를 알려면 두 이미지의 일부 레이어가 필요하다. GPU·클라우드 비용은 없고 로컬 다운로드만 한다.
+
+| 필요한 것 | 레이어 | 크기 |
+|---|---|---|
+| CPython 패치 판본(`RUNTIME_CODE_CONTRACTS` 행) | 기준 7번, 후보 7번(Python 설치) | 427.6 MB + 233.4 MB |
+| `vllm/` 설치 파일 bytes(고정값 `image_pin`, 기준 빌드 커밋 확인), uvicorn·transformers·safetensors 판본 | vLLM wheel·의존성 설치 레이어 | 레이어별 수백 MB~수 GB(이미지 전체 기준 5.56 GB, 후보 8.73 GB) |
+
+승인을 받으면 레이어를 파일 단위로 풀지 않고, 필요한 경로만 꺼내 `engine_pin_compare compare --side base=<꺼낸 site-packages>:image`로 다시 비교한다.
+
+## 14. 3단계 구현 현황 (결정 10 뒤, 승인 범위만)
+
+**구조 — 판본별 데이터를 넘긴다(코드 복사 없음).** 공통 감싸기 기반 `adapters/vllm_cache_callback.py`의 `_codes`는 관측기 표의 모듈 고정값으로 SHA-256 문자열 하나 또는 **검토 고정값 tuple**(판본별 정확 bytes 행)을 받는다.
+- 파일 bytes가 그중 하나와 정확히 같을 때만 그 파일의 함수 지문으로 대상 함수를 감싼다. 다른 판본 파일의 함수 코드를 섞으면 `CACHE_CALLBACK_ENTRY_UNSUPPORTED`로 거부한다.
+- 증거 행의 `source_file_sha256`에는 실제로 맞은 행의 고정값을 적는다. 표 형식이 틀리면(빈 tuple, 중복, SHA 아님) 거부한다.
+- 고정값 검사를 넓히지 않았다. 판본 문자열 비교는 없다. 등록 생산자 신원(`SUPPORTED_PRODUCERS`)에는 이 파일이 들어가지 않아 등록 상태는 바뀌지 않는다.
+
+| 관측기 | 점검 | 후보 판본 | 기준 판본 | 상태 |
+|---|---|---|---|---|
+| `vllm_comm_buffer_callback` | REQ-21 | 행 추가 `a048c132…` (candidate). 바뀐 것은 MNNVL multimem 경로 삭제뿐이고 관측 속성은 같음 | 행 추가 `f3e7b346…` (candidate). 생성자 인자 `max_size`만, MNNVL 없음. `_ptr`·`buffer_ptrs`·`disabled`·`rank`·`world_size`·해제 순서는 같음 | 구현·직접 시험. GPU 확인·이미지 bytes 대조 전 |
+
+- `PIN_ROWS`의 `candidate`는 태그 소스 bytes라는 뜻이다. 이미지 설치 파일과 대조하면(13절) `reviewed`로 올린다.
+- 기준 판본 쪽은 엔진 안 설치 경로(sitecustomize → `vllm_engine_callback_sensor.install`)가 V0 기본 기동에서 이 모듈을 실제로 감싸는지 GPU에서 확인해야 한다. 설치 경로의 다른 V1 전제는 확인하지 않았다.
+
+**알려진 영향 — 소스 검토 관문.** 제품 소스를 바꿔 `release/reviewed-source.json`을 다시 만들었다. 그 결과 `verify_req10_consumption`이 `SOURCE_REVIEW_RECEIPT_REQUIRED`를 낸다. 이 관문을 쓰는 LIF-07 수집 시험(`test_b_lif07_readiness::test_actual_native_helper_default_public_entrypoint_store_restore_preserved`)도 실패한다. 당시에는 결정 5(검토 기록 규칙)가 미결이라 기록을 만들지 않았다. 이후 사용자 결정 5로 면제가 확정돼 새 SHA마다 검토 기록을 넣는다.
+
+**#255 시점의 잔여 이력 (현행 상태는 15·16절):**
+- A 담당 엔진 내부 관측기의 후보 판본 (a) 행: REQ-14 `vllm_distributed_callback`, REQ-15~17 `vllm_cache_callback`·`vllm_scoped_consumption_callback`, REQ-18~20 slot·graph·kernel, LIF-13 `vllm_weights_lifetime_callback`. 이 관측기들은 `base.SOURCE_SHA` 등 공유 표를 써서, 같은 tuple 행 구조를 공유 표에 들이는 작업이 먼저다.
+- 판본 문자열 키 표(`adapters/vllm.py` SAFE_PROBES·길이 오류 형식, `kubernetes_response_error`, `engine_provider`, `vllm_runner_capture`)를 판본 행 조회로 바꾸는 일. `adapters/vllm.py`는 M-A9와 같은 파일이라 이 세션에서 고치지 않았다.
+- 기준 판본 쪽 D1~D3은 "(c) 후속, 미구현"이다.
+
+## 15. 단독 개발 후속 — 후보 행·함수 의미 대조 (2026-11-13)
+
+- 관측기 후보 파일 13개(763,545 bytes)를 태그 원본 SHA와 대조해 fixture와 adapter 데이터에 추가했다. 캐시·분산·scoped consumption·slot·kernel·graph·공유 가중치 계열이다. 이미지 bytes 대조 전이므로 모두 candidate_pin이며 등록 생산자 목록은 바꾸지 않는다.
+- V2 sampler의 상태 속성·sampling_params 인자 위치와 공유 가중치 조회의 반환 tuple 위치를 adapter 데이터로 처리한다. 공통 감싸기·최종 소스 확인은 여러 후보 중 실제로 일치한 SHA를 사용한다. 알 수 없는 bytes는 거부한다.
+- 함수 36개의 대조는 [기계 판독 검토 기록](ma6-candidate-function-review.json)에 남겼다. scheduler 대기열·전환·출력·profiler·공급 반환의 차이는 M-B4 후속이며 같은 관측 의미로 무조건 이월하지 않는다.
+- 직접 시험: 관측기·고정값·준비 자산·scoped 소비 등 175개 통과. 추가로 생산자 신원·정확 크기·후보 자격 89개 통과. 새 데이터 의존성이 바뀐 생산자는 과거 GPU 등록을 상속하지 않는지 확인했다. 양성 소비 시험은 모의 등록을 명시하고 기존 assert를 유지했다.
+- 남은 M-A6: 두 판본 HTTP 경로·길이 오류·기동 provider 데이터, 변경 경로표 대조. 기준 쪽 D1~D3 및 실제 이미지·GPU 확인은 원래 후속 범위다. 이 절은 M-A6 전체 완료 기록이 아니다.
+
+## 16. 승인된 Python 레이어 확인 (2026-11-13)
+
+결정 15의 부분 승인 범위 안에서 Python 설치 레이어 두 개만 받았다. 매니페스트 원 bytes와 레이어 SHA·크기를 각각 확인했고, tar 전체를 풀지 않고 patchlevel.h와 dpkg status를 읽었다. [원 메타데이터 요약](ma6-python-layer-check.json).
+
+| 쪽 | Python 설치 레이어의 CPython | 확인 근거 |
+|---|---|---|
+| 기준 | 3.12.8 | patchlevel.h, python3.12·python3.12-dev 패키지 3.12.8-1+jammy1 |
+| 후보 | 3.12.3 | patchlevel.h, python3.12·python3.12-dev·python3.12-minimal 패키지 3.12.3-1ubuntu0.17 |
+
+- 문서 13절의 "7번"은 0부터 센 인덱스다(매니페스트상 여덟 번째 레이어). 압축 bytes 합계는 661,014,960이다. 다른 이미지 레이어는 받지 않았다.
+- 설치 레이어의 Python 판본을 확인한 것이며 최종 엔진 프로세스의 interpreter 경로·패치 판본 확인은 실행하지 않았다. 이후 레이어의 덮어쓰기 가능성을 실제 파일 대조나 기동 확인 없이 제거하지 않는다.
+- 기준 쪽 관측기 15종에 CPython 3.12.8의 자기 코드 지문 행이 있는지는 M-B4에서 확인·추가해야 한다. 기존 패치 판본의 지문을 그대로 승인하거나 자격 검사를 넓히지 않는다.
+- 결정 14는 V0 유지로 확정했고 결정 9의 6행은 항목별 검토 대기다. vLLM·의존성 설치 레이어는 아직 미승인이므로 태그 소스 핀은 후보를 유지한다.
+
+## 17. 기동·HTTP 데이터와 이동 경로 검토
+
+provider의 기동 profile에 두 판본의 명령·모델 인자·기본 엔진·로그/profiler 데이터를 넣었다. HTTP 데이터는 오류 envelope·길이 형식·정확 이미지 쌍과 안전 프로브 후보를 담는다. 기존 판본 비교 분기는 형식 행 조회로 바꿨다. 후보 데이터는 이미지 bytes 검토 전 안전 프로브 실행이나 거부 원인 증명에 사용하지 않으며, 해당 원인은 미검증으로 돌려준다. 후보 관측 profile은 정확 소스·함수·CPython·준비 자산 검사를 거치고 새 생산자의 GPU 등록을 상속하지 않는다. 기준 V0 내부 관측 공백은 여전히 남는다.
+
+공식 두 commit의 전체 Git tree(blob) 비교는 변경 경로 8,002개다. 검토한 정확 경로 17개만 변경 영역 표에 더했다. 제외는 늘리지 않았고 미분류 332개 중 315개를 그대로 남긴다. 관련 후보 경로는 책임 비교이며 git rename이나 동일 관측 의미의 증명이 아니다. 상세 SHA·근거·미분류 목록은 `ma6-change-path-review.json`에 있다. 정식 릴리스 전체 점검 계약은 유지한다.
+
+M-A6 이틀 범위의 후보 행·36개 함수 검토·기동/HTTP 데이터·경로표는 PR 검증 대상으로 준비했다. 이미지 설치 파일 대조·기준 CPython 패치 자격·D1~D3 V0 관측 설계·실제 GPU 등록·M-B4와 결정 9는 별도 미완료다. 이를 전체 M-A6 또는 MVP 완료로 세지 않는다.
+
+## 18. 결정 9 항목별 승인 반영
+
+사용자가 9-1~9-6을 각각 승인했다. 11절 표의 UNKNOWN 분기 범위를 유지하고 REQ-06은 기존 비적용 근거만 추가한다. 기준의 guided_json 필드 대응과 기능 부재 분기는 adapter 데이터에 기록했으며 M-B2·M-B4에서 실제 소비를 연결한다. REQ-16·17의 양쪽 prefix caching 명시는 판본 profile 데이터와 렌더 도구의 `--check-id`로 적용한다. 다른 점검 기동의 기본값을 바꾸지 않는다.
+
+
+## 실제 기동 후속: 기준 V0 멀티모달 prefix cache 공백 (2026-11-14)
+
+앞의 prefix cache 기능표는 일반 기능의 유무와 기본값이다. 지정 REQ-16 멀티모달 모델을 실제 두 고정 이미지에서 기동한 결과, 기준 V0는 --enable-prefix-caching을 받더라도 내부에서 껐다. 정확 설치 engine/arg_utils.py1049~1054행 조건과 실제 로그의 enable_prefix_caching=False를 [GPU 사전 점검](ma7-gpu-preflight-20261114.json)에 남겼다. 모델 로드와 정상 HTTP200은 두 쪽 모두 확인했지만, 그 사실은 이미지 블록/문맥 캐시 격리의 측정력이 아니다. 결정9-6의 양쪽 옵션 명시는 유지하고 기능 부재를 PASS·비적용으로 바꾸지 않는다. 사용자 결정34로 기준 V0 유지와 해당 기준 캐시 분기의 원인 있는 UNKNOWN 예외를 승인받았다. 실제 결과 객체를 생성하거나 나머지 M-A6/7 전체 완료로 세지 않는다. 다른 텍스트 모델/점검의 cache 기능 부재로 일반화하지 않는다.
+
+## 19. 실행기 단위 판본표 (2026-11-15)
+
+J02 첫 실행(2026-11-15, L4 1장, 두 판본 동시 기동)에서 69개가 모두 양쪽 UNKNOWN·`NOT_COMPARABLE`이었다. 주된 원인은 판본 관문이었다. `VllmProvider.allows_legacy_native`가 판본 프로필의 `native_executors`(0.7.0 `[]`, 0.30.0 `["engine_sensor"]`)만 보아, 쿠버네티스 구현이 있는 엔진 쪽 실행기 21종이 엔진 안 관측 여부와 상관없이 `None`이 됐다.
+
+### 19.1 바꾼 구조
+
+- 관문은 실행기 → 카탈로그 기능(`engine_profiles.EXECUTOR_FEATURES`) 조회다. 어느 판본이 그 기능을 갖는지는 `assets/engine_profiles.json`에만 있다. 이전 판본 0.31.0은 `vllm-native-source/1`이 모든 기능을 가지므로 결과가 같다(직접 시험으로 고정).
+- 런타임의 판본 확인도 그 실행기 기능으로 좁혔다(`forwarded_identity`·`stored_responses`·`unix_ipc`·`boundary_egress`, 로그 무결성 전송 `log_integrity`). 전에는 모두 기본값 `native_lifecycle`이었다.
+- 막힌 엔진 쪽 실행기마다 판본 프로필 `executor_gaps`에 원인 코드·관측기·점검·근거·다음 작업을 둔다. `tools/j02_run_config.py` 보고서는 그 행에 `version_gap`을 붙인다. 열린 실행기에는 원인을 적지 않는다(시험으로 고정).
+- 고정값 검사·판정 기준·assert는 바꾸지 않았다. 열린 실행기도 엔진 판본별 HTTP·로그 데이터가 없으면 지금처럼 공백(UNKNOWN)으로 남긴다. 판본이 열렸다는 것은 실행 자격이나 PASS 근거가 아니다.
+
+### 19.2 판본별 결과
+
+| 실행기 | 점검(J02) | 엔진 안 관측 | 0.7.0 | 0.30.0 |
+|---|---|---|---|---|
+| boundary_egress | OBS-04·05, PLT-07 | 없음(소유 Pod 송수신) | 열림 | 열림 |
+| forwarded_identity | REQ-04 | 없음(역할 Pod 기록) | 열림 | 열림 |
+| log_integrity | OBS-09·11 | 없음(CRI·attach 로그) | 열림 | 열림 |
+| record_access | OBS-06 | 없음(Pod 로그 접근) | 열림 | 열림 |
+| required_event_record | OBS-01, PLT-12 | 없음 | 열림 | 열림 |
+| response_content | REQ-13 | 없음(HTTP) | 열림 | 열림 |
+| route_record | REQ-02 | 없음 | 열림 | 열림 |
+| stored_responses | REQ-06 | 없음(HTTP) | 열림 | 열림 |
+| template_validation | REQ-07, SUP-03·13 | 없음 | 열림 | 열림 |
+| unix_ipc | PLT-02·06 | 없음(/proc·소켓) | 열림 | 열림 |
+| engine_sensor | LIF-13, REQ-15·17·18·19·20 | 콜백 센서 | `V0_OBSERVER_NOT_IMPLEMENTED`(D1·D2, LIF-13은 결정 9) | 열림(콜백 후보 행, 이미지 일치) |
+| request_termination | LIF-10·12, REQ-12 | lifecycle·termination·attempt·output 센서 | `V0_OBSERVER_NOT_IMPLEMENTED`(D1) | `OBSERVER_PIN_ROWS_ABSENT` |
+| stream_buffer | LIF-03·04 | lifecycle·stream_buffer 센서(uvicorn) | `V0_OBSERVER_NOT_IMPLEMENTED`(D1) | `OBSERVER_PIN_ROWS_ABSENT` |
+| initialization | LIF-07·09 | initialization·ready·worker 센서 | `V0_OBSERVER_NOT_IMPLEMENTED`(D3) | `OBSERVER_PIN_ROWS_ABSENT` |
+| observation_state | OBS-02 | attempt·output 센서 | `V0_OBSERVER_NOT_IMPLEMENTED`(D1·D3) | `OBSERVER_PIN_ROWS_ABSENT` |
+| model_authorization | REQ-05 | lifecycle 센서(models 경로) | `V0_TARGET_TABLE_ABSENT` | 열림(`/25`, 22절) |
+| profiler_observation | LIF-14 | profiler 센서 | `APPROVED_UNKNOWN`(D5) | `OBSERVER_PIN_ROWS_ABSENT` |
+| session_revocation | PLT-11 | lifecycle 센서(인증) | `APPROVED_UNKNOWN`(D4) | 열림(`/25`, 22절) |
+| credential_revocation | PLT-10 | lifecycle 센서(인증) | `APPROVED_UNKNOWN`(D4) | 열림(`/25`, 22절) |
+| sampling_validation | REQ-10 | runner_capture | `REQUEST_FIELD_MAPPING_NOT_CONSUMED` | `OBSERVER_PIN_ROWS_ABSENT` |
+
+`input_validation`(REQ-08·09, SUP-08)은 전부터 두 판본에서 열려 있었다. J02 첫 실행에서는 운영자 spec이 고르지 않았을 뿐이다.
+
+**0.30.0 `OBSERVER_PIN_ROWS_ABSENT`의 뜻.** 이 센서들은 `vllm_lifecycle_sensor`(대상 모듈 26개)를 기반으로 하고, 0.31.0 파일 SHA 한 행만 받는다(`SOURCE_SHA`가 단일 값). 후보 판본 함수 대조(8절 도구)로 보면 lifecycle 대상 20개 모듈 중 16개는 (a)다. 남은 4개는 검토 대상이다: `default_loader`(반환 tuple 3원소↔4원소), `scheduler`(대기열 구성), `gpu_model_runner`(execute_model·sample_tokens), `gpu_input_batch`(remove_request). 행을 넣으려면 센서 원본이 여러 정확 행을 받게 바꿔야 한다. 그러면 센서 파일 SHA가 바뀌고, 센서 15개의 CPython 패치 판본별 자기 코드 지문(`RUNTIME_CODE_CONTRACTS`)과 그 위 생산자 신원을 다시 만들어야 한다. 이 일은 결정 M-A6-V6으로 묻는다. 대신 실행기를 열어 두면 센서가 0.30.0 모듈을 감싸지 않는다(`MODULE verified=false`). 결과는 원인 있는 UNKNOWN일 뿐 비교가 생기지 않는다. 그래서 열지 않고 원인을 기록했다.
+
+**sampling_validation을 닫아 둔 이유.** 0.7.0에는 `structured_outputs` 필드가 없다(`guided_json`). 판본 프로필의 `request_field_mapping`·`unavailable_branches`(REQ-10 `tool_choice=required`, LIF-05·06·07·16 분기)는 데이터로만 있고, 아직 어떤 실행기도 읽지 않는다. 지금 열면 기준 판본이 무시한 필드를 제약 결과로 오해할 수 있다. `tests/test_code_selection_observation.py`도 구 판본에서는 쿠버네티스 실행기 중 `input_validation`만 연다고 고정한다. 이 assert는 바꾸지 않았다(결정 M-A6-V5).
+
+### 19.3 이미지 bytes 대조와 고정값 승격
+
+- 두 이미지의 설치 파일 대조는 사용자 결정 31(2026-11-14)로 이미 끝났다([M-A3 기록](ma3-image-qualification-20261114.md)). 후보 행 13개의 설치 bytes와 함수 53개의 지문이 모두 일치했고, 기준 vLLM `.py` 574개는 태그 소스 `5204ff5c`와 같았다. 그때는 `pin_status`를 바꾸지 않았다.
+- 이번에 그 근거로 `vllm_observer_pin_rows.json` 13행을 `image_pin`으로, `vllm-callback-candidate-source/1`을 `image_pin`으로 올렸다. 함수 의미 검토(36개, `ma6-candidate-function-review.json`)·준비 자산·GPU 생산자 등록은 별도이며, 등록표(`SUPPORTED_PRODUCERS`)는 바꾸지 않았다.
+- 이 세션은 위 기록을 찾기 전에 기준 이미지의 vLLM·의존성 설치 레이어 4개(10~13번, 5,043,451,516 bytes, 각 레이어 SHA-256 일치)를 로컬로 다시 받아 대조했다. 결과는 기준 vLLM `.py` 574/574가 태그 소스와 같았고(이미지 전용 빌드 파일 3개), 기준 HTTP 길이 원본(`serving_engine.py` `ac5e16bc…`)과 통신 버퍼 행(`f3e7b346…`)도 일치했다. 후보 레이어는 중복이라 받다가 멈췄다. AWS 서버는 켜지 않았고 클라우드 비용은 없다. 결정 31의 승인 바이트 수를 넘는 중복 다운로드였다는 점을 기록한다.
+- 통신 버퍼 행(`vllm_comm_buffer_callback.PIN_ROWS`의 `'candidate'`)과 판본 프로필의 HTTP 행 `pin_status`는 그대로 두었다. 둘 다 기존 시험이 `candidate`를 고정하고 REQ-21·HTTP 안전 프로브 의미와 묶여 있다.
+
+## 20. 기준 V0 관측기 설계 — 중단(2026-11-15)
+
+사용자 결정14 변경으로 기준도 V1을 선택한다. V0 D1~D3와 전용 질문 M-A6-V1~V4는 더 구현하거나 묻지 않는다. [정리 전 설계](https://github.com/dohashelby/byul/blob/c60be056297599921de6271f4c8c2053e7996674/update/docs/dev-1/ma6-version-applicability.md)는 Git 이력에 보존한다. V5·V6 승인은 유지하며 V1 작업은 24절에서 다시 분류한다.
+
+## 21. J02 재실행 전 남은 공백 (2026-11-15)
+
+정적 보고서(`tools/j02_run_config.py`, 지난 J02의 ENV 두 개·정책, 엔진 쪽 실행기 모두 kubernetes 선택)로 본 상태다. 판본 원인은 모두 `version_gap`으로 기록돼 있다: 기준 19행, 후보 13행(점검 수 기준). READY_STATIC은 6에서 18로 늘었다.
+
+1. **판본표(이 문서)**: 0.30.0 파생 센서별 추가 모듈 행(기반 행은 22절 `/25`로 완료), 기준 V0 관측기 D1~D3(M-A6-V1~V3), REQ-05 V0 models 대상표(M-A6-V4), REQ-10 필드 대응 소비(M-A6-V5).
+2. **CPython 자격**: 기준 3.12.8의 센서 지문 행 없음(15/15 거부).
+3. **판본 데이터 소비**: `request_field_mapping`·`unavailable_branches`를 실행기가 읽지 않는다. LIF-05·06·16(`lifecycle_transition`, 이미 두 판본 실행)의 기준 쪽 실행 중 전환 분기가 결정 9-2대로 UNKNOWN이 되는지 실행기에서 확인해야 한다.
+4. **판본과 무관한 입력**(첫 실행 보고에서 이어짐): `--discover` target, `[run_binding]` 값(RUN_BINDING_CONFIG_INVALID·UNAVAILABLE), 정책 값 없는 점검, template_validation의 REQ-07·SUP-13 쿠버네티스 프로필(`KUBERNETES_TEMPLATE_PROFILE_UNSUPPORTED`), unix_ipc 설정.
+5. **첫 실행에서 따로 확인된 공백**(이번 범위 밖): PLT-01·04는 쿠버네티스 경로가 process scan을 하지 않아 UNKNOWN, REQ-01·SUP-04는 실행기 설정 검증 실패, PLT-08·09는 Docker용 팩 프로필, REQ-08·09·11·SUP-08은 `KubernetesTransition`이 단일 실행기만 허용해 따로 실행해야 했다.
+
+## 22. 후보 0.30.0 lifecycle 정확 행 profile `/25` (사용자 결정 M-A6-V6)
+
+### 22.1 구조
+
+- 기반 센서 `/8`(`vllm_lifecycle_sensor.py`)은 그대로 둔다. 파생 센서 15개가 이 파일 SHA(`BASE8_SHA256`)를 고정하고 있어, 기반을 고치면 0.31.0 기록·생산자 신원이 모두 바뀐다.
+- 새 `vllm_lifecycle_release_sensor.py`(`vllm-native-lifecycle-metadata/25`)는 기반의 정확 사본을 비공개로 불러 `SOURCE_SHA`에 0.30.0 정확 행(`RELEASE_ROWS`)을 덮어쓴다. `PROFILE`·`SCHEMA`·`COMMIT`(0.30.0 태그 `ced6857a`)도 바꾼다. 관측 코드는 더하지 않는다. 그래서 기반 `/8`처럼 자기 코드 지문 표가 없고, Python 3.12·optimize 0 조건만 확인한다.
+- 행이 없는 모듈은 0.31.0 값을 유지한다. 0.30.0에서는 기반이 `MODULE verified=false`로 기록하고 그 모듈을 감싸지 않는다. 기록 검증은 profile별 표(`source_hashes(/25)`)로 하므로, 0.30.0 행이 있는 모듈에 0.31.0 bytes가 나오면 `LIFECYCLE_RECORDING_MODULE_HASH_INVALID`로 거부한다(판본 혼합 거부).
+- `/25`는 카탈로그 기능 `lifecycle_release_rows`(`vllm-lifecycle-release-rows/1`, 0.30.0만)가 있는 판본에서만 세션 결합이 된다(`LIFECYCLE_RELEASE_ENGINE_UNSUPPORTED`).
+
+### 22.2 모듈별 의미 검토 (기반 지점 기준)
+
+결정 V6은 "(a) 16개 행, 검토 4개는 공백"이었다. 검토 4개는 이번에 기반 센서가 실제로 읽는 인자 위치·속성·반환을 0.31.0 태그와 0.30.0 태그(= 설치 bytes)에서 대조했다.
+
+| 모듈 | 기반 지점 | 결과 | 행 |
+|---|---|---|---|
+| (a) 13개(serving·engine·middleware·models·weight_utils·input/output_processor·async_llm·core·kv_cache_manager·single_type·block_pool·cpu_model_runner) | 각 POINTS | 줄 이동·docstring만 | 0.30.0 행 |
+| `completion.api_router`·`models.api_router`·`base_loader` | 각 지점 | 파일 동일 | 기존 행 그대로 |
+| `v1.core.sched.scheduler` | `finish_requests`·`_free_request_blocks`·`_drain_deferred_frees` | 시그니처·반환(요청 목록)·`requests`·`sched_step_seq`·`processed_step_seq`·`deferred_frees` 같음. 다른 것은 대기열 내부 구성(`kv_holding_waiting`·`deferred_waiting` ↔ `skipped_waiting`)뿐이고 센서는 읽지 않는다 | 0.30.0 행 |
+| `v1.worker.gpu_model_runner` | `_update_states`·`execute_model`·`sample_tokens`·`load_model`·`get_model`·`_model_forward`, 출력 `get_output` | 시그니처·`num_scheduled_tokens`·`finished_req_ids`·반환 `req_ids`·`input_batch.req_id_to_index` 같음. `get_output`은 routed_experts 처리만 더해졌다 | 0.30.0 행 |
+| `v1.worker.gpu_input_batch` | `InputBatch.remove_request` | prompt embeds 정리 한 줄만 다르다. `req_id_to_index` 의미 같음 | 0.30.0 행 |
+| `model_loader.default_loader` | `load_weights`·`_prepare_weights`·`_get_weights_iterator` | **다름**: `_prepare_weights` 반환이 4원소→3원소(`index_file` 없음). 센서는 4원소일 때만 준비 필드를 읽어 0.30.0에서는 빈 값이 된다 | 행 없음(공백) |
+| `v1.request`·`v1.core.sched.output` | 지점 없음(객체 속성 읽기) | `RequestStatus` enum 순서, `SchedulerOutput` 필드 같음 | 0.30.0 행 |
+| `core_client`·`kv_cache_coordinator`·`serve.utils.api_utils`·`completion.serving` | 지점 없음, 기반이 읽지 않음 | 검토하지 않음 | 행 없음 |
+
+`RELEASE_ROWS` 18행 중 5행(input_processor·kv_cache_manager·block_pool·gpu_model_runner·gpu_input_batch)은 이미지 승격된 `vllm_observer_pin_rows.json` 행과 bytes가 같다(직접 시험으로 고정). 나머지는 태그 소스 bytes이며, 결정 31 대조에서 후보 이미지 vLLM 파일은 Git blob 2,479개가 태그와 일치했다.
+
+### 22.3 열린 실행기와 남은 공백 (0.30.0)
+
+- 열림: `model_authorization`(REQ-05), `session_revocation`(PLT-11), `credential_revocation`(PLT-10), `native_route`. 기반 지점만 쓰며 필요한 모듈(models·middleware·input_processor·base_loader·gpu_model_runner `_model_forward`)에 모두 행이 있다. PLT-10·11은 1차 제외 점검이라 실행 결과는 원래대로 UNKNOWN일 수 있다.
+- 닫힘 유지: `request_termination`·`stream_buffer`·`initialization`·`observation_state`·`profiler_observation`·`rank_failure`·`resource_recovery`·`observation_identity`. 이 센서들은 기반 위에 자기 추가 모듈(`SOURCE_ADDITIONS`: scheduler·request·runner 추가 지점, uvicorn, multiproc_executor, profiler wrapper 등)을 0.31.0 행으로만 갖는다. 파생 센서마다 같은 방식의 판본 행 검토가 다음 작업이다. multiproc_executor는 M-A3 기록에서 두 이미지 모두 기존 고정값과 다르다.
+- GPU 확인·생산자 등록은 하지 않았다. 판본이 열린 것은 실행 자격이나 PASS 근거가 아니다.
+
+## 23. 후보 0.30.0 파생 센서 행 (2026-11-15)
+
+### 23.1 기반 기록으로 도는 실행기 — `/25` 연결
+
+`request_termination`(LIF-10, LIF-12 재시도, REQ-12 시도)과 `observation_state`(OBS-02)는 처음부터 기반 `/8` 기록도 받도록 설계돼 있다(`supported_native_profiles`). projection은 profile별로 갈라지지 않고 기록의 사건만 읽는다. `/25`는 `/8`과 같은 기록 형식이라 지원 집합에 `/25`를 더해 0.30.0에서 열었다. 취소·해제·종료 지점(scheduler·output_processor·core·async_llm·gpu_model_runner·gpu_input_batch)은 22절에서 모두 0.30.0 행이 있다. 파생 termination 센서(`/9`)의 추가 지점은 쓰지 않으므로 `/8` 기록이 주는 범위의 관측이다. 사용자 승인(2026-11-15, "바꿔도 됨")으로 `test_ma6_release_profiles.py`의 "후보에서 request_termination 비노출" assert를 "후보 열림, 기준 닫힘"으로 바꿨다.
+
+### 23.2 initialization — `/26`
+
+- `vllm_initialization_release_sensor.py`(`vllm-native-lifecycle-metadata/26`)는 관측 코드를 더하지 않는다. 비공개 사본 세 개를 순서대로 겹친다: 기반 `/8`, 기반 0.30.0 행(`/25`), initialization 센서 `/14`. 그다음 `/14` 사본의 `SOURCE_ADDITIONS`만 0.30.0 `multiproc_executor` 행(`3ed0149a…`, 이미지 승격 행과 같음)으로 바꾼다. 설치 파일 세 개는 정확 SHA로 확인한다.
+- `/14` 자기 코드 지문은 원본 SHA를 모듈 전역에서 이름으로 읽기 때문에 행을 바꿔도 그대로다(직접 시험으로 고정). 따라서 기존 CPython 판본별 지문 행을 그대로 쓴다. 0.30.0 이미지 CPython 3.12.3 행이 있다.
+- 의미 검토: 관측 지점 `MultiprocExecutor._init_executor`·`WorkerProc.wait_for_ready`·`WorkerProc.wait_for_response_handle_ready`는 0.31.0과 0.30.0 소스가 한 줄도 다르지 않다(code 객체 비교 시험).
+- 기록 검증 `vllm_initialization_metadata.validate_sample`은 profile별 원본 행을 받게 했다. 기본값은 기존 0.31.0 행이다. `/26` 기록에 0.31.0 행이 나오거나 `/14` 기록에 0.30.0 행이 나오면 거부한다.
+- 열린 점검: LIF-09. LIF-07도 같은 실행기라 실행은 된다. 하지만 준비 상태 사슬(`/18`~`/22`: worker startup·generation·ready endpoint)은 0.31.0 행과 `default_loader`에 묶여 있어 0.30.0에서는 원인 있는 UNKNOWN이 된다.
+
+### 23.3 닫힌 채 남은 것
+
+| 실행기 | 점검 | 원인 |
+|---|---|---|
+| stream_buffer | LIF-03·04 | uvicorn `h11_impl`·`httptools_impl`·`flow_control` 행이 기존 uvicorn 커밋 것뿐이다. 후보 이미지의 uvicorn은 0.53.0이고(M-A3 메타데이터), 그 설치 파일 bytes가 아직 없다 |
+| profiler_observation | LIF-14 | 후보의 `TorchProfilerWrapper._start/_stop`·`Worker.profile` 동작이 다르다(함수 검토 기록). 의미 검토가 먼저다 |
+| rank_failure·resource_recovery | J02 밖 | `multiproc_executor` 다른 지점·fault 경로. M-A3 별도 작업 |
+| observation_identity | J02 밖 | `default_loader` 공백 |
+
+## 24. 기준 판본 V1 전환 (2026-11-15)
+
+### 24.1 기동 선택과 증거 경계
+
+- `adapters/assets/vllm_release_profiles.json`의 `launch.default_engine`은 upstream 기본값, `launch.engine`·`launch.env`는 이번 MVP 선택이다. 기준은 V0 기본을 보존하면서 V1을 선택한다. 초기 V1에서는 `EngineArgs.__post_init__`가 `VLLM_USE_V1`에 따라 prefix cache 기본을 켠다. 이 설정도 해당 판본 데이터에 둔다.
+- `gpu_a_aws_lab.render`는 정확한 판본/이미지 쌍에서만 그 환경변수를 적용하고 `render.json#launch`에 남긴다. 세대 이름으로 엔진 모드를 추측하거나 다른 이미지에 V1을 강제하지 않는다. profile과 세대의 같은 변수 선언은 충돌로 거부한다. 새 판본·다른 변수도 같은 렌더 코드에 데이터만 더해 처리한다.
+- `gpu_a_run_inputs.environment`는 `runtime.platform`에 `engine_requested`로 선언을 남긴다. `target`은 실제 Pod spec에 profile 변수의 정확한 literal이 한 번만 있는지 검사한다. 누락·다른 값·중복·`valueFrom`은 거부한다. 렌더/ENV/Pod 일치는 실제 엔진 로그·기능·GPU 자격을 대신하지 않는다.
+- 비교 조건은 선택 엔진 의미를 남긴다. 기준의 opt-in 변수와 후보의 기본 선택이 모두 V1이면 변수 이름 차이 때문에 비교를 막지 않는다. SUP-08 로컬 사전검사도 provider의 정확 선택/변수를 렌더·YAML과 먼저 대조하고, 일치한 선택 변수만 엔진 의미로 비교한다. 다른 환경 차이, 선택 변수/렌더의 자체 재해시 변조, 중복, 과거 선택 미기록 자료는 계속 거부한다. 선택이 기록되지 않은 과거 V0 자료를 새 V1 조건과 같다고 정규화하지 않는다. 과거 `/1`·`/2` 기록은 현재 profile을 소급 적용하지 않고 기존 의미로 재생한다.
+- `Scheduler.__init__`의 `assert lora_config is None`과 `AsyncLLM.add_lora`의 `NotImplementedError`를 확인했다. 기존 LoRA 세대와 아직 없는 `--no-async-scheduling`·`--profiler-config` 옵션은 `launch.unsupported_args`, V2 runner 요구는 `launch.unsupported_env_values` 데이터로 렌더 단계에서 거부한다. 금지 옵션은 `--name=value` 형태도 거부한다. REQ-16의 LoRA/adapter 분기는 새 기동·관측 방안이 필요하며, V0 예외를 새 V1의 승인된 UNKNOWN으로 바꾸지 않는다.
+
+### 24.2 기준 V1 소스 재분류
+
+이미 확보한 태그 소스(`5204ff5c…`)와 결정31의 기준 이미지 `.py` 574개 일치 기록을 사용했다. 엔진을 import하거나 새 이미지/모델을 받거나 GPU를 기동하지 않았다. 아래는 대상표 검토이며 실행 지원·고정값 등록은 아니다.
+
+| 관측 계열 | 기준 V1의 실제 대상 | 현재 관측기와의 차이 / 다음 작업 |
+|---|---|---|
+| 요청 시도·종료·캐시 | `v1/core/scheduler.py`: `add_request`·`finish_requests`·`_free_request`; `v1/core/kv_cache_manager.py`: `get_computed_blocks`·`allocate_slots`·`free` | scheduler가 단일 파일이고 `_free_request_blocks`·block_pool 경로가 없다. 같은 사건을 낼 수 있는 인자/반환·캐시 단위 검토 후 판본별 대상표/행 추가 |
+| 요청 입력·출력·관측 상태 | `v1/engine/processor.py`: `Processor.process_inputs`; `async_llm.py`; `output_processor.py`: `OutputProcessor.process_outputs` | 현 `input_processor.InputProcessor` 대상과 다르다. 요청 수락·runner 연결·완료의 의미와 source ID를 대조 |
+| 초기화·rank·자원 회수 | `v1/executor/multiproc_executor.py`: `MultiprocExecutor._init_executor`·`collective_rpc`·`shutdown`, `WorkerProc.wait_for_startup` | 현 `wait_for_ready`·`wait_for_response_handle_ready`가 없다. 준비 완료·rank/group·새 세대의 인과를 검토. M-A3 실제 RPC 후보와 결과를 합쳐 자격으로 간주하지 않음 |
+| runner·slot·graph·kernel | `v1/worker/gpu_model_runner.py`: `execute_model`·`capture_model`; `gpu_input_batch.py`: `InputBatch.add_request`·`remove_request`·`condense` | V2 runner는 없고 V1에는 지속 InputBatch가 있다. V0의 REQ-18 대상 부재 판단은 이월하지 않는다. sampler/slot 상태·소비 시점·buffer 단위 검토 필요 |
+| HTTP·모델 권한·인증 | 초기 `entrypoints/openai` 경로 + 위 `Processor` | HTTP 기능표와 엔진 내부 대상표를 구별한다. 외부 관측 10종의 지원은 유지하고 내부 모델/인증의 정확 대상표는 별도 추가 |
+| profiler | `AsyncLLM.start_profile`·`stop_profile`, `EngineCore.profile` | V0 worker-only 설계 대신 V1 호출 사슬을 검토. 현재 profiler wrapper 대상은 없어 기존 D5 예외를 이월하지 않음 |
+| 구조화 출력·요청 옵션 | protocol 필드는 있어도 `v1/structured_output`과 현 runner의 제약 소비 대상이 없다 | V0 `guided_json` 필드 대응만으로 REQ-10을 열지 않는다. 실제 초기 V1 sampler 소비를 검토해 같은 질문/다른 질문을 구분. V5의 조건부 assert 변경 승인은 유지 |
+| 스트림 버퍼 | 기준 HTTP ASGI + uvicorn 설치 판본 | V0 D1 신규 구현 대신 정확 uvicorn 행과 초기 V1 HTTP 대상표를 검토 |
+
+검토한 주요 파일 SHA-256:
+
+| 기준 소스 파일 | SHA-256 |
+|---|---|
+| `vllm/engine/arg_utils.py` | `791c1575ff8cf3be25006530f8db0f7eaf1539e0cbb7b7e9e49b874b3f76f7be` |
+| `vllm/v1/core/scheduler.py` | `24db292542369b94d00985b6860386909cf9ce559965263395188f613c4a4985` |
+| `vllm/v1/core/kv_cache_manager.py` | `39f087609c2049d6383d45ae098d5b5a54749d32f14ab6d4cf779d3f54390355` |
+| `vllm/v1/engine/processor.py` | `b3b66559ce98fb31f89a1ca3a8b9b4d7bc942df090305ea5f765d8bcf21e5d43` |
+| `vllm/v1/executor/multiproc_executor.py` | `5db418332360f43e2a9718f62d8ec5d856d554b8d0d27d14f053fb3392d33239` |
+| `vllm/v1/worker/gpu_model_runner.py` | `1ac3fb18b2adad3609dcf58a1656d6fdd4a568eea6740258e00f6a43c7d4b813` |
+
+### 24.3 현재 공백과 구현 순서
+
+1. 기준 V1 대상표·정확 행과 CPython 3.12.8 자기 코드 지문은 25절부터 진행한다. 기반 snapshot 8파일·14함수와 지문 재현을 연결했다. 요청 선택·파생 관측기의 의미/대상표는 계속 별도 검토한다.
+2. 후보는 23절 도달점을 유지한다. uvicorn stream_buffer·profiler 의미 검토와 REQ-10 실제 소비 연결을 잇는다.
+3. ENV·target·prepared는 V1 구성으로 새로 만든다. V0 저장 실측·REQ-16 모델 기동·SUP-08 REGRESSED는 당시 구성의 근거로 보존하며 새 V1 실측으로 재사용하지 않는다.
+4. 직접 시험·소스 목록·현황 정합성을 확인하고 전체는 PR CI에서 확인한다. GPU 재실행과 생산자 등록은 별도 실제 확인이 필요하다.
+
+
+## 25. 기준 V1 관측 행과 CPython 3.12.8 (2026-11-15)
+
+### 25.1 지문 재현과 실행 허용은 구분한다
+
+- `adapters/assets/vllm_observer_abi.json`은 **원본 센서 15개**·기반 `/8`·계약 의존 파일의 정확 bytes를 고정하고, CPython 3.12.3·3.12.8에서 소스를 직접 컴파일한 코드 지문을 담는다. `tools/observer_abi.py --measure`는 측정값 출력만, 기본 실행은 저장된 행과의 정확 일치 검사만 한다. 자동으로 행을 만들거나 승인하지 않는다.
+- CPython 3.12.8은 macOS ARM과 Linux x86_64의 독립 인터프리터에서 15/15 계약 지문과 기반 모듈 지문이 일치했다. Linux는 기존 로컬 Python용 이미지에 별도 standalone 인터프리터만 읽기 전용으로 마운트해 네트워크 없이 실행했다. 엔진/모델을 import·기동하지 않았다. 실제 엔진 이미지 내부 실행이나 GPU 등록의 증거가 아니다.
+- `cpython-312` 캐시 태그는 패치 판본을 구분하지 않으므로 기존 `.pyc`를 쓰지 않는다. `compile(..., dont_inherit=True, optimize=0)`와 재귀 파일명 정규화 뒤 원본의 `code_digest`/`code_contract`로 계산한다. 정규화는 코드·줄 위치·예외표·상수를 지우지 않는다.
+- 이 표만으로 **기존 15개 센서를 활성화하지 않는다.** 원본의 `RUNTIME_CODE_CONTRACTS`와 별도 OS 정책은 그대로다. 특히 file-read·safe-open-mapping·worker-generation·worker-initialization·worker-startup은 `(runtime, os.name)` 표도 검사한다. 지문 표를 핑계로 패치 판본이나 OS를 가장하지 않는다.
+- CI의 별도 `observer-cpython-3128` job은 Linux CPython 3.12.8로 같은 지문을 재현하고 새 profile 시험을 실행한다. 전체 기본 suite는 기존 Linux 3.12.3 job이 맡는다.
+
+### 25.2 데이터로 선택하는 기반 snapshot `/27`
+
+`vllm_native_release_rows.json`의 판본 행을 공통 `vllm_configured_lifecycle_sensor.py`에 넘긴다. 새 판본마다 관측 코드를 복사하지 않는다. 기존 `/1`~`/26`과 원본 센서 bytes는 바꾸지 않았다. 준비 자산은 렌더된 센서·정확 `/8` 사본·bootstrap·설정 네 개다. 기존 자산 검사에 더해 선택한 행으로 다시 렌더한 bytes, 기반 SHA, 선언한 engine/version/image/V1 선택을 대조한다. 다른 판본 bytes·자체 재해시 변조·미선언/중복 엔진 모드는 거부한다.
+
+새 프로필은 CPython 3.12.3·3.12.8 **POSIX**에서만 기반 전체 모듈 코드 지문까지 확인한 뒤 비공개 사본을 설정한다. 허용하지 않은 런타임/OS/최적화/코드는 hook 설치 전에 거부한다. 소스 미일치 또는 대상 함수 부재는 원 동작을 유지하고 미검증 모듈로 남긴다. 이전 판본의 대상표·함수를 새 판본에 보충하지 않는다.
+
+| 정확 설치 행 | 실제 대상 | 관측 의미와 기존 코드 차이 |
+|---|---|---|
+| `v1/core/scheduler.py` | `Scheduler.add_request`, `finish_requests`, `_free_request` | 요청 ID와 현재 `requests` 포함 여부. 마지막 두 함수의 `None`은 해제 ID 목록이 아니다. `finish_requests` 반환 뒤에는 입력의 한정된 문자열 ID로 현재 상태를 읽는다. `_free_request_blocks`/deferred fence를 지어내지 않음 |
+| `v1/core/kv_cache_manager.py` | `KVCacheManager.free` | 요청 인자 ID만 연결. 실제 구현은 `req_to_blocks.pop`·참조 감소·free queue 추가다. 현 기반의 block-pool 기반 소유권 관측은 불완전으로 남으며 캐시 적중/전체 KV 또는 GPU 해제를 주장하지 않음 |
+| `v1/engine/processor.py` | `Processor.process_inputs` | 입력 `request_id`만 기록. `EngineCoreRequest` 반환을 새 ID 배정이나 ASGI 선택 사건으로 바꾸지 않음. 프롬프트/params/토큰/출력은 읽지 않음 |
+| `v1/engine/async_llm.py` | `AsyncLLM.abort` | 입력 ID와 호출/정상 반환/원 예외. 비동기 호출 의미 유지 |
+| `v1/engine/core.py` | `EngineCore.abort_requests` | scheduler의 `finish_requests` 호출, `None` 반환. 현재 scheduler 요청 포함 여부를 입력 ID로 읽음 |
+| `v1/engine/output_processor.py` | `OutputProcessor.add_request`, `abort_requests` | 현재 `request_states` 포함 여부. abort 반환 뒤 입력 ID로 상태를 읽음. 없는 `_finish_request`를 대신 만들지 않음 |
+| `v1/worker/gpu_input_batch.py` | `InputBatch.remove_request` | `req_id_to_index` 포함 여부. 반환 인덱스를 요청 ID나 GPU 해제 사건으로 바꾸지 않음 |
+| `v1/worker/gpu_model_runner.py` | `GPUModelRunner._update_states`, `execute_model`, `load_model`, `get_model` | 기존 bounded scheduler ID/모델 metadata snapshot. 없는 `sample_tokens`·`_model_forward`·sequence는 관측하지 않으며 runner 소비/최종 모델 연결을 입증하지 않음 |
+
+8개 원본은 `tests/fixtures/vllm-0.7.0/`에 태그 bytes와 라이선스/출처를 보존했다. 대상 함수는 AST로 확인하며, `finish_requests`·`abort_requests`는 실제 태그의 메서드 본문과 모의 상태로 반환 전후를 시험한다. 입력 iterator는 관측기가 소비하지 않고, property 실행·원문 노출·원 예외 변경을 금지한다.
+
+### 25.3 현재 지원 경계와 다음 작업
+
+- `configured_lifecycle_rows`는 준비·수집·기록 파싱만 허용한다. 기반 snapshot이 생겼다는 이유로 `native_lifecycle`·request-attempt·termination·initialization·모델 권한 실행기를 열지 않는다. `executor_gaps`와 GPU 등록표는 그대로다. 요청 ID 지문은 기존 `/8`의 SHA-256 계약을 유지하며 이 변경이 HMAC이나 인증을 새로 제공하지 않는다.
+- 후속은 초기 V1의 **fresh 요청 선택/ASGI 연결**, 캐시 단위/적중·소유권, runner 실제 소비, worker startup/rank·profiler/uvicorn 파생 관측이다. 각각의 실제 인자·반환·단위를 검토한 뒤 같은 판본 데이터 또는 필요한 adapter 의미를 추가한다. 기존 V0 UNKNOWN·후보 GPU 자격·과거 V0 측정 결과를 이월하지 않는다.
+- 직접 시험과 CI의 최종 결과/시간은 이번 `PROGRESS.md` 기록에 남긴다. 전체 suite는 로컬에서 실행하지 않는다.
+
+## 26. 기준 V1 요청 연결과 남은 점검 (2026-11-15)
+
+작업지시서 1.2절 1·2번의 진행분이다. 등록되지 않은 생산자나 부분 snapshot만으로 실행기를 열거나 PASS를 만들지 않는다.
+
+### 26.1 기준 0.7.0 V1의 요청 ID 의미
+
+- 0.7.0 `serving_completion`은 `request_id = f"cmpl-{_base_request_id(raw_request)}"`(`X-Request-Id` 헤더 또는 `random_uuid()`)로 만든다. 그 ID가 `AsyncLLM.generate → add_request → Processor.process_inputs(request_id, …)`까지 그대로 간다. 엔진은 0.31.0의 `InputProcessor.assign_request_id`처럼 새 접미사를 붙이지 않는다. 같은 ID가 이미 진행 중이면 `add_request`가 `ValueError`로 거부한다.
+- 따라서 "live ASGI 호출 안에서 이 엔진 요청이 생겼다"는 연결은 같은 의미로 만들 수 있다. 하지만 엔진 ID의 새로움(다른 요청과 겹치지 않음)은 엔진이 보장하지 않는다. 같은 헤더를 다시 쓰면 같은 엔진 ID가 된다. 관측 연결은 이를 가정하지 않는다. projection은 기존처럼 요청 하나에 대응이 정확히 하나일 때만 binding한다.
+
+### 26.2 (철회) `/27` 선택 지점
+
+> **철회(2026-11-15 사용자 결정 "#280에서 /27 빼고 #281 위로").** 아래 구현은 PR #280에서 제거했다. 같은 연결은 PR #281의 `/28`(fresh 선택·세션 HMAC)로 한다. 이 절은 검토 이력으로만 남긴다. 26.1의 요청 ID 의미 분석은 그대로 유효하다.
+
+- 판본 데이터 `vllm_native_release_rows.json`에 `selection: {point: Processor.process_inputs, request_id_argument: 1}`을 더했다. catalog가 지점·인자 위치를 검사하고 렌더된 SPEC에 넣는다.
+- 공통 `vllm_configured_lifecycle_sensor.py`의 관측기는 그 지점에서만 다음을 한다.
+  1. live 선택 문맥(`_ROUTE_REQUEST`가 열린 같은 pid)이 있을 때 SELECTION CALL/RETURN을 기록한다. 요청 ID는 인자에서 읽는다(priority·session·rank는 관측하지 않음).
+  2. 같은 조건과 같은 pid의 ASGI 문맥이 있을 때만 NATIVE RETURN에 `external_request_sha256`(= 엔진 ID 지문)·`asgi_request_sha256`을 붙인다.
+- 상속된 ASGI 문맥만 있거나 live 문맥이 없으면 연결을 만들지 않는다. main의 기존 불변식 시험 `test_processor_input_snapshot_cannot_claim_a_fresh_asgi_assignment`는 그대로 통과한다.
+- 기록 검증·연결 함수(`vllm_lifecycle_links.assignment`)·termination projection은 0.31.0 지점과 catalog의 판본 선택 지점 집합을 받는다. 지점 이름은 profile별 지점 표로 검증되므로 다른 판본 기록에 섞일 수 없다. `/27`은 선택 지점이 있을 때만 요청 선택·경로 키를 허용한다.
+- 직접 시험 `test_ma6_v1_selection_link.py`: 연결 성립, 상속 문맥·live 문맥 없음·잘못된 ID에서 연결 없음, 인자 위치(태그 AST). CPython 3.12.3·3.12.8에서 통과.
+
+### 26.3 기준 0.7.0의 19개 점검
+
+| 점검 | 실행기 | 상태 | 남은 것 |
+|---|---|---|---|
+| LIF-10·12, REQ-12, OBS-02 | request_termination·observation_state | **닫힘**(W1 승인, #281 `/28` 병합 뒤 연다) | `tests/test_configured_lifecycle.py`의 0.7.0 비노출 assert 변경은 W1로 승인됐다. 열려도 REQ-12의 ATTEMPT(`/10`)·KV 블록 소유권은 없다(LIF-10 kv 범위는 미관측) |
+| REQ-05 | model_authorization | 닫힘 | 0.7.0 runner에 `_model_forward`가 없다. `execute_model`이 모델을 직접 부른다. 최종 모델 연결 지점의 새 의미가 필요하다(M-A6-W2) |
+| PLT-10·11 | credential/session_revocation | 닫힘 | 0.7.0 `api_server.build_app`의 인증은 지역 함수라 감쌀 module 속성이 없다. V0 D4 승인의 이월 여부(M-A6-W4) |
+| LIF-07·09 | initialization | 닫힘 | 0.7.0 `WorkerProc`에는 `wait_for_ready`가 없고 `wait_for_startup`이 있다. `/14` 원본 센서는 3.12.8 실행 표가 없다(25.1). V1 대상표·관측 의미 신규 |
+| LIF-13 | engine_sensor | 닫힘 | 태그에 `weight_cache` 모듈이 없다. 결정 9-1(기능 부재 UNKNOWN)의 V1 이월 여부(M-A6-W4) |
+| REQ-15·17·18·19·20 | engine_sensor | 닫힘 | 0.7.0 V1 `kv_cache_manager`·`gpu_model_runner`·`gpu_input_batch` 콜백 대상표가 없다. 캐시 적중·slot·graph 의미를 V1 0.7.0 객체로 검토해야 한다 |
+| LIF-03·04 | stream_buffer | 닫힘 | uvicorn 0.34.0 설치 행 + V1 HTTP. 원본 센서 3.12.8 실행 표 없음 |
+| LIF-14 | profiler_observation | 닫힘 | V1 0.7.0 profiler 호출 사슬(`AsyncLLM.start_profile`·`EngineCore.profile`) 대상표 신규 |
+| REQ-10 | sampling_validation | 닫힘 | 0.7.0 V1에 `v1/structured_output`이 없다. 구조화 출력의 실제 소비 여부를 기능 부재로 볼지(M-A6-W5) |
+
+### 26.4 후보 0.30.0의 4개
+
+| 점검 | 상태 | 근거 |
+|---|---|---|
+| LIF-03·04 | 닫힘 | uvicorn 0.53.0 설치 파일 bytes 필요. PyPI wheel(87,081 bytes) 다운로드 승인 대기 |
+| LIF-14 | 닫힘 | `TorchProfilerWrapper._start`: 0.31.0은 start마다 새 profiler 객체를 만들고, 0.30.0은 같은 객체를 다시 시작한다. `_stop`은 dump 설정 이름이 다르다. `WorkerProfiler.start/stop/step`은 같다. profiler 세대를 객체로 볼지 호출 순서로 볼지(M-A6-W3) |
+| REQ-10 | 열림(29절 정확 runner_capture 행) | V5의 temperature/top_p API→runner→sampler 관측만 연결한다. structured_outputs·min_tokens 및 GPU 실측은 별도 공백 |
+
+## 27. 사용자 결정 M-A6-W1~W6 반영 (2026-11-15)
+
+### 27.1 W1과 PR #281의 겹침
+
+- PR #281(`codex/baseline-v1-request-binding-20261115`)은 같은 목적의 기준 V1 요청 연결을 새 profile `/28`로 구현한다. API의 요청 ID 선택, 원 `AsyncLLM`/`Processor` 입력 ID 대조, 세션 HMAC을 함께 쓰는 더 엄격한 연결이다. 26.2절의 `/27` 선택 지점과 같은 파일 네 개를 고친다: `vllm_native_release_rows.json`, `vllm_lifecycle_catalog.py`, `vllm_lifecycle_profiles.py`, `lifecycle_capture.py`.
+- 두 연결을 함께 두지 않는다. W1의 실행기 열기는 `/28` 기록을 지원 집합에 넣는 방식으로, #281 병합 뒤에 한다. 사용자 결정("#280에서 /27 빼고 #281 위로")으로 #280의 `/27` 선택 지점 코드를 제거했다. 후보 stream_buffer 변형 profile도 #281 병합 뒤 최신 main에서 새 브랜치로 한다.
+- PR #283(M-A3 V1 RPC 원본 검토)은 `multiproc_executor` RPC 영역이라 이 작업과 파일이 겹치지 않는다.
+
+### 27.2 W6 — uvicorn 0.53.0 설치 파일 대조
+
+| 대상 | SHA-256 | 대조 |
+|---|---|---|
+| `uvicorn-0.53.0-py3-none-any.whl` (87,081 bytes, files.pythonhosted.org) | `e8dca71ec86dce5f04e333f0d56cdedf942446e6643b9cea1af0d6d3a02cb03e` | PyPI JSON의 배포 SHA와 같음 |
+| `uvicorn-0.53.0.dist-info/METADATA` | `bcfb3b631d31e3ff7c6992428b0480a09d407ec829905aa9301f736bd854cb45` | M-A3의 후보 이미지 uvicorn 메타데이터 SHA와 같음 |
+| `uvicorn/protocols/http/h11_impl.py` | `a3154a6c2cfaaaebe19ac7aa255dfe9b6b7b490de1da95274c033aa093e8c322` | stream_buffer 센서 `SOURCE_ADDITIONS`의 고정값과 같음 |
+| `uvicorn/protocols/http/httptools_impl.py` | `1d4e1c579df4168433a61a01f10c628b31c1790e72dd9769d2b8633b22214033` | 같음 |
+| `uvicorn/protocols/http/flow_control.py` | `d39d16560df512f3ce907c329c2a0c3f5cd7165fef3b753876eae5739bf2a785` | 같음 |
+
+- 결론: stream_buffer 센서가 이미 고정한 uvicorn 파일 세 개는 uvicorn 0.53.0의 bytes다. 후보 이미지의 uvicorn도 0.53.0이다(메타데이터 bytes 일치). **새 uvicorn 행은 필요 없다.** 다만 이미지 안 `.py` 파일 자체의 SHA는 M-A3에 기록돼 있지 않다. 이 대조는 wheel과 이미지 메타데이터 일치에 근거한다.
+- 남은 것: 후보 0.30.0에서 stream_buffer를 열려면, 센서가 기반 모듈(요청 연결에 쓰는 `input_processor` 등)을 0.30.0 행으로 설정해야 한다. 지금은 0.31.0 행이다. 23.2절의 `/26`처럼 기반 + `/25` + stream 센서를 겹치는 변형 profile이 필요하다. 이 변형은 #281이 함께 고치는 파일(`lifecycle_capture.py`·`lifecycle_profiles.py`·`collectors/lifecycle.py`)을 건드리므로 #281 병합 뒤에 한다.
+
+### 27.3 W5 — 기준 REQ-10 구조화 출력 GPU 확인 절차
+
+소스 근거: 0.7.0의 `SamplingParams`·OpenAI protocol은 `guided_decoding`·`guided_json`을 받는다. 하지만 V1 엔진 쪽(`v1/engine/processor.py`, `v1/sample/*`, `v1/worker/gpu_model_runner.py`)에는 guided decoding이나 logits processor를 적용하는 코드가 없다. 결론은 GPU 확인으로만 낸다.
+
+절차(J02 기준 0.7.0 V1 Pod, `VLLM_USE_V1=1`, 같은 모델·`--seed`·온도 0):
+1. 엔진 기동 로그를 보존한다. guided decoding 경고나 미지원 메시지가 있으면 원문 행의 SHA를 기록한다.
+2. `POST /v1/completions`, `temperature=0`, `max_tokens=32`, `prompt="EXAMPLE: say hello"`로 보낸다. 제약 필드는 `guided_json`으로, 스키마는 `{"type":"object","properties":{"answer":{"type":"string","enum":["EXAMPLE_A"]}},"required":["answer"],"additionalProperties":false}`로 한다. 같은 요청을 5회 반복한다.
+3. 대조군으로 같은 프롬프트를 제약 필드 없이 1회 보낸다.
+4. 후보 0.30.0에서도 같은 스키마를 `structured_outputs` 필드로 5회 보낸다. 제약이 실제로 걸리는 판본의 기준선이다.
+
+판단 기준:
+- **기능 부재(결정 9 형식으로 정리):** 0.7.0 V1의 5회 응답이 모두 HTTP 200인데, 하나라도 JSON으로 읽히지 않거나 스키마(`answer`=`"EXAMPLE_A"`, 추가 키 없음)를 어긴다. 그리고 응답 내용이 대조군과 같다(제약이 반영되지 않음).
+- **제약이 적용됨:** 5회 모두 스키마를 지킨다. 이 경우 기능 부재로 정리하지 않는다. V1 0.7.0의 실제 소비 지점을 찾아 관측 대상표를 새로 만든다(새 결정 질문).
+- **판단 불가(UNKNOWN 유지):** 요청이 4xx로 거부되거나, 기동이 실패하거나, 결과가 반복마다 다르다.
+- 기록: 요청 본문 SHA, 응답 본문 SHA·HTTP 상태·스키마 판정 결과, 엔진 로그 해당 행 SHA, 이미지 digest, ENV ref. 응답 원문은 개인정보 경계에 따라 공개 요약에 넣지 않는다.
+
+### 27.4 W2·W3·W4 반영 상태
+
+- W2: 기준 REQ-05는 `model_authorization` 원인을 "최종 모델 연결 지점 없음, 사용자 결정 W2로 원인 있는 UNKNOWN"으로 둔다.
+- W4: 기준 LIF-13·PLT-10·11은 원인 있는 UNKNOWN 마감이다. 0.7.0 `executor_gaps`의 원인 코드는 `APPROVED_UNKNOWN_V1`이다. V0 승인 예외(`APPROVED_UNKNOWN`)를 물려받지 않는다는 기존 시험(`test_release_engine_selection.py`)과 구분하려고 V1에서 새로 승인한 원인을 따로 표시한다. W2의 REQ-05도 같은 코드다.
+- W3: 센서 원본을 다시 읽어 보니 profiler 센서(`vllm_profiler_sensor.py`)는 이미 세대를 호출 순서로 정한다. `profiler_emit`은 `TorchProfilerWrapper._start`가 성공할 때마다(C builtin probe가 꺼짐→켜짐) `(wrapper, thread)` 키의 세대 값을 새로 만든다. torch profiler 객체의 식별값(`backend_sha256`)은 같은 세대의 start·stop을 짝짓는 비교값으로만 쓴다. 0.30.0처럼 같은 객체를 다시 시작해도 start마다 새 세대가 생기고, 객체 재사용은 같은 `backend_sha256`으로 기록된다. 따라서 W3 결정은 센서 코드 변경 없이 충족된다. 자기 코드 지문 재계산과 그 CI job도 필요 없다(사용자 확인 대기).
+  - 후보 LIF-14를 닫은 실제 원인은 센서 추가 모듈 세 개(`vllm.profiler.wrapper`·`vllm.v1.worker.gpu_worker`·`vllm.entrypoints.serve.profile.api_router`)의 고정값이 0.31.0 것뿐이라는 점이다. 23.2절 `/26`처럼 기반 + `/25` + profiler 센서에 0.30.0 행을 겹치는 변형 profile로 연다. 바뀐 함수 중 센서가 읽는 값(`Worker.profile`의 `profiler_config.profiler`, wrapper의 `_active`·`_running`·`local_rank`, `profiler` 객체)은 변형을 만들 때 다시 대조한다. 이 변형은 #281과 같은 파일을 건드리므로 #281 병합 뒤에 한다.
+
+## 28. 기준 V1 REQ-10 제약 소비의 한정된 소스 대조 (2026-11-15)
+
+[검토 원자료](req10-initial-v1-source-review-20261115.json)는 이미 승인되어 확보한 기준 설치 소스6파일과 V1 디렉터리42개 Python 파일의 범위를 식별한다. 엔진/torch·모델을 import하지 않고 새 다운로드/GPU 실행 없이 확인했다. 이 보고서는 실제 환경의 기능 부재·보안 판정이나 전체 경로 관측을 인증하지 않는다.
+
+- API protocol의 `guided_json`·`GuidedDecodingParams.from_optional` 전달과 실제 sampler 소비는 별개다. protocol은 guided 설정을 SamplingParams로 넘기지만 검토한 V1 소스42개에서는 guided_decoding/structured_outputs/logits_processor/grammar 참조가 없었다.
+- `InputBatch.add_request`는 temperature/top-p/top-k·penalty/min/stop/logprob를 복사하고 `make_sampling_metadata`가 그 값을 조립한다. 검토한 `SamplingMetadata`에는 제약/grammar/processor 필드가 없다. 실제 sampler의 forward→penalty/temperature→sample 경로를 원 메서드 본문과 EXAMPLE 협력 객체로 greedy/random 각1회 실행했다. guided 관련 getter를 읽으면 실패시키는 대조에서 두 경로 모두 읽지 않았다. 이는 그 한정된 소스 경로의 관측이며 실제 모델/GPU 결과가 아니다.
+- 후보 소스에는 InputProcessor의 structured 설정 검증, runner의 `apply_grammar_bitmask`와 sampler의 logits processor 적용 경로가 별도로 있다. 기준에 후보의 소비 지점을 있다고 가정하거나 후보 결과를 기준으로 이월하지 않는다. 후보의 실제 검증/소비/거부 원 자료 연결은 아직 구현/확인해야 한다.
+- 현재 REQ-10은 기본 sampling+실제 지원 구조화/tool 선택의 최종 집행과 runner 소비를 요구한다. API 필드 대응·HTTP400·모의 sampler 실행만으로 runner_consumption_verified=true나 PASS·비적용을 만들지 않는다. 기본 sampling/다른 요청 독립 결과는 계속 확인하고 구조화 분기의 실제 조건/소비가 미확인인 범위는 UNKNOWN과 원인을 유지한다. 기존 결정9-5의 V0 기반 필드 대응을 새 V1 소비 근거로 쓰지 않는다.
+
+다음은 현재 V1의 실제 API/모델/설치 source·선택 backend를 고정하고, 허용/거부 지점·고비용 변환/모델 제출의 도달/미도달과 실제 sampler 소비를 관측하는 것이다. 확인 불가 분기를 MVP의 승인된 예외로 완료 처리하려면 별도 사용자 결정을 받는다. 판정·팩·정책·지원표/고정값·실행기 활성화·M-B4 보관은 바꾸지 않았다.
+
+## 29. 후보 0.30.0 transport/profiler 정확 변형 (2026-11-15)
+
+- REQ-10 후보 runner_capture는 별도 정확 0.30.0 행으로 연다. `ma6-pin-compare.json`의 후보 이미지와 일치하는 serving/input/worker 9개 파일 SHA를 runtime Pod에서 전후 다시 대조한다. 여기에 원본 callback 자산·session HMAC 키·`VLLM_DISABLE_REQUEST_ID_RANDOMIZATION=1`·`VLLM_USE_V2_MODEL_RUNNER=0`·읽기 전용 mount·동일 세대도 확인한다. 대상 요청은 `POST /v1/completions`, 비스트림 `n=1`, 짧은 prompt 하나다. 0.30.0의 `_base_request_id`는 header가 없으면 16-hex `random_uuid`를 사용하고, completion serving은 `cmpl-` 부모 ID에 `-0`을 붙여 V1 엔진에 보낸다. 후보 capture의 응답/요청 식별 기록은 session HMAC만 쓴다. 기준 0.7.0 관문과 0.31.0 기존 profile은 그대로다.
+- 실제 REQ-10 값 연결 범위는 `InputProcessor._validate_params`의 `SamplingParams`, `GPUModelRunner._update_states`의 `scheduled_new_reqs`, `GPUModelRunner._sample` 직전 `InputBatch.temperature_cpu`·`top_p_cpu`다. 후보 소스의 `InputBatch.add_request`는 그 배열을 `sampling_params`에서 채우고 `_sample`은 같은 batch의 `sampling_metadata`를 sampler에 넘긴다. 새 capture는 요청에 명시된 숫자 필드만 wire 값으로 고정한다. 생략 필드는 기본값을 발명하지 않고 API 관측의 정규화 값을 runner·sampler와 대조한다. 세 단계 중 누락·차이가 있으면 준비 receipt를 쓰기 전에 B projection에 공백을 더하고 최종 소비도 `runner_consumption_verified=false`로 둔다. 현재 유효 경계 probe는 temperature=0·top_p=1이고, 나머지 정상 probe의 실제 기본값은 API 관측으로만 결정한다. 비기본 유효값의 실측은 없다. 이 값 일치는 GPU tensor/kernel 적용, structured_outputs, min_tokens, 무응답 4xx 도전 사례의 native ID, producer 등록 또는 보안 PASS가 아니다. W5 기준 0.7.0 V1 구조화 출력 GPU 실험과 후보 GPU 확인은 남는다. 로컬 Python/pytest는 실행하지 않았고 PR CI 대상이다.
+- `/29`는 정확 `/8` 기반에 `/25`의 0.30.0 행을 적용한 뒤 원본 `/12` stream observer bytes를 붙인다. Uvicorn h11·httptools·flow_control의 설치 bytes SHA는 기존 `/12`의 세 행과 같다. HTTP 응답 크기와 실제 transport write buffer/kernel outq/RSS는 계속 서로 다른 사실이다. LIF-03/04의 버퍼 실측·GPU 자격은 현재 없다.
+- `/30`은 같은 `/25` 기반에 원본 `/15` profiler observer bytes를 붙이고 wrapper·gpu_worker는 후보 이미지의 정확 SHA 행으로 고른다. profile router는 원본과 정확 bytes가 같다. 원본 센서의 `profiler_emit`는 qualified `_start` RETURN마다 새 `profiler_nonce()`로 generation을 만든다. backend 객체 SHA가 같아도 세대는 start/stop 호출 순서로 구분하므로 이 센서의 소스·CPython 코드 지문을 바꾸지 않는다. backend 수집 종료·trace 출력·cross-process RPC·다음 정상 시작 검증은 기존 독립 관문을 유지한다.
+- 두 변형은 준비 자산의 기반·행·관측기 사본을 정확 bytes로 다시 확인한다. parser도 선택 profile의 소스 행만 허용한다. 0.31.0 원 profile과 과거 결과를 다시 쓰지 않고, 실제 ENV/target·GPU 생산자 등록·PASS를 주장하지 않는다. 로컬 Python/pytest는 사용자 지시로 실행하지 않았으며 CI에서 확인한다.
+- 새 `/29`·`/30`만 비공개 세션 키 자산과 `/28`의 고정 소스 키 검증기를 설치 전에 확인한다. 키·센서 코드 검증 실패 시 hook을 설치하지 않는다. ASGI header는 `/28`의 `asgi-header` 도메인 HMAC으로 기록한다. 원본 `/8`의 NATIVE·SELECTION 요청 ID SHA 결과가 들어가는 명시적 요청 식별 필드(`request_sha256`, `external_request_sha256`, `selected_request_id_sha256`, `observed_request_sha256`, `selected_scheduled_sha256`, `selected_finished_sha256`)는 저장 직전 `legacy-request-sha` 도메인 HMAC으로 재표현한다. ASGI context 요청 필드는 현재 scope의 header HMAC 또는 `null`이다. 모델·소스·파일·객체 SHA는 재표현하지 않는다. `/29` stream 경로는 원본의 요청 형식 검증 후 정확 header HMAC을 사용한다. 실행기 trial과 보존 report의 요청 식별자도 동일한 header HMAC이며 키 검증 실패 시 해당 요청을 보내지 않는다. 원본 `/12`·`/15` bytes와 기존 profile 동작은 유지한다.
+- `/29`의 ASGI header HMAC 경로는 `/v1/completions`이다. `/30`은 `/v1/completions`와 원본 profiler가 등록한 `/start_profile`·`/stop_profile`만 허용한다. header가 누락되거나 유효하지 않으면 요청·invocation 결합 필드는 함께 `null`이 되어 profiler 기록의 validator 조건을 지킨다. 실제 API handler 관측만 API→worker 결합 후보로 소비한다.

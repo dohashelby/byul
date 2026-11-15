@@ -24,6 +24,39 @@ on:
       - "update/docs/b-lif07/PR171_SOURCE_CONSUMPTION.md"
       - "update/docs/b-lif07/WORKER_READINESS.md"
       - "update/docs/b-lif13/WEIGHTS_LIFETIME.md"
+      - "update/docs/dev-1/ma6-version-applicability.md"
+      - "update/docs/dev-1/req10-initial-v1-source-review-20261115.json"
+      - "update/docs/dev-1/ma3-rank-fault-producer.md"
+      - "update/docs/dev-1/fresh-request-binding.md"
+      - "update/docs/dev-1/ma3-rpc-gpu-observations-20261114.json"
+      - "update/docs/dev-1/ma3-product-binding-preparation-20261115.json"
+      - "update/docs/dev-1/ma3-rpc-common-preparation-20261115.json"
+      - "update/docs/dev-1/ma3-rpc-product-preparation-20261115.json"
+      - "update/docs/dev-1/ma3-image-qualification-20261114.md"
+      - "update/docs/dev-1/ma3-image-qualification-20261114.json"
+      - "update/docs/dev-1/ma7-req16-model-candidate.json"
+      - "update/docs/dev-1/ma7-gpu-preflight-20261114.json"
+      - "update/docs/WORK_ORDER_VLLM_MVP.md"
+      - "update/docs/dev-1/ma6-change-path-review.json"
+      - "update/docs/evidence/sup08-code-selection-20261111.json"
+      - "update/docs/evidence/sup08-canonical-gpu-20261114.json"
+      - "update/docs/evidence/gpu-a-SUP-08-20261114.json"
+      - "update/docs/dev-1/ma8-poc-fixture-contract.json"
+      - "update/docs/dev-1/ma8-local-fixture-manifest.json"
+      - "update/docs/dev-1/ma8-local-preparation-20261113.json"
+      - "update/docs/dev-1/ma8-local-preflight-20261113.json"
+      - "update/docs/dev-1/ma8-local-preflight-pack35-20261114.json"
+      - "update/docs/dev-1/ma8-local-preflight-pack36-20261115.json"
+      - "update/docs/dev-1/ma7-file-preflight-20261115.json"
+      - "update/docs/dev-1/ma7-rank-input-link-20261115.json"
+      - "update/docs/dev-1/ma7-rank-product-link-20261115.json"
+      - "update/docs/dev-1/ma7-input-preflight.md"
+      - "update/docs/gpu-a/RESULTS-20261111-SUP08.md"
+      - "update/docs/dev-1/ma7-session-input-plan.json"
+      - "update/examples/mvp-confirmed-values.yaml"
+      - "update/docs/gpu-a/policy-a-draft.yaml"
+      - "update/docs/dev-1/ma7-local-materialization-20261113.json"
+      - "update/docs/dev-1/req17-split-collection.md"
       - "contracts/**"
       - "platform/api/**"
   # PR은 항상 실행하고 job 단위에서 건너뛴다. 경로 필터로 workflow 자체를 건너뛰면 필수 검사가 Pending에 남는다.
@@ -77,6 +110,8 @@ jobs:
           python-version: "3.12.3"
       - run: python -m pip install uv==0.12.11
       - run: uv sync --frozen
+      - name: Compile update sources before the full suite
+        run: uv run python -m compileall -q src/guard tools
       - name: Measure default suite parent wall clock
         run: |
           uv run --project ../platform/api --frozen --with-editable . --with-editable ../runtime --with pytest-xdist==3.8.0 python - <<'PY'
@@ -94,6 +129,46 @@ jobs:
       - run: uv build --wheel
       - name: Verify installed wheel outside checkout
         run: uv run python tools/verify_installed.py --wheel dist/guard-0.1.0-py3-none-any.whl --output "${{ runner.temp }}/byul-update-installed"
+
+  observer-cpython-3128:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: update
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12.8"
+      - run: python -m pip install uv==0.12.11
+      - run: uv sync --frozen
+      - name: Reproduce immutable observer contracts from source
+        run: python -B -I tools/observer_abi.py
+      - name: Verify configured lifecycle and exact interpreter refusal
+        run: |
+          uv run --python 3.12.8 python - <<'PY'
+          import os
+          import subprocess
+          import sys
+          import tempfile
+          import time
+
+          start = time.perf_counter()
+          with tempfile.TemporaryDirectory(prefix="byul-observer-pyc-", dir=os.environ["RUNNER_TEMP"]) as cache:
+              result = subprocess.run([sys.executable, "-X", "pycache_prefix=" + cache, "-m", "pytest", "-q",
+                  "tests/test_observer_abi.py", "tests/test_configured_lifecycle.py",
+                  "tests/test_fresh_request_binding.py", "tests/test_rank_v1_source_reviews.py", "tests/test_rank_v1_worker_binding.py",
+                  "tests/test_release_observation_variants.py", "tests/test_ma6_baseline_startup.py",
+                  "tests/test_ma6_baseline_profiler.py",
+                  "--basetemp", os.path.join(os.environ["RUNNER_TEMP"], "byul-observer-3128")])
+          print(f"Observer 3.12.8 parent wall clock: {time.perf_counter() - start:.3f}s", flush=True)
+          raise SystemExit(result.returncode)
+          PY
 
   update-docker-stub:
     needs: changes
@@ -186,7 +261,7 @@ jobs:
   # 필수 검사는 이 job 하나만 지정한다. 건너뛴 job은 통과로, 실패·취소는 실패로 본다.
   update-ci-ok:
     if: always()
-    needs: [changes, update-default, update-docker-stub, shared-contracts, platform-update-contracts]
+    needs: [changes, update-default, observer-cpython-3128, update-docker-stub, shared-contracts, platform-update-contracts]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

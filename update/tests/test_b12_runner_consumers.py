@@ -76,6 +76,7 @@ def judged(tmp_path, cid, draft, env, values):
 
 
 @pytest.mark.parametrize("v2", [False, True])
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_real_registered_producer_roundtrip_and_request_coverage(v2):
     record, original = make_runner(v2=v2)
     result = bridge.runner(record, SCOPE, check_id="REQ-10", requests={"normal": "1" * 64}, required_cases=["normal"])
@@ -86,6 +87,7 @@ def test_real_registered_producer_roundtrip_and_request_coverage(v2):
 
 
 @pytest.mark.parametrize("damage", ["unsupported", "truncated", "session", "restarted"])
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_source_and_generation_gates_are_not_lifted(damage):
     record, _ = make_runner(); record = deepcopy(record)
     if damage == "unsupported": record["producer"]["source_sha256"] = "f" * 64
@@ -132,6 +134,7 @@ def input_finish(tmp_path, *, unsupported=False, consumed=False):
     return draft, *judged(tmp_path, cid, draft, env, values)
 
 
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_registered_input_collect_finish_survives_normalization_and_stored_artifact(tmp_path):
     draft, evd, result = input_finish(tmp_path)
     assert draft.data_origin == DataOrigin.EXAMPLE and evd.data_origin == DataOrigin.EXAMPLE
@@ -168,6 +171,7 @@ def test_supply_record_is_sup03_only_and_not_native_tensor_consumption():
         bridge.supply_reads(record, SCOPE, check_id="SUP-05")
 
 
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_registered_req09_collect_maps_observed_runner_range_to_original_fail(tmp_path):
     from guard.adapters.vllm import SAFE_PROBE_REVIEWED_IMAGES
     from tests.test_input_response_semantics import error, length_error, response
@@ -200,6 +204,7 @@ def test_registered_req09_collect_maps_observed_runner_range_to_original_fail(tm
 
 
 @pytest.mark.parametrize("include_min_tokens,expected", [(False, "PASS"), (True, "UNKNOWN")])
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_registered_sampling_collect_requires_all_selected_native_fields(tmp_path, include_min_tokens, expected):
     env = environment(model={"id": "test"}, engine={"name": "vllm", "version": "0.31.0"})
     target = {"lab": False, "engine": {"trusted_url": "http://unused", "container": "engine"},
@@ -287,6 +292,7 @@ def test_input_exception_is_preserved_without_erasing_independent_failure(tmp_pa
 
 @pytest.mark.parametrize("damage", ["generation", "pid_reused"])
 @pytest.mark.parametrize("independent", [False, True])
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_req09_unbound_process_cannot_create_confirmed_fail(tmp_path, damage, independent):
     env = environment(); target = {"lab": True}
     scope = {**SCOPE, "environment_ref": env.ref().model_dump(mode="json"), "target_sha256": sha256_hex(canonical_json(target))}

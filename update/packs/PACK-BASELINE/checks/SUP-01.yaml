@@ -2,7 +2,7 @@ id: SUP-01
 framework_id: CHK-SUP-001
 mechanism_ids:
 - mechanism-01
-revision: 4
+revision: 5
 retired: true
 area: SUP
 purpose: 승인 권한 분리
@@ -12,7 +12,7 @@ scope: null
 risk_category: 보안 위협 점검
 risk_summary: 공급물 제출자가 저장소 쓰기 권한으로 승인 기록까지 바꿔 비승인 모델을 서비스에 투입할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   prose: 공급물의 제출·저장·승인 절차가 있는 환경. 승인 도구가 미정이거나 없으면 제외하지 않고 승인 집행점의 미확인으로 남긴다.
 policy_params:

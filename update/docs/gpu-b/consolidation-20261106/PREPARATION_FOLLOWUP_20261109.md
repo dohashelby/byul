@@ -11,7 +11,7 @@
 ## 사용하는 위치
 
 - [B4 도구와 상세](B12_B4_INTEGRATION.md#b4-로컬-입력-사전검증-보강--2026-11-09): `update/tools/b12_tp2_inputs.py --verify-inputs-root <로컬-입력-루트>`를 기존 prepare 명령에 선택적으로 붙인다. 옵션이 없으면 기존 포인터 선언만 확인한다. 오류 진단은 `local-verification.json`과 manifest에 연결하며 FAILED는 CLI2, 미확정은 INCOMPLETE다.
-- [REQ 인계 상세](../../b-work/B12_S5_CONSUMERS_20261108.md): `update/tools/b_runner_inputs.py --inputs <입력.json> --inputs-sha256 <파일SHA> --output <새-디렉터리>`. 독립 입력과 원 record를 pin해 `runner-input.json`으로 인계한다. raw record를 재직렬화하거나 기록에서 기대 scope/매핑을 생성하지 않는다.
+- [REQ 인계 상세](https://github.com/dohashelby/byul/blob/3c611e214044460d5929e8fb0c3a615265425da0/update/docs/b-work/B12_S5_CONSUMERS_20261108.md): `update/tools/b_runner_inputs.py --inputs <입력.json> --inputs-sha256 <파일SHA> --output <새-디렉터리>`. 독립 입력과 원 record를 pin해 `runner-input.json`으로 인계한다. raw record를 재직렬화하거나 기록에서 기대 scope/매핑을 생성하지 않는다.
 - [SUP16 인계 상세](../preparation/B3_SUP15_SUP16_RECORDS.md): `update/tools/gpu_b_sup16_prepare.py --help`의 명시 입력을 고정한다. 기존 private 준비 자산4종은 실제 bytes와 정확 SHA를 받아 사용하며 공개 helper snapshot은 동일 bytes로 준비한다. 현재 도구는 argv를 만들고 해당 writer/엔진을 실행하지 않는다.
 - [고정 실행 근거](preparation-validation-20261109.json): 각 source·원 명령/시각·JUnit/receipt·검토·실제 정적 CLI의 원 자료를 정확 SHA로 연결한다. 큰 model/원 archive/키는 PR에 복사하지 않는다.
 

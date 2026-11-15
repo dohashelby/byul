@@ -1,20 +1,8 @@
 executor: resource_recovery
 collection_profile: kubernetes-selected-resource-recovery-v1
 policy_params:
-- key: recovery_environment_sha256
-  type: str
-  required: true
-- key: recovery_target_sha256
-  type: str
-  required: true
-- key: recovery_prepared_sha256
-  type: str
-  required: true
-- key: recovery_selection_sha256
-  type: str
-  required: true
-- key: recovery_scenario_sha256
-  type: str
+- key: recovery_require_absent_kinds
+  type: list[str]
   required: true
 - key: recovery_validity_start
   type: str
@@ -67,3 +55,5 @@ judge:
     fail_when_any:
     - obs: activation_violations
       op: nonempty
+
+impact: LOW

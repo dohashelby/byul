@@ -1,0 +1,148 @@
+# GPU host + Docker with the NVIDIA runtime, bounded GPU launch example.
+# 2026-11-12: CPU images are out of scope (M-A9); this replaces the former CPU example.
+# This is launch configuration, not enterprise policy. Use real ENV inventory,
+# GPU model, driver, gpu_count and tp_size, and a DRAFT policy scoped to these checks.
+# ENV image: an official vLLM GPU repository@sha256 digest from the MVP version table.
+# ENV model: facebook/opt-125m, revision 27dcfa74d334bc871f3234de431e71c6eeba5dd6.
+# Compute inventory of the exact snapshot directory; do not copy an old hash.
+# ENV runtime: gpu_count>=1, gpu_model, driver, tp_size; no CPU profile.
+# One engine at a time. RAM/shm values are ceilings, not fit guarantees.
+# Existing unrelated containers are preserved.
+# Explicit native INFO and JSON/SSE binding fixtures; not enterprise defaults.
+store = '.guard-gpu-bounded-binding-logs'
+
+[adapter]
+name = 'vllm'
+
+[executors]
+direct_route = 'real'
+role_route = 'real'
+container_config = 'real'
+credential_exposure = 'real'
+input_validation = 'real'
+sampling_validation = 'real'
+response_content = 'real'
+log_analysis = 'real'
+template_validation = 'real'
+request_binding = 'real'
+log_integrity = 'real'
+
+[validation]
+mode = 'managed'
+topology = 'isolated'
+gateway_profile = 'role_enforced'
+engine_profile = 'hardened'
+# DRAFT sandbox counterexample only. true adds the fixed harmless
+# GUARD_TEST_CREDENTIAL=EXAMPLE_NOT_A_SECRET; false does not inject it.
+credential_canary = false
+
+# Used only by prepare-update/update. Each ENV must name a different image
+# digest for actual update validation. Both engines run sequentially.
+[update]
+mode = 'managed'
+topology = 'isolated'
+gateway_profile = 'role_enforced'
+engine_profile = 'hardened'
+credential_canary = false
+
+[vllm]
+logging_profile = 'request-info-v1'
+chat_template_profile = 'guard-text-chat-v1'
+launch_profile = 'gpu-bounded'
+model_layout = 'snapshot'
+# Replace with your absolute snapshot path.
+# Directory contains config.json, tokenizer files and real weights directly.
+models_dir = '/srv/guard-models/opt-125m-snapshot'
+dtype = 'auto'
+max_model_len = 128
+max_num_seqs = 1
+max_num_batched_tokens = 128
+gpu_memory_utilization = 0.5
+enforce_eager = true
+# tensor_parallel_size must equal ENV runtime.tp_size and gpu_count (pp/dp 1).
+tensor_parallel_size = 1
+# Device IDs or GPU-/MIG- UUIDs; the count must equal ENV runtime.gpu_count.
+gpu_devices = ['0']
+ready_timeout = 600
+
+[vllm.resources]
+cpus = 4
+memory_bytes = 17179869184
+shm_bytes = 2147483648
+pids_limit = 512
+
+[direct_route]
+roles = { allowed = 'GUARD_GPU_GENERAL' }
+request_timeout = 30.0
+allow_mutating_routes = false
+
+[role_route]
+roles = { general = 'GUARD_GPU_GENERAL', admin = 'GUARD_GPU_ADMIN' }
+admin_role = 'admin'
+request_timeout = 30.0
+allow_mutating_routes = false
+
+[container_config]
+sentinel_paths = ['/models', '/']
+request_timeout = 30.0
+
+[credential_exposure]
+request_timeout = 30.0
+
+[input_validation]
+vocab_size = 50272
+vocab_source = 'pinned facebook/opt-125m config.json; verify the actual mounted file'
+max_probe_tokens = 128
+request_timeout = 30.0
+# The diagnostic input budget belongs in the test policy, not this config.
+# No defaults or approval for enterprise policy are supplied here.
+
+[sampling_validation]
+constraint_source = 'EXAMPLE: vLLM 0.31.0 sampling API validation; actual runner consumption remains unverified'
+constraint_engine_version = '0.31.0'
+max_output_tokens = 2
+max_total_requests = 32
+max_probe_tokens = 64
+max_duration_seconds = 180
+request_timeout = 30.0
+
+[response_content]
+endpoint = '/v1/chat/completions'
+roles = { allowed = 'GUARD_GPU_GENERAL' }
+request_timeout = 30.0
+# Fixed formatting enables a synthetic private system branch; model instruction quality is unverified.
+
+[log_analysis]
+endpoint = '/v1/completions'
+request_timeout = 30.0
+log_sources = [{ id = 'engine', kind = 'docker_logs', container = '@engine', role = 'engine' }]
+# Docker stdout may be plain text. Missing structured fields or exception dumps
+# stay UNKNOWN; synthetic JSON and a safe 4xx do not prove actual dump coverage.
+
+[template_validation]
+endpoint = '/v1/chat/completions'
+tokenize_endpoint = '/tokenize'
+request_timeout = 120.0
+max_output_tokens = 1
+max_total_requests = 48
+max_probe_tokens = 256
+max_total_probe_tokens = 16384
+max_input_bytes = 4096
+max_duration_seconds = 300
+
+[request_binding]
+endpoint = '/v1/chat/completions'
+tokenize_endpoint = '/tokenize'
+request_timeout = 120.0
+max_output_tokens = 8
+max_total_requests = 24
+max_duration_seconds = 300
+read_delay_ms = 250
+
+[log_integrity]
+endpoint = '/v1/completions'
+request_timeout = 120.0
+max_total_requests = 12
+max_duration_seconds = 300
+max_id_bytes = 512
+max_events = 128

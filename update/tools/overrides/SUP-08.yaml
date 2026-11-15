@@ -1,43 +1,94 @@
 executor: input_validation
 collection_profile: request-code-selection-v1
 policy_params:
-  - { key: code_selection_fields, type: "list[str]", required: true }
-  - { key: code_selection_allowed, type: bool, required: true }
-  - { key: rejection_codes, type: "list[str]", required: true }
+- key: code_selection_fields
+  type: list[str]
+  required: true
+- key: code_selection_allowed
+  type: bool
+  required: true
+- key: rejection_codes
+  type: list[str]
+  required: true
+- key: approved_code_revisions
+  type: list[str]
+  required: true
 required_observations:
-  - { key: code_selection_trials, type: list }
-  - { key: code_selection_forbidden, type: bool }
-  - { key: code_selection_fields_planned, type: "list[str]" }
-  - { key: code_selection_rejected_fields, type: list }
-  - { key: code_selection_unverified_fields, type: list }
-  - { key: code_selection_confirmed_violations, type: list }
-  - { key: code_selection_final_code_verified, type: bool }
-  - { key: functional_probes_planned, type: "list[str]" }
-  - { key: functional_probe_results, type: "dict[str, pass|fail|no_response]" }
+- key: code_selection_trials
+  type: list
+- key: code_selection_forbidden
+  type: bool
+- key: code_selection_fields_planned
+  type: list[str]
+- key: code_selection_rejected_fields
+  type: list
+- key: code_selection_unverified_fields
+  type: list
+- key: code_selection_ignored_fields
+  type: list
+- key: code_selection_resolved_fields
+  type: list
+- key: code_selection_confirmed_violations
+  type: list
+- key: code_selection_final_code_verified
+  type: bool
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, pass|fail|no_response]
 functional_probes:
-  - method: POST
-    path: /v1/chat/completions
-    body: { model: "{model}", messages: [{ role: user, content: hello }], max_tokens: 1, temperature: 0 }
-    expect: [200]
-    via: engine
+- method: POST
+  path: /v1/chat/completions
+  body:
+    model: '{model}'
+    messages:
+    - role: user
+      content: hello
+    max_tokens: 1
+    temperature: 0
+  expect:
+  - 200
+  via: engine
 judge:
   plugin: rule_table
   params:
     pass_when_all:
-      - { obs: code_selection_forbidden, op: eq, value: true }
-      - { obs: code_selection_rejected_fields, op: superset_of, value_obs: code_selection_fields_planned }
-      - { obs: code_selection_unverified_fields, op: empty }
-      - { obs: code_selection_confirmed_violations, op: empty }
+    - obs: code_selection_forbidden
+      op: eq
+      value: true
+    - obs: code_selection_resolved_fields
+      op: superset_of
+      value_obs: code_selection_fields_planned
+    - obs: code_selection_unverified_fields
+      op: empty
+    - obs: code_selection_confirmed_violations
+      op: empty
     fail_when_any:
-      - { obs: code_selection_confirmed_violations, op: nonempty }
+    - obs: code_selection_confirmed_violations
+      op: nonempty
     axes:
       functional:
         pass_when_all:
-          - { obs: functional_probe_results, op: superset_of, value_obs: functional_probes_planned }
-          - { obs: functional_probe_results, op: all_in, value: [pass] }
+        - obs: functional_probe_results
+          op: superset_of
+          value_obs: functional_probes_planned
+        - obs: functional_probe_results
+          op: all_in
+          value:
+          - pass
         fail_when_any:
-          - { obs: functional_probe_results, op: any_in, value: [fail] }
+        - obs: functional_probe_results
+          op: any_in
+          value:
+          - fail
 limitations:
-  - "구현 분기: 지정 필드에 무해한 비허용 판본값을 넣어 import 전 거부를 정상 대조와 비교한다. 지정 필드가 모두 거부되면 해당 필드 범위의 금지 분기를 충족한다."
-  - "미구현 분기: 최종 선택 모듈·import를 보는 수집이 없어 수락된 요청은 accepted_unverified로 UNKNOWN이고, 금지 override 소비의 FAIL과 허용 구성의 판본 대조는 현재 도달하지 않는다."
-  - "real 구현만 있다. 지정하지 않은 필드는 확인하지 않는다. kwargs 전달까지만 보인 경우를 판정하지 않는다."
+- '구현 분기: 지정 필드(점으로 이은 중첩 경로 포함)에 무해한 비허용 판본 이름을 넣고, 시도 직전·직후 엔진 컨테이너의 동적 모듈 판본 폴더
+  목록을 읽기 전용으로 비교한다.'
+- 승인 목록(approved_code_revisions) 밖 판본 폴더가 시도 직후 새로 생기면 그 요청 값이 코드 선택에 반영된 것으로 보고 위반으로
+  적는다. 시도 전부터 있던 비승인 폴더는 이번 요청에 귀속할 수 없어 미확인으로 남긴다.
+- 시도가 거부되었거나 시도 직후 승인 판본 폴더만 있으면 해결된 시도로 본다. 응답 2xx만으로는 위반·통과를 정하지 않는다.
+- 폴더 이름·파일 이름·크기·SHA-256만 수집하며 코드를 import하거나 실행하지 않는다. 처리기 캐시 재사용으로 판본 선택이 일어나지 않은
+  경우는 그 실행 구성에서 반영되지 않은 것으로 기록한다.
+- 모듈 목록을 읽지 못한 구성(관측 설정 없음, 일반 HTTP 경로)은 기존처럼 accepted_unverified로 UNKNOWN이다.
+impact: HIGH
+revision: 5

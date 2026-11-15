@@ -37,3 +37,5 @@ limitations:
   - "구현 분기: 정상 메시지 요청에 무해한 재사용 토큰 필드를 더해 거부·제거·소비를 응답이 돌려준 prompt_token_ids와 정상 대조로 구분한다. 금지 정책에서 fixture 토큰이 소비되면 FAIL이다."
   - "미구현 분기: 허용 정책에서 재사용 값의 필수 검사를 확인하는 수집이 없어 reused_token_allowed=true는 PASS에 도달하지 않는다. 응답이 소비 토큰을 돌려주지 않으면 accepted_unverified로 UNKNOWN이다."
   - "real 구현만 있다. 한 endpoint·한 필드의 표본이며 다른 경로의 미도달을 증명하지 않는다. renderer 내부 분기는 관측하지 않는다."
+
+impact: MEDIUM

@@ -20,6 +20,7 @@ from guard.executors.session_seal import SESSION_SEALER
 from guard.models import canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
 from guard.store import Store
+from tests.run_binding_support import for_pack
 from tests.builders import baseline_pack,policy,T0
 from tests.test_kubernetes_lifecycle import group,target as native_target,World as NativeWorld
 from tests.test_lifecycle_capture import case,external,revised
@@ -156,7 +157,7 @@ def test_registered_cli_owned_probe_native_and_exact_refs(tmp_path,group,native_
             if path.name=="probe_log.jsonl" and a and a[0]=="w":raise OSError(PRIVATE)
             return original(path,*a,**kw)
         monkeypatch.setattr(Path,"open",open_file)
-    pol=policy(pack.ref(),scope={"include":["REQ-05"]},values={"REQ-05":values})
+    pol=policy(pack.ref(),scope={"include":["REQ-05"]},values={"REQ-05":for_pack(pack,"REQ-05",values)})
     for name,value in (("environment",group.env.to_dict()),("policy",pol.to_dict()),("target",world.target)):
         (tmp_path/(name+".json")).write_bytes(canonical_json(value))
     cfg=tmp_path/"guard.toml"

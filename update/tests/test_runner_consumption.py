@@ -7,6 +7,7 @@ import pytest
 from guard.adapters import vllm_consumption_callback as callback
 from guard.collectors import gpu_common_inputs as contract
 from guard.collectors import gpu_input_producers as producers
+from guard.executors import common_consumption as bridge, req_runner_capture as capture
 
 from tests.test_gpu_input_producers import POD, R1, R2, SCOPE, api_rows, crow, PARAMS
 
@@ -98,6 +99,54 @@ def test_real_producer_record_is_consumable_but_unregistered_until_gpu_review(mo
     register(monkeypatch, record)
     result = contract.validate(record, kind='runner-consumption', **SCOPE)
     assert result['complete'] is True and result['producer_authenticated'] is False
+
+
+@pytest.mark.parametrize('temperature,top_p,missing_array,sampler_temperature',
+                         [(0.0, 1.0, False, None), (1.0, 1.0, False, None),
+                          (0.7, 0.9, False, None), (0.7, 0.9, True, None),
+                          (0.7, 0.9, False, 0.6)])
+def test_actual_candidate_callback_fields_feed_runner_consumer_without_inventing_values(
+        monkeypatch, temperature, top_p, missing_array, sampler_temperature):
+    obs = observer()
+    obs._parent_request = lambda: R1
+    params = SimpleNamespace(temperature=temperature, top_p=top_p, top_k=-1, max_tokens=4,
+                             logprobs=None, allowed_token_ids=None, bad_words=None, logit_bias=None)
+    api = [crow(1, 'InputProcessor.process_inputs', 'CALL', call='a',
+                **obs._snapshot('InputProcessor.process_inputs', (object(), 'request-1'), {})),
+           crow(2, 'InputProcessor._validate_params', 'CALL', call='b',
+                **obs._snapshot('InputProcessor._validate_params', (object(), params), {})),
+           crow(3, 'InputProcessor._validate_params', 'RETURN', call='b'),
+           crow(4, 'InputProcessor._validate_model_input', 'CALL', call='c',
+                **obs._snapshot('InputProcessor._validate_model_input', (object(), {'prompt_token_ids': [5, 6]}), {})),
+           crow(5, 'InputProcessor._validate_model_input', 'RETURN', call='c'),
+           crow(6, 'InputProcessor.process_inputs', 'RETURN', call='a')]
+    new_request = SimpleNamespace(req_id='request-1', prompt_token_ids=[5, 6], sampling_params=params)
+    received = obs._snapshot('GPUModelRunner._update_states', (object(), SimpleNamespace(scheduled_new_reqs=[new_request])), {})
+    applied = obs._snapshot('GPUModelRunner._sample',
+        (SimpleNamespace(input_batch=batch(temperature_cpu=None if missing_array else [
+            temperature if sampler_temperature is None else sampler_temperature], top_p_cpu=[top_p],
+                                           top_k_cpu=[100], bad_words_token_ids={}, num_logprobs={'request-1': 0})),), {})
+    worker = [crow(10, 'GPUModelRunner._update_states', 'CALL', **received),
+              crow(11, 'GPUModelRunner._sample', 'CALL', **applied)]
+    record, unregistered = producers.runner_consumption_record([
+        {'pid': 1, 'start_ticks': 1, 'events': api},
+        {'pid': 112, 'start_ticks': 2, 'events': worker}], pod=POD, **SCOPE)
+    assert not unregistered['supported'] and 'GPU_INPUT_PRODUCER_UNSUPPORTED' in unregistered['gaps']
+    register(monkeypatch, record)
+    projected = bridge.runner(record, SCOPE, check_id='REQ-10', requests={'before': R1}, required_cases=['before'])
+    assert projected['cases']['before']['api_state'] == 'api_validated'
+    selected = [row for row in record['events'] if row['request_sha256'] == R1]
+    assert [row['event'] for row in selected] == ['api_validated', 'runner_received', 'sampler_applied']
+    expected = {'temperature_milli': round(temperature * 1000), 'top_p_milli': round(top_p * 1000)}
+    assert capture._sampling_values_equal(selected, expected, True) is (not missing_array and sampler_temperature is None)
+    assert capture._sampling_values_equal(selected, {}, True) is (not missing_array and sampler_temperature is None)
+    assert capture._sampling_values_equal(selected, {'temperature_milli': expected['temperature_milli'] + 1}, True) is False
+    if missing_array:
+        assert selected[-1]['temperature_milli'] is None
+    else:
+        assert selected[-1]['temperature_milli'] == round((temperature if sampler_temperature is None
+                                                           else sampler_temperature) * 1000)
+        assert selected[-1]['top_p_milli'] == round(top_p * 1000)
 
 
 @pytest.mark.parametrize('field', ['temperature_milli', 'top_p_milli', 'top_k', 'allowed_tokens', 'bad_words'])

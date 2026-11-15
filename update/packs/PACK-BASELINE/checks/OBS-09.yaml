@@ -2,7 +2,7 @@ id: OBS-09
 framework_id: CHK-OBS-009
 mechanism_ids:
 - mechanism-17
-revision: 4
+revision: 5
 retired: false
 area: OBS
 purpose: 기록 위변조 방지
@@ -12,7 +12,7 @@ scope: 입력값이 기록에 들어가는 경로
 risk_category: 보안 위협 점검
 risk_summary: 호출자가 기록되는 필드를 조작해 로그의 행위자·대상·상태를 위조하거나 자기 행위를 다른 사건처럼 보이게 할 수 있음. 실제 parser·formatter 도달 확인 필요.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   always: true
   prose: 외부 입력이 로그의 신원·대상·상태 또는 사건 경계에 반영될 때 적용한다. parser 거부와 실제 기록 소비를 구분한다.

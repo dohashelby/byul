@@ -1,30 +1,6 @@
 executor: supply_boot
 collection_profile: supply-boot-plugin-v1
-policy_params:
-- key: supply_environment_sha256
-  type: str
-  required: true
-- key: supply_normal_target_sha256
-  type: str
-  required: true
-- key: supply_challenge_target_sha256
-  type: str
-  required: true
-- key: supply_normal_prepared_sha256
-  type: str
-  required: true
-- key: supply_challenge_prepared_sha256
-  type: str
-  required: true
-- key: supply_record_source_sha256
-  type: str
-  required: true
-- key: supply_validity_start
-  type: str
-  required: true
-- key: supply_validity_end
-  type: str
-  required: true
+policy_params: []
 required_observations:
 - key: supply_boot_sessions
   type: list
@@ -73,3 +49,5 @@ limitations:
   가정하지 않는다.'
 - kubernetes 구현만 있다. 실행기는 엔진을 만들거나 바꾸지 않는다. 정상·변경 기동은 준비 절차가 만들고 target·prepared로
   받으며, 두 세션을 각각 수집해 합치지 않는다.
+
+impact: HIGH

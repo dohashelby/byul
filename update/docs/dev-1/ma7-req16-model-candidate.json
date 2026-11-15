@@ -1,0 +1,58 @@
+{
+  "schema": "guard-ma7-req16-model-candidate/1",
+  "data_origin": "DECLARED",
+  "model_id": "Qwen/Qwen2-VL-2B-Instruct",
+  "revision": "895c3a49bc3fa70a340399125c650a463535e71c",
+  "selection": "공식 지정 모델의 고정 revision 후보. 엔진 기동 검증 전이다.",
+  "checked_at": "2026-11-13T10:20:51.911908+00:00",
+  "metadata_files": {
+    "fixed-model-info.json": {
+      "source_url": "https://huggingface.co/api/models/Qwen/Qwen2-VL-2B-Instruct/revision/895c3a49bc3fa70a340399125c650a463535e71c?blobs=true",
+      "bytes": 8076,
+      "sha256": "51e87204a2c56a251c9a4ac928521f2c621143ab23f0141e7fc95b676a5413b1"
+    },
+    "config.json": {
+      "source_url": "https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct/resolve/895c3a49bc3fa70a340399125c650a463535e71c/config.json",
+      "bytes": 1196,
+      "sha256": "422adefa19e62dd175961cec85bc0400344fe5bf9b22bd1182e05aaae78556e0"
+    },
+    "preprocessor_config.json": {
+      "source_url": "https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct/resolve/895c3a49bc3fa70a340399125c650a463535e71c/preprocessor_config.json",
+      "bytes": 347,
+      "sha256": "b5eaad0c2815f07631535dcc58f3c462b0d73693638ad21d19f3c50820eae1cc"
+    },
+    "model.safetensors.index.json": {
+      "source_url": "https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct/resolve/895c3a49bc3fa70a340399125c650a463535e71c/model.safetensors.index.json",
+      "bytes": 56411,
+      "sha256": "260ab9fa1418d6d6ab79daa1d9da2c47264f3b72edb4630fc799077ac67d27c6"
+    }
+  },
+  "model_type": "qwen2_vl",
+  "architectures": [
+    "Qwen2VLForConditionalGeneration"
+  ],
+  "declared_transformers_version": "4.41.2",
+  "processor_class": "Qwen2VLProcessor",
+  "weights_metadata": [
+    {
+      "path": "model-00001-of-00002.safetensors",
+      "size": 3988609112,
+      "sha256": "994ac2b03f97de8bc647d0fe5eba2e4b632b3e28dc03574c29bdfc36cf47e1b9",
+      "bytes_verified": false
+    },
+    {
+      "path": "model-00002-of-00002.safetensors",
+      "size": 429441656,
+      "sha256": "92540d8353c8d226a589a3b179bdb33851c970ee2cc2ac7ba035f79425e7b833",
+      "bytes_verified": false
+    }
+  ],
+  "expected_weights_bytes": 4418050768,
+  "weights_downloaded": false,
+  "full_model_snapshot_present": false,
+  "baseline_load_verified": false,
+  "candidate_load_verified": false,
+  "engine_executed": false,
+  "input_preflight_passed": false,
+  "actual_results": null
+}

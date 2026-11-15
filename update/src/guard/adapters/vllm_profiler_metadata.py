@@ -58,12 +58,12 @@ def validate_state(value):
         if value[key] is not None and (type(value[key]) is not int or not 0<=value[key]<(64 if key in {'rank','local_rank'} else 2**63)):raise ValueError('PROFILER_STATE_INVALID')
 
 
-def validate_sample(value):
+def validate_sample(value, *, sources=None):
     try:
         if type(value) is not dict:raise ValueError
         legacy=value.get('schema')==sensor.LEGACY_EVENT_SCHEMA
         if set(value)!=(FIELDS if legacy else FIELDS|BACKEND_FIELDS) or value['schema'] not in {sensor.EVENT_SCHEMA,sensor.LEGACY_EVENT_SCHEMA} or value['point'] not in sensor.POINTS:raise ValueError
-        if value['phase'] not in {'CALL','RETURN','RAISE'} or value['source_module']!=sensor.POINT_SOURCES[value['point']] or value['source_sha256']!=sensor.SOURCE_ADDITIONS[value['source_module']]:raise ValueError
+        if value['phase'] not in {'CALL','RETURN','RAISE'} or value['source_module']!=sensor.POINT_SOURCES[value['point']] or value['source_sha256']!=(sources or sensor.SOURCE_ADDITIONS)[value['source_module']]:raise ValueError
         if type(value['source_verified']) is not bool or type(value['registered_handler_observed']) is not bool:raise ValueError
         contracts=sensor.LEGACY_RUNTIME_CODE_CONTRACTS if legacy else sensor.RUNTIME_CODE_CONTRACTS
         if value['observer_runtime'] not in contracts or value['observer_code_sha256']!=contracts[value['observer_runtime']]:raise ValueError
@@ -112,7 +112,10 @@ def project(packet,required_ranks=()):
         bound=bool(capture.get('process_context_verified') and recording.get('session_owner_match') and recording.get('listed_file_identity_match'))
         for row in records:
             if row['event']!='PROFILER':continue
-            payload=row['payload'];validate_sample(payload)
+            payload=row['payload']
+            from . import vllm_release_observation_sensor as release_observation
+            sources=(release_observation.PROFILER_ROWS if capture['records'][0]['payload'].get('profile')==release_observation.PROFILER_PROFILE else None)
+            validate_sample(payload,sources=sources)
             sample={'recording':number,'seq':row['seq'],'monotonic_ns':row['monotonic_ns'],'pid':context['pid'],'start_ticks':context['start_ticks'],
                 'physical_process_binding_verified':bound,'image_digest_verified':capture.get('image_digest_verified') is True,
                 'recording_closed':capture.get('summary',{}).get('recording_closed') is True,**payload}
@@ -230,3 +233,98 @@ def backend_cycles(complete):
             'owned_collision_observed':before['status']==after['status']=='owned-collision',
             'collision_sha256':before['collision_sha256'] if before==after and before['status']=='owned-collision' else None})
     return result
+
+
+def validate_native_backend(value, *, binding):
+    """Initial V1 Worker owns Torch directly; never accept wrapper field aliases."""
+    from . import vllm_baseline_profiler as native
+    try:
+        if (type(value) is not dict or set(value) != native.FIELDS or value['schema'] != native.SCHEMA
+                or value['point'] != native.POINT or value['source_sha256'] != native.SOURCE['sha256']
+                or value['binding'] != binding or value['runtime'] not in {'cpython-3.12.3', 'cpython-3.12.8'}
+                or value['phase'] not in {'CALL', 'RETURN', 'RAISE'}
+                or any(value[key] is not False for key in ('callback_directory_binding_verified',
+                    'cross_process_rpc_verified', 'producer_authenticated', 'whole_scope_complete'))):
+            raise ValueError
+        for key in ('call_sha256', 'worker_sha256'):
+            if not fingerprint(value[key]):raise ValueError
+        if value['is_start'] is not None and type(value['is_start']) is not bool:raise ValueError
+        for key in ('rank', 'local_rank'):
+            if value[key] is not None and (type(value[key]) is not int or not 0 <= value[key] < 64):raise ValueError
+        if type(value['started_ns']) is not int or not 0 <= value['started_ns'] < 2**63:raise ValueError
+        if type(value['backend_probe_qualified']) is not bool:raise ValueError
+        generation = value['backend_generation_sha256']
+        if generation is not None and not fingerprint(generation):raise ValueError
+        validate_backend(value['backend_before'])
+        validate_inventory(value['trace_before'])
+        if value['phase'] == 'CALL':
+            if (any(value[key] is not None for key in ('finished_ns', 'exception_kind', 'backend_after', 'trace_after', 'backend_generation_sha256'))
+                    or value['backend_probe_qualified'] is not False):raise ValueError
+        else:
+            if type(value['finished_ns']) is not int or not value['started_ns'] <= value['finished_ns'] < 2**63:raise ValueError
+            if value['exception_kind'] not in ({'exception', 'base-exception'} if value['phase'] == 'RAISE' else {None}):raise ValueError
+            validate_backend(value['backend_after'])
+            validate_inventory(value['trace_after'])
+            if value['backend_probe_qualified']:
+                before, after = value['backend_before'], value['backend_after']
+                if (not fingerprint(generation) or not before['collected'] or not after['collected']
+                        or before['thread_id'] != after['thread_id'] or before['backend_sha256'] != after['backend_sha256']
+                        or not fingerprint(after['backend_sha256'])):raise ValueError
+                if value['is_start'] is True:
+                    if value['phase'] != 'RETURN' or before['value'] is not False or after['value'] is not True:raise ValueError
+                elif value['is_start'] is not False or before['value'] is not True:raise ValueError
+            elif generation is not None:raise ValueError
+    except (KeyError, ValueError, TypeError):
+        raise ValueError('BASELINE_PROFILER_SAMPLE_INVALID') from None
+
+
+def native_backend_project(records, *, binding):
+    """Local Worker/backend facts with successful-start generations, no RPC join."""
+    try:
+        from .vllm_slot_mask import _binding
+        if (type(binding) is not dict or _binding(binding) != binding
+                or set(binding) != {'pid', 'session_id_sha256', 'process_start_sha256'}
+                or type(records) is not list or len(records) > 2048):raise ValueError
+        for row in records:validate_native_backend(row, binding=binding)
+        if len({row['runtime'] for row in records}) > 1:raise ValueError
+        calls = {};missing = [];complete = []
+        for row in records:calls.setdefault(row['call_sha256'], []).append(row)
+        stable = ('binding', 'source_sha256', 'runtime', 'worker_sha256', 'is_start', 'rank', 'local_rank',
+                  'started_ns', 'backend_before', 'trace_before')
+        for rows in calls.values():
+            if (len(rows) != 2 or rows[0]['phase'] != 'CALL' or rows[1]['phase'] not in {'RETURN', 'RAISE'}
+                    or any(rows[0][key] != rows[1][key] for key in stable)):
+                missing.append('unique_native_profiler_call_pair_unavailable')
+            else:complete.append(rows[1])
+        cycles = []
+        for start in complete:
+            if start['is_start'] is not True or start['phase'] != 'RETURN' or not start['backend_probe_qualified']:continue
+            stops = [stop for stop in complete if stop['is_start'] is False and stop['backend_probe_qualified']
+                and stop['backend_generation_sha256'] == start['backend_generation_sha256']
+                and stop['worker_sha256'] == start['worker_sha256']
+                and (stop['rank'], stop['local_rank']) == (start['rank'], start['local_rank'])
+                and stop['backend_before']['backend_sha256'] == start['backend_after']['backend_sha256']
+                and stop['backend_before']['thread_id'] == start['backend_after']['thread_id']
+                and start['finished_ns'] <= stop['started_ns']]
+            if len(stops) != 1:
+                missing.append('unique_start_generation_stop_unavailable');continue
+            stop = stops[0]
+            before, after = stop['trace_before'], stop['trace_after']
+            old = {(row['name_sha256'], row['sha256']) for row in before['files']}
+            new = [row for row in after['files'] if row['kind'] == 'trace' and (row['name_sha256'], row['sha256']) not in old]
+            cycles.append({'worker_sha256': start['worker_sha256'], 'rank': start['rank'],
+                'backend_sha256': start['backend_after']['backend_sha256'], 'thread_id': start['backend_after']['thread_id'],
+                'generation_sha256': start['backend_generation_sha256'], 'start_call_sha256': start['call_sha256'],
+                'stop_call_sha256': stop['call_sha256'], 'stop_phase': stop['phase'],
+                'backend_collection_stopped_observed': stop['backend_after']['value'] is False,
+                'backend_collection_continued_observed': stop['backend_after']['value'] is True,
+                'new_declared_directory_trace_facts': new if before['status'] == after['status'] == 'directory'
+                    and before['directory_identity'] == after['directory_identity'] else [],
+                'callback_directory_binding_verified': False, 'trace_output_completed_verified': False,
+                'cross_process_rpc_verified': False, 'confirmed_full_state_violation': False})
+        return {'samples': records, 'complete_calls': len(complete), 'backend_cycles': cycles,
+            'missing': sorted(set(missing + ['cross_process_API_RPC_worker_causality_unverified',
+                'consumed_trace_callback_directory_unverified', 'next_normal_profiler_start_unverified'])),
+            'scope_complete': False, 'producer_authenticated': False}
+    except (KeyError, ValueError, TypeError):
+        raise ValueError('BASELINE_PROFILER_RECORD_INVALID') from None

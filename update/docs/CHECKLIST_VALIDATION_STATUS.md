@@ -2,7 +2,7 @@
 
 이 문서와 CSV는 `tools/checklist_status.py`의 생성물이다. 수정할 정본은 팩·registry·기존 자동화표·명시된 선별 실험 기록이다.
 
-현행 팩 revision 33의 정의 77개, 정책 등록 74점검/498경로, 실행·보안 판정 규칙 연결 68개, 관측 전용 1개, 나머지 미연결 8개다. 연결 중 kubernetes 구현만 있는 점검 45개다. 연결 수는 실제 전체 분기 검증 완료 수가 아니다.
+현행 팩 revision 38의 정의 77개, 정책 등록 54점검/183경로, 실행·보안 판정 규칙 연결 68개, 관측 전용 1개, 나머지 미연결 8개다. 연결 중 kubernetes 구현만 있는 점검 45개다. 연결 수는 실제 전체 분기 검증 완료 수가 아니다.
 
 - [분기별 전체 CSV](checklist_validation_status.csv): 현재 정의·필수 관측·정상/위반/미수집/지원 밖 계획·선행 조건·기업 결정·과거 EVD/RES를 연결한다.
 - `supported_implementations`는 registry에 등록된 구현을 그대로 표시한다. `real`과 `kubernetes`는 서로 대체하지 않고, 공용 `fake`와 CPU 전용 구현은 연결 수에 넣지 않는다.
@@ -28,11 +28,8 @@
 
 | 현행 팩 GPU 실행 상태 | 점검 수 |
 |---|---:|
-| GPU_PARTIAL_MEASURED | 11 |
-| GPU_PARTIAL_EXAMPLE | 14 |
-| GPU_COMPONENT_DECLARED_ONLY | 1 |
-| GPU_ATTEMPTED_NOT_COLLECTED | 1 |
-| DEFERRED_NOT_MEASURED | 50 |
+| GPU_PARTIAL_MEASURED | 1 |
+| DEFERRED_NOT_MEASURED | 76 |
 
 | 1단계 담당 | 1단계 상태 | 점검 수 |
 |---|---|---:|
@@ -42,8 +39,8 @@
 | dev-1 | GPU_CONFIRMATION_ONLY | 3 |
 | dev-1 | MEASUREMENT_REMAINING | 1 |
 | dev-1 | NOT_APPLICABLE_IN_TARGET | 2 |
-| gpu | CPU_DEVELOPMENT_REMAINING | 30 |
-| gpu | DONE | 6 |
+| gpu | CPU_DEVELOPMENT_REMAINING | 29 |
+| gpu | DONE | 7 |
 | gpu | MEASUREMENT_REMAINING | 7 |
 
 우선순위는 연결된 점검의 관측 공백(P1), 로컬 신규 구현(P2), 추가 인프라(P3), 기업 환경(P4)이다. 기존 점검 재실증은 실행기·정의·설정·시험 자료·환경의 변경 영향이 있을 때만 해당 범위를 수행한다. 팩 revision 변경만으로 기존 5개 전체 재실증을 요구하지 않는다. 어려운 계측 하나가 독립적인 신규 점검을 모두 막지는 않는다.

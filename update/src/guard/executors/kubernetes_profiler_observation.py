@@ -1,6 +1,7 @@
 """OBS02 profiler facts and existing closed normal HTTP controls, no profiler control."""
 import re
 from guard.adapters import vllm_profiler_sensor as sensor,vllm_profiler_metadata as metadata
+from guard.adapters import vllm_release_observation_sensor as release_observation
 from guard.models import canonical_json,sha256_hex
 from .kubernetes_observation_state import KubernetesObservationStateExecutor,normalize_policy as normalize_base,POLICY_TYPES as BASE_POLICY,OBSERVATIONS as BASE_OBSERVATIONS
 
@@ -24,7 +25,7 @@ def normalize_policy(values):
 
 class KubernetesProfilerObservationExecutor(KubernetesObservationStateExecutor):
     name='profiler_observation';version='0.1.0';collection_profile=PROFILE
-    supported_native_profiles=frozenset({sensor.PROFILE});policy_normalizer=staticmethod(normalize_policy)
+    supported_native_profiles=frozenset({sensor.PROFILE,release_observation.PROFILER_PROFILE});policy_normalizer=staticmethod(normalize_policy)
 
     def __init__(self,cfg,*,implementation='kubernetes',runner=None,environ=None,expected_target_sha256=None):
         if implementation not in {'kubernetes','source-cpu'}:raise ValueError('PROFILER_IMPLEMENTATION_UNSUPPORTED')

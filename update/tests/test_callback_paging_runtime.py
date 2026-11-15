@@ -122,17 +122,19 @@ def test_startup_code_qualification_is_cached_but_replacement_is_detected(tmp_pa
     path = tmp_path / 'EXAMPLE.py'
     path.write_text('EXAMPLE = 1\n')
     module = SimpleNamespace(__name__='EXAMPLE', __file__=str(path))
+    from guard.models import sha256_hex
+    pin = sha256_hex(path.read_bytes())
     calls = []
     monkeypatch.setattr(observer_runtime.cache, '_codes', lambda *args: calls.append(True) or {'entry': 'EXAMPLE-code'})
     observer = observer_runtime.QualifiedObserver()
     observer.lock = threading.RLock()
     observer.gaps = set()
-    assert observer._qualified_codes(module, {}, {'EXAMPLE': 'a' * 64}) == {'entry': 'EXAMPLE-code'}
-    assert observer._qualified_codes(module, {}, {'EXAMPLE': 'a' * 64}) == {'entry': 'EXAMPLE-code'}
+    assert observer._qualified_codes(module, {}, {'EXAMPLE': pin}) == {'entry': 'EXAMPLE-code'}
+    assert observer._qualified_codes(module, {}, {'EXAMPLE': pin}) == {'entry': 'EXAMPLE-code'}
     assert calls == [True]
     path.write_text('EXAMPLE = 2\n')
     with pytest.raises(ValueError, match='REPLACED'):
-        observer._qualified_codes(module, {}, {'EXAMPLE': 'a' * 64})
+        observer._qualified_codes(module, {}, {'EXAMPLE': pin})
     observer.verify_sources()
     assert 'OBSERVER_SOURCE_POSTCHECK_FAILED' in observer.gaps
 

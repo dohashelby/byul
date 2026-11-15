@@ -1,4 +1,4 @@
-"""SUP04 real CPU model preparation and two existing-factory policy cases."""
+"""SUP04 real GPU model preparation and two existing-factory policy cases."""
 from __future__ import annotations
 import argparse
 from copy import deepcopy
@@ -89,8 +89,10 @@ def run(args):
     env = load_environment(args.environment)
     cfg = tomllib.loads(args.config.read_text(encoding="utf-8"))
     managed = _managed_config(env, cfg)
-    if managed.get("launch_profile") != "cpu-bounded" or env.runtime.gpu_count != 0:
-        raise ValueError("SUP04_EXPLICIT_CPU_PROFILE_REQUIRED")
+    # 2026-11-12 GPU-only decision: the CPU image profile was removed.
+    if (managed.get("launch_profile") != "gpu-bounded" or type(env.runtime.gpu_count) is not int
+            or env.runtime.gpu_count < 1):
+        raise ValueError("SUP04_EXPLICIT_GPU_PROFILE_REQUIRED")
     policies = [(label, load_policy(path, pack)) for label, path in (("included", args.included_policy), ("empty", args.empty_policy))]
     for label, policy in policies:
         factory = registry.build_executor("container_config", "real", cfg)

@@ -76,6 +76,22 @@ def test_blocked_downstream_stream_is_interrupted_and_preserves_started(route, s
         receiver.close()
 
 
+class _BufferedWriteClock:
+    """기록 준비 중 시계를 고정하고 실제 쓰기부터 같은50ms 기한을 센다."""
+
+    def __init__(self):
+        self.base = time.monotonic()
+        self.write_started_at = None
+
+    def monotonic(self):
+        if self.write_started_at is None:
+            return self.base
+        return self.base + time.monotonic() - self.write_started_at
+
+    def begin_write(self):
+        self.write_started_at = time.monotonic()
+
+
 def test_buffered_slow_write_is_failed_and_releases_request_slot(tmp_path):
     sender, receiver = sockets()
     policy = load_policy(POLICY)
@@ -103,9 +119,21 @@ def test_buffered_slow_write_is_failed_and_releases_request_slot(tmp_path):
         relay,
         limiter,
     )
+    clock = _BufferedWriteClock()
+
+    def begin_write(response, deadline_at, write):
+        clock.begin_write()
+        return write_response_before(response, deadline_at, write)
+
     began = time.monotonic()
     try:
-        flow.chat(io, "a" * 32)
+        with (
+            patch("serving_runtime.gateway.request_flow.time", clock),
+            patch("serving_runtime.gateway.response_timeout.time", clock),
+            patch("serving_runtime.gateway.request_flow.write_response_before", begin_write),
+        ):
+            flow.chat(io, "a" * 32)
+        assert clock.write_started_at is not None
         assert time.monotonic() - began < 0.25
         rows, _ = records.store.read_all()
         assert rows[-1]["final_outcome"] == "ENGINE_DEADLINE"

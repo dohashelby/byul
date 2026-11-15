@@ -8,3 +8,5 @@ limitations:
 - 자료 출처·parser/reader·거부·부수 동작의 수동 근거가 별도로 필요하다. 점검별 값은 자동 복사하지 않으며 공유 정책의 범위·일관성·승인은
   별도 업무 검토가 필요하다.
 retired: true
+
+impact: HIGH

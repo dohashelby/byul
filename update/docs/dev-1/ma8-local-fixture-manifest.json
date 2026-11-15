@@ -1,0 +1,83 @@
+{
+  "code_marker_root": "/cache/hf/byul-code-markers/sup08-local-rebuild-20261113",
+  "code_processor_sha256": {
+    "approved": "33fb6d5cfd9d0413b30d59bf0c164c7121ed777832b766ac839f305056cc028e",
+    "unapproved": "b81db80faec572aea7a2e37b406369eccc00d1f52f51292ecae6103e98352a6a"
+  },
+  "code_repository": "local-byul/sup08-phi3v-processor",
+  "code_revisions": {
+    "approved": "a239c75031d0d32a44f2a89135f574c2318244de",
+    "unapproved": "bd80f9e25ed91e97f4da47172241bbe008d77e99"
+  },
+  "hf_home": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/hf",
+  "model_id": "local-byul/sup08-phi3v-derived",
+  "model_inventory": {
+    "config.json": {
+      "bytes": 3664,
+      "sha256": "e3fbad3779524ca7e4186f276cd0fd81e2c2b33aaed3331fcced7253d5f7d391"
+    },
+    "configuration_phi3_v.py": {
+      "bytes": 10586,
+      "sha256": "98087e2f3467072e8de80958f51019c0726da6bef418968949305de4cd170e26"
+    },
+    "image_embedding_phi3_v.py": {
+      "bytes": 14079,
+      "sha256": "a4a3ab2c86448b34e1402b7dac3ea17d074a7c5f86ad46c0047f2db6267808b2"
+    },
+    "image_processing_phi3_v.py": {
+      "bytes": 11409,
+      "sha256": "8470db7ad9c2483f60ca14ed84e5eba99be0ff15b66ef9958754879b85d492bc"
+    },
+    "model-00001-of-00002.safetensors": {
+      "bytes": 4944122112,
+      "sha256": "175b2fe918dd8bd2549e3441615ee0c6d7b1f6d638c0104a614546f55c273482"
+    },
+    "model-00002-of-00002.safetensors": {
+      "bytes": 3349208776,
+      "sha256": "e61ece5a8f0c9663afa06cc22799056f5cc084fb993518bf036dc8e268fd4c94"
+    },
+    "model.safetensors.index.json": {
+      "bytes": 68901,
+      "sha256": "72d628080d85b3a0e96eac71a47f7a04a666aabf8a91269100c99a8d543f345c"
+    },
+    "modeling_phi3_v.py": {
+      "bytes": 75366,
+      "sha256": "b9caa24798d15931241b4aeeaf0624ab8d11f78ccffe79a0d2821da96ffff06b"
+    },
+    "preprocessor_config.json": {
+      "bytes": 491,
+      "sha256": "5fb81b001ba480c245782d19645774461069b4330de87dc4bbe09a4add143b85"
+    },
+    "processing_phi3_v.py": {
+      "bytes": 11331,
+      "sha256": "99d029093d9a99478fea4e6cea92b5ff47323903ca5e1af9cc441b0a64d126a8"
+    },
+    "sample_inference.py": {
+      "bytes": 5684,
+      "sha256": "78d748b915837b762856cb66e10b8536c5454bbff3c6af712005fc44751d87cd"
+    },
+    "special_tokens_map.json": {
+      "bytes": 670,
+      "sha256": "f9535fada19315e0d8eb89521cebe111c008fee98d16e7c6744acfb50505d8c3"
+    },
+    "tokenizer.json": {
+      "bytes": 1851389,
+      "sha256": "005df01af5e16e758ff74c1a31e7b8910eb75c7d5626689d6bdee40a779d44fe"
+    },
+    "tokenizer_config.json": {
+      "bytes": 9403,
+      "sha256": "948a2ff1e1cf01d05e4a9880c8145818b3de2a2cb0492eb3eba6fa82fc4fd8ba"
+    }
+  },
+  "model_inventory_sha256": "c2dd67477c1899b775e5fa0d0585861e62166ff94c7b94a7c8ba531c2756ac52",
+  "model_path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/model-snapshot",
+  "model_snapshot_id": "57f2f7423e74d97203b79372390c8f84efb81b93",
+  "offline_environment": {
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1"
+  },
+  "schema": "byul-sup08-phi3v-fixture/1",
+  "source_license": "MIT; processor files retain Apache-2.0 headers",
+  "source_model": "microsoft/Phi-3-vision-128k-instruct",
+  "source_revision": "ed2772fabe9dc9acd0caad54b62761d92520cc44"
+}

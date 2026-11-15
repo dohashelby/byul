@@ -70,7 +70,7 @@ def test_derived_pack_changes_only_obs01_and_keeps_the_seed_pack_untouched(tmp_p
     from guard.models import load_pack
     from tools import build_dev1_gateway_obs01_pack as tool
     result = tool.derive(tmp_path / 'pack')
-    derived, original = load_pack(tmp_path / 'pack'), load_pack(Path(tool.__file__).parents[1] / 'packs/PACK-BASELINE')
+    derived, original = load_pack(tmp_path / 'pack'), load_pack(Path(tool.__file__).parents[1] / 'reference/pack-seeds/PACK-BASELINE-33')
     assert original.ref().model_dump(mode='json') == tool.SEED_REF and result['pack_ref']['id'] == 'PACK-DEV1-GATEWAY-OBS01'
     assert result['pack_ref']['revision'] == tool.DERIVED_REVISION == 2
     assert derived.checks['OBS-01'].collection_profile == module.PROFILE

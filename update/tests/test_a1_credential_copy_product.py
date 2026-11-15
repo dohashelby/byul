@@ -6,12 +6,13 @@ import base64,json,socket,subprocess
 import pytest
 from typer.testing import CliRunner
 from guard.cli import app
-from guard.executors import credential_copy_contract as contract,kubernetes_credential_copy as copy_executor
+from guard.executors import credential_copy_contract as contract,kubernetes_credential_copy as copy_executor,run_binding
 from guard.executors.owned_capture import _FILE_READER,MAX_BYTES
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.models import canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
 from guard.store import Store
+from tests.run_binding_support import for_pack, run_table_toml
 from tests.builders import baseline_pack,policy,T0
 from tests.test_a1_credential_copy_contract import example
 from tests.test_a1_required_event_product import World as OriginalWorld,PRIVATE
@@ -70,6 +71,12 @@ def inputs(tmp_path,mode='normal'):
     values['copy_inventory_sha256']=sha256_hex(path.read_bytes());packet['inventory_sha256']=values['copy_inventory_sha256']
     world.copy_packet=packet;world.values=values
     receipt=derive(baseline_pack().path,tmp_path/'pack');pack=load_pack(tmp_path/'pack')
+    if 4 in run_binding.stages_for(pack.checks['PLT-12']):
+        values['copy_treatments']=contract.treatments(inventory)
+        values['copy_policy_sha256']=sha256_hex(canonical_json(for_pack(pack,'PLT-12',values)))
+        inventory['policy_sha256']=packet['policy_sha256']=values['copy_policy_sha256']
+        path.write_bytes(canonical_json(inventory))
+        values['copy_inventory_sha256']=packet['inventory_sha256']=sha256_hex(path.read_bytes())
     return environment,world,values,pack,receipt,path
 
 
@@ -77,6 +84,13 @@ def inputs(tmp_path,mode='normal'):
     'wrong-recipient','wrong-source','raw-field','trust-claim','partial','empty','after-invalid','producer-changed','missing','recovered',
     'final-missing','restart','pod-replaced','record-cleanup','owner-unbound','attachment'])
 def test_existing_registry_cli_copy_records_and_exact_refs(tmp_path,monkeypatch,mode):
+    # 모의 사건 생성과 실제 run-binding 계산이 같은 시계에서 시작하도록 고정한다.
+    # fixture 준비가 초 경계를 넘더라도 정상 사건을 실행 창 이전으로 만들지 않는다.
+    clock=utcnow()
+    for path in ('tests.test_a1_credential_copy_contract.utcnow',
+                 'tests.test_a1_credential_copy_product.utcnow',
+                 'guard.application.utcnow','guard.core.run.utcnow'):
+        monkeypatch.setattr(path,lambda:clock)
     environment,world,values,pack,receipt,inventory_path=inputs(tmp_path,mode)
     monkeypatch.setattr(http,'capture_pipes',world.runner);monkeypatch.setattr(copy_executor,'capture_pipes',world.runner)
     if mode=='owner-unbound':
@@ -92,11 +106,11 @@ def test_existing_registry_cli_copy_records_and_exact_refs(tmp_path,monkeypatch,
             if path.name=='probe_log.jsonl' and args and args[0]=='w':raise OSError(PRIVATE)
             return original(path,*args,**kwargs)
         monkeypatch.setattr(Path,'open',open_file)
-    pol=policy(pack.ref(),scope={'include':['PLT-12']},values={'PLT-12':values})
+    pol=policy(pack.ref(),scope={'include':['PLT-12']},values={'PLT-12':for_pack(pack,'PLT-12',values)})
     for name,value in [('environment',environment.to_dict()),('policy',pol.to_dict()),('target',world.target)]:
         (tmp_path/(name+'.json')).write_bytes(canonical_json(value))
     cfg=tmp_path/'guard.toml';cfg.write_text('[executors]\nrequired_event_record="kubernetes"\n[adapter]\nname="vllm"\n[required_event_record]\ntarget='
-        +json.dumps(str(tmp_path/'target.json'))+'\ncopy_inventory='+json.dumps(str(inventory_path))+'\n',encoding='utf-8')
+        +json.dumps(str(tmp_path/'target.json'))+'\ncopy_inventory='+json.dumps(str(inventory_path))+'\n'+run_table_toml(pack,'PLT-12',values),encoding='utf-8')
     runner=CliRunner();common=['--store',tmp_path/'store','--config',cfg]
     def cli(args,code=0):
         result=runner.invoke(app,list(map(str,args)));assert result.exit_code==code,(args,result.output,result.exception)

@@ -1,27 +1,6 @@
 executor: record_access
 collection_profile: kubernetes-record-access-scope-v1
-policy_params:
-- key: record_environment_sha256
-  type: str
-  required: true
-- key: record_target_sha256
-  type: str
-  required: true
-- key: record_subject_plan_sha256
-  type: str
-  required: true
-- key: record_inventory_session
-  type: str
-  required: true
-- key: record_inventory_source_sha256
-  type: str
-  required: true
-- key: record_validity_start
-  type: str
-  required: true
-- key: record_validity_end
-  type: str
-  required: true
+policy_params: []
 required_observations:
 - key: record_access_rows
   type: list
@@ -77,3 +56,5 @@ limitations:
 - kubernetes 구현만 있다. 두 신원의 로그 조회만 수집되면 record_access_partial=true로 남기고 전체 충족으로 보지
   않는다. 저장 보호 요구가 미정인 사본은 미확인이다.
 - 신원 계획은 운영자 선언이며 RBAC·IAM을 바꾸지 않는다. 로그 본문·키 값은 저장하지 않는다.
+
+impact: MEDIUM

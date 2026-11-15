@@ -33,6 +33,7 @@ class CaptureProfile:
     required_environment: Mapping[str, str]
     response_rules: Mapping[str, tuple[str, str, str]]
     response_id_pattern: str
+    private_response_identity: bool = False
 
     def fingerprinter(self, secret):
         # Reuse the official fingerprint without initializing a Linux observer.
@@ -90,6 +91,37 @@ PROFILES = MappingProxyType({
             "REQ-10": ("/v1/completions", "cmpl-", "-0"),
         }),
         response_id_pattern=r"(?:chatcmpl|cmpl)-[0-9a-f]{16}",
+    ),
+    # The candidate image's nine serving/input/worker modules are byte-qualified in
+    # ma6-pin-compare.json. V1 InputBatch stores the request's temperature/top_p
+    # in CPU arrays, and GPUModelRunner._sample passes its sampling_metadata to
+    # the sampler. This profile observes those two fields only; structured
+    # output and min_tokens still require separate evidence.
+    "0.30.0": CaptureProfile(
+        source_commit="ced6857afa0ea7b2e3f0846a62e1394e90f15607",
+        sources=MappingProxyType({
+            "entrypoints/serve/engine/serving.py": "70143311acc2230b925e7f3603b8b9314f029ff5e98d5af990b3bdca691331f1",
+            "entrypoints/openai/completion/serving.py": "75d05ddddf303734a078a3e42fcb173fef58ea56da09bc0b5c7525cb9bbbf527",
+            "v1/engine/input_processor.py": "c8abd8e4e14d99929d45a7ff3b2a74898269c5e2a7fa30b826623ee85e4ce813",
+            "v1/engine/async_llm.py": "52cbf404f1dbc99c6bebf4a50a7eb18ff842a1f53106a45f365523192d816be1",
+            "entrypoints/openai/completion/protocol.py": "5f7930635fd3924826015211032fb298206b27c7f04cd6cd2224bb128e4a3a50",
+            "entrypoints/openai/chat_completion/serving.py": "ea1f76074a9587c8054f54d30a6ba748b6a5fc4d90dd82c801504505c1da1f92",
+            "entrypoints/openai/chat_completion/protocol.py": "51fb06a943201ffdc0a0bbae44b79a996bdd6ae3373593a67666868d996451b2",
+            "v1/worker/gpu_model_runner.py": "87c29d08c0bbf66993d8b984811e7325e35e6436242a773feb55ec88f16b2c51",
+            "v1/worker/gpu_input_batch.py": "18cf455c9d0eea61cc581c7932f2e6cd09786914e82dd35eef1c1430da359a0f",
+        }),
+        image="docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+        callback_root=sensor.ROOT,
+        source_root_key="vllm_source_root",
+        required_environment=MappingProxyType({
+            "VLLM_DISABLE_REQUEST_ID_RANDOMIZATION": "1",
+            "VLLM_USE_V2_MODEL_RUNNER": "0",
+        }),
+        response_rules=MappingProxyType({
+            "REQ-10": ("/v1/completions", "cmpl-", "-0"),
+        }),
+        response_id_pattern=r"(?:chatcmpl|cmpl)-[0-9a-f]{16}",
+        private_response_identity=True,
     ),
 })
 

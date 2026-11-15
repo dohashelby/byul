@@ -2,7 +2,7 @@ id: LIF-15
 framework_id: CHK-LIF-015
 mechanism_ids:
 - mechanism-12
-revision: 3
+revision: 4
 retired: true
 area: LIF
 purpose: 복구 정책·상태 검증
@@ -12,7 +12,7 @@ scope: 기본 재배포 복원
 risk_category: 보안 위협 점검
 risk_summary: 복원 권한자가 현재 승인에서 제외한 모델·코드·자격을 과거 이미지로 되살려 금지된 실행이나 접근을 재개할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: 기본 재배포 복원에서 이전 묶음의 현재 승인·철회·실효 설정을 확인한다. 과거 승인만으로 재사용하지 않는다.
 policy_params: []

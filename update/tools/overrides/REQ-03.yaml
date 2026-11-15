@@ -47,3 +47,5 @@ functional_probes:
     expect: [200]
     as_role: admin
 functional_scope: { probed_obs: functional_probe_results, of_obs: routes_registered }
+
+impact: HIGH

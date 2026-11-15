@@ -14,8 +14,10 @@ def pack():
 
 
 def declared_inputs(pack):
+    # 2026-11-12 (M-A9): managed support needs a bounded GPU launch. The image
+    # identity stays the retained reviewed-contract data that this logic test reads.
     env = environment(engine={"name": "vllm", "version": "0.31.0", "image_digest": CHAT_REVIEWED_IMAGE},
-                      runtime={"gpu_count": 0})
+                      runtime={"gpu_count": 1, "gpu_model": "EXAMPLE-GPU", "driver": "EXAMPLE-DRIVER", "tp_size": 1})
     pol = policy(pack.ref(), values={
         "REQ-07": {"allowed_template_sha256": [CHAT_TEMPLATE_SHA256], "max_rendered_input_tokens": 127,
                    "request_template_override_allowed": False},
@@ -25,7 +27,7 @@ def declared_inputs(pack):
     })
     cfg = {"adapter": {"name": "vllm"},
            "executors": {"template_validation": "real", "request_binding": "real", "log_integrity": "real"},
-           "vllm": {"launch_profile": "cpu-bounded", "chat_template_profile": "guard-text-chat-v1",
+           "vllm": {"launch_profile": "gpu-bounded", "gpu_devices": ["0"], "chat_template_profile": "guard-text-chat-v1",
                     "logging_profile": "request-info-v1"}}
     return env, pol, cfg
 
@@ -185,7 +187,7 @@ def test_runtime_gaps_for_existing_partial_collectors_are_visible(pack):
     import tomllib
     import yaml
     root = Path(__file__).resolve().parents[1]
-    cfg = tomllib.loads((root / "examples/windows-cpu-binding-logs.toml").read_text(encoding="utf-8"))
+    cfg = tomllib.loads((root / "examples/gpu-bounded-binding-logs.toml").read_text(encoding="utf-8"))
     raw = yaml.safe_load((root / "examples/automation-binding-logs-policy.yaml").read_text(encoding="utf-8"))
     env, _, _ = declared_inputs(pack)
     pol = policy(pack.ref(), values=raw["values"])
@@ -203,7 +205,7 @@ def test_valid_token_input_scope_and_chat_private_scope_are_never_silently_reduc
     import tomllib
     import yaml
     root = Path(__file__).resolve().parents[1]
-    cfg = tomllib.loads((root / "examples/windows-cpu-binding-logs.toml").read_text(encoding="utf-8"))
+    cfg = tomllib.loads((root / "examples/gpu-bounded-binding-logs.toml").read_text(encoding="utf-8"))
     raw = yaml.safe_load((root / "examples/automation-binding-logs-policy.yaml").read_text(encoding="utf-8"))
     env, _, _ = declared_inputs(pack)
     values = deepcopy(raw["values"])
@@ -246,7 +248,7 @@ def test_unsupported_policy_keeps_execution_rejection_and_independent_config_val
     import yaml
     from guard.executors import registry
     root = Path(__file__).resolve().parents[1]
-    cfg = tomllib.loads((root / "examples/windows-cpu-binding-logs.toml").read_text(encoding="utf-8"))
+    cfg = tomllib.loads((root / "examples/gpu-bounded-binding-logs.toml").read_text(encoding="utf-8"))
     raw = yaml.safe_load((root / "examples/automation-binding-logs-policy.yaml").read_text(encoding="utf-8"))
     values = {**raw["values"][check_id], **changed_values}
     factory = registry.resolve_executor(executor, "real")
@@ -265,7 +267,7 @@ def log_inputs(pack):
     import tomllib
     import yaml
     root = Path(__file__).resolve().parents[1]
-    cfg = tomllib.loads((root / "examples/windows-cpu-binding-logs.toml").read_text(encoding="utf-8"))
+    cfg = tomllib.loads((root / "examples/gpu-bounded-binding-logs.toml").read_text(encoding="utf-8"))
     raw = yaml.safe_load((root / "examples/automation-binding-logs-policy.yaml").read_text(encoding="utf-8"))
     env, _, _ = declared_inputs(pack)
     return env, policy(pack.ref(), values={"OBS-03": raw["values"]["OBS-03"]}), cfg
@@ -348,3 +350,19 @@ def test_log_policy_must_still_reference_a_configured_local_engine_source(pack):
     executor.validate_configuration(pack.checks["OBS-03"])
     with pytest.raises(ValueError, match="local engine source"):
         executor.validate_policy(pack.checks["OBS-03"], pol.values["OBS-03"])
+
+
+@pytest.mark.parametrize("change", ["cpu-bounded", "no-devices", "no-gpu"])
+def test_managed_support_requires_a_bounded_gpu_launch(pack, change):
+    # 2026-11-12 (M-A9): the former CPU launch profile no longer qualifies.
+    def mutate(env, pol, cfg):
+        if change == "cpu-bounded":
+            cfg["vllm"]["launch_profile"] = "cpu-bounded"
+        elif change == "no-devices":
+            cfg["vllm"].pop("gpu_devices")
+        else:
+            env = env.model_copy(update={"runtime": env.runtime.model_copy(update={"gpu_count": 0})}).seal()
+        return env, pol, cfg
+    rows = support(pack, mutate=mutate)
+    assert rows and all(row["status"] == "UNSUPPORTED" for row in rows)
+    assert all(any("bounded GPU launch" in reason for reason in row["reasons"]) for row in rows)

@@ -28,8 +28,8 @@ def profile(config: dict) -> dict | None:
     timeout = config[SETTING]
     if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 1 <= timeout <= 300:
         raise ValueError("generation_readiness_timeout must be finite and between 1 and 300 seconds")
-    if config.get("launch_profile") != "cpu-bounded" or config.get("gpu", False) is not False:
-        raise ValueError("generation readiness requires the managed bounded CPU profile")
+    if config.get("launch_profile") != "gpu-bounded" or config.get("gpu") is not True:
+        raise ValueError("generation readiness requires the managed bounded GPU profile")
     model = config.get("model")
     if not isinstance(model, str) or not model.strip():
         raise ValueError("generation readiness requires an explicit served model")

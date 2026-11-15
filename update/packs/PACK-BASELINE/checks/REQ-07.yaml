@@ -3,7 +3,7 @@ framework_id: CHK-REQ-007
 mechanism_ids:
 - mechanism-02
 - mechanism-09
-revision: 3
+revision: 4
 retired: false
 area: REQ
 purpose: 최종 입력 검증
@@ -13,7 +13,7 @@ scope: 기본+선택 기능
 risk_category: 보안 위협 점검
 risk_summary: 호출자나 template 공급자가 검사 뒤 입력을 바꿔 금지 입력을 모델에 전달하거나 처리 비용 제한을 피할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: MEDIUM
 applies_when:
   always: true
   prose: 선정 endpoint가 template를 적용할 때 확인한다. 요청 template·kwargs 변경은 해당 필드를 수용할 때 추가한다.

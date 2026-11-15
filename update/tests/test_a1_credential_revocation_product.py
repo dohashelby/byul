@@ -13,6 +13,7 @@ from guard.runtime import kubernetes_http as http
 from guard.runtime.kubernetes_credential_revocation import KubernetesCredentialRevocationHTTP
 from guard.runtime.bounded import capture_pipes
 from guard.store import Store
+from tests.run_binding_support import for_pack, run_table_toml
 from tests.builders import baseline_pack,policy,T0
 from tests.test_a1_kubernetes_model_authorization_product import World as BaseWorld
 from tests.test_kubernetes_lifecycle import group,target as native_target
@@ -127,11 +128,11 @@ def test_registered_cli_auth_samples_absolute_constraint_and_exact_refs(tmp_path
             if path.name=='probe_log.jsonl' and a and a[0]=='w':raise OSError(PRIVATE)
             return original(path,*a,**kw)
         monkeypatch.setattr(Path,'open',open_file)
-    pol=policy(pack.ref(),scope={'include':['PLT-10']},values={'PLT-10':values})
+    pol=policy(pack.ref(),scope={'include':['PLT-10']},values={'PLT-10':for_pack(pack,'PLT-10',values)})
     for name,value in [('environment',group.env.to_dict()),('policy',pol.to_dict()),('target',world.target)]:
         (tmp_path/(name+'.json')).write_bytes(canonical_json(value))
     cfg=tmp_path/'guard.toml';cfg.write_text('[executors]\ncredential_revocation="kubernetes"\n[adapter]\nname="vllm"\n[credential_revocation]\ntarget='
-        +json.dumps(str(tmp_path/'target.json'))+'\nprepared='+json.dumps(str(group.manifest_path))+'\nretired_key_env="BYUL_PLT10_RETIRED"\ncontrol_key_env="BYUL_PLT10_CONTROL"\n',encoding='utf-8')
+        +json.dumps(str(tmp_path/'target.json'))+'\nprepared='+json.dumps(str(group.manifest_path))+'\nretired_key_env="BYUL_PLT10_RETIRED"\ncontrol_key_env="BYUL_PLT10_CONTROL"\n'+run_table_toml(pack,'PLT-10',values),encoding='utf-8')
     monkeypatch.setenv('BYUL_PLT10_RETIRED',RETIRED);monkeypatch.setenv('BYUL_PLT10_CONTROL',RETIRED if mode=='same-credential' else CONTROL)
     if mode=='missing-credential':monkeypatch.delenv('BYUL_PLT10_RETIRED')
     runner=CliRunner();common=['--store',tmp_path/'store','--config',cfg]

@@ -2,7 +2,7 @@ id: REQ-01
 framework_id: CHK-REQ-001
 mechanism_ids:
 - mechanism-01
-revision: 8
+revision: 9
 retired: false
 area: REQ
 purpose: 작업·대상 인가
@@ -12,7 +12,7 @@ scope: 기본
 risk_category: 보안 위협 점검
 risk_summary: 엔진 주소에 접근 가능한 호출자가 Gateway를 우회해 앞단에서 금지한 추론·관리 작업을 수행할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   all:
   - fact: gateway

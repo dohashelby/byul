@@ -13,13 +13,13 @@
 
 ## Windows CPU 실행
 
-`examples/windows-cpu.toml`은 Linux amd64 Docker와 로컬 snapshot을 사용하는 제한 실행 프로파일이다. 기술 실행 설정은 `[vllm]`과 `[vllm.resources]`, 기업 허용 기준은 POL에 둔다. 경로를 포함한 TOML은 리터럴 문자열 또는 정상적으로 이스케이프한 문자열을 사용한다.
+`examples/gpu-bounded.toml`은 Linux amd64 Docker와 로컬 snapshot을 사용하는 제한 실행 프로파일이다. 기술 실행 설정은 `[vllm]`과 `[vllm.resources]`, 기업 허용 기준은 POL에 둔다. 경로를 포함한 TOML은 리터럴 문자열 또는 정상적으로 이스케이프한 문자열을 사용한다.
 
-현행 실행에는 프로젝트의 64비트 Python 3.12와 `uv sync --frozen`을 사용한다. 아래 3.11.16 실측은 당시 기록으로 보존하며 호스트 버전 전환이 해당 엔진 시험의 재실행을 뜻하지 않는다. `examples/windows-cpu.toml`을 별도 위치에 복사하고 models_dir를 실제 snapshot 절대 경로로 바꾼다. ENV에는 실제 이미지 repository@sha256, 관측 버전, 모델 revision/inventory, Linux CPU architecture/model/kernel/threads를 기입한다. 준비 검사가 호스트 신원이나 기업 승인을 인증하지는 않는다. 8개 점검의 비공식 합성 기준 예시는 `examples/automation-policy.yaml`이다.
+현행 실행에는 프로젝트의 64비트 Python 3.12와 `uv sync --frozen`을 사용한다. 아래 3.11.16 실측은 당시 기록으로 보존하며 호스트 버전 전환이 해당 엔진 시험의 재실행을 뜻하지 않는다. `examples/gpu-bounded.toml`을 별도 위치에 복사하고 models_dir를 실제 snapshot 절대 경로로 바꾼다. ENV에는 실제 이미지 repository@sha256, 관측 버전, 모델 revision/inventory, Linux CPU architecture/model/kernel/threads를 기입한다. 준비 검사가 호스트 신원이나 기업 승인을 인증하지는 않는다. 8개 점검의 비공식 합성 기준 예시는 `examples/automation-policy.yaml`이다.
 
 ```text
-guard prepare-validation --pack packs/PACK-BASELINE --env env.yaml --policy policy.yaml --config windows-cpu.toml
-guard validate --pack packs/PACK-BASELINE --env env.yaml --policy policy.yaml --config windows-cpu.toml --store out/test-runs/cpu/store --output out/test-runs/cpu/run
+guard prepare-validation --pack packs/PACK-BASELINE --env env.yaml --policy policy.yaml --config gpu-bounded.toml
+guard validate --pack packs/PACK-BASELINE --env env.yaml --policy policy.yaml --config gpu-bounded.toml --store out/test-runs/cpu/store --output out/test-runs/cpu/run
 ```
 
 준비 검사는 이미지를 받거나 엔진을 시작하지 않는다. 실행은 새 폴더에 증거와 JSON/HTML 보고서를 만들고, 자신이 만든 자원만 정리한다. 기존 컨테이너를 정지·삭제하지 않는다. 엔진은 한 번에 하나만 기동한다. CPU 성능은 UNKNOWN이다. 실제 출처 확인과 기업 정책 승인은 다르며 EXAMPLE/DRAFT는 공식 결과가 아니다.
@@ -49,7 +49,7 @@ guard validate --pack packs/PACK-BASELINE --env env.yaml --policy policy.yaml --
 REQ-09의 작은 입력 정책을 넘는 요청 수용은 그 시험 정책 위반이며 메모리 손상 증거가 아니다. REQ-01의 격리 PASS는 외부 출발점의 TCP 차단과 신뢰 출발점의 정상 대조를 함께 요구한다. REQ-03은 선정한 등록 경로와 검증된 안전 프로브에 한정된다.
 
 ```text
-uv run python tools/validate_cpu_cases.py --config windows-cpu.toml --env env.yaml --pack packs/PACK-BASELINE --output out/test-runs/cpu-cases-unique
+uv run python tools/validate_cpu_cases.py --config gpu-bounded.toml --env env.yaml --pack packs/PACK-BASELINE --output out/test-runs/cpu-cases-unique
 ```
 
 세 구성은 노출·기본 권한·고정 canary·좁은 EXAMPLE 입력 정책, 격리·강화 권한, 같은 강화 구성의 매우 짧은 양수 관측 timeout이다. 각 구성에서 제품 CLI로 5개씩 실행하고 기대/실제 판정·증거 반출/복원·무결성을 기록한다. 매우 짧은 timeout이 언제나 UNKNOWN을 만든다고 가정하지 않고 실제 불일치를 남긴다. 준비/기동/정리 실패면 다음 엔진을 시작하지 않는다. 도구는 추가 컨테이너 삭제 명령을 갖지 않는다.

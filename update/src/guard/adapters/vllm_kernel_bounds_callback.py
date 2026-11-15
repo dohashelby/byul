@@ -11,6 +11,8 @@ kernel이 쓰고 읽는 주소 범위를 kernel 자신의 식으로 계산해 bu
 """
 from __future__ import annotations
 
+from .vllm_observer_pin_rows import candidate_sources, layout
+
 import functools
 import hashlib
 import hmac
@@ -22,7 +24,7 @@ from . import vllm_cache_callback as cache
 
 MODULE = 'vllm.v1.worker.gpu.input_batch'
 TARGETS = {MODULE: ('prepare_prefill_inputs', 'prepare_pos_seq_lens')}
-SOURCES = {MODULE: '96163c486368f2cf0e539fe68eaa06f4df3ac814da8f7a92af2b04242e01bc6d'}
+SOURCES = ({MODULE: '96163c486368f2cf0e539fe68eaa06f4df3ac814da8f7a92af2b04242e01bc6d'})
 SCHEMA = 'guard-vllm-kernel-bounds-callback/1'
 # 원 kernel launch 상수. 다른 값이면 해석하지 않는다.
 BLOCK_SIZE = 1024
@@ -71,7 +73,7 @@ def _synchronize(tensors):
 
 class KernelBoundsObserver(cache.CacheCallbackObserver):
     targets = TARGETS
-    sources = SOURCES
+    sources = candidate_sources(SOURCES, TARGETS)
     schema = SCHEMA
     profile = 'source-bound-kernel-bounds-callback-candidate-v1'
     last_positions = None

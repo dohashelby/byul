@@ -49,6 +49,7 @@ def inject_record(monkeypatch, damage=None, *, contradiction=True):
         monkeypatch.setattr(old, 'pinned', absent)
 
 
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_registered_rejection_consumption_reaches_original_FAIL_with_late_gap(tmp_path, monkeypatch):
     inject_record(monkeypatch)
     draft, evd, result = old.input_finish(tmp_path)
@@ -58,6 +59,7 @@ def test_registered_rejection_consumption_reaches_original_FAIL_with_late_gap(tm
     assert evd.data_origin == DataOrigin.EXAMPLE
 
 
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_supported_normal_control_still_uses_original_PASS_rule(tmp_path):
     draft, evd, result = old.input_finish(tmp_path)
     assert draft.status.value == 'COMPLETED'
@@ -65,6 +67,7 @@ def test_supported_normal_control_still_uses_original_PASS_rule(tmp_path):
     assert result.verdicts.security.value == 'PASS' and evd.data_origin == DataOrigin.EXAMPLE
 
 
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_null_start_ticks_is_original_A_contract_rejection_not_a_new_B_field_gate(tmp_path, monkeypatch):
     # Correct the first-run test premise: /1 _binding already requires int
     # start_ticks. Keep that original rejection, not a new permissive input.
@@ -81,6 +84,7 @@ def test_null_start_ticks_is_original_A_contract_rejection_not_a_new_B_field_gat
 
 
 @pytest.mark.parametrize('damage', ['missing', 'generation', 'identity', 'order', 'unsupported'])
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_missing_unregistered_or_unbound_fact_cannot_create_native_FAIL_or_PASS(tmp_path, monkeypatch, damage):
     inject_record(monkeypatch, damage)
     draft, evd, result = old.input_finish(tmp_path, unsupported=damage == 'unsupported')
@@ -89,6 +93,7 @@ def test_missing_unregistered_or_unbound_fact_cannot_create_native_FAIL_or_PASS(
 
 
 @pytest.mark.parametrize('damage', ['missing', 'generation', 'unsupported'])
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_original_HTTP_consumption_FAIL_survives_followup_input_gap(tmp_path, monkeypatch, damage):
     inject_record(monkeypatch, damage, contradiction=False)
     draft, evd, result = old.input_finish(tmp_path, consumed=True, unsupported=damage == 'unsupported')
@@ -123,6 +128,7 @@ def test_source_support_alone_never_qualifies_a_runner_fact_in_an_unreviewed_sco
         {'supported': True, 'runtime_qualified': False})
 
 
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_existing_factory_run_select_judge_report_preserves_new_FAIL_exact_artifacts(tmp_path, monkeypatch):
     pack = old.PACK
     env = environment(model={'id': 'test'}, engine={'name': 'vllm', 'version': '0.31.0'})

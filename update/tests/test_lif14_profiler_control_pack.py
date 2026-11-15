@@ -14,7 +14,7 @@ from tools.build_kubernetes_profiler_control_pack import derive
 
 
 def test_DRAFT_keeps_other76_bytes_and_original_question_judge_contract(tmp_path):
-    seed=load_pack(Path(__file__).resolve().parents[1]/'packs/PACK-BASELINE');output=tmp_path/'derived'
+    seed=load_pack(Path(__file__).resolve().parents[1]/'reference/pack-seeds/PACK-BASELINE-33');output=tmp_path/'derived'
     receipt=derive(seed.path,output);pack=load_pack(output)
     assert receipt['unchanged_definition_bytes']==76
     before=seed.checks['LIF-14'].model_dump(mode='json');after=pack.checks['LIF-14'].model_dump(mode='json')
@@ -26,7 +26,7 @@ def test_DRAFT_keeps_other76_bytes_and_original_question_judge_contract(tmp_path
 
 
 def test_future_baseline_is_rejected_before_any_derived_output(tmp_path):
-    source=Path(__file__).resolve().parents[1]/'packs/PACK-BASELINE'
+    source=Path(__file__).resolve().parents[1]/'reference/pack-seeds/PACK-BASELINE-33'
     seed=tmp_path/'future-seed';shutil.copytree(source,seed)
     manifest=yaml.safe_load((seed/'pack.yaml').read_bytes())
     manifest['revision']=34

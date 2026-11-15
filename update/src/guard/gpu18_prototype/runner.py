@@ -186,7 +186,7 @@ def run_demo(output: Path) -> dict:
         raise ValueError("output must be an empty or new directory")
     output.mkdir(parents=True, exist_ok=True)
     owners = _modules()
-    source_dir = Path(__file__).resolve().parents[3] / "packs" / "PACK-BASELINE"
+    source_dir = Path(__file__).resolve().parents[3] / "reference" / "pack-seeds" / "PACK-BASELINE-33"
     source = load_pack(source_dir)
     if source.ref().revision != 33 or source.ref().sha256 != _SOURCE_PACK_SHA256:
         raise ValueError("prototype cases require the pinned PACK-BASELINE33 snapshot")

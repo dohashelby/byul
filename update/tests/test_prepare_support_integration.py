@@ -10,7 +10,7 @@ from guard import application
 from guard.adapters.vllm import CHAT_REVIEWED_IMAGE
 from guard.cli import app
 from tests.builders import policy
-from tests.test_windows_cpu_launch import setup_inputs
+from tests.test_managed_gpu_launch import setup_inputs
 from typer.testing import CliRunner
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -43,7 +43,7 @@ def _local(monkeypatch):
 
 def test_update_support_is_side_specific_and_does_not_remove_other_checks(tmp_path, monkeypatch):
     pack, env, _, base = setup_inputs(tmp_path)
-    cfg = tomllib.loads((ROOT/"examples/windows-cpu-binding-logs.toml").read_text(encoding="utf-8"))
+    cfg = tomllib.loads((ROOT/"examples/gpu-bounded-binding-logs.toml").read_text(encoding="utf-8"))
     cfg["vllm"]["models_dir"] = base["vllm"]["models_dir"]
     cfg.pop("validation", None)
     cfg["update"] = {"mode": "managed"}

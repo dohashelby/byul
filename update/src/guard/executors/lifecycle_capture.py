@@ -7,6 +7,8 @@ import re
 from copy import deepcopy
 
 from guard.adapters import vllm_lifecycle_sensor as sensor
+from guard.adapters import vllm_lifecycle_release_sensor as release_sensor
+from guard.adapters import vllm_initialization_release_sensor as init_release
 from guard.adapters import sglang_request_termination_sensor as sglang_sensor
 from guard.adapters import vllm_safe_open_mapping_sensor as mapping_sensor
 from guard.adapters import vllm_safe_open_mapping_metadata as mapping_metadata
@@ -16,6 +18,7 @@ from guard.adapters import vllm_worker_initialization_sensor as joint_sensor
 from guard.adapters import vllm_worker_startup_sensor as startup_sensor,vllm_worker_startup_metadata as startup_metadata,vllm_worker_startup_contract as startup_contract
 from guard.adapters import vllm_worker_readiness as startup_callback
 from guard.adapters import vllm_lifecycle_profiles as profiles
+from guard.adapters import vllm_fresh_request_binding as fresh_binding
 from guard.adapters import vllm_online_sensor as online
 from guard.adapters import vllm_online_metadata as online_metadata
 from guard.adapters import vllm_attempt_sensor as attempt, vllm_attempt_metadata as attempt_metadata
@@ -26,6 +29,10 @@ from guard.adapters import vllm_initialization_sensor as init_sensor
 from guard.adapters import vllm_termination_sensor as termination_sensor,vllm_termination_metadata as termination_metadata
 from guard.adapters import vllm_fault_sensor as fault_sensor,vllm_fault_metadata as fault_metadata
 from guard.adapters import vllm_profiler_sensor as profiler_sensor,vllm_profiler_metadata as profiler_metadata
+from guard.adapters import vllm_release_observation_sensor as release_observation
+from guard.adapters import vllm_baseline_startup as baseline_startup
+from guard.adapters import vllm_baseline_profiler as baseline_profiler
+from guard.collectors import baseline_startup as baseline_startup_input
 from guard.adapters import vllm_file_read_sensor as read_sensor,vllm_file_read_metadata as read_metadata
 from guard.adapters import vllm_weight_iteration_sensor as weight_sensor,vllm_weight_iteration_metadata as weight_metadata
 from guard.adapters import vllm_initialization_metadata as init_metadata, vllm_rank_failure_metadata as rank_metadata
@@ -107,20 +114,25 @@ def parse_recording(raw, prepared):
     if prepared.get("profile")==sglang_sensor.PROFILE:
         from .sglang_lifecycle_capture import parse_recording as parse_sglang
         return parse_sglang(raw,prepared)
+    is_fresh_binding = profiles.configured.request_binding(prepared['profile'])
+    is_baseline_startup = profiles.configured.startup_observation(prepared['profile'])
+    is_direct_profiler = profiles.configured.profiler_observation(prepared['profile'])
     is_fault=prepared["profile"]==fault_sensor.PROFILE
     is_termination=prepared["profile"]in {fault_sensor.PROFILE,termination_sensor.PROFILE}
     is_endpoint = prepared["profile"] == endpoint_sensor.PROFILE
     is_generation = prepared["profile"] in {generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_online = prepared["profile"] == online.PROFILE
     is_output = prepared["profile"] == output_sensor.PROFILE
-    is_stream = prepared["profile"] == stream_sensor.PROFILE
+    is_stream = prepared["profile"] in {stream_sensor.PROFILE,release_observation.STREAM_PROFILE}
     is_rank = prepared["profile"]in {fault_sensor.PROFILE,rank_sensor.PROFILE}
     is_read = prepared["profile"] == read_sensor.PROFILE
     is_worker_startup = prepared["profile"] in {startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_mapping = prepared["profile"] in {mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_weight = prepared["profile"] in {weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
-    is_profiler = prepared["profile"] == profiler_sensor.PROFILE
-    is_init = prepared["profile"] in {init_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
+    is_profiler = prepared["profile"] in {profiler_sensor.PROFILE,release_observation.PROFILER_PROFILE}
+    base_profile = release_sensor.PROFILE if prepared['profile'] in {release_observation.STREAM_PROFILE,
+        release_observation.PROFILER_PROFILE} else prepared['profile']
+    is_init = prepared["profile"] in {init_release.PROFILE,init_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     is_attempt = prepared["profile"] in {attempt.PROFILE,output_sensor.PROFILE}
     if type(raw) is not bytes or not 0 < len(raw) <= (termination_sensor.MAX_BYTES if is_termination else weight_sensor.MAX_BYTES if is_weight else profiler_sensor.MAX_BYTES if is_profiler else init_sensor.MAX_BYTES if is_init else rank_sensor.MAX_BYTES if is_rank else stream_sensor.MAX_BYTES if is_stream else attempt.MAX_BYTES if is_attempt else online.MAX_BYTES if is_online else sensor.MAX_BYTES):
         raise ValueError("LIFECYCLE_RECORDING_BYTES_INVALID")
@@ -135,11 +147,30 @@ def parse_recording(raw, prepared):
         keys = keys - {"model_selection","owner_model_sha256","argument_model_sha256","returned_model_sha256",
             "configured_model_sha256","configured_revision_sha256","load_format_sha256","load_dummy_weights",
             "lora_config_present","speculative_config_present"}
-    if prepared["profile"] not in {fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V4_PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
-    if prepared["profile"] not in {fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
-    if prepared["profile"] not in {fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
-    if prepared["profile"] not in {fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
+    if base_profile not in {release_sensor.PROFILE,init_release.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V4_PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
+    if base_profile not in {release_sensor.PROFILE,init_release.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
+    if base_profile not in {release_sensor.PROFILE,init_release.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
+    if base_profile not in {release_sensor.PROFILE,init_release.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
     words = WORDS
+    if is_direct_profiler:
+        keys = keys | baseline_profiler.FIELDS | profiler_metadata.CAPTURE_KEYS | {'session_id_sha256', 'process_start_sha256'}
+        words = words | {'BASELINE_PROFILER', baseline_profiler.SCHEMA, baseline_profiler.POINT,
+            'cpython-3.12.3', 'cpython-3.12.8', 'exception', 'base-exception', *profiler_metadata.CAPTURE_WORDS}
+    if is_baseline_startup:
+        keys = keys | baseline_startup_input.FIELDS | startup_contract.SNAPSHOT_FIELDS | startup_contract.BINDING_FIELDS | startup_contract.METADATA_FIELDS | startup_contract.TRANSITION_FIELDS
+        words = words | {'BASELINE_STARTUP', baseline_startup.SCHEMA, 'cpython-3.12.3', 'cpython-3.12.8',
+            *(point for source in baseline_startup.ROWS.values() for point in source['functions']),
+            startup_callback.SCHEMA, *startup_callback.POINTS, *startup_callback.PHASES,
+            *startup_callback.STATUSES, *startup_callback.GRAPH_MODES, *startup_callback.GAPS,
+            'unsupported', 'exception', 'base-exception'}
+    if is_fresh_binding:
+        keys = keys | fresh_binding.FIELDS | {'request_binding'}
+        words = words | {'session-hmac-sha256'}
+    if profiles.configured.contains(prepared['profile']):
+        words = words | {profiles.public_commit(prepared['profile']),
+            *profiles.source_hashes(prepared['profile']), *profiles.point_sources(prepared['profile'])}
+    if base_profile in {release_sensor.PROFILE, init_release.PROFILE}:
+        words = words | {release_sensor.COMMIT}
     if is_termination:
         keys=keys|termination_metadata.FIELDS|termination_metadata.STATE_FIELDS|termination_metadata.SCHEDULER_FIELDS
         words=words|{'TERMINATION',termination_sensor.EVENT_SCHEMA,*termination_metadata.PHASES,*termination_metadata.POINT_MODULES,*termination_metadata.POINT_MODULES.values(),*termination_sensor.SOURCE_ADDITIONS,*termination_sensor.RUNTIME_CODE_CONTRACTS,'main','copy','native-exception','observer-bound','stream-unavailable'}
@@ -170,6 +201,7 @@ def parse_recording(raw, prepared):
     if is_profiler:
         keys=keys|profiler_metadata.FIELDS|profiler_metadata.STATE_FIELDS|profiler_metadata.CAPTURE_KEYS
         words=words|{'PROFILER',profiler_sensor.EVENT_SCHEMA,*profiler_sensor.POINTS,*profiler_sensor.SOURCE_ADDITIONS,
+            *release_observation.PROFILER_ROWS.values(),
             *profiler_sensor.RUNTIME_CODE_CONTRACTS,*profiler_metadata.CAPTURE_WORDS,'worker','torch-wrapper','torch','cuda','proton','other','exception','base-exception'}
     if is_init:
         keys=keys|init_metadata.FIELDS|{'rank'}
@@ -226,7 +258,7 @@ def parse_recording(raw, prepared):
                 or not _safe(safe_row, keys=keys, words=words) or type(row["seq"]) is not int or row["seq"] != seq
                 or type(row["monotonic_ns"]) is not int or row["monotonic_ns"] < clock
                 or row["previous_sha256"] != previous or canonical_row(row) != line
-                or row["event"] not in {"CHECKPOINT","SEGMENT"} and row["event"] not in ({"START","MODULE","NATIVE","ASGI","END","SELECTION","TERMINATION","RANK_FAILURE","FAULT_CONTROL"}if is_fault else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","SAFE_OPEN_MAPPING","WORKER_STARTUP","WORKER_STARTUP_LINK","WORKER_STARTUP_CLOSE","WORKER_STARTUP_LIMIT"} | ({"INITIALIZATION"} if prepared["profile"] in {joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()) | (set(generation_metadata.VALIDATORS) if is_generation else set()) | (set(endpoint_metadata.VALIDATORS) if is_endpoint else set()) if is_worker_startup else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","SAFE_OPEN_MAPPING"} if is_mapping else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","FILE_READ"} if is_read else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION"} if is_weight else {"START","MODULE","NATIVE","ASGI","END","SELECTION","PROFILER"} if is_profiler else {"START","MODULE","NATIVE","ASGI","END","SELECTION","INITIALIZATION"} if is_init else {"START","MODULE","NATIVE","ASGI","END","SELECTION","RANK_FAILURE"} if is_rank else {"START","MODULE","NATIVE","ASGI","END","SELECTION","STREAM_BUFFER"} if is_stream else {"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT","OUTPUT"} if is_output else {"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT"} if is_attempt else {"START","MODULE","NATIVE","ASGI","END","SELECTION","TERMINATION"}if is_termination else {"START","MODULE","NATIVE","ASGI","END","SELECTION"})
+                or row["event"] not in {"CHECKPOINT","SEGMENT"} and row["event"] not in ({"START","MODULE","BASELINE_PROFILER","END"} if is_direct_profiler else {"START","MODULE","BASELINE_STARTUP","END"} if is_baseline_startup else {"START","MODULE","NATIVE","ASGI","END","SELECTION","TERMINATION","RANK_FAILURE","FAULT_CONTROL"}if is_fault else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","SAFE_OPEN_MAPPING","WORKER_STARTUP","WORKER_STARTUP_LINK","WORKER_STARTUP_CLOSE","WORKER_STARTUP_LIMIT"} | ({"INITIALIZATION"} if prepared["profile"] in {joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()) | (set(generation_metadata.VALIDATORS) if is_generation else set()) | (set(endpoint_metadata.VALIDATORS) if is_endpoint else set()) if is_worker_startup else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","SAFE_OPEN_MAPPING"} if is_mapping else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION","FILE_READ"} if is_read else {"START","MODULE","NATIVE","ASGI","END","SELECTION","WEIGHT_ITERATION"} if is_weight else {"START","MODULE","NATIVE","ASGI","END","SELECTION","PROFILER"} if is_profiler else {"START","MODULE","NATIVE","ASGI","END","SELECTION","INITIALIZATION"} if is_init else {"START","MODULE","NATIVE","ASGI","END","SELECTION","RANK_FAILURE"} if is_rank else {"START","MODULE","NATIVE","ASGI","END","SELECTION","STREAM_BUFFER"} if is_stream else {"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT","OUTPUT"} if is_output else {"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT"} if is_attempt else {"START","MODULE","NATIVE","ASGI","END","SELECTION","TERMINATION"}if is_termination else {"START","MODULE","NATIVE","ASGI","END","SELECTION"})
                 or type(row["payload"]) is not dict):
             raise ValueError("LIFECYCLE_RECORDING_ROW_INVALID")
         previous, clock = hashlib.sha256(line).hexdigest(), row["monotonic_ns"]
@@ -293,8 +325,29 @@ def parse_recording(raw, prepared):
                 if "inherited" in payload and payload["inherited"] is not True:
                     raise ValueError("LIFECYCLE_RECORDING_INHERITANCE_INVALID")
                 ready.add(payload["module"])
-            elif is_termination or is_online or is_output or is_stream or is_rank or is_init or is_weight:
+            elif is_termination or is_online or is_output or is_stream or is_rank or is_init or is_weight or is_baseline_startup or is_direct_profiler:
                 ready.discard(payload["module"])
+        if row['event'] == 'BASELINE_PROFILER':
+            if not is_direct_profiler:
+                raise ValueError('BASELINE_PROFILER_PROFILE_INVALID')
+            profiler_metadata.validate_native_backend(payload,
+                binding=baseline_profiler.process_binding(prepared['session'], context))
+            if baseline_profiler.WORKER not in ready:
+                raise ValueError('BASELINE_PROFILER_SOURCE_PROVENANCE_UNAVAILABLE')
+            if (payload['started_ns'] > row['monotonic_ns']
+                    or payload['finished_ns'] is not None and payload['finished_ns'] > row['monotonic_ns']):
+                raise ValueError('BASELINE_PROFILER_CLOCK_INVALID')
+        if row['event'] == 'BASELINE_STARTUP':
+            if not is_baseline_startup:
+                raise ValueError('BASELINE_STARTUP_PROFILE_INVALID')
+            baseline_startup_input.validate_record(payload,
+                binding=baseline_startup.process_binding(prepared['session'], context))
+            module, = (name for name, source in baseline_startup.ROWS.items() if payload['point'] in source['functions'])
+            if module not in ready:
+                raise ValueError('BASELINE_STARTUP_SOURCE_PROVENANCE_UNAVAILABLE')
+            if (payload['started_ns'] > row['monotonic_ns']
+                    or payload['finished_ns'] is not None and payload['finished_ns'] > row['monotonic_ns']):
+                raise ValueError('BASELINE_STARTUP_CLOCK_INVALID')
         if row['event']=='TERMINATION':
             termination_metadata.validate_sample(payload)
             if termination_runtime is not None and termination_runtime!=payload['observer_runtime']:raise ValueError('TERMINATION_OBSERVER_RUNTIME_MISMATCH')
@@ -305,7 +358,7 @@ def parse_recording(raw, prepared):
             elif payload['source_module']not in ready:raise ValueError('TERMINATION_SOURCE_PROVENANCE_UNAVAILABLE')
             if payload['operation_started_ns']>row['monotonic_ns']or payload['operation_finished_ns']is not None and payload['operation_finished_ns']>row['monotonic_ns']:raise ValueError('TERMINATION_EVENT_CLOCK_INVALID')
         if row['event']=='INITIALIZATION':
-            init_metadata.validate_sample(payload)
+            init_metadata.validate_sample(payload, source_sha256=source_hashes.get(init_sensor.MP))
             if not is_init or payload['source_verified'] and payload['source_module'] not in ready:
                 raise ValueError('INITIALIZATION_SOURCE_PROVENANCE_UNAVAILABLE')
             if payload['operation_finished_ns'] is not None and payload['operation_finished_ns']>row['monotonic_ns']:
@@ -340,7 +393,7 @@ def parse_recording(raw, prepared):
                 raise ValueError('STREAM_BUFFER_RUNTIME_MISMATCH')
             stream_runtime=payload['observer_runtime'];stream_events+=1
         if row["event"] in {"NATIVE","SELECTION"}:
-            if row["event"]=="SELECTION" and (header["profile"] not in {fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}
+            if row["event"]=="SELECTION" and (base_profile not in {release_sensor.PROFILE,init_release.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}
                     or payload.get("point")!="InputProcessor.assign_request_id" or payload.get("requests")!=[]
                     or payload.get("selection_observed") is not False
                     or type(payload.get("metadata")) is not dict
@@ -375,6 +428,16 @@ def parse_recording(raw, prepared):
                 if row["event"]=="NATIVE" and payload["point"]=="InputProcessor.assign_request_id":
                     raise ValueError("LIFECYCLE_SELECTION_EVENT_REQUIRED")
                 profiles.validate_request_selection(payload)
+            if 'request_binding' in payload['metadata']:
+                if not is_fresh_binding:
+                    raise ValueError('REQUEST_BINDING_PROFILE_REQUIRED')
+                spec = profiles.configured.row(prepared['profile'])['request_binding']
+                required_sources = {point_sources[spec[k]] for k in (
+                    'handler_point', 'selection_point', 'native_selection_point', 'caller_point', 'input_point')}
+                if not required_sources <= set(ready):
+                    raise ValueError('REQUEST_BINDING_SOURCE_UNAVAILABLE')
+                fresh_binding.validate_sample(payload['metadata']['request_binding'],
+                    point=payload['point'], phase=payload['phase'], spec=spec)
             if is_online and payload["point"] in online.POINT_CONTRACTS:
                 if (set(payload["metadata"]) != {"online_input"} or payload["requests"] != []
                         or payload["selection_observed"] is not False or row["event"] != "NATIVE"
@@ -437,7 +500,8 @@ def parse_recording(raw, prepared):
                 raise ValueError('WEIGHT_ITERATION_CLOCK_INVALID')
             weight_events.append(row)
         if row['event']=='PROFILER':
-            profiler_metadata.validate_sample(payload)
+            profiler_metadata.validate_sample(payload,sources=(release_observation.PROFILER_ROWS
+                if prepared['profile']==release_observation.PROFILER_PROFILE else None))
             if payload['source_module'] not in ready:raise ValueError('PROFILER_SOURCE_MODULE_UNAVAILABLE')
             if profiler_runtime is not None and payload['observer_runtime']!=profiler_runtime:raise ValueError('PROFILER_OBSERVER_RUNTIME_MISMATCH')
             profiler_runtime=payload['observer_runtime'];profiler_events+=1
@@ -472,12 +536,16 @@ def parse_recording(raw, prepared):
             call["late"]+=not payload["context_live"]
             call["unhashed"]+=payload["phase"].startswith("BODY_SEND_") and not payload["body_hash_complete"]
         if row["event"] == "ASGI":
-            if (set(payload) != {"request_sha256","phase","more_body"}
+            if (set(payload) != {"request_sha256","phase","more_body"} | ({'asgi_invocation_sha256'} if is_fresh_binding else set())
                     or payload["request_sha256"] is not None and (type(payload["request_sha256"]) is not str
                         or re.fullmatch(r"[0-9a-f]{64}",payload["request_sha256"]) is None)
                     or payload["phase"] not in {"DISCONNECT_RECEIVED","BODY_SEND_RETURN","APP_RETURN","APP_RAISE"}
                     or payload["more_body"] is not None and type(payload["more_body"]) is not bool):
                 raise ValueError("LIFECYCLE_RECORDING_ASGI_INVALID")
+            if is_fresh_binding and payload['asgi_invocation_sha256'] is not None and (
+                    type(payload['asgi_invocation_sha256']) is not str
+                    or re.fullmatch('[0-9a-f]{64}', payload['asgi_invocation_sha256']) is None):
+                raise ValueError('REQUEST_BINDING_ASGI_INVALID')
         if row['event'] in endpoint_metadata.VALIDATORS:
             if not is_endpoint:raise ValueError('READY_ENDPOINT_PROFILE_UNSUPPORTED')
             endpoint_metadata.VALIDATORS[row['event']](payload)
@@ -497,10 +565,18 @@ def parse_recording(raw, prepared):
     if rows[-1]["event"] == "END" and (set(end) != {"reason"} or end["reason"] not in {"SEALED","PROCESS_EXIT","BOUND_REACHED","CONTROL_UNAVAILABLE","SEGMENT_ROLLOVER"}):
         raise ValueError("LIFECYCLE_RECORDING_END_INVALID")
     weight_journal=weight_metadata.journal(weight_events) if is_weight else {}
+    binding_journal = fresh_binding.journal(rows, profiles.configured.row(prepared['profile'])['request_binding']) if is_fresh_binding else None
+    startup_candidates = baseline_startup_input.journal(rows, prepared, context) if is_baseline_startup else None
+    direct_profiler = profiler_metadata.native_backend_project(
+        [row['payload'] for row in rows if row['event'] == 'BASELINE_PROFILER'],
+        binding=baseline_profiler.process_binding(prepared['session'], context)) if is_direct_profiler else None
     return rows, {"recording_closed": bool(end) and not incomplete_tail, "recording_end": end.get("reason"),
         "incomplete_final_row":incomplete_tail,"discarded_tail_bytes":len(tail),
         "discarded_tail_sha256":hashlib.sha256(tail).hexdigest() if tail else None,
         "source_profile_modules": sorted(ready), "whole_run_coverage_verified": False,
+        **({'fresh_request_binding': binding_journal} if is_fresh_binding else {}),
+        **({'baseline_startup': startup_candidates} if is_baseline_startup else {}),
+        **({'baseline_profiler': direct_profiler} if is_direct_profiler else {}),
         **({'ready_endpoint_events':len(endpoint_journal['events']),'ready_endpoint_missing':endpoint_journal['missing']} if is_endpoint else {}),
         **({'worker_generation_events':len(generation_journal['events']),'worker_ready_send_events':len(generation_journal['pipe_events']),'worker_generation_missing':generation_journal['missing']} if is_generation else {}),
         **({'worker_startup_events':len(startup_journal['events']),'worker_startup_missing':startup_journal['missing']} if is_worker_startup else {}),
@@ -572,11 +648,11 @@ def capture(docker, target, *, source, prepared, read_file=None, image_check=Non
     is_termination=prepared["profile"]in {fault_sensor.PROFILE,termination_sensor.PROFILE}
     is_online = prepared["profile"] == online.PROFILE
     is_attempt=prepared["profile"] in {attempt.PROFILE,output_sensor.PROFILE}
-    is_stream=prepared["profile"]==stream_sensor.PROFILE
+    is_stream=prepared["profile"] in {stream_sensor.PROFILE,release_observation.STREAM_PROFILE}
     is_rank=prepared["profile"]==rank_sensor.PROFILE
     is_weight=prepared["profile"] in {weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
-    is_profiler=prepared["profile"]==profiler_sensor.PROFILE
-    is_init=prepared["profile"] in {init_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
+    is_profiler=prepared["profile"] in {profiler_sensor.PROFILE,release_observation.PROFILER_PROFILE}
+    is_init=prepared["profile"] in {init_release.PROFILE,init_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE}
     limit = sglang_sensor.MAX_BYTES if is_sglang else termination_sensor.MAX_BYTES if is_termination else weight_sensor.MAX_BYTES if is_weight else profiler_sensor.MAX_BYTES if is_profiler else init_sensor.MAX_BYTES if is_init else rank_sensor.MAX_BYTES if is_rank else stream_sensor.MAX_BYTES if is_stream else attempt.MAX_BYTES if is_attempt else online.MAX_BYTES if is_online else sensor.MAX_BYTES
     read_options = {"read_profile":LARGE_RECORDING_PROFILE}if is_sglang and read_file is None else {"read_profile":EXTENDED_RECORDING_PROFILE} if (is_termination or is_online or is_attempt or is_stream or is_rank or is_init or is_profiler or is_weight) and read_file is None else {}
     raw, provenance = read(docker, target, **source, max_bytes=limit, **read_options)

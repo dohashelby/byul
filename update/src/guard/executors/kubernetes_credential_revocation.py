@@ -3,6 +3,7 @@ from pathlib import Path
 import uuid,re
 from datetime import datetime,timezone
 from guard.adapters import vllm_lifecycle_sensor as sensor
+from guard.adapters import vllm_lifecycle_release_sensor as release_sensor
 from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_credential_revocation import KubernetesCredentialRevocationHTTP,PROFILE as HTTP_PROFILE,SLOTS
@@ -38,7 +39,7 @@ class KubernetesCredentialRevocationExecutor(HttpCheckExecutor):
             with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
             target_hash=sha256_hex(canonical_json(target));prepared=load_prepared(self.cfg['prepared']);start,end,event,deadline=normalize_policy(policy_values)
             if (target_hash!=policy_values['revocation_target_sha256'] or env.ref().sha256!=policy_values['revocation_environment_sha256']
-                    or self.expected_target is not None and target_hash!=self.expected_target or prepared['profile']!=sensor.PROFILE
+                    or self.expected_target is not None and target_hash!=self.expected_target or prepared['profile'] not in {sensor.PROFILE,release_sensor.PROFILE}
                     or sha256_hex(canonical_json(prepared))!=policy_values['revocation_prepared_sha256'] or not start<=utcnow()<=end or type(env.model.inventory_sha256) is not str or len(env.model.inventory_sha256)!=64):raise ValueError
         except (KeyError,ValueError,TypeError,RuntimeError,OSError):raise ValueError('CREDENTIAL_REVOCATION_CONFIGURATION_INVALID') from None
         transport=KubernetesCredentialRevocationHTTP(target,env,keys,runner=self.runner,duration=self.cfg.get('max_duration_seconds',120),binary=self.cfg.get('kubectl_binary','kubectl'))

@@ -9,7 +9,7 @@ import yaml
 from guard import application
 from tests.builders import policy
 from tests.test_prepare_support_integration import _local
-from tests.test_windows_cpu_launch import setup_inputs
+from tests.test_managed_gpu_launch import setup_inputs
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def inputs(tmp_path):
     pack, env, _, base = setup_inputs(tmp_path)
-    cfg = tomllib.loads((ROOT / "examples/windows-cpu-binding-logs.toml").read_text(encoding="utf-8"))
+    cfg = tomllib.loads((ROOT / "examples/gpu-bounded-binding-logs.toml").read_text(encoding="utf-8"))
     cfg["vllm"]["models_dir"] = base["vllm"]["models_dir"]
     raw = yaml.safe_load((ROOT / "examples/automation-binding-logs-policy.yaml").read_text(encoding="utf-8"))
     pol = policy(pack.ref(), scope={"include": ["OBS-03", "REQ-09"]},

@@ -32,7 +32,7 @@ LIMITATIONS = [
 
 
 def derive(output, seed=None):
-    seed = Path(seed or Path(__file__).parents[1] / 'packs/PACK-BASELINE').resolve()
+    seed = Path(seed or Path(__file__).parents[1] / 'reference/pack-seeds/PACK-BASELINE-33').resolve()
     output = Path(output).resolve()
     if output.exists() or output.is_relative_to(seed):
         raise ValueError('NEW_EXTERNAL_PACK_DIRECTORY_REQUIRED')

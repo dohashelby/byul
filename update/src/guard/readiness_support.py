@@ -135,7 +135,8 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
         row['code_available'] = True
         if executor == 'engine_sensor':
             selected_factory = registry.resolve_executor(executor, implementation, engine=env.engine.name, version=env.engine.version)
-            selected_executor = selected_factory(cfg)
+            from guard.configuration import for_check
+            selected_executor = selected_factory(for_check(cfg, executor, check.id))
             describe = getattr(selected_executor, 'support', None)
             state = describe(check.id, check.collection_profile, env) if callable(describe) else {'implemented': False, 'reason': 'PLUGIN_SUPPORT_CONTRACT_UNAVAILABLE'}
             row.update(code_available=state.get('code_available', state['implemented']),
@@ -199,8 +200,8 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                     row["limitations"].append("Kubernetes direct Pod JSON/SSE only; no Service/Gateway/TLS or GPU-release proof")
                 continue
             launch = cfg.get(env.engine.name, {})
-            if not provider.bounded_cpu_evidence(launch, env):
-                unsupported("this inspected collection profile requires an explicit bounded CPU launch")
+            if not provider.bounded_launch_evidence(launch, env):
+                unsupported("this inspected collection profile requires an explicit bounded GPU launch (gpu-bounded with assigned GPUs)")
             image, version = env.engine.image_digest, env.engine.version
             if not image or not version:
                 if row["status"] != "UNSUPPORTED":

@@ -157,10 +157,15 @@ def test_file_input_cannot_upgrade_to_measured(tmp_path, origin):
     if origin == 'MEASURED':assert not value.observations['activation_steps'].value[-1]['records']
 
 
-def test_req12_not_declared_and_existing_closed_dispatch_preserved(tmp_path):
+def test_req12_declaration_retains_unverified_facts_and_closed_dispatch(tmp_path):
     _, _, _, record, scope, descriptor = inputs(tmp_path)
-    with pytest.raises(ValueError, match='B_COMMON_INPUT_CHECK_UNDECLARED:REQ-12'):
-        consume_record('REQ-12', record, owner=POD, **scope)
+    result = consume_record('REQ-12', record, owner=POD, **scope)
+    assert result['facts']['event_counts'] == {name: sum(e['event'] == name for e in record['events'])
+        for name in sorted({e['event'] for e in record['events']})}
+    assert result['facts']['automatic_retry_and_final_output_binding_verified'] is False
+    assert result['gaps'] and not result['producer_authenticated'] and not result['whole_question_complete']
+    with pytest.raises(ValueError, match='B_COMMON_INPUT_CHECK_UNDECLARED:PLT-02'):
+        consume_record('PLT-02', record, owner=POD, **scope)
     from guard.executors.kubernetes_request_attempts import KubernetesRequestAttemptsExecutor, PROFILE
     executor = registry.build_executor('request_termination', 'kubernetes', {'request_termination': {'common_inputs': descriptor}})
     child = executor._consumer(SimpleNamespace(id='REQ-12', collection_profile=PROFILE))
@@ -236,6 +241,9 @@ def test_without_common_inputs_primary_artifact_error_keeps_original_exception_b
 
 
 def pipeline(folder, pack, env, check_id, values, cfg, *, activation=None):
+    from tests.run_binding_support import split
+    # @35: guard run computes ENV/target/prepared/validity from these real files (guard-run-binding/1).
+    values, _ = split(pack.checks[check_id], values)
     pol = policy(pack.ref(), scope={'include':[check_id]}, values={check_id:values})
     store = Store(folder/'store'); put_pack(store, pack.path); store.put_many([env,pol])
     plan = select(pack,[env],pol); store.put(plan)
@@ -282,6 +290,7 @@ from tests.test_lifecycle_capture import case, external, revised  # noqa: E402,F
 from tests.test_lifecycle_sensor import writer_factory  # noqa: E402,F401
 
 
+@pytest.mark.usefixtures("example_registered_callback_producers")
 def test_lif10_actual_producer_to_current_pack_normalized_evidence_and_rejudge(tmp_path, group, native_target, monkeypatch):
     from tests.test_a1_kubernetes_request_termination_product import inputs as native_inputs
     from guard.runtime import kubernetes_http as http

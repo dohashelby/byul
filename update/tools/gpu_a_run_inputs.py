@@ -96,6 +96,7 @@ def environment(render, *, model_id=None, inventory=None, gpu_model, driver, obs
     # facts는 등록된 키만 받는다. 세대 구분은 서술 필드에 남기고 결과를 세대끼리 섞지 않는다.
     platform = ('GPU, amd64, AWS g6 kubeadm serving-lab; ' + '; '.join(f'{k}={v}' for k, v in (
         ('generation', generation), ('run', render['run_id']), ('profile', render['profile']),
+        ('engine_requested', launch.get('engine')),
         ('runner', launch['runner']), ('async_requested', launch['async_requested']),
         ('engine_version_observed', observed_engine_version is not None),
         ('eager', render['enforce_eager']), ('render_engine_sha256', render['outputs_sha256']['engine.yaml']))))
@@ -144,6 +145,16 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
                 or spec.get('args') != render['launch']['argv']
                 or model_volume['hostPath']['path'] != render['model_host_snapshot']):
             raise ValueError('RUN_INPUTS_RENDERED_LAUNCH_MISMATCH')
+        # New records bind the declared engine-selection variables. Historical
+        # records without this field keep their original replay meaning.
+        launch_env = render['launch'].get('env', {})
+        if type(launch_env) is not dict or any(type(k) is not str or type(v) is not str
+                                              for k, v in launch_env.items()):
+            raise ValueError('RUN_INPUTS_RENDERED_ENGINE_ENV_INVALID')
+        for name, expected in launch_env.items():
+            actual = [item for item in spec.get('env', []) if item.get('name') == name]
+            if actual != [{'name': name, 'value': expected}]:
+                raise ValueError('RUN_INPUTS_RENDERED_ENGINE_ENV_MISMATCH')
         marker_root = render.get('code_marker_root')
         if marker_root is not None and not any(
                 item.get('name') == 'BYUL_CODE_MARKER_ROOT' and item.get('value') == marker_root
@@ -181,6 +192,10 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
         value['observed_version'] = env.engine.version
         value['comparison_config'] = {'launch': {'argv': list(container['args']), 'chat_template': identity,
             'max_model_len': int(container['args'][container['args'].index('--max-model-len') + 1])}}
+    if (render.get('launch') or {}).get('engine') is not None:
+        # Compare the requested engine semantics, not version-specific env names.
+        # This is a declaration checked against the Pod spec, not runtime proof.
+        value.setdefault('comparison_config', {})['engine_selection'] = render['launch']['engine']
     # 전송 계층 생성자는 kubectl을 부르지 않고 target 형식과 신원 결합만 검사한다.
     from guard.runtime.kubernetes_http import INPUT_VALIDATION_PROFILE
     profile = INPUT_VALIDATION_PROFILE if 'code-selection' in render['generation'] else ENGINE_CALLBACK_PROFILE
@@ -190,6 +205,13 @@ def target(env, render, namespace, engine_pod, probe_pod, *, context, api_model=
 
 def _no_kubectl(*args, **kwargs):
     raise AssertionError('RUN_INPUTS_NO_KUBECTL')
+
+
+def _run_bound(check_id):
+    """Keys the current pack leaves to the per-run binding instead of the policy."""
+    from guard.executors import run_binding
+    from guard.models import load_pack
+    return run_binding.keys_for(load_pack(Path(__file__).resolve().parents[1] / 'packs/PACK-BASELINE').checks[check_id])
 
 
 def check_inputs(check_id, env, target_value, prepared_dir, case_list, draft, *, root):
@@ -208,6 +230,9 @@ def check_inputs(check_id, env, target_value, prepared_dir, case_list, draft, *,
     values = {key: value for key, value in (draft['values'].get(check_id) or {}).items() if not key.startswith('sensor_')}
     values.update(sensor_environment_sha256=env.ref().sha256, sensor_target_sha256=target_sha,
         sensor_prepared_sha256=sha256_hex(canonical_json(prepared)), sensor_manifest_sha256=sha256_hex(canonical_json(manifest)))
+    # PACK-BASELINE@35: guard run computes these from the same files (guard-run-binding/1); a policy must not carry them.
+    for key in _run_bound(check_id):
+        values.pop(key, None)
     policy = {'data_origin': 'EXAMPLE' if check_id in EXAMPLE_POLICY_CHECKS else 'DECLARED', 'status': 'DRAFT',
         'pack': deepcopy(draft['pack']), 'values': {check_id: values}, 'scope': {'include': [check_id], 'exclude': []},
         'exceptions': [], 'confirmed_by': None, 'confirmed_at': None}
@@ -218,6 +243,22 @@ def check_inputs(check_id, env, target_value, prepared_dir, case_list, draft, *,
         # LIF-13(소비자 엔진 두 번 기동)·REQ-21(TP2 엔진 재기동)은 실행 안에서 엔진을 띄운다(실행기·lab 전송 상한 900초).
         f"max_duration_seconds = {900 if check_id in ('LIF-13', 'REQ-21') else 300}", ''])
     return manifest, policy, config
+
+
+def timing_group_inputs(env, target_value, prepared_dir, cohorts, draft, *, root):
+    from guard.executors import cache_timing_group as group
+    group.validate_case_parts(cohorts)
+    first, policy, config = check_inputs('REQ-17', env, target_value, prepared_dir, cohorts[0], draft, root=root)
+    parts = [{**first, 'cases': deepcopy(cases)} for cases in cohorts]
+    raw_files = {f'part-{i}.json': canonical_json(part) for i, part in enumerate(parts, 1)}
+    manifest = {k: v for k, v in first.items() if k != 'cases'}
+    manifest.update(schema=group.SCHEMA, parts=[{'index': i, 'file': f'part-{i}.json',
+        'file_sha256': sha256_hex(raw_files[f'part-{i}.json']),
+        'manifest_sha256': sha256_hex(canonical_json(part))} for i, part in enumerate(parts, 1)])
+    group.validate_parts(manifest, parts)
+    if 'sensor_manifest_sha256' not in _run_bound('REQ-17'):
+        policy['values']['REQ-17']['sensor_manifest_sha256'] = sha256_hex(canonical_json(manifest))
+    return manifest, policy, config, raw_files
 
 
 # HTTP 점검(G-A3)의 Kubernetes 실행 설정. 기업 정책값이 아니라 요청·시간 상한과 선언 맥락이다.
@@ -327,10 +368,25 @@ def main(argv=None):
         _write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True)); _write(args.out / 'guard.toml', config)
         print(json.dumps({'schema': SCHEMA, 'check': args.check, 'executor': HTTP_CHECKS[args.check][0]}))
     else:
-        case_list = (cases(args.cases, media_text_after=args.media_text_after) if args.media_text_after is not None
-            else load(args.cases)['cases'] if Path(args.cases).is_file() else cases(args.cases))
-        manifest, policy, config = check_inputs(args.check, load_environment(args.env), load(args.target), args.prepared, case_list,
-            yaml.safe_load(args.policy_draft.read_text(encoding='utf-8')), root=args.out)
+        from tools import gpu_a_req17_cohort
+        source = load(args.cases) if Path(args.cases).is_file() else None
+        split = type(source) is dict and source.get('schema') == gpu_a_req17_cohort.GROUP_SCHEMA
+        draft = yaml.safe_load(args.policy_draft.read_text(encoding='utf-8'))
+        if split:
+            if args.check != 'REQ-17' or args.out.exists():
+                raise ValueError('REQ17_SPLIT_NEW_OUTPUT_REQUIRED')
+            cohorts = gpu_a_req17_cohort.load_split(args.cases)
+            manifest, policy, config, raw_files = timing_group_inputs(load_environment(args.env), load(args.target),
+                args.prepared, cohorts, draft, root=args.out)
+            args.out.mkdir(parents=True)
+            for name, raw in raw_files.items():
+                (args.out / name).write_bytes(raw)
+            case_list = [c for part in cohorts for c in part]
+        else:
+            case_list = (cases(args.cases, media_text_after=args.media_text_after) if args.media_text_after is not None
+                else source if type(source) is list else source['cases'] if source is not None else cases(args.cases))
+            manifest, policy, config = check_inputs(args.check, load_environment(args.env), load(args.target), args.prepared, case_list,
+                draft, root=args.out)
         _write(args.out / 'target.json', load(args.target)); _write(args.out / 'manifest.json', manifest)
         _write(args.out / 'policy.yaml', yaml.safe_dump(policy, sort_keys=False, allow_unicode=True)); _write(args.out / 'guard.toml', config)
         commands = [f'uv run guard select --pack packs/PACK-BASELINE --env {args.env.absolute()} --policy {args.out.absolute() / "policy.yaml"} --config {args.out.absolute() / "guard.toml"}',
@@ -339,7 +395,7 @@ def main(argv=None):
             f'uv run guard report --plan <PLAN> --config {args.out.absolute() / "guard.toml"} --json {args.out.absolute() / "report.json"}']
         _write(args.out / 'commands.txt', '\n'.join(commands) + '\n')
         print(json.dumps({'schema': SCHEMA, 'check': args.check, 'cases': len(case_list), 'lab': 'lab_contexts' in manifest,
-            'manifest_sha256': policy['values'][args.check]['sensor_manifest_sha256']}))
+            'manifest_sha256': sha256_hex(canonical_json(manifest))}))
 
 
 if __name__ == '__main__':

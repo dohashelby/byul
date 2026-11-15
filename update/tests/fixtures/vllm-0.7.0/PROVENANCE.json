@@ -1,0 +1,80 @@
+{
+  "repository": "https://github.com/vllm-project/vllm",
+  "tag_commit": "5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8",
+  "license": "Apache-2.0 (LICENSE.txt)",
+  "files": {
+    "custom_all_reduce.py.txt": {
+      "source": "vllm/distributed/device_communicators/custom_all_reduce.py",
+      "sha256": "f3e7b346e31eeab398c62c9a4e94a5aeab8a6936460b365ba60ceed91f0ecbf2"
+    },
+    "vllm/entrypoints/openai/serving_engine.py.txt": {
+      "source": "vllm/entrypoints/openai/serving_engine.py",
+      "sha256": "ac5e16bc8bc63b6f16a6f78509f0e773056be57dcfdc5f810c91dc3bbbd7282b"
+    },
+    "vllm/entrypoints/openai/protocol.py.txt": {
+      "source": "vllm/entrypoints/openai/protocol.py",
+      "sha256": "b8a81e70c50024af350432b1bf83d08aa8a2ada84291d6e5bcc0551f4918eb0e"
+    },
+    "vllm/entrypoints/openai/api_server.py.txt": {
+      "source": "vllm/entrypoints/openai/api_server.py",
+      "sha256": "23e5b9b81d6657653fcd5646bb4034d5a4ba5c31ebd419c2e67e1f2ba1f73240"
+    },
+    "vllm/entrypoints/openai/serving_chat.py.txt": {
+      "source": "vllm/entrypoints/openai/serving_chat.py",
+      "sha256": "baa46e8d60504ff05e6a9e7b6d9c8ed64c4adf04ee5dc7ff9e6e7895397f48bf"
+    },
+    "vllm/v1/core/scheduler.py.txt": {
+      "source": "vllm/v1/core/scheduler.py",
+      "sha256": "24db292542369b94d00985b6860386909cf9ce559965263395188f613c4a4985"
+    },
+    "vllm/v1/core/kv_cache_manager.py.txt": {
+      "source": "vllm/v1/core/kv_cache_manager.py",
+      "sha256": "39f087609c2049d6383d45ae098d5b5a54749d32f14ab6d4cf779d3f54390355"
+    },
+    "vllm/v1/engine/processor.py.txt": {
+      "source": "vllm/v1/engine/processor.py",
+      "sha256": "b3b66559ce98fb31f89a1ca3a8b9b4d7bc942df090305ea5f765d8bcf21e5d43"
+    },
+    "vllm/v1/engine/async_llm.py.txt": {
+      "source": "vllm/v1/engine/async_llm.py",
+      "sha256": "c6386700282f55a46b1f103331020e5713d59acf06b12a3e64b0eca40a3aa9b7"
+    },
+    "vllm/v1/engine/core.py.txt": {
+      "source": "vllm/v1/engine/core.py",
+      "sha256": "091b574c562202ccc60139e3d1a9cdd29f0fd33cbffa286ca4ae76f460ee3a16"
+    },
+    "vllm/v1/engine/output_processor.py.txt": {
+      "source": "vllm/v1/engine/output_processor.py",
+      "sha256": "12baa6cb772527d52b0fe4e0b69b12d9365dec280f20395dadc7286593ce99ce"
+    },
+    "vllm/v1/worker/gpu_input_batch.py.txt": {
+      "source": "vllm/v1/worker/gpu_input_batch.py",
+      "sha256": "89770d22d9398a061d96e4aa547a8afbacaf0eeff589e1dcf3df45503a4ab40c"
+    },
+    "vllm/v1/worker/gpu_model_runner.py.txt": {
+      "source": "vllm/v1/worker/gpu_model_runner.py",
+      "sha256": "1ac3fb18b2adad3609dcf58a1656d6fdd4a568eea6740258e00f6a43c7d4b813"
+    },
+    "vllm/entrypoints/openai/serving_completion.py.txt": {
+      "source": "vllm/entrypoints/openai/serving_completion.py",
+      "sha256": "95184b6b6ceaa3642e6ab86526536ab890728155a929d9dfb3b2f16adc372018"
+    },
+    "vllm/v1/executor/multiproc_executor.py.txt": {
+      "source": "vllm/v1/executor/multiproc_executor.py",
+      "sha256": "5db418332360f43e2a9718f62d8ec5d856d554b8d0d27d14f053fb3392d33239"
+    },
+    "vllm/v1/executor/abstract.py.txt": {
+      "source": "vllm/v1/executor/abstract.py",
+      "sha256": "6e0c838ef1e866b15f8176da0af117dc4661efe387fbcca20d521020c7b1970a"
+    },
+    "vllm/distributed/device_communicators/shm_broadcast.py.txt": {
+      "source": "vllm/distributed/device_communicators/shm_broadcast.py",
+      "sha256": "24a3990266dcbbdbb14f6a2a2c4dec1eecad54d9ea85622ddc8dc36774b87942"
+    },
+    "vllm/v1/worker/gpu_worker.py.txt": {
+      "source": "vllm/v1/worker/gpu_worker.py",
+      "sha256": "7bc08a4e47bac5e1d68e68f540f014e3f9244c0f8d773f0dd7f5b959da5afb7a"
+    }
+  },
+  "pin_status": "candidate: tag source bytes, not yet compared with the image install file"
+}

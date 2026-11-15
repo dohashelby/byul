@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from .vllm_lifecycle_links import assignment, asgi_assignment
+from .vllm_lifecycle_links import assignment, asgi_assignment, fresh_assignment
 
 SCOPES = frozenset({"asgi_transport", "frontend_request", "engine_core", "scheduler_state",
     "worker_batch", "kv_references", "gpu_transfers"})
@@ -18,7 +18,7 @@ def clock(context):
     return tuple(context.get(k) for k in ("boot_sha256","time_namespace","time_offsets_sha256"))
 
 
-def project_native(packet, request_sha256, max_delay_ms, required_scopes):
+def project_native(packet, request_sha256, max_delay_ms, required_scopes, *, request_hmac=None):
     if type(packet)is dict and type(packet.get('recordings'))is list and any(type(r)is dict and type(r.get('capture'))is dict and r['capture'].get('records')and r['capture']['records'][0].get('payload',{}).get('profile')=='sglang-native-lifecycle-metadata/1'for r in packet['recordings']):
         from .sglang_request_termination import project_native as project_sglang
         projected=project_sglang(packet,request_sha256,max_delay_ms,required_scopes)
@@ -46,6 +46,22 @@ def project_native(packet, request_sha256, max_delay_ms, required_scopes):
         capture=recording.get("capture")
         if not capture:continue
         rows=capture["records"];context=rows[0]["payload"]["context"]
+        if rows[0]['payload'].get('profile')=='vllm-native-lifecycle-metadata/28':
+            if request_hmac is None:
+                result['diagnostic_codes'].append('TERMINATION_REQUEST_BINDING_KEY_UNAVAILABLE')
+                continue
+            for row,binding in fresh_assignment(rows,request_hmac):
+                disconnects=[r for r in rows if r['event']=='ASGI' and r['payload']['request_sha256']==request_hmac
+                    and r['payload'].get('asgi_invocation_sha256')==binding['asgi_invocation_sha256']
+                    and r['payload']['phase']=='DISCONNECT_RECEIVED' and r['monotonic_ns']>=row['monotonic_ns']]
+                if len(disconnects)!=1:continue
+                if any(r['event']=='ASGI' and r['payload']['request_sha256']==request_hmac
+                        and r['payload'].get('asgi_invocation_sha256')==binding['asgi_invocation_sha256']
+                        and r['payload']['phase'] in {'APP_RETURN','APP_RAISE'}
+                        and row['seq']<r['seq']<disconnects[0]['seq'] for r in rows):continue
+                matches.append((index,recording,capture,context,binding['native_request_sha256'],
+                    binding['asgi_invocation_sha256'],disconnects[0]))
+            continue
         # A live selection callback supplies invocation identity; an inherited
         # header ContextVar alone cannot establish a fresh native assignment.
         selections=[r for r in rows if r["event"]=="SELECTION" and r["payload"]["phase"]=="RETURN"
@@ -72,11 +88,12 @@ def project_native(packet, request_sha256, max_delay_ms, required_scopes):
     if len(matches)!=1:
         result["diagnostic_codes"].append("TERMINATION_UNIQUE_NATIVE_DISCONNECT_BINDING_UNAVAILABLE");return result
     index,recording,capture,context,native_id,invocation,anchor=matches[0]
+    asgi_request = request_hmac if capture['records'][0]['payload'].get('profile')=='vllm-native-lifecycle-metadata/28' else request_sha256
     physical=bool(recording.get("session_owner_match") and recording.get("listed_file_identity_match")
         and capture.get("process_context_verified"))
     result["binding_observed"]=True
     result["anchor"]={"recording":index,"seq":anchor["seq"],"pid":context["pid"],"start_ticks":context["start_ticks"],
-        "native_request_sha256":native_id,"asgi_request_sha256":request_sha256,"asgi_invocation_sha256":invocation,
+        "native_request_sha256":native_id,"asgi_request_sha256":asgi_request,"asgi_invocation_sha256":invocation,
         "monotonic_ns":anchor["monotonic_ns"],"clock_domain_sha256":digest(clock(context)),
         "physical_process_binding_verified":physical,"producer_authenticated":False}
     bounded=True
@@ -88,7 +105,7 @@ def project_native(packet, request_sha256, max_delay_ms, required_scopes):
             and value.get("process_context_verified") and clock(current)==clock(context))
         for row in value["records"]:
             payload=row["payload"];scope=None;active=None;remaining=None
-            if row["event"]=="ASGI" and recording_index==index and payload["request_sha256"]==request_sha256:
+            if row["event"]=="ASGI" and recording_index==index and payload["request_sha256"]==asgi_request:
                 if payload["phase"] not in {"APP_RETURN","APP_RAISE"}:continue
                 scope="asgi_transport"
             elif row["event"]=="NATIVE":

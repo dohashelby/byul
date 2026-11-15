@@ -80,6 +80,9 @@ class KubernetesRetryRecordExecutor(HttpCheckExecutor):
                 model_inventory_sha256=env.model.inventory_sha256)
             if scope['run_id'] != target['kubernetes']['run_id']:
                 raise ValueError
+            # @38 (RB3-Q4): the limits are decided in policy; the run's scope file must carry exactly them.
+            if contract.DECISION_KEY in policy_values and scope['limits'] != policy_values[contract.DECISION_KEY]:
+                raise ValueError
         except (KeyError, TypeError, ValueError, OSError, RuntimeError):
             raise ValueError('RETRY_CONFIGURATION_INVALID') from None
         transport = KubernetesHTTP(target, env, duration=self.cfg.get('max_duration_seconds', 120),

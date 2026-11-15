@@ -1,3 +1,797 @@
+## 2026-11-16 — PR #284 일괄 통합·기존 실패 두 건 보수
+
+- 한 일: main47bee7fc의 #283·#285·#286을 통합했다. 문서·검토 영수증·원 fixture 출처를 양쪽 보존하고 CPython 3.12.8 CI의 임시 pycache와 두 PR의 직접 시험 목록을 함께 유지했다. 캐시 시험의 kwargs 인자 누락과 SlotObserver의 스트리밍 sink 미수집만 고쳤다. 기존 assert·UNKNOWN·판정 조건과 제품 소스 범위는 유지했다. 별도 worktree의 미공개 슬롯 이동 후속 커밋은 이번 병합에 넣지 않았다.
+- 테스트 결과: 종전 head29e6d1d2의 기본 suite는 2 failed / 13709 passed / 기존34 skipped(pytest712.23초·부모713.397초)였다. 실패 원인 두 건을 정적 대조로 수정했고 합친 572개 제품 파일의 셸 SHA-256 목록·검토 행을 갱신했다. 새 통합 head CI는 미확인이고 로컬 Python/pytest는 실행하지 않았다.
+- 다음 단계: 사용자 “치명적인 문제 없으면 그냥 전부 병합해” 지시에 따라 같은 PR을 갱신하고 초안을 해제해 main에 병합한다. 새 CI 결과를 과거 결과와 구분한다.
+- 막힌 것: 실제 GPU 실측·생산자 등록·공식 RPT는 이번 병합으로 완료되지 않는다.
+
+## 2026-11-16 — PR #283 일괄 병합 준비
+
+- 한 일: 초안을 포함한 일괄 병합 지시에 따라 main48d73e93을 통합했다. 양쪽 결정·진행·작업지시 기록과 과거 소스 검토 영수증을 보존했다. 제품 파일 충돌은 없었고 566개 파일의 셸 SHA-256으로 통합 목록과 검토 행을 맞췄다.
+- 테스트 결과: 종전 head5ea6c2bc의 CI 10개 모두 성공이었다. 새 통합 head의 CI는 아직 없으며 로컬 Python/pytest는 실행하지 않았다.
+- 다음 단계: 기존 /2 관측 후보 범위를 유지하며 같은 PR을 갱신하고 main에 병합한다.
+- 막힌 것: 실제 worker/모델/GPU 실측·전체 그룹 수락·생산자 등록은 이번 병합으로 완료되지 않는다.
+
+## 2026-11-16 — PR #285의 최신 main 문서 통합
+
+- 한 일: 사용자 일괄 병합 요청에 따라 main7cbaa4e1을 #285에 통합했다. DECISIONS·PROGRESS의 양쪽 기록을 보존하고 겹친 판본 적용표 번호를 28절로 정리했다. REQ-10 검토 JSON과 제품 소스·팩·원 증거는 그대로다.
+- 테스트 결과: 종전 head72a1a2bf의 CI 10개가 모두 성공했다. 이번 문서 통합의 새 head CI는 아직 확인 전이다. 로컬 Python/pytest는 실행하지 않았다.
+- 다음 단계: 통합 head의 CI와 최종 diff를 확인한 뒤 main에 병합한다.
+- 막힌 것: 실제 ENV/target·sampler/GPU 관측은 이번 문서 병합의 결과가 아니며 미확인 상태를 유지한다.
+
+## 2026-11-15 — REQ-10 초기 V1 제약 소비의 한정된 소스 검토
+
+- 한 일: 별도 main 기반 브랜치에서 기존 승인 설치 소스6파일/V1 Python42파일을 검토했다. API guided 필드 전달과 V1 sampler 소비를 구분하고 원 sampler 메서드+EXAMPLE 협력 객체로 greedy/random2개 경로를 확인했다. 후보의 grammar bitmask/logits processor 경로는 별도 후속으로 표시했다. 검토 JSON과 적용표28절을 추가하며 제품 소스/판정/고정값·지원표/팩·M-B4는 바꾸지 않았다.
+- 테스트 결과: 저장소 밖 한정된 함수 실행2개가 제약 getter 미접근 대조를 통과했다. engine/torch import·실제 GPU/모델 실행은0이다. 이 수를 pytest/실측이나 기능 부재 인증으로 세지 않는다. 현황77/23/68·경로16개(pytest0.49초·부모0.662초)·검토 JSON 구조·diff 검사가 통과했다. 제품/도구/시험 소스 무변경을 확인했다. 새 PR CI와 실제 sampler/GPU는 미실행이다.
+- 다음 단계: 현재 V1 API/모델/설치 source/선택 backend를 실제 입력과 맞추고 허용/거부·후속 변환/모델 제출과 sampler 소비를 관측한다. 확인 불가 예외를 MVP 완료로 인정하려면 별도 결정을 요청한다. 공개 전 source/문서 검토와 push 승인이 필요하다.
+- 막힌 것: 실제 ENV/target·선택 V1·sampler/worker 원 관측이 아직 없다. 필드 대응/HTTP 오류/EXAMPLE 함수 실행만으로 runner_consumption_verified=true/PASS/비적용으로 바꾸지 않는다. 새 GPU/비용/다운로드·M-B4 재개·판정/계약 변경은 승인하지 않았다.
+
+## 2026-11-15 — 통합 CI 실패 보완·기준 profiler /32와 cache 연결
+
+- CI 원결과: head8d828e1a는 227 failed·13250 passed·기존34 skipped·89 errors·10 warnings(pytest1024.87초·부모1026.210초)였다. 새 REQ-10 조건식 줄바꿈의 문법 오류와 새 영수증 설명3개의 기존128자 제한 초과가 제품 실행기/소스 gate를 연쇄 차단했다. 조건식을 고치고 검토자 설명만 제한 안으로 줄였으며 원문은 Git과 별도 evidence `receipt-format-corrections.json`에 보존했다. 기존 gate·판정·기대값을 바꾸지 않았다. CI에는 전체 시험 전에 Python compileall을 추가했다. 새 profiler 회귀에서 모든 stop 후보와 실제 충돌 flag를 혼동한 기대를 실제 projector 의미에 맞췄다. 별도 RPC control-ready 파일 거부1건은 원 로그에 보존하고 재검증한다. 원 로그 SHA70617d0b342f5d757719063f4aba79e6d125806c4a1b50d46bb4d252a1391808.
+- 한 일: 집중 검토한 기준 cache/slot9843129f·4c22d4c2와 profiler8eae090b·용량 보완6b9ec8cc를 통합했다. 캐시는 실제 baseline의 flat2-tuple과 요청 metadata를 읽되, timing 대조군의 실제 native hit가 없으면 UNKNOWN이다. 슬롯 index는 최종 sampler 소비가 없어 후보/UNKNOWN을 유지한다. 후속 condense 역사·batch 결합 수정은 별도 분기이며 아직 통합하지 않았다.
+- profiler /32: 실제 Worker.profile의 direct Torch backend와 성공한 start 호출의 세대, stop 결과를 관측한다. 원 /15 bytes는 유지하며 wrapper ID로 backend ID를 대체하지 않는다. 새 profile은 request-free이고 trace directory는 선언한 소유 경로의 파일 사실만 남기며 실제 소비된 callback 경로·출력 완료·RPC를 주장하지 않는다. object 한도에서 신규 owner 기록을 건너뛰고 generation nonce가 없으면 qualified로 올리지 않도록 보완했다.
+- 다음 단계: 엄격한 source 목록·영수증을 고정해 새 통합 CI에서 확인한다. /32와 기존 startup/stream 변형은 CPython3.12.8 별도 CI에도 넣는다. 승인받아 받은 uvicorn0.34 wheel은 정확62,315bytes/SHA·이미지 distribution METADATA 일치를 확인했고, /33의 실제 함수/기록 소비 연결을 진행 중이다. 로컬 Python/pytest·GPU 실측·생산자 등록·공식 RPT는 수행/완료로 주장하지 않는다.
+
+## 2026-11-15 — 기준 startup 전용 /31의 소유 journal·capture 연결
+
+- 한 일: 집중 검토한 b5db8b92·23f2ea49를 통합했다. 정확 MP·Worker 두 source만 감싸고 기존 per-process Writer에 기본·미지원·로드/constructor 실패 기록을 남긴다. prepare/load의 고정 비공개 의존 파일 검사, fork 뒤 새 process binding, strict 파서와 capture summary까지 연결했다. READY는 transport handshake이며 전체 준비·상위 집계·외부 접수 gate는 여전히 미확인이다.
+- 개인정보 경계: 검토 중 발견한 /27 요청 관측 상속을 제거했다. /31은 startup 전용이고 HTTP 헤더를 읽지 않으며 ASGI·NATIVE·SELECTION 기록을 생성/수락하지 않는다. 원 /27 template·/14·/15 bytes와 기존 실행기 관문은 유지한다. 실제 middleware와 무관한 Processor 호출 뒤 원 ID/단순 SHA가 비어 있지 않은 journal에 없는지 검사하는 회귀를 추가했다.
+- 테스트 결과: 정확 head8d828e1a의 CPython3.12.8 CI는 93 passed(4.53초·부모5.106초)다. 전체 update CI는 진행 중이다. 이번 /31 통합은 그 뒤의 source 변경이어서 별도 CI가 필요하다. 로컬 Python/pytest는 실행하지 않았다.
+- 다음 단계: 통합 source 목록/결정5 검토 행을 고정한다. 기준 cache/slot 및 request-free baseline profiler 의미 연결을 별도 worktree에서 계속한다. 기준 uvicorn0.34 wheel 한 개 다운로드 승인은 별도 질문 중이며 그 분기에만 대기한다. 실제 GPU/생산자 등록/공식 결과는 미완료다.
+
+## 2026-11-15 — 후보 REQ-10 소스·값 소비·원 receipt 정합 통합
+
+- 한 일: 집중 검토한 a0353d87→a00c4780→0efde02의 후보 REQ-10을 통합했다. 이미지·serving/input/worker/batch 9개 정확 파일과 준비 자산·V1 환경을 전후 대조한다. 생략한 sampling 값을 추정하지 않고 실제 API 정규화 값→runner→sampler를 같은 요청 HMAC으로 대조한다. 값 누락/차이는 처음 쓰는 준비 receipt와 capture·최종 B projection에 같은 공백으로 남겨 소비 완료를 보류한다. 기존 0.31 동작·기준 W5 관문·판정·과거 source/영수증은 보존한다.
+- 테스트 결과: 이번 source의 CI 결과는 아직 없다. 앞선 76706626의 CPython3.12.8 추가 회귀는 startup 양성 자격 9개 실패·84 passed(5.32초·부모5.949초)였다. fixture의 AST 재구성을 제거하고 원본 전체 source에서 컴파일한 변경 없는 함수 code 객체를 써 엄격한 자격 비교를 유지했다. 기존 기대·고정값·ABI gate를 완화하지 않았다. 로컬 Python/pytest는 실행하지 않았다.
+- 다음 단계: 이 통합 source의 Linux CI를 확인하고 실패를 고친다. startup의 실제 소유 journal/profile31 연결과 기준 cache/slot의 판본 의미 연결은 독립 worktree에서 계속한다. 준비·EXAMPLE·CI는 GPU 실측·등록·공식 PASS가 아니다.
+
+## 2026-11-15 — M-A6 profiler 호환 보완·기준 startup 원관측 연결
+
+- 한 일: #284의 통합 head3afd4859에서 나온 기존 profiler packet 호환성, 형식이 잘못된 profile 조회, 회귀 writer fixture 연결을 보완했다. 기존 음성 기대/assert를 유지한다. 후보의 실제 wrapper·worker·API 정확 소스 bytes를 고정 자료로 넣고 두 번의 start/stop 객체 재사용과 시작/정지/출력 실패 기록을 실제 소비기에 넣는 회귀를 추가했다. 원 센서 /12·/15 bytes는 보존한다.
+- 기준 startup: 정확 태그 소스의 WorkerProc constructor와 Worker.load_model 본문을 읽기 전용 hook으로 연결해 같은 자식 구간의 로드 반환·예외를 소비한다. READY는 초기화·로드 이전의 transport 신호임을 실제 constructor 회귀로 구분했다. 원 /14·callback bytes·팩·판정과 initialization gate는 보존하며, 준비/journal/제품 capture 연결은 다음 독립 개발이다([범위](docs/dev-1/ma6-baseline-startup-candidate.md)).
+- 테스트 결과: head3afd4859 전체 CI는 16 failed·13636 passed·기존34 skipped·fixture 오류1개(pytest658.72초·부모660.053초)였다. 나머지 CI는 성공했다. 원 실패 로그 SHA는 851023cf01cd1a604729e2f2d4c80fd1b5bde9eeb821f0e9201bf546f2fb820f이다. 보완 source의 CI 결과는 아직 없다. 새 startup 시험과 후보 변형 거부 시험은 기존 CPython3.12.8 job에도 넣었다. 로컬 Python/pytest는 실행하지 않았다. 새 baseline 원본 fixture의 기존 trailing whitespace는 정확 bytes 보존을 위해 유지했다.
+- 검토·다음 단계: profiler 보완과 후보 실제 함수 회귀는 고정 변경 집중 검토를 마쳤고 startup 원관측은 주 세션이 검토했다. source 목록/결정5 영수증을 고정해 같은 #284에 올린다. 후보 REQ-10의 생략 옵션 기본값 추정·실제 소비 정합 관문을 보완하고, startup의 소유 journal/자산/파서 연결을 별도 worktree에서 계속한다. baseline cache/slot/graph·stream/profiler와 실제 GPU/등록·공식 RPT도 남아 있다.
+
+## 2026-11-15 — #282 병합과 M-A6 W1·후보 stream/profiler 통합
+
+- 한 일: 사용자 “#282 main 병합” 승인으로 정확 head1b07af80을 main7cbaa4e1에 병합했다. 병합 tree5d45624c가 검증 head와 같음을 확인했다. 이를 #284에 통합하고 기준 /28 HMAC 소비·전송 경로와 후보 /29 stream·/30 profiler의 정확 소스/비공개 키 경계를 묶었다. 기존 /12·/15 센서 bytes·이전 profile·승인 UNKNOWN_V1은 보존한다. 후보의 원 request SHA는 명시적 필드만 HMAC으로 재표현하고 키·의존 소스 검증 뒤에만 hook을 설치한다.
+- 테스트 결과: #282 CI는 13637 passed·기존34 skipped(pytest964.40초·부모965.939초), 플랫폼 계약477 passed와 나머지 확인까지 전부 성공했다. #284 초기05915be2의 CI는 8 failed·13597 passed·기존34 skipped(pytest854.70초·부모855.906초)였다. 오래된 판본표 기대 1개와 profile 없는 과거 부분 packet 7개의 KeyError를 고쳤다. 세 projector의 호환 조회를 보완했고 기존 음성 기대/assert를 바꾸지 않았다. 새 통합 source의 전체 CI는 아직 없다. 로컬 Python/pytest는 실행하지 않았다.
+- 집중 검토: 실제 /28 생산자의 기본/단절 기록→종료/상태/시도 소비, 키 오류의 세 실행기 미전송, 후보 SELECTION·native call_chain의 scalar/list HMAC, /30 정확 control route·요청/호출 Ref 쌍, 실제 후보 profiler API 생산→파서→API join을 회귀로 추가했다. 원 소스/모델/파일 해시는 바꾸지 않는다. backend·trace·RPC·worker·전체 범위·GPU 자격은 별도 미확인으로 보존한다.
+- 다음 단계: source 목록과 결정5 검토 행을 고정해 같은 #284의 새 head CI를 확인한다. 남은 승인 CPU 개발인 후보 REQ-10 runner capture/실제 제약 소비를 별도 브랜치에서 계속한다. 기준 startup·cache/slot·stream/profiler의 의미 대조도 남아 있어 전체 M-A6/69개 완료로 세지 않는다.
+- 막힌 것: 실제 ENV/target·기록 생산자·GPU/lab 수집·공식 보고서는 미완료다. baseline REQ-10 W5는 승인된 GPU 확인 절차를 기다리며, W2/W4의 승인 UNKNOWN을 다른 분기로 확대하지 않는다.
+
+## 2026-11-15 — 팩38 전체 CI 실패 보완과 승인된 #280 통합
+
+- 한 일: 6badc405 전체 CI의 20개 실패를 분류해 보완했다. 현행 팩으로 재사용하는 PLT-12·OBS-01·REQ-04 EXAMPLE 생산자가 실제 POL 행의 새 해시를 쓰고, copy 결정/원 inventory 해시를 고정하도록 입력을 맞췄다. OBS-06 시험 subjects는 현재 봉인된 POL Ref를 사용한다. 파일 변경 회귀의 설정 키를 실제 `input_validation`으로 고치고 CSV의 빈 필드를 생성기와 같은 표현으로 맞췄다. 원 assert·FAIL/UNKNOWN 기대·기존 파생 팩 입력은 보존했다.
+- 테스트 결과: 원 CI는 20 failed, 13617 passed, 기존34 skipped(pytest634.15초·부모635.035초)였다. 별도 ABI·Docker·공유·플랫폼·웹·runtime 검사는 성공했다. 실패 로그는 `/tmp/byul-pr282-6badc405-ci-failure.log`에 보존했고 로컬 Python/pytest는 실행하지 않았다. 이번 보완의 새 CI 결과는 아직 없다.
+- 다음 단계: 사용자 “#280 main 병합” 승인으로 정확 head008dc76f의 CI 전부 성공을 확인하고 main7b8bf0af에 병합했다. 이를 #282에 통합하고 합쳐진 source 목록/검토 행을 갱신해 새 head CI를 확인한다. 별도 M-A6 실제 연결·후보 변형 개발을 계속한다.
+- 막힌 것: 실제 lab 자산·생산자·GPU 관측/등록은 미완료다. 로컬/EXAMPLE/CI를 실측 PASS로 바꾸지 않는다.
+
+## 2026-11-15 — 클로드 인계: RB3 승인 후속·팩38
+
+- 한 일: PR #282의 미커밋 Q3/Q4 변경을 인계했다. PLT-12 사전 점검 시험에 생산자 파일이 빠진 CI 실패를 dc80c753으로 보완했다. Q1/Q2의 고정 모델 inventory·기본 템플릿·별도 승인 공급 신원 DRAFT 자동 채움, Q3 정책 행 해시, Q4 기업 기준/실행 파일 분리, OBS-06 현재 POL Ref 결합과 닫힌 입력 검사를 연결했다. 팩38/플랫폼 연결표/MA7 요구 목록·이전 도구·회귀를 맞췄다. #281 병합 main82831e36을 통합하며 원 결정·진행 기록·검토 영수증을 모두 보존했다.
+- 테스트 결과: 로컬 Python/pytest는 실행하지 않았다. 실패 보완 dc80c753의 PR CI에서 update-default는 아직 진행 중이고 다른 확인은 성공이다. 팩38 최종 변경의 CI 결과는 아직 없다. 정적 검토가 지적한 정책 자기 참조·결정 형식·회수 종류 누락·파일 변경 경합을 보완했으며 diff 검사는 통과했다. 원본 팩37 해시/정의와 새 입력의 원 bytes·정규 JSON·현재 POL Ref를 대조하는 회귀를 추가했다.
+- 다음 단계: 최종 source 목록/검토 영수증과 팩 Ref를 고정해 같은 #282에 올리고 정확 head의 CI를 확인한다. #281 병합 뒤 승인된 M-A6 종료 계열·후보 stream/profiler 후속은 별도 최신 main 브랜치에서 진행한다.
+- 막힌 것: SUP-08 고정 모델/캐시/기동 자산은 다른 기기에 있고 AWS lab에서 새 팩으로 재확인해야 한다. lab 기록 생산자·실제 ENV/target·GPU 관측/등록·기업 정책 확인은 미완료다. 원 경로의 session-checkpoint.json은 이 기기에 없어 실제 Git/클로드 기록에서 복구했다. 준비 상태를 PASS·실측 완료로 올리지 않았다.
+
+## 2026-11-15 — RB3 정책에 남은 실행 결합값 자동 채움(팩 37)
+
+- 한 일: 사용자 지시 "그거 자동으로 채우게 3단계 진행해"로 생산자 소스 SHA(C, 생산자 파일 bytes·REQ-06은 adapter 검토 소스), OBS-01 시험 주체(D), PLT-10·11 발급자 사건과 실행 창(E)을 `[run_binding.<점검>]`에서 계산하게 했다. 22개 점검 38키, PACK-BASELINE@37(revision+1만, 판정 규칙·필수 관측 무변경, 검토 표기 결정 5). 정책 이전 `--stage 3`, J02 도구 REQ-05 결정값(RB3-D1). platform `MVP_PACK` 37.
+- 테스트 결과: 직접 시험(결합 1·2·3단계, 변환기, J02 도구, 3단계 키 영향 시험 35개 파일)은 main에서도 실패하는 macOS 환경 의존 28개를 빼고 통과. 전체는 PR CI.
+- 다음 단계: RB3-Q1~Q4 사용자 결정. SUP-08 @37 사전 확인 재실행(고정 자료가 다른 기기에 있음).
+- 막힌 것: lab에 기록 생산자가 없어 3단계 점검은 생산자 파일이 생길 때까지 UNKNOWN.
+
+## 2026-11-15 — 클로드 인계: #280 main 통합·남은 관측 연결 구분
+
+- 한 일: #281 병합 main82831e36을 #280에 통합해 문서·검토 영수증의 충돌을 양쪽 원문 보존으로 정리했다. W1의 선행 병합은 끝났지만 /28 HMAC ID를 기존 상태/종료 소비기에 실제 연결하는 후속이 남아 있음을 공백 기록에 적었다. W3 센서의 성공한 start마다 새 세대가 생기는 원문 동작을 확인했으며 센서 bytes를 바꾸지 않는다. 후보 정확 모듈 행/composition은 별도 최신 main 브랜치에서 진행한다.
+- 테스트 결과: 종전 head27ca28e2의 PR CI 모든 확인이 성공했다. 새 통합 head의 CI는 아직 없고 로컬 Python/pytest는 실행하지 않았다. 셸 해시 도구로 합쳐진 source 목록과 결정5 검토 행을 갱신했다.
+- 다음 단계: 같은 #280을 갱신해 정확 head CI를 확인한다. 별도 후속의 실제 HMAC/관측 연결·직접 회귀를 완성하고 검토한다. #282의 팩38 입력 변경과 독립으로 유지한다.
+- 막힌 것: 새 실행기/생산자/GPU 자격은 이번 기록 PR에서 열지 않는다. 실제 ENV/target·GPU 실증/등록은 별도다.
+
+## 2026-11-15 — 사용자 결정 M-A6-W1~W6 반영(문서·원인 기록)
+
+- 한 일: W1~W6을 DECISIONS에 기록했다. W6으로 PyPI uvicorn 0.53.0 wheel(87,081 bytes)을 받아 셸 도구로만 대조했다. METADATA SHA가 M-A3 후보 이미지 메타데이터와 같고, stream_buffer가 고정한 uvicorn 세 파일 SHA가 wheel과 같다. W5 GPU 확인 절차를 판본 적용표 27.3절에 적었다. W2·W4는 0.7.0 원인 코드를 `APPROVED_UNKNOWN_V1`로 기록했다. PR #281(`/28` 요청 연결)이 #280의 `/27` 선택 지점과 같은 파일·목적이라 W1 열기와 stream 변형 profile은 #281 병합 뒤로 미뤘다.
+- 테스트 결과: 로컬 실행 금지 규칙에 따라 pytest·파이썬 도구를 실행하지 않았다. 소스 목록 SHA는 `shasum`으로 바꾼 파일 한 행만 고쳤다. 검증은 PR #280 CI 결과로만 확인한다.
+- 다음 단계: #281 병합 뒤 W1(`/28`을 termination 계열 지원 집합에), 후보 stream 변형 profile. W3은 profiler 센서 지문 재계산 장소(CI 또는 원격) 결정이 필요하다.
+- 막힌 것: #280의 `/27` 선택 지점 코드를 #281과 어떻게 정리할지 결정 필요.
+
+## 2026-11-15 — M-A6 기준 V1 요청 연결(`/27` 선택 지점)과 남은 점검 정리
+
+- 한 일: 0.7.0 V1의 엔진 요청 ID가 호출자 ID(`cmpl-<X-Request-Id|uuid>`) 그대로임을 확인했다. `/27` 판본 데이터에 선택 지점 `Processor.process_inputs`를 더하고, live 선택 문맥에서만 SELECTION·ASGI 연결을 기록하게 했다. 기록 검증·연결 함수·termination projection이 판본 선택 지점을 받는다. 작업지시서 7절 결정 14 행을 V1 결정으로 고쳤다. 기준 19개·후보 4개의 상태와 원인, 결정 질문 M-A6-W1~W6을 판본 적용표 26절·DECISIONS에 적었다.
+- 테스트 결과: `test_ma6_v1_selection_link.py`와 기존 `test_configured_lifecycle.py` 37개가 CPython 3.12.3·3.12.8에서 통과(`-n` 없이). 전체 pytest는 PR CI로 확인한다.
+- 다음 단계: W1 승인 시 0.7.0 termination 계열 열기, W2~W6 답에 따른 대상표·행.
+- 막힌 것: 실행기 열기는 기존 assert 변경 승인(W1)이 필요하다. 열린 점검 수는 이번 PR에서 늘지 않았다.
+
+## 2026-11-15 — 기준 V1 worker /2·fresh HMAC 연결 로컬 검증
+
+- 한 일: 승인된 후속 /2의 정확 queue/worker 루프 수신·응답, /28 키/세션·HMAC 대응·닫힌 원 기록 검토/준비 도구를 구현했다. 원 호출/반환·예외/원문 비노출과 미결합/빈 일정 진단을 보존한다. 공통 bootstrap/writer/객체 HMAC을 재사용하고 SDK 선언 함수가 다른 namespace 함수로 교체된 경우도 거부한다. #281은 승인대로 main82831e36에 병합했고 #283은 draft다. 현재8cc79523 소스로 기준 /28·worker /2 준비 파일을 새로 만들고 정확 SDK/키/세션/소스 결합을 검토했다. 실제 ENV/target·ARM2와는 미결합이다.
+- 테스트 결과: 직접 묶음214개 중213개 통과(pytest29.45초·부모29.994초), 시험용 filesystem root 매핑 실패1개를 fixture만 보완해 해당 격리 설치1개 재검증 통과(1.10/1.500초). 앞선206통과/빈 일정 미기록1실패는 명시적 IDLE_UNBOUND 진단으로 고쳤다. 승인 이미지 CPython3.12.8 직접82개 통과(14.38/15.337초). 최초 ABI81통과/코드 동결1실패는 공유 .pyc의 패치 판본 혼용으로, 빈 pycache_prefix에서 원문 재컴파일 지문4개 일치와 같은82개를 재검증했다. 고정값/검사는 그대로이며 CI도 명시3.12.8·분리 캐시로 확인한다. CI 경로16개(1.43/1.873초), 현황77/23/68·소스566파일/정확 검토 기록 통과. 원본 태그 고정 자료의 trailing whitespace1건은 bytes/SHA 그대로 보존하고 직접 작성한 코드/문서/시험의 공백 검사를 구분했다. 새 전체 pytest/PR CI·실제 엔진/GPU는 미실행이다.
+- 다음 단계: 로컬 결과/준비 파일과 Source8cc79523을 검토해 기존 #283에 main 통합·후속 /2를 draft로 반영할 커밋을 정리하고 push 승인을 요청한다. 실제 현재 V1 ENV/target·Pod/CID/세대와 ARM 전 결합, 후보 후속 의미·전체 그룹/기한·실제 해제/새 세대 회복·별도 communication-stall·제품 변환/등록은 후속이다.
+- 막힌 것: 새 /2 push/병합·GPU/비용·추가 다운로드는 아직 승인 전이다. 현재 C 여유13.03GiB이며 추가 이미지/모델 다운로드는0이다. 읽기 전용 /2를 새 장애 제어점/실행기/공통 GPU 계약/판정/수락/등록의 완료로 세지 않는다. M-B4는 보관하며 원본 센서15개·native /28·팩·root runtime/contracts bytes는 main 그대로다.
+
+## 2026-11-15 — 기준 V1 worker 연결 /2 진행 중 체크포인트
+
+- 한 일: 사용자가 후속 /2·HMAC 연결을 승인했고 #281만 main82831e36으로 병합했다. #283/7711cb80는 CI전체통과(update13,599/기존skip34,624.70/625.585초)·draft다. 새 main에서 로컬 브랜치 codex/ma3-v1-worker-binding-20261115를 구성해 #283의 source 대조와 새로운 queue 수신/응답 코어·동결 설치/키 검증 골격을 연결했다. 기준 V1의 정확 queue2함수·scheduler1함수를 기존 별도 검토 행에 추가했다. 기존 /1 기본 snapshot 형식은 유지하고 공통 writer를 /2에서 상속한다. 제어/실행기/판정/등록과 M-B4 보관은 그대로다.
+- 테스트 결과: 새 /2는 아직 미시험·미완성이다. 새 두 모듈의 구문 컴파일만 확인했다. 새 upstream queue 고정 자료에는 원본 trailing whitespace1건이 있어 전체 diff --check가 이를 보고했다. 정확 bytes/SHA를 보존하며 원문을 정리하거나 검사를 끄지 않았다. 직접 작성한 코드/문서/시험의 공백 검사와 이 upstream 진단을 구분한다. #281/972783ea의 실제 CI20개 성공(update13,598/기존skip34,1055.08/1056.445초)과 #283의 과거 source 범위 CI를 새 코드의 통과로 세지 않는다. source 목록/검토 기록은 현재 WIP bytes를 식별할 뿐 GPU/그룹 자격이 아니다.
+- 다음 단계: 준비 도구·닫힌 원 기록 검증/호스트 fresh 연결, 실제 태그 메서드+EXAMPLE 협력 객체의 직접/거부/ABI 시험을 한 묶음으로 마친다. SDK 전체/alias의 동결·키/세션/원 prepared SHA·출력/예외/원 함수를 보존하는지 확인한다. 최종 source/검토 기록·현황/경로를 갱신한 뒤 기존 #283에 반영할 구체 커밋을 별도 push 승인 요청한다.
+- 막힌 것: 새 /2 공개/병합·GPU/비용·추가 다운로드는 승인 범위 밖이다. 실제 worker/IPC 전체 그룹·모델 소비·기한/물리 해제/새 세대 복구·별도 communication-stall·새 ENV/target·등록은 미완료다. #283은 이 로컬 기능의 공개 전 상태를 포함하지 않는다.
+
+## 2026-11-15 — 현재 V1 RPC 소스/원 함수의 오프라인 대조
+
+- 한 일: 최신 main9365a65b에서 codex/ma3-v1-rpc-source-20261115를 분리했다. 승인되어 확보한 설치 소스3파일·함수12개를 현재 V1 별도 검토 표로 고정하고 기존 exact 파일/본문/globals 검사 기반을 재사용한다. 기준의 직접 worker 루프, 원 오류의 failure response 전달, 모든 rank 응답 수신 뒤 rank0 선택, READY가 device/model 초기화보다 먼저인 실제 의미를 원 code와 EXAMPLE 협력 객체로 대조했다. 기존 활성 IPC/제어 profile과 고정값·공통 입력/수락/등록·M-B4 보관은 유지한다.
+- 테스트 결과: 직접159개 통과(pytest7.41초·부모7.590초), 기존 승인 이미지 추출 CPython3.12.8 직접69개 통과(pytest0.40초·부모0.522초). 첫 새 루프 시험은 실제 __init__의 필수 인자를 생략한 EXAMPLE 상태 구성 오류로1실패·158통과였고 상태 구성을 고친 뒤 같은 범위를 재검증했다. 원 함수/assert/기한/skip은 바꾸지 않았다. 현황77/23/68·경로16개·소스561파일/정확 검토 기록 관문이 통과했다. 로컬 전체 pytest·새 PR CI·실제 엔진/GPU는 미실행이다.
+- 다음 단계: 현재 V1의 정확 활성 RPC 프레임·worker 객체와 요청 HMAC, IPC·프로세스 세대를 관측에 연결하고 새로운 prepared/ARM2 실제 입력으로 검증한다. 이 소스 검토만으로 실행기/TP2 전체 인과/기한/실제 해제·새 세대 회복/communication-stall·등록은 열지 않는다. push 승인 뒤 main 대상 draft PR에서 CI를 확인한다.
+- 막힌 것: 새 브랜치 push는 사용자 승인 전이다. 현재 V1의 실제 관측/그룹/ENV·target과 GPU 자격은 아직 없고 별도 승인 비용이 필요하다. 기존 V0 기록·후보 자격을 이월하지 않는다. 기준 worker의 torch 장식자 함수는 원 함수 확인 없이 unwrap하거나 활성화하지 않는다.
+
+
+## 2026-11-15 — 승인된 runtime final 저장 경합 시험 보수
+
+- 한 일: 사용자 “시험 한 파일만 예외 승인”에 따라 runtime/tests/test_mvp_zeroday_profile.py의 두 final 조회가 저장 완료를 먼저 확인하도록 보완했다. 기존 assert37개·상태/필드/비밀 비노출·실제 소켓·제품 기한은 유지했다. 다른 runtime 파일/제품 소스·정책·의존성과 M-B4는 바꾸지 않았다. 원 CI 실패 로그와 저장소 밖의 정확 제안/진단을 보존한다.
+- 테스트 결과: 적용한 시험 파일·경로 직접42개/60 subtest 통과(pytest6.54초·부모6.869초), 현황77/23/68·diff 통과. 적용 전 원 실패1개 확정 재현, 제안의 지연 조건1개·기존 실제 소켓7개 통과, final 미저장/손상 음성2개 거부를 확인했다. 기존 전체 assert/skip 호출 AST는 같다. guard source6796f881/561파일은 그대로다. 새 최종 head의 전체 CI는 대기한다.
+- 다음 단계: 같은 #281에 승인된 CI 보수를 반영하고 정확 head의 CI를 확인한다. 기존30974aaf의 update전체13,598통과와 runtime 원 실패는 당시 head 결과로 보존한다. 별도 #283은 draft로 현재 V1 RPC 소스 대조를 검증한다.
+- 막힌 것: fresh→worker/전체TP2 인과·파생 관측·현재 실제 ENV/target·GPU 자격/등록은 미완료다. 병합·새 GPU/비용·M-B4 재개는 승인하지 않았다.
+
+## 2026-11-15 — fresh 요청 연결 PR/CI 결과와 runtime 외부 경합
+
+- 한 일: 승인된 후속 profile/HMAC 구현을 #281(main 대상)로 공개했다. 검증 대상 head30974aaf, source6796f881을 보존한다. 코드/시험 원문·판정/고정값·M-B4 보관은 유지한다.
+- 테스트 결과: PR 실행 update-default 13,598통과·기존skip34(pytest608.14초·부모608.994초), 별도CPython3.12.8·Docker stub·공유/플랫폼 계약·wheel449파일 일치가 통과했다. 전체 시험은 CI에서만 실행했다. 같은 head의 runtime PR 실행은 성공했지만 push 실행은 test_mvp_zeroday_profile.py:447의 final 행 부재로1실패·1809통과·기존skip4였다. 전체 CI 통과로 세지 않는다.
+- 다음 단계: runtime의 HTTP 응답 완료 뒤 final 저장 순서와 시험의 즉시 read_all 사이 경합을 외부 검토 자료로 남긴다. 별도 예외 승인 없이 runtime을 고치거나 재실행으로 실패를 지우지 않는다. M-A3 현재 V1 exact 원 함수 대조는 별도 #283 draft에서 잇는다.
+- 막힌 것: runtime 실패 해결은 update/CLAUDE.md11절의 변경 금지 범위다. 실제 worker/그룹 연결·파생 관측·새 ENV/target·GPU 자격/등록과 전체 MVP는 미완료다. 병합은 승인하지 않았다.
+
+## 2026-11-15 — 재개: 기준 V1 fresh 선택/입력 연결 로컬 후속
+
+- 한 일: 최신 main9365a65b에서 새 브랜치를 만들었다. #276/#278/#279와 원격 READY 수정은 보존하고 이전932490de WIP는 재적용하지 않았다. 사용자 재개·후속 native /28/HMAC 키 자산 승인으로 fresh ASGI→기본 선택→API 전체 native ID 선택→원 AsyncLLM/Processor 입력의 code/globals/self/객체·ID를 대조한다. 비밀 키는 생성부터0600·owner/NOFOLLOW/256바이트/세션·정확 bytes로 검증한다. 원본 센서/ABI와 /27 행은 main 원 bytes 그대로다. M-B4 보관·실행기/판정/공통 GPU 계약·runtime/contracts 무변경.
+- 테스트 결과: 직접 영향/기존 lifecycle·파서·중립성/경로243개 통과(pytest3.71초·부모4.167초), 기존 승인으로 추출한 CPython3.12.8로 관련61개 통과(pytest1.48초·부모1.683초). EXAMPLE 협력 객체·태그 함수 본문만 실행했다. 최초 새 시험의 협력 객체 누락 수정 뒤 재검증했고 기존 assert/기한/skip은 바꾸지 않았다. 로컬 전체 pytest·새 PR CI는 미실행이다.
+- 최종 관문: 현황 --check·source 검토·경로16개(pytest0.59초)·diff 검사를 완료하고 정확 source 목록 SHA 6796f881c7ef541d9b54cfe772d6354b1ab95f160fbb2c372e273a72a313d584의 결정5 검토 행을 추가했다.
+- 다음 단계: 구체 커밋 push/main PR 승인을 요청한다. 승인 대기 중에는1.2절의 독립적인 source/관측 의미 대조를 계속한다.
+- 막힌 것: fresh worker/RPC·캐시/runner/기동/해제의 파생 의미·실제 V1 입력/실행/등록·GPU 비용/추가 다운로드·M-B4 재개·정책 확정/J03. 이 구현을 PASS/실측/1차 완성으로 세지 않는다.
+
+## 2026-11-15 — #278·#279 통합 검토와 1차 완성 잔여 정리
+
+- 한 일: 사용자 요청에 따라 #276 병합 main7e8a0900·#278 통합373a360f를 #279에 합쳤다. DECISIONS/PROGRESS의 양쪽 원문·기존 검토 영수증55개를 보존하고, WORK_ORDER의 최신 M-A6/M-A7 행을 함께 유지했다. #279의 원본 센서 보존·정확 source/ABI/준비 bytes·snapshot만 지원·미검토 실행기 미개방 경계를 검토했다. 합쳐진560파일 목록 자체SHA a98a34360d9766ce22519c67edc6603efabc9e6ef58b4ecde9ad41e49ae67ec0을 재생성하고 결정5의 정확 검토 행1개를 더했다.
+- 개발문서: WORK_ORDER_VLLM_MVP.md 1.1·1.2절에 반영된 구현과 남은 관측/제품 연결·TP2 장애/복구·실제 입력/모델/세션·J01/J02·J03의 종료 근거를 정리했다. V0 D1~D3 계획 중단과 M-B4 보관, 과거 SUP08 실측·준비 자료의 source 범위, 현행 팩36과 생성 현황의 한계를 구분했다. 판정·1차 제외/비적용·정책 확정 기준은 바꾸지 않았다.
+- 테스트 결과: CPython3.12.3 관측기/ABI·기존 수집/센서·판본 핀·입력 조립/사전 점검/준비·설정/실행 결합·READY·CI 경로/불변식393개 통과(기존 Linux 전용skip2·기존 engine 기본 제외1, pytest17.35초/부모17.643초). 최초 명령의 존재하지 않는 시험 파일명은 수집 전에 정정했다. source560파일·현황 --check·diff --check 통과. 원본 fixture bytes는 수정하지 않았다. 전체 로컬 suite는 실행하지 않았고, 최종 head의 기본/CPython3.12.8 Linux CI를 기다린다.
+- 다음 단계/경계: 정확 head CI를 확인하고 #278 뒤 #279를 병합한다. 두 PR 인수와 잔여 문서 정리 승인은 새 GPU·비용·대용량 다운로드·M-B4 실행 재개·root runtime/contracts 변경이나 정책 CONFIRMED 승인을 포함하지 않는다. 준비·CI 결과를 GPU 수락/등록·1차 완성으로 올리지 않는다.
+
+## 2026-11-15 — 기준 V1 관측 행·CPython 3.12.8 후속
+
+- 한 일: 병합된 #277(main `77bc05a3`)의 기존 작업트리에서 `codex/baseline-v1-observers-20261115`로 이어갔다. 원본 센서 15개/의존 파일의 정확 bytes와 CPython 3.12.3·3.12.8 코드 지문 재현 표/도구, Linux 3.12.8 CI job을 추가했다. 3.12.8 Linux x86_64와 macOS ARM에서 15개 계약 및 기반 전체 코드 지문이 일치했다. 기존 센서 bytes/런타임·OS 정책은 유지한다.
+- 구현: 기준 V1 정확 설치 8파일·실제14함수의 adapter 데이터와 공통 snapshot `/27`을 추가했다. 기존 기반 사본을 사용하고 `None` 반환의 종료 함수만 입력 ID/현재 상태로 대응한다. 소스·실행 코드·런타임/OS·준비 bytes·기준 이미지/V1 선택을 대조한다. 다른 판본/미검토 함수는 섞지 않는다. fixture 원본/라이선스·미래 판본 데이터 시험·원문/iterator/property/예외·자체 재해시 거부 회귀를 추가했다.
+- 테스트 결과: CPython3.12.3 기반/수집/판본/경계/CI 경로 직접8파일144통과·기존 Linux 전용skip2(pytest2.28초/부모2.434초), 추가 판본·핀·소스 관문·INV-01/02/05 묶음124통과(pytest1.92초/부모2.086초). 신규 fixture의 센서 파일 경로 누락으로 생긴 최초7실패를 실제 준비 자산 경로로 바로잡았으며 기존 assert/skip을 바꾸지 않았다. CPython3.12.8 신규2파일39통과(pytest1.50초/부모1.904초), 정상 dependency 파일 읽기 사례를 더한 최종31개 구성 시험도3.12.3 통과(pytest0.43초/부모0.593초). 소스556파일/목록 `f302eaf2b5d4b2122b0ed9b0d147db5087fa8109f61768c057b2fa3afa1c5d37`과 결정5 검토 행, 현황 --check 및 원본 fixture를 제외한 staged diff --check 통과. fixture 원본의 trailing whitespace10곳은 정확 bytes 보존을 위해 유지했다. 전체 로컬 suite는 실행하지 않았으며 전체/3.12.8 최종 검증은 새 PR CI에서 확인한다.
+- 다음 단계/미확인: `/27`은 raw snapshot 준비/수집만 지원한다. fresh 요청 선택/ASGI 연결·캐시/runner/worker/rank/profiler/uvicorn 파생 의미와 실행기 개방은 별도다. GPU 실행·모델 다운로드·실측/생산자 등록·판정/팩·공용 계약은 바꾸지 않았다.
+
+## 2026-11-15 — #278 최신 main 통합 검토
+
+- 한 일: 사용자 요청으로 #276 병합 main7e8a0900을 #278에 통합하고 PROGRESS의 양쪽 원문을 보존했다. 조립 도구의 정확 파일/정책/ENV·target·prepared·공통 입력 범위, 원 bytes 복사, 실환경 준비 false 경계를 검토했다. 현재 main의 common-input 구현을 실제 조회하는 경로를 확인했으며 이전 준비 보고서와 원자료를 소급 수정하지 않았다.
+- 테스트 결과: CPython3.12.3 입력 조립·계획/사전 점검/준비·설정·실행 결합·READY 회귀·CI 경로107개 통과(pytest14.15초/부모14.310초). 전체 로컬 suite는 실행하지 않았으며 통합 head의 Linux CI로 확인한다. 제품 source는 main과 동일한555파일/e8be89b9 목록이다.
+- 다음 단계/경계: 통합 head를 기존 PR에 push하고 CI 통과 후 #278을 병합한다. #279도 통합·검토하고 1차 완성의 남은 개발/실측/공식 판정 조건을 작업지시서에 갱신한다. 새 GPU·비용·다운로드·M-B4 재개·runtime/contracts·수락 기준 변경은 없다.
+
+## 2026-11-15 — M-A7 입력 조립 후속 PR 생성
+
+- 한 일: 결정39의 push·PR 승인 뒤 기능 검토6167e30d를 일반 push하고 main 대상 [#278](https://github.com/dohashelby/byul/pull/278)을 열었다. 소비 구현을 담은 [#276](https://github.com/dohashelby/byul/pull/276)은 draft 유지다.
+- 테스트 결과: 직접73개·후속25개·EXAMPLE4사례 제품 결합·현황/diff 관문은 통과했다. 새 head 전체 CI는 진행 중이다. 실제 입력/엔진 결과를 만들지 않았다.
+- 다음 단계: 정확 head CI를 확인한다. 소비 구현이 없는 main에서는 조립 도구의 implementation_available와 실행 결합 사전 대조 상태가 false로 남는 의존 관계를 유지한다.
+- 막힌 것: 현재 V1 ENV/target·선택 모드 함수/핀/기동 자격·ARM2 실제 원 기록과 전체 TP2 수락/등록. 새 비용·병합은 별도이며 M-B4 보관.
+
+## 2026-11-15 — #276 READY 원 기록 저장 경쟁 수정
+
+- 한 일: 최신 원격 bb14f094까지 보존했다. PR 전체 시험에서 candidate/death의 CONTROL_READY 원 snapshot 누락1건을 확인했다. source가 READY 파일을 쓰고 snapshot을 닫기 전에 actor가 SIGKILL할 수 있어, actor가 같은 CALL/상위 프레임·대상 세대·nonce·ARM/READY 해시·정확 source의 검증된 닫힌 snapshot을 확인한 뒤에만 동작하도록 고쳤다. 기존 ARM 기한 안에서 기다리며 누락·중복·불일치는 장애 적용 없이 거부한다. 제품 소비와 #278 파일 조립은 구현된 작업으로 인계 문서를 갱신했다.
+- 테스트 결과: 새9개 회귀는 수정 전 모두 snapshot 저장 전 동작으로 실패했고 수정 후 통과했다. CPython3.12.3 직접 영향/설정/공통 입력/소스/경로/불변식370개 통과(기존 engine 기본 제외1, pytest19.69초/부모19.893초). source555파일·목록 자체 SHA e8be89b903031631806fde51cf873d84ccb75779665479cd0ff7526f733ba287의 정확 검토 행, 현황 --check와 diff --check를 확인했다. 새 source의 전체 Linux CI는 push 후 확인한다. 전체 로컬 pytest는 실행하지 않았다.
+- 실패 이력: bb14f094 PR 기본 suite는1실패/13,511통과·기존skip34(pytest804.01초/부모805.430초)였다. 제품 소스가 같고 PROGRESS만 다른 a15f426b의 push suite13,512통과를 이 실패의 해결로 대신하지 않는다. bb14f094의 runtime 첫 실행은 각각 응답504와 벽시계0.270초<0.25초 주장 실패였고, 같은 head의 2회차는 양쪽1,810통과·기존skip4·하위시험1,012다. runtime 원인 해결로 세지 않으며 원 실패 로그를 보존한다.
+- 다음 단계/경계: 기존 #276 브랜치에 수정과 검토 목록을 push하고 정확 head CI를 끝까지 확인한다. actor bytes가 바뀌었으므로 실제 실행 준비물은 최종 확정 source로 새로 만들고 기존 준비물/ARM1 원 증거를 소급 갱신하지 않는다. 현재 V1 자격·새 ARM2 실제 입력·TP2 전체 수락/등록은 별도다. runtime/contracts·판정/기한·기존 assert/skip·고정값·등록표 변경, 병합·GPU/비용·다운로드는 없다.
+
+## 2026-11-15 — M-A3 제품 경로 후속 원격 반영
+
+- 한 일: 결정39 승인 뒤 기존 [#276](https://github.com/dohashelby/byul/pull/276)을 갱신했고 draft를 유지했다. 기능 검토c7500bcc 및 승인 기록a15f426b를 일반 push했다. M-A7 후속 [#278](https://github.com/dohashelby/byul/pull/278)도 main 대상으로 열렸다.
+- 테스트 결과: 직접200개·후속75개·최종 경로16개·소스555파일/현황 관문은 통과했다. 새 head의 원격 전체 CI는 진행 중이며 실행하지 않은 결과를 통과로 기록하지 않는다.
+- 다음 단계: 두 PR의 정확 head CI를 끝까지 확인하고 실패 원인을 고친다. 판정/기한/고정값·기존 assert·skip을 완화하지 않는다.
+- 막힌 것: 현재 V1 실제 입력·ARM2 원 기록·TP2 전체 수락/등록. #276/새 PR 병합과 새 GPU/비용은 이번 승인 범위 밖이다. M-B4 보관.
+
+## 2026-11-15 — 제품 경로 후속 공개 승인
+
+- 한 일/다음 단계: 결정39로 M-A3 c7500bcc·M-A7 6167e30d의 push·PR 반영이 승인됐다. 기존 #276 draft를 갱신하고 M-A7 main PR을 열어 새 CI를 확인한다. 원격 head5dc166cc와 main77bc05a3는 승인 시점 재확인했다.
+- 테스트 결과/막힌 것: 승인 기록만 추가해 제품 source555파일/목록 SHA와 직접 시험 결과는 그대로다. 실제 입력·전체 TP2 수락/등록 미완료와 병합/새 비용 별도 경계를 유지한다.
+
+## 2026-11-15 — M-A3 공통 rank 입력의 제품 실행 연결 후속
+
+- 한 일: #275가 사용자 계정으로 main b00e4126에 병합됐음을 확인하고 #276 draft·M-B4 보관을 유지했다. 최신 main #277 및 원격 #276의 main 통합 이력을 모두 보존했다. 기존 rank_failure의 common-input 파일 소비 구현으로 공통 rank-fault 파일을 guard select/run/judge/report·guard update의 양쪽 비교·정확 EVD/RES/RPT 저장/복원에 연결했다. native Kubernetes source 자격·팩/판정/기한·등록표는 그대로다.
+- 소스/입력: source555파일·목록 자체SHA ea734eb57a98626f599725ac9d11e5f6483a9fc83439e4abcd0b4bfae88a70be의 정확 검토 행을 넣었다. 새로운 미결합 준비물6개는 product-v4 경로에 두고 과거 준비물/키/원자료를 덮어쓰지 않았다. 두 쪽 V1 선택은 요청 구성이며 실제 모드/함수/핀 자격은 미확인이다. SDK14 bytes 동일은 GPU 자격이 아니다.
+- 테스트 결과: 최신 main 통합 직접200개 통과(pytest41.56초/부모41.876초). 양쪽 guard update 비교를 추가한 최종 직접75개 통과(pytest34.73초/부모34.992초). 새 M-A7 조립 도구와 /1·/4·두 쪽 EXAMPLE 네 사례의 select/run/judge/report/verify 직접 결합도 통과(25.989초). 묶음은 중복되므로 합산하지 않는다. ABORTED/EXAMPLE/세 축 UNKNOWN·원 기록/공백·기존 독립 FAIL 보존을 확인했다. guard update의 ABORTED 종료코드1과 필수 관측만 EVD에 남기는 기존 동작을 유지했다. 새 시험의 잘못된 객체 API·종료코드 기대를 바로잡았으며 기존 시험/assert/기한/skip·판정 변경은 없다. 새 변경의 전체 CI는 아직 없다.
+- 현황: 생성 CSV에서 LIF-08의 supported_implementations에 common-input만 추가됐고 연결 수23/68·실측 상태는 그대로다. source/현황 관문 통과. 통합 diff 검토에서 진행 기록 누락을 발견해 원격 전체 기록을 복구했고 최종 기록 보존을 대조한다.
+- 다음 단계: 직접 영향 최종 관문·한국어 검토/인계 메모를 마치고 구체 커밋의 push 승인 뒤 #276 draft를 갱신해 새 CI를 확인한다. M-A7 후속은 별도 main PR로 올린다.
+- 막힌 것: 현재 V1 ENV/target·선택 모드의 정확 함수/핀/실제 기동 자격·ARM2 새 원 기록·전체 TP2 그룹/정상/탐지/상위 전달/새 세대 복구·GPU 등록. 실제 M-A3/J01 전체 완료는 아니다. 새 GPU/비용/대용량 다운로드·후속 push/병합은 미승인이다.
+
+## 2026-11-15 — #276 최신 main 통합과 검토 소스 재고정
+
+- 한 일: 사용자 요청으로 #275·#277 병합 main `77bc05a3`를 #276 head `3df5fb9c`에 통합했다. DECISIONS/PROGRESS의 양쪽 원문과 모든 기존 검토 영수증49개를 보존해 충돌3곳을 해결했다. 합쳐진 제품 source554파일의 목록 자체 SHA `cbbc57b3e3b05b167509024b357f0abc97b55b2e768f26f71f6ed209d2807d15`를 재생성·검토하고 결정5 검토 기록1개를 더했다. 새 미등록/부분 입력의 한계와 원자료/ARM1 귀속은 유지한다.
+- 테스트 결과: CPython3.12.3 로컬의 사전 결합 파일·잘못된 입력/사후 귀속 거부·source/요청 식별·입력 계획/점검별 설정·J02/CLI·불변식288개 통과(기존 engine 기본 제외1, pytest17.86초/부모벽18.038초). SDK14 자산(bootstrap 포함)은 통합 전 #276과 bytes가 같다. source554파일·현황 --check·diff --check 통과. Linux 전용 /proc·pidfd·원 RPC/물리 신호 묶음과 전체 기본 suite는 새 head의 Linux CI로 확인한다. 기존 macOS 환경 제한을 시험 skip/기한/기대값 변경으로 숨기지 않는다.
+- 다음 단계: 기존 #276 브랜치에 반영해 PR/push의 새 CI를 확인한다. 작성자 후속은 ma3-rank-fault-producer 문서에 LIF08 소비/EVD→RES→RPT, 기준 초기 V1의 정확 RPC 관측 자격, TP2 그룹·탐지/상위 전달·기한/복구 원 근거, 새 ARM2 실제 입력·J01 대조/등록 순으로 적었다.
+- 막힌 것/경계: 전체 M-A3 미완료를 명시한 Draft를 유지한다. 이 요청은 #276 병합·새 GPU/비용/다운로드·M-B4 재개·root runtime/contracts/기존 판정/기한/고정값/등록 관문 변경을 포함하지 않는다. 과거 준비 보고서/원 증거와 현재 source를 구분하고 기존 준비물의 검토 source SHA를 소급 수정하지 않는다.
+
+## 2026-11-15 — #275 병합·#277 J02 실행 및 점검별 사전 점검 수정
+
+- 한 일: 사용자 승인으로 #275를 main `b00e4126`에 merge했고 #277 기반 `858ac35e`에 main을 통합했다. J02의 여러 실행기가 함께 있어도 기존 Kubernetes 전환 관문을 사용하게 했다. 양쪽 HTTP 실행기 집합·각 쪽 모든 HTTP target의 같은 내용·ENV/Pod 신원·baseline 종료/candidate Ready·지연 결합 신규 파일 조건을 유지한다. 전환 target 해시는 검증한 HTTP 실행기에만 전달해 다른 수집기의 역할/세대별 target을 덮지 않는다. M-A 파일 사전 점검은 쪽별 설정 뒤 `for_check()`를 적용해 실제 점검별 파일을 검사한다.
+- 추가 수정: 기존 #277 CI `43686824138`의 6실패/13,353통과/34skip(pytest621.66초)은 원 로그로 보존했다. 기준 V1 선택 변수만 추가되면서 SUP08 로컬 감사가 서로 다른 환경변수 이름을 비교하던 문제였다. 정확한 판본 데이터·렌더 기록·선택 변수 값을 대조한 뒤 선택 엔진 의미로 비교하며, 누락/변경/중복/valueFrom/과거 선택 미기록·다른 환경변수 차이는 계속 거부한다. 과거 V0 결과/파일은 수정하지 않았다.
+- 테스트 결과: CPython3.12.3 직접 영향·update CLI·불변식 386개 통과(기존 기본 engine 제외1, pytest19.42초/부모벽19.560초). J02 전체 실행기 설정에서 선정한 점검의 양쪽 EVD→RES→RPT, 전환 실패 시 baseline 보존/candidate 미전송, 추가 HTTP target의 잘못된 ENV/내용/누락·지연 결합, 점검별 root/side 우선순위·없는 파일/다른 ENV 거부를 확인했다. source551파일/목록 `461087ef808a63c8c9784d9178c2406bca141237b46f0fef50393cf5895f5858`와 결정5 검토 행, 현황 --check·diff --check 통과. 로컬 신규 시험의 예외 형식과 기존 재사용 시험 호출 인자를 바로잡은 뒤 같은 묶음을 재검증했다.
+- 원격 통합 검증: 첫 일반 push는 병행 반영된 `b8cb8510` 때문에 거부돼 원격 커밋을 merge했다. SUP08 감사 구현은 원격의 정확한 선택 변수 검사를 보존하고 양쪽 회귀 시험을 모두 합쳤다. 같은 CPython3.12.3 묶음의 최종393개 통과(기존 engine 제외1, pytest21.28초/부모벽21.450초), 제품 소스/목록 SHA는 위와 동일하다.
+- 다음 단계/막힌 것: 수정 커밋을 #277에 push하고 새 head Linux CI로 전체 기본 suite를 확인한다. #277 병합은 이번 요청에 포함되지 않는다. root runtime/contracts·팩·판정/기한·등록표·원본 증거와 실제 GPU 자격은 바꾸지 않았으며 엔진/클라우드/GPU 실행이나 다운로드는 하지 않았다.
+
+### #277 최신 main 통합 — M-A7 팩36 입력/준비물 보존
+
+- 한 일: #275가 mainb00e4126에 병합된 뒤 #277의 PR 충돌로 CI가 시작되지 않음을 확인했다. 최신 main을 통합하고 PROGRESS의 양쪽 추가 기록을 모두 보존했다. M-A7 입력/준비물·현재 팩36 기본 감사 연결과 CI 경로를 그대로 받았다. 제품 소스 목록은551파일/a0706cf1…로 동일하며 새 검토 행을 중복 추가하지 않았다.
+- 테스트 결과: CPython3.12.3 직접 통합 영향6파일88개 통과(pytest14.45초/부모14.583초), 소스 목록 관문·diff --check 통과. 전체 로컬 pytest는 실행하지 않았으며 통합 head의 PR CI를 확인한다.
+- 다음 단계/미확인: 새 V1 관측 대상표·실제 기동/GPU 자격은 앞선 범위대로 남는다. main의 과거 SUP08 입력 유효/52쪽 부재 보고를 새 V1의 실제 입력 자격으로 승격하지 않는다.
+
+### #277 CI 후속 — SUP08 로컬 기동 비교를 V1 선택 의미와 연결
+
+- CI 결과: head858ac35e의 전체 시험은 6실패·13,353통과·기존skip34(pytest621.66초/부모622.585초). 실패는 두 판본의 raw env 전체를 비교하던 SUP08 로컬 감사에서 기준에만 필요한 V1 opt-in을 차이로 본 한 원인과 그 자료를 받는 입력 준비의 전파였다. 별도 runtime/web·계약/플랫폼/Docker 검사는 통과했다.
+- 한 일: 현재 provider의 정확한 선택 엔진/변수를 render와 YAML에 먼저 대조한 뒤, 확인한 선택 변수만 엔진 의미로 정규화했다. 다른 환경은 계속 원래대로 비교한다. 원 assert·판정·기한·skip은 바꾸지 않았다. 자체 재해시 뒤 선택값/변수 변경·중복·과거 미기록 구성과 무관한 환경 차이를 거부하며, 임의의 새 선택 변수 이름도 provider 데이터만으로 처리함을 검증했다.
+- 테스트 결과: CPython3.12.3 관련 3개 파일41개 통과(pytest5.77초/부모6.022초, 단일 실행). 제품 source/packs/등록표는 그대로라 소스 목록a0706cf1…도 유지한다. 전체 suite는 로컬에서 돌리지 않고 새 PR head의 CI로 확인한다.
+- 다음 단계/미확인: V1 기동·관측 자격/GPU 실측은 위 기록과 동일하게 미완료다. 로컬 파일/EXAMPLE 준비 성공을 실제 실행이나 공식 판정으로 올리지 않는다.
+
+### #277 V1 전환 후속 — 세대의 최신 옵션 가정 제거
+
+- 한 일: 기준 소스에 없는 V2 runner 환경변수와 최신 `--no-async-scheduling`·`--profiler-config`를 세대가 요구하던 경계를 확인했다. 금지 환경변수 값/인자를 판본 데이터로 선언하고 일반 렌더 코드가 거부하게 했다. 세대 이름·판본 문자열 조건을 새로 넣지 않았다.
+- 테스트 결과: CPython3.12.3 새/직접 영향 두 파일 38개 통과(pytest0.60초/부모0.742초). 가상 판본의 임의 환경변수 금지값도 데이터만으로 적용됨을 확인했다. 최신 소스 목록은 `a0706cf1549b216e9503839e7338a52b2cee48a60e4ddb2289b262243b53fa2e`이며 결정5 검토 행을 추가했다. 전체 시험은 최신 head의 CI로 확인한다.
+- 다음 단계/미확인: 위 본문과 동일하다. 기준 초기 V1의 지원 범위를 넓히려면 해당 세대의 실제 기동 방식/관측 의미가 필요하며 금지 목록을 끄거나 다른 판본의 자격을 이월하지 않는다.
+
+## 2026-11-15 — #277 기준 V1 전환과 판본 앵커링 방지
+
+- 한 일: 클로드의 미커밋 기동 설정 두 파일을 이어받았다(기준 head `c60be056`). 기준은 upstream V0 기본값을 보존하고 판본/정확 이미지 데이터로 V1을 선택한다. 렌더 기록·ENV 요청 구성·실제 Pod 환경변수 대조·엔진 의미의 비교 조건까지 연결했다. 초기 V1이 거부하는 LoRA 세대도 판본 데이터로 거부한다. V0 D1~D3와 전용 질문은 중단 기록으로 바꾸고, 기존 V0 예외/실측을 V1에 이월하지 않도록 원인/다음 작업을 재분류했다. 개발 기준은 ma6-version-applicability 24절이다.
+- 테스트 결과: CPython3.12.3 직접 관련 7개 파일 85개 통과(pytest3.44초/부모3.823초), 단일 실행·병렬 옵션 없음. 미래 판본/임의 환경변수 데이터만 추가해 렌더, 다른 이미지 비적용, 충돌·Pod 변수 누락/변조/중복/valueFrom 거부, 양쪽 같은 선택 비교와 과거 미기록 구성 비승격을 확인했다. 소스 검증551파일·현황 `--check`·`git diff --check` 통과. 소스 목록 SHA `c3998cbd21b58c94075c8a6f3c09267806f86d11859945e4924699801693dfda`에 결정5 검토 행을 넣었다. 전체 시험은 로컬에서 실행하지 않았으며 이번 head의 PR CI로 확인한다.
+- 다음 단계: 기존 #277 브랜치에 반영하고 CI를 확인한다. 이후 기준 초기 V1의 대상표·정확 행/관측 의미, CPython3.12.8 자기 코드 지문, 후보 stream_buffer/profiler·REQ10을 잇는다.
+- 막힌 것: V1 선택은 엔진 내부 지원/실제 V1 기동·모델 호환·GPU 등록의 완료가 아니다. 기존 LoRA/REQ16 adapter 분기는 V1에서 별도 대응이 필요하다. 과거 모델 기동/캐시 예외/SUP08 실측은 V0 구성의 결과로 보존한다. runtime/contracts·공통 판정/기한·팩·생산자 등록표·원자료를 바꾸지 않았고 AWS/GPU/이미지/모델 다운로드는 하지 않았다.
+
+## 2026-11-15 — 0.30.0 파생 센서 행: termination 계열 `/25` 연결, initialization `/26`
+
+- 한 일: request_termination·observation_state(LIF-10·12, REQ-12, OBS-02)를 `/25` 기록으로 0.30.0에서 열었다(사용자 승인으로 판본표 assert 1개 변경). initialization 센서를 바꾸지 않고 0.30.0 `multiproc_executor` 행으로 겹치는 `/26`을 추가해 LIF-09를 열었다. 관측 세 함수는 두 판본 소스가 같다. stream_buffer(uvicorn 0.53.0 bytes 없음)·profiler(동작 차이)는 원인을 적고 닫아 두었다. ma6-version-applicability 23절.
+- 테스트 결과: CI와 같은 CPython 3.12.3 venv에서 새 직접 시험(`test_ma6_initialization_release.py`, release rows·판본표)과 initialization·lifecycle capture 관련 시험 162개 통과(`-n` 없이). 전체 pytest는 PR CI로 확인한다.
+- 다음 단계: uvicorn 0.53.0 설치 파일 확보 뒤 stream_buffer 행, profiler 의미 검토, V0 관측기 D1~D3.
+- 막힌 것: uvicorn 설치 bytes 확보 방법(이미지 레이어 또는 배포 wheel)은 다운로드 승인이 필요하다.
+
+## 2026-11-15 — M-A6-V6 0.30.0 lifecycle 정확 행 profile `/25`
+
+- 한 일: 사용자 결정 M-A6-V6에 따라 기반 `/8`을 바꾸지 않고 0.30.0 정확 설치 행 18개로 기반을 설정하는 `vllm_lifecycle_release_sensor.py`(`/25`)를 추가했다. 검토 4개 모듈 중 scheduler·gpu_model_runner·gpu_input_batch는 기반 지점 의미가 같아 행을 넣었고 default_loader는 반환 tuple이 달라 공백으로 두었다. 준비 자산·기록 검증·세션 결합(카탈로그 `lifecycle_release_rows`, 0.30.0만)을 연결하고, 기반 지점만 쓰는 REQ-05·PLT-10·PLT-11·native_route를 0.30.0에서 열었다. 판본 혼합 bytes는 거부한다. ma6-version-applicability 22절.
+- 테스트 결과: 직접 시험 `test_ma6_lifecycle_release_rows.py` 6개와 판본표 시험 통과. 관련 시험 11개 파일을 `-n` 없이 돌렸고 실패·오류 목록이 V6 직전 커밋과 같다(로컬 CPython 3.12.13 원인). 전체 pytest는 PR CI로 확인한다.
+- 다음 단계: 파생 센서별 0.30.0 추가 모듈 행(termination·stream_buffer·initialization·profiler·attempt/output), V0 관측기 D1~D3, REQ-05 V0 대상표.
+- 막힌 것: GPU 생산자 등록·실제 기동 확인 전이다. multiproc_executor 고정값은 두 이미지 모두 불일치(M-A3).
+
+## 2026-11-15 — M-A6 실행기 단위 판본표(0.7.0·0.30.0)
+
+- 한 일: 판본 관문을 실행기→카탈로그 기능 조회로 바꿨다(`engine_profiles.EXECUTOR_FEATURES`, 0.31.0 결과 동일). 외부 관측 실행기 10종을 `vllm-external-observation/1`로 두 판본에 열고 런타임 판본 확인도 실행기 기능으로 좁혔다. 엔진 안 관측 실행기는 닫아 둔 채 판본 프로필 `executor_gaps`에 원인을 기록하고, `j02_run_config` 보고서에 `version_gap`을 붙였다. 결정 31 이미지 대조 근거로 후보 고정값 13행을 `image_pin`으로 올렸다. 기준 V0 D1~D3 설계와 J02 남은 공백을 ma6-version-applicability 19~21절에 썼다. 결정 질문 M-A6-V1~V6.
+- 테스트 결과: 직접 시험 `test_ma6_executor_version_table.py` 7개, 판본표·J02 조립·코드 선택 시험 통과. 영향 시험 45개 파일에서 새 실패 없음(로컬 CPython 3.12.13 원인의 기존 실패는 기준 커밋과 같음). 전체 pytest는 PR CI로 확인한다. 지난 J02 입력으로 본 정적 보고서: 판본 원인 기준 19행·후보 13행 모두 기록, READY_STATIC 6→18.
+- 다음 단계: 사용자 결정 M-A6-V1~V6(2026-11-15, 모두 추천안)에 따라 V0 관측기(D1~D3)·REQ-05 V0 대상표·0.30.0 lifecycle 센서 행(V6) 구현. 기준 CPython 3.12.8 센서 지문 행.
+- 막힌 것: 두 판본의 엔진 안 관측 비교는 V0 관측기와 0.30.0 센서 행이 없어 아직 나오지 않는다. 기준 이미지 레이어 4개(5.04 GB)를 결정 31 범위 밖에서 중복으로 받았다(클라우드 비용 없음).
+
+## 2026-11-14 — RB2-S 점검별 실행기 설정
+
+- 한 일: 사용자 결정 "점검별 설정 둔다"로 `[check_config.<점검>]`을 그 점검의 실행기 칸 위에 병합하게 했다(`configuration.for_check`; core 실행·결합 계산, 사전 준비 점검, 지원 평가, 이월 미리보기). 실행기·판정·팩 무변경. DECISIONS RB2-S, RUN_BINDING 10절, SPEC §4.5.
+- 테스트 결과: 직접 시험 `test_check_config.py` 3개와 결합 시험 포함 35개 통과. 준비·이월·지원 평가 관련 시험 묶음은 아래 PR 기록 참고. 전체 pytest는 PR CI로 확인한다.
+- J02 조립: `tools/j02_run_config.py`(운영자 선언 → guard.toml, 63×2 정적 보고)와 직접 시험 4개를 더했다. 빈 선언 보고에서 OBS-03은 Kubernetes 구현 미등록으로 나왔다.
+- RB2-J 반영: 사용자 결정(J1 웹 초안 값, J2 kubectl get 자동, J3 포함, J4 원인 기록 UNKNOWN)으로 `--web-values`(팩 36 DRAFT 정책 변환)·`--discover`(읽기 전용 get으로 쪽별 target)·OBS-03 원인 기록을 더했다. 직접 시험 11개 통과. 실제 웹 값으로 본 공백은 RUN_BINDING 12.1.
+- 다음 단계: 실제 lab에서 `--discover` 실행, 정책 값 없는 24개 점검과 `[run_binding]` 16개의 값 출처 정리, SUP-08 @36 재검증(고정 자료가 있는 기기에서).
+- 막힌 것: 기록 생산자 미배포(세션), PLT-07·08·09·SUP-13 프로필 불일치, SUP-08 고정 자료 위치.
+
+## 2026-11-15 — M-A3 준비물 J01 연결·M-A7 현재 파일 재점검
+
+- 한 일: 기존69개 행·M-B 입력·정책값·A18개 준비물/사례10파일2,078개를 보존한 별도 J01 계획 사본에 M-A3 미결합 준비물6개를 연결하는 도구를 구현했다. manifest/settings·14자산·소스 귀속/이미지·6독립 세션·빈 관측 폴더를 대조하고 이미 관측/결합/완료한 입력은 미입력으로 바꾸지 않는다. 현재 common-v3 준비물6개를 실제 파일로 확인해 rank-linked-v2 계획을 만들고 공개 요약/CI 경로를 추가했다. ENV/target/binding/common input/실제 결과는 null, 실행/실환경 자격은 false다.
+- 테스트 결과: 직접56개 통과(pytest17.25초·벽17.486초), 최종 경로16개·현황 --check·기존 source549파일 관문 통과. 현재 파일 결합을 다시 점검해 과거 SUP08 두 쪽 유효·나머지 A52쪽 파일 부재를 확인했다. 기존18개 준비물 manifest·10사례 파일 SHA는 유지됐고 신규 GPU/엔진/네트워크 실행은 없다. 기존 #275 head8b7360bf CI11개 성공과 새 로컬 변경의 검증을 구분하며 새 CI는 아직 실행하지 않았다.
+- 다음 단계: 사용자 결정37로 추가 push가 승인됐다. 기존 #275에 반영해 새 head CI를 확인한다. 현재 ENV/target·기동 전 자격이 확보되면 ARM 전에 제품 입력을 결합하고 실제 새 원 기록을 조립한다.
+- 막힌 것: 현재 시험 GPU는 삭제된 상태라 현재 live 입력을 수집하지 않는다. 과거 ARM1 사례를 새 ENV/target에 사후 귀속하지 않는다. 전체 TP2 그룹/탐지/상위 전달 기한/복구 수락·실제 등록 및 나머지136쪽의 결합은 미완료다. M-B4 보관·runtime/contracts 무변경·새 비용/대용량 다운로드/병합 별도 승인 원칙을 유지한다.
+
+## 2026-11-15 — #271 병합 확인과 M-A7 팩36 파일 사전 점검
+
+- 공개: 사용자 승인으로 main 대상 [#275](https://github.com/dohashelby/byul/pull/275)을 열었다. 병합은 별도 승인 전이다. PR CI는 최신 head의 checks로 확인한다.
+
+- 한 일: #271을 사용자 승인으로 main86ef57c1에 병합했고 검증 head1aeb946a와 tree가 같음을 확인했다. 이 main 기반 별도 브랜치에서 팩36 감사·v8 prepared18개/독립18세션·사례10파일/2078개·REQ17그룹2개를 연결했다. 파일 SHA/신원·정책 형식·현재 /1·/2 실행 결합을 네트워크 없이 확인하는 mvp_a_input_preflight 도구를 더했다. 기본 materialize의 감사 파일을 팩36으로 바꿨고 새 문서를 CI목록 두 곳에 넣었다. 기존 실제 SUP08 ENV/target 두 쪽의 팩36 계약 조립/파일 결합은 유효하지만 과거 입력임을 보존했다.
+- 테스트 결과: 직접 입력/감사/결합2단계/경로78개 통과(pytest13.66초·부모벽14.370초), 앞선 직접30개 통과. 실제 prepared18개·settings/모든 자산 bytes·사례10파일·분할그룹 SHA를 재확인했다. 팩36 모델/코드/기동 실제 파일 감사60.173초·오류0. 새 도구의 결과2쪽 유효·52쪽 입력 부재이고 모든 ready/input_preflight/live 자격=false·actual_results=null이다. 제품 소스는 main과 같아 기존 소스549파일/목록87b6e926 검토 행을 사용한다.
+- 다음 단계: 사용자의 후속 push·PR 생성 승인을 받아 main 대상 PR을 열고 CI를 확인한다. 실제 실환경의 ENV/target·수집기 자격을 갖춘 뒤 실행 직전 사전 점검을 다시 해야 한다. M-A3의 제품 입력 결합을 별도 main 브랜치에서 진행한다.
+- 막힌 것: 신규 GPU는 삭제돼 새 실제 수집을 하지 않았다. M-B4는 보관하며 다른 생산자 자격·A52쪽/전체136쪽·M-A3 그룹/기한/등록 및 전체69개는 미완료다. #271 통합 CI의 runtime 게이트웨이504/200 한 실패를 보존했고 같은 head의 다른 실행과 재실행은 통과했으나 원 경합 해결로 세지 않는다. 전체 로컬 pytest는 실행하지 않았으며 새 브랜치 push·PR 생성은 승인됐고 병합은 별도다. PR CI는 해당 head의 checks로 확인한다.
+
+## 2026-11-15 — M-A3 사전 결합된 RPC 공통 부분 입력 구현 후속
+
+- 한 일: 보조 대화에서 사용자가 승인해 전달한 M-A7/M-A3 후속을 기존 main86ef57c1·#275/#276 위에서 이어갔다. 기존 원 snapshot 검증3함수를 AST 동일하게 host adapter로 옮겨 tools 의존을 제거하고, ARM2/외부 예상 범위·선택 원 기록/HMAC/claim/READY/물리 영수증·시계를 검증하는 미등록 공통 /1·/4 생산자와 입력 도구를 구현했다. 실제 장애 적용과 지연의 물리 CONT+SOURCE RELEASE만 사건으로 옮긴다. 기존 delay/death/exception 의미와 별도 communication-stall 분기를 유지하고 탐지/상위 전달/복구를 채우지 않는다. SOURCE RELEASE가 빠져도 확인된 적용 사실을 보존하며 계약의 독립 FAIL이 누락 공백과 함께 유지됨을 확인했다.
+- 한 일: 현재 소스552파일/목록5b38f322의 정확 검토 행을 기록하고 새 미결합 준비물6개/독립 세션6개를 common-v3에 생성했다. 엔진 SDK14 bytes는 이전 미실행 후보와 같고 host 변환만 추가했다. 기존 후보/실제 원 기록은 보존했다. 현재 준비 보고서와 CI 경로 두 곳을 추가했다. 새 생산자와 기존 생산자를 실제 등록하지 않았다.
+- 테스트 결과: 직접187개 통과(pytest11.71초·부모벽11.982초), 최종 기준 이미지 Python ABI131개 통과(pytest8.84초·벽9.172초). 최종 source로 과거 실제6사례/329개 snapshot·제어 HMAC/원 CALL/물리 영수증을 재검증해 gap0과 원 소스 귀속을 유지했고 ARM1의 사후 결합을 전부 거부했다. 별도 새 producer 호출도6사례 모두 PRODUCT_BINDING_REQUIRED로 거부했다. 현황 --check·정확 source552파일·최종 경로16개 통과. 기존 #276 headafe78c39의 CI18개 성공과 새 로컬 변경의 검증을 구분하며 새 CI는 아직 실행하지 않았다.
+- 다음 단계: 사용자 결정37로 추가 push가 승인됐다. 기존 #276 draft에 반영해 새 head CI를 확인한다. 현재 실환경 ENV/target 확보·ARM2 사전 결합·새 실제 원 기록의 부분 입력 조립을 이어간다.
+- 막힌 것: 삭제한 GPU를 재생성하지 않았다. 현재 입력/관측 자격·실제 부분 입력·전체 TP2 인과 그룹/탐지/상위 전달 기한·같은 소유자 복구 수락·communication-stall의 별도 관측·새 소스 GPU 확인/등록은 미완료다. M-B4 보관·runtime/contracts/기존 판정·고정값·기한·등록 관문을 유지한다. EOF가 EXITED 관측보다 먼저 올 수 있어 이를 상위 전달의 인과/기한으로 쓰지 않았다. 전체 로컬 pytest·신규 엔진/클라우드 실행은 없다.
+
+## 2026-11-15 — #271 병합 확인·M-A3 제품 입력 사전 결합 후보
+
+- 공개: 사용자 승인으로 main 대상 [#276](https://github.com/dohashelby/byul/pull/276)을 열었다. 전체 미완료를 명시한 draft로 유지하며 병합은 별도 승인 전이다. PR CI는 최신 head의 checks로 확인한다.
+
+- 한 일: #271을 main86ef57c1에 병합했고 병합 tree는 검증한 head1aeb946a와 같다. PR CI18개와 병합 후 main의 UPDATE/Runtime 두 workflow가 성공했다. runtime gateway의 최초504/200 실패 로그와 동일 head 재시도 성공을 함께 보존하며 원인 해결로 세지 않는다. M-B4 브랜치745e76f0는 보관했다.
+- 한 일: 현재 정확 검토 소스의 준비물·sealed ENV·target·세션·Pod/container/restart를 ARM 전에 HMAC으로 묶는 도구와 actor/source ARM/2를 구현했다. 현재 TP2/PP1/DP1 입력만 받으며 기존 ARM/1 lab 재생·nonce/물리 신호/lease·기한·등록 관문은 유지했다. 두 판본의 지연/예외/종료용 새 미결합 준비물6개·독립 세션6개를 만들고 보고서와 CI 경로 두 곳에 기록했다. 새 ENV/target/결합 파일·실행 결과는 생성하지 않았다.
+- 테스트 결과: 직접 입력/제어/실제 시험 소유 자식의 신호·해제/설치/기존 생산자/경로151개 통과(pytest10.95초·부모벽11.384초). 기존 기준 이미지 Python ABI에서는 직접95개 통과(pytest7.30초·벽7.638초). 과거 여섯 실제 ZIP의 크기/SHA·snapshot329개·제어 HMAC/원 CALL/물리 영수증/새 Pod 정상 요청을 재검증했고 gap0과 기존 소스 귀속을 보존했다(벽12.849초). 여섯 ARM/1 모두 제품 사후 결합을 거부했다. 현황 --check·소스549파일/목록e0c39ae8의 정확 검토 행 관문 통과. 전체 로컬 pytest·신규 GPU/클라우드 실행은 하지 않았다.
+- 다음 단계: 사용자 결정36으로 새 M-A7/3 브랜치 push·main PR 생성이 승인됐다. M-A3 draft를 유지하고 새 PR CI를 확인한다. 이후 사전 결합을 필수로 한 정확 원 관측/물리 영수증의 공통 rank-fault 사건 변환과 TP2 전체 그룹/탐지/상위 전달/복구 수락을 이어간다.
+- 막힌 것: 현재 시험 GPU는 삭제된 상태다. 현재 TP2 ENV/target·기동 전 자격·새 SDK GPU 대조가 없고 새 준비물6개는 미결합/미실행/미등록이다. 전체 인과 그룹·기한·새 소유자 복구·생산자 등록·M-A3 전체 완료는 미완료다. 새 GPU/비용/대용량 다운로드와 새 브랜치 push/병합은 별도 승인 범위다. C 여유11.61GiB를 확인했으며 추가 대용량 추출의12GiB 하한을 적용한다.
+
+## 2026-11-15 — 승인된 #271 병합을 위한 팩36 main 통합
+
+- 한 일: 사용자 결정35를 기록하고 main31e4c3c6의 승인된 B2/팩36을 #271에 통합했다. PROGRESS 양쪽 모든 행·결정34/기존 결정·전체 검토 행을 보존했고 현황을 재생성했다. 통합 소스 목록 자체SHA87b6e926/549파일의 변경23개는 main과 정확히 같고 rank SDK bytes는 d5102e5b와 같다. 기존 여섯 GPU 사례·@34 SUP08 실측을 팩36 실행으로 바꾸지 않았다.
+- 테스트 결과: 직접 실행 결합1/2·현행 제품 연결·입력 도구·현황·경로143개 통과(pytest61.10초·부모벽61.532초). 소스549파일 관문·현황 --check·diff --check 통과. 기존 d5102e5b CI9개 성공은 보존하고 새 통합 head CI를 별도로 확인한다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 새 CI 통과 뒤 승인한 #271을 main에 병합한다. 그 main에서 M-A7 팩36 실제 파일/입력 조립과 M-A3 판정 입력 연결을 별도 작업으로 이어간다.
+- 막힌 것: 현재 GPU 노드는 삭제돼 새 실측/실환경 수집은 실행하지 않는다. M-A7의 기본 로컬 감사는 팩35로 남아 팩36으로 재검증해야 하고, 실제 ENV/target·관측 자격 및 M-A3 전체 그룹/기한 수락·등록은 미완료다. M-B4 보관·runtime/contracts 무변경을 유지한다.
+
+## 2026-11-14 — 기존 async 큐 센서 시험의 30ms 시계 경합 보수
+
+- 후속 검증: 같은 원인의 예외 정상 경로도100ms READY 지연으로 재현해, 해당 시험에서 제어기와 센서의 주입 단조 시계를 함께 맞췄다. 기존30ms 한도와 원 RPC 예외/출력 assert는 그대로다. 이전 지연 실패·수정 지연 성공·수정 활성화 무시 만료의 추가 진단3건과 직접72개(pytest1.88초·벽2.228초)가 통과했다. 제품 시계나 소스/판정은 바꾸지 않았다.
+
+- 한 일: head6da10660 CI에서 앞선 PLT12/현황 실패는 통과했으며 기존 async 큐 시험의 READY 파일 fsync/스레드 준비가30ms 제어 기한을 소모해 RELEASE 대신EXPIRED가 나왔다. 제품 제어기는 그대로 두고 해당 시험의 주입 가능한 단조 시계만 고정한 뒤 wait가10ms씩 전진하며 release 파일을 쓰도록 했다. 기존30ms 기한·원 async/worker 함수·스레드·출력 동일성·모든 assert/skip을 유지했다.
+- 테스트 결과: 직접 센서/제어/경로72개 통과(pytest2.54초·벽2.799초). 저장소 밖 진단3건에서 이전코드는100ms READY 게시 지연으로 기존 assert가 EXPIRED를 검출했고, 수정코드는 같은 지연에서도 RELEASE/원 출력이 유지됐다. 수정코드도 해제 게시를 막으면30ms 시계에서 EXPIRED로 기존 assert가 실패함을 확인했다. CI 원 결과13299통과·1실패·기존34skip(pytest834.62초·부모벽835.983초)은 원본대로 보존했다.
+- 다음 단계: 시험 보수의 최종 PR CI를 확인한다. 원자료·소스564e73b1/549파일·등록표·판정·기한·runtime/contracts·의존성은 바꾸지 않았다.
+- 막힌 것: 전체69개/실제 공통 판정 입력과 그룹 수락·등록은 앞선 기록대로 남아 있다. 신규 EC2/EBS/SG 정리는 확인됐고 추가 GPU 실행은 없다. #271은 draft·병합 미승인이다.
+
+## 2026-11-14 — 승인된 신규 GPU 자원 최종 정리 확인
+
+- 한 일: 여섯 RPC 원자료 ZIP과 각 대조 기록을 로컬에 보존하고 13:10 UTC 최종 무부하 감사에서 실증 Pod0·GPU 계산프로세스0·L4 네 개 모두 메모리0MiB를 확인했다. AWS 종료 지연에 강제 종료를 적용한 뒤 13:18:06 UTC 신규 인스턴스 TERMINATED, 새200GiB EBS·전용SG 삭제를 각각 API로 확인했다. 기존 사용자 자원은 변경하지 않았다. 공개 RPC 요약에 정리 확인·보수 예산 추산을 덧붙였다.
+- 테스트 결과: 최종 문서/CI경로 직접16개·현황 --check 통과. CI 원인 보수117개 중 생성물1건 외116개가 통과했고 재생성 후 현황21개 전부 통과했다. 마지막 코드/자료 수정7059ffc5의 PR CI는 실행 중이다. 전체 로컬 pytest를 돌리거나 전체 통과로 보고하지 않았다.
+- 다음 단계: #271의 최종 문서/수정 CI를 끝까지 확인한다. 이후 남은 범위는 실제 판정 입력/그룹 수락·등록 및 나머지 실행 입력이며, M-B4 보관과 병합 미승인을 유지한다.
+- 막힌 것: 전체69개·A52쪽/전체136쪽 입력 결합·공식 재판정은 미완료다. 예비비15달러·단가 여유를 포함한 최종 보수 추산은36.8269달러이며 실제 청구액이 아니다. 승인 상한100달러와 구분한다.
+
+## 2026-11-14 — 두 판본 RPC 6사례 원자료 대조와 통합 CI 원인 수정
+
+- 한 일: 기준 소스789817e3/목록30f4ea1d, 후보 소스5a39cb4e/목록564e73b1의 지연·예외·종료6사례를 각각 새 Pod 복구와 함께 검증했다. 329개 원 snapshot·제어 HMAC·정확 source/자산을 대조했고 모두 gap0이다. 지연은 실제 STOP/CONT·영향 요청200, 예외/종료는500, 각 새 세대 요청은200이다. 공개 원본 ZIP/SHA/소스 귀속은 `docs/dev-1/ma3-rpc-gpu-observations-20261114.json`에 남겼다. 과거 진단 실행은 실패로 보존했다. 팩35 통합 후 누락된 팩34 정의 색인은 고정커밋의77개 파일 bytes SHA를 대조해 보완했고, PLT12 모의 사건/실행 결합은 같은 고정 시계를 써 초 경계 경합을 없앴다. 판정 기준·기존 assert/skip·EVD/RES/팩 원본은 바꾸지 않았다.
+- 테스트 결과: head5b6597c9 CI 기본 suite는13298통과·2실패·기존34skip(pytest614.22초·부모벽615.107초)이므로 전체 통과로 보고하지 않는다. 직접 영향117개 중116개가 통과했고 색인 완료 전 생성물 정합성1건은 현황 재생성 후21개 전부 통과했다(pytest1.26초). 나머지 직접 회귀/경로 및 source549파일 대조는 앞선 결과를 보존한다. 새 소스 관측은 등록/전체 그룹 수락이 아니다.
+- 다음 단계: 이 수정의 PR CI를 다시 확인하고 원인을 고친다. 6개 원자료 반출과 Pod/GPU 계산프로세스0개 감사를 마친 동일 신규 노드의 종료·EBS/전용SG 삭제를 확인한다. AWS 종료 지연으로 강제 종료도 요청했고 완료 확인 전에는 정리 완료로 세지 않는다.
+- 막힌 것: 전체 TP2 인과 그룹·탐지/상위 전달 기한·실제 공통 판정 입력 연결/등록·A52쪽/전체136쪽 입력 결합·전체69개는 남아 있다. 결정34의 V0·REQ16 해당 캐시 UNKNOWN은 유지한다. M-B4 보관/runtime/contracts 무변경. #263은 현재 GitHub에서 CLOSED/미병합으로 조회되며 변경하지 않았다. #271은 draft이며 병합 승인 없음.
+
+## 2026-11-14 — 팩35 로컬 입력과 후보 정상 RPC 실제 대조
+
+- 한 일: 팩35 SUP-08 기동/정책 파일과 로컬 감사 보고서를 새로 만들고, M-A7 v7 prepared18개·사례10파일/2,078개·REQ-17 분할 그룹2개의 실제 파일 SHA·설정·독립 세션을 재확인했다. 현행 입력 계획·공개 준비 기록을 v7에 연결하고 팩34 v6/실측 원본은 보존했다. 기본 입력 생성 도구가 팩35 감사 보고서를 읽도록 바꾸고 CI 경로 목록 두 곳에 추가했다. 후보 새 SDK의 실제 읽기 전용 원자료29행은 gap0/HTTP200이며 빈 일정16행은 요청/장애 자격=false로 별도 기록됐다.
+- 테스트 결과: 입력 생성·SUP-08 감사·경로36개 통과(pytest6.13초), 현황 --check 통과. 새 SDK 직접106개와 기준 Python53개(pytest2.83초) 통과 결과를 보존한다. 후보 정상 원 ZIP/개별 snapshot HMAC·소스/자산을 대조했다. 기존 후보 v2 진단을 소급 삭제하지 않았다.
+- 다음 단계: 동일 확정 SDK의 후보 지연·예외·종료와 독립 새 Pod 복구를 순차 검증한다. PR CI·현재 입력 자료와 미완료 범위를 정리한다.
+- 막힌 것: v7은 미결합 준비물로 실제 ENV/target·노드 설치·실행 사전 점검은 미완료다. 과거 SUP-08 팩34 실측을 팩35 실행으로 바꾸지 않는다. 전체 그룹·기한 수락·생산자 등록과 전체69개는 미완료다.
+
+## 2026-11-14 — 빈 일정과 활성 요청을 구분하는 RPC 후보 보수
+
+- 한 일: 실제 후보 정상 요청에서 ID 읽기 거부 진단을 재현했다. 정확 클래스의 예정 요청 dict가 비고 총 예정 토큰이 정수 0인 경우만 adapter 데이터로 구분해 IDLE_CALL/RETURN/RAISE로 남긴다. 이 행은 요청 HMAC·상위 활성 결합·장애 자격이 없고 control을 호출하지 않는다. 기존 요청 ID 읽기의 빈 값 거부, 정확 소스/ABI/파일 고정값, 기존 gap·등록표·판정은 유지했다. 잘못된 합계·거짓 요청/부모 결합·장애 자격으로 다시 서명한 원자료도 거부한다. 팩35 로컬 준비물 v7은 prepared18개·사례10파일/2,078개이며 팩34 v6는 보존했다.
+- 테스트 결과: 직접 영향·입력 생성·경로106개 통과(pytest7.81초·벽시계8.099초), 추가 ABI 대조를 수행했다. SUP-08 팩35 로컬 모델/코드/기동 파일 재대조31.081초, 오류0개다. 실행·사전 점검 완료를 뜻하지 않는다.
+- 다음 단계: 새 고정 소스로 후보의 읽기 전용 정상 요청을 먼저 대조하고, 관측 자격을 충족한 경우에만 후보 지연·예외·종료를 순차 실행한다.
+- 막힌 것: 새 빈 일정 분류의 실제 GPU 확인, 후보 장애 사례, 실제 ENV/target 결합 및 전체 점검 실행은 미완료다. 과거 실제 팩34 SUP-08 결과는 팩35 실측으로 바꾸지 않는다.
+
+## 2026-11-14 — 실제 RPC 관측 공백 원인 코드 보존
+
+- 한 일: 관측 실패 시 기존 gap을 그대로 두고 실패 단계와 허용된 고정 진단 코드만 더했다. 사용자 예외의 원문·본문·토큰은 문자열로 만들지 않는다. 후보 지연 v2의 실제 STOP/CONT·HTTP 200·새 Pod 정상 응답은 원자료에 있으나 fault 16개·recovery 8개 RPC gap이 있어 전체 무결성 대조는 통과하지 않았다. 기준 지연·예외 v2는 각각 gap 0으로 대조됐다. 기준 예외는 HTTP 500·새 세대 HTTP 200이며, 전체 점검 완료·등록은 아니다.
+- 테스트 결과: 직접 영향·경로 40개 통과(pytest 2.28초), 정확 소스 549파일 대조 통과. 빈 일정의 기존 거부 시험과 원 호출 보존을 유지하고, 고정 진단·비밀 원문 거부 시험 2개를 추가했다.
+- 다음 단계: 확정된 새 소스로 후보의 읽기 전용 정상 요청을 관측해 실제 실패 코드를 확인한다. 추가 장애 주입은 해당 관측 자격을 확인한 뒤 진행한다.
+- 막힌 것: 후보 관측 공백 원인 및 나머지 장애 사례·전체 점검 입력은 미완료다.
+
+## 2026-11-14 — #271 최신 main의 실행 결합값 분리 통합
+
+- 한 일: main `2ba7a072`의 PACK-BASELINE@35·B1 실행 결합값 구현과 B2 설계 문서를 통합했다. 양쪽 진행·결정·검토 기록을 보존하고 현황표를 재생성했다. 관측 SDK bytes는 `789817e3`와 같으며, 진행 중 GPU 사례는 기존 소스 목록 `30f4ea1d`에 계속 귀속한다. B2 구현은 하지 않았다. 새 통합 소스 목록은 `35705431`(549파일)이다.
+- 테스트 결과: 실행 결합값·입력 도구·rank SDK·경로 직접 회귀 162개가 통과했다(pytest 21.27초·벽시계 21.603초). 목록 재생성 직후 검토 행이 없어 관문 15건이 거부됐고, 결정 5의 정확 SHA 검토 행을 추가한 뒤 해당 15개가 통과했다. 소스 549파일 대조·현황 --check가 통과했다. 전체 pytest는 PR CI로 확인한다.
+- 다음 단계: 통합 입력 생성과 GPU 장애 사례 원자료 대조를 이어간다. 후보 지연의 RPC 관측 공백은 성공으로 처리하지 않고 원본을 보존한다.
+- 막힌 것: 후보 RPC 추가 호출의 관측 공백 원인 확인·수정, 실제 ENV/target과 나머지 점검 실행은 미완료다.
+
+## 2026-11-14 — 실제 기준 TP2 지연/재개·새 세대 정상과 후속 단계 진단 보수
+
+- 한 일: source70f2607a/8761acb0를 실제 기준 GPU 이미지에 설치해 정상 source/RPC/ID/초기IPC 자격 뒤 rank0에 pidfd SIGSTOP을 보냈다. 실제 S→T, 같은 전체 문맥의 SIGCONT/T→S와 시각 순서를 별도 HMAC 영수증으로 확인했고 해당 요청HTTP200·새 Pod/프로세스 세대 정상HTTP200을 확인했다. 원 ZIP101,251 bytes/SHAafce6cca와 fault24/복구12 snapshot을 반출했다. 원 실행의 후속 모델 단계에서 이미 사용한 nonce claim을 재확인하며 진단1개가 나와 전체 자격 통과로 세지 않는다.
+- 테스트 결과: 물리 적용/재개·클라이언트·새 세대 정상 사실과 모든 control HMAC은 확인했다. fault source23행/진단1개, recovery12행/진단0개를 원본대로 보존한다. 보수 뒤 직접 영향/경로131개 통과(pytest4.78초·벽시계4.983초), 기준Python 새67개 통과(pytest2.35초). 같은 ARM SHA/문맥/부모 객체에 결합된 정확 claim만 소비 완료로 인식해 후속 호출에 재적용하지 않으며, 잘못된 claim은 진단/무주입으로 거부하는 회귀를 추가했다. 기존 READY/파일/nonce/물리 적용 검사를 완화하지 않았다. 새 목록 자체SHA30f4ea1d/548파일에 결정5 정확 행을 추가한다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 수정 묶음과 원 실패를 같은 draft PR에 반영하고 새 준비물/세션으로 기준 지연을 다시 검증한다. 원 진단을 지우거나 PASS/완료로 바꾸지 않는다. 통과한 자격에서만 나머지 두 판본 사례와 새 세대 정상/입력 정합성 검토를 계속한다.
+- 막힌 것: 첫 실행의 물리 사실은 유효하지만 source 진단1개 때문에 전체 자격은 미완료다. 독립 클라이언트200을 장애 오류 전달로 만들지 않고 scope_complete/인증/등록=false를 유지한다. 나머지5개 실제 사례·A 입력52쪽/전체136쪽·전체69개 실증은 남았다. 동일 신규 노드는 재개 상태이며 예산 감시를 유지한다. M-B4 보관/runtime/contracts 무변경을 유지한다.
+
+## 2026-11-14 — 일회용 nonce·pidfd 신호·독립 해제 감시의 CPU 묶음
+
+- 한 일: private ARM/READY/action의 HMAC·정확 세대/설정/자산·원 CALL/API ID·rank0/TP2를 결합하고 일회용 claim/만료/취소를 분리했다. 예외 주입 경계는 CONTROL_RAISE/original_invoked=false로 원 함수 실행과 구분한다. 실제 초기 IPC/정상 nonce 관측 후 같은 UID/PID namespace의 pidfd만 대상으로 하는 actor와 별도 resume lease를 구현했다. 신호 전 잠재 stop 의도를 전달해 actor 사망/lease 만료에도 pending SIGSTOP를 지우며 death에는 CONT를 보내지 않는다. 새 자원/이미지/의존성/판정/등록은 추가하지 않았다.
+- 테스트 결과: 직접 영향/경로130개 통과(pytest4.90초·벽시계5.079초). 새66개는 기준 이미지 Python에서도 통과(pytest2.28초·벽시계2.508초). HTTP 대역과 실제 원 RPC/barrier·소유 Python 자식에 대한 SIGSTOP/SIGCONT/SIGKILL·finally 없는 actor 사망/lease 만료의 재개를 확인했다. 제품 소스548파일/목록 자체SHA70f2607a의 결정5 정확 행을 추가했다. head0e5cf695 CI9개 모두 SUCCESS이며 새 묶음 CI는 별도 확인한다. 전체 로컬 pytest·GPU 장애는 실행하지 않았다.
+- 다음 단계: 묶음을 고정해 새 prepare/비밀 자산으로 만들고 동일 승인 GPU 노드를 재개한다. 실제 정상 요청의 source/ID/IPC/프로세스 자격을 먼저 검증한 뒤 맞는 경로만 주입한다. 물리 영수증·독립 클라이언트 결과·새 세대 복구/실행 입력을 별도로 반출·검토한다. 전체 그룹/상위 전파/기한·등록 여부를 실제 근거 범위 밖으로 올리지 않는다.
+- 막힌 것: 새 nonce/actor 경로는 아직 실제 두 엔진에서 자격을 확인하지 않았다. 실제 GPU 장애0회, scope_complete/source_authenticated/engine_group_verified/producer_registered=false를 유지한다. 새 세대 복구의 실제 결과·A 입력52쪽/전체136쪽·다른 관측기/전체69개 실증은 미완료다. 동일 신규 노드는 stopped로 설치본 임시 보존 중이며 #263 draft·M-B4 보관·runtime/contracts 무변경을 유지한다.
+
+## 2026-11-14 — 정확 상위 RPC 프레임·동일 worker/요청의 CPU 연결
+
+- 한 일: 같은 구현에 판본별 RPC source 데이터를 더해 기준 driver 안 worker 호출과 후보 worker RPC 안 wrapper 호출, API 반환 ID/후보 내부 재배정을 관측한다. 같은 요청 HMAC·문맥·실제 원 함수 code/globals/self 프레임·worker 객체 경로를 모두 대조하며 토큰/ID/시각만으로 연결하지 않는다. 앞뒤 call 지문·원 호출/예외를 보존하고 관측 sink의 BaseException도 원 호출을 바꾸지 않는다. 기존 IPC scope와 source 행은 그대로다. 실제 과거 준비물은 정확 소스 SHA/전체 자산 해시로만 재검증하며 현재 자산 누락을 거부한다.
+- 테스트 결과: 직접 영향/경로103개 통과(pytest8.14초·벽시계8.541초). 새39개가 두 Python ABI에서 각각 통과했다(기준3.08초·후보2.94초). 설치6/8파일·4/5함수의 정확 bytes/ABI 컴파일 소비를 확인했지만 모듈 namespace 대역이며 실제 엔진 실행은 아니다. 과거 실제 GPU 원 기록은 각3개/gaps0로 다시 대조했다. 현황 --check·546파일 소스 관문·diff --check 통과. 소스 목록 자체SHAa65e78f3의 결정5 행을 추가했고 기존 native24·등록표·TP1 조건은 무변경이다. 앞선 head998a5d20 CI9개 모두 SUCCESS이며 새 코드 CI는 별도 확인한다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 이 묶음을 고정해 같은 draft PR에 반영하고 nonce 제어·실제 PID/세대·물리 주입/해제·새 소유자 복구를 연결한다. source/CPU 거부 시험을 충족한 경로만 동일 승인 GPU에서 실행한다. 현재 원 RPC 프레임 연결 true를 전체 그룹 수락/생산자 인증으로 쓰지 않는다.
+- 막힌 것: 새 RPC 연결은 CPU EXAMPLE 검증이고 실제 엔진 관측·nonce/주입/해제/복구 제어는 미완료다. 실제 장애0회·source_authenticated/engine_group_verified/producer_registered=false, 동일 노드 stopped/설치본 임시 보존을 유지한다. A 실제 입력52쪽/전체136쪽과 다른 관측기 등록·전체69개 실증은 별도다. #263 draft·M-B4 보관·runtime/contracts 무변경을 유지한다.
+
+## 2026-11-14 — 활성 요청 연결의 구조체 ID 읽기 구성요소
+
+- 한 일: 정확 source hook이 넘길 요청 metadata에서 ID만 세션 HMAC으로 바꾸는 adapter 구성요소를 구현했다. 구조체 목록·양수 스케줄 dict·external/internal 재배정 쌍을 구분하고 실제 클래스 namespace/표준 슬롯 또는 일반 dict만 읽는다. property·사용자 getter/descriptor·원문 본문/토큰을 읽지 않으며 다른 클래스·중복/상한·형식·읽는 도중 교체를 거부한다. 기준/후보의 헤더 ID와 후보 내부 ID 재배정, 기준 비-driver worker broadcast 구조 및 정확 실행 지점을 설치 소스에서 확인했다. 현행 모델 표의 미고정/미기동 설명을 실제 기동 사실과 결정34에 맞췄다.
+- 테스트 결과: 새17개가 CPython3.12.3/3.12.8에서 각각 통과했다. 기존 승인 레이어의 msgspec C 모듈844,672 bytes를 추가 다운로드 없이 제한 추출해 두 이미지의 실제 C 슬롯에서도 ID 읽기/변경 구분을 확인했다. 프로젝트/venv 의존성은 무변경이다. 직접 영향/경로81개 통과(pytest5.16초·벽시계5.649초), 현황 --check·545파일 소스 관문·diff --check 통과. 기존544파일 bytes는 모두 같고 새 reader 한 파일만 목록에 추가했다. 목록 자체SHAbdb24d02에 결정5 정확 검토 행을 추가했다. 문서 커밋a3bcf197의 CI9개 모두 SUCCESS이며 이 새 코드 CI는 별도 확인한다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 요청 ID와 정확 RPC 진입/반환, 실제 worker 객체·PID/시작세대/IPC를 같은 nonce의 제어에 결합한다. 기준 driver 실행 안 worker 호출과 후보 내부 ID 재배정/worker RPC 안 호출을 각각 고정 source 데이터로 고르고 원 호출/예외를 보존한다. 물리 주입·해제 보장·새 세대 복구의 CPU 거부 시험 뒤에만 같은 승인 노드에서 실제 장애를 검증한다.
+- 막힌 것: 이 구성요소는 아직 실제 source hook/제어에 연결하지 않았고 rpc_active_verified/source_authenticated/producer_registered=false다. 주입·해제·새 세대 복구는 미완료이며 실제 장애0회다. 기존 native24 고정값/TP1 자격·판정/등록표·runtime/contracts·M-B4는 무변경이다. 동일 GPU 노드는10:28:01 UTC stopped이며 설치본을 임시 보존한다. 실제 A 입력52쪽/전체136쪽은 이 구성요소로 채워지지 않는다.
+
+## 2026-11-14 — 두 판본 실제 IPC/TP2 기동과 REQ-16 결정34
+
+- 한 일: head7e49f608/source7c225d4e의 읽기 전용 hook을 동일 승인 GPU 노드의 두 이미지에 실제 설치했다. 두 쪽 TP2 모델 로드·GPU2개·정상 HTTP200, 각각3개의 닫힌 source/IPC snapshot을 확인했다. 기준 부모/실제 rank1의 시작세대·task/result pipe와 후보 부모/rank0·1의 시작세대·broadcast/개별 response HMAC이 일치했다. 원 ZIP28,565 bytes/SHA220d8d64와10파일 해시를 반출하고 정확 자산/본문/세션/HMAC을 재검증했다. 기준 모델 로드의 실제 디스크 대기와 가중치2개 순차 읽기/SHA 재대조를 기록했으며 새 다운로드/설정 변경은 없다. 기준 V0가 지정 멀티모달 prefix caching을 꺼 비교 측정력이 없음을 확인했고 사용자 결정34로 V0 유지·해당 기준 캐시 분기만 원인 있는 UNKNOWN 예외를 기록했다.
+- 테스트 결과: 제품 코드가 같은 head7e49f608의 PR #271 CI18개 모두 SUCCESS. 실제 두 쪽 정상 HTTP200과 source_rows_verified=3씩/gaps0, 부모-자식 세대/IPC 원 기록 대조가 통과했다. 문서 연결 뒤 경로16개 통과(pytest1.70초·벽시계2.234초), 현황 --check·544파일 소스 관문 통과. 실제 상태를 요약한 문서만 수정했고 src/packs/검토 목록·기존 고정값/등록표·판정·runtime/contracts는 바꾸지 않았다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 같은 승인 브랜치의 draft #271에 실측/결정 기록을 반영하고 새 CI를 확인한다. 초기 IPC 근거와 활성 요청/RPC·nonce·대상 세대의 결합, 정확 주입 경계·물리 해제·새 소유자 복구의 필수 경로를 설치 source에서 확정해 구현한다. 코드 준비 동안 동일 신규 노드는 일시 정지를 요청했고 반출본/설치본을 보존한다. 최종 종료 시 이번 신규 EBS/SG까지 정리한다.
+- 막힌 것: 이번 hook은 초기 메타데이터 관측이며 활성 요청·장애 전파·기한·물리 해제·새 세대 복구 전체를 검증하지 않는다. source_authenticated/engine_group_verified/producer_registered=false, 장애 주입0회를 보존한다. 기준 V0 요청 전달/작업자 실행 구조는 후보와 다르며 기존 native24 source 불일치와 TP1 거부 조건을 유지한다. 실제 ENV/target은 SUP-08 두 쪽만 봉인했고 A27개 기준52쪽/전체69개 기준136쪽이 남는다. 결정34로 해당 캐시 예외만 닫았으며 나머지 입력·관측 완료나 새 결과 객체를 만들지 않았다. #263 draft·M-B4 보관·runtime 경합 미해결/무변경을 유지한다.
+
+## 2026-11-14 — M-A3 읽기 전용 source hook·비밀 준비 자산·닫힌 snapshot 후보
+
+- 한 일: 같은 hook 구현에서 adapter 데이터로 기준 queue·후보 shared-memory 관측 위치를 고른다. 정확 Python ABI/이미지·설치 파일/SHA·함수7개 본문·namespace를 먼저 대조하고, 원 함수의 인자/반환/예외를 보존한 앞뒤 경계에서만 읽는다. 커널 IPC 지문과 동일 UID·PID/time namespace의 실제 자식 시작 세대, source graph·원 관측 구간을 남긴다. 기존 sitecustomize/loader 선택과 원래 guard 패키지를 보존한다. 준비 경로는 import 경로에서 제거하고 _byul_rank_ipc 전용 namespace로만 로드한다. 비밀 키는 준비 디렉터리에만 두며 snapshot은 HMAC·O_EXCL로 봉인한다. 기존 native24·판정·등록표·M-B4는 변경하지 않는다.
+- 테스트 결과: 독립 Python 프로세스 설치/원 호출·payload 보존과 HMAC/본문/자산 변조 거부 등을 포함한48개가 CPython3.12.3/3.12.8에서 각각 통과했다. 직접 영향/경로305개 통과(pytest73.71초·벽시계74.412초), 현황 --check·544파일 소스 관문 통과. 60초를 넘겨도 중단/실패 gate를 추가하지 않았다. 목록 자체SHA7c225d4e의 결정5 정확 검토 행을 추가했고 기존 기록을 보존했다. 앞선 #271 head407640c2 CI18개도 모두 성공했다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 이 묶음을 고정해 같은 승인 브랜치/PR로 올리고 새 CI를 확인한다. 동일 신규 GPU 노드의 설치본을 재개해 실제 두 이미지에서 읽기 전용 hook·물리 IPC/프로세스 세대와 정상 요청을 확인한다. CPU 예제와 실제 source/GPU 확인을 구분하고 raw 원자료를 보존한다.
+- 막힌 것: 아직 실제 엔진에 새 hook을 설치하지 않았으며 source_authenticated/engine_group_verified/producer_registered=false다. 초기 IPC 연결은 요청별 TP 계산·장애 탐지/상위 전달/기한·해제·새 소유자 복구 전체를 증명하지 않는다. 기존 fault source 불일치와 미등록 관문을 유지해 장애 주입은0회다. runtime 무변경·기존 경합/추가504 문제 기록·#263 draft·M-B4 보관을 유지한다.
+
+## 2026-11-14 — M-A3 물리 IPC 식별·정확 source 후보와 원격 병합 상태 정정
+
+- 한 일: 부모/worker IPC의 실제 커널 객체를 세션 HMAC으로 지문화하는 읽기 전용 구성요소와 정확 이미지/파일/SHA·함수 본문/정의 namespace 대조를 추가했다. 기준 task/result queue와 후보 shared-memory broadcast/response를 adapter 데이터로 분리해4파일/7함수를 후보로 검토했다. 기존 native24·TP1 자격/고정값·판정/등록표는 유지한다. #264/#269가 사용자 계정으로 이미 main512915e1에 병합돼 있음을 재확인해 실제 GPU 후속31ec6884와 구분했고 양쪽 변경을 정상 통합했다.
+- 테스트 결과: 신규18개 직접 시험이 CPython3.12.3/3.12.8에서 각각 통과했다. 실제 자식의 동일 IPC·payload 보존과 다른 객체/키·FD 교체·변경 source/body/namespace·property·symlink 거부를 확인했다. 최신 main 통합 뒤 직접 영향/경로275개 통과(pytest35.13초·벽시계35.369초), 현황 --check·542파일 소스 관문 통과. 새 소스 목록은 기존539파일에3파일만 더했으며 목록 자체SHA c04480e5의 결정5 정확 검토 행을 추가했다. 전체 로컬 pytest는 실행하지 않는다.
+- 다음 단계: 최신 main 통합 뒤 직접 영향/경로·소스 관문을 검증하고 같은 승인 브랜치의 별도 후속 PR/CI로 넘긴다. 실제 source hook과 세대/양방향 IPC 원 기록을 연결한 뒤 같은 신규 GPU 노드에서 자격을 확인한다. 노드는 stopped로 확인했고 EBS/설치본을 임시 보존해 CPU 보완 중 EC2 비용을 줄인다. 발생분 포함 총100달러·예산 감시와 최종 신규자원 정리를 유지한다.
+- 막힌 것: 구성요소는 관측기 설치/그룹 인증/등록이 아니며 source_authenticated/engine_group_verified/observer_installed/producer_registered=false다. TP2 인과 그룹·탐지/상위 전달/기한·해제/새 소유자 복구의 제품 연결은 미완료다. 31ec6884의 update CI는 성공했으나 runtime test_mvp_03_denial_does_not_poison_next_request가 기대(403,200) 대신(403,504)로 실패했다(1실패/1,809통과·기존skip4·subtest1,012·208.36초). 원 로그/문제 기록을 보존하고 runtime 무변경 방침을 따른다. 원 S2-05와 같은 원인으로 단정하지 않는다. #263 draft·M-B4 보관을 유지한다.
+
+## 2026-11-14 — SUP-08 정본 GPU REGRESSED·양쪽 TP2 모델 기동·결정33
+
+- 한 일: 결정32의 신규 단일 GPU 노드에 실제 설치·모델 파일을 검증하고 SUP-08의 실제 ENV/target을 연결했다. @34/revision5의 guard update에서 기준 ignored/PASS·후보 비승인 코드 consumed/FAIL·REGRESSED, 기능 양쪽PASS·성능UNKNOWN을 확인했다. EVD2/RES2/RPT1을 새로 생성·반출하고 공개 요약/정확 Ref·원자료 SHA와 현황을 연결했다. verification_level=MEASURED, EVD origin=MEASURED·RES origin=EXAMPLE·official=false를 원본대로 보존했다. REQ16 고정11파일4,429,592,647 bytes를 SHA 검증했고 두 판본 모두 같은 모델의 TP2 기동·GPU2개·정상 HTTP200을 확인했다.
+- 테스트 결과: 원본 ZIP 경로/정규파일 검사·읽기 전용 Store의 객체/Ref/첨부 해시 검증 오류0, 자격 ZIP16개 파일의 SHA/크기 대조 통과. 직접/현황/경로51개 통과(pytest3.05초·벽시계3.31초), 현황 --check·539파일 소스 관문 통과. 첫 현황 시험은 “@34 실측 없음” 전제로 실패해 새 실측 두 행의 정확 ID/revision/SHA·EXAMPLE 출처·PASS/FAIL과 다른 점검 미승격을 요구하도록 갱신했고 과거@33 검증도 유지했다. 제품 소스/판정/팩/의존성·고정값/등록표·runtime/contracts는 변경하지 않았고 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 결정33의 동일 신규1대·발생분 포함 누적100달러 범위에서 M-A3 정확 소스/profile·TP2 인과 그룹/전파·해제/복구를 CPU 시험으로 보완한 뒤 실제 자격을 확인한다. 코드 준비 중 노드를 일시 중지해 EC2 비용을 줄이며 같은 EBS/설치본으로 재개한다. 최종 증거 반출 뒤 신규 노드/EBS/SG를 정리한다. 고정 시간 종료는 취소 확인했고 로컬/노드 예산 감시로 비용 추산+20% 여유·전송/기타15달러 예약, 보수 총95달러에서 정리한다.
+- 막힌 것: 기존 fault sensor의 정확 MP 소스는 두 이미지 모두 불일치하고 기준 CPython의 자기 코드 지문 자격도 없다. TP2 모델 정상 응답을 장애 관측 자격으로 올리지 않았으며 실제 장애 주입은0회다. TP2 인과 그룹·탐지/상위 전달/기한·death 새 소유자 복구·생산자 등록, 다른136쪽 ENV/target 결합·추가 사례/소유 범위·전체69개/J01/J02/J03은 남았다. #269는 열림/미병합, 병합 승인은 없다. #263draft·#264미병합·M-B4보관·runtime 원 경합 미해결을 유지한다.
+## 2026-11-14 — RB2 실행 준비값 분리 구현(팩 36)
+
+- 한 일: 사용자 결정 RB2-Q1~Q7로 B2 53개 키를 정책에서 빼고 `guard run`이 점검별 설정 표 `[run_binding.<점검>]`에서 읽게 했다(`run_binding` 단계별 판별·값 출처·`guard-run-binding/2`, `lifecycle_transition.inputs_manifest`, REQ-02 선언 파일 대조 생략·해시 기록, core·준비 점검 연결). 팩 36(17개 점검 revision+1), 정책 이전 도구 `--stage 2`, 예시·GPU 초안·MA7 계획·SUP-08 관문, SPEC §4.5, platform `MVP_PACK`·연결표·34 하드코딩 문구를 맞췄다. E 4개는 정책에 남겼다.
+- 테스트 결과: 직접 시험 `test_run_binding.py` 13개·`test_run_binding_stage2.py` 11개 통과. 실제 팩을 쓰는 영향 시험 파일을 돌렸고, 남은 로컬 실패는 main 기준에서도 같은 원인으로 실패하는 macOS 환경 시험(initialization 제품 16, owner2 6, 기록 접근 native 2)뿐이다. 변환기 재현·현황 --check 통과. 전체 pytest는 PR CI로 확인한다.
+- 다음 단계: PR CI 결과 확인. J02 공백(RUN_BINDING 9절): 점검별 실행 설정 조립 도구 확대, 공유 실행기 칸 문제(RB2-S), E 키 분리(RB2-E), MA8 감사의 팩 Ref 재검증.
+- 막힌 것: 없음. 실제 GPU 실행에서 /2 결합을 확인하는 일은 다음 GPU 세션 범위다.
+
+## 2026-11-14 — B2 실행 준비물 결합값 점검별 확인·승인안 (RB2)
+
+- 한 일: @35에 남은 B2 키 57개(17개 점검)를 실행기 코드로 하나씩 확인해 G 20·E 4·P 33으로 나눴다. 기록 세션 9개는 lifecycle prepared의 `session`이 아닌 다른 생산자 폴더 열쇠라 prepared에서 읽을 수 없음을 확인했다. `retry_scope`·`copy_inventory`는 bytes 해시, OBS-06 계획 파일은 정책 참조를 스스로 내는 구조, LIF-11 `require_absent`는 판정 기준임을 확인했다. 1단계 `keys_for`를 그대로 넓히면 @35 재생이 깨지는 점을 찾아 단계별 판별로 설계했다. `docs/RUN_BINDING.md` 7절과 DECISIONS RB2-Q1~Q7에 올렸다.
+- 테스트 결과: 문서만 바뀌어 시험 없음. 판정기·core·보고서·models·store가 B2 키를 읽지 않음을 grep으로 확인했다.
+- 다음 단계: RB2 승인 범위에 따라 2단계 구현(run_binding 단계 표·값 출처, 실행기 설정 칸, 팩 @36, 정책 이전 `--stage 2`, 직접 시험, 소스 목록·검토 행)과 PR.
+- 막힌 것: 팩 판본 상향·실행기 설정 형식 변경·E 키 분리는 사용자 승인 전이라 하지 않았다.
+
+## 2026-11-14 — RB 실행 결합값 분리 구현(팩 35)
+
+- 한 일: 사용자 승인으로 `guard-run-binding/1`을 구현했다(`executors/run_binding.py`, `core/run.py`·`application.py` 연결, `Execution.run_binding`). 44개 점검의 결합 키 222개를 `tools/overrides`와 팩에서 빼 PACK-BASELINE@35를 만들었다. 정책 이전 도구, 예시·GPU 초안 정책·MA7 계획의 @35 이전, GPU·TP2·SUP-08 입력 도구 조정, SPEC §4.5·설계 문서 6절 갱신을 했다. 소스 목록 bdc9eeec와 검토 행(결정 5)을 추가했다.
+- 테스트 결과: 직접 시험 `test_run_binding.py` 13개가 통과했다. 실제 팩을 읽는 시험 파일 37개와 영향 제품 시험을 돌렸고, 남은 실패는 변경 전 기준에서도 실패하는 로컬 환경 시험뿐이다. 해당 시험은 `.pytest_tmp` 저장소 내부 경로 거부 2종, 관측기 코드 미가용 3건, Linux 소켓 1건, macOS 임시 경로 링크 1건이다. 변환기 재현 시험이 통과했고 현황 --check도 통과했다. 전체 pytest는 PR CI로 확인한다.
+- 다음 단계: PR CI 결과를 보고 실패를 고친다. 플랫폼 정책 양식에서 B1 칸이 빠졌는지 확인한다. B2 키(세션·준비 파일·PLT-07/08 실행 신원)를 점검별로 확인한 뒤 별도 승인안을 만든다.
+- 막힌 것: 없음. 실제 GPU 실행에서 결합 계산을 확인하는 일은 다음 GPU 세션 범위다.
+
+## 2026-11-14 — 실행 결합값 분리 설계안·승인 요청 (RB)
+
+- 한 일: @34 정책 키를 A(기업 결정)·A′(정책 문서 참조)·B1(guard가 계산하는 실행 결합)·B2(준비물 결합)·C(생산자 소스 SHA)·D(시험 주체)·E(외부 사건)로 분류했다. B1은 44개 점검·키228개다. sensor /2를 일반화한 `guard-run-binding/1` 설계(run 단계 계산, EVD 증거 파일+`Execution.run_binding`, config 해시 제외, 대조식·UNKNOWN/ABORTED 의미 유지, @34 재생 호환)를 `docs/RUN_BINDING.md`에 쓰고 DECISIONS 열린 질문 RB-Q1~Q5로 올렸다.
+- 테스트 결과: 문서만 바뀌어 시험 없음. 판정기·core·보고서가 B1 키를 읽지 않음을 grep으로 확인했다.
+- 다음 단계: RB-Q1~Q5 승인 뒤 1단계 구현(run_binding·models/core·실행기37파일·팩@35·정책 이전 도구·직접 시험·소스 목록/검토 행)과 PR.
+- 막힌 것: 팩 판본 상향·정책 키 제거·`models/`·`core/` 변경은 사용자 승인 전이라 구현하지 않았다.
+
+## 2026-11-14 — 결정32 신규 GPU 환경 승인·CLI 단기 인증 연결
+
+- 한 일: 서울 신규 g6.12xlarge1대·암호화 gp3 200GiB·최대2시간/총20달러·노드 다운로드32GB 이내의 한정 승인을 결정32/작업지시서7절에 기록했다. 같은 계정의 단기 CLI 인증을 사용자 직접 승인으로 연결했고 STS로 계정끝3745를 확인했다. 기존 세 노드는 모두 stopped이며 아직 새 노드를 만들지 않았다.
+- 테스트 결과: 기존 main 통합d7940124의 PR CI18개 모두 통과. 설치 원본 대조/경로16개·현황/539파일 소스 관문은 바로 앞 기록과 같고 제품·runtime/contracts·검토 행은 불변이다. 실제 CLI 읽기 전용 조회로 지정 AMI의 amazon 공식 소유·available/x86_64, g6.12xlarge의48vCPU/L4 4개, 기존 SSM프로필·서브넷을 확인했다.
+- 다음 단계: 새 전용 SG의 외부 인바운드 없음·기존 SSM 프로필 재사용·정확 RunInstances dry-run을 확인하고 승인된 새 노드만 생성한다. driver/디스크·고정 이미지/모델·실제 ENV/target 준비와 CPU의 MP/TP2 자격 보완을 잇는다.
+- 막힌 것: MP 원본 불일치/TP2 인과그룹·전파·복구와 기준 runtime 자격이 미완료다. 정확 관문/CPU 시험을 통과하기 전 장애 주입하지 않는다. #269 병합은 미승인이고 기존 자원·M-B4 보관·runtime 무변경을 유지한다. 생성 뒤 실패/상한에는 증거 반출 후 새 노드/EBS/보안그룹을 정리한다.
+
+## 2026-11-14 — 승인된 이미지 설치 bytes 대조 완료·M-A3 차단 근거 확인
+
+- 한 일: 결정31의46개 레이어13,630,448,638 bytes를 로컬 다운로드하고 기존 Python 두 레이어와 합친48개 SHA/크기를 검증했다. 모든 레이어 순서/whiteout/링크를 반영한 선택 추출은660,944,108 bytes로2GiB 상한 안이다. 실제 설치 소스의 태그 정확 대조 기준41/41·후보73/73개와 후보 표13행/함수53개가 일치했다. 원자료 지문·결과를 M-A3 이미지 자격 문서에 기록했다.
+- 테스트 결과: 앞선 main 통합 직접115개·현황/539파일 소스 관문이 통과했고 d7940124를 기존 승인 범위의 최신 main 통합 후속으로 push했다. 외부 추출/거부7건·POSIX6건과10만 경로 overlay 대조를 확인했다. 새 문서/CI 경로 등록 뒤 경로16개 통과(pytest1.17초·벽시계1.595초), 현황 --check·539파일 소스 관문·runtime/contracts/제품/검토 행 무변경 대조 통과. 전체 로컬 pytest·엔진/컨테이너/GPU 실행은 하지 않았다.
+- 다음 단계: 실제 소스에 맞춰 M-A3의 MP 관측 의미/profile과 TP2 인과그룹/전파를 보완한다. 별도 제한 GPU 세션으로 SUP-08/실제 ENV/target·모델 로드 준비를 추진할 수 있도록 노드/시간/비용/중지 계획을 정리했다.
+- 막힌 것: 기준 바이너리는3.12.8이고 관측기15개에 runtime 키가 없다. 후보3.12.3의 키15개가 있어도 두 이미지의 fault MP 원본은 기존 정확 고정값과 달라 현재 기동 자격이 없다. 검사를 넓히거나 후보/등록 상태를 바꾸지 않았다. 실제 ENV/target138쪽·최종 사전 점검·GPU 실행/비용 승인도 미완료다. #269 draft/미병합·#263 draft·M-B4 보관·runtime 무변경/원 경합 미해결을 유지한다.
+
+## 2026-11-14 — #268 병합 반영·실제 GPU 자격의 선행 조건 확인
+
+- 한 일: 사용자 결정30으로 #268의 head8f8c33a0/CI18개·보호 소스와 경계 무변경·예상 병합 tree를 검토해 main03f70187에 병합했다. 실제 tree 일치와 main update/runtime CI 성공을 확인했다. #269에 최신 main을 정상 통합하며 PROGRESS 양쪽 기록을 보존했다. 로그인한 서울 계정의 중지된 단일GPU 인스턴스3개·G/VT48vCPU 할당량·공식 요금과 로컬 GPU/공간을 읽기 전용으로 확인했다.
+- 테스트 결과: 통합 뒤 rank-fault·입력 재생성·REQ17·엔진 중립·경로 직접115개 통과(pytest11.89초·벽시계12.436초), 현황 --check·539파일 소스 관문 통과. 소스 목록을 --write로 다시 만들었으며 source1946073c와 기존 정확 검토 행은 같았다. 승인된 Python 레이어661,014,960 bytes의 SHA/크기 재검증 통과. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 결정31로 승인받은 나머지46개 레이어를 최대13,630,448,638 bytes 로컬 다운로드하고 설치 소스를 최대2GiB 추출한다. 실제 설치 소스 대조 뒤 TP2 인과적 그룹·장애 전파의 검증 경로를 보완한다. 준비된 노드/시간/비용/중지 계획으로 별도 GPU 승인을 받은 뒤 실제 ENV/target을 수집한다.
+- 막힌 것: 현재 인스턴스는 각각 GPU1개이고 #269의 인과적 그룹/TP2 장애 전파는 미구현이다. 기존 후보 고정값·TP1 검사를 넓히지 않는다. 실제 설치 bytes·노드 내부 상태/접속·모델 로드·ENV/target138쪽·최종 사전 점검은 미완료다. 다운로드는 승인됐으나 아직 미실행이며 새 과금 기동도 하지 않았다. #269 미병합·#263 draft·#264 미병합·M-B4 보관·runtime 무변경/원 경합 미해결을 유지한다.
+
+## 2026-11-14 — M-A3 CPU 후보를 REQ-17 병합 main에 통합
+
+- 한 일: 메인 세션으로 전달된 사용자 승인(결정28, M-A7 PR #268의 결정 기록)으로 기존7997187b의 push·main 대상 draft PR 생성을 진행한다. #267이 병합된 main7181e57a를 정상 병합하고 진행 기록/검토 기록 양쪽을 보존한다. 원 후보와 REQ-17 제품 소스는 각각 그대로 보존하며 합쳐진 제품 전체의 소스 목록과 정확 검토 SHA를 다시 만든다. 기존 #263의 d81692c2 draft는 변경하지 않는다.
+- 테스트 결과: 앞선 CPU 직접/인접/경로245개가 통과했다. main 통합 뒤 rank-fault·REQ17·공통 /4·엔진 중립·경로 직접279개 통과(pytest11.62초·벽시계12.246초), 현황 --check·새539파일 소스 관문 통과. 합쳐진 source1946073c의 정확 검토 행을 추가했고 기존 검토 행도 보존했다. 전체 로컬 pytest는 실행하지 않는다.
+- 다음 단계: 승인된 후속 브랜치를 push해 main draft PR을 열고 CI를 확인한다. 실제 입력 자료가 확보되면 A7/A8 실행별 결합과 최종 사전 점검을 이어간다.
+- 막힌 것: TP2의 인과적 executor 그룹 소속·기존 TP1에서 거부되는 탐지/상위 전달/기한은 UNKNOWN이다. death 새 소유자 복구·실제 설치/GPU 자격·ENV/target138쪽·GPU 대상 접근도 미완료다. 새 PR 병합·GPU/비용·추가 대용량 다운로드·runtime 예외 확대는 미승인이다. #263 draft·#264 미병합·M-B4 보관을 유지한다.
+
+## 2026-11-14 — M-A3 TP2 관측·물리 해제·새 프로세스 세대의 CPU 후보
+
+- 한 일: #263의 단일 rank 후보를 보존하고 main df1cf20c에서 후속 브랜치를 만들었다. 기존 고정 소스/자격과 TP1 판정은 그대로 두고, ARM 전 TP2 정상 요청·두 rank의 원 호출, 별도 SIGCONT 영수증과 정확 RELEASE, 독립적인 예상 새 프로세스 세대의 TP2 정상 응답을 각각 검증한다. 새 입력은 공통 /4 봉투를 사용하고 생산자 지문에 새 검증 모듈과 공통 /4 변환을 넣는다. 부분 사실·기존 독립 위반을 보존하며 인증/등록/완료는 주장하지 않는다.
+- 테스트 결과: 직접·인접·경로245개 통과(pytest4.02초·벽시계4.408초, CPython3.12.3, 저장소 밖 새 임시 폴더). 앞선 한 건은 저장소 안 기본 임시 출력이 거부된 환경 설정으로, 제품/시험을 바꾸지 않고 --basetemp를 저장소 밖으로 지정해 같은 시험을 통과했다. 새 OS 시험은 시험이 만든 Python 자식만 SIGSTOP/SIGCONT하고 finally에서 회수했다. 현황 --check·538파일 소스 관문·정확 검토 행(source5e37c01a)·diff --check 통과. 기존 assert/skip·기준/한도와 runtime/contracts/등록표/고정값을 바꾸지 않았고 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 새 로컬 후보를 검토하고 사용자 승인 뒤 push·main 대상 draft PR/CI로 넘긴다. 기존 #263은 draft, #264는 미병합, M-B4는 보관을 유지한다. REQ-17 #267은 CI18개 통과했으며 병합 승인은 없다.
+- 막힌 것: 같은 요청에 두 rank가 관측되어도 프로세스 사이의 인과적 executor 그룹 소속은 미확인이다. 기존 TP1 투영이 TP2에서 거부하는 탐지·상위 전달·기한은 UNKNOWN이며 source_closure/scope_complete는 false다. death/새 Pod 소유자 복구·기준 V0/후보 이미지 설치 자격·GPU 재확인/등록은 남아 있다. 실제 ENV/target138쪽·GPU 대상 접근·J01/J02 실행/비용 승인도 없어 A7/A8 최종 사전 점검을 끝내지 못했다. 새 GPU/클라우드/다운로드/기존 사용자 프로세스 제어는 하지 않았다.
+
+## 2026-11-14 — 결정29 반영: runtime 무변경·S2-05 경합 기록
+
+- 한 일: 사용자 응답 "runtime 변경 없이 문제 기록"을 결정29와 작업지시서7절에 반영하고 M-A7-Q2의 예외 승인 요청을 종료했다. 초기 #268 headb086b195의 S2-05 경합은 미해결 문제로 기록하고 재현 로그·저장소 밖 검증 결과·미적용 패치를 보관한다. 실제 runtime 파일은 변경하지 않았다. 앞선 head4d3192e4의 CI18개 통과와 원 문제의 해결 여부를 구분한다.
+- 테스트 결과: 문서3개만 수정했다. 경로16개 통과(pytest0.77초·벽시계1.055초), 현황 --check·536파일 소스 관문 통과. runtime/제품 소스·소스 목록/검토 행이 이전 head와 같음을 대조했다. 기존 전체 CI18개 통과 기록은 이전 head의 결과로 보존한다. 전체 로컬 pytest는 실행하지 않는다.
+- 다음 단계: 승인된 #268 브랜치에 결정 기록을 커밋·push하고 새 head의 CI를 확인한다. 실제 대상 접근 자료가 확보되면 A7/A8의 실행별 입력 결합과 최종 사전 점검을 이어간다.
+- 막힌 것: S2-05의 원 경합은 미해결이다. 예외 승인 대기 항목은 아니며 이번 결정으로 runtime 수정은 하지 않는다. 실제 ENV/target·GPU 대상 접근·노드 설치/자격·정상 요청·추가 사례/대조/소유 범위·REQ16 가중치/로드가 없어 최종 사전 점검은 미완료다. 새 PR 병합/GPU·클라우드 비용·추가 다운로드의 승인 범위도 그대로다.
+
+## 2026-11-14 — M-A7 입력 v6의18개 prepared 직접 연결·CI 차단 기록
+
+- 한 일: source67f1a5be와 원 계획 bytes를 고정해 inputs/ma7-materialized-20261114-v6를 새로 생성했다. REQ-15를 포함한 prepared18개/독립18세션을 같은 계획에 직접 연결하고 사례10파일/2,078개·REQ17 그룹2개·확정5값 초안을 보존했다. 이전 v5/REQ15 별도 묶음은 덮어쓰지 않았다. 현재 포인터·SHA·현행 문서·138쪽 부족표를 v6에 맞췄다. #267은 main7181e57a에 병합됐고 main CI 두 workflow가 통과했다. #269 head428a4981은 draft·CI18개 모두 통과했다.
+- 테스트 결과: 실제 v6의 manifest/원 계획·prepared/설정·관측 소스 bytes·사례/그룹 SHA·정책5값·69행/138쪽 미입력·실제 결과null을 검증했다. 새 자료 연결 후 직접/경로25개 통과(pytest7.26초·벽시계7.626초), 현황 --check·536파일 소스 관문·diff --check 통과. 보호 제품 소스는 main의32733555와 같고 기존 검토 행을 유지한다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 승인된 #268에 새 입력/재생성 보완을 push하고 최신 CI를 확인한다. 별도 요청29가 승인되면 재현된 S2-05 경합의 runtime 시험 한 파일 수정안을 실제 반영하고 직접/CI 검증을 수행한다.
+- 막힌 것: #268의 초기 headb086b195는 runtime 두 실행 중 한 번 S2-05가 [ok,null,stale,ok]로 실패했다. 소유 모의 엔진 stop 뒤250ms 지연으로 재현했고 저장소 밖 시계 제어안은7개·음성subtest2개 통과, 기존24개 assert/skip·39개 사례·40ms/150ms·실제 소켓을 보존했다. 해당 runtime 파일은 기존 예외 밖이므로 실제 파일은 미변경이고 승인 요청을 DECISIONS/작업지시서7절에 기록했다. 실제 ENV/target·노드/GPU 접근·정상 요청·추가 사례/소유 범위·REQ16 가중치는 미완료다. 새 PR 병합/GPU·비용·추가 다운로드·runtime 예외 확대를 임의로 진행하지 않는다.
+
+## 2026-11-14 — M-A7 재생성 도구의 REQ-15 prepared 누락 보완
+
+- 한 일: 추가로 준비한 REQ-15 양쪽 prepared가 재생성 도구의 대상 목록에서 빠져 다음 계획에서는 다시 누락되는 것을 확인했다. 기존 native 준비 경로에 REQ-15를 포함해 재생성 시18개/독립18세션을 같은 입력 계획에 결합한다. Gateway 대상·기업 정책·추가 요청 사례·실제 ENV/target은 생성하지 않는다.
+- 테스트 결과: 입력 준비/경로25개 통과(pytest7.95초·벽시계8.447초). 새 회귀는 REQ-15 양쪽 prepared/설정 SHA·계획 포인터와 미설치/미자격·기존 정책/사례·결과 보존을 검증한다. 기존 개수 기대값은 추가 자산을 요구하도록16→18로 높였고 assert/skip·기존 사례/REQ17의504·512·200·AUC55는 유지한다. 현황 --check·536파일 소스 관문·diff --check 통과. 보호 제품 소스·runtime/contracts는 변경하지 않았다. 전체 로컬 pytest는 실행하지 않는다.
+- 다음 단계: 이 소스 커밋과 원 계획 bytes를 고정한 새 입력 폴더로 재생성해 문서의 현재 포인터를 갱신하고 승인된 #268에 반영한다. #269 draft와 main CI를 함께 확인한다.
+- 막힌 것: 실제 ENV/target·노드 설치/자격·정상 요청·REQ15 정책/주체·추가 대조/소유 범위·REQ16 가중치는 미완료다. #268의 runtime S2-05 실패는 미승인 시험 파일에 있어 저장소 밖에서 수정안을 검증 중이다. 새 PR 병합·GPU/비용·추가 다운로드·runtime 예외 확대는 승인되지 않았다.
+
+## 2026-11-14 — #267 병합·M-A7/M-A3 원격 반영 승인과 main 통합
+
+- 한 일: 메인 세션에 전달된 사용자 결정28로 #267의 main 병합과 M-A7 719ae2ca의 push/PR, M-A3 7997187b의 push/draft PR 생성을 승인받았다. CI18개가 통과한 #267 head26f46c8e를 main7181e57a에 병합했고 병합 tree가 검증 head와 같음을 확인했다. M-A7 문서 후속을 최신 main에 정상 병합하며 겹친 PROGRESS의 양쪽 기록을 보존했다. REQ-15 추가 prepared2개와 기존16개, 실제 입력 부족 기록도 보존한다.
+- 테스트 결과: 앞선 추가 입력의 bytes/SHA·18세션 독립 확인과 경로16개가 통과했다. 최신 main 통합 뒤 입력 준비/경로24개 통과(pytest6.91초·벽시계7.384초), 현황 --check·536파일 소스 관문과 실제 prepared18개/독립18세션·설정 SHA·관측 자산 bytes 대조 통과. 제품 보호 경로는 main과 같고 기존 정확 검토 행을 유지한다. 전체 로컬 pytest는 실행하지 않는다.
+- 다음 단계: 승인된 M-A7 브랜치를 push해 main PR을 열고 CI를 확인한다. M-A3도 별도 worktree에서 최신 main에 맞춘 뒤 소스 목록/검토 행을 재생성하고 draft PR로 게시한다. 실제 접근 자료가 확보되면 실행별 입력 결합을 이어간다.
+- 막힌 것: 실제 ENV/target138쪽과 노드 설치/자격/정상 요청·추가 사례/대조·REQ16 가중치/로드는 미완료다. 새 두 PR의 병합·GPU/클라우드 비용·추가 대용량 다운로드·runtime 예외 확대는 미승인이다. #263 draft·#264 미병합·M-B4 보관은 유지한다.
+
+## 2026-11-14 — M-A7 REQ-15 추가 prepared·실제 입력 부족 정리
+
+- 한 일: #267의 CI18개 통과 뒤 실제 입력 부족표를 대조했다. REQ-15 양쪽 prepared2개를 별도 폴더로 추가해 v5의16개와 총18세션 독립·main 관측 자산 bytes 일치를 확인했다. 새 Gateway/기업 정책·ENV/target·측정값은 만들지 않았다. 점검별 부족 입력과 필요한 실제 자료/접근/비용 조건을 현행 문서와 추가 기록에 정리했다.
+- 테스트 결과: 실제 추가2개 manifest/설정 SHA·load_prepared·소스 bytes·전체18세션 독립 확인 통과. 기존 코드/정책/의존성/제품 소스는 바꾸지 않았다. 경로16개·현황 --check·535파일 소스 관문·diff --check 통과. 전체 로컬 pytest는 실행하지 않는다.
+- 다음 단계: 실제 자료가 확보되면 기존 조립기로 실행별 결합/사전 점검을 수행한다. #263의 TP2·물리 신호 해제·새 세대 복구 CPU 미구현부터 잇는다. 이 문서 후속 push/PR은 별도 승인 뒤다.
+- 막힌 것: 실제ENV/target138쪽·노드 설치/자격/정상요청·REQ16 모델·REQ15/19/20/21/LIF13 사례/소유범위는 미완료다. 기존 API거부/원자료탐색을 새근거없이 반복하지 않는다. #263 draft·#264 미병합·M-B4 보관·GPU/클라우드/추가 다운로드 미승인을 유지한다.
+
+## 2026-11-14 — REQ-17 후속 push·PR 승인 기록
+
+- 한 일: 사용자 결정27로53593d77의 분할 수집·집계와 입력 v5의 push·main PR 생성을 승인받았다. 이 기록 외 구현·시험·데이터·소스 검토 SHA는 바꾸지 않았다.
+- 테스트 결과: 소스 직접163개·입력 연결35개·536파일 소스 관문은 앞선 확정 커밋에서 통과했다. 승인 기록의 경로/현황 정합성 검사를 확인한다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 승인된 브랜치를 push하고 main PR CI를 확인한다. 실제 입력 부족 정리와 A3 CPU 미구현은 독립적으로 진행한다.
+- 막힌 것: 실제 ENV/target·GPU 사전 점검·REQ-16 모델 준비는 미완료다. 병합·GPU/클라우드·추가 다운로드는 승인되지 않았다. #263 draft·#264 미병합·M-B4 보관을 유지한다.
+
+## 2026-11-14 — REQ-17 실제 후보 입력·M-A7 v5 연결
+
+- 한 일: source fc77399e에서 기존 사례6개/62사례와 REQ-17 추가4묶음/2,016사례를 합친 실제 사례파일10개·2,078사례, prepared16개·서로 다른16세션을 v5로 준비했다. 양쪽의 REQ-17 사례 bytes는 같고 각504개가 기존512 검사를 통과했다. 생성에 사용한 source plan bytes도 별도 보존하고 SHA를 기록했다. SUP-08의 모델14개·코드5개·기동12개를 실제로 다시 읽어 검증했다(34.018초). 보고서와 계획의 현재 포인터를 갱신하고 이전 묶음을 보존했다.
+- 테스트 결과: 기능/인접163개·현황/536파일 소스 관문은 소스 커밋 전 통과했다. 최종 준비 자료의 파일 SHA·세션·필수 설정·M-B42행 불변·실제 ENV/target138쪽 null·실행/사전 점검false를 대조했다. 최신 데이터 연결의 직접/경로35개·현황 --check·536파일 소스 관문·diff --check 통과. main df1cf20c의 update/runtime CI도 모두 통과했다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 검토 가능한 최종 커밋으로 push·main PR 승인을 요청하고 CI를 확인한다. A7/A8의 실제 자료 부족을 점검/판본 쪽별로 정리하고 A3 CPU 미구현을 잇는다.
+- 막힌 것: 실제 ENV/target·노드 설치/자격·정상 요청·REQ-16 가중치/첫 기동은 미완료다. GPU/클라우드·추가 대용량 다운로드·새 push/병합 승인은 없다. #263 draft·#264 미병합·M-B4 보관을 유지한다.
+
+## 2026-11-14 — REQ-17 분할 수집·원 표본 집계 구현
+
+- 한 일: 사용자 결정26으로 #265→#266을 CI18개 통과 head로 main에 병합했다(main df1cf20c, 각 검증 tree 일치). 결정23으로 REQ-17 그룹 계약과 원 표본 수집/집계를 구현했다. 504개씩 두 파일을 session/ENV/target·정책·실제 Pod/컨테이너/관측 프로세스 세대·요청 HMAC에 결합하고 원 시계/지연값을 보존한다. 기존 통계 함수를 그대로 사용하며 AUC 평균으로 대체하지 않는다. 개별 또는 완전한 원 표본의 확인된 FAIL은 늦은 수집/아티팩트 오류 뒤에도 보존한다. 불완전한 회수/아티팩트 기록 뒤에는 다음 묶음을 시작하지 않는다.
+- 테스트 결과: 직접·인접·경로163개 통과(12.80초), 현황 --check·536파일 소스 관문·diff --check 통과. 정상·회귀·세대/출처/정책 불일치·중복/누락·지연값/시계 변조·NaN/무한대·아티팩트 오류·독립 FAIL의 기존 rule_table 경로를 검증했다. 기존 project_cache_timing/512개 상한·@34/확정값·runtime/contracts bytes는 그대로다. 새 소스 목록 SHA32733555와 결정5 검토 행을 기록했다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 새 소스 커밋에서 prepared16개와 기존6개/62사례, REQ-17 추가4묶음/2,016사례를 실제 파일로 준비하고 계획에 연결한다. 새 push·PR 승인 뒤 전체 CI를 확인한다. 이후 A7/A8 실제 입력의 부족 자료를 구체화하고 A3 CPU 잔여를 진행한다.
+- 막힌 것: 실제 ENV/target·노드 설치/자격·정상 요청·REQ-16 가중치/첫 기동·GPU/클라우드 비용 승인은 여전히 없다. CPU/EXAMPLE 시험은 실측으로 올리지 않으며 최종 입력 사전 점검은 미완료다. 새 REQ-17 브랜치 push/PR·병합은 아직 승인되지 않았다. #263 draft·#264 미병합·M-B4 보관을 유지한다.
+
+## 2026-11-14 — M-A7 그래프 관측 설정 보완·실제 입력 v3 재준비
+
+- 한 일: 입력 생성기의 REQ-20에 기존 실행기가 요구하는 lab_kernel_checks 설정이 빠진 것을 확인해 REQ-19·20 모두 켜도록 고쳤다. REQ-18의 lab_faults 선택은 유지했다. prepared16개·서로 다른16세션·사례6개/62개를 source374d1e77에서 새 v3 폴더로 준비하고 보고서/계획 포인터를 갱신했다. 과거 묶음은 보존한다. 재생성 계획에서 과거 저장소 보고 포인터를 제거해 새 manifest와 혼동하지 않게 했다.
+- 테스트 결과: 직접/경로24개 통과(4.73초). 실제16개 manifest/settings의 필수 설정·현재 guard 소스 bytes·개별 SHA와 M-B42행 불변·ENV/target138쪽 미입력을 대조했다. 새 세션의 HMAC 값은 Git에 넣지 않았다. 최종 자료 반영 뒤 직접/경로24개·현황 --check·535파일 소스 관문·diff --check 통과. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 승인된 #266에 push하고 최신 CI를 확인한다. #265는 CI18개 통과 상태이며 두 PR 모두 새 병합 승인이 필요하다.
+- 막힌 것: 실제 ENV/target·노드 설치/자격·정상 요청·REQ-16 가중치/첫 기동은 미완료다. REQ-17의504개씩 두 후보 파일은 검증했지만 사용자는 설명을 요청했을 뿐 분할 집계 구현을 승인하지 않았다. UNKNOWN·200개·512개 상한·기존 판정은 유지한다. 엔진/GPU/클라우드 실행은 없다.
+
+## 2026-11-14 — M-A7 prepared 준비 후 현황 설명 정정
+
+- 한 일: 실제 prepared16개를 연결한 뒤에도 남던 “ENV/target/prepared를 만들지 않았다”와 반복 추가 문장을 제거했다. 로컬 prepared 준비와 실제 ENV/target·노드 설치/자격 미완료를 구분하고 재생성해도 같은 설명을 유지한다. 파일·SHA·세션·결과 값과 M-B42행은 바꾸지 않았다.
+- 테스트 결과: 직접 입력 준비/경로24개 통과(4.70초), 현황 --check·535파일 소스 관문·diff --check 통과. 재생성 때 서로 다른 세션과 실제 준비 상태·미입력 ENV/target·M-B 불변을 검증했다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 승인된 #266에 push하고 최신 head CI를 확인한다. 앞선 #265의8540232d는 CI18개가 모두 통과했다. 병합은 별도 승인 뒤다.
+- 막힌 것: 실제 ENV/target·GPU 관측·REQ-16 가중치/첫 기동·REQ-17 표본 상한 충돌은 그대로다. REQ-17의504개씩 두 후보 파일은 현행 검증을 각각 통과했지만 분할 집계 계약이 없어 실행 입력으로 연결하지 않았다. 후보·미실행 상태를 보존한다.
+
+## 2026-11-14 — #266 runtime 기록 완료·느린 쓰기 시험 보수
+
+- 한 일: 결정24로 M-A8 #265와 M-A7 #266을 push·main PR로 열었다. #266의 runtime 제품/시험은 main과 같았으나 한 CI 실행에서 final 저장 전 읽기 두 건과 준비 저장 지연에 따른 쓰기 전 기한 소진 한 건이 실패했다. 결정25의 세 시험 파일 예외를 받아 final 요청 ID/phase를 확인한 뒤 읽고, buffered slow-write의 시계만 실제 쓰기부터 진행한다. 제품 소스·정책·의존성·기존 assert·50ms 기한·250ms 전체 상한·실제 socketpair/Timer/저장·skip 호출은 보존했다.
+- 테스트 결과: 저장소 밖 복사본의 직접3개 통과(2.13초), 기존 실패 재현3건·수정안 동일 조건3건·인증/receipt 오염 및 watchdog 제거 거부3건이 모두 예상대로 동작했다. AST에서 기존 assert/skip 보존을 확인했다. 실제 반영 후 직접 세 모듈44개·subtest90개 통과(15.54초). 전체 로컬 pytest는 실행하지 않았다. 경로16개 통과(1.26초)·현황 --check·535파일 소스 관문·diff --check 통과.
+- 다음 단계: 경로/현황 검사 뒤 승인된 #266에 push하고 새 head CI를 확인한다. #265는 별도 CI를 확인한다. 두 PR의 병합은 별도 승인 뒤다.
+- 막힌 것: 실제 ENV/target·노드 자격·정상 요청·REQ-16 가중치와 첫 기동·REQ-17 표본/상한 충돌은 여전히 미완료다. M-B4는 로컬 보관, #263은 draft, #264는 미병합이다. 이 시험 보수로 실제 GPU 사전 점검을 완료한 것으로 세지 않는다.
+
+## 2026-11-13 — M-A7 로컬 배포 자산·사례·정책 입력 준비
+
+- 한 일: M-A8 후속 소스와 실제 로컬 확인 보고서를 기반으로 M-A7의 미결합 입력 준비 도구를 추가했다. M-A8 입력 먼저 반영 후 이 브랜치를 병합할 계획이다. M-A 점검8개의 양쪽 prepared 자산과 기존 preset3개의 사례 파일, 확정 값5개를 반영한 정책 초안을 실제 파일로 만들되 ENV/target·실행 결과는 만들지 않는다. M-B42개 행은 그대로 보존한다.
+- 테스트 결과: 직접·인접·경로43개 통과(11.76초), settings 파일 SHA 기록 보완 후 직접·경로23개 통과(4.06초). 실제 자산 bytes·서로 다른16세션·미입력 유지·M-B 행 불변·확정 값 보존·기동 파일 사후 변조 거부를 확인했다. 기존 prepared 자격 관문과 생산자 등록표는 바꾸지 않았다. REQ-17은 현행200개/역할과512개/manifest가 충돌함을 확인했으며 값·상한·판정은 그대로다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 소스01f95c00으로 첫 로컬 묶음을 만들고, 새 manifest 결합을 보완한 소스로 v2를 만들었다. prepared16개·서로 다른16세션·사례6개/62개·정책 초안과 SUP-08 새 자산 포인터를 실제 파일/SHA로 계획에 연결했다. runtime hash 자리표시자를 제거한 후 직접·경로23개(4.04초)도 통과했다. 재준비한 계획의 manifest SHA 결합을 보완한 뒤 직접·경로23개(4.82초)도 통과했다. 공개 메타데이터에 settings의 로컬 HMAC 값이 없음을 확인했다. REQ-17 분할 수집/집계는 별도 결정으로 올린다. 실제 ENV/target이 생기면 기존 도구로 실행별 결합을 만든다.
+- 막힌 것: 실제 GPU/Pod·ENV/target·노드 자격·정상 요청과 J01/J02 비용 승인은 없다. REQ-16 가중치·첫 기동, REQ-17 최소 표본과 상한 충돌이 남는다. 사용자 결정24로 두 후속 브랜치 push·PR만 승인받았다. PR CI와 병합은 아직 미완료이며 병합은 별도 승인 뒤다.
+
+## 2026-11-13 — M-A8 실제 파일 확인·판본 기동 명령 선택
+
+- 한 일: 사용자 지시에 따라 M-B4는 745e76f0 로컬 커밋으로 보관하고 M-A8·M-A7을 우선한다. WSL minikube와 Windows kind의 기존 API는 연결 거부였고, 실행 중인 로컬 엔진을 찾지 못했다. 기존 조립기의 PoC 신원 검사를 재사용해 모델/코드 캐시·기동 파일의 실제 bytes를 읽는 로컬 확인 도구를 추가했다. 미입력과 EXAMPLE ENV, 실제 실행/정상 요청 미관측은 명시적으로 남긴다.
+- 테스트 결과: 직접·인접·경로70개 통과(4.38초). 새 양성·음성 시험에서 파일 변조/누락·캐시 ref·자체 해시를 다시 쓴 잘못된 이미지·EXAMPLE 입력·기존 보고서 보존을 확인했다. 실제 기동 계획에서 후보가 과거 wrapper 명령을 상속하는 문제를 발견해 --release-launch로 정확 profile 명령을 선택하게 했다. 과거 기본 렌더 동작·기존 assert는 보존했다. 현황·535파일 소스 관문 통과. 새 기동 자산에서 실제 모델14개(8,295,393,861 bytes)·코드 캐시5개·기동 파일12개의 SHA와 비교 조건을 확인했다(19.575초). 보고서는 로컬 검증 true, 실제 ENV/target4개 미입력·최종 사전 점검 false를 보존한다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 소스 커밋 fbf1b2d3으로 만든 새 자산과 실제 확인 보고서를 M-A7에 연결한다. 실제 ENV/target이 확보되면 기존 조립기로 최종 계약을 검사한다. M-A7 입력 계획에 새 자산과 미입력 원인을 연결한다.
+- 막힌 것: 실제 ENV/Pod target·GPU 노드 배치·권한·정상 요청 관측이 없다. GPU/클라우드·추가 다운로드·새 브랜치 push는 이번 지시로 승인되지 않았다. 최종 입력 사전 점검·REGRESSED 실측은 미완료다.
+
+## 2026-11-13 — M-B1 공통 입력 소비·REQ-12 후속 검증
+
+- 한 일: #257·#262의 반환/소비 연결을 통합 소스에서 대조했다. @34 REQ-12의 /1·/4·미등록/사례 내 모의 등록·독립 FAIL 유무8개를 실제 선택·실행·판정·보고·반출·복원 경로로 확인하는 회귀 시험을 추가했다. 제품 소스·정책·등록표·의존성은 바꾸지 않았다.
+- 테스트 결과: 직접 영향84개 통과(20.08초), 새 회귀8개 통과(6.17초). 초안 시험의 Pack 필드 접근과 FAIL 사례의 활성화 입력 누락을 보수했으며 UNKNOWN/FAIL 기대값은 유지했다. actual main 병합 뒤 새 회귀·경로24개 재확인 통과(12.82초), 현황·535파일 소스 고정 관문·diff --check도 통과했다. 소스 목록 SHA는 main과 같은 3b2a2799이며 정확 검토 행 하나를 유지했다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 승인된 여섯 PR은 새 CI 통과 뒤 main b1d209fc에 모두 병합했다. 이 후속 브랜치를 actual main에 맞춰 최종 검증·커밋했다. 사용자 결정21로 push·PR만 승인받아 PR CI를 확인한다. 병합은 별도 승인 뒤다. 이후 M-B4 후보 고정값/관측 의미를 잇는다.
+- 막힌 것: 후속 PR CI·병합이 남았으며 사용자 결정21은 push·PR만 승인했다. 실제 ENV/target·GPU 자격·사전 점검·정식 결과는 미완료다. #263은 draft로 유지한다.
+
+## 2026-11-13 — 세션 계획과 앞선 여섯 작업 통합
+
+- 한 일: #262까지의 승인된 통합 후보를 #261 세션 계획에 보존했다. 두 CI 경로 목록은 후보 모델 메타데이터·실제 SUP-08 준비 자료·후보 관측 검토 경로를 함께 포함한다. 소스 목록을 다시 만들었으며 제품 bytes가 #262와 같고 정확 SHA 검토 행이 하나임을 확인했다.
+- 테스트 결과: 계획69개·138쪽·J01 6개/J02 63개·M-A 27개/M-B 42개·SUP-08 실제 manifest SHA·REQ-16 후보 메타데이터 SHA·실제 ENV/target null·실행 승인/사전 점검 false 대조 통과. 경로16개(0.69초)·현황·소스 관문 검증 통과. 전체 시험은 새 PR CI에서 확인한다.
+- 다음 단계: 새 CI 뒤 #262 다음에 main 병합하고 비용 없는 M-B1·M-B4 후속을 진행한다.
+- 막힌 것: 실제 ENV/target·GPU 등록·설치 bytes·두 판본 첫 기동·J01/J02 비용 승인은 미완료다. REQ-16 가중치는 다운로드하지 않았다. #263은 draft다.
+
+## 2026-11-13 — M-A7 실제 SUP-08 fixture·기동 자산 포인터 연결
+
+- 한 일: #257에서 SHA 검증한 실제 로컬 모델 fixture와 두 판본의 기동 YAML·렌더·EXAMPLE/DRAFT 정책·target 대기 설정을 SUP-08 입력 행에 연결했다. 각 실제 파일 경로·SHA와 고정 준비 기록 URL을 적었다. 69개 배정과 J01/J02 구성은 그대로다. SUP-08 HTTP 코드 선택은 prepared 관측기 자산을 요구하지 않음을 표시했다.
+- 테스트 결과: 로컬 fixture 실제 파일과 코드/14개 inventory 식별값, 두 기동 비교 조건·정책/설정, 출력 해시가 확인됐다. 69행·138쪽·J01/J02 배정·실제 포인터 SHA 8개와 ENV/target 미생성 상태 대조 통과. 경로 시험 16개(0.90초)·현황 --check·diff --check 통과. 제품 소스·팩·소스 목록 변경은 없다. 전체 시험은 새 PR CI에서 확인한다.
+- 다음 단계: 실제 노드에 모델/캐시를 배치하고 새 ENV·Pod target·정상 요청을 확인한 뒤 최종 입력 조립·사전 점검을 진행한다. 새 PR CI를 확인한다.
+- 막힌 것: 실제 ENV/target·노드 권한·정상 요청 관측이 없어 ready_for_execution/input_preflight_passed는 false다. GPU/클라우드 실행과 비용 상한 47달러는 승인받지 않았다.
+
+## 2026-11-13 — M-A7 두 판본 입력 목록·합동 세션 계획
+
+- 한 일: 69개(M-A 27·M-B 42)를 J01 6·J02 63으로 구분한 두 쪽 입력 계획 JSON과 실행 순서·예상 시간·비용·예상 공백 문서를 작성했다. 실제 ENV/target/prepared가 없어 null과 원인을 남겼고 확정 정책 5개만 #257 출처로 복사했다. J01 4~5.5시간, J02 5~7.5시간은 가정이며 과거 단가 EC2 추정 합계 $28.64~40.14, 제안 상한 $47이다. 최신 단가·EBS 등 별도 비용·실행 승인은 미확인이다.
+- 테스트 결과: 69개·27/42·6/63·집합 분리 구조 검증 통과. CI 경로 16개 통과(0.89초), 현황 정합성 통과. 문서/선언 자료만 바꿨고 전체 로컬 pytest는 실행하지 않았다. PR CI는 미실행이다.
+- 다음 단계: 사용자 push·PR 생성 승인을 받아 계획 PR을 연다. 결정 9 여섯 항목의 개별 승인과 REQ-16·17 기동 조건도 계획에 반영했다. #257 입력 생성기와 실제 fixture·클러스터 입력, M-B1·M-B4 후속을 결합해 사전 점검을 완료한다. J01/J02 시작 전에 최신 단가·할당량·모델 snapshot·새 비용 상한을 확정한다.
+- 막힌 것: 실제 두 판본 입력 부재로 input_preflight_passed=false. 이 계획 보고만으로 M-A7 전체 완료를 선언하지 않는다. GPU·클라우드·모델/이미지 다운로드·공식 재판정은 실행하지 않았다.
+## 2026-11-13 — /4와 후보 관측 고정값 통합
+
+- 한 일: #260까지의 통합 내용을 #262에 보존했다. 생산자7개의 신원에는 /4 직렬화·공통 감싸기·후보 고정값 helper/데이터를 함께 결합했다. @34의 REQ-12 선언·과거8개 GPU 등록 행·비어 있는 /4 자격표·후보 상태를 유지했다. 소스 목록을 다시 만들고 새 SHA 검토 행을 추가했다.
+- 테스트 결과: /4·후보 고정값·생산자·REQ-12·경로 직접 시험240개 통과(13.87초), 현황·소스 고정 관문·diff --check 통과. 고정값 helper/JSON 변조 시 생산자7개 전부 SHA가 바뀌고 미등록임을 검증했다. staged 공백 검사에서 기준 소스 fixture의 원본 공백1행을 확인했고 #260 bytes와 일치하므로 보존했다. 그 fixture 외 diff 검사는 통과했다. 전체 시험은 새 PR CI에서 확인한다.
+- 다음 단계: 통합 CI 뒤 승인된 순서로 병합하고 세션 계획을 통합한다.
+- 막힌 것: 새 /4 생산자의 GPU 자격과 실제 ENV/target·입력 사전 점검은 미완료다. #263은 draft다.
+
+## 2026-11-13 — 후보 고정값과 정본 팩 통합
+
+- 한 일: #257·#259·#258 통합 내용을 #260에 보존했다. 후보 고정값·기동/HTTP 데이터·36개 함수 검토와 @34·REQ-12·판본 중립 경로를 합쳤다. CI 경로 두 목록과 결정9·14·15·17~20을 보존하고 소스 목록 및 새 SHA 검토 행을 만들었다.
+- 테스트 결과: 합쳐진 관측기·생산자·REQ-12·경로 직접 시험182개 통과(11.31초), 현황·소스 고정 관문·diff --check 통과. 전체 시험은 새 PR CI에서 확인한다.
+- 다음 단계: 통합 CI 뒤 승인된 순서로 병합하고 /4 작업을 이어 통합한다.
+- 막힌 것: 설치 bytes와 실제 GPU 자격·ENV/target·입력 사전 점검은 미완료다. 고정값은 후보로 유지한다.
+
+## 2026-11-13 — 로컬 fixture 재구성 후속 지시·입력 준비 상태 반영
+
+- 한 일: 사용자 후속 지시 18과 실제 결과를 DECISIONS/작업지시서 7절에 기록했다. 실제 고정 가중치 8,293,330,888 bytes의 SHA와 동일 14개 inventory·snapshot·코드 식별값을 확인한 새 로컬 fixture가 생겼다. 두 판본 기동/정책 자산과 M-A7 포인터도 연결했으며, 작업지시서 1.1절에서 fixture 부재와 실제 ENV/target 부재를 구분했다.
+- 테스트 결과: #257의 fixture/입력/렌더/경로 직접 75개(7.08초), 실제 파일 SHA·하드링크·PNG/기동 비교 조건 대조 통과. #261은 69행·138쪽 배정·실제 포인터 SHA 8개와 경로 16개(0.90초) 통과. 이 브랜치는 기록 문서만 바꿨으며 경로 16개(1.03초)·현황 --check·diff --check 통과. 제품 소스·팩·소스 목록은 그대로다. 새 head 전체 결과는 PR CI로 확인한다.
+- 다음 단계: 실제 GPU 세션의 노드 모델/캐시 배치·권한·정상 요청과 새 ENV/target을 확인한 뒤 최종 입력을 조립한다. 이틀 범위의 PR CI 상태를 확인한다.
+- 막힌 것: 실제 ENV/target·기동 관측·입력 사전 점검은 미완료다. GPU/클라우드·이미지 설치 레이어·병합 승인은 없으며 새 정본 결과를 만들지 않았다.
+
+## 2026-11-13 — SUP-08 원자료 회수 승인·대상 계정 확인
+
+- 한 일: 사용자 승인(기존 대상 최대 20분·신규 EC2/전송 비용 1달러·작은 파일 10MB 이하 회수)을 결정 17과 작업지시서 7절에 기록했다. 로그인 뒤 현재 계정의 서울 리전을 읽기 전용으로 확인했으나 대상 인스턴스는 존재하지 않는다는 응답이었다. EBS 세 개도 다른 기존 노드에 연결돼 있고 내 소유 스냅샷은 0개다. 다른 노드는 기동하지 않았다.
+- 테스트 결과: 앞선 c1b11d84의 전체 CI 18개 통과, update 12,944 통과·기존 skip 34개(805.44초, 부모 806.971초), wheel 검증 통과. runtime 첫 시도의 인증 기록·heartbeat 기한 실패는 소스 변경 없이 실패 job 한 번 재실행해 통과했으며 원인 해결로 세지 않는다. 이번 변경은 결정/진행 문서뿐이며 경로·현황 검사를 확인한다.
+- 다음 단계: 다른 계정의 원본·전달 ZIP이 확보되면 같은 승인 범위에서 회수한다. 사본이 모두 없으면 고정 모델로 새 fixture를 준비하고 새 실행 세대의 입력·Ref를 만든다. 추가 가중치/이미지 다운로드·GPU 실행은 별도 승인 뒤다. 작은 공식 소파일과 LFS 메타데이터에서 재현한 코드/14개 inventory 해시 일치는 전체 fixture·실제 가중치 확보와 구분한다.
+- 막힌 것: 현재 계정에서 대상 인스턴스를 찾을 수 없어 회수는 아직 시작하지 못했다. 신규 EC2 실행 비용 0, 모델/이미지 다운로드와 GPU 시험 0. M-A8 최종 입력·M-A7 실제 사전 점검은 미완료다.
+
+## 2026-11-13 — M-A6 전체 CI 확인·미완료 범위 인계
+
+- 한 일: 승인된 #260 최신 코드 head 9e2dadbf의 전체 CI 18개 통과를 확인했다. 작업지시서의 CI 표기는 정적인 통과 주장 대신 PR 조회로 맞추고, 구현 범위와 실제 입력·설치/GPU 자격 잔여를 구분했다.
+- 테스트 결과: update 기본 suite 12,944 통과·기존 skip 34개(973.57초, 부모 975.124초). 저장소 밖 wheel 검증·Docker 대역·양 OS 공용 계약·플랫폼·runtime도 통과했다. 전체 로컬 pytest는 실행하지 않았다. 이번 인계 변경은 문서뿐이며 직접 경로/현황 검사를 확인한다.
+- 다음 단계: 이틀 목표의 M-A8 실제 fixture·두 ENV/target을 확보하고 정본 입력을 조립한다. 설치 bytes 자격·실제 GPU 등록·M-B1/M-B4·D1~D3는 후속 범위다. 병합 승인 뒤 같은 파일 충돌과 소스 목록/정확 검토 행을 다시 정리한다.
+- 막힌 것: 원자료는 로컬·WSL·첨부·이전 기록·연결 검색에서 발견하지 못했다. 다른 PR #258의 a7d3003f runtime CI 실패는 수정 금지 범위로 보고하며 이 PR의 성공으로 덮지 않는다. 병합·새 비용 승인은 없다.
+
+## 2026-11-13 — M-A6 전체 CI의 등록 전제 보수
+
+- 한 일: 전체 CI 21개 실패 중 20개는 새 의존성 생산자에게 과거 GPU 등록을 이월하지 않은 결과였다. 제품 등록표는 그대로 보존했다. 등록 뒤 소비 동작의 EXAMPLE 시험에만 명시 fixture로 메모리 내 모의 등록을 주입하고 모든 기존 판정/완료 assert를 유지했다. fixture는 시험 뒤 복원한다. 별도 시험은 과거 등록표 8행의 정확 값 보존과 변경 생산자 7개 미등록을 검증한다. 소스 교체/캐시 시험은 새 사전 소스 pin 검사를 위해 EXAMPLE 파일의 실제 SHA를 사용한다.
+- 테스트 결과: 실패 관련 소비·생산자·사후 소스 검증·경로 199개 통과(27.40초). 초기 전체 CI는 21 실패·12,923 통과·기존 skip 34개(826.17초)였다. 전체 로컬 pytest는 실행하지 않았다. 제품 소스는 이번 보수에서 바꾸지 않아 소스 목록 SHA는 a60546d0... 그대로다.
+- 다음 단계: #260 최신 head CI를 확인한다. 실제 GPU 등록은 J01의 판본별 실증 뒤 별도다.
+- 막힌 것: 로컬 실제 SUP-08 입력을 추가 탐색 중이며, 실행하지 않은 결과는 만들지 않는다. runtime/ 기한·기록 시험의 독립 실패는 해당 파일 수정 금지 범위로 남는다.
+
+## 2026-11-13 — M-A6 소스 대조 근거 구분
+
+- 한 일: Git tree 응답의 SHA를 commit SHA로 잘못 이름 붙인 검토 메타데이터를 바로잡았다. commit·tree·JSON 파일 SHA를 구분한다. 캐시의 기준 44개·후보 73개 파일 bytes는 공식 tree의 Git blob SHA와 각각 다시 일치함을 확인했다. 고정값 허용 범위를 바꾸지 않았다. 작업지시서 1.1절에 #257~261과 실제 미완료 범위를 반영했다.
+- 테스트 결과: 검토 메타데이터와 문서만 변경. 경로/기동 profile·CI 경로 직접 시험과 현황 정합성을 확인한다. 전체 CI는 #260의 최신 head 기준으로 확인한다.
+- 다음 단계: 최신 PR CI 완료 뒤 결과를 인계 메모에 남긴다.
+- 막힌 것: 실제 입력·설치 파일 자격·GPU 실행은 별도 후속이다. 병합 승인은 없다.
+
+## 2026-11-13 — M-A6 후보 실행기 선택 연결 보수
+
+- 한 일: profile 조회가 성공해도 provider의 과거 profile 전용 선택에서 후보 engine_sensor가 막히는 연결 누락을 찾았다. 판본 데이터의 명시 실행기 목록과 native_lifecycle 자격을 함께 확인해 후보 engine_sensor만 선택한다. 기준 V0 내부 관측과 후보의 다른 수명 주기 실행기는 계속 거부한다.
+- 테스트 결과: profile·실행기 선택·SUP-08·중립 계층·경로 직접 시험 64개 통과(6.98초). 소스 목록과 정확 새 SHA의 검토 행을 다시 만들었다. 앞선 CI와 새 snapshot을 구분한다.
+- 다음 단계: #260에 수정본을 push하고 최신 CI를 확인한다.
+- 막힌 것: 실제 이미지·관측 자격·GPU 등록은 미완료이며 profile/실행기 선택 성공을 실측이나 판정 성공으로 세지 않는다.
+
+## 2026-11-13 — 결정 9 항목별 승인·두 브랜치 push 승인
+
+- 한 일: 사용자 승인 9-1~9-6을 DECISIONS와 작업지시서 7절에 기록했다. 기능 부재/필드 대응 데이터와 REQ-16·17의 양쪽 prefix caching 명시를 profile·렌더 도구에 반영했다. M-A6·M-A7 push·PR 생성도 승인받았다.
+- 테스트 결과: 승인 반영 뒤 기동·profile·경로 직접 시험 45개 통과(1.34초). 소스 목록/검토 기록을 새 snapshot으로 갱신했다. 아직 새 PR CI가 통과했다고 주장하지 않는다.
+- 다음 단계: 승인된 두 브랜치를 push하고 main 대상 PR을 연다. 기능 부재 분기·guided_json의 실제 소비 연결은 M-B2·M-B4 후속이며 실측 없이 완료로 올리지 않는다.
+- 막힌 것: 추가 설치 레이어·모델 다운로드·GPU 비용·병합은 별도 승인 대상이다. 결정 9 검토 대기는 해소됐다.
+
+## 2026-11-13 — M-A6 기동·HTTP 후보와 다운로드 승인 반영
+
+- 한 일: 두 판본의 기동·HTTP profile을 adapter 데이터로 추가했다. 길이 형식 비교 코드는 행 조회로 바꾸고 후보 안전 프로브·거부 원인은 이미지 설치 bytes 검토 전 실행·증명에 쓰지 않는다. 정확 경로 17개를 소스 책임 검토 뒤 변경 영역표에 추가했다. 전체 Git blob 경로 비교 8,002개, 미분류는 332→315이며 제외 확대는 없다. 결정 9는 항목별 별도 검토 대기, 결정 14는 V0 기본 유지 승인으로 기록했다. 결정 15 승인 범위의 Python 설치 레이어 두 개만 내려받아 digest·661,014,960 bytes를 확인했다. 설치 레이어의 Python은 기준 3.12.8·후보 3.12.3이며 최종 엔진 인터프리터 실행 확인은 아니다.
+- 테스트 결과: profile·경로·기동·입력 인접 시험 231개 통과, 새 경로 근거의 그룹 누락 1개를 메타데이터에 추가한 뒤 해당 경로·profile·설계·CI 경로 184개 통과(1.89초). 앞선 관측/자산 175개·생산자/후보 자격 89개와 별도 HTTP/기동 54개도 통과했다. 소스 목록과 정확 새 SHA 검토 기록을 갱신했다. 최종 소스 검토 관문·후보 자격 18개도 통과(1.70초), 현황 정합성 통과. 전체 로컬 pytest는 실행하지 않았고 PR CI는 아직 없다.
+- 다음 단계: 직접 소스 검토 관문과 현황 정합성을 확인하고 push 승인 뒤 main 대상 PR을 연다. CI 실패는 원인을 고쳐 재검증한다.
+- 막힌 것: 결정 9 여섯 항목·추가 이미지 설치 레이어 승인·기준 CPython 패치 자격·실제 GPU/등록·D1~D3·M-B4는 남았다. 후보 고정값을 검증 완료로 올리지 않는다. push는 아직 승인받지 않았다.
+
+## 2026-11-13 — 작업지시서 3차 현황 최신화
+
+## 2026-11-13 — M-A6 후보 고정값·배치 차이 구현 중
+
+- 한 일: 판본 적용표의 태그 소스 158개를 원 SHA로 대조했다. 13개 파일(763,545 bytes)의 후보 행·fixture·함수 지문을 추가하고 캐시·분산·scoped 소비·slot·kernel·graph·가중치 관측을 연결했다. sampler 인자/상태 위치와 IPC 조회 반환 형식은 adapter 데이터로 처리한다. 실제 일치한 SHA로 사후 확인·증거를 남기고 준비 자산에 새 데이터 파일을 포함한다. 데이터 의존성이 바뀐 생산자는 과거 GPU 등록을 상속하지 않는다. 함수 36개의 의미 차이는 `docs/dev-1/ma6-candidate-function-review.json`에 기록했다.
+- 테스트 결과: 관측·준비 자산·계약·경로 175개 통과(4.01초). 추가 신원·정확 크기·후보 자격 89개 통과(1.33초). 첫 시험의 잘못된 code 목록 기대와 session 형식, 기존 단일 핀 상수 호환을 고쳤다. 등록 후 양성 시험은 모의 등록을 명시하고 기존 assert를 유지했으며 새 생산자의 미등록도 별도로 확인했다. 전체 pytest는 미실행이다.
+- 다음 단계: M-A6의 두 판본 HTTP·길이 오류·기동 provider 데이터와 변경 경로표 대조를 마친 뒤 PR을 올린다. 이 기록은 M-A6 전체 완료가 아니다. 소스 목록·검토 기록은 현 snapshot으로 재생성한다.
+- 막힌 것(후속 갱신): 결정 14·Python 두 레이어에 한정한 결정 15는 승인되어 위 후속 기록에 반영했다. 기능 부재 6건은 결정 9의 항목별 검토 대기다. D1~D3·실측·등록·M-B4는 이틀 범위 밖이며 승인 전 UNKNOWN을 완료로 세지 않는다.
+## 2026-11-13 — @34와 판본 중립 수집 경로 통합
+
+- 한 일: 승인된 #259의 main 통합 후보를 #257에 반영했다. @34/SUP-08/REQ-12와 판본 중립 수집 경로·과거 지문 보존, 결정19·20, 검토 이력을 모두 유지했다. source 목록을 다시 만들고 새 SHA에 결정5 단일 검토 행을 넣었다.
+- 테스트 결과: 통합 직접·경로 시험 199개 통과(57.32초), 현황 --check·소스 고정 관문·diff --check 통과. 이전 각 PR의 CI는 통과했고 새 통합 head CI는 아직 결과가 없다.
+- 다음 단계: 새 CI를 확인하고 main에 #259 다음 #257을 병합한다.
+- 막힌 것: 통합 CI 확인 중이다. 실제 ENV/target·입력 사전 점검·GPU 자격과 비용 승인은 미완료다.
+
+## 2026-11-13 — M-A8 실제 로컬 fixture·두 판본 기동 입력 준비
+
+- 한 일: 후속 사용자 지시에 따라 디스크 여유를 확인하고 고정 가중치 두 개(8,293,330,888 bytes)를 다운로드해 SHA-256을 검증했다. 기존 도구로 새 fixture를 만들고 14개 inventory·snapshot·승인/비승인 코드 식별값이 PoC와 일치함을 확인했다. 가중치는 하드링크로 한 번만 저장한다. 두 판본 기동 YAML·정책·target 대기 설정과 코드 캐시 배치를 만들고 작은 manifest/준비 기록을 문서에 보존했다. 실제 fixture 부재는 해소됐으며 과거 원본 증거 복구와 구분한다.
+- 테스트 결과: 실제 파일 SHA·fixture 신원·하드링크 확인 통과. 기동 비교 조건 정규화·정책/설정·PNG CRC/압축 해제·출력 해시 대조 통과. 실제 fixture는 최종 조립기의 신원 검사를 통과하고, 실제 ENV 부재에서 중단돼 출력이 생기지 않음을 확인했다. 직접 fixture/입력/렌더·경로 시험 75개 통과(7.08초), 현황 --check·diff --check 통과. 이번 변경은 문서/입력 메타데이터이며 제품 소스·팩·소스 목록은 그대로다. 전체 시험은 새 PR CI에서 확인한다.
+- 다음 단계: 실제 GPU 세션에서 새 ENV·namespace/Pod target·노드 권한·정상 요청을 확인한 뒤 최종 입력을 조립한다. 관련 PR의 최신 CI를 확인한다.
+- 막힌 것: 실제 ENV/target과 노드 배치가 없어 입력 사전 점검은 미완료다. 엔진/GPU·클라우드 실행·원본 ZIP 회수는 하지 않았다. 병합 승인은 없다.
+
+## 2026-11-13 — M-A8 원자료 탐색·PoC 신원 대조 보완
+
+- 한 일: 사용자 지시에 따라 실제 fixture·두 ENV/target을 저장소 밖 첨부·임시 경로와 이전 기록까지 찾았으나 원본을 발견하지 못했다. PoC 문서의 고정 신원만 별도 데이터로 옮기고 모델 ID·snapshot·코드 저장소·두 commit이 다른 입력은 출력 전에 거부하도록 했다. 원본 fixture를 복원했다고 주장하지 않는다. 두 CI 경로 목록에 새 데이터와 직접 읽는 근거 문서를 추가했다.
+- 테스트 결과: 입력 조립·REQ-12 투영·CI 경로 33개 통과(2.79초), 현황표 --check·diff --check 통과. 기존 정상/비교/거부 assert를 유지하고 올바른 길이의 다른 commit 2건·다른 저장소/모델/snapshot 거부 3건과 근거 bytes 검사를 추가했다. EXAMPLE 비교 문자열은 실제 열거값 REGRESSED로 바로잡았다. 제품 소스·팩·소스 목록은 변경하지 않았다. 앞선 head 59e0319d의 CI는 통과했고 이 변경의 전체 시험은 PR CI에서 확인한다.
+- 다음 단계: 승인된 #257 브랜치에 push하고 최신 CI를 확인한다. 원본이 확보되면 무실행 입력 조립을 진행하고, 실제 기동 뒤 새 target 바인딩과 사전 점검을 확인한다.
+- 막힌 것: 원본 manifest·실제 두 ENV/target 부재로 M-A8 최종 조립·실제 사전 점검은 미완료다. EC2 기동·모델 다운로드·GPU 실행은 하지 않았다. 병합 승인은 없다.
+
+## 2026-11-13 — M-A4 CI 완료·M-A8 실제 입력은 후속
+
+- 한 일: #257의 정본 @34·확정 값·REQ-12 반환·SUP-08 입력 조립기를 push했다. 실제 모델 fixture와 클러스터 입력 부재는 그대로 미완료로 남겼다.
+- 테스트 결과: 제품 head f696f107의 PR CI 전체 통과. push update 전체 12,933 통과·기존 skip 34개, 부모 805.971초. 전체 로컬 pytest는 실행하지 않았다. CI 보수 중 시험 기대/기한을 완화하지 않았고 과거 시드를 원본 bytes로 보존했다.
+- 다음 단계: 병합 승인 뒤 main 기준 소스 목록·검토 기록을 다시 확인한다. M-A8 최종 입력 조립·실제 사전 점검·새 정본 결과는 J02 준비/실행에서 수행한다.
+- 막힌 것: 실제 fixture·ENV/target 부재. M-A8 전체 완료·GPU 결과·공식 판정을 선언하지 않는다.
+
+## 2026-11-13 — M-A4 CI 후속·M-A8 정본 입력 조립
+
+- 한 일: @34 전환으로 드러난 예제 정책 판본 불일치를 고쳤다. 과거 GPU18·Gateway·profiler 검토는 @33 원본 전체 bytes를 별도 시드로 보존해 같은 정확 Ref로 재현한다. 기존 판정 assert와 고정 SHA는 유지했다. REQ-12 선언 시험은 새 선언의 사실·미완료·잘못된 점검 거부를 확인한다. 현황 시험은 과거 실측을 @34 현행 결과로 올리지 않음을 검사한다. M-A8은 같은 모델·코드·GPU 조건의 두 ENV/target에서 정본 정책·설정과 무실행 manifest를 만드는 도구를 추가했다. SUP-08 상태는 미완료로 유지한다.
+- 테스트 결과: PR #257 두 번째 update 전체 CI는 38 실패·14 오류·12,873 통과·기존 skip 34개(부모 962.850초)였다. 위 원인 수정 뒤 해당 파일 직접 시험 220개 통과, 새 REQ-12 시험의 키 오류 1개를 고쳐 별도 통과했다. M-A8 8개·REQ-12 1개·경로 16개 총 25개 통과(1.70초). 전체 로컬 pytest는 실행하지 않았다. 플랫폼·runtime CI는 해당 head에서 통과했다. 소스 목록·새 SHA 검토 행을 다시 만들었다.
+- 다음 단계: PR #257 새 head 전체 CI를 확인하고 실제 fixture·ENV/target이 준비되면 M-A8 최종 조립을 수행한다. M-A7 세션 계획에 실제 입력 부재를 명시한다. 병합은 별도 승인 뒤다.
+- 막힌 것: 실제 모델 fixture와 클러스터 입력이 없어 정본 실행 입력 최종 사전 점검은 남았다. GPU 비용·모델 다운로드·공식 재판정은 승인 없이 실행하지 않는다.
+
+## 2026-11-13 — 작업지시서 3차 현황 최신화
+
+## 2026-11-13 — M-A4 정본 팩 @34·확정 정책 값·REQ-12 반환
+
+- 한 일: 77개 impact를 HIGH 33·MEDIUM 38·LOW 6으로 반영했다. SUP-08은 PoC의 실행 코드 선택 정의(revision 5)를 정본화했고 SUP-11에 -OO 지원 밖을 표시했다. `examples/mvp-confirmed-values.yaml`의 `verification.values`에 사용자 확정 정책 5개를 저장했다. LIF-13의 제어기 역할·승인 세대·fallback 정책은 저장하되 실제 역할 결합 근거가 없는 분기는 UNKNOWN이다. request-attempt에 REQ-12 소비 선언과 `collectors/request_attempt_projection.py`의 검증된 투영을 반환했다. 후보·공백과 전체 질문 미완료를 구분하며 판정 연결은 M-B1에 남는다. 팩 검토와 소스 검토 기록은 결정 5 방식이다. 과거 시드와 결과는 바꾸지 않았다.
+- 테스트 결과: 직접·인접 118개 통과(61.30초), 현황 정합성 통과. 수정된 73개 일반 정의는 revision·impact만 바뀌었음을 정적으로 확인했다. 팩 검토 상태 반영 뒤 import 재생성·경로·정합성을 추가 확인한다. 전체 pytest는 실행하지 않았으며 PR CI는 미실행이다.
+- CI 보수: PR #257에서 platform 연결표의 이전 CheckDef SHA와 "@34가 아직 없음"을 가정한 fixture가 실패했다. 선정 37개·범위를 보존해 현행 팩에서 연결 메타데이터를 재생성하는 도구를 추가했고, 누락 팩 시험은 빈 경로를 명시하도록 고쳤다. runtime 게이트웨이의 독립 504 실패는 코드 변경 없이 실패 job 1회 재실행으로 확인 중이다.
+- 다음 단계: PR #257의 새 CI 결과를 확인한다. 나중에 병합하는 PR은 소스 목록·검토 기록을 다시 만든다. M-A8의 두 판본 정본 입력, M-A7 입력 결합, M-B1 소비 연결을 잇는다.
+- 막힌 것: push·PR 생성은 승인받아 #257을 열었다. GPU·이미지 다운로드·공식 재판정은 이 브랜치에서 실행하지 않았다.
+
+## 2026-11-13 — 승인된 runtime 시험 동기화 보수 적용
+
+- 한 일: 새 CI의 final 저장 경쟁을 확인하고 결정19에서 승인된 두 runtime 시험의 기존 보수본을 적용했다. final 완료 동기화와 제어 시계로 같은 assert·60ms·STREAM_DEADLINE을 검증한다. 제품 소스·의존성·정책은 바꾸지 않았다.
+- 테스트 결과: 직접 runtime 두 시험 20개·하위 사례6개 통과(17.38초), 경로16개·현황·소스 고정 관문·diff --check 통과. 앞선 head의 runtime CI 한 건은 실패했으며 새 CI 전에는 전체 통과로 보고하지 않는다.
+- 다음 단계: 직접 검증 뒤 새 CI를 통과시켜 승인된 순서로 main에 병합한다.
+- 막힌 것: 새 통합 CI 확인이 필요하다.
+
+## 2026-11-13 — 사용자 승인 main 통합 시작
+
+- 한 일: #263 draft 유지·다른 여섯 PR 병합 승인을 받았다. #258을 main에 병합했고 #259를 그 main에 맞췄다. PROGRESS의 두 이력을 모두 보존했다. 제품 소스 bytes는 #259 기존 head와 같다.
+- 테스트 결과: 목록 재생성 SHA0c6e4ed4…가 이전과 같고 정확 단일 검토 행을 확인했다. 경로16개·현황·소스 관문이 통과했다. 새 PR CI는 확인 중이다. 문서/이력 통합만으로 전체 로컬 pytest를 반복하지 않는다.
+- 다음 단계: #259 → #257 → #260 → #262 → #261 순서로 검증·병합한다. 서로 겹치는 실제 코드는 순차로 고친다.
+- 막힌 것: 새 head CI와 후속 충돌 해소는 진행 중이다. GPU·클라우드·추가 이미지/가중치 다운로드는 승인하지 않았다.
+
+## 2026-11-13 — M-A5 PR CI 완료
+
+- 한 일: 승인받은 #259의 최신 제품 head 849176df까지 push했다. 직접 비교 제거와 지원표 조회·검사 범위 확대를 검증했다.
+- 테스트 결과: 최신 PR CI 전체 통과. update 전체 12,932 통과·기존 skip 34개, 부모 954.934초. 초기 CI의 시계 경합 수정은 앞선 기록에 남겼으며 제품 기한/기대 assert를 유지했다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 병합 승인 뒤 main 기준 소스 목록·검토 기록을 다시 만든다.
+- 막힌 것: 병합 승인은 아직 없다. CPU 소스 분석 실행기 이동은 별도 후속이다.
+
+## 2026-11-13 — 작업지시서 3차 현황 최신화
+
+## 2026-11-13 — M-A5 판본 직접 비교 제거·검사 범위 확대
+
+- 한 일: Kubernetes HTTP 경로 인증·startup binding·worker readiness의 엔진/판본 직접 비교를 지원표 조회로 바꿨다. 같은 파일의 기존 SGLang 비교도 기존 지원 범위 그대로 지원표 조회로 옮겼다. 공통 7개 계층의 판본 literal 비교를 AST로 검사하며 주석·설명·IP 주소·계약 schema와 구분한다. 현행 collector/binding/HTTP의 정확 SHA를 고정했고 과거 proof의 소스 조합은 그대로 보존했다. 과거 proof 시험은 실제 과거 수집기 bytes를 고정 SHA로 확인한 뒤 실행한다.
+- 테스트 결과: 첫 실행 331 통과·18 실패(793.65초). IPv4 오인, 새 시험의 ENV Ref 결합, 과거 proof/현행 collector 혼용을 수정한 뒤 직접·인접·경로 349개 통과(pytest 137.32초, 부모 벽시계 134.94초). 현황 정합성 검사 통과. 전체 pytest는 실행하지 않았고 PR CI는 미실행이다.
+- CI 보수: PR #259의 전체 CI는 12,931 통과·1 실패·기존 skip 34개였다(pytest 803.37초, 부모 804.765초). 실패는 출력 보존 대조가 READY fsync 지연을 30ms 만료로 읽는 비결정적 시계 때문이었다. 기존 시계 주입으로 해당 대조만 결정적으로 만들었고 한도·RELEASE assert·별도 만료 회귀를 유지했다. fault·기한·경로 직접 시험 38개(1.34초)와 현황 검사가 통과했다.
+- 다음 단계: PR #259의 수정 CI 확인. M-A6에서 두 판본의 실제 검토 데이터 행을 추가한다. 새 지원 행이 없는 판본은 거부를 유지한다.
+- 막힌 것: push 승인 대기. GPU·이미지 다운로드는 실행하지 않았다. CPU 소스 분석 실행기 이동은 별도 후속 범위다.
+
+## 2026-11-13 — M-A1 PR 검증과 외부 CI 실패 기록
+
+- 한 일: 승인받은 브랜치를 push하고 main 대상 PR #258을 열었다. `/4` 문서 번호 정리와 과거 계약 호환 설명을 반영했다.
+- 테스트 결과: 문서 변경 직접 경로 시험 16개와 현황 정합성 통과. 최초 코드 head 944027d3의 CI는 통과했으나 진행 기록을 더한 a7d3003f는 update-ci-ok 통과·runtime 실패다. 실패 job을 한 번 재실행한 뒤에도 runtime/tests/test_downstream_deadline.py:91에서 본문 전 50ms 예산이 만료되어 504가 반환됐다. 첫 시도에는 인증 시험의 응답 직후 final 기록 읽기 경합도 있었다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 기록 정정 head의 CI를 확인한다. runtime 수정 금지 범위에서 원인을 고쳤다고 주장하지 않으며, 실패가 남으면 완료 기준의 CI 차단으로 인계한다.
+- 막힌 것: a7d3003f의 runtime CI 실패와 별도 병합 승인. runtime 소스·시험·기대 assert·skip은 변경하지 않았다. 실패 근거: https://github.com/dohashelby/byul/actions/runs/43377588516/job/131731181032
+
+## 2026-11-13 — 작업지시서 3차 현황 최신화
+
+## 2026-11-13 — M-A1 공통 입력 계약 번호 정리
+
+- 한 일: 새 공통 입력 확장 번호를 CLAUDE·AGENTS 2절과 공통 입력 설계에서 `/4`로 맞췄다. 기존 `/1`·`/2`·`/3` 기록 호환과 미구현 상태는 유지했다.
+- 테스트 결과: 문서 변경만 있다. workflow 경로 시험 16개(0.93초)와 현황 정합성 검사 통과. 전체 pytest는 실행하지 않았다.
+- 다음 단계: push 승인 뒤 main 대상 문서 PR을 열고 CI 결과를 확인한다.
+- 막힌 것: push 승인 대기. 계약 구현(M-A2)과 GPU 생산자 등록은 이 문서 변경에 포함하지 않는다.
+
+- 한 일: [작업지시서 3차](docs/WORK_ORDER_VLLM_MVP.md)에 1.1절 진행 현황(작업별 상태·PR), 3.1절 이틀 목표(A 트랙, J02 선행 조건), M-A6·M-A9 현황, 결정 9~16 상태를 넣었다. 결정 5(MVP 동안 B 검토 면제) 기록 방식을 `CLAUDE.md`·`AGENTS.md` 6절에 반영했다. #255의 CI 실패(새 적용표 문서가 CI 경로 목록에 없음)를 고쳤다.
+- 테스트 결과: 문서만 변경. 판본 번호는 0.1절 표에만 있다. `tools.checklist_status --check`, `tests/test_workflow_paths.py` 통과.
+- 다음 단계: #255 → #254 병합(결정 13 승인 뒤), 3.1절 순서대로 M-A5·M-A4·M-A6 나머지.
+- 막힌 것: 결정 9·13·14·15.
+- 추가(같은 날): 참고할 필요가 없어진 개발 문서 23개를 지웠다. 2차 작업지시서(남은 항목은 3차로 옮김, M-A1), 재평가 계획, 끝난 계획(남은 계획·2단계 GPU 실행 묶음·GPU43 후속 계획), 설계 감사·보수 메모 5개(결과는 `CLAUDE.md` 1절 2026-11-09 설계 보수에 반영됨), 세션 이어하기·인계 메모(`dev-1/continuation`, B 팀 인계, 11-02 GPU 인계 보고·요약·방법 비교), 담당 작업 메모(`b-work` S5 2개·CPU 실행 원칙), 검토 의견 2개, CI 후속 메모, 세션 체크포인트 2개다. 결과·증거 기록(`docs/evidence/`, RESULTS·측정·검증 JSON), 현행 기능의 설계·계약 문서, 코드·현황 도구가 읽는 문서는 남겼다. 남은 문서의 링크는 정리 전 main 커밋 `3c611e21` 고정 링크로 바꿨다. 지운 목록: `WORK_ORDER_VLLM_1.md`, `REVIEW_AND_DEVELOPMENT_PLAN.md`, `dev-1/continuation-20261108.md`, `dev-1/design-anchor-audit-20261108.md`, `dev-1/design-anchor-audit-2-20261108.md`, `dev-1/design-architecture-final-review-20261108.md`, `dev-1/design-fixes-20261108.md`, `dev-1/design-repairs-2-20261108.md`, `dev-1/remaining-plan-20261108.md`, `dev-1/phase2-gpu-run-package.md`, `b-work/CPU_EXECUTION.md`, `b-work/B12_S5_CONSUMERS_20261108.md`, `b-work/B3_S5_CPU_20261108.md`, `gpu-completion/20261102/GPU_HANDOFF_REPORT.md`, `gpu-completion/20261102/GPU_HANDOFF_SUMMARY.md`, `gpu-completion/20261102/METHOD_COMPARISON.md`, `gpu-completion/20261102/session-checkpoint.json`, `pack-baseline-owner2/session-checkpoint.json`, `gpu-b/B5_REVIEW_OPINION_20261108.md`, `gpu-b/consolidation-20261106/NEXT_PLAN.md`, `gpu-b/consolidation-20261106/TEAM_HANDOFF.md`, `gpu-b/consolidation-20261106/PHASE1_REVIEW.md`, `gpu-b/consolidation-20261106/CI_FOLLOWUP_20261108.md`. 원문은 https://github.com/dohashelby/byul/blob/3c611e214044460d5929e8fb0c3a615265425da0/update/docs/ 아래에서 볼 수 있다.
+- 추가(같은 날): 사용자 결정으로 A·B 분담을 없애고 단독 개발로 바꿨다. 작업지시서 2절(분담 폐지, 충돌 방지 규칙만 유지)·1.1절·3.1절·4·5절 제목·결정 5·8·8절 주석, `CLAUDE.md`·`AGENTS.md` 5·6절, `DECISIONS.md`를 고쳤다.
+
+## 2026-11-12 — M-A9 CPU 이미지 경로 정리 (결정 13은 미승인 초안)
+
+- 한 일: 2026-11-12 GPU 전용 결정에 따라 CPU용 vLLM 이미지 경로를 정리했다. REQ-09 CPU 길이 원인 증거(`vllm_length_cause.py`·검토 프로필·판본 profile 행·`input_length_cause_collector`)를 지우고, 설정의 `length_cause_evidence`는 무시하지 않고 `LENGTH_CAUSE_EVIDENCE_UNSUPPORTED`로 거부한다(REQ-09 기본 경로 0.7.1은 그대로). `cpu-bounded` 기동을 `gpu-bounded`로 바꿨다(엔진 직접 기동 vLLM은 `gpu_count>=1`, TP=할당 GPU 수, `resources.shm_bytes` 필수, 이미지 진입점 유지). 준비 단계 지원 판단(`readiness_support`)·기동 생성 확인·준비 안내·두 이미지 비교 수락 조건을 GPU 조건으로 바꿨다. 예시 `windows-cpu*.toml`은 `gpu-bounded*.toml`로 바꿨다. `tools/validate_cpu_cases.py`는 과거 CPU 실행 분석(`--analyze-existing`)만 남겼다. 과거 CPU 결과·CPU 이미지 계약 고정값은 지우지 않았다.
+- **결정 13(두 이미지 비교 GPU 수락 조건)은 사용자 미승인 초안이다.** 구현은 초안대로 넣었고(양쪽 GPU 모델·드라이버·GPU 수·TP 구성 일치, `gpu-bounded`, 할당 GPU 수 일치, CPU 프로필 없음), 초안과 다른 점 두 가지는 판단을 받아야 한다. (1) 성능을 UNKNOWN으로 강제하지 않고 수락 대상에서 뺐다. core 판정은 CPU 비교일 때만 성능을 UNKNOWN으로 두어, GPU 결과에 강제하면 정상 RES가 계약 위반으로 잡히기 때문이다. (2) 수락 결과 형식을 `guard-update-acceptance/2`로 올렸다(`identities.<side>.cpu`→`gpu`, 성능 조건 변경).
+- 테스트 결과: 바꾼 부분과 인접 시험 71개 파일을 로컬에서 돌려 1,759개 통과. 실패 1건(`test_b_lif07_readiness.py::test_actual_native_helper_default_public_entrypoint_store_restore_preserved`)은 소스 목록 SHA가 바뀌어 B 검토 기록(`tools/reviewed_manifest_receipts.json`)이 없기 때문이다. 기록을 임의로 만들지 않았다. 수집 오류 1건(`test_runtime_native_receipt_feed.py`, `serving_runtime` 없음)은 main에서도 같다. 지운 시험: `test_input_length_cause.py`(대상 코드 제거), `test_cpu_case_manifest.py`(CPU 사례 실행 제거), 길이 원인 시험 2개, CPU 진입점 사례 1개. 소스 목록 재생성(변경 파일과 일치), `checklist_status --check` 통과. 전체 시험은 PR CI로 확인한다.
+- 막힌 것: (해소, 2026-11-13) 결정 13은 #254 병합 지시로 승인, 검토 기록은 결정 5 면제로 넣음. GPU 이미지용 REQ-07 사전 거부 계약은 아직 없다(CPU 이미지 계약만 있음, M-A6·M-B4에서 판본 고정값으로 더할 대상).
+
+## 2026-11-12 — M-A6 판본 적용표·판본별 고정값 구조 (1차)
+
+- 한 일: [M-A6 문서](docs/dev-1/ma6-version-applicability.md)에 선행 확인(두 GPU 이미지 엔진 Python 3.12, 기준 V0 기본·후보 V1만, 기능·모델 표)과 판본 적용표(관측 계열 19행, 점검 69개 묶음, 결정 9·10 요청)를 썼다. 함수 단위 비교 도구 `tools/engine_pin_compare.py`를 만들었다. 결정 10(D4·D5 UNKNOWN 승인, D1~D3는 (c) 후속·미구현)을 DECISIONS·적용표 12절에 기록했다. 3단계 첫 구현으로 공통 감싸기 기반(`vllm_cache_callback._codes`)이 모듈당 검토 고정값 여러 개(판본별 정확 bytes 행)를 받게 하고, REQ-21 `vllm_comm_buffer_callback`에 두 판본 후보 고정값 행(`PIN_ROWS`)과 태그 소스 고정 자료(`tests/fixtures/vllm-<판본>/`)를 더했다. 고정값 검사는 넓히지 않았다(파일 bytes와 함수 지문이 같은 행에 정확히 맞아야 감싼다).
+- 테스트 결과: 도구 시험 11개, 판본별 고정값 시험 8개, 기존 comm buffer·cache callback·distributed TP 시험 통과(70개). 감싸기 기반을 쓰는 인접 시험 40파일은 변경 전 HEAD와 비교해 새 실패 1개(`test_b_lif07_readiness::test_actual_native_helper_default_public_entrypoint_store_restore_preserved`)만 생겼다. 나머지 113개 실패·오류는 HEAD에서도 같은 로컬 macOS 환경 실패다. 새 실패는 소스 목록 재생성 뒤 `verify_req10_consumption`이 `SOURCE_REVIEW_RECEIPT_REQUIRED`가 되어 LIF-07 수집의 소스 검토 관문이 닫힌 것이다. `checklist_status --check` 통과. 전체 suite는 CI에서 확인한다.
+- 다음 단계: 결정 5(소스 검토 기록) 처리, 후보 판본 검토 36개 함수의 관측 의미 대조, A 담당 나머지 관측기(REQ-14·15~20, LIF-13)의 후보 판본 (a) 행, 이미지 bytes 대조.
+- 막힌 것: 결정 9, 기준 판본 V0 유지, 이미지 레이어 다운로드, 결정 5(검토 기록) — 사용자 결정 대기. push·PR은 사용자 확인 뒤.
+
 ## 2026-11-12 — CPU 이미지 제외·69개 두 판본 실제 비교
 
 - 한 일: 사용자 결정 두 가지를 [작업지시서 3차](docs/WORK_ORDER_VLLM_MVP.md)·`CLAUDE.md`·`AGENTS.md`·`DECISIONS.md`·SPEC §12 D7에 반영했다. (1) CPU용 vLLM 이미지 실증을 하지 않고 GPU 이미지로만 실증한다. CPU 이미지 전용 코드 정리를 M-A9로 넣었다. (2) 69개 모두 두 판본에서 실제 관측·비교를 목표로 하고, 고정값 불일치는 M-A6·M-B4의 분류(a~d)로 대상표·adapter 관측기를 만든다. 너무 오래 걸리거나 어려운 항목만 사용자 승인 뒤 UNKNOWN(결정 10). M-A6에 선행 확인(엔진 Python 3.12 여부, 판본별 기능표, 시험 모델)을 넣고 결정 9~13을 더했다.
@@ -2224,3 +3018,70 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - Replaced the current static packet's historical ordering dependency with a separately reviewed current-generation helper. Retained historical normal-boot snapshot stays byte-identical and accepts historical sensor e32c only; the new helper accepts current sensor 554206 only. Pair/helper/preparer SHA chain stays exact and closed.
 - Tests: SUP16 20 passed; combined serialized native17 scope preparation/load and SUP16 37 passed (0.46s), external temporary paths. Broader host diagnostic: 85 passed, 55 failed (unsupported CPython3.12.13 observer runtime); supported Linux rerun remains required.
 - No SUP16 registry/packs/contracts or sensor changes, actual engine/GPU/AWS execution, remote writes, or support-status promotion. Integration owner regenerates shared source manifest and runs final Linux validation.
+
+
+## 2026-11-13 M-A7 — REQ-16 공식 모델 revision 후보 고정
+
+- 한 일: 작업지시서 지정 Qwen 모델의 공식 API에서 revision895c3a49bc3fa70a340399125c650a463535e71c를 고정 후보로 선택했다. 고정 API·config/preprocessor/index66,030 bytes의 실제 SHA와 두 가중치의 LFS 크기·해시 메타데이터를 기록하고 두 판본 planned_model에 같은 후보를 연결했다. 새 검토 JSON을 두 CI 경로 목록에 넣었다. 모델 교체·기동·가중치 다운로드는 없다.
+- 테스트 결과: 메타데이터4개 bytes/SHA와 index의 두 shard 파일명 대응,69행/138쪽 ENV·target null·J01여섯·J02예순셋·실행/사전 점검false 구조를 직접 확인했다. 경로16개 통과(0.78초), 현황 검사 통과. CI 경로 목록 반영 뒤 같은 경로 시험을 다시 확인한다. 제품 소스·팩·소스 목록 SHA는 그대로다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 승인된 기존 #261 브랜치에 push해 CI를 확인하고, 저장소를 마련한 뒤 승인 범위에서 가중치 bytes와 두 판본 첫 기동을 검증한다.
+- 막힌 것: 가중치4,418,050,768 bytes는 메타데이터만 있으며 받지 않았다. config의 transformers_version은 선언값이고 실제 설치/호환 증명이 아니다. 실제 ENV/target·prepared·정책·GPU 비용 승인과 최종 입력 사전 점검은 남았다. 새 모델 전체나 실행 가능 상태로 표시하지 않는다.
+## 2026-11-13 M-A2 — 공통 입력 /4 구현
+
+- 한 일: 승인된 반복 행 요약(첫·끝 원 행/원 순번/시각·개수·최대값, 상한4,096 유지), KV 고유 수치·단위·단위당 token 수, 한도 집행 방식, 관측된 V2 sampler logit_bias 비교를 구현했다. /1~3 읽기·/1 재생과 현재 /3 actor 실수집 경로는 유지하고 단순 생산자/공급 읽기 수집은 /4를 명시한다. 공통 감싸기 기반·변환·직렬화 bytes를 생산자 신원에 묶었다. 과거8개 등록을 그대로 두고 /4의 별도 등록표는 비워 두어 과거 wire 자격을 이월하지 않는다.
+- 테스트 결과: CPython3.12.3 관련 직접276개 통과(pytest29.32초/부모29.881초), 최종 소비자 연결 assert를 추가한 /4·경로60개 통과(1.96초), 현황 검사 통과. 소스 검토 관문은 python -m tools.verify_req10_consumption으로530파일 통과했다. 소스 목록 SHA84e946ebd12c54bc5f7043f0e1548813dbd03d1d54a2f1bf9e5c3160f2082f4a에 결정5 검토 행을 하나 넣었다. 첫 시험의 과거 등록 가정 실패는 #260과 동일한 명시 EXAMPLE 모의 등록/과거8행 보존·새 의존성 미등록 시험으로 분리했고 판정 assert·기대값·skip은 완화하지 않았다. 새 V2 시험 입력은 관측기가 읽는 인스턴스 필드로 고쳤다. 직접 경로 실행의 tools import 실패는 -m 모듈 실행으로 해결했으며 제품 코드는 바꾸지 않았다. 전체 로컬 pytest는 실행하지 않았다.
+- 다음 단계: 새 브랜치 push·main PR 생성 승인을 받은 뒤 CI를 확인한다. 다른 제품 PR 뒤 맞출 때 목록·정확 단일 검토 행을 재생성한다. GPU 확인/등록은 J01 후속이다.
+- 막힌 것: 새 브랜치 push 승인·CI·병합 승인과 실제 GPU 자격이 없다. 요약할 수 없는4,096행 초과는 계속 거부하며 원 질문 전체 완료나 실제 측정으로 표시하지 않는다. ../runtime·../contracts 변경, 이미지/GPU/클라우드 실행은 없다.
+
+
+### M-A2 PR#262 첫 CI 후속
+
+- 한 일: 첫 PR CI의 실패6건은 test_b_runner_inputs·test_b12_canonical_pipeline의 등록 후 소비 경로가 변경 소스를 과거 GPU 등록으로 가정한 데서 발생했다. #260과 동일한 명시 EXAMPLE 모의 등록을 해당 사례에 적용하고, 모의 등록 없는 실제 현재 소스는 준비 도구 뒤에도 미지원/미완료임을 별도로 확인했다. 판정 assert·PASS/FAIL/UNKNOWN 기대값·기한·skip은 그대로다. 제품 소스와 manifest SHA84e946eb…는 바꾸지 않았다.
+- 테스트 결과: 첫 CI6실패·12,960통과·기존skip34(pytest761.48초/부모763.149초), runtime 양쪽 통과. 수정 후 직접98개 통과(pytest5.91초/부모6.303초). 전체 CI 통과는 새 head 결과를 기다린다.
+- 다음 단계: 승인된 기존 브랜치에 후속 커밋을 push하고 CI를 끝까지 확인한다.
+- 막힌 것: 최종 CI·병합 승인과 J01 GPU 재확인/등록은 미완료다.
+## 2026-11-13 결정19 — #257 공통 runtime CI 시험 동기화
+
+- 한 일: 사용자에게 runtime 시험 두 파일만 예외 승인받았다. test_mvp_gateway는 body 수신과 final 저장 완료를 Event로 분리한 뒤 기존 assert를 실행하며 실제 저장 지연 순서를 강제하는 회귀 사례를 추가했다. test_mvp_stream의 해당 사례는 실제 HTTP 클라이언트·gateway·relay를 유지하고 유계 상류/시계/Timer를 제어해59ms 첫 chunk·61ms 기한 초과를 검증한다. 요청 기한60ms·idle1초·STREAM_DEADLINE 기대값은 그대로이며 watchdog의 실제 검사/callback을 실행한다. runtime 제품 소스·다른 runtime 파일은 바꾸지 않았다.
+- 테스트 결과: CPython3.12.3 두 파일20개·하위 시험6개 통과(pytest17.29초/부모18.867초). AST로 기존 assert 호출 전부와 skip 수가 보존됐음을 대조했다. 별도 작업 트리에서 검증한 두 파일 bytes를 #257에 그대로 반영했고 runtime/src·examples는 같은 기준 tree임을 확인했다. 원 통과/실패 의미·기한·수락 기준은 바꾸지 않았으며 전체 로컬 pytest는 실행하지 않았다. update 제품 소스와 목록 SHA7cdbaac5…도 그대로다.
+- 다음 단계: 승인된 기존 #257 브랜치로 push하고 새 전체 CI 결과를 확인한다. 결정19는 DECISIONS·작업지시서7절에 기록했다.
+- 막힌 것: 새 head CI가 나오기 전에는 #257 전체 통과로 세지 않는다. GPU/클라우드·이미지 레이어·다른 runtime 파일·병합 승인은 없으며 실행하지 않았다. 수정은 두 시험 파일에 한정한다.
+
+
+## 2026-11-15 — M-A7 실제 rank 제품 입력 조립 후속
+- 한 일: #275는 사용자 계정으로 main 병합돼 있음을 확인했다(merge b00e4126). 최신 main #277을 기준으로 새 브랜치를 만들고 실제 ENV/target/prepared/공통 파일/기존 정책의 정확 조립 도구와 미결합 준비물6개의 후속 계획을 추가했다. 정책 원 bytes와 UNKNOWN/부분 관측·미실행 상태를 보존한다. 두 쪽 V1 선택은 기동/함수 자격으로 올리지 않는다. M-B4 보관.
+- 테스트 결과: 도구·기존 파일 사전 점검·rank 계획·경로 직접73개 통과(pytest17.41초·벽시계17.690초). 기존 실제 파일 색인 재대조에서 SUP-08 과거2쪽 파일 결합 유효, M-A 나머지52쪽 파일 부재다. LIF-08 실제2쪽은 별도 부재다. 새 변경의 전체 CI는 아직 없다.
+- 다음 단계: #276 파일 소비 구현과 직접 결합 확인·현황 검사를 마치고 push/새 PR 승인 뒤 원격 CI를 확인한다. 현재 파일이 마련되면 새 디렉터리에 조립하고 실행 직전 실제 기동/owner 자격을 확인한다.
+- 막힌 것: 현재 V1 ENV/target·ARM2 새 원 기록·전체 TP2 그룹/기한/새 세대 복구·GPU 등록. 새 GPU/비용/다운로드와 후속 push/병합은 미승인이다.
+
+- 후속 직접 결합 결과: #276 제품 파일 소비 구현을 포함한 source에서 새 조립 도구의 실행 결합과 select/run/judge/report/verify를 두 쪽×/1·/4의 EXAMPLE4사례로 확인했다(벽시계25.989초). 결과는 EXAMPLE/ABORTED/UNKNOWN이며 실제 엔진/GPU/등록 자격이 아니다. 현황 --check와 최종 경로/기존 materialize25개도 통과(pytest5.86초·부모6.121초). 새 원격 CI는 미실행이다.
+## 2026-11-15 — M-A6 기준 V1 /28 요청 연결 소비 W1 (로컬 검토)
+
+- 한 일: 기준 0.7.0의 정확 `/28` native profile에서 준비된 private 세션 키로 ASGI 헤더 HMAC을 재계산하고, 검증된 `Processor.process_inputs` RETURN의 선택/원 요청 ID를 LIF-10/12, REQ-12, OBS-02 실행기 투영에 연결했다. `/28`의 trial 요청 식별값도 세션 HMAC이며 raw 헤더·키·기존 SHA 지문은 기록하지 않는다. 기존 profile의 연결 방식과 공통 판정은 유지한다.
+- 관측 경계: REQ-12에는 fresh 요청의 native 입력 연결만 생긴다. 시도/KV/worker/output 및 전체 범위는 계속 미관측·UNKNOWN이다. OBS-02도 선택 성분만 부분 관측하며 생산자 인증·GPU 자격·등록·실측 PASS를 뜻하지 않는다.
+- 테스트 결과: 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 정확 소스와 시험 변경은 CI에서 검증할 예정이다. `git diff --check`와 source SHA 목록은 로컬 shell로 확인한다.
+- 다음 단계: 이 커밋의 집중 검토와 CI를 거친 뒤 후보 0.30.0 stream_buffer/profiler 독립 변형을 잇는다. 실제 ENV/target·GPU 등록과 판정 수락은 미완료다.
+
+## 2026-11-15 — M-A6 후보 0.30.0 stream/profiler 변형 (로컬 검토)
+
+- 한 일: `/25` 정확 후보 행 위에 원본 `/12` stream 또는 `/15` profiler 센서를 private 정확 사본으로 조합하는 `/29`·`/30`을 추가했다. 후보 profiler wrapper·worker 파일 SHA만 정확 행으로 바꾸고 원본 센서/기반/공통 GPU 계약/판정은 보존했다. LIF-03/04와 LIF-14 실행기 판본 관문을 연결하고 파서가 선택한 소스 행을 검사하게 했다.
+- 개인정보 경계: 새 variant 준비 자산은 `/28` 검증기 원본 SHA와 0600 비공개 세션 키를 요구한다. 설치 전 키 검증이 실패하면 observer hook을 만들지 않는다. 새 profile ASGI/stream/trial 요청은 header HMAC으로, native의 명시적 요청-ID 필드는 legacy SHA 결과의 별도 도메인 HMAC으로 보존한다. 모델·소스·파일 해시는 그대로 두고 기존 `/12`·`/15` sensor/profile은 변경하지 않았다. 키 실패/권한 변경 및 저장 필드 회귀는 CI 대상이다.
+- 의미 경계: profiler generation은 원본 센서에서 각 qualified start/stop 호출 순서에 따라 이미 새로 부여된다. backend SHA 동일성을 세대 동일성으로 간주하지 않으며 backend 종료·trace·RPC·다음 정상 시작의 판정은 그대로다. 실제 ENV/target·GPU 생산자 등록과 실측은 미완료다.
+- 테스트 결과: 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 정확 bytes/준비 자산 변조/판본 노출 회귀는 CI에서 확인한다. 로컬에서는 shell SHA, JSON 구문, `git diff --check`만 확인했다.
+- 다음 단계: 집중 소스 검토와 CI에서 variant 준비·기록 파서·LIF-03/04·14 직접 경로를 확인한다. 실패하면 정확 head에서 보수한다.
+
+## 2026-11-15 — M-A6 후보 0.30.0 REQ-10 runner capture (로컬 검토)
+
+- 한 일: 후보 이미지의 serving/input 7개 정확 SHA와 V1 환경, 준비 자산/개인 키/세대를 검사하는 REQ-10 전용 capture profile을 추가했다. 기존 callback의 API 검증→runner 수신→sampler 진입 값 가운데 temperature/top_p만 case별 대조한다. 후보 응답 ID 기록은 세션 HMAC으로 보호하고 기준 0.7.0 관문과 기존 0.31.0 profile은 보존했다.
+- 테스트 결과: 실제 callback snapshot 기본값/배열 미지원 record를 producer→B 소비 경계에 전달하는 회귀와 후보 전체 mock 전송·소스/환경/mount 실패 회귀를 작성했다. 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 제품 소스 SHA와 manifest/receipt는 shell로 갱신하고 최종 확인한다.
+- 다음 단계: 집중 검토 후 Linux CI에서 정확 producer/consumer 결합과 후보 전송을 검증한다. W5 구조화 출력 GPU 실험, 후보 실제 GPU/생산자 등록은 남는다. 이 값 연결은 전체 REQ-10 PASS가 아니다.
+- 후속 검토 수정: 요청에 없는 temperature/top_p를 0/1로 가정하지 않는다. API가 실제로 정규화한 값을 runner·sampler와 대조하고, 값 누락/차이를 B 최종 projection 공백과 `runner_consumption_verified=false`로 연결했다. 후보 mock 기본값1·비기본값·sampler 반례와 이전 0.30.0 비노출 assert의 승인된 V5 변경을 추가했다. 로컬 Python/pytest는 계속 실행하지 않았다.
+- 고정값/receipt 검토 수정: 후보 worker `gpu_model_runner`·`gpu_input_batch`의 정확 설치 bytes SHA를 추가해 9개 파일을 Pod 전후 대조한다(깨끗한 ced6857 태그·원 fixture·ma6 후보표 일치). sampling 값 불일치 공백은 준비 receipt가 쓰이기 전에 projection에 반영하고, 최종 capture/B 소비와 같은 공백을 남긴다. 로컬 Python/pytest는 실행하지 않았다.
+
+## 2026-11-15 — M-A6 기준 0.7.0 V1 cache/slot 정확 소스 관측 (로컬 검토)
+
+- 한 일: 깨끗한 5204ff5c 소스와 기존 fixture의 bytes가 일치하는 KV cache manager·InputBatch 두 파일의 정확 SHA 행을 callback 소스 후보에 추가했다. 0.7.0의 평면 2원 cache 반환과 `None`을 반환하는 자리 배정을 실제 소스 형태로 읽어 기존 `computed_rows`/cache timing 및 `project_slot` 소비자에 연결했다. 요청·block 식별은 세션 키 지문만 남기고 token IDs는 읽지 않는다. 기존 0.31.0 소스/분기와 판정 기준은 유지했다.
+- 관측 경계: cache salt와 인증 주체 결합은 없으며 REQ-15 전체 의미가 미검증이다. 자리 이동 `condense`와 V1 sampler의 제한 실제 소비는 보지 못해 REQ-18 재사용과 제한 집행은 후보/UNKNOWN이다. REQ-19/20의 V2/graph 의미도 열지 않는다. GPU 생산자 등록·실측은 없다.
+- 테스트 결과: 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 정확 fixture 소스 몸체의 기본/소스 불일치 경로를 기존 소비자에 전달하는 새 회귀 시험은 CI에서 검증한다. 로컬에서는 shell SHA·diff 검사만 한다.
+- 다음 단계: 집중 소스 검토 후 CI에서 실제 반환 형태·보수적 투영·기존 프로필 회귀를 확인한다.
+- 집중 검토 후속: REQ-17에서 cache 비활성화의 정확 원 생산자 0-token 행을 기존 timing 소비자에 전달해 빠른 대조만으로 정상/전체 범위가 되는 공백을 막았다. control-present의 native 적중이 확인되지 않으면 UNKNOWN으로 남긴다. CI 실행 전이다.

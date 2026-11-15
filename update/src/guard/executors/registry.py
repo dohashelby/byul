@@ -80,6 +80,7 @@ from .lifecycle_transition import LifecycleTransitionExecutor
 
 # 키: "<CheckDef.executor>:<구현>" (특정 실행기 전용) 또는 "<구현>" (공용). guard.toml [executors]의 값이 <구현>.
 EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
+    "rank_failure:common-input": lambda cfg: _rank_record_input(cfg),
     "engine_sensor:kubernetes": lambda cfg: EngineSensorExecutor(cfg.get("engine_sensor", {}), implementation="kubernetes", expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "engine_sensor:source-cpu": lambda cfg: EngineSensorExecutor(cfg.get("engine_sensor", {}), implementation="source-cpu"),
     "lifecycle_transition:kubernetes": lambda cfg: LifecycleTransitionExecutor(cfg.get("lifecycle_transition", {}), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
@@ -135,6 +136,14 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "structured_tools_target031_cpu:source031": lambda cfg: StructuredToolsTarget031CPUExecutor(cfg.get("structured_tools_target031_cpu", {})),
 }
 
+
+def _rank_record_input(cfg):
+    """파일 소비 전용 구현. 능동 실증 설정과 섞어 엔진을 실행하지 않는다."""
+    if cfg.get('lab_activation') or cfg.get('record_attestation'):
+        raise ValueError('RANK_RECORD_INPUT_ACTIVATION_UNSUPPORTED')
+    return KubernetesRankFailureExecutor(cfg.get('rank_failure', {}), common_records=True,
+        expected_target_sha256=cfg.get('_kubernetes_target_sha256'))
+
 # 실행기 메타데이터: 이 실행기가 만든 증거를 판정하는 기본 판정기(없으면 CheckDef.judge).
 # 증거를 만들 때 EVD.execution.executor.default_judge로 기록하고, 판정 코어는 그 값만 읽는다.
 EXECUTOR_DEFAULT_JUDGES: dict[str, str] = {
@@ -161,6 +170,9 @@ def adapter_factory(name):
 
 
 def resolve_executor(executor: str, impl: str, *, engine=None, version=None) -> Callable[[dict[str, Any]], Executor] | None:
+    if impl == 'common-input':
+        # 기록만 소비하는 구현은 native 소스 설치/실행 자격을 부여하지 않는다.
+        return EXECUTORS.get(f"{executor}:{impl}")
     if engine is not None:
         from guard.adapters.engine_provider import PROVIDERS, load_installed_providers
         load_installed_providers()
@@ -184,5 +196,10 @@ def build_executor(executor: str, impl: str, cfg: dict[str, Any], *, engine=None
     if factory is None:
         raise ValueError('EXECUTOR_UNAVAILABLE')
     if impl == "kubernetes":
+        if '_kubernetes_target_sha256_by_executor' in cfg:
+            # A mixed update also has collectors with their own targets and
+            # generations. Only the HTTP executors verified by the transition
+            # receive its selected target hash.
+            cfg = {**cfg, '_kubernetes_target_sha256': cfg['_kubernetes_target_sha256_by_executor'].get(executor)}
         factory = activated(factory) if executor in ACTIVATED else attested(factory)
     return factory(cfg)

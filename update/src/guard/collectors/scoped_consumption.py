@@ -32,6 +32,8 @@ def producer():
              Path(cache.__file__), Path(cache.base.__file__)]
     for name in ('observer_runtime', 'vllm_worker_generation_contract', 'vllm_worker_startup_contract', 'vllm_worker_shard_callback'):
         paths.append(Path(scoped.__file__).with_name(name + '.py'))
+    paths.extend((Path(cache.__file__).with_name('vllm_observer_pin_rows.py'),
+                  Path(cache.__file__).parent / 'assets/vllm_observer_pin_rows.json'))
     return {'name': NAME, 'version': VERSION, 'source_sha256': release_digest(SCHEMA, paths)}
 
 

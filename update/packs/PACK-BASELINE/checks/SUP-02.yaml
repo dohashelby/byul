@@ -2,7 +2,7 @@ id: SUP-02
 framework_id: CHK-SUP-002
 mechanism_ids:
 - mechanism-01
-revision: 4
+revision: 5
 retired: true
 area: SUP
 purpose: 작업·대상 인가
@@ -12,7 +12,7 @@ scope: null
 risk_category: 보안 위협 점검
 risk_summary: 제한된 배포 담당자가 허용 밖 모델·운영 환경에 배포해 비승인 코드 실행이나 서비스 변경을 일으킬 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   prose: 모델·코드·이미지를 배포하거나 운영 환경으로 승격하는 환경. 자동 배포뿐 아니라 수동 배포도 포함한다.
 policy_params:

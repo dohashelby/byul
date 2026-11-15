@@ -44,18 +44,17 @@
 
 - EVD 10개의 `data_origin=MEASURED`는 실제 수집 출처다. REQ-01/REQ-03 Result의 `verification_level=DECLARED`와 구분한다. REQ-01 일부 상태 변경 경로에는 HTTP를 보내지 않고 TCP 차단 근거를 사용했으며 모든 handler의 실제 실행이나 기업 승인을 증명하지 않는다. 후보 미준비로 두 이미지 시험을 하지 못했던 앞선 단계는 [당시 기록](docs/UPDATE_VALIDATION.md#이번-검증-결과)에 남아 있다.
 
-- [재평가·구현 결과와 개발 계획](docs/REVIEW_AND_DEVELOPMENT_PLAN.md)
 - [설치·audit·update·실증 안내](docs/RUNBOOK.md)
 - [기업 정책 양식·필수 정책 입력 전제(M1/M2)](docs/POLICY_TEMPLATE.md)
 - [Managed 업데이트 설정](examples/update-managed.toml), [외부 대상 설정](examples/update-external.toml)
 
 직전 [자동화 보강](docs/AUTOMATION_HARDENING.md)의 당시 기준은 PACK-BASELINE 20/DRAFT·REQ-11 revision 3·자동 연결 11개·정책 21점검/46경로·카탈로그 322행/614연결·adapter 0.4.0·declared/0.12.0이다. 현행 REQ-11도 입력 projection 하위 검증과 생성 출력 귀속 미검증 구분·전체 보안 PASS 보류를 유지한다. 과거 1~3차 CPU 실측·PR #28 실측·통합판 합성 회귀를 합산하지 않는다.
 
-[3차 실제 CPU 기록](docs/AUTOMATION_PHASE3.md)과 [선별 증거](docs/evidence/automation-phase3-20261023.json)는 당시 팩19의 이력이다. 새 판정 계약을 과거 결과에 소급하지 않는다. [Windows CPU JSON/SSE·native INFO 설정](examples/windows-cpu-binding-logs.toml)과 [11점검 시험 정책](examples/automation-binding-logs-policy.yaml)은 EXAMPLE/DRAFT다. 기본 guard.toml은 fake 시연 설정이며 실제 모델 snapshot·ENV·정책은 별도 준비한다. prepare-*의 ready와 점검별 지원, 실제 실행 결과는 서로 다른 정보다.
+[3차 실제 CPU 기록](docs/AUTOMATION_PHASE3.md)과 [선별 증거](docs/evidence/automation-phase3-20261023.json)는 당시 팩19의 이력이다. 새 판정 계약을 과거 결과에 소급하지 않는다. [Windows CPU JSON/SSE·native INFO 설정](examples/gpu-bounded-binding-logs.toml)과 [11점검 시험 정책](examples/automation-binding-logs-policy.yaml)은 EXAMPLE/DRAFT다. 기본 guard.toml은 fake 시연 설정이며 실제 모델 snapshot·ENV·정책은 별도 준비한다. prepare-*의 ready와 점검별 지원, 실제 실행 결과는 서로 다른 정보다.
 
 Windows CPU 단일 관리 기동 `guard prepare-validation`·`guard validate`와 8개 실행기의 기존 직접 검증은 [자동화 1차](docs/AUTOMATION_PHASE1.md)의 과거 결과로 보존합니다. 기존 5개와 REQ-10·REQ-13·OBS-03의 당시 지원 범위·미확인 분기도 해당 기록을 따릅니다. 두 실제 이미지의 업데이트 비교는 별도 검증이며 기본 guard.toml은 EXAMPLE 시연 설정입니다.
 
-[Windows CPU 설정](examples/windows-cpu.toml)과 [8개 점검 시험 정책](examples/automation-policy.yaml)은 EXAMPLE/DRAFT 예시입니다. 실제 ENV·모델 snapshot 경로·기업 정책을 확인해야 하며 누락한 관측을 PASS로 채우지 않습니다.
+[Windows CPU 설정](examples/gpu-bounded.toml)과 [8개 점검 시험 정책](examples/automation-policy.yaml)은 EXAMPLE/DRAFT 예시입니다. 실제 ENV·모델 snapshot 경로·기업 정책을 확인해야 하며 누락한 관측을 PASS로 채우지 않습니다.
 
 
 실증 준비 검사·증거 반출/복원·실제 5개 점검 사례 행렬: [실증 안내](docs/VALIDATION.md).

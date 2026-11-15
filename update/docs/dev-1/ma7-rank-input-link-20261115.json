@@ -1,0 +1,143 @@
+{
+  "schema": "guard-ma7-rank-input-preparation/1",
+  "check_id": "LIF-08",
+  "work_item": "M-A3",
+  "session": "J01",
+  "data_origin": "DECLARED",
+  "source_plan_sha256": "036578d884955b2f687eca49422cf5836264fbd44b2efa7f24678963bbcdcc4d",
+  "rank_preparation_sha256": "266df975e867b5ae4d6d91f6905e641fae7ce96d605ace806e8ab867abbdbdfa",
+  "reviewed_source_manifest_sha256": "5b38f3226f99fb37fd4771778bb3188071dfafd43de6e9107021645d955e86e8",
+  "candidates": [
+    {
+      "side": "baseline",
+      "fault_kind": "delay",
+      "session": "b9b474debb626598279ab483d2642ae0",
+      "prepared_manifest_file": "/home/youngjo/.cache/byul-rank-rpc-prepared-20261115-common-v3/baseline-delay/manifest.json",
+      "prepared_manifest_sha256": "7f05c97ad091e689cca303715429ae8ba73a8f1da8c406d942fb49c1eaa7f190",
+      "prepared_source_bytes_verified": true,
+      "prepared_runtime_qualified": false,
+      "environment_ref": null,
+      "target": null,
+      "product_binding_file": null,
+      "common_input_file": null,
+      "actual_results": null,
+      "ready_for_execution": false,
+      "remaining": [
+        "현재 ENV/target·기동 전 자격",
+        "ARM 전 제품 사전 결합",
+        "실제 원 기록의 공통 입력 변환",
+        "전체 TP2 그룹/기한/복구 수락·등록"
+      ]
+    },
+    {
+      "side": "baseline",
+      "fault_kind": "exception",
+      "session": "3c8258676c1562705bda4be0d37e6e9b",
+      "prepared_manifest_file": "/home/youngjo/.cache/byul-rank-rpc-prepared-20261115-common-v3/baseline-exception/manifest.json",
+      "prepared_manifest_sha256": "6f7bef42377968e150f00d932ba93b4f27230383de879e73a62ed95084e466d0",
+      "prepared_source_bytes_verified": true,
+      "prepared_runtime_qualified": false,
+      "environment_ref": null,
+      "target": null,
+      "product_binding_file": null,
+      "common_input_file": null,
+      "actual_results": null,
+      "ready_for_execution": false,
+      "remaining": [
+        "현재 ENV/target·기동 전 자격",
+        "ARM 전 제품 사전 결합",
+        "실제 원 기록의 공통 입력 변환",
+        "전체 TP2 그룹/기한/복구 수락·등록"
+      ]
+    },
+    {
+      "side": "baseline",
+      "fault_kind": "death",
+      "session": "ac3dbec4b2cfb4825345de693ef6c7e1",
+      "prepared_manifest_file": "/home/youngjo/.cache/byul-rank-rpc-prepared-20261115-common-v3/baseline-death/manifest.json",
+      "prepared_manifest_sha256": "8c956216d3fe42aed6eb922baf7a8dadad0201e0e5c9f095ccf3d915b3792de0",
+      "prepared_source_bytes_verified": true,
+      "prepared_runtime_qualified": false,
+      "environment_ref": null,
+      "target": null,
+      "product_binding_file": null,
+      "common_input_file": null,
+      "actual_results": null,
+      "ready_for_execution": false,
+      "remaining": [
+        "현재 ENV/target·기동 전 자격",
+        "ARM 전 제품 사전 결합",
+        "실제 원 기록의 공통 입력 변환",
+        "전체 TP2 그룹/기한/복구 수락·등록"
+      ]
+    },
+    {
+      "side": "candidate",
+      "fault_kind": "delay",
+      "session": "3b1b4f9d93980307d79702c5b64fe20d",
+      "prepared_manifest_file": "/home/youngjo/.cache/byul-rank-rpc-prepared-20261115-common-v3/candidate-delay/manifest.json",
+      "prepared_manifest_sha256": "85995e4816806a7cded75ba94a772599b53a459013b60884ba316f23e3162ea7",
+      "prepared_source_bytes_verified": true,
+      "prepared_runtime_qualified": false,
+      "environment_ref": null,
+      "target": null,
+      "product_binding_file": null,
+      "common_input_file": null,
+      "actual_results": null,
+      "ready_for_execution": false,
+      "remaining": [
+        "현재 ENV/target·기동 전 자격",
+        "ARM 전 제품 사전 결합",
+        "실제 원 기록의 공통 입력 변환",
+        "전체 TP2 그룹/기한/복구 수락·등록"
+      ]
+    },
+    {
+      "side": "candidate",
+      "fault_kind": "exception",
+      "session": "2487e528f7fa975067f690b3bb6dc4fe",
+      "prepared_manifest_file": "/home/youngjo/.cache/byul-rank-rpc-prepared-20261115-common-v3/candidate-exception/manifest.json",
+      "prepared_manifest_sha256": "fa1e491cf69519dfac5f254a501513fac91d31491692ff2b068c7cdc4ea67d5a",
+      "prepared_source_bytes_verified": true,
+      "prepared_runtime_qualified": false,
+      "environment_ref": null,
+      "target": null,
+      "product_binding_file": null,
+      "common_input_file": null,
+      "actual_results": null,
+      "ready_for_execution": false,
+      "remaining": [
+        "현재 ENV/target·기동 전 자격",
+        "ARM 전 제품 사전 결합",
+        "실제 원 기록의 공통 입력 변환",
+        "전체 TP2 그룹/기한/복구 수락·등록"
+      ]
+    },
+    {
+      "side": "candidate",
+      "fault_kind": "death",
+      "session": "8011409d8c3f90e67ce931b9042578f7",
+      "prepared_manifest_file": "/home/youngjo/.cache/byul-rank-rpc-prepared-20261115-common-v3/candidate-death/manifest.json",
+      "prepared_manifest_sha256": "7099804673f345076ed174e7b07d537ad65b7a7489b4318b5b4a8d101963c4a2",
+      "prepared_source_bytes_verified": true,
+      "prepared_runtime_qualified": false,
+      "environment_ref": null,
+      "target": null,
+      "product_binding_file": null,
+      "common_input_file": null,
+      "actual_results": null,
+      "ready_for_execution": false,
+      "remaining": [
+        "현재 ENV/target·기동 전 자격",
+        "ARM 전 제품 사전 결합",
+        "실제 원 기록의 공통 입력 변환",
+        "전체 TP2 그룹/기한/복구 수락·등록"
+      ]
+    }
+  ],
+  "engine_executed": false,
+  "live_target_verified": false,
+  "input_preflight_passed": false,
+  "ready_for_execution": false,
+  "actual_results": null
+}

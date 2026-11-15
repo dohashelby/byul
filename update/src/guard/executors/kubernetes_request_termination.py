@@ -52,7 +52,7 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
     requires_roles=False;requires_route_scope=False;functional_via="engine"
     check_id="LIF-10";collection_profile=PROFILE;policy_prefix="termination"
     policy_normalizer=staticmethod(normalize_policy);transport_profile=TERMINATION_PROFILE
-    supported_native_profiles=frozenset({"vllm-native-lifecycle-metadata/8","vllm-native-lifecycle-metadata/9","vllm-native-lifecycle-metadata/23","sglang-native-lifecycle-metadata/1"})
+    supported_native_profiles=frozenset({"vllm-native-lifecycle-metadata/8","vllm-native-lifecycle-metadata/9","vllm-native-lifecycle-metadata/23","vllm-native-lifecycle-metadata/25","vllm-native-lifecycle-metadata/28","sglang-native-lifecycle-metadata/1"})
     configuration_keys=frozenset({'target','prepared','retry_scope','kubectl_binary','max_duration_seconds','node_image_verification'})
 
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
@@ -119,8 +119,8 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
             "run_id":ctx.cprobe.binding["run_id"],"environment_ref":ctx.env.ref().model_dump(mode="json"),
             "kubernetes":{"context":ctx.cprobe.binding["context"],"engine":ctx.cprobe.binding["engine"]}}
         reader=None;packet=None;replies={};token=uuid.uuid4().hex
-        request_sha=None;sealed=False;seal_attempted=False
-        modern=ctx._termination_prepared["profile"] in {"vllm-native-lifecycle-metadata/23","sglang-native-lifecycle-metadata/1"}
+        request_sha=None;request_hmac=None;sealed=False;seal_attempted=False
+        modern=ctx._termination_prepared["profile"] in {"vllm-native-lifecycle-metadata/23","vllm-native-lifecycle-metadata/28","sglang-native-lifecycle-metadata/1"}
         try:
             reader=KubernetesLifecycleReader(native_target,ctx.env,ctx._termination_prepared,
                 runner=self.runner,binary=self.cfg.get("kubectl_binary","kubectl"),duration=self.cfg.get("max_duration_seconds",120),node_image_verification=self.cfg.get("node_image_verification"))
@@ -140,11 +140,19 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
                 rid="byul-lif10-"+token+"-"+slot
                 body={"model":ctx.api_model,"prompt":"hello","max_tokens":8 if slot=="disconnect" else 1,
                     "temperature":0,"stream":slot=="disconnect"}
-                row={"case_id":"lif10-"+slot,"request_id_sha256":sha256_hex(rid.encode()),
+                try:
+                    if ctx._termination_prepared['profile']=='vllm-native-lifecycle-metadata/28':
+                        from guard.collectors.lifecycle import request_header_fingerprint
+                        request_identity=request_header_fingerprint(self.cfg['prepared'],ctx._termination_prepared,rid)
+                    else:request_identity=sha256_hex(rid.encode())
+                except ValueError:
+                    request_identity=None;summary['diagnostic_codes'].append('TERMINATION_REQUEST_BINDING_KEY_UNAVAILABLE')
+                row={"case_id":"lif10-"+slot,"request_id_sha256":request_identity,
                     "request_body_sha256":sha256_hex(canonical_json(body)),"attempted":False,"started_at":None,
                     "finished_at":None,"outcome":None,"normal_shape_verified":False,"expected_client_close":False,
                     "capture_complete":False,"policy_window_verified":False}
                 summary["attempts"].append(row);replies[slot]=row
+                if request_identity is None:continue
                 try:
                     now=utcnow()
                     if not start<=now<=end:raise ValueError
@@ -152,7 +160,10 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
                         "url":ctx.engine_url+"/v1/completions","headers":{"X-Request-Id":rid},"body":body}
                     if slot=="disconnect":request["read_profile"]={"profile":"slow-reader-v1","chunk_bytes":1,"interval_ms":1,"close_after_reads":1}
                     row.update(attempted=True,started_at=now.isoformat())
-                    if slot=="disconnect":request_sha=row["request_id_sha256"]
+                    if slot=="disconnect":
+                        request_sha=row["request_id_sha256"]
+                        if ctx._termination_prepared['profile']=='vllm-native-lifecycle-metadata/28':
+                            request_hmac=request_identity
                     response,=ctx.cprobe("kubernetes-probe",[request],ctx.timeout)
                     row.update(outcome=response["outcome"],capture_complete=response.get("capture_complete") is True)
                     if slot=="disconnect":
@@ -192,7 +203,7 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
                         "capture_sha256":r["capture"]["provenance"]["capture_sha256"] if r["capture"] else None,
                         "image_digest_verified":r["capture"]["image_digest_verified"] if r["capture"] else False}
                         for r in packet["recordings"]] if packet else []}
-        projected=project_native(packet,request_sha,ctx.policy_values["termination_max_delay_ms"],ctx.policy_values["termination_required_scopes"])
+        projected=project_native(packet,request_sha,ctx.policy_values["termination_max_delay_ms"],ctx.policy_values["termination_required_scopes"],request_hmac=request_hmac)
         summary["native_projection"]=projected;summary["diagnostic_codes"].extend(projected["diagnostic_codes"])
         summary["http_transport"]=ctx.cprobe.report()
         summary["diagnostic_codes"]=list(dict.fromkeys(summary["diagnostic_codes"]))
@@ -201,7 +212,7 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
             "TERMINATION_NATIVE_CAPTURE_UNAVAILABLE","TERMINATION_POLICY_WINDOW_UNVERIFIED","TERMINATION_CLIENT_CLOSE_UNVERIFIED",
             "TERMINATION_NORMAL_CONTROL_UNVERIFIED","TERMINATION_NATIVE_COVERAGE_UNVERIFIED",
             "TERMINATION_NATIVE_PACKET_UNAVAILABLE","TERMINATION_EVENT_BOUND_REACHED",
-            "TERMINATION_NATIVE_PROCESS_BINDING_UNVERIFIED"}
+            "TERMINATION_NATIVE_PROCESS_BINDING_UNVERIFIED","TERMINATION_REQUEST_BINDING_KEY_UNAVAILABLE"}
         ctx._termination_gap=bool(gaps.intersection(summary["diagnostic_codes"]) or summary["http_transport"]["collection_gap"])
         ctx._termination_cleanup=list(summary["http_transport"]["cleanup_errors"])
         if reader is not None and reader.report().get("parent_cleanup_unverified"):

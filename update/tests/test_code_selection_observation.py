@@ -50,10 +50,11 @@ def test_transport_release_gate_reads_the_catalog():
     assert 'env.engine.version != "0.31.0"' not in source
 
 
-def test_only_input_validation_kubernetes_executor_is_exposed_on_old_releases():
+def test_input_validation_stays_on_both_old_releases_and_candidate_sampling_opens():
     for version in ('0.7.0', '0.30.0'):
         assert resolve_executor('input_validation', 'kubernetes', engine='vllm', version=version) is not None
-        assert resolve_executor('sampling_validation', 'kubernetes', engine='vllm', version=version) is None
+    assert resolve_executor('sampling_validation', 'kubernetes', engine='vllm', version='0.7.0') is None
+    assert resolve_executor('sampling_validation', 'kubernetes', engine='vllm', version='0.30.0') is not None
     assert resolve_executor('input_validation', 'kubernetes', engine='vllm', version='0.31.0') is not None
 
 
@@ -210,7 +211,7 @@ def test_derived_pack_judges_observed_module_selection(code_pack, state, verdict
 
 def test_baseline_pack_is_untouched(code_pack):
     base = load_pack(ROOT / "packs/PACK-BASELINE")
-    assert base.checks["SUP-08"].revision == 4 and base.manifest.revision == 33
+    assert base.checks["SUP-08"].revision == 5 and base.manifest.revision == 38
     assert {k: deepcopy(v.model_dump()) for k, v in base.checks.items() if k != "SUP-08"} == \
            {k: deepcopy(v.model_dump()) for k, v in code_pack.checks.items() if k != "SUP-08"}
 

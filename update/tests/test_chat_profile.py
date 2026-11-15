@@ -9,7 +9,7 @@ from guard import application
 from guard.adapters import vllm
 from guard.adapters.base import LaunchSpec
 from guard.runtime import sandbox
-from tests.test_windows_cpu_launch import launch, setup_inputs
+from tests.test_managed_gpu_launch import launch, setup_inputs
 
 
 def test_chat_profile_is_explicit_and_adds_only_a_readonly_fixed_asset():
@@ -45,7 +45,7 @@ def test_chat_profile_cannot_be_an_arbitrary_template_or_path(profile):
                                      {"trust_request_chat_template": True}])
 def test_legacy_launch_never_inherits_or_accepts_new_chat_controls(options):
     spec = LaunchSpec("model", 8000, image="cpu", options={
-        "revision": "rev", "models_dir": Path("/snapshot"), "device": "cpu", **options})
+        "revision": "rev", "models_dir": Path("/snapshot"), "device": "gpu", **options})
     with pytest.raises(ValueError):
         vllm.VllmAdapter().launch_plan(spec)
 
@@ -89,8 +89,8 @@ def test_comparison_conditions_include_actual_template_and_argv_without_host_pat
     monkeypatch.setattr(sandbox, "pull_images", lambda docker: {sandbox.NGINX_IMAGE: "nginx@sha256:fixed",
                                                                sandbox.PYTHON_IMAGE: "python@sha256:fixed"})
     monkeypatch.setattr(sandbox, "probe", lambda *args, **kwargs: {"outcome": 401})
-    cfg = {"model": "test", "revision": "rev", "image": "cpu@sha256:fixed", "models_dir": "C:/private/model",
-           "gpu": False, "launch_profile": "cpu-bounded", "model_layout": "snapshot",
+    cfg = {"model": "test", "revision": "rev", "image": "gpu@sha256:fixed", "models_dir": "C:/private/model",
+           "gpu": True, "gpu_devices": ["0"], "resources": {"cpus": 4, "memory_bytes": 17179869184, "shm_bytes": 2147483648, "pids_limit": 512}, "launch_profile": "gpu-bounded", "model_layout": "snapshot",
            "chat_template_profile": "guard-text-chat-v1"}
     first = sandbox.up(Recording(), "isolated", tmp_path / "one", "credential-not-persisted", engine="vllm", vllm=cfg,
                        wait_ready=False, engine_profile="hardened")

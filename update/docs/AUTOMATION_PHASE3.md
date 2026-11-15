@@ -23,7 +23,7 @@ OBS-09는 실제 INFO request logger → NewLineFormatter → Docker CLI UTF-8 �
 
 ## 명시적 CPU 프로파일
 
-[별도 설정](../examples/windows-cpu-binding-logs.toml)은 기존 CPU chat 설정에 `logging_profile='request-info-v1'`을 명시한다. 고정 argv와 logging env·소스 SHA를 실제 기동 및 비교 조건에 기록한다. 임의 config/class/path를 받지 않는다. 기존 기본 completion/chat 예제의 기동 인자는 보존한다.
+[별도 설정](../examples/gpu-bounded-binding-logs.toml)은 기존 CPU chat 설정에 `logging_profile='request-info-v1'`을 명시한다. 고정 argv와 logging env·소스 SHA를 실제 기동 및 비교 조건에 기록한다. 임의 config/class/path를 받지 않는다. 기존 기본 completion/chat 예제의 기동 인자는 보존한다.
 
 고정 CPU 이미지 `vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b`, vLLM0.31.0, facebook/opt-125m revision `27dcfa74d334bc871f3234de431e71c6eeba5dd6`, CPU2/threads2/RAM3GiB/RAM+swap5GiB/shm512MiB/PID256/FP32/context128/KV64MiB를 사용한다. 실제 모델 inventory는 실행 시 다시 확인한다. 엔진은 하나씩이며 기존 kind 컨테이너는 보존한다.
 

@@ -98,7 +98,7 @@ def timing(present_hit, *, fast=True, power=True, control=None):
             case_id = f'{role}-{index}'; tag = 'byul-cb-' + f'{len(tags):032x}'
             cases.append({'case_id': case_id, 'role': role, 'prompt': 'x'}); tags[case_id] = tag
             elapsed[case_id] = value + index / 100
-            if role == 'present':
+            if role in ('control-present', 'present'):
                 events.append(computed(tag, 16 if hit else 0))
     return projection.project_cache_timing(cases, projection.computed_rows(events, SECRET, tags), elapsed,
         {'cache_timing_max_auc_percent': 80, 'cache_timing_min_samples': 4})

@@ -11,11 +11,12 @@ from guard.runtime import kubernetes_http as http
 from guard.runtime.kubernetes_forwarded_identity_http import KubernetesForwardedIdentityHTTP,EXTERNAL
 from guard.runtime.kubernetes_forwarded_identity import normalize_header_contract
 from guard.runtime.bounded import capture_pipes
-from guard.executors import kubernetes_forwarded_identity as product
+from guard.executors import kubernetes_forwarded_identity as product, run_binding
 from guard.executors.forwarded_identity_contract import FIELDS,SCHEMA,normalize_policy,validate_record
 from guard.executors.owned_capture import _FILE_READER
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.store import Store
+from tests.run_binding_support import for_pack, run_table_toml
 from tests.builders import baseline_pack,policy,T0
 from tests.test_kubernetes_routes import inputs as route_inputs,World as RouteWorld
 from tests.test_stream_probe import _server
@@ -103,6 +104,8 @@ def inputs(tmp_path,mode='normal',header=None,normal=NORMAL,alternate=ALTERNATE)
         'forwarded_session':SESSION,'forwarded_gateway_source_sha256':'b'*64,'forwarded_engine_source_sha256':'c'*64,
         'forwarded_identity_policy_sha256':'9'*64,'forwarded_validity_start':(now-timedelta(minutes=1)).isoformat(),'forwarded_validity_end':(now+timedelta(minutes=1)).isoformat()}
     world.values=values;receipt=derive(baseline_pack().path,tmp_path/'pack');pack=load_pack(tmp_path/'pack')
+    if 4 in run_binding.stages_for(pack.checks['REQ-04']):
+        values['forwarded_identity_policy_sha256']=sha256_hex(canonical_json(for_pack(pack,'REQ-04',values)))
     return env,world,values,pack,receipt
 
 
@@ -111,11 +114,11 @@ def inputs(tmp_path,mode='normal',header=None,normal=NORMAL,alternate=ALTERNATE)
 def test_registered_cli_issuer_claims_errors_and_exact_ref_roundtrip(tmp_path,monkeypatch,mode):
     env,world,values,pack,_=inputs(tmp_path,mode)
     for key,value in {'REQ04_KEY':CREDENTIAL,'REQ04_NORMAL':NORMAL,'REQ04_ALTERNATE':ALTERNATE}.items():monkeypatch.setenv(key,value)
-    for name,value in [('environment',env.to_dict()),('target',world.t),('policy',policy(pack.ref(),scope={'include':['REQ-04']},values={'REQ-04':values}).to_dict())]:
+    for name,value in [('environment',env.to_dict()),('target',world.t),('policy',policy(pack.ref(),scope={'include':['REQ-04']},values={'REQ-04':for_pack(pack,'REQ-04',values)}).to_dict())]:
         (tmp_path/(name+'.json')).write_bytes(canonical_json(value))
     cfg=tmp_path/'guard.toml';cfg.write_text('[executors]\nforwarded_identity="kubernetes"\n[adapter]\nname="vllm"\n[forwarded_identity]\ntarget='
         +json.dumps(str(tmp_path/'target.json'))+'\nroles={allowed="REQ04_KEY"}\n[forwarded_identity.header]\n'
-        +''.join(k+'='+json.dumps(v)+'\n' for k,v in HEADER.items()),encoding='utf-8')
+        +''.join(k+'='+json.dumps(v)+'\n' for k,v in HEADER.items())+run_table_toml(pack,'REQ-04',values),encoding='utf-8')
     monkeypatch.setattr(http,'capture_pipes',world.runner);monkeypatch.setattr(product,'capture_pipes',world.runner)
     def forbidden(*a,**kw):raise AssertionError('unexpected runtime')
     monkeypatch.setattr(subprocess,'Popen',forbidden);monkeypatch.setattr(socket,'socket',forbidden)

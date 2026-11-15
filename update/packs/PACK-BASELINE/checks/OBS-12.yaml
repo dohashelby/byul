@@ -2,7 +2,7 @@ id: OBS-12
 framework_id: CHK-OBS-012
 mechanism_ids:
 - mechanism-14
-revision: 4
+revision: 5
 retired: true
 area: OBS
 purpose: 보존·삭제
@@ -12,7 +12,7 @@ scope: '5.7 주 판정: 관측 자료 원본·사본; Q-C12 연결: 비관측 �
 risk_category: 보안 위협 점검
 risk_summary: 보존이 끝난 로그·usage·진단 사본에 접근한 주체가 삭제됐다고 여긴 민감정보를 계속 조회·반출할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: LOW
 applies_when:
   prose: 로그·사용 통계·진단의 원본과 실제 생성·저장·반출·백업 사본을 기본 확인한다. Q-C12로 연결된 모델·입력·임시 파일·cache·backup 사본도 자산별 적용 정책에 따라 별도로 확인한다. 사본별 적용 정책·기한·허용 예외 또는 필요한 증거가 미정인 부분은 미확인으로 남긴다.
 policy_params: []

@@ -447,6 +447,235 @@
         }
       }
     },
+    "/api/update/execution-settings": {
+      "get": {
+        "tags": [
+          "update execution"
+        ],
+        "summary": "Execution Settings",
+        "operationId": "execution_settings_api_update_execution_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateExecutionSettings"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/update/runs": {
+      "get": {
+        "tags": [
+          "update execution"
+        ],
+        "summary": "Runs",
+        "operationId": "runs_api_update_runs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateRunList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/update/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "update execution"
+        ],
+        "summary": "Run",
+        "operationId": "run_api_update_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/update/runs/prepare": {
+      "post": {
+        "tags": [
+          "update execution"
+        ],
+        "summary": "Prepare",
+        "operationId": "prepare_api_update_runs_prepare_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/update/runs/{run_id}/execute": {
+      "post": {
+        "tags": [
+          "update execution"
+        ],
+        "summary": "Execute",
+        "operationId": "execute_api_update_runs__run_id__execute_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inputs/catalog": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Get Input Catalog",
+        "operationId": "get_input_catalog_api_inputs_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InputCatalog"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inputs/policy-preview": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Preview Policy Inputs",
+        "operationId": "preview_policy_inputs_api_inputs_policy_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyInputRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyInputPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/environments": {
       "get": {
         "tags": [
@@ -1850,6 +2079,27 @@
         ],
         "title": "DiffEntry"
       },
+      "DocumentSelection": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Id"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "revision"
+        ],
+        "title": "DocumentSelection"
+      },
       "EnforcementComponentResult": {
         "properties": {
           "component": {
@@ -2345,6 +2595,176 @@
         ],
         "title": "Heartbeat"
       },
+      "InputBinding": {
+        "properties": {
+          "requirement": {
+            "type": "string",
+            "title": "Requirement"
+          },
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "check_id": {
+            "type": "string",
+            "title": "Check Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": ""
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requirement",
+          "field",
+          "check_id",
+          "key"
+        ],
+        "title": "InputBinding"
+      },
+      "InputCatalog": {
+        "properties": {
+          "pack": {
+            "$ref": "#/components/schemas/InputPack"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/InputVersion"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
+          "bindings": {
+            "items": {
+              "$ref": "#/components/schemas/InputBinding"
+            },
+            "type": "array",
+            "title": "Bindings"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Parameters"
+          },
+          "fixed_values": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Fixed Values"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pack",
+          "available",
+          "versions",
+          "bindings",
+          "parameters",
+          "fixed_values",
+          "limitations"
+        ],
+        "title": "InputCatalog"
+      },
+      "InputPack": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "revision"
+        ],
+        "title": "InputPack"
+      },
+      "InputVersion": {
+        "properties": {
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "profiles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Profiles"
+          },
+          "features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Features"
+          },
+          "hidden_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Hidden Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "engine",
+          "version",
+          "profiles",
+          "features"
+        ],
+        "title": "InputVersion"
+      },
       "InvalidItem": {
         "properties": {
           "index": {
@@ -2404,6 +2824,82 @@
           "source"
         ],
         "title": "LabReportResponse"
+      },
+      "LegacyUpdateRunRequest": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "validate",
+              "update"
+            ],
+            "title": "Mode",
+            "default": "validate"
+          },
+          "pack_path": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Pack Path",
+            "default": "packs/PACK-BASELINE"
+          },
+          "config_path": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Config Path",
+            "default": "examples/gpu-bounded.toml"
+          },
+          "policy_path": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Policy Path"
+          },
+          "environment_path": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment Path"
+          },
+          "baseline_path": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline Path"
+          },
+          "candidate_path": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "policy_path"
+        ],
+        "title": "LegacyUpdateRunRequest",
+        "description": "Previously saved file-based runs remain readable, but cannot be submitted."
       },
       "LoginBody": {
         "properties": {
@@ -3066,6 +3562,84 @@
         ],
         "title": "PolicyConfirm"
       },
+      "PolicyInputPreview": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Policy"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/FieldIssue"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/FieldIssue"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/FieldIssue"
+            },
+            "type": "array",
+            "title": "Gaps"
+          },
+          "connected": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Connected"
+          },
+          "pack_available": {
+            "type": "boolean",
+            "title": "Pack Available"
+          },
+          "previous_policy": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Policy"
+          },
+          "engine_executed": {
+            "type": "boolean",
+            "title": "Engine Executed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "document",
+          "errors",
+          "warnings",
+          "gaps",
+          "connected",
+          "pack_available"
+        ],
+        "title": "PolicyInputPreview"
+      },
+      "PolicyInputRequest": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Policy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document"
+        ],
+        "title": "PolicyInputRequest"
+      },
       "PolicyReadiness": {
         "properties": {
           "name": {
@@ -3209,6 +3783,100 @@
           "warnings"
         ],
         "title": "PolicySaved"
+      },
+      "PreparationCheck": {
+        "properties": {
+          "check": {
+            "type": "string",
+            "title": "Check"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": ""
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "check",
+          "ok"
+        ],
+        "title": "PreparationCheck"
+      },
+      "PreparationGuidance": {
+        "properties": {
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/PreparationIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "PreparationGuidance"
+      },
+      "PreparationIssue": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "cause": {
+            "type": "string",
+            "title": "Cause"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
+          },
+          "check_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check Id"
+          },
+          "blocking": {
+            "type": "boolean",
+            "title": "Blocking",
+            "default": true
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "code",
+          "cause",
+          "action"
+        ],
+        "title": "PreparationIssue"
       },
       "ReportCheck": {
         "properties": {
@@ -5221,6 +5889,32 @@
         ],
         "title": "SaveRejected"
       },
+      "SelectedDocumentRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Id"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "revision",
+          "sha256"
+        ],
+        "title": "SelectedDocumentRef"
+      },
       "SourceInfo": {
         "properties": {
           "name": {
@@ -7029,6 +7723,309 @@
           "verification"
         ],
         "title": "TetragonVerification"
+      },
+      "UpdateExecutionSettings": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "can_execute": {
+            "type": "boolean",
+            "title": "Can Execute"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Reason"
+          },
+          "temporary": {
+            "type": "boolean",
+            "title": "Temporary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "can_execute",
+          "temporary"
+        ],
+        "title": "UpdateExecutionSettings"
+      },
+      "UpdatePreparation": {
+        "properties": {
+          "ready": {
+            "type": "boolean",
+            "title": "Ready"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/PreparationCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "check_support": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Check Support"
+          },
+          "guidance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreparationGuidance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "ready"
+        ],
+        "title": "UpdatePreparation"
+      },
+      "UpdateRun": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdateRunRequest"
+              },
+              {
+                "$ref": "#/components/schemas/LegacyUpdateRunRequest"
+              }
+            ],
+            "title": "Request"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "preparing",
+              "ready",
+              "blocked",
+              "running",
+              "completed",
+              "failed",
+              "interrupted"
+            ],
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By"
+          },
+          "executed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executed By"
+          },
+          "preparation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdatePreparation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Code"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "report_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Report Ids"
+          },
+          "log_tail": {
+            "type": "string",
+            "title": "Log Tail",
+            "default": ""
+          },
+          "log_truncated": {
+            "type": "boolean",
+            "title": "Log Truncated",
+            "default": false
+          },
+          "input_sha256": {
+            "type": "string",
+            "title": "Input Sha256"
+          },
+          "source_refs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SelectedDocumentRef"
+            },
+            "type": "object",
+            "title": "Source Refs"
+          },
+          "pack": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pack"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "request",
+          "status",
+          "created_at",
+          "requested_by",
+          "input_sha256"
+        ],
+        "title": "UpdateRun"
+      },
+      "UpdateRunList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UpdateRun"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "UpdateRunList"
+      },
+      "UpdateRunRequest": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "validate",
+              "update"
+            ],
+            "title": "Mode",
+            "default": "validate"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/DocumentSelection"
+          },
+          "environment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "baseline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "policy"
+        ],
+        "title": "UpdateRunRequest"
       },
       "ValidationError": {
         "properties": {

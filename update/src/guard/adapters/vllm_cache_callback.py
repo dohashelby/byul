@@ -7,6 +7,8 @@ No caller-supplied verified flag or serialized observation can qualify a hook.
 """
 from __future__ import annotations
 
+from .vllm_observer_pin_rows import baseline_sources, candidate_sources, layout, BASELINE_ROWS
+
 import contextvars
 from copy import deepcopy
 import functools
@@ -32,6 +34,7 @@ TARGETS = {
     'vllm.v1.core.kv_cache_manager': ('KVCacheManager.get_computed_blocks',),
     'vllm.v1.core.block_pool': ('BlockPool.get_cached_block', 'BlockHashToBlockMap.get_one_block'),
 }
+SOURCES = baseline_sources(candidate_sources(base.SOURCE_SHA, TARGETS), TARGETS)
 MAX_EVENTS = 1024
 MAX_OBJECTS = 256
 MAX_BLOCKS = 256
@@ -40,6 +43,7 @@ MAX_BLOCKS = 256
 SOURCE_BYTES = {'bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a': 335342,
                 # vllm.v1.core.sched.scheduler (#196 request-attempt P1)
                 'f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a': 159016}
+from .vllm_observer_pin_rows import SOURCE_BYTES as CANDIDATE_SOURCE_BYTES
 _ACTIVE = contextvars.ContextVar('guard_cache_callback_active', default=None)
 # Digests of bytes that already matched their pin. The bytes are re-read and
 # re-hashed on every call; only the compile of identical bytes is reused.
@@ -51,13 +55,42 @@ def _digest(code, name):
     return base.code_digest(relative_code(code, filename))
 
 
-def _codes(module, targets=TARGETS, sources=base.SOURCE_SHA):
+def _pins(sources, name):
+    """A module's reviewed source pins. One SHA-256 string, or a tuple of them when the
+    same observer reviews several engine releases (one exact-byte row per release)."""
+    pins = sources[name]
+    pins = (pins,) if type(pins) is str else pins
+    if (type(pins) is not tuple or not pins or len(set(pins)) != len(pins)
+            or any(type(pin) is not str or re.fullmatch('[0-9a-f]{64}', pin) is None for pin in pins)):
+        raise ValueError('CACHE_CALLBACK_SOURCE_UNSUPPORTED')
+    return pins
+
+
+def _source(module, sources):
+    """Read the module file once per pin until exact bytes match. No pin is widened."""
+    name = vars(module).get('__name__')
+    path = vars(module).get('__file__')
+    error = None
+    for pin in _pins(sources, name):
+        try:
+            limits = SOURCE_BYTES | CANDIDATE_SOURCE_BYTES
+            return pin, artifact(path, pin, **({'limit': limits[pin]} if pin in limits else {}))
+        except ValueError as exc:
+            error = exc
+    raise error
+
+
+def source_pin(module, sources):
+    """The reviewed pin that the module's current bytes match (for evidence rows)."""
+    return _source(module, sources)[0]
+
+
+def _codes(module, targets=TARGETS, sources=SOURCES):
     name = vars(module).get('__name__')
     if name not in targets or name not in sources or sys.version_info[:2] != (3, 12) or sys.flags.optimize:
         raise ValueError('CACHE_CALLBACK_SOURCE_UNSUPPORTED')
     path = vars(module).get('__file__')
-    pin = sources[name]
-    raw = artifact(path, pin, **({'limit': SOURCE_BYTES[pin]} if pin in SOURCE_BYTES else {}))
+    pin, raw = _source(module, sources)
     key = (name, path, pin)
     if key not in _COMPILED:
         result = {}
@@ -88,7 +121,7 @@ def _uint(value):
 
 class CacheCallbackObserver:
     targets = TARGETS
-    sources = base.SOURCE_SHA
+    sources = SOURCES
     schema = SCHEMA
     profile = PROFILE
     def __init__(self, session, *, sink=None, context_provider=None, clock=None):
@@ -165,6 +198,17 @@ class CacheCallbackObserver:
             out.append({'offset': offset, 'length': length, 'identifier_sha256': self.fingerprint(fields.get('identifier'))})
         return out
 
+    def _baseline_hashes(self, hashes):
+        # 0.7.0 Request stores a private list of BlockHashType tuples. Read
+        # only hash_value; token_ids/extra_keys are neither read nor persisted.
+        if (type(hashes) is not list or len(hashes) > MAX_BLOCKS
+                or any(type(value).__name__ != 'BlockHashType' or type(value).__bases__ != (tuple,)
+                       or tuple.__len__(value) != 3 or type(tuple.__getitem__(value, 0)) is not int
+                       for value in hashes)):
+            self.gaps.add('CACHE_CALLBACK_BASELINE_HASH_SHAPE_UNAVAILABLE')
+            return None
+        return [self.fingerprint(str(tuple.__getitem__(value, 0))) for value in hashes]
+
     def _snapshot(self, point, args, kwargs, result=None, returned=False):
         receiver = args[0] if args else None
         active = _ACTIVE.get()
@@ -173,6 +217,23 @@ class CacheCallbackObserver:
         if point == 'KVCacheManager.get_computed_blocks':
             request = args[1] if len(args) > 1 else kwargs.get('request')
             fields = base.attrs(request)
+            baseline = self.__dict__.get('_source_pins', {}).get('vllm.v1.core.kv_cache_manager') == BASELINE_ROWS['vllm.v1.core.kv_cache_manager']['sha256']
+            if baseline:
+                # The 0.7 V1 Request has no cache_salt or grouped block pool.
+                # _kv_block_hashes is a plain list; the public ConstantList
+                # property must not be invoked by an observer.
+                row.update(request_sha256=self.fingerprint(fields.get('request_id')),
+                    request_cache_salt_sha256=None,
+                    request_lora_name_sha256=self.fingerprint(base.attrs(fields.get('lora_request')).get('lora_name')),
+                    request_block_hashes_sha256=self._baseline_hashes(fields.get('_kv_block_hashes')),
+                    request_media_ranges=None, block_pool_token=None)
+                if returned:
+                    if type(result) is tuple and len(result) == 2 and type(result[0]) is list:
+                        row.update(num_computed_tokens=_uint(result[1]), shared_prefix_boundary=None,
+                            returned_group_blocks=None, returned_flat_blocks=self._blocks(result[0]))
+                    else:
+                        self.gaps.add('CACHE_CALLBACK_COMPUTED_RESULT_UNAVAILABLE')
+                return row
             hashes = fields.get('block_hashes')
             row.update(request_sha256=self.fingerprint(fields.get('request_id')),
                 request_cache_salt_sha256=self.fingerprint(fields.get('cache_salt')),
@@ -234,6 +295,8 @@ class CacheCallbackObserver:
         expected = _codes(module, self.targets, self.sources).get(point)
         if expected is None or _digest(original.__code__, name) != expected:
             raise ValueError('CACHE_CALLBACK_ENTRY_UNSUPPORTED')
+        pin = source_pin(module, self.sources)
+        self.__dict__.setdefault('_source_pins', {})[name] = pin
 
         def qualified():
             current = vars(cls).get(method)
@@ -261,7 +324,7 @@ class CacheCallbackObserver:
             try:
                 common = {'schema': self.schema, 'session_sha256': base.sha(self.session.encode()), 'process_sha256': self.process_sha256,
                     'call_sha256': call, 'parent_call_sha256': parent['call'] if parent else None, 'point': point,
-                    'source_file_sha256': self.sources[name], 'entry_code_sha256': expected,
+                    'source_file_sha256': pin, 'entry_code_sha256': expected,
                     'entry_qualified_before': before, 'runtime_context_injected': self.injected_context,
                     'authenticated_identity_verified': False, 'actual_tensor_consumption_verified': False,
                     'transitive_dependencies_verified': False, 'native_profile_installed': False}

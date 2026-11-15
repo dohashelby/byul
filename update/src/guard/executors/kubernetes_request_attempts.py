@@ -45,7 +45,7 @@ class KubernetesRequestAttemptsExecutor(KubernetesRequestTerminationExecutor):
         target={"schema":"guard-kubernetes-lifecycle-target/1","lab":ctx.target["lab"],"run_id":ctx.cprobe.binding["run_id"],
             "environment_ref":ctx.env.ref().model_dump(mode="json"),
             "kubernetes":{"context":ctx.cprobe.binding["context"],"engine":ctx.cprobe.binding["engine"]}}
-        reader=None;packet=None;bycase={};sealed=False
+        reader=None;packet=None;bycase={};sealed=False;binding_hashes={}
         try:
             reader=KubernetesLifecycleReader(target,ctx.env,ctx._termination_prepared,runner=self.runner,
                 binary=self.cfg.get("kubectl_binary","kubectl"),duration=self.cfg.get("max_duration_seconds",120))
@@ -57,16 +57,26 @@ class KubernetesRequestAttemptsExecutor(KubernetesRequestTerminationExecutor):
                 rid="byul-req12-"+token+"-"+group;session="byul-req12-"+token+"-"+case
                 body={"model":ctx.api_model,"prompt":"hello","max_tokens":8 if case=="disconnect" else 1,"temperature":0,
                     "stream":case=="disconnect","session_id":session}
-                row={"case_id":"req12-"+case,"external_request_sha256":sha256_hex(rid.encode()),"auxiliary_session_sha256":sha256_hex(session.encode()),
+                try:
+                    if ctx._termination_prepared['profile']=='vllm-native-lifecycle-metadata/28':
+                        from guard.collectors.lifecycle import request_header_fingerprint
+                        request_identity=request_header_fingerprint(self.cfg['prepared'],ctx._termination_prepared,rid)
+                    else:request_identity=sha256_hex(rid.encode())
+                except ValueError:
+                    request_identity=None;summary['diagnostic_codes'].append('REQUEST_ATTEMPT_BINDING_KEY_UNAVAILABLE')
+                row={"case_id":"req12-"+case,"external_request_sha256":request_identity,"auxiliary_session_sha256":sha256_hex(session.encode()),
                     "request_body_sha256":sha256_hex(canonical_json(body)),"attempted":False,"normal_shape_verified":False,
                     "expected_client_close":False,"outcome":None,"response_body_sha256":None,"capture_complete":False,
                     "started_at":None,"finished_at":None,"policy_window_verified":False}
                 summary["trials"].append(row);bycase[case]=row
+                if request_identity is None:continue
                 try:
                     now=utcnow()
                     if not start<=now<=end:raise ValueError
                     request={"id":row["case_id"],"method":"POST","mode":"sse" if case=="disconnect" else "json",
                         "url":ctx.engine_url+"/v1/completions","headers":{"X-Request-Id":rid},"body":body}
+                    if ctx._termination_prepared['profile']=='vllm-native-lifecycle-metadata/28':
+                        binding_hashes[row['case_id']]=request_identity
                     if case=="disconnect":request["read_profile"]={"profile":"slow-reader-v1","chunk_bytes":1,"interval_ms":1,"close_after_reads":1}
                     row.update(attempted=True,started_at=now.isoformat())
                     response,=ctx.cprobe("kubernetes-probe",[request],ctx.timeout)
@@ -99,14 +109,15 @@ class KubernetesRequestAttemptsExecutor(KubernetesRequestTerminationExecutor):
                 summary["native"]={"sealed":sealed,"session_sha256":sha256_hex(ctx._termination_prepared["session"].encode()),
                     "recorded_files_covered":bool(packet and packet["recorded_files_covered"]),"transport":reader.report(),
                     "capture_sha256":[r["capture"]["provenance"]["capture_sha256"] for r in packet["recordings"] if r["capture"]] if packet else []}
-        projected=project_attempts(packet,summary["trials"]);summary["native_projection"]=projected
+        projected=project_attempts(packet,summary["trials"],binding_hashes=binding_hashes);summary["native_projection"]=projected
         summary["diagnostic_codes"].extend(projected["diagnostic_codes"]);summary["http_transport"]=ctx.cprobe.report()
         summary["diagnostic_codes"]=sorted(set(summary["diagnostic_codes"]))
         incomplete=bool(packet is None or not packet["recorded_files_covered"])
         gaps={"REQUEST_ATTEMPT_CLIENT_CLOSE_UNVERIFIED","REQUEST_ATTEMPT_NORMAL_CONTROL_UNVERIFIED","REQUEST_ATTEMPT_PROBE_UNAVAILABLE",
             "REQUEST_ATTEMPT_POLICY_WINDOW_UNVERIFIED","REQUEST_ATTEMPT_NATIVE_PREFLIGHT_UNAVAILABLE","REQUEST_ATTEMPT_SEAL_UNVERIFIED","REQUEST_ATTEMPT_CAPTURE_UNAVAILABLE",
             "REQUEST_ATTEMPT_OUTPUT_CAPTURE_INCOMPLETE","REQUEST_ATTEMPT_OUTPUT_LINK_UNAVAILABLE",
-            "REQUEST_ATTEMPT_EVENT_BOUND_REACHED","REQUEST_ATTEMPT_INVOCATION_CAPTURE_INCOMPLETE","REQUEST_ATTEMPT_BODY_CALLBACK_UNAVAILABLE"}
+            "REQUEST_ATTEMPT_EVENT_BOUND_REACHED","REQUEST_ATTEMPT_INVOCATION_CAPTURE_INCOMPLETE","REQUEST_ATTEMPT_BODY_CALLBACK_UNAVAILABLE",
+            "REQUEST_ATTEMPT_BINDING_KEY_UNAVAILABLE"}
         ctx._termination_gap=bool(incomplete or gaps.intersection(summary["diagnostic_codes"]) or summary["http_transport"]["collection_gap"])
         ctx._termination_cleanup=list(summary["http_transport"]["cleanup_errors"])
         if reader is not None and reader.report().get("parent_cleanup_unverified"):

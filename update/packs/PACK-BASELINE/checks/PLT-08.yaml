@@ -3,7 +3,7 @@ framework_id: CHK-PLT-008
 mechanism_ids:
 - mechanism-01
 - mechanism-16
-revision: 5
+revision: 8
 retired: false
 area: PLT
 purpose: 통신 상대·전송 보호
@@ -13,37 +13,13 @@ scope: API·기본 IPC/TP; 다중 노드·PP는 선택
 risk_category: 보안 위협 점검
 risk_summary: 내부 통신에 접근 가능한 비허용 주체가 peer를 사칭하거나 전송을 읽고 바꿔 요청 자료 유출·계산 오염·작업 중단을 일으킬 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   always: true
   prose: 호출 앱·사용자→Gateway→엔진의 실제 API 전송 구간과 기본 IPC/TP를 확인한다. Gateway가 없으면 호출 주체→엔진을 확인한다. 다중 노드·PP는 사용 시 추가한다.
 policy_params:
-- key: api_hop_scope
-  type: str
-  required: true
-- key: api_container_id
-  type: str
-  required: true
-- key: api_network_id
-  type: str
-  required: true
-- key: api_endpoint_id
-  type: str
-  required: true
-- key: api_ip
-  type: str
-  required: true
-- key: api_port
-  type: int
-  required: true
 - key: plaintext_forbidden
   type: bool
-  required: true
-- key: validity_start
-  type: str
-  required: true
-- key: validity_end
-  type: str
   required: true
 policy_prose:
   policy_to_decide: 구간별 위협 주체·자료 민감도·보호 수준

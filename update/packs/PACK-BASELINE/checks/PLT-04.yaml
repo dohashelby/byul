@@ -2,7 +2,7 @@ id: PLT-04
 framework_id: CHK-PLT-004
 mechanism_ids:
 - mechanism-11
-revision: 5
+revision: 6
 retired: false
 area: PLT
 purpose: 자격 제공·사용 제한
@@ -12,7 +12,7 @@ scope: 기본 환경 전달 확인; Ray 원격 전달은 선택
 risk_category: 보안 위협 점검
 risk_summary: 침해된 worker가 불필요하게 상속받은 secret·자격을 이용해 저장소 등 다른 서비스의 자료에 접근할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   always: true
   prose: 기본 worker 환경·자격 상속을 확인한다. Ray/원격 worker 전달은 해당 실행기를 사용할 때 추가한다.

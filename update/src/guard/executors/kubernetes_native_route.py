@@ -15,7 +15,7 @@ PROFILE=contract.PROFILE;POLICY_TYPES=contract.POLICY_TYPES;OBSERVATIONS=contrac
 class KubernetesNativeRouteExecutor(KubernetesRequestTerminationExecutor):
     name='native_route';version='0.1.0';check_id='REQ-02';collection_profile=PROFILE;policy_prefix='route_native'
     policy_normalizer=staticmethod(contract.normalize_policy);transport_profile=ROUTE_AUTHENTICATION_PROFILE
-    supported_native_profiles=frozenset({'vllm-native-lifecycle-metadata/8'})
+    supported_native_profiles=frozenset({'vllm-native-lifecycle-metadata/8','vllm-native-lifecycle-metadata/25'})
     configuration_keys=KubernetesRequestTerminationExecutor.configuration_keys|{'probe_key_env'}
 
     def run(self,check,env,policy_values,adapter,workdir):

@@ -1,5 +1,7 @@
 """Source-qualified rank and closed native worker admission observations."""
 from __future__ import annotations
+
+from .vllm_observer_pin_rows import candidate_sources, layout
 import os
 
 from . import vllm_cache_callback as cache, vllm_consumption_callback as v1, vllm_consumption_v2_callback as v2
@@ -35,8 +37,8 @@ class _Scoped(QualifiedObserver):
 
 
 class ScopedConsumptionObserver(_Scoped, v1.ConsumptionObserver):
-    pass
+    sources = candidate_sources(v1.ConsumptionObserver.sources, v1.TARGETS)
 
 
 class ScopedConsumptionV2Observer(_Scoped, v2.ConsumptionV2Observer):
-    pass
+    sources = candidate_sources(v2.SOURCES, v2.TARGETS)

@@ -1,8 +1,8 @@
 """REQ-21: TP custom all-reduce 통신 buffer의 등록·사용·완료·해제·재등록 세대.
 
-vLLM 0.31.0 `vllm.distributed.device_communicators.custom_all_reduce`(50adb01d…)의
-`CustomAllreduce.__init__`·`register_graph_buffers`·`all_reduce`·`close`를 원 소스 해시로
-고정해 감싼다. 통신기 객체를 세대로 보고, 등록한 handle·buffer 주소는 keyed 요약으로만
+`vllm.distributed.device_communicators.custom_all_reduce`의
+`CustomAllreduce.__init__`·`register_graph_buffers`·`all_reduce`·`close`를 판본별 원 소스 해시
+(`PIN_ROWS`)로 고정해 감싼다. 통신기 객체를 세대로 보고, 등록한 handle·buffer 주소는 keyed 요약으로만
 남긴다(주소 원값·tensor 비저장). 완료 fence는 lab 설정에서만 GPU 동기화로 확인한다.
 
 해제된 주소가 다음 세대에 다시 나오는 것은 CUDA의 정상 재사용일 수 있어 위반으로 보지 않는다.
@@ -14,7 +14,19 @@ from . import vllm_cache_callback as cache
 MODULE = 'vllm.distributed.device_communicators.custom_all_reduce'
 TARGETS = {MODULE: ('CustomAllreduce.__init__', 'CustomAllreduce.register_graph_buffers',
                     'CustomAllreduce.all_reduce', 'CustomAllreduce.close')}
-SOURCES = {MODULE: '50adb01de32bb910fd3c86e13125e36c9d7f3eb5efb36fba99f15c3675760cb9'}
+# 판본별 원 소스 고정값(판본 데이터). 감싸는 코드는 같고, 파일 bytes가 이 중 하나와 정확히
+# 같을 때만 감싼다. 관측 속성(`_ptr`·`buffer_ptrs`·`disabled`·`rank`·`world_size`)과
+# `all_reduce(..., registered=)` 서명은 세 소스 모두에서 함수 단위로 확인했다(M-A6,
+# `tools/engine_pin_compare.py`, docs/dev-1/ma6-version-applicability.md).
+PIN_ROWS = {
+    # 이전 판본(GPU 실측 소스 db9527a4…)
+    '50adb01de32bb910fd3c86e13125e36c9d7f3eb5efb36fba99f15c3675760cb9': 'reviewed',
+    # MVP 후보 판본 태그 소스 ced6857a…: MNNVL multimem 경로 삭제만 다름. 이미지 bytes 대조 전 후보
+    'a048c1327c23580805600c0c951831bec333b1ffc4eb26a0e3d34119c4f0c445': 'candidate',
+    # MVP 기준 판본 태그 소스 5204ff5c…: MNNVL 없음, 생성자 인자 max_size만. 이미지 bytes 대조 전 후보
+    'f3e7b346e31eeab398c62c9a4e94a5aeab8a6936460b365ba60ceed91f0ecbf2': 'candidate',
+}
+SOURCES = {MODULE: tuple(PIN_ROWS)}
 SCHEMA = 'guard-vllm-comm-buffer-callback/1'
 MAX_RANKS = 16
 

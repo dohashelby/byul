@@ -34,7 +34,7 @@ def test_existing_failure_has_safe_cause_action_and_identity(check, code, side):
     ("model inventory differs from ENV", "MODEL_INVENTORY"),
     ("model snapshot is missing", "MODEL_SNAPSHOT"),
     ("two distinct image digests are required", "IMAGE_PAIR"),
-    ("explicit Linux CPU profile", "CPU_PROFILE"),
+    ("both ENVs need an explicit GPU profile", "GPU_PROFILE"),
     ("meaningful side execution conditions differ", "COMPARISON_CONDITIONS"),
     ("scope must select exactly five minimum checks", "POLICY_SCOPE"),
     ("real executor is required", "POLICY_OR_EXECUTOR"),

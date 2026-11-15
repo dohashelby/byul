@@ -11,16 +11,18 @@ from pathlib import Path
 import stat
 
 from guard.collectors import gpu_common_inputs as contract
+from guard.collectors.gpu_common_input_v4 import event_count
 from guard.collectors import ipc_ownership_producer, group_resource_producer
 from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, Observation, canonical_json, sha256_hex
 from guard.runtime.bounded import strict_json
 from .base import DraftArtifact
 
 
-KINDS = frozenset({"request-attempt", "generation-transition", "health-worker-causal",
+LEGACY_KINDS = frozenset({"request-attempt", "generation-transition", "health-worker-causal",
                    "profiler-control", "process-device-provider", "ipc-ownership", "failed-group-resources"})
+KINDS = LEGACY_KINDS | {'rank-fault'}
 CHECK_IDS = frozenset({"LIF-03", "LIF-05", "LIF-06", "LIF-07", "LIF-09", "LIF-10", "LIF-11",
-                       "LIF-12", "LIF-14", "REQ-12", "OBS-02", "OBS-03", "PLT-01", "PLT-02", "PLT-04"})
+                       "LIF-08", "LIF-12", "LIF-14", "REQ-12", "OBS-02", "OBS-03", "PLT-01", "PLT-02", "PLT-04"})
 MAX_BYTES = 8 * 1024**2
 
 
@@ -63,7 +65,7 @@ def consume_record(check_id, record, *, environment_ref, target_sha256, prepared
             else:
                 raise ValueError("B_COMMON_INPUT_CURRENT_OWNER_MISMATCH")
     events = record["events"]
-    facts = {"event_counts": {name: sum(e["event"] == name for e in events)
+    facts = {"event_counts": {name: sum(event_count(e) for e in events if e["event"] == name)
                              for name in sorted({e["event"] for e in events})}}
     if kind == "ipc-ownership":
         facts.update(ipc_ownership_producer.summarize(record))
@@ -84,12 +86,21 @@ def consume_record(check_id, record, *, environment_ref, target_sha256, prepared
         facts["actual_weights_cache_consumption_verified"] = False
         gaps.append("B_GENERATION_LABELS_NOT_ACTUAL_WEIGHTS_CACHE_CONSUMPTION")
     elif kind == "request-attempt":
+        if record['schema'] == 'guard-gpu-common-input/4':
+            facts['kv_observations'] = [{k: e[k] for k in ('seq', 'kv_units', 'kv_unit', 'kv_unit_tokens')}
+                                       for e in events if e['event'] == 'kv_owned']
+            facts['limit_enforcement_methods'] = sorted({e['enforcement_method'] for e in events
+                if e['event'] == 'limit_enforced' and e['enforcement_method'] is not None})
         facts["automatic_retry_and_final_output_binding_verified"] = False
         gaps.append("B_ATTEMPT_EVENTS_NOT_FULL_BUDGET_DISCONNECT_OR_RETRY_SCOPE")
     elif kind == "process-device-provider":
         facts["namespace_host_pid_pairs"] = sorted({(e["namespace_pid"], e["nvml_host_pid"])
             for e in events if e["event"] == "gpu_process" and e["namespace_pid"] is not None and e["nvml_host_pid"] is not None})
         gaps.append("B_PROCESS_DEVICE_NOT_COMPLETE_WORKER_ROSTER_OR_ENTERPRISE_CREDENTIAL_SCOPE")
+    elif kind == "rank-fault":
+        facts['fault_kinds'] = sorted({e['fault_kind'] for e in events})
+        facts['whole_group_and_deadline_verified'] = False
+        gaps.append('B_RANK_EVENTS_NOT_ALL_RANK_NORMAL_DETECTION_NOTIFICATION_OR_RECOVERY')
     return {"kind": kind, "record_sha256": sha256_hex(canonical_json(record)),
             "validation": validation, "facts": facts, "gaps": sorted(set(gaps)),
             "producer_authenticated": False, "whole_question_complete": False,
@@ -114,7 +125,8 @@ def attach_inputs(draft, check, env, target, descriptor, workdir, *, prepared=No
         if (check.id not in CHECK_IDS or type(descriptor) is not dict
                 or set(descriptor) - {"prepared", "session", "records", "generation", "data_origin"}
                 or not {"prepared", "session", "records"} <= set(descriptor)
-                or type(descriptor["records"]) is not dict or not 1 <= len(descriptor["records"]) <= len(KINDS)
+                or type(descriptor["records"]) is not dict
+                or not 1 <= len(descriptor["records"]) <= (1 if check.id == 'LIF-08' else len(LEGACY_KINDS))
                 or type(descriptor["session"]) is not str
                 or descriptor.get("data_origin", "EXAMPLE") not in {"EXAMPLE", "DECLARED"}
                 or descriptor.get("generation") != generation):

@@ -13,11 +13,12 @@ from guard.cli import app
 from guard.adapters.vllm import VllmAdapter
 from guard.models import canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
-from guard.executors import kubernetes_observation as observation
+from guard.executors import kubernetes_observation as observation, run_binding
 from guard.executors.observation_contract import EVENTS,FIELDS,SCHEMA,normalize_policy,validate_record
 from guard.executors.owned_capture import _FILE_READER
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.store import Store
+from tests.run_binding_support import for_pack, run_table_toml
 from tests.builders import baseline_pack,policy,T0
 from tests.test_kubernetes_request_binding import env,target
 from tests.test_kubernetes_sampling import World as PodWorld
@@ -106,6 +107,8 @@ def inputs(tmp_path,mode='normal'):
     if mode=='required-unimplemented':values['observation_required_events']=list(sorted(EVENTS));values['observation_required_fields'].append('approval_sha256')
     if mode=='deadline':values['observation_max_delay_ms']=0
     world.values=values;receipt=derive(baseline_pack().path,tmp_path/'pack');pack=load_pack(tmp_path/'pack')
+    if 4 in run_binding.stages_for(pack.checks['OBS-01']):
+        values['observation_event_policy_sha256']=sha256_hex(canonical_json(for_pack(pack,'OBS-01',values)))
     return environment,world,values,pack,receipt
 
 
@@ -124,11 +127,11 @@ def test_existing_cli_records_and_exact_refs_preserve_unknown_and_followup_facts
             if path.name=='probe_log.jsonl' and a and a[0]=='w':raise OSError(PRIVATE)
             return original(path,*a,**kw)
         monkeypatch.setattr(Path,'open',open_file)
-    pol=policy(pack.ref(),scope={'include':['OBS-01']},values={'OBS-01':values})
+    pol=policy(pack.ref(),scope={'include':['OBS-01']},values={'OBS-01':for_pack(pack,'OBS-01',values)})
     for name,value in [('environment',environment.to_dict()),('policy',pol.to_dict()),('target',world.target)]:
         (tmp_path/(name+'.json')).write_bytes(canonical_json(value))
     cfg=tmp_path/'guard.toml';cfg.write_text('[executors]\nrequired_event_record="kubernetes"\n[adapter]\nname="vllm"\n[required_event_record]\ntarget='
-        +json.dumps(str(tmp_path/'target.json'))+'\nroles={allowed="OBS_ALLOWED",denied="OBS_DENIED"}\n',encoding='utf-8')
+        +json.dumps(str(tmp_path/'target.json'))+'\nroles={allowed="OBS_ALLOWED",denied="OBS_DENIED"}\n'+run_table_toml(pack,'OBS-01',values),encoding='utf-8')
     runner=CliRunner();common=['--store',tmp_path/'store','--config',cfg]
     def cli(args,expected=0):
         result=runner.invoke(app,list(map(str,args)));assert result.exit_code==expected,(args,result.output,result.exception)

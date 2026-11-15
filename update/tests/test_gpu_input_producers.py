@@ -13,6 +13,23 @@ POD = {'pod_uid': '10000000-0000-0000-0000-000000000001', 'container_id': 'conta
 R1, R2 = '1' * 64, '2' * 64
 
 
+@pytest.fixture
+def registered_fixture_producers(monkeypatch):
+    # 관측 변환의 등록 후 분기만 검증하는 모의 등록. 실제 GPU 승인은 아니다.
+    for factory in (producers.transition_producer, producers.profiler_producer, producers.consumption_producer):
+        value = factory()
+        monkeypatch.setitem(contract.SUPPORTED_PRODUCERS,
+            (value['name'], value['version']), value['source_sha256'])
+
+
+def test_new_pin_dependencies_do_not_inherit_previous_gpu_registration():
+    for factory in (producers.attempt_producer, producers.transition_producer,
+                    producers.health_producer, producers.profiler_producer,
+                    producers.consumption_producer, producers.supply_producer):
+        value = factory()
+        assert contract.SUPPORTED_PRODUCERS[(value['name'], value['version'])] != value['source_sha256']
+
+
 def observer():
     value = attempt.AttemptObserver.__new__(attempt.AttemptObserver)
     value.gaps = set(); value.fingerprint = lambda v: ('f' + str(v)).ljust(64, '0')[:64] if v is not None else None
@@ -124,7 +141,7 @@ def test_transition_observer_keeps_only_names_and_in_flight_fingerprints():
     assert lora['result'] is True and '/x' not in str(lora)
 
 
-def test_reload_during_a_live_request_shows_in_flight_mixed_consumption_and_the_gate():
+def test_reload_during_a_live_request_shows_in_flight_mixed_consumption_and_the_gate(registered_fixture_producers):
     rows = [row(1_000_000, 'Scheduler.add_request', 'RETURN', request_sha256=R1), sched(2_000_000, R1),
             trow(3_000_000, 'EngineCore.collective_rpc', 'CALL', rpc_transition=True, in_flight_request_sha256=[R1]),
             trow(4_000_000, 'EngineCore.collective_rpc', 'RETURN', rpc_transition=True, result=None),
@@ -134,7 +151,7 @@ def test_reload_during_a_live_request_shows_in_flight_mixed_consumption_and_the_
     assert kinds == [('consumed', 'weights-0'), ('in_flight', 'weights-0'), ('model_loaded', 'weights-1'), ('service_gate', 'service-0'),
                      ('consumed', 'weights-1'), ('consumed', 'weights-1'), ('accepted', 'service-0')]
     assert result['violation_candidates'] == [{'request_sha256': R1, 'component': 'weights', 'reason': 'mixed_generation_consumption'}]
-    # 등록된 생산자(GPU 확인 2026-11-05)라 지원 gap이 없다. 위반 후보는 그대로다.
+    # 이 사례의 모의 등록 뒤에는 지원 gap이 없다. 위반 후보는 그대로다.
     assert record['completeness']['source_ended'] is True and result['supported'] is True and result['gaps'] == []
 
 
@@ -211,7 +228,7 @@ def prow(ns, point, phase, **fields):
             'operation_started_ns': ns, 'operation_finished_ns': ns, 'fields': fields, 'process_sha256': 'p' * 64, 'call_sha256': str(ns)}
 
 
-def test_profiler_chain_across_three_processes_with_output_and_next_collection():
+def test_profiler_chain_across_three_processes_with_output_and_next_collection(registered_fixture_producers):
     api = [prow(1_000_000, 'AsyncLLM.start_profile', 'CALL', is_start=True), prow(9_000_000, 'AsyncLLM.stop_profile', 'CALL', is_start=False)]
     core = [prow(2_000_000, 'EngineCore.profile', 'RETURN', is_start=True), prow(10_000_000, 'EngineCore.profile', 'RETURN', is_start=False)]
     worker = [prow(1_500_000, 'TorchProfilerWrapper._start', 'RETURN', is_start=True), prow(1_800_000, 'Worker.profile', 'RETURN', is_start=True, rank=0),
@@ -264,7 +281,7 @@ def test_consumption_observer_reads_counts_not_strings():
     assert 'secret-word' not in str(summary)
 
 
-def test_api_runner_and_sampler_values_match_and_complete_the_record():
+def test_api_runner_and_sampler_values_match_and_complete_the_record(registered_fixture_producers):
     worker = [crow(10, 'GPUModelRunner._update_states', 'CALL', received=[{'request_sha256': R1, 'prompt_tokens': 5, 'max_token_id': 99, 'params': PARAMS}]),
               crow(11, 'GPUModelRunner._sample', 'CALL', applied=[{'request_sha256': R1, 'temperature_milli': 0, 'top_p_milli': 1000, 'top_k': 0,
                                                                     'logprobs': 0, 'allowed_tokens': 3, 'bad_words': 2}]),

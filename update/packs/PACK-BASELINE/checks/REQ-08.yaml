@@ -2,7 +2,7 @@ id: REQ-08
 framework_id: CHK-REQ-008
 mechanism_ids:
 - mechanism-02
-revision: 3
+revision: 4
 retired: false
 area: REQ
 purpose: 최종 입력 검증
@@ -12,7 +12,7 @@ scope: 도달 조건 확인
 risk_category: 보안 위협 점검
 risk_summary: 재사용 token ID 입력을 제출할 수 있는 호출자가 렌더링·tokenize 검사를 건너뛰어 허용 밖 입력을 실제 모델에 전달할 수 있음.
 review_order: implementation_path_first
-impact: null
+impact: MEDIUM
 applies_when:
   prose: dict/prompt_token_ids 등 재사용 token 입력의 지원·노출 경로에서 수용·전달 여부 또는 금지 정책의 거부·제거를 확인한다. PD 비활성만으로 비사용을 판단하지 않는다.
 policy_params:

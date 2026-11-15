@@ -15,6 +15,8 @@ replay되고, 출력은 매 replay마다 같은 영구 buffer(`hidden_states`)�
 """
 from __future__ import annotations
 
+from .vllm_observer_pin_rows import candidate_sources, layout
+
 import hashlib
 import hmac
 
@@ -23,8 +25,8 @@ from . import vllm_cache_callback as cache
 GRAPH_MODULE = 'vllm.v1.worker.gpu.cudagraph_utils'
 RUNNER_MODULE = 'vllm.v1.worker.gpu.model_runner'
 TARGETS = {GRAPH_MODULE: ('ModelCudaGraphManager.run_fullgraph',), RUNNER_MODULE: ('GPUModelRunner.sample',)}
-SOURCES = {GRAPH_MODULE: '8e6ac6f655dd013dd2a3d3561bc88fe05ceeea2b060e5cb6bc85decb0bb2f813',
-           RUNNER_MODULE: '725c47114e148ade3a26b4cc9c5f7295588fdd387afc3cb5fdb2d16513a1bb5c'}
+SOURCES = ({GRAPH_MODULE: '8e6ac6f655dd013dd2a3d3561bc88fe05ceeea2b060e5cb6bc85decb0bb2f813',
+           RUNNER_MODULE: '725c47114e148ade3a26b4cc9c5f7295588fdd387afc3cb5fdb2d16513a1bb5c'})
 SCHEMA = 'guard-vllm-graph-replay-callback/1'
 MAX_REQUESTS = 256
 
@@ -58,7 +60,7 @@ def _ptr(tensor):
 
 class GraphReplayObserver(cache.CacheCallbackObserver):
     targets = TARGETS
-    sources = SOURCES
+    sources = candidate_sources(SOURCES, TARGETS)
     schema = SCHEMA
     profile = 'source-bound-graph-replay-callback-candidate-v1'
 

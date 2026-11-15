@@ -2,7 +2,7 @@ id: OBS-10
 framework_id: CHK-OBS-010
 mechanism_ids:
 - mechanism-17
-revision: 3
+revision: 4
 retired: true
 area: OBS
 purpose: 기록 위변조 방지
@@ -12,7 +12,7 @@ scope: 실제 기록 저장소
 risk_category: 보안 위협 점검
 risk_summary: 기록 저장소 변경권자가 무단 행위의 이력을 삭제·변조해 침해 탐지·원인 분석·시험 판정을 방해할 수 있음.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   prose: 실제 기록 저장소의 writer·검토자·admin 접근과 변경/삭제를 확인한다. 저장소 미정은 미확인이다.
 policy_params: []

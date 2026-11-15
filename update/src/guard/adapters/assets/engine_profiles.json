@@ -23,6 +23,7 @@
         "forwarded_identity",
         "initialization",
         "lifecycle_transition",
+        "log_integrity",
         "log_minimization",
         "model_authorization",
         "native_input",
@@ -33,16 +34,21 @@
         "online_input",
         "profiler_control",
         "rank_failure",
+        "record_access",
         "request_attempts",
         "request_input_checks",
         "required_events",
         "resource_recovery",
+        "response_content",
         "response_error",
+        "route_record",
         "runner_capture",
+        "sampling",
         "scoped_consumption",
         "session_revocation",
         "stored_responses",
         "stream_buffer",
+        "template_supply",
         "termination",
         "unix_ipc",
         "validation_error",
@@ -61,6 +67,65 @@
       ]
     },
     {
+      "id": "vllm-external-observation/1",
+      "engine": "vllm",
+      "versions": [
+        "0.7.0",
+        "0.30.0"
+      ],
+      "features": [
+        "boundary_egress",
+        "forwarded_identity",
+        "log_integrity",
+        "record_access",
+        "required_events",
+        "response_content",
+        "route_record",
+        "stored_responses",
+        "template_supply",
+        "unix_ipc"
+      ],
+      "pin_status": "no_engine_pin",
+      "qualification": "소유 probe Pod·Kubernetes API·CRI 로그·/proc 관측만 쓰는 실행기다. 엔진 안 관측기를 설치하지 않으며 엔진 판본별 HTTP·로그 데이터가 없으면 실행기가 공백으로 남긴다. 판본 차이와 남은 공백은 docs/dev-1/ma6-version-applicability.md 19절."
+    },
+    {
+      "id": "vllm-callback-candidate-source/1",
+      "engine": "vllm",
+      "versions": [
+        "0.30.0"
+      ],
+      "features": [
+        "native_lifecycle",
+        "runner_capture",
+        "sampling",
+        "scoped_consumption"
+      ],
+      "pin_status": "image_pin",
+      "qualification": "후보 행 13개의 설치 bytes·함수 지문은 이미지와 일치했다(docs/dev-1/ma3-image-qualification-20261114.json). runner_capture는 정확 9개 serving/input/worker 파일과 기존 callback 자산, 단일 n=1 요청, V1 CPU sampling 배열 temperature/top_p만 추가로 허용한다. 실행 시 이미지·파일·환경·개인 키를 재확인한다. 구조화 출력·min_tokens와 GPU 실측/생산자 등록은 별도다."
+    },
+    {
+      "id": "vllm-lifecycle-release-rows/1",
+      "engine": "vllm",
+      "versions": [
+        "0.30.0"
+      ],
+      "features": [
+        "credential_revocation",
+        "initialization",
+        "lifecycle_release_rows",
+        "model_authorization",
+        "native_route",
+        "observation_state",
+        "profiler_control",
+        "request_attempts",
+        "session_revocation",
+        "stream_buffer",
+        "termination"
+      ],
+      "pin_status": "image_pin",
+      "qualification": "기반 /8 센서를 이 판본의 정확 설치 bytes 행으로 설정하는 /25 profile(사용자 결정 M-A6-V6). /29 stream은 이미지 대조된 Uvicorn 원 bytes를, /30 profiler는 후보 wrapper/worker 정확 bytes와 별도 호출 세대를 사용한다. 행이 없는 모듈(default_loader 등)은 검증되지 않은 모듈로 남는다. GPU 생산자 등록은 별도다. 근거 docs/dev-1/ma6-version-applicability.md 22·23절."
+    },
+    {
       "id": "sglang-runtime-request-lifecycle/1",
       "engine": "sglang",
       "versions": [
@@ -69,22 +134,22 @@
       "features": [
         "sglang-native-lifecycle-metadata/1"
       ]
+    },
+    {
+      "id": "vllm-configured-lifecycle-rows/1",
+      "engine": "vllm",
+      "versions": [
+        "0.7.0"
+      ],
+      "features": [
+        "configured_lifecycle_rows",
+        "termination",
+        "observation_state",
+        "request_attempts"
+      ],
+      "pin_status": "image_pin",
+      "qualification": "정확 설치 bytes와 /28의 fresh ASGI→native 입력 HMAC 연결로 LIF-10·12, REQ-12, OBS-02의 제한된 제품 관측을 허용한다. request_attempts 전송은 기존 소유 HTTP 시도만 허용하며 /28은 native 시도/출력/KV를 증명하지 않는다. 전체 종료·GPU 등록도 미검증이다. ma6-version-applicability.md 25·28절."
     }
   ],
-  "implementations": [
-    {
-      "feature": "length_cause",
-      "engine": "vllm",
-      "engine_version": "0.32.0",
-      "image_digest": "vllm/vllm-openai-cpu@sha256:827ef38187f9b52f2bb838695ef815ec5b65f4bf3e4c061b002b2b0a19cb0701",
-      "backend": "cpu",
-      "model": "facebook/opt-125m",
-      "model_revision": "27dcfa74d334bc871f3234de431e71c6eeba5dd6",
-      "model_inventory_sha256": "b11bc2cafab45720afd3d2f19c8250352977bc216efb88fc0afb9d90edc2aea6",
-      "profile": "vllm-cpu-length-cause/1",
-      "data": "reviewed_profiles/vllm-cpu-length-cause-1.json",
-      "data_sha256": "16f4f61acc8747916f8a2cb6b2d9855b25f178ac69b4b831ed45767b201ee8ed",
-      "factory": "guard.adapters.vllm_length_cause:VllmLengthCause"
-    }
-  ]
+  "implementations": []
 }

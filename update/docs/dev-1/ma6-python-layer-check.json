@@ -1,0 +1,64 @@
+{
+  "schema": "guard-python-layer-check/1",
+  "scope": "Python 설치 레이어 메타데이터. 최종 엔진 프로세스 실행·vLLM 설치 파일 대조·GPU 실측 아님.",
+  "layers": [
+    {
+      "side": "base",
+      "layer_index": 7,
+      "layer_number": 8,
+      "digest": "sha256:30c3b0c7b61e4c04e7708d3de2f0224129ad32f7ff773ec1879eb5225f5dbde4",
+      "size": 427580809,
+      "metadata": [
+        {
+          "path": "usr/include/python3.12/patchlevel.h",
+          "sha256": "3eb993d59fcc1d5bd6450d3455deabae1d2c9f555415626aa27e3a5147b52d3a",
+          "version": "3.12.8"
+        },
+        {
+          "path": "var/lib/dpkg/status",
+          "sha256": "5548c603051ec457982a87a49861afc2ebb0962618788c4443161624fd793f54",
+          "package": "python3.12",
+          "package_version": "3.12.8-1+jammy1"
+        },
+        {
+          "path": "var/lib/dpkg/status",
+          "sha256": "5548c603051ec457982a87a49861afc2ebb0962618788c4443161624fd793f54",
+          "package": "python3.12-dev",
+          "package_version": "3.12.8-1+jammy1"
+        }
+      ]
+    },
+    {
+      "side": "candidate",
+      "layer_index": 7,
+      "layer_number": 8,
+      "digest": "sha256:7060cfcdc2e779fa9e90fea3ceac792b39bd79954736267d84c4559ee0ee31de",
+      "size": 233434151,
+      "metadata": [
+        {
+          "path": "usr/include/python3.12/patchlevel.h",
+          "sha256": "f2f4800f05108bef77f6164484aba437b86b81e34744cbb5378f7bb2ccc69414",
+          "version": "3.12.3"
+        },
+        {
+          "path": "var/lib/dpkg/status",
+          "sha256": "7241ea85c431e8196356fe70631a417fcbae5668ed75c12b4e3746bdf3cb3e13",
+          "package": "python3.12",
+          "package_version": "3.12.3-1ubuntu0.17"
+        },
+        {
+          "path": "var/lib/dpkg/status",
+          "sha256": "7241ea85c431e8196356fe70631a417fcbae5668ed75c12b4e3746bdf3cb3e13",
+          "package": "python3.12-dev",
+          "package_version": "3.12.3-1ubuntu0.17"
+        },
+        {
+          "path": "var/lib/dpkg/status",
+          "sha256": "7241ea85c431e8196356fe70631a417fcbae5668ed75c12b4e3746bdf3cb3e13",
+          "package": "python3.12-minimal",
+          "package_version": "3.12.3-1ubuntu0.17"
+        }
+      ]
+    }
+  ]
+}

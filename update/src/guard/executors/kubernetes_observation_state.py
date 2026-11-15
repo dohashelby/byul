@@ -50,7 +50,8 @@ class KubernetesObservationStateExecutor(KubernetesRequestTerminationExecutor):
 
     def project_native(self,ctx,packet,trials):
         """Project the validated packet before its redacted artifact summary."""
-        return project(packet,trials,ctx.policy_values['observation_state_required_components'])
+        return project(packet,trials,ctx.policy_values['observation_state_required_components'],
+                       binding_hashes=getattr(ctx,'_request_binding_hashes',None))
 
     def after_trial(self,ctx,row):
         """Optional bounded follow-up collection; the base state procedure has none."""
@@ -64,7 +65,7 @@ class KubernetesObservationStateExecutor(KubernetesRequestTerminationExecutor):
         target={'schema':'guard-kubernetes-lifecycle-target/1','lab':ctx.target['lab'],'run_id':ctx.cprobe.binding['run_id'],
             'environment_ref':ctx.env.ref().model_dump(mode='json'),
             'kubernetes':{'context':ctx.cprobe.binding['context'],'engine':ctx.cprobe.binding['engine']}}
-        reader=None;packet=None;bycase={};sealed=False
+        reader=None;packet=None;bycase={};sealed=False;ctx._request_binding_hashes={}
         try:
             reader=KubernetesLifecycleReader(target,ctx.env,ctx._termination_prepared,runner=self.runner,
                 binary=self.cfg.get('kubectl_binary','kubectl'),duration=self.cfg.get('max_duration_seconds',120))
@@ -73,16 +74,28 @@ class KubernetesObservationStateExecutor(KubernetesRequestTerminationExecutor):
                 if slot=='disconnect' and not bycase.get('normal-before',{}).get('normal_shape_verified'):continue
                 health=slot.startswith('health-');close=slot=='disconnect';rid='byul-obs02-'+token+'-'+slot
                 body=None if health else {'model':ctx.api_model,'prompt':'hello','max_tokens':8 if close else 1,'temperature':0,'stream':close}
-                row={'case_id':'obs02-'+slot,'method':'GET' if health else 'POST','request_id_sha256':sha256_hex(rid.encode()),
+                try:
+                    if ctx._termination_prepared['profile'] in {'vllm-native-lifecycle-metadata/28',
+                            'vllm-native-lifecycle-metadata/30'}:
+                        from guard.collectors.lifecycle import request_header_fingerprint
+                        request_identity=request_header_fingerprint(self.cfg['prepared'],ctx._termination_prepared,rid)
+                    else:request_identity=sha256_hex(rid.encode())
+                except ValueError:
+                    request_identity=None;summary['diagnostic_codes'].append('OBSERVATION_STATE_REQUEST_BINDING_KEY_UNAVAILABLE')
+                row={'case_id':'obs02-'+slot,'method':'GET' if health else 'POST','request_id_sha256':request_identity,
                     'request_body_sha256':sha256_hex(canonical_json(body)),'attempted':False,'outcome':None,
                     'binding_verified':False,'capture_complete':False,'normal_shape_verified':False,'http_available':None,
                     'expected_client_close':False,'started_at':None,'finished_at':None,'policy_window_verified':False}
                 summary['trials'].append(row);bycase[slot]=row
+                if request_identity is None:continue
                 try:
                     now=utcnow()
                     if not start<=now<=end:raise ValueError
                     request={'id':row['case_id'],'method':row['method'],'mode':'sse' if close else 'json',
                         'url':ctx.engine_url+('/health' if health else '/v1/completions'),'headers':{'X-Request-Id':rid},'body':body}
+                    if not health and ctx._termination_prepared['profile'] in {'vllm-native-lifecycle-metadata/28',
+                            'vllm-native-lifecycle-metadata/30'}:
+                        ctx._request_binding_hashes[row['case_id']]=request_identity
                     if close:request['read_profile']={'profile':'slow-reader-v1','chunk_bytes':1,'interval_ms':1,'close_after_reads':1}
                     row.update(attempted=True,started_at=now.isoformat())
                     response,=ctx.cprobe('kubernetes-probe',[request],ctx.timeout)
@@ -143,7 +156,7 @@ class KubernetesObservationStateExecutor(KubernetesRequestTerminationExecutor):
             'OBSERVATION_STATE_CAPTURE_UNAVAILABLE','OBSERVATION_STATE_POLICY_WINDOW_UNVERIFIED','OBSERVATION_STATE_CLIENT_CLOSE_UNVERIFIED',
             'OBSERVATION_STATE_HEALTH_CAPTURE_UNVERIFIED','OBSERVATION_STATE_NORMAL_CONTROL_UNVERIFIED',
             'OBSERVATION_STATE_NATIVE_COVERAGE_UNVERIFIED','OBSERVATION_STATE_NATIVE_UNAVAILABLE','OBSERVATION_STATE_EVENT_BOUND_REACHED',
-            'OBSERVATION_STATE_FOLLOWUP_UNAVAILABLE'}
+            'OBSERVATION_STATE_FOLLOWUP_UNAVAILABLE','OBSERVATION_STATE_REQUEST_BINDING_KEY_UNAVAILABLE'}
         ctx._termination_gap=bool(gaps.intersection(summary['diagnostic_codes']) or summary['http_transport']['collection_gap'])
         ctx._termination_cleanup=list(summary['http_transport']['cleanup_errors'])
         if reader is not None and reader.report().get('parent_cleanup_unverified'):

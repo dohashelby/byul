@@ -1,0 +1,41 @@
+{
+  "actual_results": null,
+  "engine_executed": false,
+  "generator_source_commit": "26f46c8e549e2a0cd7a322930e79a2ec301718c2",
+  "input_preflight_passed": false,
+  "missing_inputs": [
+    "실제 ENV/target",
+    "Gateway target·인증 주체 매핑",
+    "REQ-15 기업 정책·사례"
+  ],
+  "prepared": [
+    {
+      "check_id": "REQ-15",
+      "file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-req15-supplement-20261114/baseline/prepared/manifest.json",
+      "node_installed": false,
+      "runtime_qualified": false,
+      "session": "5804ca178994bd096dc7d5e02d357702",
+      "settings_sha256": "84da146529717f4f45c5516cb45f3cca7a0b9b4eb5df70caa993360ff6312a84",
+      "sha256": "78470de972cac472b84d1bfd284d7373f439a31934a3346681cce2c11b44d57d",
+      "side": "baseline",
+      "source_bytes_verified": true
+    },
+    {
+      "check_id": "REQ-15",
+      "file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-req15-supplement-20261114/candidate/prepared/manifest.json",
+      "node_installed": false,
+      "runtime_qualified": false,
+      "session": "b3a08c504603911932edc3d943687fda",
+      "settings_sha256": "1dd9dc1431b9190fa54d3efdf087568bc414392bf4625faf0e779e4eda5a7059",
+      "sha256": "4164459d77e45cc784d5af4fc53124192b5ab18f145e49997e7338a368bf953c",
+      "side": "candidate",
+      "source_bytes_verified": true
+    }
+  ],
+  "prepared_assets_match_main": true,
+  "ready_for_execution": false,
+  "schema": "guard-ma7-prepared-supplement/1",
+  "scope": "REQ-15 관측 자산만 추가 준비",
+  "local_manifest_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-req15-supplement-20261114/manifest.json",
+  "local_manifest_sha256": "b002ec70b5c85d6ddc6bfa4119538385db589febeb040a25293c32898512d87b"
+}

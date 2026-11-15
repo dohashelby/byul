@@ -83,7 +83,7 @@ def _read_record(ctx, config, receiver_target):
     t = ctx.cprobe
     if (not isinstance(t, OwnedKubernetesTransport) or t.profile != REQUEST_BINDING_PROFILE
             or ctx.target.get("lab") is not True or t.lab is not True
-            or not supports(t.engine_name, t.engine_version)
+            or not supports(t.engine_name, t.engine_version, 'boundary_egress')
             or t.target_sha256 != sha256_hex(canonical_json(ctx.target))
             or canonical_json(t.environment_ref) != canonical_json(ctx.env.ref().model_dump(mode="json"))):
         raise ValueError("EGRESS_COMMON_INTERFACE_UNAVAILABLE")

@@ -5,6 +5,7 @@ from guard.models import DataOrigin,ExecStatus,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_stream_buffer_http import KubernetesStreamBufferHTTP,HTTP_PROFILE,SLOTS
 from guard.adapters import vllm_stream_buffer_sensor as sensor,vllm_stream_buffer_metadata as metadata
+from guard.adapters import vllm_release_observation_sensor as release_observation
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
 from .lifecycle_session import capture_session
@@ -37,7 +38,8 @@ class KubernetesStreamBufferExecutor(LifecycleCommonInputConsumer, HttpCheckExec
             with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
             digest=sha256_hex(canonical_json(target));prepared=load_prepared(self.cfg['prepared']);start,end,profiles=normalize_policy(policy_values)
             if (digest!=policy_values['buffer_target_sha256'] or env.ref().sha256!=policy_values['buffer_environment_sha256']
-                    or self.expected_target is not None and digest!=self.expected_target or prepared['profile']!=sensor.PROFILE
+                    or self.expected_target is not None and digest!=self.expected_target
+                    or prepared['profile'] not in {sensor.PROFILE,release_observation.STREAM_PROFILE}
                     or sha256_hex(canonical_json(prepared))!=policy_values['buffer_prepared_sha256'] or not start<=utcnow()<=end):raise ValueError
         except (ValueError,KeyError,TypeError,RuntimeError,OSError):raise ValueError('STREAM_BUFFER_CONFIGURATION_INVALID') from None
         transport=KubernetesStreamBufferHTTP(target,env,read_profiles=profiles,runner=self.runner,
@@ -47,6 +49,7 @@ class KubernetesStreamBufferExecutor(LifecycleCommonInputConsumer, HttpCheckExec
         ctx._buffer_prepared=prepared;return self._finish(ctx)
 
     def collect(self,ctx):
+        from guard.collectors.lifecycle import request_header_fingerprint
         start,end,profiles=normalize_policy(ctx.policy_values);token=uuid.uuid4().hex
         trials=[];diagnostics=[];reader=None;packet=None;sealed=False
         budget_profile=ctx.check.collection_profile==BUDGET_PROFILE;rss_samples=[]
@@ -63,12 +66,19 @@ class KubernetesStreamBufferExecutor(LifecycleCommonInputConsumer, HttpCheckExec
             for slot in SLOTS:
                 if slot in {'normal','slow','slow-close'} and not trials[0].get('normal_shape_verified'):continue
                 rid='byul-lif04-'+token+'-'+slot;streaming=slot not in {'normal-before','normal-after'}
-                row={'case_id':'lif04-'+slot,'request_id_sha256':sha256_hex(rid.encode()),'attempted':False,'started_at':None,
+                private=ctx._buffer_prepared['profile']==release_observation.STREAM_PROFILE
+                try:
+                    identity=(request_header_fingerprint(self.cfg['prepared'],ctx._buffer_prepared,rid)
+                        if private else sha256_hex(rid.encode()))
+                except ValueError:
+                    identity=None
+                    diagnostics.append('STREAM_BUFFER_REQUEST_KEY_UNAVAILABLE')
+                row={'case_id':'lif04-'+slot,'request_id_sha256':identity,'attempted':False,'started_at':None,
                     'finished_at':None,'outcome':None,'capture_complete':False,'normal_shape_verified':False,'policy_window_verified':False}
                 trials.append(row)
                 try:
                     now=utcnow()
-                    if not start<=now<=end:raise ValueError
+                    if identity is None or not start<=now<=end:raise ValueError
                     request={'id':'lif04-'+slot,'method':'POST','mode':'sse' if streaming else 'json','url':ctx.engine_url+'/v1/completions',
                         'headers':{'X-Request-Id':rid},'body':{'model':ctx.api_model,'prompt':'hello','max_tokens':8 if streaming else 1,'temperature':0,'stream':streaming}}
                     if profiles.get(slot) is not None:request['read_profile']=profiles[slot]

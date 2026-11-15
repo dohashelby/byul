@@ -32,7 +32,8 @@ def test_readiness_checks_local_images_without_starting_containers(tmp_path, mon
     pack = baseline_pack()
     envs = [environment(id="ENV-"+side,
         engine={"name":"vllm", "version":"test", "image_digest":"image@sha256:"+letter*64},
-        runtime={"gpu_count":0, "cpu":{"architecture":"x86_64", "model":"test", "system":"Linux", "kernel":"test", "threads":2}},
+        # 2026-11-12 (M-A9): managed vLLM launches GPU images only.
+        runtime={"gpu_count":1, "gpu_model":"EXAMPLE-GPU", "driver":"EXAMPLE-DRIVER", "tp_size":1},
         model={"id":"test", "revision":"rev", "inventory_sha256":inventory(snapshot)["inventory_sha256"]})
         for side, letter in [("a","a"),("b","b")]]
     pol = policy(pack.ref(), scope={"include":["REQ-09"]},
@@ -40,11 +41,13 @@ def test_readiness_checks_local_images_without_starting_containers(tmp_path, mon
                     "allowed_endpoints":[pack.checks["REQ-09"].functional_probes[0].id],
                     "allowed_input_formats":["token_ids"]}})
     cfg = {"adapter":{"name":"vllm"}, "executors":{"input_validation":"real"},
-           "update":{"mode":"managed"}, "vllm":{"models_dir":str(tmp_path)},
+           "update":{"mode":"managed"}, "vllm":{"models_dir":str(tmp_path), "gpu_devices":["0"],
+               "resources":{"cpus":4, "memory_bytes":17179869184, "pids_limit":512}},
            "input_validation":{"vocab_size":100, "vocab_source":"synthetic fixture"}}
     class Local:
         def __init__(self, *a): pass
         def daemon_info(self, **kw): return {"os":"linux", "architecture":"x86_64"}
+        def daemon_resources(self, **kw): return {"memory_bytes":64 << 30, "cpus":16}
         def image_info(self, image, **kw):
             return {"os":"linux", "architecture":image_arch, "digests":[image if "@" in image else image+"@sha256:"+"c"*64]}
     monkeypatch.setattr(application, "Docker", Local)

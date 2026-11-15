@@ -11,11 +11,11 @@ FIELDS=frozenset({'schema','phase','source_module','source_sha256','source_verif
 def fingerprint(v):return type(v) is str and re.fullmatch('[0-9a-f]{64}',v) is not None
 
 
-def validate_sample(v):
+def validate_sample(v, *, sources=None):
     try:
         if (type(v) is not dict or set(v)!=FIELDS or v['schema']!=sensor.STREAM_SCHEMA or type(v['phase']) is not str
-                or v['phase'] not in sensor.PHASES or type(v['source_module']) is not str or v['source_module'] not in sensor.SOURCE_ADDITIONS
-                or v['source_sha256']!=sensor.SOURCE_ADDITIONS[v['source_module']]
+                or v['phase'] not in sensor.PHASES or type(v['source_module']) is not str or v['source_module'] not in (sources or sensor.SOURCE_ADDITIONS)
+                or v['source_sha256']!=(sources or sensor.SOURCE_ADDITIONS)[v['source_module']]
                 or type(v['observer_runtime']) is not str or v['observer_runtime'] not in sensor.RUNTIME_CODE_CONTRACTS
                 or v['observer_code_sha256']!=sensor.RUNTIME_CODE_CONTRACTS[v['observer_runtime']]):raise ValueError
         for key in ('source_verified','asgi_context_live','socket_identity_stable'):

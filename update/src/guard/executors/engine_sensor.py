@@ -348,10 +348,77 @@ class EngineSensorExecutor:
             raise ValueError('ENGINE_SENSOR_DURATION_INVALID')
         began = utcnow()
         if check.id in CALLBACK_CHECKS:
+            from . import cache_timing_group
+            if manifest.get('schema') == cache_timing_group.SCHEMA:
+                if check.id != 'REQ-17':
+                    raise ValueError('ENGINE_SENSOR_TIMING_GROUP_CHECK_INVALID')
+                parts = cache_timing_group.load_parts(manifest, Path(self.cfg['manifest']).parent)
+                return self._timing_group(check, env, values, target, prepared, manifest, parts, duration, began, workdir)
             return self._callback(check, env, values, target, prepared, manifest, duration, began, workdir)
         raise EngineSensorNotImplemented(native_capability(check.id)['reason'])
 
-    def _callback(self, check, env, values, target, prepared, manifest, duration, began, workdir):
+    def _timing_group(self, check, env, values, target, prepared, manifest, parts, duration, began, workdir):
+        from . import cache_timing_group as group
+        values = deepcopy(values)
+        if (manifest['session'] != prepared['session'] or manifest['target_sha256'] != values['sensor_target_sha256']
+                or manifest['environment_ref'] != env.ref().model_dump(mode='json')):
+            raise ValueError('ENGINE_SENSOR_CALLBACK_MANIFEST_BINDING_MISMATCH')
+        scope = {'environment_ref': env.ref().model_dump(mode='json'),
+                 'target_sha256': values['sensor_target_sha256'], 'prepared_sha256': values['sensor_prepared_sha256'],
+                 'group_sha256': values['sensor_manifest_sha256'], 'policy_values_sha256': sha256_hex(canonical_json(values)),
+                 'runtime_binding': deepcopy(target.get('kubernetes'))}
+        captures, drafts, collection_errors = [], [], []
+        for index, part in enumerate(parts, 1):
+            sink = {'index': index, 'scope': scope}
+            part_values = {**values, 'sensor_manifest_sha256': manifest['parts'][index - 1]['manifest_sha256']}
+            try:
+                draft = self._callback(check, env, part_values, target, prepared, part, duration,
+                                       utcnow(), Path(workdir) / f'part-{index}', timing_part=sink)
+            except (OSError, ValueError):
+                if not drafts:
+                    raise
+                collection_errors.append('ENGINE_SENSOR_TIMING_PART_COLLECTION_UNAVAILABLE')
+                break
+            artifact_incomplete = 'ARTIFACT_CAPTURE_INCOMPLETE' in (draft.abort_reason or '')
+            if artifact_incomplete:
+                draft.cleanup_errors.append('ENGINE_SENSOR_TIMING_PART_ARTIFACT_INCOMPLETE')
+                if 'capture' in sink:
+                    record = sink['capture'].value()
+                    record['capture_complete'] = False
+                    sink['capture'] = group.seal_capture(record)
+            drafts.append(draft)
+            if 'capture' in sink:
+                captures.append(sink['capture'])
+            if draft.cleanup_errors or 'capture' not in sink:
+                break
+        result = group.aggregate(manifest, parts, captures, values, scope)
+        cleanup = sorted({error for draft in drafts for error in draft.cleanup_errors} | set(collection_errors))
+        collected = result['violation'] is not None
+        finished = collected and not result['missing'] and not cleanup
+        origin = DataOrigin(result['data_origin'])
+        comparison = drafts[0].comparability.model_copy(deep=True)
+        comparison.fixture_sha256 = sha256_hex(canonical_json({'schema': 'guard-native-trials-group/1', 'check': check.id,
+            'parts': [{'index': i, 'cases': part['cases']} for i, part in enumerate(parts, 1)]}))
+        artifacts = [artifact.model_copy(update={'name': f'part-{i}-{artifact.name}'})
+                     for i, draft in enumerate(drafts, 1) for artifact in draft.artifacts]
+        draft = EvidenceDraft(status=ExecStatus.COMPLETED if finished else ExecStatus.ABORTED,
+            data_origin=origin if finished or origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED,
+            normal_control={'attempted': bool(drafts), 'succeeded': result['normal_control_succeeded']},
+            observations={'engine_sensor_violation': {'value': result['violation'], 'collected': collected},
+                          'engine_sensor_full_scope': {'value': result['full_scope'] and not cleanup, 'collected': True}},
+            challenges=[{'step': step, 'attempted': True} for step in check.challenge_steps],
+            artifacts=artifacts, cleanup_errors=cleanup, started_at=began, finished_at=utcnow(),
+            abort_reason=None if finished else 'ENGINE_SENSOR_TIMING_GROUP_SCOPE_INCOMPLETE',
+            comparability=comparison, config={'profile': check.collection_profile, 'implementation': 'kubernetes',
+                'engine_started': False, 'group_schema': group.SCHEMA, 'parts': group.PARTS,
+                'per_part_duration_seconds': duration, 'conditions': drafts[0].config['conditions']})
+        return self._artifact(draft, workdir, {'safe_facts': result,
+            'run_binding': {key: values[key] for key in ('sensor_environment_sha256', 'sensor_target_sha256',
+                                                       'sensor_prepared_sha256', 'sensor_manifest_sha256')},
+            'part_captures': [{'index': i, 'sha256': capture.sha256} for i, capture in enumerate(captures, 1)],
+            'required_branches': REQUIRED_BRANCHES[check.id]})
+
+    def _callback(self, check, env, values, target, prepared, manifest, duration, began, workdir, *, timing_part=None):
         """Send the fixed cohort once, then project the session's native rows."""
         from guard.collectors import engine_callbacks
         from guard.runtime.engine_http import KubernetesBindingError, KubernetesHTTP, ENGINE_CALLBACK_PROFILE
@@ -405,6 +472,7 @@ class EngineSensorExecutor:
             transport.page_archive = Path(workdir) / 'callback-pages'
         endpoint = transport.endpoint.scheme + '://' + transport.endpoint.netloc + '/v1/chat/completions'
         tags = {}; elapsed = {}; outputs = {}; trials = []; cleanup = []; switches = []; gateway_ids = {}
+        timing_clocks = {}
         if lab is not None:
             try:
                 transport.declare_callback_lab(lab)
@@ -463,6 +531,9 @@ class EngineSensorExecutor:
             latency = _callback_elapsed_ms(row)
             if good and latency is not None:
                 elapsed[case['case_id']] = latency
+                if timing_part is not None:
+                    timing_clocks[case['case_id']] = {key: row[key] for key in ('outcome', 'capture_complete',
+                        'timing_basis', 'dispatch_ms', 'request_sent_ms', 'headers_ms', 'end_ms', 'elapsed_ms') if key in row}
         weights_scope = None
         try:
             read = transport.engine_callback_events(prepared['session'])
@@ -539,7 +610,7 @@ class EngineSensorExecutor:
             comparability=comparison,
             config={'profile': check.collection_profile, 'conditions': conditions,
                     'implementation': 'kubernetes', 'engine_started': False})
-        return self._artifact(draft, workdir, {'transport': transport.report() if hasattr(transport, 'report') else None, 'safe_facts': {**result, 'trials': trials, 'sensor_gaps': gaps,
+        payload = {'transport': transport.report() if hasattr(transport, 'report') else None, 'safe_facts': {**result, 'trials': trials, 'sensor_gaps': gaps,
                 **({'runtime_request_bindings': [
                     {'case_id': case_id, 'runtime_request_sha256': sha256_hex(rid.encode()),
                      'upstream_request_sha256': sha256_hex(('byul-cb-' + rid).encode()),
@@ -549,7 +620,28 @@ class EngineSensorExecutor:
                 'run_binding': {key: values[key] for key in ('sensor_environment_sha256', 'sensor_target_sha256', 'sensor_prepared_sha256', 'sensor_manifest_sha256')},
                 **({'comparison_nonce_sha256': sha256_hex(nonce.encode())} if 'comparison_nonce' in manifest else {}),
                 **({'lab_switches': switches} if lab is not None else {})},
-            'required_branches': REQUIRED_BRANCHES[check.id]})
+            'required_branches': REQUIRED_BRANCHES[check.id]}
+        if timing_part is not None:
+            from . import cache_timing_group as group
+            wanted = {projection.tag_digest(secret, tag) for tag in tags.values()}
+            actors = sorted({e['process_sha256'] for e in events
+                if e.get('point') == projection.COMPUTED and e.get('phase') == 'RETURN'
+                and e.get('entry_qualified_before') is True and e.get('entry_qualified_after') is True
+                and (e.get('fields') or {}).get('request_sha256') in wanted
+                and type(e.get('process_sha256')) is str and re.fullmatch('[0-9a-f]{64}', e['process_sha256'])})
+            record = {'schema': group.CAPTURE_SCHEMA, 'index': timing_part['index'],
+                'part_sha256': sha256_hex(canonical_json(manifest)), 'scope': deepcopy(timing_part['scope']),
+                'runtime_binding': (payload['transport'] or {}).get('binding'), 'actors': actors,
+                'started_at': began.isoformat(), 'finished_at': draft.finished_at.isoformat(), 'data_origin': origin.value,
+                'capture_complete': not cleanup and not gaps and len(trials) == len(cases),
+                'normal_control_succeeded': draft.normal_control.succeeded,
+                'samples': [{'case_id': c['case_id'], 'role': c['role'],
+                    'request_sha256': projection.tag_digest(secret, tags[c['case_id']]) if c['case_id'] in tags else None,
+                    'elapsed_ms': elapsed.get(c['case_id']), 'clock': timing_clocks.get(c['case_id']),
+                    'native_tokens': [r['tokens'] for r in rows.get(c['case_id'], [])]} for c in cases]}
+            timing_part['capture'] = group.seal_capture(record)
+            payload['timing_samples'] = record
+        return self._artifact(draft, workdir, payload)
 
     def _auth(self, case):
         if 'principal' not in case:

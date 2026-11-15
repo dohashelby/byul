@@ -1,0 +1,3424 @@
+{
+  "checks": [
+    {
+      "actual_results": null,
+      "check_id": "LIF-01",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "supply_stage_budget_ms",
+          "required": true,
+          "type": "dict[str,int]"
+        },
+        {
+          "key": "supply_stage_budget_bytes",
+          "required": true,
+          "type": "dict[str,int]"
+        },
+        {
+          "key": "supply_total_budget_ms",
+          "required": true,
+          "type": "int"
+        }
+      ],
+      "question": "모델을 가져와 해석·변환·로딩할 때 단계별·전체 자원 예산을 지키는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "LIF-02",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "supply_max_attempts",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "supply_max_fetch_bytes",
+          "required": true,
+          "type": "int"
+        }
+      ],
+      "question": "모델 취득이 실패해도 반복·재시도로 비용이 끝없이 쌓이지 않는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "LIF-03",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "buffer_max_write_bytes",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_max_process_rss_bytes",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_max_send_wait_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_release_deadline_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_read_chunk_bytes",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_read_interval_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_read_max_reads",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_close_chunk_bytes",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_close_interval_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_close_max_reads",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_debug_mode",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "question": "처리 비용이 큰 요청과 동시 부하의 단계별·요청별·누적 예산을 제한하면서 정상 요청도 처리할 수 있는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "LIF-04",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "buffer_max_write_bytes",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_max_process_rss_bytes",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_max_send_wait_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_release_deadline_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_read_chunk_bytes",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_read_interval_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_read_max_reads",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_close_chunk_bytes",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_close_interval_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_close_max_reads",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "buffer_debug_mode",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "question": "응답을 느리게 읽는 연결과 진단용 버퍼가 자원을 과도하게 차지하지 않는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "LIF-05",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다.",
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [],
+      "question": "재배포할 때 이전 요청과 새 모델·설정이 잘못 섞이지 않는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "LIF-06",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다.",
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [],
+      "question": "실행 중 변경이나 순차 교체 중에도 각 요청의 모델·상태가 일관되는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "LIF-07",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다.",
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "init_executor_backend",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "init_expected_ranks",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "init_phase",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "init_required_stages",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "init_failure_rank",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "init_failure_stage",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "init_preparation_deadline_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "init_recovery_deadline_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "required_readiness_items",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "필요한 worker와 모델 실행 준비가 끝난 뒤 요청을 받는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "LIF-08",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "rank_executor_backend",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "rank_expected_ranks",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "rank_output_rank",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "rank_exception_detection_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "rank_exception_notification_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "rank_death_detection_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "rank_death_notification_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "rank_delay_detection_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "rank_delay_notification_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "rank_communication_stall_detection_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "rank_communication_stall_notification_ms",
+          "required": true,
+          "type": "int"
+        }
+      ],
+      "question": "각 GPU 실행 프로세스의 예외·종료·지연·통신 정지를 감지해 상위 제어 프로세스에 알리는가?",
+      "session": "J01",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "LIF-09",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "init_executor_backend",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "init_expected_ranks",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "init_phase",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "init_required_stages",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "init_failure_rank",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "init_failure_stage",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "init_preparation_deadline_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "init_recovery_deadline_ms",
+          "required": true,
+          "type": "int"
+        }
+      ],
+      "question": "일부 worker의 초기화나 모델 준비가 실패했을 때 성공으로 처리하지 않는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "LIF-10",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "termination_max_delay_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "termination_required_scopes",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "취소·연결 종료 후 실제 작업이 정한 기한 안에 중단되고, 더 이상 사용하지 않는 상태·자원이 정리되는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "LIF-11",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "recovery_require_absent_kinds",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "recovery_validity_start",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "recovery_validity_end",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "recovery_branch",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "recovery_executor_backend",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "recovery_expected_ranks",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "recovery_phase",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "recovery_deadline_basis",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "recovery_required_absent_after",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "recovery_max_clock_skew_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "recovery_required_resource_kinds",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "실패한 worker와 내부 통신·공유 자원을 정리해 다음 기동이 가능한가?",
+      "session": "J01",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "LIF-12",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "retry_limits",
+          "required": true,
+          "type": "dict"
+        },
+        {
+          "key": "retry_policy_mode",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "retry_max_record_delay_ms",
+          "required": true,
+          "type": "int"
+        }
+      ],
+      "question": "재시도할 때 이전 작업이 남아 있는지 확인하고 중복 실행 비용을 제한하는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "LIF-13",
+      "confirmed_policy_values": {
+        "disk_fallback_allowed": false,
+        "reacquire_same_approved_generation_only": true,
+        "release_allowed_roles": [
+          "runtime_controller"
+        ]
+      },
+      "expected_gaps": [
+        "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다.",
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
+      ],
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
+      "policy_requirements": [
+        {
+          "key": "release_allowed_roles",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "reacquire_same_approved_generation_only",
+          "required": true,
+          "type": "bool"
+        },
+        {
+          "key": "disk_fallback_allowed",
+          "required": true,
+          "type": "bool"
+        }
+      ],
+      "question": "공유 가중치 전체 해제 후 재취득·대체 공급과 기존 참조의 사용이 승인·접근·수명 기준을 지키는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/baseline/LIF-13/prepared/manifest.json",
+          "prepared_file_sha256": "61a115e4b4a10408add3653795067c1cce5cad671305e026e2333b4905746d3d",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "29781db6df37570c4354369c452333b4",
+          "prepared_settings_file_sha256": "3ce0c8432e1f57bfbf5c7a36078ced3a31908f05176cc7bd7b10e56af74f4987",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/candidate/LIF-13/prepared/manifest.json",
+          "prepared_file_sha256": "9f8476528d48662ba300542517db4f7375111dba142a3ecc4adbca06c3e595fb",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "8aafa27a7359e297c885e6eb09088f4d",
+          "prepared_settings_file_sha256": "52a156b279a18dc8b4cb67de63bc329267211626e4fbdc1c854ac92e8e0d3fee",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "LIF-14",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "profiler_backend_kind",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "profiler_required_ranks",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "profiler_case",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "profiler_control_scope",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "profiler_control_owner_ref",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "question": "성능 진단 종료 응답과 실제 수집·자원 사용의 종료가 일치하는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "LIF-16",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다.",
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [],
+      "question": "변조된 복원 자료나 남은 상태가 복구 결과에 섞이지 않는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "OBS-01",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "1차 제외 범위는 실제 실행 뒤 UNKNOWN·원인을 기록한다. OBS-09는 기업 수집기 범위만 해당한다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "observation_max_delay_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "observation_required_events",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "observation_required_fields",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "필수 접근·관리·승인 기록으로 누가 무엇을 어느 실행에서 했는지 확인할 수 있는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "OBS-02",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "observation_state_required_components",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "profiler_backend_kind",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "profiler_required_ranks",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "준비·실패·종료 기록이 실제 실행 상태와 일치하는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "OBS-03",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "allowed_log_fields",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "forbidden_log_fields",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "forbidden_marker_contexts",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "required_sources",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "required_branches",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "로그·진단·추적·덤프 파일에 허용된 정보만 남기는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "OBS-04",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "usage_allowed",
+          "required": true,
+          "type": "bool"
+        },
+        {
+          "key": "usage_report_paths",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "usage_settings_fresh_process",
+          "required": true,
+          "type": "bool"
+        }
+      ],
+      "question": "금지한 사용 통계 보고가 실제로 꺼진 상태를 유지하는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "OBS-05",
+      "confirmed_policy_values": {
+        "usage_allowed": false
+      },
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "usage_allowed",
+          "required": true,
+          "type": "bool"
+        },
+        {
+          "key": "usage_report_paths",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "usage_settings_fresh_process",
+          "required": true,
+          "type": "bool"
+        },
+        {
+          "key": "allowed_usage_fields",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "allowed_usage_sinks",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "허용한 사용 통계 보고가 정한 항목과 목적지 범위를 지키는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "OBS-06",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "1차 제외 범위는 실제 실행 뒤 UNKNOWN·원인을 기록한다. OBS-09는 기업 수집기 범위만 해당한다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [],
+      "question": "기록·진단 사본의 조회·반출을 허용된 주체로 제한하고, 필요한 저장 암호화를 적용하는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "OBS-09",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "1차 제외 범위는 실제 실행 뒤 UNKNOWN·원인을 기록한다. OBS-09는 기업 수집기 범위만 해당한다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "collector_profile",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "required_trusted_fields",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "client_request_id_trust",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "question": "요청에 넣은 값으로 로그의 사용자·대상·상태를 위조할 수 없는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "OBS-11",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "1차 제외 범위는 실제 실행 뒤 UNKNOWN·원인을 기록한다. OBS-09는 기업 수집기 범위만 해당한다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "required_records",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "collection_deadline_ms",
+          "required": true,
+          "type": "dict[str,int]"
+        },
+        {
+          "key": "max_clock_uncertainty_ms",
+          "required": true,
+          "type": "dict[str,int]"
+        },
+        {
+          "key": "detection_deadline_ms",
+          "required": true,
+          "type": "dict[str,int]"
+        },
+        {
+          "key": "alert_deadline_ms",
+          "required": true,
+          "type": "dict[str,int]"
+        }
+      ],
+      "question": "기록 수집 중단·누락·시각 오류를 표시하고, 증거가 부족한 시험은 미확인으로 처리하는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "PLT-01",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "allowed_capabilities",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "allowed_mounts",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "allowed_devices",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "require_non_root",
+          "required": true,
+          "type": "bool"
+        },
+        {
+          "key": "allowed_exec_writable_paths",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "엔진과 worker의 호스트·파일·장치 권한이 필요한 범위에 한정되는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "PLT-02",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "protected_unix_paths",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "allowed_ipc_uids",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "같은 호스트의 내부 통신 접점에 허용된 프로세스만 접근하는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "PLT-03",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "supply_allowed_objects",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "모델 취득 계정이 허용된 저장소·파일에만 접근할 수 있는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "PLT-04",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "forbidden_env_names",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "forbidden_mount_paths",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "credential_candidate_paths",
+          "required": false,
+          "type": "list[str]"
+        }
+      ],
+      "question": "worker에 필요 없는 자격·비밀정보를 넘기지 않는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "PLT-05",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "supply_allowed_identities",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "자격이 만료되거나 없을 때 승인하지 않은 다른 방식으로 접근하지 않는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "PLT-06",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "worker_isolation_requirement",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "worker_trust_group_markers",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "Core·worker가 공유하는 권한과 신뢰 범위가 채택한 격리 요구에 맞고, 한 worker 침해의 영향 범위를 확인했는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "PLT-07",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "1차 제외 범위는 실제 실행 뒤 UNKNOWN·원인을 기록한다. OBS-09는 기업 수집기 범위만 해당한다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "forbidden_protocol",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "forbidden_operation",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "question": "엔진의 외부 송신이 허용된 목적지와 작업에 한정되는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "PLT-08",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "1차 제외 범위는 실제 실행 뒤 UNKNOWN·원인을 기록한다. OBS-09는 기업 수집기 범위만 해당한다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "plaintext_forbidden",
+          "required": true,
+          "type": "bool"
+        }
+      ],
+      "question": "API·내부 통신의 각 구간에서 통신 상대 인증과 기밀성·무결성 기준을 지키는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "PLT-09",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "record_transport_segments",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "record_tls_required_segments",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "엔진에서 기록 수집기와 최종 저장소까지 필요한 전송 보호가 유지되는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "PLT-10",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "1차 제외 범위는 실제 실행 뒤 UNKNOWN·원인을 기록한다. OBS-09는 기업 수집기 범위만 해당한다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "revocation_deadline_basis",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "revocation_propagation_limit_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "revocation_max_clock_skew_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "revocation_subject_label",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "revocation_max_new_access_samples",
+          "required": true,
+          "type": "int"
+        }
+      ],
+      "question": "자격을 철회한 뒤 새 접근을 정한 기한 안에 거부하는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "PLT-11",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "1차 제외 범위는 실제 실행 뒤 UNKNOWN·원인을 기록한다. OBS-09는 기업 수집기 범위만 해당한다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "session_deadline_basis",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "session_propagation_limit_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "session_max_clock_skew_ms",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "session_max_wait_seconds",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "session_residual_policy",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "question": "이미 열린 연결과 공유 자원 접근권도 정한 철회 정책대로 제한되는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "PLT-12",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "1차 제외 범위는 실제 실행 뒤 UNKNOWN·원인을 기록한다. OBS-09는 기업 수집기 범위만 해당한다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "copy_treatments",
+          "required": true,
+          "type": "dict"
+        },
+        {
+          "key": "copy_max_record_delay_ms",
+          "required": true,
+          "type": "int"
+        }
+      ],
+      "question": "폐기 대상 자격의 남은 사본에 정한 교체·회수·삭제와 재사용 금지 기준이 적용되는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-01",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "allowed_callers",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "Gateway를 거치지 않은 요청으로 허용받지 않은 작업을 할 수 없는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-02",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "1차 제외 범위는 실제 실행 뒤 UNKNOWN·원인을 기록한다. OBS-09는 기업 수집기 범위만 해당한다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [],
+      "question": "Gateway·서버의 경로 설정에 따라 요청 경로가 바뀌어도 최종 실행 API에 필요한 인증·권한 검사가 적용되는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-03",
+      "confirmed_policy_values": {
+        "general_allowed_kinds": [
+          "inference"
+        ]
+      },
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "general_allowed_kinds",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "일반 사용자가 허용받지 않은 관리·진단 작업을 할 수 없는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-04",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "기존 사용자 결정의 대상 비적용 근거를 정본 선정에 남긴다. 새 비적용 승인이 아니다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [],
+      "question": "사용자가 보낸 값으로 권한 검사에 쓰는 신원을 사칭할 수 없는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-05",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "allowed_principal_sha256",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "denied_principal_sha256",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "selected_model_grants",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "retired_model_revisions",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "최종 선택된 모델에 호출자의 사용 권한이 적용되고, 사용 종료한 모델의 실행이 차단되는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "additional_selection_basis": "기존 Gateway 비노출 결정 유지. 기준 판본에도 /v1/responses 경로가 없다는 소스 부재 근거를 추가한다.",
+      "check_id": "REQ-06",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다.",
+        "기존 사용자 결정의 대상 비적용 근거를 정본 선정에 남긴다. 새 비적용 승인이 아니다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "stored_origins",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "stored_operations",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "stored_retention",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "question": "저장된 결과를 조회하거나 취소할 때 해당 객체의 권한을 확인하는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-07",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "allowed_template_sha256",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "max_rendered_input_tokens",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "request_template_override_allowed",
+          "required": true,
+          "type": "bool"
+        }
+      ],
+      "question": "chat template 적용으로 입력이 바뀐 뒤에도 필요한 제한이 유지되는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-08",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "reused_token_field",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "reused_token_allowed",
+          "required": true,
+          "type": "bool"
+        },
+        {
+          "key": "rejection_codes",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "미리 만든 토큰 ID를 재사용하는 입력도 필요한 검사를 거치는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-09",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "max_input_tokens",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "rejection_codes",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "allowed_endpoints",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "allowed_input_formats",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "지원하는 모델 입력의 값·길이·차원과 구성요소의 정합성이 실제 모델·처리 단계의 허용 범위 안에 있는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-10",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "M-B1·M-B4 관측/소비 연결과 판본별 자격 확인이 남았다.",
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
+      ],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "allowed_sampling_options",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "rejection_codes",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "생성 요청 옵션의 값·구조·개수·복잡도·조합이 실제 처리 단계의 허용 범위를 지키는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "request_field_mapping": {
+            "structured_outputs": "guided_json"
+          },
+          "role": "기준 판본",
+          "target": null,
+          "unsupported_cases": [
+            "tool_choice=required"
+          ]
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-11",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "result_binding",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "key": "client_request_id_trust",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "question": "동시 요청과 스트리밍 응답이 각각 올바른 요청자에게 돌아가는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-12",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [],
+      "question": "취소하거나 연결을 끊은 요청의 늦은 결과가 다른 요청이나 새 시도에 섞이지 않는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-13",
+      "confirmed_policy_values": {
+        "allowed_error_fields": [
+          "message",
+          "type",
+          "code"
+        ],
+        "allowed_response_fields": [
+          "id",
+          "object",
+          "created",
+          "model",
+          "choices",
+          "usage"
+        ],
+        "forbidden_return_options": [
+          "echo",
+          "prompt_logprobs",
+          "logprobs"
+        ],
+        "required_targets": [
+          "gateway"
+        ]
+      },
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "allowed_response_fields",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "allowed_error_fields",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "forbidden_return_options",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "required_targets",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "응답 옵션과 오류 메시지가 수신자에게 허용된 정보만 반환하는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-14",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다."
+      ],
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
+      "policy_requirements": [],
+      "question": "여러 실행 프로세스가 주고받는 중간 자료와 최종 출력이 원래 요청에 맞게 처리·반환되는가?",
+      "session": "J01",
+      "sides": {
+        "baseline": {
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/baseline/REQ-14/cases.json",
+          "cases_file_sha256": "feab7942c9a48bfbb5cc150d519ae1e7aa97873ba8af87b2b3b20645ec977652",
+          "cases_preset": "req14-normal",
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/baseline/REQ-14/prepared/manifest.json",
+          "prepared_file_sha256": "6690ebce81683c4d2b73e66b061cebbfbde8af52561adfd18a58ac73f1ab8e0b",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "68bcbc770f0ef451ea9a989e51943d14",
+          "prepared_settings_file_sha256": "07e9f6cab157bcd49fe9fd877e86bc9ec7632fb25430d3e303a74c48170e5767",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/candidate/REQ-14/cases.json",
+          "cases_file_sha256": "feab7942c9a48bfbb5cc150d519ae1e7aa97873ba8af87b2b3b20645ec977652",
+          "cases_preset": "req14-normal",
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/candidate/REQ-14/prepared/manifest.json",
+          "prepared_file_sha256": "b52822076e6497818d0da922260d9de5d6b41e4b776bb19b840c31a12f155a8d",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "11eebe31ad7e22eeaa63cb56abc89435",
+          "prepared_settings_file_sha256": "d73810f697926d696ef2918425958a60fc0da57ba67fb7bde233c7d0f694f215",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-15",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다."
+      ],
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
+      "policy_requirements": [
+        {
+          "key": "public_prefix_sharing_allowed",
+          "required": true,
+          "type": "bool"
+        },
+        {
+          "key": "isolated_cache_groups",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "cache_identity_policy_ref",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "question": "캐시를 공유할 사용자 집단을 검증된 신원에 따라 결정하는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/baseline/REQ-15/prepared/manifest.json",
+          "prepared_file_sha256": "5bc51d6e0a2dd96996d89a7fb3d374f6403aed07c7cf7f69bf2a98613936e570",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "59ef51f8e62587b122aeaa6907ba2cfd",
+          "prepared_settings_file_sha256": "1470eee58c50d3bf74e459495f9a558e3419368292e9af66ca67cead62ded77e",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/candidate/REQ-15/prepared/manifest.json",
+          "prepared_file_sha256": "43fbf4a565886f977d9dbc3860d5dd5df345ab02132e7ad49170cc0def260306",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "f3755c90b39e548c945651d1ab0ed31f",
+          "prepared_settings_file_sha256": "973092aca0a9a49f9c3169fafa2958748e3466e5fbc2d6bc912d73420472d432",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-16",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다.",
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
+      ],
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
+      "policy_requirements": [
+        {
+          "key": "required_cache_contexts",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "캐시 식별값이 재사용에 필요한 모델·설정·자료의 차이를 구분하는가?",
+      "session": "J01",
+      "sides": {
+        "baseline": {
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/baseline/REQ-16/cases.json",
+          "cases_file_sha256": "4ed374d03e74db8bc7824174969f890ce7411b1faf23e6e11a35a455c0535c37",
+          "cases_preset": "req16-full",
+          "environment_ref": null,
+          "explicit_launch_args": [
+            "--enable-prefix-caching"
+          ],
+          "planned_model": {
+            "load_verified": false,
+            "metadata_file": "docs/dev-1/ma7-req16-model-candidate.json",
+            "metadata_sha256": "8820a5b4330c0bbd7740356bcd946316a59310edad38838bb9acff0d1777f10e",
+            "repository": "Qwen/Qwen2-VL-2B-Instruct",
+            "revision_candidate": "895c3a49bc3fa70a340399125c650a463535e71c",
+            "weights_downloaded": false
+          },
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/baseline/REQ-16/prepared/manifest.json",
+          "prepared_file_sha256": "121d7d05d7efa3666c42352cdadd72f3e9e55b7d0785701a9a981f0043e9f69e",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "3d154abc426a469172af9dfaaf53d6ae",
+          "prepared_settings_file_sha256": "cc60b043d922a216d76bfd9beb3e347b974af71fc243d85d26df7b2f48a4b9ac",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/candidate/REQ-16/cases.json",
+          "cases_file_sha256": "4ed374d03e74db8bc7824174969f890ce7411b1faf23e6e11a35a455c0535c37",
+          "cases_preset": "req16-full",
+          "environment_ref": null,
+          "explicit_launch_args": [
+            "--enable-prefix-caching"
+          ],
+          "planned_model": {
+            "load_verified": false,
+            "metadata_file": "docs/dev-1/ma7-req16-model-candidate.json",
+            "metadata_sha256": "8820a5b4330c0bbd7740356bcd946316a59310edad38838bb9acff0d1777f10e",
+            "repository": "Qwen/Qwen2-VL-2B-Instruct",
+            "revision_candidate": "895c3a49bc3fa70a340399125c650a463535e71c",
+            "weights_downloaded": false
+          },
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/candidate/REQ-16/prepared/manifest.json",
+          "prepared_file_sha256": "e0b47e60ff309b589e18732be80a8c413ebd60fd24e2abd44fdddaac57e65743",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "e99beb58ef4e3122c2c73f4a673b2eeb",
+          "prepared_settings_file_sha256": "1cd3e3302a5ab54095dad874b37eb9923c8f2352e39a04f0984c05c1c678a9ab",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "case_generation_deferred": false,
+      "check_id": "REQ-17",
+      "collection_plan_blockers": [
+        "ACTUAL_ENV_TARGET_AND_RUNTIME_QUALIFICATION_REQUIRED"
+      ],
+      "confirmed_policy_values": {
+        "cache_timing_max_auc_percent": 55,
+        "cache_timing_min_samples": 200
+      },
+      "expected_gaps": [
+        "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다.",
+        "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
+      ],
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
+      "policy_requirements": [
+        {
+          "key": "cache_timing_max_auc_percent",
+          "required": true,
+          "type": "int"
+        },
+        {
+          "key": "cache_timing_min_samples",
+          "required": true,
+          "type": "int"
+        }
+      ],
+      "question": "캐시 적중에 따른 시간 차이로 비공개 정보가 허용 범위 밖에 드러나지 않는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/baseline/REQ-17/cohorts/group.json",
+          "cases_file_sha256": "82b6213fee53aa2c016f6c67bf153b02d39f13bfbfdaed48166c9747ea309c72",
+          "cases_preset": "req17-split-100",
+          "environment_ref": null,
+          "explicit_launch_args": [
+            "--enable-prefix-caching"
+          ],
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/baseline/REQ-17/prepared/manifest.json",
+          "prepared_file_sha256": "174d4f99aa9044adf9e615370f31e73d039477018c4e26ec5813af5f749b7e2b",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "c91cd1034e7744c96aa672183cbdbe16",
+          "prepared_settings_file_sha256": "e396b2cbb7000692a6d55314bb8e7eb3fec0244fc646bcd07231a961ea53337f",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "기준 판본",
+          "split_group_contract": true,
+          "target": null
+        },
+        "candidate": {
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/candidate/REQ-17/cohorts/group.json",
+          "cases_file_sha256": "82b6213fee53aa2c016f6c67bf153b02d39f13bfbfdaed48166c9747ea309c72",
+          "cases_preset": "req17-split-100",
+          "environment_ref": null,
+          "explicit_launch_args": [
+            "--enable-prefix-caching"
+          ],
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/candidate/REQ-17/prepared/manifest.json",
+          "prepared_file_sha256": "5a3722c6c706d76f44dc8cd5321985b47444f3ca5d112d0fe5d86dacd0413f82",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "2799d449787f0597e7caabcb4327f153",
+          "prepared_settings_file_sha256": "ea8df2c919b5e479be163ba60a24a112534351400d9e46322221770a2db76d9d",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "후보 판본",
+          "split_group_contract": true,
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-18",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다."
+      ],
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
+      "policy_requirements": [],
+      "question": "batch slot을 옮기거나 재사용할 때 이전 요청의 제한 상태가 남지 않는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/baseline/REQ-18/cases.json",
+          "cases_file_sha256": "d51cefa389523df3e90cd9a288d6217b965b8271ccfda49511426d253ea16798",
+          "cases_preset": "req18-slot",
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/baseline/REQ-18/prepared/manifest.json",
+          "prepared_file_sha256": "41fbce97f228840fe39e05da6ad3d61efcb5030c5e7336e973378564cf44cace",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "3dc5edb557cc9ca936653421e52f80f8",
+          "prepared_settings_file_sha256": "34283c41efc5fd48e07a25b929baa37c0f33571b349d6b43a4e5cd00c6b1dfa6",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "cases_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/candidate/REQ-18/cases.json",
+          "cases_file_sha256": "d51cefa389523df3e90cd9a288d6217b965b8271ccfda49511426d253ea16798",
+          "cases_preset": "req18-slot",
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/candidate/REQ-18/prepared/manifest.json",
+          "prepared_file_sha256": "9bd9c9c88420a0a7a4a7102231b225ebdf9ef3daa4d269cf921d47081909a2d6",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "35e32f2d691dc0dc15ea0d216202d542",
+          "prepared_settings_file_sha256": "9f2496bb0472db24cd1083a70491551e86807a4f04f1b87d36e8d1b83bbde5a9",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-19",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다."
+      ],
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
+      "policy_requirements": [],
+      "question": "실제 사용하는 GPU 연산 코드가 입력·버퍼 경계를 지키고 필요한 영역을 초기화하는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/baseline/REQ-19/prepared/manifest.json",
+          "prepared_file_sha256": "b4843b8a460e76ada027ae869c4db67d5692d872439d0085a7e3f6f9de920f6d",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "7d4c8f87834082bae045714079eb214c",
+          "prepared_settings_file_sha256": "9e82da305d7b238f950be6f9e8519392c6263dc102f8f811868b09f2abf90574",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/candidate/REQ-19/prepared/manifest.json",
+          "prepared_file_sha256": "37bf4d7f704262ee9282283d18f66ec3572af594e0e04d86bacdb385de00a32d",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "917cf5e3a7b19e4c40c4eee6bbc012e7",
+          "prepared_settings_file_sha256": "be6df2bceb0f7000aa7aaeed794ec70671c44bd416e26997be1abff9280dd367",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-20",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다."
+      ],
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
+      "policy_requirements": [],
+      "question": "CUDA Graph 재실행이 현재 입력을 쓰고 아직 읽는 출력 버퍼를 덮어쓰지 않는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/baseline/REQ-20/prepared/manifest.json",
+          "prepared_file_sha256": "11a7309ff052890f4bfd26144acd5e45db3dab3f08abe147a9d50b2f097f5bc6",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "db431c28157c0643df8b27d65c81a9c4",
+          "prepared_settings_file_sha256": "5bae76ae56fc3e0f034dbffc46b452745b09756160c2613b712a3936a5f32fd0",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/candidate/REQ-20/prepared/manifest.json",
+          "prepared_file_sha256": "2bdcd5b538e7d69f72ef2f403b95f9641a665f20b9de4431e9f359bbb145e60d",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "eb810b3fd013b50f446f25a1ebfe6841",
+          "prepared_settings_file_sha256": "a45b3dc8c21995325d7d098ee2783b51db91f3478fdcea24b4f5d66ff8577373",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "REQ-21",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "기준 V0 내부 관측 대상 미구현 또는 실제 감싸기 확인 필요. 후보 행은 설치 bytes·CPython·GPU 자격 확인 전이다."
+      ],
+      "input_state": "로컬 prepared 준비·실제 ENV/target 미입력",
+      "policy_requirements": [],
+      "question": "TP의 GPU 작업 재실행에 사용하는 통신 버퍼가 등록·종료·재기동 후에도 현재 실행의 유효한 버퍼를 참조하는가?",
+      "session": "J01",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/baseline/REQ-21/prepared/manifest.json",
+          "prepared_file_sha256": "e165535880df7f1489a20090998abdbbabc16b3e522a5846556da63ac9b2c302",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "8a81a96da54a1f3196051a2ea0f144df",
+          "prepared_settings_file_sha256": "6aa86409ca4c055efca58485244b963a2d38aa701d7d27627e2e8c2195b6a891",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/candidate/REQ-21/prepared/manifest.json",
+          "prepared_file_sha256": "f7b244ccaa6f02c3792ddd7ac5155174f1be2ff1a5aaeef2071630d41196ea24",
+          "prepared_node_installed": false,
+          "prepared_runtime_qualified": false,
+          "prepared_session": "84ad7878cceda63fc48c65c531cbb9ee",
+          "prepared_settings_file_sha256": "a028dcdac3e7fb5a69a1df9f08ff4294392cd566ca6751374fca428cbdf3629e",
+          "prepared_source_bytes_verified": true,
+          "reason": "로컬 prepared bytes를 준비했으며 노드 설치·관측 지점 자격·실제 ENV/target 결합은 미완료다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "SUP-03",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "allowed_template_sha256",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "기본 모델과 함께 읽는 설정·tokenizer·chat template, 하위 모델·추가 공급원의 파일도 승인 범위에 포함되는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "SUP-04",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "approved_image_digests",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "실제로 실행하는 이미지·패키지와 함께 설치되는 의존성도 모두 승인되어 있는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "SUP-05",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [],
+      "question": "승인 뒤 파일·symlink·마운트가 바뀌어도 승인하지 않은 자료의 사용을 막는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "SUP-06",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [],
+      "question": "각 worker가 배정받은 승인 모델 파일·shard를 실제로 메모리에 올리는가?",
+      "session": "J01",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "SUP-07",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [],
+      "question": "생성된 코드·파일이나 공유 컴파일 캐시를 권한 없이 바꿀 수 없는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "SUP-08",
+      "confirmed_policy_values": null,
+      "expected_gaps": [
+        "과거 PoC의 ignored→consumed는 예상 근거다. 새 정본 결과는 J02에서 별도 생성한다."
+      ],
+      "input_state": "실제 로컬 파일 SHA 재확인·최종 ENV/target 미입력",
+      "policy_requirements": [
+        {
+          "key": "code_selection_fields",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "code_selection_allowed",
+          "required": true,
+          "type": "bool"
+        },
+        {
+          "key": "rejection_codes",
+          "required": true,
+          "type": "list[str]"
+        },
+        {
+          "key": "approved_code_revisions",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "요청에 넣은 값으로 허용받지 않은 코드 버전을 선택할 수 없는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "configuration_pending_target_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-launch-pack36-20261115/baseline/guard.pending-target.toml",
+          "configuration_pending_target_file_sha256": "e563adeee16a7b2eb3f7b6d143b1810a0837e2976679a508c76e0ce1ab4f5dc4",
+          "environment_ref": null,
+          "fixture_manifest_path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/fixture-manifest.json",
+          "fixture_manifest_sha256": "d5121b80dd3237fe63d6e646806d414d464ffc78efa6ef5fbaa436715bf67765",
+          "local_assets_verified": true,
+          "local_audit_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma8-local-preflight-pack36-20261115.json",
+          "local_audit_sha256": "d74655be6ab2da73d093eb0383e5ae6acefb9bb96be8f360299df0a4d20fd88b",
+          "policy_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-launch-pack36-20261115/baseline/policy.yaml",
+          "policy_file_sha256": "5dc025733b7f881cd1e68db435143a63795a0246ed7fa5b7a861eda18aa2cfa8",
+          "prepared": null,
+          "prepared_required": false,
+          "reason": "로컬 fixture·기동 계획·EXAMPLE/DRAFT 정책·target 대기 설정은 준비됐다. 실제 ENV/Pod target·노드 파일 배치/권한·정상 요청 확인이 남았다. HTTP 코드 선택 경로에는 prepared 관측기 자산이 필요하지 않다.",
+          "render_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-launch-pack36-20261115/baseline/render.json",
+          "render_file_sha256": "8e59ce4afa5beace1a04555a7afeb24e3538bf7eb8a7a6801097f48fae421066",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "configuration_pending_target_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-launch-pack36-20261115/candidate/guard.pending-target.toml",
+          "configuration_pending_target_file_sha256": "23a044a9db9dfab2db2671320e1a0875e56cd64a8b05a33c0e3bf9a949a36d11",
+          "environment_ref": null,
+          "fixture_manifest_path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-rebuild-20261113/fixture-manifest.json",
+          "fixture_manifest_sha256": "d5121b80dd3237fe63d6e646806d414d464ffc78efa6ef5fbaa436715bf67765",
+          "local_assets_verified": true,
+          "local_audit_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma8-local-preflight-pack36-20261115.json",
+          "local_audit_sha256": "d74655be6ab2da73d093eb0383e5ae6acefb9bb96be8f360299df0a4d20fd88b",
+          "policy_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-launch-pack36-20261115/candidate/policy.yaml",
+          "policy_file_sha256": "5dc025733b7f881cd1e68db435143a63795a0246ed7fa5b7a861eda18aa2cfa8",
+          "prepared": null,
+          "prepared_required": false,
+          "reason": "로컬 fixture·기동 계획·EXAMPLE/DRAFT 정책·target 대기 설정은 준비됐다. 실제 ENV/Pod target·노드 파일 배치/권한·정상 요청 확인이 남았다. HTTP 코드 선택 경로에는 prepared 관측기 자산이 필요하지 않다.",
+          "render_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-launch-pack36-20261115/candidate/render.json",
+          "render_file_sha256": "14a4fb68a6e483418068bbe3d2288085864d5f681ad1fda9013bca3ae093c651",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-A"
+    },
+    {
+      "actual_results": null,
+      "check_id": "SUP-09",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [],
+      "question": "모델에 포함된 추가 코드가 허용된 조건에서만 실행되는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "SUP-10",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [],
+      "question": "승인하지 않은 플러그인을 실행하기 전에 허용 여부를 검사하는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "SUP-11",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [],
+      "question": "지원하는 Python 실행 모드가 달라져도 같은 동적 import 허용 검사가 유지되는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "SUP-12",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "supply_allowed_readers",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "실제로 사용하는 파일·메시지 해석기가 금지된 객체나 동작을 거부하는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "SUP-13",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [
+        {
+          "key": "forbidden_template_attributes",
+          "required": true,
+          "type": "list[str]"
+        }
+      ],
+      "question": "모델이 제공한 chat template을 해석할 때 허용된 동작 범위를 지키는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "SUP-15",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [],
+      "question": "모델·도구·설정이 바뀌면 더 이상 맞지 않는 생성물이나 캐시를 재사용하지 않는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    },
+    {
+      "actual_results": null,
+      "check_id": "SUP-16",
+      "confirmed_policy_values": null,
+      "expected_gaps": [],
+      "input_state": "미입력",
+      "policy_requirements": [],
+      "question": "중단되거나 실패한 생성물·부분 파일을 완성된 자료로 사용하지 않는가?",
+      "session": "J02",
+      "sides": {
+        "baseline": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "기준 판본",
+          "target": null
+        },
+        "candidate": {
+          "environment_ref": null,
+          "policy_file": null,
+          "prepared": null,
+          "reason": "실제 두 판본의 모델·GPU·설치 판본·namespace/Pod 신원·세션이 아직 없어 ENV/target/prepared를 만들지 않았다. 실증·관측 작업 입력은 이틀 목표 뒤 M-B1·M-B4부터 연결한다.",
+          "role": "후보 판본",
+          "target": null
+        }
+      },
+      "work_group": "M-B"
+    }
+  ],
+  "counts": {
+    "J01": 6,
+    "J02": 63,
+    "M-A": 27,
+    "M-B": 42,
+    "active_checks": 69
+  },
+  "data_origin": "DECLARED",
+  "decision_9": {
+    "items": [
+      "LIF-13 기준 UNKNOWN",
+      "LIF-05·06·16 실행 중 전환만 기준 UNKNOWN·Pod 교체 양쪽 실행",
+      "LIF-07 준비 API 분기 기준 UNKNOWN",
+      "REQ-06 기존 비적용·부재 근거 추가",
+      "REQ-10 guided_json 대응·required 기준 UNKNOWN",
+      "REQ-16·17 양쪽 prefix caching 명시"
+    ],
+    "source": "사용자 답변, 2026-11-13; DECISIONS·작업지시서 7절은 #260에 기록",
+    "status": "항목별 승인"
+  },
+  "execution_authorized": false,
+  "input_materialization": {
+    "M-A8_generator": "tools/mvp_sup08_inputs.py (main 및 M-A8 후속 8540232d)",
+    "M-A_generator": "tools/gpu_a_run_inputs.py",
+    "M-A_render": "tools/gpu_a_aws_lab.py",
+    "M-B_TP2_plan": "tools/b12_tp2_inputs.py",
+    "REQ16_model_revision_candidate": {
+      "baseline_load_verified": false,
+      "candidate_load_verified": false,
+      "full_model_snapshot_present": false,
+      "metadata_file": "docs/dev-1/ma7-req16-model-candidate.json",
+      "metadata_sha256": "8820a5b4330c0bbd7740356bcd946316a59310edad38838bb9acff0d1777f10e",
+      "model_id": "Qwen/Qwen2-VL-2B-Instruct",
+      "revision": "895c3a49bc3fa70a340399125c650a463535e71c",
+      "weights_downloaded": false,
+      "weights_metadata_only": true
+    },
+    "REQ17_timing_requirements": {
+      "collection_or_judgment_changed": false,
+      "fits_single_manifest": false,
+      "minimum_per_scored_role": 200,
+      "minimum_scored_cases": 800,
+      "scored_roles": 4,
+      "single_manifest_max_cases": 512,
+      "split_cases_per_part": 504,
+      "split_collection_added": true,
+      "split_parts": 2,
+      "split_scored_samples_per_role": 200,
+      "unchanged_scope": "기존 단일 수집 계약·판정 계산식"
+    },
+    "SUP08_local_audit": {
+      "input_preflight_passed": false,
+      "launch_manifest_sha256": "ad71b15d649c53520ce6cad8c8863f7af1ef736d5dd648d6127ffab40cc9d7a9",
+      "model_bytes_checked_at": null,
+      "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma8-local-preflight-pack36-20261115.json",
+      "sha256": "d74655be6ab2da73d093eb0383e5ae6acefb9bb96be8f360299df0a4d20fd88b"
+    },
+    "SUP08_local_fixture": {
+      "engine_start_verified": false,
+      "environment_target_files_ready": false,
+      "fixture_files_ready": true,
+      "fixture_manifest_path": "/home/youngjo/.cache/byul-sup08-rebuild-20261113/fixture/manifest.json",
+      "fixture_manifest_sha256": "d5121b80dd3237fe63d6e646806d414d464ffc78efa6ef5fbaa436715bf67765",
+      "input_preflight_passed": false,
+      "model_inventory_sha256": "c2dd67477c1899b775e5fa0d0585861e62166ff94c7b94a7c8ba531c2756ac52",
+      "model_snapshot_id": "57f2f7423e74d97203b79372390c8f84efb81b93",
+      "preparation_receipt_url": "https://github.com/dohashelby/byul/blob/03541c853eddcf4a444b68e8abd4fae53bf472dc/update/docs/dev-1/ma8-local-preparation-20261113.json",
+      "source_pr": "https://github.com/dohashelby/byul/pull/257",
+      "weight_bytes_rechecked": true
+    },
+    "local_materialization": {
+      "case_count": 2078,
+      "case_files": 10,
+      "manifest_file": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/ma7-materialized-20261115-v8/manifest.json",
+      "manifest_sha256": "8b8c5eb804d7b3f709c2db142327fb40d2a943ec219015cdeead29ade649e56b",
+      "node_installed": false,
+      "prepared_files": 18,
+      "runtime_qualified": false
+    },
+    "model_revision_for_REQ16": null,
+    "reason": "REQ-16 revision 후보만 고정됐으며 가중치·실제 첫 기동·ENV/target은 미확인이다. SUP-08 실제 파일 재검증과 수정한 기동 자산을 후속 입력 준비에 연결한다.",
+    "repository_recorded_materialization": {
+      "path": "docs/dev-1/ma7-local-materialization-20261113.json",
+      "sha256": "0aefc819373cc98c211f114ec7e637a7d4c4f899b99c46caf666bbcbf10760c2"
+    }
+  },
+  "input_preflight_passed": false,
+  "official": false,
+  "plan_structure_validated": true,
+  "planned_pack_ref": {
+    "id": "PACK-BASELINE",
+    "kind": "PACK",
+    "revision": 38,
+    "sha256": "22dee30a0df2e9e79defd6d28010f3d16e202512d67269e831d3c5fa95113d80"
+  },
+  "planned_pack_source": {
+    "available_on_main": false,
+    "branch": "claude/run-binding-b2-impl",
+    "commit": null,
+    "note": "2026-11-14 RB2: 실행 준비값(기록 세션·전환 세대·표본 시각·시나리오·PLT-07/08 실행 신원)도 정책에서 분리한 팩 36. 결합 값은 guard run이 계산한다(docs/RUN_BINDING.md 7절). 35는 RB(실행 결합값 분리)."
+  },
+  "ready_for_execution": false,
+  "schema": "guard-mvp-session-input-plan/1",
+  "time_cost_assumptions": {
+    "J01": {
+      "allocated_gpus": 2,
+      "estimated_ec2_usd": [
+        "22.63",
+        "31.12"
+      ],
+      "historical_usd_per_hour": "5.65823",
+      "hours": [
+        4,
+        5.5
+      ],
+      "instance_type": "g6.12xlarge",
+      "physical_gpus": 4,
+      "proposed_ec2_cap_usd": "35.00",
+      "rate_source": "docs/dev-1/tp2-run-plan.md, 2026-11-06 콘솔 표시 과거 단가"
+    },
+    "J02": {
+      "allocated_gpus": 1,
+      "estimated_ec2_usd": [
+        "6.01",
+        "9.02"
+      ],
+      "historical_usd_per_hour": "1.20208",
+      "hours": [
+        5,
+        7.5
+      ],
+      "instance_type": "g6.2xlarge",
+      "physical_gpus": 1,
+      "proposed_ec2_cap_usd": "12.00",
+      "rate_source": "docs/gpu-a/COST_LEDGER.md, 2026-11-05 콘솔 표시 과거 단가"
+    },
+    "REQ17_split_collection": {
+      "budget_approved": false,
+      "cases_per_part": 504,
+      "configured_seconds_per_side": 600,
+      "http_requests_both_sides": 2020,
+      "http_requests_per_side": 1010,
+      "max_configured_seconds_per_part": 300,
+      "measured_cost": null,
+      "measured_duration": null,
+      "parts_per_side": 2,
+      "scored_samples_per_role_per_side": 200
+    },
+    "budget_approved": false,
+    "currency": "USD",
+    "excluded_costs": [
+      "EBS·스냅샷 보존",
+      "전송·공인 IPv4",
+      "세금·환율",
+      "승인 범위 밖 재시도"
+    ],
+    "latest_rate_verified": false,
+    "observed": false,
+    "region": "ap-northeast-2"
+  },
+  "versions_source": "docs/WORK_ORDER_VLLM_MVP.md#0.1"
+}

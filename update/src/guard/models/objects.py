@@ -433,10 +433,11 @@ class Execution(Strict):
     override_reason: str | None = None
     cleanup_errors: list[str] = Field(default_factory=list)
     attempt_id: str | None = None
+    run_binding: dict[str, Any] | None = None  # guard-run-binding/1; omitted when absent (past hashes kept)
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        data = _drop_none(handler(self), ("operator", "override_reason", "attempt_id"))
+        data = _drop_none(handler(self), ("operator", "override_reason", "attempt_id", "run_binding"))
         if not self.cleanup_errors:
             data.pop("cleanup_errors", None)
         return data

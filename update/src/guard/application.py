@@ -17,7 +17,7 @@ from guard.core.run import RunConfig, run_plan, validate_update_run_config
 from guard.core.select import select
 from guard.collectors.change import read_change, resolve_plan, save_change
 from guard.core.change_selection import build_context
-from guard.models import ExecStatus, Mode, Side
+from guard.models import ExecStatus, Mode, Side, utcnow
 from guard.store.packs import put_pack
 from guard.runtime.docker import Docker
 from guard.runtime import generation_readiness, sandbox
@@ -189,7 +189,9 @@ def _execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: 
                         if not _baseline_ran_without_abort(previous_evidence):
                             raise ValueError("BASELINE_EXECUTION_FAILED")
                         kube_transition.candidate_ready()
-                    side_cfg.raw["_kubernetes_target_sha256"]=kube_transition.transports[side.value].target_sha256
+                    side_cfg.raw["_kubernetes_target_sha256_by_executor"]={
+                        name:kube_transition.transports[side.value].target_sha256
+                        for name in kube_transition.executors}
                 except Exception:
                     side_cfg.abort_reason="KUBERNETES_TRANSITION_UNVERIFIED"
                     lifecycle_errors.append(f"{side.value}: KUBERNETES_TRANSITION_UNVERIFIED; operator recovery required; GPU release unverified")
@@ -450,6 +452,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                     raise ValueError(f"{side}/{item.check_id}: real executor is required")
                 if prepared[0] == "managed":
                     c, _ = _credentials(c, c.get("validation" if single else "update", {}).get("gateway_profile", "single"))
+                from guard.configuration import for_check
+                c = for_check(c, item.executor, item.check_id)  # [check_config.<CHECK>] (RB2-S)
                 executor = factory(c)
                 support = support_by_key[side, item.check_id]
                 # These collectors distinguish a valid policy outside their
@@ -459,7 +463,15 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                         and hasattr(executor, "validate_configuration")):
                     executor.validate_configuration(pack.checks[item.check_id])
                 else:
-                    executor.validate_policy(pack.checks[item.check_id], policy.values.get(item.check_id, {}))
+                    from guard.executors import run_binding
+                    check_def, values = pack.checks[item.check_id], policy.values.get(item.check_id, {})
+                    if run_binding.keys_for(check_def):
+                        # Static preparation computes the same per-run binding guard run will compute.
+                        _, values = run_binding.effective_values(
+                            check_def, c.get(item.executor, {}), selected_env, values, side=side, attempt_id=None,
+                            issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until,
+                            run_cfg=run_binding.run_config(c, item.check_id), policy_ref=policy.ref())
+                    executor.validate_policy(check_def, values)
                 executor.keys()
         record("inputs", True, "pack, selection, real executors, policy settings and model inventory checked")
     except Exception as exc:

@@ -1,0 +1,714 @@
+{
+  "schema": "guard-ma7-file-binding-preflight/1",
+  "scope": "입력 파일·정책 형식·실행 결합만 대조. 실제 수집/실행기 자격/보안 판정은 하지 않음.",
+  "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 36,
+    "sha256": "0f21244afca59829551744aea04612b9f034fd062ca390214f378a8feaa9f5c6"
+  },
+  "source_index_sha256": "09e4e247373675103c07a6b75b391556b1764ef2584f9dea13f7fc39a8f14250",
+  "generator_source_sha256": "ba221170ed4979011a45622f80da8e72a82763032d83d11c4da391990b108989",
+  "rows": [
+    {
+      "check_id": "LIF-13",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "LIF-13",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "OBS-01",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "OBS-01",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "OBS-04",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "OBS-04",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "OBS-05",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "OBS-05",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "OBS-06",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "OBS-06",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "OBS-09",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "OBS-09",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "OBS-11",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "OBS-11",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "PLT-07",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "PLT-07",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "PLT-10",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "PLT-10",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "PLT-11",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "PLT-11",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "PLT-12",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "PLT-12",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-01",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-01",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-02",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-02",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-03",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-03",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-04",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-04",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-06",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-06",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-11",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-11",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-13",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-13",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-14",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-14",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-15",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-15",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-16",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-16",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-17",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-17",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-18",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-18",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-19",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-19",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-20",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-20",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-21",
+      "side": "baseline",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "REQ-21",
+      "side": "candidate",
+      "file_binding_valid": false,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "blocking_codes": [
+        "ACTUAL_INPUT_FILES_MISSING"
+      ]
+    },
+    {
+      "check_id": "SUP-08",
+      "side": "baseline",
+      "file_binding_valid": true,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "environment_ref": {
+        "kind": "ENV",
+        "id": "ENV-01M7CDX1TFH3N8SJ09442AEEQT",
+        "revision": 1,
+        "sha256": "3e9c870a0e67d8b6d66b0b6c8fa3712af45296d673832b5cb997fb1086921017"
+      },
+      "environment_origin": "MEASURED",
+      "files": {
+        "environment": {
+          "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-pack36-replay-20261115/baseline/environment.json",
+          "sha256": "97d8c7e156696ae46b4e5a2aab002a89d5df46e44b71babd4a2c8965aa71452b"
+        },
+        "policy": {
+          "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-pack36-replay-20261115/baseline/policy.yaml",
+          "sha256": "5dc025733b7f881cd1e68db435143a63795a0246ed7fa5b7a861eda18aa2cfa8"
+        },
+        "configuration": {
+          "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-pack36-replay-20261115/baseline/guard.toml",
+          "sha256": "b61f48269277828c12b02341f2a03e6d61f142e537839277f0a359b8c34dd0b2"
+        }
+      },
+      "binding_schema": null,
+      "binding_files": {},
+      "blocking_codes": [
+        "LIVE_TARGET_AND_EXECUTOR_PREFLIGHT_REQUIRED"
+      ]
+    },
+    {
+      "check_id": "SUP-08",
+      "side": "candidate",
+      "file_binding_valid": true,
+      "live_target_verified": false,
+      "input_preflight_passed": false,
+      "ready_for_execution": false,
+      "actual_results": null,
+      "environment_ref": {
+        "kind": "ENV",
+        "id": "ENV-01M7CDX2SM176T89P5BGHPBRHS",
+        "revision": 1,
+        "sha256": "2232a2d13061fb628454102e2233fa2d23eee2e3603af37aeb731a10c0fe236a"
+      },
+      "environment_origin": "MEASURED",
+      "files": {
+        "environment": {
+          "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-pack36-replay-20261115/candidate/environment.json",
+          "sha256": "e42fe7f49ac0324b2647698d40421b52903d3ede0b0f4149dfb16372d7a847c8"
+        },
+        "policy": {
+          "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-pack36-replay-20261115/candidate/policy.yaml",
+          "sha256": "5dc025733b7f881cd1e68db435143a63795a0246ed7fa5b7a861eda18aa2cfa8"
+        },
+        "configuration": {
+          "path": "/mnt/c/Users/dudwh/Documents/ChatGPT/업데이트개발 -1106/inputs/sup08-pack36-replay-20261115/candidate/guard.toml",
+          "sha256": "0a35fb592224e60d521bea34caa2b466bb0b24b27c2003e6c546f175a5244014"
+        }
+      },
+      "binding_schema": null,
+      "binding_files": {},
+      "blocking_codes": [
+        "LIVE_TARGET_AND_EXECUTOR_PREFLIGHT_REQUIRED"
+      ]
+    }
+  ],
+  "file_binding_valid_sides": 2,
+  "live_target_verified": false,
+  "input_preflight_passed": false,
+  "ready_for_execution": false,
+  "engine_executed": false,
+  "actual_results": null
+}

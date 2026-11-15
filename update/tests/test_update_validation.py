@@ -17,8 +17,8 @@ from tests.builders import PACK_DIR, baseline_pack, environment, policy
 
 def declared_inputs():
     pack = baseline_pack()
-    runtime = {"gpu_count": 0, "cpu": {"architecture": "amd64", "model": "EXAMPLE-CPU",
-        "system": "Linux", "kernel": "EXAMPLE-kernel", "threads": 2}}
+    # 2026-11-12 (M-A9): two-image acceptance takes declared, equal GPU conditions only.
+    runtime = {"gpu_count": 1, "gpu_model": "EXAMPLE-GPU", "driver": "EXAMPLE-DRIVER", "tp_size": 1}
     model = {"id": "EXAMPLE-model", "revision": "EXAMPLE-revision", "inventory_sha256": "a" * 64}
     envs = [environment(id=f"ENV-{side}", origin=DataOrigin.DECLARED,
         engine={"name": "vllm", "version": f"0.{i}.0", "image_digest": f"example/fixture@sha256:{str(i) * 64}"},
@@ -29,7 +29,7 @@ def declared_inputs():
     cfg = {"update": {"mode": "managed", "engine_profile": "hardened"},
            "adapter": {"name": "vllm"}, "executors": {name: "real" for name in
                ("direct_route", "role_route", "container_config", "credential_exposure", "input_validation")},
-           "vllm": {"launch_profile": "cpu-bounded", "model_layout": "snapshot", "cpu_threads": 2}}
+           "vllm": {"launch_profile": "gpu-bounded", "model_layout": "snapshot", "gpu_devices": ["0"]}}
     return pack, envs, pol, cfg
 
 
@@ -52,7 +52,7 @@ def input_files(tmp_path):
     result["policy"].write_text(yaml.safe_dump({"pack": {"id": pack.ref().id, "revision": pack.ref().revision},
         "data_origin": "EXAMPLE", "status": "DRAFT", "scope": pol.scope.model_dump(), "values": pol.values}), encoding="utf-8")
     result["config"] = folder / "config.toml"
-    result["config"].write_text("[update]\nmode='managed'\nengine_profile='hardened'\n[vllm]\nlaunch_profile='cpu-bounded'\n", encoding="utf-8")
+    result["config"].write_text("[update]\nmode='managed'\nengine_profile='hardened'\n[vllm]\nlaunch_profile='gpu-bounded'\ngpu_devices=['0']\n", encoding="utf-8")
     return result
 
 
@@ -75,16 +75,32 @@ def test_same_digest_aliases_do_not_establish_two_images():
         harness.validate_inputs(pack, envs, pol, cfg)
 
 
-@pytest.mark.parametrize("kind", ["example", "missing-cpu", "wrong-model", "runtime", "profile", "scope", "external", "legacy"])
+@pytest.mark.parametrize("kind", ["example", "missing-gpu", "missing-driver", "cpu-profile", "no-gpu", "layout",
+                                  "devices", "wrong-model", "runtime", "profile", "scope", "external", "legacy"])
 def test_declared_input_contract_rejects_incompatible_pairs(kind):
     pack, envs, pol, cfg = declared_inputs()
-    expected = {"example": "EXAMPLE", "missing-cpu": "CPU profile", "wrong-model": "model identity",
-                "runtime": "CPU/runtime", "profile": "execution conditions", "scope": "exactly", "external": "managed",
-                "legacy": "cpu-bounded"}[kind]
+    expected = {"example": "EXAMPLE", "missing-gpu": "GPU profile", "missing-driver": "GPU profile",
+                "cpu-profile": "GPU profile", "no-gpu": "GPU profile", "layout": "parallel layout",
+                "devices": "gpu_devices", "wrong-model": "model identity",
+                "runtime": "GPU/runtime", "profile": "execution conditions", "scope": "exactly", "external": "managed",
+                "legacy": "gpu-bounded"}[kind]
+    def runtime(index, **update):
+        envs[index] = envs[index].model_copy(update={"runtime": envs[index].runtime.model_copy(update=update)}).seal()
     if kind == "example":
         envs[0] = envs[0].model_copy(update={"data_origin": DataOrigin.EXAMPLE}).seal()
-    elif kind == "missing-cpu":
-        envs[0] = envs[0].model_copy(update={"runtime": envs[0].runtime.model_copy(update={"cpu": None})}).seal()
+    elif kind == "missing-gpu":
+        runtime(0, gpu_model=None)
+    elif kind == "missing-driver":
+        runtime(1, driver=None)
+    elif kind == "cpu-profile":
+        from guard.models.objects import CpuProfile
+        runtime(0, cpu=CpuProfile(architecture="amd64", model="EXAMPLE-CPU", system="Linux", kernel="EXAMPLE", threads=2))
+    elif kind == "no-gpu":
+        runtime(0, gpu_count=0)
+    elif kind == "layout":
+        runtime(0, tp_size=2)
+    elif kind == "devices":
+        cfg["vllm"]["gpu_devices"] = ["0", "1"]
     elif kind == "wrong-model":
         envs[1] = envs[1].model_copy(update={"model": envs[1].model.model_copy(update={"inventory_sha256": "b" * 64})}).seal()
     elif kind == "runtime":

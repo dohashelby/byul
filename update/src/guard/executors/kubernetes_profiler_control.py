@@ -1,10 +1,11 @@
-"""LIF14 control sequence over prepared15; adapter and backend truth stay distinct."""
+"""LIF14 control sequence over exact prepared profiler variants; backend truth stays distinct."""
 from copy import deepcopy
 from pathlib import Path
 import re
 import uuid
 
 from guard.adapters import vllm_profiler_sensor as sensor, vllm_profiler_metadata as metadata
+from guard.adapters import vllm_release_observation_sensor as release_observation
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_profiler_control import KubernetesProfilerControlHTTP, SLOTS, CONTROL_PATHS
@@ -165,7 +166,8 @@ class KubernetesProfilerControlExecutor:
             prepared = load_prepared(self.cfg['prepared']); digest = sha256_hex(canonical_json(target))
             if (digest != policy_values['profiler_target_sha256'] or env.ref().sha256 != policy_values['profiler_environment_sha256']
                     or self.expected_target_sha256 is not None and self.expected_target_sha256 != digest
-                    or prepared['profile'] != sensor.PROFILE or sha256_hex(canonical_json(prepared)) != policy_values['profiler_prepared_sha256']
+                    or prepared['profile'] not in {sensor.PROFILE,release_observation.PROFILER_PROFILE}
+                    or sha256_hex(canonical_json(prepared)) != policy_values['profiler_prepared_sha256']
                     or not start <= utcnow() <= end): raise ValueError
             native_target = {'schema': 'guard-kubernetes-lifecycle-target/1', 'lab': target['lab'],
                 'run_id': target['kubernetes']['run_id'], 'environment_ref': env.ref().model_dump(mode='json'),
@@ -177,6 +179,9 @@ class KubernetesProfilerControlExecutor:
             duration=self.cfg.get('max_duration_seconds', 180), binary=self.cfg.get('kubectl_binary', 'kubectl'))
         started = utcnow(); reader = None; captures = []; trials = []; diagnostics = []; cleanup = []; sealed = False
         token = uuid.uuid4().hex
+        private = prepared['profile'] == release_observation.PROFILER_PROFILE
+        if private:
+            from guard.collectors.lifecycle import request_header_fingerprint
         fault_ready = not owned_fault
         try:
             reader = KubernetesLifecycleReader(native_target, env, prepared, runner=self.runner,
@@ -195,10 +200,20 @@ class KubernetesProfilerControlExecutor:
             captures.append(row)
 
         for slot in SLOTS:
-            trial = {'case_id': slot, 'request_id_sha256': sha256_hex(('byul-lif14-' + token + '-' + slot).encode()),
+            rid = 'byul-lif14-' + token + '-' + slot
+            try:
+                identity = (request_header_fingerprint(self.cfg['prepared'], prepared, rid) if private
+                    else sha256_hex(rid.encode()))
+            except ValueError:
+                identity = None
+                diagnostics.append('PROFILER_CONTROL_REQUEST_KEY_UNAVAILABLE')
+            trial = {'case_id': slot, 'request_id_sha256': identity,
                 'attempted': False, 'normal_shape_verified': False, 'profiler_control_response_success': False,
                 'started_at': None, 'finished_at': None, 'policy_window_verified': False}
             trials.append(trial)
+            if identity is None:
+                trial['diagnostic'] = 'PROFILER_CONTROL_REQUEST_KEY_UNAVAILABLE'
+                continue
             if owned_fault and not fault_ready and slot not in {'normal-before', 'normal-after'}:
                 trial['diagnostic'] = 'PROFILER_CONTROL_OWNED_FAULT_UNAVAILABLE'; continue
             if slot != 'normal-before' and slot != 'normal-after' and not trials[0].get('normal_shape_verified'):
@@ -207,12 +222,17 @@ class KubernetesProfilerControlExecutor:
                 now = utcnow()
                 if not start <= now <= end: raise ValueError
                 trial.update(attempted=True, started_at=now.isoformat())
-                trial.update(transport.perform(slot, 'byul-lif14-' + token + '-' + slot))
+                response = transport.perform(slot, rid)
+                if private: response.pop('request_id_sha256', None)
+                trial.update(response)
             except Exception:
                 diagnostics.append('PROFILER_CONTROL_REQUEST_UNAVAILABLE:' + slot)
                 # A validated response fact can precede later shape/follow-up failure.
                 rows = transport.report()['requests']
-                if rows and rows[-1]['case_id'] == slot: trial.update(rows[-1])
+                if rows and rows[-1]['case_id'] == slot:
+                    response = dict(rows[-1])
+                    if private: response.pop('request_id_sha256', None)
+                    trial.update(response)
             finally:
                 if trial['attempted']: trial['finished_at'] = utcnow().isoformat()
                 trial['policy_window_verified'] = bool(trial['started_at'] and start <= _time(trial['started_at']) <= _time(trial['finished_at']) <= end)
@@ -240,6 +260,10 @@ class KubernetesProfilerControlExecutor:
             if not sealed: cleanup.append('PROFILER_CONTROL_SESSION_SEAL_UNAVAILABLE')
         capture('final')
         http = transport.report(); cleanup.extend(http['cleanup_errors'])
+        if private:
+            identities = {row['case_id']: row['request_id_sha256'] for row in trials}
+            http['requests'] = [{**row, 'request_id_sha256': identities.get(row['case_id'])}
+                for row in http['requests']]
         if reader is not None:
             try:
                 if reader.report().get('parent_cleanup_unverified'): cleanup.append('PROFILER_CONTROL_READER_CLEANUP_UNVERIFIED')

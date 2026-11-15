@@ -1,30 +1,6 @@
 executor: supply_boot
 collection_profile: supply-boot-python-mode-v1
-policy_params:
-- key: supply_environment_sha256
-  type: str
-  required: true
-- key: supply_normal_target_sha256
-  type: str
-  required: true
-- key: supply_challenge_target_sha256
-  type: str
-  required: true
-- key: supply_normal_prepared_sha256
-  type: str
-  required: true
-- key: supply_challenge_prepared_sha256
-  type: str
-  required: true
-- key: supply_record_source_sha256
-  type: str
-  required: true
-- key: supply_validity_start
-  type: str
-  required: true
-- key: supply_validity_end
-  type: str
-  required: true
+policy_params: []
 required_observations:
 - key: supply_boot_sessions
   type: list
@@ -72,3 +48,6 @@ limitations:
 - '미구현 분기: 기록 생산자 인증이 없어 PASS에 도달하지 않는다. 지원 모드 목록은 fixture 범위다.'
 - kubernetes 구현만 있다. 실행기는 엔진을 만들거나 바꾸지 않는다. 정상·변경 기동은 준비 절차가 만들고 target·prepared로
   받으며, 두 세션을 각각 수집해 합치지 않는다.
+- '지원 범위: 일반 실행과 -O를 대조한다. docstring까지 제거하는 -OO는 지원 범위 밖이며 관측 결과를 통과로 해석하지 않는다. 판정
+  규칙은 유지한다.'
+impact: MEDIUM

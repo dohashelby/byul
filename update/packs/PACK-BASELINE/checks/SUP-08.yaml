@@ -2,7 +2,7 @@ id: SUP-08
 framework_id: CHK-SUP-008
 mechanism_ids:
 - mechanism-09
-revision: 4
+revision: 5
 retired: false
 area: SUP
 purpose: 추가 코드 실행 허용
@@ -12,7 +12,7 @@ scope: null
 risk_category: 보안 위협 점검
 risk_summary: 일반 호출자가 요청 필드로 코드 판본을 바꿀 수 있는 구성에서 미승인 코드를 다운로드·실행시키도록 유도할 수 있음. 선정 processor·의존성의 실제 소비 확인 필요.
 review_order: reference_baseline_first
-impact: null
+impact: HIGH
 applies_when:
   prose: 요청의 코드 판본 선택 필드와 실제 지원·노출 경로를 먼저 확인한다. 금지 구성에서도 해당 필드의 거부·제거를 확인하고, 허용 구성에서는 실제 선택·소비 판본을 추가 확인한다. 입력 미지원·비노출을 근거로 확인하면 코드 소비 분기만 비적용 후보로 남긴다. 지원 여부나 선택 허용 정책이 미정이면 해당 분기의 적용을 미정으로 둔다.
 policy_params:
@@ -23,6 +23,9 @@ policy_params:
   type: bool
   required: true
 - key: rejection_codes
+  type: list[str]
+  required: true
+- key: approved_code_revisions
   type: list[str]
   required: true
 policy_prose:
@@ -43,6 +46,10 @@ required_observations:
 - key: code_selection_rejected_fields
   type: list
 - key: code_selection_unverified_fields
+  type: list
+- key: code_selection_ignored_fields
+  type: list
+- key: code_selection_resolved_fields
   type: list
 - key: code_selection_confirmed_violations
   type: list
@@ -69,7 +76,7 @@ judge:
     - obs: code_selection_forbidden
       op: eq
       value: true
-    - obs: code_selection_rejected_fields
+    - obs: code_selection_resolved_fields
       op: superset_of
       value_obs: code_selection_fields_planned
     - obs: code_selection_unverified_fields
@@ -118,6 +125,8 @@ functional_probes:
   - 200
   via: engine
 limitations:
-- '구현 분기: 지정 필드에 무해한 비허용 판본값을 넣어 import 전 거부를 정상 대조와 비교한다. 지정 필드가 모두 거부되면 해당 필드 범위의 금지 분기를 충족한다.'
-- '미구현 분기: 최종 선택 모듈·import를 보는 수집이 없어 수락된 요청은 accepted_unverified로 UNKNOWN이고, 금지 override 소비의 FAIL과 허용 구성의 판본 대조는 현재 도달하지 않는다.'
-- real 구현만 있다. 지정하지 않은 필드는 확인하지 않는다. kwargs 전달까지만 보인 경우를 판정하지 않는다.
+- '구현 분기: 지정 필드(점으로 이은 중첩 경로 포함)에 무해한 비허용 판본 이름을 넣고, 시도 직전·직후 엔진 컨테이너의 동적 모듈 판본 폴더 목록을 읽기 전용으로 비교한다.'
+- 승인 목록(approved_code_revisions) 밖 판본 폴더가 시도 직후 새로 생기면 그 요청 값이 코드 선택에 반영된 것으로 보고 위반으로 적는다. 시도 전부터 있던 비승인 폴더는 이번 요청에 귀속할 수 없어 미확인으로 남긴다.
+- 시도가 거부되었거나 시도 직후 승인 판본 폴더만 있으면 해결된 시도로 본다. 응답 2xx만으로는 위반·통과를 정하지 않는다.
+- 폴더 이름·파일 이름·크기·SHA-256만 수집하며 코드를 import하거나 실행하지 않는다. 처리기 캐시 재사용으로 판본 선택이 일어나지 않은 경우는 그 실행 구성에서 반영되지 않은 것으로 기록한다.
+- 모듈 목록을 읽지 못한 구성(관측 설정 없음, 일반 HTTP 경로)은 기존처럼 accepted_unverified로 UNKNOWN이다.

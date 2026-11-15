@@ -311,15 +311,19 @@ def project_cache_timing(cases, rows, elapsed, policy):
             'missing': ['timing_samples_below_policy_minimum']}
     control = advantage(samples['control-present'], samples['control-absent'])
     cross = advantage(samples['present'], samples['absent'])
+    control_hits = [_hit(rows, c) for c in cases if c['role'] == 'control-present']
     hits = [_hit(rows, c) for c in cases if c['role'] == 'present']
+    control_verified = bool(control_hits) and all(hit is True for hit in control_hits)
     # Without a native cross-group hit a gap is noise; without control power a clean result proves nothing.
-    violation = cross > limit and any(h is True for h in hits)
+    violation = control_verified and cross > limit and any(h is True for h in hits)
     # 정상 대조는 캐시가 있는 쪽이 빨라야 한다. 반대로 갈리면 순서·워밍업 같은 교란을 먼저 의심한다.
     if control < 100 - limit:
         missing.append('timing_control_direction_reversed')
     elif control <= limit:
         missing.append('timing_control_has_no_power')
-    if cross > limit and not violation:
+    if not control_verified:
+        missing.append('timing_control_native_hit_unverified')
+    if cross > limit and not any(h is True for h in hits):
         missing.append('timing_gap_without_native_hit')
     if any(h is None for h in hits):
         missing.append('timing_native_rows_incomplete')
@@ -431,7 +435,8 @@ def project_slot(cases, outputs, events, secret, tags):
         if phase != 'RETURN' or event.get('entry_qualified_after') is not True:
             continue
         if point == 'InputBatch.add_request':
-            slots[fields.get('request_sha256')] = {'slot': fields.get('slot'), 'restricted': fields.get('restricted')}
+            slots[fields.get('request_sha256')] = {'slot': fields.get('slot'), 'restricted': fields.get('restricted'),
+                'lineage_complete': fields.get('slot_lineage_complete') is not False}
         elif point == 'RequestState.add_request':
             v2_slot[fields.get('request_sha256')] = fields.get('slot')
         elif point == 'Sampler.add_request':
@@ -451,8 +456,14 @@ def project_slot(cases, outputs, events, secret, tags):
             continue
         previous = next((c for c in reversed(cases[:index]) if c['role'] == 'restricted'), None)
         former = slot_of(previous) if previous else {}
-        same = former.get('slot') is not None and former.get('slot') == slot_of(case).get('slot') and former.get('restricted') is True
+        current = slot_of(case)
+        candidate_same = former.get('slot') is not None and former.get('slot') == current.get('slot') and former.get('restricted') is True
+        lineage_unknown = former.get('lineage_complete') is False or current.get('lineage_complete') is False
+        same = None if lineage_unknown else candidate_same
         row = {'slot_reused': same, 'output_matches_standalone': bool(alone) and outputs.get(case['case_id']) == alone[0]}
+        if lineage_unknown:
+            row['slot_index_match_candidate'] = candidate_same
+            missing.append('slot_movement_unobserved')
         if v2:
             states = [i for i in sampled.get(tag_digest(secret, tags[case['case_id']]), ()) if i.get('slot') == slot_of(case).get('slot')]
             row.update(sampler_state_observed=bool(states), stale_restriction_at_sampling=any(stale(i) for i in states))

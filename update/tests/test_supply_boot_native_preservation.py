@@ -107,13 +107,15 @@ def product(tmp_path, patch, *, mismatch=True, normal_record=False, report_error
                   lambda path: json.loads(Path(path).read_text(encoding='utf-8')))
     store = Store(tmp_path / 'store')
     put_pack(store, PACK.path)
+    from tests.run_binding_support import run_table, split
+    # @35: guard run computes the binding from the same (EXAMPLE) files the executor reads.
     policy = Policy(id=new_id('POL'), data_origin='EXAMPLE', status='DRAFT', pack=PACK.ref(),
-                    scope={'include': ['SUP-05']}, values={'SUP-05': values}).seal()
+                    scope={'include': ['SUP-05']}, values={'SUP-05': split(PACK.checks['SUP-05'], values)[0]}).seal()
     store.put_many([env, policy])
     plan = select(PACK, [env], policy)
     store.put(plan)
     evd, = run_plan(store, PACK, plan, RunConfig(executors={'supply_boot': 'kubernetes'},
-                           adapter='vllm', raw={'supply_boot': cfg}))
+                           adapter='vllm', raw={'supply_boot': cfg, **run_table(PACK.checks['SUP-05'], values)}))
     asof = utcnow()
     result, = judge_plan(store, PACK, plan, asof)
     report = build_report(store, PACK, plan, asof)

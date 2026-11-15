@@ -15,6 +15,7 @@ from .vllm_lifecycle_sensor import code_digest
 from .vllm_worker_generation_contract import relative_code
 
 PROFILES = Path(__file__).with_name('assets') / 'vllm_rank_ipc_profiles.json'
+V1_REVIEWS = Path(__file__).with_name('assets') / 'vllm_rank_v1_source_reviews.json'
 
 
 def _identity(value):
@@ -72,8 +73,34 @@ def _function(module, name):
     return owner
 
 
+def _qualified(module, profile, scope):
+    """선택된 한 행의 bytes·원 함수·namespace를 확인하며 hook은 설치하지 않는다."""
+    runtime = sys.implementation.name + '-' + '.'.join(map(str, sys.version_info[:3]))
+    if profile['runtime'] != runtime or sys.flags.optimize != 0:
+        raise ValueError
+    expected = profile[scope][vars(module).get('__name__')]
+    path = vars(module).get('__file__')
+    if type(path) is not str:
+        raise ValueError
+    raw = _bytes(path, expected)
+    compiled = _codes(compile(raw, path, 'exec', dont_inherit=True, optimize=0))
+    functions, digests = {}, {}
+    for name in expected['functions']:
+        actual = _function(module, name)
+        digest = code_digest(relative_code(compiled[name], expected['path']))
+        if (actual.__qualname__ != name or digest != expected['body_code_sha256'][name]
+                or code_digest(relative_code(actual.__code__, expected['path'])) != digest):
+            raise ValueError
+        functions[name] = actual
+        digests[name] = digest
+    return {'profile': profile['id'], 'source_sha256': expected['sha256'],
+            'functions': functions, 'body_code_sha256': digests,
+            'pin_status': 'candidate_pin', 'engine_group_verified': False,
+            'observer_installed': False, 'producer_registered': False}
+
+
 def qualify(module, *, image, scope='sources'):
-    """고정 이미지 행·정확 파일·현재 원 함수가 모두 맞을 때 후보 자료만 반환한다."""
+    """기존 이미지 행의 정확 대조. 과거 준비물의 판본 선택은 바꾸지 않는다."""
     try:
         if (type(module) is not types.ModuleType or type(image) is not str
                 or type(scope) is not str or scope not in {'sources', 'rpc_sources'}):
@@ -85,27 +112,25 @@ def qualify(module, *, image, scope='sources'):
         if len(matches) != 1:
             raise ValueError
         profile, = matches
-        runtime = sys.implementation.name + '-' + '.'.join(map(str, sys.version_info[:3]))
-        if profile['runtime'] != runtime or sys.flags.optimize != 0:
-            raise ValueError
-        expected = profile[scope][vars(module).get('__name__')]
-        path = vars(module).get('__file__')
-        if type(path) is not str:
-            raise ValueError
-        raw = _bytes(path, expected)
-        compiled = _codes(compile(raw, path, 'exec', dont_inherit=True, optimize=0))
-        functions, digests = {}, {}
-        for name in expected['functions']:
-            actual = _function(module, name)
-            digest = code_digest(relative_code(compiled[name], expected['path']))
-            if (actual.__qualname__ != name or digest != expected['body_code_sha256'][name]
-                    or code_digest(relative_code(actual.__code__, expected['path'])) != digest):
-                raise ValueError
-            functions[name] = actual
-            digests[name] = digest
-        return {'profile': profile['id'], 'source_sha256': expected['sha256'],
-                'functions': functions, 'body_code_sha256': digests,
-                'pin_status': 'candidate_pin', 'engine_group_verified': False,
-                'observer_installed': False, 'producer_registered': False}
+        return _qualified(module, profile, scope)
     except (OSError, ValueError, KeyError, TypeError, AttributeError, SyntaxError):
         raise ValueError('RANK_IPC_SOURCE_UNAVAILABLE') from None
+
+
+def qualify_current_v1(module, *, image):
+    """현재 V1의 별도 검토 행만 대조한다. 기존 런타임/제어 profile은 열지 않는다."""
+    try:
+        if type(module) is not types.ModuleType or type(image) is not str:
+            raise ValueError
+        data = json.loads(V1_REVIEWS.read_bytes())
+        if data['schema'] != 'guard-rank-v1-source-reviews/1':
+            raise ValueError
+        runtime = sys.implementation.name + '-' + '.'.join(map(str, sys.version_info[:3]))
+        matches = [p for p in data['profiles'] if p['image'] == image and p['runtime'] == runtime]
+        if len(matches) != 1 or matches[0]['engine_mode'] != 'V1':
+            raise ValueError
+        result = _qualified(module, matches[0], 'sources')
+        result.update(review_scope='offline_source_body_only', image_runtime_verified=False)
+        return result
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, SyntaxError):
+        raise ValueError('RANK_V1_SOURCE_UNAVAILABLE') from None

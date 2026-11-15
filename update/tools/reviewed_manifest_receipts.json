@@ -330,6 +330,31 @@
       "manifest_sha256": "7a007af543a9ca6249280e765605537445eea51c0a2515c9d9690c22956f3557",
       "reviewed_by": "Codex / RB3 pack38 with approved PR280 main integration; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T11:52:04Z"
+    },
+    {
+      "manifest_sha256": "e1e3695cbbd023690ce5031dc9e57f84c2fc7f959e2cd4908b1ccd98d65fb044",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T10:51:11.884237+00:00"
+    },
+    {
+      "manifest_sha256": "009d5903d5f2c071aac78193a59827a9056879089516fea91eb7a357d800b62f",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T11:32:48.396694+00:00"
+    },
+    {
+      "manifest_sha256": "0b670d00b8c0fe9ff530be18ad8147b4f18a6c44abc9a8455a910775632fc07d",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T11:52:57.412986+00:00"
+    },
+    {
+      "manifest_sha256": "8cc795231d5a3eba1e42f3c462f60113e337800b70542bc2b6dead6eebea9123",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T12:00:40.387899+00:00"
+    },
+    {
+      "manifest_sha256": "f5a29cad0ef0d10752bfe058a2b8ed4f04154d2b5a27a6ecab0ee9a9d63a752e",
+      "reviewed_by": "Codex / PR283 main integration; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T16:18:38.452Z"
     }
   ]
 }

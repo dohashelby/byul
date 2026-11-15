@@ -1,0 +1,384 @@
+{
+  "schema": "guard-rank-v1-source-reviews/1",
+  "scope": "현재 V1의 정확 소스·원 함수 본문 대조만. 설치 hook/장애 제어/공통 입력/등록은 연결하지 않는다.",
+  "profiles": [
+    {
+      "id": "current-v1-base",
+      "role": "기준 판본",
+      "image": "docker.io/vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8",
+      "runtime": "cpython-3.12.3",
+      "engine_mode": "V1",
+      "pin_status": "candidate_pin",
+      "engine_group_verified": false,
+      "observer_installed": false,
+      "producer_registered": false,
+      "sources": {
+        "vllm.v1.executor.multiproc_executor": {
+          "path": "vllm/v1/executor/multiproc_executor.py",
+          "bytes": 14086,
+          "sha256": "5db418332360f43e2a9718f62d8ec5d856d554b8d0d27d14f053fb3392d33239",
+          "functions": [
+            "MultiprocExecutor._init_executor",
+            "MultiprocExecutor.collective_rpc",
+            "MultiprocExecutor.shutdown",
+            "WorkerProc.__init__",
+            "WorkerProc.make_worker_process",
+            "WorkerProc.worker_main",
+            "WorkerProc.wait_for_startup",
+            "WorkerProc.worker_busy_loop"
+          ],
+          "function_lines": {
+            "MultiprocExecutor._init_executor": [
+              38,
+              90
+            ],
+            "MultiprocExecutor.collective_rpc": [
+              92,
+              131
+            ],
+            "MultiprocExecutor.shutdown": [
+              169,
+              177
+            ],
+            "WorkerProc.__init__": [
+              197,
+              241
+            ],
+            "WorkerProc.make_worker_process": [
+              244,
+              278
+            ],
+            "WorkerProc.worker_main": [
+              287,
+              331
+            ],
+            "WorkerProc.wait_for_startup": [
+              334,
+              352
+            ],
+            "WorkerProc.worker_busy_loop": [
+              358,
+              376
+            ]
+          },
+          "body_code_sha256": {
+            "MultiprocExecutor._init_executor": "7ef7bd2da0cd312641a701a3481dc5e4ce78cd18b12b0e9ed95d02665471b8fc",
+            "MultiprocExecutor.collective_rpc": "a9d66682dd42336591a67647dca14dd6687428adeb1b58431686a6afa9cc54f8",
+            "MultiprocExecutor.shutdown": "6730debf1a43fdaaf9d23091833b929799cd575b8db385e85fc8c8dc0d4ba89d",
+            "WorkerProc.__init__": "649768743734e1ffe0eecd0275640077b390a8e9f7dac67dbb7fed8725a80913",
+            "WorkerProc.make_worker_process": "2ddab615cd53c83c5166dfb3dbfdb15f66b3fb49bbd5aa9560ca8737b2ba0347",
+            "WorkerProc.worker_main": "e2dd01fed0321eee84de0f8c9f5a8aca70a2ff9a636db209afb8a3ef42525273",
+            "WorkerProc.wait_for_startup": "686e7e391282603d123ff597fc0bcdb0592824519bc0554a2ca229ec7eae0202",
+            "WorkerProc.worker_busy_loop": "47c82ec890138638e617aad2bd1c241c18bad3e9bbf245a259fac0851dc06001"
+          }
+        },
+        "vllm.v1.executor.abstract": {
+          "path": "vllm/v1/executor/abstract.py",
+          "bytes": 3585,
+          "sha256": "6e0c838ef1e866b15f8176da0af117dc4661efe387fbcca20d521020c7b1970a",
+          "functions": [
+            "Executor.execute_model"
+          ],
+          "function_lines": {
+            "Executor.execute_model": [
+              71,
+              77
+            ]
+          },
+          "body_code_sha256": {
+            "Executor.execute_model": "db89476d5723f26188b6b673e8858e0692b96ecb8b6e46e9577d7fcc9ca7dcfb"
+          }
+        },
+        "vllm.distributed.device_communicators.shm_broadcast": {
+          "path": "vllm/distributed/device_communicators/shm_broadcast.py",
+          "bytes": 22741,
+          "sha256": "24a3990266dcbbdbb14f6a2a2c4dec1eecad54d9ea85622ddc8dc36774b87942",
+          "functions": [
+            "MessageQueue.enqueue",
+            "MessageQueue.dequeue"
+          ],
+          "function_lines": {
+            "MessageQueue.enqueue": [
+              437,
+              451
+            ],
+            "MessageQueue.dequeue": [
+              453,
+              471
+            ]
+          },
+          "body_code_sha256": {
+            "MessageQueue.enqueue": "2bfebdc679f1861729764052b44169e659bec9c639d98109e5966ea3ce9b7b89",
+            "MessageQueue.dequeue": "39d0dea9fbffa46ec364ca8518eb859e7fd9baf936b05030226dfa80871d24b0"
+          }
+        },
+        "vllm.v1.core.scheduler": {
+          "path": "vllm/v1/core/scheduler.py",
+          "bytes": 26643,
+          "sha256": "24db292542369b94d00985b6860386909cf9ce559965263395188f613c4a4985",
+          "functions": [
+            "Scheduler.schedule"
+          ],
+          "function_lines": {
+            "Scheduler.schedule": [
+              93,
+              314
+            ]
+          },
+          "body_code_sha256": {
+            "Scheduler.schedule": "cd2701d1b776877d142d49d291f4ea7ce961aa4abfffe0cc6a4493879b80dd2d"
+          }
+        }
+      },
+      "worker_binding": {
+        "loop_module": "vllm.v1.executor.multiproc_executor",
+        "loop_point": "WorkerProc.worker_busy_loop",
+        "queue_module": "vllm.distributed.device_communicators.shm_broadcast",
+        "receive_point": "MessageQueue.dequeue",
+        "publish_point": "MessageQueue.enqueue",
+        "rpc_method": "execute_model",
+        "fresh_profile": "vllm-native-lifecycle-metadata/28",
+        "request_layout": {
+          "kind": "positive-dict-keys",
+          "type": {
+            "module": "vllm.v1.core.scheduler",
+            "name": "SchedulerOutput"
+          },
+          "field": "num_scheduled_tokens",
+          "item_types": []
+        }
+      }
+    },
+    {
+      "id": "current-v1-candidate",
+      "role": "후보 판본",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "runtime": "cpython-3.12.3",
+      "engine_mode": "V1",
+      "pin_status": "candidate_pin",
+      "engine_group_verified": false,
+      "observer_installed": false,
+      "producer_registered": false,
+      "sources": {
+        "vllm.v1.executor.multiproc_executor": {
+          "path": "vllm/v1/executor/multiproc_executor.py",
+          "bytes": 45225,
+          "sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+          "functions": [
+            "MultiprocExecutor.collective_rpc",
+            "WorkerProc.worker_busy_loop",
+            "WorkerProc._execute_worker_rpc"
+          ],
+          "function_lines": {
+            "MultiprocExecutor.collective_rpc": [
+              375,
+              448
+            ],
+            "WorkerProc.worker_busy_loop": [
+              1029,
+              1033
+            ],
+            "WorkerProc._execute_worker_rpc": [
+              1035,
+              1059
+            ]
+          },
+          "body_code_sha256": {
+            "MultiprocExecutor.collective_rpc": "6fb69072683ce0b8074dc3f749a8e7dc75f36ba6a4a78768c13ebb3fbf1dcbf8",
+            "WorkerProc.worker_busy_loop": "81e826b282db8411880447927c946d83fdf7b448ffe64f6acb5d1b43bb9fae52",
+            "WorkerProc._execute_worker_rpc": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a"
+          }
+        }
+      }
+    },
+    {
+      "id": "current-v1-base",
+      "role": "기준 판본",
+      "image": "docker.io/vllm/vllm-openai@sha256:a43963ed149a7b8b6c8c9dd028d4ab2be9fe804761d41b11cc07043a1edb61a8",
+      "runtime": "cpython-3.12.8",
+      "engine_mode": "V1",
+      "pin_status": "candidate_pin",
+      "engine_group_verified": false,
+      "observer_installed": false,
+      "producer_registered": false,
+      "sources": {
+        "vllm.v1.executor.multiproc_executor": {
+          "path": "vllm/v1/executor/multiproc_executor.py",
+          "bytes": 14086,
+          "sha256": "5db418332360f43e2a9718f62d8ec5d856d554b8d0d27d14f053fb3392d33239",
+          "functions": [
+            "MultiprocExecutor._init_executor",
+            "MultiprocExecutor.collective_rpc",
+            "MultiprocExecutor.shutdown",
+            "WorkerProc.__init__",
+            "WorkerProc.make_worker_process",
+            "WorkerProc.worker_main",
+            "WorkerProc.wait_for_startup",
+            "WorkerProc.worker_busy_loop"
+          ],
+          "function_lines": {
+            "MultiprocExecutor._init_executor": [
+              38,
+              90
+            ],
+            "MultiprocExecutor.collective_rpc": [
+              92,
+              131
+            ],
+            "MultiprocExecutor.shutdown": [
+              169,
+              177
+            ],
+            "WorkerProc.__init__": [
+              197,
+              241
+            ],
+            "WorkerProc.make_worker_process": [
+              244,
+              278
+            ],
+            "WorkerProc.worker_main": [
+              287,
+              331
+            ],
+            "WorkerProc.wait_for_startup": [
+              334,
+              352
+            ],
+            "WorkerProc.worker_busy_loop": [
+              358,
+              376
+            ]
+          },
+          "body_code_sha256": {
+            "MultiprocExecutor._init_executor": "b0c8a9a51f25984ace9814113e7ef6666efc41a886b0f64a710cc30056872f0b",
+            "MultiprocExecutor.collective_rpc": "6c576d22fb12f77b90757502eda8f4bcc3f9d08b2ce9b2c8aa6cafbf4c7207dc",
+            "MultiprocExecutor.shutdown": "f3fe73b94952087d3a1b5d04235e20ad6e404f038f0e6ff7e85cf56d6b69d8cf",
+            "WorkerProc.__init__": "8c5e0a5b6e79fc077e310581dbdc060c37c51efdd76a362f135a0124ac2643e5",
+            "WorkerProc.make_worker_process": "2ddab615cd53c83c5166dfb3dbfdb15f66b3fb49bbd5aa9560ca8737b2ba0347",
+            "WorkerProc.worker_main": "e2dd01fed0321eee84de0f8c9f5a8aca70a2ff9a636db209afb8a3ef42525273",
+            "WorkerProc.wait_for_startup": "5018a6b1af0892e2be931bc850cf8db40f8fd6d7e5a074c1ae6f9452eb724ea4",
+            "WorkerProc.worker_busy_loop": "47c82ec890138638e617aad2bd1c241c18bad3e9bbf245a259fac0851dc06001"
+          }
+        },
+        "vllm.v1.executor.abstract": {
+          "path": "vllm/v1/executor/abstract.py",
+          "bytes": 3585,
+          "sha256": "6e0c838ef1e866b15f8176da0af117dc4661efe387fbcca20d521020c7b1970a",
+          "functions": [
+            "Executor.execute_model"
+          ],
+          "function_lines": {
+            "Executor.execute_model": [
+              71,
+              77
+            ]
+          },
+          "body_code_sha256": {
+            "Executor.execute_model": "db89476d5723f26188b6b673e8858e0692b96ecb8b6e46e9577d7fcc9ca7dcfb"
+          }
+        },
+        "vllm.distributed.device_communicators.shm_broadcast": {
+          "path": "vllm/distributed/device_communicators/shm_broadcast.py",
+          "bytes": 22741,
+          "sha256": "24a3990266dcbbdbb14f6a2a2c4dec1eecad54d9ea85622ddc8dc36774b87942",
+          "functions": [
+            "MessageQueue.enqueue",
+            "MessageQueue.dequeue"
+          ],
+          "function_lines": {
+            "MessageQueue.enqueue": [
+              437,
+              451
+            ],
+            "MessageQueue.dequeue": [
+              453,
+              471
+            ]
+          },
+          "body_code_sha256": {
+            "MessageQueue.enqueue": "a95888ee9bc59b6faf884c095efb0634574d44ede03c571ed4256838bf79e9e1",
+            "MessageQueue.dequeue": "87064dca14250716689e12f0d34fb996e7d5e52e47f50c5ee43d897986011ae5"
+          }
+        },
+        "vllm.v1.core.scheduler": {
+          "path": "vllm/v1/core/scheduler.py",
+          "bytes": 26643,
+          "sha256": "24db292542369b94d00985b6860386909cf9ce559965263395188f613c4a4985",
+          "functions": [
+            "Scheduler.schedule"
+          ],
+          "function_lines": {
+            "Scheduler.schedule": [
+              93,
+              314
+            ]
+          },
+          "body_code_sha256": {
+            "Scheduler.schedule": "36aa73d41c748a1b0a702f364d490a4ecf88e72ea5655e06b30e28988e5b9f22"
+          }
+        }
+      },
+      "worker_binding": {
+        "loop_module": "vllm.v1.executor.multiproc_executor",
+        "loop_point": "WorkerProc.worker_busy_loop",
+        "queue_module": "vllm.distributed.device_communicators.shm_broadcast",
+        "receive_point": "MessageQueue.dequeue",
+        "publish_point": "MessageQueue.enqueue",
+        "rpc_method": "execute_model",
+        "fresh_profile": "vllm-native-lifecycle-metadata/28",
+        "request_layout": {
+          "kind": "positive-dict-keys",
+          "type": {
+            "module": "vllm.v1.core.scheduler",
+            "name": "SchedulerOutput"
+          },
+          "field": "num_scheduled_tokens",
+          "item_types": []
+        }
+      }
+    },
+    {
+      "id": "current-v1-candidate",
+      "role": "후보 판본",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "runtime": "cpython-3.12.8",
+      "engine_mode": "V1",
+      "pin_status": "candidate_pin",
+      "engine_group_verified": false,
+      "observer_installed": false,
+      "producer_registered": false,
+      "sources": {
+        "vllm.v1.executor.multiproc_executor": {
+          "path": "vllm/v1/executor/multiproc_executor.py",
+          "bytes": 45225,
+          "sha256": "3ed0149a8a8e1550c4f062af40e645d1b734e70f99981bc5bf15f0360507648a",
+          "functions": [
+            "MultiprocExecutor.collective_rpc",
+            "WorkerProc.worker_busy_loop",
+            "WorkerProc._execute_worker_rpc"
+          ],
+          "function_lines": {
+            "MultiprocExecutor.collective_rpc": [
+              375,
+              448
+            ],
+            "WorkerProc.worker_busy_loop": [
+              1029,
+              1033
+            ],
+            "WorkerProc._execute_worker_rpc": [
+              1035,
+              1059
+            ]
+          },
+          "body_code_sha256": {
+            "MultiprocExecutor.collective_rpc": "83af48277e9c49a040a5187e127684abc84a9aace36cbdeea58ac822f1a8271a",
+            "WorkerProc.worker_busy_loop": "81e826b282db8411880447927c946d83fdf7b448ffe64f6acb5d1b43bb9fae52",
+            "WorkerProc._execute_worker_rpc": "a875d692b2bfa83df8adcbe2cb3e58eb4a37d4b2744d7e94154f611055e8117a"
+          }
+        }
+      }
+    }
+  ]
+}

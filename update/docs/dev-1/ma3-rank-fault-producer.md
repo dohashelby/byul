@@ -1,5 +1,31 @@
 # M-A3 rank-fault 후보 생산자
 
+## worker 요청 수신/응답과 fresh HMAC 연결 /2 (2026-11-15 로컬 검증)
+
+사용자가 승인한 후속 /2는 기준 V1의 정확 `WorkerProc.worker_busy_loop` 프레임 안에서 동일 queue·worker 객체를 대조한다. 원 `MessageQueue.dequeue`가 반환한 `execute_model` 배치의 한정된 ID와 원 response enqueue의 상태만 기록한다. 원 queue 함수를 한 번 호출하고 원 반환/예외를 보존한다. 예외/출력 본문·pickle bytes·프롬프트/토큰은 관측하지 않는다. 다른 RPC/빈 일정은 요청 결합으로 만들지 않는다. 소스/객체/SDK/프레임/입력이 달라지면 원 호출을 유지하고 진단으로 남긴다.
+
+- `tools.rank_v1_worker_inputs prepare --image <고정 이미지> --fresh-prepared <정확 /28 준비 폴더> --output <새 폴더>`는 현재 소스 검토 관문과 /28 전체 준비물·키의 owner/0600/NOFOLLOW·세션·정확 SHA를 대조한다. 같은 세션 키를 내부 재사용하되 공개 manifest/요약에는 키를 넣지 않는다. secret settings는 생성부터0600이다. 기존 `/guard-lifecycle` 준비물과 별도 `/guard-rank-ipc` 준비물을 함께 배치하며 기존 sitecustomize/import 선택을 보존한다.
+- 설정·준비물·snapshot `/2`와 payload `guard-rank-rpc-hook-candidate/2`는 기존 `/1`과 구분한다. 원 `/1`·native `/28` 기록/키/지문을 소급 재작성하지 않는다. 공통 snapshot writer·private bootstrap·객체 HMAC·정확 소스/코드 대조를 재사용한다. SDK 동결은 원문에 선언한 함수가 다른 namespace의 함수로 교체된 경우도 거부한다.
+- `verify`는 `--prepared`·`--fresh-prepared`·`--capture`·`--fresh-recording`의 원 파일 bytes·HMAC·현재 SDK/키/세션/소스·닫힌 필드를 검사한다. 실제 /28 parser/journal을 통과한 유일한 native 입력과 worker 수신 ID가 일치하고, 같은 boot/time 문맥의 ASGI 유효 구간 안에 수신됐을 때만 부분 연결 참조를 만든다. 원 수신/응답·fresh 기록의 SHA를 남기며 다른 객체/세션·중복/재생·변조·범위 확대 주장은 거부한다. 수신만 있고 응답이 없으면 부분 사실과 공백을 함께 보존한다.
+- 모델 함수/torch 장식자의 자격·실제 모델 소비·프로세스/IPC 전체 그룹·클라이언트 전달/정책 기한·물리 해제/새 세대 회복·별도 communication-stall의 증명은 아니다. `source_authenticated`·`engine_group_verified`·`scope_complete`·`producer_registered`는 항상 false다. 새 제어점/실행기/공통 GPU 계약/판정/수락/등록은 열지 않으며 M-B4는 보관한다. GPU/클라우드/추가 다운로드 없이 CPU 고정 자료/EXAMPLE 협력 객체로 검증한다.
+
+직접214개 중213개 통과와 격리 설치 fixture 보완 후 해당1개 재검증 통과, 승인 이미지 CPython3.12.8 직접82개 통과를 확인했다. 첫 ABI의 공유 pyc 혼용은 분리한 빈 pycache_prefix의 원문 컴파일로 검증했으며 고정값/검사는 유지했다. 소스566파일/정확 검토 기록·현황·경로16개가 통과했다. 새 전체 PR CI와 실제 엔진/GPU·ENV/target·제품 ARM2 결합은 미완료다. 아래 /1 및 source 검토의 과거 통과 수를 새 /2 결과로 세지 않는다.
+
+## 현재 V1 RPC 원 함수 대조 (2026-11-15 로컬 후속)
+
+기존 이미지별 IPC/제어 profile은 과거 기준 V0·후보 V1의 자격 범위로 보존한다. `vllm_rank_v1_source_reviews.json`은 현재 두 V1의 설치 소스3파일·원 함수12개의 별도 검토 표다. `qualify_current_v1`은 고정 이미지·정확 파일 bytes/크기·현재 함수 code/globals·원문에서 다시 컴파일한 본문을 대조한다. 기존 exact 대조 구현을 재사용하며 hook을 설치하거나 장애 제어/수락·공통 입력/생산자 등록을 열지 않는다.
+
+| 기준 V1 대상 | 실제 의미와 연결할 때의 제한 |
+|---|---|
+| `Executor.execute_model` → `MultiprocExecutor.collective_rpc` | parent는 모든 rank의 response를 순서대로 받은 뒤 목록을 반환하고 상위 execute_model이 rank0 결과를 고른다. 후보의 unique reply rank/future/non_block 계약으로 바꾸지 않음 |
+| `WorkerProc.worker_busy_loop` | 세 항목 `(method,args,kwargs)`를 dequeue한 뒤 직접 worker 함수를 호출한다. 별도 `_execute_worker_rpc` 프레임은 없다. 원 Exception은 failure response에 넣고 루프를 계속하므로 worker 메서드의 예외와 parent 탐지/클라이언트 오류를 구분해야 함 |
+| `WorkerProc.__init__`·`wait_for_startup`·`worker_main` | READY와 response handle을 먼저 전송한 뒤 `init_device`·`load_model`을 실행한다. wait_for_startup의 성공만으로 모델 로드/worker 실행 준비 완료를 만들지 않음. main의 queue 준비 완료와 실제 정상 요청을 추가로 연결해야 함 |
+| `MultiprocExecutor._init_executor`·`shutdown` | 시작 시 worker 멤버·queue 준비를 대조한다. shutdown의 실제 조건문/회수 경로는 원문 그대로 검토하며 호출/반환만으로 물리 자원 회수·새 세대 복구를 주장하지 않음 |
+
+후보는 실제 `collective_rpc`·`worker_busy_loop`·`_execute_worker_rpc`의 별도 원 본문을 고정한다. 같은 이름이 있어도 기준 행과 관측 의미를 이월하지 않는다. 두 CPython 패치 판본의 표는 **오프라인 소스/본문 대조**용이다. 반환의 `review_scope=offline_source_body_only`, `image_runtime_verified=false`를 유지하며 실제 이미지 런타임·ASGI/worker 결합·프로세스/IPC 소속·전체 TP2 인과/기한·실제 해제/새 세대 복구·별도 communication-stall은 아직 미완료다. 시험 namespace는 원 code와 EXAMPLE 협력 객체만 쓰며 엔진/모델/GPU는 기동하지 않는다. M-B4는 보관한다.
+
+직접159개(pytest7.41초·부모7.590초)와 승인 이미지 CPython3.12.8 직접69개(0.40/0.522초)가 통과했다. 현황·경로16개·소스561파일 검토 관문은 통과했으며 새 PR CI와 실제 엔진/GPU는 미실행이다.
+
 ## 최신 main 통합과 PR 작성자의 다음 작업 (2026-11-15)
 
 #276은 #275·#277이 병합된 main `77bc05a3`에 맞춰 통합했다. ARM/2 사전 결합과 미등록 공통 부분 입력의 생성/검증에 이어 `rank_failure:common-input`의 LIF-08 파일 소비·양쪽 제품 비교·정확 EVD→RES→RPT 왕복까지 구현했다. 파일 소비는 엔진 실행이 아니며 부분 입력의 ABORTED·UNKNOWN과 기존 독립 FAIL을 보존한다. #278에는 실제 파일 조립 도구가 별도로 있다. 전체 TP2 수락·새 V1 GPU 자격·등록 완료를 뜻하지 않으며, 원 준비 보고서와 여섯 ARM/1 GPU 사례는 당시 source에 귀속한 채 보존한다.

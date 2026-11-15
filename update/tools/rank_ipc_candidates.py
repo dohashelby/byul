@@ -14,47 +14,9 @@ from tools.verify_req10_consumption import verify as verify_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
-BOOTSTRAP = '''"""기존 sitecustomize를 먼저 실행한 뒤 IPC 후보만 설치한다."""
-def _byul_rank_ipc_start():
-    import importlib.machinery
-    import importlib.util
-    from pathlib import Path
-    import sys
-    current = sys.modules[__name__]
-    current.__dict__.pop('_byul_rank_ipc_start', None)
-    own = Path(__file__).resolve().parent
-    search = []
-    for item in sys.path:
-        if type(item) is not str:
-            search.append(item)
-            continue
-        try:
-            same = Path(item or '.').resolve() == own
-        except OSError:
-            same = False
-        if not same:
-            search.append(item)
-    sys.path[:] = search
-    original = importlib.machinery.PathFinder.find_spec('sitecustomize', search)
-    if original is not None and original.loader is not None:
-        current.__file__, current.__loader__, current.__spec__ = original.origin, original.loader, original
-        current.__package__, current.__cached__ = original.parent, original.cached
-        original.loader.exec_module(current)
-    try:
-        name = '_byul_rank_ipc'
-        if name in sys.modules:
-            raise ValueError('RANK_IPC_NAMESPACE_IN_USE')
-        spec = importlib.util.spec_from_file_location(name, own / 'guard' / '__init__.py',
-                                                     submodule_search_locations=[str(own / 'guard')])
-        package = importlib.util.module_from_spec(spec)
-        sys.modules[name] = package
-        spec.loader.exec_module(package)
-        module = importlib.import_module(name + '.adapters.vllm_rank_ipc_runtime')
-        module.install()
-    except Exception:
-        sys.stderr.write('RANK_IPC_OBSERVER_UNAVAILABLE\\n')
-_byul_rank_ipc_start()
-'''
+from guard.adapters.vllm_rank_private_bootstrap import render as render_bootstrap
+
+BOOTSTRAP = render_bootstrap('vllm_rank_ipc_runtime')
 
 
 

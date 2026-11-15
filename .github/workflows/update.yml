@@ -149,17 +149,19 @@ jobs:
         run: python -B -I tools/observer_abi.py
       - name: Verify configured lifecycle and exact interpreter refusal
         run: |
-          uv run python - <<'PY'
+          uv run --python 3.12.8 python - <<'PY'
           import os
           import subprocess
           import sys
+          import tempfile
           import time
 
           start = time.perf_counter()
-          result = subprocess.run([sys.executable, "-m", "pytest", "-q",
-              "tests/test_observer_abi.py", "tests/test_configured_lifecycle.py",
-              "tests/test_fresh_request_binding.py",
-              "--basetemp", os.path.join(os.environ["RUNNER_TEMP"], "byul-observer-3128")])
+          with tempfile.TemporaryDirectory(prefix="byul-observer-pyc-", dir=os.environ["RUNNER_TEMP"]) as cache:
+              result = subprocess.run([sys.executable, "-X", "pycache_prefix=" + cache, "-m", "pytest", "-q",
+                  "tests/test_observer_abi.py", "tests/test_configured_lifecycle.py",
+                  "tests/test_fresh_request_binding.py", "tests/test_rank_v1_source_reviews.py", "tests/test_rank_v1_worker_binding.py",
+                  "--basetemp", os.path.join(os.environ["RUNNER_TEMP"], "byul-observer-3128")])
           print(f"Observer 3.12.8 parent wall clock: {time.perf_counter() - start:.3f}s", flush=True)
           raise SystemExit(result.returncode)
           PY

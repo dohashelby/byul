@@ -1,3 +1,9 @@
+## 2026-11-15 기준 fresh /28·worker /2 로컬 준비
+
+후속8cc795231d5a3eba1e42f3c462f60113e337800b70542bc2b6dead6eebea9123 소스로 새 기준 /28 준비물과 동일 세션 worker /2 준비물을 /home/youngjo/byul-ma7-fresh-worker-inputs-20261115에 만들었다. 정확 SDK·키 자산 SHA/owner/0600·세션·독립 source 지문을 검토했다. 공개 요약은 작업 폴더 MA7_FRESH_WORKER_PREPARATION_20261115.json이며 비밀키는 포함하지 않는다.
+
+이 파일들은 현재 실제 ENV/target·Pod/CID/세대·ARM2와 미결합이다. worker /2는 읽기 전용 수신/응답 검토이고 새로운 장애 제어점/공통 변환·전체 TP2 수락/등록을 열지 않는다. 후보의 같은 후속 관측·현재 V1 모델 기동/GPU 자격과 실제 사전 점검은 미완료다. 과거 GPU 자료·실측/승인 예외를 새 조건으로 이월하지 않는다. M-B4 보관·새 비용/다운로드 사전 승인 경계는 유지한다.
+
 # M-A7 실제 파일·실행 결합 확인
 
 팩36의 실행 준비값 분리에 맞춰 입력 파일과 결합을 확인한다. 현재 준비물은 `ma7-local-materialization-20261113.json`의 v8이며 prepared18개·독립 세션18개·사례10파일/2,078개·REQ-17 분할 그룹2개다. 이전 묶음과 실제 팩34 SUP-08 EVD/RES/RPT는 보존한다.

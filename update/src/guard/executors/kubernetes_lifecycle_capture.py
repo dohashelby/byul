@@ -24,6 +24,7 @@ from guard.adapters import vllm_termination_sensor as termination_sensor
 from guard.adapters import vllm_fault_sensor as fault_sensor
 from guard.adapters import sglang_request_termination_sensor as sglang_sensor
 from guard.adapters import vllm_initialization_sensor as init_sensor
+from guard.adapters import vllm_initialization_release_sensor as init_release
 from guard.adapters import vllm_profiler_sensor as profiler_sensor
 from guard.adapters import vllm_file_read_sensor as read_sensor
 from guard.adapters import vllm_weight_iteration_sensor as weight_sensor
@@ -65,7 +66,7 @@ class KubernetesLifecycleReader:
         if node_image_verification not in (None,"local-containerd-v1"):raise KubernetesCaptureError()
         self.node_image_verification=node_image_verification;self.node_image_receipts=[];self.node_image_proof_failures=0
         if prepared.get("profile")==sglang_sensor.PROFILE and not supports(env.engine.name,env.engine.version,sglang_sensor.PROFILE):raise KubernetesCaptureError()
-        if prepared.get("profile") in {fault_sensor.PROFILE,termination_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} and not supports(env.engine.name,env.engine.version):
+        if prepared.get("profile") in {fault_sensor.PROFILE,termination_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,init_release.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} and not supports(env.engine.name,env.engine.version):
             raise KubernetesCaptureError()
         if prepared.get("profile") in {online.PROFILE,attempt.PROFILE,output_sensor.PROFILE} and not supports(env.engine.name, env.engine.version):
             raise KubernetesCaptureError()
@@ -82,8 +83,8 @@ class KubernetesLifecycleReader:
             raise KubernetesCaptureError()
         self.target_sha256=sha256_hex(canonical_json(target));self.lab=target.get("lab")is True
         self.session=prepared["session"]
-        self.file_read_profile = LARGE_RECORDING_PROFILE if prepared.get("profile")==sglang_sensor.PROFILE else EXTENDED_RECORDING_PROFILE if prepared.get("profile") in {fault_sensor.PROFILE,termination_sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else None
-        self.file_read_limit = sglang_sensor.MAX_BYTES if prepared.get("profile")==sglang_sensor.PROFILE else termination_sensor.MAX_BYTES if prepared.get("profile")in {fault_sensor.PROFILE,termination_sensor.PROFILE} else weight_sensor.MAX_BYTES if prepared.get("profile") in {weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else profiler_sensor.MAX_BYTES if prepared.get("profile")==profiler_sensor.PROFILE else init_sensor.MAX_BYTES if prepared.get("profile")==init_sensor.PROFILE else rank_sensor.MAX_BYTES if prepared.get("profile")==rank_sensor.PROFILE else stream_sensor.MAX_BYTES if prepared.get("profile")==stream_sensor.PROFILE else attempt.MAX_BYTES if prepared.get("profile") in {attempt.PROFILE,output_sensor.PROFILE} else online.MAX_BYTES if self.file_read_profile is not None else 262144
+        self.file_read_profile = LARGE_RECORDING_PROFILE if prepared.get("profile")==sglang_sensor.PROFILE else EXTENDED_RECORDING_PROFILE if prepared.get("profile") in {fault_sensor.PROFILE,termination_sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,init_release.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else None
+        self.file_read_limit = sglang_sensor.MAX_BYTES if prepared.get("profile")==sglang_sensor.PROFILE else termination_sensor.MAX_BYTES if prepared.get("profile")in {fault_sensor.PROFILE,termination_sensor.PROFILE} else weight_sensor.MAX_BYTES if prepared.get("profile") in {weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else profiler_sensor.MAX_BYTES if prepared.get("profile")==profiler_sensor.PROFILE else init_sensor.MAX_BYTES if prepared.get("profile") in {init_sensor.PROFILE,init_release.PROFILE} else rank_sensor.MAX_BYTES if prepared.get("profile")==rank_sensor.PROFILE else stream_sensor.MAX_BYTES if prepared.get("profile")==stream_sensor.PROFILE else attempt.MAX_BYTES if prepared.get("profile") in {attempt.PROFILE,output_sensor.PROFILE} else online.MAX_BYTES if self.file_read_profile is not None else 262144
         self.binary=binary;self.deadline=time.monotonic()+duration
         self.runner=runner or capture_pipes;self.injected=runner is not None
         self.programs={"file":_FILE_READER,"context":CONTEXT_READER,"inventory":INVENTORY_READER,"inventory_rolling":ROLLING_INVENTORY_READER,"seal":LARGE_SESSION_SEALER if prepared.get("profile")==sglang_sensor.PROFILE else SESSION_SEALER}

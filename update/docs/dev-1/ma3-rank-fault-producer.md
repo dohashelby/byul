@@ -157,3 +157,8 @@ HTTP200/500은 클라이언트 구성요소 관측으로만 기록한다. 현재
 기존 rank_failure 실행기 구현에 `common-input` 파일 소비 경로를 연결한다. 설정의 `input_mode="common-records"`는 명시적으로 파일만 소비하며 lab_activation/record_attestation과 섞지 않는다. 기존 Kubernetes native 경로/소스 자격·현재 팩·판정 규칙은 그대로다. 실행 결합은 이 경로에서 선언 JSON 준비물의 정규 해시를 계산하고 기존 ENV/target/유효 기간/정책 검사를 유지한다.
 
 기존 공통 소비 기반에 LIF-08/rank-fault를 연결해 정확 공통 기록과 소스 지문·공백·위반 후보를 EVD artifact/activation_steps에 보존한다. 현재 owner·준비물 runtime·원 관측시각·모든 rank 정상/상위 전달은 미확인으로 남기며 `activation_scope_complete=false`다. 파일 소비 자체는 실제 엔진 요청이 아니고 출처는 EXAMPLE 또는 최대 DECLARED다. 새 기록의 위반 후보를 확인된 보안 FAIL로 바꾸지 않으며 기존 독립 FAIL은 보존한다. 이 경로의 EVD→RES→RPT는 UNKNOWN이며 실제 GPU 실행/수락/등록을 대신하지 않는다.
+
+
+제품 파일 소비 경로와 새 main의 점검별 설정 통합 후 직접200개가 통과했다(pytest41.56초·벽시계41.876초). 팩 필수 관측만 EVD에 남기는 기존 규칙을 유지하며, 출처 표시는 `activation_steps`와 원 기록 artifact에 남는다. 새 전체 CI는 미실행이다. [현재 후속 준비물6개](ma3-rpc-product-preparation-20261115.json)는 새 소스 목록에 결합했지만 미실행/미결합이다.
+
+#277의 결정14 변경을 반영해 이후 선택 엔진은 두 쪽 V1이다. 과거 기준 V0 GPU 결과와 예외는 이력이며 새 V1 자격으로 이월하지 않는다. SDK bytes가 앞선 후보와 같다는 사실은 선택 모드의 함수/정확 핀·GPU 자격을 증명하지 않는다. 현재 owner/엔진 모드·새 ARM2 실제 기록·TP2 정상/탐지/상위 전달/복구 수락·등록은 남아 있다. M-B4는 보관한다.

@@ -51,7 +51,7 @@ def _read_record(ctx, config):
     transport = ctx.cprobe
     if (not isinstance(transport, OwnedKubernetesTransport) or transport.profile != REQUEST_BINDING_PROFILE
             or ctx.target.get("lab") is not True or transport.lab is not True
-            or not supports(transport.engine_name, transport.engine_version)
+            or not supports(transport.engine_name, transport.engine_version, 'unix_ipc')
             or transport.target_sha256 != sha256_hex(canonical_json(ctx.target))
             or canonical_json(transport.environment_ref) != canonical_json(ctx.env.ref().model_dump(mode="json"))):
         raise ValueError("KUBERNETES_IPC_CONSUMER_INTERFACE_UNAVAILABLE")

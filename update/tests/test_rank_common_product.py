@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def world(tmp_path, side='candidate', kind='delay', wire='guard-gpu-common-input/4'):
     row = versions()[side]
-    env = environment(engine={'name': row['engine'], 'version': row['version'], 'image_digest': 'fixture-image'},
+    env = environment(id='ENV-EXAMPLE-' + side, engine={'name': row['engine'], 'version': row['version'], 'image_digest': 'fixture-image'},
         model={'id': 'EXAMPLE-model', 'revision': 'EXAMPLE-revision'}, runtime={'tp_size': 2, 'gpu_count': 2})
     target = {'environment_ref': env.ref().model_dump(mode='json'), 'lab': True,
         'kubernetes': {'engine': {'pod_uid': 'EXAMPLE-pod', 'container_id': '4' * 64, 'restart_count': 0}}}
@@ -111,6 +111,39 @@ def test_common_record_reaches_exact_product_refs_and_restores_as_unknown(tmp_pa
     assert all(restored.resolve(obj.ref()).to_dict() == obj.to_dict() for obj in objects)
     cli(['judge', '--plan', plan.id, '--as-of', as_of, '--store', tmp_path / 'restored', '--config', config])
     assert [r.ref() for r in Store.read_only(tmp_path / 'restored').iter_kind('RES')] == [result.ref()]
+
+
+@pytest.mark.parametrize('wire', ['guard-gpu-common-input/1', 'guard-gpu-common-input/4'])
+def test_update_compares_two_exact_partial_inputs_without_starting_an_engine(tmp_path, monkeypatch, wire):
+    pack = load_pack(ROOT / 'packs/PACK-BASELINE')
+    parts = ['[executors]\nrank_failure="common-input"\n[update]\nmode="external"\n']
+    environments = {}
+    for side in ('baseline', 'candidate'):
+        folder = tmp_path / side; folder.mkdir()
+        env, _, cfg, values, _ = world(folder, side=side, wire=wire)
+        environments[side] = folder / 'environment.json'; environments[side].write_bytes(canonical_json(env.to_dict()))
+        raw = config_file(folder, cfg).read_text().split('[rank_failure]', 1)[1]
+        parts.append('[sides.' + side + '.rank_failure]' + raw.replace('[rank_failure.', '[sides.' + side + '.rank_failure.'))
+    pol = policy(pack.ref(), scope={'include': ['LIF-08']}, values={'LIF-08': values})
+    (tmp_path / 'policy.json').write_bytes(canonical_json(pol.to_dict()))
+    config = tmp_path / 'guard.toml'; config.write_text('\n'.join(parts))
+    def forbidden(*a, **kw): raise AssertionError('파일 비교에서 네트워크/엔진 기동 금지')
+    monkeypatch.setattr(socket, 'socket', forbidden); monkeypatch.setattr(subprocess, 'Popen', forbidden)
+    result = CliRunner().invoke(app, ['update', '--pack', str(pack.path), '--baseline', str(environments['baseline']),
+        '--candidate', str(environments['candidate']), '--policy', str(tmp_path / 'policy.json'),
+        '--store', str(tmp_path / 'store'), '--config', str(config), '--output', str(tmp_path / 'output')])
+    # update는 기존 계약대로 ABORTED 증거가 하나라도 있으면1을 반환한다.
+    assert result.exit_code == 1, (result.output, result.exception)
+    store = Store.read_only(tmp_path / 'store')
+    evidence = list(store.iter_kind('EVD')); results = list(store.iter_kind('RES')); report, = store.iter_kind('RPT')
+    assert len(evidence) == len(results) == 2 and not report.official
+    assert {e.side.value for e in evidence} == {'baseline', 'candidate'}
+    for evd in evidence:
+        assert evd.execution.status.value == 'ABORTED' and evd.data_origin.value == 'EXAMPLE'
+        assert evd.execution.abort_reason == 'RANK_RECORD_INPUT_QUESTION_SCOPE_INCOMPLETE' and not evd.execution.cleanup_errors
+        row, = evd.observations['activation_steps'].value[-1]['records']
+        assert row['record']['environment_ref'] == store.resolve(evd.environment).ref().model_dump(mode='json')
+    assert all(getattr(r.verdicts, axis).value == 'UNKNOWN' for r in results for axis in ('security', 'functional', 'performance'))
 
 
 @pytest.mark.parametrize('damage', ['target', 'prepared', 'session', 'kind', 'origin', 'file', 'extra'])

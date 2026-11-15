@@ -81,6 +81,30 @@ def test_input_validation_uses_same_read_only_transition_gate(tmp_path):
     assert all("get" in call for call in pair.calls)
 
 
+def test_mixed_late_binding_waits_for_both_http_targets_and_rejects_stale_second_file(tmp_path):
+    pair=Pair();clock=Clock();cfg,path=late_inputs(tmp_path,pair)
+    second=tmp_path/'late-input-validation.json'
+    for side in cfg:
+        cfg[side]['executors'].update(input_validation='kubernetes',container_config='kubernetes')
+        cfg[side]['input_validation']=dict(cfg[side]['request_binding'])
+    cfg['candidate']['input_validation']['target']=str(second)
+    second.write_bytes(canonical_json(pair.worlds[1].target))
+    with pytest.raises(ValueError,match='MUST_BE_FRESH'):
+        KubernetesTransition(pair.envs,cfg,runner=pair.runner,candidate_binding='after_baseline')
+    assert not pair.calls
+    second.unlink()
+    def sleep(delay):
+        clock.sleep(delay)
+        if not path.exists():path.write_bytes(canonical_json(pair.worlds[1].target))
+        elif not second.exists():second.write_bytes(canonical_json(pair.worlds[1].target))
+    gate=KubernetesTransition(pair.envs,cfg,runner=pair.runner,clock=clock,sleep=sleep,
+        timeout=.04,poll_interval=.01,candidate_binding='after_baseline')
+    gate.prepare_baseline();gate.candidate_ready()
+    assert second.exists() and clock.value>=.02
+    assert gate.report()['events'][-1]=='CANDIDATE_READY_OBSERVED'
+    assert all('get' in call and 'exec' not in call for call in pair.calls)
+
+
 def test_baseline_transition_allows_unimplemented_checks_but_requires_completed_probe():
     rows=lambda *states:[SimpleNamespace(execution=SimpleNamespace(status=state)) for state in states]
     assert application._baseline_ran_without_abort(rows(ExecStatus.COMPLETED,ExecStatus.NOT_RUN))

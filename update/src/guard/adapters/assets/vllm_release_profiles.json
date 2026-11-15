@@ -17,10 +17,25 @@
         ],
         "model_argument": "--model",
         "default_engine": "V0",
-        "prefix_cache_default": false,
+        "engine": "V1",
+        "env": {
+          "VLLM_USE_V1": "1"
+        },
+        "engine_basis": "사용자 결정(2026-11-15, 결정 14 변경): 기준 판본을 V1 엔진으로 띄운다. 0.7.0의 V1은 opt-in 초기 구현이다",
+        "prefix_cache_default": true,
         "request_logging_enable_args": [],
         "profiler_option": null,
-        "profiler_directory_env": "VLLM_TORCH_PROFILER_DIR"
+        "profiler_directory_env": "VLLM_TORCH_PROFILER_DIR",
+        "unsupported_args": [
+          "--enable-lora",
+          "--no-async-scheduling",
+          "--profiler-config"
+        ],
+        "unsupported_env_values": {
+          "VLLM_USE_V2_MODEL_RUNNER": [
+            "1"
+          ]
+        }
       },
       "qualification": "기동 명령은 레지스트리 config·태그 소스 근거다. 설치 파일 고정값·GPU 실측·생산자 등록을 대신하지 않는다.",
       "http": {
@@ -69,7 +84,178 @@
           "tool_choice=required"
         ]
       },
-      "native_executors": []
+      "executor_gaps": {
+        "credential_revocation": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [
+            "PLT-10"
+          ],
+          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 인증·입력 경로의 정확 행 미검토. 이전 V0 UNKNOWN 예외를 이월하지 않음",
+          "next": "기준 V1 인증/요청 연결 대상표"
+        },
+        "engine_sensor": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_engine_callback_sensor"
+          ],
+          "checks": [
+            "REQ-15",
+            "REQ-17",
+            "REQ-18",
+            "REQ-19",
+            "REQ-20",
+            "LIF-13"
+          ],
+          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): scheduler 경로 이동, KV manager·runner 구조 차이, V2 runner 없음",
+          "next": "기준 V1 관측 지점·인자 의미 검토 후 정확 행"
+        },
+        "initialization": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_initialization_sensor",
+            "vllm_ready_endpoint_sensor",
+            "vllm_worker_generation_sensor",
+            "vllm_worker_initialization_sensor"
+          ],
+          "checks": [
+            "LIF-07",
+            "LIF-09"
+          ],
+          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): MultiprocExecutor는 있으나 wait_for_ready·wait_for_response_handle_ready 대신 wait_for_startup",
+          "next": "기준 V1 초기화 완료 사건과 rank/worker 세대 대응"
+        },
+        "model_authorization": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [
+            "REQ-05"
+          ],
+          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 models HTTP 경로와 입력 Processor 경로가 현 센서와 다름",
+          "next": "기준 V1 models·Processor 대상표"
+        },
+        "native_route": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [],
+          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 인증 middleware 경로가 현 센서와 다름",
+          "next": "기준 HTTP·V1 요청 연결 대상표"
+        },
+        "observation_identity": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_weight_iteration_sensor",
+            "vllm_file_read_sensor",
+            "vllm_safe_open_mapping_sensor",
+            "vllm_worker_startup_sensor"
+          ],
+          "checks": [],
+          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 가중치 적재·worker startup 대상과 정확 행 미검토",
+          "next": "기준 V1 가중치/worker 대상표"
+        },
+        "observation_state": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_attempt_sensor",
+            "vllm_request_output_sensor"
+          ],
+          "checks": [
+            "OBS-02"
+          ],
+          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 V1 AsyncLLM·OutputProcessor·scheduler의 인자/반환 구조가 다름",
+          "next": "기준 V1 사건 의미 대조와 정확 행"
+        },
+        "profiler_observation": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_profiler_sensor"
+          ],
+          "checks": [
+            "LIF-14"
+          ],
+          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): V1 AsyncLLM.start_profile/stop_profile·EngineCore.profile은 있으나 기존 profiler wrapper 없음. 이전 V0 UNKNOWN 예외를 이월하지 않음",
+          "next": "기준 V1 profiler 호출·출력 구간 검토"
+        },
+        "rank_failure": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_rank_failure_sensor",
+            "vllm_fault_sensor"
+          ],
+          "checks": [],
+          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 V1 MultiprocExecutor·WorkerProc 구조와 기존 fault 지점이 다름",
+          "next": "기준 V1 RPC·worker·그룹 대응; M-A3 연계"
+        },
+        "request_termination": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_termination_sensor",
+            "vllm_attempt_sensor",
+            "vllm_request_output_sensor"
+          ],
+          "checks": [
+            "LIF-10",
+            "LIF-12",
+            "REQ-12"
+          ],
+          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 V1 Scheduler._free_request와 KV manager의 사건 의미/인자 대조 미완료",
+          "next": "기준 V1 취소·해제·시도 대상표"
+        },
+        "resource_recovery": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [],
+          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 V1 executor shutdown·worker 정리 경로의 정확 행/소유 범위 미검토",
+          "next": "기준 V1 자원·세대 대응; M-A3 연계"
+        },
+        "sampling_validation": {
+          "cause": "REQUEST_FIELD_MAPPING_NOT_CONSUMED",
+          "observers": [
+            "vllm_runner_capture"
+          ],
+          "checks": [
+            "REQ-10"
+          ],
+          "basis": "ma6-version-applicability.md 24절. 기존 structured_outputs→guided_json은 V0 경로의 대응이다. 기준 V1의 실제 제약 소비 경로를 다시 검토해야 하며 V5 승인은 필드명 변경만으로 실행기를 열라는 뜻이 아니다",
+          "next": "기준 V1 요청 옵션과 실제 runner 소비 관측 검토(M-A6-V5)"
+        },
+        "session_revocation": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [
+            "PLT-11"
+          ],
+          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 인증·입력 경로의 정확 행 미검토. 이전 V0 UNKNOWN 예외를 이월하지 않음",
+          "next": "기준 V1 인증/세션 대상표"
+        },
+        "stream_buffer": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_stream_buffer_sensor"
+          ],
+          "checks": [
+            "LIF-03",
+            "LIF-04"
+          ],
+          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 V1 HTTP 경로·uvicorn 설치 행이 현재 sensor와 다름",
+          "next": "기준 uvicorn 정확 설치 행과 V1 HTTP 대상표"
+        }
+      }
     },
     {
       "role": "후보 판본",
@@ -86,6 +272,8 @@
         ],
         "model_argument": "positional",
         "default_engine": "V1",
+        "engine": "V1",
+        "env": {},
         "prefix_cache_default": true,
         "request_logging_enable_args": [
           "--enable-log-requests"
@@ -147,9 +335,74 @@
       },
       "request_field_mapping": {},
       "unavailable_branches": {},
-      "native_executors": [
-        "engine_sensor"
-      ]
+      "executor_gaps": {
+        "observation_identity": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor",
+            "vllm_weight_iteration_sensor",
+            "vllm_file_read_sensor",
+            "vllm_safe_open_mapping_sensor",
+            "vllm_worker_startup_sensor"
+          ],
+          "checks": [],
+          "basis": "ma6-version-applicability.md 19.2",
+          "next": "M-B4"
+        },
+        "profiler_observation": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_profiler_sensor"
+          ],
+          "checks": [
+            "LIF-14"
+          ],
+          "basis": "ma6-version-applicability.md 23절, ma6-candidate-function-review.json. 후보 TorchProfilerWrapper._start/_stop와 Worker.profile의 동작이 다르다(profiler 재생성↔재사용, backend 생성)",
+          "next": "profiler 세대·출력 구간 의미 검토(M-B4)"
+        },
+        "rank_failure": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_rank_failure_sensor",
+            "vllm_fault_sensor"
+          ],
+          "checks": [],
+          "basis": "ma6-version-applicability.md 19.2",
+          "next": "M-B4"
+        },
+        "resource_recovery": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_lifecycle_sensor"
+          ],
+          "checks": [],
+          "basis": "ma6-version-applicability.md 19.2",
+          "next": "M-B4"
+        },
+        "sampling_validation": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_runner_capture"
+          ],
+          "checks": [
+            "REQ-10"
+          ],
+          "basis": "ma6-version-applicability.md 19.3. runner_capture 소비 관측이 0.31.0 고정값만 있다. tests/test_code_selection_observation.py가 구 판본 비노출을 고정한다",
+          "next": "M-B4 및 결정 V0-5"
+        },
+        "stream_buffer": {
+          "cause": "OBSERVER_PIN_ROWS_ABSENT",
+          "observers": [
+            "vllm_stream_buffer_sensor"
+          ],
+          "checks": [
+            "LIF-03",
+            "LIF-04"
+          ],
+          "basis": "ma6-version-applicability.md 23절. uvicorn h11_impl·httptools_impl·flow_control 행이 기존 uvicorn 커밋 것뿐이다. 후보 이미지 uvicorn 0.53.0 설치 파일 bytes가 아직 없다",
+          "next": "uvicorn 0.53.0 설치 파일 확보·의미 검토"
+        }
+      }
     }
   ]
 }

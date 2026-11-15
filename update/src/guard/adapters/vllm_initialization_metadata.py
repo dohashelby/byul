@@ -10,10 +10,10 @@ FIELDS=frozenset({'schema','call_sha256','executor_sha256','parent_call_sha256',
 def fingerprint(value):return type(value) is str and re.fullmatch('[0-9a-f]{64}',value) is not None
 
 
-def validate_sample(v):
+def validate_sample(v,source_sha256=None):
     try:
         if (type(v) is not dict or set(v)!=FIELDS or v['schema']!=sensor.EVENT_SCHEMA or v['point'] not in sensor.POINTS
-                or v['source_module']!=sensor.MP or v['source_sha256']!=sensor.SOURCE_ADDITIONS[sensor.MP]
+                or v['source_module']!=sensor.MP or v['source_sha256']!=(sensor.SOURCE_ADDITIONS[sensor.MP] if source_sha256 is None else source_sha256)
                 or v['phase'] not in {'CALL','RETURN','RAISE'} or v['observer_runtime'] not in sensor.RUNTIME_CODE_CONTRACTS
                 or v['observer_code_sha256']!=sensor.RUNTIME_CODE_CONTRACTS[v['observer_runtime']]):raise ValueError
         for key in ('source_verified','failure_activation_verified','cross_process_group_verified','service_gate_verified'):

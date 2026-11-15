@@ -2,7 +2,7 @@ id: PLT-11
 framework_id: CHK-PLT-011
 mechanism_ids:
 - mechanism-12
-revision: 5
+revision: 6
 retired: false
 area: PLT
 purpose: 권한 철회
@@ -16,27 +16,6 @@ impact: MEDIUM
 applies_when:
   prose: 철회 대상 자격으로 생성된 지속 연결·session·handle이 있을 때 적용한다. 신규 요청 차단으로 대신 판정하지 않는다.
 policy_params:
-- key: session_validity_start
-  type: str
-  required: true
-- key: session_validity_end
-  type: str
-  required: true
-- key: session_issuer_id
-  type: str
-  required: true
-- key: session_event_id
-  type: str
-  required: true
-- key: session_event_at
-  type: str
-  required: true
-- key: session_open_before
-  type: str
-  required: true
-- key: session_deny_after
-  type: str
-  required: true
 - key: session_deadline_basis
   type: str
   required: true

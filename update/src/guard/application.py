@@ -470,7 +470,7 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                         _, values = run_binding.effective_values(
                             check_def, c.get(item.executor, {}), selected_env, values, side=side, attempt_id=None,
                             issued_at=utcnow(), valid_from=policy.valid_from, valid_until=policy.valid_until,
-                            run_cfg=run_binding.run_config(c, item.check_id))
+                            run_cfg=run_binding.run_config(c, item.check_id), policy_ref=policy.ref())
                     executor.validate_policy(check_def, values)
                 executor.keys()
         record("inputs", True, "pack, selection, real executors, policy settings and model inventory checked")

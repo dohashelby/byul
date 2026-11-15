@@ -13,7 +13,7 @@ from guard.cli import app
 from guard.adapters.vllm import VllmAdapter
 from guard.models import canonical_json,load_pack,sha256_hex,utcnow
 from guard.runtime import kubernetes_http as http
-from guard.executors import kubernetes_observation as observation
+from guard.executors import kubernetes_observation as observation, run_binding
 from guard.executors.observation_contract import EVENTS,FIELDS,SCHEMA,normalize_policy,validate_record
 from guard.executors.owned_capture import _FILE_READER
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
@@ -107,6 +107,8 @@ def inputs(tmp_path,mode='normal'):
     if mode=='required-unimplemented':values['observation_required_events']=list(sorted(EVENTS));values['observation_required_fields'].append('approval_sha256')
     if mode=='deadline':values['observation_max_delay_ms']=0
     world.values=values;receipt=derive(baseline_pack().path,tmp_path/'pack');pack=load_pack(tmp_path/'pack')
+    if 4 in run_binding.stages_for(pack.checks['OBS-01']):
+        values['observation_event_policy_sha256']=sha256_hex(canonical_json(for_pack(pack,'OBS-01',values)))
     return environment,world,values,pack,receipt
 
 

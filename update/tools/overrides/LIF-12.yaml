@@ -1,14 +1,8 @@
 executor: request_termination
 collection_profile: kubernetes-automatic-retry-record-observation-v1
 policy_params:
-- key: retry_scope_sha256
-  type: str
-  required: true
-- key: retry_policy_sha256
-  type: str
-  required: true
-- key: retry_record_source_sha256
-  type: str
+- key: retry_limits
+  type: dict
   required: true
 - key: retry_policy_mode
   type: str

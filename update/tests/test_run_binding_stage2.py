@@ -38,6 +38,12 @@ def declaring(check, keys):
     return old
 
 
+def at36(check_id):
+    """The @36 definition: stage-3 keys (RB3) still declared in policy."""
+    from tests.run_binding_support import before_stage4
+    return declaring(before_stage4(PACK.checks[check_id]), run_binding.KEYS_BY_CHECK_3.get(check_id, ()))
+
+
 def write(tmp_path, name, value):
     path = tmp_path / name
     path.write_text(json.dumps(value))
@@ -45,7 +51,8 @@ def write(tmp_path, name, value):
 
 
 def test_stages_are_decided_separately_so_pack_35_definitions_replay_unchanged():
-    check = PACK.checks['OBS-01']
+    assert run_binding.stages_for(PACK.checks['OBS-01']) == (1, 2, 3, 4)
+    check = at36('OBS-01')
     assert run_binding.stages_for(check) == (1, 2)
     at35 = declaring(check, run_binding.KEYS_BY_CHECK_2['OBS-01'])
     assert run_binding.stages_for(at35) == (1,)
@@ -62,20 +69,20 @@ def test_stages_are_decided_separately_so_pack_35_definitions_replay_unchanged()
 
 def test_record_session_comes_from_the_check_table_and_is_recorded_as_v2(tmp_path):
     target = write(tmp_path, 'target.json', {'schema': 'EXAMPLE-target', 'lab': True})
-    document, values = run_binding.compute(PACK.checks['OBS-01'], {'target': target}, env(), side='baseline',
+    document, values = run_binding.compute(at36('OBS-01'), {'target': target}, env(), side='baseline',
                                            attempt_id='A', issued_at=utcnow(), run_cfg={'record_session': SESSION})
     assert values['observation_session'] == SESSION
     assert values['observation_target_sha256'] == document['files']['observation_target_sha256']
     assert document['schema'] == run_binding.SCHEMA_2 and document['values'] == {'observation_session': SESSION}
     for bad in (None, {}, {'record_session': 'X' * 32}, {'record_session': SESSION, 'scenario': 'x'}):
         with pytest.raises(run_binding.RunBindingUnavailable, match='CONFIG_INVALID'):
-            run_binding.compute(PACK.checks['OBS-01'], {'target': target}, env(), side='single', attempt_id=None,
+            run_binding.compute(at36('OBS-01'), {'target': target}, env(), side='single', attempt_id=None,
                                 issued_at=utcnow(), run_cfg=bad)
 
 
 def test_sources_never_mix(tmp_path):
     target = write(tmp_path, 'target.json', {'schema': 'EXAMPLE-target', 'lab': True})
-    at35 = declaring(PACK.checks['OBS-01'], run_binding.KEYS_BY_CHECK_2['OBS-01'])
+    at35 = declaring(at36('OBS-01'), run_binding.KEYS_BY_CHECK_2['OBS-01'])
     with pytest.raises(run_binding.RunBindingUnavailable, match='BELONGS_TO_POLICY'):
         run_binding.effective_values(at35, {'target': target}, env(), {'observation_session': SESSION}, side='single',
                                      attempt_id=None, issued_at=utcnow(), run_cfg={'record_session': SESSION})
@@ -212,8 +219,8 @@ def test_policy_migration_stage_2_and_run_config_candidates(tmp_path):
         main([str(source), '--out', str(tmp_path / 'p.yaml'), '--stage', '2'])
     main([str(source), '--out', str(tmp_path / 'p.yaml'), '--stage', '2', '--run-config-out', str(tmp_path / 'rb.yaml')])
     out = yaml.safe_load((tmp_path / 'p.yaml').read_text())
-    assert out['status'] == 'DRAFT' and out['pack']['revision'] == 36
-    assert out['values']['LIF-12'] == {'retry_scope_sha256': 'a' * 64} and out['values']['REQ-02'] == {}
+    assert out['status'] == 'DRAFT' and out['pack']['revision'] == 38
+    assert out['values']['LIF-12'] == {} and out['values']['REQ-02'] == {}
     written = yaml.safe_load((tmp_path / 'rb.yaml').read_text())
     assert written['status'] == 'DRAFT' and written['run_binding']['OBS-01'] == {'record_session': SESSION}
 

@@ -14,6 +14,7 @@ POLICY_TYPES = {key: 'str' for key in (
     'retry_policy_sha256', 'retry_record_source_sha256', 'retry_session',
     'retry_validity_start', 'retry_validity_end', 'retry_policy_mode')}
 POLICY_TYPES['retry_max_record_delay_ms'] = 'int'
+DECISION_KEY = 'retry_limits'
 OBSERVATIONS = {key: 'list' for key in (
     'retry_record_snapshots', 'retry_event_declarations', 'retry_attempt_candidates',
     'retry_family_candidates', 'retry_cost_candidates', 'retry_missing',
@@ -86,7 +87,10 @@ def require(condition):
 
 def normalize_policy(values):
     try:
-        require(type(values) is dict and set(values) == set(POLICY_TYPES))
+        # @38 (RB3-Q4): the retry limits are the enterprise's policy key; the scope file must repeat them.
+        require(type(values) is dict and set(values) in (set(POLICY_TYPES), set(POLICY_TYPES) | {DECISION_KEY}))
+        if DECISION_KEY in values:
+            validate_limits(values[DECISION_KEY])
         require(all(fingerprint(values[k]) for k in POLICY_TYPES if k.endswith('_sha256')))
         require(opaque(values['retry_session']) and values['retry_policy_mode'] in MODES)
         start, end = stamp(values['retry_validity_start']), stamp(values['retry_validity_end'])
@@ -95,6 +99,24 @@ def normalize_policy(values):
         return start, end
     except (KeyError, TypeError, ValueError):
         raise ValueError('RETRY_POLICY_INVALID') from None
+
+
+def validate_limits(limits):
+    """The same closed enterprise limits in a policy and in a scope declaration."""
+    require(type(limits) is dict and set(limits) == LIMIT_FIELDS)
+    for key in ('max_attempts', 'max_overlap_ms', 'max_remaining_ms', 'max_return_ms'):
+        maximum = 64 if key == 'max_attempts' else 600000
+        require(limits[key] is None or uint(limits[key], maximum))
+    require(limits['max_attempts'] is None or limits['max_attempts'] > 0)
+    for key, amount, allowed in (
+            ('remaining_anchor', 'max_remaining_ms', {'RETRY_DECISION', 'NEW_ATTEMPT_START'}),
+            ('return_anchor', 'max_return_ms', {'CALL_START', 'TRIGGER'})):
+        require(limits[key] is None if limits[amount] is None else limits[key] in allowed)
+    cost = limits['max_cost']
+    if cost is not None:
+        require(type(cost) is dict and set(cost) == {'unit', 'amount', 'counter_source_sha256', 'epoch_id'})
+        require(cost['unit'] in UNITS and uint(cost['amount']) and fingerprint(cost['counter_source_sha256']) and opaque(cost['epoch_id']))
+    return limits
 
 
 def validate_scope(value, *, policy_sha256, source_sha256, image_digest,
@@ -123,20 +145,7 @@ def validate_scope(value, *, policy_sha256, source_sha256, image_digest,
             ids.add(row['subject_id'])
             family = (row['actor_id'], row['scenario'])
             require(families.setdefault(row['request_family_id'], family) == family)
-        limits = value['limits']
-        require(type(limits) is dict and set(limits) == LIMIT_FIELDS)
-        for key in ('max_attempts', 'max_overlap_ms', 'max_remaining_ms', 'max_return_ms'):
-            maximum = 64 if key == 'max_attempts' else 600000
-            require(limits[key] is None or uint(limits[key], maximum))
-        require(limits['max_attempts'] is None or limits['max_attempts'] > 0)
-        for key, amount, allowed in (
-                ('remaining_anchor', 'max_remaining_ms', {'RETRY_DECISION', 'NEW_ATTEMPT_START'}),
-                ('return_anchor', 'max_return_ms', {'CALL_START', 'TRIGGER'})):
-            require(limits[key] is None if limits[amount] is None else limits[key] in allowed)
-        cost = limits['max_cost']
-        if cost is not None:
-            require(type(cost) is dict and set(cost) == {'unit', 'amount', 'counter_source_sha256', 'epoch_id'})
-            require(cost['unit'] in UNITS and uint(cost['amount']) and fingerprint(cost['counter_source_sha256']) and opaque(cost['epoch_id']))
+        validate_limits(value['limits'])
         return value
     except (KeyError, TypeError, ValueError):
         raise ValueError('RETRY_SCOPE_INVALID') from None

@@ -260,6 +260,11 @@
       "manifest_sha256": "ea734eb57a98626f599725ac9d11e5f6483a9fc83439e4abcd0b4bfae88a70be",
       "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T07:38:55.385055+00:00"
+    },
+    {
+      "manifest_sha256": "cbbc57b3e3b05b167509024b357f0abc97b55b2e768f26f71f6ed209d2807d15",
+      "reviewed_by": "Codex / PR276 main integration; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T16:34:59.087578+09:00"
     }
   ]
 }

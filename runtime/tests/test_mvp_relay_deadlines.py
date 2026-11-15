@@ -241,7 +241,7 @@ class RelayDeadlineTests(unittest.TestCase):
                 self.assertEqual(stored[-1]["final_outcome"], "completed")
 
     def test_http_1_0_closing_response_relayed_as_200(self):
-        body = json.dumps({"ok": True}).encode("utf-8")
+        body = json.dumps({"choices": []}).encode("utf-8")
         wire = (
             b"HTTP/1.0 200 OK\r\nContent-Type: application/json\r\n"
             + f"Content-Length: {len(body)}\r\n\r\n".encode("ascii")

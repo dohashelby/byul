@@ -78,6 +78,15 @@ def _launch_conditions(folder, manifest, fixture, pack):
                 or render['code_revision'] != fixture['code_revisions']['approved']
                 or engine['args'] != render['launch']['argv']):
             raise ValueError('LAUNCH_IDENTITY_MISMATCH:' + side)
+        selection = release['launch']
+        selection_env = selection.get('env', {})
+        if (render['launch'].get('engine') != selection.get('engine')
+                or render['launch'].get('env', {}) != selection_env):
+            raise ValueError('LAUNCH_ENGINE_SELECTION_MISMATCH:' + side)
+        for name, value in selection_env.items():
+            actual = [row for row in engine['env'] if row.get('name') == name]
+            if actual != [{'name': name, 'value': value}]:
+                raise ValueError('LAUNCH_ENGINE_SELECTION_MISMATCH:' + side)
         args = list(engine['args'])
         if release['launch']['model_argument'] == '--model' and args.pop(0) != '--model':
             raise ValueError('LAUNCH_MODEL_ARGUMENT_MISMATCH:' + side)
@@ -88,6 +97,10 @@ def _launch_conditions(folder, manifest, fixture, pack):
                 or str(engine['resources']['limits']['nvidia.com/gpu']) != '1'):
             raise ValueError('LAUNCH_GPU_OR_CODE_MISMATCH:' + side)
         env = {row['name']: row['value'] for row in engine['env']}
+        # These exact profile variables were checked above. Compare their engine
+        # meaning while retaining every unrelated environment condition.
+        for name in selection_env:
+            env.pop(name)
         marker = env.pop('BYUL_CODE_MARKER_ROOT')
         settings = tomllib.loads((base / 'guard.pending-target.toml').read_text())['input_validation']
         policy = yaml.safe_load((base / 'policy.yaml').read_bytes())
@@ -102,7 +115,8 @@ def _launch_conditions(folder, manifest, fixture, pack):
             raise ValueError('LAUNCH_POLICY_OR_CACHE_MISMATCH:' + side)
         probe.validate_policy(pack.checks['SUP-08'], policy['values']['SUP-08'])
         probe.validate_configuration(pack.checks['SUP-08'], settings)
-        normalized.append({'args': args, 'env': env, 'resources': engine['resources']})
+        normalized.append({'args': args, 'env': env, 'engine_selection': selection.get('engine'),
+                           'resources': engine['resources']})
     if normalized[0] != normalized[1]:
         raise ValueError('LAUNCH_COMPARISON_CONDITIONS_MISMATCH')
 

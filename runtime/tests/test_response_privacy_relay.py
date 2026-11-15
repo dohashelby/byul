@@ -347,7 +347,6 @@ def recorded_vllm_chat_wire():
         return wires
 
 
-@pytest.mark.xfail(strict=True, reason="A-1")
 @pytest.mark.parametrize(
     "payload",
     [

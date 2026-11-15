@@ -558,6 +558,15 @@ class Relay:
                     ),
                     None,
                 )
+            if route == CHAT_ROUTE and (
+                not isinstance(parsed, dict)
+                or "error" in parsed
+                or not isinstance(parsed.get("choices"), list)
+                or not all(isinstance(choice, dict) for choice in parsed["choices"])
+            ):
+                return engine_error(
+                    502, "ENGINE_BAD_RESPONSE", "backend returned an invalid chat response", allowed
+                ), None
             if route == COMPLETIONS_ROUTE and not validate_completion_response(body):
                 return (
                     engine_error(

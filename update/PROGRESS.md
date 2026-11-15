@@ -1,3 +1,10 @@
+## 2026-11-15 — M-A6-V6 0.30.0 lifecycle 정확 행 profile `/25`
+
+- 한 일: 사용자 결정 M-A6-V6에 따라 기반 `/8`을 바꾸지 않고 0.30.0 정확 설치 행 18개로 기반을 설정하는 `vllm_lifecycle_release_sensor.py`(`/25`)를 추가했다. 검토 4개 모듈 중 scheduler·gpu_model_runner·gpu_input_batch는 기반 지점 의미가 같아 행을 넣었고 default_loader는 반환 tuple이 달라 공백으로 두었다. 준비 자산·기록 검증·세션 결합(카탈로그 `lifecycle_release_rows`, 0.30.0만)을 연결하고, 기반 지점만 쓰는 REQ-05·PLT-10·PLT-11·native_route를 0.30.0에서 열었다. 판본 혼합 bytes는 거부한다. ma6-version-applicability 22절.
+- 테스트 결과: 직접 시험 `test_ma6_lifecycle_release_rows.py` 6개와 판본표 시험 통과. 관련 시험 11개 파일을 `-n` 없이 돌렸고 실패·오류 목록이 V6 직전 커밋과 같다(로컬 CPython 3.12.13 원인). 전체 pytest는 PR CI로 확인한다.
+- 다음 단계: 파생 센서별 0.30.0 추가 모듈 행(termination·stream_buffer·initialization·profiler·attempt/output), V0 관측기 D1~D3, REQ-05 V0 대상표.
+- 막힌 것: GPU 생산자 등록·실제 기동 확인 전이다. multiproc_executor 고정값은 두 이미지 모두 불일치(M-A3).
+
 ## 2026-11-15 — M-A6 실행기 단위 판본표(0.7.0·0.30.0)
 
 - 한 일: 판본 관문을 실행기→카탈로그 기능 조회로 바꿨다(`engine_profiles.EXECUTOR_FEATURES`, 0.31.0 결과 동일). 외부 관측 실행기 10종을 `vllm-external-observation/1`로 두 판본에 열고 런타임 판본 확인도 실행기 기능으로 좁혔다. 엔진 안 관측 실행기는 닫아 둔 채 판본 프로필 `executor_gaps`에 원인을 기록하고, `j02_run_config` 보고서에 `version_gap`을 붙였다. 결정 31 이미지 대조 근거로 후보 고정값 13행을 `image_pin`으로 올렸다. 기준 V0 D1~D3 설계와 J02 남은 공백을 ma6-version-applicability 19~21절에 썼다. 결정 질문 M-A6-V1~V6.

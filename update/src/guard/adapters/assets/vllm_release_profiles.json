@@ -319,17 +319,6 @@
       "request_field_mapping": {},
       "unavailable_branches": {},
       "executor_gaps": {
-        "credential_revocation": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_lifecycle_sensor"
-          ],
-          "checks": [
-            "PLT-10"
-          ],
-          "basis": "ma6-version-applicability.md 19.2",
-          "next": "M-B4"
-        },
         "initialization": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
           "observers": [
@@ -343,26 +332,6 @@
             "LIF-07",
             "LIF-09"
           ],
-          "basis": "ma6-version-applicability.md 19.2",
-          "next": "M-B4"
-        },
-        "model_authorization": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_lifecycle_sensor"
-          ],
-          "checks": [
-            "REQ-05"
-          ],
-          "basis": "ma6-version-applicability.md 19.2",
-          "next": "M-B4"
-        },
-        "native_route": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_lifecycle_sensor"
-          ],
-          "checks": [],
           "basis": "ma6-version-applicability.md 19.2",
           "next": "M-B4"
         },
@@ -448,17 +417,6 @@
           ],
           "basis": "ma6-version-applicability.md 19.3. runner_capture 소비 관측이 0.31.0 고정값만 있다. tests/test_code_selection_observation.py가 구 판본 비노출을 고정한다",
           "next": "M-B4 및 결정 V0-5"
-        },
-        "session_revocation": {
-          "cause": "OBSERVER_PIN_ROWS_ABSENT",
-          "observers": [
-            "vllm_lifecycle_sensor"
-          ],
-          "checks": [
-            "PLT-11"
-          ],
-          "basis": "ma6-version-applicability.md 19.2",
-          "next": "M-B4"
         },
         "stream_buffer": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",

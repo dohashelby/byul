@@ -49,8 +49,11 @@ def test_engine_internal_observers_stay_closed_without_release_pins():
     assert resolve_executor('engine_sensor', 'kubernetes', engine='vllm', version='0.7.0') is None
     for version in ('0.7.0', '0.30.0'):
         for executor in ('stream_buffer', 'request_termination', 'initialization', 'observation_state',
-                         'profiler_observation', 'model_authorization', 'sampling_validation'):
+                         'profiler_observation', 'sampling_validation'):
             assert resolve_executor(executor, 'kubernetes', engine='vllm', version=version) is None
+    # M-A6-V6: 기반 /8만 쓰는 실행기는 0.30.0 정확 행 profile(/25)로 열린다. V0 기준은 닫혀 있다.
+    assert resolve_executor('model_authorization', 'kubernetes', engine='vllm', version='0.30.0') is not None
+    assert resolve_executor('model_authorization', 'kubernetes', engine='vllm', version='0.7.0') is None
     assert get_provider('vllm').executor_gap('0.7.0', 'profiler_observation')['cause'] == 'APPROVED_UNKNOWN'
     assert get_provider('vllm').executor_gap('EXAMPLE-future', 'stream_buffer') is None
 

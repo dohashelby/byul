@@ -195,6 +195,11 @@
       "manifest_sha256": "07cfcc1c62cdd638d84069631f1385fd1341804a1ad168f91d10a7db656ef04a",
       "reviewed_by": "Claude / BYUL UPDATE / M-A6 실행기 단위 판본표(0.7.0·0.30.0) self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T15:40:00+09:00"
+    },
+    {
+      "manifest_sha256": "226b4c94ccb7922e4318a17c29d2d660d95d68cb078239e753dc1f567262ac92",
+      "reviewed_by": "Claude / BYUL UPDATE / M-A6-V6 0.30.0 lifecycle 정확 행 profile(/25) self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T18:00:00+09:00"
     }
   ]
 }

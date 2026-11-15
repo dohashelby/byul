@@ -331,10 +331,10 @@ J02 첫 실행(2026-11-15, L4 1장, 두 판본 동시 기동)에서 69개가 모
 | stream_buffer | LIF-03·04 | lifecycle·stream_buffer 센서(uvicorn) | `V0_OBSERVER_NOT_IMPLEMENTED`(D1) | `OBSERVER_PIN_ROWS_ABSENT` |
 | initialization | LIF-07·09 | initialization·ready·worker 센서 | `V0_OBSERVER_NOT_IMPLEMENTED`(D3) | `OBSERVER_PIN_ROWS_ABSENT` |
 | observation_state | OBS-02 | attempt·output 센서 | `V0_OBSERVER_NOT_IMPLEMENTED`(D1·D3) | `OBSERVER_PIN_ROWS_ABSENT` |
-| model_authorization | REQ-05 | lifecycle 센서(models 경로) | `V0_TARGET_TABLE_ABSENT` | `OBSERVER_PIN_ROWS_ABSENT` |
+| model_authorization | REQ-05 | lifecycle 센서(models 경로) | `V0_TARGET_TABLE_ABSENT` | 열림(`/25`, 22절) |
 | profiler_observation | LIF-14 | profiler 센서 | `APPROVED_UNKNOWN`(D5) | `OBSERVER_PIN_ROWS_ABSENT` |
-| session_revocation | PLT-11 | lifecycle 센서(인증) | `APPROVED_UNKNOWN`(D4) | `OBSERVER_PIN_ROWS_ABSENT` |
-| credential_revocation | PLT-10 | lifecycle 센서(인증) | `APPROVED_UNKNOWN`(D4) | `OBSERVER_PIN_ROWS_ABSENT` |
+| session_revocation | PLT-11 | lifecycle 센서(인증) | `APPROVED_UNKNOWN`(D4) | 열림(`/25`, 22절) |
+| credential_revocation | PLT-10 | lifecycle 센서(인증) | `APPROVED_UNKNOWN`(D4) | 열림(`/25`, 22절) |
 | sampling_validation | REQ-10 | runner_capture | `REQUEST_FIELD_MAPPING_NOT_CONSUMED` | `OBSERVER_PIN_ROWS_ABSENT` |
 
 `input_validation`(REQ-08·09, SUP-08)은 전부터 두 판본에서 열려 있었다. J02 첫 실행에서는 운영자 spec이 고르지 않았을 뿐이다.
@@ -406,8 +406,40 @@ V0에는 V1과 같은 이름의 객체가 거의 없다. 계약 사건(시도·�
 
 정적 보고서(`tools/j02_run_config.py`, 지난 J02의 ENV 두 개·정책, 엔진 쪽 실행기 모두 kubernetes 선택)로 본 상태다. 판본 원인은 모두 `version_gap`으로 기록돼 있다: 기준 19행, 후보 13행(점검 수 기준). READY_STATIC은 6에서 18로 늘었다.
 
-1. **판본표(이 문서)**: 0.30.0 lifecycle 센서 계열 행(M-A6-V6), 기준 V0 관측기 D1~D3(M-A6-V1~V3), REQ-05 V0 models 대상표(M-A6-V4), REQ-10 필드 대응 소비(M-A6-V5).
+1. **판본표(이 문서)**: 0.30.0 파생 센서별 추가 모듈 행(기반 행은 22절 `/25`로 완료), 기준 V0 관측기 D1~D3(M-A6-V1~V3), REQ-05 V0 models 대상표(M-A6-V4), REQ-10 필드 대응 소비(M-A6-V5).
 2. **CPython 자격**: 기준 3.12.8의 센서 지문 행 없음(15/15 거부).
 3. **판본 데이터 소비**: `request_field_mapping`·`unavailable_branches`를 실행기가 읽지 않는다. LIF-05·06·16(`lifecycle_transition`, 이미 두 판본 실행)의 기준 쪽 실행 중 전환 분기가 결정 9-2대로 UNKNOWN이 되는지 실행기에서 확인해야 한다.
 4. **판본과 무관한 입력**(첫 실행 보고에서 이어짐): `--discover` target, `[run_binding]` 값(RUN_BINDING_CONFIG_INVALID·UNAVAILABLE), 정책 값 없는 점검, template_validation의 REQ-07·SUP-13 쿠버네티스 프로필(`KUBERNETES_TEMPLATE_PROFILE_UNSUPPORTED`), unix_ipc 설정.
 5. **첫 실행에서 따로 확인된 공백**(이번 범위 밖): PLT-01·04는 쿠버네티스 경로가 process scan을 하지 않아 UNKNOWN, REQ-01·SUP-04는 실행기 설정 검증 실패, PLT-08·09는 Docker용 팩 프로필, REQ-08·09·11·SUP-08은 `KubernetesTransition`이 단일 실행기만 허용해 따로 실행해야 했다.
+
+## 22. 후보 0.30.0 lifecycle 정확 행 profile `/25` (사용자 결정 M-A6-V6)
+
+### 22.1 구조
+
+- 기반 센서 `/8`(`vllm_lifecycle_sensor.py`)은 그대로 둔다. 파생 센서 15개가 이 파일 SHA(`BASE8_SHA256`)를 고정하고 있어, 기반을 고치면 0.31.0 기록·생산자 신원이 모두 바뀐다.
+- 새 `vllm_lifecycle_release_sensor.py`(`vllm-native-lifecycle-metadata/25`)는 기반의 정확 사본을 비공개로 불러 `SOURCE_SHA`에 0.30.0 정확 행(`RELEASE_ROWS`)을 덮어쓴다. `PROFILE`·`SCHEMA`·`COMMIT`(0.30.0 태그 `ced6857a`)도 바꾼다. 관측 코드는 더하지 않는다. 그래서 기반 `/8`처럼 자기 코드 지문 표가 없고, Python 3.12·optimize 0 조건만 확인한다.
+- 행이 없는 모듈은 0.31.0 값을 유지한다. 0.30.0에서는 기반이 `MODULE verified=false`로 기록하고 그 모듈을 감싸지 않는다. 기록 검증은 profile별 표(`source_hashes(/25)`)로 하므로, 0.30.0 행이 있는 모듈에 0.31.0 bytes가 나오면 `LIFECYCLE_RECORDING_MODULE_HASH_INVALID`로 거부한다(판본 혼합 거부).
+- `/25`는 카탈로그 기능 `lifecycle_release_rows`(`vllm-lifecycle-release-rows/1`, 0.30.0만)가 있는 판본에서만 세션 결합이 된다(`LIFECYCLE_RELEASE_ENGINE_UNSUPPORTED`).
+
+### 22.2 모듈별 의미 검토 (기반 지점 기준)
+
+결정 V6은 "(a) 16개 행, 검토 4개는 공백"이었다. 검토 4개는 이번에 기반 센서가 실제로 읽는 인자 위치·속성·반환을 0.31.0 태그와 0.30.0 태그(= 설치 bytes)에서 대조했다.
+
+| 모듈 | 기반 지점 | 결과 | 행 |
+|---|---|---|---|
+| (a) 13개(serving·engine·middleware·models·weight_utils·input/output_processor·async_llm·core·kv_cache_manager·single_type·block_pool·cpu_model_runner) | 각 POINTS | 줄 이동·docstring만 | 0.30.0 행 |
+| `completion.api_router`·`models.api_router`·`base_loader` | 각 지점 | 파일 동일 | 기존 행 그대로 |
+| `v1.core.sched.scheduler` | `finish_requests`·`_free_request_blocks`·`_drain_deferred_frees` | 시그니처·반환(요청 목록)·`requests`·`sched_step_seq`·`processed_step_seq`·`deferred_frees` 같음. 다른 것은 대기열 내부 구성(`kv_holding_waiting`·`deferred_waiting` ↔ `skipped_waiting`)뿐이고 센서는 읽지 않는다 | 0.30.0 행 |
+| `v1.worker.gpu_model_runner` | `_update_states`·`execute_model`·`sample_tokens`·`load_model`·`get_model`·`_model_forward`, 출력 `get_output` | 시그니처·`num_scheduled_tokens`·`finished_req_ids`·반환 `req_ids`·`input_batch.req_id_to_index` 같음. `get_output`은 routed_experts 처리만 더해졌다 | 0.30.0 행 |
+| `v1.worker.gpu_input_batch` | `InputBatch.remove_request` | prompt embeds 정리 한 줄만 다르다. `req_id_to_index` 의미 같음 | 0.30.0 행 |
+| `model_loader.default_loader` | `load_weights`·`_prepare_weights`·`_get_weights_iterator` | **다름**: `_prepare_weights` 반환이 4원소→3원소(`index_file` 없음). 센서는 4원소일 때만 준비 필드를 읽어 0.30.0에서는 빈 값이 된다 | 행 없음(공백) |
+| `v1.request`·`v1.core.sched.output` | 지점 없음(객체 속성 읽기) | `RequestStatus` enum 순서, `SchedulerOutput` 필드 같음 | 0.30.0 행 |
+| `core_client`·`kv_cache_coordinator`·`serve.utils.api_utils`·`completion.serving` | 지점 없음, 기반이 읽지 않음 | 검토하지 않음 | 행 없음 |
+
+`RELEASE_ROWS` 18행 중 5행(input_processor·kv_cache_manager·block_pool·gpu_model_runner·gpu_input_batch)은 이미지 승격된 `vllm_observer_pin_rows.json` 행과 bytes가 같다(직접 시험으로 고정). 나머지는 태그 소스 bytes이며, 결정 31 대조에서 후보 이미지 vLLM 파일은 Git blob 2,479개가 태그와 일치했다.
+
+### 22.3 열린 실행기와 남은 공백 (0.30.0)
+
+- 열림: `model_authorization`(REQ-05), `session_revocation`(PLT-11), `credential_revocation`(PLT-10), `native_route`. 기반 지점만 쓰며 필요한 모듈(models·middleware·input_processor·base_loader·gpu_model_runner `_model_forward`)에 모두 행이 있다. PLT-10·11은 1차 제외 점검이라 실행 결과는 원래대로 UNKNOWN일 수 있다.
+- 닫힘 유지: `request_termination`·`stream_buffer`·`initialization`·`observation_state`·`profiler_observation`·`rank_failure`·`resource_recovery`·`observation_identity`. 이 센서들은 기반 위에 자기 추가 모듈(`SOURCE_ADDITIONS`: scheduler·request·runner 추가 지점, uvicorn, multiproc_executor, profiler wrapper 등)을 0.31.0 행으로만 갖는다. 파생 센서마다 같은 방식의 판본 행 검토가 다음 작업이다. multiproc_executor는 M-A3 기록에서 두 이미지 모두 기존 고정값과 다르다.
+- GPU 확인·생산자 등록은 하지 않았다. 판본이 열린 것은 실행 자격이나 PASS 근거가 아니다.

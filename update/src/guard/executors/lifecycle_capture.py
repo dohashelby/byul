@@ -7,6 +7,7 @@ import re
 from copy import deepcopy
 
 from guard.adapters import vllm_lifecycle_sensor as sensor
+from guard.adapters import vllm_lifecycle_release_sensor as release_sensor
 from guard.adapters import sglang_request_termination_sensor as sglang_sensor
 from guard.adapters import vllm_safe_open_mapping_sensor as mapping_sensor
 from guard.adapters import vllm_safe_open_mapping_metadata as mapping_metadata
@@ -135,11 +136,13 @@ def parse_recording(raw, prepared):
         keys = keys - {"model_selection","owner_model_sha256","argument_model_sha256","returned_model_sha256",
             "configured_model_sha256","configured_revision_sha256","load_format_sha256","load_dummy_weights",
             "lora_config_present","speculative_config_present"}
-    if prepared["profile"] not in {fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V4_PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
-    if prepared["profile"] not in {fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
-    if prepared["profile"] not in {fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
-    if prepared["profile"] not in {fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
+    if prepared["profile"] not in {release_sensor.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V4_PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
+    if prepared["profile"] not in {release_sensor.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
+    if prepared["profile"] not in {release_sensor.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
+    if prepared["profile"] not in {release_sensor.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
     words = WORDS
+    if prepared["profile"] == release_sensor.PROFILE:
+        words = words | {release_sensor.COMMIT}
     if is_termination:
         keys=keys|termination_metadata.FIELDS|termination_metadata.STATE_FIELDS|termination_metadata.SCHEDULER_FIELDS
         words=words|{'TERMINATION',termination_sensor.EVENT_SCHEMA,*termination_metadata.PHASES,*termination_metadata.POINT_MODULES,*termination_metadata.POINT_MODULES.values(),*termination_sensor.SOURCE_ADDITIONS,*termination_sensor.RUNTIME_CODE_CONTRACTS,'main','copy','native-exception','observer-bound','stream-unavailable'}
@@ -340,7 +343,7 @@ def parse_recording(raw, prepared):
                 raise ValueError('STREAM_BUFFER_RUNTIME_MISMATCH')
             stream_runtime=payload['observer_runtime'];stream_events+=1
         if row["event"] in {"NATIVE","SELECTION"}:
-            if row["event"]=="SELECTION" and (header["profile"] not in {fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}
+            if row["event"]=="SELECTION" and (header["profile"] not in {release_sensor.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}
                     or payload.get("point")!="InputProcessor.assign_request_id" or payload.get("requests")!=[]
                     or payload.get("selection_observed") is not False
                     or type(payload.get("metadata")) is not dict

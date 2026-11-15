@@ -282,6 +282,21 @@
       "reviewed_at": "2026-11-15T18:05:42.726982+09:00"
     },
     {
+      "manifest_sha256": "bcc93f6d1f0074f2bf1b7b6e122e30900d232ae67a2574e3f65150139159cd8b",
+      "reviewed_by": "Claude / BYUL UPDATE / M-A6 기준 V1 /27 선택 지점 연결 self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T22:30:00+09:00"
+    },
+    {
+      "manifest_sha256": "f6553e03836f6077148c8ff360ae2ef4134ee7469a0f2f434b752a70dbb86a44",
+      "reviewed_by": "Claude / BYUL UPDATE / M-A6-W1~W6 결정 반영(판본 프로필 원인 기록) self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T23:30:00+09:00"
+    },
+    {
+      "manifest_sha256": "f410f2acce9fb203b24c33a310e7504be00dbe058d7c1f95dcb46563c0d1901d",
+      "reviewed_by": "Claude / BYUL UPDATE / #280에서 /27 선택 지점 코드 제거(사용자 결정), 판본 프로필 원인 기록만 유지 self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T00:10:00+09:00"
+    },
+    {
       "manifest_sha256": "14e7145a3c6d0626470da8bec91b0a8c11f9363450f8581783d88bbb65fdebe8",
       "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T10:17:21.728861+00:00"
@@ -295,6 +310,11 @@
       "manifest_sha256": "6796f881c7ef541d9b54cfe772d6354b1ab95f160fbb2c372e273a72a313d584",
       "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T10:36:40.206293+00:00"
+    },
+    {
+      "manifest_sha256": "12ef9dae1cb37b5a741ba0bc84bfe0a1c7e57b8712125e4ea60d5788f7502dee",
+      "reviewed_by": "Codex / PR280 main integration and accurate remaining gap records; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T11:36:55Z"
     }
   ]
 }

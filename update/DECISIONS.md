@@ -1,3 +1,21 @@
+## 2026-11-15 — #281 병합 뒤 M-A6 후속의 실제 연결 경계
+
+#281은 main82831e36에 병합됐다. W1은 /28의 세션 HMAC 지문을 기존 raw SHA 요청 선택과 혼동하지 않고, private key 자산·정확 선택 사건·종료/상태 projection을 연결한 뒤 승인된 실행기 표를 연다. 단순 지원표 추가로 준비 완료를 만들지 않는다. W3의 기존 센서는 성공한 start마다 새 세대를 기록하므로 현재 검토 범위에서 센서 bytes나 자기 코드 지문을 바꿀 필요가 없다. 필요한 후보 정확 행/composition과 반복 start 회귀는 후속에서 확인하며, 코드 변경으로 지문 재계산이 생기면 기존 사용자 결정대로 CI에서 한다. #280은 원인/결정 기록 PR로 유지한다.
+
+## 2026-11-15 — 사용자 결정: #280의 `/27` 선택 지점 제거, W3 지문은 CI job에서
+
+- "#280에서 /27 빼고 #281 위로": PR #280에서 `/27` 선택 지점 코드를 제거하고 결정 기록·원인 코드만 남긴다. W1(기준 LIF-10·12, REQ-12, OBS-02 열기)과 후보 stream_buffer 변형 profile은 PR #281(`/28`) 병합 뒤 최신 main의 새 브랜치에서 한다. #281 브랜치에는 푸시하지 않는다.
+- W3 profiler 센서 CPython 지문 재계산은 "CI job에서": 기존 `observer-cpython-3128` job처럼 정확한 CPython으로 지문을 계산해 산출물로 내는 CI job을 두고, 그 결과로 W3을 구현한다. 로컬에서는 pytest·파이썬(편집 보조 스크립트 포함)을 쓰지 않는다.
+
+## 2026-11-15 — 사용자 결정 M-A6-W1~W6: 기준 V1·후보 남은 점검
+
+메인 세션을 거쳐 전달된 사용자 답. 근거는 [판본 적용표 26·27절](docs/dev-1/ma6-version-applicability.md).
+- W1 "연다 (assert 변경 승인)": 기준 0.7.0 V1의 LIF-10·12, REQ-12, OBS-02 실행기를 연다. `tests/test_configured_lifecycle.py::test_snapshot_availability_does_not_open_unreviewed_executors_or_register_gpu_results`의 0.7.0 비노출 assert 변경을 승인했다. REQ-12의 시도 사건·KV 소유 미관측은 원인 있는 UNKNOWN으로 남긴다. 요청 연결은 PR #281의 `/28`(fresh 선택·세션 HMAC)과 겹치므로 그 연결 위에서 연다(27.1).
+- W2 "UNKNOWN": 기준 REQ-05의 최종 모델 연결(`_model_forward` 없음)은 원인 있는 UNKNOWN이다.
+- W3 "호출 순서로 세대 정의": 후보 LIF-14의 profiler 세대는 start/stop 호출 순서로 정의해 관측한다. profiler 객체 재사용은 관측 사실로 함께 남긴다. 판정 기준은 바꾸지 않는다.
+- W4 "승인 (이월)": LIF-13(태그에 `weight_cache` 없음)과 PLT-10·11(인증이 `build_app` 지역 함수)은 V1 기준에서도 원인 있는 UNKNOWN으로 마감한다. 원인은 엔진 모드가 아니라 태그 소스의 사실이다. PASS·비적용으로 바꾸지 않는다.
+- W5 "GPU 확인 후 기능 부재": 기준 REQ-10은 다음 GPU 실행 때 구조화 출력이 실제로 제약되지 않는지 확인한다. 맞으면 결정 9 형식의 기능 부재로 정리한다. 확인 절차와 판단 기준은 27.3절.
+- W6 "받는다": PyPI `uvicorn-0.53.0-py3-none-any.whl`(87,081 bytes)을 받아 대조했다(27.2). 로컬에서는 셸 도구(`curl`·`shasum`·`unzip`)만 썼고 파이썬 도구·pytest는 실행하지 않았다.
 ## 2026-11-15 — PR281 runtime final 저장 경합의 시험 한 파일 예외 승인
 
 사용자는 “시험 한 파일만 예외 승인”으로 답했다. runtime/tests/test_mvp_zeroday_profile.py 두 시험에 해당 요청의 final 저장 완료 확인을 추가한다. 기존 assert37개·상태 코드·필드 값/비밀 비노출·실제 소켓·제품 기한과 runtime 제품 소스/정책/의존성을 보존한다. 구체 검토/미적용 제안 패치는 작업 폴더 PR281_RUNTIME_ZERODAY_REVIEW_20261115.md·PR281_RUNTIME_ZERODAY_PROPOSAL.patch다. 원 실패는 보존하고 runtime의 다른 파일/문서(STATUS 포함)는 이번 한 파일 예외로 확대하지 않는다. 기존 #281의 승인된 CI 원인 보수로 검증 뒤 반영하며 병합·새 비용·M-B4 재개는 제외한다.
@@ -432,6 +450,15 @@
 
 ## 열린 질문
 
+### M-A6-W 기준 V1·후보 남은 점검 (2026-11-15) — 사용자 결정됨
+- ~~M-A6-W1~W6~~ → 2026-11-15 사용자 결정(맨 위 "사용자 결정 M-A6-W1~W6" 절). 원 질문은 이력으로 남긴다.
+근거: [판본 적용표 26절](docs/dev-1/ma6-version-applicability.md). 답이 나오기 전에는 판정 기준·assert·고정값 검사를 바꾸지 않는다.
+- **M-A6-W1 기준 0.7.0 termination 계열 열기**: `/27` 선택 지점의 live ASGI 연결을 구현했다. LIF-10·12, REQ-12, OBS-02 실행기를 0.7.0에서 열려면 `tests/test_configured_lifecycle.py::test_snapshot_availability_does_not_open_unreviewed_executors_or_register_gpu_results`의 0.7.0 비노출 assert를 고쳐야 한다. 열어도 REQ-12의 시도 사건과 KV 블록 소유권은 미관측(원인 있는 UNKNOWN 범위)이다. 잠정: 열지 않음.
+- **M-A6-W2 기준 REQ-05 최종 모델 연결**: 0.7.0 V1 runner에는 `_model_forward`가 없고 `execute_model`이 모델을 직접 부른다. `execute_model`의 선택 ID와 `load_model`/`get_model`의 모델 객체를 같은 프로세스에서 잇는 새 연결로 볼지, UNKNOWN으로 둘지. 잠정: UNKNOWN.
+- **M-A6-W3 후보 LIF-14 profiler 세대**: 0.30.0은 같은 torch profiler 객체를 다시 시작한다(0.31.0은 start마다 새 객체). profiler 세대를 ① start/stop 호출 순서로 정의해 관측, ② 객체 재사용을 관측 사실로 기록하고 세대 판단은 UNKNOWN. 잠정: ②.
+- **M-A6-W4 V0 승인 예외의 V1 이월**: 결정14 변경으로 V0 예외는 과거 V0 구성에만 적용된다. 그런데 두 공백은 엔진 모드가 아니라 태그 소스의 사실이다: LIF-13(`weight_cache` 모듈 없음, 결정 9-1)과 PLT-10·11(인증이 `build_app` 지역 함수, D4). 같은 원인으로 V1 기준에도 원인 있는 UNKNOWN을 승인할지. 잠정: 승인 전 미구현으로 둠.
+- **M-A6-W5 기준 REQ-10**: 0.7.0 V1에는 `v1/structured_output`이 없다. 구조화 출력 요청이 V1 엔진에서 실제로 제약되지 않는다면 결정 9 형식의 기능 부재로 정리할지(실제 기동 확인 필요). 잠정: GPU 확인 전 닫아 둠.
+- **M-A6-W6 후보 uvicorn 0.53.0 설치 파일**: stream_buffer(LIF-03·04) 행을 위해 PyPI `uvicorn-0.53.0-py3-none-any.whl`(87,081 bytes)을 받아 M-A3 이미지 메타데이터 SHA와 대조할지. 잠정: 승인 전 받지 않음.
 ### 기준 V1 fresh 요청 연결 형식 — 승인됨(2026-11-15)
 기존 /1~ /27과 공통 GPU /1·/4·판정은 보존하고, 후속 native /28·세션 HMAC 키 자산을 추가하는 제한안을 제안한다. 실제 원 함수/객체·live ASGI invocation을 대조하고 ContextVar/문자열만으로 연결하지 않는다. 사용자가 “후속 profile·HMAC 키 자산 승인”으로 답했다. 기존 형식/판정·실행기 활성화/비용/공개 경계는 유지하고 이 제한된 새 관측 형식만 구현한다. 상세 검토 자료는 작업 폴더 MVP_FRESH_REQUEST_BINDING_DECISION_20261115.md다.
 

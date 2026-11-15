@@ -36,7 +36,7 @@ def test_each_closed_engine_bound_executor_records_its_cause(version):
     for executor in closed:
         gap = provider.executor_gap(version, executor)
         assert gap and gap['cause'] in {'OBSERVER_PIN_ROWS_ABSENT', 'V0_OBSERVER_NOT_IMPLEMENTED', 'V0_TARGET_TABLE_ABSENT',
-                                        'APPROVED_UNKNOWN', 'REQUEST_FIELD_MAPPING_NOT_CONSUMED'}, executor
+                                        'APPROVED_UNKNOWN', 'APPROVED_UNKNOWN_V1', 'REQUEST_FIELD_MAPPING_NOT_CONSUMED'}, executor
         assert gap['observers'] and gap['basis']
     # 열린 실행기에는 원인을 적지 않는다(열림과 공백이 섞이지 않게).
     for executor, _ in (provider.release_profile(version)['executor_gaps'] or {}).items():

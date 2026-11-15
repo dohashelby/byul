@@ -300,6 +300,11 @@
       "manifest_sha256": "6796f881c7ef541d9b54cfe772d6354b1ab95f160fbb2c372e273a72a313d584",
       "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T10:36:40.206293+00:00"
+    },
+    {
+      "manifest_sha256": "cb517f9298e09d550cef101452463415df98cf561e5913a29efb480225246f90",
+      "reviewed_by": "Codex / RB3-Q1~Q4 and exact current policy Ref; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T11:32:36Z"
     }
   ]
 }

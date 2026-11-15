@@ -27,7 +27,15 @@ the record producers' source SHA-256 (the bytes of the producer file named in
 `[run_binding.<CHECK>]`; REQ-06 from the reviewed adapter sources the executor
 already requires), the OBS-01 test actors and the PLT-10/11 issuer event with
 the run window.  Allow-lists, policy-document and template hashes and the
-four E keys stay in policy until they are decided separately (RB3-Q).
+four E keys stayed in policy until the stage-4 decisions below (RB3-Q).
+
+Stage 4 (RB3-Q3/Q4, PACK-BASELINE@38, 2026-11-15 user decisions) computes the
+policy-document references as the canonical JSON SHA-256 of this check's values
+written in the POL (the key itself is not there), and the hashes of the four
+run files that used to carry enterprise decisions: those decisions are now
+policy keys (`retry_limits`, `copy_treatments`, `recovery_require_absent_kinds`)
+that the executor compares with the file. OBS-06 uses the current sealed POL
+Ref, supplied by the plan outside the POL values, to avoid a self reference.
 """
 from __future__ import annotations
 
@@ -123,7 +131,20 @@ KEYS_BY_CHECK_3 = {
     **{c: (*(f'{_EVENT_PREFIX[c]}_{f}' for f in fields), f'{_EVENT_PREFIX[c]}_validity_start',
            f'{_EVENT_PREFIX[c]}_validity_end') for c, fields in _EVENT_FIELDS.items()},
 }
-STAGES = (KEYS_BY_CHECK, KEYS_BY_CHECK_2, KEYS_BY_CHECK_3)
+# Stage 4 (RB3-Q3/Q4): policy-document references from the POL row, run-file hashes.
+POLICY_DOCUMENT_KEYS = {'LIF-12': 'retry_policy_sha256', 'PLT-12': 'copy_policy_sha256',
+                        'OBS-01': 'observation_event_policy_sha256', 'REQ-04': 'forwarded_identity_policy_sha256',
+                        'REQ-06': 'stored_identity_policy_sha256'}
+RUN_FILE_KEYS = {'LIF-12': 'retry_scope_sha256', 'PLT-12': 'copy_inventory_sha256',
+                 'OBS-06': 'record_subject_plan_sha256', 'LIF-11': 'recovery_selection_sha256'}
+KEYS_BY_CHECK_4 = {c: tuple(k for k in (RUN_FILE_KEYS.get(c), POLICY_DOCUMENT_KEYS.get(c)) if k)
+                   for c in sorted(set(POLICY_DOCUMENT_KEYS) | set(RUN_FILE_KEYS))}
+# Enterprise decisions split out of those run files: policy keys from @38 on.
+DECISION_KEYS_4 = {'LIF-12': 'retry_limits', 'PLT-12': 'copy_treatments',
+                   'LIF-11': 'recovery_require_absent_kinds'}
+DECISION_TYPES_4 = {'retry_limits': 'dict', 'copy_treatments': 'dict', 'recovery_require_absent_kinds': 'list[str]'}
+CURRENT_POLICY_REF = 'record_access_policy_ref'
+STAGES = (KEYS_BY_CHECK, KEYS_BY_CHECK_2, KEYS_BY_CHECK_3, KEYS_BY_CHECK_4)
 # Allowed `[run_binding.<CHECK>]` entries per check and stage.
 CONFIG_KEYS_3 = {
     **{c: frozenset(m) for c, m in PRODUCERS_3.items()},
@@ -209,6 +230,13 @@ _FILE_OVERRIDES = {
     'sensor_prepared_sha256': (('prepared',), 'callback'),
     'sensor_manifest_sha256': (('manifest',), 'json'),
 }
+# Stage-4 run files ('bytes' = SHA-256 of the file bytes, as the executor compares them).
+_FILE_OVERRIDES.update({
+    'retry_scope_sha256': (('retry_scope',), 'bytes'),
+    'copy_inventory_sha256': (('copy_inventory',), 'bytes'),
+    'record_subject_plan_sha256': (('subjects',), 'json'),
+    'recovery_selection_sha256': (('selection',), 'json'),
+})
 _CHECK_FILE_OVERRIDES = {
     'OBS-02': {'identity_target_sha256': (('identity_target',), 'json'),
                'profiler_target_sha256': (('profiler_target',), 'json'),
@@ -226,7 +254,7 @@ class RunBindingUnavailable(ValueError):
 
 
 def stages_for(check) -> tuple[int, ...]:
-    """Stages (1, 2, 3) this CheckDef no longer declares; a stage it still declares keeps its policy values."""
+    """Stages (1, 2, 3, 4) this CheckDef no longer declares; a stage it still declares keeps its policy values."""
     # Other profiles (source CPU, guard-sensor-run-binding/2 suffix packs) keep their own inputs.
     if getattr(check, 'collection_profile', None) != PROFILE_BY_CHECK.get(check.id):
         return ()
@@ -247,7 +275,8 @@ def keys_for(check) -> tuple[str, ...]:
 def owned_keys(check):
     """Keys the policy must not carry for this definition (computed or dropped)."""
     stages = stages_for(check)
-    return set(keys_for(check)) | (set(DROPPED_BY_CHECK_2.get(check.id, ())) if 2 in stages else set())
+    return (set(keys_for(check)) | (set(DROPPED_BY_CHECK_2.get(check.id, ())) if 2 in stages else set())
+            | ({CURRENT_POLICY_REF} if check.id == 'OBS-06' and 4 in stages else set()))
 
 
 def _source(check_id, key):
@@ -288,7 +317,16 @@ def file_hash(check_id, key, executor_cfg) -> str:
         node = node[part]
     if type(node) is not str or not node:
         raise RunBindingUnavailable('RUN_BINDING_FILE_UNAVAILABLE')
+    if loader == 'bytes':
+        return producer_sha256(node)
     return sha256_hex(canonical_json(_load(node, loader)))
+
+
+def policy_document_sha256(check_id, key, policy_row) -> str:
+    """RB3-Q3: the policy document is this check's values as written in the POL (canonical JSON)."""
+    if type(policy_row) is not dict or key in policy_row:
+        raise RunBindingUnavailable('RUN_BINDING_POLICY_UNAVAILABLE')
+    return sha256_hex(canonical_json(policy_row))
 
 
 def _session(value):
@@ -434,10 +472,11 @@ def window(executor: str, issued_at: datetime, valid_from=None, valid_until=None
 
 
 def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from=None, valid_until=None,
-            run_cfg=None):
+            run_cfg=None, policy_row=None, policy_ref=None):
     """Return (binding document, values to give the executor) or raise RunBindingUnavailable.
 
-    `run_cfg` is this check's `[run_binding.<CHECK>]` table (stage 2 only).
+    `run_cfg` is this check's `[run_binding.<CHECK>]` table (stages 2 and 3);
+    `policy_row` is this check's values as written in the POL (stage 4).
     """
     stages = stages_for(check)
     keys = tuple(k for k in KEYS_BY_CHECK.get(check.id, ()) if 1 in stages)
@@ -460,6 +499,21 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
             stage_files, stage_values, validity = _stage_3(check, run_cfg or {}, issued_at, valid_from, valid_until)
             files.update(stage_files)
             extra = {**extra, **stage_values}
+        if 4 in stages:
+            stage_values = {}
+            if check.id in RUN_FILE_KEYS:
+                key = RUN_FILE_KEYS[check.id]
+                stage_values[key] = files[key] = file_hash(check.id, key, executor_cfg)
+            if check.id in POLICY_DOCUMENT_KEYS:
+                key = POLICY_DOCUMENT_KEYS[check.id]
+                stage_values[key] = policy_document_sha256(check.id, key, policy_row)
+            if check.id == 'OBS-06':
+                from .kubernetes_record_access import _policy_ref
+                try:
+                    stage_values[CURRENT_POLICY_REF] = _policy_ref(policy_ref)
+                except ValueError:
+                    raise RunBindingUnavailable('RUN_BINDING_POLICY_REF_UNAVAILABLE') from None
+            extra = {**extra, **stage_values}
         if any(k.endswith(('validity_start', 'validity_end')) for k in keys):
             start, end, basis = window(check.executor, issued_at, valid_from, valid_until)
         for key in keys:
@@ -475,7 +529,7 @@ def compute(check, executor_cfg, env, *, side, attempt_id, issued_at, valid_from
         raise
     except Exception:
         raise RunBindingUnavailable('RUN_BINDING_UNAVAILABLE') from None
-    with_values = 2 in stages or 3 in stages
+    with_values = bool({2, 3, 4} & set(stages))
     document = {
         'schema': SCHEMA_2 if with_values else SCHEMA, 'check_id': check.id, 'side': side, 'attempt_id': attempt_id,
         'environment_sha256': env.ref().sha256, 'files': files,
@@ -503,6 +557,7 @@ def effective_values(check, executor_cfg, env, policy_values, **kwargs):
         raise RunBindingUnavailable('RUN_BINDING_BELONGS_TO_EXECUTION')
     if type(executor_cfg) is not dict:
         raise RunBindingUnavailable('RUN_BINDING_UNAVAILABLE')
+    kwargs.setdefault('policy_row', dict(policy_values or {}))
     document, values = compute(check, executor_cfg, env, **kwargs)
     return document, {**(policy_values or {}), **values}
 
@@ -557,6 +612,8 @@ def _stage_keys(stage):
                 for c in set(KEYS_BY_CHECK_2) | set(DROPPED_BY_CHECK_2)}
     if stage == 3:
         return KEYS_BY_CHECK_3
+    if stage == 4:
+        return KEYS_BY_CHECK_4
     raise ValueError('RUN_BINDING_STAGE_UNKNOWN')
 
 
@@ -584,6 +641,13 @@ def migrate_pack(source, output, *, review=None, stage=1):
     for check_id in targets:
         path = output / 'checks' / (check_id + '.yaml')
         text = _bump_revision(_drop_policy_keys(path.read_text(encoding='utf-8'), set(by_check[check_id])))
+        if stage == 4 and check_id in DECISION_KEYS_4:
+            key = DECISION_KEYS_4[check_id]
+            parameter = f'- key: {key}\n  type: {DECISION_TYPES_4[key]}\n  required: true\n'
+            if 'policy_params: []\n' in text:
+                text = text.replace('policy_params: []\n', 'policy_params:\n' + parameter, 1)
+            else:
+                text = text.replace('policy_params:\n', 'policy_params:\n' + parameter, 1)
         left = {p['key'] for p in yaml.safe_load(text).get('policy_params') or []}
         if left & set(by_check[check_id]):
             raise ValueError('RUN_BINDING_PACK_MIGRATION_INCOMPLETE')

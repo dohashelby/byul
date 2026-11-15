@@ -2,7 +2,7 @@ id: PLT-12
 framework_id: CHK-PLT-012
 mechanism_ids:
 - mechanism-12
-revision: 8
+revision: 9
 retired: false
 area: PLT
 purpose: 권한 철회
@@ -16,11 +16,8 @@ impact: MEDIUM
 applies_when:
   prose: 실제 사용 자격의 전달·저장·교체 과정에서 남는 사본과 재사용 경로를 확인한다.
 policy_params:
-- key: copy_inventory_sha256
-  type: str
-  required: true
-- key: copy_policy_sha256
-  type: str
+- key: copy_treatments
+  type: dict
   required: true
 - key: copy_max_record_delay_ms
   type: int

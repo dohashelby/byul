@@ -1,5 +1,5 @@
 pack_id: PACK-BASELINE
-revision: 37
+revision: 38
 engines:
 - vllm
 - sglang
@@ -106,9 +106,9 @@ files_sha256:
 - path: checks/LIF-10.yaml
   sha256: da8282562733bc97a8987e3611a29a98b9774de9c53ae2ee3c24440680366ee8
 - path: checks/LIF-11.yaml
-  sha256: 2a257a8accb958c76d20de219c35fa330774a0644a5f37538a9574a798615860
+  sha256: 80a4f3160aac2a4f264ff05363343d53b9ec27dd112157601fbc66a7eb9c69ac
 - path: checks/LIF-12.yaml
-  sha256: cd576f796c279bb6e14e0e22a1b0c7f35c42dc40922d5d1f6bdf00e17b44bd97
+  sha256: 17e25e585aa2880b52cc2c468849dc22d006817f51531a8c7de44b54a1832b25
 - path: checks/LIF-13.yaml
   sha256: 683e6f9bac5ef7ff29aab8c99e007396e4d7ae20fce6fca8e9e67cb0995cb955
 - path: checks/LIF-14.yaml
@@ -118,7 +118,7 @@ files_sha256:
 - path: checks/LIF-16.yaml
   sha256: 61d8a6c9fcbd5bfd3585bea9236db9f81d3e8c6d9f33bfe562574b6b11c6418c
 - path: checks/OBS-01.yaml
-  sha256: c36e649c06cfbbe5dae471b00ad2e5a079a3020be648f7ee5ab75355d50d45de
+  sha256: 759bacc99f2fc0dbc6f188ab21350bbc86cdbaa77e6dd25735d61490f48dbf3c
 - path: checks/OBS-02.yaml
   sha256: 1ac88768cafedb7e3e8f70796ca4e977abe3472c463f2c156a70ac5e2a87dc60
 - path: checks/OBS-03.yaml
@@ -128,7 +128,7 @@ files_sha256:
 - path: checks/OBS-05.yaml
   sha256: e27d5c889015eda6c7e0af373afa4b4e02f3b5c626a1816d7b45ef8b29402369
 - path: checks/OBS-06.yaml
-  sha256: 6f5150b3bc170509b59479072911863329a4c3f4005657b079082e63e9d05227
+  sha256: 2bbea9406c30e9e12799fbfa6e98627d9ca3bd02e9c9ee2ed98336c7cb000de4
 - path: checks/OBS-07.yaml
   sha256: d2d4c7bbccd987d80e65378cd109081d67dea3dbc6b6b58d0f67a7260883a4c7
 - path: checks/OBS-08.yaml
@@ -164,7 +164,7 @@ files_sha256:
 - path: checks/PLT-11.yaml
   sha256: 6151b451b441dc45ee911b1ced8c09abe962a016f5869a8324fb955cc73be734
 - path: checks/PLT-12.yaml
-  sha256: 034972edfce3fa08e5f85209a558b39244e2e5f4aa4726a592ffbbaee298ef41
+  sha256: 761a3fbca21cdf4ad3e87398539d0306ed0f3abf2a7f634dd07b2bfa3be6932d
 - path: checks/REQ-01.yaml
   sha256: cd472997d45eb22a7f65c14b87587e01934d0cdb893e5d22134ffb67abd677ea
 - path: checks/REQ-02.yaml
@@ -172,11 +172,11 @@ files_sha256:
 - path: checks/REQ-03.yaml
   sha256: 266c461ee142a54c5ab8942aee27503f1edfa8e1c122e72afce03c9d80140b29
 - path: checks/REQ-04.yaml
-  sha256: c47b32c8b8cc41131023f605669af172c41dee9fa15d4cecd660eb55d12d3bbc
+  sha256: 5f60a359a8eb0c8e1c9bbbd6c71dbae61f5c63eb3dc27c545aa564f2074ff952
 - path: checks/REQ-05.yaml
   sha256: d9ef12b564f3ce3d0214054e64d3dcb2c9c82b84b2dc0f78c70051997f024b1e
 - path: checks/REQ-06.yaml
-  sha256: 2637f4544053407a73dc3191f9bf65b1db2e8d55256178902f07e95fcef23d9a
+  sha256: d17ebc68ed0975275d457cb72041a04fccd0003e80d2223aca231a7502f86fdc
 - path: checks/REQ-07.yaml
   sha256: a2ffa15726b92d2cfca44392cb556d0eb077afa78f538855ff712078d2614f06
 - path: checks/REQ-08.yaml
@@ -244,4 +244,4 @@ files_sha256:
 review:
   status: REVIEWED
   reviewer: B 검토 면제(사용자 결정 5, 2026-11-12)
-  reviewed_at: '2026-11-15T12:00:00+09:00'
+  reviewed_at: '2026-11-15T11:24:30Z'

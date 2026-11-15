@@ -50,7 +50,9 @@ def test_report_states_what_is_missing_and_never_claims_more(tmp_path):
     for side in tool.SIDES:
         env = environment(engine={'name': 'vllm', 'version': '0.31.0'}, model={'id': 'm', 'revision': 'r'})
         (tmp_path / (side + '-env.json')).write_text(json.dumps(env.to_dict()))
-    (tmp_path / 'policy.yaml').write_text(yaml.safe_dump({'pack': {'id': 'PACK-BASELINE', 'revision': 37}, 'values': {}}))
+    from guard.models import load_pack
+    revision = load_pack(tool.ROOT / 'packs/PACK-BASELINE').manifest.revision
+    (tmp_path / 'policy.yaml').write_text(yaml.safe_dump({'pack': {'id': 'PACK-BASELINE', 'revision': revision}, 'values': {}}))
     declared = {**spec(), 'policy': 'policy.yaml'}
     (tmp_path / 'spec.yaml').write_text(yaml.safe_dump(declared))
     tool.main([str(tmp_path / 'spec.yaml'), '--out', str(tmp_path / 'out')])
@@ -77,7 +79,7 @@ def test_policy_for_another_pack_is_refused(tmp_path):
         tool.report({'policy': 'policy.yaml', 'sides': {}}, tool.build_config({}), base=tmp_path)
 
 
-def test_web_draft_values_become_a_pack_37_draft_without_run_owned_keys():
+def test_web_draft_values_become_current_pack_draft_without_run_owned_keys():
     from guard.models import load_pack
     pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE')
     web = {'PLT-07': {'subject_scope': 'all_processes_in_container_uid_netns', 'forbidden_protocol': 'tcp',
@@ -86,7 +88,7 @@ def test_web_draft_values_become_a_pack_37_draft_without_run_owned_keys():
            'SUP-08': {'approved_code_revisions': ['a' * 40]}, 'NOT-A-CHECK': {'x': 1}}
     document, dropped = tool.policy_from_web_values(web, pack)
     assert document['status'] == 'DRAFT' and document['confirmed_by'] is None
-    assert document['pack'] == {'id': 'PACK-BASELINE', 'revision': 37}
+    assert document['pack'] == {'id': 'PACK-BASELINE', 'revision': pack.manifest.revision}
     assert document['values']['PLT-07'] == {'forbidden_protocol': 'tcp', 'forbidden_operation': 'tcp_connect'}
     assert document['values']['PLT-08'] == {'plaintext_forbidden': False}
     assert dropped == {'PLT-07': ['subject_scope'], 'PLT-08': ['api_hop_scope', 'api_port'], 'NOT-A-CHECK': ['x']}
@@ -160,3 +162,92 @@ def test_req05_decision_fills_only_missing_values_from_the_one_model():
     other = environment(engine={'name': 'vllm', 'version': '0.31.0'}, model={'id': 'test-model', 'revision': 'r2'})
     with pytest.raises(ValueError, match='REQ05_MODEL_NOT_UNIQUE'):
         tool.decided_values({'values': {}}, [env, other])
+
+
+def _rb3_sources(tmp_path, *, template='{{ messages }}'):
+    from guard.adapters.model_inventory import inventory
+    declared = {}
+    hashes = []
+    for side in tool.SIDES:
+        snapshot = tmp_path / (side + '-model')
+        snapshot.mkdir()
+        (snapshot / 'config.json').write_text('{"model_type":"example"}')
+        (snapshot / 'tokenizer_config.json').write_text(json.dumps({'chat_template': template}))
+        value = inventory(snapshot, 'all')
+        (tmp_path / (side + '-inventory.json')).write_text(json.dumps(value))
+        declared[side] = {'model_snapshot': snapshot.name, 'model_inventory': side + '-inventory.json'}
+        hashes.append(value['inventory_sha256'])
+    assert hashes[0] == hashes[1]
+    env = environment(engine={'name': 'vllm', 'version': '0.31.0'},
+                      model={'id': 'test-model', 'revision': 'fixed', 'inventory_sha256': hashes[0]})
+    return declared, [env, env]
+
+
+def test_rb3_fills_only_missing_draft_keys_from_verified_fixed_model(tmp_path):
+    from guard.models import sha256_hex
+    sources, environments = _rb3_sources(tmp_path)
+    approved_identity = sha256_hex(b'explicit-approved-supply-credential-identity')
+    document = {'status': 'DRAFT', 'confirmed_by': None, 'values': {
+        'REQ-05': {'allowed_template_sha256': ['web-kept']},
+        'SUP-03': {'allowed_template_sha256': ['web-sup-kept']},
+        'PLT-03': {'supply_allowed_objects': ['web-object-kept']}}}
+    tool.decided_values(document, environments)
+    filled, gaps = tool.rb3_draft_values(document, environments, sources, base=tmp_path,
+                                        approved_supply_identity_sha256=approved_identity)
+    assert gaps == {}
+    assert filled == {'REQ-07': {'keys': ['allowed_template_sha256'], 'basis': tool.RB3_TEMPLATE_BASIS},
+                      'PLT-05': {'keys': ['supply_allowed_identities'], 'basis': tool.RB3_SUPPLY_BASIS}}
+    assert document['values']['REQ-07']['allowed_template_sha256'] == [sha256_hex(b'{{ messages }}')]
+    assert document['values']['SUP-03']['allowed_template_sha256'] == ['web-sup-kept']
+    assert document['values']['PLT-03']['supply_allowed_objects'] == ['web-object-kept']
+    assert document['values']['PLT-05']['supply_allowed_identities'] == [approved_identity]
+    assert approved_identity != document['values']['REQ-05']['allowed_principal_sha256']
+    assert document['status'] == 'DRAFT' and document['confirmed_by'] is None
+
+
+def test_rb3_inventory_hashes_and_missing_sources_do_not_fill_policy(tmp_path):
+    from guard.models import sha256_hex
+    sources, environments = _rb3_sources(tmp_path)
+    approved_identity = sha256_hex(b'explicit-approved-supply-credential-identity')
+    document = {'status': 'DRAFT', 'values': {}}
+    tool.decided_values(document, environments)
+    filled, gaps = tool.rb3_draft_values(document, environments, sources, base=tmp_path,
+                                        approved_supply_identity_sha256=approved_identity)
+    assert gaps == {} and set(filled) == {'REQ-07', 'SUP-03', 'PLT-03', 'PLT-05'}
+    expected = {sha256_hex(b'{"model_type":"example"}'),
+                sha256_hex(json.dumps({'chat_template': '{{ messages }}'}).encode())}
+    assert set(document['values']['PLT-03']['supply_allowed_objects']) == expected
+    (tmp_path / 'candidate-model' / 'config.json').write_text('{"model_type":"changed"}')
+    fresh = {'status': 'DRAFT', 'values': {'REQ-05': document['values']['REQ-05'].copy()}}
+    filled, gaps = tool.rb3_draft_values(fresh, environments, sources, base=tmp_path,
+                                        approved_supply_identity_sha256=approved_identity)
+    assert set(filled) == {'PLT-05'}
+    assert gaps['candidate'] == ['RB3_MODEL_INVENTORY_MISMATCH']
+    assert 'REQ-07' not in fresh['values'] and 'PLT-03' not in fresh['values']
+    (tmp_path / 'candidate-model' / 'config.json').unlink()
+    filled, gaps = tool.rb3_draft_values(fresh, environments, sources, base=tmp_path,
+                                        approved_supply_identity_sha256=approved_identity)
+    assert filled == {} and gaps['candidate'] == ['RB3_MODEL_INVENTORY_FILE_MISSING']
+    sources['candidate']['model_inventory'] = 'absent.json'
+    filled, gaps = tool.rb3_draft_values(fresh, environments, sources, base=tmp_path,
+                                        approved_supply_identity_sha256=approved_identity)
+    assert filled == {} and gaps['candidate'] == ['RB3_MODEL_SOURCE_MISSING']
+
+
+def test_rb3_requires_one_model_and_explicit_supply_identity(tmp_path):
+    sources, environments = _rb3_sources(tmp_path)
+    other = environment(engine={'name': 'vllm', 'version': '0.31.0'},
+                        model={'id': 'test-model', 'revision': 'different', 'inventory_sha256': environments[0].model.inventory_sha256})
+    document = {'status': 'DRAFT', 'values': {'REQ-05': {'allowed_principal_sha256': 'web-value'}}}
+    filled, gaps = tool.rb3_draft_values(document, [environments[0], other], sources, base=tmp_path)
+    assert filled == {} and gaps == {'both': ['RB3_ENV_MODEL_NOT_UNIQUE']}
+    filled, gaps = tool.rb3_draft_values(document, environments, sources, base=tmp_path)
+    assert 'PLT-05' not in filled and gaps == {'both': ['RB3_APPROVED_SUPPLY_IDENTITY_NOT_DECLARED']}
+    filled, gaps = tool.rb3_draft_values(document, environments, sources, base=tmp_path,
+                                        approved_supply_identity_sha256='not-a-fingerprint')
+    assert 'PLT-05' not in filled and gaps == {'both': ['RB3_APPROVED_SUPPLY_IDENTITY_INVALID']}
+    document['values']['PLT-05'] = {'supply_allowed_identities': ['web-approved-identity']}
+    filled, gaps = tool.rb3_draft_values(document, environments, sources, base=tmp_path)
+    assert 'PLT-05' not in filled and document['values']['PLT-05'] == {'supply_allowed_identities': ['web-approved-identity']}
+    with pytest.raises(ValueError, match='DRAFT_POLICY_REQUIRED'):
+        tool.rb3_draft_values({'status': 'CONFIRMED', 'values': {}}, environments, sources, base=tmp_path)

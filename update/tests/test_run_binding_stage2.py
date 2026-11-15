@@ -40,7 +40,8 @@ def declaring(check, keys):
 
 def at36(check_id):
     """The @36 definition: stage-3 keys (RB3) still declared in policy."""
-    return declaring(PACK.checks[check_id], run_binding.KEYS_BY_CHECK_3.get(check_id, ()))
+    from tests.run_binding_support import before_stage4
+    return declaring(before_stage4(PACK.checks[check_id]), run_binding.KEYS_BY_CHECK_3.get(check_id, ()))
 
 
 def write(tmp_path, name, value):
@@ -50,7 +51,7 @@ def write(tmp_path, name, value):
 
 
 def test_stages_are_decided_separately_so_pack_35_definitions_replay_unchanged():
-    assert run_binding.stages_for(PACK.checks['OBS-01']) == (1, 2, 3)
+    assert run_binding.stages_for(PACK.checks['OBS-01']) == (1, 2, 3, 4)
     check = at36('OBS-01')
     assert run_binding.stages_for(check) == (1, 2)
     at35 = declaring(check, run_binding.KEYS_BY_CHECK_2['OBS-01'])
@@ -218,8 +219,8 @@ def test_policy_migration_stage_2_and_run_config_candidates(tmp_path):
         main([str(source), '--out', str(tmp_path / 'p.yaml'), '--stage', '2'])
     main([str(source), '--out', str(tmp_path / 'p.yaml'), '--stage', '2', '--run-config-out', str(tmp_path / 'rb.yaml')])
     out = yaml.safe_load((tmp_path / 'p.yaml').read_text())
-    assert out['status'] == 'DRAFT' and out['pack']['revision'] == 37
-    assert out['values']['LIF-12'] == {'retry_scope_sha256': 'a' * 64} and out['values']['REQ-02'] == {}
+    assert out['status'] == 'DRAFT' and out['pack']['revision'] == 38
+    assert out['values']['LIF-12'] == {} and out['values']['REQ-02'] == {}
     written = yaml.safe_load((tmp_path / 'rb.yaml').read_text())
     assert written['status'] == 'DRAFT' and written['run_binding']['OBS-01'] == {'record_session': SESSION}
 

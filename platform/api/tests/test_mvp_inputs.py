@@ -28,7 +28,7 @@ def prepared_client(tmp_path):
     shutil.copytree(ROOT / "update/packs/PACK-BASELINE", pack)
     path = pack / "pack.yaml"
     manifest = yaml.safe_load(path.read_text())
-    manifest["revision"] = 37  # 이 시험 안에서만 사용하는 합성 정의
+    manifest["revision"] = 38  # 이 시험 안에서만 사용하는 합성 정의
     sup = pack / "checks/SUP-08.yaml"
     check = yaml.safe_load(sup.read_text())
     check["policy_params"].append({"key": "approved_code_revisions", "type": "list[str]", "required": True})

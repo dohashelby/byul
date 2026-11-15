@@ -8,7 +8,7 @@ from pathlib import Path
 from .input_models import InputBinding, InputCatalog, InputVersion, PolicyInputPreview
 from .store import InvalidDocId
 
-MVP_PACK = {"id": "PACK-BASELINE", "revision": 37}  # 2026-11-14 RB·RB2, 2026-11-15 RB3: 실행 결합값·실행 준비값·생산자 소스·발급자 사건은 정책이 아니라 guard run이 계산한다
+MVP_PACK = {"id": "PACK-BASELINE", "revision": 38}  # 2026-11-14 RB·RB2, 2026-11-15 RB3: 실행 결합값·실행 준비값·생산자 소스·발급자 사건은 정책이 아니라 guard run이 계산한다
 # 의미가 같은 필드만 연결한다. 역할표→호출자 목록, 응답 옵션→응답 필드는 추정하지 않는다.
 _GROUPS = {
     "1.2": {"REQ-01": ["allowed_callers"], "REQ-03": ["general_allowed_kinds"]},
@@ -119,6 +119,8 @@ def _valid(value, kind):
         return type(value) is list and all(_valid(v, inner) for v in value)
     if kind == "dict[str,int]":
         return type(value) is dict and all(type(k) is str and type(v) is int for k, v in value.items())
+    if kind == "dict":  # guard core와 같은 규칙(RB3-Q4). 내부 형식은 실행기 계약이 검사한다.
+        return type(value) is dict and all(type(k) is str for k in value)
     return False
 
 

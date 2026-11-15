@@ -149,6 +149,8 @@ def test_stage2_side_table_is_used_and_missing_session_stays_blocked(tmp_path, s
     data = deepcopy(sources); entry = data['inputs'][0]; entry['check_id'] = 'PLT-12'
     pack = load_pack(tool.ROOT / 'packs/PACK-BASELINE'); check = pack.checks['PLT-12']
     inventory, values, _, _ = example()
+    from guard.executors.credential_copy_contract import treatments
+    values['copy_treatments'] = treatments(inventory)
     values = {k: v for k, v in values.items() if k not in run_binding.owned_keys(check)}
     p = Path(entry['policy']['path']); value = yaml.safe_load(p.read_bytes())
     value['scope']['include'], value['values'] = ['PLT-12'], {'PLT-12': values}
@@ -156,7 +158,10 @@ def test_stage2_side_table_is_used_and_missing_session_stays_blocked(tmp_path, s
     p = Path(entry['configuration']['path']); target = p.parent / 'target.json'
     producer = p.parent / 'copy-producer.py'
     producer.write_bytes(b'# EXAMPLE credential-copy record producer\n')
+    inventory_path = p.parent / 'copy-inventory.json'
+    inventory_path.write_text(json.dumps(inventory))
     config = "[executors]\nrequired_event_record='kubernetes'\n[required_event_record]\ntarget=" + json.dumps(str(target)) + '\n'
+    config += 'copy_inventory=' + json.dumps(str(inventory_path)) + '\n'
     if record_session:
         config += "[sides.baseline.run_binding.PLT-12]\nrecord_session=" + json.dumps(record_session) + '\n'
         config += 'record_producer=' + json.dumps(str(producer)) + '\n'
@@ -170,10 +175,23 @@ def test_stage2_side_table_is_used_and_missing_session_stays_blocked(tmp_path, s
         assert not row['file_binding_valid'] and row['blocking_codes'] == ['RUN_BINDING_CONFIG_INVALID']
 
 
-def test_target_change_during_binding_is_rejected(tmp_path, monkeypatch, sources):
+@pytest.mark.parametrize('file_key', ['target', 'retry_scope', 'copy_inventory', 'subjects', 'selection',
+                                     'record_producer', 'gateway_producer', 'engine_producer', 'issuer_event'])
+def test_target_change_during_binding_is_rejected(tmp_path, monkeypatch, sources, file_key):
     from pathlib import Path
+    import tomllib
+    from tools.j02_run_config import write_config
     original = tool.run_binding.effective_values
     baseline_target = Path(sources['inputs'][0]['configuration']['path']).parent / 'target.json'
+    if file_key != 'target':
+        configuration = sources['inputs'][0]['configuration']
+        config_path = Path(configuration['path'])
+        config = tomllib.loads(config_path.read_text())
+        baseline_target = config_path.parent / (file_key + '.json')
+        baseline_target.write_bytes(b'{"example":true}\n')
+        config['code_selection'][file_key] = str(baseline_target)
+        write_config(config, config_path)
+        configuration['sha256'] = sha256(config_path.read_bytes()).hexdigest()
     def changed(*args, **kwargs):
         result = original(*args, **kwargs)
         if kwargs['side'] == 'baseline':

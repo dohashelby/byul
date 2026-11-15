@@ -38,16 +38,26 @@ Spec (YAML):
     policy: policy.yaml                  # guard policy input (values per check)
     store: .guard-j02                    # optional, written to guard.toml
     adapter: vllm                        # optional
+    approved_supply_identity_sha256: <64 lowercase hex> # approved credential identity metadata, not secret bytes
     executors: {supply_boot: kubernetes, ...}
     shared: {<executor>: {...}}          # sections common to both sides
     sides:
       baseline:
         env: baseline-env.json
+        model_snapshot: baseline-model/       # RB3: fixed model version, local files only
+        model_inventory: baseline-inventory.json # model_inventory.py --scope all output
         cluster: {context: ctx, namespace: serving-lab, render: render.json}   # --discover
         executors: {...}                 # optional per-side sections
         checks:
           LIF-05: {executor: {...}, run_binding: {...}}
       candidate: {...}
+
+RB3 draft inputs require both sides' ENV model id/revision/inventory SHA to
+agree. Each declared snapshot must reproduce its declared all-scope inventory
+and ENV hash. Missing declarations/files are reported, never downloaded. The
+default chat template is the tokenizer_config.json chat_template string (or
+chat_template.jinja when that field is absent); run observations never select
+it. These decisions fill only absent web DRAFT keys and confer no approval.
 """
 from __future__ import annotations
 
@@ -208,6 +218,127 @@ def decided_values(document, environments):
     return {'REQ-05': {'keys': filled, 'basis': REQ05_DECISION}} if filled else {}
 
 
+RB3_TEMPLATE_BASIS = 'RB3-Q1 사용자 결정(2026-11-15): 고정 모델 판본 기본 chat template, J02 lab DRAFT 전용'
+RB3_SUPPLY_BASIS = 'RB3-Q2 사용자 결정(2026-11-15): ENV 모델 inventory 파일 SHA-256 목록·별도 선언된 승인 공급 자격 신원 하나, J02 lab DRAFT 전용'
+
+
+def _fixed_inventory(snapshot, inventory_file, env):
+    """Verify declared all-scope inventory against the exact local snapshot and ENV.
+
+    Return (file rows, template digest, gap). A gap is a source-input gap, not a
+    policy verdict. File reads never use an observed run's selected template.
+    """
+    import hashlib
+    from guard.adapters.model_inventory import inventory
+    from guard.models import canonical_json, sha256_hex
+    if not snapshot or not inventory_file:
+        return None, None, 'RB3_MODEL_SOURCE_NOT_DECLARED'
+    snapshot, inventory_file = Path(snapshot), Path(inventory_file)
+    if not snapshot.is_dir() or not inventory_file.is_file():
+        return None, None, 'RB3_MODEL_SOURCE_MISSING'
+    try:
+        declared = json.loads(inventory_file.read_text(encoding='utf-8'))
+        if type(declared) is not dict or type(declared.get('files')) is not list:
+            return None, None, 'RB3_MODEL_SOURCE_INVALID'
+        if any(type(row) is not dict or type(row.get('path')) is not str
+               or Path(row['path']).is_absolute() or '..' in Path(row['path']).parts
+               for row in declared['files']):
+            return None, None, 'RB3_MODEL_SOURCE_INVALID'
+        if any(not (snapshot / row['path']).is_file() for row in declared['files']):
+            return None, None, 'RB3_MODEL_INVENTORY_FILE_MISSING'
+        actual = inventory(snapshot, 'all')
+    except (OSError, ValueError, RuntimeError, json.JSONDecodeError):
+        return None, None, 'RB3_MODEL_SOURCE_INVALID'
+    if (type(declared) is not dict or declared.get('scope') != 'all' or declared != actual
+            or actual['inventory_sha256'] != env.model.inventory_sha256
+            or actual['inventory_sha256'] != sha256_hex(canonical_json(actual['files']))):
+        return None, None, 'RB3_MODEL_INVENTORY_MISMATCH'
+    rows = actual['files']
+    names = {row['path'] for row in rows}
+    hashes = {row['path']: row['sha256'] for row in rows}
+    try:
+        if 'tokenizer_config.json' in names:
+            raw = (snapshot / 'tokenizer_config.json').read_bytes()
+            if hashlib.sha256(raw).hexdigest() != hashes['tokenizer_config.json']:
+                return None, None, 'RB3_MODEL_SOURCE_CHANGED'
+            config = json.loads(raw)
+            template = config.get('chat_template') if type(config) is dict else None
+        else:
+            template = None
+        if template is None and 'chat_template.jinja' in names:
+            raw = (snapshot / 'chat_template.jinja').read_bytes()
+            if hashlib.sha256(raw).hexdigest() != hashes['chat_template.jinja']:
+                return None, None, 'RB3_MODEL_SOURCE_CHANGED'
+            template = raw.decode('utf-8')
+    except (OSError, ValueError, UnicodeError):
+        return rows, None, 'RB3_DEFAULT_TEMPLATE_INVALID'
+    if type(template) is not str or not template:
+        return rows, None, 'RB3_DEFAULT_TEMPLATE_MISSING'
+    return rows, sha256_hex(template.encode('utf-8')), None
+
+
+def rb3_draft_values(document, environments, side_sources, *, base=Path('.'), approved_supply_identity_sha256=None):
+    """Fill absent RB3-Q1/Q2 keys in web DRAFT; return (filled, source gaps).
+
+    `side_sources` maps baseline/candidate to `model_snapshot` and
+    `model_inventory` paths declared under `sides` in the J02 spec. No
+    observation, selected template, or generated credential is an input.
+    `approved_supply_identity_sha256` is one explicitly declared nonsecret
+    fingerprint of an approved credential/identity, never credential bytes or
+    the REQ-05 synthetic caller role label. It does not authenticate approval.
+    """
+    if (document.get('status') != 'DRAFT' or document.get('confirmed_by') is not None
+            or document.get('confirmed_at') is not None):
+        raise ValueError('RB3_DRAFT_POLICY_REQUIRED')
+    models = [(env.model.id, env.model.revision, env.model.inventory_sha256) for env in environments]
+    if len(models) != len(SIDES) or len(set(models)) != 1 or any(type(v) is not str or not v for v in models[0]):
+        return {}, {'both': ['RB3_ENV_MODEL_NOT_UNIQUE']}
+    sources, gaps = {}, {}
+    for side, env in zip(SIDES, environments):
+        declared = side_sources.get(side) or {}
+        snapshot = declared.get('model_snapshot')
+        inventory_file = declared.get('model_inventory')
+        rows, template, gap = _fixed_inventory(base / snapshot if snapshot else None,
+                                               base / inventory_file if inventory_file else None, env)
+        sources[side] = (rows, template)
+        if gap:
+            gaps[side] = [gap]
+    filled = {}
+    # Q2 needs a separate operator declaration: the REQ-05 caller role label
+    # does not identify a supply credential. Never infer it from run output.
+    approved = approved_supply_identity_sha256
+    if type(approved) is str and re.fullmatch(r'[0-9a-f]{64}', approved):
+        row = document['values'].setdefault('PLT-05', {})
+        if 'supply_allowed_identities' not in row:
+            row['supply_allowed_identities'] = [approved]
+            filled['PLT-05'] = {'keys': ['supply_allowed_identities'], 'basis': RB3_SUPPLY_BASIS}
+    else:
+        gaps.setdefault('both', []).append('RB3_APPROVED_SUPPLY_IDENTITY_NOT_DECLARED' if approved is None
+                                           else 'RB3_APPROVED_SUPPLY_IDENTITY_INVALID')
+    if any(rows is None for rows, _ in sources.values()):
+        return filled, gaps
+    baseline_rows, baseline_template = sources['baseline']
+    candidate_rows, candidate_template = sources['candidate']
+    if baseline_rows != candidate_rows:
+        gaps.setdefault('both', []).append('RB3_MODEL_INVENTORIES_DIFFER')
+        return filled, gaps
+    row = document['values'].setdefault('PLT-03', {})
+    if 'supply_allowed_objects' not in row:
+        row['supply_allowed_objects'] = sorted({entry['sha256'] for entry in baseline_rows})
+        filled['PLT-03'] = {'keys': ['supply_allowed_objects'], 'basis': RB3_SUPPLY_BASIS}
+    if baseline_template is None or candidate_template is None:
+        return filled, gaps
+    if baseline_template != candidate_template:
+        gaps.setdefault('both', []).append('RB3_DEFAULT_TEMPLATES_DIFFER')
+        return filled, gaps
+    for cid in ('REQ-07', 'SUP-03'):
+        row = document['values'].setdefault(cid, {})
+        if 'allowed_template_sha256' not in row:
+            row['allowed_template_sha256'] = [baseline_template]
+            filled[cid] = {'keys': ['allowed_template_sha256'], 'basis': RB3_TEMPLATE_BASIS}
+    return filled, gaps
+
+
 # --- J2: read-only kubectl get ---------------------------------------------------------------
 
 def _kubectl(argv, runner=None):
@@ -267,7 +398,7 @@ def _version_gap(executor, env):
     return provider.executor_gap(env.engine.version, executor)
 
 
-def _row(pack, check_id, side, cfg, env, values):
+def _row(pack, check_id, side, cfg, env, values, *, policy_ref=None):
     from guard.configuration import for_check
     from guard.executors import registry, run_binding
     check = pack.checks[check_id]
@@ -302,7 +433,8 @@ def _row(pack, check_id, side, cfg, env, values):
         if run_binding.keys_for(check):
             _, effective = run_binding.effective_values(
                 check, merged.get(check.executor, {}), env, values, side=side, attempt_id=None,
-                issued_at=datetime.now(timezone.utc), run_cfg=run_binding.run_config(merged, check_id))
+                issued_at=datetime.now(timezone.utc), run_cfg=run_binding.run_config(merged, check_id),
+                policy_ref=policy_ref)
         if not row['policy_keys_missing']:
             factory(merged).validate_policy(check, effective)
     except ValueError as exc:
@@ -315,7 +447,7 @@ def _row(pack, check_id, side, cfg, env, values):
 
 
 def report(spec, config, *, plan_file=PLAN, base=Path('.'), policy_document=None):
-    from guard.collectors.file import load_environment
+    from guard.collectors.file import load_environment, load_policy
     from guard.configuration import merge_config
     from guard.models import load_pack
     pack = load_pack(base / spec.get('pack', ROOT / 'packs/PACK-BASELINE'))
@@ -325,6 +457,10 @@ def report(spec, config, *, plan_file=PLAN, base=Path('.'), policy_document=None
     values = (document or {}).get('values') or {}
     if (document or {}).get('pack', {}).get('revision') not in (None, pack.manifest.revision):
         raise ValueError('J02_POLICY_PACK_REVISION_MISMATCH')
+    # A shorthand DRAFT policy gets a fresh random POL id on each load. It has
+    # no stable current Ref to bind here; only an already sealed POL does.
+    policy_ref = (load_policy(base / policy_path, pack).ref()
+                  if policy_path and policy_document is None and (document or {}).get('kind') == 'POL' else None)
     rows = []
     for side in SIDES:
         env_path = ((spec.get('sides') or {}).get(side) or {}).get('env')
@@ -334,7 +470,7 @@ def report(spec, config, *, plan_file=PLAN, base=Path('.'), policy_document=None
             if env is None:
                 rows.append({'check_id': check_id, 'side': side, 'status': 'MISSING_INPUT', 'reasons': ['ENV_NOT_DECLARED']})
                 continue
-            rows.append(_row(pack, check_id, side, cfg, env, values.get(check_id) or {}))
+            rows.append(_row(pack, check_id, side, cfg, env, values.get(check_id) or {}, policy_ref=policy_ref))
     counts = {}
     for row in rows:
         counts[row['status']] = counts.get(row['status'], 0) + 1
@@ -360,7 +496,7 @@ def main(argv=None):
     spec = yaml.safe_load(args.spec.read_text(encoding='utf-8'))
     base = args.spec.parent
     args.out.mkdir(parents=True)
-    policy_document, dropped, decided = None, {}, {}
+    policy_document, dropped, decided, rb3_gaps = None, {}, {}, {}
     if args.web_values is not None:
         pack = load_pack(base / spec.get('pack', ROOT / 'packs/PACK-BASELINE'))
         policy_document, dropped = policy_from_web_values(json.loads(args.web_values.read_text(encoding='utf-8')), pack)
@@ -368,6 +504,10 @@ def main(argv=None):
             environments = [load_environment(base / ((spec.get('sides') or {}).get(side) or {})['env'])
                             for side in SIDES if ((spec.get('sides') or {}).get(side) or {}).get('env')]
             decided = decided_values(policy_document, environments)
+            rb3_filled, rb3_gaps = rb3_draft_values(
+                policy_document, environments, spec.get('sides') or {}, base=base,
+                approved_supply_identity_sha256=spec.get('approved_supply_identity_sha256'))
+            decided.update(rb3_filled)
         (args.out / 'policy.yaml').write_text(yaml.safe_dump(policy_document, allow_unicode=True, sort_keys=False),
                                               encoding='utf-8')
     targets, discovered = {}, {}
@@ -386,6 +526,7 @@ def main(argv=None):
     result = report(spec, config, plan_file=args.plan, base=base, policy_document=policy_document)
     result['web_values_dropped'] = dropped
     result['decided_values'] = decided
+    result['rb3_source_gaps'] = rb3_gaps
     result['discovered'] = discovered
     write_config(config, args.out / 'guard.toml')
     (args.out / 'report.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')

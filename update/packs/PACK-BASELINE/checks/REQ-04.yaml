@@ -2,7 +2,7 @@ id: REQ-04
 framework_id: CHK-REQ-004
 mechanism_ids:
 - mechanism-01
-revision: 8
+revision: 9
 retired: false
 area: REQ
 purpose: 신원 인증·전달
@@ -15,10 +15,7 @@ review_order: conditional_when_selected
 impact: HIGH
 applies_when:
   prose: 앱·Gateway·서비스 계정이 전달한 신원을 인가에 사용할 때 적용한다. 최종 사용자와 연결 주체를 구분한다.
-policy_params:
-- key: forwarded_identity_policy_sha256
-  type: str
-  required: true
+policy_params: []
 policy_prose:
   policy_to_decide: 신원 발급·전달·신뢰 주체
   enterprise_decisions: 인증 방식·실제 계정, 사용자/조직별 모델·작업 허용표, 직통 허용 주체·목적, 관리 역할, Gateway의 신원 전달·경로 변환과 선택 API. 저장 결과 기능을 쓰면 객체 소유자·조회·취소 권한도 결정한다.

@@ -18,6 +18,12 @@ applied automatically and the REQ-02 declared record-file hash is dropped
 Stage 3 (@37, RB3): producer source SHAs, OBS-01 test actors and the PLT-10/11
 issuer event leave the policy.  `--stage 3 --run-config-out FILE` writes the
 entries that can move as they are and lists the files still to be written.
+
+Stage 4 (@38, RB3-Q3/Q4) removes the policy-row/run-file hashes. New enterprise
+decisions are never inferred from observed files: the CLI lists missing
+`retry_limits`, `copy_treatments`, and `recovery_require_absent_kinds` in
+`required_policy_values`. The output stays DRAFT and is not execution-ready.
+OBS-06's current sealed policy Ref is computed at execution, outside its values.
 """
 from __future__ import annotations
 
@@ -53,7 +59,7 @@ def main(argv=None):
     parser.add_argument('policy', type=Path)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--pack', type=Path, default=ROOT / 'packs/PACK-BASELINE')
-    parser.add_argument('--stage', type=int, choices=(1, 2, 3), default=1)
+    parser.add_argument('--stage', type=int, choices=(1, 2, 3, 4), default=1)
     parser.add_argument('--run-config-out', type=Path)
     args = parser.parse_args(argv)
     if (args.stage in (2, 3)) != (args.run_config_out is not None):
@@ -62,7 +68,8 @@ def main(argv=None):
         if path is not None and path.exists():
             raise SystemExit('output exists; choose a new path')
     document = yaml.safe_load(args.policy.read_text(encoding='utf-8'))
-    out, removed = migrate(document, load_pack(args.pack))
+    pack = load_pack(args.pack)
+    out, removed = migrate(document, pack)
     args.out.write_text(yaml.safe_dump(out, allow_unicode=True, sort_keys=False), encoding='utf-8')
     if args.run_config_out is not None:
         candidates = (run_binding.run_config_candidates if args.stage == 2 else run_binding.run_config_candidates_3)(
@@ -70,7 +77,10 @@ def main(argv=None):
              for cid, row in (document.get('values') or {}).items()})
         args.run_config_out.write_text(yaml.safe_dump(
             {'status': 'DRAFT', 'run_binding': candidates}, allow_unicode=True, sort_keys=False), encoding='utf-8')
-    print(yaml.safe_dump({'removed_run_binding_keys': removed, 'status': out.get('status')}, allow_unicode=True, sort_keys=False))
+    missing = {cid: [key] for cid, key in run_binding.DECISION_KEYS_4.items()
+               if 4 in run_binding.stages_for(pack.checks[cid]) and key not in out['values'].get(cid, {})}
+    print(yaml.safe_dump({'removed_run_binding_keys': removed, 'required_policy_values': missing,
+                         'ready_for_execution': False, 'status': out.get('status')}, allow_unicode=True, sort_keys=False))
 
 
 if __name__ == '__main__':

@@ -608,9 +608,9 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "recovery_selection_sha256",
+          "key": "recovery_require_absent_kinds",
           "required": true,
-          "type": "str"
+          "type": "list[str]"
         },
         {
           "key": "recovery_validity_start",
@@ -695,14 +695,9 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "retry_scope_sha256",
+          "key": "retry_limits",
           "required": true,
-          "type": "str"
-        },
-        {
-          "key": "retry_policy_sha256",
-          "required": true,
-          "type": "str"
+          "type": "dict"
         },
         {
           "key": "retry_policy_mode",
@@ -915,11 +910,6 @@
           "key": "observation_required_fields",
           "required": true,
           "type": "list[str]"
-        },
-        {
-          "key": "observation_event_policy_sha256",
-          "required": true,
-          "type": "str"
         }
       ],
       "question": "필수 접근·관리·승인 기록으로 누가 무엇을 어느 실행에서 했는지 확인할 수 있는가?",
@@ -1158,13 +1148,7 @@
         "1차 제외 범위는 실제 실행 뒤 UNKNOWN·원인을 기록한다. OBS-09는 기업 수집기 범위만 해당한다."
       ],
       "input_state": "미입력",
-      "policy_requirements": [
-        {
-          "key": "record_subject_plan_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "기록·진단 사본의 조회·반출을 허용된 주체로 제한하고, 필요한 저장 암호화를 적용하는가?",
       "session": "J02",
       "sides": {
@@ -1788,14 +1772,9 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "copy_inventory_sha256",
+          "key": "copy_treatments",
           "required": true,
-          "type": "str"
-        },
-        {
-          "key": "copy_policy_sha256",
-          "required": true,
-          "type": "str"
+          "type": "dict"
         },
         {
           "key": "copy_max_record_delay_ms",
@@ -1938,13 +1917,7 @@
         "기존 사용자 결정의 대상 비적용 근거를 정본 선정에 남긴다. 새 비적용 승인이 아니다."
       ],
       "input_state": "미입력",
-      "policy_requirements": [
-        {
-          "key": "forwarded_identity_policy_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "사용자가 보낸 값으로 권한 검사에 쓰는 신원을 사칭할 수 없는가?",
       "session": "J02",
       "sides": {
@@ -2028,11 +2001,6 @@
       ],
       "input_state": "미입력",
       "policy_requirements": [
-        {
-          "key": "stored_identity_policy_sha256",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "stored_origins",
           "required": true,
@@ -3384,8 +3352,8 @@
   "planned_pack_ref": {
     "id": "PACK-BASELINE",
     "kind": "PACK",
-    "revision": 37,
-    "sha256": "c85b347a8b64856ecd61b1018a5f9b569bbe4475913ec537986d49d55efda1b3"
+    "revision": 38,
+    "sha256": "22dee30a0df2e9e79defd6d28010f3d16e202512d67269e831d3c5fa95113d80"
   },
   "planned_pack_source": {
     "available_on_main": false,

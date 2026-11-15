@@ -114,7 +114,9 @@ def inspect_side(source, check, pack, *, issued_at):
     referenced = {}
     binding_config = run_binding.run_config(config, check.id)
     for table in (executor_cfg, binding_config or {}):
-        for key in ('target', 'prepared', 'manifest', 'scenario', 'egress_binding', 'api_binding'):
+        for key in ('target', 'prepared', 'manifest', 'scenario', 'egress_binding', 'api_binding',
+                    'retry_scope', 'copy_inventory', 'subjects', 'selection',
+                    'record_producer', 'gateway_producer', 'engine_producer', 'issuer_event'):
             if key in table:
                 raw_file, identity = _read(table[key])
                 referenced[str(table[key])] = raw_file, identity
@@ -126,7 +128,7 @@ def inspect_side(source, check, pack, *, issued_at):
     binding, _ = run_binding.effective_values(check, executor_cfg, env, values,
         side=source['side'], attempt_id='ma7-offline-preflight', issued_at=issued_at,
         valid_from=policy.valid_from, valid_until=policy.valid_until,
-        run_cfg=binding_config)
+        run_cfg=binding_config, policy_ref=policy.ref())
     for role, identity in identities.items():
         after, current = _read(source[role]['path'])
         if current != identity or after != files[role]:

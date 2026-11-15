@@ -21,6 +21,18 @@ import pytest
 from guard.executors import run_binding
 
 
+def before_stage4(check):
+    """Replay the earlier definition's policy ownership, including its old decision-file hashes."""
+    from guard.models.checkdef import PolicyParam
+    old = check.model_copy(deep=True)
+    decision = run_binding.DECISION_KEYS_4.get(check.id)
+    old.policy_params = [p for p in old.policy_params if p.key != decision]
+    declared = {p.key for p in old.policy_params}
+    old.policy_params += [PolicyParam(key=k, type='str', required=True)
+                          for k in run_binding.KEYS_BY_CHECK_4.get(check.id, ()) if k not in declared]
+    return old
+
+
 def split(check, values):
     """(policy values without the run-binding keys, the removed file-hash values)."""
     keys = set(run_binding.keys_for(check))

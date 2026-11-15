@@ -41,7 +41,8 @@ def env():
 
 
 def at36(check_id):
-    old = PACK.checks[check_id].model_copy(deep=True)
+    from tests.run_binding_support import before_stage4
+    old = before_stage4(PACK.checks[check_id])
     old.policy_params = list(old.policy_params) + [PolicyParam(key=k, type='str', required=True)
                                                    for k in run_binding.KEYS_BY_CHECK_3[check_id]]
     return old
@@ -59,7 +60,7 @@ def supply_cfg(tmp_path):
 
 
 def test_pack_37_moves_only_stage_3_keys_and_pack_36_definitions_replay():
-    assert PACK.manifest.revision == 37
+    assert PACK.manifest.revision == 38
     for cid, keys in run_binding.KEYS_BY_CHECK_3.items():
         check = PACK.checks[cid]
         assert 3 in run_binding.stages_for(check) and not {p.key for p in check.policy_params} & set(keys)
@@ -68,8 +69,8 @@ def test_pack_37_moves_only_stage_3_keys_and_pack_36_definitions_replay():
             not run_binding.config_keys(at36(cid))
     # Decision-bound values stay in policy (RB3-Q).
     for cid, key in (('PLT-03', 'supply_allowed_objects'), ('PLT-05', 'supply_allowed_identities'),
-                     ('REQ-07', 'allowed_template_sha256'), ('OBS-01', 'observation_event_policy_sha256'),
-                     ('LIF-12', 'retry_scope_sha256'), ('REQ-05', 'selected_model_grants'),
+                     ('REQ-07', 'allowed_template_sha256'), ('PLT-12', 'copy_treatments'),
+                     ('LIF-12', 'retry_limits'), ('REQ-05', 'selected_model_grants'),
                      ('PLT-10', 'revocation_deadline_basis')):
         assert key in {p.key for p in PACK.checks[cid].policy_params}
 
@@ -99,11 +100,11 @@ def test_req04_has_two_producers_and_req06_uses_the_reviewed_adapter_sources(tmp
     target = {'target': str(target_file(tmp_path))}
     gateway, engine = write(tmp_path, 'g.py', b'gateway'), write(tmp_path, 'e.py', b'engine')
     _, values = run_binding.compute(PACK.checks['REQ-04'], target, env(), side='single', attempt_id=None, issued_at=utcnow(),
-                                    run_cfg={'record_session': SESSION, 'gateway_producer': gateway, 'engine_producer': engine})
+                                    run_cfg={'record_session': SESSION, 'gateway_producer': gateway, 'engine_producer': engine}, policy_row={})
     assert values['forwarded_gateway_source_sha256'] == hashlib.sha256(b'gateway').hexdigest()
     assert values['forwarded_engine_source_sha256'] == hashlib.sha256(b'engine').hexdigest()
     document, values = run_binding.compute(PACK.checks['REQ-06'], target, env(), side='single', attempt_id=None,
-                                           issued_at=utcnow(), run_cfg={'record_session': SESSION})
+                                           issued_at=utcnow(), run_cfg={'record_session': SESSION}, policy_row={})
     assert {k: values[f'stored_{k}_source_sha256'] for k in REVIEWED_SOURCES} == REVIEWED_SOURCES
     assert 'record_producer_sha256' not in document['files']
 
@@ -114,7 +115,7 @@ def test_obs01_test_actors_move_as_they_are(tmp_path):
     producer = write(tmp_path, 'gw.py', b'gateway')
     good = {'record_session': SESSION, 'record_producer': producer, 'test_actors': {'allowed': 'a' * 64, 'denied': 'b' * 64}}
     _, values = run_binding.compute(PACK.checks['OBS-01'], target, env(), side='single', attempt_id=None,
-                                    issued_at=utcnow(), run_cfg=good)
+                                    issued_at=utcnow(), run_cfg=good, policy_row={})
     assert (values['observation_allowed_actor_sha256'], values['observation_denied_actor_sha256']) == ('a' * 64, 'b' * 64)
     for actors in ({'allowed': 'a' * 64, 'denied': 'a' * 64}, {'allowed': 'A' * 64, 'denied': 'b' * 64}, {'allowed': 'a' * 64},
                    ['a' * 64, 'b' * 64]):
@@ -198,7 +199,7 @@ def test_policy_migration_stage_3_and_run_config_candidates(tmp_path):
         main([str(source), '--out', str(tmp_path / 'p.yaml'), '--stage', '3'])
     main([str(source), '--out', str(tmp_path / 'p.yaml'), '--stage', '3', '--run-config-out', str(tmp_path / 'rb.yaml')])
     out = yaml.safe_load((tmp_path / 'p.yaml').read_text())
-    assert out['status'] == 'DRAFT' and out['pack']['revision'] == 37 and out['values']['SUP-05'] == {}
+    assert out['status'] == 'DRAFT' and out['pack']['revision'] == 38 and out['values']['SUP-05'] == {}
     assert yaml.safe_load((tmp_path / 'rb.yaml').read_text())['run_binding']['OBS-01']['test_actors']['denied'] == 'd' * 64
 
 

@@ -142,6 +142,9 @@ def parse_recording(raw, prepared):
     if prepared["profile"] not in {release_sensor.PROFILE,init_release.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
     if prepared["profile"] not in {release_sensor.PROFILE,init_release.PROFILE,fault_sensor.PROFILE,termination_sensor.PROFILE,sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
     words = WORDS
+    if profiles.configured.contains(prepared['profile']):
+        words = words | {profiles.public_commit(prepared['profile']),
+            *profiles.source_hashes(prepared['profile']), *profiles.point_sources(prepared['profile'])}
     if prepared["profile"] in {release_sensor.PROFILE, init_release.PROFILE}:
         words = words | {release_sensor.COMMIT}
     if is_termination:

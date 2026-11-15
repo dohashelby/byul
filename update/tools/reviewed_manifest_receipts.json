@@ -222,6 +222,11 @@
       "reviewed_at": "2026-11-15T16:05:40.445204+09:00"
     },
     {
+      "manifest_sha256": "f302eaf2b5d4b2122b0ed9b0d147db5087fa8109f61768c057b2fa3afa1c5d37",
+      "reviewed_by": "Codex / baseline V1 snapshots and CPython ABI; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T08:09:31.259813+00:00"
+    },
+    {
       "manifest_sha256": "e0c39ae8c9ee74b9d7de31315bac5aa1f19317e81ae1ab8da045fbb5fa27cc47",
       "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T05:00:14.968998+00:00"
@@ -270,6 +275,11 @@
       "manifest_sha256": "e8be89b903031631806fde51cf873d84ccb75779665479cd0ff7526f733ba287",
       "reviewed_by": "Codex / PR276 READY snapshot race review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T17:17:24.504933+09:00"
+    },
+    {
+      "manifest_sha256": "a98a34360d9766ce22519c67edc6603efabc9e6ef58b4ecde9ad41e49ae67ec0",
+      "reviewed_by": "Codex / PR278-279 integrated source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T18:05:42.726982+09:00"
     }
   ]
 }

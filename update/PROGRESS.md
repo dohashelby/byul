@@ -1,3 +1,10 @@
+## 2026-11-15 — M-A6 profiler 호환 보완·기준 startup 원관측 연결
+
+- 한 일: #284의 통합 head3afd4859에서 나온 기존 profiler packet 호환성, 형식이 잘못된 profile 조회, 회귀 writer fixture 연결을 보완했다. 기존 음성 기대/assert를 유지한다. 후보의 실제 wrapper·worker·API 정확 소스 bytes를 고정 자료로 넣고 두 번의 start/stop 객체 재사용과 시작/정지/출력 실패 기록을 실제 소비기에 넣는 회귀를 추가했다. 원 센서 /12·/15 bytes는 보존한다.
+- 기준 startup: 정확 태그 소스의 WorkerProc constructor와 Worker.load_model 본문을 읽기 전용 hook으로 연결해 같은 자식 구간의 로드 반환·예외를 소비한다. READY는 초기화·로드 이전의 transport 신호임을 실제 constructor 회귀로 구분했다. 원 /14·callback bytes·팩·판정과 initialization gate는 보존하며, 준비/journal/제품 capture 연결은 다음 독립 개발이다([범위](docs/dev-1/ma6-baseline-startup-candidate.md)).
+- 테스트 결과: head3afd4859 전체 CI는 16 failed·13636 passed·기존34 skipped·fixture 오류1개(pytest658.72초·부모660.053초)였다. 나머지 CI는 성공했다. 원 실패 로그 SHA는 851023cf01cd1a604729e2f2d4c80fd1b5bde9eeb821f0e9201bf546f2fb820f이다. 보완 source의 CI 결과는 아직 없다. 새 startup 시험과 후보 변형 거부 시험은 기존 CPython3.12.8 job에도 넣었다. 로컬 Python/pytest는 실행하지 않았다. 새 baseline 원본 fixture의 기존 trailing whitespace는 정확 bytes 보존을 위해 유지했다.
+- 검토·다음 단계: profiler 보완과 후보 실제 함수 회귀는 고정 변경 집중 검토를 마쳤고 startup 원관측은 주 세션이 검토했다. source 목록/결정5 영수증을 고정해 같은 #284에 올린다. 후보 REQ-10의 생략 옵션 기본값 추정·실제 소비 정합 관문을 보완하고, startup의 소유 journal/자산/파서 연결을 별도 worktree에서 계속한다. baseline cache/slot/graph·stream/profiler와 실제 GPU/등록·공식 RPT도 남아 있다.
+
 ## 2026-11-15 — #282 병합과 M-A6 W1·후보 stream/profiler 통합
 
 - 한 일: 사용자 “#282 main 병합” 승인으로 정확 head1b07af80을 main7cbaa4e1에 병합했다. 병합 tree5d45624c가 검증 head와 같음을 확인했다. 이를 #284에 통합하고 기준 /28 HMAC 소비·전송 경로와 후보 /29 stream·/30 profiler의 정확 소스/비공개 키 경계를 묶었다. 기존 /12·/15 센서 bytes·이전 profile·승인 UNKNOWN_V1은 보존한다. 후보의 원 request SHA는 명시적 필드만 HMAC으로 재표현하고 키·의존 소스 검증 뒤에만 hook을 설치한다.

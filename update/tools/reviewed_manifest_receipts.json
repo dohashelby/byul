@@ -340,6 +340,11 @@
       "manifest_sha256": "2c89cf5a9004439aa9f9c9b857ece2338ddabd05c60a907e31084b61b5cbe6e8",
       "reviewed_by": "Codex / MA6 W1 and candidate29-30 integrated exact-source/HMAC focused review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T12:27:40Z"
+    },
+    {
+      "manifest_sha256": "d9c39a387ed4b64a3af962b10c90533b871e788592221320a3d576b8b12ad0dc",
+      "reviewed_by": "Codex / MA6 profiler compatibility and exact native candidate regression focused review; baseline startup component source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T12:45:05Z"
     }
   ]
 }

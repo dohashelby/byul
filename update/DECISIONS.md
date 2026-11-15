@@ -466,9 +466,9 @@
 
 ## 열린 질문
 
-### 기준 uvicorn 설치 행 대조 (2026-11-15, 승인 질문 중)
+### 기준 uvicorn 설치 행 대조 (2026-11-15, 사용자 승인·대조됨)
 
-- 기준 LIF-03·04를 위한 `uvicorn-0.34.0-py3-none-any.whl` 한 개(62,315 bytes, SHA-256 `023dc038422502fa28a09c7a30bf2b6991512da7dcdb8fd35fe57cfc154126f4`) 다운로드를 사용자에게 별도로 물었다. 앞선 W6은 후보0.53.0 wheel 승인이다. [PyPI 원 메타데이터](https://pypi.org/pypi/uvicorn/0.34.0/json)의 wheel METADATA SHA `6d2f1a12…`는 M-A3 기준 이미지 distribution metadata와 같다. 아직 wheel을 받지 않았으며 Python 파일 bytes·실제 함수·ABI·GPU 자격을 승격하지 않는다. 다른 M-A6 독립 개발은 계속한다.
+- 기준 LIF-03·04를 위한 `uvicorn-0.34.0-py3-none-any.whl` 한 개(62,315 bytes, SHA-256 `023dc038422502fa28a09c7a30bf2b6991512da7dcdb8fd35fe57cfc154126f4`) 다운로드를 사용자에게 별도로 물었고 “이 wheel만 받아 대조 진행”으로 승인받았다. 앞선 W6은 후보0.53.0 wheel 승인이다. [PyPI 원 메타데이터](https://pypi.org/pypi/uvicorn/0.34.0/json)의 wheel METADATA SHA `6d2f1a12…`는 M-A3 기준 이미지 distribution metadata와 같다. 정확 wheel bytes/SHA와 METADATA 일치를 확인했고 Python 파일 세 개를 소스만 읽어 대조했다. flow_control은 기존 핀과 같고 h11/httptools는 달라 /33 소스 검토로 잇는다. 실제 이미지 Python 파일·ABI·GPU 자격은 아직 승격하지 않는다. 다른 M-A6 독립 개발은 계속한다.
 
 
 ### M-A6-W 기준 V1·후보 남은 점검 (2026-11-15) — 사용자 결정됨

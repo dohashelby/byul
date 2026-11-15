@@ -380,6 +380,11 @@
       "manifest_sha256": "d08c5feaa144078482e52f519a009dfac3908bed42dd48185e01ab66d436251c",
       "reviewed_by": "Codex / MA6 REQ-17 native control-hit focused review fix; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T13:03:02Z"
+    },
+    {
+      "manifest_sha256": "b863540f91518162f4190092f917190d162b258db4a2fd975149a72f5cfc2470",
+      "reviewed_by": "Codex / MA6 integration review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T13:17:47Z"
     }
   ]
 }

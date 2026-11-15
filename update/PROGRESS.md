@@ -1,3 +1,10 @@
+## 2026-11-15 — 통합 CI 실패 보완·기준 profiler /32와 cache 연결
+
+- CI 원결과: head8d828e1a는 227 failed·13250 passed·기존34 skipped·89 errors·10 warnings(pytest1024.87초·부모1026.210초)였다. 새 REQ-10 조건식 줄바꿈의 문법 오류와 새 영수증 설명3개의 기존128자 제한 초과가 제품 실행기/소스 gate를 연쇄 차단했다. 조건식을 고치고 검토자 설명만 제한 안으로 줄였으며 원문은 Git과 별도 evidence `receipt-format-corrections.json`에 보존했다. 기존 gate·판정·기대값을 바꾸지 않았다. CI에는 전체 시험 전에 Python compileall을 추가했다. 새 profiler 회귀에서 모든 stop 후보와 실제 충돌 flag를 혼동한 기대를 실제 projector 의미에 맞췄다. 별도 RPC control-ready 파일 거부1건은 원 로그에 보존하고 재검증한다. 원 로그 SHA70617d0b342f5d757719063f4aba79e6d125806c4a1b50d46bb4d252a1391808.
+- 한 일: 집중 검토한 기준 cache/slot9843129f·4c22d4c2와 profiler8eae090b·용량 보완6b9ec8cc를 통합했다. 캐시는 실제 baseline의 flat2-tuple과 요청 metadata를 읽되, timing 대조군의 실제 native hit가 없으면 UNKNOWN이다. 슬롯 index는 최종 sampler 소비가 없어 후보/UNKNOWN을 유지한다. 후속 condense 역사·batch 결합 수정은 별도 분기이며 아직 통합하지 않았다.
+- profiler /32: 실제 Worker.profile의 direct Torch backend와 성공한 start 호출의 세대, stop 결과를 관측한다. 원 /15 bytes는 유지하며 wrapper ID로 backend ID를 대체하지 않는다. 새 profile은 request-free이고 trace directory는 선언한 소유 경로의 파일 사실만 남기며 실제 소비된 callback 경로·출력 완료·RPC를 주장하지 않는다. object 한도에서 신규 owner 기록을 건너뛰고 generation nonce가 없으면 qualified로 올리지 않도록 보완했다.
+- 다음 단계: 엄격한 source 목록·영수증을 고정해 새 통합 CI에서 확인한다. /32와 기존 startup/stream 변형은 CPython3.12.8 별도 CI에도 넣는다. 승인받아 받은 uvicorn0.34 wheel은 정확62,315bytes/SHA·이미지 distribution METADATA 일치를 확인했고, /33의 실제 함수/기록 소비 연결을 진행 중이다. 로컬 Python/pytest·GPU 실측·생산자 등록·공식 RPT는 수행/완료로 주장하지 않는다.
+
 ## 2026-11-15 — 기준 startup 전용 /31의 소유 journal·capture 연결
 
 - 한 일: 집중 검토한 b5db8b92·23f2ea49를 통합했다. 정확 MP·Worker 두 source만 감싸고 기존 per-process Writer에 기본·미지원·로드/constructor 실패 기록을 남긴다. prepare/load의 고정 비공개 의존 파일 검사, fork 뒤 새 process binding, strict 파서와 capture summary까지 연결했다. READY는 transport handshake이며 전체 준비·상위 집계·외부 접수 gate는 여전히 미확인이다.

@@ -335,6 +335,11 @@
       "manifest_sha256": "7a007af543a9ca6249280e765605537445eea51c0a2515c9d9690c22956f3557",
       "reviewed_by": "Codex / RB3 pack38 with approved PR280 main integration; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T11:52:04Z"
+    },
+    {
+      "manifest_sha256": "2c89cf5a9004439aa9f9c9b857ece2338ddabd05c60a907e31084b61b5cbe6e8",
+      "reviewed_by": "Codex / MA6 W1 and candidate29-30 integrated exact-source/HMAC focused review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T12:27:40Z"
     }
   ]
 }

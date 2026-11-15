@@ -1,3 +1,11 @@
+## 2026-11-15 — #282 병합과 M-A6 W1·후보 stream/profiler 통합
+
+- 한 일: 사용자 “#282 main 병합” 승인으로 정확 head1b07af80을 main7cbaa4e1에 병합했다. 병합 tree5d45624c가 검증 head와 같음을 확인했다. 이를 #284에 통합하고 기준 /28 HMAC 소비·전송 경로와 후보 /29 stream·/30 profiler의 정확 소스/비공개 키 경계를 묶었다. 기존 /12·/15 센서 bytes·이전 profile·승인 UNKNOWN_V1은 보존한다. 후보의 원 request SHA는 명시적 필드만 HMAC으로 재표현하고 키·의존 소스 검증 뒤에만 hook을 설치한다.
+- 테스트 결과: #282 CI는 13637 passed·기존34 skipped(pytest964.40초·부모965.939초), 플랫폼 계약477 passed와 나머지 확인까지 전부 성공했다. #284 초기05915be2의 CI는 8 failed·13597 passed·기존34 skipped(pytest854.70초·부모855.906초)였다. 오래된 판본표 기대 1개와 profile 없는 과거 부분 packet 7개의 KeyError를 고쳤다. 세 projector의 호환 조회를 보완했고 기존 음성 기대/assert를 바꾸지 않았다. 새 통합 source의 전체 CI는 아직 없다. 로컬 Python/pytest는 실행하지 않았다.
+- 집중 검토: 실제 /28 생산자의 기본/단절 기록→종료/상태/시도 소비, 키 오류의 세 실행기 미전송, 후보 SELECTION·native call_chain의 scalar/list HMAC, /30 정확 control route·요청/호출 Ref 쌍, 실제 후보 profiler API 생산→파서→API join을 회귀로 추가했다. 원 소스/모델/파일 해시는 바꾸지 않는다. backend·trace·RPC·worker·전체 범위·GPU 자격은 별도 미확인으로 보존한다.
+- 다음 단계: source 목록과 결정5 검토 행을 고정해 같은 #284의 새 head CI를 확인한다. 남은 승인 CPU 개발인 후보 REQ-10 runner capture/실제 제약 소비를 별도 브랜치에서 계속한다. 기준 startup·cache/slot·stream/profiler의 의미 대조도 남아 있어 전체 M-A6/69개 완료로 세지 않는다.
+- 막힌 것: 실제 ENV/target·기록 생산자·GPU/lab 수집·공식 보고서는 미완료다. baseline REQ-10 W5는 승인된 GPU 확인 절차를 기다리며, W2/W4의 승인 UNKNOWN을 다른 분기로 확대하지 않는다.
+
 ## 2026-11-15 — 팩38 전체 CI 실패 보완과 승인된 #280 통합
 
 - 한 일: 6badc405 전체 CI의 20개 실패를 분류해 보완했다. 현행 팩으로 재사용하는 PLT-12·OBS-01·REQ-04 EXAMPLE 생산자가 실제 POL 행의 새 해시를 쓰고, copy 결정/원 inventory 해시를 고정하도록 입력을 맞췄다. OBS-06 시험 subjects는 현재 봉인된 POL Ref를 사용한다. 파일 변경 회귀의 설정 키를 실제 `input_validation`으로 고치고 CSV의 빈 필드를 생성기와 같은 표현으로 맞췄다. 원 assert·FAIL/UNKNOWN 기대·기존 파생 팩 입력은 보존했다.

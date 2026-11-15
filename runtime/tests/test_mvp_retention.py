@@ -359,7 +359,7 @@ def test_a5_append_before_delete_preserves_the_whole_cross_file_request(tmp_path
 
 def test_a5_final_appended_to_started_before_age_deletion_keeps_both(tmp_path, monkeypatch):
     store = JsonlStore(tmp_path / "gateway_records.jsonl")
-    started = {"phase": "started", "request_id": "active", "recorded_at": iso(10)}
+    started = {"phase": "started", "request_id": "active", "recorded_at": iso(10 / 1440)}
     final = {"phase": "final", "request_id": "active", "recorded_at": iso(0)}
     store.append(started)
     JsonlStore(tmp_path / "observations.jsonl").append({"observed_at": iso(10)})
@@ -524,7 +524,6 @@ def test_d1_new_request_row_in_previously_empty_journal_protects_receipt(tmp_pat
     assert not result["deleted"]
 
 
-@pytest.mark.xfail(strict=True, reason="D-2")
 @pytest.mark.parametrize("reason", ["age", "size"])
 def test_d2_sixty_day_started_only_request_expires_normally(tmp_path, reason):
     store = JsonlStore(tmp_path / "gateway_records.jsonl")
@@ -540,7 +539,7 @@ def test_d2_sixty_day_started_only_request_expires_normally(tmp_path, reason):
 
 @pytest.mark.parametrize(
     "seconds,protected",
-    [(3599, True), (3600, True), pytest.param(3601, False, marks=pytest.mark.xfail(strict=True, reason="D-2"))],
+    [(3599, True), (3600, True), (3601, False)],
 )
 def test_d2_inflight_protection_has_an_inclusive_one_hour_boundary(tmp_path, seconds, protected):
     store = JsonlStore(tmp_path / "gateway_records.jsonl")

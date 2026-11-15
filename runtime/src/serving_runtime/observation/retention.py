@@ -24,6 +24,7 @@ HOLD_SCHEMA = "runtime-retention-hold/1.0"
 RUN_SCHEMA = "runtime-retention-run/1.0"
 DEFAULT_MAX_AGE_DAYS = 7
 DEFAULT_MAX_BYTES = 5 * 1024**3
+INFLIGHT_GRACE = timedelta(hours=1)
 
 
 @dataclass(frozen=True)
@@ -103,6 +104,7 @@ class _Unit:
     classified: bool
     started: bool = False
     final: bool = False
+    last_started: datetime | None = None
     run_ids: frozenset[str] = frozenset()
 
     def note(self, managed, record, *run_ids):
@@ -110,8 +112,20 @@ class _Unit:
             if isinstance(value, str) and value:
                 self.run_ids |= {value}
         if managed.name == "gateway_records.jsonl" and isinstance(record, dict):
-            self.started = self.started or record.get("phase") == "started"
+            if record.get("phase") == "started":
+                self.started = True
+                stamp = _parse_time(record.get("recorded_at"))
+                if stamp is not None and (self.last_started is None or stamp > self.last_started):
+                    self.last_started = stamp
             self.final = self.final or record.get("phase") == "final"
+
+    def in_progress(self, now):
+        return (
+            self.started
+            and not self.final
+            and self.last_started is not None
+            and timedelta(0) <= now - self.last_started <= INFLIGHT_GRACE
+        )
 
 
 class RecordRetention:
@@ -269,7 +283,7 @@ class RecordRetention:
                 and unit.classified
                 and unit.newest is not None
                 and unit.newest < cutoff
-                and not (unit.started and not unit.final)
+                and not unit.in_progress(now)
             ):
                 removal[key] = "age"
 
@@ -284,7 +298,7 @@ class RecordRetention:
                     and unit.classified
                     and unit.newest is not None
                     and key not in removal
-                    and not (unit.started and not unit.final)
+                    and not unit.in_progress(now)
                 ),
                 key=lambda item: item[0],
             )

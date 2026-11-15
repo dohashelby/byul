@@ -1,3 +1,9 @@
+## 2026-11-15 — 후보 REQ-10 소스·값 소비·원 receipt 정합 통합
+
+- 한 일: 집중 검토한 a0353d87→a00c4780→0efde02의 후보 REQ-10을 통합했다. 이미지·serving/input/worker/batch 9개 정확 파일과 준비 자산·V1 환경을 전후 대조한다. 생략한 sampling 값을 추정하지 않고 실제 API 정규화 값→runner→sampler를 같은 요청 HMAC으로 대조한다. 값 누락/차이는 처음 쓰는 준비 receipt와 capture·최종 B projection에 같은 공백으로 남겨 소비 완료를 보류한다. 기존 0.31 동작·기준 W5 관문·판정·과거 source/영수증은 보존한다.
+- 테스트 결과: 이번 source의 CI 결과는 아직 없다. 앞선 76706626의 CPython3.12.8 추가 회귀는 startup 양성 자격 9개 실패·84 passed(5.32초·부모5.949초)였다. fixture의 AST 재구성을 제거하고 원본 전체 source에서 컴파일한 변경 없는 함수 code 객체를 써 엄격한 자격 비교를 유지했다. 기존 기대·고정값·ABI gate를 완화하지 않았다. 로컬 Python/pytest는 실행하지 않았다.
+- 다음 단계: 이 통합 source의 Linux CI를 확인하고 실패를 고친다. startup의 실제 소유 journal/profile31 연결과 기준 cache/slot의 판본 의미 연결은 독립 worktree에서 계속한다. 준비·EXAMPLE·CI는 GPU 실측·등록·공식 PASS가 아니다.
+
 ## 2026-11-15 — M-A6 profiler 호환 보완·기준 startup 원관측 연결
 
 - 한 일: #284의 통합 head3afd4859에서 나온 기존 profiler packet 호환성, 형식이 잘못된 profile 조회, 회귀 writer fixture 연결을 보완했다. 기존 음성 기대/assert를 유지한다. 후보의 실제 wrapper·worker·API 정확 소스 bytes를 고정 자료로 넣고 두 번의 start/stop 객체 재사용과 시작/정지/출력 실패 기록을 실제 소비기에 넣는 회귀를 추가했다. 원 센서 /12·/15 bytes는 보존한다.

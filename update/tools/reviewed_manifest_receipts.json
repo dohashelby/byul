@@ -360,6 +360,11 @@
       "manifest_sha256": "0e7250d534830e07fafd93d334e251776b9e3449be32739e7b246029ffc79fb1",
       "reviewed_by": "Codex / MA6 candidate REQ10 worker file pins and immutable receipt review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T12:49:10Z"
+    },
+    {
+      "manifest_sha256": "892700fbe779d80dd65f3052cdafb8d65fc7a90b839493abbf2e32b124659ec0",
+      "reviewed_by": "Codex / reviewed candidate REQ10 nine-file preflight and immutable sampling consumption receipts; profiler and startup fixture integration; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T12:51:40Z"
     }
   ]
 }

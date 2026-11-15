@@ -370,6 +370,16 @@
       "manifest_sha256": "22cef4042bf33d39c7e7096de405aaf52a0e4418d00f53189e58aac122f26618",
       "reviewed_by": "Codex / focused startup31 private-source and process journal/capture review after request-free privacy repair; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T13:00:00Z"
+    },
+    {
+      "manifest_sha256": "bcf7d0f0b916d2cfa207a75322acab5d9bfe2a867c9ee24bc854ead8ca1c9aa4",
+      "reviewed_by": "Codex / MA6 baseline V1 exact cache and slot source-row self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T12:59:18Z"
+    },
+    {
+      "manifest_sha256": "d08c5feaa144078482e52f519a009dfac3908bed42dd48185e01ab66d436251c",
+      "reviewed_by": "Codex / MA6 REQ-17 native control-hit focused review fix; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T13:03:02Z"
     }
   ]
 }

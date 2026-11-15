@@ -3019,3 +3019,11 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 다음 단계: 집중 검토 후 Linux CI에서 정확 producer/consumer 결합과 후보 전송을 검증한다. W5 구조화 출력 GPU 실험, 후보 실제 GPU/생산자 등록은 남는다. 이 값 연결은 전체 REQ-10 PASS가 아니다.
 - 후속 검토 수정: 요청에 없는 temperature/top_p를 0/1로 가정하지 않는다. API가 실제로 정규화한 값을 runner·sampler와 대조하고, 값 누락/차이를 B 최종 projection 공백과 `runner_consumption_verified=false`로 연결했다. 후보 mock 기본값1·비기본값·sampler 반례와 이전 0.30.0 비노출 assert의 승인된 V5 변경을 추가했다. 로컬 Python/pytest는 계속 실행하지 않았다.
 - 고정값/receipt 검토 수정: 후보 worker `gpu_model_runner`·`gpu_input_batch`의 정확 설치 bytes SHA를 추가해 9개 파일을 Pod 전후 대조한다(깨끗한 ced6857 태그·원 fixture·ma6 후보표 일치). sampling 값 불일치 공백은 준비 receipt가 쓰이기 전에 projection에 반영하고, 최종 capture/B 소비와 같은 공백을 남긴다. 로컬 Python/pytest는 실행하지 않았다.
+
+## 2026-11-15 — M-A6 기준 0.7.0 V1 cache/slot 정확 소스 관측 (로컬 검토)
+
+- 한 일: 깨끗한 5204ff5c 소스와 기존 fixture의 bytes가 일치하는 KV cache manager·InputBatch 두 파일의 정확 SHA 행을 callback 소스 후보에 추가했다. 0.7.0의 평면 2원 cache 반환과 `None`을 반환하는 자리 배정을 실제 소스 형태로 읽어 기존 `computed_rows`/cache timing 및 `project_slot` 소비자에 연결했다. 요청·block 식별은 세션 키 지문만 남기고 token IDs는 읽지 않는다. 기존 0.31.0 소스/분기와 판정 기준은 유지했다.
+- 관측 경계: cache salt와 인증 주체 결합은 없으며 REQ-15 전체 의미가 미검증이다. 자리 이동 `condense`와 V1 sampler의 제한 실제 소비는 보지 못해 REQ-18 재사용과 제한 집행은 후보/UNKNOWN이다. REQ-19/20의 V2/graph 의미도 열지 않는다. GPU 생산자 등록·실측은 없다.
+- 테스트 결과: 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 정확 fixture 소스 몸체의 기본/소스 불일치 경로를 기존 소비자에 전달하는 새 회귀 시험은 CI에서 검증한다. 로컬에서는 shell SHA·diff 검사만 한다.
+- 다음 단계: 집중 소스 검토 후 CI에서 실제 반환 형태·보수적 투영·기존 프로필 회귀를 확인한다.
+- 집중 검토 후속: REQ-17에서 cache 비활성화의 정확 원 생산자 0-token 행을 기존 timing 소비자에 전달해 빠른 대조만으로 정상/전체 범위가 되는 공백을 막았다. control-present의 native 적중이 확인되지 않으면 UNKNOWN으로 남긴다. CI 실행 전이다.

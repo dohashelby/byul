@@ -1063,3 +1063,11 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 승인된 후보 0.30.0 LIF-03/04·14은 `/25` 정확 행과 원본 stream/profiler 센서 사본을 조합한다. `/29` Uvicorn 정확 설치 bytes는 기존 관측기 행과 일치한다. `/30` profiler wrapper·worker는 후보 정확 행으로 선택하고 router는 기존 행을 쓴다. 원본 profiler 코드는 qualified `_start` RETURN마다 새 generation을 만들므로 backend 객체 재사용만으로 세대를 합치지 않는다. 판정/수락/독립 backend·trace·RPC 검증은 유지하며 실제 GPU 생산자 등록은 미완료다.
 
 새 variant는 `/28`의 비공개 세션 키 검증 원본을 정확 SHA 자산으로 요구한다. 새 profile의 ASGI/stream/HTTP trial 요청 식별자는 header HMAC이고, 원본 native 센서가 생성한 요청-ID SHA는 저장 전에 별도 `legacy-request-sha` 도메인의 HMAC으로 바꾼다. 키 또는 확장 검증 실패는 관측 hook 미설치/요청 미전송으로 처리한다. 모델·코드·파일 해시는 해당 요청-ID 변환 대상이 아니다. 기존 `/12`·`/15` source 및 profile 결과는 그대로다.
+
+## 2026-11-15 — M-A6 기준 V1 cache/slot 관측 범위
+
+0.7.0 V1의 정확 `KVCacheManager.get_computed_blocks` 소스는 평면 block 목록과 계산 token 수의 2원 반환을 쓴다. 요청의 비공개 `_kv_block_hashes` 평문 list에서 각 `BlockHashType.hash_value`만 유계로 읽어 기존 세션 키 지문으로 남긴다. 공개 `ConstantList` 속성, token IDs, 원 요청 ID는 관측기가 읽거나 저장하지 않는다. 기존 0.31.0의 3원/group 반환 처리는 유지한다.
+
+0.7.0 `InputBatch.add_request`는 `None`을 반환하므로 정확 소스의 호출 후 `req_id_to_index`와 `req_ids`가 일치하는 자리만 관측한다. `condense` 이동은 관측하지 않아 같은 번호는 재사용 후보이며 REQ-18 전체 범위/위반 근거가 아니다. cache salt·인증 주체 결합이 없으므로 REQ-15 전체 결합도 검증되지 않는다. V1 `allowed_token_ids`는 sampler 실제 소비 근거가 없어 제한 집행으로 간주하지 않는다. REQ-19/20 V2/graph 의미는 이 소스 행으로 개방하지 않는다. 새 행은 소스 선택 후보이며 GPU/생산자 등록이나 실측 PASS가 아니다.
+
+REQ-17의 빠른 control timing만으로 cache가 켜졌다고 추론하지 않는다. 모든 control-present 표본에 qualified native cache 적중이 있어야 정상 대조의 검출력이 검증되며, 기본 cache 비활성화에서 나온 정확 0원 반환은 전체 범위와 정상 판정을 열지 않는다.

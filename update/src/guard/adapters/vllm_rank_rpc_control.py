@@ -23,6 +23,8 @@ ARM_FIELDS = frozenset({'schema', 'session', 'image', 'settings_sha256', 'assets
     'initial_capture_sha256'})
 CONTEXT_FIELDS = frozenset({'pid', 'start_ticks', 'uid', 'boot_sha256', 'pid_namespace',
     'time_namespace', 'time_offsets_sha256'})
+PRODUCT_FIELDS = frozenset({'schema', 'session', 'environment_ref', 'target_sha256',
+    'prepared_sha256', 'pod_uid', 'container_id', 'restart_count'})
 
 
 class NativeLabFault(RuntimeError):
@@ -64,11 +66,42 @@ def clock(value):
     return {k: value[k] for k in ('boot_sha256', 'time_namespace', 'time_offsets_sha256')}
 
 
+def product_binding(value, session):
+    """사전 결합의 닫힌 형식만 검사한다. 현재 클러스터나 생산자 인증을 주장하지 않는다."""
+    if (type(value) is not dict or set(value) != PRODUCT_FIELDS
+            or value['schema'] != 'guard-rank-rpc-product-binding/1'
+            or type(session) is not str or re.fullmatch('[0-9a-f]{32}', session) is None
+            or value['session'] != session
+            or not all(fingerprint(value[k]) for k in ('target_sha256', 'prepared_sha256', 'container_id'))
+            or type(value['pod_uid']) is not str
+            or re.fullmatch('[A-Za-z0-9_.-]{1,128}', value['pod_uid']) is None
+            or type(value['restart_count']) is not int or not 0 <= value['restart_count'] < 2**63):
+        raise ValueError('RANK_RPC_PRODUCT_BINDING_INVALID')
+    ref = value['environment_ref']
+    if (type(ref) is not dict or set(ref) != {'kind', 'id', 'revision', 'sha256'}
+            or ref['kind'] != 'ENV' or type(ref['id']) is not str
+            or re.fullmatch('ENV-[A-Za-z0-9_.-]{1,124}', ref['id']) is None
+            or type(ref['revision']) is not int or not 1 <= ref['revision'] < 2**63
+            or not fingerprint(ref['sha256'])):
+        raise ValueError('RANK_RPC_PRODUCT_BINDING_INVALID')
+    return value
+
+
 class Control:
     def __init__(self, settings, settings_sha256, profile, emit, recheck):
         self.settings, self.settings_sha256, self.profile = settings, settings_sha256, profile
         self.key = bytes.fromhex(settings['key'])
         self.emit, self.recheck = emit, recheck
+
+    def product_binding(self):
+        """ARM 전에 별도로 공급한 서명 파일과 기동 시 전달된 예상 Pod 범위를 요구한다."""
+        value, _ = self.read('control-product-binding.json')
+        product_binding(value, self.settings['session'])
+        if (value['pod_uid'] != os.environ.get('GUARD_POD_UID')
+                or value['container_id'] != os.environ.get('GUARD_CONTAINER_ID')
+                or str(value['restart_count']) != os.environ.get('GUARD_RESTART_COUNT')):
+            raise ValueError('RANK_RPC_PRODUCT_OWNER_MISMATCH')
+        return value
 
     def _directory(self):
         directory = base._open_directory(self.settings['output_dir'])
@@ -188,7 +221,13 @@ class Control:
         return records
 
     def _arm(self, arm, proof, now):
-        if type(arm) is not dict or set(arm) != ARM_FIELDS or arm['schema'] != 'guard-rank-rpc-arm/1':
+        if type(arm) is not dict:
+            raise ValueError('RANK_RPC_CONTROL_ARM')
+        if arm.get('schema') == 'guard-rank-rpc-arm/2':
+            product_binding(arm.get('product_binding'), self.settings['session'])
+            if set(arm) != ARM_FIELDS | {'product_binding'} or arm['product_binding'] != self.product_binding():
+                raise ValueError('RANK_RPC_PRODUCT_BINDING_MISMATCH')
+        elif set(arm) != ARM_FIELDS or arm.get('schema') != 'guard-rank-rpc-arm/1':
             raise ValueError('RANK_RPC_CONTROL_ARM')
         if (arm['session'] != self.settings['session'] or arm['image'] != self.settings['image']
                 or arm['settings_sha256'] != self.settings_sha256

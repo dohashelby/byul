@@ -1,5 +1,20 @@
 # M-A3 rank-fault 후보 생산자
 
+## 최신 main 통합과 PR 작성자의 다음 작업 (2026-11-15)
+
+#276은 #275·#277이 병합된 main `77bc05a3`에 맞춰 통합했다. ARM/2 사전 결합과 미등록 공통 부분 입력의 생성/검증에 이어 `rank_failure:common-input`의 LIF-08 파일 소비·양쪽 제품 비교·정확 EVD→RES→RPT 왕복까지 구현했다. 파일 소비는 엔진 실행이 아니며 부분 입력의 ABORTED·UNKNOWN과 기존 독립 FAIL을 보존한다. #278에는 실제 파일 조립 도구가 별도로 있다. 전체 TP2 수락·새 V1 GPU 자격·등록 완료를 뜻하지 않으며, 원 준비 보고서와 여섯 ARM/1 GPU 사례는 당시 source에 귀속한 채 보존한다.
+
+`bb14f094`의 PR 전체 시험은 candidate/death 입력 생성 중 CONTROL_READY 원 snapshot이 없는 사례1건으로 실패했다. READY 파일을 먼저 저장한 source가 snapshot을 닫기 전에 actor의 SIGKILL을 받을 수 있는 순서 경쟁이다. actor는 이제 같은 CALL·상위 프레임·대상 세대·nonce·ARM/READY 해시·정확 source의 닫힌 CONTROL_READY snapshot을 확인해야 동작한다. 기존 ARM 기한 안에서만 기다리며 누락/중복/범위 불일치는 장애 적용 없이 거부한다. 판정·물리 신호/해제 증명·등록 조건은 유지한다.
+
+작성자가 이어갈 순서는 다음과 같다.
+
+1. **제품 연결의 최신 CI 확인:** 구현된 LIF-08 소비와 #278 조립 도구를 중복 구현하지 않는다. READY 경쟁 수정 후 확정 head의 Linux 전체 시험·기존 실제 소유 자식 신호 시험과 제품 왕복을 확인한다. 파일 검증의 통과를 실제 엔진 자격으로 올리지 않는다.
+2. **기준 V1의 RPC 관측 자격:** main은 기준·후보 모두 V1 선택이다. 기존 `v0-task-queue` 행과 기준 V0 GPU 기록을 초기 V1의 자격으로 넘기지 않는다. 기준 V1의 정확 RPC/worker 경계·요청 연결·소스 bytes/함수 본문·Python ABI를 대조하고 필요한 adapter 데이터를 검토한다. 후보의 자격도 해당 정확 소스에 한정한다.
+3. **남은 사건의 원 근거 연결:** TP2 전체 인과 그룹, 탐지·같은 영향 요청의 상위 전달·정책 기한, 같은 소유 범위의 해제/복구 근거를 연결한다. 현재 `fault_applied`/일부 `fault_released`만으로 `detected`/`client_delivered`/`recovered`나 complete를 채우지 않는다. 별도 communication-stall 분기와 death의 복구 의미도 각각 검증한다.
+4. **새 입력과 J01 검증:** 병합 후 확정 source의 새 prepared/독립 세션과 현재 V1 ENV·target을 만들고 ARM 전에 제품 입력을 결합한다. 승인된 실제 GPU 범위에서 기동 전 자격·정상 요청을 확인한 뒤 새 ARM/2 원 기록을 수집해 공통 입력과 제품 결과를 대조한다. 정확 이미지/판본/producer source의 검증을 마친 뒤에만 등록을 검토한다. 과거 ARM/1을 새 제품 입력으로 사후 귀속하지 않는다.
+
+이번 통합은 새 GPU/클라우드 실행이나 M-B4 재개를 수행하지 않는다. main 통합 시 SDK14개 자산은 통합 전 #276과 동일했지만, 후속 READY 경쟁 수정으로 actor bytes가 바뀌었다. 과거 준비물/원자료는 보존하고 실제 실행용 준비물은 최종 병합 소스로 다시 만들어야 한다. 새 소스 고정 목록은 기존 준비물의 실행 자격을 갱신하지 않는다.
+
 ## 두 이미지의 실제 IPC 기동 관측 (2026-11-14)
 
 후속 PR #271의7e49f608/source7c225d4e 준비 자산을 동일 승인 GPU 노드에 설치했다. 두 판본 모두 TP2 모델 로드·GPU2개·정상 HTTP200을 확인했다. 기준/후보 각3개의 닫힌 snapshot을 회수했고 정확 준비 자산·ABI/설치 파일/원 함수 본문·HMAC 대조에서 공백0개였다. [원자료 요약](ma3-image-qualification-20261114.json)의 후속_GPU_IPC_관측에28,565 bytes ZIP과10개 파일의 크기/SHA를 기록했다. 비밀 settings/키는 공개 요약에 넣지 않았다.
@@ -127,3 +142,38 @@ Pod 안 actor는 정상 요청과 실제 초기 IPC/객체 연결을 먼저 확�
 | 후보 | STOP/CONT·HTTP200 | 원 RPC 경계 예외·HTTP500 | pidfd SIGKILL/EXITED·HTTP500 | 정상 요청200·새 Pod/세대 |
 
 여섯 사례의 원자료 대조 gap은 0이다. 전체 TP2 그룹 수락·탐지/상위 전달 기한·공통 판정 입력 연결·생산자 등록·M-A3 전체 완료는 남아 있으며 scope_complete/source_authenticated/engine_group_verified/producer_registered=false다. 같은 PID namespace inode 숫자가 재사용된 경우도 있으므로 Pod UID·PID/start ticks·전체 namespace/boot 문맥을 함께 대조한다.
+
+## 제품 입력 사전 결합 후속 (2026-11-15)
+
+`tools/rank_rpc_product_binding.py`는 현재 정확 검토 소스의 준비 자산과 sealed ENV·제품 target을 대조해 private `guard-rank-rpc-product-binding/1`을 새 디렉터리에 만든다. ENV의 정확 Ref·target 정규 JSON SHA·prepared manifest bytes SHA·세션·Pod UID·정규 container ID·restart count를 settings의 세션 키 HMAC에 묶는다. ENV는 MVP 표의 해당 이미지/엔진/판본, TP2/PP1/DP1·GPU 두 개 이상이어야 하며 target의 ENV Ref·이미지·실제 범위 필드가 일치해야 한다. 과거 SDK bytes·잘못된 hash·symlink·기존 출력 덮어쓰기는 거부한다. 비밀 키를 반환하거나 출력하지 않는다.
+
+actor의 `--for-common-input`은 정상 calibration 전에 별도로 공급한 `control-product-binding.json`을 요구한다. 기동 시 외부에서 제공하는 `GUARD_POD_UID`, 정규 `GUARD_CONTAINER_ID`, 십진 `GUARD_RESTART_COUNT`와 정확 대조하고 ARM/2·lab target/2 안에 같은 결합을 넣는다. source control은 원 CALL을 멈추기 전에 독립적으로 같은 서명 파일과 기동 범위를 재대조한다. 이는 외부 예상값의 결합이며 현재 Kubernetes 소유권·생산자 인증의 증명이 아니다. 실제 기동 전 현재 Pod 조회/자격 관문은 여전히 필요하다. 기존 ARM/1 lab 재생·nonce/원 프레임/요청/시계·물리 신호/lease 관문은 유지한다.
+
+후속 변환기의 선행 조건인 `require_case_binding()`은 ARM/2·target/2·외부 예상 결합·target 정규 해시를 요구한다. 이 함수만으로 HMAC/원 snapshot/물리 영수증/판정 자격이 검증된 것은 아니다. 기존 여섯 GPU 사례는 ARM/1이므로 제품 ENV/target을 사후 붙이지 않고 `RANK_RPC_PRODUCT_BINDING_REQUIRED`로 거부한다. 여섯 실제 기록과 기존 부분 대조는 원 소스에 그대로 귀속한다.
+
+이번 준비 도구는 네트워크·기동·장애 주입·공통 입력 생성·생산자 등록을 하지 않는다. 성공 시에도 live_target_verified/input_preflight_passed/engine_executed/scope_complete/producer_registered는 false다. CPU 시험은 EXAMPLE 입력과 시험 소유 자식만 사용한다. 새 SDK의 실제 GPU 실행·제품 rank-fault 사건 변환·TP2 인과 그룹·탐지/상위 전달 기한·새 소유자 복구 수락·등록은 미완료다. M-B4는 보관하고 기존 native24 TP1/같은 소유자 복구 고정값·판정 기준·등록표를 넓히지 않는다.
+
+새 미결합 준비물6개와 기존 원자료 재검증은 [현재 준비 보고서](ma3-product-binding-preparation-20261115.json)에 구분했다. 직접151개·기준 이미지 Python ABI95개가 통과했고 기존6사례/329개 원 기록의 gap0과 제품 사후 결합 거부를 확인했다. 새 소스의 실제 엔진 실행은 없다.
+
+## RPC 공통 부분 입력 후속 (2026-11-15)
+
+`vllm_rank_ipc_capture`로 기존 도구의 원 snapshot 검증3함수를 AST 동일하게 옮기고 도구의 import API를 유지했다. 제품 adapter/collector가 개발 도구에 의존하지 않게 했다. 엔진에 넣는 SDK14파일·기존 source 고정값·등록표는 이 이동으로 바뀌지 않는다.
+
+`vllm_rank_rpc_input`과 미등록 `rank_rpc_fault_producer`는 외부 예상 ENV/target/prepared/session/Pod 범위, ARM/2 사전 결합, 모든 선택 제어 HMAC·claim·READY, 정확 원 CALL/상위 프레임·worker·요청 HMAC, 별도 물리 영수증·단조 시계를 대조한다. 전체 근거가 맞는 장애 적용만 `fault_applied`로, 지연의 실제 STOP/CONT와 같은 원 CALL의 SOURCE RELEASE가 모두 있는 경우만 `fault_released`로 변환한다. 기존 metadata/정책의 delay/death/exception 이름을 그대로 보존하며 별도 communication-stall 분기를 대신하지 않는다. 공통 `/1`·`/4`와 기존 수락 기준을 유지한다.
+
+HTTP200/500은 클라이언트 구성요소 관측으로만 기록한다. 현재 원 관측으로 탐지/상위 전달/복구의 전체 인과 경로가 증명되지 않아 detected/client_delivered/recovered를 만들지 않는다. 다른 원 기록의 gap과 SOURCE RELEASE 부재는 확인된 적용 사실과 함께 공백으로 보존한다. 죽은 프로세스의 SIGCONT/해제는 허용하지 않는다. 모든 source_ended/scope_complete/인증/그룹/등록은 false다. 같은 신원을 시험 중 임시 등록해도 누락된 사건·불완전 근거 때문에 complete가 될 수 없다. 실제 등록표에는 추가하지 않는다.
+
+`tools/rank_rpc_fault_inputs.py`는 현재 소스의 sealed ENV·target과 새 준비물을 먼저 검증한 뒤 새 디렉터리에 `common-input.json`·변환 요약을 만든다. 기본은 `/4`이며 예시 ENV는 EXAMPLE로 남긴다. 변환 자체를 새 엔진 실행/실환경 사전 점검/제품 EVD·RES·RPT 생성으로 세지 않는다. 기존 ARM/1 GPU 여섯 사례에는 실제 새 제품 입력을 사후 붙이지 않는다. 현재 실환경 수집·전체 TP2 인과 그룹/기한·같은 소유자 복구 수락·새 소스 GPU 대조·등록은 계속 미완료다.
+
+최종 host 변환은 직접187개·기준 이미지 Python ABI131개·현황/경로/소스552파일 관문을 통과했다. [후속 미결합 준비물](ma3-rpc-common-preparation-20261115.json)은 엔진 SDK14 bytes가 앞선 후보와 같으며 새 host 변환 신원과 미완료를 구분한다. 실제 ARM2 원 기록의 제품 부분 입력·전체 M-A3 완료는 아직 없다.
+
+## 제품 파일 소비 경로 후속 (2026-11-15)
+
+기존 rank_failure 실행기 구현에 `common-input` 파일 소비 경로를 연결한다. 설정의 `input_mode="common-records"`는 명시적으로 파일만 소비하며 lab_activation/record_attestation과 섞지 않는다. 기존 Kubernetes native 경로/소스 자격·현재 팩·판정 규칙은 그대로다. 실행 결합은 이 경로에서 선언 JSON 준비물의 정규 해시를 계산하고 기존 ENV/target/유효 기간/정책 검사를 유지한다.
+
+기존 공통 소비 기반에 LIF-08/rank-fault를 연결해 정확 공통 기록과 소스 지문·공백·위반 후보를 EVD artifact/activation_steps에 보존한다. 현재 owner·준비물 runtime·원 관측시각·모든 rank 정상/상위 전달은 미확인으로 남기며 `activation_scope_complete=false`다. 파일 소비 자체는 실제 엔진 요청이 아니고 출처는 EXAMPLE 또는 최대 DECLARED다. 새 기록의 위반 후보를 확인된 보안 FAIL로 바꾸지 않으며 기존 독립 FAIL은 보존한다. 이 경로의 EVD→RES→RPT는 UNKNOWN이며 실제 GPU 실행/수락/등록을 대신하지 않는다.
+
+
+제품 파일 소비 경로와 새 main의 점검별 설정 통합 후 직접200개가 통과했다(pytest41.56초·벽시계41.876초). 팩 필수 관측만 EVD에 남기는 기존 규칙을 유지하며, 출처 표시는 `activation_steps`와 원 기록 artifact에 남는다. 새 전체 CI는 미실행이다. [현재 후속 준비물6개](ma3-rpc-product-preparation-20261115.json)는 새 소스 목록에 결합했지만 미실행/미결합이다.
+
+#277의 결정14 변경을 반영해 이후 선택 엔진은 두 쪽 V1이다. 과거 기준 V0 GPU 결과와 예외는 이력이며 새 V1 자격으로 이월하지 않는다. SDK bytes가 앞선 후보와 같다는 사실은 선택 모드의 함수/정확 핀·GPU 자격을 증명하지 않는다. 현재 owner/엔진 모드·새 ARM2 실제 기록·TP2 정상/탐지/상위 전달/복구 수락·등록은 남아 있다. M-B4는 보관한다.

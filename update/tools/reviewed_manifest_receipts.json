@@ -220,6 +220,56 @@
       "manifest_sha256": "461087ef808a63c8c9784d9178c2406bca141237b46f0fef50393cf5895f5858",
       "reviewed_by": "Codex / PR277 J02 and preflight fixes; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T16:05:40.445204+09:00"
+    },
+    {
+      "manifest_sha256": "e0c39ae8c9ee74b9d7de31315bac5aa1f19317e81ae1ab8da045fbb5fa27cc47",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T05:00:14.968998+00:00"
+    },
+    {
+      "manifest_sha256": "b430e2e6eed8ebb184707b09e2b1f0658a46a1bcaf05d34ed4924f8cf39fc270",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T05:52:26.348460+00:00"
+    },
+    {
+      "manifest_sha256": "352d4f3570ae22aa4c2a325dfb26dd2bccc0122eaeb8c0b762e6df86d849df81",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T05:53:48.050311+00:00"
+    },
+    {
+      "manifest_sha256": "928b3674f7624ee8e0a62964e1531ce615d62f4ebd04f90aa48df01b29b35117",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T06:03:11.298341+00:00"
+    },
+    {
+      "manifest_sha256": "5b38f3226f99fb37fd4771778bb3188071dfafd43de6e9107021645d955e86e8",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T06:08:07.551568+00:00"
+    },
+    {
+      "manifest_sha256": "cbbc57b3e3b05b167509024b357f0abc97b55b2e768f26f71f6ed209d2807d15",
+      "reviewed_by": "Codex / PR276 main integration; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T16:34:59.087578+09:00"
+    },
+    {
+      "manifest_sha256": "9045c7d959031a6b50bb1876ddb2799561a59f107cba080716b25587ee8b407b",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T07:24:25.114622+00:00"
+    },
+    {
+      "manifest_sha256": "44b2efd83ba4131e588e837b01886128c1ef2f87fa841e030e9954c96eead344",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T07:28:36.042272+00:00"
+    },
+    {
+      "manifest_sha256": "ea734eb57a98626f599725ac9d11e5f6483a9fc83439e4abcd0b4bfae88a70be",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T07:38:55.385055+00:00"
+    },
+    {
+      "manifest_sha256": "e8be89b903031631806fde51cf873d84ccb75779665479cd0ff7526f733ba287",
+      "reviewed_by": "Codex / PR276 READY snapshot race review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T17:17:24.504933+09:00"
     }
   ]
 }

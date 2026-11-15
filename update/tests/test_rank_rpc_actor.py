@@ -115,10 +115,15 @@ def test_death_is_exit_and_never_sigcont_release(child, monkeypatch):
 
 
 @pytest.mark.parametrize('kind', ['delay', 'death', 'exception'])
-def test_full_actor_uses_real_source_barrier_and_owned_child_pidfd(configured_control, monkeypatch, kind):
+@pytest.mark.parametrize('bound', [False, True])
+def test_full_actor_uses_real_source_barrier_and_owned_child_pidfd(configured_control, monkeypatch, kind, bound):
     """HTTP만 대역이고 원 RPC/barrier·자식 PID/신호·해제는 실제로 실행한다."""
     from multiprocessing import Pipe
     module, observer, rows, inner, outer, scheduled, control, _ = configured_control
+    product = None
+    if bound:
+        from tests.test_rank_rpc_product_binding import supply
+        product = supply(control, monkeypatch)
     control.profile['request_binding'].update(external_prefix='cmpl-', external_suffix='-0')
     parent, child_end = Pipe()
     worker = os.fork()
@@ -158,7 +163,15 @@ def test_full_actor_uses_real_source_barrier_and_owned_child_pidfd(configured_co
         header, = [p for p, _, _ in records if p['point'] == 'External.header' and p['event'] == 'RETURN']
         calibration = {'proof': proof, 'header_context': header['context'], 'assignment_context': None,
                        'initial_capture_sha256': '9' * 64}
-        result = actor.exercise(control, calibration, 'EXAMPLE-model', kind, {'scope': 'EXAMPLE'}, hold_ms=10)
+        owner = {'scope': 'EXAMPLE'}
+        if bound:
+            owner['pod_uid'] = product['pod_uid']
+        result = actor.exercise(control, calibration, 'EXAMPLE-model', kind, owner, hold_ms=10, product_binding=product)
+        if bound:
+            from tools.rank_rpc_product_binding import require_case_binding
+            assert require_case_binding(result, product) is None
+            signed, _ = control.read('control-case-result.json')
+            assert signed == result and signed['arm']['schema'] == 'guard-rank-rpc-arm/2'
         if kind == 'delay':
             assert result['physical_action']['after_state'] == 'T'
             assert result['physical_resume']['before_state'] == 'T'

@@ -1,3 +1,16 @@
+## 2026-11-15 — #278 최신 main 통합 검토
+
+- 한 일: 사용자 요청으로 #276 병합 main7e8a0900을 #278에 통합하고 PROGRESS의 양쪽 원문을 보존했다. 조립 도구의 정확 파일/정책/ENV·target·prepared·공통 입력 범위, 원 bytes 복사, 실환경 준비 false 경계를 검토했다. 현재 main의 common-input 구현을 실제 조회하는 경로를 확인했으며 이전 준비 보고서와 원자료를 소급 수정하지 않았다.
+- 테스트 결과: CPython3.12.3 입력 조립·계획/사전 점검/준비·설정·실행 결합·READY 회귀·CI 경로107개 통과(pytest14.15초/부모14.310초). 전체 로컬 suite는 실행하지 않았으며 통합 head의 Linux CI로 확인한다. 제품 source는 main과 동일한555파일/e8be89b9 목록이다.
+- 다음 단계/경계: 통합 head를 기존 PR에 push하고 CI 통과 후 #278을 병합한다. #279도 통합·검토하고 1차 완성의 남은 개발/실측/공식 판정 조건을 작업지시서에 갱신한다. 새 GPU·비용·다운로드·M-B4 재개·runtime/contracts·수락 기준 변경은 없다.
+
+## 2026-11-15 — M-A7 입력 조립 후속 PR 생성
+
+- 한 일: 결정39의 push·PR 승인 뒤 기능 검토6167e30d를 일반 push하고 main 대상 [#278](https://github.com/dohashelby/byul/pull/278)을 열었다. 소비 구현을 담은 [#276](https://github.com/dohashelby/byul/pull/276)은 draft 유지다.
+- 테스트 결과: 직접73개·후속25개·EXAMPLE4사례 제품 결합·현황/diff 관문은 통과했다. 새 head 전체 CI는 진행 중이다. 실제 입력/엔진 결과를 만들지 않았다.
+- 다음 단계: 정확 head CI를 확인한다. 소비 구현이 없는 main에서는 조립 도구의 implementation_available와 실행 결합 사전 대조 상태가 false로 남는 의존 관계를 유지한다.
+- 막힌 것: 현재 V1 ENV/target·선택 모드 함수/핀/기동 자격·ARM2 실제 원 기록과 전체 TP2 수락/등록. 새 비용·병합은 별도이며 M-B4 보관.
+
 ## 2026-11-15 — #276 READY 원 기록 저장 경쟁 수정
 
 - 한 일: 최신 원격 bb14f094까지 보존했다. PR 전체 시험에서 candidate/death의 CONTROL_READY 원 snapshot 누락1건을 확인했다. source가 READY 파일을 쓰고 snapshot을 닫기 전에 actor가 SIGKILL할 수 있어, actor가 같은 CALL/상위 프레임·대상 세대·nonce·ARM/READY 해시·정확 source의 검증된 닫힌 snapshot을 확인한 뒤에만 동작하도록 고쳤다. 기존 ARM 기한 안에서 기다리며 누락·중복·불일치는 장애 적용 없이 거부한다. 제품 소비와 #278 파일 조립은 구현된 작업으로 인계 문서를 갱신했다.
@@ -2870,3 +2883,12 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 테스트 결과: CPython3.12.3 두 파일20개·하위 시험6개 통과(pytest17.29초/부모18.867초). AST로 기존 assert 호출 전부와 skip 수가 보존됐음을 대조했다. 별도 작업 트리에서 검증한 두 파일 bytes를 #257에 그대로 반영했고 runtime/src·examples는 같은 기준 tree임을 확인했다. 원 통과/실패 의미·기한·수락 기준은 바꾸지 않았으며 전체 로컬 pytest는 실행하지 않았다. update 제품 소스와 목록 SHA7cdbaac5…도 그대로다.
 - 다음 단계: 승인된 기존 #257 브랜치로 push하고 새 전체 CI 결과를 확인한다. 결정19는 DECISIONS·작업지시서7절에 기록했다.
 - 막힌 것: 새 head CI가 나오기 전에는 #257 전체 통과로 세지 않는다. GPU/클라우드·이미지 레이어·다른 runtime 파일·병합 승인은 없으며 실행하지 않았다. 수정은 두 시험 파일에 한정한다.
+
+
+## 2026-11-15 — M-A7 실제 rank 제품 입력 조립 후속
+- 한 일: #275는 사용자 계정으로 main 병합돼 있음을 확인했다(merge b00e4126). 최신 main #277을 기준으로 새 브랜치를 만들고 실제 ENV/target/prepared/공통 파일/기존 정책의 정확 조립 도구와 미결합 준비물6개의 후속 계획을 추가했다. 정책 원 bytes와 UNKNOWN/부분 관측·미실행 상태를 보존한다. 두 쪽 V1 선택은 기동/함수 자격으로 올리지 않는다. M-B4 보관.
+- 테스트 결과: 도구·기존 파일 사전 점검·rank 계획·경로 직접73개 통과(pytest17.41초·벽시계17.690초). 기존 실제 파일 색인 재대조에서 SUP-08 과거2쪽 파일 결합 유효, M-A 나머지52쪽 파일 부재다. LIF-08 실제2쪽은 별도 부재다. 새 변경의 전체 CI는 아직 없다.
+- 다음 단계: #276 파일 소비 구현과 직접 결합 확인·현황 검사를 마치고 push/새 PR 승인 뒤 원격 CI를 확인한다. 현재 파일이 마련되면 새 디렉터리에 조립하고 실행 직전 실제 기동/owner 자격을 확인한다.
+- 막힌 것: 현재 V1 ENV/target·ARM2 새 원 기록·전체 TP2 그룹/기한/새 세대 복구·GPU 등록. 새 GPU/비용/다운로드와 후속 push/병합은 미승인이다.
+
+- 후속 직접 결합 결과: #276 제품 파일 소비 구현을 포함한 source에서 새 조립 도구의 실행 결합과 select/run/judge/report/verify를 두 쪽×/1·/4의 EXAMPLE4사례로 확인했다(벽시계25.989초). 결과는 EXAMPLE/ABORTED/UNKNOWN이며 실제 엔진/GPU/등록 자격이 아니다. 현황 --check와 최종 경로/기존 materialize25개도 통과(pytest5.86초·부모6.121초). 새 원격 CI는 미실행이다.

@@ -37,3 +37,18 @@ uv run python -m tools.mvp_a_input_preflight --index <실제-파일-색인.json>
 현재 연결은 [준비물 연결 보고서](ma7-rank-input-link-20261115.json)에 있다. 기준·후보 각각 delay/death/exception의 독립 세션3개를 포함한다. 준비 자산 파일 검증과 실제 런타임 자격을 구분하고, ENV/target/ARM2 제품 binding/공통 입력/실제 결과는 null과 미완료 이유로 남긴다. 과거 ARM1 원자료를 사후 제품 입력으로 만들지 않는다. M-B4 관측 개발·새 GPU 기동/비용 승인을 뜻하지 않는다.
 
 실제 현재 환경이 확보되면 M-A3 쪽 준비 도구로 ARM 전에 제품 입력을 결합한 후, 실제 새 원 기록을 미등록 공통 부분 입력으로 변환한다. 전체 TP2 그룹/탐지/상위 전달 기한/복구 수락·등록은 별도 미완료다. 이 도구는 네트워크·엔진·정책 확정을 수행하지 않는다.
+
+
+## LIF-08 제품 파일 입력 조립 (2026-11-15 후속)
+
+`tools/mvp_rank_product_inputs.py`는 현재 sealed ENV·target·prepared manifest·공통 rank-fault 원 파일·기존 LIF-08 정책의 다섯 파일을 요구한다. 해당 쪽의 정확 이미지/판본 표·TP2·ENV Ref·정규 target/prepared 해시·세션·정책 범위/필수 값/실행 결합 소유 키를 검사한 뒤 원 bytes 그대로 복사하고 `guard.toml`을 만든다. 정책의 상태·값·확정자·유효 기간을 채우거나 바꾸지 않는다. `/1`·`/4`의 지원/완전성 공백은 보존한다.
+
+```powershell
+uv run python -m tools.mvp_rank_product_inputs --side <baseline 또는 candidate> --environment <현재-ENV.json> --target <현재-target.json> --prepared <사전결합-prepared-manifest.json> --common-input <새-공통입력.json> --policy <기존-LIF08-정책.yaml> --output <새-출력폴더>
+```
+
+실행기는 `rank_failure:common-input`이다. 현재 main에 그 구현이 없으면 `implementation_available=false`, `run_binding_preflight_valid=false`로 기록한다. #276의 파일 소비 구현을 포함한 소스에서만 실행 결합 사전 대조를 할 수 있다. 이 값도 실환경/엔진 자격은 아니며 `live_target_verified`, `input_preflight_passed`, `ready_for_execution`, `engine_executed`는 항상 false다. 원 기록 수집과 별개인 파일 소비는 최대 DECLARED, EXAMPLE은 그대로 남긴다. 제품 경로에서도 부분 관측은 UNKNOWN이며 전체 TP2 수락/등록을 대체하지 않는다.
+
+[현재 후속 계획](ma7-rank-product-link-20261115.json)에 미결합 준비물6개와 필요한 파일 역할을 연결했다. 실제 ENV/target·ARM2 원 기록·LIF-08 정책 묶음이 없어 실제 입력 조립은 미완료다. 과거 SUP-08 파일의 두 쪽 bytes 결합은 재확인했지만 삭제한 Pod의 과거 구성이고 새 V1 실행 입력이 아니다. 기존 M-A27개54쪽 색인에서 SUP-08 두 쪽만 파일 결합이 유효하고 나머지52쪽은 파일 부재다. LIF-08 두 쪽은 이 기존 M-A 색인의 범위 밖이므로 별도 미완료로 관리한다.
+
+#277의 결정14 변경에 따라 새 실행은 두 쪽 V1을 선택한다. 과거 기준 V0 자료/예외는 이력으로 보존한다. 같은 SDK bytes라도 V1 대상 함수/정확 핀·기동/모드·현재 owner 자격은 별도 확인해야 한다. 새 GPU/클라우드/비용·대용량 다운로드·M-B4 재개는 하지 않았다.

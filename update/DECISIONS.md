@@ -1,3 +1,7 @@
+## 2026-11-15 — PR281 runtime final 저장 경합의 시험 한 파일 예외 승인
+
+사용자는 “시험 한 파일만 예외 승인”으로 답했다. runtime/tests/test_mvp_zeroday_profile.py 두 시험에 해당 요청의 final 저장 완료 확인을 추가한다. 기존 assert37개·상태 코드·필드 값/비밀 비노출·실제 소켓·제품 기한과 runtime 제품 소스/정책/의존성을 보존한다. 구체 검토/미적용 제안 패치는 작업 폴더 PR281_RUNTIME_ZERODAY_REVIEW_20261115.md·PR281_RUNTIME_ZERODAY_PROPOSAL.patch다. 원 실패는 보존하고 runtime의 다른 파일/문서(STATUS 포함)는 이번 한 파일 예외로 확대하지 않는다. 기존 #281의 승인된 CI 원인 보수로 검증 뒤 반영하며 병합·새 비용·M-B4 재개는 제외한다.
+
 ## 2026-11-15 — fresh 요청 연결 push·PR 생성 승인
 
 사용자는 검토 기능6a54db5d·검증 기록4605369e에 대해 “push·PR 생성 승인”으로 답했다. codex/baseline-v1-request-binding-20261115를 main 대상 PR로 공개하고 정확 head CI를 확인한다. 이 승인 기록과 CI 원인 보수는 같은 범위로 잇는다. 병합·새 GPU/비용·M-B4 재개는 포함하지 않는다. worker/그룹·GPU 자격과 생산자 등록의 미완료를 보존한다.

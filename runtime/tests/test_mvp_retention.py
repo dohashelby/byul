@@ -405,3 +405,94 @@ def test_a6_report_projects_and_enforce_measures_success(tmp_path, enforce):
     assert result["over_size_limit_after"] is False
     assert result["deleted"] is enforce
     assert path.read_bytes() == (b"" if enforce else before)
+
+
+@pytest.mark.xfail(strict=True, reason="D-1")
+def test_d1_append_finishes_while_initial_scan_is_paused(tmp_path, monkeypatch):
+    retention = RecordRetention(tmp_path, enforce=True)
+    entered, release, writer_ready, appended = (threading.Event() for _ in range(4))
+    original = retention._scan_file
+    errors = []
+
+    def pause(*args, **kwargs):
+        if not entered.is_set():
+            entered.set()
+            if not release.wait(5):
+                raise RuntimeError("scan release was not signalled")
+        return original(*args, **kwargs)
+
+    def work():
+        try:
+            retention.run(now=NOW)
+        except Exception as error:
+            errors.append(error)
+
+    def write():
+        writer_ready.set()
+        JsonlStore(tmp_path / "gateway_records.jsonl").append(
+            {"phase": "started", "request_id": "during-scan", "recorded_at": iso(0)}
+        )
+        appended.set()
+
+    monkeypatch.setattr(retention, "_scan_file", pause)
+    worker = threading.Thread(target=work)
+    writer = threading.Thread(target=write)
+    worker.start()
+    try:
+        assert entered.wait(2)
+        writer.start()
+        assert writer_ready.wait(2)
+        finished_during_scan = appended.wait(0.75)
+    finally:
+        release.set()
+        worker.join(5)
+        if writer.ident is not None:
+            writer.join(5)
+    assert not errors and not worker.is_alive() and not writer.is_alive()
+    assert finished_during_scan
+
+
+@pytest.mark.xfail(strict=True, reason="D-1")
+def test_d1_late_request_append_is_checked_without_full_rescan(tmp_path, monkeypatch):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    first = {"request_id": "r", "phase": "final", "recorded_at": iso(10)}
+    late = {**first, "recorded_at": iso(0)}
+    store.append(first)
+    retention = RecordRetention(tmp_path, enforce=True)
+    original_scan, original_remove = retention._scan_file, JsonlStore.remove_lines
+    scans = []
+
+    def scan(managed, *args, **kwargs):
+        scans.append(managed.name)
+        return original_scan(managed, *args, **kwargs)
+
+    def append_before_remove(target, lines, **kwargs):
+        store.append(late)
+        return original_remove(target, lines, **kwargs)
+
+    monkeypatch.setattr(retention, "_scan_file", scan)
+    monkeypatch.setattr(JsonlStore, "remove_lines", append_before_remove)
+    result = retention.run(now=NOW)
+    assert store.read_all()[0] == [first, late] and not result["deleted"]
+    assert scans == ["gateway_records.jsonl", "gateway_route_rejections.jsonl", "engine_receipts.jsonl", "observations.jsonl"]
+
+
+@pytest.mark.parametrize("hold_kind", ["request", "run", "invalid"])
+def test_d1_hold_changed_just_before_delete_still_blocks_request(tmp_path, monkeypatch, hold_kind):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    row = {"request_id": "r", "phase": "final", "recorded_at": iso(10), "run_id": "run"}
+    store.append(row)
+    hold = tmp_path / "hold.json"
+    hold.write_text(json.dumps({"schema": HOLD_SCHEMA}))
+    original = JsonlStore.remove_lines
+
+    def change_hold(target, lines, **kwargs):
+        value = {"schema": HOLD_SCHEMA, "request_ids": ["r"]} if hold_kind == "request" else (
+            {"schema": HOLD_SCHEMA, "run_ids": ["run"]} if hold_kind == "run" else {}
+        )
+        hold.write_text(json.dumps(value))
+        return original(target, lines, **kwargs)
+
+    monkeypatch.setattr(JsonlStore, "remove_lines", change_hold)
+    result = RecordRetention(tmp_path, enforce=True, hold_path=hold).run(now=NOW)
+    assert store.read_all()[0] == [row] and not result["deleted"]

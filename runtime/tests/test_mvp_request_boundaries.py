@@ -343,10 +343,10 @@ class ChatStreamBoundTests(unittest.TestCase):
         self.assertEqual(b"".join(client.chunks), b"")
 
     def test_blank_lines_reset_event_budget_and_normal_chunks_remain_unchanged(self):
-        chunks = [b": aa\r\n", b"\r\n", b": bb\n\n", b"data: [DO", b"NE]\n\n"]
+        chunks = [b": aa\r\n", b"\r\n", b": bb\n\n", b'data: {"choices":[{}]}\n\n', b"data: [DO", b"NE]\n\n"]
         with (
-            patch("serving_runtime.gateway.relay._CHAT_SSE_LINE_LIMIT", 16, create=True),
-            patch("serving_runtime.gateway.relay._CHAT_SSE_EVENT_LIMIT", 16, create=True),
+            patch("serving_runtime.gateway.relay._CHAT_SSE_LINE_LIMIT", 32, create=True),
+            patch("serving_runtime.gateway.relay._CHAT_SSE_EVENT_LIMIT", 32, create=True),
         ):
             (decision, outcome, started), client = self.relay(chunks)
         self.assertEqual((decision.result, outcome, started), ("ALLOWED", "completed", True))

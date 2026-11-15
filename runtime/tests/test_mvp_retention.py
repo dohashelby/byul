@@ -570,3 +570,49 @@ def test_d2_latest_started_timestamp_controls_the_grace_period(tmp_path):
     store.append(old)
     result = RecordRetention(tmp_path, max_bytes=1, enforce=True).run(now=NOW)
     assert store.read_all()[0] == [recent, old] and not result["deleted"]
+
+
+@pytest.mark.xfail(strict=True, reason="D-1")
+def test_d1_append_finishes_while_file_removal_plan_is_paused(tmp_path, monkeypatch):
+    from serving_runtime.observation import retention as module
+
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    store.append({"request_id": "expired", "phase": "final", "recorded_at": iso(10)})
+    entered, release, ready, appended = (threading.Event() for _ in range(4))
+    original_sorted = sorted
+    errors = []
+
+    def pause_plan(*args, **kwargs):
+        if not entered.is_set():
+            entered.set()
+            if not release.wait(5):
+                raise RuntimeError("plan release was not signalled")
+        return original_sorted(*args, **kwargs)
+
+    def retain():
+        try:
+            RecordRetention(tmp_path, enforce=True).run(now=NOW)
+        except Exception as error:
+            errors.append(error)
+
+    def append():
+        ready.set()
+        store.append({"request_id": "during-plan", "phase": "started", "recorded_at": iso(0)})
+        appended.set()
+
+    monkeypatch.setattr(module, "sorted", pause_plan, raising=False)
+    worker, writer = threading.Thread(target=retain), threading.Thread(target=append)
+    worker.start()
+    try:
+        assert entered.wait(2)
+        writer.start()
+        assert ready.wait(2)
+        finished_during_plan = appended.wait(0.75)
+    finally:
+        release.set()
+        worker.join(5)
+        if writer.ident is not None:
+            writer.join(5)
+    assert not errors and not worker.is_alive() and not writer.is_alive()
+    assert finished_during_plan
+    assert store.read_all()[0][0]["request_id"] == "during-plan"

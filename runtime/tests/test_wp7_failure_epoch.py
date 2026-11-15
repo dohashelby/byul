@@ -9,7 +9,7 @@ import pytest
 
 
 def test_failure_epoch_and_cumulative_costs(tmp_path, monkeypatch):
-    root = Path(__file__).resolve().parents[1] / "project-context/refactor-2026-11/wp7"
+    root = Path(__file__).resolve().parents[1] / "labtools/wp7"
     monkeypatch.syspath_prepend(str(root))
     spec = importlib.util.spec_from_file_location("wp7_failure_epoch", root / "execute_from_mac.py")
     module = importlib.util.module_from_spec(spec)

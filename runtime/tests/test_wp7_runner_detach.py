@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def launch(directory, worker):
-    tree = ast.parse((ROOT / "project-context/refactor-2026-11/wp7/execute_from_mac.py").read_text())
+    tree = ast.parse((ROOT / "labtools/wp7/execute_from_mac.py").read_text())
     node = next(
         node
         for node in ast.walk(tree)

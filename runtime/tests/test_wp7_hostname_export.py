@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def exporter(monkeypatch):
-    root = Path(__file__).resolve().parents[1] / "project-context/refactor-2026-11/wp7"
+    root = Path(__file__).resolve().parents[1] / "labtools/wp7"
     monkeypatch.syspath_prepend(str(root))
     spec = importlib.util.spec_from_file_location("wp7_hostname_export", root / "export_evidence.py")
     module = importlib.util.module_from_spec(spec)

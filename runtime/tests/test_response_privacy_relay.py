@@ -322,30 +322,21 @@ def test_error_text_in_normal_request_and_generated_content_is_not_an_error_enve
 
 @pytest.fixture(scope="module")
 def recorded_vllm_chat_wire():
-    """Use the recorded R-10 request IDs to select actual buffered/SSE replies."""
+    """Use byte-identical recorded buffered/SSE replies and capture metadata."""
     from pathlib import Path
-    import tarfile
 
-    archive = (
-        Path(__file__).resolve().parents[1]
-        / "project-context/refactor-2026-11/wp7/execution-085ebccd-20261115/R1-full.tgz"
-    )
-    with tarfile.open(archive) as saved:
-        values_member = next(m for m in saved.getmembers() if m.name.endswith("/R-10/response-values.json"))
-        values = json.load(saved.extractfile(values_member))
-        wanted = {values["normal_request_id"]: "buffered", values["stream_request_id"]: "stream"}
-        wires = {}
-        for member in saved.getmembers():
-            if not member.isfile() or "/R-10/http-" not in member.name:
-                continue
-            reply = json.load(saved.extractfile(member))
-            request_id = next((v for k, v in reply["headers"].items() if k.lower() == "x-request-id"), None)
-            if request_id in wanted:
-                assert reply["status"] == 200
-                wires[wanted[request_id]] = reply["body"].encode("utf-8")
-        assert set(wires) == {"buffered", "stream"}
-        return wires
-
+    root = Path(__file__).resolve().parent / "fixtures/vllm-r10-recorded"
+    values = json.loads((root / "index.json").read_text(encoding="utf-8"))
+    wanted = {values["normal_request_id"]: "buffered", values["stream_request_id"]: "stream"}
+    wires = {}
+    for reply in values["responses"]:
+        request_id = next((v for k, v in reply["headers"].items() if k.lower() == "x-request-id"), None)
+        if request_id in wanted:
+            assert reply["status"] == 200
+            reply["body"] = (root / reply["body_path"]).read_text(encoding="utf-8")
+            wires[wanted[request_id]] = reply["body"].encode("utf-8")
+    assert set(wires) == {"buffered", "stream"}
+    return wires
 
 @pytest.mark.parametrize(
     "payload",

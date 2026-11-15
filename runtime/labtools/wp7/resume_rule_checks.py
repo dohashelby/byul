@@ -31,7 +31,7 @@ class BudgetRules(unittest.TestCase):
 
 class PrestartRules(unittest.TestCase):
     def test_prestart_accepts_existing_alarm_without_dev_tag(self):
-        path=Path(__file__).parent/'execution-20261114/prestart_check.py'
+        path=Path(__file__).parent/'prestart_check.py'
         with tempfile.TemporaryDirectory() as temp:
             with patch.dict(os.environ,{'WP7_EXEC_WORK':temp}):
                 spec=importlib.util.spec_from_file_location('wp7_prestart_fixture',path)

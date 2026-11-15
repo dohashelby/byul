@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-BASELINE = ROOT / "project-context/refactor-2026-11/baseline/20-cli-surface-before.json"
+BASELINE = ROOT / "tests/fixtures/cli-surface-before-refactor.json"
 spec = importlib.util.spec_from_file_location("_byul_cli_surface_contract", ROOT / "scripts/cli_surface.py")
 surface = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(surface)

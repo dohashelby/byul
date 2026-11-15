@@ -1,7 +1,7 @@
 import ast,contextlib,hashlib,importlib.util,io,json,os,sys,tempfile,types
 from pathlib import Path
 from unittest.mock import patch
-repo=Path(__file__).resolve().parents[4];wp=Path(__file__).resolve().parent;sys.path[:0]=[str(wp),str(repo/'runtime/src')]
+repo=Path(__file__).resolve().parents[3];wp=Path(__file__).resolve().parent;sys.path[:0]=[str(wp),str(repo/'runtime/src')]
 import prepare_lab_bundle,server_inputs
 from serving_runtime.policy.policy_bundle import verify_policy_bundle
 from serving_runtime.policy.policy import load_policy

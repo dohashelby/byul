@@ -1,0 +1,20 @@
+{
+  "normal_request_id": "fixture-buffered",
+  "stream_request_id": "fixture-stream",
+  "responses": [
+    {
+      "status": 200,
+      "headers": {
+        "X-Request-ID": "fixture-stream"
+      },
+      "body_path": "stream.sse"
+    },
+    {
+      "status": 200,
+      "headers": {
+        "X-Request-ID": "fixture-buffered"
+      },
+      "body_path": "buffered.json"
+    }
+  ]
+}

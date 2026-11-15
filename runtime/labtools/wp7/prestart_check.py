@@ -2,8 +2,8 @@
 import json,os,re,subprocess,sys
 from datetime import datetime,timezone
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[5]
-WP=ROOT/'runtime/project-context/refactor-2026-11/wp7'
+ROOT=Path(__file__).resolve().parents[3]
+WP=ROOT/'runtime/labtools/wp7'
 sys.path.insert(0,str(WP))
 from common import approval,save
 from export_evidence import Sanitizer,leaks

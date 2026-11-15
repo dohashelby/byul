@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 from types import SimpleNamespace
 
-WP = Path(__file__).resolve().parents[1] / "project-context/refactor-2026-11/wp7"
+WP = Path(__file__).resolve().parents[1] / "labtools/wp7"
 
 
 def test_import_probe_stays_alive_for_identity_sampling(monkeypatch, tmp_path):

@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_bootstrap_tag_probe_imports_real_update():
-    path = ROOT / "runtime/project-context/refactor-2026-11/wp7/bootstrap_server.py"
+    path = ROOT / "runtime/labtools/wp7/bootstrap_server.py"
     tree = ast.parse(path.read_text())
     probes = [
         node.value

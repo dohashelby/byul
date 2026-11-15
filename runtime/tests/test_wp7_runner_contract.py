@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-WP = Path(__file__).resolve().parents[1] / "project-context/refactor-2026-11/wp7"
+WP = Path(__file__).resolve().parents[1] / "labtools/wp7"
 
 
 def load(name, monkeypatch):

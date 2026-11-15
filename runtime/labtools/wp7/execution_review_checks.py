@@ -35,7 +35,7 @@ def run():
             else:assert bad is None,'R10 invalid response accepted: '+str(bad)
         checks.append('R10 real content/positive numeric usage/DONE/completed with seven negative probes')
     import prepare_lab_bundle as lab
-    source=Path(__file__).resolve().parents[4]/'contracts/examples/bundle'
+    source=Path(__file__).resolve().parents[3]/'contracts/examples/bundle'
     for failure in ['query','patch_after_apply','late_record',None]:
         with tempfile.TemporaryDirectory() as t:
             root=Path(t);shutil.copytree(source,root/'old');(root/'current').symlink_to('old')

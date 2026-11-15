@@ -429,7 +429,7 @@ J02 첫 실행(2026-11-15, L4 1장, 두 판본 동시 기동)에서 69개가 모
 - `gpu_a_aws_lab.render`는 정확한 판본/이미지 쌍에서만 그 환경변수를 적용하고 `render.json#launch`에 남긴다. 세대 이름으로 엔진 모드를 추측하거나 다른 이미지에 V1을 강제하지 않는다. profile과 세대의 같은 변수 선언은 충돌로 거부한다. 새 판본·다른 변수도 같은 렌더 코드에 데이터만 더해 처리한다.
 - `gpu_a_run_inputs.environment`는 `runtime.platform`에 `engine_requested`로 선언을 남긴다. `target`은 실제 Pod spec에 profile 변수의 정확한 literal이 한 번만 있는지 검사한다. 누락·다른 값·중복·`valueFrom`은 거부한다. 렌더/ENV/Pod 일치는 실제 엔진 로그·기능·GPU 자격을 대신하지 않는다.
 - 비교 조건은 선택 엔진 의미를 남긴다. 기준의 opt-in 변수와 후보의 기본 선택이 모두 V1이면 변수 이름 차이 때문에 비교를 막지 않는다. 선택이 기록되지 않은 과거 V0 자료를 새 V1 조건과 같다고 정규화하지 않는다. 과거 `/1`·`/2` 기록은 현재 profile을 소급 적용하지 않고 기존 의미로 재생한다.
-- `Scheduler.__init__`의 `assert lora_config is None`과 `AsyncLLM.add_lora`의 `NotImplementedError`를 확인했다. 기존 LoRA 세대는 `launch.unsupported_args` 데이터로 렌더 단계에서 거부한다. REQ-16의 LoRA/adapter 분기는 새 기동·관측 방안이 필요하며, V0 예외를 새 V1의 승인된 UNKNOWN으로 바꾸지 않는다.
+- `Scheduler.__init__`의 `assert lora_config is None`과 `AsyncLLM.add_lora`의 `NotImplementedError`를 확인했다. 기존 LoRA 세대와 아직 없는 `--no-async-scheduling`·`--profiler-config` 옵션은 `launch.unsupported_args`, V2 runner 요구는 `launch.unsupported_env_values` 데이터로 렌더 단계에서 거부한다. 금지 옵션은 `--name=value` 형태도 거부한다. REQ-16의 LoRA/adapter 분기는 새 기동·관측 방안이 필요하며, V0 예외를 새 V1의 승인된 UNKNOWN으로 바꾸지 않는다.
 
 ### 24.2 기준 V1 소스 재분류
 

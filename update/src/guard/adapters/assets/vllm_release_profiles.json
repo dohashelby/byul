@@ -27,8 +27,15 @@
         "profiler_option": null,
         "profiler_directory_env": "VLLM_TORCH_PROFILER_DIR",
         "unsupported_args": [
-          "--enable-lora"
-        ]
+          "--enable-lora",
+          "--no-async-scheduling",
+          "--profiler-config"
+        ],
+        "unsupported_env_values": {
+          "VLLM_USE_V2_MODEL_RUNNER": [
+            "1"
+          ]
+        }
       },
       "qualification": "기동 명령은 레지스트리 config·태그 소스 근거다. 설치 파일 고정값·GPU 실측·생산자 등록을 대신하지 않는다.",
       "http": {

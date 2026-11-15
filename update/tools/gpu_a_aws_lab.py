@@ -163,6 +163,9 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
     if set(release_env) & {e['name'] for e in engine['env']}:
         raise ValueError('AWS_RELEASE_ENGINE_ENV_CONFLICT')
     engine['env'] += [{'name': k, 'value': v} for k, v in sorted(release_env.items())]
+    unsupported_env = launch_profile.get('unsupported_env_values', {})
+    if any(item.get('value') in unsupported_env.get(item['name'], []) for item in engine['env']):
+        raise ValueError('AWS_RELEASE_LAUNCH_ENV_UNSUPPORTED')
     if marker_root is not None:
         engine['env'].append({'name': 'BYUL_CODE_MARKER_ROOT', 'value': marker_root})
     run_root = f'{host_root}/{run_id}'

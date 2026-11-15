@@ -44,7 +44,8 @@ def test_future_engine_selection_and_rejected_options_need_only_profile_data(mon
     version, image = '9.8.7', 'example/engine@sha256:' + 'd' * 64
     row = {'images': [image], 'check_launch_args': {}, 'launch': {
         'command': ['example-server'], 'model_argument': 'positional', 'engine': 'EXAMPLE-next',
-        'env': {'EXAMPLE_ENGINE_MODE': 'next'}, 'unsupported_args': ['--example-incompatible']}}
+        'env': {'EXAMPLE_ENGINE_MODE': 'next'}, 'unsupported_args': ['--example-incompatible'],
+        'unsupported_env_values': {'EXAMPLE_RUNNER': ['unsupported']}}}
     monkeypatch.setattr(VllmProvider, 'release_profile', lambda self, selected: deepcopy(row) if selected == version else None)
     raw, _, record = render(version, image, release_launch=True)
     deployment, _ = yaml.safe_load_all(raw)
@@ -55,6 +56,11 @@ def test_future_engine_selection_and_rejected_options_need_only_profile_data(mon
     for option in ['--example-incompatible', '--example-incompatible=true']:
         with pytest.raises(ValueError, match='AWS_RELEASE_LAUNCH_ARGUMENT_UNSUPPORTED'):
             render(version, image, release_launch=True, extra_engine_args=[option])
+    generation = deepcopy(lab.GENERATIONS['v2-default'])
+    generation['env'] = {'EXAMPLE_RUNNER': 'unsupported'}
+    monkeypatch.setitem(lab.GENERATIONS, 'example-runner', generation)
+    with pytest.raises(ValueError, match='AWS_RELEASE_LAUNCH_ENV_UNSUPPORTED'):
+        render(version, image, release_launch=True, generation='example-runner')
 
 
 def test_engine_selection_cannot_leak_to_another_image_or_conflicting_generation(monkeypatch):
@@ -68,10 +74,17 @@ def test_engine_selection_cannot_leak_to_another_image_or_conflicting_generation
         render(version, image, generation='example-conflict')
 
 
-def test_baseline_v1_does_not_render_the_previous_lora_generation():
+@pytest.mark.parametrize('generation,error', [
+    ('v1-req16-lab', 'AWS_RELEASE_LAUNCH_ARGUMENT_UNSUPPORTED'),
+    ('v1-callback-sync', 'AWS_RELEASE_LAUNCH_ARGUMENT_UNSUPPORTED'),
+    ('v1-producers', 'AWS_RELEASE_LAUNCH_ARGUMENT_UNSUPPORTED'),
+    ('v1-producers-kv', 'AWS_RELEASE_LAUNCH_ARGUMENT_UNSUPPORTED'),
+    ('v2-producers', 'AWS_RELEASE_LAUNCH_ENV_UNSUPPORTED'),
+])
+def test_baseline_v1_does_not_render_unsupported_generations(generation, error):
     _, version, image = pair()[0]
-    with pytest.raises(ValueError, match='AWS_RELEASE_LAUNCH_ARGUMENT_UNSUPPORTED'):
-        render(version, image, generation='v1-req16-lab')
+    with pytest.raises(ValueError, match=error):
+        render(version, image, generation=generation)
 
 
 def test_v1_selection_does_not_inherit_v0_observation_gaps_or_unknown_approvals():

@@ -6,7 +6,7 @@ PROFILER_PROFILE = 'vllm-native-lifecycle-metadata/32'
 PROFILER_SCHEMA = 'guard-native-lifecycle-events/32'
 EXTRA_ASSETS = {
     'guard_profiler.py': ('vllm_profiler_sensor', '97f920da0ca9ab9ed41b814ab0e08b3af99833cb3a680686c9ffc07d552e1291'),
-    'guard_baseline_profiler.py': ('vllm_baseline_profiler', '888628708434c0a6ba78e9d711f20da40a38d4aaead0a343a8c6042d420961a3'),
+    'guard_baseline_profiler.py': ('vllm_baseline_profiler', '9d25935754a7b3f8dad2df1a0229afe9d28b3584d7d0901f7c6654e0d67c4641'),
 }
 
 

@@ -285,3 +285,60 @@ def test_native_disabled_profiler_failure_is_preserved_as_component_outcome(tmp_
     assert w.records[-1]['phase'] == 'RAISE' and w.records[-1]['backend_after']['collected'] is False
     assert 'Profiler is not enabled.' not in json.dumps(w.records)
     w.observer.close()
+
+
+def test_full_identity_capacity_skips_new_owners_without_poisoning_records(tmp_path):
+    w = world(tmp_path)
+    class Held:
+        pass
+    held = [Held() for _ in range(256)]
+    assert all(w.observer._nonce(value) is not None for value in held)
+    assert len(w.observer.objects) == 256
+    assert w.observer._nonce() is not None  # call IDs do not retain object slots
+    assert w.worker.profile(True) is None
+    assert w.worker.profiler.calls == ['start']
+    assert w.records == [] and w.observer.disabled is False
+    result = consumer.native_backend_project(w.records, binding=BINDING)
+    assert result['complete_calls'] == 0 and result['scope_complete'] is False
+    w.observer.close()
+
+
+def test_full_identity_capacity_keeps_existing_owner_cycles_valid(tmp_path):
+    w = world(tmp_path)
+    example_probe(w.observer)
+    assert w.observer._nonce(w.worker) and w.observer._nonce(w.worker.profiler)
+    class Held:
+        pass
+    held = [Held() for _ in range(254)]
+    assert all(w.observer._nonce(value) is not None for value in held)
+    assert len(w.observer.objects) == 256
+    w.worker.profile(True)
+    w.worker.profile(False)
+    result = consumer.native_backend_project(w.records, binding=BINDING)
+    assert result['complete_calls'] == 2 and len(result['backend_cycles']) == 1
+    assert all(row['call_sha256'] and row['worker_sha256'] for row in w.records)
+    assert w.observer.disabled is False and result['scope_complete'] is False
+    w.observer.close()
+
+
+def test_missing_generation_nonce_never_marks_probe_qualified(tmp_path, monkeypatch):
+    w = world(tmp_path)
+    example_probe(w.observer)
+    original_nonce = w.observer._nonce
+    counter = 0
+    def unavailable_generation(value=None):
+        nonlocal counter
+        if value is None:
+            counter += 1
+            if counter == 2:
+                return None
+        return original_nonce(value)
+    monkeypatch.setattr(w.observer, '_nonce', unavailable_generation)
+    w.worker.profile(True)
+    assert len(w.records) == 2 and w.worker.profiler.calls == ['start']
+    assert w.records[-1]['backend_generation_sha256'] is None
+    assert w.records[-1]['backend_probe_qualified'] is False
+    assert w.observer.generations == {} and w.observer.disabled is False
+    result = consumer.native_backend_project(w.records, binding=BINDING)
+    assert result['complete_calls'] == 1 and result['backend_cycles'] == []
+    w.observer.close()

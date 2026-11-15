@@ -85,7 +85,7 @@ class ProfilerCandidate:
         with self.lock:
             if value is not None and value in self.objects:
                 return self.objects[value]
-            if len(self.objects) >= 256:
+            if value is not None and len(self.objects) >= 256:
                 return None
             token = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
             if value is not None:
@@ -127,9 +127,12 @@ class ProfilerCandidate:
         data = self.profiler.attrs(owner)
         rank = self.profiler.uint(data.get('rank'))
         local = self.profiler.uint(data.get('local_rank'))
+        call_id, worker_id = self._nonce(), self._nonce(owner)
+        if call_id is None or worker_id is None:
+            return None
         return {'schema': SCHEMA, 'point': POINT, 'binding': dict(self.binding),
-            'source_sha256': SOURCE['sha256'], 'runtime': runtime, 'call_sha256': self._nonce(),
-            'worker_sha256': self._nonce(owner), 'is_start': flag if type(flag) is bool else None,
+            'source_sha256': SOURCE['sha256'], 'runtime': runtime, 'call_sha256': call_id,
+            'worker_sha256': worker_id, 'is_start': flag if type(flag) is bool else None,
             'rank': rank if rank is not None and rank < 64 else None,
             'local_rank': local if local is not None and local < 64 else None,
             'started_ns': time.monotonic_ns(), 'backend_before': self._backend(owner),
@@ -151,9 +154,11 @@ class ProfilerCandidate:
                     if info['is_start'] is True and phase == 'RETURN' and same and before['value'] is False and after['value'] is True:
                         self.generations.pop(key, None)
                         if len(self.generations) < 256:
-                            self.generations[key] = {'generation': self._nonce(), 'backend': after['backend_sha256']}
+                            created = self._nonce()
+                            if created is not None:
+                                self.generations[key] = {'generation': created, 'backend': after['backend_sha256']}
                     lease = self.generations.get(key)
-                    if (same and lease and lease['backend'] == after['backend_sha256']
+                    if (same and lease and lease['generation'] is not None and lease['backend'] == after['backend_sha256']
                             and (info['is_start'] is True and phase == 'RETURN' and before['value'] is False and after['value'] is True
                                  or info['is_start'] is False and before['value'] is True)):
                         generation, qualified = lease['generation'], True

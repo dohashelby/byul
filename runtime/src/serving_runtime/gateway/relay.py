@@ -999,7 +999,7 @@ class Relay:
                 break
         return self._completion_result(call, transport, code, outcome)
 
-    def _chat_events(self, call, transport, chunk, pending_event, first_sse_event, saw_done):
+    def _chat_events(self, call, transport, chunk, pending_event, first_sse_event, saw_done, saw_chunk):
         response, document, allowed = (call.response, call.document, call.allowed)
         watchdog = transport.watchdog
         pending_event += chunk
@@ -1016,19 +1016,23 @@ class Relay:
                     allow_initial_bom=first_sse_event,
                 )
                 first_sse_event = False
+                has_data = any(line.startswith(b"data:") for line in safe_event.splitlines())
+                if (terminal and (saw_done or not saw_chunk)) or (saw_done and has_data):
+                    raise _RelayBadEvent()
                 response.write_stream_chunk(safe_event)
                 saw_done = saw_done or terminal
+                saw_chunk = saw_chunk or (has_data and not terminal)
         except _RelayBadEvent:
             code, outcome = "ENGINE_BAD_RESPONSE", "invalid_chat_stream"
-            return pending_event, first_sse_event, saw_done, (code, outcome)
+            return pending_event, first_sse_event, saw_done, saw_chunk, (code, outcome)
         except (BrokenPipeError, ConnectionResetError):
             code, outcome = (
                 ("STREAM_DEADLINE", "deadline_exceeded")
                 if watchdog.expired()
                 else ("CLIENT_DISCONNECTED", "client_disconnected")
             )
-            return pending_event, first_sse_event, saw_done, (code, outcome)
-        return (pending_event, first_sse_event, saw_done, None)
+            return pending_event, first_sse_event, saw_done, saw_chunk, (code, outcome)
+        return (pending_event, first_sse_event, saw_done, saw_chunk, None)
 
     def _chat_result(self, allowed, code, outcome):
         return (
@@ -1052,6 +1056,7 @@ class Relay:
         first_sse_event = True
         event_bytes = 0
         saw_done = False
+        saw_chunk = False
         last_chunk_at = time.monotonic()
         response_socket = connection.sock
         if response_socket is None:
@@ -1081,8 +1086,8 @@ class Relay:
             except _RelayOversize:
                 code, outcome = "ENGINE_BAD_RESPONSE", "oversized_chat_stream"
                 break
-            pending_event, first_sse_event, saw_done, failure = self._chat_events(
-                call, transport, chunk, pending_event, first_sse_event, saw_done
+            pending_event, first_sse_event, saw_done, saw_chunk, failure = self._chat_events(
+                call, transport, chunk, pending_event, first_sse_event, saw_done, saw_chunk
             )
             if failure is not None:
                 code, outcome = failure

@@ -426,7 +426,6 @@ def test_a1_narrow_minimum_chat_structure_keeps_valid_objects(payload):
     assert decision.result == "ALLOWED" and json.loads(delivered) == payload
 
 
-@pytest.mark.xfail(strict=True, reason="A-3")
 @pytest.mark.parametrize("scenario", ["done-first", "done-duplicate", "chunk-after-done"])
 @pytest.mark.parametrize("split", [False, True], ids=["one-read", "split-reads"])
 def test_a3_chat_terminal_sequence_is_rejected(scenario, split):

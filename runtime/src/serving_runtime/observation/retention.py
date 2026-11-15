@@ -12,6 +12,7 @@ from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import json
+import os
 from pathlib import Path
 import threading
 from typing import Any
@@ -102,6 +103,15 @@ class _Unit:
     classified: bool
     started: bool = False
     final: bool = False
+    run_ids: frozenset[str] = frozenset()
+
+    def note(self, managed, record, *run_ids):
+        for value in run_ids:
+            if isinstance(value, str) and value:
+                self.run_ids |= {value}
+        if managed.name == "gateway_records.jsonl" and isinstance(record, dict):
+            self.started = self.started or record.get("phase") == "started"
+            self.final = self.final or record.get("phase") == "final"
 
 
 class RecordRetention:
@@ -135,6 +145,7 @@ class RecordRetention:
         hold_runs: set[str],
         hold_requests: set[str],
         units: dict[str, _Unit],
+        positions: dict,
     ) -> tuple[int, int, set[str]]:
         """Add one file to shared units and return its unclassified/size/unit keys."""
 
@@ -144,8 +155,10 @@ class RecordRetention:
         try:
             source = path.open("rb")
         except FileNotFoundError:
+            positions[managed.name] = (0, None)
             return 0, 0, file_units
         with source:
+            identity = os.fstat(source.fileno())
             for line_number, raw_line in enumerate(source, start=1):
                 try:
                     record = json.loads(raw_line.decode("utf-8"))
@@ -156,8 +169,7 @@ class RecordRetention:
                 run_id = record.get("run_id") if isinstance(record, dict) else None
                 group = record.get(managed.group_field) if managed.group_field and isinstance(record, dict) else None
                 if isinstance(group, str) and group:
-                    # Gateway records and engine receipts with the same request
-                    # ID form one unit even though they live in different files.
+                    # Group a request across Gateway and receipt journals.
                     key = f"request:{group}"
                 else:
                     key = f"{managed.name}:line:{line_number}"
@@ -203,26 +215,52 @@ class RecordRetention:
                     unit.classified = unit.classified and timestamp is not None
                     if timestamp is not None and (unit.newest is None or timestamp > unit.newest):
                         unit.newest = timestamp
-                if managed.name == "gateway_records.jsonl" and isinstance(record, dict):
-                    unit = units[key]
-                    unit.started = unit.started or record.get("phase") == "started"
-                    unit.final = unit.final or record.get("phase") == "final"
+                units[key].note(managed, record, run_id, route_scope_run)
                 file_units.add(key)
+            positions[managed.name] = (source.tell(), (identity.st_dev, identity.st_ino))
         return unclassified, path.stat().st_size, file_units
 
     def run(self, *, now: datetime | None = None) -> dict[str, Any]:
-        with self._run_lock, ExitStack() as locks:
-            for managed in MANAGED_FILES:
-                locks.enter_context(JsonlStore(self.data_dir / managed.name).locked())
+        with self._run_lock:
             return self._run(now or datetime.now(timezone.utc))
+
+    def _appended_requests(self, positions, finished):
+        """Read only bytes added since each initial scan, while deletion locks are held."""
+        changed = set()
+        for name, (offset, identity) in list(positions.items()):
+            if name in finished:
+                continue  # This transaction already rewrote this file under the same locks.
+            try:
+                source = (self.data_dir / name).open("rb")
+            except FileNotFoundError:
+                if identity is not None:
+                    raise OSError("journal disappeared after retention scan") from None
+                continue
+            with source:
+                info = os.fstat(source.fileno())
+                current = (info.st_dev, info.st_ino)
+                if (identity is not None and current != identity) or info.st_size < offset:
+                    raise OSError("journal changed after retention scan")
+                source.seek(offset)
+                for raw in source:
+                    try:
+                        record = json.loads(raw)
+                    except (ValueError, UnicodeError, RecursionError) as error:
+                        raise OSError("invalid journal append during retention") from error
+                    request_id = record.get("request_id") if isinstance(record, dict) else None
+                    if isinstance(request_id, str) and request_id:
+                        changed.add("request:" + request_id)
+                positions[name] = (source.tell(), current)
+        return changed
 
     def _run(self, now: datetime) -> dict[str, Any]:
         hold_runs, hold_requests, hold_state = load_holds(self.hold_path)
         cutoff = now - self.max_age
         units: dict[str, _Unit] = {}
         scanned: dict[str, tuple[int, int, set[str]]] = {}
+        positions = {}
         for managed in MANAGED_FILES:
-            scanned[managed.name] = self._scan_file(managed, hold_runs, hold_requests, units)
+            scanned[managed.name] = self._scan_file(managed, hold_runs, hold_requests, units, positions)
 
         removal: dict[str, str] = {}
         for key, unit in units.items():
@@ -259,63 +297,62 @@ class RecordRetention:
         # A broken hold file must not lead to deleting what it meant to protect.
         can_delete = self.enforce and hold_state["state"] != "error"
         files: dict[str, Any] = {}
-        skipped = set()
+        skipped, finished = set(), set()
 
         def select_unchanged(name, drop):
             runs, requests, state = load_holds(self.hold_path)
             if state["state"] == "error":
                 return set()
-            live = {}
-            for managed in MANAGED_FILES:
-                self._scan_file(managed, runs, requests, live)
-            for key in removal:
-                current = live.get(key)
-                if current is not None and (
-                    current.held
-                    or any(
-                        len(lines) > len(units[key].lines.get(filename, []))
-                        for filename, lines in current.lines.items()
-                    )
-                ):
-                    skipped.add(key)
-            protected = {line for key in skipped for line in units[key].lines.get(name, [])}
+            skipped.update(self._appended_requests(positions, finished))
+            skipped.update(
+                key
+                for key in removal
+                if units[key].run_ids & runs or (key.startswith("request:") and key[8:] in requests)
+            )
+            protected = {line for key in skipped if key in units for line in units[key].lines.get(name, [])}
             return drop - protected
 
-        for name, (unclassified, size, file_units) in scanned.items():
-            chosen = {key: removal[key] for key in file_units if key in removal}
-            removed_times = [timestamp for key in chosen for timestamp in units[key].times.get(name, [])]
-            lines = sorted(line for key in chosen for line in units[key].lines.get(name, []))
-            entry: dict[str, Any] = {
-                "bytes": size,
-                "units": len(file_units),
-                "held_units": sum(1 for key in file_units if units[key].held),
-                "unclassified_lines": unclassified,
-                "removable_by_age": sum(1 for reason in chosen.values() if reason == "age"),
-                "removable_by_size": sum(1 for reason in chosen.values() if reason == "size"),
-                "removable_lines": len(lines),
-                "removable_range": (
-                    {"from": min(removed_times).isoformat(), "to": max(removed_times).isoformat()}
-                    if removed_times
-                    else None
-                ),
-                "removed_lines": 0,
-                "durability": "not_applicable",
-            }
-            if can_delete and lines:
-                try:
-                    _kept, removed = JsonlStore(self.data_dir / name).remove_lines(
-                        lines, select=lambda drop: select_unchanged(name, drop)
-                    )
-                    entry["removed_lines"] = removed
-                    entry["durability"] = "confirmed"
-                except RewriteCommittedError as error:
-                    entry["removed_lines"] = error.removed
-                    entry["durability"] = "uncertain"
-                    entry["error"] = f"durability_uncertain:{error.cause_type}"
-                except OSError as error:
-                    entry["error"] = type(error).__name__
-            files[name] = entry
-
+        with ExitStack() as locks:
+            if can_delete and removal:
+                for managed in MANAGED_FILES:
+                    locks.enter_context(JsonlStore(self.data_dir / managed.name).locked())
+            for name, (unclassified, size, file_units) in scanned.items():
+                chosen = {key: removal[key] for key in file_units if key in removal}
+                removed_times = [timestamp for key in chosen for timestamp in units[key].times.get(name, [])]
+                lines = sorted(line for key in chosen for line in units[key].lines.get(name, []))
+                entry: dict[str, Any] = {
+                    "bytes": size,
+                    "units": len(file_units),
+                    "held_units": sum(1 for key in file_units if units[key].held),
+                    "unclassified_lines": unclassified,
+                    "removable_by_age": sum(1 for reason in chosen.values() if reason == "age"),
+                    "removable_by_size": sum(1 for reason in chosen.values() if reason == "size"),
+                    "removable_lines": len(lines),
+                    "removable_range": (
+                        {"from": min(removed_times).isoformat(), "to": max(removed_times).isoformat()}
+                        if removed_times
+                        else None
+                    ),
+                    "removed_lines": 0,
+                    "durability": "not_applicable",
+                }
+                if can_delete and lines:
+                    try:
+                        _kept, removed = JsonlStore(self.data_dir / name).remove_lines(
+                            lines, select=lambda drop: select_unchanged(name, drop)
+                        )
+                        entry["removed_lines"] = removed
+                        if removed:
+                            finished.add(name)
+                        entry["durability"] = "confirmed"
+                    except RewriteCommittedError as error:
+                        entry["removed_lines"] = error.removed
+                        finished.add(name)
+                        entry["durability"] = "uncertain"
+                        entry["error"] = f"durability_uncertain:{error.cause_type}"
+                    except OSError as error:
+                        entry["error"] = type(error).__name__
+                files[name] = entry
         if self.enforce:
             # Enforced runs report actual remaining bytes, including blocked or
             # failed rewrites. Report-only runs retain their projected value.

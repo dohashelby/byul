@@ -407,7 +407,6 @@ def test_a6_report_projects_and_enforce_measures_success(tmp_path, enforce):
     assert path.read_bytes() == (b"" if enforce else before)
 
 
-@pytest.mark.xfail(strict=True, reason="D-1")
 def test_d1_append_finishes_while_initial_scan_is_paused(tmp_path, monkeypatch):
     retention = RecordRetention(tmp_path, enforce=True)
     entered, release, writer_ready, appended = (threading.Event() for _ in range(4))
@@ -452,7 +451,6 @@ def test_d1_append_finishes_while_initial_scan_is_paused(tmp_path, monkeypatch):
     assert finished_during_scan
 
 
-@pytest.mark.xfail(strict=True, reason="D-1")
 def test_d1_late_request_append_is_checked_without_full_rescan(tmp_path, monkeypatch):
     store = JsonlStore(tmp_path / "gateway_records.jsonl")
     first = {"request_id": "r", "phase": "final", "recorded_at": iso(10)}
@@ -474,7 +472,12 @@ def test_d1_late_request_append_is_checked_without_full_rescan(tmp_path, monkeyp
     monkeypatch.setattr(JsonlStore, "remove_lines", append_before_remove)
     result = retention.run(now=NOW)
     assert store.read_all()[0] == [first, late] and not result["deleted"]
-    assert scans == ["gateway_records.jsonl", "gateway_route_rejections.jsonl", "engine_receipts.jsonl", "observations.jsonl"]
+    assert scans == [
+        "gateway_records.jsonl",
+        "gateway_route_rejections.jsonl",
+        "engine_receipts.jsonl",
+        "observations.jsonl",
+    ]
 
 
 @pytest.mark.parametrize("hold_kind", ["request", "run", "invalid"])
@@ -487,8 +490,10 @@ def test_d1_hold_changed_just_before_delete_still_blocks_request(tmp_path, monke
     original = JsonlStore.remove_lines
 
     def change_hold(target, lines, **kwargs):
-        value = {"schema": HOLD_SCHEMA, "request_ids": ["r"]} if hold_kind == "request" else (
-            {"schema": HOLD_SCHEMA, "run_ids": ["run"]} if hold_kind == "run" else {}
+        value = (
+            {"schema": HOLD_SCHEMA, "request_ids": ["r"]}
+            if hold_kind == "request"
+            else ({"schema": HOLD_SCHEMA, "run_ids": ["run"]} if hold_kind == "run" else {})
         )
         hold.write_text(json.dumps(value))
         return original(target, lines, **kwargs)
@@ -496,3 +501,24 @@ def test_d1_hold_changed_just_before_delete_still_blocks_request(tmp_path, monke
     monkeypatch.setattr(JsonlStore, "remove_lines", change_hold)
     result = RecordRetention(tmp_path, enforce=True, hold_path=hold).run(now=NOW)
     assert store.read_all()[0] == [row] and not result["deleted"]
+
+
+def test_d1_new_request_row_in_previously_empty_journal_protects_receipt(tmp_path, monkeypatch):
+    receipts = JsonlStore(tmp_path / "engine_receipts.jsonl")
+    receipt = {"request_id": "late-gateway", "received_at": iso(10)}
+    receipts.append(receipt)
+    retention = RecordRetention(tmp_path, enforce=True)
+    original = retention._scan_file
+    gateway = JsonlStore(tmp_path / "gateway_records.jsonl")
+    started = {"request_id": "late-gateway", "phase": "started", "recorded_at": iso(0)}
+
+    def append_after_scan(managed, *args, **kwargs):
+        result = original(managed, *args, **kwargs)
+        if managed.name == "observations.jsonl":
+            gateway.append(started)
+        return result
+
+    monkeypatch.setattr(retention, "_scan_file", append_after_scan)
+    result = retention.run(now=NOW)
+    assert gateway.read_all()[0] == [started] and receipts.read_all()[0] == [receipt]
+    assert not result["deleted"]

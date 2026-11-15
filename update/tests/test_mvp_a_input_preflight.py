@@ -189,7 +189,7 @@ def test_target_change_during_binding_is_rejected(tmp_path, monkeypatch, sources
         config = tomllib.loads(config_path.read_text())
         baseline_target = config_path.parent / (file_key + '.json')
         baseline_target.write_bytes(b'{"example":true}\n')
-        config['code_selection'][file_key] = str(baseline_target)
+        config['input_validation'][file_key] = str(baseline_target)
         write_config(config, config_path)
         configuration['sha256'] = sha256(config_path.read_bytes()).hexdigest()
     def changed(*args, **kwargs):

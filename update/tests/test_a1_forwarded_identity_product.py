@@ -11,7 +11,7 @@ from guard.runtime import kubernetes_http as http
 from guard.runtime.kubernetes_forwarded_identity_http import KubernetesForwardedIdentityHTTP,EXTERNAL
 from guard.runtime.kubernetes_forwarded_identity import normalize_header_contract
 from guard.runtime.bounded import capture_pipes
-from guard.executors import kubernetes_forwarded_identity as product
+from guard.executors import kubernetes_forwarded_identity as product, run_binding
 from guard.executors.forwarded_identity_contract import FIELDS,SCHEMA,normalize_policy,validate_record
 from guard.executors.owned_capture import _FILE_READER
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
@@ -104,6 +104,8 @@ def inputs(tmp_path,mode='normal',header=None,normal=NORMAL,alternate=ALTERNATE)
         'forwarded_session':SESSION,'forwarded_gateway_source_sha256':'b'*64,'forwarded_engine_source_sha256':'c'*64,
         'forwarded_identity_policy_sha256':'9'*64,'forwarded_validity_start':(now-timedelta(minutes=1)).isoformat(),'forwarded_validity_end':(now+timedelta(minutes=1)).isoformat()}
     world.values=values;receipt=derive(baseline_pack().path,tmp_path/'pack');pack=load_pack(tmp_path/'pack')
+    if 4 in run_binding.stages_for(pack.checks['REQ-04']):
+        values['forwarded_identity_policy_sha256']=sha256_hex(canonical_json(for_pack(pack,'REQ-04',values)))
     return env,world,values,pack,receipt
 
 

@@ -6,7 +6,7 @@ import base64,json,socket,subprocess
 import pytest
 from typer.testing import CliRunner
 from guard.cli import app
-from guard.executors import credential_copy_contract as contract,kubernetes_credential_copy as copy_executor
+from guard.executors import credential_copy_contract as contract,kubernetes_credential_copy as copy_executor,run_binding
 from guard.executors.owned_capture import _FILE_READER,MAX_BYTES
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.models import canonical_json,load_pack,sha256_hex,utcnow
@@ -71,6 +71,12 @@ def inputs(tmp_path,mode='normal'):
     values['copy_inventory_sha256']=sha256_hex(path.read_bytes());packet['inventory_sha256']=values['copy_inventory_sha256']
     world.copy_packet=packet;world.values=values
     receipt=derive(baseline_pack().path,tmp_path/'pack');pack=load_pack(tmp_path/'pack')
+    if 4 in run_binding.stages_for(pack.checks['PLT-12']):
+        values['copy_treatments']=contract.treatments(inventory)
+        values['copy_policy_sha256']=sha256_hex(canonical_json(for_pack(pack,'PLT-12',values)))
+        inventory['policy_sha256']=packet['policy_sha256']=values['copy_policy_sha256']
+        path.write_bytes(canonical_json(inventory))
+        values['copy_inventory_sha256']=packet['inventory_sha256']=sha256_hex(path.read_bytes())
     return environment,world,values,pack,receipt,path
 
 

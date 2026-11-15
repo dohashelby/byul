@@ -1,3 +1,10 @@
+## 2026-11-15 — M-A6 기준 V1 요청 연결(`/27` 선택 지점)과 남은 점검 정리
+
+- 한 일: 0.7.0 V1의 엔진 요청 ID가 호출자 ID(`cmpl-<X-Request-Id|uuid>`) 그대로임을 확인했다. `/27` 판본 데이터에 선택 지점 `Processor.process_inputs`를 더하고, live 선택 문맥에서만 SELECTION·ASGI 연결을 기록하게 했다. 기록 검증·연결 함수·termination projection이 판본 선택 지점을 받는다. 작업지시서 7절 결정 14 행을 V1 결정으로 고쳤다. 기준 19개·후보 4개의 상태와 원인, 결정 질문 M-A6-W1~W6을 판본 적용표 26절·DECISIONS에 적었다.
+- 테스트 결과: `test_ma6_v1_selection_link.py`와 기존 `test_configured_lifecycle.py` 37개가 CPython 3.12.3·3.12.8에서 통과(`-n` 없이). 전체 pytest는 PR CI로 확인한다.
+- 다음 단계: W1 승인 시 0.7.0 termination 계열 열기, W2~W6 답에 따른 대상표·행.
+- 막힌 것: 실행기 열기는 기존 assert 변경 승인(W1)이 필요하다. 열린 점검 수는 이번 PR에서 늘지 않았다.
+
 ## 2026-11-15 — #278·#279 통합 검토와 1차 완성 잔여 정리
 
 - 한 일: 사용자 요청에 따라 #276 병합 main7e8a0900·#278 통합373a360f를 #279에 합쳤다. DECISIONS/PROGRESS의 양쪽 원문·기존 검토 영수증55개를 보존하고, WORK_ORDER의 최신 M-A6/M-A7 행을 함께 유지했다. #279의 원본 센서 보존·정확 source/ABI/준비 bytes·snapshot만 지원·미검토 실행기 미개방 경계를 검토했다. 합쳐진560파일 목록 자체SHA a98a34360d9766ce22519c67edc6603efabc9e6ef58b4ecde9ad41e49ae67ec0을 재생성하고 결정5의 정확 검토 행1개를 더했다.

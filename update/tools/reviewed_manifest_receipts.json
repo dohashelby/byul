@@ -280,6 +280,11 @@
       "manifest_sha256": "a98a34360d9766ce22519c67edc6603efabc9e6ef58b4ecde9ad41e49ae67ec0",
       "reviewed_by": "Codex / PR278-279 integrated source review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T18:05:42.726982+09:00"
+    },
+    {
+      "manifest_sha256": "bcc93f6d1f0074f2bf1b7b6e122e30900d232ae67a2574e3f65150139159cd8b",
+      "reviewed_by": "Claude / BYUL UPDATE / M-A6 기준 V1 /27 선택 지점 연결 self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T22:30:00+09:00"
     }
   ]
 }

@@ -40,7 +40,8 @@ def assignment(row):
         if payload.get("point")=="TokenizerManager._init_req_state"and payload.get("phase")=="RETURN"and len(values)==1 and _fingerprint(payload.get("asgi_request_sha256"))and _fingerprint(values[0].get("request_sha256")):
             return payload["asgi_request_sha256"],values[0]["request_sha256"]
         return None
-    if (row["event"] != "NATIVE" or payload["point"] != "InputProcessor.assign_request_id"
+    from .vllm_lifecycle_catalog import SELECTION_POINTS
+    if (row["event"] != "NATIVE" or payload["point"] not in {"InputProcessor.assign_request_id", *SELECTION_POINTS}
             or payload["phase"] != "RETURN" or len(payload["requests"]) != 1):
         return None
     external = payload["metadata"].get("external_request_sha256")

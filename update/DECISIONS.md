@@ -416,6 +416,15 @@
 
 ## 열린 질문
 
+### M-A6-W 기준 V1·후보 남은 점검 (2026-11-15) — 사용자 결정 대기
+근거: [판본 적용표 26절](docs/dev-1/ma6-version-applicability.md). 답이 나오기 전에는 판정 기준·assert·고정값 검사를 바꾸지 않는다.
+- **M-A6-W1 기준 0.7.0 termination 계열 열기**: `/27` 선택 지점의 live ASGI 연결을 구현했다. LIF-10·12, REQ-12, OBS-02 실행기를 0.7.0에서 열려면 `tests/test_configured_lifecycle.py::test_snapshot_availability_does_not_open_unreviewed_executors_or_register_gpu_results`의 0.7.0 비노출 assert를 고쳐야 한다. 열어도 REQ-12의 시도 사건과 KV 블록 소유권은 미관측(원인 있는 UNKNOWN 범위)이다. 잠정: 열지 않음.
+- **M-A6-W2 기준 REQ-05 최종 모델 연결**: 0.7.0 V1 runner에는 `_model_forward`가 없고 `execute_model`이 모델을 직접 부른다. `execute_model`의 선택 ID와 `load_model`/`get_model`의 모델 객체를 같은 프로세스에서 잇는 새 연결로 볼지, UNKNOWN으로 둘지. 잠정: UNKNOWN.
+- **M-A6-W3 후보 LIF-14 profiler 세대**: 0.30.0은 같은 torch profiler 객체를 다시 시작한다(0.31.0은 start마다 새 객체). profiler 세대를 ① start/stop 호출 순서로 정의해 관측, ② 객체 재사용을 관측 사실로 기록하고 세대 판단은 UNKNOWN. 잠정: ②.
+- **M-A6-W4 V0 승인 예외의 V1 이월**: 결정14 변경으로 V0 예외는 과거 V0 구성에만 적용된다. 그런데 두 공백은 엔진 모드가 아니라 태그 소스의 사실이다: LIF-13(`weight_cache` 모듈 없음, 결정 9-1)과 PLT-10·11(인증이 `build_app` 지역 함수, D4). 같은 원인으로 V1 기준에도 원인 있는 UNKNOWN을 승인할지. 잠정: 승인 전 미구현으로 둠.
+- **M-A6-W5 기준 REQ-10**: 0.7.0 V1에는 `v1/structured_output`이 없다. 구조화 출력 요청이 V1 엔진에서 실제로 제약되지 않는다면 결정 9 형식의 기능 부재로 정리할지(실제 기동 확인 필요). 잠정: GPU 확인 전 닫아 둠.
+- **M-A6-W6 후보 uvicorn 0.53.0 설치 파일**: stream_buffer(LIF-03·04) 행을 위해 PyPI `uvicorn-0.53.0-py3-none-any.whl`(87,081 bytes)을 받아 M-A3 이미지 메타데이터 SHA와 대조할지. 잠정: 승인 전 받지 않음.
+
 ### M-A6 실행기 단위 판본표·V0 관측기 (2026-11-15) — 사용자 결정·구현 전
 - ~~M-A6-V1~V6~~ → 2026-11-15 사용자 결정(맨 위 "사용자 결정 M-A6-V1~V6" 절). 여섯 질문 모두 추천안으로 답했다. V5·V6은 아래 잠정과 다르다. 원 질문은 이력으로 남긴다.
 근거: [ma6-version-applicability.md](docs/dev-1/ma6-version-applicability.md) 19~21절. 판본 관문을 실행기→카탈로그 기능 조회로 바꿨고, 외부 관측 실행기 10종을 두 판본에 열었다. 엔진 안 관측 실행기는 원인을 기록하고 닫아 두었다. 아래 답이 나오기 전에는 판정 기준·assert·고정값 검사를 바꾸지 않는다. 각 질문 끝의 "잠정"은 답이 없을 때 따르는 기본값이다.

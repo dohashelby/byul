@@ -499,3 +499,44 @@ J02 첫 실행(2026-11-15, L4 1장, 두 판본 동시 기동)에서 69개가 모
 - `configured_lifecycle_rows`는 준비·수집·기록 파싱만 허용한다. 기반 snapshot이 생겼다는 이유로 `native_lifecycle`·request-attempt·termination·initialization·모델 권한 실행기를 열지 않는다. `executor_gaps`와 GPU 등록표는 그대로다. 요청 ID 지문은 기존 `/8`의 SHA-256 계약을 유지하며 이 변경이 HMAC이나 인증을 새로 제공하지 않는다.
 - 후속은 초기 V1의 **fresh 요청 선택/ASGI 연결**, 캐시 단위/적중·소유권, runner 실제 소비, worker startup/rank·profiler/uvicorn 파생 관측이다. 각각의 실제 인자·반환·단위를 검토한 뒤 같은 판본 데이터 또는 필요한 adapter 의미를 추가한다. 기존 V0 UNKNOWN·후보 GPU 자격·과거 V0 측정 결과를 이월하지 않는다.
 - 직접 시험과 CI의 최종 결과/시간은 이번 `PROGRESS.md` 기록에 남긴다. 전체 suite는 로컬에서 실행하지 않는다.
+
+## 26. 기준 V1 요청 연결과 남은 점검 (2026-11-15)
+
+작업지시서 1.2절 1·2번의 진행분이다. 등록되지 않은 생산자나 부분 snapshot만으로 실행기를 열거나 PASS를 만들지 않는다.
+
+### 26.1 기준 0.7.0 V1의 요청 ID 의미
+
+- 0.7.0 `serving_completion`은 `request_id = f"cmpl-{_base_request_id(raw_request)}"`(`X-Request-Id` 헤더 또는 `random_uuid()`)로 만든다. 그 ID가 `AsyncLLM.generate → add_request → Processor.process_inputs(request_id, …)`까지 그대로 간다. 엔진은 0.31.0의 `InputProcessor.assign_request_id`처럼 새 접미사를 붙이지 않는다. 같은 ID가 이미 진행 중이면 `add_request`가 `ValueError`로 거부한다.
+- 따라서 "live ASGI 호출 안에서 이 엔진 요청이 생겼다"는 연결은 같은 의미로 만들 수 있다. 하지만 엔진 ID의 새로움(다른 요청과 겹치지 않음)은 엔진이 보장하지 않는다. 같은 헤더를 다시 쓰면 같은 엔진 ID가 된다. 관측 연결은 이를 가정하지 않는다. projection은 기존처럼 요청 하나에 대응이 정확히 하나일 때만 binding한다.
+
+### 26.2 구현 — `/27` 선택 지점
+
+- 판본 데이터 `vllm_native_release_rows.json`에 `selection: {point: Processor.process_inputs, request_id_argument: 1}`을 더했다. catalog가 지점·인자 위치를 검사하고 렌더된 SPEC에 넣는다.
+- 공통 `vllm_configured_lifecycle_sensor.py`의 관측기는 그 지점에서만 다음을 한다.
+  1. live 선택 문맥(`_ROUTE_REQUEST`가 열린 같은 pid)이 있을 때 SELECTION CALL/RETURN을 기록한다. 요청 ID는 인자에서 읽는다(priority·session·rank는 관측하지 않음).
+  2. 같은 조건과 같은 pid의 ASGI 문맥이 있을 때만 NATIVE RETURN에 `external_request_sha256`(= 엔진 ID 지문)·`asgi_request_sha256`을 붙인다.
+- 상속된 ASGI 문맥만 있거나 live 문맥이 없으면 연결을 만들지 않는다. main의 기존 불변식 시험 `test_processor_input_snapshot_cannot_claim_a_fresh_asgi_assignment`는 그대로 통과한다.
+- 기록 검증·연결 함수(`vllm_lifecycle_links.assignment`)·termination projection은 0.31.0 지점과 catalog의 판본 선택 지점 집합을 받는다. 지점 이름은 profile별 지점 표로 검증되므로 다른 판본 기록에 섞일 수 없다. `/27`은 선택 지점이 있을 때만 요청 선택·경로 키를 허용한다.
+- 직접 시험 `test_ma6_v1_selection_link.py`: 연결 성립, 상속 문맥·live 문맥 없음·잘못된 ID에서 연결 없음, 인자 위치(태그 AST). CPython 3.12.3·3.12.8에서 통과.
+
+### 26.3 기준 0.7.0의 19개 점검
+
+| 점검 | 실행기 | 상태 | 남은 것 |
+|---|---|---|---|
+| LIF-10·12, REQ-12, OBS-02 | request_termination·observation_state | 연결 구현. **실행기는 닫힘** | `tests/test_configured_lifecycle.py`가 0.7.0 비노출을 assert로 고정한다. 여는 것은 승인 필요(M-A6-W1). 열려도 REQ-12의 ATTEMPT(`/10`)·KV 블록 소유권은 없다(LIF-10 kv 범위는 미관측) |
+| REQ-05 | model_authorization | 닫힘 | 0.7.0 runner에 `_model_forward`가 없다. `execute_model`이 모델을 직접 부른다. 최종 모델 연결 지점의 새 의미가 필요하다(M-A6-W2) |
+| PLT-10·11 | credential/session_revocation | 닫힘 | 0.7.0 `api_server.build_app`의 인증은 지역 함수라 감쌀 module 속성이 없다. V0 D4 승인의 이월 여부(M-A6-W4) |
+| LIF-07·09 | initialization | 닫힘 | 0.7.0 `WorkerProc`에는 `wait_for_ready`가 없고 `wait_for_startup`이 있다. `/14` 원본 센서는 3.12.8 실행 표가 없다(25.1). V1 대상표·관측 의미 신규 |
+| LIF-13 | engine_sensor | 닫힘 | 태그에 `weight_cache` 모듈이 없다. 결정 9-1(기능 부재 UNKNOWN)의 V1 이월 여부(M-A6-W4) |
+| REQ-15·17·18·19·20 | engine_sensor | 닫힘 | 0.7.0 V1 `kv_cache_manager`·`gpu_model_runner`·`gpu_input_batch` 콜백 대상표가 없다. 캐시 적중·slot·graph 의미를 V1 0.7.0 객체로 검토해야 한다 |
+| LIF-03·04 | stream_buffer | 닫힘 | uvicorn 0.34.0 설치 행 + V1 HTTP. 원본 센서 3.12.8 실행 표 없음 |
+| LIF-14 | profiler_observation | 닫힘 | V1 0.7.0 profiler 호출 사슬(`AsyncLLM.start_profile`·`EngineCore.profile`) 대상표 신규 |
+| REQ-10 | sampling_validation | 닫힘 | 0.7.0 V1에 `v1/structured_output`이 없다. 구조화 출력의 실제 소비 여부를 기능 부재로 볼지(M-A6-W5) |
+
+### 26.4 후보 0.30.0의 4개
+
+| 점검 | 상태 | 근거 |
+|---|---|---|
+| LIF-03·04 | 닫힘 | uvicorn 0.53.0 설치 파일 bytes 필요. PyPI wheel(87,081 bytes) 다운로드 승인 대기 |
+| LIF-14 | 닫힘 | `TorchProfilerWrapper._start`: 0.31.0은 start마다 새 profiler 객체를 만들고, 0.30.0은 같은 객체를 다시 시작한다. `_stop`은 dump 설정 이름이 다르다. `WorkerProfiler.start/stop/step`은 같다. profiler 세대를 객체로 볼지 호출 순서로 볼지(M-A6-W3) |
+| REQ-10 | 닫힘 | runner_capture 0.30.0 행이 없다. V5 조건(행 추가 뒤 assert 변경)은 유지 |

@@ -171,8 +171,8 @@
           "checks": [
             "OBS-02"
           ],
-          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 V1 AsyncLLM·OutputProcessor·scheduler의 인자/반환 구조가 다름",
-          "next": "기준 V1 사건 의미 대조와 정확 행"
+          "basis": "ma6-version-applicability.md 26절. /27 선택 지점(Processor.process_inputs)의 live ASGI 연결은 구현했다. 실행기 열기는 tests/test_configured_lifecycle.py의 비노출 assert 변경 승인(M-A6-W1) 대기. REQ-12 시도 사건(/10)과 KV 소유권은 여전히 없다",
+          "next": "M-A6-W1 승인 뒤 /27을 지원 집합에 추가"
         },
         "profiler_observation": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
@@ -208,8 +208,8 @@
             "LIF-12",
             "REQ-12"
           ],
-          "basis": "ma6-version-applicability.md 24절(2026-11-15 V1 전환): 기준 V1 Scheduler._free_request와 KV manager의 사건 의미/인자 대조 미완료",
-          "next": "기준 V1 취소·해제·시도 대상표"
+          "basis": "ma6-version-applicability.md 26절. /27 선택 지점(Processor.process_inputs)의 live ASGI 연결은 구현했다. 실행기 열기는 tests/test_configured_lifecycle.py의 비노출 assert 변경 승인(M-A6-W1) 대기. REQ-12 시도 사건(/10)과 KV 소유권은 여전히 없다",
+          "next": "M-A6-W1 승인 뒤 /27을 지원 집합에 추가"
         },
         "resource_recovery": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",
@@ -357,8 +357,8 @@
           "checks": [
             "LIF-14"
           ],
-          "basis": "ma6-version-applicability.md 23절, ma6-candidate-function-review.json. 후보 TorchProfilerWrapper._start/_stop와 Worker.profile의 동작이 다르다(profiler 재생성↔재사용, backend 생성)",
-          "next": "profiler 세대·출력 구간 의미 검토(M-B4)"
+          "basis": "ma6-version-applicability.md 26절. 후보 TorchProfilerWrapper._start는 profiler 객체를 재사용해 다시 시작하고(0.31.0은 매번 새로 만든다) _stop의 dump 설정 이름이 다르다. WorkerProfiler.start/stop/step은 같다",
+          "next": "M-A6-W3 결정 뒤 profiler 세대 의미 반영"
         },
         "rank_failure": {
           "cause": "OBSERVER_PIN_ROWS_ABSENT",

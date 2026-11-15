@@ -190,6 +190,26 @@
       "manifest_sha256": "e0c39ae8c9ee74b9d7de31315bac5aa1f19317e81ae1ab8da045fbb5fa27cc47",
       "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T05:00:14.968998+00:00"
+    },
+    {
+      "manifest_sha256": "b430e2e6eed8ebb184707b09e2b1f0658a46a1bcaf05d34ed4924f8cf39fc270",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T05:52:26.348460+00:00"
+    },
+    {
+      "manifest_sha256": "352d4f3570ae22aa4c2a325dfb26dd2bccc0122eaeb8c0b762e6df86d849df81",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T05:53:48.050311+00:00"
+    },
+    {
+      "manifest_sha256": "928b3674f7624ee8e0a62964e1531ce615d62f4ebd04f90aa48df01b29b35117",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T06:03:11.298341+00:00"
+    },
+    {
+      "manifest_sha256": "5b38f3226f99fb37fd4771778bb3188071dfafd43de6e9107021645d955e86e8",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T06:08:07.551568+00:00"
     }
   ]
 }

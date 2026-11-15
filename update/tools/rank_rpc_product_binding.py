@@ -9,6 +9,7 @@ import re
 import stat
 
 from guard.adapters import vllm_rank_rpc_control as control
+from guard.adapters.vllm_rank_rpc_input import require_case_binding
 from guard.models import Environment, canonical_json
 from tools import rank_ipc_candidates as ipc
 from tools.mvp_versions import versions
@@ -106,21 +107,6 @@ def prepare(prepared, environment, target, output):
         'engine_executed': False, 'scope_complete': False, 'producer_registered': False}
 
 
-def require_case_binding(case, expected):
-    """변환 전 필요한 범위 검사다. HMAC·원 관측·판정 자격 확인을 대신하지 않는다."""
-    if (type(case) is not dict or type(case.get('arm')) is not dict
-            or case['arm'].get('schema') != 'guard-rank-rpc-arm/2'
-            or type(case.get('target')) is not dict
-            or case['target'].get('schema') != 'guard-rank-rpc-lab-target/2'):
-        raise ValueError('RANK_RPC_PRODUCT_BINDING_REQUIRED')
-    control.product_binding(expected, expected.get('session') if type(expected) is dict else None)
-    control.product_binding(case['arm'].get('product_binding'), expected['session'])
-    if (control.canonical(case['arm']['product_binding']) != control.canonical(expected)
-            or control.canonical(case['target'].get('product_binding')) != control.canonical(expected)
-            or case['arm'].get('session') != expected['session']
-            or case['target'].get('owner', {}).get('pod_uid') != expected['pod_uid']
-            or case['arm'].get('target_sha256') != control.digest(case['target'])):
-        raise ValueError('RANK_RPC_PRODUCT_BINDING_MISMATCH')
     # 형식이 맞아도 공통 입력을 만들거나 인증/완료를 반환하지 않는다.
 
 

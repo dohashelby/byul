@@ -139,3 +139,15 @@ actor의 `--for-common-input`은 정상 calibration 전에 별도로 공급한 `
 이번 준비 도구는 네트워크·기동·장애 주입·공통 입력 생성·생산자 등록을 하지 않는다. 성공 시에도 live_target_verified/input_preflight_passed/engine_executed/scope_complete/producer_registered는 false다. CPU 시험은 EXAMPLE 입력과 시험 소유 자식만 사용한다. 새 SDK의 실제 GPU 실행·제품 rank-fault 사건 변환·TP2 인과 그룹·탐지/상위 전달 기한·새 소유자 복구 수락·등록은 미완료다. M-B4는 보관하고 기존 native24 TP1/같은 소유자 복구 고정값·판정 기준·등록표를 넓히지 않는다.
 
 새 미결합 준비물6개와 기존 원자료 재검증은 [현재 준비 보고서](ma3-product-binding-preparation-20261115.json)에 구분했다. 직접151개·기준 이미지 Python ABI95개가 통과했고 기존6사례/329개 원 기록의 gap0과 제품 사후 결합 거부를 확인했다. 새 소스의 실제 엔진 실행은 없다.
+
+## RPC 공통 부분 입력 후속 (2026-11-15)
+
+`vllm_rank_ipc_capture`로 기존 도구의 원 snapshot 검증3함수를 AST 동일하게 옮기고 도구의 import API를 유지했다. 제품 adapter/collector가 개발 도구에 의존하지 않게 했다. 엔진에 넣는 SDK14파일·기존 source 고정값·등록표는 이 이동으로 바뀌지 않는다.
+
+`vllm_rank_rpc_input`과 미등록 `rank_rpc_fault_producer`는 외부 예상 ENV/target/prepared/session/Pod 범위, ARM/2 사전 결합, 모든 선택 제어 HMAC·claim·READY, 정확 원 CALL/상위 프레임·worker·요청 HMAC, 별도 물리 영수증·단조 시계를 대조한다. 전체 근거가 맞는 장애 적용만 `fault_applied`로, 지연의 실제 STOP/CONT와 같은 원 CALL의 SOURCE RELEASE가 모두 있는 경우만 `fault_released`로 변환한다. 기존 metadata/정책의 delay/death/exception 이름을 그대로 보존하며 별도 communication-stall 분기를 대신하지 않는다. 공통 `/1`·`/4`와 기존 수락 기준을 유지한다.
+
+HTTP200/500은 클라이언트 구성요소 관측으로만 기록한다. 현재 원 관측으로 탐지/상위 전달/복구의 전체 인과 경로가 증명되지 않아 detected/client_delivered/recovered를 만들지 않는다. 다른 원 기록의 gap과 SOURCE RELEASE 부재는 확인된 적용 사실과 함께 공백으로 보존한다. 죽은 프로세스의 SIGCONT/해제는 허용하지 않는다. 모든 source_ended/scope_complete/인증/그룹/등록은 false다. 같은 신원을 시험 중 임시 등록해도 누락된 사건·불완전 근거 때문에 complete가 될 수 없다. 실제 등록표에는 추가하지 않는다.
+
+`tools/rank_rpc_fault_inputs.py`는 현재 소스의 sealed ENV·target과 새 준비물을 먼저 검증한 뒤 새 디렉터리에 `common-input.json`·변환 요약을 만든다. 기본은 `/4`이며 예시 ENV는 EXAMPLE로 남긴다. 변환 자체를 새 엔진 실행/실환경 사전 점검/제품 EVD·RES·RPT 생성으로 세지 않는다. 기존 ARM/1 GPU 여섯 사례에는 실제 새 제품 입력을 사후 붙이지 않는다. 현재 실환경 수집·전체 TP2 인과 그룹/기한·같은 소유자 복구 수락·새 소스 GPU 대조·등록은 계속 미완료다.
+
+최종 host 변환은 직접187개·기준 이미지 Python ABI131개·현황/경로/소스552파일 관문을 통과했다. [후속 미결합 준비물](ma3-rpc-common-preparation-20261115.json)은 엔진 SDK14 bytes가 앞선 후보와 같으며 새 host 변환 신원과 미완료를 구분한다. 실제 ARM2 원 기록의 제품 부분 입력·전체 M-A3 완료는 아직 없다.

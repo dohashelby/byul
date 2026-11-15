@@ -1,3 +1,10 @@
+## 2026-11-15 — 기준 startup 전용 /31의 소유 journal·capture 연결
+
+- 한 일: 집중 검토한 b5db8b92·23f2ea49를 통합했다. 정확 MP·Worker 두 source만 감싸고 기존 per-process Writer에 기본·미지원·로드/constructor 실패 기록을 남긴다. prepare/load의 고정 비공개 의존 파일 검사, fork 뒤 새 process binding, strict 파서와 capture summary까지 연결했다. READY는 transport handshake이며 전체 준비·상위 집계·외부 접수 gate는 여전히 미확인이다.
+- 개인정보 경계: 검토 중 발견한 /27 요청 관측 상속을 제거했다. /31은 startup 전용이고 HTTP 헤더를 읽지 않으며 ASGI·NATIVE·SELECTION 기록을 생성/수락하지 않는다. 원 /27 template·/14·/15 bytes와 기존 실행기 관문은 유지한다. 실제 middleware와 무관한 Processor 호출 뒤 원 ID/단순 SHA가 비어 있지 않은 journal에 없는지 검사하는 회귀를 추가했다.
+- 테스트 결과: 정확 head8d828e1a의 CPython3.12.8 CI는 93 passed(4.53초·부모5.106초)다. 전체 update CI는 진행 중이다. 이번 /31 통합은 그 뒤의 source 변경이어서 별도 CI가 필요하다. 로컬 Python/pytest는 실행하지 않았다.
+- 다음 단계: 통합 source 목록/결정5 검토 행을 고정한다. 기준 cache/slot 및 request-free baseline profiler 의미 연결을 별도 worktree에서 계속한다. 기준 uvicorn0.34 wheel 한 개 다운로드 승인은 별도 질문 중이며 그 분기에만 대기한다. 실제 GPU/생산자 등록/공식 결과는 미완료다.
+
 ## 2026-11-15 — 후보 REQ-10 소스·값 소비·원 receipt 정합 통합
 
 - 한 일: 집중 검토한 a0353d87→a00c4780→0efde02의 후보 REQ-10을 통합했다. 이미지·serving/input/worker/batch 9개 정확 파일과 준비 자산·V1 환경을 전후 대조한다. 생략한 sampling 값을 추정하지 않고 실제 API 정규화 값→runner→sampler를 같은 요청 HMAC으로 대조한다. 값 누락/차이는 처음 쓰는 준비 receipt와 capture·최종 B projection에 같은 공백으로 남겨 소비 완료를 보류한다. 기존 0.31 동작·기준 W5 관문·판정·과거 source/영수증은 보존한다.

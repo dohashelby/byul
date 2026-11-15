@@ -466,6 +466,11 @@
 
 ## 열린 질문
 
+### 기준 uvicorn 설치 행 대조 (2026-11-15, 승인 질문 중)
+
+- 기준 LIF-03·04를 위한 `uvicorn-0.34.0-py3-none-any.whl` 한 개(62,315 bytes, SHA-256 `023dc038422502fa28a09c7a30bf2b6991512da7dcdb8fd35fe57cfc154126f4`) 다운로드를 사용자에게 별도로 물었다. 앞선 W6은 후보0.53.0 wheel 승인이다. [PyPI 원 메타데이터](https://pypi.org/pypi/uvicorn/0.34.0/json)의 wheel METADATA SHA `6d2f1a12…`는 M-A3 기준 이미지 distribution metadata와 같다. 아직 wheel을 받지 않았으며 Python 파일 bytes·실제 함수·ABI·GPU 자격을 승격하지 않는다. 다른 M-A6 독립 개발은 계속한다.
+
+
 ### M-A6-W 기준 V1·후보 남은 점검 (2026-11-15) — 사용자 결정됨
 - ~~M-A6-W1~W6~~ → 2026-11-15 사용자 결정(맨 위 "사용자 결정 M-A6-W1~W6" 절). 원 질문은 이력으로 남긴다.
 근거: [판본 적용표 26절](docs/dev-1/ma6-version-applicability.md). 답이 나오기 전에는 판정 기준·assert·고정값 검사를 바꾸지 않는다.

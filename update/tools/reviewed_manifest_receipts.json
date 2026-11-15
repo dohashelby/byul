@@ -365,6 +365,11 @@
       "manifest_sha256": "892700fbe779d80dd65f3052cdafb8d65fc7a90b839493abbf2e32b124659ec0",
       "reviewed_by": "Codex / reviewed candidate REQ10 nine-file preflight and immutable sampling consumption receipts; profiler and startup fixture integration; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T12:51:40Z"
+    },
+    {
+      "manifest_sha256": "22cef4042bf33d39c7e7096de405aaf52a0e4418d00f53189e58aac122f26618",
+      "reviewed_by": "Codex / focused startup31 private-source and process journal/capture review after request-free privacy repair; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T13:00:00Z"
     }
   ]
 }

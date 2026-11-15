@@ -1,12 +1,6 @@
 executor: record_access
 collection_profile: kubernetes-record-access-scope-v1
-policy_params:
-- key: record_subject_plan_sha256
-  type: str
-  required: true
-- key: record_inventory_source_sha256
-  type: str
-  required: true
+policy_params: []
 required_observations:
 - key: record_access_rows
   type: list

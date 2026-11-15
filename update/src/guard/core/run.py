@@ -217,7 +217,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
             binding, policy_values = run_binding.effective_values(
                 check, raw.get(item.executor, {}), env, policy_values, side=str(common["side"].value),
                 attempt_id=cfg.attempt_id, issued_at=utcnow(), valid_from=policy_validity[0], valid_until=policy_validity[1],
-                run_cfg=run_binding.run_config(cfg.raw, check.id))
+                run_cfg=run_binding.run_config(cfg.raw, check.id), policy_ref=plan.inputs.policy)
         except ValueError as exc:
             code = str(exc) if str(exc).startswith("RUN_BINDING_") else "RUN_BINDING_UNAVAILABLE"
             return stopped(ExecStatus.NOT_RUN, code)

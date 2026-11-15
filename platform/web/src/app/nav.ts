@@ -30,7 +30,7 @@ export const AREAS: Area[] = [
     title: "Update · 격리 검증",
     short: "Update",
     home: "/update/results",
-    groups: [{ title: "검증", items: [{ path: "/update/results", label: "검증 결과" }] }, EVIDENCE],
+    groups: [{ title: "검증", items: [{ path: "/update/execute", label: "검증 실행" }, { path: "/update/results", label: "검증 결과" }] }, EVIDENCE],
   },
   {
     key: "runtime",

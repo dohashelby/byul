@@ -17,6 +17,14 @@ def _isolated_resource_lease_root(tmp_path_factory, monkeypatch):
     monkeypatch.setattr(resource_lease, "tempfile", SimpleNamespace(gettempdir=lambda: str(root)))
 
 
+@pytest.fixture(autouse=True)
+def _example_run_binding_inputs():
+    """Stage-3 EXAMPLE placeholders of tests/run_binding_support.stage_3_table; real paths are untouched."""
+    from tests.run_binding_support import example_inputs
+    with example_inputs():
+        yield
+
+
 @pytest.fixture
 def example_registered_callback_producers(monkeypatch):
     """EXAMPLE 소비자의 등록 후 분기만 시험한다. 제품 GPU 등록·실측이 아니다.

@@ -51,6 +51,8 @@ class KubernetesCredentialCopyRecordExecutor(HttpCheckExecutor):
             if (target.get('lab') is not True or target_hash!=policy_values['copy_target_sha256']
                     or self.expected_target is not None and target_hash!=self.expected_target):raise ValueError
             inventory=load_inventory(self.cfg['copy_inventory'],policy_values['copy_inventory_sha256'],policy_values['copy_policy_sha256'])
+            # @38 (RB3-Q4): treatments are decided in policy; the run's inventory must carry exactly them.
+            if contract.DECISION_KEY in policy_values and contract.treatments(inventory)!=policy_values[contract.DECISION_KEY]:raise ValueError
         except (KeyError,TypeError,ValueError,OSError,RuntimeError):raise ValueError('COPY_CONFIGURATION_INVALID') from None
         transport=KubernetesHTTP(target,env,duration=self.cfg.get('max_duration_seconds',120),
             binary=self.cfg.get('kubectl_binary','kubectl'),runner=self.runner,profile=REQUIRED_EVENT_PROFILE)

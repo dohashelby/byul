@@ -7,6 +7,8 @@ POLICY_TYPES={'recovery_environment_sha256':'str','recovery_target_sha256':'str'
  'recovery_selection_sha256':'str','recovery_scenario_sha256':'str','recovery_validity_start':'str','recovery_validity_end':'str',
  'recovery_branch':'str','recovery_executor_backend':'str','recovery_expected_ranks':'list[str]','recovery_phase':'str',
  'recovery_deadline_basis':'str','recovery_required_absent_after':'str','recovery_max_clock_skew_ms':'int','recovery_required_resource_kinds':'list[str]'}
+DECISION_KEY='recovery_require_absent_kinds'
+RESOURCE_KINDS=frozenset({'process','unix-socket','posix-shm-fd','gpu-memory','queue','shared-reference'})
 OBSERVATIONS={'recovery_trials':'list','recovery_resource_censuses':'list','recovery_selected_resource_status':'list','recovery_missing':'list',
  'recovery_absolute_deadline_violated':'bool','recovery_selected_absence_observed':'bool','recovery_global_resources_released':'bool',
  'recovery_next_normal_launch_verified':'bool','recovery_scope_complete':'bool'}
@@ -15,7 +17,12 @@ OBSERVATIONS={'recovery_trials':'list','recovery_resource_censuses':'list','reco
 def normalize_policy(values):
     import re
     try:
-        if type(values) is not dict or set(values)!=set(POLICY_TYPES):raise ValueError
+        # @38 (RB3-Q4): which selected kinds must be absent is the enterprise's policy rule.
+        if type(values) is not dict or set(values) not in (set(POLICY_TYPES),set(POLICY_TYPES)|{DECISION_KEY}):raise ValueError
+        if DECISION_KEY in values:
+            absent=values[DECISION_KEY]
+            if (type(absent) is not list or len(absent)>6 or any(type(v) is not str for v in absent) or len(set(absent))!=len(absent)
+                    or not set(absent)<=RESOURCE_KINDS):raise ValueError
         for key in ('recovery_environment_sha256','recovery_target_sha256','recovery_prepared_sha256','recovery_selection_sha256','recovery_scenario_sha256'):
             if not fingerprint(values[key]):raise ValueError
         start,end=stamp(values['recovery_validity_start']),stamp(values['recovery_validity_end']);deadline=stamp(values['recovery_required_absent_after'])
@@ -37,6 +44,14 @@ def validate_selected_policy(selection,values):
     validate_selection(selection);normalize_policy(values)
     if {o['rank'] for o in selection['owners']}!={int(v) for v in values['recovery_expected_ranks']}:raise ValueError('RESOURCE_SELECTED_RANKS_MISMATCH')
     if any(r['kind'] not in values['recovery_required_resource_kinds'] for r in selection['resources']):raise ValueError('RESOURCE_SELECTED_KIND_UNDECLARED')
+    if DECISION_KEY in values:
+        # @38 (RB3-Q4): each selected row's require_absent must follow the policy rule (owners are processes).
+        absent=set(values[DECISION_KEY])
+        selected_kinds=({'process'} if selection['owners'] else set())|{r['kind'] for r in selection['resources']}
+        if not absent<=selected_kinds:raise ValueError('RESOURCE_SELECTED_REQUIRED_KIND_MISSING')
+        if (any(o['require_absent']!=('process' in absent) for o in selection['owners'])
+                or any(r['require_absent']!=(r['kind'] in absent) for r in selection['resources'])):
+            raise ValueError('RESOURCE_SELECTED_ABSENCE_RULE_MISMATCH')
 
 
 def project(censuses,selection,values):

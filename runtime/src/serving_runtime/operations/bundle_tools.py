@@ -505,8 +505,13 @@ def _checked_status(
 
 
 def _bundle_read_gid(root: Path) -> int:
-    info = root.lstat()
-    if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_gid == 0:
+    try:
+        info = root.lstat()
+    except (FileNotFoundError, NotADirectoryError):
+        raise ValueError(f"묶음 루트를 찾을 수 없습니다: {root}") from None
+    if not stat.S_ISDIR(info.st_mode):
+        raise ValueError(f"묶음 루트를 찾을 수 없습니다: {root}")
+    if info.st_uid != 0 or info.st_gid == 0:
         raise ValueError("묶음 루트는 root 소유이고 그룹이 0이 아닌 실제 폴더여야 합니다")
     return info.st_gid
 

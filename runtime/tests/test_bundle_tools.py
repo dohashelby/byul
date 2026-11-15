@@ -720,7 +720,6 @@ def test_a4_installer_selected_group_reaches_bundle_apply(a4_bundle_fixture):
         case.doCleanups()
 
 
-@pytest.mark.xfail(strict=True, reason="D-3")
 @pytest.mark.parametrize("kind", ["missing", "file", "parent-file"])
 def test_d3_missing_or_non_directory_bundle_root_has_korean_error(tmp_path, kind):
     root = tmp_path / "bundles"

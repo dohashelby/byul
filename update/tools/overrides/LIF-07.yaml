@@ -5,9 +5,6 @@ policy_params:
 - key: init_expected_ranks
   type: list[str]
   required: true
-- key: init_scenario_sha256
-  type: str
-  required: true
 - key: init_phase
   type: str
   required: true

@@ -6,7 +6,6 @@ policy_params:
 - {key: max_clock_uncertainty_ms, type: 'dict[str,int]', required: true}
 - {key: detection_deadline_ms, type: 'dict[str,int]', required: true}
 - {key: alert_deadline_ms, type: 'dict[str,int]', required: true}
-- { key: collection_session, type: str, required: true }
 required_observations:
   - { key: collection_gap_violations, type: list }
   - { key: collection_records_unverified, type: list }

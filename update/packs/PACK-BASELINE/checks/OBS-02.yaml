@@ -3,7 +3,7 @@ framework_id: CHK-OBS-002
 mechanism_ids:
 - mechanism-17
 - mechanism-13
-revision: 7
+revision: 8
 retired: false
 area: OBS
 purpose: 실행 상태 관측·수집 건전성
@@ -19,9 +19,6 @@ applies_when:
 policy_params:
 - key: observation_state_required_components
   type: list[str]
-  required: true
-- key: identity_record_session
-  type: str
   required: true
 - key: identity_record_source_sha256
   type: str

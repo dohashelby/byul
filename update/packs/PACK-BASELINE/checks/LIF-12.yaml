@@ -2,7 +2,7 @@ id: LIF-12
 framework_id: CHK-LIF-012
 mechanism_ids:
 - mechanism-13
-revision: 6
+revision: 7
 retired: false
 area: LIF
 purpose: 재시도 비용 제한
@@ -23,9 +23,6 @@ policy_params:
   type: str
   required: true
 - key: retry_record_source_sha256
-  type: str
-  required: true
-- key: retry_session
   type: str
   required: true
 - key: retry_policy_mode

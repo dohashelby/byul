@@ -18,7 +18,7 @@ from guard.executors.observation_contract import EVENTS,FIELDS,SCHEMA,normalize_
 from guard.executors.owned_capture import _FILE_READER
 from guard.executors.kubernetes_lifecycle_capture import supervised_source
 from guard.store import Store
-from tests.run_binding_support import for_pack
+from tests.run_binding_support import for_pack, run_table_toml
 from tests.builders import baseline_pack,policy,T0
 from tests.test_kubernetes_request_binding import env,target
 from tests.test_kubernetes_sampling import World as PodWorld
@@ -129,7 +129,7 @@ def test_existing_cli_records_and_exact_refs_preserve_unknown_and_followup_facts
     for name,value in [('environment',environment.to_dict()),('policy',pol.to_dict()),('target',world.target)]:
         (tmp_path/(name+'.json')).write_bytes(canonical_json(value))
     cfg=tmp_path/'guard.toml';cfg.write_text('[executors]\nrequired_event_record="kubernetes"\n[adapter]\nname="vllm"\n[required_event_record]\ntarget='
-        +json.dumps(str(tmp_path/'target.json'))+'\nroles={allowed="OBS_ALLOWED",denied="OBS_DENIED"}\n',encoding='utf-8')
+        +json.dumps(str(tmp_path/'target.json'))+'\nroles={allowed="OBS_ALLOWED",denied="OBS_DENIED"}\n'+run_table_toml(pack,'OBS-01',values),encoding='utf-8')
     runner=CliRunner();common=['--store',tmp_path/'store','--config',cfg]
     def cli(args,expected=0):
         result=runner.invoke(app,list(map(str,args)));assert result.exit_code==expected,(args,result.output,result.exception)

@@ -3,7 +3,7 @@ framework_id: CHK-LIF-016
 mechanism_ids:
 - mechanism-08
 - mechanism-10
-revision: 4
+revision: 5
 retired: false
 area: LIF
 purpose: 복구 정책·상태 검증
@@ -16,34 +16,7 @@ review_order: reference_baseline_first
 impact: MEDIUM
 applies_when:
   prose: 사용하는 backup·복원 자료를 확인한다. 특수 snapshot은 지원 조건·실제 선택을 따로 확인한다.
-policy_params:
-- key: transition_inputs_sha256
-  type: str
-  required: true
-- key: transition_before_at
-  type: str
-  required: true
-- key: transition_during_at
-  type: str
-  required: true
-- key: transition_after_at
-  type: str
-  required: true
-- key: transition_recovered_at
-  type: str
-  required: true
-- key: transition_before_generation
-  type: str
-  required: true
-- key: transition_during_generation
-  type: str
-  required: true
-- key: transition_after_generation
-  type: str
-  required: true
-- key: transition_recovered_generation
-  type: str
-  required: true
+policy_params: []
 policy_prose:
   policy_to_decide: 복원 검증·정리 범위·재개 조건·복원 객체별 책임/증거·현재 정책 재적용
   enterprise_decisions: 복원 대상 보존·digest/식별, 외부 설정별 복원 책임·GitOps 재조정, 재개 근거. 긴급 권한 부여가 공급물 필수 위반·증거 부족을 예외 통과시키지 않도록 한다.

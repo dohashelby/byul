@@ -4,9 +4,6 @@ policy_params:
 - key: recovery_selection_sha256
   type: str
   required: true
-- key: recovery_scenario_sha256
-  type: str
-  required: true
 - key: recovery_validity_start
   type: str
   required: true

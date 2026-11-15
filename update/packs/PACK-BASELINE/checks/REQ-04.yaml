@@ -2,7 +2,7 @@ id: REQ-04
 framework_id: CHK-REQ-004
 mechanism_ids:
 - mechanism-01
-revision: 6
+revision: 7
 retired: false
 area: REQ
 purpose: 신원 인증·전달
@@ -16,9 +16,6 @@ impact: HIGH
 applies_when:
   prose: 앱·Gateway·서비스 계정이 전달한 신원을 인가에 사용할 때 적용한다. 최종 사용자와 연결 주체를 구분한다.
 policy_params:
-- key: forwarded_session
-  type: str
-  required: true
 - key: forwarded_gateway_source_sha256
   type: str
   required: true

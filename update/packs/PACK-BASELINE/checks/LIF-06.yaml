@@ -2,7 +2,7 @@ id: LIF-06
 framework_id: CHK-LIF-006
 mechanism_ids:
 - mechanism-04
-revision: 6
+revision: 7
 retired: false
 area: LIF
 purpose: 변경 중 일관성
@@ -15,34 +15,7 @@ review_order: conditional_when_selected
 impact: MEDIUM
 applies_when:
   prose: live weights·LoRA 변경·rolling·다중 replica 전환을 실제 사용할 때 적용한다. 기본 중단 재배포와 구분한다.
-policy_params:
-- key: transition_inputs_sha256
-  type: str
-  required: true
-- key: transition_before_at
-  type: str
-  required: true
-- key: transition_during_at
-  type: str
-  required: true
-- key: transition_after_at
-  type: str
-  required: true
-- key: transition_recovered_at
-  type: str
-  required: true
-- key: transition_before_generation
-  type: str
-  required: true
-- key: transition_during_generation
-  type: str
-  required: true
-- key: transition_after_generation
-  type: str
-  required: true
-- key: transition_recovered_generation
-  type: str
-  required: true
+policy_params: []
 policy_prose:
   policy_to_decide: 기능별 원자성·진행 요청·실패 처리
   enterprise_decisions: 수용 차단점·drain·강제 종료·서비스 중단 계획. live/rolling/canary를 선택하면 허용 세대 혼용·원자성·실패 처리를 별도로 정한다.

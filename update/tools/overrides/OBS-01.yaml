@@ -4,7 +4,6 @@ policy_params:
   - { key: observation_max_delay_ms, type: int, required: true }
   - { key: observation_required_events, type: "list[str]", required: true }
   - { key: observation_required_fields, type: "list[str]", required: true }
-  - { key: observation_session, type: str, required: true }
   - { key: observation_expected_source_sha256, type: str, required: true }
   - { key: observation_event_policy_sha256, type: str, required: true }
   - { key: observation_allowed_actor_sha256, type: str, required: true }

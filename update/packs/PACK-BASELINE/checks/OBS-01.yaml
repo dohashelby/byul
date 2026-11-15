@@ -2,7 +2,7 @@ id: OBS-01
 framework_id: CHK-OBS-001
 mechanism_ids:
 - mechanism-17
-revision: 6
+revision: 7
 retired: false
 area: OBS
 purpose: 필수 사건 기록
@@ -24,9 +24,6 @@ policy_params:
   required: true
 - key: observation_required_fields
   type: list[str]
-  required: true
-- key: observation_session
-  type: str
   required: true
 - key: observation_expected_source_sha256
   type: str

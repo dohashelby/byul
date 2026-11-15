@@ -1,12 +1,6 @@
 executor: route_record
 collection_profile: kubernetes-route-record-native-composite-v1
-policy_params:
-- key: route_session
-  type: str
-  required: true
-- key: route_file_sha256
-  type: str
-  required: true
+policy_params: []
 required_observations:
 - key: route_events
   type: list

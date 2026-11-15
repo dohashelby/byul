@@ -175,6 +175,16 @@
       "manifest_sha256": "564e73b1be6abe10dad627ae1d7ab090e454ac65fc228a1f049fd4ea22685f34",
       "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-14T12:53:51.580329+00:00"
+    },
+    {
+      "manifest_sha256": "01e1e15f6b79219e9f55b7644b443a7ec1a6b3a1aa2bf7cd1ed8c6848556ecfd",
+      "reviewed_by": "Claude / BYUL UPDATE / RB2 실행 준비값 분리(팩 36) self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-14T21:43:40+09:00"
+    },
+    {
+      "manifest_sha256": "87b6e926b6e9cc667ad8d95bb4c27769824c639a9d320abf98eca1ee972ef6f6",
+      "reviewed_by": "B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-15T04:16:05.482673+00:00"
     }
   ]
 }

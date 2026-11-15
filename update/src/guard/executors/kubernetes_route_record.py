@@ -44,11 +44,24 @@ def bypass_claims(events):
     return [row for row in events or [] if row["auth_decision"] == "deny" and row["handler_outcome"] == "entered"]
 
 
+# RB2-Q5 (2026-11-14 user decision): from PACK-BASELINE@36 the definition no longer
+# declares the record file hash.  The file is written by the producer during the
+# run, so no value exists before it; the read file's bytes hash is recorded only.
+FILE_KEY = "route_file_sha256"
+
+
+def file_declared(check):
+    """True for a definition (@35 and earlier) that still compares the declared file hash."""
+    return FILE_KEY in {p.key for p in check.policy_params}
+
+
 def normalize_policy(values):
     try:
-        if type(values) is not dict or set(values) != set(POLICY_TYPES):
+        if type(values) is not dict or set(values) not in (set(POLICY_TYPES), set(POLICY_TYPES) - {FILE_KEY}):
             raise ValueError
-        for key in ("route_environment_sha256", "route_target_sha256", "route_file_sha256"):
+        for key in ("route_environment_sha256", "route_target_sha256", FILE_KEY):
+            if key not in values:
+                continue
             if type(values[key]) is not str or not re.fullmatch(r"[0-9a-f]{64}", values[key]):
                 raise ValueError
         if type(values["route_session"]) is not str or not re.fullmatch(r"[0-9a-f]{32}", values["route_session"]):
@@ -120,13 +133,16 @@ class KubernetesRouteRecordExecutor(KubernetesContainerConfigExecutor):
     def validate_policy(self, check, values):
         if check.id == "REQ-02" and getattr(check, "collection_profile", None) == COMPOSITE_PROFILE:
             from . import native_route_contract as native
-            if type(values) is not dict or set(values) != set(composite_contract()[0]):
+            expected = set(composite_contract()[0]) - (set() if file_declared(check) else {FILE_KEY})
+            if type(values) is not dict or set(values) != expected:
                 raise ValueError("KUBERNETES_ROUTE_POLICY_INVALID")
             normalize_policy(select_policy(values, POLICY_TYPES))
             native.normalize_policy(select_policy(values, native.POLICY_TYPES))
             return
         if check.id != "REQ-02" or getattr(check, "collection_profile", None) != PROFILE:
             raise ValueError("KUBERNETES_ROUTE_PROFILE_UNSUPPORTED")
+        if type(values) is not dict or (FILE_KEY in values) != file_declared(check):
+            raise ValueError("KUBERNETES_ROUTE_POLICY_INVALID")
         normalize_policy(values)
 
     def run(self, check, env, policy_values, adapter, workdir):
@@ -188,7 +204,8 @@ class KubernetesRouteRecordExecutor(KubernetesContainerConfigExecutor):
             role = reader.binding["engine"]
             raw, provenance = reader.read_file(reader, ctx.target, container=role["container"], image=role["image"],
                 path="/guard-route/data/" + values["route_session"] + "/route-observations.json")
-            if (provenance["capture_sha256"] != values["route_file_sha256"]
+            declared = values.get(FILE_KEY)
+            if (declared is not None and provenance["capture_sha256"] != declared
                     or provenance.get("owner_binding_verified") is not True or not start <= utcnow() <= end):
                 raise ValueError
             packet = strict_json(raw)
@@ -196,7 +213,9 @@ class KubernetesRouteRecordExecutor(KubernetesContainerConfigExecutor):
                                       run_id=reader.binding["run_id"], image=role["image"])
             summary["record"] = {**record, "file_bytes_sha256": provenance["capture_sha256"],
                                  "file_bytes": provenance["bytes"], "file_identity": provenance["file_identity"],
-                                 "owner_binding_verified": True}
+                                 "owner_binding_verified": True,
+                                 # Recorded only (no declared hash) from @36; compared when declared.
+                                 **({} if declared is not None else {"declared_file_sha256": None})}
             observations["route_events"].update(value=_events(packet), collected=True)
             observations["route_record_collected"]["value"] = True
         except (ValueError, OSError, KeyError, TypeError):

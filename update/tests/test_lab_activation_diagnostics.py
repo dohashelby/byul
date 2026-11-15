@@ -316,7 +316,10 @@ def test_real_factory_core_run_serializes_write_failure_with_same_config_hash_an
     from guard.executors import run_binding
     from tests.run_binding_support import split
     # @35: the run-binding keys are computed by guard run; only the double's file hashes are fixed.
+    # @36: the scenario hash comes from the [run_binding.LIF-09] scenario file (EXAMPLE).
     policy_values, file_hashes = split(check, values)
+    scenario = tmp_path / 'scenario.json'
+    scenario.write_text('{"scenario_order": ["EXAMPLE"]}')
     pol = policy(pack.ref(), scope={'include': [check.id], 'exclude': []}, values={check.id: policy_values})
     monkeypatch.setattr(run_binding, 'file_hash', lambda check_id, key, cfg: file_hashes[key])
     # Real registered factory/core/store/judge; only native transport/scenario are EXAMPLE.
@@ -350,7 +353,7 @@ def test_real_factory_core_run_serializes_write_failure_with_same_config_hash_an
         store.put_many([env, pol]); plan = select(pack, [env], pol); store.put(plan)
         assert plan.item(check.id).selected is True
         evd, = run_plan(store, pack, plan, RunConfig(executors={'initialization': 'kubernetes'},
-            raw={'lab_activation': deepcopy(fixture.BASE)}))
+            raw={'lab_activation': deepcopy(fixture.BASE), 'run_binding': {check.id: {'scenario': str(scenario)}}}))
         restored = store.resolve(evd.ref())
         result, = judge_plan(store, pack, plan, as_of=T0)
         assert restored.execution.status == ExecStatus.COMPLETED and restored.data_origin == DataOrigin.EXAMPLE

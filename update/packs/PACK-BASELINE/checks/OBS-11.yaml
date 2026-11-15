@@ -2,7 +2,7 @@ id: OBS-11
 framework_id: CHK-OBS-011
 mechanism_ids:
 - mechanism-17
-revision: 5
+revision: 6
 retired: false
 area: OBS
 purpose: 실행 상태 관측·수집 건전성
@@ -30,9 +30,6 @@ policy_params:
   required: true
 - key: alert_deadline_ms
   type: dict[str,int]
-  required: true
-- key: collection_session
-  type: str
   required: true
 policy_prose:
   policy_to_decide: 필수 기록·수집 기한·시간 오차·장애 대응

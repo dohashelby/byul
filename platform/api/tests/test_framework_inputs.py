@@ -53,7 +53,7 @@ def _claim(env: dict) -> dict:
 def _policy() -> dict:
     pol = load_json(EXAMPLES / "policy.json")
     pol["policy_id"] = "fw-policy"
-    pol["verification"]["pack"] = {"id": "PACK-BASELINE", "revision": 35}
+    pol["verification"]["pack"] = {"id": "PACK-BASELINE", "revision": 36}
     pol["status"] = "DRAFT"
     pol["approval"] = None
     pol["framework_values"] = {

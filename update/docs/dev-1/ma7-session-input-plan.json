@@ -278,53 +278,7 @@
         "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
       ],
       "input_state": "미입력",
-      "policy_requirements": [
-        {
-          "key": "transition_inputs_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_before_at",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_during_at",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_after_at",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_recovered_at",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_before_generation",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_during_generation",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_after_generation",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_recovered_generation",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "재배포할 때 이전 요청과 새 모델·설정이 잘못 섞이지 않는가?",
       "session": "J02",
       "sides": {
@@ -356,53 +310,7 @@
         "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
       ],
       "input_state": "미입력",
-      "policy_requirements": [
-        {
-          "key": "transition_inputs_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_before_at",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_during_at",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_after_at",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_recovered_at",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_before_generation",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_during_generation",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_after_generation",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_recovered_generation",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "실행 중 변경이나 순차 교체 중에도 각 요청의 모델·상태가 일관되는가?",
       "session": "J02",
       "sides": {
@@ -444,11 +352,6 @@
           "key": "init_expected_ranks",
           "required": true,
           "type": "list[str]"
-        },
-        {
-          "key": "init_scenario_sha256",
-          "required": true,
-          "type": "str"
         },
         {
           "key": "init_phase",
@@ -613,11 +516,6 @@
           "type": "list[str]"
         },
         {
-          "key": "init_scenario_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "init_phase",
           "required": true,
           "type": "str"
@@ -725,11 +623,6 @@
           "type": "str"
         },
         {
-          "key": "recovery_scenario_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "recovery_validity_start",
           "required": true,
           "type": "str"
@@ -823,11 +716,6 @@
         },
         {
           "key": "retry_record_source_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "retry_session",
           "required": true,
           "type": "str"
         },
@@ -996,53 +884,7 @@
         "결정 9의 승인된 분기 범위를 적용한다. 실제 소비 연결·실측 완료와 구분하고 UNKNOWN을 PASS로 바꾸지 않는다."
       ],
       "input_state": "미입력",
-      "policy_requirements": [
-        {
-          "key": "transition_inputs_sha256",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_before_at",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_during_at",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_after_at",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_recovered_at",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_before_generation",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_during_generation",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_after_generation",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "transition_recovered_generation",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "변조된 복원 자료나 남은 상태가 복구 결과에 섞이지 않는가?",
       "session": "J02",
       "sides": {
@@ -1088,11 +930,6 @@
           "key": "observation_required_fields",
           "required": true,
           "type": "list[str]"
-        },
-        {
-          "key": "observation_session",
-          "required": true,
-          "type": "str"
         },
         {
           "key": "observation_expected_source_sha256",
@@ -1150,11 +987,6 @@
           "key": "observation_state_required_components",
           "required": true,
           "type": "list[str]"
-        },
-        {
-          "key": "identity_record_session",
-          "required": true,
-          "type": "str"
         },
         {
           "key": "identity_record_source_sha256",
@@ -1368,11 +1200,6 @@
           "type": "str"
         },
         {
-          "key": "record_inventory_session",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "record_inventory_source_sha256",
           "required": true,
           "type": "str"
@@ -1480,11 +1307,6 @@
           "key": "alert_deadline_ms",
           "required": true,
           "type": "dict[str,int]"
-        },
-        {
-          "key": "collection_session",
-          "required": true,
-          "type": "str"
         }
       ],
       "question": "기록 수집 중단·누락·시각 오류를 표시하고, 증거가 부족한 시험은 미확인으로 처리하는가?",
@@ -1783,41 +1605,6 @@
       "input_state": "미입력",
       "policy_requirements": [
         {
-          "key": "subject_scope",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "subject_container_id",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "subject_uid",
-          "required": true,
-          "type": "int"
-        },
-        {
-          "key": "subject_net_namespace_inode",
-          "required": true,
-          "type": "int"
-        },
-        {
-          "key": "forbidden_receiver_container_id",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "forbidden_receiver_ip",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "forbidden_receiver_port",
-          "required": true,
-          "type": "int"
-        },
-        {
           "key": "forbidden_protocol",
           "required": true,
           "type": "str"
@@ -1859,36 +1646,6 @@
       ],
       "input_state": "미입력",
       "policy_requirements": [
-        {
-          "key": "api_hop_scope",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "api_container_id",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "api_network_id",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "api_endpoint_id",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "api_ip",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "api_port",
-          "required": true,
-          "type": "int"
-        },
         {
           "key": "plaintext_forbidden",
           "required": true,
@@ -2161,11 +1918,6 @@
           "type": "str"
         },
         {
-          "key": "copy_record_session",
-          "required": true,
-          "type": "str"
-        },
-        {
           "key": "copy_max_record_delay_ms",
           "required": true,
           "type": "int"
@@ -2236,18 +1988,7 @@
         "1차 제외 범위는 실제 실행 뒤 UNKNOWN·원인을 기록한다. OBS-09는 기업 수집기 범위만 해당한다."
       ],
       "input_state": "미입력",
-      "policy_requirements": [
-        {
-          "key": "route_session",
-          "required": true,
-          "type": "str"
-        },
-        {
-          "key": "route_file_sha256",
-          "required": true,
-          "type": "str"
-        }
-      ],
+      "policy_requirements": [],
       "question": "Gateway·서버의 경로 설정에 따라 요청 경로가 바뀌어도 최종 실행 API에 필요한 인증·권한 검사가 적용되는가?",
       "session": "J02",
       "sides": {
@@ -2318,11 +2059,6 @@
       ],
       "input_state": "미입력",
       "policy_requirements": [
-        {
-          "key": "forwarded_session",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "forwarded_gateway_source_sha256",
           "required": true,
@@ -2422,11 +2158,6 @@
       ],
       "input_state": "미입력",
       "policy_requirements": [
-        {
-          "key": "stored_session",
-          "required": true,
-          "type": "str"
-        },
         {
           "key": "stored_identity_policy_sha256",
           "required": true,
@@ -3851,14 +3582,14 @@
   "planned_pack_ref": {
     "id": "PACK-BASELINE",
     "kind": "PACK",
-    "revision": 35,
-    "sha256": "353ca4e760c0bf00b575161df158f09400ab111fbd9652f84aa0e56d90de1c19"
+    "revision": 36,
+    "sha256": "0f21244afca59829551744aea04612b9f034fd062ca390214f378a8feaa9f5c6"
   },
   "planned_pack_source": {
     "available_on_main": false,
-    "branch": "claude/run-binding-design",
+    "branch": "claude/run-binding-b2-impl",
     "commit": null,
-    "note": "2026-11-14 RB: 실행 결합값을 정책에서 분리한 팩 35. 결합 키는 guard run이 계산한다(docs/RUN_BINDING.md)."
+    "note": "2026-11-14 RB2: 실행 준비값(기록 세션·전환 세대·표본 시각·시나리오·PLT-07/08 실행 신원)도 정책에서 분리한 팩 36. 결합 값은 guard run이 계산한다(docs/RUN_BINDING.md 7절). 35는 RB(실행 결합값 분리)."
   },
   "ready_for_execution": false,
   "schema": "guard-mvp-session-input-plan/1",

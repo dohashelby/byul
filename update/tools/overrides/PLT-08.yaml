@@ -2,12 +2,6 @@
 applies_when: { always: true }
 collection_profile: explicit-owned-api-plaintext-v1
 policy_params:
-  - { key: api_hop_scope, type: str, required: true }
-  - { key: api_container_id, type: str, required: true }
-  - { key: api_network_id, type: str, required: true }
-  - { key: api_endpoint_id, type: str, required: true }
-  - { key: api_ip, type: str, required: true }
-  - { key: api_port, type: int, required: true }
   - { key: plaintext_forbidden, type: bool, required: true }
 required_observations:
   - { key: forbidden_plaintext_successes, type: "list[str]" }

@@ -1,7 +1,6 @@
 executor: forwarded_identity
 collection_profile: kubernetes-forwarded-identity-observation-v1
 policy_params:
-  - { key: forwarded_session, type: str, required: true }
   - { key: forwarded_gateway_source_sha256, type: str, required: true }
   - { key: forwarded_engine_source_sha256, type: str, required: true }
   - { key: forwarded_identity_policy_sha256, type: str, required: true }

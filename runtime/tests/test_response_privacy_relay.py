@@ -424,3 +424,47 @@ def test_a1_narrow_minimum_chat_structure_keeps_valid_objects(payload):
             "a" * 32, document, allowed, route=CHAT_ROUTE
         )
     assert decision.result == "ALLOWED" and json.loads(delivered) == payload
+
+
+@pytest.mark.xfail(strict=True, reason="A-3")
+@pytest.mark.parametrize("scenario", ["done-first", "done-duplicate", "chunk-after-done"])
+@pytest.mark.parametrize("split", [False, True], ids=["one-read", "split-reads"])
+def test_a3_chat_terminal_sequence_is_rejected(scenario, split):
+    document, allowed = setup(CHAT_ROUTE)
+    event = b'data: {"choices":[{"delta":{"content":"before"}}]}\n\n'
+    late = b'data: {"choices":[{"delta":{"content":"A3-LATE-MUST-NOT-DELIVER"}}]}\n\n'
+    done = b"data: [DONE]\n\n"
+    chunks = {"done-first": [done], "done-duplicate": [event, done, done], "chunk-after-done": [event, done, late]}[
+        scenario
+    ]
+    upstream = BackendConnection(BackendResponse(chunks if split else [b"".join(chunks)], stream=True))
+    client = RequestIO(body(stream=True))
+    with patch.object(BackendConfig, "connection", return_value=(upstream, "/engine")):
+        decision, outcome, started = Relay(BackendConfig.mock(("localhost", 1)), 1, 1, 2).relay_stream(
+            client, "a" * 32, document, allowed, time.monotonic(), lambda: None
+        )
+    assert (decision.reason_code, outcome, started) == ("ENGINE_BAD_RESPONSE", "invalid_chat_stream", True)
+    delivered = b"".join(client.chunks)
+    assert b"A3-LATE-MUST-NOT-DELIVER" not in delivered
+    assert delivered.count(b"[DONE]") == (0 if scenario == "done-first" else 1)
+    assert upstream.closed
+
+
+@pytest.mark.parametrize("include_usage", [False, True], ids=["actual-wire", "actual-wire-plus-usage"])
+def test_a3_actual_vllm_chat_stream_is_preserved(recorded_vllm_chat_wire, include_usage):
+    document, allowed = setup(CHAT_ROUTE)
+    wire = recorded_vllm_chat_wire["stream"]
+    payloads = [json.loads(line[5:]) for line in wire.splitlines() if line.startswith(b"data:") and b"[DONE]" not in line]
+    assert payloads[-1]["choices"]
+    if include_usage:
+        usage = b'data: {"choices":[],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}\n\n'
+        assert wire.count(b"data: [DONE]") == 1
+        wire = wire.replace(b"data: [DONE]", usage + b"data: [DONE]")
+    upstream = BackendConnection(BackendResponse([wire[i : i + 31] for i in range(0, len(wire), 31)], stream=True))
+    client = RequestIO(body(stream=True))
+    with patch.object(BackendConfig, "connection", return_value=(upstream, "/engine")):
+        decision, outcome, started = Relay(BackendConfig.mock(("localhost", 1)), 1, 1, 2).relay_stream(
+            client, "a" * 32, document, allowed, time.monotonic(), lambda: None
+        )
+    assert (decision.result, outcome, started) == ("ALLOWED", "completed", True)
+    assert b"".join(client.chunks) == wire and upstream.closed

@@ -296,6 +296,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/update/execution-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Execution Settings */
+        get: operations["execution_settings_api_update_execution_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/update/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Runs */
+        get: operations["runs_api_update_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/update/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run */
+        get: operations["run_api_update_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/update/runs/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prepare */
+        post: operations["prepare_api_update_runs_prepare_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/update/runs/{run_id}/execute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Execute */
+        post: operations["execute_api_update_runs__run_id__execute_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/inputs/catalog": {
         parameters: {
             query?: never;
@@ -788,6 +873,13 @@ export interface components {
             /** After */
             after?: unknown;
         };
+        /** DocumentSelection */
+        DocumentSelection: {
+            /** Id */
+            id: string;
+            /** Revision */
+            revision: number;
+        };
         /** EnforcementComponentResult */
         EnforcementComponentResult: {
             /**
@@ -1028,6 +1120,36 @@ export interface components {
             invalid?: components["schemas"]["InvalidItem"] | null;
             source: components["schemas"]["SourceInfo"];
         };
+        /**
+         * LegacyUpdateRunRequest
+         * @description Previously saved file-based runs remain readable, but cannot be submitted.
+         */
+        LegacyUpdateRunRequest: {
+            /**
+             * Mode
+             * @default validate
+             * @enum {string}
+             */
+            mode: "validate" | "update";
+            /**
+             * Pack Path
+             * @default packs/PACK-BASELINE
+             */
+            pack_path: string;
+            /**
+             * Config Path
+             * @default examples/gpu-bounded.toml
+             */
+            config_path: string;
+            /** Policy Path */
+            policy_path: string;
+            /** Environment Path */
+            environment_path?: string | null;
+            /** Baseline Path */
+            baseline_path?: string | null;
+            /** Candidate Path */
+            candidate_path?: string | null;
+        };
         /** LoginBody */
         LoginBody: {
             /** Username */
@@ -1261,6 +1383,52 @@ export interface components {
             saved: components["schemas"]["PolicyRevision"];
             /** Warnings */
             warnings: components["schemas"]["FieldIssue"][];
+        };
+        /** PreparationCheck */
+        PreparationCheck: {
+            /** Check */
+            check: string;
+            /** Ok */
+            ok: boolean;
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** PreparationGuidance */
+        PreparationGuidance: {
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            /** Issues */
+            issues?: components["schemas"]["PreparationIssue"][];
+        } & {
+            [key: string]: unknown;
+        };
+        /** PreparationIssue */
+        PreparationIssue: {
+            /** Code */
+            code: string;
+            /** Cause */
+            cause: string;
+            /** Action */
+            action: string;
+            /** Side */
+            side?: string | null;
+            /** Check Id */
+            check_id?: string | null;
+            /**
+             * Blocking
+             * @default true
+             */
+            blocking: boolean;
+        } & {
+            [key: string]: unknown;
         };
         /** ReportCheck */
         ReportCheck: {
@@ -1835,6 +2003,15 @@ export interface components {
             /** Errors */
             errors: components["schemas"]["FieldIssue"][];
         };
+        /** SelectedDocumentRef */
+        SelectedDocumentRef: {
+            /** Id */
+            id: string;
+            /** Revision */
+            revision: number;
+            /** Sha256 */
+            sha256: string;
+        };
         /**
          * SourceInfo
          * @description 이 응답의 자료를 어디서 읽었는지. example이면 화면에 '예시 데이터' 띠를 띄운다.
@@ -2337,6 +2514,100 @@ export interface components {
             load?: components["schemas"]["TetragonLoad"] | null;
             /** Error */
             error?: string | null;
+        };
+        /** UpdateExecutionSettings */
+        UpdateExecutionSettings: {
+            /** Available */
+            available: boolean;
+            /** Can Execute */
+            can_execute: boolean;
+            /** Unavailable Reason */
+            unavailable_reason?: string | null;
+            /** Temporary */
+            temporary: boolean;
+        };
+        /** UpdatePreparation */
+        UpdatePreparation: {
+            /** Ready */
+            ready: boolean;
+            /** Checks */
+            checks?: components["schemas"]["PreparationCheck"][];
+            /** Check Support */
+            check_support?: {
+                [key: string]: unknown;
+            }[];
+            guidance?: components["schemas"]["PreparationGuidance"] | null;
+            /** Limitations */
+            limitations?: string[];
+        } & {
+            [key: string]: unknown;
+        };
+        /** UpdateRun */
+        UpdateRun: {
+            /** Id */
+            id: string;
+            /** Request */
+            request: components["schemas"]["UpdateRunRequest"] | components["schemas"]["LegacyUpdateRunRequest"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "preparing" | "ready" | "blocked" | "running" | "completed" | "failed" | "interrupted";
+            /** Created At */
+            created_at: string;
+            /** Started At */
+            started_at?: string | null;
+            /** Finished At */
+            finished_at?: string | null;
+            /** Requested By */
+            requested_by: string;
+            /** Executed By */
+            executed_by?: string | null;
+            preparation?: components["schemas"]["UpdatePreparation"] | null;
+            /** Exit Code */
+            exit_code?: number | null;
+            /** Error */
+            error?: string | null;
+            /** Report Ids */
+            report_ids?: string[];
+            /**
+             * Log Tail
+             * @default
+             */
+            log_tail: string;
+            /**
+             * Log Truncated
+             * @default false
+             */
+            log_truncated: boolean;
+            /** Input Sha256 */
+            input_sha256: string;
+            /** Source Refs */
+            source_refs?: {
+                [key: string]: components["schemas"]["SelectedDocumentRef"];
+            };
+            /** Pack */
+            pack?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** UpdateRunList */
+        UpdateRunList: {
+            /** Items */
+            items: components["schemas"]["UpdateRun"][];
+        };
+        /** UpdateRunRequest */
+        UpdateRunRequest: {
+            /**
+             * Mode
+             * @default validate
+             * @enum {string}
+             */
+            mode: "validate" | "update";
+            policy: components["schemas"]["DocumentSelection"];
+            environment?: components["schemas"]["DocumentSelection"] | null;
+            baseline?: components["schemas"]["DocumentSelection"] | null;
+            candidate?: components["schemas"]["DocumentSelection"] | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -3969,6 +4240,141 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RevalidationList"];
+                };
+            };
+        };
+    };
+    execution_settings_api_update_execution_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateExecutionSettings"];
+                };
+            };
+        };
+    };
+    runs_api_update_runs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateRunList"];
+                };
+            };
+        };
+    };
+    run_api_update_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateRun"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prepare_api_update_runs_prepare_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateRun"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    execute_api_update_runs__run_id__execute_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateRun"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

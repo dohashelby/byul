@@ -9,6 +9,7 @@ import { LandingPage } from "../pages/LandingPage";
 import { RequestsPage } from "../pages/RequestsPage";
 import { BlockedPage } from "../pages/BlockedPage";
 import { ResultsPage } from "../pages/ResultsPage";
+import { UpdateExecutionPage } from "../pages/UpdateExecutionPage";
 import { RevalidationPage } from "../pages/RevalidationPage";
 import { RuntimeEnforcePage } from "../pages/runtime/RuntimeEnforcePage";
 import { TetragonPolicyPage } from "../pages/runtime/TetragonPolicyPage";
@@ -39,6 +40,7 @@ export const routes: RouteObject[] = [
       { path: "policies/new", element: <PolicyEditorPage key="new" /> },
       { path: "policies/:id", element: <PolicyEditorPage /> },
       { path: "update/results", element: <ResultsPage /> },
+      { path: "update/execute", element: <UpdateExecutionPage /> },
       { path: "runtime/overview", element: <DashboardPage /> },
       { path: "runtime/alerts", element: <AlertsPage /> },
       { path: "runtime/observe/phases", element: <PhaseTimelinePage /> },

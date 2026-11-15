@@ -16,6 +16,7 @@ from .contracts import Contracts, canonical_sha256
 from .sources.evidence import EvidenceSource
 from .sources.runtime import ExampleRuntimeSource, LiveRuntimeSource, RuntimeClient, RuntimeSource
 from .sources.update import ExampleUpdateSource, ReportDirUpdateSource, UpdateSource
+from .sources.update_execution import ExecutionUpdateSource, UpdateExecutionService
 from .store import EnvironmentStore, FileDocumentStore, PolicyStore
 
 
@@ -30,6 +31,7 @@ class AppState:
     policies: PolicyStore
     store_mode: str
     store_detail: str | None
+    update_execution: UpdateExecutionService
     _cleanup: list[Any] = field(default_factory=list)
 
     @property
@@ -98,6 +100,11 @@ def build_state(settings: Settings) -> AppState:
         _seed_example_store(root, examples, envs, pols)
         store_mode, store_detail = "example", f"{root} (임시, 종료 시 삭제)"
 
+    execution = UpdateExecutionService(settings, root / "update-runs", contracts, envs, pols)
+    # Finish guard cleanup before the example store's temporary directory is removed.
+    cleanup.insert(0, execution.close)
+    update = ExecutionUpdateSource(update, execution.root / "reports")
+
     return AppState(
         settings=settings,
         contracts=contracts,
@@ -108,6 +115,7 @@ def build_state(settings: Settings) -> AppState:
         policies=pols,
         store_mode=store_mode,
         store_detail=store_detail,
+        update_execution=execution,
         _cleanup=cleanup,
     )
 

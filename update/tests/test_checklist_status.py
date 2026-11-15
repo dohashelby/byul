@@ -183,8 +183,21 @@ def test_gpu_status_takes_strongest_record_and_never_claims_whole_question():
 
 def test_real_gpu_summaries_keep_exact_refs_and_separate_declared_components():
     current = gpu_runs(ROOT)
-    assert not any(r['current_definition'] for rows in current.values() for r in rows)
-    assert {gpu_status(rows) for rows in current.values()} == {'DEFERRED_NOT_MEASURED'}
+    # 첫 @34 실측 두 쪽만 현행으로 센다. 다른 점검·과거 기록은 승격하지 않는다.
+    measured = [(cid, r) for cid, rows in current.items() for r in rows if r['current_definition']]
+    assert len(measured) == 2 and {cid for cid, _ in measured} == {'SUP-08'}
+    assert {r['result_ref'] for _, r in measured} == {
+        'RES-01M7CE9786481FWFGNTKW8F6QJ@1:f01f213733ab078cabb90a488a495bc1aff34c9076f0307f61f9521aa27d4520',
+        'RES-01M7CE978C9M2XF5A3HC1EMFEJ@1:a17ecf52da372ee606c80f7f43306dcef1a18f1c2b5cb33ba9f6dda19a7f6a7a'}
+    assert {r['evidence_ref'] for _, r in measured} == {
+        'EVD-01M7CE8NAEJR8D0SS4AQVKV2HV@1:eead284c58b01003d0cd027543504bc1c32556dab41be890724b30dae352043c',
+        'EVD-01M7CE8ZMT3N17Z7M7GH1KS6CN@1:e9d8c40cf90fa95a2822aa6ac6ba4a8c473212bb19171182f4ae093b650e0d55'}
+    assert all(r['pack_revision'] == 34 and r['verification_level'] == 'MEASURED'
+               and r['data_origin'] == 'EXAMPLE' for _, r in measured)
+    assert {r['verdicts']['security'] for _, r in measured} == {'PASS', 'FAIL'}
+    assert gpu_status(current['SUP-08']) == 'GPU_PARTIAL_MEASURED'
+    assert all(gpu_status(rows) == 'DEFERRED_NOT_MEASURED'
+               for cid, rows in current.items() if cid != 'SUP-08')
     # 과거 Ref·부분 실측 표시는 원래 @33 정의에 대해 그대로 검사한다.
     class HistoricalRoot(type(ROOT)):
         def __truediv__(self, other):
@@ -192,10 +205,12 @@ def test_real_gpu_summaries_keep_exact_refs_and_separate_declared_components():
                 return ROOT / 'reference/pack-seeds/PACK-BASELINE-33'
             return super().__truediv__(other)
     runs = gpu_runs(HistoricalRoot(ROOT))
-    assert {r["pack_revision"] for rows in runs.values() for r in rows} == {32, 33}
+    assert {r["pack_revision"] for rows in runs.values() for r in rows} == {32, 33, 34}
     old11 = [r for r in runs["REQ-11"] if r["pack_revision"] == 32]
     assert old11 and not any(r["current_definition"] for r in old11)  # rev6 기록은 이력만
-    assert all(r["current_definition"] for cid, rows in runs.items() if cid != "REQ-11" for r in rows)
+    assert all(r['current_definition'] == (r['pack_revision'] in {32, 33}
+               and not (cid == 'REQ-11' and r['pack_revision'] == 32))
+               for cid, rows in runs.items() for r in rows)
     assert gpu_status(runs["REQ-11"]) == "GPU_PARTIAL_EXAMPLE"  # 팩33 rev7 기록에서만
     assert gpu_status(old11) == "DEFERRED_NOT_MEASURED"
     assert all(r["result_ref"].startswith("RES-") for rows in runs.values() for r in rows)

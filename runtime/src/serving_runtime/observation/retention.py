@@ -316,6 +316,15 @@ class RecordRetention:
                     entry["error"] = type(error).__name__
             files[name] = entry
 
+        if self.enforce:
+            # Enforced runs report actual remaining bytes, including blocked or
+            # failed rewrites. Report-only runs retain their projected value.
+            remaining = 0
+            for managed in MANAGED_FILES:
+                try:
+                    remaining += (self.data_dir / managed.name).stat().st_size
+                except FileNotFoundError:
+                    pass
         removed_total = sum(entry["removed_lines"] for entry in files.values())
         summary = {
             "schema": RUN_SCHEMA,

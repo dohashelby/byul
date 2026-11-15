@@ -375,7 +375,6 @@ def test_a5_final_appended_to_started_before_age_deletion_keeps_both(tmp_path, m
     assert rows == [started, final]
 
 
-@pytest.mark.xfail(strict=True, reason="A-6")
 @pytest.mark.parametrize("failure", ["hold", "rewrite"])
 def test_a6_failed_or_blocked_deletion_reports_actual_bytes(tmp_path, monkeypatch, failure):
     path = tmp_path / "gateway_records.jsonl"

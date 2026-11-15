@@ -322,9 +322,11 @@ def test_startup_prepared_roundtrip_exact_private_dependencies_and_legacy_bytes(
     assert lifecycle.load_prepared(external / 'assets/manifest.json') == world.prepared
     assert set(world.prepared['assets']) == {'guard_lifecycle_sensor.py', 'guard_lifecycle_base.py',
         'sitecustomize.py', 'settings.json', *catalog.startup_assets(STARTUP_PROFILE)}
-    assert len(world.base.SOURCE_SHA) == 10
+    assert set(world.base.SOURCE_SHA) == set(sensor.ROWS)
     assert legacy.PROFILE == 'vllm-native-lifecycle-metadata/8'
-    assert catalog.row('vllm-native-lifecycle-metadata/27')['sources'].keys() < world.base.SOURCE_SHA.keys()
+    assert not catalog.row('vllm-native-lifecycle-metadata/27')['sources'].keys() & world.base.SOURCE_SHA.keys()
+    assert world.base.POINTS == {name: {} for name in sensor.ROWS}
+    assert world.base.FUNCTION_POINTS == world.base.HANDLER_POINTS == {}
     for logical, (filename, digest) in composition.DEPENDENCIES.items():
         assert world.prepared['assets'][filename]['sha256'] == digest
     assert world.prepared['product_connected'] is False
@@ -426,3 +428,70 @@ def test_composed_constructor_failure_reaches_existing_capture_summary(external,
     assert fact['confirmed_violation'] is False
     assert summary['baseline_startup']['paired_calls'] == 2
     assert summary['whole_run_coverage_verified'] is False
+
+
+def test_startup_only_middleware_and_unrelated_native_input_never_record_request_ids(external, tmp_path):  # noqa: F811
+    import asyncio
+    world = composed_world(external)
+    module = native_module(sensor.WORKER, tmp_path)
+    attach_native(world, module)  # a real nonempty Writer journal, unrelated to HTTP
+    request_id = 'request-7'  # low-entropy input must never become an unkeyed fingerprint
+    scope = {'type': 'http', 'method': 'POST', 'path': '/v1/completions',
+             'headers': [(b'x-request-id', request_id.encode())]}
+    messages = []
+    async def receive():
+        return {'type': 'http.request', 'body': b'', 'more_body': False}
+    async def send(value):
+        messages.append(value)
+    async def app(actual_scope, actual_receive, actual_send):
+        assert actual_scope is scope and actual_receive is receive and actual_send is send
+        assert (await actual_receive())['type'] == 'http.request'
+        await actual_send({'type': 'http.response.start', 'status': 200, 'headers': []})
+        await actual_send({'type': 'http.response.body', 'body': b'', 'more_body': False})
+        return 'original-app-result'
+    assert asyncio.run(world.base.Middleware(app)(scope, receive, send)) == 'original-app-result'
+    assert len(messages) == 2
+    unrelated = ModuleType('vllm.v1.engine.processor')
+    class Processor:
+        def process_inputs(self, request_id):
+            return request_id
+    unrelated.Processor = Processor
+    original = Processor.process_inputs
+    world.observer.instrument(unrelated)
+    assert Processor.process_inputs is original
+    assert Processor().process_inputs(request_id) == request_id
+    assert world.base.Finder(world.observer).find_spec(unrelated.__name__, None) is None
+    world.observer.close()
+    raw = bytes(world.fake.data)
+    assert request_id.encode() not in raw
+    assert hashlib.sha256(request_id.encode()).hexdigest().encode() not in raw
+    rows, summary = capture.parse_recording(raw, world.prepared)
+    assert {row['event'] for row in rows} <= {'START', 'MODULE', 'BASELINE_STARTUP', 'END'}
+    assert summary['baseline_startup']['paired_calls'] == 0
+    for event in ('ASGI', 'NATIVE', 'SELECTION'):
+        forged = deepcopy(rows)
+        forged.insert(-1, {'seq': 0, 'event': event, 'monotonic_ns': rows[-1]['monotonic_ns'],
+                           'previous_sha256': '0' * 64, 'payload': {}})
+        with pytest.raises(ValueError, match='LIFECYCLE_RECORDING_ROW_INVALID'):
+            capture.parse_recording(rechain(forged), world.prepared)
+
+
+def test_empty_native_targets_are_allowed_only_for_the_exact_startup_composition(monkeypatch):
+    data = json.loads((Path(catalog.__file__).with_name('assets') / 'vllm_native_release_rows.json').read_bytes())
+    startup = next(row for row in data['profiles'] if row['profile'] == STARTUP_PROFILE)
+    assert startup['void_return_argument_ids'] == []
+    assert catalog.row(STARTUP_PROFILE)['sources'] == {name: {'sha256': source['sha256'],
+        'bytes': source['bytes'], 'classes': {}} for name, source in sensor.ROWS.items()}
+    for change in ('legacy-empty', 'startup-extra-source', 'startup-request-target'):
+        damaged = deepcopy(data)
+        selected = next(row for row in damaged['profiles'] if row['profile'] == STARTUP_PROFILE)
+        if change == 'legacy-empty':
+            damaged['profiles'][0]['sources'] = {}
+            damaged['profiles'][0]['void_return_argument_ids'] = []
+        elif change == 'startup-extra-source':
+            selected['sources'].update(deepcopy(data['profiles'][0]['sources']))
+        else:
+            selected['sources'][sensor.MP]['classes'] = {'MultiprocExecutor': ['_init_executor']}
+        monkeypatch.setattr(catalog, 'json', SimpleNamespace(loads=lambda raw: damaged))
+        with pytest.raises(ValueError, match='LIFECYCLE_.*CATALOG_INVALID'):
+            catalog._catalog()

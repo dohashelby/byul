@@ -78,8 +78,8 @@ lineage, 외부 신규 요청 접수 oracle이다. 이 연결과 실제 이미�
 
 ## 기존 lifecycle 경로 연결 `/31`
 
-`vllm-native-lifecycle-metadata/31`은 `/27`의 정확 snapshot 행 8개에 startup
-두 모듈을 더한 **별도 composition**이다. `/27` template·render 의미와 기존
+`vllm-native-lifecycle-metadata/31`은 정확 startup 두 모듈만 선택하는
+**별도 composition**이다. `/27` template·render 의미와 기존
 `/14`·`/15`·`/19` 등 원본 bytes는 보존한다. 기능 추가 없이 profile만 복제한
 것이 아니라 새 `BASELINE_STARTUP` 사건과 엄격한 parser를 가진다.
 
@@ -87,7 +87,7 @@ lineage, 외부 신규 요청 접수 oracle이다. 이 연결과 실제 이미�
   helper 6개와 candidate를 각각 고정 SHA로 묶고, 다시 해시한 변조 manifest도
   source와의 대조에서 거부한다. 실행 전에는 디렉터리·파일을 nofollow로
   열고 path/fd의 dev/inode/mode/uid/size/mtime/ctime 안정성과 SHA를 확인한다.
-- 새 extension은 `/27` template 뒤에만 붙인다. private dependency의 from
+- 새 extension은 `/27` template 뒤에만 붙이되 선택한 source/target은 startup 두 모듈뿐이다. private dependency의 from
   import를 명시된 객체로 연결하며 source bytes·global importer·sys.modules를
   바꾸지 않는다. base의 검증된 CPython 3.12.3·3.12.8 계약을 재사용하고
   callback·helper는 정확 source를 현재 interpreter로 직접 컴파일해 비교한다.
@@ -100,6 +100,11 @@ lineage, 외부 신규 요청 접수 oracle이다. 이 연결과 실제 이미�
   session SHA다. fork 뒤에는 기존 Writer의 새 process context를 얻고 원본
   callback 상태와 상속된 parent call을 버린다. fresh spawn은 기존
   sitecustomize bootstrap으로 동일한 자산을 새 interpreter에서 설치한다.
+- `/31` Middleware는 scope/header를 읽지 않고 원 app에 그대로 전달한다.
+  request/scheduler source·target을 선택하지 않고 NATIVE·ASGI·SELECTION 사건은
+  생성하지 않는다. parser도 세 사건을 명시적으로 거부한다. 따라서 기존
+  기반의 unkeyed request SHA를 이 startup 증거에 넣지 않는다. 추후 접수
+  oracle은 별도 `/28`의 session-HMAC 의미를 재사용해야 한다.
 - capture parser는 `/31`에서만 새 사건을 받는다. source의 verified MODULE
   선행, 정확 source SHA·runtime, header의 process/session binding, envelope
   clock을 대조한다. callback 기본·미지원 record의 null/gap 의미는 유지한다.

@@ -8,6 +8,7 @@ import re
 from . import vllm_configured_lifecycle_sensor as template
 from . import vllm_observer_abi as abi
 from . import vllm_baseline_startup_composition as startup
+from . import vllm_baseline_startup as startup_native
 
 
 def _catalog():
@@ -30,11 +31,14 @@ def _catalog():
                     if point in points:
                         raise ValueError('LIFECYCLE_POINT_AMBIGUOUS')
                     points[point] = module
-        if not points or not set(row['void_return_argument_ids']) <= points.keys():
+        if (not points and 'startup' not in row) or not set(row['void_return_argument_ids']) <= points.keys():
             raise ValueError('LIFECYCLE_CATALOG_INVALID')
         if 'startup' in row and (row['startup'] != 'baseline-v1'
                 or row['profile'] != startup.STARTUP_PROFILE or row['schema'] != startup.STARTUP_SCHEMA
-                or row.get('startup_image') not in row['images'] or 'request_binding' in row):
+                or row.get('startup_image') not in row['images'] or 'request_binding' in row
+                or row['sources'] != {name: {'sha256': source['sha256'], 'bytes': source['bytes'], 'classes': {}}
+                                      for name, source in startup_native.ROWS.items()}
+                or row['void_return_argument_ids'] != []):
             raise ValueError('LIFECYCLE_STARTUP_CATALOG_INVALID')
         binding = row.get('request_binding')
         if binding is not None and (type(binding) is not dict or set(binding) != {

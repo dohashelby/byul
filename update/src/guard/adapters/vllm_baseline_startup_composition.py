@@ -84,7 +84,9 @@ def _startup_modules(base):
 def _startup_configure(base):
     candidate = _startup_modules(base)
     if (SPEC['profile'] != STARTUP_PROFILE or SPEC['schema'] != STARTUP_SCHEMA
+            or set(SPEC['sources']) != set(candidate.ROWS) or SPEC['void_return_argument_ids'] != []
             or any(SPEC['sources'].get(name, {}).get('sha256') != row['sha256']
+                   or SPEC['sources'][name]['classes'] != {}
                    for name, row in candidate.ROWS.items())):
         raise ValueError('BASELINE_STARTUP_COMPOSITION_INVALID')
     original = base.Observer
@@ -115,6 +117,15 @@ def _startup_configure(base):
             finally:
                 super().close()
     base.Observer = StartupObserver
+    class StartupMiddleware:
+        def __init__(self, app):
+            self.app = app
+
+        async def __call__(self, scope, receive, send):
+            # Startup-only profile has no request-ID/admission observation.
+            # In particular, never read a header or invoke the legacy ID hash.
+            return await self.app(scope, receive, send)
+    base.Middleware = StartupMiddleware
     return base
 
 

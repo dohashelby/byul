@@ -1,3 +1,7 @@
+## 2026-11-15 — fresh 요청 연결 push·PR 생성 승인
+
+사용자는 검토 기능6a54db5d·검증 기록4605369e에 대해 “push·PR 생성 승인”으로 답했다. codex/baseline-v1-request-binding-20261115를 main 대상 PR로 공개하고 정확 head CI를 확인한다. 이 승인 기록과 CI 원인 보수는 같은 범위로 잇는다. 병합·새 GPU/비용·M-B4 재개는 포함하지 않는다. worker/그룹·GPU 자격과 생산자 등록의 미완료를 보존한다.
+
 ## 2026-11-15 — fresh 요청 연결 후속 profile·HMAC 키 자산 승인
 
 사용자는 “후속 profile·HMAC 키 자산 승인”으로 답했다. 기존 /1~ /27을 보존하고 후속 native /28·세션32바이트 비밀키 자산을 추가한다. 실제 ASGI invocation과 정확 원 함수/code/globals/self·입력 ID를 대조해 HMAC 지문으로만 기록한다. 이전 raw SHA를 소급 재작성하지 않고 ContextVar/문자열만으로 연결하지 않는다. 공통 GPU /1·/4·판정/수락·정책/실행기 활성화·비용/다운로드·M-B4 재개·push/병합은 이 승인에 포함하지 않는다. 구체 형식은 작업 폴더 MVP_FRESH_REQUEST_BINDING_DECISION_20261115.md.

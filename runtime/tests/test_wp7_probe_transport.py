@@ -37,13 +37,29 @@ def test_disconnect_resets_gateway_socket_instead_of_port_forward(monkeypatch, t
     import server_checks
 
     live = FakeLive(tmp_path)
-    live.c = {"disconnect_via_cluster_service": True}
+    live.c = {"disconnect_direct_gateway_tcp": True}
     old_kube = live.kube
 
     def kube(*args, **kwargs):
-        if args[:2] == ("get", "service"):
+        if args[:2] == ("get", "deployment"):
             assert args[2] == "serving-gateway" and kwargs["private"]
-            return json.dumps({"spec": {"clusterIP": "127.0.0.2", "ports": [{"port": 8080, "targetPort": 8080}]}})
+            return json.dumps({"spec": {"selector": {"matchLabels": {"app": "actual-gateway"}}}})
+        if args[:2] == ("get", "pods"):
+            assert args[2:4] == ("-l", "app=actual-gateway") and kwargs["private"]
+            return json.dumps(
+                {
+                    "items": [
+                        {
+                            "metadata": {},
+                            "status": {
+                                "podIP": "127.0.0.2",
+                                "phase": "Running",
+                                "conditions": [{"type": "Ready", "status": "True"}],
+                            },
+                        }
+                    ]
+                }
+            )
         return old_kube(*args, **kwargs)
 
     live.kube = kube

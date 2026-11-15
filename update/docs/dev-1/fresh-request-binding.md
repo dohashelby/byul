@@ -25,7 +25,7 @@
 태그/실제 설치 대조 bytes의 handler·선택·generate/add_request·processor 함수 본문을 AST 그대로 실행하고 협력 객체만 EXAMPLE로 구성했다. 실제 vLLM/모델을 import·기동하지 않았다.
 
 - 직접 영향/기존 lifecycle·파서·중립성·경로243개 통과(pytest3.71초·부모4.167초).
-- 승인된 기준 이미지 추출 CPython3.12.8로 관련61개 통과(pytest1.52초·부모1.731초). CI의 별도3.12.8 job에도 새 직접 시험을 연결했다.
+- 승인된 기준 이미지 추출 CPython3.12.8로 관련61개 통과(pytest1.48초·부모1.683초). CI의 별도3.12.8 job에도 새 직접 시험을 연결했다.
 - 헤더 부재·세션 분리·streaming·ASGI 종료 후 task·다른 code/객체/source/선택 ID·property 비실행·동일 원 예외·재생/과장·비밀 자산 오류를 확인했다.
 - 최초 새 시험의 협력 객체 이름 누락 수정 뒤 재검증했다. 기존 assert·기한·skip은 바꾸지 않았다. 로컬 전체 pytest·새 PR CI는 미실행이다.
 

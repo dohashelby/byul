@@ -154,9 +154,12 @@ def test_stage2_side_table_is_used_and_missing_session_stays_blocked(tmp_path, s
     value['scope']['include'], value['values'] = ['PLT-12'], {'PLT-12': values}
     p.write_text(yaml.safe_dump(value)); entry['policy']['sha256'] = sha256(p.read_bytes()).hexdigest()
     p = Path(entry['configuration']['path']); target = p.parent / 'target.json'
+    producer = p.parent / 'copy-producer.py'
+    producer.write_bytes(b'# EXAMPLE credential-copy record producer\n')
     config = "[executors]\nrequired_event_record='kubernetes'\n[required_event_record]\ntarget=" + json.dumps(str(target)) + '\n'
     if record_session:
         config += "[sides.baseline.run_binding.PLT-12]\nrecord_session=" + json.dumps(record_session) + '\n'
+        config += 'record_producer=' + json.dumps(str(producer)) + '\n'
     p.write_text(config); entry['configuration']['sha256'] = sha256(p.read_bytes()).hexdigest()
     result = run(tmp_path, data)
     row = next(r for r in result['rows'] if r['check_id'] == 'PLT-12' and r['side'] == 'baseline')

@@ -1,5 +1,7 @@
 ## 2026-11-15 — #271 병합 확인·M-A3 제품 입력 사전 결합 후보
 
+- 공개: 사용자 승인으로 main 대상 [#276](https://github.com/dohashelby/byul/pull/276)을 열었다. 전체 미완료를 명시한 draft로 유지하며 병합은 별도 승인 전이다. PR CI는 최신 head의 checks로 확인한다.
+
 - 한 일: #271을 main86ef57c1에 병합했고 병합 tree는 검증한 head1aeb946a와 같다. PR CI18개와 병합 후 main의 UPDATE/Runtime 두 workflow가 성공했다. runtime gateway의 최초504/200 실패 로그와 동일 head 재시도 성공을 함께 보존하며 원인 해결로 세지 않는다. M-B4 브랜치745e76f0는 보관했다.
 - 한 일: 현재 정확 검토 소스의 준비물·sealed ENV·target·세션·Pod/container/restart를 ARM 전에 HMAC으로 묶는 도구와 actor/source ARM/2를 구현했다. 현재 TP2/PP1/DP1 입력만 받으며 기존 ARM/1 lab 재생·nonce/물리 신호/lease·기한·등록 관문은 유지했다. 두 판본의 지연/예외/종료용 새 미결합 준비물6개·독립 세션6개를 만들고 보고서와 CI 경로 두 곳에 기록했다. 새 ENV/target/결합 파일·실행 결과는 생성하지 않았다.
 - 테스트 결과: 직접 입력/제어/실제 시험 소유 자식의 신호·해제/설치/기존 생산자/경로151개 통과(pytest10.95초·부모벽11.384초). 기존 기준 이미지 Python ABI에서는 직접95개 통과(pytest7.30초·벽7.638초). 과거 여섯 실제 ZIP의 크기/SHA·snapshot329개·제어 HMAC/원 CALL/물리 영수증/새 Pod 정상 요청을 재검증했고 gap0과 기존 소스 귀속을 보존했다(벽12.849초). 여섯 ARM/1 모두 제품 사후 결합을 거부했다. 현황 --check·소스549파일/목록e0c39ae8의 정확 검토 행 관문 통과. 전체 로컬 pytest·신규 GPU/클라우드 실행은 하지 않았다.

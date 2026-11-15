@@ -2930,7 +2930,7 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 후속 직접 결합 결과: #276 제품 파일 소비 구현을 포함한 source에서 새 조립 도구의 실행 결합과 select/run/judge/report/verify를 두 쪽×/1·/4의 EXAMPLE4사례로 확인했다(벽시계25.989초). 결과는 EXAMPLE/ABORTED/UNKNOWN이며 실제 엔진/GPU/등록 자격이 아니다. 현황 --check와 최종 경로/기존 materialize25개도 통과(pytest5.86초·부모6.121초). 새 원격 CI는 미실행이다.
 ## 2026-11-15 — M-A6 기준 V1 /28 요청 연결 소비 W1 (로컬 검토)
 
-- 한 일: 기준 0.7.0의 정확 `/28` native profile에서 준비된 private 세션 키로 ASGI 헤더 HMAC을 재계산하고, 검증된 `Processor.process_inputs` RETURN의 선택/원 요청 ID를 LIF-10/12, REQ-12, OBS-02 실행기 투영에 연결했다. raw 헤더·키·과거 SHA 지문은 증거에 추가하지 않는다. 기존 profile의 연결 방식과 공통 판정은 유지한다.
+- 한 일: 기준 0.7.0의 정확 `/28` native profile에서 준비된 private 세션 키로 ASGI 헤더 HMAC을 재계산하고, 검증된 `Processor.process_inputs` RETURN의 선택/원 요청 ID를 LIF-10/12, REQ-12, OBS-02 실행기 투영에 연결했다. `/28`의 trial 요청 식별값도 세션 HMAC이며 raw 헤더·키·기존 SHA 지문은 기록하지 않는다. 기존 profile의 연결 방식과 공통 판정은 유지한다.
 - 관측 경계: REQ-12에는 fresh 요청의 native 입력 연결만 생긴다. 시도/KV/worker/output 및 전체 범위는 계속 미관측·UNKNOWN이다. OBS-02도 선택 성분만 부분 관측하며 생산자 인증·GPU 자격·등록·실측 PASS를 뜻하지 않는다.
 - 테스트 결과: 사용자 지시에 따라 로컬 Python/pytest는 실행하지 않았다. 정확 소스와 시험 변경은 CI에서 검증할 예정이다. `git diff --check`와 source SHA 목록은 로컬 shell로 확인한다.
 - 다음 단계: 이 커밋의 집중 검토와 CI를 거친 뒤 후보 0.30.0 stream_buffer/profiler 독립 변형을 잇는다. 실제 ENV/target·GPU 등록과 판정 수락은 미완료다.

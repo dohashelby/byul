@@ -74,22 +74,26 @@ class KubernetesObservationStateExecutor(KubernetesRequestTerminationExecutor):
                 if slot=='disconnect' and not bycase.get('normal-before',{}).get('normal_shape_verified'):continue
                 health=slot.startswith('health-');close=slot=='disconnect';rid='byul-obs02-'+token+'-'+slot
                 body=None if health else {'model':ctx.api_model,'prompt':'hello','max_tokens':8 if close else 1,'temperature':0,'stream':close}
-                row={'case_id':'obs02-'+slot,'method':'GET' if health else 'POST','request_id_sha256':sha256_hex(rid.encode()),
+                try:
+                    if ctx._termination_prepared['profile']=='vllm-native-lifecycle-metadata/28':
+                        from guard.collectors.lifecycle import request_header_fingerprint
+                        request_identity=request_header_fingerprint(self.cfg['prepared'],ctx._termination_prepared,rid)
+                    else:request_identity=sha256_hex(rid.encode())
+                except ValueError:
+                    request_identity=None;summary['diagnostic_codes'].append('OBSERVATION_STATE_REQUEST_BINDING_KEY_UNAVAILABLE')
+                row={'case_id':'obs02-'+slot,'method':'GET' if health else 'POST','request_id_sha256':request_identity,
                     'request_body_sha256':sha256_hex(canonical_json(body)),'attempted':False,'outcome':None,
                     'binding_verified':False,'capture_complete':False,'normal_shape_verified':False,'http_available':None,
                     'expected_client_close':False,'started_at':None,'finished_at':None,'policy_window_verified':False}
                 summary['trials'].append(row);bycase[slot]=row
+                if request_identity is None:continue
                 try:
                     now=utcnow()
                     if not start<=now<=end:raise ValueError
                     request={'id':row['case_id'],'method':row['method'],'mode':'sse' if close else 'json',
                         'url':ctx.engine_url+('/health' if health else '/v1/completions'),'headers':{'X-Request-Id':rid},'body':body}
                     if not health and ctx._termination_prepared['profile']=='vllm-native-lifecycle-metadata/28':
-                        try:
-                            from guard.collectors.lifecycle import request_header_fingerprint
-                            ctx._request_binding_hashes[row['case_id']]=request_header_fingerprint(
-                                self.cfg['prepared'],ctx._termination_prepared,rid)
-                        except ValueError:summary['diagnostic_codes'].append('OBSERVATION_STATE_REQUEST_BINDING_KEY_UNAVAILABLE')
+                        ctx._request_binding_hashes[row['case_id']]=request_identity
                     if close:request['read_profile']={'profile':'slow-reader-v1','chunk_bytes':1,'interval_ms':1,'close_after_reads':1}
                     row.update(attempted=True,started_at=now.isoformat())
                     response,=ctx.cprobe('kubernetes-probe',[request],ctx.timeout)

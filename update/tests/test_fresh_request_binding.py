@@ -18,6 +18,7 @@ from guard.adapters import vllm_lifecycle_sensor as legacy
 from guard.adapters.vllm_lifecycle_links import fresh_assignment
 from guard.adapters.vllm_observation_state import project as project_observation_state
 from guard.adapters.vllm_request_attempts import project_attempts
+from guard.adapters.vllm_request_termination import project_native as project_termination
 from guard.collectors import lifecycle
 from guard.executors import lifecycle_capture as capture
 from tests.test_configured_lifecycle import native_class
@@ -117,11 +118,11 @@ def program(world):
     return SimpleNamespace(handler=handler, engine=engine, processor=processor, params=params, request=request, result=result)
 
 
-def run_request(world, app, *, header=True, method='POST'):
+def run_request(world, app, *, header=True, method='POST', receive=None):
     async def forbidden(*a): raise AssertionError('관측기가 추가 receive/send를 호출했다')
     scope = {'type': 'http', 'path': '/v1/completions', 'root_path': '', 'method': method,
              'headers': [(b'x-request-id', SECRET.encode())] if header else []}
-    return asyncio.run(world.base.Middleware(app)(scope, forbidden, forbidden))
+    return asyncio.run(world.base.Middleware(app)(scope, receive or forbidden, forbidden))
 
 
 def recording(world):
@@ -170,7 +171,7 @@ def test_actual_fresh_binding_feeds_limited_observation_and_attempt_projections(
         'records': rows, 'summary': summary, 'process_context_verified': True,
         'image_digest_verified': False}, 'session_owner_match': True, 'listed_file_identity_match': True}]}
     trial = {'case_id': 'obs02-normal-before', 'attempted': True, 'method': 'POST',
-             'request_id_sha256': hashlib.sha256(SECRET.encode()).hexdigest()}
+             'request_id_sha256': request}
     observation = project_observation_state(packet, [trial], ['request_selection'],
                                             binding_hashes={trial['case_id']: request})
     assert len(observation['bindings']) == 1
@@ -179,11 +180,45 @@ def test_actual_fresh_binding_feeds_limited_observation_and_attempt_projections(
     assert selection['bound_events'] == 1
     assert not observation['whole_scope_complete'] and not observation['producer_authenticated']
     attempt = project_attempts(packet, [{'case_id': 'req12-disconnect', 'attempted': True,
-        'external_request_sha256': trial['request_id_sha256'], 'auxiliary_session_sha256': 'a' * 64}],
+        'external_request_sha256': request, 'auxiliary_session_sha256': 'a' * 64}],
         binding_hashes={'req12-disconnect': request})
     assert len(attempt['bindings']) == 1 and not attempt['native_attempt_binding_observed']
     assert 'REQUEST_ATTEMPT_NATIVE_ATTEMPT_UNOBSERVED' in attempt['diagnostic_codes']
     assert not attempt['native_output_collector_binding_observed'] and not attempt['whole_scope_complete']
+    assert hashlib.sha256(SECRET.encode()).hexdigest() not in json.dumps(
+        {'trials': [trial], 'observation': observation, 'attempt': attempt})
+
+
+@pytest.mark.parametrize('disconnect', [True, False])
+def test_actual_fresh_binding_requires_genuine_asgi_disconnect_for_termination_anchor(world, disconnect):
+    state = program(world)
+    async def receive():
+        return {'type': 'http.disconnect'}
+    async def app(scope, receive_callback, send):
+        raw = SimpleNamespace(scope=scope, headers={'X-Request-Id': SECRET}, state=SimpleNamespace())
+        result = await state.handler.create_completion(state.request, raw)
+        if disconnect:
+            assert await receive_callback() == {'type': 'http.disconnect'}
+        return result
+    assert run_request(world, app, receive=receive if disconnect else None) is state.result
+    (rows, summary), _ = recording(world)
+    request = lifecycle.request_header_fingerprint(world.folder / 'manifest.json', world.prepared, SECRET)
+    packet = {'recorded_files_covered': True, 'recordings': [{'capture': {
+        'records': rows, 'summary': summary, 'process_context_verified': True,
+        'image_digest_verified': False}, 'session_owner_match': True, 'listed_file_identity_match': True}]}
+    projected = project_termination(packet, hashlib.sha256(SECRET.encode()).hexdigest(), 500,
+                                    ['asgi_transport'], request_hmac=request)
+    assert projected['binding_observed'] is disconnect
+    if disconnect:
+        assert projected['anchor']['native_request_sha256'] == fresh_assignment(rows, request)[0][1]['native_request_sha256']
+        assert projected['anchor']['asgi_request_sha256'] == request
+        assert {event['scope'] for event in projected['events']} == {'asgi_transport'}
+        assert projected['scope_status'][0]['termination_verified'] is False
+    else:
+        assert projected['anchor'] is None and projected['events'] == []
+    assert not projected['worker_gpu_release_verified'] and not projected['whole_scope_complete']
+    assert all(not row['termination_verified'] for row in projected['scope_status'])
+    assert hashlib.sha256(SECRET.encode()).hexdigest() not in json.dumps(projected)
 
 
 def test_independent_sessions_do_not_publish_the_same_request_fingerprint(external):  # noqa: F811

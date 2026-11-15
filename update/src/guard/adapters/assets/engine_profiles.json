@@ -140,10 +140,11 @@
       "features": [
         "configured_lifecycle_rows",
         "termination",
-        "observation_state"
+        "observation_state",
+        "request_attempts"
       ],
       "pin_status": "image_pin",
-      "qualification": "정확 설치 bytes와 /28의 fresh ASGI→native 입력 HMAC 연결로 LIF-10·12, REQ-12, OBS-02의 제한된 제품 관측을 허용한다. REQ-12 attempt/출력과 KV 소유권·전체 종료·GPU 등록은 미검증이다. ma6-version-applicability.md 25·28절."
+      "qualification": "정확 설치 bytes와 /28의 fresh ASGI→native 입력 HMAC 연결로 LIF-10·12, REQ-12, OBS-02의 제한된 제품 관측을 허용한다. request_attempts 전송은 기존 소유 HTTP 시도만 허용하며 /28은 native 시도/출력/KV를 증명하지 않는다. 전체 종료·GPU 등록도 미검증이다. ma6-version-applicability.md 25·28절."
     }
   ],
   "implementations": []

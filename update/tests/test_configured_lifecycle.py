@@ -337,3 +337,23 @@ def test_snapshot_availability_does_not_open_unreviewed_executors_or_register_gp
     for executor in ('engine_sensor', 'initialization',
                      'model_authorization', 'profiler_observation'):
         assert resolve_executor(executor, 'kubernetes', engine='vllm', version='0.7.0') is None
+
+
+def test_baseline_four_checks_pass_exact_transport_construction_without_dispatch():
+    from guard.adapters.engine_profiles import require_transport
+    from guard.runtime.kubernetes_http import (KubernetesHTTP, TERMINATION_PROFILE,
+        REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE)
+    from tests.test_kubernetes_request_binding import env as sample_env, target as sample_target
+    original = sample_env()
+    selected = environment(engine={'name': 'vllm', 'version': '0.7.0',
+        'image_digest': original.engine.image_digest}, model={'id': original.model.id,
+        'revision': original.model.revision})
+    target = sample_target(selected)
+    target['lab'] = True
+    target['observed_version'] = '0.7.0'
+    for profile in (TERMINATION_PROFILE, REQUIRED_EVENT_PROFILE,
+                    REQUEST_ATTEMPTS_PROFILE, OBSERVATION_STATE_PROFILE):
+        assert require_transport('vllm', '0.7.0', profile).available
+        transport = KubernetesHTTP(target, selected, duration=5,
+                                   runner=lambda *args, **kwargs: None, profile=profile)
+        assert transport.profile == profile and transport.report()['requests'] == []

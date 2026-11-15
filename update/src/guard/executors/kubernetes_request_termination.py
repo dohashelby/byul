@@ -140,11 +140,19 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
                 rid="byul-lif10-"+token+"-"+slot
                 body={"model":ctx.api_model,"prompt":"hello","max_tokens":8 if slot=="disconnect" else 1,
                     "temperature":0,"stream":slot=="disconnect"}
-                row={"case_id":"lif10-"+slot,"request_id_sha256":sha256_hex(rid.encode()),
+                try:
+                    if ctx._termination_prepared['profile']=='vllm-native-lifecycle-metadata/28':
+                        from guard.collectors.lifecycle import request_header_fingerprint
+                        request_identity=request_header_fingerprint(self.cfg['prepared'],ctx._termination_prepared,rid)
+                    else:request_identity=sha256_hex(rid.encode())
+                except ValueError:
+                    request_identity=None;summary['diagnostic_codes'].append('TERMINATION_REQUEST_BINDING_KEY_UNAVAILABLE')
+                row={"case_id":"lif10-"+slot,"request_id_sha256":request_identity,
                     "request_body_sha256":sha256_hex(canonical_json(body)),"attempted":False,"started_at":None,
                     "finished_at":None,"outcome":None,"normal_shape_verified":False,"expected_client_close":False,
                     "capture_complete":False,"policy_window_verified":False}
                 summary["attempts"].append(row);replies[slot]=row
+                if request_identity is None:continue
                 try:
                     now=utcnow()
                     if not start<=now<=end:raise ValueError
@@ -155,10 +163,7 @@ class KubernetesRequestTerminationExecutor(LifecycleCommonInputConsumer, HttpChe
                     if slot=="disconnect":
                         request_sha=row["request_id_sha256"]
                         if ctx._termination_prepared['profile']=='vllm-native-lifecycle-metadata/28':
-                            try:
-                                from guard.collectors.lifecycle import request_header_fingerprint
-                                request_hmac=request_header_fingerprint(self.cfg['prepared'],ctx._termination_prepared,rid)
-                            except ValueError:summary['diagnostic_codes'].append('TERMINATION_REQUEST_BINDING_KEY_UNAVAILABLE')
+                            request_hmac=request_identity
                     response,=ctx.cprobe("kubernetes-probe",[request],ctx.timeout)
                     row.update(outcome=response["outcome"],capture_complete=response.get("capture_complete") is True)
                     if slot=="disconnect":

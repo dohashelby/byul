@@ -31,11 +31,6 @@ def _catalog():
                     points[point] = module
         if not points or not set(row['void_return_argument_ids']) <= points.keys():
             raise ValueError('LIFECYCLE_CATALOG_INVALID')
-        selection = row.get('selection')
-        if selection is not None and (type(selection) is not dict or selection.get('point') not in points
-                or type(selection.get('request_id_argument')) is not int or not 1 <= selection['request_id_argument'] <= 8
-                or selection['point'] in row['void_return_argument_ids']):
-            raise ValueError('LIFECYCLE_CATALOG_INVALID')
     return {row['profile']: row for row in rows}
 
 
@@ -52,15 +47,6 @@ def row(profile):
     return ROWS[profile]
 
 
-def selection_point(profile):
-    """The reviewed live-selection input point of a catalogued release, or None."""
-    selection = row(profile).get('selection') if contains(profile) else None
-    return selection['point'] if selection else None
-
-
-SELECTION_POINTS = frozenset(r['selection']['point'] for r in ROWS.values() if r.get('selection'))
-
-
 def runtime_spec(profile):
     selected = row(profile)
     catalog = abi.read_catalog()
@@ -68,10 +54,8 @@ def runtime_spec(profile):
     for runtime, platforms in selected['runtimes'].items():
         digest = catalog['runtimes'][runtime]['base_code_sha256']
         runtime_code[runtime] = {platform: digest for platform in platforms}
-    selection = selected.get('selection')
     return {key: selected[key] for key in ('profile', 'schema', 'commit', 'sources', 'void_return_argument_ids')} | {
-        'base_sha256': catalog['base']['sha256'], 'runtime_code': runtime_code} | (
-        {'selection': {k: selection[k] for k in ('point', 'request_id_argument')}} if selection else {})
+        'base_sha256': catalog['base']['sha256'], 'runtime_code': runtime_code}
 
 
 def render_source(profile):

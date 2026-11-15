@@ -290,6 +290,11 @@
       "manifest_sha256": "f6553e03836f6077148c8ff360ae2ef4134ee7469a0f2f434b752a70dbb86a44",
       "reviewed_by": "Claude / BYUL UPDATE / M-A6-W1~W6 결정 반영(판본 프로필 원인 기록) self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-15T23:30:00+09:00"
+    },
+    {
+      "manifest_sha256": "f410f2acce9fb203b24c33a310e7504be00dbe058d7c1f95dcb46563c0d1901d",
+      "reviewed_by": "Claude / BYUL UPDATE / #280에서 /27 선택 지점 코드 제거(사용자 결정), 판본 프로필 원인 기록만 유지 self-review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T00:10:00+09:00"
     }
   ]
 }

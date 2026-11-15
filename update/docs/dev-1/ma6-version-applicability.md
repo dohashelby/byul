@@ -509,7 +509,9 @@ J02 첫 실행(2026-11-15, L4 1장, 두 판본 동시 기동)에서 69개가 모
 - 0.7.0 `serving_completion`은 `request_id = f"cmpl-{_base_request_id(raw_request)}"`(`X-Request-Id` 헤더 또는 `random_uuid()`)로 만든다. 그 ID가 `AsyncLLM.generate → add_request → Processor.process_inputs(request_id, …)`까지 그대로 간다. 엔진은 0.31.0의 `InputProcessor.assign_request_id`처럼 새 접미사를 붙이지 않는다. 같은 ID가 이미 진행 중이면 `add_request`가 `ValueError`로 거부한다.
 - 따라서 "live ASGI 호출 안에서 이 엔진 요청이 생겼다"는 연결은 같은 의미로 만들 수 있다. 하지만 엔진 ID의 새로움(다른 요청과 겹치지 않음)은 엔진이 보장하지 않는다. 같은 헤더를 다시 쓰면 같은 엔진 ID가 된다. 관측 연결은 이를 가정하지 않는다. projection은 기존처럼 요청 하나에 대응이 정확히 하나일 때만 binding한다.
 
-### 26.2 구현 — `/27` 선택 지점
+### 26.2 (철회) `/27` 선택 지점
+
+> **철회(2026-11-15 사용자 결정 "#280에서 /27 빼고 #281 위로").** 아래 구현은 PR #280에서 제거했다. 같은 연결은 PR #281의 `/28`(fresh 선택·세션 HMAC)로 한다. 이 절은 검토 이력으로만 남긴다. 26.1의 요청 ID 의미 분석은 그대로 유효하다.
 
 - 판본 데이터 `vllm_native_release_rows.json`에 `selection: {point: Processor.process_inputs, request_id_argument: 1}`을 더했다. catalog가 지점·인자 위치를 검사하고 렌더된 SPEC에 넣는다.
 - 공통 `vllm_configured_lifecycle_sensor.py`의 관측기는 그 지점에서만 다음을 한다.
@@ -523,7 +525,7 @@ J02 첫 실행(2026-11-15, L4 1장, 두 판본 동시 기동)에서 69개가 모
 
 | 점검 | 실행기 | 상태 | 남은 것 |
 |---|---|---|---|
-| LIF-10·12, REQ-12, OBS-02 | request_termination·observation_state | 연결 구현. **실행기는 닫힘** | `tests/test_configured_lifecycle.py`가 0.7.0 비노출을 assert로 고정한다. 여는 것은 승인 필요(M-A6-W1). 열려도 REQ-12의 ATTEMPT(`/10`)·KV 블록 소유권은 없다(LIF-10 kv 범위는 미관측) |
+| LIF-10·12, REQ-12, OBS-02 | request_termination·observation_state | **닫힘**(W1 승인, #281 `/28` 병합 뒤 연다) | `tests/test_configured_lifecycle.py`의 0.7.0 비노출 assert 변경은 W1로 승인됐다. 열려도 REQ-12의 ATTEMPT(`/10`)·KV 블록 소유권은 없다(LIF-10 kv 범위는 미관측) |
 | REQ-05 | model_authorization | 닫힘 | 0.7.0 runner에 `_model_forward`가 없다. `execute_model`이 모델을 직접 부른다. 최종 모델 연결 지점의 새 의미가 필요하다(M-A6-W2) |
 | PLT-10·11 | credential/session_revocation | 닫힘 | 0.7.0 `api_server.build_app`의 인증은 지역 함수라 감쌀 module 속성이 없다. V0 D4 승인의 이월 여부(M-A6-W4) |
 | LIF-07·09 | initialization | 닫힘 | 0.7.0 `WorkerProc`에는 `wait_for_ready`가 없고 `wait_for_startup`이 있다. `/14` 원본 센서는 3.12.8 실행 표가 없다(25.1). V1 대상표·관측 의미 신규 |
@@ -546,7 +548,7 @@ J02 첫 실행(2026-11-15, L4 1장, 두 판본 동시 기동)에서 69개가 모
 ### 27.1 W1과 PR #281의 겹침
 
 - PR #281(`codex/baseline-v1-request-binding-20261115`)은 같은 목적의 기준 V1 요청 연결을 새 profile `/28`로 구현한다. API의 요청 ID 선택, 원 `AsyncLLM`/`Processor` 입력 ID 대조, 세션 HMAC을 함께 쓰는 더 엄격한 연결이다. 26.2절의 `/27` 선택 지점과 같은 파일 네 개를 고친다: `vllm_native_release_rows.json`, `vllm_lifecycle_catalog.py`, `vllm_lifecycle_profiles.py`, `lifecycle_capture.py`.
-- 두 연결을 함께 두지 않는다. W1의 실행기 열기는 `/28` 기록을 지원 집합에 넣는 방식으로, #281 병합 뒤에 한다. #280의 `/27` 선택 지점 코드는 #281과 겹치므로 정리 방향을 메인 세션에 보고했다.
+- 두 연결을 함께 두지 않는다. W1의 실행기 열기는 `/28` 기록을 지원 집합에 넣는 방식으로, #281 병합 뒤에 한다. 사용자 결정("#280에서 /27 빼고 #281 위로")으로 #280의 `/27` 선택 지점 코드를 제거했다. 후보 stream_buffer 변형 profile도 #281 병합 뒤 최신 main에서 새 브랜치로 한다.
 - PR #283(M-A3 V1 RPC 원본 검토)은 `multiproc_executor` RPC 영역이라 이 작업과 파일이 겹치지 않는다.
 
 ### 27.2 W6 — uvicorn 0.53.0 설치 파일 대조

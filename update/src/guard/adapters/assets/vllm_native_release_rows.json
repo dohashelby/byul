@@ -104,14 +104,9 @@
         "OutputProcessor.abort_requests",
         "EngineCore.abort_requests"
       ],
-      "selection": {
-        "point": "Processor.process_inputs",
-        "request_id_argument": 1,
-        "review": "AsyncLLM.add_request가 요청 처리 task 안에서 같은 request_id(cmpl-<X-Request-Id 또는 random_uuid>)로 호출한다. 엔진은 새 ID를 붙이지 않는다. live 선택 문맥이 열린 호출만 ASGI 연결로 기록한다"
-      },
       "review": "docs/dev-1/ma6-version-applicability.md#25-기준-v1-관측-행과-cpython-3128-2026-11-15",
       "installation_review": "docs/dev-1/ma3-image-qualification-20261114.json",
-      "scope": "bounded native state snapshots and a live-selection ASGI link at the reviewed input point; no cache-hit, GPU release or registered producer claim",
+      "scope": "bounded native state snapshots only; no ASGI assignment, cache-hit, GPU release or registered producer claim",
       "engine_mode": "V1"
     }
   ]

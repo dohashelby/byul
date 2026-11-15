@@ -1,9 +1,8 @@
 """Standalone lifecycle composition; release facts are supplied as pinned data.
 
 The rendered asset appends SPEC. The immutable /8 observer remains unchanged.
-This profile records native snapshots and, when the row names a reviewed input
-point, a live-selection ASGI link there. It makes no cache-hit, worker
-readiness, resource-release or GPU producer claims.
+This profile records native snapshots only, without request-selection, cache-hit,
+worker readiness, resource-release or GPU producer claims.
 """
 from __future__ import annotations
 
@@ -69,13 +68,6 @@ def _configure(base):
     base.__file__ = __file__
     original = base.Observer
     argument_ids = frozenset(SPEC['void_return_argument_ids'])
-    selection = SPEC.get('selection') or {}
-    selection_point = selection.get('point')
-    position = selection.get('request_id_argument')
-
-    def selected_id(args, kwargs):
-        value = args[position] if len(args) > position else kwargs.get('request_id')
-        return value if base.id_sha(value) else None
 
     class ConfiguredObserver(original):
         def snapshot(self, point, args, kwargs, result=None, returned=False):
@@ -84,72 +76,7 @@ def _configure(base):
             # manufacture a return value or consume a one-shot native iterator.
             if returned and point in argument_ids:
                 return super().snapshot(point, args, kwargs)
-            value = super().snapshot(point, args, kwargs, result, returned)
-            if point == selection_point and returned:
-                # The release keeps the caller's ID (no fresh native suffix). Link it to
-                # the ASGI request only inside a live selection callback, never from an
-                # inherited header context alone.
-                context, live = base._ASGI_REQUEST.get(), self.selection_context()
-                request_id = selected_id(args, kwargs)
-                if (live is not None and request_id is not None and context is not None
-                        and context[0] == base.os.getpid() and context[1] is not None
-                        and [r['request_sha256'] for r in value['requests']] == [base.id_sha(request_id)]):
-                    value['metadata'] = {'external_request_sha256': base.id_sha(request_id),
-                                         'asgi_request_sha256': context[1]}
-            return value
-
-        def request_selection(self, point, result, returned, data=None):
-            if point != selection_point:
-                return super().request_selection(point, result, returned, data)
-            # The base maps only its own selection points; this point reads the caller's ID argument only.
-            value = super().request_selection(point, None, False, None)
-            if data is not None:
-                request_id = data.get('request_id')
-                value['request_id_observed'] = request_id is not None
-                value['selected_request_id_sha256'] = base.id_sha(request_id) if request_id is not None else None
-            return value
-
-        def wrap(self, module_name, point, original_function):
-            wrapped = super().wrap(module_name, point, original_function)
-            if point != selection_point:
-                return wrapped
-            observer = self
-
-            def emit(args, kwargs, phase):
-                started = base.time.monotonic_ns()
-                try:
-                    if observer.selection_context() is None:
-                        raise ValueError('selection context closed')
-                    metadata = {'request_selection': observer.request_selection(
-                        point, None, phase == 'RETURN', {'request_id': selected_id(args, kwargs)})}
-                    diagnostic = {}
-                except Exception:
-                    metadata, diagnostic = {}, {'diagnostic': 'SAMPLE_UNAVAILABLE'}
-                observer.emit('SELECTION', {'point': point, 'phase': phase, 'source_sha256': base.SOURCE_SHA[module_name],
-                    'requests': [], 'metadata': metadata, 'selection_observed': False,
-                    'observation_started_ns': started, 'observation_finished_ns': base.time.monotonic_ns(), **diagnostic})
-
-            @base.functools.wraps(original_function)
-            def selected(*args, **kwargs):
-                live = False
-                try:
-                    live = observer.active() and observer.selection_context() is not None
-                    if live:
-                        emit(args, kwargs, 'CALL')
-                except BaseException:
-                    live = False
-                returned = False
-                try:
-                    result = wrapped(*args, **kwargs)
-                    returned = True
-                    return result
-                finally:
-                    if live:
-                        try:
-                            emit(args, kwargs, 'RETURN' if returned else 'RAISE')
-                        except BaseException:
-                            pass
-            return selected
+            return super().snapshot(point, args, kwargs, result, returned)
 
     base.Observer = ConfiguredObserver
     return base

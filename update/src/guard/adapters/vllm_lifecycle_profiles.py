@@ -627,7 +627,7 @@ def validate_request_selection(payload):
     context={"asgi_request_sha256","asgi_invocation_sha256","entry_path_sha256","entry_root_path_sha256","entry_method_sha256"}
     keys=(REQUEST_SELECTION_KEYS-{"request_selection"})|context
     if (type(value) is not dict or set(value)!=keys
-            or payload["point"] not in sensor.REQUEST_SELECTION_POINTS|{"InputProcessor.assign_request_id",*configured.SELECTION_POINTS}
+            or payload["point"] not in sensor.REQUEST_SELECTION_POINTS|{"InputProcessor.assign_request_id"}
             or type(value["asgi_invocation_sha256"]) is not str):
         raise ValueError("LIFECYCLE_REQUEST_SELECTION_INVALID")
     for key in context|{"selected_session_sha256","selected_request_id_sha256"}:
@@ -641,11 +641,7 @@ def validate_request_selection(payload):
                     and (type(selected) is not int or not -(2**63)<=selected<2**63)
                 or name=="priority" and observed and selected is None):
             raise ValueError("LIFECYCLE_REQUEST_SELECTION_VALUE_INVALID")
-    if payload["point"] in configured.SELECTION_POINTS:
-        # Release input points observe only the caller's request ID.
-        if any(value[k+"_observed"] for k in ("priority","session","rank")):
-            raise ValueError("LIFECYCLE_REQUEST_SELECTION_PHASE_INVALID")
-    elif payload["point"]!="InputProcessor.assign_request_id":
+    if payload["point"]!="InputProcessor.assign_request_id":
         name={"GenerateBaseServing._get_priority":"priority","GenerateBaseServing._get_data_parallel_rank":"rank",
             "GenerateBaseServing._get_session_id_from_headers":"session","GenerateBaseServing._get_session_id":"session",
             "BaseServing._base_request_id":"request_id"}[payload["point"]]

@@ -10,9 +10,6 @@ SCOPES = frozenset({"asgi_transport", "frontend_request", "engine_core", "schedu
 MAX_EVENTS = 4096
 
 
-from .vllm_lifecycle_catalog import SELECTION_POINTS as _RELEASE_SELECTION_POINTS
-SELECTION_POINTS = frozenset({"InputProcessor.assign_request_id", *_RELEASE_SELECTION_POINTS})
-
 def digest(value):
     return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(",",":"),ensure_ascii=True).encode()).hexdigest()
 
@@ -52,7 +49,7 @@ def project_native(packet, request_sha256, max_delay_ms, required_scopes):
         # A live selection callback supplies invocation identity; an inherited
         # header ContextVar alone cannot establish a fresh native assignment.
         selections=[r for r in rows if r["event"]=="SELECTION" and r["payload"]["phase"]=="RETURN"
-            and r["payload"]["point"] in SELECTION_POINTS
+            and r["payload"]["point"]=="InputProcessor.assign_request_id"
             and r["payload"]["metadata"].get("request_selection",{}).get("asgi_request_sha256")==request_sha256]
         for row in rows:
             pair=assignment(row) if row["event"]=="NATIVE" else None

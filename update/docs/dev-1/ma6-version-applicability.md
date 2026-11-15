@@ -586,3 +586,14 @@ J02 첫 실행(2026-11-15, L4 1장, 두 판본 동시 기동)에서 69개가 모
 - W4: 기준 LIF-13·PLT-10·11은 원인 있는 UNKNOWN 마감이다. 0.7.0 `executor_gaps`의 원인 코드는 `APPROVED_UNKNOWN_V1`이다. V0 승인 예외(`APPROVED_UNKNOWN`)를 물려받지 않는다는 기존 시험(`test_release_engine_selection.py`)과 구분하려고 V1에서 새로 승인한 원인을 따로 표시한다. W2의 REQ-05도 같은 코드다.
 - W3: 센서 원본을 다시 읽어 보니 profiler 센서(`vllm_profiler_sensor.py`)는 이미 세대를 호출 순서로 정한다. `profiler_emit`은 `TorchProfilerWrapper._start`가 성공할 때마다(C builtin probe가 꺼짐→켜짐) `(wrapper, thread)` 키의 세대 값을 새로 만든다. torch profiler 객체의 식별값(`backend_sha256`)은 같은 세대의 start·stop을 짝짓는 비교값으로만 쓴다. 0.30.0처럼 같은 객체를 다시 시작해도 start마다 새 세대가 생기고, 객체 재사용은 같은 `backend_sha256`으로 기록된다. 따라서 W3 결정은 센서 코드 변경 없이 충족된다. 자기 코드 지문 재계산과 그 CI job도 필요 없다(사용자 확인 대기).
   - 후보 LIF-14를 닫은 실제 원인은 센서 추가 모듈 세 개(`vllm.profiler.wrapper`·`vllm.v1.worker.gpu_worker`·`vllm.entrypoints.serve.profile.api_router`)의 고정값이 0.31.0 것뿐이라는 점이다. 23.2절 `/26`처럼 기반 + `/25` + profiler 센서에 0.30.0 행을 겹치는 변형 profile로 연다. 바뀐 함수 중 센서가 읽는 값(`Worker.profile`의 `profiler_config.profiler`, wrapper의 `_active`·`_running`·`local_rank`, `profiler` 객체)은 변형을 만들 때 다시 대조한다. 이 변형은 #281과 같은 파일을 건드리므로 #281 병합 뒤에 한다.
+
+## 28. 기준 V1 REQ-10 제약 소비의 한정된 소스 대조 (2026-11-15)
+
+[검토 원자료](req10-initial-v1-source-review-20261115.json)는 이미 승인되어 확보한 기준 설치 소스6파일과 V1 디렉터리42개 Python 파일의 범위를 식별한다. 엔진/torch·모델을 import하지 않고 새 다운로드/GPU 실행 없이 확인했다. 이 보고서는 실제 환경의 기능 부재·보안 판정이나 전체 경로 관측을 인증하지 않는다.
+
+- API protocol의 `guided_json`·`GuidedDecodingParams.from_optional` 전달과 실제 sampler 소비는 별개다. protocol은 guided 설정을 SamplingParams로 넘기지만 검토한 V1 소스42개에서는 guided_decoding/structured_outputs/logits_processor/grammar 참조가 없었다.
+- `InputBatch.add_request`는 temperature/top-p/top-k·penalty/min/stop/logprob를 복사하고 `make_sampling_metadata`가 그 값을 조립한다. 검토한 `SamplingMetadata`에는 제약/grammar/processor 필드가 없다. 실제 sampler의 forward→penalty/temperature→sample 경로를 원 메서드 본문과 EXAMPLE 협력 객체로 greedy/random 각1회 실행했다. guided 관련 getter를 읽으면 실패시키는 대조에서 두 경로 모두 읽지 않았다. 이는 그 한정된 소스 경로의 관측이며 실제 모델/GPU 결과가 아니다.
+- 후보 소스에는 InputProcessor의 structured 설정 검증, runner의 `apply_grammar_bitmask`와 sampler의 logits processor 적용 경로가 별도로 있다. 기준에 후보의 소비 지점을 있다고 가정하거나 후보 결과를 기준으로 이월하지 않는다. 후보의 실제 검증/소비/거부 원 자료 연결은 아직 구현/확인해야 한다.
+- 현재 REQ-10은 기본 sampling+실제 지원 구조화/tool 선택의 최종 집행과 runner 소비를 요구한다. API 필드 대응·HTTP400·모의 sampler 실행만으로 runner_consumption_verified=true나 PASS·비적용을 만들지 않는다. 기본 sampling/다른 요청 독립 결과는 계속 확인하고 구조화 분기의 실제 조건/소비가 미확인인 범위는 UNKNOWN과 원인을 유지한다. 기존 결정9-5의 V0 기반 필드 대응을 새 V1 소비 근거로 쓰지 않는다.
+
+다음은 현재 V1의 실제 API/모델/설치 source·선택 backend를 고정하고, 허용/거부 지점·고비용 변환/모델 제출의 도달/미도달과 실제 sampler 소비를 관측하는 것이다. 확인 불가 분기를 MVP의 승인된 예외로 완료 처리하려면 별도 사용자 결정을 받는다. 판정·팩·정책·지원표/고정값·실행기 활성화·M-B4 보관은 바꾸지 않았다.

@@ -1,3 +1,17 @@
+## 2026-11-16 — PR #285의 최신 main 문서 통합
+
+- 한 일: 사용자 일괄 병합 요청에 따라 main7cbaa4e1을 #285에 통합했다. DECISIONS·PROGRESS의 양쪽 기록을 보존하고 겹친 판본 적용표 번호를 28절로 정리했다. REQ-10 검토 JSON과 제품 소스·팩·원 증거는 그대로다.
+- 테스트 결과: 종전 head72a1a2bf의 CI 10개가 모두 성공했다. 이번 문서 통합의 새 head CI는 아직 확인 전이다. 로컬 Python/pytest는 실행하지 않았다.
+- 다음 단계: 통합 head의 CI와 최종 diff를 확인한 뒤 main에 병합한다.
+- 막힌 것: 실제 ENV/target·sampler/GPU 관측은 이번 문서 병합의 결과가 아니며 미확인 상태를 유지한다.
+
+## 2026-11-15 — REQ-10 초기 V1 제약 소비의 한정된 소스 검토
+
+- 한 일: 별도 main 기반 브랜치에서 기존 승인 설치 소스6파일/V1 Python42파일을 검토했다. API guided 필드 전달과 V1 sampler 소비를 구분하고 원 sampler 메서드+EXAMPLE 협력 객체로 greedy/random2개 경로를 확인했다. 후보의 grammar bitmask/logits processor 경로는 별도 후속으로 표시했다. 검토 JSON과 적용표28절을 추가하며 제품 소스/판정/고정값·지원표/팩·M-B4는 바꾸지 않았다.
+- 테스트 결과: 저장소 밖 한정된 함수 실행2개가 제약 getter 미접근 대조를 통과했다. engine/torch import·실제 GPU/모델 실행은0이다. 이 수를 pytest/실측이나 기능 부재 인증으로 세지 않는다. 현황77/23/68·경로16개(pytest0.49초·부모0.662초)·검토 JSON 구조·diff 검사가 통과했다. 제품/도구/시험 소스 무변경을 확인했다. 새 PR CI와 실제 sampler/GPU는 미실행이다.
+- 다음 단계: 현재 V1 API/모델/설치 source/선택 backend를 실제 입력과 맞추고 허용/거부·후속 변환/모델 제출과 sampler 소비를 관측한다. 확인 불가 예외를 MVP 완료로 인정하려면 별도 결정을 요청한다. 공개 전 source/문서 검토와 push 승인이 필요하다.
+- 막힌 것: 실제 ENV/target·선택 V1·sampler/worker 원 관측이 아직 없다. 필드 대응/HTTP 오류/EXAMPLE 함수 실행만으로 runner_consumption_verified=true/PASS/비적용으로 바꾸지 않는다. 새 GPU/비용/다운로드·M-B4 재개·판정/계약 변경은 승인하지 않았다.
+
 ## 2026-11-15 — 팩38 전체 CI 실패 보완과 승인된 #280 통합
 
 - 한 일: 6badc405 전체 CI의 20개 실패를 분류해 보완했다. 현행 팩으로 재사용하는 PLT-12·OBS-01·REQ-04 EXAMPLE 생산자가 실제 POL 행의 새 해시를 쓰고, copy 결정/원 inventory 해시를 고정하도록 입력을 맞췄다. OBS-06 시험 subjects는 현재 봉인된 POL Ref를 사용한다. 파일 변경 회귀의 설정 키를 실제 `input_validation`으로 고치고 CSV의 빈 필드를 생성기와 같은 표현으로 맞췄다. 원 assert·FAIL/UNKNOWN 기대·기존 파생 팩 입력은 보존했다.

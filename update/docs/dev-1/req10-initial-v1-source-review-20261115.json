@@ -1,0 +1,363 @@
+{
+  "scope": "승인되어 확보한 기준 설치 source의 한정된 경로 검토/EXAMPLE 함수 실행. 실제 엔진/GPU/전체 기능 부재 인증 아님.",
+  "files": {
+    "vllm/entrypoints/openai/protocol.py": {
+      "sha256": "b8a81e70c50024af350432b1bf83d08aa8a2ada84291d6e5bcc0551f4918eb0e",
+      "bytes": 52259,
+      "functions": {
+        "OpenAIBaseModel.__log_extra_fields__": [
+          50,
+          70
+        ],
+        "ChatCompletionRequest.to_beam_search_params": [
+          376,
+          404
+        ],
+        "ChatCompletionRequest.to_sampling_params": [
+          406,
+          493
+        ],
+        "ChatCompletionRequest._get_guided_json_from_tool": [
+          495,
+          511
+        ],
+        "ChatCompletionRequest.validate_stream_options": [
+          515,
+          520
+        ],
+        "ChatCompletionRequest.check_logprobs": [
+          524,
+          542
+        ],
+        "ChatCompletionRequest.check_guided_decoding_count": [
+          546,
+          565
+        ],
+        "ChatCompletionRequest.check_tool_usage": [
+          569,
+          622
+        ],
+        "ChatCompletionRequest.check_generation_prompt": [
+          626,
+          631
+        ],
+        "CompletionRequest.to_beam_search_params": [
+          746,
+          772
+        ],
+        "CompletionRequest.to_sampling_params": [
+          774,
+          857
+        ],
+        "CompletionRequest.check_guided_decoding_count": [
+          861,
+          871
+        ],
+        "CompletionRequest.check_logprobs": [
+          875,
+          887
+        ],
+        "CompletionRequest.validate_stream_options": [
+          891,
+          896
+        ],
+        "EmbeddingCompletionRequest.to_pooling_params": [
+          929,
+          930
+        ],
+        "EmbeddingChatRequest.check_generation_prompt": [
+          979,
+          984
+        ],
+        "EmbeddingChatRequest.to_pooling_params": [
+          986,
+          987
+        ],
+        "ScoreRequest.to_pooling_params": [
+          1017,
+          1018
+        ],
+        "RerankRequest.to_pooling_params": [
+          1042,
+          1043
+        ],
+        "TokenizeChatRequest.check_generation_prompt": [
+          1376,
+          1381
+        ]
+      }
+    },
+    "vllm/v1/engine/processor.py": {
+      "sha256": "b3b66559ce98fb31f89a1ca3a8b9b4d7bc942df090305ea5f765d8bcf21e5d43",
+      "bytes": 9515,
+      "functions": {
+        "Processor.__init__": [
+          23,
+          50
+        ],
+        "Processor.process_inputs": [
+          52,
+          193
+        ],
+        "Processor._validate_model_inputs": [
+          195,
+          219
+        ]
+      }
+    },
+    "vllm/v1/worker/gpu_input_batch.py": {
+      "sha256": "89770d22d9398a061d96e4aa547a8afbacaf0eeff589e1dcf3df45503a4ab40c",
+      "bytes": 18246,
+      "functions": {
+        "CachedRequestState.num_tokens": [
+          37,
+          38
+        ],
+        "InputBatch.__init__": [
+          43,
+          168
+        ],
+        "InputBatch.add_request": [
+          170,
+          234
+        ],
+        "InputBatch.remove_request": [
+          236,
+          252
+        ],
+        "InputBatch.clear": [
+          254,
+          266
+        ],
+        "InputBatch.condense": [
+          268,
+          320
+        ],
+        "InputBatch.make_sampling_metadata": [
+          322,
+          383
+        ],
+        "InputBatch._make_prompt_token_ids_tensor": [
+          385,
+          400
+        ],
+        "InputBatch.num_reqs": [
+          403,
+          404
+        ],
+        "InputBatch.all_greedy": [
+          407,
+          408
+        ],
+        "InputBatch.all_random": [
+          411,
+          412
+        ],
+        "InputBatch.no_top_p": [
+          415,
+          416
+        ],
+        "InputBatch.no_top_k": [
+          419,
+          420
+        ],
+        "InputBatch.no_penalties": [
+          423,
+          426
+        ],
+        "InputBatch.max_num_logprobs": [
+          429,
+          430
+        ],
+        "InputBatch.no_logprob": [
+          433,
+          434
+        ],
+        "InputBatch.no_prompt_logprob": [
+          437,
+          438
+        ]
+      }
+    },
+    "vllm/v1/worker/gpu_model_runner.py": {
+      "sha256": "1ac3fb18b2adad3609dcf58a1656d6fdd4a568eea6740258e00f6a43c7d4b813",
+      "bytes": 51313,
+      "functions": {
+        "GPUModelRunner.__init__": [
+          43,
+          204
+        ],
+        "GPUModelRunner._update_states": [
+          206,
+          330
+        ],
+        "GPUModelRunner._prepare_inputs": [
+          332,
+          543
+        ],
+        "GPUModelRunner._calc_mrope_positions": [
+          545,
+          598
+        ],
+        "GPUModelRunner._prepare_sampling": [
+          600,
+          618
+        ],
+        "GPUModelRunner._execute_encoder": [
+          620,
+          666
+        ],
+        "GPUModelRunner._gather_encoder_outputs": [
+          668,
+          706
+        ],
+        "GPUModelRunner.get_model": [
+          708,
+          709
+        ],
+        "GPUModelRunner.execute_model": [
+          712,
+          840
+        ],
+        "GPUModelRunner.load_model": [
+          842,
+          849
+        ],
+        "GPUModelRunner._dummy_run": [
+          852,
+          877
+        ],
+        "GPUModelRunner.profile_run": [
+          879,
+          992
+        ],
+        "GPUModelRunner.capture_model": [
+          994,
+          1020
+        ],
+        "GPUModelRunner.initialize_kv_cache": [
+          1022,
+          1054
+        ],
+        "GPUModelRunner.get_kv_cache_spec": [
+          1056,
+          1089
+        ]
+      }
+    },
+    "vllm/v1/sample/metadata.py": {
+      "sha256": "98e600dee71a9f06a190bb748124b57ca78adb01614417142adc0a9640734afd",
+      "bytes": 644,
+      "functions": {}
+    },
+    "vllm/v1/sample/sampler.py": {
+      "sha256": "9082d291c73104024f5658d5858393aedc192d3d4a7ebfd3d415a249c4d4f019",
+      "bytes": 5031,
+      "functions": {
+        "Sampler.__init__": [
+          18,
+          20
+        ],
+        "Sampler.forward": [
+          22,
+          60
+        ],
+        "Sampler.apply_temperature": [
+          62,
+          71
+        ],
+        "Sampler.greedy_sample": [
+          73,
+          74
+        ],
+        "Sampler.sample": [
+          76,
+          103
+        ],
+        "Sampler.get_topk_logprobs": [
+          105,
+          117
+        ],
+        "Sampler.apply_penalties": [
+          119,
+          135
+        ]
+      }
+    }
+  },
+  "v1_python_files_scanned": 42,
+  "guided_or_grammar_mentions": [],
+  "sampling_metadata_fields": [
+    "temperature",
+    "all_greedy",
+    "all_random",
+    "top_p",
+    "top_k",
+    "no_top_p",
+    "no_top_k",
+    "generators",
+    "max_num_logprobs",
+    "no_penalties",
+    "prompt_token_ids",
+    "frequency_penalties",
+    "presence_penalties",
+    "repetition_penalties",
+    "output_token_ids",
+    "min_tokens",
+    "stop_token_ids"
+  ],
+  "bounded_source_runs": [
+    {
+      "EXAMPLE_only": true,
+      "mode": "greedy",
+      "attribute_reads": [
+        "all_greedy",
+        "all_random",
+        "max_num_logprobs",
+        "min_tokens",
+        "no_penalties",
+        "output_token_ids",
+        "stop_token_ids",
+        "temperature"
+      ],
+      "operations": [
+        "tensor.to",
+        "min-token-penalty",
+        "temperature.div",
+        "sample.argmax",
+        "tensor.to"
+      ]
+    },
+    {
+      "EXAMPLE_only": true,
+      "mode": "random",
+      "attribute_reads": [
+        "all_greedy",
+        "all_random",
+        "generators",
+        "max_num_logprobs",
+        "min_tokens",
+        "no_penalties",
+        "no_top_k",
+        "no_top_p",
+        "output_token_ids",
+        "stop_token_ids",
+        "temperature",
+        "top_k",
+        "top_p"
+      ],
+      "operations": [
+        "tensor.to",
+        "min-token-penalty",
+        "temperature.div",
+        "topk-topp-sampling",
+        "tensor.to"
+      ]
+    }
+  ],
+  "GPU_executed": false,
+  "engine_imported": false,
+  "constraint_consumption_verified": false,
+  "source_only_observation": true,
+  "next": "최종 입력/runner의 실제 거부·소비를 GPU에서 확인하고 확인되지 않은 구조화 분기를 PASS/비적용으로 올리지 않는다."
+}

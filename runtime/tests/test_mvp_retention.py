@@ -615,3 +615,12 @@ def test_d1_append_finishes_while_file_removal_plan_is_paused(tmp_path, monkeypa
     assert not errors and not worker.is_alive() and not writer.is_alive()
     assert finished_during_plan
     assert store.read_all()[0][0]["request_id"] == "during-plan"
+
+
+def test_pr_future_started_request_survives_size_pressure(tmp_path):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    row = {"request_id": "future-start", "phase": "started", "recorded_at": (NOW + timedelta(seconds=30)).isoformat()}
+    store.append(row)
+    result = RecordRetention(tmp_path, max_bytes=1, enforce=True).run(now=NOW)
+    assert store.read_all()[0] == [row]
+    assert result["deleted"] is False

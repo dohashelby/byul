@@ -425,6 +425,11 @@
       "manifest_sha256": "16a472a9680564eb2ed6d245b873ac382dcde86de7ff78a787bd57e108f90683",
       "reviewed_by": "Codex 1b902eca stream/native ownership review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-16T04:13:00.463Z"
+    },
+    {
+      "manifest_sha256": "8f5b166ddded3070dab69a09e90672ad2e7c736d06ab1100e853b631dea01d5a",
+      "reviewed_by": "Codex 2de0a45b candidate target isolation review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T04:29:29.247Z"
     }
   ]
 }

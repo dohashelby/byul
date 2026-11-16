@@ -1,3 +1,9 @@
+## 2026-11-16 — #288 기준 전용 슬롯 대상과 후보 계약 분리
+
+- 원 결과: head31954efe 기본 suite는3 failed·13792 passed·기존34 skipped·10 warnings·1 error(pytest627.85초·부모628.717초)였다. stream 두 시험의 fixture/envelope 오류 외에 기준 전용 clear를 후보 판본 대상 목록에도 광고한 충돌과, 새 승인 대기 원인을 이전 원인 집합만 받던 시험의 불일치가 있었다. 원 로그 SHA d47fd0eb72157f5371e2bac4184225b10594a1c2ec2992670e1d21024874af90.
+- 보수: SlotObserver의 공통 class 대상은 기존 두 함수 그대로이며 정확 baseline pin을 선택한 instance에서만 추가 함수를 감싼다. 후보의 추가 함수 거부와 class 대상 불변을 직접 검사한다. stream은 기본 gate를 계속 닫고 기준 stream 한 쌍에서 승인 대기 원인·basis·next를 정확히 요구한다. 다른 원인 집합·assert·판정/수락 기준은 유지했다.
+- 검토/검증: 2de0a45b·fixture 보수45764f2e 집중 정적 검토에서 blocker가 없었으며 source574개 목록/고유 영수증을 고정했다. 승인된 같은 PR의 원인 보수로 공개한다. 로컬 Python/pytest·GPU 실측은 실행하지 않았다.
+
 ## 2026-11-16 — #288 stream 회귀의 fixture 연결 보수
 
 - 결과: head31954efe에서 catalog import 차단이 해소돼 Docker stub·platform 계약 검사가 통과했다. CPython3.12.8은1 failed·179 passed·1 error(pytest11.10초·부모11.907초)다. 새 시험이 공용 case에 필요한 external/writer_factory fixture를 import하지 않았고, 다른 새 시험이 기록 envelope의 source_module을 payload 밖에서 찾았다.

@@ -1,0 +1,33 @@
+{
+  "schema": "byul-approved-wheel-fixture/1",
+  "wheel": {
+    "filename": "uvicorn-0.34.0-py3-none-any.whl",
+    "bytes": 62315,
+    "sha256": "023dc038422502fa28a09c7a30bf2b6991512da7dcdb8fd35fe57cfc154126f4",
+    "source": "https://pypi.org/pypi/uvicorn/0.34.0/json"
+  },
+  "files": {
+    "h11_impl.py": {
+      "bytes": 20694,
+      "sha256": "e1bf8ab302b9ec505a44f7875e52bfa32f2928ceaf1b585a00b0887911fed5b0"
+    },
+    "httptools_impl.py": {
+      "bytes": 21805,
+      "sha256": "b6e4010a20faadfe4341ec90c0755ce39af11fda2ea233299178bd286e8d4419"
+    },
+    "flow_control.py": {
+      "bytes": 1701,
+      "sha256": "d39d16560df512f3ce907c329c2a0c3f5cd7165fef3b753876eae5739bf2a785"
+    },
+    "LICENSE.md": {
+      "bytes": 1526,
+      "sha256": "efe1acf3e62fb99c288b0ec73e5a773b7268ef4320fe757ea994214e4b63c371"
+    }
+  },
+  "license": "BSD-3-Clause",
+  "test_reference_only": true,
+  "baseline_image_distribution_metadata_match": true,
+  "baseline_image_distribution_metadata_sha256": "6d2f1a126d811ae114fb69fc98b4181d6979743d132c0537231b302c207841c5",
+  "actual_image_python_files_compared": false,
+  "wheel_installed_or_executed": false
+}

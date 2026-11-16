@@ -117,7 +117,7 @@ export const APPLICABILITY: Record<string, Entry> = {
 
 export const COMPARISON: Record<string, Entry> = {
   NO_CHANGE: { label: "변화 없음", tone: "neutral" },
-  REGRESSED: { label: "후퇴", tone: "error" },
+  REGRESSED: { label: "위험", tone: "error" },
   FIXED: { label: "개선", tone: "accent" },
   STILL_FAILING: { label: "계속 미충족", tone: "error" },
   UNKNOWN: { label: "미확인", tone: "muted" },

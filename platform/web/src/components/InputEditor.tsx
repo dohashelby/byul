@@ -35,7 +35,7 @@ export function useEditorStatus(doc: unknown, isNew: boolean) {
   return { dirty, markSaved, reportIssue, localIssues: Object.entries(localIssues).map(([path, message]) => ({ path, message })) };
 }
 
-export function EditorIntro({ kind, isNew, context, origin }: { kind: "환경" | "정책"; isNew: boolean; context: string[]; origin: string }) {
+export function EditorIntro({ kind, isNew, context }: { kind: "환경" | "정책"; isNew: boolean; context: string[] }) {
   return <header className={s.hero}>
     <div><span className={s.eyebrow}>UPDATE · {kind === "환경" ? "시험 대상" : "검증 기준"}</span>
       <h1>{kind} {isNew ? "등록" : "편집"}</h1>
@@ -43,7 +43,6 @@ export function EditorIntro({ kind, isNew, context, origin }: { kind: "환경" |
     </div>
     <div className={s.context} aria-label="현재 입력 대상">
       {context.map((item, i) => <span key={i} className={s.contextItem}>{item}</span>)}
-      <span className={s.origin}>{origin === "EXAMPLE" ? "예시 자료 · 공식 판정 근거 제외" : "입력 기준과 실제 관측은 별도"}</span>
     </div>
   </header>;
 }

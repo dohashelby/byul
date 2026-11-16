@@ -88,10 +88,8 @@ export function ThemeToggle() {
   );
 }
 
-function Sidebar() {
+function Sidebar({ areaKey }: { areaKey: AreaKey }) {
   const [params] = useSearchParams();
-  const { pathname } = useLocation();
-  const areaKey = useArea(pathname);
   const current = AREAS.find((a) => a.key === areaKey)!;
   const meta = useMeta();
   const reval = useRevalidation();
@@ -143,7 +141,7 @@ function Sidebar() {
           </div>
         ))}
       </nav>
-      <div className={l.footer}>
+      {areaKey === "runtime" && <div className={l.footer}>
         <div className={l.footItem}>
           <Dot state={conn === "connected" ? "ok" : conn === "example" ? "warn" : conn ? "bad" : "none"} />
           <span className={l.footText}>
@@ -169,7 +167,7 @@ function Sidebar() {
             <span className={l.navSub}>{meta.data ? `contracts ${meta.data.contracts_version}` : "–"}</span>
           </span>
         </div>
-      </div>
+      </div>}
     </aside>
   );
 }
@@ -178,7 +176,7 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-function Pagebar() {
+function Pagebar({ areaKey }: { areaKey: AreaKey }) {
   const { pathname } = useLocation();
   const { period, from, to, env } = useGlobalFilters();
   const [, patch] = useParams();
@@ -238,7 +236,7 @@ function Pagebar() {
             ))}
           </select>
         </label>
-        {meta.data && (
+        {areaKey === "runtime" && meta.data && (
           <span className={`${l.chip}`} style={{ padding: "0 8px", color: meta.data.example_mode ? "var(--warn)" : "var(--text-2)" }}>
             {meta.data.example_mode
               ? meta.data.sources.some((s) => s.mode !== "example") ? "일부 예시 포함" : "예시 데이터"
@@ -298,8 +296,10 @@ function useRuntimeStale(): string | null {
 export function Layout() {
   const auth = useAuth();
   const meta = useMeta();
-  const stale = useRuntimeStale();
+  const runtimeStale = useRuntimeStale();
   const { pathname } = useLocation();
+  const areaKey = useArea(pathname);
+  const stale = areaKey === "runtime" ? runtimeStale : null;
   const status = useRuntimeStatus().data?.item;
   const unavailable = (pathname.startsWith("/runtime/") || pathname === "/dashboard") && status
     ? ([
@@ -312,13 +312,13 @@ export function Layout() {
     : [];
   return (
     <div className={l.shell}>
-      <Sidebar />
+      <Sidebar areaKey={areaKey} />
       <div className={l.main}>
-        <Pagebar />
+        <Pagebar areaKey={areaKey} />
         {auth.status === "signed_in" && auth.user.default_password && (
           <Banner kind="unofficial">기본 비밀번호(admin) 사용 중 · 상단 [비밀번호 변경]에서 바꾸세요</Banner>
         )}
-        <SourceExampleBanner meta={meta.data} />
+        {areaKey === "runtime" && <SourceExampleBanner meta={meta.data} />}
         {unavailable.length > 0 && (
           <Banner kind="unofficial">관측 불가: 해당 구간 이벤트 누락 가능 ({unavailable.join(", ")})</Banner>
         )}

@@ -74,7 +74,7 @@ runtime 기록은 `platform/.runtime-data`에 쌓인다(git 제외). 조회 보�
 
 ## 예시 모드
 
-위 출처 환경변수가 없으면 그 출처는 `../contracts/examples/`를 읽는다(전부 `EXAMPLE` 등급). 하나라도 예시면 `/api/meta`의 `example_mode`가 `true`이고 첫 화면과 내부 화면에 예시인 출처 이름을 나열한다. 사이드바 아래에 출처별 모드(예시·실제 연결·파일)와 runtime 연결 상태가 보인다.
+위 출처 환경변수가 없으면 그 출처는 `../contracts/examples/`를 읽는다(전부 `EXAMPLE` 등급). 하나라도 예시면 `/api/meta`의 `example_mode`가 `true`다. 첫 화면과 Runtime 영역에는 예시인 출처 이름을 표시하며, Runtime 사이드바 아래에 출처별 모드와 연결 상태를 보여준다. Update 검증·정책·환경 화면에서는 출처 모드·자료 등급·비공식 안내와 runtime 연결 안내를 표시하지 않는다. API와 저장 문서의 출처·공식 여부·판정은 그대로 보존한다.
 
 ### 실제 반출 증거 연결
 

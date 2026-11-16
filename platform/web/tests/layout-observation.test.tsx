@@ -36,7 +36,7 @@ describe("관측 연결 경고", () => {
     expect(screen.getByText("예시 자료 · evidence · 해당 자료는 공식 판정 근거 제외")).toBeTruthy();
     expect(screen.queryByText(/^예시 데이터 ·/)).toBeNull();
   });
-  it("Runtime과 Update 사이드바의 세 단계 제목을 표시한다", async () => {
+  it("영역별 메뉴를 표시하고 Update·입력 화면에서는 출처 안내를 숨긴다", async () => {
     const status = structuredClone(STATUS);
     renderLayout(status);
     await screen.findByText("상태 조회 완료");
@@ -50,6 +50,15 @@ describe("관측 연결 경고", () => {
     expect(screen.getByText("검증")).toBeTruthy();
     expect(screen.getByRole("link", { name: "검증 결과" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "검증 실행" })).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/예시|공식 판정 근거 제외/);
+    expect(screen.queryByText("runtime")).toBeNull();
+    for (const path of ["/update/execute", "/environments", "/environments/new", "/policies", "/policies/new"]) {
+      cleanup();
+      renderLayout(status, path);
+      await screen.findByText("상태 조회 완료");
+      expect(document.body.textContent).not.toMatch(/예시|공식 판정 근거 제외/);
+      expect(screen.queryByText("runtime")).toBeNull();
+    }
   });
   it("수집원이 없는 합성 자료 시연에서는 관측 불가 경고를 띄우지 않는다", async () => {
     const status = structuredClone(STATUS);

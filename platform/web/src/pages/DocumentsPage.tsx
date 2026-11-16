@@ -112,7 +112,7 @@ export function EnvironmentEditorPage() {
   const warnings = [...factWarnings(doc), ...serverWarnings.filter((w) => !factWarnings(doc).some((x) => x.path === w.path))];
   return (
     <div className={`page ${p.inputPage}`}>
-      <EditorIntro kind="환경" isNew={isNew} origin={doc.data_origin} context={[doc.target.engine.name || "엔진 미선택", doc.target.engine.version || "판본 미확인", doc.target.model.id || "모델 미입력"]} />
+      <EditorIntro kind="환경" isNew={isNew} context={[doc.target.engine.name || "엔진 미선택", doc.target.engine.version || "판본 미확인", doc.target.model.id || "모델 미입력"]} />
       <EditorSaveBar onSave={onSave} pending={save.isPending} failed={save.isError} dirty={editor.dirty} issues={[...issues, ...editor.localIssues]} localError={editor.localIssues.length > 0} savedRev={savedRev} />
       <InputIssueSummary issues={[...issues, ...editor.localIssues]} />
       <fieldset className={p.editorFields} disabled={save.isPending} aria-label="환경 입력">
@@ -165,7 +165,7 @@ export function PolicyEditorPage() {
   if (!doc) return <StateView kind="loading" />;
   return (
     <div className={`page ${p.inputPage}`}>
-      <EditorIntro kind="정책" isNew={isNew} origin={doc.data_origin} context={[doc.policy_id || "새 정책", doc.environment_ref ? `${doc.environment_ref.id} · 판본 ${doc.environment_ref.revision}` : "기준 환경 미선택"]} />
+      <EditorIntro kind="정책" isNew={isNew} context={[doc.policy_id || "새 정책", doc.environment_ref ? `${doc.environment_ref.id} · 판본 ${doc.environment_ref.revision}` : "기준 환경 미선택"]} />
       <EditorSaveBar onSave={onSave} pending={save.isPending} failed={save.isError} dirty={editor.dirty} issues={[...issues, ...editor.localIssues]} localError={editor.localIssues.length > 0} savedRev={savedRev} />
       <InputIssueSummary issues={[...issues, ...editor.localIssues]} />
       {serverWarnings.length > 0 && <div className="notice">저장했지만 실행 준비는 완료되지 않았습니다. 입력 연결·준비 상태에서 부족한 값을 확인하세요.</div>}

@@ -448,8 +448,8 @@
     },
     {
       "manifest_sha256": "4e198d0072e495139f94b95585c4ae5ee4ca7c88d69d7cdb425d4e744ef174a6",
-      "reviewed_by": "Claude / PR291 report FAIL·UNKNOWN verdict reasons (core/report.py, models/objects.py) + main89c8569d 통합 review; B 검토 면제(사용자 결정 5, 2026-11-12)",
-      "reviewed_at": "2026-11-16T09:30:00Z"
+      "reviewed_by": "Claude / PR291 보고서 판정 이유·main89c8569d 통합 review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T08:09:45Z"
     }
   ]
 }

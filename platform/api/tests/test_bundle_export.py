@@ -199,7 +199,7 @@ def test_export_preserves_approved_launch_settings(store_client):
     with tarfile.open(fileobj=io.BytesIO(response.content), mode='r:gz') as archive:
         target = json.load(archive.extractfile('bundle-test/target.json'))
     assert target['launch_settings'] == env['deployment']['launch_settings']
-    from serving_runtime.mvp.target import _parse
+    from serving_runtime.target.target import _parse
     assert _parse(target)['launch_settings'] == env['deployment']['launch_settings']
 
 

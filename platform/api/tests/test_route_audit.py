@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from byul_platform.config import Settings
 from byul_platform.main import create_app
 from byul_platform.sources.runtime import RuntimeClient
-from serving_runtime.mvp.route_rejections import RouteRejections
+from serving_runtime.gateway.route_rejections import RouteRejections
 
 
 def test_route_audit_reads_bounded_separate_journal_and_preserves_failures(tmp_path, monkeypatch):

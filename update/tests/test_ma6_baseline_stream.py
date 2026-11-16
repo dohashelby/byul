@@ -88,6 +88,22 @@ def test_exact_wheel_rows_keep_old_extension_bytes_and_distinct_abi():
     assert resolve_executor('stream_buffer', 'kubernetes', engine='vllm', version='0.7.0') is None
 
 
+def test_stream_targets_are_separate_from_unique_native_request_points(monkeypatch):
+    assert profiles.point_sources(baseline.PROFILE) == profiles.point_sources(baseline.BASE_PROFILE)
+    assert all(source['classes'] == {} for source in baseline.SOURCE_LAYOUT.values())
+    assert set(baseline.SOURCE_LAYOUT) == set(stream.TARGETS)
+    data = json.loads((Path(catalog.__file__).with_name('assets') / 'vllm_native_release_rows.json').read_bytes())
+    # Preserve the generic ambiguity guard; do not waive duplicate point names
+    # merely because h11 and httptools share RequestResponseCycle method names.
+    row = next(row for row in data['profiles'] if row['profile'] == baseline.BASE_PROFILE)
+    sources = [source for source in row['sources'].values() if source['classes']]
+    cls, methods = next(iter(sources[0]['classes'].items()))
+    sources[1]['classes'][cls] = list(methods)
+    monkeypatch.setattr(catalog.json, 'loads', lambda raw: data)
+    with pytest.raises(ValueError, match='LIFECYCLE_POINT_AMBIGUOUS'):
+        catalog._catalog()
+
+
 def test_baseline_stream_prepares_exact_private_extension_and_refuses_tampering(tmp_path, monkeypatch):
     prepared = lifecycle.prepare_assets(tmp_path / 'assets', REPO, profile=baseline.PROFILE)
     assert lifecycle.load_prepared(tmp_path / 'assets/manifest.json') == prepared

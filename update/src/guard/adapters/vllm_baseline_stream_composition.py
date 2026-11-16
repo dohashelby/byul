@@ -21,13 +21,15 @@ SOURCE_ROWS = {
     'uvicorn.protocols.http.httptools_impl': 'b6e4010a20faadfe4341ec90c0755ce39af11fda2ea233299178bd286e8d4419',
     'uvicorn.protocols.http.flow_control': 'd39d16560df512f3ce907c329c2a0c3f5cd7165fef3b753876eae5739bf2a785',
 }
+# Stream targets belong to the original extension's module-qualified TARGETS.
+# They are source pins here, never duplicated generic NATIVE request points.
 SOURCE_LAYOUT = {
     'uvicorn.protocols.http.h11_impl': {'sha256': SOURCE_ROWS['uvicorn.protocols.http.h11_impl'],
-        'bytes': 20694, 'classes': {'RequestResponseCycle': ['run_asgi', 'send'], 'H11Protocol': ['connection_lost']}},
+        'bytes': 20694, 'classes': {}},
     'uvicorn.protocols.http.httptools_impl': {'sha256': SOURCE_ROWS['uvicorn.protocols.http.httptools_impl'],
-        'bytes': 21805, 'classes': {'RequestResponseCycle': ['run_asgi', 'send'], 'HttpToolsProtocol': ['connection_lost']}},
+        'bytes': 21805, 'classes': {}},
     'uvicorn.protocols.http.flow_control': {'sha256': SOURCE_ROWS['uvicorn.protocols.http.flow_control'],
-        'bytes': 1701, 'classes': {'FlowControl': ['drain']}},
+        'bytes': 1701, 'classes': {}},
 }
 STREAM_CODE_3128 = '9ce758b73185aedbab0f9d46ea379f12af3f189d3e9fc9460cab57bc9ef12c50'
 RUNTIME_CODES = {

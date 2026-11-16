@@ -271,15 +271,19 @@
         "vllm.v1.executor.multiproc_executor": {
           "sha256": "5db418332360f43e2a9718f62d8ec5d856d554b8d0d27d14f053fb3392d33239",
           "bytes": 14086,
-          "classes": {}
+          "classes": {
+          }
         },
         "vllm.v1.worker.gpu_worker": {
           "sha256": "7bc08a4e47bac5e1d68e68f540f014e3f9244c0f8d773f0dd7f5b959da5afb7a",
           "bytes": 11991,
-          "classes": {}
+          "classes": {
+          }
         }
       },
-      "void_return_argument_ids": [],
+      "void_return_argument_ids": [
+
+      ],
       "review": "docs/dev-1/ma6-baseline-startup-candidate.md",
       "installation_review": "docs/dev-1/ma3-image-qualification-20261114.json",
       "scope": "Startup-only component body/constructor outcomes. No ASGI/native request hooks or fingerprints. IPC READY is transport only; no all-rank/GPU/admission/registered-producer claim.",
@@ -309,10 +313,13 @@
         "vllm.v1.worker.gpu_worker": {
           "sha256": "7bc08a4e47bac5e1d68e68f540f014e3f9244c0f8d773f0dd7f5b959da5afb7a",
           "bytes": 11991,
-          "classes": {}
+          "classes": {
+          }
         }
       },
-      "void_return_argument_ids": [],
+      "void_return_argument_ids": [
+
+      ],
       "review": "docs/dev-1/ma6-baseline-profiler-candidate.md",
       "installation_review": "docs/dev-1/ma3-image-qualification-20261114.json",
       "scope": "Direct Worker.profile backend start/stop and declared owned trace inventory only; no request IDs, wrapper state, callback path binding or cross-process RPC claim.",
@@ -441,35 +448,18 @@
           "sha256": "e1bf8ab302b9ec505a44f7875e52bfa32f2928ceaf1b585a00b0887911fed5b0",
           "bytes": 20694,
           "classes": {
-            "RequestResponseCycle": [
-              "run_asgi",
-              "send"
-            ],
-            "H11Protocol": [
-              "connection_lost"
-            ]
           }
         },
         "uvicorn.protocols.http.httptools_impl": {
           "sha256": "b6e4010a20faadfe4341ec90c0755ce39af11fda2ea233299178bd286e8d4419",
           "bytes": 21805,
           "classes": {
-            "RequestResponseCycle": [
-              "run_asgi",
-              "send"
-            ],
-            "HttpToolsProtocol": [
-              "connection_lost"
-            ]
           }
         },
         "uvicorn.protocols.http.flow_control": {
           "sha256": "d39d16560df512f3ce907c329c2a0c3f5cd7165fef3b753876eae5739bf2a785",
           "bytes": 1701,
           "classes": {
-            "FlowControl": [
-              "drain"
-            ]
           }
         }
       },

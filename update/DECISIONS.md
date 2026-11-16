@@ -1,3 +1,7 @@
+## 2026-11-16 — 병합 뒤 관측 보완 push·draft PR 생성 승인
+
+사용자는 검토 커밋618c36ba의 “push·draft PR 생성 승인”으로 답했다. codex/ma6-post284-observations-20261116의 슬롯 이동 보완·기준 stream /33 준비·고정 helper 호환 수정과 해당 source 목록/검토 기록을 새 draft PR로 공개한다. 필요한 승인/CI 원인 기록은 같은 범위로 잇는다. 기본 stream gate는 닫혀 있고 sampler/graph 별도 개발·main 병합·실제 GPU/등록·새 비용 승인은 포함하지 않는다.
+
 ## 2026-11-16 — 기존 startup/profiler 의존 bytes의 호환 보존
 
 main의 M-A3 rank source 확장은 그대로 유지한다. 기존 /31·/32가 고정한 rank helper bfa843de는 과거 Git bytes를 별도 자료로 보존하고 host 준비/재검증에서만 선택한다. 기존 composition·의존 해시·in-pod 파일 bytes·등록/수락 기준을 새 helper에 맞춰 넓히지 않는다. 미공개 슬롯 이동·stream 준비·샘플러 후속은 새 main 기반 분기에서 개발하며 새 PR 공개와 기본 stream gate 활성화는 별도 승인 범위로 남긴다.

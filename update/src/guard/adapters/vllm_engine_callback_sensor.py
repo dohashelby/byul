@@ -38,6 +38,10 @@ from . import vllm_transition_dispatch_callback as transition_dispatch
 from . import vllm_execution_link_callback as execution_link
 from . import vllm_auxiliary_link_callback as auxiliary_link
 from . import vllm_scoped_consumption_callback as scoped_consumption
+from . import vllm_baseline_slot_sampling as slot_sampling
+from . import vllm_baseline_graph_callback as baseline_graph
+from . import vllm_baseline_attention_metadata as attention_metadata
+from . import vllm_baseline_profiler_local as profiler_local
 
 PROFILE = 'vllm-engine-callback-metadata/1'
 SCHEMA = 'guard-engine-callback-events/1'
@@ -45,6 +49,7 @@ ROOT = '/guard-lifecycle/engine-callbacks'
 DATA_ROOT = '/guard-lifecycle/data'
 SLOT_MODULE = 'vllm.v1.worker.gpu_input_batch'
 SLOT_TARGETS = {SLOT_MODULE: ('InputBatch.add_request', 'InputBatch.remove_request')}
+BASELINE_SLOT_EXTRA = ('InputBatch.condense', 'InputBatch.clear')
 SLOT_SOURCE = baseline_sources(candidate_sources({SLOT_MODULE: 'e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d'}, SLOT_TARGETS), SLOT_TARGETS)
 # V2 model runner (vLLM 0.31.0 기본 GPU runner). 자리 배정·회수와 sampler가 실제로
 # 받은 요청별 상태를 CPU 쪽 배열에서만 읽는다. GPU tensor를 읽거나 동기화하지 않는다.
@@ -75,6 +80,9 @@ for _name, _points in consumption.TARGETS.items():
 # 같은 설정의 V2 runner 경로: V2 runner 모듈이 불릴 때만 감싼다(lab kernel 대조 세션은 graph replay가 같은 지점을 쓴다).
 for _name, _points in consumption_v2.TARGETS.items():
     MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
+for _targets in (slot_sampling.TARGETS, baseline_graph.TARGETS, attention_metadata.TARGETS):
+    for _name, _points in _targets.items():
+        MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
 # SUP-06 worker shard(B 의존 반환 5): settings의 worker_shards가 참일 때만 감싼다. multiproc 모듈은 분산 관측과 같은 모듈이다.
 for _name, _points in worker_shard.TARGETS.items():
     MODULES[_name] = tuple(dict.fromkeys(MODULES.get(_name, ()) + _points))
@@ -87,8 +95,12 @@ for _name in auxiliary_link.MODULES:
 # 선택 관측(이름, 대상): 같은 모듈에 여러 개가 있을 수 있어 지점별로 관측기를 고른다.
 OPTIONAL = (('link', execution_link.TARGETS), ('attempt', attempt.TARGETS), ('transition', transition.TARGETS), ('health', health.TARGETS), ('profiler', profiler.TARGETS),
             ('consumption', consumption.TARGETS), ('consumption_v2', consumption_v2.TARGETS), ('shard', worker_shard.TARGETS),
-            ('dispatch', transition_dispatch.TARGETS))
+            ('dispatch', transition_dispatch.TARGETS), ('slot_sampling', slot_sampling.TARGETS),
+            ('baseline_graph', baseline_graph.TARGETS), ('attention_metadata', attention_metadata.TARGETS))
 OPTIONAL_MODULES = frozenset(name for _, targets in OPTIONAL for name in targets)
+# Local profiler segments stage only modules the engine actually loads.
+for _name in profiler_local.SPECS:
+    MODULES.setdefault(_name, ())
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
 MAX_FILE_BYTES = 16 * 1024 ** 2
@@ -117,27 +129,83 @@ class CacheObserver(_Keyed, cache.CacheCallbackObserver):
     targets = CACHE_TARGETS
 
 
+class AttentionMetadataObserver(_Keyed, attention_metadata.AttentionMetadataObserver):
+    pass
+
+
+class BaselineGraphObserver(_Keyed, baseline_graph.BaselineGraphObserver):
+    pass
+
+
 class DistributedObserver(_Keyed, distributed.DistributedCallbackObserver):
     pass
 
 
 class SlotObserver(_Keyed, cache.CacheCallbackObserver):
     """요청이 받은 batch 자리와 제한 여부만 남긴다. 값 자체는 남기지 않는다."""
+    # Public default targets remain valid for every registered candidate row.
     targets = SLOT_TARGETS
-    sources = SLOT_SOURCE
+    sources = {**slot_sampling.SOURCES, **SLOT_SOURCE}
     schema = 'guard-vllm-slot-callback/1'
     profile = 'source-bound-slot-callback-candidate-v1'
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.slot_identity_namespace = os.urandom(32)
+        self.slot_sampling_enabled = False
+
+    def _batch_identity(self, receiver):
+        token = self.token(receiver)
+        return self.fingerprint(self.slot_identity_namespace + token.encode()) if token is not None else None
+
+    def wrap(self, module, point):
+        if point in slot_sampling.POINT_MODULES:
+            if (not self.slot_sampling_enabled or
+                    cache.source_pin(module, self.sources) != slot_sampling.SOURCES[module.__name__]):
+                raise ValueError('SLOT_SAMPLING_SOURCE_UNSUPPORTED')
+            name = module.__name__
+            self.targets = {**self.targets, name: tuple(dict.fromkeys(
+                self.targets.get(name, ()) + slot_sampling.TARGETS[name]))}
+        if point in BASELINE_SLOT_EXTRA:
+            if cache.source_pin(module, self.sources) != BASELINE_ROWS[SLOT_MODULE]['sha256']:
+                raise ValueError('SLOT_BASELINE_SOURCE_UNSUPPORTED')
+            self.targets = {**self.targets, SLOT_MODULE: tuple(dict.fromkeys(
+                self.targets.get(SLOT_MODULE, ()) + BASELINE_SLOT_EXTRA))}
+        return super().wrap(module, point)
+
+    def _mapping(self, receiver):
+        fields = cache.base.attrs(receiver)
+        mapping, ids = fields.get('req_id_to_index'), fields.get('req_ids')
+        if type(mapping) is not dict or type(ids) is not list or len(mapping) > MAX_SAMPLED_SLOTS:
+            self.gaps.add('SLOT_BASELINE_MAPPING_UNAVAILABLE')
+            return None
+        rows = []
+        for req_id, index in mapping.items():
+            digest = self.fingerprint(req_id)
+            if digest is None or cache._uint(index) is None or index >= len(ids) or ids[index] != req_id:
+                self.gaps.add('SLOT_BASELINE_MAPPING_UNAVAILABLE')
+                return None
+            rows.append({'request_sha256': digest, 'slot': index})
+        return sorted(rows, key=lambda row: row['request_sha256'])
+
     def _snapshot(self, point, args, kwargs, result=None, returned=False):
+        if point in slot_sampling.POINT_MODULES:
+            return slot_sampling.snapshot(self, point, args, kwargs, result, returned)
+        baseline = self.__dict__.get('_source_pins', {}).get(SLOT_MODULE) == BASELINE_ROWS[SLOT_MODULE]['sha256']
+        binding = {'batch_sha256': self._batch_identity(args[0] if args else None)} if baseline else {}
+        if point in BASELINE_SLOT_EXTRA:
+            return {**binding, 'slot_mapping': self._mapping(args[0] if args else None)}
         value = args[1] if len(args) > 1 else kwargs.get('request', kwargs.get('req_id'))
         if point == 'InputBatch.add_request':
             fields = cache.base.attrs(value)
             allowed = cache.base.attrs(fields.get('sampling_params')).get('allowed_token_ids')
             row = {'request_sha256': self.fingerprint(fields.get('req_id')), 'restricted': type(allowed) is list and bool(allowed)}
+            if baseline and self.slot_sampling_enabled:
+                row.update(supported_restricted=slot_sampling.restricted(fields.get('sampling_params')),
+                    supported_restrictions=slot_sampling.restrictions(fields.get('sampling_params')))
         else:
             row = {'request_sha256': self.fingerprint(value)}
         if returned:
-            baseline = self.__dict__.get('_source_pins', {}).get(SLOT_MODULE) == BASELINE_ROWS[SLOT_MODULE]['sha256']
             if baseline and point == 'InputBatch.add_request':
                 # 0.7 V1 returns None; the pinned method writes this mapping.
                 # Verify the mapped position against req_ids without emitting
@@ -152,7 +220,7 @@ class SlotObserver(_Keyed, cache.CacheCallbackObserver):
                     self.gaps.add('SLOT_BASELINE_MAPPING_UNAVAILABLE')
             else:
                 row['slot'] = cache._uint(result)
-        return row
+        return {**binding, **row}
 
 
 def _slot_index(value):
@@ -330,7 +398,16 @@ class EngineCallbacks:
     def __init__(self, session, secret, sink, *, context_provider=None, clock=None, fault_file=None, kernel_checks=False,
                  request_attempts=False, generation_transitions=False, health_causal=False, profiler_control=False,
                  runner_consumption=False, worker_shards=False, transition_dispatches=False, execution_links=False,
-                 auxiliary_roots=None, scoped_runner_consumption=False, execution_link_content_hashes=False):
+                 auxiliary_roots=None, scoped_runner_consumption=False, execution_link_content_hashes=False, baseline_slot_sampling=False, baseline_piecewise_graph=False, baseline_attention_metadata=False,
+                 baseline_profiler_local=False, baseline_profiler_local_image=None):
+        if baseline_profiler_local is True:
+            if profiler_control:
+                raise ValueError('ENGINE_CALLBACK_PROFILER_LOCAL_EXCLUSIVE')
+            if baseline_profiler_local_image not in {profiler_local.IMAGE, 'docker.io/' + profiler_local.IMAGE}:
+                raise ValueError('ENGINE_CALLBACK_PROFILER_LOCAL_IMAGE_REQUIRED')
+        elif baseline_profiler_local_image is not None:
+            raise ValueError('ENGINE_CALLBACK_PROFILER_LOCAL_FLAG_REQUIRED')
+        self.local_profiler = None
         self.sink = sink; self.fault_file = fault_file
         options = {'sink': sink, 'context_provider': context_provider, 'clock': clock}
         self.cache = CacheObserver(session, **options)
@@ -343,6 +420,23 @@ class EngineCallbacks:
         self.kernel = KernelObserver(session, **options) if kernel_checks else None
         self.graph = GraphObserver(session, kernel=self.kernel, **options) if kernel_checks else None
         self.cache.secret = self.distributed.secret = self.slot.secret = self.slot_v2.secret = self.weights.secret = self.comm.secret = secret
+        self.slot_sampling = self.slot if baseline_slot_sampling is True else None
+        self.baseline_graph = BaselineGraphObserver(session, **options) if baseline_piecewise_graph is True else None
+        if self.baseline_graph is not None:
+            self.baseline_graph.secret = secret
+        self.attention_metadata = AttentionMetadataObserver(session, **options) if baseline_attention_metadata is True else None
+        if self.attention_metadata is not None:
+            self.attention_metadata.secret = secret
+        if baseline_profiler_local is True:
+            def local_binding():
+                context = (context_provider or cache.base._context)()
+                if type(context) is not dict or type(context.get('pid')) is not int or context['pid'] != os.getpid():
+                    raise ValueError('BASELINE_PROFILER_LOCAL_BINDING_UNAVAILABLE')
+                return {'pid': context['pid'], 'session_id_sha256': hashlib.sha256(session.encode()).hexdigest(),
+                    'process_start_sha256': hashlib.sha256(json.dumps(context, sort_keys=True, separators=(',', ':')).encode()).hexdigest()}
+            self.local_profiler = profiler_local.LocalProfilerRouter(sink, session=session,
+                binding_factory=local_binding, image=baseline_profiler_local_image, enabled=True)
+        self.slot.slot_sampling_enabled = self.slot_sampling is not None
         if self.kernel is not None:
             self.kernel.secret = self.graph.secret = secret
         # 매 단계 scheduler를 감싸므로 명시한 세션에서만 만든다(다른 점검의 시간 측정에 부담을 주지 않게).
@@ -376,6 +470,24 @@ class EngineCallbacks:
         self.auxiliary = auxiliary_link.AuxiliaryLinkObserver(auxiliary_roots, session=session, link=self.link, sink=sink) if self.link is not None and auxiliary_roots else None
 
     def instrument(self, module):
+        name = vars(module).get('__name__') if type(module) is type(sys) else None
+        installed = False
+        if self.local_profiler is not None and name in profiler_local.SPECS:
+            # An inherited EngineCallbacks owns the parent's static sink.
+            # Forked children require a fresh installer and owned sink.
+            if os.getpid() == self.cache.pid:
+                try:
+                    installed = self.local_profiler.observe_loaded(module)
+                    diagnostic = self.local_profiler.last_diagnostic
+                    if diagnostic not in {'INSTALLED', 'ALREADY_INSTALLED', 'PARTIAL_SEGMENT'}:
+                        self.gap('BASELINE_PROFILER_LOCAL_' + diagnostic, name)
+                except BaseException:
+                    self.gap('BASELINE_PROFILER_LOCAL_INSTALL_UNAVAILABLE', name)
+        if not MODULES.get(name) and name not in auxiliary_link.MODULES:
+            return installed
+        return self._instrument_existing(module) or installed
+
+    def _instrument_existing(self, module):
         """Validate every point of a module before changing any of them."""
         name = vars(module).get('__name__')
         if name in auxiliary_link.MODULES:
@@ -399,11 +511,25 @@ class EngineCallbacks:
             except Exception:
                 self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
                 return False
+        if name == SLOT_MODULE:
+            try:
+                points = SLOT_TARGETS[name]
+                baseline = cache.source_pin(module, SLOT_SOURCE) == BASELINE_ROWS[name]['sha256']
+                if baseline:
+                    points += BASELINE_SLOT_EXTRA
+                    if self.slot_sampling is not None:points += slot_sampling.TARGETS[name]
+                changes = [(cache._function(module, point), self.slot.wrap(module, point)) for point in points]
+            except Exception:
+                self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
+                return False
+            for (owner, method, _), wrapped in changes:setattr(owner, method, wrapped)
+            return True
         if name in OPTIONAL_MODULES:
             return self._instrument_optional(module, name)
         observer = self._default_observer(name)
         try:
-            changes = [(cache._function(module, point), observer.wrap(module, point)) for point in MODULES[name]]
+            points = MODULES[name]
+            changes = [(cache._function(module, point), observer.wrap(module, point)) for point in points]
         except Exception:
             self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
             return False
@@ -477,7 +603,7 @@ class EngineCallbacks:
                 try: verify()
                 except Exception: observer.gaps.add('OBSERVER_SOURCE_POSTCHECK_FAILED')
         kernel = self.kernel.gaps | self.graph.gaps if self.kernel is not None else set()
-        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption, getattr(self, 'consumption_v2', None), getattr(self, 'shard', None), getattr(self, 'dispatch', None), getattr(self, 'link', None), getattr(self, 'auxiliary', None), getattr(self, 'supply', None), getattr(self, 'supply_watch', None)) if o is not None))
+        extra = set().union(*(o.gaps for o in (self.attempt, self.transition, self.health, self.profiler, self.consumption, getattr(self, 'consumption_v2', None), getattr(self, 'shard', None), getattr(self, 'dispatch', None), getattr(self, 'link', None), getattr(self, 'auxiliary', None), getattr(self, 'supply', None), getattr(self, 'supply_watch', None), self.baseline_graph, self.attention_metadata) if o is not None))
         for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps | self.slot_v2.gaps | self.weights.gaps | self.comm.gaps | kernel | extra):
             self.gap(code)
 
@@ -533,6 +659,11 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
             execution_links=settings.get('execution_links') is True,
             execution_link_content_hashes=settings.get('execution_link_content_hashes') is True,
             scoped_runner_consumption=settings.get('scoped_runner_consumption') is True,
+            baseline_slot_sampling=settings.get('baseline_slot_sampling') is True,
+            baseline_piecewise_graph=settings.get('baseline_piecewise_graph') is True,
+            baseline_attention_metadata=settings.get('baseline_attention_metadata') is True,
+            baseline_profiler_local=settings.get('baseline_profiler_local') is True,
+            baseline_profiler_local_image=settings.get('baseline_profiler_local_image'),
             auxiliary_roots=settings.get('supply_roots'))
         sys.meta_path.insert(0, Finder(callbacks))
         if settings.get('supply_roots'):

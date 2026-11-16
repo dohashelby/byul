@@ -1,0 +1,15 @@
+# M-A6 baseline V1 REQ-20 PiecewiseBackend candidate
+
+The clean vLLM 0.7.0 source at commit `5204ff5c3feeb96e8a6eea65dfcb78395f90d4d8` has `vllm/compilation/backends.py` (35,385 bytes, SHA-256 `afd9a1a182409ab289cde20fb0dd0e8c31efc4bb04890fcd58b1f870339a5fb5`). The exact reviewed fixture is `tests/fixtures/vllm-070-graph/backends.py`; its `SOURCE.md` records provenance and `LICENSE` preserves the source checkout's license. This tag-source row is a candidate until the installed GPU image file is compared.
+
+`PiecewiseBackend.__call__` selects `args[self.sym_shape_indices[0]]`, a plain integer shape. It returns a general compiled graph for an unlisted shape, or uses that shape's `concrete_size_entries` entry. An entry may compile, warm up, capture a CUDA graph, or call `entry.cudagraph.replay()` and return `entry.output`. The separate `copy_and_call` closure copies tensor inputs; this observer never replaces or calls it.
+
+`vllm_baseline_graph_callback.py` uses the existing exact file and live code wrapper for `PiecewiseBackend.__call__`. It reads only bounded direct object dictionaries: shape index and integer, entry flags, graph/output object identities, and call outcome. It does not invoke properties, inspect tensor data, or change engine behavior. Its adapter projection requires one ordered CALL/RETURN/RAISE pair with the same session, process, source, code, entry and graph/output generation tokens, and bounded timestamps before it reports a replay or capture. The fixture regression exercises the exact source method with bounded capture/replay stand-ins, a general and unsupported shape, a native raise, source/code refusal, and damaged producer rows.
+
+The wrapper's live source/code check and the projection's call-to-terminal code equality are separate checks. A pair of records is not independent producer attestation; `producer_authenticated` stays false. No absolute code digest or runtime catalog is inferred from the test fixture.
+
+This is partial REQ-20 input. It cannot prove copied graph inputs are fresh, sample or request output consumption, unchanged output values, GPU completion, or equality with an independent graph-off run. The existing V2 `project_graph_lifetime` contract and verdict are unchanged; no baseline engine-sensor default gate or producer registration opens. GPU lab completion remains UNKNOWN. M-B4's separate semantic work remains deferred.
+
+기존 engine callback 준비 경로는 `baseline_piecewise_graph=True`를 명시할 때만 이 module의 지점을 선택한다. 기본값은 False이며 설정/manifest에 별도로 남는다. 다른 관측과 같은 세션 키·소유 journal을 사용하되 이 관측기는 독립된 부분 기록과 gap을 내며 기존 V2/판정/기본 실행 gate를 열지 않는다. 실제 installer→source 원 함수→스트리밍 sink→엄격한 partial consumer 연결을 별도 회귀로 확인한다.
+
+출력이 weakref를 지원하지 않는 list/tuple이면 원 반환과 `result is entry.output` 사실은 보존하지만, 컨테이너를 강하게 보유하거나 tensor 내용을 읽어 세대를 꾸미지 않는다. 그런 출력은 `CACHE_CALLBACK_WEAK_OBJECT_IDENTITY_UNAVAILABLE`·`baseline_graph_object_generation_unavailable`로 남고 검증된 세대의 replay 수에 넣지 않는다. 실제 엔진의 선택된 출력 형식은 별도 확인 대상이다.

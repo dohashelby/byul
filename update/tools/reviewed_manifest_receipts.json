@@ -417,9 +417,34 @@
       "reviewed_at": "2026-11-15T16:21:07.483Z"
     },
     {
+      "manifest_sha256": "47b2743fd9d921a0b38276597ec78bb74538896680eddebd2a2c36a833bcc59e",
+      "reviewed_by": "Codex slot45 / streamc79 / helper1795 review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T04:04:36.257Z"
+    },
+    {
+      "manifest_sha256": "16a472a9680564eb2ed6d245b873ac382dcde86de7ff78a787bd57e108f90683",
+      "reviewed_by": "Codex 1b902eca stream/native ownership review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T04:13:00.463Z"
+    },
+    {
+      "manifest_sha256": "8f5b166ddded3070dab69a09e90672ad2e7c736d06ab1100e853b631dea01d5a",
+      "reviewed_by": "Codex 2de0a45b candidate target isolation review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T04:29:29.247Z"
+    },
+    {
+      "manifest_sha256": "c62c9f8685f722cded234153471224a4eda9a0c9cd5f722919ba69ff8e9f38f5",
+      "reviewed_by": "Codex baseline lineage reviews 357/909/119/54de/44b; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T04:51:56.548Z"
+    },
+    {
       "manifest_sha256": "88eb78db537d1faa2a6c2c878f2d5c2d90548140c9e177e779244e2e8711e16c",
       "reviewed_by": "Codex / PR287 legacy qualification and startup dependency review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-16T04:14:58Z"
+    },
+    {
+      "manifest_sha256": "2c17f9a0f3e2b9a40e510d814c1b240170fbce37368ba89210127af1629edb0c",
+      "reviewed_by": "Claude / PR288 main 통합·graph Fields·profiler EngineCoreProc 지점 보수 검토; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T05:53:37Z"
     }
   ]
 }

@@ -3,6 +3,7 @@ from collections import namedtuple
 import json
 from pathlib import Path
 from types import CodeType, FunctionType, ModuleType, SimpleNamespace
+import pytest
 
 from guard.adapters import vllm_cache_callback as cache
 from guard.adapters import vllm_engine_callback_sensor as sensor
@@ -132,6 +133,8 @@ def test_baseline_disabled_cache_cannot_complete_timing_even_with_fast_control(t
 class Matrix:
     def __setitem__(self, key, value):
         pass
+    def __getitem__(self, key):
+        return []
 
 
 def batch(module):
@@ -142,7 +145,7 @@ def batch(module):
     value.token_ids_cpu = Matrix()
     value.num_tokens = [0, 0]
     value.num_computed_tokens_cpu = [0, 0]
-    value.block_table = SimpleNamespace(add_row=lambda *args: None)
+    value.block_table = SimpleNamespace(add_row=lambda *args: None, move_row=lambda *args: None)
     for name in ("temperature_cpu", "top_p_cpu", "top_k_cpu", "frequency_penalties_cpu",
                  "presence_penalties_cpu", "repetition_penalties_cpu", "min_tokens", "stop_token_ids"):
         setattr(value, name, [None, None])
@@ -163,13 +166,22 @@ def request(req_id, allowed):
         num_computed_tokens=0, block_ids=[], sampling_params=params, generator=None)
 
 
+def recording_slot_observer(session, *, context_provider):
+    records = []
+    def bounded_sink(row):
+        if len(records) >= 256:
+            raise AssertionError("EXAMPLE slot fixture event bound exceeded")
+        records.append(row)
+    observer = sensor.SlotObserver(session, sink=bounded_sink, context_provider=context_provider)
+    observer.fixture_events = records
+    return observer
+
+
 def test_baseline_none_return_uses_verified_mapping_but_slot_consumer_keeps_movement_gap(tmp_path):
     name = sensor.SLOT_MODULE
     module = source_module(name, sensor.SLOT_TARGETS[name], sensor.SLOT_SOURCE, tmp_path)
     module.SamplingType = SimpleNamespace(GREEDY="greedy")
-    # The in-pod observer streams to its sink instead of keeping report events.
-    events = []
-    observer = sensor.SlotObserver("b" * 32, sink=events.append, context_provider=lambda: {"pid": 1})
+    observer = recording_slot_observer("b" * 32, context_provider=lambda: {"pid": 1})
     observer.secret = SECRET
     for point in sensor.SLOT_TARGETS[name]:
         owner, method = point.split(".")
@@ -181,7 +193,7 @@ def test_baseline_none_return_uses_verified_mapping_but_slot_consumer_keeps_move
     assert value.req_id_to_index[restricted] == 0
     assert value.remove_request(restricted) == 0
     assert value.add_request(request(reused, None), 0) is None
-    returns = [row for row in events if row["phase"] == "RETURN"]
+    returns = [row for row in observer.fixture_events if row["phase"] == "RETURN"]
     assert [row["fields"]["slot"] for row in returns] == [0, 0, 0]
     assert returns[0]["fields"]["slot_lineage_complete"] is False
     assert returns[-1]["fields"]["slot_lineage_complete"] is False
@@ -198,4 +210,311 @@ def test_baseline_none_return_uses_verified_mapping_but_slot_consumer_keeps_move
     Path(module.__file__).write_bytes(b"# changed source")
     assert value.add_request(request("byul-cb-" + "4" * 32, None), 1) is None
     assert not any(row["phase"] == "RETURN" and row["entry_qualified_after"] is True
-                   for row in events[-2:])
+                   for row in observer.fixture_events[len(observer.fixture_events) - 2:])
+
+
+def test_baseline_condense_tracks_real_movement_without_claiming_sampler_consumption(tmp_path):
+    name = sensor.SLOT_MODULE
+    points = sensor.SLOT_TARGETS[name] + sensor.BASELINE_SLOT_EXTRA
+    module = source_module(name, points, sensor.SLOT_SOURCE, tmp_path)
+    module.SamplingType = SimpleNamespace(GREEDY="greedy")
+    observer = recording_slot_observer("d" * 32, context_provider=lambda: {"pid": 1})
+    observer.secret = SECRET
+    for point in points:
+        owner, method = point.split(".")
+        setattr(vars(module)[owner], method, observer.wrap(module, point))
+    value = batch(module)
+    restricted = "byul-cb-" + "6" * 32
+    reused = "byul-cb-" + "7" * 32
+    value.add_request(request(restricted, [1]), 0)
+    value.add_request(request(reused, None), 1)
+    assert value.remove_request(restricted) == 0
+    value.num_reqs = 1
+    empty = [0]
+    assert value.condense(empty) is None
+    assert value.req_id_to_index == {reused: 0} and value.req_ids == [reused, None]
+    rows = observer.fixture_events
+    movements = [row for row in rows if row["point"] == "InputBatch.condense"]
+    assert len(movements) == 2 and all(row["entry_qualified_before"] for row in movements)
+    assert movements[-1]["entry_qualified_after"] is True
+    assert movements[0]["fields"]["slot_mapping"] == [
+        {"request_sha256": observer.fingerprint(reused), "slot": 1}]
+    assert movements[-1]["fields"]["slot_mapping"] == [
+        {"request_sha256": observer.fingerprint(reused), "slot": 0}]
+    cases = [{"case_id": key, "role": role} for key, role in (
+        ("alone-a", "standalone"), ("alone-b", "standalone"),
+        ("restricted", "restricted"), ("reused", "reused"))]
+    tags = {"restricted": restricted, "reused": reused}
+    outputs = {"alone-a": "a", "alone-b": "a", "reused": "different"}
+    result = projection.project_slot(cases, outputs, rows, SECRET, tags)
+    assert result["observed_slot_moves"] == 1
+    assert result["rows"][0]["slot_index_match_candidate"] is True
+    assert result["rows"][0]["slot_reused"] is None
+    assert result["violation"] is None and not result["full_scope"]
+    assert "slot_movement_unobserved" in result["missing"]  # final sampler consumption still absent
+    assert restricted not in json.dumps(rows) and reused not in json.dumps(rows)
+    assert value.clear() is None
+    cleared = [row for row in observer.fixture_events if row["point"] == "InputBatch.clear"]
+    assert len(cleared) == 2 and cleared[-1]["fields"]["slot_mapping"] == []
+    Path(module.__file__).write_bytes(b"# changed source")
+    assert value.condense([]) is None
+    unqualified = observer.fixture_events[-2:]
+    assert [row["phase"] for row in unqualified] == ["CALL", "RETURN"]
+    assert all(row["entry_qualified_before"] is False for row in unqualified)
+    assert "byul-cb-" not in json.dumps(observer.fixture_events)
+
+
+def slot_world(tmp_path, name, *, context=None):
+    directory = tmp_path / name
+    directory.mkdir()
+    module = source_module(sensor.SLOT_MODULE,
+        sensor.SLOT_TARGETS[sensor.SLOT_MODULE] + sensor.BASELINE_SLOT_EXTRA, sensor.SLOT_SOURCE, directory)
+    module.SamplingType = SimpleNamespace(GREEDY="greedy")
+    observer = recording_slot_observer("e" * 32, context_provider=lambda: context or {"pid": 1, "start_ticks": 11})
+    observer.secret = SECRET
+    for point in sensor.SLOT_TARGETS[sensor.SLOT_MODULE] + sensor.BASELINE_SLOT_EXTRA:
+        owner, method = point.split(".")
+        setattr(vars(module)[owner], method, observer.wrap(module, point))
+    return module, observer
+
+
+def slot_projection(events, restricted, reused):
+    cases = [{"case_id": key, "role": role} for key, role in (
+        ("alone-a", "standalone"), ("alone-b", "standalone"),
+        ("restricted", "restricted"), ("reused", "reused"))]
+    return projection.project_slot(cases, {"alone-a": "same", "alone-b": "same", "reused": "different"},
+        events, SECRET, {"restricted": restricted, "reused": reused})
+
+
+def test_historical_reuse_candidate_survives_later_clear_and_new_allocations(tmp_path):
+    module, observer = slot_world(tmp_path, "clear")
+    value = batch(module)
+    restricted, reused = "byul-cb-" + "8" * 32, "byul-cb-" + "9" * 32
+    value.add_request(request(restricted, [1]), 0)
+    value.remove_request(restricted)
+    value.add_request(request(reused, None), 0)
+    before = slot_projection(observer.fixture_events, restricted, reused)
+    assert before["rows"][0]["slot_index_match_candidate"] is True
+    value.clear()
+    value.add_request(request("byul-cb-" + "a" * 32, None), 1)
+    after = slot_projection(observer.fixture_events, restricted, reused)
+    assert after["rows"] == before["rows"]
+    assert after["violation"] is None and not after["full_scope"]
+    assert after["rows"][0]["slot_reused"] is None
+
+
+def test_historical_reuse_candidate_survives_later_move_to_another_slot(tmp_path):
+    module, observer = slot_world(tmp_path, "move")
+    value = batch(module)
+    dummy = "byul-cb-" + "b" * 32
+    restricted, reused = "byul-cb-" + "c" * 32, "byul-cb-" + "d" * 32
+    value.add_request(request(dummy, None), 0)
+    value.add_request(request(restricted, [1]), 1)
+    value.remove_request(restricted)
+    value.add_request(request(reused, None), 1)
+    before = slot_projection(observer.fixture_events, restricted, reused)
+    assert before["rows"][0]["slot_index_match_candidate"] is True
+    value.remove_request(dummy)
+    value.num_reqs = 1
+    value.condense([0])
+    assert value.req_id_to_index[reused] == 0
+    after = slot_projection(observer.fixture_events, restricted, reused)
+    assert after["rows"] == before["rows"]
+    assert after["observed_slot_moves"] == 1
+    assert after["violation"] is None and not after["full_scope"]
+
+
+def test_equal_indices_in_distinct_batches_are_not_a_reuse_candidate(tmp_path):
+    module, observer = slot_world(tmp_path, "batches")
+    first, second = batch(module), batch(module)
+    restricted, reused = "byul-cb-" + "0" * 32, "byul-cb-" + "1" * 32
+    first.add_request(request(restricted, [1]), 0)
+    first.remove_request(restricted)
+    second.add_request(request(reused, None), 0)
+    events = observer.fixture_events
+    added = [row for row in events if row["point"] == "InputBatch.add_request" and row["phase"] == "RETURN"]
+    assert added[0]["fields"]["batch_sha256"] != added[1]["fields"]["batch_sha256"]
+    result = slot_projection(events, restricted, reused)
+    assert "slot_index_match_candidate" not in result["rows"][0]
+    assert result["rows"][0]["slot_reused"] is None and result["violation"] is None
+    assert "slot_batch_process_binding_unavailable" in result["missing"]
+    assert "byul-cb-" not in json.dumps(events)
+
+
+@pytest.mark.parametrize('second_context', [{"pid": 72, "start_ticks": 11}, {"pid": 71, "start_ticks": 12}])
+def test_process_and_start_generation_scope_cannot_join_even_colliding_batch_tokens(tmp_path, second_context):
+    restricted, reused = "byul-cb-" + "2" * 32, "byul-cb-" + "3" * 32
+    first_module, first_observer = slot_world(tmp_path, "process-one", context={"pid": 71, "start_ticks": 11})
+    second_module, second_observer = slot_world(tmp_path, "process-two", context=second_context)
+    # EXAMPLE namespace collision isolates the process/start-context check. All
+    # event rows still come from the exact source producer, not hand fixtures.
+    second_observer.slot_identity_namespace = first_observer.slot_identity_namespace
+    first, second = batch(first_module), batch(second_module)
+    first.add_request(request(restricted, [1]), 0)
+    first.remove_request(restricted)
+    second.add_request(request(reused, None), 0)
+    events = first_observer.fixture_events + second_observer.fixture_events
+    added = [row for row in events if row["point"] == "InputBatch.add_request" and row["phase"] == "RETURN"]
+    assert added[0]["fields"]["batch_sha256"] == added[1]["fields"]["batch_sha256"]
+    assert added[0]["process_sha256"] != added[1]["process_sha256"]
+    result = slot_projection(events, restricted, reused)
+    assert "slot_index_match_candidate" not in result["rows"][0]
+    assert result["violation"] is None and not result["full_scope"]
+
+
+def test_missing_batch_identity_and_repeated_tag_across_batches_remain_unknown(tmp_path):
+    module, observer = slot_world(tmp_path, "ambiguous")
+    first, second = batch(module), batch(module)
+    restricted, reused = "byul-cb-" + "4" * 32, "byul-cb-" + "5" * 32
+    first.add_request(request(restricted, [1]), 0)
+    first.remove_request(restricted)
+    first.add_request(request(reused, None), 0)
+    assert slot_projection(observer.fixture_events, restricted, reused)["rows"][0]["slot_index_match_candidate"] is True
+    second.add_request(request(reused, None), 0)
+    result = slot_projection(observer.fixture_events, restricted, reused)
+    assert "slot_index_match_candidate" not in result["rows"][0]
+    assert result["violation"] is None
+    third_module, third_observer = slot_world(tmp_path, "unbound")
+    third_observer.token = lambda receiver: None  # actual producer unavailable-object path
+    third = batch(third_module)
+    third.add_request(request(restricted, [1]), 0)
+    third.remove_request(restricted)
+    third.add_request(request(reused, None), 0)
+    unbound = slot_projection(third_observer.fixture_events, restricted, reused)
+    assert "slot_index_match_candidate" not in unbound["rows"][0]
+    assert unbound["violation"] is None and not unbound["full_scope"]
+
+
+def test_clear_does_not_make_old_restricted_slot_available_in_a_new_batch_generation(tmp_path):
+    module, observer = slot_world(tmp_path, "generation-clear")
+    value = batch(module)
+    restricted, reused = "byul-cb-" + "6" * 32, "byul-cb-" + "7" * 32
+    value.add_request(request(restricted, [1]), 0)
+    value.remove_request(restricted)
+    value.clear()
+    value.add_request(request(reused, None), 0)
+    result = slot_projection(observer.fixture_events, restricted, reused)
+    assert "slot_index_match_candidate" not in result["rows"][0]
+    assert result["rows"][0]["slot_reused"] is None
+    assert result["violation"] is None and not result["full_scope"]
+
+
+def test_recreated_observers_do_not_reuse_batch_tokens_under_the_same_key_and_context(tmp_path):
+    first_module, first_observer = slot_world(tmp_path, "observer-one")
+    second_module, second_observer = slot_world(tmp_path, "observer-two")
+    first, second = batch(first_module), batch(second_module)
+    first.add_request(request("byul-cb-" + "8" * 32, None), 0)
+    second.add_request(request("byul-cb-" + "9" * 32, None), 0)
+    first_row = first_observer.fixture_events[-1]
+    second_row = second_observer.fixture_events[-1]
+    assert first_row["process_sha256"] == second_row["process_sha256"]
+    assert first_row["fields"]["batch_sha256"] != second_row["fields"]["batch_sha256"]
+
+
+@pytest.mark.parametrize('operation', ['clear', 'condense'])
+@pytest.mark.parametrize('damage', ['drop-call', 'drop-return', 'invalid-map', 'raise', 'unqualified'])
+def test_uncertain_movement_or_reset_cannot_supply_a_future_reuse_candidate(tmp_path, operation, damage):
+    module, observer = slot_world(tmp_path, operation + '-' + damage)
+    value = batch(module)
+    restricted, reused = "byul-cb-" + "a" * 32, "byul-cb-" + "b" * 32
+    survivor = "byul-cb-" + "c" * 32
+    value.add_request(request(restricted, [1]), 0)
+    if operation == 'condense':value.add_request(request(survivor, None), 1)
+    value.remove_request(restricted)
+    value.num_reqs = 1 if operation == 'condense' else 0
+    boundary = len(observer.fixture_events)
+    original_mapping = observer._mapping
+    original_source = Path(module.__file__).read_bytes()
+    if damage == 'invalid-map':
+        calls = [0]
+        def unavailable_after(receiver):
+            calls[0] += 1
+            return original_mapping(receiver) if calls[0] == 1 else None
+        observer._mapping = unavailable_after
+    if damage == 'unqualified':Path(module.__file__).write_bytes(b'# EXAMPLE changed source')
+    error = RuntimeError('EXAMPLE partial mutation')
+    if damage == 'raise':
+        if operation == 'condense':
+            def failed_move(*args):raise error
+            value.block_table.move_row = failed_move
+        else:
+            class FailedClear(set):
+                def clear(self):raise error
+            value.greedy_reqs = FailedClear(value.greedy_reqs)
+    if damage == 'raise':
+        with pytest.raises(RuntimeError) as raised:
+            value.clear() if operation == 'clear' else value.condense([0])
+        assert raised.value is error
+    else:
+        assert (value.clear() if operation == 'clear' else value.condense([0])) is None
+    observer._mapping = original_mapping
+    if damage == 'unqualified':Path(module.__file__).write_bytes(original_source)
+    boundary_rows = observer.fixture_events[boundary:]
+    assert [row['phase'] for row in boundary_rows] == ['CALL', 'RAISE' if damage == 'raise' else 'RETURN']
+    if damage == 'invalid-map':assert boundary_rows[-1]['fields']['slot_mapping'] is None
+    if damage == 'unqualified':assert all(row['entry_qualified_before'] is False for row in boundary_rows)
+    if operation == 'condense':
+        # Even a failed condense moved the native mapping before our inert
+        # collaborator raised. Remove that survivor before valid B allocation.
+        assert value.req_id_to_index[survivor] == 0
+        assert value.remove_request(survivor) == 0
+    assert value.add_request(request(reused, None), 0) is None
+    events = list(observer.fixture_events)
+    if damage in {'drop-call', 'drop-return'}:
+        phase = 'CALL' if damage == 'drop-call' else 'RETURN'
+        selected = next(row for row in boundary_rows if row['phase'] == phase)
+        events = [row for row in events if row is not selected]
+    result = slot_projection(events, restricted, reused)
+    assert 'slot_index_match_candidate' not in result['rows'][0]
+    assert result['rows'][0]['slot_reused'] is None
+    assert result['violation'] is None and not result['full_scope']
+    assert 'slot_movement_or_reset_unavailable' in result['missing']
+
+
+def test_uncertain_batch_binding_invalidates_the_process_without_erasing_prior_frozen_fact(tmp_path):
+    module, observer = slot_world(tmp_path, 'unknown-batch')
+    first, second = batch(module), batch(module)
+    old_a, old_b = "byul-cb-" + "d" * 32, "byul-cb-" + "e" * 32
+    new_a, new_b = "byul-cb-" + "f" * 32, "byul-cb-" + "0" * 32
+    first.add_request(request(old_a, [1]), 0)
+    first.remove_request(old_a)
+    first.add_request(request(old_b, None), 0)
+    prior = slot_projection(observer.fixture_events, old_a, old_b)
+    assert prior['rows'][0]['slot_index_match_candidate'] is True
+    second.add_request(request(new_a, [1]), 0)
+    second.remove_request(new_a)
+    original_token = observer.token
+    observer.token = lambda receiver: None  # actual source producer cannot bind reset receiver
+    first.clear()
+    observer.token = original_token
+    second.add_request(request(new_b, None), 0)
+    result = slot_projection(observer.fixture_events, new_a, new_b)
+    assert 'slot_index_match_candidate' not in result['rows'][0]
+    assert result['violation'] is None and not result['full_scope']
+    earlier = slot_projection(observer.fixture_events, old_a, old_b)
+    assert earlier['rows'] == prior['rows']  # exact earlier batch/process identity remains proven
+    assert 'slot_movement_or_reset_unavailable' in earlier['missing']
+
+
+def test_untracked_condense_occupant_consumes_the_removed_slot_lease(tmp_path):
+    module, observer = slot_world(tmp_path, 'untracked-occupant')
+    value = batch(module)
+    restricted, reused = "byul-cb-" + "1" * 32, "byul-cb-" + "2" * 32
+    survivor = "byul-cb-" + "3" * 32
+    value.add_request(request(survivor, None), 1)
+    preexisting = list(observer.fixture_events)
+    value.add_request(request(restricted, [1]), 0)
+    value.remove_request(restricted)
+    value.num_reqs = 1
+    value.condense([0])
+    assert value.req_id_to_index[survivor] == 0
+    value.remove_request(survivor)
+    value.add_request(request(reused, None), 0)
+    # A source producer observed C's real movement, but the selected journal
+    # began after C's allocation. C still consumed A's freed slot before B.
+    events = [row for row in observer.fixture_events if all(row is not earlier for earlier in preexisting)]
+    result = slot_projection(events, restricted, reused)
+    assert result['observed_slot_moves'] == 1  # qualified maps count C even without its earlier allocation
+    assert result['rows'][0]['slot_index_match_candidate'] is False
+    assert result['rows'][0]['slot_reused'] is None
+    assert result['violation'] is None and not result['full_scope']

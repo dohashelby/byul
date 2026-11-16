@@ -1,3 +1,15 @@
+## 2026-11-16 — #288 기준 관측 후속 묶음 추가 push 승인
+
+사용자는 검토/소스 고정97830616에 대해 “#288에 후속 묶음 추가 push 승인”으로 답했다. sampler·piecewise graph·attention metadata·profiler local segment와 기존 callback 준비/설치/소유 기록 연결을 같은 draft PR에 추가한다. 기본값 False·기존 실행 gate·정책/판정/수락·V2·원 /15·/31·/32·PACK38 Ref를 보존한다. 이 범위의 승인/CI 보수는 잇되 main 병합·기본 gate 활성화·GPU/새 비용은 포함하지 않는다. 사용자는 로컬 테스트 금지를 재강조했고 로컬 Python/pytest/모의 실행 없이 GitHub Linux CI에서만 검증한다.
+
+## 2026-11-16 — 병합 뒤 관측 보완 push·draft PR 생성 승인
+
+사용자는 검토 커밋618c36ba의 “push·draft PR 생성 승인”으로 답했다. codex/ma6-post284-observations-20261116의 슬롯 이동 보완·기준 stream /33 준비·고정 helper 호환 수정과 해당 source 목록/검토 기록을 새 draft PR로 공개한다. 필요한 승인/CI 원인 기록은 같은 범위로 잇는다. 기본 stream gate는 닫혀 있고 sampler/graph 별도 개발·main 병합·실제 GPU/등록·새 비용 승인은 포함하지 않는다.
+
+## 2026-11-16 — 기존 startup/profiler 의존 bytes의 호환 보존
+
+main의 M-A3 rank source 확장은 그대로 유지한다. 기존 /31·/32가 고정한 rank helper bfa843de는 과거 Git bytes를 별도 자료로 보존하고 host 준비/재검증에서만 선택한다. 기존 composition·의존 해시·in-pod 파일 bytes·등록/수락 기준을 새 helper에 맞춰 넓히지 않는다. 미공개 슬롯 이동·stream 준비·샘플러 후속은 새 main 기반 분기에서 개발하며 새 PR 공개와 기본 stream gate 활성화는 별도 승인 범위로 남긴다.
+
 ## 2026-11-16 — 초안을 포함한 열린 PR 병합 승인
 
 사용자는 “치명적인 문제 없으면 그냥 전부 병합해”라고 추가 지시했다. #283·#284의 초안 유지와 이전 병합 제외는 이번 일괄 병합 지시로 대체한다. 기존 관측·수락·UNKNOWN 경계와 원 증거는 보존한다. #283은 최신 main과의 문서·소스 목록·검토 기록 충돌을 양쪽 보존으로 해소하며 원 제품 변경 범위를 확대하지 않는다. 새 CI 진행 중인 상태를 통과나 실제 GPU 실측으로 표시하지 않는다.
@@ -1102,6 +1114,18 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 
 0.7.0 V1의 정확 `KVCacheManager.get_computed_blocks` 소스는 평면 block 목록과 계산 token 수의 2원 반환을 쓴다. 요청의 비공개 `_kv_block_hashes` 평문 list에서 각 `BlockHashType.hash_value`만 유계로 읽어 기존 세션 키 지문으로 남긴다. 공개 `ConstantList` 속성, token IDs, 원 요청 ID는 관측기가 읽거나 저장하지 않는다. 기존 0.31.0의 3원/group 반환 처리는 유지한다.
 
-0.7.0 `InputBatch.add_request`는 `None`을 반환하므로 정확 소스의 호출 후 `req_id_to_index`와 `req_ids`가 일치하는 자리만 관측한다. `condense` 이동은 관측하지 않아 같은 번호는 재사용 후보이며 REQ-18 전체 범위/위반 근거가 아니다. cache salt·인증 주체 결합이 없으므로 REQ-15 전체 결합도 검증되지 않는다. V1 `allowed_token_ids`는 sampler 실제 소비 근거가 없어 제한 집행으로 간주하지 않는다. REQ-19/20 V2/graph 의미는 이 소스 행으로 개방하지 않는다. 새 행은 소스 선택 후보이며 GPU/생산자 등록이나 실측 PASS가 아니다.
+0.7.0 `InputBatch.add_request`는 `None`을 반환하므로 정확 소스의 호출 후 `req_id_to_index`와 `req_ids`가 일치하는 자리만 관측한다. 정확 `condense`의 전후 mapping·`remove_request`의 회수 자리·`clear`의 초기화도 같은 소스 행에서 관측한다. 실제 이동한 자리 수와 재사용 후보를 구분하지만 V1 sampler 최종 소비는 보지 못하므로 REQ-18 전체 범위/위반 근거가 아니다. cache salt·인증 주체 결합이 없으므로 REQ-15 전체 결합도 검증되지 않는다. V1 `allowed_token_ids`는 sampler 실제 소비 근거가 없어 제한 집행으로 간주하지 않는다. REQ-19/20 V2/graph 의미는 이 소스 행으로 개방하지 않는다. 새 행은 소스 선택 후보이며 GPU/생산자 등록이나 실측 PASS가 아니다.
 
 REQ-17의 빠른 control timing만으로 cache가 켜졌다고 추론하지 않는다. 모든 control-present 표본에 qualified native cache 적중이 있어야 정상 대조의 검출력이 검증되며, 기본 cache 비활성화에서 나온 정확 0원 반환은 전체 범위와 정상 판정을 열지 않는다.
+
+## 2026-11-15 — M-A6 기준 V1 stream `/33` 소스 후보
+
+승인받아 받은 Uvicorn 0.34.0 wheel(62,315 bytes, SHA `023dc038422502fa28a09c7a30bf2b6991512da7dcdb8fd35fe57cfc154126f4`)의 `h11_impl.py`·`httptools_impl.py`·`flow_control.py` 세 원본을 정확 후보로 사용한다. wheel METADATA는 기준 이미지의 dist metadata와 일치하나 이미지의 설치된 Python 세 파일은 아직 대조하지 않았다. 따라서 wheel 행은 배포 이미지 자격이 아니다.
+
+새 `/33` 구성은 기존 `/28`의 비공개 세션 키 검증과 HMAC 요청 식별을 먼저 적용하고, 원본 `/12` stream 확장을 정확 bytes로 검증한 뒤 0.34.0 파일 SHA만 선택한다. CPython 3.12.8 stream 코드 지문 `9ce758b7…`는 검토된 ABI 행으로 추가하며 원 `/12`의 3.12.3 계약과 bytes는 그대로 둔다. Uvicorn `send`의 0.34.0 경로는 body type 확인 전에 message type을 읽고 기존 연결 닫힘/헤더 처리 의미가 다르므로 정확 소스·code 재검증을 요구한다. 실제 이미지 bytes/transport·GPU producer, 전체 buffer inventory·close release epoch은 여전히 미검증이다.
+
+WORK_ORDER 1.2의 부분 snapshot 범위에서 `/33`은 source qualified `run_asgi`·`send`·`drain`·`connection_lost`의 실제 selected transport 표본과 HTTP trial을 연결할 준비를 한다. 준비 key와 원 확장 SHA/코드·선택 설치 Uvicorn 파일 SHA/함수 코드 검증이 실패하면 hook/HTTP 결합을 막거나 미지원 공백으로 남긴다. 다만 WORK_ORDER 7절의 후속 profile·HMAC 키 자산 승인 경계 때문에 0.7.0 기본 `stream_buffer` 실행기 gate는 열지 않는다. wheel source 후보는 `image_pin`이 아니며, 집중 검토·CI 뒤 기본 gate 활성화는 별도 사용자 결정을 받는다. 정상 buffer 전체 목록, close 뒤 release epoch, 프로세스 RSS의 연결별 귀속은 이 관측으로 판정하지 않는다. LIF-03 전체 budget·GPU 등록도 UNKNOWN이다.
+
+## 2026-11-16 M-A6 기준 V1 REQ-20 graph 부분 관측
+
+0.7.0 `PiecewiseBackend.__call__`의 정확 소스·선택 함수 코드로 shape별 graph replay 분기와 `entry.output` 객체 반환을 부분 관측한다. `copy_and_call` closure, tensor 원값, property, CUDA 완료는 관측 범위 밖이다. 기존 V2 `ModelCudaGraphManager.run_fullgraph`/`GPUModelRunner.sample` 소비와 의미가 다르므로 판정이나 수락 기준을 바꾸지 않고 별도 adapter projection을 둔다. 이는 default `engine_sensor` gate나 GPU 등록을 열지 않으며 REQ-20 전체 결과는 UNKNOWN이다. 근거와 공백은 `docs/dev-1/ma6-baseline-graph-candidate.md`에 기록한다.

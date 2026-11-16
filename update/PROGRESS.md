@@ -1,3 +1,8 @@
+## 2026-11-16 — #288 stream 회귀의 fixture 연결 보수
+
+- 결과: head31954efe에서 catalog import 차단이 해소돼 Docker stub·platform 계약 검사가 통과했다. CPython3.12.8은1 failed·179 passed·1 error(pytest11.10초·부모11.907초)다. 새 시험이 공용 case에 필요한 external/writer_factory fixture를 import하지 않았고, 다른 새 시험이 기록 envelope의 source_module을 payload 밖에서 찾았다.
+- 보수: 필요한 두 fixture를 명시적으로 가져오고 실제 envelope의 payload.source_module을 고른다. 기존 assert·기대값·제품 소스·엄격한 source 목록·관문은 바꾸지 않았다. 기본 suite가 진행 중이므로 원 결과를 확인한 뒤 같은 시험 보수 snapshot을 공개한다. 로컬 Python/pytest는 실행하지 않았다.
+
 ## 2026-11-16 — #288 첫 CI의 stream/native 지점 충돌 보수
 
 - 원 결과: 공개 head eefd7c21의 기본 suite는169 failed·4378 passed·1336 errors·6 warnings(pytest116.27초·부모117.502초)였다. /33에 넣은 두 Uvicorn 구현의 RequestResponseCycle 동명 메서드가 일반 native 지점 목록의 기존 중복 검사를 통과하지 못해 import가 연쇄 실패했다. Docker stub도 같은 오류로 수집 단계에서1 error였다. 이 결과를 테스트 통과로 집계하지 않는다.

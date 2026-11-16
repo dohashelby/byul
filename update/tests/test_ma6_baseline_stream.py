@@ -23,9 +23,9 @@ from guard.adapters import vllm_observer_abi as abi
 from guard.collectors import lifecycle
 from guard.executors.registry import resolve_executor
 from guard.executors.lifecycle_capture import parse_recording
-from tests.test_lifecycle_capture import case, revised  # noqa: F401
+from tests.test_lifecycle_capture import case, revised, external  # noqa: F401
 from tests import test_a1_stream_buffer_sensor as original
-from tests.test_lifecycle_sensor import CONTEXT
+from tests.test_lifecycle_sensor import CONTEXT, writer_factory  # noqa: F401
 
 
 FIXTURES = Path(__file__).parent / 'fixtures/uvicorn-034'
@@ -282,7 +282,7 @@ def test_exact_httptools_send_and_close_produce_keyed_rows(tmp_path, monkeypatch
         protocol.connection_lost(None)
     asyncio.run(run())
     samples = [row['payload'] for row in world.observer.recorded if row['event'] == 'STREAM_BUFFER'
-        and row['source_module'] == 'uvicorn.protocols.http.httptools_impl']
+        and row['payload']['source_module'] == 'uvicorn.protocols.http.httptools_impl']
     assert {'SEND_ENTER', 'SEND_RETURN', 'RUN_RETURN', 'CONNECTION_LOST_RETURN'} <= {
         row['phase'] for row in samples}
     digest = baseline._stream_header(scope, world.key)

@@ -420,6 +420,11 @@
       "manifest_sha256": "88eb78db537d1faa2a6c2c878f2d5c2d90548140c9e177e779244e2e8711e16c",
       "reviewed_by": "Codex / PR287 legacy qualification and startup dependency review; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-16T04:14:58Z"
+    },
+    {
+      "manifest_sha256": "a66cec02adcde2ed4ba1be3426146ff9f9cd9e969daa2b9a8fa8ad46d6e028ad",
+      "reviewed_by": "Claude / report FAIL·UNKNOWN verdict reasons (core/report.py, models/objects.py) review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T09:00:00Z"
     }
   ]
 }

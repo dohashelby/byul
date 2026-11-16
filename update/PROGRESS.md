@@ -1,3 +1,10 @@
+## 2026-11-16 — 보고서 FAIL·UNKNOWN 판정 이유 표시
+
+- 한 일: 사용자 요청으로 RPT 쪽 결과 `SideResult`에 선택 필드 `reasons`를 더했다. FAIL·UNKNOWN 축이 있으면 RES.reasons 원문을 그대로 옮기고 PASS·NOT_APPLICABLE 축 이름으로 시작하는 이유만 뺀다. 없으면 직렬화에서 빠져 기존 RPT 해시는 같다. 판정·팩·규칙 의미는 바꾸지 않았고 엔진·판본 문구를 두지 않았다. 공용 계약 `verification-result` 0.2 `sides.<side>.reasons`(선택)를 제안 반영했고(contracts/README 변경 이력), platform 변환·화면 자료 `ReportSide.reasons`·점검 상세의 "판정 이유" 목록·생성 타입 두 파일을 맞췄다. 제품 파일 두 개의 셸 SHA-256으로 소스 목록과 검토 행을 갱신했다.
+- 테스트 결과: 직접 시험(`tests/test_report.py` 2개, platform 통합 계약 1개 보강, web `report.test.tsx` 1개)을 더했다. 로컬 Python/pytest·npm은 실행하지 않았고 PR CI로 확인한다. 생성 타입(openapi.json·schema.d.ts)은 손으로 맞췄으므로 CI 재생성 대조 결과를 확인해야 한다.
+- 다음 단계: CI 확인 뒤 공용 계약 변경의 사용자 검토. SUP-08 0.30.0 FAIL은 `security: FAIL because code_selection_confirmed_violations nonempty (observed …)`로 표시된다. 사람이 읽는 설명이 필요하면 팩 규칙 데이터에 설명 필드를 두는 안을 따로 검토한다.
+- 막힌 것: 없음. 과거 RPT에는 이유가 없으므로 다시 보고서를 만들어야 표시된다.
+
 ## 2026-11-16 — PR #284 일괄 통합·기존 실패 두 건 보수
 
 - 한 일: main47bee7fc의 #283·#285·#286을 통합했다. 문서·검토 영수증·원 fixture 출처를 양쪽 보존하고 CPython 3.12.8 CI의 임시 pycache와 두 PR의 직접 시험 목록을 함께 유지했다. 캐시 시험의 kwargs 인자 누락과 SlotObserver의 스트리밍 sink 미수집만 고쳤다. 기존 assert·UNKNOWN·판정 조건과 제품 소스 범위는 유지했다. 별도 worktree의 미공개 슬롯 이동 후속 커밋은 이번 병합에 넣지 않았다.

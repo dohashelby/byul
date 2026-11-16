@@ -428,6 +428,10 @@ def test_sup03_saved_observation_projects_unknown_without_consumption_claim(
     side = row["sides"]["single"]
     assert side["security"] == side["functional"] == side["performance"] == "UNKNOWN"
     assert side["result_ref"] == result.ref().model_dump(mode="json")
+    # 세 축이 모두 UNKNOWN이라 RES의 판정 이유를 원문 그대로 모두 옮긴다(RPT → 계약 → 화면)
+    assert result.reasons and side["reasons"] == result.reasons
+    view_check = next(c for c in report_view(converted)["checks"] if c["check_id"] == "SUP-03")
+    assert view_check["single"]["reasons"] == result.reasons
     assert result.evidence == evidence.ref()
     assert evidence.ref().model_dump(mode="json") in converted["inputs_manifest"]
     assert converted["official"] is False and converted["data_origin"] == "EXAMPLE"

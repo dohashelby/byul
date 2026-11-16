@@ -4336,6 +4336,13 @@
               }
             ],
             "title": "Verification Level"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
           }
         },
         "type": "object",
@@ -4345,7 +4352,8 @@
           "security",
           "functional",
           "performance",
-          "verification_level"
+          "verification_level",
+          "reasons"
         ],
         "title": "ReportSide"
       },
@@ -13378,6 +13386,13 @@
                         "type": "array",
                         "items": {
                           "$ref": "#/components/schemas/VerificationResult_gap"
+                        }
+                      },
+                      "reasons": {
+                        "description": "선택. 이 쪽의 보안·기능·성능 중 FAIL·UNKNOWN 축이 있을 때 판정(RES)이 남긴 이유 원문. PASS·NOT_APPLICABLE 축의 이유는 뺀다. 없으면 생략한다.",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
                         }
                       }
                     }

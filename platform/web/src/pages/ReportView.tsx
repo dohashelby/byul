@@ -192,6 +192,16 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
                         ["판정(RES)", s.result_id ? <span className="mono">{`${s.result_id}@${s.result_revision}`}</span> : <Value v={null} />],
                       ]}
                     />
+                    {s.reasons.length > 0 && (
+                      <div>
+                        <span className="small muted">판정 이유(미충족·미확인 축)</span>
+                        <ul className="small mono" style={{ margin: "4px 0 0", paddingLeft: 18, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                          {s.reasons.map((reason, i) => (
+                            <li key={i}>{reason}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 );
               })}

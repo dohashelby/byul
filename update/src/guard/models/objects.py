@@ -551,6 +551,12 @@ class SideResult(Strict):
     functional: Verdict | None = None
     performance: Verdict | None = None
     verification_level: DataOrigin | None = None
+    # FAIL·UNKNOWN 축이 있을 때 RES.reasons 원문(PASS·NOT_APPLICABLE 축의 이유는 뺀다). 없으면 직렬화에서 뺀다.
+    reasons: list[str] | None = None
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("reasons",))
 
 
 class ExceptionDisplay(Strict):

@@ -24,7 +24,7 @@ def _first(items: list[Any]) -> Any:
 
 
 def _side(side: dict[str, Any]) -> dict[str, Any]:
-    return {
+    out = {
         "result_ref": side.get("result"),
         "security": side.get("security"),
         # RPT에 기능·성능 축 판정이 없으면 null로 둔다(0.2). 0.1은 계약이 판정을 요구해 UNKNOWN으로 채웠다.
@@ -32,6 +32,10 @@ def _side(side: dict[str, Any]) -> dict[str, Any]:
         "performance": side.get("performance"),
         "verification_level": side.get("verification_level"),
     }
+    # FAIL·UNKNOWN 축의 판정 이유(RPT 원문). RPT에 없으면 계약에서도 생략한다.
+    if side.get("reasons"):
+        out["reasons"] = list(side["reasons"])
+    return out
 
 
 def _axis(summary: Any) -> dict[str, Any]:
@@ -231,6 +235,7 @@ def _side_view(side: dict[str, Any] | None) -> dict[str, Any] | None:
         "functional": side.get("functional"),
         "performance": side.get("performance"),
         "verification_level": side.get("verification_level"),
+        "reasons": list(side.get("reasons") or []),
     }
 
 

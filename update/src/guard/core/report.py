@@ -61,6 +61,24 @@ def _exception_display(check_id: str, policy: Policy, as_of: datetime) -> tuple[
     return shown, notes
 
 
+_REASON_AXES = ("security", "functional", "performance")
+_REASON_VERDICTS = (Verdict.FAIL, Verdict.UNKNOWN)
+
+
+def _verdict_reasons(res: Result) -> list[str] | None:
+    """FAIL·UNKNOWN 축이 있으면 RES.reasons 원문을 보고서에 옮긴다.
+
+    판정이 남긴 문장을 그대로 쓰고 보고서에서 새로 해석하지 않는다. PASS·NOT_APPLICABLE 축
+    이름("security:" 등)으로 시작하는 이유만 빼고, 축 접두어가 없는 이유(실행 중단·정책 맥락 등)는 남긴다.
+    """
+    verdicts = {axis: getattr(res.verdicts, axis) for axis in _REASON_AXES}
+    if not any(v in _REASON_VERDICTS for v in verdicts.values()):
+        return None
+    settled = tuple(f"{axis}:" for axis, v in verdicts.items() if v not in _REASON_VERDICTS)
+    kept = [reason for reason in res.reasons if not reason.startswith(settled)]
+    return kept or None
+
+
 def _side(res: Result | None) -> SideResult:
     if res is None:
         return SideResult(result=None, security=Verdict.UNKNOWN)
@@ -70,6 +88,7 @@ def _side(res: Result | None) -> SideResult:
         functional=res.verdicts.functional,
         performance=res.verdicts.performance,
         verification_level=res.verification_level,
+        reasons=_verdict_reasons(res),
     )
 
 

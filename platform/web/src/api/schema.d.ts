@@ -1534,6 +1534,8 @@ export interface components {
             performance: string | null;
             /** Verification Level */
             verification_level: string | null;
+            /** Reasons */
+            reasons: string[];
         };
         /**
          * ReportView
@@ -3765,6 +3767,8 @@ export interface components {
                         verification_level: components["schemas"]["Common_data_origin"] | null;
                         /** @description 선택. 이 쪽(baseline·candidate·single)에만 있는 공백. 예: 기준 판본은 지원되고 후보 판본만 ENGINE_VERSION_UNSUPPORTED. 점검 행의 gaps는 모든 쪽의 합이다. */
                         gaps?: components["schemas"]["VerificationResult_gap"][];
+                        /** @description 선택. 이 쪽의 보안·기능·성능 중 FAIL·UNKNOWN 축이 있을 때 판정(RES)이 남긴 이유 원문. PASS·NOT_APPLICABLE 축의 이유는 뺀다. 없으면 생략한다. */
+                        reasons?: string[];
                     };
                 };
                 comparison: components["schemas"]["VerificationResult_comparison"] | null;

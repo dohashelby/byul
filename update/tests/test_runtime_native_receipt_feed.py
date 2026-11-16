@@ -17,11 +17,11 @@ import pytest
 from guard.collectors.lifecycle import prepare_assets
 from guard.executors.kubernetes_lifecycle_capture import KubernetesLifecycleReader
 from guard.models import canonical_json,sha256_hex
-from serving_runtime.mvp.native_receipts import NativeReceiptFeed,canonical,read_host_feed
-from serving_runtime.mvp.collectors import CollectionFailure
-from serving_runtime.mvp.update_engine_link import project_termination
-from serving_runtime.mvp.query import QueryService
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.observation.native_receipts import NativeReceiptFeed,canonical,read_host_feed
+from serving_runtime.observation.collectors import CollectionFailure
+from serving_runtime.bridge_update.update_engine_link import project_termination
+from serving_runtime.observation.query import QueryService
+from serving_runtime.observation.store import JsonlStore
 from tests.test_runtime_termination_native23 import inputs,RID
 from tests.test_kubernetes_request_binding import env
 from tests.test_kubernetes_sampling import inputs as pod_inputs
@@ -156,10 +156,10 @@ def test_unsealed_original_observations_keep_all_completion_flags_unknown(tmp_pa
 
 def test_real_background_collector_and_platform_request_endpoint(tmp_path):
     from urllib.request import urlopen,Request
-    from serving_runtime.mvp.app import GatewayApp
-    from serving_runtime.mvp.fake_backend import FakeBackend
-    from serving_runtime.mvp.config import MVPConfig
-    from serving_runtime.mvp.policy import load_policy
+    from serving_runtime.gateway.app import GatewayApp
+    from serving_runtime.devtools.fake_backend import FakeBackend
+    from serving_runtime.config.config import MVPConfig
+    from serving_runtime.policy.policy import load_policy
     from fastapi.testclient import TestClient
     from byul_platform.main import create_app
     from byul_platform.config import Settings
@@ -217,7 +217,7 @@ def test_os_reader_can_read_explicit_group_but_cannot_write(tmp_path):
     directory=Path('/tmp')/('native-reader-'+uuid.uuid4().hex);directory.mkdir(mode=0o750);os.chown(directory,0,10010)
     path=directory/'feed.json';shutil.copyfile(output,path);os.chown(path,0,10010);path.chmod(0o640)
     try:
-        code="from serving_runtime.mvp.native_receipts import read_host_feed; import sys; assert read_host_feed(sys.argv[1],10010)['state']=='ok'; exec(\"try:\\n open(sys.argv[1],'a')\\nexcept PermissionError: pass\\nelse: raise AssertionError('reader wrote root proof')\")"
+        code="from serving_runtime.observation.native_receipts import read_host_feed; import sys; assert read_host_feed(sys.argv[1],10010)['state']=='ok'; exec(\"try:\\n open(sys.argv[1],'a')\\nexcept PermissionError: pass\\nelse: raise AssertionError('reader wrote root proof')\")"
         result=subprocess.run([sys.executable,'-B','-c',code,str(path)],user=2000,group=10010,capture_output=True,text=True)
         assert result.returncode==0,result.stderr
         path.chmod(0o660)
@@ -250,7 +250,7 @@ def test_continuous_capture_route_never_seals_and_bounds_live_snapshots(tmp_path
     feed=NativeReceiptFeed(output,reader_gid=10010,producer_source_sha256=pin);feed.collect()
     assert feed.lookup(records,RID,'runtime-session') is not None
     assert feed.lookup(records,RID,'another-session') is None
-    from serving_runtime.mvp.collectors import Collector
+    from serving_runtime.observation.collectors import Collector
     collector=Collector('native_receipt_observer',feed.collect);collector.collect()
     assert collector.snapshot()['state']=='partial'
     assert collector.snapshot()['last_value']['future_observation_available']is None
@@ -288,13 +288,13 @@ def test_sglang_original_anchor_shape_connects_without_inventing_vllm_fields(tmp
 
 
 def test_gateway_module_remains_stdlib_only():
-    code="import sys;sys.path.insert(0,sys.argv[1]);import serving_runtime.mvp.app;assert not any(n=='guard'or n.startswith('guard.')for n in sys.modules)"
+    code="import sys;sys.path.insert(0,sys.argv[1]);import serving_runtime.gateway.app;assert not any(n=='guard'or n.startswith('guard.')for n in sys.modules)"
     result=subprocess.run([sys.executable,'-I','-S','-B','-c',code,str(ROOT/'runtime/src')],capture_output=True,text=True)
     assert result.returncode==0,result.stderr
 
 
 def test_protected_journal_tail_keeps_complete_rows_only(tmp_path):
-    from serving_runtime.mvp.native_receipts import read_protected
+    from serving_runtime.observation.native_receipts import read_protected
     path=tmp_path/'rows.jsonl';path.write_bytes(b'{"old":"'+b'a'*100+b'"}\n{"new":1}\n');path.chmod(0o600)
     raw=read_protected(path,10010,owner_uid=0,limit=30,tail=True)
     assert raw==b'{"new":1}\n'
@@ -308,7 +308,7 @@ def test_closed_republication_preserves_history_but_never_refreshes_native_monit
     assert second['generated_at']!=first['generated_at']
     assert second['capture_observed_at']==first['capture_observed_at']==None
     assert second['source_event_times']==first['source_event_times']
-    from serving_runtime.mvp.collectors import Collector
+    from serving_runtime.observation.collectors import Collector
     collector=Collector('native_receipt_observer',feed.collect);collector.collect();status=collector.snapshot()
     assert status['state']=='error' and status['data_origin']=='synthetic'
     detail=status['last_value'];assert detail['producer_fresh']is True and detail['capture_fresh']is False

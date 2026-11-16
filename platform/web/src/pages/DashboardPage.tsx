@@ -49,17 +49,17 @@ export function DashboardPage() {
     const verification = o.latest_verification;
     const requestPartial = requests.data?.truncated || o.requests?.counts_lower_bound || o.requests?.history_truncated;
     return <>
-      {(requests.isError || events.isError) && <StateView kind="disconnected" detail="실시간 관측 장애로 일부 집계가 누락될 수 있습니다. 수집 상태를 확인하세요." />}
-      <p className="small muted" aria-label="대시보드 집계 범위">카드·차트는 조회된 기록 중 선택한 기간·환경·대상의 집계입니다.{requestPartial ? " 요청 이력은 최근 조회 범위의 일부이며, 표시된 건수는 확인된 최소 건수입니다." : ""}</p>
+      {(requests.isError || events.isError) && <StateView kind="disconnected" detail="실시간 관측에 문제가 있어 일부 집계가 빠졌을 수 있습니다. 수집 상태를 확인해 주세요." />}
+      {requestPartial && <p className="notice" aria-label="대시보드 집계 범위">선택한 기간·환경·대상의 요청 이력 중 일부만 조회했습니다. 표시된 건수는 확인된 최소 건수입니다.</p>}
       <EventWindowNote data={events.data} />
       <section className={p.statusPanel} aria-labelledby="control-observation-heading">
-        <div className={p.statusPanelHead}><h2 id="control-observation-heading">통제·관측 현황</h2><span className="small muted">선택한 기간 기준</span></div>
+        <div className={p.statusPanelHead}><h2 id="control-observation-heading">통제·관측 현황</h2></div>
         <div className={p.fiveCards}>
-        <MetricCard title="요청 통제 (Gateway)" value={blockedRequests} caption="엔진에 닿기 전 거부" dot={blockedRequests ? "bad" : "ok"} onClick={() => go("/runtime/blocked", { section: "requests" })} label="차단 내역의 엔진 미전달 요청 보기"><span className="small muted">엔진에 닿기 전 거부·입력 오류 등</span></MetricCard>
-        <MetricCard title="네트워크 차단" value={dropped} caption="차단됨 · 참고" dot="none" onClick={() => go("/runtime/blocked", { section: "network" })} label="차단 내역의 네트워크 차단 보기"><span className="small muted">네트워크 이벤트 (Hubble)의 DROPPED 기록</span></MetricCard>
-        <MetricCard title="프로세스 이벤트" value={process} caption={processDetected ? `탐지 ${processDetected}건` : "관측 · 참고"} dot={processDetected ? "warn" : "none"} onClick={() => go("/runtime/observe/tetragon")} label="프로세스 이벤트 보기"><span className="small muted">프로세스·파일 이벤트 (Tetragon): 실행 기록</span></MetricCard>
-        <MetricCard title="파일 이벤트" value={files} caption={fileDetected ? `탐지 ${fileDetected}건` : "관측 · 참고"} dot={fileDetected ? "warn" : "none"} onClick={() => go("/runtime/observe/tetragon")} label="파일 이벤트 보기"><span className="small muted">프로세스·파일 이벤트 (Tetragon): 파일 접근 기록</span></MetricCard>
-        <MetricCard title="수집 상태" value={`${connected}/${total}`} caption={total && connected === total ? "정상" : "주의"} dot={total && connected === total ? "ok" : "warn"} onClick={() => go("/runtime/observe/collectors")} label="수집 상태 보기"><span className="small muted">정상 / 전체</span></MetricCard>
+        <MetricCard title="요청 통제" value={blockedRequests} dot={blockedRequests ? "bad" : "ok"} onClick={() => go("/runtime/blocked", { section: "requests" })} label="차단 내역의 엔진 미전달 요청 보기" />
+        <MetricCard title="네트워크 차단" value={dropped} dot="none" onClick={() => go("/runtime/blocked", { section: "network" })} label="차단 내역의 네트워크 차단 보기" />
+        <MetricCard title="프로세스 이벤트" value={process} caption={processDetected ? `탐지 ${processDetected}건` : undefined} dot={processDetected ? "warn" : "none"} onClick={() => go("/runtime/observe/tetragon")} label="프로세스 이벤트 보기" />
+        <MetricCard title="파일 이벤트" value={files} caption={fileDetected ? `탐지 ${fileDetected}건` : undefined} dot={fileDetected ? "warn" : "none"} onClick={() => go("/runtime/observe/tetragon")} label="파일 이벤트 보기" />
+        <MetricCard title="수집 상태" value={`${connected}/${total}`} caption={total && connected === total ? undefined : "확인 필요"} dot={total && connected === total ? "ok" : "warn"} onClick={() => go("/runtime/observe/collectors")} label="수집 상태 보기" />
         </div>
       </section>
       <GpuPanel />
@@ -90,13 +90,13 @@ export function DashboardPage() {
           <ChartCard title="요청 처리 결과" note="조회된 요청의 결과 비율 · 선택한 기간" total={reqRows.length}>
             <Donut items={REQUEST_SERIES.map((series) => ({ ...series, value: resultCounts.get(series.key) ?? 0 }))} />
           </ChartCard>
-          <ChartCard title="거부·오류 사유" footer={<p className="small muted">최근 요청 중 거부·오류 상위 5개 사유</p>}>
+          <ChartCard title="거부·오류 사유" footer={<p className="small muted">조회된 요청의 상위 5개 사유</p>}>
             {topReasons.length ? <ol className={p.reasonList}>{topReasons.map(([reason, count], index) => {
               const label = GATEWAY_REASON[reason] ?? "사유 확인 필요";
-              const undelivered = label.endsWith(" (엔진 미전달)");
+              const undelivered = label.endsWith(" (엔진 미전달)") || GATEWAY_PRE_ENGINE_REASONS.has(reason);
               return <li key={reason}><button type="button" onClick={() => go("/runtime/requests", { reason })}>
                 <span className={`${p.reasonRank} ${index === 0 ? p.reasonRankFirst : ""}`} aria-hidden="true">{index + 1}</span>
-                <span className={p.reasonLabel}>{undelivered ? label.slice(0, -" (엔진 미전달)".length) : label}{undelivered && <small className={p.reasonTag}>엔진 미전달</small>}</span>
+                <span className={p.reasonLabel}>{label.replace(/ \(엔진 미전달\)$/, "")}{undelivered && <small className={p.reasonTag} title="엔진에 전달하기 전에 거부된 요청">전달 전 거부</small>}</span>
                 <span className={p.reasonCount}><strong>{count}</strong>건</span>
               </button></li>;
             })}</ol> : <p className="small muted">거부·오류 사유가 없습니다. 요청 내역에서 전체 결과를 확인하세요.</p>}

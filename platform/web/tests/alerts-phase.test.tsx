@@ -199,8 +199,8 @@ describe("통합 개요", () => {
     expect(ranked.map((item) => item.querySelector("button > span:first-child")?.textContent)).toEqual(["1", "2", "3", "4", "5"]);
     expect(ranked[0].querySelector("button > span:first-child")?.className).toContain("reasonRankFirst");
     expect(ranked.slice(1).every((item) => !item.querySelector("button > span:first-child")?.className.includes("reasonRankFirst"))).toBe(true);
-    expect(ranked[0].querySelector("small")?.textContent).toBe("엔진 미전달");
-    expect(ranked[0].querySelector("button > span:nth-child(2)")?.textContent).toBe("정책 외 모델엔진 미전달");
+    expect(ranked[0].querySelector("small")?.textContent).toBe("전달 전 거부");
+    expect(ranked[0].querySelector("button > span:nth-child(2)")?.textContent).toBe("정책 외 모델전달 전 거부");
     expect(ranked.map((item) => item.querySelector("button > span:last-child strong")?.textContent)).toEqual(["5", "4", "3", "2", "1"]);
     expect(reasons.querySelector(".bigNumber")).toBeNull();
   });
@@ -217,7 +217,7 @@ describe("통합 개요", () => {
       <Route path="/runtime/overview" element={<DashboardPage />} />
       <Route path="/runtime/requests" element={<Destination />} />
     </Routes></MemoryRouter></QueryClientProvider>);
-    fireEvent.click(await screen.findByRole("button", { name: /정책 외 모델.*엔진 미전달.*1건/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /정책 외 모델.*전달 전 거부.*1건/ }));
     expect(await screen.findByText("/runtime/requests?reason=MODEL_NOT_ALLOWED")).toBeTruthy();
   });
 });

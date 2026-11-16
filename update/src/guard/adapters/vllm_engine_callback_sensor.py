@@ -133,7 +133,8 @@ class DistributedObserver(_Keyed, distributed.DistributedCallbackObserver):
 
 class SlotObserver(_Keyed, cache.CacheCallbackObserver):
     """요청이 받은 batch 자리와 제한 여부만 남긴다. 값 자체는 남기지 않는다."""
-    targets = {**slot_sampling.TARGETS, SLOT_MODULE: SLOT_TARGETS[SLOT_MODULE] + BASELINE_SLOT_EXTRA + slot_sampling.TARGETS[SLOT_MODULE]}
+    # Public default targets remain valid for every registered candidate row.
+    targets = SLOT_TARGETS
     sources = {**slot_sampling.SOURCES, **SLOT_SOURCE}
     schema = 'guard-vllm-slot-callback/1'
     profile = 'source-bound-slot-callback-candidate-v1'
@@ -148,10 +149,18 @@ class SlotObserver(_Keyed, cache.CacheCallbackObserver):
         return self.fingerprint(self.slot_identity_namespace + token.encode()) if token is not None else None
 
     def wrap(self, module, point):
-        if point in slot_sampling.POINT_MODULES and cache.source_pin(module, self.sources) != slot_sampling.SOURCES[module.__name__]:
-            raise ValueError('SLOT_SAMPLING_SOURCE_UNSUPPORTED')
-        if point in BASELINE_SLOT_EXTRA and cache.source_pin(module, self.sources) != BASELINE_ROWS[SLOT_MODULE]['sha256']:
-            raise ValueError('SLOT_BASELINE_SOURCE_UNSUPPORTED')
+        if point in slot_sampling.POINT_MODULES:
+            if (not self.slot_sampling_enabled or
+                    cache.source_pin(module, self.sources) != slot_sampling.SOURCES[module.__name__]):
+                raise ValueError('SLOT_SAMPLING_SOURCE_UNSUPPORTED')
+            name = module.__name__
+            self.targets = {**self.targets, name: tuple(dict.fromkeys(
+                self.targets.get(name, ()) + slot_sampling.TARGETS[name]))}
+        if point in BASELINE_SLOT_EXTRA:
+            if cache.source_pin(module, self.sources) != BASELINE_ROWS[SLOT_MODULE]['sha256']:
+                raise ValueError('SLOT_BASELINE_SOURCE_UNSUPPORTED')
+            self.targets = {**self.targets, SLOT_MODULE: tuple(dict.fromkeys(
+                self.targets.get(SLOT_MODULE, ()) + BASELINE_SLOT_EXTRA))}
         return super().wrap(module, point)
 
     def _mapping(self, receiver):

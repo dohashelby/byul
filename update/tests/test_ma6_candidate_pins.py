@@ -73,3 +73,19 @@ def test_candidate_weight_state_tuple_is_a_count_not_a_tensor_read():
         (SimpleNamespace(mode='copy', fallback=False),), {}, result=({'a': object(), 'b': object()}, {}), returned=True)
     assert row['entries'] == 2 and row['served'] is True
     assert row['fallback_enabled'] is False
+
+
+def test_baseline_only_slot_targets_never_expand_candidate_target_contract(tmp_path):
+    name = sensor.SLOT_MODULE
+    assert sensor.SlotObserver.targets == sensor.SLOT_TARGETS
+    raw = (FIXTURES / (ROWS[name]['path'] + '.txt')).read_bytes()
+    path = tmp_path / 'source.py'
+    path.write_bytes(raw)
+    module = ModuleType(name)
+    module.__file__ = str(path)
+    observer = sensor.SlotObserver('a' * 32, context_provider=lambda: {'fixture': True})
+    for point in sensor.BASELINE_SLOT_EXTRA:
+        with pytest.raises(ValueError, match='SLOT_BASELINE_SOURCE_UNSUPPORTED'):
+            observer.wrap(module, point)
+    assert observer.targets == sensor.SLOT_TARGETS
+    assert sensor.SlotObserver.targets == sensor.SLOT_TARGETS

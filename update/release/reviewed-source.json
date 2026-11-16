@@ -156,7 +156,7 @@
   "update/src/guard/adapters/vllm_consumption_callback.py": "fd25cd72f8ac800afb5b3aba83f624f6c6e533420ae5b8e546f8b4bedfe1cdbf",
   "update/src/guard/adapters/vllm_consumption_v2_callback.py": "cb580a9a594d542ad35b4b53b5a3229d1d6f5d73c2fee6a4d2c8a1e4e9173252",
   "update/src/guard/adapters/vllm_distributed_callback.py": "db63b33eee0f5dc839868e2c879f78fbfc15bbc9bd11e0bff875993bc18f4e72",
-  "update/src/guard/adapters/vllm_engine_callback_sensor.py": "869b201f2d93586c385f0e395bb0f6d372c8ba734940bf4e7ffc0d0aaaa5878f",
+  "update/src/guard/adapters/vllm_engine_callback_sensor.py": "b880a6ab5b990a21d1df6221daa1373760186e6ceab7e525852711044ff5441a",
   "update/src/guard/adapters/vllm_execution_link_callback.py": "e6b60b912af799e67d8c40f50f51e6b38c689d70bf222adab63ed5471bf2b58b",
   "update/src/guard/adapters/vllm_fault_control.py": "900fdecf8c32ab5b008d23bd187326a55b35023443d7d53625e64230166afbe9",
   "update/src/guard/adapters/vllm_fault_metadata.py": "52d237b2737c433295c5c1a068ab1fc859704fab19f76dc8d79243c719c9e69b",

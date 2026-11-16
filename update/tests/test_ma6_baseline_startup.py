@@ -336,6 +336,25 @@ def test_startup_prepared_roundtrip_exact_private_dependencies_and_legacy_bytes(
     world.observer.close()
 
 
+@pytest.mark.parametrize('profile', [STARTUP_PROFILE, 'vllm-native-lifecycle-metadata/32'])
+def test_sealed_startup_helper_survives_current_rank_source_extension(external, profile):  # noqa: F811
+    logical = 'vllm_rank_ipc_sources'
+    filename, digest = composition.DEPENDENCIES[logical]
+    sealed = catalog.dependency_source_path(logical, digest).read_bytes()
+    current = Path(catalog.__file__).with_name(logical + '.py').read_bytes()
+    assert hashlib.sha256(sealed).hexdigest() == digest
+    assert hashlib.sha256(current).hexdigest() != digest
+    prepared = lifecycle.prepare_assets(external / 'assets', REPO, profile=profile)
+    assert (external / 'assets' / filename).read_bytes() == sealed
+    assert prepared['assets'][filename]['sha256'] == digest
+    assert lifecycle.load_prepared(external / 'assets/manifest.json') == prepared
+    # Both rendered compositions retain the same exact private pin. The host
+    # path resolver is deliberately absent from in-pod rendered source.
+    rendered = catalog.render_source(profile)
+    assert digest.encode() in rendered and b'dependency_source_path' not in rendered
+    assert catalog.dependency_source_path(logical, 'f' * 64).name == logical + '.py'
+
+
 @pytest.mark.parametrize('damage', ['bytes', 'symlink', 'manifest-rehash'])
 def test_startup_prepared_rejects_changed_dependency_even_after_manifest_rehash(external, damage):  # noqa: F811
     world = composed_world(external)

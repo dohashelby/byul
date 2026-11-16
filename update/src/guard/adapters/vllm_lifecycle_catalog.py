@@ -119,6 +119,15 @@ def startup_assets(profile):
     return dependencies | (direct_profiler.EXTRA_ASSETS if profiler_observation(profile) else {})
 
 
+def dependency_source_path(logical, digest):
+    # /31 and /32 were sealed against this historical helper. Later rank
+    # profiles may extend the live module without rewriting prepared assets.
+    if (logical, digest) == ('vllm_rank_ipc_sources',
+            'bfa843defab00d0cf5a44077fd3729edb6d7aed0611d558d23317331da1a2a59'):
+        return Path(__file__).with_name('assets') / 'startup_rank_ipc_sources_bfa843de.py.txt'
+    return Path(__file__).with_name(logical + '.py')
+
+
 def stream_assets(profile):
     return {'guard_stream_buffer_extension.py': ('vllm_stream_buffer_sensor', baseline_stream.EXTENSION_SHA256)} if stream_observation(profile) else {}
 

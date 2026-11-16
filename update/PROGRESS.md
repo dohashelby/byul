@@ -1,3 +1,10 @@
+## 2026-11-16 — 병합 뒤 슬롯·stream 보완과 고정 helper 보존
+
+- 한 일: 다른 세션이 병합한 main3aab9c8c 위에 검토된 슬롯 이동/불확실 경계 보완과 기준 stream /33 준비를 옮겼다. CPython3.12.8 CI의 임시 pycache·rank 시험과 stream 시험을 함께 보존했다. /31·/32는 과거 rank helper bfa843de bytes를 별도 고정 자료로 준비하고 host 측 경로만 선택해, 현재 M-A3 helper 확장과 기존 비공개 의존 파일·rendered profile을 함께 보존한다.
+- 테스트 결과: #284 마지막 head821dc10f의 update-default·CPython3.12.8 CI 실패를 확인했다. 원 로그 확보와 원인 대조를 진행 중이며 새 보완은 CI 미실행이다. 로컬 Python/pytest는 실행하지 않았다. 정확 고정 helper SHA와 통합 diff는 셸로 대조했다.
+- 다음 단계: 고정 helper 보완 집중 검토, REQ18 batch→metadata→sampler lineage 통합, 새 source 목록/영수증 고정 뒤 새 PR 공개 승인을 요청한다. REQ20의 실제 piecewise capture/replay 분기는 별도 독립 개발한다.
+- 막힌 것: /33 기본 stream gate는 BASELINE_STREAM_DEFAULT_GATE_PENDING_APPROVAL로 닫혀 있다. 실제 이미지 설치 소스·GPU 관측·생산자 등록·공식 RPT는 준비/CI와 별개다.
+
 ## 2026-11-16 — PR #284 일괄 통합·기존 실패 두 건 보수
 
 - 한 일: main47bee7fc의 #283·#285·#286을 통합했다. 문서·검토 영수증·원 fixture 출처를 양쪽 보존하고 CPython 3.12.8 CI의 임시 pycache와 두 PR의 직접 시험 목록을 함께 유지했다. 캐시 시험의 kwargs 인자 누락과 SlotObserver의 스트리밍 sink 미수집만 고쳤다. 기존 assert·UNKNOWN·판정 조건과 제품 소스 범위는 유지했다. 별도 worktree의 미공개 슬롯 이동 후속 커밋은 이번 병합에 넣지 않았다.

@@ -13,16 +13,17 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.relay import sse_done
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.gateway.relay import sse_done
+from serving_runtime.observation.store import JsonlStore
 
 
 class _StreamDeadlineClock:
     """실제 준비/저장 지연과 무관하게 같은60ms 요청 기한을 통과시킨다."""
+
     def __init__(self):
         self.value = time.monotonic()
         self.elapsed = 0.0
@@ -81,7 +82,7 @@ class SSEParserUnitTests(unittest.TestCase):
     def test_done_marker_is_found_across_arbitrary_reads(self) -> None:
         pending = b""
         found = False
-        for chunk in (b"data: {\"x\":1}\n", b"\ndata: [DO", b"NE]\r", b"\n\r\n"):
+        for chunk in (b'data: {"x":1}\n', b"\ndata: [DO", b"NE]\r", b"\n\r\n"):
             pending, current = sse_done(pending, chunk)
             found = found or current
         self.assertTrue(found)
@@ -146,9 +147,7 @@ class StreamingHttpTests(unittest.TestCase):
         return None
 
     def test_split_utf8_stream_is_forwarded_byte_for_byte(self) -> None:
-        engine, gateway, data_dir = self.start_pair(
-            engine_options={"split_writes": True, "stream_interval_s": 0.03}
-        )
+        engine, gateway, data_dir = self.start_pair(engine_options={"split_writes": True, "stream_interval_s": 0.03})
         connection = http.client.HTTPConnection(*gateway.address, timeout=2)
         self.addCleanup(connection.close)
         connection.request(
@@ -236,9 +235,7 @@ class StreamingHttpTests(unittest.TestCase):
         gateway.stop()
         engine.stop()
 
-        engine, gateway, data_dir = self.start_pair(
-            engine_options={"truncate_after_events": 1, "stream_interval_s": 0}
-        )
+        engine, gateway, data_dir = self.start_pair(engine_options={"truncate_after_events": 1, "stream_interval_s": 0})
         with closing(urlopen(stream_request(gateway), timeout=2)) as response:
             request_id = response.headers["X-Request-ID"]
             response.read()
@@ -311,8 +308,8 @@ class StreamingHttpTests(unittest.TestCase):
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        from serving_runtime.mvp import relay, request_flow, response_timeout
-        from serving_runtime.mvp.backend import BackendConfig
+        from serving_runtime.gateway import relay, request_flow, response_timeout
+        from serving_runtime.gateway.backend import BackendConfig
         from test_mvp_request_boundaries import BackendConnection, BackendResponse
 
         clock = _StreamDeadlineClock()
@@ -323,18 +320,26 @@ class StreamingHttpTests(unittest.TestCase):
                 clock.advance(0.059 if self.reads == 0 else 0.002)
                 return super().read1(size)
 
-        upstream = BackendConnection(TimedResponse([
-            b'data: {"id":"stream-test","object":"chat.completion.chunk","model":"test-model",'
-            b'"choices":[{"index":0,"delta":{"content":"hello"},"finish_reason":null}]}\n\n',
-            b'data: [DONE]\n\n',
-        ], stream=True))
+        upstream = BackendConnection(
+            TimedResponse(
+                [
+                    b'data: {"id":"stream-test","object":"chat.completion.chunk","model":"test-model",'
+                    b'"choices":[{"index":0,"delta":{"content":"hello"},"finish_reason":null}]}\n\n',
+                    b"data: [DONE]\n\n",
+                ],
+                stream=True,
+            )
+        )
         controlled_time = SimpleNamespace(**{**vars(time), "monotonic": clock.monotonic})
         controlled_threads = SimpleNamespace(**{**vars(threading), "Timer": clock.timer})
         # 제품의 deadline 검사·watchdog callback은 그대로 실행한다. 시계와 유계 상류만 제어한다.
-        with patch.object(relay, "time", controlled_time), patch.object(request_flow, "time", controlled_time), \
-                patch.object(response_timeout, "time", controlled_time), \
-                patch.object(response_timeout, "threading", controlled_threads), \
-                patch.object(BackendConfig, "connection", return_value=(upstream, "/engine")):
+        with (
+            patch.object(relay, "time", controlled_time),
+            patch.object(request_flow, "time", controlled_time),
+            patch.object(response_timeout, "time", controlled_time),
+            patch.object(response_timeout, "threading", controlled_threads),
+            patch.object(BackendConfig, "connection", return_value=(upstream, "/engine")),
+        ):
             with closing(urlopen(request, timeout=2)) as response:
                 request_id = response.headers["X-Request-ID"]
                 response.read()

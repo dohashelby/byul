@@ -1,0 +1,12 @@
+{
+  "runtime_root": "/home/ubuntu/byul-wp7-7741687d/runtime",
+  "context": "byul-aws-lab",
+  "gateway_url": "http://localhost:18080",
+  "kubeconfig": "/home/ubuntu/.kube/config",
+  "token_env_file": "/home/ubuntu/runtime-acceptance.env",
+  "installer_env": "/secure/install.env",
+  "resolved_intent": "/secure/intent-resolved.json",
+  "bundle_root": "/srv/serving/bundles",
+  "engine_digest": "",
+  "raw_tetragon_file": "/srv/serving/observation/tetragon.jsonl"
+}

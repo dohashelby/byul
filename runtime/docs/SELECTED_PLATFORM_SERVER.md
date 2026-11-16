@@ -5,7 +5,7 @@ root가 최종 검증 소스·현재 Gateway loopback·메모리 viewer 환경�
 ```sh
 cd /ABS/final-frozen-source
 export PYTHONPATH=runtime:runtime/src:update/src:platform/api/src
-$PY runtime/tools/selected_platform_server.py \
+$PY runtime/labtools/selected_platform_server.py \
   --source /ABS/final-frozen-source --source-sha FULL40 \
   --gateway-url http://127.0.0.1:18080 --viewer-token-env RUNTIME_VIEWER_TOKEN \
   --platform-data-dir /NEW/RuntimeData/platform \

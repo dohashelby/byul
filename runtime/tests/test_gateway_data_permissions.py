@@ -1,4 +1,5 @@
 """Explicit offline migration, with no automatic permission changes."""
+
 import os
 import stat
 
@@ -49,7 +50,9 @@ def test_fix_refuses_unsafe_entries(tmp_path, capsys, kind):
         path.write_bytes(b"UNCHANGED")
         uid += 1
         # Parent-owner validation must also refuse the wrong Gateway UID.
-    assert main(["--data-dir", str(tmp_path), "--owner-uid", str(uid), "--fix-permissions"]) == (2 if kind == "owner" else 1)
+    assert main(["--data-dir", str(tmp_path), "--owner-uid", str(uid), "--fix-permissions"]) == (
+        2 if kind == "owner" else 1
+    )
     output = capsys.readouterr()
     assert str(tmp_path) not in output.out + output.err
     assert "UNCHANGED" not in output.out + output.err

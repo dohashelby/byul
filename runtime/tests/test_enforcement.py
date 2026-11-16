@@ -21,11 +21,11 @@ from serving_runtime.enforcement.events import (
 )
 from serving_runtime.enforcement.intent import IntentError, load_intent, parse_intent
 from serving_runtime.enforcement.tetragon import render_manifests as render_tetragon
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.observation.store import JsonlStore
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -106,8 +106,7 @@ class ManifestTests(unittest.TestCase):
     def test_cilium_policy_shapes_and_fqdn_dns_inspection(self) -> None:
         manifests = render_cilium(self.intent)
         ingress = manifests["cilium-engine-ingress.json"]
-        self.assertEqual((ingress["apiVersion"], ingress["kind"]),
-                         ("cilium.io/v2", "CiliumNetworkPolicy"))
+        self.assertEqual((ingress["apiVersion"], ingress["kind"]), ("cilium.io/v2", "CiliumNetworkPolicy"))
         sources = ingress["spec"]["ingress"][0]["fromEndpoints"]
         self.assertEqual(len(sources), 2)
         self.assertEqual(
@@ -116,17 +115,14 @@ class ManifestTests(unittest.TestCase):
         )
 
         egress = manifests["cilium-engine-egress.json"]["spec"]["egress"]
-        self.assertEqual(egress[0]["toPorts"][0]["rules"]["dns"],
-                         [{"matchPattern": "*"}])
-        self.assertEqual(egress[1]["toFQDNs"],
-                         [{"matchName": "telemetry.example.invalid"}])
+        self.assertEqual(egress[0]["toPorts"][0]["rules"]["dns"], [{"matchPattern": "*"}])
+        self.assertEqual(egress[1]["toFQDNs"], [{"matchName": "telemetry.example.invalid"}])
         self.assertEqual(egress[2]["toCIDR"], ["192.0.2.0/24"])
         self.assertNotIn("egressDeny", manifests["cilium-engine-egress.json"]["spec"])
 
         gateway = manifests["cilium-gateway-egress.json"]
         self.assertEqual(len(gateway["spec"]["egress"]), 2)
-        self.assertIn("candidate-cluster-unapplied-unverified",
-                      gateway["metadata"]["annotations"].values())
+        self.assertIn("candidate-cluster-unapplied-unverified", gateway["metadata"]["annotations"].values())
 
     def test_empty_engine_allowlist_renders_deny_all_without_dns(self) -> None:
         document = intent_document()
@@ -136,9 +132,7 @@ class ManifestTests(unittest.TestCase):
 
     def test_cidr_only_engine_allowlist_does_not_render_dns(self) -> None:
         document = intent_document()
-        document["engine_egress_allow"] = [
-            {"cidr": "192.0.2.0/24", "port": 443, "protocol": "TCP"}
-        ]
+        document["engine_egress_allow"] = [{"cidr": "192.0.2.0/24", "port": 443, "protocol": "TCP"}]
         rules = render_cilium(parse_intent(document))["cilium-engine-egress.json"]["spec"]["egress"]
         self.assertEqual(len(rules), 1)
         self.assertEqual(rules[0]["toCIDR"], ["192.0.2.0/24"])
@@ -146,9 +140,7 @@ class ManifestTests(unittest.TestCase):
 
     def test_fqdn_engine_allowlist_renders_dns_inspection(self) -> None:
         document = intent_document()
-        document["engine_egress_allow"] = [
-            {"fqdn": "telemetry.example.invalid", "port": 443, "protocol": "TCP"}
-        ]
+        document["engine_egress_allow"] = [{"fqdn": "telemetry.example.invalid", "port": 443, "protocol": "TCP"}]
         rules = render_cilium(parse_intent(document))["cilium-engine-egress.json"]["spec"]["egress"]
         self.assertEqual(rules[0]["toPorts"][0]["rules"]["dns"], [{"matchPattern": "*"}])
         self.assertEqual(rules[1]["toFQDNs"], [{"matchName": "telemetry.example.invalid"}])
@@ -169,33 +161,36 @@ class ManifestTests(unittest.TestCase):
         self.assertNotIn("tg-exec", serialized.lower())
         for document in manifests.values():
             self.assertEqual(document["kind"], "TracingPolicyNamespaced")
-            self.assertEqual(document["spec"]["podSelector"]["matchLabels"],
-                             self.intent.engine.labels)
-            self.assertIn("TG-", document["metadata"]["annotations"][
-                "serving-runtime.local/rule-id"
-            ])
+            self.assertEqual(document["spec"]["podSelector"]["matchLabels"], self.intent.engine.labels)
+            self.assertIn("TG-", document["metadata"]["annotations"]["serving-runtime.local/rule-id"])
 
     def test_enforce_probe_adds_only_path_limited_override(self) -> None:
         document = intent_document()
-        document.update({
-            "tetragon_mode": "enforce_probe",
-            "probe_path": "/var/cache/serving/engine/example/blocked-probe.txt",
-        })
+        document.update(
+            {
+                "tetragon_mode": "enforce_probe",
+                "probe_path": "/var/cache/serving/engine/example/blocked-probe.txt",
+            }
+        )
         manifests = render_tetragon(parse_intent(document))
         deny = manifests["tetragon-tg-deny-01.json"]
         selector = deny["spec"]["kprobes"][0]["selectors"][0]
-        self.assertEqual(selector["matchArgs"][0], {
-            "index": 0,
-            "operator": "Equal",
-            "values": [document["probe_path"]],
-        })
-        self.assertEqual(selector["matchActions"], [
-            {"action": "Post"},
-            {"action": "Override", "argError": -1},
-        ])
-        self.assertIn("unverified", deny["metadata"]["annotations"][
-            "serving-runtime.local/limit"
-        ])
+        self.assertEqual(
+            selector["matchArgs"][0],
+            {
+                "index": 0,
+                "operator": "Equal",
+                "values": [document["probe_path"]],
+            },
+        )
+        self.assertEqual(
+            selector["matchActions"],
+            [
+                {"action": "Post"},
+                {"action": "Override", "argError": -1},
+            ],
+        )
+        self.assertIn("unverified", deny["metadata"]["annotations"]["serving-runtime.local/limit"])
 
     def test_writer_rejects_names_outside_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -206,23 +201,16 @@ class ManifestTests(unittest.TestCase):
 
 class EventAdapterTests(unittest.TestCase):
     def test_hubble_fixture_normalizes_verdict_and_destination(self) -> None:
-        lines = (FIXTURE_DIR / "hubble_flows.synthetic.jsonl").read_text(
-            encoding="utf-8"
-        ).splitlines()
-        accepted, rejected = transform_lines(
-            lines, kind="hubble", data_origin="synthetic"
-        )
+        lines = (FIXTURE_DIR / "hubble_flows.synthetic.jsonl").read_text(encoding="utf-8").splitlines()
+        accepted, rejected = transform_lines(lines, kind="hubble", data_origin="synthetic")
         self.assertEqual(rejected, [])
-        self.assertEqual([item["verdict"] for item in accepted],
-                         ["allowed", "dropped"])
+        self.assertEqual([item["verdict"] for item in accepted], ["allowed", "dropped"])
         self.assertEqual(accepted[0]["dst"]["port"], 8000)
         self.assertEqual(accepted[1]["reason"], "POLICY_DENIED")
         self.assertTrue(all(item["data_origin"] == "synthetic" for item in accepted))
 
     def test_tetragon_fixture_drops_arguments_and_marks_allowlist(self) -> None:
-        lines = (FIXTURE_DIR / "tetragon_events.synthetic.jsonl").read_text(
-            encoding="utf-8"
-        ).splitlines()
+        lines = (FIXTURE_DIR / "tetragon_events.synthetic.jsonl").read_text(encoding="utf-8").splitlines()
         accepted, rejected = transform_lines(
             lines,
             kind="tetragon",
@@ -230,8 +218,7 @@ class EventAdapterTests(unittest.TestCase):
             allowed_engine_binaries=["/usr/local/bin/vllm"],
         )
         self.assertEqual(rejected, [])
-        self.assertEqual([item["allowed_binary"] for item in accepted[:2]],
-                         [True, False])
+        self.assertEqual([item["allowed_binary"] for item in accepted[:2]], [True, False])
         self.assertEqual(accepted[2]["access"], "write")
         self.assertEqual(accepted[2]["rule_id"], "TG-ASSET-01")
         read_event = json.loads(lines[2])
@@ -252,13 +239,9 @@ class EventAdapterTests(unittest.TestCase):
 
     def test_no_allowlist_means_unknown_and_bad_lines_are_aggregated(self) -> None:
         exec_event = json.loads(
-            (FIXTURE_DIR / "tetragon_events.synthetic.jsonl").read_text(
-                encoding="utf-8"
-            ).splitlines()[0]
+            (FIXTURE_DIR / "tetragon_events.synthetic.jsonl").read_text(encoding="utf-8").splitlines()[0]
         )
-        self.assertIsNone(
-            parse_tetragon(exec_event, data_origin="real")["allowed_binary"]
-        )
+        self.assertIsNone(parse_tetragon(exec_event, data_origin="real")["allowed_binary"])
         accepted, rejected = transform_lines(
             ["not-json", json.dumps({"time": "now", "process_exit": {}})],
             kind="tetragon",
@@ -270,9 +253,7 @@ class EventAdapterTests(unittest.TestCase):
 
     def test_kprobe_without_binary_or_pod_marks_attribution_unavailable(self) -> None:
         event = json.loads(
-            (FIXTURE_DIR / "tetragon_events.synthetic.jsonl").read_text(
-                encoding="utf-8"
-            ).splitlines()[2]
+            (FIXTURE_DIR / "tetragon_events.synthetic.jsonl").read_text(encoding="utf-8").splitlines()[2]
         )
         event["process_kprobe"]["process"].pop("binary")
         event["process_kprobe"]["process"].pop("pod")
@@ -285,9 +266,7 @@ class EventAdapterTests(unittest.TestCase):
 
     def test_kprobe_empty_binary_is_null_but_required_fields_stay_strict(self) -> None:
         event = json.loads(
-            (FIXTURE_DIR / "tetragon_events.synthetic.jsonl").read_text(
-                encoding="utf-8"
-            ).splitlines()[2]
+            (FIXTURE_DIR / "tetragon_events.synthetic.jsonl").read_text(encoding="utf-8").splitlines()[2]
         )
         event["process_kprobe"]["process"]["binary"] = ""
         observation = parse_tetragon(event, data_origin="real")
@@ -312,9 +291,7 @@ class EventAdapterTests(unittest.TestCase):
 
     def test_process_exec_still_requires_non_empty_binary(self) -> None:
         original = json.loads(
-            (FIXTURE_DIR / "tetragon_events.synthetic.jsonl").read_text(
-                encoding="utf-8"
-            ).splitlines()[0]
+            (FIXTURE_DIR / "tetragon_events.synthetic.jsonl").read_text(encoding="utf-8").splitlines()[0]
         )
         for binary in (None, ""):
             event = json.loads(json.dumps(original))
@@ -322,17 +299,14 @@ class EventAdapterTests(unittest.TestCase):
                 event["process_exec"]["process"].pop("binary")
             else:
                 event["process_exec"]["process"]["binary"] = binary
-            with self.subTest(binary=binary), self.assertRaisesRegex(
-                EventError, "process.binary must be a non-empty string"
+            with (
+                self.subTest(binary=binary),
+                self.assertRaisesRegex(EventError, "process.binary must be a non-empty string"),
             ):
                 parse_tetragon(event, data_origin="real")
 
     def test_origin_is_required_and_validated(self) -> None:
-        flow = json.loads(
-            (FIXTURE_DIR / "hubble_flows.synthetic.jsonl").read_text(
-                encoding="utf-8"
-            ).splitlines()[0]
-        )
+        flow = json.loads((FIXTURE_DIR / "hubble_flows.synthetic.jsonl").read_text(encoding="utf-8").splitlines()[0])
         with self.assertRaises(ValueError):
             parse_hubble(flow, data_origin="maybe")
 
@@ -341,22 +315,22 @@ class EventAdapterTests(unittest.TestCase):
             path = Path(temporary) / "observations.jsonl"
             store = JsonlStore(path)
             for index in range(55):
-                store.append({
-                    "observed_at": f"2026-10-24T01:00:{index:02d}Z",
-                    "source": "hubble" if index % 2 else "tetragon",
-                    "kind": "network_flow" if index % 2 else "process_exec",
-                    "verdict": "allowed" if index % 2 else None,
-                    "rule_id": "TG-EXEC-01" if index % 2 == 0 else None,
-                    "data_origin": "synthetic",
-                })
+                store.append(
+                    {
+                        "observed_at": f"2026-10-24T01:00:{index:02d}Z",
+                        "source": "hubble" if index % 2 else "tetragon",
+                        "kind": "network_flow" if index % 2 else "process_exec",
+                        "verdict": "allowed" if index % 2 else None,
+                        "rule_id": "TG-EXEC-01" if index % 2 == 0 else None,
+                        "data_origin": "synthetic",
+                    }
+                )
             with path.open("ab") as output:
                 output.write(b"{broken\n")
             payload = ObservationQuery(path).query()
             self.assertEqual(payload["counts"]["total"], 55)
             self.assertEqual(payload["counts"]["data_origin"], {"synthetic": 55})
-            self.assertEqual(
-                payload["origins_by_kind"]["process_exec"], {"synthetic": 28}
-            )
+            self.assertEqual(payload["origins_by_kind"]["process_exec"], {"synthetic": 28})
             self.assertEqual(len(payload["observations"]), 50)
             self.assertEqual(payload["corrupt_lines"], 1)
             filtered = ObservationQuery(path).query({"source": "hubble"})
@@ -368,13 +342,24 @@ class EnforcementCliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             output = io.StringIO()
             with redirect_stdout(output), redirect_stderr(io.StringIO()):
-                status = main([
-                    "enforce", "ingest", "--kind", "tetragon",
-                    "--input", str(FIXTURE_DIR / "tetragon_override.synthetic.jsonl"),
-                    "--origin", "synthetic", "--data-dir", temporary,
-                    "--environment", "kind-runtime-lab",
-                    "--intent", str(ROOT / "deploy/lab/intent.lab-v1.1.json"),
-                ])
+                status = main(
+                    [
+                        "enforce",
+                        "ingest",
+                        "--kind",
+                        "tetragon",
+                        "--input",
+                        str(FIXTURE_DIR / "tetragon_override.synthetic.jsonl"),
+                        "--origin",
+                        "synthetic",
+                        "--data-dir",
+                        temporary,
+                        "--environment",
+                        "kind-runtime-lab",
+                        "--intent",
+                        str(ROOT / "deploy/lab/intent.lab-v1.1.json"),
+                    ]
+                )
             self.assertEqual(status, 0)
             self.assertIn("저장 4건 · 거부 0건", output.getvalue())
             records, corrupt = JsonlStore(Path(temporary) / "observations.jsonl").read_all()
@@ -392,8 +377,7 @@ class EnforcementCliTests(unittest.TestCase):
                 self.assertEqual(item["access"], "read")
             self.assertEqual(
                 [(item["action_raw"], item["action_mode"]) for item in records],
-                [("KPROBE_ACTION_OVERRIDE", "enforce")] * 3
-                + [("KPROBE_ACTION_POST", "monitor")],
+                [("KPROBE_ACTION_OVERRIDE", "enforce")] * 3 + [("KPROBE_ACTION_POST", "monitor")],
             )
 
     def test_render_and_ingest(self) -> None:
@@ -401,21 +385,37 @@ class EnforcementCliTests(unittest.TestCase):
             root = Path(temporary)
             output = io.StringIO()
             with redirect_stdout(output):
-                status = main([
-                    "enforce", "render", "--intent", str(INTENT_PATH),
-                    "--out", str(root / "rendered"),
-                ])
+                status = main(
+                    [
+                        "enforce",
+                        "render",
+                        "--intent",
+                        str(INTENT_PATH),
+                        "--out",
+                        str(root / "rendered"),
+                    ]
+                )
             self.assertEqual(status, 0)
             self.assertIn("클러스터 미적용·미검증", output.getvalue())
             self.assertTrue((root / "rendered/cilium-engine-egress.json").is_file())
 
             with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
-                status = main([
-                    "enforce", "ingest", "--kind", "tetragon",
-                    "--input", str(FIXTURE_DIR / "tetragon_events.synthetic.jsonl"),
-                    "--origin", "synthetic", "--data-dir", str(root / "data"),
-                    "--intent", str(INTENT_PATH),
-                ])
+                status = main(
+                    [
+                        "enforce",
+                        "ingest",
+                        "--kind",
+                        "tetragon",
+                        "--input",
+                        str(FIXTURE_DIR / "tetragon_events.synthetic.jsonl"),
+                        "--origin",
+                        "synthetic",
+                        "--data-dir",
+                        str(root / "data"),
+                        "--intent",
+                        str(INTENT_PATH),
+                    ]
+                )
             self.assertEqual(status, 0)
             records, corrupt = JsonlStore(root / "data/observations.jsonl").read_all()
             self.assertEqual((len(records), corrupt), (3, []))
@@ -427,16 +427,18 @@ class ObservationApiTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.data_dir = Path(self.temporary.name)
-        JsonlStore(self.data_dir / "observations.jsonl").append({
-            "schema": "runtime-observation/1.0",
-            "observed_at": "2026-10-24T00:00:00Z",
-            "source": "tetragon",
-            "kind": "process_exec",
-            "rule_id": "TG-EXEC-01",
-            "data_origin": "synthetic",
-            "binary": "/bin/sh",
-            "allowed_binary": False,
-        })
+        JsonlStore(self.data_dir / "observations.jsonl").append(
+            {
+                "schema": "runtime-observation/1.0",
+                "observed_at": "2026-10-24T00:00:00Z",
+                "source": "tetragon",
+                "kind": "process_exec",
+                "rule_id": "TG-EXEC-01",
+                "data_origin": "synthetic",
+                "binary": "/bin/sh",
+                "allowed_binary": False,
+            }
+        )
         with (self.data_dir / "observations.jsonl").open("ab") as output:
             output.write(b"{broken\n")
         try:
@@ -454,9 +456,7 @@ class ObservationApiTests(unittest.TestCase):
             data_dir=str(self.data_dir),
         )
         try:
-            self.gateway = GatewayApp(
-                config, load_policy(POLICY_PATH), self.engine.address
-            ).start()
+            self.gateway = GatewayApp(config, load_policy(POLICY_PATH), self.engine.address).start()
         except PermissionError as error:
             self.skipTest(f"local sockets are unavailable: {error}")
         self.addCleanup(self.gateway.stop)
@@ -476,10 +476,11 @@ class ObservationApiTests(unittest.TestCase):
         payload = json.loads(body)
         self.assertEqual(status, 200)
         self.assertEqual(payload["counts"]["rule_id"], {"TG-EXEC-01": 1})
-        self.assertEqual(len([item for item in payload["observations"] if item.get("source")=="tetragon"]), 1)
+        self.assertEqual(len([item for item in payload["observations"] if item.get("source") == "tetragon"]), 1)
         self.assertEqual(payload["corrupt_lines"], 1)
         self.assertEqual(self.get("/api/observations?source=tetragon")[0], 200)
         self.assertEqual(self.get("/api/observations?unknown=x")[0], 400)
+
 
 if __name__ == "__main__":
     unittest.main()

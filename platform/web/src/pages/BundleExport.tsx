@@ -114,7 +114,7 @@ export function BundleExport({ policyId, revisions }: { policyId: string; revisi
         {(envRevisions.data?.items ?? []).map((r) => <option key={r.revision} value={r.revision}>{r.revision}</option>)}
       </select></label>
       <label className="small">생성 역할 <select className="select" aria-label="생성 역할" value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
-        <option value="runtime_operator">런타임 운영자</option><option value="policy_operator">정책 운영자</option>
+        <option value="runtime_operator">운영자</option><option value="policy_operator">정책 운영자</option>
       </select></label>
     </div>
     <div className="row wrap">

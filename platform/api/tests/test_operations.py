@@ -361,6 +361,15 @@ def test_platform_agent_apply_temporary_gateway_verified(ops, tmp_path, monkeypa
     assert response.status_code == 200, response.text
     root = tmp_path / "bundles"
     root.mkdir()
+    original_lstat = Path.lstat
+    def installed_bundle_root(path, *args, **kwargs):
+        info = original_lstat(path, *args, **kwargs)
+        if path == root:
+            values = list(info)
+            values[4:6] = [0, 10000]
+            return __import__("os").stat_result(values)
+        return info
+    monkeypatch.setattr(Path, "lstat", installed_bundle_root)
     with tarfile.open(fileobj=io.BytesIO(response.content), mode="r:gz") as archive:
         for item in archive.getmembers():
             path = root / item.name

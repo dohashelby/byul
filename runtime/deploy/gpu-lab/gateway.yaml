@@ -8,7 +8,7 @@
 #   /srv/serving/bundles        platform policy bundles, read-only here
 #   /srv/serving/observation    host collector output, group 10010 read-only
 # Before apply/restart: publish the reviewed revocations.json, then run
-# tools.gpu_lab_gateway_preflight on the target host with these final hostPaths.
+# labtools.gpu_lab_gateway_preflight on the target host with these final hostPaths.
 # See README.md; missing revocations fail closed, missing directories prevent startup.
 # The auth config is a Secret with token hashes only:
 #   kubectl -n serving-lab create secret generic serving-gateway-auth --from-file=auth.json
@@ -85,7 +85,7 @@ spec:
             - --native-receipt-reader-gid
             - "10010"
             - --native-receipt-producer-sha256
-            - 3c8bda5a7b6a841728b70b1cdb6c982132f03d4b5acc52cf5f6488295880e3f8
+            - a6c812a64d21afe6cd37635559f0bb5ea306729dbd2cb57672314fb4db46a709
             - --observation-feed
             - management_listener=/srv/serving/runtime/management-access/access.jsonl
             - --observation-feed

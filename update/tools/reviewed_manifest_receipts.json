@@ -435,6 +435,16 @@
       "manifest_sha256": "c62c9f8685f722cded234153471224a4eda9a0c9cd5f722919ba69ff8e9f38f5",
       "reviewed_by": "Codex baseline lineage reviews 357/909/119/54de/44b; B 검토 면제(사용자 결정 5, 2026-11-12)",
       "reviewed_at": "2026-11-16T04:51:56.548Z"
+    },
+    {
+      "manifest_sha256": "88eb78db537d1faa2a6c2c878f2d5c2d90548140c9e177e779244e2e8711e16c",
+      "reviewed_by": "Codex / PR287 legacy qualification and startup dependency review; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T04:14:58Z"
+    },
+    {
+      "manifest_sha256": "2c17f9a0f3e2b9a40e510d814c1b240170fbce37368ba89210127af1629edb0c",
+      "reviewed_by": "Claude / PR288 main 통합·graph Fields·profiler EngineCoreProc 지점 보수 검토; B 검토 면제(사용자 결정 5, 2026-11-12)",
+      "reviewed_at": "2026-11-16T05:53:37Z"
     }
   ]
 }

@@ -49,7 +49,7 @@ UTF-8 손상, kubectl 시각 누락·오류, 역순 시각은 해당 줄만 건�
 
 저장 증거의 엔진 로그 파일 5개를 읽기 전용으로 검사했다. `engine.log`와 `engine-final.log`에서 기존 표지가 각 5건(loading 시작·weights·loading 종료·init 종료·inferring 시작) 일치했고 나머지 3개 파일은 0건이다. 두 파일이 같은 실행의 사본일 수 있어 독립 실행 건수로 합산하지 않는다. 실제 vLLM GPU의 전체 로그 패턴, 특히 GPU 컴파일 표지는 **서버에서 검증 전**이다. 이 일치는 추출 패턴 전체의 GPU 적합성이나 단계 경계의 정확성을 입증하지 않는다.
 
-서버 시험은 **1차 관찰(단계별 실행 기록 수집) → 허용 목록 작성 → 2차 판정** 순서다. 1차는 `tools/aws_lab_acceptance.py inventory --tetragon <읽기 전용 파일> --timeline <시간표>`로 단계·Pod·실행 경로 건수만 뽑는다. 이 명령은 판정을 계산하지 않으며, 시간표 Pod UID 또는 이름과 맞지 않는 실행은 `unknown`으로 둔다. 그 결과와 실제 단계 경계를 검토한 뒤에만 `allowed_engine_binaries`·`phase_binaries` 변경을 결정한다. 현재 목록은 넓히지 않았다. 시간표 연결만 켜면 정상 실행이 다수 `outside_allowlist`가 될 수 있으므로 2차 AWS-11을 1차 자료의 승인 근거로 앞당겨 해석하지 않는다.
+서버 시험은 **1차 관찰(단계별 실행 기록 수집) → 허용 목록 작성 → 2차 판정** 순서다. 1차는 `labtools/aws_lab_acceptance.py inventory --tetragon <읽기 전용 파일> --timeline <시간표>`로 단계·Pod·실행 경로 건수만 뽑는다. 이 명령은 판정을 계산하지 않으며, 시간표 Pod UID 또는 이름과 맞지 않는 실행은 `unknown`으로 둔다. 그 결과와 실제 단계 경계를 검토한 뒤에만 `allowed_engine_binaries`·`phase_binaries` 변경을 결정한다. 현재 목록은 넓히지 않았다. 시간표 연결만 켜면 정상 실행이 다수 `outside_allowlist`가 될 수 있으므로 2차 AWS-11을 1차 자료의 승인 근거로 앞당겨 해석하지 않는다.
 
 AWS-11은 구간 내 유효 단계 실행이 하나도 없으면 경고가 0건이어도 `unknown`이다. 보고서에 유효·미확인 실행 수, `phase_basis`, 시간표 신선도와 쓰기 시각을 기록한다. 의도한 shell 시험 제외와 최근 50행 제한은 유지한다. AWS-09는 계속 엔진 Pod 기록만 근거로 쓴다. AWS-01~08 판정은 바꾸지 않았다.
 

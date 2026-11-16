@@ -1,6 +1,6 @@
 # 선정 default-text 배포와 응답 metadata
 
-`tools/check_selected_profile.py --policy policy.json`은 선정37개 검증에 사용하는 `selected-default-text/1.0` 배포 조건을 확인한다. 기존 정책 loader의 정상 결과와 정확 정책 SHA를 소비한다. `status=ok`, `supported=true`, 종료값0이어야 이 프로필로 배포한다. 미지원입구·잘못된 정책은 `unsupported`·종료값1과 해당 필드를 반환한다. `--report-out`은 덮어쓰기 없이 0600 JSON을 생성한다. A0/preflight는 `validate_selected_profile(load_policy(path))` 결과를 그대로 소비할 수 있다.
+`labtools/check_selected_profile.py --policy policy.json`은 선정37개 검증에 사용하는 `selected-default-text/1.0` 배포 조건을 확인한다. 기존 정책 loader의 정상 결과와 정확 정책 SHA를 소비한다. `status=ok`, `supported=true`, 종료값0이어야 이 프로필로 배포한다. 미지원입구·잘못된 정책은 `unsupported`·종료값1과 해당 필드를 반환한다. `--report-out`은 덮어쓰기 없이 0600 JSON을 생성한다. A0/preflight는 `validate_selected_profile(load_policy(path))` 결과를 그대로 소비할 수 있다.
 
 선정 프로필은 runtime `profile=default`와 빈 extra_fields를 지원한다. 기존 default sampling 예시의 bounded validate `temperature/top_p/seed/stop`도 해당 타입으로 검사한다. 그 외 extra_fields는 token/KV 재사용, 코드판본·processor 선택, structured/tools, native 옵션, 반환 옵션을 다시 열 수 있으므로 선정 배포에서 거부한다. 이 검사는 일반 policy loader나 `zeroday-lab`의 확장 기능을 변경하지 않는다.
 

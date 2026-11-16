@@ -36,7 +36,7 @@ export function ResultsPage() {
                   <select className="select" value={reportId} onChange={(e) => patch({ report: e.target.value, sel: null })}>
                     {data.items.map((r) => (
                       <option key={r.report_ref.id} value={r.report_ref.id}>
-                        {r.created_at} · {label(MODE, r.mode)} · {r.data_origin} · {r.report_ref.id}
+                        {r.created_at} · {label(MODE, r.mode)} · {r.report_ref.id}
                       </option>
                     ))}
                   </select>

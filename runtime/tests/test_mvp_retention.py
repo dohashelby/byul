@@ -10,9 +10,9 @@ import threading
 import unittest
 from unittest.mock import patch
 
-from serving_runtime.mvp.retention import HOLD_SCHEMA, RecordRetention, load_holds
-from serving_runtime.mvp import store as store_module
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.observation.retention import HOLD_SCHEMA, RecordRetention, load_holds
+from serving_runtime.observation import store as store_module
+from serving_runtime.observation.store import JsonlStore
 
 
 NOW = datetime(2026, 10, 24, 12, 0, tzinfo=timezone.utc)
@@ -67,8 +67,9 @@ class RetentionTests(unittest.TestCase):
             result = RecordRetention(data, enforce=True).run(now=NOW)
             expected = {"from": iso(12), "to": iso(10)}
             self.assertEqual(result["files"]["gateway_records.jsonl"]["removable_range"], expected)
-            self.assertEqual(result["files"]["engine_receipts.jsonl"]["removable_range"],
-                             {"from": iso(9), "to": iso(9)})
+            self.assertEqual(
+                result["files"]["engine_receipts.jsonl"]["removable_range"], {"from": iso(9), "to": iso(9)}
+            )
             self.assertEqual(gateway.read_all()[0], [])
             restarted = RecordRetention(data).run(now=NOW)
             self.assertEqual(restarted["last_deletion"]["files"]["gateway_records.jsonl"]["removable_range"], expected)
@@ -103,11 +104,11 @@ class RetentionTests(unittest.TestCase):
         self.assertIsNotNone(summary["last_deletion"])
 
     def test_size_limit_removes_oldest_first(self) -> None:
-        total = sum((self.data / name).stat().st_size for name in (
-            "gateway_records.jsonl", "engine_receipts.jsonl", "observations.jsonl"))
-        summary = RecordRetention(
-            self.data, max_age_days=365, max_bytes=total - 50, enforce=True
-        ).run(now=NOW)
+        total = sum(
+            (self.data / name).stat().st_size
+            for name in ("gateway_records.jsonl", "engine_receipts.jsonl", "observations.jsonl")
+        )
+        summary = RecordRetention(self.data, max_age_days=365, max_bytes=total - 50, enforce=True).run(now=NOW)
         self.assertTrue(summary["over_size_limit"])
         removed = sum(entry["removable_by_size"] for entry in summary["files"].values())
         self.assertGreaterEqual(removed, 1)
@@ -128,15 +129,9 @@ class RetentionTests(unittest.TestCase):
 
             gateway_records, _ = gateway.read_all()
             receipt_records, _ = receipts.read_all()
-            self.assertEqual(
-                [item["request_id"] for item in gateway_records], ["joined"]
-            )
-            self.assertEqual(
-                [item["request_id"] for item in receipt_records], ["joined"]
-            )
-            self.assertEqual(
-                summary["files"]["engine_receipts.jsonl"]["removed_lines"], 1
-            )
+            self.assertEqual([item["request_id"] for item in gateway_records], ["joined"])
+            self.assertEqual([item["request_id"] for item in receipt_records], ["joined"])
+            self.assertEqual(summary["files"]["engine_receipts.jsonl"]["removed_lines"], 1)
 
     def test_route_rejections_share_request_hold_and_retention_unit(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -170,10 +165,7 @@ class RetentionTests(unittest.TestCase):
             receipts.append({"request_id": "old", "received_at": iso(10)})
             gateway.append({"request_id": "new", "recorded_at": iso(0)})
 
-            total = sum(
-                (data / name).stat().st_size
-                for name in ("gateway_records.jsonl", "engine_receipts.jsonl")
-            )
+            total = sum((data / name).stat().st_size for name in ("gateway_records.jsonl", "engine_receipts.jsonl"))
             old_size = sum(
                 len(line) + 1
                 for name in ("gateway_records.jsonl", "engine_receipts.jsonl")
@@ -198,9 +190,7 @@ class RetentionTests(unittest.TestCase):
             gateway = JsonlStore(data / "gateway_records.jsonl")
             receipts = JsonlStore(data / "engine_receipts.jsonl")
             gateway.append({"request_id": "held-undated", "run_id": "evidence"})
-            receipts.append(
-                {"request_id": "held-undated", "received_at": iso(20)}
-            )
+            receipts.append({"request_id": "held-undated", "received_at": iso(20)})
             receipts.append({"request_id": "remove", "received_at": iso(20)})
             hold = data / "hold.json"
             hold.write_text(
@@ -208,9 +198,7 @@ class RetentionTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            summary = RecordRetention(
-                data, enforce=True, hold_path=hold
-            ).run(now=NOW)
+            summary = RecordRetention(data, enforce=True, hold_path=hold).run(now=NOW)
 
             self.assertEqual(
                 [item["request_id"] for item in gateway.read_all()[0]],
@@ -224,9 +212,7 @@ class RetentionTests(unittest.TestCase):
                 summary["files"]["gateway_records.jsonl"]["unclassified_lines"],
                 1,
             )
-            self.assertEqual(
-                summary["files"]["engine_receipts.jsonl"]["held_units"], 1
-            )
+            self.assertEqual(summary["files"]["engine_receipts.jsonl"]["held_units"], 1)
 
     def test_broken_hold_file_blocks_deletion(self) -> None:
         before = (self.data / "gateway_records.jsonl").read_bytes()
@@ -248,9 +234,7 @@ class RetentionTests(unittest.TestCase):
         ):
             with self.subTest(document=document):
                 self.assertEqual(load_holds(self.hold(document))[2]["state"], "error")
-        runs, requests, state = load_holds(
-            self.hold({"schema": HOLD_SCHEMA, "run_ids": ["a"], "request_ids": ["b"]})
-        )
+        runs, requests, state = load_holds(self.hold({"schema": HOLD_SCHEMA, "run_ids": ["a"], "request_ids": ["b"]}))
         self.assertEqual((runs, requests, state["state"]), ({"a"}, {"b"}, "ok"))
 
     def test_invalid_limits_are_rejected(self) -> None:
@@ -290,7 +274,7 @@ class RetentionTests(unittest.TestCase):
                 return original_open(path, flags, *args, **kwargs)
 
             with patch(
-                "serving_runtime.mvp.store.os.open",
+                "serving_runtime.observation.store.os.open",
                 side_effect=fail_directory_open,
             ):
                 summary = RecordRetention(data, enforce=True).run(now=NOW)
@@ -302,17 +286,13 @@ class RetentionTests(unittest.TestCase):
             self.assertIn("gateway_records.jsonl", summary["errors"])
             self.assertEqual(gateway.read_all()[0], [])
             logged = JsonlStore(data / "retention_log.jsonl").read_all()[0][0]
-            self.assertEqual(
-                logged["files"]["gateway_records.jsonl"]["removed_lines"], 1
-            )
+            self.assertEqual(logged["files"]["gateway_records.jsonl"]["removed_lines"], 1)
             self.assertEqual(
                 logged["files"]["gateway_records.jsonl"]["durability"],
                 "uncertain",
             )
             self.assertEqual(
-                summary["last_deletion"]["files"]["gateway_records.jsonl"][
-                    "durability"
-                ],
+                summary["last_deletion"]["files"]["gateway_records.jsonl"]["durability"],
                 "uncertain",
             )
 
@@ -340,3 +320,307 @@ class RetentionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+import pytest
+
+
+def test_a5_inflight_request_is_not_a_size_candidate(tmp_path):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    started = {"phase": "started", "request_id": "active", "recorded_at": iso(0)}
+    store.append(started)
+    result = RecordRetention(tmp_path, max_bytes=1, enforce=True).run(now=NOW)
+    assert store.read_all()[0] == [started]
+    assert result["deleted"] is False
+
+
+def test_a5_append_before_delete_preserves_the_whole_cross_file_request(tmp_path, monkeypatch):
+    gateway = JsonlStore(tmp_path / "gateway_records.jsonl")
+    receipts = JsonlStore(tmp_path / "engine_receipts.jsonl")
+    started = {"phase": "started", "request_id": "r", "recorded_at": iso(10)}
+    final = {"phase": "final", "request_id": "r", "recorded_at": iso(10)}
+    gateway.append(started)
+    gateway.append(final)
+    receipts.append({"request_id": "r", "received_at": iso(10)})
+    original = JsonlStore.remove_lines
+    injected = []
+
+    def append_first(store, lines, **kwargs):
+        if not injected:
+            injected.append(True)
+            gateway.append({**final, "late": True})
+        return original(store, lines, **kwargs)
+
+    monkeypatch.setattr(JsonlStore, "remove_lines", append_first)
+    result = RecordRetention(tmp_path, enforce=True).run(now=NOW)
+    assert gateway.read_all()[0] == [started, final, {**final, "late": True}]
+    assert len(receipts.read_all()[0]) == 1 and not result["deleted"]
+
+
+def test_a5_final_appended_to_started_before_age_deletion_keeps_both(tmp_path, monkeypatch):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    started = {"phase": "started", "request_id": "active", "recorded_at": iso(10 / 1440)}
+    final = {"phase": "final", "request_id": "active", "recorded_at": iso(0)}
+    store.append(started)
+    JsonlStore(tmp_path / "observations.jsonl").append({"observed_at": iso(10)})
+    original = JsonlStore.remove_lines
+
+    def append_final(target, lines, **kwargs):
+        store.append(final)
+        return original(target, lines, **kwargs)
+
+    monkeypatch.setattr(JsonlStore, "remove_lines", append_final)
+    RecordRetention(tmp_path, enforce=True).run(now=NOW)
+    rows = store.read_all()[0]
+    assert rows == [started, final]
+
+
+@pytest.mark.parametrize("failure", ["hold", "rewrite"])
+def test_a6_failed_or_blocked_deletion_reports_actual_bytes(tmp_path, monkeypatch, failure):
+    path = tmp_path / "gateway_records.jsonl"
+    raw = json.dumps({"request_id": "r", "recorded_at": iso(0)}, separators=(",", ":")).encode()
+    assert len(raw) <= 70
+    path.write_bytes(raw.ljust(70, b" ") + b"\n")
+    path.chmod(0o600)
+    hold = None
+    if failure == "hold":
+        hold = tmp_path / "hold.json"
+        hold.write_text("{}")
+    else:
+        def fail(*args, **kwargs):
+            raise OSError("A6 injected rewrite failure")
+        monkeypatch.setattr(JsonlStore, "remove_lines", fail)
+    result = RecordRetention(tmp_path, max_bytes=1, enforce=True, hold_path=hold).run(now=NOW)
+    assert path.stat().st_size == 71 and result["deleted"] is False
+    assert result["over_size_limit_after"] is True
+
+
+@pytest.mark.parametrize("enforce", [False, True])
+def test_a6_report_projects_and_enforce_measures_success(tmp_path, enforce):
+    path = tmp_path / "gateway_records.jsonl"
+    store = JsonlStore(path)
+    store.append({"request_id": "r", "recorded_at": iso(0)})
+    before = path.read_bytes()
+    result = RecordRetention(tmp_path, max_bytes=1, enforce=enforce).run(now=NOW)
+    assert result["over_size_limit_after"] is False
+    assert result["deleted"] is enforce
+    assert path.read_bytes() == (b"" if enforce else before)
+
+
+def test_d1_append_finishes_while_initial_scan_is_paused(tmp_path, monkeypatch):
+    retention = RecordRetention(tmp_path, enforce=True)
+    entered, release, writer_ready, appended = (threading.Event() for _ in range(4))
+    original = retention._scan_file
+    errors = []
+
+    def pause(*args, **kwargs):
+        if not entered.is_set():
+            entered.set()
+            if not release.wait(5):
+                raise RuntimeError("scan release was not signalled")
+        return original(*args, **kwargs)
+
+    def work():
+        try:
+            retention.run(now=NOW)
+        except Exception as error:
+            errors.append(error)
+
+    def write():
+        writer_ready.set()
+        JsonlStore(tmp_path / "gateway_records.jsonl").append(
+            {"phase": "started", "request_id": "during-scan", "recorded_at": iso(0)}
+        )
+        appended.set()
+
+    monkeypatch.setattr(retention, "_scan_file", pause)
+    worker = threading.Thread(target=work)
+    writer = threading.Thread(target=write)
+    worker.start()
+    try:
+        assert entered.wait(2)
+        writer.start()
+        assert writer_ready.wait(2)
+        finished_during_scan = appended.wait(0.75)
+    finally:
+        release.set()
+        worker.join(5)
+        if writer.ident is not None:
+            writer.join(5)
+    assert not errors and not worker.is_alive() and not writer.is_alive()
+    assert finished_during_scan
+
+
+def test_d1_late_request_append_is_checked_without_full_rescan(tmp_path, monkeypatch):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    first = {"request_id": "r", "phase": "final", "recorded_at": iso(10)}
+    late = {**first, "recorded_at": iso(0)}
+    store.append(first)
+    retention = RecordRetention(tmp_path, enforce=True)
+    original_scan, original_remove = retention._scan_file, JsonlStore.remove_lines
+    scans = []
+
+    def scan(managed, *args, **kwargs):
+        scans.append(managed.name)
+        return original_scan(managed, *args, **kwargs)
+
+    def append_before_remove(target, lines, **kwargs):
+        store.append(late)
+        return original_remove(target, lines, **kwargs)
+
+    monkeypatch.setattr(retention, "_scan_file", scan)
+    monkeypatch.setattr(JsonlStore, "remove_lines", append_before_remove)
+    result = retention.run(now=NOW)
+    assert store.read_all()[0] == [first, late] and not result["deleted"]
+    assert scans == [
+        "gateway_records.jsonl",
+        "gateway_route_rejections.jsonl",
+        "engine_receipts.jsonl",
+        "observations.jsonl",
+    ]
+
+
+@pytest.mark.parametrize("hold_kind", ["request", "run", "invalid"])
+def test_d1_hold_changed_just_before_delete_still_blocks_request(tmp_path, monkeypatch, hold_kind):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    row = {"request_id": "r", "phase": "final", "recorded_at": iso(10), "run_id": "run"}
+    store.append(row)
+    hold = tmp_path / "hold.json"
+    hold.write_text(json.dumps({"schema": HOLD_SCHEMA}))
+    original = JsonlStore.remove_lines
+
+    def change_hold(target, lines, **kwargs):
+        value = (
+            {"schema": HOLD_SCHEMA, "request_ids": ["r"]}
+            if hold_kind == "request"
+            else ({"schema": HOLD_SCHEMA, "run_ids": ["run"]} if hold_kind == "run" else {})
+        )
+        hold.write_text(json.dumps(value))
+        return original(target, lines, **kwargs)
+
+    monkeypatch.setattr(JsonlStore, "remove_lines", change_hold)
+    result = RecordRetention(tmp_path, enforce=True, hold_path=hold).run(now=NOW)
+    assert store.read_all()[0] == [row] and not result["deleted"]
+
+
+def test_d1_new_request_row_in_previously_empty_journal_protects_receipt(tmp_path, monkeypatch):
+    receipts = JsonlStore(tmp_path / "engine_receipts.jsonl")
+    receipt = {"request_id": "late-gateway", "received_at": iso(10)}
+    receipts.append(receipt)
+    retention = RecordRetention(tmp_path, enforce=True)
+    original = retention._scan_file
+    gateway = JsonlStore(tmp_path / "gateway_records.jsonl")
+    started = {"request_id": "late-gateway", "phase": "started", "recorded_at": iso(0)}
+
+    def append_after_scan(managed, *args, **kwargs):
+        result = original(managed, *args, **kwargs)
+        if managed.name == "observations.jsonl":
+            gateway.append(started)
+        return result
+
+    monkeypatch.setattr(retention, "_scan_file", append_after_scan)
+    result = retention.run(now=NOW)
+    assert gateway.read_all()[0] == [started] and receipts.read_all()[0] == [receipt]
+    assert not result["deleted"]
+
+
+@pytest.mark.parametrize("reason", ["age", "size"])
+def test_d2_sixty_day_started_only_request_expires_normally(tmp_path, reason):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    store.append({"request_id": "orphan", "phase": "started", "recorded_at": iso(60)})
+    result = RecordRetention(
+        tmp_path, enforce=True, max_age_days=7 if reason == "age" else 365,
+        max_bytes=5 * 1024**3 if reason == "age" else 1,
+    ).run(now=NOW)
+    assert store.read_all()[0] == [] and result["deleted"] is True
+    assert result["files"]["gateway_records.jsonl"]["removable_by_" + reason] == 1
+    assert result["over_size_limit_after"] is False
+
+
+@pytest.mark.parametrize(
+    "seconds,protected",
+    [(3599, True), (3600, True), (3601, False)],
+)
+def test_d2_inflight_protection_has_an_inclusive_one_hour_boundary(tmp_path, seconds, protected):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    row = {"request_id": "boundary", "phase": "started", "recorded_at": (NOW - timedelta(seconds=seconds)).isoformat()}
+    store.append(row)
+    result = RecordRetention(tmp_path, max_age_days=365, max_bytes=1, enforce=True).run(now=NOW)
+    assert store.read_all()[0] == ([row] if protected else [])
+    assert result["deleted"] is not protected
+
+
+@pytest.mark.parametrize("completed", [False, True])
+def test_d2_ten_minute_inflight_is_protected_but_complete_request_is_not(tmp_path, completed):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    started = {"request_id": "recent", "phase": "started", "recorded_at": (NOW - timedelta(minutes=10)).isoformat()}
+    store.append(started)
+    if completed:
+        store.append({**started, "phase": "final"})
+    result = RecordRetention(tmp_path, max_bytes=1, enforce=True).run(now=NOW)
+    assert store.read_all()[0] == ([] if completed else [started])
+    assert result["deleted"] is completed
+
+
+def test_d2_latest_started_timestamp_controls_the_grace_period(tmp_path):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    old = {"request_id": "retry", "phase": "started", "recorded_at": iso(60)}
+    recent = {**old, "recorded_at": (NOW - timedelta(minutes=10)).isoformat()}
+    store.append(recent)
+    store.append(old)
+    result = RecordRetention(tmp_path, max_bytes=1, enforce=True).run(now=NOW)
+    assert store.read_all()[0] == [recent, old] and not result["deleted"]
+
+
+def test_d1_append_finishes_while_file_removal_plan_is_paused(tmp_path, monkeypatch):
+    from serving_runtime.observation import retention as module
+
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    store.append({"request_id": "expired", "phase": "final", "recorded_at": iso(10)})
+    entered, release, ready, appended = (threading.Event() for _ in range(4))
+    original_sorted = sorted
+    errors = []
+
+    def pause_plan(*args, **kwargs):
+        if not entered.is_set():
+            entered.set()
+            if not release.wait(5):
+                raise RuntimeError("plan release was not signalled")
+        return original_sorted(*args, **kwargs)
+
+    def retain():
+        try:
+            RecordRetention(tmp_path, enforce=True).run(now=NOW)
+        except Exception as error:
+            errors.append(error)
+
+    def append():
+        ready.set()
+        store.append({"request_id": "during-plan", "phase": "started", "recorded_at": iso(0)})
+        appended.set()
+
+    monkeypatch.setattr(module, "sorted", pause_plan, raising=False)
+    worker, writer = threading.Thread(target=retain), threading.Thread(target=append)
+    worker.start()
+    try:
+        assert entered.wait(2)
+        writer.start()
+        assert ready.wait(2)
+        finished_during_plan = appended.wait(0.75)
+    finally:
+        release.set()
+        worker.join(5)
+        if writer.ident is not None:
+            writer.join(5)
+    assert not errors and not worker.is_alive() and not writer.is_alive()
+    assert finished_during_plan
+    assert store.read_all()[0][0]["request_id"] == "during-plan"
+
+
+def test_pr_future_started_request_survives_size_pressure(tmp_path):
+    store = JsonlStore(tmp_path / "gateway_records.jsonl")
+    row = {"request_id": "future-start", "phase": "started", "recorded_at": (NOW + timedelta(seconds=30)).isoformat()}
+    store.append(row)
+    result = RecordRetention(tmp_path, max_bytes=1, enforce=True).run(now=NOW)
+    assert store.read_all()[0] == [row]
+    assert result["deleted"] is False

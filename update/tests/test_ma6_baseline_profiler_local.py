@@ -88,7 +88,7 @@ def world(tmp_path, *, install=True):
     backend.worker_response_mq = response
     backend.world_size = 1
     backend.workers = [SimpleNamespace(rank=0, worker_response_mq=response)]
-    core = engine.EngineCore()
+    core = engine.EngineCoreProc()
     core.model_executor = backend
     return SimpleNamespace(modules=modules, records=records, observer=observer,
         frontend=frontend, core=core, backend=backend, profile_type=profile_type, queue=queue)

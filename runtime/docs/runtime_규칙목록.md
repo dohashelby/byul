@@ -4,7 +4,7 @@
 
 ## Gateway 판정
 
-근거: `runtime/src/serving_runtime/mvp/validator.py`, `request_flow.py`, `relay.py`, `policy_state.py`, `target.py`, `http_handler.py`. 아래 표는 추론 요청·transport가 실제 Gateway 요청 기록의 `decision.reason_code`로 만드는 값이다. 승인·인증·대상 파일을 읽는 내부 상태 코드(`POLICY_APPROVAL_REF_MISSING`, `AUTH_CONFIG_NOT_FOUND`, `TARGET_NOT_FOUND` 등)는 최종 요청 판정에서 각각 `POLICY_APPROVAL_*`, `AUTH_UNAVAILABLE`, `TARGET_UNAVAILABLE`로 정규화되므로 별도 사건 ID로 넣지 않았다. `rule_id`가 `없음`인 실패는 platform 변환 시 `reason_code`가 `runtime-event.rule_ref`가 된다. `DENIED` 행은 현재 코드에서 backend 전달 전에 끝나므로 계약 결과가 `denied`이고, `ERROR`는 차단 성공이 아닌 `error`다.
+근거: `runtime/src/serving_runtime/gateway/validator.py`, `request_flow.py`, `relay.py`, `policy_state.py`, `target.py`, `http_handler.py`. 아래 표는 추론 요청·transport가 실제 Gateway 요청 기록의 `decision.reason_code`로 만드는 값이다. 승인·인증·대상 파일을 읽는 내부 상태 코드(`POLICY_APPROVAL_REF_MISSING`, `AUTH_CONFIG_NOT_FOUND`, `TARGET_NOT_FOUND` 등)는 최종 요청 판정에서 각각 `POLICY_APPROVAL_*`, `AUTH_UNAVAILABLE`, `TARGET_UNAVAILABLE`로 정규화되므로 별도 사건 ID로 넣지 않았다. `rule_id`가 `없음`인 실패는 platform 변환 시 `reason_code`가 `runtime-event.rule_ref`가 된다. `DENIED` 행은 현재 코드에서 backend 전달 전에 끝나므로 계약 결과가 `denied`이고, `ERROR`는 차단 성공이 아닌 `error`다.
 
 | ID (`reason_code`) | `rule_id` | source/enforcer | 의미 | 계약 결과 | 계획서 참조 | update `check_id` |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -118,7 +118,7 @@
 
 ## 재검증 trigger
 
-근거: `runtime/src/serving_runtime/mvp/revalidation.py`. 이 항목들은 `runtime-event`가 아니라 `byul-revalidation-request/0.2`로 변환된다. 따라서 `outcome`과 enforcer가 없으며, event는 `opened`, `condition_cleared`, `condition_reappeared`, `superseded` 중 하나다. status는 현재 구현에서 `open`을 유지하고 `current_evidence_present`로 현재 조건 존재를 구분한다.
+근거: `runtime/src/serving_runtime/policy/revalidation.py`. 이 항목들은 `runtime-event`가 아니라 `byul-revalidation-request/0.2`로 변환된다. 따라서 `outcome`과 enforcer가 없으며, event는 `opened`, `condition_cleared`, `condition_reappeared`, `superseded` 중 하나다. status는 현재 구현에서 `open`을 유지하고 `current_evidence_present`로 현재 조건 존재를 구분한다.
 
 | ID(trigger) | source/enforcer | 의미 | 계약 결과 | 계획서 참조 | update `check_id` |
 | --- | --- | --- | --- | --- | --- |

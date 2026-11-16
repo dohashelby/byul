@@ -3149,3 +3149,16 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 얻은 사실은 shape별 replay 분기와 cached `entry.output` 객체 반환뿐이다. copied 입력 갱신, 요청별 sample 소비, 값 보존, GPU 완료·독립 graph-off 대조는 관측하지 않았다. 기존 V2 판정과 baseline default gate는 유지한다. M-B4 보류도 유지한다.
 - 로컬 Python/pytest는 사용자 지시로 실행하지 않았다. 정확 source/live code 변조 거부와 기본/미지원 producer→consumer 회귀는 CI 대상이다.
 - 집중 검토 보수: 부분 replay·capture 사실은 동일 세션/프로세스/소스/코드/entry 세대의 유일하고 시간순인 CALL·종결 쌍에서만 인정한다. graph/output 토큰이 없거나 바뀌면 count하지 않는다. 실제 함수 body의 capture→replay와 누락·중복·재정렬·타 세션/소스/코드/시간·용량 부족 record를 새 소비자에 넣는 회귀를 추가했다. fixture에 원 LICENSE와 provenance를 보존했다.
+
+## 2026-11-16 — PR287 startup 의존 소스 검토
+
+- 한 일: CI의 update-default·observer 11개 실패를 추적했다. 8bac1ab3에서 원 함수·파일 검증을 `_qualified`로 옮기고 별도 V1 검토 경로를 추가했지만 startup의 의존 소스 고정값은 이전 bytes를 가리켰다. 이전 소스 원본을 시험 자료로 보존하고, 공유 함수·기존 qualify의 관문/본문/거부 처리를 AST로 대조하는 회귀와 전체 7개 의존 bytes 검사를 추가했다. 검토한 현재 소스를 정확히 지정하도록 startup 고정값과 소스 목록·검토 기록을 갱신했다.
+- 검증 경계: 기존 시험·단언·해시/심볼릭 링크 거부·인터프리터 제한은 유지한다. 새 회귀를 별도 3.12.8 job에도 포함했다. 로컬 Python·pytest는 실행하지 않았으며 Linux CI 결과를 기다린다.
+- 다음 단계: 두 update job과 나머지 CI를 끝까지 확인한다. 실제 엔진·GPU 실행 및 생산자 등록 변경은 없다.
+
+## 2026-11-16 — #288 main 통합과 CI 22건 보수
+
+- 한 일: main(#287)을 병합했다. startup helper 고정값은 사용자 결정(2026-11-16)에 따라 main 방식(현재 `vllm_rank_ipc_sources.py` bytes `d54a7984…`)을 따른다. #288의 이전 bytes 보존 자산(`startup_rank_ipc_sources_bfa843de.py.txt`), `dependency_source_path` 분기와 그 전용 시험 1개를 뺐다. 이전 bytes는 main의 검토 fixture(`tests/fixtures/baseline-startup-review/`)에 남아 있다. `/33` stream 자산 경로는 그대로다.
+- 실패 원인과 보수: (1) profiler 15건 — 0.7.0 `_handle_client_request`는 `EngineCoreProc`에 정의돼 있는데 관측 지점을 `EngineCore.`로 적어 정확 소스에서 함수를 찾지 못했다. 지점 이름을 `EngineCoreProc._handle_client_request`로 고쳤다(시험 도우미·설계 문서 포함). (2) graph 7건 — `base.attrs()`가 dict가 아닌 `Fields`(`.get`만 제공)를 반환하는데 snapshot이 `state['…']`로 읽어 예외가 났고 CALL·종결 필드가 비었다. `.get()`으로 바꿨다. 시험·단언·기대값은 바꾸지 않았다.
+- 테스트 결과: 로컬 Python/pytest는 실행하지 않았다. 소스 목록은 셸 SHA·jq로 다시 만들었고(같은 방법으로 main 목록을 바이트 단위로 재현함) Linux CI 결과를 기다린다.
+- 다음 단계: 새 head의 update-default·observer 3.12.8 job 확인.

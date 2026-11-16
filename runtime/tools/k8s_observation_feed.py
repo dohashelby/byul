@@ -24,16 +24,10 @@ import time
 from typing import BinaryIO, Callable, Sequence
 from uuid import uuid4
 
-from serving_runtime.mvp.config import (
-    DEFAULT_COLLECTOR_INTERVAL_S,
-    DEFAULT_COLLECTOR_STALE_AFTER_S,
-)
-from serving_runtime.mvp.kube_context import (
-    DEFAULT_KUBE_CONTEXT,
-    validate_kube_context,
-)
-from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA
-from serving_runtime.mvp.target import (
+from serving_runtime.config.config import DEFAULT_COLLECTOR_INTERVAL_S, DEFAULT_COLLECTOR_STALE_AFTER_S
+from serving_runtime.common.kube_context import validate_kube_context
+from serving_runtime.observation.observation_feed import HEARTBEAT_SCHEMA
+from serving_runtime.target.target import (
     POD_SNAPSHOT_SCHEMA,
     KubernetesSelector,
     parse_label_selector,
@@ -41,12 +35,13 @@ from serving_runtime.mvp.target import (
     validate_kubernetes_name,
 )
 from serving_runtime.enforcement.phase_signals import (
-    _KUBECTL_TIME, _REQUEST_LINE, _TimelineState, ENGINE_PATTERN_SETS,
+    _KUBECTL_TIME,
+    _REQUEST_LINE,
+    _TimelineState,
+    ENGINE_PATTERN_SETS,
 )
 
 
-EXPECTED_CONTEXT = DEFAULT_KUBE_CONTEXT
-LAB_NAMESPACE = "serving-lab"
 PHASE_LOG_LIMIT_BYTES = 8 * 1024 * 1024
 
 
@@ -72,8 +67,14 @@ def _restore_signal_handlers(previous: dict[int, object]) -> None:
         signal.signal(signum, handler)
 
 
+def _target_namespace(value):
+    if value is None or value == "":
+        raise ValueError("target namespace is required; set --target-namespace")
+    return validate_kubernetes_name(value, "target namespace")
+
+
 def hubble_command(
-    *, since: str | None = None, include_forwarded: bool = False
+    *, namespace: str | None = None, since: str | None = None, include_forwarded: bool = False
 ) -> list[str]:
     command = [
         "hubble",
@@ -84,7 +85,7 @@ def hubble_command(
         "--server",
         "127.0.0.1:4245",
         "--namespace",
-        LAB_NAMESPACE,
+        _target_namespace(namespace),
     ]
     if since is not None:
         command.extend(["--since", since])
@@ -94,7 +95,7 @@ def hubble_command(
 
 
 def hubble_port_forward_command(
-    context: str = EXPECTED_CONTEXT,
+    context: str | None = None,
 ) -> list[str]:
     return [
         "cilium",
@@ -105,9 +106,7 @@ def hubble_port_forward_command(
     ]
 
 
-def tetragon_command(
-    *, context: str = EXPECTED_CONTEXT, since_time: str | None = None
-) -> list[str]:
+def tetragon_command(*, context: str | None = None, since_time: str | None = None) -> list[str]:
     # A fresh start skips old lines; a restart with an open gap asks for older
     # lines so events during the gap can be recovered (duplicates are dropped
     # by the Gateway's event key).
@@ -137,9 +136,7 @@ def assert_safe_context(
     validate_kube_context(requested)
 
 
-def _start(
-    argv: Sequence[str], output: BinaryIO | int, error: BinaryIO
-) -> subprocess.Popen[bytes]:
+def _start(argv: Sequence[str], output: BinaryIO | int, error: BinaryIO) -> subprocess.Popen[bytes]:
     return subprocess.Popen(
         list(argv),
         stdin=subprocess.DEVNULL,
@@ -167,7 +164,6 @@ def _probe_id(event: dict) -> str | None:
     except ValueError:
         return None
     return matches[0] if len(matches) == 1 else None
-
 
 
 def _redact_tetragon_result(line: bytes) -> tuple[bytes | None, str | None]:
@@ -198,13 +194,13 @@ def _redact_tetragon_result(line: bytes) -> tuple[bytes | None, str | None]:
         for key in _TETRAGON_PROCESS_KEYS:
             process = event.get(key)
             if isinstance(process, dict):
-                for private in ("arguments","environment_variables","environment","env","envs"):
+                for private in ("arguments", "environment_variables", "environment", "env", "envs"):
                     process.pop(private, None)
         ancestors = event.get("ancestors")
         if isinstance(ancestors, list):
             for ancestor in ancestors:
                 if isinstance(ancestor, dict):
-                    for private in ("arguments","environment_variables","environment","env","envs"):
+                    for private in ("arguments", "environment_variables", "environment", "env", "envs"):
                         ancestor.pop(private, None)
     return (json.dumps(document, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8"), None
 
@@ -214,9 +210,15 @@ def redact_tetragon_line(line: bytes) -> bytes | None:
     return _redact_tetragon_result(line)[0]
 
 
-REDACTION_DROP_REASONS = frozenset({
-    "INVALID_UTF8", "INVALID_JSON", "JSON_TOO_DEEP", "OBJECT_REQUIRED", "FILTER_REJECTED",
-})
+REDACTION_DROP_REASONS = frozenset(
+    {
+        "INVALID_UTF8",
+        "INVALID_JSON",
+        "JSON_TOO_DEEP",
+        "OBJECT_REQUIRED",
+        "FILTER_REJECTED",
+    }
+)
 
 
 class _RedactionDrops:
@@ -282,9 +284,7 @@ def _wait_for_hubble(
             raise _StopRequested
         returncode = process.poll()
         if returncode is not None:
-            raise RuntimeError(
-                f"cilium hubble port-forward exited with status {returncode}"
-            )
+            raise RuntimeError(f"cilium hubble port-forward exited with status {returncode}")
         try:
             with socket.create_connection(("127.0.0.1", 4245), timeout=0.25):
                 return
@@ -405,14 +405,8 @@ def _validate_target_timing(interval_s: float, timeout_s: float) -> None:
     if not math.isfinite(interval_s) or interval_s <= 0:
         raise ValueError("target interval must be a positive finite number")
     if interval_s > MAX_TARGET_INTERVAL_S:
-        raise ValueError(
-            f"target interval must be at most {MAX_TARGET_INTERVAL_S:g} seconds"
-        )
-    if (
-        not math.isfinite(timeout_s)
-        or timeout_s <= 0
-        or timeout_s > MAX_TARGET_QUERY_TIMEOUT_S
-    ):
+        raise ValueError(f"target interval must be at most {MAX_TARGET_INTERVAL_S:g} seconds")
+    if not math.isfinite(timeout_s) or timeout_s <= 0 or timeout_s > MAX_TARGET_QUERY_TIMEOUT_S:
         raise ValueError(
             "target query timeout must be a positive finite number no greater "
             f"than {MAX_TARGET_QUERY_TIMEOUT_S:g} seconds"
@@ -420,8 +414,7 @@ def _validate_target_timing(interval_s: float, timeout_s: float) -> None:
     worst_case_age_s = interval_s + timeout_s + DEFAULT_COLLECTOR_INTERVAL_S
     if worst_case_age_s >= DEFAULT_COLLECTOR_STALE_AFTER_S:
         raise ValueError(
-            "target interval + query timeout + Gateway poll interval must be "
-            "below the Gateway stale window"
+            "target interval + query timeout + Gateway poll interval must be below the Gateway stale window"
         )
 
 
@@ -465,9 +458,7 @@ def write_heartbeats(
                 }
             )
         actual_state = state
-        if state == "running" and not all(
-            item["running"] for item in process_status
-        ):
+        if state == "running" and not all(item["running"] for item in process_status):
             actual_state = "error"
         document: dict[str, object] = {
             "schema": HEARTBEAT_SCHEMA,
@@ -546,10 +537,7 @@ class _FeedGroup:
         self.last_redaction_error_class: str | None = None
 
     def processes(self) -> list[tuple[str, object]]:
-        return [
-            (child.name, child.process if child.process is not None else _NotStarted())
-            for child in self.children
-        ]
+        return [(child.name, child.process if child.process is not None else _NotStarted()) for child in self.children]
 
     def heartbeat_extra(self) -> dict[str, object]:
         extra: dict[str, object] = {
@@ -561,13 +549,10 @@ class _FeedGroup:
         if redacting:
             receipts = [child.redaction_drops.snapshot() for child in redacting]
             extra["dropped_lines_total"] = sum(count for count, _, _ in receipts)
-            latest = max((row for row in receipts if row[2] is not None),
-                         key=lambda row: row[2], default=None)
+            latest = max((row for row in receipts if row[2] is not None), key=lambda row: row[2], default=None)
             extra["last_redaction_drop_reason"] = latest[1] if latest else None
             extra["last_redaction_drop_at"] = latest[2] if latest else None
-            extra["last_redaction_error_class"] = (
-                self.last_redaction_error_class
-            )
+            extra["last_redaction_error_class"] = self.last_redaction_error_class
         return extra
 
 
@@ -588,6 +573,7 @@ def _append_gap(path: Path, record: dict[str, object]) -> None:
 
 def _unclosed_gaps(path: Path, kind: str) -> list[dict[str, object]] | None:
     """Read prior gaps; an unreadable or damaged journal cannot be reconciled."""
+
     def valid_time(value: object) -> bool:
         if not isinstance(value, str):
             return False
@@ -630,11 +616,7 @@ def _unclosed_gaps(path: Path, kind: str) -> list[dict[str, object]] | None:
 def _strings(document: object) -> dict[str, str]:
     if not isinstance(document, dict):
         return {}
-    return {
-        key: value
-        for key, value in document.items()
-        if isinstance(key, str) and isinstance(value, str)
-    }
+    return {key: value for key, value in document.items() if isinstance(key, str) and isinstance(value, str)}
 
 
 def _reduce_pod(item: object, engine_container: str | None = None) -> dict[str, object] | None:
@@ -656,12 +638,14 @@ def _reduce_pod(item: object, engine_container: str | None = None) -> dict[str, 
     spec: dict[str, object] = {}
     if isinstance(source_spec.get("nodeName"), str):
         spec["nodeName"] = source_spec["nodeName"]
-    from serving_runtime.mvp.launch_settings import observe
+    from serving_runtime.target.launch_settings import observe
+
     containers = source_spec.get("containers")
     if isinstance(containers, list):
         spec["containers"] = [
             {"name": c["name"], "launch_settings": {engine: observe(c, engine) for engine in ("vllm", "sglang")}}
-            for c in containers if isinstance(c, dict) and c.get("name") == engine_container
+            for c in containers
+            if isinstance(c, dict) and c.get("name") == engine_container
         ]
 
     source_status = item.get("status") if isinstance(item.get("status"), dict) else {}
@@ -699,11 +683,7 @@ def _reduce_pod(item: object, engine_container: str | None = None) -> dict[str, 
             reduced_container["restartCount"] = restart_count
         source_state = container.get("state")
         if isinstance(source_state, dict):
-            state = {
-                name: {}
-                for name in ("running", "waiting", "terminated")
-                if name in source_state
-            }
+            state = {name: {} for name in ("running", "waiting", "terminated") if name in source_state}
             if state:
                 reduced_container["state"] = state
         container_statuses.append(reduced_container)
@@ -780,9 +760,7 @@ class TargetPodSnapshotWriter:
             error = {"class": "TimeoutExpired", "code": "kubectl_timeout"}
         except (OSError, subprocess.SubprocessError) as failure:
             error = {"class": type(failure).__name__, "code": "kubectl_error"}
-        document.update(
-            {"collected_at": _utc_now(), "state": "error", "error": error}
-        )
+        document.update({"collected_at": _utc_now(), "state": "error", "error": error})
         _write_json_atomic(self.path, document)
         return document
 
@@ -800,9 +778,16 @@ class TargetPodSnapshotWriter:
 class EnginePhaseTimelineWriter:
     """Keep one Pod's extraction state and fetch only its new timestamped logs."""
 
-    def __init__(self, path: Path, selector: KubernetesSelector, *, engine: str = "vllm",
-                 interval_s: float = 2.0, timeout_s: float = 4.0,
-                 runner: Callable[..., subprocess.CompletedProcess[bytes]] = subprocess.run) -> None:
+    def __init__(
+        self,
+        path: Path,
+        selector: KubernetesSelector,
+        *,
+        engine: str = "vllm",
+        interval_s: float = 2.0,
+        timeout_s: float = 4.0,
+        runner: Callable[..., subprocess.CompletedProcess[bytes]] = subprocess.run,
+    ) -> None:
         self.path, self.selector = path, selector
         self.engine = engine
         self.patterns = ENGINE_PATTERN_SETS[engine].patterns
@@ -837,7 +822,7 @@ class EnginePhaseTimelineWriter:
         # its RFC3339 prefix. It is fetched again from the boundary timestamp.
         if data and not data.endswith(b"\n"):
             self._skipped["partial_tail"] += 1
-            data = data[:data.rfind(b"\n") + 1]
+            data = data[: data.rfind(b"\n") + 1]
         if limited:
             self._incomplete = True
         previous = self._cursor
@@ -858,9 +843,11 @@ class EnginePhaseTimelineWriter:
                 self._skipped["invalid_timestamp"] += 1
                 continue
             key = hashlib.sha256(raw).digest()
-            if (self._cursor is not None
-                    and at.replace(microsecond=0) == self._cursor.replace(microsecond=0)
-                    and key in self._second_seen):
+            if (
+                self._cursor is not None
+                and at.replace(microsecond=0) == self._cursor.replace(microsecond=0)
+                and key in self._second_seen
+            ):
                 continue
             if previous is not None and at < previous:
                 if at.replace(microsecond=0) == self._cursor.replace(microsecond=0):
@@ -884,8 +871,11 @@ class EnginePhaseTimelineWriter:
             previous = at
             progressed = True
             if self._order_unknown:
-                start_signal = any(pattern.signal in {"loading_start", "compiling_start", "inferring_start"}
-                                   and pattern.expression.search(line) for pattern in self.patterns)
+                start_signal = any(
+                    pattern.signal in {"loading_start", "compiling_start", "inferring_start"}
+                    and pattern.expression.search(line)
+                    for pattern in self.patterns
+                )
                 if _REQUEST_LINE.search(line) or not start_signal:
                     continue
                 self._order_unknown = False
@@ -918,16 +908,21 @@ class EnginePhaseTimelineWriter:
     def _container_generation(self, pod: dict[str, object]) -> tuple[object, ...]:
         """Only current running container logs belong to the current startup."""
         statuses = pod.get("status", {}).get("containerStatuses", [])
-        matches = [item for item in statuses if isinstance(item, dict)
-                   and item.get("name") == self.selector.container]
+        matches = [item for item in statuses if isinstance(item, dict) and item.get("name") == self.selector.container]
         if len(matches) != 1:
             raise ValueError("selected container identity unavailable")
         item = matches[0]
         running = item.get("state", {}).get("running")
         cid, restart = item.get("containerID"), item.get("restartCount")
         started = running.get("startedAt") if isinstance(running, dict) else None
-        if (not isinstance(cid, str) or not cid or type(restart) is not int or restart < 0
-                or not isinstance(started, str) or not started):
+        if (
+            not isinstance(cid, str)
+            or not cid
+            or type(restart) is not int
+            or restart < 0
+            or not isinstance(started, str)
+            or not started
+        ):
             raise ValueError("selected running container generation unavailable")
         return (pod["metadata"].get("uid"), cid, restart, started)
 
@@ -937,18 +932,28 @@ class EnginePhaseTimelineWriter:
         generation = None
         last_log_at = None
         try:
-            pods = self.runner(pods_command(self.selector), stdin=subprocess.DEVNULL,
-                               capture_output=True, timeout=self.timeout_s, check=False, shell=False)
+            pods = self.runner(
+                pods_command(self.selector),
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                timeout=self.timeout_s,
+                check=False,
+                shell=False,
+            )
             if pods.returncode == 0:
                 raw = json.loads(pods.stdout)
                 items = raw.get("items") if isinstance(raw, dict) else None
                 if not isinstance(items, list):
                     raise ValueError("invalid Pod list")
-                current = [item for item in items if isinstance(item, dict)
-                           and isinstance(item.get("status"), dict)
-                           and item["status"].get("phase") == "Running"
-                           and isinstance(item.get("metadata"), dict)
-                           and not item["metadata"].get("deletionTimestamp")]
+                current = [
+                    item
+                    for item in items
+                    if isinstance(item, dict)
+                    and isinstance(item.get("status"), dict)
+                    and item["status"].get("phase") == "Running"
+                    and isinstance(item.get("metadata"), dict)
+                    and not item["metadata"].get("deletionTimestamp")
+                ]
                 state = "no_target" if not current else "multiple_targets" if len(current) > 1 else "running"
                 if state == "running":
                     metadata = current[0].get("metadata", {})
@@ -960,10 +965,19 @@ class EnginePhaseTimelineWriter:
                         if generation != self._generation:
                             self._reset(uid, now.year)
                             self._generation = generation
-                        command = ["kubectl", "--context", self.selector.context,
-                                   "--namespace", self.selector.namespace, "logs", "pod/" + name,
-                                   "-c", self.selector.container, "--timestamps=true",
-                                   f"--limit-bytes={PHASE_LOG_LIMIT_BYTES}"]
+                        command = [
+                            "kubectl",
+                            "--context",
+                            self.selector.context,
+                            "--namespace",
+                            self.selector.namespace,
+                            "logs",
+                            "pod/" + name,
+                            "-c",
+                            self.selector.container,
+                            "--timestamps=true",
+                            f"--limit-bytes={PHASE_LOG_LIMIT_BYTES}",
+                        ]
                         if self._cursor is not None:
                             # Kubernetes serializes this parameter at second
                             # precision. Replay the cursor's whole second;
@@ -972,29 +986,48 @@ class EnginePhaseTimelineWriter:
                             if self._skip_boundary:
                                 boundary += timedelta(seconds=1)
                             command.append(f"--since-time={boundary.isoformat()}")
-                        result = self.runner(command, stdin=subprocess.DEVNULL,
-                                             capture_output=True, timeout=self.timeout_s,
-                                             check=False, shell=False)
+                        result = self.runner(
+                            command,
+                            stdin=subprocess.DEVNULL,
+                            capture_output=True,
+                            timeout=self.timeout_s,
+                            check=False,
+                            shell=False,
+                        )
                         if result.returncode != 0:
                             state = "log_error"
                         else:
-                            confirmed = self.runner(pods_command(self.selector), stdin=subprocess.DEVNULL,
-                                                    capture_output=True, timeout=self.timeout_s,
-                                                    check=False, shell=False)
+                            confirmed = self.runner(
+                                pods_command(self.selector),
+                                stdin=subprocess.DEVNULL,
+                                capture_output=True,
+                                timeout=self.timeout_s,
+                                check=False,
+                                shell=False,
+                            )
                             if confirmed.returncode != 0:
                                 raise ValueError("Pod identity recheck failed")
                             confirmed_doc = json.loads(confirmed.stdout)
                             confirmed_items = confirmed_doc.get("items") if isinstance(confirmed_doc, dict) else None
-                            current_after = [item for item in confirmed_items if isinstance(item, dict)
-                                             and isinstance(item.get("metadata"), dict)
-                                             and isinstance(item.get("status"), dict)
-                                             and item["status"].get("phase") == "Running"
-                                             and not item["metadata"].get("deletionTimestamp")] if isinstance(confirmed_items, list) else []
+                            current_after = (
+                                [
+                                    item
+                                    for item in confirmed_items
+                                    if isinstance(item, dict)
+                                    and isinstance(item.get("metadata"), dict)
+                                    and isinstance(item.get("status"), dict)
+                                    and item["status"].get("phase") == "Running"
+                                    and not item["metadata"].get("deletionTimestamp")
+                                ]
+                                if isinstance(confirmed_items, list)
+                                else []
+                            )
                             if len(current_after) != 1 or self._container_generation(current_after[0]) != generation:
                                 self._reset(None, now.year)
                                 raise ValueError("Pod identity changed during log fetch")
-                            self._ingest(result.stdout, limited=len(result.stdout) >= PHASE_LOG_LIMIT_BYTES,
-                                         year=now.year)
+                            self._ingest(
+                                result.stdout, limited=len(result.stdout) >= PHASE_LOG_LIMIT_BYTES, year=now.year
+                            )
                             last_log_at = self._cursor.isoformat() if self._cursor else None
                             entries, extraction = self._snapshot()
                             if self._incomplete:
@@ -1002,18 +1035,26 @@ class EnginePhaseTimelineWriter:
                 else:
                     self._reset(None, now.year)
             # A failed Pod query leaves state pod_error and no entries.
-        except (OSError, subprocess.SubprocessError, ValueError, UnicodeError,
-                json.JSONDecodeError):
+        except (OSError, subprocess.SubprocessError, ValueError, UnicodeError, json.JSONDecodeError):
             state = "log_error" if uid else "pod_error"
         written = datetime.now(timezone.utc)
         lag = (written - datetime.fromisoformat(last_log_at)).total_seconds() if last_log_at else None
         document: dict[str, object] = {
-            "schema_version": "runtime-phase-timeline/1.0", "entries": entries,
-            "collector": {"state": state, "pod_uid": uid, "pod_name": name,
-                          "context": self.selector.context, "namespace": self.selector.namespace,
-                          "container_id": generation[1] if generation is not None and state in {"running", "incomplete_history"} else None,
-                          "written_at": written.isoformat(),
-                          "last_log_at": last_log_at, "log_delivery_lag_seconds": lag},
+            "schema_version": "runtime-phase-timeline/1.0",
+            "entries": entries,
+            "collector": {
+                "state": state,
+                "pod_uid": uid,
+                "pod_name": name,
+                "context": self.selector.context,
+                "namespace": self.selector.namespace,
+                "container_id": generation[1]
+                if generation is not None and state in {"running", "incomplete_history"}
+                else None,
+                "written_at": written.isoformat(),
+                "last_log_at": last_log_at,
+                "log_delivery_lag_seconds": lag,
+            },
         }
         if extraction is not None:
             document["extraction"] = extraction
@@ -1072,7 +1113,11 @@ class _Supervisor:
             opened_at = datetime.fromisoformat(str(opened["opened_at"]).replace("Z", "+00:00"))
             backfill = opened.get("backfill_since")
             try:
-                candidate = datetime.fromisoformat(backfill.replace("Z", "+00:00")) if isinstance(backfill, str) else opened_at - BACKFILL_MARGIN
+                candidate = (
+                    datetime.fromisoformat(backfill.replace("Z", "+00:00"))
+                    if isinstance(backfill, str)
+                    else opened_at - BACKFILL_MARGIN
+                )
                 if candidate.tzinfo is None:
                     candidate = opened_at - BACKFILL_MARGIN
             except ValueError:
@@ -1087,12 +1132,14 @@ class _Supervisor:
         assert group.last_healthy_at is not None
         for opened in pending:
             closed = dict(opened)
-            closed.update({
-                "event": "gap_closed",
-                "closed_at": group.last_healthy_at.isoformat(),
-                "closed_by": "collector_restart",
-                "backfill": "requested_unverified" if group.supports_backfill else "not_available",
-            })
+            closed.update(
+                {
+                    "event": "gap_closed",
+                    "closed_at": group.last_healthy_at.isoformat(),
+                    "closed_by": "collector_restart",
+                    "backfill": "requested_unverified" if group.supports_backfill else "not_available",
+                }
+            )
             _append_gap(group.gap_path, closed)
             group.last_gap = {key: value for key, value in closed.items() if key not in ("schema", "event", "kind")}
             group.reconnect_count += 1
@@ -1212,7 +1259,7 @@ class _Supervisor:
                     try:
                         failures += group.health_check()
                     except Exception:
-                        failures.append({"name":"source_health","error":"HealthCheckFailed"})
+                        failures.append({"name": "source_health", "error": "HealthCheckFailed"})
                 if failures:
                     _stop_children(group)
                     self._open_gap(group, failures)
@@ -1252,7 +1299,7 @@ def run(
     max_ticks: int | None = None,
     reader_gid: int | None = None,
     target_selector: tuple[tuple[str, str], ...] | None = None,
-    target_namespace: str = LAB_NAMESPACE,
+    target_namespace: str | None = None,
     target_container: str = "engine",
     target_interval_s: float = DEFAULT_TARGET_INTERVAL_S,
     phase_timeline: bool = False,
@@ -1263,6 +1310,7 @@ def run(
         raise ValueError("--phase-timeline requires --target-selector")
     validate_kubernetes_name(target_container, "target container")
     assert_safe_context(context)
+    target_namespace = _target_namespace(target_namespace)
     check_reader_group(reader_gid)
     _reader_gid = reader_gid
     output_dir = output_dir.absolute()
@@ -1290,15 +1338,9 @@ def run(
     with ExitStack() as stack:
         hubble_output = stack.enter_context(_open_append(hubble_path))
         tetragon_output = None if hubble_only else stack.enter_context(_open_append(tetragon_path))
-        hubble_error = stack.enter_context(
-            _open_append(output_dir / "hubble.stderr.log")
-        )
-        tetragon_error = None if hubble_only else stack.enter_context(
-            _open_append(output_dir / "tetragon.stderr.log")
-        )
-        port_forward_log = stack.enter_context(
-            _open_append(output_dir / "cilium-hubble-port-forward.log")
-        )
+        hubble_error = stack.enter_context(_open_append(output_dir / "hubble.stderr.log"))
+        tetragon_error = None if hubble_only else stack.enter_context(_open_append(output_dir / "tetragon.stderr.log"))
+        port_forward_log = stack.enter_context(_open_append(output_dir / "cilium-hubble-port-forward.log"))
         hubble_group = _FeedGroup(
             "hubble",
             feed_path=hubble_path,
@@ -1310,13 +1352,12 @@ def run(
                     lambda _since: hubble_port_forward_command(context),
                     port_forward_log,
                     port_forward_log,
-                    ready=lambda process: _wait_for_hubble(
-                        process, stop_requested=stop_requested.is_set
-                    ),
+                    ready=lambda process: _wait_for_hubble(process, stop_requested=stop_requested.is_set),
                 ),
                 _Child(
                     "hubble",
                     lambda since: hubble_command(
+                        namespace=target_namespace,
                         since=since or hubble_group.started_at,
                         include_forwarded=include_forwarded,
                     ),
@@ -1333,9 +1374,7 @@ def run(
             children=[
                 _Child(
                     "tetragon",
-                    lambda since: tetragon_command(
-                        context=context, since_time=since
-                    ),
+                    lambda since: tetragon_command(context=context, since_time=since),
                     tetragon_output,
                     tetragon_error,
                     transform=redact_tetragon_line,
@@ -1356,8 +1395,9 @@ def run(
             )
             target_thread.start()
         if phase_writer is not None:
-            phase_thread = threading.Thread(target=phase_writer.follow,
-                                            args=(stop_requested,), name="engine-phase-timeline", daemon=True)
+            phase_thread = threading.Thread(
+                target=phase_writer.follow, args=(stop_requested,), name="engine-phase-timeline", daemon=True
+            )
             phase_thread.start()
         try:
             try:
@@ -1366,7 +1406,9 @@ def run(
                         supervisor.start_group(group, since=None)
                     except RuntimeError as error:
                         # A failed first start is a gap from the beginning; keep retrying.
-                        supervisor._open_gap(group, [{"name": "initial_start", "returncode": None, "error": str(error)}])
+                        supervisor._open_gap(
+                            group, [{"name": "initial_start", "returncode": None, "error": str(error)}]
+                        )
                 supervisor.write()
                 print(f"Hubble feed: {hubble_path}", flush=True)
                 if not hubble_only:
@@ -1410,13 +1452,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--kube-context",
         "--context",
         dest="kube_context",
-        default=EXPECTED_CONTEXT,
+        required=True,
         metavar="NAME",
-        help="명시적으로 사용할 Kubernetes context (기본: kind-runtime-lab)",
+        help="명시적으로 사용할 Kubernetes context (필수)",
     )
     parser.add_argument("--output-dir", required=True, type=Path)
-    parser.add_argument("--hubble-only", action="store_true",
-                        help="scoped tetragon_stream과 병행할 때 legacy Tetragon writer를 끔")
+    parser.add_argument(
+        "--hubble-only", action="store_true", help="scoped tetragon_stream과 병행할 때 legacy Tetragon writer를 끔"
+    )
     parser.add_argument(
         "--reader-group",
         type=int,
@@ -1436,15 +1479,13 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="KEY=VALUE[,KEY=VALUE]",
         help="이 selector의 Pod 최소 스냅샷을 target-pods.json에 주기적으로 기록",
     )
-    parser.add_argument("--phase-timeline", action="store_true",
-                        help="현재 엔진 Pod 로그에서 단계 시간표를 별도 수집")
-    parser.add_argument("--phase-engine", choices=("vllm", "sglang"), default="vllm",
-                        help="단계 시간표의 엔진 종류")
+    parser.add_argument("--phase-timeline", action="store_true", help="현재 엔진 Pod 로그에서 단계 시간표를 별도 수집")
+    parser.add_argument("--phase-engine", choices=("vllm", "sglang"), default="vllm", help="단계 시간표의 엔진 종류")
     parser.add_argument(
         "--target-namespace",
-        default=LAB_NAMESPACE,
+        required=True,
         metavar="NAME",
-        help="대상 Pod namespace (기본: serving-lab)",
+        help="Hubble·대상 Pod namespace (필수)",
     )
     parser.add_argument(
         "--target-container",
@@ -1468,11 +1509,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        target_selector = (
-            parse_label_selector(args.target_selector)
-            if args.target_selector is not None
-            else None
-        )
+        target_selector = parse_label_selector(args.target_selector) if args.target_selector is not None else None
         return run(
             args.output_dir.expanduser(),
             args.kube_context,

@@ -14,16 +14,12 @@ import unittest
 from unittest.mock import patch
 
 from serving_runtime.cli import main
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.collectors import Collector
-from serving_runtime.mvp.config import (
-    DEFAULT_COLLECTOR_INTERVAL_S,
-    DEFAULT_COLLECTOR_STALE_AFTER_S,
-    MVPConfig,
-)
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.store import JsonlStore
-from serving_runtime.mvp.target import (
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.observation.collectors import Collector
+from serving_runtime.config.config import DEFAULT_COLLECTOR_INTERVAL_S, DEFAULT_COLLECTOR_STALE_AFTER_S, MVPConfig
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.observation.store import JsonlStore
+from serving_runtime.target.target import (
     POD_SNAPSHOT_MAX_BYTES,
     POD_SNAPSHOT_SCHEMA,
     TargetPodSnapshotCollector,
@@ -78,9 +74,7 @@ def raw_pod(uid: str, container_id: str) -> dict[str, object]:
         "status": {
             "phase": "Running",
             "startTime": "2026-10-26T11:59:00Z",
-            "conditions": [
-                {"type": "Ready", "status": "True", "message": "must-not-survive"}
-            ],
+            "conditions": [{"type": "Ready", "status": "True", "message": "must-not-survive"}],
             "containerStatuses": [
                 {
                     "name": "engine",
@@ -150,9 +144,7 @@ class TargetSnapshotTests(unittest.TestCase):
         path.write_text("old", encoding="utf-8")
         old_inode = path.stat().st_ino
         runner = FakeRunner(
-            subprocess.CompletedProcess(
-                [], 0, json.dumps({"items": [raw_pod("uid-1", "containerd://one")]}), ""
-            )
+            subprocess.CompletedProcess([], 0, json.dumps({"items": [raw_pod("uid-1", "containerd://one")]}), "")
         )
         writer = feed.TargetPodSnapshotWriter(
             path,
@@ -223,21 +215,33 @@ class TargetSnapshotTests(unittest.TestCase):
 
     def test_gateway_confirmation_uses_host_collection_time_without_history_read(self) -> None:
         observed = NOW.astimezone(timezone(timedelta(hours=9))).isoformat()
-        path = self.write_snapshot(snapshot(
-            [feed._reduce_pod(raw_pod("uid-1", "containerd://one"))], collected_at=observed,
-        ))
+        path = self.write_snapshot(
+            snapshot(
+                [feed._reduce_pod(raw_pod("uid-1", "containerd://one"))],
+                collected_at=observed,
+            )
+        )
         value, origin = self.collector(path).collect()
         app = GatewayApp(
-            MVPConfig(data_dir=str(self.root / "gateway"), target_path=str(self.target_path),
-                target_pod_snapshot=str(path)),
-            load_policy(POLICY), ("127.0.0.1", 1),
+            MVPConfig(
+                data_dir=str(self.root / "gateway"), target_path=str(self.target_path), target_pod_snapshot=str(path)
+            ),
+            load_policy(POLICY),
+            ("127.0.0.1", 1),
         )
         app._target.observe_kubernetes(value, origin)
-        engine = {"source": "engine_info", "state": "ok",
+        engine = {
+            "source": "engine_info",
+            "state": "ok",
             "last_value": {"engine.version": "mock-1.0", "model.id": "test-model"},
-            "last_success_at": (NOW + timedelta(seconds=20)).isoformat()}
-        pods = {"source": "target_pods", "state": "ok", "last_value": value,
-            "last_success_at": (NOW + timedelta(seconds=12)).isoformat()}
+            "last_success_at": (NOW + timedelta(seconds=20)).isoformat(),
+        }
+        pods = {
+            "source": "target_pods",
+            "state": "ok",
+            "last_value": value,
+            "last_success_at": (NOW + timedelta(seconds=12)).isoformat(),
+        }
         with patch.object(app, "collectors_status", return_value={"collectors": [engine, pods]}):
             self.assertEqual(app._target_inputs()["kubernetes"]["last_success_at"], value["collected_at"])
             with patch.object(app._target.store, "read_all", side_effect=AssertionError("history read")):
@@ -260,9 +264,13 @@ class TargetSnapshotTests(unittest.TestCase):
     def test_gateway_restart_cannot_confirm_a_prestartup_snapshot(self) -> None:
         item = feed._reduce_pod(raw_pod("uid-1", "containerd://one"))
         path = self.write_snapshot(snapshot([item]))
-        collector = TargetPodSnapshotCollector(path, self.registration.kubernetes,
-            stale_after_s=30, now=lambda: NOW + timedelta(seconds=1),
-            not_before=NOW + timedelta(seconds=1))
+        collector = TargetPodSnapshotCollector(
+            path,
+            self.registration.kubernetes,
+            stale_after_s=30,
+            now=lambda: NOW + timedelta(seconds=1),
+            not_before=NOW + timedelta(seconds=1),
+        )
         with self.assertRaisesRegex(OSError, "predates Gateway startup"):
             collector.collect()
         self.write_snapshot(snapshot([item], collected_at=(NOW + timedelta(seconds=2)).isoformat()))
@@ -275,8 +283,10 @@ class TargetSnapshotTests(unittest.TestCase):
         path = self.root / "target-pods.json"
         runner = FakeRunner(subprocess.CompletedProcess([], 0, json.dumps({"items": [failed, running]}), ""))
         writer = feed.TargetPodSnapshotWriter(
-            path, self.registration.kubernetes,
-            interval_s=feed.DEFAULT_TARGET_INTERVAL_S, runner=runner,
+            path,
+            self.registration.kubernetes,
+            interval_s=feed.DEFAULT_TARGET_INTERVAL_S,
+            runner=runner,
         )
         with patch.object(feed, "_reader_gid", None):
             writer.collect_once()
@@ -292,9 +302,7 @@ class TargetSnapshotTests(unittest.TestCase):
             "context": snapshot([item], context="another-cluster"),
             "namespace": snapshot([item], namespace="another-namespace"),
             "selector": snapshot([item], selector={"app": "another-engine"}),
-            "stale": snapshot(
-                [item], collected_at=(NOW - timedelta(seconds=31)).isoformat()
-            ),
+            "stale": snapshot([item], collected_at=(NOW - timedelta(seconds=31)).isoformat()),
         }
         for name, document in cases.items():
             with self.subTest(name=name):
@@ -389,20 +397,27 @@ class TargetSnapshotTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 2)
 
     def test_default_snapshot_timing_stays_inside_gateway_stale_window(self) -> None:
-        parsed = feed.build_parser().parse_args(["--output-dir", str(self.root)])
-        self.assertEqual(parsed.target_interval, feed.DEFAULT_TARGET_INTERVAL_S)
-        worst_case_age_s = (
-            feed.DEFAULT_TARGET_INTERVAL_S
-            + feed.TARGET_QUERY_TIMEOUT_S
-            + DEFAULT_COLLECTOR_INTERVAL_S
+        parsed = feed.build_parser().parse_args(
+            ["--target-namespace", "serving-lab", "--kube-context", "kind-runtime-lab", "--output-dir", str(self.root)]
         )
+        self.assertEqual(parsed.target_interval, feed.DEFAULT_TARGET_INTERVAL_S)
+        worst_case_age_s = feed.DEFAULT_TARGET_INTERVAL_S + feed.TARGET_QUERY_TIMEOUT_S + DEFAULT_COLLECTOR_INTERVAL_S
         self.assertLess(worst_case_age_s, DEFAULT_COLLECTOR_STALE_AFTER_S)
 
     def test_cli_rejects_target_interval_above_safe_limit(self) -> None:
         error = io.StringIO()
         with redirect_stderr(error), self.assertRaises(SystemExit) as raised:
             feed.build_parser().parse_args(
-                ["--output-dir", str(self.root), "--target-interval", "5.1"]
+                [
+                    "--target-namespace",
+                    "serving-lab",
+                    "--kube-context",
+                    "kind-runtime-lab",
+                    "--output-dir",
+                    str(self.root),
+                    "--target-interval",
+                    "5.1",
+                ]
             )
         self.assertEqual(raised.exception.code, 2)
         self.assertIn("at most 5 seconds", error.getvalue())

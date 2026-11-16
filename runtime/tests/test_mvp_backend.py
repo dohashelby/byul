@@ -14,21 +14,21 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.backend import (
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.gateway.backend import (
     BackendConfig,
     is_valid_credential_value,
     load_backend_config,
     parse_prometheus_metrics,
 )
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.engine_client import EngineClient
-from serving_runtime.mvp.fake_backend import FakeBackend
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.relay import engine_rejection, retry_after_seconds
-from serving_runtime.mvp.store import JsonlStore
-from serving_runtime.mvp.validator import Decision
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.gateway.engine_client import EngineClient
+from serving_runtime.devtools.fake_backend import FakeBackend
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.gateway.relay import engine_rejection, retry_after_seconds
+from serving_runtime.observation.store import JsonlStore
+from serving_runtime.gateway.validator import Decision
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -136,17 +136,33 @@ class BackendConfigTests(unittest.TestCase):
             directory = Path(temporary)
             for value in (-1, True, 1.5, "64", None):
                 with self.subTest(value=value), self.assertRaises(ValueError):
-                    load_backend_config(self.write(directory, backend_document("http://example.invalid", context_headroom_tokens=value)))
-            backend = load_backend_config(self.write(directory, backend_document("http://example.invalid", context_headroom_tokens=64)))
+                    load_backend_config(
+                        self.write(directory, backend_document("http://example.invalid", context_headroom_tokens=value))
+                    )
+            backend = load_backend_config(
+                self.write(directory, backend_document("http://example.invalid", context_headroom_tokens=64))
+            )
             self.assertEqual(backend.context_headroom_tokens, 64)
-            self.assertEqual(load_backend_config(self.write(directory, backend_document("http://example.invalid"))).context_headroom_tokens, 0)
+            self.assertEqual(
+                load_backend_config(
+                    self.write(directory, backend_document("http://example.invalid"))
+                ).context_headroom_tokens,
+                0,
+            )
             policy = SimpleNamespace(max_context_tokens=2048)
             for observed, expected in ((2112, "ok"), (2048, "insufficient"), ("unknown", "unknown")):
                 with self.subTest(observed=observed):
-                    collectors = {"collectors": [{"source": "engine_info", "state": "ok", "last_value": {"option.max_model_len": observed}}]}
+                    collectors = {
+                        "collectors": [
+                            {"source": "engine_info", "state": "ok", "last_value": {"option.max_model_len": observed}}
+                        ]
+                    }
                     result = GatewayApp._engine_context_capacity(policy, backend, collectors)
                     self.assertEqual(result["state"], expected)
-                    self.assertEqual(result["reason_code"], "ENGINE_CONTEXT_CAPACITY_INSUFFICIENT" if expected == "insufficient" else None)
+                    self.assertEqual(
+                        result["reason_code"],
+                        "ENGINE_CONTEXT_CAPACITY_INSUFFICIENT" if expected == "insufficient" else None,
+                    )
 
     def test_strict_config_prefix_timeouts_and_metric_parser(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -160,9 +176,7 @@ class BackendConfigTests(unittest.TestCase):
             self.assertEqual(config.target.path("/v1/chat/completions"), "/prefix/v1/chat/completions")
             self.assertEqual(config.timeouts["relay_timeout_s"], 0.2)
             self.assertEqual(config.credential_status, "configured")
-            parsed = parse_prometheus_metrics(
-                b"vllm:num_requests_running 2\nunrelated 9\n", config.metrics_map
-            )
+            parsed = parse_prometheus_metrics(b"vllm:num_requests_running 2\nunrelated 9\n", config.metrics_map)
             self.assertEqual(parsed["requests.running"]["state"], "ok")
             self.assertEqual(parsed["requests.running"]["samples"][0]["value"], 2.0)
             self.assertEqual(parsed["missing.metric"]["state"], "unsupported_or_absent")
@@ -219,9 +233,7 @@ class BackendConfigTests(unittest.TestCase):
             directory = Path(temporary)
             env_path = self.write(
                 directory,
-                backend_document(
-                    "http://example.invalid", credential={"env": "BACKEND_TOKEN"}
-                ),
+                backend_document("http://example.invalid", credential={"env": "BACKEND_TOKEN"}),
             )
             missing = load_backend_config(env_path, environ={})
             configured = load_backend_config(env_path, environ={"BACKEND_TOKEN": "secret"})
@@ -235,9 +247,7 @@ class BackendConfigTests(unittest.TestCase):
             credential.chmod(0o644)
             file_path = self.write(
                 directory,
-                backend_document(
-                    "http://example.invalid", credential={"file": "credential"}
-                ),
+                backend_document("http://example.invalid", credential={"file": "credential"}),
                 "file-config.json",
             )
             insecure = load_backend_config(file_path)
@@ -262,12 +272,8 @@ class BackendConfigTests(unittest.TestCase):
                 inference_only.request_headers()["Authorization"],
                 "Bearer inference-secret",
             )
-            self.assertNotIn(
-                "Authorization", inference_only.request_headers(metrics=True)
-            )
-            self.assertEqual(
-                inference_only.metrics_credential_status, "not_configured"
-            )
+            self.assertNotIn("Authorization", inference_only.request_headers(metrics=True))
+            self.assertEqual(inference_only.metrics_credential_status, "not_configured")
 
             separate = load_backend_config(
                 self.write(
@@ -360,16 +366,12 @@ class BackendConfigTests(unittest.TestCase):
             directory = Path(temporary)
             env_path = self.write(
                 directory,
-                backend_document(
-                    "http://example.invalid", credential={"env": "BACKEND_TOKEN"}
-                ),
+                backend_document("http://example.invalid", credential={"env": "BACKEND_TOKEN"}),
             )
             credential = directory / "credential"
             file_path = self.write(
                 directory,
-                backend_document(
-                    "http://example.invalid", credential={"file": "credential"}
-                ),
+                backend_document("http://example.invalid", credential={"file": "credential"}),
                 "file-invalid.json",
             )
             invalid_values = (
@@ -385,9 +387,7 @@ class BackendConfigTests(unittest.TestCase):
             )
             for secret in invalid_values:
                 with self.subTest(source="env", secret=repr(secret)):
-                    config = load_backend_config(
-                        env_path, environ={"BACKEND_TOKEN": secret}
-                    )
+                    config = load_backend_config(env_path, environ={"BACKEND_TOKEN": secret})
                     self.assertEqual(config.credential_status, "invalid")
                     self.assertIsNone(config.authorization)
                     self.assertNotIn(secret, repr(config))
@@ -407,23 +407,17 @@ class BackendConfigTests(unittest.TestCase):
             directory = Path(temporary)
             env_path = self.write(
                 directory,
-                backend_document(
-                    "http://example.invalid", credential={"env": "BACKEND_TOKEN"}
-                ),
+                backend_document("http://example.invalid", credential={"env": "BACKEND_TOKEN"}),
             )
             credential = directory / "credential"
             file_path = self.write(
                 directory,
-                backend_document(
-                    "http://example.invalid", credential={"file": "credential"}
-                ),
+                backend_document("http://example.invalid", credential={"file": "credential"}),
                 "file-newline.json",
             )
             for ending in ("\n", "\r\n"):
                 with self.subTest(source="env", ending=repr(ending)):
-                    config = load_backend_config(
-                        env_path, environ={"BACKEND_TOKEN": f"abc123{ending}"}
-                    )
+                    config = load_backend_config(env_path, environ={"BACKEND_TOKEN": f"abc123{ending}"})
                     self.assertEqual(config.credential_status, "configured")
                     self.assertEqual(config.authorization, "Bearer abc123")
                 with self.subTest(source="file", ending=repr(ending)):
@@ -481,9 +475,7 @@ class ExternalBackendHttpTests(unittest.TestCase):
         )
         backend = load_backend_config(backend_path, environ=environ or {})
         try:
-            gateway = GatewayApp(
-                config, load_policy(POLICY), backend_config=backend
-            ).start()
+            gateway = GatewayApp(config, load_policy(POLICY), backend_config=backend).start()
         except PermissionError as error:
             self.skipTest(f"local sockets are unavailable: {error}")
         self.gateways.append(gateway)
@@ -522,9 +514,13 @@ class ExternalBackendHttpTests(unittest.TestCase):
         return result
 
     def records(self, data_dir: Path | None = None) -> list[dict[str, object]]:
-        records, corrupt = JsonlStore(
-            (data_dir or self.directory / "data") / "gateway_records.jsonl"
-        ).read_all()
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            pending, invalid = JsonlStore((data_dir or self.directory / "data") / "gateway_records.jsonl").read_all()
+            if invalid or (pending and pending[-1].get("phase") == "final"):
+                break
+            time.sleep(0.005)
+        records, corrupt = JsonlStore((data_dir or self.directory / "data") / "gateway_records.jsonl").read_all()
         self.assertEqual(corrupt, [])
         return records
 
@@ -542,11 +538,7 @@ class ExternalBackendHttpTests(unittest.TestCase):
         while time.monotonic() < stop_at:
             payload = self.get_json(gateway, "/api/collectors")
             item = next(
-                (
-                    entry
-                    for entry in payload["collectors"]
-                    if entry["source"] == source and entry["state"] == state
-                ),
+                (entry for entry in payload["collectors"] if entry["source"] == source and entry["state"] == state),
                 None,
             )
             if item is not None:
@@ -620,9 +612,7 @@ class ExternalBackendHttpTests(unittest.TestCase):
         self.assertEqual(self.fake.request_count, 0)
 
         gateway.stop()
-        missing = backend_document(
-            self.fake.base_url, credential={"env": "ABSENT_BACKEND_TOKEN"}
-        )
+        missing = backend_document(self.fake.base_url, credential={"env": "ABSENT_BACKEND_TOKEN"})
         gateway = self.start_gateway(document=missing, environ={})
         status, _, body = self.request(gateway, chat_body())
         self.assertEqual(status, 503)
@@ -631,12 +621,8 @@ class ExternalBackendHttpTests(unittest.TestCase):
 
         gateway.stop()
         secret = "MUST-NOT-LEAK\r\nInjected: value"
-        invalid = backend_document(
-            self.fake.base_url, credential={"env": "INVALID_BACKEND_TOKEN"}
-        )
-        gateway = self.start_gateway(
-            document=invalid, environ={"INVALID_BACKEND_TOKEN": secret}
-        )
+        invalid = backend_document(self.fake.base_url, credential={"env": "INVALID_BACKEND_TOKEN"})
+        gateway = self.start_gateway(document=invalid, environ={"INVALID_BACKEND_TOKEN": secret})
         status, headers, body = self.request(gateway, chat_body())
         self.assertEqual(status, 503)
         self.assertEqual(json.loads(body)["error"]["code"], "BACKEND_CREDENTIAL_INVALID")
@@ -708,8 +694,7 @@ class ExternalBackendHttpTests(unittest.TestCase):
                 final = next(
                     record
                     for record in reversed(self.records())
-                    if record["request_id"] == headers["X-Request-ID"]
-                    and record["phase"] == "final"
+                    if record["request_id"] == headers["X-Request-ID"] and record["phase"] == "final"
                 )
                 self.assertEqual(final["decision"]["result"], expected_result)
                 self.assertEqual(final["decision"]["source"], "engine")
@@ -740,13 +725,9 @@ class ExternalBackendHttpTests(unittest.TestCase):
     def test_credential_is_forwarded_but_never_exposed(self) -> None:
         secret = "S3A-SECRET-MUST-NOT-LEAK"
         self.fake.stop()
-        self.fake = FakeBackend(
-            port=0, required_authorization=f"Bearer {secret}"
-        ).start()
+        self.fake = FakeBackend(port=0, required_authorization=f"Bearer {secret}").start()
         self.addCleanup(self.fake.stop)
-        document = backend_document(
-            self.fake.base_url, credential={"env": "BACKEND_TOKEN"}
-        )
+        document = backend_document(self.fake.base_url, credential={"env": "BACKEND_TOKEN"})
         gateway = self.start_gateway(document=document, environ={"BACKEND_TOKEN": secret})
         status, headers, _ = self.request(gateway, chat_body())
         self.assertEqual(status, 200)
@@ -805,16 +786,12 @@ class ExternalBackendHttpTests(unittest.TestCase):
         self.assertNotEqual(received["host"], "127.0.0.1:1")
         self.assertIsNone(received["x_forwarded_host"])
         self.assertNotIn("x-evil", received["header_names"])
-        status, _, body = self.request(
-            gateway, chat_body(base_url="http://127.0.0.1:1")
-        )
+        status, _, body = self.request(gateway, chat_body(base_url="http://127.0.0.1:1"))
         self.assertEqual(status, 400)
         self.assertEqual(json.loads(body)["error"]["code"], "UNSUPPORTED_FIELD")
         gateway.stop()
 
-        mock = MockEngine(
-            port=0, receipts_path=data_dir / "engine_receipts.jsonl"
-        ).start()
+        mock = MockEngine(port=0, receipts_path=data_dir / "engine_receipts.jsonl").start()
         self.addCleanup(mock.stop)
         mock_config = MVPConfig(
             gateway_port=0,
@@ -822,16 +799,12 @@ class ExternalBackendHttpTests(unittest.TestCase):
             policy_path=str(POLICY),
             data_dir=str(data_dir),
         )
-        mock_gateway = GatewayApp(
-            mock_config, load_policy(POLICY), mock.address
-        ).start()
+        mock_gateway = GatewayApp(mock_config, load_policy(POLICY), mock.address).start()
         self.gateways.append(mock_gateway)
         status, mock_headers, _ = self.request(mock_gateway, chat_body())
         self.assertEqual(status, 200)
         old_detail = self.get_json(mock_gateway, f"/api/requests/{vllm_id}")
-        new_detail = self.get_json(
-            mock_gateway, f"/api/requests/{mock_headers['X-Request-ID']}"
-        )
+        new_detail = self.get_json(mock_gateway, f"/api/requests/{mock_headers['X-Request-ID']}")
         self.assertEqual(old_detail["backend_kind"], "vllm")
         self.assertEqual(old_detail["engine_receipts"], [])
         self.assertEqual(new_detail["backend_kind"], "mock")

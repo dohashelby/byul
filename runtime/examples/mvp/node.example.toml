@@ -1,0 +1,7 @@
+# mvp 전용 설정. 경로는 명령을 실행하는 현재 폴더 기준입니다.
+# 명시한 CLI 인자 > 이 파일 > 코드 기본값 순서로 적용됩니다.
+# 토큰·비밀번호는 넣지 않고 별도 설정 파일의 경로를 지정합니다.
+policy_path = "examples/mvp/policy.json"
+data_dir = "state/mvp"
+# auth_config_path = "private/auth.json"
+# backend_config_path = "private/backend.json"  # 외부 backend를 선택한 경우

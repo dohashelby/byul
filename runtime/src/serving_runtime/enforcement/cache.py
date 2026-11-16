@@ -15,7 +15,9 @@ SCHEMA = "runtime-cache-check/1.0"
 _DEPTH = 4  # engine / image_id / model_revision / compile_profile
 
 
-def _entry(path: Path, cache_root: Path, current: Path, engine_uid: int, *, info: os.stat_result | None = None) -> dict[str, Any]:
+def _entry(
+    path: Path, cache_root: Path, current: Path, engine_uid: int, *, info: os.stat_result | None = None
+) -> dict[str, Any]:
     info = os.lstat(path) if info is None else info
     problems: list[str] = []
     if stat.S_ISLNK(info.st_mode):
@@ -71,7 +73,9 @@ def _ancestor(path: Path, engine_uid: int, *, info: os.stat_result | None = None
     }
 
 
-def check_cache(intent: EnforcementIntent, *, root_override: str | None = None, max_entries: int | None = None) -> dict[str, Any]:
+def check_cache(
+    intent: EnforcementIntent, *, root_override: str | None = None, max_entries: int | None = None
+) -> dict[str, Any]:
     """Report generation directories, ownership and permissions under the cache root.
 
     ``root_override`` lets a test or an operator point at a copy of the tree; the
@@ -144,7 +148,8 @@ def check_cache(intent: EnforcementIntent, *, root_override: str | None = None, 
                 listed = child.stat(follow_symlinks=False)
                 if not stat.S_ISDIR(listed.st_mode):
                     result["unexpected_entries"].append(
-                        {"path": str(path), "kind": "symlink" if stat.S_ISLNK(listed.st_mode) else "file"})
+                        {"path": str(path), "kind": "symlink" if stat.S_ISLNK(listed.st_mode) else "file"}
+                    )
                     continue
                 child_descriptor = os.open(child.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor)
                 opened = os.fstat(child_descriptor)
@@ -177,11 +182,7 @@ def check_cache(intent: EnforcementIntent, *, root_override: str | None = None, 
         result["state"] = "incomplete"
     elif not current_entries:
         result["state"] = "current_generation_missing"
-    elif (
-        any(item["problems"] for item in generations)
-        or result["ancestor_problems"]
-        or result["walk_errors"]
-    ):
+    elif any(item["problems"] for item in generations) or result["ancestor_problems"] or result["walk_errors"]:
         result["state"] = "problems"
     elif result["other_generation_count"] or result["unexpected_entries"]:
         result["state"] = "other_generations_present"

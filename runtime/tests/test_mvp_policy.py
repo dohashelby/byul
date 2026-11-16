@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from serving_runtime.mvp.policy import load_policy
+from serving_runtime.policy.policy import load_policy
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,9 +33,7 @@ class PolicyTests(unittest.TestCase):
         self.assertIsNotNone(state.policy)
         self.assertEqual(state.policy.allowed_models, ("test-model",))
         self.assertEqual(state.policy.output_default_tokens, 128)
-        self.assertEqual(
-            state.sha256, hashlib.sha256(EXAMPLE_POLICY.read_bytes()).hexdigest()
-        )
+        self.assertEqual(state.sha256, hashlib.sha256(EXAMPLE_POLICY.read_bytes()).hexdigest())
         self.assertIn("+00:00", state.loaded_at)
 
     def test_missing_file_is_state_not_exception(self) -> None:

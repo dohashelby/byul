@@ -11,11 +11,11 @@ import unittest
 from urllib.request import Request, urlopen
 
 from serving_runtime.cli import main
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.revalidation import (
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.policy.revalidation import (
     EXPORT_FORMAT_STATUS,
     RevalidationRequests,
     evaluate_asset_integrity,
@@ -48,11 +48,7 @@ def asset_result(
 ) -> dict:
     return {
         "intact": intact,
-        "items": (
-            [{"path": path, "state": "changed"} for path in changed_paths]
-            if not intact
-            else []
-        ),
+        "items": ([{"path": path, "state": "changed"} for path in changed_paths] if not intact else []),
         "counts": {
             "match": 0 if not intact else 1,
             "changed": len(changed_paths) if not intact else 0,
@@ -162,12 +158,8 @@ class RequestLifecycleTests(unittest.TestCase):
     def test_clear_then_reappear_uses_same_request_id(self) -> None:
         self.observe_changed()
         request_id = self.requests.summary()["requests"][0]["revalidation_id"]
-        self.requests.observe_asset(
-            asset_result(intact=True), data_origin="local_file", **context()
-        )
-        self.requests.observe_asset(
-            asset_result(intact=True), data_origin="local_file", **context()
-        )
+        self.requests.observe_asset(asset_result(intact=True), data_origin="local_file", **context())
+        self.requests.observe_asset(asset_result(intact=True), data_origin="local_file", **context())
         cleared = self.requests.summary()["requests"][0]
         self.assertEqual(cleared["last_event"], "condition_cleared")
         self.assertEqual(cleared["event_count"], 2)
@@ -207,9 +199,7 @@ class RequestLifecycleTests(unittest.TestCase):
         summary = self.requests.summary()
         self.assertEqual(summary["open_count"], 2)
         self.assertEqual(summary["current_condition_count"], 1)
-        superseded = next(
-            item for item in summary["requests"] if item["revalidation_id"] == first_id
-        )
+        superseded = next(item for item in summary["requests"] if item["revalidation_id"] == first_id)
         self.assertEqual(superseded["condition_state"], "superseded")
         self.assertEqual(
             superseded["condition_state_label"],
@@ -218,18 +208,13 @@ class RequestLifecycleTests(unittest.TestCase):
         self.assertFalse(superseded["current_evidence_present"])
 
         current_id = records[2]["revalidation_id"]
-        self.requests.observe_asset(
-            asset_result(intact=True), data_origin="local_file", **context()
-        )
+        self.requests.observe_asset(asset_result(intact=True), data_origin="local_file", **context())
         records, _ = self.requests.store.read_all()
         self.assertEqual(records[-1]["event"], "condition_cleared")
         self.assertEqual(records[-1]["revalidation_id"], current_id)
         resolved = self.requests.summary()
         self.assertEqual(resolved["current_condition_count"], 0)
-        states = {
-            item["revalidation_id"]: item["condition_state"]
-            for item in resolved["requests"]
-        }
+        states = {item["revalidation_id"]: item["condition_state"] for item in resolved["requests"]}
         self.assertEqual(states[first_id], "superseded")
         self.assertEqual(states[current_id], "cleared")
 
@@ -312,9 +297,7 @@ class RequestLifecycleTests(unittest.TestCase):
         )
 
     def test_evaluation_error_does_not_stop_later_request_handling(self) -> None:
-        self.requests.observe_asset(
-            {"intact": "unknown"}, data_origin="local_file", **context()
-        )
+        self.requests.observe_asset({"intact": "unknown"}, data_origin="local_file", **context())
         first = self.requests.summary()
         self.assertEqual(first["evaluation_status"]["state"], "error")
         self.assertEqual(first["open_count"], 0)
@@ -342,9 +325,7 @@ class ExportAndDashboardTests(unittest.TestCase):
 
     def test_export_is_exclusive_and_marks_unagreed_draft(self) -> None:
         requests = RevalidationRequests(self.base / "data")
-        requests.observe_asset(
-            asset_result(intact=False), data_origin="local_file", **context()
-        )
+        requests.observe_asset(asset_result(intact=False), data_origin="local_file", **context())
         requests.observe_asset(
             asset_result(
                 intact=False,
@@ -370,11 +351,7 @@ class ExportAndDashboardTests(unittest.TestCase):
         document = json.loads(out.read_text(encoding="utf-8"))
         self.assertEqual(document["open_count"], 2)
         self.assertEqual(document["current_condition_count"], 1)
-        superseded = next(
-            item
-            for item in document["requests"]
-            if item["condition_state"] == "superseded"
-        )
+        superseded = next(item for item in document["requests"] if item["condition_state"] == "superseded")
         self.assertEqual(
             superseded["condition_state_label"],
             "다른 근거로 대체됨, 해소 아님",
@@ -410,12 +387,8 @@ class ExportAndDashboardTests(unittest.TestCase):
             data_dir=str(self.base / "gateway-data"),
         )
         gateway = GatewayApp(config, load_policy(POLICY_PATH), engine.address)
-        gateway._revalidation.observe_asset(
-            {"intact": "unknown"}, data_origin="local_file", **context()
-        )
-        gateway._revalidation.observe_asset(
-            asset_result(intact=False), data_origin="local_file", **context()
-        )
+        gateway._revalidation.observe_asset({"intact": "unknown"}, data_origin="local_file", **context())
+        gateway._revalidation.observe_asset(asset_result(intact=False), data_origin="local_file", **context())
         gateway.start()
         self.addCleanup(gateway.stop)
         host, port = gateway.address

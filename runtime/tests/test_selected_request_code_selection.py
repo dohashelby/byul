@@ -1,11 +1,12 @@
 """D3 protocol fixtures: fake Gateway, viewer and platform HTTP only."""
+
 import json
 from urllib.parse import urlsplit
 
 import pytest
 
-from tools import selected_request_checks as checks
-from tools.selected_runtime_check import HTTPResponse
+from labtools import selected_request_checks as checks
+from labtools.selected_runtime_check import HTTPResponse
 
 
 CODE_IDS = ("REQ-CODE-SELECT-chat-mm", "REQ-CODE-SELECT-messages", "REQ-CODE-SELECT-completions")
@@ -27,8 +28,16 @@ def fake_matrix(monkeypatch, *, target=None, fault=None, profile=None, configure
         if path == "/api/status":
             return reply(200, {"auth": {"protected_routes": ["GET /api/*"]}})
         if path == "/api/policy":
-            return reply(200, {"current": {"output_max_tokens": 16, "profile": profile,
-                                          "extra_fields": [{"name": name} for name in configured]}})
+            return reply(
+                200,
+                {
+                    "current": {
+                        "output_max_tokens": 16,
+                        "profile": profile,
+                        "extra_fields": [{"name": name} for name in configured],
+                    }
+                },
+            )
         if method == "GET" and path.startswith("/api/"):
             rid = path.rsplit("/", 1)[-1]
             if path == "/api/route-rejections":
@@ -38,8 +47,12 @@ def fake_matrix(monkeypatch, *, target=None, fault=None, profile=None, configure
             if broken and ("lookup" in faults or "platform_lookup" in faults and path.startswith("/api/runtime/")):
                 return reply(503, {})
             if path == "/api/route-rejections":
-                row = {"request_id": rid, "forwarded_to_engine": broken and "delivery" in faults,
-                       "response_code": 404, "reason": "NOT_FOUND"}
+                row = {
+                    "request_id": rid,
+                    "forwarded_to_engine": broken and "delivery" in faults,
+                    "response_code": 404,
+                    "reason": "NOT_FOUND",
+                }
                 value = {"items": [row]}
             else:
                 final = entry["final"]
@@ -65,19 +78,35 @@ def fake_matrix(monkeypatch, *, target=None, fault=None, profile=None, configure
             state["marker"] = payload["messages"][0]["code_revision"]
             ident, decision_path = CODE_IDS[1], "messages[0].code_revision"
         state["posts"].append((method, path, payload, ident))
-        rid = f'{len(state["posts"]):032x}'
+        rid = f"{len(state['posts']):032x}"
         state["last_id"] = rid
-        status, code = (404, "NOT_FOUND") if ident == ROUTE_ID else (400, "CODE_SELECTION_FIELD") if ident else (200, None)
+        status, code = (
+            (404, "NOT_FOUND") if ident == ROUTE_ID else (400, "CODE_SELECTION_FIELD") if ident else (200, None)
+        )
         broken = ident is not None and ident == target
         if broken and "status" in faults:
             status, code = 200, None
-        final = {"request_id": rid, "auth": {"state": "authenticated", "principal_id": "client"},
-                 "policy": {"sha256": "policy"}, "target_id": "target", "target": {"instance_id": "instance"},
-                 "run_id": "run", "decision": {"result": "INVALID" if ident else "ALLOWED", "http_status": status,
-                 "reason_code": code, "rule_id": "wrong" if broken and "rule" in faults else "request_code_selection",
-                 "message": state["marker"] if broken and "message_leak" in faults else "wrong.path" if broken and "path" in faults else decision_path},
-                 "delivery": {"attempted": True if broken and "delivery" in faults else not bool(ident)},
-                 "final_outcome": "rejected" if ident else "completed"}
+        final = {
+            "request_id": rid,
+            "auth": {"state": "authenticated", "principal_id": "client"},
+            "policy": {"sha256": "policy"},
+            "target_id": "target",
+            "target": {"instance_id": "instance"},
+            "run_id": "run",
+            "decision": {
+                "result": "INVALID" if ident else "ALLOWED",
+                "http_status": status,
+                "reason_code": code,
+                "rule_id": "wrong" if broken and "rule" in faults else "request_code_selection",
+                "message": state["marker"]
+                if broken and "message_leak" in faults
+                else "wrong.path"
+                if broken and "path" in faults
+                else decision_path,
+            },
+            "delivery": {"attempted": True if broken and "delivery" in faults else not bool(ident)},
+            "final_outcome": "rejected" if ident else "completed",
+        }
         state["rows"][rid] = {"id": ident, "final": final}
         value = {"error": {"code": code}} if ident else {}
         if broken and "response_leak" in faults:
@@ -86,8 +115,9 @@ def fake_matrix(monkeypatch, *, target=None, fault=None, profile=None, configure
 
     monkeypatch.setattr(checks, "request", request)
     monkeypatch.setattr(checks, "concurrent_precondition", lambda *args, **kwargs: (True, {}))
-    result = checks.request_matrix("http://gateway", "http://platform" if platform else None,
-                                   "test-model", "inference", "viewer", timeout=.1)
+    result = checks.request_matrix(
+        "http://gateway", "http://platform" if platform else None, "test-model", "inference", "viewer", timeout=0.1
+    )
     return {case["id"]: case for case in result["cases"]}, state
 
 
@@ -117,9 +147,22 @@ def test_new_cases_fail_on_contradiction_and_are_unknown_on_lookup_failure(monke
 
 
 @pytest.mark.parametrize("ident", CODE_IDS)
-@pytest.mark.parametrize("fault", ["rule", "path", "message_leak", "platform_leak", "platform_mismatch",
-                                 "delivery+platform_lookup", "rule+platform_lookup", "response_leak+lookup",
-                                 "response_leak+escaped", "platform_leak+escaped", "journal_leak+escaped"])
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "rule",
+        "path",
+        "message_leak",
+        "platform_leak",
+        "platform_mismatch",
+        "delivery+platform_lookup",
+        "rule+platform_lookup",
+        "response_leak+lookup",
+        "response_leak+escaped",
+        "platform_leak+escaped",
+        "journal_leak+escaped",
+    ],
+)
 def test_code_cases_require_rule_path_and_platform_agreement(monkeypatch, ident, fault):
     cases, state = fake_matrix(monkeypatch, target=ident, fault=fault)
     assert cases[ident]["result"] == "failed"

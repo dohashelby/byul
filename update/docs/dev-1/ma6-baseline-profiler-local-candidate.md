@@ -5,7 +5,7 @@ The 0.7 API defines `/start_profile` and `/stop_profile` handlers inside the
 `AsyncLLM.start_profile/stop_profile`, then `AsyncMPClient.profile_async` and
 `_send_input(PROFILE, EngineCoreProfile)`. The core process receives the ZMQ
 frames, decodes and queues the request, and invokes
-`EngineCore._handle_client_request`, which calls `model_executor.profile`.
+`EngineCoreProc._handle_client_request`, which calls `model_executor.profile`.
 `Executor.profile` calls `MultiprocExecutor.collective_rpc('profile',
 args=(is_start,))`; broadcast queue delivery reaches
 `WorkerProc.worker_busy_loop` and `Worker.profile`. This actual async API path
@@ -16,7 +16,7 @@ the exact installed source files and live function bodies of one selected
 process-local segment before any hook: API (`async_llm`, `core_client`) or
 core (`core`, `abstract`, `multiproc_executor`). It never imports the other
 process's files. It records request-free CALL/RETURN/RAISE pairs for the two local paths:
-`AsyncLLM` → `AsyncMPClient`, and `EngineCore._handle_client_request` →
+`AsyncLLM` → `AsyncMPClient`, and `EngineCoreProc._handle_client_request` →
 `Executor.profile` → `MultiprocExecutor.collective_rpc`. The async hooks emit
 RETURN only after the original `await` completes; failure and cancellation
 produce RAISE. A parent pair requires the original parent's live frame,

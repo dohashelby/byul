@@ -9,17 +9,12 @@ from contextlib import redirect_stderr
 from unittest.mock import patch
 
 from serving_runtime.cli import main
-from serving_runtime.mvp.demo import (
-    demo_cases,
-    run_demo_cases,
-    evaluate_case,
-    print_results,
-    write_demo_report,
-)
+from serving_runtime.devtools.demo import demo_cases, run_demo_cases, evaluate_case, print_results, write_demo_report
 
 
-def detail(result: str = "ALLOWED", *, evidence: str = "received",
-           rule_id: str | None = None, max_tokens: int = 64) -> dict:
+def detail(
+    result: str = "ALLOWED", *, evidence: str = "received", rule_id: str | None = None, max_tokens: int = 64
+) -> dict:
     return {
         "final_state": {"result": result, "max_tokens": max_tokens},
         "evidence_state": evidence,
@@ -35,10 +30,14 @@ def detail(result: str = "ALLOWED", *, evidence: str = "received",
 class DemoJudgementTests(unittest.TestCase):
     def test_demo_waits_for_post_write_final_record_before_judgement(self):
         case = demo_cases()[0]
-        with patch("serving_runtime.mvp.demo.demo_cases", return_value=(case,)), \
-                patch("serving_runtime.mvp.demo._post_case", return_value=(200, "a"*32, None)), \
-                patch("serving_runtime.mvp.demo._get_detail", side_effect=[
-                    {"final_state": {"result": "INCOMPLETE"}, "gateway_records": []}, detail()]) as get:
+        with (
+            patch("serving_runtime.devtools.demo.demo_cases", return_value=(case,)),
+            patch("serving_runtime.devtools.demo._post_case", return_value=(200, "a" * 32, None)),
+            patch(
+                "serving_runtime.devtools.demo._get_detail",
+                side_effect=[{"final_state": {"result": "INCOMPLETE"}, "gateway_records": []}, detail()],
+            ) as get,
+        ):
             result = run_demo_cases("http://127.0.0.1:1", timeout=1)
         self.assertTrue(result[0].passed)
         self.assertEqual(get.call_count, 2)
@@ -66,11 +65,7 @@ class DemoJudgementTests(unittest.TestCase):
                 detail("DENIED", evidence="not_received", rule_id="allowed_models"),
             ).passed
         )
-        self.assertTrue(
-            evaluate_case(
-                default_case, 200, "c" * 32, detail(max_tokens=128)
-            ).passed
-        )
+        self.assertTrue(evaluate_case(default_case, 200, "c" * 32, detail(max_tokens=128)).passed)
 
     def test_missing_request_id_and_wrong_http_fail(self) -> None:
         result = evaluate_case(demo_cases()[0], 500, None, None)

@@ -45,7 +45,7 @@ const report: ReportView = {
   by_area: [{ name: "REQ", security: "FAIL", inventory_complete: true }],
   by_purpose: [{ name: "요청·대상 접근 권한", security: "FAIL", inventory_complete: true }],
   evidence_counts: { REQ: { manual: 1, automated: 2, not_run: 0 } },
-  limitations: ["정책 DRAFT: 공식 아님"],
+  limitations: ["정책 DRAFT: 공식 아님", "관측 수집 중단으로 일부 점검 미확인"],
   manual_required: ["REQ-03"],
   not_selected: [],
   approval: null,
@@ -58,11 +58,12 @@ const report: ReportView = {
 };
 
 describe("검증 보고서 화면", () => {
-  it("비공식 사유·종합 판정·주요 결과 묶음을 update 보고서와 같은 문구로 보여준다", async () => {
+  it("출처 안내 없이 종합 판정·위험·실제 점검 한계를 보여준다", async () => {
     mockApi({});
-    renderAt("/update/results", "/update/results", <FullReport report={report} rawChecks={null} selected={null} onSelect={() => {}} />);
-    expect(screen.getByRole("status").textContent).toBe("공식 아님 — 정책 DRAFT, 검토 전 팩, EXAMPLE 자료");
-    expect(screen.getByText("후퇴 1건")).toBeTruthy();
+    const { container } = renderAt("/update/results", "/update/results", <FullReport report={report} rawChecks={null} selected="REQ-01" onSelect={() => {}} />);
+    expect(container.textContent).not.toMatch(/공식 아님|EXAMPLE|예시|후퇴/);
+    expect(screen.getByText("위험 1건")).toBeTruthy();
+    expect(screen.getByText("관측 수집 중단으로 일부 점검 미확인")).toBeTruthy();
     expect(screen.getByText("미충족 1건")).toBeTruthy();
     expect(screen.getByText("미확인 1건")).toBeTruthy();
     expect(screen.getByText("점검 목록 미완결: OBS")).toBeTruthy();

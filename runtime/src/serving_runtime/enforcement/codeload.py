@@ -1,4 +1,5 @@
 """Monitor code opens in download/writable directories, independent of request fields."""
+
 from __future__ import annotations
 
 import posixpath
@@ -13,8 +14,12 @@ DEFAULT_WATCH_PATHS = ("/cache", "/tmp", "/var/tmp", "/dev/shm", "/root/.cache",
 
 
 def watch_prefixes(intent: EnforcementIntent) -> list[str]:
-    paths = [*DEFAULT_WATCH_PATHS, intent.protected_paths.model_dir,
-             intent.protected_paths.cache_dir, *intent.code_load_watch_paths]
+    paths = [
+        *DEFAULT_WATCH_PATHS,
+        intent.protected_paths.model_dir,
+        intent.protected_paths.cache_dir,
+        *intent.code_load_watch_paths,
+    ]
     if intent.assets is not None:
         paths.append(intent.assets.engine_cache_watch_root)
         if intent.assets.tokenizer_dir:
@@ -33,8 +38,13 @@ def clean_path(raw: str | None) -> tuple[str | None, bool]:
     if not isinstance(raw, str) or not raw:
         return None, False
     safe = "".join(c if not unicodedata.category(c).startswith("C") else "?" for c in raw[:PATH_LIMIT])
-    valid = (len(raw) <= PATH_LIMIT and safe == raw and raw.startswith("/")
-             and not raw.startswith("//") and ".." not in raw.split("/"))
+    valid = (
+        len(raw) <= PATH_LIMIT
+        and safe == raw
+        and raw.startswith("/")
+        and not raw.startswith("//")
+        and ".." not in raw.split("/")
+    )
     return safe, valid
 
 
@@ -49,10 +59,14 @@ def classify_code_open(record: dict, event: dict, policy, identity: dict | None)
     container = pod.get("container") if isinstance(pod.get("container"), dict) else {}
     intent = policy.intent
     from .events import _matches_engine
+
     attributed = (
-        _matches_engine(event, intent) and bool(record.get("binary"))
-        and type(process.get("pid")) is int and process["pid"] > 0
-        and bool(pod.get("uid")) and bool(record.get("pod"))
+        _matches_engine(event, intent)
+        and bool(record.get("binary"))
+        and type(process.get("pid")) is int
+        and process["pid"] > 0
+        and bool(pod.get("uid"))
+        and bool(record.get("pod"))
         and bool(intent.engine.container_name)
         and container.get("name") == intent.engine.container_name
         and (identity is None or identity.get("state") == "confirmed")
@@ -65,12 +79,16 @@ def classify_code_open(record: dict, event: dict, policy, identity: dict | None)
     record["container_name"] = container["name"]
     # Reuse heartbeat, Pod generation, interval and engine-signal checks. Only
     # phase evidence is copied; binary approval/exception verdicts are discarded.
-    phase = policy.classify_exec(binary=record["binary"], parent=None, image=None,
-                                 observed_at=record["observed_at"], pod_uid=pod["uid"])
+    phase = policy.classify_exec(
+        binary=record["binary"], parent=None, image=None, observed_at=record["observed_at"], pod_uid=pod["uid"]
+    )
     record.update({key: value for key, value in phase.items() if key.startswith("phase")})
-    file_args = [arg["file_arg"] for arg in event.get("args", [])
-                 if isinstance(arg, dict) and isinstance(arg.get("file_arg"), dict)]
-    if (not valid or any(arg.get("flags") or arg.get("path") != path for arg in file_args)):
+    file_args = [
+        arg["file_arg"]
+        for arg in event.get("args", [])
+        if isinstance(arg, dict) and isinstance(arg.get("file_arg"), dict)
+    ]
+    if not valid or any(arg.get("flags") or arg.get("path") != path for arg in file_args):
         record["reason"] = "path_evidence_invalid"
     elif phase["phase_source_error"] is not None or phase["phase"] == ["unknown"]:
         record["reason"] = "phase_unavailable"
@@ -93,6 +111,5 @@ def apply_collection_evidence(record: dict, heartbeat: dict) -> None:
     """A gap cannot become a claim of no detection; keep the existing feed status."""
     if record.get("rule_id") != RULE_ID:
         return
-    if (not heartbeat.get("configured") or heartbeat.get("state") != "running"
-            or heartbeat.get("open_gap")):
+    if not heartbeat.get("configured") or heartbeat.get("state") != "running" or heartbeat.get("open_gap"):
         record.update(code_load_verdict="unknown", reason="collector_unavailable")

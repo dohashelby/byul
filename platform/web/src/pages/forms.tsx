@@ -223,7 +223,7 @@ export const CONDITION_FACTS: Record<string, string[]> = {
 
 /** 제품 전제로 정해진 사실. 묻지 않고 항상 이 값으로 저장한다. */
 export const FIXED_FACTS: Record<string, { value: boolean; source: string; note: string }> = {
-  gateway: { value: true, source: "byul runtime Gateway 전제", note: "byul runtime을 Gateway로 쓴다고 봅니다." },
+  gateway: { value: true, source: "byul runtime Gateway 전제", note: "byul Gateway를 사용합니다." },
 };
 
 type DerivedFact = { cond: string; key: string; from: string; yes: string[]; no: string[] };
@@ -398,14 +398,13 @@ export function EnvironmentForm(props: FormProps<EnvironmentDoc>) {
         <div className={p.formGrid}>
           {props.isNew ? <TextField ctx={ctx} path="/environment_id" label="환경 ID" required /> : <ReadOnly label="환경 ID" value={doc.environment_id} />}
           <ReadOnly label="현재 판본" value={String(doc.revision)} />
-          <TextField ctx={ctx} path="/target/target_ref" label="대상 ID (target_ref)" hint="runtime 정책의 target_id와 같은 값" required />
+          <TextField ctx={ctx} path="/target/target_ref" label="대상 ID (target_ref)" hint="정책의 target_id와 같은 값" required />
         </div>
         <Note>기준·후보 역할은 비교 실행 설정에서 선택합니다. 기존 입력 상태와 출처는 그대로 보존합니다.</Note>
         <div className="small muted" role="status">
           {selectedProfile ? `판본 지원 프로파일: ${selectedProfile.profiles.join(", ")}. 등록된 기능 범위만 확인되며 모든 시험 지원을 뜻하지 않습니다.` : "판본별 지원 정보 미확인 — 공통 필드를 유지합니다."}
           {catalogQuery.isError && " 지원 정보를 불러오지 못했습니다."}
         </div>
-        {doc.data_origin === "EXAMPLE" && <Note>예시·시연용 자료로 저장돼 있습니다. 판정 근거로 쓰지 않습니다.</Note>}
         <FieldMessages ctx={ctx} path="/framework_profile" exact />
       </section>
 
@@ -426,7 +425,7 @@ function ContractFields({ cond, ctx, doc, catalog }: { cond: string; ctx: FormCt
       return (
         <div className={p.formGrid}>
           <SelectField ctx={ctx} path="/target/engine/name" label="엔진" options={Object.entries(ENGINE_NAME).map(([value, label]) => ({ value, label }))} required />
-          <SelectField ctx={ctx} path="/target/engine/runtime_kind" label="런타임 엔진 종류" options={["vllm", "sglang", "mock"].map((value) => ({ value, label: value }))} />
+          <SelectField ctx={ctx} path="/target/engine/runtime_kind" label="실행 엔진 종류" options={["vllm", "sglang", "mock"].map((value) => ({ value, label: value }))} />
           <TextField ctx={ctx} path="/target/engine/version" label="버전" nullable required suggestions={catalog?.versions.filter((v) => v.engine === name).map((v) => v.version)} placeholder="목록에서 고르거나 입력 (모르면 비워 둠)" />
           <TextField ctx={ctx} path="/target/engine/image_digest" label="이미지 digest" nullable required placeholder="sha256:… (모르면 비워 둠)" />
           <TextField ctx={ctx} path="/target/engine/source_commit" label="소스 커밋" nullable placeholder="7~40자리 hex (모르면 비워 둠)" />
@@ -473,14 +472,14 @@ function ContractFields({ cond, ctx, doc, catalog }: { cond: string; ctx: FormCt
               {deployment.kind === "kubernetes" && <TextField ctx={ctx} path="/deployment/kubernetes_context" label="Kubernetes context" nullable />}
               {deployment.kind === "kubernetes" && <TextField ctx={ctx} path="/deployment/namespace" label="namespace" nullable />}
               {deployment.kind === "kubernetes" && <TextField ctx={ctx} path="/deployment/engine_container" label="엔진 컨테이너" nullable />}
-              <SelectField ctx={ctx} path="/deployment/gateway_schema_version" label="Gateway 정책 스키마" options={["runtime-mvp/1.1", "runtime-mvp/1.2"].map((value) => ({ value, label: value }))} />
+              <SelectField ctx={ctx} path="/deployment/gateway_schema_version" label="Gateway 정책 스키마" options={[{ value: "runtime-mvp/1.1", label: "Gateway 1.1" }, { value: "runtime-mvp/1.2", label: "Gateway 1.2" }]} />
               <SelectField ctx={ctx} path="/deployment/gateway_cache_isolation" label="Gateway cache isolation (1.2)" options={["off", "per_principal"].map((value) => ({ value, label: value }))} />
               <NumberField ctx={ctx} path="/deployment/engine_port" label="엔진 포트" nullable />
               <NumberField ctx={ctx} path="/deployment/management_port" label="관리 포트" nullable />
               <LabelsField ctx={ctx} path="/deployment/gateway_labels" label="Gateway labels" />
               <LabelsField ctx={ctx} path="/deployment/engine_labels" label="엔진 labels" />
               <LaunchSettingsFields ctx={ctx} />
-              <JsonField ctx={ctx} path="/deployment/enforcement_intent" label="환경 집행 intent (정책에 없을 때)" rows={8} hint="runtime-enforcement-intent/1.1 원본 JSON. 모르면 비워 둡니다." />
+              <JsonField ctx={ctx} path="/deployment/enforcement_intent" label="환경 집행 intent (정책에 없을 때)" rows={8} hint="집행 의도 원본 JSON을 입력합니다. 모르면 비워 둡니다." />
             </div>
           )}
         </div>
@@ -775,10 +774,9 @@ function ConditionCard({ cond, done, total, edit }: { cond: EnvCondition; done: 
         <Progress done={done} total={total} />
       </summary>
       <div className={p.foldBody}>
-        {(cond.elsewhere || cond.runtime) && (
+        {cond.elsewhere && (
           <details className={p.inlineHelp}><summary>기존 설정·확인 자료 안내</summary><Note>
             {cond.elsewhere && <div>{cond.elsewhere}</div>}
-            {cond.runtime && <div>byul runtime: {cond.runtime}</div>}
           </Note></details>
         )}
         <ContractFields cond={cond.key} ctx={ctx} doc={doc} catalog={edit.catalog} />
@@ -1045,7 +1043,7 @@ function ExtraFieldsEditor({ ctx }: { ctx: FormCtx }) {
         >
           필드 추가
         </button>
-        {reserved && <span className={p.fieldWarn}>runtime이 직접 다루는 필드라 열 수 없습니다.</span>}
+        {reserved && <span className={p.fieldWarn}>Gateway가 직접 다루는 필드라 열 수 없습니다.</span>}
       </div>
       <FieldMessages ctx={ctx} path={path} />
     </div>
@@ -1130,7 +1128,6 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
         <div className="small muted">
           {props.isNew ? "판본은 1부터 시작하고 저장할 때마다 자동으로 올라갑니다." : `현재 판본 ${doc.policy_version}. 저장하면 다음 판본의 초안(DRAFT)이 됩니다.`} <span className={p.req}>표시</span>는 필수 입력입니다.
         </div>
-        {doc.data_origin === "EXAMPLE" && <Note>예시·시연용 자료로 저장돼 있습니다. 판정 근거로 쓰지 않습니다.</Note>}
         <div className={p.formGrid}>
           {props.isNew ? <TextField ctx={ctx} path="/policy_id" label="정책 ID" required /> : <ReadOnly label="정책 ID" value={doc.policy_id} />}
           <ReadOnly label="사용 Pack (백엔드 지정)" value={`${doc.verification.pack.id || catalog?.pack.id || "확인 중"}@${doc.verification.pack.id ? doc.verification.pack.revision : catalog?.pack.revision ?? "미확인"}`} />
@@ -1310,15 +1307,15 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
           <span className={p.foldTitle}>고급 — 검증 팩·집행 의도·exec 예외 (JSON)</span>
         </summary>
         <div className={`${p.foldBody} stack`}>
-          <div className="small muted">update POL 고유 필드와 runtime 집행 의도 원문입니다. 예외는 판정을 바꾸지 않고 '예외 승인됨'으로만 표시됩니다.</div>
+          <div className="small muted">검증 정책 고유 필드와 집행 의도 원문입니다. 예외는 판정을 바꾸지 않고 '예외 승인됨'으로만 표시됩니다.</div>
           <div className={p.formGrid}>
             <FieldMessages ctx={ctx} path="/verification/pack" />
             <ListField ctx={ctx} path="/verification/scope/include" label="범위 포함" />
             <ListField ctx={ctx} path="/verification/scope/exclude" label="범위 제외" />
-            <SelectField ctx={ctx} path="/runtime/gateway/profile" label="runtime profile" options={[{ value: "default", label: "기본 (default)" }, { value: "zeroday-lab", label: "시험용 (zeroday-lab)" }]} />
+            <SelectField ctx={ctx} path="/runtime/gateway/profile" label="집행 프로필" options={[{ value: "default", label: "기본 (default)" }, { value: "zeroday-lab", label: "시험용 (zeroday-lab)" }]} />
             <JsonField ctx={ctx} path="/verification/values" label="점검별 정책 값 (check_id → 값)" rows={6} />
             <JsonField ctx={ctx} path="/verification/exceptions" label="예외 목록" rows={4} />
-            <JsonField ctx={ctx} path="/runtime/enforcement" label="집행 의도 (runtime.enforcement)" rows={8} hint='쓰지 않으면 null. 예: {"intent_schema": "runtime-enforcement-intent/1.1", "intent": {...}}' />
+            <JsonField ctx={ctx} path="/runtime/enforcement" label="집행 의도" rows={8} hint="집행 의도 원본 JSON을 입력합니다. 쓰지 않으면 null로 둡니다." />
             <JsonField ctx={ctx} path="/runtime/exec_exceptions" label="exec 예외" rows={4} />
           </div>
         </div>
@@ -1349,8 +1346,8 @@ function RequirementCard({ req, entry, ctx, isNew, emptyModels, envAnswers, cata
     <details id={`req-${req.id}`} data-editor-card data-field-path={path} className={p.fold} open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary className={p.foldHead}>
         <span className={p.foldNo}>{req.id}</span>
-        <span className={p.foldTitle}>{req.title}<small className={p.foldSummary}>{req.fixed ? "기존 runtime 기준을 확인하세요" : cur.decision === "needs_confirmation" ? "확인 필요 · 입력 확정에 포함하지 않음" : Object.values(cur.numbers).some((n) => n.status === "after_measurement") ? "측정 후 결정할 수치가 있습니다" : done === total && decisionComplete(cur) ? "표시된 입력을 작성했습니다 · 승인·시험 결과는 별도" : "필요한 기준을 확인하고 작성하세요"}</small></span>
-        {req.fixed ? <span className={p.decision}>runtime이 정함</span> : entry?.decision && <span className={p.decision}>{DECISION_LABEL[entry.decision]}</span>}
+        <span className={p.foldTitle}>{req.title}<small className={p.foldSummary}>{req.fixed ? "기존 기준을 확인하세요" : cur.decision === "needs_confirmation" ? "확인 필요 · 입력 확정에 포함하지 않음" : Object.values(cur.numbers).some((n) => n.status === "after_measurement") ? "측정 후 결정할 수치가 있습니다" : done === total && decisionComplete(cur) ? "표시된 입력을 작성했습니다 · 승인·시험 결과는 별도" : "필요한 기준을 확인하고 작성하세요"}</small></span>
+        {req.fixed ? <span className={p.decision}>기본 설정</span> : entry?.decision && <span className={p.decision}>{DECISION_LABEL[entry.decision]}</span>}
         {!req.fixed && <Progress done={done} total={total} />}
       </summary>
       <div className={p.foldBody}>

@@ -14,12 +14,12 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.approval import ApprovalVerifier, HashListApprovalVerifier
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.policy_state import evaluate_policy, load_revocations
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.policy.approval import ApprovalVerifier, HashListApprovalVerifier
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.policy.policy_state import evaluate_policy, load_revocations
 
 
 def policy_document() -> dict[str, object]:
@@ -235,9 +235,7 @@ class ApprovalGatewayTests(unittest.TestCase):
             data_dir=str(self.directory / "data"),
         )
         try:
-            self.gateway = GatewayApp(
-                config, load_policy(self.policy_path), self.engine.address
-            ).start()
+            self.gateway = GatewayApp(config, load_policy(self.policy_path), self.engine.address).start()
         except PermissionError as error:
             self.skipTest(f"local sockets are unavailable: {error}")
         self.addCleanup(self.gateway.stop)

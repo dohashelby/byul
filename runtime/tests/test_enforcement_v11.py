@@ -116,7 +116,9 @@ class IntentV11ParsingTests(unittest.TestCase):
             "cache-dir-mismatch": lambda d: d["protected_paths"].update(cache_dir="/var/cache/serving/other"),
             "cache-under-model": lambda d: (
                 d["assets"].update(cache_root="/opt/serving/assets/model/cache"),
-                d["protected_paths"].update(cache_dir="/opt/serving/assets/model/cache/vllm/image-example/revision-example/default"),
+                d["protected_paths"].update(
+                    cache_dir="/opt/serving/assets/model/cache/vllm/image-example/revision-example/default"
+                ),
             ),
             "manifest-mount-contains-cache": lambda d: (
                 d["assets"].update(manifest_path="/var/cache/manifest.json"),
@@ -136,9 +138,15 @@ class IntentV11ParsingTests(unittest.TestCase):
             "parent-key-not-allowed": lambda d: d.update(parent_constraints={"/not/allowed": ["/usr/bin/python3"]}),
             "parent-empty": lambda d: d.update(parent_constraints={"/usr/bin/gcc": []}),
             "parent-relative": lambda d: d.update(parent_constraints={"/usr/bin/gcc": ["python3"]}),
-            "suspect-key-not-suspect": lambda d: d.update(suspect_parent_contexts={"/usr/bin/gcc": {"parents": ["/a"], "phases": ["loading"]}}),
-            "suspect-parent-empty": lambda d: d.update(suspect_parent_contexts={"/bin/sh": {"parents": [], "phases": ["loading"]}}),
-            "suspect-phase-invalid": lambda d: d.update(suspect_parent_contexts={"/bin/sh": {"parents": ["/a"], "phases": ["serving"]}}),
+            "suspect-key-not-suspect": lambda d: d.update(
+                suspect_parent_contexts={"/usr/bin/gcc": {"parents": ["/a"], "phases": ["loading"]}}
+            ),
+            "suspect-parent-empty": lambda d: d.update(
+                suspect_parent_contexts={"/bin/sh": {"parents": [], "phases": ["loading"]}}
+            ),
+            "suspect-phase-invalid": lambda d: d.update(
+                suspect_parent_contexts={"/bin/sh": {"parents": ["/a"], "phases": ["serving"]}}
+            ),
             "kube-api-not-bool": lambda d: d.update(observer_kube_api="yes"),
         }
         for label, change in cases.items():
@@ -213,8 +221,10 @@ class RenderV11Tests(unittest.TestCase):
 
     def test_tetragon_watches_tokenizer_and_cache_root(self) -> None:
         self.assertIn("tetragon-tg-asset-02.json", self.tetragon)
+
         def prefix(name: str) -> list[str]:
             return self.tetragon[name]["spec"]["kprobes"][0]["selectors"][0]["matchArgs"][0]["values"]
+
         self.assertEqual(prefix("tetragon-tg-asset-02.json"), ["/opt/serving/assets/tokenizer"])
         self.assertEqual(prefix("tetragon-tg-cache-01.json"), ["/var/cache/serving"])
         legacy = tetragon.render_manifests(load_intent(INTENT_V10))
@@ -239,9 +249,7 @@ class RenderV11Tests(unittest.TestCase):
     def test_sglang_cache_generation_uses_common_renderers(self) -> None:
         document = v11_document()
         document["assets"]["cache_generation"]["engine"] = "sglang"
-        document["protected_paths"]["cache_dir"] = (
-            "/var/cache/serving/sglang/image-example/revision-example/default"
-        )
+        document["protected_paths"]["cache_dir"] = "/var/cache/serving/sglang/image-example/revision-example/default"
         intent = parse_intent(document)
         self.assertEqual(
             intent.assets.generation_path,
@@ -258,9 +266,9 @@ class RenderV11Tests(unittest.TestCase):
         cilium_text = json.dumps(cilium.render_manifests(intent), sort_keys=True)
         tetragon_documents = tetragon.render_manifests(intent)
         self.assertIn('"app": "serving-engine"', cilium_text)
-        cache_values = tetragon_documents["tetragon-tg-cache-01.json"]["spec"][
-            "kprobes"
-        ][0]["selectors"][0]["matchArgs"][0]["values"]
+        cache_values = tetragon_documents["tetragon-tg-cache-01.json"]["spec"]["kprobes"][0]["selectors"][0][
+            "matchArgs"
+        ][0]["values"]
         self.assertEqual(cache_values, ["/var/cache/serving"])
 
 
@@ -280,9 +288,7 @@ class CacheCheckTests(unittest.TestCase):
     def test_sglang_current_generation_path(self) -> None:
         document = v11_document()
         document["assets"]["cache_generation"]["engine"] = "sglang"
-        document["protected_paths"]["cache_dir"] = (
-            "/var/cache/serving/sglang/image-example/revision-example/default"
-        )
+        document["protected_paths"]["cache_dir"] = "/var/cache/serving/sglang/image-example/revision-example/default"
         intent = parse_intent(document)
         report = check_cache(intent, root_override=str(self.root))
         self.assertEqual(report["state"], "cache_root_missing")
@@ -317,7 +323,10 @@ class CacheCheckTests(unittest.TestCase):
         )
         stray_generation_file.unlink()
         os.chmod(self.current, 0o775)
-        self.assertIn("group_or_other_writable", [p for g in self.check()["generations"] if g["is_current"] for p in g["problems"]])
+        self.assertIn(
+            "group_or_other_writable",
+            [p for g in self.check()["generations"] if g["is_current"] for p in g["problems"]],
+        )
         self.assertEqual(self.check()["state"], "problems")
         os.chmod(self.current, 0o755)
         (self.root / "vllm" / "stray-link").symlink_to(other)
@@ -384,7 +393,9 @@ class ExecPolicyTests(unittest.TestCase):
         self.policy = ExecPolicy(self.intent, exceptions_path=EXCEPTIONS, timeline_path=TIMELINE)
 
     def classify(self, binary: str, at: str, **kwargs):
-        return self.policy.classify_exec(binary=binary, observed_at=at, parent=kwargs.get("parent"), image=kwargs.get("image"))
+        return self.policy.classify_exec(
+            binary=binary, observed_at=at, parent=kwargs.get("parent"), image=kwargs.get("image")
+        )
 
     def test_phase_verdicts(self) -> None:
         cases = [
@@ -421,35 +432,44 @@ class ExecPolicyTests(unittest.TestCase):
             (None, "outside_allowlist", "unavailable"),
         ):
             with self.subTest(parent=parent):
-                result = policy.classify_exec(binary="/usr/bin/gcc", parent=parent,
-                                              image=None, observed_at=at)
+                result = policy.classify_exec(binary="/usr/bin/gcc", parent=parent, image=None, observed_at=at)
                 self.assertEqual((result["exec_verdict"], result["parent_check"]), (verdict, check))
                 self.assertEqual(result["parent_attribution"], "available" if parent else "unavailable")
         legacy = policy.classify_exec(binary="/usr/bin/python3", parent=None, image=None, observed_at=at)
-        self.assertEqual((legacy["exec_verdict"], legacy["parent_check"]),
-                         ("allowed_in_phase", "not_constrained"))
-        self.assertEqual(policy.classify_exec(binary="/usr/local/bin/vllm", parent="/usr/local/bin/entrypoint",
-                         image=None, observed_at=at)["exec_verdict"], "allowed_in_phase")
-        self.assertEqual(policy.classify_exec(binary="/usr/local/bin/vllm", parent="/bin/sh",
-                         image=None, observed_at=at)["exec_verdict"], "outside_allowlist")
+        self.assertEqual((legacy["exec_verdict"], legacy["parent_check"]), ("allowed_in_phase", "not_constrained"))
+        self.assertEqual(
+            policy.classify_exec(
+                binary="/usr/local/bin/vllm", parent="/usr/local/bin/entrypoint", image=None, observed_at=at
+            )["exec_verdict"],
+            "allowed_in_phase",
+        )
+        self.assertEqual(
+            policy.classify_exec(binary="/usr/local/bin/vllm", parent="/bin/sh", image=None, observed_at=at)[
+                "exec_verdict"
+            ],
+            "outside_allowlist",
+        )
         event = exec_event("/usr/bin/gcc", at, parent="/bin/sh")
-        self.assertEqual(parse_tetragon(event, data_origin="synthetic", exec_policy=policy)["parent_check"],
-                         "mismatch")
+        self.assertEqual(parse_tetragon(event, data_origin="synthetic", exec_policy=policy)["parent_check"], "mismatch")
         with_exception = ExecPolicy(parse_intent(document), exceptions_path=EXCEPTIONS, timeline_path=TIMELINE)
-        result = with_exception.classify_exec(binary="/usr/bin/ptxas", parent="/bin/sh",
-            image="sha256:" + "0" * 64, observed_at=at)
-        self.assertEqual((result["exec_verdict"], result["exception_candidate_id"]),
-                         ("outside_allowlist", None))
+        result = with_exception.classify_exec(
+            binary="/usr/bin/ptxas", parent="/bin/sh", image="sha256:" + "0" * 64, observed_at=at
+        )
+        self.assertEqual((result["exec_verdict"], result["exception_candidate_id"]), ("outside_allowlist", None))
 
     def test_suspect_parent_context_preserves_verdict(self) -> None:
         document = v11_document()
         document["suspect_parent_contexts"] = {
-            "/bin/sh": {"parents": ["/usr/local/cuda/bin/nvcc", "/opt/sglang/bin/ninja"],
-                        "phases": ["loading", "compiling"]}}
+            "/bin/sh": {
+                "parents": ["/usr/local/cuda/bin/nvcc", "/opt/sglang/bin/ninja"],
+                "phases": ["loading", "compiling"],
+            }
+        }
         policy = ExecPolicy(parse_intent(document), exceptions_path=EXCEPTIONS, timeline_path=TIMELINE)
+
         def classify(parent, at):
-            return policy.classify_exec(binary="/bin/sh", parent=parent, image=None,
-                                        observed_at=at)
+            return policy.classify_exec(binary="/bin/sh", parent=parent, image=None, observed_at=at)
+
         for parent, at, context in (
             ("/usr/local/cuda/bin/nvcc", "2026-10-24T09:04:00Z", "compile_toolchain_parent"),
             ("/opt/sglang/bin/ninja", "2026-10-24T09:04:00Z", "compile_toolchain_parent"),
@@ -466,18 +486,34 @@ class ExecPolicyTests(unittest.TestCase):
                 self.assertIsNone(result["exception_id"])
         with tempfile.TemporaryDirectory() as directory:
             timeline = Path(directory) / "timeline.json"
-            timeline.write_text(json.dumps({"schema_version": "runtime-phase-timeline/1.0", "entries": [
-                {"phase": "loading", "from": "2026-10-24T09:00:00Z",
-                 "until": "2026-10-24T09:10:00Z", "basis": "declared"}]}), encoding="utf-8")
+            timeline.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "runtime-phase-timeline/1.0",
+                        "entries": [
+                            {
+                                "phase": "loading",
+                                "from": "2026-10-24T09:00:00Z",
+                                "until": "2026-10-24T09:10:00Z",
+                                "basis": "declared",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
             trusted_policy = ExecPolicy(parse_intent(document), timeline_path=timeline)
-            trusted = trusted_policy.classify_exec(binary="/bin/sh", parent="/usr/local/cuda/bin/nvcc",
-                image=None, observed_at="2026-10-24T09:04:00Z")
-            self.assertEqual((trusted["exec_verdict"], trusted["suspect_context"]),
-                             ("suspect_binary", "compile_toolchain_parent"))
+            trusted = trusted_policy.classify_exec(
+                binary="/bin/sh", parent="/usr/local/cuda/bin/nvcc", image=None, observed_at="2026-10-24T09:04:00Z"
+            )
+            self.assertEqual(
+                (trusted["exec_verdict"], trusted["suspect_context"]), ("suspect_binary", "compile_toolchain_parent")
+            )
         event = exec_event("/bin/sh", "2026-10-24T09:04:00Z", parent="/usr/local/cuda/bin/nvcc")
         normalized = parse_tetragon(event, data_origin="synthetic", exec_policy=policy)
-        self.assertEqual((normalized["exec_verdict"], normalized["suspect_context"]),
-                         ("suspect_binary", "compile_toolchain_parent"))
+        self.assertEqual(
+            (normalized["exec_verdict"], normalized["suspect_context"]), ("suspect_binary", "compile_toolchain_parent")
+        )
 
     def test_exceptions_are_bounded(self) -> None:
         maintenance = self.classify("/bin/sh", "2026-10-24T10:10:00Z")
@@ -485,8 +521,9 @@ class ExecPolicyTests(unittest.TestCase):
         traversal = self.classify("/bin/../bin/sh", "2026-10-24T10:10:00Z")
         self.assertEqual(traversal["exec_verdict"], "outside_allowlist")
         self.assertIsNone(traversal["exception_id"])
-        self.assertEqual(self.classify("/usr/./bin/python3", "2026-10-24T09:20:00Z")["exec_verdict"],
-                         "outside_allowlist")
+        self.assertEqual(
+            self.classify("/usr/./bin/python3", "2026-10-24T09:20:00Z")["exec_verdict"], "outside_allowlist"
+        )
         after = self.classify("/bin/sh", "2026-10-24T10:31:00Z")
         self.assertEqual(after["exec_verdict"], "suspect_binary")
         # Python is allowed for inference, and maintenance overlaps inference here.
@@ -510,10 +547,22 @@ class ExecPolicyTests(unittest.TestCase):
             timeline = Path(directory) / "t.json"
 
             def classify(basis: str, binary: str, image: str | None = None):
-                timeline.write_text(json.dumps({
-                    "schema_version": "runtime-phase-timeline/1.0",
-                    "entries": [{"phase": "compiling", "from": "2026-10-24T09:00:00+00:00", "until": None, "basis": basis}],
-                }), encoding="utf-8")
+                timeline.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": "runtime-phase-timeline/1.0",
+                            "entries": [
+                                {
+                                    "phase": "compiling",
+                                    "from": "2026-10-24T09:00:00+00:00",
+                                    "until": None,
+                                    "basis": basis,
+                                }
+                            ],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
                 os.utime(timeline, ns=(time.time_ns(), time.time_ns()))
                 policy = ExecPolicy(self.intent, exceptions_path=EXCEPTIONS, timeline_path=timeline)
                 return policy.classify_exec(binary=binary, parent=None, image=image, observed_at="2026-10-24T09:05:00Z")
@@ -522,7 +571,9 @@ class ExecPolicyTests(unittest.TestCase):
                 with self.subTest(basis=basis):
                     self.assertEqual(classify(basis, "/usr/bin/gcc")["exec_verdict"], "allowed_in_phase")
                     trusted = classify(basis, "/usr/bin/ptxas", image=digest)
-                    self.assertEqual((trusted["exec_verdict"], trusted["exception_id"]), ("exception", "EXC-LAB-STANDING-001"))
+                    self.assertEqual(
+                        (trusted["exec_verdict"], trusted["exception_id"]), ("exception", "EXC-LAB-STANDING-001")
+                    )
                     self.assertEqual(trusted["phase_trusted"], ["compiling"])
             signal = classify("engine_signal", "/usr/bin/gcc")
             self.assertEqual(signal["exec_verdict"], "phase_signal_unverified")
@@ -535,12 +586,26 @@ class ExecPolicyTests(unittest.TestCase):
     def test_maintenance_only_window_needs_an_exception(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             timeline = Path(directory) / "t.json"
-            timeline.write_text(json.dumps({
-                "schema_version": "runtime-phase-timeline/1.0",
-                "entries": [{"phase": "maintenance", "from": "2026-10-24T10:00:00+00:00", "until": "2026-10-24T10:30:00+00:00", "basis": "declared"}],
-            }), encoding="utf-8")
+            timeline.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "runtime-phase-timeline/1.0",
+                        "entries": [
+                            {
+                                "phase": "maintenance",
+                                "from": "2026-10-24T10:00:00+00:00",
+                                "until": "2026-10-24T10:30:00+00:00",
+                                "basis": "declared",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
             policy = ExecPolicy(self.intent, timeline_path=timeline)
-            result = policy.classify_exec(binary="/usr/bin/python3", parent=None, image=None, observed_at="2026-10-24T10:10:00Z")
+            result = policy.classify_exec(
+                binary="/usr/bin/python3", parent=None, image=None, observed_at="2026-10-24T10:10:00Z"
+            )
             self.assertEqual(result["exec_verdict"], "outside_allowlist")
 
     def test_naive_event_time_alerts_instead_of_aborting_ingest(self) -> None:
@@ -551,27 +616,45 @@ class ExecPolicyTests(unittest.TestCase):
     def test_parent_condition_requires_parent_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "e.json"
-            path.write_text(json.dumps({
-                "schema_version": "runtime-exec-exceptions/1.0",
-                "exceptions": [{
-                    "exception_id": "E1", "rule_ref": "SP3-EXEC", "kind": "maintenance",
-                    "executable": "/bin/sh", "parent": "/usr/bin/python3", "phase": "inferring",
-                    "reason": "r", "approved_by": "a", "approval_ref": "x",
-                    "valid_from": "2026-10-24T09:10:00+00:00", "valid_until": "2026-10-24T09:30:00+00:00",
-                }],
-            }), encoding="utf-8")
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "runtime-exec-exceptions/1.0",
+                        "exceptions": [
+                            {
+                                "exception_id": "E1",
+                                "rule_ref": "SP3-EXEC",
+                                "kind": "maintenance",
+                                "executable": "/bin/sh",
+                                "parent": "/usr/bin/python3",
+                                "phase": "inferring",
+                                "reason": "r",
+                                "approved_by": "a",
+                                "approval_ref": "x",
+                                "valid_from": "2026-10-24T09:10:00+00:00",
+                                "valid_until": "2026-10-24T09:30:00+00:00",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
             policy = ExecPolicy(self.intent, exceptions_path=path, timeline_path=TIMELINE)
-            classify = lambda parent: policy.classify_exec(binary="/bin/sh", parent=parent, image=None, observed_at="2026-10-24T09:20:00Z")["exec_verdict"]
+            classify = lambda parent: policy.classify_exec(
+                binary="/bin/sh", parent=parent, image=None, observed_at="2026-10-24T09:20:00Z"
+            )["exec_verdict"]
             self.assertEqual(classify(None), "suspect_binary")
             self.assertEqual(classify("/usr/bin/bash"), "suspect_binary")
             self.assertEqual(classify("/usr/bin/python3"), "exception")
 
     def test_invalid_exception_and_timeline_documents(self) -> None:
         base = json.loads(EXCEPTIONS.read_text(encoding="utf-8"))
+
         def exc(**updates):
             document = copy.deepcopy(base)
             document["exceptions"][0].update(updates)
             return document
+
         bad = {
             "long-maintenance": exc(valid_until="2026-10-24T10:31:00+00:00"),
             "end-before-start": exc(valid_until="2026-10-24T09:00:00+00:00"),
@@ -591,20 +674,31 @@ class ExecPolicyTests(unittest.TestCase):
         with self.assertRaises(IntentError):
             parse_exceptions(duplicate)
         with self.assertRaises(IntentError):
-            parse_timeline({"schema_version": "runtime-phase-timeline/1.0", "entries": [{"phase": "loading", "from": "2026-10-24T09:00:00+00:00", "until": None, "basis": "guess"}]})
+            parse_timeline(
+                {
+                    "schema_version": "runtime-phase-timeline/1.0",
+                    "entries": [
+                        {"phase": "loading", "from": "2026-10-24T09:00:00+00:00", "until": None, "basis": "guess"}
+                    ],
+                }
+            )
 
     def test_broken_or_changed_files_are_reloaded(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "t.json"
             path.write_text("{not json", encoding="utf-8")
             policy = ExecPolicy(self.intent, timeline_path=path)
-            result = policy.classify_exec(binary="/usr/bin/python3", parent=None, image=None, observed_at="2026-10-24T09:20:00Z")
+            result = policy.classify_exec(
+                binary="/usr/bin/python3", parent=None, image=None, observed_at="2026-10-24T09:20:00Z"
+            )
             self.assertEqual(result["exec_verdict"], "phase_unknown")
             self.assertIsNotNone(result["phase_source_error"])
             time.sleep(0.01)
             path.write_text(TIMELINE.read_text(encoding="utf-8"), encoding="utf-8")
             os.utime(path, None)
-            result = policy.classify_exec(binary="/usr/bin/python3", parent=None, image=None, observed_at="2026-10-24T09:20:00Z")
+            result = policy.classify_exec(
+                binary="/usr/bin/python3", parent=None, image=None, observed_at="2026-10-24T09:20:00Z"
+            )
             self.assertEqual(result["exec_verdict"], "allowed_in_phase")
             self.assertIsNone(result["phase_source_error"])
 
@@ -632,9 +726,12 @@ class AdapterIntegrationTests(unittest.TestCase):
             with self.subTest(labels=labels):
                 event = exec_event("/usr/bin/uname", "2026-10-24T09:20:00Z")
                 event["process_exec"]["process"]["pod"]["pod_labels"] = labels
-                item = parse_tetragon(event, data_origin="synthetic",
-                                      allowed_engine_binaries=self.policy.intent.allowed_engine_binaries,
-                                      exec_policy=self.policy)
+                item = parse_tetragon(
+                    event,
+                    data_origin="synthetic",
+                    allowed_engine_binaries=self.policy.intent.allowed_engine_binaries,
+                    exec_policy=self.policy,
+                )
                 self.assertNotIn("exec_verdict", item)
                 self.assertIsNone(item["allowed_binary"])
 
@@ -643,7 +740,8 @@ class AdapterIntegrationTests(unittest.TestCase):
             event = exec_event("/bin/sh", "2026-10-24T09:20:00Z")
             event["process_exec"]["process"]["pod"].update(name="serving-gateway-1", pod_labels=labels)
             accepted, rejected, losses = transform_lines_with_loss(
-                [json.dumps(event)], kind="tetragon", data_origin="synthetic", exec_policy=self.policy)
+                [json.dumps(event)], kind="tetragon", data_origin="synthetic", exec_policy=self.policy
+            )
             self.assertEqual((rejected, losses), ([], []))
             self.assertEqual(accepted[0]["exec_verdict"], "suspect_binary")
             self.assertEqual(accepted[0]["phase"], ["unknown"])
@@ -651,8 +749,9 @@ class AdapterIntegrationTests(unittest.TestCase):
 
     def test_cache_exec_stays_engine_scoped(self) -> None:
         binary = "/var/cache/serving/vllm/x/y/z/kernel.so"
-        engine = parse_tetragon(exec_event(binary, "2026-10-24T09:20:00Z"),
-                                data_origin="synthetic", exec_policy=self.policy)
+        engine = parse_tetragon(
+            exec_event(binary, "2026-10-24T09:20:00Z"), data_origin="synthetic", exec_policy=self.policy
+        )
         self.assertEqual(engine["exec_verdict"], "exec_from_cache")
         other_event = exec_event(binary, "2026-10-24T09:20:00Z")
         other_event["process_exec"]["process"]["pod"]["pod_labels"] = {"app": "serving-gateway"}
@@ -664,16 +763,53 @@ class AdapterIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             timeline = Path(directory) / "timeline.json"
             for phase in ("loading", "compiling", "inferring"):
-                timeline.write_text(json.dumps({
-                    "schema_version": "runtime-phase-timeline/1.0",
-                    "entries": [{"phase": phase, "from": "2026-10-24T09:00:00Z", "until": "2026-10-24T10:00:00Z", "basis": "declared"}],
-                }), encoding="utf-8")
+                timeline.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": "runtime-phase-timeline/1.0",
+                            "entries": [
+                                {
+                                    "phase": phase,
+                                    "from": "2026-10-24T09:00:00Z",
+                                    "until": "2026-10-24T10:00:00Z",
+                                    "basis": "declared",
+                                }
+                            ],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
                 policy = ExecPolicy(intent, timeline_path=timeline)
-                self.assertEqual(policy.classify_exec(binary="/usr/bin/python3", parent=None, image=None, observed_at="2026-10-24T09:20:00Z")["exec_verdict"], "allowed_in_phase")
-                self.assertEqual(policy.classify_exec(binary="/usr/bin/unknown", parent=None, image=None, observed_at="2026-10-24T09:20:00Z")["exec_verdict"], "outside_allowlist")
-                self.assertEqual(policy.classify_exec(binary="/bin/sh", parent=None, image=None, observed_at="2026-10-24T09:20:00Z")["exec_verdict"], "suspect_binary")
-            self.assertEqual(ExecPolicy(intent).classify_exec(binary="/usr/bin/uname", parent=None, image=None, observed_at="2026-10-24T09:20:00Z")["exec_verdict"], "outside_allowlist")
-            self.assertEqual(ExecPolicy(intent).classify_exec(binary="/usr/bin/uname", parent="/usr/bin/python3", image=None, observed_at="2026-10-24T09:20:00Z")["exec_verdict"], "phase_unknown")
+                self.assertEqual(
+                    policy.classify_exec(
+                        binary="/usr/bin/python3", parent=None, image=None, observed_at="2026-10-24T09:20:00Z"
+                    )["exec_verdict"],
+                    "allowed_in_phase",
+                )
+                self.assertEqual(
+                    policy.classify_exec(
+                        binary="/usr/bin/unknown", parent=None, image=None, observed_at="2026-10-24T09:20:00Z"
+                    )["exec_verdict"],
+                    "outside_allowlist",
+                )
+                self.assertEqual(
+                    policy.classify_exec(binary="/bin/sh", parent=None, image=None, observed_at="2026-10-24T09:20:00Z")[
+                        "exec_verdict"
+                    ],
+                    "suspect_binary",
+                )
+            self.assertEqual(
+                ExecPolicy(intent).classify_exec(
+                    binary="/usr/bin/uname", parent=None, image=None, observed_at="2026-10-24T09:20:00Z"
+                )["exec_verdict"],
+                "outside_allowlist",
+            )
+            self.assertEqual(
+                ExecPolicy(intent).classify_exec(
+                    binary="/usr/bin/uname", parent="/usr/bin/python3", image=None, observed_at="2026-10-24T09:20:00Z"
+                )["exec_verdict"],
+                "phase_unknown",
+            )
 
     def test_aws_engine_container_attribution(self) -> None:
         intent = load_intent(ROOT / "deploy/gpu-lab-sglang/intent.aws-lab.json")
@@ -706,95 +842,180 @@ class AdapterIntegrationTests(unittest.TestCase):
         raw_cicc = "/usr/local/cuda/bin/../nvvm/bin/cicc"
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "timeline.json"
-            for phase, basis, expected in (("loading", "declared", "allowed_in_phase"),
-                                           ("compiling", "engine_signal", "phase_signal_unverified"),
-                                           ("inferring", "declared", "outside_allowlist")):
-                path.write_text(json.dumps({"schema_version": "runtime-phase-timeline/1.0", "entries": [
-                    {"phase": phase, "from": "2026-11-03T00:00:00Z",
-                     "until": "2026-11-03T01:00:00Z", "basis": basis}]}))
+            for phase, basis, expected in (
+                ("loading", "declared", "allowed_in_phase"),
+                ("compiling", "engine_signal", "phase_signal_unverified"),
+                ("inferring", "declared", "outside_allowlist"),
+            ):
+                path.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": "runtime-phase-timeline/1.0",
+                            "entries": [
+                                {
+                                    "phase": phase,
+                                    "from": "2026-11-03T00:00:00Z",
+                                    "until": "2026-11-03T01:00:00Z",
+                                    "basis": basis,
+                                }
+                            ],
+                        }
+                    )
+                )
                 policy = ExecPolicy(intent, timeline_path=path)
-                self.assertEqual(policy.classify_exec(binary=raw_cicc, parent="/bin/sh", image=None,
-                    observed_at="2026-11-03T00:30:00Z")["exec_verdict"], expected)
-                self.assertEqual(policy.classify_exec(binary="/bin/sh", parent=raw_cicc, image=None,
-                    observed_at="2026-11-03T00:30:00Z")["exec_verdict"], "suspect_binary")
+                self.assertEqual(
+                    policy.classify_exec(
+                        binary=raw_cicc, parent="/bin/sh", image=None, observed_at="2026-11-03T00:30:00Z"
+                    )["exec_verdict"],
+                    expected,
+                )
+                self.assertEqual(
+                    policy.classify_exec(
+                        binary="/bin/sh", parent=raw_cicc, image=None, observed_at="2026-11-03T00:30:00Z"
+                    )["exec_verdict"],
+                    "suspect_binary",
+                )
                 for shell_parent in ("/usr/local/cuda/bin/nvcc", "/opt/sglang/bin/ninja"):
-                    shell = policy.classify_exec(binary="/bin/sh", parent=shell_parent, image=None,
-                        observed_at="2026-11-03T00:30:00Z")
-                    self.assertEqual((shell["exec_verdict"], shell["suspect_context"]),
-                        ("suspect_binary", "compile_toolchain_parent" if phase in {"loading", "compiling"} else None))
-                kubectl_shell = policy.classify_exec(binary="/bin/sh",
-                    parent="/usr/local/bin/containerd-shim-runc-v2", image=None,
-                    observed_at="2026-11-03T00:30:00Z")
-                self.assertEqual((kubectl_shell["exec_verdict"], kubectl_shell["suspect_context"]),
-                                 ("suspect_binary", None))
+                    shell = policy.classify_exec(
+                        binary="/bin/sh", parent=shell_parent, image=None, observed_at="2026-11-03T00:30:00Z"
+                    )
+                    self.assertEqual(
+                        (shell["exec_verdict"], shell["suspect_context"]),
+                        ("suspect_binary", "compile_toolchain_parent" if phase in {"loading", "compiling"} else None),
+                    )
+                kubectl_shell = policy.classify_exec(
+                    binary="/bin/sh",
+                    parent="/usr/local/bin/containerd-shim-runc-v2",
+                    image=None,
+                    observed_at="2026-11-03T00:30:00Z",
+                )
+                self.assertEqual(
+                    (kubectl_shell["exec_verdict"], kubectl_shell["suspect_context"]), ("suspect_binary", None)
+                )
 
     def test_sglang_inferring_triton_ptxas_requires_exact_path_and_parent(self) -> None:
         intent = load_intent(ROOT / "deploy/gpu-lab-sglang/intent.aws-lab.json")
         ptxas = "/opt/sglang/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas"
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "timeline.json"
-            path.write_text(json.dumps({"schema_version": "runtime-phase-timeline/1.0", "entries": [
-                {"phase": "inferring", "from": "2026-11-03T15:57:38Z",
-                 "until": "2026-11-03T16:30:00Z", "basis": "declared"}]}))
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "runtime-phase-timeline/1.0",
+                        "entries": [
+                            {
+                                "phase": "inferring",
+                                "from": "2026-11-03T15:57:38Z",
+                                "until": "2026-11-03T16:30:00Z",
+                                "basis": "declared",
+                            }
+                        ],
+                    }
+                )
+            )
             policy = ExecPolicy(intent, timeline_path=path)
+
             def check(binary: str, parent: str) -> dict:
-                return policy.classify_exec(binary=binary, parent=parent, image=None,
-                    observed_at="2026-11-03T15:59:45Z")
+                return policy.classify_exec(
+                    binary=binary, parent=parent, image=None, observed_at="2026-11-03T15:59:45Z"
+                )
+
             allowed = check(ptxas, "/opt/sglang/bin/python3")
-            self.assertEqual((allowed["exec_verdict"], allowed["parent_check"]),
-                             ("allowed_in_phase", "matched"))
+            self.assertEqual((allowed["exec_verdict"], allowed["parent_check"]), ("allowed_in_phase", "matched"))
             wrong_parent = check(ptxas, "/bin/sh")
-            self.assertEqual((wrong_parent["exec_verdict"], wrong_parent["parent_check"]),
-                             ("outside_allowlist", "mismatch"))
-            self.assertEqual(check("/usr/local/cuda/bin/ptxas", "/opt/sglang/bin/python3")["exec_verdict"],
-                             "outside_allowlist")
+            self.assertEqual(
+                (wrong_parent["exec_verdict"], wrong_parent["parent_check"]), ("outside_allowlist", "mismatch")
+            )
+            self.assertEqual(
+                check("/usr/local/cuda/bin/ptxas", "/opt/sglang/bin/python3")["exec_verdict"], "outside_allowlist"
+            )
             shell = check("/bin/sh", "/usr/local/cuda/bin/nvcc")
-            self.assertEqual((shell["exec_verdict"], shell["suspect_context"]),
-                             ("suspect_binary", None))
+            self.assertEqual((shell["exec_verdict"], shell["suspect_context"]), ("suspect_binary", None))
 
     def test_aws_variable_and_traversal_exec_paths_are_not_implicitly_allowed(self) -> None:
-        for intent_path, engine_binary in (("gpu-lab", "/usr/local/bin/vllm"),
-                                           ("gpu-lab-sglang", "/opt/sglang/bin/python3")):
+        for intent_path, engine_binary in (
+            ("gpu-lab", "/usr/local/bin/vllm"),
+            ("gpu-lab-sglang", "/opt/sglang/bin/python3"),
+        ):
             with self.subTest(intent=intent_path):
                 intent = load_intent(ROOT / "deploy" / intent_path / "intent.aws-lab.json")
                 self.assertNotIn("/proc/self/exe", intent.allowed_engine_binaries)
                 self.assertNotIn("/dev/fd/11", intent.allowed_engine_binaries)
                 self.assertIn("/usr/bin/nvidia-ctk", intent.allowed_engine_binaries)
                 policy = ExecPolicy(intent)
-                for binary in ("/proc/self/exe", "/dev/fd/11",
-                               "/cache/l/../../" + engine_binary.lstrip("/"),
-                               engine_binary.replace("/bin/", "/bin/./")):
+                for binary in (
+                    "/proc/self/exe",
+                    "/dev/fd/11",
+                    "/cache/l/../../" + engine_binary.lstrip("/"),
+                    engine_binary.replace("/bin/", "/bin/./"),
+                ):
                     with self.subTest(binary=binary):
                         expected = "exec_from_cache" if binary.startswith("/cache/") else "phase_unknown"
-                        self.assertEqual(policy.classify_exec(binary=binary, parent=None, image=None,
-                            observed_at="2026-11-03T00:30:00Z")["exec_verdict"], expected)
-                self.assertEqual(policy.classify_exec(binary="/usr/bin/nvidia-ctk", parent="/usr/sbin/runc",
-                    image=None, observed_at="2026-11-03T00:30:00Z")["exec_verdict"], "allowed_in_phase")
+                        self.assertEqual(
+                            policy.classify_exec(
+                                binary=binary, parent=None, image=None, observed_at="2026-11-03T00:30:00Z"
+                            )["exec_verdict"],
+                            expected,
+                        )
+                self.assertEqual(
+                    policy.classify_exec(
+                        binary="/usr/bin/nvidia-ctk",
+                        parent="/usr/sbin/runc",
+                        image=None,
+                        observed_at="2026-11-03T00:30:00Z",
+                    )["exec_verdict"],
+                    "allowed_in_phase",
+                )
                 with tempfile.TemporaryDirectory() as directory:
                     timeline = Path(directory) / "timeline.json"
-                    timeline.write_text(json.dumps({"schema_version": "runtime-phase-timeline/1.0",
-                        "entries": [{"phase": "loading", "from": "2026-11-03T00:00:00Z",
-                                     "until": "2026-11-03T01:00:00Z", "basis": "declared"}]}))
+                    timeline.write_text(
+                        json.dumps(
+                            {
+                                "schema_version": "runtime-phase-timeline/1.0",
+                                "entries": [
+                                    {
+                                        "phase": "loading",
+                                        "from": "2026-11-03T00:00:00Z",
+                                        "until": "2026-11-03T01:00:00Z",
+                                        "basis": "declared",
+                                    }
+                                ],
+                            }
+                        )
+                    )
                     active_policy = ExecPolicy(intent, timeline_path=timeline)
                     bypass = "/cache/l/../../" + engine_binary.lstrip("/")
-                    self.assertEqual(active_policy.classify_exec(binary=bypass, parent=None, image=None,
-                        observed_at="2026-11-03T00:30:00Z")["exec_verdict"], "exec_from_cache")
-                    self.assertEqual(active_policy.classify_exec(binary="/tmp/l/../../" + engine_binary.lstrip("/"),
-                        parent=None, image=None, observed_at="2026-11-03T00:30:00Z")["exec_verdict"],
-                        "outside_allowlist")
+                    self.assertEqual(
+                        active_policy.classify_exec(
+                            binary=bypass, parent=None, image=None, observed_at="2026-11-03T00:30:00Z"
+                        )["exec_verdict"],
+                        "exec_from_cache",
+                    )
+                    self.assertEqual(
+                        active_policy.classify_exec(
+                            binary="/tmp/l/../../" + engine_binary.lstrip("/"),
+                            parent=None,
+                            image=None,
+                            observed_at="2026-11-03T00:30:00Z",
+                        )["exec_verdict"],
+                        "outside_allowlist",
+                    )
 
     def test_cache_write_generation_tag(self) -> None:
         def kprobe(path: str) -> str:
-            return json.dumps({
-                "time": "2026-10-24T09:20:00Z",
-                "process_kprobe": {
-                    "process": {"binary": "/usr/bin/python3"},
-                    "function_name": "security_file_permission",
-                    "policy_name": "runtime-tg-cache-01",
-                    "args": [{"file_arg": {"path": path}}, {"int_arg": 2}],
-                    "action": "KPROBE_ACTION_POST",
-                },
-            })
+            return json.dumps(
+                {
+                    "time": "2026-10-24T09:20:00Z",
+                    "process_kprobe": {
+                        "process": {"binary": "/usr/bin/python3"},
+                        "function_name": "security_file_permission",
+                        "policy_name": "runtime-tg-cache-01",
+                        "args": [{"file_arg": {"path": path}}, {"int_arg": 2}],
+                        "action": "KPROBE_ACTION_POST",
+                    },
+                }
+            )
+
         accepted, rejected = transform_lines(
             [
                 kprobe("/var/cache/serving/vllm/image-example/revision-example/default/a.bin"),
@@ -884,9 +1105,7 @@ class CacheMountPathTests(unittest.TestCase):
         document = v11_document()
         document["assets"]["cache_root"] = "/models/cache-host"
         document["protected_paths"]["model_dir"] = "/models"
-        document["protected_paths"]["cache_dir"] = (
-            "/models/cache-host/vllm/image-example/revision-example/default"
-        )
+        document["protected_paths"]["cache_dir"] = "/models/cache-host/vllm/image-example/revision-example/default"
         with self.assertRaisesRegex(IntentError, "cache_root must be separate from supply paths"):
             parse_intent(document)
 

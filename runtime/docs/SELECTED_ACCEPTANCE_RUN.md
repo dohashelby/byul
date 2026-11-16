@@ -1,6 +1,6 @@
 # 선정 A 인수 실행 묶음
 
-`tools/selected_acceptance_run.py`는 승인된 `selected_runtime_check.py`의 일곱 모드를 순서별 checkpoint로 재사용한다. root가 현재 환경을 기동하고 각 단계의 공개 config를 제공한다. 실행기는 loopback GET, 선정 helper, 명시 파일 읽기와 자기 child process만 사용한다. 모델/정책 변경과 수집기 actor는 두 명령 사이에서 기존 담당자가 수행한다.
+`labtools/selected_acceptance_run.py`는 승인된 `selected_runtime_check.py`의 일곱 모드를 순서별 checkpoint로 재사용한다. root가 현재 환경을 기동하고 각 단계의 공개 config를 제공한다. 실행기는 loopback GET, 선정 helper, 명시 파일 읽기와 자기 child process만 사용한다. 모델/정책 변경과 수집기 actor는 두 명령 사이에서 기존 담당자가 수행한다.
 
 ## 기존 준비 자료의 재사용
 
@@ -33,7 +33,7 @@ workspace `outputs/runtime-development-be07-20261106/` 아래에서 확인한 �
 ```sh
 cd /ABS/final-frozen-source
 export PYTHONPATH=runtime:runtime/src:update/src:platform/api/src
-$PY runtime/tools/selected_acceptance_run.py pins \
+$PY runtime/labtools/selected_acceptance_run.py pins \
   --source /ABS/final-frozen-source --output /NEW/public/source-pins.json
 ```
 
@@ -71,10 +71,10 @@ config의 `source`에는 이 JSON 객체를 그대로 넣는다. 실행기는 �
 모든 단계는 같은 명령 형식이다. `prepare`는 파일·수입 검증과 argv 저장만 수행하고 네트워크 요청을 보내지 않는다. `run`은 새 디렉터리를 만들고 protected viewer와 정확 scope를 확인한 뒤 helper를 한 번 호출한다. 각 디렉터리의 부모는 미리 존재해야 한다.
 
 ```sh
-$PY runtime/tools/selected_acceptance_run.py prepare \
+$PY runtime/labtools/selected_acceptance_run.py prepare \
   --config /PUBLIC/STAGE.json --output-dir /NEW/prepared-STAGE
 # root가 해당 POST 창 또는 actor 단계 확인 후 실행
-$PY runtime/tools/selected_acceptance_run.py run \
+$PY runtime/labtools/selected_acceptance_run.py run \
   --config /PUBLIC/STAGE.json --output-dir /NEW/actual-STAGE
 ```
 
@@ -108,7 +108,7 @@ isolated의 backend는 정확 Pod forward origin을 사용한다. `engine_forwar
 각 witness는 원자료를 공개 반출하지 않고 기존 판정기가 만든 JSON과 해시를 사용한다. 구조 안에 `request_id` 또는 `request_ids`로 실제 UUID가 있어야 case와 연결된다. 단순 Pod/deployment 자료는 request ID가 없어도 stage의 plan witness 참조로 보존할 수 있으며 요청별 귀속은 별도로 남는다.
 
 ```sh
-$PY runtime/tools/selected_acceptance_run.py link \
+$PY runtime/labtools/selected_acceptance_run.py link \
   --run-dir /NEW/actual-requests --witnesses /PUBLIC/request-witness-refs.json \
   --output /NEW/public/requests-links.json
 ```

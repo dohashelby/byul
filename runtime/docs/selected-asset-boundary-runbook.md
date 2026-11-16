@@ -17,7 +17,7 @@ lab_model_root=/srv/serving/models/APPROVED_REVISION
 lab_bridge=$lab_evidence/asset-bridge-report.json
 
 sudo env PYTHONPATH="$lab_source/runtime/src:$lab_source/update/src" \
-  "$lab_python" "$lab_source/runtime/tools/selected_asset_boundaries.py" inspect \
+  "$lab_python" "$lab_source/runtime/labtools/selected_asset_boundaries.py" inspect \
   --intent "$lab_intent" --model-host-path "$lab_model_root" \
   --asset-report "$lab_bridge" --engine-gid 0 \
   --trusted-model-writer-uid 0 --trusted-model-writer-uid 1000 \
@@ -32,7 +32,7 @@ sudo env PYTHONPATH="$lab_source/runtime/src:$lab_source/update/src" \
 
 ```sh
 sudo env PYTHONPATH="$lab_source/runtime/src:$lab_source/update/src" \
-  "$lab_python" "$lab_source/runtime/tools/selected_asset_boundaries.py" isolated \
+  "$lab_python" "$lab_source/runtime/labtools/selected_asset_boundaries.py" isolated \
   --intent "$lab_intent" --model-host-path "$lab_model_root" \
   --sandbox-root /var/tmp/byul-selected-assets-NEW_UNIQUE_RUN \
   --engine-gid 0 --denied-uid 65534 \

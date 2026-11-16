@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from serving_runtime.file_info import inspect_file
+from serving_runtime.common.file_info import inspect_file
 
 
 class FileInfoTests(unittest.TestCase):
@@ -61,6 +61,6 @@ class FileInfoTests(unittest.TestCase):
                     changed = True
                 return chunk
 
-            with patch("serving_runtime.file_info.os.read", side_effect=read_and_change):
+            with patch("serving_runtime.common.file_info.os.read", side_effect=read_and_change):
                 with self.assertRaises(OSError):
                     inspect_file(path)

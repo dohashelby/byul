@@ -35,7 +35,7 @@ SPECS = {
         ('AsyncMPClient.profile_async',)),
     'vllm.v1.engine.core': ('vllm/v1/engine/core.py', 11486,
         '091b574c562202ccc60139e3d1a9cdd29f0fd33cbffa286ca4ae76f460ee3a16',
-        ('EngineCore._handle_client_request',)),
+        ('EngineCoreProc._handle_client_request',)),
     'vllm.v1.executor.abstract': ('vllm/v1/executor/abstract.py', 3585,
         '6e0c838ef1e866b15f8176da0af117dc4661efe387fbcca20d521020c7b1970a',
         ('Executor.profile',)),
@@ -52,7 +52,7 @@ SEGMENTS = {
 }
 PARENTS = {
     'AsyncMPClient.profile_async': frozenset({'AsyncLLM.start_profile', 'AsyncLLM.stop_profile'}),
-    'Executor.profile': frozenset({'EngineCore._handle_client_request'}),
+    'Executor.profile': frozenset({'EngineCoreProc._handle_client_request'}),
     'MultiprocExecutor.collective_rpc': frozenset({'Executor.profile'}),
 }
 FIELDS = frozenset({'schema', 'point', 'phase', 'binding', 'runtime', 'source_sha256',
@@ -155,7 +155,7 @@ class LocalProfilerObserver:
         if point in {'AsyncMPClient.profile_async', 'Executor.profile'}:
             raw = args[1] if len(args) > 1 else kwargs.get('is_start', True)
             flag = raw if type(raw) is bool else None
-        if point == 'EngineCore._handle_client_request':
+        if point == 'EngineCoreProc._handle_client_request':
             request = args[1] if len(args) > 1 else kwargs.get('request')
             # The pinned native branch uses isinstance(request, EngineCoreProfile).
             # Exact class identity is narrower and cannot mislabel an abort/list

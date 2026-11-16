@@ -1,4 +1,5 @@
 """Complete monitor windows, human reviews, fail-closed boundaries and agent handoff."""
+
 from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
@@ -25,24 +26,61 @@ class MonitorWindowTests(unittest.TestCase):
         self.time = datetime(2026, 11, 6, tzinfo=timezone.utc)
         self.intent = parse_intent(intent_document())
         self.name, self.node = "runtime-tg-secret-01", "node-01"
-        self.status, self.events, self.output, self.reviews = [self.root / name for name in
-            ("state.json", "observations.jsonl", "windows.json", "reviews.json")]
-        self.snapshot = {"schema_version": "runtime-tetragon-state/1.0", "context": "test", "state": "ok", "fresh": True,
+        self.status, self.events, self.output, self.reviews = [
+            self.root / name for name in ("state.json", "observations.jsonl", "windows.json", "reviews.json")
+        ]
+        self.snapshot = {
+            "schema_version": "runtime-tetragon-state/1.0",
+            "context": "test",
+            "state": "ok",
+            "fresh": True,
             "generated_at": self.time.isoformat(),
-            "policies": [{"name": self.name, "namespace": self.intent.namespace, "node": self.node,
-                "id": "7", "spec_sha256": "a" * 64, "method": "override_lsm", "mode": "monitor", "state": "enabled"}],
+            "policies": [
+                {
+                    "name": self.name,
+                    "namespace": self.intent.namespace,
+                    "node": self.node,
+                    "id": "7",
+                    "spec_sha256": "a" * 64,
+                    "method": "override_lsm",
+                    "mode": "monitor",
+                    "state": "enabled",
+                }
+            ],
             "capabilities": [{"node": self.node, "kernel": "test-kernel", "available": ["override_lsm"]}],
-            "verifications": [{"data_origin": "real", "node": self.node, "method": "override_lsm",
-                "policy_spec_sha256": "a" * 64, "kernel": "test-kernel", "verification": {"status": "passed"},
-                "source_report_sha256": "c" * 64}],
-            "monitoring": {"state": "healthy", "history": [], "open_gap": None,
-                **dict.fromkeys(("policies_verified", "writer_verified", "identities_verified", "events_verified"), True)}}
+            "verifications": [
+                {
+                    "data_origin": "real",
+                    "node": self.node,
+                    "method": "override_lsm",
+                    "policy_spec_sha256": "a" * 64,
+                    "kernel": "test-kernel",
+                    "verification": {"status": "passed"},
+                    "source_report_sha256": "c" * 64,
+                }
+            ],
+            "monitoring": {
+                "state": "healthy",
+                "history": [],
+                "open_gap": None,
+                **dict.fromkeys(
+                    ("policies_verified", "writer_verified", "identities_verified", "events_verified"), True
+                ),
+            },
+        }
         self.events.write_text("")
         self.generator = self.new_generator()
 
     def new_generator(self):
-        return MonitorWindowGenerator(context="test", namespace=self.intent.namespace, policies=[self.name],
-            status=self.status, observations=self.events, output=self.output, reviews=self.reviews)
+        return MonitorWindowGenerator(
+            context="test",
+            namespace=self.intent.namespace,
+            policies=[self.name],
+            status=self.status,
+            observations=self.events,
+            output=self.output,
+            reviews=self.reviews,
+        )
 
     def collect(self, seconds=0):
         self.snapshot["generated_at"] = (self.time + timedelta(seconds=seconds)).isoformat()
@@ -50,19 +88,31 @@ class MonitorWindowTests(unittest.TestCase):
         return self.generator.collect(now=self.time + timedelta(seconds=seconds))
 
     def event(self, seconds=1, **extra):
-        return {"schema": "runtime-observation/1.0", "source": "tetragon", "data_origin": "real",
-            "policy_name": self.name, "observed_at": (self.time + timedelta(seconds=seconds)).isoformat(),
-            "pod": {"namespace": self.intent.namespace}, "kind": "file_access", "path": "/run/test-token",
-            "identity": {"state": "confirmed", "context": "test", "node": self.node,
-                         "container_name": "engine", "exec_id": "test-actor"}, **extra}
+        return {
+            "schema": "runtime-observation/1.0",
+            "source": "tetragon",
+            "data_origin": "real",
+            "policy_name": self.name,
+            "observed_at": (self.time + timedelta(seconds=seconds)).isoformat(),
+            "pod": {"namespace": self.intent.namespace},
+            "kind": "file_access",
+            "path": "/run/test-token",
+            "identity": {
+                "state": "confirmed",
+                "context": "test",
+                "node": self.node,
+                "container_name": "engine",
+                "exec_id": "test-actor",
+            },
+            **extra,
+        }
 
     def append(self, event):
         with self.events.open("a") as out:
             out.write(json.dumps(event) + "\n")
 
     def ready(self, value, seconds=10):
-        return evaluate(self.snapshot, self.name, self.intent, value, 10,
-                        now=self.time + timedelta(seconds=seconds))
+        return evaluate(self.snapshot, self.name, self.intent, value, 10, now=self.time + timedelta(seconds=seconds))
 
     def test_continuous_empty_window_and_safety_duration_and_until(self):
         start = self.collect()["windows"][0]["since"]
@@ -96,8 +146,12 @@ class MonitorWindowTests(unittest.TestCase):
         self.assertEqual(result["windows"][0]["since"], result["windows"][0]["until"])
 
     def test_spec_id_method_kernel_and_agent_epoch_restart(self):
-        for target, field, value in [("policies", "spec_sha256", "b" * 64), ("policies", "id", "8"),
-                                      ("policies", "method", "sigkill_fd_install"), ("capabilities", "kernel", "new-kernel")]:
+        for target, field, value in [
+            ("policies", "spec_sha256", "b" * 64),
+            ("policies", "id", "8"),
+            ("policies", "method", "sigkill_fd_install"),
+            ("capabilities", "kernel", "new-kernel"),
+        ]:
             with self.subTest(field=field):
                 self.generator = self.new_generator()
                 self.collect()
@@ -119,8 +173,14 @@ class MonitorWindowTests(unittest.TestCase):
         self.snapshot["policies"][0]["mode"] = "monitor"
         result = self.collect(10)
         self.assertEqual(result["windows"][0]["since"], result["windows"][0]["until"])
-        self.snapshot["transitions"] = [{"policy": self.name, "namespace": self.intent.namespace,
-                                         "requested_mode": "enforce", "at": self.time.isoformat()}]
+        self.snapshot["transitions"] = [
+            {
+                "policy": self.name,
+                "namespace": self.intent.namespace,
+                "requested_mode": "enforce",
+                "at": self.time.isoformat(),
+            }
+        ]
         result = self.collect(15)
         self.assertEqual(result["windows"][0]["since"], result["windows"][0]["until"])
 
@@ -128,11 +188,21 @@ class MonitorWindowTests(unittest.TestCase):
         self.collect()
         accepted = self.event()
         self.append(accepted)
-        for event in [self.event(data_origin="synthetic"), self.event(policy_name="other"),
-                      self.event(observation_purpose="health_check"), self.event(seconds=-1), self.event(seconds=11),
-                      self.event(pod={"namespace": "other"})]:
+        for event in [
+            self.event(data_origin="synthetic"),
+            self.event(policy_name="other"),
+            self.event(observation_purpose="health_check"),
+            self.event(seconds=-1),
+            self.event(seconds=11),
+            self.event(pod={"namespace": "other"}),
+        ]:
             self.append(event)
-        for changes in [{"state": "unavailable"}, {"node": "other"}, {"context": "other"}, {"container_name": "sentinel"}]:
+        for changes in [
+            {"state": "unavailable"},
+            {"node": "other"},
+            {"context": "other"},
+            {"container_name": "sentinel"},
+        ]:
             event = self.event()
             event["identity"].update(changes)
             self.append(event)
@@ -162,8 +232,10 @@ class MonitorWindowTests(unittest.TestCase):
         value = self.collect(10)
         self.assertEqual(value["windows"][0]["false_positive_count"], 1)
         self.assertFalse(self.ready(value)["checks"]["monitor_period"])
-        for body in [{"reviewer_token_id": "bad/token", "events": rows},
-                     {"reviewer_token_id": "reviewer-01", "events": rows + rows}]:
+        for body in [
+            {"reviewer_token_id": "bad/token", "events": rows},
+            {"reviewer_token_id": "reviewer-01", "events": rows + rows},
+        ]:
             atomic_json(self.reviews, body)
             self.assertEqual(self.collect(10)["windows"][0]["reviewed_event_count"], 0)
 
@@ -172,8 +244,13 @@ class MonitorWindowTests(unittest.TestCase):
         self.append(self.event(10))
         self.collect(10)
         entry = json.loads(self.generator.catalog.read_text())["windows"][0]["events"][0]
-        atomic_json(self.reviews, {"reviewer_token_id": "reviewer-01", "events": [
-            {"event_sha256": entry["event_sha256"], "verdict": "not_false_positive"}]})
+        atomic_json(
+            self.reviews,
+            {
+                "reviewer_token_id": "reviewer-01",
+                "events": [{"event_sha256": entry["event_sha256"], "verdict": "not_false_positive"}],
+            },
+        )
         self.snapshot["policies"][0]["id"] = "new-id"
         value = self.collect(10)
         self.assertEqual(value["windows"][0]["event_count"], 1)
@@ -284,8 +361,10 @@ class MonitorWindowTests(unittest.TestCase):
             info[4] = 10000
             return os.stat_result(info)
 
-        with patch("tools.tetragon_monitor_window.os.getuid", return_value=10001), \
-             patch("tools.tetragon_monitor_window.os.fstat", side_effect=gateway_owner):
+        with (
+            patch("tools.tetragon_monitor_window.os.getuid", return_value=10001),
+            patch("tools.tetragon_monitor_window.os.fstat", side_effect=gateway_owner),
+        ):
             for owners in ((), (10002,)):
                 with self.assertRaises(ValueError):
                     read_bytes(self.events, 1024, trusted_owner_uids=owners)
@@ -297,7 +376,7 @@ class MonitorWindowTests(unittest.TestCase):
                 self.events.chmod(mode)
                 self.assertEqual(self.collect()["state"], "unavailable")
             self.events.chmod(0o644)
-            target = self.root/"renamed.jsonl"
+            target = self.root / "renamed.jsonl"
             self.events.rename(target)
             self.events.symlink_to(target)
             self.assertEqual(self.collect()["state"], "unavailable")
@@ -305,11 +384,29 @@ class MonitorWindowTests(unittest.TestCase):
     def test_cli_passes_repeated_explicit_trusted_owner_uids(self):
         generator = Mock(output=self.output)
         generator.collect.return_value = {"state": "ok"}
-        args = ["monitor", "--context", "test", "--namespace", self.intent.namespace,
-                "--policy", self.name, "--status", str(self.status), "--observations", str(self.events),
-                "--output", str(self.output), "--trusted-owner-uid", "10000", "--trusted-owner-uid", "10002"]
-        with patch("sys.argv", args), \
-             patch("tools.tetragon_monitor_window.MonitorWindowGenerator", return_value=generator) as constructor:
+        args = [
+            "monitor",
+            "--context",
+            "test",
+            "--namespace",
+            self.intent.namespace,
+            "--policy",
+            self.name,
+            "--status",
+            str(self.status),
+            "--observations",
+            str(self.events),
+            "--output",
+            str(self.output),
+            "--trusted-owner-uid",
+            "10000",
+            "--trusted-owner-uid",
+            "10002",
+        ]
+        with (
+            patch("sys.argv", args),
+            patch("tools.tetragon_monitor_window.MonitorWindowGenerator", return_value=generator) as constructor,
+        ):
             self.assertEqual(main(), 0)
         self.assertEqual(constructor.call_args.kwargs["trusted_owner_uids"], [10000, 10002])
 

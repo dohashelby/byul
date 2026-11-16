@@ -1,4 +1,5 @@
 """Failed watch polls must not accumulate original native capture files."""
+
 import importlib.util
 from pathlib import Path
 
@@ -50,15 +51,18 @@ def test_archive_publish_preserves_original_inode_and_only_removes_temporary(tmp
 
 def test_archive_creation_race_preserves_concurrent_original(tmp_path, monkeypatch):
     tool = load_tool()
-    from serving_runtime.mvp import native_receipts
+    from serving_runtime.observation import native_receipts
+
     archived = tmp_path / "sealed-original.json"
     link = tool.os.link
+
     def concurrent_create(source, target, **kwargs):
         Path(target).write_bytes(b"concurrent original")
         return link(source, target, **kwargs)
-    monkeypatch.setattr(tool.os, 'link', concurrent_create)
-    monkeypatch.setattr(native_receipts, 'read_protected', lambda path, *a, **k: Path(path).read_bytes())
-    with pytest.raises(ValueError, match='ARCHIVE_CONFLICT'):
+
+    monkeypatch.setattr(tool.os, "link", concurrent_create)
+    monkeypatch.setattr(native_receipts, "read_protected", lambda path, *a, **k: Path(path).read_bytes())
+    with pytest.raises(ValueError, match="ARCHIVE_CONFLICT"):
         with tool._temporary_capture(tmp_path) as capture:
             capture.write_bytes(b"different original")
             tool._archive_capture(capture, archived, b"different original", 10010, 1024)

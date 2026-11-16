@@ -3,12 +3,12 @@ import { Link } from "react-router-dom";
 // 모양은 runtime에서 가져온 platform 디자인을 따른다. 판정·집계 값은 서버가 RPT에서 꺼낸 그대로 쓴다.
 import type { ReactNode } from "react";
 import type { ReportCheck, ReportMark, ReportSide, ReportView as Report } from "../api/types";
-import { Badge, EnumBadge, OriginBadge, VerdictBadge } from "../components/Badges";
+import { Badge, EnumBadge, VerdictBadge } from "../components/Badges";
 import { DataTable, type Column } from "../components/DataTable";
 import { Pagination, usePagination } from "../components/Pagination";
 import { DetailPanel, KeyValue } from "../components/DetailPanel";
 import { JsonView } from "../components/JsonView";
-import { Banner, Dot, MetricCard, ui } from "../components/Misc";
+import { Dot, MetricCard, ui } from "../components/Misc";
 import { ChartCard, Donut } from "../components/StackedBars";
 import { Short, Time, Value } from "../components/Value";
 import {
@@ -22,7 +22,6 @@ import {
   NOT_SELECTED,
   PACK_STATUS,
   POLICY_STATUS,
-  UNOFFICIAL_REASON,
   VERDICT,
   label,
 } from "../lib/labels";
@@ -190,7 +189,6 @@ function CheckDrawer({ c, report, raw, onClose }: { c: ReportCheck; report: Repo
                         ["보안", <VerdictBadge verdict={s.security} />],
                         ["기능", <VerdictBadge verdict={s.functional} />],
                         ["성능", <VerdictBadge verdict={s.performance} />],
-                        ["검증 수준", <OriginBadge origin={s.verification_level} />],
                         ["판정(RES)", s.result_id ? <span className="mono">{`${s.result_id}@${s.result_revision}`}</span> : <Value v={null} />],
                       ]}
                     />
@@ -219,6 +217,7 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
   const byId = new Map(report.checks.map((c) => [c.check_id, c]));
   const selectedRows = report.checks.filter((c) => c.selected);
   const n = report.counts;
+  const limitations = report.limitations.filter((text) => !/예시|example|런타임|runtime|에비던스|evidence|비공식|공식.*(?:아님|아닙|제외|불가)/i.test(text));
   const total = Math.max(1, n.fail + n.unknown + n.pass + n.not_applicable);
   const current = selected ? byId.get(selected) : undefined;
 
@@ -256,13 +255,8 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
 
   return (
     <>
-      {!report.official && (
-        <div style={{ position: "sticky", top: 52, zIndex: 3, margin: "0 -24px" }}>
-          <Banner kind="unofficial">공식 아님 — {report.unofficial_reasons.map((r) => label(UNOFFICIAL_REASON, r)).join(", ")}</Banner>
-        </div>
-      )}
       <span className="muted mono">
-        {report.report_id}@{report.revision} · {report.created_at} · {label(MODE_LONG, report.mode)} · 자료 출처 {report.data_origin}
+        {report.report_id}@{report.revision} · {report.created_at} · {label(MODE_LONG, report.mode)}
       </span>
 
       <div className={ui.cards}>
@@ -349,7 +343,7 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
       <div className={ui.cardGrid}>
         <MetricCard title="수동 시험 필요" value={n.manual_required} caption="선정됐지만 자동 실행 불가" />
         <MetricCard title="미선정" value={n.not_selected} caption="범위 밖" />
-        {update && <MetricCard title="후퇴" dot={n.regressed ? "bad" : "none"} value={n.regressed} caption="기준 충족 → 후보 미충족" />}
+        {update && <MetricCard title="위험" dot={n.regressed ? "bad" : "none"} value={n.regressed} caption="기준 충족 → 후보 미충족" />}
         <MetricCard title="승인" dot={report.approval ? "ok" : "none"}>
           {report.approval ? (
             <span>
@@ -403,7 +397,7 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
         <p className="notice">미충족·미확인 항목 없음</p>
       ) : (
         <>
-          <FindingGroup title="후퇴" note="(기준 충족 → 후보 미충족)" ids={report.focus.regressed} byId={byId} update={update} onOpen={onSelect} pageParam="page_regressed" />
+          <FindingGroup title="위험" note="(기준 충족 → 후보 미충족)" ids={report.focus.regressed} byId={byId} update={update} onOpen={onSelect} pageParam="page_regressed" />
           <FindingGroup title="미충족" ids={report.focus.fail} byId={byId} update={update} onOpen={onSelect} pageParam="page_failed" />
           <FindingGroup title="미확인" note="(근거 부족, 충족으로 집계하지 않음)" ids={report.focus.unknown} byId={byId} update={update} onOpen={onSelect} pageParam="page_unknown" />
         </>
@@ -421,14 +415,14 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
         pageParam="page_purpose"
       />
 
-      <article className="card card-pad stack">
+      {limitations.length > 0 && <article className="card card-pad stack">
         <h3>한계</h3>
         <ul style={{ margin: 0, paddingLeft: 18 }}>
-          {report.limitations.map((x) => (
+          {limitations.map((x) => (
             <li key={x}>{x}</li>
           ))}
         </ul>
-      </article>
+      </article>}
 
       <h2 className={ui.blockTitle}>선정된 점검 전체 ({selectedRows.length}건)</h2>
       <DataTable
@@ -474,7 +468,6 @@ export function FullReport({ report, rawChecks, selected, onSelect }: { report: 
               ["작성", <Time iso={report.created_at} />],
               ["팩", <EnumBadge table={PACK_STATUS} value={report.pack_review_status} />],
               ["정책", <EnumBadge table={POLICY_STATUS} value={report.policy_status} />],
-              ["자료 등급", <OriginBadge origin={report.data_origin} />],
             ]}
           />
           <DataTable

@@ -14,7 +14,7 @@ import threading
 import time
 import unittest
 
-from serving_runtime.mvp.management_listener import (
+from serving_runtime.gateway.management_listener import (
     DEFAULT_ALLOWED_PATHS,
     ManagementListener,
     ManagementListenerConfig,
@@ -101,9 +101,7 @@ class ManagementConfigTests(unittest.TestCase):
                     allowed_paths=(path,),
                 )
         with self.assertRaises(ValueError):
-            ManagementListenerConfig.build(
-                engine_url="http://127.0.0.1:8000/base/../admin"
-            )
+            ManagementListenerConfig.build(engine_url="http://127.0.0.1:8000/base/../admin")
 
     def test_credential_file_uses_backend_rules_and_is_read_once(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -175,11 +173,7 @@ class ManagementListenerHTTPTests(unittest.TestCase):
 
     def raw_request(self, target: str) -> int:
         with closing(socket.create_connection((self.host, self.port), timeout=2)) as client:
-            client.sendall(
-                f"GET {target} HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n".encode(
-                    "ascii"
-                )
-            )
+            client.sendall(f"GET {target} HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n".encode("ascii"))
             response = HTTPResponse(client)
             response.begin()
             response.read()
@@ -207,7 +201,9 @@ class ManagementListenerHTTPTests(unittest.TestCase):
         self.assertEqual([r["method"] for r in self.engine.requests], ["HEAD", "GET"])
         records = self.parsed_records()
         self.assertEqual(len(records), 1)
-        self.assertEqual((records[0]["method"], records[0]["status_code"], records[0]["allowed_count"]), ("HEAD", 200, 1))
+        self.assertEqual(
+            (records[0]["method"], records[0]["status_code"], records[0]["allowed_count"]), ("HEAD", 200, 1)
+        )
 
     def test_head_get_fallback_retains_size_and_time_bounds(self) -> None:
         self.engine.reject_head = True
@@ -312,7 +308,20 @@ class ManagementListenerHTTPTests(unittest.TestCase):
         self.assertEqual(records[1]["path"], "/health")
         self.assertEqual(
             set(records[0]),
-            {"schema", "allowed_count", "denied_count", "path", "status_code", "event_id", "recorded_at", "method", "scope", "actor", "recording", "allowed"},
+            {
+                "schema",
+                "allowed_count",
+                "denied_count",
+                "path",
+                "status_code",
+                "event_id",
+                "recorded_at",
+                "method",
+                "scope",
+                "actor",
+                "recording",
+                "allowed",
+            },
         )
         serialized = self.records.getvalue()
         self.assertNotIn("hidden-client-secret", serialized)

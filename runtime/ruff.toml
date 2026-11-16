@@ -1,0 +1,11 @@
+required-version = "==0.17.5"
+target-version = "py312"
+line-length = 120
+extend-exclude = ["*.md"]
+
+[format]
+quote-style = "double"
+
+[lint]
+# 이번에는 보고용. 자동 수정 금지(WP1a 규칙).
+select = ["F", "E9"]

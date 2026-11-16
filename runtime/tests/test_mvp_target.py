@@ -15,13 +15,13 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.collectors import Collector
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.store import JsonlStore
-from serving_runtime.mvp.target import (
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.observation.collectors import Collector
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.observation.store import JsonlStore
+from serving_runtime.target.target import (
     KubernetesTargetCollector,
     POD_SNAPSHOT_SCHEMA,
     TargetRegistry,
@@ -60,7 +60,9 @@ def kubernetes_block(**updates: object) -> dict[str, object]:
     return block
 
 
-def pod(name: str, uid: str, container_id: str, *, restarts: int = 0, running: bool = True, deleting: bool = False) -> dict[str, object]:
+def pod(
+    name: str, uid: str, container_id: str, *, restarts: int = 0, running: bool = True, deleting: bool = False
+) -> dict[str, object]:
     metadata: dict[str, object] = {"name": name, "uid": uid}
     if deleting:
         metadata["deletionTimestamp"] = "2026-10-24T00:00:00Z"
@@ -162,7 +164,9 @@ class TargetRegistrationTests(TempMixin, unittest.TestCase):
         template["engine"]["image_digest"] = digest
         registration = load_target(self.write("sglang.json", template))
         self.assertEqual(registration.state, "ok")
-        registry = TargetRegistry(registration, data_dir=Path(self.temporary.name) / "sglang", observation_session_id="s")
+        registry = TargetRegistry(
+            registration, data_dir=Path(self.temporary.name) / "sglang", observation_session_id="s"
+        )
         info = {"state": "ok", "last_value": {"engine.version": "not_collected", "model.ids": ["test-model"]}}
         args = {"policy_target_id": template["target_id"], "backend_kind": "sglang", "engine_info": info}
         good = summarize_pods({"items": [pod("p1", "u1", "c1")]}, "engine")
@@ -178,8 +182,11 @@ class TargetRegistrationTests(TempMixin, unittest.TestCase):
         self.assertEqual(registry.hold(**args, kubernetes=wrong)[0], "TARGET_MISMATCH")
         declared = json.loads(json.dumps(template))
         declared["engine"]["version"] = "0.5.22"
-        mismatched = TargetRegistry(load_target(self.write("version.json", declared)),
-                                    data_dir=Path(self.temporary.name) / "wrong", observation_session_id="s")
+        mismatched = TargetRegistry(
+            load_target(self.write("version.json", declared)),
+            data_dir=Path(self.temporary.name) / "wrong",
+            observation_session_id="s",
+        )
         mismatched.observe_kubernetes(good, None)
         self.assertEqual(mismatched.hold(**args, kubernetes=good)[0], "TARGET_MISMATCH")
 
@@ -197,14 +204,10 @@ class PodSnapshotTests(TempMixin, unittest.TestCase):
         self.assertNotIn("must-not-be-read", json.dumps(one))
         two = summarize_pods({"items": [pod("p1", "u1", "c1"), pod("p2", "u2", "c2")]}, "engine")
         self.assertEqual((two["state"], two["instance"]), ("multiple_targets", None))
-        terminating = summarize_pods(
-            {"items": [pod("p1", "u1", "c1", deleting=True), pod("p2", "u2", "c2")]}, "engine"
-        )
+        terminating = summarize_pods({"items": [pod("p1", "u1", "c1", deleting=True), pod("p2", "u2", "c2")]}, "engine")
         self.assertEqual(terminating["instance"]["pod"], "p2")
         self.assertEqual(summarize_pods({"items": []}, "engine")["state"], "not_found")
-        self.assertEqual(
-            summarize_pods({"items": [pod("p1", "u1", "c1")]}, "other")["state"], "container_missing"
-        )
+        self.assertEqual(summarize_pods({"items": [pod("p1", "u1", "c1")]}, "other")["state"], "container_missing")
         self.assertEqual(
             summarize_pods({"items": [pod("p1", "u1", "c1", running=False)]}, "engine")["state"],
             "not_running",
@@ -224,7 +227,10 @@ class PodSnapshotTests(TempMixin, unittest.TestCase):
         self.assertEqual((one["state"], one["instance"]["pod"]), ("ok", "running"))
         self.assertEqual({item["phase"] for item in one["pods"]}, {"Failed", "Succeeded", "Running"})
         self.assertEqual(summarize_pods({"items": [failed, succeeded]}, "engine")["state"], "not_found")
-        self.assertEqual(summarize_pods({"items": [failed, running, pod("another", "u2", "c2")]}, "engine")["state"], "multiple_targets")
+        self.assertEqual(
+            summarize_pods({"items": [failed, running, pod("another", "u2", "c2")]}, "engine")["state"],
+            "multiple_targets",
+        )
         self.assertEqual(summarize_pods({"items": [failed, running, pending]}, "engine")["state"], "multiple_targets")
 
     def test_collector_uses_fixed_read_only_argv(self) -> None:
@@ -242,9 +248,7 @@ class PodSnapshotTests(TempMixin, unittest.TestCase):
         # An explicit context must agree with the registration; it never
         # silently redirects the query to another cluster.
         with self.assertRaises(ValueError):
-            KubernetesTargetCollector(
-                registration.kubernetes, timeout_s=3, context="formal-cluster", runner=runner
-            )
+            KubernetesTargetCollector(registration.kubernetes, timeout_s=3, context="formal-cluster", runner=runner)
         same = KubernetesTargetCollector(
             registration.kubernetes,
             timeout_s=3,
@@ -289,15 +293,9 @@ class PodSnapshotTests(TempMixin, unittest.TestCase):
 
     def test_snapshot_write_failure_retries_the_same_instance(self) -> None:
         data_dir = Path(self.temporary.name) / "data"
-        registration = load_target(
-            self.write("t.json", target_document(kubernetes=kubernetes_block()))
-        )
-        registry = TargetRegistry(
-            registration, data_dir=data_dir, observation_session_id="s1"
-        )
-        snapshot = summarize_pods(
-            {"items": [pod("p1", "u1", "containerd://c1")]}, "engine"
-        )
+        registration = load_target(self.write("t.json", target_document(kubernetes=kubernetes_block())))
+        registry = TargetRegistry(registration, data_dir=data_dir, observation_session_id="s1")
+        snapshot = summarize_pods({"items": [pod("p1", "u1", "containerd://c1")]}, "engine")
         with patch.object(registry.store, "append", side_effect=OSError("disk full")):
             registry.observe_kubernetes(snapshot, "kubernetes_api")
         self.assertEqual(registry.record_context()["instance_state"], "ok")
@@ -355,7 +353,9 @@ class PodSnapshotTests(TempMixin, unittest.TestCase):
         registry = TargetRegistry(registration, data_dir=Path(self.temporary.name) / "d", observation_session_id="s")
         engine_ok = {"state": "ok", "last_value": {"engine.version": "mock-1.0", "model.id": "test-model"}}
         self.assertIsNone(
-            registry.hold(policy_target_id="mock-engine-001", backend_kind="mock", engine_info=engine_ok, kubernetes=None)
+            registry.hold(
+                policy_target_id="mock-engine-001", backend_kind="mock", engine_info=engine_ok, kubernetes=None
+            )
         )
         unverified = registry.hold(
             policy_target_id="mock-engine-001",
@@ -391,47 +391,87 @@ class PodSnapshotTests(TempMixin, unittest.TestCase):
 
     def test_last_confirmed_values_control_unavailable_engine_and_pod(self) -> None:
         digest = "sha256:" + "a" * 64
-        registration = load_target(self.write("last.json", target_document(
-            engine={"kind": "mock", "version": "mock-1.0", "image_digest": digest},
-            kubernetes=kubernetes_block(),
-        )))
+        registration = load_target(
+            self.write(
+                "last.json",
+                target_document(
+                    engine={"kind": "mock", "version": "mock-1.0", "image_digest": digest},
+                    kubernetes=kubernetes_block(),
+                ),
+            )
+        )
         registry = TargetRegistry(registration, data_dir=Path(self.temporary.name) / "last", observation_session_id="s")
         good_pod = summarize_pods({"items": [pod("p1", "u1", "c1")]}, "engine")
         registry.observe_kubernetes(good_pod, None)
-        engine = {"state": "ok", "last_value": {"engine.version": "mock-1.0", "model.id": "test-model"}, "last_success_at": "2026-10-26T00:00:00+00:00"}
+        engine = {
+            "state": "ok",
+            "last_value": {"engine.version": "mock-1.0", "model.id": "test-model"},
+            "last_success_at": "2026-10-26T00:00:00+00:00",
+        }
         stale_pod = {"state": "stale", "last_value": good_pod, "last_success_at": "2026-10-26T00:00:01+00:00"}
         args = {"policy_target_id": "mock-engine-001", "backend_kind": "mock"}
         self.assertIsNone(registry.hold(**args, engine_info=engine, kubernetes=stale_pod))
-        self.assertIsNone(registry.hold(**args, engine_info=engine, kubernetes={**stale_pod, "state": "error", "last_error_kind": "OSError"}))
+        self.assertIsNone(
+            registry.hold(
+                **args, engine_info=engine, kubernetes={**stale_pod, "state": "error", "last_error_kind": "OSError"}
+            )
+        )
         status = registry.status(**args, engine_info=engine, kubernetes=stale_pod)
-        self.assertEqual(status["verification"], {"state": "unavailable", "last_confirmed_at": "2026-10-26T00:00:00+00:00"})
+        self.assertEqual(
+            status["verification"], {"state": "unavailable", "last_confirmed_at": "2026-10-26T00:00:00+00:00"}
+        )
         self.assertEqual(registry.record_context(status)["instance_state"], "stale")
         self.assertEqual(registry.record_context(status)["last_confirmed_at"], "2026-10-26T00:00:00+00:00")
         stale_engine = {**engine, "state": "error"}
         self.assertIsNone(registry.hold(**args, engine_info=stale_engine, kubernetes=good_pod))
-        self.assertEqual(registry.hold(**args, engine_info={"state": "never", "last_value": None}, kubernetes=good_pod)[0], "TARGET_UNVERIFIED")
+        self.assertEqual(
+            registry.hold(**args, engine_info={"state": "never", "last_value": None}, kubernetes=good_pod)[0],
+            "TARGET_UNVERIFIED",
+        )
         self.assertEqual(registry.hold(**args, engine_info=engine, kubernetes=None)[0], "TARGET_UNAVAILABLE")
         bad_engine = {**stale_engine, "last_value": {"engine.version": "wrong", "model.id": "test-model"}}
         self.assertEqual(registry.hold(**args, engine_info=bad_engine, kubernetes=stale_pod)[0], "TARGET_MISMATCH")
         for bad_pod in ("multiple_targets", "not_found", "not_running"):
             with self.subTest(bad_pod=bad_pod):
-                self.assertEqual(registry.hold(**args, engine_info=engine, kubernetes={"state": "stale", "last_value": {"state": bad_pod}})[0], "TARGET_UNAVAILABLE")
-        self.assertEqual(registry.hold(**args, engine_info=engine, kubernetes={**stale_pod, "last_error_kind": "TargetSnapshotInvalidError"})[0], "TARGET_UNAVAILABLE")
+                self.assertEqual(
+                    registry.hold(
+                        **args, engine_info=engine, kubernetes={"state": "stale", "last_value": {"state": bad_pod}}
+                    )[0],
+                    "TARGET_UNAVAILABLE",
+                )
+        self.assertEqual(
+            registry.hold(
+                **args, engine_info=engine, kubernetes={**stale_pod, "last_error_kind": "TargetSnapshotInvalidError"}
+            )[0],
+            "TARGET_UNAVAILABLE",
+        )
 
     def test_recovery_preserves_instance_change_and_blocks_new_digest_mismatch(self) -> None:
         digest = "sha256:" + "a" * 64
-        registration = load_target(self.write("replacement.json", target_document(
-            engine={"kind": "mock", "version": "mock-1.0", "image_digest": digest},
-            kubernetes=kubernetes_block(),
-        )))
-        registry = TargetRegistry(registration, data_dir=Path(self.temporary.name) / "replacement", observation_session_id="s")
+        registration = load_target(
+            self.write(
+                "replacement.json",
+                target_document(
+                    engine={"kind": "mock", "version": "mock-1.0", "image_digest": digest},
+                    kubernetes=kubernetes_block(),
+                ),
+            )
+        )
+        registry = TargetRegistry(
+            registration, data_dir=Path(self.temporary.name) / "replacement", observation_session_id="s"
+        )
         first = summarize_pods({"items": [pod("p1", "u1", "c1")]}, "engine")
         registry.observe_kubernetes(first, None)
         replacement = pod("p2", "u2", "c2")
         replacement["status"]["containerStatuses"][0]["imageID"] = "docker.io/library/x@sha256:" + "b" * 64
         second = summarize_pods({"items": [replacement]}, "engine")
         registry.observe_kubernetes(second, None)
-        status = registry.status(policy_target_id="mock-engine-001", backend_kind="mock", engine_info={"state": "ok", "last_value": {"engine.version": "mock-1.0", "model.id": "test-model"}}, kubernetes=second)
+        status = registry.status(
+            policy_target_id="mock-engine-001",
+            backend_kind="mock",
+            engine_info={"state": "ok", "last_value": {"engine.version": "mock-1.0", "model.id": "test-model"}},
+            kubernetes=second,
+        )
         self.assertEqual(status["gateway_hold"]["reason_code"], "TARGET_MISMATCH")
         self.assertEqual(status["history"][0]["event"], "instance_changed")
         self.assertEqual(status["history"][0]["reason"], "pod_replaced")
@@ -551,8 +591,12 @@ class TargetGatewayHttpTests(TempMixin, unittest.TestCase):
         return f"http://{self.gateway.address[0]}:{self.gateway.address[1]}{path}"
 
     def post(self):
-        body = json.dumps({"model": "test-model", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 4}).encode()
-        request = Request(self.url("/v1/chat/completions"), data=body, headers={"Content-Type": "application/json"}, method="POST")
+        body = json.dumps(
+            {"model": "test-model", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 4}
+        ).encode()
+        request = Request(
+            self.url("/v1/chat/completions"), data=body, headers={"Content-Type": "application/json"}, method="POST"
+        )
         try:
             with urlopen(request, timeout=3) as response:
                 return response.status, dict(response.headers), response.read()
@@ -649,18 +693,32 @@ class TargetGatewayHttpTests(TempMixin, unittest.TestCase):
     def test_snapshot_stop_and_invalid_selector_admission(self) -> None:
         target = self.write("snapshot-target.json", target_document(kubernetes=kubernetes_block()))
         snapshot_path = Path(self.temporary.name) / "target-pods.json"
-        config = MVPConfig(gateway_port=0, engine_port=0, policy_path=str(POLICY),
-            data_dir=str(self.data_dir), target_path=str(target), target_pod_snapshot=str(snapshot_path),
-            collector_interval_s=0.05, collector_stale_after_s=0.3)
+        config = MVPConfig(
+            gateway_port=0,
+            engine_port=0,
+            policy_path=str(POLICY),
+            data_dir=str(self.data_dir),
+            target_path=str(target),
+            target_pod_snapshot=str(snapshot_path),
+            collector_interval_s=0.05,
+            collector_stale_after_s=0.3,
+        )
         try:
             self.gateway = GatewayApp(config, load_policy(POLICY), self.engine.address).start()
         except PermissionError as error:
             self.skipTest(f"local sockets are unavailable: {error}")
         self.addCleanup(self.gateway.stop)
         self.assertEqual(self.post()[0], 503)  # never confirmed
-        document = {"schema": POD_SNAPSHOT_SCHEMA, "context": "kind-runtime-lab", "namespace": "serving-lab",
-            "selector": {"app": "serving-engine"}, "collected_at": datetime.now(timezone.utc).isoformat(),
-            "state": "ok", "error": None, "items": [pod("p1", "u1", "c1")]}
+        document = {
+            "schema": POD_SNAPSHOT_SCHEMA,
+            "context": "kind-runtime-lab",
+            "namespace": "serving-lab",
+            "selector": {"app": "serving-engine"},
+            "collected_at": datetime.now(timezone.utc).isoformat(),
+            "state": "ok",
+            "error": None,
+            "items": [pod("p1", "u1", "c1")],
+        }
         snapshot_path.write_text(json.dumps(document), encoding="utf-8")
         deadline = time.monotonic() + 3
         while time.monotonic() < deadline and self.get("/api/target")["verification"]["state"] != "ok":
@@ -693,10 +751,14 @@ class TargetGatewayHttpTests(TempMixin, unittest.TestCase):
 
     def test_single_observation_feed_failure_keeps_requests_running(self) -> None:
         self.start(EXAMPLE_TARGET)
+
         def fail():
             raise OSError("feed stopped")
-        feeds = [Collector(source, lambda: {"last_lost_at": None}, interval_s=10, stale_after_s=10)
-                 for source in ("observation_feed_hubble", "observation_feed_tetragon")]
+
+        feeds = [
+            Collector(source, lambda: {"last_lost_at": None}, interval_s=10, stale_after_s=10)
+            for source in ("observation_feed_hubble", "observation_feed_tetragon")
+        ]
         for feed in feeds:
             feed.collect()
         self.gateway._collectors.collectors.extend(feeds)

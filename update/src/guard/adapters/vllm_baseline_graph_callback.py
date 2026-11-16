@@ -87,15 +87,15 @@ class BaselineGraphObserver(cache.CacheCallbackObserver):
         if warmups is None:
             self.gaps.add('BASELINE_GRAPH_WARMUP_STATE_UNAVAILABLE')
             return {'branch': 'unsupported'}
-        branch = ('compile' if state['need_to_compile'] and not state['compiled']
-            else 'runnable' if not state['use_cudagraph']
+        branch = ('compile' if state.get('need_to_compile') and not state.get('compiled')
+            else 'runnable' if not state.get('use_cudagraph')
             else 'replay' if graph is not None
-            else 'warmup' if state['num_finished_warmup'] < warmups else 'capture')
+            else 'warmup' if state.get('num_finished_warmup') < warmups else 'capture')
         return {'branch': branch, 'shape': shape, 'entry_token': token,
             'graph_present': graph is not None, 'graph_token': self.token(graph),
             'output_token': self.token(state.get('output')),
             'returned_entry_output': (result is not None and state.get('output') is not None
-                and result is state['output']) if returned and branch == 'replay' else None}
+                and result is state.get('output')) if returned and branch == 'replay' else None}
 
 
 def instrument(module, observer):

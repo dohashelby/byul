@@ -5,7 +5,7 @@ from __future__ import annotations
 import signal
 import threading
 
-from serving_runtime.mvp.fake_backend import FakeBackend
+from serving_runtime.devtools.fake_backend import FakeBackend
 
 
 def main() -> int:
@@ -20,8 +20,7 @@ def main() -> int:
     signal.signal(signal.SIGTERM, stop)
     backend = FakeBackend(host="0.0.0.0", port=8000)
     print(
-        "TEST ONLY: starting FakeBackend on 0.0.0.0:8000; "
-        "this is not a production inference engine.",
+        "TEST ONLY: starting FakeBackend on 0.0.0.0:8000; this is not a production inference engine.",
         flush=True,
     )
     backend.start()
@@ -34,4 +33,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

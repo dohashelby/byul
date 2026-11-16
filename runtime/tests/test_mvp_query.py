@@ -9,12 +9,12 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.config import MVPConfig
-from serving_runtime.mvp.mock_engine import MockEngine
-from serving_runtime.mvp.policy import load_policy
-from serving_runtime.mvp.query import QueryError, QueryService, RequestNotFoundError
-from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.gateway.app import GatewayApp
+from serving_runtime.config.config import MVPConfig
+from serving_runtime.devtools.mock_engine import MockEngine
+from serving_runtime.policy.policy import load_policy
+from serving_runtime.observation.query import QueryError, QueryService, RequestNotFoundError
+from serving_runtime.observation.store import JsonlStore
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,8 +22,15 @@ EXAMPLE_POLICY = ROOT / "examples/mvp/policy.json"
 SESSION = "a" * 32
 
 
-def record(request_id: str, phase: str, result: str, *, attempted: bool = False,
-           session: str = SESSION, at: str = "2026-10-21T00:00:00+00:00") -> dict:
+def record(
+    request_id: str,
+    phase: str,
+    result: str,
+    *,
+    attempted: bool = False,
+    session: str = SESSION,
+    at: str = "2026-10-21T00:00:00+00:00",
+) -> dict:
     return {
         "phase": phase,
         "request_id": request_id,
@@ -157,13 +164,16 @@ class QueryHttpTests(unittest.TestCase):
             return response.status, response.headers, response.read()
 
     def post(self, max_tokens: int) -> str:
-        body = json.dumps({
-            "model": "test-model",
-            "messages": [{"role": "user", "content": "hello"}],
-            "max_tokens": max_tokens,
-        }).encode("utf-8")
-        request = Request(self.url("/v1/chat/completions"), data=body,
-                          headers={"Content-Type": "application/json"}, method="POST")
+        body = json.dumps(
+            {
+                "model": "test-model",
+                "messages": [{"role": "user", "content": "hello"}],
+                "max_tokens": max_tokens,
+            }
+        ).encode("utf-8")
+        request = Request(
+            self.url("/v1/chat/completions"), data=body, headers={"Content-Type": "application/json"}, method="POST"
+        )
         try:
             response = urlopen(request, timeout=2)
         except HTTPError as error:
@@ -210,8 +220,12 @@ class QueryHttpTests(unittest.TestCase):
         self.assertEqual(set(page["gateway_records"]), {request_id})
         _, _, body = self.get(f"/api/requests/{request_id}")
         self.assertEqual(page["gateway_records"][request_id], json.loads(body)["gateway_records"])
-        for query in ("include_records=true", "include_records=", "include_records=1&include_records=0",
-                      "include_records=1&limit=201"):
+        for query in (
+            "include_records=true",
+            "include_records=",
+            "include_records=1&include_records=0",
+            "include_records=1&limit=201",
+        ):
             self.assertEqual(self.get("/api/requests?" + query)[0], 400)
 
     def test_bad_queries(self) -> None:

@@ -56,9 +56,13 @@ def _policy(
         # first read-denial trial can compare the same kernel override behavior.
         actions.append({"action": "Override", "argError": -1})
     description = (
-        ("kernel override support and effect unverified; probe path only"
-         if rule_id == "TG-DENY-01" else "kernel override support and effect unverified; exact files only")
-        if override else "monitor only"
+        (
+            "kernel override support and effect unverified; probe path only"
+            if rule_id == "TG-DENY-01"
+            else "kernel override support and effect unverified; exact files only"
+        )
+        if override
+        else "monitor only"
     )
     return {
         "apiVersion": "cilium.io/v1alpha1",
@@ -115,11 +119,18 @@ def _secret_enforcement_policy(intent: EnforcementIntent) -> dict[str, Any]:
     if method == "lsm_file_open":
         manifest = _policy(intent, "TG-SECRET-01", exact, 4, exact_path=True)
         del manifest["spec"]["kprobes"]
-        manifest["spec"]["lsmhooks"] = [{
-            "hook": "file_open", "args": [{"index": 0, "type": "file"}],
-            "selectors": [{"matchArgs": [{"index": 0, "operator": "Equal", "values": exact}],
-                           "matchActions": [{"action": "Post"}, {"action": "Override", "argError": -13}]}],
-        }]
+        manifest["spec"]["lsmhooks"] = [
+            {
+                "hook": "file_open",
+                "args": [{"index": 0, "type": "file"}],
+                "selectors": [
+                    {
+                        "matchArgs": [{"index": 0, "operator": "Equal", "values": exact}],
+                        "matchActions": [{"action": "Post"}, {"action": "Override", "argError": -13}],
+                    }
+                ],
+            }
+        ]
         limit = "BPF LSM file_open; exact files; denies opens, process survives; existing descriptors unaffected"
     elif method == "override_lsm":
         manifest = _policy(intent, "TG-SECRET-01", exact, 4, exact_path=True, override=True)
@@ -128,27 +139,46 @@ def _secret_enforcement_policy(intent: EnforcementIntent) -> dict[str, Any]:
         limit = "Override + Sigkill; requires injectable security_file_permission; process terminates"
     elif method == "sigkill_fd_install":
         manifest = _policy(intent, "TG-SECRET-01", exact, 4, exact_path=True)
-        manifest["spec"]["kprobes"] = [{
-            "call": "fd_install", "syscall": False,
-            "args": [{"index": 0, "type": "int"}, {"index": 1, "type": "file"}],
-            "selectors": [{"matchArgs": [{"index": 1, "operator": "Equal", "values": exact}],
-                           "matchActions": [{"action": "Sigkill"}]}],
-        }]
+        manifest["spec"]["kprobes"] = [
+            {
+                "call": "fd_install",
+                "syscall": False,
+                "args": [{"index": 0, "type": "int"}, {"index": 1, "type": "file"}],
+                "selectors": [
+                    {
+                        "matchArgs": [{"index": 1, "operator": "Equal", "values": exact}],
+                        "matchActions": [{"action": "Sigkill"}],
+                    }
+                ],
+            }
+        ]
         limit = "Sigkill at fd_install; process terminates; operation prevention not guaranteed"
     elif method == "override_syscall":
         manifest = _policy(intent, "TG-SECRET-01", exact, 4, exact_path=True)
-        manifest["spec"]["kprobes"] = [{
-            # Tetragon 1.7.1 resolves the architecture prefix for syscall:true.
-            "call": "sys_openat", "syscall": True,
-            # Only filename participates in this selector. Tetragon 1.7.1
-            # counts args + identity data toward its five-field maximum.
-            "args": [{"index": 1, "type": "string"}],
-            "selectors": [{"matchArgs": [{"index": 1, "operator": "Equal",
-                                          # Keep the legacy terminator for manifest compatibility.
-                                          # Tetragon 1.7.1 trims trailing NULs for string Equal.
-                                          "values": [path + "\u0000" for path in exact]}],
-                           "matchActions": [{"action": "Post"}, {"action": "Override", "argError": -13}]}],
-        }]
+        manifest["spec"]["kprobes"] = [
+            {
+                # Tetragon 1.7.1 resolves the architecture prefix for syscall:true.
+                "call": "sys_openat",
+                "syscall": True,
+                # Only filename participates in this selector. Tetragon 1.7.1
+                # counts args + identity data toward its five-field maximum.
+                "args": [{"index": 1, "type": "string"}],
+                "selectors": [
+                    {
+                        "matchArgs": [
+                            {
+                                "index": 1,
+                                "operator": "Equal",
+                                # Keep the legacy terminator for manifest compatibility.
+                                # Tetragon 1.7.1 trims trailing NULs for string Equal.
+                                "values": [path + "\u0000" for path in exact],
+                            }
+                        ],
+                        "matchActions": [{"action": "Post"}, {"action": "Override", "argError": -13}],
+                    }
+                ],
+            }
+        ]
         manifest["metadata"]["annotations"]["serving-runtime.local/openat-symbol"] = intent.tetragon_openat_symbol
         limit = "openat path string only; relative paths, symlinks, TOCTOU, openat2 and io_uring can bypass; process survives"
     else:
@@ -157,8 +187,9 @@ def _secret_enforcement_policy(intent: EnforcementIntent) -> dict[str, Any]:
     manifest["metadata"]["annotations"]["serving-runtime.local/enforce-method"] = method
     manifest["metadata"]["annotations"]["serving-runtime.local/limit"] = limit
     manifest["metadata"]["annotations"]["serving-runtime.local/serving-impact"] = (
-        "file open denied only; process survives" if method in {"lsm_file_open", "override_syscall"} else
-        "engine process termination -> Gateway target check fails -> 503 without engine delivery -> Kubernetes restart"
+        "file open denied only; process survives"
+        if method in {"lsm_file_open", "override_syscall"}
+        else "engine process termination -> Gateway target check fails -> 503 without engine delivery -> Kubernetes restart"
     )
     return manifest
 
@@ -167,18 +198,29 @@ def _code_policy(intent: EnforcementIntent) -> dict[str, Any]:
     manifest = _policy(intent, RULE_ID, [], 4)
     prefixes = watch_prefixes(intent)
     manifest["spec"]["options"] = [{"name": "policy-mode", "value": "monitor"}]
-    manifest["spec"]["kprobes"] = [{
-        "call": "security_file_open", "syscall": False,
-        # Two copies of the same file pointer use distinct spec argument slots.
-        # v1.7.1 args:[n] selects the slot, index selects the function argument.
-        # This avoids two operators on one index. With kernel identity: 2+3=5.
-        "args": [{"index": 0, "type": "file", "label": "watch_path"},
-                 {"index": 0, "type": "file", "label": "code_path"}],
-        "selectors": [{"matchArgs": [
-            {"args": [0], "operator": "Prefix", "values": prefixes[i:i + 8]},
-            {"args": [1], "operator": "Postfix", "values": list(CODE_SUFFIXES)},
-        ], "matchActions": [{"action": "Post"}]} for i in range(0, len(prefixes), 8)],
-    }]
+    manifest["spec"]["kprobes"] = [
+        {
+            "call": "security_file_open",
+            "syscall": False,
+            # Two copies of the same file pointer use distinct spec argument slots.
+            # v1.7.1 args:[n] selects the slot, index selects the function argument.
+            # This avoids two operators on one index. With kernel identity: 2+3=5.
+            "args": [
+                {"index": 0, "type": "file", "label": "watch_path"},
+                {"index": 0, "type": "file", "label": "code_path"},
+            ],
+            "selectors": [
+                {
+                    "matchArgs": [
+                        {"args": [0], "operator": "Prefix", "values": prefixes[i : i + 8]},
+                        {"args": [1], "operator": "Postfix", "values": list(CODE_SUFFIXES)},
+                    ],
+                    "matchActions": [{"action": "Post"}],
+                }
+                for i in range(0, len(prefixes), 8)
+            ],
+        }
+    ]
     manifest["metadata"]["annotations"]["serving-runtime.local/limit"] = (
         "monitor only; code open attempt, not proof of import/execution; phase classified in adapter; kernel >=5.3; path coverage limited"
     )
@@ -196,24 +238,21 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
     # cannot see other generations; the policy watches that mount instead.
     cache_prefix = assets.engine_cache_watch_root if assets is not None else paths.cache_dir
     manifests = {
-        "tetragon-tg-asset-01.json": _policy(
-            intent, "TG-ASSET-01", [paths.model_dir], 2
-        ),
-        "tetragon-tg-cache-01.json": _policy(
-            intent, "TG-CACHE-01", [cache_prefix], 2
-        ),
+        "tetragon-tg-asset-01.json": _policy(intent, "TG-ASSET-01", [paths.model_dir], 2),
+        "tetragon-tg-cache-01.json": _policy(intent, "TG-CACHE-01", [cache_prefix], 2),
     }
     if assets is not None and assets.tokenizer_dir is not None:
-        manifests["tetragon-tg-asset-02.json"] = _policy(
-            intent, "TG-ASSET-02", [assets.tokenizer_dir], 2
-        )
+        manifests["tetragon-tg-asset-02.json"] = _policy(intent, "TG-ASSET-02", [assets.tokenizer_dir], 2)
     if paths.secret_paths:
         secret_enforce = "enforce" in intent.allowed_modes("TG-SECRET-01")
         if secret_enforce and intent.tetragon_enforce_method:
             manifests["tetragon-tg-secret-01.json"] = _secret_enforcement_policy(intent)
         else:
             manifests["tetragon-tg-secret-01.json"] = _policy(
-                intent, "TG-SECRET-01", list(paths.secret_paths), 4,
+                intent,
+                "TG-SECRET-01",
+                list(paths.secret_paths),
+                4,
                 exact_path=secret_enforce,
                 override=secret_enforce,
             )
@@ -234,7 +273,9 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
             # LsmHookSpec in 1.7.1 has no data field. Never claim kernel identity
             # for that policy; native workload attribution is still required.
             if "lsmhooks" in manifest["spec"]:
-                manifest["metadata"]["annotations"]["serving-runtime.local/identity-limit"] = "Tetragon 1.7.1 LsmHookSpec has no data field; native attribution required"
+                manifest["metadata"]["annotations"]["serving-runtime.local/identity-limit"] = (
+                    "Tetragon 1.7.1 LsmHookSpec has no data field; native attribution required"
+                )
                 continue
             for probe in manifest["spec"].get("kprobes", []):
                 probe["data"] = copy.deepcopy(KERNEL_DATA)

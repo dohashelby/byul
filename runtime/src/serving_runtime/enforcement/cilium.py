@@ -26,12 +26,7 @@ def _metadata(intent: EnforcementIntent, name: str) -> dict[str, Any]:
 
 def _dns_endpoint(intent: EnforcementIntent) -> dict[str, Any]:
     labels = {"k8s:io.kubernetes.pod.namespace": intent.dns.namespace}
-    labels.update(
-        {
-            key if ":" in key else f"k8s:{key}": value
-            for key, value in intent.dns.labels.items()
-        }
-    )
+    labels.update({key if ":" in key else f"k8s:{key}": value for key, value in intent.dns.labels.items()})
     return {"matchLabels": labels}
 
 
@@ -214,9 +209,7 @@ def receiver_ingress(intent: EnforcementIntent, receiver) -> dict[str, Any]:
         "metadata": _metadata(intent, f"runtime-receiver-{receiver.name}-ingress"),
         "spec": {
             "endpointSelector": {"matchLabels": dict(receiver.labels)},
-            "ingress": [
-                {"fromEndpoints": sources, "toPorts": [_port_rule(receiver.port, receiver.protocol)]}
-            ],
+            "ingress": [{"fromEndpoints": sources, "toPorts": [_port_rule(receiver.port, receiver.protocol)]}],
         },
     }
 
@@ -233,17 +226,13 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
         manifests["cilium-acquire-egress.json"] = acquire_egress(intent)
     if intent.schema != "runtime-enforcement-intent/1.0":
         for index, collector in enumerate(intent.metrics_collectors):
-            manifests[f"cilium-observer-{index}-egress.json"] = observer_egress(
-                intent, collector, index
-            )
+            manifests[f"cilium-observer-{index}-egress.json"] = observer_egress(intent, collector, index)
     for receiver in intent.test_receivers:
         manifests[f"cilium-receiver-{receiver.name}-ingress.json"] = receiver_ingress(intent, receiver)
     return manifests
 
 
-def write_manifests(
-    manifests: dict[str, dict[str, Any]], out_dir: str | Path
-) -> list[Path]:
+def write_manifests(manifests: dict[str, dict[str, Any]], out_dir: str | Path) -> list[Path]:
     """Write fixed-name manifests, rejecting any path that could escape ``out_dir``."""
 
     output = Path(out_dir)
